@@ -1,5 +1,5 @@
-import { createHash, randomBytes } from 'node:crypto';
-import { mkdir, open, readFile } from 'node:fs/promises';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { mkdir, open, readFile, link, unlink } from 'node:fs/promises';
 import type { TokenCounts } from '../packages/application/src/metering.js';
 import { MODEL } from '../packages/inference-ollama/src/model.js';
 
@@ -31,6 +31,7 @@ export interface MeasurementInput {
 }
 
 export function measurementRow(input: MeasurementInput, salt: Uint8Array) {
+  const validLatency = Number.isFinite(input.latencyMs) && input.latencyMs > 0;
   // Explicit allowlist: never spread a response, request, exception or arbitrary metadata.
   const copyCounts = (counts: TokenCounts) => ({
     input: counts.input,
@@ -62,10 +63,11 @@ export function measurementRow(input: MeasurementInput, salt: Uint8Array) {
           withinTolerance: input.countComparison.withinTolerance,
         }
       : null,
-    latencyMs: input.latencyMs,
-    effectiveTokensPerSecond: input.delivered
-      ? input.recountedTokens.output / (input.latencyMs / 1000)
-      : null,
+    latencyMs: validLatency ? input.latencyMs : null,
+    effectiveTokensPerSecond:
+      input.delivered && validLatency
+        ? input.recountedTokens.output / (input.latencyMs / 1000)
+        : null,
     firstWordMs: null,
     firstWordNote:
       'upto buffers the response until settlement; first-word latency is not observable',
@@ -84,16 +86,25 @@ export type Measurement = ReturnType<typeof measurementRow>;
 export async function measurementSalt(directory = '.local/devnet') {
   await mkdir(directory, { recursive: true, mode: 0o700 });
   const path = `${directory}/measurement-salt`;
+  const temporary = `${path}.${randomUUID()}.tmp`;
   try {
-    const handle = await open(path, 'wx', 0o600);
+    const handle = await open(temporary, 'wx', 0o600);
     try {
       await handle.writeFile(randomBytes(32));
       await handle.sync();
     } finally {
       await handle.close();
     }
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+    try {
+      // Publish only complete bytes, exclusively: never replace another writer's salt.
+      await link(temporary, path);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+    }
+  } finally {
+    await unlink(temporary).catch((error) => {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    });
   }
   const salt = await readFile(path);
   if (salt.length !== 32) throw new Error('Invalid local measurement salt.');
