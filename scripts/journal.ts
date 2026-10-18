@@ -7,6 +7,7 @@ export async function assertNoUnresolvedAuthorizations(
     '.local/devnet/failure-F1-attempt.json',
     '.local/devnet/failure-F2-attempt.json',
     '.local/devnet/exact-attempt.json',
+    '.local/devnet/inference-attempt.json',
   ],
 ) {
   for (const path of paths) {
