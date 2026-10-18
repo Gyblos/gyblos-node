@@ -153,12 +153,11 @@ Evidence is saved to the ignored local `evidence/gate-0005.json`. An uncertain
 authorization blocks all later gates until reconciled, without automatic payment
 retry. Public RPC rate windows are allowed to clear between cases.
 
-Local checks, including tests retained outside Git:
+Checks available in a clean checkout:
 
 ```sh
 pnpm lint
 pnpm typecheck
-pnpm test
 ```
 
 To operate `upto` in separate terminals, run `pnpm gate:facilitator`, `pnpm gate:seller`, and `pnpm gate:buyer`.
@@ -185,6 +184,7 @@ line-width target. The root `.editorconfig` keeps basic editor settings consiste
 ## Limitations and recovery
 
 - A timeout does not establish absence of payment, failure, or refund. A potentially uncertain settlement is recorded and blocks new payments until reconciled on-chain.
+- A buyer disconnect after generation can leave a confirmed charge without a delivered answer or payment-response header. Reconcile that outcome as charged but undelivered; do not assume a refund or repeat the payment.
 - An absent transaction in a history query does not prove payment failure. The gate does not automatically switch providers after attempting settlement.
 - A crash may leave `buyer.lock` or an unresolved journal. Do not delete these to retry a payment without first inspecting the authorization and its transactions.
 - The `exact` replay guard is limited to the seller process. Protection across restarts or distributed sellers has not been validated.
