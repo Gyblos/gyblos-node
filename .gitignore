@@ -1,0 +1,29 @@
+node_modules/
+.local/
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.log
+.DS_Store
+dist/
+
+# Local agent instructions
+AGENTS.md
+agents.md
+CLAUDE.md
+claude.md
+
+# Local documentation, tests and evidence
+README.md
+*.md
+*.mdx
+*.pdf
+*.docx
+docs/
+evidence/
+tests/
+coverage/
+*.test.*
+*.spec.*
