@@ -98,17 +98,27 @@ export async function inferenceSnapshot(c: Config, channelId?: string) {
   };
 }
 export async function transaction(c: Config, signature: string) {
-  const tx = await readChain<any>(c, 'getTransaction', [
-    signature,
-    {
-      encoding: 'jsonParsed',
-      commitment: 'confirmed',
-      maxSupportedTransactionVersion: 0,
-    },
-  ]);
-  assert.ok(tx && tx.meta.err === null);
-  assert.equal(tx.transaction.signatures[0], signature);
-  return tx;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const tx = await readChain<any>(c, 'getTransaction', [
+      signature,
+      {
+        encoding: 'jsonParsed',
+        commitment: 'confirmed',
+        maxSupportedTransactionVersion: 0,
+      },
+    ]);
+    if (tx === null) {
+      if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, 500));
+      continue;
+    }
+    assert.ok(tx && tx.meta.err === null);
+    assert.equal(tx.transaction.signatures[0], signature);
+    return tx;
+  }
+  throw new GateError(
+    'TRANSACTION_UNKNOWN',
+    'Confirmed transaction is not yet visible; reconcile before another authorization.',
+  );
 }
 interface Transfer {
   source: string;
@@ -132,6 +142,20 @@ export function transactionTransfers(tx: any): Transfer[] {
         mint: info.mint,
         amount: info.tokenAmount.amount,
       });
+    } else if (
+      ![
+        'initializeAccount',
+        'initializeAccount2',
+        'initializeAccount3',
+        'initializeImmutableOwner',
+        'getAccountDataSize',
+        'closeAccount',
+      ].includes(parsed?.type)
+    ) {
+      throw new GateError(
+        'UNSUPPORTED_TOKEN_INSTRUCTION',
+        'Unsupported token instruction in inference accounting.',
+      );
     }
   }
   for (const item of tx.transaction.message.instructions) visit(item);
