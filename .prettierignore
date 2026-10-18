@@ -1,0 +1,12 @@
+# Generated files and local-only material
+node_modules/
+.local/
+.env
+.env.*
+pnpm-lock.yaml
+dist/
+coverage/
+evidence/
+tests/
+AGENTS.md
+CLAUDE.md
