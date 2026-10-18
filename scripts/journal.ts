@@ -17,7 +17,9 @@ export async function assertNoUnresolvedAuthorizations(
       };
       const terminal = path.endsWith('exact-attempt.json')
         ? ['confirmed', 'rejected']
-        : ['verified', 'resolved-rejected'];
+        : path.endsWith('inference-attempt.json')
+          ? ['verified', 'reconciled', 'resolved-rejected']
+          : ['verified', 'resolved-rejected'];
       if (!terminal.includes(previous.state ?? ''))
         throw new GateError(
           'UNRESOLVED_ATTEMPT',
