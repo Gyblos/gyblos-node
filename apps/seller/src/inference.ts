@@ -18,7 +18,9 @@ import {
 import {
   charge,
   OFFER_ID,
+  type TokenCounts,
 } from '../../../packages/application/src/metering.js';
+import { verifyInferenceDeposit } from '../../../packages/payments-x402/src/inference-deposit.js';
 import {
   DEVNET,
   MAX_ATOMIC,
@@ -65,13 +67,17 @@ export function inferenceCeiling(
 export async function createInferenceSeller(options: {
   rpcUrl: string;
   facilitatorUrl: string;
+  feePayer: string;
   ollamaUrl: string;
   mint: string;
   payTo: string;
   authorizer: KeyPairSigner;
   tokenizer: ModelTokenizer;
   beforeInference: (requestId: string, channelId: string) => Promise<void>;
-  debugOverchargeRequestId?: string;
+  billingOverride?: (
+    requestId: string,
+    usage: Readonly<TokenCounts>,
+  ) => TokenCounts;
   onFragment?: (requestId: string) => Promise<void>;
 }) {
   const engine = createOllama(options.ollamaUrl);
@@ -142,6 +148,17 @@ export async function createInferenceSeller(options: {
       );
       const channelId = payload.payload.channelId;
       if (typeof channelId !== 'string') throw new Error('Missing channel.');
+      if (typeof payload.payload.from !== 'string')
+        throw new Error('Missing buyer.');
+      await verifyInferenceDeposit({
+        rpcUrl: options.rpcUrl,
+        channelId,
+        buyer: payload.payload.from,
+        feePayer: options.feePayer,
+        authorizer: options.authorizer.address,
+        mint: options.mint,
+        ceiling: inferenceCeiling(input, options.tokenizer),
+      });
       await options.beforeInference(input.requestId, channelId);
       controller.signal.throwIfAborted();
       const result = await engine.generate({
@@ -156,13 +173,11 @@ export async function createInferenceSeller(options: {
         input: result.usage.prompt_eval_count,
         output: result.usage.eval_count,
       };
-      const billedTokens = {
-        ...engineTokens,
-        output:
-          options.debugOverchargeRequestId === input.requestId
-            ? Math.ceil(engineTokens.output * 1.4)
-            : engineTokens.output,
-      };
+      const billedTokens =
+        options.billingOverride?.(
+          input.requestId,
+          Object.freeze({ ...engineTokens }),
+        ) ?? engineTokens;
       const actual = charge(billedTokens);
       if (actual > BigInt(inferenceCeiling(input, options.tokenizer)))
         throw new Error('Usage exceeds authorized ceiling.');
