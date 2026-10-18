@@ -6,10 +6,10 @@ The current implementation exercises real payments on **Solana devnet** using a 
 
 ## Available payment routes
 
-| Route | Facilitator | Behavior |
-| --- | --- | --- |
-| `upto` | Local process | Authorizes a spending ceiling, charges a smaller amount, and refunds the remainder through a payment channel. |
-| `exact` | x402.org; PayAI as a backup | Charges a fixed price in Circle devnet USDC. No usage metering or unused-ceiling refund. |
+| Route   | Facilitator                 | Behavior                                                                                                      |
+| ------- | --------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `upto`  | Local process               | Authorizes a spending ceiling, charges a smaller amount, and refunds the remainder through a payment channel. |
+| `exact` | x402.org; PayAI as a backup | Charges a fixed price in Circle devnet USDC. No usage metering or unused-ceiling refund.                      |
 
 Both routes use the official `@x402/*` packages pinned to **2.28.0**. The public `exact` route operates alongside `upto`; it does not replace it.
 
@@ -108,11 +108,16 @@ Devnet identity is checked using the genesis hash. Keys remain in `.local/devnet
 
 Runs save journals and results under `.local/devnet/`. The public gate also writes `evidence/gate-0004.json`, containing advertised capabilities, signatures, and public metadata. Evidence directories, agent instructions, tests, and internal documents are excluded from Git.
 
-Check the published source types with:
+Check formatting and source types with:
 
 ```sh
+pnpm lint
 pnpm typecheck
 ```
+
+Run `pnpm format` to apply formatting, or `pnpm format:check` to check it
+without changing files. Prettier uses two-space indentation and an 80-character
+line-width target. The root `.editorconfig` keeps basic editor settings consistent.
 
 ## Limitations and recovery
 
