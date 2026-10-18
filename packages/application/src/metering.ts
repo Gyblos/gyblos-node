@@ -66,6 +66,8 @@ export function assessCharge(
           ? 'failed'
           : !delivered
             ? 'incomplete'
-            : 'none',
+            : actual < expected - allowance
+              ? 'undercharge'
+              : 'none',
   };
 }
