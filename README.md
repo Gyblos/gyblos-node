@@ -1,39 +1,39 @@
 # Gyblos Payments
 
-Base TypeScript de pagos para Gyblos, un proyecto de inferencia P2P. Separa los adaptadores reutilizables de x402 de los hosts HTTP y del CLI.
+TypeScript payment foundation for Gyblos, a P2P inference project. It separates reusable x402 adapters from HTTP hosts and the CLI.
 
-La implementación actual prueba pagos reales en **Solana devnet** con un recurso fijo. Todavía no ejecuta modelos ni conecta nodos P2P.
+The current implementation exercises real payments on **Solana devnet** using a fixed test resource. It does not yet run models or connect P2P nodes.
 
-## Rutas disponibles
+## Available payment routes
 
-| Ruta | Facilitador | Comportamiento |
+| Route | Facilitator | Behavior |
 | --- | --- | --- |
-| `upto` | Proceso local | Autoriza un techo, cobra un importe menor y devuelve el sobrante mediante un canal de pago. |
-| `exact` | x402.org; PayAI como respaldo | Cobra un precio fijo con USDC de Circle en devnet. No mide uso ni devuelve sobrantes. |
+| `upto` | Local process | Authorizes a spending ceiling, charges a smaller amount, and refunds the remainder through a payment channel. |
+| `exact` | x402.org; PayAI as a backup | Charges a fixed price in Circle devnet USDC. No usage metering or unused-ceiling refund. |
 
-Ambas rutas utilizan los paquetes oficiales `@x402/*` fijados en **2.28.0**. La ruta pública `exact` convive con `upto`; no la sustituye.
+Both routes use the official `@x402/*` packages pinned to **2.28.0**. The public `exact` route operates alongside `upto`; it does not replace it.
 
-## Requisitos
+## Requirements
 
-- Node.js 22 o superior.
+- Node.js 22 or later.
 - pnpm 10.12.1.
-- Acceso a un RPC de Solana devnet.
-- SOL de devnet para la wallet aislada del facilitador local, que también prepara las cuentas de tokens.
+- Access to a Solana devnet RPC endpoint.
+- Devnet SOL for the isolated local facilitator wallet, which also provisions token accounts.
 
-## Instalación
+## Installation
 
 ```sh
 pnpm install --frozen-lockfile --ignore-scripts
 pnpm gate:setup
 ```
 
-`gate:setup` genera wallets separadas para comprador, vendedor, autorizador, facilitador y mint de prueba. Guarda claves y configuración en `.local/devnet/`, preservando las claves existentes. Esa carpeta está excluida de Git.
+`gate:setup` generates separate buyer, seller, authorizer, facilitator, and test-mint wallets. It stores keys and configuration in `.local/devnet/`, preserving existing keys. This directory is excluded from Git.
 
-Fondea la dirección del facilitador que imprime el comando con al menos **0,05 SOL de devnet** desde el [faucet de Solana](https://faucet.solana.com). Usa exclusivamente las wallets de prueba generadas; no importes wallets de mainnet.
+Fund the facilitator address printed by setup with at least **0.05 devnet SOL** using the [Solana faucet](https://faucet.solana.com). Use only the generated test wallets; never import mainnet wallets.
 
-## Pago `upto` con facilitador local
+## `upto` payments with a local facilitator
 
-Para preparar un token SPL de prueba de seis decimales y sus cuentas:
+Provision a six-decimal SPL test token and its accounts:
 
 ```sh
 pnpm gate:fund --test-mint
@@ -42,83 +42,83 @@ pnpm gate:challenge
 pnpm gate:run
 ```
 
-El token se identifica como `devnet-test-token`; **no es USDC**. La preparación no vuelve a acuñar tokens si el mint ya existe.
+The token is labeled `devnet-test-token`; **it is not USDC**. Provisioning does not mint additional tokens when the mint already exists.
 
-`gate:run` inicia vendedor y facilitador como procesos separados, ejecuta el comprador y comprueba:
+`gate:run` starts the seller and facilitator as separate processes, executes the buyer, and checks:
 
-- Apertura y liquidación con transacciones confirmadas y distintas.
-- Depósito de 10.000 unidades, cobro de 4.000 y devolución de 6.000.
-- Variaciones de saldo del comprador y del vendedor, sin gasto de SOL del comprador.
-- Distribución del canal y entrega del recurso fijo.
+- Distinct, confirmed channel-open and settlement transactions.
+- A 10,000-unit deposit, a 4,000-unit charge, and a 6,000-unit refund.
+- Matching buyer and seller token balance changes, with no buyer SOL spent.
+- Channel distribution and delivery of the fixed test resource.
 
-`gate:challenge` solo comprueba el desafío HTTP 402 sin pagar; no demuestra una liquidación.
+`gate:challenge` checks only the unpaid HTTP 402 challenge; it does not demonstrate settlement.
 
-Después del recorrido exitoso, puedes ejecutar los casos de comprador sin fondos y autorización vencida:
+After a successful run, exercise the insufficient-funds and expired-authorization cases:
 
 ```sh
 pnpm gate:failures
 ```
 
-La prueba de expiración espera aproximadamente 62 segundos. Los hosts de `upto` usan `127.0.0.1:4021` para el vendedor y `127.0.0.1:4022` para el facilitador.
+The expiration test waits approximately 62 seconds. The `upto` hosts bind to `127.0.0.1:4021` for the seller and `127.0.0.1:4022` for the facilitator.
 
-## Pago `exact` con facilitador público
+## `exact` payments with a public facilitator
 
-Solicita **USDC en Solana Devnet** en el [faucet de Circle](https://faucet.circle.com), usando la dirección del comprador generada por `gate:setup`.
+Request **USDC on Solana Devnet** from the [Circle faucet](https://faucet.circle.com), using the buyer address generated by `gate:setup`.
 
-Mint aceptado:
+Accepted mint:
 
 ```text
 4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU
 ```
 
-Después ejecuta:
+Then run:
 
 ```sh
 pnpm gate:exact
 ```
 
-El comando sirve un recurso fijo en un puerto local temporal y cobra **10.000 unidades atómicas: 0,01 USDC de devnet**. No inicia el facilitador local. Su wallet aislada solo patrocina la preparación de las cuentas de tokens; el facilitador público paga la comisión del pago.
+The command serves a fixed test resource on an ephemeral loopback port and charges **10,000 atomic units: 0.01 devnet USDC**. It does not start the local facilitator. The isolated local wallet only sponsors token-account provisioning; the public facilitator pays the payment transaction fee.
 
-Antes de firmar, el comprador comprueba red, mint, precio, destinatario y fee payer. El vendedor llama explícitamente a `/verify` y liquida antes de ejecutar el recurso. El recorrido comprueba firma confirmada, deltas de USDC, SOL del comprador estable y rechazo de replay sin otra ejecución.
+Before signing, the buyer checks the network, mint, price, recipient, and fee payer. The seller explicitly calls `/verify` and settles before executing the resource handler. The gate checks transaction confirmation, USDC balance changes, unchanged buyer SOL, and replay rejection without another resource execution.
 
-El proveedor principal es `https://x402.org/facilitator`; el respaldo configurado es `https://facilitator.payai.network`. Se consulta y registra `/supported` antes del pago. Un cambio de capacidad o fee payer detiene el gate. La interoperabilidad pagada se comprobó con x402.org; el respaldo PayAI no se ha probado mediante un pago.
+The primary provider is `https://x402.org/facilitator`; the configured backup is `https://facilitator.payai.network`. The gate queries and records `/supported` before payment. A capability or fee-payer change stops the gate. Paid interoperability has been verified with x402.org; the PayAI backup has not been tested with a payment.
 
-Los casos negativos incluyen otro mint, destinatario o fee payer y comprador sin USDC. Este último se rechaza **localmente antes de firmar**, sin enviar un pago al proveedor.
+Negative cases cover an unexpected mint, recipient, or fee payer, and a buyer without USDC. The empty buyer is rejected **locally before signing**, without submitting a payment to the provider.
 
-## Estructura
+## Project structure
 
 ```text
 packages/
-  application/       Flujo reutilizable e invariantes contables.
-  payments-x402/     Adaptadores upto/exact, confianza y lecturas de cadena.
+  application/       Reusable workflow and accounting invariants.
+  payments-x402/     upto/exact adapters, trust policies, and chain reads.
 apps/
-  cli/               Configuración, ejecución y presentación de resultados.
-  seller/            Hosts HTTP para los recursos fijos.
-  facilitator/       Facilitador local para upto.
-scripts/             Preparación de wallets, fondeo y utilidades de los gates.
+  cli/               Configuration, execution, and result reporting.
+  seller/            HTTP hosts for the fixed test resources.
+  facilitator/       Local facilitator for upto.
+scripts/             Wallet setup, funding, and gate utilities.
 ```
 
-Para operar `upto` en terminales separadas: `pnpm gate:facilitator`, `pnpm gate:seller` y `pnpm gate:buyer`.
+To operate `upto` in separate terminals, run `pnpm gate:facilitator`, `pnpm gate:seller`, and `pnpm gate:buyer`.
 
-## Configuración y resultados locales
+## Configuration and local results
 
-El RPC predeterminado es `https://api.devnet.solana.com`. Puedes cambiarlo mediante `GYBLOS_RPC_URL` en el entorno del proceso. `GYBLOS_GATE_CONFIG` permite seleccionar otro archivo de configuración. Los comandos no cargan `.env` automáticamente.
+The default RPC endpoint is `https://api.devnet.solana.com`. Override it with `GYBLOS_RPC_URL` in the process environment. `GYBLOS_GATE_CONFIG` selects a different configuration file. Commands do not load `.env` automatically.
 
-La identidad de devnet se comprueba mediante el genesis hash. Las claves permanecen en `.local/devnet/`; nunca deben aparecer en logs ni resultados compartidos.
+Devnet identity is checked using the genesis hash. Keys remain in `.local/devnet/`; never include them in logs or shared results.
 
-Las ejecuciones guardan diarios y resultados en `.local/devnet/`. El gate público también escribe `evidence/gate-0004.json`, con capacidades anunciadas, firmas y metadatos públicos. Los directorios de evidencia y los archivos de instrucciones, tests y documentos internos están excluidos de Git.
+Runs save journals and results under `.local/devnet/`. The public gate also writes `evidence/gate-0004.json`, containing advertised capabilities, signatures, and public metadata. Evidence directories, agent instructions, tests, and internal documents are excluded from Git.
 
-Para comprobar los tipos del código publicado:
+Check the published source types with:
 
 ```sh
 pnpm typecheck
 ```
 
-## Límites y recuperación
+## Limitations and recovery
 
-- Un timeout no demuestra ausencia de cobro, fallo ni reembolso. Una posible liquidación incierta queda registrada y bloquea nuevos pagos hasta conciliarla en cadena.
-- La ausencia de una transacción en una consulta de historial no prueba que el pago haya fallado. No se cambia de proveedor automáticamente después de intentar liquidar.
-- Un crash puede dejar `buyer.lock` o un diario pendiente. No los borres para repetir el pago sin revisar primero el estado de la autorización y sus transacciones.
-- La protección de replay de `exact` está limitada al proceso del vendedor. No se ha validado entre reinicios o vendedores distribuidos.
-- El facilitador local usa almacenamiento en memoria. No se ha validado recuperación durable, cierre unilateral ni recuperación posterior de toda la renta del PDA.
-- Los gates no validan inferencia real, medición honesta de uso, corrección del contenido, MPP, Iroh, apps móviles ni mainnet. La ruta pública depende de la disponibilidad del tercero.
+- A timeout does not establish absence of payment, failure, or refund. A potentially uncertain settlement is recorded and blocks new payments until reconciled on-chain.
+- An absent transaction in a history query does not prove payment failure. The gate does not automatically switch providers after attempting settlement.
+- A crash may leave `buyer.lock` or an unresolved journal. Do not delete these to retry a payment without first inspecting the authorization and its transactions.
+- The `exact` replay guard is limited to the seller process. Protection across restarts or distributed sellers has not been validated.
+- The local facilitator uses in-memory storage. Durable recovery, unilateral channel closure, and subsequent recovery of all channel PDA rent have not been validated.
+- The gates do not validate real inference, honest usage metering, content correctness, MPP, Iroh, mobile apps, or mainnet. The public route depends on third-party availability.
