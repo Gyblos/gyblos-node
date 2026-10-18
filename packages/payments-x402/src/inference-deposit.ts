@@ -1,11 +1,30 @@
-import { address } from '@solana/kit';
+import { address, getBase64Encoder } from '@solana/kit';
 import {
   findAssociatedTokenPda,
   TOKEN_PROGRAM_ADDRESS,
 } from '@solana-program/token';
-import { discoverChannelsByRentPayer } from '@x402/svm';
+import { CHANNEL_ACCOUNT_SIZE, discoverChannelsByRentPayer } from '@x402/svm';
 import { assertDevnet, rpc, GateError } from './chain.js';
 import { DEVNET } from './constants.js';
+
+interface ChannelAccountResponse {
+  value: { owner: string; data: [string, 'base64'] } | null;
+}
+
+interface EscrowAccountResponse {
+  value: {
+    owner: string;
+    data: {
+      parsed?: {
+        info?: {
+          owner?: string;
+          mint?: string;
+          tokenAmount?: { amount?: string };
+        };
+      };
+    };
+  } | null;
+}
 
 export interface DepositExpectation {
   rpcUrl: string;
@@ -25,16 +44,30 @@ export async function verifyInferenceDeposit(
   await assertDevnet(expected.rpcUrl);
   const channels = await discoverChannelsByRentPayer(
     {
-      async getProgramAccounts(_network, program, config) {
-        const filters = JSON.parse(
-          JSON.stringify(config, (_key, value) => {
-            if (typeof value !== 'bigint') return value;
-            if (value < 0n || value > BigInt(Number.MAX_SAFE_INTEGER))
-              throw new Error('Unsafe channel discovery filter.');
-            return Number(value);
-          }),
+      async getProgramAccounts() {
+        // Reuse the SDK's owner, layout and canonical-PDA validation on one
+        // directly fetched account, without scanning the fee payer's channels.
+        const { value } = await rpc<ChannelAccountResponse>(
+          expected.rpcUrl,
+          'getAccountInfo',
+          [expected.channelId, { commitment: 'confirmed', encoding: 'base64' }],
         );
-        return rpc(expected.rpcUrl, 'getProgramAccounts', [program, filters]);
+        // Preserve the exact account-size filter used by the previous scan.
+        if (
+          value &&
+          (value.data[1] !== 'base64' ||
+            getBase64Encoder().encode(value.data[0]).byteLength !==
+              Number(CHANNEL_ACCOUNT_SIZE))
+        )
+          return [];
+        return value
+          ? [
+              {
+                pubkey: address(expected.channelId),
+                account: { ...value, owner: address(value.owner) },
+              },
+            ]
+          : [];
       },
     },
     DEVNET,
@@ -65,7 +98,7 @@ export async function verifyInferenceDeposit(
     tokenProgram: TOKEN_PROGRAM_ADDRESS,
   });
   const account = (
-    await rpc<{ value: any }>(expected.rpcUrl, 'getAccountInfo', [
+    await rpc<EscrowAccountResponse>(expected.rpcUrl, 'getAccountInfo', [
       escrow,
       { encoding: 'jsonParsed', commitment: 'confirmed' },
     ])
@@ -76,7 +109,7 @@ export async function verifyInferenceDeposit(
     info?.owner !== expected.channelId ||
     info?.mint !== expected.mint ||
     !/^\d+$/.test(String(info?.tokenAmount?.amount)) ||
-    BigInt(info.tokenAmount.amount) < BigInt(expected.ceiling)
+    BigInt(info?.tokenAmount?.amount ?? '0') < BigInt(expected.ceiling)
   ) {
     throw new GateError(
       'INSUFFICIENT_INFERENCE_ESCROW',
