@@ -1,3 +1,4 @@
+import { observeInferenceResponse } from '../../../packages/application/src/inference-observation.js';
 import assert from 'node:assert/strict';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
@@ -16,7 +17,6 @@ import {
 import {
   inferenceSnapshot,
   confirmInference,
-  readChain,
   tokenAddress,
   transaction,
   transactionTransfers,
@@ -25,15 +25,14 @@ import {
   createOllama,
   createModelTokenizer,
   MODEL,
-  type EngineUsage,
 } from '../../../packages/inference-ollama/src/index.js';
 import {
   assessCharge,
   charge,
-  compareUsage,
   OFFER_ID,
   PRICES,
   TOLERANCE,
+  type TokenCounts,
 } from '../../../packages/application/src/metering.js';
 import { createInferenceBuyer } from '../../../packages/payments-x402/src/inference-buyer.js';
 import {
@@ -235,7 +234,16 @@ async function run() {
       (await fetch(`${facilitatorUrl}/gate/events`, {
         signal: AbortSignal.timeout(5000),
       }).then((r) => r.json())) as SettlementEvent[];
+    const gateBilling = {
+      feePayer: c.addresses.facilitator,
+      billingOverride(requestId: string, usage: Readonly<TokenCounts>) {
+        return requestId === debugRequestId
+          ? { ...usage, output: Math.ceil(usage.output * 1.4) }
+          : { ...usage };
+      },
+    };
     const host = await createInferenceSeller({
+      ...gateBilling,
       rpcUrl: c.rpcUrl,
       facilitatorUrl,
       ollamaUrl,
@@ -243,7 +251,6 @@ async function run() {
       payTo: c.addresses.seller,
       authorizer: await signer(c, 'authorizer'),
       tokenizer: sellerTokenizer,
-      debugOverchargeRequestId: debugRequestId,
       async beforeInference(requestId, channelId) {
         const deposit = (await events()).find(
           (item) =>
@@ -421,35 +428,36 @@ async function run() {
         sum(claimTransfers, escrowAta, buyerAta),
         BigInt(ceiling) - actual,
       );
-      const failed = testCase.name === 'engine-interrupted';
-      const body = response.body as {
-        requestId: string;
-        offer?: string;
-        model?: string;
-        digest?: string;
-        content?: string;
-        usage?: EngineUsage;
-        billedTokens?: { input: number; output: number };
-        done?: boolean;
-        doneReason?: string;
-      };
+      await saveJson(journalPath, {
+        state: 'reconciled',
+        requestId: request.requestId,
+        channelId,
+        depositSignature: deposit.transaction,
+        claimSignature: claim.transaction,
+        chargedAtomic: actual.toString(),
+        evidencePath,
+      });
+      const {
+        body,
+        failed,
+        text,
+        recounted,
+        engineTokens,
+        delivered,
+        comparison,
+      } = observeInferenceResponse({
+        status: response.status,
+        body: response.body,
+        expected: {
+          requestId: request.requestId,
+          offer: OFFER_ID,
+          model: MODEL.name,
+          digest: MODEL.digest,
+        },
+        inputTokens: buyerTokenizer.input(request.prompt),
+        countOutput: buyerTokenizer.count,
+      });
       assert.equal(body.requestId, request.requestId);
-      const text = typeof body.content === 'string' ? body.content : '';
-      const recounted = {
-        input: buyerTokenizer.input(request.prompt),
-        output: buyerTokenizer.count(text),
-      };
-      const engineTokens = body.usage
-        ? { input: body.usage.prompt_eval_count, output: body.usage.eval_count }
-        : null;
-      const delivered =
-        response.status === 200 &&
-        body.done === true &&
-        body.doneReason === 'stop' &&
-        Boolean(text);
-      const comparison = engineTokens
-        ? compareUsage(engineTokens, recounted)
-        : null;
       const assessment = assessCharge(actual, recounted, delivered, failed);
       const row = measurementRow(
         {
@@ -498,22 +506,15 @@ async function run() {
       };
       evidence.results.push(result);
       await saveJson(evidencePath, evidence);
-      await saveJson(journalPath, {
-        state: 'verified',
-        requestId: request.requestId,
-        channelId,
-        depositSignature: deposit.transaction,
-        claimSignature: claim.transaction,
-        chargedAtomic: actual.toString(),
-        evidencePath,
-      });
-      if (failed) {
+      if (testCase.name === 'engine-interrupted') {
+        assert.equal(failed, true);
         assert.equal(response.status, 502);
         assert.equal(actual, 0n);
         assert.equal(row.anomaly, 'failed');
         assert.ok(trace.firstFragmentAt && trace.stoppedAt);
         assert.equal(row.delivered, false);
       } else {
+        assert.equal(failed, false);
         assert.equal(body.offer, OFFER_ID);
         assert.equal(body.model, MODEL.name);
         assert.equal(body.digest, MODEL.digest);
@@ -528,6 +529,15 @@ async function run() {
           assert.equal(row.anomaly, 'none');
         }
       }
+      await saveJson(journalPath, {
+        state: 'verified',
+        requestId: request.requestId,
+        channelId,
+        depositSignature: deposit.transaction,
+        claimSignature: claim.transaction,
+        chargedAtomic: actual.toString(),
+        evidencePath,
+      });
       console.log(
         `${testCase.name}: confirmed charge=${actual}, refund=${result.refundAtomic}, anomaly=${row.anomaly}`,
       );
