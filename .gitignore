@@ -27,3 +27,6 @@ tests/
 coverage/
 *.test.*
 *.spec.*
+
+# Public repository entry point
+!/README.md
