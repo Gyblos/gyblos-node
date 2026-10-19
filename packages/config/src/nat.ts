@@ -12,6 +12,22 @@ export const NAT = {
   },
   sellerUdpPort: 43101,
   buyerUdpPort: 43102,
+  publicAudit: {
+    settleMs: 10_000,
+    waitMs: 20_000,
+    pollMs: 100,
+    descriptorPath: '/app/.local/public-local.json',
+    startPath: '/app/.local/public-start',
+    tagPrefix: 'gyb_public_',
+    outcomes: {
+      notExercised: 'not-exercised',
+      noReturn: 'no-udp-return-at-lab-wan',
+      noPeerReturn: 'no-peer-udp-return-at-lab-wan',
+      routerInput: 'peer-udp-reached-router-input',
+      forwarded: 'peer-udp-forwarded',
+      unattributed: 'udp-return-unattributed',
+    },
+  },
   discovery: {
     modes: {
       public: 'default-discovery',
