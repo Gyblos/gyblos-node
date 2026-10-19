@@ -925,5 +925,184 @@
       "No paid gate rerun, independent physical networks, VPS or off-host privacy validation was performed.",
       "No signed payloads, raw addresses, keys, salts, prompts/responses or private RPC URLs are included."
     ]
+  },
+  "automaticDiscoveryFollowup": {
+    "recordedAt": "2026-10-19",
+    "payments": 0,
+    "status": "partial-lab-observer-assisted-discovery",
+    "finding": "Public-default discovery omitted usable intermediate simulated-WAN candidates. Extra discovery wait did not select a direct path. Same-endpoint lab reflection supplied usable mapped candidates and selected peer-direct paths.",
+    "productionDiscoveryChanged": false,
+    "publicDefaultDiscoveryFixed": false,
+    "peerDescriptorExchange": "test-orchestrator-mediated",
+    "observer": {
+      "ephemeral": true,
+      "walletKeys": false,
+      "roleVolumes": false,
+      "nonRoot": true,
+      "readOnlyRoot": true,
+      "capabilities": [],
+      "publishedPorts": false,
+      "networkAttachments": 1,
+      "forwardsInference": false,
+      "identityPinned": true,
+      "requiresDirectNativePath": true,
+      "maximumReplyBytes": 256,
+      "timeoutMs": 10000,
+      "usesSameNativeEndpointSocket": true
+    },
+    "controls": [
+      {
+        "status": "passed",
+        "source": {
+          "algorithm": "sha256(sorted source path NUL bytes NUL)",
+          "digest": "31c6d4032bed8d5a3062ec8fe0c3e7d3c2b23557ada4c2d38573cff88b21203f"
+        },
+        "payments": 0,
+        "roleVolumes": false,
+        "actorsUnprivileged": true,
+        "routerImage": "sha256:6627f480b731369ec9b9a5bb33802c67a527a52c77ee949623a3b5054759d341",
+        "nodeImage": "node:22.19.0-bookworm-slim@sha256:4a4884e8a44826194dff92ba316264f392056cbe243dcc9fd3551e71cea02b90",
+        "workerSha256": "7e96c98ba0605f6002f9888ae649abfd5d34ca925b1c3b261bbaf69067a77a99",
+        "skewMs": 500,
+        "packetsReceived": [
+          25,
+          25
+        ],
+        "portsPreserved": true,
+        "actorImage": "sha256:5ddc9a3c59d41f363086e4f87c3c1b7e11f005e84809e1c40f63db6fd11520a0",
+        "inboundUdpBlocked": false,
+        "inboundUdpDroppedPackets": 0,
+        "native": {
+          "candidateMode": "default-discovery",
+          "active": true,
+          "echoes": 20,
+          "connectMs": 167.20429200000035,
+          "finalRoute": "iroh-relay",
+          "firstDirectMs": null,
+          "selectedLabWan": false,
+          "workerSha256": "4155b4c4b2bbf8ac05a01327846c648aaad3b58d239fa099ff421efc0ee634ad"
+        }
+      },
+      {
+        "status": "passed",
+        "source": {
+          "algorithm": "sha256(sorted source path NUL bytes NUL)",
+          "digest": "66de17b9dd3a5a29c32b9915a0afdb44543591f779f539c8212d1f750cf590ab"
+        },
+        "payments": 0,
+        "roleVolumes": false,
+        "actorsUnprivileged": true,
+        "routerImage": "sha256:73f3a997b068daab4fc104de1d5a114dd9e95229ae63be27ead28796a29c118b",
+        "nodeImage": "node:22.19.0-bookworm-slim@sha256:4a4884e8a44826194dff92ba316264f392056cbe243dcc9fd3551e71cea02b90",
+        "workerSha256": "7e96c98ba0605f6002f9888ae649abfd5d34ca925b1c3b261bbaf69067a77a99",
+        "skewMs": 500,
+        "packetsReceived": [
+          25,
+          24
+        ],
+        "portsPreserved": true,
+        "actorImage": "sha256:5ddc9a3c59d41f363086e4f87c3c1b7e11f005e84809e1c40f63db6fd11520a0",
+        "inboundUdpBlocked": false,
+        "inboundUdpDroppedPackets": 0,
+        "native": {
+          "candidateMode": "lab-observer",
+          "active": true,
+          "echoes": 20,
+          "connectMs": 174.65175,
+          "finalRoute": "iroh-direct",
+          "firstDirectMs": 1202.3187079999998,
+          "selectedLabWan": false,
+          "selectedReflectedAddress": true,
+          "workerSha256": "94d69438f9b41e1c74d7ba70b13b05f018e0edd216bbec9722f8602fbbc66696",
+          "reflectedMappingsVerified": true
+        }
+      },
+      {
+        "status": "passed",
+        "source": {
+          "algorithm": "sha256(sorted source path NUL bytes NUL)",
+          "digest": "66de17b9dd3a5a29c32b9915a0afdb44543591f779f539c8212d1f750cf590ab"
+        },
+        "payments": 0,
+        "roleVolumes": false,
+        "actorsUnprivileged": true,
+        "routerImage": "sha256:685c84040add1e8833706d0821c6b0a4017b2266b8d35dafa5573a8d70118297",
+        "nodeImage": "node:22.19.0-bookworm-slim@sha256:4a4884e8a44826194dff92ba316264f392056cbe243dcc9fd3551e71cea02b90",
+        "workerSha256": "7e96c98ba0605f6002f9888ae649abfd5d34ca925b1c3b261bbaf69067a77a99",
+        "skewMs": 500,
+        "packetsReceived": [
+          24,
+          24
+        ],
+        "portsPreserved": true,
+        "actorImage": "sha256:5ddc9a3c59d41f363086e4f87c3c1b7e11f005e84809e1c40f63db6fd11520a0",
+        "inboundUdpBlocked": false,
+        "inboundUdpDroppedPackets": 0,
+        "native": {
+          "candidateMode": "lab-observer",
+          "active": false,
+          "echoes": 0,
+          "connectMs": 247.47758399999998,
+          "finalRoute": "iroh-direct",
+          "firstDirectMs": 1000.319959,
+          "selectedLabWan": false,
+          "selectedReflectedAddress": true,
+          "workerSha256": "94d69438f9b41e1c74d7ba70b13b05f018e0edd216bbec9722f8602fbbc66696",
+          "reflectedMappingsVerified": true
+        }
+      },
+      {
+        "status": "passed",
+        "source": {
+          "algorithm": "sha256(sorted source path NUL bytes NUL)",
+          "digest": "66de17b9dd3a5a29c32b9915a0afdb44543591f779f539c8212d1f750cf590ab"
+        },
+        "payments": 0,
+        "roleVolumes": false,
+        "actorsUnprivileged": true,
+        "routerImage": "sha256:328d26789cd67935ba828779018d538c7589b0f4e47a61eb8256b5383abcdba1",
+        "nodeImage": "node:22.19.0-bookworm-slim@sha256:4a4884e8a44826194dff92ba316264f392056cbe243dcc9fd3551e71cea02b90",
+        "workerSha256": "7e96c98ba0605f6002f9888ae649abfd5d34ca925b1c3b261bbaf69067a77a99",
+        "skewMs": 500,
+        "packetsReceived": [
+          24,
+          23
+        ],
+        "portsPreserved": true,
+        "actorImage": "sha256:5ddc9a3c59d41f363086e4f87c3c1b7e11f005e84809e1c40f63db6fd11520a0",
+        "inboundUdpBlocked": false,
+        "inboundUdpDroppedPackets": 0,
+        "native": {
+          "candidateMode": "default-discovery",
+          "active": true,
+          "echoes": 20,
+          "connectMs": 158.26108399999998,
+          "finalRoute": "iroh-relay",
+          "firstDirectMs": null,
+          "selectedLabWan": false,
+          "selectedReflectedAddress": null,
+          "workerSha256": "94d69438f9b41e1c74d7ba70b13b05f018e0edd216bbec9722f8602fbbc66696"
+        }
+      }
+    ],
+    "verification": {
+      "tests": 117,
+      "newRegressionTests": 6,
+      "typecheck": "passed",
+      "lint": "passed",
+      "mappingChecks": "Both routers: same original native source socket to observer and peer; actual reply mappings match reflected host/port.",
+      "runtimeImageContainsHarness": false,
+      "runtimeProvenance": "Pinned runtime image supplies native SDK; current host-injected worker hashes and source fingerprints identify the actual diagnostic code."
+    },
+    "limitations": [
+      "Only socket-address discovery is automatic; peer identity and descriptors are still transferred by the test orchestrator.",
+      "This is explicit lab reflection via addExternalAddr, not native public n0/QAD discovery integration or a production rendezvous design.",
+      "Outer translation, filtering and hairpin failure remain competing explanations; no specific outer-layer cause is proven.",
+      "One controlled Docker topology does not validate independent networks, arbitrary NAT, rebinding or production discovery.",
+      "Reflected and manual/blocked-UDP modes are mutually exclusive; no new block-caused in-session migration result is claimed.",
+      "The historical selectedLabWan field compares a fixed lab port; random reflected ports are checked by selectedReflectedAddress and reflectedMappingsVerified.",
+      "No prior paid result or reconciliation is upgraded, and no inference, RPC, wallet signing, VPS or payment run occurred.",
+      "Raw addresses, conntrack tuples, descriptors and synthetic content remain private."
+    ]
   }
 }
