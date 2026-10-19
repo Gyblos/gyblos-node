@@ -22,7 +22,7 @@ import {
 import { type Config } from '@gyblos/gate/config';
 import type { AccountsResponse, ChainTransaction } from '@gyblos/gate/types';
 import { GateError, lamports, rpc } from '@gyblos/payments-x402/chain';
-import { DEVNET_USDC } from '@gyblos/payments-x402/constants';
+import { DEVNET_USDC, GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
 import { exactAuthorizationId } from '@gyblos/payments-x402/exact/authorization-id';
 
 export async function snapshot(config: Config, buyer: string) {
@@ -50,7 +50,7 @@ export async function snapshot(config: Config, buyer: string) {
     } catch (error) {
       if (
         !(error instanceof GateError) ||
-        error.code !== 'RPC_HTTP' ||
+        error.code !== GATE_ERROR_CODES.RPC_HTTP ||
         !error.message.includes(String(HTTP_STATUS.tooManyRequests)) ||
         attempt === RETRIES.exactSnapshotLastAttempt
       )
