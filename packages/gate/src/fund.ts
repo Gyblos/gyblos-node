@@ -24,7 +24,12 @@ import {
   TOKEN_PROGRAM_ADDRESS,
 } from '@gyblos/config';
 import { configPath, loadConfig, saveJson, signer } from '@gyblos/gate/config';
-import { CONFIG_ASSET_LABELS, WALLET_ROLES } from '@gyblos/gate/constants';
+import {
+  CONFIG_ASSET_LABELS,
+  FUNDING_OPERATIONS,
+  WALLET_ROLES,
+  type FundingOperation,
+} from '@gyblos/gate/constants';
 import {
   account,
   assertProgram,
@@ -32,6 +37,12 @@ import {
   lamports,
   rpc,
 } from '@gyblos/payments-x402/chain';
+
+interface FundingLogEntry {
+  operation: FundingOperation;
+  signature: string;
+  mint?: string;
+}
 
 export async function fundGate() {
   try {
@@ -47,7 +58,12 @@ export async function fundGate() {
         PAYMENT_LIMITS.airdropLamports,
       ]);
       await confirm(config.rpcUrl, signature);
-      console.log(JSON.stringify({ operation: 'devnet-airdrop', signature }));
+      console.log(
+        JSON.stringify({
+          operation: FUNDING_OPERATIONS.AIRDROP,
+          signature,
+        } satisfies FundingLogEntry),
+      );
     }
     if (!process.argv.includes('--test-mint')) {
       console.log(
@@ -148,10 +164,12 @@ export async function fundGate() {
         await confirm(config.rpcUrl, signature);
         console.log(
           JSON.stringify({
-            operation: mintExists ? 'devnet-test-accounts' : 'devnet-test-mint',
+            operation: mintExists
+              ? FUNDING_OPERATIONS.TEST_ACCOUNTS
+              : FUNDING_OPERATIONS.TEST_MINT,
             mint: mint.address,
             signature,
-          }),
+          } satisfies FundingLogEntry),
         );
       }
       config.mint = mint.address;
