@@ -30,3 +30,6 @@ coverage/
 
 # Public repository entry point
 !/README.md
+
+# Public contribution guide
+!/CONTRIBUTING.md
