@@ -1,0 +1,131 @@
+{
+  "schemaVersion": 1,
+  "evidenceId": "GYB-GATE-0007",
+  "recordedAt": "2026-10-19T19:11:03.440821+00:00",
+  "status": "blocked-before-payment",
+  "acceptance": "Not met: zero of three paid physical-network inferences completed. No paid success or payment reconciliation is claimed.",
+  "network": "solana-devnet",
+  "assetLabel": "devnet-test-token",
+  "mint": "2vXUXK2rJTPtb7Wx9em4W9FdgtfD6HTnFxZz5oirLVcH",
+  "source": {
+    "algorithm": "sha256(sorted source path NUL bytes NUL)",
+    "digest": "aa2dc8415cbad02a71f60eb4385bc892cbf166ae24ca47e14efa3991736fec72"
+  },
+  "sourceCommit": "1e85000",
+  "sdk": {
+    "iroh": "1.1.0",
+    "x402": "2.28.0"
+  },
+  "packaging": {
+    "buyerBundleSha256": "675506152f362570bec018e4223ed6225c8e9237f6a6f2228997308d40466356",
+    "sellerBundleSha256": "b59544b3e3b2d918a4b0d9c5a15dc0282235066e245aa74da547b9a2636fd989",
+    "buyerEntrypointSha256": "4255367467a3fb8b92e0ad3e16e97a21062a721e1c705ba21a0d65a1a29ac5bb",
+    "sellerEntrypointSha256": "eff71ea35980f401dd969b29720a8a199e74116385e3fc752047653e124801ec",
+    "buildScriptSha256": "9c5f6fc62fb5ab474cf1bfae4ed4c79982a6ddcd0e71195d45ac83a89d31f677",
+    "scope": "Private standalone wrappers bundle the repository modules; native Iroh remains external. Only the imported call.ts isMain auto-entry guard is removed to prevent unintended CLI execution during bundle initialization. Hashes describe local bytes; the VPS independently verified its buyer bundle hash before setup and cleanup. Source fingerprint identifies repository context separately from private wrappers.",
+    "supplyChain": "Remote Node archive SHA-256 and both Iroh package SHA-512 values verified before extraction; public tokenizer artifacts pinned by revision and SHA-256; no global installation or lifecycle scripts. Existing local public model manifest verified by SHA-256 before native startup."
+  },
+  "readinessAttempts": [
+    {
+      "sellerRuntime": "Mac Docker VM, isolated Linux seller container",
+      "initialMemoryLimitBytes": 3221225472,
+      "initialResult": "Private warmup succeeded but final pre-offer cgroup headroom guard rejected publication; no payment attempted.",
+      "adjustedMemoryLimitBytes": 5368709120,
+      "adjustedResult": "Engine and signed offer ready; VPS verified owner-pinned offer and actual remote identity, but required direct route was not observed before its readiness deadline.",
+      "routeDeadlineMs": 30000,
+      "readinessError": "Expected route was not observed; no payment attempted.",
+      "paidRequestAttempted": false,
+      "selectedRoute": "not-recorded",
+      "limitation": "A required-direct timeout does not establish that relay was selected for every sample. Native path telemetry was not exported for this failed admission."
+    },
+    {
+      "sellerRuntime": "Native macOS arm64 Ollama/Iroh on the Mac",
+      "readiness": {
+        "status": "failed",
+        "reason": "insufficient-headroom",
+        "before": {
+          "source": "os-free",
+          "vmAvailableBytes": 1927610368,
+          "cgroup": null
+        },
+        "after": {
+          "source": "os-free",
+          "vmAvailableBytes": 544210944,
+          "cgroup": null
+        },
+        "warmupMs": 863.1089160000001
+      },
+      "requiredAvailableBytes": 1610612736,
+      "offerPublished": false,
+      "paidRequestAttempted": false,
+      "error": "Insufficient memory headroom; seller not advertised.",
+      "model": "qwen3:0.6b",
+      "modelDigest": "7df6b6e09427a769808717c0a93cadc4ae99ed4eb8bf5ca557c90846becea435",
+      "limitation": "The record uses the existing conservative os-free metric. OS cache reclaimability/pressure was not used to bypass or lower admission."
+    }
+  ],
+  "payments": {
+    "fundingTransactions": 0,
+    "paymentAuthorizations": 0,
+    "resourceInferences": 0,
+    "completedPaidRequests": 0,
+    "newTransactions": [],
+    "independentFinalizedReadOnlyCheck": {
+      "checkedAt": "2026-10-19T19:10:08.358Z",
+      "newAccountsChecked": 3,
+      "allNewBuyerAndFacilitatorSolBalancesZero": true,
+      "allNewBuyerAndFacilitatorFinalizedHistoriesEmpty": true,
+      "buyerTokenAccountAbsent": true
+    },
+    "note": "Synthetic private engine warmups occurred; they are not paid resource executions or fulfillment of the three-inference criterion."
+  },
+  "routePolicyCorrection": {
+    "commit": "1e85000",
+    "behavior": "Retain ready(expected) route policy across reconnects; reject before stream opening and again before writing HTTP/payment bytes when selected path differs. Failure poisons/closes the connection. Unspecified-route behavior remains compatible.",
+    "privateRegressionTdd": {
+      "redFailed": 3,
+      "redPassed": 1,
+      "greenPassed": 4,
+      "cases": [
+        "fallback before open",
+        "reconnect on relay",
+        "path change after stream opening before write",
+        "unspecified route remains relay-compatible"
+      ]
+    },
+    "limitation": "A path can still migrate during native write/response; sampled selected paths do not prove every packet. Any future paid route discrepancy must be reconciled on-chain, never retried automatically."
+  },
+  "isolationAndCleanup": {
+    "vpsUid": 65530,
+    "vpsNoNewPrivileges": true,
+    "vpsScopeMemoryMaxBytes": 1073741824,
+    "vpsCpuQuotaPercent": 50,
+    "vpsTasksMax": 64,
+    "vpsExistingContainers": 14,
+    "vpsSameContainerIdsStartTimesAndRestartCounts": true,
+    "vpsRemainingProbeRuntimeProcesses": 0,
+    "vpsTemporaryRuntimeStateAndUnfundedKeysRemoved": true,
+    "macExistingRunningContainers": 47,
+    "macSameExistingRunningContainerIds": true,
+    "macTemporarySellerContainerNetworkAndUnfundedVolumeRemoved": true,
+    "nativeSellerListenersRemaining": 0,
+    "deploymentChanges": 0,
+    "existingFirewallOrServiceConfigurationChanges": 0,
+    "note": "This establishes observed continuity and cleanup, not a zero-load or service-SLO guarantee. Role keys were generated only on their respective machines; no private key was transferred."
+  },
+  "verification": {
+    "typecheck": "passed",
+    "publicTests": 120,
+    "publicTestFailures": 0,
+    "publicTestSkips": 0,
+    "lintAndFormat": "passed",
+    "privateRouteRegressionTests": 4
+  },
+  "remaining": [
+    "Free additional Mac memory and pass the unchanged post-warmup reserve before publishing a native seller offer.",
+    "Repeat unpaid identity-pinned required-direct readiness with the native Mac seller before any devnet funding/payment.",
+    "After readiness, execute three bounded synthetic paid requests, verify actual sampled direct paths and independently finalize deposits/claims/balance deltas/refunds/sponsor fees. Stop and reconcile any uncertainty without another authorization.",
+    "This attempted gate does not validate paid physical-network inference, hotspot, production rendezvous, mobile, content authenticity or automatic recovery. REV-13/17 remain open.",
+    "The previous successful native unpaid Mac\u2013VPS echo result and all earlier gate-0006 financial evidence remain unchanged."
+  ]
+}
