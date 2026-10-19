@@ -162,6 +162,33 @@ outer public IP. Upstream hairpin failure is a hypothesis, not a demonstrated
 cause. Real separate-network testing remains pending. Unpaid diagnostics do not
 turn the earlier paid NAT-direct case into a passing payment gate.
 
+To discover a usable address automatically **inside the simulated WAN**, run the
+separate observer-assisted mode:
+
+```sh
+pnpm p2p:diagnose --native-image gyblos-p2p-poc --wan-discovery
+pnpm p2p:diagnose --native-image gyblos-p2p-poc --wan-discovery --idle
+```
+
+This creates a temporary, unprivileged native Iroh observer on the WAN network.
+Each peer connects to its pinned identity using its own endpoint and learns the
+socket address observed after NAT. Peers bind random UDP ports; no manual peer
+WAN candidate is configured. The tool adds the reflected candidate, verifies
+that the same source socket has matching observer-directed and peer-directed
+conntrack mappings on both routers, and requires the selected peer path to match
+that candidate. Responses and time are bounded; late results cannot add
+candidates. Manual candidates and blocked UDP are incompatible with this mode.
+
+Active and idle observer-assisted controls selected direct peer paths. The
+observer does not forward inference traffic. This corrects the lab's missing
+usable intermediate candidate through explicit, lab-only reflection; it does
+**not** change production endpoint discovery or fix public n0 discovery through
+the outer NAT. Peer identities/descriptors are still exchanged by the test
+orchestrator, not a production registry or rendezvous service. A ten-second
+extra discovery wait also left the public-default control on relay. The exact
+outer translation/filtering/hairpin cause remains unproven. Real-network tests
+remain a separate requirement, and no new payments were run.
+
 Seller startup now requires measured VM/cgroup memory headroom, then one bounded
 private synthetic warmup before any offer is signed or readiness is reported.
 Headroom is checked again after tokenizer, middleware and transport
