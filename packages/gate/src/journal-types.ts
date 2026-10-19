@@ -1,3 +1,4 @@
+import type { DEVNET } from '@gyblos/config';
 import type {
   ExactCaseName,
   FAILURE_CASES,
@@ -19,7 +20,12 @@ export type AuthorizationJournal = {
   state: typeof JOURNAL_STATES.AUTHORIZATION_CREATED;
   createdAt: string;
 } & (
-  | { channelId: string; asset: string; network: string; ceiling: string }
+  | {
+      channelId: string;
+      asset: string;
+      network: typeof DEVNET;
+      ceiling: string;
+    }
   | {
       channelId: string;
       case: typeof FAILURE_CASES.EMPTY_BUYER | typeof FAILURE_CASES.EXPIRED;
@@ -28,7 +34,7 @@ export type AuthorizationJournal = {
       requestId: string;
       channelId: string;
       ceilingAtomic: string;
-      network: string;
+      network: typeof DEVNET;
       mint: string;
     }
   | (AuthorizationMetadata & {
