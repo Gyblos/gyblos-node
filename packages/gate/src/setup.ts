@@ -17,6 +17,11 @@ import {
   saveJson,
   type Config,
 } from '@gyblos/gate/config';
+import {
+  CONFIG_ASSET_LABELS,
+  SCHEMA_VERSIONS,
+  WALLET_ROLES,
+} from '@gyblos/gate/constants';
 
 export async function setupGate() {
   const path = configPath();
@@ -32,11 +37,11 @@ export async function setupGate() {
     const keys = {} as Config['keys'];
     const addresses = {} as Config['addresses'];
     for (const role of [
-      'buyer',
-      'seller',
-      'authorizer',
-      'facilitator',
-      'mint',
+      WALLET_ROLES.BUYER,
+      WALLET_ROLES.SELLER,
+      WALLET_ROLES.AUTHORIZER,
+      WALLET_ROLES.FACILITATOR,
+      WALLET_ROLES.MINT,
     ] as const) {
       keys[role] = resolve(dirname(path), keyFilename(role));
       let bytes: Uint8Array;
@@ -72,10 +77,10 @@ export async function setupGate() {
       addresses[role] = (await createKeyPairSignerFromBytes(bytes)).address;
     }
     await saveJson(path, {
-      schemaVersion: 1,
+      schemaVersion: SCHEMA_VERSIONS.CONFIG,
       rpcUrl: process.env.GYBLOS_RPC_URL ?? DEVNET_RPC_URL,
       mint: defaultMint,
-      assetLabel: 'devnet-usdc',
+      assetLabel: CONFIG_ASSET_LABELS.DEVNET_USDC,
       keys,
       addresses,
     } satisfies Config);
