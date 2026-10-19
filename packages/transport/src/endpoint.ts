@@ -4,8 +4,14 @@ import { IPV6_LOOPBACK, LOCALHOST, P2P } from '@gyblos/config';
 
 export async function bindEndpoint(
   secret: number[],
-  options: { relayOnly?: boolean; bindAddress?: string } = {},
+  options: {
+    relayOnly?: boolean;
+    bindAddress?: string;
+    externalAddress?: string;
+  } = {},
 ) {
+  if (options.relayOnly && options.externalAddress)
+    throw new Error('Relay-only mode rejects manual direct candidates.');
   const builder = Endpoint.builder();
   builder.applyN0();
   builder.secretKey(secret);
@@ -19,6 +25,14 @@ export async function bindEndpoint(
   }
   builder.relayMode(RelayMode.defaultMode());
   const endpoint = await builder.bind();
+  if (options.externalAddress) {
+    try {
+      await endpoint.addExternalAddr(options.externalAddress);
+    } catch (error) {
+      await endpoint.close();
+      throw error;
+    }
+  }
   if (
     options.relayOnly &&
     endpoint
