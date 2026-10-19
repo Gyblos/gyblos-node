@@ -6,7 +6,6 @@ import { address } from '@solana/kit';
 import type { SupportedResponse } from '@x402/core/types';
 
 import {
-  COMMITMENT,
   EVIDENCE_PATHS,
   JOURNAL_PATHS,
   LOCALHOST,
@@ -15,16 +14,25 @@ import {
   TIMEOUTS,
 } from '@gyblos/config';
 import { loadConfig, saveJson } from '@gyblos/gate/config';
+import {
+  CASE_STATUSES,
+  EVIDENCE_STATUSES,
+  EXACT_CASES,
+  EXACT_EVIDENCE_CODES,
+  FACILITATOR_STATUSES,
+  JOURNAL_STATES,
+} from '@gyblos/gate/constants';
 import { prepareExactAccounts } from '@gyblos/gate/exact-accounts';
 import { assertNoUnresolvedAuthorizations } from '@gyblos/gate/journal';
 import { withExclusiveLock } from '@gyblos/gate/lock';
 import { assertDevnet, GateError, tokens } from '@gyblos/payments-x402/chain';
-import { DEVNET_USDC } from '@gyblos/payments-x402/constants';
+import { DEVNET_USDC, GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
 import {
   assertExactSupport,
   EXACT_PRICE,
   PUBLIC_FACILITATORS,
 } from '@gyblos/payments-x402/exact/index';
+import { UNKNOWN_ERROR_NAME } from '@gyblos/runtime/constants';
 import {
   AuditedPublicFacilitator,
   createExactSeller,
@@ -55,9 +63,13 @@ export async function main() {
     await assertNoUnresolvedAuthorizations();
     try {
       const previousJournal = JSON.parse(await readFile(journalPath, 'utf8'));
-      if (![COMMITMENT, 'rejected'].includes(previousJournal.state))
+      if (
+        ![JOURNAL_STATES.CONFIRMED, JOURNAL_STATES.REJECTED].includes(
+          previousJournal.state,
+        )
+      )
         throw new GateError(
-          'UNRESOLVED_EXACT',
+          GATE_ERROR_CODES.UNRESOLVED_EXACT,
           'Previous exact payment is uncertain. Reconcile before another attempt.',
         );
     } catch (error) {
@@ -86,19 +98,22 @@ export async function main() {
         assertExactSupport(supported, provider.feePayer);
         providers.push({ ...provider, supported });
       } catch (error) {
-        if (error instanceof GateError && error.code === 'SUPPORT_CHANGED')
+        if (
+          error instanceof GateError &&
+          error.code === GATE_ERROR_CODES.SUPPORT_CHANGED
+        )
           throw error;
         evidence.facilitators.push({
           url: provider.url,
-          status: 'unavailable',
-          reason: error instanceof Error ? error.name : 'UnknownError',
+          status: FACILITATOR_STATUSES.UNAVAILABLE,
+          reason: error instanceof Error ? error.name : UNKNOWN_ERROR_NAME,
         });
         await persist();
       }
     }
     if (!providers.length)
       throw new GateError(
-        'NO_PUBLIC_FACILITATOR',
+        GATE_ERROR_CODES.NO_PUBLIC_FACILITATOR,
         'Both public facilitators unavailable.',
       );
     evidence.setupTransaction = await prepareExactAccounts(config);
@@ -108,7 +123,7 @@ export async function main() {
       BigInt(EXACT_PRICE)
     )
       throw new GateError(
-        'NEEDS_CIRCLE_USDC',
+        GATE_ERROR_CODES.NEEDS_CIRCLE_USDC,
         `Fund buyer ${config.addresses.buyer} using faucet.circle.com on Solana Devnet.`,
       );
     for (const provider of providers) {
@@ -124,13 +139,16 @@ export async function main() {
           facilitator,
         });
       } catch (error) {
-        if (error instanceof GateError && error.code === 'SUPPORT_CHANGED')
+        if (
+          error instanceof GateError &&
+          error.code === GATE_ERROR_CODES.SUPPORT_CHANGED
+        )
           throw error;
         evidence.results.push({
           facilitator: provider.url,
-          case: 'startup',
-          status: 'external-unavailable',
-          reason: error instanceof Error ? error.name : 'UnknownError',
+          case: EXACT_CASES.STARTUP,
+          status: CASE_STATUSES.EXTERNAL_UNAVAILABLE,
+          reason: error instanceof Error ? error.name : UNKNOWN_ERROR_NAME,
         });
         await persist();
         continue;
@@ -161,7 +179,7 @@ export async function main() {
       }
     }
     throw new GateError(
-      'PUBLIC_PROVIDERS_REJECTED',
+      GATE_ERROR_CODES.PUBLIC_PROVIDERS_REJECTED,
       'No public facilitator completed the exact payment; inspect evidence.',
     );
   }
@@ -172,10 +190,14 @@ export async function main() {
       await run();
     });
   } catch (error) {
-    if (evidence.status !== 'uncertain') evidence.status = 'blocked';
+    if (evidence.status !== EVIDENCE_STATUSES.UNCERTAIN)
+      evidence.status = EVIDENCE_STATUSES.BLOCKED;
     evidence.error = {
-      code: error instanceof GateError ? error.code : 'GATE_ERROR',
-      name: error instanceof Error ? error.name : 'UnknownError',
+      code:
+        error instanceof GateError
+          ? error.code
+          : EXACT_EVIDENCE_CODES.GATE_ERROR,
+      name: error instanceof Error ? error.name : UNKNOWN_ERROR_NAME,
       message:
         error instanceof GateError
           ? error.message

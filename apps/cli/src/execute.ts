@@ -14,6 +14,12 @@ import {
   X402_SDK_VERSION,
 } from '@gyblos/config';
 import { loadConfig, saveJson, signer } from '@gyblos/gate/config';
+import {
+  EVIDENCE_STATUSES,
+  JOURNAL_STATES,
+  SCHEMA_VERSIONS,
+  WALLET_ROLES,
+} from '@gyblos/gate/constants';
 import type { FixedGateEvidence } from '@gyblos/gate/fixture-evidence-types';
 import {
   assertNoUnresolvedAuthorizations,
@@ -33,6 +39,7 @@ import {
 import {
   ACTUAL_ATOMIC,
   DEVNET,
+  GATE_ERROR_CODES,
   MAX_ATOMIC,
   UPSTREAM_COMMIT,
 } from '@gyblos/payments-x402/constants';
@@ -45,7 +52,7 @@ async function executeLocked(signal?: AbortSignal) {
   const config = await loadConfig();
   await assertNoUnresolvedAuthorizations();
   const buyer = createBuyer(
-    await signer(config, 'buyer'),
+    await signer(config, WALLET_ROLES.BUYER),
     config.rpcUrl,
     {
       mint: config.mint,
@@ -57,7 +64,7 @@ async function executeLocked(signal?: AbortSignal) {
     fetch,
     async (authorization) => {
       await saveJournal(JOURNAL_PATH, {
-        state: 'authorization-created',
+        state: JOURNAL_STATES.AUTHORIZATION_CREATED,
         channelId: authorization.channelId,
         asset: config.mint,
         network: DEVNET,
@@ -74,7 +81,7 @@ async function executeLocked(signal?: AbortSignal) {
         FIXED_MIN_FACILITATOR_LAMPORTS
       )
         throw new GateError(
-          'NEEDS_SOL',
+          GATE_ERROR_CODES.NEEDS_SOL,
           `Fund facilitator ${config.addresses.facilitator} with devnet SOL.`,
         );
       if (
@@ -82,7 +89,7 @@ async function executeLocked(signal?: AbortSignal) {
         BigInt(MAX_ATOMIC)
       )
         throw new GateError(
-          'NEEDS_TOKENS',
+          GATE_ERROR_CODES.NEEDS_TOKENS,
           'Buyer does not have enough test tokens for the ceiling.',
         );
     },
@@ -122,7 +129,7 @@ async function executeLocked(signal?: AbortSignal) {
           JSON.stringify({ status: response.status, events: diagnostics }),
         );
         throw new GateError(
-          'PAID_REQUEST_FAILED',
+          GATE_ERROR_CODES.PAID_REQUEST_FAILED,
           `Paid request HTTP ${response.status}; inspect journal and chain before retrying.`,
         );
       }
@@ -151,7 +158,7 @@ async function executeLocked(signal?: AbortSignal) {
         claim.transaction !== response.settlement.transaction
       )
         throw new GateError(
-          'MISSING_EVIDENCE',
+          GATE_ERROR_CODES.MISSING_EVIDENCE,
           'Could not correlate deposit, claim and response receipt.',
         );
       await confirm(config.rpcUrl, open.transaction);
@@ -160,9 +167,12 @@ async function executeLocked(signal?: AbortSignal) {
       let distributed = !raw;
       if (raw) {
         const channels = await discoverChannelsByRentPayer(
-          toFacilitatorSvmSigner(await signer(config, 'facilitator'), {
-            defaultRpcUrl: config.rpcUrl,
-          }),
+          toFacilitatorSvmSigner(
+            await signer(config, WALLET_ROLES.FACILITATOR),
+            {
+              defaultRpcUrl: config.rpcUrl,
+            },
+          ),
           DEVNET,
           config.addresses.facilitator,
         );
@@ -174,7 +184,10 @@ async function executeLocked(signal?: AbortSignal) {
         open.amount !== response.authorization.requirements.amount ||
         claim.amount !== ACTUAL_ATOMIC
       )
-        throw new GateError('AMOUNT_MISMATCH', 'Unexpected settlement amount.');
+        throw new GateError(
+          GATE_ERROR_CODES.AMOUNT_MISMATCH,
+          'Unexpected settlement amount.',
+        );
       return {
         receipt: {
           authorized: response.authorization.requirements.amount,
@@ -189,8 +202,8 @@ async function executeLocked(signal?: AbortSignal) {
     },
   });
   const evidence: FixedGateEvidence = {
-    schemaVersion: 1,
-    status: 'passed',
+    schemaVersion: SCHEMA_VERSIONS.EVIDENCE,
+    status: EVIDENCE_STATUSES.PASSED,
     createdAt: new Date().toISOString(),
     network: DEVNET,
     assetLabel: config.assetLabel,
@@ -212,7 +225,7 @@ async function executeLocked(signal?: AbortSignal) {
   const evidencePath = fixedEvidencePath(Date.now());
   await saveJson(evidencePath, evidence);
   await saveJournal(JOURNAL_PATH, {
-    state: 'verified',
+    state: JOURNAL_STATES.VERIFIED,
     evidencePath,
     channelId: result.accounting.channelId,
   });

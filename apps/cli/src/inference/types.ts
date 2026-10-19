@@ -1,10 +1,11 @@
 import type { Config } from '@gyblos/gate/config';
+import type { InferenceCaseName } from '@gyblos/gate/constants';
 import type { InferenceGateEvidence, InferenceTrace } from '@gyblos/gate/types';
 import type { ModelTokenizer } from '@gyblos/inference-ollama';
 import type { SettlementEvent } from '@gyblos/payments-x402/facilitator';
 
 export interface InferenceCase {
-  name: string;
+  name: InferenceCaseName;
   requestId: string;
   prompt: string;
 }

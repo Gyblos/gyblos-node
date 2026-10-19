@@ -85,6 +85,7 @@ export const PAYMENT_LIMITS = {
 export const DIAGNOSTIC_LIMITS = {
   rpcMessageCharacters: 180,
   recordedErrorCharacters: 1200,
+  publicErrorMessageCharacters: 500,
   errorStackEnd: 3,
   transactionHistory: 50,
   failureHistory: 10,
@@ -104,7 +105,10 @@ export const CLEANUP = {
   maxPriorityFeeMicroLamports: 5_000,
 } as const;
 
-export const HTTP_LIMITS = { requestBody: '8kb' } as const;
+export const HTTP_LIMITS = {
+  requestBody: '8kb',
+  facilitatorBody: '64kb',
+} as const;
 
 export const INFERENCE_REQUEST_LIMITS = {
   minOutputTokens: 32,

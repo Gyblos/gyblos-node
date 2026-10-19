@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { INFERENCE_CASES } from '@gyblos/gate/constants';
+
 import { createCases } from '../apps/cli/src/inference/cases-data.js';
 
 test('gate adds the separately targeted undercharge before engine termination', () => {
@@ -18,15 +20,19 @@ test('gate adds the separately targeted undercharge before engine termination', 
   );
   assert.equal(new Set(cases.map((entry) => entry.requestId)).size, 6);
   assert.equal(
-    cases.find((entry) => entry.name === 'undercharge')?.requestId,
+    cases.find((entry) => entry.name === INFERENCE_CASES.UNDERCHARGE)
+      ?.requestId,
     'under-request',
   );
   assert.equal(
-    cases.find((entry) => entry.name === 'overcharge')?.requestId,
+    cases.find((entry) => entry.name === INFERENCE_CASES.OVERCHARGE)?.requestId,
     'over-request',
   );
   assert.equal(cases.at(-1)?.requestId, 'failure-request');
-  assert.ok(cases.find((entry) => entry.name === 'undercharge')?.prompt.length);
+  assert.ok(
+    cases.find((entry) => entry.name === INFERENCE_CASES.UNDERCHARGE)?.prompt
+      .length,
+  );
 });
 
 test('optional undercharge scenario retains all original case contents and relative ordering', () => {
@@ -35,7 +41,7 @@ test('optional undercharge scenario retains all original case contents and relat
     'over-request',
     'failure-request',
     'under-request',
-  ).filter((entry) => entry.name !== 'undercharge');
+  ).filter((entry) => entry.name !== INFERENCE_CASES.UNDERCHARGE);
   assert.deepEqual(
     original.map(({ name, prompt }) => ({ name, prompt })),
     extended.map(({ name, prompt }) => ({ name, prompt })),

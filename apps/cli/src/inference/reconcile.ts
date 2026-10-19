@@ -7,6 +7,7 @@ import {
   transaction,
   transactionTransfers,
 } from '@gyblos/gate/chain';
+import { JOURNAL_STATES } from '@gyblos/gate/constants';
 import { saveJournal } from '@gyblos/gate/journal';
 import { createInferenceBuyer } from '@gyblos/payments-x402/inference-buyer';
 import { validateSettlement } from '@gyblos/payments-x402/trust';
@@ -95,7 +96,7 @@ export async function reconcileCase({
     BigInt(ceiling) - actual,
   );
   await saveJournal(journalPath, {
-    state: 'reconciled',
+    state: JOURNAL_STATES.RECONCILED,
     requestId: requestId,
     channelId,
     depositSignature: deposit.transaction,

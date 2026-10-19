@@ -1,6 +1,7 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { link, mkdir, open, readFile, unlink } from 'node:fs/promises';
 
+import type { ChargeAnomaly } from '@gyblos/application/constants';
 import type { TokenCounts } from '@gyblos/application/metering';
 import {
   FILE_MODES,
@@ -10,6 +11,7 @@ import {
   MEASUREMENTS_PATH,
   UNITS,
 } from '@gyblos/config';
+import { SCHEMA_VERSIONS } from '@gyblos/gate/constants';
 import { MODEL } from '@gyblos/inference-ollama/model';
 
 export interface MeasurementInput {
@@ -35,7 +37,7 @@ export interface MeasurementInput {
   } | null;
   latencyMs: number;
   delivered: boolean;
-  anomaly: string;
+  anomaly: ChargeAnomaly;
   responseText: string;
   meteringMode?: 'recounted' | 'declared';
 }
@@ -50,7 +52,7 @@ export function measurementRow(input: MeasurementInput, salt: Uint8Array) {
     output: counts.output,
   });
   return {
-    schemaVersion: 1,
+    schemaVersion: SCHEMA_VERSIONS.MEASUREMENT,
     meteringMode: input.meteringMode ?? 'recounted',
     recordedAt: new Date().toISOString(),
     requestId: input.requestId,

@@ -3,6 +3,11 @@ import { readFile } from 'node:fs/promises';
 import { PRICES, TOLERANCE } from '@gyblos/application/metering';
 import { X402_SDK_VERSION } from '@gyblos/config';
 import { saveJson, type Config } from '@gyblos/gate/config';
+import {
+  EVIDENCE_IDS,
+  EVIDENCE_STATUSES,
+  SCHEMA_VERSIONS,
+} from '@gyblos/gate/constants';
 import type { InferenceGateEvidence } from '@gyblos/gate/types';
 import { GENERATION } from '@gyblos/inference-ollama/constants';
 import { MODEL } from '@gyblos/inference-ollama/index';
@@ -14,8 +19,8 @@ export async function initializeEvidence(
   evidencePath: string,
 ) {
   const evidence: InferenceGateEvidence = {
-    schemaVersion: 1,
-    evidenceId: 'GYB-GATE-0005',
+    schemaVersion: SCHEMA_VERSIONS.EVIDENCE,
+    evidenceId: EVIDENCE_IDS.INFERENCE,
     sdkVersion: X402_SDK_VERSION,
     createdAt: new Date().toISOString(),
     runId,
@@ -34,7 +39,7 @@ export async function initializeEvidence(
       outputCountConvention:
         'Visible raw output only; terminal EOS is not added. Differences remain explicit under predeclared tolerance.',
     },
-    status: 'in-progress',
+    status: EVIDENCE_STATUSES.IN_PROGRESS,
     gatePassed: false,
     results: [],
     limitations: [

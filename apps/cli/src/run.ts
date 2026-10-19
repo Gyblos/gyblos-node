@@ -17,7 +17,7 @@ import {
   lamports,
   tokens,
 } from '@gyblos/payments-x402/chain';
-import { MAX_ATOMIC } from '@gyblos/payments-x402/constants';
+import { GATE_ERROR_CODES, MAX_ATOMIC } from '@gyblos/payments-x402/constants';
 import {
   isMain,
   onShutdown,
@@ -47,7 +47,7 @@ export async function main() {
       FIXED_MIN_FACILITATOR_LAMPORTS
     )
       throw new GateError(
-        'NEEDS_SOL',
+        GATE_ERROR_CODES.NEEDS_SOL,
         `Fund devnet facilitator ${config.addresses.facilitator} first.`,
       );
     if (
@@ -55,7 +55,7 @@ export async function main() {
       BigInt(MAX_ATOMIC)
     )
       throw new GateError(
-        'NEEDS_TOKENS',
+        GATE_ERROR_CODES.NEEDS_TOKENS,
         'Fund the buyer or run gate:fund --test-mint first.',
       );
     controller.signal.throwIfAborted();

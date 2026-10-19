@@ -9,7 +9,7 @@ Every `.ts` file follows this order:
    2. external packages
    3. `@gyblos/*`
    4. relative (`./`, `../` within the same package only)
-2. **File-local constants** (`UPPER_SNAKE_CASE`). Anything used by more than one file lives in `@gyblos/config` or in its package's `constants.ts`.
+2. **File-local constants** (`UPPER_SNAKE_CASE`). Shared configuration lives in `@gyblos/config`; shared domain values live in their owning package's `constants.ts`. The canonical contract rule below also applies to a single runtime producer and its type declaration.
 3. **Types and interfaces.**
 4. **Private helpers.**
 5. **Exported functions.**
@@ -17,9 +17,51 @@ Every `.ts` file follows this order:
 
 ## Constants
 
-- No magic values: hosts, ports, paths, network IDs, program IDs, commitments, versions, timeouts, limits and HTTP statuses come from `@gyblos/config`.
-- Versions are read from `package.json` or the lockfile, never typed by hand.
+- Hosts, ports, paths, network IDs, program IDs, commitments, timeouts, limits and HTTP statuses come from `@gyblos/config`.
+- Dependency versions are read from `package.json` or the lockfile. Application-owned schema versions live in the owning package's constants.
 - Model and generation parameters live in `@gyblos/inference-ollama/constants.ts`; prices and tolerance in `@gyblos/application/constants.ts`.
+
+### Canonical contract values and derived types
+
+Define application-owned codes, statuses, case identifiers and other discrete
+contract values once in the owning package's `constants.ts`. This applies even
+when only one runtime producer shares the value with a type declaration.
+Derive types from the constants; import the values in producers, comparisons
+and assertions. An independently repeated literal union does not satisfy this
+rule, because TypeScript types do not provide runtime values.
+
+For example, the payment package owns this catalog and its derived type:
+
+```ts
+export const PUBLIC_CALL_OUTCOMES = {
+  SUCCESS: 'success',
+  REJECTED: 'rejected',
+  UNCERTAIN: 'uncertain',
+} as const;
+
+export type PublicCallOutcome =
+  (typeof PUBLIC_CALL_OUTCOMES)[keyof typeof PUBLIC_CALL_OUTCOMES];
+```
+
+Consumers import both from `@gyblos/payments-x402/constants` and assign
+`PUBLIC_CALL_OUTCOMES.SUCCESS` to a `PublicCallOutcome`, rather than repeating
+the raw value.
+
+- Keep domain ownership: payment errors belong to payments, evidence diagnostics
+  to gate, and engine completion reasons to the inference adapter. Matching text
+  in unrelated domains does not require one global catalog.
+- Keep contracts as narrow as their flow allows. Do not widen them to `string`
+  or use casts or `any` to bypass an invalid value. Types do not validate input
+  at runtime; preserve boundary checks and rejection of unknown journal states.
+- Literals remain appropriate in canonical definitions, descriptive messages,
+  private values without a shared contract, and external SDK/Node/protocol
+  identifiers without upstream constants. Prefer upstream constants when available.
+- Typed test inputs use canonical values. Independent expected wire values and
+  intentionally invalid fixtures may remain literals, so tests can detect a
+  changed contract or rejected input.
+- Review the definition, derived type, producers, comparisons and assertions
+  together. Preserve serialized values during refactors; this convention does
+  not imply every existing literal has been migrated or is lint-enforced.
 
 ## Packages and boundaries
 
@@ -35,10 +77,12 @@ Every `.ts` file follows this order:
 
 ## Commits and checks
 
+- Keep one file per commit, introducing definitions before consumers so each
+  intermediate commit remains valid.
 - Each commit builds and passes `pnpm typecheck`, `pnpm test` and `pnpm lint` on its own.
 - Behavior changes and refactors go in separate PRs.
 - Never commit real private keys, measurement salts, or private prompts/responses; `.local/` stays ignored. Synthetic test inputs, ephemeral test material and public model-template fixtures are permitted.
 
 The offline regression suites and their public fixtures are versioned and run with `pnpm test`. The suite uses synthetic inputs, ephemeral unfunded signers, mocked RPC and temporary files; it does not require wallets, Ollama, Python or devnet funds. `tooling/test-files.json` lists every published suite; the runner rejects missing or unlisted files.
 
-Raw evidence, measurements, agent files and internal documents remain outside Git. The explicitly authorized, allowlisted redacted P2P report `evidence/gate-0006.json` is the evidence exception; never publish raw role volumes, endpoint addresses, signed payloads or content. README, this guide, and the operational guides `docs/inference.md` and `docs/limitations.md` are the public documentation exceptions. The error-code regression belonging to the unpublished error-code change remains separate until that implementation is integrated.
+Raw evidence, measurements, agent files and internal documents remain outside Git. The explicitly authorized, allowlisted redacted P2P reports `evidence/gate-0006.json` and `evidence/gate-0007.json` are the evidence exceptions; never publish raw role volumes, endpoint addresses, signed payloads or content. README, this guide, and the operational guides `docs/inference.md` and `docs/limitations.md` are the public documentation exceptions. Local validation probes are not part of the published regression suite; only the suites listed in `tooling/test-files.json` run with `pnpm test`.

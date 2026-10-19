@@ -8,11 +8,13 @@ import {
 import {
   CHANNEL_PROGRAM,
   DEVNET_GENESIS,
+  GATE_ERROR_CODES,
+  type GateErrorCode,
 } from '@gyblos/payments-x402/constants';
 
 export class GateError extends Error {
   constructor(
-    readonly code: string,
+    readonly code: GateErrorCode,
     message: string,
   ) {
     super(message);
@@ -31,14 +33,17 @@ export async function rpc<T>(
     signal: AbortSignal.timeout(TIMEOUTS.rpc),
   });
   if (!response.ok)
-    throw new GateError('RPC_HTTP', `${method}: HTTP ${response.status}`);
+    throw new GateError(
+      GATE_ERROR_CODES.RPC_HTTP,
+      `${method}: HTTP ${response.status}`,
+    );
   const body = (await response.json()) as {
     result: T;
     error?: { code: number; message: string };
   };
   if (body.error)
     throw new GateError(
-      'RPC_ERROR',
+      GATE_ERROR_CODES.RPC_ERROR,
       `${method}: RPC ${body.error.code} ${body.error.message.slice(0, DIAGNOSTIC_LIMITS.rpcMessageCharacters)}`,
     );
   return body.result;
@@ -47,7 +52,10 @@ export async function rpc<T>(
 export async function assertDevnet(url: string): Promise<void> {
   const genesis = await rpc<string>(url, 'getGenesisHash');
   if (genesis !== DEVNET_GENESIS)
-    throw new GateError('WRONG_CLUSTER', 'Only Solana devnet is allowed.');
+    throw new GateError(
+      GATE_ERROR_CODES.WRONG_CLUSTER,
+      'Only Solana devnet is allowed.',
+    );
 }
 
 export async function account(url: string, address: string) {
@@ -71,7 +79,7 @@ export async function assertProgram(url: string): Promise<void> {
   const program = await account(url, CHANNEL_PROGRAM);
   if (!program?.executable)
     throw new GateError(
-      'PROGRAM_UNAVAILABLE',
+      GATE_ERROR_CODES.PROGRAM_UNAVAILABLE,
       'Canonical payment-channels program is not executable.',
     );
 }
@@ -129,7 +137,7 @@ export async function confirm(
     const status = result.value[0];
     if (status?.err)
       throw new GateError(
-        'TRANSACTION_FAILED',
+        GATE_ERROR_CODES.TRANSACTION_FAILED,
         options.failedMessage ?? `Transaction failed: ${signature}`,
       );
     if (status && [COMMITMENT, 'finalized'].includes(status.confirmationStatus))
@@ -139,7 +147,7 @@ export async function confirm(
     );
   }
   throw new GateError(
-    'TRANSACTION_UNKNOWN',
+    GATE_ERROR_CODES.TRANSACTION_UNKNOWN,
     options.unknownMessage ??
       `Confirmation unknown; reconcile before retrying: ${signature}`,
   );

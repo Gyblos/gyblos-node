@@ -1,5 +1,6 @@
 import { CLEANUP, HOSTS, LOCALHOST, PORTS } from '@gyblos/config';
 import { loadConfig, signer } from '@gyblos/gate/config';
+import { WALLET_ROLES } from '@gyblos/gate/constants';
 import { assertProgram } from '@gyblos/payments-x402/chain';
 import { createFacilitator } from '@gyblos/payments-x402/facilitator';
 import { isMain } from '@gyblos/runtime';
@@ -8,7 +9,7 @@ export async function main() {
   const config = await loadConfig();
   await assertProgram(config.rpcUrl);
   const host = createFacilitator(
-    await signer(config, 'facilitator'),
+    await signer(config, WALLET_ROLES.FACILITATOR),
     config.rpcUrl,
     {
       buyer: config.addresses.buyer,

@@ -3,6 +3,15 @@ import assert from 'node:assert/strict';
 import { EXACT_PRICE } from '@gyblos/application/constants';
 import { signer } from '@gyblos/gate/config';
 import {
+  CASE_STATUSES,
+  EXACT_CASES,
+  EXACT_ENFORCEMENT,
+  EXACT_UNTRUSTED_CASES,
+  WALLET_ROLES,
+} from '@gyblos/gate/constants';
+import { GateError } from '@gyblos/payments-x402/chain';
+import { GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
+import {
   createExactBuyer,
   validateExactTerms,
 } from '@gyblos/payments-x402/exact/index';
@@ -28,7 +37,7 @@ export async function assertUntrusted(
           }
         : { ...valid, [field]: config.addresses.buyer };
     let signed = false;
-    const base = await signer(config, 'buyer');
+    const base = await signer(config, WALLET_ROLES.BUYER);
     const buyer = createExactBuyer(
       {
         ...base,
@@ -42,12 +51,14 @@ export async function assertUntrusted(
     );
     await assert.rejects(
       buyer.authorize({ ...required, accepts: [changed] }, EXACT_PRICE),
-      /Exact terms/,
+      (error: unknown) =>
+        error instanceof GateError &&
+        error.code === GATE_ERROR_CODES.UNTRUSTED_EXACT_TERMS,
     );
     assert.equal(signed, false);
     cases.push({
-      case: `untrusted-${field}`,
-      status: 'passed',
+      case: EXACT_UNTRUSTED_CASES[field],
+      status: CASE_STATUSES.PASSED,
       signed: false,
       handlerCalls: host.handlerCalls(),
     });
@@ -67,7 +78,7 @@ export async function assertEmpty(
     emptyHandlers = host.handlerCalls();
   assert.equal(emptyBefore.buyer, '0');
   let signed = false;
-  const emptySigner = await signer(config, 'authorizer');
+  const emptySigner = await signer(config, WALLET_ROLES.AUTHORIZER);
   const emptyBuyer = createExactBuyer(
     {
       ...emptySigner,
@@ -81,7 +92,9 @@ export async function assertEmpty(
   );
   await assert.rejects(
     emptyBuyer.authorize(await challenge(), emptyBefore.buyer),
-    /insufficient Circle/,
+    (error: unknown) =>
+      error instanceof GateError &&
+      error.code === GATE_ERROR_CODES.INSUFFICIENT_EXACT_USDC,
   );
   assert.equal(signed, false);
   assert.equal(facilitator.calls.length, emptyCalls);
@@ -89,10 +102,10 @@ export async function assertEmpty(
   const emptyAfter = await snapshot(config, config.addresses.authorizer);
   assert.deepEqual(emptyAfter, emptyBefore);
   cases.push({
-    case: 'insufficient-usdc',
-    status: 'passed',
-    enforcement: 'buyer-preflight',
-    reason: 'INSUFFICIENT_EXACT_USDC',
+    case: EXACT_CASES.INSUFFICIENT_USDC,
+    status: CASE_STATUSES.PASSED,
+    enforcement: EXACT_ENFORCEMENT.BUYER_PREFLIGHT,
+    reason: GATE_ERROR_CODES.INSUFFICIENT_EXACT_USDC,
     signed: false,
     before: emptyBefore,
     after: emptyAfter,

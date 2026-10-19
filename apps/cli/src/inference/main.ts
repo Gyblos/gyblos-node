@@ -27,6 +27,12 @@ import {
   transaction,
 } from '@gyblos/gate/chain';
 import { loadConfig, saveJson, signer } from '@gyblos/gate/config';
+import {
+  CONFIG_ASSET_LABELS,
+  EVIDENCE_STATUSES,
+  INFERENCE_EVIDENCE_CODES,
+  WALLET_ROLES,
+} from '@gyblos/gate/constants';
 import { assertNoUnresolvedAuthorizations } from '@gyblos/gate/journal';
 import { withExclusiveLock } from '@gyblos/gate/lock';
 import { measurementSalt } from '@gyblos/gate/measurements';
@@ -41,7 +47,7 @@ import {
   GateError,
   lamports,
 } from '@gyblos/payments-x402/chain';
-import { DEVNET_USDC } from '@gyblos/payments-x402/constants';
+import { DEVNET_USDC, GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
 import type { SettlementEvent } from '@gyblos/payments-x402/facilitator';
 import {
   assertPortFree,
@@ -74,13 +80,15 @@ export async function main() {
     // This gate accepts only isolated setup keys, never imported wallet paths.
     assert.equal(
       config.mint,
-      config.assetLabel === 'devnet-usdc' ? DEVNET_USDC : config.addresses.mint,
+      config.assetLabel === CONFIG_ASSET_LABELS.DEVNET_USDC
+        ? DEVNET_USDC
+        : config.addresses.mint,
     );
     for (const role of [
-      'buyer',
-      'seller',
-      'authorizer',
-      'facilitator',
+      WALLET_ROLES.BUYER,
+      WALLET_ROLES.SELLER,
+      WALLET_ROLES.AUTHORIZER,
+      WALLET_ROLES.FACILITATOR,
     ] as const) {
       assert.equal(resolve(config.keys[role]), resolve(keyPath(role)));
     }
@@ -104,7 +112,7 @@ export async function main() {
         `${ollamaUrl}${ROUTES.ollamaVersion}`,
         () =>
           new GateError(
-            'PORT_BUSY',
+            GATE_ERROR_CODES.PORT_BUSY,
             'Gate requires an unused local host port.',
           ),
       );
@@ -112,7 +120,7 @@ export async function main() {
         `${facilitatorUrl}${ROUTES.health}`,
         () =>
           new GateError(
-            'PORT_BUSY',
+            GATE_ERROR_CODES.PORT_BUSY,
             'Gate requires an unused local host port.',
           ),
       );
@@ -151,7 +159,10 @@ export async function main() {
         signal: controller.signal,
         expectedRunId: runId,
         onMismatch: () =>
-          new GateError('PORT_BUSY', 'Host is not owned by this gate.'),
+          new GateError(
+            GATE_ERROR_CODES.PORT_BUSY,
+            'Host is not owned by this gate.',
+          ),
       });
       const debugRequestId = randomUUID(),
         underchargeRequestId = randomUUID(),
@@ -184,7 +195,7 @@ export async function main() {
         engine: createOllamaEngine(ollamaUrl),
         mint: config.mint,
         payTo: config.addresses.seller,
-        authorizer: await signer(config, 'authorizer'),
+        authorizer: await signer(config, WALLET_ROLES.AUTHORIZER),
         tokenizer: sellerTokenizer,
         async beforeInference(requestId, channelId) {
           const deposit = (await events()).find(
@@ -243,7 +254,7 @@ export async function main() {
         events,
         traces,
       });
-      evidence.status = 'passed';
+      evidence.status = EVIDENCE_STATUSES.PASSED;
       evidence.gatePassed = true;
       evidence.completedAt = new Date().toISOString();
       await saveJson(evidencePath, evidence);
@@ -251,13 +262,13 @@ export async function main() {
         'GYB-GATE-0005 passed. Evidence and private measurements saved without prompts or responses.',
       );
     } catch (error) {
-      evidence.status = 'incomplete';
+      evidence.status = EVIDENCE_STATUSES.INCOMPLETE;
       evidence.errorCode =
         error instanceof GateError
           ? error.code
           : error instanceof assert.AssertionError
-            ? 'ASSERTION_FAILED'
-            : 'EXECUTION_INTERRUPTED_OR_UNKNOWN';
+            ? INFERENCE_EVIDENCE_CODES.ASSERTION_FAILED
+            : INFERENCE_EVIDENCE_CODES.EXECUTION_INTERRUPTED_OR_UNKNOWN;
       evidence.errorLocation =
         error instanceof Error
           ? error.stack

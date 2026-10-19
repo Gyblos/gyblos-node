@@ -5,6 +5,7 @@ import { assessCharge, OFFER_ID } from '@gyblos/application/metering';
 import { INFERENCE_TRANSPORT_PATH, TIMEOUTS } from '@gyblos/config';
 import { inferenceSnapshot } from '@gyblos/gate/chain';
 import { saveJson, signer } from '@gyblos/gate/config';
+import { JOURNAL_STATES, WALLET_ROLES } from '@gyblos/gate/constants';
 import {
   assertNoUnresolvedAuthorizations,
   saveJournal,
@@ -33,7 +34,7 @@ export async function runCases({
   events,
   traces,
 }: CaseContext) {
-  const buyerSigner = await signer(config, 'buyer');
+  const buyerSigner = await signer(config, WALLET_ROLES.BUYER);
   for (const testCase of cases) {
     controller.signal.throwIfAborted();
     await assertNoUnresolvedAuthorizations();
@@ -68,7 +69,7 @@ export async function runCases({
           assert.equal(authorizedCeiling, ceiling);
           channelId = authorizedChannelId;
           await saveJournal(journalPath, {
-            state: 'authorization-created',
+            state: JOURNAL_STATES.AUTHORIZATION_CREATED,
             requestId: request.requestId,
             channelId: authorizedChannelId,
             ceilingAtomic: ceiling,
@@ -188,7 +189,7 @@ export async function runCases({
       trace,
     });
     await saveJournal(journalPath, {
-      state: 'verified',
+      state: JOURNAL_STATES.VERIFIED,
       requestId: request.requestId,
       channelId,
       depositSignature: deposit.transaction,

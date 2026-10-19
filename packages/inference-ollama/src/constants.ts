@@ -41,3 +41,11 @@ export const MODEL_LIMITS = {
   maxFrameCharacters: 1_000_000,
   maxOutputCharacters: 100_000,
 } as const;
+
+export const ENGINE_DONE_REASONS = {
+  STOP: 'stop',
+  LENGTH: 'length',
+} as const;
+
+export type EngineDoneReason =
+  (typeof ENGINE_DONE_REASONS)[keyof typeof ENGINE_DONE_REASONS];

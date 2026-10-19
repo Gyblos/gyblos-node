@@ -16,6 +16,7 @@ import {
   confirm,
   GateError,
 } from '@gyblos/payments-x402/chain';
+import { GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
 
 import type {
   AccountsResponse,
@@ -43,7 +44,7 @@ export async function rpc<T>(
         attempt >= RETRIES.rpc ||
         !method.startsWith('get') ||
         !(error instanceof GateError) ||
-        error.code !== 'RPC_HTTP' ||
+        error.code !== GATE_ERROR_CODES.RPC_HTTP ||
         !error.message.includes(String(HTTP_STATUS.tooManyRequests))
       )
         throw error;
@@ -153,7 +154,7 @@ export async function transaction(
     return transaction;
   }
   throw new GateError(
-    'TRANSACTION_UNKNOWN',
+    GATE_ERROR_CODES.TRANSACTION_UNKNOWN,
     'Confirmed transaction is not yet visible; reconcile before another authorization.',
   );
 }
@@ -187,7 +188,7 @@ export function transactionTransfers(
       ].includes(parsed?.type ?? '')
     ) {
       throw new GateError(
-        'UNSUPPORTED_TOKEN_INSTRUCTION',
+        GATE_ERROR_CODES.UNSUPPORTED_TOKEN_INSTRUCTION,
         'Unsupported token instruction in inference accounting.',
       );
     }

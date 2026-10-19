@@ -5,8 +5,17 @@ import {
 
 import { HTTP_STATUS, TIMEOUTS } from '@gyblos/config';
 import { signer } from '@gyblos/gate/config';
+import {
+  JOURNAL_STATES,
+  type ExactCaseName,
+  type WALLET_ROLES,
+} from '@gyblos/gate/constants';
 import { saveJournal } from '@gyblos/gate/journal';
 import { GateError } from '@gyblos/payments-x402/chain';
+import {
+  GATE_ERROR_CODES,
+  PUBLIC_CALL_OUTCOMES,
+} from '@gyblos/payments-x402/constants';
 import {
   createExactBuyer,
   validateExactTerms,
@@ -29,7 +38,10 @@ export function createPaidRequest(
   policy: Parameters<typeof validateExactTerms>[1],
   setActive: (active: ActiveAuthorization) => void,
 ) {
-  return async function paid(role: 'buyer' | 'authorizer', caseName: string) {
+  return async function paid(
+    role: typeof WALLET_ROLES.BUYER | typeof WALLET_ROLES.AUTHORIZER,
+    caseName: ExactCaseName,
+  ) {
     const terms = await challenge(),
       before = await snapshot(config, config.addresses[role]);
     const payload = await createExactBuyer(
@@ -40,7 +52,7 @@ export function createPaidRequest(
     const metadata = authorizationMetadata(payload, config.addresses[role]);
     setActive({ buyer: config.addresses[role], ...metadata });
     await saveJournal(journalPath, {
-      state: 'authorization-created',
+      state: JOURNAL_STATES.AUTHORIZATION_CREATED,
       case: caseName,
       facilitator: provider.url,
       buyer: config.addresses[role],
@@ -64,11 +76,11 @@ export function createPaidRequest(
     const after = await snapshot(config, config.addresses[role]);
     const calls = facilitator.calls.slice(firstCall);
     if (
-      calls.some((call) => call.outcome === 'uncertain') ||
+      calls.some((call) => call.outcome === PUBLIC_CALL_OUTCOMES.UNCERTAIN) ||
       response.status >= HTTP_STATUS.internalServerError
     )
       throw new GateError(
-        'PUBLIC_OUTCOME_UNCERTAIN',
+        GATE_ERROR_CODES.PUBLIC_OUTCOME_UNCERTAIN,
         'Public facilitator response is uncertain; reconcile on-chain.',
       );
     return {

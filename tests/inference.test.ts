@@ -6,6 +6,8 @@ import test from 'node:test';
 
 import { TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
 
+import { CHARGE_ANOMALIES } from '@gyblos/application/constants';
+
 import {
   assessCharge,
   charge,
@@ -141,39 +143,42 @@ test('private measurement rows use an allowlist and append without rewriting old
     const salt = await measurementSalt(directory);
     assert.deepEqual(await measurementSalt(directory), salt);
     const path = join(directory, 'measurements.jsonl');
-    for (const anomaly of ['none', 'overcharge', 'incomplete', 'failed']) {
-      const row = measurementRow(
-        {
-          requestId: 'test-id',
-          seller: 'seller',
-          offer: 'offer',
-          channelId: 'channel',
-          depositSignature: 'deposit',
-          claimSignature: 'claim',
-          ceilingAtomic: '512',
-          chargedAtomic: '140',
-          expectedAtomic: '140',
-          differenceAtomic: '0',
-          allowanceAtomic: '6',
-          relativeDifference: 0,
-          engineTokens: { input: 20, output: 60, prompt: secretPrompt },
-          billedTokens: { input: 20, output: 60 },
-          recountedTokens: { input: 20, output: 60 },
-          countComparison: {
-            inputDelta: 0,
-            outputDelta: 0,
-            withinTolerance: true,
-          },
-          latencyMs: 1000,
-          delivered: anomaly === 'none',
-          anomaly,
-          responseText: secretResponse,
-          prompt: secretPrompt,
-          content: secretResponse,
-          usage: { response: secretResponse },
-        } as unknown as Parameters<typeof measurementRow>[0],
-        salt,
-      );
+    for (const anomaly of [
+      CHARGE_ANOMALIES.NONE,
+      CHARGE_ANOMALIES.OVERCHARGE,
+      CHARGE_ANOMALIES.INCOMPLETE,
+      CHARGE_ANOMALIES.FAILED,
+    ]) {
+      const input = {
+        requestId: 'test-id',
+        seller: 'seller',
+        offer: 'offer',
+        channelId: 'channel',
+        depositSignature: 'deposit',
+        claimSignature: 'claim',
+        ceilingAtomic: '512',
+        chargedAtomic: '140',
+        expectedAtomic: '140',
+        differenceAtomic: '0',
+        allowanceAtomic: '6',
+        relativeDifference: 0,
+        engineTokens: { input: 20, output: 60, prompt: secretPrompt },
+        billedTokens: { input: 20, output: 60 },
+        recountedTokens: { input: 20, output: 60 },
+        countComparison: {
+          inputDelta: 0,
+          outputDelta: 0,
+          withinTolerance: true,
+        },
+        latencyMs: 1000,
+        delivered: anomaly === CHARGE_ANOMALIES.NONE,
+        anomaly,
+        responseText: secretResponse,
+        prompt: secretPrompt,
+        content: secretResponse,
+        usage: { response: secretResponse },
+      };
+      const row = measurementRow(input, salt);
       const encoded = JSON.stringify(row);
       assert.ok(
         !encoded.includes(secretPrompt) && !encoded.includes(secretResponse),

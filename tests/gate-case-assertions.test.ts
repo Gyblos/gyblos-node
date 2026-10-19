@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { CHARGE_ANOMALIES } from '@gyblos/application/constants';
+import {
+  INFERENCE_CASES,
+  type InferenceCaseName,
+} from '@gyblos/gate/constants';
+import { ENGINE_DONE_REASONS } from '@gyblos/inference-ollama/constants';
+
 import { assertInferenceCase } from '../apps/cli/src/inference/assertions.js';
 import { observeInferenceResponse } from '../packages/application/src/inference-observation.js';
 import {
@@ -13,7 +20,7 @@ import { MODEL } from '../packages/inference-ollama/src/index.js';
 
 function fixture(
   options: {
-    name?: string;
+    name?: InferenceCaseName;
     billedInput?: number;
     billedOutput?: number;
     status?: number;
@@ -21,7 +28,7 @@ function fixture(
     engineInput?: number;
   } = {},
 ) {
-  const caseName = options.name ?? 'undercharge';
+  const caseName = options.name ?? INFERENCE_CASES.UNDERCHARGE;
   const status = options.status ?? 200;
   const billed = {
     input: options.billedInput ?? 24,
@@ -36,7 +43,7 @@ function fixture(
       digest: MODEL.digest,
       content: 'Synthetic test output',
       done: true,
-      doneReason: options.reason ?? 'stop',
+      doneReason: options.reason ?? ENGINE_DONE_REASONS.STOP,
       billedTokens: billed,
       usage: {
         prompt_eval_count: options.engineInput ?? 24,
@@ -116,7 +123,9 @@ test('undercharge gate rejects honest billing and discounts inside tolerance', (
 
 test('undercharge gate requires complete successful delivery', () => {
   assert.throws(() => assertInferenceCase(fixture({ status: 502 })));
-  assert.throws(() => assertInferenceCase(fixture({ reason: 'length' })));
+  assert.throws(() =>
+    assertInferenceCase(fixture({ reason: ENGINE_DONE_REASONS.LENGTH })),
+  );
 });
 
 test('undercharge gate cannot discount the input tokens', () => {
@@ -125,25 +134,35 @@ test('undercharge gate cannot discount the input tokens', () => {
 
 test('a forged undercharge annotation cannot bypass the strict financial threshold', () => {
   const context = fixture({ billedOutput: 107 });
-  context.measurement.anomaly = 'undercharge';
+  context.measurement.anomaly = CHARGE_ANOMALIES.UNDERCHARGE;
   assert.throws(() => assertInferenceCase(context));
 });
 
 test('case assertion extraction retains all original honest overcharge and interruption acceptance', () => {
-  for (const name of ['honest-1', 'honest-2', 'honest-3'])
+  for (const name of [
+    INFERENCE_CASES.HONEST_1,
+    INFERENCE_CASES.HONEST_2,
+    INFERENCE_CASES.HONEST_3,
+  ])
     assert.doesNotThrow(() =>
       assertInferenceCase(fixture({ name, billedOutput: 110 })),
     );
   assert.doesNotThrow(() =>
-    assertInferenceCase(fixture({ name: 'overcharge', billedOutput: 154 })),
+    assertInferenceCase(
+      fixture({ name: INFERENCE_CASES.OVERCHARGE, billedOutput: 154 }),
+    ),
   );
   assert.doesNotThrow(() =>
-    assertInferenceCase(fixture({ name: 'engine-interrupted', status: 502 })),
+    assertInferenceCase(
+      fixture({ name: INFERENCE_CASES.ENGINE_INTERRUPTED, status: 502 }),
+    ),
   );
 });
 
 test('discounted billing cannot pass as an ordinary honest case', () => {
-  assert.throws(() => assertInferenceCase(fixture({ name: 'honest-1' })));
+  assert.throws(() =>
+    assertInferenceCase(fixture({ name: INFERENCE_CASES.HONEST_1 })),
+  );
 });
 
 test('undercharge acceptance rejects a zero charge even when its annotation and counts agree', () => {
@@ -161,6 +180,6 @@ test('strict undercharge acceptance rejects equality at the allowance boundary',
       BigInt(context.measurement.allowanceAtomic),
   );
   assert.equal(context.measurement.anomaly, 'none');
-  context.measurement.anomaly = 'undercharge';
+  context.measurement.anomaly = CHARGE_ANOMALIES.UNDERCHARGE;
   assert.throws(() => assertInferenceCase(context));
 });

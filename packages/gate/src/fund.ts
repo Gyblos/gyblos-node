@@ -25,6 +25,12 @@ import {
 } from '@gyblos/config';
 import { configPath, loadConfig, saveJson, signer } from '@gyblos/gate/config';
 import {
+  CONFIG_ASSET_LABELS,
+  FUNDING_OPERATIONS,
+  WALLET_ROLES,
+  type FundingOperation,
+} from '@gyblos/gate/constants';
+import {
   account,
   assertProgram,
   confirm,
@@ -32,11 +38,17 @@ import {
   rpc,
 } from '@gyblos/payments-x402/chain';
 
+interface FundingLogEntry {
+  operation: FundingOperation;
+  signature: string;
+  mint?: string;
+}
+
 export async function fundGate() {
   try {
     const config = await loadConfig();
     await assertProgram(config.rpcUrl);
-    const feePayer = await signer(config, 'facilitator');
+    const feePayer = await signer(config, WALLET_ROLES.FACILITATOR);
     if (
       (await lamports(config.rpcUrl, feePayer.address)) <
       PAYMENT_LIMITS.airdropThreshold
@@ -46,14 +58,19 @@ export async function fundGate() {
         PAYMENT_LIMITS.airdropLamports,
       ]);
       await confirm(config.rpcUrl, signature);
-      console.log(JSON.stringify({ operation: 'devnet-airdrop', signature }));
+      console.log(
+        JSON.stringify({
+          operation: FUNDING_OPERATIONS.AIRDROP,
+          signature,
+        } satisfies FundingLogEntry),
+      );
     }
     if (!process.argv.includes('--test-mint')) {
       console.log(
         'Fee payer funded. Fund buyer with devnet USDC, or use gate:fund --test-mint for the plan-approved SPL fallback.',
       );
     } else {
-      const mint = await signer(config, 'mint');
+      const mint = await signer(config, WALLET_ROLES.MINT);
       const mintExists = !!(await account(config.rpcUrl, mint.address));
       {
         const rent = await rpc<number>(
@@ -147,14 +164,16 @@ export async function fundGate() {
         await confirm(config.rpcUrl, signature);
         console.log(
           JSON.stringify({
-            operation: mintExists ? 'devnet-test-accounts' : 'devnet-test-mint',
+            operation: mintExists
+              ? FUNDING_OPERATIONS.TEST_ACCOUNTS
+              : FUNDING_OPERATIONS.TEST_MINT,
             mint: mint.address,
             signature,
-          }),
+          } satisfies FundingLogEntry),
         );
       }
       config.mint = mint.address;
-      config.assetLabel = 'devnet-test-token';
+      config.assetLabel = CONFIG_ASSET_LABELS.TEST_TOKEN;
       await saveJson(configPath(), config);
       console.log(
         'Configured six-decimal SPL test token. This is not Circle USDC.',
