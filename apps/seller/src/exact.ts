@@ -10,7 +10,13 @@ import { ExactSvmScheme } from '@x402/svm/exact/server';
 import express from 'express';
 
 import { HTTP_STATUS, PAYMENT_LIMITS, ROUTES, TIMEOUTS } from '@gyblos/config';
-import { DEVNET, DEVNET_USDC } from '@gyblos/payments-x402/constants';
+import {
+  DEVNET,
+  DEVNET_USDC,
+  PUBLIC_CALL_OPERATIONS,
+  PUBLIC_CALL_OUTCOMES,
+  type PublicCallOperation,
+} from '@gyblos/payments-x402/constants';
 import { exactAuthorizationId } from '@gyblos/payments-x402/exact/authorization-id';
 import {
   assertExactSupport,
@@ -38,15 +44,17 @@ export class AuditedPublicFacilitator extends HTTPFacilitatorClient {
     try {
       const result = await super.verify(payload, terms);
       this.calls.push({
-        operation: 'verify',
+        operation: PUBLIC_CALL_OPERATIONS.VERIFY,
         url: this.url,
-        outcome: result.isValid ? 'success' : 'rejected',
+        outcome: result.isValid
+          ? PUBLIC_CALL_OUTCOMES.SUCCESS
+          : PUBLIC_CALL_OUTCOMES.REJECTED,
         reason: result.invalidReason,
         payer: result.payer,
       });
       return result;
     } catch (error) {
-      this.recordError('verify', error);
+      this.recordError(PUBLIC_CALL_OPERATIONS.VERIFY, error);
       throw error;
     }
   }
@@ -54,20 +62,22 @@ export class AuditedPublicFacilitator extends HTTPFacilitatorClient {
     try {
       const result = await super.settle(payload, terms);
       this.calls.push({
-        operation: 'settle',
+        operation: PUBLIC_CALL_OPERATIONS.SETTLE,
         url: this.url,
-        outcome: result.success ? 'success' : 'uncertain',
+        outcome: result.success
+          ? PUBLIC_CALL_OUTCOMES.SUCCESS
+          : PUBLIC_CALL_OUTCOMES.UNCERTAIN,
         transaction: result.transaction,
         reason: result.errorReason,
         payer: result.payer,
       });
       return result;
     } catch (error) {
-      this.recordError('settle', error);
+      this.recordError(PUBLIC_CALL_OPERATIONS.SETTLE, error);
       throw error;
     }
   }
-  private recordError(operation: string, error: unknown) {
+  private recordError(operation: PublicCallOperation, error: unknown) {
     const errorDetails = error as {
       name?: string;
       invalidReason?: string;
@@ -81,12 +91,12 @@ export class AuditedPublicFacilitator extends HTTPFacilitatorClient {
       operation,
       url: this.url,
       outcome:
-        operation === 'verify' &&
+        operation === PUBLIC_CALL_OPERATIONS.VERIFY &&
         reason &&
         !errorDetails.transaction &&
         !/pending|timeout|unknown/i.test(reason)
-          ? 'rejected'
-          : 'uncertain',
+          ? PUBLIC_CALL_OUTCOMES.REJECTED
+          : PUBLIC_CALL_OUTCOMES.UNCERTAIN,
       reason: reason ?? errorDetails.name ?? 'UnknownError',
       transaction: errorDetails.transaction,
       message: (errorDetails.invalidMessage ?? errorDetails.errorMessage)
@@ -159,7 +169,7 @@ export async function createExactSeller(options: {
       const last = options.facilitator.calls.at(-1);
       response
         .status(
-          last?.outcome === 'uncertain'
+          last?.outcome === PUBLIC_CALL_OUTCOMES.UNCERTAIN
             ? HTTP_STATUS.serviceUnavailable
             : HTTP_STATUS.paymentRequired,
         )
