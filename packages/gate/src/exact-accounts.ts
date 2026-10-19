@@ -13,12 +13,13 @@ import {
 
 import { COMMITMENT } from '@gyblos/config';
 import { signer, type Config } from '@gyblos/gate/config';
+import { WALLET_ROLES } from '@gyblos/gate/constants';
 import { assertDevnet, confirm, rpc } from '@gyblos/payments-x402/chain';
 import { DEVNET_USDC } from '@gyblos/payments-x402/constants';
 
 export async function prepareExactAccounts(config: Config) {
   await assertDevnet(config.rpcUrl);
-  const sponsor = await signer(config, 'facilitator');
+  const sponsor = await signer(config, WALLET_ROLES.FACILITATOR);
   const instructions = await Promise.all(
     [config.addresses.seller, config.addresses.authorizer].map((owner) =>
       getCreateAssociatedTokenIdempotentInstructionAsync({

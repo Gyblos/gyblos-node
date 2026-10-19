@@ -4,23 +4,22 @@ import { resolve } from 'node:path';
 import { createKeyPairSignerFromBytes } from '@solana/kit';
 
 import { CONFIG_PATH, KEY_LIMITS } from '@gyblos/config';
+import {
+  SCHEMA_VERSIONS,
+  type ConfigAssetLabel,
+  type WalletRole,
+} from '@gyblos/gate/constants';
 import { DEVNET_USDC } from '@gyblos/payments-x402/constants';
 
 export const defaultMint = DEVNET_USDC;
 
 export interface Config {
-  schemaVersion: 1;
+  schemaVersion: typeof SCHEMA_VERSIONS.CONFIG;
   rpcUrl: string;
   mint: string;
-  assetLabel: 'devnet-usdc' | 'devnet-test-token';
-  keys: Record<
-    'buyer' | 'seller' | 'authorizer' | 'facilitator' | 'mint',
-    string
-  >;
-  addresses: Record<
-    'buyer' | 'seller' | 'authorizer' | 'facilitator' | 'mint',
-    string
-  >;
+  assetLabel: ConfigAssetLabel;
+  keys: Record<WalletRole, string>;
+  addresses: Record<WalletRole, string>;
 }
 
 export const configPath = () =>
@@ -28,7 +27,7 @@ export const configPath = () =>
 
 export async function loadConfig(): Promise<Config> {
   const config = JSON.parse(await readFile(configPath(), 'utf8')) as Config;
-  if (config.schemaVersion !== 1)
+  if (config.schemaVersion !== SCHEMA_VERSIONS.CONFIG)
     throw new Error('Unsupported config. Run pnpm gate:setup.');
   if (process.env.GYBLOS_RPC_URL) config.rpcUrl = process.env.GYBLOS_RPC_URL;
   return config;

@@ -104,4 +104,7 @@ export const CLEANUP = {
   maxPriorityFeeMicroLamports: 5_000,
 } as const;
 
-export const HTTP_LIMITS = { requestBody: '8kb' } as const;
+export const HTTP_LIMITS = {
+  requestBody: '8kb',
+  facilitatorBody: '64kb',
+} as const;

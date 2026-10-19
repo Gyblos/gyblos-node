@@ -1,4 +1,6 @@
+import type { ObservedDoneReason } from '@gyblos/application/constants';
 import type { PRICES, TOLERANCE } from '@gyblos/application/metering';
+import type { InferenceCaseName } from '@gyblos/gate/constants';
 import type { EngineUsage, MODEL } from '@gyblos/inference-ollama/index';
 
 import type { inferenceSnapshot, transactionTransfers } from './chain.js';
@@ -25,7 +27,7 @@ export interface InferenceTransaction {
 }
 
 export interface InferenceCaseResult {
-  case: string;
+  case: InferenceCaseName;
   measurement: Measurement;
   before: InferenceSnapshot;
   duringDeposit: InferenceSnapshot;
@@ -33,7 +35,7 @@ export interface InferenceCaseResult {
   trace: InferenceTrace;
   refundAtomic: string;
   engineUsage: EngineUsage | null;
-  doneReason: string | null;
+  doneReason: ObservedDoneReason | null;
   onChain: { open: InferenceTransaction; claim: InferenceTransaction };
 }
 

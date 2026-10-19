@@ -3,10 +3,24 @@ import assert from 'node:assert/strict';
 import { encodePaymentSignatureHeader } from '@x402/core/http';
 
 import { COMMITMENT, HTTP_STATUS, TIMEOUTS } from '@gyblos/config';
+import {
+  CASE_STATUSES,
+  EVIDENCE_STATUSES,
+  EXACT_CASES,
+  EXACT_REPLAY_SCOPE,
+  JOURNAL_STATES,
+  RECONCILIATION_CLASSIFICATIONS,
+  WALLET_ROLES,
+} from '@gyblos/gate/constants';
 import { saveJournal } from '@gyblos/gate/journal';
 import type { ChainTransaction } from '@gyblos/gate/types';
 import { confirm, explorer, GateError, rpc } from '@gyblos/payments-x402/chain';
-import { DEVNET, GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
+import {
+  DEVNET,
+  GATE_ERROR_CODES,
+  PUBLIC_CALL_OPERATIONS,
+  PUBLIC_CALL_OUTCOMES,
+} from '@gyblos/payments-x402/constants';
 import {
   assertExactFallbackSafe,
   EXACT_PRICE,
@@ -51,7 +65,7 @@ export async function runProvider(context: ExactContext) {
       active = value;
     });
     await assertEmpty(context, challenge, policy);
-    const success = await paid('buyer', 'paid-request');
+    const success = await paid(WALLET_ROLES.BUYER, EXACT_CASES.PAID_REQUEST);
     if (
       success.response.status !== HTTP_STATUS.ok ||
       !success.receipt?.success
@@ -68,15 +82,15 @@ export async function runProvider(context: ExactContext) {
           'Payment transaction observed without successful delivery.',
         );
       cases.push({
-        case: 'paid-request',
+        case: EXACT_CASES.PAID_REQUEST,
         facilitator: provider.url,
-        status: 'rejected',
+        status: CASE_STATUSES.REJECTED,
         httpStatus: success.response.status,
         calls: success.calls,
         reconciliation,
       });
       await saveJournal(journalPath, {
-        state: 'rejected',
+        state: JOURNAL_STATES.REJECTED,
         ...success.metadata,
         reconciliation,
       });
@@ -102,12 +116,16 @@ export async function runProvider(context: ExactContext) {
     assert.equal(host.handlerCalls() - success.previousHandlers, 1);
     assert.ok(
       success.calls.some(
-        (call) => call.operation === 'verify' && call.outcome === 'success',
+        (call) =>
+          call.operation === PUBLIC_CALL_OPERATIONS.VERIFY &&
+          call.outcome === PUBLIC_CALL_OUTCOMES.SUCCESS,
       ),
     );
     assert.ok(
       success.calls.some(
-        (call) => call.operation === 'settle' && call.outcome === 'success',
+        (call) =>
+          call.operation === PUBLIC_CALL_OPERATIONS.SETTLE &&
+          call.outcome === PUBLIC_CALL_OUTCOMES.SUCCESS,
       ),
     );
     const onChain = await rpc<ChainTransaction | null>(
@@ -131,8 +149,8 @@ export async function runProvider(context: ExactContext) {
       provider.feePayer,
     );
     cases.push({
-      case: 'paid-request',
-      status: 'passed',
+      case: EXACT_CASES.PAID_REQUEST,
+      status: CASE_STATUSES.PASSED,
       httpStatus: HTTP_STATUS.ok,
       ...success.metadata,
       receipt,
@@ -151,7 +169,7 @@ export async function runProvider(context: ExactContext) {
       },
     });
     await saveJournal(journalPath, {
-      state: COMMITMENT,
+      state: JOURNAL_STATES.CONFIRMED,
       transaction: receipt.transaction,
       ...success.metadata,
     });
@@ -172,23 +190,23 @@ export async function runProvider(context: ExactContext) {
     assert.equal(host.handlerCalls(), handlers);
     assert.equal(facilitator.calls.length, callCount);
     cases.push({
-      case: 'replay',
-      status: 'passed',
+      case: EXACT_CASES.REPLAY,
+      status: CASE_STATUSES.PASSED,
       httpStatus: HTTP_STATUS.conflict,
       before: replayBefore,
       after: replayAfter,
       handlerDelta: 0,
       publicCallDelta: 0,
       originalTransaction: receipt.transaction,
-      scope: 'same-process replay guard',
+      scope: EXACT_REPLAY_SCOPE,
     });
-    evidence.status = 'passed';
+    evidence.status = EVIDENCE_STATUSES.PASSED;
     evidence.gatePassed = true;
     evidence.finishedAt = new Date().toISOString();
     await persist();
     console.log(
       JSON.stringify({
-        status: 'passed',
+        status: EVIDENCE_STATUSES.PASSED,
         evidencePath,
         facilitator: provider.url,
         transaction: receipt.transaction,
@@ -203,12 +221,12 @@ export async function runProvider(context: ExactContext) {
         active.buyer,
         active.buyerSignature,
       ).catch(() => ({
-        classification: 'reconciliation-unavailable' as const,
+        classification: RECONCILIATION_CLASSIFICATIONS.UNAVAILABLE,
       }));
-      evidence.status = 'uncertain';
+      evidence.status = EVIDENCE_STATUSES.UNCERTAIN;
       evidence.reconciliation = reconciliation;
       await saveJournal(journalPath, {
-        state: 'uncertain',
+        state: JOURNAL_STATES.UNCERTAIN,
         ...active,
         reconciliation,
       });

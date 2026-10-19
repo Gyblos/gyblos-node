@@ -1,3 +1,7 @@
+import {
+  OBSERVED_DONE_REASONS,
+  type ObservedDoneReason,
+} from '@gyblos/application/constants';
 import { charge, compareUsage } from '@gyblos/application/metering';
 import { HTTP_STATUS } from '@gyblos/config';
 import type { EngineUsage } from '@gyblos/inference-ollama/index';
@@ -11,7 +15,7 @@ export interface ObservedBody {
   usage?: EngineUsage;
   billedTokens?: { input: number; output: number };
   done?: boolean;
-  doneReason?: string;
+  doneReason?: ObservedDoneReason;
 }
 
 export function observeInferenceResponse(input: {
@@ -72,9 +76,10 @@ export function observeInferenceResponse(input: {
       billedTokens,
       done: raw.done === true,
       doneReason:
-        raw.doneReason === 'stop' || raw.doneReason === 'length'
+        raw.doneReason === OBSERVED_DONE_REASONS.STOP ||
+        raw.doneReason === OBSERVED_DONE_REASONS.LENGTH
           ? raw.doneReason
-          : 'unknown',
+          : OBSERVED_DONE_REASONS.UNKNOWN,
     });
   }
   const text = body.content ?? '';
@@ -85,7 +90,10 @@ export function observeInferenceResponse(input: {
   const engineTokens = body.usage
     ? { input: body.usage.prompt_eval_count, output: body.usage.eval_count }
     : null;
-  const delivered = !failed && body.done === true && body.doneReason === 'stop';
+  const delivered =
+    !failed &&
+    body.done === true &&
+    body.doneReason === OBSERVED_DONE_REASONS.STOP;
   const comparison = engineTokens
     ? compareUsage(engineTokens, recounted)
     : null;

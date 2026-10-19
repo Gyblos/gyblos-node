@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
+import { INFERENCE_CASES } from '@gyblos/gate/constants';
+
 export function createCases(
   debugRequestId: string,
   failureRequestId: string,
@@ -7,22 +9,22 @@ export function createCases(
 ) {
   return [
     {
-      name: 'honest-1',
+      name: INFERENCE_CASES.HONEST_1,
       requestId: randomUUID(),
       prompt: 'Explain in three short sentences how rain forms.',
     },
     {
-      name: 'honest-2',
+      name: INFERENCE_CASES.HONEST_2,
       requestId: randomUUID(),
       prompt: 'Explain in three short sentences why plants need sunlight.',
     },
     {
-      name: 'honest-3',
+      name: INFERENCE_CASES.HONEST_3,
       requestId: randomUUID(),
       prompt: 'Explain in three short sentences how a bicycle moves.',
     },
     {
-      name: 'overcharge',
+      name: INFERENCE_CASES.OVERCHARGE,
       requestId: debugRequestId,
       prompt: 'Explain in four sentences how a seed becomes a tree.',
     },
@@ -30,13 +32,13 @@ export function createCases(
       ? []
       : [
           {
-            name: 'undercharge',
+            name: INFERENCE_CASES.UNDERCHARGE,
             requestId: underchargeRequestId,
             prompt: 'Explain in four sentences how a seed becomes a tree.',
           },
         ]),
     {
-      name: 'engine-interrupted',
+      name: INFERENCE_CASES.ENGINE_INTERRUPTED,
       requestId: failureRequestId,
       prompt: 'Describe in detail the water cycle in ten numbered paragraphs.',
     },

@@ -1,5 +1,10 @@
 import { IPV6_LOOPBACK, LOCALHOST, ROUTES, TIMEOUTS } from '@gyblos/config';
-import { GENERATION, MODEL_LIMITS } from '@gyblos/inference-ollama/constants';
+import {
+  ENGINE_DONE_REASONS,
+  GENERATION,
+  MODEL_LIMITS,
+  type EngineDoneReason,
+} from '@gyblos/inference-ollama/constants';
 import { MODEL, renderChat } from '@gyblos/inference-ollama/model';
 
 export interface EngineUsage {
@@ -15,7 +20,7 @@ export interface InferenceResult {
   text: string;
   usage: EngineUsage;
   done: true;
-  doneReason: string;
+  doneReason: EngineDoneReason;
 }
 
 export { MODEL, renderChat } from '@gyblos/inference-ollama/model';
@@ -137,11 +142,12 @@ export function createOllama(base: string, fetchImpl: typeof fetch = fetch) {
           }
           if (part.done) break;
         }
+        if (buffer.trim() || !terminal || !fragments)
+          throw new Error('Incomplete engine response.');
+        const doneReason = String(terminal.done_reason);
         if (
-          buffer.trim() ||
-          !terminal ||
-          !fragments ||
-          !['stop', 'length'].includes(String(terminal.done_reason))
+          doneReason !== ENGINE_DONE_REASONS.STOP &&
+          doneReason !== ENGINE_DONE_REASONS.LENGTH
         )
           throw new Error('Incomplete engine response.');
         const usage = Object.fromEntries(
@@ -163,7 +169,7 @@ export function createOllama(base: string, fetchImpl: typeof fetch = fetch) {
           text,
           usage,
           done: true,
-          doneReason: String(terminal.done_reason),
+          doneReason,
         };
       } finally {
         await reader.cancel().catch(() => {});

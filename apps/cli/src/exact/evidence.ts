@@ -1,4 +1,10 @@
 import { X402_SDK_VERSION } from '@gyblos/config';
+import {
+  EVIDENCE_IDS,
+  EVIDENCE_STATUSES,
+  EXACT_ASSET_LABELS,
+  SCHEMA_VERSIONS,
+} from '@gyblos/gate/constants';
 import type { ExactGateEvidence } from '@gyblos/gate/types';
 import { DEVNET, DEVNET_USDC } from '@gyblos/payments-x402/constants';
 import { EXACT_PRICE } from '@gyblos/payments-x402/exact/index';
@@ -11,14 +17,14 @@ export function createEvidence() {
     'Replay guard is process-scoped; restart/distributed replay protection is not validated',
   ];
   const evidence: ExactGateEvidence = {
-    schemaVersion: 1,
-    evidenceId: 'GYB-GATE-0004',
+    schemaVersion: SCHEMA_VERSIONS.EVIDENCE,
+    evidenceId: EVIDENCE_IDS.EXACT,
     sdkVersion: X402_SDK_VERSION,
     network: DEVNET,
     mint: DEVNET_USDC,
-    assetLabel: 'Circle devnet USDC',
+    assetLabel: EXACT_ASSET_LABELS.CIRCLE_USDC,
     priceAtomic: EXACT_PRICE,
-    status: 'in-progress',
+    status: EVIDENCE_STATUSES.IN_PROGRESS,
     gatePassed: false,
     startedAt: new Date().toISOString(),
     facilitators: [],

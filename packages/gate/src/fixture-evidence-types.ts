@@ -1,14 +1,22 @@
 import type { PaymentRequirements } from '@x402/core/types';
 
 import type { runGate } from '@gyblos/application/gate';
+import type {
+  CASE_STATUSES,
+  CHALLENGE_STAGES,
+  ConfigAssetLabel,
+  EVIDENCE_STATUSES,
+  FAILURE_CASES,
+  SCHEMA_VERSIONS,
+} from '@gyblos/gate/constants';
 import type { createFacilitator } from '@gyblos/payments-x402/facilitator';
 
 export type FixedGateEvidence = Awaited<ReturnType<typeof runGate>> & {
-  schemaVersion: number;
-  status: string;
+  schemaVersion: typeof SCHEMA_VERSIONS.EVIDENCE;
+  status: typeof EVIDENCE_STATUSES.PASSED;
   createdAt: string;
   network: string;
-  assetLabel: string;
+  assetLabel: ConfigAssetLabel;
   mint: string;
   upstreamCommit: string;
   sdkVersion: string;
@@ -17,8 +25,8 @@ export type FixedGateEvidence = Awaited<ReturnType<typeof runGate>> & {
 };
 
 export interface ChallengeEvidence {
-  schemaVersion: number;
-  stage: string;
+  schemaVersion: typeof SCHEMA_VERSIONS.EVIDENCE;
+  stage: typeof CHALLENGE_STAGES.UNPAID;
   gatePassed: boolean;
   createdAt: string;
   upstreamCommit: string;
@@ -30,8 +38,8 @@ export interface ChallengeEvidence {
 }
 
 export interface FailureCaseResult {
-  case: 'F1' | 'F2';
-  status: string;
+  case: typeof FAILURE_CASES.EMPTY_BUYER | typeof FAILURE_CASES.EXPIRED;
+  status: typeof CASE_STATUSES.PASSED;
   httpStatus: number;
   buyer: string;
   channelId: string;
@@ -47,11 +55,11 @@ export interface FailureCaseResult {
 }
 
 export interface FailureGateEvidence {
-  schemaVersion: number;
+  schemaVersion: typeof SCHEMA_VERSIONS.EVIDENCE;
   createdAt: string;
   network: string;
   mint: string;
-  assetLabel: string;
+  assetLabel: ConfigAssetLabel;
   setupTransaction: string;
   results: FailureCaseResult[];
   limitations: string[];

@@ -14,10 +14,11 @@ import {
 
 import { COMMITMENT } from '@gyblos/config';
 import { signer, type Config } from '@gyblos/gate/config';
+import { WALLET_ROLES } from '@gyblos/gate/constants';
 import { confirm, rpc } from '@gyblos/payments-x402/chain';
 
 export async function prepareFailureAccounts(config: Config) {
-  const sponsor = await signer(config, 'facilitator'),
+  const sponsor = await signer(config, WALLET_ROLES.FACILITATOR),
     emptyBuyer = await generateKeyPairSigner();
   const latest = (
     await rpc<{ value: { blockhash: string; lastValidBlockHeight: number } }>(

@@ -1,3 +1,4 @@
+import { CHARGE_ANOMALIES } from '@gyblos/application/constants';
 import { UNITS } from '@gyblos/config';
 
 import { PRICES, TOLERANCE } from './constants.js';
@@ -66,13 +67,13 @@ export function assessCharge(
         : Number(difference) / Number(expected),
     anomaly:
       actual > expected + allowance
-        ? 'overcharge'
+        ? CHARGE_ANOMALIES.OVERCHARGE
         : failed
-          ? 'failed'
+          ? CHARGE_ANOMALIES.FAILED
           : !delivered
-            ? 'incomplete'
+            ? CHARGE_ANOMALIES.INCOMPLETE
             : actual < expected - allowance
-              ? 'undercharge'
-              : 'none',
+              ? CHARGE_ANOMALIES.UNDERCHARGE
+              : CHARGE_ANOMALIES.NONE,
   };
 }

@@ -34,8 +34,24 @@ export const GATE_ERROR_CODES = {
   WRONG_CLUSTER: 'WRONG_CLUSTER',
 } as const;
 
+export const PUBLIC_CALL_OPERATIONS = {
+  VERIFY: 'verify',
+  SETTLE: 'settle',
+} as const;
+
+export const PUBLIC_CALL_OUTCOMES = {
+  SUCCESS: 'success',
+  REJECTED: 'rejected',
+  UNCERTAIN: 'uncertain',
+} as const;
+
 export type GateErrorCode =
   (typeof GATE_ERROR_CODES)[keyof typeof GATE_ERROR_CODES];
+
+export type PublicCallOperation =
+  (typeof PUBLIC_CALL_OPERATIONS)[keyof typeof PUBLIC_CALL_OPERATIONS];
+export type PublicCallOutcome =
+  (typeof PUBLIC_CALL_OUTCOMES)[keyof typeof PUBLIC_CALL_OUTCOMES];
 
 export {
   DEVNET,

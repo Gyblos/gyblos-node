@@ -6,7 +6,6 @@ import { address } from '@solana/kit';
 import type { SupportedResponse } from '@x402/core/types';
 
 import {
-  COMMITMENT,
   EVIDENCE_PATHS,
   JOURNAL_PATHS,
   LOCALHOST,
@@ -15,7 +14,14 @@ import {
   TIMEOUTS,
 } from '@gyblos/config';
 import { loadConfig, saveJson } from '@gyblos/gate/config';
-import { EXACT_EVIDENCE_CODES } from '@gyblos/gate/constants';
+import {
+  CASE_STATUSES,
+  EVIDENCE_STATUSES,
+  EXACT_CASES,
+  EXACT_EVIDENCE_CODES,
+  FACILITATOR_STATUSES,
+  JOURNAL_STATES,
+} from '@gyblos/gate/constants';
 import { prepareExactAccounts } from '@gyblos/gate/exact-accounts';
 import { assertNoUnresolvedAuthorizations } from '@gyblos/gate/journal';
 import { withExclusiveLock } from '@gyblos/gate/lock';
@@ -56,7 +62,11 @@ export async function main() {
     await assertNoUnresolvedAuthorizations();
     try {
       const previousJournal = JSON.parse(await readFile(journalPath, 'utf8'));
-      if (![COMMITMENT, 'rejected'].includes(previousJournal.state))
+      if (
+        ![JOURNAL_STATES.CONFIRMED, JOURNAL_STATES.REJECTED].includes(
+          previousJournal.state,
+        )
+      )
         throw new GateError(
           GATE_ERROR_CODES.UNRESOLVED_EXACT,
           'Previous exact payment is uncertain. Reconcile before another attempt.',
@@ -94,7 +104,7 @@ export async function main() {
           throw error;
         evidence.facilitators.push({
           url: provider.url,
-          status: 'unavailable',
+          status: FACILITATOR_STATUSES.UNAVAILABLE,
           reason: error instanceof Error ? error.name : 'UnknownError',
         });
         await persist();
@@ -135,8 +145,8 @@ export async function main() {
           throw error;
         evidence.results.push({
           facilitator: provider.url,
-          case: 'startup',
-          status: 'external-unavailable',
+          case: EXACT_CASES.STARTUP,
+          status: CASE_STATUSES.EXTERNAL_UNAVAILABLE,
           reason: error instanceof Error ? error.name : 'UnknownError',
         });
         await persist();
@@ -179,7 +189,8 @@ export async function main() {
       await run();
     });
   } catch (error) {
-    if (evidence.status !== 'uncertain') evidence.status = 'blocked';
+    if (evidence.status !== EVIDENCE_STATUSES.UNCERTAIN)
+      evidence.status = EVIDENCE_STATUSES.BLOCKED;
     evidence.error = {
       code:
         error instanceof GateError

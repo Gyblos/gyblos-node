@@ -20,6 +20,14 @@ import {
   UNITS,
 } from '@gyblos/config';
 import { loadConfig, saveJson, signer } from '@gyblos/gate/config';
+import {
+  CASE_STATUSES,
+  CONFIG_ASSET_LABELS,
+  FAILURE_CASES,
+  JOURNAL_STATES,
+  SCHEMA_VERSIONS,
+  WALLET_ROLES,
+} from '@gyblos/gate/constants';
 import type {
   FailureCaseResult,
   FailureGateEvidence,
@@ -47,14 +55,19 @@ export async function failureGate() {
     const config = await loadConfig();
     await assertProgram(config.rpcUrl);
     // This harness creates only devnet test-token accounts, never imports a user wallet.
-    assert.equal(config.assetLabel, 'devnet-test-token');
+    assert.equal(config.assetLabel, CONFIG_ASSET_LABELS.TEST_TOKEN);
     await assertNoUnresolvedAuthorizations();
     const { sponsor, emptyBuyer, setupTransaction } =
       await prepareFailureAccounts(config);
     const results: FailureCaseResult[] = [];
-    for (const kind of ['F1', 'F2'] as const) {
+    for (const kind of [
+      FAILURE_CASES.EMPTY_BUYER,
+      FAILURE_CASES.EXPIRED,
+    ] as const) {
       const buyerSigner =
-        kind === 'F1' ? emptyBuyer : await signer(config, 'buyer');
+        kind === FAILURE_CASES.EMPTY_BUYER
+          ? emptyBuyer
+          : await signer(config, WALLET_ROLES.BUYER);
       const facilitator = createFacilitator(sponsor, config.rpcUrl, {
         buyer: buyerSigner.address,
         mint: config.mint,
@@ -72,7 +85,7 @@ export async function failureGate() {
           facilitatorUrl: `http://${LOCALHOST}:${facilitatorAddress.port}`,
           mint: config.mint,
           payTo: config.addresses.seller,
-          authorizer: await signer(config, 'authorizer'),
+          authorizer: await signer(config, WALLET_ROLES.AUTHORIZER),
         });
         sellerServer = seller.app.listen(0, LOCALHOST);
         await once(sellerServer, 'listening');
@@ -93,7 +106,7 @@ export async function failureGate() {
         const fetchImpl: typeof fetch = async (input, init) => {
           const request = new Request(input, init);
           const header = request.headers.get('PAYMENT-SIGNATURE');
-          if (header && kind === 'F2') {
+          if (header && kind === FAILURE_CASES.EXPIRED) {
             expiresAt = Number(
               decodePaymentSignatureHeader(header).payload.expiresAt,
             );
@@ -152,7 +165,7 @@ export async function failureGate() {
           async (authorization) => {
             channelId = authorization.channelId;
             await saveJournal(failureJournalPath(kind), {
-              state: 'authorization-created',
+              state: JOURNAL_STATES.AUTHORIZATION_CREATED,
               channelId,
               createdAt: new Date().toISOString(),
               case: kind,
@@ -186,7 +199,7 @@ export async function failureGate() {
           ).toString(),
         };
         assert.deepEqual(after, before);
-        if (kind === 'F1') {
+        if (kind === FAILURE_CASES.EMPTY_BUYER) {
           assert.equal(before.buyer, '0');
           assert.equal(
             facilitator.events[0]?.errorReason,
@@ -207,7 +220,7 @@ export async function failureGate() {
         }
         results.push({
           case: kind,
-          status: 'passed',
+          status: CASE_STATUSES.PASSED,
           httpStatus: response.status,
           buyer: buyerSigner.address,
           channelId,
@@ -223,7 +236,7 @@ export async function failureGate() {
         });
         await saveJson(failureResultPath(kind), results.at(-1));
         await saveJournal(failureJournalPath(kind), {
-          state: 'resolved-rejected',
+          state: JOURNAL_STATES.RESOLVED_REJECTED,
           channelId,
           resolvedAt: new Date().toISOString(),
           resultPath: failureResultPath(kind),
@@ -242,7 +255,7 @@ export async function failureGate() {
       }
     }
     const evidence: FailureGateEvidence = {
-      schemaVersion: 1,
+      schemaVersion: SCHEMA_VERSIONS.EVIDENCE,
       createdAt: new Date().toISOString(),
       network: DEVNET,
       mint: config.mint,

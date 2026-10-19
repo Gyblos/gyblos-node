@@ -11,10 +11,15 @@ import express from 'express';
 import {
   CLEANUP,
   DIAGNOSTIC_LIMITS,
+  HTTP_LIMITS,
   HTTP_STATUS,
   ROUTES,
 } from '@gyblos/config';
-import { DEVNET, MAX_ATOMIC } from '@gyblos/payments-x402/constants';
+import {
+  DEVNET,
+  MAX_ATOMIC,
+  PUBLIC_CALL_OPERATIONS,
+} from '@gyblos/payments-x402/constants';
 
 export interface SettlementEvent {
   phase: string;
@@ -49,7 +54,7 @@ export function createFacilitator(
   const facilitator = new x402Facilitator().register(DEVNET, scheme);
   const cleanup = scheme.createRentCleanupManager(DEVNET);
   const app = express();
-  app.use(express.json({ limit: '64kb' }));
+  app.use(express.json({ limit: HTTP_LIMITS.facilitatorBody }));
   app.get(ROUTES.health, (_request, response) => {
     response.json({ runId: runId ?? null });
   });
@@ -62,7 +67,10 @@ export function createFacilitator(
   app.get(ROUTES.verifications, (_request, response) => {
     response.json(verifications);
   });
-  for (const operation of ['verify', 'settle'] as const) {
+  for (const operation of [
+    PUBLIC_CALL_OPERATIONS.VERIFY,
+    PUBLIC_CALL_OPERATIONS.SETTLE,
+  ]) {
     app.post(`/${operation}`, async (request, response) => {
       const payload = request.body?.paymentPayload as
         PaymentPayload | undefined;
@@ -89,7 +97,7 @@ export function createFacilitator(
         return;
       }
       try {
-        if (operation === 'verify') {
+        if (operation === PUBLIC_CALL_OPERATIONS.VERIFY) {
           const result = await facilitator.verify(payload, requirements);
           verifications.push({
             channelId: String(payload.payload.channelId),

@@ -20,6 +20,7 @@ import {
   TOKEN_PROGRAM_ADDRESS,
 } from '@gyblos/config';
 import { type Config } from '@gyblos/gate/config';
+import { RECONCILIATION_CLASSIFICATIONS } from '@gyblos/gate/constants';
 import type { AccountsResponse, ChainTransaction } from '@gyblos/gate/types';
 import { GateError, lamports, rpc } from '@gyblos/payments-x402/chain';
 import { DEVNET_USDC, GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
@@ -136,7 +137,7 @@ export async function reconcile(
     historyLimit: DIAGNOSTIC_LIMITS.transactionHistory,
     matches,
     classification: matches.length
-      ? 'matching-transaction-observed'
-      : 'no-matching-transaction-observed',
+      ? RECONCILIATION_CLASSIFICATIONS.MATCHED
+      : RECONCILIATION_CLASSIFICATIONS.NOT_OBSERVED,
   };
 }

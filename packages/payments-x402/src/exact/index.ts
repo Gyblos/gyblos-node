@@ -13,7 +13,10 @@ import {
   DEVNET,
   DEVNET_USDC,
   GATE_ERROR_CODES,
+  PUBLIC_CALL_OPERATIONS,
+  PUBLIC_CALL_OUTCOMES,
 } from '@gyblos/payments-x402/constants';
+import type { PublicCall } from '@gyblos/payments-x402/exact/types';
 
 export interface ExactPolicy {
   payTo: string;
@@ -105,15 +108,19 @@ export function createExactBuyer(
 }
 
 export function assertExactFallbackSafe(
-  calls: { operation: string; outcome: string }[],
+  calls: Pick<PublicCall, 'operation' | 'outcome'>[],
 ) {
   // Empty RPC history never proves an attempted settlement did not broadcast.
   if (
     calls.some(
-      (call) => call.operation === 'settle' || call.outcome === 'uncertain',
+      (call) =>
+        call.operation === PUBLIC_CALL_OPERATIONS.SETTLE ||
+        call.outcome === PUBLIC_CALL_OUTCOMES.UNCERTAIN,
     ) ||
     !calls.some(
-      (call) => call.operation === 'verify' && call.outcome === 'rejected',
+      (call) =>
+        call.operation === PUBLIC_CALL_OPERATIONS.VERIFY &&
+        call.outcome === PUBLIC_CALL_OUTCOMES.REJECTED,
     )
   )
     throw new GateError(
