@@ -24,6 +24,7 @@ import {
   TOKEN_PROGRAM_ADDRESS,
 } from '@gyblos/config';
 import { configPath, loadConfig, saveJson, signer } from '@gyblos/gate/config';
+import { CONFIG_ASSET_LABELS, WALLET_ROLES } from '@gyblos/gate/constants';
 import {
   account,
   assertProgram,
@@ -36,7 +37,7 @@ export async function fundGate() {
   try {
     const config = await loadConfig();
     await assertProgram(config.rpcUrl);
-    const feePayer = await signer(config, 'facilitator');
+    const feePayer = await signer(config, WALLET_ROLES.FACILITATOR);
     if (
       (await lamports(config.rpcUrl, feePayer.address)) <
       PAYMENT_LIMITS.airdropThreshold
@@ -53,7 +54,7 @@ export async function fundGate() {
         'Fee payer funded. Fund buyer with devnet USDC, or use gate:fund --test-mint for the plan-approved SPL fallback.',
       );
     } else {
-      const mint = await signer(config, 'mint');
+      const mint = await signer(config, WALLET_ROLES.MINT);
       const mintExists = !!(await account(config.rpcUrl, mint.address));
       {
         const rent = await rpc<number>(
@@ -154,7 +155,7 @@ export async function fundGate() {
         );
       }
       config.mint = mint.address;
-      config.assetLabel = 'devnet-test-token';
+      config.assetLabel = CONFIG_ASSET_LABELS.TEST_TOKEN;
       await saveJson(configPath(), config);
       console.log(
         'Configured six-decimal SPL test token. This is not Circle USDC.',
