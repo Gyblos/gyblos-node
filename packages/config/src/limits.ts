@@ -105,3 +105,9 @@ export const CLEANUP = {
 } as const;
 
 export const HTTP_LIMITS = { requestBody: '8kb' } as const;
+
+export const INFERENCE_REQUEST_LIMITS = {
+  minOutputTokens: 32,
+  maxOutputTokens: 128,
+  maxPromptCharacters: 4000,
+} as const;
