@@ -1,0 +1,308 @@
+{
+  "schemaVersion": 1,
+  "evidenceId": "GYB-GATE-0006",
+  "source": {
+    "algorithm": "sha256(sorted source path NUL bytes NUL)",
+    "digest": "26461ab51a91e95b3e4a70f55a36bc71ed3e28bd19b6a5788522b40604d50c43"
+  },
+  "runId": "1dfb05ac-56b4-4047-98a3-d9313c4c753b",
+  "recordedAt": "2026-10-19T06:33:18.404Z",
+  "status": "partial",
+  "network": "solana-devnet",
+  "assetLabel": "devnet-test-token",
+  "mint": "2vXUXK2rJTPtb7Wx9em4W9FdgtfD6HTnFxZz5oirLVcH",
+  "sdk": {
+    "iroh": "1.1.0",
+    "x402": "2.28.0"
+  },
+  "images": {
+    "runtime": "sha256:b366aa3bca41d5a60b140307f6599342ec08ac5ef4bbd0fea308fdeaf6cf3793",
+    "node": "node:22.19.0-bookworm-slim@sha256:4a4884e8a44826194dff92ba316264f392056cbe243dcc9fd3551e71cea02b90",
+    "ollama": "ollama/ollama:0.40.0@sha256:1bef639749741b375e9a1eb2c1346fb57ce52f5432de1f74846e44ccc18e1687"
+  },
+  "fundingSignature": "2XGa9tNZQrKygFKkDYj88XzEctKHN7iKja3QdQhJnXPwrLW3yqjCsebqMNsyS2aaSPSok9YxH6n85XBcEk3mqV2P",
+  "previousAttempts": [
+    {
+      "channelId": "5xWDCmcxzujvJk9Y5KdovaaiUrijBddFKHTF4WcgpUz9",
+      "initialOutcome": "uncertain",
+      "sourceFingerprint": "84b4bb1ec783667cc735b4d442fb5bc141ac78528265fc9c2f631c0e22392d86",
+      "runtimeImage": "sha256:83f0848ab7f8961babc564ec8d2fd04532c61c46e05119d594cf2590b24a57dd",
+      "httpStatus": 502,
+      "reconciledOutcome": "finalized-zero-charge",
+      "ceilingAtomic": "556",
+      "chargedAtomic": "0",
+      "refundAtomic": "556",
+      "depositSignature": "4P7N1k5GY9ceT9rN2pmCdNZExRb8ajdcK447tNM5Q2tECuKSaMKs3ZQPey1djoayUGEUAuVu76Pq9Qm9k3es6iAt",
+      "claimSignature": "8pUcBxoubFL81iDpxYUuMwci5vuua4UzDpGwCPgSiWW1cVE2odxdSQ6Y5PHqTpLvx4Xx19tfSYyjVXZrRY3N2H2",
+      "balances": {
+        "slot": 512706361,
+        "buyer": "10000",
+        "seller": "8980",
+        "escrow": "0",
+        "buyerLamports": "0"
+      },
+      "reason": "Engine runner was missing at its executable search path; packaging corrected before subsequent calls."
+    }
+  ],
+  "security": {
+    "distinctVolumes": true,
+    "roles": [
+      {
+        "role": "buyer",
+        "nonRoot": true,
+        "readOnlyRoot": true,
+        "capabilities": [],
+        "noPublishedPorts": true,
+        "keys": [
+          {
+            "name": ".local/p2p/buyer.json",
+            "mode": 384
+          },
+          {
+            "name": ".local/p2p/node.key",
+            "mode": 384
+          }
+        ]
+      },
+      {
+        "role": "seller",
+        "nonRoot": true,
+        "readOnlyRoot": true,
+        "capabilities": [],
+        "noPublishedPorts": true,
+        "keys": [
+          {
+            "name": ".local/p2p/authorizer.json",
+            "mode": 384
+          },
+          {
+            "name": ".local/p2p/facilitator.json",
+            "mode": 384
+          },
+          {
+            "name": ".local/p2p/node.key",
+            "mode": 384
+          },
+          {
+            "name": ".local/p2p/owner.json",
+            "mode": 384
+          }
+        ]
+      }
+    ],
+    "loopbackOnlyPorts": [
+      {
+        "port": 11436,
+        "reachable": false
+      },
+      {
+        "port": 4022,
+        "reachable": false
+      },
+      {
+        "port": 4032,
+        "reachable": false
+      }
+    ],
+    "nativeIrohChallenge": {
+      "status": 402,
+      "paymentRequired": true
+    }
+  },
+  "scenarios": {
+    "flat": {
+      "status": "passed",
+      "cases": [
+        {
+          "case": 1,
+          "outcome": "confirmed",
+          "transport": "iroh-direct",
+          "connectMs": 2.2239580000000387,
+          "directObserved": true,
+          "relayObserved": false,
+          "channelId": "6r6U5vmZKnzJVJkJUM58qVz7tMaEN1XH89ywaQPyP69E",
+          "ceilingAtomic": "556",
+          "chargedAtomic": "122",
+          "refundAtomic": "434",
+          "depositSignature": "3vveadmPfE7oT7RD2LdvctPnrFj8bxtHsuNYUFwJVXpoLxRzK7jkRW4JBsVWCxmhmhHnVnP1vKtXmv3wCJXHPmw",
+          "claimSignature": "67DarZsJfJ1DPyF4PsufHjzvJEHM8FDkEUaijgGbFyxmm5h62fZapMeHwVfTCyHqiufPBsDLWnArqGNJ2Tpt6igM",
+          "depositSlot": 512708507,
+          "claimSlot": 512708553,
+          "balances": {
+            "before": {
+              "slot": 512708500,
+              "buyer": "10000",
+              "seller": "8980",
+              "escrow": null,
+              "buyerLamports": "0"
+            },
+            "depositConfirmed": {
+              "slot": 512708508,
+              "buyer": "9444",
+              "seller": "8980",
+              "escrow": "556",
+              "buyerLamports": "0"
+            },
+            "after": {
+              "slot": 512708557,
+              "buyer": "9878",
+              "seller": "9102",
+              "escrow": "0",
+              "buyerLamports": "0"
+            }
+          },
+          "latencyMs": 12541.448172999999,
+          "effectiveTokensPerSecond": 3.9070448104621773,
+          "recountedTokens": {
+            "input": 22,
+            "output": 49
+          },
+          "engineTokens": {
+            "input": 22,
+            "output": 50
+          },
+          "countComparison": {
+            "inputDelta": 0,
+            "outputDelta": 1,
+            "withinTolerance": true
+          },
+          "delivered": true,
+          "anomaly": "none",
+          "meteringMode": "recounted",
+          "generationAfterConfirmedDeposit": true
+        },
+        {
+          "case": 2,
+          "outcome": "confirmed",
+          "transport": "iroh-direct",
+          "connectMs": 2.2239580000000387,
+          "directObserved": true,
+          "relayObserved": false,
+          "channelId": "8ZwwH1ctNg2KA7bLZB7x8Bt6uwyRHL9nr2mPWm93dS7Q",
+          "ceilingAtomic": "558",
+          "chargedAtomic": "143",
+          "refundAtomic": "415",
+          "depositSignature": "CYstBiFyHzAWdfxh6XUx46xjuLsD53HsYLDCVPeFAuzUDprD45pWupXZc7qRocidxrUbp9g5ujy8N15oBH7adc9",
+          "claimSignature": "4DfNWdVDJdh2dVq9w4Ep4yTAF9Q6SBgkFcU5whAJP8Q4yz7tvEgt5RFrt8fhGwYbr91WHopUaYxT7wE4YekEAfyk",
+          "depositSlot": 512708570,
+          "claimSlot": 512708651,
+          "balances": {
+            "before": {
+              "slot": 512708564,
+              "buyer": "9878",
+              "seller": "9102",
+              "escrow": null,
+              "buyerLamports": "0"
+            },
+            "depositConfirmed": {
+              "slot": 512708573,
+              "buyer": "9320",
+              "seller": "9102",
+              "escrow": "558",
+              "buyerLamports": "0"
+            },
+            "after": {
+              "slot": 512708655,
+              "buyer": "9735",
+              "seller": "9245",
+              "escrow": "0",
+              "buyerLamports": "0"
+            }
+          },
+          "latencyMs": 20243.680508999998,
+          "effectiveTokensPerSecond": 2.9144897823184674,
+          "recountedTokens": {
+            "input": 23,
+            "output": 59
+          },
+          "engineTokens": {
+            "input": 23,
+            "output": 60
+          },
+          "countComparison": {
+            "inputDelta": 0,
+            "outputDelta": 1,
+            "withinTolerance": true
+          },
+          "delivered": true,
+          "anomaly": "none",
+          "meteringMode": "recounted",
+          "generationAfterConfirmedDeposit": true
+        },
+        {
+          "case": 3,
+          "outcome": "confirmed",
+          "transport": "iroh-direct",
+          "connectMs": 2.2239580000000387,
+          "directObserved": true,
+          "relayObserved": false,
+          "channelId": "Hc9tt42LU2Z1wb3wztH7AW5zZ9aFaa8ZEoeLq87dGzBM",
+          "ceilingAtomic": "558",
+          "chargedAtomic": "149",
+          "refundAtomic": "409",
+          "depositSignature": "9Wk5DYAXL79LUsBZN1hGFRSkh9ksPoGtjXxfF53uWXchAWdk31ZGcWXbesJTguF2H7ybGz6xkH32nX5BfJCtCCx",
+          "claimSignature": "65J4Q3Ny6Q2Jh4Wh4mvFn38NMfxMxaPTMzvpewjRFSS3JvF3WVfuj1mWfvp3pu3L2YEqF9WjR6mraEyaxjX76ukQ",
+          "depositSlot": 512708668,
+          "claimSlot": 512708719,
+          "balances": {
+            "before": {
+              "slot": 512708661,
+              "buyer": "9735",
+              "seller": "9245",
+              "escrow": null,
+              "buyerLamports": "0"
+            },
+            "depositConfirmed": {
+              "slot": 512708671,
+              "buyer": "9177",
+              "seller": "9245",
+              "escrow": "558",
+              "buyerLamports": "0"
+            },
+            "after": {
+              "slot": 512708724,
+              "buyer": "9586",
+              "seller": "9394",
+              "escrow": "0",
+              "buyerLamports": "0"
+            }
+          },
+          "latencyMs": 13587.616507,
+          "effectiveTokensPerSecond": 4.562978353713409,
+          "recountedTokens": {
+            "input": 23,
+            "output": 62
+          },
+          "engineTokens": {
+            "input": 23,
+            "output": 63
+          },
+          "countComparison": {
+            "inputDelta": 0,
+            "outputDelta": 1,
+            "withinTolerance": true
+          },
+          "delivered": true,
+          "anomaly": "none",
+          "meteringMode": "recounted",
+          "generationAfterConfirmedDeposit": true
+        }
+      ]
+    },
+    "natDirect": {
+      "status": "not-run"
+    },
+    "natRelay": {
+      "status": "not-run"
+    }
+  },
+  "limitations": [
+    "Flat Docker networking validates native Iroh inference and devnet payments, not NAT traversal.",
+    "NAT routers and UDP-blocked relay fallback have not been executed.",
+    "Real separate-network Mac/VPS/mobile routes are not tested.",
+    "No content correctness, model authenticity, MPP, streaming, registry or reputation validation.",
+    "Routes are sampled observations, not proof of the path taken by every packet.",
+    "Direct peers can see each other IP addresses; relay-only mode requires an off-host empirical test.",
+    "Synthetic prompts only. Public output excludes keys, salts, content, signed payloads, RPC URLs and endpoint IP addresses."
+  ]
+}
