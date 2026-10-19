@@ -32,6 +32,7 @@ import {
   EXACT_PRICE,
   PUBLIC_FACILITATORS,
 } from '@gyblos/payments-x402/exact/index';
+import { UNKNOWN_ERROR_NAME } from '@gyblos/runtime/constants';
 import {
   AuditedPublicFacilitator,
   createExactSeller,
@@ -105,7 +106,7 @@ export async function main() {
         evidence.facilitators.push({
           url: provider.url,
           status: FACILITATOR_STATUSES.UNAVAILABLE,
-          reason: error instanceof Error ? error.name : 'UnknownError',
+          reason: error instanceof Error ? error.name : UNKNOWN_ERROR_NAME,
         });
         await persist();
       }
@@ -147,7 +148,7 @@ export async function main() {
           facilitator: provider.url,
           case: EXACT_CASES.STARTUP,
           status: CASE_STATUSES.EXTERNAL_UNAVAILABLE,
-          reason: error instanceof Error ? error.name : 'UnknownError',
+          reason: error instanceof Error ? error.name : UNKNOWN_ERROR_NAME,
         });
         await persist();
         continue;
@@ -196,7 +197,7 @@ export async function main() {
         error instanceof GateError
           ? error.code
           : EXACT_EVIDENCE_CODES.GATE_ERROR,
-      name: error instanceof Error ? error.name : 'UnknownError',
+      name: error instanceof Error ? error.name : UNKNOWN_ERROR_NAME,
       message:
         error instanceof GateError
           ? error.message

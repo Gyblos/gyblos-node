@@ -7,6 +7,10 @@ import test from 'node:test';
 import { ESLint, Linter } from 'eslint';
 
 import {
+  JOURNAL_STATES,
+  RECONCILIATION_CLASSIFICATIONS,
+} from '@gyblos/gate/constants';
+import {
   assertNoUnresolvedAuthorizations,
   saveJournal,
 } from '@gyblos/gate/journal';
@@ -76,7 +80,7 @@ test('typed journals preserve JSON serialization and path-specific terminal guar
   try {
     const path = join(directory, 'exact-attempt.json');
     const record = {
-      state: 'confirmed' as const,
+      state: JOURNAL_STATES.CONFIRMED,
       transaction: 'public-signature',
       authorizationHash: 'public-hash',
       buyerSignature: 'public-buyer-signature',
@@ -92,9 +96,11 @@ test('typed journals preserve JSON serialization and path-specific terminal guar
     >[0]);
     await saveJournal(path, {
       ...record,
-      state: 'uncertain',
+      state: JOURNAL_STATES.UNCERTAIN,
       buyer: 'buyer',
-      reconciliation: { classification: 'reconciliation-unavailable' },
+      reconciliation: {
+        classification: RECONCILIATION_CLASSIFICATIONS.UNAVAILABLE,
+      },
     });
     await assert.rejects(
       assertNoUnresolvedAuthorizations([path] as Parameters<

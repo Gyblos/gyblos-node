@@ -103,6 +103,12 @@ export const EXACT_UNTRUSTED_CASES = {
   feePayer: EXACT_CASES.UNTRUSTED_FEE_PAYER,
 } as const;
 
+export const FUNDING_OPERATIONS = {
+  AIRDROP: 'devnet-airdrop',
+  TEST_ACCOUNTS: 'devnet-test-accounts',
+  TEST_MINT: 'devnet-test-mint',
+} as const;
+
 export const SCHEMA_VERSIONS = {
   CONFIG: 1,
   EVIDENCE: 1,
@@ -147,3 +153,6 @@ export type WalletRole = (typeof WALLET_ROLES)[keyof typeof WALLET_ROLES];
 export type EvidenceAssetLabel =
   | ConfigAssetLabel
   | (typeof EXACT_ASSET_LABELS)[keyof typeof EXACT_ASSET_LABELS];
+
+export type FundingOperation =
+  (typeof FUNDING_OPERATIONS)[keyof typeof FUNDING_OPERATIONS];

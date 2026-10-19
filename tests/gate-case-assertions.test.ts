@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { CHARGE_ANOMALIES } from '@gyblos/application/constants';
 import {
   INFERENCE_CASES,
   type InferenceCaseName,
 } from '@gyblos/gate/constants';
+import { ENGINE_DONE_REASONS } from '@gyblos/inference-ollama/constants';
 
 import { assertInferenceCase } from '../apps/cli/src/inference/assertions.js';
 import { observeInferenceResponse } from '../packages/application/src/inference-observation.js';
@@ -41,7 +43,7 @@ function fixture(
       digest: MODEL.digest,
       content: 'Synthetic test output',
       done: true,
-      doneReason: options.reason ?? 'stop',
+      doneReason: options.reason ?? ENGINE_DONE_REASONS.STOP,
       billedTokens: billed,
       usage: {
         prompt_eval_count: options.engineInput ?? 24,
@@ -121,7 +123,9 @@ test('undercharge gate rejects honest billing and discounts inside tolerance', (
 
 test('undercharge gate requires complete successful delivery', () => {
   assert.throws(() => assertInferenceCase(fixture({ status: 502 })));
-  assert.throws(() => assertInferenceCase(fixture({ reason: 'length' })));
+  assert.throws(() =>
+    assertInferenceCase(fixture({ reason: ENGINE_DONE_REASONS.LENGTH })),
+  );
 });
 
 test('undercharge gate cannot discount the input tokens', () => {
@@ -130,7 +134,7 @@ test('undercharge gate cannot discount the input tokens', () => {
 
 test('a forged undercharge annotation cannot bypass the strict financial threshold', () => {
   const context = fixture({ billedOutput: 107 });
-  context.measurement.anomaly = 'undercharge';
+  context.measurement.anomaly = CHARGE_ANOMALIES.UNDERCHARGE;
   assert.throws(() => assertInferenceCase(context));
 });
 
@@ -176,6 +180,6 @@ test('strict undercharge acceptance rejects equality at the allowance boundary',
       BigInt(context.measurement.allowanceAtomic),
   );
   assert.equal(context.measurement.anomaly, 'none');
-  context.measurement.anomaly = 'undercharge';
+  context.measurement.anomaly = CHARGE_ANOMALIES.UNDERCHARGE;
   assert.throws(() => assertInferenceCase(context));
 });

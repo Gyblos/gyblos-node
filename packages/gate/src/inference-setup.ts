@@ -1,6 +1,6 @@
 import { once } from 'node:events';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { basename, resolve } from 'node:path';
 
 import {
   FILE_MODES,
@@ -12,6 +12,7 @@ import {
   ROUTES,
   TIMEOUTS,
   TOKENIZER_DIR,
+  TOKENIZER_FILES,
 } from '@gyblos/config';
 import {
   createModelTokenizer,
@@ -30,19 +31,20 @@ export async function setupInferenceGate() {
     recursive: true,
     mode: FILE_MODES.privateDirectory,
   });
-  for (const name of ['tokenizer.json', 'tokenizer_config.json']) {
+  for (const path of [TOKENIZER_FILES.tokenizer, TOKENIZER_FILES.config]) {
+    const name = basename(path);
     const response = await fetch(
       `${PUBLIC_ORIGINS.tokenizer}/${MODEL.publicModel}/resolve/${MODEL.revision}/${name}`,
       { signal: AbortSignal.timeout(TIMEOUTS.artifactDownload) },
     );
     if (!response.ok) throw new Error('Pinned tokenizer download failed.');
-    await writeFile(`${directory}/${name}`, await response.text(), {
+    await writeFile(path, await response.text(), {
       mode: FILE_MODES.privateFile,
     });
   }
   createModelTokenizer({
-    tokenizer: await readFile(`${directory}/tokenizer.json`, 'utf8'),
-    config: await readFile(`${directory}/tokenizer_config.json`, 'utf8'),
+    tokenizer: await readFile(TOKENIZER_FILES.tokenizer, 'utf8'),
+    config: await readFile(TOKENIZER_FILES.config, 'utf8'),
   });
   const environment = {
     ...process.env,
