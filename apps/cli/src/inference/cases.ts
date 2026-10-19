@@ -10,7 +10,7 @@ import {
   saveJournal,
 } from '@gyblos/gate/journal';
 import { appendMeasurement, measurementRow } from '@gyblos/gate/measurements';
-import { MODEL_LIMITS } from '@gyblos/inference-ollama/constants';
+import { GENERATION, MODEL_LIMITS } from '@gyblos/inference-ollama/constants';
 import { MODEL } from '@gyblos/inference-ollama/index';
 import { DEVNET } from '@gyblos/payments-x402/constants';
 import { createInferenceBuyer } from '@gyblos/payments-x402/inference-buyer';
@@ -42,7 +42,11 @@ export async function runCases({
       prompt: testCase.prompt,
       maxTokens: MODEL_LIMITS.requestMaxOutputTokens,
     };
-    const ceiling = inferenceCeiling(request, buyerTokenizer);
+    const ceiling = inferenceCeiling(
+      request,
+      buyerTokenizer,
+      GENERATION.numCtx,
+    );
     const before = await inferenceSnapshot(config);
     assert.ok(BigInt(before.buyer) >= BigInt(ceiling));
     let signedAt: number | undefined, channelId: string | undefined;
