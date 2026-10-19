@@ -1,8 +1,8 @@
 import { TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
 import type { PaymentRequirements, SettleResponse } from '@x402/core/types';
 
-import { GateError } from './chain.js';
-import { CHANNEL_PROGRAM, DEVNET } from './constants.js';
+import { GateError } from '@gyblos/payments-x402/chain';
+import { CHANNEL_PROGRAM, DEVNET } from '@gyblos/payments-x402/constants';
 
 export interface TrustPolicy {
   mint: string;

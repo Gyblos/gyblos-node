@@ -4,7 +4,8 @@ import { dirname, resolve } from 'node:path';
 
 import { createKeyPairSignerFromBytes } from '@solana/kit';
 
-import { DEVNET_USDC } from '../../payments-x402/src/constants.js';
+import { localPath } from '@gyblos/config';
+import { DEVNET_USDC } from '@gyblos/payments-x402/constants';
 
 export interface Config {
   schemaVersion: 1;
@@ -21,7 +22,7 @@ export interface Config {
   >;
 }
 export const configPath = () =>
-  resolve(process.env.GYBLOS_GATE_CONFIG ?? '.local/devnet/config.json');
+  resolve(process.env.GYBLOS_GATE_CONFIG ?? localPath('config.json'));
 export async function loadConfig(): Promise<Config> {
   const config = JSON.parse(await readFile(configPath(), 'utf8')) as Config;
   if (config.schemaVersion !== 1)

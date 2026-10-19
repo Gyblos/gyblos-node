@@ -4,7 +4,13 @@ import { dirname, resolve } from 'node:path';
 
 import { createKeyPairSignerFromBytes } from '@solana/kit';
 
-import { configPath, defaultMint, saveJson, type Config } from './config.js';
+import { LOCAL_DIR } from '@gyblos/config';
+import {
+  configPath,
+  defaultMint,
+  saveJson,
+  type Config,
+} from '@gyblos/gate/config';
 
 export async function setupGate() {
   const path = configPath();
@@ -64,8 +70,7 @@ export async function setupGate() {
     console.log(
       JSON.stringify(
         {
-          message:
-            'Isolated devnet wallets created. Private keys stay in .local/devnet.',
+          message: `Isolated devnet wallets created. Private keys stay in ${LOCAL_DIR}.`,
           addresses,
         },
         null,

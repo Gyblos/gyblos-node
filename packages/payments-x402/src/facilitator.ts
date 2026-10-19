@@ -8,7 +8,7 @@ import {
 } from '@x402/svm/upto/facilitator';
 import express from 'express';
 
-import { DEVNET, MAX_ATOMIC } from './constants.js';
+import { DEVNET, MAX_ATOMIC } from '@gyblos/payments-x402/constants';
 
 export interface SettlementEvent {
   phase: string;

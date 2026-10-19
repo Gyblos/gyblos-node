@@ -1,8 +1,9 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { link, mkdir, open, readFile, unlink } from 'node:fs/promises';
 
-import type { TokenCounts } from '../../application/src/metering.js';
-import { MODEL } from '../../inference-ollama/src/model.js';
+import type { TokenCounts } from '@gyblos/application/metering';
+import { LOCAL_DIR, localPath } from '@gyblos/config';
+import { MODEL } from '@gyblos/inference-ollama/model';
 
 export interface MeasurementInput {
   requestId: string;
@@ -84,7 +85,7 @@ export function measurementRow(input: MeasurementInput, salt: Uint8Array) {
 }
 export type Measurement = ReturnType<typeof measurementRow>;
 
-export async function measurementSalt(directory = '.local/devnet') {
+export async function measurementSalt(directory = LOCAL_DIR) {
   await mkdir(directory, { recursive: true, mode: 0o700 });
   const path = `${directory}/measurement-salt`;
   const temporary = `${path}.${randomUUID()}.tmp`;
@@ -113,7 +114,7 @@ export async function measurementSalt(directory = '.local/devnet') {
 }
 export async function appendMeasurement(
   row: Measurement,
-  path = '.local/devnet/measurements.jsonl',
+  path = localPath('measurements.jsonl'),
 ) {
   const handle = await open(path, 'a', 0o600);
   try {

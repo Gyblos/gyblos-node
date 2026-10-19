@@ -1,4 +1,8 @@
-import { CHANNEL_PROGRAM, DEVNET_GENESIS } from './constants.js';
+import { COMMITMENT } from '@gyblos/config';
+import {
+  CHANNEL_PROGRAM,
+  DEVNET_GENESIS,
+} from '@gyblos/payments-x402/constants';
 
 export class GateError extends Error {
   constructor(
@@ -51,7 +55,7 @@ export async function account(url: string, address: string) {
       };
     }>(url, 'getAccountInfo', [
       address,
-      { encoding: 'base64', commitment: 'confirmed' },
+      { encoding: 'base64', commitment: COMMITMENT },
     ])
   ).value;
 }
@@ -71,7 +75,7 @@ export async function lamports(url: string, owner: string): Promise<bigint> {
     (
       await rpc<{ value: number }>(url, 'getBalance', [
         owner,
-        { commitment: 'confirmed' },
+        { commitment: COMMITMENT },
       ])
     ).value,
   );
@@ -91,7 +95,7 @@ export async function tokens(
   }>(url, 'getTokenAccountsByOwner', [
     owner,
     { mint },
-    { encoding: 'jsonParsed', commitment: 'confirmed' },
+    { encoding: 'jsonParsed', commitment: COMMITMENT },
   ]);
   return result.value.reduce(
     (sum, item) =>
@@ -114,10 +118,7 @@ export async function confirm(url: string, signature: string): Promise<void> {
         'TRANSACTION_FAILED',
         `Transaction failed: ${signature}`,
       );
-    if (
-      status &&
-      ['confirmed', 'finalized'].includes(status.confirmationStatus)
-    )
+    if (status && [COMMITMENT, 'finalized'].includes(status.confirmationStatus))
       return;
     await new Promise((resolve) => setTimeout(resolve, 1_000));
   }

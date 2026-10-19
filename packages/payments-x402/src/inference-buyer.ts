@@ -6,8 +6,8 @@ import {
 } from '@x402/fetch';
 import { UptoSvmScheme } from '@x402/svm/upto/client';
 
-import { DEVNET } from './constants.js';
-import { validateTerms, type TrustPolicy } from './trust.js';
+import { DEVNET } from '@gyblos/payments-x402/constants';
+import { validateTerms, type TrustPolicy } from '@gyblos/payments-x402/trust';
 
 export function createInferenceBuyer(
   signer: KeyPairSigner,

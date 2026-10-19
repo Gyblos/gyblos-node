@@ -6,8 +6,9 @@ import {
 } from '@solana-program/token';
 import { address } from '@solana/kit';
 
-import { GateError, rpc } from '../../payments-x402/src/chain.js';
-import type { Config } from './config.js';
+import { COMMITMENT } from '@gyblos/config';
+import type { Config } from '@gyblos/gate/config';
+import { GateError, rpc } from '@gyblos/payments-x402/chain';
 
 export async function readChain<T>(
   c: Config,
@@ -44,10 +45,7 @@ export async function confirmInference(c: Config, signature: string) {
         'TRANSACTION_FAILED',
         'Inference transaction failed.',
       );
-    if (
-      status &&
-      ['confirmed', 'finalized'].includes(status.confirmationStatus)
-    )
+    if (status && [COMMITMENT, 'finalized'].includes(status.confirmationStatus))
       return;
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
@@ -79,7 +77,7 @@ export async function inferenceSnapshot(c: Config, channelId?: string) {
     'getMultipleAccounts',
     [
       [...atas, c.addresses.buyer],
-      { encoding: 'jsonParsed', commitment: 'confirmed' },
+      { encoding: 'jsonParsed', commitment: COMMITMENT },
     ],
   );
   const amounts = atas.map((_, index) => {
@@ -105,7 +103,7 @@ export async function transaction(c: Config, signature: string) {
       signature,
       {
         encoding: 'jsonParsed',
-        commitment: 'confirmed',
+        commitment: COMMITMENT,
         maxSupportedTransactionVersion: 0,
       },
     ]);

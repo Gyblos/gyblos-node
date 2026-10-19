@@ -17,17 +17,15 @@ import {
   charge,
   OFFER_ID,
   type TokenCounts,
-} from '../../../packages/application/src/metering.js';
+} from '@gyblos/application/metering';
+import { GENERATION } from '@gyblos/inference-ollama/constants';
 import {
   createOllama,
   MODEL,
   type ModelTokenizer,
-} from '../../../packages/inference-ollama/src/index.js';
-import {
-  DEVNET,
-  MAX_ATOMIC,
-} from '../../../packages/payments-x402/src/constants.js';
-import { verifyInferenceDeposit } from '../../../packages/payments-x402/src/inference-deposit.js';
+} from '@gyblos/inference-ollama/index';
+import { DEVNET, MAX_ATOMIC } from '@gyblos/payments-x402/constants';
+import { verifyInferenceDeposit } from '@gyblos/payments-x402/inference-deposit';
 
 export interface InferenceRequest {
   requestId: string;
@@ -58,7 +56,7 @@ export function inferenceCeiling(
 ): string {
   // Headroom is authorized up front, never evidence of actual usage.
   const inputTokens = tokenizer.input(input.prompt);
-  if (inputTokens + input.maxTokens > 2048) {
+  if (inputTokens + input.maxTokens > GENERATION.numCtx) {
     throw new Error('Request exceeds the pinned context window.');
   }
   const ceiling = 2n * charge({ input: inputTokens, output: input.maxTokens });

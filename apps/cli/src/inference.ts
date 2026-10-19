@@ -6,7 +6,7 @@ import { readFile } from 'node:fs/promises';
 import type { Server } from 'node:http';
 import { resolve } from 'node:path';
 
-import { observeInferenceResponse } from '../../../packages/application/src/inference-observation.js';
+import { observeInferenceResponse } from '@gyblos/application/inference-observation';
 import {
   assessCharge,
   charge,
@@ -14,48 +14,56 @@ import {
   PRICES,
   TOLERANCE,
   type TokenCounts,
-} from '../../../packages/application/src/metering.js';
+} from '@gyblos/application/metering';
 import {
-  createModelTokenizer,
-  createOllama,
-  MODEL,
-} from '../../../packages/inference-ollama/src/index.js';
-import {
-  assertProgram,
-  GateError,
-  lamports,
-} from '../../../packages/payments-x402/src/chain.js';
-import {
-  DEVNET,
-  DEVNET_USDC,
-} from '../../../packages/payments-x402/src/constants.js';
-import type { SettlementEvent } from '../../../packages/payments-x402/src/facilitator.js';
-import { createInferenceBuyer } from '../../../packages/payments-x402/src/inference-buyer.js';
-import { validateSettlement } from '../../../packages/payments-x402/src/trust.js';
-import { loadConfig, saveJson, signer } from '../../../scripts/config.js';
+  HOSTS,
+  LOCAL_DIR,
+  LOCALHOST,
+  localPath,
+  LOCK_PATH,
+  MIN_FACILITATOR_LAMPORTS,
+  X402_SDK_VERSION,
+} from '@gyblos/config';
+import { loadConfig, saveJson, signer } from '@gyblos/gate/config';
 import {
   confirmInference,
   inferenceSnapshot,
   tokenAddress,
   transaction,
   transactionTransfers,
-} from '../../../scripts/inference-chain.js';
-import { assertNoUnresolvedAuthorizations } from '../../../scripts/journal.js';
-import { withExclusiveLock } from '../../../scripts/lock.js';
+} from '@gyblos/gate/inference-chain';
+import { assertNoUnresolvedAuthorizations } from '@gyblos/gate/journal';
+import { withExclusiveLock } from '@gyblos/gate/lock';
 import {
   appendMeasurement,
   measurementRow,
   measurementSalt,
-} from '../../../scripts/measurements.js';
+} from '@gyblos/gate/measurements';
+import { GENERATION } from '@gyblos/inference-ollama/constants';
+import {
+  createModelTokenizer,
+  createOllama,
+  MODEL,
+} from '@gyblos/inference-ollama/index';
+import {
+  assertProgram,
+  GateError,
+  lamports,
+} from '@gyblos/payments-x402/chain';
+import { DEVNET, DEVNET_USDC } from '@gyblos/payments-x402/constants';
+import type { SettlementEvent } from '@gyblos/payments-x402/facilitator';
+import { createInferenceBuyer } from '@gyblos/payments-x402/inference-buyer';
+import { validateSettlement } from '@gyblos/payments-x402/trust';
+
 import {
   createInferenceSeller,
   inferenceCeiling,
 } from '../../seller/src/inference.js';
 
 const evidencePath = 'evidence/gate-0005.json';
-const journalPath = '.local/devnet/inference-attempt.json';
-const ollamaUrl = 'http://127.0.0.1:11436';
-const facilitatorUrl = 'http://127.0.0.1:4022';
+const journalPath = localPath('inference-attempt.json');
+const ollamaUrl = HOSTS.ollama;
+const facilitatorUrl = HOSTS.facilitator;
 const runId = randomUUID();
 const children: ChildProcess[] = [];
 const controller = new AbortController();
@@ -124,18 +132,19 @@ async function run() {
     'authorizer',
     'facilitator',
   ] as const) {
-    assert.equal(resolve(c.keys[role]), resolve(`.local/devnet/${role}.json`));
+    assert.equal(resolve(c.keys[role]), resolve(`${LOCAL_DIR}/${role}.json`));
   }
   await assertNoUnresolvedAuthorizations();
   await assertProgram(c.rpcUrl);
   assert.ok(
-    (await lamports(c.rpcUrl, c.addresses.facilitator)) > 15_000_000n,
+    (await lamports(c.rpcUrl, c.addresses.facilitator)) >
+      MIN_FACILITATOR_LAMPORTS,
     'Facilitator needs devnet SOL for five channels.',
   );
   const artifacts = {
-    tokenizer: await readFile('.local/devnet/tokenizer/tokenizer.json', 'utf8'),
+    tokenizer: await readFile(localPath('tokenizer/tokenizer.json'), 'utf8'),
     config: await readFile(
-      '.local/devnet/tokenizer/tokenizer_config.json',
+      localPath('tokenizer/tokenizer_config.json'),
       'utf8',
     ),
   };
@@ -145,7 +154,7 @@ async function run() {
   const evidence: Record<string, any> = {
     schemaVersion: 1,
     evidenceId: 'GYB-GATE-0005',
-    sdkVersion: '2.28.0',
+    sdkVersion: X402_SDK_VERSION,
     createdAt: new Date().toISOString(),
     runId,
     network: DEVNET,
@@ -157,9 +166,9 @@ async function run() {
     template: {
       raw: true,
       thinking: false,
-      numCtx: 2048,
-      seed: 42,
-      temperature: 0,
+      numCtx: GENERATION.numCtx,
+      seed: GENERATION.seed,
+      temperature: GENERATION.temperature,
       outputCountConvention:
         'Visible raw output only; terminal EOS is not added. Differences remain explicit under predeclared tolerance.',
     },
@@ -192,11 +201,11 @@ async function run() {
     const ollama = spawn('ollama', ['serve'], {
       env: {
         ...process.env,
-        OLLAMA_HOST: '127.0.0.1:11436',
+        OLLAMA_HOST: HOSTS.ollamaBind,
         OLLAMA_MODELS: resolve('.local/ollama/models'),
         OLLAMA_NO_CLOUD: '1',
         OLLAMA_DEBUG: '0',
-        OLLAMA_CONTEXT_LENGTH: '2048',
+        OLLAMA_CONTEXT_LENGTH: String(GENERATION.numCtx),
       },
       stdio: 'ignore',
     });
@@ -286,11 +295,11 @@ async function run() {
         }
       },
     });
-    sellerServer = host.app.listen(0, '127.0.0.1');
+    sellerServer = host.app.listen(0, LOCALHOST);
     await once(sellerServer, 'listening');
     const endpoint = sellerServer.address();
     assert.ok(endpoint && typeof endpoint !== 'string');
-    const url = `http://127.0.0.1:${endpoint.port}/v1/chat/completions`;
+    const url = `http://${LOCALHOST}:${endpoint.port}/v1/chat/completions`;
     const cases = [
       {
         name: 'honest-1',
@@ -362,7 +371,7 @@ async function run() {
         },
       );
       const response = await buyer(url, request, controller.signal);
-      await saveJson('.local/devnet/inference-last-transport.json', {
+      await saveJson(localPath('inference-last-transport.json'), {
         requestId: request.requestId,
         httpStatus: response.status,
         receipt: response.receipt,
@@ -573,7 +582,7 @@ async function run() {
 }
 
 try {
-  await withExclusiveLock('.local/devnet/buyer.lock', run);
+  await withExclusiveLock(LOCK_PATH, run);
 } catch (error) {
   console.error(
     error instanceof GateError

@@ -19,20 +19,27 @@ import {
   decodePaymentSignatureHeader,
 } from '@x402/core/http';
 
-import { createBuyer } from '../../payments-x402/src/buyer.js';
+import {
+  COMMITMENT,
+  LOCAL_DIR,
+  LOCALHOST,
+  localPath,
+  LOCK_PATH,
+} from '@gyblos/config';
+import { loadConfig, saveJson, signer } from '@gyblos/gate/config';
+import { assertNoUnresolvedAuthorizations } from '@gyblos/gate/journal';
+import { withExclusiveLock } from '@gyblos/gate/lock';
+import { createBuyer } from '@gyblos/payments-x402/buyer';
 import {
   account,
   assertProgram,
   confirm,
   rpc,
   tokens,
-} from '../../payments-x402/src/chain.js';
-import { DEVNET, MAX_ATOMIC } from '../../payments-x402/src/constants.js';
-import { createFacilitator } from '../../payments-x402/src/facilitator.js';
-import { createGateSeller } from '../../payments-x402/src/seller.js';
-import { loadConfig, saveJson, signer } from './config.js';
-import { assertNoUnresolvedAuthorizations } from './journal.js';
-import { withExclusiveLock } from './lock.js';
+} from '@gyblos/payments-x402/chain';
+import { DEVNET, MAX_ATOMIC } from '@gyblos/payments-x402/constants';
+import { createFacilitator } from '@gyblos/payments-x402/facilitator';
+import { createGateSeller } from '@gyblos/payments-x402/seller';
 
 export async function failureGate() {
   async function failures() {
@@ -47,7 +54,7 @@ export async function failureGate() {
       await rpc<{ value: { blockhash: string; lastValidBlockHeight: number } }>(
         c.rpcUrl,
         'getLatestBlockhash',
-        [{ commitment: 'confirmed' }],
+        [{ commitment: COMMITMENT }],
       )
     ).value;
     const message = pipe(
@@ -73,7 +80,7 @@ export async function failureGate() {
     );
     const setupTransaction = await rpc<string>(c.rpcUrl, 'sendTransaction', [
       getBase64EncodedWireTransaction(tx),
-      { encoding: 'base64', preflightCommitment: 'confirmed' },
+      { encoding: 'base64', preflightCommitment: COMMITMENT },
     ]);
     await confirm(c.rpcUrl, setupTransaction);
     const results = [];
@@ -85,7 +92,7 @@ export async function failureGate() {
         payTo: c.addresses.seller,
         authorizer: c.addresses.authorizer,
       });
-      const fs = f.app.listen(0, '127.0.0.1');
+      const fs = f.app.listen(0, LOCALHOST);
       await once(fs, 'listening');
       const fa = fs.address();
       assert.ok(fa && typeof fa !== 'string');
@@ -93,16 +100,16 @@ export async function failureGate() {
       try {
         const s = await createGateSeller({
           rpcUrl: c.rpcUrl,
-          facilitatorUrl: `http://127.0.0.1:${fa.port}`,
+          facilitatorUrl: `http://${LOCALHOST}:${fa.port}`,
           mint: c.mint,
           payTo: c.addresses.seller,
           authorizer: await signer(c, 'authorizer'),
         });
-        ss = s.app.listen(0, '127.0.0.1');
+        ss = s.app.listen(0, LOCALHOST);
         await once(ss, 'listening');
         const sa = ss.address();
         assert.ok(sa && typeof sa !== 'string');
-        const url = `http://127.0.0.1:${sa.port}`;
+        const url = `http://${LOCALHOST}:${sa.port}`;
         const before = {
           buyer: (
             await tokens(c.rpcUrl, buyerSigner.address, c.mint)
@@ -130,7 +137,7 @@ export async function failureGate() {
             // Verify the same expired payload directly as a read-only diagnostic.
             const payload = decodePaymentSignatureHeader(header);
             const diagnostic = await fetch(
-              `http://127.0.0.1:${fa.port}/verify`,
+              `http://${LOCALHOST}:${fa.port}/verify`,
               {
                 method: 'POST',
                 headers: { 'content-type': 'application/json' },
@@ -170,7 +177,7 @@ export async function failureGate() {
           fetchImpl,
           async (a) => {
             channelId = a.channelId;
-            await saveJson(`.local/devnet/failure-${kind}-attempt.json`, {
+            await saveJson(`${LOCAL_DIR}/failure-${kind}-attempt.json`, {
               state: 'authorization-created',
               channelId,
               createdAt: new Date().toISOString(),
@@ -234,14 +241,14 @@ export async function failureGate() {
           paymentTransactions: history,
         });
         await saveJson(
-          `.local/devnet/failure-${kind}-result.json`,
+          `${LOCAL_DIR}/failure-${kind}-result.json`,
           results.at(-1),
         );
-        await saveJson(`.local/devnet/failure-${kind}-attempt.json`, {
+        await saveJson(`${LOCAL_DIR}/failure-${kind}-attempt.json`, {
           state: 'resolved-rejected',
           channelId,
           resolvedAt: new Date().toISOString(),
-          resultPath: `.local/devnet/failure-${kind}-result.json`,
+          resultPath: `${LOCAL_DIR}/failure-${kind}-result.json`,
         });
         console.log(
           `${kind} passed: HTTP 402, no channel, no resource execution, unchanged token balances.`,
@@ -265,11 +272,11 @@ export async function failureGate() {
         'Fixed resource, not inference',
       ],
     };
-    await saveJson('.local/devnet/failure-evidence.json', evidence);
+    await saveJson(localPath('failure-evidence.json'), evidence);
     console.log(JSON.stringify(evidence, null, 2));
   }
   try {
-    await withExclusiveLock('.local/devnet/buyer.lock', failures);
+    await withExclusiveLock(LOCK_PATH, failures);
   } catch (error) {
     console.error(
       error instanceof Error ? error.message : 'Failure gate failed.',

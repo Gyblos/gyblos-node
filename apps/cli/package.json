@@ -2,5 +2,15 @@
   "name": "@gyblos/cli",
   "version": "0.1.0",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "dependencies": {
+    "@gyblos/payments-x402": "workspace:*",
+    "@gyblos/application": "workspace:*",
+    "@gyblos/config": "workspace:*",
+    "@gyblos/gate": "workspace:*",
+    "@gyblos/inference-ollama": "workspace:*"
+  }
 }

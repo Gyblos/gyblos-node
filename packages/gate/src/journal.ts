@@ -1,14 +1,15 @@
 import { readFile } from 'node:fs/promises';
 
-import { GateError } from '../../payments-x402/src/chain.js';
+import { COMMITMENT, localPath } from '@gyblos/config';
+import { GateError } from '@gyblos/payments-x402/chain';
 
 export async function assertNoUnresolvedAuthorizations(
   paths = [
-    '.local/devnet/attempt.json',
-    '.local/devnet/failure-F1-attempt.json',
-    '.local/devnet/failure-F2-attempt.json',
-    '.local/devnet/exact-attempt.json',
-    '.local/devnet/inference-attempt.json',
+    localPath('attempt.json'),
+    localPath('failure-F1-attempt.json'),
+    localPath('failure-F2-attempt.json'),
+    localPath('exact-attempt.json'),
+    localPath('inference-attempt.json'),
   ],
 ) {
   for (const path of paths) {
@@ -17,7 +18,7 @@ export async function assertNoUnresolvedAuthorizations(
         state?: string;
       };
       const terminal = path.endsWith('exact-attempt.json')
-        ? ['confirmed', 'rejected']
+        ? [COMMITMENT, 'rejected']
         : path.endsWith('inference-attempt.json')
           ? ['verified', 'reconciled', 'resolved-rejected']
           : ['verified', 'resolved-rejected'];

@@ -11,9 +11,10 @@ import {
   signTransactionMessageWithSigners,
 } from '@solana/kit';
 
-import { assertDevnet, confirm, rpc } from '../../payments-x402/src/chain.js';
-import { DEVNET_USDC } from '../../payments-x402/src/constants.js';
-import { signer, type Config } from './config.js';
+import { COMMITMENT } from '@gyblos/config';
+import { signer, type Config } from '@gyblos/gate/config';
+import { assertDevnet, confirm, rpc } from '@gyblos/payments-x402/chain';
+import { DEVNET_USDC } from '@gyblos/payments-x402/constants';
 
 export async function prepareExactAccounts(c: Config) {
   await assertDevnet(c.rpcUrl);
@@ -31,7 +32,7 @@ export async function prepareExactAccounts(c: Config) {
     await rpc<{ value: { blockhash: string; lastValidBlockHeight: number } }>(
       c.rpcUrl,
       'getLatestBlockhash',
-      [{ commitment: 'confirmed' }],
+      [{ commitment: COMMITMENT }],
     )
   ).value;
   const message = pipe(
@@ -50,7 +51,7 @@ export async function prepareExactAccounts(c: Config) {
   const tx = await signTransactionMessageWithSigners(message);
   const signature = await rpc<string>(c.rpcUrl, 'sendTransaction', [
     getBase64EncodedWireTransaction(tx),
-    { encoding: 'base64', preflightCommitment: 'confirmed' },
+    { encoding: 'base64', preflightCommitment: COMMITMENT },
   ]);
   await confirm(c.rpcUrl, signature);
   return signature;

@@ -1,7 +1,18 @@
 import { discoverChannelsByRentPayer, toFacilitatorSvmSigner } from '@x402/svm';
 
-import { runGate } from '../../../packages/application/src/gate.js';
-import { createBuyer } from '../../../packages/payments-x402/src/buyer.js';
+import { runGate } from '@gyblos/application/gate';
+import {
+  FIXED_MIN_FACILITATOR_LAMPORTS,
+  HOSTS,
+  LOCAL_DIR,
+  localPath,
+  LOCK_PATH,
+  X402_SDK_VERSION,
+} from '@gyblos/config';
+import { loadConfig, saveJson, signer } from '@gyblos/gate/config';
+import { assertNoUnresolvedAuthorizations } from '@gyblos/gate/journal';
+import { withExclusiveLock } from '@gyblos/gate/lock';
+import { createBuyer } from '@gyblos/payments-x402/buyer';
 import {
   account,
   assertProgram,
@@ -10,24 +21,19 @@ import {
   GateError,
   lamports,
   tokens,
-} from '../../../packages/payments-x402/src/chain.js';
+} from '@gyblos/payments-x402/chain';
 import {
   ACTUAL_ATOMIC,
   DEVNET,
   MAX_ATOMIC,
   UPSTREAM_COMMIT,
-} from '../../../packages/payments-x402/src/constants.js';
-import type { SettlementEvent } from '../../../packages/payments-x402/src/facilitator.js';
-import { validateSettlement } from '../../../packages/payments-x402/src/trust.js';
-import { loadConfig, saveJson, signer } from '../../../scripts/config.js';
-import { assertNoUnresolvedAuthorizations } from '../../../scripts/journal.js';
-import { withExclusiveLock } from '../../../scripts/lock.js';
+} from '@gyblos/payments-x402/constants';
+import type { SettlementEvent } from '@gyblos/payments-x402/facilitator';
+import { validateSettlement } from '@gyblos/payments-x402/trust';
 
-const journalPath = '.local/devnet/attempt.json';
+const journalPath = localPath('attempt.json');
 export async function executeGate(signal?: AbortSignal) {
-  return withExclusiveLock('.local/devnet/buyer.lock', () =>
-    executeLocked(signal),
-  );
+  return withExclusiveLock(LOCK_PATH, () => executeLocked(signal));
 }
 async function executeLocked(signal?: AbortSignal) {
   const config = await loadConfig();
@@ -59,7 +65,7 @@ async function executeLocked(signal?: AbortSignal) {
       await assertProgram(config.rpcUrl);
       if (
         (await lamports(config.rpcUrl, config.addresses.facilitator)) <
-        10_000_000n
+        FIXED_MIN_FACILITATOR_LAMPORTS
       )
         throw new GateError(
           'NEEDS_SOL',
@@ -90,7 +96,7 @@ async function executeLocked(signal?: AbortSignal) {
     async request() {
       signal?.throwIfAborted();
       const response = await buyer.request(
-        'http://127.0.0.1:4021/api/generate',
+        `${HOSTS.seller}/api/generate`,
         signal,
       );
       if (
@@ -99,9 +105,9 @@ async function executeLocked(signal?: AbortSignal) {
         !response.authorization
       ) {
         const diagnostics = await fetch(
-          'http://127.0.0.1:4022/gate/events',
+          `${HOSTS.facilitator}/gate/events`,
         ).then((r) => r.json());
-        await saveJson('.local/devnet/failed-request.json', {
+        await saveJson(localPath('failed-request.json'), {
           status: response.status,
           settlement: response.settlement,
           events: diagnostics,
@@ -118,7 +124,7 @@ async function executeLocked(signal?: AbortSignal) {
         payer: config.addresses.buyer,
         amount: ACTUAL_ATOMIC,
       });
-      const eventResponse = await fetch('http://127.0.0.1:4022/gate/events');
+      const eventResponse = await fetch(`${HOSTS.facilitator}/gate/events`);
       const events = (await eventResponse.json()) as SettlementEvent[];
       const id = response.authorization.channelId;
       const open = events.find(
@@ -177,7 +183,7 @@ async function executeLocked(signal?: AbortSignal) {
     assetLabel: config.assetLabel,
     mint: config.mint,
     upstreamCommit: UPSTREAM_COMMIT,
-    sdkVersion: '2.28.0',
+    sdkVersion: X402_SDK_VERSION,
     ...result,
     transactions: {
       open: explorer(result.accounting.openTransaction),
@@ -190,7 +196,7 @@ async function executeLocked(signal?: AbortSignal) {
       'No P2P/mobile validation',
     ],
   };
-  const evidencePath = `.local/devnet/evidence-${Date.now()}.json`;
+  const evidencePath = `${LOCAL_DIR}/evidence-${Date.now()}.json`;
   await saveJson(evidencePath, evidence);
   await saveJson(journalPath, {
     state: 'verified',

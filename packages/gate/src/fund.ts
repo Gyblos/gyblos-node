@@ -18,14 +18,15 @@ import {
   signTransactionMessageWithSigners,
 } from '@solana/kit';
 
+import { COMMITMENT } from '@gyblos/config';
+import { configPath, loadConfig, saveJson, signer } from '@gyblos/gate/config';
 import {
   account,
   assertProgram,
   confirm,
   lamports,
   rpc,
-} from '../../payments-x402/src/chain.js';
-import { configPath, loadConfig, saveJson, signer } from './config.js';
+} from '@gyblos/payments-x402/chain';
 
 export async function fundGate() {
   try {
@@ -91,7 +92,7 @@ export async function fundGate() {
             owner: feePayer.address,
             mint: mint.address,
           }),
-          // Treasury owner pinned by @x402/svm 2.28.0 for devnet; distribute validates this ATA even at zero charge.
+          // Treasury owner pinned by the configured x402 SDK for devnet; distribute validates this ATA even at zero charge.
           await getCreateAssociatedTokenIdempotentInstructionAsync({
             payer: feePayer,
             owner: address('4zTeC5mVqWLruDexgU2mV66p9t5vCA9JyiZqdGDUspap'),
@@ -111,7 +112,7 @@ export async function fundGate() {
         const latest = (
           await rpc<{
             value: { blockhash: string; lastValidBlockHeight: number };
-          }>(config.rpcUrl, 'getLatestBlockhash', [{ commitment: 'confirmed' }])
+          }>(config.rpcUrl, 'getLatestBlockhash', [{ commitment: COMMITMENT }])
         ).value;
         const message = pipe(
           createTransactionMessage({ version: 0 }),
@@ -129,7 +130,7 @@ export async function fundGate() {
         const tx = await signTransactionMessageWithSigners(message);
         const signature = await rpc<string>(config.rpcUrl, 'sendTransaction', [
           getBase64EncodedWireTransaction(tx),
-          { encoding: 'base64', preflightCommitment: 'confirmed' },
+          { encoding: 'base64', preflightCommitment: COMMITMENT },
         ]);
         await confirm(config.rpcUrl, signature);
         console.log(

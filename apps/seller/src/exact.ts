@@ -9,16 +9,13 @@ import { paymentMiddleware, x402ResourceServer } from '@x402/express';
 import { ExactSvmScheme } from '@x402/svm/exact/server';
 import express from 'express';
 
-import {
-  DEVNET,
-  DEVNET_USDC,
-} from '../../../packages/payments-x402/src/constants.js';
-import { exactAuthorizationId } from '../../../packages/payments-x402/src/exact/authorization-id.js';
+import { DEVNET, DEVNET_USDC } from '@gyblos/payments-x402/constants';
+import { exactAuthorizationId } from '@gyblos/payments-x402/exact/authorization-id';
 import {
   assertExactSupport,
   EXACT_PRICE,
   validateExactTerms,
-} from '../../../packages/payments-x402/src/exact/index.js';
+} from '@gyblos/payments-x402/exact/index';
 
 export interface PublicCall {
   operation: string;

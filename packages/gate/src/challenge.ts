@@ -2,12 +2,13 @@ import { once } from 'node:events';
 
 import { decodePaymentRequiredHeader } from '@x402/core/http';
 
-import { assertProgram } from '../../payments-x402/src/chain.js';
-import { UPSTREAM_COMMIT } from '../../payments-x402/src/constants.js';
-import { createFacilitator } from '../../payments-x402/src/facilitator.js';
-import { createGateSeller } from '../../payments-x402/src/seller.js';
-import { validateTerms } from '../../payments-x402/src/trust.js';
-import { loadConfig, saveJson, signer } from './config.js';
+import { LOCALHOST, localPath, X402_SDK_VERSION } from '@gyblos/config';
+import { loadConfig, saveJson, signer } from '@gyblos/gate/config';
+import { assertProgram } from '@gyblos/payments-x402/chain';
+import { UPSTREAM_COMMIT } from '@gyblos/payments-x402/constants';
+import { createFacilitator } from '@gyblos/payments-x402/facilitator';
+import { createGateSeller } from '@gyblos/payments-x402/seller';
+import { validateTerms } from '@gyblos/payments-x402/trust';
 
 export async function challengeGate() {
   const config = await loadConfig();
@@ -22,7 +23,7 @@ export async function challengeGate() {
       authorizer: config.addresses.authorizer,
     },
   );
-  const facilitatorServer = facilitator.app.listen(0, '127.0.0.1');
+  const facilitatorServer = facilitator.app.listen(0, LOCALHOST);
   await once(facilitatorServer, 'listening');
   let sellerServer: ReturnType<typeof facilitator.app.listen> | undefined;
   try {
@@ -31,17 +32,17 @@ export async function challengeGate() {
       throw new Error('No facilitator port.');
     const { app } = await createGateSeller({
       rpcUrl: config.rpcUrl,
-      facilitatorUrl: `http://127.0.0.1:${address.port}`,
+      facilitatorUrl: `http://${LOCALHOST}:${address.port}`,
       mint: config.mint,
       payTo: config.addresses.seller,
       authorizer: await signer(config, 'authorizer'),
     });
-    sellerServer = app.listen(0, '127.0.0.1');
+    sellerServer = app.listen(0, LOCALHOST);
     await once(sellerServer, 'listening');
     const sellerAddress = sellerServer.address();
     if (!sellerAddress || typeof sellerAddress === 'string')
       throw new Error('No seller port.');
-    const url = `http://127.0.0.1:${sellerAddress.port}`;
+    const url = `http://${LOCALHOST}:${sellerAddress.port}`;
     const response = await fetch(`${url}/api/generate`);
     if (response.status !== 402)
       throw new Error(`Expected 402, received ${response.status}.`);
@@ -68,13 +69,13 @@ export async function challengeGate() {
       gatePassed: false,
       createdAt: new Date().toISOString(),
       upstreamCommit: UPSTREAM_COMMIT,
-      sdkVersion: '2.28.0',
+      sdkVersion: X402_SDK_VERSION,
       challenge: terms,
       resourceExecutions: state.handlerCalls,
       settlements: facilitator.events.length,
       note: 'No buyer payment signed or submitted. Does not validate open, claim or refund.',
     };
-    await saveJson('.local/devnet/challenge-evidence.json', evidence);
+    await saveJson(localPath('challenge-evidence.json'), evidence);
     console.log(JSON.stringify(evidence, null, 2));
   } finally {
     sellerServer?.close();

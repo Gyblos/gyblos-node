@@ -5,8 +5,9 @@ import {
 import { address } from '@solana/kit';
 import { discoverChannelsByRentPayer } from '@x402/svm';
 
-import { assertDevnet, GateError, rpc } from './chain.js';
-import { DEVNET } from './constants.js';
+import { COMMITMENT } from '@gyblos/config';
+import { assertDevnet, GateError, rpc } from '@gyblos/payments-x402/chain';
+import { DEVNET } from '@gyblos/payments-x402/constants';
 
 export interface DepositExpectation {
   rpcUrl: string;
@@ -68,7 +69,7 @@ export async function verifyInferenceDeposit(
   const account = (
     await rpc<{ value: any }>(expected.rpcUrl, 'getAccountInfo', [
       escrow,
-      { encoding: 'jsonParsed', commitment: 'confirmed' },
+      { encoding: 'jsonParsed', commitment: COMMITMENT },
     ])
   ).value;
   const info = account?.data?.parsed?.info;

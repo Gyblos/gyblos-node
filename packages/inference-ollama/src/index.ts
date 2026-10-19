@@ -1,7 +1,12 @@
-import { MODEL, renderChat } from './model.js';
+import { LOCALHOST } from '@gyblos/config';
+import { GENERATION } from '@gyblos/inference-ollama/constants';
+import { MODEL, renderChat } from '@gyblos/inference-ollama/model';
 
-export { MODEL, renderChat } from './model.js';
-export { createModelTokenizer, type ModelTokenizer } from './tokenizer.js';
+export { MODEL, renderChat } from '@gyblos/inference-ollama/model';
+export {
+  createModelTokenizer,
+  type ModelTokenizer,
+} from '@gyblos/inference-ollama/tokenizer';
 
 export interface EngineUsage {
   prompt_eval_count: number;
@@ -22,7 +27,7 @@ export function localOllamaUrl(base: string): URL {
   const url = new URL(base);
   if (
     url.protocol !== 'http:' ||
-    !['127.0.0.1', '[::1]'].includes(url.hostname) ||
+    ![LOCALHOST, '[::1]'].includes(url.hostname) ||
     url.username ||
     url.password ||
     url.pathname !== '/' ||
@@ -75,12 +80,12 @@ export function createOllama(base: string, fetchImpl: typeof fetch = fetch) {
           prompt: renderChat(input.prompt),
           raw: true,
           stream: true,
-          keep_alive: '5m',
+          keep_alive: GENERATION.keepAlive,
           options: {
-            temperature: 0,
-            seed: 42,
+            temperature: GENERATION.temperature,
+            seed: GENERATION.seed,
             num_predict: input.maxTokens,
-            num_ctx: 2048,
+            num_ctx: GENERATION.numCtx,
           },
         }),
         signal: AbortSignal.any([

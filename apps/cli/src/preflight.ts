@@ -1,10 +1,11 @@
+import { FIXED_MIN_FACILITATOR_LAMPORTS } from '@gyblos/config';
+import { loadConfig } from '@gyblos/gate/config';
 import {
   account,
   assertProgram,
   lamports,
   tokens,
-} from '../../../packages/payments-x402/src/chain.js';
-import { loadConfig } from '../../../scripts/config.js';
+} from '@gyblos/payments-x402/chain';
 
 try {
   const config = await loadConfig();
@@ -17,7 +18,8 @@ try {
   const buyerTokens = mint
     ? await tokens(config.rpcUrl, config.addresses.buyer, config.mint)
     : 0n;
-  const ready = facilitatorSol >= 10_000_000n && buyerTokens >= 10_000n;
+  const ready =
+    facilitatorSol >= FIXED_MIN_FACILITATOR_LAMPORTS && buyerTokens >= 10_000n;
   console.log(
     JSON.stringify(
       {

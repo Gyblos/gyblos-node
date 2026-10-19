@@ -1,7 +1,7 @@
 import { mkdir, open, unlink } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
-import { GateError } from '../../payments-x402/src/chain.js';
+import { GateError } from '@gyblos/payments-x402/chain';
 
 export async function withExclusiveLock<T>(
   path: string,

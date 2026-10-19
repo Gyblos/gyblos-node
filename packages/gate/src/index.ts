@@ -1,3 +1,3 @@
-export * from './config.js';
-export * from './journal.js';
-export * from './lock.js';
+export * from '@gyblos/gate/config';
+export * from '@gyblos/gate/journal';
+export * from '@gyblos/gate/lock';

@@ -1,14 +1,16 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 
+import { FIXED_MIN_FACILITATOR_LAMPORTS, HOSTS } from '@gyblos/config';
+import { loadConfig } from '@gyblos/gate/config';
 import {
   assertProgram,
   GateError,
   lamports,
   tokens,
-} from '../../../packages/payments-x402/src/chain.js';
-import { MAX_ATOMIC } from '../../../packages/payments-x402/src/constants.js';
-import { loadConfig } from '../../../scripts/config.js';
+} from '@gyblos/payments-x402/chain';
+import { MAX_ATOMIC } from '@gyblos/payments-x402/constants';
+
 import { executeGate } from './execute.js';
 
 const children: ChildProcess[] = [];
@@ -48,7 +50,8 @@ try {
   const config = await loadConfig();
   await assertProgram(config.rpcUrl);
   if (
-    (await lamports(config.rpcUrl, config.addresses.facilitator)) < 10_000_000n
+    (await lamports(config.rpcUrl, config.addresses.facilitator)) <
+    FIXED_MIN_FACILITATOR_LAMPORTS
   )
     throw new GateError(
       'NEEDS_SOL',
@@ -72,7 +75,7 @@ try {
   children.push(facilitator);
   facilitator.on('error', (error) => controller.abort(error));
   facilitator.stderr?.pipe(process.stderr);
-  await ready('http://127.0.0.1:4022/health', facilitator);
+  await ready(`${HOSTS.facilitator}/health`, facilitator);
   const seller = spawn(
     process.execPath,
     ['--import', 'tsx', 'apps/seller/src/main.ts'],
@@ -81,7 +84,7 @@ try {
   children.push(seller);
   seller.on('error', (error) => controller.abort(error));
   seller.stderr?.pipe(process.stderr);
-  await ready('http://127.0.0.1:4021/health', seller);
+  await ready(`${HOSTS.seller}/health`, seller);
   console.log(JSON.stringify(await executeGate(controller.signal), null, 2));
 } catch (error) {
   console.error(error instanceof Error ? error.message : 'Gate failed.');

@@ -7,8 +7,8 @@ import type {
 } from '@x402/core/types';
 import { ExactSvmScheme } from '@x402/svm/exact/client';
 
-import { GateError } from '../chain.js';
-import { DEVNET, DEVNET_USDC } from '../constants.js';
+import { GateError } from '@gyblos/payments-x402/chain';
+import { DEVNET, DEVNET_USDC } from '@gyblos/payments-x402/constants';
 
 export const EXACT_PRICE = '10000'; // 0.01 Circle devnet USDC (6 decimals).
 export const PUBLIC_FACILITATORS = [

@@ -9,7 +9,11 @@ import {
 import { UptoSvmScheme } from '@x402/svm/upto/server';
 import express from 'express';
 
-import { ACTUAL_ATOMIC, DEVNET, MAX_ATOMIC } from './constants.js';
+import {
+  ACTUAL_ATOMIC,
+  DEVNET,
+  MAX_ATOMIC,
+} from '@gyblos/payments-x402/constants';
 
 export async function createGateSeller(options: {
   rpcUrl: string;

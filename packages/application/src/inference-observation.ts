@@ -1,5 +1,5 @@
-import type { EngineUsage } from '../../inference-ollama/src/index.js';
-import { charge, compareUsage } from './metering.js';
+import { charge, compareUsage } from '@gyblos/application/metering';
+import type { EngineUsage } from '@gyblos/inference-ollama/index';
 
 export interface ObservedBody {
   requestId: string;

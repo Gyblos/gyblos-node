@@ -3,14 +3,15 @@ import { once } from 'node:events';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
+import { HOSTS, localPath, PORTS } from '@gyblos/config';
 import {
   createModelTokenizer,
   createOllama,
   MODEL,
-} from '../../inference-ollama/src/index.js';
+} from '@gyblos/inference-ollama/index';
 
 export async function setupInferenceGate() {
-  const directory = '.local/devnet/tokenizer';
+  const directory = localPath('tokenizer');
   await mkdir(directory, { recursive: true, mode: 0o700 });
   await mkdir('.local/ollama/models', { recursive: true, mode: 0o700 });
   for (const name of ['tokenizer.json', 'tokenizer_config.json']) {
@@ -29,11 +30,11 @@ export async function setupInferenceGate() {
   });
   const env = {
     ...process.env,
-    OLLAMA_HOST: '127.0.0.1:11437',
+    OLLAMA_HOST: HOSTS.ollamaSetupBind,
     OLLAMA_MODELS: resolve('.local/ollama/models'),
     OLLAMA_NO_CLOUD: '1',
   };
-  const origin = 'http://127.0.0.1:11437';
+  const origin = HOSTS.ollamaSetup;
   let occupied = false;
   try {
     await fetch(`${origin}/api/version`, { signal: AbortSignal.timeout(500) });
@@ -41,7 +42,8 @@ export async function setupInferenceGate() {
   } catch {
     /* no listener */
   }
-  if (occupied) throw new Error('Setup needs unused loopback port 11437.');
+  if (occupied)
+    throw new Error(`Setup needs unused loopback port ${PORTS.ollamaSetup}.`);
   const server = spawn('ollama', ['serve'], { env, stdio: 'ignore' });
   let startupError = false;
   server.on('error', () => {

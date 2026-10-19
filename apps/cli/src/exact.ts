@@ -21,6 +21,17 @@ import {
 import type { PaymentPayload, SupportedResponse } from '@x402/core/types';
 
 import {
+  COMMITMENT,
+  LOCALHOST,
+  localPath,
+  LOCK_PATH,
+  X402_SDK_VERSION,
+} from '@gyblos/config';
+import { loadConfig, saveJson, signer, type Config } from '@gyblos/gate/config';
+import { prepareExactAccounts } from '@gyblos/gate/exact-accounts';
+import { assertNoUnresolvedAuthorizations } from '@gyblos/gate/journal';
+import { withExclusiveLock } from '@gyblos/gate/lock';
+import {
   assertDevnet,
   confirm,
   explorer,
@@ -28,12 +39,9 @@ import {
   lamports,
   rpc,
   tokens,
-} from '../../../packages/payments-x402/src/chain.js';
-import {
-  DEVNET,
-  DEVNET_USDC,
-} from '../../../packages/payments-x402/src/constants.js';
-import { exactAuthorizationId } from '../../../packages/payments-x402/src/exact/authorization-id.js';
+} from '@gyblos/payments-x402/chain';
+import { DEVNET, DEVNET_USDC } from '@gyblos/payments-x402/constants';
+import { exactAuthorizationId } from '@gyblos/payments-x402/exact/authorization-id';
 import {
   assertExactFallbackSafe,
   assertExactSupport,
@@ -41,23 +49,15 @@ import {
   EXACT_PRICE,
   PUBLIC_FACILITATORS,
   validateExactTerms,
-} from '../../../packages/payments-x402/src/exact/index.js';
-import {
-  loadConfig,
-  saveJson,
-  signer,
-  type Config,
-} from '../../../scripts/config.js';
-import { prepareExactAccounts } from '../../../scripts/exact-accounts.js';
-import { assertNoUnresolvedAuthorizations } from '../../../scripts/journal.js';
-import { withExclusiveLock } from '../../../scripts/lock.js';
+} from '@gyblos/payments-x402/exact/index';
+
 import {
   AuditedPublicFacilitator,
   createExactSeller,
 } from '../../seller/src/exact.js';
 
 const evidencePath = 'evidence/gate-0004.json',
-  journalPath = '.local/devnet/exact-attempt.json';
+  journalPath = localPath('exact-attempt.json');
 const limitations = [
   'exact charges a fixed price, without usage metering or unused-ceiling refunds',
   'Does not validate upto, MPP, inference, Iroh or correctness of delivered content; REV-13 remains open',
@@ -67,7 +67,7 @@ const limitations = [
 const evidence: Record<string, unknown> = {
   schemaVersion: 1,
   evidenceId: 'GYB-GATE-0004',
-  sdkVersion: '2.28.0',
+  sdkVersion: X402_SDK_VERSION,
   network: DEVNET,
   mint: DEVNET_USDC,
   assetLabel: 'Circle devnet USDC',
@@ -97,7 +97,7 @@ async function snapshot(c: Config, buyer: string) {
     try {
       result = await rpc<{ value: any[] }>(c.rpcUrl, 'getMultipleAccounts', [
         [atas[0]![0], atas[1]![0], buyer],
-        { encoding: 'jsonParsed', commitment: 'confirmed' },
+        { encoding: 'jsonParsed', commitment: COMMITMENT },
       ]);
       break;
     } catch (error) {
@@ -148,7 +148,7 @@ async function reconcile(c: Config, buyer: string, buyerSignature: string) {
   const history = await rpc<{ signature: string }[]>(
     c.rpcUrl,
     'getSignaturesForAddress',
-    [buyer, { limit: 50, commitment: 'confirmed' }],
+    [buyer, { limit: 50, commitment: COMMITMENT }],
   );
   const matches = [];
   for (const item of history) {
@@ -156,7 +156,7 @@ async function reconcile(c: Config, buyer: string, buyerSignature: string) {
       item.signature,
       {
         encoding: 'jsonParsed',
-        commitment: 'confirmed',
+        commitment: COMMITMENT,
         maxSupportedTransactionVersion: 0,
       },
     ]);
@@ -192,7 +192,7 @@ async function run() {
   await assertNoUnresolvedAuthorizations();
   try {
     const old = JSON.parse(await readFile(journalPath, 'utf8'));
-    if (!['confirmed', 'rejected'].includes(old.state))
+    if (![COMMITMENT, 'rejected'].includes(old.state))
       throw new GateError(
         'UNRESOLVED_EXACT',
         'Previous exact payment is uncertain. Reconcile before another attempt.',
@@ -273,11 +273,11 @@ async function run() {
       continue;
     }
     evidence.facilitatorUsed = provider.url;
-    const server = host.app.listen(0, '127.0.0.1');
+    const server = host.app.listen(0, LOCALHOST);
     await once(server, 'listening');
     const addr = server.address();
     assert.ok(addr && typeof addr !== 'string');
-    const url = `http://127.0.0.1:${addr.port}/api/exact`;
+    const url = `http://${LOCALHOST}:${addr.port}/api/exact`;
     let active:
       | (ReturnType<typeof authorizationMetadata> & { buyer: string })
       | undefined;
@@ -493,7 +493,7 @@ async function run() {
         receipt.transaction,
         {
           encoding: 'jsonParsed',
-          commitment: 'confirmed',
+          commitment: COMMITMENT,
           maxSupportedTransactionVersion: 0,
         },
       ]);
@@ -528,7 +528,7 @@ async function run() {
         },
       });
       await saveJson(journalPath, {
-        state: 'confirmed',
+        state: COMMITMENT,
         transaction: receipt.transaction,
         ...success.metadata,
       });
@@ -601,7 +601,7 @@ async function run() {
 }
 let acquired = false;
 try {
-  await withExclusiveLock('.local/devnet/buyer.lock', async () => {
+  await withExclusiveLock(LOCK_PATH, async () => {
     acquired = true;
     await run();
   });

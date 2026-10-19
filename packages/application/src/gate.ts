@@ -1,4 +1,4 @@
-import { GateError } from '../../payments-x402/src/chain.js';
+import { GateError } from '@gyblos/payments-x402/chain';
 
 export interface Snapshot {
   buyer: string;
