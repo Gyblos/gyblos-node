@@ -24,6 +24,7 @@ import { assertProgram } from '@gyblos/payments-x402/chain';
 import { createFacilitator } from '@gyblos/payments-x402/facilitator';
 import {
   assertPortFree,
+  loadJson,
   saveJson,
   spawnChild,
   stopChild,
@@ -116,7 +117,13 @@ export async function startSeller() {
       intervalSecs: CLEANUP.intervalSeconds,
       abandonGraceSecs: CLEANUP.abandonGraceSeconds,
     });
-    const traces: Trace[] = [];
+    let traces: Trace[] = [];
+    try {
+      traces = await loadJson<Trace[]>(rolePath(P2P.traceFilename));
+      if (!Array.isArray(traces)) throw new Error('Invalid trace history.');
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
     await stage('seller-middleware');
     const seller = await createInferenceSeller({
       rpcUrl: config.rpcUrl,
@@ -158,6 +165,7 @@ export async function startSeller() {
     const endpoint = await bindEndpoint(await nodeSecret(), {
       relayOnly,
       bindAddress: process.env.GYBLOS_IROH_BIND,
+      externalAddress: process.env.GYBLOS_IROH_EXTERNAL_ADDR || undefined,
     });
     disposers.push(() => endpoint.close());
     if (endpoint.id().toString() !== config.nodeId)
