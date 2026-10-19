@@ -189,6 +189,39 @@ extra discovery wait also left the public-default control on relay. The exact
 outer translation/filtering/hairpin cause remains unproven. Real-network tests
 remain a separate requirement, and no new payments were run.
 
+To locate missing public IPv4 peer returns without changing forwarding policy:
+
+```sh
+pnpm p2p:diagnose --native-image gyblos-p2p-poc --trace-public
+```
+
+This mode retains public n0 discovery and excludes observers, manual candidates
+and intentional UDP blocking. It waits for a settled descriptor, pauses the
+buyer, and installs counter-only rules on the two test routers before releasing
+peer traffic. It counts exact candidate probes, ingress before DNAT, unmatched
+router input and forwarded peer replies. Known return tuples distinguish
+background discovery traffic from peer traffic. Missing/ambiguous counters or
+resets are rejected; conntrack `UNREPLIED` is read explicitly, including its
+extended IPv4 format. Lack of `ASSURED` alone does not establish no reply.
+
+The measured window showed outgoing probes to both advertised public candidates
+on each router, no peer return at either simulated WAN, and only known
+server-return UDP arriving. Native application exchanges continued over relay. A
+separate private host-only UDP control also received no public-address peer
+returns while its same-host local-address control succeeded. The host control
+used
+[Cloudflare public STUN](https://developers.cloudflare.com/realtime/sfu/get-started/connection-patterns/)
+and did not traverse another LAN device. Its mapping stayed unchanged across two
+server ports; this does not establish independence for every destination.
+
+These observations locate a public-return failure and show it can occur without
+Docker. They do not identify the physical router, ISP/CGNAT or every host filter
+as the cause, prove an IPv6 failure, or justify disabling firewalls. Public n0
+IPv4 discovery is producing candidates and the SDK is attempting them; a
+production discovery fix is not claimed. Router/provider details and a targeted
+network correction remain necessary before claiming this path works. Raw
+addresses, tuples and host/network observations stay local; no paid gate ran.
+
 Seller startup now requires measured VM/cgroup memory headroom, then one bounded
 private synthetic warmup before any offer is signed or readiness is reported.
 Headroom is checked again after tokenizer, middleware and transport
