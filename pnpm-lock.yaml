@@ -11,6 +11,9 @@ importers:
       '@gyblos/config':
         specifier: workspace:*
         version: link:packages/config
+      '@gyblos/runtime':
+        specifier: workspace:*
+        version: link:packages/runtime
       '@solana-program/system':
         specifier: 0.10.0
         version: 0.10.0(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))
@@ -78,6 +81,12 @@ importers:
         version: 0.2.0
 
   packages/payments-x402: {}
+
+  packages/runtime:
+    dependencies:
+      '@gyblos/config':
+        specifier: workspace:*
+        version: link:../config
 
 packages:
 
