@@ -110,33 +110,41 @@ export async function provisionArtifacts(
     [TOKENIZER_FILES.config, config],
   ] as const) {
     await docker(
-      composeArgs(project, [
-        'run',
-        '--rm',
-        '-T',
-        '--no-deps',
-        role,
-        'node',
-        '-e',
-        `const fs=require('fs');const path=process.argv[1];fs.mkdirSync(require('path').dirname(path),{recursive:true});const chunks=[];process.stdin.on('data',chunk=>chunks.push(chunk));process.stdin.on('end',()=>fs.writeFileSync(path,Buffer.concat(chunks)));`,
-        path,
-      ]),
+      composeArgs(
+        project,
+        [
+          'run',
+          '--rm',
+          '-T',
+          '--no-deps',
+          role,
+          'node',
+          '-e',
+          `const fs=require('fs');const path=process.argv[1];fs.mkdirSync(require('path').dirname(path),{recursive:true});const chunks=[];process.stdin.on('data',chunk=>chunks.push(chunk));process.stdin.on('end',()=>fs.writeFileSync(path,Buffer.concat(chunks)));`,
+          path,
+        ],
+        environment,
+      ),
       bytes,
       environment,
     );
   }
   if (role === 'seller')
     await new Promise<void>((done, reject) => {
-      const args = composeArgs(project, [
-        'run',
-        '--rm',
-        '-T',
-        '--no-deps',
-        role,
-        'sh',
-        '-c',
-        `mkdir -p ${OLLAMA_MODELS_PATH} && tar -xf - -C ${OLLAMA_MODELS_PATH}`,
-      ]);
+      const args = composeArgs(
+        project,
+        [
+          'run',
+          '--rm',
+          '-T',
+          '--no-deps',
+          role,
+          'sh',
+          '-c',
+          `mkdir -p ${OLLAMA_MODELS_PATH} && tar -xf - -C ${OLLAMA_MODELS_PATH}`,
+        ],
+        environment,
+      );
       const child = spawn('docker', args, {
         env: environment,
         stdio: ['pipe', 'ignore', 'ignore'],
