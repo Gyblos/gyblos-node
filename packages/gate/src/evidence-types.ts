@@ -1,11 +1,20 @@
+import type {
+  EvidenceAssetLabel,
+  EvidenceId,
+  EvidenceStatus,
+  RECONCILIATION_CLASSIFICATIONS,
+  ReconciliationClassification,
+  SCHEMA_VERSIONS,
+} from '@gyblos/gate/constants';
+
 export interface EvidenceBase {
-  schemaVersion: number;
-  evidenceId: string;
+  schemaVersion: typeof SCHEMA_VERSIONS.EVIDENCE;
+  evidenceId: EvidenceId;
   sdkVersion: string;
   network: string;
   mint: string;
-  assetLabel: string;
-  status: string;
+  assetLabel: EvidenceAssetLabel;
+  status: EvidenceStatus;
   gatePassed: boolean;
   // Historical attempts may use earlier schemas; preserve their original JSON.
   previousAttempts?: unknown[];
@@ -29,8 +38,12 @@ export interface ReconciliationObservation {
   address: string;
   historyLimit: number;
   matches: { signature: string; slot: number; error: unknown }[];
-  classification: string;
+  classification: Exclude<
+    ReconciliationClassification,
+    typeof RECONCILIATION_CLASSIFICATIONS.UNAVAILABLE
+  >;
 }
 
 export type Reconciliation =
-  ReconciliationObservation | { classification: 'reconciliation-unavailable' };
+  | ReconciliationObservation
+  | { classification: typeof RECONCILIATION_CLASSIFICATIONS.UNAVAILABLE };
