@@ -36,7 +36,10 @@ export async function signer(config: Config, role: keyof Config['keys']) {
   if (
     !Array.isArray(bytes) ||
     bytes.length !== KEY_LIMITS.keyPairBytes ||
-    bytes.some((v) => !Number.isInteger(v) || v < 0 || v > KEY_LIMITS.byteMax)
+    bytes.some(
+      (byte) =>
+        !Number.isInteger(byte) || byte < 0 || byte > KEY_LIMITS.byteMax,
+    )
   )
     throw new Error('Invalid devnet key file.');
   const result = await createKeyPairSignerFromBytes(Uint8Array.from(bytes));

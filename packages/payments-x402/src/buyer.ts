@@ -63,12 +63,15 @@ export function createBuyer(
   });
   client.onAfterPaymentCreation(
     async ({ paymentPayload, selectedRequirements }) => {
-      const id = paymentPayload.payload.channelId;
-      if (typeof id !== 'string')
+      const channelId = paymentPayload.payload.channelId;
+      if (typeof channelId !== 'string')
         throw new Error(
           hooks.authorizationError ?? 'SDK did not provide a channel ID.',
         );
-      authorization = { channelId: id, requirements: selectedRequirements };
+      authorization = {
+        channelId: channelId,
+        requirements: selectedRequirements,
+      };
       await onAuthorization?.(authorization);
     },
   );

@@ -14,7 +14,8 @@ export const TOKENIZER_FILES = {
   tokenizer: `${TOKENIZER_DIR}/tokenizer.json`,
   config: `${TOKENIZER_DIR}/tokenizer_config.json`,
 } as const;
-export const evidencePath = (id: string) => `evidence/gate-${id}.json`;
+export const evidencePath = (evidenceId: string) =>
+  `evidence/gate-${evidenceId}.json`;
 export const localPath = (name: string) => `${LOCAL_DIR}/${name}`;
 
 export const OLLAMA_MODELS_PATH = '.local/ollama/models';

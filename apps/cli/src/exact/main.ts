@@ -50,12 +50,12 @@ export async function main() {
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
     }
-    const c = await loadConfig();
-    await assertDevnet(c.rpcUrl);
+    const config = await loadConfig();
+    await assertDevnet(config.rpcUrl);
     await assertNoUnresolvedAuthorizations();
     try {
-      const old = JSON.parse(await readFile(journalPath, 'utf8'));
-      if (![COMMITMENT, 'rejected'].includes(old.state))
+      const previousJournal = JSON.parse(await readFile(journalPath, 'utf8'));
+      if (![COMMITMENT, 'rejected'].includes(previousJournal.state))
         throw new GateError(
           'UNRESOLVED_EXACT',
           'Previous exact payment is uncertain. Reconcile before another attempt.',
@@ -101,15 +101,15 @@ export async function main() {
         'NO_PUBLIC_FACILITATOR',
         'Both public facilitators unavailable.',
       );
-    evidence.setupTransaction = await prepareExactAccounts(c);
+    evidence.setupTransaction = await prepareExactAccounts(config);
     await persist();
     if (
-      (await tokens(c.rpcUrl, c.addresses.buyer, DEVNET_USDC)) <
+      (await tokens(config.rpcUrl, config.addresses.buyer, DEVNET_USDC)) <
       BigInt(EXACT_PRICE)
     )
       throw new GateError(
         'NEEDS_CIRCLE_USDC',
-        `Fund buyer ${c.addresses.buyer} using faucet.circle.com on Solana Devnet.`,
+        `Fund buyer ${config.addresses.buyer} using faucet.circle.com on Solana Devnet.`,
       );
     for (const provider of providers) {
       const facilitator = new AuditedPublicFacilitator(
@@ -119,8 +119,8 @@ export async function main() {
       let host: Awaited<ReturnType<typeof createExactSeller>>;
       try {
         host = await createExactSeller({
-          rpcUrl: c.rpcUrl,
-          payTo: c.addresses.seller,
+          rpcUrl: config.rpcUrl,
+          payTo: config.addresses.seller,
           facilitator,
         });
       } catch (error) {
@@ -138,13 +138,13 @@ export async function main() {
       evidence.facilitatorUsed = provider.url;
       const server = host.app.listen(0, LOCALHOST);
       await once(server, 'listening');
-      const addr = server.address();
-      assert.ok(addr && typeof addr !== 'string');
-      const url = `http://${LOCALHOST}:${addr.port}${ROUTES.exact}`;
+      const serverAddress = server.address();
+      assert.ok(serverAddress && typeof serverAddress !== 'string');
+      const url = `http://${LOCALHOST}:${serverAddress.port}${ROUTES.exact}`;
       try {
         if (
           await runProvider({
-            c,
+            config: config,
             provider,
             host,
             facilitator,

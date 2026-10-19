@@ -20,7 +20,7 @@ import type { ExactContext } from './types.js';
 
 export async function runProvider(context: ExactContext) {
   const {
-    c,
+    config: config,
     provider,
     host,
     facilitator,
@@ -34,7 +34,7 @@ export async function runProvider(context: ExactContext) {
     (ReturnType<typeof authorizationMetadata> & { buyer: string }) | undefined;
   try {
     const policy = {
-      payTo: c.addresses.seller,
+      payTo: config.addresses.seller,
       feePayer: provider.feePayer,
       amount: EXACT_PRICE,
     };
@@ -58,8 +58,8 @@ export async function runProvider(context: ExactContext) {
     ) {
       assertExactFallbackSafe(success.calls);
       const reconciliation = await reconcile(
-        c,
-        c.addresses.buyer,
+        config,
+        config.addresses.buyer,
         success.metadata.buyerSignature,
       );
       if (reconciliation.matches.length)
@@ -86,10 +86,10 @@ export async function runProvider(context: ExactContext) {
     }
     const receipt = success.receipt;
     assert.equal(receipt.network, DEVNET);
-    assert.equal(receipt.payer, c.addresses.buyer);
+    assert.equal(receipt.payer, config.addresses.buyer);
     assert.ok(receipt.transaction);
     if (receipt.amount !== undefined) assert.equal(receipt.amount, EXACT_PRICE);
-    await confirm(c.rpcUrl, receipt.transaction);
+    await confirm(config.rpcUrl, receipt.transaction);
     assert.equal(
       BigInt(success.before.buyer) - BigInt(success.after.buyer),
       BigInt(EXACT_PRICE),
@@ -111,7 +111,7 @@ export async function runProvider(context: ExactContext) {
       ),
     );
     const onChain = await rpc<ChainTransaction | null>(
-      c.rpcUrl,
+      config.rpcUrl,
       'getTransaction',
       [
         receipt.transaction,
@@ -157,7 +157,7 @@ export async function runProvider(context: ExactContext) {
     });
     active = undefined;
     await persist();
-    const replayBefore = await snapshot(c, c.addresses.buyer),
+    const replayBefore = await snapshot(config, config.addresses.buyer),
       handlers = host.handlerCalls(),
       callCount = facilitator.calls.length;
     const replay = await fetch(url, {
@@ -167,7 +167,7 @@ export async function runProvider(context: ExactContext) {
       signal: AbortSignal.timeout(TIMEOUTS.publicRequest),
     });
     assert.equal(replay.status, HTTP_STATUS.conflict);
-    const replayAfter = await snapshot(c, c.addresses.buyer);
+    const replayAfter = await snapshot(config, config.addresses.buyer);
     assert.deepEqual(replayAfter, replayBefore);
     assert.equal(host.handlerCalls(), handlers);
     assert.equal(facilitator.calls.length, callCount);
@@ -199,7 +199,7 @@ export async function runProvider(context: ExactContext) {
     evidence.publicCalls = facilitator.calls;
     if (active) {
       const reconciliation = await reconcile(
-        c,
+        config,
         active.buyer,
         active.buyerSignature,
       ).catch(() => ({ classification: 'reconciliation-unavailable' }));

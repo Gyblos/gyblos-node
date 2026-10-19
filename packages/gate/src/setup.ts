@@ -48,7 +48,8 @@ export async function setupGate() {
           !Array.isArray(existing) ||
           existing.length !== KEY_LIMITS.keyPairBytes ||
           existing.some(
-            (v) => !Number.isInteger(v) || v < 0 || v > KEY_LIMITS.byteMax,
+            (byte) =>
+              !Number.isInteger(byte) || byte < 0 || byte > KEY_LIMITS.byteMax,
           )
         )
           throw new Error(
@@ -58,10 +59,10 @@ export async function setupGate() {
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
         const pair = generateKeyPairSync('ed25519');
-        const jwk = pair.privateKey.export({ format: 'jwk' });
+        const keyMaterial = pair.privateKey.export({ format: 'jwk' });
         bytes = Buffer.concat([
-          Buffer.from(jwk.d!, 'base64url'),
-          Buffer.from(jwk.x!, 'base64url'),
+          Buffer.from(keyMaterial.d!, 'base64url'),
+          Buffer.from(keyMaterial.x!, 'base64url'),
         ]);
         await writeFile(keys[role], JSON.stringify([...bytes]), {
           flag: 'wx',

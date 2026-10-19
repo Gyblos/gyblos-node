@@ -11,7 +11,7 @@ import { snapshot } from './reconcile.js';
 import type { ExactContext } from './types.js';
 
 export async function assertUntrusted(
-  { c, host, persist, evidence }: ExactContext,
+  { config: config, host, persist, evidence }: ExactContext,
   required: Awaited<ReturnType<ReturnType<typeof createChallenge>>>,
   policy: Parameters<typeof validateExactTerms>[1],
 ) {
@@ -23,11 +23,11 @@ export async function assertUntrusted(
       field === 'feePayer'
         ? {
             ...valid,
-            extra: { ...valid.extra, feePayer: c.addresses.buyer },
+            extra: { ...valid.extra, feePayer: config.addresses.buyer },
           }
-        : { ...valid, [field]: c.addresses.buyer };
+        : { ...valid, [field]: config.addresses.buyer };
     let signed = false;
-    const base = await signer(c, 'buyer');
+    const base = await signer(config, 'buyer');
     const buyer = createExactBuyer(
       {
         ...base,
@@ -36,7 +36,7 @@ export async function assertUntrusted(
           throw new Error('Untrusted terms reached signer.');
         },
       },
-      c.rpcUrl,
+      config.rpcUrl,
       policy,
     );
     await assert.rejects(
@@ -54,18 +54,18 @@ export async function assertUntrusted(
   await persist();
 }
 export async function assertEmpty(
-  { c, host, facilitator, persist, evidence }: ExactContext,
+  { config: config, host, facilitator, persist, evidence }: ExactContext,
   challenge: ReturnType<typeof createChallenge>,
   policy: Parameters<typeof validateExactTerms>[1],
 ) {
   const cases = evidence.results;
   // A live zero balance is rejected before signing or contacting public payment endpoints.
-  const emptyBefore = await snapshot(c, c.addresses.authorizer),
+  const emptyBefore = await snapshot(config, config.addresses.authorizer),
     emptyCalls = facilitator.calls.length,
     emptyHandlers = host.handlerCalls();
   assert.equal(emptyBefore.buyer, '0');
   let signed = false;
-  const emptySigner = await signer(c, 'authorizer');
+  const emptySigner = await signer(config, 'authorizer');
   const emptyBuyer = createExactBuyer(
     {
       ...emptySigner,
@@ -74,7 +74,7 @@ export async function assertEmpty(
         throw new Error('Empty buyer reached signer.');
       },
     },
-    c.rpcUrl,
+    config.rpcUrl,
     policy,
   );
   await assert.rejects(
@@ -84,7 +84,7 @@ export async function assertEmpty(
   assert.equal(signed, false);
   assert.equal(facilitator.calls.length, emptyCalls);
   assert.equal(host.handlerCalls(), emptyHandlers);
-  const emptyAfter = await snapshot(c, c.addresses.authorizer);
+  const emptyAfter = await snapshot(config, config.addresses.authorizer);
   assert.deepEqual(emptyAfter, emptyBefore);
   cases.push({
     case: 'insufficient-usdc',

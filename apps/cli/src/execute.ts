@@ -35,7 +35,7 @@ import {
 import type { SettlementEvent } from '@gyblos/payments-x402/facilitator';
 import { validateSettlement } from '@gyblos/payments-x402/trust';
 
-const journalPath = JOURNAL_PATHS.fixed;
+const JOURNAL_PATH = JOURNAL_PATHS.fixed;
 export async function executeGate(signal?: AbortSignal) {
   return withExclusiveLock(LOCK_PATH, () => executeLocked(signal));
 }
@@ -54,7 +54,7 @@ async function executeLocked(signal?: AbortSignal) {
     },
     fetch,
     async (authorization) => {
-      await saveJson(journalPath, {
+      await saveJson(JOURNAL_PATH, {
         state: 'authorization-created',
         channelId: authorization.channelId,
         asset: config.mint,
@@ -110,7 +110,7 @@ async function executeLocked(signal?: AbortSignal) {
       ) {
         const diagnostics = await fetch(
           `${HOSTS.facilitator}${ROUTES.events}`,
-        ).then((r) => r.json());
+        ).then((response) => response.json());
         await saveJson(FAILED_REQUEST_PATH, {
           status: response.status,
           settlement: response.settlement,
@@ -130,12 +130,18 @@ async function executeLocked(signal?: AbortSignal) {
       });
       const eventResponse = await fetch(`${HOSTS.facilitator}${ROUTES.events}`);
       const events = (await eventResponse.json()) as SettlementEvent[];
-      const id = response.authorization.channelId;
+      const channelId = response.authorization.channelId;
       const open = events.find(
-        (e) => e.phase === 'deposit' && e.channelId === id && e.success,
+        (event) =>
+          event.phase === 'deposit' &&
+          event.channelId === channelId &&
+          event.success,
       );
       const claim = events.find(
-        (e) => e.phase === 'claim' && e.channelId === id && e.success,
+        (event) =>
+          event.phase === 'claim' &&
+          event.channelId === channelId &&
+          event.success,
       );
       if (
         !open?.transaction ||
@@ -148,7 +154,7 @@ async function executeLocked(signal?: AbortSignal) {
         );
       await confirm(config.rpcUrl, open.transaction);
       await confirm(config.rpcUrl, claim.transaction);
-      const raw = await account(config.rpcUrl, id);
+      const raw = await account(config.rpcUrl, channelId);
       let distributed = !raw;
       if (raw) {
         const channels = await discoverChannelsByRentPayer(
@@ -159,8 +165,8 @@ async function executeLocked(signal?: AbortSignal) {
           config.addresses.facilitator,
         );
         distributed =
-          channels.find((c) => c.channelId === id)?.channel.status ===
-          CHANNEL_STATUS.distributed;
+          channels.find((channel) => channel.channelId === channelId)?.channel
+            .status === CHANNEL_STATUS.distributed;
       }
       if (
         open.amount !== response.authorization.requirements.amount ||
@@ -173,7 +179,7 @@ async function executeLocked(signal?: AbortSignal) {
           actual: claim.amount,
           openTransaction: open.transaction,
           claimTransaction: claim.transaction,
-          channelId: id,
+          channelId: channelId,
           channelDistributed: distributed,
         },
         resource: response.body,
@@ -203,7 +209,7 @@ async function executeLocked(signal?: AbortSignal) {
   };
   const evidencePath = fixedEvidencePath(Date.now());
   await saveJson(evidencePath, evidence);
-  await saveJson(journalPath, {
+  await saveJson(JOURNAL_PATH, {
     state: 'verified',
     evidencePath,
     channelId: result.accounting.channelId,

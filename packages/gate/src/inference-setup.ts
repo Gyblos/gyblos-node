@@ -44,7 +44,7 @@ export async function setupInferenceGate() {
     tokenizer: await readFile(`${directory}/tokenizer.json`, 'utf8'),
     config: await readFile(`${directory}/tokenizer_config.json`, 'utf8'),
   });
-  const env = {
+  const environment = {
     ...process.env,
     OLLAMA_HOST: HOSTS.ollamaSetupBind,
     OLLAMA_MODELS: resolve(OLLAMA_MODELS_PATH),
@@ -62,7 +62,10 @@ export async function setupInferenceGate() {
   }
   if (occupied)
     throw new Error(`Setup needs unused loopback port ${PORTS.ollamaSetup}.`);
-  const server = spawnChild('ollama', ['serve'], { env, stdio: 'ignore' });
+  const server = spawnChild('ollama', ['serve'], {
+    env: environment,
+    stdio: 'ignore',
+  });
   let startupError = false;
   server.on('error', () => {
     startupError = true;
@@ -77,7 +80,7 @@ export async function setupInferenceGate() {
       timeoutMessage: 'Local Ollama setup timed out.',
     });
     const child = spawnChild('ollama', ['pull', MODEL.name], {
-      env,
+      env: environment,
       stdio: 'inherit',
     });
     const [code] = await once(child, 'exit');

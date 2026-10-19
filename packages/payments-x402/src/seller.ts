@@ -36,8 +36,12 @@ export async function createGateSeller(options: {
   await resource.initialize();
   const app = express();
   let handlerCalls = 0;
-  app.get(ROUTES.health, (_req, res) => {
-    res.json({ gateFixture: true, handlerCalls, runId: options.runId ?? null });
+  app.get(ROUTES.health, (_request, response) => {
+    response.json({
+      gateFixture: true,
+      handlerCalls,
+      runId: options.runId ?? null,
+    });
   });
   app.use(
     paymentMiddleware(
@@ -63,10 +67,10 @@ export async function createGateSeller(options: {
       false,
     ),
   );
-  app.get(ROUTES.fixed, (_req, res) => {
+  app.get(ROUTES.fixed, (_request, response) => {
     handlerCalls++;
-    setSettlementOverrides(res, { amount: ACTUAL_ATOMIC });
-    res.json({
+    setSettlementOverrides(response, { amount: ACTUAL_ATOMIC });
+    response.json({
       gateFixture: true,
       resource: 'x402 devnet gate resource',
       usage: {

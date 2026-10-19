@@ -26,7 +26,7 @@ export async function verifyInferenceDeposit(
     {
       async getProgramAccounts(_network, program, config) {
         const filters = JSON.parse(
-          JSON.stringify(config, (_key, value) => {
+          JSON.stringify(config, (_propertyName, value) => {
             if (typeof value !== 'bigint') return value;
             if (value < 0n || value > BigInt(Number.MAX_SAFE_INTEGER))
               throw new Error('Unsafe channel discovery filter.');

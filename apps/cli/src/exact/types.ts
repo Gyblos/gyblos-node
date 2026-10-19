@@ -15,7 +15,7 @@ export interface ExactProvider {
   supported: SupportedResponse;
 }
 export interface ExactContext {
-  c: Config;
+  config: Config;
   provider: ExactProvider;
   host: Awaited<ReturnType<typeof createExactSeller>>;
   facilitator: AuditedPublicFacilitator;

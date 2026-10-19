@@ -104,12 +104,12 @@ export async function createInferenceSeller(options: {
   await resource.initialize();
   const app = express();
   app.use(express.json({ limit: HTTP_LIMITS.requestBody }));
-  app.post(ROUTES.inference, (req, res, next) => {
+  app.post(ROUTES.inference, (request, response, next) => {
     try {
-      inferenceCeiling(parseInferenceRequest(req.body), options.tokenizer);
+      inferenceCeiling(parseInferenceRequest(request.body), options.tokenizer);
       next();
     } catch {
-      res
+      response
         .status(HTTP_STATUS.badRequest)
         .json({ error: 'Invalid bounded inference request.' });
     }
@@ -145,17 +145,17 @@ export async function createInferenceSeller(options: {
       false,
     ),
   );
-  app.post(ROUTES.inference, async (req, res) => {
-    const input = parseInferenceRequest(req.body);
+  app.post(ROUTES.inference, async (request, response) => {
+    const input = parseInferenceRequest(request.body);
     const controller = new AbortController();
     const abort = () => controller.abort();
-    req.once('aborted', abort);
-    res.once('close', abort);
+    request.once('aborted', abort);
+    response.once('close', abort);
     try {
-      if (req.aborted || res.destroyed) abort();
+      if (request.aborted || response.destroyed) abort();
       controller.signal.throwIfAborted();
       const payload = decodePaymentSignatureHeader(
-        req.get('PAYMENT-SIGNATURE')!,
+        request.get('PAYMENT-SIGNATURE')!,
       );
       const channelId = payload.payload.channelId;
       if (typeof channelId !== 'string') throw new Error('Missing channel.');
@@ -192,8 +192,8 @@ export async function createInferenceSeller(options: {
       const actual = charge(billedTokens);
       if (actual > BigInt(inferenceCeiling(input, options.tokenizer)))
         throw new Error('Usage exceeds authorized ceiling.');
-      setSettlementOverrides(res, { amount: actual.toString() });
-      res.json({
+      setSettlementOverrides(response, { amount: actual.toString() });
+      response.json({
         requestId: input.requestId,
         offer: OFFER_ID,
         model: MODEL.name,
@@ -206,15 +206,15 @@ export async function createInferenceSeller(options: {
       });
     } catch {
       // Explicitly end the Express 4 response so x402 cancels and settles zero.
-      setSettlementOverrides(res, { amount: '0' });
-      res.status(HTTP_STATUS.badGateway).json({
+      setSettlementOverrides(response, { amount: '0' });
+      response.status(HTTP_STATUS.badGateway).json({
         requestId: input.requestId,
         error:
           'Local inference failed; inspect confirmed settlement for refund.',
       });
     } finally {
-      req.removeListener('aborted', abort);
-      res.removeListener('close', abort);
+      request.removeListener('aborted', abort);
+      response.removeListener('close', abort);
     }
   });
   return { app };

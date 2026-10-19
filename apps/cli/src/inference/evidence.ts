@@ -9,7 +9,7 @@ import { MODEL } from '@gyblos/inference-ollama/index';
 import { DEVNET } from '@gyblos/payments-x402/constants';
 
 export async function initializeEvidence(
-  c: Config,
+  config: Config,
   runId: string,
   evidencePath: string,
 ) {
@@ -20,8 +20,8 @@ export async function initializeEvidence(
     createdAt: new Date().toISOString(),
     runId,
     network: DEVNET,
-    mint: c.mint,
-    assetLabel: c.assetLabel,
+    mint: config.mint,
+    assetLabel: config.assetLabel,
     model: MODEL,
     prices: PRICES,
     tolerance: TOLERANCE,

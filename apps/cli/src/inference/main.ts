@@ -70,11 +70,11 @@ export async function main() {
   const dispose = onShutdown(stop);
 
   async function run() {
-    const c = await loadConfig();
+    const config = await loadConfig();
     // This gate accepts only isolated setup keys, never imported wallet paths.
     assert.equal(
-      c.mint,
-      c.assetLabel === 'devnet-usdc' ? DEVNET_USDC : c.addresses.mint,
+      config.mint,
+      config.assetLabel === 'devnet-usdc' ? DEVNET_USDC : config.addresses.mint,
     );
     for (const role of [
       'buyer',
@@ -82,12 +82,12 @@ export async function main() {
       'authorizer',
       'facilitator',
     ] as const) {
-      assert.equal(resolve(c.keys[role]), resolve(keyPath(role)));
+      assert.equal(resolve(config.keys[role]), resolve(keyPath(role)));
     }
     await assertNoUnresolvedAuthorizations();
-    await assertProgram(c.rpcUrl);
+    await assertProgram(config.rpcUrl);
     assert.ok(
-      (await lamports(c.rpcUrl, c.addresses.facilitator)) >
+      (await lamports(config.rpcUrl, config.addresses.facilitator)) >
         MIN_FACILITATOR_LAMPORTS,
       'Facilitator needs devnet SOL for five channels.',
     );
@@ -98,7 +98,7 @@ export async function main() {
     const buyerTokenizer = createModelTokenizer(artifacts);
     const sellerTokenizer = createModelTokenizer(artifacts);
     const salt = await measurementSalt();
-    const evidence = await initializeEvidence(c, runId, evidencePath);
+    const evidence = await initializeEvidence(config, runId, evidencePath);
     try {
       await assertPortFree(
         `${ollamaUrl}${ROUTES.ollamaVersion}`,
@@ -134,8 +134,8 @@ export async function main() {
       });
       await createOllama(ollamaUrl).assertModel();
       evidence.ollamaVersion = (
-        (await fetch(`${ollamaUrl}${ROUTES.ollamaVersion}`).then((r) =>
-          r.json(),
+        (await fetch(`${ollamaUrl}${ROUTES.ollamaVersion}`).then((response) =>
+          response.json(),
         )) as {
           version: string;
         }
@@ -170,9 +170,9 @@ export async function main() {
       const events = async () =>
         (await fetch(`${facilitatorUrl}${ROUTES.events}`, {
           signal: AbortSignal.timeout(TIMEOUTS.events),
-        }).then((r) => r.json())) as SettlementEvent[];
+        }).then((response) => response.json())) as SettlementEvent[];
       const gateBilling = {
-        feePayer: c.addresses.facilitator,
+        feePayer: config.addresses.facilitator,
         billingOverride(requestId: string, usage: Readonly<TokenCounts>) {
           return requestId === debugRequestId
             ? {
@@ -184,12 +184,12 @@ export async function main() {
       };
       const host = await createInferenceSeller({
         ...gateBilling,
-        rpcUrl: c.rpcUrl,
+        rpcUrl: config.rpcUrl,
         facilitatorUrl,
         ollamaUrl,
-        mint: c.mint,
-        payTo: c.addresses.seller,
-        authorizer: await signer(c, 'authorizer'),
+        mint: config.mint,
+        payTo: config.addresses.seller,
+        authorizer: await signer(config, 'authorizer'),
         tokenizer: sellerTokenizer,
         async beforeInference(requestId, channelId) {
           const deposit = (await events()).find(
@@ -199,9 +199,9 @@ export async function main() {
               item.success,
           );
           assert.ok(deposit?.transaction);
-          await confirmInference(c, deposit.transaction);
+          await confirmInference(config, deposit.transaction);
           const depositConfirmedAt = new Date().toISOString();
-          const during = await inferenceSnapshot(c, channelId);
+          const during = await inferenceSnapshot(config, channelId);
           traces.set(requestId, {
             channelId,
             depositConfirmedAt,
@@ -233,7 +233,7 @@ export async function main() {
       const cases = createCases(debugRequestId, failureRequestId);
       await runCases({
         url,
-        c,
+        config: config,
         cases,
         controller,
         buyerTokenizer,

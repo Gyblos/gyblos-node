@@ -20,7 +20,7 @@ export interface InferenceTrace {
 }
 export interface CaseContext {
   url: string;
-  c: Config;
+  config: Config;
   cases: InferenceCase[];
   controller: AbortController;
   buyerTokenizer: ModelTokenizer;

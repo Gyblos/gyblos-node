@@ -16,26 +16,33 @@ import { authorizationMetadata, snapshot } from './reconcile.js';
 import type { ActiveAuthorization, ExactContext } from './types.js';
 
 export function createPaidRequest(
-  { c, facilitator, host, url, journalPath, provider }: ExactContext,
+  {
+    config: config,
+    facilitator,
+    host,
+    url,
+    journalPath,
+    provider,
+  }: ExactContext,
   challenge: ReturnType<typeof createChallenge>,
   policy: Parameters<typeof validateExactTerms>[1],
   setActive: (active: ActiveAuthorization) => void,
 ) {
   return async function paid(role: 'buyer' | 'authorizer', caseName: string) {
     const terms = await challenge(),
-      before = await snapshot(c, c.addresses[role]);
+      before = await snapshot(config, config.addresses[role]);
     const payload = await createExactBuyer(
-      await signer(c, role),
-      c.rpcUrl,
+      await signer(config, role),
+      config.rpcUrl,
       policy,
     ).authorize(terms, before.buyer);
-    const metadata = authorizationMetadata(payload, c.addresses[role]);
-    setActive({ buyer: c.addresses[role], ...metadata });
+    const metadata = authorizationMetadata(payload, config.addresses[role]);
+    setActive({ buyer: config.addresses[role], ...metadata });
     await saveJson(journalPath, {
       state: 'authorization-created',
       case: caseName,
       facilitator: provider.url,
-      buyer: c.addresses[role],
+      buyer: config.addresses[role],
       ...metadata,
       before,
       createdAt: new Date().toISOString(),
@@ -53,7 +60,7 @@ export function createPaidRequest(
       ? decodePaymentResponseHeader(receiptHeader)
       : undefined;
     const body = await response.json();
-    const after = await snapshot(c, c.addresses[role]);
+    const after = await snapshot(config, config.addresses[role]);
     const calls = facilitator.calls.slice(firstCall);
     if (
       calls.some((call) => call.outcome === 'uncertain') ||

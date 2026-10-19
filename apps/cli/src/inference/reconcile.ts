@@ -14,7 +14,7 @@ import { validateSettlement } from '@gyblos/payments-x402/trust';
 import type { CaseContext } from './types.js';
 
 export async function reconcileCase({
-  c,
+  config: config,
   events,
   channelId,
   ceiling,
@@ -26,7 +26,7 @@ export async function reconcileCase({
   traces,
 }: Pick<
   CaseContext,
-  'c' | 'events' | 'evidencePath' | 'journalPath' | 'traces'
+  'config' | 'events' | 'evidencePath' | 'journalPath' | 'traces'
 > & {
   channelId: string;
   ceiling: string;
@@ -44,18 +44,18 @@ export async function reconcileCase({
     (event) => event.phase === 'claim' && event.success,
   );
   assert.ok(deposit?.transaction && claim?.transaction);
-  await confirmInference(c, deposit.transaction);
-  await confirmInference(c, claim.transaction);
+  await confirmInference(config, deposit.transaction);
+  await confirmInference(config, claim.transaction);
   const actual = BigInt(claim.amount);
   assert.ok(actual <= BigInt(ceiling));
   assert.equal(deposit.amount, ceiling);
   assert.ok(response.receipt);
   validateSettlement(response.receipt, {
-    payer: c.addresses.buyer,
+    payer: config.addresses.buyer,
     amount: claim.amount,
   });
   assert.equal(response.receipt.transaction, claim.transaction);
-  const after = await inferenceSnapshot(c, channelId);
+  const after = await inferenceSnapshot(config, channelId);
   const trace = traces.get(requestId);
   assert.ok(trace);
   assert.equal(
@@ -68,11 +68,11 @@ export async function reconcileCase({
   assert.equal(BigInt(after.seller) - BigInt(before.seller), actual);
   assert.equal(after.buyerLamports, before.buyerLamports);
   assert.equal(after.escrow, '0');
-  const openTx = await transaction(c, deposit.transaction);
-  const claimTx = await transaction(c, claim.transaction);
-  const buyerAta = await tokenAddress(c.addresses.buyer, c.mint),
-    sellerAta = await tokenAddress(c.addresses.seller, c.mint),
-    escrowAta = await tokenAddress(channelId, c.mint);
+  const openTx = await transaction(config, deposit.transaction);
+  const claimTx = await transaction(config, claim.transaction);
+  const buyerAta = await tokenAddress(config.addresses.buyer, config.mint),
+    sellerAta = await tokenAddress(config.addresses.seller, config.mint),
+    escrowAta = await tokenAddress(channelId, config.mint);
   const openTransfers = transactionTransfers(openTx),
     claimTransfers = transactionTransfers(claimTx);
   const sum = (
@@ -83,7 +83,7 @@ export async function reconcileCase({
     list
       .filter(
         (item) =>
-          item.mint === c.mint &&
+          item.mint === config.mint &&
           item.source === source &&
           item.destination === destination,
       )

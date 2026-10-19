@@ -24,9 +24,9 @@ import { GateError, lamports, rpc } from '@gyblos/payments-x402/chain';
 import { DEVNET_USDC } from '@gyblos/payments-x402/constants';
 import { exactAuthorizationId } from '@gyblos/payments-x402/exact/authorization-id';
 
-export async function snapshot(c: Config, buyer: string) {
+export async function snapshot(config: Config, buyer: string) {
   const atas = await Promise.all(
-    [buyer, c.addresses.seller].map((owner) =>
+    [buyer, config.addresses.seller].map((owner) =>
       findAssociatedTokenPda({
         owner: address(owner),
         mint: address(DEVNET_USDC),
@@ -37,10 +37,14 @@ export async function snapshot(c: Config, buyer: string) {
   let result: AccountsResponse | undefined;
   for (let attempt = 0; attempt < RETRIES.exactSnapshot; attempt++) {
     try {
-      result = await rpc<AccountsResponse>(c.rpcUrl, 'getMultipleAccounts', [
-        [atas[0]![0], atas[1]![0], buyer],
-        { encoding: 'jsonParsed', commitment: COMMITMENT },
-      ]);
+      result = await rpc<AccountsResponse>(
+        config.rpcUrl,
+        'getMultipleAccounts',
+        [
+          [atas[0]![0], atas[1]![0], buyer],
+          { encoding: 'jsonParsed', commitment: COMMITMENT },
+        ],
+      );
       break;
     } catch (error) {
       if (
@@ -60,7 +64,7 @@ export async function snapshot(c: Config, buyer: string) {
     const info = account?.data?.parsed?.info;
     assert.equal(account?.owner, TOKEN_PROGRAM_ADDRESS);
     assert.equal(info?.mint, DEVNET_USDC);
-    assert.equal(info?.owner, index === 0 ? buyer : c.addresses.seller);
+    assert.equal(info?.owner, index === 0 ? buyer : config.addresses.seller);
     assert.equal(info?.tokenAmount?.decimals, PAYMENT_LIMITS.tokenDecimals);
     return String(info!.tokenAmount.amount);
   });
@@ -73,13 +77,14 @@ export async function snapshot(c: Config, buyer: string) {
 export function authorizationMetadata(payload: PaymentPayload, buyer: string) {
   const wire = payload.payload.transaction;
   assert.equal(typeof wire, 'string');
-  const tx = getTransactionDecoder().decode(
+  const transaction = getTransactionDecoder().decode(
     getBase64Encoder().encode(wire as string),
   );
-  const signature = tx.signatures[buyer as keyof typeof tx.signatures];
+  const signature =
+    transaction.signatures[buyer as keyof typeof transaction.signatures];
   assert.ok(signature);
   const compiled = getCompiledTransactionMessageDecoder().decode(
-    tx.messageBytes,
+    transaction.messageBytes,
   );
   return {
     authorizationHash: exactAuthorizationId(wire as string),
@@ -89,12 +94,12 @@ export function authorizationMetadata(payload: PaymentPayload, buyer: string) {
 }
 // Public metadata only. An absent match is an observation, not proof of failure/refund.
 export async function reconcile(
-  c: Config,
+  config: Config,
   buyer: string,
   buyerSignature: string,
 ) {
   const history = await rpc<{ signature: string }[]>(
-    c.rpcUrl,
+    config.rpcUrl,
     'getSignaturesForAddress',
     [
       buyer,
@@ -103,19 +108,23 @@ export async function reconcile(
   );
   const matches = [];
   for (const item of history) {
-    const tx = await rpc<ChainTransaction | null>(c.rpcUrl, 'getTransaction', [
-      item.signature,
-      {
-        encoding: 'jsonParsed',
-        commitment: COMMITMENT,
-        maxSupportedTransactionVersion: 0,
-      },
-    ]);
-    if (tx?.transaction.signatures.includes(buyerSignature))
+    const transaction = await rpc<ChainTransaction | null>(
+      config.rpcUrl,
+      'getTransaction',
+      [
+        item.signature,
+        {
+          encoding: 'jsonParsed',
+          commitment: COMMITMENT,
+          maxSupportedTransactionVersion: 0,
+        },
+      ],
+    );
+    if (transaction?.transaction.signatures.includes(buyerSignature))
       matches.push({
         signature: item.signature,
-        slot: tx.slot,
-        error: tx.meta?.err,
+        slot: transaction.slot,
+        error: transaction.meta?.err,
       });
   }
   return {

@@ -47,15 +47,15 @@ export async function rpc<T>(
 }
 
 export function readChain<T>(
-  c: Config,
+  config: Config,
   method: string,
   params: unknown[],
 ): Promise<T> {
-  return rpc<T>(c.rpcUrl, method, params);
+  return rpc<T>(config.rpcUrl, method, params);
 }
 
-export async function confirmInference(c: Config, signature: string) {
-  return confirm(c.rpcUrl, signature, {
+export async function confirmInference(config: Config, signature: string) {
+  return confirm(config.rpcUrl, signature, {
     read: rpc,
     failedMessage: 'Inference transaction failed.',
     unknownMessage:
@@ -71,25 +71,29 @@ export async function tokenAddress(owner: string, mint: string) {
     })
   )[0];
 }
-export async function inferenceSnapshot(c: Config, channelId?: string) {
+export async function inferenceSnapshot(config: Config, channelId?: string) {
   const owners = [
-    c.addresses.buyer,
-    c.addresses.seller,
+    config.addresses.buyer,
+    config.addresses.seller,
     ...(channelId ? [channelId] : []),
   ];
   const atas = await Promise.all(
-    owners.map((owner) => tokenAddress(owner, c.mint)),
+    owners.map((owner) => tokenAddress(owner, config.mint)),
   );
-  const response = await readChain<AccountsResponse>(c, 'getMultipleAccounts', [
-    [...atas, c.addresses.buyer],
-    { encoding: 'jsonParsed', commitment: COMMITMENT },
-  ]);
+  const response = await readChain<AccountsResponse>(
+    config,
+    'getMultipleAccounts',
+    [
+      [...atas, config.addresses.buyer],
+      { encoding: 'jsonParsed', commitment: COMMITMENT },
+    ],
+  );
   const amounts = atas.map((_, index) => {
     const raw = response.value[index];
     if (!raw && index === 2) return '0';
     assert.equal(raw?.owner, TOKEN_PROGRAM_ADDRESS);
     const info = raw!.data.parsed.info;
-    assert.equal(info.mint, c.mint);
+    assert.equal(info.mint, config.mint);
     assert.equal(info.owner, owners[index]);
     return String(info.tokenAmount.amount);
   });
@@ -101,26 +105,30 @@ export async function inferenceSnapshot(c: Config, channelId?: string) {
     buyerLamports: String(response.value[atas.length]?.lamports ?? 0),
   };
 }
-export async function transaction(c: Config, signature: string) {
+export async function transaction(config: Config, signature: string) {
   for (let attempt = 0; attempt < RETRIES.transaction; attempt++) {
-    const tx = await readChain<ChainTransaction | null>(c, 'getTransaction', [
-      signature,
-      {
-        encoding: 'jsonParsed',
-        commitment: COMMITMENT,
-        maxSupportedTransactionVersion: 0,
-      },
-    ]);
-    if (tx === null) {
+    const transaction = await readChain<ChainTransaction | null>(
+      config,
+      'getTransaction',
+      [
+        signature,
+        {
+          encoding: 'jsonParsed',
+          commitment: COMMITMENT,
+          maxSupportedTransactionVersion: 0,
+        },
+      ],
+    );
+    if (transaction === null) {
       if (attempt < RETRIES.transaction - 1)
         await new Promise((resolve) =>
           setTimeout(resolve, RETRY_DELAYS.transactionVisibility),
         );
       continue;
     }
-    assert.ok(tx && tx.meta.err === null);
-    assert.equal(tx.transaction.signatures[0], signature);
-    return tx;
+    assert.ok(transaction && transaction.meta.err === null);
+    assert.equal(transaction.transaction.signatures[0], signature);
+    return transaction;
   }
   throw new GateError(
     'TRANSACTION_UNKNOWN',
@@ -133,7 +141,9 @@ interface Transfer {
   mint: string;
   amount: string;
 }
-export function transactionTransfers(tx: ChainTransaction): Transfer[] {
+export function transactionTransfers(
+  transaction: ChainTransaction,
+): Transfer[] {
   const found: Transfer[] = [];
   function visit(instruction: ChainInstruction) {
     if (instruction.programId !== TOKEN_PROGRAM_ADDRESS) return;
@@ -165,8 +175,8 @@ export function transactionTransfers(tx: ChainTransaction): Transfer[] {
       );
     }
   }
-  for (const item of tx.transaction.message.instructions) visit(item);
-  for (const group of tx.meta.innerInstructions ?? [])
+  for (const item of transaction.transaction.message.instructions) visit(item);
+  for (const group of transaction.meta.innerInstructions ?? [])
     for (const item of group.instructions) visit(item);
   return found;
 }

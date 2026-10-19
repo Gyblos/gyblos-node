@@ -123,20 +123,25 @@ export async function fundGate() {
         ).value;
         const message = pipe(
           createTransactionMessage({ version: 0 }),
-          (m) => setTransactionMessageFeePayerSigner(feePayer, m),
-          (m) =>
+          (transactionMessage) =>
+            setTransactionMessageFeePayerSigner(feePayer, transactionMessage),
+          (transactionMessage) =>
             setTransactionMessageLifetimeUsingBlockhash(
               {
                 blockhash: blockhash(latest.blockhash),
                 lastValidBlockHeight: BigInt(latest.lastValidBlockHeight),
               },
-              m,
+              transactionMessage,
             ),
-          (m) => appendTransactionMessageInstructions(instructions, m),
+          (transactionMessage) =>
+            appendTransactionMessageInstructions(
+              instructions,
+              transactionMessage,
+            ),
         );
-        const tx = await signTransactionMessageWithSigners(message);
+        const transaction = await signTransactionMessageWithSigners(message);
         const signature = await rpc<string>(config.rpcUrl, 'sendTransaction', [
-          getBase64EncodedWireTransaction(tx),
+          getBase64EncodedWireTransaction(transaction),
           { encoding: 'base64', preflightCommitment: COMMITMENT },
         ]);
         await confirm(config.rpcUrl, signature);

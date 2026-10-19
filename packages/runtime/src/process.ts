@@ -69,7 +69,11 @@ export async function waitReady(
     parseBody?: boolean;
   } = {},
 ) {
-  for (let i = 0; i < (options.attempts ?? RETRIES.startup); i++) {
+  for (
+    let attempt = 0;
+    attempt < (options.attempts ?? RETRIES.startup);
+    attempt++
+  ) {
     options.signal?.throwIfAborted();
     if (
       child.exitCode !== null ||

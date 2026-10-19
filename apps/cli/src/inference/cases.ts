@@ -23,7 +23,7 @@ import type { CaseContext } from './types.js';
 
 export async function runCases({
   url,
-  c,
+  config: config,
   cases,
   controller,
   buyerTokenizer,
@@ -34,7 +34,7 @@ export async function runCases({
   events,
   traces,
 }: CaseContext) {
-  const buyerSigner = await signer(c, 'buyer');
+  const buyerSigner = await signer(config, 'buyer');
   for (const testCase of cases) {
     controller.signal.throwIfAborted();
     await assertNoUnresolvedAuthorizations();
@@ -44,33 +44,33 @@ export async function runCases({
       maxTokens: MODEL_LIMITS.requestMaxOutputTokens,
     };
     const ceiling = inferenceCeiling(request, buyerTokenizer);
-    const before = await inferenceSnapshot(c);
+    const before = await inferenceSnapshot(config);
     assert.ok(BigInt(before.buyer) >= BigInt(ceiling));
     let signedAt: number | undefined, channelId: string | undefined;
     const buyer = createInferenceBuyer(
       buyerSigner,
-      c.rpcUrl,
+      config.rpcUrl,
       {
-        mint: c.mint,
-        payTo: c.addresses.seller,
-        feePayer: c.addresses.facilitator,
-        receiverAuthorizer: c.addresses.authorizer,
+        mint: config.mint,
+        payTo: config.addresses.seller,
+        feePayer: config.addresses.facilitator,
+        receiverAuthorizer: config.addresses.authorizer,
         maxAtomic: ceiling,
       },
       {
         beforeSigning() {
           signedAt = performance.now();
         },
-        async authorized(id, authorizedCeiling) {
+        async authorized(authorizedChannelId, authorizedCeiling) {
           assert.equal(authorizedCeiling, ceiling);
-          channelId = id;
+          channelId = authorizedChannelId;
           await saveJson(journalPath, {
             state: 'authorization-created',
             requestId: request.requestId,
-            channelId: id,
+            channelId: authorizedChannelId,
             ceilingAtomic: ceiling,
             network: DEVNET,
-            mint: c.mint,
+            mint: config.mint,
             createdAt: new Date().toISOString(),
           });
         },
@@ -95,7 +95,7 @@ export async function runCases({
       openTransfers,
       claimTransfers,
     } = await reconcileCase({
-      c,
+      config: config,
       events,
       channelId,
       ceiling,
@@ -131,7 +131,7 @@ export async function runCases({
     const row = measurementRow(
       {
         requestId: request.requestId,
-        seller: c.addresses.seller,
+        seller: config.addresses.seller,
         offer: OFFER_ID,
         channelId,
         depositSignature: deposit.transaction,

@@ -49,87 +49,95 @@ import { createGateSeller } from '@gyblos/payments-x402/seller';
 
 export async function failureGate() {
   async function failures() {
-    const c = await loadConfig();
-    await assertProgram(c.rpcUrl);
+    const config = await loadConfig();
+    await assertProgram(config.rpcUrl);
     // This harness creates only devnet test-token accounts, never imports a user wallet.
-    assert.equal(c.assetLabel, 'devnet-test-token');
+    assert.equal(config.assetLabel, 'devnet-test-token');
     await assertNoUnresolvedAuthorizations();
-    const sponsor = await signer(c, 'facilitator'),
+    const sponsor = await signer(config, 'facilitator'),
       emptyBuyer = await generateKeyPairSigner();
     const latest = (
       await rpc<{ value: { blockhash: string; lastValidBlockHeight: number } }>(
-        c.rpcUrl,
+        config.rpcUrl,
         'getLatestBlockhash',
         [{ commitment: COMMITMENT }],
       )
     ).value;
     const message = pipe(
       createTransactionMessage({ version: 0 }),
-      (m) => setTransactionMessageFeePayerSigner(sponsor, m),
-      (m) =>
+      (transactionMessage) =>
+        setTransactionMessageFeePayerSigner(sponsor, transactionMessage),
+      (transactionMessage) =>
         setTransactionMessageLifetimeUsingBlockhash(
           {
             blockhash: blockhash(latest.blockhash),
             lastValidBlockHeight: BigInt(latest.lastValidBlockHeight),
           },
-          m,
+          transactionMessage,
         ),
-      (m) => appendTransactionMessageInstructions([], m),
+      (transactionMessage) =>
+        appendTransactionMessageInstructions([], transactionMessage),
     );
-    const ix = await getCreateAssociatedTokenIdempotentInstructionAsync({
-      payer: sponsor,
-      owner: emptyBuyer.address,
-      mint: address(c.mint),
-    });
-    const tx = await signTransactionMessageWithSigners(
-      appendTransactionMessageInstructions([ix], message),
+    const instruction =
+      await getCreateAssociatedTokenIdempotentInstructionAsync({
+        payer: sponsor,
+        owner: emptyBuyer.address,
+        mint: address(config.mint),
+      });
+    const transaction = await signTransactionMessageWithSigners(
+      appendTransactionMessageInstructions([instruction], message),
     );
-    const setupTransaction = await rpc<string>(c.rpcUrl, 'sendTransaction', [
-      getBase64EncodedWireTransaction(tx),
-      { encoding: 'base64', preflightCommitment: COMMITMENT },
-    ]);
-    await confirm(c.rpcUrl, setupTransaction);
+    const setupTransaction = await rpc<string>(
+      config.rpcUrl,
+      'sendTransaction',
+      [
+        getBase64EncodedWireTransaction(transaction),
+        { encoding: 'base64', preflightCommitment: COMMITMENT },
+      ],
+    );
+    await confirm(config.rpcUrl, setupTransaction);
     const results = [];
     for (const kind of ['F1', 'F2'] as const) {
-      const buyerSigner = kind === 'F1' ? emptyBuyer : await signer(c, 'buyer');
-      const f = createFacilitator(sponsor, c.rpcUrl, {
+      const buyerSigner =
+        kind === 'F1' ? emptyBuyer : await signer(config, 'buyer');
+      const facilitator = createFacilitator(sponsor, config.rpcUrl, {
         buyer: buyerSigner.address,
-        mint: c.mint,
-        payTo: c.addresses.seller,
-        authorizer: c.addresses.authorizer,
+        mint: config.mint,
+        payTo: config.addresses.seller,
+        authorizer: config.addresses.authorizer,
       });
-      const fs = f.app.listen(0, LOCALHOST);
-      await once(fs, 'listening');
-      const fa = fs.address();
-      assert.ok(fa && typeof fa !== 'string');
-      let ss: ReturnType<typeof f.app.listen> | undefined;
+      const facilitatorServer = facilitator.app.listen(0, LOCALHOST);
+      await once(facilitatorServer, 'listening');
+      const facilitatorAddress = facilitatorServer.address();
+      assert.ok(facilitatorAddress && typeof facilitatorAddress !== 'string');
+      let sellerServer: ReturnType<typeof facilitator.app.listen> | undefined;
       try {
-        const s = await createGateSeller({
-          rpcUrl: c.rpcUrl,
-          facilitatorUrl: `http://${LOCALHOST}:${fa.port}`,
-          mint: c.mint,
-          payTo: c.addresses.seller,
-          authorizer: await signer(c, 'authorizer'),
+        const seller = await createGateSeller({
+          rpcUrl: config.rpcUrl,
+          facilitatorUrl: `http://${LOCALHOST}:${facilitatorAddress.port}`,
+          mint: config.mint,
+          payTo: config.addresses.seller,
+          authorizer: await signer(config, 'authorizer'),
         });
-        ss = s.app.listen(0, LOCALHOST);
-        await once(ss, 'listening');
-        const sa = ss.address();
-        assert.ok(sa && typeof sa !== 'string');
-        const url = `http://${LOCALHOST}:${sa.port}`;
+        sellerServer = seller.app.listen(0, LOCALHOST);
+        await once(sellerServer, 'listening');
+        const sellerAddress = sellerServer.address();
+        assert.ok(sellerAddress && typeof sellerAddress !== 'string');
+        const url = `http://${LOCALHOST}:${sellerAddress.port}`;
         const before = {
           buyer: (
-            await tokens(c.rpcUrl, buyerSigner.address, c.mint)
+            await tokens(config.rpcUrl, buyerSigner.address, config.mint)
           ).toString(),
           seller: (
-            await tokens(c.rpcUrl, c.addresses.seller, c.mint)
+            await tokens(config.rpcUrl, config.addresses.seller, config.mint)
           ).toString(),
         };
         let channelId = '',
           expiresAt = 0,
           rejection: unknown;
         const fetchImpl: typeof fetch = async (input, init) => {
-          const req = new Request(input, init);
-          const header = req.headers.get('PAYMENT-SIGNATURE');
+          const request = new Request(input, init);
+          const header = request.headers.get('PAYMENT-SIGNATURE');
           if (header && kind === 'F2') {
             expiresAt = Number(
               decodePaymentSignatureHeader(header).payload.expiresAt,
@@ -148,7 +156,7 @@ export async function failureGate() {
             // Verify the same expired payload directly as a read-only diagnostic.
             const payload = decodePaymentSignatureHeader(header);
             const diagnostic = await fetch(
-              `http://${LOCALHOST}:${fa.port}${ROUTES.verify}`,
+              `http://${LOCALHOST}:${facilitatorAddress.port}${ROUTES.verify}`,
               {
                 method: 'POST',
                 headers: { 'content-type': 'application/json' },
@@ -166,7 +174,7 @@ export async function failureGate() {
             assert.equal(verification.isValid, false);
             assert.match(verification.invalidReason ?? '', /expir/i);
           }
-          const response = await fetch(req);
+          const response = await fetch(request);
           if (header && response.status === HTTP_STATUS.paymentRequired) {
             const required = response.headers.get('PAYMENT-REQUIRED');
             rejection = required
@@ -175,19 +183,19 @@ export async function failureGate() {
           }
           return response;
         };
-        const b = createBuyer(
+        const buyer = createBuyer(
           buyerSigner,
-          c.rpcUrl,
+          config.rpcUrl,
           {
-            mint: c.mint,
-            payTo: c.addresses.seller,
-            feePayer: c.addresses.facilitator,
-            receiverAuthorizer: c.addresses.authorizer,
+            mint: config.mint,
+            payTo: config.addresses.seller,
+            feePayer: config.addresses.facilitator,
+            receiverAuthorizer: config.addresses.authorizer,
             maxAtomic: MAX_ATOMIC,
           },
           fetchImpl,
-          async (a) => {
-            channelId = a.channelId;
+          async (authorization) => {
+            channelId = authorization.channelId;
             await saveJson(failureJournalPath(kind), {
               state: 'authorization-created',
               channelId,
@@ -196,19 +204,19 @@ export async function failureGate() {
             });
           },
         );
-        const response = await b.request(`${url}${ROUTES.fixed}`);
+        const response = await buyer.request(`${url}${ROUTES.fixed}`);
         assert.equal(response.status, HTTP_STATUS.paymentRequired);
         assert.ok(channelId);
-        const health = (await fetch(`${url}${ROUTES.health}`).then((r) =>
-          r.json(),
+        const health = (await fetch(`${url}${ROUTES.health}`).then((response) =>
+          response.json(),
         )) as {
           handlerCalls: number;
         };
         assert.equal(health.handlerCalls, 0);
-        assert.ok(f.events.every((e) => !e.success));
-        const channel = await account(c.rpcUrl, channelId);
+        assert.ok(facilitator.events.every((event) => !event.success));
+        const channel = await account(config.rpcUrl, channelId);
         const history = await rpc<unknown[]>(
-          c.rpcUrl,
+          config.rpcUrl,
           'getSignaturesForAddress',
           [channelId, { limit: DIAGNOSTIC_LIMITS.failureHistory }],
         );
@@ -216,24 +224,29 @@ export async function failureGate() {
         assert.equal(history.length, 0);
         const after = {
           buyer: (
-            await tokens(c.rpcUrl, buyerSigner.address, c.mint)
+            await tokens(config.rpcUrl, buyerSigner.address, config.mint)
           ).toString(),
           seller: (
-            await tokens(c.rpcUrl, c.addresses.seller, c.mint)
+            await tokens(config.rpcUrl, config.addresses.seller, config.mint)
           ).toString(),
         };
         assert.deepEqual(after, before);
         if (kind === 'F1') {
           assert.equal(before.buyer, '0');
           assert.equal(
-            f.events[0]?.errorReason,
+            facilitator.events[0]?.errorReason,
             'invalid_upto_svm_settlement_simulation',
           );
-          assert.match(f.events[0]?.errorMessage ?? '', /Custom.*1[^0-9]/);
+          assert.match(
+            facilitator.events[0]?.errorMessage ?? '',
+            /Custom.*1[^0-9]/,
+          );
         } else {
           assert.ok(expiresAt * UNITS.millisecondsPerSecond < Date.now());
           assert.match(
-            f.verifications.find((v) => !v.isValid)?.invalidReason ?? '',
+            facilitator.verifications.find(
+              (verification) => !verification.isValid,
+            )?.invalidReason ?? '',
             /expir/i,
           );
         }
@@ -245,8 +258,8 @@ export async function failureGate() {
           channelId,
           expiresAt: expiresAt || undefined,
           rejection,
-          verifications: f.verifications,
-          events: f.events,
+          verifications: facilitator.verifications,
+          events: facilitator.events,
           handlerCalls: health.handlerCalls,
           before,
           after,
@@ -264,17 +277,21 @@ export async function failureGate() {
           `${kind} passed: HTTP 402, no channel, no resource execution, unchanged token balances.`,
         );
       } finally {
-        if (ss)
-          await new Promise<void>((resolve) => ss!.close(() => resolve()));
-        await new Promise<void>((resolve) => fs.close(() => resolve()));
+        if (sellerServer)
+          await new Promise<void>((resolve) =>
+            sellerServer!.close(() => resolve()),
+          );
+        await new Promise<void>((resolve) =>
+          facilitatorServer.close(() => resolve()),
+        );
       }
     }
     const evidence = {
       schemaVersion: 1,
       createdAt: new Date().toISOString(),
       network: DEVNET,
-      mint: c.mint,
-      assetLabel: c.assetLabel,
+      mint: config.mint,
+      assetLabel: config.assetLabel,
       setupTransaction,
       results,
       limitations: [

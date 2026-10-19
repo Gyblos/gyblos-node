@@ -74,7 +74,7 @@ export class AuditedPublicFacilitator extends HTTPFacilitatorClient {
     }
   }
   private recordError(operation: string, error: unknown) {
-    const e = error as {
+    const errorDetails = error as {
       name?: string;
       invalidReason?: string;
       errorReason?: string;
@@ -82,20 +82,20 @@ export class AuditedPublicFacilitator extends HTTPFacilitatorClient {
       errorMessage?: string;
       transaction?: string;
     };
-    const reason = e.invalidReason ?? e.errorReason;
+    const reason = errorDetails.invalidReason ?? errorDetails.errorReason;
     this.calls.push({
       operation,
       url: this.url,
       outcome:
         operation === 'verify' &&
         reason &&
-        !e.transaction &&
+        !errorDetails.transaction &&
         !/pending|timeout|unknown/i.test(reason)
           ? 'rejected'
           : 'uncertain',
-      reason: reason ?? e.name ?? 'UnknownError',
-      transaction: e.transaction,
-      message: (e.invalidMessage ?? e.errorMessage)
+      reason: reason ?? errorDetails.name ?? 'UnknownError',
+      transaction: errorDetails.transaction,
+      message: (errorDetails.invalidMessage ?? errorDetails.errorMessage)
         ?.replace(/https?:\/\/\S+/g, '[URL]')
         .slice(0, HTTP_STATUS.internalServerError),
     });
@@ -114,12 +114,12 @@ export async function createExactSeller(options: {
   const app = express();
   let handlerCalls = 0;
   const authorizations = new Set<string>();
-  app.get(ROUTES.health, (_req, res) => {
-    res.json({ handlerCalls, fixture: true, scheme: 'exact' });
+  app.get(ROUTES.health, (_request, response) => {
+    response.json({ handlerCalls, fixture: true, scheme: 'exact' });
   });
   // Process-scoped replay guard. Never retain or log the signed payload itself.
-  app.use(ROUTES.exact, async (req, res, next) => {
-    const header = req.header('PAYMENT-SIGNATURE');
+  app.use(ROUTES.exact, async (request, response, next) => {
+    const header = request.header('PAYMENT-SIGNATURE');
     if (!header) {
       next();
       return;
@@ -127,20 +127,20 @@ export async function createExactSeller(options: {
     try {
       const payload = decodePaymentSignatureHeader(header);
       if (typeof payload.payload.transaction !== 'string') {
-        res
+        response
           .status(HTTP_STATUS.badRequest)
           .json({ error: 'Invalid exact transaction.' });
         return;
       }
-      const id = exactAuthorizationId(payload.payload.transaction);
-      if (authorizations.has(id)) {
-        res.status(HTTP_STATUS.conflict).json({
+      const authorizationId = exactAuthorizationId(payload.payload.transaction);
+      if (authorizations.has(authorizationId)) {
+        response.status(HTTP_STATUS.conflict).json({
           error:
             'Authorization already attempted; reconcile instead of replaying.',
         });
         return;
       }
-      authorizations.add(id);
+      authorizations.add(authorizationId);
       validateExactTerms(payload.accepted, {
         payTo: options.payTo,
         feePayer: options.facilitator.feePayer,
@@ -153,7 +153,7 @@ export async function createExactSeller(options: {
         payload.accepted,
       );
       if (!verification.isValid) {
-        res.status(HTTP_STATUS.paymentRequired).json({
+        response.status(HTTP_STATUS.paymentRequired).json({
           error: 'Payment rejected.',
           reason: verification.invalidReason,
         });
@@ -162,7 +162,7 @@ export async function createExactSeller(options: {
       next();
     } catch {
       const last = options.facilitator.calls.at(-1);
-      res
+      response
         .status(
           last?.outcome === 'uncertain'
             ? HTTP_STATUS.serviceUnavailable
@@ -198,9 +198,13 @@ export async function createExactSeller(options: {
       false,
     ),
   );
-  app.get(ROUTES.exact, (_req, res) => {
+  app.get(ROUTES.exact, (_request, response) => {
     handlerCalls++;
-    res.json({ fixture: true, scheme: 'exact', fixedPriceAtomic: EXACT_PRICE });
+    response.json({
+      fixture: true,
+      scheme: 'exact',
+      fixedPriceAtomic: EXACT_PRICE,
+    });
   });
   return {
     app,

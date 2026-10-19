@@ -59,11 +59,11 @@ export async function main() {
         'Fund the buyer or run gate:fund --test-mint first.',
       );
     controller.signal.throwIfAborted();
-    const env = { ...process.env, GYBLOS_GATE_RUN_ID: runId };
+    const environment = { ...process.env, GYBLOS_GATE_RUN_ID: runId };
     const facilitator = spawnChild(
       process.execPath,
       ['--import', 'tsx', ENTRYPOINTS.facilitator],
-      { env, stdio: ['ignore', 'pipe', 'pipe'] },
+      { env: environment, stdio: ['ignore', 'pipe', 'pipe'] },
     );
     children.push(facilitator);
     facilitator.on('error', (error) => controller.abort(error));
@@ -84,7 +84,7 @@ export async function main() {
     const seller = spawnChild(
       process.execPath,
       ['--import', 'tsx', ENTRYPOINTS.seller],
-      { env, stdio: ['ignore', 'pipe', 'pipe'] },
+      { env: environment, stdio: ['ignore', 'pipe', 'pipe'] },
     );
     children.push(seller);
     seller.on('error', (error) => controller.abort(error));

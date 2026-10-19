@@ -16,11 +16,11 @@ import { signer, type Config } from '@gyblos/gate/config';
 import { assertDevnet, confirm, rpc } from '@gyblos/payments-x402/chain';
 import { DEVNET_USDC } from '@gyblos/payments-x402/constants';
 
-export async function prepareExactAccounts(c: Config) {
-  await assertDevnet(c.rpcUrl);
-  const sponsor = await signer(c, 'facilitator');
+export async function prepareExactAccounts(config: Config) {
+  await assertDevnet(config.rpcUrl);
+  const sponsor = await signer(config, 'facilitator');
   const instructions = await Promise.all(
-    [c.addresses.seller, c.addresses.authorizer].map((owner) =>
+    [config.addresses.seller, config.addresses.authorizer].map((owner) =>
       getCreateAssociatedTokenIdempotentInstructionAsync({
         payer: sponsor,
         owner: address(owner),
@@ -30,29 +30,31 @@ export async function prepareExactAccounts(c: Config) {
   );
   const latest = (
     await rpc<{ value: { blockhash: string; lastValidBlockHeight: number } }>(
-      c.rpcUrl,
+      config.rpcUrl,
       'getLatestBlockhash',
       [{ commitment: COMMITMENT }],
     )
   ).value;
   const message = pipe(
     createTransactionMessage({ version: 0 }),
-    (m) => setTransactionMessageFeePayerSigner(sponsor, m),
-    (m) =>
+    (transactionMessage) =>
+      setTransactionMessageFeePayerSigner(sponsor, transactionMessage),
+    (transactionMessage) =>
       setTransactionMessageLifetimeUsingBlockhash(
         {
           blockhash: blockhash(latest.blockhash),
           lastValidBlockHeight: BigInt(latest.lastValidBlockHeight),
         },
-        m,
+        transactionMessage,
       ),
-    (m) => appendTransactionMessageInstructions(instructions, m),
+    (transactionMessage) =>
+      appendTransactionMessageInstructions(instructions, transactionMessage),
   );
-  const tx = await signTransactionMessageWithSigners(message);
-  const signature = await rpc<string>(c.rpcUrl, 'sendTransaction', [
-    getBase64EncodedWireTransaction(tx),
+  const transaction = await signTransactionMessageWithSigners(message);
+  const signature = await rpc<string>(config.rpcUrl, 'sendTransaction', [
+    getBase64EncodedWireTransaction(transaction),
     { encoding: 'base64', preflightCommitment: COMMITMENT },
   ]);
-  await confirm(c.rpcUrl, signature);
+  await confirm(config.rpcUrl, signature);
   return signature;
 }

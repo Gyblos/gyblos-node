@@ -20,7 +20,10 @@ export interface ExactPolicy {
 }
 export function assertExactSupport(body: SupportedResponse, feePayer: string) {
   const kind = body.kinds.find(
-    (k) => k.x402Version === 2 && k.scheme === 'exact' && k.network === DEVNET,
+    (kind) =>
+      kind.x402Version === 2 &&
+      kind.scheme === 'exact' &&
+      kind.network === DEVNET,
   );
   if (!kind || kind.extra?.feePayer !== feePayer)
     throw new GateError(
@@ -97,8 +100,12 @@ export function assertExactFallbackSafe(
 ) {
   // Empty RPC history never proves an attempted settlement did not broadcast.
   if (
-    calls.some((c) => c.operation === 'settle' || c.outcome === 'uncertain') ||
-    !calls.some((c) => c.operation === 'verify' && c.outcome === 'rejected')
+    calls.some(
+      (call) => call.operation === 'settle' || call.outcome === 'uncertain',
+    ) ||
+    !calls.some(
+      (call) => call.operation === 'verify' && call.outcome === 'rejected',
+    )
   )
     throw new GateError(
       'PUBLIC_OUTCOME_UNCERTAIN',

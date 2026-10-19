@@ -50,22 +50,23 @@ export function createFacilitator(
   const cleanup = scheme.createRentCleanupManager(DEVNET);
   const app = express();
   app.use(express.json({ limit: '64kb' }));
-  app.get(ROUTES.health, (_req, res) => {
-    res.json({ runId: runId ?? null });
+  app.get(ROUTES.health, (_request, response) => {
+    response.json({ runId: runId ?? null });
   });
-  app.get(ROUTES.supported, (_req, res) => {
-    res.json(facilitator.getSupported());
+  app.get(ROUTES.supported, (_request, response) => {
+    response.json(facilitator.getSupported());
   });
-  app.get(ROUTES.events, (_req, res) => {
-    res.json(events);
+  app.get(ROUTES.events, (_request, response) => {
+    response.json(events);
   });
-  app.get(ROUTES.verifications, (_req, res) => {
-    res.json(verifications);
+  app.get(ROUTES.verifications, (_request, response) => {
+    response.json(verifications);
   });
   for (const operation of ['verify', 'settle'] as const) {
-    app.post(`/${operation}`, async (req, res) => {
-      const payload = req.body?.paymentPayload as PaymentPayload | undefined;
-      const requirements = req.body?.paymentRequirements as
+    app.post(`/${operation}`, async (request, response) => {
+      const payload = request.body?.paymentPayload as
+        PaymentPayload | undefined;
+      const requirements = request.body?.paymentRequirements as
         PaymentRequirements | undefined;
       if (
         !payload ||
@@ -82,7 +83,7 @@ export function createFacilitator(
         !/^\d+$/.test(requirements.amount) ||
         BigInt(requirements.amount) > BigInt(MAX_ATOMIC)
       ) {
-        res
+        response
           .status(HTTP_STATUS.badRequest)
           .json({ error: 'Gate policy rejected payment.' });
         return;
@@ -95,7 +96,7 @@ export function createFacilitator(
             isValid: result.isValid,
             invalidReason: result.invalidReason,
           });
-          res.json(result);
+          response.json(result);
         } else {
           const result = await facilitator.settle(payload, requirements);
           events.push({
@@ -109,11 +110,11 @@ export function createFacilitator(
               ?.replace(/https?:\/\/\S+/g, '[RPC URL]')
               .slice(0, DIAGNOSTIC_LIMITS.recordedErrorCharacters),
           });
-          res.json(result);
+          response.json(result);
         }
       } catch {
         // Never log signed payloads, keys, or RPC URLs.
-        res.status(HTTP_STATUS.internalServerError).json({
+        response.status(HTTP_STATUS.internalServerError).json({
           error: `${operation} failed; payment state may be unknown. Reconcile on-chain.`,
         });
       }
