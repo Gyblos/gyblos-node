@@ -1,0 +1,221 @@
+import { once } from 'node:events';
+import { resolve } from 'node:path';
+
+import { EndpointTicket } from '@number0/iroh';
+
+import { PRICES } from '@gyblos/application/metering';
+import { signInferenceOffer } from '@gyblos/application/offers';
+import {
+  CLEANUP,
+  DEVNET,
+  HOSTS,
+  INFERENCE_REQUEST_LIMITS,
+  LOCALHOST,
+  MAX_ATOMIC,
+  OLLAMA_MODELS_PATH,
+  P2P,
+  PORTS,
+  ROUTES,
+} from '@gyblos/config';
+import { inferenceSnapshot } from '@gyblos/gate/chain';
+import { GENERATION } from '@gyblos/inference-ollama/constants';
+import { createOllamaEngine } from '@gyblos/inference-ollama/engine';
+import { assertProgram } from '@gyblos/payments-x402/chain';
+import { createFacilitator } from '@gyblos/payments-x402/facilitator';
+import {
+  assertPortFree,
+  saveJson,
+  spawnChild,
+  stopChild,
+  waitReady,
+} from '@gyblos/runtime';
+import { createInferenceSeller } from '@gyblos/seller/inference';
+import { withDeadline } from '@gyblos/transport/deadline';
+import { bindEndpoint } from '@gyblos/transport/endpoint';
+import { serveIroh } from '@gyblos/transport/iroh-server';
+
+import { modelTokenizer } from './artifacts.js';
+import { loadRole, nodeSecret, rolePath, roleSigner } from './roles.js';
+
+interface Trace {
+  requestId: string;
+  channelId: string;
+  depositConfirmedAt: string;
+  engineStartedAt: string;
+  during: Awaited<ReturnType<typeof inferenceSnapshot>>;
+}
+
+export async function startSeller() {
+  const disposers: (() => Promise<void>)[] = [];
+  const close = async () => {
+    for (const dispose of disposers.splice(0).reverse())
+      await dispose().catch(() => {});
+  };
+  try {
+    const stage = (phase: string) =>
+      saveJson(rolePath(P2P.statusFilename), {
+        status: 'starting',
+        phase,
+        runId: process.env.GYBLOS_P2P_RUN_ID,
+      });
+    await stage('configuration');
+    const config = await loadRole();
+    if (config.role !== 'seller') throw new Error('Seller role required.');
+    await stage('devnet-program');
+    await assertProgram(config.rpcUrl);
+    await assertPortFree(`${HOSTS.ollama}${ROUTES.ollamaVersion}`);
+    await assertPortFree(`${HOSTS.facilitator}${ROUTES.health}`);
+    await stage('ollama-startup');
+    const child = spawnChild('ollama', ['serve'], {
+      env: {
+        PATH: process.env.PATH,
+        HOME: resolve(P2P.root),
+        TMPDIR: process.env.TMPDIR,
+        OLLAMA_HOST: HOSTS.ollamaBind,
+        OLLAMA_MODELS: resolve(OLLAMA_MODELS_PATH),
+        OLLAMA_NO_CLOUD: '1',
+        OLLAMA_DEBUG: '0',
+        OLLAMA_CONTEXT_LENGTH: String(GENERATION.numCtx),
+      },
+      stdio: 'ignore',
+    });
+    disposers.push(() => stopChild(child));
+    let processError = false;
+    child.once('error', () => {
+      processError = true;
+    });
+    try {
+      await waitReady(child, `${HOSTS.ollama}${ROUTES.ollamaVersion}`, {
+        startupError: () => processError,
+      });
+    } catch (error) {
+      await stopChild(child);
+      throw error;
+    }
+    await stage('model-identity');
+    const engine = createOllamaEngine(HOSTS.ollama),
+      model = await engine.describe();
+    await stage('role-signers');
+    const owner = await roleSigner('owner'),
+      authorizer = await roleSigner('authorizer'),
+      facilitator = await roleSigner('facilitator');
+    const host = createFacilitator(facilitator, config.rpcUrl, {
+      buyer: config.buyer,
+      mint: config.mint,
+      payTo: config.payTo,
+      authorizer: authorizer.address,
+    });
+    const facilitatorServer = host.app.listen(PORTS.facilitator, LOCALHOST);
+    await once(facilitatorServer, 'listening');
+    disposers.push(async () => {
+      await host.cleanup.stop();
+      facilitatorServer.closeAllConnections();
+      await new Promise<void>((done) => facilitatorServer.close(() => done()));
+    });
+    host.cleanup.start({
+      intervalSecs: CLEANUP.intervalSeconds,
+      abandonGraceSecs: CLEANUP.abandonGraceSeconds,
+    });
+    const traces: Trace[] = [];
+    await stage('seller-middleware');
+    const seller = await createInferenceSeller({
+      rpcUrl: config.rpcUrl,
+      facilitatorUrl: HOSTS.facilitator,
+      feePayer: facilitator.address,
+      engine,
+      mint: config.mint,
+      payTo: config.payTo,
+      authorizer,
+      tokenizer: await modelTokenizer(),
+      async beforeInference(requestId, channelId) {
+        const during = await inferenceSnapshot(
+          {
+            rpcUrl: config.rpcUrl,
+            mint: config.mint,
+            addresses: { buyer: config.buyer, seller: config.payTo },
+          },
+          channelId,
+        );
+        const depositConfirmedAt = new Date().toISOString();
+        traces.push({
+          requestId,
+          channelId,
+          depositConfirmedAt,
+          engineStartedAt: new Date().toISOString(),
+          during,
+        });
+        await saveJson(rolePath(P2P.traceFilename), traces);
+      },
+    });
+    const sellerServer = seller.app.listen(P2P.sellerPort, LOCALHOST);
+    await once(sellerServer, 'listening');
+    disposers.push(async () => {
+      sellerServer.closeAllConnections();
+      await new Promise<void>((done) => sellerServer.close(() => done()));
+    });
+    await stage('iroh-endpoint');
+    const relayOnly = process.env.GYBLOS_RELAY_ONLY === '1';
+    const endpoint = await bindEndpoint(await nodeSecret(), {
+      relayOnly,
+      bindAddress: process.env.GYBLOS_IROH_BIND,
+    });
+    disposers.push(() => endpoint.close());
+    if (endpoint.id().toString() !== config.nodeId)
+      throw new Error('Node key changed unexpectedly.');
+    await withDeadline(endpoint.online(), P2P.connectMs, () => {
+      void endpoint.close();
+    });
+    const endpointAddress = endpoint.addr();
+    const now = Date.now();
+    const signed = await signInferenceOffer(
+      {
+        schemaVersion: P2P.schemaVersion,
+        protocol: P2P.protocol,
+        owner: owner.address,
+        nodeId: config.nodeId,
+        endpoint: {
+          relayUrl: endpointAddress.relayUrl(),
+          directAddresses: relayOnly ? [] : endpointAddress.directAddresses(),
+        },
+        relayOnly,
+        network: DEVNET,
+        mint: config.mint,
+        payTo: config.payTo,
+        feePayer: facilitator.address,
+        authorizer: authorizer.address,
+        buyer: config.buyer,
+        issuedAt: now,
+        expiresAt: now + P2P.offerLifetimeMs,
+        prices: PRICES,
+        maxAtomic: MAX_ATOMIC,
+        maxTokens: INFERENCE_REQUEST_LIMITS.maxOutputTokens,
+        model,
+        capabilities: engine.capabilities(),
+        meteringMode: 'recounted',
+      },
+      owner,
+    );
+    await saveJson(rolePath(P2P.offerFilename), signed);
+    const bridge = serveIroh(
+      endpoint,
+      `http://${LOCALHOST}:${P2P.sellerPort}`,
+      relayOnly,
+    );
+    await saveJson(rolePath(P2P.statusFilename), {
+      status: 'ready',
+      runId: process.env.GYBLOS_P2P_RUN_ID,
+      role: 'seller',
+      nodeId: config.nodeId,
+      relayOnly,
+      capabilities: engine.capabilities(),
+      model,
+      offerTicket: EndpointTicket.fromAddr(endpointAddress).toString(),
+    });
+    disposers.pop();
+    disposers.push(() => bridge.close());
+    return { close };
+  } catch (error) {
+    await close();
+    throw error;
+  }
+}
