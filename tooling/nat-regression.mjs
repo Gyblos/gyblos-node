@@ -27,8 +27,17 @@ async function main() {
       idle: { type: 'boolean', default: false },
       'block-udp': { type: 'boolean', default: false },
       'wan-discovery': { type: 'boolean', default: false },
+      'trace-public': { type: 'boolean', default: false },
     },
   });
+  if (values['trace-public'])
+    assert.ok(
+      values['native-image'] &&
+        !values['wan-discovery'] &&
+        !values['lab-candidates'] &&
+        !values['block-udp'],
+      'Public tracing requires the unchanged native public-discovery mode.',
+    );
   const source = await sourceFingerprint();
   const project = `${P2P.docker.projectPrefix}-probe-${randomUUID().slice(0, P2P.docker.projectIdCharacters)}`;
   const environment = {
