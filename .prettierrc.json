@@ -5,5 +5,24 @@
   "singleQuote": true,
   "semi": true,
   "trailingComma": "all",
-  "endOfLine": "lf"
+  "endOfLine": "lf",
+  "plugins": ["@ianvs/prettier-plugin-sort-imports"],
+  "importOrder": [
+    "<BUILTIN_MODULES>",
+    "",
+    "<THIRD_PARTY_MODULES>",
+    "",
+    "^@gyblos/(.*)$",
+    "",
+    "^[.]"
+  ],
+  "importOrderTypeScriptVersion": "5.9.3",
+  "overrides": [
+    {
+      "files": ["README.md", "docs/inference.md", "docs/limitations.md"],
+      "options": {
+        "proseWrap": "always"
+      }
+    }
+  ]
 }

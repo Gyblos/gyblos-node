@@ -1,192 +1,172 @@
 # Gyblos Payments
 
-TypeScript payment foundation for Gyblos, a P2P inference project. It separates reusable x402 adapters from HTTP hosts and the CLI.
+Experimental x402 payments for Gyblos, a P2P inference project. A buyer
+authorizes a budget, a seller reports token usage, and a facilitator settles the
+charge and returns the unused deposit on Solana. This repository runs
+fixed-resource checks and local Ollama inference; it does not yet connect P2P
+nodes.
 
-The implementation exercises payments on **Solana devnet** with fixed test resources and a separate local Ollama inference gate. It does not yet connect P2P nodes.
+> **Status:** experimental, Solana **devnet** only. Not audited. Never use
+> mainnet keys. Part of [Gyblos](https://gyblos.com) ·
+> [Paper](https://gyblos.com/paper).
 
-## Available payment routes
+## How it works
 
-| Route   | Facilitator                 | Behavior                                                                                                      |
-| ------- | --------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `upto`  | Local process               | Authorizes a spending ceiling, charges a smaller amount, and refunds the remainder through a payment channel. |
-| `exact` | x402.org; PayAI as a backup | Charges a fixed price in Circle devnet USDC. No usage metering or unused-ceiling refund.                      |
+```text
+buyer (CLI) ── requests / receives 402 terms ──▶ seller (HTTP + Ollama)
+     │ signs a ceiling                              │ reports usage
+     ▼                                              ▼
+facilitator ── opens & settles a Solana payment channel
+                    └── seller paid; unused deposit returned to buyer
+```
 
-Both routes use the official `@x402/*` packages pinned to **2.28.0**. The public `exact` route operates alongside `upto`; it does not replace it.
+| Route   | Payment                                 | Facilitator                 | Use                 |
+| ------- | --------------------------------------- | --------------------------- | ------------------- |
+| `upto`  | Reported usage, within a signed ceiling | Local process in this repo  | Metered inference   |
+| `exact` | Fixed price; no unused-budget refund    | x402.org, with PayAI backup | Fixed test resource |
 
-## Requirements
+Both routes use the official `@x402/*` SDK pinned to 2.28.0. The buyer
+independently recounts inference tokens and detects discrepancies; this does
+**not** prevent a dishonest charge within the signed ceiling. The quickstart
+uses a test token, **not USDC**; the public fixed-price route uses Circle devnet
+USDC.
 
-- Node.js 22 or later.
-- pnpm 10.12.1.
-- Access to a Solana devnet RPC endpoint.
-- Devnet SOL for the isolated local facilitator wallet, which also provisions token accounts.
+## Quickstart: make a fixed-resource payment
 
-## Installation
+Requirements: Node.js 22+, pnpm 10.12.1 and access to a Solana devnet RPC. Run
+from the repository root. Funding and network confirmation can take several
+minutes.
 
 ```sh
 pnpm install --frozen-lockfile --ignore-scripts
 pnpm gate:setup
-```
-
-`gate:setup` generates separate buyer, seller, authorizer, facilitator, and test-mint wallets. It stores keys and configuration in `.local/devnet/`, preserving existing keys. This directory is excluded from Git.
-
-Fund the facilitator address printed by setup with at least **0.05 devnet SOL** using the [Solana faucet](https://faucet.solana.com). Use only the generated test wallets; never import mainnet wallets.
-
-## `upto` payments with a local facilitator
-
-Provision a six-decimal SPL test token and its accounts:
-
-```sh
+# Fund the printed facilitator address with at least 0.05 devnet SOL:
+# https://faucet.solana.com
 pnpm gate:fund --test-mint
 pnpm gate:preflight
 pnpm gate:challenge
 pnpm gate:run
 ```
 
-The token is labeled `devnet-test-token`; **it is not USDC**. Provisioning does not mint additional tokens when the mint already exists.
+Wallet setup creates isolated buyer, seller, authorizer, facilitator and
+test-mint keys in `.local/devnet/`, preserving existing keys. If configuration
+already exists, find the facilitator address in its `addresses.facilitator`
+field. Provisioning creates a six-decimal SPL test token and accounts; rerunning
+it does not mint more tokens when the mint already exists.
 
-`gate:run` starts the seller and facilitator as separate processes, executes the buyer, and checks:
+The preflight checks devnet, the program, mint and funding. The unpaid challenge
+must return HTTP 402 without executing the resource or settling a payment. The
+full run starts both hosts and verifies distinct confirmed open/claim
+transactions: **10,000 deposited, 4,000 charged, 6,000 returned**, matching
+token balances, unchanged buyer SOL, channel distribution and fixed-resource
+delivery.
 
-- Distinct, confirmed channel-open and settlement transactions.
-- A 10,000-unit deposit, a 4,000-unit charge, and a 6,000-unit refund.
-- Matching buyer and seller token balance changes, with no buyer SOL spent.
-- Channel distribution and delivery of the fixed test resource.
+## Run metered inference
 
-`gate:challenge` checks only the unpaid HTTP 402 challenge; it does not demonstrate settlement.
-
-After a successful run, exercise the insufficient-funds and expired-authorization cases:
-
-```sh
-pnpm gate:failures
-```
-
-The expiration test waits approximately 62 seconds. The `upto` hosts bind to `127.0.0.1:4021` for the seller and `127.0.0.1:4022` for the facilitator.
-
-## `exact` payments with a public facilitator
-
-Request **USDC on Solana Devnet** from the [Circle faucet](https://faucet.circle.com), using the buyer address generated by `gate:setup`.
-
-Accepted mint:
-
-```text
-4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU
-```
-
-Then run:
-
-```sh
-pnpm gate:exact
-```
-
-The command serves a fixed test resource on an ephemeral loopback port and charges **10,000 atomic units: 0.01 devnet USDC**. It does not start the local facilitator. The isolated local wallet only sponsors token-account provisioning; the public facilitator pays the payment transaction fee.
-
-Before signing, the buyer checks the network, mint, price, recipient, and fee payer. The seller explicitly calls `/verify` and settles before executing the resource handler. The gate checks transaction confirmation, USDC balance changes, unchanged buyer SOL, and replay rejection without another resource execution.
-
-The primary provider is `https://x402.org/facilitator`; the configured backup is `https://facilitator.payai.network`. The gate queries and records `/supported` before payment. A capability or fee-payer change stops the gate. Paid interoperability has been verified with x402.org; the PayAI backup has not been tested with a payment.
-
-Negative cases cover an unexpected mint, recipient, or fee payer, and a buyer without USDC. The empty buyer is rejected **locally before signing**, without submitting a payment to the provider.
-
-## Project structure
-
-```text
-packages/
-  application/       Reusable workflow and accounting invariants.
-  payments-x402/     upto/exact adapters, trust policies, and chain reads.
-  inference-ollama/  Local model generation and pinned public tokenization.
-apps/
-  cli/               Configuration, execution, and result reporting.
-  seller/            HTTP hosts for the fixed test resources.
-  facilitator/       Local facilitator for upto.
-scripts/             Wallet setup, funding, and gate utilities.
-```
-
-## Local inference and independent buyer measurements
-
-Install Ollama, provision the isolated devnet wallets and token accounts as above,
-then run:
+Install the Ollama executable and complete the wallet/token setup above first.
+Stop other gate hosts, then download the pinned model and run the five cases:
 
 ```sh
 pnpm gate:inference:setup
 pnpm gate:inference
 ```
 
-Setup downloads Qwen3 0.6B Q4_K_M (approximately 523 MB) into
-`.local/ollama/models/` and verifies pinned public tokenizer artifacts. The model
-manifest digest and tokenizer hashes are fixed in
-`packages/inference-ollama/src/model.ts`; a mismatch stops the gate before payment.
-The tokenizer dependency is needed for independent buyer-side token counting.
+Setup downloads Qwen3 0.6B Q4_K_M (about 523 MB of model layers) into
+`.local/ollama/models/` and verifies pinned tokenizer artifacts. The gate runs
+three honest calls, one deliberately inflated bill and one engine interruption.
+The buyer checks token counts against a predefined tolerance.
 
-The gate starts its own local-only Ollama instance on port 11436, a facilitator on
-4022, and an inference seller on an ephemeral loopback port. Setup uses port 11437.
-Stop other gate hosts before running it. Cloud inference is disabled. The model
-uses the pinned single-user chat template without tools or hidden thinking;
-Ollama receives the rendered prompt in raw mode.
+Measurements append to `.local/devnet/measurements.jsonl` without prompts or
+answers. Pricing, tokenization, case classification and measurement details are
+in [docs/inference.md](docs/inference.md).
 
-The seller authorizes a ceiling through `DynamicPrice`, then generates only after
-the deposit is confirmed. Actual atomic-unit pricing is `input tokens × 1 + output
-tokens × 2`. The ceiling is twice the price of the input plus the requested output
-limit, capped by the existing 10,000-unit gate policy. These prices are test prices,
-not a commercial offer. The configured mint is labeled explicitly as either the
-test SPL token or Circle devnet USDC.
+## Pay through a public facilitator
 
-The five cases are three honest calls, one debug case inflating **billed output
-tokens by 40%, rounded up**, and an engine interruption after a real output
-fragment. The interruption kills only the gate-owned Ollama process. The adversary
-still settles within the ceiling: detection does not prevent payment.
-
-The buyer independently recounts the rendered input and visible output. Before
-measurement, tolerance is fixed separately for each count as
-`max(2, ceil(recounted tokens × 0.02))`; price tolerance is the corresponding
-input/output allowance multiplied by their respective prices. The visible output
-count does not add a terminal EOS token, and both counts and their differences
-remain recorded. `delivered` requires a complete response ending with `stop`, not
-an output-limit termination; it does not establish answer quality.
-
-Measurements append to `.local/devnet/measurements.jsonl`, with confirmed deposit
-and claim signatures, chain-derived charges, expected charges, differences,
-token counts, delivery and anomaly status. Prompts and answers are never saved.
-Only a salted response hash is stored; the private salt stays in
-`.local/devnet/measurement-salt`. `sellerReceipt` is reserved as `null`.
-
-Latency runs from signing to receipt of the complete buffered response. Effective
-tokens per second includes payment overhead; first-word latency is `null`.
-Evidence is saved to the ignored local `evidence/gate-0005.json`. An uncertain
-authorization blocks all later gates until reconciled, without automatic payment
-retry. Public RPC rate windows are allowed to clear between cases.
-
-Checks available in a clean checkout:
+Request **USDC on Solana Devnet** from the
+[Circle faucet](https://faucet.circle.com) for the generated buyer address. The
+accepted mint is `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`.
 
 ```sh
-pnpm lint
-pnpm typecheck
+pnpm gate:exact
 ```
 
-To operate `upto` in separate terminals, run `pnpm gate:facilitator`, `pnpm gate:seller`, and `pnpm gate:buyer`.
+This serves a fixed resource on an ephemeral loopback port for **10,000 atomic
+units (0.01 devnet USDC)**. The local wallet provisions token accounts; the
+public facilitator pays the payment transaction fee. No local facilitator is
+started. The buyer checks network, mint, amount, recipient and fee payer before
+signing.
 
-## Configuration and local results
+The seller explicitly verifies and settles before executing the resource. The
+gate checks confirmation, balance changes, unchanged buyer SOL and replay
+rejection. It also rejects untrusted terms and an empty buyer before signing.
+Provider selection and uncertainty handling:
+[known limits](docs/limitations.md).
 
-The default RPC endpoint is `https://api.devnet.solana.com`. Override it with `GYBLOS_RPC_URL` in the process environment. `GYBLOS_GATE_CONFIG` selects a different configuration file. Commands do not load `.env` automatically.
+## Other commands
 
-Devnet identity is checked using the genesis hash. Keys remain in `.local/devnet/`; never include them in logs or shared results.
+Use these after setup. For separate fixed-resource hosts, start the facilitator
+and seller in their own terminals, then run the buyer in a third terminal.
 
-Runs save journals and results under `.local/devnet/`. The public gate also writes `evidence/gate-0004.json`, containing advertised capabilities, signatures, and public metadata. Evidence directories, agent instructions, tests, and internal documents are excluded from Git.
+| Command                 | Task                                                                                     |
+| ----------------------- | ---------------------------------------------------------------------------------------- |
+| `pnpm gate:failures`    | Check insufficient funds and expiry; expiry alone waits about 62 s, plus RPC/setup time. |
+| `pnpm gate:facilitator` | Start the local `upto` facilitator.                                                      |
+| `pnpm gate:seller`      | Start the fixed-resource seller.                                                         |
+| `pnpm gate:buyer`       | Execute the fixed-resource buyer against running local hosts.                            |
+| `pnpm lint`             | Check source conventions and formatting.                                                 |
+| `pnpm typecheck`        | Check TypeScript types.                                                                  |
+| `pnpm format`           | Apply formatting and sort imports.                                                       |
+| `pnpm format:check`     | Check formatting without changing files.                                                 |
 
-Check formatting and source types with:
+The failure checks require the configured test SPL token. Formatting uses
+Prettier with two-space indentation, an 80-column target and wrapped Markdown
+prose; `.editorconfig` supplies matching basic editor settings.
 
-```sh
-pnpm lint
-pnpm typecheck
+## Configuration
+
+| Variable             | Default and behavior                                                                               |
+| -------------------- | -------------------------------------------------------------------------------------------------- |
+| `GYBLOS_GATE_CONFIG` | `.local/devnet/config.json`, resolved from the working directory.                                  |
+| `GYBLOS_RPC_URL`     | Overrides the config's `rpcUrl`; setup initially saves `https://api.devnet.solana.com` when unset. |
+
+Commands do not load `.env` automatically. Changing the config path does not
+move journals, measurements or model artifacts; inference requires the isolated
+key paths under `.local/devnet/`. Devnet identity is checked using its genesis
+hash. Never include keys in logs or shared results.
+
+All hosts bind to loopback (`127.0.0.1`). Fixed-resource seller: **4021**; local
+facilitator: **4022**; gate-owned Ollama: **11436**, or **11437** during model
+setup. Inference and public fixed-price sellers use ephemeral ports. Child
+Ollama processes use the local model directory and have cloud inference
+disabled.
+
+## Project structure
+
+```text
+packages/
+  config/            @gyblos/config: hosts, paths, networks, limits, versions
+  runtime/           @gyblos/runtime: processes, shutdown and atomic JSON
+  gate/              @gyblos/gate: setup, funding, journals and gate utilities
+  application/       Reusable workflow, accounting and measurement policy
+  payments-x402/     upto/exact adapters, trust policies and chain reads
+  inference-ollama/  Local generation and pinned public tokenization
+apps/
+  cli/src/           Runnable CLI composition and result reporting
+    inference/       Inference cases, evidence and reconciliation
+    exact/           Public-facilitator cases, evidence and reconciliation
+  seller/            Fixed-resource, public exact and inference HTTP hosts
+  facilitator/       Local upto facilitator
+scripts/             Thin setup, funding and compatibility entrypoints
 ```
 
-Run `pnpm format` to apply formatting, or `pnpm format:check` to check it
-without changing files. Prettier uses two-space indentation and an 80-character
-line-width target. The root `.editorconfig` keeps basic editor settings consistent.
+## Safety and known limits
 
-## Limitations and recovery
+- Timeouts are **not** refunds. Uncertain payments block new ones until
+  reconciled on-chain.
+- Do not delete `.local/devnet/buyer.lock` or a journal to retry; inspect the
+  authorization and transactions first.
+- Signed seller receipts, model verification, buyer-facing streaming and mainnet
+  are not implemented.
 
-- A timeout does not establish absence of payment, failure, or refund. A potentially uncertain settlement is recorded and blocks new payments until reconciled on-chain.
-- A buyer disconnect after generation can leave a confirmed charge without a delivered answer or payment-response header. Reconcile that outcome as charged but undelivered; do not assume a refund or repeat the payment.
-- An absent transaction in a history query does not prove payment failure. The gate does not automatically switch providers after attempting settlement.
-- A crash may leave `buyer.lock` or an unresolved journal. Do not delete these to retry a payment without first inspecting the authorization and its transactions.
-- The `exact` replay guard is limited to the seller process. Protection across restarts or distributed sellers has not been validated.
-- The local facilitator uses in-memory storage. Durable recovery, unilateral channel closure, and subsequent recovery of all channel PDA rent have not been validated.
-- The inference gate records local buyer measurements without a signed seller receipt. It does not authenticate the model with LOGIC or implement penalties, reputation scoring, MPP, Iroh, mobile apps, or mainnet. The fixed-resource gates retain their original scope. The public exact route depends on third-party availability.
+Read [docs/limitations.md](docs/limitations.md) for recovery and the full scope.
+Contribution rules are in [CONTRIBUTING.md](CONTRIBUTING.md).

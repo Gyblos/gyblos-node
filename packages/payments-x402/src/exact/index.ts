@@ -6,28 +6,27 @@ import type {
   SupportedResponse,
 } from '@x402/core/types';
 import { ExactSvmScheme } from '@x402/svm/exact/client';
-import { DEVNET, DEVNET_USDC } from '../constants.js';
-import { GateError } from '../chain.js';
 
-export const EXACT_PRICE = '10000'; // 0.01 Circle devnet USDC (6 decimals).
-export const PUBLIC_FACILITATORS = [
-  {
-    url: 'https://x402.org/facilitator',
-    feePayer: 'CKPKJWNdJEqa81x7CkZ14BVPiY6y16Sxs7owznqtWYp5',
-  },
-  {
-    url: 'https://facilitator.payai.network',
-    feePayer: '2wKupLR9q6wXYppw8Gr2NvWxKBUqm4PPJKkQfoxHDBg4',
-  },
-] as const;
+import { PAYMENT_LIMITS } from '@gyblos/config';
+import { GateError } from '@gyblos/payments-x402/chain';
+import { DEVNET, DEVNET_USDC } from '@gyblos/payments-x402/constants';
+
 export interface ExactPolicy {
   payTo: string;
   feePayer: string;
   amount: string;
 }
+
+export { EXACT_PRICE } from '@gyblos/application/constants';
+
+export { PUBLIC_FACILITATORS } from '@gyblos/config';
+
 export function assertExactSupport(body: SupportedResponse, feePayer: string) {
   const kind = body.kinds.find(
-    (k) => k.x402Version === 2 && k.scheme === 'exact' && k.network === DEVNET,
+    (kind) =>
+      kind.x402Version === 2 &&
+      kind.scheme === 'exact' &&
+      kind.network === DEVNET,
   );
   if (!kind || kind.extra?.feePayer !== feePayer)
     throw new GateError(
@@ -35,6 +34,7 @@ export function assertExactSupport(body: SupportedResponse, feePayer: string) {
       'Public exact devnet support or its pinned fee payer changed. Stop and review.',
     );
 }
+
 export function validateExactTerms(
   terms: PaymentRequirements,
   policy: ExactPolicy,
@@ -49,7 +49,7 @@ export function validateExactTerms(
     !/^[1-9]\d*$/.test(terms.amount) ||
     !Number.isSafeInteger(terms.maxTimeoutSeconds) ||
     terms.maxTimeoutSeconds < 1 ||
-    terms.maxTimeoutSeconds > 120 ||
+    terms.maxTimeoutSeconds > PAYMENT_LIMITS.maxTimeoutSeconds ||
     terms.extra?.paymentFlow !== 'upfront'
   )
     throw new GateError(
@@ -57,6 +57,7 @@ export function validateExactTerms(
       'Exact terms do not match pinned network, Circle USDC, price, recipient, fee payer and upfront flow.',
     );
 }
+
 export function createExactBuyer(
   signer: KeyPairSigner,
   rpcUrl: string,
@@ -104,8 +105,12 @@ export function assertExactFallbackSafe(
 ) {
   // Empty RPC history never proves an attempted settlement did not broadcast.
   if (
-    calls.some((c) => c.operation === 'settle' || c.outcome === 'uncertain') ||
-    !calls.some((c) => c.operation === 'verify' && c.outcome === 'rejected')
+    calls.some(
+      (call) => call.operation === 'settle' || call.outcome === 'uncertain',
+    ) ||
+    !calls.some(
+      (call) => call.operation === 'verify' && call.outcome === 'rejected',
+    )
   )
     throw new GateError(
       'PUBLIC_OUTCOME_UNCERTAIN',

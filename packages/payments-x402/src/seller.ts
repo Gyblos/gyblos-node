@@ -1,14 +1,19 @@
-import express from 'express';
+import type { KeyPairSigner } from '@solana/kit';
+import { HTTPFacilitatorClient } from '@x402/core/server';
 import {
   paymentMiddleware,
   setSettlementOverrides,
   x402ResourceServer,
 } from '@x402/express';
-import { HTTPFacilitatorClient } from '@x402/core/server';
 import { UptoSvmScheme } from '@x402/svm/upto/server';
-import { TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
-import type { KeyPairSigner } from '@solana/kit';
-import { ACTUAL_ATOMIC, DEVNET, MAX_ATOMIC } from './constants.js';
+import express from 'express';
+
+import { PAYMENT_LIMITS, ROUTES, TOKEN_PROGRAM_ADDRESS } from '@gyblos/config';
+import {
+  ACTUAL_ATOMIC,
+  DEVNET,
+  MAX_ATOMIC,
+} from '@gyblos/payments-x402/constants';
 
 export async function createGateSeller(options: {
   rpcUrl: string;
@@ -25,26 +30,30 @@ export async function createGateSeller(options: {
     new UptoSvmScheme({
       receiverAuthorizerSigner: options.authorizer,
       rpcUrl: options.rpcUrl,
-      withdrawDelay: 60,
+      withdrawDelay: PAYMENT_LIMITS.withdrawDelay,
     }),
   );
   await resource.initialize();
   const app = express();
   let handlerCalls = 0;
-  app.get('/health', (_req, res) => {
-    res.json({ gateFixture: true, handlerCalls, runId: options.runId ?? null });
+  app.get(ROUTES.health, (_request, response) => {
+    response.json({
+      gateFixture: true,
+      handlerCalls,
+      runId: options.runId ?? null,
+    });
   });
   app.use(
     paymentMiddleware(
       {
-        'GET /api/generate': {
+        [ROUTES.fixedDefinition]: {
           accepts: [
             {
               scheme: 'upto',
               network: DEVNET,
               payTo: options.payTo,
               price: { asset: options.mint, amount: MAX_ATOMIC },
-              maxTimeoutSeconds: 60,
+              maxTimeoutSeconds: PAYMENT_LIMITS.withdrawDelay,
               extra: { tokenProgram: TOKEN_PROGRAM_ADDRESS },
             },
           ],
@@ -58,10 +67,10 @@ export async function createGateSeller(options: {
       false,
     ),
   );
-  app.get('/api/generate', (_req, res) => {
+  app.get(ROUTES.fixed, (_request, response) => {
     handlerCalls++;
-    setSettlementOverrides(res, { amount: ACTUAL_ATOMIC });
-    res.json({
+    setSettlementOverrides(response, { amount: ACTUAL_ATOMIC });
+    response.json({
       gateFixture: true,
       resource: 'x402 devnet gate resource',
       usage: {

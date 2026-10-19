@@ -1,6 +1,10 @@
 import { createHash } from 'node:crypto';
+
 import { Tokenizer } from '@huggingface/tokenizers';
-import { MODEL, renderChat } from './model.js';
+
+import { MODEL, renderChat } from '@gyblos/inference-ollama/model';
+
+export type ModelTokenizer = ReturnType<typeof createModelTokenizer>;
 
 export function createModelTokenizer(artifacts: {
   tokenizer: string;
@@ -22,4 +26,3 @@ export function createModelTokenizer(artifacts: {
     tokenizer.encode(text, { add_special_tokens: false }).ids.length;
   return { count, input: (prompt: string) => count(renderChat(prompt)) };
 }
-export type ModelTokenizer = ReturnType<typeof createModelTokenizer>;

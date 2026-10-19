@@ -4,6 +4,11 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/buyer.ts"
+    ".": "./src/buyer.ts",
+    "./*": "./src/*.ts"
+  },
+  "dependencies": {
+    "@gyblos/config": "workspace:*",
+    "@gyblos/application": "workspace:*"
   }
 }

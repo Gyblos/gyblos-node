@@ -1,11 +1,13 @@
+import { UNITS } from '@gyblos/config';
+
+import { PRICES, TOLERANCE } from './constants.js';
+
 export interface TokenCounts {
   input: number;
   output: number;
 }
-export const PRICES = { inputAtomic: '1', outputAtomic: '2' } as const;
-// Fixed before measuring, applied independently to input and output counts.
-export const TOLERANCE = { absoluteTokens: 2, relativePercent: 2 } as const;
-export const OFFER_ID = 'qwen3-0.6b-local-v1';
+
+export { PRICES, TOLERANCE, OFFER_ID } from './constants.js';
 
 export function charge(counts: TokenCounts): bigint {
   for (const value of Object.values(counts))
@@ -16,12 +18,14 @@ export function charge(counts: TokenCounts): bigint {
     BigInt(counts.output) * BigInt(PRICES.outputAtomic)
   );
 }
+
 export function tokenAllowance(count: number): number {
   return Math.max(
     TOLERANCE.absoluteTokens,
-    Math.ceil((count * TOLERANCE.relativePercent) / 100),
+    Math.ceil((count * TOLERANCE.relativePercent) / UNITS.percentage),
   );
 }
+
 export function compareUsage(engine: TokenCounts, recounted: TokenCounts) {
   charge(engine);
   charge(recounted);
@@ -35,6 +39,7 @@ export function compareUsage(engine: TokenCounts, recounted: TokenCounts) {
       Math.abs(outputDelta) <= tokenAllowance(recounted.output),
   };
 }
+
 export function assessCharge(
   actual: bigint,
   recounted: TokenCounts,

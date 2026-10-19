@@ -1,36 +1,44 @@
-import express from 'express';
+import type { KeyPairSigner } from '@solana/kit';
+import {
+  decodePaymentSignatureHeader,
+  type DynamicPrice,
+} from '@x402/core/http';
+import { HTTPFacilitatorClient } from '@x402/core/server';
 import {
   paymentMiddleware,
   setSettlementOverrides,
   x402ResourceServer,
 } from '@x402/express';
-import { HTTPFacilitatorClient } from '@x402/core/server';
-import type { DynamicPrice } from '@x402/core/http';
-import { decodePaymentSignatureHeader } from '@x402/core/http';
 import { UptoSvmScheme } from '@x402/svm/upto/server';
-import { TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
-import type { KeyPairSigner } from '@solana/kit';
-import {
-  createOllama,
-  MODEL,
-  type ModelTokenizer,
-} from '../../../packages/inference-ollama/src/index.js';
+import express from 'express';
+
 import {
   charge,
   OFFER_ID,
   type TokenCounts,
-} from '../../../packages/application/src/metering.js';
-import { verifyInferenceDeposit } from '../../../packages/payments-x402/src/inference-deposit.js';
+} from '@gyblos/application/metering';
 import {
-  DEVNET,
-  MAX_ATOMIC,
-} from '../../../packages/payments-x402/src/constants.js';
+  HTTP_LIMITS,
+  HTTP_STATUS,
+  PAYMENT_LIMITS,
+  ROUTES,
+  TOKEN_PROGRAM_ADDRESS,
+} from '@gyblos/config';
+import { GENERATION, MODEL_LIMITS } from '@gyblos/inference-ollama/constants';
+import {
+  createOllama,
+  MODEL,
+  type ModelTokenizer,
+} from '@gyblos/inference-ollama/index';
+import { DEVNET, MAX_ATOMIC } from '@gyblos/payments-x402/constants';
+import { verifyInferenceDeposit } from '@gyblos/payments-x402/inference-deposit';
 
 export interface InferenceRequest {
   requestId: string;
   prompt: string;
   maxTokens: number;
 }
+
 export function parseInferenceRequest(value: unknown): InferenceRequest {
   const body = value as Partial<InferenceRequest> | null;
   if (
@@ -39,8 +47,8 @@ export function parseInferenceRequest(value: unknown): InferenceRequest {
     !/^[a-f0-9-]{36}$/.test(body.requestId) ||
     typeof body.prompt !== 'string' ||
     !Number.isSafeInteger(body.maxTokens) ||
-    body.maxTokens! < 32 ||
-    body.maxTokens! > 128
+    body.maxTokens! < MODEL_LIMITS.requestMinOutputTokens ||
+    body.maxTokens! > MODEL_LIMITS.requestMaxOutputTokens
   )
     throw new Error('Invalid bounded inference request.');
   return {
@@ -49,16 +57,19 @@ export function parseInferenceRequest(value: unknown): InferenceRequest {
     maxTokens: body.maxTokens!,
   };
 }
+
 export function inferenceCeiling(
   input: InferenceRequest,
   tokenizer: ModelTokenizer,
 ): string {
   // Headroom is authorized up front, never evidence of actual usage.
   const inputTokens = tokenizer.input(input.prompt);
-  if (inputTokens + input.maxTokens > 2048) {
+  if (inputTokens + input.maxTokens > GENERATION.numCtx) {
     throw new Error('Request exceeds the pinned context window.');
   }
-  const ceiling = 2n * charge({ input: inputTokens, output: input.maxTokens });
+  const ceiling =
+    PAYMENT_LIMITS.ceilingMultiplier *
+    charge({ input: inputTokens, output: input.maxTokens });
   if (ceiling > BigInt(MAX_ATOMIC))
     throw new Error('Inference ceiling exceeds gate policy.');
   return ceiling.toString();
@@ -89,18 +100,20 @@ export async function createInferenceSeller(options: {
     new UptoSvmScheme({
       receiverAuthorizerSigner: options.authorizer,
       rpcUrl: options.rpcUrl,
-      withdrawDelay: 60,
+      withdrawDelay: PAYMENT_LIMITS.withdrawDelay,
     }),
   );
   await resource.initialize();
   const app = express();
-  app.use(express.json({ limit: '8kb' }));
-  app.post('/v1/chat/completions', (req, res, next) => {
+  app.use(express.json({ limit: HTTP_LIMITS.requestBody }));
+  app.post(ROUTES.inference, (request, response, next) => {
     try {
-      inferenceCeiling(parseInferenceRequest(req.body), options.tokenizer);
+      inferenceCeiling(parseInferenceRequest(request.body), options.tokenizer);
       next();
     } catch {
-      res.status(400).json({ error: 'Invalid bounded inference request.' });
+      response
+        .status(HTTP_STATUS.badRequest)
+        .json({ error: 'Invalid bounded inference request.' });
     }
   });
   const price: DynamicPrice = (context) => ({
@@ -113,14 +126,14 @@ export async function createInferenceSeller(options: {
   app.use(
     paymentMiddleware(
       {
-        'POST /v1/chat/completions': {
+        [ROUTES.inferenceDefinition]: {
           accepts: [
             {
               scheme: 'upto',
               network: DEVNET,
               payTo: options.payTo,
               price,
-              maxTimeoutSeconds: 120,
+              maxTimeoutSeconds: PAYMENT_LIMITS.maxTimeoutSeconds,
               extra: { tokenProgram: TOKEN_PROGRAM_ADDRESS },
             },
           ],
@@ -134,17 +147,17 @@ export async function createInferenceSeller(options: {
       false,
     ),
   );
-  app.post('/v1/chat/completions', async (req, res) => {
-    const input = parseInferenceRequest(req.body);
+  app.post(ROUTES.inference, async (request, response) => {
+    const input = parseInferenceRequest(request.body);
     const controller = new AbortController();
     const abort = () => controller.abort();
-    req.once('aborted', abort);
-    res.once('close', abort);
+    request.once('aborted', abort);
+    response.once('close', abort);
     try {
-      if (req.aborted || res.destroyed) abort();
+      if (request.aborted || response.destroyed) abort();
       controller.signal.throwIfAborted();
       const payload = decodePaymentSignatureHeader(
-        req.get('PAYMENT-SIGNATURE')!,
+        request.get('PAYMENT-SIGNATURE')!,
       );
       const channelId = payload.payload.channelId;
       if (typeof channelId !== 'string') throw new Error('Missing channel.');
@@ -181,8 +194,8 @@ export async function createInferenceSeller(options: {
       const actual = charge(billedTokens);
       if (actual > BigInt(inferenceCeiling(input, options.tokenizer)))
         throw new Error('Usage exceeds authorized ceiling.');
-      setSettlementOverrides(res, { amount: actual.toString() });
-      res.json({
+      setSettlementOverrides(response, { amount: actual.toString() });
+      response.json({
         requestId: input.requestId,
         offer: OFFER_ID,
         model: MODEL.name,
@@ -195,15 +208,15 @@ export async function createInferenceSeller(options: {
       });
     } catch {
       // Explicitly end the Express 4 response so x402 cancels and settles zero.
-      setSettlementOverrides(res, { amount: '0' });
-      res.status(502).json({
+      setSettlementOverrides(response, { amount: '0' });
+      response.status(HTTP_STATUS.badGateway).json({
         requestId: input.requestId,
         error:
           'Local inference failed; inspect confirmed settlement for refund.',
       });
     } finally {
-      req.removeListener('aborted', abort);
-      res.removeListener('close', abort);
+      request.removeListener('aborted', abort);
+      response.removeListener('close', abort);
     }
   });
   return { app };

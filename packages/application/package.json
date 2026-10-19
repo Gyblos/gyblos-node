@@ -4,6 +4,12 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/gate.ts"
+    ".": "./src/gate.ts",
+    "./*": "./src/*.ts"
+  },
+  "dependencies": {
+    "@gyblos/payments-x402": "workspace:*",
+    "@gyblos/inference-ollama": "workspace:*",
+    "@gyblos/config": "workspace:*"
   }
 }

@@ -1,11 +1,14 @@
+import { findAssociatedTokenPda } from '@solana-program/token';
 import { address, getBase64Encoder } from '@solana/kit';
-import {
-  findAssociatedTokenPda,
-  TOKEN_PROGRAM_ADDRESS,
-} from '@solana-program/token';
 import { CHANNEL_ACCOUNT_SIZE, discoverChannelsByRentPayer } from '@x402/svm';
-import { assertDevnet, rpc, GateError } from './chain.js';
-import { DEVNET } from './constants.js';
+
+import {
+  CHANNEL_STATUS,
+  COMMITMENT,
+  TOKEN_PROGRAM_ADDRESS,
+} from '@gyblos/config';
+import { assertDevnet, GateError, rpc } from '@gyblos/payments-x402/chain';
+import { DEVNET } from '@gyblos/payments-x402/constants';
 
 interface ChannelAccountResponse {
   value: { owner: string; data: [string, 'base64'] } | null;
@@ -45,14 +48,14 @@ export async function verifyInferenceDeposit(
   const channels = await discoverChannelsByRentPayer(
     {
       async getProgramAccounts() {
-        // Reuse the SDK's owner, layout and canonical-PDA validation on one
-        // directly fetched account, without scanning the fee payer's channels.
+        // Feed only the requested account into the SDK's public owner, layout
+        // and canonical-PDA validator; this adapter never scans program accounts.
         const { value } = await rpc<ChannelAccountResponse>(
           expected.rpcUrl,
           'getAccountInfo',
-          [expected.channelId, { commitment: 'confirmed', encoding: 'base64' }],
+          [expected.channelId, { commitment: COMMITMENT, encoding: 'base64' }],
         );
-        // Preserve the exact account-size filter used by the previous scan.
+        // Preserve the exact size boundary previously enforced by the RPC scan.
         if (
           value &&
           (value.data[1] !== 'base64' ||
@@ -78,7 +81,7 @@ export async function verifyInferenceDeposit(
   )?.channel;
   if (
     !channel ||
-    channel.status !== 0 ||
+    channel.status !== CHANNEL_STATUS.open ||
     channel.deposit !== BigInt(expected.ceiling) ||
     channel.settlement.settled !== 0n ||
     channel.payer !== expected.buyer ||
@@ -100,7 +103,7 @@ export async function verifyInferenceDeposit(
   const account = (
     await rpc<EscrowAccountResponse>(expected.rpcUrl, 'getAccountInfo', [
       escrow,
-      { encoding: 'jsonParsed', commitment: 'confirmed' },
+      { encoding: 'jsonParsed', commitment: COMMITMENT },
     ])
   ).value;
   const info = account?.data?.parsed?.info;
