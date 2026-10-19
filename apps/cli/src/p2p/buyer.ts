@@ -54,25 +54,38 @@ export async function startBuyer() {
     bindAddress: process.env.GYBLOS_IROH_BIND,
     externalAddress: process.env.GYBLOS_IROH_EXTERNAL_ADDR || undefined,
   });
-  if (endpoint.id().toString() !== config.nodeId)
-    throw new Error('Buyer node key mismatch.');
-  const remote = new EndpointAddr(
-    EndpointId.fromString(offer.nodeId),
-    offer.endpoint.relayUrl,
-    offer.relayOnly ? [] : offer.endpoint.directAddresses,
-  );
-  const transport = createIrohTransport(endpoint, remote, offer.nodeId);
-  const expected = process.env.GYBLOS_EXPECTED_ROUTE;
-  if (expected && !['iroh-direct', 'iroh-relay'].includes(expected))
-    throw new Error('Invalid expected route.');
-  await transport.ready(expected as TransportRoute | undefined);
-  const proxy = await startBuyerProxy(transport);
-  await saveJson(rolePath(P2P.statusFilename), {
-    status: 'ready',
-    runId: process.env.GYBLOS_P2P_RUN_ID,
-    role: 'buyer',
-    nodeId: config.nodeId,
-    sellerNodeId: offer.nodeId,
-  });
-  return proxy;
+  let cleanup = () => endpoint.close();
+  try {
+    if (endpoint.id().toString() !== config.nodeId)
+      throw new Error('Buyer node key mismatch.');
+    const remote = new EndpointAddr(
+      EndpointId.fromString(offer.nodeId),
+      offer.endpoint.relayUrl,
+      offer.relayOnly ? [] : offer.endpoint.directAddresses,
+    );
+    const transport = createIrohTransport(endpoint, remote, offer.nodeId);
+    cleanup = () => transport.close();
+    const expected = process.env.GYBLOS_EXPECTED_ROUTE;
+    if (expected && !['iroh-direct', 'iroh-relay'].includes(expected))
+      throw new Error('Invalid expected route.');
+    await transport.ready(expected as TransportRoute | undefined);
+    const proxy = await startBuyerProxy(transport);
+    cleanup = () => proxy.close();
+    await saveJson(rolePath(P2P.statusFilename), {
+      status: 'ready',
+      runId: process.env.GYBLOS_P2P_RUN_ID,
+      role: 'buyer',
+      nodeId: config.nodeId,
+      sellerNodeId: offer.nodeId,
+    });
+    return proxy;
+  } catch (error) {
+    try {
+      await cleanup();
+    } catch {
+      // A parent owner may fail before releasing the native endpoint.
+      await endpoint.close().catch(() => undefined);
+    }
+    throw error;
+  }
 }
