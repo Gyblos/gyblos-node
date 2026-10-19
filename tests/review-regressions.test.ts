@@ -7,6 +7,7 @@ import test from 'node:test';
 import { TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
 
 import { CHARGE_ANOMALIES } from '@gyblos/application/constants';
+import { ENGINE_DONE_REASONS } from '@gyblos/inference-ollama/constants';
 
 import { observeInferenceResponse } from '../packages/application/src/inference-observation.js';
 import { assessCharge } from '../packages/application/src/metering.js';
@@ -26,7 +27,7 @@ const goodBody = {
   ...expected,
   content: 'answer',
   done: true,
-  doneReason: 'stop',
+  doneReason: ENGINE_DONE_REASONS.STOP,
   usage: {
     prompt_eval_count: 10,
     eval_count: 6,
