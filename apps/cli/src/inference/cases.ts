@@ -1,14 +1,9 @@
 import assert from 'node:assert/strict';
-import { resolve } from 'node:path';
 
 import { observeInferenceResponse } from '@gyblos/application/inference-observation';
-import { assessCharge, charge, OFFER_ID } from '@gyblos/application/metering';
-import {
-  HTTP_STATUS,
-  INFERENCE_TRANSPORT_PATH,
-  TIMEOUTS,
-} from '@gyblos/config';
-import { inferenceSnapshot, transaction } from '@gyblos/gate/chain';
+import { assessCharge, OFFER_ID } from '@gyblos/application/metering';
+import { INFERENCE_TRANSPORT_PATH, TIMEOUTS } from '@gyblos/config';
+import { inferenceSnapshot } from '@gyblos/gate/chain';
 import { saveJson, signer } from '@gyblos/gate/config';
 import {
   assertNoUnresolvedAuthorizations,
@@ -21,6 +16,7 @@ import { DEVNET } from '@gyblos/payments-x402/constants';
 import { createInferenceBuyer } from '@gyblos/payments-x402/inference-buyer';
 import { inferenceCeiling } from '@gyblos/seller/inference';
 
+import { assertInferenceCase } from './assertions.js';
 import { reconcileCase } from './reconcile.js';
 import type { CaseContext } from './types.js';
 
@@ -109,15 +105,7 @@ export async function runCases({
       journalPath,
       traces,
     });
-    const {
-      body,
-      failed,
-      text,
-      recounted,
-      engineTokens,
-      delivered,
-      comparison,
-    } = observeInferenceResponse({
+    const observation = observeInferenceResponse({
       status: response.status,
       body: response.body,
       expected: {
@@ -129,6 +117,15 @@ export async function runCases({
       inputTokens: buyerTokenizer.input(request.prompt),
       countOutput: buyerTokenizer.count,
     });
+    const {
+      body,
+      failed,
+      text,
+      recounted,
+      engineTokens,
+      delivered,
+      comparison,
+    } = observation;
     assert.equal(body.requestId, request.requestId);
     const assessment = assessCharge(actual, recounted, delivered, failed);
     const row = measurementRow(
@@ -178,29 +175,14 @@ export async function runCases({
     };
     evidence.results.push(result);
     await saveJson(evidencePath, evidence);
-    if (testCase.name === 'engine-interrupted') {
-      assert.equal(failed, true);
-      assert.equal(response.status, HTTP_STATUS.badGateway);
-      assert.equal(actual, 0n);
-      assert.equal(row.anomaly, 'failed');
-      assert.ok(trace.firstFragmentAt && trace.stoppedAt);
-      assert.equal(row.delivered, false);
-    } else {
-      assert.equal(failed, false);
-      assert.equal(body.offer, OFFER_ID);
-      assert.equal(body.model, MODEL.name);
-      assert.equal(body.digest, MODEL.digest);
-      assert.ok(delivered && engineTokens && comparison?.withinTolerance);
-      assert.equal(actual, charge(body.billedTokens!));
-      if (testCase.name === 'overcharge') {
-        assert.ok(body.billedTokens!.output > engineTokens.output);
-        assert.equal(row.anomaly, 'overcharge');
-      } else {
-        assert.deepEqual(body.billedTokens, engineTokens);
-        assert.equal(actual, charge(engineTokens));
-        assert.equal(row.anomaly, 'none');
-      }
-    }
+    assertInferenceCase({
+      caseName: testCase.name,
+      status: response.status,
+      observation,
+      measurement: row,
+      actual,
+      trace,
+    });
     await saveJournal(journalPath, {
       state: 'verified',
       requestId: request.requestId,

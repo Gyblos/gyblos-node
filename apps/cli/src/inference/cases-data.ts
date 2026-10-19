@@ -1,6 +1,10 @@
 import { randomUUID } from 'node:crypto';
 
-export function createCases(debugRequestId: string, failureRequestId: string) {
+export function createCases(
+  debugRequestId: string,
+  failureRequestId: string,
+  underchargeRequestId?: string,
+) {
   return [
     {
       name: 'honest-1',
@@ -22,6 +26,15 @@ export function createCases(debugRequestId: string, failureRequestId: string) {
       requestId: debugRequestId,
       prompt: 'Explain in four sentences how a seed becomes a tree.',
     },
+    ...(underchargeRequestId === undefined
+      ? []
+      : [
+          {
+            name: 'undercharge',
+            requestId: underchargeRequestId,
+            prompt: 'Explain in four sentences how a seed becomes a tree.',
+          },
+        ]),
     {
       name: 'engine-interrupted',
       requestId: failureRequestId,

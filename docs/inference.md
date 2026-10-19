@@ -93,13 +93,19 @@ responses retain their earlier classifications. This records an anomaly without
 changing settlement, refund, prices or reputation policy. Negative atomic and
 relative charge differences remain recorded.
 
-The five gate cases are:
+The six gate cases are:
 
 1. Three honest calls: compare independent counts, billing, charge and delivery.
 2. One adversarial call: inflate **billed output tokens by 40%, rounded up**,
    while remaining within the ceiling. The expected result is a settled
    overcharge that the buyer detects.
-3. One interruption: after a real output fragment, kill only the gate-owned
+3. One undercharge call: bill **60% of output tokens, rounded down**, without
+   changing the input count. The response must be complete and successful, the
+   confirmed charge must be positive and strictly below the buyer's expected
+   charge minus its allowance, and the measurement must record `undercharge`.
+   The unused deposit is returned normally; no price or reputation policy
+   changes.
+4. One interruption: after a real output fragment, kill only the gate-owned
    Ollama process. The expected result is failed delivery, zero charge and a
    confirmed full unused-deposit return. This does not test a seller-process
    crash.

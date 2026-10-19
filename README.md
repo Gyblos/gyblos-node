@@ -64,7 +64,7 @@ delivery.
 ## Run metered inference
 
 Install the Ollama executable and complete the wallet/token setup above first.
-Stop other gate hosts, then download the pinned model and run the five cases:
+Stop other gate hosts, then download the pinned model and run the six cases:
 
 ```sh
 pnpm gate:inference:setup
@@ -73,8 +73,9 @@ pnpm gate:inference
 
 Setup downloads Qwen3 0.6B Q4_K_M (about 523 MB of model layers) into
 `.local/ollama/models/` and verifies pinned tokenizer artifacts. The gate runs
-three honest calls, one deliberately inflated bill and one engine interruption.
-The buyer checks token counts against a predefined tolerance.
+three honest calls, a deliberately inflated bill, a deliberately reduced bill
+and an engine interruption. The buyer checks token counts against a predefined
+tolerance.
 
 Measurements append to `.local/devnet/measurements.jsonl` without prompts or
 answers. Pricing, tokenization, case classification and measurement details are
