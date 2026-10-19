@@ -11,18 +11,37 @@ import { execute } from './docker-command.js';
 import { dockerEvidence } from './docker-evidence.js';
 import { fundRoles } from './docker-fund.js';
 import { prepareDocker } from './docker-prepare.js';
+import { runNat } from './nat-main.js';
 
 async function run() {
   const { values } = parseArgs({
     options: {
       'operator-root': { type: 'string' },
       scenario: { type: 'string', default: 'flat' },
+      'volume-prefix': { type: 'string' },
+      'lab-candidates': { type: 'boolean', default: false },
     },
   });
-  if (values.scenario !== 'flat')
-    throw new Error(
-      'Only the flat scenario is currently implemented; no NAT result is claimed.',
+  if (values.scenario === 'nat-direct' || values.scenario === 'nat-relay') {
+    if (!values['volume-prefix'])
+      throw new Error('NAT requires existing isolated role volumes.');
+    const result = await runNat({
+      scenario: values.scenario,
+      operatorRoot: resolve(values['operator-root'] ?? process.cwd()),
+      volumePrefix: values['volume-prefix'],
+      labCandidates: values['lab-candidates'],
+    });
+    console.log(
+      JSON.stringify({
+        scenario: values.scenario,
+        status: result.status,
+        candidateMode: result.candidateMode,
+      }),
     );
+    return;
+  }
+  if (values.scenario !== 'flat')
+    throw new Error('Unknown scenario; choose flat, nat-direct or nat-relay.');
   const operatorRoot = resolve(values['operator-root'] ?? process.cwd());
   const project = `${P2P.docker.projectPrefix}-${randomUUID().slice(0, P2P.docker.projectIdCharacters)}`;
   const context = await prepareDocker(project, operatorRoot);
@@ -37,7 +56,7 @@ async function run() {
       'node',
       '--import',
       'tsx',
-      'apps/cli/src/p2p/call.ts',
+      P2P.callEntry,
       String(index),
     ]);
   }
