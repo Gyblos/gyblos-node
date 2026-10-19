@@ -9,7 +9,13 @@ import { paymentMiddleware, x402ResourceServer } from '@x402/express';
 import { ExactSvmScheme } from '@x402/svm/exact/server';
 import express from 'express';
 
-import { HTTP_STATUS, PAYMENT_LIMITS, ROUTES, TIMEOUTS } from '@gyblos/config';
+import {
+  DIAGNOSTIC_LIMITS,
+  HTTP_STATUS,
+  PAYMENT_LIMITS,
+  ROUTES,
+  TIMEOUTS,
+} from '@gyblos/config';
 import {
   DEVNET,
   DEVNET_USDC,
@@ -24,6 +30,7 @@ import {
   validateExactTerms,
 } from '@gyblos/payments-x402/exact/index';
 import type { PublicCall } from '@gyblos/payments-x402/exact/types';
+import { UNKNOWN_ERROR_NAME } from '@gyblos/runtime/constants';
 
 export type { PublicCall } from '@gyblos/payments-x402/exact/types';
 
@@ -97,11 +104,11 @@ export class AuditedPublicFacilitator extends HTTPFacilitatorClient {
         !/pending|timeout|unknown/i.test(reason)
           ? PUBLIC_CALL_OUTCOMES.REJECTED
           : PUBLIC_CALL_OUTCOMES.UNCERTAIN,
-      reason: reason ?? errorDetails.name ?? 'UnknownError',
+      reason: reason ?? errorDetails.name ?? UNKNOWN_ERROR_NAME,
       transaction: errorDetails.transaction,
       message: (errorDetails.invalidMessage ?? errorDetails.errorMessage)
         ?.replace(/https?:\/\/\S+/g, '[URL]')
-        .slice(0, HTTP_STATUS.internalServerError),
+        .slice(0, DIAGNOSTIC_LIMITS.publicErrorMessageCharacters),
     });
   }
 }
