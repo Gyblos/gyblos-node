@@ -16,6 +16,7 @@ export function createIrohTransport(
     connecting: Promise<Connection> | undefined,
     connectMs = 0;
   let poisoned = false;
+  let expectedRoute: TransportRoute | undefined;
   async function connected() {
     if (poisoned)
       throw new Error('Transport is uncertain; reconcile before reconnecting.');
@@ -45,6 +46,10 @@ export function createIrohTransport(
       });
     return connecting;
   }
+  function assertExpectedRoute(current: Connection) {
+    if (expectedRoute && selectedRoute(current) !== expectedRoute)
+      throw new Error('Expected route changed before request forwarding.');
+  }
   return {
     kind: 'iroh',
     async ready(expected) {
@@ -52,7 +57,10 @@ export function createIrohTransport(
       if (!expected) return;
       const expires = performance.now() + P2P.connectMs;
       while (performance.now() < expires) {
-        if (selectedRoute(current) === expected) return;
+        if (selectedRoute(current) === expected) {
+          expectedRoute = expected;
+          return;
+        }
         await new Promise((resolve) => setTimeout(resolve, P2P.routePollMs));
       }
       current.close(P2P.streamCloseCode, []);
@@ -73,7 +81,9 @@ export function createIrohTransport(
       try {
         const response = await withDeadline(
           (async () => {
+            assertExpectedRoute(current);
             const stream = await current.openBi();
+            assertExpectedRoute(current);
             await stream.send.writeAll([...bytes]);
             await stream.send.finish();
             return decodeResponse(
