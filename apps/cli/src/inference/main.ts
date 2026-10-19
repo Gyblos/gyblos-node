@@ -27,7 +27,12 @@ import {
   transaction,
 } from '@gyblos/gate/chain';
 import { loadConfig, saveJson, signer } from '@gyblos/gate/config';
-import { INFERENCE_EVIDENCE_CODES } from '@gyblos/gate/constants';
+import {
+  CONFIG_ASSET_LABELS,
+  EVIDENCE_STATUSES,
+  INFERENCE_EVIDENCE_CODES,
+  WALLET_ROLES,
+} from '@gyblos/gate/constants';
 import { assertNoUnresolvedAuthorizations } from '@gyblos/gate/journal';
 import { withExclusiveLock } from '@gyblos/gate/lock';
 import { measurementSalt } from '@gyblos/gate/measurements';
@@ -74,13 +79,15 @@ export async function main() {
     // This gate accepts only isolated setup keys, never imported wallet paths.
     assert.equal(
       config.mint,
-      config.assetLabel === 'devnet-usdc' ? DEVNET_USDC : config.addresses.mint,
+      config.assetLabel === CONFIG_ASSET_LABELS.DEVNET_USDC
+        ? DEVNET_USDC
+        : config.addresses.mint,
     );
     for (const role of [
-      'buyer',
-      'seller',
-      'authorizer',
-      'facilitator',
+      WALLET_ROLES.BUYER,
+      WALLET_ROLES.SELLER,
+      WALLET_ROLES.AUTHORIZER,
+      WALLET_ROLES.FACILITATOR,
     ] as const) {
       assert.equal(resolve(config.keys[role]), resolve(keyPath(role)));
     }
@@ -187,7 +194,7 @@ export async function main() {
         ollamaUrl,
         mint: config.mint,
         payTo: config.addresses.seller,
-        authorizer: await signer(config, 'authorizer'),
+        authorizer: await signer(config, WALLET_ROLES.AUTHORIZER),
         tokenizer: sellerTokenizer,
         async beforeInference(requestId, channelId) {
           const deposit = (await events()).find(
@@ -246,7 +253,7 @@ export async function main() {
         events,
         traces,
       });
-      evidence.status = 'passed';
+      evidence.status = EVIDENCE_STATUSES.PASSED;
       evidence.gatePassed = true;
       evidence.completedAt = new Date().toISOString();
       await saveJson(evidencePath, evidence);
@@ -254,7 +261,7 @@ export async function main() {
         'GYB-GATE-0005 passed. Evidence and private measurements saved without prompts or responses.',
       );
     } catch (error) {
-      evidence.status = 'incomplete';
+      evidence.status = EVIDENCE_STATUSES.INCOMPLETE;
       evidence.errorCode =
         error instanceof GateError
           ? error.code
