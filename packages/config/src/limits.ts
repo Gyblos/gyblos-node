@@ -90,7 +90,10 @@ export const DIAGNOSTIC_LIMITS = {
   failureHistory: 10,
 } as const;
 
-export const GATE_CASES = { billingInflation: 1.4 } as const;
+export const GATE_CASES = {
+  billingInflation: 1.4,
+  billingDeflation: 0.6,
+} as const;
 
 export const CHANNEL_STATUS = { open: 0, distributed: 3 } as const;
 
