@@ -1,4 +1,7 @@
-import { TOKENIZER_SDK_VERSION } from '@gyblos/config';
+import {
+  INFERENCE_REQUEST_LIMITS,
+  TOKENIZER_SDK_VERSION,
+} from '@gyblos/config';
 
 export const MODEL = {
   name: 'qwen3:0.6b',
@@ -23,10 +26,10 @@ export const GENERATION = {
 } as const;
 
 export const MODEL_LIMITS = {
-  requestMinOutputTokens: 32,
-  requestMaxOutputTokens: 128,
+  requestMinOutputTokens: INFERENCE_REQUEST_LIMITS.minOutputTokens,
+  requestMaxOutputTokens: INFERENCE_REQUEST_LIMITS.maxOutputTokens,
   adapterMaxOutputTokens: 512,
-  maxPromptCharacters: 4000,
+  maxPromptCharacters: INFERENCE_REQUEST_LIMITS.maxPromptCharacters,
   maxFrameCharacters: 1_000_000,
   maxOutputCharacters: 100_000,
 } as const;
