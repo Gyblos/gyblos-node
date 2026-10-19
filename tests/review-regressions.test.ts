@@ -6,6 +6,8 @@ import test from 'node:test';
 
 import { TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
 
+import { CHARGE_ANOMALIES } from '@gyblos/application/constants';
+
 import { observeInferenceResponse } from '../packages/application/src/inference-observation.js';
 import { assessCharge } from '../packages/application/src/metering.js';
 import {
@@ -91,7 +93,7 @@ test('invalid elapsed time never becomes infinite throughput', () => {
     recountedTokens: { input: 0, output: 1 },
     countComparison: null,
     delivered: true,
-    anomaly: 'none',
+    anomaly: CHARGE_ANOMALIES.NONE,
     responseText: 'answer',
   };
   for (const latencyMs of [0, -1, NaN, Infinity]) {
