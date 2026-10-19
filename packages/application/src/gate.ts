@@ -5,6 +5,7 @@ export interface Snapshot {
   seller: string;
   buyerLamports: string;
 }
+
 export interface GateReceipt {
   authorized: string;
   actual: string;
@@ -12,6 +13,12 @@ export interface GateReceipt {
   claimTransaction: string;
   channelId: string;
   channelDistributed: boolean;
+}
+
+export interface GateDependencies {
+  preflight(): Promise<void>;
+  snapshot(): Promise<Snapshot>;
+  request(): Promise<{ receipt: GateReceipt; resource: unknown }>;
 }
 
 export function verifyAccounting(
@@ -53,12 +60,6 @@ export function verifyAccounting(
       'Channel still holds undistributed funds.',
     );
   return { ...receipt, refund: (ceiling - actual).toString(), before, after };
-}
-
-export interface GateDependencies {
-  preflight(): Promise<void>;
-  snapshot(): Promise<Snapshot>;
-  request(): Promise<{ receipt: GateReceipt; resource: unknown }>;
 }
 
 // No console, filesystem, environment or process lifecycle in the application flow.

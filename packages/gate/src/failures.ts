@@ -1,26 +1,13 @@
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 
-import { getCreateAssociatedTokenIdempotentInstructionAsync } from '@solana-program/token';
-import {
-  address,
-  appendTransactionMessageInstructions,
-  blockhash,
-  createTransactionMessage,
-  generateKeyPairSigner,
-  getBase64EncodedWireTransaction,
-  pipe,
-  setTransactionMessageFeePayerSigner,
-  setTransactionMessageLifetimeUsingBlockhash,
-  signTransactionMessageWithSigners,
-} from '@solana/kit';
+import { address } from '@solana/kit';
 import {
   decodePaymentRequiredHeader,
   decodePaymentSignatureHeader,
 } from '@x402/core/http';
 
 import {
-  COMMITMENT,
   DIAGNOSTIC_LIMITS,
   FAILURE_EVIDENCE_PATH,
   failureJournalPath,
@@ -39,13 +26,14 @@ import { createBuyer } from '@gyblos/payments-x402/buyer';
 import {
   account,
   assertProgram,
-  confirm,
   rpc,
   tokens,
 } from '@gyblos/payments-x402/chain';
 import { DEVNET, MAX_ATOMIC } from '@gyblos/payments-x402/constants';
 import { createFacilitator } from '@gyblos/payments-x402/facilitator';
 import { createGateSeller } from '@gyblos/payments-x402/seller';
+
+import { prepareFailureAccounts } from './failure-setup.js';
 
 export async function failureGate() {
   async function failures() {
@@ -54,48 +42,8 @@ export async function failureGate() {
     // This harness creates only devnet test-token accounts, never imports a user wallet.
     assert.equal(config.assetLabel, 'devnet-test-token');
     await assertNoUnresolvedAuthorizations();
-    const sponsor = await signer(config, 'facilitator'),
-      emptyBuyer = await generateKeyPairSigner();
-    const latest = (
-      await rpc<{ value: { blockhash: string; lastValidBlockHeight: number } }>(
-        config.rpcUrl,
-        'getLatestBlockhash',
-        [{ commitment: COMMITMENT }],
-      )
-    ).value;
-    const message = pipe(
-      createTransactionMessage({ version: 0 }),
-      (transactionMessage) =>
-        setTransactionMessageFeePayerSigner(sponsor, transactionMessage),
-      (transactionMessage) =>
-        setTransactionMessageLifetimeUsingBlockhash(
-          {
-            blockhash: blockhash(latest.blockhash),
-            lastValidBlockHeight: BigInt(latest.lastValidBlockHeight),
-          },
-          transactionMessage,
-        ),
-      (transactionMessage) =>
-        appendTransactionMessageInstructions([], transactionMessage),
-    );
-    const instruction =
-      await getCreateAssociatedTokenIdempotentInstructionAsync({
-        payer: sponsor,
-        owner: emptyBuyer.address,
-        mint: address(config.mint),
-      });
-    const transaction = await signTransactionMessageWithSigners(
-      appendTransactionMessageInstructions([instruction], message),
-    );
-    const setupTransaction = await rpc<string>(
-      config.rpcUrl,
-      'sendTransaction',
-      [
-        getBase64EncodedWireTransaction(transaction),
-        { encoding: 'base64', preflightCommitment: COMMITMENT },
-      ],
-    );
-    await confirm(config.rpcUrl, setupTransaction);
+    const { sponsor, emptyBuyer, setupTransaction } =
+      await prepareFailureAccounts(config);
     const results = [];
     for (const kind of ['F1', 'F2'] as const) {
       const buyerSigner =

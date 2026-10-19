@@ -13,8 +13,10 @@ export const spawnChild = (
   args: string[],
   options: SpawnOptions,
 ) => spawn(command, args, options);
+
 export const isMain = (moduleUrl: string) =>
   !!process.argv[1] && pathToFileURL(process.argv[1]).href === moduleUrl;
+
 export function onShutdown(handler: () => void) {
   process.once('SIGINT', handler);
   process.once('SIGTERM', handler);
@@ -23,6 +25,7 @@ export function onShutdown(handler: () => void) {
     process.removeListener('SIGTERM', handler);
   };
 }
+
 export async function stopChild(
   child: ChildProcess,
   signal: NodeJS.Signals = 'SIGTERM',
@@ -38,6 +41,7 @@ export async function stopChild(
   if (child.exitCode === null && child.signalCode === null)
     child.kill('SIGKILL');
 }
+
 export async function assertPortFree(
   url: string,
   error: () => Error = () =>
@@ -52,6 +56,7 @@ export async function assertPortFree(
   }
   throw error();
 }
+
 export async function waitReady(
   child: ChildProcess,
   url: string,

@@ -11,13 +11,16 @@ import { PAYMENT_LIMITS } from '@gyblos/config';
 import { GateError } from '@gyblos/payments-x402/chain';
 import { DEVNET, DEVNET_USDC } from '@gyblos/payments-x402/constants';
 
-export { EXACT_PRICE } from '@gyblos/application/constants';
-export { PUBLIC_FACILITATORS } from '@gyblos/config';
 export interface ExactPolicy {
   payTo: string;
   feePayer: string;
   amount: string;
 }
+
+export { EXACT_PRICE } from '@gyblos/application/constants';
+
+export { PUBLIC_FACILITATORS } from '@gyblos/config';
+
 export function assertExactSupport(body: SupportedResponse, feePayer: string) {
   const kind = body.kinds.find(
     (kind) =>
@@ -31,6 +34,7 @@ export function assertExactSupport(body: SupportedResponse, feePayer: string) {
       'Public exact devnet support or its pinned fee payer changed. Stop and review.',
     );
 }
+
 export function validateExactTerms(
   terms: PaymentRequirements,
   policy: ExactPolicy,
@@ -53,6 +57,7 @@ export function validateExactTerms(
       'Exact terms do not match pinned network, Circle USDC, price, recipient, fee payer and upfront flow.',
     );
 }
+
 export function createExactBuyer(
   signer: KeyPairSigner,
   rpcUrl: string,

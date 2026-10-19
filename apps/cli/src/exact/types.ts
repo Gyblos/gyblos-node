@@ -14,6 +14,7 @@ export interface ExactProvider {
   feePayer: string;
   supported: SupportedResponse;
 }
+
 export interface ExactContext {
   config: Config;
   provider: ExactProvider;
@@ -25,6 +26,7 @@ export interface ExactContext {
   journalPath: string;
   evidencePath: string;
 }
+
 export type ActiveAuthorization = ReturnType<typeof authorizationMetadata> & {
   buyer: string;
 };

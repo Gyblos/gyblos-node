@@ -13,10 +13,12 @@ export interface TokenAccount {
     };
   };
 }
+
 export interface AccountsResponse {
   context: { slot: number };
   value: (TokenAccount | null)[];
 }
+
 export interface ParsedInstruction {
   type: string;
   info: {
@@ -27,10 +29,12 @@ export interface ParsedInstruction {
     tokenAmount: { amount: string };
   };
 }
+
 export interface ChainInstruction {
   programId: string;
   parsed?: ParsedInstruction;
 }
+
 export interface ChainTransaction {
   slot: number;
   meta: {
@@ -46,12 +50,14 @@ export interface ChainTransaction {
     };
   };
 }
+
 export interface CaseResult {
   case?: string;
   status?: string;
   measurement?: Measurement;
   [key: string]: unknown;
 }
+
 export interface GateEvidence {
   schemaVersion: number;
   evidenceId: string;

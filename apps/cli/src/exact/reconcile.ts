@@ -74,6 +74,7 @@ export async function snapshot(config: Config, buyer: string) {
     buyerLamports: String(result.value[2]?.lamports ?? 0),
   };
 }
+
 export function authorizationMetadata(payload: PaymentPayload, buyer: string) {
   const wire = payload.payload.transaction;
   assert.equal(typeof wire, 'string');
@@ -92,6 +93,7 @@ export function authorizationMetadata(payload: PaymentPayload, buyer: string) {
     blockhash: compiled.lifetimeToken,
   };
 }
+
 // Public metadata only. An absent match is an observation, not proof of failure/refund.
 export async function reconcile(
   config: Config,

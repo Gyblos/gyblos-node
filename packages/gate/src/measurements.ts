@@ -39,6 +39,8 @@ export interface MeasurementInput {
   responseText: string;
 }
 
+export type Measurement = ReturnType<typeof measurementRow>;
+
 export function measurementRow(input: MeasurementInput, salt: Uint8Array) {
   const validLatency = Number.isFinite(input.latencyMs) && input.latencyMs > 0;
   // Explicit allowlist: never spread a response, request, exception or arbitrary metadata.
@@ -91,7 +93,6 @@ export function measurementRow(input: MeasurementInput, salt: Uint8Array) {
     sellerReceipt: null,
   };
 }
-export type Measurement = ReturnType<typeof measurementRow>;
 
 export async function measurementSalt(directory = LOCAL_DIR) {
   await mkdir(directory, {
@@ -124,6 +125,7 @@ export async function measurementSalt(directory = LOCAL_DIR) {
     throw new Error('Invalid local measurement salt.');
   return salt;
 }
+
 export async function appendMeasurement(
   row: Measurement,
   path = MEASUREMENTS_PATH,

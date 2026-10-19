@@ -2,12 +2,6 @@ import { IPV6_LOOPBACK, LOCALHOST, ROUTES, TIMEOUTS } from '@gyblos/config';
 import { GENERATION, MODEL_LIMITS } from '@gyblos/inference-ollama/constants';
 import { MODEL, renderChat } from '@gyblos/inference-ollama/model';
 
-export { MODEL, renderChat } from '@gyblos/inference-ollama/model';
-export {
-  createModelTokenizer,
-  type ModelTokenizer,
-} from '@gyblos/inference-ollama/tokenizer';
-
 export interface EngineUsage {
   prompt_eval_count: number;
   eval_count: number;
@@ -16,12 +10,20 @@ export interface EngineUsage {
   prompt_eval_duration: number;
   eval_duration: number;
 }
+
 export interface InferenceResult {
   text: string;
   usage: EngineUsage;
   done: true;
   doneReason: string;
 }
+
+export { MODEL, renderChat } from '@gyblos/inference-ollama/model';
+
+export {
+  createModelTokenizer,
+  type ModelTokenizer,
+} from '@gyblos/inference-ollama/tokenizer';
 
 export function localOllamaUrl(base: string): URL {
   const url = new URL(base);

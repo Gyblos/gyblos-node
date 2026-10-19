@@ -27,4 +27,5 @@ export async function main() {
     server.close(() => process.exit(0));
   });
 }
+
 if (isMain(import.meta.url)) await main();

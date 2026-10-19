@@ -47,4 +47,5 @@ export async function main() {
     process.exitCode = 1;
   }
 }
+
 if (isMain(import.meta.url)) await main();

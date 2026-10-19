@@ -22,6 +22,7 @@ export async function saveJson(path: string, value: unknown) {
     throw error;
   }
 }
+
 export async function loadJson<T = unknown>(path: string): Promise<T> {
   return JSON.parse(await readFile(path, 'utf8')) as T;
 }

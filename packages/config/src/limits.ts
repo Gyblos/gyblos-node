@@ -1,7 +1,11 @@
 export const MAX_ATOMIC = '10000';
+
 export const ACTUAL_ATOMIC = '4000';
+
 export const MIN_FACILITATOR_LAMPORTS = 15_000_000n;
+
 export const FIXED_MIN_FACILITATOR_LAMPORTS = 10_000_000n;
+
 export const TIMEOUTS = {
   rpc: 20_000,
   buyer: 120_000,
@@ -18,6 +22,7 @@ export const TIMEOUTS = {
   rpcCooldown: 12_000,
   expiryGrace: 2_000,
 } as const;
+
 export const RETRIES = {
   confirmation: 30,
   rpc: 4,
@@ -27,6 +32,7 @@ export const RETRIES = {
   exactSnapshot: 4,
   exactSnapshotLastAttempt: 3,
 } as const;
+
 export const HTTP_STATUS = {
   ok: 200,
   paymentRequired: 402,
@@ -43,20 +49,24 @@ export const RETRY_DELAYS = {
   exactSnapshotBase: 1_000,
   transactionVisibility: 500,
 } as const;
+
 export const UNITS = {
   millisecondsPerSecond: 1_000,
   lamportsPerSol: 1_000_000_000,
   percentage: 100,
 } as const;
+
 export const FILE_MODES = {
   privateFile: 0o600,
   privateDirectory: 0o700,
 } as const;
+
 export const KEY_LIMITS = {
   keyPairBytes: 64,
   byteMax: 255,
   measurementSaltBytes: 32,
 } as const;
+
 export const PAYMENT_LIMITS = {
   withdrawDelay: 60,
   maxWithdrawDelay: 900,
@@ -70,6 +80,7 @@ export const PAYMENT_LIMITS = {
   tokenDecimals: 6,
   testMintAmount: 1_000_000n,
 } as const;
+
 export const DIAGNOSTIC_LIMITS = {
   rpcMessageCharacters: 180,
   recordedErrorCharacters: 1200,
@@ -77,7 +88,9 @@ export const DIAGNOSTIC_LIMITS = {
   transactionHistory: 50,
   failureHistory: 10,
 } as const;
+
 export const GATE_CASES = { billingInflation: 1.4 } as const;
+
 export const CHANNEL_STATUS = { open: 0, distributed: 3 } as const;
 
 export const CLEANUP = {
@@ -86,4 +99,5 @@ export const CLEANUP = {
   maxChannelLifetimeSeconds: 120,
   maxPriorityFeeMicroLamports: 5_000,
 } as const;
+
 export const HTTP_LIMITS = { requestBody: '8kb' } as const;

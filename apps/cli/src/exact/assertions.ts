@@ -53,6 +53,7 @@ export async function assertUntrusted(
   }
   await persist();
 }
+
 export async function assertEmpty(
   { config: config, host, facilitator, persist, evidence }: ExactContext,
   challenge: ReturnType<typeof createChallenge>,

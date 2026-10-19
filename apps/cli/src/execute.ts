@@ -36,9 +36,7 @@ import type { SettlementEvent } from '@gyblos/payments-x402/facilitator';
 import { validateSettlement } from '@gyblos/payments-x402/trust';
 
 const JOURNAL_PATH = JOURNAL_PATHS.fixed;
-export async function executeGate(signal?: AbortSignal) {
-  return withExclusiveLock(LOCK_PATH, () => executeLocked(signal));
-}
+
 async function executeLocked(signal?: AbortSignal) {
   const config = await loadConfig();
   await assertNoUnresolvedAuthorizations();
@@ -215,4 +213,8 @@ async function executeLocked(signal?: AbortSignal) {
     channelId: result.accounting.channelId,
   });
   return { evidencePath, evidence };
+}
+
+export async function executeGate(signal?: AbortSignal) {
+  return withExclusiveLock(LOCK_PATH, () => executeLocked(signal));
 }

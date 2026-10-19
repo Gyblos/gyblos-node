@@ -38,6 +38,7 @@ export interface InferenceRequest {
   prompt: string;
   maxTokens: number;
 }
+
 export function parseInferenceRequest(value: unknown): InferenceRequest {
   const body = value as Partial<InferenceRequest> | null;
   if (
@@ -56,6 +57,7 @@ export function parseInferenceRequest(value: unknown): InferenceRequest {
     maxTokens: body.maxTokens!,
   };
 }
+
 export function inferenceCeiling(
   input: InferenceRequest,
   tokenizer: ModelTokenizer,

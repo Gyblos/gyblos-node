@@ -6,6 +6,8 @@ import { createKeyPairSignerFromBytes } from '@solana/kit';
 import { CONFIG_PATH, KEY_LIMITS } from '@gyblos/config';
 import { DEVNET_USDC } from '@gyblos/payments-x402/constants';
 
+export const defaultMint = DEVNET_USDC;
+
 export interface Config {
   schemaVersion: 1;
   rpcUrl: string;
@@ -20,8 +22,10 @@ export interface Config {
     string
   >;
 }
+
 export const configPath = () =>
   resolve(process.env.GYBLOS_GATE_CONFIG ?? CONFIG_PATH);
+
 export async function loadConfig(): Promise<Config> {
   const config = JSON.parse(await readFile(configPath(), 'utf8')) as Config;
   if (config.schemaVersion !== 1)
@@ -29,6 +33,7 @@ export async function loadConfig(): Promise<Config> {
   if (process.env.GYBLOS_RPC_URL) config.rpcUrl = process.env.GYBLOS_RPC_URL;
   return config;
 }
+
 export async function signer(config: Config, role: keyof Config['keys']) {
   const bytes: unknown = JSON.parse(
     await readFile(resolve(config.keys[role]), 'utf8'),
@@ -47,5 +52,5 @@ export async function signer(config: Config, role: keyof Config['keys']) {
     throw new Error(`Key/address mismatch for ${role}.`);
   return result;
 }
+
 export { saveJson } from '@gyblos/runtime';
-export const defaultMint = DEVNET_USDC;

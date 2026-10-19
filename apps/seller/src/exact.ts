@@ -27,6 +27,7 @@ export interface PublicCall {
   message?: string;
   payer?: string;
 }
+
 export class AuditedPublicFacilitator extends HTTPFacilitatorClient {
   readonly calls: PublicCall[] = [];
   constructor(
@@ -101,6 +102,7 @@ export class AuditedPublicFacilitator extends HTTPFacilitatorClient {
     });
   }
 }
+
 export async function createExactSeller(options: {
   rpcUrl: string;
   payTo: string;

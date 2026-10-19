@@ -22,6 +22,13 @@ import type {
   ChainTransaction,
 } from './types.js';
 
+interface Transfer {
+  source: string;
+  destination: string;
+  mint: string;
+  amount: string;
+}
+
 export async function rpc<T>(
   rpcUrl: string,
   method: string,
@@ -62,6 +69,7 @@ export async function confirmInference(config: Config, signature: string) {
       'Inference confirmation is unknown; reconcile before another authorization.',
   });
 }
+
 export async function tokenAddress(owner: string, mint: string) {
   return (
     await findAssociatedTokenPda({
@@ -71,6 +79,7 @@ export async function tokenAddress(owner: string, mint: string) {
     })
   )[0];
 }
+
 export async function inferenceSnapshot(config: Config, channelId?: string) {
   const owners = [
     config.addresses.buyer,
@@ -105,6 +114,7 @@ export async function inferenceSnapshot(config: Config, channelId?: string) {
     buyerLamports: String(response.value[atas.length]?.lamports ?? 0),
   };
 }
+
 export async function transaction(config: Config, signature: string) {
   for (let attempt = 0; attempt < RETRIES.transaction; attempt++) {
     const transaction = await readChain<ChainTransaction | null>(
@@ -135,12 +145,7 @@ export async function transaction(config: Config, signature: string) {
     'Confirmed transaction is not yet visible; reconcile before another authorization.',
   );
 }
-interface Transfer {
-  source: string;
-  destination: string;
-  mint: string;
-  amount: string;
-}
+
 export function transactionTransfers(
   transaction: ChainTransaction,
 ): Transfer[] {

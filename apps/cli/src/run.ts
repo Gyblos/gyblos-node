@@ -112,4 +112,5 @@ export async function main() {
     dispose();
   }
 }
+
 if (isMain(import.meta.url)) await main();

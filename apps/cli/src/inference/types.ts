@@ -9,6 +9,7 @@ export interface InferenceCase {
   requestId: string;
   prompt: string;
 }
+
 export interface InferenceTrace {
   channelId: string;
   depositConfirmedAt: string;
@@ -18,6 +19,7 @@ export interface InferenceTrace {
   stoppedAt?: string;
   stoppedSignal?: string;
 }
+
 export interface CaseContext {
   url: string;
   config: Config;

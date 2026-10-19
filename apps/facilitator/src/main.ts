@@ -38,4 +38,5 @@ export async function main() {
     void shutdown();
   });
 }
+
 if (isMain(import.meta.url)) await main();
