@@ -33,6 +33,7 @@ import {
 import {
   ACTUAL_ATOMIC,
   DEVNET,
+  GATE_ERROR_CODES,
   MAX_ATOMIC,
   UPSTREAM_COMMIT,
 } from '@gyblos/payments-x402/constants';
@@ -74,7 +75,7 @@ async function executeLocked(signal?: AbortSignal) {
         FIXED_MIN_FACILITATOR_LAMPORTS
       )
         throw new GateError(
-          'NEEDS_SOL',
+          GATE_ERROR_CODES.NEEDS_SOL,
           `Fund facilitator ${config.addresses.facilitator} with devnet SOL.`,
         );
       if (
@@ -82,7 +83,7 @@ async function executeLocked(signal?: AbortSignal) {
         BigInt(MAX_ATOMIC)
       )
         throw new GateError(
-          'NEEDS_TOKENS',
+          GATE_ERROR_CODES.NEEDS_TOKENS,
           'Buyer does not have enough test tokens for the ceiling.',
         );
     },
@@ -122,7 +123,7 @@ async function executeLocked(signal?: AbortSignal) {
           JSON.stringify({ status: response.status, events: diagnostics }),
         );
         throw new GateError(
-          'PAID_REQUEST_FAILED',
+          GATE_ERROR_CODES.PAID_REQUEST_FAILED,
           `Paid request HTTP ${response.status}; inspect journal and chain before retrying.`,
         );
       }
@@ -151,7 +152,7 @@ async function executeLocked(signal?: AbortSignal) {
         claim.transaction !== response.settlement.transaction
       )
         throw new GateError(
-          'MISSING_EVIDENCE',
+          GATE_ERROR_CODES.MISSING_EVIDENCE,
           'Could not correlate deposit, claim and response receipt.',
         );
       await confirm(config.rpcUrl, open.transaction);
@@ -174,7 +175,10 @@ async function executeLocked(signal?: AbortSignal) {
         open.amount !== response.authorization.requirements.amount ||
         claim.amount !== ACTUAL_ATOMIC
       )
-        throw new GateError('AMOUNT_MISMATCH', 'Unexpected settlement amount.');
+        throw new GateError(
+          GATE_ERROR_CODES.AMOUNT_MISMATCH,
+          'Unexpected settlement amount.',
+        );
       return {
         receipt: {
           authorized: response.authorization.requirements.amount,
