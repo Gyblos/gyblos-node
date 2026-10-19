@@ -16,6 +16,7 @@ import {
 } from '@gyblos/config';
 
 import { nativeSource } from './iroh-probe.mjs';
+import { startLabObserver } from './lab-observer.mjs';
 
 export async function runNativeProbe({ ids, values, project }) {
   const version = await execute(ids.buyer, [
@@ -37,6 +38,17 @@ export async function runNativeProbe({ ids, values, project }) {
     resultPath: NAT.nativeProbe.resultPath,
     active: !values.idle,
   };
+  if (values['wan-discovery']) {
+    await startLabObserver(ids, config.closeCode);
+    config.discovery = {
+      ...NAT.discovery,
+      closeCode: config.closeCode,
+      subnetPrefix: NAT.discovery.observerHost.slice(
+        0,
+        NAT.discovery.observerHost.lastIndexOf('.') + 1,
+      ),
+    };
+  }
   const server = nativeSource('seller'),
     client = nativeSource('buyer');
   await docker([
@@ -49,7 +61,7 @@ export async function runNativeProbe({ ids, values, project }) {
     server,
     JSON.stringify({
       ...config,
-      bind: `${NAT.homeA.actor}:${NAT.sellerUdpPort}`,
+      bind: `${NAT.homeA.actor}:${values['wan-discovery'] ? 0 : NAT.sellerUdpPort}`,
       external: values['lab-candidates']
         ? `${NAT.wan.routerA}:${NAT.sellerUdpPort}`
         : '',
@@ -76,7 +88,7 @@ export async function runNativeProbe({ ids, values, project }) {
     client,
     JSON.stringify({
       ...config,
-      bind: `${NAT.homeB.actor}:${NAT.buyerUdpPort}`,
+      bind: `${NAT.homeB.actor}:${values['wan-discovery'] ? 0 : NAT.buyerUdpPort}`,
       external: values['lab-candidates']
         ? `${NAT.wan.routerB}:${NAT.buyerUdpPort}`
         : '',
@@ -96,9 +108,11 @@ export async function runNativeProbe({ ids, values, project }) {
     snapshot.paths.some((path) => path.isSelected && path.isIp),
   );
   const native = {
-    candidateMode: values['lab-candidates']
-      ? 'manual-lab-candidates'
-      : 'default-discovery',
+    candidateMode: values['wan-discovery']
+      ? NAT.discovery.modes.observed
+      : values['lab-candidates']
+        ? NAT.discovery.modes.manual
+        : NAT.discovery.modes.public,
     active: !values.idle,
     echoes: raw.echoes,
     connectMs: raw.connectMs,
@@ -110,15 +124,22 @@ export async function runNativeProbe({ ids, values, project }) {
     firstDirectMs: firstDirect ? firstDirect.at - raw.snapshots[0].at : null,
     selectedLabWan:
       selected[0].remoteAddr === `${NAT.wan.routerA}:${NAT.sellerUdpPort}`,
+    selectedReflectedAddress: values['wan-discovery']
+      ? selected[0].isIp && selected[0].remoteAddr === raw.peer.reflectedAddress
+      : null,
     workerSha256: createHash('sha256')
       .update(server)
       .update(client)
       .digest('hex'),
   };
   if (values['block-udp']) assert.equal(native.finalRoute, 'iroh-relay');
-  else if (values['lab-candidates']) {
+  else if (values['wan-discovery']) {
+    assert.equal(native.finalRoute, 'iroh-direct');
+    assert.equal(native.selectedReflectedAddress, true);
+    assert.ok(raw.reflectedAddress);
+  } else if (values['lab-candidates']) {
     assert.equal(native.finalRoute, 'iroh-direct');
     assert.equal(native.selectedLabWan, true);
   }
-  return native;
+  return { report: native, raw };
 }
