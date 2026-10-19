@@ -12,6 +12,20 @@ export const NAT = {
   },
   sellerUdpPort: 43101,
   buyerUdpPort: 43102,
+  discovery: {
+    modes: {
+      public: 'default-discovery',
+      manual: 'manual-lab-candidates',
+      observed: 'lab-observer',
+    },
+    protocol: 'gyblos/lab-reflection/1',
+    observerHost: '10.82.20.4',
+    observerPort: 43103,
+    timeoutMs: 10_000,
+    maximumBytes: 256,
+    descriptorPath: '/app/.local/observer.json',
+    maximumClients: 2,
+  },
   nativeProbe: {
     protocol: 'gyblos/probe/1',
     maximumStreams: 1,
