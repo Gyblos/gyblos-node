@@ -37,6 +37,8 @@ Every `.ts` file follows this order:
 
 - Each commit builds and passes `pnpm typecheck`, `pnpm test` and `pnpm lint` on its own.
 - Behavior changes and refactors go in separate PRs.
-- Never commit keys, salts, prompts or responses; `.local/` stays ignored.
+- Never commit real private keys, measurement salts, or private prompts/responses; `.local/` stays ignored. Synthetic test inputs, ephemeral test material and public model-template fixtures are permitted.
 
-Current publication exception: tests, evidence, measurements, agent files and internal documents remain outside Git by project-owner instruction. A clean clone therefore does not currently include a `pnpm test` script or acceptance suite. Maintainer runs use the private branch-specific test harness and record results separately. Publishing tests or restoring a public test command requires a separate publication decision. README, this guide, and the operational guides `docs/inference.md` and `docs/limitations.md` are the public documentation exceptions.
+The offline regression suites and their public fixtures are versioned and run with `pnpm test`. The suite uses synthetic inputs, ephemeral unfunded signers, mocked RPC and temporary files; it does not require wallets, Ollama, Python or devnet funds. `tooling/test-files.json` lists every published suite; the runner rejects missing or unlisted files.
+
+Evidence, measurements, agent files and internal documents remain outside Git. README, this guide, and the operational guides `docs/inference.md` and `docs/limitations.md` are the public documentation exceptions. The error-code regression belonging to the unpublished error-code change remains separate until that implementation is integrated.

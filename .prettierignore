@@ -7,6 +7,7 @@ pnpm-lock.yaml
 dist/
 coverage/
 evidence/
-tests/
+tests/fixtures/tokenizer_config.json
 AGENTS.md
 CLAUDE.md
+tests/fixtures/Qwen-LICENSE
