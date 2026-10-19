@@ -13,6 +13,8 @@
     "@gyblos/gate": "workspace:*",
     "@gyblos/inference-ollama": "workspace:*",
     "@gyblos/runtime": "workspace:*",
-    "@gyblos/seller": "workspace:*"
+    "@gyblos/seller": "workspace:*",
+    "@gyblos/transport": "workspace:*",
+    "@number0/iroh": "1.1.0"
   }
 }
