@@ -1104,5 +1104,226 @@
       "No prior paid result or reconciliation is upgraded, and no inference, RPC, wallet signing, VPS or payment run occurred.",
       "Raw addresses, conntrack tuples, descriptors and synthetic content remain private."
     ]
+  },
+  "publicReturnPathFollowup": {
+    "recordedAt": "2026-10-19",
+    "payments": 0,
+    "scope": "Public IPv4 candidate probes in the existing keyless Docker topology plus a separate private host-only UDP control.",
+    "rootCauseStatus": "Peer public-return failure observed; exact physical router, provider or residual host-filter component unresolved.",
+    "productionDiscoveryChanged": false,
+    "publicDefaultConnectivityFixed": false,
+    "globalNetworkOrFirewallSettingsChanged": false,
+    "trace": {
+      "status": "passed",
+      "source": {
+        "algorithm": "sha256(sorted source path NUL bytes NUL)",
+        "digest": "5a702755da92f96a567e703cce6255205fadcf06df09dc4da38a7541a9a4a552"
+      },
+      "payments": 0,
+      "roleVolumes": false,
+      "actorsUnprivileged": true,
+      "routerImage": "sha256:d588a9a564a1f52baf616baed44da248064cffad18bb30ebf03d831d422ba9e9",
+      "nodeImage": "node:22.19.0-bookworm-slim@sha256:4a4884e8a44826194dff92ba316264f392056cbe243dcc9fd3551e71cea02b90",
+      "workerSha256": "7e96c98ba0605f6002f9888ae649abfd5d34ca925b1c3b261bbaf69067a77a99",
+      "skewMs": 500,
+      "packetsReceived": [
+        24,
+        24
+      ],
+      "portsPreserved": true,
+      "actorImage": "sha256:5ddc9a3c59d41f363086e4f87c3c1b7e11f005e84809e1c40f63db6fd11520a0",
+      "inboundUdpBlocked": false,
+      "inboundUdpDroppedPackets": 0,
+      "native": {
+        "candidateMode": "default-discovery",
+        "publicPathAudit": {
+          "nonTerminatingCounters": true,
+          "sides": [
+            {
+              "router": "a",
+              "outbound": 42,
+              "incomingAny": 23,
+              "incomingPeer": 0,
+              "incomingKnownReturn": 23,
+              "incomingInput": 0,
+              "incomingForward": 0,
+              "classification": "no-peer-udp-return-at-lab-wan",
+              "flows": [
+                {
+                  "candidateIndex": 0,
+                  "outboundPackets": 21,
+                  "unreplied": true
+                },
+                {
+                  "candidateIndex": 1,
+                  "outboundPackets": 21,
+                  "unreplied": true
+                }
+              ]
+            },
+            {
+              "router": "b",
+              "outbound": 38,
+              "incomingAny": 25,
+              "incomingPeer": 0,
+              "incomingKnownReturn": 25,
+              "incomingInput": 0,
+              "incomingForward": 0,
+              "classification": "no-peer-udp-return-at-lab-wan",
+              "flows": [
+                {
+                  "candidateIndex": 0,
+                  "outboundPackets": 19,
+                  "unreplied": true
+                },
+                {
+                  "candidateIndex": 1,
+                  "outboundPackets": 19,
+                  "unreplied": true
+                }
+              ]
+            }
+          ]
+        },
+        "active": true,
+        "echoes": 20,
+        "connectMs": 177.36704100000134,
+        "finalRoute": "iroh-relay",
+        "firstDirectMs": null,
+        "selectedLabWan": false,
+        "selectedReflectedAddress": null,
+        "workerSha256": "589c678b6b3bb2e44274314364db60ef91cb95362e7e87bc8096d21d0bccd441"
+      }
+    },
+    "earlierTrace": {
+      "report": {
+        "status": "passed",
+        "source": {
+          "algorithm": "sha256(sorted source path NUL bytes NUL)",
+          "digest": "61b7f6c5fe4080c75020f2297ef75878c11169ab08285fe35c039d8ce536f656"
+        },
+        "payments": 0,
+        "roleVolumes": false,
+        "actorsUnprivileged": true,
+        "routerImage": "sha256:9c5f965f7798ddcf8bba90af60955bd241d894cee94f7dfbe56fc3b2e27bd7bc",
+        "nodeImage": "node:22.19.0-bookworm-slim@sha256:4a4884e8a44826194dff92ba316264f392056cbe243dcc9fd3551e71cea02b90",
+        "workerSha256": "7e96c98ba0605f6002f9888ae649abfd5d34ca925b1c3b261bbaf69067a77a99",
+        "skewMs": 500,
+        "packetsReceived": [
+          23,
+          23
+        ],
+        "portsPreserved": true,
+        "actorImage": "sha256:5ddc9a3c59d41f363086e4f87c3c1b7e11f005e84809e1c40f63db6fd11520a0",
+        "inboundUdpBlocked": false,
+        "inboundUdpDroppedPackets": 0,
+        "native": {
+          "candidateMode": "default-discovery",
+          "publicPathAudit": {
+            "nonTerminatingCounters": true,
+            "sides": [
+              {
+                "router": "a",
+                "outbound": 44,
+                "incomingAny": 27,
+                "incomingPeer": 0,
+                "incomingInput": 0,
+                "incomingForward": 0,
+                "classification": "udp-return-unattributed",
+                "flows": [
+                  {
+                    "candidateIndex": 0,
+                    "outboundPackets": 22,
+                    "unreplied": null
+                  },
+                  {
+                    "candidateIndex": 1,
+                    "outboundPackets": 22,
+                    "unreplied": null
+                  }
+                ]
+              },
+              {
+                "router": "b",
+                "outbound": 38,
+                "incomingAny": 25,
+                "incomingPeer": 0,
+                "incomingInput": 0,
+                "incomingForward": 0,
+                "classification": "udp-return-unattributed",
+                "flows": [
+                  {
+                    "candidateIndex": 0,
+                    "outboundPackets": 19,
+                    "unreplied": null
+                  },
+                  {
+                    "candidateIndex": 1,
+                    "outboundPackets": 19,
+                    "unreplied": null
+                  }
+                ]
+              }
+            ]
+          },
+          "active": true,
+          "echoes": 20,
+          "connectMs": 228.47420899999997,
+          "finalRoute": "iroh-relay",
+          "firstDirectMs": null,
+          "selectedLabWan": false,
+          "selectedReflectedAddress": null,
+          "workerSha256": "e4e6c9e892e4979419133bc9a86bd2888cecc786e6a5cad97465be03d060bbf7"
+        }
+      },
+      "limitation": "The first audit did not parse extended IPv4 conntrack prefixes, so null reply-state entries are inconclusive. A failing regression and parser correction preceded the final trace."
+    },
+    "hostControl": {
+      "publicService": "Cloudflare public STUN",
+      "sourceSha256": "fdde3efe93025f4fab028bf0c20ab883981043545f1706034847e61d878a1605",
+      "resultSha256": "3b274cbd3acdf84dc8452f5d011a3a5a271018dd8a08d86c066fb86a07226436",
+      "publicPacketsSentPerSocket": 30,
+      "publicPacketsReceivedPerSocket": [
+        0,
+        0
+      ],
+      "sameHostLocalPacketsReceivedPerSocket": [
+        10,
+        10
+      ],
+      "localControlScope": "Same sockets addressed to the host own LAN IP; local stack only, not another LAN device.",
+      "samePublicIpv4AsNativeTrace": true,
+      "alternateServerPorts": [
+        3478,
+        53
+      ],
+      "sameMappingAcrossThosePorts": [
+        true,
+        true
+      ],
+      "routeInterfaceClass": "Wi-Fi",
+      "activeConfiguredVpnCount": 0,
+      "applicationFirewallAllowsOwnedInterpreterAndDockerBackend": true,
+      "applicationFirewallBlockAllDisabled": true,
+      "doesNotExcludeEveryHostFilter": true
+    },
+    "verification": {
+      "tests": 120,
+      "newTests": 3,
+      "typecheck": "passed",
+      "lint": "passed",
+      "tdd": "Missing module, extended-prefix and known-return classification failures were observed before the corresponding implementations.",
+      "counterRules": "No jump targets; existing accept/drop/NAT policy unchanged."
+    },
+    "limitations": [
+      "Measurements cover a bounded IPv4 window and one current Wi-Fi access, not every network or IPv6.",
+      "No peer-source or unattributed UDP returned at the lab WAN during the final window; known discovery-server returns did arrive. Public UDP is not wholly blocked.",
+      "UNREPLIED describes absence of a matching conntrack reply, not proof that every possible inbound packet was absent. Pre-DNAT counters provide the separate packet-arrival observation.",
+      "Two ports on one STUN server do not establish mapping independence for all remote addresses.",
+      "Host controls do not isolate the physical router from ISP/CGNAT or every host filter and do not prove a Wi-Fi-specific defect.",
+      "Private host-control scripts and raw observations remain outside Git; this is not a new public host gate command.",
+      "Router model/provider identification is pending before a concrete supported network-configuration correction can be proposed. No firewall, Wi-Fi or router setting was changed.",
+      "No payment, signing, inference gate, VPS test, deployment or upgrade of earlier paid evidence occurred."
+    ]
   }
 }
