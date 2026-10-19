@@ -1,0 +1,195 @@
+import assert from 'node:assert/strict';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import test from 'node:test';
+
+import { TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
+import { generateKeyPairSigner } from '@solana/kit';
+import { encodePaymentRequiredHeader } from '@x402/core/http';
+
+import { main as paidCall } from '@gyblos/cli/p2p/call';
+import { fundRoles } from '@gyblos/cli/p2p/docker-fund';
+import { rolePath } from '@gyblos/cli/p2p/roles';
+import { DEVNET, DEVNET_USDC, P2P } from '@gyblos/config';
+import { withExclusiveLock } from '@gyblos/gate/lock';
+import { createInferenceBuyer } from '@gyblos/payments-x402/inference-buyer';
+import { saveJson } from '@gyblos/runtime';
+
+test('request-specific ceiling rejects altered challenges before any signature or paid request', async () => {
+  const original = globalThis.fetch;
+  const signer = await generateKeyPairSigner();
+  const feePayer = 'HZLkSwMefjig2NhrKaW3Hb16JX8PTQnE4Jutdc2B433g';
+  const authorizer = '4hL4FcqMnrjMLnmyWzaSHhYiwV7FMjVr3CwnpehHNCV7';
+  let signatures = 0,
+    paidRequests = 0;
+  try {
+    for (const amount of ['561', '559', '560']) {
+      globalThis.fetch = (async (_input, init) => {
+        if (new Headers(init?.headers).has('payment-signature')) paidRequests++;
+        return Response.json(
+          {},
+          {
+            status: 402,
+            headers: {
+              'PAYMENT-REQUIRED': encodePaymentRequiredHeader({
+                x402Version: 2,
+                resource: {
+                  url: 'https://synthetic.test/',
+                  description: 'synthetic',
+                  mimeType: 'application/json',
+                },
+                accepts: [
+                  {
+                    scheme: 'upto',
+                    network: DEVNET,
+                    asset: DEVNET_USDC,
+                    amount,
+                    payTo: feePayer,
+                    maxTimeoutSeconds: 60,
+                    extra: {
+                      feePayer,
+                      receiverAuthorizer: authorizer,
+                      withdrawDelay: 60,
+                      tokenProgram: TOKEN_PROGRAM_ADDRESS,
+                      recentBlockhash: '11111111111111111111111111111111',
+                      lastValidBlockHeight: '1000',
+                      recentSlot: '1',
+                    },
+                  },
+                ],
+              }),
+            },
+          },
+        );
+      }) as typeof fetch;
+      const invoke = createInferenceBuyer(
+        {
+          ...signer,
+          async signTransactions(
+            ...args: Parameters<typeof signer.signTransactions>
+          ) {
+            signatures++;
+            return signer.signTransactions(...args);
+          },
+        },
+        'https://rpc-forbidden.test/',
+        {
+          mint: DEVNET_USDC,
+          payTo: feePayer,
+          feePayer,
+          receiverAuthorizer: authorizer,
+          maxAtomic: '560',
+          expectedAmount: '560',
+        },
+        {
+          beforeSigning() {
+            if (amount === '560')
+              throw new Error('Signed offer expired before signing.');
+          },
+          async authorized() {
+            throw new Error('Unexpected authorization');
+          },
+        },
+      );
+      await assert.rejects(
+        invoke('https://synthetic.test/', { prompt: 'synthetic' }),
+        undefined,
+      );
+    }
+    assert.equal(signatures, 0);
+    assert.equal(paidRequests, 0);
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+test('exclusive buyer lock preserves an unresolved authorization against concurrent calls', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'gyblos-p2p-journal-'));
+  const lock = join(directory, 'buyer.lock'),
+    journal = join(directory, 'authorization.json');
+  let release!: () => void, entered!: () => void;
+  const started = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const hold = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  try {
+    const first = withExclusiveLock(lock, async () => {
+      await saveJson(journal, {
+        state: 'uncertain',
+        channelId: 'synthetic-channel',
+      });
+      entered();
+      await hold;
+    });
+    await started;
+    await assert.rejects(
+      withExclusiveLock(lock, async () => {
+        await saveJson(journal, { state: 'confirmed' });
+      }),
+      /holds the gate lock/,
+    );
+    assert.equal(
+      JSON.parse(await readFile(journal, 'utf8')).state,
+      'uncertain',
+    );
+    release();
+    await first;
+  } finally {
+    release();
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('P2P CLI refuses a second process before loading config or making requests', async () => {
+  const original = process.cwd(),
+    directory = await mkdtemp(join(tmpdir(), 'gyblos-p2p-call-lock-'));
+  try {
+    process.chdir(directory);
+    await withExclusiveLock(rolePath(P2P.buyerLockFilename), async () => {
+      await assert.rejects(paidCall(), /holds the gate lock/);
+    });
+  } finally {
+    process.chdir(original);
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('Docker funder preserves uncertain journals and refuses concurrent funding without RPC', async () => {
+  const originalDirectory = process.cwd(),
+    originalFetch = globalThis.fetch;
+  const directory = await mkdtemp(join(tmpdir(), 'gyblos-p2p-funding-lock-'));
+  let networkCalls = 0;
+  try {
+    process.chdir(directory);
+    globalThis.fetch = (async () => {
+      networkCalls++;
+      throw new Error('RPC forbidden');
+    }) as typeof fetch;
+    await saveJson(P2P.fundingJournal, {
+      state: 'authorized',
+      signature: 'synthetic-uncertain',
+    });
+    await assert.rejects(
+      fundRoles(directory, 'unused', 'unused'),
+      /Previous funding is uncertain/,
+    );
+    assert.equal(
+      JSON.parse(await readFile(P2P.fundingJournal, 'utf8')).signature,
+      'synthetic-uncertain',
+    );
+    await withExclusiveLock(P2P.fundingLock, async () => {
+      await assert.rejects(
+        fundRoles(directory, 'unused', 'unused'),
+        /holds the gate lock/,
+      );
+    });
+    assert.equal(networkCalls, 0);
+  } finally {
+    process.chdir(originalDirectory);
+    globalThis.fetch = originalFetch;
+    await rm(directory, { recursive: true, force: true });
+  }
+});
