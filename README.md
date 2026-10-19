@@ -2,7 +2,7 @@
 
 TypeScript payment foundation for Gyblos, a P2P inference project. It separates reusable x402 adapters from HTTP hosts and the CLI.
 
-The current implementation exercises real payments on **Solana devnet** using a fixed test resource. It does not yet run models or connect P2P nodes.
+The implementation exercises payments on **Solana devnet** with fixed test resources and a separate local Ollama inference gate. It does not yet connect P2P nodes.
 
 ## Available payment routes
 
@@ -91,11 +91,73 @@ Negative cases cover an unexpected mint, recipient, or fee payer, and a buyer wi
 packages/
   application/       Reusable workflow and accounting invariants.
   payments-x402/     upto/exact adapters, trust policies, and chain reads.
+  inference-ollama/  Local model generation and pinned public tokenization.
 apps/
   cli/               Configuration, execution, and result reporting.
   seller/            HTTP hosts for the fixed test resources.
   facilitator/       Local facilitator for upto.
 scripts/             Wallet setup, funding, and gate utilities.
+```
+
+## Local inference and independent buyer measurements
+
+Install Ollama, provision the isolated devnet wallets and token accounts as above,
+then run:
+
+```sh
+pnpm gate:inference:setup
+pnpm gate:inference
+```
+
+Setup downloads Qwen3 0.6B Q4_K_M (approximately 523 MB) into
+`.local/ollama/models/` and verifies pinned public tokenizer artifacts. The model
+manifest digest and tokenizer hashes are fixed in
+`packages/inference-ollama/src/model.ts`; a mismatch stops the gate before payment.
+The tokenizer dependency is needed for independent buyer-side token counting.
+
+The gate starts its own local-only Ollama instance on port 11436, a facilitator on
+4022, and an inference seller on an ephemeral loopback port. Setup uses port 11437.
+Stop other gate hosts before running it. Cloud inference is disabled. The model
+uses the pinned single-user chat template without tools or hidden thinking;
+Ollama receives the rendered prompt in raw mode.
+
+The seller authorizes a ceiling through `DynamicPrice`, then generates only after
+the deposit is confirmed. Actual atomic-unit pricing is `input tokens × 1 + output
+tokens × 2`. The ceiling is twice the price of the input plus the requested output
+limit, capped by the existing 10,000-unit gate policy. These prices are test prices,
+not a commercial offer. The configured mint is labeled explicitly as either the
+test SPL token or Circle devnet USDC.
+
+The five cases are three honest calls, one debug case inflating **billed output
+tokens by 40%, rounded up**, and an engine interruption after a real output
+fragment. The interruption kills only the gate-owned Ollama process. The adversary
+still settles within the ceiling: detection does not prevent payment.
+
+The buyer independently recounts the rendered input and visible output. Before
+measurement, tolerance is fixed separately for each count as
+`max(2, ceil(recounted tokens × 0.02))`; price tolerance is the corresponding
+input/output allowance multiplied by their respective prices. The visible output
+count does not add a terminal EOS token, and both counts and their differences
+remain recorded. `delivered` requires a complete response ending with `stop`, not
+an output-limit termination; it does not establish answer quality.
+
+Measurements append to `.local/devnet/measurements.jsonl`, with confirmed deposit
+and claim signatures, chain-derived charges, expected charges, differences,
+token counts, delivery and anomaly status. Prompts and answers are never saved.
+Only a salted response hash is stored; the private salt stays in
+`.local/devnet/measurement-salt`. `sellerReceipt` is reserved as `null`.
+
+Latency runs from signing to receipt of the complete buffered response. Effective
+tokens per second includes payment overhead; first-word latency is `null`.
+Evidence is saved to the ignored local `evidence/gate-0005.json`. An uncertain
+authorization blocks all later gates until reconciled, without automatic payment
+retry. Public RPC rate windows are allowed to clear between cases.
+
+Checks available in a clean checkout:
+
+```sh
+pnpm lint
+pnpm typecheck
 ```
 
 To operate `upto` in separate terminals, run `pnpm gate:facilitator`, `pnpm gate:seller`, and `pnpm gate:buyer`.
@@ -122,8 +184,9 @@ line-width target. The root `.editorconfig` keeps basic editor settings consiste
 ## Limitations and recovery
 
 - A timeout does not establish absence of payment, failure, or refund. A potentially uncertain settlement is recorded and blocks new payments until reconciled on-chain.
+- A buyer disconnect after generation can leave a confirmed charge without a delivered answer or payment-response header. Reconcile that outcome as charged but undelivered; do not assume a refund or repeat the payment.
 - An absent transaction in a history query does not prove payment failure. The gate does not automatically switch providers after attempting settlement.
 - A crash may leave `buyer.lock` or an unresolved journal. Do not delete these to retry a payment without first inspecting the authorization and its transactions.
 - The `exact` replay guard is limited to the seller process. Protection across restarts or distributed sellers has not been validated.
 - The local facilitator uses in-memory storage. Durable recovery, unilateral channel closure, and subsequent recovery of all channel PDA rent have not been validated.
-- The gates do not validate real inference, honest usage metering, content correctness, MPP, Iroh, mobile apps, or mainnet. The public route depends on third-party availability.
+- The inference gate records local buyer measurements without a signed seller receipt. It does not authenticate the model with LOGIC or implement penalties, reputation scoring, MPP, Iroh, mobile apps, or mainnet. The fixed-resource gates retain their original scope. The public exact route depends on third-party availability.

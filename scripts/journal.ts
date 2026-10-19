@@ -7,6 +7,7 @@ export async function assertNoUnresolvedAuthorizations(
     '.local/devnet/failure-F1-attempt.json',
     '.local/devnet/failure-F2-attempt.json',
     '.local/devnet/exact-attempt.json',
+    '.local/devnet/inference-attempt.json',
   ],
 ) {
   for (const path of paths) {
@@ -16,7 +17,9 @@ export async function assertNoUnresolvedAuthorizations(
       };
       const terminal = path.endsWith('exact-attempt.json')
         ? ['confirmed', 'rejected']
-        : ['verified', 'resolved-rejected'];
+        : path.endsWith('inference-attempt.json')
+          ? ['verified', 'reconciled', 'resolved-rejected']
+          : ['verified', 'resolved-rejected'];
       if (!terminal.includes(previous.state ?? ''))
         throw new GateError(
           'UNRESOLVED_ATTEMPT',
