@@ -3,6 +3,7 @@
   "chain-accounting.test.ts",
   "chat-template.test.ts",
   "code-standards.test.ts",
+  "engine-independence.test.ts",
   "exact.test.ts",
   "facilitator.test.ts",
   "gate-billing.test.ts",
@@ -11,8 +12,14 @@
   "gate.test.ts",
   "inference-deposit.test.ts",
   "inference.test.ts",
+  "iroh-transport.test.ts",
+  "model-artifact-integrity.test.ts",
+  "p2p-payment-policy.test.ts",
   "refactor.test.ts",
   "review-regressions.test.ts",
+  "role-isolation.test.ts",
   "seller-admission.test.ts",
+  "signed-offers.test.ts",
+  "transport-wire.test.ts",
   "undercharge.test.ts"
 ]
