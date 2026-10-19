@@ -3,8 +3,9 @@
 Experimental x402 payments for Gyblos, a P2P inference project. A buyer
 authorizes a budget, a seller reports token usage, and a facilitator settles the
 charge and returns the unused deposit on Solana. This repository runs
-fixed-resource checks and local Ollama inference; it does not yet connect P2P
-nodes.
+fixed-resource checks, local Ollama inference and an experimental native Iroh
+transport between isolated Docker roles. NAT and real separate-network trials
+remain pending.
 
 > **Status:** experimental, Solana **devnet** only. Not audited. Never use
 > mainnet keys. Part of [Gyblos](https://gyblos.com) ·
@@ -81,6 +82,48 @@ Measurements append to `.local/devnet/measurements.jsonl` without prompts or
 answers. Pricing, tokenization, case classification and measurement details are
 in [docs/inference.md](docs/inference.md).
 
+## Experimental Iroh Docker trial
+
+The flat-network PoC keeps payment policy, the interchangeable `Engine`
+interface and `Transport` separate. A buyer verifies an owner-signed offer and
+the actual Iroh peer identity before forwarding HTTP payment requests through
+its loopback proxy. Only the paid inference route reaches the seller; Ollama and
+the facilitator stay on seller loopback.
+
+After the test-token and pinned model/tokenizer setup above, with Docker
+running:
+
+```sh
+pnpm p2p:docker --scenario flat --operator-root /absolute/path/to/funded/checkout
+```
+
+The operator checkout supplies isolated devnet funding keys and verified public
+model/tokenizer files. Its keys stay on the host. Each container generates and
+retains its own role keys in a distinct volume; the seller receives only the
+buyer's public address, and the buyer receives a signed offer plus separately
+pinned public trust settings. The payout key stays outside both containers.
+
+The command checks real container isolation and blocked HTTP ports before
+funding the new facilitator with 0.05 devnet SOL and the buyer with 10,000
+atomic test tokens. It then attempts three paid synthetic requests and exports
+an allowlisted report to `evidence/gate-0006.json`. This is a **flat scenario
+only**; NAT direct, forced relay and real-network scenarios are not implemented
+by this command yet. Docker requires outbound access to devnet and the default
+Iroh relays. Native bindings were exercised on macOS ARM64 and Linux ARM64.
+
+Uncertain calls or funding block further authorizations until reconciliation;
+there is no automatic payment retry. Private journals remain in each container's
+volume. The local operator record `.local/p2p-docker-run.json` identifies the
+containers. Preserve their volumes when stopping the experiment, and stop/remove
+only this experiment's containers and network before starting another flat run
+with the same configured subnet. No ports are published to the host.
+
+Direct peers can see each other's IP addresses. `GYBLOS_RELAY_ONLY=1` restricts
+seller binds and advertised candidates and rejects an observed direct path; its
+off-host privacy behavior still needs empirical validation. Route labels are
+sampled native observations, not a guarantee about every packet. This PoC does
+not verify model authenticity or response correctness.
+
 ## Pay through a public facilitator
 
 Request **USDC on Solana Devnet** from the
@@ -135,9 +178,9 @@ move journals, measurements or model artifacts; inference requires the isolated
 key paths under `.local/devnet/`. Devnet identity is checked using its genesis
 hash. Never include keys in logs or shared results.
 
-All hosts bind to loopback (`127.0.0.1`). Fixed-resource seller: **4021**; local
-facilitator: **4022**; gate-owned Ollama: **11436**, or **11437** during model
-setup. Inference and public fixed-price sellers use ephemeral ports. Child
+All HTTP hosts bind to loopback (`127.0.0.1`). Fixed-resource seller: **4021**;
+local facilitator: **4022**; gate-owned Ollama: **11436**, or **11437** during
+model setup. Inference and public fixed-price sellers use ephemeral ports. Child
 Ollama processes use the local model directory and have cloud inference
 disabled.
 
@@ -150,6 +193,7 @@ packages/
   gate/              @gyblos/gate: setup, funding, journals and gate utilities
   application/       Reusable workflow, accounting and measurement policy
   payments-x402/     upto/exact adapters, trust policies and chain reads
+  transport/         Bounded HTTP over loopback or native Iroh
   inference-ollama/  Local generation and pinned public tokenization
 apps/
   cli/src/           Runnable CLI composition and result reporting
@@ -178,7 +222,11 @@ Contribution rules are in [CONTRIBUTING.md](CONTRIBUTING.md).
 pnpm test
 ```
 
-The published suite runs on Node.js 22 or later without private files, wallets,
-Ollama, Python or devnet payments. Network responses are mocked, with local HTTP
-servers for middleware checks. Public, hash-checked template fixtures preserve
-independent renderer regression coverage. Evidence and measurements stay local.
+The published suite requires Node.js 22 or later and a platform supported by the
+pinned native Iroh binding. It was exercised on macOS ARM64 and Linux ARM64; Mac
+Intel has no binding in this version. It needs no private files, wallets,
+Ollama, Python or devnet payments. External RPC responses are mocked; local HTTP
+and native loopback QUIC exercise middleware and transport boundaries. Public,
+hash-checked template fixtures preserve independent renderer regression
+coverage. Raw evidence and measurements stay local. Only the explicitly redacted
+Docker report is eligible for publication.
