@@ -15,6 +15,7 @@ export interface BuyerResult {
   authorization?: { channelId: string; requirements: PaymentRequirements };
   settlement?: ReturnType<typeof decodePaymentResponseHeader>;
   body: unknown;
+  receivedAt?: number;
 }
 
 export function createBuyer(
@@ -26,12 +27,26 @@ export function createBuyer(
     channelId: string;
     requirements: PaymentRequirements;
   }) => Promise<void>,
+  hooks: { beforeSigning?: () => void; authorizationError?: string } = {},
 ) {
   let authorization:
     { channelId: string; requirements: PaymentRequirements } | undefined;
   const client = new x402Client().register(
     DEVNET,
-    new UptoSvmScheme(signer, { rpcUrl }),
+    new UptoSvmScheme(
+      hooks.beforeSigning
+        ? {
+            ...signer,
+            async signTransactions(
+              ...args: Parameters<typeof signer.signTransactions>
+            ) {
+              hooks.beforeSigning?.();
+              return signer.signTransactions(...args);
+            },
+          }
+        : signer,
+      { rpcUrl },
+    ),
   );
   client.setSpendControls({
     allowedAssets: [
@@ -49,27 +64,56 @@ export function createBuyer(
     async ({ paymentPayload, selectedRequirements }) => {
       const id = paymentPayload.payload.channelId;
       if (typeof id !== 'string')
-        throw new Error('SDK did not provide a channel ID.');
+        throw new Error(
+          hooks.authorizationError ?? 'SDK did not provide a channel ID.',
+        );
       authorization = { channelId: id, requirements: selectedRequirements };
       await onAuthorization?.(authorization);
     },
   );
   const paidFetch = wrapFetchWithPayment(fetchImpl, client);
   return {
-    async request(url: string, signal?: AbortSignal): Promise<BuyerResult> {
+    async request(
+      url: string,
+      signal?: AbortSignal,
+      options: {
+        method?: 'POST';
+        body?: unknown;
+        timeoutMs?: number;
+        measureResponse?: boolean;
+      } = {},
+    ): Promise<BuyerResult> {
       authorization = undefined;
       // No application retry: a lost response may already have settled.
-      const timeout = AbortSignal.timeout(120_000);
+      const timeout = AbortSignal.timeout(options.timeoutMs ?? 120_000);
       const response = await paidFetch(url, {
         redirect: 'error',
+        ...(options.method
+          ? {
+              method: options.method,
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify(options.body),
+            }
+          : {}),
         signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
       });
-      const header = response.headers.get('PAYMENT-RESPONSE');
-      const settlement = header
-        ? decodePaymentResponseHeader(header)
-        : undefined;
+      const receipt = () => {
+        const header = response.headers.get('PAYMENT-RESPONSE');
+        return header ? decodePaymentResponseHeader(header) : undefined;
+      };
+      let settlement = options.measureResponse ? undefined : receipt();
       const body: unknown = await response.json();
-      return { status: response.status, authorization, settlement, body };
+      const receivedAt = options.measureResponse
+        ? performance.now()
+        : undefined;
+      if (options.measureResponse) settlement = receipt();
+      return {
+        status: response.status,
+        authorization,
+        settlement,
+        body,
+        ...(receivedAt !== undefined ? { receivedAt } : {}),
+      };
     },
   };
 }

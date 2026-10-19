@@ -1,5 +1,5 @@
+import type { inferenceSnapshot } from '@gyblos/gate/chain';
 import type { Config } from '@gyblos/gate/config';
-import type { inferenceSnapshot } from '@gyblos/gate/inference-chain';
 import type { GateEvidence } from '@gyblos/gate/types';
 import type { ModelTokenizer } from '@gyblos/inference-ollama';
 import type { SettlementEvent } from '@gyblos/payments-x402/facilitator';

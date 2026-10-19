@@ -15,12 +15,12 @@ import {
   LOCK_PATH,
   MIN_FACILITATOR_LAMPORTS,
 } from '@gyblos/config';
-import { loadConfig, saveJson, signer } from '@gyblos/gate/config';
 import {
   confirmInference,
   inferenceSnapshot,
   transaction,
-} from '@gyblos/gate/inference-chain';
+} from '@gyblos/gate/chain';
+import { loadConfig, saveJson, signer } from '@gyblos/gate/config';
 import { assertNoUnresolvedAuthorizations } from '@gyblos/gate/journal';
 import { withExclusiveLock } from '@gyblos/gate/lock';
 import { measurementSalt } from '@gyblos/gate/measurements';

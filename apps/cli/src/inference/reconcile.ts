@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
 
-import { saveJson } from '@gyblos/gate/config';
 import {
   confirmInference,
   inferenceSnapshot,
   tokenAddress,
   transaction,
   transactionTransfers,
-} from '@gyblos/gate/inference-chain';
+} from '@gyblos/gate/chain';
+import { saveJson } from '@gyblos/gate/config';
 import { createInferenceBuyer } from '@gyblos/payments-x402/inference-buyer';
 import { validateSettlement } from '@gyblos/payments-x402/trust';
 
