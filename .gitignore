@@ -39,3 +39,14 @@ coverage/
 /docs/*
 !/docs/inference.md
 !/docs/limitations.md
+
+# Public offline regression suites and verified model-template fixtures
+!/tests/
+/tests/*
+!/tests/*.test.ts
+/tests/gate-error-codes.test.ts
+!/tests/fixtures/
+/tests/fixtures/*
+!/tests/fixtures/tokenizer_config.json
+!/tests/fixtures/chat-template-vectors.json
+!/tests/fixtures/Qwen-LICENSE
