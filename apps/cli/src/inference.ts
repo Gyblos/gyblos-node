@@ -39,6 +39,7 @@ import {
   measurementRow,
   measurementSalt,
 } from '@gyblos/gate/measurements';
+import type { GateEvidence } from '@gyblos/gate/types';
 import { GENERATION } from '@gyblos/inference-ollama/constants';
 import {
   createModelTokenizer,
@@ -151,7 +152,7 @@ async function run() {
   const buyerTokenizer = createModelTokenizer(artifacts);
   const sellerTokenizer = createModelTokenizer(artifacts);
   const salt = await measurementSalt();
-  const evidence: Record<string, any> = {
+  const evidence: GateEvidence = {
     schemaVersion: 1,
     evidenceId: 'GYB-GATE-0005',
     sdkVersion: X402_SDK_VERSION,

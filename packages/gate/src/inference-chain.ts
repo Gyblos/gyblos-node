@@ -8,19 +8,30 @@ import { address } from '@solana/kit';
 
 import { COMMITMENT } from '@gyblos/config';
 import type { Config } from '@gyblos/gate/config';
-import { GateError, rpc } from '@gyblos/payments-x402/chain';
+import {
+  rpc as baseRpc,
+  confirm,
+  GateError,
+} from '@gyblos/payments-x402/chain';
 
-export async function readChain<T>(
-  c: Config,
+import type {
+  AccountsResponse,
+  ChainInstruction,
+  ChainTransaction,
+} from './types.js';
+
+export async function rpc<T>(
+  rpcUrl: string,
   method: string,
-  params: unknown[],
+  params: unknown[] = [],
 ): Promise<T> {
   for (let attempt = 0; ; attempt++) {
     try {
-      return await rpc<T>(c.rpcUrl, method, params);
+      return await baseRpc<T>(rpcUrl, method, params);
     } catch (error) {
       if (
         attempt >= 4 ||
+        !method.startsWith('get') ||
         !(error instanceof GateError) ||
         error.code !== 'RPC_HTTP' ||
         !error.message.includes('429')
@@ -31,28 +42,21 @@ export async function readChain<T>(
   }
 }
 
+export function readChain<T>(
+  c: Config,
+  method: string,
+  params: unknown[],
+): Promise<T> {
+  return rpc<T>(c.rpcUrl, method, params);
+}
+
 export async function confirmInference(c: Config, signature: string) {
-  for (let attempt = 0; attempt < 30; attempt++) {
-    const result = await readChain<{
-      value: (null | { err: unknown; confirmationStatus: string })[];
-    }>(c, 'getSignatureStatuses', [
-      [signature],
-      { searchTransactionHistory: true },
-    ]);
-    const status = result.value[0];
-    if (status?.err)
-      throw new GateError(
-        'TRANSACTION_FAILED',
-        'Inference transaction failed.',
-      );
-    if (status && [COMMITMENT, 'finalized'].includes(status.confirmationStatus))
-      return;
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-  }
-  throw new GateError(
-    'TRANSACTION_UNKNOWN',
-    'Inference confirmation is unknown; reconcile before another authorization.',
-  );
+  return confirm(c.rpcUrl, signature, {
+    read: rpc,
+    failedMessage: 'Inference transaction failed.',
+    unknownMessage:
+      'Inference confirmation is unknown; reconcile before another authorization.',
+  });
 }
 export async function tokenAddress(owner: string, mint: string) {
   return (
@@ -72,19 +76,15 @@ export async function inferenceSnapshot(c: Config, channelId?: string) {
   const atas = await Promise.all(
     owners.map((owner) => tokenAddress(owner, c.mint)),
   );
-  const response = await readChain<{ context: { slot: number }; value: any[] }>(
-    c,
-    'getMultipleAccounts',
-    [
-      [...atas, c.addresses.buyer],
-      { encoding: 'jsonParsed', commitment: COMMITMENT },
-    ],
-  );
+  const response = await readChain<AccountsResponse>(c, 'getMultipleAccounts', [
+    [...atas, c.addresses.buyer],
+    { encoding: 'jsonParsed', commitment: COMMITMENT },
+  ]);
   const amounts = atas.map((_, index) => {
     const raw = response.value[index];
     if (!raw && index === 2) return '0';
     assert.equal(raw?.owner, TOKEN_PROGRAM_ADDRESS);
-    const info = raw.data.parsed.info;
+    const info = raw!.data.parsed.info;
     assert.equal(info.mint, c.mint);
     assert.equal(info.owner, owners[index]);
     return String(info.tokenAmount.amount);
@@ -99,7 +99,7 @@ export async function inferenceSnapshot(c: Config, channelId?: string) {
 }
 export async function transaction(c: Config, signature: string) {
   for (let attempt = 0; attempt < 4; attempt++) {
-    const tx = await readChain<any>(c, 'getTransaction', [
+    const tx = await readChain<ChainTransaction | null>(c, 'getTransaction', [
       signature,
       {
         encoding: 'jsonParsed',
@@ -126,9 +126,9 @@ interface Transfer {
   mint: string;
   amount: string;
 }
-export function transactionTransfers(tx: any): Transfer[] {
+export function transactionTransfers(tx: ChainTransaction): Transfer[] {
   const found: Transfer[] = [];
-  function visit(instruction: any) {
+  function visit(instruction: ChainInstruction) {
     if (instruction.programId !== TOKEN_PROGRAM_ADDRESS) return;
     const parsed = instruction.parsed;
     if (parsed?.type === 'batch') {
@@ -150,7 +150,7 @@ export function transactionTransfers(tx: any): Transfer[] {
         'initializeImmutableOwner',
         'getAccountDataSize',
         'closeAccount',
-      ].includes(parsed?.type)
+      ].includes(parsed?.type ?? '')
     ) {
       throw new GateError(
         'UNSUPPORTED_TOKEN_INSTRUCTION',

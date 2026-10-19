@@ -31,6 +31,11 @@ import { loadConfig, saveJson, signer, type Config } from '@gyblos/gate/config';
 import { prepareExactAccounts } from '@gyblos/gate/exact-accounts';
 import { assertNoUnresolvedAuthorizations } from '@gyblos/gate/journal';
 import { withExclusiveLock } from '@gyblos/gate/lock';
+import type {
+  AccountsResponse,
+  ChainTransaction,
+  GateEvidence,
+} from '@gyblos/gate/types';
 import {
   assertDevnet,
   confirm,
@@ -64,7 +69,7 @@ const limitations = [
   'Depends on third-party availability',
   'Replay guard is process-scoped; restart/distributed replay protection is not validated',
 ];
-const evidence: Record<string, unknown> = {
+const evidence: GateEvidence = {
   schemaVersion: 1,
   evidenceId: 'GYB-GATE-0004',
   sdkVersion: X402_SDK_VERSION,
@@ -92,10 +97,10 @@ async function snapshot(c: Config, buyer: string) {
       }),
     ),
   );
-  let result: { value: any[] } | undefined;
+  let result: AccountsResponse | undefined;
   for (let attempt = 0; attempt < 4; attempt++) {
     try {
-      result = await rpc<{ value: any[] }>(c.rpcUrl, 'getMultipleAccounts', [
+      result = await rpc<AccountsResponse>(c.rpcUrl, 'getMultipleAccounts', [
         [atas[0]![0], atas[1]![0], buyer],
         { encoding: 'jsonParsed', commitment: COMMITMENT },
       ]);
@@ -118,7 +123,7 @@ async function snapshot(c: Config, buyer: string) {
     assert.equal(info?.mint, DEVNET_USDC);
     assert.equal(info?.owner, index === 0 ? buyer : c.addresses.seller);
     assert.equal(info?.tokenAmount?.decimals, 6);
-    return String(info.tokenAmount.amount);
+    return String(info!.tokenAmount.amount);
   });
   return {
     buyer: amounts[0]!,
@@ -152,7 +157,7 @@ async function reconcile(c: Config, buyer: string, buyerSignature: string) {
   );
   const matches = [];
   for (const item of history) {
-    const tx = await rpc<any>(c.rpcUrl, 'getTransaction', [
+    const tx = await rpc<ChainTransaction | null>(c.rpcUrl, 'getTransaction', [
       item.signature,
       {
         encoding: 'jsonParsed',
@@ -489,14 +494,18 @@ async function run() {
           (call) => call.operation === 'settle' && call.outcome === 'success',
         ),
       );
-      const onChain = await rpc<any>(c.rpcUrl, 'getTransaction', [
-        receipt.transaction,
-        {
-          encoding: 'jsonParsed',
-          commitment: COMMITMENT,
-          maxSupportedTransactionVersion: 0,
-        },
-      ]);
+      const onChain = await rpc<ChainTransaction | null>(
+        c.rpcUrl,
+        'getTransaction',
+        [
+          receipt.transaction,
+          {
+            encoding: 'jsonParsed',
+            commitment: COMMITMENT,
+            maxSupportedTransactionVersion: 0,
+          },
+        ],
+      );
       assert.ok(onChain && !onChain.meta.err);
       assert.ok(
         onChain.transaction.signatures.includes(

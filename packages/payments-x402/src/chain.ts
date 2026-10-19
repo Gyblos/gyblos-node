@@ -104,9 +104,17 @@ export async function tokens(
   );
 }
 
-export async function confirm(url: string, signature: string): Promise<void> {
+export async function confirm(
+  url: string,
+  signature: string,
+  options: {
+    read?: typeof rpc;
+    failedMessage?: string;
+    unknownMessage?: string;
+  } = {},
+): Promise<void> {
   for (let attempt = 0; attempt < 30; attempt++) {
-    const result = await rpc<{
+    const result = await (options.read ?? rpc)<{
       value: (null | { err: unknown; confirmationStatus: string })[];
     }>(url, 'getSignatureStatuses', [
       [signature],
@@ -116,7 +124,7 @@ export async function confirm(url: string, signature: string): Promise<void> {
     if (status?.err)
       throw new GateError(
         'TRANSACTION_FAILED',
-        `Transaction failed: ${signature}`,
+        options.failedMessage ?? `Transaction failed: ${signature}`,
       );
     if (status && [COMMITMENT, 'finalized'].includes(status.confirmationStatus))
       return;
@@ -124,7 +132,8 @@ export async function confirm(url: string, signature: string): Promise<void> {
   }
   throw new GateError(
     'TRANSACTION_UNKNOWN',
-    `Confirmation unknown; reconcile before retrying: ${signature}`,
+    options.unknownMessage ??
+      `Confirmation unknown; reconcile before retrying: ${signature}`,
   );
 }
 

@@ -67,7 +67,20 @@ export async function verifyInferenceDeposit(
     tokenProgram: TOKEN_PROGRAM_ADDRESS,
   });
   const account = (
-    await rpc<{ value: any }>(expected.rpcUrl, 'getAccountInfo', [
+    await rpc<{
+      value: {
+        owner: string;
+        data: {
+          parsed: {
+            info: {
+              owner: string;
+              mint: string;
+              tokenAmount: { amount: string };
+            };
+          };
+        };
+      } | null;
+    }>(expected.rpcUrl, 'getAccountInfo', [
       escrow,
       { encoding: 'jsonParsed', commitment: COMMITMENT },
     ])
