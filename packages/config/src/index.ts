@@ -11,3 +11,5 @@ export * from '@gyblos/config/limits';
 export * from '@gyblos/config/p2p';
 
 export * from './nat.js';
+
+export * from './diagnostics.js';
