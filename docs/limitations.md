@@ -2,8 +2,9 @@
 
 This repository is an experimental TypeScript x402 payment foundation for
 Gyblos. It exercises Solana devnet fixed resources and a local Ollama inference
-gate; it does not yet connect P2P nodes. Use isolated generated devnet wallets
-only. Never import mainnet keys.
+gate, plus a separate experimental native Iroh Docker PoC. Home-router NAT and
+real separate-network connectivity remain untested. Use isolated generated
+devnet wallets only. Never import mainnet keys.
 
 ## Payment scope
 
@@ -78,10 +79,11 @@ remain explicit. See [inference details](inference.md).
 
 Model manifest and tokenizer pins check the gate's local artifacts. They do not
 authenticate a remote seller's model with LOGIC or establish answer correctness.
-The gate does not implement reputation scoring, penalties, MPP, Iroh, mobile
-apps or mainnet. Responses are buffered; buyer-facing streaming and first-word
-latency are not implemented. Killing the gate-owned engine is not durable
-recovery of a crashed seller or facilitator.
+The local gate does not validate P2P transport. The separate Iroh PoC does not
+implement reputation scoring, penalties, MPP, mobile apps or mainnet. Responses
+are buffered; buyer-facing streaming and first-word latency are not implemented.
+Killing the gate-owned engine is not durable recovery of a crashed seller or
+facilitator.
 
 The fixed-resource gates retain their own scope. A successful fixed-resource or
 public `exact` result does not validate metered inference, P2P transport or the
@@ -106,3 +108,28 @@ Configuration is read from the process environment and config file; `.env` is
 not loaded automatically. RPC identity is checked using the devnet genesis hash.
 Operational paths and ports are defined in `@gyblos/config`, with the public
 commands and defaults in the [README](../README.md#configuration).
+
+## Experimental native transport
+
+The flat Docker trial uses a separately pinned owner-signed offer, actual remote
+NodeId verification and bounded HTTP framing over Iroh. The exact per-request
+ceiling is independently calculated before signing. The seller exposes only the
+paid inference route; Ollama and the facilitator remain loopback-only. Role keys
+and journals stay in distinct container volumes under `.local/p2p/`.
+
+An initially uncertain engine error was reconciled through finalized chain
+transactions as zero charged and a complete unused-deposit return. An HTTP error
+alone never establishes that result. Preserve failed attempts and their original
+image/source identity when rebuilding; do not delete journals to rerun a case.
+
+Native routes are sampled observations. Direct connections reveal peer IPs. The
+relay-only seller option has local rejection tests but no off-host privacy
+proof. NAT-direct, UDP-blocked relay fallback and real-network success rates
+remain pending. A handshake timeout closes the entire endpoint because the
+binding exposes no individual handshake-cancellation handle.
+
+`evidence/gate-0006.json` is the explicitly authorized redacted Docker report.
+It contains public settlement metadata and synthetic-case measurements, not
+keys, salts, content, signed payment payloads, RPC URLs or endpoint addresses.
+Raw measurements and reconciliation records remain private. See the
+[Docker command](../README.md#experimental-iroh-docker-trial) for prerequisites.
