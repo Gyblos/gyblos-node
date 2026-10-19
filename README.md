@@ -171,3 +171,14 @@ scripts/             Thin setup, funding and compatibility entrypoints
 
 Read [docs/limitations.md](docs/limitations.md) for recovery and the full scope.
 Contribution rules are in [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Run offline regression tests
+
+```sh
+pnpm test
+```
+
+The published suite runs on Node.js 22 or later without private files, wallets,
+Ollama, Python or devnet payments. Network responses are mocked, with local HTTP
+servers for middleware checks. Public, hash-checked template fixtures preserve
+independent renderer regression coverage. Evidence and measurements stay local.
