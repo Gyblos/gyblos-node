@@ -5,6 +5,11 @@ import { generateKeyPairSigner } from '@solana/kit';
 import type { PaymentRequirements } from '@x402/core/types';
 
 import {
+  PUBLIC_CALL_OPERATIONS,
+  PUBLIC_CALL_OUTCOMES,
+} from '@gyblos/payments-x402/constants';
+
+import {
   DEVNET,
   DEVNET_USDC,
 } from '../packages/payments-x402/src/constants.js';
@@ -102,15 +107,26 @@ test('changed public facilitator scheme or fee payer stops the gate', () => {
 test('a settlement attempt with empty history cannot authorize fallback after confirmation failure', () => {
   let secondAuthorizations = 0;
   const sentThenConfirmationFailed = [
-    { operation: 'verify', outcome: 'success' },
-    { operation: 'settle', outcome: 'uncertain' },
+    {
+      operation: PUBLIC_CALL_OPERATIONS.VERIFY,
+      outcome: PUBLIC_CALL_OUTCOMES.SUCCESS,
+    },
+    {
+      operation: PUBLIC_CALL_OPERATIONS.SETTLE,
+      outcome: PUBLIC_CALL_OUTCOMES.UNCERTAIN,
+    },
   ];
   assert.throws(() => {
     assertExactFallbackSafe(sentThenConfirmationFailed);
     secondAuthorizations++;
   }, /Cannot switch facilitator/);
   assert.equal(secondAuthorizations, 0);
-  assertExactFallbackSafe([{ operation: 'verify', outcome: 'rejected' }]);
+  assertExactFallbackSafe([
+    {
+      operation: PUBLIC_CALL_OPERATIONS.VERIFY,
+      outcome: PUBLIC_CALL_OUTCOMES.REJECTED,
+    },
+  ]);
 });
 
 test('empty Circle USDC balance is rejected before signing', async () => {
