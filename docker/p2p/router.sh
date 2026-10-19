@@ -7,6 +7,9 @@ WAN_INTERFACE=$($IP -o -4 addr show | awk -v address="$WAN_ADDRESS" '$4 == addre
 test -n "$HOME_INTERFACE"
 test -n "$WAN_INTERFACE"
 $IP addr add "$HOME_GATEWAY" dev "$HOME_INTERFACE"
+# Reject unsolicited router-local UDP before it can reserve a conntrack tuple.
+# Replies translated to a home peer use FORWARD and remain eligible below.
+$IPTABLES -A INPUT -i "$WAN_INTERFACE" -p udp -m conntrack --ctstate NEW -j DROP
 $IPTABLES -P FORWARD DROP
 $IPTABLES -A FORWARD -d "$OTHER_HOME_CIDR" -j DROP
 if [ "$BLOCK_UDP" = "1" ]; then
