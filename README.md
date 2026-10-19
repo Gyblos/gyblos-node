@@ -4,8 +4,8 @@ Experimental x402 payments for Gyblos, a P2P inference project. A buyer
 authorizes a budget, a seller reports token usage, and a facilitator settles the
 charge and returns the unused deposit on Solana. This repository runs
 fixed-resource checks, local Ollama inference and an experimental native Iroh
-transport between isolated Docker roles. NAT and real separate-network trials
-remain pending.
+transport between isolated Docker roles. The Docker NAT experiment is partial;
+real separate-network trials remain pending.
 
 > **Status:** experimental, Solana **devnet** only. Not audited. Never use
 > mainnet keys. Part of [Gyblos](https://gyblos.com) ·
@@ -106,10 +106,37 @@ pinned public trust settings. The payout key stays outside both containers.
 The command checks real container isolation and blocked HTTP ports before
 funding the new facilitator with 0.05 devnet SOL and the buyer with 10,000
 atomic test tokens. It then attempts three paid synthetic requests and exports
-an allowlisted report to `evidence/gate-0006.json`. This is a **flat scenario
-only**; NAT direct, forced relay and real-network scenarios are not implemented
-by this command yet. Docker requires outbound access to devnet and the default
-Iroh relays. Native bindings were exercised on macOS ARM64 and Linux ARM64.
+an allowlisted report to `evidence/gate-0006.json`. Docker requires outbound
+access to devnet and the default Iroh relays. Native bindings were exercised on
+macOS ARM64 and Linux ARM64.
+
+To reuse the isolated roles for the two-home-network NAT experiment, stop the
+previous experiment's containers while preserving its volumes, then run:
+
+```sh
+pnpm p2p:docker --scenario nat-direct --volume-prefix gyblos-p2p-EXISTING --operator-root /absolute/path/to/funded/checkout
+pnpm p2p:docker --scenario nat-relay --volume-prefix gyblos-p2p-EXISTING --operator-root /absolute/path/to/funded/checkout
+```
+
+Use the actual lowercase volume prefix from the local operator record. NAT runs
+reuse funded role volumes and do not fund them again. Each actor has one home
+network and uses its keyless router as the verified default gateway. Only the
+two test routers receive `NET_ADMIN`; actors retain `cap_drop: ALL`. Routers
+remain non-root and read-only, with no role keys, privileged mode or published
+ports. Their bootstrap sets no-new-privileges before configuring MASQUERADE. The
+relay scenario drops inbound WAN UDP on the seller router.
+
+A missing required route stops before payment. The default-discovery direct
+trial did not observe a direct route within its deadline; an unpaid request
+connected over relay. An optional `--lab-candidates` diagnostic advertises known
+lab WAN candidates, is disabled by default, and also did not establish a direct
+route in this environment. It does not validate automatic NAT discovery.
+Successful relay traffic with UDP blocked must not be described as proof that
+the block caused a direct-to-relay transition. Physical-network testing remains
+pending. A private per-run start manifest preserves the journal offset and
+prefix hash before payment; any interrupted run requires reconciliation before
+another attempt. Failed preparation may leave containers available for local
+inspection; stop only that project without deleting its role volumes.
 
 Uncertain calls or funding block further authorizations until reconciliation;
 there is no automatic payment retry. Private journals remain in each container's
