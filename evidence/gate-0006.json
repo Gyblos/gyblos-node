@@ -1325,5 +1325,146 @@
       "Router model/provider identification is pending before a concrete supported network-configuration correction can be proposed. No firewall, Wi-Fi or router setting was changed.",
       "No payment, signing, inference gate, VPS test, deployment or upgrade of earlier paid evidence occurred."
     ]
+  },
+  "crossNetworkUnpaidFollowup": {
+    "recordedAt": "2026-10-19T18:33:49.218282Z",
+    "status": "unpaid-bidirectional-direct-connectivity-observed",
+    "source": {
+      "algorithm": "sha256(sorted source path NUL bytes NUL)",
+      "digest": "5a702755da92f96a567e703cce6255205fadcf06df09dc4da38a7541a9a4a552",
+      "scope": "Repository context fingerprint; the actual standalone worker digests are recorded separately below."
+    },
+    "scope": "Synthetic native Iroh echo only across Mac Wi-Fi and a VPS in a separate physical network; no payment, wallet access, model engine or inference execution. This is not paid GYB-GATE-0007.",
+    "runtime": {
+      "node": "22.19.0",
+      "iroh": "1.1.0",
+      "mac": "darwin-arm64",
+      "vps": "linux-x64-gnu",
+      "remoteNodeArchiveSha256": "c0649af18e6a24f6fe5535a3e86b341dd49a8e71117c8b68bde973ef834f16f2",
+      "sdkArchives": "Main and Linux x64 GNU package SHA-512 matched the existing pnpm lockfile before extraction; no lifecycle scripts or global installation."
+    },
+    "configuration": {
+      "ipv4Bind": "wildcard ephemeral UDP",
+      "ipv6Bind": "loopback only",
+      "samplesPerDirection": 20,
+      "sampleIntervalMs": 1000,
+      "streamReadLimitBytes": 1024,
+      "clientDeadlineMs": 70000,
+      "workerWatchdogMs": 180000,
+      "remoteOuterTimeoutSeconds": 180,
+      "remoteUid": 65534,
+      "remoteNoNewPrivileges": true,
+      "remoteNice": 10,
+      "publicN0Discovery": true,
+      "defaultRelays": true,
+      "manualCandidates": false,
+      "labObserver": false,
+      "peerDescriptors": "Operator transferred public native peer descriptors through authenticated Dokploy terminal; remote peer identity pinned before echoes. Application payloads traversed native Iroh, not the control channel.",
+      "nodeOldSpaceLimitMiB": 128
+    },
+    "runs": [
+      {
+        "direction": "Mac client to VPS server",
+        "echoes": 20,
+        "sampleCount": 20,
+        "selectedPathSequence": [
+          "relay",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct"
+        ],
+        "firstDirectSampleElapsedMs": 1132.353,
+        "connectionEstablishmentMs": 358.625,
+        "selectedDirectRttMedianMs": 102,
+        "rawResultSha256": "b7758bb3af2c14a25b219dd215b8eccb2727e25ab7afc4a35f9e879d2946a760"
+      },
+      {
+        "direction": "VPS client to Mac server",
+        "echoes": 20,
+        "sampleCount": 20,
+        "selectedPathSequence": [
+          "relay",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct"
+        ],
+        "firstDirectSampleElapsedMs": 1115.251,
+        "connectionEstablishmentMs": 96.901,
+        "selectedDirectRttMedianMs": 100,
+        "rawResultSha256": "b6738449d731309f37b511574811f0fba469d1c442601a68bf0c26a776648b2f"
+      }
+    ],
+    "isolation": {
+      "payments": 0,
+      "firewallChanges": 0,
+      "deploymentChanges": 0,
+      "existingRunningContainersBeforeAndAfter": 14,
+      "sameContainerIdsAndNames": true,
+      "existingContainerUptimesAndHealth": "Same continuously running containers; before/after status snapshots retained privately. No service-level load or request-SLO study was performed.",
+      "remainingRemoteProbeRuntimeProcesses": 0,
+      "remoteTemporaryDirectoryRemoved": true,
+      "remainingLocalProbeProcesses": 0,
+      "paymentSignatures": 0,
+      "deploymentPublishedServicePorts": 0,
+      "udpSockets": "Ephemeral native UDP sockets were used; zero deployment-published ports does not mean zero listening UDP sockets."
+    },
+    "limitations": [
+      "Route snapshots sample the selected native path; they do not prove the route of every packet or exact migration instant.",
+      "Both directions initially selected relay, then selected direct on the next sample and all remaining samples; direct RTT is SDK path telemetry, not inference latency.",
+      "Distinct discovered public IPv4 addresses establish separate public endpoints. Success is consistent with a same-public-IP return limitation in prior tests, but does not uniquely isolate router, repeater, ISP/CGNAT or host filters.",
+      "Only one Wi-Fi access and one VPS were tested. IPv6, hotspot, off-host relay-only privacy, production rendezvous and reliability across other NAT types remain untested.",
+      "Operator-mediated peer descriptor exchange is not production seller discovery or signed-offer validation.",
+      "No paid inference, application authorization, metering, accounting, reputation, content correctness, uptime guarantee or GYB-GATE-0007 acceptance is validated. REV-13/17 remain open.",
+      "One initial local client setup failed on a missing descriptor before connection; it was corrected before the successful Mac-to-VPS run. Echo servers reported ApplicationClosed after the clients closed normally; no probe process remained.",
+      "Remote V8 old space was capped, but total JavaScript/native process memory was not hard-capped or peak-profiled. Prior Docker memory evidence is unchanged."
+    ],
+    "workers": {
+      "derivation": "Existing nativeSource echo workers from tooling/iroh-probe.mjs, with CLI config argv index adjusted from 1 to 2 for file execution and an outer 180-second exit watchdog; no payment or application code.",
+      "sellerSha256": "cdc1d2dbae8aaa8c3fb0b79e9ced1ef4116ea13a46c20379f76471aebe5ac45d",
+      "buyerSha256": "6b88c7640d92422866a45b111bb6e2487c146118db19f7e858ff7a9d2245c3e6",
+      "privateSetupScriptSha256": "633704dc84340ff0ca6f2a327f6dd4b0e9da87b75e2f22da0d4181006c7791e6",
+      "digestScope": "Locally generated bytes embedded verbatim in the authenticated terminal setup transfer; remote worker digests were not independently measured before cleanup."
+    },
+    "verification": {
+      "typecheck": "passed",
+      "tests": 120,
+      "testFailures": 0,
+      "testSkips": 0,
+      "lintAndFormat": "passed",
+      "newCodeOrTests": false,
+      "artifactInvariants": "Prior evidence object unchanged; route sequences/echo counts/raw-result hashes/worker hashes and private summary match."
+    }
   }
 }
