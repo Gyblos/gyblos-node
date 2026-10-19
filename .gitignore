@@ -33,3 +33,9 @@ coverage/
 
 # Public contribution guide
 !/CONTRIBUTING.md
+
+# Public operational guides (all other docs remain local)
+!/docs/
+/docs/*
+!/docs/inference.md
+!/docs/limitations.md

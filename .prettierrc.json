@@ -16,5 +16,13 @@
     "",
     "^[.]"
   ],
-  "importOrderTypeScriptVersion": "5.9.3"
+  "importOrderTypeScriptVersion": "5.9.3",
+  "overrides": [
+    {
+      "files": ["README.md", "docs/inference.md", "docs/limitations.md"],
+      "options": {
+        "proseWrap": "always"
+      }
+    }
+  ]
 }
