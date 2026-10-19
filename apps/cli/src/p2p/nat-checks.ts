@@ -133,6 +133,23 @@ export async function inspectNat(
     const routerMac = links.find((link) => link.ifname === lan.ifname)?.address;
     assert.ok(routerMac);
     assert.equal(gateway?.[NAT.procColumns.arpMac], routerMac);
+    const inputRules = await execute(container, [
+      '/usr/sbin/iptables-nft',
+      '-S',
+      'INPUT',
+    ]);
+    const wanAddress = side === 'a' ? NAT.wan.routerA : NAT.wan.routerB;
+    const wan = addresses.find((iface) =>
+      iface.addr_info.some((info) => info.local === wanAddress),
+    );
+    assert.ok(wan);
+    assert.ok(
+      inputRules
+        .split('\n')
+        .includes(
+          `-A INPUT -i ${wan.ifname} -p udp -m conntrack --ctstate NEW -j DROP`,
+        ),
+    );
     const rules = await execute(container, [
       '/usr/sbin/iptables-nft',
       '-S',
@@ -198,6 +215,7 @@ export async function inspectNat(
       nat,
       counters,
       forwardCounters,
+      inputRules,
     });
     routers.push({
       side,
@@ -211,6 +229,7 @@ export async function inspectNat(
       masqueradePackets: packets!,
       masqueradeBytes: bytes!,
       crossHomeRouteBlocked: true,
+      unsolicitedRouterUdpDropped: true,
       inboundUdpDroppedPackets,
       forwardedPackets,
       allInboundUdpBlocked: context.scenario === 'nat-relay' && side === 'a',
