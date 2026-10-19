@@ -1,5 +1,6 @@
 import { HOSTS, LOCALHOST, PORTS } from '@gyblos/config';
 import { loadConfig, signer } from '@gyblos/gate/config';
+import { WALLET_ROLES } from '@gyblos/gate/constants';
 import { assertProgram } from '@gyblos/payments-x402/chain';
 import { createGateSeller } from '@gyblos/payments-x402/seller';
 import { isMain } from '@gyblos/runtime';
@@ -12,7 +13,7 @@ export async function main() {
     facilitatorUrl: HOSTS.facilitator,
     mint: config.mint,
     payTo: config.addresses.seller,
-    authorizer: await signer(config, 'authorizer'),
+    authorizer: await signer(config, WALLET_ROLES.AUTHORIZER),
     runId: process.env.GYBLOS_GATE_RUN_ID,
   });
   const server = app.listen(PORTS.seller, LOCALHOST, () => {
