@@ -39,8 +39,12 @@ recorded.
 ## Ceiling and charge
 
 The seller computes a ceiling through `DynamicPrice`. Deposit confirmation and
-seller admission checks precede generation. Actual test pricing, in atomic
-units, is:
+seller admission checks precede generation. Admission reads only the requested
+channel with `getAccountInfo`, reuses the SDK's owner/layout/canonical-PDA
+checks, and verifies channel participants, the committed deposit and canonical
+escrow.
+
+Actual test pricing, in atomic units, is:
 
 ```text
 charge = input tokens × 1 + output tokens × 2
@@ -73,17 +77,21 @@ and valid numeric usage and billing before a measurement is accepted.
 
 The anomaly classification uses this priority:
 
-| Condition                                                  | Classification |
-| ---------------------------------------------------------- | -------------- |
-| Actual charge exceeds expected charge plus price allowance | `overcharge`   |
-| Otherwise, HTTP status is not 200                          | `failed`       |
-| Otherwise, delivery is incomplete                          | `incomplete`   |
-| Otherwise                                                  | `none`         |
+| Condition                                                               | Classification |
+| ----------------------------------------------------------------------- | -------------- |
+| Actual charge exceeds expected charge plus price allowance              | `overcharge`   |
+| Otherwise, HTTP status is not 200                                       | `failed`       |
+| Otherwise, delivery is incomplete                                       | `incomplete`   |
+| Otherwise, actual charge is below expected charge minus price allowance | `undercharge`  |
+| Otherwise                                                               | `none`         |
 
 `delivered` requires a successful complete response ending with `stop`; a
 `length` termination is incomplete. Delivery does not establish answer quality.
-The current branch records negative charge differences but has no separate
-`undercharge` classification.
+Equality at either tolerance boundary remains `none`. A lower charge is labeled
+`undercharge` only for delivered, successful inference; failed or incomplete
+responses retain their earlier classifications. This records an anomaly without
+changing settlement, refund, prices or reputation policy. Negative atomic and
+relative charge differences remain recorded.
 
 The five gate cases are:
 
