@@ -1,6 +1,5 @@
-import { randomUUID } from 'node:crypto';
-import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 
 import { createKeyPairSignerFromBytes } from '@solana/kit';
 

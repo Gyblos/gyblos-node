@@ -59,18 +59,31 @@ export async function waitReady(
     attempts?: number;
     requestTimeout?: number;
     onMismatch?: () => Error;
+    startupError?: () => boolean;
+    exitMessage?: string;
+    timeoutMessage?: string;
+    checkSignalCode?: boolean;
+    retryResponseErrors?: boolean;
   } = {},
 ) {
   for (let i = 0; i < (options.attempts ?? 120); i++) {
     options.signal?.throwIfAborted();
-    if (child.exitCode !== null || child.signalCode !== null)
-      throw new Error('Gate-owned host exited during startup.');
+    if (
+      child.exitCode !== null ||
+      (options.checkSignalCode !== false && child.signalCode !== null) ||
+      options.startupError?.()
+    )
+      throw new Error(
+        options.exitMessage ?? 'Gate-owned host exited during startup.',
+      );
     let mismatchError: Error | undefined;
+    let responseWasOk = false;
     try {
       const response = await fetch(url, {
         signal: AbortSignal.timeout(options.requestTimeout ?? 500),
       });
       if (response.ok) {
+        responseWasOk = true;
         const body = (await response.json()) as { runId?: string };
         if (options.expectedRunId && body.runId !== options.expectedRunId)
           throw (mismatchError =
@@ -79,9 +92,13 @@ export async function waitReady(
         return;
       }
     } catch (error) {
-      if (error === mismatchError) throw error;
+      if (
+        error === mismatchError ||
+        (options.retryResponseErrors === false && responseWasOk)
+      )
+        throw error;
     }
     await new Promise((resolve) => setTimeout(resolve, TIMEOUTS.startupPoll));
   }
-  throw new Error('Gate host startup timeout.');
+  throw new Error(options.timeoutMessage ?? 'Gate host startup timeout.');
 }

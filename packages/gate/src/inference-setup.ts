@@ -1,4 +1,3 @@
-import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -9,6 +8,7 @@ import {
   createOllama,
   MODEL,
 } from '@gyblos/inference-ollama/index';
+import { spawnChild, stopChild, waitReady } from '@gyblos/runtime';
 
 export async function setupInferenceGate() {
   const directory = localPath('tokenizer');
@@ -44,31 +44,20 @@ export async function setupInferenceGate() {
   }
   if (occupied)
     throw new Error(`Setup needs unused loopback port ${PORTS.ollamaSetup}.`);
-  const server = spawn('ollama', ['serve'], { env, stdio: 'ignore' });
+  const server = spawnChild('ollama', ['serve'], { env, stdio: 'ignore' });
   let startupError = false;
   server.on('error', () => {
     startupError = true;
   });
   try {
-    let ready = false;
-    for (let i = 0; i < 80; i++) {
-      if (startupError || server.exitCode !== null)
-        throw new Error('Local Ollama startup failed.');
-      try {
-        const response = await fetch(`${origin}/api/version`, {
-          signal: AbortSignal.timeout(500),
-        });
-        if (response.ok) {
-          ready = true;
-          break;
-        }
-      } catch {
-        /* starting */
-      }
-      await new Promise((resolve) => setTimeout(resolve, 250));
-    }
-    if (!ready) throw new Error('Local Ollama setup timed out.');
-    const child = spawn('ollama', ['pull', MODEL.name], {
+    await waitReady(server, `${origin}/api/version`, {
+      attempts: 80,
+      startupError: () => startupError,
+      checkSignalCode: false,
+      exitMessage: 'Local Ollama startup failed.',
+      timeoutMessage: 'Local Ollama setup timed out.',
+    });
+    const child = spawnChild('ollama', ['pull', MODEL.name], {
       env,
       stdio: 'inherit',
     });
@@ -77,14 +66,6 @@ export async function setupInferenceGate() {
     await createOllama(origin).assertModel();
     console.log('Pinned local model and public tokenizer artifacts verified.');
   } finally {
-    if (server.pid && server.exitCode === null) {
-      server.kill('SIGTERM');
-      await Promise.race([
-        once(server, 'exit'),
-        new Promise((resolve) => setTimeout(resolve, 2000)),
-      ]);
-      if (server.exitCode === null && server.signalCode === null)
-        server.kill('SIGKILL');
-    }
+    if (server.pid && server.exitCode === null) await stopChild(server);
   }
 }
