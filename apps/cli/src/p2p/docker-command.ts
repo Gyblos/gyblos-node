@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
-import { FILE_MODES, P2P } from '@gyblos/config';
+import { FILE_MODES, NAT, P2P } from '@gyblos/config';
 
 export async function docker(
   args: string[],
@@ -39,13 +39,19 @@ export async function docker(
   });
 }
 
-export function composeArgs(project: string, args: string[]) {
+export function composeArgs(
+  project: string,
+  args: string[],
+  environment: NodeJS.ProcessEnv = process.env,
+) {
   return [
     'compose',
     '--project-name',
     project,
     '--file',
-    P2P.docker.composePath,
+    environment.GYBLOS_P2P_SCENARIO?.startsWith('nat-')
+      ? NAT.composePath
+      : P2P.docker.composePath,
     ...args,
   ];
 }
@@ -57,7 +63,7 @@ export async function containerId(
 ) {
   const id = (
     await docker(
-      composeArgs(project, ['ps', '--quiet', role]),
+      composeArgs(project, ['ps', '--quiet', role], environment),
       undefined,
       environment,
     )
