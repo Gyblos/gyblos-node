@@ -27,6 +27,7 @@ import {
   transaction,
 } from '@gyblos/gate/chain';
 import { loadConfig, saveJson, signer } from '@gyblos/gate/config';
+import { INFERENCE_EVIDENCE_CODES } from '@gyblos/gate/constants';
 import { assertNoUnresolvedAuthorizations } from '@gyblos/gate/journal';
 import { withExclusiveLock } from '@gyblos/gate/lock';
 import { measurementSalt } from '@gyblos/gate/measurements';
@@ -258,8 +259,8 @@ export async function main() {
         error instanceof GateError
           ? error.code
           : error instanceof assert.AssertionError
-            ? 'ASSERTION_FAILED'
-            : 'EXECUTION_INTERRUPTED_OR_UNKNOWN';
+            ? INFERENCE_EVIDENCE_CODES.ASSERTION_FAILED
+            : INFERENCE_EVIDENCE_CODES.EXECUTION_INTERRUPTED_OR_UNKNOWN;
       evidence.errorLocation =
         error instanceof Error
           ? error.stack
