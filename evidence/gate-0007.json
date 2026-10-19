@@ -3,7 +3,7 @@
   "evidenceId": "GYB-GATE-0007",
   "recordedAt": "2026-10-19T19:11:03.440821+00:00",
   "status": "blocked-before-payment",
-  "acceptance": "Not met: zero of three paid physical-network inferences completed. No paid success or payment reconciliation is claimed.",
+  "acceptance": "Not met: zero of three paid physical-network inferences completed across all recorded attempts. Latest native retry stopped before model warmup because kernel pressure was warning (2).",
   "network": "solana-devnet",
   "assetLabel": "devnet-test-token",
   "mint": "2vXUXK2rJTPtb7Wx9em4W9FdgtfD6HTnFxZz5oirLVcH",
@@ -122,10 +122,168 @@
     "privateRouteRegressionTests": 4
   },
   "remaining": [
-    "Free additional Mac memory and pass the unchanged post-warmup reserve before publishing a native seller offer.",
+    "Free additional native Mac memory until kernel pressure is normal (1), then pass the pressure-aware approximate-headroom check and unchanged post-warmup reserve before publishing a seller offer.",
     "Repeat unpaid identity-pinned required-direct readiness with the native Mac seller before any devnet funding/payment.",
     "After readiness, execute three bounded synthetic paid requests, verify actual sampled direct paths and independently finalize deposits/claims/balance deltas/refunds/sponsor fees. Stop and reconcile any uncertainty without another authorization.",
     "This attempted gate does not validate paid physical-network inference, hotspot, production rendezvous, mobile, content authenticity or automatic recovery. REV-13/17 remain open.",
     "The previous successful native unpaid Mac\u2013VPS echo result and all earlier gate-0006 financial evidence remain unchanged."
-  ]
+  ],
+  "followUpAttempts": [
+    {
+      "recordedAt": "2026-10-19T22:36:44.639263+00:00",
+      "sourceCommit": "2c8eeac",
+      "source": {
+        "algorithm": "sha256(sorted source path NUL bytes NUL)",
+        "digest": "a6edcd7e6bc0f56b55387ed0703a5780f26219c13aace505682862bbf1444348"
+      },
+      "status": "blocked-before-payment",
+      "sellerRuntime": "Native macOS arm64 Ollama/Iroh; Linux x64 VPS buyer prepared but never started",
+      "admissionCorrection": {
+        "commits": [
+          "6a735f5",
+          "a066994",
+          "2c8eeac"
+        ],
+        "estimate": "(vm_stat free + speculative + inactive pages) * page size; purgeable excluded",
+        "source": "darwin-reclaimable-estimate",
+        "normalPressureRequired": 1,
+        "requiredAvailableBytes": 1610612736,
+        "observationTimeoutMs": 2000,
+        "maxObservationOutputBytes": 65536,
+        "limitation": "Inactive memory is an approximate reclaimability estimate, not reserved or guaranteed immediately allocatable RAM. Separate pressure/counter observations are not atomic and cannot guarantee future capacity. Linux behavior unchanged."
+      },
+      "initialObservation": {
+        "source": "darwin-reclaimable-estimate",
+        "vmAvailableBytes": 16261988352,
+        "darwin": {
+          "pageBytes": 16384,
+          "freePages": 13894,
+          "inactivePages": 974601,
+          "speculativePages": 4058,
+          "pressureLevel": 1,
+          "totalBytes": 68719476736
+        },
+        "cgroup": null
+      },
+      "readiness": {
+        "status": "failed",
+        "reason": "insufficient-headroom",
+        "before": {
+          "source": "darwin-reclaimable-estimate",
+          "vmAvailableBytes": 15667789824,
+          "darwin": {
+            "pageBytes": 16384,
+            "freePages": 11320,
+            "inactivePages": 942001,
+            "speculativePages": 2965,
+            "pressureLevel": 2,
+            "totalBytes": 68719476736
+          },
+          "cgroup": null
+        },
+        "after": {
+          "source": "darwin-reclaimable-estimate",
+          "vmAvailableBytes": 15666806784,
+          "darwin": {
+            "pageBytes": 16384,
+            "freePages": 11258,
+            "inactivePages": 942003,
+            "speculativePages": 2965,
+            "pressureLevel": 2,
+            "totalBytes": 68719476736
+          },
+          "cgroup": null
+        },
+        "warmupMs": 7.812542000000008
+      },
+      "modelWarmupAttempted": false,
+      "offerPublished": false,
+      "directRouteAttempted": false,
+      "selectedRoute": "not-attempted",
+      "fundingTransactions": 0,
+      "paymentAuthorizations": 0,
+      "resourceInferences": 0,
+      "completedPaidRequests": 0,
+      "stabilityObservations": [
+        {
+          "at": "2026-10-19T22:31:34.966Z",
+          "admitted": false,
+          "source": "darwin-reclaimable-estimate",
+          "vmAvailableBytes": 15561932800,
+          "darwin": {
+            "pageBytes": 16384,
+            "freePages": 5772,
+            "inactivePages": 943416,
+            "speculativePages": 637,
+            "pressureLevel": 2,
+            "totalBytes": 68719476736
+          },
+          "cgroup": null
+        },
+        {
+          "at": "2026-10-19T22:31:39.981Z",
+          "admitted": false,
+          "source": "darwin-reclaimable-estimate",
+          "vmAvailableBytes": 15731769344,
+          "darwin": {
+            "pageBytes": 16384,
+            "freePages": 10848,
+            "inactivePages": 948071,
+            "speculativePages": 1272,
+            "pressureLevel": 2,
+            "totalBytes": 68719476736
+          },
+          "cgroup": null
+        },
+        {
+          "at": "2026-10-19T22:31:44.994Z",
+          "admitted": false,
+          "source": "darwin-reclaimable-estimate",
+          "vmAvailableBytes": 15823421440,
+          "darwin": {
+            "pageBytes": 16384,
+            "freePages": 10293,
+            "inactivePages": 954184,
+            "speculativePages": 1308,
+            "pressureLevel": 2,
+            "totalBytes": 68719476736
+          },
+          "cgroup": null
+        }
+      ],
+      "packagingSha256": {
+        "seller-entry.ts": "eff71ea35980f401dd969b29720a8a199e74116385e3fc752047653e124801ec",
+        "remote-entry.ts": "4255367467a3fb8b92e0ad3e16e97a21062a721e1c705ba21a0d65a1a29ac5bb",
+        "build.mjs": "a04f80aeae2d21037da18055113c9cc00527216160ae71a725832fc0d18b7c17",
+        "bundle/buyer.mjs": "51899bb5946cfcfb27ac4091ad2ad220abd3f3294a6b07735a266f7238c7b8f9",
+        "bundle/seller.mjs": "2f2da0c242c82b13fa683e447779044b246a0c80e97254fb4257185c5f5afad0"
+      },
+      "independentFinalizedReadOnlyCheck": {
+        "checkedAt": "2026-10-19T22:35:00.270Z",
+        "newAccountsChecked": 2,
+        "buyerAndFacilitatorSolBalancesZero": true,
+        "buyerAndFacilitatorFinalizedHistoriesEmpty": true
+      },
+      "isolationAndCleanup": {
+        "vpsExistingContainers": 14,
+        "vpsSameContainerIdsStartTimesAndRestartCounts": true,
+        "vpsRemainingProbeRuntimeProcesses": 0,
+        "vpsTemporaryRuntimeAndUnfundedKeysRemoved": true,
+        "macExistingRunningContainers": 47,
+        "macSameExistingRunningContainerIds": true,
+        "nativeSellerListenersRemaining": 0,
+        "deploymentChanges": 0,
+        "existingFirewallOrServiceConfigurationChanges": 0
+      },
+      "verification": {
+        "privateTddTests": 12,
+        "publicTests": 120,
+        "typecheck": "passed for each source commit",
+        "lintAndFormat": "passed for each source commit",
+        "readOnlyReviews": 3
+      },
+      "note": "The initial normal-pressure observation did not authorize a later warmup: startup re-read pressure level 2 and refused before engine description/generation. No payment reconciliation or paid direct inference is claimed. Previous attempts and gate-0006 remain unchanged."
+    }
+  ],
+  "lastUpdatedAt": "2026-10-19T22:36:44.639263+00:00"
 }
