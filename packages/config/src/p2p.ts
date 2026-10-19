@@ -16,7 +16,7 @@ export const P2P = {
   maxPeers: 128,
   requestsPerWindow: 30,
   rateWindowMs: 60_000,
-  offerLifetimeMs: 10 * 60_000,
+  offerLifetimeMs: 4 * 60_000,
   streamCloseCode: 1n,
   minimumRequests: 3,
   maxChannelSignatures: 10,
