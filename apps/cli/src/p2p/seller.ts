@@ -8,6 +8,7 @@ import { signInferenceOffer } from '@gyblos/application/offers';
 import {
   CLEANUP,
   DEVNET,
+  DIAGNOSTICS,
   HOSTS,
   INFERENCE_REQUEST_LIMITS,
   LOCALHOST,
@@ -18,7 +19,10 @@ import {
   ROUTES,
 } from '@gyblos/config';
 import { inferenceSnapshot } from '@gyblos/gate/chain';
-import { GENERATION } from '@gyblos/inference-ollama/constants';
+import {
+  GENERATION,
+  READINESS_GENERATION,
+} from '@gyblos/inference-ollama/constants';
 import { createOllamaEngine } from '@gyblos/inference-ollama/engine';
 import { assertProgram } from '@gyblos/payments-x402/chain';
 import { createFacilitator } from '@gyblos/payments-x402/facilitator';
@@ -36,6 +40,11 @@ import { bindEndpoint } from '@gyblos/transport/endpoint';
 import { serveIroh } from '@gyblos/transport/iroh-server';
 
 import { modelTokenizer } from './artifacts.js';
+import {
+  assertReadinessCurrent,
+  prepareSellerEngine,
+} from './engine-readiness.js';
+import { assertMemoryHeadroom, memorySnapshot } from './memory.js';
 import { loadRole, nodeSecret, rolePath, roleSigner } from './roles.js';
 
 interface Trace {
@@ -77,6 +86,9 @@ export async function startSeller() {
         OLLAMA_NO_CLOUD: '1',
         OLLAMA_DEBUG: '0',
         OLLAMA_CONTEXT_LENGTH: String(GENERATION.numCtx),
+        OLLAMA_NUM_PARALLEL: String(READINESS_GENERATION.parallel),
+        OLLAMA_MAX_LOADED_MODELS: String(READINESS_GENERATION.loadedModels),
+        OLLAMA_MAX_QUEUE: String(P2P.maxConcurrent),
       },
       stdio: 'ignore',
     });
@@ -93,9 +105,13 @@ export async function startSeller() {
       await stopChild(child);
       throw error;
     }
-    await stage('model-identity');
+    await stage('private-engine-warmup');
     const engine = createOllamaEngine(HOSTS.ollama),
-      model = await engine.describe();
+      { model, offerExpiresAt } = await prepareSellerEngine(engine, {
+        snapshot: memorySnapshot,
+        record: (record) =>
+          saveJson(rolePath(DIAGNOSTICS.readinessFilename), record),
+      });
     await stage('role-signers');
     const owner = await roleSigner('owner'),
       authorizer = await roleSigner('authorizer'),
@@ -174,7 +190,9 @@ export async function startSeller() {
       void endpoint.close();
     });
     const endpointAddress = endpoint.addr();
+    assertMemoryHeadroom(await memorySnapshot());
     const now = Date.now();
+    assertReadinessCurrent(offerExpiresAt, now);
     const signed = await signInferenceOffer(
       {
         schemaVersion: P2P.schemaVersion,
@@ -193,7 +211,7 @@ export async function startSeller() {
         authorizer: authorizer.address,
         buyer: config.buyer,
         issuedAt: now,
-        expiresAt: now + P2P.offerLifetimeMs,
+        expiresAt: offerExpiresAt,
         prices: PRICES,
         maxAtomic: MAX_ATOMIC,
         maxTokens: INFERENCE_REQUEST_LIMITS.maxOutputTokens,
