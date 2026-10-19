@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import {
+  INFERENCE_CASES,
+  type InferenceCaseName,
+} from '@gyblos/gate/constants';
+
 import { assertInferenceCase } from '../apps/cli/src/inference/assertions.js';
 import { observeInferenceResponse } from '../packages/application/src/inference-observation.js';
 import {
@@ -13,7 +18,7 @@ import { MODEL } from '../packages/inference-ollama/src/index.js';
 
 function fixture(
   options: {
-    name?: string;
+    name?: InferenceCaseName;
     billedInput?: number;
     billedOutput?: number;
     status?: number;
@@ -21,7 +26,7 @@ function fixture(
     engineInput?: number;
   } = {},
 ) {
-  const caseName = options.name ?? 'undercharge';
+  const caseName = options.name ?? INFERENCE_CASES.UNDERCHARGE;
   const status = options.status ?? 200;
   const billed = {
     input: options.billedInput ?? 24,
@@ -130,20 +135,30 @@ test('a forged undercharge annotation cannot bypass the strict financial thresho
 });
 
 test('case assertion extraction retains all original honest overcharge and interruption acceptance', () => {
-  for (const name of ['honest-1', 'honest-2', 'honest-3'])
+  for (const name of [
+    INFERENCE_CASES.HONEST_1,
+    INFERENCE_CASES.HONEST_2,
+    INFERENCE_CASES.HONEST_3,
+  ])
     assert.doesNotThrow(() =>
       assertInferenceCase(fixture({ name, billedOutput: 110 })),
     );
   assert.doesNotThrow(() =>
-    assertInferenceCase(fixture({ name: 'overcharge', billedOutput: 154 })),
+    assertInferenceCase(
+      fixture({ name: INFERENCE_CASES.OVERCHARGE, billedOutput: 154 }),
+    ),
   );
   assert.doesNotThrow(() =>
-    assertInferenceCase(fixture({ name: 'engine-interrupted', status: 502 })),
+    assertInferenceCase(
+      fixture({ name: INFERENCE_CASES.ENGINE_INTERRUPTED, status: 502 }),
+    ),
   );
 });
 
 test('discounted billing cannot pass as an ordinary honest case', () => {
-  assert.throws(() => assertInferenceCase(fixture({ name: 'honest-1' })));
+  assert.throws(() =>
+    assertInferenceCase(fixture({ name: INFERENCE_CASES.HONEST_1 })),
+  );
 });
 
 test('undercharge acceptance rejects a zero charge even when its annotation and counts agree', () => {
