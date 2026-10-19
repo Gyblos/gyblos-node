@@ -1,19 +1,29 @@
 import type {
+  ExactCaseName,
+  FAILURE_CASES,
+  JOURNAL_STATES,
+} from '@gyblos/gate/constants';
+
+import type {
   AuthorizationMetadata,
   ExactSnapshot,
   Reconciliation,
 } from './evidence-types.js';
 
+// Historical input stays open: unknown states must continue to block new payments.
 export interface JournalStateRecord {
   state?: string;
 }
 
 export type AuthorizationJournal = {
-  state: 'authorization-created';
+  state: typeof JOURNAL_STATES.AUTHORIZATION_CREATED;
   createdAt: string;
 } & (
   | { channelId: string; asset: string; network: string; ceiling: string }
-  | { channelId: string; case: 'F1' | 'F2' }
+  | {
+      channelId: string;
+      case: typeof FAILURE_CASES.EMPTY_BUYER | typeof FAILURE_CASES.EXPIRED;
+    }
   | {
       requestId: string;
       channelId: string;
@@ -22,7 +32,7 @@ export type AuthorizationJournal = {
       mint: string;
     }
   | (AuthorizationMetadata & {
-      case: string;
+      case: ExactCaseName;
       facilitator: string;
       buyer: string;
       before: ExactSnapshot;
@@ -30,7 +40,7 @@ export type AuthorizationJournal = {
 );
 
 export interface InferenceJournal {
-  state: 'reconciled' | 'verified';
+  state: typeof JOURNAL_STATES.RECONCILED | typeof JOURNAL_STATES.VERIFIED;
   requestId: string;
   channelId: string;
   depositSignature: string;
@@ -42,20 +52,27 @@ export interface InferenceJournal {
 export type GateJournalRecord =
   | AuthorizationJournal
   | InferenceJournal
-  | { state: 'verified'; evidencePath: string; channelId: string }
   | {
-      state: 'resolved-rejected';
+      state: typeof JOURNAL_STATES.VERIFIED;
+      evidencePath: string;
+      channelId: string;
+    }
+  | {
+      state: typeof JOURNAL_STATES.RESOLVED_REJECTED;
       channelId: string;
       resolvedAt: string;
       resultPath: string;
     }
   | (AuthorizationMetadata & {
-      state: 'rejected';
+      state: typeof JOURNAL_STATES.REJECTED;
       reconciliation: Reconciliation;
     })
-  | (AuthorizationMetadata & { state: 'confirmed'; transaction: string })
   | (AuthorizationMetadata & {
-      state: 'uncertain';
+      state: typeof JOURNAL_STATES.CONFIRMED;
+      transaction: string;
+    })
+  | (AuthorizationMetadata & {
+      state: typeof JOURNAL_STATES.UNCERTAIN;
       buyer: string;
       reconciliation: Reconciliation;
     });
