@@ -18,11 +18,19 @@ export const MODEL = {
     'single-user/no-tools/enable_thinking=false/add_generation_prompt=true',
 } as const;
 
+export const READINESS_GENERATION = {
+  prompt: 'Reply OK.',
+  maxTokens: 1,
+  parallel: 1,
+  loadedModels: 1,
+  residencyMs: 5 * 60_000,
+} as const;
+
 export const GENERATION = {
   numCtx: 2048,
   seed: 42,
   temperature: 0,
-  keepAlive: '5m',
+  keepAlive: `${READINESS_GENERATION.residencyMs}ms`,
 } as const;
 
 export const MODEL_LIMITS = {
