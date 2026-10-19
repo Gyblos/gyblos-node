@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { encodePaymentSignatureHeader } from '@x402/core/http';
 
 import { COMMITMENT, HTTP_STATUS, TIMEOUTS } from '@gyblos/config';
-import { saveJson } from '@gyblos/gate/config';
+import { saveJournal } from '@gyblos/gate/journal';
 import type { ChainTransaction } from '@gyblos/gate/types';
 import { confirm, explorer, GateError, rpc } from '@gyblos/payments-x402/chain';
 import { DEVNET } from '@gyblos/payments-x402/constants';
@@ -45,7 +45,7 @@ export async function runProvider(context: ExactContext) {
       ...required,
     };
     await persist();
-    const cases = evidence.results as unknown[];
+    const cases = evidence.results;
     await assertUntrusted(context, required, policy);
     const paid = createPaidRequest(context, challenge, policy, (value) => {
       active = value;
@@ -75,7 +75,7 @@ export async function runProvider(context: ExactContext) {
         calls: success.calls,
         reconciliation,
       });
-      await saveJson(journalPath, {
+      await saveJournal(journalPath, {
         state: 'rejected',
         ...success.metadata,
         reconciliation,
@@ -150,7 +150,7 @@ export async function runProvider(context: ExactContext) {
         meta: onChain.meta,
       },
     });
-    await saveJson(journalPath, {
+    await saveJournal(journalPath, {
       state: COMMITMENT,
       transaction: receipt.transaction,
       ...success.metadata,
@@ -202,10 +202,12 @@ export async function runProvider(context: ExactContext) {
         config,
         active.buyer,
         active.buyerSignature,
-      ).catch(() => ({ classification: 'reconciliation-unavailable' }));
+      ).catch(() => ({
+        classification: 'reconciliation-unavailable' as const,
+      }));
       evidence.status = 'uncertain';
       evidence.reconciliation = reconciliation;
-      await saveJson(journalPath, {
+      await saveJournal(journalPath, {
         state: 'uncertain',
         ...active,
         reconciliation,

@@ -37,6 +37,7 @@ export const HTTP_STATUS = {
   ok: 200,
   paymentRequired: 402,
   conflict: 409,
+  tooManyRequests: 429,
   badGateway: 502,
   badRequest: 400,
   internalServerError: 500,

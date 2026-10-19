@@ -14,7 +14,11 @@ import {
   X402_SDK_VERSION,
 } from '@gyblos/config';
 import { loadConfig, saveJson, signer } from '@gyblos/gate/config';
-import { assertNoUnresolvedAuthorizations } from '@gyblos/gate/journal';
+import type { FixedGateEvidence } from '@gyblos/gate/fixture-evidence-types';
+import {
+  assertNoUnresolvedAuthorizations,
+  saveJournal,
+} from '@gyblos/gate/journal';
 import { withExclusiveLock } from '@gyblos/gate/lock';
 import { createBuyer } from '@gyblos/payments-x402/buyer';
 import {
@@ -52,7 +56,7 @@ async function executeLocked(signal?: AbortSignal) {
     },
     fetch,
     async (authorization) => {
-      await saveJson(JOURNAL_PATH, {
+      await saveJournal(JOURNAL_PATH, {
         state: 'authorization-created',
         channelId: authorization.channelId,
         asset: config.mint,
@@ -184,7 +188,7 @@ async function executeLocked(signal?: AbortSignal) {
       };
     },
   });
-  const evidence = {
+  const evidence: FixedGateEvidence = {
     schemaVersion: 1,
     status: 'passed',
     createdAt: new Date().toISOString(),
@@ -207,7 +211,7 @@ async function executeLocked(signal?: AbortSignal) {
   };
   const evidencePath = fixedEvidencePath(Date.now());
   await saveJson(evidencePath, evidence);
-  await saveJson(JOURNAL_PATH, {
+  await saveJournal(JOURNAL_PATH, {
     state: 'verified',
     evidencePath,
     channelId: result.accounting.channelId,

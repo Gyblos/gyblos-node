@@ -1,7 +1,7 @@
 import type { SupportedResponse } from '@x402/core/types';
 
 import type { Config } from '@gyblos/gate/config';
-import type { GateEvidence } from '@gyblos/gate/types';
+import type { ExactGateEvidence } from '@gyblos/gate/types';
 import type {
   AuditedPublicFacilitator,
   createExactSeller,
@@ -21,7 +21,7 @@ export interface ExactContext {
   host: Awaited<ReturnType<typeof createExactSeller>>;
   facilitator: AuditedPublicFacilitator;
   url: string;
-  evidence: GateEvidence;
+  evidence: ExactGateEvidence;
   persist: () => Promise<void>;
   journalPath: string;
   evidencePath: string;

@@ -17,16 +17,9 @@ import {
   EXACT_PRICE,
   validateExactTerms,
 } from '@gyblos/payments-x402/exact/index';
+import type { PublicCall } from '@gyblos/payments-x402/exact/types';
 
-export interface PublicCall {
-  operation: string;
-  url: string;
-  outcome: string;
-  transaction?: string;
-  reason?: string;
-  message?: string;
-  payer?: string;
-}
+export type { PublicCall } from '@gyblos/payments-x402/exact/types';
 
 export class AuditedPublicFacilitator extends HTTPFacilitatorClient {
   readonly calls: PublicCall[] = [];

@@ -10,7 +10,10 @@ import {
 } from '@gyblos/config';
 import { inferenceSnapshot, transaction } from '@gyblos/gate/chain';
 import { saveJson, signer } from '@gyblos/gate/config';
-import { assertNoUnresolvedAuthorizations } from '@gyblos/gate/journal';
+import {
+  assertNoUnresolvedAuthorizations,
+  saveJournal,
+} from '@gyblos/gate/journal';
 import { appendMeasurement, measurementRow } from '@gyblos/gate/measurements';
 import { MODEL_LIMITS } from '@gyblos/inference-ollama/constants';
 import { MODEL } from '@gyblos/inference-ollama/index';
@@ -64,7 +67,7 @@ export async function runCases({
         async authorized(authorizedChannelId, authorizedCeiling) {
           assert.equal(authorizedCeiling, ceiling);
           channelId = authorizedChannelId;
-          await saveJson(journalPath, {
+          await saveJournal(journalPath, {
             state: 'authorization-created',
             requestId: request.requestId,
             channelId: authorizedChannelId,
@@ -198,7 +201,7 @@ export async function runCases({
         assert.equal(row.anomaly, 'none');
       }
     }
-    await saveJson(journalPath, {
+    await saveJournal(journalPath, {
       state: 'verified',
       requestId: request.requestId,
       channelId,

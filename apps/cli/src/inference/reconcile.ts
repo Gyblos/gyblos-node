@@ -7,7 +7,7 @@ import {
   transaction,
   transactionTransfers,
 } from '@gyblos/gate/chain';
-import { saveJson } from '@gyblos/gate/config';
+import { saveJournal } from '@gyblos/gate/journal';
 import { createInferenceBuyer } from '@gyblos/payments-x402/inference-buyer';
 import { validateSettlement } from '@gyblos/payments-x402/trust';
 
@@ -94,7 +94,7 @@ export async function reconcileCase({
     sum(claimTransfers, escrowAta, buyerAta),
     BigInt(ceiling) - actual,
   );
-  await saveJson(journalPath, {
+  await saveJournal(journalPath, {
     state: 'reconciled',
     requestId: requestId,
     channelId,

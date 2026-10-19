@@ -1,6 +1,5 @@
-import type { inferenceSnapshot } from '@gyblos/gate/chain';
 import type { Config } from '@gyblos/gate/config';
-import type { GateEvidence } from '@gyblos/gate/types';
+import type { InferenceGateEvidence, InferenceTrace } from '@gyblos/gate/types';
 import type { ModelTokenizer } from '@gyblos/inference-ollama';
 import type { SettlementEvent } from '@gyblos/payments-x402/facilitator';
 
@@ -10,15 +9,7 @@ export interface InferenceCase {
   prompt: string;
 }
 
-export interface InferenceTrace {
-  channelId: string;
-  depositConfirmedAt: string;
-  engineStartedAt: string;
-  during: Awaited<ReturnType<typeof inferenceSnapshot>>;
-  firstFragmentAt?: string;
-  stoppedAt?: string;
-  stoppedSignal?: string;
-}
+export type { InferenceTrace } from '@gyblos/gate/types';
 
 export interface CaseContext {
   url: string;
@@ -27,7 +18,7 @@ export interface CaseContext {
   controller: AbortController;
   buyerTokenizer: ModelTokenizer;
   salt: Uint8Array;
-  evidence: GateEvidence;
+  evidence: InferenceGateEvidence;
   evidencePath: string;
   journalPath: string;
   events: () => Promise<SettlementEvent[]>;

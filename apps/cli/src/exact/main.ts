@@ -76,7 +76,7 @@ export async function main() {
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const supported = (await response.json()) as SupportedResponse;
-        (evidence.facilitators as unknown[]).push({
+        evidence.facilitators.push({
           ...provider,
           fetchedAt: new Date().toISOString(),
           httpStatus: response.status,
@@ -88,7 +88,7 @@ export async function main() {
       } catch (error) {
         if (error instanceof GateError && error.code === 'SUPPORT_CHANGED')
           throw error;
-        (evidence.facilitators as unknown[]).push({
+        evidence.facilitators.push({
           url: provider.url,
           status: 'unavailable',
           reason: error instanceof Error ? error.name : 'UnknownError',
@@ -126,7 +126,7 @@ export async function main() {
       } catch (error) {
         if (error instanceof GateError && error.code === 'SUPPORT_CHANGED')
           throw error;
-        (evidence.results as unknown[]).push({
+        evidence.results.push({
           facilitator: provider.url,
           case: 'startup',
           status: 'external-unavailable',

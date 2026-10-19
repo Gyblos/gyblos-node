@@ -5,6 +5,7 @@ import { address } from '@solana/kit';
 
 import {
   COMMITMENT,
+  HTTP_STATUS,
   RETRIES,
   RETRY_DELAYS,
   TOKEN_PROGRAM_ADDRESS,
@@ -43,7 +44,7 @@ export async function rpc<T>(
         !method.startsWith('get') ||
         !(error instanceof GateError) ||
         error.code !== 'RPC_HTTP' ||
-        !error.message.includes('429')
+        !error.message.includes(String(HTTP_STATUS.tooManyRequests))
       )
         throw error;
       await new Promise((resolve) =>

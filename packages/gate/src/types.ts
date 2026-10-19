@@ -1,5 +1,3 @@
-import type { Measurement } from './measurements.js';
-
 export interface TokenAccount {
   owner: string;
   lamports: number;
@@ -51,25 +49,21 @@ export interface ChainTransaction {
   };
 }
 
-export interface CaseResult {
-  case?: string;
-  status?: string;
-  measurement?: Measurement;
-  [key: string]: unknown;
-}
+export type {
+  ExactGateEvidence,
+  ExactCaseResult,
+} from './exact-evidence-types.js';
 
-export interface GateEvidence {
-  schemaVersion: number;
-  evidenceId: string;
-  sdkVersion: string;
-  network: string;
-  mint: string;
-  assetLabel: string;
-  status: string;
-  gatePassed: boolean;
-  results: CaseResult[];
-  previousAttempts?: unknown[];
-  facilitators?: unknown[];
-  limitations: string[];
-  [key: string]: unknown;
-}
+export type {
+  InferenceGateEvidence,
+  InferenceCaseResult,
+  InferenceTrace,
+} from './inference-evidence-types.js';
+
+export type GateEvidence =
+  | import('./exact-evidence-types.js').ExactGateEvidence
+  | import('./inference-evidence-types.js').InferenceGateEvidence;
+
+export type CaseResult =
+  | import('./exact-evidence-types.js').ExactCaseResult
+  | import('./inference-evidence-types.js').InferenceCaseResult;

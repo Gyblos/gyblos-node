@@ -13,6 +13,7 @@ import type { PaymentPayload } from '@x402/core/types';
 import {
   COMMITMENT,
   DIAGNOSTIC_LIMITS,
+  HTTP_STATUS,
   PAYMENT_LIMITS,
   RETRIES,
   RETRY_DELAYS,
@@ -50,7 +51,7 @@ export async function snapshot(config: Config, buyer: string) {
       if (
         !(error instanceof GateError) ||
         error.code !== 'RPC_HTTP' ||
-        !error.message.includes('429') ||
+        !error.message.includes(String(HTTP_STATUS.tooManyRequests)) ||
         attempt === RETRIES.exactSnapshotLastAttempt
       )
         throw error;

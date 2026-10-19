@@ -20,7 +20,14 @@ import {
   UNITS,
 } from '@gyblos/config';
 import { loadConfig, saveJson, signer } from '@gyblos/gate/config';
-import { assertNoUnresolvedAuthorizations } from '@gyblos/gate/journal';
+import type {
+  FailureCaseResult,
+  FailureGateEvidence,
+} from '@gyblos/gate/fixture-evidence-types';
+import {
+  assertNoUnresolvedAuthorizations,
+  saveJournal,
+} from '@gyblos/gate/journal';
 import { withExclusiveLock } from '@gyblos/gate/lock';
 import { createBuyer } from '@gyblos/payments-x402/buyer';
 import {
@@ -44,7 +51,7 @@ export async function failureGate() {
     await assertNoUnresolvedAuthorizations();
     const { sponsor, emptyBuyer, setupTransaction } =
       await prepareFailureAccounts(config);
-    const results = [];
+    const results: FailureCaseResult[] = [];
     for (const kind of ['F1', 'F2'] as const) {
       const buyerSigner =
         kind === 'F1' ? emptyBuyer : await signer(config, 'buyer');
@@ -144,7 +151,7 @@ export async function failureGate() {
           fetchImpl,
           async (authorization) => {
             channelId = authorization.channelId;
-            await saveJson(failureJournalPath(kind), {
+            await saveJournal(failureJournalPath(kind), {
               state: 'authorization-created',
               channelId,
               createdAt: new Date().toISOString(),
@@ -215,7 +222,7 @@ export async function failureGate() {
           paymentTransactions: history,
         });
         await saveJson(failureResultPath(kind), results.at(-1));
-        await saveJson(failureJournalPath(kind), {
+        await saveJournal(failureJournalPath(kind), {
           state: 'resolved-rejected',
           channelId,
           resolvedAt: new Date().toISOString(),
@@ -234,7 +241,7 @@ export async function failureGate() {
         );
       }
     }
-    const evidence = {
+    const evidence: FailureGateEvidence = {
       schemaVersion: 1,
       createdAt: new Date().toISOString(),
       network: DEVNET,

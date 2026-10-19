@@ -6,10 +6,12 @@ import {
   CHALLENGE_EVIDENCE_PATH,
   HTTP_STATUS,
   LOCALHOST,
+  MAX_ATOMIC,
   ROUTES,
   X402_SDK_VERSION,
 } from '@gyblos/config';
 import { loadConfig, saveJson, signer } from '@gyblos/gate/config';
+import type { ChallengeEvidence } from '@gyblos/gate/fixture-evidence-types';
 import { assertProgram } from '@gyblos/payments-x402/chain';
 import { UPSTREAM_COMMIT } from '@gyblos/payments-x402/constants';
 import { createFacilitator } from '@gyblos/payments-x402/facilitator';
@@ -62,14 +64,14 @@ export async function challengeGate() {
       payTo: config.addresses.seller,
       feePayer: config.addresses.facilitator,
       receiverAuthorizer: config.addresses.authorizer,
-      maxAtomic: '10000',
+      maxAtomic: MAX_ATOMIC,
     });
     const state = (await (await fetch(`${url}${ROUTES.health}`)).json()) as {
       handlerCalls: number;
     };
     if (state.handlerCalls !== 0 || facilitator.events.length !== 0)
       throw new Error('Unpaid request executed resource or settlement.');
-    const evidence = {
+    const evidence: ChallengeEvidence = {
       schemaVersion: 1,
       stage: 'unpaid-challenge-only',
       gatePassed: false,

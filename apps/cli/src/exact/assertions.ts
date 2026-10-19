@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 
+import { EXACT_PRICE } from '@gyblos/application/constants';
 import { signer } from '@gyblos/gate/config';
 import {
   createExactBuyer,
@@ -40,7 +41,7 @@ export async function assertUntrusted(
       policy,
     );
     await assert.rejects(
-      buyer.authorize({ ...required, accepts: [changed] }, '10000'),
+      buyer.authorize({ ...required, accepts: [changed] }, EXACT_PRICE),
       /Exact terms/,
     );
     assert.equal(signed, false);

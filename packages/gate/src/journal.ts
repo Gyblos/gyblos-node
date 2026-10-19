@@ -2,6 +2,9 @@ import { readFile } from 'node:fs/promises';
 
 import { COMMITMENT, JOURNAL_FILENAMES, JOURNAL_PATHS } from '@gyblos/config';
 import { GateError } from '@gyblos/payments-x402/chain';
+import { saveJson } from '@gyblos/runtime';
+
+import type { GateJournalRecord, JournalStateRecord } from './journal-types.js';
 
 export async function assertNoUnresolvedAuthorizations(
   paths = [
@@ -14,9 +17,9 @@ export async function assertNoUnresolvedAuthorizations(
 ) {
   for (const path of paths) {
     try {
-      const previous = JSON.parse(await readFile(path, 'utf8')) as {
-        state?: string;
-      };
+      const previous = JSON.parse(
+        await readFile(path, 'utf8'),
+      ) as JournalStateRecord;
       const terminal = path.endsWith(JOURNAL_FILENAMES.exact)
         ? [COMMITMENT, 'rejected']
         : path.endsWith(JOURNAL_FILENAMES.inference)
@@ -31,4 +34,8 @@ export async function assertNoUnresolvedAuthorizations(
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
     }
   }
+}
+
+export async function saveJournal(path: string, record: GateJournalRecord) {
+  await saveJson(path, record);
 }

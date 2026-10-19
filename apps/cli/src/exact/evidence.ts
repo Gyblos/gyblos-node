@@ -1,5 +1,5 @@
 import { X402_SDK_VERSION } from '@gyblos/config';
-import type { GateEvidence } from '@gyblos/gate/types';
+import type { ExactGateEvidence } from '@gyblos/gate/types';
 import { DEVNET, DEVNET_USDC } from '@gyblos/payments-x402/constants';
 import { EXACT_PRICE } from '@gyblos/payments-x402/exact/index';
 
@@ -10,7 +10,7 @@ export function createEvidence() {
     'Depends on third-party availability',
     'Replay guard is process-scoped; restart/distributed replay protection is not validated',
   ];
-  const evidence: GateEvidence = {
+  const evidence: ExactGateEvidence = {
     schemaVersion: 1,
     evidenceId: 'GYB-GATE-0004',
     sdkVersion: X402_SDK_VERSION,

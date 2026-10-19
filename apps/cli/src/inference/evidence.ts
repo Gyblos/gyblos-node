@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { PRICES, TOLERANCE } from '@gyblos/application/metering';
 import { X402_SDK_VERSION } from '@gyblos/config';
 import { saveJson, type Config } from '@gyblos/gate/config';
-import type { GateEvidence } from '@gyblos/gate/types';
+import type { InferenceGateEvidence } from '@gyblos/gate/types';
 import { GENERATION } from '@gyblos/inference-ollama/constants';
 import { MODEL } from '@gyblos/inference-ollama/index';
 import { DEVNET } from '@gyblos/payments-x402/constants';
@@ -13,7 +13,7 @@ export async function initializeEvidence(
   runId: string,
   evidencePath: string,
 ) {
-  const evidence: GateEvidence = {
+  const evidence: InferenceGateEvidence = {
     schemaVersion: 1,
     evidenceId: 'GYB-GATE-0005',
     sdkVersion: X402_SDK_VERSION,
