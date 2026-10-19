@@ -9,7 +9,11 @@ import { ExactSvmScheme } from '@x402/svm/exact/client';
 
 import { PAYMENT_LIMITS } from '@gyblos/config';
 import { GateError } from '@gyblos/payments-x402/chain';
-import { DEVNET, DEVNET_USDC } from '@gyblos/payments-x402/constants';
+import {
+  DEVNET,
+  DEVNET_USDC,
+  GATE_ERROR_CODES,
+} from '@gyblos/payments-x402/constants';
 
 export interface ExactPolicy {
   payTo: string;
@@ -30,7 +34,7 @@ export function assertExactSupport(body: SupportedResponse, feePayer: string) {
   );
   if (!kind || kind.extra?.feePayer !== feePayer)
     throw new GateError(
-      'SUPPORT_CHANGED',
+      GATE_ERROR_CODES.SUPPORT_CHANGED,
       'Public exact devnet support or its pinned fee payer changed. Stop and review.',
     );
 }
@@ -53,7 +57,7 @@ export function validateExactTerms(
     terms.extra?.paymentFlow !== 'upfront'
   )
     throw new GateError(
-      'UNTRUSTED_EXACT_TERMS',
+      GATE_ERROR_CODES.UNTRUSTED_EXACT_TERMS,
       'Exact terms do not match pinned network, Circle USDC, price, recipient, fee payer and upfront flow.',
     );
 }
@@ -83,7 +87,7 @@ export function createExactBuyer(
     async authorize(challenge: PaymentRequired, availableAtomic: string) {
       if (challenge.x402Version !== 2 || challenge.accepts.length !== 1)
         throw new GateError(
-          'UNTRUSTED_EXACT_TERMS',
+          GATE_ERROR_CODES.UNTRUSTED_EXACT_TERMS,
           'Expected one x402 V2 exact payment option.',
         );
       validateExactTerms(challenge.accepts[0]!, policy); // before SDK network access or signing
@@ -92,7 +96,7 @@ export function createExactBuyer(
         BigInt(availableAtomic) < BigInt(policy.amount)
       )
         throw new GateError(
-          'INSUFFICIENT_EXACT_USDC',
+          GATE_ERROR_CODES.INSUFFICIENT_EXACT_USDC,
           'Buyer has insufficient Circle devnet USDC; no authorization created.',
         );
       return client.createPaymentPayload(challenge);
@@ -113,7 +117,7 @@ export function assertExactFallbackSafe(
     )
   )
     throw new GateError(
-      'PUBLIC_OUTCOME_UNCERTAIN',
+      GATE_ERROR_CODES.PUBLIC_OUTCOME_UNCERTAIN,
       'Cannot switch facilitator after a possible settlement; reconcile on-chain.',
     );
 }
