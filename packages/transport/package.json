@@ -1,0 +1,14 @@
+{
+  "name": "@gyblos/transport",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/types.ts",
+    "./*": "./src/*.ts"
+  },
+  "dependencies": {
+    "@gyblos/config": "workspace:*",
+    "@number0/iroh": "1.1.0"
+  }
+}
