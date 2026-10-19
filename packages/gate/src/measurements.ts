@@ -37,6 +37,7 @@ export interface MeasurementInput {
   delivered: boolean;
   anomaly: string;
   responseText: string;
+  meteringMode?: 'recounted' | 'declared';
 }
 
 export type Measurement = ReturnType<typeof measurementRow>;
@@ -50,6 +51,7 @@ export function measurementRow(input: MeasurementInput, salt: Uint8Array) {
   });
   return {
     schemaVersion: 1,
+    meteringMode: input.meteringMode ?? 'recounted',
     recordedAt: new Date().toISOString(),
     requestId: input.requestId,
     seller: input.seller,
