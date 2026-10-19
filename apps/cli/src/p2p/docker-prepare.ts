@@ -16,6 +16,11 @@ import {
 } from './docker-command.js';
 import { fundingConfig } from './docker-fund.js';
 import { sourceFingerprint } from './docker-source.js';
+import {
+  natEnvironment,
+  startNatRouters,
+  type NatScenario,
+} from './nat-topology.js';
 
 export interface PublicBuyer {
   role: 'buyer';
@@ -52,7 +57,15 @@ async function waitReady(container: string, runId: string) {
   throw new Error('Role startup did not become ready; no paid call attempted.');
 }
 
-export async function prepareDocker(project: string, operatorRoot: string) {
+export async function prepareDocker(
+  project: string,
+  operatorRoot: string,
+  options: {
+    scenario?: NatScenario;
+    volumePrefix?: string;
+    labCandidates?: boolean;
+  } = {},
+) {
   const config = await fundingConfig(operatorRoot),
     manifest = JSON.parse(await readFile('package.json', 'utf8')) as {
       packageManager: string;
@@ -79,9 +92,10 @@ export async function prepareDocker(project: string, operatorRoot: string) {
   ).trim();
   const runId = randomUUID();
   const environment = {
-    GYBLOS_P2P_RUN_ID: runId,
     ...process.env,
+    GYBLOS_P2P_RUN_ID: runId,
     GYBLOS_P2P_IMAGE: image,
+    GYBLOS_P2P_ROUTER_IMAGE: '',
     GYBLOS_P2P_USER: P2P.docker.user,
     GYBLOS_P2P_CPUS: String(P2P.docker.cpus),
     GYBLOS_P2P_ACTOR_ENTRY: P2P.actorEntry,
@@ -92,25 +106,37 @@ export async function prepareDocker(project: string, operatorRoot: string) {
     GYBLOS_P2P_SELLER_IP: P2P.docker.sellerIp,
     GYBLOS_P2P_BUYER_IP: P2P.docker.buyerIp,
     GYBLOS_P2P_RPC: config.rpcUrl,
+    ...(options.scenario
+      ? natEnvironment(
+          options.scenario,
+          options.volumePrefix ?? '',
+          options.labCandidates,
+        )
+      : {}),
   };
+  if (options.scenario) await startNatRouters(project, environment);
   const archive = await modelArchive(operatorRoot);
   const buyer = JSON.parse(
     await docker(
-      composeArgs(project, [
-        'run',
-        '--rm',
-        '-T',
-        '--no-deps',
-        'buyer',
-        'node',
-        '--import',
-        'tsx',
-        'scripts/setup.ts',
-        '--role',
-        'buyer',
-        '--mint',
-        config.mint,
-      ]),
+      composeArgs(
+        project,
+        [
+          'run',
+          '--rm',
+          '-T',
+          '--no-deps',
+          'buyer',
+          'node',
+          '--import',
+          'tsx',
+          'scripts/setup.ts',
+          '--role',
+          'buyer',
+          '--mint',
+          config.mint,
+        ],
+        environment,
+      ),
       undefined,
       environment,
     ),
@@ -131,32 +157,36 @@ export async function prepareDocker(project: string, operatorRoot: string) {
   );
   const seller = JSON.parse(
     await docker(
-      composeArgs(project, [
-        'run',
-        '--rm',
-        '-T',
-        '--no-deps',
-        'seller',
-        'node',
-        '--import',
-        'tsx',
-        'scripts/setup.ts',
-        '--role',
-        'seller',
-        '--mint',
-        config.mint,
-        '--buyer',
-        buyer.buyer,
-        '--pay-to',
-        config.addresses.seller,
-      ]),
+      composeArgs(
+        project,
+        [
+          'run',
+          '--rm',
+          '-T',
+          '--no-deps',
+          'seller',
+          'node',
+          '--import',
+          'tsx',
+          'scripts/setup.ts',
+          '--role',
+          'seller',
+          '--mint',
+          config.mint,
+          '--buyer',
+          buyer.buyer,
+          '--pay-to',
+          config.addresses.seller,
+        ],
+        environment,
+      ),
       undefined,
       environment,
     ),
   ) as PublicSeller;
   assert.notEqual(seller.nodeId, buyer.nodeId);
   await docker(
-    composeArgs(project, ['up', '-d', 'seller']),
+    composeArgs(project, ['up', '-d', 'seller'], environment),
     undefined,
     environment,
   );
@@ -181,22 +211,26 @@ export async function prepareDocker(project: string, operatorRoot: string) {
     [P2P.trustFilename, trust],
   ] as const)
     await docker(
-      composeArgs(project, [
-        'run',
-        '--rm',
-        '-T',
-        '--no-deps',
-        'buyer',
-        'node',
-        '-e',
-        `const fs=require('fs');const path=process.argv[1];let parts=[];process.stdin.on('data',part=>parts.push(part));process.stdin.on('end',()=>fs.writeFileSync(path,Buffer.concat(parts),{mode:${FILE_MODES.privateFile}}));`,
-        `${P2P.root}/${name}`,
-      ]),
+      composeArgs(
+        project,
+        [
+          'run',
+          '--rm',
+          '-T',
+          '--no-deps',
+          'buyer',
+          'node',
+          '-e',
+          `const fs=require('fs');const path=process.argv[1];let parts=[];process.stdin.on('data',part=>parts.push(part));process.stdin.on('end',()=>fs.writeFileSync(path,Buffer.concat(parts),{mode:${FILE_MODES.privateFile}}));`,
+          `${P2P.root}/${name}`,
+        ],
+        environment,
+      ),
       Buffer.from(JSON.stringify(value)),
       environment,
     );
   await docker(
-    composeArgs(project, ['up', '-d', 'buyer']),
+    composeArgs(project, ['up', '-d', 'buyer'], environment),
     undefined,
     environment,
   );
@@ -212,7 +246,7 @@ export async function prepareDocker(project: string, operatorRoot: string) {
     buyerContainer,
     sellerContainer,
     stage: 'prepared',
-    scenario: 'flat',
+    scenario: options.scenario ?? 'flat',
   });
   return {
     project,
@@ -220,6 +254,7 @@ export async function prepareDocker(project: string, operatorRoot: string) {
     runId,
     image,
     environment,
+    scenario: options.scenario ?? 'flat',
     buyer,
     seller,
     buyerContainer,
