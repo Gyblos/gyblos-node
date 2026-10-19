@@ -4,6 +4,14 @@ import type {
   SupportedResponse,
 } from '@x402/core/types';
 
+import type {
+  CASE_STATUSES,
+  EXACT_CASES,
+  EXACT_ENFORCEMENT,
+  EXACT_REPLAY_SCOPE,
+  EXACT_UNTRUSTED_CASES,
+  FACILITATOR_STATUSES,
+} from '@gyblos/gate/constants';
 import type { GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
 import type { PublicCall } from '@gyblos/payments-x402/exact/types';
 
@@ -18,21 +26,21 @@ import type { ChainTransaction } from './types.js';
 
 export type ExactCaseResult =
   | {
-      case: 'startup';
+      case: typeof EXACT_CASES.STARTUP;
       facilitator: string;
-      status: 'external-unavailable';
+      status: typeof CASE_STATUSES.EXTERNAL_UNAVAILABLE;
       reason: string;
     }
   | {
-      case: `untrusted-${string}`;
-      status: 'passed';
+      case: (typeof EXACT_UNTRUSTED_CASES)[keyof typeof EXACT_UNTRUSTED_CASES];
+      status: typeof CASE_STATUSES.PASSED;
       signed: false;
       handlerCalls: number;
     }
   | {
-      case: 'insufficient-usdc';
-      status: 'passed';
-      enforcement: 'buyer-preflight';
+      case: typeof EXACT_CASES.INSUFFICIENT_USDC;
+      status: typeof CASE_STATUSES.PASSED;
+      enforcement: typeof EXACT_ENFORCEMENT.BUYER_PREFLIGHT;
       reason: typeof GATE_ERROR_CODES.INSUFFICIENT_EXACT_USDC;
       signed: false;
       before: ExactSnapshot;
@@ -41,16 +49,16 @@ export type ExactCaseResult =
       publicPaymentCalls: 0;
     }
   | {
-      case: 'paid-request';
+      case: typeof EXACT_CASES.PAID_REQUEST;
       facilitator: string;
-      status: 'rejected';
+      status: typeof CASE_STATUSES.REJECTED;
       httpStatus: number;
       calls: PublicCall[];
       reconciliation: Reconciliation;
     }
   | (AuthorizationMetadata & {
-      case: 'paid-request';
-      status: 'passed';
+      case: typeof EXACT_CASES.PAID_REQUEST;
+      status: typeof CASE_STATUSES.PASSED;
       httpStatus: number;
       receipt: SettleResponse;
       resource: unknown;
@@ -68,15 +76,15 @@ export type ExactCaseResult =
       };
     })
   | {
-      case: 'replay';
-      status: 'passed';
+      case: typeof EXACT_CASES.REPLAY;
+      status: typeof CASE_STATUSES.PASSED;
       httpStatus: number;
       before: ExactSnapshot;
       after: ExactSnapshot;
       handlerDelta: 0;
       publicCallDelta: 0;
       originalTransaction: string;
-      scope: 'same-process replay guard';
+      scope: typeof EXACT_REPLAY_SCOPE;
     };
 
 export type FacilitatorObservation =
@@ -87,7 +95,11 @@ export type FacilitatorObservation =
       httpStatus: number;
       supported: SupportedResponse;
     }
-  | { url: string; status: 'unavailable'; reason: string };
+  | {
+      url: string;
+      status: typeof FACILITATOR_STATUSES.UNAVAILABLE;
+      reason: string;
+    };
 
 export interface ExactGateEvidence extends EvidenceBase {
   priceAtomic: string;
