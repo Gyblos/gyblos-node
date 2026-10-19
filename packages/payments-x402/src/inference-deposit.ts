@@ -8,7 +8,7 @@ import {
   TOKEN_PROGRAM_ADDRESS,
 } from '@gyblos/config';
 import { assertDevnet, GateError, rpc } from '@gyblos/payments-x402/chain';
-import { DEVNET } from '@gyblos/payments-x402/constants';
+import { DEVNET, GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
 
 interface ChannelAccountResponse {
   value: { owner: string; data: [string, 'base64'] } | null;
@@ -91,7 +91,7 @@ export async function verifyInferenceDeposit(
     channel.mint !== expected.mint
   ) {
     throw new GateError(
-      'UNCONFIRMED_INFERENCE_DEPOSIT',
+      GATE_ERROR_CODES.UNCONFIRMED_INFERENCE_DEPOSIT,
       'Channel does not match the committed inference deposit.',
     );
   }
@@ -115,7 +115,7 @@ export async function verifyInferenceDeposit(
     BigInt(info?.tokenAmount?.amount ?? '0') < BigInt(expected.ceiling)
   ) {
     throw new GateError(
-      'INSUFFICIENT_INFERENCE_ESCROW',
+      GATE_ERROR_CODES.INSUFFICIENT_INFERENCE_ESCROW,
       'Escrow does not cover the committed inference deposit.',
     );
   }
