@@ -1,4 +1,5 @@
 import { GateError } from '@gyblos/payments-x402/chain';
+import { GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
 
 export interface Snapshot {
   buyer: string;
@@ -30,33 +31,36 @@ export function verifyAccounting(
   const actual = BigInt(receipt.actual);
   if (actual <= 0n || actual >= ceiling)
     throw new GateError(
-      'BAD_USAGE',
+      GATE_ERROR_CODES.BAD_USAGE,
       'Gate must demonstrate a nonzero charge below the ceiling.',
     );
   if (BigInt(before.buyer) - BigInt(after.buyer) !== actual)
     throw new GateError(
-      'BUYER_DELTA',
+      GATE_ERROR_CODES.BUYER_DELTA,
       'Buyer token delta does not match charge.',
     );
   if (BigInt(after.seller) - BigInt(before.seller) !== actual)
     throw new GateError(
-      'SELLER_DELTA',
+      GATE_ERROR_CODES.SELLER_DELTA,
       'Seller token delta does not match charge.',
     );
   if (before.buyerLamports !== after.buyerLamports)
-    throw new GateError('BUYER_GAS', 'Buyer SOL changed during the call.');
+    throw new GateError(
+      GATE_ERROR_CODES.BUYER_GAS,
+      'Buyer SOL changed during the call.',
+    );
   if (
     !receipt.openTransaction ||
     !receipt.claimTransaction ||
     receipt.openTransaction === receipt.claimTransaction
   )
     throw new GateError(
-      'MISSING_TRANSACTIONS',
+      GATE_ERROR_CODES.MISSING_TRANSACTIONS,
       'Distinct open and claim transactions are required.',
     );
   if (!receipt.channelDistributed)
     throw new GateError(
-      'CHANNEL_NOT_DISTRIBUTED',
+      GATE_ERROR_CODES.CHANNEL_NOT_DISTRIBUTED,
       'Channel still holds undistributed funds.',
     );
   return { ...receipt, refund: (ceiling - actual).toString(), before, after };
