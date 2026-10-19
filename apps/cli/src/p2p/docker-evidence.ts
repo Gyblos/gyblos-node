@@ -27,6 +27,7 @@ interface ReconciledAttempt {
   runtimeImage: string;
   httpStatus: number;
   status: 'finalized-zero-charge';
+  reason?: string;
   ceilingAtomic: string;
   chargedAtomic: '0';
   refundAtomic: string;
@@ -42,15 +43,15 @@ interface Trace {
   during: Awaited<ReturnType<typeof paymentProof>>['before'];
 }
 
-export async function dockerEvidence(
+export async function collectDockerCalls(
   context: Awaited<ReturnType<typeof prepareDocker>>,
-  security: Awaited<ReturnType<typeof inspectDocker>>,
-  fundingSignature: string,
+  selection: { offset: number; expectedRoute: 'iroh-direct' | 'iroh-relay' },
 ) {
-  const calls = await readContainerJson<PaidCall[]>(
+  const allCalls = await readContainerJson<PaidCall[]>(
     context.buyerContainer,
     `${P2P.root}/${P2P.callsFilename}`,
   );
+  const calls = allCalls.slice(selection.offset);
   const traces = await readContainerJson<Trace[]>(
     context.sellerContainer,
     `${P2P.root}/${P2P.traceFilename}`,
@@ -92,14 +93,15 @@ export async function dockerEvidence(
         claimSignature: proof.claimSignature,
         balances: proof.balances,
         reason:
-          'Engine runner was missing at its executable search path; packaging corrected before subsequent calls.',
+          proof.reason ??
+          'Manual finalized zero-charge/full-return reconciliation; retain per-attempt provenance.',
       };
     });
   const confirmedCalls = calls.filter((call) => call.outcome === 'confirmed');
   assert.equal(confirmedCalls.length, P2P.minimumRequests);
   const cases = confirmedCalls.map((call, index) => {
     assert.equal(call.outcome, 'confirmed');
-    assert.equal(call.transport.transport, 'iroh-direct');
+    assert.equal(call.transport.transport, selection.expectedRoute);
     const trace = traces.find((trace) => trace.channelId === call.channelId);
     assert.ok(trace);
     assert.equal(trace.during.escrow, call.ceilingAtomic);
@@ -135,6 +137,18 @@ export async function dockerEvidence(
       meteringMode: call.measurement.meteringMode,
       generationAfterConfirmedDeposit: true,
     };
+  });
+  return { cases, previousAttempts };
+}
+
+export async function dockerEvidence(
+  context: Awaited<ReturnType<typeof prepareDocker>>,
+  security: Awaited<ReturnType<typeof inspectDocker>>,
+  fundingSignature: string,
+) {
+  const { cases, previousAttempts } = await collectDockerCalls(context, {
+    offset: 0,
+    expectedRoute: 'iroh-direct',
   });
   const evidence = {
     schemaVersion: 1,
