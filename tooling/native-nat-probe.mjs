@@ -17,6 +17,7 @@ import {
 
 import { nativeSource } from './iroh-probe.mjs';
 import { startLabObserver } from './lab-observer.mjs';
+import { startPublicPathCounters } from './public-path-counters.mjs';
 
 export async function runNativeProbe({ ids, values, project }) {
   const version = await execute(ids.buyer, [
@@ -49,6 +50,7 @@ export async function runNativeProbe({ ids, values, project }) {
       ),
     };
   }
+  if (values['trace-public']) config.publicAudit = NAT.publicAudit;
   const server = nativeSource('seller'),
     client = nativeSource('buyer');
   await docker([
@@ -81,7 +83,7 @@ export async function runNativeProbe({ ids, values, project }) {
     NAT.nativeProbe.peerPath,
     Buffer.from(peer),
   );
-  await execute(ids.buyer, [
+  const completion = execute(ids.buyer, [
     'node',
     '--input-type=module',
     '-e',
@@ -93,7 +95,18 @@ export async function runNativeProbe({ ids, values, project }) {
         ? `${NAT.wan.routerB}:${NAT.buyerUdpPort}`
         : '',
     }),
-  ]);
+  ]).then(
+    () => null,
+    (error) => error,
+  );
+  const collectPublicAudit = values['trace-public']
+    ? await startPublicPathCounters(ids, JSON.parse(peer))
+    : null;
+  const error = await completion;
+  if (error) throw error;
+  const publicPathAudit = collectPublicAudit
+    ? await collectPublicAudit(project)
+    : undefined;
   const raw = JSON.parse(
     await execute(ids.buyer, ['cat', NAT.nativeProbe.resultPath]),
   );
@@ -113,6 +126,7 @@ export async function runNativeProbe({ ids, values, project }) {
       : values['lab-candidates']
         ? NAT.discovery.modes.manual
         : NAT.discovery.modes.public,
+    publicPathAudit,
     active: !values.idle,
     echoes: raw.echoes,
     connectMs: raw.connectMs,
