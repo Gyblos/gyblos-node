@@ -4,7 +4,6 @@ import {
   getCreateAssociatedTokenIdempotentInstructionAsync,
   getInitializeMint2Instruction,
   getMintToInstruction,
-  TOKEN_PROGRAM_ADDRESS,
 } from '@solana-program/token';
 import {
   address,
@@ -18,7 +17,12 @@ import {
   signTransactionMessageWithSigners,
 } from '@solana/kit';
 
-import { COMMITMENT } from '@gyblos/config';
+import {
+  COMMITMENT,
+  DEVNET_TREASURY_OWNER,
+  PAYMENT_LIMITS,
+  TOKEN_PROGRAM_ADDRESS,
+} from '@gyblos/config';
 import { configPath, loadConfig, saveJson, signer } from '@gyblos/gate/config';
 import {
   account,
@@ -33,10 +37,13 @@ export async function fundGate() {
     const config = await loadConfig();
     await assertProgram(config.rpcUrl);
     const feePayer = await signer(config, 'facilitator');
-    if ((await lamports(config.rpcUrl, feePayer.address)) < 50_000_000n) {
+    if (
+      (await lamports(config.rpcUrl, feePayer.address)) <
+      PAYMENT_LIMITS.airdropThreshold
+    ) {
       const signature = await rpc<string>(config.rpcUrl, 'requestAirdrop', [
         feePayer.address,
-        1_000_000_000,
+        PAYMENT_LIMITS.airdropLamports,
       ]);
       await confirm(config.rpcUrl, signature);
       console.log(JSON.stringify({ operation: 'devnet-airdrop', signature }));
@@ -52,7 +59,7 @@ export async function fundGate() {
         const rent = await rpc<number>(
           config.rpcUrl,
           'getMinimumBalanceForRentExemption',
-          [82],
+          [PAYMENT_LIMITS.mintAccountBytes],
         );
         const [buyerAta] = await findAssociatedTokenPda({
           owner: address(config.addresses.buyer),
@@ -66,12 +73,12 @@ export async function fundGate() {
                   payer: feePayer,
                   newAccount: mint,
                   lamports: BigInt(rent),
-                  space: 82n,
+                  space: PAYMENT_LIMITS.mintAccountSpace,
                   programAddress: TOKEN_PROGRAM_ADDRESS,
                 }),
                 getInitializeMint2Instruction({
                   mint: mint.address,
-                  decimals: 6,
+                  decimals: PAYMENT_LIMITS.tokenDecimals,
                   mintAuthority: feePayer.address,
                   freezeAuthority: null,
                 }),
@@ -95,7 +102,7 @@ export async function fundGate() {
           // Treasury owner pinned by the configured x402 SDK for devnet; distribute validates this ATA even at zero charge.
           await getCreateAssociatedTokenIdempotentInstructionAsync({
             payer: feePayer,
-            owner: address('4zTeC5mVqWLruDexgU2mV66p9t5vCA9JyiZqdGDUspap'),
+            owner: address(DEVNET_TREASURY_OWNER),
             mint: mint.address,
           }),
           ...(!mintExists
@@ -104,7 +111,7 @@ export async function fundGate() {
                   mint: mint.address,
                   token: buyerAta,
                   mintAuthority: feePayer,
-                  amount: 1_000_000n,
+                  amount: PAYMENT_LIMITS.testMintAmount,
                 }),
               ]
             : []),

@@ -2,11 +2,15 @@ import { discoverChannelsByRentPayer, toFacilitatorSvmSigner } from '@x402/svm';
 
 import { runGate } from '@gyblos/application/gate';
 import {
+  CHANNEL_STATUS,
+  FAILED_REQUEST_PATH,
   FIXED_MIN_FACILITATOR_LAMPORTS,
+  fixedEvidencePath,
   HOSTS,
-  LOCAL_DIR,
-  localPath,
+  HTTP_STATUS,
+  JOURNAL_PATHS,
   LOCK_PATH,
+  ROUTES,
   X402_SDK_VERSION,
 } from '@gyblos/config';
 import { loadConfig, saveJson, signer } from '@gyblos/gate/config';
@@ -31,7 +35,7 @@ import {
 import type { SettlementEvent } from '@gyblos/payments-x402/facilitator';
 import { validateSettlement } from '@gyblos/payments-x402/trust';
 
-const journalPath = localPath('attempt.json');
+const journalPath = JOURNAL_PATHS.fixed;
 export async function executeGate(signal?: AbortSignal) {
   return withExclusiveLock(LOCK_PATH, () => executeLocked(signal));
 }
@@ -96,18 +100,18 @@ async function executeLocked(signal?: AbortSignal) {
     async request() {
       signal?.throwIfAborted();
       const response = await buyer.request(
-        `${HOSTS.seller}/api/generate`,
+        `${HOSTS.seller}${ROUTES.fixed}`,
         signal,
       );
       if (
-        response.status !== 200 ||
+        response.status !== HTTP_STATUS.ok ||
         !response.settlement?.success ||
         !response.authorization
       ) {
         const diagnostics = await fetch(
-          `${HOSTS.facilitator}/gate/events`,
+          `${HOSTS.facilitator}${ROUTES.events}`,
         ).then((r) => r.json());
-        await saveJson(localPath('failed-request.json'), {
+        await saveJson(FAILED_REQUEST_PATH, {
           status: response.status,
           settlement: response.settlement,
           events: diagnostics,
@@ -124,7 +128,7 @@ async function executeLocked(signal?: AbortSignal) {
         payer: config.addresses.buyer,
         amount: ACTUAL_ATOMIC,
       });
-      const eventResponse = await fetch(`${HOSTS.facilitator}/gate/events`);
+      const eventResponse = await fetch(`${HOSTS.facilitator}${ROUTES.events}`);
       const events = (await eventResponse.json()) as SettlementEvent[];
       const id = response.authorization.channelId;
       const open = events.find(
@@ -155,7 +159,8 @@ async function executeLocked(signal?: AbortSignal) {
           config.addresses.facilitator,
         );
         distributed =
-          channels.find((c) => c.channelId === id)?.channel.status === 3;
+          channels.find((c) => c.channelId === id)?.channel.status ===
+          CHANNEL_STATUS.distributed;
       }
       if (
         open.amount !== response.authorization.requirements.amount ||
@@ -196,7 +201,7 @@ async function executeLocked(signal?: AbortSignal) {
       'No P2P/mobile validation',
     ],
   };
-  const evidencePath = `${LOCAL_DIR}/evidence-${Date.now()}.json`;
+  const evidencePath = fixedEvidencePath(Date.now());
   await saveJson(evidencePath, evidence);
   await saveJson(journalPath, {
     state: 'verified',

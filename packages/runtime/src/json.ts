@@ -2,10 +2,15 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
+import { FILE_MODES } from '@gyblos/config';
+
 export async function saveJson(path: string, value: unknown) {
-  await mkdir(dirname(path), { recursive: true, mode: 0o700 });
+  await mkdir(dirname(path), {
+    recursive: true,
+    mode: FILE_MODES.privateDirectory,
+  });
   const temporary = `${path}.${randomUUID()}.tmp`;
-  const handle = await open(temporary, 'wx', 0o600);
+  const handle = await open(temporary, 'wx', FILE_MODES.privateFile);
   try {
     await handle.writeFile(JSON.stringify(value, null, 2) + '\n');
     await handle.sync();

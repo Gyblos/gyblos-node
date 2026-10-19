@@ -5,7 +5,9 @@ export const PORTS = {
   ollama: 11436,
   ollamaSetup: 11437,
 } as const;
-export const url = (port: number) => `http://${LOCALHOST}:${port}`;
+export function url(port: number) {
+  return `http://${LOCALHOST}:${port}`;
+}
 export const HOSTS = {
   seller: url(PORTS.seller),
   facilitator: url(PORTS.facilitator),
@@ -14,3 +16,10 @@ export const HOSTS = {
   ollamaBind: `${LOCALHOST}:${PORTS.ollama}`,
   ollamaSetupBind: `${LOCALHOST}:${PORTS.ollamaSetup}`,
 } as const;
+
+export const IPV6_LOOPBACK = '[::1]';
+export const EXPLORER_ORIGIN = 'https://explorer.solana.com';
+
+export const PUBLIC_ORIGINS = { tokenizer: 'https://huggingface.co' } as const;
+export const explorerUrl = (signature: string) =>
+  `${EXPLORER_ORIGIN}/tx/${signature}?cluster=devnet`;

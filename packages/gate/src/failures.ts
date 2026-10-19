@@ -21,10 +21,16 @@ import {
 
 import {
   COMMITMENT,
-  LOCAL_DIR,
+  DIAGNOSTIC_LIMITS,
+  FAILURE_EVIDENCE_PATH,
+  failureJournalPath,
+  failureResultPath,
+  HTTP_STATUS,
   LOCALHOST,
-  localPath,
   LOCK_PATH,
+  ROUTES,
+  TIMEOUTS,
+  UNITS,
 } from '@gyblos/config';
 import { loadConfig, saveJson, signer } from '@gyblos/gate/config';
 import { assertNoUnresolvedAuthorizations } from '@gyblos/gate/journal';
@@ -128,16 +134,21 @@ export async function failureGate() {
             expiresAt = Number(
               decodePaymentSignatureHeader(header).payload.expiresAt,
             );
-            const wait = Math.max(0, expiresAt * 1000 - Date.now() + 2000);
+            const wait = Math.max(
+              0,
+              expiresAt * UNITS.millisecondsPerSecond -
+                Date.now() +
+                TIMEOUTS.expiryGrace,
+            );
             console.log(
-              `F2: waiting ${Math.ceil(wait / 1000)} seconds for authorization expiry.`,
+              `F2: waiting ${Math.ceil(wait / UNITS.millisecondsPerSecond)} seconds for authorization expiry.`,
             );
             await new Promise((resolve) => setTimeout(resolve, wait));
             // The resource layer can reject expiry before calling the facilitator.
             // Verify the same expired payload directly as a read-only diagnostic.
             const payload = decodePaymentSignatureHeader(header);
             const diagnostic = await fetch(
-              `http://${LOCALHOST}:${fa.port}/verify`,
+              `http://${LOCALHOST}:${fa.port}${ROUTES.verify}`,
               {
                 method: 'POST',
                 headers: { 'content-type': 'application/json' },
@@ -147,7 +158,7 @@ export async function failureGate() {
                 }),
               },
             );
-            assert.equal(diagnostic.status, 200);
+            assert.equal(diagnostic.status, HTTP_STATUS.ok);
             const verification = (await diagnostic.json()) as {
               isValid: boolean;
               invalidReason?: string;
@@ -156,7 +167,7 @@ export async function failureGate() {
             assert.match(verification.invalidReason ?? '', /expir/i);
           }
           const response = await fetch(req);
-          if (header && response.status === 402) {
+          if (header && response.status === HTTP_STATUS.paymentRequired) {
             const required = response.headers.get('PAYMENT-REQUIRED');
             rejection = required
               ? decodePaymentRequiredHeader(required).error
@@ -177,7 +188,7 @@ export async function failureGate() {
           fetchImpl,
           async (a) => {
             channelId = a.channelId;
-            await saveJson(`${LOCAL_DIR}/failure-${kind}-attempt.json`, {
+            await saveJson(failureJournalPath(kind), {
               state: 'authorization-created',
               channelId,
               createdAt: new Date().toISOString(),
@@ -185,10 +196,12 @@ export async function failureGate() {
             });
           },
         );
-        const response = await b.request(`${url}/api/generate`);
-        assert.equal(response.status, 402);
+        const response = await b.request(`${url}${ROUTES.fixed}`);
+        assert.equal(response.status, HTTP_STATUS.paymentRequired);
         assert.ok(channelId);
-        const health = (await fetch(`${url}/health`).then((r) => r.json())) as {
+        const health = (await fetch(`${url}${ROUTES.health}`).then((r) =>
+          r.json(),
+        )) as {
           handlerCalls: number;
         };
         assert.equal(health.handlerCalls, 0);
@@ -197,7 +210,7 @@ export async function failureGate() {
         const history = await rpc<unknown[]>(
           c.rpcUrl,
           'getSignaturesForAddress',
-          [channelId, { limit: 10 }],
+          [channelId, { limit: DIAGNOSTIC_LIMITS.failureHistory }],
         );
         assert.equal(channel, null);
         assert.equal(history.length, 0);
@@ -218,7 +231,7 @@ export async function failureGate() {
           );
           assert.match(f.events[0]?.errorMessage ?? '', /Custom.*1[^0-9]/);
         } else {
-          assert.ok(expiresAt * 1000 < Date.now());
+          assert.ok(expiresAt * UNITS.millisecondsPerSecond < Date.now());
           assert.match(
             f.verifications.find((v) => !v.isValid)?.invalidReason ?? '',
             /expir/i,
@@ -240,15 +253,12 @@ export async function failureGate() {
           channelExists: false,
           paymentTransactions: history,
         });
-        await saveJson(
-          `${LOCAL_DIR}/failure-${kind}-result.json`,
-          results.at(-1),
-        );
-        await saveJson(`${LOCAL_DIR}/failure-${kind}-attempt.json`, {
+        await saveJson(failureResultPath(kind), results.at(-1));
+        await saveJson(failureJournalPath(kind), {
           state: 'resolved-rejected',
           channelId,
           resolvedAt: new Date().toISOString(),
-          resultPath: `${LOCAL_DIR}/failure-${kind}-result.json`,
+          resultPath: failureResultPath(kind),
         });
         console.log(
           `${kind} passed: HTTP 402, no channel, no resource execution, unchanged token balances.`,
@@ -272,7 +282,7 @@ export async function failureGate() {
         'Fixed resource, not inference',
       ],
     };
-    await saveJson(localPath('failure-evidence.json'), evidence);
+    await saveJson(FAILURE_EVIDENCE_PATH, evidence);
     console.log(JSON.stringify(evidence, null, 2));
   }
   try {

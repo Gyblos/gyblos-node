@@ -7,20 +7,12 @@ import type {
 } from '@x402/core/types';
 import { ExactSvmScheme } from '@x402/svm/exact/client';
 
+import { PAYMENT_LIMITS } from '@gyblos/config';
 import { GateError } from '@gyblos/payments-x402/chain';
 import { DEVNET, DEVNET_USDC } from '@gyblos/payments-x402/constants';
 
-export const EXACT_PRICE = '10000'; // 0.01 Circle devnet USDC (6 decimals).
-export const PUBLIC_FACILITATORS = [
-  {
-    url: 'https://x402.org/facilitator',
-    feePayer: 'CKPKJWNdJEqa81x7CkZ14BVPiY6y16Sxs7owznqtWYp5',
-  },
-  {
-    url: 'https://facilitator.payai.network',
-    feePayer: '2wKupLR9q6wXYppw8Gr2NvWxKBUqm4PPJKkQfoxHDBg4',
-  },
-] as const;
+export { EXACT_PRICE } from '@gyblos/application/constants';
+export { PUBLIC_FACILITATORS } from '@gyblos/config';
 export interface ExactPolicy {
   payTo: string;
   feePayer: string;
@@ -50,7 +42,7 @@ export function validateExactTerms(
     !/^[1-9]\d*$/.test(terms.amount) ||
     !Number.isSafeInteger(terms.maxTimeoutSeconds) ||
     terms.maxTimeoutSeconds < 1 ||
-    terms.maxTimeoutSeconds > 120 ||
+    terms.maxTimeoutSeconds > PAYMENT_LIMITS.maxTimeoutSeconds ||
     terms.extra?.paymentFlow !== 'upfront'
   )
     throw new GateError(

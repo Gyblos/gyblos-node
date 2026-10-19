@@ -8,6 +8,12 @@ import {
 } from '@x402/svm/upto/facilitator';
 import express from 'express';
 
+import {
+  CLEANUP,
+  DIAGNOSTIC_LIMITS,
+  HTTP_STATUS,
+  ROUTES,
+} from '@gyblos/config';
 import { DEVNET, MAX_ATOMIC } from '@gyblos/payments-x402/constants';
 
 export interface SettlementEvent {
@@ -36,24 +42,24 @@ export function createFacilitator(
     toFacilitatorSvmSigner(signer, { defaultRpcUrl: rpcUrl }),
     {
       channelStorage: new InMemoryPaymentChannelStorage(),
-      maxChannelLifetimeSecs: 120,
-      maxPriorityFeeMicroLamports: 5_000,
+      maxChannelLifetimeSecs: CLEANUP.maxChannelLifetimeSeconds,
+      maxPriorityFeeMicroLamports: CLEANUP.maxPriorityFeeMicroLamports,
     },
   );
   const facilitator = new x402Facilitator().register(DEVNET, scheme);
   const cleanup = scheme.createRentCleanupManager(DEVNET);
   const app = express();
   app.use(express.json({ limit: '64kb' }));
-  app.get('/health', (_req, res) => {
+  app.get(ROUTES.health, (_req, res) => {
     res.json({ runId: runId ?? null });
   });
-  app.get('/supported', (_req, res) => {
+  app.get(ROUTES.supported, (_req, res) => {
     res.json(facilitator.getSupported());
   });
-  app.get('/gate/events', (_req, res) => {
+  app.get(ROUTES.events, (_req, res) => {
     res.json(events);
   });
-  app.get('/gate/verifications', (_req, res) => {
+  app.get(ROUTES.verifications, (_req, res) => {
     res.json(verifications);
   });
   for (const operation of ['verify', 'settle'] as const) {
@@ -76,7 +82,9 @@ export function createFacilitator(
         !/^\d+$/.test(requirements.amount) ||
         BigInt(requirements.amount) > BigInt(MAX_ATOMIC)
       ) {
-        res.status(400).json({ error: 'Gate policy rejected payment.' });
+        res
+          .status(HTTP_STATUS.badRequest)
+          .json({ error: 'Gate policy rejected payment.' });
         return;
       }
       try {
@@ -99,13 +107,13 @@ export function createFacilitator(
             errorReason: result.errorReason,
             errorMessage: result.errorMessage
               ?.replace(/https?:\/\/\S+/g, '[RPC URL]')
-              .slice(0, 1200),
+              .slice(0, DIAGNOSTIC_LIMITS.recordedErrorCharacters),
           });
           res.json(result);
         }
       } catch {
         // Never log signed payloads, keys, or RPC URLs.
-        res.status(500).json({
+        res.status(HTTP_STATUS.internalServerError).json({
           error: `${operation} failed; payment state may be unknown. Reconcile on-chain.`,
         });
       }

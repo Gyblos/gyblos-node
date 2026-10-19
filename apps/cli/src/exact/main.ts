@@ -5,7 +5,15 @@ import { readFile } from 'node:fs/promises';
 import { address } from '@solana/kit';
 import type { SupportedResponse } from '@x402/core/types';
 
-import { COMMITMENT, LOCALHOST, localPath, LOCK_PATH } from '@gyblos/config';
+import {
+  COMMITMENT,
+  EVIDENCE_PATHS,
+  JOURNAL_PATHS,
+  LOCALHOST,
+  LOCK_PATH,
+  ROUTES,
+  TIMEOUTS,
+} from '@gyblos/config';
 import { loadConfig, saveJson } from '@gyblos/gate/config';
 import { prepareExactAccounts } from '@gyblos/gate/exact-accounts';
 import { assertNoUnresolvedAuthorizations } from '@gyblos/gate/journal';
@@ -17,17 +25,17 @@ import {
   EXACT_PRICE,
   PUBLIC_FACILITATORS,
 } from '@gyblos/payments-x402/exact/index';
-
 import {
   AuditedPublicFacilitator,
   createExactSeller,
-} from '../../../seller/src/exact.js';
+} from '@gyblos/seller/exact';
+
 import { runProvider } from './cases.js';
 import { createEvidence } from './evidence.js';
 
 export async function main() {
-  const evidencePath = 'evidence/gate-0004.json',
-    journalPath = localPath('exact-attempt.json');
+  const evidencePath = EVIDENCE_PATHS.exact,
+    journalPath = JOURNAL_PATHS.exact;
   const evidence = createEvidence();
   async function persist() {
     await saveJson(evidencePath, evidence);
@@ -63,8 +71,8 @@ export async function main() {
     }[] = [];
     for (const provider of PUBLIC_FACILITATORS) {
       try {
-        const response = await fetch(provider.url + '/supported', {
-          signal: AbortSignal.timeout(20000),
+        const response = await fetch(provider.url + ROUTES.supported, {
+          signal: AbortSignal.timeout(TIMEOUTS.rpc),
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const supported = (await response.json()) as SupportedResponse;
@@ -132,7 +140,7 @@ export async function main() {
       await once(server, 'listening');
       const addr = server.address();
       assert.ok(addr && typeof addr !== 'string');
-      const url = `http://${LOCALHOST}:${addr.port}/api/exact`;
+      const url = `http://${LOCALHOST}:${addr.port}${ROUTES.exact}`;
       try {
         if (
           await runProvider({

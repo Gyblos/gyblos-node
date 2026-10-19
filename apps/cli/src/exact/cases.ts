@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 
 import { encodePaymentSignatureHeader } from '@x402/core/http';
 
-import { COMMITMENT } from '@gyblos/config';
+import { COMMITMENT, HTTP_STATUS, TIMEOUTS } from '@gyblos/config';
 import { saveJson } from '@gyblos/gate/config';
 import type { ChainTransaction } from '@gyblos/gate/types';
 import { confirm, explorer, GateError, rpc } from '@gyblos/payments-x402/chain';
@@ -40,7 +40,10 @@ export async function runProvider(context: ExactContext) {
     };
     const challenge = createChallenge(context, policy);
     const required = await challenge();
-    evidence.challenge = { httpStatus: 402, ...required };
+    evidence.challenge = {
+      httpStatus: HTTP_STATUS.paymentRequired,
+      ...required,
+    };
     await persist();
     const cases = evidence.results as unknown[];
     await assertUntrusted(context, required, policy);
@@ -49,7 +52,10 @@ export async function runProvider(context: ExactContext) {
     });
     await assertEmpty(context, challenge, policy);
     const success = await paid('buyer', 'paid-request');
-    if (success.response.status !== 200 || !success.receipt?.success) {
+    if (
+      success.response.status !== HTTP_STATUS.ok ||
+      !success.receipt?.success
+    ) {
       assertExactFallbackSafe(success.calls);
       const reconciliation = await reconcile(
         c,
@@ -127,7 +133,7 @@ export async function runProvider(context: ExactContext) {
     cases.push({
       case: 'paid-request',
       status: 'passed',
-      httpStatus: 200,
+      httpStatus: HTTP_STATUS.ok,
       ...success.metadata,
       receipt,
       resource: success.body,
@@ -158,9 +164,9 @@ export async function runProvider(context: ExactContext) {
       headers: {
         'PAYMENT-SIGNATURE': encodePaymentSignatureHeader(success.payload),
       },
-      signal: AbortSignal.timeout(25000),
+      signal: AbortSignal.timeout(TIMEOUTS.publicRequest),
     });
-    assert.equal(replay.status, 409);
+    assert.equal(replay.status, HTTP_STATUS.conflict);
     const replayAfter = await snapshot(c, c.addresses.buyer);
     assert.deepEqual(replayAfter, replayBefore);
     assert.equal(host.handlerCalls(), handlers);
@@ -168,7 +174,7 @@ export async function runProvider(context: ExactContext) {
     cases.push({
       case: 'replay',
       status: 'passed',
-      httpStatus: 409,
+      httpStatus: HTTP_STATUS.conflict,
       before: replayBefore,
       after: replayAfter,
       handlerDelta: 0,

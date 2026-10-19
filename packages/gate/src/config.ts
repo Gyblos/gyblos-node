@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 
 import { createKeyPairSignerFromBytes } from '@solana/kit';
 
-import { localPath } from '@gyblos/config';
+import { CONFIG_PATH, KEY_LIMITS } from '@gyblos/config';
 import { DEVNET_USDC } from '@gyblos/payments-x402/constants';
 
 export interface Config {
@@ -21,7 +21,7 @@ export interface Config {
   >;
 }
 export const configPath = () =>
-  resolve(process.env.GYBLOS_GATE_CONFIG ?? localPath('config.json'));
+  resolve(process.env.GYBLOS_GATE_CONFIG ?? CONFIG_PATH);
 export async function loadConfig(): Promise<Config> {
   const config = JSON.parse(await readFile(configPath(), 'utf8')) as Config;
   if (config.schemaVersion !== 1)
@@ -35,8 +35,8 @@ export async function signer(config: Config, role: keyof Config['keys']) {
   );
   if (
     !Array.isArray(bytes) ||
-    bytes.length !== 64 ||
-    bytes.some((v) => !Number.isInteger(v) || v < 0 || v > 255)
+    bytes.length !== KEY_LIMITS.keyPairBytes ||
+    bytes.some((v) => !Number.isInteger(v) || v < 0 || v > KEY_LIMITS.byteMax)
   )
     throw new Error('Invalid devnet key file.');
   const result = await createKeyPairSignerFromBytes(Uint8Array.from(bytes));

@@ -1,6 +1,6 @@
-import { TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
 import type { PaymentRequirements, SettleResponse } from '@x402/core/types';
 
+import { PAYMENT_LIMITS, TOKEN_PROGRAM_ADDRESS } from '@gyblos/config';
 import { GateError } from '@gyblos/payments-x402/chain';
 import { CHANNEL_PROGRAM, DEVNET } from '@gyblos/payments-x402/constants';
 
@@ -48,7 +48,7 @@ export function validateTerms(
   if (
     !Number.isSafeInteger(terms.maxTimeoutSeconds) ||
     terms.maxTimeoutSeconds < 1 ||
-    terms.maxTimeoutSeconds > 120
+    terms.maxTimeoutSeconds > PAYMENT_LIMITS.maxTimeoutSeconds
   )
     reject('Unsupported timeout.');
   const extra = terms.extra ?? {};
@@ -69,7 +69,7 @@ export function validateTerms(
     typeof extra.withdrawDelay !== 'number' ||
     !Number.isSafeInteger(extra.withdrawDelay) ||
     extra.withdrawDelay < 1 ||
-    extra.withdrawDelay > 900
+    extra.withdrawDelay > PAYMENT_LIMITS.maxWithdrawDelay
   )
     reject('Unsupported withdrawal delay.');
 }

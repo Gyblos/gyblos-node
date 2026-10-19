@@ -1,4 +1,3 @@
-import { TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
 import type { KeyPairSigner } from '@solana/kit';
 import {
   decodePaymentSignatureHeader,
@@ -18,7 +17,14 @@ import {
   OFFER_ID,
   type TokenCounts,
 } from '@gyblos/application/metering';
-import { GENERATION } from '@gyblos/inference-ollama/constants';
+import {
+  HTTP_LIMITS,
+  HTTP_STATUS,
+  PAYMENT_LIMITS,
+  ROUTES,
+  TOKEN_PROGRAM_ADDRESS,
+} from '@gyblos/config';
+import { GENERATION, MODEL_LIMITS } from '@gyblos/inference-ollama/constants';
 import {
   createOllama,
   MODEL,
@@ -40,8 +46,8 @@ export function parseInferenceRequest(value: unknown): InferenceRequest {
     !/^[a-f0-9-]{36}$/.test(body.requestId) ||
     typeof body.prompt !== 'string' ||
     !Number.isSafeInteger(body.maxTokens) ||
-    body.maxTokens! < 32 ||
-    body.maxTokens! > 128
+    body.maxTokens! < MODEL_LIMITS.requestMinOutputTokens ||
+    body.maxTokens! > MODEL_LIMITS.requestMaxOutputTokens
   )
     throw new Error('Invalid bounded inference request.');
   return {
@@ -59,7 +65,9 @@ export function inferenceCeiling(
   if (inputTokens + input.maxTokens > GENERATION.numCtx) {
     throw new Error('Request exceeds the pinned context window.');
   }
-  const ceiling = 2n * charge({ input: inputTokens, output: input.maxTokens });
+  const ceiling =
+    PAYMENT_LIMITS.ceilingMultiplier *
+    charge({ input: inputTokens, output: input.maxTokens });
   if (ceiling > BigInt(MAX_ATOMIC))
     throw new Error('Inference ceiling exceeds gate policy.');
   return ceiling.toString();
@@ -90,18 +98,20 @@ export async function createInferenceSeller(options: {
     new UptoSvmScheme({
       receiverAuthorizerSigner: options.authorizer,
       rpcUrl: options.rpcUrl,
-      withdrawDelay: 60,
+      withdrawDelay: PAYMENT_LIMITS.withdrawDelay,
     }),
   );
   await resource.initialize();
   const app = express();
-  app.use(express.json({ limit: '8kb' }));
-  app.post('/v1/chat/completions', (req, res, next) => {
+  app.use(express.json({ limit: HTTP_LIMITS.requestBody }));
+  app.post(ROUTES.inference, (req, res, next) => {
     try {
       inferenceCeiling(parseInferenceRequest(req.body), options.tokenizer);
       next();
     } catch {
-      res.status(400).json({ error: 'Invalid bounded inference request.' });
+      res
+        .status(HTTP_STATUS.badRequest)
+        .json({ error: 'Invalid bounded inference request.' });
     }
   });
   const price: DynamicPrice = (context) => ({
@@ -114,14 +124,14 @@ export async function createInferenceSeller(options: {
   app.use(
     paymentMiddleware(
       {
-        'POST /v1/chat/completions': {
+        [ROUTES.inferenceDefinition]: {
           accepts: [
             {
               scheme: 'upto',
               network: DEVNET,
               payTo: options.payTo,
               price,
-              maxTimeoutSeconds: 120,
+              maxTimeoutSeconds: PAYMENT_LIMITS.maxTimeoutSeconds,
               extra: { tokenProgram: TOKEN_PROGRAM_ADDRESS },
             },
           ],
@@ -135,7 +145,7 @@ export async function createInferenceSeller(options: {
       false,
     ),
   );
-  app.post('/v1/chat/completions', async (req, res) => {
+  app.post(ROUTES.inference, async (req, res) => {
     const input = parseInferenceRequest(req.body);
     const controller = new AbortController();
     const abort = () => controller.abort();
@@ -197,7 +207,7 @@ export async function createInferenceSeller(options: {
     } catch {
       // Explicitly end the Express 4 response so x402 cancels and settles zero.
       setSettlementOverrides(res, { amount: '0' });
-      res.status(502).json({
+      res.status(HTTP_STATUS.badGateway).json({
         requestId: input.requestId,
         error:
           'Local inference failed; inspect confirmed settlement for refund.',

@@ -96,6 +96,9 @@ importers:
       '@gyblos/runtime':
         specifier: workspace:*
         version: link:../../packages/runtime
+      '@gyblos/seller':
+        specifier: workspace:*
+        version: link:../seller
 
   apps/facilitator:
     dependencies:
@@ -135,6 +138,9 @@ importers:
 
   packages/application:
     dependencies:
+      '@gyblos/config':
+        specifier: workspace:*
+        version: link:../config
       '@gyblos/inference-ollama':
         specifier: workspace:*
         version: link:../inference-ollama
@@ -142,7 +148,17 @@ importers:
         specifier: workspace:*
         version: link:../payments-x402
 
-  packages/config: {}
+  packages/config:
+    dependencies:
+      '@huggingface/tokenizers':
+        specifier: 0.2.0
+        version: 0.2.0
+      '@solana-program/token':
+        specifier: 0.9.0
+        version: 0.9.0(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))
+      '@x402/core':
+        specifier: 2.28.0
+        version: 2.28.0
 
   packages/gate:
     dependencies:
@@ -173,6 +189,9 @@ importers:
 
   packages/payments-x402:
     dependencies:
+      '@gyblos/application':
+        specifier: workspace:*
+        version: link:../application
       '@gyblos/config':
         specifier: workspace:*
         version: link:../config

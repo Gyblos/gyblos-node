@@ -2,7 +2,14 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { link, mkdir, open, readFile, unlink } from 'node:fs/promises';
 
 import type { TokenCounts } from '@gyblos/application/metering';
-import { LOCAL_DIR, localPath } from '@gyblos/config';
+import {
+  FILE_MODES,
+  KEY_LIMITS,
+  LOCAL_DIR,
+  MEASUREMENT_FILENAMES,
+  MEASUREMENTS_PATH,
+  UNITS,
+} from '@gyblos/config';
 import { MODEL } from '@gyblos/inference-ollama/model';
 
 export interface MeasurementInput {
@@ -68,7 +75,8 @@ export function measurementRow(input: MeasurementInput, salt: Uint8Array) {
     latencyMs: validLatency ? input.latencyMs : null,
     effectiveTokensPerSecond:
       input.delivered && validLatency
-        ? input.recountedTokens.output / (input.latencyMs / 1000)
+        ? input.recountedTokens.output /
+          (input.latencyMs / UNITS.millisecondsPerSecond)
         : null,
     firstWordMs: null,
     firstWordNote:
@@ -86,13 +94,16 @@ export function measurementRow(input: MeasurementInput, salt: Uint8Array) {
 export type Measurement = ReturnType<typeof measurementRow>;
 
 export async function measurementSalt(directory = LOCAL_DIR) {
-  await mkdir(directory, { recursive: true, mode: 0o700 });
-  const path = `${directory}/measurement-salt`;
+  await mkdir(directory, {
+    recursive: true,
+    mode: FILE_MODES.privateDirectory,
+  });
+  const path = `${directory}/${MEASUREMENT_FILENAMES.salt}`;
   const temporary = `${path}.${randomUUID()}.tmp`;
   try {
-    const handle = await open(temporary, 'wx', 0o600);
+    const handle = await open(temporary, 'wx', FILE_MODES.privateFile);
     try {
-      await handle.writeFile(randomBytes(32));
+      await handle.writeFile(randomBytes(KEY_LIMITS.measurementSaltBytes));
       await handle.sync();
     } finally {
       await handle.close();
@@ -109,14 +120,15 @@ export async function measurementSalt(directory = LOCAL_DIR) {
     });
   }
   const salt = await readFile(path);
-  if (salt.length !== 32) throw new Error('Invalid local measurement salt.');
+  if (salt.length !== KEY_LIMITS.measurementSaltBytes)
+    throw new Error('Invalid local measurement salt.');
   return salt;
 }
 export async function appendMeasurement(
   row: Measurement,
-  path = localPath('measurements.jsonl'),
+  path = MEASUREMENTS_PATH,
 ) {
-  const handle = await open(path, 'a', 0o600);
+  const handle = await open(path, 'a', FILE_MODES.privateFile);
   try {
     await handle.writeFile(JSON.stringify(row) + '\n');
     await handle.sync();

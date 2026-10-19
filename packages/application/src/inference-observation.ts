@@ -1,4 +1,5 @@
 import { charge, compareUsage } from '@gyblos/application/metering';
+import { HTTP_STATUS } from '@gyblos/config';
 import type { EngineUsage } from '@gyblos/inference-ollama/index';
 
 export interface ObservedBody {
@@ -28,7 +29,7 @@ export function observeInferenceResponse(input: {
   ) {
     throw new Error('Inference response identity does not match the request.');
   }
-  const failed = input.status !== 200;
+  const failed = input.status !== HTTP_STATUS.ok;
   const body: ObservedBody = { requestId: raw.requestId };
   if (!failed) {
     if (typeof raw.content !== 'string' || raw.content.length === 0)

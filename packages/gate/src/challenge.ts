@@ -2,7 +2,13 @@ import { once } from 'node:events';
 
 import { decodePaymentRequiredHeader } from '@x402/core/http';
 
-import { LOCALHOST, localPath, X402_SDK_VERSION } from '@gyblos/config';
+import {
+  CHALLENGE_EVIDENCE_PATH,
+  HTTP_STATUS,
+  LOCALHOST,
+  ROUTES,
+  X402_SDK_VERSION,
+} from '@gyblos/config';
 import { loadConfig, saveJson, signer } from '@gyblos/gate/config';
 import { assertProgram } from '@gyblos/payments-x402/chain';
 import { UPSTREAM_COMMIT } from '@gyblos/payments-x402/constants';
@@ -43,8 +49,8 @@ export async function challengeGate() {
     if (!sellerAddress || typeof sellerAddress === 'string')
       throw new Error('No seller port.');
     const url = `http://${LOCALHOST}:${sellerAddress.port}`;
-    const response = await fetch(`${url}/api/generate`);
-    if (response.status !== 402)
+    const response = await fetch(`${url}${ROUTES.fixed}`);
+    if (response.status !== HTTP_STATUS.paymentRequired)
       throw new Error(`Expected 402, received ${response.status}.`);
     const required = response.headers.get('PAYMENT-REQUIRED');
     if (!required) throw new Error('Missing challenge.');
@@ -58,7 +64,7 @@ export async function challengeGate() {
       receiverAuthorizer: config.addresses.authorizer,
       maxAtomic: '10000',
     });
-    const state = (await (await fetch(`${url}/health`)).json()) as {
+    const state = (await (await fetch(`${url}${ROUTES.health}`)).json()) as {
       handlerCalls: number;
     };
     if (state.handlerCalls !== 0 || facilitator.events.length !== 0)
@@ -75,7 +81,7 @@ export async function challengeGate() {
       settlements: facilitator.events.length,
       note: 'No buyer payment signed or submitted. Does not validate open, claim or refund.',
     };
-    await saveJson(localPath('challenge-evidence.json'), evidence);
+    await saveJson(CHALLENGE_EVIDENCE_PATH, evidence);
     console.log(JSON.stringify(evidence, null, 2));
   } finally {
     sellerServer?.close();

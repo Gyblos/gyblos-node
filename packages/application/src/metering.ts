@@ -1,3 +1,5 @@
+import { UNITS } from '@gyblos/config';
+
 import { PRICES, TOLERANCE } from './constants.js';
 
 export { PRICES, TOLERANCE, OFFER_ID } from './constants.js';
@@ -17,7 +19,7 @@ export function charge(counts: TokenCounts): bigint {
 export function tokenAllowance(count: number): number {
   return Math.max(
     TOLERANCE.absoluteTokens,
-    Math.ceil((count * TOLERANCE.relativePercent) / 100),
+    Math.ceil((count * TOLERANCE.relativePercent) / UNITS.percentage),
   );
 }
 export function compareUsage(engine: TokenCounts, recounted: TokenCounts) {

@@ -7,6 +7,7 @@ import {
 } from '@x402/fetch';
 import { UptoSvmScheme } from '@x402/svm/upto/client';
 
+import { TIMEOUTS } from '@gyblos/config';
 import { DEVNET } from '@gyblos/payments-x402/constants';
 import { validateTerms, type TrustPolicy } from '@gyblos/payments-x402/trust';
 
@@ -85,7 +86,7 @@ export function createBuyer(
     ): Promise<BuyerResult> {
       authorization = undefined;
       // No application retry: a lost response may already have settled.
-      const timeout = AbortSignal.timeout(options.timeoutMs ?? 120_000);
+      const timeout = AbortSignal.timeout(options.timeoutMs ?? TIMEOUTS.buyer);
       const response = await paidFetch(url, {
         redirect: 'error',
         ...(options.method

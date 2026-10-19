@@ -1,5 +1,7 @@
 import type { KeyPairSigner } from '@solana/kit';
 
+import { TIMEOUTS } from '@gyblos/config';
+
 import { createBuyer } from './buyer.js';
 import type { TrustPolicy } from './trust.js';
 
@@ -31,7 +33,7 @@ export function createInferenceBuyer(
     const response = await buyer.request(url, signal, {
       method: 'POST',
       body: request,
-      timeoutMs: 180_000,
+      timeoutMs: TIMEOUTS.inference,
       measureResponse: true,
     });
     return {

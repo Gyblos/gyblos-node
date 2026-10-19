@@ -3,16 +3,21 @@ import { resolve } from 'node:path';
 
 import { observeInferenceResponse } from '@gyblos/application/inference-observation';
 import { assessCharge, charge, OFFER_ID } from '@gyblos/application/metering';
-import { localPath } from '@gyblos/config';
+import {
+  HTTP_STATUS,
+  INFERENCE_TRANSPORT_PATH,
+  TIMEOUTS,
+} from '@gyblos/config';
 import { inferenceSnapshot, transaction } from '@gyblos/gate/chain';
 import { saveJson, signer } from '@gyblos/gate/config';
 import { assertNoUnresolvedAuthorizations } from '@gyblos/gate/journal';
 import { appendMeasurement, measurementRow } from '@gyblos/gate/measurements';
+import { MODEL_LIMITS } from '@gyblos/inference-ollama/constants';
 import { MODEL } from '@gyblos/inference-ollama/index';
 import { DEVNET } from '@gyblos/payments-x402/constants';
 import { createInferenceBuyer } from '@gyblos/payments-x402/inference-buyer';
+import { inferenceCeiling } from '@gyblos/seller/inference';
 
-import { inferenceCeiling } from '../../../seller/src/inference.js';
 import { reconcileCase } from './reconcile.js';
 import type { CaseContext } from './types.js';
 
@@ -36,7 +41,7 @@ export async function runCases({
     const request = {
       requestId: testCase.requestId,
       prompt: testCase.prompt,
-      maxTokens: 128,
+      maxTokens: MODEL_LIMITS.requestMaxOutputTokens,
     };
     const ceiling = inferenceCeiling(request, buyerTokenizer);
     const before = await inferenceSnapshot(c);
@@ -72,7 +77,7 @@ export async function runCases({
       },
     );
     const response = await buyer(url, request, controller.signal);
-    await saveJson(localPath('inference-last-transport.json'), {
+    await saveJson(INFERENCE_TRANSPORT_PATH, {
       requestId: request.requestId,
       httpStatus: response.status,
       receipt: response.receipt,
@@ -172,7 +177,7 @@ export async function runCases({
     await saveJson(evidencePath, evidence);
     if (testCase.name === 'engine-interrupted') {
       assert.equal(failed, true);
-      assert.equal(response.status, 502);
+      assert.equal(response.status, HTTP_STATUS.badGateway);
       assert.equal(actual, 0n);
       assert.equal(row.anomaly, 'failed');
       assert.ok(trace.firstFragmentAt && trace.stoppedAt);
@@ -206,6 +211,6 @@ export async function runCases({
       `${testCase.name}: confirmed charge=${actual}, refund=${result.refundAtomic}, anomaly=${row.anomaly}`,
     );
     // Let the public devnet RPC rate window clear between paid cases.
-    await new Promise((resolve) => setTimeout(resolve, 12_000));
+    await new Promise((resolve) => setTimeout(resolve, TIMEOUTS.rpcCooldown));
   }
 }

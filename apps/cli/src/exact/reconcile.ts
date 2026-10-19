@@ -1,9 +1,6 @@
 import assert from 'node:assert/strict';
 
-import {
-  findAssociatedTokenPda,
-  TOKEN_PROGRAM_ADDRESS,
-} from '@solana-program/token';
+import { findAssociatedTokenPda } from '@solana-program/token';
 import {
   address,
   getBase58Decoder,
@@ -13,7 +10,14 @@ import {
 } from '@solana/kit';
 import type { PaymentPayload } from '@x402/core/types';
 
-import { COMMITMENT } from '@gyblos/config';
+import {
+  COMMITMENT,
+  DIAGNOSTIC_LIMITS,
+  PAYMENT_LIMITS,
+  RETRIES,
+  RETRY_DELAYS,
+  TOKEN_PROGRAM_ADDRESS,
+} from '@gyblos/config';
 import { type Config } from '@gyblos/gate/config';
 import type { AccountsResponse, ChainTransaction } from '@gyblos/gate/types';
 import { GateError, lamports, rpc } from '@gyblos/payments-x402/chain';
@@ -31,7 +35,7 @@ export async function snapshot(c: Config, buyer: string) {
     ),
   );
   let result: AccountsResponse | undefined;
-  for (let attempt = 0; attempt < 4; attempt++) {
+  for (let attempt = 0; attempt < RETRIES.exactSnapshot; attempt++) {
     try {
       result = await rpc<AccountsResponse>(c.rpcUrl, 'getMultipleAccounts', [
         [atas[0]![0], atas[1]![0], buyer],
@@ -43,10 +47,12 @@ export async function snapshot(c: Config, buyer: string) {
         !(error instanceof GateError) ||
         error.code !== 'RPC_HTTP' ||
         !error.message.includes('429') ||
-        attempt === 3
+        attempt === RETRIES.exactSnapshotLastAttempt
       )
         throw error;
-      await new Promise((resolve) => setTimeout(resolve, 1000 * 2 ** attempt));
+      await new Promise((resolve) =>
+        setTimeout(resolve, RETRY_DELAYS.exactSnapshotBase * 2 ** attempt),
+      );
     }
   }
   assert.ok(result);
@@ -55,7 +61,7 @@ export async function snapshot(c: Config, buyer: string) {
     assert.equal(account?.owner, TOKEN_PROGRAM_ADDRESS);
     assert.equal(info?.mint, DEVNET_USDC);
     assert.equal(info?.owner, index === 0 ? buyer : c.addresses.seller);
-    assert.equal(info?.tokenAmount?.decimals, 6);
+    assert.equal(info?.tokenAmount?.decimals, PAYMENT_LIMITS.tokenDecimals);
     return String(info!.tokenAmount.amount);
   });
   return {
@@ -90,7 +96,10 @@ export async function reconcile(
   const history = await rpc<{ signature: string }[]>(
     c.rpcUrl,
     'getSignaturesForAddress',
-    [buyer, { limit: 50, commitment: COMMITMENT }],
+    [
+      buyer,
+      { limit: DIAGNOSTIC_LIMITS.transactionHistory, commitment: COMMITMENT },
+    ],
   );
   const matches = [];
   for (const item of history) {
@@ -112,7 +121,7 @@ export async function reconcile(
   return {
     checkedAt: new Date().toISOString(),
     address: buyer,
-    historyLimit: 50,
+    historyLimit: DIAGNOSTIC_LIMITS.transactionHistory,
     matches,
     classification: matches.length
       ? 'matching-transaction-observed'

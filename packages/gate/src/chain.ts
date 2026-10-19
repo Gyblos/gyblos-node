@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
 
-import {
-  findAssociatedTokenPda,
-  TOKEN_PROGRAM_ADDRESS,
-} from '@solana-program/token';
+import { findAssociatedTokenPda } from '@solana-program/token';
 import { address } from '@solana/kit';
 
-import { COMMITMENT } from '@gyblos/config';
+import {
+  COMMITMENT,
+  RETRIES,
+  RETRY_DELAYS,
+  TOKEN_PROGRAM_ADDRESS,
+} from '@gyblos/config';
 import type { Config } from '@gyblos/gate/config';
 import {
   rpc as baseRpc,
@@ -30,14 +32,16 @@ export async function rpc<T>(
       return await baseRpc<T>(rpcUrl, method, params);
     } catch (error) {
       if (
-        attempt >= 4 ||
+        attempt >= RETRIES.rpc ||
         !method.startsWith('get') ||
         !(error instanceof GateError) ||
         error.code !== 'RPC_HTTP' ||
         !error.message.includes('429')
       )
         throw error;
-      await new Promise((resolve) => setTimeout(resolve, 1500 * 2 ** attempt));
+      await new Promise((resolve) =>
+        setTimeout(resolve, RETRY_DELAYS.rpcBase * 2 ** attempt),
+      );
     }
   }
 }
@@ -98,7 +102,7 @@ export async function inferenceSnapshot(c: Config, channelId?: string) {
   };
 }
 export async function transaction(c: Config, signature: string) {
-  for (let attempt = 0; attempt < 4; attempt++) {
+  for (let attempt = 0; attempt < RETRIES.transaction; attempt++) {
     const tx = await readChain<ChainTransaction | null>(c, 'getTransaction', [
       signature,
       {
@@ -108,7 +112,10 @@ export async function transaction(c: Config, signature: string) {
       },
     ]);
     if (tx === null) {
-      if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, 500));
+      if (attempt < RETRIES.transaction - 1)
+        await new Promise((resolve) =>
+          setTimeout(resolve, RETRY_DELAYS.transactionVisibility),
+        );
       continue;
     }
     assert.ok(tx && tx.meta.err === null);

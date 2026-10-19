@@ -6,7 +6,7 @@ import {
 import { once } from 'node:events';
 import { pathToFileURL } from 'node:url';
 
-import { TIMEOUTS } from '@gyblos/config';
+import { RETRIES, TIMEOUTS } from '@gyblos/config';
 
 export const spawnChild = (
   command: string,
@@ -44,7 +44,9 @@ export async function assertPortFree(
     new Error('Gate requires an unused local host port.'),
 ) {
   try {
-    await fetch(url, { signal: AbortSignal.timeout(500) });
+    await fetch(url, {
+      signal: AbortSignal.timeout(TIMEOUTS.readinessRequest),
+    });
   } catch {
     return;
   }
@@ -67,7 +69,7 @@ export async function waitReady(
     parseBody?: boolean;
   } = {},
 ) {
-  for (let i = 0; i < (options.attempts ?? 120); i++) {
+  for (let i = 0; i < (options.attempts ?? RETRIES.startup); i++) {
     options.signal?.throwIfAborted();
     if (
       child.exitCode !== null ||
@@ -81,7 +83,9 @@ export async function waitReady(
     let responseWasOk = false;
     try {
       const response = await fetch(url, {
-        signal: AbortSignal.timeout(options.requestTimeout ?? 500),
+        signal: AbortSignal.timeout(
+          options.requestTimeout ?? TIMEOUTS.readinessRequest,
+        ),
       });
       if (response.ok) {
         responseWasOk = true;

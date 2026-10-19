@@ -8,12 +8,20 @@ import { resolve } from 'node:path';
 
 import { type TokenCounts } from '@gyblos/application/metering';
 import {
+  DIAGNOSTIC_LIMITS,
+  ENTRYPOINTS,
+  EVIDENCE_PATHS,
+  GATE_CASES,
   HOSTS,
-  LOCAL_DIR,
+  JOURNAL_PATHS,
+  keyPath,
   LOCALHOST,
-  localPath,
   LOCK_PATH,
   MIN_FACILITATOR_LAMPORTS,
+  OLLAMA_MODELS_PATH,
+  ROUTES,
+  TIMEOUTS,
+  TOKENIZER_FILES,
 } from '@gyblos/config';
 import {
   confirmInference,
@@ -43,15 +51,15 @@ import {
   stopChild,
   waitReady,
 } from '@gyblos/runtime';
+import { createInferenceSeller } from '@gyblos/seller/inference';
 
-import { createInferenceSeller } from '../../../seller/src/inference.js';
 import { createCases } from './cases-data.js';
 import { runCases } from './cases.js';
 import { initializeEvidence } from './evidence.js';
 
 export async function main() {
-  const evidencePath = 'evidence/gate-0005.json';
-  const journalPath = localPath('inference-attempt.json');
+  const evidencePath = EVIDENCE_PATHS.inference;
+  const journalPath = JOURNAL_PATHS.inference;
   const ollamaUrl = HOSTS.ollama;
   const facilitatorUrl = HOSTS.facilitator;
   const runId = randomUUID();
@@ -74,7 +82,7 @@ export async function main() {
       'authorizer',
       'facilitator',
     ] as const) {
-      assert.equal(resolve(c.keys[role]), resolve(`${LOCAL_DIR}/${role}.json`));
+      assert.equal(resolve(c.keys[role]), resolve(keyPath(role)));
     }
     await assertNoUnresolvedAuthorizations();
     await assertProgram(c.rpcUrl);
@@ -84,11 +92,8 @@ export async function main() {
       'Facilitator needs devnet SOL for five channels.',
     );
     const artifacts = {
-      tokenizer: await readFile(localPath('tokenizer/tokenizer.json'), 'utf8'),
-      config: await readFile(
-        localPath('tokenizer/tokenizer_config.json'),
-        'utf8',
-      ),
+      tokenizer: await readFile(TOKENIZER_FILES.tokenizer, 'utf8'),
+      config: await readFile(TOKENIZER_FILES.config, 'utf8'),
     };
     const buyerTokenizer = createModelTokenizer(artifacts);
     const sellerTokenizer = createModelTokenizer(artifacts);
@@ -96,7 +101,7 @@ export async function main() {
     const evidence = await initializeEvidence(c, runId, evidencePath);
     try {
       await assertPortFree(
-        `${ollamaUrl}/api/version`,
+        `${ollamaUrl}${ROUTES.ollamaVersion}`,
         () =>
           new GateError(
             'PORT_BUSY',
@@ -104,7 +109,7 @@ export async function main() {
           ),
       );
       await assertPortFree(
-        `${facilitatorUrl}/health`,
+        `${facilitatorUrl}${ROUTES.health}`,
         () =>
           new GateError(
             'PORT_BUSY',
@@ -115,7 +120,7 @@ export async function main() {
         env: {
           ...process.env,
           OLLAMA_HOST: HOSTS.ollamaBind,
-          OLLAMA_MODELS: resolve('.local/ollama/models'),
+          OLLAMA_MODELS: resolve(OLLAMA_MODELS_PATH),
           OLLAMA_NO_CLOUD: '1',
           OLLAMA_DEBUG: '0',
           OLLAMA_CONTEXT_LENGTH: String(GENERATION.numCtx),
@@ -124,23 +129,25 @@ export async function main() {
       });
       children.push(ollama);
       ollama.on('error', stop);
-      await waitReady(ollama, `${ollamaUrl}/api/version`, {
+      await waitReady(ollama, `${ollamaUrl}${ROUTES.ollamaVersion}`, {
         signal: controller.signal,
       });
       await createOllama(ollamaUrl).assertModel();
       evidence.ollamaVersion = (
-        (await fetch(`${ollamaUrl}/api/version`).then((r) => r.json())) as {
+        (await fetch(`${ollamaUrl}${ROUTES.ollamaVersion}`).then((r) =>
+          r.json(),
+        )) as {
           version: string;
         }
       ).version;
       const facilitator = spawnChild(
         process.execPath,
-        ['--import', 'tsx', 'apps/facilitator/src/main.ts'],
+        ['--import', 'tsx', ENTRYPOINTS.facilitator],
         { env: { ...process.env, GYBLOS_GATE_RUN_ID: runId }, stdio: 'ignore' },
       );
       children.push(facilitator);
       facilitator.on('error', stop);
-      await waitReady(facilitator, `${facilitatorUrl}/health`, {
+      await waitReady(facilitator, `${facilitatorUrl}${ROUTES.health}`, {
         signal: controller.signal,
         expectedRunId: runId,
         onMismatch: () =>
@@ -161,14 +168,17 @@ export async function main() {
         }
       >();
       const events = async () =>
-        (await fetch(`${facilitatorUrl}/gate/events`, {
-          signal: AbortSignal.timeout(5000),
+        (await fetch(`${facilitatorUrl}${ROUTES.events}`, {
+          signal: AbortSignal.timeout(TIMEOUTS.events),
         }).then((r) => r.json())) as SettlementEvent[];
       const gateBilling = {
         feePayer: c.addresses.facilitator,
         billingOverride(requestId: string, usage: Readonly<TokenCounts>) {
           return requestId === debugRequestId
-            ? { ...usage, output: Math.ceil(usage.output * 1.4) }
+            ? {
+                ...usage,
+                output: Math.ceil(usage.output * GATE_CASES.billingInflation),
+              }
             : { ...usage };
         },
       };
@@ -219,7 +229,7 @@ export async function main() {
       await once(sellerServer, 'listening');
       const endpoint = sellerServer.address();
       assert.ok(endpoint && typeof endpoint !== 'string');
-      const url = `http://${LOCALHOST}:${endpoint.port}/v1/chat/completions`;
+      const url = `http://${LOCALHOST}:${endpoint.port}${ROUTES.inference}`;
       const cases = createCases(debugRequestId, failureRequestId);
       await runCases({
         url,
@@ -253,7 +263,7 @@ export async function main() {
         error instanceof Error
           ? error.stack
               ?.split('\n')
-              .slice(1, 3)
+              .slice(1, DIAGNOSTIC_LIMITS.errorStackEnd)
               .map((line) => line.trim())
           : [];
       await saveJson(evidencePath, evidence);

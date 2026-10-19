@@ -4,7 +4,13 @@ import { dirname, resolve } from 'node:path';
 
 import { createKeyPairSignerFromBytes } from '@solana/kit';
 
-import { LOCAL_DIR } from '@gyblos/config';
+import {
+  DEVNET_RPC_URL,
+  FILE_MODES,
+  KEY_LIMITS,
+  keyFilename,
+  LOCAL_DIR,
+} from '@gyblos/config';
 import {
   configPath,
   defaultMint,
@@ -14,7 +20,10 @@ import {
 
 export async function setupGate() {
   const path = configPath();
-  await mkdir(dirname(path), { recursive: true, mode: 0o700 });
+  await mkdir(dirname(path), {
+    recursive: true,
+    mode: FILE_MODES.privateDirectory,
+  });
   try {
     await readFile(path);
     console.log('Devnet config already exists; existing keys preserved.');
@@ -29,7 +38,7 @@ export async function setupGate() {
       'facilitator',
       'mint',
     ] as const) {
-      keys[role] = resolve(dirname(path), `${role}.json`);
+      keys[role] = resolve(dirname(path), keyFilename(role));
       let bytes: Uint8Array;
       try {
         const existing: unknown = JSON.parse(
@@ -37,8 +46,10 @@ export async function setupGate() {
         );
         if (
           !Array.isArray(existing) ||
-          existing.length !== 64 ||
-          existing.some((v) => !Number.isInteger(v) || v < 0 || v > 255)
+          existing.length !== KEY_LIMITS.keyPairBytes ||
+          existing.some(
+            (v) => !Number.isInteger(v) || v < 0 || v > KEY_LIMITS.byteMax,
+          )
         )
           throw new Error(
             'Invalid existing devnet key; preserve files and recover manually.',
@@ -54,14 +65,14 @@ export async function setupGate() {
         ]);
         await writeFile(keys[role], JSON.stringify([...bytes]), {
           flag: 'wx',
-          mode: 0o600,
+          mode: FILE_MODES.privateFile,
         });
       }
       addresses[role] = (await createKeyPairSignerFromBytes(bytes)).address;
     }
     await saveJson(path, {
       schemaVersion: 1,
-      rpcUrl: process.env.GYBLOS_RPC_URL ?? 'https://api.devnet.solana.com',
+      rpcUrl: process.env.GYBLOS_RPC_URL ?? DEVNET_RPC_URL,
       mint: defaultMint,
       assetLabel: 'devnet-usdc',
       keys,

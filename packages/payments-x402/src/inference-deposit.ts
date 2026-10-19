@@ -1,11 +1,8 @@
-import {
-  findAssociatedTokenPda,
-  TOKEN_PROGRAM_ADDRESS,
-} from '@solana-program/token';
+import { findAssociatedTokenPda } from '@solana-program/token';
 import { address } from '@solana/kit';
 import { discoverChannelsByRentPayer } from '@x402/svm';
 
-import { COMMITMENT } from '@gyblos/config';
+import { COMMITMENT, TOKEN_PROGRAM_ADDRESS } from '@gyblos/config';
 import { assertDevnet, GateError, rpc } from '@gyblos/payments-x402/chain';
 import { DEVNET } from '@gyblos/payments-x402/constants';
 

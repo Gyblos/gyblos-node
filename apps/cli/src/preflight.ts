@@ -1,4 +1,4 @@
-import { FIXED_MIN_FACILITATOR_LAMPORTS } from '@gyblos/config';
+import { FIXED_MIN_FACILITATOR_LAMPORTS, MAX_ATOMIC } from '@gyblos/config';
 import { loadConfig } from '@gyblos/gate/config';
 import {
   account,
@@ -22,7 +22,7 @@ export async function main() {
       : 0n;
     const ready =
       facilitatorSol >= FIXED_MIN_FACILITATOR_LAMPORTS &&
-      buyerTokens >= 10_000n;
+      buyerTokens >= BigInt(MAX_ATOMIC);
     console.log(
       JSON.stringify(
         {

@@ -1,4 +1,10 @@
-import { COMMITMENT } from '@gyblos/config';
+import {
+  COMMITMENT,
+  DIAGNOSTIC_LIMITS,
+  RETRIES,
+  RETRY_DELAYS,
+  TIMEOUTS,
+} from '@gyblos/config';
 import {
   CHANNEL_PROGRAM,
   DEVNET_GENESIS,
@@ -22,7 +28,7 @@ export async function rpc<T>(
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
-    signal: AbortSignal.timeout(20_000),
+    signal: AbortSignal.timeout(TIMEOUTS.rpc),
   });
   if (!response.ok)
     throw new GateError('RPC_HTTP', `${method}: HTTP ${response.status}`);
@@ -33,7 +39,7 @@ export async function rpc<T>(
   if (body.error)
     throw new GateError(
       'RPC_ERROR',
-      `${method}: RPC ${body.error.code} ${body.error.message.slice(0, 180)}`,
+      `${method}: RPC ${body.error.code} ${body.error.message.slice(0, DIAGNOSTIC_LIMITS.rpcMessageCharacters)}`,
     );
   return body.result;
 }
@@ -113,7 +119,7 @@ export async function confirm(
     unknownMessage?: string;
   } = {},
 ): Promise<void> {
-  for (let attempt = 0; attempt < 30; attempt++) {
+  for (let attempt = 0; attempt < RETRIES.confirmation; attempt++) {
     const result = await (options.read ?? rpc)<{
       value: (null | { err: unknown; confirmationStatus: string })[];
     }>(url, 'getSignatureStatuses', [
@@ -128,7 +134,9 @@ export async function confirm(
       );
     if (status && [COMMITMENT, 'finalized'].includes(status.confirmationStatus))
       return;
-    await new Promise((resolve) => setTimeout(resolve, 1_000));
+    await new Promise((resolve) =>
+      setTimeout(resolve, RETRY_DELAYS.confirmation),
+    );
   }
   throw new GateError(
     'TRANSACTION_UNKNOWN',
@@ -137,5 +145,4 @@ export async function confirm(
   );
 }
 
-export const explorer = (signature: string) =>
-  `https://explorer.solana.com/tx/${signature}?cluster=devnet`;
+export { explorerUrl as explorer } from '@gyblos/config';

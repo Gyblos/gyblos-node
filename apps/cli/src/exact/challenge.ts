@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 
 import { decodePaymentRequiredHeader } from '@x402/core/http';
 
+import { HTTP_STATUS, TIMEOUTS } from '@gyblos/config';
 import { validateExactTerms } from '@gyblos/payments-x402/exact/index';
 
 import type { ExactContext } from './types.js';
@@ -12,9 +13,9 @@ export function createChallenge(
 ) {
   return async function challenge() {
     const response = await fetch(url, {
-      signal: AbortSignal.timeout(25000),
+      signal: AbortSignal.timeout(TIMEOUTS.publicRequest),
     });
-    assert.equal(response.status, 402);
+    assert.equal(response.status, HTTP_STATUS.paymentRequired);
     const header = response.headers.get('PAYMENT-REQUIRED');
     assert.ok(header);
     const terms = decodePaymentRequiredHeader(header);

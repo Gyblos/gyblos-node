@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@gyblos/payments-x402": "workspace:*",
-    "@gyblos/inference-ollama": "workspace:*"
+    "@gyblos/inference-ollama": "workspace:*",
+    "@gyblos/config": "workspace:*"
   }
 }

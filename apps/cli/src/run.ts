@@ -1,7 +1,15 @@
 import { type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 
-import { FIXED_MIN_FACILITATOR_LAMPORTS, HOSTS } from '@gyblos/config';
+import {
+  ENTRYPOINTS,
+  FIXED_MIN_FACILITATOR_LAMPORTS,
+  HOSTS,
+  RETRIES,
+  RETRY_DELAYS,
+  ROUTES,
+  TIMEOUTS,
+} from '@gyblos/config';
 import { loadConfig } from '@gyblos/gate/config';
 import {
   assertProgram,
@@ -54,17 +62,17 @@ export async function main() {
     const env = { ...process.env, GYBLOS_GATE_RUN_ID: runId };
     const facilitator = spawnChild(
       process.execPath,
-      ['--import', 'tsx', 'apps/facilitator/src/main.ts'],
+      ['--import', 'tsx', ENTRYPOINTS.facilitator],
       { env, stdio: ['ignore', 'pipe', 'pipe'] },
     );
     children.push(facilitator);
     facilitator.on('error', (error) => controller.abort(error));
     facilitator.stderr?.pipe(process.stderr);
-    await waitReady(facilitator, `${HOSTS.facilitator}/health`, {
+    await waitReady(facilitator, `${HOSTS.facilitator}${ROUTES.health}`, {
       signal: controller.signal,
       expectedRunId: runId,
-      attempts: 80,
-      requestTimeout: 1000,
+      attempts: RETRIES.fixedStartup,
+      requestTimeout: RETRY_DELAYS.confirmation,
       checkSignalCode: false,
       retryResponseErrors: false,
       exitMessage: 'Gate host exited during startup.',
@@ -75,17 +83,17 @@ export async function main() {
     });
     const seller = spawnChild(
       process.execPath,
-      ['--import', 'tsx', 'apps/seller/src/main.ts'],
+      ['--import', 'tsx', ENTRYPOINTS.seller],
       { env, stdio: ['ignore', 'pipe', 'pipe'] },
     );
     children.push(seller);
     seller.on('error', (error) => controller.abort(error));
     seller.stderr?.pipe(process.stderr);
-    await waitReady(seller, `${HOSTS.seller}/health`, {
+    await waitReady(seller, `${HOSTS.seller}${ROUTES.health}`, {
       signal: controller.signal,
       expectedRunId: runId,
-      attempts: 80,
-      requestTimeout: 1000,
+      attempts: RETRIES.fixedStartup,
+      requestTimeout: RETRY_DELAYS.confirmation,
       checkSignalCode: false,
       retryResponseErrors: false,
       exitMessage: 'Gate host exited during startup.',
@@ -100,7 +108,7 @@ export async function main() {
     process.exitCode = 1;
   } finally {
     for (const child of children.reverse())
-      await stopChild(child, 'SIGTERM', 5000);
+      await stopChild(child, 'SIGTERM', TIMEOUTS.fixedStop);
     dispose();
   }
 }

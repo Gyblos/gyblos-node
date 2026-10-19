@@ -1,4 +1,4 @@
-import { HOSTS, LOCALHOST, PORTS } from '@gyblos/config';
+import { CLEANUP, HOSTS, LOCALHOST, PORTS } from '@gyblos/config';
 import { loadConfig, signer } from '@gyblos/gate/config';
 import { assertProgram } from '@gyblos/payments-x402/chain';
 import { createFacilitator } from '@gyblos/payments-x402/facilitator';
@@ -19,7 +19,10 @@ export async function main() {
     process.env.GYBLOS_GATE_RUN_ID,
   );
   const server = host.app.listen(PORTS.facilitator, LOCALHOST, () => {
-    host.cleanup.start({ intervalSecs: 15, abandonGraceSecs: 30 });
+    host.cleanup.start({
+      intervalSecs: CLEANUP.intervalSeconds,
+      abandonGraceSecs: CLEANUP.abandonGraceSeconds,
+    });
     console.log(
       `Gate facilitator ready at ${HOSTS.facilitator} (devnet only; memory storage).`,
     );

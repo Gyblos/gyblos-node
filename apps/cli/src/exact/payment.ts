@@ -3,6 +3,7 @@ import {
   encodePaymentSignatureHeader,
 } from '@x402/core/http';
 
+import { HTTP_STATUS, TIMEOUTS } from '@gyblos/config';
 import { saveJson, signer } from '@gyblos/gate/config';
 import { GateError } from '@gyblos/payments-x402/chain';
 import {
@@ -45,7 +46,7 @@ export function createPaidRequest(
       headers: {
         'PAYMENT-SIGNATURE': encodePaymentSignatureHeader(payload),
       },
-      signal: AbortSignal.timeout(50000),
+      signal: AbortSignal.timeout(TIMEOUTS.publicPayment),
     });
     const receiptHeader = response.headers.get('PAYMENT-RESPONSE');
     const receipt = receiptHeader
@@ -56,7 +57,7 @@ export function createPaidRequest(
     const calls = facilitator.calls.slice(firstCall);
     if (
       calls.some((call) => call.outcome === 'uncertain') ||
-      response.status >= 500
+      response.status >= HTTP_STATUS.internalServerError
     )
       throw new GateError(
         'PUBLIC_OUTCOME_UNCERTAIN',

@@ -2,11 +2,11 @@ import type { SupportedResponse } from '@x402/core/types';
 
 import type { Config } from '@gyblos/gate/config';
 import type { GateEvidence } from '@gyblos/gate/types';
-
 import type {
   AuditedPublicFacilitator,
   createExactSeller,
-} from '../../../seller/src/exact.js';
+} from '@gyblos/seller/exact';
+
 import type { authorizationMetadata } from './reconcile.js';
 
 export interface ExactProvider {
