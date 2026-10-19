@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 
 import { COMMITMENT, JOURNAL_FILENAMES, JOURNAL_PATHS } from '@gyblos/config';
 import { GateError } from '@gyblos/payments-x402/chain';
+import { GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
 import { saveJson } from '@gyblos/runtime';
 
 import type { GateJournalRecord, JournalStateRecord } from './journal-types.js';
@@ -27,7 +28,7 @@ export async function assertNoUnresolvedAuthorizations(
           : ['verified', 'resolved-rejected'];
       if (!terminal.includes(previous.state ?? ''))
         throw new GateError(
-          'UNRESOLVED_ATTEMPT',
+          GATE_ERROR_CODES.UNRESOLVED_ATTEMPT,
           `Authorization may be unsettled. Reconcile ${path} before another attempt.`,
         );
     } catch (error) {
