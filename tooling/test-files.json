@@ -14,6 +14,7 @@
   "inference.test.ts",
   "iroh-transport.test.ts",
   "model-artifact-integrity.test.ts",
+  "nat-topology.test.ts",
   "p2p-payment-policy.test.ts",
   "refactor.test.ts",
   "review-regressions.test.ts",
