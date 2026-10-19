@@ -64,6 +64,7 @@ export async function waitReady(
     timeoutMessage?: string;
     checkSignalCode?: boolean;
     retryResponseErrors?: boolean;
+    parseBody?: boolean;
   } = {},
 ) {
   for (let i = 0; i < (options.attempts ?? 120); i++) {
@@ -84,7 +85,10 @@ export async function waitReady(
       });
       if (response.ok) {
         responseWasOk = true;
-        const body = (await response.json()) as { runId?: string };
+        const body =
+          options.parseBody === false
+            ? {}
+            : ((await response.json()) as { runId?: string });
         if (options.expectedRunId && body.runId !== options.expectedRunId)
           throw (mismatchError =
             options.onMismatch?.() ??

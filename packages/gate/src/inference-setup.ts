@@ -52,6 +52,7 @@ export async function setupInferenceGate() {
   try {
     await waitReady(server, `${origin}/api/version`, {
       attempts: 80,
+      parseBody: false,
       startupError: () => startupError,
       checkSignalCode: false,
       exitMessage: 'Local Ollama startup failed.',
