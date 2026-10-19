@@ -6,12 +6,10 @@ import { readFile } from 'node:fs/promises';
 import type { Server } from 'node:http';
 import { resolve } from 'node:path';
 
-import { type TokenCounts } from '@gyblos/application/metering';
 import {
   DIAGNOSTIC_LIMITS,
   ENTRYPOINTS,
   EVIDENCE_PATHS,
-  GATE_CASES,
   HOSTS,
   JOURNAL_PATHS,
   keyPath,
@@ -53,6 +51,7 @@ import {
 } from '@gyblos/runtime';
 import { createInferenceSeller } from '@gyblos/seller/inference';
 
+import { createGateBilling } from './billing.js';
 import { createCases } from './cases-data.js';
 import { runCases } from './cases.js';
 import { initializeEvidence } from './evidence.js';
@@ -89,7 +88,7 @@ export async function main() {
     assert.ok(
       (await lamports(config.rpcUrl, config.addresses.facilitator)) >
         MIN_FACILITATOR_LAMPORTS,
-      'Facilitator needs devnet SOL for five channels.',
+      'Facilitator needs devnet SOL for the inference channels.',
     );
     const artifacts = {
       tokenizer: await readFile(TOKENIZER_FILES.tokenizer, 'utf8'),
@@ -154,6 +153,7 @@ export async function main() {
           new GateError('PORT_BUSY', 'Host is not owned by this gate.'),
       });
       const debugRequestId = randomUUID(),
+        underchargeRequestId = randomUUID(),
         failureRequestId = randomUUID();
       const traces = new Map<
         string,
@@ -171,17 +171,11 @@ export async function main() {
         (await fetch(`${facilitatorUrl}${ROUTES.events}`, {
           signal: AbortSignal.timeout(TIMEOUTS.events),
         }).then((response) => response.json())) as SettlementEvent[];
-      const gateBilling = {
-        feePayer: config.addresses.facilitator,
-        billingOverride(requestId: string, usage: Readonly<TokenCounts>) {
-          return requestId === debugRequestId
-            ? {
-                ...usage,
-                output: Math.ceil(usage.output * GATE_CASES.billingInflation),
-              }
-            : { ...usage };
-        },
-      };
+      const gateBilling = createGateBilling(
+        config.addresses.facilitator,
+        debugRequestId,
+        underchargeRequestId,
+      );
       const host = await createInferenceSeller({
         ...gateBilling,
         rpcUrl: config.rpcUrl,
@@ -230,7 +224,11 @@ export async function main() {
       const endpoint = sellerServer.address();
       assert.ok(endpoint && typeof endpoint !== 'string');
       const url = `http://${LOCALHOST}:${endpoint.port}${ROUTES.inference}`;
-      const cases = createCases(debugRequestId, failureRequestId);
+      const cases = createCases(
+        debugRequestId,
+        failureRequestId,
+        underchargeRequestId,
+      );
       await runCases({
         url,
         config: config,
