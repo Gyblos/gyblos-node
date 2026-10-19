@@ -1,4 +1,14 @@
-import { CHANNEL_PROGRAM, DEVNET_GENESIS } from './constants.js';
+import {
+  COMMITMENT,
+  DIAGNOSTIC_LIMITS,
+  RETRIES,
+  RETRY_DELAYS,
+  TIMEOUTS,
+} from '@gyblos/config';
+import {
+  CHANNEL_PROGRAM,
+  DEVNET_GENESIS,
+} from '@gyblos/payments-x402/constants';
 
 export class GateError extends Error {
   constructor(
@@ -18,7 +28,7 @@ export async function rpc<T>(
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
-    signal: AbortSignal.timeout(20_000),
+    signal: AbortSignal.timeout(TIMEOUTS.rpc),
   });
   if (!response.ok)
     throw new GateError('RPC_HTTP', `${method}: HTTP ${response.status}`);
@@ -29,7 +39,7 @@ export async function rpc<T>(
   if (body.error)
     throw new GateError(
       'RPC_ERROR',
-      `${method}: RPC ${body.error.code} ${body.error.message.slice(0, 180)}`,
+      `${method}: RPC ${body.error.code} ${body.error.message.slice(0, DIAGNOSTIC_LIMITS.rpcMessageCharacters)}`,
     );
   return body.result;
 }
@@ -51,7 +61,7 @@ export async function account(url: string, address: string) {
       };
     }>(url, 'getAccountInfo', [
       address,
-      { encoding: 'base64', commitment: 'confirmed' },
+      { encoding: 'base64', commitment: COMMITMENT },
     ])
   ).value;
 }
@@ -71,7 +81,7 @@ export async function lamports(url: string, owner: string): Promise<bigint> {
     (
       await rpc<{ value: number }>(url, 'getBalance', [
         owner,
-        { commitment: 'confirmed' },
+        { commitment: COMMITMENT },
       ])
     ).value,
   );
@@ -91,7 +101,7 @@ export async function tokens(
   }>(url, 'getTokenAccountsByOwner', [
     owner,
     { mint },
-    { encoding: 'jsonParsed', commitment: 'confirmed' },
+    { encoding: 'jsonParsed', commitment: COMMITMENT },
   ]);
   return result.value.reduce(
     (sum, item) =>
@@ -100,9 +110,17 @@ export async function tokens(
   );
 }
 
-export async function confirm(url: string, signature: string): Promise<void> {
-  for (let attempt = 0; attempt < 30; attempt++) {
-    const result = await rpc<{
+export async function confirm(
+  url: string,
+  signature: string,
+  options: {
+    read?: typeof rpc;
+    failedMessage?: string;
+    unknownMessage?: string;
+  } = {},
+): Promise<void> {
+  for (let attempt = 0; attempt < RETRIES.confirmation; attempt++) {
+    const result = await (options.read ?? rpc)<{
       value: (null | { err: unknown; confirmationStatus: string })[];
     }>(url, 'getSignatureStatuses', [
       [signature],
@@ -112,20 +130,19 @@ export async function confirm(url: string, signature: string): Promise<void> {
     if (status?.err)
       throw new GateError(
         'TRANSACTION_FAILED',
-        `Transaction failed: ${signature}`,
+        options.failedMessage ?? `Transaction failed: ${signature}`,
       );
-    if (
-      status &&
-      ['confirmed', 'finalized'].includes(status.confirmationStatus)
-    )
+    if (status && [COMMITMENT, 'finalized'].includes(status.confirmationStatus))
       return;
-    await new Promise((resolve) => setTimeout(resolve, 1_000));
+    await new Promise((resolve) =>
+      setTimeout(resolve, RETRY_DELAYS.confirmation),
+    );
   }
   throw new GateError(
     'TRANSACTION_UNKNOWN',
-    `Confirmation unknown; reconcile before retrying: ${signature}`,
+    options.unknownMessage ??
+      `Confirmation unknown; reconcile before retrying: ${signature}`,
   );
 }
 
-export const explorer = (signature: string) =>
-  `https://explorer.solana.com/tx/${signature}?cluster=devnet`;
+export { explorerUrl as explorer } from '@gyblos/config';

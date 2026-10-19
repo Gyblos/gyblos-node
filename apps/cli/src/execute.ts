@@ -1,7 +1,26 @@
-import { assertNoUnresolvedAuthorizations } from '../../../scripts/journal.js';
 import { discoverChannelsByRentPayer, toFacilitatorSvmSigner } from '@x402/svm';
-import { loadConfig, saveJson, signer } from '../../../scripts/config.js';
-import { createBuyer } from '../../../packages/payments-x402/src/buyer.js';
+
+import { runGate } from '@gyblos/application/gate';
+import {
+  CHANNEL_STATUS,
+  FAILED_REQUEST_PATH,
+  FIXED_MIN_FACILITATOR_LAMPORTS,
+  fixedEvidencePath,
+  HOSTS,
+  HTTP_STATUS,
+  JOURNAL_PATHS,
+  LOCK_PATH,
+  ROUTES,
+  X402_SDK_VERSION,
+} from '@gyblos/config';
+import { loadConfig, saveJson, signer } from '@gyblos/gate/config';
+import type { FixedGateEvidence } from '@gyblos/gate/fixture-evidence-types';
+import {
+  assertNoUnresolvedAuthorizations,
+  saveJournal,
+} from '@gyblos/gate/journal';
+import { withExclusiveLock } from '@gyblos/gate/lock';
+import { createBuyer } from '@gyblos/payments-x402/buyer';
 import {
   account,
   assertProgram,
@@ -10,24 +29,18 @@ import {
   GateError,
   lamports,
   tokens,
-} from '../../../packages/payments-x402/src/chain.js';
+} from '@gyblos/payments-x402/chain';
 import {
   ACTUAL_ATOMIC,
   DEVNET,
   MAX_ATOMIC,
   UPSTREAM_COMMIT,
-} from '../../../packages/payments-x402/src/constants.js';
-import type { SettlementEvent } from '../../../packages/payments-x402/src/facilitator.js';
-import { runGate } from '../../../packages/application/src/gate.js';
-import { withExclusiveLock } from '../../../scripts/lock.js';
-import { validateSettlement } from '../../../packages/payments-x402/src/trust.js';
+} from '@gyblos/payments-x402/constants';
+import type { SettlementEvent } from '@gyblos/payments-x402/facilitator';
+import { validateSettlement } from '@gyblos/payments-x402/trust';
 
-const journalPath = '.local/devnet/attempt.json';
-export async function executeGate(signal?: AbortSignal) {
-  return withExclusiveLock('.local/devnet/buyer.lock', () =>
-    executeLocked(signal),
-  );
-}
+const JOURNAL_PATH = JOURNAL_PATHS.fixed;
+
 async function executeLocked(signal?: AbortSignal) {
   const config = await loadConfig();
   await assertNoUnresolvedAuthorizations();
@@ -43,7 +56,7 @@ async function executeLocked(signal?: AbortSignal) {
     },
     fetch,
     async (authorization) => {
-      await saveJson(journalPath, {
+      await saveJournal(JOURNAL_PATH, {
         state: 'authorization-created',
         channelId: authorization.channelId,
         asset: config.mint,
@@ -58,7 +71,7 @@ async function executeLocked(signal?: AbortSignal) {
       await assertProgram(config.rpcUrl);
       if (
         (await lamports(config.rpcUrl, config.addresses.facilitator)) <
-        10_000_000n
+        FIXED_MIN_FACILITATOR_LAMPORTS
       )
         throw new GateError(
           'NEEDS_SOL',
@@ -89,18 +102,18 @@ async function executeLocked(signal?: AbortSignal) {
     async request() {
       signal?.throwIfAborted();
       const response = await buyer.request(
-        'http://127.0.0.1:4021/api/generate',
+        `${HOSTS.seller}${ROUTES.fixed}`,
         signal,
       );
       if (
-        response.status !== 200 ||
+        response.status !== HTTP_STATUS.ok ||
         !response.settlement?.success ||
         !response.authorization
       ) {
         const diagnostics = await fetch(
-          'http://127.0.0.1:4022/gate/events',
-        ).then((r) => r.json());
-        await saveJson('.local/devnet/failed-request.json', {
+          `${HOSTS.facilitator}${ROUTES.events}`,
+        ).then((response) => response.json());
+        await saveJson(FAILED_REQUEST_PATH, {
           status: response.status,
           settlement: response.settlement,
           events: diagnostics,
@@ -117,14 +130,20 @@ async function executeLocked(signal?: AbortSignal) {
         payer: config.addresses.buyer,
         amount: ACTUAL_ATOMIC,
       });
-      const eventResponse = await fetch('http://127.0.0.1:4022/gate/events');
+      const eventResponse = await fetch(`${HOSTS.facilitator}${ROUTES.events}`);
       const events = (await eventResponse.json()) as SettlementEvent[];
-      const id = response.authorization.channelId;
+      const channelId = response.authorization.channelId;
       const open = events.find(
-        (e) => e.phase === 'deposit' && e.channelId === id && e.success,
+        (event) =>
+          event.phase === 'deposit' &&
+          event.channelId === channelId &&
+          event.success,
       );
       const claim = events.find(
-        (e) => e.phase === 'claim' && e.channelId === id && e.success,
+        (event) =>
+          event.phase === 'claim' &&
+          event.channelId === channelId &&
+          event.success,
       );
       if (
         !open?.transaction ||
@@ -137,7 +156,7 @@ async function executeLocked(signal?: AbortSignal) {
         );
       await confirm(config.rpcUrl, open.transaction);
       await confirm(config.rpcUrl, claim.transaction);
-      const raw = await account(config.rpcUrl, id);
+      const raw = await account(config.rpcUrl, channelId);
       let distributed = !raw;
       if (raw) {
         const channels = await discoverChannelsByRentPayer(
@@ -148,7 +167,8 @@ async function executeLocked(signal?: AbortSignal) {
           config.addresses.facilitator,
         );
         distributed =
-          channels.find((c) => c.channelId === id)?.channel.status === 3;
+          channels.find((channel) => channel.channelId === channelId)?.channel
+            .status === CHANNEL_STATUS.distributed;
       }
       if (
         open.amount !== response.authorization.requirements.amount ||
@@ -161,14 +181,14 @@ async function executeLocked(signal?: AbortSignal) {
           actual: claim.amount,
           openTransaction: open.transaction,
           claimTransaction: claim.transaction,
-          channelId: id,
+          channelId: channelId,
           channelDistributed: distributed,
         },
         resource: response.body,
       };
     },
   });
-  const evidence = {
+  const evidence: FixedGateEvidence = {
     schemaVersion: 1,
     status: 'passed',
     createdAt: new Date().toISOString(),
@@ -176,7 +196,7 @@ async function executeLocked(signal?: AbortSignal) {
     assetLabel: config.assetLabel,
     mint: config.mint,
     upstreamCommit: UPSTREAM_COMMIT,
-    sdkVersion: '2.28.0',
+    sdkVersion: X402_SDK_VERSION,
     ...result,
     transactions: {
       open: explorer(result.accounting.openTransaction),
@@ -189,12 +209,16 @@ async function executeLocked(signal?: AbortSignal) {
       'No P2P/mobile validation',
     ],
   };
-  const evidencePath = `.local/devnet/evidence-${Date.now()}.json`;
+  const evidencePath = fixedEvidencePath(Date.now());
   await saveJson(evidencePath, evidence);
-  await saveJson(journalPath, {
+  await saveJournal(JOURNAL_PATH, {
     state: 'verified',
     evidencePath,
     channelId: result.accounting.channelId,
   });
   return { evidencePath, evidence };
+}
+
+export async function executeGate(signal?: AbortSignal) {
+  return withExclusiveLock(LOCK_PATH, () => executeLocked(signal));
 }

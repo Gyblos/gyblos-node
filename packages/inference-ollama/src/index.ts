@@ -1,7 +1,6 @@
-import { MODEL, renderChat } from './model.js';
-
-export { MODEL, renderChat } from './model.js';
-export { createModelTokenizer, type ModelTokenizer } from './tokenizer.js';
+import { IPV6_LOOPBACK, LOCALHOST, ROUTES, TIMEOUTS } from '@gyblos/config';
+import { GENERATION, MODEL_LIMITS } from '@gyblos/inference-ollama/constants';
+import { MODEL, renderChat } from '@gyblos/inference-ollama/model';
 
 export interface EngineUsage {
   prompt_eval_count: number;
@@ -11,6 +10,7 @@ export interface EngineUsage {
   prompt_eval_duration: number;
   eval_duration: number;
 }
+
 export interface InferenceResult {
   text: string;
   usage: EngineUsage;
@@ -18,11 +18,18 @@ export interface InferenceResult {
   doneReason: string;
 }
 
+export { MODEL, renderChat } from '@gyblos/inference-ollama/model';
+
+export {
+  createModelTokenizer,
+  type ModelTokenizer,
+} from '@gyblos/inference-ollama/tokenizer';
+
 export function localOllamaUrl(base: string): URL {
   const url = new URL(base);
   if (
     url.protocol !== 'http:' ||
-    !['127.0.0.1', '[::1]'].includes(url.hostname) ||
+    ![LOCALHOST, IPV6_LOOPBACK].includes(url.hostname) ||
     url.username ||
     url.password ||
     url.pathname !== '/' ||
@@ -37,9 +44,9 @@ export function localOllamaUrl(base: string): URL {
 export function createOllama(base: string, fetchImpl: typeof fetch = fetch) {
   const origin = localOllamaUrl(base);
   async function assertModel() {
-    const response = await fetchImpl(new URL('/api/tags', origin), {
+    const response = await fetchImpl(new URL(ROUTES.ollamaTags, origin), {
       redirect: 'error',
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(TIMEOUTS.events),
     });
     if (!response.ok) throw new Error('Local model inventory unavailable.');
     const body = (await response.json()) as {
@@ -60,13 +67,13 @@ export function createOllama(base: string, fetchImpl: typeof fetch = fetch) {
       if (
         !Number.isSafeInteger(input.maxTokens) ||
         input.maxTokens < 1 ||
-        input.maxTokens > 512
+        input.maxTokens > MODEL_LIMITS.adapterMaxOutputTokens
       )
         throw new Error('Invalid output token limit.');
       input.signal?.throwIfAborted();
       await assertModel();
       input.signal?.throwIfAborted();
-      const response = await fetchImpl(new URL('/api/generate', origin), {
+      const response = await fetchImpl(new URL(ROUTES.ollamaGenerate, origin), {
         method: 'POST',
         redirect: 'error',
         headers: { 'content-type': 'application/json' },
@@ -75,16 +82,16 @@ export function createOllama(base: string, fetchImpl: typeof fetch = fetch) {
           prompt: renderChat(input.prompt),
           raw: true,
           stream: true,
-          keep_alive: '5m',
+          keep_alive: GENERATION.keepAlive,
           options: {
-            temperature: 0,
-            seed: 42,
+            temperature: GENERATION.temperature,
+            seed: GENERATION.seed,
             num_predict: input.maxTokens,
-            num_ctx: 2048,
+            num_ctx: GENERATION.numCtx,
           },
         }),
         signal: AbortSignal.any([
-          AbortSignal.timeout(90_000),
+          AbortSignal.timeout(TIMEOUTS.generation),
           ...(input.signal ? [input.signal] : []),
         ]),
       });
@@ -102,7 +109,7 @@ export function createOllama(base: string, fetchImpl: typeof fetch = fetch) {
         for (;;) {
           const part = await reader.read();
           buffer += decoder.decode(part.value, { stream: !part.done });
-          if (buffer.length > 1_000_000)
+          if (buffer.length > MODEL_LIMITS.maxFrameCharacters)
             throw new Error('Engine frame exceeds limit.');
           let newline: number;
           while ((newline = buffer.indexOf('\n')) !== -1) {
@@ -120,7 +127,7 @@ export function createOllama(base: string, fetchImpl: typeof fetch = fetch) {
             if (typeof event.response !== 'string')
               throw new Error('Missing engine text.');
             text += event.response;
-            if (text.length > 100_000)
+            if (text.length > MODEL_LIMITS.maxOutputCharacters)
               throw new Error('Engine output exceeds limit.');
             if (event.response) {
               fragments++;

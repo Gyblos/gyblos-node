@@ -1,40 +1,33 @@
-import express from 'express';
-import { exactAuthorizationId } from '../../../packages/payments-x402/src/exact/authorization-id.js';
-import { paymentMiddleware, x402ResourceServer } from '@x402/express';
-import { HTTPFacilitatorClient } from '@x402/core/server';
 import { decodePaymentSignatureHeader } from '@x402/core/http';
+import { HTTPFacilitatorClient } from '@x402/core/server';
 import type {
   PaymentPayload,
   PaymentRequirements,
   SupportedResponse,
 } from '@x402/core/types';
+import { paymentMiddleware, x402ResourceServer } from '@x402/express';
 import { ExactSvmScheme } from '@x402/svm/exact/server';
-import {
-  DEVNET,
-  DEVNET_USDC,
-} from '../../../packages/payments-x402/src/constants.js';
+import express from 'express';
+
+import { HTTP_STATUS, PAYMENT_LIMITS, ROUTES, TIMEOUTS } from '@gyblos/config';
+import { DEVNET, DEVNET_USDC } from '@gyblos/payments-x402/constants';
+import { exactAuthorizationId } from '@gyblos/payments-x402/exact/authorization-id';
 import {
   assertExactSupport,
   EXACT_PRICE,
   validateExactTerms,
-} from '../../../packages/payments-x402/src/exact/index.js';
+} from '@gyblos/payments-x402/exact/index';
+import type { PublicCall } from '@gyblos/payments-x402/exact/types';
 
-export interface PublicCall {
-  operation: string;
-  url: string;
-  outcome: string;
-  transaction?: string;
-  reason?: string;
-  message?: string;
-  payer?: string;
-}
+export type { PublicCall } from '@gyblos/payments-x402/exact/types';
+
 export class AuditedPublicFacilitator extends HTTPFacilitatorClient {
   readonly calls: PublicCall[] = [];
   constructor(
     url: string,
     readonly feePayer: string,
   ) {
-    super({ url, timeoutMs: 20_000 });
+    super({ url, timeoutMs: TIMEOUTS.rpc });
   }
   override async getSupported(): Promise<SupportedResponse> {
     const result = await super.getSupported();
@@ -75,7 +68,7 @@ export class AuditedPublicFacilitator extends HTTPFacilitatorClient {
     }
   }
   private recordError(operation: string, error: unknown) {
-    const e = error as {
+    const errorDetails = error as {
       name?: string;
       invalidReason?: string;
       errorReason?: string;
@@ -83,25 +76,26 @@ export class AuditedPublicFacilitator extends HTTPFacilitatorClient {
       errorMessage?: string;
       transaction?: string;
     };
-    const reason = e.invalidReason ?? e.errorReason;
+    const reason = errorDetails.invalidReason ?? errorDetails.errorReason;
     this.calls.push({
       operation,
       url: this.url,
       outcome:
         operation === 'verify' &&
         reason &&
-        !e.transaction &&
+        !errorDetails.transaction &&
         !/pending|timeout|unknown/i.test(reason)
           ? 'rejected'
           : 'uncertain',
-      reason: reason ?? e.name ?? 'UnknownError',
-      transaction: e.transaction,
-      message: (e.invalidMessage ?? e.errorMessage)
+      reason: reason ?? errorDetails.name ?? 'UnknownError',
+      transaction: errorDetails.transaction,
+      message: (errorDetails.invalidMessage ?? errorDetails.errorMessage)
         ?.replace(/https?:\/\/\S+/g, '[URL]')
-        .slice(0, 500),
+        .slice(0, HTTP_STATUS.internalServerError),
     });
   }
 }
+
 export async function createExactSeller(options: {
   rpcUrl: string;
   payTo: string;
@@ -115,12 +109,12 @@ export async function createExactSeller(options: {
   const app = express();
   let handlerCalls = 0;
   const authorizations = new Set<string>();
-  app.get('/health', (_req, res) => {
-    res.json({ handlerCalls, fixture: true, scheme: 'exact' });
+  app.get(ROUTES.health, (_request, response) => {
+    response.json({ handlerCalls, fixture: true, scheme: 'exact' });
   });
   // Process-scoped replay guard. Never retain or log the signed payload itself.
-  app.use('/api/exact', async (req, res, next) => {
-    const header = req.header('PAYMENT-SIGNATURE');
+  app.use(ROUTES.exact, async (request, response, next) => {
+    const header = request.header('PAYMENT-SIGNATURE');
     if (!header) {
       next();
       return;
@@ -128,18 +122,20 @@ export async function createExactSeller(options: {
     try {
       const payload = decodePaymentSignatureHeader(header);
       if (typeof payload.payload.transaction !== 'string') {
-        res.status(400).json({ error: 'Invalid exact transaction.' });
+        response
+          .status(HTTP_STATUS.badRequest)
+          .json({ error: 'Invalid exact transaction.' });
         return;
       }
-      const id = exactAuthorizationId(payload.payload.transaction);
-      if (authorizations.has(id)) {
-        res.status(409).json({
+      const authorizationId = exactAuthorizationId(payload.payload.transaction);
+      if (authorizations.has(authorizationId)) {
+        response.status(HTTP_STATUS.conflict).json({
           error:
             'Authorization already attempted; reconcile instead of replaying.',
         });
         return;
       }
-      authorizations.add(id);
+      authorizations.add(authorizationId);
       validateExactTerms(payload.accepted, {
         payTo: options.payTo,
         feePayer: options.facilitator.feePayer,
@@ -152,7 +148,7 @@ export async function createExactSeller(options: {
         payload.accepted,
       );
       if (!verification.isValid) {
-        res.status(402).json({
+        response.status(HTTP_STATUS.paymentRequired).json({
           error: 'Payment rejected.',
           reason: verification.invalidReason,
         });
@@ -161,23 +157,29 @@ export async function createExactSeller(options: {
       next();
     } catch {
       const last = options.facilitator.calls.at(-1);
-      res.status(last?.outcome === 'uncertain' ? 503 : 402).json({
-        error: 'Payment not authorized.',
-        reason: last?.reason ?? 'invalid_payment',
-      });
+      response
+        .status(
+          last?.outcome === 'uncertain'
+            ? HTTP_STATUS.serviceUnavailable
+            : HTTP_STATUS.paymentRequired,
+        )
+        .json({
+          error: 'Payment not authorized.',
+          reason: last?.reason ?? 'invalid_payment',
+        });
     }
   });
   app.use(
     paymentMiddleware(
       {
-        'GET /api/exact': {
+        [ROUTES.exactDefinition]: {
           accepts: [
             {
               scheme: 'exact',
               network: DEVNET,
               payTo: options.payTo,
               price: { asset: DEVNET_USDC, amount: EXACT_PRICE },
-              maxTimeoutSeconds: 60,
+              maxTimeoutSeconds: PAYMENT_LIMITS.withdrawDelay,
               extra: { paymentFlow: 'upfront' },
             },
           ],
@@ -191,9 +193,13 @@ export async function createExactSeller(options: {
       false,
     ),
   );
-  app.get('/api/exact', (_req, res) => {
+  app.get(ROUTES.exact, (_request, response) => {
     handlerCalls++;
-    res.json({ fixture: true, scheme: 'exact', fixedPriceAtomic: EXACT_PRICE });
+    response.json({
+      fixture: true,
+      scheme: 'exact',
+      fixedPriceAtomic: EXACT_PRICE,
+    });
   });
   return {
     app,

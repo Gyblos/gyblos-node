@@ -1,33 +1,42 @@
-import { loadConfig, signer } from '../../../scripts/config.js';
-import { assertProgram } from '../../../packages/payments-x402/src/chain.js';
-import { createFacilitator } from '../../../packages/payments-x402/src/facilitator.js';
+import { CLEANUP, HOSTS, LOCALHOST, PORTS } from '@gyblos/config';
+import { loadConfig, signer } from '@gyblos/gate/config';
+import { assertProgram } from '@gyblos/payments-x402/chain';
+import { createFacilitator } from '@gyblos/payments-x402/facilitator';
+import { isMain } from '@gyblos/runtime';
 
-const config = await loadConfig();
-await assertProgram(config.rpcUrl);
-const host = createFacilitator(
-  await signer(config, 'facilitator'),
-  config.rpcUrl,
-  {
-    buyer: config.addresses.buyer,
-    mint: config.mint,
-    payTo: config.addresses.seller,
-    authorizer: config.addresses.authorizer,
-  },
-  process.env.GYBLOS_GATE_RUN_ID,
-);
-const server = host.app.listen(4022, '127.0.0.1', () => {
-  host.cleanup.start({ intervalSecs: 15, abandonGraceSecs: 30 });
-  console.log(
-    'Gate facilitator ready at http://127.0.0.1:4022 (devnet only; memory storage).',
+export async function main() {
+  const config = await loadConfig();
+  await assertProgram(config.rpcUrl);
+  const host = createFacilitator(
+    await signer(config, 'facilitator'),
+    config.rpcUrl,
+    {
+      buyer: config.addresses.buyer,
+      mint: config.mint,
+      payTo: config.addresses.seller,
+      authorizer: config.addresses.authorizer,
+    },
+    process.env.GYBLOS_GATE_RUN_ID,
   );
-});
-async function shutdown() {
-  await host.cleanup.stop();
-  server.close(() => process.exit(0));
+  const server = host.app.listen(PORTS.facilitator, LOCALHOST, () => {
+    host.cleanup.start({
+      intervalSecs: CLEANUP.intervalSeconds,
+      abandonGraceSecs: CLEANUP.abandonGraceSeconds,
+    });
+    console.log(
+      `Gate facilitator ready at ${HOSTS.facilitator} (devnet only; memory storage).`,
+    );
+  });
+  async function shutdown() {
+    await host.cleanup.stop();
+    server.close(() => process.exit(0));
+  }
+  process.once('SIGINT', () => {
+    void shutdown();
+  });
+  process.once('SIGTERM', () => {
+    void shutdown();
+  });
 }
-process.once('SIGINT', () => {
-  void shutdown();
-});
-process.once('SIGTERM', () => {
-  void shutdown();
-});
+
+if (isMain(import.meta.url)) await main();

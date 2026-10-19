@@ -1,11 +1,10 @@
+import { findAssociatedTokenPda } from '@solana-program/token';
 import { address } from '@solana/kit';
-import {
-  findAssociatedTokenPda,
-  TOKEN_PROGRAM_ADDRESS,
-} from '@solana-program/token';
 import { discoverChannelsByRentPayer } from '@x402/svm';
-import { assertDevnet, rpc, GateError } from './chain.js';
-import { DEVNET } from './constants.js';
+
+import { COMMITMENT, TOKEN_PROGRAM_ADDRESS } from '@gyblos/config';
+import { assertDevnet, GateError, rpc } from '@gyblos/payments-x402/chain';
+import { DEVNET } from '@gyblos/payments-x402/constants';
 
 export interface DepositExpectation {
   rpcUrl: string;
@@ -27,7 +26,7 @@ export async function verifyInferenceDeposit(
     {
       async getProgramAccounts(_network, program, config) {
         const filters = JSON.parse(
-          JSON.stringify(config, (_key, value) => {
+          JSON.stringify(config, (_propertyName, value) => {
             if (typeof value !== 'bigint') return value;
             if (value < 0n || value > BigInt(Number.MAX_SAFE_INTEGER))
               throw new Error('Unsafe channel discovery filter.');
@@ -65,9 +64,22 @@ export async function verifyInferenceDeposit(
     tokenProgram: TOKEN_PROGRAM_ADDRESS,
   });
   const account = (
-    await rpc<{ value: any }>(expected.rpcUrl, 'getAccountInfo', [
+    await rpc<{
+      value: {
+        owner: string;
+        data: {
+          parsed: {
+            info: {
+              owner: string;
+              mint: string;
+              tokenAmount: { amount: string };
+            };
+          };
+        };
+      } | null;
+    }>(expected.rpcUrl, 'getAccountInfo', [
       escrow,
-      { encoding: 'jsonParsed', commitment: 'confirmed' },
+      { encoding: 'jsonParsed', commitment: COMMITMENT },
     ])
   ).value;
   const info = account?.data?.parsed?.info;
