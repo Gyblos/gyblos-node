@@ -55,14 +55,17 @@ export async function rpc<T>(
 }
 
 export function readChain<T>(
-  config: Config,
+  config: Pick<Config, 'rpcUrl'>,
   method: string,
   params: unknown[],
 ): Promise<T> {
   return rpc<T>(config.rpcUrl, method, params);
 }
 
-export async function confirmInference(config: Config, signature: string) {
+export async function confirmInference(
+  config: Pick<Config, 'rpcUrl'>,
+  signature: string,
+) {
   return confirm(config.rpcUrl, signature, {
     read: rpc,
     failedMessage: 'Inference transaction failed.',
@@ -81,7 +84,12 @@ export async function tokenAddress(owner: string, mint: string) {
   )[0];
 }
 
-export async function inferenceSnapshot(config: Config, channelId?: string) {
+export async function inferenceSnapshot(
+  config: Pick<Config, 'rpcUrl' | 'mint'> & {
+    addresses: Pick<Config['addresses'], 'buyer' | 'seller'>;
+  },
+  channelId?: string,
+) {
   const owners = [
     config.addresses.buyer,
     config.addresses.seller,
@@ -116,7 +124,10 @@ export async function inferenceSnapshot(config: Config, channelId?: string) {
   };
 }
 
-export async function transaction(config: Config, signature: string) {
+export async function transaction(
+  config: Pick<Config, 'rpcUrl'>,
+  signature: string,
+) {
   for (let attempt = 0; attempt < RETRIES.transaction; attempt++) {
     const transaction = await readChain<ChainTransaction | null>(
       config,
