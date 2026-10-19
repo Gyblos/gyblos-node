@@ -1,3 +1,5 @@
+import { discoverLabAddress } from './lab-reflection.mjs';
+
 export async function nativeSeller() {
   const { Endpoint, RelayMode } = await import('@number0/iroh');
   const { writeFile } = await import('node:fs/promises');
@@ -11,10 +13,29 @@ export async function nativeSeller() {
   const endpoint = await builder.bind();
   if (config.external) await endpoint.addExternalAddr(config.external);
   await endpoint.online();
+  let reflectedAddress = null;
+  if (config.discovery) {
+    const { EndpointAddr, EndpointId } = await import('@number0/iroh');
+    const { readFile } = await import('node:fs/promises');
+    const observer = JSON.parse(
+      await readFile(config.discovery.descriptorPath, 'utf8'),
+    );
+    reflectedAddress = await discoverLabAddress(
+      endpoint,
+      new EndpointAddr(
+        EndpointId.fromString(observer.id),
+        null,
+        observer.addresses,
+      ),
+      { ...config.discovery, observerId: observer.id },
+    );
+  }
   const address = endpoint.addr();
   await writeFile(
     config.peerPath,
     JSON.stringify({
+      boundSockets: endpoint.boundSockets(),
+      reflectedAddress,
       id: address.id().toString(),
       relayUrl: address.relayUrl(),
       directAddresses: address.directAddresses(),
@@ -56,6 +77,21 @@ export async function nativeBuyer() {
   try {
     if (config.external) await endpoint.addExternalAddr(config.external);
     await endpoint.online();
+    let reflectedAddress = null;
+    if (config.discovery) {
+      const observer = JSON.parse(
+        await readFile(config.discovery.descriptorPath, 'utf8'),
+      );
+      reflectedAddress = await discoverLabAddress(
+        endpoint,
+        new EndpointAddr(
+          EndpointId.fromString(observer.id),
+          null,
+          observer.addresses,
+        ),
+        { ...config.discovery, observerId: observer.id },
+      );
+    }
     const peer = JSON.parse(await readFile(config.peerPath, 'utf8'));
     const start = performance.now();
     connection = await endpoint.connect(
@@ -88,6 +124,8 @@ export async function nativeBuyer() {
     await writeFile(
       config.resultPath,
       JSON.stringify({
+        boundSockets: endpoint.boundSockets(),
+        reflectedAddress,
         connectMs,
         echoes,
         snapshots,
@@ -103,6 +141,54 @@ export async function nativeBuyer() {
   }
 }
 
+export async function nativeObserver() {
+  const { Endpoint, RelayMode } = await import('@number0/iroh');
+  const { writeFile } = await import('node:fs/promises');
+  const config = JSON.parse(process.argv[1]);
+  const builder = Endpoint.builder();
+  builder.applyMinimal();
+  builder.bindAddr(config.bind);
+  builder.relayMode(RelayMode.disabled());
+  builder.alpns([[...Buffer.from(config.protocol)]]);
+  const endpoint = await builder.bind();
+  await writeFile(
+    config.descriptorPath,
+    JSON.stringify({
+      id: endpoint.id().toString(),
+      addresses: endpoint.addr().directAddresses(),
+    }),
+  );
+  try {
+    for (let index = 0; index < config.maximumClients; index++) {
+      const incoming = await endpoint.acceptNext();
+      if (!incoming) throw new Error('Observer closed before reflection.');
+      const remote = await incoming.remoteAddr();
+      if (remote.kind !== 'ip' || !remote.addr)
+        throw new Error('Observer requires direct native UDP.');
+      const connection = await (await incoming.accept()).connect();
+      try {
+        const stream = await connection.acceptBi();
+        await stream.recv.readToEnd(config.maximumBytes);
+        await stream.send.writeAll([
+          ...Buffer.from(JSON.stringify({ address: remote.addr })),
+        ]);
+        await stream.send.finish();
+        await stream.send.stopped();
+      } finally {
+        connection.close(BigInt(config.closeCode), []);
+      }
+    }
+  } finally {
+    await endpoint.close();
+  }
+}
+
 export function nativeSource(role) {
-  return `await (${(role === 'seller' ? nativeSeller : nativeBuyer).toString()})();`;
+  const worker =
+    role === 'seller'
+      ? nativeSeller
+      : role === 'observer'
+        ? nativeObserver
+        : nativeBuyer;
+  return `const discoverLabAddress = ${discoverLabAddress.toString()}; await (${worker.toString()})();`;
 }
