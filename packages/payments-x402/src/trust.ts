@@ -10,6 +10,7 @@ export interface TrustPolicy {
   feePayer: string;
   receiverAuthorizer: string;
   maxAtomic: string;
+  expectedAmount?: string;
 }
 
 export function validateSettlement(
@@ -51,6 +52,11 @@ export function validateTerms(
     terms.maxTimeoutSeconds > PAYMENT_LIMITS.maxTimeoutSeconds
   )
     reject('Unsupported timeout.');
+  if (
+    policy.expectedAmount !== undefined &&
+    terms.amount !== policy.expectedAmount
+  )
+    reject('Challenge does not match the independently calculated ceiling.');
   const extra = terms.extra ?? {};
   if (
     extra.feePayer !== policy.feePayer ||
