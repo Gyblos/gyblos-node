@@ -30,6 +30,10 @@ export async function nativeSeller() {
       { ...config.discovery, observerId: observer.id },
     );
   }
+  if (config.publicAudit)
+    await new Promise((resolve) =>
+      setTimeout(resolve, config.publicAudit.settleMs),
+    );
   const address = endpoint.addr();
   await writeFile(
     config.peerPath,
@@ -91,6 +95,31 @@ export async function nativeBuyer() {
         ),
         { ...config.discovery, observerId: observer.id },
       );
+    }
+    if (config.publicAudit) {
+      await new Promise((resolve) =>
+        setTimeout(resolve, config.publicAudit.settleMs),
+      );
+      await writeFile(
+        config.publicAudit.descriptorPath,
+        JSON.stringify({
+          boundSockets: endpoint.boundSockets(),
+          directAddresses: endpoint.addr().directAddresses(),
+        }),
+      );
+      const deadline = Date.now() + config.publicAudit.waitMs;
+      let ready = false;
+      while (Date.now() < deadline) {
+        try {
+          await readFile(config.publicAudit.startPath);
+          ready = true;
+          break;
+        } catch {}
+        await new Promise((resolve) =>
+          setTimeout(resolve, config.publicAudit.pollMs),
+        );
+      }
+      if (!ready) throw new Error('Public audit did not release the peer.');
     }
     const peer = JSON.parse(await readFile(config.peerPath, 'utf8'));
     const start = performance.now();
