@@ -2,6 +2,7 @@ import type { PRICES, TOLERANCE } from '@gyblos/application/metering';
 import type { EngineUsage, MODEL } from '@gyblos/inference-ollama/index';
 
 import type { inferenceSnapshot, transactionTransfers } from './chain.js';
+import type { InferenceEvidenceErrorCode } from './constants.js';
 import type { EvidenceBase } from './evidence-types.js';
 import type { Measurement } from './measurements.js';
 
@@ -54,6 +55,6 @@ export interface InferenceGateEvidence extends EvidenceBase {
   engineTraces?: Record<string, InferenceTrace>;
   ollamaVersion?: string;
   completedAt?: string;
-  errorCode?: string;
+  errorCode?: InferenceEvidenceErrorCode;
   errorLocation?: string[];
 }
