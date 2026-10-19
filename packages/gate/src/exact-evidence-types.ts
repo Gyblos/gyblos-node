@@ -4,8 +4,12 @@ import type {
   SupportedResponse,
 } from '@x402/core/types';
 
+import type { EXACT_PRICE } from '@gyblos/application/constants';
+import type { HTTP_STATUS } from '@gyblos/config';
 import type {
   CASE_STATUSES,
+  EVIDENCE_IDS,
+  EXACT_ASSET_LABELS,
   EXACT_CASES,
   EXACT_ENFORCEMENT,
   EXACT_REPLAY_SCOPE,
@@ -59,7 +63,7 @@ export type ExactCaseResult =
   | (AuthorizationMetadata & {
       case: typeof EXACT_CASES.PAID_REQUEST;
       status: typeof CASE_STATUSES.PASSED;
-      httpStatus: number;
+      httpStatus: typeof HTTP_STATUS.ok;
       receipt: SettleResponse;
       resource: unknown;
       before: ExactSnapshot;
@@ -78,7 +82,7 @@ export type ExactCaseResult =
   | {
       case: typeof EXACT_CASES.REPLAY;
       status: typeof CASE_STATUSES.PASSED;
-      httpStatus: number;
+      httpStatus: typeof HTTP_STATUS.conflict;
       before: ExactSnapshot;
       after: ExactSnapshot;
       handlerDelta: 0;
@@ -102,13 +106,17 @@ export type FacilitatorObservation =
     };
 
 export interface ExactGateEvidence extends EvidenceBase {
-  priceAtomic: string;
+  evidenceId: typeof EVIDENCE_IDS.EXACT;
+  assetLabel: typeof EXACT_ASSET_LABELS.CIRCLE_USDC;
+  priceAtomic: typeof EXACT_PRICE;
   startedAt: string;
   facilitators: FacilitatorObservation[];
   results: ExactCaseResult[];
   setupTransaction?: string;
   facilitatorUsed?: string;
-  challenge?: PaymentRequired & { httpStatus: number };
+  challenge?: PaymentRequired & {
+    httpStatus: typeof HTTP_STATUS.paymentRequired;
+  };
   publicCalls?: PublicCall[];
   reconciliation?: Reconciliation;
   finishedAt?: string;

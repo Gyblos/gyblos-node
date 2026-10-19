@@ -33,6 +33,7 @@ import {
   INFERENCE_EVIDENCE_CODES,
   WALLET_ROLES,
 } from '@gyblos/gate/constants';
+import type { InferenceTrace } from '@gyblos/gate/inference-evidence-types';
 import { assertNoUnresolvedAuthorizations } from '@gyblos/gate/journal';
 import { withExclusiveLock } from '@gyblos/gate/lock';
 import { measurementSalt } from '@gyblos/gate/measurements';
@@ -167,18 +168,7 @@ export async function main() {
       const debugRequestId = randomUUID(),
         underchargeRequestId = randomUUID(),
         failureRequestId = randomUUID();
-      const traces = new Map<
-        string,
-        {
-          channelId: string;
-          depositConfirmedAt: string;
-          engineStartedAt: string;
-          during: Awaited<ReturnType<typeof inferenceSnapshot>>;
-          firstFragmentAt?: string;
-          stoppedAt?: string;
-          stoppedSignal?: string;
-        }
-      >();
+      const traces = new Map<string, InferenceTrace>();
       const events = async () =>
         (await fetch(`${facilitatorUrl}${ROUTES.events}`, {
           signal: AbortSignal.timeout(TIMEOUTS.events),

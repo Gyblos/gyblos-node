@@ -1,3 +1,4 @@
+import type { DEVNET, DIAGNOSTIC_LIMITS } from '@gyblos/config';
 import type {
   EvidenceAssetLabel,
   EvidenceId,
@@ -11,7 +12,7 @@ export interface EvidenceBase {
   schemaVersion: typeof SCHEMA_VERSIONS.EVIDENCE;
   evidenceId: EvidenceId;
   sdkVersion: string;
-  network: string;
+  network: typeof DEVNET;
   mint: string;
   assetLabel: EvidenceAssetLabel;
   status: EvidenceStatus;
@@ -36,7 +37,7 @@ export interface ExactSnapshot {
 export interface ReconciliationObservation {
   checkedAt: string;
   address: string;
-  historyLimit: number;
+  historyLimit: typeof DIAGNOSTIC_LIMITS.transactionHistory;
   matches: { signature: string; slot: number; error: unknown }[];
   classification: Exclude<
     ReconciliationClassification,

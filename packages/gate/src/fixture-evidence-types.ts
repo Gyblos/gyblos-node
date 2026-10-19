@@ -1,6 +1,7 @@
 import type { PaymentRequirements } from '@x402/core/types';
 
 import type { runGate } from '@gyblos/application/gate';
+import type { DEVNET, HTTP_STATUS } from '@gyblos/config';
 import type {
   CASE_STATUSES,
   CHALLENGE_STAGES,
@@ -15,7 +16,7 @@ export type FixedGateEvidence = Awaited<ReturnType<typeof runGate>> & {
   schemaVersion: typeof SCHEMA_VERSIONS.EVIDENCE;
   status: typeof EVIDENCE_STATUSES.PASSED;
   createdAt: string;
-  network: string;
+  network: typeof DEVNET;
   assetLabel: ConfigAssetLabel;
   mint: string;
   upstreamCommit: string;
@@ -27,37 +28,37 @@ export type FixedGateEvidence = Awaited<ReturnType<typeof runGate>> & {
 export interface ChallengeEvidence {
   schemaVersion: typeof SCHEMA_VERSIONS.EVIDENCE;
   stage: typeof CHALLENGE_STAGES.UNPAID;
-  gatePassed: boolean;
+  gatePassed: false;
   createdAt: string;
   upstreamCommit: string;
   sdkVersion: string;
   challenge: PaymentRequirements;
-  resourceExecutions: number;
-  settlements: number;
+  resourceExecutions: 0;
+  settlements: 0;
   note: string;
 }
 
 export interface FailureCaseResult {
   case: typeof FAILURE_CASES.EMPTY_BUYER | typeof FAILURE_CASES.EXPIRED;
   status: typeof CASE_STATUSES.PASSED;
-  httpStatus: number;
+  httpStatus: typeof HTTP_STATUS.paymentRequired;
   buyer: string;
   channelId: string;
   expiresAt: number | undefined;
   rejection: unknown;
   verifications: ReturnType<typeof createFacilitator>['verifications'];
   events: ReturnType<typeof createFacilitator>['events'];
-  handlerCalls: number;
+  handlerCalls: 0;
   before: { buyer: string; seller: string };
   after: { buyer: string; seller: string };
-  channelExists: boolean;
+  channelExists: false;
   paymentTransactions: unknown[];
 }
 
 export interface FailureGateEvidence {
   schemaVersion: typeof SCHEMA_VERSIONS.EVIDENCE;
   createdAt: string;
-  network: string;
+  network: typeof DEVNET;
   mint: string;
   assetLabel: ConfigAssetLabel;
   setupTransaction: string;
