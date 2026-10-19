@@ -11,6 +11,11 @@ import {
   X402_SDK_VERSION,
 } from '@gyblos/config';
 import { loadConfig, saveJson, signer } from '@gyblos/gate/config';
+import {
+  CHALLENGE_STAGES,
+  SCHEMA_VERSIONS,
+  WALLET_ROLES,
+} from '@gyblos/gate/constants';
 import type { ChallengeEvidence } from '@gyblos/gate/fixture-evidence-types';
 import { assertProgram } from '@gyblos/payments-x402/chain';
 import { UPSTREAM_COMMIT } from '@gyblos/payments-x402/constants';
@@ -22,7 +27,7 @@ export async function challengeGate() {
   const config = await loadConfig();
   await assertProgram(config.rpcUrl);
   const facilitator = createFacilitator(
-    await signer(config, 'facilitator'),
+    await signer(config, WALLET_ROLES.FACILITATOR),
     config.rpcUrl,
     {
       buyer: config.addresses.buyer,
@@ -43,7 +48,7 @@ export async function challengeGate() {
       facilitatorUrl: `http://${LOCALHOST}:${address.port}`,
       mint: config.mint,
       payTo: config.addresses.seller,
-      authorizer: await signer(config, 'authorizer'),
+      authorizer: await signer(config, WALLET_ROLES.AUTHORIZER),
     });
     sellerServer = app.listen(0, LOCALHOST);
     await once(sellerServer, 'listening');
@@ -72,8 +77,8 @@ export async function challengeGate() {
     if (state.handlerCalls !== 0 || facilitator.events.length !== 0)
       throw new Error('Unpaid request executed resource or settlement.');
     const evidence: ChallengeEvidence = {
-      schemaVersion: 1,
-      stage: 'unpaid-challenge-only',
+      schemaVersion: SCHEMA_VERSIONS.EVIDENCE,
+      stage: CHALLENGE_STAGES.UNPAID,
       gatePassed: false,
       createdAt: new Date().toISOString(),
       upstreamCommit: UPSTREAM_COMMIT,
