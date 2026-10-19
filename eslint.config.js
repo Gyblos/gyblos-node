@@ -1,5 +1,7 @@
 import tseslint from 'typescript-eslint';
 
+import standards from './tooling/code-standards.js';
+
 export default [
   {
     ignores: [
@@ -14,24 +16,12 @@ export default [
   {
     files: ['apps/**/*.ts', 'packages/**/*.ts', 'scripts/**/*.ts'],
     languageOptions: { parser: tseslint.parser },
-    plugins: { '@typescript-eslint': tseslint.plugin },
+    plugins: { '@typescript-eslint': tseslint.plugin, gyblos: standards },
     rules: {
       '@typescript-eslint/no-explicit-any': 'error',
-      'max-lines': [
-        'warn',
-        { max: 300, skipBlankLines: true, skipComments: true },
-      ],
-      '@typescript-eslint/no-magic-numbers': [
-        'warn',
-        {
-          ignore: [0, 1, -1, 2],
-          ignoreArrayIndexes: true,
-          ignoreDefaultValues: true,
-          ignoreNumericLiteralTypes: true,
-          ignoreReadonlyClassProperties: true,
-          enforceConst: true,
-        },
-      ],
+      'max-lines': ['error', { max: 300 }],
+      'gyblos/structure': 'error',
+      'gyblos/numeric-constants': 'error',
     },
   },
   {
@@ -48,5 +38,13 @@ export default [
         },
       ],
     },
+  },
+  {
+    files: ['packages/config/**/*.ts', '**/constants.ts'],
+    rules: { 'gyblos/numeric-constants': 'off' },
+  },
+  {
+    files: ['packages/config/src/versions.ts'],
+    rules: { 'gyblos/version-pins': 'error' },
   },
 ];
