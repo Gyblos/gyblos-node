@@ -126,17 +126,62 @@ remain non-root and read-only, with no role keys, privileged mode or published
 ports. Their bootstrap sets no-new-privileges before configuring MASQUERADE. The
 relay scenario drops inbound WAN UDP on the seller router.
 
-A missing required route stops before payment. The default-discovery direct
-trial did not observe a direct route within its deadline; an unpaid request
-connected over relay. An optional `--lab-candidates` diagnostic advertises known
-lab WAN candidates, is disabled by default, and also did not establish a direct
-route in this environment. It does not validate automatic NAT discovery.
-Successful relay traffic with UDP blocked must not be described as proof that
-the block caused a direct-to-relay transition. Physical-network testing remains
-pending. A private per-run start manifest preserves the journal offset and
-prefix hash before payment; any interrupted run requires reconciliation before
-another attempt. Failed preparation may leave containers available for local
-inspection; stop only that project without deleting its role volumes.
+A missing required route stops before payment. The original direct trials are
+retained in the report. Follow-up diagnostics reproduced an unsolicited UDP
+conntrack collision in the test routers: an early packet could reserve a tuple
+and force the peer's source port to change. Routers now drop new WAN UDP
+addressed to themselves; replies translated to actors still use the FORWARD
+rules.
+
+Run the keyless UDP/conntrack regression without model files, wallets or RPC:
+
+```sh
+pnpm p2p:diagnose
+```
+
+With an already built P2P runtime image, add native Iroh observations:
+
+```sh
+pnpm p2p:diagnose --native-image gyblos-p2p-poc --lab-candidates
+pnpm p2p:diagnose --native-image gyblos-p2p-poc --lab-candidates --idle
+pnpm p2p:diagnose --native-image gyblos-p2p-poc --lab-candidates --block-udp
+```
+
+These commands generate ephemeral native identities, use tmpfs instead of role
+volumes, verify the pinned SDK version, and exchange only bounded synthetic
+bytes. They authorize no payments and start no model or facilitator. Full
+addresses/mappings stay private; console reports contain counts, route classes
+and source/image hashes. The base command tests UDP; optional native controls
+also test Iroh. The diagnostic's idle workers stop with its own Compose project.
+
+With corrected routers, native direct routing succeeded with explicit lab WAN
+candidates, including an idle control. Those candidates remain disabled by
+default and do not establish automatic discovery. Default discovery still used
+relay: its learned addresses omitted the intermediate lab WAN and shared an
+outer public IP. Upstream hairpin failure is a hypothesis, not a demonstrated
+cause. Real separate-network testing remains pending. Unpaid diagnostics do not
+turn the earlier paid NAT-direct case into a passing payment gate.
+
+Seller startup now requires measured VM/cgroup memory headroom, then one bounded
+private synthetic warmup before any offer is signed or readiness is reported.
+Headroom is checked again after tokenizer, middleware and transport
+initialization, before signing. Generated text is discarded. The 1.5 GiB reserve
+is a conservative admission policy, not a proven minimum working set or a future
+capacity guarantee. Memory snapshots and OOM deltas are private metadata;
+failure aborts startup without an automatic retry. One model/parallel generation
+and a bounded queue are explicit. Offers expire four minutes after warmup,
+within the five-minute model keep-alive; slow publication cannot extend that
+lease. A valid warmup cannot prevent later VM pressure, model eviction or
+unrelated processes consuming memory.
+
+The historical runner death was attributed to Docker-VM global OOM by its kernel
+record, not to exhausting the seller's 3 GiB limit. Increasing the local Docker
+allocation was an operator environment change; the repository does not change
+Docker Desktop settings. Keep enough shared-VM headroom for other services.
+
+A private per-run start manifest preserves the journal offset and prefix hash
+before payment. Failed preparation may leave containers for local inspection;
+stop only that project and preserve its funded role volumes.
 
 Uncertain calls or funding block further authorizations until reconciliation;
 there is no automatic payment retry. Private journals remain in each container's
