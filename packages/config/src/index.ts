@@ -9,3 +9,5 @@ export * from '@gyblos/config/versions';
 export * from '@gyblos/config/limits';
 
 export * from '@gyblos/config/p2p';
+
+export * from './nat.js';
