@@ -20,6 +20,7 @@
   "nat-mapping.test.ts",
   "nat-topology.test.ts",
   "p2p-payment-policy.test.ts",
+  "public-path-audit.test.ts",
   "refactor.test.ts",
   "review-regressions.test.ts",
   "role-isolation.test.ts",
