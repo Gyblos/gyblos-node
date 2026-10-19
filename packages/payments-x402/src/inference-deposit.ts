@@ -1,10 +1,33 @@
 import { findAssociatedTokenPda } from '@solana-program/token';
-import { address } from '@solana/kit';
-import { discoverChannelsByRentPayer } from '@x402/svm';
+import { address, getBase64Encoder } from '@solana/kit';
+import { CHANNEL_ACCOUNT_SIZE, discoverChannelsByRentPayer } from '@x402/svm';
 
-import { COMMITMENT, TOKEN_PROGRAM_ADDRESS } from '@gyblos/config';
+import {
+  CHANNEL_STATUS,
+  COMMITMENT,
+  TOKEN_PROGRAM_ADDRESS,
+} from '@gyblos/config';
 import { assertDevnet, GateError, rpc } from '@gyblos/payments-x402/chain';
 import { DEVNET } from '@gyblos/payments-x402/constants';
+
+interface ChannelAccountResponse {
+  value: { owner: string; data: [string, 'base64'] } | null;
+}
+
+interface EscrowAccountResponse {
+  value: {
+    owner: string;
+    data: {
+      parsed?: {
+        info?: {
+          owner?: string;
+          mint?: string;
+          tokenAmount?: { amount?: string };
+        };
+      };
+    };
+  } | null;
+}
 
 export interface DepositExpectation {
   rpcUrl: string;
@@ -24,16 +47,30 @@ export async function verifyInferenceDeposit(
   await assertDevnet(expected.rpcUrl);
   const channels = await discoverChannelsByRentPayer(
     {
-      async getProgramAccounts(_network, program, config) {
-        const filters = JSON.parse(
-          JSON.stringify(config, (_propertyName, value) => {
-            if (typeof value !== 'bigint') return value;
-            if (value < 0n || value > BigInt(Number.MAX_SAFE_INTEGER))
-              throw new Error('Unsafe channel discovery filter.');
-            return Number(value);
-          }),
+      async getProgramAccounts() {
+        // Feed only the requested account into the SDK's public owner, layout
+        // and canonical-PDA validator; this adapter never scans program accounts.
+        const { value } = await rpc<ChannelAccountResponse>(
+          expected.rpcUrl,
+          'getAccountInfo',
+          [expected.channelId, { commitment: COMMITMENT, encoding: 'base64' }],
         );
-        return rpc(expected.rpcUrl, 'getProgramAccounts', [program, filters]);
+        // Preserve the exact size boundary previously enforced by the RPC scan.
+        if (
+          value &&
+          (value.data[1] !== 'base64' ||
+            getBase64Encoder().encode(value.data[0]).byteLength !==
+              Number(CHANNEL_ACCOUNT_SIZE))
+        )
+          return [];
+        return value
+          ? [
+              {
+                pubkey: address(expected.channelId),
+                account: { ...value, owner: address(value.owner) },
+              },
+            ]
+          : [];
       },
     },
     DEVNET,
@@ -44,7 +81,7 @@ export async function verifyInferenceDeposit(
   )?.channel;
   if (
     !channel ||
-    channel.status !== 0 ||
+    channel.status !== CHANNEL_STATUS.open ||
     channel.deposit !== BigInt(expected.ceiling) ||
     channel.settlement.settled !== 0n ||
     channel.payer !== expected.buyer ||
@@ -64,20 +101,7 @@ export async function verifyInferenceDeposit(
     tokenProgram: TOKEN_PROGRAM_ADDRESS,
   });
   const account = (
-    await rpc<{
-      value: {
-        owner: string;
-        data: {
-          parsed: {
-            info: {
-              owner: string;
-              mint: string;
-              tokenAmount: { amount: string };
-            };
-          };
-        };
-      } | null;
-    }>(expected.rpcUrl, 'getAccountInfo', [
+    await rpc<EscrowAccountResponse>(expected.rpcUrl, 'getAccountInfo', [
       escrow,
       { encoding: 'jsonParsed', commitment: COMMITMENT },
     ])
@@ -88,7 +112,7 @@ export async function verifyInferenceDeposit(
     info?.owner !== expected.channelId ||
     info?.mint !== expected.mint ||
     !/^\d+$/.test(String(info?.tokenAmount?.amount)) ||
-    BigInt(info.tokenAmount.amount) < BigInt(expected.ceiling)
+    BigInt(info?.tokenAmount?.amount ?? '0') < BigInt(expected.ceiling)
   ) {
     throw new GateError(
       'INSUFFICIENT_INFERENCE_ESCROW',
