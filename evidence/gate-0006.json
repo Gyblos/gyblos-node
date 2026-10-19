@@ -711,5 +711,219 @@
     "sellerAtomic": "9808",
     "buyerLamports": "0",
     "finalEscrowsAtomic": "0"
+  },
+  "diagnosticFollowup": {
+    "recordedAt": "2026-10-19",
+    "payments": 0,
+    "status": "partial-unpaid-diagnostics",
+    "scope": "Controlled Docker topology, ephemeral identities and engine-only synthetic probe; existing paid scenarios are unchanged.",
+    "kernelFinding": {
+      "matchedHistoricalSeller": true,
+      "scope": "Docker-VM global OOM",
+      "constraint": "CONSTRAINT_NONE",
+      "victim": "llama-server",
+      "selectedRecordsSha256": "0be00555deb8afd59db15dcbba1057ecf8c9a595eb4dfe47fcd05ecfe36dd1b4",
+      "sellerCgroupLimitExhaustionEstablished": false
+    },
+    "routerFinding": {
+      "reproduction": "500 ms skew: unsolicited router-local WAN UDP created a conflicting conntrack tuple, remapping the later peer source port. Before correction both peers received zero packets.",
+      "correction": "Drop NEW router-local WAN UDP in INPUT; forwarded DNAT replies still use FORWARD. No port forwarding or added actor capabilities.",
+      "rawMappingsPublished": false
+    },
+    "nativeProbes": [
+      {
+        "status": "passed",
+        "source": {
+          "algorithm": "sha256(sorted source path NUL bytes NUL)",
+          "digest": "72232e8296ea585f63cbe9cce6c98dda2e35c00ecdf0ab077080ba7ce1da5590"
+        },
+        "payments": 0,
+        "roleVolumes": false,
+        "actorsUnprivileged": true,
+        "routerImage": "sha256:19d70a59d32210d2cf7649b7df84c8be9237c9dffdb50ec7769b165223c8bafd",
+        "nodeImage": "node:22.19.0-bookworm-slim@sha256:4a4884e8a44826194dff92ba316264f392056cbe243dcc9fd3551e71cea02b90",
+        "workerSha256": "7e96c98ba0605f6002f9888ae649abfd5d34ca925b1c3b261bbaf69067a77a99",
+        "skewMs": 500,
+        "packetsReceived": [
+          24,
+          24
+        ],
+        "portsPreserved": true,
+        "actorImage": "sha256:5ddc9a3c59d41f363086e4f87c3c1b7e11f005e84809e1c40f63db6fd11520a0",
+        "inboundUdpBlocked": false,
+        "inboundUdpDroppedPackets": 0,
+        "native": {
+          "candidateMode": "manual-lab-candidates",
+          "active": true,
+          "echoes": 20,
+          "connectMs": 177.77820900000006,
+          "finalRoute": "iroh-direct",
+          "firstDirectMs": 1176.946,
+          "selectedLabWan": true,
+          "workerSha256": "c2bb4559445319e0d32c33c574c6d80341dc53c204189d4ba56bc73f730b067c"
+        }
+      },
+      {
+        "status": "passed",
+        "source": {
+          "algorithm": "sha256(sorted source path NUL bytes NUL)",
+          "digest": "72232e8296ea585f63cbe9cce6c98dda2e35c00ecdf0ab077080ba7ce1da5590"
+        },
+        "payments": 0,
+        "roleVolumes": false,
+        "actorsUnprivileged": true,
+        "routerImage": "sha256:a77a634d629acecc864bbaa41835613b8ea1ba5c048edc86f1c1c9e5748efc05",
+        "nodeImage": "node:22.19.0-bookworm-slim@sha256:4a4884e8a44826194dff92ba316264f392056cbe243dcc9fd3551e71cea02b90",
+        "workerSha256": "7e96c98ba0605f6002f9888ae649abfd5d34ca925b1c3b261bbaf69067a77a99",
+        "skewMs": 500,
+        "packetsReceived": [
+          24,
+          23
+        ],
+        "portsPreserved": true,
+        "actorImage": "sha256:5ddc9a3c59d41f363086e4f87c3c1b7e11f005e84809e1c40f63db6fd11520a0",
+        "inboundUdpBlocked": false,
+        "inboundUdpDroppedPackets": 0,
+        "native": {
+          "candidateMode": "manual-lab-candidates",
+          "active": false,
+          "echoes": 0,
+          "connectMs": 171.282917,
+          "finalRoute": "iroh-direct",
+          "firstDirectMs": 1002.708417,
+          "selectedLabWan": true,
+          "workerSha256": "c2bb4559445319e0d32c33c574c6d80341dc53c204189d4ba56bc73f730b067c"
+        }
+      },
+      {
+        "status": "passed",
+        "source": {
+          "algorithm": "sha256(sorted source path NUL bytes NUL)",
+          "digest": "d497786aa365d0e64720ffdb004a3fbb0b7f6a610bc5058753122a53106b6d9b"
+        },
+        "payments": 0,
+        "roleVolumes": false,
+        "actorsUnprivileged": true,
+        "routerImage": "sha256:8143db69f599b6d504c97f090243b6987aea31fc902a4e99705ed75cd1d06534",
+        "nodeImage": "node:22.19.0-bookworm-slim@sha256:4a4884e8a44826194dff92ba316264f392056cbe243dcc9fd3551e71cea02b90",
+        "workerSha256": "7e96c98ba0605f6002f9888ae649abfd5d34ca925b1c3b261bbaf69067a77a99",
+        "skewMs": 500,
+        "packetsReceived": [
+          0,
+          23
+        ],
+        "portsPreserved": null,
+        "actorImage": "sha256:5ddc9a3c59d41f363086e4f87c3c1b7e11f005e84809e1c40f63db6fd11520a0",
+        "inboundUdpBlocked": true,
+        "inboundUdpDroppedPackets": 167,
+        "native": {
+          "candidateMode": "manual-lab-candidates",
+          "active": true,
+          "echoes": 20,
+          "connectMs": 168.35133299999995,
+          "finalRoute": "iroh-relay",
+          "firstDirectMs": null,
+          "selectedLabWan": false,
+          "workerSha256": "c2bb4559445319e0d32c33c574c6d80341dc53c204189d4ba56bc73f730b067c"
+        }
+      },
+      {
+        "status": "passed",
+        "source": {
+          "algorithm": "sha256(sorted source path NUL bytes NUL)",
+          "digest": "d497786aa365d0e64720ffdb004a3fbb0b7f6a610bc5058753122a53106b6d9b"
+        },
+        "payments": 0,
+        "roleVolumes": false,
+        "actorsUnprivileged": true,
+        "routerImage": "sha256:9a4c0043c3e94aeb782b4b48d4e3798aa1532ce744f36d3b32a66a462126e1d8",
+        "nodeImage": "node:22.19.0-bookworm-slim@sha256:4a4884e8a44826194dff92ba316264f392056cbe243dcc9fd3551e71cea02b90",
+        "workerSha256": "7e96c98ba0605f6002f9888ae649abfd5d34ca925b1c3b261bbaf69067a77a99",
+        "skewMs": 500,
+        "packetsReceived": [
+          25,
+          24
+        ],
+        "portsPreserved": true,
+        "actorImage": "sha256:5ddc9a3c59d41f363086e4f87c3c1b7e11f005e84809e1c40f63db6fd11520a0",
+        "inboundUdpBlocked": false,
+        "inboundUdpDroppedPackets": 0,
+        "native": {
+          "candidateMode": "default-discovery",
+          "active": true,
+          "echoes": 20,
+          "connectMs": 275.924167,
+          "finalRoute": "iroh-relay",
+          "firstDirectMs": null,
+          "selectedLabWan": false,
+          "workerSha256": "c2bb4559445319e0d32c33c574c6d80341dc53c204189d4ba56bc73f730b067c"
+        }
+      }
+    ],
+    "unsuccessfulDiagnosticAttempts": [
+      {
+        "case": "blocked-UDP repeat",
+        "status": "incomplete",
+        "error": "Docker exec operation failed (1)",
+        "payments": 0,
+        "limitation": "The failed operation did not retain a native result; no cause or route result is inferred. A separate subsequent run completed."
+      }
+    ],
+    "memoryAdmission": {
+      "minimumVmAvailableBytes": 1610612736,
+      "minimumCgroupHeadroomBytes": 1610612736,
+      "lowHeadroomProbe": {
+        "status": "blocked-before-generation",
+        "vmAvailableBytes": 1544978432,
+        "payments": 0
+      },
+      "policyIsMeasuredMinimumWorkingSet": false,
+      "finalPrePublicationHeadroomCheck": true,
+      "finalHostCompositionRuntimeValidated": false,
+      "offerLifetimeMs": 240000,
+      "modelResidencyMs": 300000
+    },
+    "operatorEnvironment": {
+      "userAuthorizedDockerMemoryIncrease": true,
+      "configuredMemoryMiB": 16384,
+      "reportedVmMemoryBytes": 16749006848,
+      "previouslyRunningContainers": 47,
+      "restoredRunningContainers": 47,
+      "sellerMemoryLimitBytes": 3221225472
+    },
+    "engineOnlyProbe": {
+      "runtimeImage": "sha256:5ddc9a3c59d41f363086e4f87c3c1b7e11f005e84809e1c40f63db6fd11520a0",
+      "source": {
+        "algorithm": "sha256(sorted source path NUL bytes NUL)",
+        "digest": "a6b22aeb2e742c72e5feeb576b65bbc0c68a3d8bbbaae427707480a914ae4157"
+      },
+      "payments": 0,
+      "keys": false,
+      "network": "none",
+      "coldWarmupMs": 16417.004341,
+      "warmWarmupMs": 2346.8655419999996,
+      "boundedGeneration": {
+        "inputTokens": 18,
+        "outputTokens": 18,
+        "durationNs": 19593257051
+      },
+      "peakCgroupBytes": 1473593344,
+      "oomKillDelta": 0,
+      "excludes": [
+        "tokenizer",
+        "facilitator",
+        "HTTP seller middleware",
+        "Iroh endpoint"
+      ]
+    },
+    "limitations": [
+      "Manual lab candidates are required for the demonstrated direct route; default discovery remains an independent observation.",
+      "firstDirectMs starts at the first post-connect path sample, not process start.",
+      "The assisted active/idle and blocked controls are separate sessions, not proof of in-session route migration.",
+      "Shared outer NAT/hairpin behavior is a hypothesis for automatic-discovery failure, not an established cause.",
+      "Engine-only success after VM enlargement does not prove full-seller capacity or prevention of future global OOM.",
+      "No paid gate rerun, independent physical networks, VPS or off-host privacy validation was performed.",
+      "No signed payloads, raw addresses, keys, salts, prompts/responses or private RPC URLs are included."
+    ]
   }
 }
