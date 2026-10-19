@@ -1,6 +1,11 @@
 import type { ObservedDoneReason } from '@gyblos/application/constants';
 import type { PRICES, TOLERANCE } from '@gyblos/application/metering';
-import type { InferenceCaseName } from '@gyblos/gate/constants';
+import type {
+  ConfigAssetLabel,
+  EVIDENCE_IDS,
+  InferenceCaseName,
+} from '@gyblos/gate/constants';
+import type { GENERATION } from '@gyblos/inference-ollama/constants';
 import type { EngineUsage, MODEL } from '@gyblos/inference-ollama/index';
 
 import type { inferenceSnapshot, transactionTransfers } from './chain.js';
@@ -17,7 +22,7 @@ export interface InferenceTrace {
   during: InferenceSnapshot;
   firstFragmentAt?: string;
   stoppedAt?: string;
-  stoppedSignal?: string;
+  stoppedSignal?: NodeJS.Signals;
 }
 
 export interface InferenceTransaction {
@@ -40,17 +45,19 @@ export interface InferenceCaseResult {
 }
 
 export interface InferenceGateEvidence extends EvidenceBase {
+  evidenceId: typeof EVIDENCE_IDS.INFERENCE;
+  assetLabel: ConfigAssetLabel;
   createdAt: string;
   runId: string;
   model: typeof MODEL;
   prices: typeof PRICES;
   tolerance: typeof TOLERANCE;
   template: {
-    raw: boolean;
-    thinking: boolean;
-    numCtx: number;
-    seed: number;
-    temperature: number;
+    raw: true;
+    thinking: false;
+    numCtx: typeof GENERATION.numCtx;
+    seed: typeof GENERATION.seed;
+    temperature: typeof GENERATION.temperature;
     outputCountConvention: string;
   };
   results: InferenceCaseResult[];

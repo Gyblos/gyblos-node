@@ -150,21 +150,25 @@ export function createOllama(base: string, fetchImpl: typeof fetch = fetch) {
           doneReason !== ENGINE_DONE_REASONS.LENGTH
         )
           throw new Error('Incomplete engine response.');
-        const usage = Object.fromEntries(
-          [
-            'prompt_eval_count',
-            'eval_count',
-            'total_duration',
-            'load_duration',
-            'prompt_eval_duration',
-            'eval_duration',
-          ].map((key) => {
-            const value = terminal![key];
-            if (!Number.isSafeInteger(value) || Number(value) < 0)
-              throw new Error('Invalid engine usage.');
-            return [key, value];
-          }),
-        ) as unknown as EngineUsage;
+        const terminalFrame = terminal;
+        const usageValue = (key: keyof EngineUsage): number => {
+          const value = terminalFrame[key];
+          if (
+            typeof value !== 'number' ||
+            !Number.isSafeInteger(value) ||
+            value < 0
+          )
+            throw new Error('Invalid engine usage.');
+          return value;
+        };
+        const usage: EngineUsage = {
+          prompt_eval_count: usageValue('prompt_eval_count'),
+          eval_count: usageValue('eval_count'),
+          total_duration: usageValue('total_duration'),
+          load_duration: usageValue('load_duration'),
+          prompt_eval_duration: usageValue('prompt_eval_duration'),
+          eval_duration: usageValue('eval_duration'),
+        };
         return {
           text,
           usage,

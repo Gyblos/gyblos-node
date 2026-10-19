@@ -2,7 +2,11 @@ import {
   OBSERVED_DONE_REASONS,
   type ObservedDoneReason,
 } from '@gyblos/application/constants';
-import { charge, compareUsage } from '@gyblos/application/metering';
+import {
+  charge,
+  compareUsage,
+  type TokenCounts,
+} from '@gyblos/application/metering';
 import { HTTP_STATUS } from '@gyblos/config';
 import type { EngineUsage } from '@gyblos/inference-ollama/index';
 
@@ -13,7 +17,7 @@ export interface ObservedBody {
   digest?: string;
   content?: string;
   usage?: EngineUsage;
-  billedTokens?: { input: number; output: number };
+  billedTokens?: TokenCounts;
   done?: boolean;
   doneReason?: ObservedDoneReason;
 }
@@ -48,20 +52,21 @@ export function observeInferenceResponse(input: {
       );
     if (!raw.usage || !raw.billedTokens)
       throw new Error('Missing inference usage.');
-    const usage = {} as EngineUsage;
-    for (const key of [
-      'prompt_eval_count',
-      'eval_count',
-      'total_duration',
-      'load_duration',
-      'prompt_eval_duration',
-      'eval_duration',
-    ] as const) {
-      const value = raw.usage[key];
+    const rawUsage = raw.usage;
+    const usageValue = (key: keyof EngineUsage): number => {
+      const value = rawUsage[key];
       if (!Number.isSafeInteger(value) || value < 0)
         throw new Error('Invalid inference usage.');
-      usage[key] = value;
-    }
+      return value;
+    };
+    const usage: EngineUsage = {
+      prompt_eval_count: usageValue('prompt_eval_count'),
+      eval_count: usageValue('eval_count'),
+      total_duration: usageValue('total_duration'),
+      load_duration: usageValue('load_duration'),
+      prompt_eval_duration: usageValue('prompt_eval_duration'),
+      eval_duration: usageValue('eval_duration'),
+    };
     const billedTokens = {
       input: raw.billedTokens.input,
       output: raw.billedTokens.output,
