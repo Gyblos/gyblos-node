@@ -4,9 +4,10 @@ import type {
   SupportedResponse,
 } from '@x402/core/types';
 
-import type { GateErrorCode } from '@gyblos/payments-x402/constants';
+import type { GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
 import type { PublicCall } from '@gyblos/payments-x402/exact/types';
 
+import type { ExactEvidenceErrorCode } from './constants.js';
 import type {
   AuthorizationMetadata,
   EvidenceBase,
@@ -32,7 +33,7 @@ export type ExactCaseResult =
       case: 'insufficient-usdc';
       status: 'passed';
       enforcement: 'buyer-preflight';
-      reason: 'INSUFFICIENT_EXACT_USDC';
+      reason: typeof GATE_ERROR_CODES.INSUFFICIENT_EXACT_USDC;
       signed: false;
       before: ExactSnapshot;
       after: ExactSnapshot;
@@ -99,5 +100,5 @@ export interface ExactGateEvidence extends EvidenceBase {
   publicCalls?: PublicCall[];
   reconciliation?: Reconciliation;
   finishedAt?: string;
-  error?: { code: GateErrorCode | 'GATE_ERROR'; name: string; message: string };
+  error?: { code: ExactEvidenceErrorCode; name: string; message: string };
 }
