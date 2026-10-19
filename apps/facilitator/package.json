@@ -9,6 +9,7 @@
   "dependencies": {
     "@gyblos/config": "workspace:*",
     "@gyblos/payments-x402": "workspace:*",
-    "@gyblos/gate": "workspace:*"
+    "@gyblos/gate": "workspace:*",
+    "@gyblos/runtime": "workspace:*"
   }
 }

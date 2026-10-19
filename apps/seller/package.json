@@ -11,6 +11,7 @@
     "@gyblos/application": "workspace:*",
     "@gyblos/config": "workspace:*",
     "@gyblos/gate": "workspace:*",
-    "@gyblos/inference-ollama": "workspace:*"
+    "@gyblos/inference-ollama": "workspace:*",
+    "@gyblos/runtime": "workspace:*"
   }
 }

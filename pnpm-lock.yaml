@@ -93,6 +93,9 @@ importers:
       '@gyblos/payments-x402':
         specifier: workspace:*
         version: link:../../packages/payments-x402
+      '@gyblos/runtime':
+        specifier: workspace:*
+        version: link:../../packages/runtime
 
   apps/facilitator:
     dependencies:
@@ -105,6 +108,9 @@ importers:
       '@gyblos/payments-x402':
         specifier: workspace:*
         version: link:../../packages/payments-x402
+      '@gyblos/runtime':
+        specifier: workspace:*
+        version: link:../../packages/runtime
 
   apps/seller:
     dependencies:
@@ -123,6 +129,9 @@ importers:
       '@gyblos/payments-x402':
         specifier: workspace:*
         version: link:../../packages/payments-x402
+      '@gyblos/runtime':
+        specifier: workspace:*
+        version: link:../../packages/runtime
 
   packages/application:
     dependencies:
