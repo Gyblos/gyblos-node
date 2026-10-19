@@ -52,6 +52,7 @@ export async function startBuyer() {
   await assertProgram(config.rpcUrl);
   const endpoint = await bindEndpoint(await nodeSecret(), {
     bindAddress: process.env.GYBLOS_IROH_BIND,
+    externalAddress: process.env.GYBLOS_IROH_EXTERNAL_ADDR || undefined,
   });
   if (endpoint.id().toString() !== config.nodeId)
     throw new Error('Buyer node key mismatch.');
