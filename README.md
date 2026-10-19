@@ -4,8 +4,11 @@ Experimental x402 payments for Gyblos, a P2P inference project. A buyer
 authorizes a budget, a seller reports token usage, and a facilitator settles the
 charge and returns the unused deposit on Solana. This repository runs
 fixed-resource checks, local Ollama inference and an experimental native Iroh
-transport between isolated Docker roles. The Docker NAT experiment is partial;
-real separate-network trials remain pending.
+transport between isolated Docker roles and native peers. A native Mac–VPS trial
+completed three paid devnet inferences with direct routing at source `2c8eeac`;
+see the redacted [real-network report](evidence/gate-0007.json). The Docker NAT
+experiment remains partial. Hotspot and broader NAT coverage remain pending;
+this result does not validate every subsequent source change.
 
 > **Status:** experimental, Solana **devnet** only. Not audited. Never use
 > mainnet keys. Part of [Gyblos](https://gyblos.com) ·
@@ -159,8 +162,10 @@ candidates, including an idle control. Those candidates remain disabled by
 default and do not establish automatic discovery. Default discovery still used
 relay: its learned addresses omitted the intermediate lab WAN and shared an
 outer public IP. Upstream hairpin failure is a hypothesis, not a demonstrated
-cause. Real separate-network testing remains pending. Unpaid diagnostics do not
-turn the earlier paid NAT-direct case into a passing payment gate.
+cause. A later native Mac–VPS trial observed direct routing and completed paid
+devnet inference at source `2c8eeac` ([report](evidence/gate-0007.json)). This
+separate trial does not resolve the original Docker public-return cause or turn
+the earlier paid NAT-direct case into a passing Docker payment gate.
 
 To discover a usable address automatically **inside the simulated WAN**, run the
 separate observer-assisted mode:
