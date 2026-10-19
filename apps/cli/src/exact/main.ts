@@ -15,6 +15,7 @@ import {
   TIMEOUTS,
 } from '@gyblos/config';
 import { loadConfig, saveJson } from '@gyblos/gate/config';
+import { EXACT_EVIDENCE_CODES } from '@gyblos/gate/constants';
 import { prepareExactAccounts } from '@gyblos/gate/exact-accounts';
 import { assertNoUnresolvedAuthorizations } from '@gyblos/gate/journal';
 import { withExclusiveLock } from '@gyblos/gate/lock';
@@ -180,7 +181,10 @@ export async function main() {
   } catch (error) {
     if (evidence.status !== 'uncertain') evidence.status = 'blocked';
     evidence.error = {
-      code: error instanceof GateError ? error.code : 'GATE_ERROR',
+      code:
+        error instanceof GateError
+          ? error.code
+          : EXACT_EVIDENCE_CODES.GATE_ERROR,
       name: error instanceof Error ? error.name : 'UnknownError',
       message:
         error instanceof GateError
