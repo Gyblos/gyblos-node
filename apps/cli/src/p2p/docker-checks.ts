@@ -5,6 +5,7 @@ import {
   HTTP_STATUS,
   INFERENCE_REQUEST_LIMITS,
   LOCALHOST,
+  NAT,
   P2P,
   PORTS,
   ROUTES,
@@ -103,11 +104,11 @@ export async function inspectDocker(
       '-e',
       `
     const ports=JSON.parse(process.argv[1]);(async()=>{const results=[];
-    for(const port of ports){let reachable=false;try{await fetch('http://'+process.argv[2]+':'+port+'/',{signal:AbortSignal.timeout(${P2P.connectMs})});reachable=true;}catch{}
+    for(const port of ports){let reachable=false;try{await fetch('http://'+process.argv[2]+':'+port+'/',{signal:AbortSignal.timeout(${NAT.negativeProbeMs})});reachable=true;}catch{}
     results.push({port,reachable});}console.log(JSON.stringify(results));})();
   `,
       JSON.stringify([PORTS.ollama, PORTS.facilitator, P2P.sellerPort]),
-      P2P.docker.sellerIp,
+      context.environment.GYBLOS_P2P_SELLER_IP ?? P2P.docker.sellerIp,
     ]),
   ) as { port: number; reachable: boolean }[];
   assert.ok(blocked.every((result) => !result.reachable));
