@@ -25,7 +25,8 @@
     "gate:challenge": "node --import tsx scripts/challenge.ts",
     "gate:failures": "node --import tsx scripts/failures.ts",
     "gate:exact": "node --import tsx apps/cli/src/exact.ts",
-    "p2p:docker": "node --import tsx apps/cli/src/p2p/docker-main.ts"
+    "p2p:docker": "node --import tsx apps/cli/src/p2p/docker-main.ts",
+    "p2p:diagnose": "node --import tsx tooling/nat-regression.mjs"
   },
   "dependencies": {
     "@gyblos/application": "workspace:*",
