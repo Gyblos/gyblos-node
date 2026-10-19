@@ -7,7 +7,6 @@ export default [
     ignores: [
       'node_modules/**',
       '.local/**',
-      'tests/**',
       'evidence/**',
       'dist/**',
       'coverage/**',
@@ -22,6 +21,15 @@ export default [
       'max-lines': ['error', { max: 300 }],
       'gyblos/structure': 'error',
       'gyblos/numeric-constants': 'error',
+    },
+  },
+  {
+    files: ['tests/**/*.ts'],
+    languageOptions: { parser: tseslint.parser },
+    plugins: { '@typescript-eslint': tseslint.plugin },
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'error',
+      'max-lines': ['error', { max: 300 }],
     },
   },
   {
