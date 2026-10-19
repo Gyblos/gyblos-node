@@ -55,3 +55,6 @@ coverage/
 !/evidence/
 /evidence/*
 !/evidence/gate-0006.json
+
+# Explicitly authorized redacted real-network P2P report
+!/evidence/gate-0007.json
