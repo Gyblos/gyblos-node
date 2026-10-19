@@ -1,11 +1,13 @@
 import { once } from 'node:events';
+
 import { decodePaymentRequiredHeader } from '@x402/core/http';
-import { loadConfig, signer, saveJson } from './config.js';
+
 import { assertProgram } from '../packages/payments-x402/src/chain.js';
+import { UPSTREAM_COMMIT } from '../packages/payments-x402/src/constants.js';
 import { createFacilitator } from '../packages/payments-x402/src/facilitator.js';
 import { createGateSeller } from '../packages/payments-x402/src/seller.js';
 import { validateTerms } from '../packages/payments-x402/src/trust.js';
-import { UPSTREAM_COMMIT } from '../packages/payments-x402/src/constants.js';
+import { loadConfig, saveJson, signer } from './config.js';
 
 const config = await loadConfig();
 await assertProgram(config.rpcUrl);

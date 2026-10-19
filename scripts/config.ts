@@ -1,7 +1,9 @@
-import { readFile, mkdir, open, rename, unlink } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
-import { resolve, dirname } from 'node:path';
+import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
+
 import { createKeyPairSignerFromBytes } from '@solana/kit';
+
 import { DEVNET_USDC } from '../packages/payments-x402/src/constants.js';
 
 export interface Config {

@@ -1,5 +1,5 @@
 import type { EngineUsage } from '../../inference-ollama/src/index.js';
-import { compareUsage, charge } from './metering.js';
+import { charge, compareUsage } from './metering.js';
 
 export interface ObservedBody {
   requestId: string;

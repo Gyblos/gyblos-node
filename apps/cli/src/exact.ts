@@ -1,54 +1,56 @@
+import assert from 'node:assert/strict';
+import { once } from 'node:events';
+import { readFile } from 'node:fs/promises';
+
 import {
   findAssociatedTokenPda,
   TOKEN_PROGRAM_ADDRESS,
 } from '@solana-program/token';
-import assert from 'node:assert/strict';
-import { once } from 'node:events';
-import { readFile } from 'node:fs/promises';
-import { exactAuthorizationId } from '../../../packages/payments-x402/src/exact/authorization-id.js';
 import {
   address,
-  getTransactionDecoder,
-  getBase64Encoder,
   getBase58Decoder,
+  getBase64Encoder,
   getCompiledTransactionMessageDecoder,
+  getTransactionDecoder,
 } from '@solana/kit';
 import {
   decodePaymentRequiredHeader,
-  encodePaymentSignatureHeader,
   decodePaymentResponseHeader,
+  encodePaymentSignatureHeader,
 } from '@x402/core/http';
 import type { PaymentPayload, SupportedResponse } from '@x402/core/types';
+
+import {
+  assertDevnet,
+  confirm,
+  explorer,
+  GateError,
+  lamports,
+  rpc,
+  tokens,
+} from '../../../packages/payments-x402/src/chain.js';
+import {
+  DEVNET,
+  DEVNET_USDC,
+} from '../../../packages/payments-x402/src/constants.js';
+import { exactAuthorizationId } from '../../../packages/payments-x402/src/exact/authorization-id.js';
+import {
+  assertExactFallbackSafe,
+  assertExactSupport,
+  createExactBuyer,
+  EXACT_PRICE,
+  PUBLIC_FACILITATORS,
+  validateExactTerms,
+} from '../../../packages/payments-x402/src/exact/index.js';
 import {
   loadConfig,
   saveJson,
   signer,
   type Config,
 } from '../../../scripts/config.js';
-import { withExclusiveLock } from '../../../scripts/lock.js';
-import { assertNoUnresolvedAuthorizations } from '../../../scripts/journal.js';
 import { prepareExactAccounts } from '../../../scripts/exact-accounts.js';
-import {
-  assertDevnet,
-  confirm,
-  tokens,
-  lamports,
-  rpc,
-  GateError,
-  explorer,
-} from '../../../packages/payments-x402/src/chain.js';
-import {
-  DEVNET,
-  DEVNET_USDC,
-} from '../../../packages/payments-x402/src/constants.js';
-import {
-  assertExactSupport,
-  createExactBuyer,
-  validateExactTerms,
-  assertExactFallbackSafe,
-  EXACT_PRICE,
-  PUBLIC_FACILITATORS,
-} from '../../../packages/payments-x402/src/exact/index.js';
+import { assertNoUnresolvedAuthorizations } from '../../../scripts/journal.js';
+import { withExclusiveLock } from '../../../scripts/lock.js';
 import {
   AuditedPublicFacilitator,
   createExactSeller,

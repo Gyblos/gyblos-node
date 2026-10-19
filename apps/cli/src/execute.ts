@@ -1,6 +1,6 @@
-import { assertNoUnresolvedAuthorizations } from '../../../scripts/journal.js';
 import { discoverChannelsByRentPayer, toFacilitatorSvmSigner } from '@x402/svm';
-import { loadConfig, saveJson, signer } from '../../../scripts/config.js';
+
+import { runGate } from '../../../packages/application/src/gate.js';
 import { createBuyer } from '../../../packages/payments-x402/src/buyer.js';
 import {
   account,
@@ -18,9 +18,10 @@ import {
   UPSTREAM_COMMIT,
 } from '../../../packages/payments-x402/src/constants.js';
 import type { SettlementEvent } from '../../../packages/payments-x402/src/facilitator.js';
-import { runGate } from '../../../packages/application/src/gate.js';
-import { withExclusiveLock } from '../../../scripts/lock.js';
 import { validateSettlement } from '../../../packages/payments-x402/src/trust.js';
+import { loadConfig, saveJson, signer } from '../../../scripts/config.js';
+import { assertNoUnresolvedAuthorizations } from '../../../scripts/journal.js';
+import { withExclusiveLock } from '../../../scripts/lock.js';
 
 const journalPath = '.local/devnet/attempt.json';
 export async function executeGate(signal?: AbortSignal) {

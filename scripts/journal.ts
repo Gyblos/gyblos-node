@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+
 import { GateError } from '../packages/payments-x402/src/chain.js';
 
 export async function assertNoUnresolvedAuthorizations(

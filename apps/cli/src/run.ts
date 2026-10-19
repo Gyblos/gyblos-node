@@ -1,7 +1,6 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { executeGate } from './execute.js';
-import { loadConfig } from '../../../scripts/config.js';
+
 import {
   assertProgram,
   GateError,
@@ -9,6 +8,8 @@ import {
   tokens,
 } from '../../../packages/payments-x402/src/chain.js';
 import { MAX_ATOMIC } from '../../../packages/payments-x402/src/constants.js';
+import { loadConfig } from '../../../scripts/config.js';
+import { executeGate } from './execute.js';
 
 const children: ChildProcess[] = [];
 const controller = new AbortController();

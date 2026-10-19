@@ -1,4 +1,5 @@
 import { executeGate } from './execute.js';
+
 try {
   console.log(JSON.stringify(await executeGate(), null, 2));
 } catch (error) {

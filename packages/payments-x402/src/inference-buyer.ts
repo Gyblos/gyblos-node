@@ -1,10 +1,11 @@
 import type { KeyPairSigner } from '@solana/kit';
 import {
-  x402Client,
-  wrapFetchWithPayment,
   decodePaymentResponseHeader,
+  wrapFetchWithPayment,
+  x402Client,
 } from '@x402/fetch';
 import { UptoSvmScheme } from '@x402/svm/upto/client';
+
 import { DEVNET } from './constants.js';
 import { validateTerms, type TrustPolicy } from './trust.js';
 

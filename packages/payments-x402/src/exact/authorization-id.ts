@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto';
+
 import { getBase64Encoder, getTransactionDecoder } from '@solana/kit';
+
 // Hash the signed message, independent of base64 spelling or facilitator co-signature.
 // Node host utility; never persist the wire transaction itself.
 export function exactAuthorizationId(transaction: string) {

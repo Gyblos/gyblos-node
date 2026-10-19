@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
-import { address } from '@solana/kit';
+
 import {
   findAssociatedTokenPda,
   TOKEN_PROGRAM_ADDRESS,
 } from '@solana-program/token';
-import { rpc, GateError } from '../packages/payments-x402/src/chain.js';
+import { address } from '@solana/kit';
+
+import { GateError, rpc } from '../packages/payments-x402/src/chain.js';
 import type { Config } from './config.js';
 
 export async function readChain<T>(

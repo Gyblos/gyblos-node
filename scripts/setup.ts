@@ -1,8 +1,10 @@
 import { generateKeyPairSync } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { resolve, dirname } from 'node:path';
+import { dirname, resolve } from 'node:path';
+
 import { createKeyPairSignerFromBytes } from '@solana/kit';
-import { configPath, defaultMint, type Config, saveJson } from './config.js';
+
+import { configPath, defaultMint, saveJson, type Config } from './config.js';
 
 const path = configPath();
 await mkdir(dirname(path), { recursive: true, mode: 0o700 });

@@ -1,18 +1,19 @@
-import express from 'express';
-import { exactAuthorizationId } from '../../../packages/payments-x402/src/exact/authorization-id.js';
-import { paymentMiddleware, x402ResourceServer } from '@x402/express';
-import { HTTPFacilitatorClient } from '@x402/core/server';
 import { decodePaymentSignatureHeader } from '@x402/core/http';
+import { HTTPFacilitatorClient } from '@x402/core/server';
 import type {
   PaymentPayload,
   PaymentRequirements,
   SupportedResponse,
 } from '@x402/core/types';
+import { paymentMiddleware, x402ResourceServer } from '@x402/express';
 import { ExactSvmScheme } from '@x402/svm/exact/server';
+import express from 'express';
+
 import {
   DEVNET,
   DEVNET_USDC,
 } from '../../../packages/payments-x402/src/constants.js';
+import { exactAuthorizationId } from '../../../packages/payments-x402/src/exact/authorization-id.js';
 import {
   assertExactSupport,
   EXACT_PRICE,

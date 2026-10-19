@@ -1,10 +1,10 @@
-import { loadConfig } from '../../../scripts/config.js';
 import {
+  account,
   assertProgram,
   lamports,
   tokens,
-  account,
 } from '../../../packages/payments-x402/src/chain.js';
+import { loadConfig } from '../../../scripts/config.js';
 
 try {
   const config = await loadConfig();

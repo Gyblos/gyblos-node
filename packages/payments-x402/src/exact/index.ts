@@ -6,8 +6,9 @@ import type {
   SupportedResponse,
 } from '@x402/core/types';
 import { ExactSvmScheme } from '@x402/svm/exact/client';
-import { DEVNET, DEVNET_USDC } from '../constants.js';
+
 import { GateError } from '../chain.js';
+import { DEVNET, DEVNET_USDC } from '../constants.js';
 
 export const EXACT_PRICE = '10000'; // 0.01 Circle devnet USDC (6 decimals).
 export const PUBLIC_FACILITATORS = [

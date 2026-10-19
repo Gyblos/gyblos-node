@@ -1,6 +1,6 @@
-import { loadConfig, signer } from '../../../scripts/config.js';
 import { assertProgram } from '../../../packages/payments-x402/src/chain.js';
 import { createGateSeller } from '../../../packages/payments-x402/src/seller.js';
+import { loadConfig, signer } from '../../../scripts/config.js';
 
 const config = await loadConfig();
 await assertProgram(config.rpcUrl);

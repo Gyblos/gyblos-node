@@ -1,13 +1,14 @@
 import type { KeyPairSigner } from '@solana/kit';
+import type { PaymentRequirements } from '@x402/core/types';
 import {
-  x402Client,
-  wrapFetchWithPayment,
   decodePaymentResponseHeader,
+  wrapFetchWithPayment,
+  x402Client,
 } from '@x402/fetch';
 import { UptoSvmScheme } from '@x402/svm/upto/client';
+
 import { DEVNET } from './constants.js';
 import { validateTerms, type TrustPolicy } from './trust.js';
-import type { PaymentRequirements } from '@x402/core/types';
 
 export interface BuyerResult {
   status: number;

@@ -1,23 +1,23 @@
+import { getCreateAccountInstruction } from '@solana-program/system';
+import {
+  findAssociatedTokenPda,
+  getCreateAssociatedTokenIdempotentInstructionAsync,
+  getInitializeMint2Instruction,
+  getMintToInstruction,
+  TOKEN_PROGRAM_ADDRESS,
+} from '@solana-program/token';
 import {
   address,
   appendTransactionMessageInstructions,
+  blockhash,
   createTransactionMessage,
   getBase64EncodedWireTransaction,
   pipe,
   setTransactionMessageFeePayerSigner,
   setTransactionMessageLifetimeUsingBlockhash,
   signTransactionMessageWithSigners,
-  blockhash,
 } from '@solana/kit';
-import { getCreateAccountInstruction } from '@solana-program/system';
-import {
-  TOKEN_PROGRAM_ADDRESS,
-  getInitializeMint2Instruction,
-  getCreateAssociatedTokenIdempotentInstructionAsync,
-  getMintToInstruction,
-  findAssociatedTokenPda,
-} from '@solana-program/token';
-import { loadConfig, signer, saveJson, configPath } from './config.js';
+
 import {
   account,
   assertProgram,
@@ -25,6 +25,7 @@ import {
   lamports,
   rpc,
 } from '../packages/payments-x402/src/chain.js';
+import { configPath, loadConfig, saveJson, signer } from './config.js';
 
 try {
   const config = await loadConfig();

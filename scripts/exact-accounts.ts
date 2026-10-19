@@ -1,22 +1,24 @@
+import { getCreateAssociatedTokenIdempotentInstructionAsync } from '@solana-program/token';
 import {
   address,
   appendTransactionMessageInstructions,
+  blockhash,
   createTransactionMessage,
   getBase64EncodedWireTransaction,
   pipe,
   setTransactionMessageFeePayerSigner,
   setTransactionMessageLifetimeUsingBlockhash,
   signTransactionMessageWithSigners,
-  blockhash,
 } from '@solana/kit';
-import { getCreateAssociatedTokenIdempotentInstructionAsync } from '@solana-program/token';
-import { signer, type Config } from './config.js';
+
 import {
   assertDevnet,
   confirm,
   rpc,
 } from '../packages/payments-x402/src/chain.js';
 import { DEVNET_USDC } from '../packages/payments-x402/src/constants.js';
+import { signer, type Config } from './config.js';
+
 export async function prepareExactAccounts(c: Config) {
   await assertDevnet(c.rpcUrl);
   const sponsor = await signer(c, 'facilitator');

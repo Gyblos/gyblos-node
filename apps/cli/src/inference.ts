@@ -1,31 +1,12 @@
-import { observeInferenceResponse } from '../../../packages/application/src/inference-observation.js';
 import assert from 'node:assert/strict';
 import { spawn, type ChildProcess } from 'node:child_process';
-import { once } from 'node:events';
 import { randomUUID } from 'node:crypto';
+import { once } from 'node:events';
 import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
 import type { Server } from 'node:http';
-import { loadConfig, saveJson, signer } from '../../../scripts/config.js';
-import { withExclusiveLock } from '../../../scripts/lock.js';
-import { assertNoUnresolvedAuthorizations } from '../../../scripts/journal.js';
-import {
-  appendMeasurement,
-  measurementRow,
-  measurementSalt,
-} from '../../../scripts/measurements.js';
-import {
-  inferenceSnapshot,
-  confirmInference,
-  tokenAddress,
-  transaction,
-  transactionTransfers,
-} from '../../../scripts/inference-chain.js';
-import {
-  createOllama,
-  createModelTokenizer,
-  MODEL,
-} from '../../../packages/inference-ollama/src/index.js';
+import { resolve } from 'node:path';
+
+import { observeInferenceResponse } from '../../../packages/application/src/inference-observation.js';
 import {
   assessCharge,
   charge,
@@ -34,7 +15,11 @@ import {
   TOLERANCE,
   type TokenCounts,
 } from '../../../packages/application/src/metering.js';
-import { createInferenceBuyer } from '../../../packages/payments-x402/src/inference-buyer.js';
+import {
+  createModelTokenizer,
+  createOllama,
+  MODEL,
+} from '../../../packages/inference-ollama/src/index.js';
 import {
   assertProgram,
   GateError,
@@ -45,7 +30,23 @@ import {
   DEVNET_USDC,
 } from '../../../packages/payments-x402/src/constants.js';
 import type { SettlementEvent } from '../../../packages/payments-x402/src/facilitator.js';
+import { createInferenceBuyer } from '../../../packages/payments-x402/src/inference-buyer.js';
 import { validateSettlement } from '../../../packages/payments-x402/src/trust.js';
+import { loadConfig, saveJson, signer } from '../../../scripts/config.js';
+import {
+  confirmInference,
+  inferenceSnapshot,
+  tokenAddress,
+  transaction,
+  transactionTransfers,
+} from '../../../scripts/inference-chain.js';
+import { assertNoUnresolvedAuthorizations } from '../../../scripts/journal.js';
+import { withExclusiveLock } from '../../../scripts/lock.js';
+import {
+  appendMeasurement,
+  measurementRow,
+  measurementSalt,
+} from '../../../scripts/measurements.js';
 import {
   createInferenceSeller,
   inferenceCeiling,

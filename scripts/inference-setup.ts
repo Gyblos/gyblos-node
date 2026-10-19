@@ -1,11 +1,12 @@
 import { spawn } from 'node:child_process';
+import { once } from 'node:events';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { once } from 'node:events';
+
 import {
-  MODEL,
   createModelTokenizer,
   createOllama,
+  MODEL,
 } from '../packages/inference-ollama/src/index.js';
 
 const directory = '.local/devnet/tokenizer';

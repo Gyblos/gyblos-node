@@ -1,30 +1,33 @@
-import express from 'express';
+import { TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
+import type { KeyPairSigner } from '@solana/kit';
+import {
+  decodePaymentSignatureHeader,
+  type DynamicPrice,
+} from '@x402/core/http';
+import { HTTPFacilitatorClient } from '@x402/core/server';
 import {
   paymentMiddleware,
   setSettlementOverrides,
   x402ResourceServer,
 } from '@x402/express';
-import { HTTPFacilitatorClient } from '@x402/core/server';
-import type { DynamicPrice } from '@x402/core/http';
-import { decodePaymentSignatureHeader } from '@x402/core/http';
 import { UptoSvmScheme } from '@x402/svm/upto/server';
-import { TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
-import type { KeyPairSigner } from '@solana/kit';
+import express from 'express';
+
+import {
+  charge,
+  OFFER_ID,
+  type TokenCounts,
+} from '../../../packages/application/src/metering.js';
 import {
   createOllama,
   MODEL,
   type ModelTokenizer,
 } from '../../../packages/inference-ollama/src/index.js';
 import {
-  charge,
-  OFFER_ID,
-  type TokenCounts,
-} from '../../../packages/application/src/metering.js';
-import { verifyInferenceDeposit } from '../../../packages/payments-x402/src/inference-deposit.js';
-import {
   DEVNET,
   MAX_ATOMIC,
 } from '../../../packages/payments-x402/src/constants.js';
+import { verifyInferenceDeposit } from '../../../packages/payments-x402/src/inference-deposit.js';
 
 export interface InferenceRequest {
   requestId: string;

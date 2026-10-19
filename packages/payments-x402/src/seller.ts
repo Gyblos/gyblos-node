@@ -1,13 +1,14 @@
-import express from 'express';
+import { TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
+import type { KeyPairSigner } from '@solana/kit';
+import { HTTPFacilitatorClient } from '@x402/core/server';
 import {
   paymentMiddleware,
   setSettlementOverrides,
   x402ResourceServer,
 } from '@x402/express';
-import { HTTPFacilitatorClient } from '@x402/core/server';
 import { UptoSvmScheme } from '@x402/svm/upto/server';
-import { TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
-import type { KeyPairSigner } from '@solana/kit';
+import express from 'express';
+
 import { ACTUAL_ATOMIC, DEVNET, MAX_ATOMIC } from './constants.js';
 
 export async function createGateSeller(options: {

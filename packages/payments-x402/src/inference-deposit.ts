@@ -1,10 +1,11 @@
-import { address } from '@solana/kit';
 import {
   findAssociatedTokenPda,
   TOKEN_PROGRAM_ADDRESS,
 } from '@solana-program/token';
+import { address } from '@solana/kit';
 import { discoverChannelsByRentPayer } from '@x402/svm';
-import { assertDevnet, rpc, GateError } from './chain.js';
+
+import { assertDevnet, GateError, rpc } from './chain.js';
 import { DEVNET } from './constants.js';
 
 export interface DepositExpectation {

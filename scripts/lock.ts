@@ -1,5 +1,6 @@
 import { mkdir, open, unlink } from 'node:fs/promises';
 import { dirname } from 'node:path';
+
 import { GateError } from '../packages/payments-x402/src/chain.js';
 
 export async function withExclusiveLock<T>(

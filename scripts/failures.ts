@@ -1,25 +1,25 @@
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
-import { assertNoUnresolvedAuthorizations } from './journal.js';
-import {
-  address,
-  blockhash,
-  generateKeyPairSigner,
-  pipe,
-  createTransactionMessage,
-  setTransactionMessageFeePayerSigner,
-  setTransactionMessageLifetimeUsingBlockhash,
-  appendTransactionMessageInstructions,
-  signTransactionMessageWithSigners,
-  getBase64EncodedWireTransaction,
-} from '@solana/kit';
+
 import { getCreateAssociatedTokenIdempotentInstructionAsync } from '@solana-program/token';
 import {
-  decodePaymentSignatureHeader,
+  address,
+  appendTransactionMessageInstructions,
+  blockhash,
+  createTransactionMessage,
+  generateKeyPairSigner,
+  getBase64EncodedWireTransaction,
+  pipe,
+  setTransactionMessageFeePayerSigner,
+  setTransactionMessageLifetimeUsingBlockhash,
+  signTransactionMessageWithSigners,
+} from '@solana/kit';
+import {
   decodePaymentRequiredHeader,
+  decodePaymentSignatureHeader,
 } from '@x402/core/http';
-import { loadConfig, signer, saveJson } from './config.js';
-import { withExclusiveLock } from './lock.js';
+
+import { createBuyer } from '../packages/payments-x402/src/buyer.js';
 import {
   account,
   assertProgram,
@@ -27,10 +27,12 @@ import {
   rpc,
   tokens,
 } from '../packages/payments-x402/src/chain.js';
+import { DEVNET, MAX_ATOMIC } from '../packages/payments-x402/src/constants.js';
 import { createFacilitator } from '../packages/payments-x402/src/facilitator.js';
 import { createGateSeller } from '../packages/payments-x402/src/seller.js';
-import { createBuyer } from '../packages/payments-x402/src/buyer.js';
-import { DEVNET, MAX_ATOMIC } from '../packages/payments-x402/src/constants.js';
+import { loadConfig, saveJson, signer } from './config.js';
+import { assertNoUnresolvedAuthorizations } from './journal.js';
+import { withExclusiveLock } from './lock.js';
 
 async function failures() {
   const c = await loadConfig();

@@ -1,6 +1,6 @@
-import { loadConfig, signer } from '../../../scripts/config.js';
 import { assertProgram } from '../../../packages/payments-x402/src/chain.js';
 import { createFacilitator } from '../../../packages/payments-x402/src/facilitator.js';
+import { loadConfig, signer } from '../../../scripts/config.js';
 
 const config = await loadConfig();
 await assertProgram(config.rpcUrl);
