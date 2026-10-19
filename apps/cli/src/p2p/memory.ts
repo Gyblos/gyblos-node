@@ -3,8 +3,11 @@ import { freemem } from 'node:os';
 
 import { DIAGNOSTICS } from '@gyblos/config';
 
+import { readDarwinMemorySnapshot } from './darwin-memory.js';
+
 export interface MemorySnapshot {
-  source: 'linux-memavailable' | 'os-free';
+  source: (typeof DIAGNOSTICS.memorySources)[keyof typeof DIAGNOSTICS.memorySources];
+  darwin?: Awaited<ReturnType<typeof readDarwinMemorySnapshot>>['darwin'];
   vmAvailableBytes: number;
   cgroup: {
     currentBytes: number;
@@ -45,7 +48,7 @@ export function parseMemorySnapshot(input: {
     if (events[name] === undefined)
       throw new Error('Incomplete memory observation.');
   return {
-    source: 'linux-memavailable',
+    source: DIAGNOSTICS.memorySources.linux,
     vmAvailableBytes: bytes(available[1]!) * DIAGNOSTICS.kibibyte,
     cgroup: {
       currentBytes: bytes(input.current),
@@ -57,6 +60,11 @@ export function parseMemorySnapshot(input: {
 }
 
 export function assertMemoryHeadroom(snapshot: MemorySnapshot) {
+  if (
+    snapshot.source === DIAGNOSTICS.memorySources.darwin &&
+    snapshot.darwin?.pressureLevel !== DIAGNOSTICS.darwinMemory.normalPressure
+  )
+    throw new Error('Native Mac memory pressure is not normal or unknown.');
   if (
     !Number.isSafeInteger(snapshot.vmAvailableBytes) ||
     snapshot.vmAvailableBytes < DIAGNOSTICS.minimumVmAvailableBytes
@@ -75,8 +83,13 @@ export function assertMemoryHeadroom(snapshot: MemorySnapshot) {
 }
 
 export async function memorySnapshot(): Promise<MemorySnapshot> {
+  if (process.platform === 'darwin') return readDarwinMemorySnapshot();
   if (process.platform !== 'linux')
-    return { source: 'os-free', vmAvailableBytes: freemem(), cgroup: null };
+    return {
+      source: DIAGNOSTICS.memorySources.fallback,
+      vmAvailableBytes: freemem(),
+      cgroup: null,
+    };
   const read = (path: string) => readFile(path, 'utf8');
   const [available, current, limit, events, peak] = await Promise.all([
     read(DIAGNOSTICS.memory.available),
