@@ -1,29 +1,42 @@
-# Contributing
+# Contributing to gyblos-payments
 
-Use English for source, comments, commit messages and pull requests.
+## File layout
 
-## Layout
+Every `.ts` file follows this order:
 
-- `@gyblos/config` owns network, host, path, version and limit constants.
-- `@gyblos/runtime` owns process supervision and JSON file operations.
-- `@gyblos/gate` owns local gate configuration, journals, locking, measurements and chain observations.
-- `@gyblos/application` owns reusable accounting and observation rules.
-- `@gyblos/payments-x402` adapts the pinned payment SDK.
-- `@gyblos/inference-ollama` owns local generation and independent token counting.
-- Apps compose these packages. Scripts are thin, explicitly invoked entrypoints.
+1. **Imports**, in four groups separated by a blank line (sorted automatically by `pnpm format`):
+   1. `node:*`
+   2. external packages
+   3. `@gyblos/*`
+   4. relative (`./`, `../` within the same package only)
+2. **File-local constants** (`UPPER_SNAKE_CASE`). Anything used by more than one file lives in `@gyblos/config` or in its package's `constants.ts`.
+3. **Types and interfaces.**
+4. **Private helpers.**
+5. **Exported functions.**
+6. **`main()`** at the bottom for entrypoints. Signal handlers, timers and mutable state are created inside `main()`, never at import time.
 
-Import package APIs through `@gyblos/*`; keep apps and packages independent of `scripts/`. Group imports as Node built-ins, external dependencies, workspace packages, then relative modules. Prettier sorts these groups.
+## Constants
 
-Keep modules below 300 lines, or explain a necessary exception in the PR. Keep signals, child processes, network requests and mutable run state inside explicitly invoked functions. Importing an entrypoint must be inert.
+- No magic values: hosts, ports, paths, network IDs, program IDs, commitments, versions, timeouts, limits and HTTP statuses come from `@gyblos/config`.
+- Versions are read from `package.json` or the lockfile, never typed by hand.
+- Model and generation parameters live in `@gyblos/inference-ollama/constants.ts`; prices and tolerance in `@gyblos/application/constants.ts`.
 
-## Checks
+## Packages and boundaries
 
-Install with `pnpm install --frozen-lockfile`, then run `pnpm typecheck` and `pnpm lint`. Pin added dependencies to exact versions and verify that their releases are at least two weeks old.
+- Import other packages by name (`@gyblos/gate`), never with `../../../packages/...`.
+- `scripts/` contains thin entrypoints only. Nothing in `apps/` or `packages/` imports from `scripts/`.
+- Inference adapters know nothing about wallets; payment code knows nothing about engines.
 
-The current publication policy keeps acceptance tests, evidence and measurements in the maintainer checkout. Run the private acceptance harness appropriate to the branch and record its result in the PR; those files and their commands are not available in a clean clone. Preserve existing assertions when refactoring.
+## Size and naming
 
-Use coherent commits that compile and pass the applicable private baseline. Order dependencies before consumers. A behavior-preserving refactor must preserve prices, tolerance, payment states, errors, retry ownership, evidence fields and delivery semantics. Keep functional changes in separate PRs.
+- Files stay under ~300 lines; split by responsibility (`cases`, `reconcile`, `evidence`, `assertions`).
+- Descriptive names: `config`, not `c`; `depositSignature`, not `sig`.
+- No `any`. Evidence and journal records have explicit types.
 
-The unpaid `pnpm gate:challenge` can compare the 402 contract before and after a refactor. Time, blockhash and slot metadata naturally change. A challenge does not prove payment or refund; a paid gate requires task authorization and confirmed on-chain evidence.
+## Commits and checks
 
-Never commit local keys, salts, signed payloads, journals, measurements, evidence, private tests or internal product documents. Product documentation lives in the separate local Gyblos vault. README and this contribution guide are the public documentation exceptions.
+- Each commit builds and passes `pnpm typecheck`, `pnpm test` and `pnpm lint` on its own.
+- Behavior changes and refactors go in separate PRs.
+- Never commit keys, salts, prompts or responses; `.local/` stays ignored.
+
+Current publication exception: tests, evidence, measurements, agent files and internal documents remain outside Git by project-owner instruction. A clean clone therefore does not currently include a `pnpm test` script or acceptance suite. Maintainer runs use the private branch-specific test harness and record results separately. Publishing tests or restoring a public test command requires a separate publication decision. README and this guide are the public documentation exceptions.
