@@ -50,3 +50,8 @@ coverage/
 !/tests/fixtures/tokenizer_config.json
 !/tests/fixtures/chat-template-vectors.json
 !/tests/fixtures/Qwen-LICENSE
+
+# Explicitly authorized redacted P2P report only
+!/evidence/
+/evidence/*
+!/evidence/gate-0006.json
