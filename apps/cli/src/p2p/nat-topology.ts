@@ -60,6 +60,8 @@ export async function startNatRouters(
     `IPTABLES_VERSION=${NAT.packages.iptables}`,
     '--build-arg',
     `LIBCAP_VERSION=${NAT.packages.libcap}`,
+    '--build-arg',
+    `CONNTRACK_VERSION=${NAT.packages.conntrack}`,
     '-f',
     NAT.routerDockerfile,
     '-t',
