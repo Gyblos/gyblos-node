@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 
-import { COMMITMENT, JOURNAL_FILENAMES, JOURNAL_PATHS } from '@gyblos/config';
+import { JOURNAL_FILENAMES, JOURNAL_PATHS } from '@gyblos/config';
+import { JOURNAL_STATES } from '@gyblos/gate/constants';
 import { GateError } from '@gyblos/payments-x402/chain';
 import { GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
 import { saveJson } from '@gyblos/runtime';
@@ -21,11 +22,15 @@ export async function assertNoUnresolvedAuthorizations(
       const previous = JSON.parse(
         await readFile(path, 'utf8'),
       ) as JournalStateRecord;
-      const terminal = path.endsWith(JOURNAL_FILENAMES.exact)
-        ? [COMMITMENT, 'rejected']
+      const terminal: readonly string[] = path.endsWith(JOURNAL_FILENAMES.exact)
+        ? [JOURNAL_STATES.CONFIRMED, JOURNAL_STATES.REJECTED]
         : path.endsWith(JOURNAL_FILENAMES.inference)
-          ? ['verified', 'reconciled', 'resolved-rejected']
-          : ['verified', 'resolved-rejected'];
+          ? [
+              JOURNAL_STATES.VERIFIED,
+              JOURNAL_STATES.RECONCILED,
+              JOURNAL_STATES.RESOLVED_REJECTED,
+            ]
+          : [JOURNAL_STATES.VERIFIED, JOURNAL_STATES.RESOLVED_REJECTED];
       if (!terminal.includes(previous.state ?? ''))
         throw new GateError(
           GATE_ERROR_CODES.UNRESOLVED_ATTEMPT,
