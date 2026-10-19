@@ -40,7 +40,7 @@ import {
   GateError,
   lamports,
 } from '@gyblos/payments-x402/chain';
-import { DEVNET_USDC } from '@gyblos/payments-x402/constants';
+import { DEVNET_USDC, GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
 import type { SettlementEvent } from '@gyblos/payments-x402/facilitator';
 import {
   assertPortFree,
@@ -103,7 +103,7 @@ export async function main() {
         `${ollamaUrl}${ROUTES.ollamaVersion}`,
         () =>
           new GateError(
-            'PORT_BUSY',
+            GATE_ERROR_CODES.PORT_BUSY,
             'Gate requires an unused local host port.',
           ),
       );
@@ -111,7 +111,7 @@ export async function main() {
         `${facilitatorUrl}${ROUTES.health}`,
         () =>
           new GateError(
-            'PORT_BUSY',
+            GATE_ERROR_CODES.PORT_BUSY,
             'Gate requires an unused local host port.',
           ),
       );
@@ -150,7 +150,10 @@ export async function main() {
         signal: controller.signal,
         expectedRunId: runId,
         onMismatch: () =>
-          new GateError('PORT_BUSY', 'Host is not owned by this gate.'),
+          new GateError(
+            GATE_ERROR_CODES.PORT_BUSY,
+            'Host is not owned by this gate.',
+          ),
       });
       const debugRequestId = randomUUID(),
         underchargeRequestId = randomUUID(),

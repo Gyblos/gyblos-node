@@ -2,7 +2,11 @@ import type { PaymentRequirements, SettleResponse } from '@x402/core/types';
 
 import { PAYMENT_LIMITS, TOKEN_PROGRAM_ADDRESS } from '@gyblos/config';
 import { GateError } from '@gyblos/payments-x402/chain';
-import { CHANNEL_PROGRAM, DEVNET } from '@gyblos/payments-x402/constants';
+import {
+  CHANNEL_PROGRAM,
+  DEVNET,
+  GATE_ERROR_CODES,
+} from '@gyblos/payments-x402/constants';
 
 export interface TrustPolicy {
   mint: string;
@@ -24,7 +28,7 @@ export function validateSettlement(
     !receipt.transaction
   )
     throw new GateError(
-      'UNTRUSTED_RECEIPT',
+      GATE_ERROR_CODES.UNTRUSTED_RECEIPT,
       'Settlement receipt does not match expected payer, network and actual amount.',
     );
 }
@@ -34,7 +38,7 @@ export function validateTerms(
   policy: TrustPolicy,
 ): void {
   const reject = (message: string): never => {
-    throw new GateError('UNTRUSTED_TERMS', message);
+    throw new GateError(GATE_ERROR_CODES.UNTRUSTED_TERMS, message);
   };
   if (terms.network !== DEVNET || terms.scheme !== 'upto')
     reject('Wrong network or scheme.');

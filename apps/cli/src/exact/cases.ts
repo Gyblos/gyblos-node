@@ -6,7 +6,7 @@ import { COMMITMENT, HTTP_STATUS, TIMEOUTS } from '@gyblos/config';
 import { saveJournal } from '@gyblos/gate/journal';
 import type { ChainTransaction } from '@gyblos/gate/types';
 import { confirm, explorer, GateError, rpc } from '@gyblos/payments-x402/chain';
-import { DEVNET } from '@gyblos/payments-x402/constants';
+import { DEVNET, GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
 import {
   assertExactFallbackSafe,
   EXACT_PRICE,
@@ -64,7 +64,7 @@ export async function runProvider(context: ExactContext) {
       );
       if (reconciliation.matches.length)
         throw new GateError(
-          'PUBLIC_OUTCOME_UNCERTAIN',
+          GATE_ERROR_CODES.PUBLIC_OUTCOME_UNCERTAIN,
           'Payment transaction observed without successful delivery.',
         );
       cases.push({

@@ -19,7 +19,7 @@ import { prepareExactAccounts } from '@gyblos/gate/exact-accounts';
 import { assertNoUnresolvedAuthorizations } from '@gyblos/gate/journal';
 import { withExclusiveLock } from '@gyblos/gate/lock';
 import { assertDevnet, GateError, tokens } from '@gyblos/payments-x402/chain';
-import { DEVNET_USDC } from '@gyblos/payments-x402/constants';
+import { DEVNET_USDC, GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
 import {
   assertExactSupport,
   EXACT_PRICE,
@@ -57,7 +57,7 @@ export async function main() {
       const previousJournal = JSON.parse(await readFile(journalPath, 'utf8'));
       if (![COMMITMENT, 'rejected'].includes(previousJournal.state))
         throw new GateError(
-          'UNRESOLVED_EXACT',
+          GATE_ERROR_CODES.UNRESOLVED_EXACT,
           'Previous exact payment is uncertain. Reconcile before another attempt.',
         );
     } catch (error) {
@@ -86,7 +86,10 @@ export async function main() {
         assertExactSupport(supported, provider.feePayer);
         providers.push({ ...provider, supported });
       } catch (error) {
-        if (error instanceof GateError && error.code === 'SUPPORT_CHANGED')
+        if (
+          error instanceof GateError &&
+          error.code === GATE_ERROR_CODES.SUPPORT_CHANGED
+        )
           throw error;
         evidence.facilitators.push({
           url: provider.url,
@@ -98,7 +101,7 @@ export async function main() {
     }
     if (!providers.length)
       throw new GateError(
-        'NO_PUBLIC_FACILITATOR',
+        GATE_ERROR_CODES.NO_PUBLIC_FACILITATOR,
         'Both public facilitators unavailable.',
       );
     evidence.setupTransaction = await prepareExactAccounts(config);
@@ -108,7 +111,7 @@ export async function main() {
       BigInt(EXACT_PRICE)
     )
       throw new GateError(
-        'NEEDS_CIRCLE_USDC',
+        GATE_ERROR_CODES.NEEDS_CIRCLE_USDC,
         `Fund buyer ${config.addresses.buyer} using faucet.circle.com on Solana Devnet.`,
       );
     for (const provider of providers) {
@@ -124,7 +127,10 @@ export async function main() {
           facilitator,
         });
       } catch (error) {
-        if (error instanceof GateError && error.code === 'SUPPORT_CHANGED')
+        if (
+          error instanceof GateError &&
+          error.code === GATE_ERROR_CODES.SUPPORT_CHANGED
+        )
           throw error;
         evidence.results.push({
           facilitator: provider.url,
@@ -161,7 +167,7 @@ export async function main() {
       }
     }
     throw new GateError(
-      'PUBLIC_PROVIDERS_REJECTED',
+      GATE_ERROR_CODES.PUBLIC_PROVIDERS_REJECTED,
       'No public facilitator completed the exact payment; inspect evidence.',
     );
   }

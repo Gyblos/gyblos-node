@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 
 import { EXACT_PRICE } from '@gyblos/application/constants';
 import { signer } from '@gyblos/gate/config';
+import { GateError } from '@gyblos/payments-x402/chain';
+import { GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
 import {
   createExactBuyer,
   validateExactTerms,
@@ -42,7 +44,9 @@ export async function assertUntrusted(
     );
     await assert.rejects(
       buyer.authorize({ ...required, accepts: [changed] }, EXACT_PRICE),
-      /Exact terms/,
+      (error: unknown) =>
+        error instanceof GateError &&
+        error.code === GATE_ERROR_CODES.UNTRUSTED_EXACT_TERMS,
     );
     assert.equal(signed, false);
     cases.push({
@@ -81,7 +85,9 @@ export async function assertEmpty(
   );
   await assert.rejects(
     emptyBuyer.authorize(await challenge(), emptyBefore.buyer),
-    /insufficient Circle/,
+    (error: unknown) =>
+      error instanceof GateError &&
+      error.code === GATE_ERROR_CODES.INSUFFICIENT_EXACT_USDC,
   );
   assert.equal(signed, false);
   assert.equal(facilitator.calls.length, emptyCalls);
@@ -92,7 +98,7 @@ export async function assertEmpty(
     case: 'insufficient-usdc',
     status: 'passed',
     enforcement: 'buyer-preflight',
-    reason: 'INSUFFICIENT_EXACT_USDC',
+    reason: GATE_ERROR_CODES.INSUFFICIENT_EXACT_USDC,
     signed: false,
     before: emptyBefore,
     after: emptyAfter,

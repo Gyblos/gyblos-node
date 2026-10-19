@@ -3,6 +3,7 @@ import { dirname } from 'node:path';
 
 import { FILE_MODES } from '@gyblos/config';
 import { GateError } from '@gyblos/payments-x402/chain';
+import { GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
 
 export async function withExclusiveLock<T>(
   path: string,
@@ -16,7 +17,7 @@ export async function withExclusiveLock<T>(
     (error) => {
       if ((error as NodeJS.ErrnoException).code === 'EEXIST')
         throw new GateError(
-          'BUYER_BUSY',
+          GATE_ERROR_CODES.BUYER_BUSY,
           'Another buyer or an interrupted process holds the gate lock. Reconcile before removing a stale lock.',
         );
       throw error;
