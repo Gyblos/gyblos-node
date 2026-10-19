@@ -4,6 +4,7 @@ import type {
   SupportedResponse,
 } from '@x402/core/types';
 
+import type { GateErrorCode } from '@gyblos/payments-x402/constants';
 import type { PublicCall } from '@gyblos/payments-x402/exact/types';
 
 import type {
@@ -98,5 +99,5 @@ export interface ExactGateEvidence extends EvidenceBase {
   publicCalls?: PublicCall[];
   reconciliation?: Reconciliation;
   finishedAt?: string;
-  error?: { code: string; name: string; message: string };
+  error?: { code: GateErrorCode | 'GATE_ERROR'; name: string; message: string };
 }
