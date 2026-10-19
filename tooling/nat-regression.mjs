@@ -14,6 +14,8 @@ import {
   selectUdpMapping,
 } from '@gyblos/transport/nat-mapping';
 
+import { assertReflectedMappings } from './lab-mapping.mjs';
+import { addLabObserver } from './lab-observer.mjs';
 import { runNativeProbe } from './native-nat-probe.mjs';
 import { UDP_PROBE_ARGUMENTS, UDP_PROBE_SOURCE } from './udp-probe.mjs';
 
@@ -24,6 +26,7 @@ async function main() {
       'lab-candidates': { type: 'boolean', default: false },
       idle: { type: 'boolean', default: false },
       'block-udp': { type: 'boolean', default: false },
+      'wan-discovery': { type: 'boolean', default: false },
     },
   });
   const source = await sourceFingerprint();
@@ -88,6 +91,7 @@ async function main() {
     assert.equal(actor.network_mode, undefined);
     assert.equal(actor.ports, undefined);
   }
+  addLabObserver(template, values);
   const composePath = `.local/${project}.json`;
   await writeFile(composePath, JSON.stringify(template), {
     mode: FILE_MODES.privateFile,
@@ -103,7 +107,7 @@ async function main() {
   try {
     await docker(compose(['up', '-d', '--wait']), undefined, environment);
     const ids = {};
-    for (const role of ['seller', 'buyer', 'router-a', 'router-b']) {
+    for (const role of Object.keys(template.services)) {
       ids[role] = (
         await docker(compose(['ps', '-q', role]), undefined, environment)
       ).trim();
@@ -203,9 +207,26 @@ async function main() {
       }
       mappings.push(mapping);
     }
-    const native = values['native-image']
+    const nativeResult = values['native-image']
       ? await runNativeProbe({ ids, values, project })
       : undefined;
+    const native = nativeResult?.report;
+    const nativeMappings = {};
+    if (native) {
+      for (const side of ['a', 'b'])
+        nativeMappings[side] = parseUdpMappings(
+          await execute(ids[`router-${side}`], [
+            '/usr/sbin/conntrack',
+            '-L',
+            '-p',
+            'udp',
+          ]),
+        );
+    }
+    if (values['wan-discovery']) {
+      assertReflectedMappings(nativeResult.raw, nativeMappings);
+      native.reflectedMappingsVerified = true;
+    }
     let inboundUdpDroppedPackets = 0;
     if (values['block-udp']) {
       const counters = await execute(ids['router-a'], [
@@ -241,7 +262,7 @@ async function main() {
     };
     await writeFile(
       `.local/${project}-private.json`,
-      JSON.stringify({ report, mappings }),
+      JSON.stringify({ report, mappings, nativeMappings }),
       { mode: FILE_MODES.privateFile },
     );
     console.log(JSON.stringify(report));
