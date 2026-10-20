@@ -90,6 +90,14 @@ wallet, Ollama, Docker, Python or devnet funds. `tooling/test-files.json` lists
 every published test entrypoint; the runner rejects missing or unlisted suites.
 Case modules in `tests/support/` are explicitly registered by those entrypoints.
 
+Paid-call diagnostic cases spawn the real CLI entrypoint using the asynchronous
+Node test-loader API. Stubs replace only its direct readiness/payment ports;
+locks, temporary persistence, classification and evidence filtering remain real.
+Each owned child has a 15-second deadline, forced cleanup and a 64 KiB output
+limit per stream. Tests forbid RPC and assert one simulated invocation, without
+loading funded keys or authorizing another payment. Receipt and deposit hints
+remain unverified when the full proof fails.
+
 Native transport cases require the pinned native Iroh binding and IPv6 loopback
 `[::1]`. Before registering those cases, the test helpers probe SDK loading and
 an IPv6 loopback socket. Missing bindings or known IPv6 capability errors produce
@@ -105,7 +113,10 @@ receive handles and stalls only its own loopback UDP return path to create real
 native write backpressure. An owned buyer subprocess is paused with `SIGSTOP`
 before it can recover via IPv6, then resumed and terminated during cleanup.
 That single process-control case explicitly skips outside macOS/Linux. A passthrough observer forwards the original native
-write promise without replacing or delaying it. It advances JavaScript
+write and finish promises without replacing or delaying them. Warm-up waits
+for native finish to settle and a subsequent event-loop turn before sending
+the next request; write completion alone does not establish that the peer slot is free.
+It advances JavaScript
 `Date.now` across an admission window to fill the binding's send buffer within
 two per-peer quotas; native clocks and ingress/egress timers remain real. Seven
 other incomplete streams keep the remaining slots occupied while expiry closes
