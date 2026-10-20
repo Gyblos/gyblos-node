@@ -45,6 +45,24 @@ export const PUBLIC_CALL_OUTCOMES = {
   UNCERTAIN: 'uncertain',
 } as const;
 
+export const CHANNEL_GUARDS = {
+  AVAILABLE: 'Finalized channel account unavailable.',
+  ENCODING: 'Finalized channel account must use base64 encoding.',
+  SIZE: 'Finalized channel account must have the canonical size.',
+  LAMPORTS: 'Finalized channel lamports must be a safe nonnegative integer.',
+  CANONICAL: 'Channel owner, layout or canonical PDA is invalid.',
+  STATUS: 'Finalized channel must be distributed.',
+  DEPOSIT: 'Finalized channel deposit must equal the original ceiling.',
+  SETTLED: 'Finalized channel settlement must equal the observed charge.',
+  BUYER: 'Finalized channel payer must match the expected buyer.',
+  PAYEE: 'Finalized channel payee must match the sponsor.',
+  RENT_PAYER: 'Finalized channel rent payer must match the sponsor.',
+  AUTHORIZER: 'Finalized channel authorizer must match the expected signer.',
+  MINT: 'Finalized channel mint must match the expected asset.',
+  MINIMUM_SAFE: 'Minimum channel rent must be a safe nonnegative integer.',
+  MINIMUM: 'Retained channel rent is below minimum.',
+} as const;
+
 export type GateErrorCode =
   (typeof GATE_ERROR_CODES)[keyof typeof GATE_ERROR_CODES];
 
@@ -52,6 +70,9 @@ export type PublicCallOperation =
   (typeof PUBLIC_CALL_OPERATIONS)[keyof typeof PUBLIC_CALL_OPERATIONS];
 export type PublicCallOutcome =
   (typeof PUBLIC_CALL_OUTCOMES)[keyof typeof PUBLIC_CALL_OUTCOMES];
+
+export type FinalizedChannelGuardMessage =
+  (typeof CHANNEL_GUARDS)[keyof typeof CHANNEL_GUARDS];
 
 export {
   DEVNET,
