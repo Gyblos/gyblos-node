@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import test from 'node:test';
-import { setTimeout as delay } from 'node:timers/promises';
 
 import { P2P } from '@gyblos/config';
 import { encodeRequest } from '@gyblos/transport/wire';
@@ -14,6 +13,7 @@ import {
   NativeTestDeadlineError,
   within,
 } from './native-fixture.js';
+import { NATIVE_TEST_OPTIONS, waitFor } from './native-runtime.js';
 
 const TIMEOUT = 20_000;
 
@@ -31,7 +31,7 @@ async function rejectsBeforeDeadline(operation: Promise<unknown>) {
 export function registerNativeCases() {
   test(
     'native priority1: reset/half-close incomplete input and a closed response preserve healthy-peer access',
-    { timeout: TIMEOUT },
+    { ...NATIVE_TEST_OPTIONS, timeout: TIMEOUT },
     async () => {
       const lab = await fixture();
       try {
@@ -75,7 +75,7 @@ export function registerNativeCases() {
 
   test(
     'native priority2: valid fragmentation is exact; truncated/ambiguous/oversized frames never reach origin',
-    { timeout: TIMEOUT },
+    { ...NATIVE_TEST_OPTIONS, timeout: TIMEOUT },
     async () => {
       const lab = await fixture();
       try {
@@ -118,7 +118,7 @@ export function registerNativeCases() {
 
   test(
     'native priority3: remote receipt loss poisons the live buyer; a new transport does not execute the duplicate',
-    { timeout: TIMEOUT },
+    { ...NATIVE_TEST_OPTIONS, timeout: TIMEOUT },
     async () => {
       const lab = await fixture({ dropPaidResponse: true });
       try {
@@ -156,7 +156,7 @@ export function registerNativeCases() {
 
   test(
     'native priority4: multiple NodeIds behind one IP stay usable despite another NodeId opening duplicate connections',
-    { timeout: TIMEOUT },
+    { ...NATIVE_TEST_OPTIONS, timeout: TIMEOUT },
     async () => {
       const lab = await fixture();
       try {
@@ -171,8 +171,14 @@ export function registerNativeCases() {
             /* Admission can refuse excess connections. */
           }
         }
-        // Let accepted handshakes complete and application policy take ownership.
-        await delay(40);
+        await waitFor(
+          () =>
+            duplicates.filter(
+              (client) => client.connection.closeReason() === null,
+            ).length <= P2P.maxPeerConnections,
+          undefined,
+          'duplicate-connection admission decisions',
+        );
         assert.equal(
           (await within(first.exchange(fixtureRequest('same-ip-first'))))
             .status,
