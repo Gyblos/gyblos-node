@@ -2,11 +2,15 @@
 
 This repository is an experimental TypeScript x402 payment foundation for
 Gyblos. It exercises Solana devnet fixed resources and a local Ollama inference
-gate, plus an experimental native Iroh PoC. One native Wi-Fi Mac–VPS direct
-trial completed three paid devnet requests at source `2c8eeac`, using a test SPL
-mint, not USDC. Broader NAT/hotspot/CGNAT coverage and subsequent-head physical
-validation remain pending. Use isolated generated devnet wallets only. Never
-import mainnet keys.
+gate, plus an experimental native Iroh PoC. One earlier Wi-Fi Mac–VPS direct
+trial completed three paid devnet requests using a test SPL mint, not USDC. That
+report is historical; it does not validate the current source. The exact
+candidate hash and final-head paid-smoke status belong to
+[PR #10's validation record](https://github.com/Gyblos/gyblos-payments/pull/10).
+A new smoke needs explicit VPS/funds approval and must use that unchanged final
+commit. Docker NAT-direct did not pass; hotspot/CGNAT and broader NAT coverage
+remain untested. Use isolated generated devnet wallets only. Never import
+mainnet keys.
 
 ## Payment scope
 
@@ -162,8 +166,11 @@ Reconnection can reuse or refill an allowance only while shared capacity
 remains. It does not guarantee a disconnected identity capacity against
 competing work. A connected peer with an exhausted partial reservation may need
 to reconnect before obtaining newly freed allowance. Free challenges and failed
-origin work still consume the same admission budget. A payment header, prior
-free request or HTTP status grants no special entitlement. The earlier
+origin work still consume the same admission budget. About nine identities
+attempting 30 free requests each per minute can deny new peers for the window:
+eight consume 240 admissions and the ninth consumes the remaining 16 of 256. No
+payment is required; this is not Sybil resistance. A payment header, prior free
+request or HTTP status grants no special entitlement. The earlier
 nine-single-request/disconnect regression now passes with real direct-loopback
 Iroh: unused inactive grace is reclaimable, while actually consuming all 256
 admissions denies additional new and disconnected known peers until rollover.
@@ -328,8 +335,29 @@ same-NodeId reconnection without resetting its 30-request quota and newcomer
 admission after nine disconnected free-request peers. Offline limiter tests
 cover protected connected reservations, exhaustion after 256 actual admissions,
 per-identity debt through LRU churn, rollover with active work, duplicate
-release and partial grants. The current public suite uses the actual production
-limiter; older private reduced-table diagnostics remain historical.
+release and partial grants. In the partial-grant case, one identity consumes 30,
+seven connected identities reserve 210, and an eighth receives the remaining 16.
+Releasing one reservation creates spare capacity, but the exhausted partial
+lease must still refuse entry until disconnect/re-register allows its
+remaining 14. This directly exercises the connected `leases > 0` guard; it is an
+offline limiter result, not a new network fairness guarantee. The current public
+suite uses the actual production limiter; older reduced-table diagnostics remain
+historical. Both the limiter and native nine-single-request tests require the
+newcomer to receive its full 30-request quota and refuse its 31st request.
+
+A separate native egress test uses an unread receiver plus controlled packet
+loss on owned loopback UDP sockets. It pauses only its owned buyer subprocess
+with `SIGSTOP`, preventing IPv6 route recovery until the seller expires its
+write; cleanup resumes and terminates that child. This one process-control case
+explicitly skips outside macOS/Linux. It retains the actual receive handles,
+observes original native write promises and fills the send buffer across two
+admission windows by advancing JavaScript `Date.now`. Native clocks and deadline
+timers remain real. Seven other incomplete ingress streams keep all other slots
+occupied, so a healthy request after expiry proves the stalled slot was
+released. Non-reading alone did not block this SDK's buffered writes; this is a
+deterministic local loss/paused-receiver experiment, not a physical-network or
+payment result. Binding/IPv6 capability skips are explicit; see
+[Contributing](../CONTRIBUTING.md).
 
 The public fixture is a minimal projection of one saved finalized deposit/claim
 pair: selected metadata and parsed financial instructions remain unchanged.
@@ -363,9 +391,14 @@ compatibility, on-chain replay or exactly-once settlement. Existing charged or
 missing-claim recovery, ordinary confirmed journal clearance, journal-derived
 paid exports, generic outer diagnostics and broader native/Sybil/source-key/
 relay/privacy limits remain follow-ups. Raw transaction responses, private logs,
-measurements and evidence remain excluded. The original physical payment
-evidence still belongs to `2c8eeac`; no later-head paid run is implied. Broader
-lab reorganization, typechecking of all diagnostic JavaScript and
-alternate-engine rollout remain follow-up work. Measurement code can accept the
-explicit allowlisted offer model identity while existing fixed-engine gates
-retain their pinned default; this does not validate another engine end to end.
+measurements and evidence remain excluded. The historical physical report is
+retained separately from the
+[current candidate validation record](https://github.com/Gyblos/gyblos-payments/pull/10).
+Only a new smoke bound to the exact final commit can validate that candidate.
+Its per-request and total charge plus refund must equal the authorized ceiling.
+Updating that external record leaves the tested Git revision unchanged;
+historical evidence never implies a later-head paid pass. Broader lab
+reorganization, typechecking of all diagnostic JavaScript and alternate-engine
+rollout remain follow-up work. Measurement code can accept the explicit
+allowlisted offer model identity while existing fixed-engine gates retain their
+pinned default; this does not validate another engine end to end.
