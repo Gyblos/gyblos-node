@@ -32,11 +32,49 @@ function consume(limiter: Limiter) {
 }
 
 export function registerLimiterCases() {
+  test('a connected partial grant cannot refill until its lease ends, even after capacity is released', () => {
+    const limiter = createPeerLimiter(() => 0);
+    const spent = limiter.register('spent');
+    assert.ok(spent);
+    for (let index = 0; index < P2P.requestsPerWindow; index++)
+      assert.ok(request(limiter, 'spent'));
+    spent();
+    const held: (() => void)[] = [];
+    for (let index = 0; index < 7; index++) {
+      const lease = limiter.register('held-' + index);
+      assert.ok(lease);
+      held.push(lease);
+    }
+    const partial = limiter.register('partial');
+    assert.ok(partial);
+    const granted = P2P.globalRequestsPerWindow - P2P.requestsPerWindow * 8;
+    for (let index = 0; index < granted; index++)
+      assert.ok(request(limiter, 'partial'));
+    held[0]!();
+    assert.equal(
+      limiter.enter('partial'),
+      undefined,
+      'An existing lease cannot refill its exhausted partial grant.',
+    );
+    partial();
+    const returning = limiter.register('partial');
+    assert.ok(returning);
+    for (let index = granted; index < P2P.requestsPerWindow; index++)
+      assert.ok(request(limiter, 'partial'));
+    assert.equal(limiter.enter('partial'), undefined);
+    returning();
+    for (const release of held) release();
+  });
   test('nine free requests followed by disconnects preserve newcomer admission', () => {
     const limiter = createPeerLimiter(() => 0);
     for (let index = 0; index < 9; index++)
       assert.ok(single(limiter, 'free-' + index));
-    assert.ok(single(limiter, 'newcomer'));
+    const newcomer = limiter.register('newcomer');
+    assert.ok(newcomer);
+    for (let index = 0; index < P2P.requestsPerWindow; index++)
+      assert.ok(request(limiter, 'newcomer'));
+    assert.equal(request(limiter, 'newcomer'), false);
+    newcomer();
     assert.ok(single(limiter, 'free-0'));
   });
   test('255 actual requests leave one admission and the 256th exhausts the budget', () => {
