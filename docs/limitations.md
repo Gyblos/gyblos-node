@@ -324,11 +324,12 @@ creation. No fresh paid dust transaction or physical-network result is claimed.
 The public suite exercises real direct-loopback Iroh using simulated payments.
 Native cases cover resets and half-closes, fragmented and malformed frames, a
 lost simulated receipt, multiple identities behind one source address,
-same-NodeId reconnection while shared capacity remains, connected quota under
-free-challenge pressure and refusal after 256 actual admissions. Offline limiter
-controls cover per-identity debt through LRU churn, rollover with active work,
-duplicate release and partial grants. The current public suite uses the actual
-production limiter; older private reduced-table diagnostics remain historical.
+same-NodeId reconnection without resetting its 30-request quota and newcomer
+admission after nine disconnected free-request peers. Offline limiter tests
+cover protected connected reservations, exhaustion after 256 actual admissions,
+per-identity debt through LRU churn, rollover with active work, duplicate
+release and partial grants. The current public suite uses the actual production
+limiter; older private reduced-table diagnostics remain historical.
 
 The public fixture is a minimal projection of one saved finalized deposit/claim
 pair: selected metadata and parsed financial instructions remain unchanged.
