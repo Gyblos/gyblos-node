@@ -41,7 +41,8 @@ export function createPeerLimiter(now: () => number = Date.now) {
     if (!window) {
       if (windows.size >= P2P.maxPeers) {
         const oldest = [...windows].find(
-          ([, peer]) => peer.active === 0 && peer.leases === 0,
+          ([, peer]) =>
+            peer.active === 0 && peer.leases === 0 && peer.reserved === 0,
         );
         if (!oldest) return undefined;
         windows.delete(oldest[0]);
@@ -70,8 +71,9 @@ export function createPeerLimiter(now: () => number = Date.now) {
         if (released) return;
         released = true;
         window.leases--;
-        // Releasing unused capacity never erases this window's consumed debt.
-        if (window.leases === 0) window.reserved = 0;
+        // Admitted peers retain unused quota until rollover for same-identity reconnects.
+        // A connection with no admitted work cannot reserve capacity after closing.
+        if (window.leases === 0 && window.requests === 0) window.reserved = 0;
       };
     },
     enter(nodeId: string) {
@@ -82,12 +84,12 @@ export function createPeerLimiter(now: () => number = Date.now) {
         !window ||
         window.active >= P2P.maxPeerConcurrent ||
         window.requests >= P2P.requestsPerWindow ||
-        (window.leases > 0 ? window.reserved <= 0 : remaining() <= 0)
+        (window.reserved === 0 && (window.leases > 0 || remaining() <= 0))
       )
         return undefined;
       window.requests++;
       window.active++;
-      if (window.leases > 0) window.reserved--;
+      if (window.reserved > 0) window.reserved--;
       globalRequests++;
       active++;
       let released = false;
