@@ -10,6 +10,7 @@ import { P2P } from '@gyblos/config';
 import { JOURNAL_STATES } from '@gyblos/gate/constants';
 import { finalizedPaymentProof } from '@gyblos/gate/finalized-proof';
 import { withExclusiveLock } from '@gyblos/gate/lock';
+import { withP2pRecoveryLock } from '@gyblos/gate/recovery-lock';
 import { isMain, loadJson, saveJson } from '@gyblos/runtime';
 
 import {
@@ -105,7 +106,7 @@ export async function main(args = process.argv.slice(2)) {
     strict: true,
     allowPositionals: false,
   });
-  return withExclusiveLock(rolePath(P2P.buyerLockFilename), async () => {
+  const operation = async () => {
     const config = await loadRole();
     assert.equal(config.role, 'buyer');
     const journal = await loadJson<RecoveryJournal>(
@@ -195,7 +196,17 @@ export async function main(args = process.argv.slice(2)) {
     });
     console.log(JSON.stringify(proof));
     return proof;
-  });
+  };
+  if (values['audit-only'])
+    return withExclusiveLock(rolePath(P2P.buyerLockFilename), operation);
+  return withP2pRecoveryLock(
+    {
+      buyer: rolePath(P2P.buyerLockFilename),
+      recovery: rolePath(P2P.recoveryLockFilename),
+      audit: rolePath(P2P.staleLockJournalFilename),
+    },
+    operation,
+  );
 }
 
 if (isMain(import.meta.url)) {
