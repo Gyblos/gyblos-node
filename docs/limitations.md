@@ -146,9 +146,16 @@ eight. Validated source addresses admit at most two pending handshakes per IP
 without counting source ports as new identities; established connections are
 limited to one per NodeId. Connected peers reserve their available per-minute
 allowance within the shared budget of 256 requests. Free challenges from other
-peers cannot spend that reservation, and disconnecting does not erase consumed
-global capacity. A payment header grants no priority. The peer table retains
-active and connected entries; inactive LRU eviction can reset per-peer history.
+peers cannot spend that reservation. A peer with admitted work retains unused
+quota after disconnect until the current fixed window ends, so its authenticated
+NodeId can reconnect while other peers consume unreserved capacity. Zero-work
+connections release unused quota. Reconnection retains consumed debt and may
+refill a partial allowance only from available shared capacity. Active,
+connected and reserved entries cannot be evicted by LRU; rollover expires
+inactive grace and refreshes connected reservations. Inactive unreserved
+eviction can reset per-peer history. A free request can qualify for this grace;
+it is not paid history, costly identity or Sybil resistance. A payment header
+grants no priority.
 
 Application-idle connections expire after 30 seconds. A 15-minute lifetime
 retires a connection after active work drains. Expired handshakes preserve the
@@ -199,12 +206,22 @@ persistence precedes the journal transition. Charged outcomes are rejected by
 this zero-charge command.
 
 Default recovery serializes through a separate recovery lock. It can retire a
-buyer lock only after validating its private regular-file metadata and proving
-that its recorded local process no longer exists. It persists a stale-lock audit
-before removal and rechecks the file identity. Live or reused process IDs,
-ambiguous metadata, symlinks, hardlinks and unsafe filesystem identities stop
-recovery. An interrupted recovery lock requires manual investigation; this is
-cooperative local-process recovery, not a multi-host lock protocol.
+buyer lock only after validating its private regular-file metadata, matching its
+versioned ownership domain and proving its recorded local PID is absent. Linux
+binds the host, boot ID and PID namespace; macOS binds the host and a bounded
+boot-session query. Legacy, missing, mismatched or unavailable identity stops
+automatic retirement before any PID probe. `startedAt` records lock acquisition,
+not OS process start; live/reused PIDs remain busy regardless of age.
+
+Buyer/audit opens are nonblocking and no-follow; FIFOs, symlinks, hardlinks,
+unsafe filesystem identities and ambiguous metadata stop recovery. A stale-lock
+audit is synchronized before removal and file identity is rechecked. Normal
+exclusive locking remains usable with unverifiable owner metadata, and cleanup
+only removes the acquired inode, preserving replacements and original operation
+errors. An interrupted recovery lock requires manual investigation. These are
+cooperative local-process checks: comparison and unlink are separate operations,
+not protection against hostile same-privilege replacement or a multi-host lock
+protocol. No cross-container shared-volume experiment has been run.
 
 Add `--audit-only` to verify either a charged or zero-charge payment without
 changing journal/reconciliation files or retiring stale locks. This mode only
@@ -212,10 +229,15 @@ acquires the normal buyer lock. Both modes use RPC reads, with no signer,
 funding, submission or payment retry. Keep output private. The verifier checks
 finalized statuses, transaction errors, transfer identities, exact token/SOL
 deltas and canonical channel ownership, layout, PDA and settlement. Sponsor fee
-and rent conservation is checked independently inside each transaction. Four
-explicit sponsor balance snapshots distinguish the two transaction deltas from
-any intervening balance movement; that movement is not labeled as fees. Later
-wallet balances are not historical proof.
+and rent conservation is checked independently inside each transaction,
+including the canonical escrow ATA's temporary rent advance and return. Its
+creation must be sponsor funded with the token program's account owner/size;
+closure must be authorized by the channel and return rent to that sponsor. Fresh
+creation, safe balances, continuity and complete closure are required. This
+temporary ATA rent is separate from retained channel rent and network fees.
+Explicit sponsor/escrow snapshots distinguish transaction deltas from unrelated
+sponsor interval movement; that movement is not labeled as fees. Later wallet
+balances are not historical proof.
 
 This verifier is deliberately limited to fresh, individually settled channels
 with retained canonical accounts. Closed/missing channels, nonfinalized data,
@@ -229,11 +251,17 @@ unverified when supplied by an operator.
 The current corrections were validated with private offline regressions,
 controlled process/filesystem failures and real direct-loopback Iroh using
 simulated payments. The native cases cover resets and half-closes, fragmented
-and malformed frames, a lost simulated receipt and multiple identities behind
-one source address. Synthetic backend counters do not prove on-chain replay
-protection or exactly-once settlement. The original physical payment evidence
-still belongs to `2c8eeac`. No later-head paid run is implied. Broader lab
-reorganization, typechecking of all diagnostic JavaScript and alternate-engine
-rollout remain follow-up work. Measurement code can now accept the explicit
-allowlisted offer model identity, while existing fixed-engine gates retain their
-pinned default; this does not validate another engine end to end.
+and malformed frames, a lost simulated receipt, multiple identities behind one
+source address and same-NodeId reconnection after verified free-challenge
+pressure. Financial regressions replay unchanged historical transactions with
+explicitly synthetic current-channel and RPC responses through the real SDK
+verifier; a synthetic full-refund variant retains the escrow rent lifecycle.
+Ownership tests include the actual macOS domain and mocked Linux/macOS probes.
+These checks are not a fresh chain audit, public relay test, on-chain replay
+proof or exactly-once settlement proof. All new test/evidence artifacts remain
+outside Git. The original physical payment evidence still belongs to `2c8eeac`.
+No later-head paid run is implied. Broader lab reorganization, typechecking of
+all diagnostic JavaScript and alternate-engine rollout remain follow-up work.
+Measurement code can now accept the explicit allowlisted offer model identity,
+while existing fixed-engine gates retain their pinned default; this does not
+validate another engine end to end.
