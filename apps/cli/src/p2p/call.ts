@@ -14,7 +14,6 @@ import {
   measurementRow,
   measurementSalt,
 } from '@gyblos/gate/measurements';
-import type { BuyerResponseObservation } from '@gyblos/payments-x402/buyer';
 import { assertProgram } from '@gyblos/payments-x402/chain';
 import { createInferenceBuyer } from '@gyblos/payments-x402/inference-buyer';
 import { validateSettlement } from '@gyblos/payments-x402/trust';
@@ -28,7 +27,12 @@ import {
 import { createCases } from '../inference/cases-data.js';
 import { modelTokenizer } from './artifacts.js';
 import { trustedOffer } from './buyer.js';
-import { priorCalls, readCallMetrics } from './call-evidence.js';
+import {
+  priorCalls,
+  proofObservation,
+  readCallMetrics,
+  type CallPaymentObservation,
+} from './call-evidence.js';
 import {
   CALL_OUTCOMES,
   CALL_PHASES,
@@ -85,7 +89,7 @@ async function run() {
   };
   let confirmedProof: Awaited<ReturnType<typeof paymentProof>> | undefined;
   let phase: CallPhase = CALL_PHASES.REQUEST;
-  let observedPayment: BuyerResponseObservation | undefined;
+  let observedPayment: CallPaymentObservation | undefined;
   let authorization: { channelId: string; ceiling: string } | undefined,
     signedAt = performance.now();
   const retainAuthorization = async () => {
@@ -144,6 +148,10 @@ async function run() {
       ceiling,
       response.receipt.transaction,
       before,
+      async (observation) => {
+        observedPayment = proofObservation(response.status, observation);
+        await retainAuthorization();
+      },
     );
     confirmedProof = proof;
     await saveJson(rolePath(P2P.journalFilename), {
