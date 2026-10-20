@@ -1,19 +1,15 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { CHANNEL_PROGRAM, TOKEN_PROGRAM_ADDRESS } from '@gyblos/config';
 import { verifyEscrowRent } from '@gyblos/gate/escrow-rent';
 
 import {
-  accountIndex,
-  accountInstruction,
+  guardFailure,
   paymentFixture,
   verifyPayment,
-  type PaymentFixture,
 } from './payment-fixture.js';
-import { lamportCredits, rentInfo } from './payment-mutations.js';
-
-type Fault = (fixture: PaymentFixture) => void;
+import { lamportCredits } from './payment-mutations.js';
+import { RENT_FAULTS } from './rent-faults.js';
 
 export function registerRentCases() {
   test('real-pair sponsor accounting includes escrow creation and return in each transaction', async () => {
@@ -86,133 +82,10 @@ export function registerRentCases() {
       },
     );
   }
-  const faults: Record<string, Fault> = {
-    'wrong escrow rent payer': (f) => {
-      rentInfo(f, true, 'createAccount').source = f.expected.buyer;
-    },
-    'wrong escrow account owner': (f) => {
-      rentInfo(f, true, 'createAccount').owner = f.expected.authorizer;
-    },
-    'wrong escrow account size': (f) => {
-      rentInfo(f, true, 'createAccount').space = 1;
-    },
-    'wrong escrow rent amount': (f) => {
-      const info = rentInfo(f, true, 'createAccount');
-      info.lamports = Number(info.lamports) + 1;
-    },
-    'wrong escrow create program': (f) => {
-      accountInstruction(f, true, 'createAccount').programId = CHANNEL_PROGRAM;
-    },
-    'missing escrow creation': (f) => {
-      accountInstruction(f, true, 'createAccount').parsed!.type = 'omitted';
-    },
-    'duplicate escrow creation': (f) => {
-      f.source.deposit.transaction.message.instructions.push(
-        structuredClone(accountInstruction(f, true, 'createAccount')),
-      );
-    },
-    'wrong escrow close recipient': (f) => {
-      rentInfo(f, false, 'closeAccount').destination = f.expected.buyer;
-    },
-    'wrong escrow close authority': (f) => {
-      rentInfo(f, false, 'closeAccount').owner = f.expected.buyer;
-    },
-    'missing escrow close': (f) => {
-      f.source.claim.transaction.message.instructions =
-        f.source.claim.transaction.message.instructions.filter(
-          (instruction) => instruction.parsed?.type !== 'closeAccount',
-        );
-      for (const group of f.source.claim.meta.innerInstructions ?? [])
-        group.instructions = group.instructions.filter(
-          (instruction) => instruction.parsed?.type !== 'closeAccount',
-        );
-    },
-    'duplicate escrow close': (f) => {
-      f.source.claim.transaction.message.instructions.push(
-        structuredClone(accountInstruction(f, false, 'closeAccount')),
-      );
-    },
-    'prefunded escrow rent': (f) => {
-      f.source.deposit.meta.preBalances[
-        accountIndex(f.source.deposit, f.escrow)
-      ] = 1;
-    },
-    'decreased escrow rent': (f) => {
-      f.source.claim.meta.preBalances[
-        accountIndex(f.source.claim, f.escrow)
-      ]! -= 1;
-    },
-    'unclosed escrow rent': (f) => {
-      f.source.claim.meta.postBalances[accountIndex(f.source.claim, f.escrow)] =
-        1;
-    },
-    'unsafe rent amount': (f) => {
-      f.source.deposit.meta.postBalances[
-        accountIndex(f.source.deposit, f.escrow)
-      ] = Number.MAX_SAFE_INTEGER + 1;
-    },
-    'offsetting sponsor errors': (f) => {
-      f.source.deposit.meta.postBalances[0]! += 1;
-      f.source.claim.meta.postBalances[0]! -= 1;
-    },
-    'shifted fees': (f) => {
-      f.source.deposit.meta.fee += 1;
-      f.source.claim.meta.fee -= 1;
-    },
-    'buyer SOL charge': (f) => {
-      f.source.deposit.meta.postBalances[
-        accountIndex(f.source.deposit, f.expected.buyer)
-      ]! += 1;
-    },
-    'channel interval depletion': (f) => {
-      lamportCredits(f, { interval: -1 });
-    },
-    'channel later depletion': (f) => {
-      lamportCredits(f, { later: -1 });
-    },
-    'wrong channel owner': (f) => {
-      f.owner = TOKEN_PROGRAM_ADDRESS;
-    },
-    'wrong canonical PDA': (f) => {
-      f.data.writeBigUInt64LE(f.data.readBigUInt64LE(4) + 1n, 4);
-    },
-    'wrong channel state': (f) => {
-      f.data[3] = 0;
-    },
-    'missing current channel': (f) => {
-      f.accountMissing = true;
-    },
-    'initial rent below minimum': (f) => {
-      f.minimum += 1;
-    },
-    'nonfinalized status': (f) => {
-      f.confirmation = 'confirmed';
-    },
-    'missing finalized status': (f) => {
-      f.confirmation = null;
-    },
-    'reused transaction signatures': (f) => {
-      f.expected.claimSignature = f.expected.depositSignature;
-    },
-    'transaction error': (f) => {
-      f.source.claim.meta.err = { custom: 1 };
-    },
-    'claim before deposit': (f) => {
-      f.source.claim.slot = f.source.deposit.slot - 1;
-    },
-    'wrong transaction signature': (f) => {
-      f.source.claim.transaction.signatures[0] = f.expected.depositSignature;
-    },
-  };
-  for (const [name, mutate] of Object.entries(faults))
+  for (const [name, [message, mutate]] of Object.entries(RENT_FAULTS))
     test('finalized rent/proof rejects ' + name, async () => {
       const fixture = await paymentFixture();
       mutate(fixture);
-      if (name === 'missing escrow close')
-        await assert.rejects(
-          verifyPayment(fixture),
-          /One canonical escrow closure is required/,
-        );
-      else await assert.rejects(verifyPayment(fixture));
+      await assert.rejects(verifyPayment(fixture), guardFailure(message));
     });
 }
