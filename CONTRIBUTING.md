@@ -81,8 +81,28 @@ the raw value.
   intermediate commit remains valid.
 - Each commit builds and passes `pnpm typecheck`, `pnpm test` and `pnpm lint` on its own.
 - Behavior changes and refactors go in separate PRs.
-- Never commit real private keys, measurement salts, or private prompts/responses; `.local/` stays ignored. Synthetic test inputs, ephemeral test material and public model-template fixtures are permitted.
+- Never commit real private keys, measurement salts, or private prompts/responses; `.local/` stays ignored. Synthetic test inputs, ephemeral test material, public model-template fixtures and the curated historical on-chain metadata fixture are permitted.
 
-The offline regression suites and their public fixtures are versioned and run with `pnpm test`. The suite uses synthetic inputs, ephemeral unfunded signers, mocked RPC and temporary files; it does not require wallets, Ollama, Python or devnet funds. `tooling/test-files.json` lists every published suite; the runner rejects missing or unlisted files.
+The offline regression suites and their public fixtures are versioned and run
+with `pnpm test`. The suite uses synthetic inputs, ephemeral unfunded signers,
+mocked RPC/container process creation and temporary files; it requires no funded
+wallet, Ollama, Docker, Python or devnet funds. `tooling/test-files.json` lists
+every published test entrypoint; the runner rejects missing or unlisted suites.
+Case modules in `tests/support/` are explicitly registered by those entrypoints.
 
-Raw evidence, measurements, agent files and internal documents remain outside Git. The explicitly authorized, allowlisted redacted P2P reports `evidence/gate-0006.json` and `evidence/gate-0007.json` are the evidence exceptions; never publish raw role volumes, endpoint addresses, signed payloads or content. README, this guide, and the operational guides `docs/inference.md` and `docs/limitations.md` are the public documentation exceptions. Local validation probes are not part of the published regression suite; only the suites listed in `tooling/test-files.json` run with `pnpm test`.
+`tests/fixtures/finalized-payment-pair.json` contains selected public metadata
+and parsed financial instructions from a saved finalized deposit/claim pair.
+Transaction signatures and the decoded public channel-creation nonce support
+original identity/PDA checks; that nonce is not a private measurement salt.
+Current-account responses and unsigned mutated transaction variants are labeled
+synthetic. Do not add encoded payment/voucher payloads, raw logs, credentials or
+private endpoint/content data to the fixture.
+
+Raw evidence, measurements, agent files and internal documents remain outside
+Git. The explicitly authorized, allowlisted redacted P2P reports
+`evidence/gate-0006.json` and `evidence/gate-0007.json` are the evidence exceptions;
+never publish raw role volumes, endpoint addresses, signed payment payloads or
+private content. README, this guide, and the operational guides
+`docs/inference.md` and `docs/limitations.md` are the public documentation
+exceptions. Other private validation probes remain excluded; public case groups
+run only through the entrypoints listed in `tooling/test-files.json`.
