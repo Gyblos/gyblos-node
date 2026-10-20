@@ -2,8 +2,10 @@ import type { BiStream, Connection, Endpoint } from '@number0/iroh';
 
 import { HTTP_STATUS, P2P } from '@gyblos/config';
 
+import { connectionSource, createConnectionAdmission } from './admission.js';
 import { TRANSPORT_ROUTES } from './constants.js';
 import { withDeadline } from './deadline.js';
+import { handleIrohConnection } from './iroh-connection.js';
 import { createPeerLimiter } from './limiter.js';
 import { loopbackRequest } from './loopback.js';
 import { selectedRoute } from './paths.js';
@@ -15,136 +17,115 @@ export function serveIroh(
   relayOnly = false,
 ) {
   const limiter = createPeerLimiter();
+  const admission = createConnectionAdmission();
   const connections = new Set<Connection>();
-  const ingressPeers = new Map<string, number>();
-  let ingressActive = 0;
+  const streamPeers = new Set<string>();
+  let streamsActive = 0;
   let closed = false;
-  let pending = 0;
 
-  async function respond(stream: BiStream, connection: Connection) {
+  async function respond(
+    stream: BiStream,
+    connection: Connection,
+    signal: AbortSignal,
+  ) {
     const peer = connection.remoteId().toString();
-    if (
-      ingressActive >= P2P.maxIngressConcurrent ||
-      (ingressPeers.get(peer) ?? 0) >= P2P.maxPeerConcurrent
-    ) {
-      connection.close(P2P.streamCloseCode, []);
+    const close = () => connection.close(P2P.streamCloseCode, []);
+    if (streamsActive >= P2P.maxEgressConcurrent || streamPeers.has(peer)) {
+      close();
       return;
     }
-    ingressActive++;
-    ingressPeers.set(peer, (ingressPeers.get(peer) ?? 0) + 1);
-    let request: ReturnType<typeof decodeRequest>;
+    streamsActive++;
+    streamPeers.add(peer);
     try {
       const bytes = await withDeadline(
         stream.recv.readToEnd(P2P.bodyBytes + P2P.headerBytes),
         P2P.ingressMs,
-        () => connection.close(P2P.streamCloseCode, []),
+        close,
       );
-      request = decodeRequest(Uint8Array.from(bytes));
+      const request = decodeRequest(Uint8Array.from(bytes));
+      const release = limiter.enter(peer);
+      let response;
+      if (!release) {
+        response = {
+          status: HTTP_STATUS.tooManyRequests,
+          headers: { 'content-type': 'application/json' },
+          body: Buffer.from('{"error":"Request limit reached"}'),
+        };
+      } else {
+        const controller = new AbortController();
+        const abort = () => controller.abort();
+        const source = (async () => {
+          try {
+            if (signal.aborted) throw new Error('Connection closed.');
+            if (
+              relayOnly &&
+              selectedRoute(connection) !== TRANSPORT_ROUTES.RELAY
+            )
+              throw new Error('Direct paths disabled by seller policy.');
+            return await loopbackRequest(
+              origin,
+              request,
+              AbortSignal.any([signal, controller.signal]),
+            );
+          } finally {
+            release();
+          }
+        })();
+        response = await withDeadline(source, P2P.requestMs, () => {
+          abort();
+          close();
+        });
+      }
+      if (relayOnly && selectedRoute(connection) !== TRANSPORT_ROUTES.RELAY)
+        throw new Error('Unexpected direct path.');
+      const sending = (async () => {
+        await stream.send.writeAll([...encodeResponse(response)]);
+        await stream.send.finish();
+      })();
+      let expired = false;
+      try {
+        await withDeadline(sending, P2P.egressMs, () => {
+          expired = true;
+          close(); // Native reset shares the blocked writer's mutex.
+        });
+      } catch (error) {
+        if (expired) await sending.catch(() => undefined);
+        throw error;
+      }
     } catch {
+      close();
+    } finally {
+      streamsActive--;
+      streamPeers.delete(peer);
+    }
+  }
+
+  async function handle(connection: Connection) {
+    const peer = connection.remoteId().toString();
+    const releasePeer = admission.established(peer);
+    const releaseQuota = releasePeer ? limiter.register(peer) : undefined;
+    if (!releasePeer || !releaseQuota) {
+      releasePeer?.();
       connection.close(P2P.streamCloseCode, []);
       return;
-    } finally {
-      ingressActive--;
-      const remaining = (ingressPeers.get(peer) ?? 1) - 1;
-      if (remaining === 0) ingressPeers.delete(peer);
-      else ingressPeers.set(peer, remaining);
     }
-    const release = limiter.enter(peer);
+    connections.add(connection);
     const controller = new AbortController();
     void connection.closed().then(
       () => controller.abort(),
       () => controller.abort(),
     );
     try {
-      await withDeadline(
-        (async () => {
-          if (!release) {
-            await stream.send.writeAll([
-              ...encodeResponse({
-                status: HTTP_STATUS.tooManyRequests,
-                headers: { 'content-type': 'application/json' },
-                body: Buffer.from('{"error":"Request limit reached"}'),
-              }),
-            ]);
-            await stream.send.finish();
-            return;
-          }
-          if (relayOnly && selectedRoute(connection) !== TRANSPORT_ROUTES.RELAY)
-            throw new Error('Direct paths disabled by seller policy.');
-          const response = await loopbackRequest(
-            origin,
-            request,
-            controller.signal,
-          );
-          if (relayOnly && selectedRoute(connection) !== TRANSPORT_ROUTES.RELAY)
-            throw new Error('Unexpected direct path.');
-          await stream.send.writeAll([...encodeResponse(response)]);
-          await stream.send.finish();
-        })(),
-        release ? P2P.requestMs : P2P.ingressMs,
-        () => {
-          controller.abort();
-          connection.close(P2P.streamCloseCode, []);
-        },
+      await handleIrohConnection(
+        connection,
+        (stream) => respond(stream, connection, controller.signal),
+        () => closed,
       );
-    } catch {
-      connection.close(P2P.streamCloseCode, []);
     } finally {
-      release?.();
-    }
-  }
-
-  async function handle(connection: Connection) {
-    connections.add(connection);
-    let inFlight = 0;
-    let retiring = false;
-    let finished = false;
-    let idle: ReturnType<typeof setTimeout> | undefined;
-    const closeIfIdle = () => {
-      if (inFlight === 0) connection.close(P2P.streamCloseCode, []);
-    };
-    const armIdle = () => {
-      clearTimeout(idle);
-      if (inFlight === 0 && !closed && !finished) {
-        if (retiring) closeIfIdle();
-        else idle = setTimeout(closeIfIdle, P2P.connectionIdleMs);
-      }
-    };
-    const lifetime = setTimeout(() => {
-      retiring = true;
-      closeIfIdle();
-    }, P2P.connectionLifetimeMs);
-    try {
-      connection.setReceiveWindow(
-        BigInt(P2P.bodyBytes + P2P.headerBytes) * BigInt(P2P.maxPeerConcurrent),
-      );
-      connection.setMaxConcurrentBiStreams(BigInt(P2P.maxPeerConcurrent));
-      connection.setMaxConcurrentUniStreams(0n);
-      armIdle();
-      while (!closed) {
-        const stream = await connection.acceptBi();
-        if (retiring) {
-          void stream.recv.stop(P2P.streamCloseCode).catch(() => undefined);
-          void stream.send.reset(P2P.streamCloseCode).catch(() => undefined);
-          closeIfIdle();
-          continue;
-        }
-        clearTimeout(idle);
-        inFlight++;
-        void respond(stream, connection)
-          .catch(() => connection.close(P2P.streamCloseCode, []))
-          .finally(() => {
-            inFlight--;
-            armIdle();
-          });
-      }
-    } catch {
-      /* Closing a connection wakes pending native stream reads. */
-    } finally {
-      clearTimeout(idle);
-      clearTimeout(lifetime);
-      finished = true;
+      controller.abort();
       connections.delete(connection);
+      releaseQuota();
+      releasePeer();
     }
   }
 
@@ -152,39 +133,51 @@ export function serveIroh(
     while (!closed) {
       const incoming = await endpoint.acceptNext();
       if (!incoming) break;
-      if (connections.size + pending >= P2P.maxConnections) {
-        await incoming.refuse();
-        continue;
+      try {
+        const source = connectionSource(await incoming.remoteAddr());
+        if (!source) {
+          await incoming.refuse();
+          continue;
+        }
+        if (!(await incoming.remoteAddrValidated())) {
+          await incoming.retry();
+          continue;
+        }
+        const releasePending = admission.pending(source);
+        if (!releasePending) {
+          await incoming.refuse();
+          continue;
+        }
+        void (async () => {
+          let expired = false;
+          const native = (async () => (await incoming.accept()).connect())();
+          let connection: Connection;
+          try {
+            connection = await withDeadline(native, P2P.connectMs, () => {
+              expired = true;
+            });
+          } catch {
+            // Reserve uncancellable native work until it actually settles.
+            if (expired)
+              await native.then(
+                (late) => late.close(P2P.streamCloseCode, []),
+                () => undefined,
+              );
+            return;
+          } finally {
+            releasePending();
+          }
+          if (closed) {
+            connection.close(P2P.streamCloseCode, []);
+            return;
+          }
+          void handle(connection).catch(() =>
+            connection.close(P2P.streamCloseCode, []),
+          );
+        })().catch(() => undefined);
+      } catch {
+        await incoming.ignore().catch(() => undefined);
       }
-      pending++;
-      void (async () => {
-        let expired = false;
-        const native = (async () => (await incoming.accept()).connect())();
-        let connection: Connection;
-        try {
-          connection = await withDeadline(native, P2P.connectMs, () => {
-            expired = true;
-          });
-        } catch {
-          // The binding cannot cancel this native job. Keep its reservation
-          // until it settles, and dispose any late result without serving it.
-          if (expired)
-            await native.then(
-              (late) => late.close(P2P.streamCloseCode, []),
-              () => undefined,
-            );
-          return;
-        } finally {
-          pending--;
-        }
-        if (closed) {
-          connection.close(P2P.streamCloseCode, []);
-          return;
-        }
-        void handle(connection).catch(() =>
-          connection.close(P2P.streamCloseCode, []),
-        );
-      })().catch(() => undefined);
     }
   })();
   void running.catch(() => {
