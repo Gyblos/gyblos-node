@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 
 import { P2P } from '@gyblos/config';
 import { saveJson } from '@gyblos/runtime';
+import { TRANSPORT_ROUTES } from '@gyblos/transport/constants';
 
 import type { inspectDocker } from './docker-checks.js';
 import { collectDockerCalls, type dockerEvidence } from './docker-evidence.js';
@@ -47,7 +48,9 @@ export async function recordNatEvidence(
 ) {
   assert.ok(['nat-direct', 'nat-relay'].includes(context.scenario));
   const expectedRoute =
-    context.scenario === 'nat-relay' ? 'iroh-relay' : 'iroh-direct';
+    context.scenario === 'nat-relay'
+      ? TRANSPORT_ROUTES.RELAY
+      : TRANSPORT_ROUTES.DIRECT;
   const { cases, previousAttempts } = await collectDockerCalls(context, {
     offset,
     expectedRoute,
