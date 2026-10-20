@@ -30,4 +30,6 @@ export const PUBLIC_FACILITATORS = [
 export const DEVNET_TREASURY_OWNER =
   '4zTeC5mVqWLruDexgU2mV66p9t5vCA9JyiZqdGDUspap';
 
+export { SYSTEM_PROGRAM_ADDRESS } from '@solana-program/system';
+
 export { TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
