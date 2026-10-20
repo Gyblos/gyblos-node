@@ -86,3 +86,7 @@ coverage/
 !/tests/support/native-runtime.ts
 !/tests/support/egress-cases.ts
 !/tests/support/native-reader.ts
+
+# Paid-call failure metadata regressions
+!/tests/support/call-fixture.ts
+!/tests/support/call-cases.ts
