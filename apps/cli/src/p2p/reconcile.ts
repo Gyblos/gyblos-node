@@ -30,6 +30,9 @@ interface RecoveryJournal {
   requestId: string;
   channelId: string;
   paymentExpectation?: Omit<RecoveryAccounts, 'rpcUrl'>;
+  ceiling?: string;
+  ceilingAtomic?: string;
+  runId?: string;
   depositSignature?: string;
   claimSignature?: string;
 }
@@ -37,6 +40,53 @@ interface RecoveryJournal {
 interface RecoveryCall extends UncertainAttempt {
   requestId: string;
   outcome: CallOutcome;
+}
+
+function originalAttempt(
+  journal: RecoveryJournal,
+  calls: RecoveryCall[],
+): RecoveryCall {
+  assert.ok(typeof journal.requestId === 'string' && journal.requestId.trim());
+  assert.ok(typeof journal.channelId === 'string' && journal.channelId.trim());
+  const ceiling = journal.ceiling ?? journal.ceilingAtomic;
+  if (ceiling !== undefined) {
+    assert.match(ceiling, /^\d+$/);
+    assert.ok(BigInt(ceiling) > 0n);
+    if (journal.ceilingAtomic !== undefined)
+      assert.equal(journal.ceilingAtomic, ceiling);
+  }
+  const related = calls.filter(
+    (call) =>
+      call.channelId === journal.channelId ||
+      call.requestId === journal.requestId,
+  );
+  assert.ok(related.length <= 1, 'Conflicting original call metadata.');
+  const attempt = related[0];
+  if (attempt) {
+    assert.equal(attempt.requestId, journal.requestId);
+    assert.equal(attempt.channelId, journal.channelId);
+    assert.match(attempt.ceilingAtomic, /^\d+$/);
+    assert.ok(BigInt(attempt.ceilingAtomic) > 0n);
+    if (ceiling !== undefined) assert.equal(attempt.ceilingAtomic, ceiling);
+    return attempt;
+  }
+  assert.ok(
+    journal.state === P2P_JOURNAL_STATES.AUTHORIZED ||
+      journal.state === P2P_JOURNAL_STATES.UNCERTAIN,
+    'Journal-only recovery requires an unresolved authorization.',
+  );
+  assert.ok(
+    journal.paymentExpectation,
+    'Original payment identities required.',
+  );
+  assert.ok(ceiling, 'Original authorization ceiling required.');
+  return {
+    requestId: journal.requestId,
+    channelId: journal.channelId,
+    ceilingAtomic: ceiling,
+    runId: journal.runId,
+    outcome: CALL_OUTCOMES.UNCERTAIN,
+  };
 }
 
 export async function main(args = process.argv.slice(2)) {
@@ -58,18 +108,18 @@ export async function main(args = process.argv.slice(2)) {
     );
     if (!values['audit-only'])
       assert.ok(
-        journal.state === CALL_OUTCOMES.UNCERTAIN ||
+        journal.state === P2P_JOURNAL_STATES.UNCERTAIN ||
           journal.state === P2P_JOURNAL_STATES.AUTHORIZED,
         'Only an unresolved authorization can be reconciled.',
       );
-    const calls = await loadJson<RecoveryCall[]>(rolePath(P2P.callsFilename));
+    let calls: RecoveryCall[] = [];
+    try {
+      calls = await loadJson<RecoveryCall[]>(rolePath(P2P.callsFilename));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
     assert.ok(Array.isArray(calls));
-    const attempt = calls.find(
-      (call) =>
-        call.channelId === journal.channelId &&
-        call.requestId === journal.requestId,
-    );
-    assert.ok(attempt, 'Matching original call metadata is required.');
+    const attempt = originalAttempt(journal, calls);
     if (!values['audit-only'])
       assert.equal(attempt.outcome, CALL_OUTCOMES.UNCERTAIN);
     const trust = await loadJson<OfferTrust>(rolePath(P2P.trustFilename));
