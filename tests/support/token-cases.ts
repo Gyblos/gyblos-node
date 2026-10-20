@@ -5,6 +5,7 @@ import { RECONCILED_ZERO_CHARGE } from '@gyblos/cli/p2p/constants';
 import { DEVNET_TREASURY_OWNER } from '@gyblos/config';
 
 import {
+  accountIndex,
   instructions,
   paymentFixture,
   verifyPayment,
@@ -156,7 +157,10 @@ export function registerTokenCases() {
       sweep.info.tokenAmount.amount = '0';
     },
     'prefunded escrow': (f) => {
-      shiftTokenBalance(f, f.escrow, 1n, false, true);
+      const balance = structuredClone(tokenBalance(f, f.escrow, false));
+      balance.accountIndex = accountIndex(f.source.deposit, f.escrow);
+      balance.uiTokenAmount.amount = '1';
+      f.source.deposit.meta.preTokenBalances.push(balance);
     },
     'principal decreased before claim': (f) => {
       shiftTokenBalance(f, f.escrow, -2n, false);
