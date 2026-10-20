@@ -1,33 +1,16 @@
 import assert from 'node:assert/strict';
+import { randomBytes } from 'node:crypto';
 import { once } from 'node:events';
 import { createServer } from 'node:http';
 import test from 'node:test';
-import { setTimeout as delay } from 'node:timers/promises';
 
-import { Endpoint, RelayMode, SecretKey } from '@number0/iroh';
-
-import {
-  HTTP_STATUS,
-  IPV6_LOOPBACK,
-  LOCALHOST,
-  P2P,
-  ROUTES,
-} from '@gyblos/config';
+import { HTTP_STATUS, LOCALHOST, P2P, ROUTES } from '@gyblos/config';
 import { createIrohTransport } from '@gyblos/transport/iroh-client';
 import { serveIroh } from '@gyblos/transport/iroh-server';
 
 import { registerNativeCases } from './support/native-cases.js';
-import { fixture, fixtureRequest } from './support/native-fixture.js';
-
-async function endpoint() {
-  const builder = Endpoint.builder();
-  builder.applyMinimal();
-  builder.relayMode(RelayMode.disabled());
-  builder.bindAddr(`${LOCALHOST}:0`);
-  builder.bindAddr(`${IPV6_LOOPBACK}:0`);
-  builder.alpns([[...Buffer.from(P2P.protocol)]]);
-  return builder.bind();
-}
+import { endpoint, fixture, fixtureRequest } from './support/native-fixture.js';
+import { NATIVE_TEST_OPTIONS, waitFor } from './support/native-runtime.js';
 
 async function exercise(relayOnly: boolean, wrongIdentity: boolean) {
   const seller = await endpoint(),
@@ -89,18 +72,27 @@ async function exercise(relayOnly: boolean, wrongIdentity: boolean) {
   }
 }
 
-test('native Iroh carries HTTP payment challenges without public HTTP ports', () =>
-  exercise(false, false));
-test('native remote NodeId mismatch blocks HTTP before any signing challenge', () =>
-  exercise(false, true));
-test('relay-only server refuses an observed direct path before forwarding HTTP', () =>
-  exercise(true, false));
+test(
+  'native Iroh carries HTTP payment challenges without public HTTP ports',
+  NATIVE_TEST_OPTIONS,
+  () => exercise(false, false),
+);
+test(
+  'native remote NodeId mismatch blocks HTTP before any signing challenge',
+  NATIVE_TEST_OPTIONS,
+  () => exercise(false, true),
+);
+test(
+  'relay-only server refuses an observed direct path before forwarding HTTP',
+  NATIVE_TEST_OPTIONS,
+  () => exercise(true, false),
+);
 
 registerNativeCases();
 
 test(
   'native smoke: nine distinct free-request peers disconnect and a newcomer remains admissible',
-  { timeout: 20000 },
+  { ...NATIVE_TEST_OPTIONS, timeout: 20000 },
   async () => {
     const lab = await fixture(),
       identities = new Set<string>();
@@ -116,14 +108,24 @@ test(
           402,
         );
         await peer.close();
-        await delay(20);
+        await waitFor(
+          () => lab.retired.has(id),
+          undefined,
+          'server retirement of disconnected peer',
+        );
       }
       const newcomer = await lab.transport();
+      for (let index = 0; index < P2P.requestsPerWindow; index++)
+        assert.equal(
+          (await newcomer.exchange(fixtureRequest('newcomer-' + index))).status,
+          HTTP_STATUS.paymentRequired,
+        );
       assert.equal(
-        (await newcomer.exchange(fixtureRequest('newcomer'))).status,
-        402,
+        (await newcomer.exchange(fixtureRequest('newcomer-over-budget')))
+          .status,
+        HTTP_STATUS.tooManyRequests,
       );
-      assert.equal(lab.accepted.length, 10);
+      assert.equal(lab.accepted.length, 9 + P2P.requestsPerWindow);
       assert.equal(lab.executions, 0);
       assert.equal(lab.paid.size, 0);
     } finally {
@@ -134,10 +136,10 @@ test(
 
 test(
   'native same-NodeId reconnect preserves remaining quota and refuses after actual consumption',
-  { timeout: 20000 },
+  { ...NATIVE_TEST_OPTIONS, timeout: 20000 },
   async () => {
     const lab = await fixture(),
-      secret = [...SecretKey.generate().toBytes()];
+      secret = [...randomBytes(P2P.nodeSecretBytes)];
     try {
       const first = await lab.transport(secret),
         identity = lab.nodeId(first);
@@ -147,7 +149,12 @@ test(
           402,
         );
       await first.close();
-      await delay(40);
+      assert.ok(identity);
+      await waitFor(
+        () => lab.retired.has(identity),
+        undefined,
+        'server retirement before same-identity reconnect',
+      );
       const returning = await lab.transport(secret);
       assert.equal(lab.nodeId(returning), identity);
       for (let index = 4; index < P2P.requestsPerWindow; index++)
