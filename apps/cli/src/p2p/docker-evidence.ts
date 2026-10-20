@@ -74,9 +74,10 @@ export async function collectDockerCalls(
           CALL_OUTCOMES.UNCERTAIN,
           'A known paid outcome or route discrepancy cannot become zero-charge evidence.',
         );
-        const record = reconciliations.find(
-          (item) => item.channelId === call.channelId,
-        );
+        const record = reconciliations
+          .slice()
+          .reverse()
+          .find((item) => item.channelId === call.channelId);
         assert.ok(record, 'Verified reconciliation signatures are required.');
         // Bind the record before constructing RPC inputs or trusting any claimed balances.
         assert.equal(record.ceilingAtomic, call.ceilingAtomic);
