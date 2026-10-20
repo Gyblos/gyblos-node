@@ -335,9 +335,10 @@ best-effort: another admission or quota refill may reclaim it. LRU eviction can
 also return inactive unused reservations. Consumed per-NodeId debt is kept
 separately until rollover, so eviction, reclamation and reconnection cannot
 reset the 30-request allowance. That debt storage is bounded by the 256 actual
-admissions per window. Active work and live connections cannot be evicted. An
-identity with no admitted work in the current window releases unused quota once
-disconnected and inactive.
+admissions per window. Active work and live connections cannot be evicted. At
+lease release, unused quota is returned when the identity has no current-window
+admitted work and no active operation. Otherwise, inactive quota remains
+reclaimable.
 
 A same-identity reconnect can reuse or refill quota when shared capacity
 remains; it has no guaranteed reservation against competing work while
