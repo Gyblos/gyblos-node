@@ -4,13 +4,19 @@ import { IROH_SDK_VERSION, P2P, X402_SDK_VERSION } from '@gyblos/config';
 import type { Measurement } from '@gyblos/gate/measurements';
 import { saveJson } from '@gyblos/runtime';
 
+import { CALL_OUTCOMES, type CallOutcome } from './constants.js';
 import type { inspectDocker } from './docker-checks.js';
 import { readContainerJson } from './docker-command.js';
 import type { prepareDocker } from './docker-prepare.js';
 import type { paymentProof } from './proof.js';
+import {
+  verifyZeroChargeReconciliation,
+  type ReconciliationSignatures,
+} from './reconciliation.js';
 
 interface PaidCall extends Awaited<ReturnType<typeof paymentProof>> {
-  outcome: string;
+  outcome: CallOutcome;
+  runId?: string;
   channelId: string;
   ceilingAtomic: string;
   measurement: Measurement;
@@ -21,25 +27,14 @@ interface PaidCall extends Awaited<ReturnType<typeof paymentProof>> {
     relayObserved: boolean;
   };
 }
-interface ReconciledAttempt {
-  channelId: string;
-  sourceFingerprint: string;
-  runtimeImage: string;
-  httpStatus: number;
-  status: 'finalized-zero-charge';
-  reason?: string;
-  ceilingAtomic: string;
-  chargedAtomic: '0';
-  refundAtomic: string;
-  depositSignature: string;
-  claimSignature: string;
-  balances: Awaited<ReturnType<typeof paymentProof>>['after'];
+interface ReconciledAttempt extends ReconciliationSignatures {
+  sourceFingerprint?: string;
+  runtimeImage?: string;
+  httpStatus?: number;
 }
 
 interface Trace {
   channelId: string;
-  depositConfirmedAt: string;
-  engineStartedAt: string;
   during: Awaited<ReturnType<typeof paymentProof>>['before'];
 }
 
@@ -64,49 +59,60 @@ export async function collectDockerCalls(
     );
   } catch {
     assert.ok(
-      calls.every((call) => call.outcome === 'confirmed'),
+      calls.every((call) => call.outcome === CALL_OUTCOMES.CONFIRMED),
       'An unresolved call prevents passing evidence.',
     );
   }
-  const previousAttempts = calls
-    .filter((call) => call.outcome !== 'confirmed')
-    .map((call) => {
-      const proof = reconciliations.find(
-        (item) => item.channelId === call.channelId,
-      );
-      assert.ok(proof);
-      assert.equal(proof.status, 'finalized-zero-charge');
-      assert.equal(proof.chargedAtomic, '0');
-      assert.equal(proof.refundAtomic, proof.ceilingAtomic);
-      assert.equal(proof.balances.escrow, '0');
-      return {
-        channelId: proof.channelId,
-        initialOutcome: 'uncertain',
-        sourceFingerprint: proof.sourceFingerprint,
-        runtimeImage: proof.runtimeImage,
-        httpStatus: proof.httpStatus,
-        reconciledOutcome: proof.status,
-        ceilingAtomic: proof.ceilingAtomic,
-        chargedAtomic: proof.chargedAtomic,
-        refundAtomic: proof.refundAtomic,
-        depositSignature: proof.depositSignature,
-        claimSignature: proof.claimSignature,
-        balances: proof.balances,
-        reason:
-          proof.reason ??
-          'Manual finalized zero-charge/full-return reconciliation; retain per-attempt provenance.',
-      };
-    });
-  const confirmedCalls = calls.filter((call) => call.outcome === 'confirmed');
+  const previousAttempts = await Promise.all(
+    calls
+      .filter((call) => call.outcome !== CALL_OUTCOMES.CONFIRMED)
+      .map(async (call) => {
+        assert.equal(
+          call.outcome,
+          CALL_OUTCOMES.UNCERTAIN,
+          'A known paid outcome or route discrepancy cannot become zero-charge evidence.',
+        );
+        const record = reconciliations.find(
+          (item) => item.channelId === call.channelId,
+        );
+        assert.ok(record, 'Verified reconciliation signatures are required.');
+        // Bind the record before constructing RPC inputs or trusting any claimed balances.
+        assert.equal(record.ceilingAtomic, call.ceilingAtomic);
+        const proof = await verifyZeroChargeReconciliation(
+          {
+            rpcUrl: context.environment.GYBLOS_P2P_RPC!,
+            buyer: context.buyer.buyer,
+            mint: context.seller.mint,
+            payTo: context.seller.payTo,
+            feePayer: context.seller.facilitator,
+            authorizer: context.seller.authorizer,
+          },
+          call,
+          record,
+        );
+        return {
+          ...proof,
+          initialOutcome: CALL_OUTCOMES.UNCERTAIN,
+          reconciledOutcome: proof.status,
+          sourceFingerprint: record.sourceFingerprint ?? null,
+          runtimeImage: record.runtimeImage ?? null,
+          httpStatus: record.httpStatus ?? null,
+          reason:
+            'Financial state reverified from finalized chain data; historical source/image claims are operator supplied and unverified.',
+        };
+      }),
+  );
+  const confirmedCalls = calls.filter(
+    (call) => call.outcome === CALL_OUTCOMES.CONFIRMED,
+  );
   assert.equal(confirmedCalls.length, P2P.minimumRequests);
   const cases = confirmedCalls.map((call, index) => {
-    assert.equal(call.outcome, 'confirmed');
+    assert.equal(call.outcome, CALL_OUTCOMES.CONFIRMED);
     assert.equal(call.transport.transport, selection.expectedRoute);
     const trace = traces.find((trace) => trace.channelId === call.channelId);
     assert.ok(trace);
     assert.equal(trace.during.escrow, call.ceilingAtomic);
     assert.equal(trace.during.seller, call.before.seller);
-    assert.ok(trace.depositConfirmedAt <= trace.engineStartedAt);
     return {
       case: index + 1,
       outcome: call.outcome,
@@ -136,6 +142,8 @@ export async function collectDockerCalls(
       anomaly: call.measurement.anomaly,
       meteringMode: call.measurement.meteringMode,
       generationAfterConfirmedDeposit: true,
+      generationOrderEvidence:
+        'Canonical deposit admission and full escrow snapshot precede the awaited inference hook; local labels are not independent engine-start timing.',
     };
   });
   return { cases, previousAttempts };
