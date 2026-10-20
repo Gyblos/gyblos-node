@@ -255,9 +255,9 @@ including the canonical escrow ATA's temporary rent advance and return. Its
 creation must be sponsor funded with the token program's account owner/size;
 closure must be authorized by the channel and return rent to that sponsor. Fresh
 creation, safe balances and complete closure are required. Escrow/channel
-credits between the selected transactions and later channel credits do not
-invalidate an otherwise consistent proof. Every selected transaction must still
-conserve its exact sponsor/channel/escrow deltas against its fee. Negative
+lamport credits between the selected transactions and later channel credits do
+not invalidate an otherwise consistent proof. Every selected transaction must
+still conserve its exact sponsor/channel/escrow deltas against its fee. Negative
 interval changes, a claim-time channel withdrawal, later channel depletion or an
 initial channel allocation below the checked minimum fail closed; positive
 credits cannot compensate for these failures or changed token settlement.
@@ -269,17 +269,44 @@ ATA allocation, with its interval credit reported separately. Credits are net
 observations, not proof of donor identity or of every intervening operation;
 they are neither network fees nor unused-token refunds. Explicit sponsor
 snapshots likewise separate transaction deltas from unrelated interval activity.
-Current wallets never supply historical token balances. Prefunding, token dust
-and arbitrary additional transaction shapes are outside this correction.
+Current wallets never supply historical token balances.
+
+Positive net same-mint token credits between the selected deposit and claim are
+accepted only when the full surplus goes to the canonical devnet treasury ATA,
+derived from the configured treasury owner and expected mint. The principal
+charge plus buyer refund must still equal the original ceiling; the measured
+charge must still match the canonical channel settlement. The treasury token
+delta must equal the gross sweep, which must equal the escrow's observed token
+surplus. Buyer/seller token deltas, empty escrow closure, SOL fees and rent
+remain independently checked. Surplus cannot compensate for principal loss or be
+classified as a buyer refund or fee.
+
+The new `escrowInterveningTokenCreditAtomic` and `treasurySweepAtomic` fields
+separate that observed surplus from principal. Escrow token balances before and
+after each transaction are reported in `escrowDepositBeforeAtomic`,
+`escrowDepositAfterAtomic`, `escrowClaimBeforeAtomic` and
+`escrowClaimAfterAtomic`. These are net observations without donor attribution
+or a complete interval history. `balanceDeltas.escrow` keeps the
+initial-empty/final-empty endpoint value; the historical snapshots disclose the
+intervening increase. Missing fields in older records mean not recorded, not
+verified zero. Zero-charge recovery still requires the full principal returned
+and no charge; its persistence and export retain the separate surplus fields.
+
+Buyer, seller, escrow and treasury ATAs must be distinct. The selected deposit
+allows only buyer-to-escrow token transfers, and the claim only escrow-to-buyer,
+escrow-to-seller and escrow-to-canonical-treasury transfers, all in the expected
+mint. Prefunded escrow accounts, claim-time incoming transfers, unrelated or
+compensating token transfers and arbitrary additional transaction shapes remain
+unsupported. This is deliberate fail-closed compatibility scope.
 
 This verifier is deliberately limited to fresh, individually settled channels
 with retained canonical accounts. Closed/missing channels, nonfinalized data,
-unexplained transaction-local deltas or unsupported shapes stop verification. It
-does not recover rent or guarantee recovery from every crash. Evidence export
-re-fetches proof for zero-charge reconciliations and binds their ceiling to the
-original attempt. Confirmed paid rows still come from the call journal.
-Source/image provenance is separate from chain truth and remains explicitly
-unverified when supplied by an operator.
+deltas violating the checked sponsor/channel/escrow equations or unsupported
+shapes stop verification. It does not recover rent or guarantee recovery from
+every crash. Evidence export re-fetches proof for zero-charge reconciliations
+and binds their ceiling to the original attempt. Confirmed paid rows still come
+from the call journal. Source/image provenance is separate from chain truth and
+remains explicitly unverified when supplied by an operator.
 
 The current corrections were validated with private offline regressions,
 controlled process/filesystem failures and real direct-loopback Iroh using
@@ -295,16 +322,20 @@ explicitly synthetic current-channel and RPC responses through the real SDK
 verifier; synthetic full-refund variants retain the escrow rent lifecycle.
 Positive-credit cases also exercise the actual zero-charge reconciliation
 function and CLI main workflow with mocked role/offer boundaries and RPC, plus a
-wrapper forwarding persistence to real temporary JSON files. They verify proof
-persistence before journal confirmation, charged/depleted proof refusal and
-failure to persist proof leaving the journal unresolved. They do not exercise
-the spawned CLI's outer catch, real offer verification or chain submission.
-Ownership tests include the actual macOS domain and mocked Linux/macOS probes.
-These checks are not a fresh chain audit, public relay test, on-chain replay
-proof or exactly-once settlement proof. All new test/evidence artifacts remain
-outside Git. The original physical payment evidence still belongs to `2c8eeac`.
-No later-head paid run is implied. Broader lab reorganization, typechecking of
-all diagnostic JavaScript and alternate-engine rollout remain follow-up work.
+wrapper forwarding persistence to real temporary JSON files. Token-surplus
+variants preserve principal and route the modeled surplus to the canonical
+treasury before closure; those modified transaction models are unsigned and were
+not executed on-chain. The source of the deployed binary was not verified. They
+verify proof persistence before journal confirmation, surplus fields surviving
+persistence and re-fetched export, charged/depleted proof refusal and failure to
+persist proof leaving the journal unresolved. They do not exercise the spawned
+CLI's outer catch, real offer verification or chain submission. Ownership tests
+include the actual macOS domain and mocked Linux/macOS probes. These checks are
+not a fresh chain audit, public relay test, on-chain replay proof or
+exactly-once settlement proof. All new test/evidence artifacts remain outside
+Git. The original physical payment evidence still belongs to `2c8eeac`. No
+later-head paid run is implied. Broader lab reorganization, typechecking of all
+diagnostic JavaScript and alternate-engine rollout remain follow-up work.
 Measurement code can now accept the explicit allowlisted offer model identity,
 while existing fixed-engine gates retain their pinned default; this does not
 validate another engine end to end.
