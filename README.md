@@ -388,21 +388,26 @@ relay sources use the remote endpoint identity. Free identities or multiple
 addresses can therefore bypass a single actor's effective source budget. A
 shared NAT may see temporary handshake rejection; additional sources can
 saturate pending capacity. Relay compatibility of the new admission checks and
-off-host behavior remain untested on the current head. Private regressions cover
-the corrections, including FIFO/process failures and real loopback Iroh
-reconnection under free challenge pressure. Financial tests replay unchanged
-historical transactions with explicitly synthetic current-channel/RPC responses
-through the real SDK verifier. Positive-credit regressions also exercise
-zero-charge reconciliation and CLI orchestration with mocked role/offer
-boundaries, RPC responses and a wrapper around real temporary-file persistence.
-They establish offline acceptance, not a fresh on-chain audit or a real
-signed-offer recovery run. The native nine-identity regression now passes,
-alongside conditional same-identity reconnect, connected quota protection and
-refusal after 256 actual free admissions. Offline controls cover LRU debt,
-rollover and explicitly reduced peer-table capacity. The earlier unconditional
-disconnected-grace expectation is superseded by this best-effort contract. New
-tests and evidence stay excluded from Git and the public suite. The physical
-paid evidence remains bound to `2c8eeac`; no new paid-network result is implied.
+off-host behavior remain untested on the current head. Public regressions cover
+FIFO/process failures, quota debt and rollover, real loopback Iroh reconnection,
+malformed frames and simulated payment delivery failures. Nine single-request,
+disconnected identities no longer exclude a newcomer; known peers still refuse
+work after all 256 actual admissions until rollover. The earlier unconditional
+disconnected-grace expectation is superseded by this best-effort contract.
+
+The public finalized payment-pair fixture retains selected historical on-chain
+metadata and parsed financial instructions. The real SDK verifier replays saved
+finality with an explicitly synthetic current canonical account. Unsigned
+full-refund, token-surplus and lamport-credit variants test supported accounting
+and rejection boundaries; they were not executed on-chain. Recovery cases run
+the actual CLI workflow, ephemeral unfunded offer signing/verification, locks
+and temporary-file persistence. RPC is mocked, and persistence-failure cases
+also inject rename errors. Export cases use synthetic paid rows/traces, a
+separate raw-derived zero-charge proof and mocked container process creation.
+These checks establish offline behavior, without a fresh chain audit or physical
+signed-offer recovery run. Raw evidence and private measurements remain
+excluded. The physical paid evidence remains bound to `2c8eeac`; no new
+paid-network result is implied.
 
 ## Pay through a public facilitator
 
@@ -503,10 +508,22 @@ pnpm test
 ```
 
 The published suite requires Node.js 22 or later and a platform supported by the
-pinned native Iroh binding. It was exercised on macOS ARM64 and Linux ARM64; Mac
-Intel has no binding in this version. It needs no private files, wallets,
-Ollama, Python or devnet payments. External RPC responses are mocked; local HTTP
-and native loopback QUIC exercise middleware and transport boundaries. Public,
-hash-checked template fixtures preserve independent renderer regression
-coverage. Raw evidence and measurements stay local. Only the explicitly redacted
-Docker and real-network reports are eligible for publication.
+pinned native Iroh binding. The earlier suite was exercised on macOS ARM64 and
+Linux ARM64; these additional regressions were verified on macOS ARM64. Mac
+Intel has no binding in this version. The suite needs no private files, funded
+wallets, Ollama, Docker, Python or devnet payments. External RPC responses and
+container process creation are mocked; local HTTP and native loopback QUIC
+exercise actual middleware and transport boundaries. Lock cases use owned
+temporary files and child processes; unsupported ownership/FIFO checks skip
+explicitly on other platforms.
+
+Existing test entrypoints register the case groups in `tests/support/`.
+`tests/fixtures/finalized-payment-pair.json` is a minimal projection of one
+saved finalized deposit/claim pair, not a complete signed transaction or a new
+chain query. Public signatures, account addresses and decoded channel-creation
+nonce are retained to derive and verify the original PDA; that public on-chain
+nonce is separate from private measurement salts. Logs, encoded payment/voucher
+payloads, private configuration and content are excluded. Public, hash-checked
+model-template fixtures preserve independent renderer coverage. Raw evidence,
+measurements and funded keys stay local; only the two explicitly authorized
+redacted Docker and real-network reports are published as evidence.
