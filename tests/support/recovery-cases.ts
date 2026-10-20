@@ -12,36 +12,44 @@ import {
 import { P2P } from '@gyblos/config';
 import { JOURNAL_STATES } from '@gyblos/gate/constants';
 
+import { NATIVE_CAPABILITY } from './native-runtime.js';
 import { recoveryFixture } from './recovery-fixture.js';
 
+const RECOVERY_OPTIONS = { skip: NATIVE_CAPABILITY.bindingSkip };
+
 export function registerRecoveryCases() {
-  test('actual CLI recovers journal-only full principal return without wallet keys or invented calls', async () => {
-    const fixture = await recoveryFixture();
-    try {
-      const proof = await fixture.run();
-      assert.ok('status' in proof);
-      assert.equal(proof.status, RECONCILED_ZERO_CHARGE);
-      assert.equal(proof.treasurySweepAtomic, '17');
-      assert.equal(proof.refundAtomic, fixture.financial.expected.ceiling);
-      assert.equal(
-        (await fixture.read<{ state: string }>(P2P.journalFilename)).state,
-        JOURNAL_STATES.CONFIRMED,
-      );
-      await assert.rejects(stat(fixture.path(P2P.callsFilename)), {
-        code: 'ENOENT',
-      });
-      for (const key of Object.values(P2P.keys))
-        await assert.rejects(stat(fixture.path(key)), { code: 'ENOENT' });
-      assert.ok(
-        fixture.financial.methods.every((method) => method.startsWith('get')),
-      );
-    } finally {
-      await fixture.close();
-    }
-  });
+  test(
+    'actual CLI recovers journal-only full principal return without wallet keys or invented calls',
+    RECOVERY_OPTIONS,
+    async () => {
+      const fixture = await recoveryFixture();
+      try {
+        const proof = await fixture.run();
+        assert.ok('status' in proof);
+        assert.equal(proof.status, RECONCILED_ZERO_CHARGE);
+        assert.equal(proof.treasurySweepAtomic, '17');
+        assert.equal(proof.refundAtomic, fixture.financial.expected.ceiling);
+        assert.equal(
+          (await fixture.read<{ state: string }>(P2P.journalFilename)).state,
+          JOURNAL_STATES.CONFIRMED,
+        );
+        await assert.rejects(stat(fixture.path(P2P.callsFilename)), {
+          code: 'ENOENT',
+        });
+        for (const key of Object.values(P2P.keys))
+          await assert.rejects(stat(fixture.path(key)), { code: 'ENOENT' });
+        assert.ok(
+          fixture.financial.methods.every((method) => method.startsWith('get')),
+        );
+      } finally {
+        await fixture.close();
+      }
+    },
+  );
   for (const target of [P2P.reconciliationsFilename, P2P.journalFilename])
     test(
       'actual CLI leaves recovery unresolved if saving ' + target + ' fails',
+      RECOVERY_OPTIONS,
       async (context) => {
         const fixture = await recoveryFixture(),
           original = fs.rename;
@@ -97,53 +105,61 @@ export function registerRecoveryCases() {
         }
       },
     );
-  test('actual CLI refuses a second recovery and preserves files during read-only audit', async () => {
-    const fixture = await recoveryFixture();
-    try {
-      await fixture.run();
-      const journal = await readFile(fixture.path(P2P.journalFilename)),
-        records = await readFile(fixture.path(P2P.reconciliationsFilename));
-      const reads = fixture.financial.methods.length;
-      await assert.rejects(fixture.run(), /Only an unresolved authorization/);
-      assert.equal(fixture.financial.methods.length, reads);
-      await fixture.run(['--audit-only']);
-      assert.ok(fixture.financial.methods.length > reads);
-      assert.deepEqual(
-        await readFile(fixture.path(P2P.journalFilename)),
-        journal,
-      );
-      assert.deepEqual(
-        await readFile(fixture.path(P2P.reconciliationsFilename)),
-        records,
-      );
-    } finally {
-      await fixture.close();
-    }
-  });
-  test('actual CLI refuses charged recovery but permits a read-only financial audit', async () => {
-    const fixture = await recoveryFixture(false);
-    try {
-      await assert.rejects(
-        fixture.run(),
-        /confirmed charge requires charged-outcome recovery/,
-      );
-      assert.deepEqual(
-        await fixture.read(P2P.journalFilename),
-        fixture.journal,
-      );
-      const proof = await fixture.run(['--audit-only']);
-      assert.equal(
-        proof.chargedAtomic,
-        fixture.financial.historicalResult.chargedAtomic,
-      );
-      assert.deepEqual(
-        await fixture.read(P2P.journalFilename),
-        fixture.journal,
-      );
-    } finally {
-      await fixture.close();
-    }
-  });
+  test(
+    'actual CLI refuses a second recovery and preserves files during read-only audit',
+    RECOVERY_OPTIONS,
+    async () => {
+      const fixture = await recoveryFixture();
+      try {
+        await fixture.run();
+        const journal = await readFile(fixture.path(P2P.journalFilename)),
+          records = await readFile(fixture.path(P2P.reconciliationsFilename));
+        const reads = fixture.financial.methods.length;
+        await assert.rejects(fixture.run(), /Only an unresolved authorization/);
+        assert.equal(fixture.financial.methods.length, reads);
+        await fixture.run(['--audit-only']);
+        assert.ok(fixture.financial.methods.length > reads);
+        assert.deepEqual(
+          await readFile(fixture.path(P2P.journalFilename)),
+          journal,
+        );
+        assert.deepEqual(
+          await readFile(fixture.path(P2P.reconciliationsFilename)),
+          records,
+        );
+      } finally {
+        await fixture.close();
+      }
+    },
+  );
+  test(
+    'actual CLI refuses charged recovery but permits a read-only financial audit',
+    RECOVERY_OPTIONS,
+    async () => {
+      const fixture = await recoveryFixture(false);
+      try {
+        await assert.rejects(
+          fixture.run(),
+          /confirmed charge requires charged-outcome recovery/,
+        );
+        assert.deepEqual(
+          await fixture.read(P2P.journalFilename),
+          fixture.journal,
+        );
+        const proof = await fixture.run(['--audit-only']);
+        assert.equal(
+          proof.chargedAtomic,
+          fixture.financial.historicalResult.chargedAtomic,
+        );
+        assert.deepEqual(
+          await fixture.read(P2P.journalFilename),
+          fixture.journal,
+        );
+      } finally {
+        await fixture.close();
+      }
+    },
+  );
   for (const fault of [
     'identity',
     'ceiling',
@@ -154,6 +170,7 @@ export function registerRecoveryCases() {
     test(
       'actual CLI rejects original metadata conflict before proof persistence: ' +
         fault,
+      RECOVERY_OPTIONS,
       async () => {
         const fixture = await recoveryFixture();
         try {
