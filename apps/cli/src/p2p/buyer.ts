@@ -9,9 +9,9 @@ import {
 import { MAX_ATOMIC, P2P } from '@gyblos/config';
 import { assertProgram } from '@gyblos/payments-x402/chain';
 import { saveJson } from '@gyblos/runtime';
-import type { TransportRoute } from '@gyblos/transport';
 import { bindEndpoint } from '@gyblos/transport/endpoint';
 import { createIrohTransport } from '@gyblos/transport/iroh-client';
+import { expectedIrohRoute } from '@gyblos/transport/route-policy';
 
 import { startBuyerProxy } from './proxy.js';
 import { loadRole, nodeSecret, rolePath } from './roles.js';
@@ -65,10 +65,8 @@ export async function startBuyer() {
     );
     const transport = createIrohTransport(endpoint, remote, offer.nodeId);
     cleanup = () => transport.close();
-    const expected = process.env.GYBLOS_EXPECTED_ROUTE;
-    if (expected && !['iroh-direct', 'iroh-relay'].includes(expected))
-      throw new Error('Invalid expected route.');
-    await transport.ready(expected as TransportRoute | undefined);
+    const expected = expectedIrohRoute(process.env.GYBLOS_EXPECTED_ROUTE);
+    await transport.ready(expected);
     const proxy = await startBuyerProxy(transport);
     cleanup = () => proxy.close();
     await saveJson(rolePath(P2P.statusFilename), {
