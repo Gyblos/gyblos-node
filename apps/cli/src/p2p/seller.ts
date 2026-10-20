@@ -50,8 +50,7 @@ import { loadRole, nodeSecret, rolePath, roleSigner } from './roles.js';
 interface Trace {
   requestId: string;
   channelId: string;
-  depositConfirmedAt: string;
-  engineStartedAt: string;
+  preInferenceObservedAt: string;
   during: Awaited<ReturnType<typeof inferenceSnapshot>>;
 }
 
@@ -159,12 +158,10 @@ export async function startSeller() {
           },
           channelId,
         );
-        const depositConfirmedAt = new Date().toISOString();
         traces.push({
           requestId,
           channelId,
-          depositConfirmedAt,
-          engineStartedAt: new Date().toISOString(),
+          preInferenceObservedAt: new Date().toISOString(),
           during,
         });
         await saveJson(rolePath(P2P.traceFilename), traces);
