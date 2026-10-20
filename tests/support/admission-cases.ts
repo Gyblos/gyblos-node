@@ -8,6 +8,27 @@ import {
 } from '@gyblos/transport/admission';
 
 export function registerAdmissionCases() {
+  test('established per-peer admission cap applies while the global pool has capacity', () => {
+    const admission = createConnectionAdmission(),
+      leases: (() => void)[] = [];
+    assert.ok(P2P.maxPeerConnections < P2P.maxConnections);
+    for (let index = 0; index < P2P.maxPeerConnections; index++) {
+      const lease = admission.established('one-peer');
+      assert.ok(lease);
+      leases.push(lease);
+    }
+    assert.equal(admission.established('one-peer'), undefined);
+    const other = admission.established('different-peer');
+    assert.ok(other);
+    leases[0]!();
+    leases[0]!();
+    const returning = admission.established('one-peer');
+    assert.ok(returning);
+    assert.equal(admission.established('one-peer'), undefined);
+    returning();
+    other();
+    for (const release of leases) release();
+  });
   test('source ports share one IP pending budget; malformed sources are refused', () => {
     assert.equal(
       connectionSource({ kind: 'ip', addr: '192.0.2.1:1000' }),
