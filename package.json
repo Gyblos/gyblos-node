@@ -26,7 +26,8 @@
     "gate:failures": "node --import tsx scripts/failures.ts",
     "gate:exact": "node --import tsx apps/cli/src/exact.ts",
     "p2p:docker": "node --import tsx apps/cli/src/p2p/docker-main.ts",
-    "p2p:diagnose": "node --import tsx tooling/nat-regression.mjs"
+    "p2p:diagnose": "node --import tsx tooling/nat-regression.mjs",
+    "p2p:reconcile": "node --import tsx apps/cli/src/p2p/reconcile.ts"
   },
   "dependencies": {
     "@gyblos/application": "workspace:*",
