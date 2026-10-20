@@ -7,10 +7,13 @@ trial completed three paid devnet requests using a test SPL mint, not USDC. That
 report is historical; it does not validate the current source. The exact
 candidate hash and final-head paid-smoke status belong to
 [PR #10's validation record](https://github.com/Gyblos/gyblos-payments/pull/10).
-A new smoke needs explicit VPS/funds approval and must use that unchanged final
-commit. Docker NAT-direct did not pass; hotspot/CGNAT and broader NAT coverage
-remain untested. Use isolated generated devnet wallets only. Never import
-mainnet keys.
+The additional `24af211` attempt is partial: the first request completed, the
+second settled on-chain but left an uncertain buyer journal, and the third never
+started. Later fixes have offline validation only; the precise historical error
+was discarded and remains unknown. A new paid smoke needs explicit VPS/funds
+approval and must use its unchanged final commit. Docker NAT-direct did not
+pass; hotspot/CGNAT and broader NAT coverage remain untested. Use isolated
+generated devnet wallets only. Never import mainnet keys.
 
 ## Payment scope
 
@@ -76,6 +79,39 @@ on-chain balances to establish the outcome before another authorization. There
 is no general automatic recovery or guarantee that an interrupted run has
 returned funds. The P2P zero-charge recovery command below covers one explicitly
 verified case; charged-but-undelivered outcomes still require separate recovery.
+
+P2P paid calls now retain a canonical failure phase and allowlisted diagnostic
+code, filtered per-request route metrics, and available HTTP status/signature
+hints. `observedPayment` contains only bounded syntactically valid claim/deposit
+signatures; it is not verified settlement or evidence of delivery. The shared
+buyer preserves receipt-header hints even when body parsing fails. Arbitrary
+error messages, stacks, causes, response bodies and credential URLs are not
+copied into these diagnostics.
+
+After a confirmed claim, deposit discovery rereads a temporarily missing index
+within the existing configured transaction-read budget. History queries and the
+post-claim snapshot use the known claim slot as `minContextSlot`; an account
+response reporting an older slot is rejected even if its amounts happen to
+match. The claim slot must first be a nonnegative safe integer; missing or
+malformed slots stop before history/snapshot reads. Only reads are repeated.
+Ambiguous deposits and accounting mismatches fail immediately. An exhausted read
+budget still leaves uncertainty and blocks new authorization. The
+[account RPC context minimum](https://solana.com/docs/rpc/http/getmultipleaccounts)
+is distinct from finalized proof. These reads use the existing confirmed
+commitment, do not replace the finalized recovery verifier and do not guarantee
+timely RPC indexing.
+
+A discovered deposit is persisted as an unverified hint before subsequent
+snapshot/delta checks. Only a completed proof establishes the confirmed
+financial classification; a later receipt/observation failure keeps the existing
+`confirmed-payment-error` distinction. A nonmissing unreadable/malformed metrics
+file after proof is now reported as `confirmed-payment-error` at the metrics
+phase; a missing file still yields empty samples and a route discrepancy. This
+refines the old empty-route classification without losing confirmed financial
+state. These reproducible fixes cannot recover the lost original error,
+establish the second request's delivery/paid route, clear its charged journal or
+restore a current-account audit after canonical reclaim. Do not use the
+zero-charge recovery path for that charged outcome.
 
 ## Inference and verification limits
 
@@ -350,7 +386,8 @@ loss on owned loopback UDP sockets. It pauses only its owned buyer subprocess
 with `SIGSTOP`, preventing IPv6 route recovery until the seller expires its
 write; cleanup resumes and terminates that child. This one process-control case
 explicitly skips outside macOS/Linux. It retains the actual receive handles,
-observes original native write promises and fills the send buffer across two
+observes original native write/finish promises and waits for actual finish
+cleanup before the next warm-up request. It fills the send buffer across two
 admission windows by advancing JavaScript `Date.now`. Native clocks and deadline
 timers remain real. Seven other incomplete ingress streams keep all other slots
 occupied, so a healthy request after expiry proves the stalled slot was
@@ -379,17 +416,27 @@ remain actual. They verify proof persistence before journal confirmation,
 preservation of surplus fields, charged/conflicting proof refusal and an
 unresolved journal after a persistence failure. Export cases retain the actual
 container-read parser and collector while stubbing process creation, and
-re-fetch zero-charge proof with the actual verifier/SDK. They do not exercise
-the spawned CLI's outer catch, chain submission, power-loss durability or
+re-fetch zero-charge proof with the actual verifier/SDK. Their scope excludes
+the spawned CLI's outer catch, chain submission, power-loss durability and
 physical signed-offer recovery. Ownership/FIFO checks run only on supported
 platforms and otherwise skip explicitly; owned bounded child probes protect the
 test process from blocking.
+
+Separate paid-call fault cases spawn the actual CLI entrypoint with narrowly
+scoped readiness/payment-port stubs. Real locks, temporary JSON persistence,
+failure handling and metric filtering remain. They cover lost responses,
+truncated bodies, proof errors, post-discovery snapshot errors, hostile thrown
+values and later receipt-validation failures with one simulated invocation and
+no signing/RPC. Shared-buyer receipt and proof-read tests use synthetic
+responses and the curated historical pair. They establish diagnostics and
+conservative read handling, not a new settlement, live RPC lag or general
+charged recovery.
 
 These public checks require no private fixtures, funded keys, Docker, inference
 engine or live RPC. They do not establish a fresh chain audit, public relay
 compatibility, on-chain replay or exactly-once settlement. Existing charged or
 missing-claim recovery, ordinary confirmed journal clearance, journal-derived
-paid exports, generic outer diagnostics and broader native/Sybil/source-key/
+paid exports, remaining command diagnostics and broader native/Sybil/source-key/
 relay/privacy limits remain follow-ups. Raw transaction responses, private logs,
 measurements and evidence remain excluded. The historical physical report is
 retained separately from the
