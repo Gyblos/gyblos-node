@@ -3,27 +3,21 @@ import assert from 'node:assert/strict';
 import { FINALIZED_COMMITMENT, SVM_TRANSACTION_VERSION } from '@gyblos/config';
 import { verifyFinalizedChannel } from '@gyblos/payments-x402/finalized-channel';
 
-import { readChain, tokenAddress, transactionTransfers } from './chain.js';
+import { readChain, tokenAddress } from './chain.js';
 import {
   transactionLamports as lamports,
   verifyEscrowRent,
 } from './escrow-rent.js';
-import type { ChainTransaction } from './types.js';
+import {
+  verifyEscrowTokens,
+  type EscrowTokenTransaction,
+} from './escrow-tokens.js';
 
-interface TokenBalance {
-  accountIndex: number;
-  owner: string;
-  mint: string;
-  uiTokenAmount: { amount: string };
-}
-
-interface FinalizedTransaction extends ChainTransaction {
-  meta: ChainTransaction['meta'] & {
+interface FinalizedTransaction extends EscrowTokenTransaction {
+  meta: EscrowTokenTransaction['meta'] & {
     fee: number;
     preBalances: number[];
     postBalances: number[];
-    preTokenBalances: TokenBalance[];
-    postTokenBalances: TokenBalance[];
   };
 }
 
@@ -38,29 +32,6 @@ export interface FinalizedPaymentExpectation {
   ceiling: string;
   depositSignature: string;
   claimSignature: string;
-}
-
-function tokens(
-  transaction: FinalizedTransaction,
-  account: string,
-  owner: string,
-  mint: string,
-  after: boolean,
-) {
-  const index = transaction.transaction.message.accountKeys.findIndex(
-    (key) => key.pubkey === account,
-  );
-  if (index < 0) return 0n; // An absent account cannot be changed by this transaction.
-  const balances = after
-    ? transaction.meta.postTokenBalances
-    : transaction.meta.preTokenBalances;
-  assert.ok(Array.isArray(balances));
-  const balance = balances.find((item) => item.accountIndex === index);
-  if (!balance) return 0n;
-  assert.equal(balance.owner, owner);
-  assert.equal(balance.mint, mint);
-  assert.match(balance.uiTokenAmount.amount, /^\d+$/);
-  return BigInt(balance.uiTokenAmount.amount);
 }
 
 async function finalizedTransaction(
@@ -120,60 +91,11 @@ export async function finalizedPaymentProof(
   );
   const claim = await finalizedTransaction(expected, expected.claimSignature);
   assert.ok(deposit.slot <= claim.slot, 'Claim precedes deposit.');
-  const buyerAta = await tokenAddress(expected.buyer, expected.mint);
-  const sellerAta = await tokenAddress(expected.payTo, expected.mint);
-  const escrowAta = await tokenAddress(expected.channelId, expected.mint);
-  const transfers = (transaction: FinalizedTransaction) => {
-    const items = transactionTransfers(transaction);
-    for (const transfer of items) assert.match(transfer.amount, /^\d+$/);
-    return items;
-  };
-  const sum = (
-    transaction: FinalizedTransaction,
-    source: string,
-    destination: string,
-  ) =>
-    transfers(transaction)
-      .filter(
-        (transfer) =>
-          transfer.source === source &&
-          transfer.destination === destination &&
-          transfer.mint === expected.mint,
-      )
-      .reduce((amount, transfer) => amount + BigInt(transfer.amount), 0n);
-  assert.equal(sum(deposit, buyerAta, escrowAta), ceiling);
-  const charged = sum(claim, escrowAta, sellerAta);
-  const refund = sum(claim, escrowAta, buyerAta);
-  assert.equal(charged + refund, ceiling);
-  for (const transfer of transfers(claim).filter(
-    (item) => item.source === escrowAta,
-  )) {
-    assert.equal(transfer.mint, expected.mint);
-    assert.ok(
-      transfer.destination === buyerAta || transfer.destination === sellerAta,
-    );
-  }
-  const balance = (
-    transaction: FinalizedTransaction,
-    owner: string,
-    ata: string,
-    after: boolean,
-  ) => tokens(transaction, ata, owner, expected.mint, after);
-  const delta = (
-    transaction: FinalizedTransaction,
-    owner: string,
-    ata: string,
-  ) =>
-    balance(transaction, owner, ata, true) -
-    balance(transaction, owner, ata, false);
-  assert.equal(delta(deposit, expected.buyer, buyerAta), -ceiling);
-  assert.equal(delta(deposit, expected.payTo, sellerAta), 0n);
-  assert.equal(balance(deposit, expected.channelId, escrowAta, false), 0n);
-  assert.equal(balance(deposit, expected.channelId, escrowAta, true), ceiling);
-  assert.equal(delta(claim, expected.buyer, buyerAta), refund);
-  assert.equal(delta(claim, expected.payTo, sellerAta), charged);
-  assert.equal(balance(claim, expected.channelId, escrowAta, false), ceiling);
-  assert.equal(balance(claim, expected.channelId, escrowAta, true), 0n);
+  const { charged, refund, ...tokenEvidence } = await verifyEscrowTokens(
+    deposit,
+    claim,
+    expected,
+  );
   for (const transaction of [deposit, claim]) {
     const buyerIndex = transaction.transaction.message.accountKeys.findIndex(
       (key) => key.pubkey === expected.buyer,
@@ -185,7 +107,7 @@ export async function finalizedPaymentProof(
       );
   }
   const escrowRent = verifyEscrowRent(deposit, claim, {
-    escrowAta,
+    escrowAta: await tokenAddress(expected.channelId, expected.mint),
     channelId: expected.channelId,
     feePayer: expected.feePayer,
   });
@@ -241,6 +163,7 @@ export async function finalizedPaymentProof(
   return {
     chargedAtomic: charged.toString(),
     refundAtomic: refund.toString(),
+    ...tokenEvidence,
     depositSignature: expected.depositSignature,
     claimSignature: expected.claimSignature,
     depositSlot: deposit.slot,
