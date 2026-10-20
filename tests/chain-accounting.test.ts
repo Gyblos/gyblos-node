@@ -10,6 +10,7 @@ import {
   transaction,
   transactionTransfers,
 } from '../scripts/inference-chain.js';
+import { registerProofReadCases } from './support/proof-read-cases.js';
 import { registerRentCases } from './support/rent-cases.js';
 import { registerTokenCases } from './support/token-cases.js';
 
@@ -195,3 +196,5 @@ test('bounded transaction visibility retries preserve unknown state and do not h
 
 registerRentCases();
 registerTokenCases();
+
+registerProofReadCases();
