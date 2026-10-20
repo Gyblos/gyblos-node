@@ -144,6 +144,18 @@ export function registerCallCases() {
       ERROR_DIAGNOSTICS.TIMEOUT,
     );
   });
+  test('a stateful error code getter cannot replace a matched canonical diagnostic', () => {
+    const canonical = Object.values(GATE_ERROR_CODES)[0]!;
+    const error = new GateError(canonical, 'PRIVATE_SENTINEL');
+    let reads = 0;
+    Object.defineProperty(error, 'code', {
+      get() {
+        return ++reads === 1 ? canonical : 'PRIVATE_SENTINEL';
+      },
+    });
+    assert.equal(errorDiagnostic(error), canonical);
+    assert.equal(reads, 1);
+  });
   for (const validReceipt of [true, false])
     test(`shared buyer observes bounded ${validReceipt ? 'valid' : 'invalid'} receipt hints despite a truncated body`, async () => {
       const signer = await generateKeyPairSigner();
