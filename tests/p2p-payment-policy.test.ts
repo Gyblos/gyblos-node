@@ -16,6 +16,10 @@ import { withExclusiveLock } from '@gyblos/gate/lock';
 import { createInferenceBuyer } from '@gyblos/payments-x402/inference-buyer';
 import { saveJson } from '@gyblos/runtime';
 
+import { registerExportCases } from './support/export-cases.js';
+import { registerLockCases } from './support/lock-cases.js';
+import { registerRecoveryCases } from './support/recovery-cases.js';
+
 test('request-specific ceiling rejects altered challenges before any signature or paid request', async () => {
   const original = globalThis.fetch;
   const signer = await generateKeyPairSigner();
@@ -193,3 +197,7 @@ test('Docker funder preserves uncertain journals and refuses concurrent funding 
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+registerLockCases();
+registerRecoveryCases();
+registerExportCases();
