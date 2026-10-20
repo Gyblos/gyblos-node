@@ -274,20 +274,25 @@ pnpm p2p:reconcile --deposit DEPOSIT_SIGNATURE --claim CLAIM_SIGNATURE
 ```
 
 It verifies finalized transaction identities, token/SOL deltas, the canonical
-distributed channel and sponsor fees versus retained channel rent. Proof is
-saved before the matching journal can be confirmed; failed calls remain in
-history. If a process stopped before writing a call row, complete original
-identities and the ceiling in its durable journal can supply that metadata.
-Conflicting rows or incomplete journals stop recovery; no delivered call is
-invented. A charged outcome or unavailable/inconsistent proof keeps recovery
-blocked. No signing, funding, submission or payment retry occurs.
+distributed channel, sponsor fees, retained channel rent and temporary canonical
+escrow-account rent. Proof is saved before the matching journal can be
+confirmed; failed calls remain in history. If a process stopped before writing a
+call row, complete original identities and the ceiling in its durable journal
+can supply that metadata. Conflicting rows or incomplete journals stop recovery;
+no delivered call is invented. A charged outcome or unavailable/inconsistent
+proof keeps recovery blocked. No signing, funding, submission or payment retry
+occurs.
 
 The recovery command can reclaim a buyer lock only after checking a private,
-regular, unchanged file and proving its recorded PID is absent. It synchronizes
-a structured stale-owner audit before removing that lock, then acquires the
-normal buyer lock. Live/reused PIDs, corrupt metadata, unsupported owner checks
-and an interrupted recovery lock require operator investigation. The generic
-`upto` gate lock is unchanged. Audit-only mode performs no stale-lock cleanup.
+regular, unchanged file, matching its host/boot/PID ownership domain and proving
+its recorded local PID is absent. Linux records the boot ID and PID namespace;
+macOS reads a bounded boot-session identifier. Legacy, mismatched or unavailable
+owner identity requires manual investigation, as do live/reused PIDs, corrupt
+metadata and an interrupted recovery lock. Nonblocking, no-follow opens reject
+FIFO and link paths. A structured stale-owner audit is synchronized before
+removal. Normal exclusive locking remains usable if owner detection is
+unavailable; its cleanup preserves replacement files. Audit-only performs no
+stale-lock cleanup.
 
 For a charged or zero-charge payment, `--audit-only` emits the verified
 financial proof without changing journal/reconciliation files. Keep the output
@@ -300,9 +305,12 @@ pnpm --silent p2p:reconcile --audit-only --deposit DEPOSIT_SIGNATURE --claim CLA
 
 The proof includes the sponsor's pre/post balances and fee/rent conservation for
 each selected transaction. It reports unrelated sponsor movement between them
-separately, without attributing that movement to fees. It never infers
-historical balances from current wallets. Fresh individually settled channels
-and retained canonical accounts are supported; unsupported or incomplete data
+separately, without attributing that movement to fees. Canonical escrow ATA
+creation and closure must account for the sponsor's temporary rent advance and
+its return; this is separate from retained channel rent and network fees. It
+never infers historical balances from current wallets. Supported channels are
+fresh and individually settled, with a retained channel account and an escrow
+ATA created by the sponsor and closed back to it. Unsupported or incomplete data
 requires separate investigation, not an inferred refund. See
 [recovery limits](docs/limitations.md#verified-p2p-reconciliation-and-reproducible-audits).
 
@@ -312,17 +320,25 @@ cannot replace a paid `200` and receipt. Ingress and response delivery each have
 a five-second limit; origin work has its own permit and deadline. Established
 connections are limited to one per NodeId. Up to eight handshakes are tracked
 separately, with two pending jobs per validated source. Connected peers reserve
-up to 30 requests from the shared 256-request minute budget; disconnecting never
-erases already consumed capacity. This is connection fairness, not proof of
-payment or Sybil resistance.
+up to 30 requests from the shared 256-request minute budget. After at least one
+admitted request, unused quota survives disconnect until the current window
+ends, allowing the same authenticated NodeId to reconnect under churn. A
+connection with no admitted work releases its unused reservation. Reconnection
+preserves consumed debt and can use newly available capacity within the same
+peer/global limits. Active, connected and reserved entries are protected from
+LRU eviction; rollover expires inactive grace. This is bounded admission
+fairness, not paid history or Sybil resistance.
 
 Uncancellable native jobs can still consume their bounded pools. A shared NAT
 may see temporary handshake rejection; additional sources can saturate pending
 capacity. Relay compatibility of the new admission checks and off-host behavior
-remain untested on the current head. Selected private regressions and native
-loopback tests with simulated payments cover the corrections; these private
-tests are excluded from the public suite. The physical paid evidence remains
-bound to `2c8eeac`; no new paid-network result is implied.
+remain untested on the current head. Private regressions cover the corrections,
+including FIFO/process failures and real loopback Iroh reconnection under free
+challenge pressure. Financial tests replay unchanged historical transactions
+with explicitly synthetic current-channel/RPC responses through the real SDK
+verifier. They establish offline acceptance, not a fresh on-chain audit. New
+tests and evidence stay excluded from Git and the public suite. The physical
+paid evidence remains bound to `2c8eeac`; no new paid-network result is implied.
 
 ## Pay through a public facilitator
 
