@@ -144,26 +144,33 @@ including late writes after the connection closes.
 Pending native handshakes and established connections have separate limits of
 eight. Validated source addresses admit at most two pending handshakes per IP
 without counting source ports as new identities; established connections are
-limited to one per NodeId. Connected peers reserve their available per-minute
-allowance within the shared budget of 256 requests. Free challenges from other
-peers cannot spend that reservation. A peer with admitted work retains unused
-quota after disconnect until the current fixed window ends, so its authenticated
-NodeId can reconnect while other peers consume unreserved capacity. Zero-work
-connections release unused quota. Reconnection retains consumed debt and may
-refill a partial allowance only from available shared capacity. Active,
-connected and reserved entries cannot be evicted by LRU; rollover expires
-inactive grace and refreshes connected reservations. Inactive unreserved
-eviction can reset per-peer history. A request qualifies for grace before the
-origin outcome, so a free challenge or failed work can earn it. Nine disposable
-NodeIds can each make one free request, disconnect and encumber all 256 shared
-admissions: nine consumed and 247 reserved, with no live attacker connection.
-New unreserved identities are refused until rollover; already-reserved peers can
-still reconnect. For this serial request-and-disconnect pattern without live
-connections, the original release policy required 256 admissions to exhaust the
-budget. Other connection-holding attacks already existed. A real direct-loopback
-Iroh comparison reproduces this regression; it remains unresolved. This is not
-paid history, costly identity or production fairness. A payment header grants no
-priority.
+limited to one per NodeId. Connected or active peers reserve their available
+per-minute allowance within the shared budget of 256 requests. Other peers
+cannot reclaim that protected reservation. Disconnected, inactive grace is
+best-effort: registration or quota refill may reclaim unused quota, and LRU
+pressure may evict inactive reservations. Reclamation changes no consumed debt
+or active/lease ownership. Each NodeId's consumed allowance is stored separately
+until rollover, including after eviction. Its map is bounded by the 256 actual
+admissions per window; the peer-window table retains its separate 128-entry
+bound. An identity with no admitted work in the current window releases unused
+quota once disconnected and inactive. Rollover resets window debt and refreshes
+connected reservations while retaining in-flight ownership, including requests
+started in the previous window.
+
+Reconnection can reuse or refill an allowance only while shared capacity
+remains. It does not guarantee a disconnected identity capacity against
+competing work. A connected peer with an exhausted partial reservation may need
+to reconnect before obtaining newly freed allowance. Free challenges and failed
+origin work still consume the same admission budget. A payment header, prior
+free request or HTTP status grants no special entitlement. The earlier
+nine-single-request/disconnect regression now passes with real direct-loopback
+Iroh: unused inactive grace is reclaimable, while actually consuming all 256
+admissions denies additional new and disconnected known peers until rollover.
+The former test expecting a dormant free identity's untouchable quota under
+exhaustive churn is superseded; its historical results do not establish the
+current best-effort contract. Connected/active reservations remain protected.
+This does not prevent cheap identities from exhausting actual work budgets or
+holding bounded connection/native pools, and it is not production fairness.
 
 IP source budgets use full addresses rather than IPv6 prefixes; IPv4-mapped
 aliases are separate keys. Relay source keys use the remote endpoint identity,
@@ -277,8 +284,12 @@ The current corrections were validated with private offline regressions,
 controlled process/filesystem failures and real direct-loopback Iroh using
 simulated payments. The native cases cover resets and half-closes, fragmented
 and malformed frames, a lost simulated receipt, multiple identities behind one
-source address and same-NodeId reconnection after verified free-challenge
-pressure. Financial regressions replay unchanged historical transactions with
+source address, same-NodeId reconnection while shared capacity remains,
+connected quota under free-challenge pressure and refusal after 256 actual
+admissions. Offline limiter controls cover per-identity debt through LRU churn,
+rollover with active work, duplicate release and partial grants. An explicitly
+synthetic two-row table exercises soft-grace eviction; production still uses 128
+rows. Financial regressions replay unchanged historical transactions with
 explicitly synthetic current-channel and RPC responses through the real SDK
 verifier; synthetic full-refund variants retain the escrow rent lifecycle.
 Positive-credit cases also exercise the actual zero-charge reconciliation
