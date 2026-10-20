@@ -16,6 +16,8 @@ interface RecoveryLockPaths {
 
 async function privateFile(handle: FileHandle) {
   const info = await handle.stat();
+  assert.ok(Number.isSafeInteger(info.dev) && info.dev >= 0);
+  assert.ok(Number.isSafeInteger(info.ino) && info.ino >= 0);
   assert.ok(
     info.isFile() && info.nlink === 1,
     'Private regular file required.',
