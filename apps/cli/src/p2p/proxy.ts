@@ -42,15 +42,15 @@ export async function startBuyerProxy(transport: Transport) {
           };
         const payment = request.headers['payment-signature'];
         if (typeof payment === 'string') headers['payment-signature'] = payment;
+        const identifier = (
+          JSON.parse(body.toString('utf8')) as { requestId?: unknown }
+        ).requestId;
         const result = await transport.exchange({
           method: 'POST',
           path: ROUTES.inference,
           headers,
           body,
         });
-        const identifier = (
-          JSON.parse(body.toString('utf8')) as { requestId?: unknown }
-        ).requestId;
         const metric = {
           requestId: typeof identifier === 'string' ? identifier : null,
           status: result.status,
@@ -63,7 +63,7 @@ export async function startBuyerProxy(transport: Transport) {
           rolePath(P2P.metricsFilename),
           JSON.stringify(metric) + '\n',
           { mode: FILE_MODES.privateFile },
-        );
+        ).catch(() => undefined); // Telemetry must not replace a settled response.
         response.writeHead(result.status, result.headers);
         response.end(Buffer.from(result.body));
       } catch {
