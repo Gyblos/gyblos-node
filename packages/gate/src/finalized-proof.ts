@@ -4,6 +4,10 @@ import { FINALIZED_COMMITMENT, SVM_TRANSACTION_VERSION } from '@gyblos/config';
 import { verifyFinalizedChannel } from '@gyblos/payments-x402/finalized-channel';
 
 import { readChain, tokenAddress, transactionTransfers } from './chain.js';
+import {
+  transactionLamports as lamports,
+  verifyEscrowRent,
+} from './escrow-rent.js';
 import type { ChainTransaction } from './types.js';
 
 interface TokenBalance {
@@ -34,29 +38,6 @@ export interface FinalizedPaymentExpectation {
   ceiling: string;
   depositSignature: string;
   claimSignature: string;
-}
-
-function accountIndex(transaction: FinalizedTransaction, account: string) {
-  const index = transaction.transaction.message.accountKeys.findIndex(
-    (key) => key.pubkey === account,
-  );
-  assert.ok(index >= 0, 'Required transaction account missing.');
-  return index;
-}
-
-function lamports(
-  transaction: FinalizedTransaction,
-  account: string,
-  after: boolean,
-) {
-  const value = (
-    after ? transaction.meta.postBalances : transaction.meta.preBalances
-  )[accountIndex(transaction, account)];
-  assert.ok(
-    typeof value === 'number' && Number.isSafeInteger(value) && value >= 0,
-    'Unsafe lamport balance.',
-  );
-  return BigInt(value);
 }
 
 function tokens(
@@ -203,6 +184,11 @@ export async function finalizedPaymentProof(
         lamports(transaction, expected.buyer, false),
       );
   }
+  const escrowRent = verifyEscrowRent(deposit, claim, {
+    escrowAta,
+    channelId: expected.channelId,
+    feePayer: expected.feePayer,
+  });
   const sponsorBefore = lamports(deposit, expected.feePayer, false);
   const sponsorAfter = lamports(claim, expected.feePayer, true);
   const sponsorDepositAfter = lamports(deposit, expected.feePayer, true);
@@ -217,16 +203,21 @@ export async function finalizedPaymentProof(
   );
   const fees = BigInt(deposit.meta.fee) + BigInt(claim.meta.fee);
   assert.equal(
-    depositSponsorDelta + lamports(deposit, expected.channelId, true),
+    depositSponsorDelta +
+      lamports(deposit, expected.channelId, true) +
+      escrowRent.afterDeposit -
+      escrowRent.beforeDeposit,
     -BigInt(deposit.meta.fee),
-    'Deposit sponsor delta must equal its fee plus channel rent.',
+    'Deposit sponsor delta must equal its fee plus channel and escrow rent.',
   );
   assert.equal(
     claimSponsorDelta +
       retainedRent -
-      lamports(claim, expected.channelId, false),
+      lamports(claim, expected.channelId, false) +
+      escrowRent.afterClaim -
+      escrowRent.beforeClaim,
     -BigInt(claim.meta.fee),
-    'Claim sponsor delta must equal its fee plus channel rent change.',
+    'Claim sponsor delta must equal its fee plus channel and escrow rent changes.',
   );
   const channel = await verifyFinalizedChannel({
     ...expected,
@@ -260,6 +251,11 @@ export async function finalizedPaymentProof(
     sponsorInterveningDeltaLamports: (
       sponsorClaimBefore - sponsorDepositAfter
     ).toString(),
+    escrowAccountRentLamports: escrowRent.afterDeposit.toString(),
+    escrowDepositBeforeLamports: escrowRent.beforeDeposit.toString(),
+    escrowDepositAfterLamports: escrowRent.afterDeposit.toString(),
+    escrowClaimBeforeLamports: escrowRent.beforeClaim.toString(),
+    escrowClaimAfterLamports: escrowRent.afterClaim.toString(),
     sponsorFeesLamports: fees.toString(),
     retainedChannelRentLamports: retainedRent.toString(),
     minimumChannelRentLamports: channel.minimumRentLamports,
