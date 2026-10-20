@@ -45,6 +45,7 @@ interface RecoveryCall extends UncertainAttempt {
 function originalAttempt(
   journal: RecoveryJournal,
   calls: RecoveryCall[],
+  auditOnly: boolean,
 ): RecoveryCall {
   assert.ok(typeof journal.requestId === 'string' && journal.requestId.trim());
   assert.ok(typeof journal.channelId === 'string' && journal.channelId.trim());
@@ -72,8 +73,9 @@ function originalAttempt(
   }
   assert.ok(
     journal.state === P2P_JOURNAL_STATES.AUTHORIZED ||
-      journal.state === P2P_JOURNAL_STATES.UNCERTAIN,
-    'Journal-only recovery requires an unresolved authorization.',
+      journal.state === P2P_JOURNAL_STATES.UNCERTAIN ||
+      (auditOnly && journal.state === P2P_JOURNAL_STATES.CONFIRMED),
+    'Journal-only recovery requires an unresolved authorization or read-only audit.',
   );
   assert.ok(
     journal.paymentExpectation,
@@ -85,7 +87,10 @@ function originalAttempt(
     channelId: journal.channelId,
     ceilingAtomic: ceiling,
     runId: journal.runId,
-    outcome: CALL_OUTCOMES.UNCERTAIN,
+    outcome:
+      journal.state === P2P_JOURNAL_STATES.CONFIRMED
+        ? CALL_OUTCOMES.CONFIRMED
+        : CALL_OUTCOMES.UNCERTAIN,
   };
 }
 
@@ -119,7 +124,7 @@ export async function main(args = process.argv.slice(2)) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
     }
     assert.ok(Array.isArray(calls));
-    const attempt = originalAttempt(journal, calls);
+    const attempt = originalAttempt(journal, calls, values['audit-only']);
     if (!values['audit-only'])
       assert.equal(attempt.outcome, CALL_OUTCOMES.UNCERTAIN);
     const trust = await loadJson<OfferTrust>(rolePath(P2P.trustFilename));
@@ -143,10 +148,9 @@ export async function main(args = process.argv.slice(2)) {
       feePayer: offer.feePayer,
       authorizer: offer.authorizer,
     };
-    if (journal.paymentExpectation) {
-      const { rpcUrl: _rpcUrl, ...identities } = accounts;
+    const { rpcUrl: _rpcUrl, ...identities } = accounts;
+    if (journal.paymentExpectation)
       assert.deepEqual(journal.paymentExpectation, identities);
-    }
     const signatures = {
       channelId: attempt.channelId,
       ceilingAtomic: attempt.ceilingAtomic,
@@ -183,6 +187,9 @@ export async function main(args = process.argv.slice(2)) {
       resolution: proof.status,
       requestId: attempt.requestId,
       channelId: attempt.channelId,
+      ceilingAtomic: attempt.ceilingAtomic,
+      paymentExpectation: identities,
+      runId: attempt.runId,
       depositSignature: proof.depositSignature,
       claimSignature: proof.claimSignature,
     });
