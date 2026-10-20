@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
+import { setTimeout as delay } from 'node:timers/promises';
 
-import { COMMITMENT, P2P } from '@gyblos/config';
+import { COMMITMENT, P2P, RETRIES, RETRY_DELAYS } from '@gyblos/config';
 import {
   confirmInference,
   inferenceSnapshot,
@@ -9,6 +10,8 @@ import {
   transaction,
   transactionTransfers,
 } from '@gyblos/gate/chain';
+import { GateError } from '@gyblos/payments-x402/chain';
+import { GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
 
 export interface PaymentAccounts {
   rpcUrl: string;
@@ -45,24 +48,41 @@ export async function paymentProof(
     charged = sum(transfers, escrowAta, sellerAta),
     refund = sum(transfers, escrowAta, buyerAta);
   assert.equal(charged + refund, BigInt(ceiling));
-  const signatures = await readChain<{ signature: string; err: unknown }[]>(
-    config,
-    'getSignaturesForAddress',
-    [channelId, { limit: P2P.maxChannelSignatures, commitment: COMMITMENT }],
-  );
   let deposit: { signature: string; slot: number } | undefined;
-  for (const entry of signatures) {
-    if (entry.err !== null || entry.signature === claimSignature) continue;
-    const open = await transaction(config, entry.signature);
-    if (
-      sum(transactionTransfers(open), buyerAta, escrowAta) === BigInt(ceiling)
-    ) {
-      assert.equal(deposit, undefined);
-      deposit = { signature: entry.signature, slot: open.slot };
+  for (let attempt = 0; attempt < RETRIES.transaction; attempt++) {
+    const signatures = await readChain<{ signature: string; err: unknown }[]>(
+      config,
+      'getSignaturesForAddress',
+      [
+        channelId,
+        {
+          limit: P2P.maxChannelSignatures,
+          commitment: COMMITMENT,
+          minContextSlot: claim.slot,
+        },
+      ],
+    );
+    for (const entry of signatures) {
+      if (entry.err !== null || entry.signature === claimSignature) continue;
+      const depositTransaction = await transaction(config, entry.signature);
+      if (
+        sum(transactionTransfers(depositTransaction), buyerAta, escrowAta) ===
+        BigInt(ceiling)
+      ) {
+        assert.equal(deposit, undefined);
+        deposit = { signature: entry.signature, slot: depositTransaction.slot };
+      }
     }
+    if (deposit) break;
+    if (attempt < RETRIES.transaction - 1)
+      await delay(RETRY_DELAYS.transactionVisibility);
   }
-  assert.ok(deposit, 'Confirmed deposit missing.');
-  const after = await inferenceSnapshot(config, channelId);
+  if (!deposit)
+    throw new GateError(
+      GATE_ERROR_CODES.TRANSACTION_UNKNOWN,
+      'Confirmed deposit is not yet visible; reconcile before another authorization.',
+    );
+  const after = await inferenceSnapshot(config, channelId, claim.slot);
   assert.equal(BigInt(before.buyer) - BigInt(after.buyer), charged);
   assert.equal(BigInt(after.seller) - BigInt(before.seller), charged);
   assert.equal(after.buyerLamports, before.buyerLamports);
