@@ -50,6 +50,23 @@ export function registerCallCases() {
     );
     assert.equal('claimSignature' in journal, false);
   });
+  test('actual call retains a discovered deposit as an unverified hint after a later proof failure', async () => {
+    const { journal, call } = await callFault({ afterDiscovery: true });
+    assert.equal(journal.state, P2P_JOURNAL_STATES.UNCERTAIN);
+    assert.equal(call.outcome, CALL_OUTCOMES.UNCERTAIN);
+    assert.deepEqual(call.failure, {
+      phase: CALL_PHASES.PROOF,
+      code: GATE_ERROR_CODES.TRANSACTION_UNKNOWN,
+    });
+    assert.equal(
+      journal.observedPayment?.depositSignature,
+      '1'.repeat(63) + '2',
+    );
+    assert.equal(journal.observedPayment?.claimSignature, '1'.repeat(64));
+    assert.deepEqual(call.observedPayment, journal.observedPayment);
+    assert.equal('depositSignature' in journal, false);
+    assert.equal('claimSignature' in journal, false);
+  });
   test('actual call preserves body-read phase and keeps an observed receipt unverified', async () => {
     const { journal, call } = await callFault({ invalidBody: true });
     assert.equal(journal.state, P2P_JOURNAL_STATES.UNCERTAIN);
