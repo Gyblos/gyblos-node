@@ -1,5 +1,6 @@
 import { LOCALHOST, P2P, ROUTES } from '@gyblos/config';
 
+import { TRANSPORT_ROUTES } from './constants.js';
 import type { HttpRequest, HttpResponse, Transport } from './types.js';
 
 export async function loopbackRequest(
@@ -67,7 +68,7 @@ export function createLoopbackTransport(origin: string): Transport {
     async exchange(request) {
       return {
         ...(await loopbackRequest(origin, request)),
-        transport: 'loopback',
+        transport: TRANSPORT_ROUTES.LOOPBACK,
         connectMs: 0,
         directObserved: false,
         relayObserved: false,
