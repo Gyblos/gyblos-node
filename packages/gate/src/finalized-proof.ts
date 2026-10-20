@@ -4,6 +4,7 @@ import { FINALIZED_COMMITMENT, SVM_TRANSACTION_VERSION } from '@gyblos/config';
 import { verifyFinalizedChannel } from '@gyblos/payments-x402/finalized-channel';
 
 import { readChain, tokenAddress } from './chain.js';
+import { PROOF_GUARDS } from './constants.js';
 import {
   transactionLamports as lamports,
   verifyEscrowRent,
@@ -38,7 +39,7 @@ async function finalizedTransaction(
   expected: FinalizedPaymentExpectation,
   signature: string,
 ) {
-  assert.ok(signature.length > 0);
+  assert.ok(signature.length > 0, PROOF_GUARDS.SIGNATURE_REQUIRED);
   const transaction = await readChain<FinalizedTransaction | null>(
     expected,
     'getTransaction',
@@ -51,16 +52,25 @@ async function finalizedTransaction(
       },
     ],
   );
-  assert.ok(transaction, 'Finalized transaction unavailable.');
-  assert.equal(transaction.meta.err, null);
-  assert.ok(Number.isSafeInteger(transaction.slot) && transaction.slot >= 0);
-  assert.equal(transaction.transaction.signatures[0], signature);
+  assert.ok(transaction, PROOF_GUARDS.TRANSACTION_AVAILABLE);
+  assert.equal(transaction.meta.err, null, PROOF_GUARDS.TRANSACTION_SUCCESS);
+  assert.ok(
+    Number.isSafeInteger(transaction.slot) && transaction.slot >= 0,
+    PROOF_GUARDS.TRANSACTION_SLOT,
+  );
+  assert.equal(
+    transaction.transaction.signatures[0],
+    signature,
+    PROOF_GUARDS.TRANSACTION_SIGNATURE,
+  );
   assert.equal(
     transaction.transaction.message.accountKeys[0]?.pubkey,
     expected.feePayer,
+    PROOF_GUARDS.TRANSACTION_SPONSOR,
   );
   assert.ok(
     Number.isSafeInteger(transaction.meta.fee) && transaction.meta.fee >= 0,
+    PROOF_GUARDS.TRANSACTION_FEE,
   );
   return transaction;
 }
@@ -68,10 +78,14 @@ async function finalizedTransaction(
 export async function finalizedPaymentProof(
   expected: FinalizedPaymentExpectation,
 ) {
-  assert.match(expected.ceiling, /^\d+$/);
+  assert.match(expected.ceiling, /^\d+$/, PROOF_GUARDS.CEILING_FORMAT);
   const ceiling = BigInt(expected.ceiling);
-  assert.ok(ceiling > 0n);
-  assert.notEqual(expected.depositSignature, expected.claimSignature);
+  assert.ok(ceiling > 0n, PROOF_GUARDS.CEILING_POSITIVE);
+  assert.notEqual(
+    expected.depositSignature,
+    expected.claimSignature,
+    PROOF_GUARDS.SIGNATURES_DISTINCT,
+  );
   const signatures = [expected.depositSignature, expected.claimSignature];
   const statuses = await readChain<{
     value: ({ err: unknown; confirmationStatus: string | null } | null)[];
@@ -79,18 +93,26 @@ export async function finalizedPaymentProof(
     signatures,
     { searchTransactionHistory: true },
   ]);
-  assert.equal(statuses.value.length, signatures.length);
+  assert.equal(
+    statuses.value.length,
+    signatures.length,
+    PROOF_GUARDS.STATUS_COUNT,
+  );
   for (const status of statuses.value) {
-    assert.ok(status, 'Finalized signature unavailable.');
-    assert.equal(status.err, null);
-    assert.equal(status.confirmationStatus, FINALIZED_COMMITMENT);
+    assert.ok(status, PROOF_GUARDS.STATUS_AVAILABLE);
+    assert.equal(status.err, null, PROOF_GUARDS.STATUS_SUCCESS);
+    assert.equal(
+      status.confirmationStatus,
+      FINALIZED_COMMITMENT,
+      PROOF_GUARDS.STATUS_FINALIZED,
+    );
   }
   const deposit = await finalizedTransaction(
     expected,
     expected.depositSignature,
   );
   const claim = await finalizedTransaction(expected, expected.claimSignature);
-  assert.ok(deposit.slot <= claim.slot, 'Claim precedes deposit.');
+  assert.ok(deposit.slot <= claim.slot, PROOF_GUARDS.ORDER);
   const { charged, refund, ...tokenEvidence } = await verifyEscrowTokens(
     deposit,
     claim,
@@ -104,6 +126,7 @@ export async function finalizedPaymentProof(
       assert.equal(
         lamports(transaction, expected.buyer, true),
         lamports(transaction, expected.buyer, false),
+        PROOF_GUARDS.BUYER_SOL,
       );
   }
   const escrowRent = verifyEscrowRent(deposit, claim, {
@@ -117,18 +140,19 @@ export async function finalizedPaymentProof(
   const sponsorClaimBefore = lamports(claim, expected.feePayer, false);
   const depositSponsorDelta = sponsorDepositAfter - sponsorBefore;
   const claimSponsorDelta = sponsorAfter - sponsorClaimBefore;
-  assert.equal(lamports(deposit, expected.channelId, false), 0n);
+  assert.equal(
+    lamports(deposit, expected.channelId, false),
+    0n,
+    PROOF_GUARDS.CHANNEL_FRESH,
+  );
   const initialChannelRent = lamports(deposit, expected.channelId, true);
   const channelClaimBefore = lamports(claim, expected.channelId, false);
   const retainedRent = lamports(claim, expected.channelId, true);
   assert.ok(
     channelClaimBefore >= initialChannelRent,
-    'Channel rent decreased between transactions.',
+    PROOF_GUARDS.CHANNEL_INTERVAL,
   );
-  assert.ok(
-    retainedRent >= channelClaimBefore,
-    'Retained channel lamports decreased during the claim.',
-  );
+  assert.ok(retainedRent >= channelClaimBefore, PROOF_GUARDS.CHANNEL_RETAINED);
   const fees = BigInt(deposit.meta.fee) + BigInt(claim.meta.fee);
   assert.equal(
     depositSponsorDelta +
@@ -136,7 +160,7 @@ export async function finalizedPaymentProof(
       escrowRent.afterDeposit -
       escrowRent.beforeDeposit,
     -BigInt(deposit.meta.fee),
-    'Deposit sponsor delta must equal its fee plus channel and escrow rent.',
+    PROOF_GUARDS.DEPOSIT_SPONSOR,
   );
   assert.equal(
     claimSponsorDelta +
@@ -145,7 +169,7 @@ export async function finalizedPaymentProof(
       escrowRent.afterClaim -
       escrowRent.beforeClaim,
     -BigInt(claim.meta.fee),
-    'Claim sponsor delta must equal its fee plus channel and escrow rent changes.',
+    PROOF_GUARDS.CLAIM_SPONSOR,
   );
   const channel = await verifyFinalizedChannel({
     ...expected,
@@ -154,11 +178,11 @@ export async function finalizedPaymentProof(
   const currentChannelLamports = BigInt(channel.lamports);
   assert.ok(
     currentChannelLamports >= retainedRent,
-    'Retained channel lamports decreased after the claim.',
+    PROOF_GUARDS.CHANNEL_CURRENT,
   );
   assert.ok(
     initialChannelRent >= BigInt(channel.minimumRentLamports),
-    'Initial channel rent is below minimum.',
+    PROOF_GUARDS.INITIAL_RENT,
   );
   return {
     chargedAtomic: charged.toString(),
