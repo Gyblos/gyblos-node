@@ -9,6 +9,14 @@ export const INFERENCE_EVIDENCE_CODES = {
   EXECUTION_INTERRUPTED_OR_UNKNOWN: 'EXECUTION_INTERRUPTED_OR_UNKNOWN',
 } as const;
 
+export const ERROR_DIAGNOSTICS = {
+  ASSERTION: INFERENCE_EVIDENCE_CODES.ASSERTION_FAILED,
+  UNKNOWN: INFERENCE_EVIDENCE_CODES.EXECUTION_INTERRUPTED_OR_UNKNOWN,
+  ABORTED: 'REQUEST_ABORTED',
+  TIMEOUT: 'REQUEST_TIMEOUT',
+  RESPONSE_INVALID: 'RESPONSE_INVALID',
+} as const;
+
 export const JOURNAL_STATES = {
   AUTHORIZATION_CREATED: 'authorization-created',
   RECONCILED: 'reconciled',
@@ -245,3 +253,6 @@ export type FinancialGuardMessage =
   | (typeof RENT_GUARDS)[keyof typeof RENT_GUARDS]
   | (typeof TOKEN_GUARDS)[keyof typeof TOKEN_GUARDS]
   | (typeof PROOF_GUARDS)[keyof typeof PROOF_GUARDS];
+
+export type ErrorDiagnosticCode =
+  GateErrorCode | (typeof ERROR_DIAGNOSTICS)[keyof typeof ERROR_DIAGNOSTICS];
