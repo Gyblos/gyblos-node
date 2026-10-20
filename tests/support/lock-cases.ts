@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import { execFile, spawnSync } from 'node:child_process';
-import { promises as fs } from 'node:fs';
 import {
   link,
   lstat,
@@ -13,7 +12,6 @@ import {
   unlink,
   writeFile,
 } from 'node:fs/promises';
-import { syncBuiltinESMExports } from 'node:module';
 import { hostname, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -26,39 +24,14 @@ import { withExclusiveLock } from '@gyblos/gate/lock';
 import { currentLockOwner } from '@gyblos/gate/lock-owner';
 import { withP2pRecoveryLock } from '@gyblos/gate/recovery-lock';
 
+import { registerLockFaultCases } from './lock-faults.js';
+import { lockFixture } from './lock-fixture.js';
+
 const LOCAL_OWNER_SUPPORTED =
   process.platform === 'darwin' || process.platform === 'linux';
 
-async function lockFixture() {
-  const directory = await mkdtemp(join(tmpdir(), 'gyblos-public-lock-'));
-  const paths = {
-    buyer: join(directory, 'buyer.lock'),
-    recovery: join(directory, 'recovery.lock'),
-    audit: join(directory, 'audit.jsonl'),
-  };
-  const processResult = spawnSync(process.execPath, ['-e', 'process.exit(0)']);
-  assert.equal(processResult.status, 0);
-  assert.ok(processResult.pid);
-  assert.throws(() => process.kill(processResult.pid, 0), { code: 'ESRCH' });
-  const owner = await currentLockOwner();
-  assert.ok(owner);
-  const metadata = {
-    pid: processResult.pid,
-    startedAt: new Date().toISOString(),
-    owner,
-  };
-  await writeFile(paths.buyer, JSON.stringify(metadata), {
-    mode: FILE_MODES.privateFile,
-  });
-  return {
-    directory,
-    paths,
-    metadata,
-    close: () => rm(directory, { recursive: true, force: true }),
-  };
-}
-
 export function registerLockCases() {
+  registerLockFaultCases();
   test(
     'local lock owner contains the current host, boot identity and PID namespace',
     { skip: !LOCAL_OWNER_SUPPORTED },
@@ -198,46 +171,6 @@ export function registerLockCases() {
         }
       },
     );
-  test(
-    'stale-lock inode replacement aborts retirement and preserves the replacement',
-    { skip: !LOCAL_OWNER_SUPPORTED },
-    async (context) => {
-      const fixture = await lockFixture(),
-        original = fs.lstat;
-      let swapped = false;
-      try {
-        context.mock.method(
-          fs,
-          'lstat',
-          async (path: Parameters<typeof fs.lstat>[0]) => {
-            if (String(path) === fixture.paths.buyer && !swapped) {
-              swapped = true;
-              await unlink(fixture.paths.buyer);
-              await writeFile(fixture.paths.buyer, 'replacement', {
-                mode: FILE_MODES.privateFile,
-              });
-            }
-            return original(path);
-          },
-        );
-        syncBuiltinESMExports();
-        await assert.rejects(
-          withP2pRecoveryLock(fixture.paths, async () => {
-            throw Error('Recovery must not enter');
-          }),
-        );
-        assert.equal(swapped, true);
-        assert.equal(
-          await readFile(fixture.paths.buyer, 'utf8'),
-          'replacement',
-        );
-      } finally {
-        context.mock.restoreAll();
-        syncBuiltinESMExports();
-        await fixture.close();
-      }
-    },
-  );
   test('exclusive-lock cleanup preserves a different inode and original operation error', async () => {
     const directory = await mkdtemp(
         join(tmpdir(), 'gyblos-public-lock-cleanup-'),
