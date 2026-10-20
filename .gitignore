@@ -51,6 +51,25 @@ coverage/
 !/tests/fixtures/chat-template-vectors.json
 !/tests/fixtures/Qwen-LICENSE
 
+# Authorized PR 10 offline regression fixture and typed support modules
+!/tests/fixtures/finalized-payment-pair.json
+!/tests/support/
+/tests/support/*
+!/tests/support/payment-fixture.ts
+!/tests/support/payment-mutations.ts
+!/tests/support/token-cases.ts
+!/tests/support/rent-cases.ts
+!/tests/support/limiter-cases.ts
+!/tests/support/admission-cases.ts
+!/tests/support/native-fixture.ts
+!/tests/support/native-cases.ts
+!/tests/support/lock-probe.ts
+!/tests/support/lock-cases.ts
+!/tests/support/recovery-fixture.ts
+!/tests/support/recovery-cases.ts
+!/tests/support/export-fixture.ts
+!/tests/support/export-cases.ts
+
 # Explicitly authorized redacted P2P report only
 !/evidence/
 /evidence/*
