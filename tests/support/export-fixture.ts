@@ -196,6 +196,12 @@ export async function exportFixture(
           P2P.reconciliationsFilename,
         ]).has(filename),
       );
+      assert.equal(
+        args[1],
+        filename === P2P.traceFilename
+          ? context.sellerContainer
+          : context.buyerContainer,
+      );
       const payload =
         filename === P2P.callsFilename
           ? calls
