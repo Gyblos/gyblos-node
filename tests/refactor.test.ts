@@ -4,8 +4,9 @@ import { syncBuiltinESMExports } from 'node:module';
 import test from 'node:test';
 
 import { waitReady } from '../packages/runtime/src/process.js';
+import { NATIVE_CAPABILITY } from './support/native-runtime.js';
 
-test('all executable modules are inert when imported', async () => {
+test('all executable modules are inert when imported', async (context) => {
   const beforeSignals = ['SIGINT', 'SIGTERM'].map((s) =>
     process.listenerCount(s),
   );
@@ -34,11 +35,17 @@ test('all executable modules are inert when imported', async () => {
       'apps/facilitator/src/main.ts',
       'scripts/challenge.ts',
       'scripts/fund.ts',
-      'scripts/setup.ts',
       'scripts/failures.ts',
       'scripts/inference-setup.ts',
     ])
       await import('../' + file);
+    await context.test(
+      'native role setup entry is inert when imported',
+      { skip: NATIVE_CAPABILITY.bindingSkip },
+      async () => {
+        await import('../scripts/setup.js');
+      },
+    );
     assert.equal(fetches, 0);
     assert.equal(spawns, 0);
     assert.equal(process.exitCode, exitCode);
