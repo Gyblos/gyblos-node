@@ -90,3 +90,4 @@ coverage/
 # Paid-call failure metadata regressions
 !/tests/support/call-fixture.ts
 !/tests/support/call-cases.ts
+!/tests/support/proof-read-cases.ts
