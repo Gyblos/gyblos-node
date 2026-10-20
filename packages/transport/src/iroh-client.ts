@@ -2,6 +2,7 @@ import type { Connection, Endpoint, EndpointAddr } from '@number0/iroh';
 
 import { P2P } from '@gyblos/config';
 
+import { TRANSPORT_ROUTES } from './constants.js';
 import { withDeadline } from './deadline.js';
 import { selectedRoute } from './paths.js';
 import type { HttpRequest, Transport, TransportRoute } from './types.js';
@@ -73,8 +74,8 @@ export function createIrohTransport(
         relayObserved = false;
       const observe = () => {
         const route = selectedRoute(current);
-        directObserved ||= route === 'iroh-direct';
-        relayObserved ||= route === 'iroh-relay';
+        directObserved ||= route === TRANSPORT_ROUTES.DIRECT;
+        relayObserved ||= route === TRANSPORT_ROUTES.RELAY;
       };
       observe();
       const poll = setInterval(observe, P2P.routePollMs);
