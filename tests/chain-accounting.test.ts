@@ -10,6 +10,8 @@ import {
   transaction,
   transactionTransfers,
 } from '../scripts/inference-chain.js';
+import { registerRentCases } from './support/rent-cases.js';
+import { registerTokenCases } from './support/token-cases.js';
 
 test('on-chain extraction recognizes SPL batch transfers without double counting', () => {
   const transfer = {
@@ -190,3 +192,6 @@ test('bounded transaction visibility retries preserve unknown state and do not h
     globalThis.fetch = original;
   }
 });
+
+registerRentCases();
+registerTokenCases();
