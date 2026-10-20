@@ -316,12 +316,33 @@ actual deposit/claim/current channel snapshots, claim-time changes and interval
 or later credits have separate fields. `escrowAccountRentLamports` remains the
 initial sponsored ATA allocation. Credits do not identify their sender and are
 not token refunds or network fees. Negative channel movement, missing escrow
-rent, an underfunded initial channel or unexplained transaction-local deltas
-still stop verification. Supported channels are fresh and individually settled,
-with a retained channel account and an escrow ATA created by the sponsor and
-closed back to it. Unsupported or incomplete data requires separate
-investigation, not an inferred refund. See
+rent, an underfunded initial channel or deltas that violate the checked
+sponsor/channel/escrow equations still stop verification. Supported channels are
+fresh and individually settled, with a retained channel account and an escrow
+ATA created by the sponsor and closed back to it. Unsupported or incomplete data
+requires separate investigation, not an inferred refund. See
 [recovery limits](docs/limitations.md#verified-p2p-reconciliation-and-reproducible-audits).
+
+Positive net token credits to the escrow between deposit and claim are also
+supported. The entire surplus must be swept to the canonical devnet treasury ATA
+for the expected mint. The seller's charge plus the buyer's principal refund
+must still equal the original ceiling, and the charge must match the canonical
+channel settlement. Treasury surplus is neither a buyer refund nor a fee. Buyer,
+seller, escrow and treasury token accounts must be distinct. The selected
+deposit permits only buyer-to-escrow token transfers; the claim permits only
+escrow-to-buyer, escrow-to-seller and escrow-to-treasury transfers. Incoming
+claim-time transfers, prefunded escrow accounts, other mints and unrelated token
+movements remain unsupported and fail closed.
+
+Finalized proofs report `escrowInterveningTokenCreditAtomic` and
+`treasurySweepAtomic` separately, plus `escrowDepositBeforeAtomic`,
+`escrowDepositAfterAtomic`, `escrowClaimBeforeAtomic` and
+`escrowClaimAfterAtomic`. The credit is a net interval balance increase, without
+donor attribution. `balanceDeltas.escrow` retains the initial-empty/final-empty
+endpoint value; the token snapshots expose the intervening surplus. Older
+records without these fields do not establish zero surplus. Zero-charge recovery
+still requires zero charge and return of the full principal; export re-fetches
+that proof. Confirmed paid rows retain their existing journal-based scope.
 
 A required-route discrepancy or missing telemetry now fails the route check
 while preserving known financial confirmation. Post-exchange telemetry errors
