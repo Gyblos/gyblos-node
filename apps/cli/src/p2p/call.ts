@@ -6,6 +6,7 @@ import { observeInferenceResponse } from '@gyblos/application/inference-observat
 import { assessCharge, charge, OFFER_ID } from '@gyblos/application/metering';
 import { HTTP_STATUS, LOCALHOST, P2P, ROUTES } from '@gyblos/config';
 import { inferenceSnapshot } from '@gyblos/gate/chain';
+import { JOURNAL_STATES } from '@gyblos/gate/constants';
 import { withExclusiveLock } from '@gyblos/gate/lock';
 import {
   appendMeasurement,
@@ -17,20 +18,22 @@ import { createInferenceBuyer } from '@gyblos/payments-x402/inference-buyer';
 import { validateSettlement } from '@gyblos/payments-x402/trust';
 import { isMain, saveJson } from '@gyblos/runtime';
 import { inferenceCeiling } from '@gyblos/seller/inference';
+import type { RouteObservation } from '@gyblos/transport';
+import {
+  expectedIrohRoute,
+  routesMatchRequired,
+} from '@gyblos/transport/route-policy';
 
 import { createCases } from '../inference/cases-data.js';
 import { modelTokenizer } from './artifacts.js';
 import { trustedOffer } from './buyer.js';
+import { CALL_OUTCOMES } from './constants.js';
 import { paymentProof } from './proof.js';
 import { rolePath, roleSigner } from './roles.js';
 
-interface TransportMetric {
+interface TransportMetric extends RouteObservation {
   requestId: string;
   status: number;
-  transport: string;
-  connectMs: number;
-  directObserved: boolean;
-  relayObserved: boolean;
 }
 
 async function priorCalls() {
@@ -45,13 +48,14 @@ async function priorCalls() {
 }
 
 async function run() {
+  const requiredRoute = expectedIrohRoute(process.env.GYBLOS_EXPECTED_ROUTE);
   const { config, offer, trust } = await trustedOffer();
   await assertProgram(config.rpcUrl);
   try {
     const previous = JSON.parse(
       await readFile(rolePath(P2P.journalFilename), 'utf8'),
     ) as { state: string };
-    if (previous.state !== 'confirmed')
+    if (previous.state !== JOURNAL_STATES.CONFIRMED)
       throw new Error('Reconcile prior authorization before another call.');
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
@@ -80,6 +84,14 @@ async function run() {
       addresses: { buyer: buyer.address, seller: offer.payTo },
     };
   const before = await inferenceSnapshot(accounts);
+  const paymentExpectation = {
+    buyer: buyer.address,
+    mint: config.mint,
+    payTo: offer.payTo,
+    feePayer: offer.feePayer,
+    authorizer: offer.authorizer,
+  };
+  let confirmedProof: Awaited<ReturnType<typeof paymentProof>> | undefined;
   let authorization: { channelId: string; ceiling: string } | undefined,
     signedAt = performance.now();
   const invoke = createInferenceBuyer(
@@ -105,6 +117,9 @@ async function run() {
           state: 'authorized',
           requestId: request.requestId,
           ...authorization,
+          paymentExpectation,
+          before,
+          runId: process.env.GYBLOS_P2P_RUN_ID,
         });
       },
     },
@@ -128,6 +143,14 @@ async function run() {
     validateSettlement(response.receipt, {
       payer: buyer.address,
       amount: proof.chargedAtomic,
+    });
+    confirmedProof = proof;
+    await saveJson(rolePath(P2P.journalFilename), {
+      state: JOURNAL_STATES.CONFIRMED,
+      requestId: request.requestId,
+      channelId: authorization.channelId,
+      depositSignature: proof.depositSignature,
+      claimSignature: proof.claimSignature,
     });
     const observation = observeInferenceResponse({
       status: response.status,
@@ -158,6 +181,7 @@ async function run() {
     const row = measurementRow(
       {
         requestId: request.requestId,
+        model: { name: offer.model.name, digest: offer.model.digest },
         seller: offer.payTo,
         offer: OFFER_ID,
         channelId: authorization.channelId,
@@ -179,20 +203,25 @@ async function run() {
       await measurementSalt(P2P.root),
     );
     await appendMeasurement(row, rolePath(P2P.measurementsFilename));
-    const metrics = (await readFile(rolePath(P2P.metricsFilename), 'utf8'))
+    const metrics = (
+      await readFile(rolePath(P2P.metricsFilename), 'utf8').catch(() => '')
+    )
       .trim()
       .split('\n')
+      .filter(Boolean)
       .map((line) => JSON.parse(line) as TransportMetric)
       .filter((metric) => metric.requestId === request.requestId);
-    assert.ok(
-      metrics.some((metric) => metric.status === HTTP_STATUS.paymentRequired),
-    );
     const paid = metrics.find((metric) => metric.status === HTTP_STATUS.ok);
-    assert.ok(paid && ['iroh-direct', 'iroh-relay'].includes(paid.transport));
+    const routeAccepted =
+      Boolean(paid) &&
+      metrics.some((metric) => metric.status === HTTP_STATUS.paymentRequired) &&
+      routesMatchRequired(metrics, requiredRoute);
     const result = {
       requestId: request.requestId,
       case: testCase.name,
-      outcome: 'confirmed',
+      outcome: routeAccepted
+        ? CALL_OUTCOMES.CONFIRMED
+        : CALL_OUTCOMES.ROUTE_DISCREPANCY,
       channelId: authorization.channelId,
       ceilingAtomic: ceiling,
       ...proof,
@@ -204,25 +233,27 @@ async function run() {
       ...(await priorCalls()),
       result,
     ]);
-    await saveJson(rolePath(P2P.journalFilename), {
-      state: 'confirmed',
-      requestId: request.requestId,
-      channelId: authorization.channelId,
-      depositSignature: proof.depositSignature,
-      claimSignature: proof.claimSignature,
-    });
     console.log(JSON.stringify(result));
+    if (!routeAccepted) process.exitCode = 1;
   } catch {
     const result = {
       requestId: request.requestId,
       case: testCase.name,
-      outcome: authorization ? 'uncertain' : 'rejected',
+      outcome: confirmedProof
+        ? CALL_OUTCOMES.CONFIRMED_ERROR
+        : authorization
+          ? CALL_OUTCOMES.UNCERTAIN
+          : CALL_OUTCOMES.REJECTED,
       channelId: authorization?.channelId,
       ceilingAtomic: ceiling,
+      before,
+      paymentExpectation,
+      runId: process.env.GYBLOS_P2P_RUN_ID,
+      ...(confirmedProof ?? {}),
     };
-    if (authorization)
+    if (authorization && !confirmedProof)
       await saveJson(rolePath(P2P.journalFilename), {
-        state: 'uncertain',
+        state: JOURNAL_STATES.UNCERTAIN,
         ...result,
       });
     await saveJson(rolePath(P2P.callsFilename), [
