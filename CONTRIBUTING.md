@@ -90,6 +90,29 @@ wallet, Ollama, Docker, Python or devnet funds. `tooling/test-files.json` lists
 every published test entrypoint; the runner rejects missing or unlisted suites.
 Case modules in `tests/support/` are explicitly registered by those entrypoints.
 
+Native transport cases require the pinned native Iroh binding and IPv6 loopback
+`[::1]`. Before registering those cases, the test helpers probe SDK loading and
+an IPv6 loopback socket. Missing bindings or known IPv6 capability errors produce
+an explicit per-case skip reason; unexpected import/socket errors fail the suite.
+Role setup and CLI recovery cases require the binding but do not require IPv6.
+Other financial, lock, limiter and export cases keep running. Report passed,
+failed, cancelled and skipped counts separately; skipped native cases establish
+no transport result on that host.
+
+Native fixtures use relay-disabled loopback endpoints and condition-based waits
+for connection retirement and admission. The egress-expiry case retains unread
+receive handles and stalls only its own loopback UDP return path to create real
+native write backpressure. An owned buyer subprocess is paused with `SIGSTOP`
+before it can recover via IPv6, then resumed and terminated during cleanup.
+That single process-control case explicitly skips outside macOS/Linux. A passthrough observer forwards the original native
+write promise without replacing or delaying it. It advances JavaScript
+`Date.now` across an admission window to fill the binding's send buffer within
+two per-peer quotas; native clocks and ingress/egress timers remain real. Seven
+other incomplete streams keep the remaining slots occupied while expiry closes
+the stalled connection and a healthy peer uses its released slot. This is
+simulated return-path loss with an unread receiver, not proof that non-reading
+alone exhausts this SDK's buffers or a physical-network measurement.
+
 `tests/fixtures/finalized-payment-pair.json` contains selected public metadata
 and parsed financial instructions from a saved finalized deposit/claim pair.
 Transaction signatures and the decoded public channel-creation nonce support
