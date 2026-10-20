@@ -27,7 +27,11 @@ import {
 import { createCases } from '../inference/cases-data.js';
 import { modelTokenizer } from './artifacts.js';
 import { trustedOffer } from './buyer.js';
-import { CALL_OUTCOMES } from './constants.js';
+import {
+  CALL_OUTCOMES,
+  P2P_JOURNAL_STATES,
+  type P2pJournalState,
+} from './constants.js';
 import { paymentProof } from './proof.js';
 import { rolePath, roleSigner } from './roles.js';
 
@@ -54,7 +58,7 @@ async function run() {
   try {
     const previous = JSON.parse(
       await readFile(rolePath(P2P.journalFilename), 'utf8'),
-    ) as { state: string };
+    ) as { state: P2pJournalState };
     if (previous.state !== JOURNAL_STATES.CONFIRMED)
       throw new Error('Reconcile prior authorization before another call.');
   } catch (error) {
@@ -114,7 +118,7 @@ async function run() {
       async authorized(channelId, amount) {
         authorization = { channelId, ceiling: amount };
         await saveJson(rolePath(P2P.journalFilename), {
-          state: 'authorized',
+          state: P2P_JOURNAL_STATES.AUTHORIZED,
           requestId: request.requestId,
           ...authorization,
           paymentExpectation,
@@ -140,10 +144,6 @@ async function run() {
       response.receipt.transaction,
       before,
     );
-    validateSettlement(response.receipt, {
-      payer: buyer.address,
-      amount: proof.chargedAtomic,
-    });
     confirmedProof = proof;
     await saveJson(rolePath(P2P.journalFilename), {
       state: JOURNAL_STATES.CONFIRMED,
@@ -151,6 +151,10 @@ async function run() {
       channelId: authorization.channelId,
       depositSignature: proof.depositSignature,
       claimSignature: proof.claimSignature,
+    });
+    validateSettlement(response.receipt, {
+      payer: buyer.address,
+      amount: proof.chargedAtomic,
     });
     const observation = observeInferenceResponse({
       status: response.status,
