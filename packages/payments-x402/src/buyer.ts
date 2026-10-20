@@ -1,4 +1,4 @@
-import type { KeyPairSigner } from '@solana/kit';
+import { isSignature, type KeyPairSigner, type Signature } from '@solana/kit';
 import type { PaymentRequirements } from '@x402/core/types';
 import {
   decodePaymentResponseHeader,
@@ -10,6 +10,11 @@ import { UptoSvmScheme } from '@x402/svm/upto/client';
 import { TIMEOUTS } from '@gyblos/config';
 import { DEVNET } from '@gyblos/payments-x402/constants';
 import { validateTerms, type TrustPolicy } from '@gyblos/payments-x402/trust';
+
+export interface BuyerResponseObservation {
+  status: number;
+  claimSignature?: Signature;
+}
 
 export interface BuyerResult {
   status: number;
@@ -28,7 +33,13 @@ export function createBuyer(
     channelId: string;
     requirements: PaymentRequirements;
   }) => Promise<void>,
-  hooks: { beforeSigning?: () => void; authorizationError?: string } = {},
+  hooks: {
+    beforeSigning?: () => void;
+    authorizationError?: string;
+    responseObserved?: (
+      observation: BuyerResponseObservation,
+    ) => Promise<void> | void;
+  } = {},
 ) {
   let authorization:
     { channelId: string; requirements: PaymentRequirements } | undefined;
@@ -105,19 +116,40 @@ export function createBuyer(
         const header = response.headers.get('PAYMENT-RESPONSE');
         return header ? decodePaymentResponseHeader(header) : undefined;
       };
-      let settlement = options.measureResponse ? undefined : receipt();
-      const body: unknown = await response.json();
-      const receivedAt = options.measureResponse
-        ? performance.now()
-        : undefined;
-      if (options.measureResponse) settlement = receipt();
-      return {
-        status: response.status,
-        authorization,
-        settlement,
-        body,
-        ...(receivedAt !== undefined ? { receivedAt } : {}),
-      };
+      let settlement: BuyerResult['settlement'];
+      try {
+        settlement = options.measureResponse ? undefined : receipt();
+        const body: unknown = await response.json();
+        const receivedAt = options.measureResponse
+          ? performance.now()
+          : undefined;
+        if (options.measureResponse) settlement = receipt();
+        return {
+          status: response.status,
+          authorization,
+          settlement,
+          body,
+          ...(receivedAt !== undefined ? { receivedAt } : {}),
+        };
+      } finally {
+        if (hooks.responseObserved) {
+          // A receipt is an unverified hint, including when body parsing fails.
+          if (!settlement) {
+            try {
+              settlement = receipt();
+            } catch {
+              // Invalid headers must not erase the original response error.
+            }
+          }
+          const candidate = settlement?.transaction;
+          await hooks.responseObserved({
+            status: response.status,
+            ...(typeof candidate === 'string' && isSignature(candidate)
+              ? { claimSignature: candidate }
+              : {}),
+          });
+        }
+      }
     },
   };
 }
