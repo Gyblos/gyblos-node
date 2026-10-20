@@ -2,6 +2,7 @@ import type { BiStream, Connection, Endpoint } from '@number0/iroh';
 
 import { HTTP_STATUS, P2P } from '@gyblos/config';
 
+import { TRANSPORT_ROUTES } from './constants.js';
 import { withDeadline } from './deadline.js';
 import { createPeerLimiter } from './limiter.js';
 import { loopbackRequest } from './loopback.js';
@@ -68,14 +69,14 @@ export function serveIroh(
             await stream.send.finish();
             return;
           }
-          if (relayOnly && selectedRoute(connection) !== 'iroh-relay')
+          if (relayOnly && selectedRoute(connection) !== TRANSPORT_ROUTES.RELAY)
             throw new Error('Direct paths disabled by seller policy.');
           const response = await loopbackRequest(
             origin,
             request,
             controller.signal,
           );
-          if (relayOnly && selectedRoute(connection) !== 'iroh-relay')
+          if (relayOnly && selectedRoute(connection) !== TRANSPORT_ROUTES.RELAY)
             throw new Error('Unexpected direct path.');
           await stream.send.writeAll([...encodeResponse(response)]);
           await stream.send.finish();
@@ -97,13 +98,14 @@ export function serveIroh(
     connections.add(connection);
     let inFlight = 0;
     let retiring = false;
+    let finished = false;
     let idle: ReturnType<typeof setTimeout> | undefined;
     const closeIfIdle = () => {
       if (inFlight === 0) connection.close(P2P.streamCloseCode, []);
     };
     const armIdle = () => {
       clearTimeout(idle);
-      if (inFlight === 0 && !closed) {
+      if (inFlight === 0 && !closed && !finished) {
         if (retiring) closeIfIdle();
         else idle = setTimeout(closeIfIdle, P2P.connectionIdleMs);
       }
@@ -141,6 +143,7 @@ export function serveIroh(
     } finally {
       clearTimeout(idle);
       clearTimeout(lifetime);
+      finished = true;
       connections.delete(connection);
     }
   }
