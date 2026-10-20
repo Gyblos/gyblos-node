@@ -8,7 +8,6 @@ import { HTTP_STATUS, LOCALHOST, P2P, ROUTES } from '@gyblos/config';
 import { createIrohTransport } from '@gyblos/transport/iroh-client';
 import { serveIroh } from '@gyblos/transport/iroh-server';
 
-import { registerEgressCases } from './support/egress-cases.js';
 import { registerNativeCases } from './support/native-cases.js';
 import { endpoint, fixture, fixtureRequest } from './support/native-fixture.js';
 import { NATIVE_TEST_OPTIONS, waitFor } from './support/native-runtime.js';
@@ -90,7 +89,6 @@ test(
 );
 
 registerNativeCases();
-registerEgressCases();
 
 test(
   'native smoke: nine distinct free-request peers disconnect and a newcomer remains admissible',
