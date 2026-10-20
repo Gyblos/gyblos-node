@@ -184,6 +184,7 @@ export function registerTokenCases() {
     },
     'canonical settlement differs': (f) => {
       f.data.writeBigUInt64LE(0n, 20);
+      f.data.writeBigUInt64LE(0n, 28);
     },
     'seller aliases treasury': (f) => {
       f.expected.payTo = DEVNET_TREASURY_OWNER;
