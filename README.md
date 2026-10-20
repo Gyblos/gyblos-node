@@ -344,6 +344,16 @@ records without these fields do not establish zero surplus. Zero-charge recovery
 still requires zero charge and return of the full principal; export re-fetches
 that proof. Confirmed paid rows retain their existing journal-based scope.
 
+Paid Docker/NAT reports also expose `preInferenceEscrowExcessAtomic`: the
+seller's recorded pre-inference escrow balance minus the original ceiling.
+Export requires a positive ceiling, sufficient escrow, charge plus principal
+refund equal to that ceiling, unchanged seller balance and one trace matching
+the distinct request/channel pair. The original ceiling and balance snapshots
+remain intact. This is a local trace observation with the same journal-based
+scope as the paid rows; it establishes neither a finalized treasury sweep nor
+who funded the excess. Older reports without this field leave the excess
+unrecorded.
+
 A required-route discrepancy or missing telemetry now fails the route check
 while preserving known financial confirmation. Post-exchange telemetry errors
 cannot replace a paid `200` and receipt. Ingress and response delivery each have
