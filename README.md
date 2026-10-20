@@ -7,11 +7,15 @@ fixed-resource checks, local Ollama inference and an experimental native Iroh
 transport between isolated Docker roles and native peers. One earlier Mac–VPS
 run completed three direct paid devnet inferences with a test token; its
 [historical report](evidence/gate-0007.json) does not validate the current head.
-Use the exact commit and final-head smoke status in
+A later attempt at `24af211` completed its first call; the second settled
+on-chain but left the buyer uncertain, so the third was not started. Subsequent
+diagnostic and read-consistency fixes are validated offline, without another
+payment. Use
 [PR #10's validation record](https://github.com/Gyblos/gyblos-payments/pull/10)
-for this candidate. The new physical smoke requires explicit VPS/funds
-authorization and its result must match the final commit. Docker NAT-direct did
-not pass. Hotspot/CGNAT and broader NAT coverage remain untested.
+for the exact candidate, checks and incomplete paid acceptance. Another physical
+smoke needs explicit VPS/funds authorization and must match its final commit.
+Docker NAT-direct did not pass. Hotspot/CGNAT and broader NAT coverage remain
+untested.
 
 > **Status:** experimental, Solana **devnet** only. Not audited. Never use
 > mainnet keys. Part of [Gyblos](https://gyblos.com) ·
@@ -37,6 +41,44 @@ independently recounts inference tokens and detects discrepancies; this does
 **not** prevent a dishonest charge within the signed ceiling. The quickstart
 uses a test token, **not USDC**; the public fixed-price route uses Circle devnet
 USDC.
+
+## Reproduce checks on another host without payments
+
+Create a source package from a committed revision. `git archive` includes only
+tracked files; it does not copy local wallets, journals, logs or installed
+packages. Keep the commit and SHA-256 digest with the private operator record:
+
+```sh
+GYBLOS_REVISION=$(git rev-parse --verify HEAD)
+git archive --format=tar.gz --output="/tmp/gyblos-${GYBLOS_REVISION}.tar.gz" "$GYBLOS_REVISION"
+shasum -a 256 "/tmp/gyblos-${GYBLOS_REVISION}.tar.gz"
+```
+
+Transfer it over authenticated SSH/SCP and compare its SHA-256 digest with the
+local value before extracting into a fresh, empty directory. Install
+dependencies on each host; native Mac packages are not a Linux runtime. From
+that directory:
+
+```sh
+pnpm install --frozen-lockfile --ignore-scripts
+pnpm typecheck
+pnpm lint
+pnpm test
+```
+
+An already populated pnpm store can use `--offline` for installation. These
+checks need no funded wallets, model or payment service. Native Iroh cases
+report explicit capability skips; see [Contributing](CONTRIBUTING.md). Keep role
+state in its original private directory, and preserve an uncertain authorization
+until it is reconciled. This workflow does not start a buyer, seller or
+facilitator.
+
+P2P calls retain a safe failure phase/code, filtered route metrics and bounded
+receipt/deposit signature hints in `observedPayment`. Those hints do not confirm
+a payment. Read-only proof retries tolerate a temporarily missing deposit index;
+post-claim snapshots must reach the known claim slot. A remaining failure blocks
+another authorization. See
+[reconciliation limits](docs/limitations.md#uncertain-outcomes-and-manual-reconciliation).
 
 ## Quickstart: make a fixed-resource payment
 
