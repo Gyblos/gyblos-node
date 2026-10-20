@@ -343,9 +343,11 @@ admissions plus 247 retained reservations across the 256-request budget. New
 unreserved identities are refused until rollover without the attacker holding
 connections; already-reserved identities can still reconnect. Admission earns
 grace before the origin outcome, including free challenges and failed work. The
-original policy required 256 admissions to exhaust that budget. This is bounded
-quota accounting, not a production fairness or Sybil guarantee, and the grace
-regression remains unresolved.
+original policy required 256 admissions to exhaust that budget for this serial
+request-and-disconnect pattern without live connections. Other
+connection-holding attacks already existed. This is bounded quota accounting,
+not a production fairness or Sybil guarantee, and the grace regression remains
+unresolved.
 
 Uncancellable native jobs can still consume their bounded pools. Pending IP
 sources use full addresses, including full IPv6 addresses rather than prefixes;
