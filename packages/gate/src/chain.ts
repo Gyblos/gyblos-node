@@ -90,7 +90,10 @@ export async function inferenceSnapshot(
     addresses: Pick<Config['addresses'], 'buyer' | 'seller'>;
   },
   channelId?: string,
+  minContextSlot?: number,
 ) {
+  if (minContextSlot !== undefined)
+    assert.ok(Number.isSafeInteger(minContextSlot) && minContextSlot >= 0);
   const owners = [
     config.addresses.buyer,
     config.addresses.seller,
@@ -104,9 +107,19 @@ export async function inferenceSnapshot(
     'getMultipleAccounts',
     [
       [...atas, config.addresses.buyer],
-      { encoding: 'jsonParsed', commitment: COMMITMENT },
+      {
+        encoding: 'jsonParsed',
+        commitment: COMMITMENT,
+        ...(minContextSlot !== undefined ? { minContextSlot } : {}),
+      },
     ],
   );
+  if (minContextSlot !== undefined)
+    assert.ok(
+      Number.isSafeInteger(response.context.slot) &&
+        response.context.slot >= minContextSlot,
+      'Account snapshot predates the confirmed claim slot.',
+    );
   const amounts = atas.map((_, index) => {
     const raw = response.value[index];
     if (!raw && index === 2) return '0';
