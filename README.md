@@ -308,10 +308,19 @@ each selected transaction. It reports unrelated sponsor movement between them
 separately, without attributing that movement to fees. Canonical escrow ATA
 creation and closure must account for the sponsor's temporary rent advance and
 its return; this is separate from retained channel rent and network fees. It
-never infers historical balances from current wallets. Supported channels are
-fresh and individually settled, with a retained channel account and an escrow
-ATA created by the sponsor and closed back to it. Unsupported or incomplete data
-requires separate investigation, not an inferred refund. See
+never infers historical token balances from current wallets. Positive net
+lamport credits between the selected transactions or after the claim are
+reported separately and do not invalidate an otherwise consistent proof.
+`retainedChannelRentLamports` is the initial sponsored channel allocation;
+actual deposit/claim/current channel snapshots, claim-time changes and interval
+or later credits have separate fields. `escrowAccountRentLamports` remains the
+initial sponsored ATA allocation. Credits do not identify their sender and are
+not token refunds or network fees. Negative channel movement, missing escrow
+rent, an underfunded initial channel or unexplained transaction-local deltas
+still stop verification. Supported channels are fresh and individually settled,
+with a retained channel account and an escrow ATA created by the sponsor and
+closed back to it. Unsupported or incomplete data requires separate
+investigation, not an inferred refund. See
 [recovery limits](docs/limitations.md#verified-p2p-reconciliation-and-reproducible-audits).
 
 A required-route discrepancy or missing telemetry now fails the route check
@@ -326,19 +335,36 @@ ends, allowing the same authenticated NodeId to reconnect under churn. A
 connection with no admitted work releases its unused reservation. Reconnection
 preserves consumed debt and can use newly available capacity within the same
 peer/global limits. Active, connected and reserved entries are protected from
-LRU eviction; rollover expires inactive grace. This is bounded admission
-fairness, not paid history or Sybil resistance.
+LRU eviction; rollover expires inactive grace.
 
-Uncancellable native jobs can still consume their bounded pools. A shared NAT
-may see temporary handshake rejection; additional sources can saturate pending
-capacity. Relay compatibility of the new admission checks and off-host behavior
-remain untested on the current head. Private regressions cover the corrections,
-including FIFO/process failures and real loopback Iroh reconnection under free
-challenge pressure. Financial tests replay unchanged historical transactions
-with explicitly synthetic current-channel/RPC responses through the real SDK
-verifier. They establish offline acceptance, not a fresh on-chain audit. New
-tests and evidence stay excluded from Git and the public suite. The physical
-paid evidence remains bound to `2c8eeac`; no new paid-network result is implied.
+This policy has a confirmed newcomer-admission vulnerability: nine disposable
+NodeIds can each make one free request and disconnect, leaving nine consumed
+admissions plus 247 retained reservations across the 256-request budget. New
+unreserved identities are refused until rollover without the attacker holding
+connections; already-reserved identities can still reconnect. Admission earns
+grace before the origin outcome, including free challenges and failed work. The
+original policy required 256 admissions to exhaust that budget. This is bounded
+quota accounting, not a production fairness or Sybil guarantee, and the grace
+regression remains unresolved.
+
+Uncancellable native jobs can still consume their bounded pools. Pending IP
+sources use full addresses, including full IPv6 addresses rather than prefixes;
+relay sources use the remote endpoint identity. Free identities or multiple
+addresses can therefore bypass a single actor's effective source budget. A
+shared NAT may see temporary handshake rejection; additional sources can
+saturate pending capacity. Relay compatibility of the new admission checks and
+off-host behavior remain untested on the current head. Private regressions cover
+the corrections, including FIFO/process failures and real loopback Iroh
+reconnection under free challenge pressure. Financial tests replay unchanged
+historical transactions with explicitly synthetic current-channel/RPC responses
+through the real SDK verifier. Positive-credit regressions also exercise
+zero-charge reconciliation and CLI orchestration with mocked role/offer
+boundaries, RPC responses and a wrapper around real temporary-file persistence.
+They establish offline acceptance, not a fresh on-chain audit or a real
+signed-offer recovery run. A native free-request comparison confirms the
+unresolved grace regression against the original limiter. New tests and evidence
+stay excluded from Git and the public suite. The physical paid evidence remains
+bound to `2c8eeac`; no new paid-network result is implied.
 
 ## Pay through a public facilitator
 
