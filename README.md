@@ -276,8 +276,18 @@ pnpm p2p:reconcile --deposit DEPOSIT_SIGNATURE --claim CLAIM_SIGNATURE
 It verifies finalized transaction identities, token/SOL deltas, the canonical
 distributed channel and sponsor fees versus retained channel rent. Proof is
 saved before the matching journal can be confirmed; failed calls remain in
-history. A charged outcome or unavailable/inconsistent proof keeps recovery
+history. If a process stopped before writing a call row, complete original
+identities and the ceiling in its durable journal can supply that metadata.
+Conflicting rows or incomplete journals stop recovery; no delivered call is
+invented. A charged outcome or unavailable/inconsistent proof keeps recovery
 blocked. No signing, funding, submission or payment retry occurs.
+
+The recovery command can reclaim a buyer lock only after checking a private,
+regular, unchanged file and proving its recorded PID is absent. It synchronizes
+a structured stale-owner audit before removing that lock, then acquires the
+normal buyer lock. Live/reused PIDs, corrupt metadata, unsupported owner checks
+and an interrupted recovery lock require operator investigation. The generic
+`upto` gate lock is unchanged. Audit-only mode performs no stale-lock cleanup.
 
 For a charged or zero-charge payment, `--audit-only` emits the verified
 financial proof without changing journal/reconciliation files. Keep the output
@@ -288,19 +298,31 @@ umask 077
 pnpm --silent p2p:reconcile --audit-only --deposit DEPOSIT_SIGNATURE --claim CLAIM_SIGNATURE > .local/p2p/finalized-audit.json
 ```
 
-The proof includes sponsor starting/ending balances, transaction fees and
-retained channel rent; it never infers historical balances from current wallets.
-It supports fresh individually settled channels, retained canonical accounts and
-no intervening sponsor-balance activity. Unsupported or incomplete data requires
-separate investigation, not an inferred refund. See
+The proof includes the sponsor's pre/post balances and fee/rent conservation for
+each selected transaction. It reports unrelated sponsor movement between them
+separately, without attributing that movement to fees. It never infers
+historical balances from current wallets. Fresh individually settled channels
+and retained canonical accounts are supported; unsupported or incomplete data
+requires separate investigation, not an inferred refund. See
 [recovery limits](docs/limitations.md#verified-p2p-reconciliation-and-reproducible-audits).
 
 A required-route discrepancy or missing telemetry now fails the route check
 while preserving known financial confirmation. Post-exchange telemetry errors
-cannot replace a paid `200` and receipt. Ingress, per-peer/global work,
-connection idle/lifetime and late-handshake ownership are bounded; uncancellable
-native jobs can still exhaust pending admission. These corrections have offline
-regression coverage only; the physical paid evidence remains bound to `2c8eeac`.
+cannot replace a paid `200` and receipt. Ingress and response delivery each have
+a five-second limit; origin work has its own permit and deadline. Established
+connections are limited to one per NodeId. Up to eight handshakes are tracked
+separately, with two pending jobs per validated source. Connected peers reserve
+up to 30 requests from the shared 256-request minute budget; disconnecting never
+erases already consumed capacity. This is connection fairness, not proof of
+payment or Sybil resistance.
+
+Uncancellable native jobs can still consume their bounded pools. A shared NAT
+may see temporary handshake rejection; additional sources can saturate pending
+capacity. Relay compatibility of the new admission checks and off-host behavior
+remain untested on the current head. Selected private regressions and native
+loopback tests with simulated payments cover the corrections; these private
+tests are excluded from the public suite. The physical paid evidence remains
+bound to `2c8eeac`; no new paid-network result is implied.
 
 ## Pay through a public facilitator
 
