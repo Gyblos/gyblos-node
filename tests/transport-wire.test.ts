@@ -11,6 +11,9 @@ import {
   encodeResponse,
 } from '@gyblos/transport/wire';
 
+import { registerAdmissionCases } from './support/admission-cases.js';
+import { registerLimiterCases } from './support/limiter-cases.js';
+
 const REQUEST = {
   method: 'POST',
   path: ROUTES.inference,
@@ -108,3 +111,6 @@ test('deadline closes the native connection rather than waiting for a locked str
   );
   assert.equal(closed, true);
 });
+
+registerAdmissionCases();
+registerLimiterCases();
