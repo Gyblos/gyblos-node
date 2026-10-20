@@ -158,10 +158,12 @@ origin outcome, so a free challenge or failed work can earn it. Nine disposable
 NodeIds can each make one free request, disconnect and encumber all 256 shared
 admissions: nine consumed and 247 reserved, with no live attacker connection.
 New unreserved identities are refused until rollover; already-reserved peers can
-still reconnect. The original release policy required 256 admissions to exhaust
-the same budget. A real direct-loopback Iroh comparison reproduces this
-regression; it remains unresolved. This is not paid history, costly identity or
-production fairness. A payment header grants no priority.
+still reconnect. For this serial request-and-disconnect pattern without live
+connections, the original release policy required 256 admissions to exhaust the
+budget. Other connection-holding attacks already existed. A real direct-loopback
+Iroh comparison reproduces this regression; it remains unresolved. This is not
+paid history, costly identity or production fairness. A payment header grants no
+priority.
 
 IP source budgets use full addresses rather than IPv6 prefixes; IPv4-mapped
 aliases are separate keys. Relay source keys use the remote endpoint identity,
