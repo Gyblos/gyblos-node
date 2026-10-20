@@ -35,6 +35,10 @@ export async function paymentProof(
 ) {
   await confirmInference(config, claimSignature);
   const claim = await transaction(config, claimSignature);
+  assert.ok(
+    Number.isSafeInteger(claim.slot) && claim.slot >= 0,
+    'Confirmed claim has an invalid slot.',
+  );
   const buyerAta = await tokenAddress(config.addresses.buyer, config.mint),
     sellerAta = await tokenAddress(config.addresses.seller, config.mint),
     escrowAta = await tokenAddress(channelId, config.mint);
