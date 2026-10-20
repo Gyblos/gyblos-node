@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import { IROH_SDK_VERSION, P2P, X402_SDK_VERSION } from '@gyblos/config';
 import type { Measurement } from '@gyblos/gate/measurements';
 import { saveJson } from '@gyblos/runtime';
+import type { RouteObservation } from '@gyblos/transport';
+import { TRANSPORT_ROUTES } from '@gyblos/transport/constants';
+import { routesMatchRequired } from '@gyblos/transport/route-policy';
 
 import { CALL_OUTCOMES, type CallOutcome } from './constants.js';
 import type { inspectDocker } from './docker-checks.js';
@@ -20,12 +23,7 @@ interface PaidCall extends Awaited<ReturnType<typeof paymentProof>> {
   channelId: string;
   ceilingAtomic: string;
   measurement: Measurement;
-  transport: {
-    transport: string;
-    connectMs: number;
-    directObserved: boolean;
-    relayObserved: boolean;
-  };
+  transport: RouteObservation;
 }
 interface ReconciledAttempt extends ReconciliationSignatures {
   sourceFingerprint?: string;
@@ -40,7 +38,11 @@ interface Trace {
 
 export async function collectDockerCalls(
   context: Awaited<ReturnType<typeof prepareDocker>>,
-  selection: { offset: number; expectedRoute: 'iroh-direct' | 'iroh-relay' },
+  selection: {
+    offset: number;
+    expectedRoute:
+      typeof TRANSPORT_ROUTES.DIRECT | typeof TRANSPORT_ROUTES.RELAY;
+  },
 ) {
   const allCalls = await readContainerJson<PaidCall[]>(
     context.buyerContainer,
@@ -108,7 +110,10 @@ export async function collectDockerCalls(
   assert.equal(confirmedCalls.length, P2P.minimumRequests);
   const cases = confirmedCalls.map((call, index) => {
     assert.equal(call.outcome, CALL_OUTCOMES.CONFIRMED);
-    assert.equal(call.transport.transport, selection.expectedRoute);
+    assert.ok(
+      routesMatchRequired([call.transport], selection.expectedRoute),
+      'Mixed or unexpected routes cannot pass a required-route gate.',
+    );
     const trace = traces.find((trace) => trace.channelId === call.channelId);
     assert.ok(trace);
     assert.equal(trace.during.escrow, call.ceilingAtomic);
@@ -156,7 +161,7 @@ export async function dockerEvidence(
 ) {
   const { cases, previousAttempts } = await collectDockerCalls(context, {
     offset: 0,
-    expectedRoute: 'iroh-direct',
+    expectedRoute: TRANSPORT_ROUTES.DIRECT,
   });
   const evidence = {
     schemaVersion: 1,
