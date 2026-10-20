@@ -18,6 +18,7 @@ import {
 } from './reconciliation.js';
 
 interface PaidCall extends Awaited<ReturnType<typeof paymentProof>> {
+  requestId: string;
   outcome: CallOutcome;
   runId?: string;
   channelId: string;
@@ -32,8 +33,51 @@ interface ReconciledAttempt extends ReconciliationSignatures {
 }
 
 interface Trace {
+  requestId: string;
   channelId: string;
   during: Awaited<ReturnType<typeof paymentProof>>['before'];
+}
+
+function atomicAmount(value: unknown): bigint {
+  assert.ok(typeof value === 'string', 'Atomic amounts must be strings.');
+  assert.match(value, /^(0|[1-9]\d*)$/, 'Invalid atomic amount.');
+  return BigInt(value);
+}
+
+function preInferenceEvidence(call: PaidCall, traces: Trace[]) {
+  assert.ok(typeof call.requestId === 'string' && call.requestId.trim());
+  assert.ok(typeof call.channelId === 'string' && call.channelId.trim());
+  const matchingTraces = traces.filter(
+    (trace) =>
+      trace.channelId === call.channelId || trace.requestId === call.requestId,
+  );
+  assert.equal(
+    matchingTraces.length,
+    1,
+    'A unique matching trace is required.',
+  );
+  const trace = matchingTraces[0]!;
+  assert.equal(trace.channelId, call.channelId);
+  assert.equal(trace.requestId, call.requestId);
+  const ceiling = atomicAmount(call.ceilingAtomic);
+  assert.ok(ceiling > 0n, 'The original ceiling must be positive.');
+  assert.equal(
+    atomicAmount(call.chargedAtomic) + atomicAmount(call.refundAtomic),
+    ceiling,
+    'Principal settlement must equal the original ceiling.',
+  );
+  const observedEscrow = atomicAmount(trace.during.escrow);
+  assert.ok(
+    observedEscrow >= ceiling,
+    'The observed escrow must cover principal.',
+  );
+  atomicAmount(trace.during.seller);
+  atomicAmount(call.before.seller);
+  assert.equal(trace.during.seller, call.before.seller);
+  return {
+    trace,
+    preInferenceEscrowExcessAtomic: (observedEscrow - ceiling).toString(),
+  };
 }
 
 export async function collectDockerCalls(
@@ -109,16 +153,26 @@ export async function collectDockerCalls(
     (call) => call.outcome === CALL_OUTCOMES.CONFIRMED,
   );
   assert.equal(confirmedCalls.length, P2P.minimumRequests);
+  assert.equal(
+    new Set(confirmedCalls.map((call) => call.channelId)).size,
+    confirmedCalls.length,
+    'Confirmed calls must use distinct channels.',
+  );
+  assert.equal(
+    new Set(confirmedCalls.map((call) => call.requestId)).size,
+    confirmedCalls.length,
+    'Confirmed calls must use distinct requests.',
+  );
   const cases = confirmedCalls.map((call, index) => {
     assert.equal(call.outcome, CALL_OUTCOMES.CONFIRMED);
     assert.ok(
       routesMatchRequired([call.transport], selection.expectedRoute),
       'Mixed or unexpected routes cannot pass a required-route gate.',
     );
-    const trace = traces.find((trace) => trace.channelId === call.channelId);
-    assert.ok(trace);
-    assert.equal(trace.during.escrow, call.ceilingAtomic);
-    assert.equal(trace.during.seller, call.before.seller);
+    const { trace, preInferenceEscrowExcessAtomic } = preInferenceEvidence(
+      call,
+      traces,
+    );
     return {
       case: index + 1,
       outcome: call.outcome,
@@ -128,6 +182,7 @@ export async function collectDockerCalls(
       relayObserved: call.transport.relayObserved,
       channelId: call.channelId,
       ceilingAtomic: call.ceilingAtomic,
+      preInferenceEscrowExcessAtomic,
       chargedAtomic: call.chargedAtomic,
       refundAtomic: call.refundAtomic,
       depositSignature: call.depositSignature,
