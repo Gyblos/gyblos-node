@@ -16,12 +16,14 @@ import {
   FINALIZED_COMMITMENT,
 } from '@gyblos/config';
 import { tokenAddress } from '@gyblos/gate/chain';
+import type { FinancialGuardMessage } from '@gyblos/gate/constants';
 import type { EscrowTokenTransaction } from '@gyblos/gate/escrow-tokens';
 import {
   finalizedPaymentProof,
   type FinalizedPaymentExpectation,
 } from '@gyblos/gate/finalized-proof';
 import type { ChainInstruction } from '@gyblos/gate/types';
+import type { FinalizedChannelGuardMessage } from '@gyblos/payments-x402/constants';
 
 export interface PaymentTransaction extends EscrowTokenTransaction {
   meta: EscrowTokenTransaction['meta'] & {
@@ -238,4 +240,21 @@ export function verifyPayment(fixture: PaymentFixture) {
   return withOfflineProof(fixture, () =>
     finalizedPaymentProof(fixture.expected),
   );
+}
+
+export function guardFailure(
+  message: FinancialGuardMessage | FinalizedChannelGuardMessage,
+) {
+  return (error: unknown) => {
+    assert.ok(
+      error instanceof assert.AssertionError,
+      'Expected a financial guard AssertionError.',
+    );
+    assert.equal(
+      error.message.split('\n')[0],
+      message,
+      'A different guard rejected the fault.',
+    );
+    return true;
+  };
 }
