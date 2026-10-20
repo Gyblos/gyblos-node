@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { paymentProof } from '@gyblos/cli/p2p/proof';
+import {
+  paymentProof,
+  type PaymentProofObservation,
+} from '@gyblos/cli/p2p/proof';
 import { COMMITMENT, RETRIES, TOKEN_PROGRAM_ADDRESS } from '@gyblos/config';
 import { GateError } from '@gyblos/payments-x402/chain';
 import { GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
@@ -17,7 +20,9 @@ interface ReadFaults {
   wrongCeiling?: boolean;
 }
 interface ReadProbe {
-  run: () => ReturnType<typeof paymentProof>;
+  run: (
+    observed?: Parameters<typeof paymentProof>[5],
+  ) => ReturnType<typeof paymentProof>;
   histories: () => number;
   methods: string[];
 }
@@ -105,7 +110,7 @@ async function withProofReads(
   }) as typeof fetch;
   try {
     await verify({
-      run: () =>
+      run: (observed) =>
         paymentProof(
           {
             rpcUrl: expected.rpcUrl,
@@ -118,6 +123,7 @@ async function withProofReads(
             : expected.ceiling,
           expected.claimSignature,
           before,
+          observed,
         ),
       histories: () => histories,
       methods,
@@ -145,6 +151,24 @@ export function registerProofReadCases() {
     await withProofReads({ staleSnapshot: true }, async ({ run }) => {
       await assert.rejects(run, /snapshot.*claim slot/i);
     });
+  });
+  test('deposit discovery is observable before a later snapshot guard rejects the proof', async () => {
+    const { expected } = await paymentFixture();
+    const observed: PaymentProofObservation[] = [];
+    await withProofReads({ staleSnapshot: true }, async ({ run }) => {
+      await assert.rejects(
+        run((value) => {
+          observed.push(value);
+        }),
+        /snapshot.*claim slot/i,
+      );
+    });
+    assert.deepEqual(observed, [
+      {
+        depositSignature: expected.depositSignature,
+        claimSignature: expected.claimSignature,
+      },
+    ]);
   });
   test('missing deposit visibility stops at the configured read budget', async () => {
     await withProofReads({ missingIndex: true }, async ({ run, histories }) => {
