@@ -1,9 +1,29 @@
-import { mkdir, open, unlink } from 'node:fs/promises';
+import { lstat, mkdir, open, unlink, type FileHandle } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
 import { FILE_MODES } from '@gyblos/config';
 import { GateError } from '@gyblos/payments-x402/chain';
 import { GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
+
+import { currentLockOwner } from './lock-owner.js';
+
+async function removeOwnedLock(path: string, handle: FileHandle) {
+  const owned = await handle.stat({ bigint: true });
+  const current = await lstat(path, { bigint: true }).catch(
+    (error: NodeJS.ErrnoException) => {
+      if (error.code === 'ENOENT') return undefined;
+      throw error;
+    },
+  );
+  if (
+    current?.isFile() &&
+    current.dev === owned.dev &&
+    current.ino === owned.ino
+  )
+    await unlink(path).catch((error: NodeJS.ErrnoException) => {
+      if (error.code !== 'ENOENT') throw error;
+    });
+}
 
 export async function withExclusiveLock<T>(
   path: string,
@@ -23,14 +43,29 @@ export async function withExclusiveLock<T>(
       throw error;
     },
   );
+  let operationFailed = false;
   try {
     await handle.writeFile(
-      JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }),
+      JSON.stringify({
+        pid: process.pid,
+        startedAt: new Date().toISOString(),
+        owner: await currentLockOwner(),
+      }),
     );
     await handle.sync();
     return await operation();
+  } catch (error) {
+    operationFailed = true;
+    throw error;
   } finally {
-    await handle.close();
-    await unlink(path);
+    try {
+      await removeOwnedLock(path, handle);
+    } catch (error) {
+      if (!operationFailed) throw error;
+    } finally {
+      await handle.close().catch((error) => {
+        if (!operationFailed) throw error;
+      });
+    }
   }
 }
