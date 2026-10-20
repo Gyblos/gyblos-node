@@ -153,9 +153,20 @@ connections release unused quota. Reconnection retains consumed debt and may
 refill a partial allowance only from available shared capacity. Active,
 connected and reserved entries cannot be evicted by LRU; rollover expires
 inactive grace and refreshes connected reservations. Inactive unreserved
-eviction can reset per-peer history. A free request can qualify for this grace;
-it is not paid history, costly identity or Sybil resistance. A payment header
-grants no priority.
+eviction can reset per-peer history. A request qualifies for grace before the
+origin outcome, so a free challenge or failed work can earn it. Nine disposable
+NodeIds can each make one free request, disconnect and encumber all 256 shared
+admissions: nine consumed and 247 reserved, with no live attacker connection.
+New unreserved identities are refused until rollover; already-reserved peers can
+still reconnect. The original release policy required 256 admissions to exhaust
+the same budget. A real direct-loopback Iroh comparison reproduces this
+regression; it remains unresolved. This is not paid history, costly identity or
+production fairness. A payment header grants no priority.
+
+IP source budgets use full addresses rather than IPv6 prefixes; IPv4-mapped
+aliases are separate keys. Relay source keys use the remote endpoint identity,
+which is inexpensive to replace. Those keys do not bound an actor controlling
+multiple addresses or identities.
 
 Application-idle connections expire after 30 seconds. A 15-minute lifetime
 retires a connection after active work drains. Expired handshakes preserve the
@@ -233,11 +244,23 @@ and rent conservation is checked independently inside each transaction,
 including the canonical escrow ATA's temporary rent advance and return. Its
 creation must be sponsor funded with the token program's account owner/size;
 closure must be authorized by the channel and return rent to that sponsor. Fresh
-creation, safe balances, continuity and complete closure are required. This
-temporary ATA rent is separate from retained channel rent and network fees.
-Explicit sponsor/escrow snapshots distinguish transaction deltas from unrelated
-sponsor interval movement; that movement is not labeled as fees. Later wallet
-balances are not historical proof.
+creation, safe balances and complete closure are required. Escrow/channel
+credits between the selected transactions and later channel credits do not
+invalidate an otherwise consistent proof. Every selected transaction must still
+conserve its exact sponsor/channel/escrow deltas against its fee. Negative
+interval changes, a claim-time channel withdrawal, later channel depletion or an
+initial channel allocation below the checked minimum fail closed; positive
+credits cannot compensate for these failures or changed token settlement.
+
+`retainedChannelRentLamports` records the initial sponsored channel allocation;
+actual channel deposit/claim/current snapshots and nonnegative observed changes
+are separate fields. `escrowAccountRentLamports` remains the initial sponsored
+ATA allocation, with its interval credit reported separately. Credits are net
+observations, not proof of donor identity or of every intervening operation;
+they are neither network fees nor unused-token refunds. Explicit sponsor
+snapshots likewise separate transaction deltas from unrelated interval activity.
+Current wallets never supply historical token balances. Prefunding, token dust
+and arbitrary additional transaction shapes are outside this correction.
 
 This verifier is deliberately limited to fresh, individually settled channels
 with retained canonical accounts. Closed/missing channels, nonfinalized data,
@@ -255,7 +278,13 @@ and malformed frames, a lost simulated receipt, multiple identities behind one
 source address and same-NodeId reconnection after verified free-challenge
 pressure. Financial regressions replay unchanged historical transactions with
 explicitly synthetic current-channel and RPC responses through the real SDK
-verifier; a synthetic full-refund variant retains the escrow rent lifecycle.
+verifier; synthetic full-refund variants retain the escrow rent lifecycle.
+Positive-credit cases also exercise the actual zero-charge reconciliation
+function and CLI main workflow with mocked role/offer boundaries and RPC, plus a
+wrapper forwarding persistence to real temporary JSON files. They verify proof
+persistence before journal confirmation, charged/depleted proof refusal and
+failure to persist proof leaving the journal unresolved. They do not exercise
+the spawned CLI's outer catch, real offer verification or chain submission.
 Ownership tests include the actual macOS domain and mocked Linux/macOS probes.
 These checks are not a fresh chain audit, public relay test, on-chain replay
 proof or exactly-once settlement proof. All new test/evidence artifacts remain
