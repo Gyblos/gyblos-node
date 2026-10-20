@@ -11,10 +11,22 @@ import {
   exchange,
   fixture,
   fixtureRequest,
+  NativeTestDeadlineError,
   within,
 } from './native-fixture.js';
 
 const TIMEOUT = 20_000;
+
+async function rejectsBeforeDeadline(operation: Promise<unknown>) {
+  await assert.rejects(within(operation), (error: unknown) => {
+    assert.ok(error instanceof Error);
+    assert.ok(
+      !(error instanceof NativeTestDeadlineError),
+      'The peer must reject the request before the fixture deadline.',
+    );
+    return true;
+  });
+}
 
 export function registerNativeCases() {
   test(
@@ -89,7 +101,9 @@ export function registerNativeCases() {
         ];
         for (const frame of malformed) {
           const client = await lab.client();
-          await assert.rejects(within(exchange(client.connection, frame, 5)));
+          await rejectsBeforeDeadline(exchange(client.connection, frame, 5));
+          await within(client.connection.closed());
+          assert.notEqual(client.connection.closeReason(), null);
         }
         assert.deepEqual(lab.accepted, ['fragmented']);
         assert.equal(
@@ -103,27 +117,26 @@ export function registerNativeCases() {
   );
 
   test(
-    'native priority3: lost simulated receipt poisons transport; explicit reconnect duplicate does not execute again',
+    'native priority3: remote receipt loss poisons the live buyer; a new transport does not execute the duplicate',
     { timeout: TIMEOUT },
     async () => {
-      const lab = await fixture();
+      const lab = await fixture({ dropPaidResponse: true });
       try {
         const client = await lab.transport();
-        const request = fixtureRequest('hold-after-simulated-settlement');
+        const request = fixtureRequest('remote-simulated-receipt-loss');
         request.headers['payment-signature'] =
           'synthetic-authorization-not-a-signature';
-        const pending = client.exchange(request);
-        const rejected = assert.rejects(pending);
+        await rejectsBeforeDeadline(client.exchange(request));
         await within(lab.paidReached);
-        await client.close();
-        lab.releaseResponse();
-        await rejected;
         const before = lab.accepted.length;
-        await assert.rejects(client.exchange(request));
+        await assert.rejects(
+          within(client.exchange(request)),
+          /Transport is uncertain; reconcile before reconnecting/,
+        );
         assert.equal(
           lab.accepted.length,
           before,
-          'No automatic reconnect or new request',
+          'An uncertain live transport must refuse an explicit subsequent exchange',
         );
         assert.equal(lab.executions, 1);
         const reconnected = await lab.transport();
