@@ -205,11 +205,10 @@ export async function finalizedPaymentProof(
   }
   const sponsorBefore = lamports(deposit, expected.feePayer, false);
   const sponsorAfter = lamports(claim, expected.feePayer, true);
-  assert.equal(
-    lamports(deposit, expected.feePayer, true),
-    lamports(claim, expected.feePayer, false),
-    'Intervening sponsor activity requires separate reconciliation.',
-  );
+  const sponsorDepositAfter = lamports(deposit, expected.feePayer, true);
+  const sponsorClaimBefore = lamports(claim, expected.feePayer, false);
+  const depositSponsorDelta = sponsorDepositAfter - sponsorBefore;
+  const claimSponsorDelta = sponsorAfter - sponsorClaimBefore;
   assert.equal(lamports(deposit, expected.channelId, false), 0n);
   const retainedRent = lamports(claim, expected.channelId, true);
   assert.equal(
@@ -218,9 +217,16 @@ export async function finalizedPaymentProof(
   );
   const fees = BigInt(deposit.meta.fee) + BigInt(claim.meta.fee);
   assert.equal(
-    sponsorAfter - sponsorBefore,
-    -fees - retainedRent,
-    'Sponsor delta must equal fees plus retained rent.',
+    depositSponsorDelta + lamports(deposit, expected.channelId, true),
+    -BigInt(deposit.meta.fee),
+    'Deposit sponsor delta must equal its fee plus channel rent.',
+  );
+  assert.equal(
+    claimSponsorDelta +
+      retainedRent -
+      lamports(claim, expected.channelId, false),
+    -BigInt(claim.meta.fee),
+    'Claim sponsor delta must equal its fee plus channel rent change.',
   );
   const channel = await verifyFinalizedChannel({
     ...expected,
@@ -242,6 +248,18 @@ export async function finalizedPaymentProof(
     },
     sponsorBeforeLamports: sponsorBefore.toString(),
     sponsorAfterLamports: sponsorAfter.toString(),
+    sponsorDepositBeforeLamports: sponsorBefore.toString(),
+    sponsorDepositAfterLamports: sponsorDepositAfter.toString(),
+    sponsorClaimBeforeLamports: sponsorClaimBefore.toString(),
+    sponsorClaimAfterLamports: sponsorAfter.toString(),
+    sponsorDepositDeltaLamports: depositSponsorDelta.toString(),
+    sponsorClaimDeltaLamports: claimSponsorDelta.toString(),
+    sponsorTransactionDeltaLamports: (
+      depositSponsorDelta + claimSponsorDelta
+    ).toString(),
+    sponsorInterveningDeltaLamports: (
+      sponsorClaimBefore - sponsorDepositAfter
+    ).toString(),
     sponsorFeesLamports: fees.toString(),
     retainedChannelRentLamports: retainedRent.toString(),
     minimumChannelRentLamports: channel.minimumRentLamports,
