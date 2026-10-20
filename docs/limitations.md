@@ -2,9 +2,11 @@
 
 This repository is an experimental TypeScript x402 payment foundation for
 Gyblos. It exercises Solana devnet fixed resources and a local Ollama inference
-gate, plus a separate experimental native Iroh Docker PoC. Home-router NAT and
-real separate-network connectivity remain untested. Use isolated generated
-devnet wallets only. Never import mainnet keys.
+gate, plus an experimental native Iroh PoC. One native Wi-Fi Mac–VPS direct
+trial completed three paid devnet requests at source `2c8eeac`, using a test SPL
+mint, not USDC. Broader NAT/hotspot/CGNAT coverage and subsequent-head physical
+validation remain pending. Use isolated generated devnet wallets only. Never
+import mainnet keys.
 
 ## Payment scope
 
@@ -67,8 +69,9 @@ change. This does not remove the need for devnet SOL for provisioning.
 
 Use the recorded public transaction signatures, authorization metadata and
 on-chain balances to establish the outcome before another authorization. There
-is no general automatic recovery command or guarantee that an interrupted run
-has returned funds.
+is no general automatic recovery or guarantee that an interrupted run has
+returned funds. The P2P zero-charge recovery command below covers one explicitly
+verified case; charged-but-undelivered outcomes still require separate recovery.
 
 ## Inference and verification limits
 
@@ -122,14 +125,87 @@ transactions as zero charged and a complete unused-deposit return. An HTTP error
 alone never establishes that result. Preserve failed attempts and their original
 image/source identity when rebuilding; do not delete journals to rerun a case.
 
-Native routes are sampled observations. Direct connections reveal peer IPs. The
-relay-only seller option has local rejection tests but no off-host privacy
-proof. NAT-direct, UDP-blocked relay fallback and real-network success rates
-remain pending. A handshake timeout closes the entire endpoint because the
-binding exposes no individual handshake-cancellation handle.
+Native routes are sampled observations. Direct connections reveal peer IPs.
+`GYBLOS_RELAY_ONLY` configures the seller only. The buyer still uses a default
+endpoint and has no enforced relay-only privacy mode: asking for a relay route
+or omitting seller direct candidates does not prevent buyer IP disclosure.
+Off-host relay-only privacy remains untested. Docker NAT-direct readiness did
+not pass; a separate inbound-UDP-blocked relay session did complete paid calls.
+An in-session direct-to-relay transition and broader success rates are unproven.
+The later native Mac–VPS result does not explain the original Docker return
+path.
 
-`evidence/gate-0006.json` is the explicitly authorized redacted Docker report.
-It contains public settlement metadata and synthetic-case measurements, not
+Request ingress has a separate five-second deadline and bounded concurrency;
+inference permits are acquired after decoding. Execution allows one active
+request per NodeId and two globally. The bounded peer table evicts inactive LRU
+entries; its per-peer rate history can reset after eviction. The independent
+global budget of 256 admitted requests per minute survives that churn, but these
+limits are not Sybil resistance or a production DoS guarantee.
+
+Application-idle connections expire after 30 seconds. A 15-minute lifetime
+retires a connection after active work drains, rather than interrupting that
+work. Expired handshakes preserve the seller endpoint and close late results.
+Because the binding cannot cancel an individual native handshake, its pending
+reservation stays occupied until native completion. Permanently stuck native
+jobs can still exhaust connection admission capacity; the application bounds the
+jobs but cannot guarantee their native cancellation.
+
+Required-route mismatches are blocked before opening/writing a request when
+observed. Later sampled wrong/mixed routes, or unavailable telemetry, produce a
+`route-discrepancy` result while retaining independently confirmed financial
+state. Route checks cannot prove every packet used the requested path. A proved
+charge with an invalid receipt or later processing failure remains a
+`confirmed-payment-error`, not an inferred refund or an automatic retry.
+Post-exchange metrics are best effort and cannot replace a delivered
+`200`/receipt.
+
+The trace's pre-inference timestamp labels a local hook after deposit admission;
+it is not independent engine-start timing. Generation-order evidence combines
+canonical deposit validation, full-escrow observation and the awaited code path.
+It does not authenticate remote model/content correctness.
+
+The explicitly authorized redacted reports are `evidence/gate-0006.json` for
+Docker/diagnostics and `evidence/gate-0007.json` for physical-network attempts.
+They contain public settlement metadata and synthetic-case measurements, not
 keys, salts, content, signed payment payloads, RPC URLs or endpoint addresses.
 Raw measurements and reconciliation records remain private. See the
 [Docker command](../README.md#experimental-iroh-docker-trial) for prerequisites.
+
+## Verified P2P reconciliation and reproducible audits
+
+`pnpm p2p:reconcile --deposit DEPOSIT_SIGNATURE --claim CLAIM_SIGNATURE`
+verifies finalized transactions and the canonical distributed channel before
+saving a zero-charge/full-return record and then confirming the matching local
+buyer journal. The buyer lock, original call, role/trust metadata and original
+owner-signed offer must be preserved. An expired signed offer may supply
+historical identities for this read-only chain workflow; it never authorizes a
+new payment. Changed identities or missing original metadata stop recovery. The
+failed call remains in history. Proof/record failures leave the journal
+unresolved; record persistence precedes the journal transition. Charged outcomes
+are rejected by this zero-charge command.
+
+Add `--audit-only` to verify either a charged or zero-charge payment without
+changing the journal/reconciliation files. Only the local buyer lock is
+acquired. Both modes use RPC reads, with no signer, funding, submission or
+payment retry. Keep output private. The verifier checks finalized statuses,
+transaction errors, transfer identities and exact token/SOL deltas, canonical
+channel owner/layout/ PDA/settlement, and sponsor fees separately from retained
+channel rent. It emits explicit sponsor pre/post balances and verifies their
+difference against fees plus rent. It does not use later wallet balances as
+historical proof.
+
+This verifier is deliberately limited to fresh, individually settled channels
+with retained canonical accounts and no intervening sponsor-balance movement.
+Closed/missing channels, nonfinalized data, unexplained deltas or unsupported
+shapes stop verification and require separate investigation. It does not recover
+rent or establish an automatic crash-recovery guarantee. Evidence export
+re-fetches financial proof and binds its ceiling to the original call; it does
+not trust handwritten balances. Source/image provenance is separate from chain
+truth and is explicitly unverified when supplied by an operator.
+
+These corrections were validated offline only; the original physical evidence
+still belongs to `2c8eeac`. No later-head paid run is implied. Broader lab
+reorganization, typechecking of all diagnostic JavaScript and alternate-engine
+rollout remain follow-up work. Measurement code can now accept the explicit
+allowlisted offer model identity, while existing fixed-engine gates retain their
+pinned default; this does not validate another engine end to end.
