@@ -19,12 +19,19 @@ export interface PaymentAccounts {
   addresses: { buyer: string; seller: string };
 }
 
+// Progress is an unverified hint until the full financial proof completes.
+export interface PaymentProofObservation {
+  depositSignature: string;
+  claimSignature: string;
+}
+
 export async function paymentProof(
   config: PaymentAccounts,
   channelId: string,
   ceiling: string,
   claimSignature: string,
   before: Awaited<ReturnType<typeof inferenceSnapshot>>,
+  observed?: (value: PaymentProofObservation) => Promise<void> | void,
 ) {
   await confirmInference(config, claimSignature);
   const claim = await transaction(config, claimSignature);
@@ -82,6 +89,7 @@ export async function paymentProof(
       GATE_ERROR_CODES.TRANSACTION_UNKNOWN,
       'Confirmed deposit is not yet visible; reconcile before another authorization.',
     );
+  await observed?.({ depositSignature: deposit.signature, claimSignature });
   const after = await inferenceSnapshot(config, channelId, claim.slot);
   assert.equal(BigInt(before.buyer) - BigInt(after.buyer), charged);
   assert.equal(BigInt(after.seller) - BigInt(before.seller), charged);
