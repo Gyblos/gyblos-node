@@ -258,8 +258,49 @@ with the same configured subnet. No ports are published to the host.
 Direct peers can see each other's IP addresses. `GYBLOS_RELAY_ONLY=1` restricts
 seller binds and advertised candidates and rejects an observed direct path; its
 off-host privacy behavior still needs empirical validation. Route labels are
-sampled native observations, not a guarantee about every packet. This PoC does
-not verify model authenticity or response correctness.
+sampled native observations, not a guarantee about every packet. This setting
+configures the seller only: the buyer has no enforced relay-only privacy mode.
+Requiring a relay route does not hide buyer addressing. This PoC does not verify
+model authenticity or response correctness.
+
+### Verify P2P settlement or reconcile zero charge
+
+Preserve the original role, trust, signed offer, journal and call history. The
+following command only reads the chain and changes local recovery files after
+proving zero charged and complete unused-deposit return:
+
+```sh
+pnpm p2p:reconcile --deposit DEPOSIT_SIGNATURE --claim CLAIM_SIGNATURE
+```
+
+It verifies finalized transaction identities, token/SOL deltas, the canonical
+distributed channel and sponsor fees versus retained channel rent. Proof is
+saved before the matching journal can be confirmed; failed calls remain in
+history. A charged outcome or unavailable/inconsistent proof keeps recovery
+blocked. No signing, funding, submission or payment retry occurs.
+
+For a charged or zero-charge payment, `--audit-only` emits the verified
+financial proof without changing journal/reconciliation files. Keep the output
+private:
+
+```sh
+umask 077
+pnpm --silent p2p:reconcile --audit-only --deposit DEPOSIT_SIGNATURE --claim CLAIM_SIGNATURE > .local/p2p/finalized-audit.json
+```
+
+The proof includes sponsor starting/ending balances, transaction fees and
+retained channel rent; it never infers historical balances from current wallets.
+It supports fresh individually settled channels, retained canonical accounts and
+no intervening sponsor-balance activity. Unsupported or incomplete data requires
+separate investigation, not an inferred refund. See
+[recovery limits](docs/limitations.md#verified-p2p-reconciliation-and-reproducible-audits).
+
+A required-route discrepancy or missing telemetry now fails the route check
+while preserving known financial confirmation. Post-exchange telemetry errors
+cannot replace a paid `200` and receipt. Ingress, per-peer/global work,
+connection idle/lifetime and late-handshake ownership are bounded; uncancellable
+native jobs can still exhaust pending admission. These corrections have offline
+regression coverage only; the physical paid evidence remains bound to `2c8eeac`.
 
 ## Pay through a public facilitator
 
@@ -366,4 +407,4 @@ Ollama, Python or devnet payments. External RPC responses are mocked; local HTTP
 and native loopback QUIC exercise middleware and transport boundaries. Public,
 hash-checked template fixtures preserve independent renderer regression
 coverage. Raw evidence and measurements stay local. Only the explicitly redacted
-Docker report is eligible for publication.
+Docker and real-network reports are eligible for publication.
