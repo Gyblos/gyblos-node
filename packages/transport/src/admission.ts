@@ -9,14 +9,14 @@ export function connectionSource(source: IncomingAddr): string | undefined {
     return `relay:${source.endpointId.toLowerCase()}`;
   if (source.kind !== 'ip' || !source.addr) return undefined;
   try {
-    const address = new URL(`http://${source.addr}`);
+    const address = new URL(`udp://${source.addr}`);
     const host = address.hostname.replace(/^\[|\]$/g, '');
     if (
       !isIP(host) ||
       !address.port ||
       address.username ||
       address.password ||
-      address.pathname !== '/' ||
+      address.pathname !== '' ||
       address.search ||
       address.hash
     )
