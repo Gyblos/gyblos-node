@@ -317,38 +317,54 @@ checks. This is local evidence consistency, without an independent finalized
 proof of the paid journal rows. Observed pre-inference excess can differ from
 the later finalized interval credit or treasury sweep; its donor and eventual
 disposition are not established by the trace. Missing fields in older reports
-mean unrecorded. Private offline collector tests use synthetic paid rows/traces
-and a separate raw-derived zero-charge proof with mocked RPC/container reads; no
-fresh paid dust transaction or physical-network result is claimed.
+mean unrecorded. Public offline collector tests use synthetic paid rows/traces
+and a separate raw-derived zero-charge proof with mocked RPC/container process
+creation. No fresh paid dust transaction or physical-network result is claimed.
 
-The current corrections were validated with private offline regressions,
-controlled process/filesystem failures and real direct-loopback Iroh using
-simulated payments. The native cases cover resets and half-closes, fragmented
-and malformed frames, a lost simulated receipt, multiple identities behind one
-source address, same-NodeId reconnection while shared capacity remains,
-connected quota under free-challenge pressure and refusal after 256 actual
-admissions. Offline limiter controls cover per-identity debt through LRU churn,
-rollover with active work, duplicate release and partial grants. An explicitly
-synthetic two-row table exercises soft-grace eviction; production still uses 128
-rows. Financial regressions replay unchanged historical transactions with
-explicitly synthetic current-channel and RPC responses through the real SDK
-verifier; synthetic full-refund variants retain the escrow rent lifecycle.
-Positive-credit cases also exercise the actual zero-charge reconciliation
-function and CLI main workflow with mocked role/offer boundaries and RPC, plus a
-wrapper forwarding persistence to real temporary JSON files. Token-surplus
-variants preserve principal and route the modeled surplus to the canonical
-treasury before closure; those modified transaction models are unsigned and were
-not executed on-chain. The source of the deployed binary was not verified. They
-verify proof persistence before journal confirmation, surplus fields surviving
-persistence and re-fetched export, charged/depleted proof refusal and failure to
-persist proof leaving the journal unresolved. They do not exercise the spawned
-CLI's outer catch, real offer verification or chain submission. Ownership tests
-include the actual macOS domain and mocked Linux/macOS probes. These checks are
-not a fresh chain audit, public relay test, on-chain replay proof or
-exactly-once settlement proof. All new test/evidence artifacts remain outside
-Git. The original physical payment evidence still belongs to `2c8eeac`. No
-later-head paid run is implied. Broader lab reorganization, typechecking of all
-diagnostic JavaScript and alternate-engine rollout remain follow-up work.
-Measurement code can now accept the explicit allowlisted offer model identity,
-while existing fixed-engine gates retain their pinned default; this does not
-validate another engine end to end.
+The public suite exercises real direct-loopback Iroh using simulated payments.
+Native cases cover resets and half-closes, fragmented and malformed frames, a
+lost simulated receipt, multiple identities behind one source address,
+same-NodeId reconnection while shared capacity remains, connected quota under
+free-challenge pressure and refusal after 256 actual admissions. Offline limiter
+controls cover per-identity debt through LRU churn, rollover with active work,
+duplicate release and partial grants. The current public suite uses the actual
+production limiter; older private reduced-table diagnostics remain historical.
+
+The public fixture is a minimal projection of one saved finalized deposit/claim
+pair: selected metadata and parsed financial instructions remain unchanged.
+Public transaction signatures, account addresses and decoded creation fields
+allow the actual SDK to derive the original channel PDA. The on-chain creation
+nonce is public and distinct from private measurement salts. Saved finality is
+replayed; the current channel account and RPC responses are explicitly
+synthetic. Full-refund and positive-credit variants are unsigned modified
+observations, retain the escrow rent lifecycle and preserve principal while
+routing modeled token surplus to the canonical treasury before closure. These
+variants were not executed on-chain; deployed-binary/source equivalence was not
+verified.
+
+Recovery cases exercise the actual CLI main workflow, role/trust loading,
+ephemeral unfunded synthetic offer signing/verification, filesystem locks and
+real temporary JSON persistence. RPC is mocked, and persistence-failure cases
+also inject rename errors. Offer verification, locks and normal persistence
+remain actual. They verify proof persistence before journal confirmation,
+preservation of surplus fields, charged/conflicting proof refusal and an
+unresolved journal after a persistence failure. Export cases retain the actual
+container-read parser and collector while stubbing process creation, and
+re-fetch zero-charge proof with the actual verifier/SDK. They do not exercise
+the spawned CLI's outer catch, chain submission, power-loss durability or
+physical signed-offer recovery. Ownership/FIFO checks run only on supported
+platforms and otherwise skip explicitly; owned bounded child probes protect the
+test process from blocking.
+
+These public checks require no private fixtures, funded keys, Docker, inference
+engine or live RPC. They do not establish a fresh chain audit, public relay
+compatibility, on-chain replay or exactly-once settlement. Existing charged or
+missing-claim recovery, ordinary confirmed journal clearance, journal-derived
+paid exports, generic outer diagnostics and broader native/Sybil/source-key/
+relay/privacy limits remain follow-ups. Raw transaction responses, private logs,
+measurements and evidence remain excluded. The original physical payment
+evidence still belongs to `2c8eeac`; no later-head paid run is implied. Broader
+lab reorganization, typechecking of all diagnostic JavaScript and
+alternate-engine rollout remain follow-up work. Measurement code can accept the
+explicit allowlisted offer model identity while existing fixed-engine gates
+retain their pinned default; this does not validate another engine end to end.
