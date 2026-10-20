@@ -85,10 +85,9 @@ export function verifyEscrowRent(
   const afterClaim = transactionLamports(claim, expected.escrowAta, true);
   assert.equal(beforeDeposit, 0n, 'A fresh escrow account is required.');
   assert.ok(afterDeposit > 0n, 'Escrow account rent is required.');
-  assert.equal(
-    beforeClaim,
-    afterDeposit,
-    'Escrow rent changed between transactions.',
+  assert.ok(
+    beforeClaim >= afterDeposit,
+    'Escrow rent decreased between transactions.',
   );
   assert.equal(afterClaim, 0n, 'The escrow account must be closed.');
 
@@ -126,5 +125,11 @@ export function verifyEscrowRent(
   assert.equal(closure.info.owner, expected.channelId);
   assert.equal(closure.info.destination, expected.feePayer);
 
-  return { beforeDeposit, afterDeposit, beforeClaim, afterClaim };
+  return {
+    beforeDeposit,
+    afterDeposit,
+    beforeClaim,
+    afterClaim,
+    interveningCreditLamports: beforeClaim - afterDeposit,
+  };
 }
