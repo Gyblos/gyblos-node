@@ -1,4 +1,5 @@
 import { NAT, P2P } from '@gyblos/config';
+import { TRANSPORT_ROUTES } from '@gyblos/transport/constants';
 
 import { composeArgs, docker } from './docker-command.js';
 
@@ -27,7 +28,9 @@ export function natEnvironment(
       : '',
     GYBLOS_P2P_VOLUME_PREFIX: volumePrefix,
     GYBLOS_P2P_EXPECTED_ROUTE:
-      scenario === 'nat-direct' ? 'iroh-direct' : 'iroh-relay',
+      scenario === 'nat-direct'
+        ? TRANSPORT_ROUTES.DIRECT
+        : TRANSPORT_ROUTES.RELAY,
     GYBLOS_P2P_BLOCK_UDP: scenario === 'nat-relay' ? '1' : '0',
     GYBLOS_P2P_SELLER_IP: NAT.homeA.actor,
     GYBLOS_P2P_BUYER_IP: NAT.homeB.actor,
