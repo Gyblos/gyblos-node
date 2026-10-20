@@ -4,6 +4,7 @@ import { getTokenSize } from '@solana-program/token';
 
 import { SYSTEM_PROGRAM_ADDRESS, TOKEN_PROGRAM_ADDRESS } from '@gyblos/config';
 
+import { RENT_GUARDS } from './constants.js';
 import type { ChainTransaction } from './types.js';
 
 export interface RentTransaction extends ChainTransaction {
@@ -62,14 +63,14 @@ export function transactionLamports(
   const index = transaction.transaction.message.accountKeys.findIndex(
     (key) => key.pubkey === account,
   );
-  assert.ok(index >= 0, 'Required transaction account missing.');
+  assert.ok(index >= 0, RENT_GUARDS.ACCOUNT);
   const balances = after
     ? transaction.meta.postBalances
     : transaction.meta.preBalances;
   const value = balances[index];
   assert.ok(
     typeof value === 'number' && Number.isSafeInteger(value) && value >= 0,
-    'Unsafe lamport balance.',
+    RENT_GUARDS.SAFE_LAMPORTS,
   );
   return BigInt(value);
 }
@@ -83,13 +84,10 @@ export function verifyEscrowRent(
   const afterDeposit = transactionLamports(deposit, expected.escrowAta, true);
   const beforeClaim = transactionLamports(claim, expected.escrowAta, false);
   const afterClaim = transactionLamports(claim, expected.escrowAta, true);
-  assert.equal(beforeDeposit, 0n, 'A fresh escrow account is required.');
-  assert.ok(afterDeposit > 0n, 'Escrow account rent is required.');
-  assert.ok(
-    beforeClaim >= afterDeposit,
-    'Escrow rent decreased between transactions.',
-  );
-  assert.equal(afterClaim, 0n, 'The escrow account must be closed.');
+  assert.equal(beforeDeposit, 0n, RENT_GUARDS.FRESH);
+  assert.ok(afterDeposit > 0n, RENT_GUARDS.FUNDED);
+  assert.ok(beforeClaim >= afterDeposit, RENT_GUARDS.NONDECREASING);
+  assert.equal(afterClaim, 0n, RENT_GUARDS.CLOSED);
 
   const creations = accountInstructions(
     deposit,
@@ -97,21 +95,30 @@ export function verifyEscrowRent(
     'newAccount',
     expected.escrowAta,
   );
-  assert.equal(
-    creations.length,
-    1,
-    'One canonical escrow creation is required.',
-  );
+  assert.equal(creations.length, 1, RENT_GUARDS.CREATION_COUNT);
   const creation = creations[0]!;
-  assert.equal(creation.programId, SYSTEM_PROGRAM_ADDRESS);
-  assert.equal(creation.info.source, expected.feePayer);
-  assert.equal(creation.info.owner, TOKEN_PROGRAM_ADDRESS);
-  assert.equal(creation.info.space, getTokenSize());
+  assert.equal(
+    creation.programId,
+    SYSTEM_PROGRAM_ADDRESS,
+    RENT_GUARDS.CREATION_PROGRAM,
+  );
+  assert.equal(
+    creation.info.source,
+    expected.feePayer,
+    RENT_GUARDS.CREATION_PAYER,
+  );
+  assert.equal(
+    creation.info.owner,
+    TOKEN_PROGRAM_ADDRESS,
+    RENT_GUARDS.CREATION_OWNER,
+  );
+  assert.equal(creation.info.space, getTokenSize(), RENT_GUARDS.CREATION_SIZE);
   const amount = creation.info.lamports;
   assert.ok(
     typeof amount === 'number' && Number.isSafeInteger(amount) && amount > 0,
+    RENT_GUARDS.CREATION_SAFE_AMOUNT,
   );
-  assert.equal(BigInt(amount), afterDeposit);
+  assert.equal(BigInt(amount), afterDeposit, RENT_GUARDS.CREATION_AMOUNT);
 
   const closures = accountInstructions(
     claim,
@@ -119,11 +126,23 @@ export function verifyEscrowRent(
     'account',
     expected.escrowAta,
   );
-  assert.equal(closures.length, 1, 'One canonical escrow closure is required.');
+  assert.equal(closures.length, 1, RENT_GUARDS.CLOSURE_COUNT);
   const closure = closures[0]!;
-  assert.equal(closure.programId, TOKEN_PROGRAM_ADDRESS);
-  assert.equal(closure.info.owner, expected.channelId);
-  assert.equal(closure.info.destination, expected.feePayer);
+  assert.equal(
+    closure.programId,
+    TOKEN_PROGRAM_ADDRESS,
+    RENT_GUARDS.CLOSURE_PROGRAM,
+  );
+  assert.equal(
+    closure.info.owner,
+    expected.channelId,
+    RENT_GUARDS.CLOSURE_AUTHORITY,
+  );
+  assert.equal(
+    closure.info.destination,
+    expected.feePayer,
+    RENT_GUARDS.CLOSURE_DESTINATION,
+  );
 
   return {
     beforeDeposit,
