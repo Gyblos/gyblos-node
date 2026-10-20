@@ -14,6 +14,7 @@ import { withExclusiveLock } from '@gyblos/gate/lock';
 import { createInferenceBuyer } from '@gyblos/payments-x402/inference-buyer';
 import { saveJson } from '@gyblos/runtime';
 
+import { registerCallCases } from './support/call-cases.js';
 import { registerExportCases } from './support/export-cases.js';
 import { registerLockCases } from './support/lock-cases.js';
 import { NATIVE_CAPABILITY } from './support/native-runtime.js';
@@ -206,3 +207,5 @@ test('Docker funder preserves uncertain journals and refuses concurrent funding 
 registerLockCases();
 registerRecoveryCases();
 registerExportCases();
+
+registerCallCases();
