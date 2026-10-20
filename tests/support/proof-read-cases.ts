@@ -18,6 +18,7 @@ interface ReadFaults {
   requireContext?: boolean;
   duplicateDeposit?: boolean;
   wrongCeiling?: boolean;
+  claimSlot?: unknown;
 }
 interface ReadProbe {
   run: (
@@ -59,7 +60,11 @@ async function withProofReads(
         ),
       );
       result =
-        params[0] === expected.claimSignature ? source.claim : source.deposit;
+        params[0] === expected.claimSignature
+          ? Object.hasOwn(options, 'claimSlot')
+            ? { ...source.claim, slot: options.claimSlot }
+            : source.claim
+          : source.deposit;
     } else if (method === 'getSignaturesForAddress') {
       assert.equal(params[0], expected.channelId);
       histories++;
@@ -169,6 +174,24 @@ export function registerProofReadCases() {
         claimSignature: expected.claimSignature,
       },
     ]);
+  });
+  test('malformed or missing claim slots stop before history or snapshot reads', async () => {
+    for (const claimSlot of [
+      undefined,
+      null,
+      -1,
+      1.5,
+      Number.MAX_SAFE_INTEGER + 1,
+      '1',
+    ])
+      await withProofReads(
+        { claimSlot },
+        async ({ run, histories, methods }) => {
+          await assert.rejects(run, /claim.*invalid slot/i);
+          assert.equal(histories(), 0);
+          assert.equal(methods.includes('getMultipleAccounts'), false);
+        },
+      );
   });
   test('missing deposit visibility stops at the configured read budget', async () => {
     await withProofReads({ missingIndex: true }, async ({ run, histories }) => {
