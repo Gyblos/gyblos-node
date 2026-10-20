@@ -8,9 +8,7 @@ import { TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
 import { generateKeyPairSigner } from '@solana/kit';
 import { encodePaymentRequiredHeader } from '@x402/core/http';
 
-import { main as paidCall } from '@gyblos/cli/p2p/call';
 import { fundRoles } from '@gyblos/cli/p2p/docker-fund';
-import { rolePath } from '@gyblos/cli/p2p/roles';
 import { DEVNET, DEVNET_USDC, P2P } from '@gyblos/config';
 import { withExclusiveLock } from '@gyblos/gate/lock';
 import { createInferenceBuyer } from '@gyblos/payments-x402/inference-buyer';
@@ -18,6 +16,7 @@ import { saveJson } from '@gyblos/runtime';
 
 import { registerExportCases } from './support/export-cases.js';
 import { registerLockCases } from './support/lock-cases.js';
+import { NATIVE_CAPABILITY } from './support/native-runtime.js';
 import { registerRecoveryCases } from './support/recovery-cases.js';
 
 test('request-specific ceiling rejects altered challenges before any signature or paid request', async () => {
@@ -147,19 +146,25 @@ test('exclusive buyer lock preserves an unresolved authorization against concurr
   }
 });
 
-test('P2P CLI refuses a second process before loading config or making requests', async () => {
-  const original = process.cwd(),
-    directory = await mkdtemp(join(tmpdir(), 'gyblos-p2p-call-lock-'));
-  try {
-    process.chdir(directory);
-    await withExclusiveLock(rolePath(P2P.buyerLockFilename), async () => {
-      await assert.rejects(paidCall(), /holds the gate lock/);
-    });
-  } finally {
-    process.chdir(original);
-    await rm(directory, { recursive: true, force: true });
-  }
-});
+test(
+  'P2P CLI refuses a second process before loading config or making requests',
+  { skip: NATIVE_CAPABILITY.bindingSkip },
+  async () => {
+    const { main: paidCall } = await import('@gyblos/cli/p2p/call');
+    const { rolePath } = await import('@gyblos/cli/p2p/roles');
+    const original = process.cwd(),
+      directory = await mkdtemp(join(tmpdir(), 'gyblos-p2p-call-lock-'));
+    try {
+      process.chdir(directory);
+      await withExclusiveLock(rolePath(P2P.buyerLockFilename), async () => {
+        await assert.rejects(paidCall(), /holds the gate lock/);
+      });
+    } finally {
+      process.chdir(original);
+      await rm(directory, { recursive: true, force: true });
+    }
+  },
+);
 
 test('Docker funder preserves uncertain journals and refuses concurrent funding without RPC', async () => {
   const originalDirectory = process.cwd(),
