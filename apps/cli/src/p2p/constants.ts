@@ -17,7 +17,20 @@ export const P2P_JOURNAL_STATES = {
   UNCERTAIN: JOURNAL_STATES.UNCERTAIN,
 } as const;
 
+export const CALL_PHASES = {
+  REQUEST: 'request',
+  RESPONSE: 'response',
+  PROOF: 'payment-proof',
+  SETTLEMENT: 'settlement-receipt',
+  OBSERVATION: 'inference-observation',
+  MEASUREMENT: 'measurement',
+  METRICS: 'route-metrics',
+  PERSISTENCE: 'call-record',
+} as const;
+
 export type P2pJournalState =
   (typeof P2P_JOURNAL_STATES)[keyof typeof P2P_JOURNAL_STATES];
 
 export type CallOutcome = (typeof CALL_OUTCOMES)[keyof typeof CALL_OUTCOMES];
+
+export type CallPhase = (typeof CALL_PHASES)[keyof typeof CALL_PHASES];
