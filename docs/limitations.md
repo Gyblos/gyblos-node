@@ -308,6 +308,19 @@ and binds their ceiling to the original attempt. Confirmed paid rows still come
 from the call journal. Source/image provenance is separate from chain truth and
 remains explicitly unverified when supplied by an operator.
 
+Paid Docker/NAT export reports `preInferenceEscrowExcessAtomic` separately from
+the original ceiling and raw balance snapshot. It accepts a pre-inference escrow
+observation covering that ceiling, validates canonical nonnegative integer
+strings and a positive ceiling, and retains exact principal charge/refund,
+unchanged seller balance, unique request/channel trace and required-route
+checks. This is local evidence consistency, without an independent finalized
+proof of the paid journal rows. Observed pre-inference excess can differ from
+the later finalized interval credit or treasury sweep; its donor and eventual
+disposition are not established by the trace. Missing fields in older reports
+mean unrecorded. Private offline collector tests use synthetic paid rows/traces
+and a separate raw-derived zero-charge proof with mocked RPC/container reads; no
+fresh paid dust transaction or physical-network result is claimed.
+
 The current corrections were validated with private offline regressions,
 controlled process/filesystem failures and real direct-loopback Iroh using
 simulated payments. The native cases cover resets and half-closes, fragmented
