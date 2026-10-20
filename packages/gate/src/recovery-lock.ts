@@ -6,6 +6,7 @@ import { FILE_MODES, P2P } from '@gyblos/config';
 import { GateError } from '@gyblos/payments-x402/chain';
 import { GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
 
+import { currentLockOwner } from './lock-owner.js';
 import { withExclusiveLock } from './lock.js';
 
 interface RecoveryLockPaths {
@@ -31,7 +32,7 @@ async function privateFile(handle: FileHandle) {
 async function removeDeadBuyerLock(paths: RecoveryLockPaths) {
   const handle = await open(
     paths.buyer,
-    constants.O_RDONLY | constants.O_NOFOLLOW,
+    constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
   ).catch((error: NodeJS.ErrnoException) => {
     if (error.code === 'ENOENT') return undefined;
     throw error;
@@ -53,6 +54,17 @@ async function removeDeadBuyerLock(paths: RecoveryLockPaths) {
     assert.ok(
       typeof startedAt === 'string' && Number.isFinite(Date.parse(startedAt)),
     );
+    const owner = await currentLockOwner();
+    assert.ok(owner, 'Local lock ownership domain is unverifiable.');
+    assert.ok(
+      'owner' in metadata,
+      'Original lock ownership domain is required.',
+    );
+    assert.deepEqual(
+      metadata.owner,
+      owner,
+      'Original lock belongs to another ownership domain.',
+    );
     let absent = false;
     try {
       process.kill(pid, 0);
@@ -70,7 +82,8 @@ async function removeDeadBuyerLock(paths: RecoveryLockPaths) {
       constants.O_WRONLY |
         constants.O_APPEND |
         constants.O_CREAT |
-        constants.O_NOFOLLOW,
+        constants.O_NOFOLLOW |
+        constants.O_NONBLOCK,
       FILE_MODES.privateFile,
     );
     try {
@@ -79,6 +92,7 @@ async function removeDeadBuyerLock(paths: RecoveryLockPaths) {
         JSON.stringify({
           pid,
           startedAt,
+          owner,
           device: info.dev,
           inode: info.ino,
           recordedAt: new Date().toISOString(),
