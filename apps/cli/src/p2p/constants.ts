@@ -11,4 +11,13 @@ export const CALL_OUTCOMES = {
 
 export const RECONCILED_ZERO_CHARGE = 'finalized-zero-charge' as const;
 
+export const P2P_JOURNAL_STATES = {
+  AUTHORIZED: 'authorized',
+  CONFIRMED: JOURNAL_STATES.CONFIRMED,
+  UNCERTAIN: JOURNAL_STATES.UNCERTAIN,
+} as const;
+
+export type P2pJournalState =
+  (typeof P2P_JOURNAL_STATES)[keyof typeof P2P_JOURNAL_STATES];
+
 export type CallOutcome = (typeof CALL_OUTCOMES)[keyof typeof CALL_OUTCOMES];
