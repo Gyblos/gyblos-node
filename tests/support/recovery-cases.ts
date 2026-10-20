@@ -190,7 +190,14 @@ export function registerRecoveryCases() {
                     },
                   ],
             );
+          const journalBefore = await readFile(
+            fixture.path(P2P.journalFilename),
+          );
           await assert.rejects(fixture.run());
+          assert.deepEqual(
+            await readFile(fixture.path(P2P.journalFilename)),
+            journalBefore,
+          );
           assert.equal(fixture.financial.methods.length, 0);
           await assert.rejects(
             stat(fixture.path(P2P.reconciliationsFilename)),
