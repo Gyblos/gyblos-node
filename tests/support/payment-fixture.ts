@@ -205,6 +205,10 @@ export async function withOfflineProof<T>(
           : fixture.source.claim;
     } else if (method === 'getAccountInfo') {
       assert.equal(params[0], fixture.expected.channelId);
+      assert.deepEqual(params[1], {
+        commitment: FINALIZED_COMMITMENT,
+        encoding: 'base64',
+      });
       result = {
         value: fixture.accountMissing
           ? null
@@ -214,9 +218,13 @@ export async function withOfflineProof<T>(
               data: [fixture.data.toString('base64'), 'base64'],
             },
       };
-    } else if (method === 'getMinimumBalanceForRentExemption')
+    } else if (method === 'getMinimumBalanceForRentExemption') {
+      assert.deepEqual(params, [
+        Number(CHANNEL_ACCOUNT_SIZE),
+        { commitment: FINALIZED_COMMITMENT },
+      ]);
       result = fixture.minimum;
-    else throw new Error('Unexpected offline RPC method: ' + method);
+    } else throw new Error('Unexpected offline RPC method: ' + method);
     return Response.json({ jsonrpc: '2.0', id: request.id, result });
   };
   try {
