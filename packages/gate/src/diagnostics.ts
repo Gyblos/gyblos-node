@@ -7,11 +7,13 @@ import { ERROR_DIAGNOSTICS, type ErrorDiagnosticCode } from './constants.js';
 
 export function errorDiagnostic(error: unknown): ErrorDiagnosticCode {
   try {
-    if (
-      error instanceof GateError &&
-      Object.values(GATE_ERROR_CODES).some((code) => code === error.code)
-    )
-      return error.code;
+    if (error instanceof GateError) {
+      const candidate = error.code;
+      const canonical = Object.values(GATE_ERROR_CODES).find(
+        (code) => code === candidate,
+      );
+      if (canonical) return canonical;
+    }
     if (error instanceof AssertionError) return ERROR_DIAGNOSTICS.ASSERTION;
     if (error instanceof SyntaxError) return ERROR_DIAGNOSTICS.RESPONSE_INVALID;
     if (error instanceof Error) {
