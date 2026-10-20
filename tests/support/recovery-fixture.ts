@@ -11,7 +11,6 @@ import {
   type OfferTrust,
 } from '@gyblos/application/offers';
 import { P2P_JOURNAL_STATES } from '@gyblos/cli/p2p/constants';
-import { main } from '@gyblos/cli/p2p/reconcile';
 import type { RoleConfig } from '@gyblos/cli/p2p/roles';
 import {
   DEVNET,
@@ -118,6 +117,7 @@ export async function recoveryFixture(fullRefund = true) {
     write,
     read: <T>(filename: string) => loadJson<T>(path(filename)),
     async run(args: string[] = []) {
+      const { main } = await import('@gyblos/cli/p2p/reconcile');
       const originalDirectory = process.cwd(),
         originalLog = console.log;
       try {
