@@ -328,26 +328,27 @@ while preserving known financial confirmation. Post-exchange telemetry errors
 cannot replace a paid `200` and receipt. Ingress and response delivery each have
 a five-second limit; origin work has its own permit and deadline. Established
 connections are limited to one per NodeId. Up to eight handshakes are tracked
-separately, with two pending jobs per validated source. Connected peers reserve
-up to 30 requests from the shared 256-request minute budget. After at least one
-admitted request, unused quota survives disconnect until the current window
-ends, allowing the same authenticated NodeId to reconnect under churn. A
-connection with no admitted work releases its unused reservation. Reconnection
-preserves consumed debt and can use newly available capacity within the same
-peer/global limits. Active, connected and reserved entries are protected from
-LRU eviction; rollover expires inactive grace.
+separately, with two pending jobs per validated source. Connected or actively
+working peers reserve up to 30 requests from the shared 256-request minute
+budget. After disconnect and completion of active work, unused grace is
+best-effort: another admission or quota refill may reclaim it. LRU eviction can
+also return inactive unused reservations. Consumed per-NodeId debt is kept
+separately until rollover, so eviction, reclamation and reconnection cannot
+reset the 30-request allowance. That debt storage is bounded by the 256 actual
+admissions per window. Active work and live connections cannot be evicted. An
+identity with no admitted work in the current window releases unused quota once
+disconnected and inactive.
 
-This policy has a confirmed newcomer-admission vulnerability: nine disposable
-NodeIds can each make one free request and disconnect, leaving nine consumed
-admissions plus 247 retained reservations across the 256-request budget. New
-unreserved identities are refused until rollover without the attacker holding
-connections; already-reserved identities can still reconnect. Admission earns
-grace before the origin outcome, including free challenges and failed work. The
-original policy required 256 admissions to exhaust that budget for this serial
-request-and-disconnect pattern without live connections. Other
-connection-holding attacks already existed. This is bounded quota accounting,
-not a production fairness or Sybil guarantee, and the grace regression remains
-unresolved.
+A same-identity reconnect can reuse or refill quota when shared capacity
+remains; it has no guaranteed reservation against competing work while
+disconnected. Every admitted request still counts, including free challenges and
+failed origin work. No payment header or HTTP status grants priority. Inactive
+reservations can no longer make nine single-request, disconnected identities
+deny a newcomer. Once all 256 admissions are actually consumed, both new and
+disconnected known peers must wait for rollover. Connected reservations remain
+protected. A peer that spends a partial reservation may need to reconnect before
+obtaining newly available allowance. These are bounded admission controls, not
+costly identity, Sybil resistance or a production availability guarantee.
 
 Uncancellable native jobs can still consume their bounded pools. Pending IP
 sources use full addresses, including full IPv6 addresses rather than prefixes;
@@ -363,10 +364,13 @@ through the real SDK verifier. Positive-credit regressions also exercise
 zero-charge reconciliation and CLI orchestration with mocked role/offer
 boundaries, RPC responses and a wrapper around real temporary-file persistence.
 They establish offline acceptance, not a fresh on-chain audit or a real
-signed-offer recovery run. A native free-request comparison confirms the
-unresolved grace regression against the original limiter. New tests and evidence
-stay excluded from Git and the public suite. The physical paid evidence remains
-bound to `2c8eeac`; no new paid-network result is implied.
+signed-offer recovery run. The native nine-identity regression now passes,
+alongside conditional same-identity reconnect, connected quota protection and
+refusal after 256 actual free admissions. Offline controls cover LRU debt,
+rollover and explicitly reduced peer-table capacity. The earlier unconditional
+disconnected-grace expectation is superseded by this best-effort contract. New
+tests and evidence stay excluded from Git and the public suite. The physical
+paid evidence remains bound to `2c8eeac`; no new paid-network result is implied.
 
 ## Pay through a public facilitator
 
