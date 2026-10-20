@@ -7,18 +7,19 @@ import { assessCharge, charge, OFFER_ID } from '@gyblos/application/metering';
 import { HTTP_STATUS, LOCALHOST, P2P, ROUTES } from '@gyblos/config';
 import { inferenceSnapshot } from '@gyblos/gate/chain';
 import { JOURNAL_STATES } from '@gyblos/gate/constants';
+import { errorDiagnostic } from '@gyblos/gate/diagnostics';
 import { withExclusiveLock } from '@gyblos/gate/lock';
 import {
   appendMeasurement,
   measurementRow,
   measurementSalt,
 } from '@gyblos/gate/measurements';
+import type { BuyerResponseObservation } from '@gyblos/payments-x402/buyer';
 import { assertProgram } from '@gyblos/payments-x402/chain';
 import { createInferenceBuyer } from '@gyblos/payments-x402/inference-buyer';
 import { validateSettlement } from '@gyblos/payments-x402/trust';
 import { isMain, saveJson } from '@gyblos/runtime';
 import { inferenceCeiling } from '@gyblos/seller/inference';
-import type { RouteObservation } from '@gyblos/transport';
 import {
   expectedIrohRoute,
   routesMatchRequired,
@@ -27,29 +28,16 @@ import {
 import { createCases } from '../inference/cases-data.js';
 import { modelTokenizer } from './artifacts.js';
 import { trustedOffer } from './buyer.js';
+import { priorCalls, readCallMetrics } from './call-evidence.js';
 import {
   CALL_OUTCOMES,
+  CALL_PHASES,
   P2P_JOURNAL_STATES,
+  type CallPhase,
   type P2pJournalState,
 } from './constants.js';
 import { paymentProof } from './proof.js';
 import { rolePath, roleSigner } from './roles.js';
-
-interface TransportMetric extends RouteObservation {
-  requestId: string;
-  status: number;
-}
-
-async function priorCalls() {
-  try {
-    return JSON.parse(
-      await readFile(rolePath(P2P.callsFilename), 'utf8'),
-    ) as unknown[];
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-    return [];
-  }
-}
 
 async function run() {
   const requiredRoute = expectedIrohRoute(process.env.GYBLOS_EXPECTED_ROUTE);
@@ -96,8 +84,22 @@ async function run() {
     authorizer: offer.authorizer,
   };
   let confirmedProof: Awaited<ReturnType<typeof paymentProof>> | undefined;
+  let phase: CallPhase = CALL_PHASES.REQUEST;
+  let observedPayment: BuyerResponseObservation | undefined;
   let authorization: { channelId: string; ceiling: string } | undefined,
     signedAt = performance.now();
+  const retainAuthorization = async () => {
+    assert.ok(authorization);
+    await saveJson(rolePath(P2P.journalFilename), {
+      state: P2P_JOURNAL_STATES.AUTHORIZED,
+      requestId: request.requestId,
+      ...authorization,
+      paymentExpectation,
+      before,
+      runId: process.env.GYBLOS_P2P_RUN_ID,
+      observedPayment,
+    });
+  };
   const invoke = createInferenceBuyer(
     buyer,
     config.rpcUrl,
@@ -115,16 +117,14 @@ async function run() {
           throw new Error('Signed offer expired before signing.');
         signedAt = performance.now();
       },
+      async responseObserved(observation) {
+        phase = CALL_PHASES.RESPONSE;
+        observedPayment = observation;
+        if (authorization) await retainAuthorization();
+      },
       async authorized(channelId, amount) {
         authorization = { channelId, ceiling: amount };
-        await saveJson(rolePath(P2P.journalFilename), {
-          state: P2P_JOURNAL_STATES.AUTHORIZED,
-          requestId: request.requestId,
-          ...authorization,
-          paymentExpectation,
-          before,
-          runId: process.env.GYBLOS_P2P_RUN_ID,
-        });
+        await retainAuthorization();
       },
     },
   );
@@ -137,6 +137,7 @@ async function run() {
     assert.equal(authorization.ceiling, ceiling);
     assert.equal(response.status, HTTP_STATUS.ok);
     assert.ok(response.receipt?.transaction);
+    phase = CALL_PHASES.PROOF;
     const proof = await paymentProof(
       accounts,
       authorization.channelId,
@@ -152,10 +153,12 @@ async function run() {
       depositSignature: proof.depositSignature,
       claimSignature: proof.claimSignature,
     });
+    phase = CALL_PHASES.SETTLEMENT;
     validateSettlement(response.receipt, {
       payer: buyer.address,
       amount: proof.chargedAtomic,
     });
+    phase = CALL_PHASES.OBSERVATION;
     const observation = observeInferenceResponse({
       status: response.status,
       body: response.body,
@@ -182,6 +185,7 @@ async function run() {
       charge(observation.body.billedTokens!),
     );
     assert.deepEqual(observation.body.billedTokens, observation.engineTokens);
+    phase = CALL_PHASES.MEASUREMENT;
     const row = measurementRow(
       {
         requestId: request.requestId,
@@ -207,14 +211,11 @@ async function run() {
       await measurementSalt(P2P.root),
     );
     await appendMeasurement(row, rolePath(P2P.measurementsFilename));
-    const metrics = (
-      await readFile(rolePath(P2P.metricsFilename), 'utf8').catch(() => '')
-    )
-      .trim()
-      .split('\n')
-      .filter(Boolean)
-      .map((line) => JSON.parse(line) as TransportMetric)
-      .filter((metric) => metric.requestId === request.requestId);
+    phase = CALL_PHASES.METRICS;
+    const metrics = await readCallMetrics(
+      rolePath(P2P.metricsFilename),
+      request.requestId,
+    );
     const paid = metrics.find((metric) => metric.status === HTTP_STATUS.ok);
     const routeAccepted =
       Boolean(paid) &&
@@ -233,14 +234,21 @@ async function run() {
       transport: paid,
       metrics,
     };
+    phase = CALL_PHASES.PERSISTENCE;
     await saveJson(rolePath(P2P.callsFilename), [
-      ...(await priorCalls()),
+      ...(await priorCalls(rolePath(P2P.callsFilename))),
       result,
     ]);
     console.log(JSON.stringify(result));
     if (!routeAccepted) process.exitCode = 1;
-  } catch {
+  } catch (error) {
     const result = {
+      failure: { phase, code: errorDiagnostic(error) },
+      observedPayment,
+      metrics: await readCallMetrics(
+        rolePath(P2P.metricsFilename),
+        request.requestId,
+      ).catch(() => []),
       requestId: request.requestId,
       case: testCase.name,
       outcome: confirmedProof
@@ -261,7 +269,7 @@ async function run() {
         ...result,
       });
     await saveJson(rolePath(P2P.callsFilename), [
-      ...(await priorCalls()),
+      ...(await priorCalls(rolePath(P2P.callsFilename))),
       result,
     ]);
     console.error(JSON.stringify(result));
