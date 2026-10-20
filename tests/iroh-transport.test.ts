@@ -2,12 +2,22 @@ import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { createServer } from 'node:http';
 import test from 'node:test';
+import { setTimeout as delay } from 'node:timers/promises';
 
-import { Endpoint, RelayMode } from '@number0/iroh';
+import { Endpoint, RelayMode, SecretKey } from '@number0/iroh';
 
-import { IPV6_LOOPBACK, LOCALHOST, P2P, ROUTES } from '@gyblos/config';
+import {
+  HTTP_STATUS,
+  IPV6_LOOPBACK,
+  LOCALHOST,
+  P2P,
+  ROUTES,
+} from '@gyblos/config';
 import { createIrohTransport } from '@gyblos/transport/iroh-client';
 import { serveIroh } from '@gyblos/transport/iroh-server';
+
+import { registerNativeCases } from './support/native-cases.js';
+import { fixture, fixtureRequest } from './support/native-fixture.js';
 
 async function endpoint() {
   const builder = Endpoint.builder();
@@ -85,3 +95,75 @@ test('native remote NodeId mismatch blocks HTTP before any signing challenge', (
   exercise(false, true));
 test('relay-only server refuses an observed direct path before forwarding HTTP', () =>
   exercise(true, false));
+
+registerNativeCases();
+
+test(
+  'native smoke: nine distinct free-request peers disconnect and a newcomer remains admissible',
+  { timeout: 20000 },
+  async () => {
+    const lab = await fixture(),
+      identities = new Set<string>();
+    try {
+      for (let index = 0; index < 9; index++) {
+        const peer = await lab.transport(),
+          id = lab.nodeId(peer);
+        assert.ok(id);
+        assert.equal(identities.has(id), false);
+        identities.add(id);
+        assert.equal(
+          (await peer.exchange(fixtureRequest('free-' + index))).status,
+          402,
+        );
+        await peer.close();
+        await delay(20);
+      }
+      const newcomer = await lab.transport();
+      assert.equal(
+        (await newcomer.exchange(fixtureRequest('newcomer'))).status,
+        402,
+      );
+      assert.equal(lab.accepted.length, 10);
+      assert.equal(lab.executions, 0);
+      assert.equal(lab.paid.size, 0);
+    } finally {
+      await lab.close();
+    }
+  },
+);
+
+test(
+  'native same-NodeId reconnect preserves remaining quota and refuses after actual consumption',
+  { timeout: 20000 },
+  async () => {
+    const lab = await fixture(),
+      secret = [...SecretKey.generate().toBytes()];
+    try {
+      const first = await lab.transport(secret),
+        identity = lab.nodeId(first);
+      for (let index = 0; index < 4; index++)
+        assert.equal(
+          (await first.exchange(fixtureRequest('before-' + index))).status,
+          402,
+        );
+      await first.close();
+      await delay(40);
+      const returning = await lab.transport(secret);
+      assert.equal(lab.nodeId(returning), identity);
+      for (let index = 4; index < P2P.requestsPerWindow; index++)
+        assert.equal(
+          (await returning.exchange(fixtureRequest('after-' + index))).status,
+          402,
+        );
+      assert.equal(
+        (await returning.exchange(fixtureRequest('over-budget'))).status,
+        HTTP_STATUS.tooManyRequests,
+      );
+      assert.equal(lab.accepted.length, P2P.requestsPerWindow);
+      assert.equal(lab.executions, 0);
+      assert.equal(lab.paid.size, 0);
+    } finally {
+      await lab.close();
+    }
+  },
+);
