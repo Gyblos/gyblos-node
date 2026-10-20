@@ -2,8 +2,17 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { STATUS_CODES } from 'node:http';
 
+import { isSignature, type Signature } from '@solana/kit';
+
+import type { BuyerResponseObservation } from '@gyblos/payments-x402/buyer';
 import type { RouteObservation } from '@gyblos/transport';
 import { TRANSPORT_ROUTES } from '@gyblos/transport/constants';
+
+import type { PaymentProofObservation } from './proof.js';
+
+export interface CallPaymentObservation extends BuyerResponseObservation {
+  depositSignature?: Signature;
+}
 
 interface TransportMetric extends RouteObservation {
   requestId: string;
@@ -62,4 +71,19 @@ export async function readCallMetrics(path: string, requestId: string) {
     });
   }
   return metrics;
+}
+
+export function proofObservation(
+  status: number,
+  value: PaymentProofObservation,
+): CallPaymentObservation {
+  return {
+    status,
+    ...(isSignature(value.claimSignature)
+      ? { claimSignature: value.claimSignature }
+      : {}),
+    ...(isSignature(value.depositSignature)
+      ? { depositSignature: value.depositSignature }
+      : {}),
+  };
 }
