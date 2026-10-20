@@ -77,3 +77,11 @@ coverage/
 
 # Explicitly authorized redacted real-network P2P report
 !/evidence/gate-0007.json
+
+# Guard-specific public regression support
+!/tests/support/rent-faults.ts
+!/tests/support/token-faults.ts
+!/tests/support/lock-faults.ts
+!/tests/support/lock-fixture.ts
+!/tests/support/native-runtime.ts
+!/tests/support/egress-cases.ts
