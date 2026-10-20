@@ -3,7 +3,7 @@ import { once } from 'node:events';
 import { createServer } from 'node:http';
 import { setTimeout as delay } from 'node:timers/promises';
 
-import { Endpoint, RelayMode, type Connection } from '@number0/iroh';
+import type { Connection, Endpoint, EndpointAddr } from '@number0/iroh';
 
 import {
   HTTP_STATUS,
@@ -17,7 +17,10 @@ import { createIrohTransport } from '@gyblos/transport/iroh-client';
 import { serveIroh } from '@gyblos/transport/iroh-server';
 import { decodeResponse, encodeRequest } from '@gyblos/transport/wire';
 
+import { NATIVE_CAPABILITY } from './native-runtime.js';
+
 interface FixtureOptions {
+  freeBody?: Buffer;
   freeStatus?: number;
   dropPaidResponse?: boolean;
 }
@@ -29,7 +32,12 @@ export class NativeTestDeadlineError extends Error {
   }
 }
 
-async function endpoint(secret?: number[]) {
+export async function endpoint(secret?: number[]) {
+  assert.ok(
+    NATIVE_CAPABILITY.sdk,
+    'Native Iroh capability must be checked before endpoint creation.',
+  );
+  const { Endpoint, RelayMode } = NATIVE_CAPABILITY.sdk;
   const builder = Endpoint.builder();
   builder.applyMinimal();
   builder.relayMode(RelayMode.disabled());
@@ -66,9 +74,44 @@ export async function within<T>(operation: Promise<T>, milliseconds = 3500) {
 export async function fixture({
   freeStatus = HTTP_STATUS.paymentRequired,
   dropPaidResponse = false,
+  freeBody = Buffer.from('{"synthetic":true}'),
 }: FixtureOptions = {}) {
   const seller = await endpoint();
   const clients: Endpoint[] = [];
+  const retired = new Set<string>();
+  const serverConnections: Connection[] = [];
+  let serverStreams = 0;
+  const acceptNext = seller.acceptNext.bind(seller);
+  seller.acceptNext = async () => {
+    const incoming = await acceptNext();
+    if (!incoming) return incoming;
+    const accept = incoming.accept.bind(incoming);
+    incoming.accept = async () => {
+      const accepting = await accept();
+      const connect = accepting.connect.bind(accepting);
+      accepting.connect = async () => {
+        const connection = await connect();
+        const peer = connection.remoteId().toString();
+        retired.delete(peer);
+        serverConnections.push(connection);
+        const acceptBi = connection.acceptBi.bind(connection);
+        connection.acceptBi = async () => {
+          try {
+            const stream = await acceptBi();
+            serverStreams++;
+            return stream;
+          } catch (error) {
+            // Observe after the server's rejection/finally microtasks have run.
+            setImmediate(() => retired.add(peer));
+            throw error;
+          }
+        };
+        return connection;
+      };
+      return accepting;
+    };
+    return incoming;
+  };
   const transports: ReturnType<typeof createIrohTransport>[] = [];
   const nodeIds = new WeakMap<object, string>();
   const accepted: string[] = [];
@@ -97,7 +140,7 @@ export async function fixture({
         'content-type': 'application/json',
         'payment-required': 'synthetic-only',
       });
-      response.end('{"synthetic":true}');
+      response.end(freeBody);
       return;
     }
     assert.equal(authorization, 'synthetic-authorization-not-a-signature');
@@ -134,6 +177,11 @@ export async function fixture({
       return nodeIds.get(transport);
     },
     accepted,
+    retired,
+    serverConnections,
+    get serverStreams() {
+      return serverStreams;
+    },
     paid,
     paidReached,
     get executions() {
@@ -142,11 +190,16 @@ export async function fixture({
     releaseResponse() {
       holdResponse?.();
     },
-    async client(secret?: number[]) {
+    async client(
+      secret?: number[],
+      route?: (address: EndpointAddr) => Promise<EndpointAddr>,
+    ) {
       const client = await endpoint(secret);
       clients.push(client);
       const connection = await within(
-        client.connect(seller.addr(), [...Buffer.from(P2P.protocol)]),
+        client.connect(route ? await route(seller.addr()) : seller.addr(), [
+          ...Buffer.from(P2P.protocol),
+        ]),
       );
       assert.equal(connection.remoteId().toString(), seller.id().toString());
       return { endpoint: client, connection };
