@@ -4,11 +4,14 @@ Experimental x402 payments for Gyblos, a P2P inference project. A buyer
 authorizes a budget, a seller reports token usage, and a facilitator settles the
 charge and returns the unused deposit on Solana. This repository runs
 fixed-resource checks, local Ollama inference and an experimental native Iroh
-transport between isolated Docker roles and native peers. A native Mac–VPS trial
-completed three paid devnet inferences with direct routing at source `2c8eeac`;
-see the redacted [real-network report](evidence/gate-0007.json). The Docker NAT
-experiment remains partial. Hotspot and broader NAT coverage remain pending;
-this result does not validate every subsequent source change.
+transport between isolated Docker roles and native peers. One earlier Mac–VPS
+run completed three direct paid devnet inferences with a test token; its
+[historical report](evidence/gate-0007.json) does not validate the current head.
+Use the exact commit and final-head smoke status in
+[PR #10's validation record](https://github.com/Gyblos/gyblos-payments/pull/10)
+for this candidate. The new physical smoke requires explicit VPS/funds
+authorization and its result must match the final commit. Docker NAT-direct did
+not pass. Hotspot/CGNAT and broader NAT coverage remain untested.
 
 > **Status:** experimental, Solana **devnet** only. Not audited. Never use
 > mainnet keys. Part of [Gyblos](https://gyblos.com) ·
@@ -379,8 +382,10 @@ reservations can no longer make nine single-request, disconnected identities
 deny a newcomer. Once all 256 admissions are actually consumed, both new and
 disconnected known peers must wait for rollover. Connected reservations remain
 protected. A peer that spends a partial reservation may need to reconnect before
-obtaining newly available allowance. These are bounded admission controls, not
-costly identity, Sybil resistance or a production availability guarantee.
+obtaining newly available allowance. About nine identities attempting 30 free
+requests each per minute can deny new peers for the window: eight consume 240
+admissions and the ninth consumes the remaining 16 of 256. No payment is
+required. There is no Sybil resistance or production availability guarantee.
 
 Uncancellable native jobs can still consume their bounded pools. Pending IP
 sources use full addresses, including full IPv6 addresses rather than prefixes;
@@ -406,8 +411,13 @@ also inject rename errors. Export cases use synthetic paid rows/traces, a
 separate raw-derived zero-charge proof and mocked container process creation.
 These checks establish offline behavior, without a fresh chain audit or physical
 signed-offer recovery run. Raw evidence and private measurements remain
-excluded. The physical paid evidence remains bound to `2c8eeac`; no new
-paid-network result is implied.
+excluded. The historical paid report is retained for provenance; the
+[current candidate validation record](https://github.com/Gyblos/gyblos-payments/pull/10)
+tracks the exact final commit, smoke authorization/status and per-request
+ceiling, charge and refund. A successful smoke must verify that each charge plus
+refund equals its authorized ceiling, and that their aggregate sums match. Docs
+link that record so recording a result does not change the tested commit. No
+current-head paid success is implied by the historical report.
 
 ## Pay through a public facilitator
 
