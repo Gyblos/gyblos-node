@@ -196,15 +196,21 @@ export async function finalizedPaymentProof(
   const depositSponsorDelta = sponsorDepositAfter - sponsorBefore;
   const claimSponsorDelta = sponsorAfter - sponsorClaimBefore;
   assert.equal(lamports(deposit, expected.channelId, false), 0n);
+  const initialChannelRent = lamports(deposit, expected.channelId, true);
+  const channelClaimBefore = lamports(claim, expected.channelId, false);
   const retainedRent = lamports(claim, expected.channelId, true);
-  assert.equal(
-    lamports(deposit, expected.channelId, true),
-    lamports(claim, expected.channelId, false),
+  assert.ok(
+    channelClaimBefore >= initialChannelRent,
+    'Channel rent decreased between transactions.',
+  );
+  assert.ok(
+    retainedRent >= channelClaimBefore,
+    'Retained channel lamports decreased during the claim.',
   );
   const fees = BigInt(deposit.meta.fee) + BigInt(claim.meta.fee);
   assert.equal(
     depositSponsorDelta +
-      lamports(deposit, expected.channelId, true) +
+      initialChannelRent +
       escrowRent.afterDeposit -
       escrowRent.beforeDeposit,
     -BigInt(deposit.meta.fee),
@@ -213,7 +219,7 @@ export async function finalizedPaymentProof(
   assert.equal(
     claimSponsorDelta +
       retainedRent -
-      lamports(claim, expected.channelId, false) +
+      channelClaimBefore +
       escrowRent.afterClaim -
       escrowRent.beforeClaim,
     -BigInt(claim.meta.fee),
@@ -223,7 +229,15 @@ export async function finalizedPaymentProof(
     ...expected,
     chargedAtomic: charged.toString(),
   });
-  assert.equal(BigInt(channel.lamports), retainedRent);
+  const currentChannelLamports = BigInt(channel.lamports);
+  assert.ok(
+    currentChannelLamports >= retainedRent,
+    'Retained channel lamports decreased after the claim.',
+  );
+  assert.ok(
+    initialChannelRent >= BigInt(channel.minimumRentLamports),
+    'Initial channel rent is below minimum.',
+  );
   return {
     chargedAtomic: charged.toString(),
     refundAtomic: refund.toString(),
@@ -256,8 +270,22 @@ export async function finalizedPaymentProof(
     escrowDepositAfterLamports: escrowRent.afterDeposit.toString(),
     escrowClaimBeforeLamports: escrowRent.beforeClaim.toString(),
     escrowClaimAfterLamports: escrowRent.afterClaim.toString(),
+    escrowInterveningCreditLamports:
+      escrowRent.interveningCreditLamports.toString(),
+    channelDepositBeforeLamports: '0',
+    channelDepositAfterLamports: initialChannelRent.toString(),
+    channelClaimBeforeLamports: channelClaimBefore.toString(),
+    channelClaimAfterLamports: retainedRent.toString(),
+    currentChannelLamports: currentChannelLamports.toString(),
+    channelInterveningCreditLamports: (
+      channelClaimBefore - initialChannelRent
+    ).toString(),
+    channelClaimDeltaLamports: (retainedRent - channelClaimBefore).toString(),
+    channelPostClaimCreditLamports: (
+      currentChannelLamports - retainedRent
+    ).toString(),
     sponsorFeesLamports: fees.toString(),
-    retainedChannelRentLamports: retainedRent.toString(),
+    retainedChannelRentLamports: initialChannelRent.toString(),
     minimumChannelRentLamports: channel.minimumRentLamports,
   };
 }
