@@ -135,20 +135,31 @@ An in-session direct-to-relay transition and broader success rates are unproven.
 The later native Mac–VPS result does not explain the original Docker return
 path.
 
-Request ingress has a separate five-second deadline and bounded concurrency;
-inference permits are acquired after decoding. Execution allows one active
-request per NodeId and two globally. The bounded peer table evicts inactive LRU
-entries; its per-peer rate history can reset after eviction. The independent
-global budget of 256 admitted requests per minute survives that churn, but these
-limits are not Sybil resistance or a production DoS guarantee.
+Request ingress has a separate five-second deadline. Execution allows one active
+request per NodeId and two globally. Its permits are released when the origin
+finishes, before response delivery. Egress has its own five-second deadline; at
+most eight streams retain native ownership until their operations finish,
+including late writes after the connection closes.
+
+Pending native handshakes and established connections have separate limits of
+eight. Validated source addresses admit at most two pending handshakes per IP
+without counting source ports as new identities; established connections are
+limited to one per NodeId. Connected peers reserve their available per-minute
+allowance within the shared budget of 256 requests. Free challenges from other
+peers cannot spend that reservation, and disconnecting does not erase consumed
+global capacity. A payment header grants no priority. The peer table retains
+active and connected entries; inactive LRU eviction can reset per-peer history.
 
 Application-idle connections expire after 30 seconds. A 15-minute lifetime
-retires a connection after active work drains, rather than interrupting that
-work. Expired handshakes preserve the seller endpoint and close late results.
-Because the binding cannot cancel an individual native handshake, its pending
-reservation stays occupied until native completion. Permanently stuck native
-jobs can still exhaust connection admission capacity; the application bounds the
-jobs but cannot guarantee their native cancellation.
+retires a connection after active work drains. Expired handshakes preserve the
+seller endpoint and close late results, but the binding cannot cancel an
+individual native handshake. Its pending reservation stays occupied until native
+completion. Permanently stuck native handshakes or writes can exhaust their
+bounded pools. Multiple independent sources can exhaust pending capacity, and
+peers behind a shared NAT can encounter the source limit. These controls are not
+Sybil resistance or a production DoS guarantee. The revised admission policy has
+been tested with direct loopback Iroh; its relay and physical-network
+compatibility has not been newly validated.
 
 Required-route mismatches are blocked before opening/writing a request when
 observed. Later sampled wrong/mixed routes, or unavailable telemetry, produce a
@@ -176,34 +187,51 @@ Raw measurements and reconciliation records remain private. See the
 `pnpm p2p:reconcile --deposit DEPOSIT_SIGNATURE --claim CLAIM_SIGNATURE`
 verifies finalized transactions and the canonical distributed channel before
 saving a zero-charge/full-return record and then confirming the matching local
-buyer journal. The buyer lock, original call, role/trust metadata and original
-owner-signed offer must be preserved. An expired signed offer may supply
-historical identities for this read-only chain workflow; it never authorizes a
-new payment. Changed identities or missing original metadata stop recovery. The
-failed call remains in history. Proof/record failures leave the journal
-unresolved; record persistence precedes the journal transition. Charged outcomes
-are rejected by this zero-charge command.
+buyer journal. Preserve the original authorization journal, role/trust metadata
+and owner-signed offer. If interruption prevented the call row from being
+written, a complete durable authorization journal can supply the original
+request, channel, ceiling and payment identities. Incomplete metadata or
+conflicting call rows stop recovery; missing call history is never fabricated.
+An expired signed offer can supply historical identities for this read-only
+chain workflow; it never authorizes a new payment. Existing failed calls remain
+in history. Proof/record failures leave the journal unresolved; record
+persistence precedes the journal transition. Charged outcomes are rejected by
+this zero-charge command.
+
+Default recovery serializes through a separate recovery lock. It can retire a
+buyer lock only after validating its private regular-file metadata and proving
+that its recorded local process no longer exists. It persists a stale-lock audit
+before removal and rechecks the file identity. Live or reused process IDs,
+ambiguous metadata, symlinks, hardlinks and unsafe filesystem identities stop
+recovery. An interrupted recovery lock requires manual investigation; this is
+cooperative local-process recovery, not a multi-host lock protocol.
 
 Add `--audit-only` to verify either a charged or zero-charge payment without
-changing the journal/reconciliation files. Only the local buyer lock is
-acquired. Both modes use RPC reads, with no signer, funding, submission or
-payment retry. Keep output private. The verifier checks finalized statuses,
-transaction errors, transfer identities and exact token/SOL deltas, canonical
-channel owner/layout/ PDA/settlement, and sponsor fees separately from retained
-channel rent. It emits explicit sponsor pre/post balances and verifies their
-difference against fees plus rent. It does not use later wallet balances as
-historical proof.
+changing journal/reconciliation files or retiring stale locks. This mode only
+acquires the normal buyer lock. Both modes use RPC reads, with no signer,
+funding, submission or payment retry. Keep output private. The verifier checks
+finalized statuses, transaction errors, transfer identities, exact token/SOL
+deltas and canonical channel ownership, layout, PDA and settlement. Sponsor fee
+and rent conservation is checked independently inside each transaction. Four
+explicit sponsor balance snapshots distinguish the two transaction deltas from
+any intervening balance movement; that movement is not labeled as fees. Later
+wallet balances are not historical proof.
 
 This verifier is deliberately limited to fresh, individually settled channels
-with retained canonical accounts and no intervening sponsor-balance movement.
-Closed/missing channels, nonfinalized data, unexplained deltas or unsupported
-shapes stop verification and require separate investigation. It does not recover
-rent or establish an automatic crash-recovery guarantee. Evidence export
-re-fetches financial proof and binds its ceiling to the original call; it does
-not trust handwritten balances. Source/image provenance is separate from chain
-truth and is explicitly unverified when supplied by an operator.
+with retained canonical accounts. Closed/missing channels, nonfinalized data,
+unexplained transaction-local deltas or unsupported shapes stop verification. It
+does not recover rent or guarantee recovery from every crash. Evidence export
+re-fetches proof for zero-charge reconciliations and binds their ceiling to the
+original attempt. Confirmed paid rows still come from the call journal.
+Source/image provenance is separate from chain truth and remains explicitly
+unverified when supplied by an operator.
 
-These corrections were validated offline only; the original physical evidence
+The current corrections were validated with private offline regressions,
+controlled process/filesystem failures and real direct-loopback Iroh using
+simulated payments. The native cases cover resets and half-closes, fragmented
+and malformed frames, a lost simulated receipt and multiple identities behind
+one source address. Synthetic backend counters do not prove on-chain replay
+protection or exactly-once settlement. The original physical payment evidence
 still belongs to `2c8eeac`. No later-head paid run is implied. Broader lab
 reorganization, typechecking of all diagnostic JavaScript and alternate-engine
 rollout remain follow-up work. Measurement code can now accept the explicit
