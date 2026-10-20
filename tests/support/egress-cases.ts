@@ -32,6 +32,8 @@ interface ObservedWrite {
   started: number;
   done: Promise<void>;
   settled: boolean;
+  finishSettled?: boolean;
+  finishSucceeded?: boolean;
 }
 
 // Only owned loopback UDP sockets are affected. No host firewall or relay changes.
@@ -151,15 +153,34 @@ export function registerEgressCases() {
           if (response) {
             const record = { started: performance.now(), done, settled: false };
             writes.push(record);
-            void done.then(
-              () => {
-                record.settled = true;
-              },
-              () => {
-                record.settled = true;
-              },
-            );
+            const settled = () => {
+              record.settled = true;
+            };
+            void done.then(settled, settled);
           }
+          return done;
+        },
+      );
+      let warmingUp = true;
+      const originalFinish = SendStream.prototype.finish;
+      context.mock.method(
+        SendStream.prototype,
+        'finish',
+        function (this: SendStream) {
+          const record = warmingUp ? writes.at(-1) : undefined;
+          const done = originalFinish.call(this);
+          const settled = (succeeded: boolean) =>
+            setImmediate(() => {
+              if (record) {
+                record.finishSucceeded = succeeded;
+                record.finishSettled = true;
+              }
+            });
+          if (record)
+            void done.then(
+              () => settled(true),
+              () => settled(false),
+            );
           return done;
         },
       );
@@ -176,8 +197,7 @@ export function registerEgressCases() {
       const unread = await unreadPeer(target);
       closePeer = unread.close;
       let blocked: ObservedWrite | undefined;
-      // Real unread receive handles stay in the owned child. Admission Date.now
-      // advances across two quotas; native clocks and all deadline timers stay real.
+      // Only admission Date.now is advanced; native clocks and deadlines stay real.
       for (let index = 0; index < P2P.requestsPerWindow * 2; index++) {
         if (index > 0 && index % P2P.requestsPerWindow === 0)
           windowTime += P2P.rateWindowMs;
@@ -190,6 +210,12 @@ export function registerEgressCases() {
         const record = writes[index]!;
         try {
           await within(record.done, P2P.egressMs / 10);
+          await waitFor(
+            () => record.finishSettled === true,
+            undefined,
+            'native finish cleanup',
+          );
+          assert.equal(record.finishSucceeded, true);
         } catch (error) {
           if (!(error instanceof NativeTestDeadlineError)) throw error;
           blocked = record;
@@ -200,6 +226,7 @@ export function registerEgressCases() {
         blocked,
         'The real native write must block within the bounded warm-up.',
       );
+      warmingUp = false;
       unread.pause(); // Only the owned buyer child; prevents IPv6 path recovery too.
       assert.equal(blocked.settled, false);
       const server = lab.serverConnections.find(
