@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { verifyZeroChargeReconciliation } from '@gyblos/cli/p2p/reconciliation';
 import { DEVNET_TREASURY_OWNER } from '@gyblos/config';
 import { tokenAddress } from '@gyblos/gate/chain';
+import type { ParsedInstruction } from '@gyblos/gate/types';
 
 import {
   accountIndex,
@@ -11,6 +12,12 @@ import {
   withOfflineProof,
   type PaymentFixture,
 } from './payment-fixture.js';
+
+function setAtomicAmount(instruction: ParsedInstruction, amount: bigint) {
+  instruction.info.tokenAmount.amount = amount.toString();
+  Reflect.deleteProperty(instruction.info.tokenAmount, 'uiAmount');
+  Reflect.deleteProperty(instruction.info.tokenAmount, 'uiAmountString');
+}
 
 export function tokenBalance(
   fixture: PaymentFixture,
@@ -71,9 +78,11 @@ export async function fullPrincipalRefund(fixture: PaymentFixture) {
   const charge = BigInt(tokenLeg(fixture, sellerAta).info.tokenAmount.amount);
   shiftTokenBalance(fixture, sellerAta, -charge, true);
   shiftTokenBalance(fixture, buyerAta, charge, true);
-  tokenLeg(fixture, sellerAta).info.tokenAmount.amount = '0';
-  tokenLeg(fixture, buyerAta).info.tokenAmount.amount =
-    fixture.expected.ceiling;
+  setAtomicAmount(tokenLeg(fixture, sellerAta), 0n);
+  setAtomicAmount(
+    tokenLeg(fixture, buyerAta),
+    BigInt(fixture.expected.ceiling),
+  );
   fixture.data.writeBigUInt64LE(0n, 20);
   fixture.data.writeBigUInt64LE(0n, 28);
 }
@@ -84,7 +93,7 @@ export async function tokenCredit(fixture: PaymentFixture, amount: bigint) {
   shiftTokenBalance(fixture, treasuryAta, amount, true);
   const sweep = structuredClone(tokenLeg(fixture, sellerAta));
   sweep.info.destination = treasuryAta;
-  sweep.info.tokenAmount.amount = amount.toString();
+  setAtomicAmount(sweep, amount);
   const batch = instructions(fixture.source.claim).find(
     (instruction) => instruction.parsed?.type === 'batch',
   )?.parsed;
