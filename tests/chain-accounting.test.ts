@@ -3,6 +3,9 @@ import test from 'node:test';
 
 import { TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
 
+import { GateError } from '@gyblos/payments-x402/chain';
+import { GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
+
 import {
   transaction,
   transactionTransfers,
@@ -159,7 +162,8 @@ test('bounded transaction visibility retries preserve unknown state and do not h
         'sig',
       ),
       (error: unknown) =>
-        (error as { code?: string }).code === 'TRANSACTION_UNKNOWN',
+        error instanceof GateError &&
+        error.code === GATE_ERROR_CODES.TRANSACTION_UNKNOWN,
     );
     assert.equal(calls, 4);
     for (const tx of [
