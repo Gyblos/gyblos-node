@@ -152,10 +152,11 @@ pressure may evict inactive reservations. Reclamation changes no consumed debt
 or active/lease ownership. Each NodeId's consumed allowance is stored separately
 until rollover, including after eviction. Its map is bounded by the 256 actual
 admissions per window; the peer-window table retains its separate 128-entry
-bound. An identity with no admitted work in the current window releases unused
-quota once disconnected and inactive. Rollover resets window debt and refreshes
-connected reservations while retaining in-flight ownership, including requests
-started in the previous window.
+bound. At lease release, unused quota is returned when the identity has no
+current-window admitted work and no active operation. Otherwise, inactive quota
+remains reclaimable. Rollover resets window debt and refreshes connected
+reservations while retaining in-flight ownership, including requests started in
+the previous window.
 
 Reconnection can reuse or refill an allowance only while shared capacity
 remains. It does not guarantee a disconnected identity capacity against
