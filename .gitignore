@@ -85,3 +85,4 @@ coverage/
 !/tests/support/lock-fixture.ts
 !/tests/support/native-runtime.ts
 !/tests/support/egress-cases.ts
+!/tests/support/native-reader.ts
