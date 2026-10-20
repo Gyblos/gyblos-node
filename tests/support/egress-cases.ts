@@ -4,7 +4,7 @@ import { once } from 'node:events';
 import test from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
 
-import type { EndpointAddr, SendStream } from '@number0/iroh';
+import type { BiStream, EndpointAddr, SendStream } from '@number0/iroh';
 
 import { HTTP_STATUS, LOCALHOST, P2P } from '@gyblos/config';
 
@@ -212,11 +212,13 @@ export function registerEgressCases() {
       );
       // Seven independent incomplete ingress streams retain every other slot.
       const holders: Awaited<ReturnType<typeof lab.client>>[] = [];
+      const heldStreams: BiStream[] = [];
       const previousStreams = lab.serverStreams;
       for (let index = 1; index < P2P.maxEgressConcurrent; index++) {
         const holder = await lab.client();
         holders.push(holder);
         const stream = await holder.connection.openBi();
+        heldStreams.push(stream);
         await stream.send.writeAll([
           ...Buffer.from('POST /inference HTTP/1.1\r\n'),
         ]);
@@ -259,6 +261,7 @@ export function registerEgressCases() {
         HTTP_STATUS.paymentRequired,
       );
       assert.equal(holders.length + 1, P2P.maxEgressConcurrent);
+      assert.equal(heldStreams.length, holders.length);
       assert.ok(
         holders.every((holder) => holder.connection.closeReason() === null),
         'Other slots must still be held when the freed slot serves a new peer.',
