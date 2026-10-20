@@ -1,5 +1,7 @@
+import { TRANSPORT_ROUTES } from './constants.js';
+
 export type TransportRoute =
-  'loopback' | 'iroh-direct' | 'iroh-relay' | 'unknown';
+  (typeof TRANSPORT_ROUTES)[keyof typeof TRANSPORT_ROUTES];
 
 export interface HttpMessage {
   headers: Record<string, string>;
