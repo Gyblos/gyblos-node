@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { TOKEN_PROGRAM_ADDRESS } from '@gyblos/config';
+import { CHANNEL_PROGRAM, TOKEN_PROGRAM_ADDRESS } from '@gyblos/config';
 import { verifyEscrowRent } from '@gyblos/gate/escrow-rent';
 
 import {
@@ -101,8 +101,7 @@ export function registerRentCases() {
       info.lamports = Number(info.lamports) + 1;
     },
     'wrong escrow create program': (f) => {
-      accountInstruction(f, true, 'createAccount').programId =
-        TOKEN_PROGRAM_ADDRESS;
+      accountInstruction(f, true, 'createAccount').programId = CHANNEL_PROGRAM;
     },
     'missing escrow creation': (f) => {
       accountInstruction(f, true, 'createAccount').parsed!.type = 'omitted';
@@ -119,7 +118,14 @@ export function registerRentCases() {
       rentInfo(f, false, 'closeAccount').owner = f.expected.buyer;
     },
     'missing escrow close': (f) => {
-      accountInstruction(f, false, 'closeAccount').parsed!.type = 'omitted';
+      f.source.claim.transaction.message.instructions =
+        f.source.claim.transaction.message.instructions.filter(
+          (instruction) => instruction.parsed?.type !== 'closeAccount',
+        );
+      for (const group of f.source.claim.meta.innerInstructions ?? [])
+        group.instructions = group.instructions.filter(
+          (instruction) => instruction.parsed?.type !== 'closeAccount',
+        );
     },
     'duplicate escrow close': (f) => {
       f.source.claim.transaction.message.instructions.push(
@@ -202,6 +208,11 @@ export function registerRentCases() {
     test('finalized rent/proof rejects ' + name, async () => {
       const fixture = await paymentFixture();
       mutate(fixture);
-      await assert.rejects(verifyPayment(fixture));
+      if (name === 'missing escrow close')
+        await assert.rejects(
+          verifyPayment(fixture),
+          /One canonical escrow closure is required/,
+        );
+      else await assert.rejects(verifyPayment(fixture));
     });
 }
