@@ -5,11 +5,29 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 import { Endpoint, RelayMode, type Connection } from '@number0/iroh';
 
-import { IPV6_LOOPBACK, LOCALHOST, P2P, ROUTES } from '@gyblos/config';
+import {
+  HTTP_STATUS,
+  IPV6_LOOPBACK,
+  LOCALHOST,
+  P2P,
+  ROUTES,
+} from '@gyblos/config';
 import { TRANSPORT_ROUTES } from '@gyblos/transport/constants';
 import { createIrohTransport } from '@gyblos/transport/iroh-client';
 import { serveIroh } from '@gyblos/transport/iroh-server';
 import { decodeResponse, encodeRequest } from '@gyblos/transport/wire';
+
+interface FixtureOptions {
+  freeStatus?: number;
+  dropPaidResponse?: boolean;
+}
+
+export class NativeTestDeadlineError extends Error {
+  constructor() {
+    super('Synthetic native test deadline exceeded');
+    this.name = 'NativeTestDeadlineError';
+  }
+}
 
 async function endpoint(secret?: number[]) {
   const builder = Endpoint.builder();
@@ -37,7 +55,7 @@ export async function within<T>(operation: Promise<T>, milliseconds = 3500) {
     return await Promise.race([
       operation,
       delay(milliseconds, undefined, { signal: controller.signal }).then(() => {
-        throw Error('Synthetic native test deadline exceeded');
+        throw new NativeTestDeadlineError();
       }),
     ]);
   } finally {
@@ -45,7 +63,10 @@ export async function within<T>(operation: Promise<T>, milliseconds = 3500) {
   }
 }
 
-export async function fixture(freeStatus = 402) {
+export async function fixture({
+  freeStatus = HTTP_STATUS.paymentRequired,
+  dropPaidResponse = false,
+}: FixtureOptions = {}) {
   const seller = await endpoint();
   const clients: Endpoint[] = [];
   const transports: ReturnType<typeof createIrohTransport>[] = [];
@@ -89,6 +110,10 @@ export async function fixture(freeStatus = 402) {
     paid.set(String(authorization), { requestId, executions: 1, claims: 1 });
     executed++;
     onPaid?.();
+    if (dropPaidResponse) {
+      response.destroy();
+      return;
+    }
     if (requestId === 'hold-after-simulated-settlement')
       await new Promise<void>((resolve) => {
         holdResponse = resolve;
