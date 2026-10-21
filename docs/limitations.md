@@ -151,9 +151,14 @@ to a freshly reserved slot at most 3 times per process; a pending rotation
 occupies one queue entry. After that, records are dropped and health degrades
 with `STORAGE_LIMIT` for the rest of the process. One process therefore writes
 at most 16 MiB, and the named diagnostic files total at most 16 x 4 MiB = 64
-MiB. A buyer can still exhaust a process's rotations; rotation only raises that
-cost fourfold. Because rotation reclaims the oldest files when the pool is full,
-such traffic can also evict up to three older diagnostic files per process.
+MiB. That bound covers named slot files only: a crash during reclamation can
+leave a `diagnostic-reclaim-*.reclaim` quarantine file next to a full pool (17
+files) until a later reclamation removes it, and an unlinked inode still open by
+another process keeps its blocks until that process closes it. A record larger
+than the per-file budget is dropped with `STORAGE_LIMIT` instead of rotating. A
+buyer can still exhaust a process's rotations; rotation only raises that cost
+fourfold. Because rotation reclaims the oldest files when the pool is full, such
+traffic can also evict up to three older diagnostic files per process.
 
 When all slots are taken, opening (at start or rotation) reclaims the slot file
 with the oldest last append. Only an exact `diagnostic-N.jsonl` slot name in the

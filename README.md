@@ -106,17 +106,19 @@ acknowledgment. Neither record is proof of settlement, refund or delivery.
 
 Logging does not await disk I/O on the payment path. It is bounded to 128
 pending entries, 4 KiB per record, 4 MiB per file, 3 budget rotations per
-process and 16 files (at most 64 MiB). When every slot is taken, the oldest
-settled `diagnostic-N.jsonl` file owned by this subsystem is deleted after
-ownership, link and inode checks; otherwise opening fails closed. Archive files
-you must keep privately, because restarts and rotations reclaim the oldest
-diagnostics. A full queue, exhausted rotations or persistence failure degrades
-diagnostic health and emits a fixed warning without retrying or replacing a
-payment result. Files are never truncated or repaired. Mixed legacy layouts that
-cannot preserve the bound are refused. Drain and descriptor close share a
-two-second deadline; file opening, including rotation, has no deadline. Late
-disconnected SDK work is not awaited, and its final diagnostics can be lost at
-shutdown. See
+process and 16 named slot files (at most 64 MiB). A crash during reclamation can
+leave one extra quarantine file until a later reclamation removes it, and an
+unlinked file still open by another process keeps its blocks until it closes;
+neither is counted in that bound. When every slot is taken, the oldest settled
+`diagnostic-N.jsonl` file owned by this subsystem is deleted after ownership,
+link and inode checks; otherwise opening fails closed. Archive files you must
+keep privately, because restarts and rotations reclaim the oldest diagnostics. A
+full queue, exhausted rotations or persistence failure degrades diagnostic
+health and emits a fixed warning without retrying or replacing a payment result.
+Files are never truncated or repaired. Mixed legacy layouts that cannot preserve
+the bound are refused. Drain and descriptor close share a two-second deadline;
+file opening, including rotation, has no deadline. Late disconnected SDK work is
+not awaited, and its final diagnostics can be lost at shutdown. See
 [diagnostic limits](docs/limitations.md#private-facilitator-diagnostics).
 
 ## Quickstart: make a fixed-resource payment
