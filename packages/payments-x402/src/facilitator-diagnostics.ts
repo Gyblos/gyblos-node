@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { isAddress, isSignature } from '@solana/kit';
+import { isAddress } from '@solana/kit';
 import {
   FacilitatorTimeoutError,
   SettleError,
@@ -28,6 +28,7 @@ import {
   type FacilitatorStage,
   type PublicCallOperation,
 } from './constants.js';
+import { signatureHint } from './signature-hint.js';
 
 export interface FacilitatorDiagnosticRecord {
   schemaVersion: typeof FACILITATOR_DIAGNOSTIC_SCHEMA;
@@ -73,10 +74,6 @@ function field(value: unknown, key: string): unknown {
     // Never coerce or serialize a hostile SDK property.
   }
   return undefined;
-}
-
-function signature(value: unknown): string | undefined {
-  return typeof value === 'string' && isSignature(value) ? value : undefined;
 }
 
 function reason(value: unknown): FacilitatorDiagnosticCode {
@@ -127,7 +124,7 @@ function resultDetail(operation: PublicCallOperation, result: unknown): Detail {
   return {
     sdkSuccess: typeof success === 'boolean' ? success : undefined,
     code: success === false ? reason(candidate) : undefined,
-    transaction: signature(field(result, 'transaction')),
+    transaction: signatureHint(field(result, 'transaction')),
   };
 }
 
@@ -139,7 +136,7 @@ function exceptionDetail(error: unknown): Detail {
     )
       return {
         code: FACILITATOR_DIAGNOSTIC_CODES.CONFIRMATION_UNKNOWN,
-        transaction: signature(field(error, 'signature')),
+        transaction: signatureHint(field(error, 'signature')),
       };
     if (error instanceof SettlementSimulationError)
       return { code: FACILITATOR_DIAGNOSTIC_CODES.SIMULATION_REJECTED };
@@ -150,7 +147,7 @@ function exceptionDetail(error: unknown): Detail {
     if (error instanceof SettleError)
       return {
         code: reason(field(error, 'errorReason')),
-        transaction: signature(field(error, 'transaction')),
+        transaction: signatureHint(field(error, 'transaction')),
       };
     if (error instanceof VerifyError)
       return { code: reason(field(error, 'invalidReason')) };
