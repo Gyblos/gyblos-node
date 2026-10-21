@@ -1,3 +1,5 @@
+import { LOCAL_DIR } from './paths.js';
+
 export const DIAGNOSTICS = {
   minimumVmAvailableBytes: 1536 * 1024 * 1024,
   minimumCgroupHeadroomBytes: 1536 * 1024 * 1024,
@@ -25,4 +27,19 @@ export const DIAGNOSTICS = {
   },
   readinessFilename: 'engine-readiness.json',
   warmupMs: 90_000,
+} as const;
+
+export const PRIVATE_LOG_LIMITS = {
+  fileBytes: 4 * 1024 * 1024,
+  recordBytes: 4096,
+  pendingRecords: 128,
+  maxFiles: 16,
+  drainMs: 2000,
+  filenamePrefix: 'diagnostic-',
+  filenameSuffix: '.jsonl',
+} as const;
+
+export const FACILITATOR_LOG_PATHS = {
+  devnet: `${LOCAL_DIR}/facilitator-diagnostics`,
+  roleDirectory: 'facilitator-diagnostics',
 } as const;
