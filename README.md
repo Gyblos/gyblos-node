@@ -4,18 +4,20 @@ Experimental x402 payments for Gyblos, a P2P inference project. A buyer
 authorizes a budget, a seller reports token usage, and a facilitator settles the
 charge and returns the unused deposit on Solana. This repository runs
 fixed-resource checks, local Ollama inference and an experimental native Iroh
-transport between isolated Docker roles and native peers. One earlier Mac–VPS
-run completed three direct paid devnet inferences with a test token; its
-[historical report](evidence/gate-0007.json) does not validate the current head.
-A later attempt at `24af211` completed its first call; the second settled
-on-chain but left the buyer uncertain, so the third was not started. Subsequent
-diagnostic and read-consistency fixes are validated offline, without another
-payment. Use
-[PR #10's validation record](https://github.com/Gyblos/gyblos-payments/pull/10)
-for the exact candidate, checks and incomplete paid acceptance. Another physical
-smoke needs explicit VPS/funds authorization and must match its final commit.
-Docker NAT-direct did not pass. Hotspot/CGNAT and broader NAT coverage remain
-untested.
+transport between isolated Docker roles and native peers. The final paid smoke
+on `ba168c4` completed three strictly sequential native Mac–VPS inferences over
+required direct Iroh routes, with a devnet test token and persistent facilitator
+diagnostics enabled. All six payment transactions finalized; each delivered
+answer passed independent recount and a finalized payment audit before the next
+request started. See the [commit-bound report](evidence/gate-0008.json).
+
+The [older report](evidence/gate-0007.json) remains historical. The separate
+`24af211` attempt completed its first call; its second settled on-chain but left
+the buyer uncertain, so its third was never started. That old journal and the
+unknown historical 402 cause remain unresolved. This successful new run used
+fresh isolated roles and did not retry or clear the old authorization. Docker
+NAT-direct did not pass. Hotspot/CGNAT and broader NAT coverage remain untested.
+PR #10 remains unmerged; issues #17–#23 stay deferred.
 
 > **Status:** experimental, Solana **devnet** only. Not audited. Never use
 > mainnet keys. Part of [Gyblos](https://gyblos.com) ·
@@ -248,10 +250,11 @@ candidates, including an idle control. Those candidates remain disabled by
 default and do not establish automatic discovery. Default discovery still used
 relay: its learned addresses omitted the intermediate lab WAN and shared an
 outer public IP. Upstream hairpin failure is a hypothesis, not a demonstrated
-cause. A later native Mac–VPS trial observed direct routing and completed paid
-devnet inference at source `2c8eeac` ([report](evidence/gate-0007.json)). This
-separate trial does not resolve the original Docker public-return cause or turn
-the earlier paid NAT-direct case into a passing Docker payment gate.
+cause. The final native Mac–VPS smoke observed direct routing and completed
+three sequential paid devnet inferences at source `ba168c4`
+([report](evidence/gate-0008.json)). This separate trial does not resolve the
+original Docker public-return cause or turn the earlier paid NAT-direct case
+into a passing Docker payment gate.
 
 To discover a usable address automatically **inside the simulated WAN**, run the
 separate observer-assisted mode:
@@ -475,12 +478,13 @@ sources use full addresses, including full IPv6 addresses rather than prefixes;
 relay sources use the remote endpoint identity. Free identities or multiple
 addresses can therefore bypass a single actor's effective source budget. A
 shared NAT may see temporary handshake rejection; additional sources can
-saturate pending capacity. Relay compatibility of the new admission checks and
-off-host behavior remain untested on the current head. Public regressions cover
-FIFO/process failures, quota debt and rollover, real loopback Iroh reconnection,
-malformed frames and simulated payment delivery failures. Nine single-request,
-disconnected identities no longer exclude a newcomer; known peers still refuse
-work after all 256 actual admissions until rollover. The earlier unconditional
+saturate pending capacity. Relay compatibility and adversarial off-host
+admission testing remain unvalidated. The final physical smoke covers the
+selected direct paid happy path. Public regressions cover FIFO/process failures,
+quota debt and rollover, real loopback Iroh reconnection, malformed frames and
+simulated payment delivery failures. Nine single-request, disconnected
+identities no longer exclude a newcomer; known peers still refuse work after all
+256 actual admissions until rollover. The earlier unconditional
 disconnected-grace expectation is superseded by this best-effort contract.
 
 The public finalized payment-pair fixture retains selected historical on-chain
@@ -494,13 +498,44 @@ also inject rename errors. Export cases use synthetic paid rows/traces, a
 separate raw-derived zero-charge proof and mocked container process creation.
 These checks establish offline behavior, without a fresh chain audit or physical
 signed-offer recovery run. Raw evidence and private measurements remain
-excluded. The historical paid report is retained for provenance; the
-[current candidate validation record](https://github.com/Gyblos/gyblos-payments/pull/10)
-tracks the exact final commit, smoke authorization/status and per-request
-ceiling, charge and refund. A successful smoke must verify that each charge plus
-refund equals its authorized ceiling, and that their aggregate sums match. Docs
-link that record so recording a result does not change the tested commit. No
-current-head paid success is implied by the historical report.
+excluded. The owner-authorized [final paid report](evidence/gate-0008.json) is a
+curated metadata-only exception, bound to the exact tested source
+`ba168c4fae043dc1170268cad9c0852d3c7533d9` and its verified source archive.
+Later evidence and documentation commits record that run; they do not claim that
+another runtime revision was paid-tested.
+
+### Final paid smoke: native Mac seller and VPS buyer
+
+On 2026-10-21, three short synthetic requests ran strictly one after another,
+using only the devnet test token. Each CLI invocation and its unchanged
+finalized transaction/current-channel audit completed before the next began.
+Required-direct admission passed before signing; all sampled 402 and 200
+exchanges were direct, with no relay observation. All answers were delivered and
+independently recounted within tolerance. Amounts below are atomic units.
+
+| Request | Authorized | Charged | Refunded | Conservation        |
+| ------- | ---------- | ------- | -------- | ------------------- |
+| 1       | 556        | 140     | 416      | 140 + 416 = 556     |
+| 2       | 558        | 139     | 419      | 139 + 419 = 558     |
+| 3       | 558        | 147     | 411      | 147 + 411 = 558     |
+| Total   | 1,672      | 426     | 1,246    | 426 + 1,246 = 1,672 |
+
+Six distinct selected transactions finalized. Buyer/seller token deltas were
+−426/+426; buyer SOL delta was zero. The sponsor paid 60,006 lamports in payment
+transaction fees, with 5,852,160 lamports retained as channel rent. Safe
+facilitator diagnostics persisted 24 records: six successful SDK settlement
+results and six local HTTP 200 finishes, zero dropped records or SDK exceptions.
+These observations accompany the independent delivery and on-chain checks.
+
+No request overlapped, became uncertain or was retried. Historical task files
+and all 14 existing containers retained their observed metadata; only owned
+smoke actors were stopped. The [report](evidence/gate-0008.json) publishes
+public signatures, amounts, route categories and source hashes. Keys, salts,
+prompts, response content, IPs, endpoint tickets, RPC URLs, raw logs and private
+measurements/journals remain excluded. This one configuration does not establish
+every packet's path, production discovery, Sybil resistance, model/content
+correctness or general recovery. The old uncertain payment remains intact;
+issues #17–#23 are outside this frozen scope. The PR is not merged.
 
 ## Pay through a public facilitator
 
