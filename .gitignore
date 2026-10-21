@@ -106,3 +106,6 @@ coverage/
 # Malformed signature diagnostic regressions
 !/tests/support/signature-facilitator-cases.ts
 !/tests/support/signature-buyer-cases.ts
+
+# Loopback Host (DNS rebinding) regressions
+!/tests/support/loopback-host-cases.ts

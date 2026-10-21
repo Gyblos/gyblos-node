@@ -14,6 +14,7 @@ import {
   DEVNET,
   MAX_ATOMIC,
 } from '@gyblos/payments-x402/constants';
+import { requireLoopbackHost } from '@gyblos/runtime/loopback-host';
 
 export async function createGateSeller(options: {
   rpcUrl: string;
@@ -35,6 +36,7 @@ export async function createGateSeller(options: {
   );
   await resource.initialize();
   const app = express();
+  app.use(requireLoopbackHost);
   let handlerCalls = 0;
   app.get(ROUTES.health, (_request, response) => {
     response.json({
