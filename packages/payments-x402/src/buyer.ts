@@ -1,4 +1,4 @@
-import { isSignature, type KeyPairSigner, type Signature } from '@solana/kit';
+import type { KeyPairSigner, Signature } from '@solana/kit';
 import type { PaymentRequirements } from '@x402/core/types';
 import {
   decodePaymentResponseHeader,
@@ -10,6 +10,8 @@ import { UptoSvmScheme } from '@x402/svm/upto/client';
 import { TIMEOUTS } from '@gyblos/config';
 import { DEVNET } from '@gyblos/payments-x402/constants';
 import { validateTerms, type TrustPolicy } from '@gyblos/payments-x402/trust';
+
+import { signatureHint } from './signature-hint.js';
 
 export interface BuyerResponseObservation {
   status: number;
@@ -141,12 +143,10 @@ export function createBuyer(
               // Invalid headers must not erase the original response error.
             }
           }
-          const candidate = settlement?.transaction;
+          const claimSignature = signatureHint(settlement?.transaction);
           await hooks.responseObserved({
             status: response.status,
-            ...(typeof candidate === 'string' && isSignature(candidate)
-              ? { claimSignature: candidate }
-              : {}),
+            ...(claimSignature ? { claimSignature } : {}),
           });
         }
       }
