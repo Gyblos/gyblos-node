@@ -29,6 +29,21 @@ export interface PrivateLogOptions {
   drainMs?: number;
 }
 
+function storageCode(error: unknown): PrivateLogCode {
+  try {
+    if (error instanceof PrivateLogError) {
+      const candidate = error.code;
+      const canonical = Object.values(PRIVATE_LOG_CODES).find(
+        (code) => code === candidate,
+      );
+      if (canonical) return canonical;
+    }
+  } catch {
+    // Hostile error prototypes/getters never become diagnostic data.
+  }
+  return PRIVATE_LOG_CODES.PERSISTENCE_FAILED;
+}
+
 export async function createPrivateLog(
   directory: string,
   options: PrivateLogOptions = {},
@@ -82,11 +97,7 @@ export async function createPrivateLog(
     file = await openPrivateLogFile(directory);
   } catch (error) {
     poisoned = true;
-    degrade(
-      error instanceof PrivateLogError
-        ? error.code
-        : PRIVATE_LOG_CODES.PERSISTENCE_FAILED,
-    );
+    degrade(storageCode(error));
   }
   const pump = async () => {
     while (queue.length && !poisoned) {
@@ -99,11 +110,7 @@ export async function createPrivateLog(
         poisoned = true;
         dropped += queue.length + 1;
         queue.splice(0);
-        degrade(
-          error instanceof PrivateLogError
-            ? error.code
-            : PRIVATE_LOG_CODES.PERSISTENCE_FAILED,
-        );
+        degrade(storageCode(error));
       } finally {
         inFlight = false;
       }
@@ -124,7 +131,13 @@ export async function createPrivateLog(
       return;
     }
     try {
-      const line = JSON.stringify(record) + '\n';
+      const serialized = JSON.stringify(record);
+      if (typeof serialized !== 'string') {
+        dropped++;
+        degrade(PRIVATE_LOG_CODES.PERSISTENCE_FAILED);
+        return;
+      }
+      const line = serialized + '\n';
       const bytes = Buffer.byteLength(line);
       if (bytes > limits.recordBytes) {
         dropped++;
@@ -149,13 +162,14 @@ export async function createPrivateLog(
       degrade(PRIVATE_LOG_CODES.PERSISTENCE_FAILED);
     }
   };
-  const flush = async () => {
+  const drain = async () => {
+    while (running) await running;
+  };
+  const bounded = async (work: Promise<void>) => {
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
       await Promise.race([
-        (async () => {
-          while (running) await running;
-        })(),
+        work,
         new Promise<void>((resolve) => {
           timer = setTimeout(() => {
             degrade(PRIVATE_LOG_CODES.DRAIN_TIMEOUT);
@@ -166,8 +180,12 @@ export async function createPrivateLog(
     } finally {
       clearTimeout(timer);
     }
+  };
+  const flush = async () => {
+    await bounded(drain());
     return health();
   };
+
   return {
     write,
     health,
@@ -175,19 +193,18 @@ export async function createPrivateLog(
     path: file?.path,
     close(): Promise<PrivateLogHealth> {
       if (closing) return closing;
-      closing = (async () => {
-        accepting = false;
-        await flush();
-        const finish = async () => {
-          try {
-            await file?.close();
-          } catch {
-            degrade(PRIVATE_LOG_CODES.PERSISTENCE_FAILED);
-          }
+      accepting = false;
+      const finish = async () => {
+        try {
+          await drain();
+          await file?.close();
           closed = true;
-        };
-        if (running) void running.then(finish);
-        else await finish();
+        } catch {
+          degrade(PRIVATE_LOG_CODES.PERSISTENCE_FAILED);
+        }
+      };
+      closing = (async () => {
+        await bounded(finish());
         return health();
       })();
       return closing;
