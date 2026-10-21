@@ -19,6 +19,7 @@ import { registerExportCases } from './support/export-cases.js';
 import { registerLockCases } from './support/lock-cases.js';
 import { NATIVE_CAPABILITY } from './support/native-runtime.js';
 import { registerRecoveryCases } from './support/recovery-cases.js';
+import { registerSignatureBuyerCases } from './support/signature-buyer-cases.js';
 
 test('request-specific ceiling rejects altered challenges before any signature or paid request', async () => {
   const original = globalThis.fetch;
@@ -209,3 +210,5 @@ registerRecoveryCases();
 registerExportCases();
 
 registerCallCases();
+
+registerSignatureBuyerCases();
