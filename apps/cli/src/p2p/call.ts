@@ -15,6 +15,7 @@ import {
   measurementSalt,
 } from '@gyblos/gate/measurements';
 import { assertProgram } from '@gyblos/payments-x402/chain';
+import type { BuyerDiagnosticCode } from '@gyblos/payments-x402/constants';
 import { createInferenceBuyer } from '@gyblos/payments-x402/inference-buyer';
 import { validateSettlement } from '@gyblos/payments-x402/trust';
 import { isMain, saveJson } from '@gyblos/runtime';
@@ -90,6 +91,7 @@ async function run() {
   let confirmedProof: Awaited<ReturnType<typeof paymentProof>> | undefined;
   let phase: CallPhase = CALL_PHASES.REQUEST;
   let observedPayment: CallPaymentObservation | undefined;
+  let responseObservation: BuyerDiagnosticCode | undefined;
   let authorization: { channelId: string; ceiling: string } | undefined,
     signedAt = performance.now();
   const retainAuthorization = async () => {
@@ -126,6 +128,9 @@ async function run() {
         observedPayment = observation;
         if (authorization) await retainAuthorization();
       },
+      responseObservationFailed(code) {
+        responseObservation = code;
+      },
       async authorized(channelId, amount) {
         authorization = { channelId, ceiling: amount };
         await retainAuthorization();
@@ -138,6 +143,7 @@ async function run() {
       request,
     );
     assert.ok(authorization);
+    if (responseObservation) await retainAuthorization(); // Retry before proof.
     assert.equal(authorization.ceiling, ceiling);
     assert.equal(response.status, HTTP_STATUS.ok);
     assert.ok(response.receipt?.transaction);
@@ -241,6 +247,7 @@ async function run() {
       measurement: row,
       transport: paid,
       metrics,
+      ...(responseObservation ? { responseObservation } : {}),
     };
     phase = CALL_PHASES.PERSISTENCE;
     await saveJson(rolePath(P2P.callsFilename), [
@@ -253,6 +260,7 @@ async function run() {
     const result = {
       failure: { phase, code: errorDiagnostic(error) },
       observedPayment,
+      ...(responseObservation ? { responseObservation } : {}),
       metrics: await readCallMetrics(
         rolePath(P2P.metricsFilename),
         request.requestId,
