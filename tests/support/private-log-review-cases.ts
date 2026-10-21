@@ -112,6 +112,65 @@ export function registerPrivateLogReviewCases() {
     },
   );
   test(
+    'mixed legacy and out-of-pool slots cannot expose excess concurrent capacity',
+    { timeout: 10000, skip: PRIVATE_LOG_PLATFORM_SKIP },
+    async () => {
+      const directory = await diagnosticDirectory();
+      try {
+        await withLogIo(async () => {
+          const preserved = [
+            'legacy',
+            ...Array.from(
+              { length: PRIVATE_LOG_LIMITS.maxFiles - 3 },
+              (_, index) => index,
+            ),
+            PRIVATE_LOG_LIMITS.maxFiles - 1,
+          ];
+          for (const index of preserved)
+            await writeFile(
+              join(
+                directory,
+                PRIVATE_LOG_LIMITS.filenamePrefix +
+                  index +
+                  PRIVATE_LOG_LIMITS.filenameSuffix,
+              ),
+              'old\n',
+              { mode: 0o600 },
+            );
+          const logs = await Promise.all([
+            createPrivateLog(directory),
+            createPrivateLog(directory),
+          ]);
+          try {
+            assert.ok(
+              logs.every(
+                (log) => log.health().code === PRIVATE_LOG_CODES.STORAGE_LIMIT,
+              ),
+            );
+            assert.equal((await readdir(directory)).length, preserved.length);
+            for (const index of preserved)
+              assert.equal(
+                await readFile(
+                  join(
+                    directory,
+                    PRIVATE_LOG_LIMITS.filenamePrefix +
+                      index +
+                      PRIVATE_LOG_LIMITS.filenameSuffix,
+                  ),
+                  'utf8',
+                ),
+                'old\n',
+              );
+          } finally {
+            await Promise.all(logs.map((log) => log.close()));
+          }
+        });
+      } finally {
+        await rm(directory, { recursive: true });
+      }
+    },
+  );
+  test(
     'bounded close includes descriptor retirement and reports pending cleanup truthfully',
     { timeout: 10000, skip: PRIVATE_LOG_PLATFORM_SKIP },
     async () => {
