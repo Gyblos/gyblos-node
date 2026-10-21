@@ -9,6 +9,13 @@ import {
   DEVNET_USDC,
 } from '../packages/payments-x402/src/constants.js';
 import { createFacilitator } from '../packages/payments-x402/src/facilitator.js';
+import { registerFacilitatorHttpCases } from './support/facilitator-http-cases.js';
+import { registerFacilitatorObserverCases } from './support/facilitator-observer-cases.js';
+import { registerFacilitatorPrivacyCases } from './support/facilitator-privacy-cases.js';
+import { registerFacilitatorStartupCases } from './support/facilitator-startup-cases.js';
+import { registerPrivateLogCases } from './support/private-log-cases.js';
+import { registerPrivateLogGuardCases } from './support/private-log-guard-cases.js';
+import { registerPrivateLogReviewCases } from './support/private-log-review-cases.js';
 
 test('malformed payment cannot crash the facilitator or reach settlement', async () => {
   const signer = await generateKeyPairSigner();
@@ -52,3 +59,11 @@ test('malformed payment cannot crash the facilitator or reach settlement', async
     await once(server, 'close');
   }
 });
+
+registerFacilitatorObserverCases();
+registerFacilitatorPrivacyCases();
+registerFacilitatorHttpCases();
+registerPrivateLogCases();
+registerPrivateLogGuardCases();
+registerPrivateLogReviewCases();
+registerFacilitatorStartupCases();
