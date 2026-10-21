@@ -9,6 +9,7 @@ import {
   CLEANUP,
   DEVNET,
   DIAGNOSTICS,
+  FACILITATOR_LOG_PATHS,
   HOSTS,
   INFERENCE_REQUEST_LIMITS,
   LOCALHOST,
@@ -34,6 +35,7 @@ import {
   stopChild,
   waitReady,
 } from '@gyblos/runtime';
+import { createPrivateLog } from '@gyblos/runtime/private-log';
 import { createInferenceSeller } from '@gyblos/seller/inference';
 import { withDeadline } from '@gyblos/transport/deadline';
 import { bindEndpoint } from '@gyblos/transport/endpoint';
@@ -115,11 +117,26 @@ export async function startSeller() {
     const owner = await roleSigner('owner'),
       authorizer = await roleSigner('authorizer'),
       facilitator = await roleSigner('facilitator');
-    const host = createFacilitator(facilitator, config.rpcUrl, {
-      buyer: config.buyer,
-      mint: config.mint,
-      payTo: config.payTo,
-      authorizer: authorizer.address,
+    const diagnosticLog = await createPrivateLog(
+      rolePath(FACILITATOR_LOG_PATHS.roleDirectory),
+    );
+    disposers.push(async () => {
+      await diagnosticLog.close();
+    });
+    const host = createFacilitator(
+      facilitator,
+      config.rpcUrl,
+      {
+        buyer: config.buyer,
+        mint: config.mint,
+        payTo: config.payTo,
+        authorizer: authorizer.address,
+      },
+      undefined,
+      { onDiagnostic: diagnosticLog.write },
+    );
+    host.app.get(ROUTES.facilitatorDiagnostics, (_request, response) => {
+      response.json(diagnosticLog.health());
     });
     const facilitatorServer = host.app.listen(PORTS.facilitator, LOCALHOST);
     await once(facilitatorServer, 'listening');
