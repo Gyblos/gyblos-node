@@ -32,6 +32,7 @@ interface BuyerScenario {
   measureResponse: boolean;
   bodyError?: Error;
   observationError?: Error;
+  reporterRejects?: boolean;
 }
 
 async function observeBuyer(scenario: BuyerScenario) {
@@ -95,9 +96,14 @@ async function observeBuyer(scenario: BuyerScenario) {
           observed = value;
           if (scenario.observationError) throw scenario.observationError;
         },
-        responseObservationFailed(code) {
-          failures.push(code);
-        },
+        responseObservationFailed: scenario.reporterRejects
+          ? async (code) => {
+              failures.push(code);
+              throw new Error(DIAGNOSTIC_CANARY);
+            }
+          : (code) => {
+              failures.push(code);
+            },
       },
     );
     const request = buyer.request('https://synthetic.invalid/', undefined, {
@@ -176,6 +182,29 @@ export function registerSignatureBuyerCases() {
       });
       assert.deepEqual(failures, ['RESPONSE_OBSERVATION_FAILED']);
     });
+    for (const truncated of [false, true])
+      test(`observation failure: a rejecting asynchronous reporter neither replaces the ${truncated ? 'body error' : 'result'} nor leaks: measured=${measureResponse}`, async () => {
+        const unhandled: unknown[] = [];
+        const onUnhandled = (reason: unknown) => unhandled.push(reason);
+        process.on('unhandledRejection', onUnhandled);
+        try {
+          const { failures } = await observeBuyer({
+            transaction: DIAGNOSTIC_SIGNATURE,
+            measureResponse,
+            observationError: new Error(DIAGNOSTIC_CANARY),
+            reporterRejects: true,
+            ...(truncated
+              ? { bodyError: new SyntaxError(DIAGNOSTIC_CANARY) }
+              : {}),
+          });
+          assert.deepEqual(failures, ['RESPONSE_OBSERVATION_FAILED']);
+          await new Promise((resolve) => setImmediate(resolve));
+          await new Promise((resolve) => setImmediate(resolve));
+          assert.deepEqual(unhandled, []);
+        } finally {
+          process.off('unhandledRejection', onUnhandled);
+        }
+      });
     test(`observation failure: a successful observer leaves the result and error unchanged without a code: measured=${measureResponse}`, async () => {
       for (const bodyError of [undefined, new SyntaxError(DIAGNOSTIC_CANARY)]) {
         const { observed, failures } = await observeBuyer({

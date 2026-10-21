@@ -158,9 +158,12 @@ export function createBuyer(
             // An observer failure must not replace the original result or
             // error; it is reported only as a canonical code.
             try {
-              hooks.responseObservationFailed?.(
+              const reported: unknown = hooks.responseObservationFailed?.(
                 BUYER_DIAGNOSTIC_CODES.RESPONSE_OBSERVATION_FAILED,
               );
+              // An asynchronous reporter may reject; consume it so it can
+              // neither crash the process nor expose its error.
+              void Promise.resolve(reported).catch(() => undefined);
             } catch {
               // A failing reporter must not replace the outcome either.
             }
