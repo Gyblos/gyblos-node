@@ -15,7 +15,9 @@ import { registerFacilitatorPrivacyCases } from './support/facilitator-privacy-c
 import { registerFacilitatorStartupCases } from './support/facilitator-startup-cases.js';
 import { registerPrivateLogCases } from './support/private-log-cases.js';
 import { registerPrivateLogGuardCases } from './support/private-log-guard-cases.js';
+import { registerPrivateLogReclaimCases } from './support/private-log-reclaim-cases.js';
 import { registerPrivateLogReviewCases } from './support/private-log-review-cases.js';
+import { registerPrivateLogRotationCases } from './support/private-log-rotation-cases.js';
 import { registerSignatureFacilitatorCases } from './support/signature-facilitator-cases.js';
 
 test('malformed payment cannot crash the facilitator or reach settlement', async () => {
@@ -67,6 +69,8 @@ registerFacilitatorHttpCases();
 registerPrivateLogCases();
 registerPrivateLogGuardCases();
 registerPrivateLogReviewCases();
+registerPrivateLogReclaimCases();
+registerPrivateLogRotationCases();
 registerFacilitatorStartupCases();
 
 registerSignatureFacilitatorCases();

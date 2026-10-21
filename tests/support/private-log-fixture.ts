@@ -1,10 +1,25 @@
-import fsPromises, { type FileHandle } from 'node:fs/promises';
+import fsPromises, {
+  lstat,
+  readdir,
+  readFile,
+  readlink,
+  utimes,
+  writeFile,
+  type FileHandle,
+} from 'node:fs/promises';
 import { syncBuiltinESMExports } from 'node:module';
+import { join } from 'node:path';
+
+import { PRIVATE_LOG_LIMITS } from '@gyblos/config';
 
 export const PRIVATE_LOG_PLATFORM_SKIP =
   process.platform === 'win32'
     ? 'Private log ownership, modes and directory fsync require macOS or Linux'
     : false;
+
+export const SETTLED_AGE_SECONDS = 24 * 60 * 60;
+
+type PatchableFs = 'lstat' | 'rename';
 
 interface LogIo {
   sync?: () => Promise<void>;
@@ -76,6 +91,61 @@ export async function withLogIo<T>(run: (io: LogIo) => Promise<T>) {
   } finally {
     fsPromises.open = originalOpen;
     console.error = originalWarning;
+    syncBuiltinESMExports();
+  }
+}
+
+export function slotName(index: number | string) {
+  return (
+    PRIVATE_LOG_LIMITS.filenamePrefix +
+    index +
+    PRIVATE_LOG_LIMITS.filenameSuffix
+  );
+}
+
+/** Creates a private journal whose last append is `ageSeconds` in the past. */
+export async function seedJournal(
+  directory: string,
+  name: string,
+  ageSeconds: number,
+) {
+  const path = join(directory, name);
+  await writeFile(path, name + '\n', { mode: 0o600, flag: 'wx' });
+  const time = new Date(Date.now() - ageSeconds * 1000);
+  await utimes(path, time, time);
+  return path;
+}
+
+/** Inode and content of every entry, to prove nothing was replaced. */
+export async function directorySnapshot(directory: string) {
+  const entries: Record<string, string> = {};
+  for (const name of (await readdir(directory)).sort()) {
+    const path = join(directory, name);
+    const info = await lstat(path);
+    entries[name] =
+      info.ino +
+      ':' +
+      (info.isSymbolicLink()
+        ? 'link->' + (await readlink(path))
+        : info.isFile()
+          ? await readFile(path, 'utf8')
+          : 'directory');
+  }
+  return entries;
+}
+
+export async function withFsPatch<Name extends PatchableFs, T>(
+  name: Name,
+  wrap: (original: (typeof fsPromises)[Name]) => (typeof fsPromises)[Name],
+  run: () => Promise<T>,
+) {
+  const original = fsPromises[name];
+  fsPromises[name] = wrap(original);
+  syncBuiltinESMExports();
+  try {
+    return await run();
+  } finally {
+    fsPromises[name] = original;
     syncBuiltinESMExports();
   }
 }
