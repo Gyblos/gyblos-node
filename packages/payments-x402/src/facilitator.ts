@@ -1,3 +1,5 @@
+import { errorMonitor } from 'node:events';
+
 import type { KeyPairSigner } from '@solana/kit';
 import { x402Facilitator } from '@x402/core/facilitator';
 import type { PaymentPayload, PaymentRequirements } from '@x402/core/types';
@@ -82,7 +84,7 @@ export function createFacilitator(
             httpStatus: response.headersSent ? response.statusCode : undefined,
           });
       });
-      response.once('error', () =>
+      response.once(errorMonitor, () =>
         attempt.record(FACILITATOR_STAGES.RESPONSE_ERROR, {
           code: FACILITATOR_DIAGNOSTIC_CODES.RESPONSE_ERROR,
         }),
