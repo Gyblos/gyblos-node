@@ -18,6 +18,15 @@ export const HOSTS = {
 
 export const IPV6_LOOPBACK = '[::1]';
 
+export const LOCALHOST_NAME = 'localhost';
+
+// Host header names accepted by loopback-bound HTTP servers (DNS rebinding guard).
+export const LOOPBACK_HOST_NAMES = [
+  LOCALHOST,
+  LOCALHOST_NAME,
+  IPV6_LOOPBACK,
+] as const;
+
 export const EXPLORER_ORIGIN = 'https://explorer.solana.com';
 
 export const PUBLIC_ORIGINS = { tokenizer: 'https://huggingface.co' } as const;
