@@ -98,21 +98,25 @@ from this new stream. Existing in-memory `/gate/events` and
 `/gate/verifications` are separate legacy diagnostics, outside this projection.
 
 The loopback facilitator exposes `GET /gate/diagnostics`: `state`, a canonical
-failure `code`, `queued`, `synced`, `dropped` and `closed`. `synced` advances
-only after append and filesystem sync; queued records can be lost on a crash.
-SDK rejection can retain HTTP 200 from the facilitator and cause a
-seller-facing 402. HTTP finish is local completion, not buyer acknowledgment.
-Neither record is proof of settlement, refund or delivery.
+failure `code`, `queued`, `synced`, `dropped`, `rotations` and `closed`.
+`synced` advances only after append and filesystem sync; queued records can be
+lost on a crash. SDK rejection can retain HTTP 200 from the facilitator and
+cause a seller-facing 402. HTTP finish is local completion, not buyer
+acknowledgment. Neither record is proof of settlement, refund or delivery.
 
 Logging does not await disk I/O on the payment path. It is bounded to 128
-pending records, 4 KiB per record, 4 MiB per file and 16 instance files. A full
-queue, exhausted storage or persistence failure degrades diagnostic health and
-emits a fixed warning without retrying or replacing a payment result. Archive
-closed instance files privately before exhausting the file budget; files are
-never automatically deleted, repaired or rotated. Mixed legacy layouts that
+pending entries, 4 KiB per record, 4 MiB per file, 3 budget rotations per
+process and 16 files (at most 64 MiB). When every slot is taken, the oldest
+settled `diagnostic-N.jsonl` file owned by this subsystem is deleted after
+ownership, link and inode checks; otherwise opening fails closed. Archive files
+you must keep privately, because restarts and rotations reclaim the oldest
+diagnostics. A full queue, exhausted rotations or persistence failure degrades
+diagnostic health and emits a fixed warning without retrying or replacing a
+payment result. Files are never truncated or repaired. Mixed legacy layouts that
 cannot preserve the bound are refused. Drain and descriptor close share a
-two-second deadline; initial file opening has no deadline. Late disconnected SDK
-work is not awaited, and its final diagnostics can be lost at shutdown. See
+two-second deadline; file opening, including rotation, has no deadline. Late
+disconnected SDK work is not awaited, and its final diagnostics can be lost at
+shutdown. See
 [diagnostic limits](docs/limitations.md#private-facilitator-diagnostics).
 
 ## Quickstart: make a fixed-resource payment
