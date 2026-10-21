@@ -16,6 +16,7 @@ import { registerFacilitatorStartupCases } from './support/facilitator-startup-c
 import { registerPrivateLogCases } from './support/private-log-cases.js';
 import { registerPrivateLogGuardCases } from './support/private-log-guard-cases.js';
 import { registerPrivateLogReviewCases } from './support/private-log-review-cases.js';
+import { registerSignatureFacilitatorCases } from './support/signature-facilitator-cases.js';
 
 test('malformed payment cannot crash the facilitator or reach settlement', async () => {
   const signer = await generateKeyPairSigner();
@@ -67,3 +68,5 @@ registerPrivateLogCases();
 registerPrivateLogGuardCases();
 registerPrivateLogReviewCases();
 registerFacilitatorStartupCases();
+
+registerSignatureFacilitatorCases();
