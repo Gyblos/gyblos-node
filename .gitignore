@@ -91,3 +91,14 @@ coverage/
 !/tests/support/call-fixture.ts
 !/tests/support/call-cases.ts
 !/tests/support/proof-read-cases.ts
+
+# Safe facilitator diagnostic and private-storage regression support
+!/tests/support/facilitator-diagnostic-fixture.ts
+!/tests/support/facilitator-http-cases.ts
+!/tests/support/facilitator-observer-cases.ts
+!/tests/support/facilitator-privacy-cases.ts
+!/tests/support/facilitator-startup-cases.ts
+!/tests/support/private-log-cases.ts
+!/tests/support/private-log-fixture.ts
+!/tests/support/private-log-guard-cases.ts
+!/tests/support/private-log-review-cases.ts
