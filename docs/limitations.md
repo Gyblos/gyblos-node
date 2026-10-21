@@ -144,28 +144,55 @@ historical exception or identify the precise cause of the `24af211` second
 request. That authorization remains uncertain and charged historically; do not
 retry it, clear its journal or invoke zero-charge recovery.
 
-The queue is nonblocking and bounded to 128 pending records, each at most 4 KiB,
-with a 4 MiB file budget. New instances exclusively reserve one of 16 file
-slots. Preserved legacy files consume this budget; incompatible mixed slot
-layouts fail closed for logging. There is no automatic truncation, repair,
-rotation or deletion. Archive only closed diagnostic files to private storage as
-operator maintenance, separately from payment journals and locks.
+The queue is nonblocking and bounded to 128 pending entries, each record at most
+4 KiB, with a 4 MiB budget per file. New instances exclusively reserve one of 16
+`diagnostic-N.jsonl` slots. When a file's budget is exhausted the writer rotates
+to a freshly reserved slot at most 3 times per process; a pending rotation
+occupies one queue entry. After that, records are dropped and health degrades
+with `STORAGE_LIMIT` for the rest of the process. One process therefore writes
+at most 16 MiB, and the named diagnostic files total at most 16 x 4 MiB = 64
+MiB. A buyer can still exhaust a process's rotations; rotation only raises that
+cost fourfold. Because rotation reclaims the oldest files when the pool is full,
+such traffic can also evict up to three older diagnostic files per process.
+
+When all slots are taken, opening (at start or rotation) reclaims the slot file
+with the oldest last append. Only an exact `diagnostic-N.jsonl` slot name in the
+verified private directory qualifies, and only if `lstat` shows a regular,
+single-link `0600` file owned by the current uid, last modified at least 60
+seconds ago and not held open by this process. The file is atomically renamed to
+a unique `diagnostic-reclaim-*.reclaim` name; its device, inode, size and mtime
+are rechecked before unlinking. A concurrently vanished file is treated as a
+freed slot; an identity change restores the file without overwriting a newer one
+and fails closed with `STORAGE_LIMIT`, as does a pool with no qualifying file.
+Settled quarantine leftovers from a crash during this step are removed by later
+reclamation. Legacy files, symlinks, hard links, other names and other owners
+are never deleted; preserved legacy files consume slots, and incompatible mixed
+slot layouts fail closed. Truncation and repair never occur.
+
+Reclamation makes the directory a ring buffer: restarts and rotations delete the
+oldest diagnostics. Archive closed files you must keep to private storage before
+that happens, separately from payment journals and locks. Another running
+process whose file has been idle for 60 seconds can lose that file; its next
+append then fails its identity check and degrades instead of writing elsewhere.
+Until it closes, the unlinked inode keeps its disk blocks but no longer grows.
 
 `GET /gate/diagnostics` is exposed by the loopback actors and returns only
-canonical health and counters. `synced` means append, file sync and identity
-checks completed; enqueue is not durable retention. Initialization or append
-failure, exhausted limits and drain timeout produce degraded health and a fixed
-warning without printing paths or raw errors. These failures do not replace SDK
-responses, authorize payment or cause payment retries. A damaged append poisons
-that writer; a restart reserves a separate file, preserving the old tail for
-private investigation.
+canonical health and counters, including the number of `rotations`. `synced`
+means append, file sync and identity checks completed; enqueue is not durable
+retention. Initialization or append failure, exhausted limits and drain timeout
+produce degraded health and a fixed warning without printing paths or raw
+errors. These failures do not replace SDK responses, authorize payment or cause
+payment retries. A damaged append poisons that writer; a restart reserves a
+separate file, preserving the old tail for private investigation until slot
+reclamation removes it as the oldest file.
 
 Flush and full descriptor close have a two-second bound. A timed-out close
-reports `closed: false` while cleanup remains pending; initial directory/file
-opening is not deadline-bounded. Normal actor shutdown drains queued records,
-not disconnected in-flight SDK operations. A crash, forced exit, failed cleanup
-or late SDK return can lose pending events. Diagnostic persistence does not make
-the SDK's channel storage durable and does not implement reconciliation.
+reports `closed: false` while cleanup remains pending; directory/file opening,
+including rotation and reclamation, is not deadline-bounded. Normal actor
+shutdown drains queued records, not disconnected in-flight SDK operations. A
+crash, forced exit, failed cleanup or late SDK return can lose pending events.
+Diagnostic persistence does not make the SDK's channel storage durable and does
+not implement reconciliation.
 
 Owner/mode, link and inode checks plus `O_NOFOLLOW` protect cooperative local
 POSIX storage on macOS/Linux. They are not a defense against an adversary

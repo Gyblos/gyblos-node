@@ -102,6 +102,8 @@ coverage/
 !/tests/support/private-log-fixture.ts
 !/tests/support/private-log-guard-cases.ts
 !/tests/support/private-log-review-cases.ts
+!/tests/support/private-log-reclaim-cases.ts
+!/tests/support/private-log-rotation-cases.ts
 
 # Malformed signature diagnostic regressions
 !/tests/support/signature-facilitator-cases.ts

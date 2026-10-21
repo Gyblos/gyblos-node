@@ -37,6 +37,12 @@ export const PRIVATE_LOG_LIMITS = {
   drainMs: 2000,
   filenamePrefix: 'diagnostic-',
   filenameSuffix: '.jsonl',
+  // Budget-exhaustion rotations per process (1 + maxRotations files at most).
+  maxRotations: 3,
+  // Slot files and stale quarantines younger than this are never reclaimed.
+  reclaimMinAgeMs: 60_000,
+  quarantineInfix: 'reclaim-',
+  quarantineSuffix: '.reclaim',
 } as const;
 
 export const FACILITATOR_LOG_PATHS = {
