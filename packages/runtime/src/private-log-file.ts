@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import { constants } from 'node:fs';
 import { lstat, mkdir, open, readdir, type FileHandle } from 'node:fs/promises';
 import { join, parse, resolve, sep } from 'node:path';
@@ -88,22 +87,39 @@ export async function openPrivateLogFile(
   let handle: FileHandle | undefined;
   try {
     await sameFile(directoryHandle, absolute, true);
-    const path = join(
-      absolute,
-      PRIVATE_LOG_LIMITS.filenamePrefix +
-        randomUUID() +
+    const slotNames = Array.from(
+      { length: PRIVATE_LOG_LIMITS.maxFiles },
+      (_, index) =>
+        PRIVATE_LOG_LIMITS.filenamePrefix +
+        index +
         PRIVATE_LOG_LIMITS.filenameSuffix,
     );
-    handle = await open(
-      path,
-      constants.O_WRONLY |
-        constants.O_CREAT |
-        constants.O_EXCL |
-        constants.O_APPEND |
-        constants.O_NOFOLLOW |
-        constants.O_NONBLOCK,
-      FILE_MODES.privateFile,
-    );
+    const legacyCount = files.filter(
+      (name) => !slotNames.includes(name),
+    ).length;
+    let path = '';
+    for (const name of slotNames.slice(
+      0,
+      PRIVATE_LOG_LIMITS.maxFiles - legacyCount,
+    )) {
+      path = join(absolute, name);
+      try {
+        handle = await open(
+          path,
+          constants.O_WRONLY |
+            constants.O_CREAT |
+            constants.O_EXCL |
+            constants.O_APPEND |
+            constants.O_NOFOLLOW |
+            constants.O_NONBLOCK,
+          FILE_MODES.privateFile,
+        );
+        break;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+      }
+    }
+    if (!handle) throw new PrivateLogError(PRIVATE_LOG_CODES.STORAGE_LIMIT);
     const fileHandle = handle;
     await sameFile(fileHandle, path);
     await fileHandle.sync();
