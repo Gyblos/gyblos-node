@@ -24,6 +24,7 @@ import {
   MAX_ATOMIC,
   PUBLIC_CALL_OPERATIONS,
 } from '@gyblos/payments-x402/constants';
+import { requireLoopbackHost } from '@gyblos/runtime/loopback-host';
 
 import {
   createFacilitatorObserver,
@@ -64,6 +65,7 @@ export function createFacilitator(
   const facilitator = new x402Facilitator().register(DEVNET, scheme);
   const cleanup = scheme.createRentCleanupManager(DEVNET);
   const app = express();
+  app.use(requireLoopbackHost);
   const observe = createFacilitatorObserver(diagnostics);
   const attempts = new WeakMap<Request, ReturnType<typeof observe>>();
   for (const operation of [

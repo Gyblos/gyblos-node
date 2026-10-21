@@ -176,6 +176,15 @@ behavior and arbitrary legacy fields; they are not persisted by this writer and
 are outside its safe-projection guarantee. Do not publish them as sanitized
 evidence.
 
+Loopback binding alone does not stop DNS rebinding: a web page can resolve its
+own name to `127.0.0.1` and make the browser read local responses. The
+facilitator, gate/inference/exact sellers and the P2P buyer proxy therefore
+reject any `Host` other than `127.0.0.1`, `localhost` or `[::1]` with the exact
+local port (empty 421, before routes and body parsers; Node rejects HTTP/1.1
+without `Host` with 400 first). This is not authentication: any local process,
+or a browser page served from a loopback origin on that port, can still call
+these routes. Ollama is a separate process and is not covered by this check.
+
 ## Inference and verification limits
 
 Buyer measurements have no signed seller receipt. Token recounts detect

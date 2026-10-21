@@ -556,6 +556,13 @@ model setup. Inference and public fixed-price sellers use ephemeral ports. Child
 Ollama processes use the local model directory and have cloud inference
 disabled.
 
+Gate-owned HTTP servers (facilitator, sellers and the P2P buyer proxy) answer
+only requests whose `Host` is `127.0.0.1`, `localhost` or `[::1]` with the exact
+listening port. Any other or missing `Host` gets an empty **421** before routing
+or body parsing (Node itself answers HTTP/1.1 without `Host` with 400). This
+blocks DNS-rebinding reads from a browser; it is not authentication against
+local processes.
+
 ## Project structure
 
 ```text

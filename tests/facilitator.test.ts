@@ -13,6 +13,7 @@ import { registerFacilitatorHttpCases } from './support/facilitator-http-cases.j
 import { registerFacilitatorObserverCases } from './support/facilitator-observer-cases.js';
 import { registerFacilitatorPrivacyCases } from './support/facilitator-privacy-cases.js';
 import { registerFacilitatorStartupCases } from './support/facilitator-startup-cases.js';
+import { registerLoopbackHostCases } from './support/loopback-host-cases.js';
 import { registerPrivateLogCases } from './support/private-log-cases.js';
 import { registerPrivateLogGuardCases } from './support/private-log-guard-cases.js';
 import { registerPrivateLogReviewCases } from './support/private-log-review-cases.js';
@@ -70,3 +71,4 @@ registerPrivateLogReviewCases();
 registerFacilitatorStartupCases();
 
 registerSignatureFacilitatorCases();
+registerLoopbackHostCases();
