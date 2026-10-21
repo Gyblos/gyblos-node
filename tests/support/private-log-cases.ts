@@ -155,6 +155,7 @@ export function registerPrivateLogCases() {
           const log = await createPrivateLog(join(directory, 'log'), {
             recordBytes: 32,
             fileBytes: 40,
+            maxRotations: 0,
           });
           log.write({ small: 1 });
           await log.flush();
