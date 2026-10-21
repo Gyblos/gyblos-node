@@ -97,11 +97,18 @@ export async function openPrivateLogFile(
     const legacyCount = files.filter(
       (name) => !slotNames.includes(name),
     ).length;
-    let path = '';
-    for (const name of slotNames.slice(
+    const allowedSlots = slotNames.slice(
       0,
       PRIVATE_LOG_LIMITS.maxFiles - legacyCount,
-    )) {
+    );
+    if (
+      files.some(
+        (name) => slotNames.includes(name) && !allowedSlots.includes(name),
+      )
+    )
+      throw new PrivateLogError(PRIVATE_LOG_CODES.STORAGE_LIMIT);
+    let path = '';
+    for (const name of allowedSlots) {
       path = join(absolute, name);
       try {
         handle = await open(
