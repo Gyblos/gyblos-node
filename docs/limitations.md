@@ -88,6 +88,16 @@ buyer preserves receipt-header hints even when body parsing fails. Arbitrary
 error messages, stacks, causes, response bodies and credential URLs are not
 copied into these diagnostics.
 
+A failing response observer, such as a buyer journal write hitting a full or
+read-only disk, no longer replaces the buyer's original result or body error.
+The buyer reports only `RESPONSE_OBSERVATION_FAILED`, recorded as
+`responseObservation` on the call row and any uncertain journal. Before proof,
+the P2P call retries the authorization journal write once; if that also fails,
+the call stays uncertain at the response phase and the earlier authorized
+journal still blocks new payments until reconciled. Only a completed proof
+confirms the journal. This does not make local persistence durable; an
+unwritable disk can still lose the call row and leave only that journal.
+
 After a confirmed claim, deposit discovery rereads a temporarily missing index
 within the existing configured transaction-read budget. History queries and the
 post-claim snapshot use the known claim slot as `minContextSlot`; an account

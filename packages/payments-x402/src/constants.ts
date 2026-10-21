@@ -95,6 +95,13 @@ export const FACILITATOR_DIAGNOSTIC_CODES = {
   RESPONSE_ERROR: 'RESPONSE_ERROR',
 } as const;
 
+export const BUYER_DIAGNOSTIC_CODES = {
+  RESPONSE_OBSERVATION_FAILED: 'RESPONSE_OBSERVATION_FAILED',
+} as const;
+
+export type BuyerDiagnosticCode =
+  (typeof BUYER_DIAGNOSTIC_CODES)[keyof typeof BUYER_DIAGNOSTIC_CODES];
+
 export type FacilitatorStage =
   (typeof FACILITATOR_STAGES)[keyof typeof FACILITATOR_STAGES];
 export type FacilitatorPhase =

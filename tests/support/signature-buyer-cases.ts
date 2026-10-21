@@ -9,7 +9,11 @@ import {
   createBuyer,
   type BuyerResponseObservation,
 } from '@gyblos/payments-x402/buyer';
-import { DEVNET, DEVNET_USDC } from '@gyblos/payments-x402/constants';
+import {
+  DEVNET,
+  DEVNET_USDC,
+  type BuyerDiagnosticCode,
+} from '@gyblos/payments-x402/constants';
 
 import {
   DIAGNOSTIC_CANARY,
@@ -27,6 +31,7 @@ interface BuyerScenario {
   transaction: string;
   measureResponse: boolean;
   bodyError?: Error;
+  observationError?: Error;
 }
 
 async function observeBuyer(scenario: BuyerScenario) {
@@ -37,6 +42,7 @@ async function observeBuyer(scenario: BuyerScenario) {
     signed = 0,
     authorizations = 0;
   let observed: BuyerResponseObservation | undefined;
+  const failures: BuyerDiagnosticCode[] = [];
   const settlement = {
     success: true,
     network: DEVNET,
@@ -85,8 +91,12 @@ async function observeBuyer(scenario: BuyerScenario) {
         throw new Error('Authorization is forbidden');
       },
       {
-        responseObserved(value) {
+        async responseObserved(value) {
           observed = value;
+          if (scenario.observationError) throw scenario.observationError;
+        },
+        responseObservationFailed(code) {
+          failures.push(code);
         },
       },
     );
@@ -103,7 +113,8 @@ async function observeBuyer(scenario: BuyerScenario) {
       assert.equal(result.authorization, undefined);
     }
     assert.ok(!JSON.stringify(observed).includes(DIAGNOSTIC_CANARY));
-    return observed;
+    assert.ok(!JSON.stringify(failures).includes(DIAGNOSTIC_CANARY));
+    return { observed, failures };
   } finally {
     globalThis.fetch = originalFetch;
     assert.equal(requests, 1);
@@ -121,17 +132,18 @@ export function registerSignatureBuyerCases() {
           const bodyError = truncated
             ? new SyntaxError(DIAGNOSTIC_CANARY)
             : undefined;
-          const observed = await observeBuyer({
+          const { observed, failures } = await observeBuyer({
             transaction,
             measureResponse,
             bodyError,
           });
           assert.deepEqual(observed, { status: 200 });
+          assert.deepEqual(failures, []);
         }
       });
     test(`signature hints: buyer retains a valid hint on result and original body failure: measured=${measureResponse}`, async () => {
       for (const bodyError of [undefined, new SyntaxError(DIAGNOSTIC_CANARY)]) {
-        const observed = await observeBuyer({
+        const { observed, failures } = await observeBuyer({
           transaction: DIAGNOSTIC_SIGNATURE,
           measureResponse,
           bodyError,
@@ -140,6 +152,42 @@ export function registerSignatureBuyerCases() {
           status: 200,
           claimSignature: DIAGNOSTIC_SIGNATURE,
         });
+        assert.deepEqual(failures, []);
+      }
+    });
+    test(`observation failure: buyer returns the original 200 result with a valid receipt and reports the canonical code: measured=${measureResponse}`, async () => {
+      const { observed, failures } = await observeBuyer({
+        transaction: DIAGNOSTIC_SIGNATURE,
+        measureResponse,
+        observationError: new Error(DIAGNOSTIC_CANARY),
+      });
+      assert.deepEqual(observed, {
+        status: 200,
+        claimSignature: DIAGNOSTIC_SIGNATURE,
+      });
+      assert.deepEqual(failures, ['RESPONSE_OBSERVATION_FAILED']);
+    });
+    test(`observation failure: buyer preserves the original body parse error and reports the canonical code: measured=${measureResponse}`, async () => {
+      const { failures } = await observeBuyer({
+        transaction: DIAGNOSTIC_SIGNATURE,
+        measureResponse,
+        bodyError: new SyntaxError(DIAGNOSTIC_CANARY),
+        observationError: new Error(DIAGNOSTIC_CANARY),
+      });
+      assert.deepEqual(failures, ['RESPONSE_OBSERVATION_FAILED']);
+    });
+    test(`observation failure: a successful observer leaves the result and error unchanged without a code: measured=${measureResponse}`, async () => {
+      for (const bodyError of [undefined, new SyntaxError(DIAGNOSTIC_CANARY)]) {
+        const { observed, failures } = await observeBuyer({
+          transaction: DIAGNOSTIC_SIGNATURE,
+          measureResponse,
+          bodyError,
+        });
+        assert.deepEqual(observed, {
+          status: 200,
+          claimSignature: DIAGNOSTIC_SIGNATURE,
+        });
+        assert.deepEqual(failures, []);
       }
     });
   }
