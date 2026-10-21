@@ -63,6 +63,45 @@ export const CHANNEL_GUARDS = {
   MINIMUM: 'Retained channel rent is below minimum.',
 } as const;
 
+export const FACILITATOR_DIAGNOSTIC_SCHEMA = 1;
+
+export const FACILITATOR_STAGES = {
+  RECEIVED: 'received',
+  POLICY_REJECTED: 'policy-rejected',
+  SDK_STARTED: 'sdk-started',
+  SDK_RESULT: 'sdk-result',
+  SDK_EXCEPTION: 'sdk-exception',
+  RESPONSE_FINISHED: 'http-finished',
+  RESPONSE_CLOSED: 'http-early-close',
+  RESPONSE_ERROR: 'http-error',
+} as const;
+
+export const FACILITATOR_PHASES = {
+  DEPOSIT: 'deposit',
+  CLAIM: 'claim',
+  UNKNOWN: 'unknown',
+} as const;
+
+export const FACILITATOR_DIAGNOSTIC_CODES = {
+  POLICY_REJECTED: 'POLICY_REJECTED',
+  SDK_REJECTED: 'SDK_REJECTED',
+  SDK_EXCEPTION: 'SDK_EXCEPTION',
+  SETTLEMENT_PENDING: 'SETTLEMENT_PENDING',
+  TRANSACTION_FAILED: 'TRANSACTION_FAILED',
+  SIMULATION_REJECTED: 'SIMULATION_REJECTED',
+  CONFIRMATION_UNKNOWN: 'CONFIRMATION_UNKNOWN',
+  TIMEOUT: 'TIMEOUT',
+  ABORTED: 'ABORTED',
+  RESPONSE_ERROR: 'RESPONSE_ERROR',
+} as const;
+
+export type FacilitatorStage =
+  (typeof FACILITATOR_STAGES)[keyof typeof FACILITATOR_STAGES];
+export type FacilitatorPhase =
+  (typeof FACILITATOR_PHASES)[keyof typeof FACILITATOR_PHASES];
+export type FacilitatorDiagnosticCode =
+  (typeof FACILITATOR_DIAGNOSTIC_CODES)[keyof typeof FACILITATOR_DIAGNOSTIC_CODES];
+
 export type GateErrorCode =
   (typeof GATE_ERROR_CODES)[keyof typeof GATE_ERROR_CODES];
 
