@@ -52,6 +52,26 @@ async function indexes(path: string) {
 
 export function registerPrivateLogRotationCases() {
   test(
+    'a record larger than one file is dropped without rotating',
+    OPTIONS,
+    () =>
+      inTemporaryDirectory(async (directory) => {
+        const fileBytes = 8;
+        const log = await createPrivateLog(directory, {
+          fileBytes,
+          recordBytes: 64,
+        });
+        log.write({ ok: true });
+        const health = await log.close();
+        assert.equal(health.code, PRIVATE_LOG_CODES.STORAGE_LIMIT);
+        assert.equal(health.synced, 0);
+        assert.equal(health.dropped, 1);
+        assert.equal(health.rotations, 0);
+        for (const name of await readdir(directory))
+          assert.ok((await lstat(join(directory, name))).size <= fileBytes);
+      }),
+  );
+  test(
     'budget exhaustion rotates a bounded number of times, then drops',
     OPTIONS,
     () =>

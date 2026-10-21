@@ -165,6 +165,13 @@ export async function createPrivateLog(
         degrade(PRIVATE_LOG_CODES.RECORD_LIMIT);
         return;
       }
+      // A record that cannot fit in one file would exceed its hard budget
+      // even after rotation.
+      if (bytes > limits.fileBytes) {
+        dropped++;
+        degrade(PRIVATE_LOG_CODES.STORAGE_LIMIT);
+        return;
+      }
       const rotate = reservedBytes + bytes > limits.fileBytes;
       if (rotate && rotations >= limits.maxRotations) {
         dropped++;
