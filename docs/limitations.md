@@ -2,18 +2,25 @@
 
 This repository is an experimental TypeScript x402 payment foundation for
 Gyblos. It exercises Solana devnet fixed resources and a local Ollama inference
-gate, plus an experimental native Iroh PoC. One earlier Wi-Fi Mac–VPS direct
-trial completed three paid devnet requests using a test SPL mint, not USDC. That
-report is historical; it does not validate the current source. The exact
-candidate hash and final-head paid-smoke status belong to
-[PR #10's validation record](https://github.com/Gyblos/gyblos-payments/pull/10).
-The additional `24af211` attempt is partial: the first request completed, the
+gate, plus an experimental native Iroh PoC. The owner-authorized final paid
+smoke on `ba168c4fae043dc1170268cad9c0852d3c7533d9` completed three strictly
+sequential native Mac-seller/VPS-buyer requests with required direct Iroh routes
+and a test SPL mint, not USDC. Every delivered answer passed independent recount
+and the unchanged finalized transaction/current-channel audit before the next
+request. The [commit-bound report](../evidence/gate-0008.json) records source
+hashes, six finalized signatures, per-request accounting and safe persistent
+facilitator diagnostics. Subsequent publication commits contain evidence and
+documentation only; this run validates the specified runtime source.
+
+The [older physical report](../evidence/gate-0007.json) remains historical. The
+separate `24af211` attempt is still partial: its first request completed, the
 second settled on-chain but left an uncertain buyer journal, and the third never
-started. Later fixes have offline validation only; the precise historical error
-was discarded and remains unknown. A new paid smoke needs explicit VPS/funds
-approval and must use its unchanged final commit. Docker NAT-direct did not
-pass; hotspot/CGNAT and broader NAT coverage remain untested. Use isolated
-generated devnet wallets only. Never import mainnet keys.
+started. The original error was discarded and remains unknown. This new run used
+fresh isolated roles without retrying or clearing the old authorization; it does
+not provide charged recovery. Docker NAT-direct did not pass; hotspot/CGNAT and
+broader NAT coverage remain untested. PR #10 is unmerged and issues #17–#23
+remain deferred. Use isolated generated devnet wallets only. Never import
+mainnet keys.
 
 ## Payment scope
 
@@ -351,10 +358,13 @@ canonical deposit validation, full-escrow observation and the awaited code path.
 It does not authenticate remote model/content correctness.
 
 The explicitly authorized redacted reports are `evidence/gate-0006.json` for
-Docker/diagnostics and `evidence/gate-0007.json` for physical-network attempts.
-They contain public settlement metadata and synthetic-case measurements, not
-keys, salts, content, signed payment payloads, RPC URLs or endpoint addresses.
-Raw measurements and reconciliation records remain private. See the
+Docker/diagnostics, `evidence/gate-0007.json` for historical physical-network
+attempts, and `evidence/gate-0008.json` for the final three-request smoke on
+`ba168c4`. The last report contains only selected source/runtime metadata,
+public settlement signatures and amounts, route categories and safe diagnostic
+fields. It includes no keys, salts, prompts, response content, IPs, signed
+payment payloads, RPC URLs or endpoint tickets/addresses. Raw measurements, logs
+and reconciliation journals remain private. See the
 [Docker command](../README.md#experimental-iroh-docker-trial) for prerequisites.
 
 ## Verified P2P reconciliation and reproducible audits
@@ -542,14 +552,21 @@ compatibility, on-chain replay or exactly-once settlement. Existing charged or
 missing-claim recovery, ordinary confirmed journal clearance, journal-derived
 paid exports, remaining command diagnostics and broader native/Sybil/source-key/
 relay/privacy limits remain follow-ups. Raw transaction responses, private logs,
-measurements and evidence remain excluded. The historical physical report is
-retained separately from the
-[current candidate validation record](https://github.com/Gyblos/gyblos-payments/pull/10).
-Only a new smoke bound to the exact final commit can validate that candidate.
-Its per-request and total charge plus refund must equal the authorized ceiling.
-Updating that external record leaves the tested Git revision unchanged;
-historical evidence never implies a later-head paid pass. Broader lab
-reorganization, typechecking of all diagnostic JavaScript and alternate-engine
-rollout remain follow-up work. Measurement code can accept the explicit
-allowlisted offer model identity while existing fixed-engine gates retain their
-pinned default; this does not validate another engine end to end.
+measurements and uncurated evidence remain excluded. The explicitly authorized
+[final smoke report](../evidence/gate-0008.json) is bound to `ba168c4` and
+retains only allowlisted metadata. Its atomic-unit results are 556 = 140 + 416,
+558 = 139 + 419 and 558 = 147 + 411: total authorization 1,672 = charge 426 +
+refund 1,246. All six selected transactions finalized; buyer/seller token deltas
+were −426/+426 and buyer SOL was unchanged. The sponsor paid 60,006 lamports in
+payment fees and retained 5,852,160 lamports as channel rent. Twenty-four safe
+diagnostic records were synced without loss; six SDK settlements succeeded and
+six facilitator HTTP responses finished with 200. No request overlapped,
+remained uncertain or was retried. Sampled direct paths are not packet-level
+proof, and local HTTP finish alone is not delivery or finality. The old charged
+uncertainty and issues #17–#23 remain open outside this scope. Evidence/docs
+publication does not claim payment execution on a different source revision; PR
+#10 remains unmerged. Broader lab reorganization, typechecking of all diagnostic
+JavaScript and alternate-engine rollout remain follow-up work. Measurement code
+can accept the explicit allowlisted offer model identity while existing
+fixed-engine gates retain their pinned default; this does not validate another
+engine end to end.
