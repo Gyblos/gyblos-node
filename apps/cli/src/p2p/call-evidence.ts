@@ -2,9 +2,10 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { STATUS_CODES } from 'node:http';
 
-import { isSignature, type Signature } from '@solana/kit';
+import type { Signature } from '@solana/kit';
 
 import type { BuyerResponseObservation } from '@gyblos/payments-x402/buyer';
+import { signatureHint } from '@gyblos/payments-x402/signature-hint';
 import type { RouteObservation } from '@gyblos/transport';
 import { TRANSPORT_ROUTES } from '@gyblos/transport/constants';
 
@@ -77,13 +78,11 @@ export function proofObservation(
   status: number,
   value: PaymentProofObservation,
 ): CallPaymentObservation {
+  const claimSignature = signatureHint(value.claimSignature);
+  const depositSignature = signatureHint(value.depositSignature);
   return {
     status,
-    ...(isSignature(value.claimSignature)
-      ? { claimSignature: value.claimSignature }
-      : {}),
-    ...(isSignature(value.depositSignature)
-      ? { depositSignature: value.depositSignature }
-      : {}),
+    ...(claimSignature ? { claimSignature } : {}),
+    ...(depositSignature ? { depositSignature } : {}),
   };
 }
