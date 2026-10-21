@@ -80,6 +80,41 @@ post-claim snapshots must reach the known claim slot. A remaining failure blocks
 another authorization. See
 [reconciliation limits](docs/limitations.md#uncertain-outcomes-and-manual-reconciliation).
 
+## Private facilitator diagnostics
+
+The standalone facilitator and the P2P seller append private JSONL records to
+`.local/devnet/facilitator-diagnostics/` and
+`.local/p2p/facilitator-diagnostics/`, respectively, relative to the role's
+working directory. Each process reserves a separate `diagnostic-N.jsonl` file;
+files use mode `0600`, and their directory uses `0700`. Keep these files out of
+Git and public reports.
+
+Records identify the SDK version, process instance, attempt, operation,
+deposit/claim phase and ordered stages: received, policy decision, SDK start,
+SDK result/exception, and local HTTP finish or early close/error. Only bounded,
+validated channel, amount and transaction-signature hints are included. Raw
+errors, messages, stacks, payloads, salts, prompts and RPC URLs are excluded
+from this new stream. Existing in-memory `/gate/events` and
+`/gate/verifications` are separate legacy diagnostics, outside this projection.
+
+The loopback facilitator exposes `GET /gate/diagnostics`: `state`, a canonical
+failure `code`, `queued`, `synced`, `dropped` and `closed`. `synced` advances
+only after append and filesystem sync; queued records can be lost on a crash.
+SDK rejection can retain HTTP 200 from the facilitator and cause a
+seller-facing 402. HTTP finish is local completion, not buyer acknowledgment.
+Neither record is proof of settlement, refund or delivery.
+
+Logging does not await disk I/O on the payment path. It is bounded to 128
+pending records, 4 KiB per record, 4 MiB per file and 16 instance files. A full
+queue, exhausted storage or persistence failure degrades diagnostic health and
+emits a fixed warning without retrying or replacing a payment result. Archive
+closed instance files privately before exhausting the file budget; files are
+never automatically deleted, repaired or rotated. Mixed legacy layouts that
+cannot preserve the bound are refused. Drain and descriptor close share a
+two-second deadline; initial file opening has no deadline. Late disconnected SDK
+work is not awaited, and its final diagnostics can be lost at shutdown. See
+[diagnostic limits](docs/limitations.md#private-facilitator-diagnostics).
+
 ## Quickstart: make a fixed-resource payment
 
 Requirements: Node.js 22+, pnpm 10.12.1 and access to a Solana devnet RPC. Run
