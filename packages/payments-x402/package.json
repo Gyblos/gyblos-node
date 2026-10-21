@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",
-    "@gyblos/application": "workspace:*"
+    "@gyblos/application": "workspace:*",
+    "@gyblos/runtime": "workspace:*"
   }
 }

@@ -1,0 +1,1470 @@
+{
+  "schemaVersion": 1,
+  "evidenceId": "GYB-GATE-0006",
+  "source": {
+    "algorithm": "sha256(sorted source path NUL bytes NUL)",
+    "digest": "26461ab51a91e95b3e4a70f55a36bc71ed3e28bd19b6a5788522b40604d50c43"
+  },
+  "runId": "1dfb05ac-56b4-4047-98a3-d9313c4c753b",
+  "recordedAt": "2026-10-19T06:33:18.404Z",
+  "status": "partial",
+  "network": "solana-devnet",
+  "assetLabel": "devnet-test-token",
+  "mint": "2vXUXK2rJTPtb7Wx9em4W9FdgtfD6HTnFxZz5oirLVcH",
+  "sdk": {
+    "iroh": "1.1.0",
+    "x402": "2.28.0"
+  },
+  "images": {
+    "runtime": "sha256:b366aa3bca41d5a60b140307f6599342ec08ac5ef4bbd0fea308fdeaf6cf3793",
+    "node": "node:22.19.0-bookworm-slim@sha256:4a4884e8a44826194dff92ba316264f392056cbe243dcc9fd3551e71cea02b90",
+    "ollama": "ollama/ollama:0.40.0@sha256:1bef639749741b375e9a1eb2c1346fb57ce52f5432de1f74846e44ccc18e1687"
+  },
+  "fundingSignature": "2XGa9tNZQrKygFKkDYj88XzEctKHN7iKja3QdQhJnXPwrLW3yqjCsebqMNsyS2aaSPSok9YxH6n85XBcEk3mqV2P",
+  "previousAttempts": [
+    {
+      "channelId": "5xWDCmcxzujvJk9Y5KdovaaiUrijBddFKHTF4WcgpUz9",
+      "initialOutcome": "uncertain",
+      "sourceFingerprint": "84b4bb1ec783667cc735b4d442fb5bc141ac78528265fc9c2f631c0e22392d86",
+      "runtimeImage": "sha256:83f0848ab7f8961babc564ec8d2fd04532c61c46e05119d594cf2590b24a57dd",
+      "httpStatus": 502,
+      "reconciledOutcome": "finalized-zero-charge",
+      "ceilingAtomic": "556",
+      "chargedAtomic": "0",
+      "refundAtomic": "556",
+      "depositSignature": "4P7N1k5GY9ceT9rN2pmCdNZExRb8ajdcK447tNM5Q2tECuKSaMKs3ZQPey1djoayUGEUAuVu76Pq9Qm9k3es6iAt",
+      "claimSignature": "8pUcBxoubFL81iDpxYUuMwci5vuua4UzDpGwCPgSiWW1cVE2odxdSQ6Y5PHqTpLvx4Xx19tfSYyjVXZrRY3N2H2",
+      "balances": {
+        "slot": 512706361,
+        "buyer": "10000",
+        "seller": "8980",
+        "escrow": "0",
+        "buyerLamports": "0"
+      },
+      "reason": "Engine runner was missing at its executable search path; packaging corrected before subsequent calls."
+    }
+  ],
+  "security": {
+    "distinctVolumes": true,
+    "roles": [
+      {
+        "role": "buyer",
+        "nonRoot": true,
+        "readOnlyRoot": true,
+        "capabilities": [],
+        "noPublishedPorts": true,
+        "keys": [
+          {
+            "name": ".local/p2p/buyer.json",
+            "mode": 384
+          },
+          {
+            "name": ".local/p2p/node.key",
+            "mode": 384
+          }
+        ]
+      },
+      {
+        "role": "seller",
+        "nonRoot": true,
+        "readOnlyRoot": true,
+        "capabilities": [],
+        "noPublishedPorts": true,
+        "keys": [
+          {
+            "name": ".local/p2p/authorizer.json",
+            "mode": 384
+          },
+          {
+            "name": ".local/p2p/facilitator.json",
+            "mode": 384
+          },
+          {
+            "name": ".local/p2p/node.key",
+            "mode": 384
+          },
+          {
+            "name": ".local/p2p/owner.json",
+            "mode": 384
+          }
+        ]
+      }
+    ],
+    "loopbackOnlyPorts": [
+      {
+        "port": 11436,
+        "reachable": false
+      },
+      {
+        "port": 4022,
+        "reachable": false
+      },
+      {
+        "port": 4032,
+        "reachable": false
+      }
+    ],
+    "nativeIrohChallenge": {
+      "status": 402,
+      "paymentRequired": true
+    }
+  },
+  "scenarios": {
+    "flat": {
+      "status": "passed",
+      "cases": [
+        {
+          "case": 1,
+          "outcome": "confirmed",
+          "transport": "iroh-direct",
+          "connectMs": 2.2239580000000387,
+          "directObserved": true,
+          "relayObserved": false,
+          "channelId": "6r6U5vmZKnzJVJkJUM58qVz7tMaEN1XH89ywaQPyP69E",
+          "ceilingAtomic": "556",
+          "chargedAtomic": "122",
+          "refundAtomic": "434",
+          "depositSignature": "3vveadmPfE7oT7RD2LdvctPnrFj8bxtHsuNYUFwJVXpoLxRzK7jkRW4JBsVWCxmhmhHnVnP1vKtXmv3wCJXHPmw",
+          "claimSignature": "67DarZsJfJ1DPyF4PsufHjzvJEHM8FDkEUaijgGbFyxmm5h62fZapMeHwVfTCyHqiufPBsDLWnArqGNJ2Tpt6igM",
+          "depositSlot": 512708507,
+          "claimSlot": 512708553,
+          "balances": {
+            "before": {
+              "slot": 512708500,
+              "buyer": "10000",
+              "seller": "8980",
+              "escrow": null,
+              "buyerLamports": "0"
+            },
+            "depositConfirmed": {
+              "slot": 512708508,
+              "buyer": "9444",
+              "seller": "8980",
+              "escrow": "556",
+              "buyerLamports": "0"
+            },
+            "after": {
+              "slot": 512708557,
+              "buyer": "9878",
+              "seller": "9102",
+              "escrow": "0",
+              "buyerLamports": "0"
+            }
+          },
+          "latencyMs": 12541.448172999999,
+          "effectiveTokensPerSecond": 3.9070448104621773,
+          "recountedTokens": {
+            "input": 22,
+            "output": 49
+          },
+          "engineTokens": {
+            "input": 22,
+            "output": 50
+          },
+          "countComparison": {
+            "inputDelta": 0,
+            "outputDelta": 1,
+            "withinTolerance": true
+          },
+          "delivered": true,
+          "anomaly": "none",
+          "meteringMode": "recounted",
+          "generationAfterConfirmedDeposit": true
+        },
+        {
+          "case": 2,
+          "outcome": "confirmed",
+          "transport": "iroh-direct",
+          "connectMs": 2.2239580000000387,
+          "directObserved": true,
+          "relayObserved": false,
+          "channelId": "8ZwwH1ctNg2KA7bLZB7x8Bt6uwyRHL9nr2mPWm93dS7Q",
+          "ceilingAtomic": "558",
+          "chargedAtomic": "143",
+          "refundAtomic": "415",
+          "depositSignature": "CYstBiFyHzAWdfxh6XUx46xjuLsD53HsYLDCVPeFAuzUDprD45pWupXZc7qRocidxrUbp9g5ujy8N15oBH7adc9",
+          "claimSignature": "4DfNWdVDJdh2dVq9w4Ep4yTAF9Q6SBgkFcU5whAJP8Q4yz7tvEgt5RFrt8fhGwYbr91WHopUaYxT7wE4YekEAfyk",
+          "depositSlot": 512708570,
+          "claimSlot": 512708651,
+          "balances": {
+            "before": {
+              "slot": 512708564,
+              "buyer": "9878",
+              "seller": "9102",
+              "escrow": null,
+              "buyerLamports": "0"
+            },
+            "depositConfirmed": {
+              "slot": 512708573,
+              "buyer": "9320",
+              "seller": "9102",
+              "escrow": "558",
+              "buyerLamports": "0"
+            },
+            "after": {
+              "slot": 512708655,
+              "buyer": "9735",
+              "seller": "9245",
+              "escrow": "0",
+              "buyerLamports": "0"
+            }
+          },
+          "latencyMs": 20243.680508999998,
+          "effectiveTokensPerSecond": 2.9144897823184674,
+          "recountedTokens": {
+            "input": 23,
+            "output": 59
+          },
+          "engineTokens": {
+            "input": 23,
+            "output": 60
+          },
+          "countComparison": {
+            "inputDelta": 0,
+            "outputDelta": 1,
+            "withinTolerance": true
+          },
+          "delivered": true,
+          "anomaly": "none",
+          "meteringMode": "recounted",
+          "generationAfterConfirmedDeposit": true
+        },
+        {
+          "case": 3,
+          "outcome": "confirmed",
+          "transport": "iroh-direct",
+          "connectMs": 2.2239580000000387,
+          "directObserved": true,
+          "relayObserved": false,
+          "channelId": "Hc9tt42LU2Z1wb3wztH7AW5zZ9aFaa8ZEoeLq87dGzBM",
+          "ceilingAtomic": "558",
+          "chargedAtomic": "149",
+          "refundAtomic": "409",
+          "depositSignature": "9Wk5DYAXL79LUsBZN1hGFRSkh9ksPoGtjXxfF53uWXchAWdk31ZGcWXbesJTguF2H7ybGz6xkH32nX5BfJCtCCx",
+          "claimSignature": "65J4Q3Ny6Q2Jh4Wh4mvFn38NMfxMxaPTMzvpewjRFSS3JvF3WVfuj1mWfvp3pu3L2YEqF9WjR6mraEyaxjX76ukQ",
+          "depositSlot": 512708668,
+          "claimSlot": 512708719,
+          "balances": {
+            "before": {
+              "slot": 512708661,
+              "buyer": "9735",
+              "seller": "9245",
+              "escrow": null,
+              "buyerLamports": "0"
+            },
+            "depositConfirmed": {
+              "slot": 512708671,
+              "buyer": "9177",
+              "seller": "9245",
+              "escrow": "558",
+              "buyerLamports": "0"
+            },
+            "after": {
+              "slot": 512708724,
+              "buyer": "9586",
+              "seller": "9394",
+              "escrow": "0",
+              "buyerLamports": "0"
+            }
+          },
+          "latencyMs": 13587.616507,
+          "effectiveTokensPerSecond": 4.562978353713409,
+          "recountedTokens": {
+            "input": 23,
+            "output": 62
+          },
+          "engineTokens": {
+            "input": 23,
+            "output": 63
+          },
+          "countComparison": {
+            "inputDelta": 0,
+            "outputDelta": 1,
+            "withinTolerance": true
+          },
+          "delivered": true,
+          "anomaly": "none",
+          "meteringMode": "recounted",
+          "generationAfterConfirmedDeposit": true
+        }
+      ]
+    },
+    "natDirect": {
+      "status": "required-route-not-observed",
+      "paymentAttempted": false,
+      "attempts": [
+        {
+          "candidateMode": "default-discovery",
+          "requiredTransport": "iroh-direct",
+          "observedTransport": "iroh-relay",
+          "unpaidHttpStatus": 402,
+          "connectMs": 1162.021625,
+          "directObserved": false,
+          "relayObserved": true,
+          "paymentAttempted": false,
+          "runtimeImage": "sha256:63832cc1975e3caaa605eb6c0a6aab02d5cab5fb5d78c47108b771f678623d83",
+          "sourceFingerprint": null,
+          "limitation": "Source fingerprint was not captured for this unpaid probe; do not attribute it to the final branch head."
+        },
+        {
+          "candidateMode": "manual-lab-candidates",
+          "requiredTransport": "iroh-direct",
+          "status": "required-route-not-observed-before-readiness-deadline",
+          "paymentAttempted": false,
+          "sourceFingerprint": "758a0fbaef10e8f7aac94f8623bb2eb75ba6135db343f466a4d89fd497940e71",
+          "runtimeImage": "sha256:5f06ddb7e4e5ac297a966703243807d295169a10b57ec53074fb79051e0920cc",
+          "runId": "5b60cd06-1cb4-4f86-a3ea-1cf7fd0c685c"
+        }
+      ]
+    },
+    "natRelay": {
+      "status": "passed",
+      "candidateMode": "default-discovery",
+      "source": {
+        "algorithm": "sha256(sorted source path NUL bytes NUL)",
+        "digest": "1bfb89e1a5623b03efec5845f9f51bbe4d4c9bc117f6e77ba62c9757fda0cb29"
+      },
+      "runId": "f5ca84ed-ecd7-48e3-b720-c61611593d81",
+      "image": "sha256:537bf72215acf24f19348ad8dae962007c3796d0b7d2886f5329b9f00e373ac0",
+      "routerImage": "sha256:75f6aedddf38904e560cadce7d05895bb7c0b18deba6a95c83f56d027b49423b",
+      "previousAttempts": [
+        {
+          "channelId": "GCTJkCHTVd2CQ45PASfXGf7zukCSqrQaDv4nBaHnaGrM",
+          "initialOutcome": "uncertain",
+          "sourceFingerprint": "1bfb89e1a5623b03efec5845f9f51bbe4d4c9bc117f6e77ba62c9757fda0cb29",
+          "runtimeImage": "sha256:537bf72215acf24f19348ad8dae962007c3796d0b7d2886f5329b9f00e373ac0",
+          "httpStatus": 502,
+          "reconciledOutcome": "finalized-zero-charge",
+          "ceilingAtomic": "556",
+          "chargedAtomic": "0",
+          "refundAtomic": "556",
+          "depositSignature": "5pBivNQt4cdZUa7RBAE7GyPnZ3MBqX4jiXste4sLDjPNbnxRodteQwSjJQyeAhSkMQaCrJMbPfFzemN82AaNvNr6",
+          "claimSignature": "5f3UphWPR8KmdRuA9cRrApzFGe1Eb2SmrxyvdzFxW3XztrVvkPAnsANCtGPyTbKtu9xmDwMsv4iqRwbgCNz4Fk6N",
+          "balances": {
+            "slot": 512851807,
+            "buyer": "9586",
+            "seller": "9394",
+            "escrow": "0",
+            "buyerLamports": "0"
+          },
+          "reason": "HTTP 502 during engine generation; seller cgroup reported an OOM kill. A later operator-only synthetic engine diagnostic succeeded; the cause of memory pressure is not established."
+        }
+      ],
+      "security": {
+        "distinctVolumes": true,
+        "roles": [
+          {
+            "role": "buyer",
+            "nonRoot": true,
+            "readOnlyRoot": true,
+            "capabilities": [],
+            "noPublishedPorts": true,
+            "keys": [
+              {
+                "name": ".local/p2p/buyer.json",
+                "mode": 384
+              },
+              {
+                "name": ".local/p2p/node.key",
+                "mode": 384
+              }
+            ]
+          },
+          {
+            "role": "seller",
+            "nonRoot": true,
+            "readOnlyRoot": true,
+            "capabilities": [],
+            "noPublishedPorts": true,
+            "keys": [
+              {
+                "name": ".local/p2p/authorizer.json",
+                "mode": 384
+              },
+              {
+                "name": ".local/p2p/facilitator.json",
+                "mode": 384
+              },
+              {
+                "name": ".local/p2p/node.key",
+                "mode": 384
+              },
+              {
+                "name": ".local/p2p/owner.json",
+                "mode": 384
+              }
+            ]
+          }
+        ],
+        "loopbackOnlyPorts": [
+          {
+            "port": 11436,
+            "reachable": false
+          },
+          {
+            "port": 4022,
+            "reachable": false
+          },
+          {
+            "port": 4032,
+            "reachable": false
+          }
+        ],
+        "nativeIrohChallenge": {
+          "status": 402,
+          "paymentRequired": true
+        }
+      },
+      "topologyBefore": {
+        "routerCount": 2,
+        "homeBridgeIpv4Inhibited": true,
+        "actorGatewaysVerified": true,
+        "routers": [
+          {
+            "side": "a",
+            "nonRoot": true,
+            "capabilities": [
+              "NET_ADMIN"
+            ],
+            "noNewPrivilegesAfterBootstrap": true,
+            "keyless": true,
+            "readOnlyRoot": true,
+            "actorHasOneHomeInterface": true,
+            "gatewayArpMatchesRouter": true,
+            "masqueradePackets": 22,
+            "masqueradeBytes": 5995,
+            "crossHomeRouteBlocked": true,
+            "inboundUdpDroppedPackets": 48,
+            "forwardedPackets": 458,
+            "allInboundUdpBlocked": true
+          },
+          {
+            "side": "b",
+            "nonRoot": true,
+            "capabilities": [
+              "NET_ADMIN"
+            ],
+            "noNewPrivilegesAfterBootstrap": true,
+            "keyless": true,
+            "readOnlyRoot": true,
+            "actorHasOneHomeInterface": true,
+            "gatewayArpMatchesRouter": true,
+            "masqueradePackets": 17,
+            "masqueradeBytes": 5692,
+            "crossHomeRouteBlocked": true,
+            "inboundUdpDroppedPackets": 0,
+            "forwardedPackets": 251,
+            "allInboundUdpBlocked": false
+          }
+        ]
+      },
+      "topologyAfter": {
+        "routerCount": 2,
+        "homeBridgeIpv4Inhibited": true,
+        "actorGatewaysVerified": true,
+        "routers": [
+          {
+            "side": "a",
+            "nonRoot": true,
+            "capabilities": [
+              "NET_ADMIN"
+            ],
+            "noNewPrivilegesAfterBootstrap": true,
+            "keyless": true,
+            "readOnlyRoot": true,
+            "actorHasOneHomeInterface": true,
+            "gatewayArpMatchesRouter": true,
+            "masqueradePackets": 159,
+            "masqueradeBytes": 14236,
+            "crossHomeRouteBlocked": true,
+            "inboundUdpDroppedPackets": 830,
+            "forwardedPackets": 4781,
+            "allInboundUdpBlocked": true
+          },
+          {
+            "side": "b",
+            "nonRoot": true,
+            "capabilities": [
+              "NET_ADMIN"
+            ],
+            "noNewPrivilegesAfterBootstrap": true,
+            "keyless": true,
+            "readOnlyRoot": true,
+            "actorHasOneHomeInterface": true,
+            "gatewayArpMatchesRouter": true,
+            "masqueradePackets": 38,
+            "masqueradeBytes": 6952,
+            "crossHomeRouteBlocked": true,
+            "inboundUdpDroppedPackets": 0,
+            "forwardedPackets": 2578,
+            "allInboundUdpBlocked": false
+          }
+        ]
+      },
+      "cases": [
+        {
+          "case": 1,
+          "outcome": "confirmed",
+          "transport": "iroh-relay",
+          "connectMs": 478.26537600000006,
+          "directObserved": false,
+          "relayObserved": true,
+          "channelId": "BS9yYn27koLS5Bi2RaaEj18JS3nwrGRvyCWgnMDEL54E",
+          "ceilingAtomic": "556",
+          "chargedAtomic": "122",
+          "refundAtomic": "434",
+          "depositSignature": "4Y9aMRG1fmoHCzuZz2QMyHKaqUykeQPMkAR8tT2GqQTZB9zrPjdCr1LQdBUUF1Pmmc5Wh4T4q14ew9yRjuNmWEkH",
+          "claimSignature": "4chQS3fEqzumhedrCiC97H2ayxsNWY3AQ6ph4xZ5nBuQVnMsW1geQUwYZKXbTXa2L3acB3GC3sYyrtSscH6MKzFh",
+          "depositSlot": 512852208,
+          "claimSlot": 512852498,
+          "balances": {
+            "before": {
+              "slot": 512852201,
+              "buyer": "9586",
+              "seller": "9394",
+              "escrow": null,
+              "buyerLamports": "0"
+            },
+            "depositConfirmed": {
+              "slot": 512852211,
+              "buyer": "9030",
+              "seller": "9394",
+              "escrow": "556",
+              "buyerLamports": "0"
+            },
+            "after": {
+              "slot": 512852504,
+              "buyer": "9464",
+              "seller": "9516",
+              "escrow": "0",
+              "buyerLamports": "0"
+            }
+          },
+          "latencyMs": 70384.281408,
+          "effectiveTokensPerSecond": 0.6961781667693574,
+          "recountedTokens": {
+            "input": 22,
+            "output": 49
+          },
+          "engineTokens": {
+            "input": 22,
+            "output": 50
+          },
+          "countComparison": {
+            "inputDelta": 0,
+            "outputDelta": 1,
+            "withinTolerance": true
+          },
+          "delivered": true,
+          "anomaly": "none",
+          "meteringMode": "recounted",
+          "generationAfterConfirmedDeposit": true
+        },
+        {
+          "case": 2,
+          "outcome": "confirmed",
+          "transport": "iroh-relay",
+          "connectMs": 478.26537600000006,
+          "directObserved": false,
+          "relayObserved": true,
+          "channelId": "2KGQAgDpVXQyvKdTeFu7e3CbDWixGDbKU17XeGkPjSCy",
+          "ceilingAtomic": "558",
+          "chargedAtomic": "143",
+          "refundAtomic": "415",
+          "depositSignature": "36kzgCJrfmhqS2JZdqW61JuGwD3BQ5JePdCnbzm9SS6b7nDLMH55ye2whQyULcGPSfc4Xm3R61FzwU1rfmEy6udo",
+          "claimSignature": "4maTBTygtofg76RfeTnE6ZTacSKrzCeXB9kAC38PCZUpBxFJ2Zqu5PSbZFUoFkHbuQZWbErmmcBWVBkaC2STp4Au",
+          "depositSlot": 512852520,
+          "claimSlot": 512852728,
+          "balances": {
+            "before": {
+              "slot": 512852513,
+              "buyer": "9464",
+              "seller": "9516",
+              "escrow": null,
+              "buyerLamports": "0"
+            },
+            "depositConfirmed": {
+              "slot": 512852523,
+              "buyer": "8906",
+              "seller": "9516",
+              "escrow": "558",
+              "buyerLamports": "0"
+            },
+            "after": {
+              "slot": 512852735,
+              "buyer": "9321",
+              "seller": "9659",
+              "escrow": "0",
+              "buyerLamports": "0"
+            }
+          },
+          "latencyMs": 51667.98594,
+          "effectiveTokensPerSecond": 1.141906326066481,
+          "recountedTokens": {
+            "input": 23,
+            "output": 59
+          },
+          "engineTokens": {
+            "input": 23,
+            "output": 60
+          },
+          "countComparison": {
+            "inputDelta": 0,
+            "outputDelta": 1,
+            "withinTolerance": true
+          },
+          "delivered": true,
+          "anomaly": "none",
+          "meteringMode": "recounted",
+          "generationAfterConfirmedDeposit": true
+        },
+        {
+          "case": 3,
+          "outcome": "confirmed",
+          "transport": "iroh-relay",
+          "connectMs": 478.26537600000006,
+          "directObserved": false,
+          "relayObserved": true,
+          "channelId": "EjiQP21V7ojPUvz65iVAPKnUWeFHq7G7kXW8FNTj5fLS",
+          "ceilingAtomic": "558",
+          "chargedAtomic": "149",
+          "refundAtomic": "409",
+          "depositSignature": "5XBdntCWyKq8pSY9sueE8wS8FVzf7cYcBVxJE5MJjbStBTA4qAPb6mebScZPQERpvQEYLAjmepvmeU7ZiPv7rc9a",
+          "claimSignature": "3zED5LuSLtYTRhwWcrbjED81RA4PP3qydtYjqwNjumP8Jck7P2mi5acw1e98qXmJ76UvWTfn46foLoeszL61Z8pA",
+          "depositSlot": 512852751,
+          "claimSlot": 512852985,
+          "balances": {
+            "before": {
+              "slot": 512852743,
+              "buyer": "9321",
+              "seller": "9659",
+              "escrow": null,
+              "buyerLamports": "0"
+            },
+            "depositConfirmed": {
+              "slot": 512852753,
+              "buyer": "8763",
+              "seller": "9659",
+              "escrow": "558",
+              "buyerLamports": "0"
+            },
+            "after": {
+              "slot": 512852991,
+              "buyer": "9172",
+              "seller": "9808",
+              "escrow": "0",
+              "buyerLamports": "0"
+            }
+          },
+          "latencyMs": 57801.150318,
+          "effectiveTokensPerSecond": 1.072643012446976,
+          "recountedTokens": {
+            "input": 23,
+            "output": 62
+          },
+          "engineTokens": {
+            "input": 23,
+            "output": 63
+          },
+          "countComparison": {
+            "inputDelta": 0,
+            "outputDelta": 1,
+            "withinTolerance": true
+          },
+          "delivered": true,
+          "anomaly": "none",
+          "meteringMode": "recounted",
+          "generationAfterConfirmedDeposit": true
+        }
+      ],
+      "execution": {
+        "mode": "manually-resumed",
+        "originalCallOffset": 4,
+        "failedCallsRetained": 1,
+        "newFunding": false,
+        "successfulRequests": 3,
+        "automaticRecovery": false
+      }
+    }
+  },
+  "limitations": [
+    "Flat Docker networking validates native Iroh inference and devnet payments, not NAT traversal.",
+    "Real separate-network Mac/VPS/mobile routes are not tested.",
+    "No content correctness, model authenticity, MPP, streaming, registry or reputation validation.",
+    "Routes are sampled observations, not proof of the path taken by every packet.",
+    "Direct peers can see each other IP addresses; relay-only mode requires an off-host empirical test.",
+    "Synthetic prompts only. Public output excludes keys, salts, content, signed payloads, RPC URLs and endpoint IP addresses.",
+    "Default NAT discovery did not select the required direct route within the readiness deadline; an unpaid challenge used relay. This does not prove direct connectivity is impossible.",
+    "Explicit manual lab WAN candidates also did not satisfy direct readiness; no payment was attempted in either direct trial.",
+    "Relay connectivity with inbound UDP blocked does not prove that the block caused a direct-to-relay transition: the default direct baseline also selected relay.",
+    "MASQUERADE and FORWARD counters include RPC and control traffic and are not per-payload Iroh proof.",
+    "The successful NAT relay calls were manually resumed after a finalized zero-charge/full-return HTTP 502 attempt; this is not automatic recovery or fresh one-shot success.",
+    "The seller cgroup recorded an OOM kill; the cause of memory pressure is not established and a later successful local diagnostic does not prove resolution.",
+    "Paid actor code is identified by each scenario image/source fingerprint. Later inspection-constant and export-reason edits passed offline checks without another paid run."
+  ],
+  "independentAudit": {
+    "commitment": "finalized",
+    "distinctTransactions": 16,
+    "rawTokenBalanceDeltasMatched": true,
+    "expectedFacilitatorFeePayerMatched": true,
+    "buyerAtomic": "9172",
+    "sellerAtomic": "9808",
+    "buyerLamports": "0",
+    "finalEscrowsAtomic": "0"
+  },
+  "diagnosticFollowup": {
+    "recordedAt": "2026-10-19",
+    "payments": 0,
+    "status": "partial-unpaid-diagnostics",
+    "scope": "Controlled Docker topology, ephemeral identities and engine-only synthetic probe; existing paid scenarios are unchanged.",
+    "kernelFinding": {
+      "matchedHistoricalSeller": true,
+      "scope": "Docker-VM global OOM",
+      "constraint": "CONSTRAINT_NONE",
+      "victim": "llama-server",
+      "selectedRecordsSha256": "0be00555deb8afd59db15dcbba1057ecf8c9a595eb4dfe47fcd05ecfe36dd1b4",
+      "sellerCgroupLimitExhaustionEstablished": false
+    },
+    "routerFinding": {
+      "reproduction": "500 ms skew: unsolicited router-local WAN UDP created a conflicting conntrack tuple, remapping the later peer source port. Before correction both peers received zero packets.",
+      "correction": "Drop NEW router-local WAN UDP in INPUT; forwarded DNAT replies still use FORWARD. No port forwarding or added actor capabilities.",
+      "rawMappingsPublished": false
+    },
+    "nativeProbes": [
+      {
+        "status": "passed",
+        "source": {
+          "algorithm": "sha256(sorted source path NUL bytes NUL)",
+          "digest": "72232e8296ea585f63cbe9cce6c98dda2e35c00ecdf0ab077080ba7ce1da5590"
+        },
+        "payments": 0,
+        "roleVolumes": false,
+        "actorsUnprivileged": true,
+        "routerImage": "sha256:19d70a59d32210d2cf7649b7df84c8be9237c9dffdb50ec7769b165223c8bafd",
+        "nodeImage": "node:22.19.0-bookworm-slim@sha256:4a4884e8a44826194dff92ba316264f392056cbe243dcc9fd3551e71cea02b90",
+        "workerSha256": "7e96c98ba0605f6002f9888ae649abfd5d34ca925b1c3b261bbaf69067a77a99",
+        "skewMs": 500,
+        "packetsReceived": [
+          24,
+          24
+        ],
+        "portsPreserved": true,
+        "actorImage": "sha256:5ddc9a3c59d41f363086e4f87c3c1b7e11f005e84809e1c40f63db6fd11520a0",
+        "inboundUdpBlocked": false,
+        "inboundUdpDroppedPackets": 0,
+        "native": {
+          "candidateMode": "manual-lab-candidates",
+          "active": true,
+          "echoes": 20,
+          "connectMs": 177.77820900000006,
+          "finalRoute": "iroh-direct",
+          "firstDirectMs": 1176.946,
+          "selectedLabWan": true,
+          "workerSha256": "c2bb4559445319e0d32c33c574c6d80341dc53c204189d4ba56bc73f730b067c"
+        }
+      },
+      {
+        "status": "passed",
+        "source": {
+          "algorithm": "sha256(sorted source path NUL bytes NUL)",
+          "digest": "72232e8296ea585f63cbe9cce6c98dda2e35c00ecdf0ab077080ba7ce1da5590"
+        },
+        "payments": 0,
+        "roleVolumes": false,
+        "actorsUnprivileged": true,
+        "routerImage": "sha256:a77a634d629acecc864bbaa41835613b8ea1ba5c048edc86f1c1c9e5748efc05",
+        "nodeImage": "node:22.19.0-bookworm-slim@sha256:4a4884e8a44826194dff92ba316264f392056cbe243dcc9fd3551e71cea02b90",
+        "workerSha256": "7e96c98ba0605f6002f9888ae649abfd5d34ca925b1c3b261bbaf69067a77a99",
+        "skewMs": 500,
+        "packetsReceived": [
+          24,
+          23
+        ],
+        "portsPreserved": true,
+        "actorImage": "sha256:5ddc9a3c59d41f363086e4f87c3c1b7e11f005e84809e1c40f63db6fd11520a0",
+        "inboundUdpBlocked": false,
+        "inboundUdpDroppedPackets": 0,
+        "native": {
+          "candidateMode": "manual-lab-candidates",
+          "active": false,
+          "echoes": 0,
+          "connectMs": 171.282917,
+          "finalRoute": "iroh-direct",
+          "firstDirectMs": 1002.708417,
+          "selectedLabWan": true,
+          "workerSha256": "c2bb4559445319e0d32c33c574c6d80341dc53c204189d4ba56bc73f730b067c"
+        }
+      },
+      {
+        "status": "passed",
+        "source": {
+          "algorithm": "sha256(sorted source path NUL bytes NUL)",
+          "digest": "d497786aa365d0e64720ffdb004a3fbb0b7f6a610bc5058753122a53106b6d9b"
+        },
+        "payments": 0,
+        "roleVolumes": false,
+        "actorsUnprivileged": true,
+        "routerImage": "sha256:8143db69f599b6d504c97f090243b6987aea31fc902a4e99705ed75cd1d06534",
+        "nodeImage": "node:22.19.0-bookworm-slim@sha256:4a4884e8a44826194dff92ba316264f392056cbe243dcc9fd3551e71cea02b90",
+        "workerSha256": "7e96c98ba0605f6002f9888ae649abfd5d34ca925b1c3b261bbaf69067a77a99",
+        "skewMs": 500,
+        "packetsReceived": [
+          0,
+          23
+        ],
+        "portsPreserved": null,
+        "actorImage": "sha256:5ddc9a3c59d41f363086e4f87c3c1b7e11f005e84809e1c40f63db6fd11520a0",
+        "inboundUdpBlocked": true,
+        "inboundUdpDroppedPackets": 167,
+        "native": {
+          "candidateMode": "manual-lab-candidates",
+          "active": true,
+          "echoes": 20,
+          "connectMs": 168.35133299999995,
+          "finalRoute": "iroh-relay",
+          "firstDirectMs": null,
+          "selectedLabWan": false,
+          "workerSha256": "c2bb4559445319e0d32c33c574c6d80341dc53c204189d4ba56bc73f730b067c"
+        }
+      },
+      {
+        "status": "passed",
+        "source": {
+          "algorithm": "sha256(sorted source path NUL bytes NUL)",
+          "digest": "d497786aa365d0e64720ffdb004a3fbb0b7f6a610bc5058753122a53106b6d9b"
+        },
+        "payments": 0,
+        "roleVolumes": false,
+        "actorsUnprivileged": true,
+        "routerImage": "sha256:9a4c0043c3e94aeb782b4b48d4e3798aa1532ce744f36d3b32a66a462126e1d8",
+        "nodeImage": "node:22.19.0-bookworm-slim@sha256:4a4884e8a44826194dff92ba316264f392056cbe243dcc9fd3551e71cea02b90",
+        "workerSha256": "7e96c98ba0605f6002f9888ae649abfd5d34ca925b1c3b261bbaf69067a77a99",
+        "skewMs": 500,
+        "packetsReceived": [
+          25,
+          24
+        ],
+        "portsPreserved": true,
+        "actorImage": "sha256:5ddc9a3c59d41f363086e4f87c3c1b7e11f005e84809e1c40f63db6fd11520a0",
+        "inboundUdpBlocked": false,
+        "inboundUdpDroppedPackets": 0,
+        "native": {
+          "candidateMode": "default-discovery",
+          "active": true,
+          "echoes": 20,
+          "connectMs": 275.924167,
+          "finalRoute": "iroh-relay",
+          "firstDirectMs": null,
+          "selectedLabWan": false,
+          "workerSha256": "c2bb4559445319e0d32c33c574c6d80341dc53c204189d4ba56bc73f730b067c"
+        }
+      }
+    ],
+    "unsuccessfulDiagnosticAttempts": [
+      {
+        "case": "blocked-UDP repeat",
+        "status": "incomplete",
+        "error": "Docker exec operation failed (1)",
+        "payments": 0,
+        "limitation": "The failed operation did not retain a native result; no cause or route result is inferred. A separate subsequent run completed."
+      }
+    ],
+    "memoryAdmission": {
+      "minimumVmAvailableBytes": 1610612736,
+      "minimumCgroupHeadroomBytes": 1610612736,
+      "lowHeadroomProbe": {
+        "status": "blocked-before-generation",
+        "vmAvailableBytes": 1544978432,
+        "payments": 0
+      },
+      "policyIsMeasuredMinimumWorkingSet": false,
+      "finalPrePublicationHeadroomCheck": true,
+      "finalHostCompositionRuntimeValidated": false,
+      "offerLifetimeMs": 240000,
+      "modelResidencyMs": 300000
+    },
+    "operatorEnvironment": {
+      "userAuthorizedDockerMemoryIncrease": true,
+      "configuredMemoryMiB": 16384,
+      "reportedVmMemoryBytes": 16749006848,
+      "previouslyRunningContainers": 47,
+      "restoredRunningContainers": 47,
+      "sellerMemoryLimitBytes": 3221225472
+    },
+    "engineOnlyProbe": {
+      "runtimeImage": "sha256:5ddc9a3c59d41f363086e4f87c3c1b7e11f005e84809e1c40f63db6fd11520a0",
+      "source": {
+        "algorithm": "sha256(sorted source path NUL bytes NUL)",
+        "digest": "a6b22aeb2e742c72e5feeb576b65bbc0c68a3d8bbbaae427707480a914ae4157"
+      },
+      "payments": 0,
+      "keys": false,
+      "network": "none",
+      "coldWarmupMs": 16417.004341,
+      "warmWarmupMs": 2346.8655419999996,
+      "boundedGeneration": {
+        "inputTokens": 18,
+        "outputTokens": 18,
+        "durationNs": 19593257051
+      },
+      "peakCgroupBytes": 1473593344,
+      "oomKillDelta": 0,
+      "excludes": [
+        "tokenizer",
+        "facilitator",
+        "HTTP seller middleware",
+        "Iroh endpoint"
+      ]
+    },
+    "limitations": [
+      "Manual lab candidates are required for the demonstrated direct route; default discovery remains an independent observation.",
+      "firstDirectMs starts at the first post-connect path sample, not process start.",
+      "The assisted active/idle and blocked controls are separate sessions, not proof of in-session route migration.",
+      "Shared outer NAT/hairpin behavior is a hypothesis for automatic-discovery failure, not an established cause.",
+      "Engine-only success after VM enlargement does not prove full-seller capacity or prevention of future global OOM.",
+      "No paid gate rerun, independent physical networks, VPS or off-host privacy validation was performed.",
+      "No signed payloads, raw addresses, keys, salts, prompts/responses or private RPC URLs are included."
+    ]
+  },
+  "automaticDiscoveryFollowup": {
+    "recordedAt": "2026-10-19",
+    "payments": 0,
+    "status": "partial-lab-observer-assisted-discovery",
+    "finding": "Public-default discovery omitted usable intermediate simulated-WAN candidates. Extra discovery wait did not select a direct path. Same-endpoint lab reflection supplied usable mapped candidates and selected peer-direct paths.",
+    "productionDiscoveryChanged": false,
+    "publicDefaultDiscoveryFixed": false,
+    "peerDescriptorExchange": "test-orchestrator-mediated",
+    "observer": {
+      "ephemeral": true,
+      "walletKeys": false,
+      "roleVolumes": false,
+      "nonRoot": true,
+      "readOnlyRoot": true,
+      "capabilities": [],
+      "publishedPorts": false,
+      "networkAttachments": 1,
+      "forwardsInference": false,
+      "identityPinned": true,
+      "requiresDirectNativePath": true,
+      "maximumReplyBytes": 256,
+      "timeoutMs": 10000,
+      "usesSameNativeEndpointSocket": true
+    },
+    "controls": [
+      {
+        "status": "passed",
+        "source": {
+          "algorithm": "sha256(sorted source path NUL bytes NUL)",
+          "digest": "31c6d4032bed8d5a3062ec8fe0c3e7d3c2b23557ada4c2d38573cff88b21203f"
+        },
+        "payments": 0,
+        "roleVolumes": false,
+        "actorsUnprivileged": true,
+        "routerImage": "sha256:6627f480b731369ec9b9a5bb33802c67a527a52c77ee949623a3b5054759d341",
+        "nodeImage": "node:22.19.0-bookworm-slim@sha256:4a4884e8a44826194dff92ba316264f392056cbe243dcc9fd3551e71cea02b90",
+        "workerSha256": "7e96c98ba0605f6002f9888ae649abfd5d34ca925b1c3b261bbaf69067a77a99",
+        "skewMs": 500,
+        "packetsReceived": [
+          25,
+          25
+        ],
+        "portsPreserved": true,
+        "actorImage": "sha256:5ddc9a3c59d41f363086e4f87c3c1b7e11f005e84809e1c40f63db6fd11520a0",
+        "inboundUdpBlocked": false,
+        "inboundUdpDroppedPackets": 0,
+        "native": {
+          "candidateMode": "default-discovery",
+          "active": true,
+          "echoes": 20,
+          "connectMs": 167.20429200000035,
+          "finalRoute": "iroh-relay",
+          "firstDirectMs": null,
+          "selectedLabWan": false,
+          "workerSha256": "4155b4c4b2bbf8ac05a01327846c648aaad3b58d239fa099ff421efc0ee634ad"
+        }
+      },
+      {
+        "status": "passed",
+        "source": {
+          "algorithm": "sha256(sorted source path NUL bytes NUL)",
+          "digest": "66de17b9dd3a5a29c32b9915a0afdb44543591f779f539c8212d1f750cf590ab"
+        },
+        "payments": 0,
+        "roleVolumes": false,
+        "actorsUnprivileged": true,
+        "routerImage": "sha256:73f3a997b068daab4fc104de1d5a114dd9e95229ae63be27ead28796a29c118b",
+        "nodeImage": "node:22.19.0-bookworm-slim@sha256:4a4884e8a44826194dff92ba316264f392056cbe243dcc9fd3551e71cea02b90",
+        "workerSha256": "7e96c98ba0605f6002f9888ae649abfd5d34ca925b1c3b261bbaf69067a77a99",
+        "skewMs": 500,
+        "packetsReceived": [
+          25,
+          24
+        ],
+        "portsPreserved": true,
+        "actorImage": "sha256:5ddc9a3c59d41f363086e4f87c3c1b7e11f005e84809e1c40f63db6fd11520a0",
+        "inboundUdpBlocked": false,
+        "inboundUdpDroppedPackets": 0,
+        "native": {
+          "candidateMode": "lab-observer",
+          "active": true,
+          "echoes": 20,
+          "connectMs": 174.65175,
+          "finalRoute": "iroh-direct",
+          "firstDirectMs": 1202.3187079999998,
+          "selectedLabWan": false,
+          "selectedReflectedAddress": true,
+          "workerSha256": "94d69438f9b41e1c74d7ba70b13b05f018e0edd216bbec9722f8602fbbc66696",
+          "reflectedMappingsVerified": true
+        }
+      },
+      {
+        "status": "passed",
+        "source": {
+          "algorithm": "sha256(sorted source path NUL bytes NUL)",
+          "digest": "66de17b9dd3a5a29c32b9915a0afdb44543591f779f539c8212d1f750cf590ab"
+        },
+        "payments": 0,
+        "roleVolumes": false,
+        "actorsUnprivileged": true,
+        "routerImage": "sha256:685c84040add1e8833706d0821c6b0a4017b2266b8d35dafa5573a8d70118297",
+        "nodeImage": "node:22.19.0-bookworm-slim@sha256:4a4884e8a44826194dff92ba316264f392056cbe243dcc9fd3551e71cea02b90",
+        "workerSha256": "7e96c98ba0605f6002f9888ae649abfd5d34ca925b1c3b261bbaf69067a77a99",
+        "skewMs": 500,
+        "packetsReceived": [
+          24,
+          24
+        ],
+        "portsPreserved": true,
+        "actorImage": "sha256:5ddc9a3c59d41f363086e4f87c3c1b7e11f005e84809e1c40f63db6fd11520a0",
+        "inboundUdpBlocked": false,
+        "inboundUdpDroppedPackets": 0,
+        "native": {
+          "candidateMode": "lab-observer",
+          "active": false,
+          "echoes": 0,
+          "connectMs": 247.47758399999998,
+          "finalRoute": "iroh-direct",
+          "firstDirectMs": 1000.319959,
+          "selectedLabWan": false,
+          "selectedReflectedAddress": true,
+          "workerSha256": "94d69438f9b41e1c74d7ba70b13b05f018e0edd216bbec9722f8602fbbc66696",
+          "reflectedMappingsVerified": true
+        }
+      },
+      {
+        "status": "passed",
+        "source": {
+          "algorithm": "sha256(sorted source path NUL bytes NUL)",
+          "digest": "66de17b9dd3a5a29c32b9915a0afdb44543591f779f539c8212d1f750cf590ab"
+        },
+        "payments": 0,
+        "roleVolumes": false,
+        "actorsUnprivileged": true,
+        "routerImage": "sha256:328d26789cd67935ba828779018d538c7589b0f4e47a61eb8256b5383abcdba1",
+        "nodeImage": "node:22.19.0-bookworm-slim@sha256:4a4884e8a44826194dff92ba316264f392056cbe243dcc9fd3551e71cea02b90",
+        "workerSha256": "7e96c98ba0605f6002f9888ae649abfd5d34ca925b1c3b261bbaf69067a77a99",
+        "skewMs": 500,
+        "packetsReceived": [
+          24,
+          23
+        ],
+        "portsPreserved": true,
+        "actorImage": "sha256:5ddc9a3c59d41f363086e4f87c3c1b7e11f005e84809e1c40f63db6fd11520a0",
+        "inboundUdpBlocked": false,
+        "inboundUdpDroppedPackets": 0,
+        "native": {
+          "candidateMode": "default-discovery",
+          "active": true,
+          "echoes": 20,
+          "connectMs": 158.26108399999998,
+          "finalRoute": "iroh-relay",
+          "firstDirectMs": null,
+          "selectedLabWan": false,
+          "selectedReflectedAddress": null,
+          "workerSha256": "94d69438f9b41e1c74d7ba70b13b05f018e0edd216bbec9722f8602fbbc66696"
+        }
+      }
+    ],
+    "verification": {
+      "tests": 117,
+      "newRegressionTests": 6,
+      "typecheck": "passed",
+      "lint": "passed",
+      "mappingChecks": "Both routers: same original native source socket to observer and peer; actual reply mappings match reflected host/port.",
+      "runtimeImageContainsHarness": false,
+      "runtimeProvenance": "Pinned runtime image supplies native SDK; current host-injected worker hashes and source fingerprints identify the actual diagnostic code."
+    },
+    "limitations": [
+      "Only socket-address discovery is automatic; peer identity and descriptors are still transferred by the test orchestrator.",
+      "This is explicit lab reflection via addExternalAddr, not native public n0/QAD discovery integration or a production rendezvous design.",
+      "Outer translation, filtering and hairpin failure remain competing explanations; no specific outer-layer cause is proven.",
+      "One controlled Docker topology does not validate independent networks, arbitrary NAT, rebinding or production discovery.",
+      "Reflected and manual/blocked-UDP modes are mutually exclusive; no new block-caused in-session migration result is claimed.",
+      "The historical selectedLabWan field compares a fixed lab port; random reflected ports are checked by selectedReflectedAddress and reflectedMappingsVerified.",
+      "No prior paid result or reconciliation is upgraded, and no inference, RPC, wallet signing, VPS or payment run occurred.",
+      "Raw addresses, conntrack tuples, descriptors and synthetic content remain private."
+    ]
+  },
+  "publicReturnPathFollowup": {
+    "recordedAt": "2026-10-19",
+    "payments": 0,
+    "scope": "Public IPv4 candidate probes in the existing keyless Docker topology plus a separate private host-only UDP control.",
+    "rootCauseStatus": "Peer public-return failure observed; exact physical router, provider or residual host-filter component unresolved.",
+    "productionDiscoveryChanged": false,
+    "publicDefaultConnectivityFixed": false,
+    "globalNetworkOrFirewallSettingsChanged": false,
+    "trace": {
+      "status": "passed",
+      "source": {
+        "algorithm": "sha256(sorted source path NUL bytes NUL)",
+        "digest": "5a702755da92f96a567e703cce6255205fadcf06df09dc4da38a7541a9a4a552"
+      },
+      "payments": 0,
+      "roleVolumes": false,
+      "actorsUnprivileged": true,
+      "routerImage": "sha256:d588a9a564a1f52baf616baed44da248064cffad18bb30ebf03d831d422ba9e9",
+      "nodeImage": "node:22.19.0-bookworm-slim@sha256:4a4884e8a44826194dff92ba316264f392056cbe243dcc9fd3551e71cea02b90",
+      "workerSha256": "7e96c98ba0605f6002f9888ae649abfd5d34ca925b1c3b261bbaf69067a77a99",
+      "skewMs": 500,
+      "packetsReceived": [
+        24,
+        24
+      ],
+      "portsPreserved": true,
+      "actorImage": "sha256:5ddc9a3c59d41f363086e4f87c3c1b7e11f005e84809e1c40f63db6fd11520a0",
+      "inboundUdpBlocked": false,
+      "inboundUdpDroppedPackets": 0,
+      "native": {
+        "candidateMode": "default-discovery",
+        "publicPathAudit": {
+          "nonTerminatingCounters": true,
+          "sides": [
+            {
+              "router": "a",
+              "outbound": 42,
+              "incomingAny": 23,
+              "incomingPeer": 0,
+              "incomingKnownReturn": 23,
+              "incomingInput": 0,
+              "incomingForward": 0,
+              "classification": "no-peer-udp-return-at-lab-wan",
+              "flows": [
+                {
+                  "candidateIndex": 0,
+                  "outboundPackets": 21,
+                  "unreplied": true
+                },
+                {
+                  "candidateIndex": 1,
+                  "outboundPackets": 21,
+                  "unreplied": true
+                }
+              ]
+            },
+            {
+              "router": "b",
+              "outbound": 38,
+              "incomingAny": 25,
+              "incomingPeer": 0,
+              "incomingKnownReturn": 25,
+              "incomingInput": 0,
+              "incomingForward": 0,
+              "classification": "no-peer-udp-return-at-lab-wan",
+              "flows": [
+                {
+                  "candidateIndex": 0,
+                  "outboundPackets": 19,
+                  "unreplied": true
+                },
+                {
+                  "candidateIndex": 1,
+                  "outboundPackets": 19,
+                  "unreplied": true
+                }
+              ]
+            }
+          ]
+        },
+        "active": true,
+        "echoes": 20,
+        "connectMs": 177.36704100000134,
+        "finalRoute": "iroh-relay",
+        "firstDirectMs": null,
+        "selectedLabWan": false,
+        "selectedReflectedAddress": null,
+        "workerSha256": "589c678b6b3bb2e44274314364db60ef91cb95362e7e87bc8096d21d0bccd441"
+      }
+    },
+    "earlierTrace": {
+      "report": {
+        "status": "passed",
+        "source": {
+          "algorithm": "sha256(sorted source path NUL bytes NUL)",
+          "digest": "61b7f6c5fe4080c75020f2297ef75878c11169ab08285fe35c039d8ce536f656"
+        },
+        "payments": 0,
+        "roleVolumes": false,
+        "actorsUnprivileged": true,
+        "routerImage": "sha256:9c5f965f7798ddcf8bba90af60955bd241d894cee94f7dfbe56fc3b2e27bd7bc",
+        "nodeImage": "node:22.19.0-bookworm-slim@sha256:4a4884e8a44826194dff92ba316264f392056cbe243dcc9fd3551e71cea02b90",
+        "workerSha256": "7e96c98ba0605f6002f9888ae649abfd5d34ca925b1c3b261bbaf69067a77a99",
+        "skewMs": 500,
+        "packetsReceived": [
+          23,
+          23
+        ],
+        "portsPreserved": true,
+        "actorImage": "sha256:5ddc9a3c59d41f363086e4f87c3c1b7e11f005e84809e1c40f63db6fd11520a0",
+        "inboundUdpBlocked": false,
+        "inboundUdpDroppedPackets": 0,
+        "native": {
+          "candidateMode": "default-discovery",
+          "publicPathAudit": {
+            "nonTerminatingCounters": true,
+            "sides": [
+              {
+                "router": "a",
+                "outbound": 44,
+                "incomingAny": 27,
+                "incomingPeer": 0,
+                "incomingInput": 0,
+                "incomingForward": 0,
+                "classification": "udp-return-unattributed",
+                "flows": [
+                  {
+                    "candidateIndex": 0,
+                    "outboundPackets": 22,
+                    "unreplied": null
+                  },
+                  {
+                    "candidateIndex": 1,
+                    "outboundPackets": 22,
+                    "unreplied": null
+                  }
+                ]
+              },
+              {
+                "router": "b",
+                "outbound": 38,
+                "incomingAny": 25,
+                "incomingPeer": 0,
+                "incomingInput": 0,
+                "incomingForward": 0,
+                "classification": "udp-return-unattributed",
+                "flows": [
+                  {
+                    "candidateIndex": 0,
+                    "outboundPackets": 19,
+                    "unreplied": null
+                  },
+                  {
+                    "candidateIndex": 1,
+                    "outboundPackets": 19,
+                    "unreplied": null
+                  }
+                ]
+              }
+            ]
+          },
+          "active": true,
+          "echoes": 20,
+          "connectMs": 228.47420899999997,
+          "finalRoute": "iroh-relay",
+          "firstDirectMs": null,
+          "selectedLabWan": false,
+          "selectedReflectedAddress": null,
+          "workerSha256": "e4e6c9e892e4979419133bc9a86bd2888cecc786e6a5cad97465be03d060bbf7"
+        }
+      },
+      "limitation": "The first audit did not parse extended IPv4 conntrack prefixes, so null reply-state entries are inconclusive. A failing regression and parser correction preceded the final trace."
+    },
+    "hostControl": {
+      "publicService": "Cloudflare public STUN",
+      "sourceSha256": "fdde3efe93025f4fab028bf0c20ab883981043545f1706034847e61d878a1605",
+      "resultSha256": "3b274cbd3acdf84dc8452f5d011a3a5a271018dd8a08d86c066fb86a07226436",
+      "publicPacketsSentPerSocket": 30,
+      "publicPacketsReceivedPerSocket": [
+        0,
+        0
+      ],
+      "sameHostLocalPacketsReceivedPerSocket": [
+        10,
+        10
+      ],
+      "localControlScope": "Same sockets addressed to the host own LAN IP; local stack only, not another LAN device.",
+      "samePublicIpv4AsNativeTrace": true,
+      "alternateServerPorts": [
+        3478,
+        53
+      ],
+      "sameMappingAcrossThosePorts": [
+        true,
+        true
+      ],
+      "routeInterfaceClass": "Wi-Fi",
+      "activeConfiguredVpnCount": 0,
+      "applicationFirewallAllowsOwnedInterpreterAndDockerBackend": true,
+      "applicationFirewallBlockAllDisabled": true,
+      "doesNotExcludeEveryHostFilter": true
+    },
+    "verification": {
+      "tests": 120,
+      "newTests": 3,
+      "typecheck": "passed",
+      "lint": "passed",
+      "tdd": "Missing module, extended-prefix and known-return classification failures were observed before the corresponding implementations.",
+      "counterRules": "No jump targets; existing accept/drop/NAT policy unchanged."
+    },
+    "limitations": [
+      "Measurements cover a bounded IPv4 window and one current Wi-Fi access, not every network or IPv6.",
+      "No peer-source or unattributed UDP returned at the lab WAN during the final window; known discovery-server returns did arrive. Public UDP is not wholly blocked.",
+      "UNREPLIED describes absence of a matching conntrack reply, not proof that every possible inbound packet was absent. Pre-DNAT counters provide the separate packet-arrival observation.",
+      "Two ports on one STUN server do not establish mapping independence for all remote addresses.",
+      "Host controls do not isolate the physical router from ISP/CGNAT or every host filter and do not prove a Wi-Fi-specific defect.",
+      "Private host-control scripts and raw observations remain outside Git; this is not a new public host gate command.",
+      "Router model/provider identification is pending before a concrete supported network-configuration correction can be proposed. No firewall, Wi-Fi or router setting was changed.",
+      "No payment, signing, inference gate, VPS test, deployment or upgrade of earlier paid evidence occurred."
+    ]
+  },
+  "crossNetworkUnpaidFollowup": {
+    "recordedAt": "2026-10-19T18:33:49.218282Z",
+    "status": "unpaid-bidirectional-direct-connectivity-observed",
+    "source": {
+      "algorithm": "sha256(sorted source path NUL bytes NUL)",
+      "digest": "5a702755da92f96a567e703cce6255205fadcf06df09dc4da38a7541a9a4a552",
+      "scope": "Repository context fingerprint; the actual standalone worker digests are recorded separately below."
+    },
+    "scope": "Synthetic native Iroh echo only across Mac Wi-Fi and a VPS in a separate physical network; no payment, wallet access, model engine or inference execution. This is not paid GYB-GATE-0007.",
+    "runtime": {
+      "node": "22.19.0",
+      "iroh": "1.1.0",
+      "mac": "darwin-arm64",
+      "vps": "linux-x64-gnu",
+      "remoteNodeArchiveSha256": "c0649af18e6a24f6fe5535a3e86b341dd49a8e71117c8b68bde973ef834f16f2",
+      "sdkArchives": "Main and Linux x64 GNU package SHA-512 matched the existing pnpm lockfile before extraction; no lifecycle scripts or global installation."
+    },
+    "configuration": {
+      "ipv4Bind": "wildcard ephemeral UDP",
+      "ipv6Bind": "loopback only",
+      "samplesPerDirection": 20,
+      "sampleIntervalMs": 1000,
+      "streamReadLimitBytes": 1024,
+      "clientDeadlineMs": 70000,
+      "workerWatchdogMs": 180000,
+      "remoteOuterTimeoutSeconds": 180,
+      "remoteUid": 65534,
+      "remoteNoNewPrivileges": true,
+      "remoteNice": 10,
+      "publicN0Discovery": true,
+      "defaultRelays": true,
+      "manualCandidates": false,
+      "labObserver": false,
+      "peerDescriptors": "Operator transferred public native peer descriptors through authenticated Dokploy terminal; remote peer identity pinned before echoes. Application payloads traversed native Iroh, not the control channel.",
+      "nodeOldSpaceLimitMiB": 128
+    },
+    "runs": [
+      {
+        "direction": "Mac client to VPS server",
+        "echoes": 20,
+        "sampleCount": 20,
+        "selectedPathSequence": [
+          "relay",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct"
+        ],
+        "firstDirectSampleElapsedMs": 1132.353,
+        "connectionEstablishmentMs": 358.625,
+        "selectedDirectRttMedianMs": 102,
+        "rawResultSha256": "b7758bb3af2c14a25b219dd215b8eccb2727e25ab7afc4a35f9e879d2946a760"
+      },
+      {
+        "direction": "VPS client to Mac server",
+        "echoes": 20,
+        "sampleCount": 20,
+        "selectedPathSequence": [
+          "relay",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct",
+          "direct"
+        ],
+        "firstDirectSampleElapsedMs": 1115.251,
+        "connectionEstablishmentMs": 96.901,
+        "selectedDirectRttMedianMs": 100,
+        "rawResultSha256": "b6738449d731309f37b511574811f0fba469d1c442601a68bf0c26a776648b2f"
+      }
+    ],
+    "isolation": {
+      "payments": 0,
+      "firewallChanges": 0,
+      "deploymentChanges": 0,
+      "existingRunningContainersBeforeAndAfter": 14,
+      "sameContainerIdsAndNames": true,
+      "existingContainerUptimesAndHealth": "Same continuously running containers; before/after status snapshots retained privately. No service-level load or request-SLO study was performed.",
+      "remainingRemoteProbeRuntimeProcesses": 0,
+      "remoteTemporaryDirectoryRemoved": true,
+      "remainingLocalProbeProcesses": 0,
+      "paymentSignatures": 0,
+      "deploymentPublishedServicePorts": 0,
+      "udpSockets": "Ephemeral native UDP sockets were used; zero deployment-published ports does not mean zero listening UDP sockets."
+    },
+    "limitations": [
+      "Route snapshots sample the selected native path; they do not prove the route of every packet or exact migration instant.",
+      "Both directions initially selected relay, then selected direct on the next sample and all remaining samples; direct RTT is SDK path telemetry, not inference latency.",
+      "Distinct discovered public IPv4 addresses establish separate public endpoints. Success is consistent with a same-public-IP return limitation in prior tests, but does not uniquely isolate router, repeater, ISP/CGNAT or host filters.",
+      "Only one Wi-Fi access and one VPS were tested. IPv6, hotspot, off-host relay-only privacy, production rendezvous and reliability across other NAT types remain untested.",
+      "Operator-mediated peer descriptor exchange is not production seller discovery or signed-offer validation.",
+      "No paid inference, application authorization, metering, accounting, reputation, content correctness, uptime guarantee or GYB-GATE-0007 acceptance is validated. REV-13/17 remain open.",
+      "One initial local client setup failed on a missing descriptor before connection; it was corrected before the successful Mac-to-VPS run. Echo servers reported ApplicationClosed after the clients closed normally; no probe process remained.",
+      "Remote V8 old space was capped, but total JavaScript/native process memory was not hard-capped or peak-profiled. Prior Docker memory evidence is unchanged."
+    ],
+    "workers": {
+      "derivation": "Existing nativeSource echo workers from tooling/iroh-probe.mjs, with CLI config argv index adjusted from 1 to 2 for file execution and an outer 180-second exit watchdog; no payment or application code.",
+      "sellerSha256": "cdc1d2dbae8aaa8c3fb0b79e9ced1ef4116ea13a46c20379f76471aebe5ac45d",
+      "buyerSha256": "6b88c7640d92422866a45b111bb6e2487c146118db19f7e858ff7a9d2245c3e6",
+      "privateSetupScriptSha256": "633704dc84340ff0ca6f2a327f6dd4b0e9da87b75e2f22da0d4181006c7791e6",
+      "digestScope": "Locally generated bytes embedded verbatim in the authenticated terminal setup transfer; remote worker digests were not independently measured before cleanup."
+    },
+    "verification": {
+      "typecheck": "passed",
+      "tests": 120,
+      "testFailures": 0,
+      "testSkips": 0,
+      "lintAndFormat": "passed",
+      "newCodeOrTests": false,
+      "artifactInvariants": "Prior evidence object unchanged; route sequences/echo counts/raw-result hashes/worker hashes and private summary match."
+    }
+  }
+}

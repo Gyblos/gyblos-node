@@ -2,6 +2,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { link, mkdir, open, readFile, unlink } from 'node:fs/promises';
 
 import type { ChargeAnomaly } from '@gyblos/application/constants';
+import type { EngineDescription } from '@gyblos/application/engine';
 import type { TokenCounts } from '@gyblos/application/metering';
 import {
   FILE_MODES,
@@ -16,6 +17,7 @@ import { MODEL } from '@gyblos/inference-ollama/model';
 
 export interface MeasurementInput {
   requestId: string;
+  model?: Pick<Required<EngineDescription>, 'name' | 'digest'>;
   seller: string;
   offer: string;
   channelId: string;
@@ -39,11 +41,13 @@ export interface MeasurementInput {
   delivered: boolean;
   anomaly: ChargeAnomaly;
   responseText: string;
+  meteringMode?: 'recounted' | 'declared';
 }
 
 export type Measurement = ReturnType<typeof measurementRow>;
 
 export function measurementRow(input: MeasurementInput, salt: Uint8Array) {
+  const model = input.model ?? MODEL;
   const validLatency = Number.isFinite(input.latencyMs) && input.latencyMs > 0;
   // Explicit allowlist: never spread a response, request, exception or arbitrary metadata.
   const copyCounts = (counts: TokenCounts) => ({
@@ -52,11 +56,12 @@ export function measurementRow(input: MeasurementInput, salt: Uint8Array) {
   });
   return {
     schemaVersion: SCHEMA_VERSIONS.MEASUREMENT,
+    meteringMode: input.meteringMode ?? 'recounted',
     recordedAt: new Date().toISOString(),
     requestId: input.requestId,
     seller: input.seller,
     offer: input.offer,
-    model: { name: MODEL.name, digest: MODEL.digest },
+    model: { name: model.name, digest: model.digest },
     channelId: input.channelId,
     depositSignature: input.depositSignature,
     claimSignature: input.claimSignature,

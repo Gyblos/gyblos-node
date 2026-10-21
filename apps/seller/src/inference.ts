@@ -13,6 +13,11 @@ import { UptoSvmScheme } from '@x402/svm/upto/server';
 import express from 'express';
 
 import {
+  inferenceWireUsage,
+  type Engine,
+  type RecountTokenizer,
+} from '@gyblos/application/engine';
+import {
   charge,
   OFFER_ID,
   type TokenCounts,
@@ -20,18 +25,14 @@ import {
 import {
   HTTP_LIMITS,
   HTTP_STATUS,
+  INFERENCE_REQUEST_LIMITS,
   PAYMENT_LIMITS,
   ROUTES,
   TOKEN_PROGRAM_ADDRESS,
 } from '@gyblos/config';
-import { GENERATION, MODEL_LIMITS } from '@gyblos/inference-ollama/constants';
-import {
-  createOllama,
-  MODEL,
-  type ModelTokenizer,
-} from '@gyblos/inference-ollama/index';
 import { DEVNET, MAX_ATOMIC } from '@gyblos/payments-x402/constants';
 import { verifyInferenceDeposit } from '@gyblos/payments-x402/inference-deposit';
+import { requireLoopbackHost } from '@gyblos/runtime/loopback-host';
 
 export interface InferenceRequest {
   requestId: string;
@@ -47,8 +48,8 @@ export function parseInferenceRequest(value: unknown): InferenceRequest {
     !/^[a-f0-9-]{36}$/.test(body.requestId) ||
     typeof body.prompt !== 'string' ||
     !Number.isSafeInteger(body.maxTokens) ||
-    body.maxTokens! < MODEL_LIMITS.requestMinOutputTokens ||
-    body.maxTokens! > MODEL_LIMITS.requestMaxOutputTokens
+    body.maxTokens! < INFERENCE_REQUEST_LIMITS.minOutputTokens ||
+    body.maxTokens! > INFERENCE_REQUEST_LIMITS.maxOutputTokens
   )
     throw new Error('Invalid bounded inference request.');
   return {
@@ -60,11 +61,12 @@ export function parseInferenceRequest(value: unknown): InferenceRequest {
 
 export function inferenceCeiling(
   input: InferenceRequest,
-  tokenizer: ModelTokenizer,
+  tokenizer: RecountTokenizer,
+  contextTokens: number,
 ): string {
   // Headroom is authorized up front, never evidence of actual usage.
   const inputTokens = tokenizer.input(input.prompt);
-  if (inputTokens + input.maxTokens > GENERATION.numCtx) {
+  if (inputTokens + input.maxTokens > contextTokens) {
     throw new Error('Request exceeds the pinned context window.');
   }
   const ceiling =
@@ -79,11 +81,11 @@ export async function createInferenceSeller(options: {
   rpcUrl: string;
   facilitatorUrl: string;
   feePayer: string;
-  ollamaUrl: string;
+  engine: Engine;
   mint: string;
   payTo: string;
   authorizer: KeyPairSigner;
-  tokenizer: ModelTokenizer;
+  tokenizer: RecountTokenizer;
   beforeInference: (requestId: string, channelId: string) => Promise<void>;
   billingOverride?: (
     requestId: string,
@@ -91,8 +93,18 @@ export async function createInferenceSeller(options: {
   ) => TokenCounts;
   onFragment?: (requestId: string) => Promise<void>;
 }) {
-  const engine = createOllama(options.ollamaUrl);
-  await engine.assertModel();
+  const engine = options.engine;
+  const model = await engine.describe();
+  const capabilities = engine.capabilities();
+  if (
+    !capabilities.reportsUsage ||
+    !capabilities.recountable ||
+    capabilities.modelIdentity !== 'digest' ||
+    !model.digest
+  )
+    throw new Error(
+      'This PoC requires recountable usage and a declared model digest.',
+    );
   const resource = new x402ResourceServer(
     new HTTPFacilitatorClient({ url: options.facilitatorUrl }),
   ).register(
@@ -105,10 +117,15 @@ export async function createInferenceSeller(options: {
   );
   await resource.initialize();
   const app = express();
+  app.use(requireLoopbackHost);
   app.use(express.json({ limit: HTTP_LIMITS.requestBody }));
   app.post(ROUTES.inference, (request, response, next) => {
     try {
-      inferenceCeiling(parseInferenceRequest(request.body), options.tokenizer);
+      inferenceCeiling(
+        parseInferenceRequest(request.body),
+        options.tokenizer,
+        model.contextTokens,
+      );
       next();
     } catch {
       response
@@ -121,6 +138,7 @@ export async function createInferenceSeller(options: {
     amount: inferenceCeiling(
       parseInferenceRequest(context.adapter.getBody?.()),
       options.tokenizer,
+      model.contextTokens,
     ),
   });
   app.use(
@@ -170,7 +188,11 @@ export async function createInferenceSeller(options: {
         feePayer: options.feePayer,
         authorizer: options.authorizer.address,
         mint: options.mint,
-        ceiling: inferenceCeiling(input, options.tokenizer),
+        ceiling: inferenceCeiling(
+          input,
+          options.tokenizer,
+          model.contextTokens,
+        ),
       });
       await options.beforeInference(input.requestId, channelId);
       controller.signal.throwIfAborted();
@@ -183,8 +205,8 @@ export async function createInferenceSeller(options: {
       });
       controller.signal.throwIfAborted();
       const engineTokens = {
-        input: result.usage.prompt_eval_count,
-        output: result.usage.eval_count,
+        input: result.usage.inputTokens,
+        output: result.usage.outputTokens,
       };
       const billedTokens =
         options.billingOverride?.(
@@ -192,19 +214,23 @@ export async function createInferenceSeller(options: {
           Object.freeze({ ...engineTokens }),
         ) ?? engineTokens;
       const actual = charge(billedTokens);
-      if (actual > BigInt(inferenceCeiling(input, options.tokenizer)))
+      if (
+        actual >
+        BigInt(inferenceCeiling(input, options.tokenizer, model.contextTokens))
+      )
         throw new Error('Usage exceeds authorized ceiling.');
       setSettlementOverrides(response, { amount: actual.toString() });
       response.json({
         requestId: input.requestId,
         offer: OFFER_ID,
-        model: MODEL.name,
-        digest: MODEL.digest,
+        model: model.name,
+        digest: model.digest,
         content: result.text,
-        usage: result.usage,
+        usage: inferenceWireUsage(result.usage),
+        meteringMode: capabilities.recountable ? 'recounted' : 'declared',
         billedTokens,
-        done: result.done,
-        doneReason: result.doneReason,
+        done: true,
+        doneReason: result.finishReason,
       });
     } catch {
       // Explicitly end the Express 4 response so x402 cancels and settles zero.

@@ -50,3 +50,64 @@ coverage/
 !/tests/fixtures/tokenizer_config.json
 !/tests/fixtures/chat-template-vectors.json
 !/tests/fixtures/Qwen-LICENSE
+
+# Authorized PR 10 offline regression fixture and typed support modules
+!/tests/fixtures/finalized-payment-pair.json
+!/tests/support/
+/tests/support/*
+!/tests/support/payment-fixture.ts
+!/tests/support/payment-mutations.ts
+!/tests/support/token-cases.ts
+!/tests/support/rent-cases.ts
+!/tests/support/limiter-cases.ts
+!/tests/support/admission-cases.ts
+!/tests/support/native-fixture.ts
+!/tests/support/native-cases.ts
+!/tests/support/lock-probe.ts
+!/tests/support/lock-cases.ts
+!/tests/support/recovery-fixture.ts
+!/tests/support/recovery-cases.ts
+!/tests/support/export-fixture.ts
+!/tests/support/export-cases.ts
+
+# Explicitly authorized redacted P2P report only
+!/evidence/
+/evidence/*
+!/evidence/gate-0006.json
+
+# Explicitly authorized redacted real-network P2P report
+!/evidence/gate-0007.json
+
+# Guard-specific public regression support
+!/tests/support/rent-faults.ts
+!/tests/support/token-faults.ts
+!/tests/support/lock-faults.ts
+!/tests/support/lock-fixture.ts
+!/tests/support/native-runtime.ts
+!/tests/support/egress-cases.ts
+!/tests/support/native-reader.ts
+
+# Paid-call failure metadata regressions
+!/tests/support/call-fixture.ts
+!/tests/support/call-cases.ts
+!/tests/support/proof-read-cases.ts
+
+# Safe facilitator diagnostic and private-storage regression support
+!/tests/support/facilitator-diagnostic-fixture.ts
+!/tests/support/facilitator-http-cases.ts
+!/tests/support/facilitator-observer-cases.ts
+!/tests/support/facilitator-privacy-cases.ts
+!/tests/support/facilitator-startup-cases.ts
+!/tests/support/private-log-cases.ts
+!/tests/support/private-log-fixture.ts
+!/tests/support/private-log-guard-cases.ts
+!/tests/support/private-log-review-cases.ts
+!/tests/support/private-log-reclaim-cases.ts
+!/tests/support/private-log-rotation-cases.ts
+
+# Malformed signature diagnostic regressions
+!/tests/support/signature-facilitator-cases.ts
+!/tests/support/signature-buyer-cases.ts
+
+# Loopback Host (DNS rebinding) regressions
+!/tests/support/loopback-host-cases.ts

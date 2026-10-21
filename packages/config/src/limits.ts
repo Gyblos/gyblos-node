@@ -37,6 +37,7 @@ export const HTTP_STATUS = {
   ok: 200,
   paymentRequired: 402,
   conflict: 409,
+  misdirectedRequest: 421,
   tooManyRequests: 429,
   badGateway: 502,
   badRequest: 400,
@@ -108,4 +109,10 @@ export const CLEANUP = {
 export const HTTP_LIMITS = {
   requestBody: '8kb',
   facilitatorBody: '64kb',
+} as const;
+
+export const INFERENCE_REQUEST_LIMITS = {
+  minOutputTokens: 32,
+  maxOutputTokens: 128,
+  maxPromptCharacters: 4000,
 } as const;

@@ -50,6 +50,7 @@ export const ROUTES = {
   inference: '/v1/chat/completions',
   events: '/gate/events',
   verifications: '/gate/verifications',
+  facilitatorDiagnostics: '/gate/diagnostics',
   verify: '/verify',
   supported: '/supported',
   ollamaVersion: '/api/version',

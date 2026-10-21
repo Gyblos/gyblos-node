@@ -1,0 +1,694 @@
+{
+  "schemaVersion": 2,
+  "evidenceId": "GYB-GATE-0007",
+  "recordedAt": "2026-10-19T23:06:18.605774+00:00",
+  "status": "passed-native-mac-vps-direct",
+  "acceptance": "Met for the native Mac seller to VPS buyer direct configuration: three paid synthetic inferences, six finalized payment transactions, verified transfers/refunds/metering and sampled direct paths. Other routes and production claims remain outside this result.",
+  "network": "solana-devnet",
+  "assetLabel": "devnet-test-token",
+  "mint": "2vXUXK2rJTPtb7Wx9em4W9FdgtfD6HTnFxZz5oirLVcH",
+  "sdk": {
+    "iroh": "1.1.0",
+    "x402": "2.28.0"
+  },
+  "historyNote": "Schema2 makes the latest result explicit. The complete earlier report is preserved as initialAttempt; earlier native-pressure retry remains unchanged in followUpAttempts. Current results live only in latestAttempt. gate-0006 is unchanged.",
+  "initialAttempt": {
+    "schemaVersion": 1,
+    "evidenceId": "GYB-GATE-0007",
+    "recordedAt": "2026-10-19T19:11:03.440821+00:00",
+    "status": "blocked-before-payment",
+    "acceptance": "Not met: zero of three paid physical-network inferences completed across all recorded attempts. Latest native retry stopped before model warmup because kernel pressure was warning (2).",
+    "network": "solana-devnet",
+    "assetLabel": "devnet-test-token",
+    "mint": "2vXUXK2rJTPtb7Wx9em4W9FdgtfD6HTnFxZz5oirLVcH",
+    "source": {
+      "algorithm": "sha256(sorted source path NUL bytes NUL)",
+      "digest": "aa2dc8415cbad02a71f60eb4385bc892cbf166ae24ca47e14efa3991736fec72"
+    },
+    "sourceCommit": "1e85000",
+    "sdk": {
+      "iroh": "1.1.0",
+      "x402": "2.28.0"
+    },
+    "packaging": {
+      "buyerBundleSha256": "675506152f362570bec018e4223ed6225c8e9237f6a6f2228997308d40466356",
+      "sellerBundleSha256": "b59544b3e3b2d918a4b0d9c5a15dc0282235066e245aa74da547b9a2636fd989",
+      "buyerEntrypointSha256": "4255367467a3fb8b92e0ad3e16e97a21062a721e1c705ba21a0d65a1a29ac5bb",
+      "sellerEntrypointSha256": "eff71ea35980f401dd969b29720a8a199e74116385e3fc752047653e124801ec",
+      "buildScriptSha256": "9c5f6fc62fb5ab474cf1bfae4ed4c79982a6ddcd0e71195d45ac83a89d31f677",
+      "scope": "Private standalone wrappers bundle the repository modules; native Iroh remains external. Only the imported call.ts isMain auto-entry guard is removed to prevent unintended CLI execution during bundle initialization. Hashes describe local bytes; the VPS independently verified its buyer bundle hash before setup and cleanup. Source fingerprint identifies repository context separately from private wrappers.",
+      "supplyChain": "Remote Node archive SHA-256 and both Iroh package SHA-512 values verified before extraction; public tokenizer artifacts pinned by revision and SHA-256; no global installation or lifecycle scripts. Existing local public model manifest verified by SHA-256 before native startup."
+    },
+    "readinessAttempts": [
+      {
+        "sellerRuntime": "Mac Docker VM, isolated Linux seller container",
+        "initialMemoryLimitBytes": 3221225472,
+        "initialResult": "Private warmup succeeded but final pre-offer cgroup headroom guard rejected publication; no payment attempted.",
+        "adjustedMemoryLimitBytes": 5368709120,
+        "adjustedResult": "Engine and signed offer ready; VPS verified owner-pinned offer and actual remote identity, but required direct route was not observed before its readiness deadline.",
+        "routeDeadlineMs": 30000,
+        "readinessError": "Expected route was not observed; no payment attempted.",
+        "paidRequestAttempted": false,
+        "selectedRoute": "not-recorded",
+        "limitation": "A required-direct timeout does not establish that relay was selected for every sample. Native path telemetry was not exported for this failed admission."
+      },
+      {
+        "sellerRuntime": "Native macOS arm64 Ollama/Iroh on the Mac",
+        "readiness": {
+          "status": "failed",
+          "reason": "insufficient-headroom",
+          "before": {
+            "source": "os-free",
+            "vmAvailableBytes": 1927610368,
+            "cgroup": null
+          },
+          "after": {
+            "source": "os-free",
+            "vmAvailableBytes": 544210944,
+            "cgroup": null
+          },
+          "warmupMs": 863.1089160000001
+        },
+        "requiredAvailableBytes": 1610612736,
+        "offerPublished": false,
+        "paidRequestAttempted": false,
+        "error": "Insufficient memory headroom; seller not advertised.",
+        "model": "qwen3:0.6b",
+        "modelDigest": "7df6b6e09427a769808717c0a93cadc4ae99ed4eb8bf5ca557c90846becea435",
+        "limitation": "The record uses the existing conservative os-free metric. OS cache reclaimability/pressure was not used to bypass or lower admission."
+      }
+    ],
+    "payments": {
+      "fundingTransactions": 0,
+      "paymentAuthorizations": 0,
+      "resourceInferences": 0,
+      "completedPaidRequests": 0,
+      "newTransactions": [],
+      "independentFinalizedReadOnlyCheck": {
+        "checkedAt": "2026-10-19T19:10:08.358Z",
+        "newAccountsChecked": 3,
+        "allNewBuyerAndFacilitatorSolBalancesZero": true,
+        "allNewBuyerAndFacilitatorFinalizedHistoriesEmpty": true,
+        "buyerTokenAccountAbsent": true
+      },
+      "note": "Synthetic private engine warmups occurred; they are not paid resource executions or fulfillment of the three-inference criterion."
+    },
+    "routePolicyCorrection": {
+      "commit": "1e85000",
+      "behavior": "Retain ready(expected) route policy across reconnects; reject before stream opening and again before writing HTTP/payment bytes when selected path differs. Failure poisons/closes the connection. Unspecified-route behavior remains compatible.",
+      "privateRegressionTdd": {
+        "redFailed": 3,
+        "redPassed": 1,
+        "greenPassed": 4,
+        "cases": [
+          "fallback before open",
+          "reconnect on relay",
+          "path change after stream opening before write",
+          "unspecified route remains relay-compatible"
+        ]
+      },
+      "limitation": "A path can still migrate during native write/response; sampled selected paths do not prove every packet. Any future paid route discrepancy must be reconciled on-chain, never retried automatically."
+    },
+    "isolationAndCleanup": {
+      "vpsUid": 65530,
+      "vpsNoNewPrivileges": true,
+      "vpsScopeMemoryMaxBytes": 1073741824,
+      "vpsCpuQuotaPercent": 50,
+      "vpsTasksMax": 64,
+      "vpsExistingContainers": 14,
+      "vpsSameContainerIdsStartTimesAndRestartCounts": true,
+      "vpsRemainingProbeRuntimeProcesses": 0,
+      "vpsTemporaryRuntimeStateAndUnfundedKeysRemoved": true,
+      "macExistingRunningContainers": 47,
+      "macSameExistingRunningContainerIds": true,
+      "macTemporarySellerContainerNetworkAndUnfundedVolumeRemoved": true,
+      "nativeSellerListenersRemaining": 0,
+      "deploymentChanges": 0,
+      "existingFirewallOrServiceConfigurationChanges": 0,
+      "note": "This establishes observed continuity and cleanup, not a zero-load or service-SLO guarantee. Role keys were generated only on their respective machines; no private key was transferred."
+    },
+    "verification": {
+      "typecheck": "passed",
+      "publicTests": 120,
+      "publicTestFailures": 0,
+      "publicTestSkips": 0,
+      "lintAndFormat": "passed",
+      "privateRouteRegressionTests": 4
+    },
+    "remaining": [
+      "Free additional native Mac memory until kernel pressure is normal (1), then pass the pressure-aware approximate-headroom check and unchanged post-warmup reserve before publishing a seller offer.",
+      "Repeat unpaid identity-pinned required-direct readiness with the native Mac seller before any devnet funding/payment.",
+      "After readiness, execute three bounded synthetic paid requests, verify actual sampled direct paths and independently finalize deposits/claims/balance deltas/refunds/sponsor fees. Stop and reconcile any uncertainty without another authorization.",
+      "This attempted gate does not validate paid physical-network inference, hotspot, production rendezvous, mobile, content authenticity or automatic recovery. REV-13/17 remain open.",
+      "The previous successful native unpaid Mac\u2013VPS echo result and all earlier gate-0006 financial evidence remain unchanged."
+    ]
+  },
+  "followUpAttempts": [
+    {
+      "recordedAt": "2026-10-19T22:36:44.639263+00:00",
+      "sourceCommit": "2c8eeac",
+      "source": {
+        "algorithm": "sha256(sorted source path NUL bytes NUL)",
+        "digest": "a6edcd7e6bc0f56b55387ed0703a5780f26219c13aace505682862bbf1444348"
+      },
+      "status": "blocked-before-payment",
+      "sellerRuntime": "Native macOS arm64 Ollama/Iroh; Linux x64 VPS buyer prepared but never started",
+      "admissionCorrection": {
+        "commits": [
+          "6a735f5",
+          "a066994",
+          "2c8eeac"
+        ],
+        "estimate": "(vm_stat free + speculative + inactive pages) * page size; purgeable excluded",
+        "source": "darwin-reclaimable-estimate",
+        "normalPressureRequired": 1,
+        "requiredAvailableBytes": 1610612736,
+        "observationTimeoutMs": 2000,
+        "maxObservationOutputBytes": 65536,
+        "limitation": "Inactive memory is an approximate reclaimability estimate, not reserved or guaranteed immediately allocatable RAM. Separate pressure/counter observations are not atomic and cannot guarantee future capacity. Linux behavior unchanged."
+      },
+      "initialObservation": {
+        "source": "darwin-reclaimable-estimate",
+        "vmAvailableBytes": 16261988352,
+        "darwin": {
+          "pageBytes": 16384,
+          "freePages": 13894,
+          "inactivePages": 974601,
+          "speculativePages": 4058,
+          "pressureLevel": 1,
+          "totalBytes": 68719476736
+        },
+        "cgroup": null
+      },
+      "readiness": {
+        "status": "failed",
+        "reason": "insufficient-headroom",
+        "before": {
+          "source": "darwin-reclaimable-estimate",
+          "vmAvailableBytes": 15667789824,
+          "darwin": {
+            "pageBytes": 16384,
+            "freePages": 11320,
+            "inactivePages": 942001,
+            "speculativePages": 2965,
+            "pressureLevel": 2,
+            "totalBytes": 68719476736
+          },
+          "cgroup": null
+        },
+        "after": {
+          "source": "darwin-reclaimable-estimate",
+          "vmAvailableBytes": 15666806784,
+          "darwin": {
+            "pageBytes": 16384,
+            "freePages": 11258,
+            "inactivePages": 942003,
+            "speculativePages": 2965,
+            "pressureLevel": 2,
+            "totalBytes": 68719476736
+          },
+          "cgroup": null
+        },
+        "warmupMs": 7.812542000000008
+      },
+      "modelWarmupAttempted": false,
+      "offerPublished": false,
+      "directRouteAttempted": false,
+      "selectedRoute": "not-attempted",
+      "fundingTransactions": 0,
+      "paymentAuthorizations": 0,
+      "resourceInferences": 0,
+      "completedPaidRequests": 0,
+      "stabilityObservations": [
+        {
+          "at": "2026-10-19T22:31:34.966Z",
+          "admitted": false,
+          "source": "darwin-reclaimable-estimate",
+          "vmAvailableBytes": 15561932800,
+          "darwin": {
+            "pageBytes": 16384,
+            "freePages": 5772,
+            "inactivePages": 943416,
+            "speculativePages": 637,
+            "pressureLevel": 2,
+            "totalBytes": 68719476736
+          },
+          "cgroup": null
+        },
+        {
+          "at": "2026-10-19T22:31:39.981Z",
+          "admitted": false,
+          "source": "darwin-reclaimable-estimate",
+          "vmAvailableBytes": 15731769344,
+          "darwin": {
+            "pageBytes": 16384,
+            "freePages": 10848,
+            "inactivePages": 948071,
+            "speculativePages": 1272,
+            "pressureLevel": 2,
+            "totalBytes": 68719476736
+          },
+          "cgroup": null
+        },
+        {
+          "at": "2026-10-19T22:31:44.994Z",
+          "admitted": false,
+          "source": "darwin-reclaimable-estimate",
+          "vmAvailableBytes": 15823421440,
+          "darwin": {
+            "pageBytes": 16384,
+            "freePages": 10293,
+            "inactivePages": 954184,
+            "speculativePages": 1308,
+            "pressureLevel": 2,
+            "totalBytes": 68719476736
+          },
+          "cgroup": null
+        }
+      ],
+      "packagingSha256": {
+        "seller-entry.ts": "eff71ea35980f401dd969b29720a8a199e74116385e3fc752047653e124801ec",
+        "remote-entry.ts": "4255367467a3fb8b92e0ad3e16e97a21062a721e1c705ba21a0d65a1a29ac5bb",
+        "build.mjs": "a04f80aeae2d21037da18055113c9cc00527216160ae71a725832fc0d18b7c17",
+        "bundle/buyer.mjs": "51899bb5946cfcfb27ac4091ad2ad220abd3f3294a6b07735a266f7238c7b8f9",
+        "bundle/seller.mjs": "2f2da0c242c82b13fa683e447779044b246a0c80e97254fb4257185c5f5afad0"
+      },
+      "independentFinalizedReadOnlyCheck": {
+        "checkedAt": "2026-10-19T22:35:00.270Z",
+        "newAccountsChecked": 2,
+        "buyerAndFacilitatorSolBalancesZero": true,
+        "buyerAndFacilitatorFinalizedHistoriesEmpty": true
+      },
+      "isolationAndCleanup": {
+        "vpsExistingContainers": 14,
+        "vpsSameContainerIdsStartTimesAndRestartCounts": true,
+        "vpsRemainingProbeRuntimeProcesses": 0,
+        "vpsTemporaryRuntimeAndUnfundedKeysRemoved": true,
+        "macExistingRunningContainers": 47,
+        "macSameExistingRunningContainerIds": true,
+        "nativeSellerListenersRemaining": 0,
+        "deploymentChanges": 0,
+        "existingFirewallOrServiceConfigurationChanges": 0
+      },
+      "verification": {
+        "privateTddTests": 12,
+        "publicTests": 120,
+        "typecheck": "passed for each source commit",
+        "lintAndFormat": "passed for each source commit",
+        "readOnlyReviews": 3
+      },
+      "note": "The initial normal-pressure observation did not authorize a later warmup: startup re-read pressure level 2 and refused before engine description/generation. No payment reconciliation or paid direct inference is claimed. Previous attempts and gate-0006 remain unchanged."
+    }
+  ],
+  "latestAttempt": {
+    "recordedAt": "2026-10-19T23:06:18.605774+00:00",
+    "status": "passed-native-mac-vps-direct",
+    "sourceCommit": "2c8eeac",
+    "source": {
+      "algorithm": "sha256(sorted source path NUL bytes NUL)",
+      "digest": "a6edcd7e6bc0f56b55387ed0703a5780f26219c13aace505682862bbf1444348"
+    },
+    "runtimes": {
+      "seller": "native macOS arm64 Ollama/Iroh on Wi-Fi",
+      "buyer": "native Linux x64 VPS; UID65530, no-new-privileges, transient scope MemoryMax1GiB/CPU50%/TasksMax64, 900s host and 180s call deadline",
+      "node": "22.19.0",
+      "ollama": "0.40.0",
+      "model": "qwen3:0.6b",
+      "modelDigest": "7df6b6e09427a769808717c0a93cadc4ae99ed4eb8bf5ca557c90846becea435"
+    },
+    "nativeReadiness": [
+      {
+        "status": "passed",
+        "reason": "ready",
+        "before": {
+          "source": "darwin-reclaimable-estimate",
+          "vmAvailableBytes": 20186841088,
+          "darwin": {
+            "pageBytes": 16384,
+            "freePages": 6137,
+            "inactivePages": 1219343,
+            "speculativePages": 6627,
+            "pressureLevel": 1,
+            "totalBytes": 68719476736
+          },
+          "cgroup": null
+        },
+        "after": {
+          "source": "darwin-reclaimable-estimate",
+          "vmAvailableBytes": 19507888128,
+          "darwin": {
+            "pageBytes": 16384,
+            "freePages": 17527,
+            "inactivePages": 1169007,
+            "speculativePages": 4133,
+            "pressureLevel": 1,
+            "totalBytes": 68719476736
+          },
+          "cgroup": null
+        },
+        "warmupMs": 1128.2592499999998
+      },
+      {
+        "status": "passed",
+        "reason": "ready",
+        "before": {
+          "source": "darwin-reclaimable-estimate",
+          "vmAvailableBytes": 20002766848,
+          "darwin": {
+            "pageBytes": 16384,
+            "freePages": 90576,
+            "inactivePages": 1106481,
+            "speculativePages": 23815,
+            "pressureLevel": 1,
+            "totalBytes": 68719476736
+          },
+          "cgroup": null
+        },
+        "after": {
+          "source": "darwin-reclaimable-estimate",
+          "vmAvailableBytes": 19210420224,
+          "darwin": {
+            "pageBytes": 16384,
+            "freePages": 41031,
+            "inactivePages": 1126362,
+            "speculativePages": 5118,
+            "pressureLevel": 1,
+            "totalBytes": 68719476736
+          },
+          "cgroup": null
+        },
+        "warmupMs": 842.441875
+      }
+    ],
+    "routeReadiness": {
+      "requiredRoute": "iroh-direct",
+      "ownerSignatureAndLocallyPinnedTermsVerified": true,
+      "actualRemoteNodeIdVerified": true,
+      "unpaidDirect402BeforeFunding": true,
+      "renewedUnpaidDirect402BeforeSecondPayment": true,
+      "publicN0Defaults": true,
+      "manualCandidates": false,
+      "labObserver": false,
+      "operatorExchangedPublicPeerDescriptors": true,
+      "productionProviderDiscovery": false,
+      "paidCallRouteSamples": 6,
+      "allPaidCallRouteSamplesDirect": true,
+      "relayObservedDuringPaidCallSamples": false,
+      "limitation": "Selected paths are sampled; no guarantee that every packet stayed direct or that the precise migration instant was measured."
+    },
+    "packagingSha256": {
+      "remote-entry.ts": "4255367467a3fb8b92e0ad3e16e97a21062a721e1c705ba21a0d65a1a29ac5bb",
+      "seller-entry.ts": "eff71ea35980f401dd969b29720a8a199e74116385e3fc752047653e124801ec",
+      "bundle/buyer.mjs": "51899bb5946cfcfb27ac4091ad2ad220abd3f3294a6b07735a266f7238c7b8f9",
+      "bundle/seller.mjs": "2f2da0c242c82b13fa683e447779044b246a0c80e97254fb4257185c5f5afad0",
+      "audit.ts": "40f16e1b4303a66df42ad719f89b5cc20e23d80da0f5369974030b9f3f776166"
+    },
+    "fundingSignature": "thEFvgnoZyms8gh7ftVCZJESTyMzgjn9AWsYzyxoXi1Fov3xEuJx7nFk1JqihwRwGEsM5iiLP8DE8dRgh5Ch2z4",
+    "cases": [
+      {
+        "caseIndex": 0,
+        "checkedAt": "2026-10-19T23:01:04.075Z",
+        "finalized": true,
+        "channelId": "J7M52z3rM3532t2W4EBJJRAwD55KtBjCUG7HXkfWgBqA",
+        "depositSignature": "4KBwdgmEKHFtejZM5Wy5tuLi3QqvvQH1TELABmdaV5rHnY7Tkw1L42JNRi2uoTZuqn2vm2mAqcCdA8aLwZnFZdqH",
+        "claimSignature": "4K77CosCBrfanZDcddvtqAmKsove1P547qWNnVnU4n7wjXYHiCiYDbzxuzaKNx1myTJpBXAyWMD9QMHw7dAGHEKB",
+        "depositSlot": 512956762,
+        "claimSlot": 512956773,
+        "ceilingAtomic": "556",
+        "chargedAtomic": "140",
+        "refundAtomic": "416",
+        "buyerTokenDelta": "-140",
+        "sellerTokenDelta": "140",
+        "buyerLamportDelta": "0",
+        "buyerFinalLamports": "0",
+        "sponsorLamportDelta": "-1970722",
+        "sponsorFeesLamports": "20002",
+        "retainedChannelRentLamports": "1950720",
+        "channelStatus": 3,
+        "channelOwnerVerified": true,
+        "escrowAtomic": "0",
+        "actualRoute": "iroh-direct",
+        "mixedRouteObserved": false,
+        "case": 1,
+        "outcome": "confirmed",
+        "connectMs": 245.32266900000002,
+        "latencyMs": 4362.25386,
+        "effectiveTokensPerSecond": 13.295879116948045,
+        "firstWordMs": null,
+        "firstWordNote": "upto buffers the response until settlement; first-word latency is not observable",
+        "engineTokens": {
+          "input": 22,
+          "output": 59
+        },
+        "recountedTokens": {
+          "input": 22,
+          "output": 58
+        },
+        "countComparison": {
+          "inputDelta": 0,
+          "outputDelta": 1,
+          "withinTolerance": true
+        },
+        "meteringMode": "recounted",
+        "delivered": true,
+        "anomaly": "none",
+        "generationAfterConfirmedDeposit": true
+      },
+      {
+        "caseIndex": 1,
+        "checkedAt": "2026-10-19T23:03:01.511Z",
+        "finalized": true,
+        "channelId": "AvMkw3Cus9rkzVfsu1N5uRVFdnT4cZ1ejqN9z2hztub5",
+        "depositSignature": "4yMGYAwhNxHnwvGHfA35tu45qLWHvSh8d4oFBMT3VDrH1dN2JdV5WrdXHrMLgHcidjW5JQoC1pMeDcX6BLm9tkwA",
+        "claimSignature": "5afMhGNXBdqLFyoKQbfrxmbuFmNPShfXq9Muv9WsqF3cYySwN8t8okmCEY6UThwWUw3MxLWTAwLtMSdq1k51zeHH",
+        "depositSlot": 512957592,
+        "claimSlot": 512957602,
+        "ceilingAtomic": "558",
+        "chargedAtomic": "139",
+        "refundAtomic": "419",
+        "buyerTokenDelta": "-139",
+        "sellerTokenDelta": "139",
+        "buyerLamportDelta": "0",
+        "buyerFinalLamports": "0",
+        "sponsorLamportDelta": "-1970722",
+        "sponsorFeesLamports": "20002",
+        "retainedChannelRentLamports": "1950720",
+        "channelStatus": 3,
+        "channelOwnerVerified": true,
+        "escrowAtomic": "0",
+        "actualRoute": "iroh-direct",
+        "mixedRouteObserved": false,
+        "case": 2,
+        "outcome": "confirmed",
+        "connectMs": 313.85069599999997,
+        "latencyMs": 4487.881843000001,
+        "effectiveTokensPerSecond": 12.700869139169978,
+        "firstWordMs": null,
+        "firstWordNote": "upto buffers the response until settlement; first-word latency is not observable",
+        "engineTokens": {
+          "input": 23,
+          "output": 58
+        },
+        "recountedTokens": {
+          "input": 23,
+          "output": 57
+        },
+        "countComparison": {
+          "inputDelta": 0,
+          "outputDelta": 1,
+          "withinTolerance": true
+        },
+        "meteringMode": "recounted",
+        "delivered": true,
+        "anomaly": "none",
+        "generationAfterConfirmedDeposit": true
+      },
+      {
+        "caseIndex": 2,
+        "checkedAt": "2026-10-19T23:03:49.842Z",
+        "finalized": true,
+        "channelId": "8BazEqS1CQRGvpr2f53M52htnH1gBdQTvECC1qy4KSq6",
+        "depositSignature": "4Rfo9RrQqxt4jxyGWd9DX9VoSTmkS6YAHnHpiD4SAZsaGK3aiwuaYU5YV6PjDqn6MhG2K6uVA6sNmV64kKWL7d4D",
+        "claimSignature": "a79YHBedpkCNSa2ukewXuQAkExBnzL7pvYRrpMfeF8kzmYvccHwbf7jw6LEkqqdyKdRT1myJUJg8ygMYHZde3Ah",
+        "depositSlot": 512957818,
+        "claimSlot": 512957832,
+        "ceilingAtomic": "558",
+        "chargedAtomic": "147",
+        "refundAtomic": "411",
+        "buyerTokenDelta": "-147",
+        "sellerTokenDelta": "147",
+        "buyerLamportDelta": "0",
+        "buyerFinalLamports": "0",
+        "sponsorLamportDelta": "-1970722",
+        "sponsorFeesLamports": "20002",
+        "retainedChannelRentLamports": "1950720",
+        "channelStatus": 3,
+        "channelOwnerVerified": true,
+        "escrowAtomic": "0",
+        "actualRoute": "iroh-direct",
+        "mixedRouteObserved": false,
+        "case": 3,
+        "outcome": "confirmed",
+        "connectMs": 313.85069599999997,
+        "latencyMs": 7376.998919,
+        "effectiveTokensPerSecond": 8.268945226884885,
+        "firstWordMs": null,
+        "firstWordNote": "upto buffers the response until settlement; first-word latency is not observable",
+        "engineTokens": {
+          "input": 23,
+          "output": 62
+        },
+        "recountedTokens": {
+          "input": 23,
+          "output": 61
+        },
+        "countComparison": {
+          "inputDelta": 0,
+          "outputDelta": 1,
+          "withinTolerance": true
+        },
+        "meteringMode": "recounted",
+        "delivered": true,
+        "anomaly": "none",
+        "generationAfterConfirmedDeposit": true
+      }
+    ],
+    "payments": {
+      "fundingTransactions": 1,
+      "paymentAuthorizations": 3,
+      "completedPaidRequests": 3,
+      "resourceInferences": 3,
+      "independentlyFinalizedPaymentTransactions": 6,
+      "allSevenIncludingFundingFinalized": true,
+      "totalCeilingAtomic": "1672",
+      "totalChargedAtomic": "426",
+      "totalRefundAtomic": "1246",
+      "buyerTokenBefore": "10000",
+      "buyerTokenAfter": "9574",
+      "sellerTokenBefore": "9808",
+      "sellerTokenAfter": "10234",
+      "buyerSolBefore": "0",
+      "buyerSolAfter": "0",
+      "sponsorFeesLamports": "60006",
+      "retainedChannelRentLamports": "5852160",
+      "sponsorFinalLamports": "44087834",
+      "escrowTokensAfterEachCall": "0",
+      "retainedRentNote": "Canonical distributed channel accounts retain rent; it is not a network fee or a completed refund. Each sponsor delta equals negative transaction fees minus the exact finalized channel-account rent delta, with canonical owner/PDA/state and RPC minimum-rent checks."
+    },
+    "auditCorrectionAndRenewal": {
+      "firstFeesOnlyAssertionFailed": true,
+      "cause": "Private audit incorrectly assumed distributed channels immediately return their account rent. Exact raw finalized balances and SDK channel validation explain the retained rent. No payment failure or refund was inferred from the assertion error.",
+      "firstCallRepeated": false,
+      "remainingCallsPausedUntilIndependentReconciliation": true,
+      "readOnlyFinancialReviewBeforeResumption": true,
+      "signedOfferRenewedAfterExpiry": true,
+      "sameRoleKeysPreserved": true,
+      "newFundingOnRenewal": false,
+      "readinessRechecked": true,
+      "unpaidProbeCorrections": "Local diagnostics first used a wrong route and then a non-UUID request identifier; both returned400 before any authorization/resource work. A valid UUID on the configured route returned402 over direct. One local read-only operator-balance invocation lacked the TS loader and failed before any transaction; it was corrected before funding."
+    },
+    "dockerComparison": {
+      "flat": {
+        "cases": 3,
+        "summary": {
+          "connectMs": {
+            "min": 2.2239580000000387,
+            "median": 2.2239580000000387,
+            "max": 2.2239580000000387
+          },
+          "latencyMs": {
+            "min": 12541.448172999999,
+            "median": 13587.616507,
+            "max": 20243.680508999998
+          },
+          "effectiveTokensPerSecond": {
+            "min": 2.9144897823184674,
+            "median": 3.9070448104621773,
+            "max": 4.562978353713409
+          }
+        }
+      },
+      "natRelay": {
+        "cases": 3,
+        "summary": {
+          "connectMs": {
+            "min": 478.26537600000006,
+            "median": 478.26537600000006,
+            "max": 478.26537600000006
+          },
+          "latencyMs": {
+            "min": 51667.98594,
+            "median": 57801.150318,
+            "max": 70384.281408
+          },
+          "effectiveTokensPerSecond": {
+            "min": 0.6961781667693574,
+            "median": 1.072643012446976,
+            "max": 1.141906326066481
+          }
+        }
+      },
+      "nativeMacVpsDirect": {
+        "cases": 3,
+        "summary": {
+          "connectMs": {
+            "min": 245.32266900000002,
+            "median": 313.85069599999997,
+            "max": 313.85069599999997
+          },
+          "latencyMs": {
+            "min": 4362.25386,
+            "median": 4487.881843000001,
+            "max": 7376.998919
+          },
+          "effectiveTokensPerSecond": {
+            "min": 8.268945226884885,
+            "median": 12.700869139169978,
+            "max": 13.295879116948045
+          }
+        }
+      },
+      "limitation": "Descriptive small-sample comparison only: Docker Linux ARM64 CPU vs a native macOS ARM64 engine whose acceleration was not independently profiled, with distinct networks, transactions, warming and token outputs. Effective output TPS and latency include payment/RPC and delivery overhead; this is not engine TPS or a controlled benchmark. connectMs is the observed cached connection setup duration, reused on each exchange, not a fresh handshake per request."
+    },
+    "isolationAndCleanup": {
+      "vpsExistingContainers": 14,
+      "vpsSameContainerIdsStartTimesRestartCounts": true,
+      "vpsRemainingProbeProcesses": 0,
+      "vpsTemporaryRuntimeRemoved": true,
+      "vpsFundedBuyerKeysAndJournalsPreservedPrivatelyOnOriginalMachine": true,
+      "vpsArchiveRootMode": "0700",
+      "roleKeyModes": "0600",
+      "macExistingRunningContainers": 47,
+      "macSameExistingRunningContainerIds": true,
+      "nativeSellerListenersRemaining": 0,
+      "macFundedFacilitatorAndRoleKeysPreservedPrivately": true,
+      "existingServiceOrFirewallConfigurationChanges": 0,
+      "deploymentChanges": 0,
+      "limitation": "Observed continuity, not a service-SLO, zero-load or continuous-liveness guarantee. No role private key was transferred between machines."
+    },
+    "verification": {
+      "sourceUnchangedFromIndividuallyCheckedCommits": true,
+      "publicTests": 120,
+      "privateMemoryTddTests": 12,
+      "typecheck": "passed for source commits",
+      "lintAndFormat": "passed for source commits",
+      "privateSourceTraceAudit": {
+        "cases": 3,
+        "depositBeforeEngine": true,
+        "fullEscrowAtEngineStart": true,
+        "noPredepositPaidWork": true,
+        "allWithinTolerance": true,
+        "allFinalized": true
+      }
+    },
+    "limitations": [
+      "Devnet test SPL token, not Circle USDC or mainnet.",
+      "Three bounded synthetic requests on one native Mac-to-VPS direct configuration; hotspot/CGNAT diversity, arbitrary NAT and production reliability remain unvalidated.",
+      "Buffered upto delivery: no MPP or streaming, and no observed first-word latency.",
+      "Buyer recount and payment checks do not authenticate model execution or content correctness; REV-13 remains open.",
+      "Production rendezvous/8004, mobile, off-host relay-only privacy and automatic durable recovery remain unvalidated; REV-17 remains open.",
+      "Approximate reclaimable memory plus normal pressure is admission, not reserved capacity or an OOM guarantee.",
+      "Offer renewal and audit-assumption correction were operator-mediated, not automatic recovery."
+    ]
+  }
+}

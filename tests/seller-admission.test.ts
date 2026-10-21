@@ -11,6 +11,7 @@ import {
 } from '@x402/core/http';
 
 import { createInferenceSeller } from '../apps/seller/src/inference.js';
+import { createOllamaEngine } from '../packages/inference-ollama/src/engine.js';
 import { MODEL } from '../packages/inference-ollama/src/model.js';
 import {
   DEVNET,
@@ -114,7 +115,7 @@ test('real middleware waits for deposit and seller rejects false escrow despite 
       rpcUrl: 'https://rpc.test/',
       facilitatorUrl: 'https://facilitator.test',
       feePayer,
-      ollamaUrl: 'http://127.0.0.1:11439',
+      engine: createOllamaEngine('http://127.0.0.1:11439'),
       mint,
       payTo: buyer,
       authorizer,

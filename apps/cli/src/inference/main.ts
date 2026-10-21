@@ -38,6 +38,7 @@ import { assertNoUnresolvedAuthorizations } from '@gyblos/gate/journal';
 import { withExclusiveLock } from '@gyblos/gate/lock';
 import { measurementSalt } from '@gyblos/gate/measurements';
 import { GENERATION } from '@gyblos/inference-ollama/constants';
+import { createOllamaEngine } from '@gyblos/inference-ollama/engine';
 import {
   createModelTokenizer,
   createOllama,
@@ -181,7 +182,7 @@ export async function main() {
         ...gateBilling,
         rpcUrl: config.rpcUrl,
         facilitatorUrl,
-        ollamaUrl,
+        engine: createOllamaEngine(ollamaUrl),
         mint: config.mint,
         payTo: config.addresses.seller,
         authorizer: await signer(config, WALLET_ROLES.AUTHORIZER),

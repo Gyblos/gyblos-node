@@ -1,4 +1,7 @@
-import { TOKENIZER_SDK_VERSION } from '@gyblos/config';
+import {
+  INFERENCE_REQUEST_LIMITS,
+  TOKENIZER_SDK_VERSION,
+} from '@gyblos/config';
 
 export const MODEL = {
   name: 'qwen3:0.6b',
@@ -15,18 +18,26 @@ export const MODEL = {
     'single-user/no-tools/enable_thinking=false/add_generation_prompt=true',
 } as const;
 
+export const READINESS_GENERATION = {
+  prompt: 'Reply OK.',
+  maxTokens: 1,
+  parallel: 1,
+  loadedModels: 1,
+  residencyMs: 5 * 60_000,
+} as const;
+
 export const GENERATION = {
   numCtx: 2048,
   seed: 42,
   temperature: 0,
-  keepAlive: '5m',
+  keepAlive: `${READINESS_GENERATION.residencyMs}ms`,
 } as const;
 
 export const MODEL_LIMITS = {
-  requestMinOutputTokens: 32,
-  requestMaxOutputTokens: 128,
+  requestMinOutputTokens: INFERENCE_REQUEST_LIMITS.minOutputTokens,
+  requestMaxOutputTokens: INFERENCE_REQUEST_LIMITS.maxOutputTokens,
   adapterMaxOutputTokens: 512,
-  maxPromptCharacters: 4000,
+  maxPromptCharacters: INFERENCE_REQUEST_LIMITS.maxPromptCharacters,
   maxFrameCharacters: 1_000_000,
   maxOutputCharacters: 100_000,
 } as const;

@@ -1,0 +1,80 @@
+{
+  "services": {
+    "seller": {
+      "image": "${GYBLOS_P2P_IMAGE}",
+      "command": [
+        "node",
+        "--import",
+        "tsx",
+        "${GYBLOS_P2P_ACTOR_ENTRY}",
+        "seller"
+      ],
+      "user": "${GYBLOS_P2P_USER}",
+      "read_only": true,
+      "cap_drop": ["ALL"],
+      "security_opt": ["no-new-privileges:true"],
+      "init": true,
+      "pids_limit": "${GYBLOS_P2P_PIDS}",
+      "mem_limit": "${GYBLOS_P2P_SELLER_MEMORY}",
+      "cpus": "${GYBLOS_P2P_CPUS}",
+      "volumes": ["seller-data:/app/.local"],
+      "networks": {
+        "flat": {
+          "ipv4_address": "${GYBLOS_P2P_SELLER_IP}"
+        }
+      },
+      "environment": {
+        "GYBLOS_IROH_BIND": "${GYBLOS_P2P_SELLER_IP}:0",
+        "GYBLOS_EXPECTED_ROUTE": "",
+        "GYBLOS_RPC_URL": "${GYBLOS_P2P_RPC}",
+        "GYBLOS_P2P_RUN_ID": "${GYBLOS_P2P_RUN_ID}"
+      }
+    },
+    "buyer": {
+      "image": "${GYBLOS_P2P_IMAGE}",
+      "command": [
+        "node",
+        "--import",
+        "tsx",
+        "${GYBLOS_P2P_ACTOR_ENTRY}",
+        "buyer"
+      ],
+      "user": "${GYBLOS_P2P_USER}",
+      "read_only": true,
+      "cap_drop": ["ALL"],
+      "security_opt": ["no-new-privileges:true"],
+      "init": true,
+      "pids_limit": "${GYBLOS_P2P_PIDS}",
+      "mem_limit": "${GYBLOS_P2P_BUYER_MEMORY}",
+      "cpus": "${GYBLOS_P2P_CPUS}",
+      "volumes": ["buyer-data:/app/.local"],
+      "networks": {
+        "flat": {
+          "ipv4_address": "${GYBLOS_P2P_BUYER_IP}"
+        }
+      },
+      "environment": {
+        "GYBLOS_IROH_BIND": "${GYBLOS_P2P_BUYER_IP}:0",
+        "GYBLOS_EXPECTED_ROUTE": "iroh-direct",
+        "GYBLOS_RPC_URL": "${GYBLOS_P2P_RPC}",
+        "GYBLOS_P2P_RUN_ID": "${GYBLOS_P2P_RUN_ID}"
+      }
+    }
+  },
+  "networks": {
+    "flat": {
+      "driver": "bridge",
+      "ipam": {
+        "config": [
+          {
+            "subnet": "${GYBLOS_P2P_SUBNET}"
+          }
+        ]
+      }
+    }
+  },
+  "volumes": {
+    "seller-data": {},
+    "buyer-data": {}
+  }
+}

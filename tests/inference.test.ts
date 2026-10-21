@@ -200,10 +200,14 @@ test('bounded inference rejects tokenized context overflow before signing', asyn
   const { inferenceCeiling } = await import('../apps/seller/src/inference.js');
   assert.throws(
     () =>
-      inferenceCeiling({ requestId: 'id', prompt: 'prompt', maxTokens: 128 }, {
-        input: () => 2040,
-        count: () => 0,
-      } as Parameters<typeof inferenceCeiling>[1]),
+      inferenceCeiling(
+        { requestId: 'id', prompt: 'prompt', maxTokens: 128 },
+        {
+          input: () => 2040,
+          count: () => 0,
+        } as Parameters<typeof inferenceCeiling>[1],
+        2048,
+      ),
     /context window/,
   );
 });
