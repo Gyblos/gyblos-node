@@ -31,6 +31,7 @@ import {
 } from '@gyblos/payments-x402/exact/index';
 import type { PublicCall } from '@gyblos/payments-x402/exact/types';
 import { UNKNOWN_ERROR_NAME } from '@gyblos/runtime/constants';
+import { requireLoopbackHost } from '@gyblos/runtime/loopback-host';
 
 export type { PublicCall } from '@gyblos/payments-x402/exact/types';
 
@@ -124,6 +125,7 @@ export async function createExactSeller(options: {
   );
   await resource.initialize();
   const app = express();
+  app.use(requireLoopbackHost);
   let handlerCalls = 0;
   const authorizations = new Set<string>();
   app.get(ROUTES.health, (_request, response) => {

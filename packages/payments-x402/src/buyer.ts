@@ -8,7 +8,11 @@ import {
 import { UptoSvmScheme } from '@x402/svm/upto/client';
 
 import { TIMEOUTS } from '@gyblos/config';
-import { DEVNET } from '@gyblos/payments-x402/constants';
+import {
+  BUYER_DIAGNOSTIC_CODES,
+  DEVNET,
+  type BuyerDiagnosticCode,
+} from '@gyblos/payments-x402/constants';
 import { validateTerms, type TrustPolicy } from '@gyblos/payments-x402/trust';
 
 import { signatureHint } from './signature-hint.js';
@@ -41,6 +45,7 @@ export function createBuyer(
     responseObserved?: (
       observation: BuyerResponseObservation,
     ) => Promise<void> | void;
+    responseObservationFailed?: (code: BuyerDiagnosticCode) => void;
   } = {},
 ) {
   let authorization:
@@ -143,11 +148,26 @@ export function createBuyer(
               // Invalid headers must not erase the original response error.
             }
           }
-          const claimSignature = signatureHint(settlement?.transaction);
-          await hooks.responseObserved({
-            status: response.status,
-            ...(claimSignature ? { claimSignature } : {}),
-          });
+          try {
+            const claimSignature = signatureHint(settlement?.transaction);
+            await hooks.responseObserved({
+              status: response.status,
+              ...(claimSignature ? { claimSignature } : {}),
+            });
+          } catch {
+            // An observer failure must not replace the original result or
+            // error; it is reported only as a canonical code.
+            try {
+              const reported: unknown = hooks.responseObservationFailed?.(
+                BUYER_DIAGNOSTIC_CODES.RESPONSE_OBSERVATION_FAILED,
+              );
+              // An asynchronous reporter may reject; consume it so it can
+              // neither crash the process nor expose its error.
+              void Promise.resolve(reported).catch(() => undefined);
+            } catch {
+              // A failing reporter must not replace the outcome either.
+            }
+          }
         }
       }
     },

@@ -216,6 +216,9 @@ importers:
       '@gyblos/config':
         specifier: workspace:*
         version: link:../config
+      '@gyblos/runtime':
+        specifier: workspace:*
+        version: link:../runtime
 
   packages/runtime:
     dependencies:

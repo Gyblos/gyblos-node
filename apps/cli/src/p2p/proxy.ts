@@ -8,6 +8,7 @@ import {
   P2P,
   ROUTES,
 } from '@gyblos/config';
+import { acceptLoopbackHost } from '@gyblos/runtime/loopback-host';
 import type { Transport } from '@gyblos/transport';
 
 import { rolePath } from './roles.js';
@@ -17,6 +18,7 @@ export async function startBuyerProxy(transport: Transport) {
   const server = createServer(
     { maxHeaderSize: P2P.headerBytes, requestTimeout: P2P.requestMs },
     async (request, response) => {
+      if (!acceptLoopbackHost(request, response)) return;
       if (request.method !== 'POST' || request.url !== ROUTES.inference) {
         response.writeHead(HTTP_STATUS.badRequest).end();
         return;

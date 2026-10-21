@@ -13,12 +13,16 @@ import {
   type PrivateLogFile,
 } from './private-log-file.js';
 
+// Queue marker: close the exhausted file and reserve a fresh one in order.
+const ROTATE = Symbol('rotate');
+
 export interface PrivateLogHealth {
   state: PrivateLogState;
   code?: PrivateLogCode;
   queued: number;
   synced: number;
   dropped: number;
+  rotations: number;
   closed: boolean;
 }
 
@@ -27,6 +31,8 @@ export interface PrivateLogOptions {
   recordBytes?: number;
   pendingRecords?: number;
   drainMs?: number;
+  maxRotations?: number;
+  reclaimMinAgeMs?: number;
 }
 
 function storageCode(error: unknown): PrivateLogCode {
@@ -57,7 +63,10 @@ export async function createPrivateLog(
   ])
     if (!Number.isSafeInteger(value) || value <= 0)
       throw new Error('Invalid private log limit.');
-  const queue: string[] = [];
+  for (const value of [limits.maxRotations, limits.reclaimMinAgeMs])
+    if (!Number.isSafeInteger(value) || value < 0)
+      throw new Error('Invalid private log limit.');
+  const queue: (string | typeof ROTATE)[] = [];
   let file: PrivateLogFile | undefined;
   let running: Promise<void> | undefined;
   let failure: PrivateLogCode | undefined;
@@ -69,7 +78,8 @@ export async function createPrivateLog(
   let closing: Promise<PrivateLogHealth> | undefined;
   let reservedBytes = 0,
     synced = 0,
-    dropped = 0;
+    dropped = 0,
+    rotations = 0;
   const degrade = (code: PrivateLogCode) => {
     failure = code;
     if (!warned) {
@@ -91,10 +101,13 @@ export async function createPrivateLog(
     queued: queue.length + (inFlight ? 1 : 0),
     synced,
     dropped,
+    rotations,
     closed,
   });
+  const reopen = () =>
+    openPrivateLogFile(directory, { reclaimMinAgeMs: limits.reclaimMinAgeMs });
   try {
-    file = await openPrivateLogFile(directory);
+    file = await reopen();
   } catch (error) {
     poisoned = true;
     degrade(storageCode(error));
@@ -104,11 +117,19 @@ export async function createPrivateLog(
       const line = queue.shift()!;
       inFlight = true;
       try {
-        await file!.append(line);
-        synced++;
+        if (line === ROTATE) {
+          const exhausted = file!;
+          file = undefined;
+          await exhausted.close();
+          file = await reopen();
+        } else {
+          await file!.append(line);
+          synced++;
+        }
       } catch (error) {
         poisoned = true;
-        dropped += queue.length + 1;
+        dropped += queue.filter((entry) => entry !== ROTATE).length;
+        if (line !== ROTATE) dropped++;
         queue.splice(0);
         degrade(storageCode(error));
       } finally {
@@ -144,15 +165,32 @@ export async function createPrivateLog(
         degrade(PRIVATE_LOG_CODES.RECORD_LIMIT);
         return;
       }
-      if (reservedBytes + bytes > limits.fileBytes) {
+      // A record that cannot fit in one file would exceed its hard budget
+      // even after rotation.
+      if (bytes > limits.fileBytes) {
         dropped++;
         degrade(PRIVATE_LOG_CODES.STORAGE_LIMIT);
         return;
       }
-      if (queue.length + (inFlight ? 1 : 0) >= limits.pendingRecords) {
+      const rotate = reservedBytes + bytes > limits.fileBytes;
+      if (rotate && rotations >= limits.maxRotations) {
+        dropped++;
+        degrade(PRIVATE_LOG_CODES.STORAGE_LIMIT);
+        return;
+      }
+      // A rotation marker occupies one queue slot, keeping the queue bound.
+      if (
+        queue.length + (inFlight ? 1 : 0) + (rotate ? 1 : 0) >=
+        limits.pendingRecords
+      ) {
         dropped++;
         degrade(PRIVATE_LOG_CODES.QUEUE_FULL);
         return;
+      }
+      if (rotate) {
+        rotations++;
+        reservedBytes = 0;
+        queue.push(ROTATE);
       }
       reservedBytes += bytes;
       queue.push(line);
@@ -190,7 +228,9 @@ export async function createPrivateLog(
     write,
     health,
     flush,
-    path: file?.path,
+    get path() {
+      return file?.path;
+    },
     close(): Promise<PrivateLogHealth> {
       if (closing) return closing;
       accepting = false;

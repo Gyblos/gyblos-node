@@ -190,7 +190,7 @@ export function registerPrivateLogGuardCases() {
     },
   );
   test(
-    'log instance limit preserves every older journal without rotation',
+    'log instance limit never reclaims legacy journals',
     { timeout: 10000, skip: PRIVATE_LOG_PLATFORM_SKIP },
     async () => {
       const directory = await diagnosticDirectory();

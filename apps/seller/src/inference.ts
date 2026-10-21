@@ -32,6 +32,7 @@ import {
 } from '@gyblos/config';
 import { DEVNET, MAX_ATOMIC } from '@gyblos/payments-x402/constants';
 import { verifyInferenceDeposit } from '@gyblos/payments-x402/inference-deposit';
+import { requireLoopbackHost } from '@gyblos/runtime/loopback-host';
 
 export interface InferenceRequest {
   requestId: string;
@@ -116,6 +117,7 @@ export async function createInferenceSeller(options: {
   );
   await resource.initialize();
   const app = express();
+  app.use(requireLoopbackHost);
   app.use(express.json({ limit: HTTP_LIMITS.requestBody }));
   app.post(ROUTES.inference, (request, response, next) => {
     try {
