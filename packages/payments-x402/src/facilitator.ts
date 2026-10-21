@@ -6,7 +6,7 @@ import {
   InMemoryPaymentChannelStorage,
   UptoSvmScheme,
 } from '@x402/svm/upto/facilitator';
-import express from 'express';
+import express, { type Request } from 'express';
 
 import {
   CLEANUP,
@@ -17,9 +17,16 @@ import {
 } from '@gyblos/config';
 import {
   DEVNET,
+  FACILITATOR_DIAGNOSTIC_CODES,
+  FACILITATOR_STAGES,
   MAX_ATOMIC,
   PUBLIC_CALL_OPERATIONS,
 } from '@gyblos/payments-x402/constants';
+
+import {
+  createFacilitatorObserver,
+  type FacilitatorDiagnosticOptions,
+} from './facilitator-diagnostics.js';
 
 export interface SettlementEvent {
   phase: string;
@@ -36,6 +43,7 @@ export function createFacilitator(
   rpcUrl: string,
   allowed: { buyer: string; mint: string; payTo: string; authorizer: string },
   runId?: string,
+  diagnostics: FacilitatorDiagnosticOptions = {},
 ) {
   const events: SettlementEvent[] = [];
   const verifications: {
@@ -54,6 +62,34 @@ export function createFacilitator(
   const facilitator = new x402Facilitator().register(DEVNET, scheme);
   const cleanup = scheme.createRentCleanupManager(DEVNET);
   const app = express();
+  const observe = createFacilitatorObserver(diagnostics);
+  const attempts = new WeakMap<Request, ReturnType<typeof observe>>();
+  for (const operation of [
+    PUBLIC_CALL_OPERATIONS.VERIFY,
+    PUBLIC_CALL_OPERATIONS.SETTLE,
+  ]) {
+    app.post(`/${operation}`, (request, response, next) => {
+      const attempt = observe(operation);
+      attempts.set(request, attempt);
+      response.once('finish', () =>
+        attempt.record(FACILITATOR_STAGES.RESPONSE_FINISHED, {
+          httpStatus: response.statusCode,
+        }),
+      );
+      response.once('close', () => {
+        if (!response.writableFinished)
+          attempt.record(FACILITATOR_STAGES.RESPONSE_CLOSED, {
+            httpStatus: response.headersSent ? response.statusCode : undefined,
+          });
+      });
+      response.once('error', () =>
+        attempt.record(FACILITATOR_STAGES.RESPONSE_ERROR, {
+          code: FACILITATOR_DIAGNOSTIC_CODES.RESPONSE_ERROR,
+        }),
+      );
+      next();
+    });
+  }
   app.use(express.json({ limit: HTTP_LIMITS.facilitatorBody }));
   app.get(ROUTES.health, (_request, response) => {
     response.json({ runId: runId ?? null });
@@ -76,6 +112,8 @@ export function createFacilitator(
         PaymentPayload | undefined;
       const requirements = request.body?.paymentRequirements as
         PaymentRequirements | undefined;
+      const attempt = attempts.get(request)!;
+      attempt.identify(payload, requirements);
       if (
         !payload ||
         !requirements ||
@@ -91,14 +129,21 @@ export function createFacilitator(
         !/^\d+$/.test(requirements.amount) ||
         BigInt(requirements.amount) > BigInt(MAX_ATOMIC)
       ) {
+        attempt.record(FACILITATOR_STAGES.POLICY_REJECTED, {
+          code: FACILITATOR_DIAGNOSTIC_CODES.POLICY_REJECTED,
+        });
         response
           .status(HTTP_STATUS.badRequest)
           .json({ error: 'Gate policy rejected payment.' });
         return;
       }
+      let sdkReturned = false;
       try {
+        attempt.record(FACILITATOR_STAGES.SDK_STARTED);
         if (operation === PUBLIC_CALL_OPERATIONS.VERIFY) {
           const result = await facilitator.verify(payload, requirements);
+          sdkReturned = true;
+          attempt.result(result);
           verifications.push({
             channelId: String(payload.payload.channelId),
             isValid: result.isValid,
@@ -107,6 +152,8 @@ export function createFacilitator(
           response.json(result);
         } else {
           const result = await facilitator.settle(payload, requirements);
+          sdkReturned = true;
+          attempt.result(result);
           events.push({
             phase: String(payload.payload.type),
             channelId: String(payload.payload.channelId),
@@ -120,7 +167,12 @@ export function createFacilitator(
           });
           response.json(result);
         }
-      } catch {
+      } catch (error) {
+        if (sdkReturned)
+          attempt.record(FACILITATOR_STAGES.RESPONSE_ERROR, {
+            code: FACILITATOR_DIAGNOSTIC_CODES.RESPONSE_ERROR,
+          });
+        else attempt.exception(error);
         // Never log signed payloads, keys, or RPC URLs.
         response.status(HTTP_STATUS.internalServerError).json({
           error: `${operation} failed; payment state may be unknown. Reconcile on-chain.`,
