@@ -1,6 +1,7 @@
 import type { KeyPairSigner } from '@solana/kit';
 
 import { TIMEOUTS } from '@gyblos/config';
+import type { BuyerDiagnosticCode } from '@gyblos/payments-x402/constants';
 
 import { createBuyer, type BuyerResponseObservation } from './buyer.js';
 import type { TrustPolicy } from './trust.js';
@@ -15,6 +16,7 @@ export function createInferenceBuyer(
     responseObserved?: (
       observation: BuyerResponseObservation,
     ) => Promise<void> | void;
+    responseObservationFailed?: (code: BuyerDiagnosticCode) => void;
   },
 ) {
   const buyer = createBuyer(
@@ -30,6 +32,7 @@ export function createInferenceBuyer(
     {
       beforeSigning: hooks.beforeSigning,
       responseObserved: hooks.responseObserved,
+      responseObservationFailed: hooks.responseObservationFailed,
       authorizationError: 'Missing inference channel ID.',
     },
   );
