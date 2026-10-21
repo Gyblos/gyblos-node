@@ -113,6 +113,59 @@ establish the second request's delivery/paid route, clear its charged journal or
 restore a current-account audit after canonical reclaim. Do not use the
 zero-charge recovery path for that charged outcome.
 
+## Private facilitator diagnostics
+
+The standalone facilitator and P2P seller persist only the new allowlisted
+attempt stream. Each record has an independently generated instance/attempt ID,
+a sequence number, timestamp, elapsed time, SDK version, operation, normalized
+deposit/claim phase and stage. Optional channel IDs, atomic amounts and
+transaction signatures pass bounded syntax checks. Errors map to canonical
+categories; their messages, stacks, causes, arbitrary SDK reasons, request/body
+objects, signed payloads, environment values and URLs are not serialized. A
+signature is an observation hint, not a confirmed payment.
+
+The stages distinguish policy rejection, an SDK return or exception and local
+HTTP finish, early close or error. SDK `success: false` can be returned with
+HTTP 200, leading the seller middleware to answer 402. An early close before
+headers omits the unobserved default status. HTTP finish proves neither remote
+receipt nor delivery. A missing record can mean diagnostic loss; it is not proof
+that an SDK operation never ran. These new records cannot reconstruct the lost
+historical exception or identify the precise cause of the `24af211` second
+request. That authorization remains uncertain and charged historically; do not
+retry it, clear its journal or invoke zero-charge recovery.
+
+The queue is nonblocking and bounded to 128 pending records, each at most 4 KiB,
+with a 4 MiB file budget. New instances exclusively reserve one of 16 file
+slots. Preserved legacy files consume this budget; incompatible mixed slot
+layouts fail closed for logging. There is no automatic truncation, repair,
+rotation or deletion. Archive only closed diagnostic files to private storage as
+operator maintenance, separately from payment journals and locks.
+
+`GET /gate/diagnostics` is exposed by the loopback actors and returns only
+canonical health and counters. `synced` means append, file sync and identity
+checks completed; enqueue is not durable retention. Initialization or append
+failure, exhausted limits and drain timeout produce degraded health and a fixed
+warning without printing paths or raw errors. These failures do not replace SDK
+responses, authorize payment or cause payment retries. A damaged append poisons
+that writer; a restart reserves a separate file, preserving the old tail for
+private investigation.
+
+Flush and full descriptor close have a two-second bound. A timed-out close
+reports `closed: false` while cleanup remains pending; initial directory/file
+opening is not deadline-bounded. Normal actor shutdown drains queued records,
+not disconnected in-flight SDK operations. A crash, forced exit, failed cleanup
+or late SDK return can lose pending events. Diagnostic persistence does not make
+the SDK's channel storage durable and does not implement reconciliation.
+
+Owner/mode, link and inode checks plus `O_NOFOLLOW` protect cooperative local
+POSIX storage on macOS/Linux. They are not a defense against an adversary
+controlling the same OS user. Windows ACL guarantees are unvalidated; POSIX file
+tests explicitly skip there, while pure projection/observer tests run. The older
+in-memory `/gate/events` and `/gate/verifications` retain their existing
+behavior and arbitrary legacy fields; they are not persisted by this writer and
+are outside its safe-projection guarantee. Do not publish them as sanitized
+evidence.
+
 ## Inference and verification limits
 
 Buyer measurements have no signed seller receipt. Token recounts detect
