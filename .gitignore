@@ -39,6 +39,7 @@ coverage/
 /docs/*
 !/docs/inference.md
 !/docs/limitations.md
+!/docs/stack.md
 
 # Public offline regression suites and verified model-template fixtures
 !/tests/
