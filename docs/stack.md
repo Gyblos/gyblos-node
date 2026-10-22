@@ -28,6 +28,18 @@ ports, which is central to Gyblos. Alternatives were libp2p (heavier, public
 relays cut long streams), a Mainline DHT with IP:port (excludes home sellers),
 Hyperswarm and outbound tunnels.
 
+The relay is a meeting point and a fallback, not a mandatory hop. Peers use it
+to exchange addresses and coordinate hole punching; once a direct path works,
+data flows peer to peer. Traffic stays on the relay only when a direct path
+fails (strict NAT, CGNAT, some mobile networks). Relays are stateless and
+replaceable.
+
+Cost: the Iroh library is free and open source (MIT or Apache-2.0). The public
+n0 relays used today are free but meant for development. In production we run
+our own `iroh-relay` (free software, we pay only for the server) or use the
+paid, optional Iroh Services relays, which bill relay connections and relay
+egress but not direct peer-to-peer traffic.
+
 Limits that matter here:
 
 - A direct connection reveals each peer's IP to the other; relay-only mode hides
