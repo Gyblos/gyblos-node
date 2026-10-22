@@ -17,7 +17,8 @@ the buyer uncertain, so its third was never started. That old journal and the
 unknown historical 402 cause remain unresolved. This successful new run used
 fresh isolated roles and did not retry or clear the old authorization. Docker
 NAT-direct did not pass. Hotspot/CGNAT and broader NAT coverage remain untested.
-PR #10 remains unmerged; issues #17–#23 stay deferred.
+This work was merged into `main` after the final review; issues #17–#23 stay
+deferred.
 
 > **Status:** experimental, Solana **devnet** only. Not audited. Never use
 > mainnet keys. Part of [Gyblos](https://gyblos.com) ·
@@ -606,6 +607,8 @@ local processes.
 
 ## Project structure
 
+Stack and technology choices: [docs/stack.md](docs/stack.md).
+
 ```text
 packages/
   config/            @gyblos/config: hosts, paths, networks, limits, versions
@@ -634,7 +637,9 @@ scripts/             Thin setup, funding and compatibility entrypoints
   are not implemented.
 
 Read [docs/limitations.md](docs/limitations.md) for recovery and the full scope.
-Contribution rules are in [CONTRIBUTING.md](CONTRIBUTING.md).
+The technology stack, why Iroh, and when to use Rust are in
+[docs/stack.md](docs/stack.md). Contribution rules are in
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Run offline regression tests
 
