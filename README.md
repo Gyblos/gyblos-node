@@ -46,13 +46,26 @@ one proxy instance; it does not coordinate separate buyer processes.
 Native sellers and buyers use `https://na1.relay.gyblos.com/` by default, with
 QUIC address discovery on UDP 7842. Set `GYBLOS_RELAY_TOKEN` privately in each
 process environment before starting either role. There is no built-in token;
-missing or invalid configuration stops endpoint binding. Never put the token in
-a relay URL, a signed offer, a config file or a committed environment file.
+missing, invalid or out-of-bounds (32 to 512 printable characters) configuration
+stops endpoint binding. The token is attached only to owned relay hosts under
+`.relay.gyblos.com`; other configured relays receive no token. Never put the
+token in a relay URL, a signed offer, a config file or a committed environment
+file.
 
 `GYBLOS_RELAYS` optionally overrides the comma-separated HTTPS relay origins.
 Both roles must use the same set and credentials. The buyer accepts a signed
 offer's relay only if its normalized URL belongs to that configured set. Relay
-URLs and the QUIC port defaults live in `@gyblos/config`.
+URLs, the owned host suffix and the QUIC port defaults live in `@gyblos/config`.
+The default set contains only `na1`. A future `na2` slot is added by listing it
+in `GYBLOS_RELAYS` (for example
+`https://na1.relay.gyblos.com/,https://na2.relay.gyblos.com/`) once that relay
+exists; it receives the token because it is under the owned suffix. The built-in
+default changes only after `na2` is deployed.
+
+`GYBLOS_BUYER_RELAY_ONLY=1` binds the buyer endpoint to loopback only, like the
+seller's relay-only mode, ignores the seller's advertised direct addresses and
+dials only the offer's normalized configured relay. An offer without a relay is
+rejected in this mode. The default buyer behavior is unchanged.
 
 The n0 preset still initializes crypto and DNS/pkarr address discovery before
 the custom map replaces its relays. Public n0 relays are not an automatic
@@ -418,8 +431,10 @@ Direct peers can see each other's IP addresses. `GYBLOS_RELAY_ONLY=1` restricts
 seller binds and advertised candidates and rejects an observed direct path; its
 off-host privacy behavior still needs empirical validation. Route labels are
 sampled native observations, not a guarantee about every packet. This setting
-configures the seller only: the buyer has no enforced relay-only privacy mode.
-Requiring a relay route does not hide buyer addressing. This PoC does not verify
+configures the seller only. `GYBLOS_BUYER_RELAY_ONLY=1` separately keeps the
+buyer endpoint on loopback sockets and dials the seller only through its relay;
+its off-host privacy behavior is likewise unvalidated. Requiring a relay route
+without that setting does not hide buyer addressing. This PoC does not verify
 model authenticity or response correctness.
 
 ### Verify P2P settlement or reconcile zero charge
