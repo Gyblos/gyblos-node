@@ -1,7 +1,10 @@
-import type { Config } from '@gyblos/gate/config';
-import type { InferenceCaseName } from '@gyblos/gate/constants';
-import type { InferenceGateEvidence, InferenceTrace } from '@gyblos/gate/types';
 import type { ModelTokenizer } from '@gyblos/inference-ollama';
+import type { Config } from '@gyblos/lab-harness/config';
+import type { InferenceCaseName } from '@gyblos/lab-harness/constants';
+import type {
+  InferenceGateEvidence,
+  InferenceTrace,
+} from '@gyblos/lab-harness/types';
 import type { SettlementEvent } from '@gyblos/payments-x402/facilitator';
 
 export interface InferenceCase {
@@ -10,7 +13,7 @@ export interface InferenceCase {
   prompt: string;
 }
 
-export type { InferenceTrace } from '@gyblos/gate/types';
+export type { InferenceTrace } from '@gyblos/lab-harness/types';
 
 export interface CaseContext {
   url: string;

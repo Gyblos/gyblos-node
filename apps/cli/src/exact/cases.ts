@@ -12,9 +12,9 @@ import {
   JOURNAL_STATES,
   RECONCILIATION_CLASSIFICATIONS,
   WALLET_ROLES,
-} from '@gyblos/gate/constants';
-import { saveJournal } from '@gyblos/gate/journal';
-import type { ChainTransaction } from '@gyblos/gate/types';
+} from '@gyblos/lab-harness/constants';
+import { saveJournal } from '@gyblos/lab-harness/journal';
+import type { ChainTransaction } from '@gyblos/lab-harness/types';
 import { confirm, explorer, GateError, rpc } from '@gyblos/payments-x402/chain';
 import {
   DEVNET,

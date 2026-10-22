@@ -6,9 +6,9 @@ import {
   tokenAddress,
   transaction,
   transactionTransfers,
-} from '@gyblos/gate/chain';
-import { JOURNAL_STATES } from '@gyblos/gate/constants';
-import { saveJournal } from '@gyblos/gate/journal';
+} from '@gyblos/lab-harness/chain';
+import { JOURNAL_STATES } from '@gyblos/lab-harness/constants';
+import { saveJournal } from '@gyblos/lab-harness/journal';
 import { createInferenceBuyer } from '@gyblos/payments-x402/inference-buyer';
 import { validateSettlement } from '@gyblos/payments-x402/trust';
 

@@ -1,0 +1,22 @@
+{
+  "name": "@gyblos/lab-p2p",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "dependencies": {
+    "@gyblos/config": "workspace:*",
+    "@gyblos/lab-harness": "workspace:*",
+    "@gyblos/runtime": "workspace:*",
+    "@gyblos/transport": "workspace:*",
+    "@gyblos/cli": "workspace:*",
+    "@solana-program/system": "0.10.0",
+    "@solana-program/token": "0.9.0",
+    "@solana/kit": "5.1.0",
+    "@gyblos/payments-x402": "workspace:*",
+    "@gyblos/inference-ollama": "workspace:*",
+    "@number0/iroh": "1.1.0"
+  }
+}

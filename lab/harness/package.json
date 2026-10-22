@@ -1,0 +1,17 @@
+{
+  "name": "@gyblos/lab-harness",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "dependencies": {
+    "@gyblos/config": "workspace:*",
+    "@gyblos/runtime": "workspace:*",
+    "@gyblos/payments-x402": "workspace:*",
+    "@gyblos/application": "workspace:*",
+    "@gyblos/inference-ollama": "workspace:*"
+  }
+}

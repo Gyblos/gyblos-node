@@ -9,9 +9,9 @@ on `ba168c4` completed three strictly sequential native Mac–VPS inferences ove
 required direct Iroh routes, with a devnet test token and persistent facilitator
 diagnostics enabled. All six payment transactions finalized; each delivered
 answer passed independent recount and a finalized payment audit before the next
-request started. See the [commit-bound report](evidence/gate-0008.json).
+request started. See the [commit-bound report](lab/evidence/gate-0008.json).
 
-The [older report](evidence/gate-0007.json) remains historical. The separate
+The [older report](lab/evidence/gate-0007.json) remains historical. The separate
 `24af211` attempt completed its first call; its second settled on-chain but left
 the buyer uncertain, so its third was never started. That old journal and the
 unknown historical 402 cause remain unresolved. This successful new run used
@@ -229,7 +229,7 @@ pinned public trust settings. The payout key stays outside both containers.
 The command checks real container isolation and blocked HTTP ports before
 funding the new facilitator with 0.05 devnet SOL and the buyer with 10,000
 atomic test tokens. It then attempts three paid synthetic requests and exports
-an allowlisted report to `evidence/gate-0006.json`. Docker requires outbound
+an allowlisted report to `lab/evidence/gate-0006.json`. Docker requires outbound
 access to devnet and the default Iroh relays. Native bindings were exercised on
 macOS ARM64 and Linux ARM64.
 
@@ -284,8 +284,8 @@ relay: its learned addresses omitted the intermediate lab WAN and shared an
 outer public IP. Upstream hairpin failure is a hypothesis, not a demonstrated
 cause. The final native Mac–VPS smoke observed direct routing and completed
 three sequential paid devnet inferences at source `ba168c4`
-([report](evidence/gate-0008.json)). This separate trial does not resolve the
-original Docker public-return cause or turn the earlier paid NAT-direct case
+([report](lab/evidence/gate-0008.json)). This separate trial does not resolve
+the original Docker public-return cause or turn the earlier paid NAT-direct case
 into a passing Docker payment gate.
 
 To discover a usable address automatically **inside the simulated WAN**, run the
@@ -530,8 +530,8 @@ also inject rename errors. Export cases use synthetic paid rows/traces, a
 separate raw-derived zero-charge proof and mocked container process creation.
 These checks establish offline behavior, without a fresh chain audit or physical
 signed-offer recovery run. Raw evidence and private measurements remain
-excluded. The owner-authorized [final paid report](evidence/gate-0008.json) is a
-curated metadata-only exception, bound to the exact tested source
+excluded. The owner-authorized [final paid report](lab/evidence/gate-0008.json)
+is a curated metadata-only exception, bound to the exact tested source
 `ba168c4fae043dc1170268cad9c0852d3c7533d9` and its verified source archive.
 Later evidence and documentation commits record that run; they do not claim that
 another runtime revision was paid-tested.
@@ -561,7 +561,7 @@ These observations accompany the independent delivery and on-chain checks.
 
 No request overlapped, became uncertain or was retried. Historical task files
 and all 14 existing containers retained their observed metadata; only owned
-smoke actors were stopped. The [report](evidence/gate-0008.json) publishes
+smoke actors were stopped. The [report](lab/evidence/gate-0008.json) publishes
 public signatures, amounts, route categories and source hashes. Keys, salts,
 prompts, response content, IPs, endpoint tickets, RPC URLs, raw logs and private
 measurements/journals remain excluded. This one configuration does not establish
@@ -644,7 +644,7 @@ Stack and technology choices: [docs/stack.md](docs/stack.md).
 packages/
   config/            @gyblos/config: hosts, paths, networks, limits, versions
   runtime/           @gyblos/runtime: processes, shutdown and atomic JSON
-  gate/              @gyblos/gate: setup, funding, journals and gate utilities
+  protocol/          SDK-independent signed bytes, Engine contracts and error codes
   application/       Reusable workflow, accounting and measurement policy
   payments-x402/     upto/exact adapters, trust policies and chain reads
   transport/         Bounded HTTP over loopback or native Iroh
@@ -655,7 +655,12 @@ apps/
     exact/           Public-facilitator cases, evidence and reconciliation
   seller/            Fixed-resource, public exact and inference HTTP hosts
   facilitator/       Local upto facilitator
-scripts/             Thin setup, funding and compatibility entrypoints
+lab/
+  harness/           @gyblos/lab-harness: gates, journals and thin scripts
+  p2p/               @gyblos/lab-p2p: Docker/NAT experiments and constants
+  tools/             Native and public-path diagnostic tooling
+  docker/            Isolated test images and topology templates
+  evidence/          Previously authorized redacted historical reports only
 ```
 
 ## Safety and known limits

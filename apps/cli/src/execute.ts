@@ -13,19 +13,19 @@ import {
   ROUTES,
   X402_SDK_VERSION,
 } from '@gyblos/config';
-import { loadConfig, saveJson, signer } from '@gyblos/gate/config';
+import { loadConfig, saveJson, signer } from '@gyblos/lab-harness/config';
 import {
   EVIDENCE_STATUSES,
   JOURNAL_STATES,
   SCHEMA_VERSIONS,
   WALLET_ROLES,
-} from '@gyblos/gate/constants';
-import type { FixedGateEvidence } from '@gyblos/gate/fixture-evidence-types';
+} from '@gyblos/lab-harness/constants';
+import type { FixedGateEvidence } from '@gyblos/lab-harness/fixture-evidence-types';
 import {
   assertNoUnresolvedAuthorizations,
   saveJournal,
-} from '@gyblos/gate/journal';
-import { withExclusiveLock } from '@gyblos/gate/lock';
+} from '@gyblos/lab-harness/journal';
+import { withExclusiveLock } from '@gyblos/lab-harness/lock';
 import { createBuyer } from '@gyblos/payments-x402/buyer';
 import {
   account,

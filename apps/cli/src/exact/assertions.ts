@@ -1,14 +1,14 @@
 import assert from 'node:assert/strict';
 
 import { EXACT_PRICE } from '@gyblos/application/constants';
-import { signer } from '@gyblos/gate/config';
+import { signer } from '@gyblos/lab-harness/config';
 import {
   CASE_STATUSES,
   EXACT_CASES,
   EXACT_ENFORCEMENT,
   EXACT_UNTRUSTED_CASES,
   WALLET_ROLES,
-} from '@gyblos/gate/constants';
+} from '@gyblos/lab-harness/constants';
 import { GateError } from '@gyblos/payments-x402/chain';
 import { GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
 import {

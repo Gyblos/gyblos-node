@@ -2,15 +2,15 @@ import { readFile } from 'node:fs/promises';
 
 import { PRICES, TOLERANCE } from '@gyblos/application/metering';
 import { X402_SDK_VERSION } from '@gyblos/config';
-import { saveJson, type Config } from '@gyblos/gate/config';
+import { GENERATION } from '@gyblos/inference-ollama/constants';
+import { MODEL } from '@gyblos/inference-ollama/index';
+import { saveJson, type Config } from '@gyblos/lab-harness/config';
 import {
   EVIDENCE_IDS,
   EVIDENCE_STATUSES,
   SCHEMA_VERSIONS,
-} from '@gyblos/gate/constants';
-import type { InferenceGateEvidence } from '@gyblos/gate/types';
-import { GENERATION } from '@gyblos/inference-ollama/constants';
-import { MODEL } from '@gyblos/inference-ollama/index';
+} from '@gyblos/lab-harness/constants';
+import type { InferenceGateEvidence } from '@gyblos/lab-harness/types';
 import { DEVNET } from '@gyblos/payments-x402/constants';
 
 export async function initializeEvidence(

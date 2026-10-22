@@ -12,7 +12,7 @@ import type {
   P2pJournalState,
 } from '@gyblos/cli/p2p/constants';
 import { P2P } from '@gyblos/config';
-import type { ErrorDiagnosticCode } from '@gyblos/gate/constants';
+import type { ErrorDiagnosticCode } from '@gyblos/lab-harness/constants';
 
 const SOURCE = new URL('../../', import.meta.url);
 const SIGNATURE = '1'.repeat(64);
@@ -77,7 +77,7 @@ function bootstrap(faults: CallFaults) {
   // Durable JSON, locking, failure handling and evidence filtering remain real.
   const stubs = {
     '@gyblos/payments-x402/chain': 'export async function assertProgram(){}',
-    '@gyblos/gate/chain':
+    '@gyblos/lab-harness/chain':
       'export async function inferenceSnapshot(){return {slot:1,buyer:"10000",seller:"0",escrow:null,buyerLamports:"0"}}',
     '@gyblos/seller/inference':
       'export function inferenceCeiling(){return "556"}',

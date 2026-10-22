@@ -2,20 +2,20 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { CHARGE_ANOMALIES } from '@gyblos/application/constants';
+import { ENGINE_DONE_REASONS } from '@gyblos/inference-ollama/constants';
 import {
   INFERENCE_CASES,
   type InferenceCaseName,
-} from '@gyblos/gate/constants';
-import { ENGINE_DONE_REASONS } from '@gyblos/inference-ollama/constants';
+} from '@gyblos/lab-harness/constants';
 
 import { assertInferenceCase } from '../apps/cli/src/inference/assertions.js';
+import { measurementRow } from '../lab/harness/src/measurements.js';
 import { observeInferenceResponse } from '../packages/application/src/inference-observation.js';
 import {
   assessCharge,
   charge,
   OFFER_ID,
 } from '../packages/application/src/metering.js';
-import { measurementRow } from '../packages/gate/src/measurements.js';
 import { MODEL } from '../packages/inference-ollama/src/index.js';
 
 function fixture(

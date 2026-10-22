@@ -10,7 +10,7 @@ import {
   RECONCILED_ZERO_CHARGE,
 } from '@gyblos/cli/p2p/constants';
 import { P2P } from '@gyblos/config';
-import { JOURNAL_STATES } from '@gyblos/gate/constants';
+import { JOURNAL_STATES } from '@gyblos/lab-harness/constants';
 
 import { NATIVE_CAPABILITY } from './native-runtime.js';
 import { recoveryFixture } from './recovery-fixture.js';

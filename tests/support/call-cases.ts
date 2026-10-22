@@ -9,8 +9,8 @@ import {
   CALL_PHASES,
   P2P_JOURNAL_STATES,
 } from '@gyblos/cli/p2p/constants';
-import { ERROR_DIAGNOSTICS } from '@gyblos/gate/constants';
-import { errorDiagnostic } from '@gyblos/gate/diagnostics';
+import { ERROR_DIAGNOSTICS } from '@gyblos/lab-harness/constants';
+import { errorDiagnostic } from '@gyblos/lab-harness/diagnostics';
 import {
   createBuyer,
   type BuyerResponseObservation,

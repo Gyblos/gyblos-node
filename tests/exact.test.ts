@@ -166,7 +166,7 @@ test('an uncertain exact journal blocks the shared authorization guard', async (
   const { tmpdir } = await import('node:os');
   const { join } = await import('node:path');
   const { assertNoUnresolvedAuthorizations } =
-    await import('../scripts/journal.js');
+    await import('../lab/harness/scripts/journal.js');
   const directory = await mkdtemp(join(tmpdir(), 'gyblos-exact-'));
   const path = join(directory, 'exact-attempt.json');
   try {

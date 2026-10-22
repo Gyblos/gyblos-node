@@ -5,15 +5,15 @@ import { readFile } from 'node:fs/promises';
 import { observeInferenceResponse } from '@gyblos/application/inference-observation';
 import { assessCharge, charge, OFFER_ID } from '@gyblos/application/metering';
 import { HTTP_STATUS, LOCALHOST, P2P, ROUTES } from '@gyblos/config';
-import { inferenceSnapshot } from '@gyblos/gate/chain';
-import { JOURNAL_STATES } from '@gyblos/gate/constants';
-import { errorDiagnostic } from '@gyblos/gate/diagnostics';
-import { withExclusiveLock } from '@gyblos/gate/lock';
+import { inferenceSnapshot } from '@gyblos/lab-harness/chain';
+import { JOURNAL_STATES } from '@gyblos/lab-harness/constants';
+import { errorDiagnostic } from '@gyblos/lab-harness/diagnostics';
+import { withExclusiveLock } from '@gyblos/lab-harness/lock';
 import {
   appendMeasurement,
   measurementRow,
   measurementSalt,
-} from '@gyblos/gate/measurements';
+} from '@gyblos/lab-harness/measurements';
 import { assertProgram } from '@gyblos/payments-x402/chain';
 import type { BuyerDiagnosticCode } from '@gyblos/payments-x402/constants';
 import { createInferenceBuyer } from '@gyblos/payments-x402/inference-buyer';

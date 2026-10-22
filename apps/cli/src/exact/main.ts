@@ -14,7 +14,7 @@ import {
   ROUTES,
   TIMEOUTS,
 } from '@gyblos/config';
-import { loadConfig, saveJson } from '@gyblos/gate/config';
+import { loadConfig, saveJson } from '@gyblos/lab-harness/config';
 import {
   CASE_STATUSES,
   EVIDENCE_STATUSES,
@@ -22,10 +22,10 @@ import {
   EXACT_EVIDENCE_CODES,
   FACILITATOR_STATUSES,
   JOURNAL_STATES,
-} from '@gyblos/gate/constants';
-import { prepareExactAccounts } from '@gyblos/gate/exact-accounts';
-import { assertNoUnresolvedAuthorizations } from '@gyblos/gate/journal';
-import { withExclusiveLock } from '@gyblos/gate/lock';
+} from '@gyblos/lab-harness/constants';
+import { prepareExactAccounts } from '@gyblos/lab-harness/exact-accounts';
+import { assertNoUnresolvedAuthorizations } from '@gyblos/lab-harness/journal';
+import { withExclusiveLock } from '@gyblos/lab-harness/lock';
 import { assertDevnet, GateError, tokens } from '@gyblos/payments-x402/chain';
 import { DEVNET_USDC, GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
 import {

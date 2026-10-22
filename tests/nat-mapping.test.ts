@@ -5,7 +5,7 @@ import {
   advertisedMappingMatches,
   parseUdpMappings,
   selectUdpMapping,
-} from '@gyblos/transport/nat-mapping';
+} from '@gyblos/lab-p2p/nat-mapping';
 
 const original = {
   source: '192.0.2.10',

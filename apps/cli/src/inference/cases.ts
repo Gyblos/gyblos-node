@@ -3,16 +3,19 @@ import assert from 'node:assert/strict';
 import { observeInferenceResponse } from '@gyblos/application/inference-observation';
 import { assessCharge, OFFER_ID } from '@gyblos/application/metering';
 import { INFERENCE_TRANSPORT_PATH, TIMEOUTS } from '@gyblos/config';
-import { inferenceSnapshot } from '@gyblos/gate/chain';
-import { saveJson, signer } from '@gyblos/gate/config';
-import { JOURNAL_STATES, WALLET_ROLES } from '@gyblos/gate/constants';
+import { GENERATION, MODEL_LIMITS } from '@gyblos/inference-ollama/constants';
+import { MODEL } from '@gyblos/inference-ollama/index';
+import { inferenceSnapshot } from '@gyblos/lab-harness/chain';
+import { saveJson, signer } from '@gyblos/lab-harness/config';
+import { JOURNAL_STATES, WALLET_ROLES } from '@gyblos/lab-harness/constants';
 import {
   assertNoUnresolvedAuthorizations,
   saveJournal,
-} from '@gyblos/gate/journal';
-import { appendMeasurement, measurementRow } from '@gyblos/gate/measurements';
-import { GENERATION, MODEL_LIMITS } from '@gyblos/inference-ollama/constants';
-import { MODEL } from '@gyblos/inference-ollama/index';
+} from '@gyblos/lab-harness/journal';
+import {
+  appendMeasurement,
+  measurementRow,
+} from '@gyblos/lab-harness/measurements';
 import { DEVNET } from '@gyblos/payments-x402/constants';
 import { createInferenceBuyer } from '@gyblos/payments-x402/inference-buyer';
 import { inferenceCeiling } from '@gyblos/seller/inference';

@@ -2,7 +2,7 @@
   "provenance": {
     "description": "Selected parsed metadata from a retained real Solana devnet deposit/claim pair.",
     "sourceCommit": "2c8eeac",
-    "publicReport": "evidence/gate-0007.json",
+    "publicReport": "lab/evidence/gate-0007.json",
     "finality": "Saved finalized observation replayed offline; no fresh RPC observation.",
     "projection": "Fees, ordered public account keys, atomic balance metadata, signatures, slots and selected parsed financial instructions are preserved. Display-only balance amounts, logs, blockhashes, encoded open/voucher data, serialized signed messages, private configuration and inference content are omitted.",
     "currentChannel": "Tests reconstruct a synthetic current channel account from public creation fields and the historical charge; no saved current-account response is claimed.",

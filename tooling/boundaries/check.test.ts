@@ -28,7 +28,7 @@ test('current and future names map to the intended layers', () => {
     'packages/gate/src/a.ts': 'lab',
     'scripts/main.ts': 'lab',
     'lab/harness/src/a.ts': 'lab',
-    'tooling/nat-regression.mjs': 'lab',
+    'lab/tools/nat-regression.mjs': 'lab',
     'tooling/test.mjs': 'verification',
     'tooling/check-boundaries.ts': 'verification',
     'tests/synthetic.test.ts': 'verification',
@@ -106,11 +106,11 @@ test('product cannot import lab, scripts, legacy gate or experimental tooling', 
   await fixture(
     {
       'apps/buyer/src/a.ts':
-        "import '../../../lab/a.js'; import '../../../scripts/a.js'; import '../../../packages/gate/src/a.js'; import '../../../tooling/nat-regression.mjs';",
+        "import '../../../lab/a.js'; import '../../../scripts/a.js'; import '../../../packages/gate/src/a.js'; import '../../../lab/tools/nat-regression.mjs';",
       'lab/a.ts': 'export const value = 1;',
       'scripts/a.ts': 'export const value = 1;',
       'packages/gate/src/a.ts': 'export const value = 1;',
-      'tooling/nat-regression.mjs': 'export const value = 1;',
+      'lab/tools/nat-regression.mjs': 'export const value = 1;',
     },
     async (files, root) =>
       assert.equal(
@@ -246,7 +246,7 @@ test('source code is never executed and existing baseline differences are explic
     '/private/tmp/a',
     '../outside.ts',
     '.local/key.ts',
-    'evidence/run.json',
+    'lab/evidence/run.json',
   ])
     assert.throws(() => validateBaseline([{ ...oldEntry, target }]), /Invalid/);
   assert.throws(() => validateBaseline({}), /Invalid/);

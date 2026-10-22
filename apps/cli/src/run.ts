@@ -10,7 +10,7 @@ import {
   ROUTES,
   TIMEOUTS,
 } from '@gyblos/config';
-import { loadConfig } from '@gyblos/gate/config';
+import { loadConfig } from '@gyblos/lab-harness/config';
 import {
   assertProgram,
   GateError,

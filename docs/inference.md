@@ -130,7 +130,7 @@ not buyer-facing streaming measurements.
 
 ## Results and uncertainty
 
-The local run report is written to `evidence/gate-0005.json`; journals and
+The local run report is written to `lab/evidence/gate-0005.json`; journals and
 additional diagnostics stay under `.local/devnet/`. Existing attempts remain in
 the report's history. The run waits between cases to let public RPC rate windows
 clear.

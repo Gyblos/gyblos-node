@@ -6,6 +6,8 @@ import { test } from 'node:test';
 
 import type { PaymentRequirements } from '@x402/core/types';
 
+import { assertNoUnresolvedAuthorizations } from '../lab/harness/scripts/journal.js';
+import { withExclusiveLock } from '../lab/harness/scripts/lock.js';
 import {
   runGate,
   verifyAccounting,
@@ -20,8 +22,6 @@ import {
   validateSettlement,
   validateTerms,
 } from '../packages/payments-x402/src/trust.js';
-import { assertNoUnresolvedAuthorizations } from '../scripts/journal.js';
-import { withExclusiveLock } from '../scripts/lock.js';
 
 const policy = {
   mint: DEVNET_USDC,

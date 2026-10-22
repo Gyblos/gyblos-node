@@ -62,14 +62,14 @@ export const ROUTES = {
 } as const;
 
 export const EVIDENCE_PATHS = {
-  exact: 'evidence/gate-0004.json',
-  inference: 'evidence/gate-0005.json',
+  exact: 'lab/evidence/gate-0004.json',
+  inference: 'lab/evidence/gate-0005.json',
 } as const;
 
 export const keyPath = (role: string) => `${LOCAL_DIR}/${role}.json`;
 
 export const evidencePath = (evidenceId: string) =>
-  `evidence/gate-${evidenceId}.json`;
+  `lab/evidence/gate-${evidenceId}.json`;
 
 export const localPath = (name: string) => `${LOCAL_DIR}/${name}`;
 

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   finalizedPaymentProof,
   type FinalizedPaymentExpectation,
-} from '@gyblos/gate/finalized-proof';
+} from '@gyblos/lab-harness/finalized-proof';
 
 import { RECONCILED_ZERO_CHARGE } from './constants.js';
 

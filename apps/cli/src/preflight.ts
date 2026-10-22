@@ -1,5 +1,5 @@
 import { FIXED_MIN_FACILITATOR_LAMPORTS, MAX_ATOMIC } from '@gyblos/config';
-import { loadConfig } from '@gyblos/gate/config';
+import { loadConfig } from '@gyblos/lab-harness/config';
 import {
   account,
   assertProgram,

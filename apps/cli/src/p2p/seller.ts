@@ -19,12 +19,12 @@ import {
   PORTS,
   ROUTES,
 } from '@gyblos/config';
-import { inferenceSnapshot } from '@gyblos/gate/chain';
 import {
   GENERATION,
   READINESS_GENERATION,
 } from '@gyblos/inference-ollama/constants';
 import { createOllamaEngine } from '@gyblos/inference-ollama/engine';
+import { inferenceSnapshot } from '@gyblos/lab-harness/chain';
 import { assertProgram } from '@gyblos/payments-x402/chain';
 import { createFacilitator } from '@gyblos/payments-x402/facilitator';
 import {
@@ -35,6 +35,7 @@ import {
   stopChild,
   waitReady,
 } from '@gyblos/runtime';
+import { assertMemoryHeadroom, memorySnapshot } from '@gyblos/runtime/memory';
 import { createPrivateLog } from '@gyblos/runtime/private-log';
 import { createInferenceSeller } from '@gyblos/seller/inference';
 import { withDeadline } from '@gyblos/transport/deadline';
@@ -46,7 +47,6 @@ import {
   assertReadinessCurrent,
   prepareSellerEngine,
 } from './engine-readiness.js';
-import { assertMemoryHeadroom, memorySnapshot } from './memory.js';
 import { loadRole, nodeSecret, rolePath, roleSigner } from './roles.js';
 
 interface Trace {

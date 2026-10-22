@@ -16,13 +16,14 @@ CLAUDE.md
 claude.md
 
 # Local documentation, tests and evidence
+/evidence/
 README.md
 *.md
 *.mdx
 *.pdf
 *.docx
 docs/
-evidence/
+lab/evidence/
 tests/
 coverage/
 *.test.*
@@ -72,12 +73,12 @@ coverage/
 !/tests/support/export-cases.ts
 
 # Explicitly authorized redacted P2P report only
-!/evidence/
-/evidence/*
-!/evidence/gate-0006.json
+!/lab/evidence/
+/lab/evidence/*
+!/lab/evidence/gate-0006.json
 
 # Explicitly authorized redacted real-network P2P report
-!/evidence/gate-0007.json
+!/lab/evidence/gate-0007.json
 
 # Guard-specific public regression support
 !/tests/support/rent-faults.ts
@@ -118,3 +119,9 @@ coverage/
 
 # Public wire compatibility contract for the SDK-independent protocol package.
 !/packages/protocol/SPEC.md
+
+# Relocated, previously authorized redacted reports only.
+/lab/evidence/*
+!/lab/evidence/gate-0006.json
+!/lab/evidence/gate-0007.json
+!/lab/evidence/gate-0008.json

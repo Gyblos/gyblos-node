@@ -7,13 +7,18 @@ export default [
     ignores: [
       'node_modules/**',
       '.local/**',
-      'evidence/**',
+      'lab/evidence/**',
       'dist/**',
       'coverage/**',
     ],
   },
   {
-    files: ['apps/**/*.ts', 'packages/**/*.ts', 'scripts/**/*.ts'],
+    files: [
+      'apps/**/*.ts',
+      'packages/**/*.ts',
+      'scripts/**/*.ts',
+      'lab/**/*.ts',
+    ],
     languageOptions: { parser: tseslint.parser },
     plugins: { '@typescript-eslint': tseslint.plugin, gyblos: standards },
     rules: {

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { INFERENCE_CASES } from '@gyblos/gate/constants';
+import { INFERENCE_CASES } from '@gyblos/lab-harness/constants';
 
 export function createCases(
   debugRequestId: string,
