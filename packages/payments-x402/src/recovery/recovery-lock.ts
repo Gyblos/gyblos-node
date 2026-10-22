@@ -3,9 +3,9 @@ import { constants } from 'node:fs';
 import { lstat, open, unlink, type FileHandle } from 'node:fs/promises';
 
 import { FILE_MODES, P2P } from '@gyblos/config';
-import { GateError } from '@gyblos/payments-x402/chain';
-import { GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
 
+import { GateError } from '../chain.js';
+import { GATE_ERROR_CODES } from '../constants.js';
 import { currentLockOwner } from './lock-owner.js';
 import { withExclusiveLock } from './lock.js';
 

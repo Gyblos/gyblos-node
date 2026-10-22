@@ -24,7 +24,7 @@ test('archive enumeration excludes private/generated trees and symlinks before t
       'packages/core/.local/a.ts': 'synthetic private marker',
       'packages/core/dist/a.ts': 'synthetic build output',
       'packages/core/node_modules/a.ts': 'synthetic dependency',
-      'lab/lab/evidence/a.ts': 'synthetic evidence',
+      'lab/evidence/a.ts': 'synthetic evidence',
       '.local/a.ts': 'synthetic private marker',
       'other/a.ts': 'outside explicit roots',
     },
@@ -72,12 +72,32 @@ test('CLI reports new violations without rewriting baseline and fails analyzer e
           },
         );
       const report = invoke('--json');
-      assert.equal(report.status, 0, report.stderr);
+      assert.equal(report.status, 1, report.stderr);
       assert.equal(addedCount(report.stdout), 1);
+      assert.match(report.stdout, /"mode": "enforcing"/);
       const baseline = join(root, 'tooling/boundaries-baseline.json');
       assert.equal(await readFile(baseline, 'utf8'), '[]\n');
+      assert.equal(invoke('--update-baseline').status, 1);
+      assert.equal(await readFile(baseline, 'utf8'), '[]\n');
+      assert.equal(addedCount(invoke('--json').stdout), 1);
+      await writeFile(
+        join(root, 'packages/core/src/a.ts'),
+        'export const value = 1;',
+      );
+      assert.equal(invoke('--json').status, 0);
       assert.equal(invoke('--update-baseline').status, 0);
       assert.equal(addedCount(invoke('--json').stdout), 0);
+      const previous: unknown = JSON.parse(report.stdout);
+      assert.ok(
+        typeof previous === 'object' &&
+          previous !== null &&
+          'violations' in previous,
+      );
+      assert.ok(Array.isArray(previous.violations));
+      await writeFile(baseline, JSON.stringify(previous.violations));
+      assert.equal(invoke('--json').status, 1);
+      await writeFile(baseline, '[]');
+      assert.equal(invoke('--json').status, 0);
       assert.equal(invoke('--unknown-option').status, 1);
       await writeFile(baseline, '{}');
       assert.equal(invoke().status, 1);

@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 
 import { TOKENIZER_FILES } from '@gyblos/config';
-import { createModelTokenizer } from '@gyblos/inference-ollama';
+import { createModelTokenizer } from '@gyblos/engine-ollama';
 
 export async function modelTokenizer() {
   return createModelTokenizer({

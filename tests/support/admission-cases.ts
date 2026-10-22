@@ -5,7 +5,7 @@ import { P2P } from '@gyblos/config';
 import {
   connectionSource,
   createConnectionAdmission,
-} from '@gyblos/transport/admission';
+} from '@gyblos/transport-iroh/admission';
 
 export function registerAdmissionCases() {
   test('established per-peer admission cap applies while the global pool has capacity', () => {

@@ -1,12 +1,12 @@
 import type { SupportedResponse } from '@x402/core/types';
 
-import type { Config } from '@gyblos/lab-harness/config';
-import type { ExactGateEvidence } from '@gyblos/lab-harness/types';
 import type {
   AuditedPublicFacilitator,
   createExactSeller,
 } from '@gyblos/node/http/exact';
 
+import type { Config } from '../../config.js';
+import type { ExactGateEvidence } from '../../types.js';
 import type { authorizationMetadata } from './reconcile.js';
 
 export interface ExactProvider {

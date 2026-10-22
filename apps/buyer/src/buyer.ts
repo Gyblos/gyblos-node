@@ -7,9 +7,9 @@ import { verifyInferenceOffer, type OfferTrust } from '@gyblos/node/offers';
 import { loadRole, nodeSecret, rolePath } from '@gyblos/node/roles';
 import { assertProgram } from '@gyblos/payments-x402/chain';
 import { saveJson } from '@gyblos/runtime';
-import { bindEndpoint } from '@gyblos/transport/endpoint';
-import { createIrohTransport } from '@gyblos/transport/iroh-client';
-import { expectedIrohRoute } from '@gyblos/transport/route-policy';
+import { bindEndpoint } from '@gyblos/transport-iroh/endpoint';
+import { createIrohTransport } from '@gyblos/transport-iroh/iroh-client';
+import { expectedIrohRoute } from '@gyblos/transport-iroh/route-policy';
 
 import { startBuyerProxy } from './proxy.js';
 

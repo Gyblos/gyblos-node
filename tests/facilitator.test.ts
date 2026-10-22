@@ -4,11 +4,9 @@ import { test } from 'node:test';
 
 import { generateKeyPairSigner } from '@solana/kit';
 
-import {
-  DEVNET,
-  DEVNET_USDC,
-} from '../packages/payments-x402/src/constants.js';
-import { createFacilitator } from '../packages/payments-x402/src/facilitator.js';
+import { DEVNET, DEVNET_USDC } from '@gyblos/payments-x402/constants';
+import { createFacilitator } from '@gyblos/payments-x402/facilitator';
+
 import { registerFacilitatorHttpCases } from './support/facilitator-http-cases.js';
 import { registerFacilitatorObserverCases } from './support/facilitator-observer-cases.js';
 import { registerFacilitatorPrivacyCases } from './support/facilitator-privacy-cases.js';

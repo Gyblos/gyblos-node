@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 
 import { P2P } from '@gyblos/config';
-import { NAT } from '@gyblos/lab-p2p/constants';
 import { saveJson } from '@gyblos/runtime';
 
+import { NAT } from './constants.js';
 import { containerId, docker, execute } from './docker-command.js';
 import type { prepareDocker } from './docker-prepare.js';
 

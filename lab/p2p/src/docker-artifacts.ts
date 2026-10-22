@@ -14,8 +14,8 @@ import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 
 import { OLLAMA_MODELS_PATH, P2P, TOKENIZER_FILES } from '@gyblos/config';
-import { createModelTokenizer, MODEL } from '@gyblos/inference-ollama';
-import { verifyManifestLineage } from '@gyblos/inference-ollama/artifacts';
+import { createModelTokenizer, MODEL } from '@gyblos/engine-ollama';
+import { verifyManifestLineage } from '@gyblos/engine-ollama/artifacts';
 
 import { composeArgs, docker } from './docker-command.js';
 

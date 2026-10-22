@@ -51,10 +51,12 @@ interface CallProbe {
 }
 
 function bootstrap(faults: CallFaults) {
-  const entry = new URL('apps/buyer/src/call.ts', SOURCE).href;
-  const config = new URL('packages/config/src/index.ts', SOURCE).href;
-  const chain = new URL('packages/payments-x402/src/chain.ts', SOURCE).href;
-  const codes = new URL('packages/payments-x402/src/constants.ts', SOURCE).href;
+  const entry = new URL(import.meta.resolve('@gyblos/buyer/call')).href;
+  const config = new URL(import.meta.resolve('@gyblos/config')).href;
+  const chain = new URL(import.meta.resolve('@gyblos/payments-x402/chain'))
+    .href;
+  const codes = new URL(import.meta.resolve('@gyblos/payments-x402/constants'))
+    .href;
   const roles = `import {P2P} from '${config}'; export function rolePath(name){return P2P.root+'/'+name} export async function roleSigner(){return {address:'synthetic-buyer'}}`;
   const proof = `import {GateError} from '${chain}'; import {GATE_ERROR_CODES} from '${codes}';
     export async function paymentProof(...args){

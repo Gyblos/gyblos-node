@@ -4,22 +4,19 @@ import { test } from 'node:test';
 import { generateKeyPairSigner } from '@solana/kit';
 import type { PaymentRequirements } from '@x402/core/types';
 
-import { EXACT_PRICE } from '@gyblos/application/constants';
-import {
-  PUBLIC_CALL_OPERATIONS,
-  PUBLIC_CALL_OUTCOMES,
-} from '@gyblos/payments-x402/constants';
-
+import { EXACT_PRICE } from '@gyblos/core/constants';
 import {
   DEVNET,
   DEVNET_USDC,
-} from '../packages/payments-x402/src/constants.js';
+  PUBLIC_CALL_OPERATIONS,
+  PUBLIC_CALL_OUTCOMES,
+} from '@gyblos/payments-x402/constants';
 import {
   assertExactFallbackSafe,
   assertExactSupport,
   createExactBuyer,
   validateExactTerms,
-} from '../packages/payments-x402/src/exact/index.js';
+} from '@gyblos/payments-x402/exact/index';
 
 const policy = { payTo: 'seller', feePayer: 'sponsor', amount: EXACT_PRICE };
 const terms: PaymentRequirements = {
@@ -166,7 +163,7 @@ test('an uncertain exact journal blocks the shared authorization guard', async (
   const { tmpdir } = await import('node:os');
   const { join } = await import('node:path');
   const { assertNoUnresolvedAuthorizations } =
-    await import('../lab/harness/scripts/journal.js');
+    await import('@gyblos/lab-harness/journal');
   const directory = await mkdtemp(join(tmpdir(), 'gyblos-exact-'));
   const path = join(directory, 'exact-attempt.json');
   try {
@@ -196,7 +193,7 @@ test('replay ID ignores equivalent base64 and the facilitator co-signature', asy
     getBase64EncodedWireTransaction,
   } = await import('@solana/kit');
   const { exactAuthorizationId } =
-    await import('../packages/payments-x402/src/exact/authorization-id.js');
+    await import('@gyblos/payments-x402/exact/authorization-id');
   const signer = await generateKeyPairSigner();
   const message = setTransactionMessageLifetimeUsingBlockhash(
     {

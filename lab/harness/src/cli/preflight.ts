@@ -1,5 +1,4 @@
 import { FIXED_MIN_FACILITATOR_LAMPORTS, MAX_ATOMIC } from '@gyblos/config';
-import { loadConfig } from '@gyblos/lab-harness/config';
 import {
   account,
   assertProgram,
@@ -7,6 +6,8 @@ import {
   tokens,
 } from '@gyblos/payments-x402/chain';
 import { isMain } from '@gyblos/runtime';
+
+import { loadConfig } from '../config.js';
 
 export async function main() {
   try {

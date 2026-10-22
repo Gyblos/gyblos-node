@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto';
 import test from 'node:test';
 
 import { P2P } from '@gyblos/config';
-import { encodeRequest } from '@gyblos/transport/wire';
+import { encodeRequest } from '@gyblos/transport-iroh/wire';
 
 import {
   bytes,

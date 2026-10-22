@@ -1,5 +1,5 @@
 import { JOURNAL_STATES } from '@gyblos/payments-x402/constants';
-import { ROUTE_DISCREPANCY } from '@gyblos/transport/constants';
+import { ROUTE_DISCREPANCY } from '@gyblos/transport-iroh/constants';
 
 export const CALL_OUTCOMES = {
   CONFIRMED: JOURNAL_STATES.CONFIRMED,

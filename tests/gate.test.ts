@@ -6,22 +6,12 @@ import { test } from 'node:test';
 
 import type { PaymentRequirements } from '@x402/core/types';
 
-import { assertNoUnresolvedAuthorizations } from '../lab/harness/scripts/journal.js';
-import { withExclusiveLock } from '../lab/harness/scripts/lock.js';
-import {
-  runGate,
-  verifyAccounting,
-  type GateReceipt,
-} from '../packages/application/src/gate.js';
-import { assertDevnet } from '../packages/payments-x402/src/chain.js';
-import {
-  DEVNET,
-  DEVNET_USDC,
-} from '../packages/payments-x402/src/constants.js';
-import {
-  validateSettlement,
-  validateTerms,
-} from '../packages/payments-x402/src/trust.js';
+import { runGate, verifyAccounting, type GateReceipt } from '@gyblos/core';
+import { assertNoUnresolvedAuthorizations } from '@gyblos/lab-harness/journal';
+import { assertDevnet } from '@gyblos/payments-x402/chain';
+import { DEVNET, DEVNET_USDC } from '@gyblos/payments-x402/constants';
+import { withExclusiveLock } from '@gyblos/payments-x402/recovery/lock';
+import { validateSettlement, validateTerms } from '@gyblos/payments-x402/trust';
 
 const policy = {
   mint: DEVNET_USDC,

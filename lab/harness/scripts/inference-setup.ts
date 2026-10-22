@@ -1,4 +1,5 @@
-import { setupInferenceGate } from '@gyblos/lab-harness/inference-setup';
 import { isMain } from '@gyblos/runtime';
+
+import { setupInferenceGate } from '../src/inference-setup.js';
 
 if (isMain(import.meta.url)) await setupInferenceGate();

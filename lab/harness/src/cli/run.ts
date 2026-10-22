@@ -10,7 +10,6 @@ import {
   ROUTES,
   TIMEOUTS,
 } from '@gyblos/config';
-import { loadConfig } from '@gyblos/lab-harness/config';
 import {
   assertProgram,
   GateError,
@@ -26,6 +25,7 @@ import {
   waitReady,
 } from '@gyblos/runtime';
 
+import { loadConfig } from '../config.js';
 import { executeGate } from './execute.js';
 
 export async function main() {

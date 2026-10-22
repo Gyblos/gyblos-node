@@ -18,7 +18,7 @@ import {
   createModelTokenizer,
   createOllama,
   MODEL,
-} from '@gyblos/inference-ollama/index';
+} from '@gyblos/engine-ollama';
 import { spawnChild, stopChild, waitReady } from '@gyblos/runtime';
 
 export async function setupInferenceGate() {

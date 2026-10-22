@@ -11,13 +11,9 @@ import {
   TOKEN_PROGRAM_ADDRESS,
 } from '@gyblos/config';
 import type { Config } from '@gyblos/config/wallet';
-import {
-  rpc as baseRpc,
-  confirm,
-  GateError,
-} from '@gyblos/payments-x402/chain';
-import { GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
 
+import { rpc as baseRpc, confirm, GateError } from '../chain.js';
+import { GATE_ERROR_CODES } from '../constants.js';
 import type {
   AccountsResponse,
   ChainInstruction,

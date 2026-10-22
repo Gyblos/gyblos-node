@@ -4,18 +4,24 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./*": "./src/*.ts"
+    "./constants": "./src/constants.ts",
+    "./docker-command": "./src/docker-command.ts",
+    "./docker-evidence": "./src/docker-evidence.ts",
+    "./docker-fund": "./src/docker-fund.ts",
+    "./docker-source": "./src/docker-source.ts",
+    "./nat-mapping": "./src/nat-mapping.ts",
+    "./nat-topology": "./src/nat-topology.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",
     "@gyblos/lab-harness": "workspace:*",
     "@gyblos/runtime": "workspace:*",
-    "@gyblos/transport": "workspace:*",
+    "@gyblos/transport-iroh": "workspace:*",
     "@solana-program/system": "0.10.0",
     "@solana-program/token": "0.9.0",
     "@solana/kit": "5.1.0",
     "@gyblos/payments-x402": "workspace:*",
-    "@gyblos/inference-ollama": "workspace:*",
+    "@gyblos/engine-ollama": "workspace:*",
     "@number0/iroh": "1.1.0",
     "@gyblos/buyer": "workspace:*",
     "@gyblos/node": "workspace:*"

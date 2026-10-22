@@ -1,4 +1,5 @@
-import { challengeGate } from '@gyblos/lab-harness/challenge';
 import { isMain } from '@gyblos/runtime';
+
+import { challengeGate } from '../src/challenge.js';
 
 if (isMain(import.meta.url)) await challengeGate();

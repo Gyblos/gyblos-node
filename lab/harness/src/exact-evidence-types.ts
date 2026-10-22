@@ -4,8 +4,12 @@ import type {
   SupportedResponse,
 } from '@x402/core/types';
 
-import type { EXACT_PRICE } from '@gyblos/application/constants';
 import type { HTTP_STATUS } from '@gyblos/config';
+import type { EXACT_PRICE } from '@gyblos/core/constants';
+import type { ChainTransaction } from '@gyblos/payments-x402/accounting/types';
+import type { GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
+import type { PublicCall } from '@gyblos/payments-x402/exact/types';
+
 import type {
   CASE_STATUSES,
   EVIDENCE_IDS,
@@ -14,13 +18,9 @@ import type {
   EXACT_ENFORCEMENT,
   EXACT_REPLAY_SCOPE,
   EXACT_UNTRUSTED_CASES,
+  ExactEvidenceErrorCode,
   FACILITATOR_STATUSES,
-} from '@gyblos/lab-harness/constants';
-import type { ChainTransaction } from '@gyblos/payments-x402/accounting/types';
-import type { GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
-import type { PublicCall } from '@gyblos/payments-x402/exact/types';
-
-import type { ExactEvidenceErrorCode } from './constants.js';
+} from './constants.js';
 import type {
   AuthorizationMetadata,
   EvidenceBase,

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { assessCharge } from '../packages/application/src/metering.js';
+import { assessCharge } from '@gyblos/core/metering';
 
 test('undercharge is explicit only beyond tolerance for delivered successful inference', () => {
   const counts = { input: 20, output: 60 };

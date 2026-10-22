@@ -5,8 +5,8 @@ import test from 'node:test';
 
 import { NODE_STATES } from '@gyblos/node/constants';
 import { createNodeLifecycle } from '@gyblos/node/lifecycle';
+import { waitReady } from '@gyblos/runtime/process';
 
-import { waitReady } from '../packages/runtime/src/process.js';
 import { NATIVE_CAPABILITY } from './support/native-runtime.js';
 
 test('all executable modules are inert when imported', async (context) => {
@@ -96,26 +96,26 @@ test('all executable modules are inert when imported', async (context) => {
   syncBuiltinESMExports();
   try {
     for (const file of [
-      'lab/harness/src/cli/buyer.ts',
-      'lab/harness/src/cli/exact.ts',
-      'lab/harness/src/cli/inference.ts',
-      'lab/harness/src/cli/run.ts',
-      'lab/harness/src/cli/preflight.ts',
-      'apps/node/src/fixed.ts',
-      'apps/facilitator/src/main.ts',
-      'lab/harness/scripts/challenge.ts',
-      'lab/harness/scripts/fund.ts',
-      'lab/harness/scripts/failures.ts',
-      'lab/harness/scripts/inference-setup.ts',
+      '@gyblos/lab-harness/cli/buyer',
+      '@gyblos/lab-harness/cli/exact',
+      '@gyblos/lab-harness/cli/inference',
+      '@gyblos/lab-harness/cli/run',
+      '@gyblos/lab-harness/cli/preflight',
+      '@gyblos/node-app/fixed',
+      '@gyblos/facilitator/main',
+      '@gyblos/lab-harness/commands/challenge',
+      '@gyblos/lab-harness/commands/fund',
+      '@gyblos/lab-harness/commands/failures',
+      '@gyblos/lab-harness/commands/inference-setup',
     ])
-      await import('../' + file);
+      await import(file);
     await context.test(
       'native role setup entry is inert when imported',
       { skip: NATIVE_CAPABILITY.bindingSkip },
       async () => {
-        await import('../apps/node/src/main.js');
-        await import('../apps/buyer/src/main.js');
-        await import('../lab/harness/scripts/setup.js');
+        await import('@gyblos/node-app/main');
+        await import('@gyblos/buyer/main');
+        await import('@gyblos/lab-harness/commands/setup');
       },
     );
     assert.equal(fetches, 0);

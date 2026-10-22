@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import type { Engine } from '@gyblos/application/engine';
+import type { Engine } from '@gyblos/core/engine';
 import {
   assertReadinessCurrent,
   prepareSellerEngine,

@@ -8,15 +8,16 @@ import type {
 import { ExactSvmScheme } from '@x402/svm/exact/client';
 
 import { PAYMENT_LIMITS } from '@gyblos/config';
-import { GateError } from '@gyblos/payments-x402/chain';
+
+import { GateError } from '../chain.js';
 import {
   DEVNET,
   DEVNET_USDC,
   GATE_ERROR_CODES,
   PUBLIC_CALL_OPERATIONS,
   PUBLIC_CALL_OUTCOMES,
-} from '@gyblos/payments-x402/constants';
-import type { PublicCall } from '@gyblos/payments-x402/exact/types';
+} from '../constants.js';
+import type { PublicCall } from './types.js';
 
 export interface ExactPolicy {
   payTo: string;

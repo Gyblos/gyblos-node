@@ -4,7 +4,6 @@ import { join } from 'node:path';
 
 import { generateKeyPairSigner } from '@solana/kit';
 
-import { PRICES } from '@gyblos/application/metering';
 import { P2P_JOURNAL_STATES } from '@gyblos/buyer/constants';
 import {
   DEVNET,
@@ -13,6 +12,7 @@ import {
   MAX_ATOMIC,
   P2P,
 } from '@gyblos/config';
+import { PRICES } from '@gyblos/core/metering';
 import {
   signInferenceOffer,
   type InferenceOffer,

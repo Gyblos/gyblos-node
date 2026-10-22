@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 
 import { P2P } from '@gyblos/config';
 import { saveJson } from '@gyblos/runtime';
-import { TRANSPORT_ROUTES } from '@gyblos/transport/constants';
+import { TRANSPORT_ROUTES } from '@gyblos/transport-iroh/constants';
 
 import type { inspectDocker } from './docker-checks.js';
 import { collectDockerCalls, type dockerEvidence } from './docker-evidence.js';

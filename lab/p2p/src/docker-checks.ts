@@ -9,8 +9,8 @@ import {
   PORTS,
   ROUTES,
 } from '@gyblos/config';
-import { NAT } from '@gyblos/lab-p2p/constants';
 
+import { NAT } from './constants.js';
 import { docker, execute } from './docker-command.js';
 import type { prepareDocker } from './docker-prepare.js';
 

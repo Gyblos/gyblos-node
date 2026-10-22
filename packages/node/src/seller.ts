@@ -3,7 +3,6 @@ import { resolve } from 'node:path';
 
 import { EndpointTicket } from '@number0/iroh';
 
-import { PRICES } from '@gyblos/application/metering';
 import {
   CLEANUP,
   DEVNET,
@@ -18,13 +17,12 @@ import {
   PORTS,
   ROUTES,
 } from '@gyblos/config';
+import { PRICES } from '@gyblos/core/metering';
 import {
   GENERATION,
   READINESS_GENERATION,
-} from '@gyblos/inference-ollama/constants';
-import { createOllamaEngine } from '@gyblos/inference-ollama/engine';
-import { createInferenceSeller } from '@gyblos/node/http/inference';
-import { signInferenceOffer } from '@gyblos/node/offers';
+} from '@gyblos/engine-ollama/constants';
+import { createOllamaEngine } from '@gyblos/engine-ollama/engine';
 import { inferenceSnapshot } from '@gyblos/payments-x402/accounting/chain';
 import { assertProgram } from '@gyblos/payments-x402/chain';
 import { createFacilitator } from '@gyblos/payments-x402/facilitator';
@@ -38,15 +36,17 @@ import {
 } from '@gyblos/runtime';
 import { assertMemoryHeadroom, memorySnapshot } from '@gyblos/runtime/memory';
 import { createPrivateLog } from '@gyblos/runtime/private-log';
-import { withDeadline } from '@gyblos/transport/deadline';
-import { bindEndpoint } from '@gyblos/transport/endpoint';
-import { serveIroh } from '@gyblos/transport/iroh-server';
+import { withDeadline } from '@gyblos/transport-iroh/deadline';
+import { bindEndpoint } from '@gyblos/transport-iroh/endpoint';
+import { serveIroh } from '@gyblos/transport-iroh/iroh-server';
 
 import { modelTokenizer } from './artifacts.js';
 import {
   assertReadinessCurrent,
   prepareSellerEngine,
 } from './engine-readiness.js';
+import { createInferenceSeller } from './http/inference.js';
+import { signInferenceOffer } from './offers.js';
 import { loadRole, nodeSecret, rolePath, roleSigner } from './roles.js';
 
 interface Trace {

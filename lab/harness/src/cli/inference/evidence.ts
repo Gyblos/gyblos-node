@@ -1,17 +1,18 @@
 import { readFile } from 'node:fs/promises';
 
-import { PRICES, TOLERANCE } from '@gyblos/application/metering';
 import { X402_SDK_VERSION } from '@gyblos/config';
-import { GENERATION } from '@gyblos/inference-ollama/constants';
-import { MODEL } from '@gyblos/inference-ollama/index';
-import { saveJson, type Config } from '@gyblos/lab-harness/config';
+import { PRICES, TOLERANCE } from '@gyblos/core/metering';
+import { MODEL } from '@gyblos/engine-ollama';
+import { GENERATION } from '@gyblos/engine-ollama/constants';
+import { DEVNET } from '@gyblos/payments-x402/constants';
+
+import { saveJson, type Config } from '../../config.js';
 import {
   EVIDENCE_IDS,
   EVIDENCE_STATUSES,
   SCHEMA_VERSIONS,
-} from '@gyblos/lab-harness/constants';
-import type { InferenceGateEvidence } from '@gyblos/lab-harness/types';
-import { DEVNET } from '@gyblos/payments-x402/constants';
+} from '../../constants.js';
+import type { InferenceGateEvidence } from '../../types.js';
 
 export async function initializeEvidence(
   config: Config,

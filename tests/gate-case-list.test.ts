@@ -2,8 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { INFERENCE_CASES } from '@gyblos/lab-harness/constants';
-
-import { createCases } from '../packages/node/src/synthetic-cases.js';
+import { createCases } from '@gyblos/node/synthetic-cases';
 
 test('gate adds the separately targeted undercharge before engine termination', () => {
   const cases = createCases('over-request', 'failure-request', 'under-request');

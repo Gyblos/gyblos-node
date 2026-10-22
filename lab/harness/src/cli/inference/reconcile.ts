@@ -1,7 +1,5 @@
 import assert from 'node:assert/strict';
 
-import { JOURNAL_STATES } from '@gyblos/lab-harness/constants';
-import { saveJournal } from '@gyblos/lab-harness/journal';
 import {
   confirmInference,
   inferenceSnapshot,
@@ -12,6 +10,8 @@ import {
 import { createInferenceBuyer } from '@gyblos/payments-x402/inference-buyer';
 import { validateSettlement } from '@gyblos/payments-x402/trust';
 
+import { JOURNAL_STATES } from '../../constants.js';
+import { saveJournal } from '../../journal.js';
 import type { CaseContext } from './types.js';
 
 export async function reconcileCase({

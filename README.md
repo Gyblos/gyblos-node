@@ -83,28 +83,29 @@ post-claim snapshots must reach the known claim slot. A remaining failure blocks
 another authorization. See
 [reconciliation limits](docs/limitations.md#uncertain-outcomes-and-manual-reconciliation).
 
-## Import boundary report
+## Enforced import boundaries
 
 `pnpm boundaries` statically checks the package layers and reports current, new
 and resolved violations against `tooling/boundaries-baseline.json`. It also runs
 as part of `pnpm lint`. The checker and its separate regression suites are
 TypeScript, included in strict `pnpm typecheck` and ESLint checks, and run
-through the existing `tsx` loader. Architectural violations are report-only
-during the restructure; analysis, configuration and resolution errors fail the
+through the existing `tsx` loader. Architectural violations, a nonempty
+baseline, analysis failures, configuration errors and resolution errors fail the
 command.
 
-Current names map to their intended layers: `application` is core;
-`inference-ollama`, `payments-x402` and `transport` are separate adapters;
-`gate`, `scripts` and experimental tooling are lab. Each app is independent.
-Tests and verification tooling may inspect every layer. Protocol is independent;
-config/runtime are shared support above protocol. Product cannot import lab,
-adapters cannot import one another, and apps cannot import other apps.
+`core` owns domain policy; `engine-ollama`, `payments-x402` and `transport-iroh`
+are separate adapters; `node` owns composition; gates, scripts and experiments
+live in `lab`. Each app is independent. Tests and verification tooling may
+inspect every layer. Protocol is independent; config/runtime are shared support
+above protocol. Product cannot import lab, adapters cannot import one another,
+and apps cannot import other apps.
 
 Use `pnpm boundaries --json` for a structured report and `pnpm boundaries:test`
 for the separate synthetic tooling checks. Baseline changes are deliberate:
-`pnpm boundaries --update-baseline`; normal checks never rewrite it. A baseline
-records existing violations, not approval to keep them. It contains rule names
-and relative source/target paths only. SDK targets use package names.
+`pnpm boundaries --update-baseline` can only confirm an empty baseline; normal
+checks never rewrite it. Both the current graph and the versioned baseline must
+stay empty. Explicit package exports expose the public entries used by tests;
+internal imports stay relative to their owning package.
 
 Analysis parses source without executing it. Git checkouts use tracked and
 nonignored source files; source archives use the same explicit source roots.
@@ -645,10 +646,10 @@ packages/
   config/            @gyblos/config: hosts, paths, networks, limits, versions
   runtime/           @gyblos/runtime: processes, shutdown and atomic JSON
   protocol/          SDK-independent signed bytes, Engine contracts and error codes
-  application/       Reusable workflow, accounting and measurement policy
+  core/              Reusable workflow, accounting and measurement policy
   payments-x402/     upto/exact adapters, trust policies and chain reads
-  transport/         Bounded HTTP over loopback or native Iroh
-  inference-ollama/  Local generation and pinned public tokenization
+  transport-iroh/    Bounded HTTP over loopback or native Iroh
+  engine-ollama/     Local generation and pinned public tokenization
   node/              Native seller composition with start, stop and health
 apps/
   node/              Headless seller daemon and fixed-resource compatibility entry

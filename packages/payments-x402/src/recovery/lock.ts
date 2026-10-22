@@ -2,9 +2,9 @@ import { lstat, mkdir, open, unlink, type FileHandle } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
 import { FILE_MODES } from '@gyblos/config';
-import { GateError } from '@gyblos/payments-x402/chain';
-import { GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
 
+import { GateError } from '../chain.js';
+import { GATE_ERROR_CODES } from '../constants.js';
 import { currentLockOwner } from './lock-owner.js';
 
 async function removeOwnedLock(path: string, handle: FileHandle) {

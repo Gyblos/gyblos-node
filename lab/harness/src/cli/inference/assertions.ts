@@ -1,16 +1,14 @@
 import assert from 'node:assert/strict';
 
-import { CHARGE_ANOMALIES } from '@gyblos/application/constants';
-import type { observeInferenceResponse } from '@gyblos/application/inference-observation';
-import { charge, OFFER_ID } from '@gyblos/application/metering';
 import { HTTP_STATUS } from '@gyblos/config';
-import { MODEL } from '@gyblos/inference-ollama/index';
-import {
-  INFERENCE_CASES,
-  type InferenceCaseName,
-} from '@gyblos/lab-harness/constants';
-import type { InferenceTrace } from '@gyblos/lab-harness/types';
+import { CHARGE_ANOMALIES } from '@gyblos/core/constants';
+import type { observeInferenceResponse } from '@gyblos/core/inference-observation';
+import { charge, OFFER_ID } from '@gyblos/core/metering';
+import { MODEL } from '@gyblos/engine-ollama';
 import type { Measurement } from '@gyblos/node/measurements';
+
+import { INFERENCE_CASES, type InferenceCaseName } from '../../constants.js';
+import type { InferenceTrace } from '../../types.js';
 
 interface CaseAssertion {
   caseName: InferenceCaseName;

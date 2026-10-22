@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 
-import { observeInferenceResponse } from '@gyblos/application/inference-observation';
-import { assessCharge, charge, OFFER_ID } from '@gyblos/application/metering';
 import { HTTP_STATUS, LOCALHOST, P2P, ROUTES } from '@gyblos/config';
+import { observeInferenceResponse } from '@gyblos/core/inference-observation';
+import { assessCharge, charge, OFFER_ID } from '@gyblos/core/metering';
 import { modelTokenizer } from '@gyblos/node/artifacts';
 import { errorDiagnostic } from '@gyblos/node/diagnostics';
 import { inferenceCeiling } from '@gyblos/node/http/inference';
@@ -27,7 +27,7 @@ import { isMain, saveJson } from '@gyblos/runtime';
 import {
   expectedIrohRoute,
   routesMatchRequired,
-} from '@gyblos/transport/route-policy';
+} from '@gyblos/transport-iroh/route-policy';
 
 import { trustedOffer } from './buyer.js';
 import {

@@ -4,11 +4,11 @@ import { STATUS_CODES } from 'node:http';
 
 import type { Signature } from '@solana/kit';
 
-import type { BuyerResponseObservation } from '@gyblos/payments-x402/buyer';
+import type { BuyerResponseObservation } from '@gyblos/payments-x402';
 import { JOURNAL_STATES } from '@gyblos/payments-x402/constants';
 import { signatureHint } from '@gyblos/payments-x402/signature-hint';
-import type { RouteObservation } from '@gyblos/transport';
-import { TRANSPORT_ROUTES } from '@gyblos/transport/constants';
+import type { RouteObservation } from '@gyblos/transport-iroh';
+import { TRANSPORT_ROUTES } from '@gyblos/transport-iroh/constants';
 
 import type { P2pJournalState } from './constants.js';
 import type { PaymentProofObservation } from './proof.js';

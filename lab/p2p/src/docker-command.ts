@@ -3,7 +3,8 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
 import { FILE_MODES, P2P } from '@gyblos/config';
-import { NAT } from '@gyblos/lab-p2p/constants';
+
+import { NAT } from './constants.js';
 
 export async function docker(
   args: string[],

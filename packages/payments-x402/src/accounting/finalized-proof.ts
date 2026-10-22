@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 
 import { FINALIZED_COMMITMENT, SVM_TRANSACTION_VERSION } from '@gyblos/config';
-import { verifyFinalizedChannel } from '@gyblos/payments-x402/finalized-channel';
 
+import { verifyFinalizedChannel } from '../finalized-channel.js';
 import { readChain, tokenAddress } from './chain.js';
 import { PROOF_GUARDS } from './constants.js';
 import {

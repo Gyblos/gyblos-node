@@ -5,7 +5,27 @@
   "type": "module",
   "exports": {
     ".": "./src/buyer.ts",
-    "./*": "./src/*.ts"
+    "./accounting/chain": "./src/accounting/chain.ts",
+    "./accounting/constants": "./src/accounting/constants.ts",
+    "./accounting/escrow-rent": "./src/accounting/escrow-rent.ts",
+    "./accounting/escrow-tokens": "./src/accounting/escrow-tokens.ts",
+    "./accounting/finalized-proof": "./src/accounting/finalized-proof.ts",
+    "./accounting/types": "./src/accounting/types.ts",
+    "./chain": "./src/chain.ts",
+    "./constants": "./src/constants.ts",
+    "./exact/authorization-id": "./src/exact/authorization-id.ts",
+    "./exact/index": "./src/exact/index.ts",
+    "./exact/types": "./src/exact/types.ts",
+    "./facilitator": "./src/facilitator.ts",
+    "./facilitator-diagnostics": "./src/facilitator-diagnostics.ts",
+    "./inference-buyer": "./src/inference-buyer.ts",
+    "./inference-deposit": "./src/inference-deposit.ts",
+    "./recovery/lock": "./src/recovery/lock.ts",
+    "./recovery/lock-owner": "./src/recovery/lock-owner.ts",
+    "./recovery/recovery-lock": "./src/recovery/recovery-lock.ts",
+    "./seller": "./src/seller.ts",
+    "./signature-hint": "./src/signature-hint.ts",
+    "./trust": "./src/trust.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",

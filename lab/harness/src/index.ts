@@ -1,5 +1,5 @@
-export * from '@gyblos/lab-harness/config';
+export * from './config.js';
 
-export * from '@gyblos/lab-harness/journal';
+export * from './journal.js';
 
 export * from '@gyblos/payments-x402/recovery/lock';

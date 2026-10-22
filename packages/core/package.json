@@ -1,0 +1,19 @@
+{
+  "name": "@gyblos/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/gate.ts",
+    "./constants": "./src/constants.ts",
+    "./engine": "./src/engine.ts",
+    "./inference-observation": "./src/inference-observation.ts",
+    "./metering": "./src/metering.ts",
+    "./offers": "./src/offers.ts",
+    "./package.json": "./package.json"
+  },
+  "dependencies": {
+    "@gyblos/config": "workspace:*",
+    "@gyblos/protocol": "workspace:*"
+  }
+}

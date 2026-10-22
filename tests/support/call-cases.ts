@@ -14,7 +14,7 @@ import { errorDiagnostic } from '@gyblos/node/diagnostics';
 import {
   createBuyer,
   type BuyerResponseObservation,
-} from '@gyblos/payments-x402/buyer';
+} from '@gyblos/payments-x402';
 import { GateError } from '@gyblos/payments-x402/chain';
 import {
   DEVNET,

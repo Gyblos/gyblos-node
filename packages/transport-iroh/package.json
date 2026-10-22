@@ -1,0 +1,22 @@
+{
+  "name": "@gyblos/transport-iroh",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/types.ts",
+    "./admission": "./src/admission.ts",
+    "./constants": "./src/constants.ts",
+    "./deadline": "./src/deadline.ts",
+    "./endpoint": "./src/endpoint.ts",
+    "./iroh-client": "./src/iroh-client.ts",
+    "./iroh-server": "./src/iroh-server.ts",
+    "./limiter": "./src/limiter.ts",
+    "./route-policy": "./src/route-policy.ts",
+    "./wire": "./src/wire.ts"
+  },
+  "dependencies": {
+    "@gyblos/config": "workspace:*",
+    "@number0/iroh": "1.1.0"
+  }
+}

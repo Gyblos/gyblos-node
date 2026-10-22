@@ -13,10 +13,10 @@ independent buyer-side counting.
 
 The model manifest digest, public model revision, tokenizer/config hashes and
 tokenizer version are pinned in
-[`packages/inference-ollama/src/constants.ts`](../packages/inference-ollama/src/constants.ts).
+[`packages/engine-ollama/src/constants.ts`](../packages/engine-ollama/src/constants.ts).
 Setup verifies the model and artifacts; a mismatch stops inference before
 payment. The single-user chat renderer lives in
-[`model.ts`](../packages/inference-ollama/src/model.ts).
+[`model.ts`](../packages/engine-ollama/src/model.ts).
 
 The gate starts its own loopback-only Ollama on port 11436 and a facilitator on
 4022; its inference seller uses an ephemeral loopback port. Model setup

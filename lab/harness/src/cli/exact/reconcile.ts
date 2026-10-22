@@ -19,15 +19,13 @@ import {
   RETRY_DELAYS,
   TOKEN_PROGRAM_ADDRESS,
 } from '@gyblos/config';
-import { type Config } from '@gyblos/lab-harness/config';
-import { RECONCILIATION_CLASSIFICATIONS } from '@gyblos/lab-harness/constants';
-import type {
-  AccountsResponse,
-  ChainTransaction,
-} from '@gyblos/lab-harness/types';
 import { GateError, lamports, rpc } from '@gyblos/payments-x402/chain';
 import { DEVNET_USDC, GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
 import { exactAuthorizationId } from '@gyblos/payments-x402/exact/authorization-id';
+
+import { type Config } from '../../config.js';
+import { RECONCILIATION_CLASSIFICATIONS } from '../../constants.js';
+import type { AccountsResponse, ChainTransaction } from '../../types.js';
 
 export async function snapshot(config: Config, buyer: string) {
   const atas = await Promise.all(

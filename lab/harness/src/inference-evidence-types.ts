@@ -1,19 +1,19 @@
-import type { ObservedDoneReason } from '@gyblos/application/constants';
-import type { PRICES, TOLERANCE } from '@gyblos/application/metering';
-import type { GENERATION } from '@gyblos/inference-ollama/constants';
-import type { EngineUsage, MODEL } from '@gyblos/inference-ollama/index';
-import type {
-  ConfigAssetLabel,
-  EVIDENCE_IDS,
-  InferenceCaseName,
-} from '@gyblos/lab-harness/constants';
+import type { ObservedDoneReason } from '@gyblos/core/constants';
+import type { PRICES, TOLERANCE } from '@gyblos/core/metering';
+import type { EngineUsage, MODEL } from '@gyblos/engine-ollama';
+import type { GENERATION } from '@gyblos/engine-ollama/constants';
 import type { Measurement } from '@gyblos/node/measurements';
 import type {
   inferenceSnapshot,
   transactionTransfers,
 } from '@gyblos/payments-x402/accounting/chain';
 
-import type { InferenceEvidenceErrorCode } from './constants.js';
+import type {
+  ConfigAssetLabel,
+  EVIDENCE_IDS,
+  InferenceCaseName,
+  InferenceEvidenceErrorCode,
+} from './constants.js';
 import type { EvidenceBase } from './evidence-types.js';
 
 export type InferenceSnapshot = Awaited<ReturnType<typeof inferenceSnapshot>>;

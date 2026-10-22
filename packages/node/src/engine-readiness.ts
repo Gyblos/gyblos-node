@@ -1,6 +1,6 @@
-import type { Engine, EngineDescription } from '@gyblos/application/engine';
 import { DIAGNOSTICS, P2P } from '@gyblos/config';
-import { READINESS_GENERATION } from '@gyblos/inference-ollama/constants';
+import type { Engine, EngineDescription } from '@gyblos/core/engine';
+import { READINESS_GENERATION } from '@gyblos/engine-ollama/constants';
 import {
   assertMemoryHeadroom,
   type MemorySnapshot,

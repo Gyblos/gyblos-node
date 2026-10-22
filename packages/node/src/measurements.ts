@@ -1,9 +1,6 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { link, mkdir, open, readFile, unlink } from 'node:fs/promises';
 
-import type { ChargeAnomaly } from '@gyblos/application/constants';
-import type { EngineDescription } from '@gyblos/application/engine';
-import type { TokenCounts } from '@gyblos/application/metering';
 import {
   FILE_MODES,
   KEY_LIMITS,
@@ -12,7 +9,10 @@ import {
   MEASUREMENTS_PATH,
   UNITS,
 } from '@gyblos/config';
-import { MODEL } from '@gyblos/inference-ollama/model';
+import type { ChargeAnomaly } from '@gyblos/core/constants';
+import type { EngineDescription } from '@gyblos/core/engine';
+import type { TokenCounts } from '@gyblos/core/metering';
+import { MODEL } from '@gyblos/engine-ollama/model';
 
 import { MEASUREMENT_SCHEMA_VERSION } from './constants.js';
 

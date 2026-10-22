@@ -5,9 +5,10 @@ import test from 'node:test';
 import { address, generateKeyPairSigner, getAddressEncoder } from '@solana/kit';
 import ts from 'typescript';
 
-import { inferenceWireUsage as applicationWireUsage } from '@gyblos/application/engine';
 import { P2P } from '@gyblos/config';
-import { ENGINE_DONE_REASONS as adapterReasons } from '@gyblos/inference-ollama/constants';
+import { inferenceWireUsage as applicationWireUsage } from '@gyblos/core/engine';
+import applicationManifest from '@gyblos/core/package.json' with { type: 'json' };
+import { ENGINE_DONE_REASONS as adapterReasons } from '@gyblos/engine-ollama/constants';
 import {
   signInferenceOffer,
   verifyInferenceOffer,
@@ -27,10 +28,8 @@ import {
   type EngineUsage,
   type EngineWireUsage,
 } from '@gyblos/protocol';
-
-import applicationManifest from '../packages/application/package.json' with { type: 'json' };
-import protocolManifest from '../packages/protocol/package.json' with { type: 'json' };
-import vector from '../packages/protocol/vectors/signed-inference-offer-v1.json' with { type: 'json' };
+import protocolManifest from '@gyblos/protocol/package.json' with { type: 'json' };
+import vector from '@gyblos/protocol/vectors/signed-inference-offer-v1.json' with { type: 'json' };
 
 const EXPECTED_ERROR_CODES = [
   'AMOUNT_MISMATCH',
@@ -225,9 +224,9 @@ test('engine completion reasons and separate domain/wire usage contracts keep th
 
 test('protocol has no SDK dependencies and application imports neither payment nor engine adapters', () => {
   assert.ok(!('dependencies' in protocolManifest));
-  for (const adapter of ['@gyblos/payments-x402', '@gyblos/inference-ollama'])
+  for (const adapter of ['@gyblos/payments-x402', '@gyblos/engine-ollama'])
     assert.ok(!(adapter in applicationManifest.dependencies));
-  const root = new URL('../packages/application/src/', import.meta.url);
+  const root = new URL('../packages/core/src/', import.meta.url);
   for (const filename of readdirSync(root, {
     recursive: true,
     encoding: 'utf8',

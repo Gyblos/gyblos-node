@@ -7,20 +7,20 @@ import {
   type KeyPairSigner,
 } from '@solana/kit';
 
+import { P2P } from '@gyblos/config';
 import {
   validateInferenceOffer,
   type InferenceOffer,
   type OfferTrust,
   type SignedInferenceOffer,
-} from '@gyblos/application/offers';
-import { P2P } from '@gyblos/config';
+} from '@gyblos/core/offers';
 import { sign, verify } from '@gyblos/protocol/signing';
 
 export type {
   InferenceOffer,
   OfferTrust,
   SignedInferenceOffer,
-} from '@gyblos/application/offers';
+} from '@gyblos/core/offers';
 
 export async function signInferenceOffer(
   offer: InferenceOffer,

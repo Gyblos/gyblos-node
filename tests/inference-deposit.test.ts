@@ -12,8 +12,8 @@ import {
 import {
   CHANNEL_PROGRAM,
   DEVNET_GENESIS,
-} from '../packages/payments-x402/src/constants.js';
-import { verifyInferenceDeposit } from '../packages/payments-x402/src/inference-deposit.js';
+} from '@gyblos/payments-x402/constants';
+import { verifyInferenceDeposit } from '@gyblos/payments-x402/inference-deposit';
 
 const buyer = '5FVtvnKXCabCDxSoeNJuLdRpCTBZQnhTnNooZzEYfg2j',
   feePayer = 'HZLkSwMefjig2NhrKaW3Hb16JX8PTQnE4Jutdc2B433g',

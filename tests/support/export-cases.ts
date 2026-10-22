@@ -3,7 +3,7 @@ import test from 'node:test';
 
 import { CALL_OUTCOMES } from '@gyblos/buyer/constants';
 import { P2P } from '@gyblos/config';
-import { TRANSPORT_ROUTES } from '@gyblos/transport/constants';
+import { TRANSPORT_ROUTES } from '@gyblos/transport-iroh/constants';
 
 import { exportFixture } from './export-fixture.js';
 import { paymentAccounts, tokenLeg } from './payment-mutations.js';

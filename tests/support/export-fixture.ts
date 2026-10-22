@@ -6,14 +6,14 @@ import { basename } from 'node:path';
 import { PassThrough } from 'node:stream';
 import type { TestContext } from 'node:test';
 
-import { CHARGE_ANOMALIES } from '@gyblos/application/constants';
 import { CALL_OUTCOMES, type CallOutcome } from '@gyblos/buyer/constants';
 import type { paymentProof } from '@gyblos/buyer/proof';
 import { P2P } from '@gyblos/config';
+import { CHARGE_ANOMALIES } from '@gyblos/core/constants';
 import { collectDockerCalls } from '@gyblos/lab-p2p/docker-evidence';
 import { measurementRow, type Measurement } from '@gyblos/node/measurements';
-import { TRANSPORT_ROUTES } from '@gyblos/transport/constants';
-import type { RouteObservation } from '@gyblos/transport/types';
+import type { RouteObservation } from '@gyblos/transport-iroh';
+import { TRANSPORT_ROUTES } from '@gyblos/transport-iroh/constants';
 
 import { paymentFixture, withOfflineProof } from './payment-fixture.js';
 import { fullPrincipalRefund, tokenCredit } from './payment-mutations.js';

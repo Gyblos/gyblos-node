@@ -1,6 +1,6 @@
 import { isIP } from 'node:net';
 
-import { NAT } from '@gyblos/lab-p2p/constants';
+import { NAT } from './constants.js';
 
 export interface UdpTuple {
   source: string;

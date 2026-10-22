@@ -1,6 +1,5 @@
 import { discoverChannelsByRentPayer, toFacilitatorSvmSigner } from '@x402/svm';
 
-import { runGate } from '@gyblos/application/gate';
 import {
   CHANNEL_STATUS,
   FAILED_REQUEST_PATH,
@@ -13,19 +12,8 @@ import {
   ROUTES,
   X402_SDK_VERSION,
 } from '@gyblos/config';
-import { loadConfig, saveJson, signer } from '@gyblos/lab-harness/config';
-import {
-  EVIDENCE_STATUSES,
-  JOURNAL_STATES,
-  SCHEMA_VERSIONS,
-  WALLET_ROLES,
-} from '@gyblos/lab-harness/constants';
-import type { FixedGateEvidence } from '@gyblos/lab-harness/fixture-evidence-types';
-import {
-  assertNoUnresolvedAuthorizations,
-  saveJournal,
-} from '@gyblos/lab-harness/journal';
-import { createBuyer } from '@gyblos/payments-x402/buyer';
+import { runGate } from '@gyblos/core';
+import { createBuyer } from '@gyblos/payments-x402';
 import {
   account,
   assertProgram,
@@ -45,6 +33,16 @@ import {
 import type { SettlementEvent } from '@gyblos/payments-x402/facilitator';
 import { withExclusiveLock } from '@gyblos/payments-x402/recovery/lock';
 import { validateSettlement } from '@gyblos/payments-x402/trust';
+
+import { loadConfig, saveJson, signer } from '../config.js';
+import {
+  EVIDENCE_STATUSES,
+  JOURNAL_STATES,
+  SCHEMA_VERSIONS,
+  WALLET_ROLES,
+} from '../constants.js';
+import type { FixedGateEvidence } from '../fixture-evidence-types.js';
+import { assertNoUnresolvedAuthorizations, saveJournal } from '../journal.js';
 
 const JOURNAL_PATH = JOURNAL_PATHS.fixed;
 

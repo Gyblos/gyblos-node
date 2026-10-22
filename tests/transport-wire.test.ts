@@ -2,14 +2,14 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { P2P, ROUTES } from '@gyblos/config';
-import { withDeadline } from '@gyblos/transport/deadline';
-import { createPeerLimiter } from '@gyblos/transport/limiter';
+import { withDeadline } from '@gyblos/transport-iroh/deadline';
+import { createPeerLimiter } from '@gyblos/transport-iroh/limiter';
 import {
   decodeRequest,
   decodeResponse,
   encodeRequest,
   encodeResponse,
-} from '@gyblos/transport/wire';
+} from '@gyblos/transport-iroh/wire';
 
 import { registerAdmissionCases } from './support/admission-cases.js';
 import { registerLimiterCases } from './support/limiter-cases.js';

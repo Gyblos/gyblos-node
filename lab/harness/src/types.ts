@@ -3,18 +3,18 @@ export type * from '@gyblos/payments-x402/accounting/types';
 export type {
   ExactGateEvidence,
   ExactCaseResult,
-} from '@gyblos/lab-harness/exact-evidence-types';
+} from './exact-evidence-types.js';
 
 export type {
   InferenceGateEvidence,
   InferenceCaseResult,
   InferenceTrace,
-} from '@gyblos/lab-harness/inference-evidence-types';
+} from './inference-evidence-types.js';
 
 export type GateEvidence =
-  | import('@gyblos/lab-harness/exact-evidence-types').ExactGateEvidence
-  | import('@gyblos/lab-harness/inference-evidence-types').InferenceGateEvidence;
+  | import('./exact-evidence-types.js').ExactGateEvidence
+  | import('./inference-evidence-types.js').InferenceGateEvidence;
 
 export type CaseResult =
-  | import('@gyblos/lab-harness/exact-evidence-types').ExactCaseResult
-  | import('@gyblos/lab-harness/inference-evidence-types').InferenceCaseResult;
+  | import('./exact-evidence-types.js').ExactCaseResult
+  | import('./inference-evidence-types.js').InferenceCaseResult;
