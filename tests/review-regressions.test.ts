@@ -1,5 +1,6 @@
 // Owns offline review regressions.test regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -182,6 +183,35 @@ void test('published tests have a public command without private harness depende
   );
   assert.equal(pkg.scripts.test.includes('.local/'), false);
   assert.ok((await readFile('README.md', 'utf8')).includes('pnpm test'));
+  // A missing binding must reach explicit skips before the proxy's role import.
+  const sdkSource =
+    'export class SecretKey {}\nthrow new Error("Cannot find native binding: synthetic absence");';
+  const resolver = `export function resolve(specifier,context,next){
+    if(specifier==='@number0/iroh')return {url:${JSON.stringify('data:text/javascript,' + encodeURIComponent(sdkSource))},shortCircuit:true};
+    return next(specifier,context);
+  }`;
+  const bootstrap = `import { register } from 'node:module';register(${JSON.stringify('data:text/javascript,' + encodeURIComponent(resolver))});`;
+  const hook = 'data:text/javascript,' + encodeURIComponent(bootstrap);
+  const unavailable = spawnSync(
+    process.execPath,
+    [
+      '--import',
+      hook,
+      '--import',
+      'tsx',
+      '--test',
+      'tests/buyer-proxy.test.ts',
+    ],
+    {
+      encoding: 'utf8',
+      timeout: 10000,
+      maxBuffer: 65536,
+      env: { PATH: process.env.PATH, TMPDIR: process.env.TMPDIR },
+    },
+  );
+  assert.equal(unavailable.status, 0, unavailable.stderr + unavailable.stdout);
+  assert.match(unavailable.stdout, /^# skipped 6$/m);
+  assert.match(unavailable.stdout, /^# fail 0$/m);
 });
 
 void test('successful responses with missing usage are rejected before accepting measurements', () => {

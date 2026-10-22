@@ -17,12 +17,28 @@ the buyer uncertain, so its third was never started. That old journal and the
 unknown historical 402 cause remain unresolved. This successful new run used
 fresh isolated roles and did not retry or clear the old authorization. Docker
 NAT-direct did not pass. Hotspot/CGNAT and broader NAT coverage remain untested.
-This work was merged into `main` after the final review; issues #17–#23 stay
-deferred.
+This work was merged into `main` after the final review. Review issues #17–#19
+and #21–#23 remain deferred; the buyer-proxy overlap and malformed-JSON issue is
+addressed separately below.
 
 > **Status:** experimental, Solana **devnet** only. Not audited. Never use
 > mainnet keys. Part of [Gyblos](https://gyblos.com) ·
 > [Paper](https://gyblos.com/paper).
+
+## Buyer proxy request ordering
+
+Each proxy instance serializes requests to its configured seller through the
+full response and local metric write. The existing two-request admission limit
+includes the active request and one queued request; excess requests receive 429.
+A queued request whose caller disconnects is skipped before forwarding.
+Malformed JSON receives 400 with `MALFORMED_JSON`, without forwarding payment
+headers. Transport failures retain the uncertain 503 response and never trigger
+a retry.
+
+Offline regressions reproduce the old overlap failure and validate the fix with
+real native Iroh loopback and simulated payment messages. This is not another
+paid devnet run or an explanation of the historical 402. The queue belongs to
+one proxy instance; it does not coordinate separate buyer processes.
 
 ## How it works
 

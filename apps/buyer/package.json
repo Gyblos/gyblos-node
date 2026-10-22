@@ -12,7 +12,8 @@
     "./main": "./src/main.ts",
     "./proof": "./src/proof.ts",
     "./reconcile": "./src/reconcile.ts",
-    "./reconciliation": "./src/reconciliation.ts"
+    "./reconciliation": "./src/reconciliation.ts",
+    "./proxy": "./src/proxy.ts"
   },
   "dependencies": {
     "@gyblos/core": "workspace:*",
