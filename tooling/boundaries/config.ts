@@ -1,5 +1,10 @@
 // Owns architectural policy and current-to-future package mapping.
 // Static analysis only: this module must never load product modules or secrets.
+import type {
+  ICruiseOptions,
+  IRegularForbiddenRuleType,
+} from 'dependency-cruiser';
+
 export const SOURCE_ROOTS = [
   'apps',
   'packages',
@@ -20,23 +25,56 @@ const PROTOCOL_PATH = '^packages/protocol/';
 const PRODUCT_PATH = '^(?:packages/|apps/)';
 const SDK_PATH = '(^|/)(?:@solana(?:-program)?/|@x402/|@number0/iroh(?:/|$))';
 
-export function layerOf(source) {
-  if (new RegExp(LAB_PATH).test(source)) return 'lab';
+export const BOUNDARY_LAYERS = {
+  PROTOCOL: 'protocol',
+  CORE: 'core',
+  ADAPTER: 'adapter',
+  NODE: 'node',
+  CONFIG: 'config',
+  RUNTIME: 'runtime',
+  APPS: 'apps',
+  LAB: 'lab',
+  VERIFICATION: 'verification',
+} as const;
+
+export type BoundaryLayer =
+  (typeof BOUNDARY_LAYERS)[keyof typeof BOUNDARY_LAYERS];
+export interface BoundaryConfig {
+  forbidden: IRegularForbiddenRuleType[];
+  options: ICruiseOptions;
+}
+
+export function layerOf(source: string): BoundaryLayer | null {
+  if (new RegExp(LAB_PATH).test(source)) return BOUNDARY_LAYERS.LAB;
   if (source.startsWith('tests/') || source.startsWith('tooling/'))
-    return 'verification';
-  if (source.startsWith('apps/')) return 'apps';
+    return BOUNDARY_LAYERS.VERIFICATION;
+  if (source.startsWith('apps/')) return BOUNDARY_LAYERS.APPS;
   const name = source.match(/^packages\/([^/]+)\//)?.[1];
-  if (name === 'application' || name === 'core') return 'core';
-  if (ADAPTER_NAME.test(name ?? '')) return 'adapter';
-  if (['protocol', 'config', 'runtime', 'node'].includes(name)) return name;
+  if (name === 'application' || name === BOUNDARY_LAYERS.CORE)
+    return BOUNDARY_LAYERS.CORE;
+  if (ADAPTER_NAME.test(name ?? '')) return BOUNDARY_LAYERS.ADAPTER;
+  if (
+    name === BOUNDARY_LAYERS.PROTOCOL ||
+    name === BOUNDARY_LAYERS.CONFIG ||
+    name === BOUNDARY_LAYERS.RUNTIME ||
+    name === BOUNDARY_LAYERS.NODE
+  )
+    return name;
   return null;
 }
 
-function rule(name, from, to) {
+function rule(
+  name: string,
+  from: IRegularForbiddenRuleType['from'],
+  to: IRegularForbiddenRuleType['to'],
+): IRegularForbiddenRuleType {
   return { name, severity: 'warn', from, to };
 }
 
-export function boundaryConfig(packageNames, appNames) {
+export function boundaryConfig(
+  packageNames: string[],
+  appNames: string[],
+): BoundaryConfig {
   const adapters = packageNames.filter((name) => ADAPTER_NAME.test(name));
   const adapterPath = `^packages/(?:${adapters.join('|')})/`;
   const higherThanCore = `(?:${adapterPath}|^packages/node/|^apps/)`;

@@ -5,12 +5,15 @@ import { existsSync } from 'node:fs';
 import { lstat, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { PRIVATE_PATH, SOURCE_ROOTS } from './config.mjs';
+import { PRIVATE_PATH, SOURCE_ROOTS } from './config.js';
 
 const EXCLUDED = new RegExp(`(?:${PRIVATE_PATH})|(^|/)node_modules(?:/|$)`);
 const SOURCE_FILE = /\.(?:[cm]?js|[cm]?tsx?)$/;
 
-export async function isSafeSource(root, name) {
+export async function isSafeSource(
+  root: string,
+  name: string,
+): Promise<boolean> {
   if (EXCLUDED.test(name)) return false;
   let current = root;
   for (const part of name.split('/')) {
@@ -21,16 +24,17 @@ export async function isSafeSource(root, name) {
   return true;
 }
 
-async function walk(root, directory) {
+async function walk(root: string, directory: string): Promise<string[]> {
   let entries;
   try {
     if (!(await isSafeSource(root, directory))) return [];
     entries = await readdir(join(root, directory), { withFileTypes: true });
   } catch (error) {
-    if (error.code === 'ENOENT') return [];
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT')
+      return [];
     throw error;
   }
-  const files = [];
+  const files: string[] = [];
   for (const entry of entries) {
     const name = `${directory}/${entry.name}`;
     if (EXCLUDED.test(name) || entry.isSymbolicLink()) continue;
@@ -40,7 +44,7 @@ async function walk(root, directory) {
   return files;
 }
 
-export async function sourceFiles(root) {
+export async function sourceFiles(root: string): Promise<string[]> {
   const files = existsSync(join(root, '.git'))
     ? execFileSync(
         'git',

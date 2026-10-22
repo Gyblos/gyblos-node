@@ -87,8 +87,11 @@ another authorization. See
 
 `pnpm boundaries` statically checks the package layers and reports current, new
 and resolved violations against `tooling/boundaries-baseline.json`. It also runs
-as part of `pnpm lint`. Architectural violations are report-only during the
-restructure; analysis, configuration and resolution errors fail the command.
+as part of `pnpm lint`. The checker and its separate regression suites are
+TypeScript, included in strict `pnpm typecheck` and ESLint checks, and run
+through the existing `tsx` loader. Architectural violations are report-only
+during the restructure; analysis, configuration and resolution errors fail the
+command.
 
 Current names map to their intended layers: `application` is core;
 `inference-ollama`, `payments-x402` and `transport` are separate adapters;

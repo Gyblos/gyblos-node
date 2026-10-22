@@ -28,8 +28,8 @@
     "p2p:docker": "node --import tsx apps/cli/src/p2p/docker-main.ts",
     "p2p:diagnose": "node --import tsx tooling/nat-regression.mjs",
     "p2p:reconcile": "node --import tsx apps/cli/src/p2p/reconcile.ts",
-    "boundaries": "node tooling/check-boundaries.mjs",
-    "boundaries:test": "node --test tooling/boundaries/check.test.mjs"
+    "boundaries": "node --import tsx tooling/check-boundaries.ts",
+    "boundaries:test": "node --import tsx --test tooling/boundaries/*.test.ts"
   },
   "dependencies": {
     "@gyblos/application": "workspace:*",

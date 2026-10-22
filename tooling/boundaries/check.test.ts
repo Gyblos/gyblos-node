@@ -1,68 +1,14 @@
-// Owns synthetic tests of static architectural analysis, outside the product suite.
-// Fixtures are temporary and unfunded; no application or native endpoint is started.
+// Owns synthetic architectural policy regressions, separate from product tests.
+// It must never execute product modules or initialize an endpoint.
 import assert from 'node:assert/strict';
-import { execFileSync, spawnSync } from 'node:child_process';
-import {
-  mkdir,
-  mkdtemp,
-  readFile,
-  realpath,
-  rm,
-  symlink,
-  writeFile,
-} from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { mkdir, symlink } from 'node:fs/promises';
+import { join } from 'node:path';
 import test from 'node:test';
-import { fileURLToPath } from 'node:url';
 
-import { analyze, compareBaseline, validateBaseline } from './analyze.mjs';
-import { layerOf } from './config.mjs';
-import { sourceFiles } from './inventory.mjs';
-
-const REPOSITORY = fileURLToPath(new URL('../../', import.meta.url));
-
-async function fixture(sources, run) {
-  const root = await realpath(
-    await mkdtemp(join(tmpdir(), 'gyblos-boundaries-')),
-  );
-  const previous = process.cwd();
-  try {
-    const files = {
-      'tsconfig.json': JSON.stringify({
-        compilerOptions: {
-          target: 'ES2022',
-          module: 'NodeNext',
-          moduleResolution: 'NodeNext',
-        },
-      }),
-      ...sources,
-    };
-    for (const [name, content] of Object.entries(files)) {
-      const target = join(root, name);
-      await mkdir(dirname(target), { recursive: true });
-      await writeFile(target, content);
-    }
-    process.chdir(root);
-    await run(
-      Object.keys(sources).filter(
-        (name) =>
-          /\.(?:[cm]?js|tsx?)$/.test(name) && !name.startsWith('node_modules/'),
-      ),
-      root,
-    );
-  } finally {
-    process.chdir(previous);
-    await rm(root, { recursive: true, force: true });
-  }
-}
-
-function hasRule(result, name) {
-  assert.ok(
-    result.entries.some((entry) => entry.rule === name),
-    `Expected ${name}`,
-  );
-}
+import { analyze, compareBaseline, validateBaseline } from './analyze.js';
+import { layerOf } from './config.js';
+import { fixture, hasRule } from './fixture.js';
+import { parseGraph } from './graph.js';
 
 test('current and future names map to the intended layers', () => {
   const examples = {
@@ -84,7 +30,7 @@ test('current and future names map to the intended layers', () => {
     'lab/harness/src/a.ts': 'lab',
     'tooling/nat-regression.mjs': 'lab',
     'tooling/test.mjs': 'verification',
-    'tooling/check-boundaries.mjs': 'verification',
+    'tooling/check-boundaries.ts': 'verification',
     'tests/synthetic.test.ts': 'verification',
     'apps/buyer/src/a.ts': 'apps',
     'apps/desktop/src/a.ts': 'apps',
@@ -304,147 +250,15 @@ test('source code is never executed and existing baseline differences are explic
   ])
     assert.throws(() => validateBaseline([{ ...oldEntry, target }]), /Invalid/);
   assert.throws(() => validateBaseline({}), /Invalid/);
-});
-
-test('archive enumeration excludes private/generated trees and symlinks before traversal', async () => {
-  await fixture(
-    {
-      'packages/core/src/a.mts': 'export const value = 1;',
-      'packages/core/.local/a.ts': 'synthetic private marker',
-      'packages/core/dist/a.ts': 'synthetic build output',
-      'packages/core/node_modules/a.ts': 'synthetic dependency',
-      'lab/evidence/a.ts': 'synthetic evidence',
-      '.local/a.ts': 'synthetic private marker',
-      'other/a.ts': 'outside explicit roots',
-    },
-    async (_files, root) => {
-      await symlink(join(root, '.local'), join(root, 'packages/core/linked'));
-      assert.deepEqual(await sourceFiles(root), ['packages/core/src/a.mts']);
-    },
-  );
-});
-
-test('CLI reports new violations without rewriting baseline and fails analyzer errors', async () => {
-  await fixture(
-    {
-      'packages/core/src/a.ts': "import '../../engine-ollama/src/a.js';",
-      'packages/engine-ollama/src/a.ts': 'export const value = 1;',
-      'tooling/boundaries-baseline.json': '[]\n',
-    },
-    async (_files, root) => {
-      await mkdir(join(root, 'tooling/boundaries'), { recursive: true });
-      for (const file of [
-        'check-boundaries.mjs',
-        'boundaries/analyze.mjs',
-        'boundaries/config.mjs',
-        'boundaries/inventory.mjs',
-      ])
-        await writeFile(
-          join(root, 'tooling', file),
-          await readFile(join(REPOSITORY, 'tooling', file)),
-        );
-      await symlink(
-        join(REPOSITORY, 'node_modules'),
-        join(root, 'node_modules'),
-      );
-      const invoke = (...args) =>
-        spawnSync(process.execPath, ['tooling/check-boundaries.mjs', ...args], {
-          cwd: root,
-          encoding: 'utf8',
-          timeout: 15000,
-          maxBuffer: 1024 * 1024,
-        });
-      const report = invoke('--json');
-      assert.equal(report.status, 0, report.stderr);
-      assert.equal(JSON.parse(report.stdout).added.length, 1);
-      const baseline = join(root, 'tooling/boundaries-baseline.json');
-      assert.equal(await readFile(baseline, 'utf8'), '[]\n');
-      assert.equal(invoke('--update-baseline').status, 0);
-      assert.equal(JSON.parse(invoke('--json').stdout).added.length, 0);
-      assert.equal(invoke('--unknown-option').status, 1);
-      await writeFile(baseline, '{}');
-      assert.equal(invoke().status, 1);
-      await writeFile(baseline, '[]');
-      await writeFile(
-        join(root, 'packages/core/src/a.ts'),
-        "import './unresolved-SYNTHETIC-SENSITIVE-MARKER.js';",
-      );
-      const failed = invoke('--json');
-      assert.equal(failed.status, 1);
-      assert.equal(failed.stdout, '');
-      assert.ok(!failed.stderr.includes('SYNTHETIC-SENSITIVE-MARKER'));
-    },
-  );
-});
-
-test('unmapped transitive shims cannot launder a forbidden dependency', async () => {
-  await fixture(
-    {
-      'packages/core/src/a.ts': "export * from '../../../shim.js';",
-      'shim.ts': "export * from './packages/payments-x402/src/a.js';",
-      'packages/payments-x402/src/a.ts': 'export const value = 1;',
-    },
-    async (files, root) => {
-      await assert.rejects(
-        analyze(
-          files.filter((file) => file !== 'shim.ts'),
-          root,
-        ),
-        /Unmapped source/,
-      );
-    },
-  );
-});
-
-test('Git enumeration rejects symbolic source files and archive enumeration rejects linked roots', async () => {
-  await fixture(
-    {
-      '.gitignore': 'captures/\n',
-      'packages/core/src/a.ts': 'export const value = 1;',
-      'captures/synthetic.ts': "import 'node:fs';",
-      'captures/owned.ts': "import 'node:fs';",
-      'packages/engine-ollama/src/owned.ts': 'export const value = 1;',
-    },
-    async (_files, root) => {
-      execFileSync('git', ['init', '--quiet', root]);
-      execFileSync('git', ['add', 'packages/engine-ollama/src/owned.ts'], {
-        cwd: root,
-      });
-      await rm(join(root, 'packages/engine-ollama/src'), { recursive: true });
-      await symlink(
-        join(root, 'captures'),
-        join(root, 'packages/engine-ollama/src'),
-      );
-      await symlink(
-        '../../../captures/synthetic.ts',
-        join(root, 'packages/core/src/linked.ts'),
-      );
-      assert.deepEqual(await sourceFiles(root), ['packages/core/src/a.ts']);
-      await rm(join(root, '.git'), { recursive: true, force: true });
-      await symlink(join(root, 'captures'), join(root, 'lab'));
-      assert.deepEqual(await sourceFiles(root), ['packages/core/src/a.ts']);
-      await rm(join(root, 'lab'));
-      await symlink(join(root, 'captures/synthetic.ts'), join(root, 'lab'));
-      assert.deepEqual(await sourceFiles(root), ['packages/core/src/a.ts']);
-    },
-  );
-});
-
-test('imports cannot make analysis parse a symlink target outside the vetted inventory', async () => {
-  await fixture(
-    {
-      'packages/core/src/a.ts': "import './linked.mjs';",
-      'outside-roots/synthetic.mjs': 'import { from ???;',
-    },
-    async (_files, root) => {
-      await symlink(
-        '../../../outside-roots/synthetic.mjs',
-        join(root, 'packages/core/src/linked.mjs'),
-      );
-      await assert.rejects(
-        analyze(await sourceFiles(root), root),
-        /Unmapped source/,
-      );
-    },
-  );
+  assert.deepEqual(parseGraph('{"modules":[],"summary":{"violations":[]}}'), {
+    modules: [],
+    summary: { violations: [] },
+  });
+  for (const text of [
+    '{}',
+    '{"modules":[{"source":1,"dependencies":[]}],"summary":{"violations":[]}}',
+    '{"modules":[{"source":"a.ts","dependencies":[{}]}],"summary":{"violations":[]}}',
+    '{"modules":[],"summary":{"violations":[{}]}}',
+  ])
+    assert.throws(() => parseGraph(text), /Invalid dependency analysis/);
 });

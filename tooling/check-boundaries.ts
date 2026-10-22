@@ -10,8 +10,8 @@ import {
   analyze,
   compareBaseline,
   validateBaseline,
-} from './boundaries/analyze.mjs';
-import { sourceFiles } from './boundaries/inventory.mjs';
+} from './boundaries/analyze.js';
+import { sourceFiles } from './boundaries/inventory.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const BASELINE = resolve(ROOT, 'tooling/boundaries-baseline.json');

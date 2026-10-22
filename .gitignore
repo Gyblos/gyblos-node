@@ -114,4 +114,4 @@ coverage/
 !/tests/support/loopback-host-cases.ts
 
 # Static boundary tooling has its own synthetic suite, separate from pnpm test.
-!/tooling/boundaries/check.test.mjs
+!/tooling/boundaries/*.test.ts

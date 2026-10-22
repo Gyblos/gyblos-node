@@ -4,10 +4,22 @@ import { isAbsolute, relative } from 'node:path';
 
 import { cruise } from 'dependency-cruiser';
 
-import { boundaryConfig, layerOf, PRIVATE_PATH } from './config.mjs';
-import { isSafeSource } from './inventory.mjs';
+import { boundaryConfig, layerOf, PRIVATE_PATH } from './config.js';
+import { isRecord, parseGraph } from './graph.js';
+import { isSafeSource } from './inventory.js';
 
-function normalizePath(source, root) {
+export interface BoundaryEntry {
+  rule: string;
+  source: string;
+  target: string;
+}
+
+export interface BoundaryAnalysis {
+  entries: BoundaryEntry[];
+  modules: number;
+}
+
+function normalizePath(source: string, root: string): string {
   const normalized = (
     isAbsolute(source) ? relative(root, source) : source
   ).replaceAll('\\', '/');
@@ -16,15 +28,19 @@ function normalizePath(source, root) {
   return normalized;
 }
 
-export function entryKey(entry) {
+export function entryKey(entry: BoundaryEntry): string {
   return JSON.stringify([entry.rule, entry.source, entry.target]);
 }
 
-export function validateBaseline(value) {
+export function validateBaseline(value: unknown): BoundaryEntry[] {
   if (!Array.isArray(value)) throw new Error('Invalid boundary baseline.');
+  const validated: BoundaryEntry[] = [];
   for (const entry of value) {
     if (
-      !entry ||
+      !isRecord(entry) ||
+      typeof entry.rule !== 'string' ||
+      typeof entry.source !== 'string' ||
+      typeof entry.target !== 'string' ||
       Object.keys(entry).sort().join(',') !== 'rule,source,target' ||
       ![entry.rule, entry.source, entry.target].every(
         (part) =>
@@ -41,13 +57,21 @@ export function validateBaseline(value) {
       )
     )
       throw new Error('Invalid boundary baseline entry.');
+    validated.push({
+      rule: entry.rule,
+      source: entry.source,
+      target: entry.target,
+    });
   }
-  if (new Set(value.map(entryKey)).size !== value.length)
+  if (new Set(validated.map(entryKey)).size !== validated.length)
     throw new Error('Duplicate boundary baseline entries.');
-  return value;
+  return validated;
 }
 
-export function compareBaseline(actual, baseline) {
+export function compareBaseline(
+  actual: BoundaryEntry[],
+  baseline: BoundaryEntry[],
+) {
   const currentKeys = new Set(actual.map(entryKey));
   const knownKeys = new Set(baseline.map(entryKey));
   return {
@@ -58,19 +82,24 @@ export function compareBaseline(actual, baseline) {
   };
 }
 
-export async function analyze(files, root) {
+export async function analyze(
+  files: string[],
+  root: string,
+): Promise<BoundaryAnalysis> {
   if (files.length === 0)
     throw new Error('No source files found for boundary analysis.');
   const packageNames = [
     ...new Set(
       files
         .map((file) => file.match(/^packages\/([^/]+)\//)?.[1])
-        .filter(Boolean),
+        .filter((name): name is string => name !== undefined),
     ),
   ];
   const appNames = [
     ...new Set(
-      files.map((file) => file.match(/^apps\/([^/]+)\//)?.[1]).filter(Boolean),
+      files
+        .map((file) => file.match(/^apps\/([^/]+)\//)?.[1])
+        .filter((name): name is string => name !== undefined),
     ),
   ];
   if (files.some((file) => !layerOf(file)))
@@ -97,12 +126,9 @@ export async function analyze(files, root) {
     validate: true,
     outputType: 'json',
   });
-  const graph = JSON.parse(result.output);
-  if (
-    !Array.isArray(graph.modules) ||
-    !Array.isArray(graph.summary?.violations)
-  )
-    throw new Error('Invalid dependency analysis result.');
+  if (typeof result.output !== 'string')
+    throw new Error('Invalid dependency analysis output.');
+  const graph = parseGraph(result.output);
   for (const module of graph.modules) {
     if (
       !module.coreModule &&
