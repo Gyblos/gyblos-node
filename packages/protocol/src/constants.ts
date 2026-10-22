@@ -46,3 +46,78 @@ export type EngineDoneReason =
 
 export type ProtocolErrorCode =
   (typeof PROTOCOL_ERROR_CODES)[keyof typeof PROTOCOL_ERROR_CODES];
+
+export const PUBLIC_RECORD_KINDS = {
+  CATALOG: 'catalog',
+  PRESENCE: 'presence',
+  WITHDRAWAL: 'withdrawal',
+} as const;
+
+export const PUBLIC_RECORD_DOMAINS = {
+  [PUBLIC_RECORD_KINDS.CATALOG]: 'gyblos/catalog/v1\n',
+  [PUBLIC_RECORD_KINDS.PRESENCE]: 'gyblos/presence/v1\n',
+  [PUBLIC_RECORD_KINDS.WITHDRAWAL]: 'gyblos/withdrawal/v1\n',
+} as const satisfies Record<PublicRecordKind, string>;
+
+export const PUBLIC_RECORD_LIMITS = {
+  schemaVersion: 1,
+  maxModels: 64,
+  maxIdentifierCharacters: 128,
+  maxAtomicDigits: 20,
+  maxAtomic: '18446744073709551615',
+  maxContextTokens: 10_000_000,
+  catalogLifetimeMs: 600_000,
+  presenceLifetimeMs: 90_000,
+  withdrawalLifetimeMs: 600_000,
+  suggestedHeartbeatMs: 30_000,
+  publicKeyBytes: 32,
+  signatureBytes: 64,
+  hexCharactersPerByte: 2,
+  maxAddressCharacters: 44,
+  minAddressCharacters: 32,
+  maxWireBytes: 32_768,
+} as const;
+
+export const PUBLIC_RECORD_ERROR_CODES = {
+  INVALID_RECORD: 'INVALID_PUBLIC_RECORD',
+  INVALID_SIGNATURE: 'INVALID_PUBLIC_SIGNATURE',
+  UNTRUSTED_IDENTITY: 'UNTRUSTED_PUBLIC_IDENTITY',
+  INVALID_TIME: 'INVALID_PUBLIC_TIME',
+  STALE_SEQUENCE: 'STALE_PUBLIC_SEQUENCE',
+  INVALID_REFERENCE: 'INVALID_CATALOG_REFERENCE',
+} as const;
+
+export const DATA_RETENTION = {
+  NONE: 'none',
+  MAY_RETAIN: 'may-retain',
+  UNSPECIFIED: 'unspecified',
+} as const;
+
+export const PUBLIC_PRESENCE_STATE = 'alive';
+export const PUBLIC_PRICE_UNIT = 'token';
+export const MODEL_CLASSIFICATIONS = {
+  CATALOG: 'catalog',
+  CUSTOM: 'custom',
+} as const;
+
+export type PublicRecordKind =
+  (typeof PUBLIC_RECORD_KINDS)[keyof typeof PUBLIC_RECORD_KINDS];
+export type PublicRecordErrorCode =
+  (typeof PUBLIC_RECORD_ERROR_CODES)[keyof typeof PUBLIC_RECORD_ERROR_CODES];
+export type DataRetention =
+  (typeof DATA_RETENTION)[keyof typeof DATA_RETENTION];
+
+export const MODEL_IDS = {
+  QWEN3_30B_A3B: 'qwen3-30b-a3b',
+  QWEN3_235B_A22B: 'qwen3-235b-a22b',
+  DEEPSEEK_V4_1_FLASH: 'deepseek-v4.1-flash',
+  KIMI_K3: 'kimi-k3',
+  GLM_5_3_FLASH: 'glm-5.3-flash',
+  GPT_OSS_120B: 'gpt-oss-120b',
+  GPT_OSS_20B: 'gpt-oss-20b',
+  LLAMA_3_3_70B: 'llama-3.3-70b',
+  GEMMA_4_26B: 'gemma-4-26b',
+  QWEN3_0_6B: 'qwen3-0.6b',
+} as const;
+
+export type CatalogModelId = (typeof MODEL_IDS)[keyof typeof MODEL_IDS];
