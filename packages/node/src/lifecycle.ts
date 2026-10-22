@@ -1,38 +1,44 @@
 // Owns the node's explicit start, stop and health lifecycle.
 // Resource construction is injected; this module knows no SDKs or wallets.
-import { NODE_STATES } from './constants.js';
+import { NODE_STATES, type NodeState } from './constants.js';
 
 export interface NodeHost {
   close(): Promise<void>;
 }
 
 export function createNodeLifecycle(startHost: () => Promise<NodeHost>) {
-  let pending: Promise<NodeHost> | undefined;
   let host: NodeHost | undefined;
+  let state: NodeState = NODE_STATES.STOPPED;
+  let transition = Promise.resolve();
+  const enqueue = (operation: () => Promise<void>) => {
+    const next = transition.then(operation);
+    transition = next.catch(() => {});
+    return next;
+  };
   return {
-    async start() {
-      if (host) return;
-      pending ??= startHost();
-      try {
-        host = await pending;
-      } finally {
-        pending = undefined;
-      }
+    start() {
+      return enqueue(async () => {
+        if (host) return;
+        state = NODE_STATES.STARTING;
+        try {
+          host = await startHost();
+          state = NODE_STATES.RUNNING;
+        } catch (error) {
+          state = NODE_STATES.STOPPED;
+          throw error;
+        }
+      });
     },
-    async stop() {
-      if (pending) await pending;
-      const running = host;
-      host = undefined;
-      await running?.close();
+    stop() {
+      return enqueue(async () => {
+        const running = host;
+        host = undefined;
+        state = NODE_STATES.STOPPED;
+        await running?.close();
+      });
     },
     health() {
-      return {
-        state: host
-          ? NODE_STATES.RUNNING
-          : pending
-            ? NODE_STATES.STARTING
-            : NODE_STATES.STOPPED,
-      };
+      return { state };
     },
   };
 }

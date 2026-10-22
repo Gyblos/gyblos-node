@@ -34,6 +34,49 @@ test('all executable modules are inert when imported', async (context) => {
   });
   await assert.rejects(refused.start(), (error) => error === failure);
   assert.equal(refused.health().state, NODE_STATES.STOPPED);
+  let releaseStart = () => {};
+  let releaseStop = () => {};
+  let reportClosing = () => {};
+  const closing = new Promise<void>((resolve) => {
+    reportClosing = resolve;
+  });
+  let racingStarts = 0;
+  let racingStops = 0;
+  const racing = createNodeLifecycle(async () => {
+    racingStarts++;
+    if (racingStarts === 1)
+      await new Promise<void>((resolve) => {
+        releaseStart = resolve;
+      });
+    return {
+      async close() {
+        racingStops++;
+        if (racingStops === 1) {
+          reportClosing();
+          await new Promise<void>((resolve) => {
+            releaseStop = resolve;
+          });
+        }
+      },
+    };
+  });
+  const firstStart = racing.start();
+  const stopping = racing.stop();
+  const restarting = racing.start();
+  await Promise.resolve();
+  releaseStart();
+  await firstStart;
+  await closing;
+  const duringShutdown = racing.start();
+  assert.equal(racingStarts, 1);
+  releaseStop();
+  await Promise.all([stopping, restarting, duringShutdown]);
+  assert.equal(racingStarts, 2);
+  assert.equal(racingStops, 1);
+  assert.equal(racing.health().state, NODE_STATES.RUNNING);
+  await racing.stop();
+  assert.equal(racingStops, 2);
+  assert.equal(racing.health().state, NODE_STATES.STOPPED);
   const beforeSignals = ['SIGINT', 'SIGTERM'].map((s) =>
     process.listenerCount(s),
   );
