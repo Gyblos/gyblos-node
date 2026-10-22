@@ -7,6 +7,7 @@ export default [
     ignores: [
       'node_modules/**',
       '.local/**',
+      'evidence/**',
       'lab/evidence/**',
       'dist/**',
       'coverage/**',

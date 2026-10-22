@@ -25,6 +25,11 @@ async function rules(code: string) {
 }
 
 test('standards lint rejects layout, opaque names and nonlocal relative imports', async () => {
+  for (const path of [
+    'evidence/synthetic-private.mjs',
+    'lab/evidence/synthetic-private.mjs',
+  ])
+    assert.equal(await eslint.isPathIgnored(resolve(path)), true);
   assert.ok(
     (await rules('export function run() {}\ninterface Later {}')).includes(
       'gyblos/structure',
