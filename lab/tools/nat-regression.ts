@@ -130,23 +130,22 @@ async function main() {
       ids[role] = (
         await docker(compose(['ps', '-q', role]), undefined, environment)
       ).trim();
-      const inspections: ContainerInspection[] = JSON.parse(
+      const [inspection]: ContainerInspection[] = JSON.parse(
         await docker(['inspect', ids[role]!]),
       );
-      const inspection = inspections[0]!;
-      assert.equal(inspection.Config.User, P2P.docker.user);
-      assert.equal(inspection.HostConfig.ReadonlyRootfs, true);
-      assert.equal(inspection.HostConfig.Privileged, false);
-      assert.ok(inspection.Mounts.every((mount) => mount.Type === 'tmpfs'));
+      assert.equal(inspection!.Config.User, P2P.docker.user);
+      assert.equal(inspection!.HostConfig.ReadonlyRootfs, true);
+      assert.equal(inspection!.HostConfig.Privileged, false);
+      assert.ok(inspection!.Mounts.every((mount) => mount.Type === 'tmpfs'));
       assert.equal(
-        Object.keys(inspection.HostConfig.PortBindings ?? {}).length,
+        Object.keys(inspection!.HostConfig.PortBindings ?? {}).length,
         0,
       );
       assert.equal(
-        Object.keys(inspection.NetworkSettings.Networks).length,
+        Object.keys(inspection!.NetworkSettings.Networks).length,
         role.startsWith('router') ? 2 : 1,
       );
-      const capabilities = (inspection.HostConfig.CapAdd ?? []).map(
+      const capabilities = (inspection!.HostConfig.CapAdd ?? []).map(
         (capability) => capability.replace(/^CAP_/, ''),
       );
       assert.deepEqual(
