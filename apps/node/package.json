@@ -1,0 +1,16 @@
+{
+  "name": "@gyblos/node-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "dependencies": {
+    "@gyblos/config": "workspace:*",
+    "@gyblos/payments-x402": "workspace:*",
+    "@gyblos/runtime": "workspace:*",
+    "@gyblos/node": "workspace:*"
+  }
+}

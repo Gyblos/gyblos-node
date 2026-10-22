@@ -5,12 +5,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import type { CallPaymentObservation } from '@gyblos/cli/p2p/call-evidence';
+import type { CallPaymentObservation } from '@gyblos/buyer/call-evidence';
 import type {
   CallOutcome,
   CallPhase,
   P2pJournalState,
-} from '@gyblos/cli/p2p/constants';
+} from '@gyblos/buyer/constants';
 import { P2P } from '@gyblos/config';
 import type { ErrorDiagnosticCode } from '@gyblos/lab-harness/constants';
 
@@ -51,7 +51,7 @@ interface CallProbe {
 }
 
 function bootstrap(faults: CallFaults) {
-  const entry = new URL('apps/cli/src/p2p/call.ts', SOURCE).href;
+  const entry = new URL('apps/buyer/src/call.ts', SOURCE).href;
   const config = new URL('packages/config/src/index.ts', SOURCE).href;
   const chain = new URL('packages/payments-x402/src/chain.ts', SOURCE).href;
   const codes = new URL('packages/payments-x402/src/constants.ts', SOURCE).href;
@@ -79,12 +79,12 @@ function bootstrap(faults: CallFaults) {
     '@gyblos/payments-x402/chain': 'export async function assertProgram(){}',
     '@gyblos/lab-harness/chain':
       'export async function inferenceSnapshot(){return {slot:1,buyer:"10000",seller:"0",escrow:null,buyerLamports:"0"}}',
-    '@gyblos/seller/inference':
+    '@gyblos/node/http/inference':
       'export function inferenceCeiling(){return "556"}',
     './buyer.js':
       'export async function trustedOffer(){return {config:{rpcUrl:"https://private.invalid/?api_key=PRIVATE_SENTINEL",mint:"synthetic-mint",buyer:"synthetic-buyer"},trust:{maxAtomic:"10000"},offer:{maxTokens:128,maxAtomic:"10000",expiresAt:Date.now()+240000,payTo:"synthetic-seller",feePayer:"synthetic-fee-payer",authorizer:"synthetic-authorizer",model:{name:"synthetic-model",digest:"synthetic-digest",contextTokens:2048}}}}',
-    './roles.js': roles,
-    './artifacts.js':
+    '@gyblos/node/roles': roles,
+    '@gyblos/node/artifacts':
       'export async function modelTokenizer(){return {input:()=>22,count:()=>1}}',
     './proof.js': proof,
     '@gyblos/payments-x402/inference-buyer': inference,

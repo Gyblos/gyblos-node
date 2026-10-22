@@ -8,7 +8,7 @@ import {
   type InferenceCaseName,
 } from '@gyblos/lab-harness/constants';
 
-import { assertInferenceCase } from '../apps/cli/src/inference/assertions.js';
+import { assertInferenceCase } from '../lab/harness/src/cli/inference/assertions.js';
 import { measurementRow } from '../lab/harness/src/measurements.js';
 import { observeInferenceResponse } from '../packages/application/src/inference-observation.js';
 import {

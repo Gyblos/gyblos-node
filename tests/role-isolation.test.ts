@@ -18,7 +18,7 @@ test(
   ROLE_OPTIONS,
   async () => {
     const { setupRole, nodeSecret, publicRole, rolePath, roleSigner } =
-      await import('@gyblos/cli/p2p/roles');
+      await import('@gyblos/node/roles');
     const original = process.cwd(),
       directory = await mkdtemp(join(tmpdir(), 'gyblos-role-test-'));
     try {
@@ -49,7 +49,7 @@ test(
   ROLE_OPTIONS,
   async () => {
     const { setupRole, publicRole, roleSigner } =
-      await import('@gyblos/cli/p2p/roles');
+      await import('@gyblos/node/roles');
     const original = process.cwd(),
       directory = await mkdtemp(join(tmpdir(), 'gyblos-seller-role-test-'));
     const buyer = await generateKeyPairSigner(),

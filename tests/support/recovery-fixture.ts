@@ -10,8 +10,7 @@ import {
   type InferenceOffer,
   type OfferTrust,
 } from '@gyblos/application/offers';
-import { P2P_JOURNAL_STATES } from '@gyblos/cli/p2p/constants';
-import type { RoleConfig } from '@gyblos/cli/p2p/roles';
+import { P2P_JOURNAL_STATES } from '@gyblos/buyer/constants';
 import {
   DEVNET,
   FILE_MODES,
@@ -19,6 +18,7 @@ import {
   MAX_ATOMIC,
   P2P,
 } from '@gyblos/config';
+import type { RoleConfig } from '@gyblos/node/roles';
 import { loadJson, saveJson } from '@gyblos/runtime';
 
 import { paymentFixture, withOfflineProof } from './payment-fixture.js';
@@ -117,7 +117,7 @@ export async function recoveryFixture(fullRefund = true) {
     write,
     read: <T>(filename: string) => loadJson<T>(path(filename)),
     async run(args: string[] = []) {
-      const { main } = await import('@gyblos/cli/p2p/reconcile');
+      const { main } = await import('@gyblos/buyer/reconcile');
       const originalDirectory = process.cwd(),
         originalLog = console.log;
       try {

@@ -1,11 +1,10 @@
 import { readFile } from 'node:fs/promises';
 
+import { startBuyer } from '@gyblos/buyer/buyer';
 import { P2P } from '@gyblos/config';
+import { publicRole, rolePath } from '@gyblos/node/roles';
+import { startSeller } from '@gyblos/node/seller';
 import { isMain, onShutdown, saveJson } from '@gyblos/runtime';
-
-import { startBuyer } from './buyer.js';
-import { publicRole, rolePath } from './roles.js';
-import { startSeller } from './seller.js';
 
 async function waitForFile(name: string) {
   const expires = Date.now() + P2P.docker.readyMs;

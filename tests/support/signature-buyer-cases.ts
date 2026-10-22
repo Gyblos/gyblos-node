@@ -4,7 +4,7 @@ import test from 'node:test';
 import { generateKeyPairSigner } from '@solana/kit';
 import { encodePaymentResponseHeader } from '@x402/core/http';
 
-import { proofObservation } from '@gyblos/cli/p2p/call-evidence';
+import { proofObservation } from '@gyblos/buyer/call-evidence';
 import {
   createBuyer,
   type BuyerResponseObservation,

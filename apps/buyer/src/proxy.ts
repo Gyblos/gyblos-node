@@ -8,10 +8,9 @@ import {
   P2P,
   ROUTES,
 } from '@gyblos/config';
+import { rolePath } from '@gyblos/node/roles';
 import { acceptLoopbackHost } from '@gyblos/runtime/loopback-host';
 import type { Transport } from '@gyblos/transport';
-
-import { rolePath } from './roles.js';
 
 export async function startBuyerProxy(transport: Transport) {
   let active = 0;

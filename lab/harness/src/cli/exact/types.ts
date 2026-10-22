@@ -5,7 +5,7 @@ import type { ExactGateEvidence } from '@gyblos/lab-harness/types';
 import type {
   AuditedPublicFacilitator,
   createExactSeller,
-} from '@gyblos/seller/exact';
+} from '@gyblos/node/http/exact';
 
 import type { authorizationMetadata } from './reconcile.js';
 

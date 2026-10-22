@@ -17,8 +17,8 @@ import {
   encodePaymentSignatureHeader,
 } from '@x402/core/http';
 
-import { createInferenceSeller } from '../apps/seller/src/inference.js';
 import { MODEL } from '../packages/inference-ollama/src/model.js';
+import { createInferenceSeller } from '../packages/node/src/http/inference.js';
 import {
   CHANNEL_PROGRAM,
   DEVNET,

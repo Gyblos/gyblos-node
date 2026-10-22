@@ -1,4 +1,4 @@
-import { setupP2PRole } from '@gyblos/cli/p2p/setup';
+import { setupP2PRole } from '@gyblos/lab-harness/p2p-setup';
 import { setupGate } from '@gyblos/lab-harness/setup';
 import { isMain } from '@gyblos/runtime';
 

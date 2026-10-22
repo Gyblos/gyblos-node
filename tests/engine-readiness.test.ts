@@ -5,7 +5,7 @@ import type { Engine } from '@gyblos/application/engine';
 import {
   assertReadinessCurrent,
   prepareSellerEngine,
-} from '@gyblos/cli/p2p/engine-readiness';
+} from '@gyblos/node/engine-readiness';
 import type { MemorySnapshot } from '@gyblos/runtime/memory';
 
 function fixture() {

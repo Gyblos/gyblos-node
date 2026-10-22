@@ -20,4 +20,4 @@ COPY tooling/ ./tooling/
 RUN pnpm install --frozen-lockfile --ignore-scripts && mkdir -p .local/tmp && chown -R node:node .local
 LABEL org.gyblos.source-sha256=${SOURCE_SHA256}
 USER node
-CMD ["node", "--import", "tsx", "apps/cli/src/p2p/actor.ts"]
+CMD ["node", "--import", "tsx", "lab/p2p/src/actor.ts"]

@@ -16,9 +16,9 @@ import {
   appendMeasurement,
   measurementRow,
 } from '@gyblos/lab-harness/measurements';
+import { inferenceCeiling } from '@gyblos/node/http/inference';
 import { DEVNET } from '@gyblos/payments-x402/constants';
 import { createInferenceBuyer } from '@gyblos/payments-x402/inference-buyer';
-import { inferenceCeiling } from '@gyblos/seller/inference';
 
 import { assertInferenceCase } from './assertions.js';
 import { reconcileCase } from './reconcile.js';

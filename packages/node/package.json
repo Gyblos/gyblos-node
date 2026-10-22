@@ -1,0 +1,25 @@
+{
+  "name": "@gyblos/node",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "dependencies": {
+    "@gyblos/application": "workspace:*",
+    "@gyblos/config": "workspace:*",
+    "@gyblos/inference-ollama": "workspace:*",
+    "@gyblos/runtime": "workspace:*",
+    "@number0/iroh": "1.1.0",
+    "@gyblos/lab-harness": "workspace:*",
+    "@gyblos/payments-x402": "workspace:*",
+    "@gyblos/transport": "workspace:*",
+    "@solana/kit": "5.1.0",
+    "@x402/core": "2.28.0",
+    "@x402/express": "2.28.0",
+    "@x402/svm": "2.28.0",
+    "express": "4.21.2"
+  }
+}

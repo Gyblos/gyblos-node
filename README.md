@@ -649,14 +649,13 @@ packages/
   payments-x402/     upto/exact adapters, trust policies and chain reads
   transport/         Bounded HTTP over loopback or native Iroh
   inference-ollama/  Local generation and pinned public tokenization
+  node/              Native seller composition with start, stop and health
 apps/
-  cli/src/           Runnable CLI composition and result reporting
-    inference/       Inference cases, evidence and reconciliation
-    exact/           Public-facilitator cases, evidence and reconciliation
-  seller/            Fixed-resource, public exact and inference HTTP hosts
+  node/              Headless seller daemon and fixed-resource compatibility entry
+  buyer/             Buyer proxy, call and reconciliation commands
   facilitator/       Local upto facilitator
 lab/
-  harness/           @gyblos/lab-harness: gates, journals and thin scripts
+  harness/           @gyblos/lab-harness: gates, journals, CLI cases and scripts
   p2p/               @gyblos/lab-p2p: Docker/NAT experiments and constants
   tools/             Native and public-path diagnostic tooling
   docker/            Isolated test images and topology templates

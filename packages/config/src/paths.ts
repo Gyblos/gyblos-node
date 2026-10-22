@@ -32,7 +32,7 @@ export const FAILURE_EVIDENCE_PATH = `${LOCAL_DIR}/failure-evidence.json`;
 export const INFERENCE_TRANSPORT_PATH = `${LOCAL_DIR}/inference-last-transport.json`;
 
 export const ENTRYPOINTS = {
-  seller: 'apps/seller/src/main.ts',
+  seller: 'apps/node/src/fixed.ts',
   facilitator: 'apps/facilitator/src/main.ts',
 } as const;
 

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createGateBilling } from '../apps/cli/src/inference/billing.js';
+import { createGateBilling } from '../lab/harness/src/cli/inference/billing.js';
 import { assessCharge, charge } from '../packages/application/src/metering.js';
 
 test('gate underbilling changes only selected output counts without mutating usage', () => {
