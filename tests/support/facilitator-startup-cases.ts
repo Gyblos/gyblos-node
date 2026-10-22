@@ -24,7 +24,7 @@ function startupProbe(directory: string) {
   const entry = new URL('apps/facilitator/src/main.ts', SOURCE).href;
   const runtime = new URL('packages/runtime/src/private-log.ts', SOURCE).href;
   const stubs = {
-    '@gyblos/gate/config':
+    '@gyblos/config/wallet':
       'export async function loadConfig(){return {rpcUrl:"https://forbidden.invalid/",addresses:{buyer:"synthetic",seller:"synthetic",authorizer:"synthetic"}}} export async function signer(){throw Error("Synthetic startup refusal")}',
     '@gyblos/payments-x402/chain': 'export async function assertProgram(){}',
     '@gyblos/runtime': 'export function isMain(){return false}',

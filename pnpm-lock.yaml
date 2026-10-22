@@ -126,9 +126,6 @@ importers:
       '@gyblos/config':
         specifier: workspace:*
         version: link:../../packages/config
-      '@gyblos/gate':
-        specifier: workspace:*
-        version: link:../../packages/gate
       '@gyblos/payments-x402':
         specifier: workspace:*
         version: link:../../packages/payments-x402
@@ -144,9 +141,6 @@ importers:
       '@gyblos/config':
         specifier: workspace:*
         version: link:../../packages/config
-      '@gyblos/gate':
-        specifier: workspace:*
-        version: link:../../packages/gate
       '@gyblos/inference-ollama':
         specifier: workspace:*
         version: link:../../packages/inference-ollama
@@ -177,6 +171,9 @@ importers:
       '@solana-program/token':
         specifier: 0.9.0
         version: 0.9.0(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))
+      '@solana/kit':
+        specifier: 5.1.0
+        version: 5.1.0(typescript@5.9.3)(ws@8.21.0)
       '@x402/core':
         specifier: 2.28.0
         version: 2.28.0

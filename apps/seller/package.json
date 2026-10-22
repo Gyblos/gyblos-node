@@ -10,7 +10,6 @@
     "@gyblos/payments-x402": "workspace:*",
     "@gyblos/application": "workspace:*",
     "@gyblos/config": "workspace:*",
-    "@gyblos/gate": "workspace:*",
     "@gyblos/inference-ollama": "workspace:*",
     "@gyblos/runtime": "workspace:*"
   }
