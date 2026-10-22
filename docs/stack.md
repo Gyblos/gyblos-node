@@ -6,17 +6,17 @@ this file describes the code here.
 
 ## At a glance
 
-| Layer | Technology | Version | Why |
-|---|---|---|---|
-| Language | TypeScript (strict), Node.js | TS 5.9, Node ≥ 22 | One language across payments, CLI, seller and web; the x402 and Solana SDKs are TypeScript |
-| Workspace | pnpm workspaces | pnpm 10 | Simple monorepo without a build orchestrator (Turborepo deferred until measured) |
-| Payments | x402 `upto` and `exact` (`@x402/core`, `@x402/svm`, `@x402/fetch`, `@x402/express`) | 2.28.0 | Pay per request with a signed spending ceiling; charge what was used and refund the rest |
-| Chain | Solana devnet (`@solana/kit`, `@solana-program/token`, `@solana-program/system`) | kit 5.1.0 | Fast, cheap settlement; payment channels from the x402 SVM scheme |
-| P2P transport | Iroh (`@number0/iroh`) | 1.1.0 | Connect to a public key behind home NAT, QUIC, end-to-end encryption, relay fallback |
-| HTTP | Express (sellers, facilitator), Node `http` (buyer proxy) | 4.21.2 | Standard x402 middleware; loopback-only servers with Host validation |
-| Inference | Ollama (local engine), `@huggingface/tokenizers` | tokenizers 0.2.0 | Real open-weight model; buyer recounts tokens with the public tokenizer |
-| Lab | Docker Compose (non-root, read-only, no published ports) | — | Isolated buyer/seller roles and simulated NAT routers |
-| Quality | ESLint, Prettier, Node test runner (`tsx`) | — | Typecheck, lint and offline regression tests on every change |
+| Layer         | Technology                                                                          | Version           | Why                                                                                        |
+| ------------- | ----------------------------------------------------------------------------------- | ----------------- | ------------------------------------------------------------------------------------------ |
+| Language      | TypeScript (strict), Node.js                                                        | TS 5.9, Node ≥ 22 | One language across payments, CLI, seller and web; the x402 and Solana SDKs are TypeScript |
+| Workspace     | pnpm workspaces                                                                     | pnpm 10           | Simple monorepo without a build orchestrator (Turborepo deferred until measured)           |
+| Payments      | x402 `upto` and `exact` (`@x402/core`, `@x402/svm`, `@x402/fetch`, `@x402/express`) | 2.28.0            | Pay per request with a signed spending ceiling; charge what was used and refund the rest   |
+| Chain         | Solana devnet (`@solana/kit`, `@solana-program/token`, `@solana-program/system`)    | kit 5.1.0         | Fast, cheap settlement; payment channels from the x402 SVM scheme                          |
+| P2P transport | Iroh (`@number0/iroh`)                                                              | 1.1.0             | Connect to a public key behind home NAT, QUIC, end-to-end encryption, relay fallback       |
+| HTTP          | Express (sellers, facilitator), Node `http` (buyer proxy)                           | 4.21.2            | Standard x402 middleware; loopback-only servers with Host validation                       |
+| Inference     | Ollama (local engine), `@huggingface/tokenizers`                                    | tokenizers 0.2.0  | Real open-weight model; buyer recounts tokens with the public tokenizer                    |
+| Lab           | Docker Compose (non-root, read-only, no published ports)                            | —                 | Isolated buyer/seller roles and simulated NAT routers                                      |
+| Quality       | ESLint, Prettier, Node test runner (`tsx`)                                          | —                 | Typecheck, lint and offline regression tests on every change                               |
 
 ## Why Iroh
 
