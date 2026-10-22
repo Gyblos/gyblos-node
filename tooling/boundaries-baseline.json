@@ -1,0 +1,432 @@
+[
+  {
+    "rule": "app-cli-is-independent",
+    "source": "apps/cli/src/exact/main.ts",
+    "target": "apps/seller/src/exact.ts"
+  },
+  {
+    "rule": "app-cli-is-independent",
+    "source": "apps/cli/src/exact/types.ts",
+    "target": "apps/seller/src/exact.ts"
+  },
+  {
+    "rule": "app-cli-is-independent",
+    "source": "apps/cli/src/inference/cases.ts",
+    "target": "apps/seller/src/inference.ts"
+  },
+  {
+    "rule": "app-cli-is-independent",
+    "source": "apps/cli/src/inference/main.ts",
+    "target": "apps/seller/src/inference.ts"
+  },
+  {
+    "rule": "app-cli-is-independent",
+    "source": "apps/cli/src/p2p/call.ts",
+    "target": "apps/seller/src/inference.ts"
+  },
+  {
+    "rule": "app-cli-is-independent",
+    "source": "apps/cli/src/p2p/seller.ts",
+    "target": "apps/seller/src/inference.ts"
+  },
+  {
+    "rule": "core-does-not-import-higher-layers",
+    "source": "packages/application/src/constants.ts",
+    "target": "packages/inference-ollama/src/constants.ts"
+  },
+  {
+    "rule": "core-does-not-import-higher-layers",
+    "source": "packages/application/src/gate.ts",
+    "target": "packages/payments-x402/src/chain.ts"
+  },
+  {
+    "rule": "core-does-not-import-higher-layers",
+    "source": "packages/application/src/gate.ts",
+    "target": "packages/payments-x402/src/constants.ts"
+  },
+  {
+    "rule": "core-does-not-import-higher-layers",
+    "source": "packages/application/src/inference-observation.ts",
+    "target": "packages/inference-ollama/src/index.ts"
+  },
+  {
+    "rule": "domain-has-no-sdk",
+    "source": "packages/application/src/offers.ts",
+    "target": "@solana/kit"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/exact/assertions.ts",
+    "target": "packages/gate/src/config.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/exact/assertions.ts",
+    "target": "packages/gate/src/constants.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/exact/cases.ts",
+    "target": "packages/gate/src/constants.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/exact/cases.ts",
+    "target": "packages/gate/src/journal.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/exact/cases.ts",
+    "target": "packages/gate/src/types.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/exact/evidence.ts",
+    "target": "packages/gate/src/constants.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/exact/evidence.ts",
+    "target": "packages/gate/src/types.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/exact/main.ts",
+    "target": "packages/gate/src/config.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/exact/main.ts",
+    "target": "packages/gate/src/constants.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/exact/main.ts",
+    "target": "packages/gate/src/exact-accounts.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/exact/main.ts",
+    "target": "packages/gate/src/journal.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/exact/main.ts",
+    "target": "packages/gate/src/lock.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/exact/payment.ts",
+    "target": "packages/gate/src/config.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/exact/payment.ts",
+    "target": "packages/gate/src/constants.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/exact/payment.ts",
+    "target": "packages/gate/src/journal.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/exact/reconcile.ts",
+    "target": "packages/gate/src/config.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/exact/reconcile.ts",
+    "target": "packages/gate/src/constants.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/exact/reconcile.ts",
+    "target": "packages/gate/src/types.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/exact/types.ts",
+    "target": "packages/gate/src/config.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/exact/types.ts",
+    "target": "packages/gate/src/types.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/execute.ts",
+    "target": "packages/gate/src/config.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/execute.ts",
+    "target": "packages/gate/src/constants.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/execute.ts",
+    "target": "packages/gate/src/fixture-evidence-types.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/execute.ts",
+    "target": "packages/gate/src/journal.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/execute.ts",
+    "target": "packages/gate/src/lock.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/inference/assertions.ts",
+    "target": "packages/gate/src/constants.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/inference/assertions.ts",
+    "target": "packages/gate/src/measurements.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/inference/assertions.ts",
+    "target": "packages/gate/src/types.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/inference/cases-data.ts",
+    "target": "packages/gate/src/constants.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/inference/cases.ts",
+    "target": "packages/gate/src/chain.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/inference/cases.ts",
+    "target": "packages/gate/src/config.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/inference/cases.ts",
+    "target": "packages/gate/src/constants.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/inference/cases.ts",
+    "target": "packages/gate/src/journal.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/inference/cases.ts",
+    "target": "packages/gate/src/measurements.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/inference/evidence.ts",
+    "target": "packages/gate/src/config.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/inference/evidence.ts",
+    "target": "packages/gate/src/constants.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/inference/evidence.ts",
+    "target": "packages/gate/src/types.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/inference/main.ts",
+    "target": "packages/gate/src/chain.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/inference/main.ts",
+    "target": "packages/gate/src/config.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/inference/main.ts",
+    "target": "packages/gate/src/constants.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/inference/main.ts",
+    "target": "packages/gate/src/inference-evidence-types.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/inference/main.ts",
+    "target": "packages/gate/src/journal.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/inference/main.ts",
+    "target": "packages/gate/src/lock.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/inference/main.ts",
+    "target": "packages/gate/src/measurements.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/inference/reconcile.ts",
+    "target": "packages/gate/src/chain.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/inference/reconcile.ts",
+    "target": "packages/gate/src/constants.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/inference/reconcile.ts",
+    "target": "packages/gate/src/journal.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/inference/types.ts",
+    "target": "packages/gate/src/config.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/inference/types.ts",
+    "target": "packages/gate/src/constants.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/inference/types.ts",
+    "target": "packages/gate/src/types.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/p2p/call.ts",
+    "target": "packages/gate/src/chain.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/p2p/call.ts",
+    "target": "packages/gate/src/constants.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/p2p/call.ts",
+    "target": "packages/gate/src/diagnostics.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/p2p/call.ts",
+    "target": "packages/gate/src/lock.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/p2p/call.ts",
+    "target": "packages/gate/src/measurements.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/p2p/constants.ts",
+    "target": "packages/gate/src/constants.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/p2p/docker-evidence.ts",
+    "target": "packages/gate/src/measurements.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/p2p/docker-fund.ts",
+    "target": "packages/gate/src/chain.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/p2p/docker-fund.ts",
+    "target": "packages/gate/src/config.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/p2p/docker-fund.ts",
+    "target": "packages/gate/src/lock.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/p2p/docker-main.ts",
+    "target": "packages/gate/src/lock.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/p2p/nat-main.ts",
+    "target": "packages/gate/src/lock.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/p2p/proof.ts",
+    "target": "packages/gate/src/chain.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/p2p/reconcile.ts",
+    "target": "packages/gate/src/constants.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/p2p/reconcile.ts",
+    "target": "packages/gate/src/finalized-proof.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/p2p/reconcile.ts",
+    "target": "packages/gate/src/lock.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/p2p/reconcile.ts",
+    "target": "packages/gate/src/recovery-lock.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/p2p/reconciliation.ts",
+    "target": "packages/gate/src/finalized-proof.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/p2p/seller.ts",
+    "target": "packages/gate/src/chain.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/preflight.ts",
+    "target": "packages/gate/src/config.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/cli/src/run.ts",
+    "target": "packages/gate/src/config.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/facilitator/src/main.ts",
+    "target": "packages/gate/src/config.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/facilitator/src/main.ts",
+    "target": "packages/gate/src/constants.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/seller/src/main.ts",
+    "target": "packages/gate/src/config.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "apps/seller/src/main.ts",
+    "target": "packages/gate/src/constants.ts"
+  }
+]

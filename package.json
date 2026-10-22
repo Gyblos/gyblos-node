@@ -8,7 +8,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "lint": "eslint . && prettier . --check",
+    "lint": "eslint . && prettier . --check && pnpm boundaries:test && pnpm boundaries",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.tests.json",
@@ -27,7 +27,9 @@
     "gate:exact": "node --import tsx apps/cli/src/exact.ts",
     "p2p:docker": "node --import tsx apps/cli/src/p2p/docker-main.ts",
     "p2p:diagnose": "node --import tsx tooling/nat-regression.mjs",
-    "p2p:reconcile": "node --import tsx apps/cli/src/p2p/reconcile.ts"
+    "p2p:reconcile": "node --import tsx apps/cli/src/p2p/reconcile.ts",
+    "boundaries": "node --import tsx tooling/check-boundaries.ts",
+    "boundaries:test": "node --import tsx --test tooling/boundaries/*.test.ts"
   },
   "dependencies": {
     "@gyblos/application": "workspace:*",
@@ -52,6 +54,7 @@
     "@ianvs/prettier-plugin-sort-imports": "4.7.0",
     "@types/express": "4.17.21",
     "@types/node": "22.19.0",
+    "dependency-cruiser": "18.7.0",
     "eslint": "9.39.1",
     "prettier": "3.9.10",
     "tsx": "4.21.0",
