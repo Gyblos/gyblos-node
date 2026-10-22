@@ -75,7 +75,43 @@ socket or a binding), so the TypeScript code that handles payments does not
 change. Payment logic stays in TypeScript next to the x402 SDK unless a
 reviewed reason says otherwise.
 
+## Identity (8004 agent registry)
+
+`packages/identity` (`@gyblos/identity`) is an adapter for node identity on the
+8004 Solana agent registry, devnet only, built on `@solana/kit` without Anchor or
+an indexer. **Nothing in the node or apps calls it yet.**
+
+- `buildSponsoredRegistration` builds one atomic transaction paid by a sponsor:
+  an exact rent prefund to the owner (sized by `simulateOwnerSpend`), the
+  registration, an owner-signed `gyblos.nodeId` metadata entry carrying the
+  node key's signature over (program, asset, owner), and the payout wallet set
+  with its Ed25519 proof. The owner can hold 0 SOL.
+- `readNodeIdentity` (by asset or by owner) and `resolveOwner` (NodeId → owner)
+  read chain accounts directly; ownership comes from the Core asset, and only
+  bindings whose node signature verifies count, so a replayed binding on
+  another asset is reported as invalid.
+- The sponsor policy (`evaluateSponsorRules`, `decideSponsorship`,
+  `recordSponsorship`) is pure: per-registration cap, total budget, one
+  sponsorship per device key and per owner, then an injected online check.
+  Ledger persistence and the real online check are future work.
+
+Cost per sponsored node, measured on a local validator running the devnet
+bytecode: about 12.5M lamports (12,544,640: agent PDA rent 6,096,960, Core
+asset 3,226,080, nodeId metadata rent 3,201,600, fee 20,000), roughly US$1.35
+at ~108 USD/SOL. It is mostly rent; only the metadata rent is refundable. The
+transaction uses 1,172 of 1,232 bytes, so `agentUri` must stay short (about
+100 bytes).
+
+Risk: the 8004 program `8oo4J9tBB3Hna1jRQ3rWvJjojqM5DYTDJo5cejUuJy3C` is
+upgradeable by a single wallet, `2KmHw8VbShuz9xfj3ecEjBM5nPKR5BcYHRDSFfK1286t`
+(not a multisig), which also holds the registry authority. An upgrade could
+silently change layouts or ownership checks. The golden tests pin real devnet
+account bytes; treat 8004 as one signal verified by our own binding signature,
+and keep the option to deploy our own instance (the deployment addresses live
+in `@gyblos/config`).
+
 ## Planned
 
-Seller discovery (8004 identity, signed catalog and presence, several discovery
-sources) is proposed and not built; see the vault decision on seller discovery.
+Seller discovery (signed catalog and presence, several discovery sources) is
+proposed and not built; see the vault decision on seller discovery. The 8004
+identity adapter above exists but is not wired into discovery.
