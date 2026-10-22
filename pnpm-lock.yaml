@@ -17,12 +17,15 @@ importers:
       '@gyblos/config':
         specifier: workspace:*
         version: link:packages/config
-      '@gyblos/gate':
-        specifier: workspace:*
-        version: link:packages/gate
       '@gyblos/inference-ollama':
         specifier: workspace:*
         version: link:packages/inference-ollama
+      '@gyblos/lab-harness':
+        specifier: workspace:*
+        version: link:lab/harness
+      '@gyblos/lab-p2p':
+        specifier: workspace:*
+        version: link:lab/p2p
       '@gyblos/payments-x402':
         specifier: workspace:*
         version: link:packages/payments-x402
@@ -99,12 +102,12 @@ importers:
       '@gyblos/config':
         specifier: workspace:*
         version: link:../../packages/config
-      '@gyblos/gate':
-        specifier: workspace:*
-        version: link:../../packages/gate
       '@gyblos/inference-ollama':
         specifier: workspace:*
         version: link:../../packages/inference-ollama
+      '@gyblos/lab-harness':
+        specifier: workspace:*
+        version: link:../../lab/harness
       '@gyblos/payments-x402':
         specifier: workspace:*
         version: link:../../packages/payments-x402
@@ -151,6 +154,60 @@ importers:
         specifier: workspace:*
         version: link:../../packages/runtime
 
+  lab/harness:
+    dependencies:
+      '@gyblos/application':
+        specifier: workspace:*
+        version: link:../../packages/application
+      '@gyblos/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@gyblos/inference-ollama':
+        specifier: workspace:*
+        version: link:../../packages/inference-ollama
+      '@gyblos/payments-x402':
+        specifier: workspace:*
+        version: link:../../packages/payments-x402
+      '@gyblos/runtime':
+        specifier: workspace:*
+        version: link:../../packages/runtime
+
+  lab/p2p:
+    dependencies:
+      '@gyblos/cli':
+        specifier: workspace:*
+        version: link:../../apps/cli
+      '@gyblos/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@gyblos/inference-ollama':
+        specifier: workspace:*
+        version: link:../../packages/inference-ollama
+      '@gyblos/lab-harness':
+        specifier: workspace:*
+        version: link:../harness
+      '@gyblos/payments-x402':
+        specifier: workspace:*
+        version: link:../../packages/payments-x402
+      '@gyblos/runtime':
+        specifier: workspace:*
+        version: link:../../packages/runtime
+      '@gyblos/transport':
+        specifier: workspace:*
+        version: link:../../packages/transport
+      '@number0/iroh':
+        specifier: 1.1.0
+        version: 1.1.0
+      '@solana-program/system':
+        specifier: 0.10.0
+        version: 0.10.0(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))
+      '@solana-program/token':
+        specifier: 0.9.0
+        version: 0.9.0(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))
+      '@solana/kit':
+        specifier: 5.1.0
+        version: 5.1.0(typescript@5.9.3)(ws@8.21.0)
+
   packages/application:
     dependencies:
       '@gyblos/config':
@@ -177,24 +234,6 @@ importers:
       '@x402/core':
         specifier: 2.28.0
         version: 2.28.0
-
-  packages/gate:
-    dependencies:
-      '@gyblos/application':
-        specifier: workspace:*
-        version: link:../application
-      '@gyblos/config':
-        specifier: workspace:*
-        version: link:../config
-      '@gyblos/inference-ollama':
-        specifier: workspace:*
-        version: link:../inference-ollama
-      '@gyblos/payments-x402':
-        specifier: workspace:*
-        version: link:../payments-x402
-      '@gyblos/runtime':
-        specifier: workspace:*
-        version: link:../runtime
 
   packages/inference-ollama:
     dependencies:

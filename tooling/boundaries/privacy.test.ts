@@ -24,7 +24,7 @@ test('archive enumeration excludes private/generated trees and symlinks before t
       'packages/core/.local/a.ts': 'synthetic private marker',
       'packages/core/dist/a.ts': 'synthetic build output',
       'packages/core/node_modules/a.ts': 'synthetic dependency',
-      'lab/evidence/a.ts': 'synthetic evidence',
+      'lab/lab/evidence/a.ts': 'synthetic evidence',
       '.local/a.ts': 'synthetic private marker',
       'other/a.ts': 'outside explicit roots',
     },

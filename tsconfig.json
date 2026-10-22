@@ -16,6 +16,7 @@
     "apps/**/*.ts",
     "packages/**/*.ts",
     "scripts/**/*.ts",
-    "tooling/**/*.ts"
+    "tooling/**/*.ts",
+    "lab/**/*.ts"
   ]
 }

@@ -1,14 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { NAT } from '@gyblos/config';
+import { NAT } from '@gyblos/lab-p2p/constants';
 
 import {
   auditCounterDelta,
   classifyPublicPath,
   readAuditCounters,
   readReplyState,
-} from '../tooling/public-path-audit.mjs';
+} from '../lab/tools/public-path-audit.mjs';
 
 const tags = [
   'gyb_public_out_0',

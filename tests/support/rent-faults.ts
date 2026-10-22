@@ -3,7 +3,7 @@ import {
   PROOF_GUARDS,
   RENT_GUARDS,
   type FinancialGuardMessage,
-} from '@gyblos/gate/constants';
+} from '@gyblos/lab-harness/constants';
 import {
   CHANNEL_GUARDS,
   type FinalizedChannelGuardMessage,

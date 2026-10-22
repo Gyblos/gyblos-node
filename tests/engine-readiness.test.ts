@@ -6,7 +6,7 @@ import {
   assertReadinessCurrent,
   prepareSellerEngine,
 } from '@gyblos/cli/p2p/engine-readiness';
-import type { MemorySnapshot } from '@gyblos/cli/p2p/memory';
+import type { MemorySnapshot } from '@gyblos/runtime/memory';
 
 function fixture() {
   let generations = 0;

@@ -9,7 +9,7 @@ import {
   tokenAddress,
   transaction,
   transactionTransfers,
-} from '@gyblos/gate/chain';
+} from '@gyblos/lab-harness/chain';
 import { GateError } from '@gyblos/payments-x402/chain';
 import { GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
 

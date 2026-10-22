@@ -12,7 +12,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 
 import { FILE_MODES } from '@gyblos/config';
-import { withP2pRecoveryLock } from '@gyblos/gate/recovery-lock';
+import { withP2pRecoveryLock } from '@gyblos/lab-harness/recovery-lock';
 
 import {
   interceptAuditSync,

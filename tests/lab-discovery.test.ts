@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { NAT } from '@gyblos/config';
+import { NAT } from '@gyblos/lab-p2p/constants';
 
-import { assertReflectedMappings } from '../tooling/lab-mapping.mjs';
-import { addLabObserver } from '../tooling/lab-observer.mjs';
-import { discoverLabAddress } from '../tooling/lab-reflection.mjs';
+import { assertReflectedMappings } from '../lab/tools/lab-mapping.mjs';
+import { addLabObserver } from '../lab/tools/lab-observer.mjs';
+import { discoverLabAddress } from '../lab/tools/lab-reflection.mjs';
 
 function fixture(
   options: {

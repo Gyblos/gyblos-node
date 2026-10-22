@@ -2,8 +2,9 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
-import { natEnvironment } from '@gyblos/cli/p2p/nat-topology';
-import { NAT, P2P } from '@gyblos/config';
+import { P2P } from '@gyblos/config';
+import { NAT } from '@gyblos/lab-p2p/constants';
+import { natEnvironment } from '@gyblos/lab-p2p/nat-topology';
 
 test('NAT plan restricts capabilities to keyless non-root routers and isolates actor networks', async () => {
   const environment = natEnvironment('nat-direct', 'gyblos-p2p-synthetic');

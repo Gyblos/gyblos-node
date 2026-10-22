@@ -4,13 +4,13 @@ import { CHARGE_ANOMALIES } from '@gyblos/application/constants';
 import type { observeInferenceResponse } from '@gyblos/application/inference-observation';
 import { charge, OFFER_ID } from '@gyblos/application/metering';
 import { HTTP_STATUS } from '@gyblos/config';
+import { MODEL } from '@gyblos/inference-ollama/index';
 import {
   INFERENCE_CASES,
   type InferenceCaseName,
-} from '@gyblos/gate/constants';
-import type { Measurement } from '@gyblos/gate/measurements';
-import type { InferenceTrace } from '@gyblos/gate/types';
-import { MODEL } from '@gyblos/inference-ollama/index';
+} from '@gyblos/lab-harness/constants';
+import type { Measurement } from '@gyblos/lab-harness/measurements';
+import type { InferenceTrace } from '@gyblos/lab-harness/types';
 
 interface CaseAssertion {
   caseName: InferenceCaseName;

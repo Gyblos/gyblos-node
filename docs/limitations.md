@@ -7,20 +7,21 @@ smoke on `ba168c4fae043dc1170268cad9c0852d3c7533d9` completed three strictly
 sequential native Mac-seller/VPS-buyer requests with required direct Iroh routes
 and a test SPL mint, not USDC. Every delivered answer passed independent recount
 and the unchanged finalized transaction/current-channel audit before the next
-request. The [commit-bound report](../evidence/gate-0008.json) records source
-hashes, six finalized signatures, per-request accounting and safe persistent
-facilitator diagnostics. Subsequent publication commits contain evidence and
-documentation only; this run validates the specified runtime source.
+request. The [commit-bound report](../lab/evidence/gate-0008.json) records
+source hashes, six finalized signatures, per-request accounting and safe
+persistent facilitator diagnostics. Subsequent publication commits contain
+evidence and documentation only; this run validates the specified runtime
+source.
 
-The [older physical report](../evidence/gate-0007.json) remains historical. The
-separate `24af211` attempt is still partial: its first request completed, the
-second settled on-chain but left an uncertain buyer journal, and the third never
-started. The original error was discarded and remains unknown. This new run used
-fresh isolated roles without retrying or clearing the old authorization; it does
-not provide charged recovery. Docker NAT-direct did not pass; hotspot/CGNAT and
-broader NAT coverage remain untested. PR #10 is unmerged and issues #17–#23
-remain deferred. Use isolated generated devnet wallets only. Never import
-mainnet keys.
+The [older physical report](../lab/evidence/gate-0007.json) remains historical.
+The separate `24af211` attempt is still partial: its first request completed,
+the second settled on-chain but left an uncertain buyer journal, and the third
+never started. The original error was discarded and remains unknown. This new
+run used fresh isolated roles without retrying or clearing the old
+authorization; it does not provide charged recovery. Docker NAT-direct did not
+pass; hotspot/CGNAT and broader NAT coverage remain untested. PR #10 is unmerged
+and issues #17–#23 remain deferred. Use isolated generated devnet wallets only.
+Never import mainnet keys.
 
 ## Payment scope
 
@@ -251,9 +252,9 @@ fixed paths in that directory; model artifacts live in `.local/ollama/models/`.
 Changing `GYBLOS_GATE_CONFIG` selects a config file without relocating these
 other paths. Inference requires the default isolated key paths.
 
-The public-facilitator report is saved locally to `evidence/gate-0004.json`,
+The public-facilitator report is saved locally to `lab/evidence/gate-0004.json`,
 with advertised capabilities, signatures and public metadata. The inference
-report is at `evidence/gate-0005.json`; fixed-resource results and
+report is at `lab/evidence/gate-0005.json`; fixed-resource results and
 failure/challenge reports stay under `.local/devnet/`. These reports are not
 signed seller receipts. Keep private files local and review output before
 sharing it.
@@ -357,15 +358,16 @@ it is not independent engine-start timing. Generation-order evidence combines
 canonical deposit validation, full-escrow observation and the awaited code path.
 It does not authenticate remote model/content correctness.
 
-The explicitly authorized redacted reports are `evidence/gate-0006.json` for
-Docker/diagnostics, `evidence/gate-0007.json` for historical physical-network
-attempts, and `evidence/gate-0008.json` for the final three-request smoke on
-`ba168c4`. The last report contains only selected source/runtime metadata,
-public settlement signatures and amounts, route categories and safe diagnostic
-fields. It includes no keys, salts, prompts, response content, IPs, signed
-payment payloads, RPC URLs or endpoint tickets/addresses. Raw measurements, logs
-and reconciliation journals remain private. See the
-[Docker command](../README.md#experimental-iroh-docker-trial) for prerequisites.
+The explicitly authorized redacted reports are `lab/evidence/gate-0006.json` for
+Docker/diagnostics, `lab/evidence/gate-0007.json` for historical
+physical-network attempts, and `lab/evidence/gate-0008.json` for the final
+three-request smoke on `ba168c4`. The last report contains only selected
+source/runtime metadata, public settlement signatures and amounts, route
+categories and safe diagnostic fields. It includes no keys, salts, prompts,
+response content, IPs, signed payment payloads, RPC URLs or endpoint
+tickets/addresses. Raw measurements, logs and reconciliation journals remain
+private. See the [Docker command](../README.md#experimental-iroh-docker-trial)
+for prerequisites.
 
 ## Verified P2P reconciliation and reproducible audits
 
@@ -553,7 +555,7 @@ missing-claim recovery, ordinary confirmed journal clearance, journal-derived
 paid exports, remaining command diagnostics and broader native/Sybil/source-key/
 relay/privacy limits remain follow-ups. Raw transaction responses, private logs,
 measurements and uncurated evidence remain excluded. The explicitly authorized
-[final smoke report](../evidence/gate-0008.json) is bound to `ba168c4` and
+[final smoke report](../lab/evidence/gate-0008.json) is bound to `ba168c4` and
 retains only allowlisted metadata. Its atomic-unit results are 556 = 140 + 416,
 558 = 139 + 419 and 558 = 147 + 411: total authorization 1,672 = charge 426 +
 refund 1,246. All six selected transactions finalized; buyer/seller token deltas

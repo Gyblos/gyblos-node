@@ -9,7 +9,7 @@ import { GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
 import {
   transaction,
   transactionTransfers,
-} from '../scripts/inference-chain.js';
+} from '../lab/harness/scripts/inference-chain.js';
 import { registerProofReadCases } from './support/proof-read-cases.js';
 import { registerRentCases } from './support/rent-cases.js';
 import { registerTokenCases } from './support/token-cases.js';
@@ -50,7 +50,8 @@ test('on-chain extraction recognizes SPL batch transfers without double counting
 });
 
 test('gasless buyer snapshot treats an absent native account as zero SOL', async () => {
-  const { inferenceSnapshot } = await import('../scripts/inference-chain.js');
+  const { inferenceSnapshot } =
+    await import('../lab/harness/scripts/inference-chain.js');
   const owner = '5FVtvnKXCabCDxSoeNJuLdRpCTBZQnhTnNooZzEYfg2j';
   const seller = 'DujktA3sKqUAbsNJqZW5o7vownA7tUP5iKeiBHP11Gbf';
   const mint = '2vXUXK2rJTPtb7Wx9em4W9FdgtfD6HTnFxZz5oirLVcH';
@@ -84,7 +85,8 @@ test('gasless buyer snapshot treats an absent native account as zero SOL', async
 });
 
 test('confirmation retries only throttled read requests and confirms without another payment', async () => {
-  const { confirmInference } = await import('../scripts/inference-chain.js');
+  const { confirmInference } =
+    await import('../lab/harness/scripts/inference-chain.js');
   const original = globalThis.fetch;
   const methods: string[] = [];
   globalThis.fetch = (async (_url, init) => {

@@ -8,6 +8,12 @@ import { TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
 
 import { CHARGE_ANOMALIES } from '@gyblos/application/constants';
 
+import { transactionTransfers } from '../lab/harness/scripts/inference-chain.js';
+import {
+  appendMeasurement,
+  measurementRow,
+  measurementSalt,
+} from '../lab/harness/scripts/measurements.js';
 import {
   assessCharge,
   charge,
@@ -21,12 +27,6 @@ import {
   MODEL,
   renderChat,
 } from '../packages/inference-ollama/src/index.js';
-import { transactionTransfers } from '../scripts/inference-chain.js';
-import {
-  appendMeasurement,
-  measurementRow,
-  measurementSalt,
-} from '../scripts/measurements.js';
 
 const secretPrompt = 'private prompt that must never reach storage';
 const secretResponse = 'private response that must never reach storage';

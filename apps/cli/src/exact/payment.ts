@@ -4,13 +4,13 @@ import {
 } from '@x402/core/http';
 
 import { HTTP_STATUS, TIMEOUTS } from '@gyblos/config';
-import { signer } from '@gyblos/gate/config';
+import { signer } from '@gyblos/lab-harness/config';
 import {
   JOURNAL_STATES,
   type ExactCaseName,
   type WALLET_ROLES,
-} from '@gyblos/gate/constants';
-import { saveJournal } from '@gyblos/gate/journal';
+} from '@gyblos/lab-harness/constants';
+import { saveJournal } from '@gyblos/lab-harness/journal';
 import { GateError } from '@gyblos/payments-x402/chain';
 import {
   GATE_ERROR_CODES,

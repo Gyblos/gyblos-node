@@ -65,7 +65,7 @@ the raw value.
 
 ## Packages and boundaries
 
-- Import other packages by name (`@gyblos/gate`), never with `../../../packages/...`.
+- Import other packages by name (`@gyblos/lab-harness`), never with `../../../packages/...`.
 - `scripts/` contains thin entrypoints only. Nothing in `apps/` or `packages/` imports from `scripts/`.
 - Inference adapters know nothing about wallets; payment code knows nothing about engines.
 
@@ -134,7 +134,7 @@ private endpoint/content data to the fixture.
 
 Raw evidence, measurements, agent files and internal documents remain outside
 Git. The explicitly authorized, allowlisted redacted P2P reports
-`evidence/gate-0006.json` and `evidence/gate-0007.json` are the evidence exceptions;
+`lab/evidence/gate-0006.json` and `lab/evidence/gate-0007.json` are the evidence exceptions;
 never publish raw role volumes, endpoint addresses, signed payment payloads or
 private content. README, this guide, and the operational guides
 `docs/inference.md` and `docs/limitations.md` are the public documentation

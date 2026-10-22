@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { INFERENCE_CASES } from '@gyblos/gate/constants';
+import { INFERENCE_CASES } from '@gyblos/lab-harness/constants';
 
 import { createCases } from '../apps/cli/src/inference/cases-data.js';
 

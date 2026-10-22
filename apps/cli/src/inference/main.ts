@@ -21,28 +21,28 @@ import {
   TIMEOUTS,
   TOKENIZER_FILES,
 } from '@gyblos/config';
-import {
-  confirmInference,
-  inferenceSnapshot,
-  transaction,
-} from '@gyblos/gate/chain';
-import { loadConfig, saveJson, signer } from '@gyblos/gate/config';
-import {
-  CONFIG_ASSET_LABELS,
-  EVIDENCE_STATUSES,
-  INFERENCE_EVIDENCE_CODES,
-  WALLET_ROLES,
-} from '@gyblos/gate/constants';
-import type { InferenceTrace } from '@gyblos/gate/inference-evidence-types';
-import { assertNoUnresolvedAuthorizations } from '@gyblos/gate/journal';
-import { withExclusiveLock } from '@gyblos/gate/lock';
-import { measurementSalt } from '@gyblos/gate/measurements';
 import { GENERATION } from '@gyblos/inference-ollama/constants';
 import { createOllamaEngine } from '@gyblos/inference-ollama/engine';
 import {
   createModelTokenizer,
   createOllama,
 } from '@gyblos/inference-ollama/index';
+import {
+  confirmInference,
+  inferenceSnapshot,
+  transaction,
+} from '@gyblos/lab-harness/chain';
+import { loadConfig, saveJson, signer } from '@gyblos/lab-harness/config';
+import {
+  CONFIG_ASSET_LABELS,
+  EVIDENCE_STATUSES,
+  INFERENCE_EVIDENCE_CODES,
+  WALLET_ROLES,
+} from '@gyblos/lab-harness/constants';
+import type { InferenceTrace } from '@gyblos/lab-harness/inference-evidence-types';
+import { assertNoUnresolvedAuthorizations } from '@gyblos/lab-harness/journal';
+import { withExclusiveLock } from '@gyblos/lab-harness/lock';
+import { measurementSalt } from '@gyblos/lab-harness/measurements';
 import {
   assertProgram,
   GateError,

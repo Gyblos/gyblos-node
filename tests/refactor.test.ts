@@ -33,17 +33,17 @@ test('all executable modules are inert when imported', async (context) => {
       'apps/cli/src/preflight.ts',
       'apps/seller/src/main.ts',
       'apps/facilitator/src/main.ts',
-      'scripts/challenge.ts',
-      'scripts/fund.ts',
-      'scripts/failures.ts',
-      'scripts/inference-setup.ts',
+      'lab/harness/scripts/challenge.ts',
+      'lab/harness/scripts/fund.ts',
+      'lab/harness/scripts/failures.ts',
+      'lab/harness/scripts/inference-setup.ts',
     ])
       await import('../' + file);
     await context.test(
       'native role setup entry is inert when imported',
       { skip: NATIVE_CAPABILITY.bindingSkip },
       async () => {
-        await import('../scripts/setup.js');
+        await import('../lab/harness/scripts/setup.js');
       },
     );
     assert.equal(fetches, 0);

@@ -4,7 +4,7 @@ import { DEVNET_TREASURY_OWNER } from '@gyblos/config';
 import {
   TOKEN_GUARDS,
   type FinancialGuardMessage,
-} from '@gyblos/gate/constants';
+} from '@gyblos/lab-harness/constants';
 import {
   CHANNEL_GUARDS,
   type FinalizedChannelGuardMessage,

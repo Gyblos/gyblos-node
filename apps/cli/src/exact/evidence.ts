@@ -5,8 +5,8 @@ import {
   EVIDENCE_STATUSES,
   EXACT_ASSET_LABELS,
   SCHEMA_VERSIONS,
-} from '@gyblos/gate/constants';
-import type { ExactGateEvidence } from '@gyblos/gate/types';
+} from '@gyblos/lab-harness/constants';
+import type { ExactGateEvidence } from '@gyblos/lab-harness/types';
 import { DEVNET, DEVNET_USDC } from '@gyblos/payments-x402/constants';
 
 export function createEvidence() {

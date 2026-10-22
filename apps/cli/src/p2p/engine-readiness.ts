@@ -1,8 +1,10 @@
 import type { Engine, EngineDescription } from '@gyblos/application/engine';
 import { DIAGNOSTICS, P2P } from '@gyblos/config';
 import { READINESS_GENERATION } from '@gyblos/inference-ollama/constants';
-
-import { assertMemoryHeadroom, type MemorySnapshot } from './memory.js';
+import {
+  assertMemoryHeadroom,
+  type MemorySnapshot,
+} from '@gyblos/runtime/memory';
 
 export interface ReadinessRecord {
   status: 'passed' | 'failed';

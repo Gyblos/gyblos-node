@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 
 const SHORT_BINDINGS = new Set([
@@ -193,11 +193,15 @@ const versionPins = {
         const metadata = manifest('packages/config/package.json');
         const paths = [
           'package.json',
-          ...['apps', 'packages'].flatMap((directory) =>
-            readdirSync(resolve(root, directory), { withFileTypes: true })
-              .filter((entry) => entry.isDirectory())
-              .map((entry) => `${directory}/${entry.name}/package.json`),
-          ),
+          ...['apps', 'packages', 'lab']
+            .flatMap((directory) =>
+              !existsSync(resolve(root, directory))
+                ? []
+                : readdirSync(resolve(root, directory), { withFileTypes: true })
+                    .filter((entry) => entry.isDirectory())
+                    .map((entry) => `${directory}/${entry.name}/package.json`),
+            )
+            .filter((path) => existsSync(resolve(root, path))),
         ];
         const manifests = paths.map(manifest);
         for (const dependency of Object.keys(metadata)) {

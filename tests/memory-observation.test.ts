@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { parseMemorySnapshot } from '@gyblos/cli/p2p/memory';
+import { parseMemorySnapshot } from '@gyblos/runtime/memory';
 
 const input = {
   available: 'MemTotal: 8000000 kB\nMemAvailable: 2000000 kB\n',

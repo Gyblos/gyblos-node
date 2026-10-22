@@ -9,11 +9,11 @@ import { ESLint, Linter } from 'eslint';
 import {
   JOURNAL_STATES,
   RECONCILIATION_CLASSIFICATIONS,
-} from '@gyblos/gate/constants';
+} from '@gyblos/lab-harness/constants';
 import {
   assertNoUnresolvedAuthorizations,
   saveJournal,
-} from '@gyblos/gate/journal';
+} from '@gyblos/lab-harness/journal';
 
 import standards from '../tooling/code-standards.js';
 
@@ -25,6 +25,11 @@ async function rules(code: string) {
 }
 
 test('standards lint rejects layout, opaque names and nonlocal relative imports', async () => {
+  for (const path of [
+    'evidence/synthetic-private.mjs',
+    'lab/evidence/synthetic-private.mjs',
+  ])
+    assert.equal(await eslint.isPathIgnored(resolve(path)), true);
   assert.ok(
     (await rules('export function run() {}\ninterface Later {}')).includes(
       'gyblos/structure',
@@ -127,23 +132,43 @@ test('version metadata lint rejects a dependency pin mismatch', async () => {
       join(directory, 'packages/config/package.json'),
       JSON.stringify({ dependencies: { '@x402/core': '0.0.0' } }),
     );
-    const messages = new Linter({ cwd: directory }).verify(
-      'export const VERSION = "fixture";',
-      [
-        {
-          files: ['**/*.ts'],
-          plugins: {
-            gyblos: standards as unknown as NonNullable<
-              Linter.Config['plugins']
-            >[string],
-          },
-          rules: { 'gyblos/version-pins': 'error' },
+    const linter = new Linter({ cwd: directory });
+    const configuration: Linter.Config[] = [
+      {
+        files: ['**/*.ts'],
+        plugins: {
+          gyblos: standards as unknown as NonNullable<
+            Linter.Config['plugins']
+          >[string],
         },
-      ],
-      { filename: join(directory, 'packages/config/src/versions.ts') },
-    );
+        rules: { 'gyblos/version-pins': 'error' },
+      },
+    ];
+    const filename = join(directory, 'packages/config/src/versions.ts');
+    const inspect = () =>
+      linter.verify('export const VERSION = "fixture";', configuration, {
+        filename,
+      });
+    const messages = inspect();
     assert.ok(
       messages.some((message) => message.ruleId === 'gyblos/version-pins'),
+    );
+    await writeFile(
+      join(directory, 'packages/config/package.json'),
+      JSON.stringify({ dependencies: { '@x402/core': '2.28.0' } }),
+    );
+    // A generated-only leftover directory is not a workspace manifest.
+    await mkdir(join(directory, 'packages/old-package/node_modules'), {
+      recursive: true,
+    });
+    assert.deepEqual(inspect(), []);
+    await mkdir(join(directory, 'lab/harness'), { recursive: true });
+    await writeFile(
+      join(directory, 'lab/harness/package.json'),
+      JSON.stringify({ dependencies: { '@x402/core': '0.0.0' } }),
+    );
+    assert.ok(
+      inspect().some((message) => message.ruleId === 'gyblos/version-pins'),
     );
   } finally {
     await rm(directory, { recursive: true });

@@ -1,3 +1,5 @@
 packages:
   - apps/*
   - packages/*
+  - lab/harness
+  - lab/p2p

@@ -8,10 +8,13 @@ import type { TestContext } from 'node:test';
 
 import { CHARGE_ANOMALIES } from '@gyblos/application/constants';
 import { CALL_OUTCOMES, type CallOutcome } from '@gyblos/cli/p2p/constants';
-import { collectDockerCalls } from '@gyblos/cli/p2p/docker-evidence';
 import type { paymentProof } from '@gyblos/cli/p2p/proof';
 import { P2P } from '@gyblos/config';
-import { measurementRow, type Measurement } from '@gyblos/gate/measurements';
+import {
+  measurementRow,
+  type Measurement,
+} from '@gyblos/lab-harness/measurements';
+import { collectDockerCalls } from '@gyblos/lab-p2p/docker-evidence';
 import { TRANSPORT_ROUTES } from '@gyblos/transport/constants';
 import type { RouteObservation } from '@gyblos/transport/types';
 

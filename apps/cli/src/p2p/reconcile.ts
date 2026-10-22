@@ -7,10 +7,10 @@ import {
   type SignedInferenceOffer,
 } from '@gyblos/application/offers';
 import { P2P } from '@gyblos/config';
-import { JOURNAL_STATES } from '@gyblos/gate/constants';
-import { finalizedPaymentProof } from '@gyblos/gate/finalized-proof';
-import { withExclusiveLock } from '@gyblos/gate/lock';
-import { withP2pRecoveryLock } from '@gyblos/gate/recovery-lock';
+import { JOURNAL_STATES } from '@gyblos/lab-harness/constants';
+import { finalizedPaymentProof } from '@gyblos/lab-harness/finalized-proof';
+import { withExclusiveLock } from '@gyblos/lab-harness/lock';
+import { withP2pRecoveryLock } from '@gyblos/lab-harness/recovery-lock';
 import { isMain, loadJson, saveJson } from '@gyblos/runtime';
 
 import {

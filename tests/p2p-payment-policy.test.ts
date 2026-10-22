@@ -8,9 +8,9 @@ import { TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
 import { generateKeyPairSigner } from '@solana/kit';
 import { encodePaymentRequiredHeader } from '@x402/core/http';
 
-import { fundRoles } from '@gyblos/cli/p2p/docker-fund';
 import { DEVNET, DEVNET_USDC, P2P } from '@gyblos/config';
-import { withExclusiveLock } from '@gyblos/gate/lock';
+import { withExclusiveLock } from '@gyblos/lab-harness/lock';
+import { fundRoles } from '@gyblos/lab-p2p/docker-fund';
 import { createInferenceBuyer } from '@gyblos/payments-x402/inference-buyer';
 import { saveJson } from '@gyblos/runtime';
 

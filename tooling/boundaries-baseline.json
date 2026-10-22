@@ -57,376 +57,376 @@
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/exact/assertions.ts",
-    "target": "packages/gate/src/config.ts"
+    "target": "lab/harness/src/config.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/exact/assertions.ts",
-    "target": "packages/gate/src/constants.ts"
+    "target": "lab/harness/src/constants.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/exact/cases.ts",
-    "target": "packages/gate/src/constants.ts"
+    "target": "lab/harness/src/constants.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/exact/cases.ts",
-    "target": "packages/gate/src/journal.ts"
+    "target": "lab/harness/src/journal.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/exact/cases.ts",
-    "target": "packages/gate/src/types.ts"
+    "target": "lab/harness/src/types.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/exact/evidence.ts",
-    "target": "packages/gate/src/constants.ts"
+    "target": "lab/harness/src/constants.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/exact/evidence.ts",
-    "target": "packages/gate/src/types.ts"
+    "target": "lab/harness/src/types.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/exact/main.ts",
-    "target": "packages/gate/src/config.ts"
+    "target": "lab/harness/src/config.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/exact/main.ts",
-    "target": "packages/gate/src/constants.ts"
+    "target": "lab/harness/src/constants.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/exact/main.ts",
-    "target": "packages/gate/src/exact-accounts.ts"
+    "target": "lab/harness/src/exact-accounts.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/exact/main.ts",
-    "target": "packages/gate/src/journal.ts"
+    "target": "lab/harness/src/journal.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/exact/main.ts",
-    "target": "packages/gate/src/lock.ts"
+    "target": "lab/harness/src/lock.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/exact/payment.ts",
-    "target": "packages/gate/src/config.ts"
+    "target": "lab/harness/src/config.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/exact/payment.ts",
-    "target": "packages/gate/src/constants.ts"
+    "target": "lab/harness/src/constants.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/exact/payment.ts",
-    "target": "packages/gate/src/journal.ts"
+    "target": "lab/harness/src/journal.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/exact/reconcile.ts",
-    "target": "packages/gate/src/config.ts"
+    "target": "lab/harness/src/config.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/exact/reconcile.ts",
-    "target": "packages/gate/src/constants.ts"
+    "target": "lab/harness/src/constants.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/exact/reconcile.ts",
-    "target": "packages/gate/src/types.ts"
+    "target": "lab/harness/src/types.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/exact/types.ts",
-    "target": "packages/gate/src/config.ts"
+    "target": "lab/harness/src/config.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/exact/types.ts",
-    "target": "packages/gate/src/types.ts"
+    "target": "lab/harness/src/types.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/execute.ts",
-    "target": "packages/gate/src/config.ts"
+    "target": "lab/harness/src/config.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/execute.ts",
-    "target": "packages/gate/src/constants.ts"
+    "target": "lab/harness/src/constants.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/execute.ts",
-    "target": "packages/gate/src/fixture-evidence-types.ts"
+    "target": "lab/harness/src/fixture-evidence-types.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/execute.ts",
-    "target": "packages/gate/src/journal.ts"
+    "target": "lab/harness/src/journal.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/execute.ts",
-    "target": "packages/gate/src/lock.ts"
+    "target": "lab/harness/src/lock.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/inference/assertions.ts",
-    "target": "packages/gate/src/constants.ts"
+    "target": "lab/harness/src/constants.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/inference/assertions.ts",
-    "target": "packages/gate/src/measurements.ts"
+    "target": "lab/harness/src/measurements.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/inference/assertions.ts",
-    "target": "packages/gate/src/types.ts"
+    "target": "lab/harness/src/types.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/inference/cases-data.ts",
-    "target": "packages/gate/src/constants.ts"
+    "target": "lab/harness/src/constants.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/inference/cases.ts",
-    "target": "packages/gate/src/chain.ts"
+    "target": "lab/harness/src/chain.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/inference/cases.ts",
-    "target": "packages/gate/src/config.ts"
+    "target": "lab/harness/src/config.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/inference/cases.ts",
-    "target": "packages/gate/src/constants.ts"
+    "target": "lab/harness/src/constants.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/inference/cases.ts",
-    "target": "packages/gate/src/journal.ts"
+    "target": "lab/harness/src/journal.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/inference/cases.ts",
-    "target": "packages/gate/src/measurements.ts"
+    "target": "lab/harness/src/measurements.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/inference/evidence.ts",
-    "target": "packages/gate/src/config.ts"
+    "target": "lab/harness/src/config.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/inference/evidence.ts",
-    "target": "packages/gate/src/constants.ts"
+    "target": "lab/harness/src/constants.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/inference/evidence.ts",
-    "target": "packages/gate/src/types.ts"
+    "target": "lab/harness/src/types.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/inference/main.ts",
-    "target": "packages/gate/src/chain.ts"
+    "target": "lab/harness/src/chain.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/inference/main.ts",
-    "target": "packages/gate/src/config.ts"
+    "target": "lab/harness/src/config.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/inference/main.ts",
-    "target": "packages/gate/src/constants.ts"
+    "target": "lab/harness/src/constants.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/inference/main.ts",
-    "target": "packages/gate/src/inference-evidence-types.ts"
+    "target": "lab/harness/src/inference-evidence-types.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/inference/main.ts",
-    "target": "packages/gate/src/journal.ts"
+    "target": "lab/harness/src/journal.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/inference/main.ts",
-    "target": "packages/gate/src/lock.ts"
+    "target": "lab/harness/src/lock.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/inference/main.ts",
-    "target": "packages/gate/src/measurements.ts"
+    "target": "lab/harness/src/measurements.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/inference/reconcile.ts",
-    "target": "packages/gate/src/chain.ts"
+    "target": "lab/harness/src/chain.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/inference/reconcile.ts",
-    "target": "packages/gate/src/constants.ts"
+    "target": "lab/harness/src/constants.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/inference/reconcile.ts",
-    "target": "packages/gate/src/journal.ts"
+    "target": "lab/harness/src/journal.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/inference/types.ts",
-    "target": "packages/gate/src/config.ts"
+    "target": "lab/harness/src/config.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/inference/types.ts",
-    "target": "packages/gate/src/constants.ts"
+    "target": "lab/harness/src/constants.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/inference/types.ts",
-    "target": "packages/gate/src/types.ts"
+    "target": "lab/harness/src/types.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/p2p/call.ts",
-    "target": "packages/gate/src/chain.ts"
+    "target": "lab/harness/src/chain.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/p2p/call.ts",
-    "target": "packages/gate/src/constants.ts"
+    "target": "lab/harness/src/constants.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/p2p/call.ts",
-    "target": "packages/gate/src/diagnostics.ts"
+    "target": "lab/harness/src/diagnostics.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/p2p/call.ts",
-    "target": "packages/gate/src/lock.ts"
+    "target": "lab/harness/src/lock.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/p2p/call.ts",
-    "target": "packages/gate/src/measurements.ts"
+    "target": "lab/harness/src/measurements.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/p2p/constants.ts",
-    "target": "packages/gate/src/constants.ts"
-  },
-  {
-    "rule": "product-does-not-import-lab",
-    "source": "apps/cli/src/p2p/docker-evidence.ts",
-    "target": "packages/gate/src/measurements.ts"
-  },
-  {
-    "rule": "product-does-not-import-lab",
-    "source": "apps/cli/src/p2p/docker-fund.ts",
-    "target": "packages/gate/src/chain.ts"
-  },
-  {
-    "rule": "product-does-not-import-lab",
-    "source": "apps/cli/src/p2p/docker-fund.ts",
-    "target": "packages/gate/src/config.ts"
-  },
-  {
-    "rule": "product-does-not-import-lab",
-    "source": "apps/cli/src/p2p/docker-fund.ts",
-    "target": "packages/gate/src/lock.ts"
-  },
-  {
-    "rule": "product-does-not-import-lab",
-    "source": "apps/cli/src/p2p/docker-main.ts",
-    "target": "packages/gate/src/lock.ts"
-  },
-  {
-    "rule": "product-does-not-import-lab",
-    "source": "apps/cli/src/p2p/nat-main.ts",
-    "target": "packages/gate/src/lock.ts"
+    "target": "lab/harness/src/constants.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/p2p/proof.ts",
-    "target": "packages/gate/src/chain.ts"
+    "target": "lab/harness/src/chain.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/p2p/reconcile.ts",
-    "target": "packages/gate/src/constants.ts"
+    "target": "lab/harness/src/constants.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/p2p/reconcile.ts",
-    "target": "packages/gate/src/finalized-proof.ts"
+    "target": "lab/harness/src/finalized-proof.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/p2p/reconcile.ts",
-    "target": "packages/gate/src/lock.ts"
+    "target": "lab/harness/src/lock.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/p2p/reconcile.ts",
-    "target": "packages/gate/src/recovery-lock.ts"
+    "target": "lab/harness/src/recovery-lock.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/p2p/reconciliation.ts",
-    "target": "packages/gate/src/finalized-proof.ts"
+    "target": "lab/harness/src/finalized-proof.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/p2p/seller.ts",
-    "target": "packages/gate/src/chain.ts"
+    "target": "lab/harness/src/chain.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/preflight.ts",
-    "target": "packages/gate/src/config.ts"
+    "target": "lab/harness/src/config.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/cli/src/run.ts",
-    "target": "packages/gate/src/config.ts"
+    "target": "lab/harness/src/config.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/facilitator/src/main.ts",
-    "target": "packages/gate/src/config.ts"
+    "target": "lab/harness/src/config.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/facilitator/src/main.ts",
-    "target": "packages/gate/src/constants.ts"
+    "target": "lab/harness/src/constants.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/seller/src/main.ts",
-    "target": "packages/gate/src/config.ts"
+    "target": "lab/harness/src/config.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/seller/src/main.ts",
-    "target": "packages/gate/src/constants.ts"
+    "target": "lab/harness/src/constants.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "lab/p2p/src/docker-evidence.ts",
+    "target": "lab/harness/src/measurements.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "lab/p2p/src/docker-fund.ts",
+    "target": "lab/harness/src/chain.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "lab/p2p/src/docker-fund.ts",
+    "target": "lab/harness/src/config.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "lab/p2p/src/docker-fund.ts",
+    "target": "lab/harness/src/lock.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "lab/p2p/src/docker-main.ts",
+    "target": "lab/harness/src/lock.ts"
+  },
+  {
+    "rule": "product-does-not-import-lab",
+    "source": "lab/p2p/src/nat-main.ts",
+    "target": "lab/harness/src/lock.ts"
   }
 ]

@@ -15,3 +15,5 @@ dist
 **/.local
 **/agents.md
 **/claude.md
+
+lab/evidence
