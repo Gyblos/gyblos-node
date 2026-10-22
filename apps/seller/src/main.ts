@@ -1,6 +1,6 @@
 import { HOSTS, LOCALHOST, PORTS } from '@gyblos/config';
-import { loadConfig, signer } from '@gyblos/gate/config';
-import { WALLET_ROLES } from '@gyblos/gate/constants';
+import { WALLET_ROLES } from '@gyblos/config/constants';
+import { loadConfig, signer } from '@gyblos/config/wallet';
 import { assertProgram } from '@gyblos/payments-x402/chain';
 import { createGateSeller } from '@gyblos/payments-x402/seller';
 import { isMain } from '@gyblos/runtime';

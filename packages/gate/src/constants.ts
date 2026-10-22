@@ -1,3 +1,7 @@
+import {
+  CONFIG_SCHEMA_VERSION,
+  type ConfigAssetLabel,
+} from '@gyblos/config/constants';
 import type { GateErrorCode } from '@gyblos/payments-x402/constants';
 
 export const EXACT_EVIDENCE_CODES = {
@@ -75,11 +79,6 @@ export const FAILURE_CASES = {
   EXPIRED: 'F2',
 } as const;
 
-export const CONFIG_ASSET_LABELS = {
-  DEVNET_USDC: 'devnet-usdc',
-  TEST_TOKEN: 'devnet-test-token',
-} as const;
-
 export const EXACT_ASSET_LABELS = {
   CIRCLE_USDC: 'Circle devnet USDC',
 } as const;
@@ -97,14 +96,6 @@ export const EVIDENCE_IDS = {
   INFERENCE: 'GYB-GATE-0005',
 } as const;
 
-export const WALLET_ROLES = {
-  BUYER: 'buyer',
-  SELLER: 'seller',
-  AUTHORIZER: 'authorizer',
-  FACILITATOR: 'facilitator',
-  MINT: 'mint',
-} as const;
-
 export const EXACT_UNTRUSTED_CASES = {
   asset: EXACT_CASES.UNTRUSTED_ASSET,
   payTo: EXACT_CASES.UNTRUSTED_PAY_TO,
@@ -118,7 +109,7 @@ export const FUNDING_OPERATIONS = {
 } as const;
 
 export const SCHEMA_VERSIONS = {
-  CONFIG: 1,
+  CONFIG: CONFIG_SCHEMA_VERSION,
   EVIDENCE: 1,
   MEASUREMENT: 1,
 } as const;
@@ -235,12 +226,7 @@ export type InferenceCaseName =
 export type FailureCaseName =
   (typeof FAILURE_CASES)[keyof typeof FAILURE_CASES];
 
-export type ConfigAssetLabel =
-  (typeof CONFIG_ASSET_LABELS)[keyof typeof CONFIG_ASSET_LABELS];
-
 export type EvidenceId = (typeof EVIDENCE_IDS)[keyof typeof EVIDENCE_IDS];
-
-export type WalletRole = (typeof WALLET_ROLES)[keyof typeof WALLET_ROLES];
 
 export type EvidenceAssetLabel =
   | ConfigAssetLabel
@@ -256,3 +242,10 @@ export type FinancialGuardMessage =
 
 export type ErrorDiagnosticCode =
   GateErrorCode | (typeof ERROR_DIAGNOSTICS)[keyof typeof ERROR_DIAGNOSTICS];
+
+export {
+  CONFIG_ASSET_LABELS,
+  WALLET_ROLES,
+  type ConfigAssetLabel,
+  type WalletRole,
+} from '@gyblos/config/constants';
