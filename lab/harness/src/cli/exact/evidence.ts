@@ -1,13 +1,14 @@
-import { EXACT_PRICE } from '@gyblos/application/constants';
 import { X402_SDK_VERSION } from '@gyblos/config';
+import { EXACT_PRICE } from '@gyblos/core/constants';
+import { DEVNET, DEVNET_USDC } from '@gyblos/payments-x402/constants';
+
 import {
   EVIDENCE_IDS,
   EVIDENCE_STATUSES,
   EXACT_ASSET_LABELS,
   SCHEMA_VERSIONS,
-} from '@gyblos/lab-harness/constants';
-import type { ExactGateEvidence } from '@gyblos/lab-harness/types';
-import { DEVNET, DEVNET_USDC } from '@gyblos/payments-x402/constants';
+} from '../../constants.js';
+import type { ExactGateEvidence } from '../../types.js';
 
 export function createEvidence() {
   const limitations = [

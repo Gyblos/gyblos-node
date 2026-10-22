@@ -6,19 +6,15 @@ import test from 'node:test';
 
 import { TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
 
-import { CHARGE_ANOMALIES } from '@gyblos/application/constants';
-import { ENGINE_DONE_REASONS } from '@gyblos/inference-ollama/constants';
-
+import { CHARGE_ANOMALIES } from '@gyblos/core/constants';
+import { observeInferenceResponse } from '@gyblos/core/inference-observation';
+import { assessCharge } from '@gyblos/core/metering';
+import { ENGINE_DONE_REASONS } from '@gyblos/engine-ollama/constants';
+import { measurementRow, measurementSalt } from '@gyblos/node/measurements';
 import {
   transaction,
   transactionTransfers,
-} from '../lab/harness/scripts/inference-chain.js';
-import {
-  measurementRow,
-  measurementSalt,
-} from '../lab/harness/scripts/measurements.js';
-import { observeInferenceResponse } from '../packages/application/src/inference-observation.js';
-import { assessCharge } from '../packages/application/src/metering.js';
+} from '@gyblos/payments-x402/accounting/chain';
 
 const expected = {
   requestId: 'id',
@@ -195,7 +191,7 @@ test('successful responses with missing usage are rejected before accepting meas
 test('financial reconciliation is terminal only for inference journals', async () => {
   const { writeFile } = await import('node:fs/promises');
   const { assertNoUnresolvedAuthorizations } =
-    await import('../lab/harness/scripts/journal.js');
+    await import('@gyblos/lab-harness/journal');
   const directory = await mkdtemp(join(tmpdir(), 'gyblos-journal-'));
   try {
     for (const name of ['inference-attempt.json', 'attempt.json'])

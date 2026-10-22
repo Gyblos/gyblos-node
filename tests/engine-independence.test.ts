@@ -17,13 +17,13 @@ import {
   encodePaymentSignatureHeader,
 } from '@x402/core/http';
 
-import { MODEL } from '../packages/inference-ollama/src/model.js';
-import { createInferenceSeller } from '../packages/node/src/http/inference.js';
+import { MODEL } from '@gyblos/engine-ollama/model';
+import { createInferenceSeller } from '@gyblos/node/http/inference';
 import {
   CHANNEL_PROGRAM,
   DEVNET,
   DEVNET_GENESIS,
-} from '../packages/payments-x402/src/constants.js';
+} from '@gyblos/payments-x402/constants';
 
 // The real x402 middleware runs against controlled, non-broadcasting services.
 // No wallet is funded and no RPC method can submit a transaction.

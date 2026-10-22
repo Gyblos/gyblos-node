@@ -8,14 +8,14 @@ import {
 import { UptoSvmScheme } from '@x402/svm/upto/client';
 
 import { TIMEOUTS } from '@gyblos/config';
+
 import {
   BUYER_DIAGNOSTIC_CODES,
   DEVNET,
   type BuyerDiagnosticCode,
-} from '@gyblos/payments-x402/constants';
-import { validateTerms, type TrustPolicy } from '@gyblos/payments-x402/trust';
-
+} from './constants.js';
 import { signatureHint } from './signature-hint.js';
+import { validateTerms, type TrustPolicy } from './trust.js';
 
 export interface BuyerResponseObservation {
   status: number;

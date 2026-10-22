@@ -5,7 +5,6 @@ import { readFile } from 'node:fs/promises';
 import { address } from '@solana/kit';
 import type { SupportedResponse } from '@x402/core/types';
 
-import { EXACT_PRICE } from '@gyblos/application/constants';
 import {
   EVIDENCE_PATHS,
   JOURNAL_PATHS,
@@ -14,18 +13,7 @@ import {
   ROUTES,
   TIMEOUTS,
 } from '@gyblos/config';
-import { loadConfig, saveJson } from '@gyblos/lab-harness/config';
-import {
-  CASE_STATUSES,
-  EVIDENCE_STATUSES,
-  EXACT_CASES,
-  EXACT_EVIDENCE_CODES,
-  FACILITATOR_STATUSES,
-  JOURNAL_STATES,
-} from '@gyblos/lab-harness/constants';
-import { prepareExactAccounts } from '@gyblos/lab-harness/exact-accounts';
-import { assertNoUnresolvedAuthorizations } from '@gyblos/lab-harness/journal';
-import { withExclusiveLock } from '@gyblos/lab-harness/lock';
+import { EXACT_PRICE } from '@gyblos/core/constants';
 import {
   AuditedPublicFacilitator,
   createExactSeller,
@@ -36,8 +24,20 @@ import {
   assertExactSupport,
   PUBLIC_FACILITATORS,
 } from '@gyblos/payments-x402/exact/index';
+import { withExclusiveLock } from '@gyblos/payments-x402/recovery/lock';
 import { UNKNOWN_ERROR_NAME } from '@gyblos/runtime/constants';
 
+import { loadConfig, saveJson } from '../../config.js';
+import {
+  CASE_STATUSES,
+  EVIDENCE_STATUSES,
+  EXACT_CASES,
+  EXACT_EVIDENCE_CODES,
+  FACILITATOR_STATUSES,
+  JOURNAL_STATES,
+} from '../../constants.js';
+import { prepareExactAccounts } from '../../exact-accounts.js';
+import { assertNoUnresolvedAuthorizations } from '../../journal.js';
 import { runProvider } from './cases.js';
 import { createEvidence } from './evidence.js';
 

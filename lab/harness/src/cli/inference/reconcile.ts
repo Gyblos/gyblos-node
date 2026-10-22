@@ -6,12 +6,12 @@ import {
   tokenAddress,
   transaction,
   transactionTransfers,
-} from '@gyblos/lab-harness/chain';
-import { JOURNAL_STATES } from '@gyblos/lab-harness/constants';
-import { saveJournal } from '@gyblos/lab-harness/journal';
+} from '@gyblos/payments-x402/accounting/chain';
 import { createInferenceBuyer } from '@gyblos/payments-x402/inference-buyer';
 import { validateSettlement } from '@gyblos/payments-x402/trust';
 
+import { JOURNAL_STATES } from '../../constants.js';
+import { saveJournal } from '../../journal.js';
 import type { CaseContext } from './types.js';
 
 export async function reconcileCase({

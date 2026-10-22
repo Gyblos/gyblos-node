@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 
 import { Tokenizer } from '@huggingface/tokenizers';
 
-import { MODEL, renderChat } from '@gyblos/inference-ollama/model';
+import { MODEL, renderChat } from './model.js';
 
 export type ModelTokenizer = ReturnType<typeof createModelTokenizer>;
 

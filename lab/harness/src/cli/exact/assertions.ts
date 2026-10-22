@@ -1,14 +1,6 @@
 import assert from 'node:assert/strict';
 
-import { EXACT_PRICE } from '@gyblos/application/constants';
-import { signer } from '@gyblos/lab-harness/config';
-import {
-  CASE_STATUSES,
-  EXACT_CASES,
-  EXACT_ENFORCEMENT,
-  EXACT_UNTRUSTED_CASES,
-  WALLET_ROLES,
-} from '@gyblos/lab-harness/constants';
+import { EXACT_PRICE } from '@gyblos/core/constants';
 import { GateError } from '@gyblos/payments-x402/chain';
 import { GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
 import {
@@ -16,6 +8,14 @@ import {
   validateExactTerms,
 } from '@gyblos/payments-x402/exact/index';
 
+import { signer } from '../../config.js';
+import {
+  CASE_STATUSES,
+  EXACT_CASES,
+  EXACT_ENFORCEMENT,
+  EXACT_UNTRUSTED_CASES,
+  WALLET_ROLES,
+} from '../../constants.js';
 import type { createChallenge } from './challenge.js';
 import { snapshot } from './reconcile.js';
 import type { ExactContext } from './types.js';

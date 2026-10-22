@@ -1,35 +1,37 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
 
-import { observeInferenceResponse } from '@gyblos/application/inference-observation';
-import { assessCharge, charge, OFFER_ID } from '@gyblos/application/metering';
 import { HTTP_STATUS, LOCALHOST, P2P, ROUTES } from '@gyblos/config';
-import { inferenceSnapshot } from '@gyblos/lab-harness/chain';
-import { JOURNAL_STATES } from '@gyblos/lab-harness/constants';
-import { errorDiagnostic } from '@gyblos/lab-harness/diagnostics';
-import { withExclusiveLock } from '@gyblos/lab-harness/lock';
+import { observeInferenceResponse } from '@gyblos/core/inference-observation';
+import { assessCharge, charge, OFFER_ID } from '@gyblos/core/metering';
+import { modelTokenizer } from '@gyblos/node/artifacts';
+import { errorDiagnostic } from '@gyblos/node/diagnostics';
+import { inferenceCeiling } from '@gyblos/node/http/inference';
 import {
   appendMeasurement,
   measurementRow,
   measurementSalt,
-} from '@gyblos/lab-harness/measurements';
-import { modelTokenizer } from '@gyblos/node/artifacts';
-import { inferenceCeiling } from '@gyblos/node/http/inference';
+} from '@gyblos/node/measurements';
 import { rolePath, roleSigner } from '@gyblos/node/roles';
 import { createCases } from '@gyblos/node/synthetic-cases';
+import { inferenceSnapshot } from '@gyblos/payments-x402/accounting/chain';
 import { assertProgram } from '@gyblos/payments-x402/chain';
-import type { BuyerDiagnosticCode } from '@gyblos/payments-x402/constants';
+import {
+  JOURNAL_STATES,
+  type BuyerDiagnosticCode,
+} from '@gyblos/payments-x402/constants';
 import { createInferenceBuyer } from '@gyblos/payments-x402/inference-buyer';
+import { withExclusiveLock } from '@gyblos/payments-x402/recovery/lock';
 import { validateSettlement } from '@gyblos/payments-x402/trust';
 import { isMain, saveJson } from '@gyblos/runtime';
 import {
   expectedIrohRoute,
   routesMatchRequired,
-} from '@gyblos/transport/route-policy';
+} from '@gyblos/transport-iroh/route-policy';
 
 import { trustedOffer } from './buyer.js';
 import {
+  assertPriorCallResolved,
   priorCalls,
   proofObservation,
   readCallMetrics,
@@ -40,7 +42,6 @@ import {
   CALL_PHASES,
   P2P_JOURNAL_STATES,
   type CallPhase,
-  type P2pJournalState,
 } from './constants.js';
 import { paymentProof } from './proof.js';
 
@@ -48,15 +49,7 @@ async function run() {
   const requiredRoute = expectedIrohRoute(process.env.GYBLOS_EXPECTED_ROUTE);
   const { config, offer, trust } = await trustedOffer();
   await assertProgram(config.rpcUrl);
-  try {
-    const previous = JSON.parse(
-      await readFile(rolePath(P2P.journalFilename), 'utf8'),
-    ) as { state: P2pJournalState };
-    if (previous.state !== JOURNAL_STATES.CONFIRMED)
-      throw new Error('Reconcile prior authorization before another call.');
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-  }
+  await assertPriorCallResolved(rolePath(P2P.journalFilename));
   const index = Number(process.argv[2]);
   if (!Number.isInteger(index) || index < 0 || index >= P2P.minimumRequests)
     throw new Error('Select a synthetic case index.');

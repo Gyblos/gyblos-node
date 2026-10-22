@@ -1,10 +1,10 @@
 import type { DEVNET } from '@gyblos/config';
+
 import type {
   ExactCaseName,
   FAILURE_CASES,
   JOURNAL_STATES,
-} from '@gyblos/lab-harness/constants';
-
+} from './constants.js';
 import type {
   AuthorizationMetadata,
   ExactSnapshot,

@@ -13,16 +13,6 @@ import { UptoSvmScheme } from '@x402/svm/upto/server';
 import express from 'express';
 
 import {
-  inferenceWireUsage,
-  type Engine,
-  type RecountTokenizer,
-} from '@gyblos/application/engine';
-import {
-  charge,
-  OFFER_ID,
-  type TokenCounts,
-} from '@gyblos/application/metering';
-import {
   HTTP_LIMITS,
   HTTP_STATUS,
   INFERENCE_REQUEST_LIMITS,
@@ -30,6 +20,12 @@ import {
   ROUTES,
   TOKEN_PROGRAM_ADDRESS,
 } from '@gyblos/config';
+import {
+  inferenceWireUsage,
+  type Engine,
+  type RecountTokenizer,
+} from '@gyblos/core/engine';
+import { charge, OFFER_ID, type TokenCounts } from '@gyblos/core/metering';
 import { DEVNET, MAX_ATOMIC } from '@gyblos/payments-x402/constants';
 import { verifyInferenceDeposit } from '@gyblos/payments-x402/inference-deposit';
 import { requireLoopbackHost } from '@gyblos/runtime/loopback-host';

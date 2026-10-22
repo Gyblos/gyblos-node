@@ -2,19 +2,8 @@ import assert from 'node:assert/strict';
 
 import { encodePaymentSignatureHeader } from '@x402/core/http';
 
-import { EXACT_PRICE } from '@gyblos/application/constants';
 import { COMMITMENT, HTTP_STATUS, TIMEOUTS } from '@gyblos/config';
-import {
-  CASE_STATUSES,
-  EVIDENCE_STATUSES,
-  EXACT_CASES,
-  EXACT_REPLAY_SCOPE,
-  JOURNAL_STATES,
-  RECONCILIATION_CLASSIFICATIONS,
-  WALLET_ROLES,
-} from '@gyblos/lab-harness/constants';
-import { saveJournal } from '@gyblos/lab-harness/journal';
-import type { ChainTransaction } from '@gyblos/lab-harness/types';
+import { EXACT_PRICE } from '@gyblos/core/constants';
 import { confirm, explorer, GateError, rpc } from '@gyblos/payments-x402/chain';
 import {
   DEVNET,
@@ -24,6 +13,17 @@ import {
 } from '@gyblos/payments-x402/constants';
 import { assertExactFallbackSafe } from '@gyblos/payments-x402/exact/index';
 
+import {
+  CASE_STATUSES,
+  EVIDENCE_STATUSES,
+  EXACT_CASES,
+  EXACT_REPLAY_SCOPE,
+  JOURNAL_STATES,
+  RECONCILIATION_CLASSIFICATIONS,
+  WALLET_ROLES,
+} from '../../constants.js';
+import { saveJournal } from '../../journal.js';
+import type { ChainTransaction } from '../../types.js';
 import { assertEmpty, assertUntrusted } from './assertions.js';
 import { createChallenge } from './challenge.js';
 import { createPaidRequest } from './payment.js';

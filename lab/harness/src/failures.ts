@@ -19,25 +19,7 @@ import {
   TIMEOUTS,
   UNITS,
 } from '@gyblos/config';
-import { loadConfig, saveJson, signer } from '@gyblos/lab-harness/config';
-import {
-  CASE_STATUSES,
-  CONFIG_ASSET_LABELS,
-  FAILURE_CASES,
-  JOURNAL_STATES,
-  SCHEMA_VERSIONS,
-  WALLET_ROLES,
-} from '@gyblos/lab-harness/constants';
-import type {
-  FailureCaseResult,
-  FailureGateEvidence,
-} from '@gyblos/lab-harness/fixture-evidence-types';
-import {
-  assertNoUnresolvedAuthorizations,
-  saveJournal,
-} from '@gyblos/lab-harness/journal';
-import { withExclusiveLock } from '@gyblos/lab-harness/lock';
-import { createBuyer } from '@gyblos/payments-x402/buyer';
+import { createBuyer } from '@gyblos/payments-x402';
 import {
   account,
   assertProgram,
@@ -46,9 +28,24 @@ import {
 } from '@gyblos/payments-x402/chain';
 import { DEVNET, MAX_ATOMIC } from '@gyblos/payments-x402/constants';
 import { createFacilitator } from '@gyblos/payments-x402/facilitator';
+import { withExclusiveLock } from '@gyblos/payments-x402/recovery/lock';
 import { createGateSeller } from '@gyblos/payments-x402/seller';
 
+import { loadConfig, saveJson, signer } from './config.js';
+import {
+  CASE_STATUSES,
+  CONFIG_ASSET_LABELS,
+  FAILURE_CASES,
+  JOURNAL_STATES,
+  SCHEMA_VERSIONS,
+  WALLET_ROLES,
+} from './constants.js';
 import { prepareFailureAccounts } from './failure-setup.js';
+import type {
+  FailureCaseResult,
+  FailureGateEvidence,
+} from './fixture-evidence-types.js';
+import { assertNoUnresolvedAuthorizations, saveJournal } from './journal.js';
 
 export async function failureGate() {
   async function failures() {

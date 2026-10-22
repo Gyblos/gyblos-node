@@ -20,9 +20,9 @@ import { promisify } from 'node:util';
 
 import { FILE_MODES } from '@gyblos/config';
 import { LOCK_OWNER } from '@gyblos/config/lock';
-import { withExclusiveLock } from '@gyblos/lab-harness/lock';
-import { currentLockOwner } from '@gyblos/lab-harness/lock-owner';
-import { withP2pRecoveryLock } from '@gyblos/lab-harness/recovery-lock';
+import { withExclusiveLock } from '@gyblos/payments-x402/recovery/lock';
+import { currentLockOwner } from '@gyblos/payments-x402/recovery/lock-owner';
+import { withP2pRecoveryLock } from '@gyblos/payments-x402/recovery/recovery-lock';
 
 import { registerLockFaultCases } from './lock-faults.js';
 import { lockFixture } from './lock-fixture.js';

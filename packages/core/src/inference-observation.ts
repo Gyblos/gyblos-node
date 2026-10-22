@@ -1,14 +1,8 @@
-import {
-  OBSERVED_DONE_REASONS,
-  type ObservedDoneReason,
-} from '@gyblos/application/constants';
-import {
-  charge,
-  compareUsage,
-  type TokenCounts,
-} from '@gyblos/application/metering';
 import { HTTP_STATUS } from '@gyblos/config';
 import type { EngineWireUsage as EngineUsage } from '@gyblos/protocol/wire-usage';
+
+import { OBSERVED_DONE_REASONS, type ObservedDoneReason } from './constants.js';
+import { charge, compareUsage, type TokenCounts } from './metering.js';
 
 export interface ObservedBody {
   requestId: string;

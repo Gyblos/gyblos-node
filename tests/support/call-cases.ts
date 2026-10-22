@@ -10,11 +10,11 @@ import {
   P2P_JOURNAL_STATES,
 } from '@gyblos/buyer/constants';
 import { ERROR_DIAGNOSTICS } from '@gyblos/lab-harness/constants';
-import { errorDiagnostic } from '@gyblos/lab-harness/diagnostics';
+import { errorDiagnostic } from '@gyblos/node/diagnostics';
 import {
   createBuyer,
   type BuyerResponseObservation,
-} from '@gyblos/payments-x402/buyer';
+} from '@gyblos/payments-x402';
 import { GateError } from '@gyblos/payments-x402/chain';
 import {
   DEVNET,

@@ -10,7 +10,7 @@ import {
 } from '@gyblos/config';
 import { rolePath } from '@gyblos/node/roles';
 import { acceptLoopbackHost } from '@gyblos/runtime/loopback-host';
-import type { Transport } from '@gyblos/transport';
+import type { Transport } from '@gyblos/transport-iroh';
 
 export async function startBuyerProxy(transport: Transport) {
   let active = 0;

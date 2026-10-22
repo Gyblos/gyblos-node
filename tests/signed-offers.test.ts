@@ -4,17 +4,17 @@ import test from 'node:test';
 import { generateKeyPairSigner } from '@solana/kit';
 
 import {
-  signInferenceOffer,
-  verifyInferenceOffer,
-  type InferenceOffer,
-} from '@gyblos/application/offers';
-import {
   DEVNET,
   DEVNET_USDC,
   INFERENCE_REQUEST_LIMITS,
   MAX_ATOMIC,
   P2P,
 } from '@gyblos/config';
+import {
+  signInferenceOffer,
+  verifyInferenceOffer,
+  type InferenceOffer,
+} from '@gyblos/node/offers';
 
 async function fixture() {
   const [owner, payout, buyer, feePayer, authorizer] = await Promise.all(

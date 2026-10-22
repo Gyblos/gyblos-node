@@ -1,3 +1,13 @@
+export const JOURNAL_STATES = {
+  AUTHORIZATION_CREATED: 'authorization-created',
+  RECONCILED: 'reconciled',
+  VERIFIED: 'verified',
+  RESOLVED_REJECTED: 'resolved-rejected',
+  REJECTED: 'rejected',
+  CONFIRMED: 'confirmed',
+  UNCERTAIN: 'uncertain',
+} as const;
+
 export const PUBLIC_CALL_OPERATIONS = {
   VERIFY: 'verify',
   SETTLE: 'settle',

@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
 import { P2P } from '@gyblos/config';
-import { withExclusiveLock } from '@gyblos/lab-harness/lock';
+import { withExclusiveLock } from '@gyblos/payments-x402/recovery/lock';
 import { isMain } from '@gyblos/runtime';
 
 import { inspectDocker } from './docker-checks.js';

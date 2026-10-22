@@ -8,12 +8,9 @@ import {
   encodePaymentResponseHeader,
 } from '@x402/core/http';
 
-import { createBuyer } from '../packages/payments-x402/src/buyer.js';
-import {
-  DEVNET,
-  DEVNET_USDC,
-} from '../packages/payments-x402/src/constants.js';
-import { createInferenceBuyer } from '../packages/payments-x402/src/inference-buyer.js';
+import { createBuyer } from '@gyblos/payments-x402';
+import { DEVNET, DEVNET_USDC } from '@gyblos/payments-x402/constants';
+import { createInferenceBuyer } from '@gyblos/payments-x402/inference-buyer';
 
 // Ephemeral local signatures only. The mock forbids every RPC or broadcast.
 async function exercise(

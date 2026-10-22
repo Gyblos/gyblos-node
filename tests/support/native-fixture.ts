@@ -12,10 +12,10 @@ import {
   P2P,
   ROUTES,
 } from '@gyblos/config';
-import { TRANSPORT_ROUTES } from '@gyblos/transport/constants';
-import { createIrohTransport } from '@gyblos/transport/iroh-client';
-import { serveIroh } from '@gyblos/transport/iroh-server';
-import { decodeResponse, encodeRequest } from '@gyblos/transport/wire';
+import { TRANSPORT_ROUTES } from '@gyblos/transport-iroh/constants';
+import { createIrohTransport } from '@gyblos/transport-iroh/iroh-client';
+import { serveIroh } from '@gyblos/transport-iroh/iroh-server';
+import { decodeResponse, encodeRequest } from '@gyblos/transport-iroh/wire';
 
 import { NATIVE_CAPABILITY } from './native-runtime.js';
 

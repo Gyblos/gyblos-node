@@ -1,12 +1,9 @@
 import type { PaymentRequirements, SettleResponse } from '@x402/core/types';
 
 import { PAYMENT_LIMITS, TOKEN_PROGRAM_ADDRESS } from '@gyblos/config';
-import { GateError } from '@gyblos/payments-x402/chain';
-import {
-  CHANNEL_PROGRAM,
-  DEVNET,
-  GATE_ERROR_CODES,
-} from '@gyblos/payments-x402/constants';
+
+import { GateError } from './chain.js';
+import { CHANNEL_PROGRAM, DEVNET, GATE_ERROR_CODES } from './constants.js';
 
 export interface TrustPolicy {
   mint: string;

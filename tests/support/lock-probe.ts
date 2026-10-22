@@ -1,4 +1,4 @@
-import { withP2pRecoveryLock } from '@gyblos/lab-harness/recovery-lock';
+import { withP2pRecoveryLock } from '@gyblos/payments-x402/recovery/recovery-lock';
 import { isMain } from '@gyblos/runtime';
 
 async function main() {

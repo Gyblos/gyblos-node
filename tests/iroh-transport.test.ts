@@ -5,8 +5,8 @@ import { createServer } from 'node:http';
 import test from 'node:test';
 
 import { HTTP_STATUS, LOCALHOST, P2P, ROUTES } from '@gyblos/config';
-import { createIrohTransport } from '@gyblos/transport/iroh-client';
-import { serveIroh } from '@gyblos/transport/iroh-server';
+import { createIrohTransport } from '@gyblos/transport-iroh/iroh-client';
+import { serveIroh } from '@gyblos/transport-iroh/iroh-server';
 
 import { registerEgressCases } from './support/egress-cases.js';
 import { registerNativeCases } from './support/native-cases.js';

@@ -11,17 +11,13 @@ import {
   keyFilename,
   LOCAL_DIR,
 } from '@gyblos/config';
-import {
-  configPath,
-  defaultMint,
-  saveJson,
-  type Config,
-} from '@gyblos/lab-harness/config';
+
+import { configPath, defaultMint, saveJson, type Config } from './config.js';
 import {
   CONFIG_ASSET_LABELS,
   SCHEMA_VERSIONS,
   WALLET_ROLES,
-} from '@gyblos/lab-harness/constants';
+} from './constants.js';
 
 export async function setupGate() {
   const path = configPath();

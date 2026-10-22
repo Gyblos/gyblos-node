@@ -1,4 +1,5 @@
 import type { DEVNET, DIAGNOSTIC_LIMITS } from '@gyblos/config';
+
 import type {
   EvidenceAssetLabel,
   EvidenceId,
@@ -6,7 +7,7 @@ import type {
   RECONCILIATION_CLASSIFICATIONS,
   ReconciliationClassification,
   SCHEMA_VERSIONS,
-} from '@gyblos/lab-harness/constants';
+} from './constants.js';
 
 export interface EvidenceBase {
   schemaVersion: typeof SCHEMA_VERSIONS.EVIDENCE;

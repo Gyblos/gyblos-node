@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import test from 'node:test';
 
-import { verifyManifestLineage } from '@gyblos/inference-ollama/artifacts';
+import { verifyManifestLineage } from '@gyblos/engine-ollama/artifacts';
 
 const ORIGINAL = {
   schemaVersion: 2,

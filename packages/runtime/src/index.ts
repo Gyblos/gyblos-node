@@ -1,3 +1,3 @@
-export * from '@gyblos/runtime/json';
+export * from './json.js';
 
-export * from '@gyblos/runtime/process';
+export * from './process.js';

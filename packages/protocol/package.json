@@ -9,7 +9,9 @@
     "./constants": "./src/constants.ts",
     "./engine": "./src/engine.ts",
     "./errors": "./src/errors.ts",
+    "./package.json": "./package.json",
     "./signing": "./src/signing.ts",
+    "./vectors/signed-inference-offer-v1.json": "./vectors/signed-inference-offer-v1.json",
     "./wire-usage": "./src/wire-usage.ts"
   }
 }

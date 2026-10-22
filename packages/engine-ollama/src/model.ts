@@ -1,4 +1,4 @@
-import { MODEL_LIMITS } from '@gyblos/inference-ollama/constants';
+import { MODEL_LIMITS } from './constants.js';
 
 export { MODEL } from './constants.js';
 

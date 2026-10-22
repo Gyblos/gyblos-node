@@ -19,7 +19,7 @@ Every `.ts` file follows this order:
 
 - Hosts, ports, paths, network IDs, program IDs, commitments, timeouts, limits and HTTP statuses come from `@gyblos/config`.
 - Dependency versions are read from `package.json` or the lockfile. Application-owned schema versions live in the owning package's constants.
-- Model and generation parameters live in `@gyblos/inference-ollama/constants.ts`; prices and tolerance in `@gyblos/application/constants.ts`.
+- Model and generation parameters live in `@gyblos/engine-ollama/constants.ts`; prices and tolerance in `@gyblos/core/constants.ts`.
 
 ### Canonical contract values and derived types
 

@@ -24,24 +24,20 @@ import {
   TOKEN_PROGRAM_ADDRESS,
 } from '@gyblos/config';
 import {
-  configPath,
-  loadConfig,
-  saveJson,
-  signer,
-} from '@gyblos/lab-harness/config';
-import {
-  CONFIG_ASSET_LABELS,
-  FUNDING_OPERATIONS,
-  WALLET_ROLES,
-  type FundingOperation,
-} from '@gyblos/lab-harness/constants';
-import {
   account,
   assertProgram,
   confirm,
   lamports,
   rpc,
 } from '@gyblos/payments-x402/chain';
+
+import { configPath, loadConfig, saveJson, signer } from './config.js';
+import {
+  CONFIG_ASSET_LABELS,
+  FUNDING_OPERATIONS,
+  WALLET_ROLES,
+  type FundingOperation,
+} from './constants.js';
 
 interface FundingLogEntry {
   operation: FundingOperation;

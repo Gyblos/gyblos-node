@@ -1,1 +1,1 @@
-export * from './chain.js';
+export * from '@gyblos/payments-x402/accounting/chain';

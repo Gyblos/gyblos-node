@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { P2P } from '@gyblos/config';
-import { createPeerLimiter } from '@gyblos/transport/limiter';
+import { createPeerLimiter } from '@gyblos/transport-iroh/limiter';
 
 type Limiter = ReturnType<typeof createPeerLimiter>;
 

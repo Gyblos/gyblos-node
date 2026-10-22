@@ -18,7 +18,7 @@ import {
 import standards from '../tooling/code-standards.js';
 
 const eslint = new ESLint();
-const filePath = resolve('packages/application/src/lint-sample.ts');
+const filePath = resolve('packages/core/src/lint-sample.ts');
 async function rules(code: string) {
   const [result] = await eslint.lintText(code, { filePath });
   return result!.messages.map((message) => message.ruleId);

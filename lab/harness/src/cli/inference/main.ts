@@ -21,30 +21,17 @@ import {
   TIMEOUTS,
   TOKENIZER_FILES,
 } from '@gyblos/config';
-import { GENERATION } from '@gyblos/inference-ollama/constants';
-import { createOllamaEngine } from '@gyblos/inference-ollama/engine';
-import {
-  createModelTokenizer,
-  createOllama,
-} from '@gyblos/inference-ollama/index';
+import { createModelTokenizer, createOllama } from '@gyblos/engine-ollama';
+import { GENERATION } from '@gyblos/engine-ollama/constants';
+import { createOllamaEngine } from '@gyblos/engine-ollama/engine';
+import { createInferenceSeller } from '@gyblos/node/http/inference';
+import { measurementSalt } from '@gyblos/node/measurements';
+import { createCases } from '@gyblos/node/synthetic-cases';
 import {
   confirmInference,
   inferenceSnapshot,
   transaction,
-} from '@gyblos/lab-harness/chain';
-import { loadConfig, saveJson, signer } from '@gyblos/lab-harness/config';
-import {
-  CONFIG_ASSET_LABELS,
-  EVIDENCE_STATUSES,
-  INFERENCE_EVIDENCE_CODES,
-  WALLET_ROLES,
-} from '@gyblos/lab-harness/constants';
-import type { InferenceTrace } from '@gyblos/lab-harness/inference-evidence-types';
-import { assertNoUnresolvedAuthorizations } from '@gyblos/lab-harness/journal';
-import { withExclusiveLock } from '@gyblos/lab-harness/lock';
-import { measurementSalt } from '@gyblos/lab-harness/measurements';
-import { createInferenceSeller } from '@gyblos/node/http/inference';
-import { createCases } from '@gyblos/node/synthetic-cases';
+} from '@gyblos/payments-x402/accounting/chain';
 import {
   assertProgram,
   GateError,
@@ -52,6 +39,7 @@ import {
 } from '@gyblos/payments-x402/chain';
 import { DEVNET_USDC, GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
 import type { SettlementEvent } from '@gyblos/payments-x402/facilitator';
+import { withExclusiveLock } from '@gyblos/payments-x402/recovery/lock';
 import {
   assertPortFree,
   onShutdown,
@@ -60,6 +48,15 @@ import {
   waitReady,
 } from '@gyblos/runtime';
 
+import { loadConfig, saveJson, signer } from '../../config.js';
+import {
+  CONFIG_ASSET_LABELS,
+  EVIDENCE_STATUSES,
+  INFERENCE_EVIDENCE_CODES,
+  WALLET_ROLES,
+} from '../../constants.js';
+import type { InferenceTrace } from '../../inference-evidence-types.js';
+import { assertNoUnresolvedAuthorizations } from '../../journal.js';
 import { createGateBilling } from './billing.js';
 import { runCases } from './cases.js';
 import { initializeEvidence } from './evidence.js';

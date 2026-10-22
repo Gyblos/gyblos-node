@@ -7,11 +7,11 @@ import {
   type ReconciliationSignatures,
 } from '@gyblos/buyer/reconciliation';
 import { IROH_SDK_VERSION, P2P, X402_SDK_VERSION } from '@gyblos/config';
-import type { Measurement } from '@gyblos/lab-harness/measurements';
+import type { Measurement } from '@gyblos/node/measurements';
 import { saveJson } from '@gyblos/runtime';
-import type { RouteObservation } from '@gyblos/transport';
-import { TRANSPORT_ROUTES } from '@gyblos/transport/constants';
-import { routesMatchRequired } from '@gyblos/transport/route-policy';
+import type { RouteObservation } from '@gyblos/transport-iroh';
+import { TRANSPORT_ROUTES } from '@gyblos/transport-iroh/constants';
+import { routesMatchRequired } from '@gyblos/transport-iroh/route-policy';
 
 import type { inspectDocker } from './docker-checks.js';
 import { readContainerJson } from './docker-command.js';

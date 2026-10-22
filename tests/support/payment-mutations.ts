@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 
 import { verifyZeroChargeReconciliation } from '@gyblos/buyer/reconciliation';
 import { DEVNET_TREASURY_OWNER } from '@gyblos/config';
-import { tokenAddress } from '@gyblos/lab-harness/chain';
 import type { ParsedInstruction } from '@gyblos/lab-harness/types';
+import { tokenAddress } from '@gyblos/payments-x402/accounting/chain';
 
 import {
   accountIndex,

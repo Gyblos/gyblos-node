@@ -1,11 +1,9 @@
-import type { ModelTokenizer } from '@gyblos/inference-ollama';
-import type { Config } from '@gyblos/lab-harness/config';
-import type { InferenceCaseName } from '@gyblos/lab-harness/constants';
-import type {
-  InferenceGateEvidence,
-  InferenceTrace,
-} from '@gyblos/lab-harness/types';
+import type { ModelTokenizer } from '@gyblos/engine-ollama';
 import type { SettlementEvent } from '@gyblos/payments-x402/facilitator';
+
+import type { Config } from '../../config.js';
+import type { InferenceCaseName } from '../../constants.js';
+import type { InferenceGateEvidence, InferenceTrace } from '../../types.js';
 
 export interface InferenceCase {
   name: InferenceCaseName;
@@ -13,7 +11,7 @@ export interface InferenceCase {
   prompt: string;
 }
 
-export type { InferenceTrace } from '@gyblos/lab-harness/types';
+export type { InferenceTrace } from '../../types.js';
 
 export interface CaseContext {
   url: string;

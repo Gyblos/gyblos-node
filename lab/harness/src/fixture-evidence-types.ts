@@ -1,7 +1,9 @@
 import type { PaymentRequirements } from '@x402/core/types';
 
-import type { runGate } from '@gyblos/application/gate';
 import type { DEVNET, HTTP_STATUS } from '@gyblos/config';
+import type { runGate } from '@gyblos/core';
+import type { createFacilitator } from '@gyblos/payments-x402/facilitator';
+
 import type {
   CASE_STATUSES,
   CHALLENGE_STAGES,
@@ -9,8 +11,7 @@ import type {
   EVIDENCE_STATUSES,
   FAILURE_CASES,
   SCHEMA_VERSIONS,
-} from '@gyblos/lab-harness/constants';
-import type { createFacilitator } from '@gyblos/payments-x402/facilitator';
+} from './constants.js';
 
 export type FixedGateEvidence = Awaited<ReturnType<typeof runGate>> & {
   schemaVersion: typeof SCHEMA_VERSIONS.EVIDENCE;

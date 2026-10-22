@@ -1,6 +1,7 @@
-import { setupP2PRole } from '@gyblos/lab-harness/p2p-setup';
-import { setupGate } from '@gyblos/lab-harness/setup';
 import { isMain } from '@gyblos/runtime';
+
+import { setupP2PRole } from '../src/p2p-setup.js';
+import { setupGate } from '../src/setup.js';
 
 if (isMain(import.meta.url)) {
   if (process.argv.includes('--role')) await setupP2PRole();

@@ -1,5 +1,5 @@
-import type { TokenCounts } from '@gyblos/application/metering';
 import { GATE_CASES } from '@gyblos/config';
+import type { TokenCounts } from '@gyblos/core/metering';
 
 export function createGateBilling(
   feePayer: string,

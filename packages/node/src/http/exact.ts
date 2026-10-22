@@ -9,7 +9,6 @@ import { paymentMiddleware, x402ResourceServer } from '@x402/express';
 import { ExactSvmScheme } from '@x402/svm/exact/server';
 import express from 'express';
 
-import { EXACT_PRICE } from '@gyblos/application/constants';
 import {
   DIAGNOSTIC_LIMITS,
   HTTP_STATUS,
@@ -17,6 +16,7 @@ import {
   ROUTES,
   TIMEOUTS,
 } from '@gyblos/config';
+import { EXACT_PRICE } from '@gyblos/core/constants';
 import {
   DEVNET,
   DEVNET_USDC,

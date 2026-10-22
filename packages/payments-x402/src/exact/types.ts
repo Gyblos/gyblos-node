@@ -1,7 +1,4 @@
-import type {
-  PublicCallOperation,
-  PublicCallOutcome,
-} from '@gyblos/payments-x402/constants';
+import type { PublicCallOperation, PublicCallOutcome } from '../constants.js';
 
 export interface PublicCall {
   operation: PublicCallOperation;

@@ -1,12 +1,13 @@
 import { IPV6_LOOPBACK, LOCALHOST, ROUTES, TIMEOUTS } from '@gyblos/config';
+import type { EngineWireUsage as EngineUsage } from '@gyblos/protocol/wire-usage';
+
 import {
   ENGINE_DONE_REASONS,
   GENERATION,
   MODEL_LIMITS,
   type EngineDoneReason,
-} from '@gyblos/inference-ollama/constants';
-import { MODEL, renderChat } from '@gyblos/inference-ollama/model';
-import type { EngineWireUsage as EngineUsage } from '@gyblos/protocol/wire-usage';
+} from './constants.js';
+import { MODEL, renderChat } from './model.js';
 
 export type { EngineWireUsage as EngineUsage } from '@gyblos/protocol/wire-usage';
 
@@ -17,12 +18,9 @@ export interface InferenceResult {
   doneReason: EngineDoneReason;
 }
 
-export { MODEL, renderChat } from '@gyblos/inference-ollama/model';
+export { MODEL, renderChat } from './model.js';
 
-export {
-  createModelTokenizer,
-  type ModelTokenizer,
-} from '@gyblos/inference-ollama/tokenizer';
+export { createModelTokenizer, type ModelTokenizer } from './tokenizer.js';
 
 export function localOllamaUrl(base: string): URL {
   const url = new URL(base);

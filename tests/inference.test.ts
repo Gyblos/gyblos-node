@@ -6,27 +6,26 @@ import test from 'node:test';
 
 import { TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
 
-import { CHARGE_ANOMALIES } from '@gyblos/application/constants';
-
-import { transactionTransfers } from '../lab/harness/scripts/inference-chain.js';
-import {
-  appendMeasurement,
-  measurementRow,
-  measurementSalt,
-} from '../lab/harness/scripts/measurements.js';
+import { CHARGE_ANOMALIES } from '@gyblos/core/constants';
 import {
   assessCharge,
   charge,
   compareUsage,
   tokenAllowance,
-} from '../packages/application/src/metering.js';
+} from '@gyblos/core/metering';
 import {
   createModelTokenizer,
   createOllama,
   localOllamaUrl,
   MODEL,
   renderChat,
-} from '../packages/inference-ollama/src/index.js';
+} from '@gyblos/engine-ollama';
+import {
+  appendMeasurement,
+  measurementRow,
+  measurementSalt,
+} from '@gyblos/node/measurements';
+import { transactionTransfers } from '@gyblos/payments-x402/accounting/chain';
 
 const secretPrompt = 'private prompt that must never reach storage';
 const secretResponse = 'private response that must never reach storage';
@@ -197,8 +196,7 @@ test('private measurement rows use an allowlist and append without rewriting old
 });
 
 test('bounded inference rejects tokenized context overflow before signing', async () => {
-  const { inferenceCeiling } =
-    await import('../packages/node/src/http/inference.js');
+  const { inferenceCeiling } = await import('@gyblos/node/http/inference');
   assert.throws(
     () =>
       inferenceCeiling(

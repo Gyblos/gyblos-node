@@ -5,7 +5,12 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./*": "./src/*.ts"
+    "./constants": "./src/constants.ts",
+    "./loopback-host": "./src/loopback-host.ts",
+    "./memory": "./src/memory.ts",
+    "./private-log": "./src/private-log.ts",
+    "./private-log-file": "./src/private-log-file.ts",
+    "./process": "./src/process.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*"

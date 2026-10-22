@@ -17,15 +17,15 @@ import {
   HTTP_STATUS,
   ROUTES,
 } from '@gyblos/config';
+import { requireLoopbackHost } from '@gyblos/runtime/loopback-host';
+
 import {
   DEVNET,
   FACILITATOR_DIAGNOSTIC_CODES,
   FACILITATOR_STAGES,
   MAX_ATOMIC,
   PUBLIC_CALL_OPERATIONS,
-} from '@gyblos/payments-x402/constants';
-import { requireLoopbackHost } from '@gyblos/runtime/loopback-host';
-
+} from './constants.js';
 import {
   createFacilitatorObserver,
   type FacilitatorDiagnosticOptions,

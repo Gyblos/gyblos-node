@@ -5,12 +5,13 @@ import {
   RETRY_DELAYS,
   TIMEOUTS,
 } from '@gyblos/config';
+import { ProtocolError as GateError } from '@gyblos/protocol/errors';
+
 import {
   CHANNEL_PROGRAM,
   DEVNET_GENESIS,
   GATE_ERROR_CODES,
-} from '@gyblos/payments-x402/constants';
-import { ProtocolError as GateError } from '@gyblos/protocol/errors';
+} from './constants.js';
 
 export { ProtocolError as GateError } from '@gyblos/protocol/errors';
 

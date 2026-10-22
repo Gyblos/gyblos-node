@@ -1,13 +1,13 @@
-export * from '@gyblos/config/network';
+export * from './network.js';
 
-export * from '@gyblos/config/hosts';
+export * from './hosts.js';
 
-export * from '@gyblos/config/paths';
+export * from './paths.js';
 
-export * from '@gyblos/config/versions';
+export * from './versions.js';
 
-export * from '@gyblos/config/limits';
+export * from './limits.js';
 
-export * from '@gyblos/config/p2p';
+export * from './p2p.js';
 
 export * from './diagnostics.js';

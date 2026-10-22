@@ -1,7 +1,6 @@
-import { CHARGE_ANOMALIES } from '@gyblos/application/constants';
 import { UNITS } from '@gyblos/config';
 
-import { PRICES, TOLERANCE } from './constants.js';
+import { CHARGE_ANOMALIES, PRICES, TOLERANCE } from './constants.js';
 
 export interface TokenCounts {
   input: number;

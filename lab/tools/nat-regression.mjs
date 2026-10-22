@@ -4,7 +4,6 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { parseArgs } from 'node:util';
 
 import { FILE_MODES, P2P } from '@gyblos/config';
-import { withExclusiveLock } from '@gyblos/lab-harness/lock';
 import { NAT } from '@gyblos/lab-p2p/constants';
 import { docker, execute } from '@gyblos/lab-p2p/docker-command';
 import { sourceFingerprint } from '@gyblos/lab-p2p/docker-source';
@@ -14,6 +13,7 @@ import {
   selectUdpMapping,
 } from '@gyblos/lab-p2p/nat-mapping';
 import { natEnvironment } from '@gyblos/lab-p2p/nat-topology';
+import { withExclusiveLock } from '@gyblos/payments-x402/recovery/lock';
 
 import { assertReflectedMappings } from './lab-mapping.mjs';
 import { addLabObserver } from './lab-observer.mjs';

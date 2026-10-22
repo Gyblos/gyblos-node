@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createGateBilling } from '../lab/harness/src/cli/inference/billing.js';
-import { assessCharge, charge } from '../packages/application/src/metering.js';
+import { assessCharge, charge } from '@gyblos/core/metering';
+import { createGateBilling } from '@gyblos/lab-harness/cli/inference/billing';
 
 test('gate underbilling changes only selected output counts without mutating usage', () => {
   const billing = createGateBilling('sponsor', 'over-request', 'under-request');

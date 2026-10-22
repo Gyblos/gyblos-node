@@ -5,16 +5,22 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./*": "./src/*.ts"
+    "./buyer": "./src/buyer.ts",
+    "./call": "./src/call.ts",
+    "./call-evidence": "./src/call-evidence.ts",
+    "./constants": "./src/constants.ts",
+    "./main": "./src/main.ts",
+    "./proof": "./src/proof.ts",
+    "./reconcile": "./src/reconcile.ts",
+    "./reconciliation": "./src/reconciliation.ts"
   },
   "dependencies": {
-    "@gyblos/application": "workspace:*",
+    "@gyblos/core": "workspace:*",
     "@gyblos/config": "workspace:*",
-    "@gyblos/lab-harness": "workspace:*",
     "@gyblos/runtime": "workspace:*",
     "@gyblos/node": "workspace:*",
     "@gyblos/payments-x402": "workspace:*",
-    "@gyblos/transport": "workspace:*",
+    "@gyblos/transport-iroh": "workspace:*",
     "@number0/iroh": "1.1.0",
     "@solana/kit": "5.1.0"
   }

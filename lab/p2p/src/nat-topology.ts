@@ -1,7 +1,7 @@
 import { P2P } from '@gyblos/config';
-import { NAT } from '@gyblos/lab-p2p/constants';
-import { TRANSPORT_ROUTES } from '@gyblos/transport/constants';
+import { TRANSPORT_ROUTES } from '@gyblos/transport-iroh/constants';
 
+import { NAT } from './constants.js';
 import { composeArgs, docker } from './docker-command.js';
 
 export type NatScenario = 'nat-direct' | 'nat-relay';

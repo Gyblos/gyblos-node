@@ -7,8 +7,9 @@ import {
   COMMITMENT,
   TOKEN_PROGRAM_ADDRESS,
 } from '@gyblos/config';
-import { assertDevnet, GateError, rpc } from '@gyblos/payments-x402/chain';
-import { DEVNET, GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
+
+import { assertDevnet, GateError, rpc } from './chain.js';
+import { DEVNET, GATE_ERROR_CODES } from './constants.js';
 
 interface ChannelAccountResponse {
   value: { owner: string; data: [string, 'base64'] } | null;

@@ -3,13 +3,13 @@ import test from 'node:test';
 
 import { TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
 
-import { GateError } from '@gyblos/payments-x402/chain';
-import { GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
-
 import {
   transaction,
   transactionTransfers,
-} from '../lab/harness/scripts/inference-chain.js';
+} from '@gyblos/payments-x402/accounting/chain';
+import { GateError } from '@gyblos/payments-x402/chain';
+import { GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
+
 import { registerProofReadCases } from './support/proof-read-cases.js';
 import { registerRentCases } from './support/rent-cases.js';
 import { registerTokenCases } from './support/token-cases.js';
@@ -51,7 +51,7 @@ test('on-chain extraction recognizes SPL batch transfers without double counting
 
 test('gasless buyer snapshot treats an absent native account as zero SOL', async () => {
   const { inferenceSnapshot } =
-    await import('../lab/harness/scripts/inference-chain.js');
+    await import('@gyblos/payments-x402/accounting/chain');
   const owner = '5FVtvnKXCabCDxSoeNJuLdRpCTBZQnhTnNooZzEYfg2j';
   const seller = 'DujktA3sKqUAbsNJqZW5o7vownA7tUP5iKeiBHP11Gbf';
   const mint = '2vXUXK2rJTPtb7Wx9em4W9FdgtfD6HTnFxZz5oirLVcH';
@@ -86,7 +86,7 @@ test('gasless buyer snapshot treats an absent native account as zero SOL', async
 
 test('confirmation retries only throttled read requests and confirms without another payment', async () => {
   const { confirmInference } =
-    await import('../lab/harness/scripts/inference-chain.js');
+    await import('@gyblos/payments-x402/accounting/chain');
   const original = globalThis.fetch;
   const methods: string[] = [];
   globalThis.fetch = (async (_url, init) => {

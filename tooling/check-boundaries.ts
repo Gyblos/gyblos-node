@@ -1,4 +1,4 @@
-// Owns the report-only boundary command and explicit baseline updates.
+// Owns enforcing architectural checks and explicit empty-baseline updates.
 // It must not start applications, inspect local roles, or conceal analyzer failures.
 import { readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
@@ -16,6 +16,7 @@ import { sourceFiles } from './boundaries/inventory.js';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const BASELINE = resolve(ROOT, 'tooling/boundaries-baseline.json');
 const ARGUMENTS = process.argv.slice(2);
+const BOUNDARY_MODE = 'enforcing';
 
 async function main() {
   if (
@@ -30,13 +31,15 @@ async function main() {
   const baseline = update
     ? result.entries
     : validateBaseline(JSON.parse(await readFile(BASELINE, 'utf8')));
+  if (update && result.entries.length > 0)
+    throw new Error('An enforcing baseline must remain empty.');
   if (update)
     await writeFile(
       BASELINE,
       await format(JSON.stringify(result.entries), { parser: 'json' }),
     );
   const report = {
-    mode: 'report-only',
+    mode: BOUNDARY_MODE,
     modules: result.modules,
     ...compareBaseline(result.entries, baseline),
     violations: result.entries,
@@ -44,7 +47,9 @@ async function main() {
   if (ARGUMENTS.includes('--json'))
     console.log(JSON.stringify(report, null, 2));
   else {
-    console.log(`Boundary analysis: report-only; ${report.modules} modules.`);
+    console.log(
+      `Boundary analysis: ${BOUNDARY_MODE}; ${report.modules} modules.`,
+    );
     console.log(
       `Current: ${report.current}; baseline: ${report.baseline}; new: ${report.added.length}; resolved: ${report.resolved.length}.`,
     );
@@ -52,6 +57,7 @@ async function main() {
       console.log(`${entry.rule}: ${entry.source} -> ${entry.target}`);
     if (update) console.log('Baseline explicitly updated.');
   }
+  if (report.current > 0 || report.baseline > 0) process.exitCode = 1;
 }
 
 main().catch(() => {

@@ -4,8 +4,7 @@ import test from 'node:test';
 
 test('chat renderer matches canonical pinned Jinja template golden vectors', async () => {
   const { createHash } = await import('node:crypto');
-  const { MODEL, renderChat } =
-    await import('../packages/inference-ollama/src/model.js');
+  const { MODEL, renderChat } = await import('@gyblos/engine-ollama/model');
   const config = await readFile('tests/fixtures/tokenizer_config.json', 'utf8');
   const vectors = JSON.parse(
     await readFile('tests/fixtures/chat-template-vectors.json', 'utf8'),

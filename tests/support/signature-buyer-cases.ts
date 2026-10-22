@@ -8,7 +8,7 @@ import { proofObservation } from '@gyblos/buyer/call-evidence';
 import {
   createBuyer,
   type BuyerResponseObservation,
-} from '@gyblos/payments-x402/buyer';
+} from '@gyblos/payments-x402';
 import {
   DEVNET,
   DEVNET_USDC,

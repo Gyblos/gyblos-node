@@ -8,18 +8,21 @@ importers:
 
   .:
     dependencies:
-      '@gyblos/application':
-        specifier: workspace:*
-        version: link:packages/application
       '@gyblos/buyer':
         specifier: workspace:*
         version: link:apps/buyer
       '@gyblos/config':
         specifier: workspace:*
         version: link:packages/config
-      '@gyblos/inference-ollama':
+      '@gyblos/core':
         specifier: workspace:*
-        version: link:packages/inference-ollama
+        version: link:packages/core
+      '@gyblos/engine-ollama':
+        specifier: workspace:*
+        version: link:packages/engine-ollama
+      '@gyblos/facilitator':
+        specifier: workspace:*
+        version: link:apps/facilitator
       '@gyblos/lab-harness':
         specifier: workspace:*
         version: link:lab/harness
@@ -41,9 +44,9 @@ importers:
       '@gyblos/runtime':
         specifier: workspace:*
         version: link:packages/runtime
-      '@gyblos/transport':
+      '@gyblos/transport-iroh':
         specifier: workspace:*
-        version: link:packages/transport
+        version: link:packages/transport-iroh
       '@number0/iroh':
         specifier: 1.1.0
         version: 1.1.0
@@ -102,15 +105,12 @@ importers:
 
   apps/buyer:
     dependencies:
-      '@gyblos/application':
-        specifier: workspace:*
-        version: link:../../packages/application
       '@gyblos/config':
         specifier: workspace:*
         version: link:../../packages/config
-      '@gyblos/lab-harness':
+      '@gyblos/core':
         specifier: workspace:*
-        version: link:../../lab/harness
+        version: link:../../packages/core
       '@gyblos/node':
         specifier: workspace:*
         version: link:../../packages/node
@@ -120,9 +120,9 @@ importers:
       '@gyblos/runtime':
         specifier: workspace:*
         version: link:../../packages/runtime
-      '@gyblos/transport':
+      '@gyblos/transport-iroh':
         specifier: workspace:*
-        version: link:../../packages/transport
+        version: link:../../packages/transport-iroh
       '@number0/iroh':
         specifier: 1.1.0
         version: 1.1.0
@@ -159,15 +159,15 @@ importers:
 
   lab/harness:
     dependencies:
-      '@gyblos/application':
-        specifier: workspace:*
-        version: link:../../packages/application
       '@gyblos/config':
         specifier: workspace:*
         version: link:../../packages/config
-      '@gyblos/inference-ollama':
+      '@gyblos/core':
         specifier: workspace:*
-        version: link:../../packages/inference-ollama
+        version: link:../../packages/core
+      '@gyblos/engine-ollama':
+        specifier: workspace:*
+        version: link:../../packages/engine-ollama
       '@gyblos/node':
         specifier: workspace:*
         version: link:../../packages/node
@@ -201,9 +201,9 @@ importers:
       '@gyblos/config':
         specifier: workspace:*
         version: link:../../packages/config
-      '@gyblos/inference-ollama':
+      '@gyblos/engine-ollama':
         specifier: workspace:*
-        version: link:../../packages/inference-ollama
+        version: link:../../packages/engine-ollama
       '@gyblos/lab-harness':
         specifier: workspace:*
         version: link:../harness
@@ -216,9 +216,9 @@ importers:
       '@gyblos/runtime':
         specifier: workspace:*
         version: link:../../packages/runtime
-      '@gyblos/transport':
+      '@gyblos/transport-iroh':
         specifier: workspace:*
-        version: link:../../packages/transport
+        version: link:../../packages/transport-iroh
       '@number0/iroh':
         specifier: 1.1.0
         version: 1.1.0
@@ -231,15 +231,6 @@ importers:
       '@solana/kit':
         specifier: 5.1.0
         version: 5.1.0(typescript@5.9.3)(ws@8.21.0)
-
-  packages/application:
-    dependencies:
-      '@gyblos/config':
-        specifier: workspace:*
-        version: link:../config
-      '@gyblos/protocol':
-        specifier: workspace:*
-        version: link:../protocol
 
   packages/config:
     dependencies:
@@ -259,7 +250,16 @@ importers:
         specifier: 2.28.0
         version: 2.28.0
 
-  packages/inference-ollama:
+  packages/core:
+    dependencies:
+      '@gyblos/config':
+        specifier: workspace:*
+        version: link:../config
+      '@gyblos/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+
+  packages/engine-ollama:
     dependencies:
       '@gyblos/config':
         specifier: workspace:*
@@ -273,27 +273,27 @@ importers:
 
   packages/node:
     dependencies:
-      '@gyblos/application':
-        specifier: workspace:*
-        version: link:../application
       '@gyblos/config':
         specifier: workspace:*
         version: link:../config
-      '@gyblos/inference-ollama':
+      '@gyblos/core':
         specifier: workspace:*
-        version: link:../inference-ollama
-      '@gyblos/lab-harness':
+        version: link:../core
+      '@gyblos/engine-ollama':
         specifier: workspace:*
-        version: link:../../lab/harness
+        version: link:../engine-ollama
       '@gyblos/payments-x402':
         specifier: workspace:*
         version: link:../payments-x402
+      '@gyblos/protocol':
+        specifier: workspace:*
+        version: link:../protocol
       '@gyblos/runtime':
         specifier: workspace:*
         version: link:../runtime
-      '@gyblos/transport':
+      '@gyblos/transport-iroh':
         specifier: workspace:*
-        version: link:../transport
+        version: link:../transport-iroh
       '@number0/iroh':
         specifier: 1.1.0
         version: 1.1.0
@@ -324,6 +324,27 @@ importers:
       '@gyblos/runtime':
         specifier: workspace:*
         version: link:../runtime
+      '@solana-program/token':
+        specifier: 0.9.0
+        version: 0.9.0(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))
+      '@solana/kit':
+        specifier: 5.1.0
+        version: 5.1.0(typescript@5.9.3)(ws@8.21.0)
+      '@x402/core':
+        specifier: 2.28.0
+        version: 2.28.0
+      '@x402/express':
+        specifier: 2.28.0
+        version: 2.28.0(express@4.21.2)(typescript@5.9.3)
+      '@x402/fetch':
+        specifier: 2.28.0
+        version: 2.28.0
+      '@x402/svm':
+        specifier: 2.28.0
+        version: 2.28.0(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))(@solana/sysvars@6.1.0(typescript@5.9.3))(typescript@5.9.3)
+      express:
+        specifier: 4.21.2
+        version: 4.21.2
 
   packages/protocol: {}
 
@@ -333,7 +354,7 @@ importers:
         specifier: workspace:*
         version: link:../config
 
-  packages/transport:
+  packages/transport-iroh:
     dependencies:
       '@gyblos/config':
         specifier: workspace:*
