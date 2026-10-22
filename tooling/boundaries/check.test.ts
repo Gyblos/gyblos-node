@@ -10,7 +10,7 @@ import { layerOf } from './config.js';
 import { fixture, hasRule } from './fixture.js';
 import { parseGraph } from './graph.js';
 
-test('current and future names map to the intended layers', () => {
+void test('current and future names map to the intended layers', () => {
   const examples = {
     'packages/application/src/a.ts': 'core',
     'packages/core/src/a.ts': 'core',
@@ -40,7 +40,7 @@ test('current and future names map to the intended layers', () => {
   assert.equal(layerOf('packages/unmapped/src/a.ts'), null);
 });
 
-test('upper layers may use lower layers, own-package modules and shared support', async () => {
+void test('upper layers may use lower layers, own-package modules and shared support', async () => {
   await fixture(
     {
       'packages/protocol/src/a.ts': 'export const value = 1;',
@@ -63,7 +63,7 @@ test('upper layers may use lower layers, own-package modules and shared support'
   );
 });
 
-test('core-to-adapter is detected for relative type-only imports', async () => {
+void test('core-to-adapter is detected for relative type-only imports', async () => {
   await fixture(
     {
       'packages/core/src/a.ts':
@@ -75,7 +75,7 @@ test('core-to-adapter is detected for relative type-only imports', async () => {
   );
 });
 
-test('distinct adapters cannot import each other through reexports', async () => {
+void test('distinct adapters cannot import each other through reexports', async () => {
   await fixture(
     {
       'packages/engine-ollama/src/a.ts':
@@ -90,7 +90,7 @@ test('distinct adapters cannot import each other through reexports', async () =>
   );
 });
 
-test('applications cannot import another app, including literal dynamic imports', async () => {
+void test('applications cannot import another app, including literal dynamic imports', async () => {
   await fixture(
     {
       'apps/buyer/src/a.ts':
@@ -102,7 +102,7 @@ test('applications cannot import another app, including literal dynamic imports'
   );
 });
 
-test('product cannot import lab, scripts, legacy gate or experimental tooling', async () => {
+void test('product cannot import lab, scripts, legacy gate or experimental tooling', async () => {
   await fixture(
     {
       'apps/buyer/src/a.ts':
@@ -122,7 +122,7 @@ test('product cannot import lab, scripts, legacy gate or experimental tooling', 
   );
 });
 
-test('config and runtime cannot depend on product composition', async () => {
+void test('config and runtime cannot depend on product composition', async () => {
   await fixture(
     {
       'packages/config/src/a.ts': "import '../../runtime/src/b.js';",
@@ -138,7 +138,7 @@ test('config and runtime cannot depend on product composition', async () => {
   );
 });
 
-test('protocol independence and core filesystem imports are reported', async () => {
+void test('protocol independence and core filesystem imports are reported', async () => {
   await fixture(
     {
       'packages/protocol/src/a.ts': "import '../../config/src/a.js';",
@@ -154,7 +154,7 @@ test('protocol independence and core filesystem imports are reported', async () 
   );
 });
 
-test('SDK imports remain visible without traversing their implementation', async () => {
+void test('SDK imports remain visible without traversing their implementation', async () => {
   await fixture(
     {
       'packages/core/src/a.ts':
@@ -180,7 +180,7 @@ test('SDK imports remain visible without traversing their implementation', async
   );
 });
 
-test('workspace package exports and relative paths resolve to identical ownership', async () => {
+void test('workspace package exports and relative paths resolve to identical ownership', async () => {
   await fixture(
     {
       'packages/core/src/a.ts':
@@ -209,7 +209,7 @@ test('workspace package exports and relative paths resolve to identical ownershi
   );
 });
 
-test('unresolved imports, unknown packages and empty scans fail analysis', async () => {
+void test('unresolved imports, unknown packages and empty scans fail analysis', async () => {
   await fixture(
     { 'packages/core/src/a.ts': "import './missing.js';" },
     async (files, root) => {
@@ -223,7 +223,7 @@ test('unresolved imports, unknown packages and empty scans fail analysis', async
   );
 });
 
-test('source code is never executed and existing baseline differences are explicit', async () => {
+void test('source code is never executed and existing baseline differences are explicit', async () => {
   await fixture(
     {
       'packages/core/src/a.ts':

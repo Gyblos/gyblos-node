@@ -1,3 +1,4 @@
+// Owns offline engine readiness.test regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -53,10 +54,10 @@ function fixture() {
   return { engine, snapshot, generations: () => generations };
 }
 
-test('insufficient VM or local cgroup headroom blocks warmup and advertisement', async () => {
+void test('insufficient VM or local cgroup headroom blocks warmup and advertisement', async () => {
   for (const side of ['vm', 'cgroup']) {
-    const value = fixture(),
-      records: unknown[] = [];
+    const value = fixture();
+    const records: unknown[] = [];
     let advertised = 0;
     if (side === 'vm') value.snapshot.vmAvailableBytes = 1;
     else
@@ -77,11 +78,11 @@ test('insufficient VM or local cgroup headroom blocks warmup and advertisement',
   }
 });
 
-test('readiness waits for one successful private warmup and records no generated text', async () => {
-  const value = fixture(),
-    records: unknown[] = [];
-  let release!: () => void,
-    advertised = false;
+void test('readiness waits for one successful private warmup and records no generated text', async () => {
+  const value = fixture();
+  const records: unknown[] = [];
+  let release!: () => void;
+  let advertised = false;
   const previous = value.engine.generate;
   value.engine.generate = async (input) => {
     await new Promise<void>((resolve) => {
@@ -107,11 +108,11 @@ test('readiness waits for one successful private warmup and records no generated
   assert.ok(!JSON.stringify(records).includes('PRIVATE_GENERATED_TEXT'));
 });
 
-test('failed warmup never advertises and never retries; diagnostics omit error payloads', async () => {
-  const value = fixture(),
-    records: unknown[] = [];
-  let attempts = 0,
-    advertised = 0;
+void test('failed warmup never advertises and never retries; diagnostics omit error payloads', async () => {
+  const value = fixture();
+  const records: unknown[] = [];
+  let attempts = 0;
+  let advertised = 0;
   value.engine.generate = async () => {
     attempts++;
     throw new Error('PRIVATE_RESPONSE_AND_PROMPT');
@@ -131,11 +132,11 @@ test('failed warmup never advertises and never retries; diagnostics omit error p
   assert.ok(!JSON.stringify(records).includes('PRIVATE_'));
 });
 
-test('a hung engine is aborted before readiness even if it ignores cancellation', async () => {
-  const value = fixture(),
-    records: unknown[] = [];
-  let aborted = false,
-    advertised = 0;
+void test('a hung engine is aborted before readiness even if it ignores cancellation', async () => {
+  const value = fixture();
+  const records: unknown[] = [];
+  let aborted = false;
+  let advertised = 0;
   value.engine.generate = async ({ signal }) => {
     signal!.addEventListener('abort', () => {
       aborted = true;
@@ -157,10 +158,10 @@ test('a hung engine is aborted before readiness even if it ignores cancellation'
   assert.equal(records.length, 1);
 });
 
-test('a newly observed OOM blocks readiness, while a historical unchanged counter does not', async () => {
+void test('a newly observed OOM blocks readiness, while a historical unchanged counter does not', async () => {
   for (const increases of [false, true]) {
-    const value = fixture(),
-      records: unknown[] = [];
+    const value = fixture();
+    const records: unknown[] = [];
     let reads = 0;
     value.snapshot.cgroup!.events.oomKill = 1;
     const snapshot = async () => {
@@ -188,7 +189,7 @@ test('a newly observed OOM blocks readiness, while a historical unchanged counte
   }
 });
 
-test('offer expiration is anchored to private warmup, and slow startup cannot extend residency', async () => {
+void test('offer expiration is anchored to private warmup, and slow startup cannot extend residency', async () => {
   const value = fixture();
   const readiness = await prepareSellerEngine(value.engine, {
     snapshot: async () => value.snapshot,

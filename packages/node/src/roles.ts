@@ -1,3 +1,4 @@
+// Owns roles in node; it must not know lab orchestration or CLI processes.
 import { generateKeyPairSync } from 'node:crypto';
 import { lstat, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -72,8 +73,8 @@ async function wallet(role: keyof typeof P2P.keys) {
     await lstat(path);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-    const pair = generateKeyPairSync('ed25519'),
-      key = pair.privateKey.export({ format: 'jwk' });
+    const pair = generateKeyPairSync('ed25519');
+    const key = pair.privateKey.export({ format: 'jwk' });
     await writeFile(
       path,
       JSON.stringify([
@@ -187,9 +188,9 @@ export async function setupRole(options: SetupOptions) {
       )
     )
       throw new Error('Payout cannot be the hot node key.');
-    const owner = await wallet('owner'),
-      authorizer = await wallet('authorizer'),
-      facilitator = await wallet('facilitator');
+    const owner = await wallet('owner');
+    const authorizer = await wallet('authorizer');
+    const facilitator = await wallet('facilitator');
     if (
       [owner.address, authorizer.address, facilitator.address].includes(
         address(options.payTo),

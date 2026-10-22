@@ -1,3 +1,4 @@
+// Owns laboratory nat topology; product code must not depend on this module.
 import { P2P } from '@gyblos/config';
 import { TRANSPORT_ROUTES } from '@gyblos/transport-iroh/constants';
 

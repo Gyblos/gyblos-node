@@ -1,3 +1,4 @@
+// Owns seller in node; it must not know lab orchestration or CLI processes.
 import { once } from 'node:events';
 import { resolve } from 'node:path';
 
@@ -107,16 +108,16 @@ export async function startSeller() {
       throw error;
     }
     await stage('private-engine-warmup');
-    const engine = createOllamaEngine(HOSTS.ollama),
-      { model, offerExpiresAt } = await prepareSellerEngine(engine, {
-        snapshot: memorySnapshot,
-        record: (record) =>
-          saveJson(rolePath(DIAGNOSTICS.readinessFilename), record),
-      });
+    const engine = createOllamaEngine(HOSTS.ollama);
+    const { model, offerExpiresAt } = await prepareSellerEngine(engine, {
+      snapshot: memorySnapshot,
+      record: (record) =>
+        saveJson(rolePath(DIAGNOSTICS.readinessFilename), record),
+    });
     await stage('role-signers');
-    const owner = await roleSigner('owner'),
-      authorizer = await roleSigner('authorizer'),
-      facilitator = await roleSigner('facilitator');
+    const owner = await roleSigner('owner');
+    const authorizer = await roleSigner('authorizer');
+    const facilitator = await roleSigner('facilitator');
     const diagnosticLog = await createPrivateLog(
       rolePath(FACILITATOR_LOG_PATHS.roleDirectory),
     );

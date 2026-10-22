@@ -1,3 +1,4 @@
+// Owns laboratory challenge; product code must not depend on this module.
 import assert from 'node:assert/strict';
 
 import { decodePaymentRequiredHeader } from '@x402/core/http';

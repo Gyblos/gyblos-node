@@ -1,3 +1,4 @@
+// Owns laboratory failures; product code must not depend on this module.
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 
@@ -97,9 +98,9 @@ export async function failureGate() {
             await tokens(config.rpcUrl, config.addresses.seller, config.mint)
           ).toString(),
         };
-        let channelId = '',
-          expiresAt = 0,
-          rejection: unknown;
+        let channelId = '';
+        let expiresAt = 0;
+        let rejection: unknown;
         const fetchImpl: typeof fetch = async (input, init) => {
           const request = new Request(input, init);
           const header = request.headers.get('PAYMENT-SIGNATURE');

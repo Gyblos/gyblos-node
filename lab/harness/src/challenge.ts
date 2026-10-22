@@ -1,3 +1,4 @@
+// Owns laboratory challenge; product code must not depend on this module.
 import { once } from 'node:events';
 
 import { decodePaymentRequiredHeader } from '@x402/core/http';

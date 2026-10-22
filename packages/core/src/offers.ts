@@ -1,3 +1,4 @@
+// Owns offers in core; it must not know SDKs, engines or filesystem.
 import {
   DEVNET,
   INFERENCE_REQUEST_LIMITS,

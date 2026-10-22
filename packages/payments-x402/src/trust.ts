@@ -1,3 +1,4 @@
+// Owns trust in payments-x402; it must not know inference engines or lab orchestration.
 import type { PaymentRequirements, SettleResponse } from '@x402/core/types';
 
 import { PAYMENT_LIMITS, TOKEN_PROGRAM_ADDRESS } from '@gyblos/config';

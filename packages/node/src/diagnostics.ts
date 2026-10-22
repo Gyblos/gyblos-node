@@ -1,3 +1,4 @@
+// Owns diagnostics in node; it must not know lab orchestration or CLI processes.
 import { AssertionError } from 'node:assert';
 
 import { GateError } from '@gyblos/payments-x402/chain';

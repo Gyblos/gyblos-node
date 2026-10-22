@@ -1,3 +1,4 @@
+// Owns laboratory main; product code must not depend on this module.
 import assert from 'node:assert/strict';
 import { type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -162,9 +163,9 @@ export async function main() {
             'Host is not owned by this gate.',
           ),
       });
-      const debugRequestId = randomUUID(),
-        underchargeRequestId = randomUUID(),
-        failureRequestId = randomUUID();
+      const debugRequestId = randomUUID();
+      const underchargeRequestId = randomUUID();
+      const failureRequestId = randomUUID();
       const traces = new Map<string, InferenceTrace>();
       const events = async () =>
         (await fetch(`${facilitatorUrl}${ROUTES.events}`, {

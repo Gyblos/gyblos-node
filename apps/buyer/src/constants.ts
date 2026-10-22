@@ -1,3 +1,4 @@
+// Owns constants in buyer; it must not know laboratory orchestration.
 import { JOURNAL_STATES } from '@gyblos/payments-x402/constants';
 import { ROUTE_DISCREPANCY } from '@gyblos/transport-iroh/constants';
 

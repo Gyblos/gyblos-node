@@ -1,3 +1,4 @@
+// Owns laboratory nat regression; product code must not depend on this module.
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
@@ -15,10 +16,16 @@ import {
 import { natEnvironment } from '@gyblos/lab-p2p/nat-topology';
 import { withExclusiveLock } from '@gyblos/payments-x402/recovery/lock';
 
-import { assertReflectedMappings } from './lab-mapping.mjs';
-import { addLabObserver } from './lab-observer.mjs';
-import { runNativeProbe } from './native-nat-probe.mjs';
-import { UDP_PROBE_ARGUMENTS, UDP_PROBE_SOURCE } from './udp-probe.mjs';
+import { assertReflectedMappings } from './lab-mapping.js';
+import { addLabObserver } from './lab-observer.js';
+import { runNativeProbe } from './native-nat-probe.js';
+import type {
+  ComposeTemplate,
+  ContainerIds,
+  ContainerInspection,
+  NativeMappings,
+} from './types.js';
+import { UDP_PROBE_ARGUMENTS, UDP_PROBE_SOURCE } from './udp-probe.js';
 
 async function main() {
   const { values } = parseArgs({
@@ -41,7 +48,7 @@ async function main() {
     );
   const source = await sourceFingerprint();
   const project = `${P2P.docker.projectPrefix}-probe-${randomUUID().slice(0, P2P.docker.projectIdCharacters)}`;
-  const environment = {
+  const environment: NodeJS.ProcessEnv = {
     ...process.env,
     ...natEnvironment(
       values['block-udp'] ? 'nat-relay' : 'nat-direct',
@@ -86,10 +93,12 @@ async function main() {
   environment.GYBLOS_P2P_ROUTER_IMAGE = (
     await docker(['image', 'inspect', '--format', '{{.Id}}', NAT.routerImage])
   ).trim();
-  const template = JSON.parse(await readFile(NAT.composePath, 'utf8'));
+  const template: ComposeTemplate = JSON.parse(
+    await readFile(NAT.composePath, 'utf8'),
+  );
   delete template.volumes;
   for (const role of ['seller', 'buyer']) {
-    const actor = template.services[role];
+    const actor = template.services[role]!;
     delete actor.volumes;
     actor.tmpfs = [`${NAT.privateMount}:uid=1000,gid=1000,mode=0700`];
     actor.environment = {};
@@ -106,7 +115,7 @@ async function main() {
   await writeFile(composePath, JSON.stringify(template), {
     mode: FILE_MODES.privateFile,
   });
-  const compose = (args) => [
+  const compose = (args: string[]) => [
     'compose',
     '-p',
     project,
@@ -116,25 +125,27 @@ async function main() {
   ];
   try {
     await docker(compose(['up', '-d', '--wait']), undefined, environment);
-    const ids = {};
+    const ids: ContainerIds = {};
     for (const role of Object.keys(template.services)) {
       ids[role] = (
         await docker(compose(['ps', '-q', role]), undefined, environment)
       ).trim();
-      const [inspection] = JSON.parse(await docker(['inspect', ids[role]]));
-      assert.equal(inspection.Config.User, P2P.docker.user);
-      assert.equal(inspection.HostConfig.ReadonlyRootfs, true);
-      assert.equal(inspection.HostConfig.Privileged, false);
-      assert.ok(inspection.Mounts.every((mount) => mount.Type === 'tmpfs'));
+      const [inspection]: ContainerInspection[] = JSON.parse(
+        await docker(['inspect', ids[role]!]),
+      );
+      assert.equal(inspection!.Config.User, P2P.docker.user);
+      assert.equal(inspection!.HostConfig.ReadonlyRootfs, true);
+      assert.equal(inspection!.HostConfig.Privileged, false);
+      assert.ok(inspection!.Mounts.every((mount) => mount.Type === 'tmpfs'));
       assert.equal(
-        Object.keys(inspection.HostConfig.PortBindings ?? {}).length,
+        Object.keys(inspection!.HostConfig.PortBindings ?? {}).length,
         0,
       );
       assert.equal(
-        Object.keys(inspection.NetworkSettings.Networks).length,
+        Object.keys(inspection!.NetworkSettings.Networks).length,
         role.startsWith('router') ? 2 : 1,
       );
-      const capabilities = (inspection.HostConfig.CapAdd ?? []).map(
+      const capabilities = (inspection!.HostConfig.CapAdd ?? []).map(
         (capability) => capability.replace(/^CAP_/, ''),
       );
       assert.deepEqual(
@@ -142,8 +153,14 @@ async function main() {
         role.startsWith('router') ? ['NET_ADMIN'] : [],
       );
     }
-    const run = (role, own, port, remote, remotePort) =>
-      execute(ids[role], [
+    const run = (
+      role: string,
+      own: string,
+      port: number,
+      remote: string,
+      remotePort: number,
+    ) =>
+      execute(ids[role]!, [
         'node',
         '-e',
         UDP_PROBE_SOURCE,
@@ -195,8 +212,8 @@ async function main() {
         NAT.probe.sellerPort,
         NAT.wan.routerB,
       ],
-    ]) {
-      const raw = await execute(ids[`router-${side}`], [
+    ] as const) {
+      const raw = await execute(ids[`router-${side}`]!, [
         '/usr/sbin/conntrack',
         '-L',
         '-p',
@@ -221,11 +238,11 @@ async function main() {
       ? await runNativeProbe({ ids, values, project })
       : undefined;
     const native = nativeResult?.report;
-    const nativeMappings = {};
+    const nativeMappings: NativeMappings = {};
     if (native) {
       for (const side of ['a', 'b'])
         nativeMappings[side] = parseUdpMappings(
-          await execute(ids[`router-${side}`], [
+          await execute(ids[`router-${side}`]!, [
             '/usr/sbin/conntrack',
             '-L',
             '-p',
@@ -234,12 +251,12 @@ async function main() {
         );
     }
     if (values['wan-discovery']) {
-      assertReflectedMappings(nativeResult.raw, nativeMappings);
-      native.reflectedMappingsVerified = true;
+      assertReflectedMappings(nativeResult!.raw, nativeMappings);
+      native!.reflectedMappingsVerified = true;
     }
     let inboundUdpDroppedPackets = 0;
     if (values['block-udp']) {
-      const counters = await execute(ids['router-a'], [
+      const counters = await execute(ids['router-a']!, [
         '/usr/sbin/iptables-nft',
         '-L',
         'FORWARD',

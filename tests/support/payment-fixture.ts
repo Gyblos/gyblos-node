@@ -1,3 +1,4 @@
+// Owns offline payment fixture regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 

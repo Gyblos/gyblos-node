@@ -1,3 +1,4 @@
+// Owns offline native cases regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import test from 'node:test';
@@ -29,7 +30,7 @@ async function rejectsBeforeDeadline(operation: Promise<unknown>) {
 }
 
 export function registerNativeCases() {
-  test(
+  void test(
     'native priority1: reset/half-close incomplete input and a closed response preserve healthy-peer access',
     { ...NATIVE_TEST_OPTIONS, timeout: TIMEOUT },
     async () => {
@@ -73,7 +74,7 @@ export function registerNativeCases() {
     },
   );
 
-  test(
+  void test(
     'native priority2: valid fragmentation is exact; truncated/ambiguous/oversized frames never reach origin',
     { ...NATIVE_TEST_OPTIONS, timeout: TIMEOUT },
     async () => {
@@ -116,7 +117,7 @@ export function registerNativeCases() {
     },
   );
 
-  test(
+  void test(
     'native priority3: remote receipt loss poisons the live buyer; a new transport does not execute the duplicate',
     { ...NATIVE_TEST_OPTIONS, timeout: TIMEOUT },
     async () => {
@@ -154,7 +155,7 @@ export function registerNativeCases() {
     },
   );
 
-  test(
+  void test(
     'native priority4: multiple NodeIds behind one IP stay usable despite another NodeId opening duplicate connections',
     { ...NATIVE_TEST_OPTIONS, timeout: TIMEOUT },
     async () => {

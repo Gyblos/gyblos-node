@@ -1,3 +1,4 @@
+// Owns offline facilitator privacy cases regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -23,7 +24,7 @@ import {
 } from './facilitator-diagnostic-fixture.js';
 
 export function registerFacilitatorPrivacyCases() {
-  test('facilitator projection omits arbitrary fields and never coerces hostile metadata', () => {
+  void test('facilitator projection omits arbitrary fields and never coerces hostile metadata', () => {
     const records: FacilitatorDiagnosticRecord[] = [];
     const begin = createFacilitatorObserver({
       onDiagnostic(record) {
@@ -69,7 +70,7 @@ export function registerFacilitatorPrivacyCases() {
       assert.equal(records.at(-1)?.amountAtomic, undefined);
     }
   });
-  test('facilitator projection reads reason once and returns the canonical member', () => {
+  void test('facilitator projection reads reason once and returns the canonical member', () => {
     const records: FacilitatorDiagnosticRecord[] = [];
     const attempt = createFacilitatorObserver({
       onDiagnostic(record) {
@@ -98,7 +99,7 @@ export function registerFacilitatorPrivacyCases() {
     assert.ok(!JSON.stringify(records).includes(DIAGNOSTIC_CANARY));
     assert.ok(records.every(Object.isFrozen));
   });
-  test('facilitator exception projection ignores message, stack, cause and hostile prototypes', () => {
+  void test('facilitator exception projection ignores message, stack, cause and hostile prototypes', () => {
     const records: FacilitatorDiagnosticRecord[] = [];
     const attempt = createFacilitatorObserver({
       onDiagnostic(record) {
@@ -146,7 +147,7 @@ export function registerFacilitatorPrivacyCases() {
     );
     assert.ok(!JSON.stringify(records).includes(DIAGNOSTIC_CANARY));
   });
-  test('facilitator pending with empty or malformed signature never invents a hint', () => {
+  void test('facilitator pending with empty or malformed signature never invents a hint', () => {
     const records: FacilitatorDiagnosticRecord[] = [];
     const attempt = createFacilitatorObserver({
       onDiagnostic(record) {

@@ -1,3 +1,4 @@
+// Owns json in runtime; it must not know product workflows or lab orchestration.
 import { randomUUID } from 'node:crypto';
 import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises';
 import { dirname } from 'node:path';

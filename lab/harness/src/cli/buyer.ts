@@ -1,3 +1,4 @@
+// Owns laboratory buyer; product code must not depend on this module.
 import { isMain } from '@gyblos/runtime';
 
 import { executeGate } from './execute.js';

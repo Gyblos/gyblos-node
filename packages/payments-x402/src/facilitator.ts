@@ -1,3 +1,4 @@
+// Owns facilitator in payments-x402; it must not know inference engines or lab orchestration.
 import { errorMonitor } from 'node:events';
 
 import type { KeyPairSigner } from '@solana/kit';

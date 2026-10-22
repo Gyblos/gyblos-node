@@ -1,3 +1,4 @@
+// Owns offline private log guard cases regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import {
   chmod,
@@ -36,7 +37,7 @@ export function registerPrivateLogGuardCases() {
     'hardlink',
     'inode-swap',
   ] as const)
-    test(
+    void test(
       `private log refuses ${fault} without modifying the replacement`,
       { timeout: 10000, skip: PRIVATE_LOG_PLATFORM_SKIP },
       async () => {
@@ -88,7 +89,7 @@ export function registerPrivateLogGuardCases() {
         }
       },
     );
-  test(
+  void test(
     'partial append poisons its writer and restart preserves the damaged tail',
     { timeout: 10000, skip: PRIVATE_LOG_PLATFORM_SKIP },
     async () => {
@@ -122,7 +123,7 @@ export function registerPrivateLogGuardCases() {
       }
     },
   );
-  test(
+  void test(
     'fsync failure keeps SDK success and exposes only canonical degradation',
     { timeout: 10000, skip: PRIVATE_LOG_PLATFORM_SKIP },
     async () => {
@@ -155,7 +156,7 @@ export function registerPrivateLogGuardCases() {
       }
     },
   );
-  test(
+  void test(
     'persistent facilitator logs exclude non-URL secrets from SDK reasons and messages',
     { timeout: 10000, skip: PRIVATE_LOG_PLATFORM_SKIP },
     async () => {
@@ -189,7 +190,7 @@ export function registerPrivateLogGuardCases() {
       }
     },
   );
-  test(
+  void test(
     'log instance limit never reclaims legacy journals',
     { timeout: 10000, skip: PRIVATE_LOG_PLATFORM_SKIP },
     async () => {

@@ -1,3 +1,4 @@
+// Owns chain in payments-x402; it must not know inference engines or lab orchestration.
 import {
   COMMITMENT,
   DIAGNOSTIC_LIMITS,

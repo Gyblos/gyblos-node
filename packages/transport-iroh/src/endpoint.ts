@@ -1,3 +1,4 @@
+// Owns endpoint in transport-iroh; it must not know wallets or inference engines.
 import { Endpoint, RelayMode } from '@number0/iroh';
 
 import { IPV6_LOOPBACK, LOCALHOST, P2P } from '@gyblos/config';

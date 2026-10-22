@@ -1,3 +1,4 @@
+// Owns reconcile in buyer; it must not know laboratory orchestration.
 import assert from 'node:assert/strict';
 import { parseArgs } from 'node:util';
 

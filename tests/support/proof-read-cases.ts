@@ -1,3 +1,4 @@
+// Owns offline proof read cases regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -140,24 +141,24 @@ async function withProofReads(
 }
 
 export function registerProofReadCases() {
-  test('a lagging deposit index is reread without another payment', async () => {
+  void test('a lagging deposit index is reread without another payment', async () => {
     await withProofReads({ laggingIndex: true }, async ({ run, histories }) => {
       const proof = await run();
       assert.equal(histories(), 2);
       assert.ok(BigInt(proof.chargedAtomic) > 0n);
     });
   });
-  test('the known claim slot constrains subsequent history and account reads', async () => {
+  void test('the known claim slot constrains subsequent history and account reads', async () => {
     await withProofReads({ requireContext: true }, async ({ run }) => {
       await run();
     });
   });
-  test('a post-claim snapshot older than the claim slot cannot pass coincidentally matching balances', async () => {
+  void test('a post-claim snapshot older than the claim slot cannot pass coincidentally matching balances', async () => {
     await withProofReads({ staleSnapshot: true }, async ({ run }) => {
       await assert.rejects(run, /snapshot.*claim slot/i);
     });
   });
-  test('deposit discovery is observable before a later snapshot guard rejects the proof', async () => {
+  void test('deposit discovery is observable before a later snapshot guard rejects the proof', async () => {
     const { expected } = await paymentFixture();
     const observed: PaymentProofObservation[] = [];
     await withProofReads({ staleSnapshot: true }, async ({ run }) => {
@@ -175,7 +176,7 @@ export function registerProofReadCases() {
       },
     ]);
   });
-  test('malformed or missing claim slots stop before history or snapshot reads', async () => {
+  void test('malformed or missing claim slots stop before history or snapshot reads', async () => {
     for (const claimSlot of [
       undefined,
       null,
@@ -193,7 +194,7 @@ export function registerProofReadCases() {
         },
       );
   });
-  test('missing deposit visibility stops at the configured read budget', async () => {
+  void test('missing deposit visibility stops at the configured read budget', async () => {
     await withProofReads({ missingIndex: true }, async ({ run, histories }) => {
       await assert.rejects(
         run,
@@ -204,13 +205,13 @@ export function registerProofReadCases() {
       assert.equal(histories(), RETRIES.transaction);
     });
   });
-  test('read retries do not relax charge-plus-refund conservation', async () => {
+  void test('read retries do not relax charge-plus-refund conservation', async () => {
     await withProofReads({ wrongCeiling: true }, async ({ run, histories }) => {
       await assert.rejects(run, assert.AssertionError);
       assert.equal(histories(), 0);
     });
   });
-  test('ambiguous duplicate deposits fail instead of selecting one through retries', async () => {
+  void test('ambiguous duplicate deposits fail instead of selecting one through retries', async () => {
     await withProofReads(
       { duplicateDeposit: true },
       async ({ run, histories }) => {

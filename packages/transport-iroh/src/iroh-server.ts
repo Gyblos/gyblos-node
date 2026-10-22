@@ -1,3 +1,4 @@
+// Owns iroh server in transport-iroh; it must not know wallets or inference engines.
 import type { BiStream, Connection, Endpoint } from '@number0/iroh';
 
 import { HTTP_STATUS, P2P } from '@gyblos/config';

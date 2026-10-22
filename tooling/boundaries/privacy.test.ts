@@ -17,7 +17,7 @@ function addedCount(text: string): number {
   return value.added.length;
 }
 
-test('archive enumeration excludes private/generated trees and symlinks before traversal', async () => {
+void test('archive enumeration excludes private/generated trees and symlinks before traversal', async () => {
   await fixture(
     {
       'packages/core/src/a.mts': 'export const value = 1;',
@@ -35,7 +35,7 @@ test('archive enumeration excludes private/generated trees and symlinks before t
   );
 });
 
-test('CLI reports new violations without rewriting baseline and fails analyzer errors', async () => {
+void test('CLI reports new violations without rewriting baseline and fails analyzer errors', async () => {
   await fixture(
     {
       'package.json': JSON.stringify({ type: 'module' }),
@@ -114,7 +114,7 @@ test('CLI reports new violations without rewriting baseline and fails analyzer e
   );
 });
 
-test('unmapped transitive shims cannot launder a forbidden dependency', async () => {
+void test('unmapped transitive shims cannot launder a forbidden dependency', async () => {
   await fixture(
     {
       'packages/core/src/a.ts': "export * from '../../../shim.js';",
@@ -133,7 +133,7 @@ test('unmapped transitive shims cannot launder a forbidden dependency', async ()
   );
 });
 
-test('Git enumeration rejects symbolic source files and archive enumeration rejects linked roots', async () => {
+void test('Git enumeration rejects symbolic source files and archive enumeration rejects linked roots', async () => {
   await fixture(
     {
       '.gitignore': 'captures/\n',
@@ -167,7 +167,7 @@ test('Git enumeration rejects symbolic source files and archive enumeration reje
   );
 });
 
-test('imports cannot make analysis parse a symlink target outside the vetted inventory', async () => {
+void test('imports cannot make analysis parse a symlink target outside the vetted inventory', async () => {
   await fixture(
     {
       'packages/core/src/a.ts': "import './linked.mjs';",

@@ -1,3 +1,4 @@
+// Owns index in config; it must not know product workflows or lab orchestration.
 export * from './network.js';
 
 export * from './hosts.js';

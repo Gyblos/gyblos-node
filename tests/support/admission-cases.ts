@@ -1,3 +1,4 @@
+// Owns offline admission cases regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -8,9 +9,9 @@ import {
 } from '@gyblos/transport-iroh/admission';
 
 export function registerAdmissionCases() {
-  test('established per-peer admission cap applies while the global pool has capacity', () => {
-    const admission = createConnectionAdmission(),
-      leases: (() => void)[] = [];
+  void test('established per-peer admission cap applies while the global pool has capacity', () => {
+    const admission = createConnectionAdmission();
+    const leases: (() => void)[] = [];
     assert.ok(P2P.maxPeerConnections < P2P.maxConnections);
     for (let index = 0; index < P2P.maxPeerConnections; index++) {
       const lease = admission.established('one-peer');
@@ -29,7 +30,7 @@ export function registerAdmissionCases() {
     other();
     for (const release of leases) release();
   });
-  test('source ports share one IP pending budget; malformed sources are refused', () => {
+  void test('source ports share one IP pending budget; malformed sources are refused', () => {
     assert.equal(
       connectionSource({ kind: 'ip', addr: '192.0.2.1:1000' }),
       connectionSource({ kind: 'ip', addr: '192.0.2.1:2000' }),
@@ -47,7 +48,7 @@ export function registerAdmissionCases() {
     ])
       assert.equal(connectionSource({ kind: 'ip', addr }), undefined);
   });
-  test('relay identity sources and full IPv6 address keys retain their documented boundary', () => {
+  void test('relay identity sources and full IPv6 address keys retain their documented boundary', () => {
     assert.equal(
       connectionSource({ kind: 'relay', endpointId: 'ABC' }),
       'relay:abc',
@@ -61,10 +62,10 @@ export function registerAdmissionCases() {
       connectionSource({ kind: 'ip', addr: '192.0.2.1:1000' }),
     );
   });
-  test('pending and established pools have independent global and per-source limits', () => {
-    const admission = createConnectionAdmission(),
-      pending: (() => void)[] = [],
-      established: (() => void)[] = [];
+  void test('pending and established pools have independent global and per-source limits', () => {
+    const admission = createConnectionAdmission();
+    const pending: (() => void)[] = [];
+    const established: (() => void)[] = [];
     for (let index = 0; index < P2P.maxPendingConnections; index++) {
       const release = admission.pending(
         'source-' + Math.floor(index / P2P.maxPendingPerSource),
@@ -93,9 +94,9 @@ export function registerAdmissionCases() {
     nextEstablished();
     for (const release of [...pending, ...established]) release();
   });
-  test('one source cannot bypass its pending limit using multiple connections', () => {
-    const admission = createConnectionAdmission(),
-      leases: (() => void)[] = [];
+  void test('one source cannot bypass its pending limit using multiple connections', () => {
+    const admission = createConnectionAdmission();
+    const leases: (() => void)[] = [];
     for (let index = 0; index < P2P.maxPendingPerSource; index++) {
       const lease = admission.pending('one-source');
       assert.ok(lease);

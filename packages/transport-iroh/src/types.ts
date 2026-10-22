@@ -1,3 +1,4 @@
+// Owns types in transport-iroh; it must not know wallets or inference engines.
 import { TRANSPORT_ROUTES } from './constants.js';
 
 export type TransportRoute =

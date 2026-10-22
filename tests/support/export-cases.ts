@@ -1,3 +1,4 @@
+// Owns offline export cases regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -13,12 +14,12 @@ const call = (lab: Lab) => lab.paid[0]!;
 const trace = (lab: Lab) => lab.traces[0]!;
 
 export function registerExportCases() {
-  test('actual collector preserves original payment fields and observed snapshots', async (context) => {
-    const fixture = await exportFixture(context),
-      original = structuredClone(call(fixture)),
-      snapshot = structuredClone(trace(fixture).during);
-    const result = await fixture.collect(),
-      first = result.cases[0]!;
+  void test('actual collector preserves original payment fields and observed snapshots', async (context) => {
+    const fixture = await exportFixture(context);
+    const original = structuredClone(call(fixture));
+    const snapshot = structuredClone(trace(fixture).during);
+    const result = await fixture.collect();
+    const first = result.cases[0]!;
     assert.equal(result.cases.length, P2P.minimumRequests);
     for (const field of [
       'ceilingAtomic',
@@ -36,7 +37,7 @@ export function registerExportCases() {
       after: original.after,
     });
   });
-  test('actual collector records exact-ceiling observation as explicit zero excess', async (context) => {
+  void test('actual collector records exact-ceiling observation as explicit zero excess', async (context) => {
     const fixture = await exportFixture(context);
     assert.equal(
       (await fixture.collect()).cases[0]!.preInferenceEscrowExcessAtomic,
@@ -44,17 +45,17 @@ export function registerExportCases() {
     );
   });
   for (const excess of [1n, 17n, 9007199254740993n])
-    test(
+    void test(
       'observed escrow excess stays separate from principal and finalized treasury=' +
         excess,
       async (context) => {
-        const fixture = await exportFixture(context),
-          original = structuredClone(call(fixture));
+        const fixture = await exportFixture(context);
+        const original = structuredClone(call(fixture));
         trace(fixture).during.escrow = (
           BigInt(original.ceilingAtomic) + excess
         ).toString();
-        const result = await fixture.collect(),
-          first = result.cases[0]!;
+        const result = await fixture.collect();
+        const first = result.cases[0]!;
         assert.equal(first.preInferenceEscrowExcessAtomic, excess.toString());
         assert.equal(first.ceilingAtomic, original.ceilingAtomic);
         assert.equal(first.chargedAtomic, original.chargedAtomic);
@@ -71,7 +72,7 @@ export function registerExportCases() {
         assert.equal(Object.hasOwn(first, 'treasurySweepAtomic'), false);
       },
     );
-  test('surplus-aware export respects required relay and original call offset', async (context) => {
+  void test('surplus-aware export respects required relay and original call offset', async (context) => {
     const fixture = await exportFixture(context);
     for (const paid of fixture.paid)
       paid.transport = {
@@ -95,7 +96,7 @@ export function registerExportCases() {
     assert.equal(result.cases[0]!.preInferenceEscrowExcessAtomic, '3');
     assert.equal(result.cases[0]!.transport, TRANSPORT_ROUTES.RELAY);
   });
-  test('unrelated old traces do not prevent exact request and channel matching', async (context) => {
+  void test('unrelated old traces do not prevent exact request and channel matching', async (context) => {
     const fixture = await exportFixture(context);
     fixture.traces.push({
       ...trace(fixture),
@@ -198,7 +199,7 @@ export function registerExportCases() {
     },
   };
   for (const [name, mutate] of Object.entries(faults))
-    test('collector rejects ' + name, async (context) => {
+    void test('collector rejects ' + name, async (context) => {
       const fixture = await exportFixture(context);
       mutate(fixture);
       await assert.rejects(fixture.collect());
@@ -220,7 +221,7 @@ export function registerExportCases() {
     {},
     [],
   ]) {
-    test(
+    void test(
       'collector rejects malformed escrow ' + JSON.stringify(value),
       async (context) => {
         const fixture = await exportFixture(context);
@@ -236,7 +237,7 @@ export function registerExportCases() {
   };
   for (const [field, values] of Object.entries(invalidFields))
     for (const value of values)
-      test(
+      void test(
         'collector rejects malformed ' + field + ' ' + JSON.stringify(value),
         async (context) => {
           const fixture = await exportFixture(context);
@@ -252,7 +253,7 @@ export function registerExportCases() {
       'refundAtomic',
       'seller',
     ] as const)
-      test(
+      void test(
         'collector rejects trailing line ending in ' +
           field +
           ' ' +
@@ -267,10 +268,10 @@ export function registerExportCases() {
           await assert.rejects(fixture.collect());
         },
       );
-  test('zero-charge export re-fetches treasury proof despite stale local fields', async (context) => {
-    const fixture = await exportFixture(context),
-      result = await fixture.collect(),
-      proof = result.previousAttempts[0]!;
+  void test('zero-charge export re-fetches treasury proof despite stale local fields', async (context) => {
+    const fixture = await exportFixture(context);
+    const result = await fixture.collect();
+    const proof = result.previousAttempts[0]!;
     assert.equal(proof.treasurySweepAtomic, '1');
     assert.equal(proof.escrowInterveningTokenCreditAtomic, '1');
     assert.equal(proof.chargedAtomic, '0');
@@ -278,21 +279,21 @@ export function registerExportCases() {
     assert.ok(fixture.financial.methods.includes('getTransaction'));
     assert.equal(proof.provenanceVerified, false);
   });
-  test('zero-charge export rejects an incorrect canonical treasury sweep', async (context) => {
-    const fixture = await exportFixture(context),
-      accounts = await paymentAccounts(fixture.financial);
+  void test('zero-charge export rejects an incorrect canonical treasury sweep', async (context) => {
+    const fixture = await exportFixture(context);
+    const accounts = await paymentAccounts(fixture.financial);
     tokenLeg(fixture.financial, accounts.treasuryAta).info.tokenAmount.amount =
       '2';
     await assert.rejects(fixture.collect());
   });
-  test('zero-charge export cannot mask a charged outcome with forged stored zero fields', async (context) => {
+  void test('zero-charge export cannot mask a charged outcome with forged stored zero fields', async (context) => {
     const fixture = await exportFixture(context, false);
     await assert.rejects(
       fixture.collect(),
       /confirmed charge requires charged-outcome recovery/,
     );
   });
-  test('zero-charge export binds the original attempt ceiling', async (context) => {
+  void test('zero-charge export binds the original attempt ceiling', async (context) => {
     const fixture = await exportFixture(context);
     fixture.records[0]!.ceilingAtomic = '1';
     await assert.rejects(fixture.collect());

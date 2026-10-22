@@ -1,3 +1,4 @@
+// Owns private log file in runtime; it must not know product workflows or lab orchestration.
 import { constants, type Stats } from 'node:fs';
 import { lstat, mkdir, open, readdir, type FileHandle } from 'node:fs/promises';
 import { join, parse, resolve, sep } from 'node:path';

@@ -1,3 +1,4 @@
+// Owns offline token cases regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -18,7 +19,7 @@ import {
 import { TOKEN_FAULTS } from './token-faults.js';
 
 export function registerTokenCases() {
-  test('saved real finalized pair retains original charge, refund and zero surplus', async () => {
+  void test('saved real finalized pair retains original charge, refund and zero surplus', async () => {
     const fixture = await paymentFixture();
     const proof = await verifyPayment(fixture);
     assert.equal(proof.chargedAtomic, fixture.historicalResult.chargedAtomic);
@@ -29,7 +30,7 @@ export function registerTokenCases() {
   });
   for (const fullRefund of [false, true])
     for (const credit of [1n, 17n]) {
-      test(
+      void test(
         'unsigned token credit preserves principal: full refund=' +
           fullRefund +
           ', credit=' +
@@ -69,7 +70,7 @@ export function registerTokenCases() {
         },
       );
     }
-  test('zero-charge recovery keeps principal refund separate from token and lamport credits', async () => {
+  void test('zero-charge recovery keeps principal refund separate from token and lamport credits', async () => {
     const fixture = await paymentFixture();
     await fullPrincipalRefund(fixture);
     await tokenCredit(fixture, 17n);
@@ -83,7 +84,7 @@ export function registerTokenCases() {
     assert.equal(proof.channelInterveningCreditLamports, '11');
     assert.equal(proof.channelPostClaimCreditLamports, '13');
   });
-  test('charged canonical settlement refuses zero-charge recovery despite a surplus', async () => {
+  void test('charged canonical settlement refuses zero-charge recovery despite a surplus', async () => {
     const fixture = await paymentFixture();
     await tokenCredit(fixture, 1n);
     await assert.rejects(
@@ -92,7 +93,7 @@ export function registerTokenCases() {
     );
   });
   for (const [name, [message, mutate]] of Object.entries(TOKEN_FAULTS))
-    test('token proof rejects ' + name, async () => {
+    void test('token proof rejects ' + name, async () => {
       const fixture = await paymentFixture();
       const accounts = await paymentAccounts(fixture);
       const sweep = await tokenCredit(fixture, 1n);

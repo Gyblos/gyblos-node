@@ -1,3 +1,4 @@
+// Owns laboratory udp probe; product code must not depend on this module.
 import { NAT } from '@gyblos/lab-p2p/constants';
 
 export const UDP_PROBE_SOURCE = `

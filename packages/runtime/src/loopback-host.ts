@@ -1,3 +1,4 @@
+// Owns loopback host in runtime; it must not know product workflows or lab orchestration.
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
 import { HTTP_STATUS, LOOPBACK_HOST_NAMES } from '@gyblos/config';

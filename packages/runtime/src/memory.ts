@@ -1,3 +1,4 @@
+// Owns memory in runtime; it must not know product workflows or lab orchestration.
 import { readFile } from 'node:fs/promises';
 import { freemem } from 'node:os';
 

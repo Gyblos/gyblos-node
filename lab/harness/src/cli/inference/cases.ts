@@ -1,3 +1,4 @@
+// Owns laboratory cases; product code must not depend on this module.
 import assert from 'node:assert/strict';
 
 import { INFERENCE_TRANSPORT_PATH, TIMEOUTS } from '@gyblos/config';
@@ -50,7 +51,8 @@ export async function runCases({
     );
     const before = await inferenceSnapshot(config);
     assert.ok(BigInt(before.buyer) >= BigInt(ceiling));
-    let signedAt: number | undefined, channelId: string | undefined;
+    let signedAt: number | undefined;
+    let channelId: string | undefined;
     const buyer = createInferenceBuyer(
       buyerSigner,
       config.rpcUrl,

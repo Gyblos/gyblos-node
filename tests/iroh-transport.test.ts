@@ -1,3 +1,4 @@
+// Owns offline iroh transport.test regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { once } from 'node:events';
@@ -14,8 +15,8 @@ import { endpoint, fixture, fixtureRequest } from './support/native-fixture.js';
 import { NATIVE_TEST_OPTIONS, waitFor } from './support/native-runtime.js';
 
 async function exercise(relayOnly: boolean, wrongIdentity: boolean) {
-  const seller = await endpoint(),
-    buyer = await endpoint();
+  const seller = await endpoint();
+  const buyer = await endpoint();
   let executions = 0;
   const http = createServer((request, response) => {
     executions++;
@@ -32,15 +33,15 @@ async function exercise(relayOnly: boolean, wrongIdentity: boolean) {
   const address = http.address();
   assert.ok(address && typeof address !== 'string');
   const bridge = serveIroh(
-      seller,
-      `http://${LOCALHOST}:${address.port}`,
-      relayOnly,
-    ),
-    transport = createIrohTransport(
-      buyer,
-      seller.addr(),
-      wrongIdentity ? buyer.id().toString() : seller.id().toString(),
-    );
+    seller,
+    `http://${LOCALHOST}:${address.port}`,
+    relayOnly,
+  );
+  const transport = createIrohTransport(
+    buyer,
+    seller.addr(),
+    wrongIdentity ? buyer.id().toString() : seller.id().toString(),
+  );
   try {
     if (wrongIdentity) {
       await assert.rejects(transport.ready(), /NodeId/);
@@ -73,17 +74,17 @@ async function exercise(relayOnly: boolean, wrongIdentity: boolean) {
   }
 }
 
-test(
+void test(
   'native Iroh carries HTTP payment challenges without public HTTP ports',
   NATIVE_TEST_OPTIONS,
   () => exercise(false, false),
 );
-test(
+void test(
   'native remote NodeId mismatch blocks HTTP before any signing challenge',
   NATIVE_TEST_OPTIONS,
   () => exercise(false, true),
 );
-test(
+void test(
   'relay-only server refuses an observed direct path before forwarding HTTP',
   NATIVE_TEST_OPTIONS,
   () => exercise(true, false),
@@ -92,16 +93,16 @@ test(
 registerNativeCases();
 registerEgressCases();
 
-test(
+void test(
   'native smoke: nine distinct free-request peers disconnect and a newcomer remains admissible',
   { ...NATIVE_TEST_OPTIONS, timeout: 20000 },
   async () => {
-    const lab = await fixture(),
-      identities = new Set<string>();
+    const lab = await fixture();
+    const identities = new Set<string>();
     try {
       for (let index = 0; index < 9; index++) {
-        const peer = await lab.transport(),
-          id = lab.nodeId(peer);
+        const peer = await lab.transport();
+        const id = lab.nodeId(peer);
         assert.ok(id);
         assert.equal(identities.has(id), false);
         identities.add(id);
@@ -136,15 +137,15 @@ test(
   },
 );
 
-test(
+void test(
   'native same-NodeId reconnect preserves remaining quota and refuses after actual consumption',
   { ...NATIVE_TEST_OPTIONS, timeout: 20000 },
   async () => {
-    const lab = await fixture(),
-      secret = [...randomBytes(P2P.nodeSecretBytes)];
+    const lab = await fixture();
+    const secret = [...randomBytes(P2P.nodeSecretBytes)];
     try {
-      const first = await lab.transport(secret),
-        identity = lab.nodeId(first);
+      const first = await lab.transport(secret);
+      const identity = lab.nodeId(first);
       for (let index = 0; index < 4; index++)
         assert.equal(
           (await first.exchange(fixtureRequest('before-' + index))).status,

@@ -1,3 +1,4 @@
+// Owns constants in payments-x402; it must not know inference engines or lab orchestration.
 export const JOURNAL_STATES = {
   AUTHORIZATION_CREATED: 'authorization-created',
   RECONCILED: 'reconciled',

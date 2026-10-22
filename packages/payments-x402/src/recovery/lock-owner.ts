@@ -1,3 +1,4 @@
+// Owns lock owner in payments-x402; it must not know inference engines or lab orchestration.
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { readFile, readlink } from 'node:fs/promises';

@@ -1,3 +1,4 @@
+// Owns laboratory assertions; product code must not depend on this module.
 import assert from 'node:assert/strict';
 
 import { EXACT_PRICE } from '@gyblos/core/constants';
@@ -73,9 +74,9 @@ export async function assertEmpty(
 ) {
   const cases = evidence.results;
   // A live zero balance is rejected before signing or contacting public payment endpoints.
-  const emptyBefore = await snapshot(config, config.addresses.authorizer),
-    emptyCalls = facilitator.calls.length,
-    emptyHandlers = host.handlerCalls();
+  const emptyBefore = await snapshot(config, config.addresses.authorizer);
+  const emptyCalls = facilitator.calls.length;
+  const emptyHandlers = host.handlerCalls();
   assert.equal(emptyBefore.buyer, '0');
   let signed = false;
   const emptySigner = await signer(config, WALLET_ROLES.AUTHORIZER);

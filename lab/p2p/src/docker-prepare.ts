@@ -1,3 +1,4 @@
+// Owns laboratory docker prepare; product code must not depend on this module.
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
@@ -66,10 +67,10 @@ export async function prepareDocker(
     labCandidates?: boolean;
   } = {},
 ) {
-  const config = await fundingConfig(operatorRoot),
-    manifest = JSON.parse(await readFile('package.json', 'utf8')) as {
-      packageManager: string;
-    };
+  const config = await fundingConfig(operatorRoot);
+  const manifest = JSON.parse(await readFile('package.json', 'utf8')) as {
+    packageManager: string;
+  };
   const source = await sourceFingerprint();
   await docker([
     'build',

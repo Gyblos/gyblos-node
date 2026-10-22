@@ -1,3 +1,4 @@
+// Owns proxy in buyer; it must not know laboratory orchestration.
 import { appendFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 
@@ -36,11 +37,11 @@ export async function startBuyerProxy(transport: Transport) {
             throw new Error('Request body exceeds limit.');
           chunks.push(Buffer.from(chunk));
         }
-        const body = Buffer.concat(chunks),
-          headers: Record<string, string> = {
-            'content-type': 'application/json',
-            host: `${LOCALHOST}:${P2P.buyerProxyPort}`,
-          };
+        const body = Buffer.concat(chunks);
+        const headers: Record<string, string> = {
+          'content-type': 'application/json',
+          host: `${LOCALHOST}:${P2P.buyerProxyPort}`,
+        };
         const payment = request.headers['payment-signature'];
         if (typeof payment === 'string') headers['payment-signature'] = payment;
         const identifier = (

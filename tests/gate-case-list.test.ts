@@ -1,10 +1,11 @@
+// Owns offline gate case list.test regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { INFERENCE_CASES } from '@gyblos/lab-harness/constants';
 import { createCases } from '@gyblos/node/synthetic-cases';
 
-test('gate adds the separately targeted undercharge before engine termination', () => {
+void test('gate adds the separately targeted undercharge before engine termination', () => {
   const cases = createCases('over-request', 'failure-request', 'under-request');
   assert.deepEqual(
     cases.map((entry) => entry.name),
@@ -34,7 +35,7 @@ test('gate adds the separately targeted undercharge before engine termination', 
   );
 });
 
-test('optional undercharge scenario retains all original case contents and relative ordering', () => {
+void test('optional undercharge scenario retains all original case contents and relative ordering', () => {
   const original = createCases('over-request', 'failure-request');
   const extended = createCases(
     'over-request',

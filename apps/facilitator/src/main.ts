@@ -1,3 +1,4 @@
+// Owns main in facilitator; it must not know laboratory orchestration.
 import { once } from 'node:events';
 import type { Server } from 'node:http';
 

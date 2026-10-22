@@ -1,3 +1,4 @@
+// Owns offline review regressions.test regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -49,7 +50,7 @@ function observe(status: number, body: unknown, caseName = 'honest') {
   return observeInferenceResponse(input);
 }
 
-test('HTTP engine failure is recognized in an ordinary honest scenario', () => {
+void test('HTTP engine failure is recognized in an ordinary honest scenario', () => {
   const result = observe(502, { requestId: 'id', error: 'failed' });
   assert.equal(result.failed, true);
   assert.equal(
@@ -59,11 +60,11 @@ test('HTTP engine failure is recognized in an ordinary honest scenario', () => {
   );
 });
 
-test('successful output cannot be labelled failed by an experiment name', () => {
+void test('successful output cannot be labelled failed by an experiment name', () => {
   assert.equal(observe(200, goodBody, 'engine-interrupted').failed, false);
 });
 
-test('wrong seller identity is rejected before accepting a measurement', () => {
+void test('wrong seller identity is rejected before accepting a measurement', () => {
   for (const field of ['offer', 'model', 'digest'] as const) {
     let persisted = false;
     assert.throws(() => {
@@ -74,7 +75,7 @@ test('wrong seller identity is rejected before accepting a measurement', () => {
   }
 });
 
-test('invalid elapsed time never becomes infinite throughput', () => {
+void test('invalid elapsed time never becomes infinite throughput', () => {
   const input = {
     requestId: 'id',
     seller: 'seller',
@@ -102,7 +103,7 @@ test('invalid elapsed time never becomes infinite throughput', () => {
   }
 });
 
-test('concurrent salt initializers cannot observe a partially written salt', async () => {
+void test('concurrent salt initializers cannot observe a partially written salt', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'gyblos-salt-race-'));
   try {
     const results = await Promise.allSettled(
@@ -125,7 +126,7 @@ test('concurrent salt initializers cannot observe a partially written salt', asy
   }
 });
 
-test('interrupted salt initialization never publishes an empty destination', async () => {
+void test('interrupted salt initialization never publishes an empty destination', async () => {
   const fs = (await import('node:fs')).default;
   const { syncBuiltinESMExports } = await import('node:module');
   const directory = await mkdtemp(join(tmpdir(), 'gyblos-salt-interruption-'));
@@ -155,7 +156,7 @@ test('interrupted salt initialization never publishes an empty destination', asy
   }
 });
 
-test('existing invalid salt is never silently regenerated', async () => {
+void test('existing invalid salt is never silently regenerated', async () => {
   const { writeFile } = await import('node:fs/promises');
   const directory = await mkdtemp(join(tmpdir(), 'gyblos-salt-existing-'));
   try {
@@ -173,22 +174,24 @@ test('existing invalid salt is never silently regenerated', async () => {
   }
 });
 
-test('published tests have a public command without private harness dependencies', async () => {
+void test('published tests have a public command without private harness dependencies', async () => {
   const pkg = JSON.parse(await readFile('package.json', 'utf8'));
-  assert.equal(pkg.scripts.test, 'node tooling/test.mjs');
-  const runner = await readFile('tooling/test.mjs', 'utf8');
-  assert.equal(runner.includes('.local/'), false);
+  assert.equal(
+    pkg.scripts.test,
+    'node --import tsx --test \"tests/**/*.test.ts\"',
+  );
+  assert.equal(pkg.scripts.test.includes('.local/'), false);
   assert.ok((await readFile('README.md', 'utf8')).includes('pnpm test'));
 });
 
-test('successful responses with missing usage are rejected before accepting measurements', () => {
+void test('successful responses with missing usage are rejected before accepting measurements', () => {
   assert.throws(
     () => observe(200, { ...goodBody, usage: undefined }),
     /usage/i,
   );
 });
 
-test('financial reconciliation is terminal only for inference journals', async () => {
+void test('financial reconciliation is terminal only for inference journals', async () => {
   const { writeFile } = await import('node:fs/promises');
   const { assertNoUnresolvedAuthorizations } =
     await import('@gyblos/lab-harness/journal');
@@ -215,7 +218,7 @@ test('financial reconciliation is terminal only for inference journals', async (
   }
 });
 
-test('response usage is sanitized before it reaches evidence and failed billing cannot leak text', () => {
+void test('response usage is sanitized before it reaches evidence and failed billing cannot leak text', () => {
   const secret = 'private content must not be stored';
   const usage = {
     prompt_eval_count: 10,
@@ -238,7 +241,7 @@ test('response usage is sanitized before it reaches evidence and failed billing 
   assert.equal(failure.body.usage, undefined);
 });
 
-test('a successful status without content is malformed rather than an engine failure claim', () => {
+void test('a successful status without content is malformed rather than an engine failure claim', () => {
   assert.throws(
     () => observe(200, { ...goodBody, content: undefined }),
     /malformed/i,

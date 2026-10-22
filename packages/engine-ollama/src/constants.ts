@@ -1,3 +1,4 @@
+// Owns constants in engine-ollama; it must not know wallets or payments.
 import {
   INFERENCE_REQUEST_LIMITS,
   TOKENIZER_SDK_VERSION,

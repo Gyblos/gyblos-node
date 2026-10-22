@@ -1,10 +1,11 @@
+// Owns offline gate billing.test regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { assessCharge, charge } from '@gyblos/core/metering';
 import { createGateBilling } from '@gyblos/lab-harness/cli/inference/billing';
 
-test('gate underbilling changes only selected output counts without mutating usage', () => {
+void test('gate underbilling changes only selected output counts without mutating usage', () => {
   const billing = createGateBilling('sponsor', 'over-request', 'under-request');
   const usage = Object.freeze({ input: 24, output: 110 });
   assert.equal(billing.feePayer, 'sponsor');
@@ -20,7 +21,7 @@ test('gate underbilling changes only selected output counts without mutating usa
   assert.deepEqual(usage, { input: 24, output: 110 });
 });
 
-test('gate billing retains upward adversarial rounding and floors the discounted count', () => {
+void test('gate billing retains upward adversarial rounding and floors the discounted count', () => {
   const billing = createGateBilling('sponsor', 'over-request', 'under-request');
   assert.deepEqual(
     billing.billingOverride('over-request', { input: 10, output: 3 }),
@@ -36,7 +37,7 @@ test('gate billing retains upward adversarial rounding and floors the discounted
   );
 });
 
-test('gate discounted billing yields a positive undercharge outside buyer tolerance', () => {
+void test('gate discounted billing yields a positive undercharge outside buyer tolerance', () => {
   const billing = createGateBilling('sponsor', 'over-request', 'under-request');
   const actual = charge(
     billing.billingOverride('under-request', { input: 24, output: 110 }),

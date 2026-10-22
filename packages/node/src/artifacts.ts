@@ -1,3 +1,4 @@
+// Owns artifacts in node; it must not know lab orchestration or CLI processes.
 import { readFile } from 'node:fs/promises';
 
 import { TOKENIZER_FILES } from '@gyblos/config';

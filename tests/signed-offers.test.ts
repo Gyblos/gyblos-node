@@ -1,3 +1,4 @@
+// Owns offline signed offers.test regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -71,7 +72,7 @@ async function fixture() {
   };
 }
 
-test('signed owner offer binds NodeId, complete payment terms and engine capabilities', async () => {
+void test('signed owner offer binds NodeId, complete payment terms and engine capabilities', async () => {
   const { offer, trust, signed, now } = await fixture();
   assert.deepEqual(await verifyInferenceOffer(signed, trust, now), offer);
   for (const field of [
@@ -106,7 +107,7 @@ test('signed owner offer binds NodeId, complete payment terms and engine capabil
   }
 });
 
-test('self-signed attacker and expired/budget-invalid offers are rejected before connecting', async () => {
+void test('self-signed attacker and expired/budget-invalid offers are rejected before connecting', async () => {
   const { offer, trust, signed, owner, now } = await fixture();
   const attacker = await generateKeyPairSigner();
   const replacement = await signInferenceOffer(

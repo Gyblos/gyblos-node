@@ -1,3 +1,4 @@
+// Owns buyer in payments-x402; it must not know inference engines or lab orchestration.
 import type { KeyPairSigner, Signature } from '@solana/kit';
 import type { PaymentRequirements } from '@x402/core/types';
 import {

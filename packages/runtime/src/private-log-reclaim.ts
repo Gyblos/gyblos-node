@@ -1,3 +1,4 @@
+// Owns private log reclaim in runtime; it must not know product workflows or lab orchestration.
 import { randomUUID } from 'node:crypto';
 import { constants, type Stats } from 'node:fs';
 import { link, lstat, readdir, rename, unlink } from 'node:fs/promises';

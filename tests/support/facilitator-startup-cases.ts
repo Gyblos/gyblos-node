@@ -1,3 +1,4 @@
+// Owns offline facilitator startup cases regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { writeFile } from 'node:fs/promises';
@@ -52,7 +53,7 @@ function startupProbe(directory: string) {
 }
 
 export function registerFacilitatorStartupCases() {
-  test(
+  void test(
     'standalone facilitator closes its real diagnostic log after startup refusal',
     { timeout: 20000, skip: PRIVATE_LOG_PLATFORM_SKIP },
     async () => {

@@ -1,3 +1,4 @@
+// Owns laboratory docker fund; product code must not depend on this module.
 import assert from 'node:assert/strict';
 import { lstat, readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
@@ -59,9 +60,9 @@ async function fundRolesUnlocked(
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
   }
-  const config = await fundingConfig(operatorRoot),
-    payer = await signer(config, 'facilitator'),
-    source = await signer(config, 'buyer');
+  const config = await fundingConfig(operatorRoot);
+  const payer = await signer(config, 'facilitator');
+  const source = await signer(config, 'buyer');
   assert.notEqual(buyerAddress, source.address);
   assert.notEqual(feePayerAddress, payer.address);
   assert.ok(
@@ -123,8 +124,8 @@ async function fundRolesUnlocked(
       ),
     (message) => appendTransactionMessageInstructions(instructions, message),
   );
-  const transaction = await signTransactionMessageWithSigners(message),
-    signature = getSignatureFromTransaction(transaction);
+  const transaction = await signTransactionMessageWithSigners(message);
+  const signature = getSignatureFromTransaction(transaction);
   await saveJson(P2P.fundingJournal, {
     state: 'authorized',
     signature,

@@ -1,3 +1,4 @@
+// Owns diagnostics in config; it must not know product workflows or lab orchestration.
 import { LOCAL_DIR } from './paths.js';
 
 export const DIAGNOSTICS = {

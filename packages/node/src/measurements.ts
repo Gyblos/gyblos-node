@@ -1,3 +1,4 @@
+// Owns measurements in node; it must not know lab orchestration or CLI processes.
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { link, mkdir, open, readFile, unlink } from 'node:fs/promises';
 

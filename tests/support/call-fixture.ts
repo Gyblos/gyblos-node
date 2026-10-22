@@ -1,3 +1,4 @@
+// Owns offline call fixture regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { lstat, mkdtemp, rm, writeFile } from 'node:fs/promises';
@@ -126,9 +127,9 @@ export async function callFault(faults: CallFaults = {}): Promise<CallProbe> {
         env: { ...process.env, GYBLOS_P2P_RUN_ID: 'synthetic-diagnostic' },
       },
     );
-    let stdout = '',
-      stderr = '',
-      outputExceeded = false;
+    let stdout = '';
+    let stderr = '';
+    let outputExceeded = false;
     child.stdout.on('data', (chunk: Buffer) => {
       if (Buffer.byteLength(stdout) + chunk.length > PROBE_OUTPUT_BYTES) {
         outputExceeded = true;

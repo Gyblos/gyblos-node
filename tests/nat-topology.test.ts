@@ -1,3 +1,4 @@
+// Owns offline nat topology.test regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
@@ -6,7 +7,7 @@ import { P2P } from '@gyblos/config';
 import { NAT } from '@gyblos/lab-p2p/constants';
 import { natEnvironment } from '@gyblos/lab-p2p/nat-topology';
 
-test('NAT plan restricts capabilities to keyless non-root routers and isolates actor networks', async () => {
+void test('NAT plan restricts capabilities to keyless non-root routers and isolates actor networks', async () => {
   const environment = natEnvironment('nat-direct', 'gyblos-p2p-synthetic');
   assert.equal(environment.GYBLOS_P2P_BLOCK_UDP, '0');
   assert.equal(environment.GYBLOS_P2P_SELLER_IP, NAT.homeA.actor);
@@ -52,7 +53,7 @@ test('NAT plan restricts capabilities to keyless non-root routers and isolates a
   assert.equal(P2P.docker.user, '1000:1000');
 });
 
-test('UDP-blocked plan requires relay and rejects unsafe volume prefixes or unknown scenarios', () => {
+void test('UDP-blocked plan requires relay and rejects unsafe volume prefixes or unknown scenarios', () => {
   const environment = natEnvironment('nat-relay', 'gyblos-p2p-synthetic');
   assert.equal(environment.GYBLOS_P2P_BLOCK_UDP, '1');
   assert.equal(environment.GYBLOS_P2P_EXPECTED_ROUTE, 'iroh-relay');
@@ -68,7 +69,7 @@ test('UDP-blocked plan requires relay and rejects unsafe volume prefixes or unkn
   );
 });
 
-test('manual lab candidates require an explicit opt-in and remain separate from default discovery', () => {
+void test('manual lab candidates require an explicit opt-in and remain separate from default discovery', () => {
   const automatic = natEnvironment('nat-direct', 'gyblos-p2p-synthetic');
   assert.equal(automatic.GYBLOS_P2P_LAB_CANDIDATES, '0');
   assert.equal(automatic.GYBLOS_P2P_SELLER_EXTERNAL, '');

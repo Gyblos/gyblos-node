@@ -1,3 +1,4 @@
+// Owns laboratory p2p setup; product code must not depend on this module.
 import { parseArgs } from 'node:util';
 
 import { publicRole, setupRole } from '@gyblos/node/roles';

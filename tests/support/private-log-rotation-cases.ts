@@ -1,3 +1,4 @@
+// Owns offline private log rotation cases regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import { lstat, readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -51,7 +52,7 @@ async function indexes(path: string) {
 }
 
 export function registerPrivateLogRotationCases() {
-  test(
+  void test(
     'a record larger than one file is dropped without rotating',
     OPTIONS,
     () =>
@@ -71,7 +72,7 @@ export function registerPrivateLogRotationCases() {
           assert.ok((await lstat(join(directory, name))).size <= fileBytes);
       }),
   );
-  test(
+  void test(
     'budget exhaustion rotates a bounded number of times, then drops',
     OPTIONS,
     () =>
@@ -110,7 +111,7 @@ export function registerPrivateLogRotationCases() {
         );
       }),
   );
-  test(
+  void test(
     'rotation reclaims the oldest settled journal within the file cap',
     OPTIONS,
     () =>
@@ -145,7 +146,7 @@ export function registerPrivateLogRotationCases() {
         );
       }),
   );
-  test(
+  void test(
     'a pending rotation occupies a queue slot and never exceeds the bound',
     OPTIONS,
     () =>

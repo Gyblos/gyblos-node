@@ -1,3 +1,4 @@
+// Owns laboratory docker source; product code must not depend on this module.
 import { createHash } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';

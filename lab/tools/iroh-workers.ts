@@ -1,9 +1,13 @@
-import { discoverLabAddress } from './lab-reflection.mjs';
+// Owns laboratory iroh workers; product code must not depend on this module.
+import type { Connection } from '@number0/iroh';
+
+import { discoverLabAddress } from './lab-reflection.js';
+import type { NativeDescriptor, ObserverConfig, ProbeConfig } from './types.js';
 
 export async function nativeSeller() {
   const { Endpoint, RelayMode } = await import('@number0/iroh');
   const { writeFile } = await import('node:fs/promises');
-  const config = JSON.parse(process.argv[1]);
+  const config: ProbeConfig = JSON.parse(process.argv[1]!);
   const builder = Endpoint.builder();
   builder.applyN0();
   builder.bindAddr(config.bind);
@@ -32,7 +36,7 @@ export async function nativeSeller() {
   }
   if (config.publicAudit)
     await new Promise((resolve) =>
-      setTimeout(resolve, config.publicAudit.settleMs),
+      setTimeout(resolve, config.publicAudit!.settleMs),
     );
   const address = endpoint.addr();
   await writeFile(
@@ -65,7 +69,7 @@ export async function nativeBuyer() {
   const { Endpoint, EndpointAddr, EndpointId, RelayMode } =
     await import('@number0/iroh');
   const { readFile, writeFile } = await import('node:fs/promises');
-  const config = JSON.parse(process.argv[1]);
+  const config: ProbeConfig = JSON.parse(process.argv[1]!);
   const builder = Endpoint.builder();
   builder.applyN0();
   builder.bindAddr(config.bind);
@@ -73,7 +77,7 @@ export async function nativeBuyer() {
   builder.alpns([[...Buffer.from(config.protocol)]]);
   builder.relayMode(RelayMode.defaultMode());
   const endpoint = await builder.bind();
-  let connection;
+  let connection: Connection | undefined;
   const timer = setTimeout(() => {
     connection?.close(BigInt(config.closeCode), []);
     void endpoint.close();
@@ -98,30 +102,32 @@ export async function nativeBuyer() {
     }
     if (config.publicAudit) {
       await new Promise((resolve) =>
-        setTimeout(resolve, config.publicAudit.settleMs),
+        setTimeout(resolve, config.publicAudit!.settleMs),
       );
       await writeFile(
-        config.publicAudit.descriptorPath,
+        config.publicAudit!.descriptorPath,
         JSON.stringify({
           boundSockets: endpoint.boundSockets(),
           directAddresses: endpoint.addr().directAddresses(),
         }),
       );
-      const deadline = Date.now() + config.publicAudit.waitMs;
+      const deadline = Date.now() + config.publicAudit!.waitMs;
       let ready = false;
       while (Date.now() < deadline) {
         try {
-          await readFile(config.publicAudit.startPath);
+          await readFile(config.publicAudit!.startPath);
           ready = true;
           break;
         } catch {}
         await new Promise((resolve) =>
-          setTimeout(resolve, config.publicAudit.pollMs),
+          setTimeout(resolve, config.publicAudit!.pollMs),
         );
       }
       if (!ready) throw new Error('Public audit did not release the peer.');
     }
-    const peer = JSON.parse(await readFile(config.peerPath, 'utf8'));
+    const peer: NativeDescriptor = JSON.parse(
+      await readFile(config.peerPath, 'utf8'),
+    );
     const start = performance.now();
     connection = await endpoint.connect(
       new EndpointAddr(
@@ -173,7 +179,7 @@ export async function nativeBuyer() {
 export async function nativeObserver() {
   const { Endpoint, RelayMode } = await import('@number0/iroh');
   const { writeFile } = await import('node:fs/promises');
-  const config = JSON.parse(process.argv[1]);
+  const config: ObserverConfig = JSON.parse(process.argv[1]!);
   const builder = Endpoint.builder();
   builder.applyMinimal();
   builder.bindAddr(config.bind);
@@ -210,14 +216,4 @@ export async function nativeObserver() {
   } finally {
     await endpoint.close();
   }
-}
-
-export function nativeSource(role) {
-  const worker =
-    role === 'seller'
-      ? nativeSeller
-      : role === 'observer'
-        ? nativeObserver
-        : nativeBuyer;
-  return `const discoverLabAddress = ${discoverLabAddress.toString()}; await (${worker.toString()})();`;
 }

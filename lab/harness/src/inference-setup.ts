@@ -1,3 +1,4 @@
+// Owns laboratory inference setup; product code must not depend on this module.
 import { once } from 'node:events';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { basename, resolve } from 'node:path';

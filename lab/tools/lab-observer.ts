@@ -1,3 +1,4 @@
+// Owns laboratory lab observer; product code must not depend on this module.
 import assert from 'node:assert/strict';
 
 import { P2P } from '@gyblos/config';
@@ -8,9 +9,13 @@ import {
   writeContainerFile,
 } from '@gyblos/lab-p2p/docker-command';
 
-import { nativeSource } from './iroh-probe.mjs';
+import { nativeSource } from './iroh-probe.js';
+import type { ComposeTemplate, ContainerIds, ProbeOptions } from './types.js';
 
-export function addLabObserver(template, values) {
+export function addLabObserver(
+  template: ComposeTemplate,
+  values: ProbeOptions,
+) {
   if (!values['wan-discovery']) return;
   assert.ok(values['native-image'], 'WAN discovery requires a native image.');
   assert.ok(
@@ -27,11 +32,11 @@ export function addLabObserver(template, values) {
   template.services.observer = actor;
 }
 
-export async function startLabObserver(ids, closeCode) {
+export async function startLabObserver(ids: ContainerIds, closeCode: string) {
   await docker([
     'exec',
     '-d',
-    ids.observer,
+    ids.observer!,
     'node',
     '--input-type=module',
     '-e',
@@ -45,7 +50,7 @@ export async function startLabObserver(ids, closeCode) {
   let descriptor;
   for (let index = 0; index < P2P.docker.readyMs / P2P.routePollMs; index++) {
     try {
-      descriptor = await execute(ids.observer, [
+      descriptor = await execute(ids.observer!, [
         'cat',
         NAT.discovery.descriptorPath,
       ]);
@@ -62,7 +67,7 @@ export async function startLabObserver(ids, closeCode) {
   );
   for (const role of ['seller', 'buyer'])
     await writeContainerFile(
-      ids[role],
+      ids[role]!,
       NAT.discovery.descriptorPath,
       Buffer.from(descriptor),
     );

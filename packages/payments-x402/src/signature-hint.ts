@@ -1,3 +1,4 @@
+// Owns signature hint in payments-x402; it must not know inference engines or lab orchestration.
 import { isSignature, type Signature } from '@solana/kit';
 
 export function signatureHint(value: unknown): Signature | undefined {

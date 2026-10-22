@@ -1,3 +1,4 @@
+// Owns laboratory native nat probe; product code must not depend on this module.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { writeFile } from 'node:fs/promises';
@@ -15,18 +16,32 @@ import {
   writeContainerFile,
 } from '@gyblos/lab-p2p/docker-command';
 
-import { nativeSource } from './iroh-probe.mjs';
-import { startLabObserver } from './lab-observer.mjs';
-import { startPublicPathCounters } from './public-path-counters.mjs';
+import { nativeSource } from './iroh-probe.js';
+import { startLabObserver } from './lab-observer.js';
+import { startPublicPathCounters } from './public-path-counters.js';
+import type {
+  ContainerIds,
+  NativeResult,
+  ProbeConfig,
+  ProbeOptions,
+} from './types.js';
 
-export async function runNativeProbe({ ids, values, project }) {
-  const version = await execute(ids.buyer, [
+export async function runNativeProbe({
+  ids,
+  values,
+  project,
+}: {
+  ids: ContainerIds;
+  values: ProbeOptions;
+  project: string;
+}) {
+  const version = await execute(ids.buyer!, [
     'node',
     '-e',
     'process.stdout.write(JSON.parse(require("node:fs").readFileSync("node_modules/@number0/iroh/package.json","utf8")).version)',
   ]);
   assert.equal(version, IROH_SDK_VERSION);
-  const config = {
+  const config: Omit<ProbeConfig, 'bind'> = {
     protocol: NAT.nativeProbe.protocol,
     ipv6Bind: `${IPV6_LOOPBACK}:0`,
     closeCode: P2P.streamCloseCode.toString(),
@@ -51,12 +66,12 @@ export async function runNativeProbe({ ids, values, project }) {
     };
   }
   if (values['trace-public']) config.publicAudit = NAT.publicAudit;
-  const server = nativeSource('seller'),
-    client = nativeSource('buyer');
+  const server = nativeSource('seller');
+  const client = nativeSource('buyer');
   await docker([
     'exec',
     '-d',
-    ids.seller,
+    ids.seller!,
     'node',
     '--input-type=module',
     '-e',
@@ -72,18 +87,18 @@ export async function runNativeProbe({ ids, values, project }) {
   let peer;
   for (let index = 0; index < P2P.docker.readyMs / P2P.routePollMs; index++) {
     try {
-      peer = await execute(ids.seller, ['cat', NAT.nativeProbe.peerPath]);
+      peer = await execute(ids.seller!, ['cat', NAT.nativeProbe.peerPath]);
       break;
     } catch {}
     await new Promise((resolve) => setTimeout(resolve, P2P.routePollMs));
   }
   assert.ok(peer, 'Native seller did not become ready.');
   await writeContainerFile(
-    ids.buyer,
+    ids.buyer!,
     NAT.nativeProbe.peerPath,
     Buffer.from(peer),
   );
-  const completion = execute(ids.buyer, [
+  const completion = execute(ids.buyer!, [
     'node',
     '--input-type=module',
     '-e',
@@ -107,15 +122,17 @@ export async function runNativeProbe({ ids, values, project }) {
   const publicPathAudit = collectPublicAudit
     ? await collectPublicAudit(project)
     : undefined;
-  const raw = JSON.parse(
-    await execute(ids.buyer, ['cat', NAT.nativeProbe.resultPath]),
+  const raw: NativeResult = JSON.parse(
+    await execute(ids.buyer!, ['cat', NAT.nativeProbe.resultPath]),
   );
   await writeFile(
     `.local/${project}-native-private.json`,
     JSON.stringify(raw),
     { mode: FILE_MODES.privateFile },
   );
-  const selected = raw.snapshots.at(-1).paths.filter((path) => path.isSelected);
+  const selected = raw.snapshots
+    .at(-1)!
+    .paths.filter((path) => path.isSelected);
   assert.equal(selected.length, 1);
   const firstDirect = raw.snapshots.find((snapshot) =>
     snapshot.paths.some((path) => path.isSelected && path.isIp),
@@ -130,16 +147,17 @@ export async function runNativeProbe({ ids, values, project }) {
     active: !values.idle,
     echoes: raw.echoes,
     connectMs: raw.connectMs,
-    finalRoute: selected[0].isIp
+    finalRoute: selected[0]!.isIp
       ? 'iroh-direct'
-      : selected[0].isRelay
+      : selected[0]!.isRelay
         ? 'iroh-relay'
         : 'unknown',
-    firstDirectMs: firstDirect ? firstDirect.at - raw.snapshots[0].at : null,
+    firstDirectMs: firstDirect ? firstDirect.at - raw.snapshots[0]!.at : null,
     selectedLabWan:
-      selected[0].remoteAddr === `${NAT.wan.routerA}:${NAT.sellerUdpPort}`,
+      selected[0]!.remoteAddr === `${NAT.wan.routerA}:${NAT.sellerUdpPort}`,
     selectedReflectedAddress: values['wan-discovery']
-      ? selected[0].isIp && selected[0].remoteAddr === raw.peer.reflectedAddress
+      ? selected[0]!.isIp &&
+        selected[0]!.remoteAddr === raw.peer.reflectedAddress
       : null,
     workerSha256: createHash('sha256')
       .update(server)
@@ -155,5 +173,8 @@ export async function runNativeProbe({ ids, values, project }) {
     assert.equal(native.finalRoute, 'iroh-direct');
     assert.equal(native.selectedLabWan, true);
   }
-  return { report: native, raw };
+  return {
+    report: native as typeof native & { reflectedMappingsVerified?: boolean },
+    raw,
+  };
 }

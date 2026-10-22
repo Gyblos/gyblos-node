@@ -1,3 +1,4 @@
+// Owns laboratory assertions; product code must not depend on this module.
 import assert from 'node:assert/strict';
 
 import { HTTP_STATUS } from '@gyblos/config';

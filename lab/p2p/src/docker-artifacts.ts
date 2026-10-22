@@ -1,3 +1,4 @@
+// Owns laboratory docker artifacts; product code must not depend on this module.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -27,8 +28,8 @@ async function digestFile(path: string) {
 }
 
 export async function modelArchive(operatorRoot: string) {
-  const models = resolve(operatorRoot, OLLAMA_MODELS_PATH),
-    [name, tag] = MODEL.name.split(':');
+  const models = resolve(operatorRoot, OLLAMA_MODELS_PATH);
+  const [name, tag] = MODEL.name.split(':');
   assert.ok(name && tag);
   const manifest = `manifests/registry.ollama.ai/library/${name}/${tag}`;
   const bytes = await readFile(resolve(models, manifest));
@@ -98,9 +99,9 @@ export async function provisionArtifacts(
   environment: NodeJS.ProcessEnv,
 ) {
   const tokenizer = await readFile(
-      resolve(operatorRoot, TOKENIZER_FILES.tokenizer),
-    ),
-    config = await readFile(resolve(operatorRoot, TOKENIZER_FILES.config));
+    resolve(operatorRoot, TOKENIZER_FILES.tokenizer),
+  );
+  const config = await readFile(resolve(operatorRoot, TOKENIZER_FILES.config));
   createModelTokenizer({
     tokenizer: tokenizer.toString('utf8'),
     config: config.toString('utf8'),

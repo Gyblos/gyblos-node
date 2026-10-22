@@ -1,3 +1,4 @@
+// Owns laboratory types; product code must not depend on this module.
 import type { ModelTokenizer } from '@gyblos/engine-ollama';
 import type { SettlementEvent } from '@gyblos/payments-x402/facilitator';
 

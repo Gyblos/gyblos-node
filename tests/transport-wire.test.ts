@@ -1,3 +1,4 @@
+// Owns offline transport wire.test regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -24,7 +25,7 @@ const REQUEST = {
   body: Buffer.from('{"prompt":"synthetic"}'),
 };
 
-test('bounded HTTP wire preserves raw synthetic request bytes and x402 headers', () => {
+void test('bounded HTTP wire preserves raw synthetic request bytes and x402 headers', () => {
   const decoded = decodeRequest(encodeRequest(REQUEST));
   assert.equal(decoded.method, 'POST');
   assert.equal(decoded.path, ROUTES.inference);
@@ -44,7 +45,7 @@ test('bounded HTTP wire preserves raw synthetic request bytes and x402 headers',
   }
 });
 
-test('HTTP wire rejects non-inference routes and request smuggling or oversized bodies', () => {
+void test('HTTP wire rejects non-inference routes and request smuggling or oversized bodies', () => {
   for (const path of [
     '/api/generate',
     '/supported',
@@ -78,11 +79,11 @@ test('HTTP wire rejects non-inference routes and request smuggling or oversized 
   );
 });
 
-test('per-peer and global limits cannot be bypassed with duplicate release or unbounded peers', () => {
+void test('per-peer and global limits cannot be bypassed with duplicate release or unbounded peers', () => {
   let now = 0;
   const limiter = createPeerLimiter(() => now);
-  const first = limiter.enter('one'),
-    second = limiter.enter('two');
+  const first = limiter.enter('one');
+  const second = limiter.enter('two');
   assert.ok(first && second);
   assert.equal(limiter.enter('three'), undefined);
   first();
@@ -101,7 +102,7 @@ test('per-peer and global limits cannot be bypassed with duplicate release or un
   assert.ok(rate.enter('same'));
 });
 
-test('deadline closes the native connection rather than waiting for a locked stream mutex', async () => {
+void test('deadline closes the native connection rather than waiting for a locked stream mutex', async () => {
   let closed = false;
   await assert.rejects(
     withDeadline(new Promise<never>(() => {}), 1, () => {

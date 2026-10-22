@@ -1,3 +1,4 @@
+// Owns laboratory nat checks; product code must not depend on this module.
 import assert from 'node:assert/strict';
 
 import { P2P } from '@gyblos/config';

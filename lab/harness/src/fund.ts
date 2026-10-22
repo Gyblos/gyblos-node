@@ -1,3 +1,4 @@
+// Owns laboratory fund; product code must not depend on this module.
 import { getCreateAccountInstruction } from '@solana-program/system';
 import {
   findAssociatedTokenPda,

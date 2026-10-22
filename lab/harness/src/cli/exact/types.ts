@@ -1,3 +1,4 @@
+// Owns laboratory types; product code must not depend on this module.
 import type { SupportedResponse } from '@x402/core/types';
 
 import type {

@@ -1,3 +1,4 @@
+// Owns recovery lock in payments-x402; it must not know inference engines or lab orchestration.
 import assert from 'node:assert/strict';
 import { constants } from 'node:fs';
 import { lstat, open, unlink, type FileHandle } from 'node:fs/promises';

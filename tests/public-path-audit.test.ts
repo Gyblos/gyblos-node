@@ -1,3 +1,4 @@
+// Owns offline public path audit.test regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -8,7 +9,7 @@ import {
   classifyPublicPath,
   readAuditCounters,
   readReplyState,
-} from '../lab/tools/public-path-audit.mjs';
+} from '../lab/tools/public-path-audit.js';
 
 const tags = [
   'gyb_public_out_0',
@@ -25,7 +26,7 @@ function dump(values: number[]) {
     .join('\n');
 }
 
-test('audit counters require every exact tag once and never treat missing evidence as zero', () => {
+void test('audit counters require every exact tag once and never treat missing evidence as zero', () => {
   assert.deepEqual(
     readAuditCounters(dump([3, 1, 0, 1]), tags),
     Object.fromEntries(tags.map((tag, index) => [tag, [3, 1, 0, 1][index]])),
@@ -38,7 +39,7 @@ test('audit counters require every exact tag once and never treat missing eviden
     assert.throws(() => readAuditCounters(invalid, tags));
 });
 
-test('counter deltas reject resets and preserve unrelated inbound packets as uncertainty', () => {
+void test('counter deltas reject resets and preserve unrelated inbound packets as uncertainty', () => {
   assert.deepEqual(auditCounterDelta({ a: 2 }, { a: 5 }), { a: 3 });
   assert.throws(() => auditCounterDelta({ a: 5 }, { a: 2 }));
   assert.throws(() => auditCounterDelta({ a: 2 }, {}));
@@ -100,7 +101,7 @@ test('counter deltas reject resets and preserve unrelated inbound packets as unc
   );
 });
 
-test('UNREPLIED is read explicitly; lack of ASSURED is not proof of no reply', () => {
+void test('UNREPLIED is read explicitly; lack of ASSURED is not proof of no reply', () => {
   const tuple = {
     source: '10.82.11.10',
     destination: '203.0.113.10',

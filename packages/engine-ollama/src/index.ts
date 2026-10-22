@@ -1,3 +1,4 @@
+// Owns index in engine-ollama; it must not know wallets or payments.
 import { IPV6_LOOPBACK, LOCALHOST, ROUTES, TIMEOUTS } from '@gyblos/config';
 import type { EngineWireUsage as EngineUsage } from '@gyblos/protocol/wire-usage';
 
@@ -96,9 +97,9 @@ export function createOllama(base: string, fetchImpl: typeof fetch = fetch) {
         throw new Error('Local engine generation failed.');
       // Streaming is internal to the adapter, solely for bounded buffering and fault injection.
       // The paid HTTP response remains fully buffered until settlement.
-      let buffer = '',
-        text = '',
-        terminal: Record<string, unknown> | undefined;
+      let buffer = '';
+      let text = '';
+      let terminal: Record<string, unknown> | undefined;
       let fragments = 0;
       const decoder = new TextDecoder();
       const reader = response.body.getReader();

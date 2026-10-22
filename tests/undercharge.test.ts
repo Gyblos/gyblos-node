@@ -1,9 +1,10 @@
+// Owns offline undercharge.test regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { assessCharge } from '@gyblos/core/metering';
 
-test('undercharge is explicit only beyond tolerance for delivered successful inference', () => {
+void test('undercharge is explicit only beyond tolerance for delivered successful inference', () => {
   const counts = { input: 20, output: 60 };
   const result = assessCharge(133n, counts, true, false);
   assert.equal(result.anomaly, 'undercharge');
@@ -21,14 +22,14 @@ test('undercharge is explicit only beyond tolerance for delivered successful inf
   );
 });
 
-test('undercharge does not hide failed or incomplete delivery', () => {
+void test('undercharge does not hide failed or incomplete delivery', () => {
   const counts = { input: 20, output: 60 };
   assert.equal(assessCharge(0n, counts, false, true).anomaly, 'failed');
   assert.equal(assessCharge(133n, counts, false, false).anomaly, 'incomplete');
   assert.equal(assessCharge(1n, counts, false, true).anomaly, 'overcharge');
 });
 
-test('relative token tolerance bounds undercharge at larger counts', () => {
+void test('relative token tolerance bounds undercharge at larger counts', () => {
   const counts = { input: 1000, output: 1000 };
   assert.equal(assessCharge(2940n, counts, true, false).anomaly, 'none');
   assert.equal(assessCharge(2939n, counts, true, false).anomaly, 'undercharge');

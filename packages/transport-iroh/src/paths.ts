@@ -1,3 +1,4 @@
+// Owns paths in transport-iroh; it must not know wallets or inference engines.
 import type { Connection } from '@number0/iroh';
 
 import { TRANSPORT_ROUTES } from './constants.js';

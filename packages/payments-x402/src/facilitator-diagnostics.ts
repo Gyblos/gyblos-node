@@ -1,3 +1,4 @@
+// Owns facilitator diagnostics in payments-x402; it must not know inference engines or lab orchestration.
 import { randomUUID } from 'node:crypto';
 
 import { isAddress } from '@solana/kit';

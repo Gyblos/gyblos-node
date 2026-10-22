@@ -1,3 +1,4 @@
+// Owns admission in transport-iroh; it must not know wallets or inference engines.
 import { isIP } from 'node:net';
 
 import type { IncomingAddr } from '@number0/iroh';

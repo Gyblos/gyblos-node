@@ -1,3 +1,4 @@
+// Owns constants in runtime; it must not know product workflows or lab orchestration.
 export const UNKNOWN_ERROR_NAME = 'UnknownError';
 
 export const PRIVATE_LOG_STATES = {

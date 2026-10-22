@@ -1,3 +1,4 @@
+// Owns deadline in transport-iroh; it must not know wallets or inference engines.
 export async function withDeadline<T>(
   operation: Promise<T>,
   milliseconds: number,

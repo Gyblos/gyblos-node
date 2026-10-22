@@ -1,3 +1,4 @@
+// Owns offline call cases regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -25,7 +26,7 @@ import {
 import { callFault } from './call-fixture.js';
 
 export function registerCallCases() {
-  test('actual call preserves the observed receipt and safe proof failure without another invocation', async () => {
+  void test('actual call preserves the observed receipt and safe proof failure without another invocation', async () => {
     const { journal, call } = await callFault();
     assert.equal(journal.state, P2P_JOURNAL_STATES.UNCERTAIN);
     assert.equal(call.outcome, CALL_OUTCOMES.UNCERTAIN);
@@ -50,7 +51,7 @@ export function registerCallCases() {
     );
     assert.equal('claimSignature' in journal, false);
   });
-  test('actual call retains a discovered deposit as an unverified hint after a later proof failure', async () => {
+  void test('actual call retains a discovered deposit as an unverified hint after a later proof failure', async () => {
     const { journal, call } = await callFault({ afterDiscovery: true });
     assert.equal(journal.state, P2P_JOURNAL_STATES.UNCERTAIN);
     assert.equal(call.outcome, CALL_OUTCOMES.UNCERTAIN);
@@ -67,7 +68,7 @@ export function registerCallCases() {
     assert.equal('depositSignature' in journal, false);
     assert.equal('claimSignature' in journal, false);
   });
-  test('actual call preserves body-read phase and keeps an observed receipt unverified', async () => {
+  void test('actual call preserves body-read phase and keeps an observed receipt unverified', async () => {
     const { journal, call } = await callFault({ invalidBody: true });
     assert.equal(journal.state, P2P_JOURNAL_STATES.UNCERTAIN);
     assert.equal(call.outcome, CALL_OUTCOMES.UNCERTAIN);
@@ -78,7 +79,7 @@ export function registerCallCases() {
     assert.equal(journal.observedPayment?.claimSignature, '1'.repeat(64));
     assert.equal('claimSignature' in journal, false);
   });
-  test('actual lost response retains authorization and cannot invent a receipt', async () => {
+  void test('actual lost response retains authorization and cannot invent a receipt', async () => {
     const { journal, call } = await callFault({ lostResponse: true });
     assert.equal(journal.state, P2P_JOURNAL_STATES.UNCERTAIN);
     assert.equal(call.outcome, CALL_OUTCOMES.UNCERTAIN);
@@ -89,7 +90,7 @@ export function registerCallCases() {
     assert.equal(call.observedPayment, undefined);
     assert.equal(journal.channelId, 'synthetic-channel');
   });
-  test('post-proof receipt validation failure preserves the confirmed financial classification', async () => {
+  void test('post-proof receipt validation failure preserves the confirmed financial classification', async () => {
     const { journal, call } = await callFault({ afterProof: true });
     assert.equal(journal.state, P2P_JOURNAL_STATES.CONFIRMED);
     assert.equal(call.outcome, CALL_OUTCOMES.CONFIRMED_ERROR);
@@ -99,7 +100,7 @@ export function registerCallCases() {
     });
     assert.equal(journal.claimSignature, '1'.repeat(64));
   });
-  test('hostile thrown values cannot break durable uncertain failure recording', async () => {
+  void test('hostile thrown values cannot break durable uncertain failure recording', async () => {
     const { journal, call } = await callFault({ hostileError: true });
     assert.equal(journal.state, P2P_JOURNAL_STATES.UNCERTAIN);
     assert.deepEqual(call.failure, {
@@ -108,7 +109,7 @@ export function registerCallCases() {
     });
     assert.equal(journal.observedPayment?.status, 200);
   });
-  test('diagnostic codes discard arbitrary messages, causes and invalid owned codes', () => {
+  void test('diagnostic codes discard arbitrary messages, causes and invalid owned codes', () => {
     for (const code of Object.values(GATE_ERROR_CODES))
       assert.equal(
         errorDiagnostic(new GateError(code, 'PRIVATE_SENTINEL')),
@@ -144,7 +145,7 @@ export function registerCallCases() {
       ERROR_DIAGNOSTICS.TIMEOUT,
     );
   });
-  test('a stateful error code getter cannot replace a matched canonical diagnostic', () => {
+  void test('a stateful error code getter cannot replace a matched canonical diagnostic', () => {
     const canonical = Object.values(GATE_ERROR_CODES)[0]!;
     const error = new GateError(canonical, 'PRIVATE_SENTINEL');
     let reads = 0;
@@ -157,7 +158,7 @@ export function registerCallCases() {
     assert.equal(reads, 1);
   });
   for (const validReceipt of [true, false])
-    test(`shared buyer observes bounded ${validReceipt ? 'valid' : 'invalid'} receipt hints despite a truncated body`, async () => {
+    void test(`shared buyer observes bounded ${validReceipt ? 'valid' : 'invalid'} receipt hints despite a truncated body`, async () => {
       const signer = await generateKeyPairSigner();
       let requests = 0;
       let observed: BuyerResponseObservation | undefined;

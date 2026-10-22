@@ -1,3 +1,4 @@
+// Owns loopback in transport-iroh; it must not know wallets or inference engines.
 import { LOCALHOST, P2P, ROUTES } from '@gyblos/config';
 
 import { TRANSPORT_ROUTES } from './constants.js';
@@ -35,8 +36,8 @@ export async function loopbackRequest(
       ...(signal ? [signal] : []),
     ]),
   });
-  const reader = response.body?.getReader(),
-    parts: Uint8Array[] = [];
+  const reader = response.body?.getReader();
+  const parts: Uint8Array[] = [];
   let length = 0;
   try {
     if (reader)

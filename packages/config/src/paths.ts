@@ -1,3 +1,4 @@
+// Owns paths in config; it must not know product workflows or lab orchestration.
 export const LOCAL_DIR = '.local/devnet';
 
 export const LOCK_PATH = `${LOCAL_DIR}/buyer.lock`;

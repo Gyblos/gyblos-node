@@ -1,3 +1,4 @@
+// Owns offline chain accounting.test regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -14,7 +15,7 @@ import { registerProofReadCases } from './support/proof-read-cases.js';
 import { registerRentCases } from './support/rent-cases.js';
 import { registerTokenCases } from './support/token-cases.js';
 
-test('on-chain extraction recognizes SPL batch transfers without double counting', () => {
+void test('on-chain extraction recognizes SPL batch transfers without double counting', () => {
   const transfer = {
     type: 'transferChecked',
     info: {
@@ -49,7 +50,7 @@ test('on-chain extraction recognizes SPL batch transfers without double counting
   );
 });
 
-test('gasless buyer snapshot treats an absent native account as zero SOL', async () => {
+void test('gasless buyer snapshot treats an absent native account as zero SOL', async () => {
   const { inferenceSnapshot } =
     await import('@gyblos/payments-x402/accounting/chain');
   const owner = '5FVtvnKXCabCDxSoeNJuLdRpCTBZQnhTnNooZzEYfg2j';
@@ -84,7 +85,7 @@ test('gasless buyer snapshot treats an absent native account as zero SOL', async
   }
 });
 
-test('confirmation retries only throttled read requests and confirms without another payment', async () => {
+void test('confirmation retries only throttled read requests and confirms without another payment', async () => {
   const { confirmInference } =
     await import('@gyblos/payments-x402/accounting/chain');
   const original = globalThis.fetch;
@@ -107,7 +108,7 @@ test('confirmation retries only throttled read requests and confirms without ano
   }
 });
 
-test('a null transaction read is retried without submitting anything', async () => {
+void test('a null transaction read is retried without submitting anything', async () => {
   const original = globalThis.fetch;
   const methods: string[] = [];
   const good = { meta: { err: null }, transaction: { signatures: ['sig'] } };
@@ -129,7 +130,7 @@ test('a null transaction read is retried without submitting anything', async () 
   }
 });
 
-test('unknown SPL token instructions are explicitly rejected during accounting', () => {
+void test('unknown SPL token instructions are explicitly rejected during accounting', () => {
   const tx = {
     slot: 1,
     transaction: {
@@ -153,7 +154,7 @@ test('unknown SPL token instructions are explicitly rejected during accounting',
   );
 });
 
-test('bounded transaction visibility retries preserve unknown state and do not hide chain errors', async () => {
+void test('bounded transaction visibility retries preserve unknown state and do not hide chain errors', async () => {
   const original = globalThis.fetch;
   let calls = 0;
   try {

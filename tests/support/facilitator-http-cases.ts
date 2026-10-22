@@ -1,3 +1,4 @@
+// Owns offline facilitator http cases regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import { request, ServerResponse } from 'node:http';
 import test from 'node:test';
@@ -20,7 +21,7 @@ import {
 } from './facilitator-diagnostic-fixture.js';
 
 export function registerFacilitatorHttpCases() {
-  test(
+  void test(
     'diagnostic response-error monitoring preserves unhandled error propagation',
     { timeout: 10000 },
     async () => {
@@ -61,7 +62,7 @@ export function registerFacilitatorHttpCases() {
       }
     },
   );
-  test(
+  void test(
     'diagnostic host fixture restores SDK and fetch when owned listen fails',
     { timeout: 10000 },
     async () => {
@@ -89,7 +90,7 @@ export function registerFacilitatorHttpCases() {
     },
   );
 
-  test(
+  void test(
     'facilitator records early close before SDK resolution without aborting or retrying',
     { timeout: 10000 },
     async () => {
@@ -156,7 +157,7 @@ export function registerFacilitatorHttpCases() {
       );
     },
   );
-  test(
+  void test(
     'facilitator separates response serialization error from a successful SDK result',
     { timeout: 10000 },
     async () => {
@@ -203,7 +204,7 @@ export function registerFacilitatorHttpCases() {
     ['{', 400],
     ['"' + 'x'.repeat(70 * 1024) + '"', 413],
   ] as const)
-    test(
+    void test(
       `facilitator starts diagnostics before parser rejection ${status}`,
       { timeout: 10000 },
       async () => {
@@ -231,7 +232,7 @@ export function registerFacilitatorHttpCases() {
         });
       },
     );
-  test(
+  void test(
     'same-channel concurrent attempts retain distinct IDs and a shared instance',
     { timeout: 10000 },
     async () => {

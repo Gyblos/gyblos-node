@@ -1,3 +1,4 @@
+// Owns iroh client in transport-iroh; it must not know wallets or inference engines.
 import type { Connection, Endpoint, EndpointAddr } from '@number0/iroh';
 
 import { P2P } from '@gyblos/config';
@@ -13,9 +14,9 @@ export function createIrohTransport(
   remote: EndpointAddr,
   expectedNodeId: string,
 ): Transport & { ready(expected?: TransportRoute): Promise<void> } {
-  let connection: Connection | undefined,
-    connecting: Promise<Connection> | undefined,
-    connectMs = 0;
+  let connection: Connection | undefined;
+  let connecting: Promise<Connection> | undefined;
+  let connectMs = 0;
   let poisoned = false;
   let expectedRoute: TransportRoute | undefined;
   async function connected() {
@@ -68,10 +69,10 @@ export function createIrohTransport(
       throw new Error('Expected route was not observed; no payment attempted.');
     },
     async exchange(request: HttpRequest) {
-      const bytes = encodeRequest(request),
-        current = await connected();
-      let directObserved = false,
-        relayObserved = false;
+      const bytes = encodeRequest(request);
+      const current = await connected();
+      let directObserved = false;
+      let relayObserved = false;
       const observe = () => {
         const route = selectedRoute(current);
         directObserved ||= route === TRANSPORT_ROUTES.DIRECT;

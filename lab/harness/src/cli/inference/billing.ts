@@ -1,3 +1,4 @@
+// Owns laboratory billing; product code must not depend on this module.
 import { GATE_CASES } from '@gyblos/config';
 import type { TokenCounts } from '@gyblos/core/metering';
 

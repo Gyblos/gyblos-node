@@ -1,3 +1,4 @@
+// Owns process in runtime; it must not know product workflows or lab orchestration.
 import {
   spawn,
   type ChildProcess,

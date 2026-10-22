@@ -1,10 +1,10 @@
+// Owns static naming/import/version checks; it must not start applications.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 
 const SHORT_BINDINGS = new Set([
   'c',
   'sig',
-  'tx',
   'req',
   'res',
   'r',
@@ -19,40 +19,12 @@ const SHORT_BINDINGS = new Set([
   'b',
   'a',
   'k',
-  'i',
   'v',
   'e',
   'env',
   'jwk',
   'addr',
 ]);
-const SIMPLE_NUMBERS = new Set([0, 1, 2, 0n, 1n, 2n]);
-
-function declarationRank(node) {
-  if (node.type === 'ImportDeclaration') return 0;
-  const declaration = node.declaration ?? node;
-  if (
-    ['TSInterfaceDeclaration', 'TSTypeAliasDeclaration'].includes(
-      declaration.type,
-    )
-  )
-    return 2;
-  if (node.exportKind === 'type') return 2;
-  if (declaration.type === 'VariableDeclaration') {
-    const functions = declaration.declarations.every(({ init }) =>
-      ['ArrowFunctionExpression', 'FunctionExpression'].includes(init?.type),
-    );
-    return functions ? (node === declaration ? 3 : 4) : 1;
-  }
-  if (
-    declaration.type === 'FunctionDeclaration' &&
-    declaration.id?.name === 'main'
-  )
-    return 5;
-  if (node.type.startsWith('Export')) return 4;
-  if (['FunctionDeclaration', 'ClassDeclaration'].includes(node.type)) return 3;
-  return 6;
-}
 
 function packageRoot(filename) {
   const parts = filename.split('/');
@@ -79,11 +51,14 @@ function bindingNames(pattern) {
 const structure = {
   meta: {
     type: 'suggestion',
-    schema: [],
+    schema: [
+      {
+        type: 'object',
+        properties: { bindings: { type: 'boolean' } },
+        additionalProperties: false,
+      },
+    ],
     messages: {
-      order:
-        'Follow imports, constants, types, private helpers, exports, main, invocation order.',
-      constant: 'Name file-local data constants in UPPER_SNAKE_CASE.',
       binding: 'Use a descriptive binding instead of "{{name}}".',
       boundary:
         'Import other packages by workspace name; relative imports stay inside their package.',
@@ -94,6 +69,7 @@ const structure = {
     const filename = context.filename.replaceAll('\\', '/');
     const root = packageRoot(filename);
     function checkBinding(pattern) {
+      if (!context.options[0]?.bindings) return;
       for (const identifier of bindingNames(pattern)) {
         if (SHORT_BINDINGS.has(identifier.name.replace(/^_+/, '')))
           context.report({
@@ -105,7 +81,7 @@ const structure = {
     }
     function checkSource(node) {
       const source = node.source?.value;
-      if (!source) return;
+      if (!source || context.options[0]?.bindings) return;
       if (root && /(^|\/)scripts\//.test(source))
         context.report({ node, messageId: 'scripts' });
       if (root && source.startsWith('.')) {
@@ -115,23 +91,6 @@ const structure = {
       }
     }
     return {
-      Program(program) {
-        let previous = 0;
-        for (const statement of program.body) {
-          const rank = declarationRank(statement);
-          if (rank < previous)
-            context.report({ node: statement, messageId: 'order' });
-          previous = Math.max(previous, rank);
-          if (statement.type === 'VariableDeclaration' && rank === 1) {
-            for (const declaration of statement.declarations) {
-              for (const identifier of bindingNames(declaration.id)) {
-                if (!/^[A-Z][A-Z0-9_]*$/.test(identifier.name))
-                  context.report({ node: identifier, messageId: 'constant' });
-              }
-            }
-          }
-        }
-      },
       VariableDeclarator(node) {
         checkBinding(node.id);
       },
@@ -150,27 +109,6 @@ const structure = {
       ImportDeclaration: checkSource,
       ExportNamedDeclaration: checkSource,
       ExportAllDeclaration: checkSource,
-    };
-  },
-};
-
-const numericConstants = {
-  meta: {
-    type: 'suggestion',
-    schema: [],
-    messages: {
-      numeric:
-        'Move this operational value into @gyblos/config or its package constants.ts.',
-    },
-  },
-  create(context) {
-    return {
-      Literal(node) {
-        if (typeof node.value !== 'number' && typeof node.value !== 'bigint')
-          return;
-        if (!SIMPLE_NUMBERS.has(node.value))
-          context.report({ node, messageId: 'numeric' });
-      },
     };
   },
 };
@@ -226,7 +164,7 @@ const versionPins = {
 export default {
   rules: {
     structure,
-    'numeric-constants': numericConstants,
+    'package-boundaries': structure,
     'version-pins': versionPins,
   },
 };

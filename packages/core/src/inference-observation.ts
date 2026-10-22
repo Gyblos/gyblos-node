@@ -1,3 +1,4 @@
+// Owns inference observation in core; it must not know SDKs, engines or filesystem.
 import { HTTP_STATUS } from '@gyblos/config';
 import type { EngineWireUsage as EngineUsage } from '@gyblos/protocol/wire-usage';
 

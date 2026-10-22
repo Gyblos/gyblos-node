@@ -1,3 +1,4 @@
+// Owns offline engine independence.test regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { once } from 'node:events';
@@ -27,12 +28,12 @@ import {
 
 // The real x402 middleware runs against controlled, non-broadcasting services.
 // No wallet is funded and no RPC method can submit a transaction.
-test('seller uses an injected Engine and generates only after confirmed valid escrow', async () => {
+void test('seller uses an injected Engine and generates only after confirmed valid escrow', async () => {
   const original = globalThis.fetch;
   const authorizer = await generateKeyPairSigner();
-  const buyer = '5FVtvnKXCabCDxSoeNJuLdRpCTBZQnhTnNooZzEYfg2j',
-    feePayer = 'HZLkSwMefjig2NhrKaW3Hb16JX8PTQnE4Jutdc2B433g',
-    mint = '2vXUXK2rJTPtb7Wx9em4W9FdgtfD6HTnFxZz5oirLVcH';
+  const buyer = '5FVtvnKXCabCDxSoeNJuLdRpCTBZQnhTnNooZzEYfg2j';
+  const feePayer = 'HZLkSwMefjig2NhrKaW3Hb16JX8PTQnE4Jutdc2B433g';
+  const mint = '2vXUXK2rJTPtb7Wx9em4W9FdgtfD6HTnFxZz5oirLVcH';
   const encoder = getAddressEncoder();
   const [channelId, bump] = await getProgramDerivedAddress({
     programAddress: address(CHANNEL_PROGRAM),
@@ -93,9 +94,9 @@ test('seller uses an injected Engine and generates only after confirmed valid es
       };
     },
   };
-  let engineCalls = 0,
-    releaseDeposit!: () => void,
-    signalDeposit!: () => void;
+  let engineCalls = 0;
+  let releaseDeposit!: () => void;
+  let signalDeposit!: () => void;
   const depositBarrier = new Promise<void>((resolve) => {
     releaseDeposit = resolve;
   });
@@ -208,12 +209,12 @@ test('seller uses an injected Engine and generates only after confirmed valid es
     await once(server, 'listening');
     const address = server.address();
     assert.ok(address && typeof address !== 'string');
-    const url = `http://127.0.0.1:${address.port}/v1/chat/completions`,
-      body = JSON.stringify({
-        requestId: randomUUID(),
-        prompt: 'Hi',
-        maxTokens: 32,
-      });
+    const url = `http://127.0.0.1:${address.port}/v1/chat/completions`;
+    const body = JSON.stringify({
+      requestId: randomUUID(),
+      prompt: 'Hi',
+      maxTokens: 32,
+    });
     const challenge = await original(url, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
