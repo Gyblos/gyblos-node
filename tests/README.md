@@ -7,6 +7,14 @@ wallet, Ollama, Docker, Python or devnet funds. Node discovers
 `tests/**/*.test.ts` directly; there is no entrypoint allowlist. Case modules in
 `tests/support/` are explicitly registered by those entrypoints.
 
+Public discovery contract tests use ephemeral, unfunded Node/OpenSSL signers.
+The committed `packages/protocol/vectors/public-discovery-v1.json` contains only
+synthetic public keys, record bytes and signatures, with no retained private
+keys. Golden tests verify each catalog/presence/withdrawal with Web Crypto and
+an independent OpenSSL verifier. Strict JSON, trust, lifetime, sequence, linked
+catalog, alias and size/amount rejection cases do not perform discovery or
+register identities. The original private-offer vector/tests remain unchanged.
+
 Paid-call diagnostic cases spawn the real CLI entrypoint using the asynchronous
 Node test-loader API. Stubs replace only its direct readiness/payment ports;
 locks, temporary persistence, classification and evidence filtering remain real.
