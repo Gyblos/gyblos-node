@@ -1,17 +1,18 @@
 # Limitations and recovery
 
-This repository is an experimental TypeScript x402 payment foundation for
-Gyblos. It exercises Solana devnet fixed resources and a local Ollama inference
-gate, plus an experimental native Iroh PoC. The owner-authorized final paid
-smoke on `ba168c4fae043dc1170268cad9c0852d3c7533d9` completed three strictly
-sequential native Mac-seller/VPS-buyer requests with required direct Iroh routes
-and a test SPL mint, not USDC. Every delivered answer passed independent recount
-and the unchanged finalized transaction/current-channel audit before the next
-request. The [commit-bound report](../lab/evidence/gate-0008.json) records
-source hashes, six finalized signatures, per-request accounting and safe
-persistent facilitator diagnostics. The report validates that specified runtime
-source. Later structural changes and the buyer-proxy fix are checked with
-offline regressions; no paid smoke has been repeated for the current head.
+Gyblos Node is an experimental TypeScript node and buyer application with x402
+payments. It exercises Solana devnet fixed resources and a local Ollama
+inference gate, plus an experimental native Iroh PoC. The owner-authorized final
+paid smoke on `ba168c4fae043dc1170268cad9c0852d3c7533d9` completed three
+strictly sequential native Mac-seller/VPS-buyer requests with required direct
+Iroh routes and a test SPL mint, not USDC. Every delivered answer passed
+independent recount and the unchanged finalized transaction/current-channel
+audit before the next request. The
+[commit-bound report](../lab/evidence/gate-0008.json) records source hashes, six
+finalized signatures, per-request accounting and safe persistent facilitator
+diagnostics. The report validates that specified runtime source. Later
+structural changes and the buyer-proxy fix are checked with offline regressions;
+no paid smoke has been repeated for the current head.
 
 The [older physical report](../lab/evidence/gate-0007.json) remains historical.
 The separate `24af211` attempt is still partial: its first request completed,

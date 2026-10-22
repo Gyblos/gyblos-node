@@ -1,15 +1,16 @@
-# Gyblos Payments
+# Gyblos Node
 
-Experimental x402 payments for Gyblos, a P2P inference project. A buyer
-authorizes a budget, a seller reports token usage, and a facilitator settles the
-charge and returns the unused deposit on Solana. This repository runs
-fixed-resource checks, local Ollama inference and an experimental native Iroh
-transport between isolated Docker roles and native peers. The final paid smoke
-on `ba168c4` completed three strictly sequential native Mac–VPS inferences over
-required direct Iroh routes, with a devnet test token and persistent facilitator
-diagnostics enabled. All six payment transactions finalized; each delivered
-answer passed independent recount and a finalized payment audit before the next
-request started. See the [commit-bound report](lab/evidence/gate-0008.json).
+Gyblos node and buyer application for P2P inference, with experimental x402
+payments. A buyer authorizes a budget, a seller reports token usage, and a
+facilitator settles the charge and returns the unused deposit on Solana. This
+repository runs fixed-resource checks, local Ollama inference and an
+experimental native Iroh transport between isolated Docker roles and native
+peers. The final paid smoke on `ba168c4` completed three strictly sequential
+native Mac–VPS inferences over required direct Iroh routes, with a devnet test
+token and persistent facilitator diagnostics enabled. All six payment
+transactions finalized; each delivered answer passed independent recount and a
+finalized payment audit before the next request started. See the
+[commit-bound report](lab/evidence/gate-0008.json).
 
 The [older report](lab/evidence/gate-0007.json) remains historical. The separate
 `24af211` attempt completed its first call; its second settled on-chain but left

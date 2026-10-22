@@ -17,7 +17,7 @@ This repository contains the Gyblos node and buyer application, not the separate
 
 Product documentation, research, decisions and design live in `../gyblos-brain`. Before planning or documenting, read its `AGENTS.md`, `Home.md`, `20 Decisions/Decision log.md`, and `40 Validation/Self-improvement.md`, in that order, then the relevant spec, DESIGN and existing task notes. Follow that procedure there rather than copying it into this repository. Verify the active repository and target note before editing; landing paths and commands are not instructions for this app.
 
-Search titles, aliases and content before creating a note; extend an existing relevant note. Never create vault categories, folders, subfolders or structural indexes without explicit approval. Apply its self-improvement cycle and independent read-only reviews for substantive changes. Do not change confirmed decisions, expand permissions or create automations. Keep `30 Repos/gyblos-payments.md` current after meaningful merged work, version and locally commit authorized vault changes, and do not push the vault without approval. Never touch `.obsidian`.
+Search titles, aliases and content before creating a note; extend an existing relevant note. Never create vault categories, folders, subfolders or structural indexes without explicit approval. Apply its self-improvement cycle and independent read-only reviews for substantive changes. Do not change confirmed decisions, expand permissions or create automations. Keep `30 Repos/gyblos-payments.md` (the stable vault note for gyblos-node) current after meaningful merged work, version and locally commit authorized vault changes, and do not push the vault without approval. Never touch `.obsidian`.
 
 ## Commands
 
