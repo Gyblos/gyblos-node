@@ -6,7 +6,7 @@ This repository contains the Gyblos node and buyer application, not the separate
 
 - `packages/protocol`: SDK-independent signing, canonical bytes, engine contracts and shared error taxonomy.
 - `packages/core`: workflow and metering policy; no SDKs, filesystem or adapters.
-- `packages/engine-ollama`, `payments-x402`, `transport-iroh`: independent adapters.
+- `packages/engine-ollama`, `payments-x402`, `transport-iroh`, `identity` (8004 registry; not wired yet): independent adapters.
 - `packages/node`: reusable seller composition, lifecycle and SDK adaptation.
 - `apps/node`, `apps/buyer`, `apps/facilitator`: independent executable applications.
 - `packages/config`: operator configuration and retained legacy shared values; `runtime`: platform support.

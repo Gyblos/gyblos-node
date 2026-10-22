@@ -49,7 +49,9 @@ Current-account responses and unsigned mutated transaction variants are labeled
 synthetic. Do not add encoded payment/voucher payloads, raw logs, credentials or
 private endpoint/content data to the fixture.
 
-Identity integration cases start a throwaway `solana-test-validator` on
+Identity integration cases are **opt-in**
+(`GYBLOS_IDENTITY_INTEGRATION=1 pnpm test`), so the default suite never reaches
+the network. When enabled they start a throwaway `solana-test-validator` on
 synthetic loopback ports, cloning the 8004 program, mpl-core and the registry
 accounts read-only from public devnet; the ledger and log stay under ignored
 `.local/identity-validator/`. Signers are ephemeral and funded only by that

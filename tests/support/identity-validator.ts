@@ -25,11 +25,20 @@ export interface LocalValidator {
 export type ValidatorStart =
   { ok: true; validator: LocalValidator } | { ok: false; reason: string };
 
-// Probed once at registration time, like the native Iroh capability; false means available.
-export const VALIDATOR_SKIP: false | string =
-  spawnSync(VALIDATOR_BINARY, ['--version'], { stdio: 'ignore' }).status === 0
+// The integration clones public devnet accounts, so it is opt-in: the default
+// suite stays offline. Probed once at registration time; false means run.
+const OPT_IN_ENV = 'GYBLOS_IDENTITY_INTEGRATION';
+
+function validatorSkip(): false | string {
+  if (process.env[OPT_IN_ENV] !== '1')
+    return `set ${OPT_IN_ENV}=1 to run identity integration (clones public devnet accounts)`;
+  return spawnSync(VALIDATOR_BINARY, ['--version'], { stdio: 'ignore' })
+    .status === 0
     ? false
     : `${VALIDATOR_BINARY} not found on PATH; identity integration not exercised`;
+}
+
+export const VALIDATOR_SKIP: false | string = validatorSkip();
 
 function validatorArgs(ledger: string): string[] {
   return [
