@@ -9,9 +9,9 @@ and a test SPL mint, not USDC. Every delivered answer passed independent recount
 and the unchanged finalized transaction/current-channel audit before the next
 request. The [commit-bound report](../lab/evidence/gate-0008.json) records
 source hashes, six finalized signatures, per-request accounting and safe
-persistent facilitator diagnostics. Subsequent publication commits contain
-evidence and documentation only; this run validates the specified runtime
-source.
+persistent facilitator diagnostics. The report validates that specified runtime
+source. Later structural changes and the buyer-proxy fix are checked with
+offline regressions; no paid smoke has been repeated for the current head.
 
 The [older physical report](../lab/evidence/gate-0007.json) remains historical.
 The separate `24af211` attempt is still partial: its first request completed,
@@ -19,9 +19,29 @@ the second settled on-chain but left an uncertain buyer journal, and the third
 never started. The original error was discarded and remains unknown. This new
 run used fresh isolated roles without retrying or clearing the old
 authorization; it does not provide charged recovery. Docker NAT-direct did not
-pass; hotspot/CGNAT and broader NAT coverage remain untested. PR #10 is unmerged
-and issues #17–#23 remain deferred. Use isolated generated devnet wallets only.
-Never import mainnet keys.
+pass; hotspot/CGNAT and broader NAT coverage remain untested. PR #10 is merged.
+Review issues #17–#19 and #21–#23 remain deferred; the buyer-proxy overlap and
+malformed-JSON issue is fixed separately. Use isolated generated devnet wallets
+only. Never import mainnet keys.
+
+## Buyer proxy queue
+
+A proxy admits at most two requests, counting active and queued work, and runs
+only one exchange with its configured seller at a time. The queue covers
+response forwarding and metric persistence; an error releases it without
+retrying the failed exchange. A caller that disconnects while queued is skipped
+before any forwarding. The existing native transport stays poisoned after an
+uncertain exchange, so subsequent queued work cannot reconnect or repeat that
+payment. Malformed JSON is rejected locally with HTTP 400 and `MALFORMED_JSON`;
+actual transport uncertainty remains HTTP 503 and still requires reconciliation.
+
+The queue is local to a proxy instance, not a global lock across buyer processes
+or devices. Local callers can occupy its bounded waiting slot until preceding
+work settles. Cancellation after forwarding cannot establish whether a payment
+settled and does not authorize retry or refund. Tests use native loopback and
+synthetic authorization strings with no funded wallets. They demonstrate this
+ordering defect and correction, not the cause of the historical 402 or recovery
+of its existing uncertain journal.
 
 ## Payment scope
 

@@ -35,3 +35,10 @@ export type P2pJournalState =
 export type CallOutcome = (typeof CALL_OUTCOMES)[keyof typeof CALL_OUTCOMES];
 
 export type CallPhase = (typeof CALL_PHASES)[keyof typeof CALL_PHASES];
+
+export const BUYER_PROXY_ERROR_CODES = {
+  MALFORMED_JSON: 'MALFORMED_JSON',
+} as const;
+
+export type BuyerProxyErrorCode =
+  (typeof BUYER_PROXY_ERROR_CODES)[keyof typeof BUYER_PROXY_ERROR_CODES];
