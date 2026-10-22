@@ -1,4 +1,4 @@
-# Technology stack
+# Gyblos Node technology stack
 
 What this repository runs on, why each piece was chosen, and when to use Rust
 instead of TypeScript. Product decisions and research live in the Gyblos vault;
