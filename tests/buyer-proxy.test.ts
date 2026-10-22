@@ -7,13 +7,21 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { buyerProxyHandler } from '@gyblos/buyer/proxy';
 import { HTTP_STATUS, LOCALHOST, P2P, ROUTES } from '@gyblos/config';
 import type { Transport } from '@gyblos/transport-iroh';
 import { TRANSPORT_ROUTES } from '@gyblos/transport-iroh/constants';
 
 import { fixture, within } from './support/native-fixture.js';
-import { NATIVE_TEST_OPTIONS, waitFor } from './support/native-runtime.js';
+import {
+  NATIVE_CAPABILITY,
+  NATIVE_TEST_OPTIONS,
+  waitFor,
+} from './support/native-runtime.js';
+
+const PROXY_TEST_OPTIONS = { skip: NATIVE_CAPABILITY.bindingSkip };
+const buyerProxyHandler = NATIVE_CAPABILITY.bindingSkip
+  ? undefined
+  : (await import('@gyblos/buyer/proxy')).buyerProxyHandler;
 
 function deferred() {
   let resolve = () => {};
@@ -44,6 +52,10 @@ async function withProxy(
 ) {
   const directory = await mkdtemp(join(tmpdir(), 'gyblos-proxy-'));
   const previous = process.cwd();
+  assert.ok(
+    buyerProxyHandler,
+    'Proxy binding capability must be checked first.',
+  );
   const server = createServer(buyerProxyHandler(transport));
   let readBodies = 0;
   let closedResponses = 0;
@@ -94,101 +106,117 @@ function send(
   });
 }
 
-void test('malformed proxy JSON returns 400 without forwarding payment headers', async () => {
-  let exchanges = 0;
-  await withProxy(
-    stub(async () => {
-      exchanges++;
-      return SUCCESS;
-    }),
-    async (url) => {
-      const response = await fetch(url, {
-        method: 'POST',
-        body: '{PRIVATE_SENTINEL',
-        headers: { 'payment-signature': 'synthetic-not-a-signature' },
-      });
-      assert.equal(response.status, HTTP_STATUS.badRequest);
-      assert.deepEqual(await response.json(), {
-        code: 'MALFORMED_JSON',
-        error: 'Malformed JSON request',
-      });
-      assert.equal(exchanges, 0);
-    },
-  );
-});
+void test(
+  'malformed proxy JSON returns 400 without forwarding payment headers',
+  PROXY_TEST_OPTIONS,
+  async () => {
+    let exchanges = 0;
+    await withProxy(
+      stub(async () => {
+        exchanges++;
+        return SUCCESS;
+      }),
+      async (url) => {
+        const response = await fetch(url, {
+          method: 'POST',
+          body: '{PRIVATE_SENTINEL',
+          headers: { 'payment-signature': 'synthetic-not-a-signature' },
+        });
+        assert.equal(response.status, HTTP_STATUS.badRequest);
+        assert.deepEqual(await response.json(), {
+          code: 'MALFORMED_JSON',
+          error: 'Malformed JSON request',
+        });
+        assert.equal(exchanges, 0);
+      },
+    );
+  },
+);
 
-void test('proxy queues a second request and bounds all active plus queued requests', async () => {
-  const entered = deferred();
-  const release = deferred();
-  const requests: string[] = [];
-  await withProxy(
-    stub(async (request) => {
-      requests.push(JSON.parse(Buffer.from(request.body).toString()).requestId);
-      if (requests.length === 1) {
-        entered.resolve();
-        await release.promise;
-      }
-      return SUCCESS;
-    }),
-    async (url, bodies) => {
-      const first = send(url, 'first', true);
-      await entered.promise;
-      const second = send(url, 'second');
-      try {
-        await waitFor(() => bodies() >= 2);
-        assert.deepEqual(requests, ['first']);
-        const rejected = await send(url, 'excess');
-        assert.equal(rejected.status, HTTP_STATUS.tooManyRequests);
-        release.resolve();
-        assert.deepEqual(
-          await Promise.all([first, second]).then((responses) =>
-            responses.map((response) => response.status),
-          ),
-          [HTTP_STATUS.ok, HTTP_STATUS.ok],
+void test(
+  'proxy queues a second request and bounds all active plus queued requests',
+  PROXY_TEST_OPTIONS,
+  async () => {
+    const entered = deferred();
+    const release = deferred();
+    const requests: string[] = [];
+    await withProxy(
+      stub(async (request) => {
+        requests.push(
+          JSON.parse(Buffer.from(request.body).toString()).requestId,
         );
-        assert.deepEqual(requests, ['first', 'second']);
-      } finally {
-        release.resolve();
-        await Promise.allSettled([first, second]);
-      }
-    },
-  );
-});
+        if (requests.length === 1) {
+          entered.resolve();
+          await release.promise;
+        }
+        return SUCCESS;
+      }),
+      async (url, bodies) => {
+        const first = send(url, 'first', true);
+        await entered.promise;
+        const second = send(url, 'second');
+        try {
+          await waitFor(() => bodies() >= 2);
+          assert.deepEqual(requests, ['first']);
+          const rejected = await send(url, 'excess');
+          assert.equal(rejected.status, HTTP_STATUS.tooManyRequests);
+          release.resolve();
+          assert.deepEqual(
+            await Promise.all([first, second]).then((responses) =>
+              responses.map((response) => response.status),
+            ),
+            [HTTP_STATUS.ok, HTTP_STATUS.ok],
+          );
+          assert.deepEqual(requests, ['first', 'second']);
+        } finally {
+          release.resolve();
+          await Promise.allSettled([first, second]);
+        }
+      },
+    );
+  },
+);
 
-void test('a failed exchange releases the proxy queue without retrying the failed request', async () => {
-  const entered = deferred();
-  const release = deferred();
-  const requests: string[] = [];
-  await withProxy(
-    stub(async (request) => {
-      requests.push(JSON.parse(Buffer.from(request.body).toString()).requestId);
-      if (requests.length === 1) {
-        entered.resolve();
-        await release.promise;
-        throw new Error('synthetic lost response');
-      }
-      return SUCCESS;
-    }),
-    async (url, bodies) => {
-      const first = send(url, 'failed', true);
-      await entered.promise;
-      const second = send(url, 'next');
-      try {
-        await waitFor(() => bodies() >= 2);
-        assert.deepEqual(requests, ['failed']);
-        release.resolve();
-        const responses = await Promise.all([first, second]);
-        assert.equal(responses[0]!.status, HTTP_STATUS.serviceUnavailable);
-        assert.match(await responses[0]!.text(), /uncertain/);
-        assert.equal(responses[1]!.status, HTTP_STATUS.ok);
-        assert.deepEqual(requests, ['failed', 'next']);
-      } finally {
-        release.resolve();
-        await Promise.allSettled([first, second]);
-      }
-    },
-  );
-});
+void test(
+  'a failed exchange releases the proxy queue without retrying the failed request',
+  PROXY_TEST_OPTIONS,
+  async () => {
+    const entered = deferred();
+    const release = deferred();
+    const requests: string[] = [];
+    await withProxy(
+      stub(async (request) => {
+        requests.push(
+          JSON.parse(Buffer.from(request.body).toString()).requestId,
+        );
+        if (requests.length === 1) {
+          entered.resolve();
+          await release.promise;
+          throw new Error('synthetic lost response');
+        }
+        return SUCCESS;
+      }),
+      async (url, bodies) => {
+        const first = send(url, 'failed', true);
+        await entered.promise;
+        const second = send(url, 'next');
+        try {
+          await waitFor(() => bodies() >= 2);
+          assert.deepEqual(requests, ['failed']);
+          release.resolve();
+          const responses = await Promise.all([first, second]);
+          assert.equal(responses[0]!.status, HTTP_STATUS.serviceUnavailable);
+          assert.match(await responses[0]!.text(), /uncertain/);
+          assert.equal(responses[1]!.status, HTTP_STATUS.ok);
+          assert.deepEqual(requests, ['failed', 'next']);
+        } finally {
+          release.resolve();
+          await Promise.allSettled([first, second]);
+        }
+      },
+    );
+  },
+);
 
 void test(
   'native Iroh proxy keeps a paid response intact while another request waits',
@@ -231,41 +259,47 @@ void test(
   },
 );
 
-void test('a queued proxy request abandoned by its caller is never forwarded', async () => {
-  const entered = deferred();
-  const release = deferred();
-  const requests: string[] = [];
-  await withProxy(
-    stub(async (request) => {
-      requests.push(JSON.parse(Buffer.from(request.body).toString()).requestId);
-      if (requests.length === 1) {
-        entered.resolve();
-        await release.promise;
-      }
-      return SUCCESS;
-    }),
-    async (url, bodies, closed) => {
-      const first = send(url, 'first');
-      await entered.promise;
-      const controller = new AbortController();
-      const abandoned = send(url, 'abandoned', true, controller.signal);
-      try {
-        await waitFor(() => bodies() >= 2);
-        controller.abort();
-        await assert.rejects(abandoned, { name: 'AbortError' });
-        await waitFor(() => closed() >= 1);
-        release.resolve();
-        assert.equal((await first).status, HTTP_STATUS.ok);
-        assert.equal((await send(url, 'healthy')).status, HTTP_STATUS.ok);
-        assert.deepEqual(requests, ['first', 'healthy']);
-      } finally {
-        release.resolve();
-        controller.abort();
-        await Promise.allSettled([first, abandoned]);
-      }
-    },
-  );
-});
+void test(
+  'a queued proxy request abandoned by its caller is never forwarded',
+  PROXY_TEST_OPTIONS,
+  async () => {
+    const entered = deferred();
+    const release = deferred();
+    const requests: string[] = [];
+    await withProxy(
+      stub(async (request) => {
+        requests.push(
+          JSON.parse(Buffer.from(request.body).toString()).requestId,
+        );
+        if (requests.length === 1) {
+          entered.resolve();
+          await release.promise;
+        }
+        return SUCCESS;
+      }),
+      async (url, bodies, closed) => {
+        const first = send(url, 'first');
+        await entered.promise;
+        const controller = new AbortController();
+        const abandoned = send(url, 'abandoned', true, controller.signal);
+        try {
+          await waitFor(() => bodies() >= 2);
+          controller.abort();
+          await assert.rejects(abandoned, { name: 'AbortError' });
+          await waitFor(() => closed() >= 1);
+          release.resolve();
+          assert.equal((await first).status, HTTP_STATUS.ok);
+          assert.equal((await send(url, 'healthy')).status, HTTP_STATUS.ok);
+          assert.deepEqual(requests, ['first', 'healthy']);
+        } finally {
+          release.resolve();
+          controller.abort();
+          await Promise.allSettled([first, abandoned]);
+        }
+      },
+    );
+  },
+);
 
 void test(
   'native Iroh remains poisoned after a lost paid response while a second request waits',

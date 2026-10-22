@@ -19,10 +19,10 @@ Native transport cases require the pinned native Iroh binding and IPv6 loopback
 `[::1]`. Before registering those cases, the test helpers probe SDK loading and
 an IPv6 loopback socket. Missing bindings or known IPv6 capability errors
 produce an explicit per-case skip reason; unexpected import/socket errors fail
-the suite. Role setup and CLI recovery cases require the binding but do not
-require IPv6. Other financial, lock, limiter and export cases keep running.
-Report passed, failed, cancelled and skipped counts separately; skipped native
-cases establish no transport result on that host.
+the suite. Role setup, proxy-handler and CLI recovery cases require the binding
+but do not require IPv6. Other financial, lock, limiter and export cases keep
+running. Report passed, failed, cancelled and skipped counts separately; skipped
+native cases establish no transport result on that host.
 
 Native fixtures use relay-disabled loopback endpoints and condition-based waits
 for connection retirement and admission. The egress-expiry case retains unread
