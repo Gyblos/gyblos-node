@@ -1,14 +1,14 @@
 import assert from 'node:assert/strict';
 
+import { JOURNAL_STATES } from '@gyblos/lab-harness/constants';
+import { saveJournal } from '@gyblos/lab-harness/journal';
 import {
   confirmInference,
   inferenceSnapshot,
   tokenAddress,
   transaction,
   transactionTransfers,
-} from '@gyblos/lab-harness/chain';
-import { JOURNAL_STATES } from '@gyblos/lab-harness/constants';
-import { saveJournal } from '@gyblos/lab-harness/journal';
+} from '@gyblos/payments-x402/accounting/chain';
 import { createInferenceBuyer } from '@gyblos/payments-x402/inference-buyer';
 import { validateSettlement } from '@gyblos/payments-x402/trust';
 

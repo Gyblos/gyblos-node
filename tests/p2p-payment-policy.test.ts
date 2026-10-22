@@ -9,9 +9,9 @@ import { generateKeyPairSigner } from '@solana/kit';
 import { encodePaymentRequiredHeader } from '@x402/core/http';
 
 import { DEVNET, DEVNET_USDC, P2P } from '@gyblos/config';
-import { withExclusiveLock } from '@gyblos/lab-harness/lock';
 import { fundRoles } from '@gyblos/lab-p2p/docker-fund';
 import { createInferenceBuyer } from '@gyblos/payments-x402/inference-buyer';
+import { withExclusiveLock } from '@gyblos/payments-x402/recovery/lock';
 import { saveJson } from '@gyblos/runtime';
 
 import { registerCallCases } from './support/call-cases.js';

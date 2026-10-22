@@ -4,7 +4,6 @@ import { resolve } from 'node:path';
 import { EndpointTicket } from '@number0/iroh';
 
 import { PRICES } from '@gyblos/application/metering';
-import { signInferenceOffer } from '@gyblos/application/offers';
 import {
   CLEANUP,
   DEVNET,
@@ -24,8 +23,9 @@ import {
   READINESS_GENERATION,
 } from '@gyblos/inference-ollama/constants';
 import { createOllamaEngine } from '@gyblos/inference-ollama/engine';
-import { inferenceSnapshot } from '@gyblos/lab-harness/chain';
 import { createInferenceSeller } from '@gyblos/node/http/inference';
+import { signInferenceOffer } from '@gyblos/node/offers';
+import { inferenceSnapshot } from '@gyblos/payments-x402/accounting/chain';
 import { assertProgram } from '@gyblos/payments-x402/chain';
 import { createFacilitator } from '@gyblos/payments-x402/facilitator';
 import {

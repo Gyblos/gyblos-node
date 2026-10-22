@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { verifyEscrowRent } from '@gyblos/lab-harness/escrow-rent';
+import { verifyEscrowRent } from '@gyblos/payments-x402/accounting/escrow-rent';
 
 import {
   guardFailure,

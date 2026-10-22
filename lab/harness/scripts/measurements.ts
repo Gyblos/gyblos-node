@@ -1,1 +1,1 @@
-export * from '@gyblos/lab-harness/measurements';
+export * from '@gyblos/node/measurements';

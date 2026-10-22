@@ -7,11 +7,14 @@ import type {
   EVIDENCE_IDS,
   InferenceCaseName,
 } from '@gyblos/lab-harness/constants';
+import type { Measurement } from '@gyblos/node/measurements';
+import type {
+  inferenceSnapshot,
+  transactionTransfers,
+} from '@gyblos/payments-x402/accounting/chain';
 
-import type { inferenceSnapshot, transactionTransfers } from './chain.js';
 import type { InferenceEvidenceErrorCode } from './constants.js';
 import type { EvidenceBase } from './evidence-types.js';
-import type { Measurement } from './measurements.js';
 
 export type InferenceSnapshot = Awaited<ReturnType<typeof inferenceSnapshot>>;
 

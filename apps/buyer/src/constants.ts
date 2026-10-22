@@ -1,4 +1,4 @@
-import { JOURNAL_STATES } from '@gyblos/lab-harness/constants';
+import { JOURNAL_STATES } from '@gyblos/payments-x402/constants';
 import { ROUTE_DISCREPANCY } from '@gyblos/transport/constants';
 
 export const CALL_OUTCOMES = {

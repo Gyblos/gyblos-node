@@ -3,9 +3,9 @@ import { createHash, randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 
 import { P2P } from '@gyblos/config';
-import { withExclusiveLock } from '@gyblos/lab-harness/lock';
 import { NAT } from '@gyblos/lab-p2p/constants';
 import { lamports, tokens } from '@gyblos/payments-x402/chain';
+import { withExclusiveLock } from '@gyblos/payments-x402/recovery/lock';
 import { saveJson } from '@gyblos/runtime';
 
 import { inspectDocker } from './docker-checks.js';

@@ -36,7 +36,6 @@ import {
   assertNoUnresolvedAuthorizations,
   saveJournal,
 } from '@gyblos/lab-harness/journal';
-import { withExclusiveLock } from '@gyblos/lab-harness/lock';
 import { createBuyer } from '@gyblos/payments-x402/buyer';
 import {
   account,
@@ -46,6 +45,7 @@ import {
 } from '@gyblos/payments-x402/chain';
 import { DEVNET, MAX_ATOMIC } from '@gyblos/payments-x402/constants';
 import { createFacilitator } from '@gyblos/payments-x402/facilitator';
+import { withExclusiveLock } from '@gyblos/payments-x402/recovery/lock';
 import { createGateSeller } from '@gyblos/payments-x402/seller';
 
 import { prepareFailureAccounts } from './failure-setup.js';

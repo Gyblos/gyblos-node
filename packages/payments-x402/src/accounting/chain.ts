@@ -10,7 +10,7 @@ import {
   RETRY_DELAYS,
   TOKEN_PROGRAM_ADDRESS,
 } from '@gyblos/config';
-import type { Config } from '@gyblos/lab-harness/config';
+import type { Config } from '@gyblos/config/wallet';
 import {
   rpc as baseRpc,
   confirm,

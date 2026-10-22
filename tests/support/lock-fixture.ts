@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import type { TestContext } from 'node:test';
 
 import { FILE_MODES } from '@gyblos/config';
-import { currentLockOwner } from '@gyblos/lab-harness/lock-owner';
+import { currentLockOwner } from '@gyblos/payments-x402/recovery/lock-owner';
 
 export async function lockFixture() {
   const directory = await mkdtemp(join(tmpdir(), 'gyblos-public-lock-'));

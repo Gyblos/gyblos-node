@@ -5,18 +5,15 @@ import { assessCharge, OFFER_ID } from '@gyblos/application/metering';
 import { INFERENCE_TRANSPORT_PATH, TIMEOUTS } from '@gyblos/config';
 import { GENERATION, MODEL_LIMITS } from '@gyblos/inference-ollama/constants';
 import { MODEL } from '@gyblos/inference-ollama/index';
-import { inferenceSnapshot } from '@gyblos/lab-harness/chain';
 import { saveJson, signer } from '@gyblos/lab-harness/config';
 import { JOURNAL_STATES, WALLET_ROLES } from '@gyblos/lab-harness/constants';
 import {
   assertNoUnresolvedAuthorizations,
   saveJournal,
 } from '@gyblos/lab-harness/journal';
-import {
-  appendMeasurement,
-  measurementRow,
-} from '@gyblos/lab-harness/measurements';
 import { inferenceCeiling } from '@gyblos/node/http/inference';
+import { appendMeasurement, measurementRow } from '@gyblos/node/measurements';
+import { inferenceSnapshot } from '@gyblos/payments-x402/accounting/chain';
 import { DEVNET } from '@gyblos/payments-x402/constants';
 import { createInferenceBuyer } from '@gyblos/payments-x402/inference-buyer';
 

@@ -10,7 +10,6 @@
   "dependencies": {
     "@gyblos/application": "workspace:*",
     "@gyblos/config": "workspace:*",
-    "@gyblos/lab-harness": "workspace:*",
     "@gyblos/runtime": "workspace:*",
     "@gyblos/node": "workspace:*",
     "@gyblos/payments-x402": "workspace:*",

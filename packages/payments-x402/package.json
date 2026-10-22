@@ -10,6 +10,13 @@
   "dependencies": {
     "@gyblos/config": "workspace:*",
     "@gyblos/runtime": "workspace:*",
-    "@gyblos/protocol": "workspace:*"
+    "@gyblos/protocol": "workspace:*",
+    "@solana/kit": "5.1.0",
+    "@x402/core": "2.28.0",
+    "@x402/svm": "2.28.0",
+    "express": "4.21.2",
+    "@x402/express": "2.28.0",
+    "@solana-program/token": "0.9.0",
+    "@x402/fetch": "2.28.0"
   }
 }

@@ -2,11 +2,8 @@ import { readFile } from 'node:fs/promises';
 
 import { EndpointAddr, EndpointId, RelayMode } from '@number0/iroh';
 
-import {
-  verifyInferenceOffer,
-  type OfferTrust,
-} from '@gyblos/application/offers';
 import { MAX_ATOMIC, P2P } from '@gyblos/config';
+import { verifyInferenceOffer, type OfferTrust } from '@gyblos/node/offers';
 import { loadRole, nodeSecret, rolePath } from '@gyblos/node/roles';
 import { assertProgram } from '@gyblos/payments-x402/chain';
 import { saveJson } from '@gyblos/runtime';

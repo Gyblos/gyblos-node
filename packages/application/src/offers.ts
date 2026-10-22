@@ -1,17 +1,9 @@
 import {
-  address,
-  createSignableMessage,
-  getAddressEncoder,
-  type KeyPairSigner,
-} from '@solana/kit';
-
-import {
   DEVNET,
   INFERENCE_REQUEST_LIMITS,
   MAX_ATOMIC,
   P2P,
 } from '@gyblos/config';
-import { sign, verify } from '@gyblos/protocol/signing';
 
 import type { EngineCapabilities, EngineDescription } from './engine.js';
 import { PRICES } from './metering.js';
@@ -53,7 +45,14 @@ export interface OfferTrust {
   maxAtomic: string;
 }
 
-function validOffer(offer: InferenceOffer, trust: OfferTrust, now: number) {
+export type OfferAddressValidator = (value: string) => unknown;
+
+function validOffer(
+  offer: InferenceOffer,
+  trust: OfferTrust,
+  now: number,
+  validateAddress: OfferAddressValidator,
+) {
   if (
     offer.schemaVersion !== P2P.schemaVersion ||
     offer.protocol !== P2P.protocol ||
@@ -114,7 +113,7 @@ function validOffer(offer: InferenceOffer, trust: OfferTrust, now: number) {
     offer.authorizer,
     offer.buyer,
   ])
-    address(wallet);
+    validateAddress(wallet);
   if (
     typeof offer.relayOnly !== 'boolean' ||
     !Array.isArray(offer.endpoint.directAddresses) ||
@@ -136,27 +135,12 @@ function validOffer(offer: InferenceOffer, trust: OfferTrust, now: number) {
     throw new Error('Relay-only offers must not advertise direct addresses.');
 }
 
-export async function signInferenceOffer(
-  offer: InferenceOffer,
-  owner: KeyPairSigner,
-): Promise<SignedInferenceOffer> {
-  if (owner.address !== offer.owner)
-    throw new Error('Offer signer does not match owner.');
-  const signature = await sign(P2P.offerDomain, offer, async (bytes) => {
-    const signatures = await owner.signMessages([createSignableMessage(bytes)]);
-    return signatures[0]![owner.address]!;
-  });
-  return {
-    offer,
-    signature: Buffer.from(signature).toString('base64'),
-  };
-}
-
-export async function verifyInferenceOffer(
+export function validateInferenceOffer(
   value: unknown,
   trust: OfferTrust,
-  now = Date.now(),
-): Promise<InferenceOffer> {
+  now: number,
+  validateAddress: OfferAddressValidator,
+): InferenceOffer {
   const signed = value as SignedInferenceOffer;
   if (
     !signed?.offer ||
@@ -165,15 +149,6 @@ export async function verifyInferenceOffer(
   )
     throw new Error('Malformed signed offer.');
   const offer = signed.offer;
-  validOffer(offer, trust, now);
-  if (
-    !(await verify(
-      P2P.offerDomain,
-      offer,
-      Uint8Array.from(getAddressEncoder().encode(address(trust.owner))),
-      Buffer.from(signed.signature, 'base64'),
-    ))
-  )
-    throw new Error('Invalid owner signature.');
+  validOffer(offer, trust, now, validateAddress);
   return offer;
 }

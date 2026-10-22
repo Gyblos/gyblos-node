@@ -25,7 +25,6 @@ import {
   assertNoUnresolvedAuthorizations,
   saveJournal,
 } from '@gyblos/lab-harness/journal';
-import { withExclusiveLock } from '@gyblos/lab-harness/lock';
 import { createBuyer } from '@gyblos/payments-x402/buyer';
 import {
   account,
@@ -44,6 +43,7 @@ import {
   UPSTREAM_COMMIT,
 } from '@gyblos/payments-x402/constants';
 import type { SettlementEvent } from '@gyblos/payments-x402/facilitator';
+import { withExclusiveLock } from '@gyblos/payments-x402/recovery/lock';
 import { validateSettlement } from '@gyblos/payments-x402/trust';
 
 const JOURNAL_PATH = JOURNAL_PATHS.fixed;

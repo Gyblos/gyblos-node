@@ -10,11 +10,8 @@ import { CHARGE_ANOMALIES } from '@gyblos/application/constants';
 import { CALL_OUTCOMES, type CallOutcome } from '@gyblos/buyer/constants';
 import type { paymentProof } from '@gyblos/buyer/proof';
 import { P2P } from '@gyblos/config';
-import {
-  measurementRow,
-  type Measurement,
-} from '@gyblos/lab-harness/measurements';
 import { collectDockerCalls } from '@gyblos/lab-p2p/docker-evidence';
+import { measurementRow, type Measurement } from '@gyblos/node/measurements';
 import { TRANSPORT_ROUTES } from '@gyblos/transport/constants';
 import type { RouteObservation } from '@gyblos/transport/types';
 

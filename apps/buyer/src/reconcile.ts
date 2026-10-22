@@ -1,17 +1,17 @@
 import assert from 'node:assert/strict';
 import { parseArgs } from 'node:util';
 
+import { P2P } from '@gyblos/config';
 import {
   verifyInferenceOffer,
   type OfferTrust,
   type SignedInferenceOffer,
-} from '@gyblos/application/offers';
-import { P2P } from '@gyblos/config';
-import { JOURNAL_STATES } from '@gyblos/lab-harness/constants';
-import { finalizedPaymentProof } from '@gyblos/lab-harness/finalized-proof';
-import { withExclusiveLock } from '@gyblos/lab-harness/lock';
-import { withP2pRecoveryLock } from '@gyblos/lab-harness/recovery-lock';
+} from '@gyblos/node/offers';
 import { loadRole, rolePath } from '@gyblos/node/roles';
+import { finalizedPaymentProof } from '@gyblos/payments-x402/accounting/finalized-proof';
+import { JOURNAL_STATES } from '@gyblos/payments-x402/constants';
+import { withExclusiveLock } from '@gyblos/payments-x402/recovery/lock';
+import { withP2pRecoveryLock } from '@gyblos/payments-x402/recovery/recovery-lock';
 import { isMain, loadJson, saveJson } from '@gyblos/runtime';
 
 import {

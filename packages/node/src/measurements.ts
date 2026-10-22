@@ -13,7 +13,8 @@ import {
   UNITS,
 } from '@gyblos/config';
 import { MODEL } from '@gyblos/inference-ollama/model';
-import { SCHEMA_VERSIONS } from '@gyblos/lab-harness/constants';
+
+import { MEASUREMENT_SCHEMA_VERSION } from './constants.js';
 
 export interface MeasurementInput {
   requestId: string;
@@ -55,7 +56,7 @@ export function measurementRow(input: MeasurementInput, salt: Uint8Array) {
     output: counts.output,
   });
   return {
-    schemaVersion: SCHEMA_VERSIONS.MEASUREMENT,
+    schemaVersion: MEASUREMENT_SCHEMA_VERSION,
     meteringMode: input.meteringMode ?? 'recounted',
     recordedAt: new Date().toISOString(),
     requestId: input.requestId,

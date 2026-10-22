@@ -16,6 +16,7 @@ import type {
   EXACT_UNTRUSTED_CASES,
   FACILITATOR_STATUSES,
 } from '@gyblos/lab-harness/constants';
+import type { ChainTransaction } from '@gyblos/payments-x402/accounting/types';
 import type { GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
 import type { PublicCall } from '@gyblos/payments-x402/exact/types';
 
@@ -26,7 +27,6 @@ import type {
   ExactSnapshot,
   Reconciliation,
 } from './evidence-types.js';
-import type { ChainTransaction } from './types.js';
 
 export type ExactCaseResult =
   | {

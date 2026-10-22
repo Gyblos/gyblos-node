@@ -30,9 +30,8 @@ import {
   P2P,
   PAYMENT_LIMITS,
 } from '@gyblos/config';
-import { tokenAddress } from '@gyblos/lab-harness/chain';
 import { loadConfig, signer, type Config } from '@gyblos/lab-harness/config';
-import { withExclusiveLock } from '@gyblos/lab-harness/lock';
+import { tokenAddress } from '@gyblos/payments-x402/accounting/chain';
 import {
   assertProgram,
   confirm,
@@ -40,6 +39,7 @@ import {
   rpc,
   tokens,
 } from '@gyblos/payments-x402/chain';
+import { withExclusiveLock } from '@gyblos/payments-x402/recovery/lock';
 import { saveJson } from '@gyblos/runtime';
 
 async function fundRolesUnlocked(

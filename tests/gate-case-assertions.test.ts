@@ -9,7 +9,6 @@ import {
 } from '@gyblos/lab-harness/constants';
 
 import { assertInferenceCase } from '../lab/harness/src/cli/inference/assertions.js';
-import { measurementRow } from '../lab/harness/src/measurements.js';
 import { observeInferenceResponse } from '../packages/application/src/inference-observation.js';
 import {
   assessCharge,
@@ -17,6 +16,7 @@ import {
   OFFER_ID,
 } from '../packages/application/src/metering.js';
 import { MODEL } from '../packages/inference-ollama/src/index.js';
+import { measurementRow } from '../packages/node/src/measurements.js';
 
 function fixture(
   options: {

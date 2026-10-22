@@ -57,7 +57,7 @@
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/buyer/src/call.ts",
-    "target": "lab/harness/src/chain.ts"
+    "target": "packages/payments-x402/src/accounting/chain.ts"
   },
   {
     "rule": "product-does-not-import-lab",
@@ -67,17 +67,17 @@
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/buyer/src/call.ts",
-    "target": "lab/harness/src/diagnostics.ts"
+    "target": "packages/node/src/diagnostics.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/buyer/src/call.ts",
-    "target": "lab/harness/src/lock.ts"
+    "target": "packages/payments-x402/src/recovery/lock.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/buyer/src/call.ts",
-    "target": "lab/harness/src/measurements.ts"
+    "target": "packages/node/src/measurements.ts"
   },
   {
     "rule": "product-does-not-import-lab",
@@ -87,7 +87,7 @@
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/buyer/src/proof.ts",
-    "target": "lab/harness/src/chain.ts"
+    "target": "packages/payments-x402/src/accounting/chain.ts"
   },
   {
     "rule": "product-does-not-import-lab",
@@ -97,22 +97,22 @@
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/buyer/src/reconcile.ts",
-    "target": "lab/harness/src/finalized-proof.ts"
+    "target": "packages/payments-x402/src/accounting/finalized-proof.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/buyer/src/reconcile.ts",
-    "target": "lab/harness/src/lock.ts"
+    "target": "packages/payments-x402/src/recovery/lock.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/buyer/src/reconcile.ts",
-    "target": "lab/harness/src/recovery-lock.ts"
+    "target": "packages/payments-x402/src/recovery/recovery-lock.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "apps/buyer/src/reconciliation.ts",
-    "target": "lab/harness/src/finalized-proof.ts"
+    "target": "packages/payments-x402/src/accounting/finalized-proof.ts"
   },
   {
     "rule": "product-does-not-import-lab",
@@ -157,7 +157,7 @@
   {
     "rule": "product-does-not-import-lab",
     "source": "lab/harness/src/cli/exact/cases.ts",
-    "target": "lab/harness/src/types.ts"
+    "target": "packages/payments-x402/src/accounting/types.ts"
   },
   {
     "rule": "product-does-not-import-lab",
@@ -167,7 +167,7 @@
   {
     "rule": "product-does-not-import-lab",
     "source": "lab/harness/src/cli/exact/evidence.ts",
-    "target": "lab/harness/src/types.ts"
+    "target": "packages/payments-x402/src/accounting/types.ts"
   },
   {
     "rule": "product-does-not-import-lab",
@@ -192,7 +192,7 @@
   {
     "rule": "product-does-not-import-lab",
     "source": "lab/harness/src/cli/exact/main.ts",
-    "target": "lab/harness/src/lock.ts"
+    "target": "packages/payments-x402/src/recovery/lock.ts"
   },
   {
     "rule": "product-does-not-import-lab",
@@ -222,7 +222,7 @@
   {
     "rule": "product-does-not-import-lab",
     "source": "lab/harness/src/cli/exact/reconcile.ts",
-    "target": "lab/harness/src/types.ts"
+    "target": "packages/payments-x402/src/accounting/types.ts"
   },
   {
     "rule": "product-does-not-import-lab",
@@ -232,7 +232,7 @@
   {
     "rule": "product-does-not-import-lab",
     "source": "lab/harness/src/cli/exact/types.ts",
-    "target": "lab/harness/src/types.ts"
+    "target": "packages/payments-x402/src/accounting/types.ts"
   },
   {
     "rule": "product-does-not-import-lab",
@@ -257,7 +257,7 @@
   {
     "rule": "product-does-not-import-lab",
     "source": "lab/harness/src/cli/execute.ts",
-    "target": "lab/harness/src/lock.ts"
+    "target": "packages/payments-x402/src/recovery/lock.ts"
   },
   {
     "rule": "product-does-not-import-lab",
@@ -267,17 +267,17 @@
   {
     "rule": "product-does-not-import-lab",
     "source": "lab/harness/src/cli/inference/assertions.ts",
-    "target": "lab/harness/src/measurements.ts"
+    "target": "packages/node/src/measurements.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "lab/harness/src/cli/inference/assertions.ts",
-    "target": "lab/harness/src/types.ts"
+    "target": "packages/payments-x402/src/accounting/types.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "lab/harness/src/cli/inference/cases.ts",
-    "target": "lab/harness/src/chain.ts"
+    "target": "packages/payments-x402/src/accounting/chain.ts"
   },
   {
     "rule": "product-does-not-import-lab",
@@ -297,7 +297,7 @@
   {
     "rule": "product-does-not-import-lab",
     "source": "lab/harness/src/cli/inference/cases.ts",
-    "target": "lab/harness/src/measurements.ts"
+    "target": "packages/node/src/measurements.ts"
   },
   {
     "rule": "product-does-not-import-lab",
@@ -312,12 +312,12 @@
   {
     "rule": "product-does-not-import-lab",
     "source": "lab/harness/src/cli/inference/evidence.ts",
-    "target": "lab/harness/src/types.ts"
+    "target": "packages/payments-x402/src/accounting/types.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "lab/harness/src/cli/inference/main.ts",
-    "target": "lab/harness/src/chain.ts"
+    "target": "packages/payments-x402/src/accounting/chain.ts"
   },
   {
     "rule": "product-does-not-import-lab",
@@ -342,17 +342,17 @@
   {
     "rule": "product-does-not-import-lab",
     "source": "lab/harness/src/cli/inference/main.ts",
-    "target": "lab/harness/src/lock.ts"
+    "target": "packages/payments-x402/src/recovery/lock.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "lab/harness/src/cli/inference/main.ts",
-    "target": "lab/harness/src/measurements.ts"
+    "target": "packages/node/src/measurements.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "lab/harness/src/cli/inference/reconcile.ts",
-    "target": "lab/harness/src/chain.ts"
+    "target": "packages/payments-x402/src/accounting/chain.ts"
   },
   {
     "rule": "product-does-not-import-lab",
@@ -377,7 +377,7 @@
   {
     "rule": "product-does-not-import-lab",
     "source": "lab/harness/src/cli/inference/types.ts",
-    "target": "lab/harness/src/types.ts"
+    "target": "packages/payments-x402/src/accounting/types.ts"
   },
   {
     "rule": "product-does-not-import-lab",
@@ -392,12 +392,12 @@
   {
     "rule": "product-does-not-import-lab",
     "source": "lab/p2p/src/docker-evidence.ts",
-    "target": "lab/harness/src/measurements.ts"
+    "target": "packages/node/src/measurements.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "lab/p2p/src/docker-fund.ts",
-    "target": "lab/harness/src/chain.ts"
+    "target": "packages/payments-x402/src/accounting/chain.ts"
   },
   {
     "rule": "product-does-not-import-lab",
@@ -407,22 +407,22 @@
   {
     "rule": "product-does-not-import-lab",
     "source": "lab/p2p/src/docker-fund.ts",
-    "target": "lab/harness/src/lock.ts"
+    "target": "packages/payments-x402/src/recovery/lock.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "lab/p2p/src/docker-main.ts",
-    "target": "lab/harness/src/lock.ts"
+    "target": "packages/payments-x402/src/recovery/lock.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "lab/p2p/src/nat-main.ts",
-    "target": "lab/harness/src/lock.ts"
+    "target": "packages/payments-x402/src/recovery/lock.ts"
   },
   {
     "rule": "product-does-not-import-lab",
     "source": "packages/node/src/seller.ts",
-    "target": "lab/harness/src/chain.ts"
+    "target": "packages/payments-x402/src/accounting/chain.ts"
   },
   {
     "rule": "product-does-not-import-lab",

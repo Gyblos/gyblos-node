@@ -27,11 +27,6 @@ import {
   createModelTokenizer,
   createOllama,
 } from '@gyblos/inference-ollama/index';
-import {
-  confirmInference,
-  inferenceSnapshot,
-  transaction,
-} from '@gyblos/lab-harness/chain';
 import { loadConfig, saveJson, signer } from '@gyblos/lab-harness/config';
 import {
   CONFIG_ASSET_LABELS,
@@ -41,10 +36,14 @@ import {
 } from '@gyblos/lab-harness/constants';
 import type { InferenceTrace } from '@gyblos/lab-harness/inference-evidence-types';
 import { assertNoUnresolvedAuthorizations } from '@gyblos/lab-harness/journal';
-import { withExclusiveLock } from '@gyblos/lab-harness/lock';
-import { measurementSalt } from '@gyblos/lab-harness/measurements';
 import { createInferenceSeller } from '@gyblos/node/http/inference';
+import { measurementSalt } from '@gyblos/node/measurements';
 import { createCases } from '@gyblos/node/synthetic-cases';
+import {
+  confirmInference,
+  inferenceSnapshot,
+  transaction,
+} from '@gyblos/payments-x402/accounting/chain';
 import {
   assertProgram,
   GateError,
@@ -52,6 +51,7 @@ import {
 } from '@gyblos/payments-x402/chain';
 import { DEVNET_USDC, GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
 import type { SettlementEvent } from '@gyblos/payments-x402/facilitator';
+import { withExclusiveLock } from '@gyblos/payments-x402/recovery/lock';
 import {
   assertPortFree,
   onShutdown,

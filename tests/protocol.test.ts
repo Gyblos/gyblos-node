@@ -6,13 +6,13 @@ import { address, generateKeyPairSigner, getAddressEncoder } from '@solana/kit';
 import ts from 'typescript';
 
 import { inferenceWireUsage as applicationWireUsage } from '@gyblos/application/engine';
+import { P2P } from '@gyblos/config';
+import { ENGINE_DONE_REASONS as adapterReasons } from '@gyblos/inference-ollama/constants';
 import {
   signInferenceOffer,
   verifyInferenceOffer,
   type InferenceOffer,
-} from '@gyblos/application/offers';
-import { P2P } from '@gyblos/config';
-import { ENGINE_DONE_REASONS as adapterReasons } from '@gyblos/inference-ollama/constants';
+} from '@gyblos/node/offers';
 import { GateError } from '@gyblos/payments-x402/chain';
 import { GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
 import {

@@ -77,7 +77,7 @@ function bootstrap(faults: CallFaults) {
   // Durable JSON, locking, failure handling and evidence filtering remain real.
   const stubs = {
     '@gyblos/payments-x402/chain': 'export async function assertProgram(){}',
-    '@gyblos/lab-harness/chain':
+    '@gyblos/payments-x402/accounting/chain':
       'export async function inferenceSnapshot(){return {slot:1,buyer:"10000",seller:"0",escrow:null,buyerLamports:"0"}}',
     '@gyblos/node/http/inference':
       'export function inferenceCeiling(){return "556"}',

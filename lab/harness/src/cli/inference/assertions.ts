@@ -9,8 +9,8 @@ import {
   INFERENCE_CASES,
   type InferenceCaseName,
 } from '@gyblos/lab-harness/constants';
-import type { Measurement } from '@gyblos/lab-harness/measurements';
 import type { InferenceTrace } from '@gyblos/lab-harness/types';
+import type { Measurement } from '@gyblos/node/measurements';
 
 interface CaseAssertion {
   caseName: InferenceCaseName;

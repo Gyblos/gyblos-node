@@ -25,7 +25,6 @@ import {
 } from '@gyblos/lab-harness/constants';
 import { prepareExactAccounts } from '@gyblos/lab-harness/exact-accounts';
 import { assertNoUnresolvedAuthorizations } from '@gyblos/lab-harness/journal';
-import { withExclusiveLock } from '@gyblos/lab-harness/lock';
 import {
   AuditedPublicFacilitator,
   createExactSeller,
@@ -36,6 +35,7 @@ import {
   assertExactSupport,
   PUBLIC_FACILITATORS,
 } from '@gyblos/payments-x402/exact/index';
+import { withExclusiveLock } from '@gyblos/payments-x402/recovery/lock';
 import { UNKNOWN_ERROR_NAME } from '@gyblos/runtime/constants';
 
 import { runProvider } from './cases.js';
