@@ -3,10 +3,37 @@ import childProcess, { type ChildProcess } from 'node:child_process';
 import { syncBuiltinESMExports } from 'node:module';
 import test from 'node:test';
 
+import { NODE_STATES } from '@gyblos/node/constants';
+import { createNodeLifecycle } from '@gyblos/node/lifecycle';
+
 import { waitReady } from '../packages/runtime/src/process.js';
 import { NATIVE_CAPABILITY } from './support/native-runtime.js';
 
 test('all executable modules are inert when imported', async (context) => {
+  let starts = 0;
+  let stops = 0;
+  const node = createNodeLifecycle(async () => {
+    starts++;
+    return {
+      async close() {
+        stops++;
+      },
+    };
+  });
+  assert.equal(node.health().state, NODE_STATES.STOPPED);
+  await Promise.all([node.start(), node.start()]);
+  assert.equal(starts, 1);
+  assert.equal(node.health().state, NODE_STATES.RUNNING);
+  await node.stop();
+  await node.stop();
+  assert.equal(stops, 1);
+  assert.equal(node.health().state, NODE_STATES.STOPPED);
+  const failure = new Error('Synthetic startup refusal');
+  const refused = createNodeLifecycle(async () => {
+    throw failure;
+  });
+  await assert.rejects(refused.start(), (error) => error === failure);
+  assert.equal(refused.health().state, NODE_STATES.STOPPED);
   const beforeSignals = ['SIGINT', 'SIGTERM'].map((s) =>
     process.listenerCount(s),
   );
@@ -26,12 +53,12 @@ test('all executable modules are inert when imported', async (context) => {
   syncBuiltinESMExports();
   try {
     for (const file of [
-      'apps/cli/src/buyer.ts',
-      'apps/cli/src/exact.ts',
-      'apps/cli/src/inference.ts',
-      'apps/cli/src/run.ts',
-      'apps/cli/src/preflight.ts',
-      'apps/seller/src/main.ts',
+      'lab/harness/src/cli/buyer.ts',
+      'lab/harness/src/cli/exact.ts',
+      'lab/harness/src/cli/inference.ts',
+      'lab/harness/src/cli/run.ts',
+      'lab/harness/src/cli/preflight.ts',
+      'apps/node/src/fixed.ts',
       'apps/facilitator/src/main.ts',
       'lab/harness/scripts/challenge.ts',
       'lab/harness/scripts/fund.ts',
@@ -43,6 +70,8 @@ test('all executable modules are inert when imported', async (context) => {
       'native role setup entry is inert when imported',
       { skip: NATIVE_CAPABILITY.bindingSkip },
       async () => {
+        await import('../apps/node/src/main.js');
+        await import('../apps/buyer/src/main.js');
         await import('../lab/harness/scripts/setup.js');
       },
     );

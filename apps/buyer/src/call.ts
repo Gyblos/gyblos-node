@@ -14,19 +14,20 @@ import {
   measurementRow,
   measurementSalt,
 } from '@gyblos/lab-harness/measurements';
+import { modelTokenizer } from '@gyblos/node/artifacts';
+import { inferenceCeiling } from '@gyblos/node/http/inference';
+import { rolePath, roleSigner } from '@gyblos/node/roles';
+import { createCases } from '@gyblos/node/synthetic-cases';
 import { assertProgram } from '@gyblos/payments-x402/chain';
 import type { BuyerDiagnosticCode } from '@gyblos/payments-x402/constants';
 import { createInferenceBuyer } from '@gyblos/payments-x402/inference-buyer';
 import { validateSettlement } from '@gyblos/payments-x402/trust';
 import { isMain, saveJson } from '@gyblos/runtime';
-import { inferenceCeiling } from '@gyblos/seller/inference';
 import {
   expectedIrohRoute,
   routesMatchRequired,
 } from '@gyblos/transport/route-policy';
 
-import { createCases } from '../inference/cases-data.js';
-import { modelTokenizer } from './artifacts.js';
 import { trustedOffer } from './buyer.js';
 import {
   priorCalls,
@@ -42,7 +43,6 @@ import {
   type P2pJournalState,
 } from './constants.js';
 import { paymentProof } from './proof.js';
-import { rolePath, roleSigner } from './roles.js';
 
 async function run() {
   const requiredRoute = expectedIrohRoute(process.env.GYBLOS_EXPECTED_ROUTE);

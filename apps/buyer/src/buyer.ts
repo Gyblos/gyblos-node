@@ -7,6 +7,7 @@ import {
   type OfferTrust,
 } from '@gyblos/application/offers';
 import { MAX_ATOMIC, P2P } from '@gyblos/config';
+import { loadRole, nodeSecret, rolePath } from '@gyblos/node/roles';
 import { assertProgram } from '@gyblos/payments-x402/chain';
 import { saveJson } from '@gyblos/runtime';
 import { bindEndpoint } from '@gyblos/transport/endpoint';
@@ -14,7 +15,6 @@ import { createIrohTransport } from '@gyblos/transport/iroh-client';
 import { expectedIrohRoute } from '@gyblos/transport/route-policy';
 
 import { startBuyerProxy } from './proxy.js';
-import { loadRole, nodeSecret, rolePath } from './roles.js';
 
 export async function trustedOffer() {
   const config = await loadRole();

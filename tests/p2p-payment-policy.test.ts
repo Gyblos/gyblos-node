@@ -152,8 +152,8 @@ test(
   'P2P CLI refuses a second process before loading config or making requests',
   { skip: NATIVE_CAPABILITY.bindingSkip },
   async () => {
-    const { main: paidCall } = await import('@gyblos/cli/p2p/call');
-    const { rolePath } = await import('@gyblos/cli/p2p/roles');
+    const { main: paidCall } = await import('@gyblos/buyer/call');
+    const { rolePath } = await import('@gyblos/node/roles');
     const original = process.cwd(),
       directory = await mkdtemp(join(tmpdir(), 'gyblos-p2p-call-lock-'));
     try {

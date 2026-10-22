@@ -7,8 +7,8 @@ import { PassThrough } from 'node:stream';
 import type { TestContext } from 'node:test';
 
 import { CHARGE_ANOMALIES } from '@gyblos/application/constants';
-import { CALL_OUTCOMES, type CallOutcome } from '@gyblos/cli/p2p/constants';
-import type { paymentProof } from '@gyblos/cli/p2p/proof';
+import { CALL_OUTCOMES, type CallOutcome } from '@gyblos/buyer/constants';
+import type { paymentProof } from '@gyblos/buyer/proof';
 import { P2P } from '@gyblos/config';
 import {
   measurementRow,

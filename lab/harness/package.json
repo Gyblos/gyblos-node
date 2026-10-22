@@ -12,6 +12,12 @@
     "@gyblos/runtime": "workspace:*",
     "@gyblos/payments-x402": "workspace:*",
     "@gyblos/application": "workspace:*",
-    "@gyblos/inference-ollama": "workspace:*"
+    "@gyblos/inference-ollama": "workspace:*",
+    "@solana-program/token": "0.9.0",
+    "@x402/core": "2.28.0",
+    "@solana/kit": "5.1.0",
+    "@gyblos/node": "workspace:*",
+    "@solana-program/system": "0.10.0",
+    "@x402/svm": "2.28.0"
   }
 }

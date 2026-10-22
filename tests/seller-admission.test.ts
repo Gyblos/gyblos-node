@@ -10,9 +10,9 @@ import {
   encodePaymentSignatureHeader,
 } from '@x402/core/http';
 
-import { createInferenceSeller } from '../apps/seller/src/inference.js';
 import { createOllamaEngine } from '../packages/inference-ollama/src/engine.js';
 import { MODEL } from '../packages/inference-ollama/src/model.js';
+import { createInferenceSeller } from '../packages/node/src/http/inference.js';
 import {
   DEVNET,
   DEVNET_GENESIS,

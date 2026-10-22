@@ -1,6 +1,6 @@
 import { parseArgs } from 'node:util';
 
-import { publicRole, setupRole } from './roles.js';
+import { publicRole, setupRole } from '@gyblos/node/roles';
 
 export async function setupP2PRole() {
   const { values } = parseArgs({

@@ -8,7 +8,7 @@ import {
   CALL_OUTCOMES,
   CALL_PHASES,
   P2P_JOURNAL_STATES,
-} from '@gyblos/cli/p2p/constants';
+} from '@gyblos/buyer/constants';
 import { ERROR_DIAGNOSTICS } from '@gyblos/lab-harness/constants';
 import { errorDiagnostic } from '@gyblos/lab-harness/diagnostics';
 import {

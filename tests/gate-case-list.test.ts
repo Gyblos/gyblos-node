@@ -3,7 +3,7 @@ import test from 'node:test';
 
 import { INFERENCE_CASES } from '@gyblos/lab-harness/constants';
 
-import { createCases } from '../apps/cli/src/inference/cases-data.js';
+import { createCases } from '../packages/node/src/synthetic-cases.js';
 
 test('gate adds the separately targeted undercharge before engine termination', () => {
   const cases = createCases('over-request', 'failure-request', 'under-request');

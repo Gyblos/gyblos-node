@@ -2,6 +2,7 @@ import {
   CONFIG_SCHEMA_VERSION,
   type ConfigAssetLabel,
 } from '@gyblos/config/constants';
+import { INFERENCE_CASES } from '@gyblos/node/constants';
 import type { GateErrorCode } from '@gyblos/payments-x402/constants';
 
 export const EXACT_EVIDENCE_CODES = {
@@ -63,15 +64,6 @@ export const EXACT_CASES = {
   INSUFFICIENT_USDC: 'insufficient-usdc',
   PAID_REQUEST: 'paid-request',
   REPLAY: 'replay',
-} as const;
-
-export const INFERENCE_CASES = {
-  HONEST_1: 'honest-1',
-  HONEST_2: 'honest-2',
-  HONEST_3: 'honest-3',
-  OVERCHARGE: 'overcharge',
-  UNDERCHARGE: 'undercharge',
-  ENGINE_INTERRUPTED: 'engine-interrupted',
 } as const;
 
 export const FAILURE_CASES = {
@@ -249,3 +241,5 @@ export {
   type ConfigAssetLabel,
   type WalletRole,
 } from '@gyblos/config/constants';
+
+export { INFERENCE_CASES } from '@gyblos/node/constants';

@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 
-import { CALL_OUTCOMES, type CallOutcome } from '@gyblos/cli/p2p/constants';
-import type { paymentProof } from '@gyblos/cli/p2p/proof';
+import { CALL_OUTCOMES, type CallOutcome } from '@gyblos/buyer/constants';
+import type { paymentProof } from '@gyblos/buyer/proof';
 import {
   verifyZeroChargeReconciliation,
   type ReconciliationSignatures,
-} from '@gyblos/cli/p2p/reconciliation';
+} from '@gyblos/buyer/reconciliation';
 import { IROH_SDK_VERSION, P2P, X402_SDK_VERSION } from '@gyblos/config';
 import type { Measurement } from '@gyblos/lab-harness/measurements';
 import { saveJson } from '@gyblos/runtime';

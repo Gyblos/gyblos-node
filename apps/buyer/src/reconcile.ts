@@ -11,6 +11,7 @@ import { JOURNAL_STATES } from '@gyblos/lab-harness/constants';
 import { finalizedPaymentProof } from '@gyblos/lab-harness/finalized-proof';
 import { withExclusiveLock } from '@gyblos/lab-harness/lock';
 import { withP2pRecoveryLock } from '@gyblos/lab-harness/recovery-lock';
+import { loadRole, rolePath } from '@gyblos/node/roles';
 import { isMain, loadJson, saveJson } from '@gyblos/runtime';
 
 import {
@@ -24,7 +25,6 @@ import {
   type RecoveryAccounts,
   type UncertainAttempt,
 } from './reconciliation.js';
-import { loadRole, rolePath } from './roles.js';
 
 interface RecoveryJournal {
   state: P2pJournalState;

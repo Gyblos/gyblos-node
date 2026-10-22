@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { CALL_OUTCOMES } from '@gyblos/cli/p2p/constants';
+import { CALL_OUTCOMES } from '@gyblos/buyer/constants';
 import { P2P } from '@gyblos/config';
 import { TRANSPORT_ROUTES } from '@gyblos/transport/constants';
 

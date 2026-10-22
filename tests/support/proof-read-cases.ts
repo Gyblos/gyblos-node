@@ -4,7 +4,7 @@ import test from 'node:test';
 import {
   paymentProof,
   type PaymentProofObservation,
-} from '@gyblos/cli/p2p/proof';
+} from '@gyblos/buyer/proof';
 import { COMMITMENT, RETRIES, TOKEN_PROGRAM_ADDRESS } from '@gyblos/config';
 import { GateError } from '@gyblos/payments-x402/chain';
 import { GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';

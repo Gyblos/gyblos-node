@@ -25,6 +25,7 @@ import {
 } from '@gyblos/inference-ollama/constants';
 import { createOllamaEngine } from '@gyblos/inference-ollama/engine';
 import { inferenceSnapshot } from '@gyblos/lab-harness/chain';
+import { createInferenceSeller } from '@gyblos/node/http/inference';
 import { assertProgram } from '@gyblos/payments-x402/chain';
 import { createFacilitator } from '@gyblos/payments-x402/facilitator';
 import {
@@ -37,7 +38,6 @@ import {
 } from '@gyblos/runtime';
 import { assertMemoryHeadroom, memorySnapshot } from '@gyblos/runtime/memory';
 import { createPrivateLog } from '@gyblos/runtime/private-log';
-import { createInferenceSeller } from '@gyblos/seller/inference';
 import { withDeadline } from '@gyblos/transport/deadline';
 import { bindEndpoint } from '@gyblos/transport/endpoint';
 import { serveIroh } from '@gyblos/transport/iroh-server';

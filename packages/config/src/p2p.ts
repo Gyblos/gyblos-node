@@ -52,8 +52,8 @@ export const P2P = {
   permissionMask: 0o777,
   nodeSecretBytes: 32,
   nodeKeyFilename: 'node.key',
-  callEntry: 'apps/cli/src/p2p/call.ts',
-  actorEntry: 'apps/cli/src/p2p/actor.ts',
+  callEntry: 'apps/buyer/src/call.ts',
+  actorEntry: 'lab/p2p/src/actor.ts',
   buyerProxyPort: 4031,
   sellerPort: 4032,
   keys: {

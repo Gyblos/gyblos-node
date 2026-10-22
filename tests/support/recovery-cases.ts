@@ -5,10 +5,7 @@ import { syncBuiltinESMExports } from 'node:module';
 import { basename } from 'node:path';
 import test from 'node:test';
 
-import {
-  CALL_OUTCOMES,
-  RECONCILED_ZERO_CHARGE,
-} from '@gyblos/cli/p2p/constants';
+import { CALL_OUTCOMES, RECONCILED_ZERO_CHARGE } from '@gyblos/buyer/constants';
 import { P2P } from '@gyblos/config';
 import { JOURNAL_STATES } from '@gyblos/lab-harness/constants';
 

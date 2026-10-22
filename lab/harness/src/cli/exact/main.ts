@@ -26,6 +26,10 @@ import {
 import { prepareExactAccounts } from '@gyblos/lab-harness/exact-accounts';
 import { assertNoUnresolvedAuthorizations } from '@gyblos/lab-harness/journal';
 import { withExclusiveLock } from '@gyblos/lab-harness/lock';
+import {
+  AuditedPublicFacilitator,
+  createExactSeller,
+} from '@gyblos/node/http/exact';
 import { assertDevnet, GateError, tokens } from '@gyblos/payments-x402/chain';
 import { DEVNET_USDC, GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
 import {
@@ -33,10 +37,6 @@ import {
   PUBLIC_FACILITATORS,
 } from '@gyblos/payments-x402/exact/index';
 import { UNKNOWN_ERROR_NAME } from '@gyblos/runtime/constants';
-import {
-  AuditedPublicFacilitator,
-  createExactSeller,
-} from '@gyblos/seller/exact';
 
 import { runProvider } from './cases.js';
 import { createEvidence } from './evidence.js';

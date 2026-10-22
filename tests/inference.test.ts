@@ -197,7 +197,8 @@ test('private measurement rows use an allowlist and append without rewriting old
 });
 
 test('bounded inference rejects tokenized context overflow before signing', async () => {
-  const { inferenceCeiling } = await import('../apps/seller/src/inference.js');
+  const { inferenceCeiling } =
+    await import('../packages/node/src/http/inference.js');
   assert.throws(
     () =>
       inferenceCeiling(

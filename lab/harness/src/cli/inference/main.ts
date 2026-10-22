@@ -43,6 +43,8 @@ import type { InferenceTrace } from '@gyblos/lab-harness/inference-evidence-type
 import { assertNoUnresolvedAuthorizations } from '@gyblos/lab-harness/journal';
 import { withExclusiveLock } from '@gyblos/lab-harness/lock';
 import { measurementSalt } from '@gyblos/lab-harness/measurements';
+import { createInferenceSeller } from '@gyblos/node/http/inference';
+import { createCases } from '@gyblos/node/synthetic-cases';
 import {
   assertProgram,
   GateError,
@@ -57,10 +59,8 @@ import {
   stopChild,
   waitReady,
 } from '@gyblos/runtime';
-import { createInferenceSeller } from '@gyblos/seller/inference';
 
 import { createGateBilling } from './billing.js';
-import { createCases } from './cases-data.js';
 import { runCases } from './cases.js';
 import { initializeEvidence } from './evidence.js';
 

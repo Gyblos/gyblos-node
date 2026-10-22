@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-import { verifyZeroChargeReconciliation } from '@gyblos/cli/p2p/reconciliation';
+import { verifyZeroChargeReconciliation } from '@gyblos/buyer/reconciliation';
 import { DEVNET_TREASURY_OWNER } from '@gyblos/config';
 import { tokenAddress } from '@gyblos/lab-harness/chain';
 import type { ParsedInstruction } from '@gyblos/lab-harness/types';

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { RECONCILED_ZERO_CHARGE } from '@gyblos/cli/p2p/constants';
+import { RECONCILED_ZERO_CHARGE } from '@gyblos/buyer/constants';
 
 import {
   guardFailure,

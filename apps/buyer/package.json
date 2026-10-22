@@ -1,20 +1,21 @@
 {
-  "name": "@gyblos/cli",
+  "name": "@gyblos/buyer",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "exports": {
+    ".": "./src/index.ts",
     "./*": "./src/*.ts"
   },
   "dependencies": {
-    "@gyblos/payments-x402": "workspace:*",
     "@gyblos/application": "workspace:*",
     "@gyblos/config": "workspace:*",
     "@gyblos/lab-harness": "workspace:*",
-    "@gyblos/inference-ollama": "workspace:*",
     "@gyblos/runtime": "workspace:*",
-    "@gyblos/seller": "workspace:*",
+    "@gyblos/node": "workspace:*",
+    "@gyblos/payments-x402": "workspace:*",
     "@gyblos/transport": "workspace:*",
-    "@number0/iroh": "1.1.0"
+    "@number0/iroh": "1.1.0",
+    "@solana/kit": "5.1.0"
   }
 }
