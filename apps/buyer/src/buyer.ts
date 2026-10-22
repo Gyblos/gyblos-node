@@ -1,14 +1,17 @@
 // Owns buyer in buyer; it must not know laboratory orchestration.
 import { readFile } from 'node:fs/promises';
 
-import { EndpointAddr, EndpointId, RelayMode } from '@number0/iroh';
+import { EndpointAddr, EndpointId } from '@number0/iroh';
 
 import { MAX_ATOMIC, P2P } from '@gyblos/config';
 import { verifyInferenceOffer, type OfferTrust } from '@gyblos/node/offers';
 import { loadRole, nodeSecret, rolePath } from '@gyblos/node/roles';
 import { assertProgram } from '@gyblos/payments-x402/chain';
 import { saveJson } from '@gyblos/runtime';
-import { bindEndpoint } from '@gyblos/transport-iroh/endpoint';
+import {
+  assertConfiguredRelay,
+  bindEndpoint,
+} from '@gyblos/transport-iroh/endpoint';
 import { createIrohTransport } from '@gyblos/transport-iroh/iroh-client';
 import { expectedIrohRoute } from '@gyblos/transport-iroh/route-policy';
 
@@ -32,16 +35,7 @@ export async function trustedOffer() {
     JSON.parse(bytes.toString('utf8')),
     trust,
   );
-  if (
-    offer.endpoint.relayUrl &&
-    !RelayMode.defaultMode()
-      .relayMap()
-      .urls()
-      .some(
-        (url) => new URL(url).href === new URL(offer.endpoint.relayUrl!).href,
-      )
-  )
-    throw new Error('Unconfigured relay rejected.');
+  if (offer.endpoint.relayUrl) assertConfiguredRelay(offer.endpoint.relayUrl);
   return { config, offer, trust };
 }
 
