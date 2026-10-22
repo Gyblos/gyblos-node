@@ -180,6 +180,24 @@ void test('SDK imports remain visible without traversing their implementation', 
   );
 });
 
+void test('the tokenizer SDK is an SDK for the domain layer', async () => {
+  await fixture(
+    {
+      'packages/core/src/a.ts':
+        "import { Tokenizer } from '@huggingface/tokenizers'; export { Tokenizer };",
+      'node_modules/@huggingface/tokenizers/package.json': JSON.stringify({
+        name: '@huggingface/tokenizers',
+        version: '1.0.0',
+        main: 'dist/index.js',
+      }),
+      'node_modules/@huggingface/tokenizers/dist/index.js':
+        'export class Tokenizer {}',
+    },
+    async (files, root) =>
+      hasRule(await analyze(files, root), 'domain-has-no-sdk'),
+  );
+});
+
 void test('workspace package exports and relative paths resolve to identical ownership', async () => {
   await fixture(
     {

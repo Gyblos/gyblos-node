@@ -85,6 +85,17 @@ void test('standards lint rejects layout, opaque names and nonlocal relative imp
       'gyblos/package-boundaries',
     ),
   );
+  for (const dynamic of [
+    "export async function load() { return import('../../config/src/index.js'); }",
+    'export async function load() { return import(`../../config/src/index.js`); }',
+  ])
+    assert.ok((await rules(dynamic)).includes('gyblos/package-boundaries'));
+  assert.deepEqual(
+    await rules(
+      "export async function load() { return import('./local.js'); }",
+    ),
+    [],
+  );
 });
 
 void test('standards lint detects numeric values inside object literals', async () => {
