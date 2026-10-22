@@ -9,6 +9,7 @@ import { paymentMiddleware, x402ResourceServer } from '@x402/express';
 import { ExactSvmScheme } from '@x402/svm/exact/server';
 import express from 'express';
 
+import { EXACT_PRICE } from '@gyblos/application/constants';
 import {
   DIAGNOSTIC_LIMITS,
   HTTP_STATUS,
@@ -26,7 +27,6 @@ import {
 import { exactAuthorizationId } from '@gyblos/payments-x402/exact/authorization-id';
 import {
   assertExactSupport,
-  EXACT_PRICE,
   validateExactTerms,
 } from '@gyblos/payments-x402/exact/index';
 import type { PublicCall } from '@gyblos/payments-x402/exact/types';

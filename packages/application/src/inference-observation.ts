@@ -8,7 +8,7 @@ import {
   type TokenCounts,
 } from '@gyblos/application/metering';
 import { HTTP_STATUS } from '@gyblos/config';
-import type { EngineUsage } from '@gyblos/inference-ollama/index';
+import type { EngineWireUsage as EngineUsage } from '@gyblos/protocol/wire-usage';
 
 export interface ObservedBody {
   requestId: string;

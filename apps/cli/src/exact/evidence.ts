@@ -1,3 +1,4 @@
+import { EXACT_PRICE } from '@gyblos/application/constants';
 import { X402_SDK_VERSION } from '@gyblos/config';
 import {
   EVIDENCE_IDS,
@@ -7,7 +8,6 @@ import {
 } from '@gyblos/gate/constants';
 import type { ExactGateEvidence } from '@gyblos/gate/types';
 import { DEVNET, DEVNET_USDC } from '@gyblos/payments-x402/constants';
-import { EXACT_PRICE } from '@gyblos/payments-x402/exact/index';
 
 export function createEvidence() {
   const limitations = [

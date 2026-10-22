@@ -115,3 +115,6 @@ coverage/
 
 # Static boundary tooling has its own synthetic suite, separate from pnpm test.
 !/tooling/boundaries/*.test.ts
+
+# Public wire compatibility contract for the SDK-independent protocol package.
+!/packages/protocol/SPEC.md

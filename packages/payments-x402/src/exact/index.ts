@@ -24,8 +24,6 @@ export interface ExactPolicy {
   amount: string;
 }
 
-export { EXACT_PRICE } from '@gyblos/application/constants';
-
 export { PUBLIC_FACILITATORS } from '@gyblos/config';
 
 export function assertExactSupport(body: SupportedResponse, feePayer: string) {

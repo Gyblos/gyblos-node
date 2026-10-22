@@ -26,6 +26,9 @@ importers:
       '@gyblos/payments-x402':
         specifier: workspace:*
         version: link:packages/payments-x402
+      '@gyblos/protocol':
+        specifier: workspace:*
+        version: link:packages/protocol
       '@gyblos/runtime':
         specifier: workspace:*
         version: link:packages/runtime
@@ -159,12 +162,9 @@ importers:
       '@gyblos/config':
         specifier: workspace:*
         version: link:../config
-      '@gyblos/inference-ollama':
+      '@gyblos/protocol':
         specifier: workspace:*
-        version: link:../inference-ollama
-      '@gyblos/payments-x402':
-        specifier: workspace:*
-        version: link:../payments-x402
+        version: link:../protocol
 
   packages/config:
     dependencies:
@@ -201,27 +201,29 @@ importers:
 
   packages/inference-ollama:
     dependencies:
-      '@gyblos/application':
-        specifier: workspace:*
-        version: link:../application
       '@gyblos/config':
         specifier: workspace:*
         version: link:../config
+      '@gyblos/protocol':
+        specifier: workspace:*
+        version: link:../protocol
       '@huggingface/tokenizers':
         specifier: 0.2.0
         version: 0.2.0
 
   packages/payments-x402:
     dependencies:
-      '@gyblos/application':
-        specifier: workspace:*
-        version: link:../application
       '@gyblos/config':
         specifier: workspace:*
         version: link:../config
+      '@gyblos/protocol':
+        specifier: workspace:*
+        version: link:../protocol
       '@gyblos/runtime':
         specifier: workspace:*
         version: link:../runtime
+
+  packages/protocol: {}
 
   packages/runtime:
     dependencies:

@@ -9,17 +9,10 @@ import {
   CHANNEL_PROGRAM,
   DEVNET_GENESIS,
   GATE_ERROR_CODES,
-  type GateErrorCode,
 } from '@gyblos/payments-x402/constants';
+import { ProtocolError as GateError } from '@gyblos/protocol/errors';
 
-export class GateError extends Error {
-  constructor(
-    readonly code: GateErrorCode,
-    message: string,
-  ) {
-    super(message);
-  }
-}
+export { ProtocolError as GateError } from '@gyblos/protocol/errors';
 
 export async function rpc<T>(
   url: string,

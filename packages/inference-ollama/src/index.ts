@@ -6,15 +6,9 @@ import {
   type EngineDoneReason,
 } from '@gyblos/inference-ollama/constants';
 import { MODEL, renderChat } from '@gyblos/inference-ollama/model';
+import type { EngineWireUsage as EngineUsage } from '@gyblos/protocol/wire-usage';
 
-export interface EngineUsage {
-  prompt_eval_count: number;
-  eval_count: number;
-  total_duration: number;
-  load_duration: number;
-  prompt_eval_duration: number;
-  eval_duration: number;
-}
+export type { EngineWireUsage as EngineUsage } from '@gyblos/protocol/wire-usage';
 
 export interface InferenceResult {
   text: string;

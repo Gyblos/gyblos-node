@@ -11,6 +11,7 @@ import {
   MAX_ATOMIC,
   P2P,
 } from '@gyblos/config';
+import { sign, verify } from '@gyblos/protocol/signing';
 
 import type { EngineCapabilities, EngineDescription } from './engine.js';
 import { PRICES } from './metering.js';
@@ -50,27 +51,6 @@ export interface OfferTrust {
   payTo: string;
   buyer: string;
   maxAtomic: string;
-}
-
-function canonical(value: unknown): string {
-  if (value === null || typeof value === 'boolean' || typeof value === 'string')
-    return JSON.stringify(value);
-  if (typeof value === 'number' && Number.isSafeInteger(value))
-    return JSON.stringify(value);
-  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
-  if (value && typeof value === 'object')
-    return `{${Object.keys(value)
-      .sort()
-      .map(
-        (key) =>
-          `${JSON.stringify(key)}:${canonical((value as Record<string, unknown>)[key])}`,
-      )
-      .join(',')}}`;
-  throw new Error('Unsupported signed offer value.');
-}
-
-function signingBytes(offer: InferenceOffer) {
-  return Buffer.from(P2P.offerDomain + canonical(offer));
 }
 
 function validOffer(offer: InferenceOffer, trust: OfferTrust, now: number) {
@@ -162,12 +142,13 @@ export async function signInferenceOffer(
 ): Promise<SignedInferenceOffer> {
   if (owner.address !== offer.owner)
     throw new Error('Offer signer does not match owner.');
-  const signatures = await owner.signMessages([
-    createSignableMessage(signingBytes(offer)),
-  ]);
+  const signature = await sign(P2P.offerDomain, offer, async (bytes) => {
+    const signatures = await owner.signMessages([createSignableMessage(bytes)]);
+    return signatures[0]![owner.address]!;
+  });
   return {
     offer,
-    signature: Buffer.from(signatures[0]![owner.address]!).toString('base64'),
+    signature: Buffer.from(signature).toString('base64'),
   };
 }
 
@@ -185,19 +166,12 @@ export async function verifyInferenceOffer(
     throw new Error('Malformed signed offer.');
   const offer = signed.offer;
   validOffer(offer, trust, now);
-  const publicKey = await crypto.subtle.importKey(
-    'raw',
-    Uint8Array.from(getAddressEncoder().encode(address(trust.owner))),
-    { name: 'Ed25519' },
-    false,
-    ['verify'],
-  );
   if (
-    !(await crypto.subtle.verify(
-      'Ed25519',
-      publicKey,
+    !(await verify(
+      P2P.offerDomain,
+      offer,
+      Uint8Array.from(getAddressEncoder().encode(address(trust.owner))),
       Buffer.from(signed.signature, 'base64'),
-      signingBytes(offer),
     ))
   )
     throw new Error('Invalid owner signature.');

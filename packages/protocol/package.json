@@ -1,0 +1,15 @@
+{
+  "name": "@gyblos/protocol",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./canonical": "./src/canonical.ts",
+    "./constants": "./src/constants.ts",
+    "./engine": "./src/engine.ts",
+    "./errors": "./src/errors.ts",
+    "./signing": "./src/signing.ts",
+    "./wire-usage": "./src/wire-usage.ts"
+  }
+}

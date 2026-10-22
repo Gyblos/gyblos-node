@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises';
 import { address } from '@solana/kit';
 import type { SupportedResponse } from '@x402/core/types';
 
+import { EXACT_PRICE } from '@gyblos/application/constants';
 import {
   EVIDENCE_PATHS,
   JOURNAL_PATHS,
@@ -29,7 +30,6 @@ import { assertDevnet, GateError, tokens } from '@gyblos/payments-x402/chain';
 import { DEVNET_USDC, GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
 import {
   assertExactSupport,
-  EXACT_PRICE,
   PUBLIC_FACILITATORS,
 } from '@gyblos/payments-x402/exact/index';
 import { UNKNOWN_ERROR_NAME } from '@gyblos/runtime/constants';
