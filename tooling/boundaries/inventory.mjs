@@ -2,7 +2,7 @@
 // Private/generated trees and symlinks must never be traversed.
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { readdir } from 'node:fs/promises';
+import { lstat, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { PRIVATE_PATH, SOURCE_ROOTS } from './config.mjs';
@@ -10,9 +10,21 @@ import { PRIVATE_PATH, SOURCE_ROOTS } from './config.mjs';
 const EXCLUDED = new RegExp(`(?:${PRIVATE_PATH})|(^|/)node_modules(?:/|$)`);
 const SOURCE_FILE = /\.(?:[cm]?js|[cm]?tsx?)$/;
 
+export async function isSafeSource(root, name) {
+  if (EXCLUDED.test(name)) return false;
+  let current = root;
+  for (const part of name.split('/')) {
+    if (part === '..' || part === '' || part === '.') return false;
+    current = join(current, part);
+    if ((await lstat(current)).isSymbolicLink()) return false;
+  }
+  return true;
+}
+
 async function walk(root, directory) {
   let entries;
   try {
+    if (!(await isSafeSource(root, directory))) return [];
     entries = await readdir(join(root, directory), { withFileTypes: true });
   } catch (error) {
     if (error.code === 'ENOENT') return [];
@@ -51,9 +63,13 @@ export async function sourceFiles(root) {
           SOURCE_ROOTS.map((directory) => walk(root, directory)),
         )
       ).flat();
-  return [
+  const sources = [
     ...new Set(
       files.filter((file) => SOURCE_FILE.test(file) && !EXCLUDED.test(file)),
     ),
   ].sort();
+  const safe = await Promise.all(
+    sources.map((file) => isSafeSource(root, file)),
+  );
+  return sources.filter((_file, index) => safe[index]);
 }

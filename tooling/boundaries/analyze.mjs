@@ -5,6 +5,7 @@ import { isAbsolute, relative } from 'node:path';
 import { cruise } from 'dependency-cruiser';
 
 import { boundaryConfig, layerOf, PRIVATE_PATH } from './config.mjs';
+import { isSafeSource } from './inventory.mjs';
 
 function normalizePath(source, root) {
   const normalized = (
@@ -76,9 +77,21 @@ export async function analyze(files, root) {
     throw new Error(
       'Unmapped source package; update the architectural layer map.',
     );
+  if (
+    (await Promise.all(files.map((file) => isSafeSource(root, file)))).some(
+      (safe) => !safe,
+    )
+  )
+    throw new Error('Unsafe source path in boundary inventory.');
   const config = boundaryConfig(packageNames, appNames);
+  const allowedPaths = files
+    .map((file) => file.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('|');
   const result = await cruise(files, {
     ...config.options,
+    // Retain unknown dependency edges for validation, but never parse targets
+    // outside the vetted source inventory (including imported symlink targets).
+    doNotFollow: { path: `(^|/)node_modules/|^(?!(?:${allowedPaths})$)` },
     baseDir: root,
     ruleSet: { forbidden: config.forbidden },
     validate: true,
@@ -91,6 +104,17 @@ export async function analyze(files, root) {
   )
     throw new Error('Invalid dependency analysis result.');
   for (const module of graph.modules) {
+    if (
+      !module.coreModule &&
+      !module.source.includes('node_modules/') &&
+      /\.(?:[cm]?js|[cm]?tsx?)$/.test(module.source)
+    ) {
+      const source = normalizePath(module.source, root);
+      if (!layerOf(source))
+        throw new Error('Unmapped source module discovered during analysis.');
+      if (!files.includes(source))
+        throw new Error('Source module is outside the vetted inventory.');
+    }
     if (
       (module.dependencies ?? []).some(
         (dependency) => dependency.couldNotResolve,

@@ -106,8 +106,10 @@ and relative source/target paths only. SDK targets use package names.
 Analysis parses source without executing it. Git checkouts use tracked and
 nonignored source files; source archives use the same explicit source roots.
 Private and generated trees are excluded, and installed dependencies are
-resolved without following their implementations. The verifier remains in
-`tooling/` when experimental tools move to `lab/`.
+resolved without following their implementations. Source symlinks and linked
+source roots are excluded; imports outside the vetted source inventory fail
+analysis before their contents are parsed. The verifier remains in `tooling/`
+when experimental tools move to `lab/`.
 
 ## Private facilitator diagnostics
 

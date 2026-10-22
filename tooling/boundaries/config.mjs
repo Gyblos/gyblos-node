@@ -136,9 +136,8 @@ export function boundaryConfig(packageNames, appNames) {
       tsPreCompilationDeps: true,
       tsConfig: { fileName: 'tsconfig.json' },
       doNotFollow: { path: '(^|/)node_modules/' },
-      // Keep external edges (often resolved to node_modules/**/dist) visible.
-      // doNotFollow prevents reading their implementations.
-      exclude: { path: `^(?!node_modules/).*(${PRIVATE_PATH})` },
+      // analyze() restricts traversal to its vetted source inventory. Keep
+      // other edges visible so excluded/private source imports fail closed.
       enhancedResolveOptions: {
         exportsFields: ['exports'],
         conditionNames: ['import', 'node', 'default', 'types'],
