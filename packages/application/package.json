@@ -8,8 +8,7 @@
     "./*": "./src/*.ts"
   },
   "dependencies": {
-    "@gyblos/payments-x402": "workspace:*",
-    "@gyblos/inference-ollama": "workspace:*",
-    "@gyblos/config": "workspace:*"
+    "@gyblos/config": "workspace:*",
+    "@gyblos/protocol": "workspace:*"
   }
 }

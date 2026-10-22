@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 
 import { encodePaymentSignatureHeader } from '@x402/core/http';
 
+import { EXACT_PRICE } from '@gyblos/application/constants';
 import { COMMITMENT, HTTP_STATUS, TIMEOUTS } from '@gyblos/config';
 import {
   CASE_STATUSES,
@@ -21,10 +22,7 @@ import {
   PUBLIC_CALL_OPERATIONS,
   PUBLIC_CALL_OUTCOMES,
 } from '@gyblos/payments-x402/constants';
-import {
-  assertExactFallbackSafe,
-  EXACT_PRICE,
-} from '@gyblos/payments-x402/exact/index';
+import { assertExactFallbackSafe } from '@gyblos/payments-x402/exact/index';
 
 import { assertEmpty, assertUntrusted } from './assertions.js';
 import { createChallenge } from './challenge.js';

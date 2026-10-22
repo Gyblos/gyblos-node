@@ -1,0 +1,46 @@
+{
+  "description": "Synthetic unfunded offer captured from the legacy implementation at 6abdb6d before extraction. No private signing material is retained.",
+  "domain": "gyblos/signed-inference-offer/v1\n",
+  "offer": {
+    "schemaVersion": 1,
+    "protocol": "gyblos/http/1",
+    "owner": "FCaUGwD7bPFUGUcZhS1yZ9ELejKUcfhxYX8iMbjGt3PU",
+    "nodeId": "synthetic-protocol-vector",
+    "endpoint": {
+      "relayUrl": null,
+      "directAddresses": []
+    },
+    "relayOnly": false,
+    "network": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1",
+    "mint": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+    "payTo": "9qu3LDEBERqxRZh6NMu8exiGfXqa2cjYori8T1yvhWQ4",
+    "feePayer": "4EhLnDY3tkdTh96NkdznFrDuBR7tsJa2oC3jM7kkBmd3",
+    "authorizer": "HaSERM8yVkNNfjRnqcd5PfVCY41q96MAJNzbtyu2KiWX",
+    "buyer": "52is24tEAW1n1s3syWYW9aKvopbPyxqX3FMZvaBtroRM",
+    "issuedAt": 1761000000000,
+    "expiresAt": 1761000060000,
+    "prices": {
+      "inputAtomic": "1",
+      "outputAtomic": "2"
+    },
+    "maxAtomic": "10000",
+    "maxTokens": 32,
+    "model": {
+      "name": "synthetic/α-model",
+      "digest": "synthetic-model-digest",
+      "contextTokens": 128
+    },
+    "capabilities": {
+      "reportsUsage": true,
+      "logprobs": false,
+      "cancellable": true,
+      "recountable": true,
+      "modelIdentity": "digest"
+    },
+    "meteringMode": "recounted"
+  },
+  "canonicalJson": "{\"authorizer\":\"HaSERM8yVkNNfjRnqcd5PfVCY41q96MAJNzbtyu2KiWX\",\"buyer\":\"52is24tEAW1n1s3syWYW9aKvopbPyxqX3FMZvaBtroRM\",\"capabilities\":{\"cancellable\":true,\"logprobs\":false,\"modelIdentity\":\"digest\",\"recountable\":true,\"reportsUsage\":true},\"endpoint\":{\"directAddresses\":[],\"relayUrl\":null},\"expiresAt\":1761000060000,\"feePayer\":\"4EhLnDY3tkdTh96NkdznFrDuBR7tsJa2oC3jM7kkBmd3\",\"issuedAt\":1761000000000,\"maxAtomic\":\"10000\",\"maxTokens\":32,\"meteringMode\":\"recounted\",\"mint\":\"4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU\",\"model\":{\"contextTokens\":128,\"digest\":\"synthetic-model-digest\",\"name\":\"synthetic/α-model\"},\"network\":\"solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1\",\"nodeId\":\"synthetic-protocol-vector\",\"owner\":\"FCaUGwD7bPFUGUcZhS1yZ9ELejKUcfhxYX8iMbjGt3PU\",\"payTo\":\"9qu3LDEBERqxRZh6NMu8exiGfXqa2cjYori8T1yvhWQ4\",\"prices\":{\"inputAtomic\":\"1\",\"outputAtomic\":\"2\"},\"protocol\":\"gyblos/http/1\",\"relayOnly\":false,\"schemaVersion\":1}",
+  "signingBytesHex": "6779626c6f732f7369676e65642d696e666572656e63652d6f666665722f76310a7b22617574686f72697a6572223a2248615345524d3879566b4e4e666a526e71636435506656435934317139364d414a4e7a62747975324b695758222c226275796572223a2235326973323474454157316e317333737957595739614b766f7062507978715833464d5a76614274726f524d222c226361706162696c6974696573223a7b2263616e63656c6c61626c65223a747275652c226c6f6770726f6273223a66616c73652c226d6f64656c4964656e74697479223a22646967657374222c227265636f756e7461626c65223a747275652c227265706f7274735573616765223a747275657d2c22656e64706f696e74223a7b22646972656374416464726573736573223a5b5d2c2272656c617955726c223a6e756c6c7d2c22657870697265734174223a313736313030303036303030302c226665655061796572223a223445684c6e445933746b64546839364e6b647a6e4672447542523774734a61326f43336a4d376b6b426d6433222c226973737565644174223a313736313030303030303030302c226d617841746f6d6963223a223130303030222c226d6178546f6b656e73223a33322c226d65746572696e674d6f6465223a227265636f756e746564222c226d696e74223a22347a4d4d43397372743552693558313447416758686148696933476e504145455259504a675a4a446e634455222c226d6f64656c223a7b22636f6e74657874546f6b656e73223a3132382c22646967657374223a2273796e7468657469632d6d6f64656c2d646967657374222c226e616d65223a2273796e7468657469632fceb12d6d6f64656c227d2c226e6574776f726b223a22736f6c616e613a457457545241425a61597136694d6665594b6f75527531363656553278716131222c226e6f64654964223a2273796e7468657469632d70726f746f636f6c2d766563746f72222c226f776e6572223a224643615547774437625046554755635a685331795a39454c656a4b5563666878595838694d626a4774335055222c22706179546f223a22397175334c44454245527178525a68364e4d7538657869476658716132636a596f7269385431797668575134222c22707269636573223a7b22696e70757441746f6d6963223a2231222c226f757470757441746f6d6963223a2232227d2c2270726f746f636f6c223a226779626c6f732f687474702f31222c2272656c61794f6e6c79223a66616c73652c22736368656d6156657273696f6e223a317d",
+  "publicKeyHex": "d2fad9ce66794efe58df6cbc169e415447d95f3121e3f1ebf3f70c2eb3d6eb07",
+  "signatureBase64": "rSnwfmTXok72W3zAvnpmevfXjNt9UBiqawQbHOVx6IbAtWx0JRP/dU3cZ/txHYkdhsVqTh0eGSN+ovrTA92UBQ=="
+}

@@ -1,5 +1,5 @@
-import { GateError } from '@gyblos/payments-x402/chain';
-import { GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
+import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
+import { ProtocolError } from '@gyblos/protocol/errors';
 
 export interface Snapshot {
   buyer: string;
@@ -30,23 +30,23 @@ export function verifyAccounting(
   const ceiling = BigInt(receipt.authorized);
   const actual = BigInt(receipt.actual);
   if (actual <= 0n || actual >= ceiling)
-    throw new GateError(
-      GATE_ERROR_CODES.BAD_USAGE,
+    throw new ProtocolError(
+      PROTOCOL_ERROR_CODES.BAD_USAGE,
       'Gate must demonstrate a nonzero charge below the ceiling.',
     );
   if (BigInt(before.buyer) - BigInt(after.buyer) !== actual)
-    throw new GateError(
-      GATE_ERROR_CODES.BUYER_DELTA,
+    throw new ProtocolError(
+      PROTOCOL_ERROR_CODES.BUYER_DELTA,
       'Buyer token delta does not match charge.',
     );
   if (BigInt(after.seller) - BigInt(before.seller) !== actual)
-    throw new GateError(
-      GATE_ERROR_CODES.SELLER_DELTA,
+    throw new ProtocolError(
+      PROTOCOL_ERROR_CODES.SELLER_DELTA,
       'Seller token delta does not match charge.',
     );
   if (before.buyerLamports !== after.buyerLamports)
-    throw new GateError(
-      GATE_ERROR_CODES.BUYER_GAS,
+    throw new ProtocolError(
+      PROTOCOL_ERROR_CODES.BUYER_GAS,
       'Buyer SOL changed during the call.',
     );
   if (
@@ -54,13 +54,13 @@ export function verifyAccounting(
     !receipt.claimTransaction ||
     receipt.openTransaction === receipt.claimTransaction
   )
-    throw new GateError(
-      GATE_ERROR_CODES.MISSING_TRANSACTIONS,
+    throw new ProtocolError(
+      PROTOCOL_ERROR_CODES.MISSING_TRANSACTIONS,
       'Distinct open and claim transactions are required.',
     );
   if (!receipt.channelDistributed)
-    throw new GateError(
-      GATE_ERROR_CODES.CHANNEL_NOT_DISTRIBUTED,
+    throw new ProtocolError(
+      PROTOCOL_ERROR_CODES.CHANNEL_NOT_DISTRIBUTED,
       'Channel still holds undistributed funds.',
     );
   return { ...receipt, refund: (ceiling - actual).toString(), before, after };

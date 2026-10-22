@@ -1,4 +1,4 @@
-import { ENGINE_DONE_REASONS } from '@gyblos/inference-ollama/constants';
+import { ENGINE_DONE_REASONS } from '@gyblos/protocol/constants';
 
 export const PRICES = { inputAtomic: '1', outputAtomic: '2' } as const;
 

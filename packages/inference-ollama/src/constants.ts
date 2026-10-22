@@ -42,10 +42,7 @@ export const MODEL_LIMITS = {
   maxOutputCharacters: 100_000,
 } as const;
 
-export const ENGINE_DONE_REASONS = {
-  STOP: 'stop',
-  LENGTH: 'length',
-} as const;
-
-export type EngineDoneReason =
-  (typeof ENGINE_DONE_REASONS)[keyof typeof ENGINE_DONE_REASONS];
+export {
+  ENGINE_DONE_REASONS,
+  type EngineDoneReason,
+} from '@gyblos/protocol/constants';

@@ -1,4 +1,4 @@
-import type { Engine, EngineInput } from '@gyblos/application/engine';
+import type { Engine, EngineInput } from '@gyblos/protocol/engine';
 
 import { GENERATION, MODEL } from './constants.js';
 import { createOllama } from './index.js';
@@ -42,7 +42,7 @@ export function createOllamaEngine(
       });
       return {
         text: result.text,
-        finishReason: result.doneReason as 'stop' | 'length',
+        finishReason: result.doneReason,
         usage: {
           inputTokens: result.usage.prompt_eval_count,
           outputTokens: result.usage.eval_count,

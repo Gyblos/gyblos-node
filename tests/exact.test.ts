@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import { generateKeyPairSigner } from '@solana/kit';
 import type { PaymentRequirements } from '@x402/core/types';
 
+import { EXACT_PRICE } from '@gyblos/application/constants';
 import {
   PUBLIC_CALL_OPERATIONS,
   PUBLIC_CALL_OUTCOMES,
@@ -17,7 +18,6 @@ import {
   assertExactFallbackSafe,
   assertExactSupport,
   createExactBuyer,
-  EXACT_PRICE,
   validateExactTerms,
 } from '../packages/payments-x402/src/exact/index.js';
 
