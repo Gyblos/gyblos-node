@@ -4,13 +4,22 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test, { type TestContext } from 'node:test';
 
-import { RELAY_CONFIGURATION_CODES } from '@gyblos/transport-iroh/constants';
+import { BUYER_RELAY_ONLY_ENV, IPV6_LOOPBACK, LOCALHOST } from '@gyblos/config';
+import {
+  RELAY_CONFIGURATION_CODES,
+  RELAY_TOKEN_LENGTH,
+} from '@gyblos/transport-iroh/constants';
 
 import { NATIVE_CAPABILITY } from './support/native-runtime.js';
-import { endpointProbe, withRelayOffer } from './support/relay-fixture.js';
+import {
+  endpointProbe,
+  PROBE_ACTIONS,
+  RELAY_TOKEN_SENTINEL,
+  withRelayOffer,
+} from './support/relay-fixture.js';
 
 const OPTIONS = { skip: NATIVE_CAPABILITY.bindingSkip };
-const TOKEN = 'synthetic-relay-token';
+const TOKEN = `${RELAY_TOKEN_SENTINEL}-synthetic-relay-token`;
 const OWNED_RELAY = 'https://na1.relay.gyblos.com/';
 
 void test('Docker actors receive relay environment without putting credentials into routers', async () => {
@@ -52,14 +61,14 @@ void test(
     const result = endpointProbe({ GYBLOS_RELAY_TOKEN: TOKEN });
     assert.equal(result.error, undefined);
     assert.deepEqual(result.relays, [
-      { url: OWNED_RELAY, quicPort: 7842, authToken: TOKEN },
+      { url: OWNED_RELAY, quicPort: 7842, token: 'environment' },
     ]);
     assert.deepEqual(result.events, ['builder', 'n0', 'relay-mode', 'bind']);
   },
 );
 
 void test(
-  'operator relay URLs are normalized and retain QUIC discovery and env-only auth',
+  'operator relay URLs are normalized and retain QUIC discovery without foreign auth',
   OPTIONS,
   () => {
     const result = endpointProbe({
@@ -71,10 +80,65 @@ void test(
     assert.deepEqual(
       result.relays?.sort((left, right) => left.url.localeCompare(right.url)),
       [
-        { url: 'https://backup.example/', quicPort: 7842, authToken: TOKEN },
-        { url: 'https://relay.example/', quicPort: 7842, authToken: TOKEN },
+        { url: 'https://backup.example/', quicPort: 7842, token: 'absent' },
+        { url: 'https://relay.example/', quicPort: 7842, token: 'absent' },
       ],
     );
+  },
+);
+
+void test(
+  'relay tokens are attached only to owned Gyblos relay hosts',
+  OPTIONS,
+  () => {
+    const result = endpointProbe({
+      GYBLOS_RELAYS: [
+        OWNED_RELAY,
+        'https://na2.relay.gyblos.com/',
+        'https://relay.example/',
+        'https://evilrelay.gyblos.com/',
+        'https://na1.relay.gyblos.com.evil.example/',
+      ].join(','),
+      GYBLOS_RELAY_TOKEN: TOKEN,
+    });
+    assert.equal(result.error, undefined);
+    assert.deepEqual(
+      Object.fromEntries(
+        (result.relays ?? []).map((relay) => [relay.url, relay.token]),
+      ),
+      {
+        [OWNED_RELAY]: 'environment',
+        'https://na2.relay.gyblos.com/': 'environment',
+        'https://relay.example/': 'absent',
+        'https://evilrelay.gyblos.com/': 'absent',
+        'https://na1.relay.gyblos.com.evil.example/': 'absent',
+      },
+    );
+  },
+);
+
+void test(
+  'relay tokens outside the length bounds fail closed with a typed error',
+  OPTIONS,
+  () => {
+    const shortest = TOKEN.padEnd(RELAY_TOKEN_LENGTH.min, 'x');
+    const longest = TOKEN.padEnd(RELAY_TOKEN_LENGTH.max, 'x');
+    for (const value of [shortest, longest])
+      assert.equal(
+        endpointProbe({ GYBLOS_RELAY_TOKEN: value }).error,
+        undefined,
+      );
+    for (const value of [
+      RELAY_TOKEN_SENTINEL.padEnd(RELAY_TOKEN_LENGTH.min - 1, 'x'),
+      TOKEN.padEnd(RELAY_TOKEN_LENGTH.max + 1, 'x'),
+    ]) {
+      const result = endpointProbe({ GYBLOS_RELAY_TOKEN: value });
+      assert.equal(
+        result.error?.code,
+        RELAY_CONFIGURATION_CODES.INVALID_TOKEN_LENGTH,
+      );
+      assert.ok(!result.events.includes('bind'));
+    }
   },
 );
 
@@ -119,7 +183,7 @@ void test(
   'invalid relay tokens fail closed without reflecting their value',
   OPTIONS,
   () => {
-    for (const value of ['', '   ', 'PRIVATE_SENTINEL\r\nheader: value']) {
+    for (const value of ['', '   ', `${TOKEN}\r\nheader: value`]) {
       const result = endpointProbe({ GYBLOS_RELAY_TOKEN: value });
       assert.ok(result.error);
       assert.equal(
@@ -141,8 +205,9 @@ void test(
     setRelayUrls(context, OWNED_RELAY);
     const { trustedOffer } = await import('@gyblos/buyer/buyer');
     await withRelayOffer(OWNED_RELAY.slice(0, -1), async () => {
-      const { offer } = await trustedOffer();
-      assert.equal(new URL(offer.endpoint.relayUrl!).href, OWNED_RELAY);
+      const { offer, relayUrl } = await trustedOffer();
+      assert.equal(offer.endpoint.relayUrl, OWNED_RELAY.slice(0, -1));
+      assert.equal(relayUrl, OWNED_RELAY);
     });
   },
 );
@@ -162,6 +227,15 @@ void test(
           code: RELAY_CONFIGURATION_CODES.UNCONFIGURED,
         });
       });
+    const result = endpointProbe(
+      {
+        GYBLOS_RELAYS: OWNED_RELAY,
+        GYBLOS_RELAY_TOKEN: TOKEN,
+        PROBE_RELAY_URL: `https://${RELAY_TOKEN_SENTINEL}.example/`,
+      },
+      PROBE_ACTIONS.ADMISSION,
+    );
+    assert.equal(result.error?.code, RELAY_CONFIGURATION_CODES.UNCONFIGURED);
   },
 );
 
@@ -182,5 +256,71 @@ void test(
         code: RELAY_CONFIGURATION_CODES.UNCONFIGURED,
       });
     });
+  },
+);
+
+function isLoopbackBind(address: string) {
+  return (
+    address.startsWith(`${LOCALHOST}:`) ||
+    address.startsWith(`${IPV6_LOOPBACK}:`)
+  );
+}
+
+void test(
+  'buyer relay-only mode binds loopback sockets only while the default is unchanged',
+  OPTIONS,
+  () => {
+    const relayOnly = endpointProbe(
+      { GYBLOS_RELAY_TOKEN: TOKEN, [BUYER_RELAY_ONLY_ENV]: '1' },
+      PROBE_ACTIONS.BUYER,
+    );
+    assert.equal(relayOnly.error, undefined);
+    assert.ok(relayOnly.events.includes('bind'));
+    assert.ok(relayOnly.binds.length > 0);
+    assert.ok(relayOnly.binds.every(isLoopbackBind));
+    const standard = endpointProbe(
+      { GYBLOS_RELAY_TOKEN: TOKEN },
+      PROBE_ACTIONS.BUYER,
+    );
+    assert.equal(standard.error, undefined);
+    assert.deepEqual(standard.binds, []);
+    const conflicting = endpointProbe(
+      {
+        GYBLOS_RELAY_TOKEN: TOKEN,
+        [BUYER_RELAY_ONLY_ENV]: '1',
+        GYBLOS_IROH_EXTERNAL_ADDR: `${LOCALHOST}:9`,
+      },
+      PROBE_ACTIONS.BUYER,
+    );
+    assert.ok(conflicting.error);
+    assert.ok(!conflicting.events.includes('bind'));
+  },
+);
+
+void test(
+  'buyer relay-only mode dials the normalized relay without seller direct addresses',
+  OPTIONS,
+  async () => {
+    const { sellerAddress } = await import('@gyblos/buyer/buyer');
+    const offer = {
+      nodeId: NATIVE_CAPABILITY.sdk!.SecretKey.generate().public().toString(),
+      relayOnly: false,
+      endpoint: {
+        relayUrl: OWNED_RELAY.slice(0, -1),
+        directAddresses: [`${LOCALHOST}:7`],
+      },
+    };
+    const relayOnly = sellerAddress(offer, OWNED_RELAY, true);
+    assert.deepEqual(relayOnly.directAddresses(), []);
+    assert.equal(relayOnly.relayUrl(), OWNED_RELAY);
+    const standard = sellerAddress(offer, OWNED_RELAY, false);
+    assert.deepEqual(standard.directAddresses(), [`${LOCALHOST}:7`]);
+    assert.equal(standard.relayUrl(), OWNED_RELAY);
+    assert.throws(() => sellerAddress(offer, undefined, true), {
+      code: RELAY_CONFIGURATION_CODES.RELAY_REQUIRED,
+    });
+    assert.deepEqual(sellerAddress(offer, undefined, false).directAddresses(), [
+      `${LOCALHOST}:7`,
+    ]);
   },
 );

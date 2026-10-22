@@ -5,7 +5,7 @@ import { IPV6_LOOPBACK, LOCALHOST, P2P } from '@gyblos/config';
 
 import { relayModeFromEnv } from './relays.js';
 
-export { assertConfiguredRelay } from './relays.js';
+export { assertConfiguredRelay, RelayConfigurationError } from './relays.js';
 
 export async function bindEndpoint(
   secret: number[],
