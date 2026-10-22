@@ -83,6 +83,32 @@ post-claim snapshots must reach the known claim slot. A remaining failure blocks
 another authorization. See
 [reconciliation limits](docs/limitations.md#uncertain-outcomes-and-manual-reconciliation).
 
+## Import boundary report
+
+`pnpm boundaries` statically checks the package layers and reports current, new
+and resolved violations against `tooling/boundaries-baseline.json`. It also runs
+as part of `pnpm lint`. Architectural violations are report-only during the
+restructure; analysis, configuration and resolution errors fail the command.
+
+Current names map to their intended layers: `application` is core;
+`inference-ollama`, `payments-x402` and `transport` are separate adapters;
+`gate`, `scripts` and experimental tooling are lab. Each app is independent.
+Tests and verification tooling may inspect every layer. Protocol is independent;
+config/runtime are shared support above protocol. Product cannot import lab,
+adapters cannot import one another, and apps cannot import other apps.
+
+Use `pnpm boundaries --json` for a structured report and `pnpm boundaries:test`
+for the separate synthetic tooling checks. Baseline changes are deliberate:
+`pnpm boundaries --update-baseline`; normal checks never rewrite it. A baseline
+records existing violations, not approval to keep them. It contains rule names
+and relative source/target paths only. SDK targets use package names.
+
+Analysis parses source without executing it. Git checkouts use tracked and
+nonignored source files; source archives use the same explicit source roots.
+Private and generated trees are excluded, and installed dependencies are
+resolved without following their implementations. The verifier remains in
+`tooling/` when experimental tools move to `lab/`.
+
 ## Private facilitator diagnostics
 
 The standalone facilitator and the P2P seller append private JSONL records to
