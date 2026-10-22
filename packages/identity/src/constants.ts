@@ -82,6 +82,7 @@ export const IDENTITY_ERROR_CODES = {
   ACCOUNT_DATA_INVALID: 'IDENTITY_ACCOUNT_DATA_INVALID',
   ACCOUNT_OWNER_MISMATCH: 'IDENTITY_ACCOUNT_OWNER_MISMATCH',
   BINDING_INVALID: 'IDENTITY_BINDING_INVALID',
+  COLLECTION_MISMATCH: 'IDENTITY_COLLECTION_MISMATCH',
   ENCODING_INVARIANT: 'IDENTITY_ENCODING_INVARIANT',
   INPUT_INVALID: 'IDENTITY_INPUT_INVALID',
   NODE_ID_AMBIGUOUS: 'IDENTITY_NODE_ID_AMBIGUOUS',
@@ -91,6 +92,24 @@ export const IDENTITY_ERROR_CODES = {
 
 export type IdentityErrorCode =
   (typeof IDENTITY_ERROR_CODES)[keyof typeof IDENTITY_ERROR_CODES];
+
+// Errors that disqualify one claimant's on-chain accounts (missing pieces, burned, foreign or
+// undecodable) without saying anything about the RPC; multi-asset reads skip such claimants.
+export const CLAIMANT_DISQUALIFYING_CODES: ReadonlySet<IdentityErrorCode> =
+  new Set([
+    IDENTITY_ERROR_CODES.ACCOUNT_DATA_INVALID,
+    IDENTITY_ERROR_CODES.ACCOUNT_OWNER_MISMATCH,
+    IDENTITY_ERROR_CODES.BINDING_INVALID,
+    IDENTITY_ERROR_CODES.COLLECTION_MISMATCH,
+  ]);
+
+// Collection accepted by reads: the configured Gyblos/8004 collection unless the caller opts into ANY.
+export const COLLECTION_POLICY = {
+  ANY: 'any',
+} as const;
+
+export type CollectionPolicy =
+  (typeof COLLECTION_POLICY)[keyof typeof COLLECTION_POLICY];
 
 export const SPONSOR_REASONS = {
   ALLOWED: 'ALLOWED',

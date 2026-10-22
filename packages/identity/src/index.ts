@@ -9,10 +9,12 @@
 // - IdentityError carries a code from IDENTITY_ERROR_CODES.
 export {
   BINDING_STATUSES,
+  COLLECTION_POLICY,
   IDENTITY_ERROR_CODES,
   METADATA_KEYS,
   SPONSOR_REASONS,
   type BindingStatus,
+  type CollectionPolicy,
   type IdentityErrorCode,
   type SponsorReason,
 } from './constants.js';
@@ -27,7 +29,12 @@ export {
   type SponsoredRegistration,
   type SponsoredRegistrationInput,
 } from './registration.js';
-export { readNodeIdentity, resolveOwner, type NodeIdentity } from './read.js';
+export {
+  readNodeIdentity,
+  resolveOwner,
+  type IdentityReadOptions,
+  type NodeIdentity,
+} from './read.js';
 export {
   decideSponsorship,
   evaluateSponsorRules,
