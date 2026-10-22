@@ -1,0 +1,22 @@
+{
+  "name": "@gyblos/identity",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./accounts": "./src/accounts.ts",
+    "./binding": "./src/binding.ts",
+    "./bytes": "./src/bytes.ts",
+    "./constants": "./src/constants.ts",
+    "./filters": "./src/filters.ts",
+    "./instructions": "./src/instructions.ts",
+    "./pda": "./src/pda.ts",
+    "./read": "./src/read.ts"
+  },
+  "dependencies": {
+    "@gyblos/config": "workspace:*",
+    "@solana-program/system": "0.10.0",
+    "@solana/kit": "5.1.0"
+  }
+}
