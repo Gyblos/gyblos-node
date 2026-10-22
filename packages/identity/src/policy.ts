@@ -1,7 +1,17 @@
-// Owns the sponsorship decision: one sponsored registration per device key and per owner,
+// Owns the sponsorship decision: one sponsored registration per canonical device key and owner,
 // a per-registration cap, a total budget, and an injected online check. Must not know about RPC or storage.
-import { SPONSOR_REASONS, type SponsorReason } from './constants.js';
+import { isAddress } from '@solana/kit';
 
+import { isCanonicalNodeId } from './binding.js';
+import {
+  IDENTITY_ERROR_CODES,
+  SPONSOR_REASONS,
+  type SponsorReason,
+} from './constants.js';
+import { IdentityError } from './errors.js';
+
+// deviceKey is the canonical NodeId (64 lowercase hex); owner is a base58 Solana address.
+// costLamports is everything the sponsor pays: prefund plus transaction fee.
 export interface SponsorRequest {
   deviceKey: string;
   owner: string;
@@ -41,12 +51,33 @@ export const EMPTY_LEDGER: SponsorLedger = {
   spentLamports: 0n,
 };
 
+// An operator config with a zero or negative cap or budget is a mistake, not a policy; it throws.
+export function assertSponsorPolicyConfig(config: SponsorPolicyConfig): void {
+  if (config.budgetLamports <= 0n || config.maxPerRegistrationLamports <= 0n) {
+    throw new IdentityError(
+      IDENTITY_ERROR_CODES.POLICY_CONFIG_INVALID,
+      'sponsor budget and per-registration cap must be positive',
+    );
+  }
+}
+
+// Ledger keys must be canonical so one device or owner cannot appear under two spellings.
+function inputReason(request: SponsorRequest): SponsorReason | undefined {
+  if (!isCanonicalNodeId(request.deviceKey))
+    return SPONSOR_REASONS.INVALID_DEVICE_KEY;
+  if (!isAddress(request.owner)) return SPONSOR_REASONS.INVALID_OWNER;
+  return undefined;
+}
+
 // Pure, synchronous rules; cheap checks run before the (network) online check.
 export function evaluateSponsorRules(
   request: SponsorRequest,
   ledger: SponsorLedger,
   config: SponsorPolicyConfig,
 ): SponsorDecision {
+  assertSponsorPolicyConfig(config);
+  const invalidInput = inputReason(request);
+  if (invalidInput !== undefined) return deny(invalidInput);
   if (request.costLamports <= 0n) return deny(SPONSOR_REASONS.INVALID_COST);
   if (request.costLamports > config.maxPerRegistrationLamports)
     return deny(SPONSOR_REASONS.COST_ABOVE_CAP);
@@ -79,10 +110,18 @@ export async function decideSponsorship(
 }
 
 // Returns the ledger after a sponsorship; the caller persists it atomically with the decision.
+// A non-canonical request never reaches the ledger.
 export function recordSponsorship(
   ledger: SponsorLedger,
   request: SponsorRequest,
 ): SponsorLedger {
+  const invalidInput = inputReason(request);
+  if (invalidInput !== undefined) {
+    throw new IdentityError(
+      IDENTITY_ERROR_CODES.INPUT_INVALID,
+      `cannot record sponsorship: ${invalidInput}`,
+    );
+  }
   return {
     sponsoredDevices: new Set([...ledger.sponsoredDevices, request.deviceKey]),
     sponsoredOwners: new Set([...ledger.sponsoredOwners, request.owner]),

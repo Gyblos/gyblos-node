@@ -85,15 +85,29 @@ an indexer. **Nothing in the node or apps calls it yet.**
   an exact rent prefund to the owner (sized by `simulateOwnerSpend`), the
   registration, an owner-signed `gyblos.nodeId` metadata entry carrying the
   node key's signature over (program, asset, owner), and the payout wallet set
-  with its Ed25519 proof. The owner can hold 0 SOL.
+  with its Ed25519 proof. The owner can hold 0 SOL. It reports
+  `sponsorCostLamports` (prefund plus network fee) and refuses to build when
+  that exceeds the caller's `maxSponsorCostLamports`.
 - `readNodeIdentity` (by asset or by owner) and `resolveOwner` (NodeId → owner)
   read chain accounts directly; ownership comes from the Core asset, and only
   bindings whose node signature verifies count, so a replayed binding on
-  another asset is reported as invalid.
+  another asset is reported as invalid. Agents outside the configured 8004
+  collection are rejected unless the caller passes `COLLECTION_POLICY.ANY`.
+  Each claimant is judged alone: a missing, burned, foreign or undecodable
+  claimant is skipped, RPC failures propagate, and two valid owners throw.
 - The sponsor policy (`evaluateSponsorRules`, `decideSponsorship`,
   `recordSponsorship`) is pure: per-registration cap, total budget, one
   sponsorship per device key and per owner, then an injected online check.
-  Ledger persistence and the real online check are future work.
+  Device keys must be canonical NodeIds (64 lowercase hex, as iroh prints an
+  EndpointId), owners valid Solana addresses, and cap and budget positive.
+  Costs are the full sponsor cost (prefund plus fee). Ledger persistence and
+  the real online check are future work.
+- Known limitation (cluster binding): the node signature covers (program,
+  asset, owner) but not the cluster, so a binding is valid on any cluster that
+  runs the same program id with the same asset and owner.
+- Known limitation (stale owner index): reading by owner filters on the agent
+  PDA's cached owner, so an asset transferred without that cache updating is
+  missed (results are re-checked against the Core owner, so never misattributed).
 
 Cost per sponsored node, measured on a local validator running the devnet
 bytecode: about 12.5M lamports (12,544,640: agent PDA rent 6,096,960, Core

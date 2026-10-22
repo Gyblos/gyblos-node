@@ -1,9 +1,10 @@
-// Owns the sponsored registration flow: one atomic message (prefund, register, nodeId binding, payout wallet)
-// and the simulation that sizes the prefund exactly. Must not know about policy, key storage or sending.
+// Owns the sponsored registration flow: one atomic message (prefund, register, nodeId binding, payout wallet),
+// the simulation that sizes the prefund and the sponsor's total cost ceiling. Must not know policy, keys or sending.
 import {
   appendTransactionMessageInstructions,
   compileTransaction,
   createTransactionMessage,
+  getBase64Decoder,
   getBase64EncodedWireTransaction,
   pipe,
   setTransactionMessageFeePayerSigner,
@@ -12,6 +13,7 @@ import {
   type Instruction,
   type Rpc,
   type SolanaRpcApi,
+  type TransactionMessageBytesBase64,
   type TransactionSigner,
 } from '@solana/kit';
 
@@ -37,6 +39,8 @@ const BASE64_BITS_PER_CHAR = 6;
 const BITS_PER_BYTE = 8;
 const SIMULATION_LOG_TAIL = 3;
 const BASE64_ENCODING = 'base64' as const;
+const BASE64_TEXT = /^[A-Za-z0-9+/]*={0,2}$/;
+const BASE64 = getBase64Decoder();
 
 type IdentityRpc = Rpc<SolanaRpcApi>;
 
@@ -48,6 +52,8 @@ export interface SponsoredRegistrationInput {
   node: DetachedSigner;
   payoutWallet: DetachedSigner;
   agentUri: string;
+  // Ceiling on prefund + fee; a larger computed cost throws SPONSOR_COST_ABOVE_CEILING.
+  maxSponsorCostLamports: bigint;
   probeLamports?: bigint;
 }
 
@@ -56,6 +62,9 @@ export type SponsoredMessage = ReturnType<typeof composeMessage>;
 export interface SponsoredRegistration {
   message: SponsoredMessage;
   prefundLamports: bigint;
+  feeLamports: bigint;
+  // Everything the sponsor pays: prefund + fee. Budget and ledger accounting use this value.
+  sponsorCostLamports: bigint;
   unitsConsumed: bigint;
   transactionBytes: number;
   nodeId: string;
@@ -187,6 +196,43 @@ export function prefundFromSpend(spend: OwnerSpend): bigint {
   return shortfall > 0n ? shortfall : 0n;
 }
 
+function isMessageBase64(text: string): text is TransactionMessageBytesBase64 {
+  return BASE64_TEXT.test(text);
+}
+
+// The network fee for this exact message (signatures plus Ed25519 precompile proofs).
+async function messageFee(
+  rpc: IdentityRpc,
+  message: SponsoredMessage,
+): Promise<bigint> {
+  const encoded = BASE64.decode(compileTransaction(message).messageBytes);
+  if (!isMessageBase64(encoded)) {
+    throw new IdentityError(
+      IDENTITY_ERROR_CODES.ENCODING_INVARIANT,
+      'base64 encoder produced invalid output',
+    );
+  }
+  const { value } = await rpc
+    .getFeeForMessage(encoded, { commitment: COMMITMENT })
+    .send();
+  if (value === null) {
+    throw new IdentityError(
+      IDENTITY_ERROR_CODES.FEE_UNAVAILABLE,
+      'RPC returned no fee for the registration message',
+    );
+  }
+  return value;
+}
+
+function assertWithinCeiling(sponsorCost: bigint, ceiling: bigint): void {
+  if (sponsorCost > ceiling) {
+    throw new IdentityError(
+      IDENTITY_ERROR_CODES.SPONSOR_COST_ABOVE_CEILING,
+      `sponsor cost ${sponsorCost} exceeds ceiling ${ceiling}`,
+    );
+  }
+}
+
 function assertFits(message: SponsoredMessage): number {
   const transactionBytes = wireBytes(wireBase64(message));
   if (transactionBytes > LIMITS.transactionBytes) {
@@ -224,9 +270,14 @@ export async function buildSponsoredRegistration(
   const prefundLamports = prefundFromSpend(probeRun);
   const message = withPrefund(prefundLamports);
   const transactionBytes = assertFits(message);
+  const feeLamports = await messageFee(input.rpc, message);
+  const sponsorCostLamports = prefundLamports + feeLamports;
+  assertWithinCeiling(sponsorCostLamports, input.maxSponsorCostLamports);
   return {
     message,
     prefundLamports,
+    feeLamports,
+    sponsorCostLamports,
     unitsConsumed: probeRun.unitsConsumed,
     transactionBytes,
     nodeId,

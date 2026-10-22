@@ -1,14 +1,19 @@
-// Owns offline identity sponsor policy regression cases: every reason, check ordering and ledger recording.
+// Owns offline identity sponsor policy regression cases: every reason, input canonicalisation, config
+// validation, check ordering and ledger recording.
 // Pure functions only; no network, funded wallets or keys.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  assertSponsorPolicyConfig,
   decideSponsorship,
   EMPTY_LEDGER,
   evaluateSponsorRules,
+  IDENTITY_ERROR_CODES,
+  IdentityError,
   recordSponsorship,
   SPONSOR_REASONS,
+  type IdentityErrorCode,
   type SponsorRequest,
 } from '@gyblos/identity';
 
@@ -16,12 +21,23 @@ const CONFIG = {
   budgetLamports: 20_000_000n,
   maxPerRegistrationLamports: 12_000_000n,
 };
+// Synthetic, unfunded base58 addresses.
+const OWNERS = {
+  first: 'Cmsscfv2BPJSGYvGa4QQTUAsGNvWqpPy4z6UdtFM5Uai',
+  second: 'Ff26VsLhHiL8miieVi5SyadPrzMEf9nWSEH3FvmMvS3E',
+  third: '6Nyir6EcfrqqEtV935vzbzCUwam64mVNAnkQCyu7apg6',
+} as const;
 const REQUEST: SponsorRequest = {
   deviceKey: 'aa'.repeat(32),
-  owner: 'Owner1',
+  owner: OWNERS.first,
   costLamports: 9_000_000n,
 };
 const passes = async () => true;
+
+function hasCode(code: IdentityErrorCode) {
+  return (error: unknown) =>
+    error instanceof IdentityError && error.code === code;
+}
 
 void test('allows a first registration within cap and budget after the online check', async () => {
   assert.deepEqual(
@@ -49,7 +65,7 @@ void test('denies invalid cost and cost above the per-registration cap', () => {
 void test('one sponsorship per device key and per owner', () => {
   const ledger = recordSponsorship(EMPTY_LEDGER, REQUEST);
   assert.equal(
-    evaluateSponsorRules({ ...REQUEST, owner: 'Owner2' }, ledger, CONFIG)
+    evaluateSponsorRules({ ...REQUEST, owner: OWNERS.second }, ledger, CONFIG)
       .reason,
     SPONSOR_REASONS.DEVICE_ALREADY_SPONSORED,
   );
@@ -67,7 +83,7 @@ void test('denies when the budget ceiling would be crossed, allows exactly reach
   const ledger = recordSponsorship(EMPTY_LEDGER, REQUEST);
   const next = {
     deviceKey: 'cc'.repeat(32),
-    owner: 'Owner3',
+    owner: OWNERS.third,
     costLamports: 11_000_001n,
   };
   assert.equal(
@@ -109,4 +125,48 @@ void test('recordSponsorship does not mutate the previous ledger', () => {
   assert.equal(EMPTY_LEDGER.sponsoredDevices.size, 0);
   assert.equal(EMPTY_LEDGER.spentLamports, 0n);
   assert.equal(next.spentLamports, REQUEST.costLamports);
+});
+
+void test('rejects non-canonical device keys and owners before any other rule', () => {
+  const badDeviceKeys = ['AA'.repeat(32), 'aa'.repeat(31), 'zz'.repeat(32), ''];
+  for (const deviceKey of badDeviceKeys) {
+    assert.equal(
+      evaluateSponsorRules({ ...REQUEST, deviceKey }, EMPTY_LEDGER, CONFIG)
+        .reason,
+      SPONSOR_REASONS.INVALID_DEVICE_KEY,
+    );
+  }
+  const badOwners = ['Owner1', `${OWNERS.first} `, '0'.repeat(44), ''];
+  for (const owner of badOwners) {
+    assert.equal(
+      evaluateSponsorRules({ ...REQUEST, owner }, EMPTY_LEDGER, CONFIG).reason,
+      SPONSOR_REASONS.INVALID_OWNER,
+    );
+  }
+  assert.throws(
+    () => recordSponsorship(EMPTY_LEDGER, { ...REQUEST, owner: 'Owner1' }),
+    hasCode(IDENTITY_ERROR_CODES.INPUT_INVALID),
+  );
+});
+
+void test('rejects a zero or negative budget or per-registration cap with a typed error', async () => {
+  const badConfigs = [
+    { ...CONFIG, budgetLamports: 0n },
+    { ...CONFIG, budgetLamports: -1n },
+    { ...CONFIG, maxPerRegistrationLamports: 0n },
+    { ...CONFIG, maxPerRegistrationLamports: -5n },
+  ];
+  const invalid = hasCode(IDENTITY_ERROR_CODES.POLICY_CONFIG_INVALID);
+  for (const config of badConfigs) {
+    assert.throws(() => assertSponsorPolicyConfig(config), invalid);
+    assert.throws(
+      () => evaluateSponsorRules(REQUEST, EMPTY_LEDGER, config),
+      invalid,
+    );
+    await assert.rejects(
+      decideSponsorship(REQUEST, EMPTY_LEDGER, config, passes),
+      invalid,
+    );
+  }
+  assert.doesNotThrow(() => assertSponsorPolicyConfig(CONFIG));
 });

@@ -36,6 +36,7 @@ export {
   type NodeIdentity,
 } from './read.js';
 export {
+  assertSponsorPolicyConfig,
   decideSponsorship,
   evaluateSponsorRules,
   recordSponsorship,

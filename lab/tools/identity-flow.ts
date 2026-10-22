@@ -20,15 +20,17 @@ import {
   detachedSignerFromKeyPair,
   EMPTY_LEDGER,
   readNodeIdentity,
+  recordSponsorship,
   resolveOwner,
   type DetachedSigner,
   type NodeIdentity,
   type SponsorDecision,
+  type SponsorPolicyConfig,
 } from '@gyblos/identity';
 
 const CONFIRM_POLL_MS = 500;
 const CONFIRM_ATTEMPTS = 120;
-const LAB_POLICY = {
+const LAB_POLICY: SponsorPolicyConfig = {
   budgetLamports: 1_000_000_000n,
   maxPerRegistrationLamports: 15_000_000n,
 };
@@ -45,8 +47,10 @@ export interface FlowParticipants {
 export interface FlowResult {
   signature: Signature;
   decision: SponsorDecision;
+  ledgerSpentLamports: bigint;
   prefundLamports: bigint;
   feeLamports: bigint;
+  sponsorCostLamports: bigint;
   sponsorSpentLamports: bigint;
   ownerBalanceAfter: bigint;
   transactionBytes: number;
@@ -122,12 +126,14 @@ export async function runSponsoredFlow(
     rpc,
     sponsor,
     agentUri,
+    maxSponsorCostLamports: LAB_POLICY.maxPerRegistrationLamports,
     ...participants,
   });
+  // The sponsor pays prefund + fee, so that total is what the budget and ledger count.
   const request = {
     deviceKey: built.nodeId,
     owner: participants.owner.address,
-    costLamports: built.prefundLamports,
+    costLamports: built.sponsorCostLamports,
   };
   const decision = await decideSponsorship(
     request,
@@ -141,7 +147,9 @@ export async function runSponsoredFlow(
   return {
     ...sent,
     decision,
+    ledgerSpentLamports: recordSponsorship(EMPTY_LEDGER, request).spentLamports,
     prefundLamports: built.prefundLamports,
+    sponsorCostLamports: built.sponsorCostLamports,
     sponsorSpentLamports: sponsorBefore - (await balance(rpc, sponsor.address)),
     ownerBalanceAfter: await balance(rpc, participants.owner.address),
     transactionBytes: built.transactionBytes,

@@ -28,8 +28,13 @@ function bindingError(message: string): IdentityError {
   return new IdentityError(IDENTITY_ERROR_CODES.BINDING_INVALID, message);
 }
 
+// Canonical NodeId text: 64 lowercase hex characters, as iroh's EndpointId prints itself.
+export function isCanonicalNodeId(nodeId: string): boolean {
+  return NODE_ID_HEX.test(nodeId);
+}
+
 export function nodeIdToBytes(nodeId: string): Uint8Array {
-  if (!NODE_ID_HEX.test(nodeId)) {
+  if (!isCanonicalNodeId(nodeId)) {
     throw new IdentityError(
       IDENTITY_ERROR_CODES.INPUT_INVALID,
       'nodeId must be 64 lowercase hex characters',

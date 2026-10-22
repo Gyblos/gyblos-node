@@ -1,13 +1,15 @@
-// Owns a throwaway solana-test-validator cloned from public devnet (8004 program, mpl-core, registry configs).
-// The clone source is fixed to devnet; it never connects to mainnet. Ledger and log stay under ignored .local/.
+// Owns a throwaway solana-test-validator cloned from public devnet (8004 program, mpl-core, registry configs),
+// optionally preloaded with synthetic accounts. Clone source is fixed to devnet; ledger and log stay in .local/.
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
-import { mkdirSync, openSync } from 'node:fs';
+import { mkdirSync, openSync, writeFileSync } from 'node:fs';
 import { setTimeout as delay } from 'node:timers/promises';
 
 import { createSolanaRpc } from '@solana/kit';
 
 import { DEVNET_RPC_URL, FILE_MODES, LOCALHOST } from '@gyblos/config';
 import { DEVNET_REGISTRY, PROGRAMS } from '@gyblos/identity/constants';
+
+import type { SyntheticChain } from './identity-accounts.js';
 
 const VALIDATOR_BINARY = 'solana-test-validator';
 // Synthetic local ports; the validator also binds RPC_PORT + 1 for websockets.
@@ -16,6 +18,8 @@ const FAUCET_PORT = 19900;
 const STARTUP_POLLS = 120;
 const POLL_MS = 500;
 const LOCAL_DIR = new URL('../../.local/identity-validator/', import.meta.url);
+const PRELOAD_DIR = new URL('accounts/', LOCAL_DIR);
+const PRELOAD_LAMPORTS = 10_000_000;
 
 export interface LocalValidator {
   url: string;
@@ -40,7 +44,31 @@ function validatorSkip(): false | string {
 
 export const VALIDATOR_SKIP: false | string = validatorSkip();
 
-function validatorArgs(ledger: string): string[] {
+// Writes each synthetic account as a `solana account --output json` file and returns --account flags.
+function preloadArgs(chain: SyntheticChain): string[] {
+  mkdirSync(PRELOAD_DIR, {
+    recursive: true,
+    mode: FILE_MODES.privateDirectory,
+  });
+  return [...chain].flatMap(([pubkey, account]) => {
+    const file = new URL(`${pubkey}.json`, PRELOAD_DIR).pathname;
+    const json = {
+      pubkey,
+      account: {
+        lamports: PRELOAD_LAMPORTS,
+        data: [Buffer.from(account.data).toString('base64'), 'base64'],
+        owner: account.owner,
+        executable: false,
+        rentEpoch: 0,
+        space: account.data.length,
+      },
+    };
+    writeFileSync(file, JSON.stringify(json), { mode: FILE_MODES.privateFile });
+    return ['--account', pubkey, file];
+  });
+}
+
+function validatorArgs(ledger: string, preload: SyntheticChain): string[] {
   return [
     ...['--ledger', ledger, '--reset', '--quiet'],
     ...['--bind-address', LOCALHOST],
@@ -51,6 +79,7 @@ function validatorArgs(ledger: string): string[] {
     ...['--clone', DEVNET_REGISTRY.rootConfig],
     ...['--clone', DEVNET_REGISTRY.registryConfig],
     ...['--clone', DEVNET_REGISTRY.collection],
+    ...preloadArgs(preload),
   ];
 }
 
@@ -68,7 +97,9 @@ async function waitHealthy(child: ChildProcess, url: string): Promise<boolean> {
   return false;
 }
 
-export async function startLocalValidator(): Promise<ValidatorStart> {
+export async function startLocalValidator(
+  preload: SyntheticChain = new Map(),
+): Promise<ValidatorStart> {
   mkdirSync(LOCAL_DIR, { recursive: true, mode: FILE_MODES.privateDirectory });
   const log = openSync(
     new URL('validator.log', LOCAL_DIR),
@@ -77,7 +108,7 @@ export async function startLocalValidator(): Promise<ValidatorStart> {
   );
   const ledger = new URL('ledger', LOCAL_DIR).pathname;
   const url = `http://${LOCALHOST}:${RPC_PORT}`;
-  const child = spawn(VALIDATOR_BINARY, validatorArgs(ledger), {
+  const child = spawn(VALIDATOR_BINARY, validatorArgs(ledger, preload), {
     stdio: ['ignore', log, log],
     // macOS tar would add AppleDouble "._" entries that break the genesis archive.
     env: { ...process.env, COPYFILE_DISABLE: '1' },
