@@ -1,3 +1,4 @@
+// Owns finalized proof in payments-x402; it must not know inference engines or lab orchestration.
 import assert from 'node:assert/strict';
 
 import { FINALIZED_COMMITMENT, SVM_TRANSACTION_VERSION } from '@gyblos/config';

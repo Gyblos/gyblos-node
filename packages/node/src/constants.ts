@@ -1,3 +1,4 @@
+// Owns constants in node; it must not know lab orchestration or CLI processes.
 import type { GateErrorCode } from '@gyblos/payments-x402/constants';
 
 // Owns existing bounded call examples and node lifecycle states.

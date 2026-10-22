@@ -1,3 +1,4 @@
+// Owns private log in runtime; it must not know product workflows or lab orchestration.
 import { PRIVATE_LOG_LIMITS } from '@gyblos/config';
 
 import {
@@ -70,16 +71,16 @@ export async function createPrivateLog(
   let file: PrivateLogFile | undefined;
   let running: Promise<void> | undefined;
   let failure: PrivateLogCode | undefined;
-  let poisoned = false,
-    closed = false,
-    accepting = true,
-    warned = false,
-    inFlight = false;
+  let poisoned = false;
+  let closed = false;
+  let accepting = true;
+  let warned = false;
+  let inFlight = false;
   let closing: Promise<PrivateLogHealth> | undefined;
-  let reservedBytes = 0,
-    synced = 0,
-    dropped = 0,
-    rotations = 0;
+  let reservedBytes = 0;
+  let synced = 0;
+  let dropped = 0;
+  let rotations = 0;
   const degrade = (code: PrivateLogCode) => {
     failure = code;
     if (!warned) {

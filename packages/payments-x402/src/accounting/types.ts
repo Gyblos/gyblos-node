@@ -1,3 +1,4 @@
+// Owns types in payments-x402; it must not know inference engines or lab orchestration.
 export interface TokenAccount {
   owner: string;
   lamports: number;

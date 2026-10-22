@@ -1,3 +1,4 @@
+// Owns laboratory actor; product code must not depend on this module.
 import { readFile } from 'node:fs/promises';
 
 import { startBuyer } from '@gyblos/buyer/buyer';

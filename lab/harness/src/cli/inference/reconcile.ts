@@ -1,3 +1,4 @@
+// Owns laboratory reconcile; product code must not depend on this module.
 import assert from 'node:assert/strict';
 
 import {
@@ -71,11 +72,11 @@ export async function reconcileCase({
   assert.equal(after.escrow, '0');
   const openTx = await transaction(config, deposit.transaction);
   const claimTx = await transaction(config, claim.transaction);
-  const buyerAta = await tokenAddress(config.addresses.buyer, config.mint),
-    sellerAta = await tokenAddress(config.addresses.seller, config.mint),
-    escrowAta = await tokenAddress(channelId, config.mint);
-  const openTransfers = transactionTransfers(openTx),
-    claimTransfers = transactionTransfers(claimTx);
+  const buyerAta = await tokenAddress(config.addresses.buyer, config.mint);
+  const sellerAta = await tokenAddress(config.addresses.seller, config.mint);
+  const escrowAta = await tokenAddress(channelId, config.mint);
+  const openTransfers = transactionTransfers(openTx);
+  const claimTransfers = transactionTransfers(claimTx);
   const sum = (
     list: typeof openTransfers,
     source: string,

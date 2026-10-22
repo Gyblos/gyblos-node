@@ -1,3 +1,4 @@
+// Owns laboratory run; product code must not depend on this module.
 import { type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 

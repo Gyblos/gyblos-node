@@ -1,3 +1,4 @@
+// Owns offline recovery fixture regression cases; no funded wallets or live services.
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -118,8 +119,8 @@ export async function recoveryFixture(fullRefund = true) {
     read: <T>(filename: string) => loadJson<T>(path(filename)),
     async run(args: string[] = []) {
       const { main } = await import('@gyblos/buyer/reconcile');
-      const originalDirectory = process.cwd(),
-        originalLog = console.log;
+      const originalDirectory = process.cwd();
+      const originalLog = console.log;
       try {
         process.chdir(directory);
         console.log = () => {};

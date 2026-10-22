@@ -1,3 +1,4 @@
+// Owns index in payments-x402; it must not know inference engines or lab orchestration.
 import type { KeyPairSigner } from '@solana/kit';
 import { x402Client } from '@x402/core/client';
 import type {

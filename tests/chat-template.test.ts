@@ -1,8 +1,9 @@
+// Owns offline chat template.test regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
-test('chat renderer matches canonical pinned Jinja template golden vectors', async () => {
+void test('chat renderer matches canonical pinned Jinja template golden vectors', async () => {
   const { createHash } = await import('node:crypto');
   const { MODEL, renderChat } = await import('@gyblos/engine-ollama/model');
   const config = await readFile('tests/fixtures/tokenizer_config.json', 'utf8');

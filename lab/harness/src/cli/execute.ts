@@ -1,3 +1,4 @@
+// Owns laboratory execute; product code must not depend on this module.
 import { discoverChannelsByRentPayer, toFacilitatorSvmSigner } from '@x402/svm';
 
 import {

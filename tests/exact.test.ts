@@ -1,3 +1,4 @@
+// Owns offline exact.test regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
@@ -28,7 +29,7 @@ const terms: PaymentRequirements = {
   maxTimeoutSeconds: 60,
   extra: { feePayer: policy.feePayer, paymentFlow: 'upfront' },
 };
-test('exact policy pins network, Circle mint, exact price, recipient, sponsor and upfront flow', () => {
+void test('exact policy pins network, Circle mint, exact price, recipient, sponsor and upfront flow', () => {
   validateExactTerms(terms, policy);
   for (const change of [
     { network: 'solana:mainnet' as const },
@@ -45,7 +46,7 @@ test('exact policy pins network, Circle mint, exact price, recipient, sponsor an
     );
 });
 for (const field of ['asset', 'payTo', 'feePayer'] as const)
-  test(`untrusted exact ${field} is rejected before any signer call`, async () => {
+  void test(`untrusted exact ${field} is rejected before any signer call`, async () => {
     const signer = await generateKeyPairSigner();
     let signed = 0;
     const buyer = createExactBuyer(
@@ -80,7 +81,7 @@ for (const field of ['asset', 'payTo', 'feePayer'] as const)
     );
     assert.equal(signed, 0);
   });
-test('changed public facilitator scheme or fee payer stops the gate', () => {
+void test('changed public facilitator scheme or fee payer stops the gate', () => {
   const support = {
     kinds: [
       {
@@ -101,7 +102,7 @@ test('changed public facilitator scheme or fee payer stops the gate', () => {
   );
 });
 
-test('a settlement attempt with empty history cannot authorize fallback after confirmation failure', () => {
+void test('a settlement attempt with empty history cannot authorize fallback after confirmation failure', () => {
   let secondAuthorizations = 0;
   const sentThenConfirmationFailed = [
     {
@@ -126,7 +127,7 @@ test('a settlement attempt with empty history cannot authorize fallback after co
   ]);
 });
 
-test('empty Circle USDC balance is rejected before signing', async () => {
+void test('empty Circle USDC balance is rejected before signing', async () => {
   const signer = await generateKeyPairSigner();
   let signed = false;
   const buyer = createExactBuyer(
@@ -158,7 +159,7 @@ test('empty Circle USDC balance is rejected before signing', async () => {
   assert.equal(signed, false);
 });
 
-test('an uncertain exact journal blocks the shared authorization guard', async () => {
+void test('an uncertain exact journal blocks the shared authorization guard', async () => {
   const { mkdtemp, writeFile, rm } = await import('node:fs/promises');
   const { tmpdir } = await import('node:os');
   const { join } = await import('node:path');
@@ -183,7 +184,7 @@ test('an uncertain exact journal blocks the shared authorization guard', async (
   }
 });
 
-test('replay ID ignores equivalent base64 and the facilitator co-signature', async () => {
+void test('replay ID ignores equivalent base64 and the facilitator co-signature', async () => {
   const {
     compileTransaction,
     createTransactionMessage,

@@ -1,3 +1,4 @@
+// Owns offline nat mapping.test regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -16,7 +17,7 @@ const original = {
 const changed =
   'udp 17 29 src=192.0.2.10 dst=198.51.100.3 sport=44102 dport=44101 [UNREPLIED] src=198.51.100.3 dst=198.51.100.2 sport=44101 dport=47129 mark=0 use=1';
 
-test('actual reply tuple detects remapping even when a manual candidate keeps the original port', () => {
+void test('actual reply tuple detects remapping even when a manual candidate keeps the original port', () => {
   const mapping = selectUdpMapping(parseUdpMappings(changed), original);
   assert.equal(mapping.reply.destinationPort, 47129);
   assert.equal(
@@ -29,7 +30,7 @@ test('actual reply tuple detects remapping even when a manual candidate keeps th
   );
 });
 
-test('mapping selection ignores unrelated inbound traffic and rejects ambiguous or missing correlations', () => {
+void test('mapping selection ignores unrelated inbound traffic and rejects ambiguous or missing correlations', () => {
   const inbound =
     'udp 17 29 src=198.51.100.3 dst=198.51.100.2 sport=44101 dport=44102 [UNREPLIED] src=198.51.100.2 dst=198.51.100.3 sport=44102 dport=44101 mark=0 use=1';
   const rows = parseUdpMappings(
@@ -46,7 +47,7 @@ test('mapping selection ignores unrelated inbound traffic and rejects ambiguous 
   assert.throws(() => selectUdpMapping([], original), /missing/);
 });
 
-test('UDP mapping parser rejects incomplete or invalid kernel tuples', () => {
+void test('UDP mapping parser rejects incomplete or invalid kernel tuples', () => {
   for (const row of [
     changed.replace('dport=47129', ''),
     changed.replace('sport=44102', 'sport=999999'),

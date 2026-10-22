@@ -1,11 +1,21 @@
 /** Discover one lab-only candidate using the endpoint's own native UDP socket. */
-export async function discoverLabAddress(endpoint, observer, config) {
-  let timer;
+import type {
+  ReflectionConfig,
+  ReflectionConnection,
+  ReflectionEndpoint,
+} from './types.js';
+
+export async function discoverLabAddress<Observer>(
+  endpoint: ReflectionEndpoint<Observer>,
+  observer: Observer,
+  config: ReflectionConfig,
+) {
+  let timer: ReturnType<typeof setTimeout> | undefined;
   let active = true;
   try {
     return await Promise.race([
       (async () => {
-        let connection;
+        let connection: ReflectionConnection | undefined;
         try {
           connection = await endpoint.connect(observer, [
             ...Buffer.from(config.protocol),
@@ -18,7 +28,9 @@ export async function discoverLabAddress(endpoint, observer, config) {
           const stream = await connection.openBi();
           await stream.send.finish();
           const raw = await stream.recv.readToEnd(config.maximumBytes);
-          const { address } = JSON.parse(Buffer.from(raw).toString());
+          const { address }: { address?: unknown } = JSON.parse(
+            Buffer.from(raw).toString(),
+          );
           const match =
             typeof address === 'string'
               ? /^(\d{1,3}(?:\.\d{1,3}){3}):([1-9]\d{0,4})$/.exec(address)
@@ -26,8 +38,8 @@ export async function discoverLabAddress(endpoint, observer, config) {
           if (
             !match ||
             match[0] !== address ||
-            !match[1].startsWith(config.subnetPrefix) ||
-            match[1].split('.').some((part) => Number(part) > 255) ||
+            !match[1]!.startsWith(config.subnetPrefix) ||
+            match[1]!.split('.').some((part) => Number(part) > 255) ||
             Number(match[2]) > 65535
           )
             throw new Error('Invalid lab reflection address.');
@@ -38,7 +50,7 @@ export async function discoverLabAddress(endpoint, observer, config) {
           connection?.close(BigInt(config.closeCode), []);
         }
       })(),
-      new Promise((_, reject) => {
+      new Promise<never>((_, reject) => {
         timer = setTimeout(() => {
           active = false;
           void endpoint.close();

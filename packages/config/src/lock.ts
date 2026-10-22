@@ -1,3 +1,4 @@
+// Owns lock in config; it must not know product workflows or lab orchestration.
 export const LOCK_OWNER = {
   schemaVersion: 1,
   linuxBootIdPath: '/proc/sys/kernel/random/boot_id',

@@ -1,3 +1,4 @@
+// Owns offline recovery cases regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import { promises as fs } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
@@ -15,7 +16,7 @@ import { recoveryFixture } from './recovery-fixture.js';
 const RECOVERY_OPTIONS = { skip: NATIVE_CAPABILITY.bindingSkip };
 
 export function registerRecoveryCases() {
-  test(
+  void test(
     'actual CLI recovers journal-only full principal return without wallet keys or invented calls',
     RECOVERY_OPTIONS,
     async () => {
@@ -44,12 +45,12 @@ export function registerRecoveryCases() {
     },
   );
   for (const target of [P2P.reconciliationsFilename, P2P.journalFilename])
-    test(
+    void test(
       'actual CLI leaves recovery unresolved if saving ' + target + ' fails',
       RECOVERY_OPTIONS,
       async (context) => {
-        const fixture = await recoveryFixture(),
-          original = fs.rename;
+        const fixture = await recoveryFixture();
+        const original = fs.rename;
         let fail = true;
         try {
           context.mock.method(
@@ -102,15 +103,17 @@ export function registerRecoveryCases() {
         }
       },
     );
-  test(
+  void test(
     'actual CLI refuses a second recovery and preserves files during read-only audit',
     RECOVERY_OPTIONS,
     async () => {
       const fixture = await recoveryFixture();
       try {
         await fixture.run();
-        const journal = await readFile(fixture.path(P2P.journalFilename)),
-          records = await readFile(fixture.path(P2P.reconciliationsFilename));
+        const journal = await readFile(fixture.path(P2P.journalFilename));
+        const records = await readFile(
+          fixture.path(P2P.reconciliationsFilename),
+        );
         const reads = fixture.financial.methods.length;
         await assert.rejects(fixture.run(), /Only an unresolved authorization/);
         assert.equal(fixture.financial.methods.length, reads);
@@ -129,7 +132,7 @@ export function registerRecoveryCases() {
       }
     },
   );
-  test(
+  void test(
     'actual CLI refuses charged recovery but permits a read-only financial audit',
     RECOVERY_OPTIONS,
     async () => {
@@ -164,7 +167,7 @@ export function registerRecoveryCases() {
     'multiple',
     'missing signatures',
   ] as const)
-    test(
+    void test(
       'actual CLI rejects original metadata conflict before proof persistence: ' +
         fault,
       RECOVERY_OPTIONS,

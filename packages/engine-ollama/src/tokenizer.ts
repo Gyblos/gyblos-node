@@ -1,3 +1,4 @@
+// Owns tokenizer in engine-ollama; it must not know wallets or payments.
 import { createHash } from 'node:crypto';
 
 import { Tokenizer } from '@huggingface/tokenizers';

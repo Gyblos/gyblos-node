@@ -1,3 +1,4 @@
+// Owns offline rent cases regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -12,7 +13,7 @@ import { lamportCredits } from './payment-mutations.js';
 import { RENT_FAULTS } from './rent-faults.js';
 
 export function registerRentCases() {
-  test('real-pair sponsor accounting includes escrow creation and return in each transaction', async () => {
+  void test('real-pair sponsor accounting includes escrow creation and return in each transaction', async () => {
     const fixture = await paymentFixture();
     const rent = verifyEscrowRent(
       fixture.source.deposit,
@@ -50,7 +51,7 @@ export function registerRentCases() {
     { later: 1 },
     { escrow: 7, interval: 11, later: 13 },
   ]) {
-    test(
+    void test(
       'unsigned positive lamport observations remain separate: ' +
         JSON.stringify(credits),
       async () => {
@@ -83,7 +84,7 @@ export function registerRentCases() {
     );
   }
   for (const [name, [message, mutate]] of Object.entries(RENT_FAULTS))
-    test('finalized rent/proof rejects ' + name, async () => {
+    void test('finalized rent/proof rejects ' + name, async () => {
       const fixture = await paymentFixture();
       mutate(fixture);
       await assert.rejects(verifyPayment(fixture), guardFailure(message));

@@ -1,3 +1,4 @@
+// Owns laboratory constants; product code must not depend on this module.
 import {
   CONFIG_SCHEMA_VERSION,
   type ConfigAssetLabel,

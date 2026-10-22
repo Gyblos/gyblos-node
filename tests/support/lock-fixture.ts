@@ -1,3 +1,4 @@
+// Owns offline lock fixture regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { promises as fs } from 'node:fs';

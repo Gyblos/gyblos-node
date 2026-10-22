@@ -1,3 +1,4 @@
+// Owns call in buyer; it must not know laboratory orchestration.
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 
@@ -45,7 +46,21 @@ import {
 } from './constants.js';
 import { paymentProof } from './proof.js';
 
-async function run() {
+type CallContext = Awaited<ReturnType<typeof prepareCall>>;
+type CallResponse = Awaited<
+  ReturnType<ReturnType<typeof createInferenceBuyer>>
+>;
+type ConfirmedProof = Awaited<ReturnType<typeof paymentProof>>;
+interface CallState {
+  confirmedProof?: ConfirmedProof;
+  phase: CallPhase;
+  observedPayment?: CallPaymentObservation;
+  responseObservation?: BuyerDiagnosticCode;
+  authorization?: { channelId: string; ceiling: string };
+  signedAt: number;
+}
+
+async function prepareCall() {
   const requiredRoute = expectedIrohRoute(process.env.GYBLOS_EXPECTED_ROUTE);
   const { config, offer, trust } = await trustedOffer();
   await assertProgram(config.rpcUrl);
@@ -59,20 +74,24 @@ async function run() {
     prompt: testCase.prompt,
     maxTokens: offer.maxTokens,
   };
-  const tokenizer = await modelTokenizer(),
-    ceiling = inferenceCeiling(request, tokenizer, offer.model.contextTokens);
+  const tokenizer = await modelTokenizer();
+  const ceiling = inferenceCeiling(
+    request,
+    tokenizer,
+    offer.model.contextTokens,
+  );
   if (
     BigInt(ceiling) > BigInt(trust.maxAtomic) ||
     BigInt(ceiling) > BigInt(offer.maxAtomic) ||
     offer.model.digest === undefined
   )
     throw new Error('Local budget or model mismatch.');
-  const buyer = await roleSigner('buyer'),
-    accounts = {
-      rpcUrl: config.rpcUrl,
-      mint: config.mint,
-      addresses: { buyer: buyer.address, seller: offer.payTo },
-    };
+  const buyer = await roleSigner('buyer');
+  const accounts = {
+    rpcUrl: config.rpcUrl,
+    mint: config.mint,
+    addresses: { buyer: buyer.address, seller: offer.payTo },
+  };
   const before = await inferenceSnapshot(accounts);
   const paymentExpectation = {
     buyer: buyer.address,
@@ -81,25 +100,43 @@ async function run() {
     feePayer: offer.feePayer,
     authorizer: offer.authorizer,
   };
-  let confirmedProof: Awaited<ReturnType<typeof paymentProof>> | undefined;
-  let phase: CallPhase = CALL_PHASES.REQUEST;
-  let observedPayment: CallPaymentObservation | undefined;
-  let responseObservation: BuyerDiagnosticCode | undefined;
-  let authorization: { channelId: string; ceiling: string } | undefined,
-    signedAt = performance.now();
-  const retainAuthorization = async () => {
-    assert.ok(authorization);
-    await saveJson(rolePath(P2P.journalFilename), {
-      state: P2P_JOURNAL_STATES.AUTHORIZED,
-      requestId: request.requestId,
-      ...authorization,
-      paymentExpectation,
-      before,
-      runId: process.env.GYBLOS_P2P_RUN_ID,
-      observedPayment,
-    });
+  return {
+    requiredRoute,
+    config,
+    offer,
+    trust,
+    request,
+    testCase,
+    tokenizer,
+    ceiling,
+    buyer,
+    accounts,
+    before,
+    paymentExpectation,
   };
-  const invoke = createInferenceBuyer(
+}
+
+async function retainCallAuthorization(context: CallContext, state: CallState) {
+  const { request, before, paymentExpectation } = context;
+  assert.ok(state.authorization);
+  await saveJson(rolePath(P2P.journalFilename), {
+    state: P2P_JOURNAL_STATES.AUTHORIZED,
+    requestId: request.requestId,
+    ...state.authorization,
+    paymentExpectation,
+    before,
+    runId: process.env.GYBLOS_P2P_RUN_ID,
+    observedPayment: state.observedPayment,
+  });
+}
+
+function callInvoker(
+  context: CallContext,
+  state: CallState,
+  retainAuthorization: () => Promise<void>,
+) {
+  const { config, offer, ceiling, buyer, before } = context;
+  return createInferenceBuyer(
     buyer,
     config.rpcUrl,
     {
@@ -114,175 +151,236 @@ async function run() {
       beforeSigning: () => {
         if (Date.now() >= offer.expiresAt)
           throw new Error('Signed offer expired before signing.');
-        signedAt = performance.now();
+        state.signedAt = performance.now();
       },
       async responseObserved(observation) {
-        phase = CALL_PHASES.RESPONSE;
-        observedPayment = observation;
-        if (authorization) await retainAuthorization();
+        state.phase = CALL_PHASES.RESPONSE;
+        state.observedPayment = observation;
+        if (state.authorization) await retainAuthorization();
       },
       responseObservationFailed(code) {
-        responseObservation = code;
+        state.responseObservation = code;
       },
       async authorized(channelId, amount) {
-        authorization = { channelId, ceiling: amount };
+        state.authorization = { channelId, ceiling: amount };
         await retainAuthorization();
       },
     },
   );
+}
+
+async function confirmCallPayment(
+  context: CallContext,
+  state: CallState,
+  response: CallResponse,
+  retainAuthorization: () => Promise<void>,
+) {
+  const { request, ceiling, buyer, accounts, before } = context;
+  assert.ok(state.authorization);
+  if (state.responseObservation) await retainAuthorization(); // Retry before proof.
+  assert.equal(state.authorization.ceiling, ceiling);
+  assert.equal(response.status, HTTP_STATUS.ok);
+  assert.ok(response.receipt?.transaction);
+  state.phase = CALL_PHASES.PROOF;
+  const proof = await paymentProof(
+    accounts,
+    state.authorization.channelId,
+    ceiling,
+    response.receipt.transaction,
+    before,
+    async (observation) => {
+      state.observedPayment = proofObservation(response.status, observation);
+      await retainAuthorization();
+    },
+  );
+  state.confirmedProof = proof;
+  await saveJson(rolePath(P2P.journalFilename), {
+    state: JOURNAL_STATES.CONFIRMED,
+    requestId: request.requestId,
+    channelId: state.authorization.channelId,
+    depositSignature: proof.depositSignature,
+    claimSignature: proof.claimSignature,
+  });
+  state.phase = CALL_PHASES.SETTLEMENT;
+  validateSettlement(response.receipt, {
+    payer: buyer.address,
+    amount: proof.chargedAtomic,
+  });
+  return proof;
+}
+
+async function measureCallDelivery(
+  context: CallContext,
+  state: CallState,
+  response: CallResponse,
+  proof: ConfirmedProof,
+) {
+  const { offer, request, tokenizer, ceiling } = context;
+  state.phase = CALL_PHASES.OBSERVATION;
+  const observation = observeInferenceResponse({
+    status: response.status,
+    body: response.body,
+    expected: {
+      requestId: request.requestId,
+      offer: OFFER_ID,
+      model: offer.model.name,
+      digest: offer.model.digest!,
+    },
+    inputTokens: tokenizer.input(request.prompt),
+    countOutput: tokenizer.count,
+  });
+  const assessment = assessCharge(
+    BigInt(proof.chargedAtomic),
+    observation.recounted,
+    observation.delivered,
+    observation.failed,
+  );
+  assert.equal(assessment.anomaly, 'none');
+  assert.equal(observation.delivered, true);
+  assert.equal(observation.comparison?.withinTolerance, true);
+  assert.equal(
+    BigInt(proof.chargedAtomic),
+    charge(observation.body.billedTokens!),
+  );
+  assert.deepEqual(observation.body.billedTokens, observation.engineTokens);
+  state.phase = CALL_PHASES.MEASUREMENT;
+  const row = measurementRow(
+    {
+      requestId: request.requestId,
+      model: { name: offer.model.name, digest: offer.model.digest! },
+      seller: offer.payTo,
+      offer: OFFER_ID,
+      channelId: state.authorization!.channelId,
+      depositSignature: proof.depositSignature,
+      claimSignature: proof.claimSignature,
+      ceilingAtomic: ceiling,
+      chargedAtomic: proof.chargedAtomic,
+      ...assessment,
+      engineTokens: observation.engineTokens,
+      billedTokens: observation.body.billedTokens ?? null,
+      recountedTokens: observation.recounted,
+      countComparison: observation.comparison,
+      latencyMs: response.receivedAt - state.signedAt,
+      delivered: observation.delivered,
+      anomaly: assessment.anomaly,
+      responseText: observation.text,
+      meteringMode: offer.meteringMode,
+    },
+    await measurementSalt(P2P.root),
+  );
+  await appendMeasurement(row, rolePath(P2P.measurementsFilename));
+  return row;
+}
+
+async function recordCallSuccess(
+  context: CallContext,
+  state: CallState,
+  proof: ConfirmedProof,
+  row: Awaited<ReturnType<typeof measureCallDelivery>>,
+) {
+  const { requiredRoute, request, testCase, ceiling } = context;
+  state.phase = CALL_PHASES.METRICS;
+  const metrics = await readCallMetrics(
+    rolePath(P2P.metricsFilename),
+    request.requestId,
+  );
+  const paid = metrics.find((metric) => metric.status === HTTP_STATUS.ok);
+  const routeAccepted =
+    Boolean(paid) &&
+    metrics.some((metric) => metric.status === HTTP_STATUS.paymentRequired) &&
+    routesMatchRequired(metrics, requiredRoute);
+  const result = {
+    requestId: request.requestId,
+    case: testCase.name,
+    outcome: routeAccepted
+      ? CALL_OUTCOMES.CONFIRMED
+      : CALL_OUTCOMES.ROUTE_DISCREPANCY,
+    channelId: state.authorization!.channelId,
+    ceilingAtomic: ceiling,
+    ...proof,
+    measurement: row,
+    transport: paid,
+    metrics,
+    ...(state.responseObservation
+      ? { responseObservation: state.responseObservation }
+      : {}),
+  };
+  state.phase = CALL_PHASES.PERSISTENCE;
+  await saveJson(rolePath(P2P.callsFilename), [
+    ...(await priorCalls(rolePath(P2P.callsFilename))),
+    result,
+  ]);
+  console.log(JSON.stringify(result));
+  if (!routeAccepted) process.exitCode = 1;
+}
+
+async function recordCallFailure(
+  context: CallContext,
+  state: CallState,
+  error: unknown,
+) {
+  const { request, testCase, ceiling, before, paymentExpectation } = context;
+
+  const result = {
+    failure: { phase: state.phase, code: errorDiagnostic(error) },
+    observedPayment: state.observedPayment,
+    ...(state.responseObservation
+      ? { responseObservation: state.responseObservation }
+      : {}),
+    metrics: await readCallMetrics(
+      rolePath(P2P.metricsFilename),
+      request.requestId,
+    ).catch(() => []),
+    requestId: request.requestId,
+    case: testCase.name,
+    outcome: state.confirmedProof
+      ? CALL_OUTCOMES.CONFIRMED_ERROR
+      : state.authorization
+        ? CALL_OUTCOMES.UNCERTAIN
+        : CALL_OUTCOMES.REJECTED,
+    channelId: state.authorization?.channelId,
+    ceilingAtomic: ceiling,
+    before,
+    paymentExpectation,
+    runId: process.env.GYBLOS_P2P_RUN_ID,
+    ...(state.confirmedProof ?? {}),
+  };
+  if (state.authorization && !state.confirmedProof)
+    await saveJson(rolePath(P2P.journalFilename), {
+      state: JOURNAL_STATES.UNCERTAIN,
+      ...result,
+    });
+  await saveJson(rolePath(P2P.callsFilename), [
+    ...(await priorCalls(rolePath(P2P.callsFilename))),
+    result,
+  ]);
+  console.error(JSON.stringify(result));
+  process.exitCode = 1;
+}
+
+async function run() {
+  const context = await prepareCall();
+  const state: CallState = {
+    phase: CALL_PHASES.REQUEST,
+    signedAt: performance.now(),
+  };
+  const retainAuthorization = () => retainCallAuthorization(context, state);
+  const invoke = callInvoker(context, state, retainAuthorization);
   try {
     const response = await invoke(
       `http://${LOCALHOST}:${P2P.buyerProxyPort}${ROUTES.inference}`,
-      request,
+      context.request,
     );
-    assert.ok(authorization);
-    if (responseObservation) await retainAuthorization(); // Retry before proof.
-    assert.equal(authorization.ceiling, ceiling);
-    assert.equal(response.status, HTTP_STATUS.ok);
-    assert.ok(response.receipt?.transaction);
-    phase = CALL_PHASES.PROOF;
-    const proof = await paymentProof(
-      accounts,
-      authorization.channelId,
-      ceiling,
-      response.receipt.transaction,
-      before,
-      async (observation) => {
-        observedPayment = proofObservation(response.status, observation);
-        await retainAuthorization();
-      },
+    const proof = await confirmCallPayment(
+      context,
+      state,
+      response,
+      retainAuthorization,
     );
-    confirmedProof = proof;
-    await saveJson(rolePath(P2P.journalFilename), {
-      state: JOURNAL_STATES.CONFIRMED,
-      requestId: request.requestId,
-      channelId: authorization.channelId,
-      depositSignature: proof.depositSignature,
-      claimSignature: proof.claimSignature,
-    });
-    phase = CALL_PHASES.SETTLEMENT;
-    validateSettlement(response.receipt, {
-      payer: buyer.address,
-      amount: proof.chargedAtomic,
-    });
-    phase = CALL_PHASES.OBSERVATION;
-    const observation = observeInferenceResponse({
-      status: response.status,
-      body: response.body,
-      expected: {
-        requestId: request.requestId,
-        offer: OFFER_ID,
-        model: offer.model.name,
-        digest: offer.model.digest,
-      },
-      inputTokens: tokenizer.input(request.prompt),
-      countOutput: tokenizer.count,
-    });
-    const assessment = assessCharge(
-      BigInt(proof.chargedAtomic),
-      observation.recounted,
-      observation.delivered,
-      observation.failed,
-    );
-    assert.equal(assessment.anomaly, 'none');
-    assert.equal(observation.delivered, true);
-    assert.equal(observation.comparison?.withinTolerance, true);
-    assert.equal(
-      BigInt(proof.chargedAtomic),
-      charge(observation.body.billedTokens!),
-    );
-    assert.deepEqual(observation.body.billedTokens, observation.engineTokens);
-    phase = CALL_PHASES.MEASUREMENT;
-    const row = measurementRow(
-      {
-        requestId: request.requestId,
-        model: { name: offer.model.name, digest: offer.model.digest },
-        seller: offer.payTo,
-        offer: OFFER_ID,
-        channelId: authorization.channelId,
-        depositSignature: proof.depositSignature,
-        claimSignature: proof.claimSignature,
-        ceilingAtomic: ceiling,
-        chargedAtomic: proof.chargedAtomic,
-        ...assessment,
-        engineTokens: observation.engineTokens,
-        billedTokens: observation.body.billedTokens ?? null,
-        recountedTokens: observation.recounted,
-        countComparison: observation.comparison,
-        latencyMs: response.receivedAt - signedAt,
-        delivered: observation.delivered,
-        anomaly: assessment.anomaly,
-        responseText: observation.text,
-        meteringMode: offer.meteringMode,
-      },
-      await measurementSalt(P2P.root),
-    );
-    await appendMeasurement(row, rolePath(P2P.measurementsFilename));
-    phase = CALL_PHASES.METRICS;
-    const metrics = await readCallMetrics(
-      rolePath(P2P.metricsFilename),
-      request.requestId,
-    );
-    const paid = metrics.find((metric) => metric.status === HTTP_STATUS.ok);
-    const routeAccepted =
-      Boolean(paid) &&
-      metrics.some((metric) => metric.status === HTTP_STATUS.paymentRequired) &&
-      routesMatchRequired(metrics, requiredRoute);
-    const result = {
-      requestId: request.requestId,
-      case: testCase.name,
-      outcome: routeAccepted
-        ? CALL_OUTCOMES.CONFIRMED
-        : CALL_OUTCOMES.ROUTE_DISCREPANCY,
-      channelId: authorization.channelId,
-      ceilingAtomic: ceiling,
-      ...proof,
-      measurement: row,
-      transport: paid,
-      metrics,
-      ...(responseObservation ? { responseObservation } : {}),
-    };
-    phase = CALL_PHASES.PERSISTENCE;
-    await saveJson(rolePath(P2P.callsFilename), [
-      ...(await priorCalls(rolePath(P2P.callsFilename))),
-      result,
-    ]);
-    console.log(JSON.stringify(result));
-    if (!routeAccepted) process.exitCode = 1;
+    const row = await measureCallDelivery(context, state, response, proof);
+    await recordCallSuccess(context, state, proof, row);
   } catch (error) {
-    const result = {
-      failure: { phase, code: errorDiagnostic(error) },
-      observedPayment,
-      ...(responseObservation ? { responseObservation } : {}),
-      metrics: await readCallMetrics(
-        rolePath(P2P.metricsFilename),
-        request.requestId,
-      ).catch(() => []),
-      requestId: request.requestId,
-      case: testCase.name,
-      outcome: confirmedProof
-        ? CALL_OUTCOMES.CONFIRMED_ERROR
-        : authorization
-          ? CALL_OUTCOMES.UNCERTAIN
-          : CALL_OUTCOMES.REJECTED,
-      channelId: authorization?.channelId,
-      ceilingAtomic: ceiling,
-      before,
-      paymentExpectation,
-      runId: process.env.GYBLOS_P2P_RUN_ID,
-      ...(confirmedProof ?? {}),
-    };
-    if (authorization && !confirmedProof)
-      await saveJson(rolePath(P2P.journalFilename), {
-        state: JOURNAL_STATES.UNCERTAIN,
-        ...result,
-      });
-    await saveJson(rolePath(P2P.callsFilename), [
-      ...(await priorCalls(rolePath(P2P.callsFilename))),
-      result,
-    ]);
-    console.error(JSON.stringify(result));
-    process.exitCode = 1;
+    await recordCallFailure(context, state, error);
   }
 }
 

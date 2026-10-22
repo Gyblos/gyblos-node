@@ -1,3 +1,4 @@
+// Owns laboratory nat main; product code must not depend on this module.
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
@@ -46,8 +47,8 @@ export async function runNat(options: {
     context.buyerContainer,
     `${P2P.root}/${P2P.callsFilename}`,
   );
-  const security = await inspectDocker(context),
-    before = await inspectNat(context);
+  const security = await inspectDocker(context);
+  const before = await inspectNat(context);
   await saveJson(`${NAT.startManifestPrefix}-${context.runId}.json`, {
     scenario: context.scenario,
     source: context.source,

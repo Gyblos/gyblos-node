@@ -1,3 +1,4 @@
+// Owns lock in payments-x402; it must not know inference engines or lab orchestration.
 import { lstat, mkdir, open, unlink, type FileHandle } from 'node:fs/promises';
 import { dirname } from 'node:path';
 

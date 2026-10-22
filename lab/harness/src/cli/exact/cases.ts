@@ -1,3 +1,4 @@
+// Owns laboratory cases; product code must not depend on this module.
 import assert from 'node:assert/strict';
 
 import { encodePaymentSignatureHeader } from '@x402/core/http';
@@ -173,9 +174,9 @@ export async function runProvider(context: ExactContext) {
     });
     active = undefined;
     await persist();
-    const replayBefore = await snapshot(config, config.addresses.buyer),
-      handlers = host.handlerCalls(),
-      callCount = facilitator.calls.length;
+    const replayBefore = await snapshot(config, config.addresses.buyer);
+    const handlers = host.handlerCalls();
+    const callCount = facilitator.calls.length;
     const replay = await fetch(url, {
       headers: {
         'PAYMENT-SIGNATURE': encodePaymentSignatureHeader(success.payload),

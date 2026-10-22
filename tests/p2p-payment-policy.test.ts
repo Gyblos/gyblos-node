@@ -1,3 +1,4 @@
+// Owns offline p2p payment policy.test regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -21,13 +22,13 @@ import { NATIVE_CAPABILITY } from './support/native-runtime.js';
 import { registerRecoveryCases } from './support/recovery-cases.js';
 import { registerSignatureBuyerCases } from './support/signature-buyer-cases.js';
 
-test('request-specific ceiling rejects altered challenges before any signature or paid request', async () => {
+void test('request-specific ceiling rejects altered challenges before any signature or paid request', async () => {
   const original = globalThis.fetch;
   const signer = await generateKeyPairSigner();
   const feePayer = 'HZLkSwMefjig2NhrKaW3Hb16JX8PTQnE4Jutdc2B433g';
   const authorizer = '4hL4FcqMnrjMLnmyWzaSHhYiwV7FMjVr3CwnpehHNCV7';
-  let signatures = 0,
-    paidRequests = 0;
+  let signatures = 0;
+  let paidRequests = 0;
   try {
     for (const amount of ['561', '559', '560']) {
       globalThis.fetch = (async (_input, init) => {
@@ -109,11 +110,12 @@ test('request-specific ceiling rejects altered challenges before any signature o
   }
 });
 
-test('exclusive buyer lock preserves an unresolved authorization against concurrent calls', async () => {
+void test('exclusive buyer lock preserves an unresolved authorization against concurrent calls', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'gyblos-p2p-journal-'));
-  const lock = join(directory, 'buyer.lock'),
-    journal = join(directory, 'authorization.json');
-  let release!: () => void, entered!: () => void;
+  const lock = join(directory, 'buyer.lock');
+  const journal = join(directory, 'authorization.json');
+  let release!: () => void;
+  let entered!: () => void;
   const started = new Promise<void>((resolve) => {
     entered = resolve;
   });
@@ -148,14 +150,14 @@ test('exclusive buyer lock preserves an unresolved authorization against concurr
   }
 });
 
-test(
+void test(
   'P2P CLI refuses a second process before loading config or making requests',
   { skip: NATIVE_CAPABILITY.bindingSkip },
   async () => {
     const { main: paidCall } = await import('@gyblos/buyer/call');
     const { rolePath } = await import('@gyblos/node/roles');
-    const original = process.cwd(),
-      directory = await mkdtemp(join(tmpdir(), 'gyblos-p2p-call-lock-'));
+    const original = process.cwd();
+    const directory = await mkdtemp(join(tmpdir(), 'gyblos-p2p-call-lock-'));
     try {
       process.chdir(directory);
       await withExclusiveLock(rolePath(P2P.buyerLockFilename), async () => {
@@ -168,9 +170,9 @@ test(
   },
 );
 
-test('Docker funder preserves uncertain journals and refuses concurrent funding without RPC', async () => {
-  const originalDirectory = process.cwd(),
-    originalFetch = globalThis.fetch;
+void test('Docker funder preserves uncertain journals and refuses concurrent funding without RPC', async () => {
+  const originalDirectory = process.cwd();
+  const originalFetch = globalThis.fetch;
   const directory = await mkdtemp(join(tmpdir(), 'gyblos-p2p-funding-lock-'));
   let networkCalls = 0;
   try {

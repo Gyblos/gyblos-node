@@ -1,3 +1,4 @@
+// Owns fixed in node; it must not know lab orchestration or CLI processes.
 import { HOSTS, LOCALHOST, PORTS } from '@gyblos/config';
 import { WALLET_ROLES } from '@gyblos/config/constants';
 import { loadConfig, signer } from '@gyblos/config/wallet';

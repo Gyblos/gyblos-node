@@ -1,3 +1,4 @@
+// Owns laboratory failure setup; product code must not depend on this module.
 import { getCreateAssociatedTokenIdempotentInstructionAsync } from '@solana-program/token';
 import {
   address,
@@ -19,8 +20,8 @@ import { signer, type Config } from './config.js';
 import { WALLET_ROLES } from './constants.js';
 
 export async function prepareFailureAccounts(config: Config) {
-  const sponsor = await signer(config, WALLET_ROLES.FACILITATOR),
-    emptyBuyer = await generateKeyPairSigner();
+  const sponsor = await signer(config, WALLET_ROLES.FACILITATOR);
+  const emptyBuyer = await generateKeyPairSigner();
   const latest = (
     await rpc<{ value: { blockhash: string; lastValidBlockHeight: number } }>(
       config.rpcUrl,

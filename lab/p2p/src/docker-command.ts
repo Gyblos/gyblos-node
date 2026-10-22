@@ -1,3 +1,4 @@
+// Owns laboratory docker command; product code must not depend on this module.
 import { spawn } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
@@ -13,11 +14,11 @@ export async function docker(
 ) {
   return new Promise<string>((resolve, reject) => {
     const child = spawn('docker', args, {
-        env: environment,
-        stdio: ['pipe', 'pipe', 'pipe'],
-      }),
-      output: Buffer[] = [],
-      errors: Buffer[] = [];
+      env: environment,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    const output: Buffer[] = [];
+    const errors: Buffer[] = [];
     child.stdout.on('data', (chunk) => output.push(Buffer.from(chunk)));
     child.stderr.on('data', (chunk) => errors.push(Buffer.from(chunk)));
     child.once('error', reject);

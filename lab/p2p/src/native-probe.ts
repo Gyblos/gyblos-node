@@ -1,3 +1,4 @@
+// Owns laboratory native probe; product code must not depend on this module.
 import { Endpoint, RelayMode } from '@number0/iroh';
 
 import { IPV6_LOOPBACK, LOCALHOST, P2P } from '@gyblos/config';

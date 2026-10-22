@@ -1,3 +1,4 @@
+// Owns offline facilitator observer cases regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -22,7 +23,7 @@ import {
 } from './facilitator-diagnostic-fixture.js';
 
 export function registerFacilitatorObserverCases() {
-  test(
+  void test(
     'facilitator records received, SDK success and local finish with one attempt',
     { timeout: 10000 },
     async () => {
@@ -57,7 +58,7 @@ export function registerFacilitatorObserverCases() {
       });
     },
   );
-  test(
+  void test(
     'facilitator keeps SDK pending failure inside HTTP200 without retrying',
     { timeout: 10000 },
     async () => {
@@ -87,7 +88,7 @@ export function registerFacilitatorObserverCases() {
       );
     },
   );
-  test(
+  void test(
     'facilitator verification rejection differs from SDK exception and policy rejection',
     { timeout: 10000 },
     async () => {
@@ -114,7 +115,7 @@ export function registerFacilitatorObserverCases() {
       );
     },
   );
-  test(
+  void test(
     'facilitator policy rejection has no SDK-start event or settlement',
     { timeout: 10000 },
     async () => {
@@ -134,7 +135,7 @@ export function registerFacilitatorObserverCases() {
       });
     },
   );
-  test(
+  void test(
     'facilitator typed confirmation exception retains only a public signature hint',
     { timeout: 10000 },
     async () => {
@@ -168,7 +169,7 @@ export function registerFacilitatorObserverCases() {
     },
   );
   for (const behavior of ['throws', 'rejects', 'stalls'] as const)
-    test(
+    void test(
       `diagnostic observer ${behavior} cannot replace or delay settlement response`,
       { timeout: 10000 },
       async () => {

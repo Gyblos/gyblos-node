@@ -1,3 +1,4 @@
+// Owns gate in core; it must not know SDKs, engines or filesystem.
 import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { ProtocolError } from '@gyblos/protocol/errors';
 

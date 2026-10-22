@@ -1,3 +1,4 @@
+// Owns offline model artifact integrity.test regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import test from 'node:test';
@@ -33,7 +34,7 @@ function wrapped() {
   };
 }
 
-test('model integrity accepts the exact pinned manifest and its unchanged Ollama provenance envelope', async () => {
+void test('model integrity accepts the exact pinned manifest and its unchanged Ollama provenance envelope', async () => {
   assert.deepEqual(
     await verifyManifestLineage(BYTES, PIN, async () => {
       throw new Error('No blob read expected');
@@ -51,7 +52,7 @@ test('model integrity accepts the exact pinned manifest and its unchanged Ollama
   );
 });
 
-test('provenance cannot hide changed weights/config or a substituted original manifest', async () => {
+void test('provenance cannot hide changed weights/config or a substituted original manifest', async () => {
   for (const field of ['config', 'layers'] as const) {
     const changed = wrapped();
     if (field === 'config')

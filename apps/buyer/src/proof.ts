@@ -1,3 +1,4 @@
+// Owns proof in buyer; it must not know laboratory orchestration.
 import assert from 'node:assert/strict';
 import { setTimeout as delay } from 'node:timers/promises';
 
@@ -39,9 +40,9 @@ export async function paymentProof(
     Number.isSafeInteger(claim.slot) && claim.slot >= 0,
     'Confirmed claim has an invalid slot.',
   );
-  const buyerAta = await tokenAddress(config.addresses.buyer, config.mint),
-    sellerAta = await tokenAddress(config.addresses.seller, config.mint),
-    escrowAta = await tokenAddress(channelId, config.mint);
+  const buyerAta = await tokenAddress(config.addresses.buyer, config.mint);
+  const sellerAta = await tokenAddress(config.addresses.seller, config.mint);
+  const escrowAta = await tokenAddress(channelId, config.mint);
   const sum = (
     transfers: ReturnType<typeof transactionTransfers>,
     source: string,
@@ -55,9 +56,9 @@ export async function paymentProof(
           item.mint === config.mint,
       )
       .reduce((total, item) => total + BigInt(item.amount), 0n);
-  const transfers = transactionTransfers(claim),
-    charged = sum(transfers, escrowAta, sellerAta),
-    refund = sum(transfers, escrowAta, buyerAta);
+  const transfers = transactionTransfers(claim);
+  const charged = sum(transfers, escrowAta, sellerAta);
+  const refund = sum(transfers, escrowAta, buyerAta);
   assert.equal(charged + refund, BigInt(ceiling));
   let deposit: { signature: string; slot: number } | undefined;
   for (let attempt = 0; attempt < RETRIES.transaction; attempt++) {

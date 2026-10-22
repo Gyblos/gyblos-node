@@ -1,3 +1,4 @@
+// Owns offline native reader regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import { fork } from 'node:child_process';
 import { once } from 'node:events';
@@ -39,7 +40,8 @@ interface ReaderReply {
 async function readerMain() {
   assert.ok(process.send && NATIVE_CAPABILITY.sdk);
   const { EndpointAddr, EndpointId } = NATIVE_CAPABILITY.sdk;
-  let client: Endpoint | undefined, connection: Connection | undefined;
+  let client: Endpoint | undefined;
+  let connection: Connection | undefined;
   const retained: { stream: BiStream; receiver: RecvStream }[] = [];
   process.on('message', async (message: ReaderRequest) => {
     try {
@@ -90,8 +92,8 @@ export async function unreadPeer(target: EndpointAddr) {
     execArgv: ['--import', import.meta.resolve('tsx')],
     stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
   });
-  let sequence = 0,
-    stopped = false;
+  let sequence = 0;
+  let stopped = false;
   const pending = new Map<
     number,
     { resolve: (reply: ReaderReply) => void; reject: (error: Error) => void }

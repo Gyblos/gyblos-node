@@ -1,3 +1,4 @@
+// Owns offline lock probe regression cases; no funded wallets or live services.
 import { withP2pRecoveryLock } from '@gyblos/payments-x402/recovery/recovery-lock';
 import { isMain } from '@gyblos/runtime';
 

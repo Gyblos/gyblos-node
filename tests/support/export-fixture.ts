@@ -1,3 +1,4 @@
+// Owns offline export fixture regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import childProcess, { ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -41,8 +42,8 @@ export async function exportFixture(
   const financial = await paymentFixture();
   if (fullRefund) await fullPrincipalRefund(financial);
   await tokenCredit(financial, 1n);
-  const ceiling = BigInt(financial.expected.ceiling),
-    runId = randomUUID();
+  const ceiling = BigInt(financial.expected.ceiling);
+  const runId = randomUUID();
   // Paid journal rows/traces are synthetic and independent of the raw-derived zero-charge proof.
   const paid: PaidCall[] = Array.from(
     { length: P2P.minimumRequests },
@@ -208,8 +209,8 @@ export async function exportFixture(
           : filename === P2P.traceFilename
             ? traces
             : records;
-      const child = new ChildProcess(),
-        output = new PassThrough();
+      const child = new ChildProcess();
+      const output = new PassThrough();
       child.stdout = output;
       child.stderr = new PassThrough();
       child.stdin = new PassThrough();

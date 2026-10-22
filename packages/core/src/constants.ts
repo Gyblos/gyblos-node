@@ -1,3 +1,4 @@
+// Owns constants in core; it must not know SDKs, engines or filesystem.
 import { ENGINE_DONE_REASONS } from '@gyblos/protocol/constants';
 
 export const PRICES = { inputAtomic: '1', outputAtomic: '2' } as const;

@@ -1,3 +1,4 @@
+// Owns laboratory docker checks; product code must not depend on this module.
 import assert from 'node:assert/strict';
 
 import {

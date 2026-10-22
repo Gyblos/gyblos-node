@@ -1,3 +1,4 @@
+// Owns model in engine-ollama; it must not know wallets or payments.
 import { MODEL_LIMITS } from './constants.js';
 
 export { MODEL } from './constants.js';

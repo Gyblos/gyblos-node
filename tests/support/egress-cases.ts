@@ -1,3 +1,4 @@
+// Owns offline egress cases regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import { createSocket, type RemoteInfo } from 'node:dgram';
 import { once } from 'node:events';
@@ -40,11 +41,11 @@ interface ObservedWrite {
 async function stalledReturnPath() {
   assert.ok(NATIVE_CAPABILITY.sdk);
   const { EndpointAddr } = NATIVE_CAPABILITY.sdk;
-  const front = createSocket('udp4'),
-    back = createSocket('udp4');
-  let peer: RemoteInfo | undefined,
-    sellerPort = 0,
-    paused = false;
+  const front = createSocket('udp4');
+  const back = createSocket('udp4');
+  let peer: RemoteInfo | undefined;
+  let sellerPort = 0;
+  let paused = false;
   let lastPacket: Buffer | undefined;
   front.on('message', (packet, remote) => {
     peer = remote;
@@ -104,7 +105,7 @@ async function stalledReturnPath() {
 }
 
 export function registerEgressCases() {
-  test(
+  void test(
     'native egress expiry closes a paused unread peer and releases its occupied slot',
     {
       ...NATIVE_TEST_OPTIONS,
@@ -117,8 +118,8 @@ export function registerEgressCases() {
       let windowTime = 0;
       context.mock.method(Date, 'now', () => windowTime);
       const path = await stalledReturnPath();
-      let closeLab = async () => {},
-        closePeer = async () => {};
+      let closeLab = async () => {};
+      let closePeer = async () => {};
       context.after(async () => {
         path.resume();
         try {

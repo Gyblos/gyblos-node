@@ -1,3 +1,4 @@
+// Owns laboratory types; product code must not depend on this module.
 export type * from '@gyblos/payments-x402/accounting/types';
 
 export type {

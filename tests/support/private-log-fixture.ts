@@ -1,3 +1,4 @@
+// Owns offline private log fixture regression cases; no funded wallets or live services.
 import fsPromises, {
   lstat,
   readdir,

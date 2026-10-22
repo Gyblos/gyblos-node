@@ -1,3 +1,4 @@
+// Owns offline lock cases regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import { execFile, spawnSync } from 'node:child_process';
 import {
@@ -32,7 +33,7 @@ const LOCAL_OWNER_SUPPORTED =
 
 export function registerLockCases() {
   registerLockFaultCases();
-  test(
+  void test(
     'local lock owner contains the current host, boot identity and PID namespace',
     { skip: !LOCAL_OWNER_SUPPORTED },
     async () => {
@@ -59,7 +60,7 @@ export function registerLockCases() {
       );
     },
   );
-  test(
+  void test(
     'dead local buyer retirement writes an audit before entering recovery',
     { skip: !LOCAL_OWNER_SUPPORTED },
     async () => {
@@ -90,7 +91,7 @@ export function registerLockCases() {
     'symlink',
     'hardlink',
   ] as const) {
-    test(
+    void test(
       'recovery preserves an unsafe original lock: ' + fault,
       { skip: !LOCAL_OWNER_SUPPORTED },
       async () => {
@@ -138,7 +139,7 @@ export function registerLockCases() {
     );
   }
   for (const target of ['buyer', 'audit'] as const)
-    test(
+    void test(
       'FIFO ' + target + ' is refused without entering or blocking recovery',
       { skip: !LOCAL_OWNER_SUPPORTED, timeout: 5000 },
       async () => {
@@ -171,12 +172,12 @@ export function registerLockCases() {
         }
       },
     );
-  test('exclusive-lock cleanup preserves a different inode and original operation error', async () => {
+  void test('exclusive-lock cleanup preserves a different inode and original operation error', async () => {
     const directory = await mkdtemp(
-        join(tmpdir(), 'gyblos-public-lock-cleanup-'),
-      ),
-      path = join(directory, 'owned.lock'),
-      failure = new Error('Synthetic operation failure');
+      join(tmpdir(), 'gyblos-public-lock-cleanup-'),
+    );
+    const path = join(directory, 'owned.lock');
+    const failure = new Error('Synthetic operation failure');
     try {
       await assert.rejects(
         withExclusiveLock(path, async () => {

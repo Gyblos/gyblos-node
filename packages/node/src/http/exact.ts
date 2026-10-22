@@ -1,3 +1,4 @@
+// Owns exact in node; it must not know lab orchestration or CLI processes.
 import { decodePaymentSignatureHeader } from '@x402/core/http';
 import { HTTPFacilitatorClient } from '@x402/core/server';
 import type {

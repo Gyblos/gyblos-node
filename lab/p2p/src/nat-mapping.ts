@@ -1,3 +1,4 @@
+// Owns laboratory nat mapping; product code must not depend on this module.
 import { isIP } from 'node:net';
 
 import { NAT } from './constants.js';

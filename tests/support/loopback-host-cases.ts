@@ -1,3 +1,4 @@
+// Owns offline loopback host cases regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { request, type Server } from 'node:http';
@@ -99,7 +100,7 @@ async function withFacilitator(run: (port: number) => Promise<void>) {
 }
 
 export function registerLoopbackHostCases() {
-  test('loopback host check accepts only loopback literals with the exact port', () => {
+  void test('loopback host check accepts only loopback literals with the exact port', () => {
     const port = 4022;
     for (const host of [
       `127.0.0.1:${port}`,
@@ -125,7 +126,7 @@ export function registerLoopbackHostCases() {
     assert.equal(isLoopbackHost(`127.0.0.1:${port}`, 0), false);
   });
 
-  test('facilitator serves loopback Host values and rejects rebinding, missing or wrong-port Host', async () => {
+  void test('facilitator serves loopback Host values and rejects rebinding, missing or wrong-port Host', async () => {
     await withFacilitator(async (port) => {
       for (const host of [
         `127.0.0.1:${port}`,
@@ -172,7 +173,7 @@ export function registerLoopbackHostCases() {
     });
   });
 
-  test('facilitator rejects a rebinding Host before body parsing', async () => {
+  void test('facilitator rejects a rebinding Host before body parsing', async () => {
     await withFacilitator(async (port) => {
       const path = `/${PUBLIC_CALL_OPERATIONS.VERIFY}`;
       // Control: with a loopback Host the JSON parser runs and rejects the body.

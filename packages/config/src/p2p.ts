@@ -1,3 +1,4 @@
+// Owns p2p in config; it must not know product workflows or lab orchestration.
 export const P2P = {
   schemaVersion: 1,
   protocol: 'gyblos/http/1',

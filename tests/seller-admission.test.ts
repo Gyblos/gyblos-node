@@ -1,3 +1,4 @@
+// Owns offline seller admission.test regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { once } from 'node:events';
@@ -17,15 +18,15 @@ import { DEVNET, DEVNET_GENESIS } from '@gyblos/payments-x402/constants';
 
 // The real x402 middleware runs against controlled, non-broadcasting services.
 // No wallet is funded and no RPC method can submit a transaction.
-test('real middleware waits for deposit and seller rejects false escrow despite a no-op observer', async () => {
+void test('real middleware waits for deposit and seller rejects false escrow despite a no-op observer', async () => {
   const original = globalThis.fetch;
   const authorizer = await generateKeyPairSigner();
-  const buyer = '5FVtvnKXCabCDxSoeNJuLdRpCTBZQnhTnNooZzEYfg2j',
-    feePayer = 'HZLkSwMefjig2NhrKaW3Hb16JX8PTQnE4Jutdc2B433g',
-    mint = '2vXUXK2rJTPtb7Wx9em4W9FdgtfD6HTnFxZz5oirLVcH';
-  let engineCalls = 0,
-    releaseDeposit!: () => void,
-    signalDeposit!: () => void;
+  const buyer = '5FVtvnKXCabCDxSoeNJuLdRpCTBZQnhTnNooZzEYfg2j';
+  const feePayer = 'HZLkSwMefjig2NhrKaW3Hb16JX8PTQnE4Jutdc2B433g';
+  const mint = '2vXUXK2rJTPtb7Wx9em4W9FdgtfD6HTnFxZz5oirLVcH';
+  let engineCalls = 0;
+  let releaseDeposit!: () => void;
+  let signalDeposit!: () => void;
   const depositBarrier = new Promise<void>((resolve) => {
     releaseDeposit = resolve;
   });
@@ -123,12 +124,12 @@ test('real middleware waits for deposit and seller rejects false escrow despite 
     await once(server, 'listening');
     const address = server.address();
     assert.ok(address && typeof address !== 'string');
-    const url = `http://127.0.0.1:${address.port}/v1/chat/completions`,
-      body = JSON.stringify({
-        requestId: randomUUID(),
-        prompt: 'Hi',
-        maxTokens: 32,
-      });
+    const url = `http://127.0.0.1:${address.port}/v1/chat/completions`;
+    const body = JSON.stringify({
+      requestId: randomUUID(),
+      prompt: 'Hi',
+      maxTokens: 32,
+    });
     const challenge = await original(url, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },

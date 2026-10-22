@@ -1,3 +1,4 @@
+// Owns inference in node; it must not know lab orchestration or CLI processes.
 import type { KeyPairSigner } from '@solana/kit';
 import {
   decodePaymentSignatureHeader,

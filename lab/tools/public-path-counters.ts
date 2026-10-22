@@ -1,3 +1,4 @@
+// Owns laboratory public path counters; product code must not depend on this module.
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import { BlockList, isIP } from 'node:net';
@@ -5,16 +6,33 @@ import { BlockList, isIP } from 'node:net';
 import { FILE_MODES, P2P } from '@gyblos/config';
 import { NAT } from '@gyblos/lab-p2p/constants';
 import { execute, writeContainerFile } from '@gyblos/lab-p2p/docker-command';
-import { parseUdpMappings } from '@gyblos/lab-p2p/nat-mapping';
+import { parseUdpMappings, type UdpMapping } from '@gyblos/lab-p2p/nat-mapping';
 
 import {
   auditCounterDelta,
   classifyPublicPath,
   readAuditCounters,
   readReplyState,
-} from './public-path-audit.mjs';
+} from './public-path-audit.js';
+import type { ContainerIds, NativeDescriptor } from './types.js';
 
-function publicCandidates(addresses) {
+interface PublicDescriptor {
+  boundSockets: string[];
+  directAddresses: string[];
+}
+interface AuditSide {
+  side: string;
+  router: string;
+  home: string;
+  sourcePort: number;
+  candidates: { host: string; port: number }[];
+  tags: string[];
+  initialConntrack: string;
+  before: string;
+  counters: Record<string, number>;
+}
+
+function publicCandidates(addresses: string[]) {
   const blocked = new BlockList();
   for (const [address, prefix] of [
     ['0.0.0.0', 8],
@@ -25,37 +43,40 @@ function publicCandidates(addresses) {
     ['192.168.0.0', 16],
     ['224.0.0.0', 4],
     ['240.0.0.0', 4],
-  ])
+  ] as const)
     blocked.addSubnet(address, prefix, 'ipv4');
   return addresses
     .map((value) => value.split(':'))
     .filter(
       ([host, port]) =>
-        isIP(host) === NAT.ipv4Family &&
-        !blocked.check(host, 'ipv4') &&
+        isIP(host!) === NAT.ipv4Family &&
+        !blocked.check(host!, 'ipv4') &&
         Number(port) > 0 &&
         Number(port) <= NAT.maximumPort,
     )
-    .map(([host, port]) => ({ host, port: Number(port) }));
+    .map(([host, port]) => ({ host: host!, port: Number(port) }));
 }
 
-export async function startPublicPathCounters(ids, peer) {
-  let local;
+export async function startPublicPathCounters(
+  ids: ContainerIds,
+  peer: NativeDescriptor,
+) {
+  let local: PublicDescriptor | undefined;
   for (let index = 0; index < P2P.docker.readyMs / P2P.routePollMs; index++) {
     try {
       local = JSON.parse(
-        await execute(ids.buyer, ['cat', NAT.publicAudit.descriptorPath]),
+        await execute(ids.buyer!, ['cat', NAT.publicAudit.descriptorPath]),
       );
       break;
     } catch {}
     await new Promise((resolve) => setTimeout(resolve, P2P.routePollMs));
   }
   assert.ok(local, 'Public audit did not receive the buyer descriptor.');
-  const sides = [];
+  const sides: AuditSide[] = [];
   for (const [side, own, remote, home, wan] of [
     ['a', peer, local, NAT.homeA.actor, NAT.wan.routerA],
     ['b', local, peer, NAT.homeB.actor, NAT.wan.routerB],
-  ]) {
+  ] as const) {
     const candidates = publicCandidates(remote.directAddresses);
     assert.ok(
       candidates.length,
@@ -67,10 +88,11 @@ export async function startPublicPathCounters(ids, peer) {
         ?.split(':')[1],
     );
     assert.ok(sourcePort > 0);
-    const router = ids[`router-${side}`];
-    const interfaces = JSON.parse(
-      await execute(router, ['/sbin/ip', '-j', '-4', 'addr', 'show']),
-    );
+    const router = ids[`router-${side}`]!;
+    const interfaces: { addr_info: { local: string }[]; ifname: string }[] =
+      JSON.parse(
+        await execute(router, ['/sbin/ip', '-j', '-4', 'addr', 'show']),
+      );
     const iface = interfaces.find((value) =>
       value.addr_info.some((address) => address.local === wan),
     )?.ifname;
@@ -205,13 +227,13 @@ export async function startPublicPathCounters(ids, peer) {
     });
   }
   await writeContainerFile(
-    ids.buyer,
+    ids.buyer!,
     NAT.publicAudit.startPath,
     Buffer.from('ready'),
   );
-  return async (project) => {
-    const reports = [],
-      raw = [];
+  return async (project: string) => {
+    const reports = [];
+    const raw = [];
     for (const value of sides) {
       const after = await execute(value.router, [
         '/usr/sbin/iptables-nft-save',
@@ -229,7 +251,7 @@ export async function startPublicPathCounters(ids, peer) {
         value.counters,
         readAuditCounters(after, value.tags),
       );
-      const sum = (suffix) =>
+      const sum = (suffix: string) =>
         Object.entries(delta)
           .filter(([tag]) => tag.startsWith(NAT.publicAudit.tagPrefix + suffix))
           .reduce((total, [, count]) => total + count, 0);

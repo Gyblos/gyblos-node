@@ -1,3 +1,4 @@
+// Owns laboratory reconcile; product code must not depend on this module.
 import assert from 'node:assert/strict';
 
 import { findAssociatedTokenPda } from '@solana-program/token';

@@ -1,3 +1,4 @@
+// Owns hosts in config; it must not know product workflows or lab orchestration.
 export const LOCALHOST = '127.0.0.1';
 
 export const PORTS = {

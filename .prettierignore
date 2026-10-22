@@ -9,6 +9,4 @@ dist/
 coverage/
 evidence/
 tests/fixtures/tokenizer_config.json
-AGENTS.md
-CLAUDE.md
 tests/fixtures/Qwen-LICENSE

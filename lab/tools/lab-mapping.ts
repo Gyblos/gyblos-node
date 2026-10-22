@@ -1,3 +1,4 @@
+// Owns laboratory lab mapping; product code must not depend on this module.
 import assert from 'node:assert/strict';
 
 import { NAT } from '@gyblos/lab-p2p/constants';
@@ -6,7 +7,14 @@ import {
   selectUdpMapping,
 } from '@gyblos/lab-p2p/nat-mapping';
 
-export function assertReflectedMappings(raw, mappings) {
+import type { NativeMappings, NativeResult } from './types.js';
+
+export function assertReflectedMappings(
+  raw: Pick<NativeResult, 'reflectedAddress' | 'boundSockets'> & {
+    peer: Pick<NativeResult['peer'], 'reflectedAddress' | 'boundSockets'>;
+  },
+  mappings: NativeMappings,
+) {
   const roles = [
     {
       side: 'a',
@@ -29,20 +37,20 @@ export function assertReflectedMappings(raw, mappings) {
     );
     assert.ok(socket, 'Native source socket was not retained.');
     const sourcePort = Number(socket.split(':')[1]);
-    const [host, port] = role.own.split(':');
-    const [remoteHost, remotePort] = role.remote.split(':');
+    const [host, port] = role.own!.split(':');
+    const [remoteHost, remotePort] = role.remote!.split(':');
     for (const [destination, destinationPort] of [
       [NAT.discovery.observerHost, NAT.discovery.observerPort],
       [remoteHost, Number(remotePort)],
-    ]) {
-      const mapping = selectUdpMapping(mappings[role.side], {
+    ] as const) {
+      const mapping = selectUdpMapping(mappings[role.side]!, {
         source: role.home,
         sourcePort,
-        destination,
-        destinationPort,
+        destination: destination!,
+        destinationPort: destinationPort!,
       });
       assert.equal(
-        advertisedMappingMatches(mapping, { host, port: Number(port) }),
+        advertisedMappingMatches(mapping, { host: host!, port: Number(port) }),
         true,
         'Observed and peer-directed NAT mappings differ.',
       );

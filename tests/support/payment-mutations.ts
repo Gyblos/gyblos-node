@@ -1,3 +1,4 @@
+// Owns offline payment mutations regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 
 import { verifyZeroChargeReconciliation } from '@gyblos/buyer/reconciliation';

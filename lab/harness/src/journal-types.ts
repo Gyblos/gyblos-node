@@ -1,3 +1,4 @@
+// Owns laboratory journal types; product code must not depend on this module.
 import type { DEVNET } from '@gyblos/config';
 
 import type {

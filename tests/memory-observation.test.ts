@@ -1,3 +1,4 @@
+// Owns offline memory observation.test regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -11,7 +12,7 @@ const input = {
   events: 'max 0\noom 0\noom_kill 1\n',
 };
 
-test('memory observations preserve an OOM victim count without claiming its cause', () => {
+void test('memory observations preserve an OOM victim count without claiming its cause', () => {
   const snapshot = parseMemorySnapshot(input);
   assert.equal(snapshot.vmAvailableBytes, 2048000000);
   assert.equal(snapshot.cgroup!.events.oomKill, 1);
@@ -20,7 +21,7 @@ test('memory observations preserve an OOM victim count without claiming its caus
   assert.ok(!JSON.stringify(snapshot).includes('global_oom'));
 });
 
-test('unlimited cgroup and absent optional peak are explicit, not fake zero memory', () => {
+void test('unlimited cgroup and absent optional peak are explicit, not fake zero memory', () => {
   const snapshot = parseMemorySnapshot({
     ...input,
     limit: 'max',
@@ -30,7 +31,7 @@ test('unlimited cgroup and absent optional peak are explicit, not fake zero memo
   assert.equal(snapshot.cgroup!.peakBytes, null);
 });
 
-test('missing or malformed memory evidence prevents a readiness observation', () => {
+void test('missing or malformed memory evidence prevents a readiness observation', () => {
   for (const changed of [
     { available: 'MemFree: 1 kB' },
     { current: 'NaN' },

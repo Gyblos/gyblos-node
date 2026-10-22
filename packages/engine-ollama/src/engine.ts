@@ -1,3 +1,4 @@
+// Owns engine in engine-ollama; it must not know wallets or payments.
 import type { Engine, EngineInput } from '@gyblos/protocol/engine';
 
 import { GENERATION, MODEL } from './constants.js';

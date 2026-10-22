@@ -1,3 +1,4 @@
+// Owns authorization id in payments-x402; it must not know inference engines or lab orchestration.
 import { createHash } from 'node:crypto';
 
 import { getBase64Encoder, getTransactionDecoder } from '@solana/kit';

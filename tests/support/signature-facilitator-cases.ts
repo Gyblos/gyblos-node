@@ -1,3 +1,4 @@
+// Owns offline signature facilitator cases regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -81,7 +82,7 @@ function observer() {
 }
 
 export function registerSignatureFacilitatorCases() {
-  test('signature hints: malformed result metadata cannot throw or erase canonical SDK observations', () => {
+  void test('signature hints: malformed result metadata cannot throw or erase canonical SDK observations', () => {
     const { attempt, records } = observer();
     for (const transaction of [
       ...INVALID_SIGNATURES,
@@ -111,7 +112,7 @@ export function registerSignatureFacilitatorCases() {
     assert.ok(!JSON.stringify(records).includes(DIAGNOSTIC_CANARY));
   });
   for (const success of [true, false])
-    test(
+    void test(
       `signature hints: facilitator preserves SDK HTTP200 and body with malformed transaction: success=${success}`,
       { timeout: 10000 },
       async () => {
@@ -163,7 +164,7 @@ export function registerSignatureFacilitatorCases() {
       },
     );
   for (const scenario of TYPED_ERRORS)
-    test(`signature hints: malformed ${scenario.name} hint preserves the typed error category`, () => {
+    void test(`signature hints: malformed ${scenario.name} hint preserves the typed error category`, () => {
       const { attempt, records } = observer();
       for (const invalid of INVALID_SIGNATURES) {
         const error = scenario.create();
@@ -178,7 +179,7 @@ export function registerSignatureFacilitatorCases() {
       assert.equal(records.at(-1)?.code, scenario.code);
       assert.ok(!JSON.stringify(records).includes(DIAGNOSTIC_CANARY));
     });
-  test(
+  void test(
     'signature hints: malformed SDK hints are omitted from persistent records without losing the result',
     { timeout: 10000, skip: PRIVATE_LOG_PLATFORM_SKIP },
     async () => {

@@ -1,3 +1,4 @@
+// Owns laboratory preflight; product code must not depend on this module.
 import { FIXED_MIN_FACILITATOR_LAMPORTS, MAX_ATOMIC } from '@gyblos/config';
 import {
   account,

@@ -1,3 +1,4 @@
+// Owns offline private log review cases regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import { readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -20,7 +21,7 @@ import { PRIVATE_LOG_PLATFORM_SKIP, withLogIo } from './private-log-fixture.js';
 
 export function registerPrivateLogReviewCases() {
   for (const hostile of [false, true])
-    test(
+    void test(
       `storage errors retain only canonical codes: hostile=${hostile}`,
       { timeout: 10000, skip: PRIVATE_LOG_PLATFORM_SKIP },
       async () => {
@@ -62,7 +63,7 @@ export function registerPrivateLogReviewCases() {
         }
       },
     );
-  test(
+  void test(
     'concurrent journal creation reserves the last remaining slot atomically',
     { timeout: 10000, skip: PRIVATE_LOG_PLATFORM_SKIP },
     async () => {
@@ -111,7 +112,7 @@ export function registerPrivateLogReviewCases() {
       }
     },
   );
-  test(
+  void test(
     'mixed legacy and out-of-pool slots cannot expose excess concurrent capacity',
     { timeout: 10000, skip: PRIVATE_LOG_PLATFORM_SKIP },
     async () => {
@@ -170,7 +171,7 @@ export function registerPrivateLogReviewCases() {
       }
     },
   );
-  test(
+  void test(
     'bounded close includes descriptor retirement and reports pending cleanup truthfully',
     { timeout: 10000, skip: PRIVATE_LOG_PLATFORM_SKIP },
     async () => {
@@ -204,7 +205,7 @@ export function registerPrivateLogReviewCases() {
       }
     },
   );
-  test(
+  void test(
     'undefined serialization is refused before it can poison JSONL',
     { timeout: 10000, skip: PRIVATE_LOG_PLATFORM_SKIP },
     async () => {

@@ -1,3 +1,4 @@
+// Owns artifacts in engine-ollama; it must not know wallets or payments.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 

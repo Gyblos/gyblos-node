@@ -1,3 +1,4 @@
+// Owns laboratory evidence; product code must not depend on this module.
 import { X402_SDK_VERSION } from '@gyblos/config';
 import { EXACT_PRICE } from '@gyblos/core/constants';
 import { DEVNET, DEVNET_USDC } from '@gyblos/payments-x402/constants';

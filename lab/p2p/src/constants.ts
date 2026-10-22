@@ -1,3 +1,4 @@
+// Owns laboratory constants; product code must not depend on this module.
 export const NAT = {
   composePath: 'lab/docker/p2p/compose-nat.json',
   routerDockerfile: 'lab/docker/p2p/Router.Dockerfile',

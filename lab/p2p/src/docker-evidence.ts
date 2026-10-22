@@ -1,3 +1,4 @@
+// Owns laboratory docker evidence; product code must not depend on this module.
 import assert from 'node:assert/strict';
 
 import { CALL_OUTCOMES, type CallOutcome } from '@gyblos/buyer/constants';

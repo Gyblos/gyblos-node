@@ -1,3 +1,4 @@
+// Owns offline lock faults regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import {
   link,
@@ -25,13 +26,13 @@ const LOCAL_OWNER_SUPPORTED =
   process.platform === 'darwin' || process.platform === 'linux';
 
 export function registerLockFaultCases() {
-  test(
+  void test(
     'pre-unlink recheck rejects an inode swapped after the durable audit',
     { skip: !LOCAL_OWNER_SUPPORTED },
     async (context) => {
       const fixture = await lockFixture();
-      let entered = false,
-        swapped = false;
+      let entered = false;
+      let swapped = false;
       try {
         const original = await lstat(fixture.paths.buyer);
         const replacement = join(fixture.directory, 'replacement');
@@ -76,13 +77,13 @@ export function registerLockFaultCases() {
     },
   );
 
-  test(
+  void test(
     'initial nlink guard rejects before an audit open could normalize the link count',
     { skip: !LOCAL_OWNER_SUPPORTED },
     async (context) => {
       const fixture = await lockFixture();
-      let entered = false,
-        auditOpened = false;
+      let entered = false;
+      let auditOpened = false;
       try {
         const other = join(fixture.directory, 'other-link');
         await link(fixture.paths.buyer, other);
@@ -108,13 +109,13 @@ export function registerLockFaultCases() {
     },
   );
 
-  test(
+  void test(
     'pre-unlink nlink guard rejects a hardlink added after the durable audit',
     { skip: !LOCAL_OWNER_SUPPORTED },
     async (context) => {
       const fixture = await lockFixture();
-      let entered = false,
-        linked = false;
+      let entered = false;
+      let linked = false;
       try {
         interceptAuditSync(context, fixture.paths.audit, async () => {
           await link(
@@ -140,18 +141,18 @@ export function registerLockFaultCases() {
   );
 
   for (const target of ['buyer', 'audit'] as const)
-    test(
+    void test(
       'O_NOFOLLOW rejects the ' +
         target +
         ' symlink at open before path normalization',
       { skip: !LOCAL_OWNER_SUPPORTED },
       async (context) => {
         const fixture = await lockFixture();
-        let entered = false,
-          opened = false;
+        let entered = false;
+        let opened = false;
         try {
-          const path = fixture.paths[target],
-            destination = join(fixture.directory, 'symlink-target');
+          const path = fixture.paths[target];
+          const destination = join(fixture.directory, 'symlink-target');
           const original =
             target === 'buyer' ? await readFile(path, 'utf8') : 'audit-target';
           await writeFile(destination, original, {

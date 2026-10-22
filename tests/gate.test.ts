@@ -1,3 +1,4 @@
+// Owns offline gate.test regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -34,7 +35,7 @@ const terms: PaymentRequirements = {
   },
 };
 
-test('trust checks reject redirected funds and unsafe terms before signing', () => {
+void test('trust checks reject redirected funds and unsafe terms before signing', () => {
   validateTerms(terms, policy);
   for (const change of [
     { payTo: 'attacker' },
@@ -68,7 +69,7 @@ const receipt: GateReceipt = {
   channelDistributed: true,
 };
 
-test('application gate can be called without a CLI and proves both balance deltas', async () => {
+void test('application gate can be called without a CLI and proves both balance deltas', async () => {
   const calls: string[] = [];
   let snapshots = 0;
   const result = await runGate({
@@ -88,7 +89,7 @@ test('application gate can be called without a CLI and proves both balance delta
   assert.equal(result.accounting.refund, '6000');
 });
 
-test('no apparent success from overcharge, missing refund, gas charge or open channel', () => {
+void test('no apparent success from overcharge, missing refund, gas charge or open channel', () => {
   assert.throws(
     () => verifyAccounting(before, { ...after, buyer: '990000' }, receipt),
     /Buyer token delta/,
@@ -120,7 +121,7 @@ test('no apparent success from overcharge, missing refund, gas charge or open ch
   );
 });
 
-test('failed preflight cannot trigger a paid request', async () => {
+void test('failed preflight cannot trigger a paid request', async () => {
   let requested = false;
   await assert.rejects(
     runGate({
@@ -137,7 +138,7 @@ test('failed preflight cannot trigger a paid request', async () => {
   assert.equal(requested, false);
 });
 
-test('cluster verification rejects a mainnet RPC even if its URL says devnet', async () => {
+void test('cluster verification rejects a mainnet RPC even if its URL says devnet', async () => {
   const previous = globalThis.fetch;
   globalThis.fetch = async () => Response.json({ result: 'mainnet-genesis' });
   try {
@@ -150,7 +151,7 @@ test('cluster verification rejects a mainnet RPC even if its URL says devnet', a
   }
 });
 
-test('a second buyer is excluded before entering its payment workflow', async () => {
+void test('a second buyer is excluded before entering its payment workflow', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'gyblos-lock-'));
   let release!: () => void;
   let entered!: () => void;
@@ -182,7 +183,7 @@ test('a second buyer is excluded before entering its payment workflow', async ()
   }
 });
 
-test('a receipt must match amount, payer and devnet even when its transaction matches', () => {
+void test('a receipt must match amount, payer and devnet even when its transaction matches', () => {
   const valid = {
     success: true,
     network: DEVNET,
@@ -207,10 +208,10 @@ test('a receipt must match amount, payer and devnet even when its transaction ma
     );
 });
 
-test('an unresolved failure-case authorization blocks later paid attempts', async () => {
+void test('an unresolved failure-case authorization blocks later paid attempts', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'gyblos-journal-'));
-  const happy = join(directory, 'happy.json'),
-    failure = join(directory, 'failure.json');
+  const happy = join(directory, 'happy.json');
+  const failure = join(directory, 'failure.json');
   try {
     await writeFile(happy, JSON.stringify({ state: 'verified' }));
     await writeFile(

@@ -1,3 +1,4 @@
+// Owns call evidence in buyer; it must not know laboratory orchestration.
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { STATUS_CODES } from 'node:http';

@@ -1,3 +1,4 @@
+// Owns laboratory evidence; product code must not depend on this module.
 import { readFile } from 'node:fs/promises';
 
 import { X402_SDK_VERSION } from '@gyblos/config';

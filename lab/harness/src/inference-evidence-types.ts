@@ -1,3 +1,4 @@
+// Owns laboratory inference evidence types; product code must not depend on this module.
 import type { ObservedDoneReason } from '@gyblos/core/constants';
 import type { PRICES, TOLERANCE } from '@gyblos/core/metering';
 import type { EngineUsage, MODEL } from '@gyblos/engine-ollama';

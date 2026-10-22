@@ -1,3 +1,4 @@
+// Owns offline inference.test regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -30,7 +31,7 @@ import { transactionTransfers } from '@gyblos/payments-x402/accounting/chain';
 const secretPrompt = 'private prompt that must never reach storage';
 const secretResponse = 'private response that must never reach storage';
 
-test('integer token pricing, tolerance boundaries and within-ceiling overcharge', () => {
+void test('integer token pricing, tolerance boundaries and within-ceiling overcharge', () => {
   assert.equal(charge({ input: 23, output: 57 }), 137n);
   for (const invalid of [-1, 0.1, NaN, Number.MAX_SAFE_INTEGER + 1])
     assert.throws(() => charge({ input: invalid, output: 0 }));
@@ -63,7 +64,7 @@ test('integer token pricing, tolerance boundaries and within-ceiling overcharge'
   );
 });
 
-test('Ollama origins reject cloud, aliases, redirects and credentials', () => {
+void test('Ollama origins reject cloud, aliases, redirects and credentials', () => {
   for (const value of [
     'https://ollama.com',
     'http://localhost:11434',
@@ -113,7 +114,7 @@ const finalFrame = {
   eval_duration: 79,
 };
 
-test('adapter requires complete engine frames and valid usage without hiding thinking', async () => {
+void test('adapter requires complete engine frames and valid usage without hiding thinking', async () => {
   const good = [
     { model: MODEL.name, response: 'Hello', done: false },
     finalFrame,
@@ -136,7 +137,7 @@ test('adapter requires complete engine frames and valid usage without hiding thi
   }
 });
 
-test('private measurement rows use an allowlist and append without rewriting old rows', async () => {
+void test('private measurement rows use an allowlist and append without rewriting old rows', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'gyblos-meter-'));
   try {
     const salt = await measurementSalt(directory);
@@ -195,7 +196,7 @@ test('private measurement rows use an allowlist and append without rewriting old
   }
 });
 
-test('bounded inference rejects tokenized context overflow before signing', async () => {
+void test('bounded inference rejects tokenized context overflow before signing', async () => {
   const { inferenceCeiling } = await import('@gyblos/node/http/inference');
   assert.throws(
     () =>
@@ -211,7 +212,7 @@ test('bounded inference rejects tokenized context overflow before signing', asyn
   );
 });
 
-test('already aborted generation never contacts the local engine', async () => {
+void test('already aborted generation never contacts the local engine', async () => {
   const controller = new AbortController();
   controller.abort();
   let called = false;

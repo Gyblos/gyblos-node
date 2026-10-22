@@ -1,3 +1,4 @@
+// Owns laboratory nat evidence; product code must not depend on this module.
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 

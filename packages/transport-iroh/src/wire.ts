@@ -1,3 +1,4 @@
+// Owns wire in transport-iroh; it must not know wallets or inference engines.
 import { HTTP_STATUS, P2P, ROUTES } from '@gyblos/config';
 
 import type { HttpMessage, HttpRequest, HttpResponse } from './types.js';
@@ -56,8 +57,8 @@ function decode(
     const separator = line.indexOf(':');
     if (separator < 1 || /^[ \t]/.test(line))
       throw new Error('Invalid HTTP header.');
-    const name = line.slice(0, separator).toLowerCase(),
-      value = line.slice(separator + 1).trim();
+    const name = line.slice(0, separator).toLowerCase();
+    const value = line.slice(separator + 1).trim();
     if (
       !/^[a-z-]+$/.test(name) ||
       names.has(name) ||

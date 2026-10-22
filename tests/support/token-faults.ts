@@ -1,3 +1,4 @@
+// Owns offline token faults regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 
 import { DEVNET_TREASURY_OWNER } from '@gyblos/config';

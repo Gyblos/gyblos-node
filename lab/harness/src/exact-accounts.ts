@@ -1,3 +1,4 @@
+// Owns laboratory exact accounts; product code must not depend on this module.
 import { getCreateAssociatedTokenIdempotentInstructionAsync } from '@solana-program/token';
 import {
   address,

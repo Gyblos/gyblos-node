@@ -1,3 +1,4 @@
+// Owns laboratory docker main; product code must not depend on this module.
 import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';

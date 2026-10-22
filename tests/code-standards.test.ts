@@ -1,3 +1,4 @@
+// Owns offline code standards.test regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -18,24 +19,52 @@ import {
 import standards from '../tooling/code-standards.js';
 
 const eslint = new ESLint();
-const filePath = resolve('packages/core/src/lint-sample.ts');
+const filePath = resolve('packages/core/src/gate.ts');
 async function rules(code: string) {
   const [result] = await eslint.lintText(code, { filePath });
   return result!.messages.map((message) => message.ruleId);
 }
 
-test('standards lint rejects layout, opaque names and nonlocal relative imports', async () => {
+void test('standards lint rejects layout, opaque names and nonlocal relative imports', async () => {
   for (const path of [
     'evidence/synthetic-private.mjs',
     'lab/evidence/synthetic-private.mjs',
   ])
     assert.equal(await eslint.isPathIgnored(resolve(path)), true);
+  assert.deepEqual(
+    await rules('export function run() {}\ninterface Later {}'),
+    [],
+  );
+  assert.deepEqual(await rules('const hidden = 1;'), []);
   assert.ok(
-    (await rules('export function run() {}\ninterface Later {}')).includes(
-      'gyblos/structure',
+    (await rules('const value = { limit: 1 } as { limit: number };')).includes(
+      '@typescript-eslint/consistent-type-assertions',
     ),
   );
-  assert.ok((await rules('const hidden = 1;')).includes('gyblos/structure'));
+  assert.ok(
+    (
+      await rules(
+        'export function longStep() {\n' + 'void 0;\n'.repeat(81) + '}',
+      )
+    ).includes('max-lines-per-function'),
+  );
+  assert.ok((await rules('// line\n'.repeat(401))).includes('max-lines'));
+  assert.ok(
+    (await rules('const first = 1, second = 2;')).includes(
+      'no-restricted-syntax',
+    ),
+  );
+  assert.deepEqual(
+    await rules(
+      'export function run(i: number, tx: number) { return i + tx; }',
+    ),
+    [],
+  );
+  assert.ok(
+    (await rules('Promise.resolve();')).includes(
+      '@typescript-eslint/no-floating-promises',
+    ),
+  );
   assert.ok(
     (await rules('export function run(c: string) { return c; }')).includes(
       'gyblos/structure',
@@ -44,24 +73,24 @@ test('standards lint rejects layout, opaque names and nonlocal relative imports'
   assert.ok(
     (
       await rules("import { value } from '../../config/src/index.js';")
-    ).includes('gyblos/structure'),
+    ).includes('gyblos/package-boundaries'),
   );
   assert.ok(
     (
       await rules("export { value } from '../../config/src/index.js';")
-    ).includes('gyblos/structure'),
+    ).includes('gyblos/package-boundaries'),
   );
   assert.ok(
     (await rules("import { run } from '../../../scripts/run.js';")).includes(
-      'gyblos/structure',
+      'gyblos/package-boundaries',
     ),
   );
 });
 
-test('standards lint detects numeric values inside object literals', async () => {
+void test('standards lint detects numeric values inside object literals', async () => {
   assert.ok(
-    (await rules('export const settings = { timeout: 7000 };')).includes(
-      'gyblos/numeric-constants',
+    (await rules('export function timeout() { return 7000; }')).includes(
+      'no-magic-numbers',
     ),
   );
   assert.deepEqual(
@@ -72,7 +101,7 @@ test('standards lint detects numeric values inside object literals', async () =>
   );
 });
 
-test('version metadata pins match installed-source manifests', async () => {
+void test('version metadata pins match installed-source manifests', async () => {
   const results = await eslint.lintFiles(['packages/config/src/versions.ts']);
   assert.equal(
     results.reduce((sum, result) => sum + result.errorCount, 0),
@@ -80,7 +109,7 @@ test('version metadata pins match installed-source manifests', async () => {
   );
 });
 
-test('typed journals preserve JSON serialization and path-specific terminal guards', async () => {
+void test('typed journals preserve JSON serialization and path-specific terminal guards', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'gyblos-typed-journals-'));
   try {
     const path = join(directory, 'exact-attempt.json');
@@ -118,7 +147,7 @@ test('typed journals preserve JSON serialization and path-specific terminal guar
   }
 });
 
-test('version metadata lint rejects a dependency pin mismatch', async () => {
+void test('version metadata lint rejects a dependency pin mismatch', async () => {
   const { mkdir, writeFile } = await import('node:fs/promises');
   const directory = await mkdtemp(join(tmpdir(), 'gyblos-version-rule-'));
   try {

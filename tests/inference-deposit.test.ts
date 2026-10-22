@@ -1,3 +1,4 @@
+// Owns offline inference deposit.test regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -15,10 +16,10 @@ import {
 } from '@gyblos/payments-x402/constants';
 import { verifyInferenceDeposit } from '@gyblos/payments-x402/inference-deposit';
 
-const buyer = '5FVtvnKXCabCDxSoeNJuLdRpCTBZQnhTnNooZzEYfg2j',
-  feePayer = 'HZLkSwMefjig2NhrKaW3Hb16JX8PTQnE4Jutdc2B433g',
-  authorizer = '4hL4FcqMnrjMLnmyWzaSHhYiwV7FMjVr3CwnpehHNCV7',
-  mint = '2vXUXK2rJTPtb7Wx9em4W9FdgtfD6HTnFxZz5oirLVcH';
+const buyer = '5FVtvnKXCabCDxSoeNJuLdRpCTBZQnhTnNooZzEYfg2j';
+const feePayer = 'HZLkSwMefjig2NhrKaW3Hb16JX8PTQnE4Jutdc2B433g';
+const authorizer = '4hL4FcqMnrjMLnmyWzaSHhYiwV7FMjVr3CwnpehHNCV7';
+const mint = '2vXUXK2rJTPtb7Wx9em4W9FdgtfD6HTnFxZz5oirLVcH';
 async function fixture() {
   const enc = getAddressEncoder();
   const [channelId, bump] = await getProgramDerivedAddress({
@@ -180,7 +181,7 @@ async function withChain(
   }
 }
 
-test('independent seller guard blocks inference on insufficient or missing escrow', async () => {
+void test('independent seller guard blocks inference on insufficient or missing escrow', async () => {
   for (const opts of [
     { escrow: '99' },
     { missing: true },
@@ -198,20 +199,20 @@ test('independent seller guard blocks inference on insufficient or missing escro
     });
   }
 });
-test('independent seller guard accepts the committed deposit and harmless token donations', async () => {
+void test('independent seller guard accepts the committed deposit and harmless token donations', async () => {
   for (const escrow of ['100', '105'])
     await withChain({ escrow }, async (expected) => {
       await verifyInferenceDeposit(expected);
     });
 });
 
-test('admission reads the requested channel directly, without scanning fee-payer channels', async () => {
+void test('admission reads the requested channel directly, without scanning fee-payer channels', async () => {
   await withChain({ directOnly: true }, async (expected) =>
     verifyInferenceDeposit(expected),
   );
 });
 
-test('direct admission rejects absent, foreign, truncated and noncanonical channel accounts', async () => {
+void test('direct admission rejects absent, foreign, truncated and noncanonical channel accounts', async () => {
   for (const options of [
     { missing: true },
     { wrongOwner: true },
@@ -230,7 +231,7 @@ test('direct admission rejects absent, foreign, truncated and noncanonical chann
   }
 });
 
-test('direct admission rejects wrong encoding and channel discriminator before inference', async () => {
+void test('direct admission rejects wrong encoding and channel discriminator before inference', async () => {
   for (const options of [
     { wrongEncoding: true },
     { wrongDiscriminator: true },
@@ -241,7 +242,7 @@ test('direct admission rejects wrong encoding and channel discriminator before i
   }
 });
 
-test('direct admission retains canonical escrow owner and absence checks', async () => {
+void test('direct admission retains canonical escrow owner and absence checks', async () => {
   for (const options of [{ missingEscrow: true }, { wrongEscrowOwner: true }]) {
     await withChain({ ...options, directOnly: true }, async (expected) => {
       await assert.rejects(verifyInferenceDeposit(expected), /escrow/i);

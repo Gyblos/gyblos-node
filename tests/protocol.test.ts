@@ -1,3 +1,4 @@
+// Owns offline protocol.test regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import test from 'node:test';
@@ -67,7 +68,7 @@ const EXPECTED_ERROR_CODES = [
   'WRONG_CLUSTER',
 ];
 
-test('legacy offer golden vector preserves canonical bytes, Ed25519 signature and application trust', async () => {
+void test('legacy offer golden vector preserves canonical bytes, Ed25519 signature and application trust', async () => {
   assert.equal(vector.domain, 'gyblos/signed-inference-offer/v1\n');
   assert.equal(vector.domain, P2P.offerDomain);
   assert.equal(canonicalJson(vector.offer), vector.canonicalJson);
@@ -104,7 +105,7 @@ test('legacy offer golden vector preserves canonical bytes, Ed25519 signature an
   assert.deepEqual(actual, vector.offer);
 });
 
-test('SDK-independent signing uses the exact domain bytes and rejects a different domain or payload', async () => {
+void test('SDK-independent signing uses the exact domain bytes and rejects a different domain or payload', async () => {
   const keys = await crypto.subtle.generateKey({ name: 'Ed25519' }, true, [
     'sign',
     'verify',
@@ -150,7 +151,7 @@ test('SDK-independent signing uses the exact domain bytes and rejects a differen
   );
 });
 
-test('canonical encoding preserves legacy integer/string, UTF-16 key order and rejection rules', () => {
+void test('canonical encoding preserves legacy integer/string, UTF-16 key order and rejection rules', () => {
   assert.equal(
     canonicalJson({ z: [null, true, '1'], a: { '2': 'two', '10': 'ten' } }),
     '{"a":{"10":"ten","2":"two"},"z":[null,true,"1"]}',
@@ -184,7 +185,7 @@ test('canonical encoding preserves legacy integer/string, UTF-16 key order and r
     );
 });
 
-test('legacy payment error aliases retain one constructor, catalog and Error serialization', () => {
+void test('legacy payment error aliases retain one constructor, catalog and Error serialization', () => {
   assert.equal(GateError, ProtocolError);
   assert.equal(GATE_ERROR_CODES, PROTOCOL_ERROR_CODES);
   const error = new GateError(
@@ -199,7 +200,7 @@ test('legacy payment error aliases retain one constructor, catalog and Error ser
   assert.deepEqual(Object.values(PROTOCOL_ERROR_CODES), EXPECTED_ERROR_CODES);
 });
 
-test('engine completion reasons and separate domain/wire usage contracts keep their values', () => {
+void test('engine completion reasons and separate domain/wire usage contracts keep their values', () => {
   assert.equal(adapterReasons, ENGINE_DONE_REASONS);
   assert.deepEqual(ENGINE_DONE_REASONS, { STOP: 'stop', LENGTH: 'length' });
   assert.equal(applicationWireUsage, inferenceWireUsage);
@@ -222,7 +223,7 @@ test('engine completion reasons and separate domain/wire usage contracts keep th
   });
 });
 
-test('protocol has no SDK dependencies and application imports neither payment nor engine adapters', () => {
+void test('protocol has no SDK dependencies and application imports neither payment nor engine adapters', () => {
   assert.ok(!('dependencies' in protocolManifest));
   for (const adapter of ['@gyblos/payments-x402', '@gyblos/engine-ollama'])
     assert.ok(!(adapter in applicationManifest.dependencies));
@@ -255,7 +256,7 @@ test('protocol has no SDK dependencies and application imports neither payment n
   }
 });
 
-test('application signing adapts the wallet once and preserves protocol bytes and signature', async () => {
+void test('application signing adapts the wallet once and preserves protocol bytes and signature', async () => {
   const owner = await generateKeyPairSigner();
   const offer: InferenceOffer = {
     ...vector.offer,

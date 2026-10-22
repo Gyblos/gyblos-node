@@ -1,3 +1,4 @@
+// Owns laboratory fixture evidence types; product code must not depend on this module.
 import type { PaymentRequirements } from '@x402/core/types';
 
 import type { DEVNET, HTTP_STATUS } from '@gyblos/config';

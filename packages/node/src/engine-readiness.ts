@@ -1,3 +1,4 @@
+// Owns engine readiness in node; it must not know lab orchestration or CLI processes.
 import { DIAGNOSTICS, P2P } from '@gyblos/config';
 import type { Engine, EngineDescription } from '@gyblos/core/engine';
 import { READINESS_GENERATION } from '@gyblos/engine-ollama/constants';
@@ -40,8 +41,8 @@ export async function prepareSellerEngine(
   let before: MemorySnapshot | null = null;
   let reason: ReadinessRecord['reason'] = 'memory-observation-failed';
   let timer: ReturnType<typeof setTimeout> | undefined;
-  const controller = new AbortController(),
-    start = performance.now();
+  const controller = new AbortController();
+  const start = performance.now();
   try {
     before = await dependencies.snapshot();
     reason = 'insufficient-headroom';

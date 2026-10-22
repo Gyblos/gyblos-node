@@ -1,3 +1,4 @@
+// Owns inference deposit in payments-x402; it must not know inference engines or lab orchestration.
 import { findAssociatedTokenPda } from '@solana-program/token';
 import { address, getBase64Encoder } from '@solana/kit';
 import { CHANNEL_ACCOUNT_SIZE, discoverChannelsByRentPayer } from '@x402/svm';

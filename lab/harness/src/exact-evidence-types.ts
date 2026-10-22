@@ -1,3 +1,4 @@
+// Owns laboratory exact evidence types; product code must not depend on this module.
 import type {
   PaymentRequired,
   SettleResponse,

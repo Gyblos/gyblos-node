@@ -1,3 +1,4 @@
+// Owns offline private log reclaim cases regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import {
   chmod,
@@ -62,7 +63,7 @@ async function inTemporaryDirectory(run: (directory: string) => Promise<void>) {
 }
 
 export function registerPrivateLogReclaimCases() {
-  test(
+  void test(
     'slot limit reclaims only the least recently appended own journal',
     OPTIONS,
     () =>
@@ -94,7 +95,7 @@ export function registerPrivateLogReclaimCases() {
         assert.match(await readFile(log.path!, 'utf8'), /after reclamation/);
       }),
   );
-  test(
+  void test(
     'reclamation never removes linked, foreign, unsafe or legacy entries',
     OPTIONS,
     () =>
@@ -160,7 +161,7 @@ export function registerPrivateLogReclaimCases() {
         await chmod(join(directory, slotName(3)), 0o700);
       }),
   );
-  test(
+  void test(
     'reclamation fails closed for recent journals and journals open here',
     OPTIONS,
     () =>
@@ -180,7 +181,7 @@ export function registerPrivateLogReclaimCases() {
         assert.equal(open.health().synced, 1);
       }),
   );
-  test(
+  void test(
     'a concurrently vanished oldest journal frees its slot without other deletions',
     OPTIONS,
     () =>
@@ -212,7 +213,7 @@ export function registerPrivateLogReclaimCases() {
         assert.deepEqual(await quarantines(directory), []);
       }),
   );
-  test(
+  void test(
     'a journal replaced during reclamation is restored and storage fails closed',
     OPTIONS,
     () =>
@@ -249,7 +250,7 @@ export function registerPrivateLogReclaimCases() {
         assert.deepEqual(await quarantines(directory), []);
       }),
   );
-  test(
+  void test(
     'settled own quarantine leftovers are removed; recent ones are kept',
     OPTIONS,
     () =>

@@ -1,3 +1,4 @@
+// Owns buyer in buyer; it must not know laboratory orchestration.
 import { readFile } from 'node:fs/promises';
 
 import { EndpointAddr, EndpointId, RelayMode } from '@number0/iroh';

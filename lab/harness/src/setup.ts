@@ -1,3 +1,4 @@
+// Owns laboratory setup; product code must not depend on this module.
 import { generateKeyPairSync } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
@@ -30,8 +31,20 @@ export async function setupGate() {
     console.log('Devnet config already exists; existing keys preserved.');
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-    const keys = {} as Config['keys'];
-    const addresses = {} as Config['addresses'];
+    const keys: Config['keys'] = {
+      [WALLET_ROLES.BUYER]: '',
+      [WALLET_ROLES.SELLER]: '',
+      [WALLET_ROLES.AUTHORIZER]: '',
+      [WALLET_ROLES.FACILITATOR]: '',
+      [WALLET_ROLES.MINT]: '',
+    };
+    const addresses: Config['addresses'] = {
+      [WALLET_ROLES.BUYER]: '',
+      [WALLET_ROLES.SELLER]: '',
+      [WALLET_ROLES.AUTHORIZER]: '',
+      [WALLET_ROLES.FACILITATOR]: '',
+      [WALLET_ROLES.MINT]: '',
+    };
     for (const role of [
       WALLET_ROLES.BUYER,
       WALLET_ROLES.SELLER,

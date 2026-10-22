@@ -1,3 +1,4 @@
+// Owns offline role isolation.test regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import { chmod, mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -13,14 +14,14 @@ import { NATIVE_CAPABILITY } from './support/native-runtime.js';
 const ROLE_OPTIONS = { skip: NATIVE_CAPABILITY.bindingSkip };
 const MINT = '2vXUXK2rJTPtb7Wx9em4W9FdgtfD6HTnFxZz5oirLVcH';
 
-test(
+void test(
   'role setup generates only its own keys and preserves them; insecure modes fail closed',
   ROLE_OPTIONS,
   async () => {
     const { setupRole, nodeSecret, publicRole, rolePath, roleSigner } =
       await import('@gyblos/node/roles');
-    const original = process.cwd(),
-      directory = await mkdtemp(join(tmpdir(), 'gyblos-role-test-'));
+    const original = process.cwd();
+    const directory = await mkdtemp(join(tmpdir(), 'gyblos-role-test-'));
     try {
       process.chdir(directory);
       const first = await setupRole({ role: 'buyer', mint: MINT });
@@ -44,16 +45,16 @@ test(
   },
 );
 
-test(
+void test(
   'seller setup stores no buyer or payout key and rejects reconfiguration',
   ROLE_OPTIONS,
   async () => {
     const { setupRole, publicRole, roleSigner } =
       await import('@gyblos/node/roles');
-    const original = process.cwd(),
-      directory = await mkdtemp(join(tmpdir(), 'gyblos-seller-role-test-'));
-    const buyer = await generateKeyPairSigner(),
-      payout = await generateKeyPairSigner();
+    const original = process.cwd();
+    const directory = await mkdtemp(join(tmpdir(), 'gyblos-seller-role-test-'));
+    const buyer = await generateKeyPairSigner();
+    const payout = await generateKeyPairSigner();
     try {
       process.chdir(directory);
       const first = await setupRole({

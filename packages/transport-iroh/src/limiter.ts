@@ -1,3 +1,4 @@
+// Owns limiter in transport-iroh; it must not know wallets or inference engines.
 import { P2P } from '@gyblos/config';
 
 interface PeerWindow {

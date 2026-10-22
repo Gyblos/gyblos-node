@@ -1,3 +1,4 @@
+// Owns offline buyer refactor.test regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -18,14 +19,14 @@ async function exercise(
   untrusted = false,
   aborted = false,
 ) {
-  const originalFetch = globalThis.fetch,
-    originalTimeout = AbortSignal.timeout;
+  const originalFetch = globalThis.fetch;
+  const originalTimeout = AbortSignal.timeout;
   const signer = await generateKeyPairSigner();
   const feePayer = 'HZLkSwMefjig2NhrKaW3Hb16JX8PTQnE4Jutdc2B433g';
   const authorizer = '4hL4FcqMnrjMLnmyWzaSHhYiwV7FMjVr3CwnpehHNCV7';
-  const events: string[] = [],
-    calls: unknown[] = [],
-    timeouts: number[] = [];
+  const events: string[] = [];
+  const calls: unknown[] = [];
+  const timeouts: number[] = [];
   const policy = {
     mint: DEVNET_USDC,
     payTo: feePayer,
@@ -67,8 +68,8 @@ async function exercise(
       input instanceof Request && !init ? input : new Request(input, init);
     assert.equal(request.url, 'https://resource.test/');
     if (request.signal.aborted) throw request.signal.reason;
-    const headers = request.headers,
-      paid = headers.has('PAYMENT-SIGNATURE');
+    const headers = request.headers;
+    const paid = headers.has('PAYMENT-SIGNATURE');
     calls.push({
       method: request.method,
       redirect: request.redirect,
@@ -101,8 +102,8 @@ async function exercise(
       { value: 'controlled-result' },
       { headers: { 'PAYMENT-RESPONSE': encodePaymentResponseHeader(receipt) } },
     );
-    const json = response.json.bind(response),
-      get = response.headers.get.bind(response.headers);
+    const json = response.json.bind(response);
+    const get = response.headers.get.bind(response.headers);
     response.json = async () => {
       events.push('body');
       return json();
@@ -175,8 +176,8 @@ async function exercise(
         ? ['before-sign', 'sign', 'authorized', 'paid-fetch']
         : ['sign', 'authorized', 'paid-fetch'],
     );
-    const bodyAt = events.indexOf('body'),
-      receiptAt = events.lastIndexOf('receipt');
+    const bodyAt = events.indexOf('body');
+    const receiptAt = events.lastIndexOf('receipt');
     assert.ok(
       inference ? bodyAt < receiptAt : receiptAt < bodyAt,
       JSON.stringify({ inference, events }),
@@ -188,7 +189,7 @@ async function exercise(
   }
 }
 
-test('shared buyer preserves GET/POST signing hooks transport timeout and receipt order', async () => {
+void test('shared buyer preserves GET/POST signing hooks transport timeout and receipt order', async () => {
   for (const inference of [false, true]) {
     const result = await exercise(inference);
     assert.equal(result.calls.length, 2);
@@ -213,7 +214,7 @@ test('shared buyer preserves GET/POST signing hooks transport timeout and receip
     );
   }
 });
-test('shared buyer rejects untrusted terms and pre-aborted requests without signing', async () => {
+void test('shared buyer rejects untrusted terms and pre-aborted requests without signing', async () => {
   for (const inference of [false, true])
     for (const [bad, abort] of [
       [true, false],

@@ -1,3 +1,4 @@
+// Owns darwin memory in runtime; it must not know product workflows or lab orchestration.
 import { execFile } from 'node:child_process';
 import { totalmem } from 'node:os';
 import { promisify } from 'node:util';
@@ -31,13 +32,16 @@ export function parseDarwinMemorySnapshot(input: {
     (pageBytes & (pageBytes - 1)) !== 0
   )
     throw new Error('Invalid Darwin page size.');
-  const freePages = single(input.vmStat, /^Pages free:\s+(\d+)\.\s*$/gm),
-    inactivePages = single(input.vmStat, /^Pages inactive:\s+(\d+)\.\s*$/gm),
-    speculativePages = single(
-      input.vmStat,
-      /^Pages speculative:\s+(\d+)\.\s*$/gm,
-    ),
-    pressureLevel = integer(input.pressure.trim());
+  const freePages = single(input.vmStat, /^Pages free:\s+(\d+)\.\s*$/gm);
+  const inactivePages = single(
+    input.vmStat,
+    /^Pages inactive:\s+(\d+)\.\s*$/gm,
+  );
+  const speculativePages = single(
+    input.vmStat,
+    /^Pages speculative:\s+(\d+)\.\s*$/gm,
+  );
+  const pressureLevel = integer(input.pressure.trim());
   // vm_stat displays free pages separately from speculative pages. Purgeable
   // pages are excluded to avoid counting them again within inactive memory.
   const vmAvailableBytes =
@@ -65,13 +69,13 @@ export function parseDarwinMemorySnapshot(input: {
 }
 
 export async function readDarwinMemorySnapshot() {
-  const execute = promisify(execFile),
-    options = {
-      encoding: 'utf8' as const,
-      timeout: DIAGNOSTICS.darwinMemory.readTimeoutMs,
-      maxBuffer: DIAGNOSTICS.darwinMemory.maxOutputBytes,
-      env: { LANG: 'C', LC_ALL: 'C' },
-    };
+  const execute = promisify(execFile);
+  const options = {
+    encoding: 'utf8' as const,
+    timeout: DIAGNOSTICS.darwinMemory.readTimeoutMs,
+    maxBuffer: DIAGNOSTICS.darwinMemory.maxOutputBytes,
+    env: { LANG: 'C', LC_ALL: 'C' },
+  };
   const [vmStat, pressure] = await Promise.all([
     execute(DIAGNOSTICS.darwinMemory.vmStatPath, [], options),
     execute(

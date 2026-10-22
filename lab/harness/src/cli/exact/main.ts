@@ -1,3 +1,4 @@
+// Owns laboratory main; product code must not depend on this module.
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { readFile } from 'node:fs/promises';
@@ -42,8 +43,8 @@ import { runProvider } from './cases.js';
 import { createEvidence } from './evidence.js';
 
 export async function main() {
-  const evidencePath = EVIDENCE_PATHS.exact,
-    journalPath = JOURNAL_PATHS.exact;
+  const evidencePath = EVIDENCE_PATHS.exact;
+  const journalPath = JOURNAL_PATHS.exact;
   const evidence = createEvidence();
   async function persist() {
     await saveJson(evidencePath, evidence);

@@ -1,3 +1,4 @@
+// Owns offline facilitator diagnostic fixture regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { mkdtemp, readFile, realpath, rm } from 'node:fs/promises';

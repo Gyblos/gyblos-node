@@ -1,3 +1,4 @@
+// Owns laboratory payment; product code must not depend on this module.
 import {
   decodePaymentResponseHeader,
   encodePaymentSignatureHeader,
@@ -42,8 +43,8 @@ export function createPaidRequest(
     role: typeof WALLET_ROLES.BUYER | typeof WALLET_ROLES.AUTHORIZER,
     caseName: ExactCaseName,
   ) {
-    const terms = await challenge(),
-      before = await snapshot(config, config.addresses[role]);
+    const terms = await challenge();
+    const before = await snapshot(config, config.addresses[role]);
     const payload = await createExactBuyer(
       await signer(config, role),
       config.rpcUrl,
@@ -60,8 +61,8 @@ export function createPaidRequest(
       before,
       createdAt: new Date().toISOString(),
     });
-    const firstCall = facilitator.calls.length,
-      previousHandlers = host.handlerCalls();
+    const firstCall = facilitator.calls.length;
+    const previousHandlers = host.handlerCalls();
     const response = await fetch(url, {
       headers: {
         'PAYMENT-SIGNATURE': encodePaymentSignatureHeader(payload),

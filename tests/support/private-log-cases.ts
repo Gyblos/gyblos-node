@@ -1,3 +1,4 @@
+// Owns offline private log cases regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import { constants } from 'node:fs';
 import { lstat, readdir, readFile } from 'node:fs/promises';
@@ -22,7 +23,7 @@ import {
 import { PRIVATE_LOG_PLATFORM_SKIP, withLogIo } from './private-log-fixture.js';
 
 export function registerPrivateLogCases() {
-  test(
+  void test(
     'facilitator records survive stop and restart in distinct private exclusive files',
     { timeout: 10000, skip: PRIVATE_LOG_PLATFORM_SKIP },
     async () => {
@@ -67,7 +68,7 @@ export function registerPrivateLogCases() {
       }
     },
   );
-  test(
+  void test(
     'stalled fsync cannot block facilitator response; queue and shutdown are bounded',
     { timeout: 10000, skip: PRIVATE_LOG_PLATFORM_SKIP },
     async () => {
@@ -78,8 +79,8 @@ export function registerPrivateLogCases() {
             pendingRecords: 2,
             drainMs: 25,
           });
-          const reached = diagnosticBarrier<void>(),
-            release = diagnosticBarrier<void>();
+          const reached = diagnosticBarrier<void>();
+          const release = diagnosticBarrier<void>();
           io.sync = async () => {
             reached.resolve();
             await release.promise;
@@ -115,7 +116,7 @@ export function registerPrivateLogCases() {
       }
     },
   );
-  test(
+  void test(
     'open failure degrades diagnostics without changing the SDK payment response',
     { timeout: 10000, skip: PRIVATE_LOG_PLATFORM_SKIP },
     async () => {
@@ -145,7 +146,7 @@ export function registerPrivateLogCases() {
       }
     },
   );
-  test(
+  void test(
     'record and byte limits preserve existing records without truncation',
     { timeout: 10000, skip: PRIVATE_LOG_PLATFORM_SKIP },
     async () => {
@@ -182,7 +183,7 @@ export function registerPrivateLogCases() {
       }
     },
   );
-  test(
+  void test(
     'exclusive concurrent writers never interleave or reuse another journal',
     { timeout: 10000, skip: PRIVATE_LOG_PLATFORM_SKIP },
     async () => {

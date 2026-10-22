@@ -1,3 +1,4 @@
+// Owns offline gate case assertions.test regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -102,7 +103,7 @@ function fixture(
   return { caseName, status, observation, measurement, actual, trace };
 }
 
-test('gate accepts a delivered positive undercharge beyond independently recounted tolerance', () => {
+void test('gate accepts a delivered positive undercharge beyond independently recounted tolerance', () => {
   const context = fixture();
   assert.equal(context.actual, 156n);
   assert.equal(context.measurement.expectedAtomic, '242');
@@ -111,29 +112,29 @@ test('gate accepts a delivered positive undercharge beyond independently recount
   assert.doesNotThrow(() => assertInferenceCase(context));
 });
 
-test('undercharge gate rejects honest billing and discounts inside tolerance', () => {
+void test('undercharge gate rejects honest billing and discounts inside tolerance', () => {
   for (const billedOutput of [110, 107])
     assert.throws(() => assertInferenceCase(fixture({ billedOutput })));
 });
 
-test('undercharge gate requires complete successful delivery', () => {
+void test('undercharge gate requires complete successful delivery', () => {
   assert.throws(() => assertInferenceCase(fixture({ status: 502 })));
   assert.throws(() =>
     assertInferenceCase(fixture({ reason: ENGINE_DONE_REASONS.LENGTH })),
   );
 });
 
-test('undercharge gate cannot discount the input tokens', () => {
+void test('undercharge gate cannot discount the input tokens', () => {
   assert.throws(() => assertInferenceCase(fixture({ billedInput: 23 })));
 });
 
-test('a forged undercharge annotation cannot bypass the strict financial threshold', () => {
+void test('a forged undercharge annotation cannot bypass the strict financial threshold', () => {
   const context = fixture({ billedOutput: 107 });
   context.measurement.anomaly = CHARGE_ANOMALIES.UNDERCHARGE;
   assert.throws(() => assertInferenceCase(context));
 });
 
-test('case assertion extraction retains all original honest overcharge and interruption acceptance', () => {
+void test('case assertion extraction retains all original honest overcharge and interruption acceptance', () => {
   for (const name of [
     INFERENCE_CASES.HONEST_1,
     INFERENCE_CASES.HONEST_2,
@@ -154,20 +155,20 @@ test('case assertion extraction retains all original honest overcharge and inter
   );
 });
 
-test('discounted billing cannot pass as an ordinary honest case', () => {
+void test('discounted billing cannot pass as an ordinary honest case', () => {
   assert.throws(() =>
     assertInferenceCase(fixture({ name: INFERENCE_CASES.HONEST_1 })),
   );
 });
 
-test('undercharge acceptance rejects a zero charge even when its annotation and counts agree', () => {
+void test('undercharge acceptance rejects a zero charge even when its annotation and counts agree', () => {
   const context = fixture({ engineInput: 0, billedInput: 0, billedOutput: 0 });
   assert.equal(context.actual, 0n);
   assert.equal(context.measurement.anomaly, 'undercharge');
   assert.throws(() => assertInferenceCase(context));
 });
 
-test('strict undercharge acceptance rejects equality at the allowance boundary', () => {
+void test('strict undercharge acceptance rejects equality at the allowance boundary', () => {
   const context = fixture({ billedOutput: 105 });
   assert.equal(
     context.actual,

@@ -1,3 +1,4 @@
+// Owns metering in core; it must not know SDKs, engines or filesystem.
 import { UNITS } from '@gyblos/config';
 
 import { CHARGE_ANOMALIES, PRICES, TOLERANCE } from './constants.js';

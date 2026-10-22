@@ -1,3 +1,4 @@
+// Owns laboratory setup; product code must not depend on this module.
 import { isMain } from '@gyblos/runtime';
 
 import { setupP2PRole } from '../src/p2p-setup.js';

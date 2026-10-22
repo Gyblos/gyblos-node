@@ -1,11 +1,14 @@
+// Owns offline lab discovery.test regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 
 import { NAT } from '@gyblos/lab-p2p/constants';
 
-import { assertReflectedMappings } from '../lab/tools/lab-mapping.mjs';
-import { addLabObserver } from '../lab/tools/lab-observer.mjs';
-import { discoverLabAddress } from '../lab/tools/lab-reflection.mjs';
+import { nativeSource } from '../lab/tools/iroh-probe.js';
+import { assertReflectedMappings } from '../lab/tools/lab-mapping.js';
+import { addLabObserver } from '../lab/tools/lab-observer.js';
+import { discoverLabAddress } from '../lab/tools/lab-reflection.js';
 
 function fixture(
   options: {
@@ -16,9 +19,9 @@ function fixture(
   } = {},
 ) {
   const added: string[] = [];
-  let connections = 0,
-    closed = 0,
-    endpointClosed = false;
+  let connections = 0;
+  let closed = 0;
+  let endpointClosed = false;
   const endpoint = {
     connect: async () => {
       connections++;
@@ -70,7 +73,41 @@ const config = {
   subnetPrefix: '10.82.20.',
 };
 
-test('reflection uses the same native endpoint, pins the observer and preserves the observed mapped port', async () => {
+void test('reflection uses the same native endpoint, pins the observer and preserves the observed mapped port', async () => {
+  // Generated remote workers must run in plain Node, without tsx helper closures.
+  for (const role of ['seller', 'buyer', 'observer']) {
+    const syntax = spawnSync(
+      process.execPath,
+      ['--input-type=module', '--check'],
+      { input: nativeSource(role), encoding: 'utf8' },
+    );
+    assert.equal(syntax.status, 0, syntax.stderr);
+  }
+  const portable = nativeSource('observer')
+    .replace(/await import\((['"])@number0\/iroh\1\)/g, 'globalThis.fakeIroh')
+    .replace(/await import\((['"])node:fs\/promises\1\)/g, 'globalThis.fakeFs');
+  const worker = spawnSync(
+    process.execPath,
+    [
+      '--input-type=module',
+      '-e',
+      `
+    let writes=0, closes=0;
+    globalThis.fakeIroh={RelayMode:{disabled:()=>0},Endpoint:{builder:()=>({
+      applyMinimal(){},bindAddr(){},relayMode(){},alpns(){},async bind(){return {
+        id:()=>({toString:()=> 'synthetic-observer'}),addr:()=>({directAddresses:()=>[]}),
+        async close(){closes++}
+      }}
+    })}};
+    globalThis.fakeFs={async writeFile(_path,value){if(JSON.parse(value).id!=='synthetic-observer')throw Error('bad descriptor');writes++}};
+    process.argv[1]=JSON.stringify({protocol:'synthetic',bind:'[::1]:0',descriptorPath:'unused',maximumClients:0});
+    ${portable}
+    if(writes!==1||closes!==1)throw Error('portable worker lifecycle mismatch');
+  `,
+    ],
+    { encoding: 'utf8', timeout: 5000 },
+  );
+  assert.equal(worker.status, 0, worker.stderr);
   const value = fixture();
   const result = await discoverLabAddress(value.endpoint, {}, config);
   assert.equal(result, '10.82.20.2:54321');
@@ -80,7 +117,7 @@ test('reflection uses the same native endpoint, pins the observer and preserves 
   assert.equal(value.endpointClosed(), false);
 });
 
-test('untrusted or relayed observers and malformed/out-of-lab addresses never become candidates', async () => {
+void test('untrusted or relayed observers and malformed/out-of-lab addresses never become candidates', async () => {
   for (const options of [
     { wrongIdentity: true },
     { relay: true },
@@ -102,7 +139,7 @@ test('untrusted or relayed observers and malformed/out-of-lab addresses never be
   }
 });
 
-test('a hung observer is bounded, closes its endpoint and never injects a candidate', async () => {
+void test('a hung observer is bounded, closes its endpoint and never injects a candidate', async () => {
   const value = fixture({ hung: true });
   await assert.rejects(
     discoverLabAddress(value.endpoint, {}, { ...config, timeoutMs: 5 }),
@@ -112,7 +149,7 @@ test('a hung observer is bounded, closes its endpoint and never injects a candid
   assert.deepEqual(value.added, []);
 });
 
-test('a late connection after timeout is closed without publishing its reflected candidate', async () => {
+void test('a late connection after timeout is closed without publishing its reflected candidate', async () => {
   const value = fixture();
   const connect = value.endpoint.connect;
   let release!: () => void;
@@ -132,7 +169,7 @@ test('a late connection after timeout is closed without publishing its reflected
   assert.equal(value.closed(), 1);
 });
 
-test('lab discovery is explicit and excludes manual candidates, blocked UDP and missing native images', () => {
+void test('lab discovery is explicit and excludes manual candidates, blocked UDP and missing native images', () => {
   const template = () => ({
     services: {
       buyer: {
@@ -164,9 +201,9 @@ test('lab discovery is explicit and excludes manual candidates, blocked UDP and 
   assert.deepEqual(Object.keys(observer.networks), ['internet']);
 });
 
-test('reflection requires actual same-socket mappings to observer and peer on both routers', () => {
-  const portA = 50101,
-    portB = 50102;
+void test('reflection requires actual same-socket mappings to observer and peer on both routers', () => {
+  const portA = 50101;
+  const portB = 50102;
   const raw = {
     peer: {
       reflectedAddress: `${NAT.wan.routerA}:${portA}`,
@@ -182,10 +219,12 @@ test('reflection requires actual same-socket mappings to observer and peer on bo
     peer: string,
     peerPort: number,
   ) =>
-    [
-      [NAT.discovery.observerHost, NAT.discovery.observerPort],
-      [peer, peerPort],
-    ].map(([destination, destinationPort]) => ({
+    (
+      [
+        [NAT.discovery.observerHost, NAT.discovery.observerPort],
+        [peer, peerPort],
+      ] as const
+    ).map(([destination, destinationPort]) => ({
       original: { source: home, destination, sourcePort, destinationPort },
       reply: {
         source: destination,

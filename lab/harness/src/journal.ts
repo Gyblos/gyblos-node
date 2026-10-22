@@ -1,3 +1,4 @@
+// Owns laboratory journal; product code must not depend on this module.
 import { readFile } from 'node:fs/promises';
 
 import { JOURNAL_FILENAMES, JOURNAL_PATHS } from '@gyblos/config';

@@ -1,3 +1,4 @@
+// Owns offline refactor.test regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import childProcess, { type ChildProcess } from 'node:child_process';
 import { syncBuiltinESMExports } from 'node:module';
@@ -9,7 +10,7 @@ import { waitReady } from '@gyblos/runtime/process';
 
 import { NATIVE_CAPABILITY } from './support/native-runtime.js';
 
-test('all executable modules are inert when imported', async (context) => {
+void test('all executable modules are inert when imported', async (context) => {
   let starts = 0;
   let stops = 0;
   const node = createNodeLifecycle(async () => {
@@ -80,11 +81,11 @@ test('all executable modules are inert when imported', async (context) => {
   const beforeSignals = ['SIGINT', 'SIGTERM'].map((s) =>
     process.listenerCount(s),
   );
-  const originalFetch = globalThis.fetch,
-    originalSpawn = childProcess.spawn,
-    exitCode = process.exitCode;
-  let fetches = 0,
-    spawns = 0;
+  const originalFetch = globalThis.fetch;
+  const originalSpawn = childProcess.spawn;
+  const exitCode = process.exitCode;
+  let fetches = 0;
+  let spawns = 0;
   globalThis.fetch = (async () => {
     fetches++;
     throw new Error('Unexpected network effect');
@@ -133,7 +134,7 @@ test('all executable modules are inert when imported', async (context) => {
   }
 });
 
-test('shared readiness preserves ownership rejection and caller-specific error identity', async () => {
+void test('shared readiness preserves ownership rejection and caller-specific error identity', async () => {
   const original = globalThis.fetch;
   let reads = 0;
   globalThis.fetch = (async () => {
@@ -158,7 +159,7 @@ test('shared readiness preserves ownership rejection and caller-specific error i
   }
 });
 
-test('shared readiness preserves early exit and setup error messages', async () => {
+void test('shared readiness preserves early exit and setup error messages', async () => {
   await assert.rejects(
     waitReady(
       { exitCode: 1, signalCode: null } as ChildProcess,
@@ -177,7 +178,7 @@ test('shared readiness preserves early exit and setup error messages', async () 
   );
 });
 
-test('setup readiness preserves HTTP-only acceptance without parsing a body', async () => {
+void test('setup readiness preserves HTTP-only acceptance without parsing a body', async () => {
   const original = globalThis.fetch;
   let reads = 0;
   globalThis.fetch = (async () => {

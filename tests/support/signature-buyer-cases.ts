@@ -1,3 +1,4 @@
+// Owns offline signature buyer cases regression cases; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -38,10 +39,10 @@ interface BuyerScenario {
 async function observeBuyer(scenario: BuyerScenario) {
   const signer = await generateKeyPairSigner();
   const originalFetch = globalThis.fetch;
-  let requests = 0,
-    externalCalls = 0,
-    signed = 0,
-    authorizations = 0;
+  let requests = 0;
+  let externalCalls = 0;
+  let signed = 0;
+  let authorizations = 0;
   let observed: BuyerResponseObservation | undefined;
   const failures: BuyerDiagnosticCode[] = [];
   const settlement = {
@@ -133,7 +134,7 @@ async function observeBuyer(scenario: BuyerScenario) {
 export function registerSignatureBuyerCases() {
   for (const measureResponse of [false, true]) {
     for (const truncated of [false, true])
-      test(`signature hints: buyer preserves original ${truncated ? 'body error' : 'result'} and HTTP status with malformed receipt: measured=${measureResponse}`, async () => {
+      void test(`signature hints: buyer preserves original ${truncated ? 'body error' : 'result'} and HTTP status with malformed receipt: measured=${measureResponse}`, async () => {
         for (const transaction of INVALID_SIGNATURES) {
           const bodyError = truncated
             ? new SyntaxError(DIAGNOSTIC_CANARY)
@@ -147,7 +148,7 @@ export function registerSignatureBuyerCases() {
           assert.deepEqual(failures, []);
         }
       });
-    test(`signature hints: buyer retains a valid hint on result and original body failure: measured=${measureResponse}`, async () => {
+    void test(`signature hints: buyer retains a valid hint on result and original body failure: measured=${measureResponse}`, async () => {
       for (const bodyError of [undefined, new SyntaxError(DIAGNOSTIC_CANARY)]) {
         const { observed, failures } = await observeBuyer({
           transaction: DIAGNOSTIC_SIGNATURE,
@@ -161,7 +162,7 @@ export function registerSignatureBuyerCases() {
         assert.deepEqual(failures, []);
       }
     });
-    test(`observation failure: buyer returns the original 200 result with a valid receipt and reports the canonical code: measured=${measureResponse}`, async () => {
+    void test(`observation failure: buyer returns the original 200 result with a valid receipt and reports the canonical code: measured=${measureResponse}`, async () => {
       const { observed, failures } = await observeBuyer({
         transaction: DIAGNOSTIC_SIGNATURE,
         measureResponse,
@@ -173,7 +174,7 @@ export function registerSignatureBuyerCases() {
       });
       assert.deepEqual(failures, ['RESPONSE_OBSERVATION_FAILED']);
     });
-    test(`observation failure: buyer preserves the original body parse error and reports the canonical code: measured=${measureResponse}`, async () => {
+    void test(`observation failure: buyer preserves the original body parse error and reports the canonical code: measured=${measureResponse}`, async () => {
       const { failures } = await observeBuyer({
         transaction: DIAGNOSTIC_SIGNATURE,
         measureResponse,
@@ -183,7 +184,7 @@ export function registerSignatureBuyerCases() {
       assert.deepEqual(failures, ['RESPONSE_OBSERVATION_FAILED']);
     });
     for (const truncated of [false, true])
-      test(`observation failure: a rejecting asynchronous reporter neither replaces the ${truncated ? 'body error' : 'result'} nor leaks: measured=${measureResponse}`, async () => {
+      void test(`observation failure: a rejecting asynchronous reporter neither replaces the ${truncated ? 'body error' : 'result'} nor leaks: measured=${measureResponse}`, async () => {
         const unhandled: unknown[] = [];
         const onUnhandled = (reason: unknown) => unhandled.push(reason);
         process.on('unhandledRejection', onUnhandled);
@@ -205,7 +206,7 @@ export function registerSignatureBuyerCases() {
           process.off('unhandledRejection', onUnhandled);
         }
       });
-    test(`observation failure: a successful observer leaves the result and error unchanged without a code: measured=${measureResponse}`, async () => {
+    void test(`observation failure: a successful observer leaves the result and error unchanged without a code: measured=${measureResponse}`, async () => {
       for (const bodyError of [undefined, new SyntaxError(DIAGNOSTIC_CANARY)]) {
         const { observed, failures } = await observeBuyer({
           transaction: DIAGNOSTIC_SIGNATURE,
@@ -221,7 +222,7 @@ export function registerSignatureBuyerCases() {
     });
   }
   for (const invalidField of ['claimSignature', 'depositSignature', 'both'])
-    test(`signature hints: proof projection omits invalid ${invalidField} while retaining neighboring valid hints`, () => {
+    void test(`signature hints: proof projection omits invalid ${invalidField} while retaining neighboring valid hints`, () => {
       for (const malformed of INVALID_SIGNATURES) {
         const claimSignature =
           invalidField === 'depositSignature'

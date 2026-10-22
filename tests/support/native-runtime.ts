@@ -1,3 +1,4 @@
+// Owns offline native runtime regression cases; no funded wallets or live services.
 import { createSocket } from 'node:dgram';
 import { setTimeout as delay } from 'node:timers/promises';
 
