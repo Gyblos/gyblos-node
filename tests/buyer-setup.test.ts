@@ -16,6 +16,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 
 import { TOKENIZER_DIR, TOKENIZER_FILES } from '@gyblos/config';
+import { NODE_ERROR_CODES } from '@gyblos/node/constants';
 
 async function preparation(
   corrupt: false | 'tokenizer' | 'config' = false,
@@ -145,7 +146,10 @@ void test('buyer preparation caps streamed bodies without trusting Content-Lengt
   );
   try {
     assert.notEqual(result.status, 0);
-    assert.match(result.stderr, /TOKENIZER_DOWNLOAD_TOO_LARGE/);
+    assert.match(
+      result.stderr,
+      new RegExp(NODE_ERROR_CODES.TOKENIZER_DOWNLOAD_TOO_LARGE),
+    );
     for (const [name, path] of Object.entries(TOKENIZER_FILES))
       assert.equal(
         await readFile(join(directory, path), 'utf8'),
