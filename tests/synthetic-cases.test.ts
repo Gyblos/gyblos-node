@@ -1,8 +1,8 @@
-// Owns offline gate case list.test regression cases; no funded wallets or live services.
+// Owns offline synthetic inference case list regressions for @gyblos/node; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { INFERENCE_CASES } from '@gyblos/lab-harness/constants';
+import { INFERENCE_CASES } from '@gyblos/node/constants';
 import { createCases } from '@gyblos/node/synthetic-cases';
 
 void test('gate adds the separately targeted undercharge before engine termination', () => {

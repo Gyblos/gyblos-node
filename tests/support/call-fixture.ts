@@ -13,7 +13,7 @@ import type {
   P2pJournalState,
 } from '@gyblos/buyer/constants';
 import { P2P } from '@gyblos/config';
-import type { ErrorDiagnosticCode } from '@gyblos/lab-harness/constants';
+import type { ErrorDiagnosticCode } from '@gyblos/node/constants';
 
 const SOURCE = new URL('../../', import.meta.url);
 const SIGNATURE = '1'.repeat(64);

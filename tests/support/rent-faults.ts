@@ -4,7 +4,7 @@ import {
   PROOF_GUARDS,
   RENT_GUARDS,
   type FinancialGuardMessage,
-} from '@gyblos/lab-harness/constants';
+} from '@gyblos/payments-x402/accounting/constants';
 import {
   CHANNEL_GUARDS,
   type FinalizedChannelGuardMessage,

@@ -28,6 +28,7 @@ pnpm install --frozen-lockfile
 pnpm typecheck
 pnpm lint
 pnpm test
+pnpm test:lab
 pnpm boundaries
 pnpm format
 ```
@@ -73,7 +74,7 @@ Parse external JSON as unknown, then validate shape, bounds and trust at the bou
 
 ## Testing
 
-Run typecheck, lint and the discovered offline tests for every PR. Report exact passed, failed, cancelled and skipped counts; distinguish tooling tests from product tests. Use public package entries. See [tests/README.md](tests/README.md) for native prerequisites, synthetic ports, safe fixtures and diagnostic tests. TDD is required for confirmed behavior bugs; keep behavior changes and moves in separate PRs. Golden vectors protect signing domain, canonical bytes and error alias identity. Refactors preserve existing test names/counts, wire values, journals and private paths; explain any new test registration.
+Run typecheck, lint and the discovered offline tests for every PR. `pnpm test` is the product gate (`tests/*.test.ts`); `pnpm test:lab` runs lab-only regressions in `tests/lab/` and must also pass when lab code changes; `pnpm test:all` runs both. Report exact passed, failed, cancelled and skipped counts; distinguish tooling tests from product tests. Use public package entries. See [tests/README.md](tests/README.md) for native prerequisites, synthetic ports, safe fixtures and diagnostic tests. TDD is required for confirmed behavior bugs; keep behavior changes and moves in separate PRs. Golden vectors protect signing domain, canonical bytes and error alias identity. Refactors preserve existing test names/counts, wire values, journals and private paths; explain any new test registration.
 
 ## Security and privacy
 

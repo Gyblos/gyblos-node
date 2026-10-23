@@ -1,4 +1,4 @@
-// Owns offline gate case assertions.test regression cases; no funded wallets or live services.
+// Owns lab inference-gate case assertion regressions; offline, no funded wallets or live services.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 

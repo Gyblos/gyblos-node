@@ -8,7 +8,7 @@ import test from 'node:test';
 
 import { CALL_OUTCOMES, RECONCILED_ZERO_CHARGE } from '@gyblos/buyer/constants';
 import { P2P } from '@gyblos/config';
-import { JOURNAL_STATES } from '@gyblos/lab-harness/constants';
+import { JOURNAL_STATES } from '@gyblos/payments-x402/constants';
 
 import { NATIVE_CAPABILITY } from './native-runtime.js';
 import { recoveryFixture } from './recovery-fixture.js';

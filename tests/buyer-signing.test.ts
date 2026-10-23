@@ -1,4 +1,4 @@
-// Owns offline buyer refactor.test regression cases; no funded wallets or live services.
+// Owns offline x402 buyer signing-order and rejection regressions; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 

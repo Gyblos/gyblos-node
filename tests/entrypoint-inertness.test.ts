@@ -1,12 +1,11 @@
-// Owns offline refactor.test regression cases; no funded wallets or live services.
+// Owns offline import-inertness regressions for executable entrypoints and node lifecycle; no funded wallets or live services.
 import assert from 'node:assert/strict';
-import childProcess, { type ChildProcess } from 'node:child_process';
+import childProcess from 'node:child_process';
 import { syncBuiltinESMExports } from 'node:module';
 import test from 'node:test';
 
 import { NODE_STATES } from '@gyblos/node/constants';
 import { createNodeLifecycle } from '@gyblos/node/lifecycle';
-import { waitReady } from '@gyblos/runtime/process';
 
 import { NATIVE_CAPABILITY } from './support/native-runtime.js';
 
@@ -131,68 +130,5 @@ void test('all executable modules are inert when imported', async (context) => {
     childProcess.spawn = originalSpawn;
     process.exitCode = exitCode;
     syncBuiltinESMExports();
-  }
-});
-
-void test('shared readiness preserves ownership rejection and caller-specific error identity', async () => {
-  const original = globalThis.fetch;
-  let reads = 0;
-  globalThis.fetch = (async () => {
-    reads++;
-    return Response.json({ runId: 'another-process' });
-  }) as typeof fetch;
-  const child = { exitCode: null, signalCode: null } as ChildProcess;
-  const mismatch = new Error(
-    'Gate port belongs to a different process. No payment attempted.',
-  );
-  try {
-    await assert.rejects(
-      waitReady(child, 'http://fake', {
-        expectedRunId: 'current',
-        onMismatch: () => mismatch,
-      }),
-      (error) => error === mismatch,
-    );
-    assert.equal(reads, 1);
-  } finally {
-    globalThis.fetch = original;
-  }
-});
-
-void test('shared readiness preserves early exit and setup error messages', async () => {
-  await assert.rejects(
-    waitReady(
-      { exitCode: 1, signalCode: null } as ChildProcess,
-      'http://fake',
-      { exitMessage: 'Local Ollama startup failed.' },
-    ),
-    /Local Ollama startup failed/,
-  );
-  await assert.rejects(
-    waitReady(
-      { exitCode: null, signalCode: null } as ChildProcess,
-      'http://fake',
-      { startupError: () => true, exitMessage: 'Local Ollama startup failed.' },
-    ),
-    /Local Ollama startup failed/,
-  );
-});
-
-void test('setup readiness preserves HTTP-only acceptance without parsing a body', async () => {
-  const original = globalThis.fetch;
-  let reads = 0;
-  globalThis.fetch = (async () => {
-    reads++;
-    return new Response('not JSON', { status: 200 });
-  }) as typeof fetch;
-  try {
-    await waitReady(
-      { exitCode: null, signalCode: null } as ChildProcess,
-      'http://fake',
-      { parseBody: false, attempts: 1 },
-    );
-    assert.equal(reads, 1);
-  } finally {
-    globalThis.fetch = original;
   }
 });

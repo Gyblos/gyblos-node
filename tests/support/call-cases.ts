@@ -10,7 +10,7 @@ import {
   CALL_PHASES,
   P2P_JOURNAL_STATES,
 } from '@gyblos/buyer/constants';
-import { ERROR_DIAGNOSTICS } from '@gyblos/lab-harness/constants';
+import { ERROR_DIAGNOSTICS } from '@gyblos/node/constants';
 import { errorDiagnostic } from '@gyblos/node/diagnostics';
 import {
   createBuyer,

@@ -1,11 +1,14 @@
 # Offline regression tests
 
-The offline regression suites and their public fixtures are versioned and run
-with `pnpm test`. The suite uses synthetic inputs, ephemeral unfunded signers,
-mocked RPC and temporary files; it requires no funded wallet, Ollama, Docker,
-Python or devnet funds. Node discovers `tests/**/*.test.ts` directly; there is
-no entrypoint allowlist. Case modules in `tests/support/` are explicitly
-registered by those entrypoints.
+The offline regression suites and their public fixtures are versioned. Product
+suites (`tests/*.test.ts`) run with `pnpm test`, which is the PR gate.
+Laboratory regressions that guard only `lab/` code live in `tests/lab/` and run
+with `pnpm test:lab`; `pnpm test:all` runs both. Product tests import product
+values from their owning packages, not through lab re-exports. The suite uses
+synthetic inputs, ephemeral unfunded signers, mocked RPC and temporary files; it
+requires no funded wallet, Ollama, Docker, Python or devnet funds. Node
+discovers the test files by glob; there is no entrypoint allowlist. Case modules
+in `tests/support/` are explicitly registered by those entrypoints.
 
 Public discovery contract tests use ephemeral, unfunded Node/OpenSSL signers.
 The committed `packages/protocol/vectors/public-discovery-v1.json` contains only

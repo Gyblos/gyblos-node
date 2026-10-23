@@ -7,14 +7,12 @@ import test from 'node:test';
 
 import { ESLint, Linter } from 'eslint';
 
-import {
-  JOURNAL_STATES,
-  RECONCILIATION_CLASSIFICATIONS,
-} from '@gyblos/lab-harness/constants';
+import { RECONCILIATION_CLASSIFICATIONS } from '@gyblos/lab-harness/constants';
 import {
   assertNoUnresolvedAuthorizations,
   saveJournal,
 } from '@gyblos/lab-harness/journal';
+import { JOURNAL_STATES } from '@gyblos/payments-x402/constants';
 
 import standards from '../tooling/code-standards.js';
 
