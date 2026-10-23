@@ -110,6 +110,7 @@ void test(
       { ...ROLE, rpcUrl: 'file:///not-an-rpc' },
       { ...ROLE, mint: 'invalid' },
       { ...ROLE, nodeId: 'invalid' },
+      { ...ROLE, nodeId: 'a'.repeat(63) + '\n' },
       { ...ROLE, buyer: 1 },
       { ...seller, payTo: undefined },
     ])
@@ -143,6 +144,7 @@ void test('local trust parser validates identity fields and positive bounded dec
     {},
     { ...TRUST, owner: false },
     { ...TRUST, nodeId: 'invalid' },
+    { ...TRUST, nodeId: 'a'.repeat(63) + '\n' },
     { ...TRUST, mint: 'invalid' },
     { ...TRUST, buyer: undefined },
   ])
