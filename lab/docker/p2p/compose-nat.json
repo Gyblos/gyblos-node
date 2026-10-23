@@ -24,6 +24,8 @@
         }
       },
       "environment": {
+        "GYBLOS_RELAYS": null,
+        "GYBLOS_RELAY_TOKEN": "${GYBLOS_RELAY_TOKEN:?GYBLOS_RELAY_TOKEN is required}",
         "GYBLOS_IROH_BIND": "${GYBLOS_P2P_SELLER_BIND}",
         "GYBLOS_EXPECTED_ROUTE": "",
         "GYBLOS_RPC_URL": "${GYBLOS_P2P_RPC}",
@@ -60,6 +62,8 @@
         }
       },
       "environment": {
+        "GYBLOS_RELAYS": null,
+        "GYBLOS_RELAY_TOKEN": "${GYBLOS_RELAY_TOKEN:?GYBLOS_RELAY_TOKEN is required}",
         "GYBLOS_IROH_BIND": "${GYBLOS_P2P_BUYER_BIND}",
         "GYBLOS_EXPECTED_ROUTE": "${GYBLOS_P2P_EXPECTED_ROUTE}",
         "GYBLOS_RPC_URL": "${GYBLOS_P2P_RPC}",

@@ -17,6 +17,11 @@ export const SVM_TRANSACTION_VERSION = 0 as const;
 
 export const DEVNET_RPC_URL = 'https://api.devnet.solana.com';
 
+export const IROH_RELAYS = {
+  urls: ['https://na1.relay.gyblos.com/'],
+  quicPort: 7842,
+} as const;
+
 export const PUBLIC_FACILITATORS = [
   {
     url: 'https://x402.org/facilitator',

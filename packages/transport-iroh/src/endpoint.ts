@@ -1,7 +1,11 @@
 // Owns endpoint in transport-iroh; it must not know wallets or inference engines.
-import { Endpoint, RelayMode } from '@number0/iroh';
+import { Endpoint } from '@number0/iroh';
 
 import { IPV6_LOOPBACK, LOCALHOST, P2P } from '@gyblos/config';
+
+import { relayModeFromEnv } from './relays.js';
+
+export { assertConfiguredRelay } from './relays.js';
 
 export async function bindEndpoint(
   secret: number[],
@@ -13,6 +17,7 @@ export async function bindEndpoint(
 ) {
   if (options.relayOnly && options.externalAddress)
     throw new Error('Relay-only mode rejects manual direct candidates.');
+  const relayMode = relayModeFromEnv();
   const builder = Endpoint.builder();
   builder.applyN0();
   builder.secretKey(secret);
@@ -24,7 +29,7 @@ export async function bindEndpoint(
     builder.bindAddr(options.bindAddress);
     builder.bindAddr(`${IPV6_LOOPBACK}:0`);
   }
-  builder.relayMode(RelayMode.defaultMode());
+  builder.relayMode(relayMode);
   const endpoint = await builder.bind();
   if (options.externalAddress) {
     try {

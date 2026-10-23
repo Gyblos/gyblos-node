@@ -80,7 +80,12 @@ const structure = {
       }
     }
     function checkSource(node) {
-      const source = node.source?.value;
+      const literal = node.source;
+      const source =
+        literal?.type === 'TemplateLiteral' && literal.expressions.length === 0
+          ? literal.quasis[0]?.value.cooked
+          : literal?.value;
+      if (typeof source !== 'string') return;
       if (!source || context.options[0]?.bindings) return;
       if (root && /(^|\/)scripts\//.test(source))
         context.report({ node, messageId: 'scripts' });
@@ -109,6 +114,7 @@ const structure = {
       ImportDeclaration: checkSource,
       ExportNamedDeclaration: checkSource,
       ExportAllDeclaration: checkSource,
+      ImportExpression: checkSource,
     };
   },
 };

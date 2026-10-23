@@ -41,6 +41,26 @@ real native Iroh loopback and simulated payment messages. This is not another
 paid devnet run or an explanation of the historical 402. The queue belongs to
 one proxy instance; it does not coordinate separate buyer processes.
 
+## Iroh relay configuration
+
+Native sellers and buyers use `https://na1.relay.gyblos.com/` by default, with
+QUIC address discovery on UDP 7842. Set `GYBLOS_RELAY_TOKEN` privately in each
+process environment before starting either role. There is no built-in token;
+missing or invalid configuration stops endpoint binding. Never put the token in
+a relay URL, a signed offer, a config file or a committed environment file.
+
+`GYBLOS_RELAYS` optionally overrides the comma-separated HTTPS relay origins.
+Both roles must use the same set and credentials. The buyer accepts a signed
+offer's relay only if its normalized URL belongs to that configured set. Relay
+URLs and the QUIC port defaults live in `@gyblos/config`.
+
+The n0 preset still initializes crypto and DNS/pkarr address discovery before
+the custom map replaces its relays. Public n0 relays are not an automatic
+fallback. Iroh can still choose direct paths and fall back to the configured
+relay; this does not retry a paid request or resolve an uncertain payment. This
+integration is verified offline with native relay maps and a fake endpoint
+builder, not a new authenticated cross-machine relay or payment run.
+
 ## How it works
 
 ```text

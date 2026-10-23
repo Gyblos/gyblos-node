@@ -23,7 +23,8 @@ const PACKAGE_PATH = '^packages/';
 const CORE_PATH = '^packages/(?:application|core)/';
 const PROTOCOL_PATH = '^packages/protocol/';
 const PRODUCT_PATH = '^(?:packages/|apps/)';
-const SDK_PATH = '(^|/)(?:@solana(?:-program)?/|@x402/|@number0/iroh(?:/|$))';
+const SDK_PATH =
+  '(^|/)(?:@solana(?:-program)?/|@x402/|@number0/iroh(?:/|$)|@huggingface/tokenizers(?:/|$))';
 
 export const BOUNDARY_LAYERS = {
   PROTOCOL: 'protocol',
