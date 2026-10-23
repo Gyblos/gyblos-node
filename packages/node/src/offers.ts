@@ -1,4 +1,4 @@
-// Owns the unchanged Solana wallet adaptation for private signed offers.
+// Signs private inference offers with the owner's Solana wallet key and verifies them against the trusted owner.
 // Trust policy stays in core; signing bytes and Ed25519 stay in protocol.
 import {
   address,

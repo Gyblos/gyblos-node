@@ -1,4 +1,4 @@
-// Owns limits in config; it must not know product workflows or lab orchestration.
+// Shared payment amounts, timeouts, retry counts, HTTP statuses, file modes and size limits.
 export const MAX_ATOMIC = '10000';
 
 export const ACTUAL_ATOMIC = '4000';

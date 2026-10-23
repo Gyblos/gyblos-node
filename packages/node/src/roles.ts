@@ -1,4 +1,5 @@
-// Owns roles in node; it must not know lab orchestration or CLI processes.
+// P2P role setup and loading: per-role key files and role config under .local/p2p with private file modes.
+// Never overwrites existing keys; seller setup keeps the payout wallet cold and stores no buyer key.
 import { generateKeyPairSync } from 'node:crypto';
 import { lstat, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';

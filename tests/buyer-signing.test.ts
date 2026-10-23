@@ -1,4 +1,5 @@
-// Owns offline x402 buyer signing-order and rejection regressions; no funded wallets or live services.
+// Checks that the shared x402 buyer keeps GET/POST signing-hook, timeout and receipt order, and refuses
+// untrusted terms or pre-aborted requests without signing.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 

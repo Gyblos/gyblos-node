@@ -1,4 +1,5 @@
-// Owns escrow rent in payments-x402; it must not know inference engines or lab orchestration.
+// Checks escrow rent across a deposit/claim pair: one sponsor-funded creation of a fresh escrow account
+// and one channel-authorized closure that returns the rent to the sponsor.
 import assert from 'node:assert/strict';
 
 import { getTokenSize } from '@solana-program/token';

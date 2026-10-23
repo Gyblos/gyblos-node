@@ -1,4 +1,4 @@
-// Owns loopback host in runtime; it must not know product workflows or lab orchestration.
+// Host-header checks for loopback HTTP servers, rejecting DNS-rebinding and wrong-port Host values.
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
 import { HTTP_STATUS, LOOPBACK_HOST_NAMES } from '@gyblos/config';

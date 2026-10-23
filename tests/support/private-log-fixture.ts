@@ -1,4 +1,5 @@
-// Owns offline private log fixture regression cases; no funded wallets or live services.
+// Provides private-log test helpers: a temporary log directory, journal slot seeding, directory
+// snapshots and fs patching.
 import fsPromises, {
   lstat,
   readdir,

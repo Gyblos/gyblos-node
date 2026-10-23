@@ -1,4 +1,5 @@
-// Owns call in buyer; it must not know laboratory orchestration.
+// CLI for one paid inference call on a synthetic case: checks budget and model, journals the
+// authorization before paying, proves the payment on chain and records the call and its measurement.
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 

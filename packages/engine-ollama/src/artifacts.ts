@@ -1,4 +1,5 @@
-// Owns artifacts in engine-ollama; it must not know wallets or payments.
+// Verifies an Ollama model manifest against the pinned digest, including a re-pushed manifest whose last
+// layer carries the original pinned manifest.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 

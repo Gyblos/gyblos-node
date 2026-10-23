@@ -1,4 +1,4 @@
-// Owns limiter in transport-iroh; it must not know wallets or inference engines.
+// Per-peer and global request quotas per window; consumed quota survives reconnects and eviction.
 import { P2P } from '@gyblos/config';
 
 interface PeerWindow {

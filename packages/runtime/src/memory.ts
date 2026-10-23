@@ -1,4 +1,4 @@
-// Owns memory in runtime; it must not know product workflows or lab orchestration.
+// Memory snapshots from /proc and cgroup files (or macOS) and the headroom check before engine warmup.
 import { readFile } from 'node:fs/promises';
 import { freemem } from 'node:os';
 

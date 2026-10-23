@@ -1,5 +1,5 @@
-// Preserves the harness configuration entrypoint during wallet extraction.
-// Loading belongs to config; JSON persistence remains in runtime.
+// Harness view of the devnet wallet config: load/locate it and get role signers from @gyblos/config,
+// and write JSON via @gyblos/runtime.
 export {
   configPath,
   defaultMint,

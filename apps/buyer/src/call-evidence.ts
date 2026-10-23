@@ -1,4 +1,5 @@
-// Owns call evidence in buyer; it must not know laboratory orchestration.
+// Reads the buyer's journal, prior calls and per-request transport metrics, and maps a confirmed
+// payment proof into the observation stored with each call.
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { STATUS_CODES } from 'node:http';

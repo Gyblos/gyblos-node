@@ -1,4 +1,5 @@
-// Owns offline loopback host cases regression cases; no funded wallets or live services.
+// Registers loopback Host cases: the facilitator accepts only loopback Host values on its exact port
+// and rejects rebinding, missing or wrong-port Host before parsing the body.
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { request, type Server } from 'node:http';

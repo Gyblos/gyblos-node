@@ -1,4 +1,4 @@
-// Owns laboratory exact evidence types; product code must not depend on this module.
+// Evidence types for the exact gate (GYB-GATE-0004): per-case results and facilitator observations.
 import type {
   PaymentRequired,
   SettleResponse,

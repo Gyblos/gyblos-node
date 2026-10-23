@@ -1,4 +1,5 @@
-// Owns iroh client in transport-iroh; it must not know wallets or inference engines.
+// Buyer-side Iroh transport: connects to the expected NodeId, sends one bounded HTTP exchange per stream
+// and reports the observed route. After an uncertain failure it refuses to reconnect.
 import type { Connection, Endpoint, EndpointAddr } from '@number0/iroh';
 
 import { P2P } from '@gyblos/config';

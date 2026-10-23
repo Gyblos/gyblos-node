@@ -1,4 +1,4 @@
-// Owns p2p in config; it must not know product workflows or lab orchestration.
+// Peer-to-peer limits, timeouts and file names for the Iroh buyer/seller roles under .local/p2p.
 export const P2P = {
   schemaVersion: 1,
   protocol: 'gyblos/http/1',

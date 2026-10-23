@@ -1,4 +1,4 @@
-// Owns the existing snake_case inference usage wire contract.
+// Owns the snake_case inference usage wire contract (Ollama-style field names).
 // It is distinct from the camelCase domain EngineUsage and contains no engine SDK.
 export interface EngineWireUsage {
   prompt_eval_count: number;

@@ -1,4 +1,4 @@
-// Owns offline native reader regression cases; no funded wallets or live services.
+// Forks a child-process Iroh peer that opens requests but never reads responses, driven over IPC.
 import assert from 'node:assert/strict';
 import { fork } from 'node:child_process';
 import { once } from 'node:events';

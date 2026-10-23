@@ -1,4 +1,4 @@
-// Owns inference buyer in payments-x402; it must not know inference engines or lab orchestration.
+// Inference wrapper over the shared buyer: one bounded POST per call, reporting channel and ceiling first.
 import type { KeyPairSigner } from '@solana/kit';
 
 import { TIMEOUTS } from '@gyblos/config';

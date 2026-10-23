@@ -1,4 +1,5 @@
-// Owns laboratory exact accounts; product code must not depend on this module.
+// Creates the seller and authorizer Circle devnet USDC token accounts, paid by the facilitator wallet.
+// Devnet only; returns the setup signature.
 import { getCreateAssociatedTokenIdempotentInstructionAsync } from '@solana-program/token';
 import {
   address,

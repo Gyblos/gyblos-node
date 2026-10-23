@@ -1,4 +1,4 @@
-// Owns types in payments-x402; it must not know inference engines or lab orchestration.
+// Shapes of the jsonParsed RPC accounts, instructions and transactions the accounting checks read.
 export interface TokenAccount {
   owner: string;
   lamports: number;

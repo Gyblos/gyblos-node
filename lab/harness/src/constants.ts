@@ -1,4 +1,5 @@
-// Owns laboratory constants; product code must not depend on this module.
+// Harness-only vocabulary: evidence IDs and statuses, case names, funding operations and schema
+// versions, plus re-exports of the shared wallet, journal and guard constants it uses.
 import {
   CONFIG_SCHEMA_VERSION,
   type ConfigAssetLabel,

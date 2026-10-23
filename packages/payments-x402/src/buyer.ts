@@ -1,4 +1,5 @@
-// Owns buyer in payments-x402; it must not know inference engines or lab orchestration.
+// Shared x402 "upto" buyer: signs within the trust policy, reports the authorization before the request and
+// never retries, since a lost response may already have settled. Receipts are unverified hints.
 import type { KeyPairSigner, Signature } from '@solana/kit';
 import type { PaymentRequirements } from '@x402/core/types';
 import {

@@ -1,4 +1,4 @@
-// Owns diagnostics in node; it must not know lab orchestration or CLI processes.
+// Maps any thrown value to a fixed diagnostic code, so logs and measurements never carry error text.
 import { AssertionError } from 'node:assert';
 
 import { GateError } from '@gyblos/payments-x402/chain';

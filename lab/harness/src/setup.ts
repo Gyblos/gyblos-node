@@ -1,4 +1,5 @@
-// Owns laboratory setup; product code must not depend on this module.
+// Creates the isolated devnet gate config: generates or reuses one key file per wallet role under
+// .local/devnet (private file modes) and never overwrites existing keys. Prints addresses only.
 import { generateKeyPairSync } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';

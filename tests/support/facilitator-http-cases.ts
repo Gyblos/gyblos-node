@@ -1,4 +1,5 @@
-// Owns offline facilitator http cases regression cases; no funded wallets or live services.
+// Registers facilitator HTTP diagnostic cases: early closes, serialization errors, parser rejections
+// and concurrent same-channel attempts are recorded without retrying.
 import assert from 'node:assert/strict';
 import { request, ServerResponse } from 'node:http';
 import test from 'node:test';

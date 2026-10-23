@@ -1,4 +1,5 @@
-// Owns metering in core; it must not know SDKs, engines or filesystem.
+// Prices token counts, compares engine usage with an independent recount within tolerance, and
+// assesses whether an actual charge is fair. Pure arithmetic; no engines or tokenizers.
 import { UNITS } from '@gyblos/config';
 
 import { CHARGE_ANOMALIES, PRICES, TOLERANCE } from './constants.js';

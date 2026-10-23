@@ -1,4 +1,4 @@
-// Owns wire in transport-iroh; it must not know wallets or inference engines.
+// Encodes and decodes the bounded HTTP/1-style wire format, keeping only allowlisted headers.
 import { HTTP_STATUS, P2P, ROUTES } from '@gyblos/config';
 
 import type { HttpMessage, HttpRequest, HttpResponse } from './types.js';

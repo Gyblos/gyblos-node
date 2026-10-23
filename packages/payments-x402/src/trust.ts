@@ -1,4 +1,5 @@
-// Owns trust in payments-x402; it must not know inference engines or lab orchestration.
+// Buyer trust policy for x402 terms and receipts: pinned network, mint, payee, fee payer, authorizer and
+// amount bounds. Rejects before signing.
 import type { PaymentRequirements, SettleResponse } from '@x402/core/types';
 
 import { PAYMENT_LIMITS, TOKEN_PROGRAM_ADDRESS } from '@gyblos/config';

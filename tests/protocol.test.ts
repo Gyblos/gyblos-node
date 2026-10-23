@@ -1,4 +1,5 @@
-// Owns offline protocol.test regression cases; no funded wallets or live services.
+// Checks the signed-offer protocol: golden vector bytes and signature, domain separation, canonical encoding,
+// legacy error aliases, engine/wire contracts and that the protocol package has no SDK or adapter imports.
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import test from 'node:test';

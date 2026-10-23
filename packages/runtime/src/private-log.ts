@@ -1,4 +1,5 @@
-// Owns private log in runtime; it must not know product workflows or lab orchestration.
+// Bounded, asynchronous private diagnostic log: queued JSONL appends with size limits, rotation and
+// health reporting. Logging failures degrade health but never affect callers.
 import { PRIVATE_LOG_LIMITS } from '@gyblos/config';
 
 import {

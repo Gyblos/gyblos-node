@@ -1,4 +1,5 @@
-// Owns offline private log rotation cases regression cases; no funded wallets or live services.
+// Registers private-log rotation cases: oversized records drop, rotation is bounded and
+// reclaims the oldest settled journal within the file cap.
 import assert from 'node:assert/strict';
 import { lstat, readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';

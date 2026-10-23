@@ -1,4 +1,4 @@
-// Owns index in config; it must not know product workflows or lab orchestration.
+// Public surface of @gyblos/config: shared constants only; nothing here reads files or opens sockets.
 export * from './network.js';
 
 export * from './hosts.js';

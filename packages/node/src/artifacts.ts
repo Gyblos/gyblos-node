@@ -1,4 +1,4 @@
-// Owns artifacts in node; it must not know lab orchestration or CLI processes.
+// Loads the recount tokenizer from the locally downloaded tokenizer files.
 import { readFile } from 'node:fs/promises';
 
 import { TOKENIZER_FILES } from '@gyblos/config';

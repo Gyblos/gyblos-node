@@ -1,4 +1,5 @@
-// Owns offline chain accounting.test regression cases; no funded wallets or live services.
+// Checks on-chain payment accounting: SPL transfer extraction, gasless buyer snapshots, throttled-read
+// retries without repayment, unknown-instruction rejection, plus the proof-read, rent and token suites.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 

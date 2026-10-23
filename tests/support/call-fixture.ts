@@ -1,4 +1,5 @@
-// Owns offline call fixture regression cases; no funded wallets or live services.
+// Runs the real P2P call entrypoint in a child process with chain, offer and payment ports stubbed and
+// fetch forbidden, returning the resulting journal and call record.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { lstat, mkdtemp, rm, writeFile } from 'node:fs/promises';

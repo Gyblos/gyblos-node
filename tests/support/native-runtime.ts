@@ -1,4 +1,5 @@
-// Owns offline native runtime regression cases; no funded wallets or live services.
+// Detects whether the native Iroh binding and IPv6 loopback are available, so native tests can skip,
+// and provides a polling waitFor helper.
 import { createSocket } from 'node:dgram';
 import { setTimeout as delay } from 'node:timers/promises';
 

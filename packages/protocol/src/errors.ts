@@ -1,4 +1,4 @@
-// Owns the shared coded error constructor and preserves Error's legacy shape.
+// Owns ProtocolError: a plain Error carrying a code from PROTOCOL_ERROR_CODES.
 // It must not perform RPC, persistence or payment recovery.
 import type { ProtocolErrorCode } from './constants.js';
 

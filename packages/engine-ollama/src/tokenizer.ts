@@ -1,4 +1,4 @@
-// Owns tokenizer in engine-ollama; it must not know wallets or payments.
+// Builds the recount tokenizer from hash-checked public tokenizer files; counts output and templated input.
 import { createHash } from 'node:crypto';
 
 import { Tokenizer } from '@huggingface/tokenizers';

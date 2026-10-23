@@ -1,4 +1,5 @@
-// Owns exact in node; it must not know lab orchestration or CLI processes.
+// Loopback x402 "exact" seller and an audited public facilitator client that records each verify/settle
+// call; rejects replayed authorizations without retaining the signed payload.
 import { decodePaymentSignatureHeader } from '@x402/core/http';
 import { HTTPFacilitatorClient } from '@x402/core/server';
 import type {

@@ -1,4 +1,5 @@
-// Owns offline inference.test regression cases; no funded wallets or live services.
+// Checks inference metering and the Ollama adapter: token pricing tolerance, local-only origins, complete
+// engine frames, allowlisted measurement rows, context-overflow rejection and pre-aborted generation.
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';

@@ -1,4 +1,5 @@
-// Owns offline facilitator startup cases regression cases; no funded wallets or live services.
+// Registers a child-process case checking that the standalone facilitator closes its diagnostic log
+// after a startup refusal.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { writeFile } from 'node:fs/promises';

@@ -1,4 +1,4 @@
-// Owns lock in config; it must not know product workflows or lab orchestration.
+// Sources and bounds for identifying a buyer-lock owner (boot id, PID namespace) on Linux and macOS.
 export const LOCK_OWNER = {
   schemaVersion: 1,
   linuxBootIdPath: '/proc/sys/kernel/random/boot_id',

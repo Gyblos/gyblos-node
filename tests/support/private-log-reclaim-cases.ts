@@ -1,4 +1,5 @@
-// Owns offline private log reclaim cases regression cases; no funded wallets or live services.
+// Registers private-log reclamation cases: only the oldest settled own journal is removed, and
+// linked, foreign, recent, open or concurrently replaced journals are kept.
 import assert from 'node:assert/strict';
 import {
   chmod,

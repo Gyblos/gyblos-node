@@ -1,4 +1,5 @@
-// Owns offline admission cases regression cases; no funded wallets or live services.
+// Registers transport admission cases: per-peer and per-source caps, IPv6 and relay source keys, and
+// independent pending and established pools.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 

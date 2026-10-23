@@ -1,4 +1,5 @@
-// Owns proxy in buyer; it must not know laboratory orchestration.
+// Loopback HTTP proxy that forwards bounded inference POSTs and their payment header to the seller over
+// Iroh, one exchange at a time, and appends per-request route metrics. It never signs payments.
 import { appendFile } from 'node:fs/promises';
 import {
   createServer,

@@ -1,4 +1,4 @@
-// Owns chain in payments-x402; it must not know inference engines or lab orchestration.
+// Minimal Solana JSON-RPC helpers: devnet genesis and program checks, balances and confirmation polling.
 import {
   COMMITMENT,
   DIAGNOSTIC_LIMITS,

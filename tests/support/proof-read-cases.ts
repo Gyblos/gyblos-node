@@ -1,4 +1,5 @@
-// Owns offline proof read cases regression cases; no funded wallets or live services.
+// Registers finalized-proof read cases: lagging or missing deposit reads retry within budget and claim
+// slot, without relaxing conservation or picking among duplicate deposits.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 

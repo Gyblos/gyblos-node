@@ -1,4 +1,5 @@
-// Owns laboratory challenge; product code must not depend on this module.
+// Unpaid-challenge gate: starts a local facilitator and seller, fetches the fixed route without paying,
+// validates the 402 terms and saves evidence that no resource ran and nothing settled. Signs nothing.
 import { once } from 'node:events';
 
 import { decodePaymentRequiredHeader } from '@x402/core/http';

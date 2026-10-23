@@ -1,4 +1,4 @@
-// Owns engine in engine-ollama; it must not know wallets or payments.
+// Adapts the Ollama client to the protocol Engine port: one user message, digest identity, recountable usage.
 import type { Engine, EngineInput } from '@gyblos/protocol/engine';
 
 import { GENERATION, MODEL } from './constants.js';

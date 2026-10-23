@@ -1,4 +1,5 @@
-// Owns offline lock faults regression cases; no funded wallets or live services.
+// Registers lock-retirement fault cases: inode swaps, added hardlinks and symlinks around the durable
+// audit are rejected before unlink.
 import assert from 'node:assert/strict';
 import {
   link,

@@ -1,4 +1,4 @@
-// Owns loopback in transport-iroh; it must not know wallets or inference engines.
+// Forwards one bridged inference POST to the seller's literal loopback origin with bounded response size.
 import { LOCALHOST, P2P, ROUTES } from '@gyblos/config';
 
 import type { HttpRequest, HttpResponse } from './types.js';

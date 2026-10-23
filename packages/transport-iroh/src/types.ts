@@ -1,4 +1,4 @@
-// Owns types in transport-iroh; it must not know wallets or inference engines.
+// HTTP message, route observation and Transport interface shared by buyer and seller sides.
 import { TRANSPORT_ROUTES } from './constants.js';
 
 export type TransportRoute =

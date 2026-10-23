@@ -1,4 +1,5 @@
-// Owns facilitator diagnostics in payments-x402; it must not know inference engines or lab orchestration.
+// Observer for facilitator verify/settle outcomes that writes allowlisted diagnostic records; it never
+// serializes SDK objects and can never change or delay a payment result.
 import { randomUUID } from 'node:crypto';
 
 import { isAddress } from '@solana/kit';

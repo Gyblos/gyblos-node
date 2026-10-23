@@ -1,4 +1,5 @@
-// Owns escrow tokens in payments-x402; it must not know inference engines or lab orchestration.
+// Checks token flows across a deposit/claim pair: the buyer deposits exactly the ceiling into escrow and
+// the claim pays the seller and refunds the rest, any surplus goes to the treasury and escrow ends empty.
 import assert from 'node:assert/strict';
 
 import { DEVNET_TREASURY_OWNER } from '@gyblos/config';

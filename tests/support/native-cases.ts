@@ -1,4 +1,5 @@
-// Owns offline native cases regression cases; no funded wallets or live services.
+// Registers native Iroh transport fault cases: resets and half-closes, framing limits, receipt loss and
+// many NodeIds behind one IP.
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import test from 'node:test';

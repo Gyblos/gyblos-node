@@ -1,4 +1,5 @@
-// Owns laboratory evidence types; product code must not depend on this module.
+// Evidence shapes shared by the exact and inference gates: base record, authorization metadata,
+// balance snapshot and reconciliation result.
 import type { DEVNET, DIAGNOSTIC_LIMITS } from '@gyblos/config';
 
 import type {

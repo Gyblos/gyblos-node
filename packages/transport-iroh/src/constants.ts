@@ -1,4 +1,4 @@
-// Owns constants in transport-iroh; it must not know wallets or inference engines.
+// Transport route names, relay configuration error codes and relay token length bounds.
 export const TRANSPORT_ROUTES = {
   LOOPBACK: 'loopback',
   DIRECT: 'iroh-direct',

@@ -1,4 +1,4 @@
-// Owns darwin memory in runtime; it must not know product workflows or lab orchestration.
+// Reads macOS memory headroom from vm_stat and the kernel pressure level, with bounded tool output.
 import { execFile } from 'node:child_process';
 import { totalmem } from 'node:os';
 import { promisify } from 'node:util';

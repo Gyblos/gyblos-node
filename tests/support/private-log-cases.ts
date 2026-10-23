@@ -1,4 +1,5 @@
-// Owns offline private log cases regression cases; no funded wallets or live services.
+// Registers facilitator private-log cases: exclusive files survive restarts, stalled fsync or open
+// failure never changes payment responses, and limits never truncate records.
 import assert from 'node:assert/strict';
 import { constants } from 'node:fs';
 import { lstat, readdir, readFile } from 'node:fs/promises';

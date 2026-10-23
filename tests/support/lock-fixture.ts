@@ -1,4 +1,5 @@
-// Owns offline lock fixture regression cases; no funded wallets or live services.
+// Provides a temporary buyer lock owned by a dead PID, plus fs mocks that intercept file opens and
+// audit syncs.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { promises as fs } from 'node:fs';
