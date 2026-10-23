@@ -2,8 +2,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { CONTROL_CAPACITY } from '@gyblos/core/constants';
 import { ControlAdmission } from '@gyblos/core/control-admission';
-import { CONTROL_CAPACITY, CONTROL_CODES } from '@gyblos/protocol/constants';
+import { CONTROL_CODES } from '@gyblos/protocol/constants';
 
 const peer = (index: number) => index.toString(16).padStart(64, '0');
 void test('control quotas aggregate connections and active queries across a peer with no queue', () => {

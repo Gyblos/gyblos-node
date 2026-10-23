@@ -48,14 +48,16 @@ export async function signOfferV2(
 ): Promise<SignedOfferV2> {
   const offer = parseOfferV2(value);
   validateOfferV2Time(offer, offer.issuedAt);
-  const signature = await sign(CONTROL_DOMAINS.OFFER, offer, signer);
+  const signature = Uint8Array.from(
+    await sign(CONTROL_DOMAINS.OFFER, offer, signer),
+  );
   if (
     signature.length !== CONTROL_LIMITS.signatureBytes ||
     !(await verify(
       CONTROL_DOMAINS.OFFER,
       offer,
       publicAddressBytes(offer.owner),
-      Uint8Array.from(signature),
+      signature,
     ))
   )
     return controlFail(CONTROL_CODES.SIGNATURE);

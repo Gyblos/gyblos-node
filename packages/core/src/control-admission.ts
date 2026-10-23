@@ -1,6 +1,8 @@
 // Tracks proposed control quotas with a caller-supplied monotonic clock; no timers, sockets or global state.
-import { CONTROL_CAPACITY, CONTROL_CODES } from '@gyblos/protocol/constants';
+import { CONTROL_CODES } from '@gyblos/protocol/constants';
 import { controlFail, controlHex } from '@gyblos/protocol/control-validation';
+
+import { CONTROL_CAPACITY } from './constants.js';
 
 interface Bucket {
   tokens: number;
@@ -156,12 +158,12 @@ export class ControlAdmission {
     };
   }
   private checkConnection(connection: ConnectionState) {
-    this.now();
+    const now = this.now();
     if (!connection.active) return controlFail(CONTROL_CODES.CANCELLED);
+    return now;
   }
   private beginQuery(connection: ConnectionState): ControlQueryLease {
-    this.checkConnection(connection);
-    const now = this.now();
+    const now = this.checkConnection(connection);
     this.consume(connection.peer, now);
     if (
       this.queries.size >= CONTROL_CAPACITY.queries ||
@@ -180,17 +182,18 @@ export class ControlAdmission {
     connection.queries.add(query);
     this.queries.add(query);
     const check = () => {
-      this.now();
+      const now = this.now();
       if (!query.active || !connection.active)
         return controlFail(CONTROL_CODES.CANCELLED);
+      return now;
     };
     return {
       check,
       finish: () => this.release(query, false, this.now()),
       cancel: () => this.release(query, true, this.now()),
       publish: <T>(value: T) => {
-        check();
-        this.release(query, false, this.now());
+        const now = check();
+        this.release(query, false, now);
         return value;
       },
     };

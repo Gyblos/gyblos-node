@@ -24,3 +24,20 @@ export type ChargeAnomaly =
   (typeof CHARGE_ANOMALIES)[keyof typeof CHARGE_ANOMALIES];
 export type ObservedDoneReason =
   (typeof OBSERVED_DONE_REASONS)[keyof typeof OBSERVED_DONE_REASONS];
+
+// Proposed local control admission policy; these values do not define wire framing.
+export const CONTROL_CAPACITY = {
+  connections: 32,
+  connectionsPerPeer: 4,
+  queries: 32,
+  queriesPerPeer: 4,
+  globalRate: 100,
+  globalBurst: 100,
+  peerRate: 5,
+  peerBurst: 10,
+  peers: 1024,
+  peerIdleMs: 60000,
+  queryMs: 10000,
+  connectionIdleMs: 10000,
+  millisecondsPerSecond: 1000,
+} as const;

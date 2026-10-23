@@ -180,21 +180,7 @@ export const CONTROL_LIMITS = {
   digestBytes: 32,
 } as const;
 export const CONTROL_AVAILABILITY = 'ready';
-export const CONTROL_CAPACITY = {
-  connections: 32,
-  connectionsPerPeer: 4,
-  queries: 32,
-  queriesPerPeer: 4,
-  globalRate: 100,
-  globalBurst: 100,
-  peerRate: 5,
-  peerBurst: 10,
-  peers: 1024,
-  peerIdleMs: 60000,
-  queryMs: 10000,
-  connectionIdleMs: 10000,
-  millisecondsPerSecond: 1000,
-} as const;
+
 export const CONTROL_METERING_MODES = {
   RECOUNTED: 'recounted',
   DECLARED: 'declared',
