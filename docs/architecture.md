@@ -11,11 +11,11 @@ are in [stack.md](stack.md).
 | ------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `packages/protocol`       | protocol | Canonical JSON, signed offer wire shape, domain and bytes, Iroh ALPN, `Engine` contract, error codes, model catalog, public discovery records. No SDKs.              |
 | `packages/core`           | core     | Pricing and metering math, offer trust rules, charge-anomaly checks. No SDKs or filesystem.                                                                          |
-| `packages/config`         | config   | Devnet addresses, ports, paths, limits, relay defaults.                                                                                                              |
+| `packages/config`         | config   | Devnet addresses, ports, operator limits, relay defaults and the local home layout (`home.ts`).                                                                      |
 | `packages/runtime`        | runtime  | Atomic JSON writes, private rotating logs, processes, memory probes, loopback `Host` guard.                                                                          |
 | `packages/engine-ollama`  | adapter  | Ollama client, `Engine` adapter, pinned tokenizer and model constants.                                                                                               |
 | `packages/payments-x402`  | adapter  | x402 `upto`, facilitator, buyer signer, on-chain proofs, recovery locks.                                                                                             |
-| `packages/transport-iroh` | adapter  | Iroh endpoint, HTTP over QUIC, relay policy, admission limits.                                                                                                       |
+| `packages/transport-iroh` | adapter  | Iroh endpoint, HTTP over QUIC and its wire framing limits, relay policy, admission.                                                                                  |
 | `packages/identity`       | adapter  | 8004 registry adapter; not used by the node yet ([identity.md](identity.md)).                                                                                        |
 | `packages/node`           | node     | Local-node library for both roles: seller composition (`createNode`), roles and keys, signed offers, tokenizer artifacts and inference pricing used by `apps/buyer`. |
 
@@ -84,3 +84,31 @@ apps/buyer proxy :4031 ── Iroh ──────────▶  packages/n
 
 Everything except the Iroh endpoint listens on loopback only. See
 [running-a-node.md](running-a-node.md).
+
+## Local data
+
+One module, `packages/config/src/home.ts`, owns every local path as a pure
+function of the environment; no other module builds `.local/...` paths.
+
+```text
+$GYBLOS_HOME (default .local/gyblos; a container would use /data)
+  buyer/     role.json, node.key, buyer.json, trust.json, offer.json, journals,
+             locks, calls, status, transport metrics, measurements + salt
+  seller/    role.json, node.key, owner/authorizer/facilitator keys, offer.json,
+             status, traces, readiness, facilitator-diagnostics/
+  artifacts/ tokenizer/, ollama-models/   (public, hash-pinned, shared)
+$GYBLOS_LAB_HOME (default .local/lab)
+  lab config, keys, journals, measurements, facilitator-diagnostics/, identity/
+```
+
+Payment adapters receive journal and lock paths from the apps, which take them
+from this layout. The lab reads `artifacts/` as a shared cache and never a role
+directory. `packages/node/src/home.ts` refuses to start with a missing home
+directory when its legacy path exists; see
+[running-a-node.md](running-a-node.md#local-home).
+
+Named values follow their readers: HTTP-over-Iroh framing limits and stream
+deadlines are `transport-iroh` constants, the offer lifetime is a `core` trust
+rule, call and proof bounds belong to the buyer app, and only operator-tunable
+capacity, rate, timeout and port values stay in `config` (`TRANSPORT_LIMITS`,
+`TRANSPORT_TIMEOUTS`, `PORTS`).

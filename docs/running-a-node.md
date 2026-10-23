@@ -3,13 +3,69 @@
 A seller node serves paid inference over Iroh. A buyer proxy on another machine
 forwards local requests to it. Both are devnet-only and experimental.
 
+## Local home
+
+All node data lives under one local home, `GYBLOS_HOME` (default `.local/gyblos`
+in the working directory; a container image would use `/data`). Each role has
+its own directory, so one machine can hold a buyer and a seller side by side
+without sharing keys or journals:
+
+| Path                              | Contents                                                      |
+| --------------------------------- | ------------------------------------------------------------- |
+| `<home>/buyer/`                   | Buyer keys, role, trust, offer copy, journals, lock, calls.   |
+| `<home>/seller/`                  | Seller keys, role, signed offer, status, traces, diagnostics. |
+| `<home>/artifacts/tokenizer/`     | Pinned public tokenizer (re-downloadable).                    |
+| `<home>/artifacts/ollama-models/` | Pinned Ollama model layers (re-downloadable).                 |
+
+Lab state (`gate:*`, identity tools) lives in a separate `GYBLOS_LAB_HOME`
+(default `.local/lab`). The lab may reuse `<home>/artifacts/` as a shared cache
+but never reads a role directory.
+
+### Moving data from the old layout
+
+Older versions kept role data in `.local/p2p/` (one role per checkout), the
+tokenizer in `.local/devnet/tokenizer/`, models in `.local/ollama/models/` and
+lab state in `.local/devnet/`. Nothing is migrated automatically. When a home
+directory is missing but its old path exists, setup and startup stop with
+`LEGACY_LOCAL_LAYOUT`, naming both paths. A fresh role next to an old, possibly
+uncertain authorization journal could otherwise lose recovery state
+([recovery.md](recovery.md)). The check only tests whether the old path exists
+(it never reads it) and applies whether or not `GYBLOS_HOME` is set, because an
+old journal in the working directory is just as unsafe to ignore when the new
+home is elsewhere.
+
+Stop every node, buyer and lab process first. Then, from the same working
+directory (`ls .local/p2p` shows `buyer.json` for a buyer or `owner.json` for a
+seller):
+
+```sh
+umask 077
+mkdir -p .local/gyblos/artifacts
+mv .local/p2p .local/gyblos/buyer        # a seller checkout: .local/gyblos/seller
+mv .local/devnet/tokenizer .local/gyblos/artifacts/tokenizer
+mv .local/ollama/models .local/gyblos/artifacts/ollama-models
+```
+
+Lab state, after the tokenizer has moved out of `.local/devnet/`. The lab config
+records absolute key paths, so rewrite them in place and review the result:
+
+```sh
+mv .local/devnet .local/lab
+sed -i.bak 's#/.local/devnet/#/.local/lab/#g' .local/lab/config.json
+mkdir -p .local/lab/identity
+mv .local/identity/keys .local/lab/identity/keys   # only if it exists
+```
+
+If a destination already exists, stop and compare the two directories by hand
+instead of merging them. `.local/identity-validator/` is disposable test scratch
+and is not checked. With a custom `GYBLOS_HOME` or `GYBLOS_LAB_HOME`, move into
+those directories instead.
+
 ## Roles and files
 
-Each role lives in `.local/p2p/` of its working directory, so run the seller and
-the buyer from **different** checkouts or machines. `pnpm node:setup --role`
-creates the role file, the Iroh node key (`node.key`) and the role's Solana keys
-with private permissions. It never overwrites existing keys; a mismatched
-existing role stops with an error.
+`pnpm node:setup --role` creates the role directory, the role file, the Iroh
+node key (`node.key`) and the role's Solana keys with private permissions. It
+never overwrites existing keys; a mismatched existing role stops with an error.
 
 | File                                             | Role  | Contents                                                |
 | ------------------------------------------------ | ----- | ------------------------------------------------------- |
@@ -46,7 +102,7 @@ pnpm node:start
 export GYBLOS_RELAY_TOKEN=...
 pnpm node:setup --role buyer --mint MINT
 pnpm buyer:setup             # download and verify only the pinned tokenizer
-# copy the seller's .local/p2p/offer.json into this .local/p2p/
+# copy the seller's .local/gyblos/seller/offer.json into .local/gyblos/buyer/
 pnpm buyer:trust --owner SELLER_OWNER_ADDRESS --node-id SELLER_NODE_ID --pay-to PAYOUT_ADDRESS --max-atomic 10000
 pnpm buyer:start
 ```
@@ -70,9 +126,10 @@ file. It does not derive trust automatically from the offer or make payments.
 }
 ```
 
-`buyer:setup` downloads public tokenizer files into `.local/devnet/tokenizer/`
-in the buyer checkout. It does not install Ollama, download model weights, read
-keys or contact Solana. Run it once before the synthetic paid-call CLI.
+`buyer:setup` downloads public tokenizer files into
+`.local/gyblos/artifacts/tokenizer/`. It does not install Ollama, download model
+weights, read keys or contact Solana. Run it once before the synthetic paid-call
+CLI.
 
 There is no command that funds P2P roles. Give the buyer address test tokens of
 `MINT` with your own Solana tooling.
@@ -84,7 +141,7 @@ time; a second waits and a third gets 429. Malformed JSON gets 400
 payment, never retried.
 
 One paid synthetic call through a running proxy: `pnpm buyer:call 0` (case 0, 1
-or 2). It records journals and measurements in `.local/p2p/`.
+or 2). It records journals and measurements in `.local/gyblos/buyer/`.
 
 ## Relays
 
@@ -121,13 +178,15 @@ not been measured.
 
 ## Other settings
 
+- `GYBLOS_HOME`: local home for both roles and shared artifacts (default
+  `.local/gyblos`).
 - `GYBLOS_RPC_URL`: devnet RPC; the genesis hash is checked before use.
 - `GYBLOS_P2P_RUN_ID`: optional label copied into `status.json` and evidence.
 - Ports: buyer proxy 4031, seller HTTP 4032 (loopback only), facilitator 4022,
   Ollama 11436. Stop any lab runs (`gate:*`) before starting a seller.
 
 Facilitator diagnostics for the seller are written privately under
-`.local/p2p/facilitator-diagnostics/`; see [payments.md](payments.md).
+`.local/gyblos/seller/facilitator-diagnostics/`; see [payments.md](payments.md).
 
 Local role/trust JSON is validated before use: required fields, Solana
 addresses, lowercase hex NodeIds, HTTP(S) RPC URLs and positive decimal-string

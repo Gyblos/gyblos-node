@@ -26,7 +26,10 @@ top-level `test()` in a `*.test.ts` file.
 No funded wallet, Ollama, Docker, Python, devnet funds or network. It uses
 synthetic inputs, ephemeral unfunded signers, mocked RPC and temporary files.
 Paid-call cases spawn the real CLI with stubbed payment ports and assert that no
-RPC is made.
+RPC is made. Cases that touch local data run in a temporary working directory
+(and set `GYBLOS_HOME` or `GYBLOS_LAB_HOME` inside it when needed);
+legacy-layout cases create synthetic paths there and never read a real
+`.local/`.
 
 ## Native skips
 
