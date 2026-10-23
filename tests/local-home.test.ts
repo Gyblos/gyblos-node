@@ -13,8 +13,14 @@ import {
   homeLayout,
   labLayout,
   LEGACY_LOCAL_PATHS,
+  ROLE_DIRECTORIES,
+  type HomeRole,
 } from '@gyblos/config';
-import { NODE_ERROR_CODES, P2P_ROLES } from '@gyblos/node/constants';
+import {
+  NODE_ERROR_CODES,
+  P2P_ROLES,
+  type P2PRole,
+} from '@gyblos/node/constants';
 import {
   assertOllamaModelsHome,
   assertRoleHome,
@@ -112,6 +118,24 @@ void test('buyer, seller, artifacts and lab state never share a directory', () =
           `${other} is inside ${directory}`,
         );
   assert.equal(new Set(directories).size, directories.length);
+});
+
+// Config cannot import node, so the home role set and the node role set are pinned here instead.
+void test('home role directories match the node roles exactly', () => {
+  type SameRoles = [HomeRole] extends [P2PRole]
+    ? [P2PRole] extends [HomeRole]
+      ? true
+      : false
+    : false;
+  const sameRoles: SameRoles = true;
+  assert.equal(sameRoles, true);
+  const nodeRoles = Object.values(P2P_ROLES).sort();
+  assert.deepEqual(Object.keys(ROLE_DIRECTORIES).sort(), nodeRoles);
+  assert.deepEqual(Object.values(ROLE_DIRECTORIES).sort(), nodeRoles);
+  assert.deepEqual(
+    Object.keys(homeLayout(DEFAULT_ENV).roles).sort(),
+    nodeRoles,
+  );
 });
 
 void test('a fresh home passes the legacy guard for every role and artifact', async () => {
