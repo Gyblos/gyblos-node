@@ -44,6 +44,7 @@ import { bindEndpoint } from '@gyblos/transport-iroh/endpoint';
 import { serveIroh } from '@gyblos/transport-iroh/iroh-server';
 
 import { modelTokenizer } from './artifacts.js';
+import { P2P_ROLES } from './constants.js';
 import {
   assertReadinessCurrent,
   prepareSellerEngine,
@@ -74,7 +75,8 @@ export async function startSeller() {
       });
     await stage('configuration');
     const config = await loadRole();
-    if (config.role !== 'seller') throw new Error('Seller role required.');
+    if (config.role !== P2P_ROLES.SELLER)
+      throw new Error('Seller role required.');
     await stage('devnet-program');
     await assertProgram(config.rpcUrl);
     await assertPortFree(`${HOSTS.ollama}${ROUTES.ollamaVersion}`);
@@ -247,7 +249,7 @@ export async function startSeller() {
     await saveJson(rolePath(P2P.statusFilename), {
       status: 'ready',
       runId: process.env.GYBLOS_P2P_RUN_ID,
-      role: 'seller',
+      role: P2P_ROLES.SELLER,
       nodeId: config.nodeId,
       relayOnly,
       capabilities: engine.capabilities(),

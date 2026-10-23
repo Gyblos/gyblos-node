@@ -5,6 +5,7 @@ import { parseArgs } from 'node:util';
 
 import { P2P } from '@gyblos/config';
 import type { OfferTrust } from '@gyblos/core/offers';
+import { P2P_ROLES } from '@gyblos/node/constants';
 import { verifyInferenceOffer } from '@gyblos/node/offers';
 import { loadRole, rolePath } from '@gyblos/node/roles';
 import { finalizedPaymentProof } from '@gyblos/payments-x402/accounting/finalized-proof';
@@ -108,7 +109,7 @@ export async function main(args = process.argv.slice(2)) {
   });
   const operation = async () => {
     const config = await loadRole();
-    assert.equal(config.role, 'buyer');
+    assert.equal(config.role, P2P_ROLES.BUYER);
     const journal = await loadJson<RecoveryJournal>(
       rolePath(P2P.journalFilename),
     );
