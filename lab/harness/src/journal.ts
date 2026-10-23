@@ -7,17 +7,11 @@ import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { ProtocolError } from '@gyblos/protocol/errors';
 import { saveJson } from '@gyblos/runtime';
 
-import { JOURNAL_FILENAMES, JOURNAL_PATHS } from './constants.js';
+import { JOURNAL_FILENAMES, labPaths } from './constants.js';
 import type { GateJournalRecord, JournalStateRecord } from './journal-types.js';
 
 export async function assertNoUnresolvedAuthorizations(
-  paths = [
-    JOURNAL_PATHS.fixed,
-    JOURNAL_PATHS.f1,
-    JOURNAL_PATHS.f2,
-    JOURNAL_PATHS.exact,
-    JOURNAL_PATHS.inference,
-  ],
+  paths: readonly string[] = Object.values(labPaths().journals),
 ) {
   for (const path of paths) {
     try {

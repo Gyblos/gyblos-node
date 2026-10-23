@@ -31,13 +31,11 @@ import { saveJson } from '@gyblos/runtime';
 import {
   ACTUAL_ATOMIC,
   EVIDENCE_STATUSES,
-  FAILED_REQUEST_PATH,
   FIXED_MIN_FACILITATOR_LAMPORTS,
   fixedEvidencePath,
   GATE_HOSTS,
   GATE_ROUTES,
-  JOURNAL_PATHS,
-  LOCK_PATH,
+  labPaths,
   SCHEMA_VERSIONS,
   UPSTREAM_COMMIT,
   WALLET_ROLES,
@@ -47,7 +45,7 @@ import { runGate } from '../gate.js';
 import { assertNoUnresolvedAuthorizations, saveJournal } from '../journal.js';
 import { loadConfig, signer } from '../wallet.js';
 
-const JOURNAL_PATH = JOURNAL_PATHS.fixed;
+const journalPath = () => labPaths().journals.fixed;
 
 async function executeLocked(signal?: AbortSignal) {
   const config = await loadConfig();
@@ -64,7 +62,7 @@ async function executeLocked(signal?: AbortSignal) {
     },
     fetch,
     async (authorization) => {
-      await saveJournal(JOURNAL_PATH, {
+      await saveJournal(journalPath(), {
         state: JOURNAL_STATES.AUTHORIZATION_CREATED,
         channelId: authorization.channelId,
         asset: config.mint,
@@ -121,7 +119,7 @@ async function executeLocked(signal?: AbortSignal) {
         const diagnostics = await fetch(
           `${HOSTS.facilitator}${ROUTES.events}`,
         ).then((response) => response.json());
-        await saveJson(FAILED_REQUEST_PATH, {
+        await saveJson(labPaths().failedRequest, {
           status: response.status,
           settlement: response.settlement,
           events: diagnostics,
@@ -225,7 +223,7 @@ async function executeLocked(signal?: AbortSignal) {
   };
   const evidencePath = fixedEvidencePath(Date.now());
   await saveJson(evidencePath, evidence);
-  await saveJournal(JOURNAL_PATH, {
+  await saveJournal(journalPath(), {
     state: JOURNAL_STATES.VERIFIED,
     evidencePath,
     channelId: result.accounting.channelId,
@@ -234,5 +232,5 @@ async function executeLocked(signal?: AbortSignal) {
 }
 
 export async function executeGate(signal?: AbortSignal) {
-  return withExclusiveLock(LOCK_PATH, () => executeLocked(signal));
+  return withExclusiveLock(labPaths().lock, () => executeLocked(signal));
 }

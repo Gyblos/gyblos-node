@@ -41,9 +41,9 @@ separately; a skipped case proves nothing on that host.
 
 `GYBLOS_IDENTITY_INTEGRATION=1 pnpm test:lab` starts a throwaway
 `solana-test-validator` on loopback ports 18000-19999, cloning the 8004 program
-and registry accounts read-only from public devnet. Its ledger stays in ignored
-`.local/identity-validator/`. Without the binary, or if devnet is unreachable,
-the four cases skip with a reason.
+and registry accounts read-only from public devnet. Its ledger stays in the
+ignored lab home (`.local/lab/identity-validator/` by default). Without the
+binary, or if devnet is unreachable, the four cases skip with a reason.
 
 ## Fixtures policy
 

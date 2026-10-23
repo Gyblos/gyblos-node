@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { HTTP_STATUS, LOCALHOST, P2P, ROUTES } from '@gyblos/config';
+import { homeLayout, HTTP_STATUS, LOCALHOST, ROUTES } from '@gyblos/config';
 import type { Transport } from '@gyblos/transport-iroh';
 import {
   HTTP_OVER_IROH,
@@ -72,7 +72,7 @@ async function withProxy(
   });
   try {
     process.chdir(directory);
-    await mkdir(P2P.root, { recursive: true });
+    await mkdir(homeLayout(process.env).roles.buyer, { recursive: true });
     server.listen(0, LOCALHOST);
     await once(server, 'listening');
     const address = server.address();

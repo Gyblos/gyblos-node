@@ -28,7 +28,7 @@ export async function main(args = process.argv.slice(2)) {
     buyer: values.buyer,
     payTo: values['pay-to'],
   });
-  console.log(JSON.stringify(await publicRole()));
+  console.log(JSON.stringify(await publicRole(values.role)));
 }
 
 if (isMain(import.meta.url)) await main();

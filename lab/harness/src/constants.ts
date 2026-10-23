@@ -1,11 +1,13 @@
 // Harness-only vocabulary: devnet wallet roles and config file, evidence IDs and statuses, case
 // names, funding operations and schema versions. Shared journal and guard values come from their owners.
+import { join } from 'node:path';
+
 import {
   ERROR_DIAGNOSTICS,
   INFERENCE_CASES,
   MEASUREMENT_SCHEMA_VERSION,
 } from '@gyblos/buyer/constants';
-import { LOCAL_DIR, LOCALHOST } from '@gyblos/config';
+import { labLayout, LEGACY_LOCAL_PATHS, LOCALHOST } from '@gyblos/config';
 import { type ConfigAssetLabel } from '@gyblos/config/constants';
 import { type ProtocolErrorCode } from '@gyblos/protocol/constants';
 
@@ -21,7 +23,7 @@ export type WalletRole = (typeof WALLET_ROLES)[keyof typeof WALLET_ROLES];
 
 export const CONFIG_SCHEMA_VERSION = 1;
 
-export const CONFIG_PATH = `${LOCAL_DIR}/config.json`;
+export const CONFIG_FILENAME = 'config.json';
 
 export const EXACT_PRICE = '10000';
 
@@ -147,24 +149,53 @@ export type FundingOperation =
 export type PublicCallOutcome =
   (typeof PUBLIC_CALL_OUTCOMES)[keyof typeof PUBLIC_CALL_OUTCOMES];
 
-// Gate-only paths, entrypoints, routes, funding floors and public endpoints.
-export const LOCK_PATH = `${LOCAL_DIR}/buyer.lock`;
-
-export const JOURNAL_PATHS = {
-  fixed: `${LOCAL_DIR}/attempt.json`,
-  f1: `${LOCAL_DIR}/failure-F1-attempt.json`,
-  f2: `${LOCAL_DIR}/failure-F2-attempt.json`,
-  exact: `${LOCAL_DIR}/exact-attempt.json`,
-  inference: `${LOCAL_DIR}/inference-attempt.json`,
+// Gate-only paths, entrypoints, routes, funding floors and public endpoints. Local paths live in the
+// lab home (GYBLOS_LAB_HOME, default .local/lab), resolved when called, never at import.
+export const LAB_FILENAMES = {
+  lock: 'buyer.lock',
+  failedRequest: 'failed-request.json',
+  challengeEvidence: 'challenge-evidence.json',
+  failureEvidence: 'failure-evidence.json',
+  inferenceTransport: 'inference-last-transport.json',
 } as const;
 
-export const FAILED_REQUEST_PATH = `${LOCAL_DIR}/failed-request.json`;
+export const LAB_JOURNAL_FILENAMES = {
+  fixed: 'attempt.json',
+  f1: 'failure-F1-attempt.json',
+  f2: 'failure-F2-attempt.json',
+  exact: 'exact-attempt.json',
+  inference: 'inference-attempt.json',
+} as const;
 
-export const CHALLENGE_EVIDENCE_PATH = `${LOCAL_DIR}/challenge-evidence.json`;
+const labPath = (name: string) => join(labLayout(process.env).root, name);
 
-export const FAILURE_EVIDENCE_PATH = `${LOCAL_DIR}/failure-evidence.json`;
+export function labPaths() {
+  return {
+    config: labPath(CONFIG_FILENAME),
+    lock: labPath(LAB_FILENAMES.lock),
+    failedRequest: labPath(LAB_FILENAMES.failedRequest),
+    challengeEvidence: labPath(LAB_FILENAMES.challengeEvidence),
+    failureEvidence: labPath(LAB_FILENAMES.failureEvidence),
+    inferenceTransport: labPath(LAB_FILENAMES.inferenceTransport),
+    journals: {
+      fixed: labPath(LAB_JOURNAL_FILENAMES.fixed),
+      f1: labPath(LAB_JOURNAL_FILENAMES.f1),
+      f2: labPath(LAB_JOURNAL_FILENAMES.f2),
+      exact: labPath(LAB_JOURNAL_FILENAMES.exact),
+      inference: labPath(LAB_JOURNAL_FILENAMES.inference),
+    },
+  } as const;
+}
 
-export const INFERENCE_TRANSPORT_PATH = `${LOCAL_DIR}/inference-last-transport.json`;
+// Former lab state under .local/devnet, checked for existence only before the lab home is created.
+export const LEGACY_LAB_PATHS = [
+  join(LEGACY_LOCAL_PATHS.lab, CONFIG_FILENAME),
+  LEGACY_LOCAL_PATHS.labMeasurements,
+  join(LEGACY_LOCAL_PATHS.lab, LAB_FILENAMES.lock),
+  ...Object.values(LAB_JOURNAL_FILENAMES).map((name) =>
+    join(LEGACY_LOCAL_PATHS.lab, name),
+  ),
+] as const;
 
 export const ENTRYPOINTS = {
   seller: 'lab/harness/scripts/seller.ts',
@@ -172,8 +203,8 @@ export const ENTRYPOINTS = {
 } as const;
 
 export const JOURNAL_FILENAMES = {
-  exact: 'exact-attempt.json',
-  inference: 'inference-attempt.json',
+  exact: LAB_JOURNAL_FILENAMES.exact,
+  inference: LAB_JOURNAL_FILENAMES.inference,
 } as const;
 
 export const EVIDENCE_PATHS = {
@@ -181,18 +212,18 @@ export const EVIDENCE_PATHS = {
   inference: 'lab/evidence/gate-0005.json',
 } as const;
 
-export const keyPath = (role: string) => `${LOCAL_DIR}/${role}.json`;
+export const keyPath = (role: string) => labPath(keyFilename(role));
 
 export function failureJournalPath(kind: string) {
-  return `${LOCAL_DIR}/failure-${kind}-attempt.json`;
+  return labPath(`failure-${kind}-attempt.json`);
 }
 
 export function failureResultPath(kind: string) {
-  return `${LOCAL_DIR}/failure-${kind}-result.json`;
+  return labPath(`failure-${kind}-result.json`);
 }
 
 export function fixedEvidencePath(timestamp: number) {
-  return `${LOCAL_DIR}/evidence-${timestamp}.json`;
+  return labPath(`evidence-${timestamp}.json`);
 }
 
 export function keyFilename(role: string) {

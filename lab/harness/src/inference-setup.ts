@@ -1,17 +1,10 @@
-// Downloads the pinned tokenizer files and pulls the pinned model into a private Ollama models dir
-// using a temporary loopback Ollama server, then verifies both.
+// Downloads the pinned tokenizer files and pulls the pinned model into the shared product artifacts
+// directory using a temporary loopback Ollama server, then verifies both. Never touches role data.
 import { once } from 'node:events';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { basename, resolve } from 'node:path';
 
-import {
-  FILE_MODES,
-  OLLAMA_MODELS_PATH,
-  ROUTES,
-  TIMEOUTS,
-  TOKENIZER_DIR,
-  TOKENIZER_FILES,
-} from '@gyblos/config';
+import { FILE_MODES, homeLayout, ROUTES, TIMEOUTS } from '@gyblos/config';
 import { createModelTokenizer, createOllama } from '@gyblos/engine-ollama';
 import { MODEL } from '@gyblos/engine-ollama/model';
 import { spawnChild, stopChild, waitReady } from '@gyblos/runtime';
@@ -25,16 +18,20 @@ import {
 } from './constants.js';
 
 async function prepareGateArtifacts() {
-  const directory = TOKENIZER_DIR;
+  const artifacts = homeLayout(process.env).artifacts;
+  const directory = artifacts.tokenizer;
   await mkdir(directory, {
     recursive: true,
     mode: FILE_MODES.privateDirectory,
   });
-  await mkdir(OLLAMA_MODELS_PATH, {
+  await mkdir(artifacts.ollamaModels, {
     recursive: true,
     mode: FILE_MODES.privateDirectory,
   });
-  for (const path of [TOKENIZER_FILES.tokenizer, TOKENIZER_FILES.config]) {
+  for (const path of [
+    artifacts.tokenizerFiles.tokenizer,
+    artifacts.tokenizerFiles.config,
+  ]) {
     const name = basename(path);
     const response = await fetch(
       `${PUBLIC_ORIGINS.tokenizer}/${MODEL.publicModel}/resolve/${MODEL.revision}/${name}`,
@@ -46,8 +43,8 @@ async function prepareGateArtifacts() {
     });
   }
   createModelTokenizer({
-    tokenizer: await readFile(TOKENIZER_FILES.tokenizer, 'utf8'),
-    config: await readFile(TOKENIZER_FILES.config, 'utf8'),
+    tokenizer: await readFile(artifacts.tokenizerFiles.tokenizer, 'utf8'),
+    config: await readFile(artifacts.tokenizerFiles.config, 'utf8'),
   });
 }
 
@@ -55,7 +52,7 @@ async function pullGateModel() {
   const environment = {
     ...process.env,
     OLLAMA_HOST: GATE_HOSTS.ollamaSetupBind,
-    OLLAMA_MODELS: resolve(OLLAMA_MODELS_PATH),
+    OLLAMA_MODELS: resolve(homeLayout(process.env).artifacts.ollamaModels),
     OLLAMA_NO_CLOUD: '1',
   };
   const origin = GATE_HOSTS.ollamaSetup;

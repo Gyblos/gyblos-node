@@ -3,8 +3,10 @@
 import assert from 'node:assert/strict';
 import { parseArgs } from 'node:util';
 
-import { P2P } from '@gyblos/config';
+import { ROLE_FILES } from '@gyblos/config';
 import type { OfferTrust } from '@gyblos/core/offers';
+import { P2P_ROLES } from '@gyblos/node/constants';
+import { assertRoleHome } from '@gyblos/node/home';
 import { verifyInferenceOffer } from '@gyblos/node/offers';
 import { loadRole, rolePath } from '@gyblos/node/roles';
 import { finalizedPaymentProof } from '@gyblos/payments-x402/accounting/finalized-proof';
@@ -25,6 +27,8 @@ import {
   type RecoveryAccounts,
   type UncertainAttempt,
 } from './reconciliation.js';
+
+const buyerPath = (name: string) => rolePath(P2P_ROLES.BUYER, name);
 
 interface RecoveryJournal {
   state: P2pJournalState;
@@ -107,10 +111,10 @@ export async function main(args = process.argv.slice(2)) {
     allowPositionals: false,
   });
   const operation = async () => {
-    const config = await loadRole();
+    const config = await loadRole(P2P_ROLES.BUYER);
     assert.equal(config.role, 'buyer');
     const journal = await loadJson<RecoveryJournal>(
-      rolePath(P2P.journalFilename),
+      buyerPath(ROLE_FILES.journal),
     );
     if (!values['audit-only'])
       assert.ok(
@@ -120,7 +124,7 @@ export async function main(args = process.argv.slice(2)) {
       );
     let calls: RecoveryCall[] = [];
     try {
-      calls = await loadJson<RecoveryCall[]>(rolePath(P2P.callsFilename));
+      calls = await loadJson<RecoveryCall[]>(buyerPath(ROLE_FILES.calls));
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
     }
@@ -128,11 +132,11 @@ export async function main(args = process.argv.slice(2)) {
     const attempt = originalAttempt(journal, calls, values['audit-only']);
     if (!values['audit-only'])
       assert.equal(attempt.outcome, CALL_OUTCOMES.UNCERTAIN);
-    const trust = await loadJson<OfferTrust>(rolePath(P2P.trustFilename));
+    const trust = await loadJson<OfferTrust>(buyerPath(ROLE_FILES.trust));
     assert.equal(trust.buyer, config.buyer);
     assert.equal(trust.mint, config.mint);
     const signed = await loadJson<SignedInferenceOffer>(
-      rolePath(P2P.offerFilename),
+      buyerPath(ROLE_FILES.offer),
     );
     // An expired owner-signed offer is historical identity metadata only here.
     // This workflow never authorizes, signs, submits or retries a payment.
@@ -176,14 +180,14 @@ export async function main(args = process.argv.slice(2)) {
     );
     let prior: unknown[] = [];
     try {
-      prior = await loadJson<unknown[]>(rolePath(P2P.reconciliationsFilename));
+      prior = await loadJson<unknown[]>(buyerPath(ROLE_FILES.reconciliations));
       assert.ok(Array.isArray(prior));
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
     }
-    await saveJson(rolePath(P2P.reconciliationsFilename), [...prior, proof]);
+    await saveJson(buyerPath(ROLE_FILES.reconciliations), [...prior, proof]);
     // A failed proof/record write never unlocks the buyer. Keep the failed call.
-    await saveJson(rolePath(P2P.journalFilename), {
+    await saveJson(buyerPath(ROLE_FILES.journal), {
       state: JOURNAL_STATES.CONFIRMED,
       resolution: proof.status,
       requestId: attempt.requestId,
@@ -197,13 +201,15 @@ export async function main(args = process.argv.slice(2)) {
     console.log(JSON.stringify(proof));
     return proof;
   };
+  // Before any lock: taking one would create the new role directory.
+  await assertRoleHome(P2P_ROLES.BUYER);
   if (values['audit-only'])
-    return withExclusiveLock(rolePath(P2P.buyerLockFilename), operation);
+    return withExclusiveLock(buyerPath(ROLE_FILES.buyerLock), operation);
   return withP2pRecoveryLock(
     {
-      buyer: rolePath(P2P.buyerLockFilename),
-      recovery: rolePath(P2P.recoveryLockFilename),
-      audit: rolePath(P2P.staleLockJournalFilename),
+      buyer: buyerPath(ROLE_FILES.buyerLock),
+      recovery: buyerPath(ROLE_FILES.recoveryLock),
+      audit: buyerPath(ROLE_FILES.staleLockJournal),
     },
     operation,
   );

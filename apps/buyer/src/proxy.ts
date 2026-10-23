@@ -11,12 +11,13 @@ import {
   FILE_MODES,
   HTTP_STATUS,
   LOCALHOST,
-  P2P,
   PORTS,
+  ROLE_FILES,
   ROUTES,
   TRANSPORT_LIMITS,
   TRANSPORT_TIMEOUTS,
 } from '@gyblos/config';
+import { P2P_ROLES } from '@gyblos/node/constants';
 import { rolePath } from '@gyblos/node/roles';
 import { acceptLoopbackHost } from '@gyblos/runtime/loopback-host';
 import type { Transport } from '@gyblos/transport-iroh';
@@ -102,7 +103,7 @@ export function buyerProxyHandler(transport: Transport) {
         relayObserved: result.relayObserved,
       };
       await appendFile(
-        rolePath(P2P.metricsFilename),
+        rolePath(P2P_ROLES.BUYER, ROLE_FILES.metrics),
         JSON.stringify(metric) + '\n',
         { mode: FILE_MODES.privateFile },
       ).catch(() => undefined); // Telemetry must not replace a settled response.

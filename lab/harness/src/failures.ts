@@ -33,13 +33,12 @@ import { saveJson } from '@gyblos/runtime';
 import {
   CASE_STATUSES,
   FAILURE_CASES,
-  FAILURE_EVIDENCE_PATH,
   failureJournalPath,
   failureResultPath,
   GATE_DIAGNOSTIC_LIMITS,
   GATE_ROUTES,
   GATE_TIMEOUTS,
-  LOCK_PATH,
+  labPaths,
   SCHEMA_VERSIONS,
   WALLET_ROLES,
 } from './constants.js';
@@ -269,11 +268,11 @@ export async function failureGate() {
         'Fixed resource, not inference',
       ],
     };
-    await saveJson(FAILURE_EVIDENCE_PATH, evidence);
+    await saveJson(labPaths().failureEvidence, evidence);
     console.log(JSON.stringify(evidence, null, 2));
   }
   try {
-    await withExclusiveLock(LOCK_PATH, failures);
+    await withExclusiveLock(labPaths().lock, failures);
   } catch (error) {
     console.error(
       error instanceof Error ? error.message : 'Failure gate failed.',

@@ -11,8 +11,6 @@ export * from './versions.js';
 
 export * from './limits.js';
 
-export * from './p2p.js';
-
 export * from './transport.js';
 
 export * from './diagnostics.js';

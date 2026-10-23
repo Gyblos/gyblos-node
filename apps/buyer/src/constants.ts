@@ -1,5 +1,5 @@
-// Buyer call outcomes, phases, journal states, proxy error codes, measurement schema version, error
-// diagnostic codes and synthetic inference case names.
+// Buyer call outcomes, phases, journal states, proxy error codes, measurement schema version, call and
+// proof bounds, error diagnostic codes and synthetic inference case names.
 import { JOURNAL_STATES } from '@gyblos/payments-x402/constants';
 import type { ProtocolErrorCode } from '@gyblos/protocol/constants';
 import { ROUTE_DISCREPANCY } from '@gyblos/transport-iroh/constants';

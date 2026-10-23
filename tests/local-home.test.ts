@@ -2,7 +2,7 @@
 // guard. Every path lives in a synthetic temporary directory; legacy contents are never read.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { chmod, lstat, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -20,6 +20,8 @@ import {
   assertRoleHome,
   assertTokenizerHome,
 } from '@gyblos/node/home';
+
+import { NATIVE_CAPABILITY } from './support/native-runtime.js';
 
 const DEFAULT_ENV = {};
 
@@ -195,3 +197,98 @@ void test('legacy detection never opens a FIFO or an unreadable legacy path', as
     }
   });
 });
+
+void test(
+  'role setup refuses to create a fresh role next to legacy role data',
+  { skip: NATIVE_CAPABILITY.bindingSkip },
+  async () => {
+    const { setupRole, loadRole } = await import('@gyblos/node/roles');
+    const previous = process.env.GYBLOS_HOME;
+    await inTemporaryCwd(async (directory) => {
+      process.env.GYBLOS_HOME = join(directory, 'home');
+      await mkdir(LEGACY_LOCAL_PATHS.roles, { recursive: true });
+      const mint = '2vXUXK2rJTPtb7Wx9em4W9FdgtfD6HTnFxZz5oirLVcH';
+      await assert.rejects(setupRole({ role: P2P_ROLES.BUYER, mint }), {
+        code: NODE_ERROR_CODES.LEGACY_LOCAL_LAYOUT,
+      });
+      await assert.rejects(loadRole(P2P_ROLES.SELLER), {
+        code: NODE_ERROR_CODES.LEGACY_LOCAL_LAYOUT,
+      });
+      await assert.rejects(lstat(homeLayout(process.env).root), {
+        code: 'ENOENT',
+      });
+    }).finally(() => {
+      if (previous === undefined) delete process.env.GYBLOS_HOME;
+      else process.env.GYBLOS_HOME = previous;
+    });
+  },
+);
+
+void test(
+  'buyer call and reconcile refuse legacy role data before taking a lock',
+  { skip: NATIVE_CAPABILITY.bindingSkip },
+  async () => {
+    const { main: paidCall } = await import('@gyblos/buyer/call');
+    const { main: reconcile } = await import('@gyblos/buyer/reconcile');
+    const previous = process.env.GYBLOS_HOME;
+    await inTemporaryCwd(async (directory) => {
+      process.env.GYBLOS_HOME = join(directory, 'home');
+      await mkdir(LEGACY_LOCAL_PATHS.roles, { recursive: true });
+      await assert.rejects(paidCall(), {
+        code: NODE_ERROR_CODES.LEGACY_LOCAL_LAYOUT,
+      });
+      await assert.rejects(reconcile([]), {
+        code: NODE_ERROR_CODES.LEGACY_LOCAL_LAYOUT,
+      });
+      await assert.rejects(lstat(homeLayout(process.env).root), {
+        code: 'ENOENT',
+      });
+    }).finally(() => {
+      if (previous === undefined) delete process.env.GYBLOS_HOME;
+      else process.env.GYBLOS_HOME = previous;
+    });
+  },
+);
+
+void test(
+  'buyer and seller set up in one home keep separate role directories',
+  { skip: NATIVE_CAPABILITY.bindingSkip },
+  async () => {
+    const { generateKeyPairSigner } = await import('@solana/kit');
+    const { setupRole } = await import('@gyblos/node/roles');
+    const { readdir } = await import('node:fs/promises');
+    const previous = process.env.GYBLOS_HOME;
+    const mint = '2vXUXK2rJTPtb7Wx9em4W9FdgtfD6HTnFxZz5oirLVcH';
+    await inTemporaryCwd(async (directory) => {
+      process.env.GYBLOS_HOME = join(directory, 'home');
+      const buyer = await setupRole({ role: P2P_ROLES.BUYER, mint });
+      const seller = await setupRole({
+        role: P2P_ROLES.SELLER,
+        mint,
+        buyer: buyer.buyer,
+        payTo: (await generateKeyPairSigner()).address,
+      });
+      assert.notEqual(buyer.nodeId, seller.nodeId);
+      const layout = homeLayout(process.env);
+      assert.deepEqual((await readdir(layout.root)).sort(), [
+        P2P_ROLES.BUYER,
+        P2P_ROLES.SELLER,
+      ]);
+      assert.deepEqual((await readdir(layout.roles.buyer)).sort(), [
+        'buyer.json',
+        'node.key',
+        'role.json',
+      ]);
+      assert.deepEqual((await readdir(layout.roles.seller)).sort(), [
+        'authorizer.json',
+        'facilitator.json',
+        'node.key',
+        'owner.json',
+        'role.json',
+      ]);
+    }).finally(() => {
+      if (previous === undefined) delete process.env.GYBLOS_HOME;
+      else process.env.GYBLOS_HOME = previous;
+    });
+  },
+);

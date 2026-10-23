@@ -1,4 +1,4 @@
-// P2P role setup and loading: per-role key files and role config under .local/p2p with private file modes.
+// P2P role setup and loading: per-role key files and role config in <home>/<role>/ with private file modes.
 // Never overwrites existing keys; seller setup keeps the payout wallet cold and stores no buyer key.
 import { generateKeyPairSync } from 'node:crypto';
 import { lstat, mkdir, readFile, writeFile } from 'node:fs/promises';
@@ -11,7 +11,16 @@ import {
   getAddressEncoder,
 } from '@solana/kit';
 
-import { DEVNET_RPC_URL, FILE_MODES, KEY_LIMITS, P2P } from '@gyblos/config';
+import {
+  DEVNET_RPC_URL,
+  FILE_MODES,
+  homeLayout,
+  KEY_LIMITS,
+  ROLE_FILES,
+  ROLE_KEY_FILES,
+  rolePathIn,
+  type RoleKey,
+} from '@gyblos/config';
 import { CONFIG_ASSET_LABELS } from '@gyblos/config/constants';
 import { saveJson } from '@gyblos/runtime';
 
@@ -30,6 +39,7 @@ import {
   type P2PRole,
 } from './constants.js';
 import { NodeError } from './errors.js';
+import { assertRoleHome } from './home.js';
 
 interface CommonRole {
   schemaVersion: typeof ROLE_CONFIG_SCHEMA_VERSION;
@@ -59,8 +69,12 @@ export interface SetupOptions {
   payTo?: string;
 }
 
-function file(name: string) {
-  return resolve(P2P.root, name);
+function file(role: P2PRole, name: string) {
+  return resolve(rolePathIn(process.env, role, name));
+}
+
+export function roleDirectory(role: P2PRole) {
+  return resolve(homeLayout(process.env).roles[role]);
 }
 
 async function privateBytes(path: string, length: number) {
@@ -85,8 +99,8 @@ async function privateBytes(path: string, length: number) {
   return Uint8Array.from(value);
 }
 
-async function wallet(role: keyof typeof P2P.keys) {
-  const path = file(P2P.keys[role]);
+async function wallet(role: P2PRole, key: RoleKey) {
+  const path = file(role, ROLE_KEY_FILES[key]);
   try {
     await lstat(path);
   } catch (error) {
@@ -107,8 +121,8 @@ async function wallet(role: keyof typeof P2P.keys) {
   );
 }
 
-export function rolePath(name: string) {
-  return file(name);
+export function rolePath(role: P2PRole, name: string) {
+  return file(role, name);
 }
 
 export function parseRoleConfig(value: unknown): RoleConfig {
@@ -140,38 +154,45 @@ export function parseRoleConfig(value: unknown): RoleConfig {
   };
 }
 
-export async function loadRole(): Promise<RoleConfig> {
+export async function loadRole(role: P2PRole): Promise<RoleConfig> {
+  await assertRoleHome(role);
   const value = configurationJson(
-    await readFile(file(P2P.roleConfig), 'utf8'),
+    await readFile(file(role, ROLE_FILES.roleConfig), 'utf8'),
     NODE_ERROR_CODES.INVALID_ROLE_CONFIGURATION,
   );
   return parseRoleConfig(value);
 }
 
-export async function roleSigner(role: keyof typeof P2P.keys) {
-  const config = await loadRole();
+export async function roleSigner(role: P2PRole, key: RoleKey) {
+  const config = await loadRole(role);
   if (
-    (config.role === P2P_ROLES.BUYER && role !== P2P_ROLES.BUYER) ||
-    (config.role === P2P_ROLES.SELLER && role === P2P_ROLES.BUYER)
+    (config.role === P2P_ROLES.BUYER && key !== P2P_ROLES.BUYER) ||
+    (config.role === P2P_ROLES.SELLER && key === P2P_ROLES.BUYER)
   )
     throw new Error('Cross-role key access rejected.');
   const signer = await createKeyPairSignerFromBytes(
-    await privateBytes(file(P2P.keys[role]), KEY_LIMITS.keyPairBytes),
+    await privateBytes(
+      file(role, ROLE_KEY_FILES[key]),
+      KEY_LIMITS.keyPairBytes,
+    ),
   );
-  if (config[role as keyof RoleConfig] !== signer.address)
+  if (config[key as keyof RoleConfig] !== signer.address)
     throw new Error('Role key/address mismatch.');
   return signer;
 }
 
-export async function nodeSecret() {
-  return [...(await privateBytes(file(P2P.nodeKeyFilename), NODE_KEY_BYTES))];
+export async function nodeSecret(role: P2PRole) {
+  return [
+    ...(await privateBytes(file(role, ROLE_FILES.nodeKey), NODE_KEY_BYTES)),
+  ];
 }
 
 export async function setupRole(options: SetupOptions) {
   address(options.mint);
-  const path = file(P2P.roleConfig);
+  const role = options.role;
+  const path = file(role, ROLE_FILES.roleConfig);
   try {
-    const existing = await loadRole();
+    const existing = await loadRole(role);
     if (
       existing.role !== options.role ||
       existing.mint !== options.mint ||
@@ -189,13 +210,16 @@ export async function setupRole(options: SetupOptions) {
     process.env.GYBLOS_RPC_URL ?? DEVNET_RPC_URL,
     NODE_ERROR_CODES.INVALID_ROLE_CONFIGURATION,
   );
-  await mkdir(P2P.root, { recursive: true, mode: FILE_MODES.privateDirectory });
+  await mkdir(roleDirectory(role), {
+    recursive: true,
+    mode: FILE_MODES.privateDirectory,
+  });
   try {
-    await lstat(file(P2P.nodeKeyFilename));
+    await lstat(file(role, ROLE_FILES.nodeKey));
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
     await writeFile(
-      file(P2P.nodeKeyFilename),
+      file(role, ROLE_FILES.nodeKey),
       JSON.stringify(SecretKey.generate().toBytes()),
       { flag: 'wx', mode: FILE_MODES.privateFile },
     );
@@ -205,7 +229,7 @@ export async function setupRole(options: SetupOptions) {
     rpcUrl,
     mint: options.mint,
     assetLabel: CONFIG_ASSET_LABELS.TEST_TOKEN,
-    nodeId: SecretKey.fromBytes(await nodeSecret())
+    nodeId: SecretKey.fromBytes(await nodeSecret(role))
       .public()
       .toString(),
   };
@@ -214,7 +238,7 @@ export async function setupRole(options: SetupOptions) {
     config = {
       ...common,
       role: P2P_ROLES.BUYER,
-      buyer: (await wallet('buyer')).address,
+      buyer: (await wallet(role, 'buyer')).address,
     };
   else {
     if (!options.payTo || !options.buyer)
@@ -225,16 +249,16 @@ export async function setupRole(options: SetupOptions) {
     if (
       Buffer.from(payoutBytes).equals(
         Buffer.from(
-          SecretKey.fromBytes(await nodeSecret())
+          SecretKey.fromBytes(await nodeSecret(role))
             .public()
             .toBytes(),
         ),
       )
     )
       throw new Error('Payout cannot be the hot node key.');
-    const owner = await wallet('owner');
-    const authorizer = await wallet('authorizer');
-    const facilitator = await wallet('facilitator');
+    const owner = await wallet(role, 'owner');
+    const authorizer = await wallet(role, 'authorizer');
+    const facilitator = await wallet(role, 'facilitator');
     if (
       [owner.address, authorizer.address, facilitator.address].includes(
         address(options.payTo),
@@ -255,21 +279,21 @@ export async function setupRole(options: SetupOptions) {
   return config;
 }
 
-export async function publicRole() {
-  const config = await loadRole();
+export async function publicRole(role: P2PRole) {
+  const config = await loadRole(role);
   const names =
     config.role === P2P_ROLES.BUYER
-      ? [P2P.keys.buyer, P2P.nodeKeyFilename]
+      ? [ROLE_KEY_FILES.buyer, ROLE_FILES.nodeKey]
       : [
-          P2P.keys.owner,
-          P2P.keys.authorizer,
-          P2P.keys.facilitator,
-          P2P.nodeKeyFilename,
+          ROLE_KEY_FILES.owner,
+          ROLE_KEY_FILES.authorizer,
+          ROLE_KEY_FILES.facilitator,
+          ROLE_FILES.nodeKey,
         ];
   const keys = await Promise.all(
     names.map(async (name) => ({
       name,
-      mode: (await lstat(file(name))).mode & FILE_MODES.permissionMask,
+      mode: (await lstat(file(role, name))).mode & FILE_MODES.permissionMask,
     })),
   );
   const common = {

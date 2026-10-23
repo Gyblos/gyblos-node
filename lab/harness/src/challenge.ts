@@ -17,9 +17,9 @@ import { validateTerms } from '@gyblos/payments-x402/trust';
 import { saveJson } from '@gyblos/runtime';
 
 import {
-  CHALLENGE_EVIDENCE_PATH,
   CHALLENGE_STAGES,
   GATE_ROUTES,
+  labPaths,
   SCHEMA_VERSIONS,
   UPSTREAM_COMMIT,
   WALLET_ROLES,
@@ -93,7 +93,7 @@ export async function challengeGate() {
       settlements: facilitator.events.length,
       note: 'No buyer payment signed or submitted. Does not validate open, claim or refund.',
     };
-    await saveJson(CHALLENGE_EVIDENCE_PATH, evidence);
+    await saveJson(labPaths().challengeEvidence, evidence);
     console.log(JSON.stringify(evidence, null, 2));
   } finally {
     sellerServer?.close();

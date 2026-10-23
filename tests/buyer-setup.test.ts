@@ -15,8 +15,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { TOKENIZER_DIR, TOKENIZER_FILES } from '@gyblos/config';
+import { homeLayout } from '@gyblos/config';
 import { NODE_ERROR_CODES } from '@gyblos/node/constants';
+
+// The child runs with a minimal environment, so the default home applies.
+function artifactLayout() {
+  return homeLayout({}).artifacts;
+}
 
 async function preparation(
   corrupt: false | 'tokenizer' | 'config' = false,
@@ -29,12 +34,17 @@ async function preparation(
     config: 'synthetic config',
   };
   if (seed) {
-    await mkdir(join(directory, TOKENIZER_DIR), { recursive: true });
+    await mkdir(join(directory, artifactLayout().tokenizer), {
+      recursive: true,
+    });
     await writeFile(
-      join(directory, TOKENIZER_FILES.tokenizer),
+      join(directory, artifactLayout().tokenizerFiles.tokenizer),
       artifacts.tokenizer,
     );
-    await writeFile(join(directory, TOKENIZER_FILES.config), artifacts.config);
+    await writeFile(
+      join(directory, artifactLayout().tokenizerFiles.config),
+      artifacts.config,
+    );
   }
   const digest = (body: string) =>
     createHash('sha256').update(body).digest('hex');
@@ -95,11 +105,17 @@ void test('a fresh buyer prepares pinned tokenizer files without an engine or ro
   try {
     assert.equal(result.status, 0, result.stderr);
     assert.equal(
-      await readFile(join(directory, TOKENIZER_FILES.tokenizer), 'utf8'),
+      await readFile(
+        join(directory, artifactLayout().tokenizerFiles.tokenizer),
+        'utf8',
+      ),
       artifacts.tokenizer,
     );
     assert.equal(
-      await readFile(join(directory, TOKENIZER_FILES.config), 'utf8'),
+      await readFile(
+        join(directory, artifactLayout().tokenizerFiles.config),
+        'utf8',
+      ),
       artifacts.config,
     );
   } finally {
@@ -112,9 +128,12 @@ void test('buyer preparation rejects a substituted tokenizer before writing arti
   try {
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /hash mismatch/);
-    await assert.rejects(readFile(join(directory, TOKENIZER_FILES.tokenizer)), {
-      code: 'ENOENT',
-    });
+    await assert.rejects(
+      readFile(join(directory, artifactLayout().tokenizerFiles.tokenizer)),
+      {
+        code: 'ENOENT',
+      },
+    );
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
@@ -126,11 +145,17 @@ void test('a substituted config leaves both previously verified tokenizer files 
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /hash mismatch/);
     assert.equal(
-      await readFile(join(directory, TOKENIZER_FILES.tokenizer), 'utf8'),
+      await readFile(
+        join(directory, artifactLayout().tokenizerFiles.tokenizer),
+        'utf8',
+      ),
       artifacts.tokenizer,
     );
     assert.equal(
-      await readFile(join(directory, TOKENIZER_FILES.config), 'utf8'),
+      await readFile(
+        join(directory, artifactLayout().tokenizerFiles.config),
+        'utf8',
+      ),
       artifacts.config,
     );
   } finally {
@@ -150,7 +175,7 @@ void test('buyer preparation caps streamed bodies without trusting Content-Lengt
       result.stderr,
       new RegExp(NODE_ERROR_CODES.TOKENIZER_DOWNLOAD_TOO_LARGE),
     );
-    for (const [name, path] of Object.entries(TOKENIZER_FILES))
+    for (const [name, path] of Object.entries(artifactLayout().tokenizerFiles))
       assert.equal(
         await readFile(join(directory, path), 'utf8'),
         artifacts[name as keyof typeof artifacts],
@@ -170,17 +195,23 @@ void test('a failed staged write preserves existing artifacts and removes tempor
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /Synthetic write failure/);
     assert.equal(
-      await readFile(join(directory, TOKENIZER_FILES.tokenizer), 'utf8'),
+      await readFile(
+        join(directory, artifactLayout().tokenizerFiles.tokenizer),
+        'utf8',
+      ),
       artifacts.tokenizer,
     );
     assert.equal(
-      await readFile(join(directory, TOKENIZER_FILES.config), 'utf8'),
+      await readFile(
+        join(directory, artifactLayout().tokenizerFiles.config),
+        'utf8',
+      ),
       artifacts.config,
     );
-    assert.deepEqual((await readdir(join(directory, TOKENIZER_DIR))).sort(), [
-      'tokenizer.json',
-      'tokenizer_config.json',
-    ]);
+    assert.deepEqual(
+      (await readdir(join(directory, artifactLayout().tokenizer))).sort(),
+      ['tokenizer.json', 'tokenizer_config.json'],
+    );
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

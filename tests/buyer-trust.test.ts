@@ -4,9 +4,9 @@ import assert from 'node:assert/strict';
 import { lstat, readFile, unlink, writeFile } from 'node:fs/promises';
 import test from 'node:test';
 
-import { FILE_MODES, MAX_ATOMIC, P2P } from '@gyblos/config';
+import { FILE_MODES, MAX_ATOMIC, ROLE_FILES } from '@gyblos/config';
 import type { OfferTrust } from '@gyblos/core/offers';
-import { NODE_ERROR_CODES } from '@gyblos/node/constants';
+import { NODE_ERROR_CODES, P2P_ROLES } from '@gyblos/node/constants';
 import type { SignedInferenceOffer } from '@gyblos/protocol/offer';
 import { loadJson } from '@gyblos/runtime';
 
@@ -25,7 +25,7 @@ async function withTrust(
   const { main } = await import('@gyblos/buyer/trust');
   const { rolePath } = await import('@gyblos/node/roles');
   await withRelayOffer(null, async () => {
-    const path = rolePath(P2P.trustFilename);
+    const path = rolePath(P2P_ROLES.BUYER, ROLE_FILES.trust);
     const trust = await loadJson<OfferTrust>(path);
     await unlink(path);
     await run(main, trust, path);
@@ -70,7 +70,7 @@ void test(
     await withTrust(async (main, trust, path) => {
       const { rolePath } = await import('@gyblos/node/roles');
       const { saveJson } = await import('@gyblos/runtime');
-      const offerPath = rolePath(P2P.offerFilename);
+      const offerPath = rolePath(P2P_ROLES.BUYER, ROLE_FILES.offer);
       const signed = await loadJson<SignedInferenceOffer>(offerPath);
       await saveJson(offerPath, {
         ...signed,
@@ -105,7 +105,7 @@ void test(
     await withTrust(async (main, trust, path) => {
       const { rolePath } = await import('@gyblos/node/roles');
       await writeFile(
-        rolePath(P2P.offerFilename),
+        rolePath(P2P_ROLES.BUYER, ROLE_FILES.offer),
         'SYNTHETIC_PRIVATE_OFFER_SENTINEL',
       );
       await assert.rejects(main(args(trust)), {

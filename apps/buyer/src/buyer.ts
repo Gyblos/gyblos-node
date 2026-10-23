@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 
 import { EndpointAddr, EndpointId } from '@number0/iroh';
 
-import { BUYER_RELAY_ONLY_ENV, MAX_ATOMIC, P2P } from '@gyblos/config';
+import { BUYER_RELAY_ONLY_ENV, MAX_ATOMIC, ROLE_FILES } from '@gyblos/config';
 import { P2P_ROLES } from '@gyblos/node/constants';
 import { parseOfferTrustJson, verifyInferenceOffer } from '@gyblos/node/offers';
 import { loadRole, nodeSecret, rolePath } from '@gyblos/node/roles';
@@ -24,10 +24,10 @@ import { expectedIrohRoute } from '@gyblos/transport-iroh/route-policy';
 import { startBuyerProxy } from './proxy.js';
 
 export async function trustedOffer() {
-  const config = await loadRole();
+  const config = await loadRole(P2P_ROLES.BUYER);
   if (config.role !== P2P_ROLES.BUYER) throw new Error('Buyer role required.');
   const trust = parseOfferTrustJson(
-    await readFile(rolePath(P2P.trustFilename), 'utf8'),
+    await readFile(rolePath(P2P_ROLES.BUYER, ROLE_FILES.trust), 'utf8'),
   );
   if (
     trust.buyer !== config.buyer ||
@@ -35,7 +35,7 @@ export async function trustedOffer() {
     BigInt(trust.maxAtomic) > BigInt(MAX_ATOMIC)
   )
     throw new Error('Local buyer trust configuration mismatch.');
-  const bytes = await readFile(rolePath(P2P.offerFilename));
+  const bytes = await readFile(rolePath(P2P_ROLES.BUYER, ROLE_FILES.offer));
   if (bytes.length > HTTP_OVER_IROH.bodyBytes)
     throw new Error('Offer exceeds bounds.');
   const offer = await verifyInferenceOffer(
@@ -80,7 +80,10 @@ export async function startBuyer() {
     plan.remote.directAddresses,
   );
   await assertProgram(config.rpcUrl);
-  const endpoint = await bindEndpoint(await nodeSecret(), plan.bindOptions);
+  const endpoint = await bindEndpoint(
+    await nodeSecret(P2P_ROLES.BUYER),
+    plan.bindOptions,
+  );
   let cleanup = () => endpoint.close();
   try {
     if (endpoint.id().toString() !== config.nodeId)
@@ -91,7 +94,7 @@ export async function startBuyer() {
     await transport.ready(expected);
     const proxy = await startBuyerProxy(transport);
     cleanup = () => proxy.close();
-    await saveJson(rolePath(P2P.statusFilename), {
+    await saveJson(rolePath(P2P_ROLES.BUYER, ROLE_FILES.status), {
       status: 'ready',
       runId: process.env.GYBLOS_P2P_RUN_ID,
       role: 'buyer',

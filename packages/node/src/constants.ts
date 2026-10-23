@@ -7,7 +7,7 @@ export const NODE_STATES = {
 } as const;
 export type NodeState = (typeof NODE_STATES)[keyof typeof NODE_STATES];
 
-// Schema of .local/p2p role config files; independent of the offer wire schema.
+// Schema of role config files in the local home; independent of the offer wire schema.
 export const ROLE_CONFIG_SCHEMA_VERSION = 1;
 
 export const TOKENIZER_ORIGIN = 'https://huggingface.co';

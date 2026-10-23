@@ -1,5 +1,5 @@
 // Pins the values moved out of the former P2P config object so a split by owner cannot change a wire,
-// limit, port or policy value. Expected values are independent literals on purpose.
+// limit, port or file name. Expected values are independent literals on purpose.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -7,9 +7,12 @@ import {
   MAX_CHANNEL_SIGNATURES,
   MINIMUM_REQUESTS,
 } from '@gyblos/buyer/constants';
+import * as config from '@gyblos/config';
 import {
   FILE_MODES,
   PORTS,
+  ROLE_FILES,
+  ROLE_KEY_FILES,
   TRANSPORT_LIMITS,
   TRANSPORT_TIMEOUTS,
 } from '@gyblos/config';
@@ -66,4 +69,32 @@ void test('offer, payment-evidence, lock and key values keep their owners and va
   assert.equal(LOCK_METADATA_BYTES, 4096);
   assert.equal(NODE_KEY_BYTES, 32);
   assert.equal(FILE_MODES.permissionMask, 0o777);
+  assert.equal('P2P' in config, false);
+});
+
+void test('role file and key names inside a role directory are unchanged', () => {
+  assert.deepEqual(ROLE_FILES, {
+    roleConfig: 'role.json',
+    nodeKey: 'node.key',
+    trust: 'trust.json',
+    status: 'status.json',
+    traces: 'traces.json',
+    metrics: 'transport.jsonl',
+    measurements: 'measurements.jsonl',
+    measurementSalt: 'measurement-salt',
+    buyerLock: 'buyer.lock',
+    recoveryLock: 'recovery.lock',
+    staleLockJournal: 'stale-locks.jsonl',
+    journal: 'authorization.json',
+    reconciliations: 'reconciliations.json',
+    calls: 'calls.json',
+    offer: 'offer.json',
+    facilitatorDiagnostics: 'facilitator-diagnostics',
+  });
+  assert.deepEqual(ROLE_KEY_FILES, {
+    buyer: 'buyer.json',
+    owner: 'owner.json',
+    authorizer: 'authorizer.json',
+    facilitator: 'facilitator.json',
+  });
 });
