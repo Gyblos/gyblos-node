@@ -55,7 +55,6 @@ export const RETRY_DELAYS = {
 
 export const UNITS = {
   millisecondsPerSecond: 1_000,
-  lamportsPerSol: 1_000_000_000,
   percentage: 100,
 } as const;
 
@@ -74,7 +73,6 @@ export const PAYMENT_LIMITS = {
   withdrawDelay: 60,
   maxWithdrawDelay: 900,
   maxTimeoutSeconds: 120,
-  distributionAttempts: 3,
   ceilingMultiplier: 2n,
   airdropThreshold: 50_000_000n,
   airdropLamports: 1_000_000_000,

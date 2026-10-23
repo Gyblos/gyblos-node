@@ -35,7 +35,6 @@ export const GENERATION = {
 } as const;
 
 export const MODEL_LIMITS = {
-  requestMinOutputTokens: INFERENCE_REQUEST_LIMITS.minOutputTokens,
   requestMaxOutputTokens: INFERENCE_REQUEST_LIMITS.maxOutputTokens,
   adapterMaxOutputTokens: 512,
   maxPromptCharacters: INFERENCE_REQUEST_LIMITS.maxPromptCharacters,

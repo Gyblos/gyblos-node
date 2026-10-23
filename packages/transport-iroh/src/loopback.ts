@@ -1,8 +1,7 @@
 // Owns loopback in transport-iroh; it must not know wallets or inference engines.
 import { LOCALHOST, P2P, ROUTES } from '@gyblos/config';
 
-import { TRANSPORT_ROUTES } from './constants.js';
-import type { HttpRequest, HttpResponse, Transport } from './types.js';
+import type { HttpRequest, HttpResponse } from './types.js';
 
 export async function loopbackRequest(
   origin: string,
@@ -60,21 +59,5 @@ export async function loopbackRequest(
     status: response.status,
     headers,
     body: Buffer.concat(parts),
-  };
-}
-
-export function createLoopbackTransport(origin: string): Transport {
-  return {
-    kind: 'loopback',
-    async exchange(request) {
-      return {
-        ...(await loopbackRequest(origin, request)),
-        transport: TRANSPORT_ROUTES.LOOPBACK,
-        connectMs: 0,
-        directObserved: false,
-        relayObserved: false,
-      };
-    },
-    async close() {},
   };
 }

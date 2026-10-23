@@ -38,5 +38,3 @@ function formatHostUrl(port: number) {
 
 export const explorerUrl = (signature: string) =>
   `${EXPLORER_ORIGIN}/tx/${signature}?cluster=devnet`;
-
-export const url = (port: number) => formatHostUrl(port);

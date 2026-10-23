@@ -4,7 +4,6 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts",
     "./cli/buyer": "./src/cli/buyer.ts",
     "./cli/exact": "./src/cli/exact.ts",
     "./cli/inference": "./src/cli/inference.ts",

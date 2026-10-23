@@ -69,11 +69,6 @@ export const EVIDENCE_PATHS = {
 
 export const keyPath = (role: string) => `${LOCAL_DIR}/${role}.json`;
 
-export const evidencePath = (evidenceId: string) =>
-  `lab/evidence/gate-${evidenceId}.json`;
-
-export const localPath = (name: string) => `${LOCAL_DIR}/${name}`;
-
 export function failureJournalPath(kind: string) {
   return `${LOCAL_DIR}/failure-${kind}-attempt.json`;
 }

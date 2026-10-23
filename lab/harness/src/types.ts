@@ -11,11 +11,3 @@ export type {
   InferenceCaseResult,
   InferenceTrace,
 } from './inference-evidence-types.js';
-
-export type GateEvidence =
-  | import('./exact-evidence-types.js').ExactGateEvidence
-  | import('./inference-evidence-types.js').InferenceGateEvidence;
-
-export type CaseResult =
-  | import('./exact-evidence-types.js').ExactCaseResult
-  | import('./inference-evidence-types.js').InferenceCaseResult;

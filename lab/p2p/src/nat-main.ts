@@ -5,7 +5,6 @@ import { resolve } from 'node:path';
 
 import { P2P } from '@gyblos/config';
 import { lamports, tokens } from '@gyblos/payments-x402/chain';
-import { withExclusiveLock } from '@gyblos/payments-x402/recovery/lock';
 import { saveJson } from '@gyblos/runtime';
 
 import { NAT } from './constants.js';
@@ -80,8 +79,4 @@ export async function runNat(options: {
   );
   await stopNatTopology(project, context.environment);
   return result;
-}
-
-export async function natGate(options: Parameters<typeof runNat>[0]) {
-  return withExclusiveLock(P2P.docker.lock, () => runNat(options));
 }
