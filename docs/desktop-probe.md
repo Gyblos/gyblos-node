@@ -32,7 +32,11 @@ pnpm desktop:package
 The smoke runs the same renderer/preload/IPC/worker path in a hidden window and
 exits nonzero on failure, including a renderer that never calls the bridge. A
 successful result has two cycles, two round trips and `closed: true`. Timeouts
-cover both startup and the worker. Native failures are intentionally reported
+cover startup and request worker termination at its deadline. An
+already-cancelled request creates no worker; cancellation before spawn retries
+termination at spawn. A created worker reports failure only after its exit
+event, including on timeout; this is not a hard completion bound if the
+operating system cannot terminate it. Native failures are intentionally reported
 without raw SDK errors, identities or socket addresses.
 
 Packaging creates an **unsigned local `.app`**, for macOS arm64 only, under

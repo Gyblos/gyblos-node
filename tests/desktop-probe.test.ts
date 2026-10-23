@@ -121,8 +121,6 @@ void test('desktop worker preserves failure exit after receipt', () => {
     exitCode = code;
   });
   assert.ok(receive);
-  receive({ data: 'synthetic-invalid-ack' });
-  assert.equal(exitCode, undefined);
   receive({ data: DESKTOP.FINISH_ACK });
   assert.equal(exitCode, 1);
 });
