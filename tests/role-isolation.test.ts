@@ -1,4 +1,5 @@
-// Owns offline role isolation.test regression cases; no funded wallets or live services.
+// Checks that role setup generates and keeps only its own keys, fails closed on insecure file modes, and
+// that seller setup stores no buyer or payout key.
 import assert from 'node:assert/strict';
 import { chmod, mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';

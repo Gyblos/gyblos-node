@@ -1,4 +1,4 @@
-// Owns laboratory types; product code must not depend on this module.
+// Shared context and provider types for the exact-gate modules.
 import type { SupportedResponse } from '@x402/core/types';
 
 import type {

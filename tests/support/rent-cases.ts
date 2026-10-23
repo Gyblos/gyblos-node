@@ -1,4 +1,5 @@
-// Owns offline rent cases regression cases; no funded wallets or live services.
+// Registers rent accounting cases: escrow creation and return in sponsor accounting, unsigned lamport
+// credits, and each RENT_FAULTS mutation rejected by its guard.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 

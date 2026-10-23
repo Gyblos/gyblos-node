@@ -1,4 +1,5 @@
-// Owns offline signed offers.test regression cases; no funded wallets or live services.
+// Checks that owner-signed offers bind NodeId, payment terms and engine capabilities, and that
+// self-signed, expired or over-budget offers are rejected before connecting.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 

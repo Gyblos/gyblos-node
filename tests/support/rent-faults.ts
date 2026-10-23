@@ -1,4 +1,5 @@
-// Owns offline rent faults regression cases; no funded wallets or live services.
+// Rent and channel fault table: each entry mutates the payment fixture and names the guard that must
+// reject it.
 import { CHANNEL_PROGRAM, TOKEN_PROGRAM_ADDRESS } from '@gyblos/config';
 import {
   PROOF_GUARDS,

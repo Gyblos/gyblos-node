@@ -1,4 +1,5 @@
-// Owns laboratory cases; product code must not depend on this module.
+// Runs the exact-gate cases against one public facilitator: rejections, one real paid request checked
+// on-chain, then a replay that must return 409. Journals uncertain outcomes for reconciliation.
 import assert from 'node:assert/strict';
 
 import { encodePaymentSignatureHeader } from '@x402/core/http';

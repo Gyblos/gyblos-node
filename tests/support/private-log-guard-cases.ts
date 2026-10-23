@@ -1,4 +1,5 @@
-// Owns offline private log guard cases regression cases; no funded wallets or live services.
+// Registers private-log guard cases: replaced or partial journals fail closed, fsync failure keeps
+// SDK success, secrets stay out of records and legacy journals are never reclaimed.
 import assert from 'node:assert/strict';
 import {
   chmod,

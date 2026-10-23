@@ -1,4 +1,4 @@
-// Owns offline undercharge.test regression cases; no funded wallets or live services.
+// Checks that undercharge is flagged only beyond token tolerance and only for complete, successful delivery.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 

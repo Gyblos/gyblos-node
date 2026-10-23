@@ -1,4 +1,5 @@
-// Owns laboratory setup; product code must not depend on this module.
+// Script entry for wallet setup: with --role it sets up one P2P buyer/seller role, otherwise it
+// creates the isolated devnet gate wallets.
 import { isMain } from '@gyblos/runtime';
 
 import { setupP2PRole } from '../src/p2p-setup.js';

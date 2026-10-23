@@ -1,4 +1,5 @@
-// Owns laboratory failure setup; product code must not depend on this module.
+// Generates a throwaway empty buyer and creates its token account, paid by the facilitator wallet,
+// for the F1 empty-buyer case.
 import { getCreateAssociatedTokenIdempotentInstructionAsync } from '@solana-program/token';
 import {
   address,

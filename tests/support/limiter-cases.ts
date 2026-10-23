@@ -1,4 +1,5 @@
-// Owns offline limiter cases regression cases; no funded wallets or live services.
+// Registers transport quota limiter cases: request debt survives reconnects and eviction, leases
+// release once, and budgets reset only at rollover.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 

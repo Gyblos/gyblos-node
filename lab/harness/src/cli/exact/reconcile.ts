@@ -1,4 +1,5 @@
-// Owns laboratory reconcile; product code must not depend on this module.
+// Devnet USDC balance snapshots (retried on 429), authorization metadata from a signed payload, and
+// a read-only scan of buyer history for the payment signature.
 import assert from 'node:assert/strict';
 
 import { findAssociatedTokenPda } from '@solana-program/token';

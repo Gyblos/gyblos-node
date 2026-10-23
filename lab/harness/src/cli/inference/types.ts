@@ -1,4 +1,4 @@
-// Owns laboratory types; product code must not depend on this module.
+// Shared case and context types for the inference-gate modules.
 import type { ModelTokenizer } from '@gyblos/engine-ollama';
 import type { SettlementEvent } from '@gyblos/payments-x402/facilitator';
 

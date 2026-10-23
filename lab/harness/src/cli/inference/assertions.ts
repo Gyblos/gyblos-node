@@ -1,4 +1,5 @@
-// Owns laboratory assertions; product code must not depend on this module.
+// Per-case inference assertions: engine interruption charges nothing; overcharge, undercharge and
+// normal cases must match their expected billed tokens, charge and anomaly label.
 import assert from 'node:assert/strict';
 
 import { HTTP_STATUS } from '@gyblos/config';

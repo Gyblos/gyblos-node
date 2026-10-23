@@ -1,4 +1,5 @@
-// Owns offline signature buyer cases regression cases; no funded wallets or live services.
+// Registers buyer signature-hint cases: malformed receipts or failing observers never replace the
+// original result or error, and invalid hints are omitted from proofs.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 

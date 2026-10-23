@@ -1,4 +1,5 @@
-// Owns offline p2p payment policy.test regression cases; no funded wallets or live services.
+// Checks P2P buyer payment policy: per-request ceilings before signing, the exclusive buyer lock and
+// single-process CLI, plus the call, lock, recovery and signature-hint suites.
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';

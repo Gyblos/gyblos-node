@@ -1,4 +1,5 @@
-// Owns laboratory payment; product code must not depend on this module.
+// Signs an exact payment for the buyer or authorizer wallet, journals it before sending, and returns
+// the response, receipt, balance snapshots and public calls. Uncertain outcomes throw.
 import {
   decodePaymentResponseHeader,
   encodePaymentSignatureHeader,

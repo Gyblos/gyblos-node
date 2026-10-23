@@ -1,4 +1,5 @@
-// Owns offline engine independence.test regression cases; no funded wallets or live services.
+// Checks that the inference seller runs on an injected Engine and generates only after a confirmed
+// valid escrow deposit.
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { once } from 'node:events';

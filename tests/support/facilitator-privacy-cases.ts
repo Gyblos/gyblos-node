@@ -1,4 +1,5 @@
-// Owns offline facilitator privacy cases regression cases; no funded wallets or live services.
+// Registers facilitator diagnostic privacy cases: projections drop arbitrary fields, messages, stacks
+// and hostile metadata, and never invent a signature hint.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 

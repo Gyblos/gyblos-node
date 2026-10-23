@@ -1,4 +1,5 @@
-// Owns laboratory journal; product code must not depend on this module.
+// Payment journal guard: refuses a new attempt while any gate journal is in a non-terminal state,
+// and saves journal records.
 import { readFile } from 'node:fs/promises';
 
 import { JOURNAL_FILENAMES, JOURNAL_PATHS } from '@gyblos/config';

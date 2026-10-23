@@ -1,4 +1,5 @@
-// Owns offline signature facilitator cases regression cases; no funded wallets or live services.
+// Registers facilitator signature-hint cases: malformed SDK hints are dropped from records without
+// changing the HTTP 200 body or typed error category.
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';

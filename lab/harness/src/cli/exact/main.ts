@@ -1,4 +1,5 @@
-// Owns laboratory main; product code must not depend on this module.
+// Exact-scheme gate (GYB-GATE-0004): under the gate lock, probes public facilitators, prepares devnet
+// USDC accounts and runs the cases per provider until one passes. Refuses while a journal is unresolved.
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { readFile } from 'node:fs/promises';

@@ -1,4 +1,5 @@
-// Owns offline iroh transport.test regression cases; no funded wallets or live services.
+// Checks HTTP payment traffic over native Iroh: NodeId mismatch and direct-path refusal before signing,
+// free-request quota across reconnects, plus the egress and native transport suites.
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { once } from 'node:events';

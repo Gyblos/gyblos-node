@@ -1,4 +1,5 @@
-// Owns offline facilitator.test regression cases; no funded wallets or live services.
+// Checks that malformed payments cannot crash the facilitator or reach settlement, and runs the
+// facilitator HTTP, observer, privacy, startup, loopback-host, private-log and signature-hint suites.
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { test } from 'node:test';

@@ -1,4 +1,5 @@
-// Owns laboratory evidence; product code must not depend on this module.
+// Creates the in-progress GYB-GATE-0005 evidence record (model, prices, template, limitations),
+// carrying earlier attempts forward, and saves it.
 import { readFile } from 'node:fs/promises';
 
 import { X402_SDK_VERSION } from '@gyblos/config';

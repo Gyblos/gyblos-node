@@ -1,4 +1,5 @@
-// Owns offline facilitator observer cases regression cases; no funded wallets or live services.
+// Registers facilitator observer cases: SDK success, pending, verification and policy outcomes are
+// recorded distinctly, and a faulty observer cannot alter or delay the settlement response.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 

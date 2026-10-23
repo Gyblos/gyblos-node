@@ -1,4 +1,4 @@
-// Owns laboratory inference setup; product code must not depend on this module.
+// Script entry that downloads the pinned tokenizer and Ollama model: runs setupInferenceGate().
 import { isMain } from '@gyblos/runtime';
 
 import { setupInferenceGate } from '../src/inference-setup.js';

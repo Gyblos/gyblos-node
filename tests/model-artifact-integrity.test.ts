@@ -1,4 +1,5 @@
-// Owns offline model artifact integrity.test regression cases; no funded wallets or live services.
+// Checks that model integrity accepts only the pinned manifest and its Ollama provenance, and detects
+// changed weights, config or a substituted manifest.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import test from 'node:test';

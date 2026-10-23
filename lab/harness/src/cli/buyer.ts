@@ -1,4 +1,5 @@
-// Owns laboratory buyer; product code must not depend on this module.
+// CLI that runs the fixed-price paid gate against already-running facilitator/seller hosts and prints
+// the evidence JSON; sets a non-zero exit code on failure.
 import { isMain } from '@gyblos/runtime';
 
 import { executeGate } from './execute.js';

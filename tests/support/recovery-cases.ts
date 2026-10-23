@@ -1,4 +1,5 @@
-// Owns offline recovery cases regression cases; no funded wallets or live services.
+// Registers recovery CLI cases: journal-only principal return without wallet keys, single-process
+// recovery, read-only audits and metadata-conflict refusal.
 import assert from 'node:assert/strict';
 import { promises as fs } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
