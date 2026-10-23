@@ -1,7 +1,7 @@
 // Validates a seller's inference response against the requested id, offer, model and digest, and
 // derives what the buyer observed (usage, billed tokens, done reason). No SDKs or I/O.
 import { HTTP_STATUS } from '@gyblos/config';
-import type { EngineWireUsage as EngineUsage } from '@gyblos/protocol/wire-usage';
+import type { EngineWireUsage } from '@gyblos/protocol/wire-usage';
 
 import { OBSERVED_DONE_REASONS, type ObservedDoneReason } from './constants.js';
 import { charge, compareUsage, type TokenCounts } from './metering.js';
@@ -12,7 +12,7 @@ export interface ObservedBody {
   model?: string;
   digest?: string;
   content?: string;
-  usage?: EngineUsage;
+  usage?: EngineWireUsage;
   billedTokens?: TokenCounts;
   done?: boolean;
   doneReason?: ObservedDoneReason;
@@ -49,13 +49,13 @@ export function observeInferenceResponse(input: {
     if (!raw.usage || !raw.billedTokens)
       throw new Error('Missing inference usage.');
     const rawUsage = raw.usage;
-    const usageValue = (key: keyof EngineUsage): number => {
+    const usageValue = (key: keyof EngineWireUsage): number => {
       const value = rawUsage[key];
       if (!Number.isSafeInteger(value) || value < 0)
         throw new Error('Invalid inference usage.');
       return value;
     };
-    const usage: EngineUsage = {
+    const usage: EngineWireUsage = {
       prompt_eval_count: usageValue('prompt_eval_count'),
       eval_count: usageValue('eval_count'),
       total_duration: usageValue('total_duration'),

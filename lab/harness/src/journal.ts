@@ -2,12 +2,12 @@
 // and saves journal records.
 import { readFile } from 'node:fs/promises';
 
-import { JOURNAL_FILENAMES, JOURNAL_PATHS } from '@gyblos/config';
-import { GateError } from '@gyblos/payments-x402/chain';
-import { GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
+import { JOURNAL_STATES } from '@gyblos/payments-x402/constants';
+import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
+import { ProtocolError } from '@gyblos/protocol/errors';
 import { saveJson } from '@gyblos/runtime';
 
-import { JOURNAL_STATES } from './constants.js';
+import { JOURNAL_FILENAMES, JOURNAL_PATHS } from './constants.js';
 import type { GateJournalRecord, JournalStateRecord } from './journal-types.js';
 
 export async function assertNoUnresolvedAuthorizations(
@@ -34,8 +34,8 @@ export async function assertNoUnresolvedAuthorizations(
             ]
           : [JOURNAL_STATES.VERIFIED, JOURNAL_STATES.RESOLVED_REJECTED];
       if (!terminal.includes(previous.state ?? ''))
-        throw new GateError(
-          GATE_ERROR_CODES.UNRESOLVED_ATTEMPT,
+        throw new ProtocolError(
+          PROTOCOL_ERROR_CODES.UNRESOLVED_ATTEMPT,
           `Authorization may be unsettled. Reconcile ${path} before another attempt.`,
         );
     } catch (error) {

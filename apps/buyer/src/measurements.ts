@@ -12,9 +12,9 @@ import {
   UNITS,
 } from '@gyblos/config';
 import type { ChargeAnomaly } from '@gyblos/core/constants';
-import type { EngineDescription } from '@gyblos/core/engine';
 import type { TokenCounts } from '@gyblos/core/metering';
 import { MODEL } from '@gyblos/engine-ollama/model';
+import { type EngineDescription } from '@gyblos/protocol/engine';
 
 import { MEASUREMENT_SCHEMA_VERSION } from './constants.js';
 

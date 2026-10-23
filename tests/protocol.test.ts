@@ -1,5 +1,5 @@
 // Checks the signed-offer protocol: golden vector bytes and signature, domain separation, canonical encoding,
-// legacy error aliases, engine/wire contracts and that the protocol package has no SDK or adapter imports.
+// protocol error serialization, engine/wire contracts and that the protocol package has no SDK or adapter imports.
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import test from 'node:test';
@@ -8,7 +8,6 @@ import { address, generateKeyPairSigner, getAddressEncoder } from '@solana/kit';
 import ts from 'typescript';
 
 import { P2P } from '@gyblos/config';
-import { inferenceWireUsage as applicationWireUsage } from '@gyblos/core/engine';
 import applicationManifest from '@gyblos/core/package.json' with { type: 'json' };
 import { ENGINE_DONE_REASONS as adapterReasons } from '@gyblos/engine-ollama/constants';
 import {
@@ -16,8 +15,6 @@ import {
   verifyInferenceOffer,
   type InferenceOffer,
 } from '@gyblos/node/offers';
-import { GateError } from '@gyblos/payments-x402/chain';
-import { GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
 import {
   canonicalJson,
   ENGINE_DONE_REASONS,
@@ -186,14 +183,12 @@ void test('canonical encoding preserves legacy integer/string, UTF-16 key order 
     );
 });
 
-void test('legacy payment error aliases retain one constructor, catalog and Error serialization', () => {
-  assert.equal(GateError, ProtocolError);
-  assert.equal(GATE_ERROR_CODES, PROTOCOL_ERROR_CODES);
-  const error = new GateError(
+void test('protocol errors retain one constructor, catalog and Error serialization', () => {
+  const error = new ProtocolError(
     PROTOCOL_ERROR_CODES.BAD_USAGE,
     'synthetic error',
   );
-  assert.ok(error instanceof ProtocolError && error instanceof GateError);
+  assert.ok(error instanceof ProtocolError && error instanceof Error);
   assert.equal(error.name, 'Error');
   assert.equal(error.message, 'synthetic error');
   assert.deepEqual(Object.keys(error), ['code']);
@@ -204,7 +199,6 @@ void test('legacy payment error aliases retain one constructor, catalog and Erro
 void test('engine completion reasons and separate domain/wire usage contracts keep their values', () => {
   assert.equal(adapterReasons, ENGINE_DONE_REASONS);
   assert.deepEqual(ENGINE_DONE_REASONS, { STOP: 'stop', LENGTH: 'length' });
-  assert.equal(applicationWireUsage, inferenceWireUsage);
   const domain: EngineUsage = {
     inputTokens: 1,
     outputTokens: 2,

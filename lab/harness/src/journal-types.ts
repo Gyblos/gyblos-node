@@ -1,11 +1,8 @@
 // Shapes of the payment journal records the gates write before and after each authorization.
 import type { DEVNET } from '@gyblos/config';
+import { type JOURNAL_STATES } from '@gyblos/payments-x402/constants';
 
-import type {
-  ExactCaseName,
-  FAILURE_CASES,
-  JOURNAL_STATES,
-} from './constants.js';
+import type { ExactCaseName, FAILURE_CASES } from './constants.js';
 import type {
   AuthorizationMetadata,
   ExactSnapshot,

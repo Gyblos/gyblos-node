@@ -2,8 +2,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { INFERENCE_CASES } from '@gyblos/node/constants';
-import { createCases } from '@gyblos/node/synthetic-cases';
+import { INFERENCE_CASES } from '@gyblos/buyer/constants';
+import { createCases } from '@gyblos/buyer/synthetic-cases';
 
 void test('gate adds the separately targeted undercharge before engine termination', () => {
   const cases = createCases('over-request', 'failure-request', 'under-request');

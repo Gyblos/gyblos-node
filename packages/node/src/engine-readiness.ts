@@ -1,8 +1,8 @@
 // Gates the seller on engine readiness: checks memory headroom, runs one bounded private warmup, records
 // the outcome and anchors offer expiry to the warmed model's residency.
 import { DIAGNOSTICS, P2P } from '@gyblos/config';
-import type { Engine, EngineDescription } from '@gyblos/core/engine';
 import { READINESS_GENERATION } from '@gyblos/engine-ollama/constants';
+import { type Engine, type EngineDescription } from '@gyblos/protocol/engine';
 import {
   assertMemoryHeadroom,
   type MemorySnapshot,

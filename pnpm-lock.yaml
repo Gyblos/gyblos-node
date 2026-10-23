@@ -50,9 +50,6 @@ importers:
       '@number0/iroh':
         specifier: 1.1.0
         version: 1.1.0
-      '@solana-program/system':
-        specifier: 0.10.0
-        version: 0.10.0(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))
       '@solana-program/token':
         specifier: 0.9.0
         version: 0.9.0(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))
@@ -105,12 +102,18 @@ importers:
       '@gyblos/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@gyblos/engine-ollama':
+        specifier: workspace:*
+        version: link:../../packages/engine-ollama
       '@gyblos/node':
         specifier: workspace:*
         version: link:../../packages/node
       '@gyblos/payments-x402':
         specifier: workspace:*
         version: link:../../packages/payments-x402
+      '@gyblos/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
       '@gyblos/runtime':
         specifier: workspace:*
         version: link:../../packages/runtime
@@ -138,21 +141,18 @@ importers:
 
   apps/node:
     dependencies:
-      '@gyblos/config':
-        specifier: workspace:*
-        version: link:../../packages/config
       '@gyblos/node':
         specifier: workspace:*
         version: link:../../packages/node
-      '@gyblos/payments-x402':
-        specifier: workspace:*
-        version: link:../../packages/payments-x402
       '@gyblos/runtime':
         specifier: workspace:*
         version: link:../../packages/runtime
 
   lab/harness:
     dependencies:
+      '@gyblos/buyer':
+        specifier: workspace:*
+        version: link:../../apps/buyer
       '@gyblos/config':
         specifier: workspace:*
         version: link:../../packages/config
@@ -168,6 +168,9 @@ importers:
       '@gyblos/payments-x402':
         specifier: workspace:*
         version: link:../../packages/payments-x402
+      '@gyblos/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
       '@gyblos/runtime':
         specifier: workspace:*
         version: link:../../packages/runtime
@@ -183,15 +186,24 @@ importers:
       '@x402/core':
         specifier: 2.28.0
         version: 2.28.0
+      '@x402/express':
+        specifier: 2.28.0
+        version: 2.28.0(express@4.21.2)(typescript@5.9.3)
       '@x402/svm':
         specifier: 2.28.0
         version: 2.28.0(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))(@solana/sysvars@6.1.0(typescript@5.9.3))(typescript@5.9.3)
+      express:
+        specifier: 4.21.2
+        version: 4.21.2
 
   packages/config:
     dependencies:
       '@huggingface/tokenizers':
         specifier: 0.2.0
         version: 0.2.0
+      '@solana-program/system':
+        specifier: 0.10.0
+        version: 0.10.0(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))
       '@solana-program/token':
         specifier: 0.9.0
         version: 0.9.0(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))
@@ -297,9 +309,6 @@ importers:
       '@x402/core':
         specifier: 2.28.0
         version: 2.28.0
-      '@x402/express':
-        specifier: 2.28.0
-        version: 2.28.0(express@4.21.2)(typescript@5.9.3)
       '@x402/fetch':
         specifier: 2.28.0
         version: 2.28.0

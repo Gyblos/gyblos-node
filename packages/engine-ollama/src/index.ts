@@ -1,7 +1,7 @@
 // Ollama HTTP client restricted to a literal loopback origin: checks the pinned model is present and runs
 // bounded, deterministic raw generations. It must not know wallets or payments.
 import { IPV6_LOOPBACK, LOCALHOST, ROUTES, TIMEOUTS } from '@gyblos/config';
-import type { EngineWireUsage as EngineUsage } from '@gyblos/protocol/wire-usage';
+import type { EngineWireUsage } from '@gyblos/protocol/wire-usage';
 
 import {
   ENGINE_DONE_REASONS,
@@ -11,11 +11,9 @@ import {
 } from './constants.js';
 import { MODEL, renderChat } from './model.js';
 
-export type { EngineWireUsage as EngineUsage } from '@gyblos/protocol/wire-usage';
-
 export interface InferenceResult {
   text: string;
-  usage: EngineUsage;
+  usage: EngineWireUsage;
   done: true;
   doneReason: EngineDoneReason;
 }
@@ -145,7 +143,7 @@ export function createOllama(base: string, fetchImpl: typeof fetch = fetch) {
         )
           throw new Error('Incomplete engine response.');
         const terminalFrame = terminal;
-        const usageValue = (key: keyof EngineUsage): number => {
+        const usageValue = (key: keyof EngineWireUsage): number => {
           const value = terminalFrame[key];
           if (
             typeof value !== 'number' ||
@@ -155,7 +153,7 @@ export function createOllama(base: string, fetchImpl: typeof fetch = fetch) {
             throw new Error('Invalid engine usage.');
           return value;
         };
-        const usage: EngineUsage = {
+        const usage: EngineWireUsage = {
           prompt_eval_count: usageValue('prompt_eval_count'),
           eval_count: usageValue('eval_count'),
           total_duration: usageValue('total_duration'),

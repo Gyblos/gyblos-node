@@ -3,12 +3,13 @@
 import { readFile } from 'node:fs/promises';
 
 import { X402_SDK_VERSION } from '@gyblos/config';
+import { type Config } from '@gyblos/config/wallet';
 import { PRICES, TOLERANCE } from '@gyblos/core/metering';
 import { MODEL } from '@gyblos/engine-ollama';
 import { GENERATION } from '@gyblos/engine-ollama/constants';
 import { DEVNET } from '@gyblos/payments-x402/constants';
+import { saveJson } from '@gyblos/runtime';
 
-import { saveJson, type Config } from '../../config.js';
 import {
   EVIDENCE_IDS,
   EVIDENCE_STATUSES,

@@ -8,13 +8,13 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import type { CallPaymentObservation } from '@gyblos/buyer/call-evidence';
-import type {
-  CallOutcome,
-  CallPhase,
-  P2pJournalState,
+import {
+  type CallOutcome,
+  type CallPhase,
+  type ErrorDiagnosticCode,
+  type P2pJournalState,
 } from '@gyblos/buyer/constants';
 import { P2P } from '@gyblos/config';
-import type { ErrorDiagnosticCode } from '@gyblos/node/constants';
 
 const SOURCE = new URL('../../', import.meta.url);
 const SIGNATURE = '1'.repeat(64);
@@ -55,17 +55,15 @@ interface CallProbe {
 function bootstrap(faults: CallFaults) {
   const entry = new URL(import.meta.resolve('@gyblos/buyer/call')).href;
   const config = new URL(import.meta.resolve('@gyblos/config')).href;
-  const chain = new URL(import.meta.resolve('@gyblos/payments-x402/chain'))
-    .href;
-  const codes = new URL(import.meta.resolve('@gyblos/payments-x402/constants'))
-    .href;
+  const errors = new URL(import.meta.resolve('@gyblos/protocol/errors')).href;
+  const codes = new URL(import.meta.resolve('@gyblos/protocol/constants')).href;
   const roles = `import {P2P} from '${config}'; export function rolePath(name){return P2P.root+'/'+name} export async function roleSigner(){return {address:'synthetic-buyer'}}`;
-  const proof = `import {GateError} from '${chain}'; import {GATE_ERROR_CODES} from '${codes}';
+  const proof = `import {ProtocolError} from '${errors}'; import {PROTOCOL_ERROR_CODES} from '${codes}';
     export async function paymentProof(...args){
       if(${Boolean(faults.afterDiscovery)})await args[5]?.({depositSignature:'${DEPOSIT_SIGNATURE}',claimSignature:'${SIGNATURE}'});
       if(${Boolean(faults.afterProof)})return {chargedAtomic:'140',refundAtomic:'416',claimSignature:'${SIGNATURE}',depositSignature:'synthetic-deposit'};
       if(${Boolean(faults.hostileError)})throw new Proxy({},{getPrototypeOf(){throw Error('PRIVATE_SENTINEL')}});
-      throw new GateError(GATE_ERROR_CODES.TRANSACTION_UNKNOWN,'https://private.invalid/?api_key=PRIVATE_SENTINEL');
+      throw new ProtocolError(PROTOCOL_ERROR_CODES.TRANSACTION_UNKNOWN,'https://private.invalid/?api_key=PRIVATE_SENTINEL');
     }`;
   const inference = `import {appendFile} from 'node:fs/promises'; import {P2P} from '${config}';
     export function createInferenceBuyer(_signer,_rpc,_policy,hooks){return async(_url,request)=>{

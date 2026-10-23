@@ -21,13 +21,18 @@ import {
   RETRY_DELAYS,
   TOKEN_PROGRAM_ADDRESS,
 } from '@gyblos/config';
-import { GateError, lamports, rpc } from '@gyblos/payments-x402/chain';
-import { DEVNET_USDC, GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
-import { exactAuthorizationId } from '@gyblos/payments-x402/exact/authorization-id';
+import { type Config } from '@gyblos/config/wallet';
+import {
+  type AccountsResponse,
+  type ChainTransaction,
+} from '@gyblos/payments-x402/accounting/types';
+import { lamports, rpc } from '@gyblos/payments-x402/chain';
+import { DEVNET_USDC } from '@gyblos/payments-x402/constants';
+import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
+import { ProtocolError } from '@gyblos/protocol/errors';
 
-import { type Config } from '../../config.js';
 import { RECONCILIATION_CLASSIFICATIONS } from '../../constants.js';
-import type { AccountsResponse, ChainTransaction } from '../../types.js';
+import { exactAuthorizationId } from '../../exact/authorization-id.js';
 
 export async function snapshot(config: Config, buyer: string) {
   const atas = await Promise.all(
@@ -53,8 +58,8 @@ export async function snapshot(config: Config, buyer: string) {
       break;
     } catch (error) {
       if (
-        !(error instanceof GateError) ||
-        error.code !== GATE_ERROR_CODES.RPC_HTTP ||
+        !(error instanceof ProtocolError) ||
+        error.code !== PROTOCOL_ERROR_CODES.RPC_HTTP ||
         !error.message.includes(String(HTTP_STATUS.tooManyRequests)) ||
         attempt === RETRIES.exactSnapshotLastAttempt
       )

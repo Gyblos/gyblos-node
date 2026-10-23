@@ -1,4 +1,4 @@
-// Payment journal states, public facilitator call outcomes, channel guard messages and diagnostic codes.
+// Payment journal states, facilitator call operations, channel guard messages and diagnostic codes.
 export const JOURNAL_STATES = {
   AUTHORIZATION_CREATED: 'authorization-created',
   RECONCILED: 'reconciled',
@@ -12,12 +12,6 @@ export const JOURNAL_STATES = {
 export const PUBLIC_CALL_OPERATIONS = {
   VERIFY: 'verify',
   SETTLE: 'settle',
-} as const;
-
-export const PUBLIC_CALL_OUTCOMES = {
-  SUCCESS: 'success',
-  REJECTED: 'rejected',
-  UNCERTAIN: 'uncertain',
 } as const;
 
 export const CHANNEL_GUARDS = {
@@ -86,8 +80,6 @@ export type FacilitatorDiagnosticCode =
 
 export type PublicCallOperation =
   (typeof PUBLIC_CALL_OPERATIONS)[keyof typeof PUBLIC_CALL_OPERATIONS];
-export type PublicCallOutcome =
-  (typeof PUBLIC_CALL_OUTCOMES)[keyof typeof PUBLIC_CALL_OUTCOMES];
 
 export type FinalizedChannelGuardMessage =
   (typeof CHANNEL_GUARDS)[keyof typeof CHANNEL_GUARDS];
@@ -101,8 +93,3 @@ export {
   MAX_ATOMIC,
   ACTUAL_ATOMIC,
 } from '@gyblos/config';
-
-export {
-  PROTOCOL_ERROR_CODES as GATE_ERROR_CODES,
-  type ProtocolErrorCode as GateErrorCode,
-} from '@gyblos/protocol/constants';

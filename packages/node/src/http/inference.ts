@@ -22,14 +22,14 @@ import {
   ROUTES,
   TOKEN_PROGRAM_ADDRESS,
 } from '@gyblos/config';
+import { charge, OFFER_ID, type TokenCounts } from '@gyblos/core/metering';
+import { DEVNET, MAX_ATOMIC } from '@gyblos/payments-x402/constants';
+import { verifyInferenceDeposit } from '@gyblos/payments-x402/inference-deposit';
 import {
   inferenceWireUsage,
   type Engine,
   type RecountTokenizer,
-} from '@gyblos/core/engine';
-import { charge, OFFER_ID, type TokenCounts } from '@gyblos/core/metering';
-import { DEVNET, MAX_ATOMIC } from '@gyblos/payments-x402/constants';
-import { verifyInferenceDeposit } from '@gyblos/payments-x402/inference-deposit';
+} from '@gyblos/protocol/engine';
 import { requireLoopbackHost } from '@gyblos/runtime/loopback-host';
 
 export interface InferenceRequest {

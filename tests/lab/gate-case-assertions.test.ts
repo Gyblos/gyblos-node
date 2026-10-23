@@ -2,17 +2,15 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { INFERENCE_CASES } from '@gyblos/buyer/constants';
+import { measurementRow } from '@gyblos/buyer/measurements';
 import { CHARGE_ANOMALIES } from '@gyblos/core/constants';
 import { observeInferenceResponse } from '@gyblos/core/inference-observation';
 import { assessCharge, charge, OFFER_ID } from '@gyblos/core/metering';
 import { MODEL } from '@gyblos/engine-ollama';
 import { ENGINE_DONE_REASONS } from '@gyblos/engine-ollama/constants';
 import { assertInferenceCase } from '@gyblos/lab-harness/cli/inference/assertions';
-import {
-  INFERENCE_CASES,
-  type InferenceCaseName,
-} from '@gyblos/lab-harness/constants';
-import { measurementRow } from '@gyblos/node/measurements';
+import { type InferenceCaseName } from '@gyblos/lab-harness/constants';
 
 function fixture(
   options: {

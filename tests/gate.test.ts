@@ -1,4 +1,4 @@
-// Owns offline application gate, trust and journal guard regressions; no funded wallets or live services.
+// Offline payment trust, devnet, buyer-lock and journal guard regressions; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -7,7 +7,6 @@ import { test } from 'node:test';
 
 import type { PaymentRequirements } from '@x402/core/types';
 
-import { runGate, verifyAccounting, type GateReceipt } from '@gyblos/core';
 import { assertNoUnresolvedAuthorizations } from '@gyblos/lab-harness/journal';
 import { assertDevnet } from '@gyblos/payments-x402/chain';
 import { DEVNET, DEVNET_USDC } from '@gyblos/payments-x402/constants';
@@ -56,86 +55,6 @@ void test('trust checks reject redirected funds and unsafe terms before signing'
         validateTerms({ ...terms, ...change } as PaymentRequirements, policy),
       /./,
     );
-});
-
-const before = { buyer: '1000000', seller: '0', buyerLamports: '0' };
-const after = { buyer: '996000', seller: '4000', buyerLamports: '0' };
-const receipt: GateReceipt = {
-  authorized: '10000',
-  actual: '4000',
-  channelId: 'channel',
-  openTransaction: 'open',
-  claimTransaction: 'claim',
-  channelDistributed: true,
-};
-
-void test('application gate can be called without a CLI and proves both balance deltas', async () => {
-  const calls: string[] = [];
-  let snapshots = 0;
-  const result = await runGate({
-    preflight: async () => {
-      calls.push('preflight');
-    },
-    snapshot: async () => {
-      calls.push('snapshot');
-      return snapshots++ === 0 ? before : after;
-    },
-    request: async () => {
-      calls.push('request');
-      return { receipt, resource: 'fixture' };
-    },
-  });
-  assert.deepEqual(calls, ['preflight', 'snapshot', 'request', 'snapshot']);
-  assert.equal(result.accounting.refund, '6000');
-});
-
-void test('no apparent success from overcharge, missing refund, gas charge or open channel', () => {
-  assert.throws(
-    () => verifyAccounting(before, { ...after, buyer: '990000' }, receipt),
-    /Buyer token delta/,
-  );
-  assert.throws(
-    () => verifyAccounting(before, { ...after, seller: '0' }, receipt),
-    /Seller token delta/,
-  );
-  assert.throws(
-    () => verifyAccounting(before, { ...after, buyerLamports: '1' }, receipt),
-    /Buyer SOL/,
-  );
-  assert.throws(
-    () => verifyAccounting(before, after, { ...receipt, actual: '10001' }),
-    /nonzero charge/,
-  );
-  assert.throws(
-    () =>
-      verifyAccounting(before, after, {
-        ...receipt,
-        channelDistributed: false,
-      }),
-    /undistributed/,
-  );
-  assert.throws(
-    () =>
-      verifyAccounting(before, after, { ...receipt, claimTransaction: 'open' }),
-    /Distinct open/,
-  );
-});
-
-void test('failed preflight cannot trigger a paid request', async () => {
-  let requested = false;
-  await assert.rejects(
-    runGate({
-      preflight: async () => {
-        throw new Error('not funded');
-      },
-      snapshot: async () => before,
-      request: async () => {
-        requested = true;
-        return { receipt, resource: null };
-      },
-    }),
-  );
-  assert.equal(requested, false);
 });
 
 void test('cluster verification rejects a mainnet RPC even if its URL says devnet', async () => {

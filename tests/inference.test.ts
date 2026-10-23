@@ -8,6 +8,11 @@ import test from 'node:test';
 
 import { TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
 
+import {
+  appendMeasurement,
+  measurementRow,
+  measurementSalt,
+} from '@gyblos/buyer/measurements';
 import { CHARGE_ANOMALIES } from '@gyblos/core/constants';
 import {
   assessCharge,
@@ -22,11 +27,6 @@ import {
   MODEL,
   renderChat,
 } from '@gyblos/engine-ollama';
-import {
-  appendMeasurement,
-  measurementRow,
-  measurementSalt,
-} from '@gyblos/node/measurements';
 import { transactionTransfers } from '@gyblos/payments-x402/accounting/chain';
 
 const secretPrompt = 'private prompt that must never reach storage';

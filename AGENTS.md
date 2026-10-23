@@ -7,10 +7,10 @@ This repository contains the Gyblos node and buyer application, not the separate
 - `packages/protocol`: SDK-independent signing, canonical bytes, engine contracts, shared error taxonomy and public discovery records (see `SPEC.md`).
 - `packages/core`: workflow and metering policy; no SDKs, filesystem or adapters.
 - `packages/engine-ollama`, `payments-x402`, `transport-iroh`, `identity` (8004 registry; not wired yet): independent adapters.
-- `packages/node`: seller composition and lifecycle, plus role keys, signed offers and buyer measurements shared with `apps/buyer`.
-- `apps/node` (seller daemon, fixed-price test seller), `apps/buyer` (proxy, paid call, reconciliation), `apps/facilitator`: independent executable applications.
-- `packages/config`: operator configuration and retained legacy shared values; `runtime`: platform support.
-- `lab/harness`, `lab/tools`, `lab/evidence`: validation and experiments, outside product ownership. The Docker/NAT laboratory is archived at tag `archive/poc-lab-2026-10`.
+- `packages/node`: seller composition and lifecycle, plus role keys and signed offers shared with `apps/buyer`.
+- `apps/node` (seller daemon), `apps/buyer` (proxy, paid call, measurements, synthetic cases, reconciliation), `apps/facilitator`: independent executable applications.
+- `packages/config`: operator configuration and values shared by product packages (gate-only paths and endpoints live in `lab/harness`); `runtime`: platform support.
+- `lab/harness` (gate checks, x402 `exact` scheme, fixed-price test seller, gate runner), `lab/tools`, `lab/evidence`: validation and experiments, outside product ownership. The Docker/NAT laboratory is archived at tag `archive/poc-lab-2026-10`.
 - `tests` and `tooling`: offline verification; no import-time application initialization.
 
 ## Documentation
@@ -78,7 +78,7 @@ Parse external JSON as unknown, then validate shape, bounds and trust at the bou
 
 ## Testing
 
-Run typecheck, lint and the discovered offline tests for every PR. `pnpm test` is the product gate (`tests/*.test.ts`); `pnpm test:lab` runs lab-only regressions in `tests/lab/` and must also pass when lab code changes; `pnpm test:all` runs both. Report exact passed, failed, cancelled and skipped counts; distinguish tooling tests from product tests. Use public package entries. See [tests/README.md](tests/README.md) for native prerequisites, opt-in integration and the fixtures policy. Keep explicit `void test(...)` registration; deliberately invalid boundary data and partial SDK doubles may use assertions in tests, never in product code. TDD is required for confirmed behavior bugs; keep behavior changes and moves in separate PRs. Golden vectors protect signing domain, canonical bytes and error alias identity. Refactors preserve existing test names/counts, wire values, journals and private paths; explain any new test registration.
+Run typecheck, lint and the discovered offline tests for every PR. `pnpm test` is the product gate (`tests/*.test.ts`); `pnpm test:lab` runs lab-only regressions in `tests/lab/` and must also pass when lab code changes; `pnpm test:all` runs both. Report exact passed, failed, cancelled and skipped counts; distinguish tooling tests from product tests. Use public package entries. See [tests/README.md](tests/README.md) for native prerequisites, opt-in integration and the fixtures policy. Keep explicit `void test(...)` registration; deliberately invalid boundary data and partial SDK doubles may use assertions in tests, never in product code. TDD is required for confirmed behavior bugs; keep behavior changes and moves in separate PRs. Golden vectors protect signing domain, canonical bytes and error code values. Refactors preserve existing test names/counts, wire values, journals and private paths; explain any new test registration.
 
 ## Security and privacy
 

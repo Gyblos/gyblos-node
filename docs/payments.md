@@ -26,8 +26,9 @@ The `upto` gates and the node use a test token labelled `devnet-test-token`,
 
 ## Gates
 
-Gates are proof-of-concept checks in `lab/harness`. Run them from the repository
-root after `pnpm gate:setup` and funding; network confirmation can take minutes.
+Gates are proof-of-concept checks in `lab/harness`; the `exact` scheme and the
+fixed-price test seller exist only there. Run them from the repository root
+after `pnpm gate:setup` and funding; network confirmation can take minutes.
 
 | Command               | What it proves                                                                                               |
 | --------------------- | ------------------------------------------------------------------------------------------------------------ |

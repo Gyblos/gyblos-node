@@ -1,13 +1,13 @@
 // Builds the initial in-progress GYB-GATE-0004 (exact, Circle devnet USDC) evidence record and its
 // declared limitations.
 import { X402_SDK_VERSION } from '@gyblos/config';
-import { EXACT_PRICE } from '@gyblos/core/constants';
 import { DEVNET, DEVNET_USDC } from '@gyblos/payments-x402/constants';
 
 import {
   EVIDENCE_IDS,
   EVIDENCE_STATUSES,
   EXACT_ASSET_LABELS,
+  EXACT_PRICE,
   SCHEMA_VERSIONS,
 } from '../../constants.js';
 import type { ExactGateEvidence } from '../../types.js';

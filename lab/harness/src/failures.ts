@@ -11,16 +11,14 @@ import {
 
 import {
   DIAGNOSTIC_LIMITS,
-  FAILURE_EVIDENCE_PATH,
-  failureJournalPath,
-  failureResultPath,
   HTTP_STATUS,
   LOCALHOST,
-  LOCK_PATH,
   ROUTES,
   TIMEOUTS,
   UNITS,
 } from '@gyblos/config';
+import { CONFIG_ASSET_LABELS, WALLET_ROLES } from '@gyblos/config/constants';
+import { loadConfig, signer } from '@gyblos/config/wallet';
 import { createBuyer } from '@gyblos/payments-x402';
 import {
   account,
@@ -28,21 +26,27 @@ import {
   rpc,
   tokens,
 } from '@gyblos/payments-x402/chain';
-import { DEVNET, MAX_ATOMIC } from '@gyblos/payments-x402/constants';
+import {
+  DEVNET,
+  JOURNAL_STATES,
+  MAX_ATOMIC,
+} from '@gyblos/payments-x402/constants';
 import { createFacilitator } from '@gyblos/payments-x402/facilitator';
 import { withExclusiveLock } from '@gyblos/payments-x402/recovery/lock';
-import { createGateSeller } from '@gyblos/payments-x402/seller';
+import { saveJson } from '@gyblos/runtime';
 
-import { loadConfig, saveJson, signer } from './config.js';
 import {
   CASE_STATUSES,
-  CONFIG_ASSET_LABELS,
   FAILURE_CASES,
-  JOURNAL_STATES,
+  FAILURE_EVIDENCE_PATH,
+  failureJournalPath,
+  failureResultPath,
+  GATE_ROUTES,
+  LOCK_PATH,
   SCHEMA_VERSIONS,
-  WALLET_ROLES,
 } from './constants.js';
 import { prepareFailureAccounts } from './failure-setup.js';
+import { createGateSeller } from './fixed-seller.js';
 import type {
   FailureCaseResult,
   FailureGateEvidence,
@@ -171,7 +175,7 @@ export async function failureGate() {
             });
           },
         );
-        const response = await buyer.request(`${url}${ROUTES.fixed}`);
+        const response = await buyer.request(`${url}${GATE_ROUTES.fixed}`);
         assert.equal(response.status, HTTP_STATUS.paymentRequired);
         assert.ok(channelId);
         const health = (await fetch(`${url}${ROUTES.health}`).then((response) =>

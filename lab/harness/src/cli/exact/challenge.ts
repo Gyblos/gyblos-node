@@ -4,8 +4,8 @@ import assert from 'node:assert/strict';
 import { decodePaymentRequiredHeader } from '@x402/core/http';
 
 import { HTTP_STATUS, TIMEOUTS } from '@gyblos/config';
-import { validateExactTerms } from '@gyblos/payments-x402/exact/index';
 
+import { validateExactTerms } from '../../exact/index.js';
 import type { ExactContext } from './types.js';
 
 export function createChallenge(

@@ -4,46 +4,48 @@ import { discoverChannelsByRentPayer, toFacilitatorSvmSigner } from '@x402/svm';
 
 import {
   CHANNEL_STATUS,
-  FAILED_REQUEST_PATH,
-  FIXED_MIN_FACILITATOR_LAMPORTS,
-  fixedEvidencePath,
   HOSTS,
   HTTP_STATUS,
-  JOURNAL_PATHS,
-  LOCK_PATH,
   ROUTES,
   X402_SDK_VERSION,
 } from '@gyblos/config';
-import { runGate } from '@gyblos/core';
+import { WALLET_ROLES } from '@gyblos/config/constants';
+import { loadConfig, signer } from '@gyblos/config/wallet';
 import { createBuyer } from '@gyblos/payments-x402';
 import {
   account,
   assertProgram,
   confirm,
   explorer,
-  GateError,
   lamports,
   tokens,
 } from '@gyblos/payments-x402/chain';
 import {
   ACTUAL_ATOMIC,
   DEVNET,
-  GATE_ERROR_CODES,
+  JOURNAL_STATES,
   MAX_ATOMIC,
   UPSTREAM_COMMIT,
 } from '@gyblos/payments-x402/constants';
 import type { SettlementEvent } from '@gyblos/payments-x402/facilitator';
 import { withExclusiveLock } from '@gyblos/payments-x402/recovery/lock';
 import { validateSettlement } from '@gyblos/payments-x402/trust';
+import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
+import { ProtocolError } from '@gyblos/protocol/errors';
+import { saveJson } from '@gyblos/runtime';
 
-import { loadConfig, saveJson, signer } from '../config.js';
 import {
   EVIDENCE_STATUSES,
-  JOURNAL_STATES,
+  FAILED_REQUEST_PATH,
+  FIXED_MIN_FACILITATOR_LAMPORTS,
+  fixedEvidencePath,
+  GATE_ROUTES,
+  JOURNAL_PATHS,
+  LOCK_PATH,
   SCHEMA_VERSIONS,
-  WALLET_ROLES,
 } from '../constants.js';
 import type { FixedGateEvidence } from '../fixture-evidence-types.js';
+import { runGate } from '../gate.js';
 import { assertNoUnresolvedAuthorizations, saveJournal } from '../journal.js';
 
 const JOURNAL_PATH = JOURNAL_PATHS.fixed;
@@ -80,16 +82,16 @@ async function executeLocked(signal?: AbortSignal) {
         (await lamports(config.rpcUrl, config.addresses.facilitator)) <
         FIXED_MIN_FACILITATOR_LAMPORTS
       )
-        throw new GateError(
-          GATE_ERROR_CODES.NEEDS_SOL,
+        throw new ProtocolError(
+          PROTOCOL_ERROR_CODES.NEEDS_SOL,
           `Fund facilitator ${config.addresses.facilitator} with devnet SOL.`,
         );
       if (
         (await tokens(config.rpcUrl, config.addresses.buyer, config.mint)) <
         BigInt(MAX_ATOMIC)
       )
-        throw new GateError(
-          GATE_ERROR_CODES.NEEDS_TOKENS,
+        throw new ProtocolError(
+          PROTOCOL_ERROR_CODES.NEEDS_TOKENS,
           'Buyer does not have enough test tokens for the ceiling.',
         );
     },
@@ -109,7 +111,7 @@ async function executeLocked(signal?: AbortSignal) {
     async request() {
       signal?.throwIfAborted();
       const response = await buyer.request(
-        `${HOSTS.seller}${ROUTES.fixed}`,
+        `${HOSTS.seller}${GATE_ROUTES.fixed}`,
         signal,
       );
       if (
@@ -128,8 +130,8 @@ async function executeLocked(signal?: AbortSignal) {
         console.error(
           JSON.stringify({ status: response.status, events: diagnostics }),
         );
-        throw new GateError(
-          GATE_ERROR_CODES.PAID_REQUEST_FAILED,
+        throw new ProtocolError(
+          PROTOCOL_ERROR_CODES.PAID_REQUEST_FAILED,
           `Paid request HTTP ${response.status}; inspect journal and chain before retrying.`,
         );
       }
@@ -157,8 +159,8 @@ async function executeLocked(signal?: AbortSignal) {
         !claim?.transaction ||
         claim.transaction !== response.settlement.transaction
       )
-        throw new GateError(
-          GATE_ERROR_CODES.MISSING_EVIDENCE,
+        throw new ProtocolError(
+          PROTOCOL_ERROR_CODES.MISSING_EVIDENCE,
           'Could not correlate deposit, claim and response receipt.',
         );
       await confirm(config.rpcUrl, open.transaction);
@@ -184,8 +186,8 @@ async function executeLocked(signal?: AbortSignal) {
         open.amount !== response.authorization.requirements.amount ||
         claim.amount !== ACTUAL_ATOMIC
       )
-        throw new GateError(
-          GATE_ERROR_CODES.AMOUNT_MISMATCH,
+        throw new ProtocolError(
+          PROTOCOL_ERROR_CODES.AMOUNT_MISMATCH,
           'Unexpected settlement amount.',
         );
       return {

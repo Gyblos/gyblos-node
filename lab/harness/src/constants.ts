@@ -1,15 +1,24 @@
 // Harness-only vocabulary: evidence IDs and statuses, case names, funding operations and schema
-// versions, plus re-exports of the shared wallet, journal and guard constants it uses.
-import {
-  CONFIG_SCHEMA_VERSION,
-  type ConfigAssetLabel,
-} from '@gyblos/config/constants';
+// versions. Shared wallet, journal and guard values are imported from their owning packages.
 import {
   ERROR_DIAGNOSTICS,
   INFERENCE_CASES,
   MEASUREMENT_SCHEMA_VERSION,
-} from '@gyblos/node/constants';
-import { type GateErrorCode } from '@gyblos/payments-x402/constants';
+} from '@gyblos/buyer/constants';
+import { LOCAL_DIR } from '@gyblos/config';
+import {
+  CONFIG_SCHEMA_VERSION,
+  type ConfigAssetLabel,
+} from '@gyblos/config/constants';
+import { type ProtocolErrorCode } from '@gyblos/protocol/constants';
+
+export const EXACT_PRICE = '10000';
+
+export const PUBLIC_CALL_OUTCOMES = {
+  SUCCESS: 'success',
+  REJECTED: 'rejected',
+  UNCERTAIN: 'uncertain',
+} as const;
 
 export const EXACT_EVIDENCE_CODES = {
   GATE_ERROR: 'GATE_ERROR',
@@ -97,11 +106,11 @@ export const SCHEMA_VERSIONS = {
 export const EXACT_REPLAY_SCOPE = 'same-process replay guard' as const;
 
 export type ExactEvidenceErrorCode =
-  | GateErrorCode
+  | ProtocolErrorCode
   | (typeof EXACT_EVIDENCE_CODES)[keyof typeof EXACT_EVIDENCE_CODES];
 
 export type InferenceEvidenceErrorCode =
-  | GateErrorCode
+  | ProtocolErrorCode
   | (typeof INFERENCE_EVIDENCE_CODES)[keyof typeof INFERENCE_EVIDENCE_CODES];
 
 export type EvidenceStatus =
@@ -124,25 +133,86 @@ export type EvidenceAssetLabel =
 export type FundingOperation =
   (typeof FUNDING_OPERATIONS)[keyof typeof FUNDING_OPERATIONS];
 
-export {
-  CONFIG_ASSET_LABELS,
-  WALLET_ROLES,
-  type ConfigAssetLabel,
-  type WalletRole,
-} from '@gyblos/config/constants';
+export type PublicCallOutcome =
+  (typeof PUBLIC_CALL_OUTCOMES)[keyof typeof PUBLIC_CALL_OUTCOMES];
 
-export { INFERENCE_CASES } from '@gyblos/node/constants';
+// Gate-only paths, entrypoints, routes, funding floors and public endpoints (formerly in @gyblos/config).
+export const LOCK_PATH = `${LOCAL_DIR}/buyer.lock`;
 
-export {
-  RENT_GUARDS,
-  TOKEN_GUARDS,
-  PROOF_GUARDS,
-  type FinancialGuardMessage,
-} from '@gyblos/payments-x402/accounting/constants';
+export const JOURNAL_PATHS = {
+  fixed: `${LOCAL_DIR}/attempt.json`,
+  f1: `${LOCAL_DIR}/failure-F1-attempt.json`,
+  f2: `${LOCAL_DIR}/failure-F2-attempt.json`,
+  exact: `${LOCAL_DIR}/exact-attempt.json`,
+  inference: `${LOCAL_DIR}/inference-attempt.json`,
+} as const;
 
-export { JOURNAL_STATES } from '@gyblos/payments-x402/constants';
+export const FAILED_REQUEST_PATH = `${LOCAL_DIR}/failed-request.json`;
 
-export {
-  ERROR_DIAGNOSTICS,
-  type ErrorDiagnosticCode,
-} from '@gyblos/node/constants';
+export const CHALLENGE_EVIDENCE_PATH = `${LOCAL_DIR}/challenge-evidence.json`;
+
+export const FAILURE_EVIDENCE_PATH = `${LOCAL_DIR}/failure-evidence.json`;
+
+export const INFERENCE_TRANSPORT_PATH = `${LOCAL_DIR}/inference-last-transport.json`;
+
+export const ENTRYPOINTS = {
+  seller: 'lab/harness/scripts/seller.ts',
+  facilitator: 'apps/facilitator/src/main.ts',
+} as const;
+
+export const JOURNAL_FILENAMES = {
+  exact: 'exact-attempt.json',
+  inference: 'inference-attempt.json',
+} as const;
+
+export const EVIDENCE_PATHS = {
+  exact: 'lab/evidence/gate-0004.json',
+  inference: 'lab/evidence/gate-0005.json',
+} as const;
+
+export const keyPath = (role: string) => `${LOCAL_DIR}/${role}.json`;
+
+export function failureJournalPath(kind: string) {
+  return `${LOCAL_DIR}/failure-${kind}-attempt.json`;
+}
+
+export function failureResultPath(kind: string) {
+  return `${LOCAL_DIR}/failure-${kind}-result.json`;
+}
+
+export function fixedEvidencePath(timestamp: number) {
+  return `${LOCAL_DIR}/evidence-${timestamp}.json`;
+}
+
+export function keyFilename(role: string) {
+  return `${role}.json`;
+}
+
+export const MIN_FACILITATOR_LAMPORTS = 15_000_000n;
+
+export const FIXED_MIN_FACILITATOR_LAMPORTS = 10_000_000n;
+
+export const GATE_CASES = {
+  billingInflation: 1.4,
+  billingDeflation: 0.6,
+} as const;
+
+export const PUBLIC_FACILITATORS = [
+  {
+    url: 'https://x402.org/facilitator',
+    feePayer: 'CKPKJWNdJEqa81x7CkZ14BVPiY6y16Sxs7owznqtWYp5',
+  },
+  {
+    url: 'https://facilitator.payai.network',
+    feePayer: '2wKupLR9q6wXYppw8Gr2NvWxKBUqm4PPJKkQfoxHDBg4',
+  },
+] as const;
+
+export const PUBLIC_ORIGINS = { tokenizer: 'https://huggingface.co' } as const;
+
+export const GATE_ROUTES = {
+  fixed: '/api/generate',
+  exact: '/api/exact',
+  fixedDefinition: 'GET /api/generate',
+  exactDefinition: 'GET /api/exact',
+} as const;

@@ -1,4 +1,4 @@
-// Loopback ports, host URLs and accepted Host names, plus the few public origins the node contacts.
+// Loopback ports, host URLs, accepted Host names and the explorer origin.
 export const LOCALHOST = '127.0.0.1';
 
 export const PORTS = {
@@ -29,8 +29,6 @@ export const LOOPBACK_HOST_NAMES = [
 ] as const;
 
 export const EXPLORER_ORIGIN = 'https://explorer.solana.com';
-
-export const PUBLIC_ORIGINS = { tokenizer: 'https://huggingface.co' } as const;
 
 function formatHostUrl(port: number) {
   return `http://${LOCALHOST}:${port}`;

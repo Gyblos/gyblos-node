@@ -13,9 +13,6 @@
     "./accounting/types": "./src/accounting/types.ts",
     "./chain": "./src/chain.ts",
     "./constants": "./src/constants.ts",
-    "./exact/authorization-id": "./src/exact/authorization-id.ts",
-    "./exact/index": "./src/exact/index.ts",
-    "./exact/types": "./src/exact/types.ts",
     "./facilitator": "./src/facilitator.ts",
     "./facilitator-diagnostics": "./src/facilitator-diagnostics.ts",
     "./inference-buyer": "./src/inference-buyer.ts",
@@ -23,7 +20,6 @@
     "./recovery/lock": "./src/recovery/lock.ts",
     "./recovery/lock-owner": "./src/recovery/lock-owner.ts",
     "./recovery/recovery-lock": "./src/recovery/recovery-lock.ts",
-    "./seller": "./src/seller.ts",
     "./signature-hint": "./src/signature-hint.ts",
     "./trust": "./src/trust.ts"
   },
@@ -35,7 +31,6 @@
     "@x402/core": "2.28.0",
     "@x402/svm": "2.28.0",
     "express": "4.21.2",
-    "@x402/express": "2.28.0",
     "@solana-program/token": "0.9.0",
     "@x402/fetch": "2.28.0"
   }

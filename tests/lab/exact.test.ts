@@ -6,19 +6,21 @@ import { test } from 'node:test';
 import { generateKeyPairSigner } from '@solana/kit';
 import type { PaymentRequirements } from '@x402/core/types';
 
-import { EXACT_PRICE } from '@gyblos/core/constants';
 import {
-  DEVNET,
-  DEVNET_USDC,
-  PUBLIC_CALL_OPERATIONS,
+  EXACT_PRICE,
   PUBLIC_CALL_OUTCOMES,
-} from '@gyblos/payments-x402/constants';
+} from '@gyblos/lab-harness/constants';
 import {
   assertExactFallbackSafe,
   assertExactSupport,
   createExactBuyer,
   validateExactTerms,
-} from '@gyblos/payments-x402/exact/index';
+} from '@gyblos/lab-harness/exact/index';
+import {
+  DEVNET,
+  DEVNET_USDC,
+  PUBLIC_CALL_OPERATIONS,
+} from '@gyblos/payments-x402/constants';
 
 const policy = { payTo: 'seller', feePayer: 'sponsor', amount: EXACT_PRICE };
 const terms: PaymentRequirements = {
@@ -195,7 +197,7 @@ void test('replay ID ignores equivalent base64 and the facilitator co-signature'
     getBase64EncodedWireTransaction,
   } = await import('@solana/kit');
   const { exactAuthorizationId } =
-    await import('@gyblos/payments-x402/exact/authorization-id');
+    await import('@gyblos/lab-harness/exact/authorization-id');
   const signer = await generateKeyPairSigner();
   const message = setTransactionMessageLifetimeUsingBlockhash(
     {

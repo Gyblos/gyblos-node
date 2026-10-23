@@ -3,22 +3,12 @@
 import { type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 
-import {
-  ENTRYPOINTS,
-  FIXED_MIN_FACILITATOR_LAMPORTS,
-  HOSTS,
-  RETRIES,
-  RETRY_DELAYS,
-  ROUTES,
-  TIMEOUTS,
-} from '@gyblos/config';
-import {
-  assertProgram,
-  GateError,
-  lamports,
-  tokens,
-} from '@gyblos/payments-x402/chain';
-import { GATE_ERROR_CODES, MAX_ATOMIC } from '@gyblos/payments-x402/constants';
+import { HOSTS, RETRIES, RETRY_DELAYS, ROUTES, TIMEOUTS } from '@gyblos/config';
+import { loadConfig } from '@gyblos/config/wallet';
+import { assertProgram, lamports, tokens } from '@gyblos/payments-x402/chain';
+import { MAX_ATOMIC } from '@gyblos/payments-x402/constants';
+import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
+import { ProtocolError } from '@gyblos/protocol/errors';
 import {
   isMain,
   onShutdown,
@@ -27,7 +17,7 @@ import {
   waitReady,
 } from '@gyblos/runtime';
 
-import { loadConfig } from '../config.js';
+import { ENTRYPOINTS, FIXED_MIN_FACILITATOR_LAMPORTS } from '../constants.js';
 import { executeGate } from './execute.js';
 
 export async function main() {
@@ -48,16 +38,16 @@ export async function main() {
       (await lamports(config.rpcUrl, config.addresses.facilitator)) <
       FIXED_MIN_FACILITATOR_LAMPORTS
     )
-      throw new GateError(
-        GATE_ERROR_CODES.NEEDS_SOL,
+      throw new ProtocolError(
+        PROTOCOL_ERROR_CODES.NEEDS_SOL,
         `Fund devnet facilitator ${config.addresses.facilitator} first.`,
       );
     if (
       (await tokens(config.rpcUrl, config.addresses.buyer, config.mint)) <
       BigInt(MAX_ATOMIC)
     )
-      throw new GateError(
-        GATE_ERROR_CODES.NEEDS_TOKENS,
+      throw new ProtocolError(
+        PROTOCOL_ERROR_CODES.NEEDS_TOKENS,
         'Fund the buyer or run gate:fund --test-mint first.',
       );
     controller.signal.throwIfAborted();

@@ -3,8 +3,9 @@ import { HOSTS, LOCALHOST, PORTS } from '@gyblos/config';
 import { WALLET_ROLES } from '@gyblos/config/constants';
 import { loadConfig, signer } from '@gyblos/config/wallet';
 import { assertProgram } from '@gyblos/payments-x402/chain';
-import { createGateSeller } from '@gyblos/payments-x402/seller';
 import { isMain } from '@gyblos/runtime';
+
+import { createGateSeller } from '../src/fixed-seller.js';
 
 export async function main() {
   const config = await loadConfig();

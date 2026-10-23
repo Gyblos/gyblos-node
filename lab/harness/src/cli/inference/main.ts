@@ -8,54 +8,52 @@ import { readFile } from 'node:fs/promises';
 import type { Server } from 'node:http';
 import { resolve } from 'node:path';
 
+import { measurementSalt } from '@gyblos/buyer/measurements';
+import { createCases } from '@gyblos/buyer/synthetic-cases';
 import {
   DIAGNOSTIC_LIMITS,
-  ENTRYPOINTS,
-  EVIDENCE_PATHS,
   HOSTS,
-  JOURNAL_PATHS,
-  keyPath,
   LOCALHOST,
-  LOCK_PATH,
-  MIN_FACILITATOR_LAMPORTS,
   OLLAMA_MODELS_PATH,
   ROUTES,
   TIMEOUTS,
   TOKENIZER_FILES,
 } from '@gyblos/config';
+import { CONFIG_ASSET_LABELS, WALLET_ROLES } from '@gyblos/config/constants';
+import { loadConfig, signer } from '@gyblos/config/wallet';
 import { createModelTokenizer, createOllama } from '@gyblos/engine-ollama';
 import { GENERATION } from '@gyblos/engine-ollama/constants';
 import { createOllamaEngine } from '@gyblos/engine-ollama/engine';
 import { createInferenceSeller } from '@gyblos/node/http/inference';
-import { measurementSalt } from '@gyblos/node/measurements';
-import { createCases } from '@gyblos/node/synthetic-cases';
 import {
   confirmInference,
   inferenceSnapshot,
   transaction,
 } from '@gyblos/payments-x402/accounting/chain';
-import {
-  assertProgram,
-  GateError,
-  lamports,
-} from '@gyblos/payments-x402/chain';
-import { DEVNET_USDC, GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
+import { assertProgram, lamports } from '@gyblos/payments-x402/chain';
+import { DEVNET_USDC } from '@gyblos/payments-x402/constants';
 import type { SettlementEvent } from '@gyblos/payments-x402/facilitator';
 import { withExclusiveLock } from '@gyblos/payments-x402/recovery/lock';
+import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
+import { ProtocolError } from '@gyblos/protocol/errors';
 import {
   assertPortFree,
   onShutdown,
+  saveJson,
   spawnChild,
   stopChild,
   waitReady,
 } from '@gyblos/runtime';
 
-import { loadConfig, saveJson, signer } from '../../config.js';
 import {
-  CONFIG_ASSET_LABELS,
+  ENTRYPOINTS,
+  EVIDENCE_PATHS,
   EVIDENCE_STATUSES,
   INFERENCE_EVIDENCE_CODES,
-  WALLET_ROLES,
+  JOURNAL_PATHS,
+  keyPath,
+  LOCK_PATH,
+  MIN_FACILITATOR_LAMPORTS,
 } from '../../constants.js';
 import type { InferenceTrace } from '../../inference-evidence-types.js';
 import { assertNoUnresolvedAuthorizations } from '../../journal.js';
@@ -111,16 +109,16 @@ export async function main() {
       await assertPortFree(
         `${ollamaUrl}${ROUTES.ollamaVersion}`,
         () =>
-          new GateError(
-            GATE_ERROR_CODES.PORT_BUSY,
+          new ProtocolError(
+            PROTOCOL_ERROR_CODES.PORT_BUSY,
             'Gate requires an unused local host port.',
           ),
       );
       await assertPortFree(
         `${facilitatorUrl}${ROUTES.health}`,
         () =>
-          new GateError(
-            GATE_ERROR_CODES.PORT_BUSY,
+          new ProtocolError(
+            PROTOCOL_ERROR_CODES.PORT_BUSY,
             'Gate requires an unused local host port.',
           ),
       );
@@ -159,8 +157,8 @@ export async function main() {
         signal: controller.signal,
         expectedRunId: runId,
         onMismatch: () =>
-          new GateError(
-            GATE_ERROR_CODES.PORT_BUSY,
+          new ProtocolError(
+            PROTOCOL_ERROR_CODES.PORT_BUSY,
             'Host is not owned by this gate.',
           ),
       });
@@ -253,7 +251,7 @@ export async function main() {
     } catch (error) {
       evidence.status = EVIDENCE_STATUSES.INCOMPLETE;
       evidence.errorCode =
-        error instanceof GateError
+        error instanceof ProtocolError
           ? error.code
           : error instanceof assert.AssertionError
             ? INFERENCE_EVIDENCE_CODES.ASSERTION_FAILED
@@ -274,7 +272,7 @@ export async function main() {
     await withExclusiveLock(LOCK_PATH, run);
   } catch (error) {
     console.error(
-      error instanceof GateError
+      error instanceof ProtocolError
         ? error.code
         : 'Inference gate incomplete. Inspect evidence and reconcile any pending journal before retrying.',
     );

@@ -18,24 +18,23 @@ import {
   ROUTES,
   TIMEOUTS,
 } from '@gyblos/config';
-import { EXACT_PRICE } from '@gyblos/core/constants';
 import {
   DEVNET,
   DEVNET_USDC,
   PUBLIC_CALL_OPERATIONS,
-  PUBLIC_CALL_OUTCOMES,
   type PublicCallOperation,
 } from '@gyblos/payments-x402/constants';
-import { exactAuthorizationId } from '@gyblos/payments-x402/exact/authorization-id';
-import {
-  assertExactSupport,
-  validateExactTerms,
-} from '@gyblos/payments-x402/exact/index';
-import type { PublicCall } from '@gyblos/payments-x402/exact/types';
 import { UNKNOWN_ERROR_NAME } from '@gyblos/runtime/constants';
 import { requireLoopbackHost } from '@gyblos/runtime/loopback-host';
 
-export type { PublicCall } from '@gyblos/payments-x402/exact/types';
+import {
+  EXACT_PRICE,
+  GATE_ROUTES,
+  PUBLIC_CALL_OUTCOMES,
+} from '../constants.js';
+import { exactAuthorizationId } from './authorization-id.js';
+import { assertExactSupport, validateExactTerms } from './index.js';
+import type { PublicCall } from './types.js';
 
 export class AuditedPublicFacilitator extends HTTPFacilitatorClient {
   readonly calls: PublicCall[] = [];
@@ -134,7 +133,7 @@ export async function createExactSeller(options: {
     response.json({ handlerCalls, fixture: true, scheme: 'exact' });
   });
   // Process-scoped replay guard. Never retain or log the signed payload itself.
-  app.use(ROUTES.exact, async (request, response, next) => {
+  app.use(GATE_ROUTES.exact, async (request, response, next) => {
     const header = request.header('PAYMENT-SIGNATURE');
     if (!header) {
       next();
@@ -193,7 +192,7 @@ export async function createExactSeller(options: {
   app.use(
     paymentMiddleware(
       {
-        [ROUTES.exactDefinition]: {
+        [GATE_ROUTES.exactDefinition]: {
           accepts: [
             {
               scheme: 'exact',
@@ -214,7 +213,7 @@ export async function createExactSeller(options: {
       false,
     ),
   );
-  app.get(ROUTES.exact, (_request, response) => {
+  app.get(GATE_ROUTES.exact, (_request, response) => {
     handlerCalls++;
     response.json({
       fixture: true,

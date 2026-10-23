@@ -2,22 +2,19 @@
 // before the signer or any public facilitator call is reached.
 import assert from 'node:assert/strict';
 
-import { EXACT_PRICE } from '@gyblos/core/constants';
-import { GateError } from '@gyblos/payments-x402/chain';
-import { GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
-import {
-  createExactBuyer,
-  validateExactTerms,
-} from '@gyblos/payments-x402/exact/index';
+import { WALLET_ROLES } from '@gyblos/config/constants';
+import { signer } from '@gyblos/config/wallet';
+import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
+import { ProtocolError } from '@gyblos/protocol/errors';
 
-import { signer } from '../../config.js';
 import {
   CASE_STATUSES,
   EXACT_CASES,
   EXACT_ENFORCEMENT,
+  EXACT_PRICE,
   EXACT_UNTRUSTED_CASES,
-  WALLET_ROLES,
 } from '../../constants.js';
+import { createExactBuyer, validateExactTerms } from '../../exact/index.js';
 import type { createChallenge } from './challenge.js';
 import { snapshot } from './reconcile.js';
 import type { ExactContext } from './types.js';
@@ -54,8 +51,8 @@ export async function assertUntrusted(
     await assert.rejects(
       buyer.authorize({ ...required, accepts: [changed] }, EXACT_PRICE),
       (error: unknown) =>
-        error instanceof GateError &&
-        error.code === GATE_ERROR_CODES.UNTRUSTED_EXACT_TERMS,
+        error instanceof ProtocolError &&
+        error.code === PROTOCOL_ERROR_CODES.UNTRUSTED_EXACT_TERMS,
     );
     assert.equal(signed, false);
     cases.push({
@@ -95,8 +92,8 @@ export async function assertEmpty(
   await assert.rejects(
     emptyBuyer.authorize(await challenge(), emptyBefore.buyer),
     (error: unknown) =>
-      error instanceof GateError &&
-      error.code === GATE_ERROR_CODES.INSUFFICIENT_EXACT_USDC,
+      error instanceof ProtocolError &&
+      error.code === PROTOCOL_ERROR_CODES.INSUFFICIENT_EXACT_USDC,
   );
   assert.equal(signed, false);
   assert.equal(facilitator.calls.length, emptyCalls);
@@ -107,7 +104,7 @@ export async function assertEmpty(
     case: EXACT_CASES.INSUFFICIENT_USDC,
     status: CASE_STATUSES.PASSED,
     enforcement: EXACT_ENFORCEMENT.BUYER_PREFLIGHT,
-    reason: GATE_ERROR_CODES.INSUFFICIENT_EXACT_USDC,
+    reason: PROTOCOL_ERROR_CODES.INSUFFICIENT_EXACT_USDC,
     signed: false,
     before: emptyBefore,
     after: emptyAfter,

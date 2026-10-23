@@ -9,9 +9,11 @@ import {
   COMMITMENT,
   TOKEN_PROGRAM_ADDRESS,
 } from '@gyblos/config';
+import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
+import { ProtocolError } from '@gyblos/protocol/errors';
 
-import { assertDevnet, GateError, rpc } from './chain.js';
-import { DEVNET, GATE_ERROR_CODES } from './constants.js';
+import { assertDevnet, rpc } from './chain.js';
+import { DEVNET } from './constants.js';
 
 interface ChannelAccountResponse {
   value: { owner: string; data: [string, 'base64'] } | null;
@@ -93,8 +95,8 @@ export async function verifyInferenceDeposit(
     channel.authorizedSigner !== expected.authorizer ||
     channel.mint !== expected.mint
   ) {
-    throw new GateError(
-      GATE_ERROR_CODES.UNCONFIRMED_INFERENCE_DEPOSIT,
+    throw new ProtocolError(
+      PROTOCOL_ERROR_CODES.UNCONFIRMED_INFERENCE_DEPOSIT,
       'Channel does not match the committed inference deposit.',
     );
   }
@@ -117,8 +119,8 @@ export async function verifyInferenceDeposit(
     !/^\d+$/.test(String(info?.tokenAmount?.amount)) ||
     BigInt(info?.tokenAmount?.amount ?? '0') < BigInt(expected.ceiling)
   ) {
-    throw new GateError(
-      GATE_ERROR_CODES.INSUFFICIENT_INFERENCE_ESCROW,
+    throw new ProtocolError(
+      PROTOCOL_ERROR_CODES.INSUFFICIENT_INFERENCE_ESCROW,
       'Escrow does not cover the committed inference deposit.',
     );
   }

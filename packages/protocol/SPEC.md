@@ -40,8 +40,8 @@ not replace, reinterpret or authorize the buyer-bound paid offer.
 distinct snake_case wire counters; inferenceWireUsage performs the existing
 mapping. Engine completion reasons and error-code strings retain their values.
 `ProtocolError` keeps Error's existing name/message and enumerable code.
-The payment package temporarily re-exports that same constructor as GateError
-and the same code catalog as GATE_ERROR_CODES; these are aliases, not wrappers.
+Payment, node and buyer code throw and compare this same constructor and
+`PROTOCOL_ERROR_CODES` catalog directly; there are no payment-package aliases.
 
 `vectors/signed-inference-offer-v1.json` contains a synthetic, unfunded offer,
 canonical JSON, complete signing bytes in hexadecimal, raw public key and
@@ -120,8 +120,8 @@ Arbitrary JavaScript Proxies are outside the JSON input contract.
 `verifyPublicRecord(value, { owner, nodeId, now, lastSequence?, catalog? })`
 checks shape, caller-trusted identity, time, sequence, linked catalog and the node
 signature. It returns the parsed record or a typed `PublicRecordError` with an
-input-independent code/message. Existing ProtocolError/GateError aliases and
-code catalogs are unaffected. `signPublicRecord` validates shape/lifetime and
+input-independent code/message. Existing `ProtocolError` and
+its code catalog are unaffected. `signPublicRecord` validates shape/lifetime and
 signature length; its injected signer must use the matching node key. Signer
 failures retain their original identity. Signing does not establish discovery
 trust or online status.

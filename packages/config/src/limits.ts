@@ -3,10 +3,6 @@ export const MAX_ATOMIC = '10000';
 
 export const ACTUAL_ATOMIC = '4000';
 
-export const MIN_FACILITATOR_LAMPORTS = 15_000_000n;
-
-export const FIXED_MIN_FACILITATOR_LAMPORTS = 10_000_000n;
-
 export const TIMEOUTS = {
   rpc: 20_000,
   buyer: 120_000,
@@ -89,11 +85,6 @@ export const DIAGNOSTIC_LIMITS = {
   errorStackEnd: 3,
   transactionHistory: 50,
   failureHistory: 10,
-} as const;
-
-export const GATE_CASES = {
-  billingInflation: 1.4,
-  billingDeflation: 0.6,
 } as const;
 
 export const CHANNEL_STATUS = { open: 0, distributed: 3 } as const;

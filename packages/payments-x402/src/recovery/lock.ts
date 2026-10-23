@@ -3,9 +3,9 @@ import { lstat, mkdir, open, unlink, type FileHandle } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
 import { FILE_MODES } from '@gyblos/config';
+import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
+import { ProtocolError } from '@gyblos/protocol/errors';
 
-import { GateError } from '../chain.js';
-import { GATE_ERROR_CODES } from '../constants.js';
 import { currentLockOwner } from './lock-owner.js';
 
 async function removeOwnedLock(path: string, handle: FileHandle) {
@@ -37,8 +37,8 @@ export async function withExclusiveLock<T>(
   const handle = await open(path, 'wx', FILE_MODES.privateFile).catch(
     (error) => {
       if ((error as NodeJS.ErrnoException).code === 'EEXIST')
-        throw new GateError(
-          GATE_ERROR_CODES.BUYER_BUSY,
+        throw new ProtocolError(
+          PROTOCOL_ERROR_CODES.BUYER_BUSY,
           'Another buyer or an interrupted process holds the gate lock. Reconcile before removing a stale lock.',
         );
       throw error;

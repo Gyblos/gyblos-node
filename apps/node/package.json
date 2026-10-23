@@ -4,12 +4,9 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./fixed": "./src/fixed.ts",
     "./main": "./src/main.ts"
   },
   "dependencies": {
-    "@gyblos/config": "workspace:*",
-    "@gyblos/payments-x402": "workspace:*",
     "@gyblos/runtime": "workspace:*",
     "@gyblos/node": "workspace:*"
   }

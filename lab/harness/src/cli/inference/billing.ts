@@ -1,7 +1,8 @@
 // Seller billing override for the inference gate: inflates or deflates output tokens for two chosen
 // request IDs so overcharge and undercharge detection can be exercised.
-import { GATE_CASES } from '@gyblos/config';
 import type { TokenCounts } from '@gyblos/core/metering';
+
+import { GATE_CASES } from '../../constants.js';
 
 export function createGateBilling(
   feePayer: string,
