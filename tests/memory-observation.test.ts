@@ -1,4 +1,5 @@
-// Owns offline memory observation.test regression cases; no funded wallets or live services.
+// Checks memory snapshot parsing: OOM counts, unlimited cgroups and absent peaks stay explicit, and
+// missing or malformed evidence yields no readiness observation.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 

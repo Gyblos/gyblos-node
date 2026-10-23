@@ -1,4 +1,4 @@
-// Owns laboratory challenge; product code must not depend on this module.
+// Fetches the exact route unpaid and returns its single 402 option after validating it against policy.
 import assert from 'node:assert/strict';
 
 import { decodePaymentRequiredHeader } from '@x402/core/http';

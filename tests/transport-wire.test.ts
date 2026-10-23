@@ -1,4 +1,5 @@
-// Owns offline transport wire.test regression cases; no funded wallets or live services.
+// Checks the bounded HTTP wire: raw request and x402 header preservation, route and smuggling rejection,
+// peer limits and deadlines, plus the admission and limiter suites.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 

@@ -1,4 +1,5 @@
-// Owns gate in core; it must not know SDKs, engines or filesystem.
+// Runs the paid gate call through injected preflight/snapshot/request steps and checks its accounting:
+// a nonzero charge below the ceiling, matching buyer/seller deltas and no buyer SOL spent. No SDKs or I/O.
 import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { ProtocolError } from '@gyblos/protocol/errors';
 

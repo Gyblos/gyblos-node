@@ -1,4 +1,5 @@
-// Owns laboratory failures; product code must not depend on this module.
+// F1/F2 failure gate: an empty buyer and an expired authorization must both get 402 with no channel,
+// no resource execution and unchanged balances. Requires the devnet test token.
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 

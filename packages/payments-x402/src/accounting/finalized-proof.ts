@@ -1,4 +1,5 @@
-// Owns finalized proof in payments-x402; it must not know inference engines or lab orchestration.
+// Proves a settled payment from finalized chain data: both signatures finalized and successful, sponsor-paid,
+// with token and rent accounting checked. Read-only.
 import assert from 'node:assert/strict';
 
 import { FINALIZED_COMMITMENT, SVM_TRANSACTION_VERSION } from '@gyblos/config';

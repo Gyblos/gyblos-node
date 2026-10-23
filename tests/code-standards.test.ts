@@ -1,4 +1,5 @@
-// Owns offline code standards.test regression cases; no funded wallets or live services.
+// Checks the repo's standards and version-metadata lints, and that typed journals keep JSON
+// serialization and terminal-state guards.
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';

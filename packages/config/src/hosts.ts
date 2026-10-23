@@ -1,4 +1,4 @@
-// Owns hosts in config; it must not know product workflows or lab orchestration.
+// Loopback ports, host URLs and accepted Host names, plus the few public origins the node contacts.
 export const LOCALHOST = '127.0.0.1';
 
 export const PORTS = {

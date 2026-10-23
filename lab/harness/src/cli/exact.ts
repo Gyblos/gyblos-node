@@ -1,4 +1,4 @@
-// Owns laboratory exact; product code must not depend on this module.
+// CLI entry for the exact-scheme gate against public facilitators; logic lives in exact/main.ts.
 import { isMain } from '@gyblos/runtime';
 
 import { main } from './exact/main.js';

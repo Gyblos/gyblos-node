@@ -1,4 +1,4 @@
-// Owns paths in config; it must not know product workflows or lab orchestration.
+// Local file paths, journal names, entrypoints and HTTP routes shared by node, buyer and facilitator.
 export const LOCAL_DIR = '.local/devnet';
 
 export const LOCK_PATH = `${LOCAL_DIR}/buyer.lock`;

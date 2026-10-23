@@ -1,4 +1,5 @@
-// Owns offline lock probe regression cases; no funded wallets or live services.
+// Child-process entry for lock-cases: tries to take the P2P recovery lock and prints whether it was
+// rejected or entered.
 import { withP2pRecoveryLock } from '@gyblos/payments-x402/recovery/recovery-lock';
 import { isMain } from '@gyblos/runtime';
 

@@ -1,4 +1,5 @@
-// Owns offline payment fixture regression cases; no funded wallets or live services.
+// Loads the saved finalized deposit/claim pair with a synthetic current channel account, and serves
+// proof RPC reads from it behind a fetch stub that refuses any other endpoint.
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 

@@ -1,4 +1,5 @@
-// Owns offline token faults regression cases; no funded wallets or live services.
+// Token fault table: each entry mutates the payment fixture's balances or transfers and names the guard
+// that must reject it.
 import assert from 'node:assert/strict';
 
 import { DEVNET_TREASURY_OWNER } from '@gyblos/config';

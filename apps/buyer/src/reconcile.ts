@@ -1,4 +1,5 @@
-// Owns reconcile in buyer; it must not know laboratory orchestration.
+// CLI that resolves an uncertain journaled call: proves a zero-charge refund (or audits only),
+// records the result and unlocks the buyer only after the proof is written.
 import assert from 'node:assert/strict';
 import { parseArgs } from 'node:util';
 

@@ -1,4 +1,5 @@
-// Owns inference observation in core; it must not know SDKs, engines or filesystem.
+// Validates a seller's inference response against the requested id, offer, model and digest, and
+// derives what the buyer observed (usage, billed tokens, done reason). No SDKs or I/O.
 import { HTTP_STATUS } from '@gyblos/config';
 import type { EngineWireUsage as EngineUsage } from '@gyblos/protocol/wire-usage';
 

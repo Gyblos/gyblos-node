@@ -1,4 +1,5 @@
-// Owns offline native fixture regression cases; no funded wallets or live services.
+// Provides native Iroh endpoints and a seller/buyer fixture with instrumented connections, plus request,
+// exchange and deadline helpers.
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { createServer } from 'node:http';

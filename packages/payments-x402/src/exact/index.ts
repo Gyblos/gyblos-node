@@ -1,4 +1,5 @@
-// Owns index in payments-x402; it must not know inference engines or lab orchestration.
+// x402 "exact" scheme for public facilitators: checks supported kinds and terms against the pinned policy,
+// builds the buyer, and refuses a fallback provider while an attempt may have settled.
 import type { KeyPairSigner } from '@solana/kit';
 import { x402Client } from '@x402/core/client';
 import type {

@@ -1,4 +1,5 @@
-// Owns seller in node; it must not know lab orchestration or CLI processes.
+// Starts the P2P seller: local Ollama and facilitator, engine warmup, the inference seller on loopback, a
+// signed offer and the Iroh bridge; tears everything down in reverse order on failure.
 import { once } from 'node:events';
 import { resolve } from 'node:path';
 

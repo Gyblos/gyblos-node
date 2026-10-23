@@ -1,4 +1,4 @@
-// Owns laboratory journal types; product code must not depend on this module.
+// Shapes of the payment journal records the gates write before and after each authorization.
 import type { DEVNET } from '@gyblos/config';
 
 import type {

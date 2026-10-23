@@ -1,4 +1,5 @@
-// Owns offline lock cases regression cases; no funded wallets or live services.
+// Registers buyer and recovery lock cases: lock owner identity, audited dead-buyer retirement and
+// preservation of unsafe or swapped lock files; also runs the lock fault cases.
 import assert from 'node:assert/strict';
 import { execFile, spawnSync } from 'node:child_process';
 import {

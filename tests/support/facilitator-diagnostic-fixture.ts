@@ -1,4 +1,5 @@
-// Owns offline facilitator diagnostic fixture regression cases; no funded wallets or live services.
+// Provides a loopback facilitator host with stubbed SDK verify/settle and blocked fetch, plus
+// helpers to read its diagnostic log rows.
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { mkdtemp, readFile, realpath, rm } from 'node:fs/promises';

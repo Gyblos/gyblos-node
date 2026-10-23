@@ -1,4 +1,4 @@
-// Owns the unchanged financial-proof guard messages and their derived type.
+// Assertion messages for the rent, token and finalized-proof guards, and the union type of those messages.
 // No RPC, storage, inference or lab orchestration belongs here.
 export const RENT_GUARDS = {
   ACCOUNT: 'Required transaction account missing.',

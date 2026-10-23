@@ -1,4 +1,4 @@
-// Owns laboratory fund; product code must not depend on this module.
+// Script entry for devnet funding: runs fundGate() when executed directly (pass --test-mint for SPL).
 import { isMain } from '@gyblos/runtime';
 
 import { fundGate } from '../src/fund.js';

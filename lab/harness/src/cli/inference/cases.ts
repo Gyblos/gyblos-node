@@ -1,4 +1,5 @@
-// Owns laboratory cases; product code must not depend on this module.
+// Runs each inference case: pays up to a computed ceiling, reconciles on-chain, records a private
+// measurement and evidence, then journals the result. Pauses between cases for RPC rate limits.
 import assert from 'node:assert/strict';
 
 import { INFERENCE_TRANSPORT_PATH, TIMEOUTS } from '@gyblos/config';

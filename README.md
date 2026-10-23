@@ -1,606 +1,150 @@
 # Gyblos Node
 
-Gyblos node and buyer application for P2P inference, with experimental x402
-payments. A buyer authorizes a budget, a seller reports token usage, and a
-facilitator settles the charge and returns the unused deposit on Solana. This
-repository runs fixed-resource checks, local Ollama inference and an
-experimental native Iroh transport between isolated Docker roles and native
-peers. The final paid smoke on `ba168c4` completed three strictly sequential
-native Mac–VPS inferences over required direct Iroh routes, with a devnet test
-token and persistent facilitator diagnostics enabled. All six payment
-transactions finalized; each delivered answer passed independent recount and a
-finalized payment audit before the next request started. See the
-[commit-bound report](lab/evidence/gate-0008.json).
-
-The [older report](lab/evidence/gate-0007.json) remains historical. The separate
-`24af211` attempt completed its first call; its second settled on-chain but left
-the buyer uncertain, so its third was never started. That old journal and the
-unknown historical 402 cause remain unresolved. This successful new run used
-fresh isolated roles and did not retry or clear the old authorization. Docker
-NAT-direct did not pass. Hotspot/CGNAT and broader NAT coverage remain untested.
-This work was merged into `main` after the final review. Review issues #17–#19
-and #21–#23 remain deferred; the buyer-proxy overlap and malformed-JSON issue is
-addressed separately below.
+Peer-to-peer inference with pay-per-use payments. The buyer signs a spending
+ceiling, the seller charges only the tokens it used, and the unused deposit goes
+back to the buyer.
 
 > **Status:** experimental, Solana **devnet** only. Not audited. Never use
 > mainnet keys. Part of [Gyblos](https://gyblos.com) ·
 > [Paper](https://gyblos.com/paper).
 
-## Buyer proxy request ordering
+## What it does
 
-Each proxy instance serializes requests to its configured seller through the
-full response and local metric write. The existing two-request admission limit
-includes the active request and one queued request; excess requests receive 429.
-A queued request whose caller disconnects is skipped before forwarding.
-Malformed JSON receives 400 with `MALFORMED_JSON`, without forwarding payment
-headers. Transport failures retain the uncertain 503 response and never trigger
-a retry.
-
-Offline regressions reproduce the old overlap failure and validate the fix with
-real native Iroh loopback and simulated payment messages. This is not another
-paid devnet run or an explanation of the historical 402. The queue belongs to
-one proxy instance; it does not coordinate separate buyer processes.
-
-## Iroh relay configuration
-
-Native sellers and buyers use `https://na1.relay.gyblos.com/` by default, with
-QUIC address discovery on UDP 7842. Set `GYBLOS_RELAY_TOKEN` privately in each
-process environment before starting either role. There is no built-in token;
-missing, invalid or out-of-bounds (32 to 512 printable characters) configuration
-stops endpoint binding. The token is attached only to relays whose normalized
-hostname exactly matches the owned allowlist (`na1.relay.gyblos.com` and
-`na2.relay.gyblos.com`); other configured relays, including other
-`*.relay.gyblos.com` names, receive no token. Never put the token in a relay
-URL, a signed offer, a config file or a committed environment file.
-
-`GYBLOS_RELAYS` optionally overrides the comma-separated HTTPS relay origins.
-Both roles must use the same set and credentials. The buyer accepts a signed
-offer's relay only if its normalized URL belongs to that configured set. Both
-buyer modes then dial that normalized URL (an equivalent origin, for example
-with a trailing slash added) rather than the offer's raw string. Relay URLs, the
-owned host allowlist and the QUIC port defaults live in `@gyblos/config`. The
-default set contains only `na1`. A future `na2` slot is added by listing it in
-`GYBLOS_RELAYS` (for example
-`https://na1.relay.gyblos.com/,https://na2.relay.gyblos.com/`) once that relay
-exists; it receives the token because it is on the owned host allowlist. The
-built-in default changes only after `na2` is deployed.
-
-`GYBLOS_BUYER_RELAY_ONLY=1` binds the buyer endpoint to loopback only, like the
-seller's relay-only mode, ignores `GYBLOS_IROH_BIND` and the seller's advertised
-direct addresses, and dials only the offer's normalized configured relay. An
-offer without a relay, or a `GYBLOS_IROH_EXTERNAL_ADDR` candidate, is rejected
-in this mode. Without it, the buyer keeps its operator binds and seller direct
-addresses.
-
-The n0 preset still initializes crypto and DNS/pkarr address discovery before
-the custom map replaces its relays. Public n0 relays are not an automatic
-fallback. Iroh can still choose direct paths and fall back to the configured
-relay; this does not retry a paid request or resolve an uncertain payment. This
-integration is verified offline with native relay maps and a fake endpoint
-builder, not a new authenticated cross-machine relay or payment run.
-
-## How it works
+- **Seller node** (`pnpm node:start`): Ollama + signed offer, served over Iroh.
+- **Buyer proxy** (`pnpm buyer:start`): checks the offer, listens on `:4031`.
+- **Payments**: x402 `upto`, local facilitator, devnet test token (not USDC).
+- **Transport**: Iroh over our relay `na1.relay.gyblos.com`, or direct.
+- **Identity**: 8004 registry adapter in `packages/identity`, **not wired** yet.
 
 ```text
-buyer (CLI) ── requests / receives 402 terms ──▶ seller (HTTP + Ollama)
-     │ signs a ceiling                              │ reports usage
-     ▼                                              ▼
-facilitator ── opens & settles a Solana payment channel
-                    └── seller paid; unused deposit returned to buyer
+app ─▶ buyer proxy ══ Iroh (direct or na1 relay) ══▶ seller node ─▶ Ollama
+        signs ceiling ─▶ Solana devnet channel ◀─ facilitator settles usage
 ```
 
-| Route   | Payment                                 | Facilitator                 | Use                 |
-| ------- | --------------------------------------- | --------------------------- | ------------------- |
-| `upto`  | Reported usage, within a signed ceiling | Local process in this repo  | Metered inference   |
-| `exact` | Fixed price; no unused-budget refund    | x402.org, with PayAI backup | Fixed test resource |
+## Status
 
-Both routes use the official `@x402/*` SDK pinned to 2.28.0. The buyer
-independently recounts inference tokens and detects discrepancies; this does
-**not** prevent a dishonest charge within the signed ceiling. The quickstart
-uses a test token, **not USDC**; the public fixed-price route uses Circle devnet
-USDC.
+- **Paid on devnet:** three sequential inferences, VPS buyer to Mac seller over
+  direct Iroh ([gate-0008.json](lab/evidence/gate-0008.json), source `ba168c4`).
+- **Offline on every change:** payments, recovery, transport, relay config.
+- **Not tested:** paid runs on this head, relay-only privacy off-host, CGNAT,
+  mainnet ([all limits](docs/limitations.md)).
 
-## Reproduce checks on another host without payments
+## Quickstart
 
-Create a source package from a committed revision. `git archive` includes only
-tracked files; it does not copy local wallets, journals, logs or installed
-packages. Keep the commit and SHA-256 digest with the private operator record:
+Requirements: Node.js 22+, pnpm 10.12.1 and a native Iroh platform (macOS ARM64
+or Linux x64/ARM64; no Intel Mac, Windows untested). Paid runs need devnet SOL
+from [faucet.solana.com](https://faucet.solana.com); inference needs
+[Ollama](https://ollama.com).
 
-```sh
-GYBLOS_REVISION=$(git rev-parse --verify HEAD)
-git archive --format=tar.gz --output="/tmp/gyblos-${GYBLOS_REVISION}.tar.gz" "$GYBLOS_REVISION"
-shasum -a 256 "/tmp/gyblos-${GYBLOS_REVISION}.tar.gz"
-```
-
-Transfer it over authenticated SSH/SCP and compare its SHA-256 digest with the
-local value before extracting into a fresh, empty directory. Install
-dependencies on each host; native Mac packages are not a Linux runtime. From
-that directory:
+### 1. Offline checks
 
 ```sh
 pnpm install --frozen-lockfile --ignore-scripts
-pnpm typecheck
-pnpm lint
-pnpm test
+pnpm typecheck && pnpm lint && pnpm test
 ```
 
-An already populated pnpm store can use `--offline` for installation. These
-checks need no funded wallets, model or payment service. Native Iroh cases
-report explicit capability skips; see [Contributing](CONTRIBUTING.md). Keep role
-state in its original private directory, and preserve an uncertain authorization
-until it is reconciled. This workflow does not start a buyer, seller or
-facilitator.
+No wallet, model or network needed; unsupported native cases skip explicitly.
 
-P2P calls retain a safe failure phase/code, filtered route metrics and bounded
-receipt/deposit signature hints in `observedPayment`. Those hints do not confirm
-a payment. Read-only proof retries tolerate a temporarily missing deposit index;
-post-claim snapshots must reach the known claim slot. A remaining failure blocks
-another authorization. See
-[reconciliation limits](docs/limitations.md#uncertain-outcomes-and-manual-reconciliation).
-
-## Enforced import boundaries
-
-`pnpm boundaries` statically checks the package layers and reports current, new
-and resolved violations against `tooling/boundaries-baseline.json`. It also runs
-as part of `pnpm lint`. The checker and its separate regression suites are
-TypeScript, included in strict `pnpm typecheck` and ESLint checks, and run
-through the existing `tsx` loader. Architectural violations, a nonempty
-baseline, analysis failures, configuration errors and resolution errors fail the
-command.
-
-`core` owns domain policy; `engine-ollama`, `payments-x402` and `transport-iroh`
-are separate adapters; `node` owns composition; gates, scripts and experiments
-live in `lab`. Each app is independent. Tests and verification tooling may
-inspect every layer. Protocol is independent; config/runtime are shared support
-above protocol. Product cannot import lab, adapters cannot import one another,
-and apps cannot import other apps.
-
-Use `pnpm boundaries --json` for a structured report and `pnpm boundaries:test`
-for the separate synthetic tooling checks. Baseline changes are deliberate:
-`pnpm boundaries --update-baseline` can only confirm an empty baseline; normal
-checks never rewrite it. Both the current graph and the versioned baseline must
-stay empty. Explicit package exports expose the public entries used by tests;
-internal imports stay relative to their owning package.
-
-Analysis parses source without executing it. Git checkouts use tracked and
-nonignored source files; source archives use the same explicit source roots.
-Private and generated trees are excluded, and installed dependencies are
-resolved without following their implementations. Source symlinks and linked
-source roots are excluded; imports outside the vetted source inventory fail
-analysis before their contents are parsed. The verifier remains in `tooling/`
-when experimental tools move to `lab/`.
-
-## Private facilitator diagnostics
-
-The standalone facilitator and the P2P seller append private JSONL records to
-`.local/devnet/facilitator-diagnostics/` and
-`.local/p2p/facilitator-diagnostics/`, respectively, relative to the role's
-working directory. Each process reserves a separate `diagnostic-N.jsonl` file;
-files use mode `0600`, and their directory uses `0700`. Keep these files out of
-Git and public reports.
-
-Records identify the SDK version, process instance, attempt, operation,
-deposit/claim phase and ordered stages: received, policy decision, SDK start,
-SDK result/exception, and local HTTP finish or early close/error. Only bounded,
-validated channel, amount and transaction-signature hints are included. Raw
-errors, messages, stacks, payloads, salts, prompts and RPC URLs are excluded
-from this new stream. Existing in-memory `/gate/events` and
-`/gate/verifications` are separate legacy diagnostics, outside this projection.
-
-The loopback facilitator exposes `GET /gate/diagnostics`: `state`, a canonical
-failure `code`, `queued`, `synced`, `dropped`, `rotations` and `closed`.
-`synced` advances only after append and filesystem sync; queued records can be
-lost on a crash. SDK rejection can retain HTTP 200 from the facilitator and
-cause a seller-facing 402. HTTP finish is local completion, not buyer
-acknowledgment. Neither record is proof of settlement, refund or delivery.
-
-Logging does not await disk I/O on the payment path. It is bounded to 128
-pending entries, 4 KiB per record, 4 MiB per file, 3 budget rotations per
-process and 16 named slot files (at most 64 MiB). A crash during reclamation can
-leave one extra quarantine file until a later reclamation removes it, and an
-unlinked file still open by another process keeps its blocks until it closes;
-neither is counted in that bound. When every slot is taken, the oldest settled
-`diagnostic-N.jsonl` file owned by this subsystem is deleted after ownership,
-link and inode checks; otherwise opening fails closed. Archive files you must
-keep privately, because restarts and rotations reclaim the oldest diagnostics. A
-full queue, exhausted rotations or persistence failure degrades diagnostic
-health and emits a fixed warning without retrying or replacing a payment result.
-Files are never truncated or repaired. Mixed legacy layouts that cannot preserve
-the bound are refused. Drain and descriptor close share a two-second deadline;
-file opening, including rotation, has no deadline. Late disconnected SDK work is
-not awaited, and its final diagnostics can be lost at shutdown. See
-[diagnostic limits](docs/limitations.md#private-facilitator-diagnostics).
-
-## Quickstart: make a fixed-resource payment
-
-Requirements: Node.js 22+, pnpm 10.12.1 and access to a Solana devnet RPC. Run
-from the repository root. Funding and network confirmation can take several
-minutes.
+### 2. A devnet payment on one machine
 
 ```sh
-pnpm install --frozen-lockfile --ignore-scripts
-pnpm gate:setup
-# Fund the printed facilitator address with at least 0.05 devnet SOL:
-# https://faucet.solana.com
-pnpm gate:fund --test-mint
-pnpm gate:preflight
-pnpm gate:challenge
-pnpm gate:run
+pnpm gate:setup              # creates isolated keys in .local/devnet/
+# fund the printed facilitator address with at least 0.05 devnet SOL
+pnpm gate:fund --test-mint   # creates the six-decimal test token
+pnpm gate:preflight          # checks devnet, program, mint and funding
+pnpm gate:challenge          # unpaid request must get HTTP 402
+pnpm gate:run                # 10,000 deposited, 4,000 charged, 6,000 returned
+pnpm gate:inference:setup && pnpm gate:inference   # metered, real model (523 MB)
 ```
 
-Wallet setup creates isolated buyer, seller, authorizer, facilitator and
-test-mint keys in `.local/devnet/`, preserving existing keys. If configuration
-already exists, find the facilitator address in its `addresses.facilitator`
-field. Provisioning creates a six-decimal SPL test token and accounts; rerunning
-it does not mint more tokens when the mint already exists.
+Details: [docs/payments.md](docs/payments.md).
 
-The preflight checks devnet, the program, mint and funding. The unpaid challenge
-must return HTTP 402 without executing the resource or settling a payment. The
-full run starts both hosts and verifies distinct confirmed open/claim
-transactions: **10,000 deposited, 4,000 charged, 6,000 returned**, matching
-token balances, unchanged buyer SOL, channel distribution and fixed-resource
-delivery.
+### 3. Run a seller and a buyer
 
-## Run metered inference
-
-Install the Ollama executable and complete the wallet/token setup above first.
-Stop other gate hosts, then download the pinned model and run the six cases:
+Use a separate working directory per role. Seller:
 
 ```sh
-pnpm gate:inference:setup
-pnpm gate:inference
+export GYBLOS_RELAY_TOKEN=...   # 32-512 characters; never commit it
+pnpm gate:setup --role seller --mint MINT --buyer BUYER_ADDRESS --pay-to PAYOUT_ADDRESS
+pnpm gate:inference:setup       # downloads the pinned model
+pnpm node:start                 # writes the signed offer to .local/p2p/offer.json
 ```
 
-Setup downloads Qwen3 0.6B Q4_K_M (about 523 MB of model layers) into
-`.local/ollama/models/` and verifies pinned tokenizer artifacts. The gate runs
-three honest calls, a deliberately inflated bill, a deliberately reduced bill
-and an engine interruption. The buyer checks token counts against a predefined
-tolerance.
+Buyer: same token, `pnpm gate:setup --role buyer --mint MINT`, put the seller's
+`offer.json` and a `trust.json` in `.local/p2p/`, then `pnpm buyer:start`. Full
+steps: [docs/running-a-node.md](docs/running-a-node.md).
 
-Measurements append to `.local/devnet/measurements.jsonl` without prompts or
-answers. Pricing, tokenization, case classification and measurement details are
-in [docs/inference.md](docs/inference.md).
+## Commands
 
-## Experimental Iroh P2P
-
-The P2P path keeps payment policy, the interchangeable `Engine` interface and
-`Transport` separate. A buyer verifies an owner-signed offer and the actual Iroh
-peer identity before forwarding HTTP payment requests through its loopback
-proxy. Only the paid inference route reaches the seller; Ollama and the
-facilitator stay on seller loopback.
-
-The Docker/NAT laboratory used for the proof of concept was archived at tag
-`archive/poc-lab-2026-10`; its published reports remain in `lab/evidence/`.
-
-Seller startup now requires measured VM/cgroup memory headroom, then one bounded
-private synthetic warmup before any offer is signed or readiness is reported.
-Headroom is checked again after tokenizer, middleware and transport
-initialization, before signing. Generated text is discarded. The 1.5 GiB reserve
-is a conservative admission policy, not a proven minimum working set or a future
-capacity guarantee. Memory snapshots and OOM deltas are private metadata;
-failure aborts startup without an automatic retry. One model/parallel generation
-and a bounded queue are explicit. Offers expire four minutes after warmup,
-within the five-minute model keep-alive; slow publication cannot extend that
-lease. A valid warmup cannot prevent later VM pressure, model eviction or
-unrelated processes consuming memory.
-
-Uncertain calls block further authorizations until reconciliation; there is no
-automatic payment retry.
-
-Direct peers can see each other's IP addresses. `GYBLOS_RELAY_ONLY=1` restricts
-seller binds and advertised candidates and rejects an observed direct path; its
-off-host privacy behavior still needs empirical validation. Route labels are
-sampled native observations, not a guarantee about every packet. This setting
-configures the seller only. `GYBLOS_BUYER_RELAY_ONLY=1` separately keeps the
-buyer endpoint on loopback sockets and dials the seller only through its relay;
-its off-host privacy behavior is likewise unvalidated. Requiring a relay route
-without that setting does not hide buyer addressing. This PoC does not verify
-model authenticity or response correctness.
-
-### Verify P2P settlement or reconcile zero charge
-
-Preserve the original role, trust, signed offer, journal and call history. The
-following command only reads the chain and changes local recovery files after
-proving zero charged and complete unused-deposit return:
-
-```sh
-pnpm p2p:reconcile --deposit DEPOSIT_SIGNATURE --claim CLAIM_SIGNATURE
-```
-
-It verifies finalized transaction identities, token/SOL deltas, the canonical
-distributed channel, sponsor fees, retained channel rent and temporary canonical
-escrow-account rent. Proof is saved before the matching journal can be
-confirmed; failed calls remain in history. If a process stopped before writing a
-call row, complete original identities and the ceiling in its durable journal
-can supply that metadata. Conflicting rows or incomplete journals stop recovery;
-no delivered call is invented. A charged outcome or unavailable/inconsistent
-proof keeps recovery blocked. No signing, funding, submission or payment retry
-occurs.
-
-The recovery command can reclaim a buyer lock only after checking a private,
-regular, unchanged file, matching its host/boot/PID ownership domain and proving
-its recorded local PID is absent. Linux records the boot ID and PID namespace;
-macOS reads a bounded boot-session identifier. Legacy, mismatched or unavailable
-owner identity requires manual investigation, as do live/reused PIDs, corrupt
-metadata and an interrupted recovery lock. Nonblocking, no-follow opens reject
-FIFO and link paths. A structured stale-owner audit is synchronized before
-removal. Normal exclusive locking remains usable if owner detection is
-unavailable; its cleanup preserves replacement files. Audit-only performs no
-stale-lock cleanup.
-
-For a charged or zero-charge payment, `--audit-only` emits the verified
-financial proof without changing journal/reconciliation files. Keep the output
-private:
-
-```sh
-umask 077
-pnpm --silent p2p:reconcile --audit-only --deposit DEPOSIT_SIGNATURE --claim CLAIM_SIGNATURE > .local/p2p/finalized-audit.json
-```
-
-The proof includes the sponsor's pre/post balances and fee/rent conservation for
-each selected transaction. It reports unrelated sponsor movement between them
-separately, without attributing that movement to fees. Canonical escrow ATA
-creation and closure must account for the sponsor's temporary rent advance and
-its return; this is separate from retained channel rent and network fees. It
-never infers historical token balances from current wallets. Positive net
-lamport credits between the selected transactions or after the claim are
-reported separately and do not invalidate an otherwise consistent proof.
-`retainedChannelRentLamports` is the initial sponsored channel allocation;
-actual deposit/claim/current channel snapshots, claim-time changes and interval
-or later credits have separate fields. `escrowAccountRentLamports` remains the
-initial sponsored ATA allocation. Credits do not identify their sender and are
-not token refunds or network fees. Negative channel movement, missing escrow
-rent, an underfunded initial channel or deltas that violate the checked
-sponsor/channel/escrow equations still stop verification. Supported channels are
-fresh and individually settled, with a retained channel account and an escrow
-ATA created by the sponsor and closed back to it. Unsupported or incomplete data
-requires separate investigation, not an inferred refund. See
-[recovery limits](docs/limitations.md#verified-p2p-reconciliation-and-reproducible-audits).
-
-Positive net token credits to the escrow between deposit and claim are also
-supported. The entire surplus must be swept to the canonical devnet treasury ATA
-for the expected mint. The seller's charge plus the buyer's principal refund
-must still equal the original ceiling, and the charge must match the canonical
-channel settlement. Treasury surplus is neither a buyer refund nor a fee. Buyer,
-seller, escrow and treasury token accounts must be distinct. The selected
-deposit permits only buyer-to-escrow token transfers; the claim permits only
-escrow-to-buyer, escrow-to-seller and escrow-to-treasury transfers. Incoming
-claim-time transfers, prefunded escrow accounts, other mints and unrelated token
-movements remain unsupported and fail closed.
-
-Finalized proofs report `escrowInterveningTokenCreditAtomic` and
-`treasurySweepAtomic` separately, plus `escrowDepositBeforeAtomic`,
-`escrowDepositAfterAtomic`, `escrowClaimBeforeAtomic` and
-`escrowClaimAfterAtomic`. The credit is a net interval balance increase, without
-donor attribution. `balanceDeltas.escrow` retains the initial-empty/final-empty
-endpoint value; the token snapshots expose the intervening surplus. Older
-records without these fields do not establish zero surplus. Zero-charge recovery
-still requires zero charge and return of the full principal. Confirmed paid rows
-retain their existing journal-based scope.
-
-A required-route discrepancy or missing telemetry now fails the route check
-while preserving known financial confirmation. Post-exchange telemetry errors
-cannot replace a paid `200` and receipt. Ingress and response delivery each have
-a five-second limit; origin work has its own permit and deadline. Established
-connections are limited to one per NodeId. Up to eight handshakes are tracked
-separately, with two pending jobs per validated source. Connected or actively
-working peers reserve up to 30 requests from the shared 256-request minute
-budget. After disconnect and completion of active work, unused grace is
-best-effort: another admission or quota refill may reclaim it. LRU eviction can
-also return inactive unused reservations. Consumed per-NodeId debt is kept
-separately until rollover, so eviction, reclamation and reconnection cannot
-reset the 30-request allowance. That debt storage is bounded by the 256 actual
-admissions per window. Active work and live connections cannot be evicted. At
-lease release, unused quota is returned when the identity has no current-window
-admitted work and no active operation. Otherwise, inactive quota remains
-reclaimable.
-
-A same-identity reconnect can reuse or refill quota when shared capacity
-remains; it has no guaranteed reservation against competing work while
-disconnected. Every admitted request still counts, including free challenges and
-failed origin work. No payment header or HTTP status grants priority. Inactive
-reservations can no longer make nine single-request, disconnected identities
-deny a newcomer. Once all 256 admissions are actually consumed, both new and
-disconnected known peers must wait for rollover. Connected reservations remain
-protected. A peer that spends a partial reservation may need to reconnect before
-obtaining newly available allowance. About nine identities attempting 30 free
-requests each per minute can deny new peers for the window: eight consume 240
-admissions and the ninth consumes the remaining 16 of 256. No payment is
-required. There is no Sybil resistance or production availability guarantee.
-
-Uncancellable native jobs can still consume their bounded pools. Pending IP
-sources use full addresses, including full IPv6 addresses rather than prefixes;
-relay sources use the remote endpoint identity. Free identities or multiple
-addresses can therefore bypass a single actor's effective source budget. A
-shared NAT may see temporary handshake rejection; additional sources can
-saturate pending capacity. Relay compatibility and adversarial off-host
-admission testing remain unvalidated. The final physical smoke covers the
-selected direct paid happy path. Public regressions cover FIFO/process failures,
-quota debt and rollover, real loopback Iroh reconnection, malformed frames and
-simulated payment delivery failures. Nine single-request, disconnected
-identities no longer exclude a newcomer; known peers still refuse work after all
-256 actual admissions until rollover. The earlier unconditional
-disconnected-grace expectation is superseded by this best-effort contract.
-
-The public finalized payment-pair fixture retains selected historical on-chain
-metadata and parsed financial instructions. The real SDK verifier replays saved
-finality with an explicitly synthetic current canonical account. Unsigned
-full-refund, token-surplus and lamport-credit variants test supported accounting
-and rejection boundaries; they were not executed on-chain. Recovery cases run
-the actual CLI workflow, ephemeral unfunded offer signing/verification, locks
-and temporary-file persistence. RPC is mocked, and persistence-failure cases
-also inject rename errors. These checks establish offline behavior, without a
-fresh chain audit or physical signed-offer recovery run. Raw evidence and
-private measurements remain excluded. The owner-authorized
-[final paid report](lab/evidence/gate-0008.json) is a curated metadata-only
-exception, bound to the exact tested source
-`ba168c4fae043dc1170268cad9c0852d3c7533d9` and its verified source archive.
-Later evidence and documentation commits record that run; they do not claim that
-another runtime revision was paid-tested.
-
-### Final paid smoke: native Mac seller and VPS buyer
-
-On 2026-10-21, three short synthetic requests ran strictly one after another,
-using only the devnet test token. Each CLI invocation and its unchanged
-finalized transaction/current-channel audit completed before the next began.
-Required-direct admission passed before signing; all sampled 402 and 200
-exchanges were direct, with no relay observation. All answers were delivered and
-independently recounted within tolerance. Amounts below are atomic units.
-
-| Request | Authorized | Charged | Refunded | Conservation        |
-| ------- | ---------- | ------- | -------- | ------------------- |
-| 1       | 556        | 140     | 416      | 140 + 416 = 556     |
-| 2       | 558        | 139     | 419      | 139 + 419 = 558     |
-| 3       | 558        | 147     | 411      | 147 + 411 = 558     |
-| Total   | 1,672      | 426     | 1,246    | 426 + 1,246 = 1,672 |
-
-Six distinct selected transactions finalized. Buyer/seller token deltas were
-−426/+426; buyer SOL delta was zero. The sponsor paid 60,006 lamports in payment
-transaction fees, with 5,852,160 lamports retained as channel rent. Safe
-facilitator diagnostics persisted 24 records: six successful SDK settlement
-results and six local HTTP 200 finishes, zero dropped records or SDK exceptions.
-These observations accompany the independent delivery and on-chain checks.
-
-No request overlapped, became uncertain or was retried. Historical task files
-and all 14 existing containers retained their observed metadata; only owned
-smoke actors were stopped. The [report](lab/evidence/gate-0008.json) publishes
-public signatures, amounts, route categories and source hashes. Keys, salts,
-prompts, response content, IPs, endpoint tickets, RPC URLs, raw logs and private
-measurements/journals remain excluded. This one configuration does not establish
-every packet's path, production discovery, Sybil resistance, model/content
-correctness or general recovery. The old uncertain payment remains intact;
-issues #17–#23 are outside this frozen scope. The PR is not merged.
-
-## Pay through a public facilitator
-
-Request **USDC on Solana Devnet** from the
-[Circle faucet](https://faucet.circle.com) for the generated buyer address. The
-accepted mint is `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`.
-
-```sh
-pnpm gate:exact
-```
-
-This serves a fixed resource on an ephemeral loopback port for **10,000 atomic
-units (0.01 devnet USDC)**. The local wallet provisions token accounts; the
-public facilitator pays the payment transaction fee. No local facilitator is
-started. The buyer checks network, mint, amount, recipient and fee payer before
-signing.
-
-The seller explicitly verifies and settles before executing the resource. The
-gate checks confirmation, balance changes, unchanged buyer SOL and replay
-rejection. It also rejects untrusted terms and an empty buyer before signing.
-Provider selection and uncertainty handling:
-[known limits](docs/limitations.md).
-
-## Other commands
-
-Use these after setup. For separate fixed-resource hosts, start the facilitator
-and seller in their own terminals, then run the buyer in a third terminal.
-
-| Command                 | Task                                                                                     |
-| ----------------------- | ---------------------------------------------------------------------------------------- |
-| `pnpm gate:failures`    | Check insufficient funds and expiry; expiry alone waits about 62 s, plus RPC/setup time. |
-| `pnpm gate:facilitator` | Start the local `upto` facilitator.                                                      |
-| `pnpm gate:seller`      | Start the fixed-resource seller.                                                         |
-| `pnpm gate:buyer`       | Execute the fixed-resource buyer against running local hosts.                            |
-| `pnpm lint`             | Check source conventions and formatting.                                                 |
-| `pnpm typecheck`        | Check TypeScript types.                                                                  |
-| `pnpm format`           | Apply formatting and sort imports.                                                       |
-| `pnpm format:check`     | Check formatting without changing files.                                                 |
-
-The failure checks require the configured test SPL token. Formatting uses
-Prettier with two-space indentation, an 80-column target and wrapped Markdown
-prose; `.editorconfig` supplies matching basic editor settings.
+| Group  | Command                                              | What it does                                                |
+| ------ | ---------------------------------------------------- | ----------------------------------------------------------- |
+| Node   | `pnpm node:start`, `buyer:start`                     | Start the seller node; start the buyer proxy (`:4031`).     |
+| Node   | `pnpm p2p:reconcile`                                 | Verify a P2P payment; clear a zero-charge block.            |
+| Gate   | `pnpm gate:setup`                                    | Create devnet keys; `--role buyer\|seller` for P2P.         |
+| Gate   | `pnpm gate:fund`                                     | Provision accounts; `--test-mint` makes a test token.       |
+| Gate   | `pnpm gate:preflight`, `gate:challenge`              | Check devnet and balances; check that unpaid gets 402.      |
+| Gate   | `pnpm gate:run`                                      | Run the fixed-resource `upto` payment end to end.           |
+| Gate   | `pnpm gate:failures`                                 | Empty buyer and expired authorization (about 62 s).         |
+| Gate   | `pnpm gate:facilitator`, `gate:seller`, `gate:buyer` | Run the fixed-resource roles separately (ports 4022, 4021). |
+| Gate   | `pnpm gate:exact`                                    | Fixed price through the public x402.org facilitator.        |
+| Gate   | `pnpm gate:inference:setup`, `gate:inference`        | Download the model; run six metered cases.                  |
+| Lab    | `pnpm identity:devnet-run`                           | Try the sponsored 8004 registration on devnet.              |
+| Checks | `pnpm test`, `test:lab`, `test:all`                  | Product tests (PR gate), lab tests, both.                   |
+| Checks | `pnpm typecheck`                                     | TypeScript, including tests.                                |
+| Checks | `pnpm lint`                                          | ESLint, Prettier and import boundaries.                     |
+| Checks | `pnpm boundaries`, `boundaries:test`                 | Boundary check (`--json`); its own tests.                   |
+| Checks | `pnpm format`, `format:check`                        | Format and sort imports; check only.                        |
 
 ## Configuration
 
-| Variable             | Default and behavior                                                                               |
-| -------------------- | -------------------------------------------------------------------------------------------------- |
-| `GYBLOS_GATE_CONFIG` | `.local/devnet/config.json`, resolved from the working directory.                                  |
-| `GYBLOS_RPC_URL`     | Overrides the config's `rpcUrl`; setup initially saves `https://api.devnet.solana.com` when unset. |
+Set these in the environment; `.env` is **not** loaded
+([.env.example](.env.example)).
 
-Commands do not load `.env` automatically. Changing the config path does not
-move journals, measurements or model artifacts; inference requires the isolated
-key paths under `.local/devnet/`. Devnet identity is checked using its genesis
-hash. Never include keys in logs or shared results.
+| Variable                                        | Used by       | Meaning                                                   |
+| ----------------------------------------------- | ------------- | --------------------------------------------------------- |
+| `GYBLOS_RELAY_TOKEN`                            | seller, buyer | **Required.** Relay credential, 32-512 characters.        |
+| `GYBLOS_RELAYS`                                 | seller, buyer | Comma-separated relay URLs; default `na1` only.           |
+| `GYBLOS_RELAY_ONLY`                             | seller        | `1` = relay only; advertise no direct addresses.          |
+| `GYBLOS_BUYER_RELAY_ONLY`                       | buyer         | `1` = loopback binds; dial the seller only via its relay. |
+| `GYBLOS_IROH_BIND`, `GYBLOS_IROH_EXTERNAL_ADDR` | seller, buyer | UDP bind address; extra public address to advertise.      |
+| `GYBLOS_EXPECTED_ROUTE`                         | buyer         | Require `iroh-direct` or `iroh-relay` before paying.      |
+| `GYBLOS_RPC_URL`                                | all           | Devnet RPC; default `https://api.devnet.solana.com`.      |
+| `GYBLOS_GATE_CONFIG`                            | gates         | Gate config file; default `.local/devnet/config.json`.    |
+| `GYBLOS_IDENTITY_INTEGRATION`                   | tests         | `1` = run opt-in local-validator identity tests.          |
 
-All HTTP hosts bind to loopback (`127.0.0.1`). Fixed-resource seller: **4021**;
-local facilitator: **4022**; gate-owned Ollama: **11436**, or **11437** during
-model setup. Inference and public fixed-price sellers use ephemeral ports. Child
-Ollama processes use the local model directory and have cloud inference
-disabled.
-
-Gate-owned HTTP servers (facilitator, sellers and the P2P buyer proxy) answer
-only requests whose `Host` is `127.0.0.1`, `localhost` or `[::1]` with the exact
-listening port. Any other or missing `Host` gets an empty **421** before routing
-or body parsing (Node itself answers HTTP/1.1 without `Host` with 400). This
-blocks DNS-rebinding reads from a browser; it is not authentication against
-local processes.
-
-## Project structure
-
-Stack and technology choices: [docs/stack.md](docs/stack.md).
+## Repository layout
 
 ```text
-packages/
-  config/            @gyblos/config: hosts, paths, networks, limits, versions
-  runtime/           @gyblos/runtime: processes, shutdown and atomic JSON
-  protocol/          SDK-independent signed bytes, Engine contracts and error codes
-  core/              Reusable workflow, accounting and measurement policy
-  payments-x402/     upto/exact adapters, trust policies and chain reads
-  transport-iroh/    Bounded HTTP over loopback or native Iroh
-  engine-ollama/     Local generation and pinned public tokenization
-  node/              Native seller composition with start, stop and health
-apps/
-  node/              Headless seller daemon and fixed-resource compatibility entry
-  buyer/             Buyer proxy, call and reconciliation commands
-  facilitator/       Local upto facilitator
-lab/
-  harness/           @gyblos/lab-harness: gates, journals, CLI cases and scripts
-  tools/             Identity devnet lab tools
-  evidence/          Previously authorized redacted historical reports only
+apps/node/              seller daemon (node:start) and the fixed-price test seller
+apps/buyer/             buyer proxy, one paid call, and p2p:reconcile
+apps/facilitator/       local x402 facilitator process
+packages/protocol/      wire format: signed bytes, Engine contract, error codes (SPEC.md)
+packages/core/          pricing, metering and offer trust rules
+packages/config/        addresses, ports, paths, limits
+packages/runtime/       files, processes, private logs, memory checks
+packages/engine-ollama/ Ollama client and tokenizer
+packages/payments-x402/ x402 payments, facilitator, chain proofs, recovery locks
+packages/transport-iroh/ HTTP over Iroh, relays, admission limits
+packages/identity/      8004 registry adapter (not wired yet)
+packages/node/          seller composition used by apps/node and apps/buyer
+lab/harness/            gate:* proof-of-concept checks (Docker/NAT lab: tag archive/poc-lab-2026-10)
+lab/tools/              identity devnet tools
+lab/evidence/           three published, redacted run reports
+tests/, tooling/        offline tests and fixtures; boundary checker and lint rules
 ```
 
-## Safety and known limits
+## Safety
 
-- Timeouts are **not** refunds. Uncertain payments block new ones until
-  reconciled on-chain.
-- Do not delete `.local/devnet/buyer.lock` or a journal to retry; inspect the
-  authorization and transactions first.
-- Signed seller receipts, model verification, buyer-facing streaming and mainnet
-  are not implemented.
+- A timeout is **not** a refund; uncertain payments block new ones until
+  reconciled. Never delete `buyer.lock` or a journal to retry
+  ([recovery](docs/recovery.md)).
+- Use only generated devnet keys. Never commit keys, tokens, journals or logs.
 
-Read [docs/limitations.md](docs/limitations.md) for recovery and the full scope.
-The technology stack, why Iroh, and when to use Rust are in
-[docs/stack.md](docs/stack.md). Contribution rules are in
-[CONTRIBUTING.md](CONTRIBUTING.md).
+## Documentation
 
-## Run offline regression tests
-
-```sh
-pnpm test
-```
-
-`pnpm test` runs the product suite and is the PR gate. `pnpm test:lab` runs the
-laboratory regressions in `tests/lab/`, and `pnpm test:all` runs both.
-
-The published suite requires Node.js 22 or later and a platform supported by the
-pinned native Iroh binding. The earlier suite was exercised on macOS ARM64 and
-Linux ARM64; these additional regressions were verified on macOS ARM64. Mac
-Intel has no binding in this version. The suite needs no private files, funded
-wallets, Ollama, Docker, Python or devnet payments. External RPC responses are
-mocked; local HTTP and native loopback QUIC exercise actual middleware and
-transport boundaries. Lock cases use owned temporary files and child processes;
-unsupported ownership/FIFO checks skip explicitly on other platforms.
-
-Existing test entrypoints register the case groups in `tests/support/`.
-`tests/fixtures/finalized-payment-pair.json` is a minimal projection of one
-saved finalized deposit/claim pair, not a complete signed transaction or a new
-chain query. Public signatures, account addresses and decoded channel-creation
-nonce are retained to derive and verify the original PDA; that public on-chain
-nonce is separate from private measurement salts. Logs, encoded payment/voucher
-payloads, private configuration and content are excluded. Public, hash-checked
-model-template fixtures preserve independent renderer coverage. Raw evidence,
-measurements and funded keys stay local; only the two explicitly authorized
-redacted Docker and real-network reports are published as evidence.
+[Architecture](docs/architecture.md) · [Running a node](docs/running-a-node.md)
+· [Payments](docs/payments.md) · [Inference](docs/inference.md) ·
+[Recovery](docs/recovery.md) · [Identity](docs/identity.md) ·
+[Stack](docs/stack.md) · [Limitations](docs/limitations.md) ·
+[Protocol spec](packages/protocol/SPEC.md) · [Tests](tests/README.md) ·
+[Contributing](AGENTS.md)

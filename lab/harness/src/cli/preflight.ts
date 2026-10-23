@@ -1,4 +1,5 @@
-// Owns laboratory preflight; product code must not depend on this module.
+// Read-only devnet readiness check: prints facilitator SOL and buyer token balances; exits 2 if the
+// fixed gate is not yet funded.
 import { FIXED_MIN_FACILITATOR_LAMPORTS, MAX_ATOMIC } from '@gyblos/config';
 import {
   account,

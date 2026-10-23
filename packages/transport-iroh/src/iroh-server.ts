@@ -1,4 +1,5 @@
-// Owns iroh server in transport-iroh; it must not know wallets or inference engines.
+// Seller-side Iroh server: admits connections, rate-limits peers and bridges each bounded request to the
+// local inference origin under ingress and egress deadlines.
 import type { BiStream, Connection, Endpoint } from '@number0/iroh';
 
 import { HTTP_STATUS, P2P } from '@gyblos/config';

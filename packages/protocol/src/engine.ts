@@ -1,4 +1,4 @@
-// Owns the existing SDK-independent Engine port and domain usage contract.
+// Owns the SDK-independent Engine port and domain usage contract.
 // It must not know wallets, engine implementations or transport.
 import type { EngineDoneReason } from './constants.js';
 import type { EngineWireUsage } from './wire-usage.js';

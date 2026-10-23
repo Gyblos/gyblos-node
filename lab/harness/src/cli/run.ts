@@ -1,4 +1,5 @@
-// Owns laboratory run; product code must not depend on this module.
+// Fixed gate runner: checks funding, spawns facilitator and seller hosts tied to a run ID, runs the
+// paid gate and stops the children on exit or interrupt.
 import { type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 

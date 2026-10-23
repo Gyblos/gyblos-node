@@ -1,4 +1,5 @@
-// Owns offline token cases regression cases; no funded wallets or live services.
+// Registers token accounting cases: charge, refund and surplus on the saved pair, zero-charge recovery
+// rules, and each TOKEN_FAULTS mutation rejected by its guard.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 

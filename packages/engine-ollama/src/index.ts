@@ -1,4 +1,5 @@
-// Owns index in engine-ollama; it must not know wallets or payments.
+// Ollama HTTP client restricted to a literal loopback origin: checks the pinned model is present and runs
+// bounded, deterministic raw generations. It must not know wallets or payments.
 import { IPV6_LOOPBACK, LOCALHOST, ROUTES, TIMEOUTS } from '@gyblos/config';
 import type { EngineWireUsage as EngineUsage } from '@gyblos/protocol/wire-usage';
 

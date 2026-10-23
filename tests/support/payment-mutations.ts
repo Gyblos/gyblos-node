@@ -1,4 +1,5 @@
-// Owns offline payment mutations regression cases; no funded wallets or live services.
+// Helpers that edit the payment fixture's token balances, transfers, refunds and lamport credits
+// for proof fault cases.
 import assert from 'node:assert/strict';
 
 import { verifyZeroChargeReconciliation } from '@gyblos/buyer/reconciliation';

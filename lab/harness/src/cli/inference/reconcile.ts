@@ -1,4 +1,5 @@
-// Owns laboratory reconcile; product code must not depend on this module.
+// Reconciles one inference payment: deposit equals the ceiling, claim pays the seller, the rest is
+// refunded, checked via balances and on-chain token transfers; then journals it reconciled.
 import assert from 'node:assert/strict';
 
 import {

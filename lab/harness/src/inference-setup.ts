@@ -1,4 +1,5 @@
-// Owns laboratory inference setup; product code must not depend on this module.
+// Downloads the pinned tokenizer files and pulls the pinned model into a private Ollama models dir
+// using a temporary loopback Ollama server, then verifies both.
 import { once } from 'node:events';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { basename, resolve } from 'node:path';

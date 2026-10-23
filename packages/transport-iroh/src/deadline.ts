@@ -1,4 +1,4 @@
-// Owns deadline in transport-iroh; it must not know wallets or inference engines.
+// Races an operation against a deadline and cancels it on timeout; the payment outcome is then uncertain.
 export async function withDeadline<T>(
   operation: Promise<T>,
   milliseconds: number,

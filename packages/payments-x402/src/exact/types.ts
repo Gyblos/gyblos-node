@@ -1,4 +1,4 @@
-// Owns types in payments-x402; it must not know inference engines or lab orchestration.
+// Record of one call to a public facilitator (operation, outcome, optional transaction and reason).
 import type { PublicCallOperation, PublicCallOutcome } from '../constants.js';
 
 export interface PublicCall {

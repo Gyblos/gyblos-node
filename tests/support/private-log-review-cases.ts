@@ -1,4 +1,5 @@
-// Owns offline private log review cases regression cases; no funded wallets or live services.
+// Registers private-log edge cases: canonical storage error codes, atomic slot reservation, bounded
+// close and refusal of undefined serialization.
 import assert from 'node:assert/strict';
 import { readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';

@@ -1,4 +1,5 @@
-// Owns laboratory fund; product code must not depend on this module.
+// Airdrops devnet SOL to the facilitator when low; with --test-mint, creates a six-decimal SPL test
+// token, the needed token accounts and buyer balance, and switches the config to it. Devnet only.
 import { getCreateAccountInstruction } from '@solana-program/system';
 import {
   findAssociatedTokenPda,

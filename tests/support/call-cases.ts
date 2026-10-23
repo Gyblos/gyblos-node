@@ -1,4 +1,5 @@
-// Owns offline call cases regression cases; no funded wallets or live services.
+// Registers buyer call-evidence cases: receipts, deposits and lost responses are recorded durably and
+// never invented, and diagnostics keep only canonical codes.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 

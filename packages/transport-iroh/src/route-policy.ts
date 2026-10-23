@@ -1,4 +1,4 @@
-// Owns route policy in transport-iroh; it must not know wallets or inference engines.
+// Parses the required route (direct or relay) and checks every observation used only that route.
 import { TRANSPORT_ROUTES } from './constants.js';
 import type { RouteObservation } from './types.js';
 

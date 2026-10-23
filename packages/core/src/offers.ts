@@ -1,4 +1,5 @@
-// Owns offers in core; it must not know SDKs, engines or filesystem.
+// Buyer-side trust policy for signed inference offers: identity, lifetime, budget, prices, model bounds,
+// capabilities and wallet separation. Signature checks live in the node's offer adapter.
 import {
   DEVNET,
   INFERENCE_REQUEST_LIMITS,

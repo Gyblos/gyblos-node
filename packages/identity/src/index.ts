@@ -8,7 +8,7 @@
 //   bindings whose node signature verifies count, the highest sequence wins, fan-out is capped (READ_LIMITS).
 // - evaluateSponsorRules / decideSponsorship / recordSponsorship: sponsor policy, reasons in SPONSOR_REASONS.
 //   decideSponsorship requires an online check answered by the node key; sponsorship must not be wired
-//   until a real Iroh + catalog online check exists (docs/stack.md).
+//   until a real Iroh + catalog online check exists (docs/identity.md).
 // - IdentityError carries a code from IDENTITY_ERROR_CODES.
 export {
   BINDING_STATUSES,

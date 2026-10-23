@@ -1,4 +1,5 @@
-// Owns offline inference deposit.test regression cases; no funded wallets or live services.
+// Checks the seller's escrow deposit guard: missing or short escrow blocks inference, and direct channel
+// admission rejects absent, foreign, truncated or wrongly encoded accounts.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 

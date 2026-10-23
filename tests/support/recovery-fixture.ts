@@ -1,4 +1,5 @@
-// Owns offline recovery fixture regression cases; no funded wallets or live services.
+// Builds a recovery scenario from the payment fixture: temporary P2P root, saved journal and a
+// synthetic signed offer.
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

@@ -1,4 +1,5 @@
-// Owns offline seller admission.test regression cases; no funded wallets or live services.
+// Checks that the real x402 middleware waits for the deposit and the seller rejects a false escrow even
+// when the observer is a no-op.
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { once } from 'node:events';

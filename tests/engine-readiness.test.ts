@@ -1,4 +1,5 @@
-// Owns offline engine readiness.test regression cases; no funded wallets or live services.
+// Checks seller readiness gating: memory headroom, one private warmup, no retry after failure, hung-engine
+// abort, new OOM detection and offer expiry anchored to warmup.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 

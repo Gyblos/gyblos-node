@@ -1,4 +1,5 @@
-// Owns laboratory p2p setup; product code must not depend on this module.
+// Parses --role buyer|seller, --mint, --buyer and --pay-to, sets up that P2P node role and prints
+// its public details.
 import { parseArgs } from 'node:util';
 
 import { publicRole, setupRole } from '@gyblos/node/roles';

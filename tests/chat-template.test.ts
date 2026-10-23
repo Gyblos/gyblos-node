@@ -1,4 +1,4 @@
-// Owns offline chat template.test regression cases; no funded wallets or live services.
+// Checks that the chat renderer matches golden vectors from the pinned Jinja template and tokenizer config.
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';

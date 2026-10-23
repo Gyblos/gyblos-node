@@ -1,4 +1,5 @@
-// Owns laboratory main; product code must not depend on this module.
+// Inference gate (GYB-GATE-0005): under the gate lock, starts local Ollama and facilitator, hosts the
+// inference seller, runs all cases and saves evidence. Only accepts the isolated setup keys.
 import assert from 'node:assert/strict';
 import { type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';

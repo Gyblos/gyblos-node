@@ -1,4 +1,4 @@
-// Owns versions in config; it must not know product workflows or lab orchestration.
+// Pinned SDK versions read from this package's manifest, so evidence records the exact dependency.
 import manifest from '../package.json' with { type: 'json' };
 
 export const X402_SDK_VERSION = manifest.dependencies['@x402/core'];

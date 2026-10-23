@@ -1,4 +1,5 @@
-// Owns laboratory execute; product code must not depend on this module.
+// Fixed-price upto gate body: under the gate lock, pays the local seller once, correlates deposit and
+// claim events with the receipt, confirms them on devnet and saves evidence plus a verified journal.
 import { discoverChannelsByRentPayer, toFacilitatorSvmSigner } from '@x402/svm';
 
 import {

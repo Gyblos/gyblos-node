@@ -118,7 +118,7 @@ async function sendSponsored(
 }
 
 // Lab-only stand-in for the real online check: it holds the node key and answers the challenge locally.
-// Product wiring needs a check that reaches the node over Iroh instead (see docs/stack.md).
+// Product wiring needs a check that reaches the node over Iroh instead (see docs/identity.md).
 function labOnlineCheck(node: DetachedSigner): OnlineCheck {
   return (request, challenge) =>
     node.signDetached(onlineChallengeMessage(challenge, request));

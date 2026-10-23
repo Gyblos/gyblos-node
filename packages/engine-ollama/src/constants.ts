@@ -1,4 +1,5 @@
-// Owns constants in engine-ollama; it must not know wallets or payments.
+// Pinned model (qwen3:0.6b digest, tokenizer and config hashes, template mode), deterministic generation
+// settings and prompt/output size limits.
 import {
   INFERENCE_REQUEST_LIMITS,
   TOKENIZER_SDK_VERSION,

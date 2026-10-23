@@ -1,8 +1,10 @@
 # Local inference and buyer measurements
 
-Follow the [inference task in the README](../README.md#run-metered-inference)
-after installing Ollama and provisioning the isolated devnet wallets and token
-accounts. This is a local inference/payment gate, without P2P connectivity.
+Run `pnpm gate:inference:setup` and then `pnpm gate:inference` after installing
+Ollama and completing the devnet setup in the
+[README quickstart](../README.md#quickstart) (see also
+[payments.md](payments.md)). This is a local inference/payment gate, without P2P
+connectivity. The P2P seller node uses the same model, pricing and recount.
 
 ## Model and runtime
 
@@ -130,11 +132,13 @@ not buyer-facing streaming measurements.
 
 ## Results and uncertainty
 
-The local run report is written to `lab/evidence/gate-0005.json`; journals and
-additional diagnostics stay under `.local/devnet/`. Existing attempts remain in
-the report's history. The run waits between cases to let public RPC rate windows
+The run writes a local report to `lab/evidence/gate-0005.json`. That path is
+ignored by Git, so the report is not in the repository; journals and additional
+diagnostics stay under `.local/devnet/`. Existing attempts remain in the
+report's history. The run waits between cases to let public RPC rate windows
 clear.
 
 An uncertain authorization blocks subsequent gates until it is reconciled. There
-is no automatic payment retry. See [limitations and recovery](limitations.md)
-for charges without delivery, journal handling and unvalidated recovery paths.
+is no automatic payment retry. See [recovery.md](recovery.md) and
+[limitations.md](limitations.md) for charges without delivery, journal handling
+and unvalidated recovery paths.

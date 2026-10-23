@@ -4,20 +4,24 @@ This repository contains the Gyblos node and buyer application, not the separate
 
 ## Package map and purpose
 
-- `packages/protocol`: SDK-independent signing, canonical bytes, engine contracts and shared error taxonomy.
+- `packages/protocol`: SDK-independent signing, canonical bytes, engine contracts, shared error taxonomy and public discovery records (see `SPEC.md`).
 - `packages/core`: workflow and metering policy; no SDKs, filesystem or adapters.
 - `packages/engine-ollama`, `payments-x402`, `transport-iroh`, `identity` (8004 registry; not wired yet): independent adapters.
-- `packages/node`: reusable seller composition, lifecycle and SDK adaptation.
-- `apps/node`, `apps/buyer`, `apps/facilitator`: independent executable applications.
+- `packages/node`: seller composition and lifecycle, plus role keys, signed offers and buyer measurements shared with `apps/buyer`.
+- `apps/node` (seller daemon, fixed-price test seller), `apps/buyer` (proxy, paid call, reconciliation), `apps/facilitator`: independent executable applications.
 - `packages/config`: operator configuration and retained legacy shared values; `runtime`: platform support.
 - `lab/harness`, `lab/tools`, `lab/evidence`: validation and experiments, outside product ownership. The Docker/NAT laboratory is archived at tag `archive/poc-lab-2026-10`.
 - `tests` and `tooling`: offline verification; no import-time application initialization.
+
+## Documentation
+
+User-facing docs: `README.md` (short entry point) and topical pages in `docs/`. Keep them current and short; no PR numbers, merge status or run history (that belongs in the vault).
 
 ## Vault context
 
 Product documentation, research, decisions and design live in `../gyblos-brain`. Before planning or documenting, read its `AGENTS.md`, `Home.md`, `20 Decisions/Decision log.md`, and `40 Validation/Self-improvement.md`, in that order, then the relevant spec, DESIGN and existing task notes. Follow that procedure there rather than copying it into this repository. Verify the active repository and target note before editing; landing paths and commands are not instructions for this app.
 
-Search titles, aliases and content before creating a note; extend an existing relevant note. Never create vault categories, folders, subfolders or structural indexes without explicit approval. Apply its self-improvement cycle and independent read-only reviews for substantive changes. Do not change confirmed decisions, expand permissions or create automations. Keep `30 Repos/gyblos-payments.md` (the stable vault note for gyblos-node) current after meaningful merged work, version and locally commit authorized vault changes, and do not push the vault without approval. Never touch `.obsidian`.
+Search titles, aliases and content before creating a note; extend an existing relevant note. Never create vault categories, folders, subfolders or structural indexes without explicit approval. Apply its self-improvement cycle and independent read-only reviews for substantive changes. Do not change confirmed decisions, expand permissions or create automations. Keep `30 Repos/gyblos-payments.md` (the stable vault note for gyblos-node; the file name is the legacy repository name) current after meaningful merged work, version and locally commit authorized vault changes, and do not push the vault without approval. Never touch `.obsidian`.
 
 ## Commands
 
@@ -74,11 +78,11 @@ Parse external JSON as unknown, then validate shape, bounds and trust at the bou
 
 ## Testing
 
-Run typecheck, lint and the discovered offline tests for every PR. `pnpm test` is the product gate (`tests/*.test.ts`); `pnpm test:lab` runs lab-only regressions in `tests/lab/` and must also pass when lab code changes; `pnpm test:all` runs both. Report exact passed, failed, cancelled and skipped counts; distinguish tooling tests from product tests. Use public package entries. See [tests/README.md](tests/README.md) for native prerequisites, synthetic ports, safe fixtures and diagnostic tests. TDD is required for confirmed behavior bugs; keep behavior changes and moves in separate PRs. Golden vectors protect signing domain, canonical bytes and error alias identity. Refactors preserve existing test names/counts, wire values, journals and private paths; explain any new test registration.
+Run typecheck, lint and the discovered offline tests for every PR. `pnpm test` is the product gate (`tests/*.test.ts`); `pnpm test:lab` runs lab-only regressions in `tests/lab/` and must also pass when lab code changes; `pnpm test:all` runs both. Report exact passed, failed, cancelled and skipped counts; distinguish tooling tests from product tests. Use public package entries. See [tests/README.md](tests/README.md) for native prerequisites, opt-in integration and the fixtures policy. Keep explicit `void test(...)` registration; deliberately invalid boundary data and partial SDK doubles may use assertions in tests, never in product code. TDD is required for confirmed behavior bugs; keep behavior changes and moves in separate PRs. Golden vectors protect signing domain, canonical bytes and error alias identity. Refactors preserve existing test names/counts, wire values, journals and private paths; explain any new test registration.
 
 ## Security and privacy
 
-Never commit real private keys, measurement salts, private prompts/responses, raw logs, endpoint addresses, signed payment/voucher payloads, RPC credentials, role volumes or operational journals. `.local`, env secrets, evidence and captures stay ignored. The three already curated historical reports in lab/evidence and the finalized public transaction fixture are deliberate exceptions; do not expand them casually. Public docs/tests are tracked by default with a privacy denylist. Synthetic fixtures and ephemeral unfunded signers are permitted. Review the staged diff, including formerly ignored paths, before publication.
+Never commit real private keys, measurement salts, private prompts/responses, raw logs, endpoint addresses, signed payment/voucher payloads, RPC credentials, role volumes or operational journals. `.local`, env secrets, evidence and captures stay ignored. The three curated reports in `lab/evidence/` and the finalized public transaction fixture are deliberate exceptions; do not expand them casually. Public docs/tests are tracked by default with a privacy denylist. Synthetic fixtures and ephemeral unfunded signers are permitted. Review the staged diff, including formerly ignored paths, before publication.
 
 Never access existing keys/journals, make payments, touch funded wallets, deploy, access a VPS or send messages without authorization for that action. Uncertain payments stop subsequent calls and require reconciliation; never retry or clear a journal to make a test pass.
 

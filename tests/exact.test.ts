@@ -1,4 +1,5 @@
-// Owns offline exact.test regression cases; no funded wallets or live services.
+// Checks the x402 exact payment gate: pinned network, mint, price and recipient, rejection of untrusted terms
+// before signing, empty-balance and uncertain-journal blocks, and replay-ID normalisation.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 

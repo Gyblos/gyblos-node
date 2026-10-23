@@ -1,4 +1,4 @@
-// Owns laboratory fixture evidence types; product code must not depend on this module.
+// Evidence types for the fixed-price, unpaid-challenge and F1/F2 failure gates.
 import type { PaymentRequirements } from '@x402/core/types';
 
 import type { DEVNET, HTTP_STATUS } from '@gyblos/config';

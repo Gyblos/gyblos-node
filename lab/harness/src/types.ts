@@ -1,4 +1,4 @@
-// Owns laboratory types; product code must not depend on this module.
+// Type barrel for the harness: accounting types plus exact and inference evidence types.
 export type * from '@gyblos/payments-x402/accounting/types';
 
 export type {

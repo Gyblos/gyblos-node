@@ -1,4 +1,5 @@
-// Owns laboratory assertions; product code must not depend on this module.
+// Exact-gate rejection cases: tampered asset/payTo/feePayer terms and a zero-balance buyer must fail
+// before the signer or any public facilitator call is reached.
 import assert from 'node:assert/strict';
 
 import { EXACT_PRICE } from '@gyblos/core/constants';

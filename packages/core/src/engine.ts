@@ -1,5 +1,5 @@
-// Retains the existing application Engine entrypoint during protocol extraction.
-// Engine contracts are owned by protocol; this compatibility path adds no behavior.
+// Re-exports the Engine port from @gyblos/protocol/engine for callers that import it via core.
+// Engine contracts are owned by protocol; this module adds no behavior.
 export {
   inferenceWireUsage,
   type Engine,

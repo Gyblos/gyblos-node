@@ -1,4 +1,4 @@
-// Owns json in runtime; it must not know product workflows or lab orchestration.
+// Private JSON files: atomic write (temp file, fsync, rename) with private modes, and plain reads.
 import { randomUUID } from 'node:crypto';
 import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises';
 import { dirname } from 'node:path';

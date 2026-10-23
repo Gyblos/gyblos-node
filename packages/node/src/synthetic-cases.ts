@@ -1,4 +1,4 @@
-// Owns synthetic cases in node; it must not know lab orchestration or CLI processes.
+// The fixed synthetic prompts for paid inference cases, with the request ids used for failure and billing cases.
 import { randomUUID } from 'node:crypto';
 
 import { INFERENCE_CASES } from './constants.js';
