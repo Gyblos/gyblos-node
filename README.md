@@ -55,7 +55,7 @@ URL, a signed offer, a config file or a committed environment file.
 
 `GYBLOS_RELAYS` optionally overrides the comma-separated HTTPS relay origins.
 Both roles must use the same set and credentials. The buyer accepts a signed
-offer's relay only if its normalized URL belongs to that configured set. Relay
+offer's relay only if its normalized URL belongs to that configured set.
 Both buyer modes then dial that normalized URL (an equivalent origin, for
 example with a trailing slash added) rather than the offer's raw string. Relay
 URLs, the owned host allowlist and the QUIC port defaults live in
