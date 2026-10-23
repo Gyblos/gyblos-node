@@ -144,15 +144,9 @@ importers:
 
   apps/node:
     dependencies:
-      '@gyblos/config':
-        specifier: workspace:*
-        version: link:../../packages/config
       '@gyblos/node':
         specifier: workspace:*
         version: link:../../packages/node
-      '@gyblos/payments-x402':
-        specifier: workspace:*
-        version: link:../../packages/payments-x402
       '@gyblos/runtime':
         specifier: workspace:*
         version: link:../../packages/runtime

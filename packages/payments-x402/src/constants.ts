@@ -1,4 +1,4 @@
-// Payment journal states, public facilitator call outcomes, channel guard messages and diagnostic codes.
+// Payment journal states, facilitator call operations, channel guard messages and diagnostic codes.
 export const JOURNAL_STATES = {
   AUTHORIZATION_CREATED: 'authorization-created',
   RECONCILED: 'reconciled',
