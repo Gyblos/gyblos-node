@@ -5,10 +5,11 @@ import {
   controlFail,
   controlInteger,
   controlObject,
+  controlVerify,
 } from './control-validation.js';
 import { parseOfferV2 } from './offer-v2-parser.js';
 import { publicAddressBytes } from './public-validation.js';
-import { sign, verify, type Signer } from './signing.js';
+import { sign, type Signer } from './signing.js';
 
 export { parseOfferV2 } from './offer-v2-parser.js';
 function base64Encode(bytes: Readonly<Uint8Array>): string {
@@ -59,7 +60,7 @@ export async function signOfferV2(
   );
   if (
     signature.length !== CONTROL_LIMITS.signatureBytes ||
-    !(await verify(
+    !(await controlVerify(
       CONTROL_DOMAINS.OFFER,
       offer,
       publicAddressBytes(offer.owner),
@@ -79,7 +80,7 @@ export async function verifyOfferV2(
     return controlFail(CONTROL_CODES.POLICY);
   validateOfferV2Time(offer, trust.now);
   if (
-    !(await verify(
+    !(await controlVerify(
       CONTROL_DOMAINS.OFFER,
       offer,
       publicAddressBytes(trust.owner),

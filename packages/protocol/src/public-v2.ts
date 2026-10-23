@@ -18,10 +18,11 @@ import {
   controlHex,
   controlInteger,
   controlObject,
+  controlVerify,
 } from './control-validation.js';
 import { parsePublicV2 } from './public-v2-parser.js';
 import { bytesHex, hexBytes } from './public-validation.js';
-import { sign, signingBytes, verify, type Signer } from './signing.js';
+import { sign, signingBytes, type Signer } from './signing.js';
 
 export { parsePublicV2 } from './public-v2-parser.js';
 export function validatePublicV2Time(record: PublicRecordV2, now: number) {
@@ -63,7 +64,7 @@ export async function signPublicV2(
   );
   if (
     signature.length !== CONTROL_LIMITS.signatureBytes ||
-    !(await verify(
+    !(await controlVerify(
       PUBLIC_V2_DOMAINS[record.kind],
       record,
       hexBytes(record.nodeId),
@@ -112,7 +113,7 @@ export async function verifyPublicV2(
     controlHex(input.signature, CONTROL_LIMITS.signatureBytes),
   );
   if (
-    !(await verify(
+    !(await controlVerify(
       PUBLIC_V2_DOMAINS[record.kind],
       record,
       hexBytes(record.nodeId),

@@ -175,3 +175,31 @@ void test('control response parsing rejects offer signatures that are not canoni
       code: CONTROL_CODES.SIGNATURE,
     });
 });
+void test('control verification maps Web Crypto key import failures to the typed signature code', async (context) => {
+  const vector: Vector = JSON.parse(
+    await readFile(
+      new URL(import.meta.resolve('@gyblos/protocol/vectors/control-v2.json')),
+      'utf8',
+    ),
+  );
+  const catalog = parsePublicV2(vector.records[0]!.record) as PublicCatalogV2;
+  // Some runtimes reject a non-point key at import instead of returning false.
+  context.mock.method(crypto.subtle, 'importKey', () =>
+    Promise.reject(new DOMException('PRIVATE_SENTINEL', 'DataError')),
+  );
+  await assert.rejects(
+    verifyOfferV2(vector.signedOffer, {
+      ...vector.signedOffer.offer,
+      now: catalog.issuedAt,
+    }),
+    { code: CONTROL_CODES.SIGNATURE },
+  );
+  await assert.rejects(
+    verifyPublicV2(vector.records[0], {
+      owner: catalog.owner,
+      nodeId: catalog.nodeId,
+      now: catalog.issuedAt,
+    }),
+    { code: CONTROL_CODES.SIGNATURE },
+  );
+});

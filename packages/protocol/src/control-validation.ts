@@ -15,6 +15,7 @@ import {
   publicObject,
   PublicRecordError,
 } from './public-validation.js';
+import { verify } from './signing.js';
 
 export class ControlError extends Error {
   constructor(readonly code: ControlCode) {
@@ -24,6 +25,16 @@ export class ControlError extends Error {
 }
 export function controlFail(code: ControlCode = CONTROL_CODES.INVALID): never {
   throw new ControlError(code);
+}
+// Runtimes may reject a malformed key at import; v2 callers see a static code, v1 keeps its behavior.
+export async function controlVerify(
+  ...input: Parameters<typeof verify>
+): Promise<boolean> {
+  try {
+    return await verify(...input);
+  } catch {
+    return controlFail(CONTROL_CODES.SIGNATURE);
+  }
 }
 export function controlPrimitive<T>(parse: () => T): T {
   try {
