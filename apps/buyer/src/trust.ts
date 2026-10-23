@@ -5,7 +5,11 @@ import { parseArgs } from 'node:util';
 
 import { FILE_MODES, P2P } from '@gyblos/config';
 import { P2P_ROLES } from '@gyblos/node/constants';
-import { parseOfferTrust, verifyInferenceOffer } from '@gyblos/node/offers';
+import {
+  parseOfferTrust,
+  parseSignedOfferJson,
+  verifyInferenceOffer,
+} from '@gyblos/node/offers';
 import { loadRole, rolePath } from '@gyblos/node/roles';
 import { isMain } from '@gyblos/runtime';
 import { assertConfiguredRelay } from '@gyblos/transport-iroh/endpoint';
@@ -32,7 +36,7 @@ export async function main(args = process.argv.slice(2)) {
   });
   const bytes = await readFile(rolePath(P2P.offerFilename));
   if (bytes.length > P2P.bodyBytes) throw new Error('Offer exceeds bounds.');
-  const value: unknown = JSON.parse(bytes.toString('utf8'));
+  const value = parseSignedOfferJson(bytes.toString('utf8'));
   const offer = await verifyInferenceOffer(value, trust);
   if (offer.endpoint.relayUrl) assertConfiguredRelay(offer.endpoint.relayUrl);
   await writeFile(

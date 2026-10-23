@@ -34,7 +34,7 @@ export function configurationNodeId(value: unknown, code: NodeErrorCode) {
   const text = configurationString(value, code);
   if (
     text.length !== NODE_CONFIGURATION_LIMITS.nodeIdHexCharacters ||
-    !/^[0-9a-f]+$/i.test(text)
+    !/^[0-9a-f]+$/.test(text)
   )
     throw new NodeError(code);
   return text;

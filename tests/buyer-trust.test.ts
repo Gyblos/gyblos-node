@@ -1,11 +1,12 @@
 // Creates buyer trust only from explicit identities and a locally verified synthetic signed offer.
 // Fixtures own their temporary files and unfunded signers; no operational keys or RPC are used.
 import assert from 'node:assert/strict';
-import { lstat, readFile, unlink } from 'node:fs/promises';
+import { lstat, readFile, unlink, writeFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import { FILE_MODES, MAX_ATOMIC, P2P } from '@gyblos/config';
 import type { OfferTrust } from '@gyblos/core/offers';
+import { NODE_ERROR_CODES } from '@gyblos/node/constants';
 import type { SignedInferenceOffer } from '@gyblos/protocol/offer';
 import { loadJson } from '@gyblos/runtime';
 
@@ -92,6 +93,25 @@ void test(
         main(args({ ...trust, nodeId: '3'.repeat(64) })),
         /Untrusted/,
       );
+      await assert.rejects(lstat(path), { code: 'ENOENT' });
+    });
+  },
+);
+
+void test(
+  'buyer trust reports malformed offer JSON without exposing its contents',
+  OPTIONS,
+  async () => {
+    await withTrust(async (main, trust, path) => {
+      const { rolePath } = await import('@gyblos/node/roles');
+      await writeFile(
+        rolePath(P2P.offerFilename),
+        'SYNTHETIC_PRIVATE_OFFER_SENTINEL',
+      );
+      await assert.rejects(main(args(trust)), {
+        code: NODE_ERROR_CODES.INVALID_SIGNED_OFFER,
+        message: NODE_ERROR_CODES.INVALID_SIGNED_OFFER,
+      });
       await assert.rejects(lstat(path), { code: 'ENOENT' });
     });
   },

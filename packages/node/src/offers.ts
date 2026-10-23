@@ -87,3 +87,8 @@ export function parseOfferTrustJson(text: string): OfferTrust {
     configurationJson(text, NODE_ERROR_CODES.INVALID_OFFER_TRUST),
   );
 }
+
+// Decode untrusted offer text without including malformed payload fragments in diagnostics.
+export function parseSignedOfferJson(text: string): unknown {
+  return configurationJson(text, NODE_ERROR_CODES.INVALID_SIGNED_OFFER);
+}
