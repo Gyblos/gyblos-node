@@ -582,6 +582,9 @@ The technology stack, why Iroh, and when to use Rust are in
 pnpm test
 ```
 
+`pnpm test` runs the product suite and is the PR gate. `pnpm test:lab` runs the
+laboratory regressions in `tests/lab/`, and `pnpm test:all` runs both.
+
 The published suite requires Node.js 22 or later and a platform supported by the
 pinned native Iroh binding. The earlier suite was exercised on macOS ARM64 and
 Linux ARM64; these additional regressions were verified on macOS ARM64. Mac

@@ -179,7 +179,11 @@ void test('published tests have a public command without private harness depende
   const pkg = JSON.parse(await readFile('package.json', 'utf8'));
   assert.equal(
     pkg.scripts.test,
-    'node --import tsx --test \"tests/**/*.test.ts\"',
+    'node --import tsx --test \"tests/*.test.ts\"',
+  );
+  assert.equal(
+    pkg.scripts['test:lab'],
+    'node --import tsx --test \"tests/lab/**/*.test.ts\"',
   );
   assert.equal(pkg.scripts.test.includes('.local/'), false);
   assert.ok((await readFile('README.md', 'utf8')).includes('pnpm test'));
