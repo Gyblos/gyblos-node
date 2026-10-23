@@ -146,3 +146,9 @@ void test('public v2 rejects duplicate models, invalid reasoning and private or 
     true,
   );
 });
+void test('public v2 signing refuses a signer whose key does not match the record node id', async () => {
+  const fixture = await controlFixture();
+  await assert.rejects(signPublicV2(fixture.catalog, fixture.ownerSigner), {
+    code: CONTROL_CODES.SIGNATURE,
+  });
+});

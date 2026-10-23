@@ -58,8 +58,18 @@ export async function signPublicV2(
 ): Promise<SignedPublicV2> {
   const record = parsePublicV2(value);
   validatePublicV2Time(record, record.issuedAt);
-  const signature = await sign(PUBLIC_V2_DOMAINS[record.kind], record, signer);
-  if (signature.length !== CONTROL_LIMITS.signatureBytes)
+  const signature = Uint8Array.from(
+    await sign(PUBLIC_V2_DOMAINS[record.kind], record, signer),
+  );
+  if (
+    signature.length !== CONTROL_LIMITS.signatureBytes ||
+    !(await verify(
+      PUBLIC_V2_DOMAINS[record.kind],
+      record,
+      hexBytes(record.nodeId),
+      signature,
+    ))
+  )
     return controlFail(CONTROL_CODES.SIGNATURE);
   return { record, signature: bytesHex(signature) };
 }
