@@ -19,9 +19,9 @@ export const MEASUREMENT_FILENAMES = { salt: 'measurement-salt' } as const;
 export const ROUTES = {
   health: '/health',
   inference: '/v1/chat/completions',
-  events: '/gate/events',
-  verifications: '/gate/verifications',
-  facilitatorDiagnostics: '/gate/diagnostics',
+  events: '/facilitator/events',
+  verifications: '/facilitator/verifications',
+  facilitatorDiagnostics: '/facilitator/diagnostics',
   verify: '/verify',
   supported: '/supported',
   ollamaVersion: '/api/version',
