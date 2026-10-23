@@ -1,4 +1,4 @@
-// Checks a child-process case checking that the standalone facilitator closes its diagnostic log
+// Checks a child-process case checking that the lab facilitator closes its diagnostic log
 // after a startup refusal.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -10,10 +10,10 @@ import { fileURLToPath } from 'node:url';
 import {
   diagnosticDirectory,
   rm,
-} from './support/facilitator-diagnostic-fixture.js';
-import { PRIVATE_LOG_PLATFORM_SKIP } from './support/private-log-fixture.js';
+} from '../support/facilitator-diagnostic-fixture.js';
+import { PRIVATE_LOG_PLATFORM_SKIP } from '../support/private-log-fixture.js';
 
-const SOURCE = new URL('../', import.meta.url);
+const SOURCE = new URL('../../', import.meta.url);
 const CHILD_TIMEOUT_MS = 15000;
 const CHILD_OUTPUT_BYTES = 64 * 1024;
 
