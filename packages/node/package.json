@@ -11,7 +11,8 @@
     "./http/inference": "./src/http/inference.ts",
     "./lifecycle": "./src/lifecycle.ts",
     "./offers": "./src/offers.ts",
-    "./roles": "./src/roles.ts"
+    "./roles": "./src/roles.ts",
+    "./errors": "./src/errors.ts"
   },
   "dependencies": {
     "@gyblos/core": "workspace:*",

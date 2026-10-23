@@ -2,6 +2,7 @@
 
 | Command             | Runs                                                                  |
 | ------------------- | --------------------------------------------------------------------- |
+| `pnpm check`        | Typecheck, lint (including tooling), product and lab tests.           |
 | `pnpm test`         | Product suites `tests/*.test.ts` (the PR gate).                       |
 | `pnpm test:lab`     | Lab-only regressions `tests/lab/**/*.test.ts`.                        |
 | `pnpm test:all`     | Both.                                                                 |
