@@ -5,8 +5,8 @@ import { readFile } from 'node:fs/promises';
 import { EndpointAddr, EndpointId } from '@number0/iroh';
 
 import { BUYER_RELAY_ONLY_ENV, MAX_ATOMIC, P2P } from '@gyblos/config';
-import type { OfferTrust } from '@gyblos/core/offers';
-import { verifyInferenceOffer } from '@gyblos/node/offers';
+import { P2P_ROLES } from '@gyblos/node/constants';
+import { parseOfferTrustJson, verifyInferenceOffer } from '@gyblos/node/offers';
 import { loadRole, nodeSecret, rolePath } from '@gyblos/node/roles';
 import { assertProgram } from '@gyblos/payments-x402/chain';
 import type { InferenceOffer } from '@gyblos/protocol/offer';
@@ -24,10 +24,10 @@ import { startBuyerProxy } from './proxy.js';
 
 export async function trustedOffer() {
   const config = await loadRole();
-  if (config.role !== 'buyer') throw new Error('Buyer role required.');
-  const trust = JSON.parse(
+  if (config.role !== P2P_ROLES.BUYER) throw new Error('Buyer role required.');
+  const trust = parseOfferTrustJson(
     await readFile(rolePath(P2P.trustFilename), 'utf8'),
-  ) as OfferTrust;
+  );
   if (
     trust.buyer !== config.buyer ||
     trust.mint !== config.mint ||

@@ -12,23 +12,37 @@ import {
 } from '@solana/kit';
 
 import { DEVNET_RPC_URL, FILE_MODES, KEY_LIMITS, P2P } from '@gyblos/config';
+import { CONFIG_ASSET_LABELS } from '@gyblos/config/constants';
 import { saveJson } from '@gyblos/runtime';
 
-import { ROLE_CONFIG_SCHEMA_VERSION } from './constants.js';
+import {
+  configurationAddress,
+  configurationJson,
+  configurationNodeId,
+  configurationObject,
+  configurationRpcUrl,
+} from './configuration.js';
+import {
+  NODE_ERROR_CODES,
+  P2P_ROLES,
+  ROLE_CONFIG_SCHEMA_VERSION,
+  type P2PRole,
+} from './constants.js';
+import { NodeError } from './errors.js';
 
 interface CommonRole {
-  schemaVersion: number;
+  schemaVersion: typeof ROLE_CONFIG_SCHEMA_VERSION;
   rpcUrl: string;
   mint: string;
-  assetLabel: 'devnet-test-token';
+  assetLabel: typeof CONFIG_ASSET_LABELS.TEST_TOKEN;
   nodeId: string;
 }
 
 export type RoleConfig = CommonRole &
   (
-    | { role: 'buyer'; buyer: string }
+    | { role: typeof P2P_ROLES.BUYER; buyer: string }
     | {
-        role: 'seller';
+        role: typeof P2P_ROLES.SELLER;
         owner: string;
         authorizer: string;
         facilitator: string;
@@ -38,7 +52,7 @@ export type RoleConfig = CommonRole &
   );
 
 export interface SetupOptions {
-  role: 'buyer' | 'seller';
+  role: P2PRole;
   mint: string;
   buyer?: string;
   payTo?: string;
@@ -96,24 +110,48 @@ export function rolePath(name: string) {
   return file(name);
 }
 
-export async function loadRole(): Promise<RoleConfig> {
-  const config = JSON.parse(
-    await readFile(file(P2P.roleConfig), 'utf8'),
-  ) as RoleConfig;
+export function parseRoleConfig(value: unknown): RoleConfig {
+  const code = NODE_ERROR_CODES.INVALID_ROLE_CONFIGURATION;
+  const config = configurationObject(value, code);
   if (
     config.schemaVersion !== ROLE_CONFIG_SCHEMA_VERSION ||
-    !['buyer', 'seller'].includes(config.role) ||
-    config.assetLabel !== 'devnet-test-token'
+    (config.role !== P2P_ROLES.BUYER && config.role !== P2P_ROLES.SELLER) ||
+    config.assetLabel !== CONFIG_ASSET_LABELS.TEST_TOKEN
   )
-    throw new Error('Invalid role configuration.');
-  return config;
+    throw new NodeError(code);
+  const common: CommonRole & Pick<RoleConfig, 'buyer'> = {
+    schemaVersion: ROLE_CONFIG_SCHEMA_VERSION,
+    rpcUrl: configurationRpcUrl(config.rpcUrl, code),
+    mint: configurationAddress(config.mint, code),
+    assetLabel: CONFIG_ASSET_LABELS.TEST_TOKEN,
+    nodeId: configurationNodeId(config.nodeId, code),
+    buyer: configurationAddress(config.buyer, code),
+  };
+  if (config.role === P2P_ROLES.BUYER)
+    return { ...common, role: P2P_ROLES.BUYER };
+  return {
+    ...common,
+    role: P2P_ROLES.SELLER,
+    owner: configurationAddress(config.owner, code),
+    authorizer: configurationAddress(config.authorizer, code),
+    facilitator: configurationAddress(config.facilitator, code),
+    payTo: configurationAddress(config.payTo, code),
+  };
+}
+
+export async function loadRole(): Promise<RoleConfig> {
+  const value = configurationJson(
+    await readFile(file(P2P.roleConfig), 'utf8'),
+    NODE_ERROR_CODES.INVALID_ROLE_CONFIGURATION,
+  );
+  return parseRoleConfig(value);
 }
 
 export async function roleSigner(role: keyof typeof P2P.keys) {
   const config = await loadRole();
   if (
-    (config.role === 'buyer' && role !== 'buyer') ||
-    (config.role === 'seller' && role === 'buyer')
+    (config.role === P2P_ROLES.BUYER && role !== P2P_ROLES.BUYER) ||
+    (config.role === P2P_ROLES.SELLER && role === P2P_ROLES.BUYER)
   )
     throw new Error('Cross-role key access rejected.');
   const signer = await createKeyPairSignerFromBytes(
@@ -132,14 +170,13 @@ export async function nodeSecret() {
 
 export async function setupRole(options: SetupOptions) {
   address(options.mint);
-  await mkdir(P2P.root, { recursive: true, mode: FILE_MODES.privateDirectory });
   const path = file(P2P.roleConfig);
   try {
     const existing = await loadRole();
     if (
       existing.role !== options.role ||
       existing.mint !== options.mint ||
-      (existing.role === 'seller' &&
+      (existing.role === P2P_ROLES.SELLER &&
         (existing.payTo !== options.payTo || existing.buyer !== options.buyer))
     )
       throw new Error(
@@ -149,6 +186,11 @@ export async function setupRole(options: SetupOptions) {
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
   }
+  const rpcUrl = configurationRpcUrl(
+    process.env.GYBLOS_RPC_URL ?? DEVNET_RPC_URL,
+    NODE_ERROR_CODES.INVALID_ROLE_CONFIGURATION,
+  );
+  await mkdir(P2P.root, { recursive: true, mode: FILE_MODES.privateDirectory });
   try {
     await lstat(file(P2P.nodeKeyFilename));
   } catch (error) {
@@ -159,20 +201,20 @@ export async function setupRole(options: SetupOptions) {
       { flag: 'wx', mode: FILE_MODES.privateFile },
     );
   }
-  const common = {
+  const common: CommonRole = {
     schemaVersion: ROLE_CONFIG_SCHEMA_VERSION,
-    rpcUrl: process.env.GYBLOS_RPC_URL ?? DEVNET_RPC_URL,
+    rpcUrl,
     mint: options.mint,
-    assetLabel: 'devnet-test-token' as const,
+    assetLabel: CONFIG_ASSET_LABELS.TEST_TOKEN,
     nodeId: SecretKey.fromBytes(await nodeSecret())
       .public()
       .toString(),
   };
   let config: RoleConfig;
-  if (options.role === 'buyer')
+  if (options.role === P2P_ROLES.BUYER)
     config = {
       ...common,
-      role: 'buyer',
+      role: P2P_ROLES.BUYER,
       buyer: (await wallet('buyer')).address,
     };
   else {
@@ -202,7 +244,7 @@ export async function setupRole(options: SetupOptions) {
       throw new Error('Payout key must be cold.');
     config = {
       ...common,
-      role: 'seller',
+      role: P2P_ROLES.SELLER,
       owner: owner.address,
       authorizer: authorizer.address,
       facilitator: facilitator.address,
@@ -217,7 +259,7 @@ export async function setupRole(options: SetupOptions) {
 export async function publicRole() {
   const config = await loadRole();
   const names =
-    config.role === 'buyer'
+    config.role === P2P_ROLES.BUYER
       ? [P2P.keys.buyer, P2P.nodeKeyFilename]
       : [
           P2P.keys.owner,
@@ -240,7 +282,7 @@ export async function publicRole() {
     buyer: config.buyer,
     keys,
   };
-  return config.role === 'buyer'
+  return config.role === P2P_ROLES.BUYER
     ? common
     : {
         ...common,

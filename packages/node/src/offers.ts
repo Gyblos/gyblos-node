@@ -1,5 +1,5 @@
 // Signs private inference offers with the owner's Solana wallet key and verifies them against the trusted owner.
-// Wire shape, domain, signing bytes and Ed25519 stay in protocol; trust policy stays in core.
+// Trust policy stays in core; signing bytes and Ed25519 stay in protocol.
 import {
   address,
   createSignableMessage,
@@ -7,6 +7,7 @@ import {
   type KeyPairSigner,
 } from '@solana/kit';
 
+import { MAX_ATOMIC } from '@gyblos/config';
 import { validateInferenceOffer, type OfferTrust } from '@gyblos/core/offers';
 import { OFFER_DOMAIN } from '@gyblos/protocol/constants';
 import type {
@@ -14,6 +15,16 @@ import type {
   SignedInferenceOffer,
 } from '@gyblos/protocol/offer';
 import { sign, verify } from '@gyblos/protocol/signing';
+
+import {
+  configurationAddress,
+  configurationJson,
+  configurationNodeId,
+  configurationObject,
+  configurationString,
+} from './configuration.js';
+import { NODE_ERROR_CODES } from './constants.js';
+import { NodeError } from './errors.js';
 
 export async function signInferenceOffer(
   offer: InferenceOffer,
@@ -48,4 +59,36 @@ export async function verifyInferenceOffer(
   )
     throw new Error('Invalid owner signature.');
   return offer;
+}
+
+// Trust is supplied independently by the buyer; never infer trusted identities from an unverified offer.
+export function parseOfferTrust(value: unknown): OfferTrust {
+  const code = NODE_ERROR_CODES.INVALID_OFFER_TRUST;
+  const input = configurationObject(value, code);
+  const maxAtomic = configurationString(input.maxAtomic, code);
+  if (
+    /[^0-9]/.test(maxAtomic) ||
+    BigInt(maxAtomic) <= 0n ||
+    BigInt(maxAtomic) > BigInt(MAX_ATOMIC)
+  )
+    throw new NodeError(code);
+  return {
+    owner: configurationAddress(input.owner, code),
+    nodeId: configurationNodeId(input.nodeId, code),
+    mint: configurationAddress(input.mint, code),
+    payTo: configurationAddress(input.payTo, code),
+    buyer: configurationAddress(input.buyer, code),
+    maxAtomic,
+  };
+}
+
+export function parseOfferTrustJson(text: string): OfferTrust {
+  return parseOfferTrust(
+    configurationJson(text, NODE_ERROR_CODES.INVALID_OFFER_TRUST),
+  );
+}
+
+// Decode untrusted offer text without including malformed payload fragments in diagnostics.
+export function parseSignedOfferJson(text: string): unknown {
+  return configurationJson(text, NODE_ERROR_CODES.INVALID_SIGNED_OFFER);
 }

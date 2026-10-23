@@ -119,8 +119,8 @@ The seller limits work per Iroh identity, but identities are free to create.
 - `GYBLOS_GATE_CONFIG` moves only the config file, not keys, journals or models.
   Inference needs the default key paths.
 - `.env` is not loaded; set variables in the process environment.
-- There is no command yet to write the buyer's `trust.json` or to fund P2P
-  roles.
+- P2P role funding remains manual. `buyer:trust` creates the trust file only
+  from explicit seller identities after checking the signed offer.
 - Local gate reports (`gate-0004.json`, `gate-0005.json`) are not signed
   receipts and are not committed.
 

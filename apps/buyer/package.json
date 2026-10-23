@@ -16,7 +16,8 @@
     "./reconciliation": "./src/reconciliation.ts",
     "./synthetic-cases": "./src/synthetic-cases.ts",
     "./proxy": "./src/proxy.ts",
-    "./setup": "./src/setup.ts"
+    "./setup": "./src/setup.ts",
+    "./trust": "./src/trust.ts"
   },
   "dependencies": {
     "@gyblos/core": "workspace:*",

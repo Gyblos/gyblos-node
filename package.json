@@ -37,7 +37,8 @@
     "buyer:reconcile": "node --import tsx apps/buyer/src/reconcile.ts",
     "buyer:setup": "node --import tsx apps/buyer/src/setup.ts",
     "node:setup": "node --import tsx apps/node/src/setup.ts",
-    "check": "pnpm typecheck && pnpm lint && pnpm test:all"
+    "check": "pnpm typecheck && pnpm lint && pnpm test:all",
+    "buyer:trust": "node --import tsx apps/buyer/src/trust.ts"
   },
   "dependencies": {
     "@gyblos/core": "workspace:*",
