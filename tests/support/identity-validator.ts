@@ -1,6 +1,7 @@
 // Owns a throwaway solana-test-validator cloned from public devnet (8004 program, mpl-core, registry configs),
 // optionally preloaded with synthetic accounts. Clone source is fixed to devnet; ledger and log stay in .local/.
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
+import { once } from 'node:events';
 import { mkdirSync, openSync, writeFileSync } from 'node:fs';
 import { setTimeout as delay } from 'node:timers/promises';
 
@@ -12,9 +13,12 @@ import { DEVNET_REGISTRY, PROGRAMS } from '@gyblos/identity/constants';
 import type { SyntheticChain } from './identity-accounts.js';
 
 const VALIDATOR_BINARY = 'solana-test-validator';
-// Synthetic local ports; the validator also binds RPC_PORT + 1 for websockets.
+// Synthetic loopback ports kept inside 18000-19999: RPC (plus RPC_PORT + 1 for websockets), faucet, gossip
+// and the dynamic range for TPU/TVU/repair, so the validator never reaches for its default 1024-65535 range.
 const RPC_PORT = 18899;
 const FAUCET_PORT = 19900;
+const GOSSIP_PORT = 18001;
+const DYNAMIC_PORT_RANGE = '18100-18200';
 const STARTUP_POLLS = 120;
 const POLL_MS = 500;
 const LOCAL_DIR = new URL('../../.local/identity-validator/', import.meta.url);
@@ -23,7 +27,8 @@ const PRELOAD_LAMPORTS = 10_000_000;
 
 export interface LocalValidator {
   url: string;
-  stop(): void;
+  // Resolves once the validator process has exited.
+  stop(): Promise<void>;
 }
 
 export type ValidatorStart =
@@ -73,6 +78,8 @@ function validatorArgs(ledger: string, preload: SyntheticChain): string[] {
     ...['--ledger', ledger, '--reset', '--quiet'],
     ...['--bind-address', LOCALHOST],
     ...['--rpc-port', String(RPC_PORT), '--faucet-port', String(FAUCET_PORT)],
+    ...['--gossip-port', String(GOSSIP_PORT)],
+    ...['--dynamic-port-range', DYNAMIC_PORT_RANGE],
     ...['--url', DEVNET_RPC_URL],
     ...['--clone-upgradeable-program', PROGRAMS.registry],
     ...['--clone-upgradeable-program', PROGRAMS.mplCore],
@@ -97,6 +104,13 @@ async function waitHealthy(child: ChildProcess, url: string): Promise<boolean> {
   return false;
 }
 
+async function stopProcess(child: ChildProcess): Promise<void> {
+  if (child.exitCode !== null || child.signalCode !== null) return;
+  const exited = once(child, 'exit');
+  child.kill('SIGTERM');
+  await exited;
+}
+
 export async function startLocalValidator(
   preload: SyntheticChain = new Map(),
 ): Promise<ValidatorStart> {
@@ -114,12 +128,12 @@ export async function startLocalValidator(
     env: { ...process.env, COPYFILE_DISABLE: '1' },
   });
   if (!(await waitHealthy(child, url))) {
-    child.kill('SIGTERM');
+    await stopProcess(child);
     return {
       ok: false,
       reason:
         'validator did not become healthy (devnet clone unreachable?); see .local/identity-validator/validator.log',
     };
   }
-  return { ok: true, validator: { url, stop: () => child.kill('SIGTERM') } };
+  return { ok: true, validator: { url, stop: () => stopProcess(child) } };
 }

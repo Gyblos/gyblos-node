@@ -1,6 +1,6 @@
 // Owns offline identity sponsor policy regression cases: every reason, input canonicalisation, config
-// validation, check ordering and ledger recording.
-// Pure functions only; no network, funded wallets or keys.
+// validation, check ordering, the node-signed online-check challenge and ledger recording.
+// No network or funded wallets; the node key is a fixed synthetic signer.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -11,11 +11,16 @@ import {
   evaluateSponsorRules,
   IDENTITY_ERROR_CODES,
   IdentityError,
+  onlineChallengeMessage,
   recordSponsorship,
   SPONSOR_REASONS,
   type IdentityErrorCode,
+  type OnlineCheck,
   type SponsorRequest,
 } from '@gyblos/identity';
+import { nodeIdFromAddress } from '@gyblos/identity/codec';
+
+import { fixedSigner } from './support/identity-fixture.js';
 
 const CONFIG = {
   budgetLamports: 20_000_000n,
@@ -27,12 +32,15 @@ const OWNERS = {
   second: 'Ff26VsLhHiL8miieVi5SyadPrzMEf9nWSEH3FvmMvS3E',
   third: '6Nyir6EcfrqqEtV935vzbzCUwam64mVNAnkQCyu7apg6',
 } as const;
+const NODE = await fixedSigner(1);
 const REQUEST: SponsorRequest = {
-  deviceKey: 'aa'.repeat(32),
+  deviceKey: nodeIdFromAddress(NODE.address),
   owner: OWNERS.first,
   costLamports: 9_000_000n,
 };
-const passes = async () => true;
+// Stands in for the node answering the challenge over Iroh: it signs with the device key.
+const passes: OnlineCheck = async (request, challenge) =>
+  NODE.signDetached(onlineChallengeMessage(challenge, request));
 
 function hasCode(code: IdentityErrorCode) {
   return (error: unknown) =>
@@ -99,25 +107,63 @@ void test('denies when the budget ceiling would be crossed, allows exactly reach
 
 void test('online check runs only after the rules pass, and failures map to reasons', async () => {
   let calls = 0;
-  const counting = async () => {
+  const counting: OnlineCheck = async (request, challenge) => {
     calls += 1;
-    return true;
+    return passes(request, challenge);
   };
   const ledger = recordSponsorship(EMPTY_LEDGER, REQUEST);
   await decideSponsorship(REQUEST, ledger, CONFIG, counting);
   assert.equal(calls, 0);
-  assert.equal(
-    (await decideSponsorship(REQUEST, EMPTY_LEDGER, CONFIG, async () => false))
-      .reason,
-    SPONSOR_REASONS.ONLINE_CHECK_FAILED,
-  );
-  const throwing = async (): Promise<boolean> => {
+  const throwing: OnlineCheck = async () => {
     throw new Error('synthetic online check failure');
   };
   assert.equal(
     (await decideSponsorship(REQUEST, EMPTY_LEDGER, CONFIG, throwing)).reason,
     SPONSOR_REASONS.ONLINE_CHECK_ERROR,
   );
+});
+
+void test('an online check that does not return the node key signature over this challenge is denied', async () => {
+  const otherNode = await fixedSigner(2);
+  const stale = new Uint8Array(32);
+  const failing: OnlineCheck[] = [
+    // Placeholder "ok" answers: no proof, or arbitrary bytes.
+    async () => new Uint8Array(0),
+    async () => new Uint8Array(64).fill(1),
+    // A real signature, but by another key, over another challenge, or for another owner.
+    async (request, challenge) =>
+      otherNode.signDetached(onlineChallengeMessage(challenge, request)),
+    async (request) =>
+      NODE.signDetached(onlineChallengeMessage(stale, request)),
+    async (request, challenge) =>
+      NODE.signDetached(
+        onlineChallengeMessage(challenge, { ...request, owner: OWNERS.second }),
+      ),
+  ];
+  for (const check of failing) {
+    assert.equal(
+      (await decideSponsorship(REQUEST, EMPTY_LEDGER, CONFIG, check)).reason,
+      SPONSOR_REASONS.ONLINE_CHECK_FAILED,
+    );
+  }
+});
+
+void test('each decision issues a fresh challenge the check cannot alter', async () => {
+  const seen: Uint8Array[] = [];
+  const recording: OnlineCheck = async (request, challenge) => {
+    seen.push(challenge.slice());
+    const proof = await passes(request, challenge);
+    challenge.fill(0);
+    return proof;
+  };
+  for (let round = 0; round < 2; round += 1) {
+    assert.equal(
+      (await decideSponsorship(REQUEST, EMPTY_LEDGER, CONFIG, recording))
+        .reason,
+      SPONSOR_REASONS.ALLOWED,
+    );
+  }
+  assert.notDeepEqual(seen[0], seen[1]);
 });
 
 void test('recordSponsorship does not mutate the previous ledger', () => {
@@ -128,7 +174,12 @@ void test('recordSponsorship does not mutate the previous ledger', () => {
 });
 
 void test('rejects non-canonical device keys and owners before any other rule', () => {
-  const badDeviceKeys = ['AA'.repeat(32), 'aa'.repeat(31), 'zz'.repeat(32), ''];
+  const badDeviceKeys = [
+    REQUEST.deviceKey.toUpperCase(),
+    'aa'.repeat(31),
+    'zz'.repeat(32),
+    '',
+  ];
   for (const deviceKey of badDeviceKeys) {
     assert.equal(
       evaluateSponsorRules({ ...REQUEST, deviceKey }, EMPTY_LEDGER, CONFIG)

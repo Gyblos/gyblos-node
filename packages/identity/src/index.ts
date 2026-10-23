@@ -2,18 +2,23 @@
 // Adapter layer: it must not import other adapters, node or apps; nothing in product calls it yet.
 //
 // - buildSponsoredRegistration: one atomic v0 message (prefund → register → owner-signed gyblos.nodeId
-//   binding with node-key proof → Ed25519 proof + set_agent_wallet), prefund sized by simulateOwnerSpend.
-// - readNodeIdentity / resolveOwner: read identities and resolve NodeId → owner without an indexer;
-//   only bindings whose node signature verifies count.
-// - evaluateSponsorRules / decideSponsorship / recordSponsorship: pure sponsor policy, reasons in SPONSOR_REASONS.
+//   binding with node-key proof over a caller-chosen sequence → Ed25519 proof + set_agent_wallet), prefund
+//   sized by simulateOwnerSpend and the final message simulated once more.
+// - readNodeIdentity / resolveOwner: read identities and resolve NodeId → owner without an indexer; only
+//   bindings whose node signature verifies count, the highest sequence wins, fan-out is capped (READ_LIMITS).
+// - evaluateSponsorRules / decideSponsorship / recordSponsorship: sponsor policy, reasons in SPONSOR_REASONS.
+//   decideSponsorship requires an online check answered by the node key; sponsorship must not be wired
+//   until a real Iroh + catalog online check exists (docs/stack.md).
 // - IdentityError carries a code from IDENTITY_ERROR_CODES.
 export {
   BINDING_STATUSES,
+  BINDING_VERSIONS,
   COLLECTION_POLICY,
   IDENTITY_ERROR_CODES,
   METADATA_KEYS,
   SPONSOR_REASONS,
   type BindingStatus,
+  type BindingVersion,
   type CollectionPolicy,
   type IdentityErrorCode,
   type SponsorReason,
@@ -31,14 +36,15 @@ export {
 } from './registration.js';
 export {
   readNodeIdentity,
-  resolveOwner,
   type IdentityReadOptions,
   type NodeIdentity,
 } from './read.js';
+export { resolveOwner } from './resolve.js';
 export {
   assertSponsorPolicyConfig,
   decideSponsorship,
   evaluateSponsorRules,
+  onlineChallengeMessage,
   recordSponsorship,
   EMPTY_LEDGER,
   type OnlineCheck,

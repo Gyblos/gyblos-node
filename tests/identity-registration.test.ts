@@ -1,5 +1,6 @@
 // Owns offline sponsored registration sizing cases against a loopback JSON-RPC double: sponsor cost counts the
-// fee, the cost ceiling holds and the budget sees prefund + fee. Ephemeral unfunded signers only; no network.
+// fee, the cost ceiling holds, the budget sees prefund + fee, an owner who can pay gets no prefund and the final
+// message is simulated again. Ephemeral unfunded signers only; no network.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -11,6 +12,7 @@ import {
   EMPTY_LEDGER,
   IDENTITY_ERROR_CODES,
   IdentityError,
+  onlineChallengeMessage,
   recordSponsorship,
   SPONSOR_REASONS,
   type IdentityErrorCode,
@@ -49,6 +51,7 @@ async function build(fake: FakeRpc, maxSponsorCostLamports: bigint) {
     node: await fixedSigner(1),
     payoutWallet: await fixedSigner(4),
     agentUri: 'https://gyblos.com/n.json',
+    bindingSequence: 1n,
     maxSponsorCostLamports,
   });
 }
@@ -87,7 +90,10 @@ void test('sponsor cost is the prefund plus the message fee, and the ledger coun
           request,
           EMPTY_LEDGER,
           prefundOnlyCap,
-          async () => true,
+          async (asked, challenge) =>
+            (await fixedSigner(1)).signDetached(
+              onlineChallengeMessage(challenge, asked),
+            ),
         )
       ).reason,
       SPONSOR_REASONS.COST_ABOVE_CAP,
@@ -115,6 +121,38 @@ void test('a missing fee quote fails closed with a typed error', async () => {
     await assert.rejects(
       build(fake, GENEROUS_CEILING),
       hasCode(IDENTITY_ERROR_CODES.FEE_UNAVAILABLE),
+    );
+  });
+});
+
+void test('an owner who can already pay gets a zero prefund and the sponsor pays only the fee', async () => {
+  const ownerBalance = 100_000_000;
+  const canPay: SimulatedSpend = {
+    ownerBalance,
+    ownerAfterProbe: ownerBalance + PROBE - RENT,
+    fee: FEE,
+  };
+  await withRpc(canPay, async (fake) => {
+    const built = await build(fake, GENEROUS_CEILING);
+    assert.equal(built.prefundLamports, 0n);
+    assert.equal(built.sponsorCostLamports, BigInt(FEE));
+  });
+});
+
+void test('the final message is simulated again, so a probe that passes cannot hide a failing final run', async () => {
+  // E.g. prefund 0 leaves the owner below rent exemption once the probe's extra lamports are gone.
+  const finalFails: SimulatedSpend = {
+    ...SPEND,
+    laterSimulationErr: 'InsufficientFundsForRent',
+  };
+  await withRpc(finalFails, async (fake) => {
+    await assert.rejects(
+      build(fake, GENEROUS_CEILING),
+      hasCode(IDENTITY_ERROR_CODES.SIMULATION_FAILED),
+    );
+    assert.equal(
+      fake.state.calls.filter((call) => call === 'simulateTransaction').length,
+      2,
     );
   });
 });

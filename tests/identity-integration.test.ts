@@ -1,6 +1,6 @@
 // Owns identity integration cases on a local solana-test-validator cloned from devnet: a 0-SOL owner is
-// sponsored, read back without an indexer, and neither a squatter's replayed binding nor a preloaded burned
-// claimant hijacks or blocks resolveOwner. Opt-in; skips without the validator.
+// sponsored, read back without an indexer, neither a squatter's replayed binding nor a preloaded burned
+// claimant hijacks or blocks resolveOwner, and a higher-sequence rebinding moves the NodeId. Opt-in.
 import assert from 'node:assert/strict';
 import test, { after, before } from 'node:test';
 
@@ -30,9 +30,12 @@ import {
   readNodeIdentity,
   resolveOwner,
 } from '@gyblos/identity';
-import { encodeBindingValue, signNodeBinding } from '@gyblos/identity/binding';
+import {
+  encodeBindingValue,
+  setMetadataInstruction,
+  signNodeBinding,
+} from '@gyblos/identity/codec';
 import { PROGRAMS } from '@gyblos/identity/constants';
-import { setMetadataInstruction } from '@gyblos/identity/instructions';
 
 import {
   confirm,
@@ -56,6 +59,7 @@ import {
 const SPONSOR_AIRDROP = lamports(2_000_000_000n);
 const AGENT_URI = 'https://gyblos.com/.well-known/node.json';
 const CASE_OPTIONS = { skip: VALIDATOR_SKIP, timeout: 120_000 };
+const HONEST_SEQUENCE = 1n;
 
 let validator: LocalValidator | undefined;
 let startSkip: string | undefined;
@@ -110,7 +114,10 @@ void test(
   async (t) => {
     if (startSkip !== undefined) return t.skip(startSkip);
     assert.equal((await rpc.getBalance(honest.owner.address).send()).value, 0n);
-    honestResult = await runSponsoredFlow(rpc, sponsor, honest, AGENT_URI);
+    honestResult = await runSponsoredFlow(rpc, sponsor, honest, {
+      agentUri: AGENT_URI,
+      bindingSequence: HONEST_SEQUENCE,
+    });
     t.diagnostic(
       printable({
         prefundLamports: honestResult.prefundLamports,
@@ -141,6 +148,7 @@ void test(
       payoutWallet: honest.payoutWallet.address,
       uri: AGENT_URI,
       nodeId: honestResult.nodeId,
+      bindingSequence: HONEST_SEQUENCE,
       bindingStatus: 'valid',
     });
     assert.deepEqual(honestResult.byOwner, [honestResult.byAsset]);
@@ -154,12 +162,15 @@ void test(
   async (t) => {
     if (startSkip !== undefined) return t.skip(startSkip);
     const squatter = await freshParticipants();
-    await runSponsoredFlow(rpc, sponsor, squatter, AGENT_URI);
-    const stolen = await signNodeBinding(
-      honest.node,
-      honest.asset.address,
-      honest.owner.address,
-    );
+    await runSponsoredFlow(rpc, sponsor, squatter, {
+      agentUri: AGENT_URI,
+      bindingSequence: HONEST_SEQUENCE,
+    });
+    const stolen = await signNodeBinding(honest.node, {
+      asset: honest.asset.address,
+      owner: honest.owner.address,
+      sequence: HONEST_SEQUENCE,
+    });
     const replay = await setMetadataInstruction(
       squatter.owner,
       squatter.asset.address,
@@ -205,6 +216,33 @@ void test(
     assert.equal(
       await resolveOwner(rpc, honestResult.nodeId),
       honest.owner.address,
+    );
+  },
+);
+
+void test(
+  'a later registration signed by the node key with a higher sequence moves the NodeId to the new owner',
+  CASE_OPTIONS,
+  async (t) => {
+    if (startSkip !== undefined) return t.skip(startSkip);
+    const first = await freshParticipants();
+    const firstResult = await runSponsoredFlow(rpc, sponsor, first, {
+      agentUri: AGENT_URI,
+      bindingSequence: 1n,
+    });
+    assert.equal(firstResult.resolvedOwner, first.owner.address);
+    const second = { ...(await freshParticipants()), node: first.node };
+    const secondResult = await runSponsoredFlow(rpc, sponsor, second, {
+      agentUri: AGENT_URI,
+      bindingSequence: 2n,
+    });
+    assert.equal(secondResult.nodeId, firstResult.nodeId);
+    assert.equal(secondResult.resolvedOwner, second.owner.address);
+    // The first owner's binding is still valid on chain, just outranked.
+    assert.equal(
+      (await readNodeIdentity(rpc, { asset: first.asset.address }))
+        ?.bindingStatus,
+      BINDING_STATUSES.VALID,
     );
   },
 );

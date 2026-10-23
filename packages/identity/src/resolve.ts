@@ -1,0 +1,101 @@
+// Owns resolving NodeId → owner from on-chain gyblos.nodeId claims: the highest valid signed sequence wins.
+// Builds on read.ts for account reads; must not know registration, sponsorship or caching.
+import type { Address, Rpc, SolanaRpcApi } from '@solana/kit';
+
+import { decodeMetadataEntry } from './accounts.js';
+import { nodeIdMetadataPrefix } from './binding.js';
+import {
+  ACCOUNT_DISCRIMINATORS,
+  ACCOUNT_OFFSETS,
+  BINDING_STATUSES,
+  BINDING_VERSIONS,
+  IDENTITY_ERROR_CODES,
+} from './constants.js';
+import { IdentityError } from './errors.js';
+import { memcmpFilter } from './filters.js';
+import {
+  readClaimants,
+  registryAssets,
+  type IdentityReadOptions,
+  type NodeIdentity,
+} from './read.js';
+
+type IdentityRpc = Rpc<SolanaRpcApi>;
+
+interface ValidClaim {
+  owner: Address;
+  sequence: bigint;
+}
+
+const NO_SEQUENCE = -1n;
+
+// Metadata accounts whose value (in any readable binding version) starts with this NodeId.
+async function assetsClaimingNodeId(
+  rpc: IdentityRpc,
+  nodeId: string,
+): Promise<Address[]> {
+  const versions = Object.values(BINDING_VERSIONS);
+  const scans = await Promise.all(
+    versions.map((version) =>
+      registryAssets(
+        rpc,
+        [
+          memcmpFilter(
+            ACCOUNT_OFFSETS.discriminator,
+            ACCOUNT_DISCRIMINATORS.metadata,
+          ),
+          memcmpFilter(
+            ACCOUNT_OFFSETS.metadataKey,
+            nodeIdMetadataPrefix(nodeId, version),
+          ),
+        ],
+        decodeMetadataEntry,
+      ),
+    ),
+  );
+  return scans.flat();
+}
+
+function validClaims(
+  identities: readonly (NodeIdentity | undefined)[],
+  nodeId: string,
+): ValidClaim[] {
+  return identities.flatMap((identity) =>
+    identity?.bindingStatus === BINDING_STATUSES.VALID &&
+    identity.nodeId === nodeId &&
+    identity.bindingSequence !== undefined
+      ? [{ owner: identity.owner, sequence: identity.bindingSequence }]
+      : [],
+  );
+}
+
+// The latest registration signed by the node key wins; a tie between owners at the top is ambiguous.
+function latestOwner(claims: readonly ValidClaim[]): Address | undefined {
+  const top = claims.reduce(
+    (highest, claim) => (claim.sequence > highest ? claim.sequence : highest),
+    NO_SEQUENCE,
+  );
+  const owners = new Set(
+    claims.filter((claim) => claim.sequence === top).map(({ owner }) => owner),
+  );
+  if (owners.size > 1) {
+    throw new IdentityError(
+      IDENTITY_ERROR_CODES.NODE_ID_AMBIGUOUS,
+      `nodeId bound to ${owners.size} owners at sequence ${top}`,
+    );
+  }
+  return [...owners][0];
+}
+
+// Anyone can write a claim for any NodeId; only claims carrying the node key's proof count, a broken
+// claimant cannot block the honest one, and the highest signed sequence wins. undefined means no valid
+// claim was found, never "safe to sponsor again"; more than READ_LIMITS.maxClaimants claimants throws.
+export async function resolveOwner(
+  rpc: IdentityRpc,
+  nodeId: string,
+  options: IdentityReadOptions = {},
+): Promise<Address | undefined> {
+  const assets = await assetsClaimingNodeId(rpc, nodeId);
+  const identities = await readClaimants(rpc, assets, options);
+  return latestOwner(validClaims(identities, nodeId));
+}

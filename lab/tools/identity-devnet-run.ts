@@ -68,7 +68,13 @@ async function main(): Promise<void> {
     payoutWallet: await detached('devnet-payout'),
   };
   console.log(
-    printable(await runSponsoredFlow(rpc, sponsor, participants, AGENT_URI)),
+    printable(
+      await runSponsoredFlow(rpc, sponsor, participants, {
+        agentUri: AGENT_URI,
+        // Unix milliseconds: strictly increasing across runs with the same node key.
+        bindingSequence: BigInt(Date.now()),
+      }),
+    ),
   );
 }
 

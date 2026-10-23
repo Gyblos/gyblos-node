@@ -1,5 +1,6 @@
 // Owns the sponsored registration flow: one atomic message (prefund, register, nodeId binding, payout wallet),
-// the simulation that sizes the prefund and the sponsor's total cost ceiling. Must not know policy, keys or sending.
+// the simulations that size and then check the prefund, and the sponsor's cost ceiling. Must not know policy,
+// keys or sending.
 import {
   appendTransactionMessageInstructions,
   compileTransaction,
@@ -21,6 +22,7 @@ import { COMMITMENT, SVM_TRANSACTION_VERSION } from '@gyblos/config';
 
 import { encodeBindingValue, signNodeBinding } from './binding.js';
 import {
+  BASE64_ENCODING,
   IDENTITY_ERROR_CODES,
   LIMITS,
   METADATA_KEYS,
@@ -38,9 +40,9 @@ import type { DetachedSigner } from './signers.js';
 const BASE64_BITS_PER_CHAR = 6;
 const BITS_PER_BYTE = 8;
 const SIMULATION_LOG_TAIL = 3;
-const BASE64_ENCODING = 'base64' as const;
-const BASE64_TEXT = /^[A-Za-z0-9+/]*={0,2}$/;
-const BASE64 = getBase64Decoder();
+const BASE64_ALPHABET = /^[A-Za-z0-9+/]*={0,2}$/;
+// Kit's base64 "decoder" turns message bytes into base64 text.
+const BYTES_TO_BASE64_TEXT = getBase64Decoder();
 
 type IdentityRpc = Rpc<SolanaRpcApi>;
 
@@ -52,6 +54,9 @@ export interface SponsoredRegistrationInput {
   node: DetachedSigner;
   payoutWallet: DetachedSigner;
   agentUri: string;
+  // Rebinding sequence the node key signs; the highest valid sequence for a NodeId wins resolveOwner.
+  // Use a strictly increasing value per node key (unix ms, or a counter persisted with the key).
+  bindingSequence: bigint;
   // Ceiling on prefund + fee; a larger computed cost throws SPONSOR_COST_ABOVE_CEILING.
   maxSponsorCostLamports: bigint;
   probeLamports?: bigint;
@@ -119,11 +124,11 @@ async function registrationInstructions(
   input: SponsoredRegistrationInput,
   deadline: bigint,
 ) {
-  const binding = await signNodeBinding(
-    input.node,
-    input.asset.address,
-    input.owner.address,
-  );
+  const binding = await signNodeBinding(input.node, {
+    asset: input.asset.address,
+    owner: input.owner.address,
+    sequence: input.bindingSequence,
+  });
   const register = await registerInstruction(
     input.owner,
     input.asset,
@@ -157,6 +162,31 @@ function simulationDetail(
   return `simulation failed: ${detail}; ${(logs ?? []).slice(-SIMULATION_LOG_TAIL).join(' | ')}`;
 }
 
+// Simulates the message and returns the owner's post-run lamports; any program error throws SIMULATION_FAILED.
+async function simulateOwnerAfter(
+  rpc: IdentityRpc,
+  message: SponsoredMessage,
+  owner: Address,
+): Promise<{ ownerAfter: bigint; unitsConsumed: bigint }> {
+  const result = await rpc
+    .simulateTransaction(wireBase64(message), {
+      encoding: BASE64_ENCODING,
+      sigVerify: false,
+      replaceRecentBlockhash: true,
+      commitment: COMMITMENT,
+      accounts: { addresses: [owner], encoding: BASE64_ENCODING },
+    })
+    .send();
+  const ownerAfter = result.value.accounts?.[0]?.lamports;
+  if (result.value.err !== null || ownerAfter === undefined) {
+    throw new IdentityError(
+      IDENTITY_ERROR_CODES.SIMULATION_FAILED,
+      simulationDetail(result.value.err, result.value.logs),
+    );
+  }
+  return { ownerAfter, unitsConsumed: result.value.unitsConsumed ?? 0n };
+}
+
 // Simulates with a generous prefund and returns how many lamports the owner actually spent.
 export async function simulateOwnerSpend(
   rpc: IdentityRpc,
@@ -167,26 +197,15 @@ export async function simulateOwnerSpend(
   const before = (
     await rpc.getBalance(owner, { commitment: COMMITMENT }).send()
   ).value;
-  const result = await rpc
-    .simulateTransaction(wireBase64(message), {
-      encoding: BASE64_ENCODING,
-      sigVerify: false,
-      replaceRecentBlockhash: true,
-      commitment: COMMITMENT,
-      accounts: { addresses: [owner], encoding: BASE64_ENCODING },
-    })
-    .send();
-  const after = result.value.accounts?.[0]?.lamports;
-  if (result.value.err !== null || after === undefined) {
-    throw new IdentityError(
-      IDENTITY_ERROR_CODES.SIMULATION_FAILED,
-      simulationDetail(result.value.err, result.value.logs),
-    );
-  }
+  const { ownerAfter, unitsConsumed } = await simulateOwnerAfter(
+    rpc,
+    message,
+    owner,
+  );
   return {
-    spentLamports: before + probeLamports - after,
+    spentLamports: before + probeLamports - ownerAfter,
     ownerBalance: before,
-    unitsConsumed: result.value.unitsConsumed ?? 0n,
+    unitsConsumed,
   };
 }
 
@@ -197,7 +216,7 @@ export function prefundFromSpend(spend: OwnerSpend): bigint {
 }
 
 function isMessageBase64(text: string): text is TransactionMessageBytesBase64 {
-  return BASE64_TEXT.test(text);
+  return BASE64_ALPHABET.test(text);
 }
 
 // The network fee for this exact message (signatures plus Ed25519 precompile proofs).
@@ -205,7 +224,9 @@ async function messageFee(
   rpc: IdentityRpc,
   message: SponsoredMessage,
 ): Promise<bigint> {
-  const encoded = BASE64.decode(compileTransaction(message).messageBytes);
+  const encoded = BYTES_TO_BASE64_TEXT.decode(
+    compileTransaction(message).messageBytes,
+  );
   if (!isMessageBase64(encoded)) {
     throw new IdentityError(
       IDENTITY_ERROR_CODES.ENCODING_INVARIANT,
@@ -270,6 +291,9 @@ export async function buildSponsoredRegistration(
   const prefundLamports = prefundFromSpend(probeRun);
   const message = withPrefund(prefundLamports);
   const transactionBytes = assertFits(message);
+  // The final prefund can differ from the probe's (0 for an owner who can pay), so the exact message
+  // is simulated once more; an under-funded or rent-violating result throws SIMULATION_FAILED here.
+  await simulateOwnerAfter(input.rpc, message, input.owner.address);
   const feeLamports = await messageFee(input.rpc, message);
   const sponsorCostLamports = prefundLamports + feeLamports;
   assertWithinCeiling(sponsorCostLamports, input.maxSponsorCostLamports);

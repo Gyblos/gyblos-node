@@ -1,15 +1,18 @@
 // Owns synthetic 8004 account bytes (AgentAccount, Core AssetV1, MetadataEntryPda) and claimant builders.
-// Synthetic data only: no network, funded wallets or private keys; layouts mirror @gyblos/identity/accounts.
+// Synthetic data only: no network, funded wallets or private keys; layouts mirror @gyblos/identity/codec.
 import { getAddressEncoder, type Address } from '@solana/kit';
 
 import type { DetachedSigner } from '@gyblos/identity';
-import { encodeBindingValue, signNodeBinding } from '@gyblos/identity/binding';
 import {
   concatBytes,
+  encodeBindingValue,
   encodeBool,
   encodeString,
   encodeVecU8,
-} from '@gyblos/identity/bytes';
+  findAgentAddress,
+  findMetadataAddress,
+  signNodeBinding,
+} from '@gyblos/identity/codec';
 import {
   ACCOUNT_DISCRIMINATORS,
   DEVNET_REGISTRY,
@@ -17,13 +20,13 @@ import {
   MPL_CORE_ASSET_V1_KEY,
   PROGRAMS,
 } from '@gyblos/identity/constants';
-import { findAgentAddress, findMetadataAddress } from '@gyblos/identity/pda';
 
 const ADDRESS_ENCODER = getAddressEncoder();
 const REPUTATION_DIGESTS_BYTES = 3 * (32 + 8);
 const CORE_TAIL_BYTES = 16;
 // The Uninitialized key a burned Core asset may leave behind in a 1-byte account.
 const CORE_UNINITIALIZED_KEY = 0;
+const DEFAULT_SEQUENCE = 1n;
 
 export interface SyntheticAccount {
   owner: Address;
@@ -105,6 +108,9 @@ export interface ClaimantSpec {
   asset: Address;
   node: DetachedSigner;
   collection?: Address;
+  // Binding sequence the node signs (default 1); bindingValue replaces the signed value outright.
+  sequence?: bigint;
+  bindingValue?: Uint8Array;
 }
 
 export interface ClaimantAddresses {
@@ -123,7 +129,15 @@ export async function addClaimant(
     core: spec.asset,
     metadata: await findMetadataAddress(spec.asset, METADATA_KEYS.nodeId),
   };
-  const binding = await signNodeBinding(spec.node, spec.asset, spec.owner);
+  const binding =
+    spec.bindingValue ??
+    encodeBindingValue(
+      await signNodeBinding(spec.node, {
+        asset: spec.asset,
+        owner: spec.owner,
+        sequence: spec.sequence ?? DEFAULT_SEQUENCE,
+      }),
+    );
   chain.set(addresses.agent, {
     owner: PROGRAMS.registry,
     data: agentAccountBytes({
@@ -140,11 +154,7 @@ export async function addClaimant(
   });
   chain.set(addresses.metadata, {
     owner: PROGRAMS.registry,
-    data: metadataBytes(
-      spec.asset,
-      METADATA_KEYS.nodeId,
-      encodeBindingValue(binding),
-    ),
+    data: metadataBytes(spec.asset, METADATA_KEYS.nodeId, binding),
   });
   return addresses;
 }

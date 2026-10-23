@@ -19,11 +19,13 @@ import {
   decideSponsorship,
   detachedSignerFromKeyPair,
   EMPTY_LEDGER,
+  onlineChallengeMessage,
   readNodeIdentity,
   recordSponsorship,
   resolveOwner,
   type DetachedSigner,
   type NodeIdentity,
+  type OnlineCheck,
   type SponsorDecision,
   type SponsorPolicyConfig,
 } from '@gyblos/identity';
@@ -115,17 +117,25 @@ async function sendSponsored(
   return { signature, feeLamports: transaction?.meta?.fee ?? 0n };
 }
 
+// Lab-only stand-in for the real online check: it holds the node key and answers the challenge locally.
+// Product wiring needs a check that reaches the node over Iroh instead (see docs/stack.md).
+function labOnlineCheck(node: DetachedSigner): OnlineCheck {
+  return (request, challenge) =>
+    node.signDetached(onlineChallengeMessage(challenge, request));
+}
+
 export async function runSponsoredFlow(
   rpc: Rpc<SolanaRpcApi>,
   sponsor: TransactionSigner,
   participants: FlowParticipants,
-  agentUri: string,
+  options: { agentUri: string; bindingSequence: bigint },
 ): Promise<FlowResult> {
   const sponsorBefore = await balance(rpc, sponsor.address);
   const built = await buildSponsoredRegistration({
     rpc,
     sponsor,
-    agentUri,
+    agentUri: options.agentUri,
+    bindingSequence: options.bindingSequence,
     maxSponsorCostLamports: LAB_POLICY.maxPerRegistrationLamports,
     ...participants,
   });
@@ -139,7 +149,7 @@ export async function runSponsoredFlow(
     request,
     EMPTY_LEDGER,
     LAB_POLICY,
-    async () => true,
+    labOnlineCheck(participants.node),
   );
   if (!decision.allow)
     throw new Error(`sponsorship denied: ${decision.reason}`);

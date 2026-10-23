@@ -24,11 +24,13 @@ const RPC_ERROR_CODE = -32603;
 const UNITS_CONSUMED = 150_000;
 const SYSTEM_OWNER = '11111111111111111111111111111111';
 
-// Registration sizing knobs: what the owner holds before and after the simulated probe run.
+// Registration sizing knobs: what the owner holds before and after the simulated probe run, and an
+// optional program error returned by every simulation after the first (the final-message check).
 export interface SimulatedSpend {
   ownerBalance: number;
   ownerAfterProbe: number;
   fee: number | null;
+  laterSimulationErr?: string;
 }
 
 export interface FakeRpcState {
@@ -36,6 +38,8 @@ export interface FakeRpcState {
   // getMultipleAccounts requests touching any of these fail like an RPC outage.
   failingAddresses: Set<string>;
   spend: SimulatedSpend;
+  // JSON-RPC method names in arrival order, so tests can count round trips.
+  calls: string[];
 }
 
 export interface FakeRpc {
@@ -142,10 +146,13 @@ function multipleAccounts(state: FakeRpcState, params: unknown[]) {
 }
 
 function simulation(state: FakeRpcState) {
+  const simulations = state.calls.filter(
+    (method) => method === 'simulateTransaction',
+  ).length;
   return {
     context: { slot: SLOT },
     value: {
-      err: null,
+      err: simulations > 1 ? (state.spend.laterSimulationErr ?? null) : null,
       logs: [],
       accounts: [
         {
@@ -165,6 +172,7 @@ function simulation(state: FakeRpcState) {
 
 function respond(state: FakeRpcState, call: JsonRpcCall): object {
   const context = { slot: SLOT };
+  state.calls.push(call.method);
   switch (call.method) {
     case 'getMultipleAccounts':
       return multipleAccounts(state, call.params);
@@ -223,7 +231,12 @@ export async function startFakeRpc(
   chain: SyntheticChain,
   spend: SimulatedSpend = { ownerBalance: 0, ownerAfterProbe: 0, fee: 0 },
 ): Promise<FakeRpc> {
-  const state: FakeRpcState = { chain, failingAddresses: new Set(), spend };
+  const state: FakeRpcState = {
+    chain,
+    failingAddresses: new Set(),
+    spend,
+    calls: [],
+  };
   const server = serve(state);
   server.listen(0, LOCALHOST);
   await once(server, 'listening');

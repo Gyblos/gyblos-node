@@ -5,14 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./accounts": "./src/accounts.ts",
-    "./binding": "./src/binding.ts",
-    "./bytes": "./src/bytes.ts",
-    "./constants": "./src/constants.ts",
-    "./filters": "./src/filters.ts",
-    "./instructions": "./src/instructions.ts",
-    "./pda": "./src/pda.ts",
-    "./read": "./src/read.ts"
+    "./codec": "./src/codec.ts",
+    "./constants": "./src/constants.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",

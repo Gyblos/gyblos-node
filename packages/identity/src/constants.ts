@@ -60,13 +60,31 @@ export const METADATA_KEYS = {
   nodeId: 'gyblos.nodeId',
 } as const;
 
-// gyblos.nodeId value: version(1) ‖ nodeId(32) ‖ node signature(64).
+// gyblos.nodeId value layouts. v2 (written): version(1) ‖ nodeId(32) ‖ sequence(u64 LE, 8) ‖ signature(64),
+// where the node key signs domain ‖ version ‖ sequence ‖ program ‖ asset ‖ owner. v1 (read only, legacy):
+// version(1) ‖ nodeId(32) ‖ signature(64) over domain ‖ program ‖ asset ‖ owner; it counts as sequence 0.
+export const BINDING_VERSIONS = {
+  V1: 1,
+  V2: 2,
+} as const;
+
+export type BindingVersion =
+  (typeof BINDING_VERSIONS)[keyof typeof BINDING_VERSIONS];
+
+export const BINDING_LAYOUTS = {
+  [BINDING_VERSIONS.V1]: { domain: 'gyblos.nodeId/v1', valueBytes: 97 },
+  [BINDING_VERSIONS.V2]: { domain: 'gyblos.nodeId/v2', valueBytes: 105 },
+} as const satisfies Record<
+  BindingVersion,
+  { domain: string; valueBytes: number }
+>;
+
 export const BINDING = {
-  version: 1,
-  domain: 'gyblos.nodeId/v1',
+  version: BINDING_VERSIONS.V2,
   nodeIdBytes: 32,
   signatureBytes: 64,
-  valueBytes: 97,
+  legacySequence: 0n,
+  maxSequence: 0xffff_ffff_ffff_ffffn,
 } as const;
 
 export const BINDING_STATUSES = {
@@ -90,6 +108,7 @@ export const IDENTITY_ERROR_CODES = {
   POLICY_CONFIG_INVALID: 'IDENTITY_POLICY_CONFIG_INVALID',
   SIMULATION_FAILED: 'IDENTITY_SIMULATION_FAILED',
   SPONSOR_COST_ABOVE_CEILING: 'IDENTITY_SPONSOR_COST_ABOVE_CEILING',
+  TOO_MANY_CLAIMANTS: 'IDENTITY_TOO_MANY_CLAIMANTS',
   TRANSACTION_TOO_LARGE: 'IDENTITY_TRANSACTION_TOO_LARGE',
 } as const;
 
@@ -105,6 +124,17 @@ export const CLAIMANT_DISQUALIFYING_CODES: ReadonlySet<IdentityErrorCode> =
     IDENTITY_ERROR_CODES.BINDING_INVALID,
     IDENTITY_ERROR_CODES.COLLECTION_MISMATCH,
   ]);
+
+// Read fan-out bounds: at most maxClaimants assets are considered for one NodeId or owner (more throws
+// TOO_MANY_CLAIMANTS rather than silently picking); their accounts are fetched accountsPerRequest at a time.
+export const READ_LIMITS = {
+  maxClaimants: 16,
+  accountsPerClaimant: 3,
+  accountsPerRequest: 100,
+} as const;
+
+// RPC account data encoding (an external Solana JSON-RPC identifier) shared by reads and simulation.
+export const BASE64_ENCODING = 'base64' as const;
 
 // Collection accepted by reads: the configured Gyblos/8004 collection unless the caller opts into ANY.
 export const COLLECTION_POLICY = {
@@ -129,6 +159,13 @@ export const SPONSOR_REASONS = {
 
 export type SponsorReason =
   (typeof SPONSOR_REASONS)[keyof typeof SPONSOR_REASONS];
+
+// Domain of the message a node signs to answer the sponsor's online-check challenge:
+// domain ‖ challenge(32) ‖ nodeId(32) ‖ owner(32).
+export const ONLINE_CHALLENGE = {
+  domain: 'gyblos.sponsor-online/v1',
+  challengeBytes: 32,
+} as const;
 
 // Registration defaults: simulation probe (sponsor must hold at least this) and wallet-proof lifetime.
 export const REGISTRATION_DEFAULTS = {

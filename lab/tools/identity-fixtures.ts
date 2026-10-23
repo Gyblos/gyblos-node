@@ -9,12 +9,12 @@ import {
 } from '@solana/kit';
 
 import { DEVNET_RPC_URL } from '@gyblos/config';
+import { memcmpFilter } from '@gyblos/identity/codec';
 import {
   ACCOUNT_DISCRIMINATORS,
   ACCOUNT_OFFSETS,
   PROGRAMS,
 } from '@gyblos/identity/constants';
-import { memcmpFilter } from '@gyblos/identity/filters';
 import { assertDevnet } from '@gyblos/payments-x402/chain';
 
 const FIXTURE = new URL(

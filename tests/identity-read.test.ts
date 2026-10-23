@@ -1,5 +1,6 @@
 // Owns offline identity read regression cases over synthetic accounts served by a loopback JSON-RPC double:
 // per-claimant resolution, collection check, metadata cross-check and account-owner checks. No network or keys.
+// Rebinding by sequence, legacy v1 bindings, fan-out caps and batching live in identity-resolve.test.ts.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -15,12 +16,18 @@ import {
   resolveOwner,
   type IdentityErrorCode,
 } from '@gyblos/identity';
-import { encodeBindingValue, signNodeBinding } from '@gyblos/identity/binding';
-import { PROGRAMS } from '@gyblos/identity/constants';
+import {
+  encodeBindingValue,
+  nodeIdFromAddress,
+  signNodeBinding,
+} from '@gyblos/identity/codec';
+import { DEVNET_REGISTRY, PROGRAMS } from '@gyblos/identity/constants';
 
 import {
   addClaimant,
+  agentAccountBytes,
   burnedCoreAssetBytes,
+  coreAssetBytes,
   metadataBytes,
   type ClaimantAddresses,
   type SyntheticChain,
@@ -73,17 +80,17 @@ function hasCode(code: IdentityErrorCode) {
     error instanceof IdentityError && error.code === code;
 }
 
-async function nodeIdOf(k: Keys): Promise<string> {
-  return (await signNodeBinding(k.node, k.honestAsset, k.honestOwner)).nodeId;
+function nodeIdOf(k: Keys): string {
+  return nodeIdFromAddress(k.node.address);
 }
 
-void test('two valid owners for one NodeId stay ambiguous', async () => {
+void test('two valid owners for one NodeId at the same sequence stay ambiguous', async () => {
   const k = await keys();
   const chain: SyntheticChain = new Map();
   await honestAndRival(chain, k);
   await withRpc(chain, async ({ rpc }) => {
     await assert.rejects(
-      resolveOwner(rpc, await nodeIdOf(k)),
+      resolveOwner(rpc, nodeIdOf(k)),
       hasCode(IDENTITY_ERROR_CODES.NODE_ID_AMBIGUOUS),
     );
   });
@@ -98,7 +105,7 @@ void test('a claimant whose Core asset is a burned 1-byte stub cannot block the 
     data: burnedCoreAssetBytes(),
   });
   await withRpc(chain, async ({ rpc }) => {
-    assert.equal(await resolveOwner(rpc, await nodeIdOf(k)), k.honestOwner);
+    assert.equal(await resolveOwner(rpc, nodeIdOf(k)), k.honestOwner);
     await assert.rejects(
       readNodeIdentity(rpc, { asset: k.rivalAsset }),
       hasCode(IDENTITY_ERROR_CODES.ACCOUNT_DATA_INVALID),
@@ -134,7 +141,7 @@ void test('claimants with undecodable, foreign-owned or missing accounts are non
     const rival = await honestAndRival(chain, k);
     breakRival(chain, rival);
     await withRpc(chain, async ({ rpc }) => {
-      assert.equal(await resolveOwner(rpc, await nodeIdOf(k)), k.honestOwner);
+      assert.equal(await resolveOwner(rpc, nodeIdOf(k)), k.honestOwner);
     });
   }
 });
@@ -145,7 +152,7 @@ void test('an RPC failure while reading one claimant propagates instead of readi
   await honestAndRival(chain, k);
   await withRpc(chain, async (fake) => {
     fake.state.failingAddresses.add(k.rivalAsset);
-    await assert.rejects(resolveOwner(fake.rpc, await nodeIdOf(k)), (error) =>
+    await assert.rejects(resolveOwner(fake.rpc, nodeIdOf(k)), (error) =>
       isSolanaError(error),
     );
   });
@@ -166,7 +173,7 @@ void test('an agent outside the configured collection is rejected unless ANY is 
     collection: OTHER_COLLECTION,
   });
   await withRpc(chain, async ({ rpc }) => {
-    const nodeId = await nodeIdOf(k);
+    const nodeId = nodeIdOf(k);
     assert.equal(await resolveOwner(rpc, nodeId), k.honestOwner);
     await assert.rejects(
       readNodeIdentity(rpc, { asset: k.rivalAsset }),
@@ -213,7 +220,11 @@ void test('reading by owner skips a broken asset and keeps the healthy one', asy
 void test('metadata whose asset or key does not match its PDA is an invalid binding', async () => {
   const k = await keys();
   const binding = encodeBindingValue(
-    await signNodeBinding(k.node, k.honestAsset, k.honestOwner),
+    await signNodeBinding(k.node, {
+      asset: k.honestAsset,
+      owner: k.honestOwner,
+      sequence: 1n,
+    }),
   );
   const forgeries = [
     metadataBytes(k.rivalAsset, METADATA_KEYS.nodeId, binding),
@@ -254,4 +265,57 @@ void test('agent, Core asset and metadata accounts owned by another program are 
       );
     });
   }
+});
+
+void test('reading by owner drops an asset whose Core owner is no longer the queried owner', async () => {
+  const k = await keys();
+  const chain: SyntheticChain = new Map();
+  await addClaimant(chain, {
+    owner: k.honestOwner,
+    asset: k.honestAsset,
+    node: k.node,
+  });
+  // The agent PDA still caches honestOwner, but the Core asset was transferred to rivalOwner.
+  const transferred = await addClaimant(chain, {
+    owner: k.honestOwner,
+    asset: k.rivalAsset,
+    node: k.node,
+  });
+  chain.set(transferred.core, {
+    owner: PROGRAMS.mplCore,
+    data: coreAssetBytes(k.rivalOwner),
+  });
+  await withRpc(chain, async ({ rpc }) => {
+    const owned = await readNodeIdentity(rpc, { owner: k.honestOwner });
+    assert.deepEqual(
+      owned.map((identity) => identity.asset),
+      [k.honestAsset],
+    );
+  });
+});
+
+void test('an agent PDA describing a different asset is rejected', async () => {
+  const k = await keys();
+  const chain: SyntheticChain = new Map();
+  const honest = await addClaimant(chain, {
+    owner: k.honestOwner,
+    asset: k.honestAsset,
+    node: k.node,
+  });
+  chain.set(honest.agent, {
+    owner: PROGRAMS.registry,
+    data: agentAccountBytes({
+      collection: DEVNET_REGISTRY.collection,
+      creator: k.honestOwner,
+      owner: k.honestOwner,
+      asset: k.rivalAsset,
+      uri: 'https://gyblos.com/n.json',
+    }),
+  });
+  await withRpc(chain, async ({ rpc }) => {
+    await assert.rejects(
+      readNodeIdentity(rpc, { asset: k.honestAsset }),
+      hasCode(IDENTITY_ERROR_CODES.ACCOUNT_DATA_INVALID),
+    );
+  });
 });

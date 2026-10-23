@@ -6,32 +6,37 @@ import test from 'node:test';
 
 import { address, createNoopSigner } from '@solana/kit';
 
-import { IDENTITY_ERROR_CODES, IdentityError } from '@gyblos/identity';
 import {
+  BINDING_VERSIONS,
+  IDENTITY_ERROR_CODES,
+  IdentityError,
+  type IdentityErrorCode,
+} from '@gyblos/identity';
+import {
+  concatBytes,
   decodeAgentAccount,
+  decodeBindingValue,
   decodeCoreAssetOwner,
   decodeMetadataEntry,
-} from '@gyblos/identity/accounts';
-import {
-  decodeBindingValue,
   encodeBindingValue,
+  encodeString,
+  encodeU64,
+  encodeVecU8,
+  findAgentAddress,
+  metadataKeyHash,
+  nodeIdMetadataPrefix,
   nodeIdToBytes,
-  signNodeBinding,
-  verifyNodeBinding,
-} from '@gyblos/identity/binding';
-import { concatBytes, encodeString, encodeVecU8 } from '@gyblos/identity/bytes';
-import {
-  ACCOUNT_DISCRIMINATORS,
-  BINDING,
-  METADATA_KEYS,
-} from '@gyblos/identity/constants';
-import {
   registerInstruction,
   setAgentWalletInstructions,
   setMetadataInstruction,
-} from '@gyblos/identity/instructions';
-import { findAgentAddress, metadataKeyHash } from '@gyblos/identity/pda';
-import { nodeIdMetadataPrefix } from '@gyblos/identity/read';
+  signNodeBinding,
+  verifyNodeBinding,
+} from '@gyblos/identity/codec';
+import {
+  ACCOUNT_DISCRIMINATORS,
+  BINDING_LAYOUTS,
+  METADATA_KEYS,
+} from '@gyblos/identity/constants';
 
 import {
   bytesOf,
@@ -44,7 +49,12 @@ const FIXTURES = devnetAccounts();
 
 const GOLDEN = {
   nodeId: '8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c',
+  // v2 value for sequence 7: version ‖ nodeId ‖ u64 LE sequence ‖ signature.
+  bindingSequence: 7n,
   bindingValue:
+    '028a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c070000000000000039f93c39250788c46cb01a8f3b4fa0f61eb2faea21a248be91ababa0928a9e6d123076ba1358e3a35bfead69b5048f4d5029788bd32177818bae2fbcadbde609',
+  // Historical v1 value (no sequence) written before v2; still readable as sequence 0.
+  legacyBindingValue:
     '018a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c617adeb78270c24eddef9b152c674def59c8d277be4e66846358e46b2b4694f05f755e8a415607f6ff6766abde93024583a70bd37bf4e8060c1c45befe590204',
   registerData:
     'b1af60293ba60d061900000068747470733a2f2f6779626c6f732e636f6d2f6e2e6a736f6e00',
@@ -63,11 +73,24 @@ async function goldenKeys() {
   };
 }
 
-function isDataError(error: unknown): boolean {
-  return (
-    error instanceof IdentityError &&
-    error.code === IDENTITY_ERROR_CODES.ACCOUNT_DATA_INVALID
-  );
+function hasCode(code: IdentityErrorCode) {
+  return (error: unknown) =>
+    error instanceof IdentityError && error.code === code;
+}
+
+const isDataError = hasCode(IDENTITY_ERROR_CODES.ACCOUNT_DATA_INVALID);
+const isBindingError = hasCode(IDENTITY_ERROR_CODES.BINDING_INVALID);
+
+function fromHex(text: string): Uint8Array {
+  return new Uint8Array(Buffer.from(text, 'hex'));
+}
+
+async function goldenBinding(keys: Awaited<ReturnType<typeof goldenKeys>>) {
+  return signNodeBinding(keys.node, {
+    asset: keys.asset.address,
+    owner: keys.owner.address,
+    sequence: GOLDEN.bindingSequence,
+  });
 }
 
 void test('decodes a real devnet AgentAccount and its PDA matches the fixture address', async () => {
@@ -130,17 +153,16 @@ void test('metadata key hash is SHA-256(key)[0..16]', async () => {
 
 void test('node binding golden vector: encode, decode, verify, and reject a different owner', async () => {
   const keys = await goldenKeys();
-  const binding = await signNodeBinding(
-    keys.node,
-    keys.asset.address,
-    keys.owner.address,
-  );
+  const binding = await goldenBinding(keys);
   assert.equal(binding.nodeId, GOLDEN.nodeId);
-  assert.equal(BINDING.valueBytes, 1 + 32 + 64);
-  assert.equal(hex(encodeBindingValue(binding)), GOLDEN.bindingValue);
-  const decoded = decodeBindingValue(
-    new Uint8Array(Buffer.from(GOLDEN.bindingValue, 'hex')),
+  assert.equal(
+    BINDING_LAYOUTS[BINDING_VERSIONS.V2].valueBytes,
+    1 + 32 + 8 + 64,
   );
+  assert.equal(hex(encodeBindingValue(binding)), GOLDEN.bindingValue);
+  const decoded = decodeBindingValue(fromHex(GOLDEN.bindingValue));
+  assert.equal(decoded.version, BINDING_VERSIONS.V2);
+  assert.equal(decoded.sequence, GOLDEN.bindingSequence);
   assert.equal(
     await verifyNodeBinding(decoded, keys.asset.address, keys.owner.address),
     true,
@@ -151,10 +173,65 @@ void test('node binding golden vector: encode, decode, verify, and reject a diff
   );
   assert.throws(
     () => nodeIdToBytes('ABC'),
-    (error) =>
-      error instanceof IdentityError &&
-      error.code === IDENTITY_ERROR_CODES.INPUT_INVALID,
+    hasCode(IDENTITY_ERROR_CODES.INPUT_INVALID),
   );
+});
+
+void test('a tampered binding sequence no longer verifies', async () => {
+  const keys = await goldenKeys();
+  const value = encodeBindingValue(await goldenBinding(keys));
+  value.set(encodeU64(GOLDEN.bindingSequence + 1n), 1 + 32);
+  const tampered = decodeBindingValue(value);
+  assert.equal(tampered.sequence, GOLDEN.bindingSequence + 1n);
+  assert.equal(
+    await verifyNodeBinding(tampered, keys.asset.address, keys.owner.address),
+    false,
+  );
+});
+
+void test('a legacy v1 binding decodes as sequence 0 and still verifies, but is never written', async () => {
+  const keys = await goldenKeys();
+  const legacy = decodeBindingValue(fromHex(GOLDEN.legacyBindingValue));
+  assert.equal(legacy.version, BINDING_VERSIONS.V1);
+  assert.equal(legacy.sequence, 0n);
+  assert.equal(legacy.nodeId, GOLDEN.nodeId);
+  assert.equal(
+    await verifyNodeBinding(legacy, keys.asset.address, keys.owner.address),
+    true,
+  );
+  assert.throws(() => encodeBindingValue(legacy), isBindingError);
+});
+
+void test('binding values with an unknown version, a mismatched length or no bytes are rejected', () => {
+  const current = fromHex(GOLDEN.bindingValue);
+  const unknownVersion = current.slice();
+  unknownVersion[0] = 3;
+  const v1Labelled = current.slice();
+  v1Labelled[0] = BINDING_VERSIONS.V1;
+  const malformed = [
+    unknownVersion,
+    v1Labelled,
+    current.subarray(0, current.length - 1),
+    fromHex(GOLDEN.legacyBindingValue).subarray(1),
+    new Uint8Array(0),
+  ];
+  for (const value of malformed)
+    assert.throws(() => decodeBindingValue(value), isBindingError);
+});
+
+void test('a binding sequence outside u64 is rejected before signing', async () => {
+  const keys = await goldenKeys();
+  const outOfRange = [-1n, 1n << 64n];
+  for (const sequence of outOfRange) {
+    await assert.rejects(
+      signNodeBinding(keys.node, {
+        asset: keys.asset.address,
+        owner: keys.owner.address,
+        sequence,
+      }),
+      hasCode(IDENTITY_ERROR_CODES.INPUT_INVALID),
+    );
+  }
 });
 
 void test('instruction data golden bytes: register, set_metadata, ed25519 proof, set_agent_wallet', async () => {
@@ -168,11 +245,7 @@ void test('instruction data golden bytes: register, set_metadata, ed25519 proof,
   );
   assert.equal(hex(Uint8Array.from(register.data ?? [])), GOLDEN.registerData);
   assert.equal(register.accounts?.[2]?.address, GOLDEN.agentPda);
-  const binding = await signNodeBinding(
-    keys.node,
-    keys.asset.address,
-    keys.owner.address,
-  );
+  const binding = await goldenBinding(keys);
   const metadata = await setMetadataInstruction(
     owner,
     keys.asset.address,
@@ -203,20 +276,28 @@ void test('instruction data golden bytes: register, set_metadata, ed25519 proof,
   );
 });
 
-void test('nodeId metadata prefix sits at offset 42 of an encoded metadata account', () => {
-  const value = new Uint8Array(Buffer.from(GOLDEN.bindingValue, 'hex'));
-  const account = concatBytes([
-    ACCOUNT_DISCRIMINATORS.metadata,
-    new Uint8Array(32),
-    Uint8Array.of(0, 255),
-    encodeString(METADATA_KEYS.nodeId),
-    encodeVecU8(value),
-  ]);
-  const prefix = nodeIdMetadataPrefix(GOLDEN.nodeId);
-  assert.equal(hex(account.subarray(42, 42 + prefix.length)), hex(prefix));
-  assert.equal(decodeMetadataEntry(account).key, METADATA_KEYS.nodeId);
-  assert.equal(
-    address(decodeMetadataEntry(account).asset),
-    '11111111111111111111111111111111',
-  );
+void test('nodeId metadata prefix sits at offset 42 of an encoded metadata account, for each version', () => {
+  const values = [
+    { version: BINDING_VERSIONS.V2, value: fromHex(GOLDEN.bindingValue) },
+    {
+      version: BINDING_VERSIONS.V1,
+      value: fromHex(GOLDEN.legacyBindingValue),
+    },
+  ];
+  for (const { version, value } of values) {
+    const account = concatBytes([
+      ACCOUNT_DISCRIMINATORS.metadata,
+      new Uint8Array(32),
+      Uint8Array.of(0, 255),
+      encodeString(METADATA_KEYS.nodeId),
+      encodeVecU8(value),
+    ]);
+    const prefix = nodeIdMetadataPrefix(GOLDEN.nodeId, version);
+    assert.equal(hex(account.subarray(42, 42 + prefix.length)), hex(prefix));
+    assert.equal(decodeMetadataEntry(account).key, METADATA_KEYS.nodeId);
+    assert.equal(
+      address(decodeMetadataEntry(account).asset),
+      '11111111111111111111111111111111',
+    );
+  }
 });

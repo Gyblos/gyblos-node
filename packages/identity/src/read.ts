@@ -1,5 +1,5 @@
-// Owns reading Gyblos node identities straight from chain accounts (no indexer) and resolving NodeId → owner.
-// Multi-asset reads judge each claimant alone. Must not know about registration, sponsorship or caching.
+// Owns reading Gyblos node identities straight from chain accounts (no indexer), by asset or by owner.
+// Fan-out is capped and batched; each claimant is judged alone. Must not know registration, sponsorship or caching.
 import {
   getAddressEncoder,
   getBase64Encoder,
@@ -15,16 +15,11 @@ import {
   decodeCoreAssetOwner,
   decodeMetadataEntry,
 } from './accounts.js';
-import {
-  decodeBindingValue,
-  nodeIdToBytes,
-  verifyNodeBinding,
-} from './binding.js';
-import { concatBytes, encodeString, encodeU32 } from './bytes.js';
+import { decodeBindingValue, verifyNodeBinding } from './binding.js';
 import {
   ACCOUNT_DISCRIMINATORS,
   ACCOUNT_OFFSETS,
-  BINDING,
+  BASE64_ENCODING,
   BINDING_STATUSES,
   CLAIMANT_DISQUALIFYING_CODES,
   COLLECTION_POLICY,
@@ -32,6 +27,7 @@ import {
   IDENTITY_ERROR_CODES,
   METADATA_KEYS,
   PROGRAMS,
+  READ_LIMITS,
   type BindingStatus,
   type CollectionPolicy,
 } from './constants.js';
@@ -45,6 +41,8 @@ export interface NodeIdentity {
   creator: Address;
   payoutWallet: Address | undefined;
   nodeId: string | undefined;
+  // Rebinding sequence of a valid binding (legacy v1 reads as 0); undefined unless bindingStatus is VALID.
+  bindingSequence: bigint | undefined;
   bindingStatus: BindingStatus;
   uri: string;
 }
@@ -61,28 +59,43 @@ interface RawAccount {
   data: Uint8Array;
 }
 
+interface ClaimantAccounts {
+  agent: RawAccount | undefined;
+  core: RawAccount | undefined;
+  metadata: RawAccount | undefined;
+}
+
 interface BindingResult {
   nodeId: string | undefined;
+  bindingSequence: bigint | undefined;
   bindingStatus: BindingStatus;
 }
 
-const BASE64 = getBase64Encoder();
+// Kit's base64 "encoder" turns RPC base64 text into bytes.
+const BASE64_TEXT_TO_BYTES = getBase64Encoder();
 const ADDRESS_ENCODER = getAddressEncoder();
-const BASE64_ENCODING = 'base64' as const;
 const MISSING_BINDING: BindingResult = {
   nodeId: undefined,
+  bindingSequence: undefined,
   bindingStatus: BINDING_STATUSES.MISSING,
 };
 const INVALID_BINDING: BindingResult = {
   nodeId: undefined,
+  bindingSequence: undefined,
   bindingStatus: BINDING_STATUSES.INVALID,
 };
 
-async function fetchAccounts(
+function chunked<T>(items: readonly T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let start = 0; start < items.length; start += size)
+    chunks.push(items.slice(start, start + size));
+  return chunks;
+}
+
+async function fetchBatch(
   rpc: IdentityRpc,
   addresses: readonly Address[],
 ): Promise<(RawAccount | undefined)[]> {
-  if (addresses.length === 0) return [];
   const { value } = await rpc
     .getMultipleAccounts(addresses, {
       encoding: BASE64_ENCODING,
@@ -94,9 +107,22 @@ async function fetchAccounts(
       ? undefined
       : {
           owner: account.owner,
-          data: new Uint8Array(BASE64.encode(account.data[0])),
+          data: new Uint8Array(BASE64_TEXT_TO_BYTES.encode(account.data[0])),
         },
   );
+}
+
+// One getMultipleAccounts call per accountsPerRequest addresses, in order.
+async function fetchAccounts(
+  rpc: IdentityRpc,
+  addresses: readonly Address[],
+): Promise<(RawAccount | undefined)[]> {
+  const batches = await Promise.all(
+    chunked(addresses, READ_LIMITS.accountsPerRequest).map((batch) =>
+      fetchBatch(rpc, batch),
+    ),
+  );
+  return batches.flat();
 }
 
 function expectProgram(
@@ -123,7 +149,11 @@ async function verifiedBinding(
     const binding = decodeBindingValue(value);
     const valid = await verifyNodeBinding(binding, asset, owner);
     return valid
-      ? { nodeId: binding.nodeId, bindingStatus: BINDING_STATUSES.VALID }
+      ? {
+          nodeId: binding.nodeId,
+          bindingSequence: binding.sequence,
+          bindingStatus: BINDING_STATUSES.VALID,
+        }
       : INVALID_BINDING;
   } catch (error) {
     if (error instanceof IdentityError) return INVALID_BINDING;
@@ -157,21 +187,25 @@ function assertCollection(
   );
 }
 
-// Fetches agent PDA, Core asset and nodeId metadata in one round trip and cross-checks them.
-async function readAsset(
-  rpc: IdentityRpc,
-  asset: Address,
-  options: IdentityReadOptions,
-): Promise<NodeIdentity | undefined> {
-  const addresses = [
+// Agent PDA, Core asset and nodeId metadata, in the order identityFrom expects them.
+async function claimantAddresses(asset: Address): Promise<Address[]> {
+  return [
     await findAgentAddress(asset),
     asset,
     await findMetadataAddress(asset, METADATA_KEYS.nodeId),
   ];
-  const [agentRaw, coreRaw, metadataRaw] = await fetchAccounts(rpc, addresses);
-  if (agentRaw === undefined || coreRaw === undefined) return undefined;
+}
+
+// Cross-checks one asset's accounts; broken accounts throw a typed error.
+async function identityFrom(
+  asset: Address,
+  accounts: ClaimantAccounts,
+  options: IdentityReadOptions,
+): Promise<NodeIdentity | undefined> {
+  if (accounts.agent === undefined || accounts.core === undefined)
+    return undefined;
   const agent = decodeAgentAccount(
-    expectProgram(agentRaw, PROGRAMS.registry, 'agent account'),
+    expectProgram(accounts.agent, PROGRAMS.registry, 'agent account'),
   );
   if (agent.asset !== asset) {
     throw new IdentityError(
@@ -182,9 +216,9 @@ async function readAsset(
   assertCollection(agent.collection, options);
   // The Core asset is the source of truth for ownership; the agent PDA only caches it.
   const owner = decodeCoreAssetOwner(
-    expectProgram(coreRaw, PROGRAMS.mplCore, 'Core asset'),
+    expectProgram(accounts.core, PROGRAMS.mplCore, 'Core asset'),
   );
-  const binding = await bindingFrom(metadataRaw, asset, owner);
+  const binding = await bindingFrom(accounts.metadata, asset, owner);
   return {
     asset,
     owner,
@@ -192,6 +226,18 @@ async function readAsset(
     payoutWallet: agent.agentWallet,
     uri: agent.agentUri,
     ...binding,
+  };
+}
+
+function claimantAccounts(
+  accounts: readonly (RawAccount | undefined)[],
+  index: number,
+): ClaimantAccounts {
+  const base = index * READ_LIMITS.accountsPerClaimant;
+  return {
+    agent: accounts[base],
+    core: accounts[base + 1],
+    metadata: accounts[base + 2],
   };
 }
 
@@ -204,17 +250,53 @@ function isDisqualifying(error: unknown): boolean {
 
 // One claimant's missing, burned, foreign or undecodable accounts disqualify only that claimant;
 // RPC and transport failures still propagate so an outage never reads as "no identity".
-async function readClaimant(
-  rpc: IdentityRpc,
+async function judgedAlone(
   asset: Address,
+  accounts: ClaimantAccounts,
   options: IdentityReadOptions,
 ): Promise<NodeIdentity | undefined> {
   try {
-    return await readAsset(rpc, asset, options);
+    return await identityFrom(asset, accounts, options);
   } catch (error) {
     if (isDisqualifying(error)) return undefined;
     throw error;
   }
+}
+
+// More claimants than READ_LIMITS.maxClaimants throws rather than reading an unbounded or arbitrary subset.
+function assertClaimantCount(count: number): void {
+  if (count > READ_LIMITS.maxClaimants) {
+    throw new IdentityError(
+      IDENTITY_ERROR_CODES.TOO_MANY_CLAIMANTS,
+      `${count} claimants exceed the limit of ${READ_LIMITS.maxClaimants}`,
+    );
+  }
+}
+
+// Reads every claimant's accounts in batched getMultipleAccounts calls and judges each claimant alone.
+export async function readClaimants(
+  rpc: IdentityRpc,
+  claimants: readonly Address[],
+  options: IdentityReadOptions,
+): Promise<(NodeIdentity | undefined)[]> {
+  const assets = [...new Set(claimants)];
+  assertClaimantCount(assets.length);
+  const addresses = await Promise.all(assets.map(claimantAddresses));
+  const accounts = await fetchAccounts(rpc, addresses.flat());
+  return Promise.all(
+    assets.map((asset, index) =>
+      judgedAlone(asset, claimantAccounts(accounts, index), options),
+    ),
+  );
+}
+
+async function readAsset(
+  rpc: IdentityRpc,
+  asset: Address,
+  options: IdentityReadOptions,
+): Promise<NodeIdentity | undefined> {
+  const accounts = await fetchAccounts(rpc, await claimantAddresses(asset));
+  return identityFrom(asset, claimantAccounts(accounts, 0), options);
 }
 
 // Decodes one getProgramAccounts item; an undecodable account yields no asset instead of failing the scan.
@@ -230,35 +312,39 @@ function assetOf(
   }
 }
 
-async function assetsOwnedBy(
+export async function registryAssets(
   rpc: IdentityRpc,
-  owner: Address,
+  filters: ReturnType<typeof memcmpFilter>[],
+  decode: (bytes: Uint8Array) => { asset: Address },
 ): Promise<Address[]> {
   const accounts = await rpc
     .getProgramAccounts(PROGRAMS.registry, {
       encoding: BASE64_ENCODING,
       commitment: COMMITMENT,
-      filters: [
-        memcmpFilter(
-          ACCOUNT_OFFSETS.discriminator,
-          ACCOUNT_DISCRIMINATORS.agent,
-        ),
-        memcmpFilter(
-          ACCOUNT_OFFSETS.agentOwner,
-          new Uint8Array(ADDRESS_ENCODER.encode(owner)),
-        ),
-      ],
+      filters,
     })
     .send();
   return accounts.flatMap((item) =>
     assetOf(
-      new Uint8Array(BASE64.encode(item.account.data[0])),
-      decodeAgentAccount,
+      new Uint8Array(BASE64_TEXT_TO_BYTES.encode(item.account.data[0])),
+      decode,
     ),
   );
 }
 
-// By asset, broken accounts throw a typed error; by owner, each asset is judged alone (see readClaimant).
+function assetsOwnedBy(rpc: IdentityRpc, owner: Address): Promise<Address[]> {
+  const filters = [
+    memcmpFilter(ACCOUNT_OFFSETS.discriminator, ACCOUNT_DISCRIMINATORS.agent),
+    memcmpFilter(
+      ACCOUNT_OFFSETS.agentOwner,
+      new Uint8Array(ADDRESS_ENCODER.encode(owner)),
+    ),
+  ];
+  return registryAssets(rpc, filters, decodeAgentAccount);
+}
+
+// By asset, broken accounts throw a typed error; by owner, each asset is judged alone and more than
+// READ_LIMITS.maxClaimants assets throws TOO_MANY_CLAIMANTS.
 export function readNodeIdentity(
   rpc: IdentityRpc,
   query: { asset: Address },
@@ -276,74 +362,9 @@ export async function readNodeIdentity(
 ): Promise<NodeIdentity | undefined | NodeIdentity[]> {
   if ('asset' in query) return readAsset(rpc, query.asset, options);
   const assets = await assetsOwnedBy(rpc, query.owner);
-  const identities = await Promise.all(
-    assets.map((asset) => readClaimant(rpc, asset, options)),
-  );
+  const identities = await readClaimants(rpc, assets, options);
   // Cached owner may be stale; keep only assets whose Core owner really is the queried owner.
   return identities.filter(
     (identity): identity is NodeIdentity => identity?.owner === query.owner,
   );
-}
-
-// Metadata accounts whose key is gyblos.nodeId and whose value starts with this NodeId.
-export function nodeIdMetadataPrefix(nodeId: string): Uint8Array {
-  return concatBytes([
-    encodeString(METADATA_KEYS.nodeId),
-    encodeU32(BINDING.valueBytes),
-    Uint8Array.of(BINDING.version),
-    nodeIdToBytes(nodeId),
-  ]);
-}
-
-async function assetsClaimingNodeId(
-  rpc: IdentityRpc,
-  nodeId: string,
-): Promise<Address[]> {
-  const accounts = await rpc
-    .getProgramAccounts(PROGRAMS.registry, {
-      encoding: BASE64_ENCODING,
-      commitment: COMMITMENT,
-      filters: [
-        memcmpFilter(
-          ACCOUNT_OFFSETS.discriminator,
-          ACCOUNT_DISCRIMINATORS.metadata,
-        ),
-        memcmpFilter(ACCOUNT_OFFSETS.metadataKey, nodeIdMetadataPrefix(nodeId)),
-      ],
-    })
-    .send();
-  return accounts.flatMap((item) =>
-    assetOf(
-      new Uint8Array(BASE64.encode(item.account.data[0])),
-      decodeMetadataEntry,
-    ),
-  );
-}
-
-// Anyone can write a claim for any NodeId; only claims carrying the node key's proof count, and a
-// broken claimant cannot block the honest one. More than one valid owner is ambiguous and throws.
-export async function resolveOwner(
-  rpc: IdentityRpc,
-  nodeId: string,
-  options: IdentityReadOptions = {},
-): Promise<Address | undefined> {
-  const assets = await assetsClaimingNodeId(rpc, nodeId);
-  const identities = await Promise.all(
-    assets.map((asset) => readClaimant(rpc, asset, options)),
-  );
-  const owners = new Set(
-    identities.flatMap((identity) =>
-      identity?.bindingStatus === BINDING_STATUSES.VALID &&
-      identity.nodeId === nodeId
-        ? [identity.owner]
-        : [],
-    ),
-  );
-  if (owners.size > 1) {
-    throw new IdentityError(
-      IDENTITY_ERROR_CODES.NODE_ID_AMBIGUOUS,
-      `nodeId bound to ${owners.size} owners`,
-    );
-  }
-  return [...owners][0];
 }

@@ -5,6 +5,7 @@ import { IdentityError } from './errors.js';
 
 const U32_BYTES = 4;
 const I64_BYTES = 8;
+const U64_BYTES = 8;
 const UTF8 = new TextEncoder();
 const STRICT_UTF8 = new TextDecoder('utf-8', { fatal: true });
 
@@ -32,6 +33,12 @@ export function encodeU32(value: number): Uint8Array {
 export function encodeI64(value: bigint): Uint8Array {
   const out = new Uint8Array(I64_BYTES);
   new DataView(out.buffer).setBigInt64(0, value, true);
+  return out;
+}
+
+export function encodeU64(value: bigint): Uint8Array {
+  const out = new Uint8Array(U64_BYTES);
+  new DataView(out.buffer).setBigUint64(0, value, true);
   return out;
 }
 
@@ -85,6 +92,14 @@ export class ByteReader {
   u32(): number {
     const raw = this.bytes(U32_BYTES);
     return new DataView(raw.buffer, raw.byteOffset, U32_BYTES).getUint32(
+      0,
+      true,
+    );
+  }
+
+  u64(): bigint {
+    const raw = this.bytes(U64_BYTES);
+    return new DataView(raw.buffer, raw.byteOffset, U64_BYTES).getBigUint64(
       0,
       true,
     );

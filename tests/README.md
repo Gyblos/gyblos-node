@@ -52,12 +52,13 @@ private endpoint/content data to the fixture.
 Identity integration cases are **opt-in**
 (`GYBLOS_IDENTITY_INTEGRATION=1 pnpm test`), so the default suite never reaches
 the network. When enabled they start a throwaway `solana-test-validator` on
-synthetic loopback ports, cloning the 8004 program, mpl-core and the registry
-accounts read-only from public devnet; the ledger and log stay under ignored
-`.local/identity-validator/`. Signers are ephemeral and funded only by that
-local validator. Without the binary on `PATH` both cases skip with an explicit
-reason; if the devnet clone is unreachable they skip at startup. Skipped cases
-establish no on-chain identity result.
+synthetic loopback ports (RPC, faucet, gossip and an explicit dynamic port
+range, all within 18000-19999), cloning the 8004 program, mpl-core and the
+registry accounts read-only from public devnet; the ledger and log stay under
+ignored `.local/identity-validator/`. Signers are ephemeral and funded only by
+that local validator. Without the binary on `PATH` all four cases skip with an
+explicit reason; if the devnet clone is unreachable they skip at startup.
+Skipped cases establish no on-chain identity result.
 `tests/fixtures/identity-devnet-accounts.json` holds two public devnet registry
 accounts captured read-only by `lab/tools/identity-fixtures.ts`; it contains no
 keys or private data.
