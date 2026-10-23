@@ -14,6 +14,7 @@ import type { PaymentPayload } from '@x402/core/types';
 
 import {
   COMMITMENT,
+  DEVNET_USDC,
   DIAGNOSTIC_LIMITS,
   HTTP_STATUS,
   PAYMENT_LIMITS,
@@ -27,7 +28,6 @@ import {
   type ChainTransaction,
 } from '@gyblos/payments-x402/accounting/types';
 import { lamports, rpc } from '@gyblos/payments-x402/chain';
-import { DEVNET_USDC } from '@gyblos/payments-x402/constants';
 import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { ProtocolError } from '@gyblos/protocol/errors';
 

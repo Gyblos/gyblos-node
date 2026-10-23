@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import { generateKeyPairSigner } from '@solana/kit';
 import type { PaymentRequirements } from '@x402/core/types';
 
+import { DEVNET, DEVNET_USDC } from '@gyblos/config';
 import {
   EXACT_PRICE,
   PUBLIC_CALL_OUTCOMES,
@@ -16,11 +17,7 @@ import {
   createExactBuyer,
   validateExactTerms,
 } from '@gyblos/lab-harness/exact/index';
-import {
-  DEVNET,
-  DEVNET_USDC,
-  PUBLIC_CALL_OPERATIONS,
-} from '@gyblos/payments-x402/constants';
+import { PUBLIC_CALL_OPERATIONS } from '@gyblos/payments-x402/constants';
 
 const policy = { payTo: 'seller', feePayer: 'sponsor', amount: EXACT_PRICE };
 const terms: PaymentRequirements = {

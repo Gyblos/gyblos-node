@@ -41,7 +41,7 @@ These checks require no funded wallet, real engine or Docker. Native tests requi
 
 ## Architecture rules
 
-Dependency direction is protocol → core → independent adapters → node → apps. Config/runtime may be consumed above protocol. Product must never import lab, tests or tooling; distinct adapters and distinct apps must not import each other. Tests and lab may exercise public package entries. Import other workspaces by name and only explicit exports; use relative imports within the same package. Inference knows no wallets; payment code knows no engines. Boundaries are enforcing with an empty baseline; do not suppress violations or regenerate a baseline to hide them.
+Dependency direction is protocol → core → independent adapters → node → apps. Config/runtime may be consumed above protocol. Product must never import lab, tests or tooling; distinct adapters and distinct apps must not import each other. Tests and lab may exercise public package entries. Import other workspaces by name and only explicit exports; use relative imports within the same package. Inference knows no wallets; payment code knows no engines. Boundaries are enforcing; do not suppress violations.
 
 ## Canonical values and derived types
 

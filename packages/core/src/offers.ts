@@ -11,7 +11,7 @@ import {
   type EngineDescription,
 } from '@gyblos/protocol/engine';
 
-import { PRICES } from './metering.js';
+import { PRICES } from './constants.js';
 
 export interface InferenceOffer {
   schemaVersion: number;

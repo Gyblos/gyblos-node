@@ -10,8 +10,8 @@ import {
   encodePaymentResponseHeader,
 } from '@x402/core/http';
 
+import { DEVNET, DEVNET_USDC } from '@gyblos/config';
 import { createBuyer } from '@gyblos/payments-x402';
-import { DEVNET, DEVNET_USDC } from '@gyblos/payments-x402/constants';
 import { createInferenceBuyer } from '@gyblos/payments-x402/inference-buyer';
 
 // Ephemeral local signatures only. The mock forbids every RPC or broadcast.

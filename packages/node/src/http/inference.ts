@@ -15,15 +15,17 @@ import { UptoSvmScheme } from '@x402/svm/upto/server';
 import express from 'express';
 
 import {
+  DEVNET,
   HTTP_LIMITS,
   HTTP_STATUS,
   INFERENCE_REQUEST_LIMITS,
+  MAX_ATOMIC,
   PAYMENT_LIMITS,
   ROUTES,
   TOKEN_PROGRAM_ADDRESS,
 } from '@gyblos/config';
-import { charge, OFFER_ID, type TokenCounts } from '@gyblos/core/metering';
-import { DEVNET, MAX_ATOMIC } from '@gyblos/payments-x402/constants';
+import { OFFER_ID } from '@gyblos/core/constants';
+import { charge, type TokenCounts } from '@gyblos/core/metering';
 import { verifyInferenceDeposit } from '@gyblos/payments-x402/inference-deposit';
 import {
   inferenceWireUsage,
@@ -32,13 +34,13 @@ import {
 } from '@gyblos/protocol/engine';
 import { requireLoopbackHost } from '@gyblos/runtime/loopback-host';
 
-export interface InferenceRequest {
+interface InferenceRequest {
   requestId: string;
   prompt: string;
   maxTokens: number;
 }
 
-export function parseInferenceRequest(value: unknown): InferenceRequest {
+function parseInferenceRequest(value: unknown): InferenceRequest {
   const body = value as Partial<InferenceRequest> | null;
   if (
     !body ||

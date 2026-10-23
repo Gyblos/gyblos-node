@@ -11,10 +11,7 @@ import {
   getU64Encoder,
 } from '@solana/kit';
 
-import {
-  CHANNEL_PROGRAM,
-  DEVNET_GENESIS,
-} from '@gyblos/payments-x402/constants';
+import { CHANNEL_PROGRAM, DEVNET_GENESIS } from '@gyblos/config';
 import { verifyInferenceDeposit } from '@gyblos/payments-x402/inference-deposit';
 
 const buyer = '5FVtvnKXCabCDxSoeNJuLdRpCTBZQnhTnNooZzEYfg2j';

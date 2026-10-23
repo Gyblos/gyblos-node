@@ -1,5 +1,5 @@
 # Generated files and local-only material
-evidence/
+lab/evidence/
 node_modules/
 .local/
 .env

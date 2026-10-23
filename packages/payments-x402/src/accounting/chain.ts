@@ -30,7 +30,7 @@ interface Transfer {
   amount: string;
 }
 
-export async function rpc<T>(
+async function readWithBackoff<T>(
   rpcUrl: string,
   method: string,
   params: unknown[] = [],
@@ -59,7 +59,7 @@ export function readChain<T>(
   method: string,
   params: unknown[],
 ): Promise<T> {
-  return rpc<T>(config.rpcUrl, method, params);
+  return readWithBackoff<T>(config.rpcUrl, method, params);
 }
 
 export async function confirmInference(
@@ -67,7 +67,7 @@ export async function confirmInference(
   signature: string,
 ) {
   return confirm(config.rpcUrl, signature, {
-    read: rpc,
+    read: readWithBackoff,
     failedMessage: 'Inference transaction failed.',
     unknownMessage:
       'Inference confirmation is unknown; reconcile before another authorization.',

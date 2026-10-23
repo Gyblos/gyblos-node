@@ -3,10 +3,15 @@
 import { discoverChannelsByRentPayer, toFacilitatorSvmSigner } from '@x402/svm';
 
 import {
+  ACTUAL_ATOMIC,
   CHANNEL_STATUS,
+  DEVNET,
+  explorerUrl,
   HOSTS,
   HTTP_STATUS,
+  MAX_ATOMIC,
   ROUTES,
+  UPSTREAM_COMMIT,
   X402_SDK_VERSION,
 } from '@gyblos/config';
 import { WALLET_ROLES } from '@gyblos/config/constants';
@@ -16,17 +21,10 @@ import {
   account,
   assertProgram,
   confirm,
-  explorer,
   lamports,
   tokens,
 } from '@gyblos/payments-x402/chain';
-import {
-  ACTUAL_ATOMIC,
-  DEVNET,
-  JOURNAL_STATES,
-  MAX_ATOMIC,
-  UPSTREAM_COMMIT,
-} from '@gyblos/payments-x402/constants';
+import { JOURNAL_STATES } from '@gyblos/payments-x402/constants';
 import type { SettlementEvent } from '@gyblos/payments-x402/facilitator';
 import { withExclusiveLock } from '@gyblos/payments-x402/recovery/lock';
 import { validateSettlement } from '@gyblos/payments-x402/trust';
@@ -214,8 +212,8 @@ async function executeLocked(signal?: AbortSignal) {
     sdkVersion: X402_SDK_VERSION,
     ...result,
     transactions: {
-      open: explorer(result.accounting.openTransaction),
-      claim: explorer(result.accounting.claimTransaction),
+      open: explorerUrl(result.accounting.openTransaction),
+      claim: explorerUrl(result.accounting.claimTransaction),
     },
     limitations: [
       'Fixed resource, not inference',

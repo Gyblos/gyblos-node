@@ -14,8 +14,7 @@ import {
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { PRIVATE_LOG_LIMITS } from '@gyblos/config';
-import { DEVNET } from '@gyblos/payments-x402/constants';
+import { DEVNET, PRIVATE_LOG_LIMITS } from '@gyblos/config';
 import {
   PRIVATE_LOG_CODES,
   PRIVATE_LOG_STATES,

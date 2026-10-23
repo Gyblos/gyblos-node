@@ -10,9 +10,11 @@ import {
 } from '@x402/core/http';
 
 import {
+  DEVNET,
   DIAGNOSTIC_LIMITS,
   HTTP_STATUS,
   LOCALHOST,
+  MAX_ATOMIC,
   ROUTES,
   TIMEOUTS,
   UNITS,
@@ -26,11 +28,7 @@ import {
   rpc,
   tokens,
 } from '@gyblos/payments-x402/chain';
-import {
-  DEVNET,
-  JOURNAL_STATES,
-  MAX_ATOMIC,
-} from '@gyblos/payments-x402/constants';
+import { JOURNAL_STATES } from '@gyblos/payments-x402/constants';
 import { createFacilitator } from '@gyblos/payments-x402/facilitator';
 import { withExclusiveLock } from '@gyblos/payments-x402/recovery/lock';
 import { saveJson } from '@gyblos/runtime';

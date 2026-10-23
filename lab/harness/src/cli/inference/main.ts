@@ -11,6 +11,7 @@ import { resolve } from 'node:path';
 import { measurementSalt } from '@gyblos/buyer/measurements';
 import { createCases } from '@gyblos/buyer/synthetic-cases';
 import {
+  DEVNET_USDC,
   DIAGNOSTIC_LIMITS,
   HOSTS,
   LOCALHOST,
@@ -31,7 +32,6 @@ import {
   transaction,
 } from '@gyblos/payments-x402/accounting/chain';
 import { assertProgram, lamports } from '@gyblos/payments-x402/chain';
-import { DEVNET_USDC } from '@gyblos/payments-x402/constants';
 import type { SettlementEvent } from '@gyblos/payments-x402/facilitator';
 import { withExclusiveLock } from '@gyblos/payments-x402/recovery/lock';
 import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';

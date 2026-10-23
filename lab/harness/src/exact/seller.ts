@@ -12,6 +12,8 @@ import { ExactSvmScheme } from '@x402/svm/exact/server';
 import express from 'express';
 
 import {
+  DEVNET,
+  DEVNET_USDC,
   DIAGNOSTIC_LIMITS,
   HTTP_STATUS,
   PAYMENT_LIMITS,
@@ -19,8 +21,6 @@ import {
   TIMEOUTS,
 } from '@gyblos/config';
 import {
-  DEVNET,
-  DEVNET_USDC,
   PUBLIC_CALL_OPERATIONS,
   type PublicCallOperation,
 } from '@gyblos/payments-x402/constants';

@@ -9,11 +9,10 @@ import {
 } from '@x402/fetch';
 import { UptoSvmScheme } from '@x402/svm/upto/client';
 
-import { TIMEOUTS } from '@gyblos/config';
+import { DEVNET, TIMEOUTS } from '@gyblos/config';
 
 import {
   BUYER_DIAGNOSTIC_CODES,
-  DEVNET,
   type BuyerDiagnosticCode,
 } from './constants.js';
 import { signatureHint } from './signature-hint.js';

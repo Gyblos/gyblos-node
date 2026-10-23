@@ -16,14 +16,13 @@ import {
   SettlementSimulationError,
 } from '@x402/svm/upto/facilitator';
 
-import { X402_SDK_VERSION } from '@gyblos/config';
+import { MAX_ATOMIC, X402_SDK_VERSION } from '@gyblos/config';
 
 import {
   FACILITATOR_DIAGNOSTIC_CODES,
   FACILITATOR_DIAGNOSTIC_SCHEMA,
   FACILITATOR_PHASES,
   FACILITATOR_STAGES,
-  MAX_ATOMIC,
   PUBLIC_CALL_OPERATIONS,
   type FacilitatorDiagnosticCode,
   type FacilitatorPhase,

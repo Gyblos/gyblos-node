@@ -19,7 +19,7 @@ import {
   PORTS,
   ROUTES,
 } from '@gyblos/config';
-import { PRICES } from '@gyblos/core/metering';
+import { PRICES } from '@gyblos/core/constants';
 import {
   GENERATION,
   READINESS_GENERATION,

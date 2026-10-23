@@ -3,10 +3,16 @@
 import { type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 
-import { HOSTS, RETRIES, RETRY_DELAYS, ROUTES, TIMEOUTS } from '@gyblos/config';
+import {
+  HOSTS,
+  MAX_ATOMIC,
+  RETRIES,
+  RETRY_DELAYS,
+  ROUTES,
+  TIMEOUTS,
+} from '@gyblos/config';
 import { loadConfig } from '@gyblos/config/wallet';
 import { assertProgram, lamports, tokens } from '@gyblos/payments-x402/chain';
-import { MAX_ATOMIC } from '@gyblos/payments-x402/constants';
 import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { ProtocolError } from '@gyblos/protocol/errors';
 import {

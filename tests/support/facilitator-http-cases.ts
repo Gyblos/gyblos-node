@@ -7,8 +7,8 @@ import test from 'node:test';
 import { UptoSvmScheme } from '@x402/svm/upto/facilitator';
 import express from 'express';
 
+import { DEVNET } from '@gyblos/config';
 import {
-  DEVNET,
   FACILITATOR_DIAGNOSTIC_CODES,
   FACILITATOR_STAGES,
 } from '@gyblos/payments-x402/constants';

@@ -9,8 +9,8 @@ import {
   SettlementConfirmationTimeoutError,
 } from '@x402/svm/upto/facilitator';
 
+import { DEVNET } from '@gyblos/config';
 import {
-  DEVNET,
   FACILITATOR_DIAGNOSTIC_CODES,
   FACILITATOR_STAGES,
   PUBLIC_CALL_OPERATIONS,

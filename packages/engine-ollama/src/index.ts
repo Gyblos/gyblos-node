@@ -1,14 +1,13 @@
 // Ollama HTTP client restricted to a literal loopback origin: checks the pinned model is present and runs
 // bounded, deterministic raw generations. It must not know wallets or payments.
 import { IPV6_LOOPBACK, LOCALHOST, ROUTES, TIMEOUTS } from '@gyblos/config';
-import type { EngineWireUsage } from '@gyblos/protocol/wire-usage';
-
 import {
   ENGINE_DONE_REASONS,
-  GENERATION,
-  MODEL_LIMITS,
   type EngineDoneReason,
-} from './constants.js';
+} from '@gyblos/protocol/constants';
+import type { EngineWireUsage } from '@gyblos/protocol/wire-usage';
+
+import { GENERATION, MODEL_LIMITS } from './constants.js';
 import { MODEL, renderChat } from './model.js';
 
 export interface InferenceResult {
@@ -18,7 +17,7 @@ export interface InferenceResult {
   doneReason: EngineDoneReason;
 }
 
-export { MODEL, renderChat } from './model.js';
+export { renderChat } from './model.js';
 
 export { createModelTokenizer, type ModelTokenizer } from './tokenizer.js';
 

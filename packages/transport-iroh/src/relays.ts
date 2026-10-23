@@ -25,9 +25,7 @@ export class RelayConfigurationError extends Error {
   }
 }
 
-export function configuredRelayUrls(
-  environment: RelayEnvironment = process.env,
-) {
+function configuredRelayUrls(environment: RelayEnvironment = process.env) {
   const values = environment.GYBLOS_RELAYS?.split(',') ?? IROH_RELAYS.urls;
   try {
     return [

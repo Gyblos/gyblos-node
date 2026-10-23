@@ -8,11 +8,8 @@ import test from 'node:test';
 
 import { generateKeyPairSigner } from '@solana/kit';
 
-import { HTTP_STATUS, LOCALHOST, ROUTES } from '@gyblos/config';
-import {
-  DEVNET_USDC,
-  PUBLIC_CALL_OPERATIONS,
-} from '@gyblos/payments-x402/constants';
+import { DEVNET_USDC, HTTP_STATUS, LOCALHOST, ROUTES } from '@gyblos/config';
+import { PUBLIC_CALL_OPERATIONS } from '@gyblos/payments-x402/constants';
 import { createFacilitator } from '@gyblos/payments-x402/facilitator';
 import { isLoopbackHost } from '@gyblos/runtime/loopback-host';
 
