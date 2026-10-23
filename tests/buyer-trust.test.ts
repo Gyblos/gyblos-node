@@ -9,6 +9,7 @@ import type { OfferTrust } from '@gyblos/core/offers';
 import { NODE_ERROR_CODES } from '@gyblos/node/constants';
 import type { SignedInferenceOffer } from '@gyblos/protocol/offer';
 import { loadJson } from '@gyblos/runtime';
+import { RELAY_CONFIGURATION_CODES } from '@gyblos/transport-iroh/constants';
 
 import { NATIVE_CAPABILITY } from './support/native-runtime.js';
 
@@ -20,11 +21,12 @@ async function withTrust(
     trust: OfferTrust,
     path: string,
   ) => Promise<void>,
+  relayUrl: string | null = null,
 ) {
   const { withRelayOffer } = await import('./support/relay-fixture.js');
   const { main } = await import('@gyblos/buyer/trust');
   const { rolePath } = await import('@gyblos/node/roles');
-  await withRelayOffer(null, async () => {
+  await withRelayOffer(relayUrl, async () => {
     const path = rolePath(P2P.trustFilename);
     const trust = await loadJson<OfferTrust>(path);
     await unlink(path);
@@ -51,7 +53,11 @@ void test(
   async () => {
     await withTrust(async (main, trust, path) => {
       await main(args(trust));
-      assert.deepEqual(await loadJson(path), trust);
+      const { parseOfferTrustJson } = await import('@gyblos/node/offers');
+      assert.deepEqual(
+        parseOfferTrustJson(await readFile(path, 'utf8')),
+        trust,
+      );
       assert.equal(
         (await lstat(path)).mode & P2P.permissionMask,
         FILE_MODES.privateFile,
@@ -114,5 +120,25 @@ void test(
       });
       await assert.rejects(lstat(path), { code: 'ENOENT' });
     });
+  },
+);
+
+void test(
+  'buyer trust rejects an unconfigured relay without writing trust',
+  OPTIONS,
+  async () => {
+    const previous = process.env.GYBLOS_RELAYS;
+    try {
+      process.env.GYBLOS_RELAYS = 'https://configured.example';
+      await withTrust(async (main, trust, path) => {
+        await assert.rejects(main(args(trust)), {
+          code: RELAY_CONFIGURATION_CODES.UNCONFIGURED,
+        });
+        await assert.rejects(lstat(path), { code: 'ENOENT' });
+      }, 'https://unconfigured.example');
+    } finally {
+      if (previous === undefined) delete process.env.GYBLOS_RELAYS;
+      else process.env.GYBLOS_RELAYS = previous;
+    }
   },
 );

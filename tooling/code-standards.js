@@ -28,7 +28,9 @@ const SHORT_BINDINGS = new Set([
 
 function packageRoot(filename) {
   const parts = filename.split('/');
-  const index = parts.findIndex((part) => ['apps', 'packages'].includes(part));
+  const index = parts.findIndex((part) =>
+    ['apps', 'packages', 'lab'].includes(part),
+  );
   return index < 0 ? null : parts.slice(0, index + 2).join('/');
 }
 

@@ -16,7 +16,7 @@ import {
 } from '@gyblos/config';
 import { PRICES } from '@gyblos/core/constants';
 import type { OfferTrust } from '@gyblos/core/offers';
-import { ROLE_CONFIG_SCHEMA_VERSION } from '@gyblos/node/constants';
+import { P2P_ROLES, ROLE_CONFIG_SCHEMA_VERSION } from '@gyblos/node/constants';
 import { signInferenceOffer } from '@gyblos/node/offers';
 import type { RoleConfig } from '@gyblos/node/roles';
 import { GYBLOS_ALPN, OFFER_SCHEMA_VERSION } from '@gyblos/protocol/constants';
@@ -87,7 +87,7 @@ export async function recoveryFixture(fullRefund = true) {
     mint: identities.mint,
     assetLabel: 'devnet-test-token',
     nodeId: '2'.repeat(64),
-    role: 'buyer',
+    role: P2P_ROLES.BUYER,
     buyer: identities.buyer,
   };
   const journal = {

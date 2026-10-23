@@ -219,8 +219,6 @@ export const PUBLIC_FACILITATORS = [
   },
 ] as const;
 
-export const PUBLIC_ORIGINS = { tokenizer: 'https://huggingface.co' } as const;
-
 export const GATE_ROUTES = {
   fixed: '/api/generate',
   exact: '/api/exact',
@@ -236,7 +234,6 @@ export const UPSTREAM_COMMIT = 'faa1c694c66a3732aaabbce93bdae140e521a67d';
 export const GATE_TIMEOUTS = {
   publicRequest: 25_000,
   publicPayment: 50_000,
-  artifactDownload: 60_000,
   fixedStop: 5_000,
   rpcCooldown: 12_000,
   expiryGrace: 2_000,

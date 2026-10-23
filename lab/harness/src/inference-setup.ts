@@ -1,53 +1,27 @@
 // Downloads the pinned tokenizer files and pulls the pinned model into a private Ollama models dir
 // using a temporary loopback Ollama server, then verifies both.
 import { once } from 'node:events';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { basename, resolve } from 'node:path';
+import { mkdir } from 'node:fs/promises';
+import { resolve } from 'node:path';
 
 import {
   FILE_MODES,
   OLLAMA_MODELS_PATH,
   ROUTES,
   TIMEOUTS,
-  TOKENIZER_DIR,
-  TOKENIZER_FILES,
 } from '@gyblos/config';
-import { createModelTokenizer, createOllama } from '@gyblos/engine-ollama';
+import { createOllama } from '@gyblos/engine-ollama';
 import { MODEL } from '@gyblos/engine-ollama/model';
+import { prepareModelTokenizer } from '@gyblos/node/artifacts';
 import { spawnChild, stopChild, waitReady } from '@gyblos/runtime';
 
-import {
-  GATE_HOSTS,
-  GATE_PORTS,
-  GATE_RETRIES,
-  GATE_TIMEOUTS,
-  PUBLIC_ORIGINS,
-} from './constants.js';
+import { GATE_HOSTS, GATE_PORTS, GATE_RETRIES } from './constants.js';
 
 async function prepareGateArtifacts() {
-  const directory = TOKENIZER_DIR;
-  await mkdir(directory, {
-    recursive: true,
-    mode: FILE_MODES.privateDirectory,
-  });
+  await prepareModelTokenizer();
   await mkdir(OLLAMA_MODELS_PATH, {
     recursive: true,
     mode: FILE_MODES.privateDirectory,
-  });
-  for (const path of [TOKENIZER_FILES.tokenizer, TOKENIZER_FILES.config]) {
-    const name = basename(path);
-    const response = await fetch(
-      `${PUBLIC_ORIGINS.tokenizer}/${MODEL.publicModel}/resolve/${MODEL.revision}/${name}`,
-      { signal: AbortSignal.timeout(GATE_TIMEOUTS.artifactDownload) },
-    );
-    if (!response.ok) throw new Error('Pinned tokenizer download failed.');
-    await writeFile(path, await response.text(), {
-      mode: FILE_MODES.privateFile,
-    });
-  }
-  createModelTokenizer({
-    tokenizer: await readFile(TOKENIZER_FILES.tokenizer, 'utf8'),
-    config: await readFile(TOKENIZER_FILES.config, 'utf8'),
   });
 }
 

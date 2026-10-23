@@ -92,7 +92,7 @@ export async function startBuyer() {
     await saveJson(rolePath(P2P.statusFilename), {
       status: 'ready',
       runId: process.env.GYBLOS_P2P_RUN_ID,
-      role: 'buyer',
+      role: P2P_ROLES.BUYER,
       nodeId: config.nodeId,
       sellerNodeId: offer.nodeId,
     });

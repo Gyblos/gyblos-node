@@ -119,6 +119,18 @@ export function parseRoleConfig(value: unknown): RoleConfig {
     config.assetLabel !== CONFIG_ASSET_LABELS.TEST_TOKEN
   )
     throw new NodeError(code);
+  configurationObject(config, code, [
+    'schemaVersion',
+    'role',
+    'rpcUrl',
+    'mint',
+    'assetLabel',
+    'nodeId',
+    'buyer',
+    ...(config.role === P2P_ROLES.SELLER
+      ? ['owner', 'authorizer', 'facilitator', 'payTo']
+      : []),
+  ]);
   const common: CommonRole & Pick<RoleConfig, 'buyer'> = {
     schemaVersion: ROLE_CONFIG_SCHEMA_VERSION,
     rpcUrl: configurationRpcUrl(config.rpcUrl, code),
@@ -215,7 +227,7 @@ export async function setupRole(options: SetupOptions) {
     config = {
       ...common,
       role: P2P_ROLES.BUYER,
-      buyer: (await wallet('buyer')).address,
+      buyer: (await wallet(P2P_ROLES.BUYER)).address,
     };
   else {
     if (!options.payTo || !options.buyer)

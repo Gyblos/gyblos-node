@@ -188,3 +188,46 @@ void test('version metadata lint rejects a dependency pin mismatch', async () =>
     await rm(directory, { recursive: true });
   }
 });
+
+void test('lab workspace relative imports stay within their package', () => {
+  const linter = new Linter();
+  const configuration: Linter.Config[] = [
+    {
+      plugins: {
+        gyblos: standards as unknown as NonNullable<
+          Linter.Config['plugins']
+        >[string],
+      },
+      rules: { 'gyblos/package-boundaries': 'error' },
+    },
+  ];
+  for (const workspace of ['harness', 'facilitator']) {
+    const filename = resolve('lab', workspace, 'src/fixture.js');
+    for (const code of [
+      "import { value } from '../../other/src/index.js';",
+      "export { value } from '../../../packages/config/src/index.js';",
+      "export * from '../../other/src/index.js';",
+      "import('../../other/src/index.js');",
+      'import(`../../other/src/index.js`);',
+    ])
+      assert.equal(
+        linter
+          .verify(code, configuration, { filename })
+          .filter((message) => message.ruleId === 'gyblos/package-boundaries')
+          .length,
+        1,
+      );
+    assert.deepEqual(
+      linter.verify("import { value } from './local.js';", configuration, {
+        filename,
+      }),
+      [],
+    );
+    assert.deepEqual(
+      linter.verify("import { value } from '@gyblos/config';", configuration, {
+        filename,
+      }),
+      [],
+    );
+  }
+});
