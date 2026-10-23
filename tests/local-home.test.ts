@@ -1,0 +1,197 @@
+// Checks the local home layout (env, defaults, buyer/seller separation) and the fail-closed legacy
+// guard. Every path lives in a synthetic temporary directory; legacy contents are never read.
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import test from 'node:test';
+
+import {
+  DEFAULT_HOMES,
+  HOME_ENVIRONMENT,
+  homeLayout,
+  labLayout,
+  LEGACY_LOCAL_PATHS,
+} from '@gyblos/config';
+import { NODE_ERROR_CODES, P2P_ROLES } from '@gyblos/node/constants';
+import {
+  assertOllamaModelsHome,
+  assertRoleHome,
+  assertTokenizerHome,
+} from '@gyblos/node/home';
+
+const DEFAULT_ENV = {};
+
+async function inTemporaryCwd(run: (directory: string) => Promise<void>) {
+  const directory = await mkdtemp(join(tmpdir(), 'gyblos-home-test-'));
+  const original = process.cwd();
+  try {
+    process.chdir(directory);
+    await run(directory);
+  } finally {
+    process.chdir(original);
+    await chmod(directory, 0o700).catch(() => undefined);
+    await rm(directory, { recursive: true, force: true });
+  }
+}
+
+function legacyError(legacyPath: string, homePath: string) {
+  return (error: unknown) => {
+    assert.ok(error instanceof Error);
+    assert.equal(
+      (error as Error & { code?: string }).code,
+      NODE_ERROR_CODES.LEGACY_LOCAL_LAYOUT,
+    );
+    assert.ok(error.message.includes(legacyPath), error.message);
+    assert.ok(error.message.includes(homePath), error.message);
+    return true;
+  };
+}
+
+void test('home layout defaults to one cwd-relative product home and a separate lab home', () => {
+  const layout = homeLayout(DEFAULT_ENV);
+  assert.equal(layout.root, '.local/gyblos');
+  assert.equal(layout.roles.buyer, '.local/gyblos/buyer');
+  assert.equal(layout.roles.seller, '.local/gyblos/seller');
+  assert.equal(layout.artifacts.tokenizer, '.local/gyblos/artifacts/tokenizer');
+  assert.deepEqual(layout.artifacts.tokenizerFiles, {
+    tokenizer: '.local/gyblos/artifacts/tokenizer/tokenizer.json',
+    config: '.local/gyblos/artifacts/tokenizer/tokenizer_config.json',
+  });
+  assert.equal(
+    layout.artifacts.ollamaModels,
+    '.local/gyblos/artifacts/ollama-models',
+  );
+  assert.deepEqual(labLayout(DEFAULT_ENV), {
+    root: '.local/lab',
+    measurements: '.local/lab/measurements.jsonl',
+    facilitatorDiagnostics: '.local/lab/facilitator-diagnostics',
+    identityKeys: '.local/lab/identity/keys',
+    identityValidator: '.local/lab/identity-validator',
+  });
+  assert.equal(DEFAULT_HOMES.product, layout.root);
+});
+
+void test('home layout follows GYBLOS_HOME and GYBLOS_LAB_HOME; empty values use the defaults', () => {
+  const env = {
+    [HOME_ENVIRONMENT.product]: '/data',
+    [HOME_ENVIRONMENT.lab]: '/lab-data',
+  };
+  assert.equal(HOME_ENVIRONMENT.product, 'GYBLOS_HOME');
+  assert.equal(HOME_ENVIRONMENT.lab, 'GYBLOS_LAB_HOME');
+  assert.equal(homeLayout(env).roles.buyer, '/data/buyer');
+  assert.equal(homeLayout(env).roles.seller, '/data/seller');
+  assert.equal(
+    homeLayout(env).artifacts.ollamaModels,
+    '/data/artifacts/ollama-models',
+  );
+  assert.equal(labLayout(env).root, '/lab-data');
+  assert.equal(labLayout(env).measurements, '/lab-data/measurements.jsonl');
+  const empty = { GYBLOS_HOME: '', GYBLOS_LAB_HOME: '' };
+  assert.equal(homeLayout(empty).root, DEFAULT_HOMES.product);
+  assert.equal(labLayout(empty).root, DEFAULT_HOMES.lab);
+});
+
+void test('buyer, seller, artifacts and lab state never share a directory', () => {
+  const layout = homeLayout(DEFAULT_ENV);
+  const directories = [
+    layout.roles.buyer,
+    layout.roles.seller,
+    layout.artifacts.root,
+    labLayout(DEFAULT_ENV).root,
+  ];
+  for (const directory of directories)
+    for (const other of directories)
+      if (directory !== other)
+        assert.equal(
+          other.startsWith(`${directory}/`),
+          false,
+          `${other} is inside ${directory}`,
+        );
+  assert.equal(new Set(directories).size, directories.length);
+});
+
+void test('a fresh home passes the legacy guard for every role and artifact', async () => {
+  await inTemporaryCwd(async () => {
+    await assertRoleHome(P2P_ROLES.BUYER, DEFAULT_ENV);
+    await assertRoleHome(P2P_ROLES.SELLER, DEFAULT_ENV);
+    await assertTokenizerHome(DEFAULT_ENV);
+    await assertOllamaModelsHome(DEFAULT_ENV);
+  });
+});
+
+void test('legacy role data blocks both roles until the new role directory exists', async () => {
+  await inTemporaryCwd(async () => {
+    await mkdir(LEGACY_LOCAL_PATHS.roles, { recursive: true });
+    const layout = homeLayout(DEFAULT_ENV);
+    for (const role of [P2P_ROLES.BUYER, P2P_ROLES.SELLER])
+      await assert.rejects(
+        assertRoleHome(role, DEFAULT_ENV),
+        legacyError(LEGACY_LOCAL_PATHS.roles, layout.roles[role]),
+      );
+    await mkdir(layout.roles.buyer, { recursive: true });
+    await assertRoleHome(P2P_ROLES.BUYER, DEFAULT_ENV);
+    await assert.rejects(assertRoleHome(P2P_ROLES.SELLER, DEFAULT_ENV), {
+      code: NODE_ERROR_CODES.LEGACY_LOCAL_LAYOUT,
+    });
+  });
+});
+
+void test('legacy tokenizer and Ollama model caches block their artifact directories', async () => {
+  await inTemporaryCwd(async () => {
+    const layout = homeLayout(DEFAULT_ENV);
+    await mkdir(LEGACY_LOCAL_PATHS.tokenizer, { recursive: true });
+    await assert.rejects(
+      assertTokenizerHome(DEFAULT_ENV),
+      legacyError(LEGACY_LOCAL_PATHS.tokenizer, layout.artifacts.tokenizer),
+    );
+    await assertOllamaModelsHome(DEFAULT_ENV);
+    await mkdir(LEGACY_LOCAL_PATHS.ollamaModels, { recursive: true });
+    await assert.rejects(
+      assertOllamaModelsHome(DEFAULT_ENV),
+      legacyError(
+        LEGACY_LOCAL_PATHS.ollamaModels,
+        layout.artifacts.ollamaModels,
+      ),
+    );
+    await assertRoleHome(P2P_ROLES.BUYER, DEFAULT_ENV);
+  });
+});
+
+void test('an explicit GYBLOS_HOME still refuses legacy data in the working directory', async () => {
+  await inTemporaryCwd(async (directory) => {
+    const env = { GYBLOS_HOME: join(directory, 'data') };
+    await mkdir(LEGACY_LOCAL_PATHS.roles, { recursive: true });
+    await assert.rejects(
+      assertRoleHome(P2P_ROLES.BUYER, env),
+      legacyError(LEGACY_LOCAL_PATHS.roles, homeLayout(env).roles.buyer),
+    );
+  });
+});
+
+void test('legacy detection never opens a FIFO or an unreadable legacy path', async () => {
+  await inTemporaryCwd(async () => {
+    await mkdir('.local/devnet', { recursive: true });
+    await mkdir('.local/ollama', { recursive: true });
+    // Opening a FIFO without a writer would hang; lstat must not.
+    execFileSync('mkfifo', [LEGACY_LOCAL_PATHS.roles]);
+    await writeFile(LEGACY_LOCAL_PATHS.tokenizer, 'synthetic');
+    await chmod(LEGACY_LOCAL_PATHS.tokenizer, 0o000);
+    await mkdir(LEGACY_LOCAL_PATHS.ollamaModels);
+    await chmod(LEGACY_LOCAL_PATHS.ollamaModels, 0o000);
+    try {
+      await assert.rejects(assertRoleHome(P2P_ROLES.BUYER, DEFAULT_ENV), {
+        code: NODE_ERROR_CODES.LEGACY_LOCAL_LAYOUT,
+      });
+      await assert.rejects(assertTokenizerHome(DEFAULT_ENV), {
+        code: NODE_ERROR_CODES.LEGACY_LOCAL_LAYOUT,
+      });
+      await assert.rejects(assertOllamaModelsHome(DEFAULT_ENV), {
+        code: NODE_ERROR_CODES.LEGACY_LOCAL_LAYOUT,
+      });
+    } finally {
+      await chmod(LEGACY_LOCAL_PATHS.ollamaModels, 0o700);
+    }
+  });
+});
