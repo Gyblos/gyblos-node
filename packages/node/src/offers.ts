@@ -1,5 +1,5 @@
 // Signs private inference offers with the owner's Solana wallet key and verifies them against the trusted owner.
-// Trust policy stays in core; signing bytes and Ed25519 stay in protocol.
+// Wire shape, domain, signing bytes and Ed25519 stay in protocol; trust policy stays in core.
 import {
   address,
   createSignableMessage,
@@ -7,20 +7,13 @@ import {
   type KeyPairSigner,
 } from '@solana/kit';
 
-import { P2P } from '@gyblos/config';
-import {
-  validateInferenceOffer,
-  type InferenceOffer,
-  type OfferTrust,
-  type SignedInferenceOffer,
-} from '@gyblos/core/offers';
-import { sign, verify } from '@gyblos/protocol/signing';
-
-export type {
+import { validateInferenceOffer, type OfferTrust } from '@gyblos/core/offers';
+import { OFFER_DOMAIN } from '@gyblos/protocol/constants';
+import type {
   InferenceOffer,
-  OfferTrust,
   SignedInferenceOffer,
-} from '@gyblos/core/offers';
+} from '@gyblos/protocol/offer';
+import { sign, verify } from '@gyblos/protocol/signing';
 
 export async function signInferenceOffer(
   offer: InferenceOffer,
@@ -28,7 +21,7 @@ export async function signInferenceOffer(
 ): Promise<SignedInferenceOffer> {
   if (owner.address !== offer.owner)
     throw new Error('Offer signer does not match owner.');
-  const signature = await sign(P2P.offerDomain, offer, async (bytes) => {
+  const signature = await sign(OFFER_DOMAIN, offer, async (bytes) => {
     const signatures = await owner.signMessages([createSignableMessage(bytes)]);
     return signatures[0]![owner.address]!;
   });
@@ -47,7 +40,7 @@ export async function verifyInferenceOffer(
   const offer = validateInferenceOffer(value, trust, now, address);
   if (
     !(await verify(
-      P2P.offerDomain,
+      OFFER_DOMAIN,
       offer,
       Uint8Array.from(getAddressEncoder().encode(address(trust.owner))),
       Buffer.from(signed.signature, 'base64'),

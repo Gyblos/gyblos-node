@@ -15,12 +15,12 @@ import {
   P2P,
 } from '@gyblos/config';
 import { PRICES } from '@gyblos/core/constants';
-import {
-  signInferenceOffer,
-  type InferenceOffer,
-  type OfferTrust,
-} from '@gyblos/node/offers';
+import type { OfferTrust } from '@gyblos/core/offers';
+import { ROLE_CONFIG_SCHEMA_VERSION } from '@gyblos/node/constants';
+import { signInferenceOffer } from '@gyblos/node/offers';
 import type { RoleConfig } from '@gyblos/node/roles';
+import { GYBLOS_ALPN, OFFER_SCHEMA_VERSION } from '@gyblos/protocol/constants';
+import type { InferenceOffer } from '@gyblos/protocol/offer';
 import { loadJson, saveJson } from '@gyblos/runtime';
 
 import { paymentFixture, withOfflineProof } from './payment-fixture.js';
@@ -42,8 +42,8 @@ export async function recoveryFixture(fullRefund = true) {
   // This unfunded ephemeral key signs only a local synthetic OFFER, never a payment.
   const owner = await generateKeyPairSigner();
   const offer: InferenceOffer = {
-    schemaVersion: P2P.schemaVersion,
-    protocol: P2P.protocol,
+    schemaVersion: OFFER_SCHEMA_VERSION,
+    protocol: GYBLOS_ALPN,
     owner: owner.address,
     nodeId: 'synthetic-offer-node',
     endpoint: { relayUrl: null, directAddresses: [] },
@@ -82,7 +82,7 @@ export async function recoveryFixture(fullRefund = true) {
     maxAtomic: MAX_ATOMIC,
   };
   const config: RoleConfig = {
-    schemaVersion: P2P.schemaVersion,
+    schemaVersion: ROLE_CONFIG_SCHEMA_VERSION,
     rpcUrl,
     mint: identities.mint,
     assetLabel: 'devnet-test-token',

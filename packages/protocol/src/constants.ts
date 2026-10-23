@@ -1,4 +1,4 @@
-// Owns canonical shared protocol codes and engine completion reasons.
+// Owns canonical shared protocol codes, engine completion reasons, offer and public-record wire ids.
 // These are wire strings: changing one breaks peers. No SDK dependencies.
 export const PROTOCOL_ERROR_CODES = {
   AMOUNT_MISMATCH: 'AMOUNT_MISMATCH',
@@ -46,6 +46,13 @@ export type EngineDoneReason =
 
 export type ProtocolErrorCode =
   (typeof PROTOCOL_ERROR_CODES)[keyof typeof PROTOCOL_ERROR_CODES];
+
+// Iroh ALPN for the seller's HTTP-over-QUIC stream; also the offer's `protocol` field.
+export const GYBLOS_ALPN = 'gyblos/http/1';
+
+// Signed private inference offer: domain prefix (real LF) and payload schema version.
+export const OFFER_DOMAIN = 'gyblos/signed-inference-offer/v1\n';
+export const OFFER_SCHEMA_VERSION = 1;
 
 export const PUBLIC_RECORD_KINDS = {
   CATALOG: 'catalog',

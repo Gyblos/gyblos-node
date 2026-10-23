@@ -28,6 +28,7 @@ import { createOllamaEngine } from '@gyblos/engine-ollama/engine';
 import { inferenceSnapshot } from '@gyblos/payments-x402/accounting/chain';
 import { assertProgram } from '@gyblos/payments-x402/chain';
 import { createFacilitator } from '@gyblos/payments-x402/facilitator';
+import { GYBLOS_ALPN, OFFER_SCHEMA_VERSION } from '@gyblos/protocol/constants';
 import {
   assertPortFree,
   loadJson,
@@ -211,8 +212,8 @@ export async function startSeller() {
     assertReadinessCurrent(offerExpiresAt, now);
     const signed = await signInferenceOffer(
       {
-        schemaVersion: P2P.schemaVersion,
-        protocol: P2P.protocol,
+        schemaVersion: OFFER_SCHEMA_VERSION,
+        protocol: GYBLOS_ALPN,
         owner: owner.address,
         nodeId: config.nodeId,
         endpoint: {

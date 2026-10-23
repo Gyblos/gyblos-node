@@ -11,7 +11,7 @@ import type {
   RecvStream,
 } from '@number0/iroh';
 
-import { P2P } from '@gyblos/config';
+import { GYBLOS_ALPN } from '@gyblos/protocol/constants';
 import { isMain } from '@gyblos/runtime';
 
 import { bytes, endpoint, within } from './native-fixture.js';
@@ -54,7 +54,7 @@ async function readerMain() {
             null,
             message.target.addresses,
           ),
-          [...Buffer.from(P2P.protocol)],
+          [...Buffer.from(GYBLOS_ALPN)],
         );
         connection.setReceiveWindow(1n);
       } else if (message.action === READER_ACTIONS.REQUEST) {

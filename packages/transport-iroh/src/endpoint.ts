@@ -2,7 +2,8 @@
 // no external UDP socket.
 import { Endpoint } from '@number0/iroh';
 
-import { IPV6_LOOPBACK, LOCALHOST, P2P } from '@gyblos/config';
+import { IPV6_LOOPBACK, LOCALHOST } from '@gyblos/config';
+import { GYBLOS_ALPN } from '@gyblos/protocol/constants';
 
 import { RELAY_CONFIGURATION_CODES } from './constants.js';
 import { RelayConfigurationError, relayModeFromEnv } from './relays.js';
@@ -28,7 +29,7 @@ export async function bindEndpoint(
   const builder = Endpoint.builder();
   builder.applyN0();
   builder.secretKey(secret);
-  builder.alpns([[...Buffer.from(P2P.protocol)]]);
+  builder.alpns([[...Buffer.from(GYBLOS_ALPN)]]);
   if (options.relayOnly) {
     builder.bindAddr(`${LOCALHOST}:0`);
     builder.bindAddr(`${IPV6_LOOPBACK}:0`);

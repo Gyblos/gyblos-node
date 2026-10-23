@@ -5,13 +5,11 @@ import { readFile } from 'node:fs/promises';
 import { EndpointAddr, EndpointId } from '@number0/iroh';
 
 import { BUYER_RELAY_ONLY_ENV, MAX_ATOMIC, P2P } from '@gyblos/config';
-import {
-  verifyInferenceOffer,
-  type InferenceOffer,
-  type OfferTrust,
-} from '@gyblos/node/offers';
+import type { OfferTrust } from '@gyblos/core/offers';
+import { verifyInferenceOffer } from '@gyblos/node/offers';
 import { loadRole, nodeSecret, rolePath } from '@gyblos/node/roles';
 import { assertProgram } from '@gyblos/payments-x402/chain';
+import type { InferenceOffer } from '@gyblos/protocol/offer';
 import { saveJson } from '@gyblos/runtime';
 import {
   assertConfiguredRelay,

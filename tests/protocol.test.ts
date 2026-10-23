@@ -7,13 +7,8 @@ import test from 'node:test';
 import { address, generateKeyPairSigner, getAddressEncoder } from '@solana/kit';
 import ts from 'typescript';
 
-import { P2P } from '@gyblos/config';
 import applicationManifest from '@gyblos/core/package.json' with { type: 'json' };
-import {
-  signInferenceOffer,
-  verifyInferenceOffer,
-  type InferenceOffer,
-} from '@gyblos/node/offers';
+import { signInferenceOffer, verifyInferenceOffer } from '@gyblos/node/offers';
 import {
   canonicalJson,
   ENGINE_DONE_REASONS,
@@ -26,6 +21,8 @@ import {
   type EngineUsage,
   type EngineWireUsage,
 } from '@gyblos/protocol';
+import { OFFER_DOMAIN } from '@gyblos/protocol/constants';
+import type { InferenceOffer } from '@gyblos/protocol/offer';
 import protocolManifest from '@gyblos/protocol/package.json' with { type: 'json' };
 import vector from '@gyblos/protocol/vectors/signed-inference-offer-v1.json' with { type: 'json' };
 
@@ -67,7 +64,7 @@ const EXPECTED_ERROR_CODES = [
 
 void test('legacy offer golden vector preserves canonical bytes, Ed25519 signature and application trust', async () => {
   assert.equal(vector.domain, 'gyblos/signed-inference-offer/v1\n');
-  assert.equal(vector.domain, P2P.offerDomain);
+  assert.equal(vector.domain, OFFER_DOMAIN);
   assert.equal(canonicalJson(vector.offer), vector.canonicalJson);
   assert.equal(
     Buffer.from(signingBytes(vector.domain, vector.offer)).toString('hex'),

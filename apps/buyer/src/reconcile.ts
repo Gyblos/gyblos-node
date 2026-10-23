@@ -4,16 +4,14 @@ import assert from 'node:assert/strict';
 import { parseArgs } from 'node:util';
 
 import { P2P } from '@gyblos/config';
-import {
-  verifyInferenceOffer,
-  type OfferTrust,
-  type SignedInferenceOffer,
-} from '@gyblos/node/offers';
+import type { OfferTrust } from '@gyblos/core/offers';
+import { verifyInferenceOffer } from '@gyblos/node/offers';
 import { loadRole, rolePath } from '@gyblos/node/roles';
 import { finalizedPaymentProof } from '@gyblos/payments-x402/accounting/finalized-proof';
 import { JOURNAL_STATES } from '@gyblos/payments-x402/constants';
 import { withExclusiveLock } from '@gyblos/payments-x402/recovery/lock';
 import { withP2pRecoveryLock } from '@gyblos/payments-x402/recovery/recovery-lock';
+import type { SignedInferenceOffer } from '@gyblos/protocol/offer';
 import { isMain, loadJson, saveJson } from '@gyblos/runtime';
 
 import {

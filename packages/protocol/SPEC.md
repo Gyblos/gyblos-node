@@ -1,9 +1,10 @@
 # Protocol compatibility, version 1
 
-This package owns canonical JSON, domain-separated signature bytes, the Engine
-contract and the shared error taxonomy. It has no SDK or workspace dependencies,
-filesystem access, network calls or import-time process lifecycle. It uses the
-standard TextEncoder and Web Crypto APIs; callers adapt their wallets.
+This package owns canonical JSON, domain-separated signature bytes, the signed
+inference offer wire shape, the Engine contract and the shared error taxonomy.
+It has no SDK or workspace dependencies, filesystem access, network calls or
+import-time process lifecycle. It uses the standard TextEncoder and Web Crypto
+APIs; callers adapt their wallets.
 
 ## Canonical JSON and signing bytes
 
@@ -25,6 +26,11 @@ gyblos/&lt;kind&gt;/v&lt;n&gt; followed by one newline. The existing offer prefi
 exactly `gyblos/signed-inference-offer/v1\n`, with a real LF byte, not the two
 characters backslash and n. Keep this kind and payload shape unchanged. Callers
 select the domain; the helpers do not introduce a new domain policy.
+
+The offer types `InferenceOffer` and `SignedInferenceOffer` are exported from
+`./offer`. `./constants` names the wire values: `OFFER_DOMAIN` (the prefix
+above), `OFFER_SCHEMA_VERSION` (`1`) and `GYBLOS_ALPN` (`gyblos/http/1`, the
+Iroh ALPN, also carried in the offer's `protocol` field).
 
 ## Signatures, contracts and compatibility
 

@@ -14,6 +14,8 @@ import {
 import { DEVNET_RPC_URL, FILE_MODES, KEY_LIMITS, P2P } from '@gyblos/config';
 import { saveJson } from '@gyblos/runtime';
 
+import { ROLE_CONFIG_SCHEMA_VERSION } from './constants.js';
+
 interface CommonRole {
   schemaVersion: number;
   rpcUrl: string;
@@ -99,7 +101,7 @@ export async function loadRole(): Promise<RoleConfig> {
     await readFile(file(P2P.roleConfig), 'utf8'),
   ) as RoleConfig;
   if (
-    config.schemaVersion !== P2P.schemaVersion ||
+    config.schemaVersion !== ROLE_CONFIG_SCHEMA_VERSION ||
     !['buyer', 'seller'].includes(config.role) ||
     config.assetLabel !== 'devnet-test-token'
   )
@@ -158,7 +160,7 @@ export async function setupRole(options: SetupOptions) {
     );
   }
   const common = {
-    schemaVersion: P2P.schemaVersion,
+    schemaVersion: ROLE_CONFIG_SCHEMA_VERSION,
     rpcUrl: process.env.GYBLOS_RPC_URL ?? DEVNET_RPC_URL,
     mint: options.mint,
     assetLabel: 'devnet-test-token' as const,

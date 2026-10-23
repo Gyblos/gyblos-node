@@ -14,6 +14,7 @@ import {
   P2P,
   ROUTES,
 } from '@gyblos/config';
+import { GYBLOS_ALPN } from '@gyblos/protocol/constants';
 import { TRANSPORT_ROUTES } from '@gyblos/transport-iroh/constants';
 import { createIrohTransport } from '@gyblos/transport-iroh/iroh-client';
 import { serveIroh } from '@gyblos/transport-iroh/iroh-server';
@@ -46,7 +47,7 @@ export async function endpoint(secret?: number[]) {
   builder.relayMode(RelayMode.disabled());
   builder.bindAddr(`${LOCALHOST}:0`);
   builder.bindAddr(`${IPV6_LOOPBACK}:0`);
-  builder.alpns([[...Buffer.from(P2P.protocol)]]);
+  builder.alpns([[...Buffer.from(GYBLOS_ALPN)]]);
   if (secret) builder.secretKey(secret);
   return builder.bind();
 }
@@ -215,7 +216,7 @@ export async function fixture({
       clients.push(client);
       const connection = await within(
         client.connect(route ? await route(seller.addr()) : seller.addr(), [
-          ...Buffer.from(P2P.protocol),
+          ...Buffer.from(GYBLOS_ALPN),
         ]),
       );
       assert.equal(connection.remoteId().toString(), seller.id().toString());

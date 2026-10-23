@@ -9,7 +9,7 @@ are in [stack.md](stack.md).
 
 | Package                   | Layer    | Responsibility                                                                                                                                                       |
 | ------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `packages/protocol`       | protocol | Canonical JSON, signed offer bytes, `Engine` contract, error codes, model catalog, public discovery records. No SDKs.                                                |
+| `packages/protocol`       | protocol | Canonical JSON, signed offer wire shape, domain and bytes, Iroh ALPN, `Engine` contract, error codes, model catalog, public discovery records. No SDKs.              |
 | `packages/core`           | core     | Pricing and metering math, offer trust rules, charge-anomaly checks. No SDKs or filesystem.                                                                          |
 | `packages/config`         | config   | Devnet addresses, ports, paths, limits, relay defaults, wallet loading.                                                                                              |
 | `packages/runtime`        | runtime  | Atomic JSON writes, private rotating logs, processes, memory probes, loopback `Host` guard.                                                                          |
