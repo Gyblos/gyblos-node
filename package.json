@@ -8,7 +8,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "lint": "eslint . && prettier . --check && pnpm boundaries:test && pnpm boundaries",
+    "lint": "eslint . && prettier . --check && pnpm tooling:test && pnpm boundaries",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.tests.json",
@@ -30,7 +30,7 @@
     "p2p:reconcile": "node --import tsx apps/buyer/src/reconcile.ts",
     "identity:devnet-run": "node --import tsx lab/tools/identity-devnet-run.ts",
     "boundaries": "node --import tsx tooling/check-boundaries.ts",
-    "boundaries:test": "node --import tsx --test tooling/boundaries/*.test.ts",
+    "tooling:test": "node --import tsx --test \"tooling/**/*.test.ts\"",
     "node:start": "node --import tsx apps/node/src/main.ts",
     "buyer:start": "node --import tsx apps/buyer/src/main.ts"
   },

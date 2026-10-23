@@ -1,5 +1,5 @@
-// Checks that malformed payments cannot crash the facilitator or reach settlement, and runs the
-// facilitator HTTP, observer, privacy, startup, loopback-host, private-log and signature-hint suites.
+// Checks that malformed payments cannot crash the facilitator or reach settlement; no funded wallets
+// or live services.
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { test } from 'node:test';
@@ -8,18 +8,6 @@ import { generateKeyPairSigner } from '@solana/kit';
 
 import { DEVNET, DEVNET_USDC } from '@gyblos/config';
 import { createFacilitator } from '@gyblos/payments-x402/facilitator';
-
-import { registerFacilitatorHttpCases } from './support/facilitator-http-cases.js';
-import { registerFacilitatorObserverCases } from './support/facilitator-observer-cases.js';
-import { registerFacilitatorPrivacyCases } from './support/facilitator-privacy-cases.js';
-import { registerFacilitatorStartupCases } from './support/facilitator-startup-cases.js';
-import { registerLoopbackHostCases } from './support/loopback-host-cases.js';
-import { registerPrivateLogCases } from './support/private-log-cases.js';
-import { registerPrivateLogGuardCases } from './support/private-log-guard-cases.js';
-import { registerPrivateLogReclaimCases } from './support/private-log-reclaim-cases.js';
-import { registerPrivateLogReviewCases } from './support/private-log-review-cases.js';
-import { registerPrivateLogRotationCases } from './support/private-log-rotation-cases.js';
-import { registerSignatureFacilitatorCases } from './support/signature-facilitator-cases.js';
 
 void test('malformed payment cannot crash the facilitator or reach settlement', async () => {
   const signer = await generateKeyPairSigner();
@@ -63,16 +51,3 @@ void test('malformed payment cannot crash the facilitator or reach settlement', 
     await once(server, 'close');
   }
 });
-
-registerFacilitatorObserverCases();
-registerFacilitatorPrivacyCases();
-registerFacilitatorHttpCases();
-registerPrivateLogCases();
-registerPrivateLogGuardCases();
-registerPrivateLogReviewCases();
-registerPrivateLogReclaimCases();
-registerPrivateLogRotationCases();
-registerFacilitatorStartupCases();
-
-registerSignatureFacilitatorCases();
-registerLoopbackHostCases();

@@ -1,15 +1,24 @@
 # Offline regression tests
 
-| Command                | Runs                                               |
-| ---------------------- | -------------------------------------------------- |
-| `pnpm test`            | Product suites `tests/*.test.ts` (the PR gate).    |
-| `pnpm test:lab`        | Lab-only regressions in `tests/lab/`.              |
-| `pnpm test:all`        | Both.                                              |
-| `pnpm boundaries:test` | Tests of the import-boundary checker (`tooling/`). |
+| Command             | Runs                                                                  |
+| ------------------- | --------------------------------------------------------------------- |
+| `pnpm test`         | Product suites `tests/*.test.ts` (the PR gate).                       |
+| `pnpm test:lab`     | Lab-only regressions `tests/lab/**/*.test.ts`.                        |
+| `pnpm test:all`     | Both.                                                                 |
+| `pnpm tooling:test` | Tests of the boundary checker and lint rules, `tooling/**/*.test.ts`. |
 
-Node discovers test files by glob; there is no allowlist. Shared case groups in
-`tests/support/` are registered by the test files that import them. Product
-tests import values from their owning packages, not through lab re-exports.
+Node discovers test files by glob; there is no allowlist, and every case is a
+top-level `test()` in a `*.test.ts` file.
+
+- `tests/*.test.ts` exercise product packages and apps through their public
+  entries. They never import `@gyblos/lab-harness` or `lab/`.
+- `tests/lab/` covers lab code (gate harness, exact scheme, journals, lab tools
+  and entrypoints) and the opt-in identity integration with its validator
+  helper.
+- `tests/support/` holds fixtures, fakes, fault catalogs and helpers only, no
+  test cases. Both suites may import it.
+- `tooling/**/*.test.ts` test the repository tooling, not the product, and are
+  counted separately.
 
 ## What the suite needs
 
@@ -29,7 +38,7 @@ separately; a skipped case proves nothing on that host.
 
 ## Opt-in identity integration
 
-`GYBLOS_IDENTITY_INTEGRATION=1 pnpm test` starts a throwaway
+`GYBLOS_IDENTITY_INTEGRATION=1 pnpm test:lab` starts a throwaway
 `solana-test-validator` on loopback ports 18000-19999, cloning the 8004 program
 and registry accounts read-only from public devnet. Its ledger stays in ignored
 `.local/identity-validator/`. Without the binary, or if devnet is unreachable,

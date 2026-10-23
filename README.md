@@ -76,24 +76,24 @@ steps: [docs/running-a-node.md](docs/running-a-node.md).
 
 ## Commands
 
-| Group  | Command                                              | What it does                                                |
-| ------ | ---------------------------------------------------- | ----------------------------------------------------------- |
-| Node   | `pnpm node:start`, `buyer:start`                     | Start the seller node; start the buyer proxy (`:4031`).     |
-| Node   | `pnpm p2p:reconcile`                                 | Verify a P2P payment; clear a zero-charge block.            |
-| Gate   | `pnpm gate:setup`                                    | Create devnet keys; `--role buyer\|seller` for P2P.         |
-| Gate   | `pnpm gate:fund`                                     | Provision accounts; `--test-mint` makes a test token.       |
-| Gate   | `pnpm gate:preflight`, `gate:challenge`              | Check devnet and balances; check that unpaid gets 402.      |
-| Gate   | `pnpm gate:run`                                      | Run the fixed-resource `upto` payment end to end.           |
-| Gate   | `pnpm gate:failures`                                 | Empty buyer and expired authorization (about 62 s).         |
-| Gate   | `pnpm gate:facilitator`, `gate:seller`, `gate:buyer` | Run the fixed-resource roles separately (ports 4022, 4021). |
-| Gate   | `pnpm gate:exact`                                    | Fixed price through the public x402.org facilitator.        |
-| Gate   | `pnpm gate:inference:setup`, `gate:inference`        | Download the model; run six metered cases.                  |
-| Lab    | `pnpm identity:devnet-run`                           | Try the sponsored 8004 registration on devnet.              |
-| Checks | `pnpm test`, `test:lab`, `test:all`                  | Product tests (PR gate), lab tests, both.                   |
-| Checks | `pnpm typecheck`                                     | TypeScript, including tests.                                |
-| Checks | `pnpm lint`                                          | ESLint, Prettier and import boundaries.                     |
-| Checks | `pnpm boundaries`, `boundaries:test`                 | Boundary check (`--json`); its own tests.                   |
-| Checks | `pnpm format`, `format:check`                        | Format and sort imports; check only.                        |
+| Group  | Command                                              | What it does                                                    |
+| ------ | ---------------------------------------------------- | --------------------------------------------------------------- |
+| Node   | `pnpm node:start`, `buyer:start`                     | Start the seller node; start the buyer proxy (`:4031`).         |
+| Node   | `pnpm p2p:reconcile`                                 | Verify a P2P payment; clear a zero-charge block.                |
+| Gate   | `pnpm gate:setup`                                    | Create devnet keys; `--role buyer\|seller` for P2P.             |
+| Gate   | `pnpm gate:fund`                                     | Provision accounts; `--test-mint` makes a test token.           |
+| Gate   | `pnpm gate:preflight`, `gate:challenge`              | Check devnet and balances; check that unpaid gets 402.          |
+| Gate   | `pnpm gate:run`                                      | Run the fixed-resource `upto` payment end to end.               |
+| Gate   | `pnpm gate:failures`                                 | Empty buyer and expired authorization (about 62 s).             |
+| Gate   | `pnpm gate:facilitator`, `gate:seller`, `gate:buyer` | Run the fixed-resource roles separately (ports 4022, 4021).     |
+| Gate   | `pnpm gate:exact`                                    | Fixed price through the public x402.org facilitator.            |
+| Gate   | `pnpm gate:inference:setup`, `gate:inference`        | Download the model; run six metered cases.                      |
+| Lab    | `pnpm identity:devnet-run`                           | Try the sponsored 8004 registration on devnet.                  |
+| Checks | `pnpm test`, `test:lab`, `test:all`                  | Product tests (PR gate), lab tests, both.                       |
+| Checks | `pnpm typecheck`                                     | TypeScript, including tests.                                    |
+| Checks | `pnpm lint`                                          | ESLint, Prettier and import boundaries.                         |
+| Checks | `pnpm boundaries`, `tooling:test`                    | Boundary check (`--json`); tests of the checker and lint rules. |
+| Checks | `pnpm format`, `format:check`                        | Format and sort imports; check only.                            |
 
 ## Configuration
 
@@ -110,7 +110,7 @@ Set these in the environment; `.env` is **not** loaded
 | `GYBLOS_EXPECTED_ROUTE`                         | buyer         | Require `iroh-direct` or `iroh-relay` before paying.      |
 | `GYBLOS_RPC_URL`                                | all           | Devnet RPC; default `https://api.devnet.solana.com`.      |
 | `GYBLOS_GATE_CONFIG`                            | gates         | Gate config file; default `.local/devnet/config.json`.    |
-| `GYBLOS_IDENTITY_INTEGRATION`                   | tests         | `1` = run opt-in local-validator identity tests.          |
+| `GYBLOS_IDENTITY_INTEGRATION`                   | lab tests     | `1` = run opt-in local-validator identity tests.          |
 
 ## Repository layout
 

@@ -1,5 +1,5 @@
 // Checks the x402 exact payment gate: pinned network, mint, price and recipient, rejection of untrusted terms
-// before signing, empty-balance and uncertain-journal blocks, and replay-ID normalisation.
+// before signing, empty-balance blocks and replay-ID normalisation.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
@@ -157,31 +157,6 @@ void test('empty Circle USDC balance is rejected before signing', async () => {
     /insufficient Circle/,
   );
   assert.equal(signed, false);
-});
-
-void test('an uncertain exact journal blocks the shared authorization guard', async () => {
-  const { mkdtemp, writeFile, rm } = await import('node:fs/promises');
-  const { tmpdir } = await import('node:os');
-  const { join } = await import('node:path');
-  const { assertNoUnresolvedAuthorizations } =
-    await import('@gyblos/lab-harness/journal');
-  const directory = await mkdtemp(join(tmpdir(), 'gyblos-exact-'));
-  const path = join(directory, 'exact-attempt.json');
-  try {
-    await writeFile(path, JSON.stringify({ state: 'uncertain' }));
-    await assert.rejects(
-      assertNoUnresolvedAuthorizations([path] as Parameters<
-        typeof assertNoUnresolvedAuthorizations
-      >[0]),
-      /Authorization may be unsettled/,
-    );
-    await writeFile(path, JSON.stringify({ state: 'confirmed' }));
-    await assertNoUnresolvedAuthorizations([path] as Parameters<
-      typeof assertNoUnresolvedAuthorizations
-    >[0]);
-  } finally {
-    await rm(directory, { recursive: true });
-  }
 });
 
 void test('replay ID ignores equivalent base64 and the facilitator co-signature', async () => {

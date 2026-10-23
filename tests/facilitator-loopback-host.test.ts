@@ -1,4 +1,4 @@
-// Registers loopback Host cases: the facilitator accepts only loopback Host values on its exact port
+// Checks loopback Host cases: the facilitator accepts only loopback Host values on its exact port
 // and rejects rebinding, missing or wrong-port Host before parsing the body.
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
@@ -97,116 +97,114 @@ async function withFacilitator(run: (port: number) => Promise<void>) {
   }
 }
 
-export function registerLoopbackHostCases() {
-  void test('loopback host check accepts only loopback literals with the exact port', () => {
-    const port = 4022;
+void test('loopback host check accepts only loopback literals with the exact port', () => {
+  const port = 4022;
+  for (const host of [
+    `127.0.0.1:${port}`,
+    `localhost:${port}`,
+    `LOCALHOST:${port}`,
+    `[::1]:${port}`,
+  ])
+    assert.equal(isLoopbackHost(host, port), true, host);
+  for (const host of [
+    undefined,
+    '',
+    '127.0.0.1',
+    'localhost',
+    `127.0.0.1:${port + 1}`,
+    `localhost:0${port}`,
+    `${REBINDING_HOST}:${port}`,
+    `127.0.0.1.${REBINDING_HOST}:${port}`,
+    `localhost.:${port}`,
+    `::1:${port}`,
+    `127.0.0.2:${port}`,
+  ])
+    assert.equal(isLoopbackHost(host, port), false, String(host));
+  assert.equal(isLoopbackHost(`127.0.0.1:${port}`, 0), false);
+});
+
+void test('facilitator serves loopback Host values and rejects rebinding, missing or wrong-port Host', async () => {
+  await withFacilitator(async (port) => {
     for (const host of [
       `127.0.0.1:${port}`,
       `localhost:${port}`,
-      `LOCALHOST:${port}`,
+      `LocalHost:${port}`,
       `[::1]:${port}`,
     ])
-      assert.equal(isLoopbackHost(host, port), true, host);
-    for (const host of [
-      undefined,
-      '',
-      '127.0.0.1',
-      'localhost',
-      `127.0.0.1:${port + 1}`,
-      `localhost:0${port}`,
-      `${REBINDING_HOST}:${port}`,
-      `127.0.0.1.${REBINDING_HOST}:${port}`,
-      `localhost.:${port}`,
-      `::1:${port}`,
-      `127.0.0.2:${port}`,
-    ])
-      assert.equal(isLoopbackHost(host, port), false, String(host));
-    assert.equal(isLoopbackHost(`127.0.0.1:${port}`, 0), false);
-  });
-
-  void test('facilitator serves loopback Host values and rejects rebinding, missing or wrong-port Host', async () => {
-    await withFacilitator(async (port) => {
-      for (const host of [
-        `127.0.0.1:${port}`,
-        `localhost:${port}`,
-        `LocalHost:${port}`,
-        `[::1]:${port}`,
-      ])
-        assert.equal(
-          (await rawRequest(port, { path: ROUTES.health, host })).status,
-          HTTP_STATUS.ok,
-          host,
-        );
-      const paths = [
-        ROUTES.health,
-        ROUTES.supported,
-        ROUTES.events,
-        ROUTES.verifications,
-      ];
-      for (const host of [
-        `${REBINDING_HOST}:${port}`,
-        REBINDING_HOST,
-        `127.0.0.1:${port + 1}`,
-        `localhost:${port + 1}`,
-      ])
-        for (const path of paths) {
-          const response = await rawRequest(port, { path, host });
-          assert.equal(
-            response.status,
-            HTTP_STATUS.misdirectedRequest,
-            `${host} ${path}`,
-          );
-          assert.equal(response.body, '');
-        }
-      // Node itself rejects an HTTP/1.1 request without Host.
       assert.equal(
-        (await rawRequest(port, { path: ROUTES.events })).status,
-        HTTP_STATUS.badRequest,
+        (await rawRequest(port, { path: ROUTES.health, host })).status,
+        HTTP_STATUS.ok,
+        host,
       );
+    const paths = [
+      ROUTES.health,
+      ROUTES.supported,
+      ROUTES.events,
+      ROUTES.verifications,
+    ];
+    for (const host of [
+      `${REBINDING_HOST}:${port}`,
+      REBINDING_HOST,
+      `127.0.0.1:${port + 1}`,
+      `localhost:${port + 1}`,
+    ])
       for (const path of paths) {
-        const response = await hostlessHttp10Request(port, path);
-        assert.equal(response.status, HTTP_STATUS.misdirectedRequest, path);
+        const response = await rawRequest(port, { path, host });
+        assert.equal(
+          response.status,
+          HTTP_STATUS.misdirectedRequest,
+          `${host} ${path}`,
+        );
         assert.equal(response.body, '');
       }
-    });
+    // Node itself rejects an HTTP/1.1 request without Host.
+    assert.equal(
+      (await rawRequest(port, { path: ROUTES.events })).status,
+      HTTP_STATUS.badRequest,
+    );
+    for (const path of paths) {
+      const response = await hostlessHttp10Request(port, path);
+      assert.equal(response.status, HTTP_STATUS.misdirectedRequest, path);
+      assert.equal(response.body, '');
+    }
   });
+});
 
-  void test('facilitator rejects a rebinding Host before body parsing', async () => {
-    await withFacilitator(async (port) => {
-      const path = `/${PUBLIC_CALL_OPERATIONS.VERIFY}`;
-      // Control: with a loopback Host the JSON parser runs and rejects the body.
-      assert.equal(
-        (
-          await rawRequest(port, {
-            path,
-            method: 'POST',
-            host: `${LOCALHOST}:${port}`,
-            body: MALFORMED_JSON,
-          })
-        ).status,
-        HTTP_STATUS.badRequest,
-      );
-      assert.equal(
-        (
-          await rawRequest(port, {
-            path,
-            method: 'POST',
-            host: `${LOCALHOST}:${port}`,
-            body: OVERSIZED_BODY,
-          })
-        ).status,
-        PAYLOAD_TOO_LARGE,
-      );
-      for (const body of [MALFORMED_JSON, OVERSIZED_BODY]) {
-        const response = await rawRequest(port, {
+void test('facilitator rejects a rebinding Host before body parsing', async () => {
+  await withFacilitator(async (port) => {
+    const path = `/${PUBLIC_CALL_OPERATIONS.VERIFY}`;
+    // Control: with a loopback Host the JSON parser runs and rejects the body.
+    assert.equal(
+      (
+        await rawRequest(port, {
           path,
           method: 'POST',
-          host: `${REBINDING_HOST}:${port}`,
-          body,
-        });
-        assert.equal(response.status, HTTP_STATUS.misdirectedRequest);
-        assert.equal(response.body, '');
-      }
-    });
+          host: `${LOCALHOST}:${port}`,
+          body: MALFORMED_JSON,
+        })
+      ).status,
+      HTTP_STATUS.badRequest,
+    );
+    assert.equal(
+      (
+        await rawRequest(port, {
+          path,
+          method: 'POST',
+          host: `${LOCALHOST}:${port}`,
+          body: OVERSIZED_BODY,
+        })
+      ).status,
+      PAYLOAD_TOO_LARGE,
+    );
+    for (const body of [MALFORMED_JSON, OVERSIZED_BODY]) {
+      const response = await rawRequest(port, {
+        path,
+        method: 'POST',
+        host: `${REBINDING_HOST}:${port}`,
+        body,
+      });
+      assert.equal(response.status, HTTP_STATUS.misdirectedRequest);
+      assert.equal(response.body, '');
+    }
   });
-}
+});

@@ -1,5 +1,5 @@
 // Checks HTTP payment traffic over native Iroh: NodeId mismatch and direct-path refusal before signing,
-// free-request quota across reconnects, plus the egress and native transport suites.
+// and free-request quota across reconnects.
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { once } from 'node:events';
@@ -10,8 +10,6 @@ import { HTTP_STATUS, LOCALHOST, P2P, ROUTES } from '@gyblos/config';
 import { createIrohTransport } from '@gyblos/transport-iroh/iroh-client';
 import { serveIroh } from '@gyblos/transport-iroh/iroh-server';
 
-import { registerEgressCases } from './support/egress-cases.js';
-import { registerNativeCases } from './support/native-cases.js';
 import { endpoint, fixture, fixtureRequest } from './support/native-fixture.js';
 import { NATIVE_TEST_OPTIONS, waitFor } from './support/native-runtime.js';
 
@@ -90,9 +88,6 @@ void test(
   NATIVE_TEST_OPTIONS,
   () => exercise(true, false),
 );
-
-registerNativeCases();
-registerEgressCases();
 
 void test(
   'native smoke: nine distinct free-request peers disconnect and a newcomer remains admissible',

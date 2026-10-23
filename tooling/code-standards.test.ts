@@ -1,21 +1,13 @@
-// Checks the repo's standards and version-metadata lints, and that typed journals keep JSON
-// serialization and terminal-state guards.
+// Checks the repo's standards and version-metadata lints; it must never initialize product applications.
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import test from 'node:test';
 
 import { ESLint, Linter } from 'eslint';
 
-import { RECONCILIATION_CLASSIFICATIONS } from '@gyblos/lab-harness/constants';
-import {
-  assertNoUnresolvedAuthorizations,
-  saveJournal,
-} from '@gyblos/lab-harness/journal';
-import { JOURNAL_STATES } from '@gyblos/payments-x402/constants';
-
-import standards from '../tooling/code-standards.js';
+import standards from './code-standards.js';
 
 const eslint = new ESLint();
 const filePath = resolve('packages/core/src/metering.ts');
@@ -117,44 +109,6 @@ void test('version metadata pins match installed-source manifests', async () => 
     results.reduce((sum, result) => sum + result.errorCount, 0),
     0,
   );
-});
-
-void test('typed journals preserve JSON serialization and path-specific terminal guards', async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'gyblos-typed-journals-'));
-  try {
-    const path = join(directory, 'exact-attempt.json');
-    const record = {
-      state: JOURNAL_STATES.CONFIRMED,
-      transaction: 'public-signature',
-      authorizationHash: 'public-hash',
-      buyerSignature: 'public-buyer-signature',
-      blockhash: undefined,
-    };
-    await saveJournal(path, record);
-    assert.deepEqual(
-      JSON.parse(await readFile(path, 'utf8')),
-      JSON.parse(JSON.stringify(record)),
-    );
-    await assertNoUnresolvedAuthorizations([path] as Parameters<
-      typeof assertNoUnresolvedAuthorizations
-    >[0]);
-    await saveJournal(path, {
-      ...record,
-      state: JOURNAL_STATES.UNCERTAIN,
-      buyer: 'buyer',
-      reconciliation: {
-        classification: RECONCILIATION_CLASSIFICATIONS.UNAVAILABLE,
-      },
-    });
-    await assert.rejects(
-      assertNoUnresolvedAuthorizations([path] as Parameters<
-        typeof assertNoUnresolvedAuthorizations
-      >[0]),
-      /Reconcile/,
-    );
-  } finally {
-    await rm(directory, { recursive: true });
-  }
 });
 
 void test('version metadata lint rejects a dependency pin mismatch', async () => {

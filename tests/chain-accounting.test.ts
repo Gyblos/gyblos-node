@@ -1,5 +1,5 @@
 // Checks on-chain payment accounting: SPL transfer extraction, gasless buyer snapshots, throttled-read
-// retries without repayment, unknown-instruction rejection, plus the proof-read, rent and token suites.
+// retries without repayment and unknown-instruction rejection.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -11,10 +11,6 @@ import {
 } from '@gyblos/payments-x402/accounting/chain';
 import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { ProtocolError } from '@gyblos/protocol/errors';
-
-import { registerProofReadCases } from './support/proof-read-cases.js';
-import { registerRentCases } from './support/rent-cases.js';
-import { registerTokenCases } from './support/token-cases.js';
 
 void test('on-chain extraction recognizes SPL batch transfers without double counting', () => {
   const transfer = {
@@ -197,8 +193,3 @@ void test('bounded transaction visibility retries preserve unknown state and do 
     globalThis.fetch = original;
   }
 });
-
-registerRentCases();
-registerTokenCases();
-
-registerProofReadCases();

@@ -51,24 +51,13 @@ function bindingNames(pattern) {
 const structure = {
   meta: {
     type: 'suggestion',
-    schema: [
-      {
-        type: 'object',
-        properties: { bindings: { type: 'boolean' } },
-        additionalProperties: false,
-      },
-    ],
+    schema: [],
     messages: {
       binding: 'Use a descriptive binding instead of "{{name}}".',
-      boundary:
-        'Import other packages by workspace name; relative imports stay inside their package.',
     },
   },
   create(context) {
-    const filename = context.filename.replaceAll('\\', '/');
-    const root = packageRoot(filename);
     function checkBinding(pattern) {
-      if (!context.options[0]?.bindings) return;
       for (const identifier of bindingNames(pattern)) {
         if (SHORT_BINDINGS.has(identifier.name.replace(/^_+/, '')))
           context.report({
@@ -76,20 +65,6 @@ const structure = {
             messageId: 'binding',
             data: { name: identifier.name },
           });
-      }
-    }
-    function checkSource(node) {
-      const literal = node.source;
-      const source =
-        literal?.type === 'TemplateLiteral' && literal.expressions.length === 0
-          ? literal.quasis[0]?.value.cooked
-          : literal?.value;
-      if (typeof source !== 'string') return;
-      if (!source || context.options[0]?.bindings) return;
-      if (root && source.startsWith('.')) {
-        const target = resolve(dirname(filename), source);
-        if (relative(root, target).startsWith('..'))
-          context.report({ node, messageId: 'boundary' });
       }
     }
     return {
@@ -108,6 +83,37 @@ const structure = {
       CatchClause(node) {
         checkBinding(node.param);
       },
+    };
+  },
+};
+
+const packageBoundaries = {
+  meta: {
+    type: 'suggestion',
+    schema: [],
+    messages: {
+      boundary:
+        'Import other packages by workspace name; relative imports stay inside their package.',
+    },
+  },
+  create(context) {
+    const filename = context.filename.replaceAll('\\', '/');
+    const root = packageRoot(filename);
+    function checkSource(node) {
+      const literal = node.source;
+      const source =
+        literal?.type === 'TemplateLiteral' && literal.expressions.length === 0
+          ? literal.quasis[0]?.value.cooked
+          : literal?.value;
+      if (typeof source !== 'string') return;
+      if (!source) return;
+      if (root && source.startsWith('.')) {
+        const target = resolve(dirname(filename), source);
+        if (relative(root, target).startsWith('..'))
+          context.report({ node, messageId: 'boundary' });
+      }
+    }
+    return {
       ImportDeclaration: checkSource,
       ExportNamedDeclaration: checkSource,
       ExportAllDeclaration: checkSource,
@@ -167,7 +173,7 @@ const versionPins = {
 export default {
   rules: {
     structure,
-    'package-boundaries': structure,
+    'package-boundaries': packageBoundaries,
     'version-pins': versionPins,
   },
 };

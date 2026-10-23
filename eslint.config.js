@@ -74,7 +74,7 @@ export default [
     files: ['apps/**/*.ts', 'packages/**/*.ts', 'lab/**/*.ts'],
     rules: {
       'gyblos/package-boundaries': 'error',
-      'gyblos/structure': ['warn', { bindings: true }],
+      'gyblos/structure': 'warn',
     },
   },
   // Numeric definitions and independent expected fixtures are the canonical source.
@@ -86,6 +86,11 @@ export default [
       '**/*.test.ts',
     ],
     rules: { 'no-magic-numbers': 'off' },
+  },
+  // Test cases and lab scripts may be long; product and tooling keep the function-length warning.
+  {
+    files: ['tests/**/*.ts', 'lab/**/*.ts'],
+    rules: { 'max-lines-per-function': 'off' },
   },
   // Invalid boundary inputs and deliberately partial SDK doubles are test data.
   {

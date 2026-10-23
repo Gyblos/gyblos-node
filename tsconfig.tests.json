@@ -3,5 +3,10 @@
   "compilerOptions": {
     "allowJs": true
   },
-  "include": ["tests/**/*.ts", "tooling/code-standards.js"]
+  "include": [
+    "tests/**/*.ts",
+    "tooling/code-standards.js",
+    "tooling/code-standards.test.ts"
+  ],
+  "exclude": []
 }
