@@ -268,6 +268,12 @@ export const GATE_DIAGNOSTIC_LIMITS = {
   failureHistory: 10,
 } as const;
 
+// Lab wording for host startup failures; product runtime defaults are neutral.
+export const GATE_HOST_MESSAGES = {
+  exit: 'Gate-owned host exited during startup.',
+  timeout: 'Gate host startup timeout.',
+} as const;
+
 export const GATE_PORTS = {
   seller: 4021,
   ollamaSetup: 11437,

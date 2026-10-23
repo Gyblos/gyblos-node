@@ -48,6 +48,7 @@ import {
   EVIDENCE_PATHS,
   EVIDENCE_STATUSES,
   GATE_DIAGNOSTIC_LIMITS,
+  GATE_HOST_MESSAGES,
   INFERENCE_EVIDENCE_CODES,
   JOURNAL_PATHS,
   keyPath,
@@ -138,6 +139,8 @@ export async function main() {
       ollama.on('error', stop);
       await waitReady(ollama, `${ollamaUrl}${ROUTES.ollamaVersion}`, {
         signal: controller.signal,
+        exitMessage: GATE_HOST_MESSAGES.exit,
+        timeoutMessage: GATE_HOST_MESSAGES.timeout,
       });
       await createOllama(ollamaUrl).assertModel();
       evidence.ollamaVersion = (
@@ -157,6 +160,8 @@ export async function main() {
       await waitReady(facilitator, `${facilitatorUrl}${ROUTES.health}`, {
         signal: controller.signal,
         expectedRunId: runId,
+        exitMessage: GATE_HOST_MESSAGES.exit,
+        timeoutMessage: GATE_HOST_MESSAGES.timeout,
         onMismatch: () =>
           new ProtocolError(
             PROTOCOL_ERROR_CODES.PORT_BUSY,

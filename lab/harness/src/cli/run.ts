@@ -18,6 +18,7 @@ import {
 import {
   ENTRYPOINTS,
   FIXED_MIN_FACILITATOR_LAMPORTS,
+  GATE_HOST_MESSAGES,
   GATE_HOSTS,
   GATE_RETRIES,
   GATE_TIMEOUTS,
@@ -73,6 +74,7 @@ export async function main() {
       checkSignalCode: false,
       retryResponseErrors: false,
       exitMessage: 'Gate host exited during startup.',
+      timeoutMessage: GATE_HOST_MESSAGES.timeout,
       onMismatch: () =>
         new Error(
           'Gate port belongs to a different process. No payment attempted.',
@@ -94,6 +96,7 @@ export async function main() {
       checkSignalCode: false,
       retryResponseErrors: false,
       exitMessage: 'Gate host exited during startup.',
+      timeoutMessage: GATE_HOST_MESSAGES.timeout,
       onMismatch: () =>
         new Error(
           'Gate port belongs to a different process. No payment attempted.',
