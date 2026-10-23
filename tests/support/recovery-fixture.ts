@@ -45,7 +45,7 @@ export async function recoveryFixture(fullRefund = true) {
     schemaVersion: OFFER_SCHEMA_VERSION,
     protocol: GYBLOS_ALPN,
     owner: owner.address,
-    nodeId: 'synthetic-offer-node',
+    nodeId: '1'.repeat(64),
     endpoint: { relayUrl: null, directAddresses: [] },
     relayOnly: false,
     network: DEVNET,
@@ -86,7 +86,7 @@ export async function recoveryFixture(fullRefund = true) {
     rpcUrl,
     mint: identities.mint,
     assetLabel: 'devnet-test-token',
-    nodeId: 'synthetic-buyer-node',
+    nodeId: '2'.repeat(64),
     role: 'buyer',
     buyer: identities.buyer,
   };

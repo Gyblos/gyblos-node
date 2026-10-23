@@ -47,9 +47,15 @@ export GYBLOS_RELAY_TOKEN=...
 pnpm node:setup --role buyer --mint MINT
 pnpm buyer:setup             # download and verify only the pinned tokenizer
 # copy the seller's .local/p2p/offer.json into this .local/p2p/
-# write .local/p2p/trust.json (see below)
+pnpm buyer:trust --owner SELLER_OWNER_ADDRESS --node-id SELLER_NODE_ID --pay-to PAYOUT_ADDRESS --max-atomic 10000
 pnpm buyer:start
 ```
+
+Independently confirm the seller owner, NodeId and payout address before running
+`buyer:trust`. The command checks the offer signature, lifetime, payment terms
+and configured relay against those explicit identities and the local buyer/mint.
+It creates private `trust.json` exclusively and refuses to overwrite an existing
+file. It does not derive trust automatically from the offer or make payments.
 
 `trust.json` names the seller you trust; every field must match the offer:
 
@@ -68,9 +74,8 @@ pnpm buyer:start
 in the buyer checkout. It does not install Ollama, download model weights, read
 keys or contact Solana. Run it once before the synthetic paid-call CLI.
 
-There is no command that writes `trust.json` or funds P2P roles yet (the
-archived Docker lab did both). Give the buyer address test tokens of `MINT` with
-your own Solana tooling.
+There is no command that funds P2P roles. Give the buyer address test tokens of
+`MINT` with your own Solana tooling.
 
 The proxy listens on `127.0.0.1:4031` and accepts only
 `POST /v1/chat/completions` with a loopback `Host`. It runs one request at a
@@ -123,3 +128,9 @@ not been measured.
 
 Facilitator diagnostics for the seller are written privately under
 `.local/p2p/facilitator-diagnostics/`; see [payments.md](payments.md).
+
+Local role/trust JSON is validated before use: required fields, Solana
+addresses, hex NodeIds, HTTP(S) RPC URLs and positive decimal-string budgets up
+to the local maximum. Existing malformed configurations now fail explicitly.
+Operator RPC URLs may contain provider credentials; validation errors never echo
+them.

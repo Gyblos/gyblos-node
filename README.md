@@ -71,8 +71,9 @@ pnpm node:start                 # writes the signed offer to .local/p2p/offer.js
 ```
 
 Buyer: same token, `pnpm node:setup --role buyer --mint MINT`, put the seller's
-`offer.json` and a `trust.json` in `.local/p2p/`, run `pnpm buyer:setup` to
-prepare the tokenizer, then `pnpm buyer:start`. Full steps:
+`offer.json` in `.local/p2p/`, create trust with `pnpm buyer:trust` using
+independently confirmed seller identities, run `pnpm buyer:setup`, then
+`pnpm buyer:start`. Full steps:
 [docs/running-a-node.md](docs/running-a-node.md).
 
 ## Commands
@@ -82,6 +83,7 @@ prepare the tokenizer, then `pnpm buyer:start`. Full steps:
 | Node   | `pnpm node:start`, `buyer:start`                     | Start the seller node; start the buyer proxy (`:4031`).               |
 | Node   | `pnpm node:setup --role buyer\|seller --mint MINT`   | Create isolated role keys without RPC or funding.                     |
 | Node   | `pnpm buyer:setup`                                   | Download and verify the buyer tokenizer without an inference engine.  |
+| Node   | `pnpm buyer:trust`                                   | Verify the offer against explicit seller identities and create trust. |
 | Node   | `pnpm buyer:call`, `buyer:reconcile`                 | One paid synthetic call; verify a payment, clear a zero-charge block. |
 | Gate   | `pnpm gate:setup`                                    | Create devnet keys; `--role buyer\|seller` for P2P.                   |
 | Gate   | `pnpm gate:fund`                                     | Provision accounts; `--test-mint` makes a test token.                 |
