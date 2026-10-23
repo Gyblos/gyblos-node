@@ -12,14 +12,8 @@ import { measurementSalt } from '@gyblos/buyer/measurements';
 import { createCases } from '@gyblos/buyer/synthetic-cases';
 import {
   DIAGNOSTIC_LIMITS,
-  ENTRYPOINTS,
-  EVIDENCE_PATHS,
   HOSTS,
-  JOURNAL_PATHS,
-  keyPath,
   LOCALHOST,
-  LOCK_PATH,
-  MIN_FACILITATOR_LAMPORTS,
   OLLAMA_MODELS_PATH,
   ROUTES,
   TIMEOUTS,
@@ -52,8 +46,14 @@ import {
 } from '@gyblos/runtime';
 
 import {
+  ENTRYPOINTS,
+  EVIDENCE_PATHS,
   EVIDENCE_STATUSES,
   INFERENCE_EVIDENCE_CODES,
+  JOURNAL_PATHS,
+  keyPath,
+  LOCK_PATH,
+  MIN_FACILITATOR_LAMPORTS,
 } from '../../constants.js';
 import type { InferenceTrace } from '../../inference-evidence-types.js';
 import { assertNoUnresolvedAuthorizations } from '../../journal.js';

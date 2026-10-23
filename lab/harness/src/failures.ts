@@ -11,12 +11,8 @@ import {
 
 import {
   DIAGNOSTIC_LIMITS,
-  FAILURE_EVIDENCE_PATH,
-  failureJournalPath,
-  failureResultPath,
   HTTP_STATUS,
   LOCALHOST,
-  LOCK_PATH,
   ROUTES,
   TIMEOUTS,
   UNITS,
@@ -39,7 +35,16 @@ import { createFacilitator } from '@gyblos/payments-x402/facilitator';
 import { withExclusiveLock } from '@gyblos/payments-x402/recovery/lock';
 import { saveJson } from '@gyblos/runtime';
 
-import { CASE_STATUSES, FAILURE_CASES, SCHEMA_VERSIONS } from './constants.js';
+import {
+  CASE_STATUSES,
+  FAILURE_CASES,
+  FAILURE_EVIDENCE_PATH,
+  failureJournalPath,
+  failureResultPath,
+  GATE_ROUTES,
+  LOCK_PATH,
+  SCHEMA_VERSIONS,
+} from './constants.js';
 import { prepareFailureAccounts } from './failure-setup.js';
 import { createGateSeller } from './fixed-seller.js';
 import type {
@@ -170,7 +175,7 @@ export async function failureGate() {
             });
           },
         );
-        const response = await buyer.request(`${url}${ROUTES.fixed}`);
+        const response = await buyer.request(`${url}${GATE_ROUTES.fixed}`);
         assert.equal(response.status, HTTP_STATUS.paymentRequired);
         assert.ok(channelId);
         const health = (await fetch(`${url}${ROUTES.health}`).then((response) =>

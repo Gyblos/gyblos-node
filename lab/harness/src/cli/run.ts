@@ -3,15 +3,7 @@
 import { type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 
-import {
-  ENTRYPOINTS,
-  FIXED_MIN_FACILITATOR_LAMPORTS,
-  HOSTS,
-  RETRIES,
-  RETRY_DELAYS,
-  ROUTES,
-  TIMEOUTS,
-} from '@gyblos/config';
+import { HOSTS, RETRIES, RETRY_DELAYS, ROUTES, TIMEOUTS } from '@gyblos/config';
 import { loadConfig } from '@gyblos/config/wallet';
 import { assertProgram, lamports, tokens } from '@gyblos/payments-x402/chain';
 import { MAX_ATOMIC } from '@gyblos/payments-x402/constants';
@@ -25,6 +17,7 @@ import {
   waitReady,
 } from '@gyblos/runtime';
 
+import { ENTRYPOINTS, FIXED_MIN_FACILITATOR_LAMPORTS } from '../constants.js';
 import { executeGate } from './execute.js';
 
 export async function main() {

@@ -4,13 +4,8 @@ import { discoverChannelsByRentPayer, toFacilitatorSvmSigner } from '@x402/svm';
 
 import {
   CHANNEL_STATUS,
-  FAILED_REQUEST_PATH,
-  FIXED_MIN_FACILITATOR_LAMPORTS,
-  fixedEvidencePath,
   HOSTS,
   HTTP_STATUS,
-  JOURNAL_PATHS,
-  LOCK_PATH,
   ROUTES,
   X402_SDK_VERSION,
 } from '@gyblos/config';
@@ -39,7 +34,16 @@ import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { ProtocolError } from '@gyblos/protocol/errors';
 import { saveJson } from '@gyblos/runtime';
 
-import { EVIDENCE_STATUSES, SCHEMA_VERSIONS } from '../constants.js';
+import {
+  EVIDENCE_STATUSES,
+  FAILED_REQUEST_PATH,
+  FIXED_MIN_FACILITATOR_LAMPORTS,
+  fixedEvidencePath,
+  GATE_ROUTES,
+  JOURNAL_PATHS,
+  LOCK_PATH,
+  SCHEMA_VERSIONS,
+} from '../constants.js';
 import type { FixedGateEvidence } from '../fixture-evidence-types.js';
 import { runGate } from '../gate.js';
 import { assertNoUnresolvedAuthorizations, saveJournal } from '../journal.js';
@@ -107,7 +111,7 @@ async function executeLocked(signal?: AbortSignal) {
     async request() {
       signal?.throwIfAborted();
       const response = await buyer.request(
-        `${HOSTS.seller}${ROUTES.fixed}`,
+        `${HOSTS.seller}${GATE_ROUTES.fixed}`,
         signal,
       );
       if (

@@ -17,6 +17,8 @@ import {
 } from '@gyblos/payments-x402/constants';
 import { requireLoopbackHost } from '@gyblos/runtime/loopback-host';
 
+import { GATE_ROUTES } from './constants.js';
+
 export async function createGateSeller(options: {
   rpcUrl: string;
   facilitatorUrl: string;
@@ -49,7 +51,7 @@ export async function createGateSeller(options: {
   app.use(
     paymentMiddleware(
       {
-        [ROUTES.fixedDefinition]: {
+        [GATE_ROUTES.fixedDefinition]: {
           accepts: [
             {
               scheme: 'upto',
@@ -70,7 +72,7 @@ export async function createGateSeller(options: {
       false,
     ),
   );
-  app.get(ROUTES.fixed, (_request, response) => {
+  app.get(GATE_ROUTES.fixed, (_request, response) => {
     handlerCalls++;
     setSettlementOverrides(response, { amount: ACTUAL_ATOMIC });
     response.json({

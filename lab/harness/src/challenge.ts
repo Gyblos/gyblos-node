@@ -5,7 +5,6 @@ import { once } from 'node:events';
 import { decodePaymentRequiredHeader } from '@x402/core/http';
 
 import {
-  CHALLENGE_EVIDENCE_PATH,
   HTTP_STATUS,
   LOCALHOST,
   MAX_ATOMIC,
@@ -20,7 +19,12 @@ import { createFacilitator } from '@gyblos/payments-x402/facilitator';
 import { validateTerms } from '@gyblos/payments-x402/trust';
 import { saveJson } from '@gyblos/runtime';
 
-import { CHALLENGE_STAGES, SCHEMA_VERSIONS } from './constants.js';
+import {
+  CHALLENGE_EVIDENCE_PATH,
+  CHALLENGE_STAGES,
+  GATE_ROUTES,
+  SCHEMA_VERSIONS,
+} from './constants.js';
 import { createGateSeller } from './fixed-seller.js';
 import type { ChallengeEvidence } from './fixture-evidence-types.js';
 
@@ -57,7 +61,7 @@ export async function challengeGate() {
     if (!sellerAddress || typeof sellerAddress === 'string')
       throw new Error('No seller port.');
     const url = `http://${LOCALHOST}:${sellerAddress.port}`;
-    const response = await fetch(`${url}${ROUTES.fixed}`);
+    const response = await fetch(`${url}${GATE_ROUTES.fixed}`);
     if (response.status !== HTTP_STATUS.paymentRequired)
       throw new Error(`Expected 402, received ${response.status}.`);
     const required = response.headers.get('PAYMENT-REQUIRED');

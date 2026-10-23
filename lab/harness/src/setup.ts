@@ -10,14 +10,13 @@ import {
   DEVNET_RPC_URL,
   FILE_MODES,
   KEY_LIMITS,
-  keyFilename,
   LOCAL_DIR,
 } from '@gyblos/config';
 import { CONFIG_ASSET_LABELS, WALLET_ROLES } from '@gyblos/config/constants';
 import { configPath, defaultMint, type Config } from '@gyblos/config/wallet';
 import { saveJson } from '@gyblos/runtime';
 
-import { SCHEMA_VERSIONS } from './constants.js';
+import { keyFilename, SCHEMA_VERSIONS } from './constants.js';
 
 export async function setupGate() {
   const path = configPath();

@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 
 import { appendMeasurement, measurementRow } from '@gyblos/buyer/measurements';
-import { INFERENCE_TRANSPORT_PATH, TIMEOUTS } from '@gyblos/config';
+import { TIMEOUTS } from '@gyblos/config';
 import { WALLET_ROLES } from '@gyblos/config/constants';
 import { signer } from '@gyblos/config/wallet';
 import { observeInferenceResponse } from '@gyblos/core/inference-observation';
@@ -16,6 +16,7 @@ import { DEVNET, JOURNAL_STATES } from '@gyblos/payments-x402/constants';
 import { createInferenceBuyer } from '@gyblos/payments-x402/inference-buyer';
 import { saveJson } from '@gyblos/runtime';
 
+import { INFERENCE_TRANSPORT_PATH } from '../../constants.js';
 import {
   assertNoUnresolvedAuthorizations,
   saveJournal,

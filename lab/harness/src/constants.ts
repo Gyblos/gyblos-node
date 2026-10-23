@@ -5,6 +5,7 @@ import {
   INFERENCE_CASES,
   MEASUREMENT_SCHEMA_VERSION,
 } from '@gyblos/buyer/constants';
+import { LOCAL_DIR } from '@gyblos/config';
 import {
   CONFIG_SCHEMA_VERSION,
   type ConfigAssetLabel,
@@ -134,3 +135,84 @@ export type FundingOperation =
 
 export type PublicCallOutcome =
   (typeof PUBLIC_CALL_OUTCOMES)[keyof typeof PUBLIC_CALL_OUTCOMES];
+
+// Gate-only paths, entrypoints, routes, funding floors and public endpoints (formerly in @gyblos/config).
+export const LOCK_PATH = `${LOCAL_DIR}/buyer.lock`;
+
+export const JOURNAL_PATHS = {
+  fixed: `${LOCAL_DIR}/attempt.json`,
+  f1: `${LOCAL_DIR}/failure-F1-attempt.json`,
+  f2: `${LOCAL_DIR}/failure-F2-attempt.json`,
+  exact: `${LOCAL_DIR}/exact-attempt.json`,
+  inference: `${LOCAL_DIR}/inference-attempt.json`,
+} as const;
+
+export const FAILED_REQUEST_PATH = `${LOCAL_DIR}/failed-request.json`;
+
+export const CHALLENGE_EVIDENCE_PATH = `${LOCAL_DIR}/challenge-evidence.json`;
+
+export const FAILURE_EVIDENCE_PATH = `${LOCAL_DIR}/failure-evidence.json`;
+
+export const INFERENCE_TRANSPORT_PATH = `${LOCAL_DIR}/inference-last-transport.json`;
+
+export const ENTRYPOINTS = {
+  seller: 'lab/harness/scripts/seller.ts',
+  facilitator: 'apps/facilitator/src/main.ts',
+} as const;
+
+export const JOURNAL_FILENAMES = {
+  exact: 'exact-attempt.json',
+  inference: 'inference-attempt.json',
+} as const;
+
+export const EVIDENCE_PATHS = {
+  exact: 'lab/evidence/gate-0004.json',
+  inference: 'lab/evidence/gate-0005.json',
+} as const;
+
+export const keyPath = (role: string) => `${LOCAL_DIR}/${role}.json`;
+
+export function failureJournalPath(kind: string) {
+  return `${LOCAL_DIR}/failure-${kind}-attempt.json`;
+}
+
+export function failureResultPath(kind: string) {
+  return `${LOCAL_DIR}/failure-${kind}-result.json`;
+}
+
+export function fixedEvidencePath(timestamp: number) {
+  return `${LOCAL_DIR}/evidence-${timestamp}.json`;
+}
+
+export function keyFilename(role: string) {
+  return `${role}.json`;
+}
+
+export const MIN_FACILITATOR_LAMPORTS = 15_000_000n;
+
+export const FIXED_MIN_FACILITATOR_LAMPORTS = 10_000_000n;
+
+export const GATE_CASES = {
+  billingInflation: 1.4,
+  billingDeflation: 0.6,
+} as const;
+
+export const PUBLIC_FACILITATORS = [
+  {
+    url: 'https://x402.org/facilitator',
+    feePayer: 'CKPKJWNdJEqa81x7CkZ14BVPiY6y16Sxs7owznqtWYp5',
+  },
+  {
+    url: 'https://facilitator.payai.network',
+    feePayer: '2wKupLR9q6wXYppw8Gr2NvWxKBUqm4PPJKkQfoxHDBg4',
+  },
+] as const;
+
+export const PUBLIC_ORIGINS = { tokenizer: 'https://huggingface.co' } as const;
+
+export const GATE_ROUTES = {
+  fixed: '/api/generate',
+  exact: '/api/exact',
+  fixedDefinition: 'GET /api/generate',
+  exactDefinition: 'GET /api/exact',
+} as const;

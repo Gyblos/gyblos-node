@@ -9,7 +9,6 @@ import {
   HOSTS,
   OLLAMA_MODELS_PATH,
   PORTS,
-  PUBLIC_ORIGINS,
   RETRIES,
   ROUTES,
   TIMEOUTS,
@@ -22,6 +21,8 @@ import {
   MODEL,
 } from '@gyblos/engine-ollama';
 import { spawnChild, stopChild, waitReady } from '@gyblos/runtime';
+
+import { PUBLIC_ORIGINS } from './constants.js';
 
 export async function setupInferenceGate() {
   const directory = TOKENIZER_DIR;

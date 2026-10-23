@@ -9,7 +9,7 @@ This repository contains the Gyblos node and buyer application, not the separate
 - `packages/engine-ollama`, `payments-x402`, `transport-iroh`, `identity` (8004 registry; not wired yet): independent adapters.
 - `packages/node`: seller composition and lifecycle, plus role keys and signed offers shared with `apps/buyer`.
 - `apps/node` (seller daemon), `apps/buyer` (proxy, paid call, measurements, synthetic cases, reconciliation), `apps/facilitator`: independent executable applications.
-- `packages/config`: operator configuration and retained legacy shared values; `runtime`: platform support.
+- `packages/config`: operator configuration and values shared by product packages (gate-only paths and endpoints live in `lab/harness`); `runtime`: platform support.
 - `lab/harness` (gate checks, x402 `exact` scheme, fixed-price test seller, gate runner), `lab/tools`, `lab/evidence`: validation and experiments, outside product ownership. The Docker/NAT laboratory is archived at tag `archive/poc-lab-2026-10`.
 - `tests` and `tooling`: offline verification; no import-time application initialization.
 

@@ -7,15 +7,7 @@ import { readFile } from 'node:fs/promises';
 import { address } from '@solana/kit';
 import type { SupportedResponse } from '@x402/core/types';
 
-import {
-  EVIDENCE_PATHS,
-  JOURNAL_PATHS,
-  LOCALHOST,
-  LOCK_PATH,
-  PUBLIC_FACILITATORS,
-  ROUTES,
-  TIMEOUTS,
-} from '@gyblos/config';
+import { LOCALHOST, ROUTES, TIMEOUTS } from '@gyblos/config';
 import { loadConfig } from '@gyblos/config/wallet';
 import { assertDevnet, tokens } from '@gyblos/payments-x402/chain';
 import { DEVNET_USDC, JOURNAL_STATES } from '@gyblos/payments-x402/constants';
@@ -27,11 +19,16 @@ import { UNKNOWN_ERROR_NAME } from '@gyblos/runtime/constants';
 
 import {
   CASE_STATUSES,
+  EVIDENCE_PATHS,
   EVIDENCE_STATUSES,
   EXACT_CASES,
   EXACT_EVIDENCE_CODES,
   EXACT_PRICE,
   FACILITATOR_STATUSES,
+  GATE_ROUTES,
+  JOURNAL_PATHS,
+  LOCK_PATH,
+  PUBLIC_FACILITATORS,
 } from '../../constants.js';
 import { prepareExactAccounts } from '../../exact-accounts.js';
 import { assertExactSupport } from '../../exact/index.js';
@@ -160,7 +157,7 @@ export async function main() {
       await once(server, 'listening');
       const serverAddress = server.address();
       assert.ok(serverAddress && typeof serverAddress !== 'string');
-      const url = `http://${LOCALHOST}:${serverAddress.port}${ROUTES.exact}`;
+      const url = `http://${LOCALHOST}:${serverAddress.port}${GATE_ROUTES.exact}`;
       try {
         if (
           await runProvider({
