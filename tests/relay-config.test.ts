@@ -1,10 +1,11 @@
 // Owns offline regressions for owned-relay binding and buyer admission.
-// No endpoint opens a socket; offers use temporary, unfunded synthetic identities.
+// Only the native bind-failure probe opens a real endpoint, on an unassigned address;
+// offers use temporary, unfunded synthetic identities.
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test, { type TestContext } from 'node:test';
 
-import { BUYER_RELAY_ONLY_ENV, IPV6_LOOPBACK, LOCALHOST } from '@gyblos/config';
+import { IPV6_LOOPBACK, LOCALHOST } from '@gyblos/config';
 import {
   RELAY_CONFIGURATION_CODES,
   RELAY_TOKEN_LENGTH,
@@ -15,6 +16,7 @@ import {
   endpointProbe,
   PROBE_ACTIONS,
   RELAY_TOKEN_SENTINEL,
+  UNASSIGNED_BIND_ADDRESS,
   withRelayOffer,
 } from './support/relay-fixture.js';
 
@@ -63,7 +65,13 @@ void test(
     assert.deepEqual(result.relays, [
       { url: OWNED_RELAY, quicPort: 7842, token: 'environment' },
     ]);
-    assert.deepEqual(result.events, ['builder', 'n0', 'relay-mode', 'bind']);
+    assert.deepEqual(result.events, [
+      'builder',
+      'n0',
+      'relay-mode',
+      'bind',
+      'close',
+    ]);
   },
 );
 
@@ -88,13 +96,16 @@ void test(
 );
 
 void test(
-  'relay tokens are attached only to owned Gyblos relay hosts',
+  'relay tokens are attached only to the exact owned relay host allowlist',
   OPTIONS,
   () => {
     const result = endpointProbe({
       GYBLOS_RELAYS: [
         OWNED_RELAY,
-        'https://na2.relay.gyblos.com/',
+        'https://NA2.Relay.Gyblos.com',
+        'https://x.relay.gyblos.com/',
+        'https://relay.gyblos.com/',
+        'https://na1.relay.gyblos.com./',
         'https://relay.example/',
         'https://evilrelay.gyblos.com/',
         'https://na1.relay.gyblos.com.evil.example/',
@@ -109,6 +120,9 @@ void test(
       {
         [OWNED_RELAY]: 'environment',
         'https://na2.relay.gyblos.com/': 'environment',
+        'https://x.relay.gyblos.com/': 'absent',
+        'https://relay.gyblos.com/': 'absent',
+        'https://na1.relay.gyblos.com./': 'absent',
         'https://relay.example/': 'absent',
         'https://evilrelay.gyblos.com/': 'absent',
         'https://na1.relay.gyblos.com.evil.example/': 'absent',
@@ -203,11 +217,12 @@ void test(
   OPTIONS,
   async (context) => {
     setRelayUrls(context, OWNED_RELAY);
-    const { trustedOffer } = await import('@gyblos/buyer/buyer');
+    const { buyerConnectionPlan, trustedOffer } =
+      await import('@gyblos/buyer/buyer');
     await withRelayOffer(OWNED_RELAY.slice(0, -1), async () => {
-      const { offer, relayUrl } = await trustedOffer();
+      const { offer } = await trustedOffer();
       assert.equal(offer.endpoint.relayUrl, OWNED_RELAY.slice(0, -1));
-      assert.equal(relayUrl, OWNED_RELAY);
+      assert.equal(buyerConnectionPlan(offer).remote.relayUrl, OWNED_RELAY);
     });
   },
 );
@@ -259,68 +274,59 @@ void test(
   },
 );
 
-function isLoopbackBind(address: string) {
-  return (
-    address.startsWith(`${LOCALHOST}:`) ||
-    address.startsWith(`${IPV6_LOOPBACK}:`)
-  );
-}
-
 void test(
-  'buyer relay-only mode binds loopback sockets only while the default is unchanged',
+  'relay-only endpoints close and fail when a bound UDP socket is external',
   OPTIONS,
   () => {
-    const relayOnly = endpointProbe(
-      { GYBLOS_RELAY_TOKEN: TOKEN, [BUYER_RELAY_ONLY_ENV]: '1' },
-      PROBE_ACTIONS.BUYER,
+    const external = endpointProbe({
+      GYBLOS_RELAY_TOKEN: TOKEN,
+      PROBE_RELAY_ONLY: '1',
+      PROBE_BOUND_SOCKETS: `${LOCALHOST}:1,0.0.0.0:2`,
+    });
+    assert.equal(
+      external.error?.message,
+      'Relay-only endpoint has an external UDP socket.',
     );
-    assert.equal(relayOnly.error, undefined);
-    assert.ok(relayOnly.events.includes('bind'));
-    assert.ok(relayOnly.binds.length > 0);
-    assert.ok(relayOnly.binds.every(isLoopbackBind));
-    const standard = endpointProbe(
-      { GYBLOS_RELAY_TOKEN: TOKEN },
-      PROBE_ACTIONS.BUYER,
-    );
-    assert.equal(standard.error, undefined);
-    assert.deepEqual(standard.binds, []);
-    const conflicting = endpointProbe(
-      {
-        GYBLOS_RELAY_TOKEN: TOKEN,
-        [BUYER_RELAY_ONLY_ENV]: '1',
-        GYBLOS_IROH_EXTERNAL_ADDR: `${LOCALHOST}:9`,
-      },
-      PROBE_ACTIONS.BUYER,
-    );
-    assert.ok(conflicting.error);
-    assert.ok(!conflicting.events.includes('bind'));
+    assert.deepEqual(external.events.slice(-2), ['bind', 'close']);
+    const loopback = endpointProbe({
+      GYBLOS_RELAY_TOKEN: TOKEN,
+      PROBE_RELAY_ONLY: '1',
+      PROBE_BOUND_SOCKETS: `${LOCALHOST}:1,${IPV6_LOOPBACK}:2`,
+    });
+    assert.equal(loopback.error, undefined);
   },
 );
 
 void test(
-  'buyer relay-only mode dials the normalized relay without seller direct addresses',
+  'native relay maps and bind failures never print the relay token at trace level',
   OPTIONS,
-  async () => {
-    const { sellerAddress } = await import('@gyblos/buyer/buyer');
-    const offer = {
-      nodeId: NATIVE_CAPABILITY.sdk!.SecretKey.generate().public().toString(),
-      relayOnly: false,
-      endpoint: {
-        relayUrl: OWNED_RELAY.slice(0, -1),
-        directAddresses: [`${LOCALHOST}:7`],
+  () => {
+    for (const [address, message] of [
+      [UNASSIGNED_BIND_ADDRESS, /Failed to bind sockets/],
+      ['not-a-socket-address', /invalid socket address/],
+    ] as const) {
+      const result = endpointProbe(
+        {
+          GYBLOS_RELAY_TOKEN: TOKEN,
+          PROBE_BIND_ADDRESS: address,
+          RUST_LOG: 'trace',
+          RUST_BACKTRACE: 'full',
+        },
+        PROBE_ACTIONS.NATIVE_BIND,
+      );
+      assert.match(result.error?.message ?? '', message);
+      assert.ok(!result.error?.message.includes(RELAY_TOKEN_SENTINEL));
+    }
+    const traced = endpointProbe(
+      {
+        GYBLOS_RELAY_TOKEN: TOKEN,
+        PROBE_BIND_ADDRESS: UNASSIGNED_BIND_ADDRESS,
       },
-    };
-    const relayOnly = sellerAddress(offer, OWNED_RELAY, true);
-    assert.deepEqual(relayOnly.directAddresses(), []);
-    assert.equal(relayOnly.relayUrl(), OWNED_RELAY);
-    const standard = sellerAddress(offer, OWNED_RELAY, false);
-    assert.deepEqual(standard.directAddresses(), [`${LOCALHOST}:7`]);
-    assert.equal(standard.relayUrl(), OWNED_RELAY);
-    assert.throws(() => sellerAddress(offer, undefined, true), {
-      code: RELAY_CONFIGURATION_CODES.RELAY_REQUIRED,
-    });
-    assert.deepEqual(sellerAddress(offer, undefined, false).directAddresses(), [
-      `${LOCALHOST}:7`,
-    ]);
+      PROBE_ACTIONS.NATIVE_BIND,
+    );
+    assert.ok(
+      traced.nativeLogLines > 0,
+      'Native trace logging was not active.',
+    );
   },
 );

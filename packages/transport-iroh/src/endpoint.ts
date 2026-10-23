@@ -3,20 +3,26 @@ import { Endpoint } from '@number0/iroh';
 
 import { IPV6_LOOPBACK, LOCALHOST, P2P } from '@gyblos/config';
 
-import { relayModeFromEnv } from './relays.js';
+import { RELAY_CONFIGURATION_CODES } from './constants.js';
+import { RelayConfigurationError, relayModeFromEnv } from './relays.js';
 
-export { assertConfiguredRelay, RelayConfigurationError } from './relays.js';
+export { assertConfiguredRelay, requireConfiguredRelay } from './relays.js';
+
+export interface BindEndpointOptions {
+  relayOnly?: boolean;
+  bindAddress?: string;
+  externalAddress?: string;
+}
 
 export async function bindEndpoint(
   secret: number[],
-  options: {
-    relayOnly?: boolean;
-    bindAddress?: string;
-    externalAddress?: string;
-  } = {},
+  options: BindEndpointOptions = {},
 ) {
   if (options.relayOnly && options.externalAddress)
-    throw new Error('Relay-only mode rejects manual direct candidates.');
+    throw new RelayConfigurationError(
+      RELAY_CONFIGURATION_CODES.DIRECT_CANDIDATE,
+      'Relay-only mode rejects manual direct candidates.',
+    );
   const relayMode = relayModeFromEnv();
   const builder = Endpoint.builder();
   builder.applyN0();

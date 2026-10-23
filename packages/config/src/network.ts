@@ -20,7 +20,8 @@ export const DEVNET_RPC_URL = 'https://api.devnet.solana.com';
 export const IROH_RELAYS = {
   urls: ['https://na1.relay.gyblos.com/'],
   quicPort: 7842,
-  ownedHostSuffix: '.relay.gyblos.com',
+  // Exact hostnames that may receive GYBLOS_RELAY_TOKEN; no suffix matching.
+  ownedHosts: ['na1.relay.gyblos.com', 'na2.relay.gyblos.com'],
 } as const;
 
 export const BUYER_RELAY_ONLY_ENV = 'GYBLOS_BUYER_RELAY_ONLY' as const;

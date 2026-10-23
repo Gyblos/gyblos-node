@@ -81,8 +81,9 @@ function relayToken(environment: RelayEnvironment) {
   return authToken;
 }
 
-export function isOwnedRelay(url: string) {
-  return new URL(url).hostname.endsWith(IROH_RELAYS.ownedHostSuffix);
+function isOwnedRelay(url: string) {
+  const { hostname } = new URL(url);
+  return IROH_RELAYS.ownedHosts.some((host) => host === hostname);
 }
 
 export function relayModeFromEnv(environment: RelayEnvironment = process.env) {
@@ -122,4 +123,16 @@ export function assertConfiguredRelay(
       'Unconfigured relay rejected.',
     );
   return normalized;
+}
+
+export function requireConfiguredRelay(
+  relayUrl: string | null | undefined,
+  environment: RelayEnvironment = process.env,
+) {
+  if (!relayUrl)
+    throw new RelayConfigurationError(
+      RELAY_CONFIGURATION_CODES.REQUIRED,
+      'Relay-only mode requires a configured relay in the seller offer.',
+    );
+  return assertConfiguredRelay(relayUrl, environment);
 }

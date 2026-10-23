@@ -12,11 +12,11 @@ import {
 import { loadRole, nodeSecret, rolePath } from '@gyblos/node/roles';
 import { assertProgram } from '@gyblos/payments-x402/chain';
 import { saveJson } from '@gyblos/runtime';
-import { RELAY_CONFIGURATION_CODES } from '@gyblos/transport-iroh/constants';
 import {
   assertConfiguredRelay,
   bindEndpoint,
-  RelayConfigurationError,
+  requireConfiguredRelay,
+  type BindEndpointOptions,
 } from '@gyblos/transport-iroh/endpoint';
 import { createIrohTransport } from '@gyblos/transport-iroh/iroh-client';
 import { expectedIrohRoute } from '@gyblos/transport-iroh/route-policy';
@@ -41,49 +41,45 @@ export async function trustedOffer() {
     JSON.parse(bytes.toString('utf8')),
     trust,
   );
-  const relayUrl = offer.endpoint.relayUrl
-    ? assertConfiguredRelay(offer.endpoint.relayUrl)
-    : undefined;
-  return { config, offer, trust, relayUrl };
+  if (offer.endpoint.relayUrl) assertConfiguredRelay(offer.endpoint.relayUrl);
+  return { config, offer, trust };
 }
 
-export function buyerRelayOnly(environment: NodeJS.ProcessEnv = process.env) {
-  return environment[BUYER_RELAY_ONLY_ENV] === '1';
-}
-
-export function bindBuyerEndpoint(
-  secret: number[],
+// The single buyer decision point for relay-only binding and seller dialing.
+export function buyerConnectionPlan(
+  offer: Pick<InferenceOffer, 'nodeId' | 'relayOnly' | 'endpoint'>,
   environment: NodeJS.ProcessEnv = process.env,
 ) {
-  return bindEndpoint(secret, {
-    relayOnly: buyerRelayOnly(environment),
-    bindAddress: environment.GYBLOS_IROH_BIND,
+  const relayOnly = environment[BUYER_RELAY_ONLY_ENV] === '1';
+  const offeredRelay = offer.endpoint.relayUrl;
+  let relayUrl: string | undefined;
+  if (relayOnly) relayUrl = requireConfiguredRelay(offeredRelay, environment);
+  else if (offeredRelay)
+    relayUrl = assertConfiguredRelay(offeredRelay, environment);
+  const bindOptions: BindEndpointOptions = {
+    relayOnly,
+    bindAddress: relayOnly ? undefined : environment.GYBLOS_IROH_BIND,
     externalAddress: environment.GYBLOS_IROH_EXTERNAL_ADDR || undefined,
-  });
-}
-
-export function sellerAddress(
-  offer: Pick<InferenceOffer, 'nodeId' | 'relayOnly' | 'endpoint'>,
-  relayUrl: string | undefined,
-  relayOnly: boolean,
-) {
-  if (relayOnly && !relayUrl)
-    throw new RelayConfigurationError(
-      RELAY_CONFIGURATION_CODES.RELAY_REQUIRED,
-      `${BUYER_RELAY_ONLY_ENV}=1 requires a configured relay in the seller offer.`,
-    );
-  return new EndpointAddr(
-    EndpointId.fromString(offer.nodeId),
+  };
+  const remote = {
+    nodeId: offer.nodeId,
     relayUrl,
-    relayOnly || offer.relayOnly ? [] : offer.endpoint.directAddresses,
-  );
+    directAddresses:
+      relayOnly || offer.relayOnly ? [] : offer.endpoint.directAddresses,
+  };
+  return { relayOnly, bindOptions, remote };
 }
 
 export async function startBuyer() {
-  const { config, offer, relayUrl } = await trustedOffer();
-  const remote = sellerAddress(offer, relayUrl, buyerRelayOnly());
+  const { config, offer } = await trustedOffer();
+  const plan = buyerConnectionPlan(offer);
+  const remote = new EndpointAddr(
+    EndpointId.fromString(plan.remote.nodeId),
+    plan.remote.relayUrl,
+    plan.remote.directAddresses,
+  );
   await assertProgram(config.rpcUrl);
-  const endpoint = await bindBuyerEndpoint(await nodeSecret());
+  const endpoint = await bindEndpoint(await nodeSecret(), plan.bindOptions);
   let cleanup = () => endpoint.close();
   try {
     if (endpoint.id().toString() !== config.nodeId)
