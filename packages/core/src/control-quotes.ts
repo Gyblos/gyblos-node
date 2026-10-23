@@ -220,7 +220,7 @@ export async function createControlQuote(
   checkReadiness(context, state, now);
   const catalog = await trustedCatalog(context, now);
   const offer = await buildQuote(query, context, state, catalog, now);
-  unchangedReadiness(context, state, context.now());
+  unchangedReadiness(context, state, controlInteger(context.now()));
   // Capture signed data, recheck after asynchronous signing, and never publish a cancelled/stale result.
   const signed = await signOfferV2(offer, signer);
   const finishedAt = controlInteger(context.now());

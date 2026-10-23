@@ -77,3 +77,19 @@ void test('control supports exact reasoning levels only when catalog and engine 
     );
   }
 });
+void test('control rejects an invalid clock reading before signing a quote', async () => {
+  const fixture = await controlFixture();
+  const start = fixture.context.now();
+  let reads = 0;
+  // The first read is valid; the recheck before signing returns NaN.
+  fixture.context.now = () => (reads++ ? Number.NaN : start);
+  let calls = 0;
+  await assert.rejects(
+    createControlQuote(fixture.request, fixture.context, async (bytes) => {
+      calls++;
+      return fixture.ownerSigner(bytes);
+    }),
+    { code: CONTROL_CODES.INVALID },
+  );
+  assert.equal(calls, 0);
+});
