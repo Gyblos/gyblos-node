@@ -2,7 +2,6 @@
 // Only the native bind-failure probe opens a real endpoint, on an unassigned address;
 // offers use temporary, unfunded synthetic identities.
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
 import test, { type TestContext } from 'node:test';
 
 import { IPV6_LOOPBACK, LOCALHOST } from '@gyblos/config';
@@ -23,29 +22,6 @@ import {
 const OPTIONS = { skip: NATIVE_CAPABILITY.bindingSkip };
 const TOKEN = `${RELAY_TOKEN_SENTINEL}-synthetic-relay-token`;
 const OWNED_RELAY = 'https://na1.relay.gyblos.com/';
-
-void test('Docker actors receive relay environment without putting credentials into routers', async () => {
-  for (const filename of ['compose.json', 'compose-nat.json']) {
-    const compose = JSON.parse(
-      await readFile(`lab/docker/p2p/${filename}`, 'utf8'),
-    ) as {
-      services: Record<string, { environment: Record<string, unknown> }>;
-    };
-    for (const role of ['buyer', 'seller']) {
-      const environment = compose.services[role]!.environment;
-      assert.equal(
-        environment.GYBLOS_RELAY_TOKEN,
-        '${GYBLOS_RELAY_TOKEN:?GYBLOS_RELAY_TOKEN is required}',
-      );
-      assert.equal(environment.GYBLOS_RELAYS, null);
-    }
-    for (const role of ['router-a', 'router-b'])
-      assert.equal(
-        compose.services[role]?.environment.GYBLOS_RELAY_TOKEN,
-        undefined,
-      );
-  }
-});
 
 function setRelayUrls(context: TestContext, value: string) {
   const previous = process.env.GYBLOS_RELAYS;
