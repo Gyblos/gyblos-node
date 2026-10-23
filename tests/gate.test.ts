@@ -1,4 +1,4 @@
-// Owns offline gate.test regression cases; no funded wallets or live services.
+// Owns offline application gate, trust and journal guard regressions; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -233,5 +233,29 @@ void test('an unresolved failure-case authorization blocks later paid attempts',
     >[0]);
   } finally {
     await rm(directory, { recursive: true });
+  }
+});
+
+void test('financial reconciliation is terminal only for inference journals', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'gyblos-journal-'));
+  try {
+    for (const name of ['inference-attempt.json', 'attempt.json'])
+      await writeFile(
+        join(directory, name),
+        JSON.stringify({ state: 'reconciled' }),
+      );
+    await assert.doesNotReject(
+      assertNoUnresolvedAuthorizations([
+        join(directory, 'inference-attempt.json'),
+      ] as Parameters<typeof assertNoUnresolvedAuthorizations>[0]),
+    );
+    await assert.rejects(
+      assertNoUnresolvedAuthorizations([
+        join(directory, 'attempt.json'),
+      ] as Parameters<typeof assertNoUnresolvedAuthorizations>[0]),
+      /unsettled/i,
+    );
+  } finally {
+    await rm(directory, { recursive: true, force: true });
   }
 });
