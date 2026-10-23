@@ -261,148 +261,16 @@ Measurements append to `.local/devnet/measurements.jsonl` without prompts or
 answers. Pricing, tokenization, case classification and measurement details are
 in [docs/inference.md](docs/inference.md).
 
-## Experimental Iroh Docker trial
+## Experimental Iroh P2P
 
-The flat-network PoC keeps payment policy, the interchangeable `Engine`
-interface and `Transport` separate. A buyer verifies an owner-signed offer and
-the actual Iroh peer identity before forwarding HTTP payment requests through
-its loopback proxy. Only the paid inference route reaches the seller; Ollama and
-the facilitator stay on seller loopback.
+The P2P path keeps payment policy, the interchangeable `Engine` interface and
+`Transport` separate. A buyer verifies an owner-signed offer and the actual Iroh
+peer identity before forwarding HTTP payment requests through its loopback
+proxy. Only the paid inference route reaches the seller; Ollama and the
+facilitator stay on seller loopback.
 
-After the test-token and pinned model/tokenizer setup above, with Docker
-running:
-
-```sh
-pnpm p2p:docker --scenario flat --operator-root /absolute/path/to/funded/checkout
-```
-
-The operator checkout supplies isolated devnet funding keys and verified public
-model/tokenizer files. Its keys stay on the host. Each container generates and
-retains its own role keys in a distinct volume; the seller receives only the
-buyer's public address, and the buyer receives a signed offer plus separately
-pinned public trust settings. The payout key stays outside both containers.
-
-The command checks real container isolation and blocked HTTP ports before
-funding the new facilitator with 0.05 devnet SOL and the buyer with 10,000
-atomic test tokens. It then attempts three paid synthetic requests and exports
-an allowlisted report to `lab/evidence/gate-0006.json`. Docker requires outbound
-access to devnet and the default Iroh relays. Native bindings were exercised on
-macOS ARM64 and Linux ARM64.
-
-To reuse the isolated roles for the two-home-network NAT experiment, stop the
-previous experiment's containers while preserving its volumes, then run:
-
-```sh
-pnpm p2p:docker --scenario nat-direct --volume-prefix gyblos-p2p-EXISTING --operator-root /absolute/path/to/funded/checkout
-pnpm p2p:docker --scenario nat-relay --volume-prefix gyblos-p2p-EXISTING --operator-root /absolute/path/to/funded/checkout
-```
-
-Use the actual lowercase volume prefix from the local operator record. NAT runs
-reuse funded role volumes and do not fund them again. Each actor has one home
-network and uses its keyless router as the verified default gateway. Only the
-two test routers receive `NET_ADMIN`; actors retain `cap_drop: ALL`. Routers
-remain non-root and read-only, with no role keys, privileged mode or published
-ports. Their bootstrap sets no-new-privileges before configuring MASQUERADE. The
-relay scenario drops inbound WAN UDP on the seller router.
-
-A missing required route stops before payment. The original direct trials are
-retained in the report. Follow-up diagnostics reproduced an unsolicited UDP
-conntrack collision in the test routers: an early packet could reserve a tuple
-and force the peer's source port to change. Routers now drop new WAN UDP
-addressed to themselves; replies translated to actors still use the FORWARD
-rules.
-
-Run the keyless UDP/conntrack regression without model files, wallets or RPC:
-
-```sh
-pnpm p2p:diagnose
-```
-
-With an already built P2P runtime image, add native Iroh observations:
-
-```sh
-pnpm p2p:diagnose --native-image gyblos-p2p-poc --lab-candidates
-pnpm p2p:diagnose --native-image gyblos-p2p-poc --lab-candidates --idle
-pnpm p2p:diagnose --native-image gyblos-p2p-poc --lab-candidates --block-udp
-```
-
-These commands generate ephemeral native identities, use tmpfs instead of role
-volumes, verify the pinned SDK version, and exchange only bounded synthetic
-bytes. They authorize no payments and start no model or facilitator. Full
-addresses/mappings stay private; console reports contain counts, route classes
-and source/image hashes. The base command tests UDP; optional native controls
-also test Iroh. The diagnostic's idle workers stop with its own Compose project.
-
-With corrected routers, native direct routing succeeded with explicit lab WAN
-candidates, including an idle control. Those candidates remain disabled by
-default and do not establish automatic discovery. Default discovery still used
-relay: its learned addresses omitted the intermediate lab WAN and shared an
-outer public IP. Upstream hairpin failure is a hypothesis, not a demonstrated
-cause. The final native Mac–VPS smoke observed direct routing and completed
-three sequential paid devnet inferences at source `ba168c4`
-([report](lab/evidence/gate-0008.json)). This separate trial does not resolve
-the original Docker public-return cause or turn the earlier paid NAT-direct case
-into a passing Docker payment gate.
-
-To discover a usable address automatically **inside the simulated WAN**, run the
-separate observer-assisted mode:
-
-```sh
-pnpm p2p:diagnose --native-image gyblos-p2p-poc --wan-discovery
-pnpm p2p:diagnose --native-image gyblos-p2p-poc --wan-discovery --idle
-```
-
-This creates a temporary, unprivileged native Iroh observer on the WAN network.
-Each peer connects to its pinned identity using its own endpoint and learns the
-socket address observed after NAT. Peers bind random UDP ports; no manual peer
-WAN candidate is configured. The tool adds the reflected candidate, verifies
-that the same source socket has matching observer-directed and peer-directed
-conntrack mappings on both routers, and requires the selected peer path to match
-that candidate. Responses and time are bounded; late results cannot add
-candidates. Manual candidates and blocked UDP are incompatible with this mode.
-
-Active and idle observer-assisted controls selected direct peer paths. The
-observer does not forward inference traffic. This corrects the lab's missing
-usable intermediate candidate through explicit, lab-only reflection; it does
-**not** change production endpoint discovery or fix public n0 discovery through
-the outer NAT. Peer identities/descriptors are still exchanged by the test
-orchestrator, not a production registry or rendezvous service. A ten-second
-extra discovery wait also left the public-default control on relay. The exact
-outer translation/filtering/hairpin cause remains unproven. Real-network tests
-remain a separate requirement, and no new payments were run.
-
-To locate missing public IPv4 peer returns without changing forwarding policy:
-
-```sh
-pnpm p2p:diagnose --native-image gyblos-p2p-poc --trace-public
-```
-
-This mode retains public n0 discovery and excludes observers, manual candidates
-and intentional UDP blocking. It waits for a settled descriptor, pauses the
-buyer, and installs counter-only rules on the two test routers before releasing
-peer traffic. It counts exact candidate probes, ingress before DNAT, unmatched
-router input and forwarded peer replies. Known return tuples distinguish
-background discovery traffic from peer traffic. Missing/ambiguous counters or
-resets are rejected; conntrack `UNREPLIED` is read explicitly, including its
-extended IPv4 format. Lack of `ASSURED` alone does not establish no reply.
-
-The measured window showed outgoing probes to both advertised public candidates
-on each router, no peer return at either simulated WAN, and only known
-server-return UDP arriving. Native application exchanges continued over relay. A
-separate private host-only UDP control also received no public-address peer
-returns while its same-host local-address control succeeded. The host control
-used
-[Cloudflare public STUN](https://developers.cloudflare.com/realtime/sfu/get-started/connection-patterns/)
-and did not traverse another LAN device. Its mapping stayed unchanged across two
-server ports; this does not establish independence for every destination.
-
-These observations locate a public-return failure and show it can occur without
-Docker. They do not identify the physical router, ISP/CGNAT or every host filter
-as the cause, prove an IPv6 failure, or justify disabling firewalls. Public n0
-IPv4 discovery is producing candidates and the SDK is attempting them; a
-production discovery fix is not claimed. Router/provider details and a targeted
-network correction remain necessary before claiming this path works. Raw
-addresses, tuples and host/network observations stay local; no paid gate ran.
+The Docker/NAT laboratory used for the proof of concept was archived at tag
+`archive/poc-lab-2026-10`; its published reports remain in `lab/evidence/`.
 
 Seller startup now requires measured VM/cgroup memory headroom, then one bounded
 private synthetic warmup before any offer is signed or readiness is reported.
@@ -416,21 +284,8 @@ within the five-minute model keep-alive; slow publication cannot extend that
 lease. A valid warmup cannot prevent later VM pressure, model eviction or
 unrelated processes consuming memory.
 
-The historical runner death was attributed to Docker-VM global OOM by its kernel
-record, not to exhausting the seller's 3 GiB limit. Increasing the local Docker
-allocation was an operator environment change; the repository does not change
-Docker Desktop settings. Keep enough shared-VM headroom for other services.
-
-A private per-run start manifest preserves the journal offset and prefix hash
-before payment. Failed preparation may leave containers for local inspection;
-stop only that project and preserve its funded role volumes.
-
-Uncertain calls or funding block further authorizations until reconciliation;
-there is no automatic payment retry. Private journals remain in each container's
-volume. The local operator record `.local/p2p-docker-run.json` identifies the
-containers. Preserve their volumes when stopping the experiment, and stop/remove
-only this experiment's containers and network before starting another flat run
-with the same configured subnet. No ports are published to the host.
+Uncertain calls block further authorizations until reconciliation; there is no
+automatic payment retry.
 
 Direct peers can see each other's IP addresses. `GYBLOS_RELAY_ONLY=1` restricts
 seller binds and advertised candidates and rejects an observed direct path; its
@@ -520,18 +375,8 @@ Finalized proofs report `escrowInterveningTokenCreditAtomic` and
 donor attribution. `balanceDeltas.escrow` retains the initial-empty/final-empty
 endpoint value; the token snapshots expose the intervening surplus. Older
 records without these fields do not establish zero surplus. Zero-charge recovery
-still requires zero charge and return of the full principal; export re-fetches
-that proof. Confirmed paid rows retain their existing journal-based scope.
-
-Paid Docker/NAT reports also expose `preInferenceEscrowExcessAtomic`: the
-seller's recorded pre-inference escrow balance minus the original ceiling.
-Export requires a positive ceiling, sufficient escrow, charge plus principal
-refund equal to that ceiling, unchanged seller balance and one trace matching
-the distinct request/channel pair. The original ceiling and balance snapshots
-remain intact. This is a local trace observation with the same journal-based
-scope as the paid rows; it establishes neither a finalized treasury sweep nor
-who funded the excess. Older reports without this field leave the excess
-unrecorded.
+still requires zero charge and return of the full principal. Confirmed paid rows
+retain their existing journal-based scope.
 
 A required-route discrepancy or missing telemetry now fails the route check
 while preserving known financial confirmation. Post-exchange telemetry errors
@@ -584,12 +429,11 @@ full-refund, token-surplus and lamport-credit variants test supported accounting
 and rejection boundaries; they were not executed on-chain. Recovery cases run
 the actual CLI workflow, ephemeral unfunded offer signing/verification, locks
 and temporary-file persistence. RPC is mocked, and persistence-failure cases
-also inject rename errors. Export cases use synthetic paid rows/traces, a
-separate raw-derived zero-charge proof and mocked container process creation.
-These checks establish offline behavior, without a fresh chain audit or physical
-signed-offer recovery run. Raw evidence and private measurements remain
-excluded. The owner-authorized [final paid report](lab/evidence/gate-0008.json)
-is a curated metadata-only exception, bound to the exact tested source
+also inject rename errors. These checks establish offline behavior, without a
+fresh chain audit or physical signed-offer recovery run. Raw evidence and
+private measurements remain excluded. The owner-authorized
+[final paid report](lab/evidence/gate-0008.json) is a curated metadata-only
+exception, bound to the exact tested source
 `ba168c4fae043dc1170268cad9c0852d3c7533d9` and its verified source archive.
 Later evidence and documentation commits record that run; they do not claim that
 another runtime revision was paid-tested.
@@ -714,9 +558,7 @@ apps/
   facilitator/       Local upto facilitator
 lab/
   harness/           @gyblos/lab-harness: gates, journals, CLI cases and scripts
-  p2p/               @gyblos/lab-p2p: Docker/NAT experiments and constants
-  tools/             Native and public-path diagnostic tooling
-  docker/            Isolated test images and topology templates
+  tools/             Identity devnet lab tools
   evidence/          Previously authorized redacted historical reports only
 ```
 
@@ -744,11 +586,10 @@ The published suite requires Node.js 22 or later and a platform supported by the
 pinned native Iroh binding. The earlier suite was exercised on macOS ARM64 and
 Linux ARM64; these additional regressions were verified on macOS ARM64. Mac
 Intel has no binding in this version. The suite needs no private files, funded
-wallets, Ollama, Docker, Python or devnet payments. External RPC responses and
-container process creation are mocked; local HTTP and native loopback QUIC
-exercise actual middleware and transport boundaries. Lock cases use owned
-temporary files and child processes; unsupported ownership/FIFO checks skip
-explicitly on other platforms.
+wallets, Ollama, Docker, Python or devnet payments. External RPC responses are
+mocked; local HTTP and native loopback QUIC exercise actual middleware and
+transport boundaries. Lock cases use owned temporary files and child processes;
+unsupported ownership/FIFO checks skip explicitly on other platforms.
 
 Existing test entrypoints register the case groups in `tests/support/`.
 `tests/fixtures/finalized-payment-pair.json` is a minimal projection of one

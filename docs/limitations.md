@@ -287,11 +287,12 @@ commands and defaults in the [README](../README.md#configuration).
 
 ## Experimental native transport
 
-The flat Docker trial uses a separately pinned owner-signed offer, actual remote
-NodeId verification and bounded HTTP framing over Iroh. The exact per-request
-ceiling is independently calculated before signing. The seller exposes only the
-paid inference route; Ollama and the facilitator remain loopback-only. Role keys
-and journals stay in distinct container volumes under `.local/p2p/`.
+The experimental P2P path uses a separately pinned owner-signed offer, actual
+remote NodeId verification and bounded HTTP framing over Iroh. The exact
+per-request ceiling is independently calculated before signing. The seller
+exposes only the paid inference route; Ollama and the facilitator remain
+loopback-only. Role keys and journals stay in the local role directory under
+`.local/p2p/`.
 
 An initially uncertain engine error was reconciled through finalized chain
 transactions as zero charged and a complete unused-deposit return. An HTTP error
@@ -396,8 +397,8 @@ source/runtime metadata, public settlement signatures and amounts, route
 categories and safe diagnostic fields. It includes no keys, salts, prompts,
 response content, IPs, signed payment payloads, RPC URLs or endpoint
 tickets/addresses. Raw measurements, logs and reconciliation journals remain
-private. See the [Docker command](../README.md#experimental-iroh-docker-trial)
-for prerequisites.
+private. The Docker/NAT laboratory used for the proof of concept was archived at
+tag `archive/poc-lab-2026-10`; its published reports remain in `lab/evidence/`.
 
 ## Verified P2P reconciliation and reproducible audits
 
@@ -492,23 +493,8 @@ This verifier is deliberately limited to fresh, individually settled channels
 with retained canonical accounts. Closed/missing channels, nonfinalized data,
 deltas violating the checked sponsor/channel/escrow equations or unsupported
 shapes stop verification. It does not recover rent or guarantee recovery from
-every crash. Evidence export re-fetches proof for zero-charge reconciliations
-and binds their ceiling to the original attempt. Confirmed paid rows still come
-from the call journal. Source/image provenance is separate from chain truth and
-remains explicitly unverified when supplied by an operator.
-
-Paid Docker/NAT export reports `preInferenceEscrowExcessAtomic` separately from
-the original ceiling and raw balance snapshot. It accepts a pre-inference escrow
-observation covering that ceiling, validates canonical nonnegative integer
-strings and a positive ceiling, and retains exact principal charge/refund,
-unchanged seller balance, unique request/channel trace and required-route
-checks. This is local evidence consistency, without an independent finalized
-proof of the paid journal rows. Observed pre-inference excess can differ from
-the later finalized interval credit or treasury sweep; its donor and eventual
-disposition are not established by the trace. Missing fields in older reports
-mean unrecorded. Public offline collector tests use synthetic paid rows/traces
-and a separate raw-derived zero-charge proof with mocked RPC/container process
-creation. No fresh paid dust transaction or physical-network result is claimed.
+every crash. Source/image provenance is separate from chain truth and remains
+explicitly unverified when supplied by an operator.
 
 The public suite exercises real direct-loopback Iroh using simulated payments.
 Native cases cover resets and half-closes, fragmented and malformed frames, a
@@ -560,13 +546,11 @@ real temporary JSON persistence. RPC is mocked, and persistence-failure cases
 also inject rename errors. Offer verification, locks and normal persistence
 remain actual. They verify proof persistence before journal confirmation,
 preservation of surplus fields, charged/conflicting proof refusal and an
-unresolved journal after a persistence failure. Export cases retain the actual
-container-read parser and collector while stubbing process creation, and
-re-fetch zero-charge proof with the actual verifier/SDK. Their scope excludes
-the spawned CLI's outer catch, chain submission, power-loss durability and
-physical signed-offer recovery. Ownership/FIFO checks run only on supported
-platforms and otherwise skip explicitly; owned bounded child probes protect the
-test process from blocking.
+unresolved journal after a persistence failure. Their scope excludes the spawned
+CLI's outer catch, chain submission, power-loss durability and physical
+signed-offer recovery. Ownership/FIFO checks run only on supported platforms and
+otherwise skip explicitly; owned bounded child probes protect the test process
+from blocking.
 
 Separate paid-call fault cases spawn the actual CLI entrypoint with narrowly
 scoped readiness/payment-port stubs. Real locks, temporary JSON persistence,
