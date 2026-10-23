@@ -7,6 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { generateKeyPairSigner } from '@solana/kit';
 
 import { P2P } from '@gyblos/config';
+import { OFFER_LIFETIME_MS } from '@gyblos/core/constants';
 import type { OfferTrust } from '@gyblos/core/offers';
 import { signInferenceOffer } from '@gyblos/node/offers';
 import type { RoleConfig } from '@gyblos/node/roles';
@@ -189,7 +190,7 @@ export async function withRelayOffer(
       nodeId,
       endpoint: { relayUrl, directAddresses: options.directAddresses ?? [] },
       issuedAt: now,
-      expiresAt: now + P2P.offerLifetimeMs,
+      expiresAt: now + OFFER_LIFETIME_MS,
     };
     await fixture.write(
       P2P.offerFilename,

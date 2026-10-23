@@ -47,6 +47,12 @@ export type BuyerProxyErrorCode =
 
 export const MEASUREMENT_SCHEMA_VERSION = 1;
 
+// Synthetic call cases selectable by index on the buyer:call command line.
+export const MINIMUM_REQUESTS = 3;
+
+// Bound on the channel history read when locating a deposit for a proof.
+export const MAX_CHANNEL_SIGNATURES = 10;
+
 export const ERROR_DIAGNOSTICS = {
   ASSERTION: 'ASSERTION_FAILED',
   UNKNOWN: 'EXECUTION_INTERRUPTED_OR_UNKNOWN',

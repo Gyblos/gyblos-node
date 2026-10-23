@@ -10,8 +10,8 @@ import {
   DEVNET_USDC,
   INFERENCE_REQUEST_LIMITS,
   MAX_ATOMIC,
-  P2P,
 } from '@gyblos/config';
+import { OFFER_LIFETIME_MS } from '@gyblos/core/constants';
 import { signInferenceOffer, verifyInferenceOffer } from '@gyblos/node/offers';
 import { GYBLOS_ALPN, OFFER_SCHEMA_VERSION } from '@gyblos/protocol/constants';
 import type { InferenceOffer } from '@gyblos/protocol/offer';
@@ -36,7 +36,7 @@ async function fixture() {
     authorizer: authorizer.address,
     buyer: buyer.address,
     issuedAt: now,
-    expiresAt: now + P2P.offerLifetimeMs,
+    expiresAt: now + OFFER_LIFETIME_MS,
     prices: { inputAtomic: '1', outputAtomic: '2' },
     maxAtomic: MAX_ATOMIC,
     maxTokens: INFERENCE_REQUEST_LIMITS.maxOutputTokens,

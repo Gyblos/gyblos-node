@@ -24,6 +24,7 @@ import {
 } from './configuration.js';
 import {
   NODE_ERROR_CODES,
+  NODE_KEY_BYTES,
   P2P_ROLES,
   ROLE_CONFIG_SCHEMA_VERSION,
   type P2PRole,
@@ -67,7 +68,7 @@ async function privateBytes(path: string, length: number) {
   if (
     !metadata.isFile() ||
     metadata.isSymbolicLink() ||
-    (metadata.mode & P2P.permissionMask) !== FILE_MODES.privateFile ||
+    (metadata.mode & FILE_MODES.permissionMask) !== FILE_MODES.privateFile ||
     (process.getuid && metadata.uid !== process.getuid())
   )
     throw new Error('Role key permissions or owner are invalid.');
@@ -163,9 +164,7 @@ export async function roleSigner(role: keyof typeof P2P.keys) {
 }
 
 export async function nodeSecret() {
-  return [
-    ...(await privateBytes(file(P2P.nodeKeyFilename), P2P.nodeSecretBytes)),
-  ];
+  return [...(await privateBytes(file(P2P.nodeKeyFilename), NODE_KEY_BYTES))];
 }
 
 export async function setupRole(options: SetupOptions) {
@@ -270,7 +269,7 @@ export async function publicRole() {
   const keys = await Promise.all(
     names.map(async (name) => ({
       name,
-      mode: (await lstat(file(name))).mode & P2P.permissionMask,
+      mode: (await lstat(file(name))).mode & FILE_MODES.permissionMask,
     })),
   );
   const common = {

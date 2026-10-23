@@ -1,4 +1,7 @@
-// Payment journal states, facilitator call operations, channel guard messages and diagnostic codes.
+// Payment journal states, facilitator call operations, channel guard messages, diagnostic codes and the
+// buyer-lock metadata bound.
+export const LOCK_METADATA_BYTES = 4096;
+
 export const JOURNAL_STATES = {
   AUTHORIZATION_CREATED: 'authorization-created',
   RECONCILED: 'reconciled',

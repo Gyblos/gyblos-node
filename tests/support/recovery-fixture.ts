@@ -14,7 +14,7 @@ import {
   MAX_ATOMIC,
   P2P,
 } from '@gyblos/config';
-import { PRICES } from '@gyblos/core/constants';
+import { OFFER_LIFETIME_MS, PRICES } from '@gyblos/core/constants';
 import type { OfferTrust } from '@gyblos/core/offers';
 import { ROLE_CONFIG_SCHEMA_VERSION } from '@gyblos/node/constants';
 import { signInferenceOffer } from '@gyblos/node/offers';
@@ -55,7 +55,7 @@ export async function recoveryFixture(fullRefund = true) {
     authorizer: identities.authorizer,
     buyer: identities.buyer,
     issuedAt: 1,
-    expiresAt: 1 + P2P.offerLifetimeMs,
+    expiresAt: 1 + OFFER_LIFETIME_MS,
     prices: PRICES,
     maxAtomic: MAX_ATOMIC,
     maxTokens: INFERENCE_REQUEST_LIMITS.maxOutputTokens,

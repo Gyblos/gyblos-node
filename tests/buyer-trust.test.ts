@@ -53,7 +53,7 @@ void test(
       await main(args(trust));
       assert.deepEqual(await loadJson(path), trust);
       assert.equal(
-        (await lstat(path)).mode & P2P.permissionMask,
+        (await lstat(path)).mode & FILE_MODES.permissionMask,
         FILE_MODES.privateFile,
       );
       const before = await readFile(path, 'utf8');

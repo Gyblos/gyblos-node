@@ -9,10 +9,10 @@ import test from 'node:test';
 import {
   HTTP_STATUS,
   LOCALHOST,
-  P2P,
   ROUTES,
   TRANSPORT_LIMITS,
 } from '@gyblos/config';
+import { NODE_KEY_BYTES } from '@gyblos/node/constants';
 import { createIrohTransport } from '@gyblos/transport-iroh/iroh-client';
 import { serveIroh } from '@gyblos/transport-iroh/iroh-server';
 
@@ -144,7 +144,7 @@ void test(
   { ...NATIVE_TEST_OPTIONS, timeout: 20000 },
   async () => {
     const lab = await fixture();
-    const secret = [...randomBytes(P2P.nodeSecretBytes)];
+    const secret = [...randomBytes(NODE_KEY_BYTES)];
     try {
       const first = await lab.transport(secret);
       const identity = lab.nodeId(first);

@@ -36,6 +36,7 @@ import {
 import {
   CALL_OUTCOMES,
   CALL_PHASES,
+  MINIMUM_REQUESTS,
   P2P_JOURNAL_STATES,
   type CallPhase,
 } from './constants.js';
@@ -68,7 +69,7 @@ async function prepareCall() {
   await assertProgram(config.rpcUrl);
   await assertPriorCallResolved(rolePath(P2P.journalFilename));
   const index = Number(process.argv[2]);
-  if (!Number.isInteger(index) || index < 0 || index >= P2P.minimumRequests)
+  if (!Number.isInteger(index) || index < 0 || index >= MINIMUM_REQUESTS)
     throw new Error('Select a synthetic case index.');
   const testCase = createCases(randomUUID(), randomUUID())[index]!;
   const request = {

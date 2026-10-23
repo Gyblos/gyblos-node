@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import test from 'node:test';
 
-import { P2P, TRANSPORT_LIMITS } from '@gyblos/config';
+import { TRANSPORT_LIMITS } from '@gyblos/config';
+import { NODE_KEY_BYTES } from '@gyblos/node/constants';
 import { HTTP_OVER_IROH } from '@gyblos/transport-iroh/constants';
 import { encodeRequest } from '@gyblos/transport-iroh/wire';
 
@@ -163,7 +164,7 @@ void test(
     try {
       const first = await lab.transport();
       const second = await lab.transport();
-      const secret = [...randomBytes(P2P.nodeSecretBytes)];
+      const secret = [...randomBytes(NODE_KEY_BYTES)];
       const duplicates: Awaited<ReturnType<typeof lab.client>>[] = [];
       for (let index = 0; index < TRANSPORT_LIMITS.maxConnections; index++) {
         try {

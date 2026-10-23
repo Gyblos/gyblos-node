@@ -1,9 +1,6 @@
-// Remaining peer-to-peer values and file names for the Iroh buyer/seller roles under .local/p2p.
-// Transport limits live in transport.ts and @gyblos/transport-iroh; ports in hosts.ts.
+// File names for the Iroh buyer/seller roles under .local/p2p. Limits, ports and policy values
+// live with their owners (transport.ts, hosts.ts, core, payments-x402, node and buyer constants).
 export const P2P = {
-  offerLifetimeMs: 4 * 60_000,
-  minimumRequests: 3,
-  maxChannelSignatures: 10,
   root: '.local/p2p',
   roleConfig: 'role.json',
   trustFilename: 'trust.json',
@@ -14,13 +11,10 @@ export const P2P = {
   buyerLockFilename: 'buyer.lock',
   recoveryLockFilename: 'recovery.lock',
   staleLockJournalFilename: 'stale-locks.jsonl',
-  lockMetadataBytes: 4096,
   journalFilename: 'authorization.json',
   reconciliationsFilename: 'reconciliations.json',
   callsFilename: 'calls.json',
   offerFilename: 'offer.json',
-  permissionMask: 0o777,
-  nodeSecretBytes: 32,
   nodeKeyFilename: 'node.key',
   keys: {
     buyer: 'buyer.json',

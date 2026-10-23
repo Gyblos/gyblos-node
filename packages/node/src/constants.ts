@@ -28,6 +28,8 @@ export type NodeErrorCode =
 
 export const P2P_ROLES = { BUYER: 'buyer', SELLER: 'seller' } as const;
 export type P2PRole = (typeof P2P_ROLES)[keyof typeof P2P_ROLES];
+// Iroh secret key length stored in a role's node.key.
+export const NODE_KEY_BYTES = 32;
 export const NODE_CONFIGURATION_LIMITS = {
   stringCharacters: 2048,
   nodeIdHexCharacters: 64,

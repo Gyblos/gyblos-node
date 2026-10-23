@@ -1,9 +1,21 @@
-// Pins the values moved out of the P2P config object so a split by owner cannot change a wire,
-// limit or port. Expected values are independent literals on purpose.
+// Pins the values moved out of the former P2P config object so a split by owner cannot change a wire,
+// limit, port or policy value. Expected values are independent literals on purpose.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { PORTS, TRANSPORT_LIMITS, TRANSPORT_TIMEOUTS } from '@gyblos/config';
+import {
+  MAX_CHANNEL_SIGNATURES,
+  MINIMUM_REQUESTS,
+} from '@gyblos/buyer/constants';
+import {
+  FILE_MODES,
+  PORTS,
+  TRANSPORT_LIMITS,
+  TRANSPORT_TIMEOUTS,
+} from '@gyblos/config';
+import { OFFER_LIFETIME_MS } from '@gyblos/core/constants';
+import { NODE_KEY_BYTES } from '@gyblos/node/constants';
+import { LOCK_METADATA_BYTES } from '@gyblos/payments-x402/constants';
 import {
   HTTP_OVER_IROH,
   IROH_DEADLINES,
@@ -45,4 +57,13 @@ void test('operator-tunable transport limits, timeouts and ports keep their valu
   assert.deepEqual(TRANSPORT_TIMEOUTS, { connectMs: 30000, requestMs: 180000 });
   assert.equal(PORTS.buyerProxy, 4031);
   assert.equal(PORTS.seller, 4032);
+});
+
+void test('offer, payment-evidence, lock and key values keep their owners and values', () => {
+  assert.equal(OFFER_LIFETIME_MS, 240000);
+  assert.equal(MINIMUM_REQUESTS, 3);
+  assert.equal(MAX_CHANNEL_SIGNATURES, 10);
+  assert.equal(LOCK_METADATA_BYTES, 4096);
+  assert.equal(NODE_KEY_BYTES, 32);
+  assert.equal(FILE_MODES.permissionMask, 0o777);
 });

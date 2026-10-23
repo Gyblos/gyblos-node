@@ -44,6 +44,7 @@ export const UNITS = {
 export const FILE_MODES = {
   privateFile: 0o600,
   privateDirectory: 0o700,
+  permissionMask: 0o777,
 } as const;
 
 export const KEY_LIMITS = {
