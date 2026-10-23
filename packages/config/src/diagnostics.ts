@@ -1,4 +1,4 @@
-// Owns diagnostics in config; it must not know product workflows or lab orchestration.
+// Thresholds and OS paths for memory diagnostics, plus private diagnostic-log size and rotation limits.
 import { LOCAL_DIR } from './paths.js';
 
 export const DIAGNOSTICS = {

@@ -1,4 +1,4 @@
-// Owns the existing operator wallet roles and configuration-file contract.
+// Owns the operator wallet roles and the devnet configuration-file contract.
 // Evidence, payment policy and lab orchestration do not belong here.
 export const WALLET_ROLES = {
   BUYER: 'buyer',

@@ -1,4 +1,5 @@
-// Owns admission in transport-iroh; it must not know wallets or inference engines.
+// Connection admission for the Iroh server: source keys per IP or relay endpoint and caps on pending,
+// per-source and per-peer connections.
 import { isIP } from 'node:net';
 
 import type { IncomingAddr } from '@number0/iroh';

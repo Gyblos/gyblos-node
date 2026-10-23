@@ -1,4 +1,5 @@
-// Owns inference deposit in payments-x402; it must not know inference engines or lab orchestration.
+// Seller-side admission check that the requested channel holds a valid escrow deposit for this buyer,
+// reading only that one account. Read-only.
 import { findAssociatedTokenPda } from '@solana-program/token';
 import { address, getBase64Encoder } from '@solana/kit';
 import { CHANNEL_ACCOUNT_SIZE, discoverChannelsByRentPayer } from '@x402/svm';
@@ -57,7 +58,7 @@ export async function verifyInferenceDeposit(
           'getAccountInfo',
           [expected.channelId, { commitment: COMMITMENT, encoding: 'base64' }],
         );
-        // Preserve the exact size boundary previously enforced by the RPC scan.
+        // Enforce the exact channel account size, as a program-account scan would.
         if (
           value &&
           (value.data[1] !== 'base64' ||

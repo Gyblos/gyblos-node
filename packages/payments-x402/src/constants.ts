@@ -1,4 +1,4 @@
-// Owns constants in payments-x402; it must not know inference engines or lab orchestration.
+// Payment journal states, public facilitator call outcomes, channel guard messages and diagnostic codes.
 export const JOURNAL_STATES = {
   AUTHORIZATION_CREATED: 'authorization-created',
   RECONCILED: 'reconciled',

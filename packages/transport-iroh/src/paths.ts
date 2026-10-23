@@ -1,4 +1,4 @@
-// Owns paths in transport-iroh; it must not know wallets or inference engines.
+// Classifies a connection's selected path as direct, relay or unknown.
 import type { Connection } from '@number0/iroh';
 
 import { TRANSPORT_ROUTES } from './constants.js';

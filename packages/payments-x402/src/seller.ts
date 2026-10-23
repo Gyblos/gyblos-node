@@ -1,4 +1,4 @@
-// Owns seller in payments-x402; it must not know inference engines or lab orchestration.
+// Fixed-price x402 "upto" gate seller on loopback: authorizes MAX_ATOMIC and settles the fixed ACTUAL_ATOMIC.
 import type { KeyPairSigner } from '@solana/kit';
 import { HTTPFacilitatorClient } from '@x402/core/server';
 import {

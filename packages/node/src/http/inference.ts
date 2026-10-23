@@ -1,4 +1,5 @@
-// Owns inference in node; it must not know lab orchestration or CLI processes.
+// Loopback x402 "upto" inference seller: parses bounded requests, authorizes a ceiling, generates only after
+// the escrow deposit is confirmed, recounts usage and bills it; failures settle zero.
 import type { KeyPairSigner } from '@solana/kit';
 import {
   decodePaymentSignatureHeader,

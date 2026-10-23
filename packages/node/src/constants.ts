@@ -1,8 +1,7 @@
-// Owns constants in node; it must not know lab orchestration or CLI processes.
+// Node measurement schema version, error diagnostic codes, synthetic inference case names and lifecycle
+// states. Values only; no wallet, network or process actions.
 import type { GateErrorCode } from '@gyblos/payments-x402/constants';
 
-// Owns existing bounded call examples and node lifecycle states.
-// It performs no wallet, network or process actions.
 export const MEASUREMENT_SCHEMA_VERSION = 1;
 
 export const ERROR_DIAGNOSTICS = {

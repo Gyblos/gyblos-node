@@ -1,4 +1,5 @@
-// Owns proof in buyer; it must not know laboratory orchestration.
+// Proves one inference payment on chain: finds the deposit for the confirmed claim, checks that charge
+// plus refund equals the ceiling and that buyer/seller balances moved by exactly the charge.
 import assert from 'node:assert/strict';
 import { setTimeout as delay } from 'node:timers/promises';
 

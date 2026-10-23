@@ -1,4 +1,4 @@
-// Owns reconciliation in buyer; it must not know laboratory orchestration.
+// Verifies that an uncertain call ended in a finalized zero-charge reconciliation on chain.
 import assert from 'node:assert/strict';
 
 import {

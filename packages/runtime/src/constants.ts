@@ -1,4 +1,4 @@
-// Owns constants in runtime; it must not know product workflows or lab orchestration.
+// Private diagnostic log states, error codes and the degraded-logging warning.
 export const UNKNOWN_ERROR_NAME = 'UnknownError';
 
 export const PRIVATE_LOG_STATES = {

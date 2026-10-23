@@ -1,4 +1,4 @@
-// Owns signature hint in payments-x402; it must not know inference engines or lab orchestration.
+// Extracts an optional transaction signature hint from untrusted values; returns undefined when invalid.
 import { isSignature, type Signature } from '@solana/kit';
 
 export function signatureHint(value: unknown): Signature | undefined {

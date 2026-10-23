@@ -1,4 +1,5 @@
-// Owns private log file in runtime; it must not know product workflows or lab orchestration.
+// Opens one slot of the private diagnostic journal pool: safe directory and file checks, exclusive
+// slot reservation and reclamation when the pool is full. Never repairs or unlinks a failed journal.
 import { constants, type Stats } from 'node:fs';
 import { lstat, mkdir, open, readdir, type FileHandle } from 'node:fs/promises';
 import { join, parse, resolve, sep } from 'node:path';

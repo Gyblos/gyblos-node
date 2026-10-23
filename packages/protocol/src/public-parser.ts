@@ -1,5 +1,5 @@
 // Parses public catalog/presence/withdrawal JSON into detached, allowlisted values.
-// Rejects private endpoint/engine fields; it does not parse the existing paid offer.
+// Rejects private endpoint/engine fields; it does not parse the private paid offer.
 import { canonicalJson } from './canonical.js';
 import {
   DATA_RETENTION,

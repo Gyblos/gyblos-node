@@ -1,5 +1,5 @@
 // Validates bounded JSON primitives for public discovery contracts only.
-// Legacy canonicalization and private offers retain their existing acceptance rules.
+// Private offers keep the separate canonicalJson rules in canonical.ts.
 import {
   PUBLIC_RECORD_ERROR_CODES,
   PUBLIC_RECORD_LIMITS,

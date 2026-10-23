@@ -1,4 +1,5 @@
-// Owns chain in payments-x402; it must not know inference engines or lab orchestration.
+// Chain reads for payment accounting: RPC with 429 backoff for reads, inference confirmation, token
+// addresses, balance snapshots and parsed SPL transfers. Read-only; never sends transactions.
 import assert from 'node:assert/strict';
 
 import { findAssociatedTokenPda } from '@solana-program/token';

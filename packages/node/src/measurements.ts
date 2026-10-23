@@ -1,4 +1,5 @@
-// Owns measurements in node; it must not know lab orchestration or CLI processes.
+// Builds allowlisted measurement rows (with a salted response hash) and appends them to a private JSONL file.
+// Never copies responses, prompts or error text into a row.
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { link, mkdir, open, readFile, unlink } from 'node:fs/promises';
 

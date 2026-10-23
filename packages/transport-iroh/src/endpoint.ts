@@ -1,4 +1,5 @@
-// Owns endpoint in transport-iroh; it must not know wallets or inference engines.
+// Binds the native Iroh endpoint with the node key and configured relays; relay-only mode must leave
+// no external UDP socket.
 import { Endpoint } from '@number0/iroh';
 
 import { IPV6_LOOPBACK, LOCALHOST, P2P } from '@gyblos/config';

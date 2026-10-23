@@ -1,4 +1,4 @@
-// Owns model in engine-ollama; it must not know wallets or payments.
+// Renders a prompt with the exact single-user, no-tools branch of the pinned Qwen chat template.
 import { MODEL_LIMITS } from './constants.js';
 
 export { MODEL } from './constants.js';

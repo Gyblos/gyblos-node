@@ -1,5 +1,5 @@
 // Owns canonical shared protocol codes and engine completion reasons.
-// These values preserve existing wire strings and must not depend on SDKs.
+// These are wire strings: changing one breaks peers. No SDK dependencies.
 export const PROTOCOL_ERROR_CODES = {
   AMOUNT_MISMATCH: 'AMOUNT_MISMATCH',
   BAD_USAGE: 'BAD_USAGE',

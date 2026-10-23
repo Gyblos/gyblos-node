@@ -1,4 +1,4 @@
-// Owns constants in core; it must not know SDKs, engines or filesystem.
+// Inference prices, recount tolerance, offer id, exact-call price and the charge-anomaly and done-reason codes.
 import { ENGINE_DONE_REASONS } from '@gyblos/protocol/constants';
 
 export const PRICES = { inputAtomic: '1', outputAtomic: '2' } as const;

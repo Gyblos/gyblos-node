@@ -1,4 +1,5 @@
-// Owns private log reclaim in runtime; it must not know product workflows or lab orchestration.
+// Reclaims the oldest settled journal slot and stale quarantines, removing only private single-link
+// files owned by this uid that are not held open.
 import { randomUUID } from 'node:crypto';
 import { constants, type Stats } from 'node:fs';
 import { link, lstat, readdir, rename, unlink } from 'node:fs/promises';

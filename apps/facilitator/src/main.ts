@@ -1,4 +1,5 @@
-// Owns main in facilitator; it must not know laboratory orchestration.
+// Process entry for the devnet gate facilitator: serves x402 verify/settle on loopback with
+// in-memory storage, a private diagnostic log and periodic channel cleanup.
 import { once } from 'node:events';
 import type { Server } from 'node:http';
 

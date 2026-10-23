@@ -1,4 +1,5 @@
-// Owns recovery lock in payments-x402; it must not know inference engines or lab orchestration.
+// Recovery lock that may retire a dead buyer's lock after a durable audit, refusing swapped, linked or
+// foreign lock files; never retries or removes a live buyer's lock.
 import assert from 'node:assert/strict';
 import { constants } from 'node:fs';
 import { lstat, open, unlink, type FileHandle } from 'node:fs/promises';

@@ -1,4 +1,5 @@
-// Owns facilitator in payments-x402; it must not know inference engines or lab orchestration.
+// Local x402 "upto" facilitator on loopback: verifies and settles channels for one allowed buyer, mint and
+// payee with in-memory channel storage, and exposes settlement events. Never logs payloads or keys.
 import { errorMonitor } from 'node:events';
 
 import type { KeyPairSigner } from '@solana/kit';

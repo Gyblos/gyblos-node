@@ -1,4 +1,4 @@
-// Owns process in runtime; it must not know product workflows or lab orchestration.
+// Child-process helpers: spawn, stop with SIGKILL fallback, port-free and readiness polling, main checks.
 import {
   spawn,
   type ChildProcess,

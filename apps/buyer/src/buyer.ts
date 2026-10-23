@@ -1,4 +1,5 @@
-// Owns buyer in buyer; it must not know laboratory orchestration.
+// Starts the buyer: verifies the stored signed offer against local trust, plans relay-only or direct
+// dialing, binds the buyer's Iroh endpoint and opens the loopback proxy to the seller.
 import { readFile } from 'node:fs/promises';
 
 import { EndpointAddr, EndpointId } from '@number0/iroh';

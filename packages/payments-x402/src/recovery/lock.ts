@@ -1,4 +1,4 @@
-// Owns lock in payments-x402; it must not know inference engines or lab orchestration.
+// Exclusive buyer lock file: created with O_EXCL and private mode, removed only if it is still our inode.
 import { lstat, mkdir, open, unlink, type FileHandle } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
