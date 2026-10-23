@@ -1,11 +1,11 @@
 // Signs the additive public family with node keys; identity resolution and cache persistence stay outside.
 import {
   CONTROL_CODES,
-  CONTROL_DOMAINS,
   CONTROL_LIMITS,
   CONTROL_RECORD_VERSION,
   PUBLIC_RECORD_KINDS,
   PUBLIC_RECORD_LIMITS,
+  PUBLIC_V2_DOMAINS,
 } from './constants.js';
 import type {
   PublicCatalogV2,
@@ -47,7 +47,7 @@ export async function catalogDigestV2(value: unknown) {
     new Uint8Array(
       await crypto.subtle.digest(
         'SHA-256',
-        signingBytes(CONTROL_DOMAINS.catalog, catalog),
+        signingBytes(PUBLIC_V2_DOMAINS[PUBLIC_RECORD_KINDS.CATALOG], catalog),
       ),
     ),
   );
@@ -58,7 +58,7 @@ export async function signPublicV2(
 ): Promise<SignedPublicV2> {
   const record = parsePublicV2(value);
   validatePublicV2Time(record, record.issuedAt);
-  const signature = await sign(CONTROL_DOMAINS[record.kind], record, signer);
+  const signature = await sign(PUBLIC_V2_DOMAINS[record.kind], record, signer);
   if (signature.length !== CONTROL_LIMITS.signatureBytes)
     return controlFail(CONTROL_CODES.SIGNATURE);
   return { record, signature: bytesHex(signature) };
@@ -103,7 +103,7 @@ export async function verifyPublicV2(
   );
   if (
     !(await verify(
-      CONTROL_DOMAINS[record.kind],
+      PUBLIC_V2_DOMAINS[record.kind],
       record,
       hexBytes(record.nodeId),
       signature,

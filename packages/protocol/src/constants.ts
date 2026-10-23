@@ -164,10 +164,12 @@ export type ControlCode = (typeof CONTROL_CODES)[keyof typeof CONTROL_CODES];
 export const CONTROL_DOMAINS = {
   REQUEST: 'gyblos/control-request/v1\n',
   OFFER: 'gyblos/signed-inference-offer/v2\n',
-  catalog: 'gyblos/catalog/v2\n',
-  presence: 'gyblos/presence/v2\n',
-  withdrawal: 'gyblos/withdrawal/v2\n',
 } as const;
+export const PUBLIC_V2_DOMAINS = {
+  [PUBLIC_RECORD_KINDS.CATALOG]: 'gyblos/catalog/v2\n',
+  [PUBLIC_RECORD_KINDS.PRESENCE]: 'gyblos/presence/v2\n',
+  [PUBLIC_RECORD_KINDS.WITHDRAWAL]: 'gyblos/withdrawal/v2\n',
+} as const satisfies Record<PublicRecordKind, string>;
 export const CONTROL_LIMITS = {
   maxDirectAddresses: 16,
   requestBytes: 8192,

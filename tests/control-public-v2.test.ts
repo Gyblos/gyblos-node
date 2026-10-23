@@ -4,10 +4,10 @@ import test from 'node:test';
 
 import {
   CONTROL_CODES,
-  CONTROL_DOMAINS,
   CONTROL_RECORD_VERSION,
   PUBLIC_PRESENCE_STATE,
   PUBLIC_RECORD_KINDS,
+  PUBLIC_V2_DOMAINS,
   REASONING_LEVELS,
 } from '@gyblos/protocol/constants';
 import type {
@@ -141,5 +141,8 @@ void test('public v2 rejects duplicate models, invalid reasoning and private or 
       code: CONTROL_CODES.INVALID,
     });
   assert.equal(fixture.catalog.schemaVersion, CONTROL_RECORD_VERSION);
-  assert.equal(CONTROL_DOMAINS.catalog.endsWith('\n'), true);
+  assert.equal(
+    PUBLIC_V2_DOMAINS[PUBLIC_RECORD_KINDS.CATALOG].endsWith('\n'),
+    true,
+  );
 });

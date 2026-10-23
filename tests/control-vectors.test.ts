@@ -10,6 +10,7 @@ import {
   CONTROL_METHODS,
   CONTROL_VERSION,
   PUBLIC_RECORD_KINDS,
+  PUBLIC_V2_DOMAINS,
 } from '@gyblos/protocol/constants';
 import {
   ControlFrameReader,
@@ -110,7 +111,7 @@ void test('control v2 public family and owner offer signatures verify with WebCr
     assert.equal(
       opensslVerify(
         null,
-        signingBytes(CONTROL_DOMAINS[parsed.kind], parsed),
+        signingBytes(PUBLIC_V2_DOMAINS[parsed.kind], parsed),
         key,
         Buffer.from(envelope.signature, 'hex'),
       ),
