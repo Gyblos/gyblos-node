@@ -28,6 +28,7 @@
     "p2p:docker": "node --import tsx lab/p2p/src/docker-main.ts",
     "p2p:diagnose": "node --import tsx lab/tools/nat-regression.ts",
     "p2p:reconcile": "node --import tsx apps/buyer/src/reconcile.ts",
+    "identity:devnet-run": "node --import tsx lab/tools/identity-devnet-run.ts",
     "boundaries": "node --import tsx tooling/check-boundaries.ts",
     "boundaries:test": "node --import tsx --test tooling/boundaries/*.test.ts",
     "node:start": "node --import tsx apps/node/src/main.ts",
@@ -55,7 +56,8 @@
     "@gyblos/node": "workspace:*",
     "@gyblos/buyer": "workspace:*",
     "@gyblos/node-app": "workspace:*",
-    "@gyblos/facilitator": "workspace:*"
+    "@gyblos/facilitator": "workspace:*",
+    "@gyblos/identity": "workspace:*"
   },
   "devDependencies": {
     "@ianvs/prettier-plugin-sort-imports": "4.7.0",

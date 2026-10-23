@@ -12,3 +12,5 @@ export * from './limits.js';
 export * from './p2p.js';
 
 export * from './diagnostics.js';
+
+export * from './identity.js';
