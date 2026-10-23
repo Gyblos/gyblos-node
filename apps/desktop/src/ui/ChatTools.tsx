@@ -34,8 +34,8 @@ export function ToolConnections({
     <section className="tool-connections">
       <SectionTitle trailing={<Badge>Preview</Badge>}>Web tools</SectionTitle>
       <p className="connections-description">
-        Search, read and browse with your Gyblos agents. Separate from inference
-        applications.
+        Enable optional web tools for simulated Chat responses. Separate from
+        inference applications.
       </p>
       <List label="Web tool connections">
         {TOOLS.map((tool) => {
