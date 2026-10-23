@@ -1,0 +1,32 @@
+{
+  "name": "@gyblos/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/main.cjs",
+  "exports": {
+    "./probe-model": "./src/probe-model.ts"
+  },
+  "scripts": {
+    "build": "tsx scripts/build.ts",
+    "start": "electron dist/main.cjs",
+    "smoke": "electron dist/main.cjs --smoke",
+    "package": "tsx scripts/package.ts"
+  },
+  "dependencies": {
+    "@gyblos/node": "workspace:*",
+    "@gyblos/config": "workspace:*",
+    "@gyblos/protocol": "workspace:*",
+    "@number0/iroh": "1.1.0",
+    "react": "19.2.0",
+    "react-dom": "19.2.0"
+  },
+  "devDependencies": {
+    "electron": "45.0.0",
+    "@electron/packager": "20.3.0",
+    "esbuild": "0.28.2",
+    "vite": "6.4.2",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2"
+  }
+}

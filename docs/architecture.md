@@ -1,7 +1,7 @@
 # Architecture
 
-A pnpm workspace of small TypeScript packages, two apps and a lab. The wire
-format is specified in
+A pnpm workspace of small TypeScript packages, two product apps, a local desktop
+compatibility probe and a lab. The wire format is specified in
 [packages/protocol/SPEC.md](../packages/protocol/SPEC.md). Technology choices
 are in [stack.md](stack.md).
 
@@ -33,6 +33,10 @@ and `lab/evidence` the published reports. `lab/harness`, `lab/facilitator` and
 historical record of past runs, and the archived Docker/NAT lab lives only at
 tag `archive/poc-lab-2026-10`. `tests/` and `tooling/` verify everything and may
 import any layer.
+
+The experimental `apps/desktop` hosts a sandboxed Electron view and a
+loopback-only Iroh utility probe, reusing the node lifecycle. It does not start
+the buyer or seller app; see [desktop-probe.md](desktop-probe.md).
 
 ## Where `@gyblos/*` comes from
 

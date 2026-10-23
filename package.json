@@ -11,7 +11,7 @@
     "lint": "eslint . && prettier . --check && pnpm tooling:test && pnpm boundaries",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
-    "typecheck": "tsc --noEmit && tsc -p tsconfig.tests.json",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.tests.json && tsc -p apps/desktop/tsconfig.renderer.json",
     "test": "node --import tsx --test \"tests/*.test.ts\"",
     "test:lab": "node --import tsx --test \"tests/lab/**/*.test.ts\"",
     "test:all": "node --import tsx --test \"tests/**/*.test.ts\"",
@@ -38,7 +38,11 @@
     "buyer:setup": "node --import tsx apps/buyer/src/setup.ts",
     "node:setup": "node --import tsx apps/node/src/setup.ts",
     "check": "pnpm typecheck && pnpm lint && pnpm test:all",
-    "buyer:trust": "node --import tsx apps/buyer/src/trust.ts"
+    "buyer:trust": "node --import tsx apps/buyer/src/trust.ts",
+    "desktop:build": "pnpm --filter @gyblos/desktop build",
+    "desktop:start": "pnpm desktop:build && pnpm --filter @gyblos/desktop start",
+    "desktop:smoke": "pnpm desktop:build && pnpm --filter @gyblos/desktop smoke",
+    "desktop:package": "pnpm desktop:build && pnpm --filter @gyblos/desktop package"
   },
   "dependencies": {
     "@gyblos/core": "workspace:*",
@@ -59,7 +63,8 @@
     "@gyblos/buyer": "workspace:*",
     "@gyblos/node-app": "workspace:*",
     "@gyblos/lab-facilitator": "workspace:*",
-    "@gyblos/identity": "workspace:*"
+    "@gyblos/identity": "workspace:*",
+    "@gyblos/desktop": "workspace:*"
   },
   "devDependencies": {
     "@ianvs/prettier-plugin-sort-imports": "4.7.0",

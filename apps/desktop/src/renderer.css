@@ -1,0 +1,160 @@
+/* Compact shell extracted from the approved mockup; one geometry/spacing scale. */
+:root {
+  font-family: Arial, sans-serif;
+  font-size: 12px;
+  --panel-radius: 16px;
+  --control-radius: 10px;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+button,
+textarea {
+  font: inherit;
+}
+button {
+  border: 0;
+  cursor: pointer;
+  color: var(--ink);
+  background: var(--raised);
+  border-radius: var(--control-radius);
+  min-width: 28px;
+  height: 28px;
+}
+button:focus-visible {
+  outline: 2px solid var(--focus);
+}
+button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.desktop-probe {
+  height: 100dvh;
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  grid-template-rows: 1fr 30px;
+  background: var(--bg);
+  color: var(--ink);
+}
+aside {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+.modes {
+  display: flex;
+  gap: 4px;
+}
+.sidebar-bottom {
+  margin-top: auto;
+}
+main {
+  min-width: 0;
+  min-height: 0;
+  padding: 0 16px 12px;
+  display: flex;
+  flex-direction: column;
+}
+header {
+  height: 48px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.badge {
+  background: var(--soft);
+  color: var(--blue);
+  padding: 4px 8px;
+  border-radius: 999px;
+}
+.chat-panel {
+  flex: 1;
+  overflow: auto;
+  background: var(--panel);
+  border-radius: var(--panel-radius);
+  display: grid;
+  place-items: safe center;
+  padding: 24px;
+}
+.welcome {
+  width: 100%;
+  max-width: 680px;
+  text-align: center;
+}
+.signature {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  color: var(--blue);
+}
+h1 {
+  font-size: 20px;
+  font-weight: 500;
+  margin: 16px 0 8px;
+}
+p {
+  color: var(--muted);
+  line-height: 1.6;
+}
+.probe-result {
+  padding: 12px;
+  margin: 24px 0;
+  border-radius: var(--panel-radius);
+  background: var(--raised);
+}
+.probe-result p {
+  margin: 4px 0 0;
+}
+.composer {
+  text-align: left;
+  background: var(--composer-surface);
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--panel-radius);
+}
+.composer textarea {
+  resize: none;
+  border: 0;
+  width: 100%;
+  min-height: 48px;
+  background: transparent;
+  color: var(--muted);
+}
+.composer > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+}
+.composer button {
+  border-radius: 50%;
+}
+footer {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 16px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 11px;
+}
+footer > :first-child {
+  color: var(--connected);
+}
+@media (max-width: 700px) {
+  .chat-panel {
+    padding: 16px;
+  }
+  footer > :nth-child(2) {
+    display: none;
+  }
+}

@@ -21,6 +21,12 @@ app ─▶ buyer proxy ══ Iroh (direct or na1 relay) ══▶ seller node �
         signs ceiling ─▶ Solana devnet channel ◀─ facilitator settles usage
 ```
 
+## Desktop compatibility probe
+
+An isolated macOS arm64 Electron/Iroh experiment is available in `apps/desktop`.
+It performs local synthetic checks only; Chat, Connect and payments stay
+disabled. See [running and packaging the probe](docs/desktop-probe.md).
+
 ## Status
 
 - **Paid on devnet:** three sequential inferences, VPS buyer to Mac seller over
