@@ -8,12 +8,14 @@ import { FILE_MODES, homeLayout, ROUTES, TIMEOUTS } from '@gyblos/config';
 import { createOllama } from '@gyblos/engine-ollama';
 import { MODEL } from '@gyblos/engine-ollama/model';
 import { prepareModelTokenizer } from '@gyblos/node/artifacts';
+import { assertOllamaModelsHome } from '@gyblos/node/home';
 import { spawnChild, stopChild, waitReady } from '@gyblos/runtime';
 
 import { GATE_HOSTS, GATE_PORTS, GATE_RETRIES } from './constants.js';
 
 async function prepareGateArtifacts() {
   await prepareModelTokenizer();
+  await assertOllamaModelsHome();
   await mkdir(homeLayout(process.env).artifacts.ollamaModels, {
     recursive: true,
     mode: FILE_MODES.privateDirectory,

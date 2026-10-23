@@ -1,9 +1,10 @@
 // Exercises the lab setup entry using synthetic downloads; no engine or network is started.
 import assert from 'node:assert/strict';
-import { readdir, readFile, rm } from 'node:fs/promises';
+import { lstat, readdir, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import test from 'node:test';
 
+import { LEGACY_LOCAL_PATHS } from '@gyblos/config';
 import { NODE_ERROR_CODES } from '@gyblos/node/constants';
 
 import {
@@ -140,6 +141,29 @@ void test('lab setup prepares valid artifacts before probing the local engine', 
     assert.deepEqual(
       (await readdir(join(directory, artifactLayout().tokenizer))).sort(),
       ['tokenizer.json', 'tokenizer_config.json'],
+    );
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+void test('lab setup refuses a legacy Ollama model cache before creating the new one', async () => {
+  const { directory, result } = await preparation(
+    false,
+    true,
+    undefined,
+    true,
+    [LEGACY_LOCAL_PATHS.ollamaModels],
+  );
+  try {
+    assert.notEqual(result.status, 0);
+    assert.match(
+      result.stderr,
+      new RegExp(NODE_ERROR_CODES.LEGACY_LOCAL_LAYOUT),
+    );
+    await assert.rejects(
+      lstat(join(directory, artifactLayout().ollamaModels)),
+      { code: 'ENOENT' },
     );
   } finally {
     await rm(directory, { recursive: true, force: true });

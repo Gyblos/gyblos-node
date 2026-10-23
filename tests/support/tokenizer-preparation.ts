@@ -18,8 +18,11 @@ export async function preparation(
   seed = false,
   failure: 'oversize' | 'write' | undefined = undefined,
   lab = false,
+  legacyDirectories: readonly string[] = [],
 ) {
   const directory = await mkdtemp(join(tmpdir(), 'gyblos-buyer-setup-'));
+  for (const legacy of legacyDirectories)
+    await mkdir(join(directory, legacy), { recursive: true });
   const artifacts = {
     tokenizer: 'synthetic tokenizer',
     config: 'synthetic config',
