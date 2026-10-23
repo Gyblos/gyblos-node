@@ -10,7 +10,7 @@ import type { EngineWireUsage } from '@gyblos/protocol/wire-usage';
 import { GENERATION, MODEL_LIMITS } from './constants.js';
 import { MODEL, renderChat } from './model.js';
 
-interface InferenceResult {
+export interface InferenceResult {
   text: string;
   usage: EngineWireUsage;
   done: true;

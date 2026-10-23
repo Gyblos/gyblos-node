@@ -10,7 +10,7 @@ import {
   type RelayConfigurationCode,
 } from './constants.js';
 
-interface RelayEnvironment extends NodeJS.ProcessEnv {
+export interface RelayEnvironment extends NodeJS.ProcessEnv {
   GYBLOS_RELAYS?: string;
   GYBLOS_RELAY_TOKEN?: string;
 }

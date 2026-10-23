@@ -50,7 +50,7 @@ export interface OfferTrust {
   maxAtomic: string;
 }
 
-type OfferAddressValidator = (value: string) => unknown;
+export type OfferAddressValidator = (value: string) => unknown;
 
 function validOffer(
   offer: InferenceOffer,

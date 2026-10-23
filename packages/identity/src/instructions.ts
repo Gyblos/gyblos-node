@@ -38,7 +38,7 @@ import type { DetachedSigner } from './signers.js';
 
 type AccountMetaWithSigner = AccountMeta | AccountSignerMeta;
 
-type RegistryInstruction = Instruction<
+export type RegistryInstruction = Instruction<
   string,
   readonly AccountMetaWithSigner[]
 >;
