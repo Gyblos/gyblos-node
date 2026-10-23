@@ -1,45 +1,18 @@
 // Buyer-side trust policy for signed inference offers: identity, lifetime, budget, prices, model bounds,
-// capabilities and wallet separation. Signature checks live in the node's offer adapter.
+// capabilities and wallet separation. Wire shape is protocol's; signature checks live in the node adapter.
 import {
   DEVNET,
   INFERENCE_REQUEST_LIMITS,
   MAX_ATOMIC,
   P2P,
 } from '@gyblos/config';
-import {
-  type EngineCapabilities,
-  type EngineDescription,
-} from '@gyblos/protocol/engine';
+import { GYBLOS_ALPN, OFFER_SCHEMA_VERSION } from '@gyblos/protocol/constants';
+import type {
+  InferenceOffer,
+  SignedInferenceOffer,
+} from '@gyblos/protocol/offer';
 
 import { PRICES } from './constants.js';
-
-export interface InferenceOffer {
-  schemaVersion: number;
-  protocol: string;
-  owner: string;
-  nodeId: string;
-  endpoint: { relayUrl: string | null; directAddresses: string[] };
-  relayOnly: boolean;
-  network: string;
-  mint: string;
-  payTo: string;
-  feePayer: string;
-  authorizer: string;
-  buyer: string;
-  issuedAt: number;
-  expiresAt: number;
-  prices: { inputAtomic: string; outputAtomic: string };
-  maxAtomic: string;
-  maxTokens: number;
-  model: EngineDescription;
-  capabilities: EngineCapabilities;
-  meteringMode: 'recounted' | 'declared';
-}
-
-export interface SignedInferenceOffer {
-  offer: InferenceOffer;
-  signature: string;
-}
 
 export interface OfferTrust {
   owner: string;
@@ -59,8 +32,8 @@ function validOffer(
   validateAddress: OfferAddressValidator,
 ) {
   if (
-    offer.schemaVersion !== P2P.schemaVersion ||
-    offer.protocol !== P2P.protocol ||
+    offer.schemaVersion !== OFFER_SCHEMA_VERSION ||
+    offer.protocol !== GYBLOS_ALPN ||
     offer.owner !== trust.owner ||
     offer.nodeId !== trust.nodeId ||
     offer.network !== DEVNET ||

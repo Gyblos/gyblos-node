@@ -9,6 +9,7 @@
     "./engine": "./src/engine.ts",
     "./errors": "./src/errors.ts",
     "./models": "./src/models.ts",
+    "./offer": "./src/offer.ts",
     "./package.json": "./package.json",
     "./public-records": "./src/public-records.ts",
     "./public-types": "./src/public-types.ts",

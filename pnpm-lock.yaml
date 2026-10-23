@@ -334,6 +334,9 @@ importers:
       '@gyblos/config':
         specifier: workspace:*
         version: link:../config
+      '@gyblos/protocol':
+        specifier: workspace:*
+        version: link:../protocol
       '@number0/iroh':
         specifier: 1.1.0
         version: 1.1.0

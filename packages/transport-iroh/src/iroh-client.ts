@@ -3,6 +3,7 @@
 import type { Connection, Endpoint, EndpointAddr } from '@number0/iroh';
 
 import { P2P } from '@gyblos/config';
+import { GYBLOS_ALPN } from '@gyblos/protocol/constants';
 
 import { TRANSPORT_ROUTES } from './constants.js';
 import { withDeadline } from './deadline.js';
@@ -31,7 +32,7 @@ export function createIrohTransport(
       connecting = (async () => {
         const start = performance.now();
         const result = await withDeadline(
-          endpoint.connect(remote, [...Buffer.from(P2P.protocol)]),
+          endpoint.connect(remote, [...Buffer.from(GYBLOS_ALPN)]),
           P2P.connectMs,
           () => {
             void endpoint.close();

@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",
+    "@gyblos/protocol": "workspace:*",
     "@number0/iroh": "1.1.0"
   }
 }

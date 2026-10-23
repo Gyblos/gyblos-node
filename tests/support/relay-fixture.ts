@@ -7,12 +7,10 @@ import { spawnSync } from 'node:child_process';
 import { generateKeyPairSigner } from '@solana/kit';
 
 import { P2P } from '@gyblos/config';
-import {
-  signInferenceOffer,
-  type OfferTrust,
-  type SignedInferenceOffer,
-} from '@gyblos/node/offers';
+import type { OfferTrust } from '@gyblos/core/offers';
+import { signInferenceOffer } from '@gyblos/node/offers';
 import type { RoleConfig } from '@gyblos/node/roles';
+import type { SignedInferenceOffer } from '@gyblos/protocol/offer';
 
 import { recoveryFixture } from './recovery-fixture.js';
 

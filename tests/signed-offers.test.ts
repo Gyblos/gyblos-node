@@ -12,11 +12,9 @@ import {
   MAX_ATOMIC,
   P2P,
 } from '@gyblos/config';
-import {
-  signInferenceOffer,
-  verifyInferenceOffer,
-  type InferenceOffer,
-} from '@gyblos/node/offers';
+import { signInferenceOffer, verifyInferenceOffer } from '@gyblos/node/offers';
+import { GYBLOS_ALPN, OFFER_SCHEMA_VERSION } from '@gyblos/protocol/constants';
+import type { InferenceOffer } from '@gyblos/protocol/offer';
 
 async function fixture() {
   const [owner, payout, buyer, feePayer, authorizer] = await Promise.all(
@@ -25,8 +23,8 @@ async function fixture() {
   assert.ok(owner && payout && buyer && feePayer && authorizer);
   const now = Date.now();
   const offer: InferenceOffer = {
-    schemaVersion: P2P.schemaVersion,
-    protocol: P2P.protocol,
+    schemaVersion: OFFER_SCHEMA_VERSION,
+    protocol: GYBLOS_ALPN,
     owner: owner.address,
     nodeId: 'synthetic-node-id',
     endpoint: { relayUrl: null, directAddresses: [] },

@@ -1,8 +1,5 @@
 // Peer-to-peer limits, timeouts and file names for the Iroh buyer/seller roles under .local/p2p.
 export const P2P = {
-  schemaVersion: 1,
-  protocol: 'gyblos/http/1',
-  offerDomain: 'gyblos/signed-inference-offer/v1\n',
   bodyBytes: 64 * 1024,
   headerBytes: 24 * 1024,
   responseBytes: 256 * 1024,
