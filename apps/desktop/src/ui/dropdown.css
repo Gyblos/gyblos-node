@@ -1,0 +1,59 @@
+/* Shared desktop select/menu surface: compact, anchored, and never a backdrop. */
+.compact-dropdown {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  padding: var(--overlay-inset);
+  border: 1px solid var(--subtle-line);
+  background: var(--raised);
+  color: var(--ink);
+  overflow: auto;
+  box-shadow: var(--overlay-shadow);
+  opacity: 0;
+  translate: 0 -8px;
+  transition:
+    opacity var(--motion-overlay) var(--motion-ease),
+    translate var(--motion-overlay) var(--motion-ease),
+    display var(--motion-overlay) allow-discrete,
+    overlay var(--motion-overlay) allow-discrete;
+}
+.compact-dropdown[data-direction='up'] {
+  translate: 0 8px;
+}
+.compact-dropdown:popover-open {
+  opacity: 1;
+  translate: 0 0;
+}
+@starting-style {
+  .compact-dropdown:popover-open {
+    opacity: 0;
+    translate: 0 -8px;
+  }
+  .compact-dropdown[data-direction='up']:popover-open {
+    translate: 0 8px;
+  }
+}
+.compact-dropdown::backdrop {
+  background: transparent;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .compact-dropdown {
+    transition: none;
+  }
+}
+
+.desktop-frame .compact-dropdown .dropdown-search {
+  margin: 0 0 var(--overlay-row-gap);
+}
+.dropdown-note {
+  margin: 0;
+  padding: 5px 7px;
+  font-size: 10px;
+  color: var(--muted);
+}
+.model-trigger-price {
+  font-size: 10px;
+  color: var(--blue);
+  white-space: nowrap;
+}

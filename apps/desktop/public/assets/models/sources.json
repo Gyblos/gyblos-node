@@ -1,0 +1,39 @@
+{
+  "retrieved": "2026-10-17",
+  "library": "https://github.com/lobehub/lobe-icons",
+  "purpose": "Model-family marks in the Gyblos desktop concept; not identity or model authenticity verification.",
+  "assets": [
+    {
+      "file": "qwen-color.svg",
+      "family": "Qwen",
+      "source": "https://raw.githubusercontent.com/lobehub/lobe-icons/8a1b2821bb768c484fe8da20c5e1838b6bf551a9/packages/static-svg/icons/qwen-color.svg",
+      "license": "MIT",
+      "retrieved": "2026-10-22",
+      "sha256": "77f5768c66d08ce1d3d14e73373975c1bc0454be88c81523ddd0ffd7e2974029",
+      "bytes": 2044
+    },
+    {
+      "file": "openai.svg",
+      "family": "OpenAI",
+      "source": "https://raw.githubusercontent.com/lobehub/lobe-icons/8a1b2821bb768c484fe8da20c5e1838b6bf551a9/packages/static-svg/icons/openai.svg",
+      "license": "MIT",
+      "retrieved": "2026-10-22",
+      "sha256": "a595df6b423920c67a7f8f73c063e4bfb72d415948097b6cac063a2366bb5186",
+      "bytes": 1687
+    },
+    {
+      "file": "meta-color.svg",
+      "family": "Llama / Meta",
+      "source": "https://raw.githubusercontent.com/lobehub/lobe-icons/8a1b2821bb768c484fe8da20c5e1838b6bf551a9/packages/static-svg/icons/meta-color.svg",
+      "license": "MIT",
+      "retrieved": "2026-10-22",
+      "sha256": "adf9f2c1a646ccd3a37ca8c2e7e5985d64630cd633f4b95fba393d1d44e0578c",
+      "bytes": 6022
+    }
+  ],
+  "lobe_icons_license": {
+    "file": "lobe-icons-LICENSE.txt",
+    "source": "https://raw.githubusercontent.com/lobehub/lobe-icons/8a1b2821bb768c484fe8da20c5e1838b6bf551a9/LICENSE"
+  },
+  "updated": "2026-10-22"
+}

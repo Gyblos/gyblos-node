@@ -1,135 +1,25 @@
-// Reuses the mockup's compact Chat/Connect shell and palette for a compatibility view.
-// Chat, gateway, wallets and network discovery remain disabled in this probe.
-import { useEffect, useState } from 'react';
+// Mounts either the simulated buyer UI or the existing isolated compatibility smoke.
+// The normal Chat/Connect flow never invokes the native probe or any product service.
 import { createRoot } from 'react-dom/client';
 
-import { PROBE_STATUS } from './constants.js';
-import {
-  failedProbe,
-  type ProbeResult,
-  type ProbeStatus,
-} from './probe-model.js';
-import { themeStyle } from './theme.js';
+import { CompatibilityView } from './compatibility-view.js';
+import { DesktopApp } from './desktop-app.js';
 
-import './renderer.css';
+import './mockup-base.css';
+import './ui/motion.css';
+import './ui/ui.css';
+import './ui/geometry.css';
+import './ui/chat.css';
+import './ui/signal.css';
+import './ui/dropdown.css';
+import './desktop-shell.css';
 
-declare global {
-  interface Window {
-    desktopProbe: { run(): Promise<ProbeResult> };
-  }
-}
-function App() {
-  const [light, setLight] = useState(false);
-  const [status, setStatus] = useState<ProbeStatus>(PROBE_STATUS.WAITING);
-  const [result, setResult] = useState<ProbeResult | null>(null);
-  useEffect(() => {
-    const apply = (value: ProbeResult) => {
-      setResult(value);
-      setStatus(value.status);
-    };
-    void window.desktopProbe
-      .run()
-      .then(apply)
-      .catch(() => apply(failedProbe()));
-  }, []);
-  return (
-    <div className="desktop-probe" style={themeStyle(light)}>
-      <aside>
-        <div className="modes">
-          <button
-            title="Chat preview"
-            aria-label="Chat preview"
-            aria-pressed="true"
-          >
-            ◯
-          </button>
-          <button
-            title="Connect is outside this probe"
-            aria-label="Connect is outside this probe"
-            disabled
-          >
-            ⌘
-          </button>
-        </div>
-        <span>Chat</span>
-        <div className="sidebar-bottom">
-          <button
-            onClick={() => setLight(!light)}
-            aria-label="Toggle light mode"
-          >
-            {light ? '☾' : '☀'}
-          </button>
-        </div>
-      </aside>
-      <main>
-        <header>
-          <span>Chat</span>
-          <span className="badge">Compatibility probe</span>
-        </header>
-        <ProbePanel status={status} result={result} light={light} />
-      </main>
-      <footer>
-        <span>
-          {status === PROBE_STATUS.PASSED
-            ? '● Local transport verified'
-            : '○ Local compatibility check'}
-        </span>
-        <span>No external network · No payments</span>
-        <span>Desktop probe</span>
-      </footer>
-    </div>
-  );
-}
-function ProbePanel({
-  status,
-  result,
-  light,
-}: {
-  status: ProbeStatus;
-  result: ProbeResult | null;
-  light: boolean;
-}) {
-  return (
-    <section className="chat-panel">
-      <div className="welcome">
-        <img
-          className="signature"
-          alt="Gyblos"
-          src={`./assets/gyblos-mark-solid-${light ? 'light' : 'dark'}.svg`}
-        />
-        <h1>Desktop foundation</h1>
-        <p>Electron + the Gyblos node lifecycle + native Iroh</p>
-        <div className="probe-result" role="status">
-          <strong>
-            {status === PROBE_STATUS.WAITING
-              ? 'Checking local transport…'
-              : status === PROBE_STATUS.PASSED
-                ? 'Local Iroh check passed'
-                : 'Local Iroh check failed'}
-          </strong>
-          <p>
-            {result?.closed
-              ? 'Two loopback round trips · two lifecycle cycles · endpoints closed'
-              : 'No relay, wallet or payment is started.'}
-          </p>
-        </div>
-        <div className="composer">
-          <textarea
-            disabled
-            placeholder="Chat stays simulated in this compatibility probe"
-            aria-label="Chat unavailable in compatibility probe"
-          />
-          <div>
-            <span>Model selection and Connect follow in separate work.</span>
-            <button disabled aria-label="Send unavailable">
-              ↑
-            </button>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
 const root = document.getElementById('root');
 if (!root) throw new Error('Missing desktop root.');
-createRoot(root).render(<App />);
+createRoot(root).render(
+  new URLSearchParams(window.location.search).get('probe') === '1' ? (
+    <CompatibilityView />
+  ) : (
+    <DesktopApp />
+  ),
+);

@@ -1,0 +1,276 @@
+@font-face {
+  font-family: Geist;
+  src: url('/assets/geist-400.ttf');
+}
+@font-face {
+  font-family: Geist;
+  src: url('/assets/geist-500.ttf');
+  font-weight: 500;
+}
+@font-face {
+  font-family: Geist;
+  src: url('/assets/geist-600.ttf');
+  font-weight: 600;
+}
+@font-face {
+  font-family: GeistMono;
+  src: url('/assets/JetBrainsMono-Regular.woff2');
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  font:
+    14px Geist,
+    Arial,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+button {
+  cursor: pointer;
+  color: inherit;
+  border: 0;
+  background: none;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: var(--accent) !important;
+}
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+svg {
+  flex-shrink: 0;
+}
+a {
+  color: inherit;
+  text-decoration: none;
+}
+.app {
+  display: flex;
+  height: 100dvh;
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--ink);
+  overflow: hidden;
+  color-scheme: dark;
+}
+.app.light {
+  color-scheme: light;
+}
+nav {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.connection {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.connection > svg {
+  margin-left: auto;
+}
+.content {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.content.chat-content {
+  display: flex;
+  overflow: hidden;
+}
+.chat-page {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.model-picker {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 12px;
+}
+.model-picker > svg {
+  color: var(--muted);
+}
+.wide {
+  width: 100%;
+}
+.full-input {
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--ink);
+  min-width: 0;
+  outline: 0;
+}
+.full-input {
+  width: 100%;
+  font-size: 15px;
+}
+.endpoint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  gap: 12px;
+}
+.endpoint code {
+  font-family: GeistMono, monospace;
+  font-size: 11px;
+  color: var(--muted);
+}
+@media (max-width: 700px) {
+  .connection > svg {
+    display: none;
+  }
+  .connection {
+    justify-content: center;
+  }
+  .endpoint code {
+    font-size: 10px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    scroll-behavior: auto !important;
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* Compact navigation keeps every destination available and named. */
+
+/* Compact app density: reduce space, preserve readable type and hit targets. */
+.model-picker {
+  padding: 5px 0;
+}
+/* Desktop application shell. Real window chrome belongs to the host platform. */
+.desktop-frame nav {
+  gap: 3px;
+}
+kbd {
+  font:
+    10px Geist,
+    Arial,
+    sans-serif;
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  padding: 1px 4px;
+  color: var(--dim);
+}
+.pane-empty-copy {
+  font-size: 11px;
+  line-height: 1.8;
+  color: var(--dim);
+  padding: 12px 0;
+}
+
+/* Keep resize affordances visible before hover. */
+/* Rounded surfaces: tonal separation carries hierarchy; borders stay quiet. */
+.desktop-frame kbd {
+  border-color: var(--subtle-line);
+  background: var(--bg);
+}
+.desktop-frame .chat-page {
+  height: auto;
+  overflow: hidden;
+  background: var(--editor);
+}
+.desktop-frame .model-picker {
+  padding: 5px 8px;
+}
+.desktop-frame .model-picker:hover {
+  background: var(--panel);
+}
+.desktop-frame .endpoint {
+  border-color: var(--subtle-line);
+  background: var(--editor);
+}
+.desktop-frame .full-input {
+  background: var(--editor);
+  border-color: var(--line);
+}
+
+/* Use a stronger focus color on light surfaces without changing the sky accent. */
+.desktop-frame :is(button, a, [role='separator']):focus-visible {
+  outline-color: var(--focus);
+}
+.desktop-frame.light :is(input, textarea, select):focus {
+  border-color: var(--focus) !important;
+}
+/* Compact navigation rail: icon above label, at a stable desktop hit size. */
+.desktop-frame .connection {
+  flex-direction: column;
+  gap: 6px;
+  justify-content: center;
+  padding: 9px 2px;
+  font-size: 9px;
+  line-height: 1.2;
+}
+.desktop-frame .connection:hover {
+  background: var(--side-elevated);
+}
+.desktop-frame .connection > svg {
+  display: block;
+  order: -1;
+  margin: 0;
+  width: 17px;
+  height: 17px;
+  color: var(--blue);
+}
+@media (max-width: 700px) {
+  .desktop-frame .model-picker {
+    font-size: 11px;
+    gap: 6px;
+    padding: 5px 4px;
+  }
+}
+
+/* Genuine model-family artwork, compact at every selection surface. */
+.model-artwork {
+  display: block;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  object-fit: contain;
+}
+.light .model-artwork.monochrome {
+  filter: brightness(0);
+}
+
+/* Labels retain breathing room even in narrow desktop windows. */

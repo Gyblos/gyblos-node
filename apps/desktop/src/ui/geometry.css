@@ -1,0 +1,58 @@
+/* Sole owner of corner tokens and role assignments. Component styles own layout only. */
+:root {
+  --radius-panel: 16px;
+  --radius-control: 10px;
+  --radius-option: 8px;
+  --radius-badge: 999px;
+  --radius-circle: 50%;
+}
+
+/* panel geometry, shared across every desktop surface. */
+.chat-user,
+.compact-dropdown,
+.compact-picker,
+.desktop-frame .chat-page,
+.desktop-frame .composer,
+.desktop-frame .session,
+.desktop-frame .ui-info-bar,
+.desktop-frame .ui-list,
+.desktop-frame .ui-stat,
+.message.user,
+.modal,
+.reply-text pre,
+.run-details,
+.slide-stage,
+.tool-request-preview,
+::view-transition-group(agent-output),
+::view-transition-group(workspace) {
+  border-radius: var(--radius-panel);
+}
+
+/* control geometry, shared across every desktop surface. */
+.desktop-frame .connection,
+.desktop-frame .model-picker,
+.desktop-frame .ui-avatar,
+.desktop-frame .ui-button,
+.desktop-frame .ui-search,
+.endpoint,
+.full-input,
+kbd {
+  border-radius: var(--radius-control);
+}
+
+/* option geometry, shared across every desktop surface. */
+.ui-tooltip,
+.desktop-frame .ui-row,
+.dropdown-row {
+  border-radius: var(--radius-option);
+}
+
+/* badge geometry, shared across every desktop surface. */
+.desktop-frame .ui-badge {
+  border-radius: var(--radius-badge);
+}
+
+/* circle geometry, shared across every desktop surface. */
+.desktop-frame .ui-composer-action {
+  border-radius: var(--radius-circle);
+}

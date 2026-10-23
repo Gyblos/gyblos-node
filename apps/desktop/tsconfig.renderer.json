@@ -3,10 +3,12 @@
   "compilerOptions": {
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"]
   },
   "include": [
-    "src/renderer.tsx",
+    "src/**/*.tsx",
+    "src/**/*.d.ts",
     "src/theme.ts",
     "src/constants.ts",
     "src/probe-model.ts"

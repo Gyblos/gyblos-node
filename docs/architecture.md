@@ -34,9 +34,10 @@ historical record of past runs, and the archived Docker/NAT lab lives only at
 tag `archive/poc-lab-2026-10`. `tests/` and `tooling/` verify everything and may
 import any layer.
 
-The experimental `apps/desktop` hosts a sandboxed Electron view and a
-loopback-only Iroh utility probe, reusing the node lifecycle. It does not start
-the buyer or seller app; see [desktop-probe.md](desktop-probe.md).
+The experimental `apps/desktop` hosts a simulated Chat/Connect renderer plus a
+separate sandboxed compatibility view and a loopback-only Iroh utility probe,
+reusing the node lifecycle. It does not start the buyer or seller app; see
+[desktop-probe.md](desktop-probe.md).
 
 ## Where `@gyblos/*` comes from
 

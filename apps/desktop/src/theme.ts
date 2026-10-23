@@ -1,5 +1,5 @@
 // Uses the landing's canonical colors, organized for compact desktop surfaces.
-// Extracted from the approved isolated mockup; no runtime or service dependency.
+// Reference: gyblos/web/src/index.css and gyblos-brain/50 Brand/gyblos-brand-tokens.json.
 import type { CSSProperties } from 'react';
 
 export const BRAND_COLORS = {

@@ -1,4 +1,4 @@
-// Runs the isolated desktop compatibility window, not a buyer or seller daemon.
+// Runs the simulated desktop preview and its separate compatibility smoke, not a daemon.
 // Only bundled assets and one read-only loopback probe are reachable from the UI.
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -84,7 +84,9 @@ async function main() {
     controller.abort();
     app.quit();
   });
-  await window.loadFile(join(__dirname, 'renderer', 'index.html'));
+  await window.loadFile(join(__dirname, 'renderer', 'index.html'), {
+    query: smoke ? { probe: '1' } : {},
+  });
 }
 void main().catch(() => {
   process.stderr.write('Desktop probe startup failed.\n');

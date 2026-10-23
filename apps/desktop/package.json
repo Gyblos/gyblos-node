@@ -6,7 +6,9 @@
   "main": "dist/main.cjs",
   "exports": {
     "./probe-model": "./src/probe-model.ts",
-    "./probe-session": "./src/probe-session.ts"
+    "./probe-session": "./src/probe-session.ts",
+    "./chat-state": "./src/ui/chat-state.ts",
+    "./connection-state": "./src/ui/connection-state.ts"
   },
   "scripts": {
     "build": "tsx scripts/build.ts",
@@ -20,7 +22,8 @@
     "@gyblos/protocol": "workspace:*",
     "@number0/iroh": "1.1.0",
     "react": "19.2.0",
-    "react-dom": "19.2.0"
+    "react-dom": "19.2.0",
+    "@phosphor-icons/react": "2.1.10"
   },
   "devDependencies": {
     "electron": "45.0.0",

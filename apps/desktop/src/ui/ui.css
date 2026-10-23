@@ -1,0 +1,721 @@
+/* One compact desktop scale, shared by UI.tsx across routes and dialogs. */
+.desktop-frame {
+  --control-size: 28px;
+  --control-icon: 16px;
+  --row-size: 48px;
+  --avatar-size: 28px;
+  --ui-font: 12px;
+  --ui-detail: 11px;
+  --page-gutter: 16px;
+  --page-top: 2px;
+  --section-gap: 12px;
+}
+.desktop-frame .ui-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: var(--control-size);
+  min-height: var(--control-size);
+  padding: 0 8px;
+  border: 1px solid transparent;
+  font-size: var(--ui-font);
+  font-weight: 450;
+  line-height: 16px;
+  white-space: nowrap;
+  color: var(--muted);
+  background: transparent;
+  flex-shrink: 0;
+}
+.desktop-frame .ui-button > svg {
+  width: var(--control-icon);
+  height: var(--control-icon);
+  flex-shrink: 0;
+}
+.desktop-frame .ui-button:hover:not(:disabled) {
+  background: var(--raised);
+  color: var(--ink);
+}
+.desktop-frame .ui-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.desktop-frame .ui-icon-button {
+  width: var(--control-size);
+  padding: 0;
+}
+.desktop-frame .ui-button.wide {
+  width: 100%;
+}
+.desktop-frame .ui-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 6px;
+  font-size: 10px;
+  line-height: 14px;
+  font-weight: 450;
+  white-space: nowrap;
+  color: var(--blue);
+  background: var(--soft);
+  flex-shrink: 0;
+}
+.desktop-frame .ui-badge--warm {
+  color: var(--muted);
+  background: var(--raised);
+}
+.desktop-frame .ui-avatar {
+  display: inline-grid;
+  place-items: center;
+  width: var(--avatar-size);
+  height: var(--avatar-size);
+  flex: 0 0 var(--avatar-size);
+  background: var(--raised);
+  color: var(--muted);
+}
+.desktop-frame .ui-avatar > svg {
+  width: 16px;
+  height: 16px;
+}
+.desktop-frame .ui-avatar .model-artwork {
+  width: 20px;
+  height: 20px;
+}
+.desktop-frame .ui-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: var(--control-size);
+  padding: 0 7px;
+  border: 1px solid var(--subtle-line);
+  background: var(--editor);
+  color: var(--dim);
+}
+.desktop-frame .ui-search:focus-within {
+  border-color: var(--focus, var(--accent));
+}
+.desktop-frame .ui-search > svg {
+  flex: 0 0 16px;
+}
+.desktop-frame .ui-search input {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--ink);
+  font-size: var(--ui-font);
+}
+.desktop-frame .ui-search input::placeholder {
+  color: var(--dim);
+}
+.desktop-frame .ui-search .ui-icon-button {
+  margin-right: -7px;
+  height: 26px;
+  min-height: 26px;
+}
+.desktop-frame .ui-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--section-gap);
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+}
+.desktop-frame .ui-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 20px;
+}
+.desktop-frame .ui-section-title h2 {
+  margin: 0;
+  font-size: var(--ui-font);
+  line-height: 18px;
+  font-weight: 550;
+}
+.desktop-frame .ui-list {
+  overflow: hidden;
+  border: 1px solid var(--subtle-line);
+  background: var(--panel);
+}
+.desktop-frame .ui-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  min-height: var(--row-size);
+  padding: 7px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--subtle-line);
+  color: var(--ink);
+  font-size: var(--ui-font);
+}
+.desktop-frame .ui-row:last-child {
+  border-bottom: 0;
+}
+.desktop-frame .ui-row--action:hover {
+  background: var(--raised);
+}
+.desktop-frame .ui-row--action[aria-pressed='true'] {
+  background: var(--soft);
+}
+.desktop-frame .ui-row-leading {
+  display: flex;
+  flex: 0 0 var(--avatar-size);
+}
+.desktop-frame .ui-row-content {
+  flex: 1;
+  min-width: 0;
+}
+.desktop-frame .ui-row-trailing {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.desktop-frame .ui-row-trailing > svg {
+  width: 16px;
+  height: 16px;
+  color: var(--blue);
+  flex-shrink: 0;
+}
+.desktop-frame .ui-copy {
+  min-width: 0;
+}
+.desktop-frame .ui-copy strong {
+  display: block;
+  font-size: var(--ui-font);
+  font-weight: 500;
+  line-height: 17px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.desktop-frame .ui-copy small {
+  display: block;
+  margin-top: 1px;
+  color: var(--dim);
+  font-size: var(--ui-detail);
+  line-height: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.desktop-frame .ui-info-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  min-height: 40px;
+  background: var(--side-elevated);
+  color: var(--muted);
+  font-size: var(--ui-detail);
+  line-height: 16px;
+}
+.desktop-frame .ui-info-bar > div {
+  flex: 1;
+  min-width: 0;
+}
+.desktop-frame .ui-info-bar > svg {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  color: var(--blue);
+}
+.desktop-frame .ui-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  padding: 4px 2px;
+  font-size: var(--ui-detail);
+  line-height: 16px;
+  color: var(--dim);
+}
+.desktop-frame .ui-note > svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+}
+.desktop-frame .ui-stat {
+  min-width: 0;
+  min-height: 88px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-right: 1px solid var(--subtle-line);
+}
+.desktop-frame .ui-stat:last-child {
+  border-right: 0;
+}
+.desktop-frame .ui-stat > span {
+  color: var(--muted);
+  font-size: var(--ui-detail);
+  line-height: 16px;
+}
+.desktop-frame .ui-stat > strong {
+  font-size: 24px;
+  line-height: 28px;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+}
+.desktop-frame .ui-stat > small {
+  font-size: 10px;
+  line-height: 14px;
+  color: var(--dim);
+}
+.desktop-frame .ui-list-empty {
+  padding: 12px;
+  font-size: var(--ui-font);
+  color: var(--muted);
+}
+.desktop-frame .ui-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 16px;
+  text-align: center;
+  color: var(--dim);
+}
+.desktop-frame .ui-empty > svg {
+  width: 24px;
+  height: 24px;
+}
+.desktop-frame .ui-empty h2 {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  margin: 0;
+  color: var(--muted);
+}
+.desktop-frame .ui-empty p {
+  font-size: var(--ui-font);
+  line-height: 18px;
+  margin: 0;
+}
+
+/* Chat layout owns placement only; buttons and rows keep the same shared scale. */
+.desktop-frame .chat-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  height: 36px;
+  min-height: 36px;
+  padding: 4px 8px;
+  border: 0;
+}
+.desktop-frame .chat-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.desktop-frame .model-picker {
+  max-width: 70%;
+  min-width: 0;
+}
+.desktop-frame .model-picker .model-artwork,
+.desktop-frame .composer-model .model-artwork {
+  width: 16px;
+  height: 16px;
+}
+/* Empty chats center one compact group; active conversations keep a bottom composer. */
+.desktop-frame .chat-stage {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+.desktop-frame .chat-stage.is-empty {
+  justify-content: safe center;
+  overflow: auto;
+  padding-block: 16px;
+}
+.desktop-frame .chat-stage.is-empty .conversation {
+  flex: 0 0 auto;
+  overflow: visible;
+  padding-block: 0 12px;
+}
+.desktop-frame .conversation {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px 16px;
+}
+.desktop-frame .conversation.empty {
+  display: grid;
+  place-items: center;
+  margin: 0;
+}
+.desktop-frame .composer-wrap {
+  width: 100%;
+  max-width: 760px;
+  padding: 8px 16px 12px;
+  margin: 0 auto;
+  flex-shrink: 0;
+}
+.desktop-frame .composer {
+  border: 1px solid var(--subtle-line);
+  background: var(--panel);
+  padding: 10px;
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.06);
+}
+.desktop-frame .composer:has(> textarea:focus-visible) {
+  border-color: var(--focus, var(--accent));
+}
+.desktop-frame .composer textarea {
+  width: 100%;
+  min-height: 48px;
+  height: 48px;
+  padding: 0;
+  resize: none;
+  color: var(--ink);
+  background: none;
+  border: 0;
+  outline: none;
+  font-size: 13px;
+  line-height: 20px;
+}
+.desktop-frame .composer textarea::placeholder {
+  color: var(--dim);
+}
+.desktop-frame .composer-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+}
+.desktop-frame .composer-model {
+  min-width: 0;
+  max-width: 60%;
+  padding-inline: 4px;
+}
+.desktop-frame .composer-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.desktop-frame .composer-actions > span {
+  color: var(--dim);
+  font-size: 10px;
+}
+.desktop-frame .quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+.desktop-frame .quick-actions .ui-button {
+  font-size: var(--ui-detail);
+  background: var(--side-elevated);
+  color: var(--muted);
+}
+.desktop-frame .quick-actions .ui-button:hover {
+  background: var(--raised);
+  color: var(--ink);
+}
+.desktop-frame .quick-actions .ui-button svg {
+  color: var(--blue);
+}
+.desktop-frame .composer-note {
+  color: var(--dim);
+  font-size: 10px;
+  line-height: 15px;
+  margin: 6px 0 0;
+  text-align: center;
+}
+/* Shared overlay spacing; dialog content reuses the same controls and list rows. */
+.desktop-frame {
+  --overlay-inset: 6px;
+  --overlay-gap: 6px;
+  --overlay-row-gap: 4px;
+  --dialog-inset: 16px;
+}
+.desktop-frame .modal {
+  background: var(--panel);
+  color: var(--ink);
+  border: 1px solid var(--subtle-line);
+  width: min(390px, calc(100vw - 24px));
+  max-height: min(560px, 85dvh);
+  padding: var(--dialog-inset);
+  overflow: auto;
+  box-shadow: var(--overlay-shadow);
+}
+.modal::backdrop {
+  background: var(--overlay-backdrop);
+  backdrop-filter: blur(5px);
+}
+.desktop-frame .modal > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.desktop-frame .modal h2 {
+  font-size: 16px;
+  line-height: 22px;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+}
+.desktop-frame .modal header p {
+  margin-top: var(--overlay-row-gap);
+  color: var(--muted);
+  font-size: var(--ui-detail);
+  line-height: 17px;
+}
+.desktop-frame .modal > .ui-search,
+.desktop-frame .modal > .ui-list {
+  margin-bottom: 8px;
+}
+.desktop-frame .compact-picker .ui-row-trailing {
+  gap: 6px;
+}
+@media (max-width: 700px) {
+  .desktop-frame {
+    --page-gutter: 12px;
+    --section-gap: 10px;
+  }
+  .desktop-frame .ui-row-trailing {
+    gap: 8px;
+  }
+  .desktop-frame .composer-wrap {
+    padding: 8px 10px 10px;
+  }
+}
+@media (max-width: 480px) {
+  .desktop-frame .composer-actions > span {
+    display: none;
+  }
+  .desktop-frame .ui-stat {
+    padding: 8px;
+  }
+}
+
+/* Compact dialog details and header metadata share the same scale. */
+.desktop-frame .modal-note {
+  margin: 10px 0;
+  font-size: var(--ui-detail);
+  line-height: 17px;
+}
+.desktop-frame .full-input {
+  height: var(--control-size);
+  padding: 0 8px;
+  font-size: var(--ui-font);
+}
+
+/* Compact choice rows are shared by all searchable menus. */
+.dropdown-row {
+  width: 100%;
+  min-height: 34px;
+  padding: 4px 7px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--ink);
+  text-align: left;
+}
+.dropdown-row:hover,
+.dropdown-row:focus-visible {
+  background: var(--soft);
+}
+.dropdown-row > svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: var(--blue);
+}
+.dropdown-row .model-artwork {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+.dropdown-copy {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.dropdown-copy strong {
+  font-size: 11px;
+  font-weight: 500;
+}
+.dropdown-copy small,
+.dropdown-hint {
+  font-size: 10px;
+  color: var(--muted);
+}
+.dropdown-footer {
+  min-height: 28px;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--blue);
+  border-top: 1px solid var(--line);
+}
+.dropdown-footer span {
+  flex: 1;
+}
+.dropdown-copy strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ui-item-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* Search density belongs to SearchField, not to each menu consumer. */
+.desktop-frame .ui-search--compact {
+  min-height: var(--control-size);
+}
+.desktop-frame .ui-search--compact input {
+  font-size: 11px;
+}
+.ui-search--compact .ui-icon-button {
+  width: 22px;
+  height: 22px;
+  min-height: 22px;
+  padding: 3px;
+}
+
+/* Connection editors reuse the shared form controls, menus and dialog geometry. */
+.desktop-frame .connection-form {
+  display: grid;
+  gap: 12px;
+}
+.desktop-frame .connection-field {
+  display: grid;
+  gap: 6px;
+  font-size: var(--ui-font);
+  color: var(--muted);
+}
+.desktop-frame .connection-field .composer-model {
+  justify-content: flex-start;
+  max-width: 100%;
+}
+.desktop-frame .connection-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+.desktop-frame .connection-form .modal-note {
+  margin: 0;
+}
+.desktop-frame .connection-field select {
+  color-scheme: dark;
+}
+.desktop-frame.light .connection-field select {
+  color-scheme: light;
+}
+
+.desktop-frame .connection-list-compact .ui-copy small {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.desktop-frame .connection-list-compact .ui-row {
+  padding: 6px;
+  gap: 6px;
+}
+.desktop-frame .connection-list-compact .ui-list {
+  border: 0;
+  background: transparent;
+}
+
+.desktop-frame .connections-description {
+  margin: -4px 0 10px;
+  color: var(--muted);
+  font-size: var(--ui-font);
+  line-height: 1.5;
+}
+.desktop-frame .tool-connections {
+  margin-top: 18px;
+}
+.connection-location {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--ui-font);
+  color: var(--muted);
+}
+.desktop-frame .connection-form .instructions-toggle {
+  padding-inline: 0;
+}
+.desktop-frame .connection-form .ui-row small {
+  white-space: normal;
+}
+.app.desktop-frame {
+  display: grid;
+  grid-template-columns: var(--navigation-width) 8px minmax(0, 1fr);
+  grid-template-rows: 48px minmax(0, 1fr) 30px;
+}
+
+/* Theme and Settings share one compact baseline in the expanded rail. */
+
+/* Running tasks prioritize output without losing the editable draft. */
+
+/* Global mode tabs sit next to the brand, above contextual navigation. */
+.ui-tooltip {
+  position: fixed;
+  top: anchor(bottom);
+  left: anchor(left);
+  position-try-fallbacks: flip-inline, flip-block;
+  margin: var(--overlay-gap) 0 0;
+  z-index: 10000;
+  display: block;
+  visibility: hidden;
+  opacity: 0;
+  max-width: min(240px, calc(100vw - 16px));
+  padding: var(--overlay-inset) 8px;
+  border: 1px solid var(--subtle-line);
+  background: var(--raised);
+  color: var(--ink);
+  box-shadow: var(--overlay-shadow);
+  font: inherit;
+  font-size: var(--ui-detail);
+  line-height: 1.4;
+  translate: 0 -3px;
+  pointer-events: none;
+  transition:
+    opacity var(--motion-overlay) var(--motion-ease),
+    translate var(--motion-overlay) var(--motion-ease),
+    visibility var(--motion-overlay);
+}
+.ui-button:is(:hover, :focus-visible) + .ui-tooltip:not([data-dismissed]) {
+  visibility: visible;
+  opacity: 1;
+  translate: 0 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ui-tooltip {
+    transition: none;
+  }
+}
+
+/* Hidden means no icon rail; one independent trigger can restore navigation. */
+.app.desktop-frame {
+  position: relative;
+}
+
+/* One content inset for Chat, Connect, Models and Activity. */
+.desktop-frame .content {
+  padding: var(--page-top) var(--page-gutter) var(--page-gutter);
+}
