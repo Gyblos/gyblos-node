@@ -6,7 +6,7 @@ forwards local requests to it. Both are devnet-only and experimental.
 ## Roles and files
 
 Each role lives in `.local/p2p/` of its working directory, so run the seller and
-the buyer from **different** checkouts or machines. `pnpm gate:setup --role`
+the buyer from **different** checkouts or machines. `pnpm node:setup --role`
 creates the role file, the Iroh node key (`node.key`) and the role's Solana keys
 with private permissions. It never overwrites existing keys; a mismatched
 existing role stops with an error.
@@ -25,7 +25,7 @@ existing role stops with an error.
 
 ```sh
 export GYBLOS_RELAY_TOKEN=...    # private; 32-512 printable characters
-pnpm gate:setup --role seller --mint MINT --buyer BUYER_ADDRESS --pay-to PAYOUT_ADDRESS
+pnpm node:setup --role seller --mint MINT --buyer BUYER_ADDRESS --pay-to PAYOUT_ADDRESS
 pnpm gate:inference:setup        # pinned Qwen3 0.6B model and tokenizer
 pnpm node:start
 ```
@@ -44,7 +44,8 @@ pnpm node:start
 
 ```sh
 export GYBLOS_RELAY_TOKEN=...
-pnpm gate:setup --role buyer --mint MINT
+pnpm node:setup --role buyer --mint MINT
+pnpm buyer:setup             # download and verify only the pinned tokenizer
 # copy the seller's .local/p2p/offer.json into this .local/p2p/
 # write .local/p2p/trust.json (see below)
 pnpm buyer:start
@@ -62,6 +63,10 @@ pnpm buyer:start
   "maxAtomic": "10000"
 }
 ```
+
+`buyer:setup` downloads public tokenizer files into `.local/devnet/tokenizer/`
+in the buyer checkout. It does not install Ollama, download model weights, read
+keys or contact Solana. Run it once before the synthetic paid-call CLI.
 
 There is no command that writes `trust.json` or funds P2P roles yet (the
 archived Docker lab did both). Give the buyer address test tokens of `MINT` with

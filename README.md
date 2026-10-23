@@ -40,7 +40,7 @@ from [faucet.solana.com](https://faucet.solana.com); inference needs
 
 ```sh
 pnpm install --frozen-lockfile
-pnpm typecheck && pnpm lint && pnpm test
+pnpm check
 ```
 
 No wallet, model or network needed; unsupported native cases skip explicitly.
@@ -65,20 +65,23 @@ Use a separate working directory per role. Seller:
 
 ```sh
 export GYBLOS_RELAY_TOKEN=...   # 32-512 characters; never commit it
-pnpm gate:setup --role seller --mint MINT --buyer BUYER_ADDRESS --pay-to PAYOUT_ADDRESS
+pnpm node:setup --role seller --mint MINT --buyer BUYER_ADDRESS --pay-to PAYOUT_ADDRESS
 pnpm gate:inference:setup       # downloads the pinned model
 pnpm node:start                 # writes the signed offer to .local/p2p/offer.json
 ```
 
-Buyer: same token, `pnpm gate:setup --role buyer --mint MINT`, put the seller's
-`offer.json` and a `trust.json` in `.local/p2p/`, then `pnpm buyer:start`. Full
-steps: [docs/running-a-node.md](docs/running-a-node.md).
+Buyer: same token, `pnpm node:setup --role buyer --mint MINT`, put the seller's
+`offer.json` and a `trust.json` in `.local/p2p/`, run `pnpm buyer:setup` to
+prepare the tokenizer, then `pnpm buyer:start`. Full steps:
+[docs/running-a-node.md](docs/running-a-node.md).
 
 ## Commands
 
 | Group  | Command                                              | What it does                                                          |
 | ------ | ---------------------------------------------------- | --------------------------------------------------------------------- |
 | Node   | `pnpm node:start`, `buyer:start`                     | Start the seller node; start the buyer proxy (`:4031`).               |
+| Node   | `pnpm node:setup --role buyer\|seller --mint MINT`   | Create isolated role keys without RPC or funding.                     |
+| Node   | `pnpm buyer:setup`                                   | Download and verify the buyer tokenizer without an inference engine.  |
 | Node   | `pnpm buyer:call`, `buyer:reconcile`                 | One paid synthetic call; verify a payment, clear a zero-charge block. |
 | Gate   | `pnpm gate:setup`                                    | Create devnet keys; `--role buyer\|seller` for P2P.                   |
 | Gate   | `pnpm gate:fund`                                     | Provision accounts; `--test-mint` makes a test token.                 |
@@ -92,6 +95,7 @@ steps: [docs/running-a-node.md](docs/running-a-node.md).
 | Lab    | `pnpm identity:fixtures`                             | Recapture the public registry fixture (read-only devnet).             |
 | Checks | `pnpm test`, `test:lab`, `test:all`                  | Product tests (PR gate), lab tests, both.                             |
 | Checks | `pnpm typecheck`                                     | TypeScript, including tests.                                          |
+| Checks | `pnpm check`                                         | Typecheck, lint (including tooling), product and lab tests.           |
 | Checks | `pnpm lint`                                          | ESLint, Prettier and import boundaries.                               |
 | Checks | `pnpm boundaries`, `tooling:test`                    | Boundary check (`--json`); tests of the checker and lint rules.       |
 | Checks | `pnpm format`, `format:check`                        | Format and sort imports; check only.                                  |

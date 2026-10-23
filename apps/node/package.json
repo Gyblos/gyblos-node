@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./main": "./src/main.ts"
+    "./main": "./src/main.ts",
+    "./setup": "./src/setup.ts"
   },
   "dependencies": {
     "@gyblos/runtime": "workspace:*",

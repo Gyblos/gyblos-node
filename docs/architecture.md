@@ -33,6 +33,20 @@ the identity devnet tools and `lab/evidence` the published reports.
 lab lives only at tag `archive/poc-lab-2026-10`. `tests/` and `tooling/` verify
 everything and may import any layer.
 
+## Where `@gyblos/*` comes from
+
+These are private local packages in this repository. `@gyblos` is their shared
+namespace. `pnpm-workspace.yaml` registers `packages/*`, `apps/*` and
+`lab/harness`; each package declares its own name in `package.json`.
+Dependencies such as `"@gyblos/protocol": "workspace:*"` tell pnpm to link the
+local package during installation.
+
+For example, `@gyblos/protocol/errors` resolves through the `./errors` export in
+`packages/protocol/package.json` to `packages/protocol/src/errors.ts`. There is
+no TypeScript path alias or generated package behind that import. P2P role keys
+are loaded by `packages/node/src/roles.ts`; `@gyblos/config/wallet` loads
+operator-selected wallet configuration.
+
 ## Dependency rule
 
 ```text
