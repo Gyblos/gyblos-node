@@ -73,7 +73,7 @@ export function inferenceCeiling(
     PAYMENT_LIMITS.ceilingMultiplier *
     charge({ input: inputTokens, output: input.maxTokens });
   if (ceiling > BigInt(MAX_ATOMIC))
-    throw new Error('Inference ceiling exceeds gate policy.');
+    throw new Error('Inference ceiling exceeds payment policy.');
   return ceiling.toString();
 }
 

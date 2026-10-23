@@ -46,7 +46,7 @@ export async function stopChild(
 export async function assertPortFree(
   url: string,
   error: () => Error = () =>
-    new Error('Gate requires an unused local host port.'),
+    new Error('Host requires an unused local port.'),
 ) {
   try {
     await fetch(url, {
@@ -87,7 +87,7 @@ export async function waitReady(
       options.startupError?.()
     )
       throw new Error(
-        options.exitMessage ?? 'Gate-owned host exited during startup.',
+        options.exitMessage ?? 'Host exited during startup.',
       );
     let mismatchError: Error | undefined;
     let responseWasOk = false;
@@ -106,7 +106,7 @@ export async function waitReady(
         if (options.expectedRunId && body.runId !== options.expectedRunId)
           throw (mismatchError =
             options.onMismatch?.() ??
-            new Error('Host is not owned by this gate.'));
+            new Error('Host is not owned by this process.'));
         return;
       }
     } catch (error) {
@@ -118,5 +118,5 @@ export async function waitReady(
     }
     await new Promise((resolve) => setTimeout(resolve, TIMEOUTS.startupPoll));
   }
-  throw new Error(options.timeoutMessage ?? 'Gate host startup timeout.');
+  throw new Error(options.timeoutMessage ?? 'Host startup timeout.');
 }

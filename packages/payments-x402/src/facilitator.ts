@@ -140,7 +140,7 @@ export function createFacilitator(
         });
         response
           .status(HTTP_STATUS.badRequest)
-          .json({ error: 'Gate policy rejected payment.' });
+          .json({ error: 'Payment policy rejected payment.' });
         return;
       }
       let sdkReturned = false;

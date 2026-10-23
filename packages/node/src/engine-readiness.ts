@@ -1,4 +1,4 @@
-// Gates the seller on engine readiness: checks memory headroom, runs one bounded private warmup, records
+// Holds the seller until the engine is ready: checks memory headroom, runs one bounded private warmup, records
 // the outcome and anchors offer expiry to the warmed model's residency.
 import { DIAGNOSTICS, P2P } from '@gyblos/config';
 import { READINESS_GENERATION } from '@gyblos/engine-ollama/constants';
