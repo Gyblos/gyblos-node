@@ -6,7 +6,8 @@ import { spawnSync } from 'node:child_process';
 
 import { generateKeyPairSigner } from '@solana/kit';
 
-import { P2P } from '@gyblos/config';
+import { ROLE_FILES } from '@gyblos/config';
+import { OFFER_LIFETIME_MS } from '@gyblos/core/constants';
 import type { OfferTrust } from '@gyblos/core/offers';
 import { signInferenceOffer } from '@gyblos/node/offers';
 import type { RoleConfig } from '@gyblos/node/roles';
@@ -179,8 +180,8 @@ export async function withRelayOffer(
   const owner = await generateKeyPairSigner();
   const previousDirectory = process.cwd();
   try {
-    const signed = await fixture.read<SignedInferenceOffer>(P2P.offerFilename);
-    const trust = await fixture.read<OfferTrust>(P2P.trustFilename);
+    const signed = await fixture.read<SignedInferenceOffer>(ROLE_FILES.offer);
+    const trust = await fixture.read<OfferTrust>(ROLE_FILES.trust);
     const nodeId = options.sellerNodeId ?? signed.offer.nodeId;
     const now = Date.now();
     const offer = {
@@ -189,21 +190,21 @@ export async function withRelayOffer(
       nodeId,
       endpoint: { relayUrl, directAddresses: options.directAddresses ?? [] },
       issuedAt: now,
-      expiresAt: now + P2P.offerLifetimeMs,
+      expiresAt: now + OFFER_LIFETIME_MS,
     };
     await fixture.write(
-      P2P.offerFilename,
+      ROLE_FILES.offer,
       await signInferenceOffer(offer, owner),
     );
-    await fixture.write(P2P.trustFilename, {
+    await fixture.write(ROLE_FILES.trust, {
       ...trust,
       owner: owner.address,
       nodeId,
     });
     if (options.buyer) {
-      const role = await fixture.read<RoleConfig>(P2P.roleConfig);
-      await fixture.write(P2P.nodeKeyFilename, options.buyer.secret);
-      await fixture.write(P2P.roleConfig, {
+      const role = await fixture.read<RoleConfig>(ROLE_FILES.roleConfig);
+      await fixture.write(ROLE_FILES.nodeKey, options.buyer.secret);
+      await fixture.write(ROLE_FILES.roleConfig, {
         ...role,
         nodeId: options.buyer.nodeId,
       });

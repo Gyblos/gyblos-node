@@ -2,15 +2,9 @@
 // Never copies responses, prompts or error text into a row.
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { link, mkdir, open, readFile, unlink } from 'node:fs/promises';
+import { join } from 'node:path';
 
-import {
-  FILE_MODES,
-  KEY_LIMITS,
-  LOCAL_DIR,
-  MEASUREMENT_FILENAMES,
-  MEASUREMENTS_PATH,
-  UNITS,
-} from '@gyblos/config';
+import { FILE_MODES, KEY_LIMITS, ROLE_FILES, UNITS } from '@gyblos/config';
 import type { ChargeAnomaly } from '@gyblos/core/constants';
 import type { TokenCounts } from '@gyblos/core/metering';
 import { MODEL } from '@gyblos/engine-ollama/model';
@@ -104,12 +98,13 @@ export function measurementRow(input: MeasurementInput, salt: Uint8Array) {
   };
 }
 
-export async function measurementSalt(directory = LOCAL_DIR) {
+// Callers pass their own private directory: the buyer role directory, or the lab home.
+export async function measurementSalt(directory: string) {
   await mkdir(directory, {
     recursive: true,
     mode: FILE_MODES.privateDirectory,
   });
-  const path = `${directory}/${MEASUREMENT_FILENAMES.salt}`;
+  const path = join(directory, ROLE_FILES.measurementSalt);
   const temporary = `${path}.${randomUUID()}.tmp`;
   try {
     const handle = await open(temporary, 'wx', FILE_MODES.privateFile);
@@ -136,10 +131,7 @@ export async function measurementSalt(directory = LOCAL_DIR) {
   return salt;
 }
 
-export async function appendMeasurement(
-  row: Measurement,
-  path = MEASUREMENTS_PATH,
-) {
+export async function appendMeasurement(row: Measurement, path: string) {
   const handle = await open(path, 'a', FILE_MODES.privateFile);
   try {
     await handle.writeFile(JSON.stringify(row) + '\n');

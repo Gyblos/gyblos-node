@@ -40,8 +40,9 @@ after `pnpm gate:setup` and funding; network confirmation can take minutes.
 | `pnpm gate:inference` | Six metered-inference cases with a real model; see [inference.md](inference.md).                             |
 
 `gate:setup` creates isolated buyer, seller, authorizer, facilitator and
-test-mint keys in `.local/devnet/` and never overwrites existing keys. Rerunning
-`gate:fund --test-mint` does not mint more tokens when the mint already exists.
+test-mint keys in the lab home (`.local/lab/`, or `GYBLOS_LAB_HOME`) and never
+overwrites existing keys. Rerunning `gate:fund --test-mint` does not mint more
+tokens when the mint already exists.
 
 To run the fixed-resource roles in separate terminals: `pnpm gate:facilitator`
 (port 4022), `pnpm gate:seller` (port 4021), then `pnpm gate:buyer`.
@@ -70,9 +71,8 @@ standalone for lab checks) signs and pays for channel settlement with its own
 devnet key. It keeps channel state in memory; there is no durable channel
 storage.
 
-It writes private diagnostics as JSONL to
-`.local/devnet/facilitator-diagnostics/` (standalone) or
-`.local/p2p/facilitator-diagnostics/` (seller node):
+It writes private diagnostics as JSONL to `.local/lab/facilitator-diagnostics/`
+(standalone) or `.local/gyblos/seller/facilitator-diagnostics/` (seller node):
 
 - Files are mode `0600`, the directory `0700`. Keep them out of Git.
 - Records hold only allowlisted fields: SDK version, attempt, operation, phase,

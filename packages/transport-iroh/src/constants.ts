@@ -1,4 +1,25 @@
-// Transport route names, relay configuration error codes and relay token length bounds.
+// Transport route names, relay configuration error codes, relay token length bounds, HTTP-over-Iroh
+// framing limits and internal stream deadlines. Operator-tunable capacity lives in @gyblos/config.
+
+// Wire-visible framing limits; tests pin these values.
+export const HTTP_OVER_IROH = {
+  bodyBytes: 64 * 1024,
+  headerBytes: 24 * 1024,
+  responseBytes: 256 * 1024,
+  maxHeaders: 32,
+  headerTerminatorBytes: 4,
+  maxHttpStatus: 599,
+  streamCloseCode: 1n,
+} as const;
+
+export const IROH_DEADLINES = {
+  ingressMs: 5_000,
+  egressMs: 5_000,
+  connectionIdleMs: 30_000,
+  connectionLifetimeMs: 15 * 60_000,
+  routePollMs: 100,
+} as const;
+
 export const TRANSPORT_ROUTES = {
   LOOPBACK: 'loopback',
   DIRECT: 'iroh-direct',

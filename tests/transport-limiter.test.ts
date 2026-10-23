@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { P2P } from '@gyblos/config';
+import { TRANSPORT_LIMITS } from '@gyblos/config';
 import { createPeerLimiter } from '@gyblos/transport-iroh/limiter';
 
 type Limiter = ReturnType<typeof createPeerLimiter>;
@@ -23,7 +23,11 @@ function single(limiter: Limiter, peer: string) {
 }
 function consume(limiter: Limiter) {
   let total = 0;
-  for (let index = 0; index <= P2P.globalRequestsPerWindow; index++) {
+  for (
+    let index = 0;
+    index <= TRANSPORT_LIMITS.globalRequestsPerWindow;
+    index++
+  ) {
     const peer = 'spender-' + index;
     const lease = limiter.register(peer);
     if (!lease) break;
@@ -37,7 +41,7 @@ void test('a connected partial grant cannot refill until its lease ends, even af
   const limiter = createPeerLimiter(() => 0);
   const spent = limiter.register('spent');
   assert.ok(spent);
-  for (let index = 0; index < P2P.requestsPerWindow; index++)
+  for (let index = 0; index < TRANSPORT_LIMITS.requestsPerWindow; index++)
     assert.ok(request(limiter, 'spent'));
   spent();
   const held: (() => void)[] = [];
@@ -48,7 +52,9 @@ void test('a connected partial grant cannot refill until its lease ends, even af
   }
   const partial = limiter.register('partial');
   assert.ok(partial);
-  const granted = P2P.globalRequestsPerWindow - P2P.requestsPerWindow * 8;
+  const granted =
+    TRANSPORT_LIMITS.globalRequestsPerWindow -
+    TRANSPORT_LIMITS.requestsPerWindow * 8;
   for (let index = 0; index < granted; index++)
     assert.ok(request(limiter, 'partial'));
   held[0]!();
@@ -60,7 +66,7 @@ void test('a connected partial grant cannot refill until its lease ends, even af
   partial();
   const returning = limiter.register('partial');
   assert.ok(returning);
-  for (let index = granted; index < P2P.requestsPerWindow; index++)
+  for (let index = granted; index < TRANSPORT_LIMITS.requestsPerWindow; index++)
     assert.ok(request(limiter, 'partial'));
   assert.equal(limiter.enter('partial'), undefined);
   returning();
@@ -72,7 +78,7 @@ void test('nine free requests followed by disconnects preserve newcomer admissio
     assert.ok(single(limiter, 'free-' + index));
   const newcomer = limiter.register('newcomer');
   assert.ok(newcomer);
-  for (let index = 0; index < P2P.requestsPerWindow; index++)
+  for (let index = 0; index < TRANSPORT_LIMITS.requestsPerWindow; index++)
     assert.ok(request(limiter, 'newcomer'));
   assert.equal(request(limiter, 'newcomer'), false);
   newcomer();
@@ -80,7 +86,11 @@ void test('nine free requests followed by disconnects preserve newcomer admissio
 });
 void test('255 actual requests leave one admission and the 256th exhausts the budget', () => {
   const limiter = createPeerLimiter(() => 0);
-  for (let index = 0; index < P2P.globalRequestsPerWindow - 1; index++)
+  for (
+    let index = 0;
+    index < TRANSPORT_LIMITS.globalRequestsPerWindow - 1;
+    index++
+  )
     assert.ok(single(limiter, 'peer-' + index));
   assert.ok(single(limiter, 'last'));
   assert.equal(limiter.register('over-budget'), undefined);
@@ -100,7 +110,7 @@ void test('seven protected reservations plus 46 real admissions exhaust new capa
   assert.ok(single(limiter, 'newcomer'));
   for (const lease of leases) lease();
 });
-for (const spent of [7, P2P.requestsPerWindow])
+for (const spent of [7, TRANSPORT_LIMITS.requestsPerWindow])
   void test(
     'LRU eviction and reconnect preserve identity debt=' + spent,
     () => {
@@ -110,24 +120,24 @@ for (const spent of [7, P2P.requestsPerWindow])
       for (let index = 0; index < spent; index++)
         assert.ok(request(limiter, 'known'));
       lease();
-      for (let index = 0; index < P2P.maxPeers + 5; index++)
+      for (let index = 0; index < TRANSPORT_LIMITS.maxPeers + 5; index++)
         assert.ok(single(limiter, 'churn-' + index));
       const next = limiter.register('known');
-      if (spent === P2P.requestsPerWindow) {
+      if (spent === TRANSPORT_LIMITS.requestsPerWindow) {
         assert.equal(next, undefined);
         assert.equal(limiter.enter('known'), undefined);
       } else {
         assert.ok(next);
         let left = 0;
         while (request(limiter, 'known')) left++;
-        assert.equal(left, P2P.requestsPerWindow - spent);
+        assert.equal(left, TRANSPORT_LIMITS.requestsPerWindow - spent);
         next();
       }
     },
   );
 void test('repeated same-identity reconnects never reset request debt', () => {
   const limiter = createPeerLimiter(() => 0);
-  for (let index = 0; index < P2P.requestsPerWindow; index++)
+  for (let index = 0; index < TRANSPORT_LIMITS.requestsPerWindow; index++)
     assert.ok(single(limiter, 'known'));
   assert.equal(limiter.register('known'), undefined);
   assert.ok(single(limiter, 'different'));
@@ -141,7 +151,8 @@ void test('connected and active ownership remain protected when inactive grace i
   lease();
   assert.equal(
     consume(limiter),
-    P2P.globalRequestsPerWindow - P2P.requestsPerWindow,
+    TRANSPORT_LIMITS.globalRequestsPerWindow -
+      TRANSPORT_LIMITS.requestsPerWindow,
   );
   const returning = limiter.register('active');
   assert.ok(returning);
@@ -149,7 +160,7 @@ void test('connected and active ownership remain protected when inactive grace i
   active();
   let left = 0;
   while (request(limiter, 'active')) left++;
-  assert.equal(left, P2P.requestsPerWindow - 1);
+  assert.equal(left, TRANSPORT_LIMITS.requestsPerWindow - 1);
   returning();
 });
 void test('late duplicate lease release cannot discard the reconnected reservation', () => {
@@ -164,22 +175,23 @@ void test('late duplicate lease release cannot discard the reconnected reservati
   first();
   assert.equal(
     consume(limiter),
-    P2P.globalRequestsPerWindow - P2P.requestsPerWindow,
+    TRANSPORT_LIMITS.globalRequestsPerWindow -
+      TRANSPORT_LIMITS.requestsPerWindow,
   );
   let left = 0;
   while (request(limiter, 'known')) left++;
-  assert.equal(left, P2P.requestsPerWindow - 1);
+  assert.equal(left, TRANSPORT_LIMITS.requestsPerWindow - 1);
   second();
 });
 void test('zero-work connection churn returns unused quota without erasing consumed debt', () => {
   const limiter = createPeerLimiter(() => 0);
-  for (let index = 0; index < P2P.maxPeers * 4; index++) {
+  for (let index = 0; index < TRANSPORT_LIMITS.maxPeers * 4; index++) {
     const lease = limiter.register('empty-' + index);
     assert.ok(lease);
     lease();
     lease();
   }
-  assert.equal(consume(limiter), P2P.globalRequestsPerWindow);
+  assert.equal(consume(limiter), TRANSPORT_LIMITS.globalRequestsPerWindow);
 });
 void test('rollover resets request debt while preserving an old in-flight operation', () => {
   let time = 0;
@@ -189,7 +201,7 @@ void test('rollover resets request debt while preserving an old in-flight operat
   const active = limiter.enter('active');
   assert.ok(active);
   lease();
-  time = P2P.rateWindowMs;
+  time = TRANSPORT_LIMITS.rateWindowMs;
   const next = limiter.register('active');
   assert.ok(next);
   assert.equal(limiter.enter('active'), undefined);
@@ -201,9 +213,9 @@ void test('actual budget exhaustion denies a known disconnected peer until rollo
   let time = 0;
   const limiter = createPeerLimiter(() => time);
   assert.ok(single(limiter, 'known'));
-  assert.equal(consume(limiter), P2P.globalRequestsPerWindow - 1);
+  assert.equal(consume(limiter), TRANSPORT_LIMITS.globalRequestsPerWindow - 1);
   assert.equal(limiter.register('known'), undefined);
-  time = P2P.rateWindowMs;
+  time = TRANSPORT_LIMITS.rateWindowMs;
   assert.ok(single(limiter, 'known'));
 });
 void test('origin concurrency and duplicate releases remain bounded independently of quota', () => {

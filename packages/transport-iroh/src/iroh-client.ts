@@ -2,10 +2,14 @@
 // and reports the observed route. After an uncertain failure it refuses to reconnect.
 import type { Connection, Endpoint, EndpointAddr } from '@number0/iroh';
 
-import { P2P } from '@gyblos/config';
+import { TRANSPORT_TIMEOUTS } from '@gyblos/config';
 import { GYBLOS_ALPN } from '@gyblos/protocol/constants';
 
-import { TRANSPORT_ROUTES } from './constants.js';
+import {
+  HTTP_OVER_IROH,
+  IROH_DEADLINES,
+  TRANSPORT_ROUTES,
+} from './constants.js';
 import { withDeadline } from './deadline.js';
 import { selectedRoute } from './paths.js';
 import type { HttpRequest, Transport, TransportRoute } from './types.js';
@@ -33,13 +37,13 @@ export function createIrohTransport(
         const start = performance.now();
         const result = await withDeadline(
           endpoint.connect(remote, [...Buffer.from(GYBLOS_ALPN)]),
-          P2P.connectMs,
+          TRANSPORT_TIMEOUTS.connectMs,
           () => {
             void endpoint.close();
           },
         );
         if (result.remoteId().toString() !== expectedNodeId) {
-          result.close(P2P.streamCloseCode, []);
+          result.close(HTTP_OVER_IROH.streamCloseCode, []);
           throw new Error('Connected NodeId does not match the trusted offer.');
         }
         connectMs = performance.now() - start;
@@ -59,15 +63,17 @@ export function createIrohTransport(
     async ready(expected) {
       const current = await connected();
       if (!expected) return;
-      const expires = performance.now() + P2P.connectMs;
+      const expires = performance.now() + TRANSPORT_TIMEOUTS.connectMs;
       while (performance.now() < expires) {
         if (selectedRoute(current) === expected) {
           expectedRoute = expected;
           return;
         }
-        await new Promise((resolve) => setTimeout(resolve, P2P.routePollMs));
+        await new Promise((resolve) =>
+          setTimeout(resolve, IROH_DEADLINES.routePollMs),
+        );
       }
-      current.close(P2P.streamCloseCode, []);
+      current.close(HTTP_OVER_IROH.streamCloseCode, []);
       throw new Error('Expected route was not observed; no payment attempted.');
     },
     async exchange(request: HttpRequest) {
@@ -81,7 +87,7 @@ export function createIrohTransport(
         relayObserved ||= route === TRANSPORT_ROUTES.RELAY;
       };
       observe();
-      const poll = setInterval(observe, P2P.routePollMs);
+      const poll = setInterval(observe, IROH_DEADLINES.routePollMs);
       try {
         const response = await withDeadline(
           (async () => {
@@ -93,13 +99,13 @@ export function createIrohTransport(
             return decodeResponse(
               Uint8Array.from(
                 await stream.recv.readToEnd(
-                  P2P.responseBytes + P2P.headerBytes,
+                  HTTP_OVER_IROH.responseBytes + HTTP_OVER_IROH.headerBytes,
                 ),
               ),
             );
           })(),
-          P2P.requestMs,
-          () => current.close(P2P.streamCloseCode, []),
+          TRANSPORT_TIMEOUTS.requestMs,
+          () => current.close(HTTP_OVER_IROH.streamCloseCode, []),
         );
         observe();
         return {
@@ -111,14 +117,14 @@ export function createIrohTransport(
         };
       } catch (error) {
         poisoned = true;
-        current.close(P2P.streamCloseCode, []);
+        current.close(HTTP_OVER_IROH.streamCloseCode, []);
         throw error;
       } finally {
         clearInterval(poll);
       }
     },
     async close() {
-      connection?.close(P2P.streamCloseCode, []);
+      connection?.close(HTTP_OVER_IROH.streamCloseCode, []);
       await endpoint.close();
     },
   };

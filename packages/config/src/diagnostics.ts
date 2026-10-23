@@ -1,6 +1,4 @@
 // Thresholds and OS paths for memory diagnostics, plus private diagnostic-log size and rotation limits.
-import { LOCAL_DIR } from './paths.js';
-
 export const DIAGNOSTICS = {
   minimumVmAvailableBytes: 1536 * 1024 * 1024,
   minimumCgroupHeadroomBytes: 1536 * 1024 * 1024,
@@ -44,9 +42,4 @@ export const PRIVATE_LOG_LIMITS = {
   reclaimMinAgeMs: 60_000,
   quarantineInfix: 'reclaim-',
   quarantineSuffix: '.reclaim',
-} as const;
-
-export const FACILITATOR_LOG_PATHS = {
-  devnet: `${LOCAL_DIR}/facilitator-diagnostics`,
-  roleDirectory: 'facilitator-diagnostics',
 } as const;

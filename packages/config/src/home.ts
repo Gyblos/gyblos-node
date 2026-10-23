@@ -1,0 +1,133 @@
+// Owns the local data layout: the product home (one directory per role plus shared public artifacts),
+// the separate lab home and the legacy paths they replace. Pure path computation; never touches files.
+import { join } from 'node:path';
+
+export const HOME_ENVIRONMENT = {
+  product: 'GYBLOS_HOME',
+  lab: 'GYBLOS_LAB_HOME',
+} as const;
+
+// Relative defaults resolve against the working directory, as the former .local paths did.
+export const DEFAULT_HOMES = {
+  product: '.local/gyblos',
+  lab: '.local/lab',
+} as const;
+
+export const ROLE_DIRECTORIES = { buyer: 'buyer', seller: 'seller' } as const;
+
+export type HomeRole = keyof typeof ROLE_DIRECTORIES;
+
+export const ARTIFACT_DIRECTORIES = {
+  root: 'artifacts',
+  tokenizer: 'tokenizer',
+  ollamaModels: 'ollama-models',
+} as const;
+
+// File names inside one role directory.
+export const ROLE_FILES = {
+  roleConfig: 'role.json',
+  nodeKey: 'node.key',
+  trust: 'trust.json',
+  status: 'status.json',
+  traces: 'traces.json',
+  metrics: 'transport.jsonl',
+  measurements: 'measurements.jsonl',
+  measurementSalt: 'measurement-salt',
+  buyerLock: 'buyer.lock',
+  recoveryLock: 'recovery.lock',
+  staleLockJournal: 'stale-locks.jsonl',
+  journal: 'authorization.json',
+  reconciliations: 'reconciliations.json',
+  calls: 'calls.json',
+  offer: 'offer.json',
+  facilitatorDiagnostics: 'facilitator-diagnostics',
+} as const;
+
+// Solana key files inside a role directory: buyer for the buyer role, the other three for the seller.
+export const ROLE_KEY_FILES = {
+  buyer: 'buyer.json',
+  owner: 'owner.json',
+  authorizer: 'authorizer.json',
+  facilitator: 'facilitator.json',
+} as const;
+
+export type RoleKey = keyof typeof ROLE_KEY_FILES;
+
+export const TOKENIZER_FILENAMES = {
+  tokenizer: 'tokenizer.json',
+  config: 'tokenizer_config.json',
+} as const;
+
+// Former cwd-relative locations. Only existence is ever checked; nothing reads or moves them.
+export const LEGACY_LOCAL_PATHS = {
+  roles: '.local/p2p',
+  tokenizer: '.local/devnet/tokenizer',
+  ollamaModels: '.local/ollama/models',
+  lab: '.local/devnet',
+  labMeasurements: '.local/devnet/measurements.jsonl',
+  identityKeys: '.local/identity/keys',
+} as const;
+
+export const LAB_DIRECTORIES = {
+  identityKeys: 'identity/keys',
+  identityValidator: 'identity-validator',
+} as const;
+
+export type HomeEnvironment = Readonly<Record<string, string | undefined>>;
+
+function configuredRoot(value: string | undefined, fallback: string) {
+  return value ? value : fallback;
+}
+
+export function homeLayout(environment: HomeEnvironment) {
+  const root = configuredRoot(
+    environment[HOME_ENVIRONMENT.product],
+    DEFAULT_HOMES.product,
+  );
+  const artifacts = join(root, ARTIFACT_DIRECTORIES.root);
+  const tokenizer = join(artifacts, ARTIFACT_DIRECTORIES.tokenizer);
+  return {
+    root,
+    roles: {
+      buyer: join(root, ROLE_DIRECTORIES.buyer),
+      seller: join(root, ROLE_DIRECTORIES.seller),
+    },
+    artifacts: {
+      root: artifacts,
+      tokenizer,
+      tokenizerFiles: {
+        tokenizer: join(tokenizer, TOKENIZER_FILENAMES.tokenizer),
+        config: join(tokenizer, TOKENIZER_FILENAMES.config),
+      },
+      ollamaModels: join(artifacts, ARTIFACT_DIRECTORIES.ollamaModels),
+    },
+  } as const;
+}
+
+export type HomeLayout = ReturnType<typeof homeLayout>;
+
+export function rolePathIn(
+  environment: HomeEnvironment,
+  role: HomeRole,
+  name: string,
+) {
+  return join(homeLayout(environment).roles[role], name);
+}
+
+// Lab-only state (devnet wallet config and keys, journals, lab measurements and outputs). The lab may
+// read the product artifacts directory as a shared public cache, never a product role directory.
+export function labLayout(environment: HomeEnvironment) {
+  const root = configuredRoot(
+    environment[HOME_ENVIRONMENT.lab],
+    DEFAULT_HOMES.lab,
+  );
+  return {
+    root,
+    measurements: join(root, ROLE_FILES.measurements),
+    facilitatorDiagnostics: join(root, ROLE_FILES.facilitatorDiagnostics),
+    identityKeys: join(root, LAB_DIRECTORIES.identityKeys),
+    identityValidator: join(root, LAB_DIRECTORIES.identityValidator),
+  } as const;
+}
+
+export type LabLayout = ReturnType<typeof labLayout>;

@@ -8,7 +8,13 @@ import test from 'node:test';
 
 import { generateKeyPairSigner } from '@solana/kit';
 
-import { FILE_MODES, P2P } from '@gyblos/config';
+import {
+  FILE_MODES,
+  homeLayout,
+  ROLE_FILES,
+  ROLE_KEY_FILES,
+} from '@gyblos/config';
+import { P2P_ROLES } from '@gyblos/node/constants';
 
 import { NATIVE_CAPABILITY } from './support/native-runtime.js';
 
@@ -25,20 +31,27 @@ void test(
     const directory = await mkdtemp(join(tmpdir(), 'gyblos-role-test-'));
     try {
       process.chdir(directory);
-      const first = await setupRole({ role: 'buyer', mint: MINT });
-      assert.deepEqual(await setupRole({ role: 'buyer', mint: MINT }), first);
+      const first = await setupRole({ role: P2P_ROLES.BUYER, mint: MINT });
       assert.deepEqual(
-        (await readdir(P2P.root)).sort(),
-        [P2P.keys.buyer, P2P.nodeKeyFilename, P2P.roleConfig].sort(),
+        await setupRole({ role: P2P_ROLES.BUYER, mint: MINT }),
+        first,
       );
-      const report = await publicRole();
+      assert.deepEqual(
+        (await readdir(homeLayout(process.env).roles.buyer)).sort(),
+        [
+          ROLE_KEY_FILES.buyer,
+          ROLE_FILES.nodeKey,
+          ROLE_FILES.roleConfig,
+        ].sort(),
+      );
+      const report = await publicRole(P2P_ROLES.BUYER);
       assert.ok(
         report.keys.every((key) => key.mode === FILE_MODES.privateFile),
       );
-      await assert.rejects(roleSigner('owner'), /Cross-role/);
-      await roleSigner('buyer');
-      await chmod(rolePath(P2P.nodeKeyFilename), 0o644);
-      await assert.rejects(nodeSecret(), /permissions/);
+      await assert.rejects(roleSigner(P2P_ROLES.BUYER, 'owner'), /Cross-role/);
+      await roleSigner(P2P_ROLES.BUYER, 'buyer');
+      await chmod(rolePath(P2P_ROLES.BUYER, ROLE_FILES.nodeKey), 0o644);
+      await assert.rejects(nodeSecret(P2P_ROLES.BUYER), /permissions/);
     } finally {
       process.chdir(original);
       await rm(directory, { recursive: true, force: true });
@@ -59,32 +72,32 @@ void test(
     try {
       process.chdir(directory);
       const first = await setupRole({
-        role: 'seller',
+        role: P2P_ROLES.SELLER,
         mint: MINT,
         buyer: buyer.address,
         payTo: payout.address,
       });
       assert.equal(first.role, 'seller');
       assert.deepEqual(
-        (await readdir(P2P.root)).sort(),
+        (await readdir(homeLayout(process.env).roles.seller)).sort(),
         [
-          P2P.keys.owner,
-          P2P.keys.authorizer,
-          P2P.keys.facilitator,
-          P2P.nodeKeyFilename,
-          P2P.roleConfig,
+          ROLE_KEY_FILES.owner,
+          ROLE_KEY_FILES.authorizer,
+          ROLE_KEY_FILES.facilitator,
+          ROLE_FILES.nodeKey,
+          ROLE_FILES.roleConfig,
         ].sort(),
       );
       assert.ok(
-        (await publicRole()).keys.every(
+        (await publicRole(P2P_ROLES.SELLER)).keys.every(
           (key) => key.mode === FILE_MODES.privateFile,
         ),
       );
-      await assert.rejects(roleSigner('buyer'), /Cross-role/);
-      await roleSigner('owner');
+      await assert.rejects(roleSigner(P2P_ROLES.SELLER, 'buyer'), /Cross-role/);
+      await roleSigner(P2P_ROLES.SELLER, 'owner');
       await assert.rejects(
         setupRole({
-          role: 'seller',
+          role: P2P_ROLES.SELLER,
           mint: MINT,
           buyer: buyer.address,
           payTo: buyer.address,

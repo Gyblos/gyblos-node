@@ -1,18 +1,13 @@
 // Buyer-side trust policy for signed inference offers: identity, lifetime, budget, prices, model bounds,
 // capabilities and wallet separation. Wire shape is protocol's; signature checks live in the node adapter.
-import {
-  DEVNET,
-  INFERENCE_REQUEST_LIMITS,
-  MAX_ATOMIC,
-  P2P,
-} from '@gyblos/config';
+import { DEVNET, INFERENCE_REQUEST_LIMITS, MAX_ATOMIC } from '@gyblos/config';
 import { GYBLOS_ALPN, OFFER_SCHEMA_VERSION } from '@gyblos/protocol/constants';
 import type {
   InferenceOffer,
   SignedInferenceOffer,
 } from '@gyblos/protocol/offer';
 
-import { PRICES } from './constants.js';
+import { OFFER_LIFETIME_MS, PRICES } from './constants.js';
 
 export interface OfferTrust {
   owner: string;
@@ -47,7 +42,7 @@ function validOffer(
     !Number.isSafeInteger(offer.expiresAt) ||
     offer.issuedAt > now ||
     offer.expiresAt <= now ||
-    offer.expiresAt - offer.issuedAt > P2P.offerLifetimeMs
+    offer.expiresAt - offer.issuedAt > OFFER_LIFETIME_MS
   )
     throw new Error('Expired or invalid offer lifetime.');
   if (

@@ -5,11 +5,13 @@ export * from './hosts.js';
 
 export * from './paths.js';
 
+export * from './home.js';
+
 export * from './versions.js';
 
 export * from './limits.js';
 
-export * from './p2p.js';
+export * from './transport.js';
 
 export * from './diagnostics.js';
 

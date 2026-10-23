@@ -1,5 +1,5 @@
-// Buyer call outcomes, phases, journal states, proxy error codes, measurement schema version, error
-// diagnostic codes and synthetic inference case names.
+// Buyer call outcomes, phases, journal states, proxy error codes, measurement schema version, call and
+// proof bounds, error diagnostic codes and synthetic inference case names.
 import { JOURNAL_STATES } from '@gyblos/payments-x402/constants';
 import type { ProtocolErrorCode } from '@gyblos/protocol/constants';
 import { ROUTE_DISCREPANCY } from '@gyblos/transport-iroh/constants';
@@ -46,6 +46,12 @@ export type BuyerProxyErrorCode =
   (typeof BUYER_PROXY_ERROR_CODES)[keyof typeof BUYER_PROXY_ERROR_CODES];
 
 export const MEASUREMENT_SCHEMA_VERSION = 1;
+
+// Synthetic call cases selectable by index on the buyer:call command line.
+export const MINIMUM_REQUESTS = 3;
+
+// Bound on the channel history read when locating a deposit for a proof.
+export const MAX_CHANNEL_SIGNATURES = 10;
 
 export const ERROR_DIAGNOSTICS = {
   ASSERTION: 'ASSERTION_FAILED',

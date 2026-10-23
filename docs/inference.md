@@ -9,9 +9,11 @@ connectivity. The P2P seller node uses the same model, pricing and recount.
 ## Model and runtime
 
 Setup downloads Qwen3 0.6B Q4_K_M, approximately 523 MB of model layers, into
-`.local/ollama/models/`. Public tokenizer artifacts are stored under
-`.local/devnet/tokenizer/`. The `@huggingface/tokenizers` dependency provides
-independent buyer-side counting.
+`.local/gyblos/artifacts/ollama-models/`. Public tokenizer artifacts are stored
+under `.local/gyblos/artifacts/tokenizer/`. Both are public, hash-pinned
+artifacts in the product home that the lab shares as a public cache (its setup
+may write them) ([running-a-node.md](running-a-node.md#local-home)). The
+`@huggingface/tokenizers` dependency provides independent buyer-side counting.
 
 The model manifest digest, public model revision, tokenizer/config hashes and
 tokenizer version are pinned in
@@ -115,15 +117,16 @@ are:
 
 ## Private local measurements
 
-Records append to `.local/devnet/measurements.jsonl`. They include confirmed
+Lab records append to `.local/lab/measurements.jsonl`; a buyer's paid calls
+append to `.local/gyblos/buyer/measurements.jsonl`. They include confirmed
 deposit/claim signatures, chain-derived and expected charges, atomic and
 relative differences, token counts, delivery and anomaly status. Records use an
 explicit metadata allowlist; prompts and answers are not saved in measurements.
 
-Only a salted response hash is retained. The private salt is stored at
-`.local/devnet/measurement-salt`, with private file permissions. `sellerReceipt`
-remains `null`; these are local buyer declarations, not authenticated seller
-receipts or publicly verifiable content evidence.
+Only a salted response hash is retained. The private salt is stored next to them
+as `measurement-salt`, with private file permissions. `sellerReceipt` remains
+`null`; these are local buyer declarations, not authenticated seller receipts or
+publicly verifiable content evidence.
 
 Latency starts at signing and ends when the complete buffered response is
 received. Effective tokens per second includes payment/settlement overhead.
@@ -135,8 +138,8 @@ not buyer-facing streaming measurements.
 
 The run writes a local report to `lab/evidence/gate-0005.json`. That path is
 ignored by Git, so the report is not in the repository; journals and additional
-diagnostics stay under `.local/devnet/`. Existing attempts remain in the
-report's history. The run waits between cases to let public RPC rate windows
+diagnostics stay in the lab home (`.local/lab/`). Existing attempts remain in
+the report's history. The run waits between cases to let public RPC rate windows
 clear.
 
 An uncertain authorization blocks subsequent gates until it is reconciled. There

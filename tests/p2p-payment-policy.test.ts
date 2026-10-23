@@ -10,7 +10,8 @@ import { TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
 import { generateKeyPairSigner } from '@solana/kit';
 import { encodePaymentRequiredHeader } from '@x402/core/http';
 
-import { DEVNET, DEVNET_USDC, P2P } from '@gyblos/config';
+import { DEVNET, DEVNET_USDC, ROLE_FILES } from '@gyblos/config';
+import { P2P_ROLES } from '@gyblos/node/constants';
 import { createInferenceBuyer } from '@gyblos/payments-x402/inference-buyer';
 import { withExclusiveLock } from '@gyblos/payments-x402/recovery/lock';
 import { saveJson } from '@gyblos/runtime';
@@ -155,9 +156,12 @@ void test(
     const directory = await mkdtemp(join(tmpdir(), 'gyblos-p2p-call-lock-'));
     try {
       process.chdir(directory);
-      await withExclusiveLock(rolePath(P2P.buyerLockFilename), async () => {
-        await assert.rejects(paidCall(), /holds the buyer lock/);
-      });
+      await withExclusiveLock(
+        rolePath(P2P_ROLES.BUYER, ROLE_FILES.buyerLock),
+        async () => {
+          await assert.rejects(paidCall(), /holds the buyer lock/);
+        },
+      );
     } finally {
       process.chdir(original);
       await rm(directory, { recursive: true, force: true });

@@ -6,8 +6,8 @@ on-chain.** Nothing is retried automatically.
 
 ## What blocks new payments
 
-- `authorization.json` (the buyer journal in `.local/p2p/`, or the gate journals
-  in `.local/devnet/`) records each authorization before it is sent. It is
+- `authorization.json` (the buyer journal in `.local/gyblos/buyer/`, or the gate
+  journals in `.local/lab/`) records each authorization before it is sent. It is
   cleared only after a finalized proof.
 - `buyer.lock` stops two buyer processes from paying at once.
 - `calls.json` keeps every call, including failed ones.
@@ -19,10 +19,21 @@ miss the answer; reconcile that as charged but undelivered.
 **Never delete the lock or a journal to retry.** Inspect the authorization and
 its transactions first.
 
+## Journals from the old layout
+
+A buyer journal written by an older version sits in `.local/p2p/`, and gate
+journals in `.local/devnet/`. The node never reads or moves them. Until they are
+moved by hand, setup, `buyer:call` and `buyer:reconcile` stop with
+`LEGACY_LOCAL_LAYOUT` before taking a lock, so a fresh buyer cannot pay past an
+uncertain authorization. Move the whole directory, journal and lock included,
+with the commands in
+[running-a-node.md](running-a-node.md#moving-data-from-the-old-layout), then
+reconcile as below.
+
 ## Verify or clear a zero-charge payment
 
-Run from the buyer's working directory, with the original role, trust, offer,
-journal and call history in place:
+Run from the buyer's working directory (same `GYBLOS_HOME`), with the original
+role, trust, offer, journal and call history in place:
 
 ```sh
 pnpm buyer:reconcile --deposit DEPOSIT_SIGNATURE --claim CLAIM_SIGNATURE
@@ -42,7 +53,7 @@ missing identities. Missing history is never invented.
 
 ```sh
 umask 077
-pnpm --silent buyer:reconcile --audit-only --deposit DEPOSIT_SIGNATURE --claim CLAIM_SIGNATURE > .local/p2p/finalized-audit.json
+pnpm --silent buyer:reconcile --audit-only --deposit DEPOSIT_SIGNATURE --claim CLAIM_SIGNATURE > .local/gyblos/buyer/finalized-audit.json
 ```
 
 This prints the verified financial proof for a charged or zero-charge payment

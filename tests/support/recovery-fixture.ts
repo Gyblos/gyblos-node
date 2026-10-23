@@ -1,4 +1,4 @@
-// Builds a recovery scenario from the payment fixture: temporary P2P root, saved journal and a
+// Builds a recovery scenario from the payment fixture: temporary buyer role directory, saved journal and a
 // synthetic signed offer.
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -10,11 +10,12 @@ import { P2P_JOURNAL_STATES } from '@gyblos/buyer/constants';
 import {
   DEVNET,
   FILE_MODES,
+  homeLayout,
   INFERENCE_REQUEST_LIMITS,
   MAX_ATOMIC,
-  P2P,
+  ROLE_FILES,
 } from '@gyblos/config';
-import { PRICES } from '@gyblos/core/constants';
+import { OFFER_LIFETIME_MS, PRICES } from '@gyblos/core/constants';
 import type { OfferTrust } from '@gyblos/core/offers';
 import { P2P_ROLES, ROLE_CONFIG_SCHEMA_VERSION } from '@gyblos/node/constants';
 import { signInferenceOffer } from '@gyblos/node/offers';
@@ -55,7 +56,7 @@ export async function recoveryFixture(fullRefund = true) {
     authorizer: identities.authorizer,
     buyer: identities.buyer,
     issuedAt: 1,
-    expiresAt: 1 + P2P.offerLifetimeMs,
+    expiresAt: 1 + OFFER_LIFETIME_MS,
     prices: PRICES,
     maxAtomic: MAX_ATOMIC,
     maxTokens: INFERENCE_REQUEST_LIMITS.maxOutputTokens,
@@ -99,14 +100,15 @@ export async function recoveryFixture(fullRefund = true) {
     depositSignature,
     claimSignature,
   };
-  const path = (filename: string) => join(directory, P2P.root, filename);
+  const path = (filename: string) =>
+    join(directory, homeLayout(process.env).roles.buyer, filename);
   const write = (filename: string, value: unknown) =>
     saveJson(path(filename), value);
   try {
-    await write(P2P.roleConfig, config);
-    await write(P2P.trustFilename, trust);
-    await write(P2P.offerFilename, await signInferenceOffer(offer, owner));
-    await write(P2P.journalFilename, journal);
+    await write(ROLE_FILES.roleConfig, config);
+    await write(ROLE_FILES.trust, trust);
+    await write(ROLE_FILES.offer, await signInferenceOffer(offer, owner));
+    await write(ROLE_FILES.journal, journal);
   } catch (error) {
     await rm(directory, { recursive: true, force: true });
     throw error;

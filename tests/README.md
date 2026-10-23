@@ -26,7 +26,10 @@ top-level `test()` in a `*.test.ts` file.
 No funded wallet, Ollama, Docker, Python, devnet funds or network. It uses
 synthetic inputs, ephemeral unfunded signers, mocked RPC and temporary files.
 Paid-call cases spawn the real CLI with stubbed payment ports and assert that no
-RPC is made.
+RPC is made. Cases that touch local data run in a temporary working directory
+(and set `GYBLOS_HOME` or `GYBLOS_LAB_HOME` inside it when needed);
+legacy-layout cases create synthetic paths there and never read a real
+`.local/`.
 
 ## Native skips
 
@@ -41,9 +44,9 @@ separately; a skipped case proves nothing on that host.
 
 `GYBLOS_IDENTITY_INTEGRATION=1 pnpm test:lab` starts a throwaway
 `solana-test-validator` on loopback ports 18000-19999, cloning the 8004 program
-and registry accounts read-only from public devnet. Its ledger stays in ignored
-`.local/identity-validator/`. Without the binary, or if devnet is unreachable,
-the four cases skip with a reason.
+and registry accounts read-only from public devnet. Its ledger stays in the
+ignored lab home (`.local/lab/identity-validator/` by default). Without the
+binary, or if devnet is unreachable, the four cases skip with a reason.
 
 ## Fixtures policy
 

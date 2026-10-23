@@ -11,12 +11,17 @@ import {
   FILE_MODES,
   HTTP_STATUS,
   LOCALHOST,
-  P2P,
+  PORTS,
+  ROLE_FILES,
   ROUTES,
+  TRANSPORT_LIMITS,
+  TRANSPORT_TIMEOUTS,
 } from '@gyblos/config';
+import { P2P_ROLES } from '@gyblos/node/constants';
 import { rolePath } from '@gyblos/node/roles';
 import { acceptLoopbackHost } from '@gyblos/runtime/loopback-host';
 import type { Transport } from '@gyblos/transport-iroh';
+import { HTTP_OVER_IROH } from '@gyblos/transport-iroh/constants';
 
 import {
   BUYER_PROXY_ERROR_CODES,
@@ -47,7 +52,7 @@ export function buyerProxyHandler(transport: Transport) {
       response.writeHead(HTTP_STATUS.badRequest).end();
       return;
     }
-    if (active >= P2P.maxConcurrent) {
+    if (active >= TRANSPORT_LIMITS.maxConcurrent) {
       response.writeHead(HTTP_STATUS.tooManyRequests).end();
       return;
     }
@@ -58,14 +63,14 @@ export function buyerProxyHandler(transport: Transport) {
       let size = 0;
       for await (const chunk of request) {
         size += chunk.length;
-        if (size > P2P.bodyBytes)
+        if (size > HTTP_OVER_IROH.bodyBytes)
           throw new Error('Request body exceeds limit.');
         chunks.push(Buffer.from(chunk));
       }
       const body = Buffer.concat(chunks);
       const headers: Record<string, string> = {
         'content-type': 'application/json',
-        host: `${LOCALHOST}:${P2P.buyerProxyPort}`,
+        host: `${LOCALHOST}:${PORTS.buyerProxy}`,
       };
       const payment = request.headers['payment-signature'];
       if (typeof payment === 'string') headers['payment-signature'] = payment;
@@ -98,7 +103,7 @@ export function buyerProxyHandler(transport: Transport) {
         relayObserved: result.relayObserved,
       };
       await appendFile(
-        rolePath(P2P.metricsFilename),
+        rolePath(P2P_ROLES.BUYER, ROLE_FILES.metrics),
         JSON.stringify(metric) + '\n',
         { mode: FILE_MODES.privateFile },
       ).catch(() => undefined); // Telemetry must not replace a settled response.
@@ -121,12 +126,15 @@ export function buyerProxyHandler(transport: Transport) {
 
 export async function startBuyerProxy(transport: Transport) {
   const server = createServer(
-    { maxHeaderSize: P2P.headerBytes, requestTimeout: P2P.requestMs },
+    {
+      maxHeaderSize: HTTP_OVER_IROH.headerBytes,
+      requestTimeout: TRANSPORT_TIMEOUTS.requestMs,
+    },
     buyerProxyHandler(transport),
   );
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject);
-    server.listen(P2P.buyerProxyPort, LOCALHOST, () => resolve());
+    server.listen(PORTS.buyerProxy, LOCALHOST, () => resolve());
   });
   return {
     async close() {

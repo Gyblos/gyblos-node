@@ -5,8 +5,8 @@ import type { Server } from 'node:http';
 
 import {
   CLEANUP,
-  FACILITATOR_LOG_PATHS,
   HOSTS,
+  labLayout,
   LOCALHOST,
   PORTS,
   ROUTES,
@@ -21,7 +21,9 @@ import { createPrivateLog } from '@gyblos/runtime/private-log';
 export async function main() {
   const config = await loadConfig();
   await assertProgram(config.rpcUrl);
-  const diagnosticLog = await createPrivateLog(FACILITATOR_LOG_PATHS.devnet);
+  const diagnosticLog = await createPrivateLog(
+    labLayout(process.env).facilitatorDiagnostics,
+  );
   let server: Server | undefined;
   try {
     const host = createFacilitator(

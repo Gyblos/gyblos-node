@@ -1,4 +1,4 @@
-// Inference prices, recount tolerance, offer id and the charge-anomaly and done-reason codes.
+// Inference prices, recount tolerance, offer id and lifetime, and the charge-anomaly and done-reason codes.
 import { ENGINE_DONE_REASONS } from '@gyblos/protocol/constants';
 
 export const PRICES = { inputAtomic: '1', outputAtomic: '2' } as const;
@@ -7,6 +7,9 @@ export const PRICES = { inputAtomic: '1', outputAtomic: '2' } as const;
 export const TOLERANCE = { absoluteTokens: 2, relativePercent: 2 } as const;
 
 export const OFFER_ID = 'qwen3-0.6b-local-v1';
+
+// Longest issued-to-expiry window a buyer accepts; the seller signs offers with exactly this lifetime.
+export const OFFER_LIFETIME_MS = 4 * 60_000;
 
 export const CHARGE_ANOMALIES = {
   OVERCHARGE: 'overcharge',

@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { setTimeout as delay } from 'node:timers/promises';
 
-import { COMMITMENT, P2P, RETRIES, RETRY_DELAYS } from '@gyblos/config';
+import { COMMITMENT, RETRIES, RETRY_DELAYS } from '@gyblos/config';
 import {
   confirmInference,
   inferenceSnapshot,
@@ -14,6 +14,8 @@ import {
 } from '@gyblos/payments-x402/accounting/chain';
 import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { ProtocolError } from '@gyblos/protocol/errors';
+
+import { MAX_CHANNEL_SIGNATURES } from './constants.js';
 
 export interface PaymentAccounts {
   rpcUrl: string;
@@ -69,7 +71,7 @@ export async function paymentProof(
       [
         channelId,
         {
-          limit: P2P.maxChannelSignatures,
+          limit: MAX_CHANNEL_SIGNATURES,
           commitment: COMMITMENT,
           minContextSlot: claim.slot,
         },

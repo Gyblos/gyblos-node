@@ -4,7 +4,9 @@ import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import test from 'node:test';
 
-import { P2P } from '@gyblos/config';
+import { TRANSPORT_LIMITS } from '@gyblos/config';
+import { NODE_KEY_BYTES } from '@gyblos/node/constants';
+import { HTTP_OVER_IROH } from '@gyblos/transport-iroh/constants';
 import { encodeRequest } from '@gyblos/transport-iroh/wire';
 
 import {
@@ -94,9 +96,9 @@ void test(
         ),
         Buffer.concat([
           Buffer.from(
-            `POST /inference HTTP/1.1\r\ncontent-type: application/json\r\ncontent-length: ${P2P.bodyBytes + 1}\r\n\r\n`,
+            `POST /inference HTTP/1.1\r\ncontent-type: application/json\r\ncontent-length: ${HTTP_OVER_IROH.bodyBytes + 1}\r\n\r\n`,
           ),
-          Buffer.alloc(P2P.bodyBytes + 1),
+          Buffer.alloc(HTTP_OVER_IROH.bodyBytes + 1),
         ]),
       ];
       for (const frame of malformed) {
@@ -162,9 +164,9 @@ void test(
     try {
       const first = await lab.transport();
       const second = await lab.transport();
-      const secret = [...randomBytes(P2P.nodeSecretBytes)];
+      const secret = [...randomBytes(NODE_KEY_BYTES)];
       const duplicates: Awaited<ReturnType<typeof lab.client>>[] = [];
-      for (let index = 0; index < P2P.maxConnections; index++) {
+      for (let index = 0; index < TRANSPORT_LIMITS.maxConnections; index++) {
         try {
           duplicates.push(await lab.client(secret));
         } catch {
@@ -175,7 +177,7 @@ void test(
         () =>
           duplicates.filter(
             (client) => client.connection.closeReason() === null,
-          ).length <= P2P.maxPeerConnections,
+          ).length <= TRANSPORT_LIMITS.maxPeerConnections,
         undefined,
         'duplicate-connection admission decisions',
       );

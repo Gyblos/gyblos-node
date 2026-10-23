@@ -1,5 +1,5 @@
 // Per-peer and global request quotas per window; consumed quota survives reconnects and eviction.
-import { P2P } from '@gyblos/config';
+import { TRANSPORT_LIMITS } from '@gyblos/config';
 
 interface PeerWindow {
   active: number;
@@ -17,7 +17,7 @@ export function createPeerLimiter(now: () => number = Date.now) {
 
   function remaining() {
     return (
-      P2P.globalRequestsPerWindow -
+      TRANSPORT_LIMITS.globalRequestsPerWindow -
       globalRequests -
       [...windows.values()].reduce((sum, window) => sum + window.reserved, 0)
     );
@@ -25,7 +25,7 @@ export function createPeerLimiter(now: () => number = Date.now) {
 
   function refresh() {
     const time = now();
-    if (time - globalStarted < P2P.rateWindowMs) return;
+    if (time - globalStarted < TRANSPORT_LIMITS.rateWindowMs) return;
     globalStarted = time;
     globalRequests = 0;
     requestCounts.clear();
@@ -35,13 +35,16 @@ export function createPeerLimiter(now: () => number = Date.now) {
     }
     for (const window of windows.values())
       if (window.leases > 0)
-        window.reserved = Math.min(P2P.requestsPerWindow, remaining());
+        window.reserved = Math.min(
+          TRANSPORT_LIMITS.requestsPerWindow,
+          remaining(),
+        );
   }
 
   function windowFor(nodeId: string) {
     let window = windows.get(nodeId);
     if (!window) {
-      if (windows.size >= P2P.maxPeers) {
+      if (windows.size >= TRANSPORT_LIMITS.maxPeers) {
         const inactive = ([, peer]: [string, PeerWindow]) =>
           peer.active === 0 && peer.leases === 0;
         const oldest =
@@ -73,14 +76,16 @@ export function createPeerLimiter(now: () => number = Date.now) {
       refresh();
       const requests = requestCounts.get(nodeId) ?? 0;
       if (
-        requests >= P2P.requestsPerWindow ||
-        globalRequests >= P2P.globalRequestsPerWindow ||
-        (windows.get(nodeId)?.leases ?? 0) >= P2P.maxPeerConnections
+        requests >= TRANSPORT_LIMITS.requestsPerWindow ||
+        globalRequests >= TRANSPORT_LIMITS.globalRequestsPerWindow ||
+        (windows.get(nodeId)?.leases ?? 0) >=
+          TRANSPORT_LIMITS.maxPeerConnections
       )
         return undefined;
       const window = windowFor(nodeId);
       if (!window) return undefined;
-      const needed = P2P.requestsPerWindow - requests - window.reserved;
+      const needed =
+        TRANSPORT_LIMITS.requestsPerWindow - requests - window.reserved;
       reclaim(nodeId, needed);
       const additional = Math.min(needed, remaining());
       if (window.reserved + additional <= 0) return undefined;
@@ -104,13 +109,14 @@ export function createPeerLimiter(now: () => number = Date.now) {
       refresh();
       const requests = requestCounts.get(nodeId) ?? 0;
       if (
-        active >= P2P.maxConcurrent ||
-        requests >= P2P.requestsPerWindow ||
-        globalRequests >= P2P.globalRequestsPerWindow
+        active >= TRANSPORT_LIMITS.maxConcurrent ||
+        requests >= TRANSPORT_LIMITS.requestsPerWindow ||
+        globalRequests >= TRANSPORT_LIMITS.globalRequestsPerWindow
       )
         return undefined;
       const window = windowFor(nodeId);
-      if (!window || window.active >= P2P.maxPeerConcurrent) return undefined;
+      if (!window || window.active >= TRANSPORT_LIMITS.maxPeerConcurrent)
+        return undefined;
       if (window.reserved === 0) {
         if (window.leases > 0) return undefined;
         reclaim(nodeId, 1);

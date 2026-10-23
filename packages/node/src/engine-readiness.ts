@@ -1,6 +1,7 @@
 // Holds the seller until the engine is ready: checks memory headroom, runs one bounded private warmup, records
 // the outcome and anchors offer expiry to the warmed model's residency.
-import { DIAGNOSTICS, P2P } from '@gyblos/config';
+import { DIAGNOSTICS } from '@gyblos/config';
+import { OFFER_LIFETIME_MS } from '@gyblos/core/constants';
 import { READINESS_GENERATION } from '@gyblos/engine-ollama/constants';
 import { type Engine, type EngineDescription } from '@gyblos/protocol/engine';
 import {
@@ -49,7 +50,7 @@ export async function prepareSellerEngine(
     reason = 'insufficient-headroom';
     assertMemoryHeadroom(before);
     reason = 'warmup-failed';
-    if (P2P.offerLifetimeMs >= READINESS_GENERATION.residencyMs)
+    if (OFFER_LIFETIME_MS >= READINESS_GENERATION.residencyMs)
       throw new Error('Offer lifetime exceeds warmed model residency.');
     const model = await engine.describe();
     await Promise.race([
@@ -67,7 +68,7 @@ export async function prepareSellerEngine(
       }),
     ]);
     clearTimeout(timer);
-    const offerExpiresAt = Date.now() + P2P.offerLifetimeMs;
+    const offerExpiresAt = Date.now() + OFFER_LIFETIME_MS;
     reason = 'memory-observation-failed';
     const after = await dependencies.snapshot();
     reason = 'warmup-failed';

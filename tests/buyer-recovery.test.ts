@@ -8,7 +8,7 @@ import { basename } from 'node:path';
 import test from 'node:test';
 
 import { CALL_OUTCOMES, RECONCILED_ZERO_CHARGE } from '@gyblos/buyer/constants';
-import { P2P } from '@gyblos/config';
+import { ROLE_FILES, ROLE_KEY_FILES } from '@gyblos/config';
 import { JOURNAL_STATES } from '@gyblos/payments-x402/constants';
 
 import { NATIVE_CAPABILITY } from './support/native-runtime.js';
@@ -28,13 +28,13 @@ void test(
       assert.equal(proof.treasurySweepAtomic, '17');
       assert.equal(proof.refundAtomic, fixture.financial.expected.ceiling);
       assert.equal(
-        (await fixture.read<{ state: string }>(P2P.journalFilename)).state,
+        (await fixture.read<{ state: string }>(ROLE_FILES.journal)).state,
         JOURNAL_STATES.CONFIRMED,
       );
-      await assert.rejects(stat(fixture.path(P2P.callsFilename)), {
+      await assert.rejects(stat(fixture.path(ROLE_FILES.calls)), {
         code: 'ENOENT',
       });
-      for (const key of Object.values(P2P.keys))
+      for (const key of Object.values(ROLE_KEY_FILES))
         await assert.rejects(stat(fixture.path(key)), { code: 'ENOENT' });
       assert.ok(
         fixture.financial.methods.every((method) => method.startsWith('get')),
@@ -44,7 +44,7 @@ void test(
     }
   },
 );
-for (const target of [P2P.reconciliationsFilename, P2P.journalFilename])
+for (const target of [ROLE_FILES.reconciliations, ROLE_FILES.journal])
   void test(
     'actual CLI leaves recovery unresolved if saving ' + target + ' fails',
     RECOVERY_OPTIONS,
@@ -68,16 +68,16 @@ for (const target of [P2P.reconciliationsFilename, P2P.journalFilename])
         syncBuiltinESMExports();
         await assert.rejects(fixture.run(), /Synthetic persistence failure/);
         assert.deepEqual(
-          await fixture.read(P2P.journalFilename),
+          await fixture.read(ROLE_FILES.journal),
           fixture.journal,
         );
-        if (target === P2P.reconciliationsFilename)
+        if (target === ROLE_FILES.reconciliations)
           await assert.rejects(stat(fixture.path(target)), {
             code: 'ENOENT',
           });
         else
           assert.equal(
-            (await fixture.read<unknown[]>(P2P.reconciliationsFilename)).length,
+            (await fixture.read<unknown[]>(ROLE_FILES.reconciliations)).length,
             1,
           );
         const reads = fixture.financial.methods.length;
@@ -85,14 +85,14 @@ for (const target of [P2P.reconciliationsFilename, P2P.journalFilename])
         await fixture.run();
         assert.ok(fixture.financial.methods.length > reads);
         assert.equal(
-          (await fixture.read<{ state: string }>(P2P.journalFilename)).state,
+          (await fixture.read<{ state: string }>(ROLE_FILES.journal)).state,
           JOURNAL_STATES.CONFIRMED,
         );
         assert.equal(
-          (await fixture.read<unknown[]>(P2P.reconciliationsFilename)).length,
-          target === P2P.journalFilename ? 2 : 1,
+          (await fixture.read<unknown[]>(ROLE_FILES.reconciliations)).length,
+          target === ROLE_FILES.journal ? 2 : 1,
         );
-        await assert.rejects(stat(fixture.path(P2P.callsFilename)), {
+        await assert.rejects(stat(fixture.path(ROLE_FILES.calls)), {
           code: 'ENOENT',
         });
       } finally {
@@ -109,19 +109,19 @@ void test(
     const fixture = await recoveryFixture();
     try {
       await fixture.run();
-      const journal = await readFile(fixture.path(P2P.journalFilename));
-      const records = await readFile(fixture.path(P2P.reconciliationsFilename));
+      const journal = await readFile(fixture.path(ROLE_FILES.journal));
+      const records = await readFile(fixture.path(ROLE_FILES.reconciliations));
       const reads = fixture.financial.methods.length;
       await assert.rejects(fixture.run(), /Only an unresolved authorization/);
       assert.equal(fixture.financial.methods.length, reads);
       await fixture.run(['--audit-only']);
       assert.ok(fixture.financial.methods.length > reads);
       assert.deepEqual(
-        await readFile(fixture.path(P2P.journalFilename)),
+        await readFile(fixture.path(ROLE_FILES.journal)),
         journal,
       );
       assert.deepEqual(
-        await readFile(fixture.path(P2P.reconciliationsFilename)),
+        await readFile(fixture.path(ROLE_FILES.reconciliations)),
         records,
       );
     } finally {
@@ -139,19 +139,13 @@ void test(
         fixture.run(),
         /confirmed charge requires charged-outcome recovery/,
       );
-      assert.deepEqual(
-        await fixture.read(P2P.journalFilename),
-        fixture.journal,
-      );
+      assert.deepEqual(await fixture.read(ROLE_FILES.journal), fixture.journal);
       const proof = await fixture.run(['--audit-only']);
       assert.equal(
         proof.chargedAtomic,
         fixture.financial.historicalResult.chargedAtomic,
       );
-      assert.deepEqual(
-        await fixture.read(P2P.journalFilename),
-        fixture.journal,
-      );
+      assert.deepEqual(await fixture.read(ROLE_FILES.journal), fixture.journal);
     } finally {
       await fixture.close();
     }
@@ -178,7 +172,7 @@ for (const fault of [
           outcome: CALL_OUTCOMES.UNCERTAIN,
         };
         if (fault === 'identity')
-          await fixture.write(P2P.journalFilename, {
+          await fixture.write(ROLE_FILES.journal, {
             ...fixture.journal,
             paymentExpectation: {
               ...fixture.journal.paymentExpectation,
@@ -186,13 +180,13 @@ for (const fault of [
             },
           });
         else if (fault === 'missing signatures')
-          await fixture.write(P2P.journalFilename, {
+          await fixture.write(ROLE_FILES.journal, {
             ...fixture.journal,
             claimSignature: '',
           });
         else
           await fixture.write(
-            P2P.callsFilename,
+            ROLE_FILES.calls,
             fault === 'multiple'
               ? [call, { ...call, requestId: 'conflicting-request' }]
               : [
@@ -204,14 +198,14 @@ for (const fault of [
                   },
                 ],
           );
-        const journalBefore = await readFile(fixture.path(P2P.journalFilename));
+        const journalBefore = await readFile(fixture.path(ROLE_FILES.journal));
         await assert.rejects(fixture.run());
         assert.deepEqual(
-          await readFile(fixture.path(P2P.journalFilename)),
+          await readFile(fixture.path(ROLE_FILES.journal)),
           journalBefore,
         );
         assert.equal(fixture.financial.methods.length, 0);
-        await assert.rejects(stat(fixture.path(P2P.reconciliationsFilename)), {
+        await assert.rejects(stat(fixture.path(ROLE_FILES.reconciliations)), {
           code: 'ENOENT',
         });
       } finally {

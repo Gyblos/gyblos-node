@@ -1,4 +1,4 @@
-// Owns laboratory throwaway identity keys under ignored .local/identity/keys (dir 0700, files 0600).
+// Owns laboratory throwaway identity keys in <lab home>/identity/keys (dir 0700, files 0600).
 // Devnet/local test keys only; never prints secret bytes. Product code must not depend on this module.
 import {
   chmodSync,
@@ -7,6 +7,7 @@ import {
   readFileSync,
   writeFileSync,
 } from 'node:fs';
+import { join } from 'node:path';
 
 import {
   createKeyPairFromPrivateKeyBytes,
@@ -16,9 +17,10 @@ import {
   type KeyPairSigner,
 } from '@solana/kit';
 
-import { FILE_MODES } from '@gyblos/config';
+import { FILE_MODES, labLayout, LEGACY_LOCAL_PATHS } from '@gyblos/config';
+import { assertLabHome } from '@gyblos/lab-harness/wallet';
+import { assertNoLegacyLayout } from '@gyblos/node/home';
 
-const KEY_DIR = new URL('../../.local/identity/keys/', import.meta.url);
 const SEED_BYTES = 32;
 const KEY_NAME = /^[a-z0-9-]+$/;
 
@@ -42,9 +44,13 @@ export async function loadOrCreateKey(
   name: string,
 ): Promise<{ signer: KeyPairSigner; seed: Uint8Array }> {
   if (!KEY_NAME.test(name)) throw new Error('key name must be [a-z0-9-]+');
-  mkdirSync(KEY_DIR, { recursive: true, mode: FILE_MODES.privateDirectory });
-  chmodSync(KEY_DIR, FILE_MODES.privateDirectory);
-  const file = new URL(`${name}.json`, KEY_DIR);
+  const directory = labLayout(process.env).identityKeys;
+  // Both guards run before the mkdir, which would also create the lab home.
+  await assertLabHome();
+  await assertNoLegacyLayout(directory, [LEGACY_LOCAL_PATHS.identityKeys]);
+  mkdirSync(directory, { recursive: true, mode: FILE_MODES.privateDirectory });
+  chmodSync(directory, FILE_MODES.privateDirectory);
+  const file = join(directory, `${name}.json`);
   if (!existsSync(file))
     writeFileSync(file, JSON.stringify([...(await createSecret())]), {
       mode: FILE_MODES.privateFile,

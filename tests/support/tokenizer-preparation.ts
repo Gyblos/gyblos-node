@@ -6,26 +6,39 @@ import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { TOKENIZER_DIR, TOKENIZER_FILES } from '@gyblos/config';
+import { homeLayout } from '@gyblos/config';
+
+// The child runs with a minimal environment, so the default home applies.
+export function artifactLayout() {
+  return homeLayout({}).artifacts;
+}
 
 export async function preparation(
   corrupt: false | 'tokenizer' | 'config' = false,
   seed = false,
   failure: 'oversize' | 'write' | undefined = undefined,
   lab = false,
+  legacyDirectories: readonly string[] = [],
 ) {
   const directory = await mkdtemp(join(tmpdir(), 'gyblos-buyer-setup-'));
+  for (const legacy of legacyDirectories)
+    await mkdir(join(directory, legacy), { recursive: true });
   const artifacts = {
     tokenizer: 'synthetic tokenizer',
     config: 'synthetic config',
   };
   if (seed) {
-    await mkdir(join(directory, TOKENIZER_DIR), { recursive: true });
+    await mkdir(join(directory, artifactLayout().tokenizer), {
+      recursive: true,
+    });
     await writeFile(
-      join(directory, TOKENIZER_FILES.tokenizer),
+      join(directory, artifactLayout().tokenizerFiles.tokenizer),
       artifacts.tokenizer,
     );
-    await writeFile(join(directory, TOKENIZER_FILES.config), artifacts.config);
+    await writeFile(
+      join(directory, artifactLayout().tokenizerFiles.config),
+      artifacts.config,
+    );
   }
   const digest = (body: string) =>
     createHash('sha256').update(body).digest('hex');

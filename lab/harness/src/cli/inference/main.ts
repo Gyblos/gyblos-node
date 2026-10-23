@@ -12,17 +12,18 @@ import { measurementSalt } from '@gyblos/buyer/measurements';
 import { createCases } from '@gyblos/buyer/synthetic-cases';
 import {
   DEVNET_USDC,
+  homeLayout,
   HOSTS,
+  labLayout,
   LOCALHOST,
-  OLLAMA_MODELS_PATH,
   ROUTES,
   TIMEOUTS,
-  TOKENIZER_FILES,
 } from '@gyblos/config';
 import { CONFIG_ASSET_LABELS } from '@gyblos/config/constants';
 import { createModelTokenizer, createOllama } from '@gyblos/engine-ollama';
 import { GENERATION } from '@gyblos/engine-ollama/constants';
 import { createOllamaEngine } from '@gyblos/engine-ollama/engine';
+import { assertOllamaModelsHome } from '@gyblos/node/home';
 import { createInferenceSeller } from '@gyblos/node/http/inference';
 import {
   confirmInference,
@@ -50,22 +51,24 @@ import {
   GATE_DIAGNOSTIC_LIMITS,
   GATE_HOST_MESSAGES,
   INFERENCE_EVIDENCE_CODES,
-  JOURNAL_PATHS,
   keyPath,
-  LOCK_PATH,
+  labPaths,
   MIN_FACILITATOR_LAMPORTS,
   WALLET_ROLES,
 } from '../../constants.js';
 import type { InferenceTrace } from '../../inference-evidence-types.js';
 import { assertNoUnresolvedAuthorizations } from '../../journal.js';
-import { loadConfig, signer } from '../../wallet.js';
+import { assertLabHome, loadConfig, signer } from '../../wallet.js';
 import { createGateBilling } from './billing.js';
 import { runCases } from './cases.js';
 import { initializeEvidence } from './evidence.js';
 
 export async function main() {
+  // Before the lab lock, which would create the lab home.
+  await assertLabHome();
+  await assertOllamaModelsHome();
   const evidencePath = EVIDENCE_PATHS.inference;
-  const journalPath = JOURNAL_PATHS.inference;
+  const journalPath = labPaths().journals.inference;
   const ollamaUrl = HOSTS.ollama;
   const facilitatorUrl = HOSTS.facilitator;
   const runId = randomUUID();
@@ -100,12 +103,18 @@ export async function main() {
       'Facilitator needs devnet SOL for the inference channels.',
     );
     const artifacts = {
-      tokenizer: await readFile(TOKENIZER_FILES.tokenizer, 'utf8'),
-      config: await readFile(TOKENIZER_FILES.config, 'utf8'),
+      tokenizer: await readFile(
+        homeLayout(process.env).artifacts.tokenizerFiles.tokenizer,
+        'utf8',
+      ),
+      config: await readFile(
+        homeLayout(process.env).artifacts.tokenizerFiles.config,
+        'utf8',
+      ),
     };
     const buyerTokenizer = createModelTokenizer(artifacts);
     const sellerTokenizer = createModelTokenizer(artifacts);
-    const salt = await measurementSalt();
+    const salt = await measurementSalt(labLayout(process.env).root);
     const evidence = await initializeEvidence(config, runId, evidencePath);
     try {
       await assertPortFree(
@@ -128,7 +137,9 @@ export async function main() {
         env: {
           ...process.env,
           OLLAMA_HOST: HOSTS.ollamaBind,
-          OLLAMA_MODELS: resolve(OLLAMA_MODELS_PATH),
+          OLLAMA_MODELS: resolve(
+            homeLayout(process.env).artifacts.ollamaModels,
+          ),
           OLLAMA_NO_CLOUD: '1',
           OLLAMA_DEBUG: '0',
           OLLAMA_CONTEXT_LENGTH: String(GENERATION.numCtx),
@@ -275,7 +286,7 @@ export async function main() {
   }
 
   try {
-    await withExclusiveLock(LOCK_PATH, run);
+    await withExclusiveLock(labPaths().lock, run);
   } catch (error) {
     console.error(
       error instanceof ProtocolError

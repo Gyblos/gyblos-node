@@ -7,7 +7,7 @@ export const NODE_STATES = {
 } as const;
 export type NodeState = (typeof NODE_STATES)[keyof typeof NODE_STATES];
 
-// Schema of .local/p2p role config files; independent of the offer wire schema.
+// Schema of role config files in the local home; independent of the offer wire schema.
 export const ROLE_CONFIG_SCHEMA_VERSION = 1;
 
 export const TOKENIZER_ORIGIN = 'https://huggingface.co';
@@ -21,12 +21,15 @@ export const NODE_ERROR_CODES = {
   INVALID_ROLE_CONFIGURATION: 'INVALID_ROLE_CONFIGURATION',
   INVALID_OFFER_TRUST: 'INVALID_OFFER_TRUST',
   INVALID_SIGNED_OFFER: 'INVALID_SIGNED_OFFER',
+  LEGACY_LOCAL_LAYOUT: 'LEGACY_LOCAL_LAYOUT',
 } as const;
 export type NodeErrorCode =
   (typeof NODE_ERROR_CODES)[keyof typeof NODE_ERROR_CODES];
 
 export const P2P_ROLES = { BUYER: 'buyer', SELLER: 'seller' } as const;
 export type P2PRole = (typeof P2P_ROLES)[keyof typeof P2P_ROLES];
+// Iroh secret key length stored in a role's node.key.
+export const NODE_KEY_BYTES = 32;
 export const NODE_CONFIGURATION_LIMITS = {
   stringCharacters: 2048,
   nodeIdHexCharacters: 64,

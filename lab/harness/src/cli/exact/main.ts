@@ -25,8 +25,7 @@ import {
   EXACT_PRICE,
   FACILITATOR_STATUSES,
   GATE_ROUTES,
-  JOURNAL_PATHS,
-  LOCK_PATH,
+  labPaths,
   PUBLIC_FACILITATORS,
 } from '../../constants.js';
 import { prepareExactAccounts } from '../../exact-accounts.js';
@@ -36,13 +35,15 @@ import {
   createExactSeller,
 } from '../../exact/seller.js';
 import { assertNoUnresolvedAuthorizations } from '../../journal.js';
-import { loadConfig } from '../../wallet.js';
+import { assertLabHome, loadConfig } from '../../wallet.js';
 import { runProvider } from './cases.js';
 import { createEvidence } from './evidence.js';
 
 export async function main() {
+  // Before the lab lock, which would create the lab home.
+  await assertLabHome();
   const evidencePath = EVIDENCE_PATHS.exact;
-  const journalPath = JOURNAL_PATHS.exact;
+  const journalPath = labPaths().journals.exact;
   const evidence = createEvidence();
   async function persist() {
     await saveJson(evidencePath, evidence);
@@ -184,7 +185,7 @@ export async function main() {
   }
   let acquired = false;
   try {
-    await withExclusiveLock(LOCK_PATH, async () => {
+    await withExclusiveLock(labPaths().lock, async () => {
       acquired = true;
       await run();
     });

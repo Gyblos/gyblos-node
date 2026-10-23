@@ -4,10 +4,11 @@ import assert from 'node:assert/strict';
 import { constants } from 'node:fs';
 import { lstat, open, unlink, type FileHandle } from 'node:fs/promises';
 
-import { FILE_MODES, P2P } from '@gyblos/config';
+import { FILE_MODES } from '@gyblos/config';
 import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { ProtocolError } from '@gyblos/protocol/errors';
 
+import { LOCK_METADATA_BYTES } from '../constants.js';
 import { currentLockOwner } from './lock-owner.js';
 import { withExclusiveLock } from './lock.js';
 
@@ -27,7 +28,7 @@ async function privateFile(handle: FileHandle) {
   );
   assert.ok(process.geteuid, 'Local owner metadata is required.');
   assert.equal(info.uid, process.geteuid());
-  assert.equal(info.mode & P2P.permissionMask, FILE_MODES.privateFile);
+  assert.equal(info.mode & FILE_MODES.permissionMask, FILE_MODES.privateFile);
   return info;
 }
 
@@ -42,10 +43,10 @@ async function removeDeadBuyerLock(paths: RecoveryLockPaths) {
   if (!handle) return;
   try {
     const info = await privateFile(handle);
-    assert.ok(info.size > 0 && info.size <= P2P.lockMetadataBytes);
-    const buffer = Buffer.alloc(P2P.lockMetadataBytes + 1);
+    assert.ok(info.size > 0 && info.size <= LOCK_METADATA_BYTES);
+    const buffer = Buffer.alloc(LOCK_METADATA_BYTES + 1);
     const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
-    assert.ok(bytesRead > 0 && bytesRead <= P2P.lockMetadataBytes);
+    assert.ok(bytesRead > 0 && bytesRead <= LOCK_METADATA_BYTES);
     const metadata: unknown = JSON.parse(
       buffer.subarray(0, bytesRead).toString(),
     );
@@ -109,7 +110,10 @@ async function removeDeadBuyerLock(paths: RecoveryLockPaths) {
     assert.equal(current.dev, info.dev);
     assert.equal(current.ino, info.ino);
     assert.equal(current.uid, info.uid);
-    assert.equal(current.mode & P2P.permissionMask, FILE_MODES.privateFile);
+    assert.equal(
+      current.mode & FILE_MODES.permissionMask,
+      FILE_MODES.privateFile,
+    );
     await unlink(paths.buyer);
   } finally {
     await handle.close();
