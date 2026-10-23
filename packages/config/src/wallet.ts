@@ -11,10 +11,7 @@ import {
   type WalletRole,
 } from './constants.js';
 import { KEY_LIMITS } from './limits.js';
-import { DEVNET_USDC } from './network.js';
 import { CONFIG_PATH } from './paths.js';
-
-export const defaultMint = DEVNET_USDC;
 
 export interface Config {
   schemaVersion: typeof CONFIG_SCHEMA_VERSION;

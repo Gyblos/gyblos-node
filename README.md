@@ -39,7 +39,7 @@ from [faucet.solana.com](https://faucet.solana.com); inference needs
 ### 1. Offline checks
 
 ```sh
-pnpm install --frozen-lockfile --ignore-scripts
+pnpm install --frozen-lockfile
 pnpm typecheck && pnpm lint && pnpm test
 ```
 
@@ -76,62 +76,51 @@ steps: [docs/running-a-node.md](docs/running-a-node.md).
 
 ## Commands
 
-| Group  | Command                                              | What it does                                                    |
-| ------ | ---------------------------------------------------- | --------------------------------------------------------------- |
-| Node   | `pnpm node:start`, `buyer:start`                     | Start the seller node; start the buyer proxy (`:4031`).         |
-| Node   | `pnpm p2p:reconcile`                                 | Verify a P2P payment; clear a zero-charge block.                |
-| Gate   | `pnpm gate:setup`                                    | Create devnet keys; `--role buyer\|seller` for P2P.             |
-| Gate   | `pnpm gate:fund`                                     | Provision accounts; `--test-mint` makes a test token.           |
-| Gate   | `pnpm gate:preflight`, `gate:challenge`              | Check devnet and balances; check that unpaid gets 402.          |
-| Gate   | `pnpm gate:run`                                      | Run the fixed-resource `upto` payment end to end.               |
-| Gate   | `pnpm gate:failures`                                 | Empty buyer and expired authorization (about 62 s).             |
-| Gate   | `pnpm gate:facilitator`, `gate:seller`, `gate:buyer` | Run the fixed-resource roles separately (ports 4022, 4021).     |
-| Gate   | `pnpm gate:exact`                                    | Fixed price through the public x402.org facilitator.            |
-| Gate   | `pnpm gate:inference:setup`, `gate:inference`        | Download the model; run six metered cases.                      |
-| Lab    | `pnpm identity:devnet-run`                           | Try the sponsored 8004 registration on devnet.                  |
-| Checks | `pnpm test`, `test:lab`, `test:all`                  | Product tests (PR gate), lab tests, both.                       |
-| Checks | `pnpm typecheck`                                     | TypeScript, including tests.                                    |
-| Checks | `pnpm lint`                                          | ESLint, Prettier and import boundaries.                         |
-| Checks | `pnpm boundaries`, `tooling:test`                    | Boundary check (`--json`); tests of the checker and lint rules. |
-| Checks | `pnpm format`, `format:check`                        | Format and sort imports; check only.                            |
+| Group  | Command                                              | What it does                                                          |
+| ------ | ---------------------------------------------------- | --------------------------------------------------------------------- |
+| Node   | `pnpm node:start`, `buyer:start`                     | Start the seller node; start the buyer proxy (`:4031`).               |
+| Node   | `pnpm buyer:call`, `buyer:reconcile`                 | One paid synthetic call; verify a payment, clear a zero-charge block. |
+| Gate   | `pnpm gate:setup`                                    | Create devnet keys; `--role buyer\|seller` for P2P.                   |
+| Gate   | `pnpm gate:fund`                                     | Provision accounts; `--test-mint` makes a test token.                 |
+| Gate   | `pnpm gate:preflight`, `gate:challenge`              | Check devnet and balances; check that unpaid gets 402.                |
+| Gate   | `pnpm gate:run`                                      | Run the fixed-resource `upto` payment end to end.                     |
+| Gate   | `pnpm gate:failures`                                 | Empty buyer and expired authorization (about 62 s).                   |
+| Gate   | `pnpm gate:facilitator`, `gate:seller`, `gate:buyer` | Run the fixed-resource roles separately (ports 4022, 4021).           |
+| Gate   | `pnpm gate:exact`                                    | Fixed price through the public x402.org facilitator.                  |
+| Gate   | `pnpm gate:inference:setup`, `gate:inference`        | Download the model; run six metered cases.                            |
+| Lab    | `pnpm identity:devnet-run`                           | Try the sponsored 8004 registration on devnet.                        |
+| Lab    | `pnpm identity:fixtures`                             | Recapture the public registry fixture (read-only devnet).             |
+| Checks | `pnpm test`, `test:lab`, `test:all`                  | Product tests (PR gate), lab tests, both.                             |
+| Checks | `pnpm typecheck`                                     | TypeScript, including tests.                                          |
+| Checks | `pnpm lint`                                          | ESLint, Prettier and import boundaries.                               |
+| Checks | `pnpm boundaries`, `tooling:test`                    | Boundary check (`--json`); tests of the checker and lint rules.       |
+| Checks | `pnpm format`, `format:check`                        | Format and sort imports; check only.                                  |
 
 ## Configuration
 
 Set these in the environment; `.env` is **not** loaded
 ([.env.example](.env.example)).
 
-| Variable                                        | Used by       | Meaning                                                   |
-| ----------------------------------------------- | ------------- | --------------------------------------------------------- |
-| `GYBLOS_RELAY_TOKEN`                            | seller, buyer | **Required.** Relay credential, 32-512 characters.        |
-| `GYBLOS_RELAYS`                                 | seller, buyer | Comma-separated relay URLs; default `na1` only.           |
-| `GYBLOS_RELAY_ONLY`                             | seller        | `1` = relay only; advertise no direct addresses.          |
-| `GYBLOS_BUYER_RELAY_ONLY`                       | buyer         | `1` = loopback binds; dial the seller only via its relay. |
-| `GYBLOS_IROH_BIND`, `GYBLOS_IROH_EXTERNAL_ADDR` | seller, buyer | UDP bind address; extra public address to advertise.      |
-| `GYBLOS_EXPECTED_ROUTE`                         | buyer         | Require `iroh-direct` or `iroh-relay` before paying.      |
-| `GYBLOS_RPC_URL`                                | all           | Devnet RPC; default `https://api.devnet.solana.com`.      |
-| `GYBLOS_GATE_CONFIG`                            | gates         | Gate config file; default `.local/devnet/config.json`.    |
-| `GYBLOS_IDENTITY_INTEGRATION`                   | lab tests     | `1` = run opt-in local-validator identity tests.          |
+| Variable                                        | Used by       | Meaning                                                    |
+| ----------------------------------------------- | ------------- | ---------------------------------------------------------- |
+| `GYBLOS_RELAY_TOKEN`                            | seller, buyer | **Required.** Relay credential, 32-512 characters.         |
+| `GYBLOS_RELAYS`                                 | seller, buyer | Comma-separated relay URLs; default `na1` only.            |
+| `GYBLOS_RELAY_ONLY`                             | seller        | `1` = relay only; advertise no direct addresses.           |
+| `GYBLOS_BUYER_RELAY_ONLY`                       | buyer         | `1` = loopback binds; dial the seller only via its relay.  |
+| `GYBLOS_IROH_BIND`, `GYBLOS_IROH_EXTERNAL_ADDR` | seller, buyer | UDP bind address; extra public address to advertise.       |
+| `GYBLOS_EXPECTED_ROUTE`                         | buyer         | Require `iroh-direct` or `iroh-relay` before paying.       |
+| `GYBLOS_RPC_URL`                                | all           | Devnet RPC; default `https://api.devnet.solana.com`.       |
+| `GYBLOS_GATE_CONFIG`                            | gates         | Gate config file; default `.local/devnet/config.json`.     |
+| `GYBLOS_P2P_RUN_ID`                             | seller, buyer | Optional label copied into `status.json` and evidence.     |
+| `GYBLOS_GATE_RUN_ID`                            | gates         | Run label set by `gate:run`/`gate:inference` for children. |
+| `GYBLOS_IDENTITY_INTEGRATION`                   | lab tests     | `1` = run opt-in local-validator identity tests.           |
 
 ## Repository layout
 
-```text
-apps/node/              seller daemon (node:start)
-apps/buyer/             buyer proxy, one paid call, and p2p:reconcile
-apps/facilitator/       local x402 facilitator process
-packages/protocol/      wire format: signed bytes, Engine contract, error codes (SPEC.md)
-packages/core/          pricing, metering and offer trust rules
-packages/config/        addresses, ports, paths, limits
-packages/runtime/       files, processes, private logs, memory checks
-packages/engine-ollama/ Ollama client and tokenizer
-packages/payments-x402/ x402 payments, facilitator, chain proofs, recovery locks
-packages/transport-iroh/ HTTP over Iroh, relays, admission limits
-packages/identity/      8004 registry adapter (not wired yet)
-packages/node/          seller composition; roles and offers shared with apps/buyer
-lab/harness/            gate:* proof-of-concept checks, exact scheme, fixed-price test seller (Docker/NAT lab: tag archive/poc-lab-2026-10)
-lab/tools/              identity devnet tools
-lab/evidence/           three published, redacted run reports
-tests/, tooling/        offline tests and fixtures; boundary checker and lint rules
-```
+`apps/` holds the executables (seller node, buyer, facilitator), `packages/` the
+libraries they share, `lab/` the gate checks and their evidence, and `tests/`
+and `tooling/` the offline checks. Package-by-package map:
+[docs/architecture.md](docs/architecture.md).
 
 ## Safety
 

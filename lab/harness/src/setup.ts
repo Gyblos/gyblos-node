@@ -8,12 +8,13 @@ import { createKeyPairSignerFromBytes } from '@solana/kit';
 
 import {
   DEVNET_RPC_URL,
+  DEVNET_USDC,
   FILE_MODES,
   KEY_LIMITS,
   LOCAL_DIR,
 } from '@gyblos/config';
 import { CONFIG_ASSET_LABELS, WALLET_ROLES } from '@gyblos/config/constants';
-import { configPath, defaultMint, type Config } from '@gyblos/config/wallet';
+import { configPath, type Config } from '@gyblos/config/wallet';
 import { saveJson } from '@gyblos/runtime';
 
 import { keyFilename, SCHEMA_VERSIONS } from './constants.js';
@@ -86,7 +87,7 @@ export async function setupGate() {
     await saveJson(path, {
       schemaVersion: SCHEMA_VERSIONS.CONFIG,
       rpcUrl: process.env.GYBLOS_RPC_URL ?? DEVNET_RPC_URL,
-      mint: defaultMint,
+      mint: DEVNET_USDC,
       assetLabel: CONFIG_ASSET_LABELS.DEVNET_USDC,
       keys,
       addresses,

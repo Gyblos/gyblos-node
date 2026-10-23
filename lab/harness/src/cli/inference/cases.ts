@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 
 import { appendMeasurement, measurementRow } from '@gyblos/buyer/measurements';
-import { DEVNET, TIMEOUTS } from '@gyblos/config';
+import { DEVNET } from '@gyblos/config';
 import { WALLET_ROLES } from '@gyblos/config/constants';
 import { signer } from '@gyblos/config/wallet';
 import { OFFER_ID } from '@gyblos/core/constants';
@@ -17,7 +17,7 @@ import { JOURNAL_STATES } from '@gyblos/payments-x402/constants';
 import { createInferenceBuyer } from '@gyblos/payments-x402/inference-buyer';
 import { saveJson } from '@gyblos/runtime';
 
-import { INFERENCE_TRANSPORT_PATH } from '../../constants.js';
+import { GATE_TIMEOUTS, INFERENCE_TRANSPORT_PATH } from '../../constants.js';
 import {
   assertNoUnresolvedAuthorizations,
   saveJournal,
@@ -207,6 +207,8 @@ export async function runCases({
       `${testCase.name}: confirmed charge=${actual}, refund=${result.refundAtomic}, anomaly=${row.anomaly}`,
     );
     // Let the public devnet RPC rate window clear between paid cases.
-    await new Promise((resolve) => setTimeout(resolve, TIMEOUTS.rpcCooldown));
+    await new Promise((resolve) =>
+      setTimeout(resolve, GATE_TIMEOUTS.rpcCooldown),
+    );
   }
 }

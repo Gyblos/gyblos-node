@@ -10,7 +10,6 @@ import { UptoSvmScheme } from '@x402/svm/upto/server';
 import express from 'express';
 
 import {
-  ACTUAL_ATOMIC,
   DEVNET,
   MAX_ATOMIC,
   PAYMENT_LIMITS,
@@ -19,7 +18,7 @@ import {
 } from '@gyblos/config';
 import { requireLoopbackHost } from '@gyblos/runtime/loopback-host';
 
-import { GATE_ROUTES } from './constants.js';
+import { ACTUAL_ATOMIC, GATE_ROUTES } from './constants.js';
 
 export async function createGateSeller(options: {
   rpcUrl: string;

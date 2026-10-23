@@ -1,11 +1,12 @@
 // Evidence shapes shared by the exact and inference gates: base record, authorization metadata,
 // balance snapshot and reconciliation result.
-import type { DEVNET, DIAGNOSTIC_LIMITS } from '@gyblos/config';
+import type { DEVNET } from '@gyblos/config';
 
 import type {
   EvidenceAssetLabel,
   EvidenceId,
   EvidenceStatus,
+  GATE_DIAGNOSTIC_LIMITS,
   RECONCILIATION_CLASSIFICATIONS,
   ReconciliationClassification,
   SCHEMA_VERSIONS,
@@ -40,7 +41,7 @@ export interface ExactSnapshot {
 export interface ReconciliationObservation {
   checkedAt: string;
   address: string;
-  historyLimit: typeof DIAGNOSTIC_LIMITS.transactionHistory;
+  historyLimit: typeof GATE_DIAGNOSTIC_LIMITS.transactionHistory;
   matches: { signature: string; slot: number; error: unknown }[];
   classification: Exclude<
     ReconciliationClassification,

@@ -7,28 +7,31 @@ are in [stack.md](stack.md).
 
 ## Packages
 
-| Package                   | Layer    | Responsibility                                                                                                        |
-| ------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------- |
-| `packages/protocol`       | protocol | Canonical JSON, signed offer bytes, `Engine` contract, error codes, model catalog, public discovery records. No SDKs. |
-| `packages/core`           | core     | Pricing and metering math, offer trust rules, charge-anomaly checks. No SDKs or filesystem.                           |
-| `packages/config`         | config   | Devnet addresses, ports, paths, limits, relay defaults, wallet loading.                                               |
-| `packages/runtime`        | runtime  | Atomic JSON writes, private rotating logs, processes, memory probes, loopback `Host` guard.                           |
-| `packages/engine-ollama`  | adapter  | Ollama client, `Engine` adapter, pinned tokenizer and model constants.                                                |
-| `packages/payments-x402`  | adapter  | x402 `upto`, facilitator, buyer signer, on-chain proofs, recovery locks.                                              |
-| `packages/transport-iroh` | adapter  | Iroh endpoint, HTTP over QUIC, relay policy, admission limits.                                                        |
-| `packages/identity`       | adapter  | 8004 registry adapter; not used by the node yet ([identity.md](identity.md)).                                         |
-| `packages/node`           | node     | Seller composition (`createNode`), roles and keys, signed offers.                                                     |
+| Package                   | Layer    | Responsibility                                                                                                                                                       |
+| ------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/protocol`       | protocol | Canonical JSON, signed offer bytes, `Engine` contract, error codes, model catalog, public discovery records. No SDKs.                                                |
+| `packages/core`           | core     | Pricing and metering math, offer trust rules, charge-anomaly checks. No SDKs or filesystem.                                                                          |
+| `packages/config`         | config   | Devnet addresses, ports, paths, limits, relay defaults, wallet loading.                                                                                              |
+| `packages/runtime`        | runtime  | Atomic JSON writes, private rotating logs, processes, memory probes, loopback `Host` guard.                                                                          |
+| `packages/engine-ollama`  | adapter  | Ollama client, `Engine` adapter, pinned tokenizer and model constants.                                                                                               |
+| `packages/payments-x402`  | adapter  | x402 `upto`, facilitator, buyer signer, on-chain proofs, recovery locks.                                                                                             |
+| `packages/transport-iroh` | adapter  | Iroh endpoint, HTTP over QUIC, relay policy, admission limits.                                                                                                       |
+| `packages/identity`       | adapter  | 8004 registry adapter; not used by the node yet ([identity.md](identity.md)).                                                                                        |
+| `packages/node`           | node     | Local-node library for both roles: seller composition (`createNode`), roles and keys, signed offers, tokenizer artifacts and inference pricing used by `apps/buyer`. |
 
-| App                | Command                        | Responsibility                                                  |
-| ------------------ | ------------------------------ | --------------------------------------------------------------- |
-| `apps/node`        | `node:start` (`main.ts`)       | Seller daemon.                                                  |
-| `apps/buyer`       | `buyer:start`, `p2p:reconcile` | Buyer proxy, one paid call (`call.ts`), measurements, recovery. |
-| `apps/facilitator` | `gate:facilitator`             | Standalone local facilitator.                                   |
+| App                | Command                          | Responsibility                                                  |
+| ------------------ | -------------------------------- | --------------------------------------------------------------- |
+| `apps/node`        | `node:start` (`main.ts`)         | Seller daemon.                                                  |
+| `apps/buyer`       | `buyer:start`, `buyer:reconcile` | Buyer proxy, one paid call (`call.ts`), measurements, recovery. |
+| `apps/facilitator` | `gate:facilitator`               | Standalone local facilitator.                                   |
 
 `lab/harness` holds the `gate:*` proof-of-concept checks (including the x402
 `exact` scheme, the fixed-price test seller and the gate runner), `lab/tools`
-the identity devnet tools and `lab/evidence` the published reports. `tests/` and
-`tooling/` verify everything and may import any layer.
+the identity devnet tools and `lab/evidence` the published reports.
+`lab/harness` and `lab/tools` are runnable through the package scripts;
+`lab/evidence` is a historical record of past runs, and the archived Docker/NAT
+lab lives only at tag `archive/poc-lab-2026-10`. `tests/` and `tooling/` verify
+everything and may import any layer.
 
 ## Dependency rule
 

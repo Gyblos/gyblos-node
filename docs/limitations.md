@@ -27,9 +27,10 @@ only; never import mainnet keys.
   automatic retry or provider switch after settlement was attempted.
 - A buyer can be charged and still not receive the answer (for example after a
   disconnect). That case must be reconciled as charged but undelivered.
-- `p2p:reconcile` clears only **zero-charge** outcomes. Charged-but-undelivered
-  recovery, missing-claim recovery and journal-derived paid exports are not
-  implemented; `--audit-only` can still verify a charged payment.
+- `buyer:reconcile` clears only **zero-charge** outcomes.
+  Charged-but-undelivered recovery, missing-claim recovery and journal-derived
+  paid exports are not implemented; `--audit-only` can still verify a charged
+  payment.
 - The verifier supports only fresh, individually settled channels with the
   expected account shapes. Anything else fails closed and needs manual
   investigation. It does not recover channel rent.

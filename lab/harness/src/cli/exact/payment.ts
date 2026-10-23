@@ -5,14 +5,18 @@ import {
   encodePaymentSignatureHeader,
 } from '@x402/core/http';
 
-import { HTTP_STATUS, TIMEOUTS } from '@gyblos/config';
+import { HTTP_STATUS } from '@gyblos/config';
 import { type WALLET_ROLES } from '@gyblos/config/constants';
 import { signer } from '@gyblos/config/wallet';
 import { JOURNAL_STATES } from '@gyblos/payments-x402/constants';
 import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { ProtocolError } from '@gyblos/protocol/errors';
 
-import { PUBLIC_CALL_OUTCOMES, type ExactCaseName } from '../../constants.js';
+import {
+  GATE_TIMEOUTS,
+  PUBLIC_CALL_OUTCOMES,
+  type ExactCaseName,
+} from '../../constants.js';
 import { createExactBuyer, validateExactTerms } from '../../exact/index.js';
 import { saveJournal } from '../../journal.js';
 import type { createChallenge } from './challenge.js';
@@ -60,7 +64,7 @@ export function createPaidRequest(
       headers: {
         'PAYMENT-SIGNATURE': encodePaymentSignatureHeader(payload),
       },
-      signal: AbortSignal.timeout(TIMEOUTS.publicPayment),
+      signal: AbortSignal.timeout(GATE_TIMEOUTS.publicPayment),
     });
     const receiptHeader = response.headers.get('PAYMENT-RESPONSE');
     const receipt = receiptHeader

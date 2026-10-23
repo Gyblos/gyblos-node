@@ -95,7 +95,8 @@ responses retain their earlier classifications. This records an anomaly without
 changing settlement, refund, prices or reputation policy. Negative atomic and
 relative charge differences remain recorded.
 
-The six gate cases are:
+The six gate cases (three honest calls and three fault cases, in four groups)
+are:
 
 1. Three honest calls: compare independent counts, billing, charge and delivery.
 2. One adversarial call: inflate **billed output tokens by 40%, rounded up**,

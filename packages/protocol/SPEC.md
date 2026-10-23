@@ -180,8 +180,8 @@ Only Qwen3 0.6B carries the already pinned repository/revision/tokenizer SHA-256
 from the existing Ollama adapter; that reference is not a new fetch or license
 audit. All other tokenizer references are unknown. In particular, marketing
 names copied from the website must not be treated as verified releases.
-Website/init/discovery consumer migration and primary-source model metadata
-curation remain later work; the website and legacy adapter are unchanged here.
+Website, init and discovery consumers and the Ollama adapter do not read this
+catalog yet; primary-source model metadata curation is later work.
 
 ### Public golden vectors
 
@@ -191,5 +191,6 @@ catalog reference, public key and signatures. A separate one-shot Node/OpenSSL
 oracle built and signed the records independently of the protocol helpers.
 Only synthetic public material is retained. Tests check both Web Crypto and
 OpenSSL, wrong domains, changed payloads and reordered JSON properties. These
-are public discovery signatures, not signed payment authorizations. Existing
-`vectors/signed-inference-offer-v1.json` remains byte-for-byte unchanged.
+are public discovery signatures, not signed payment authorizations. The
+signed-offer vectors in `vectors/signed-inference-offer-v1.json` are a separate
+set.

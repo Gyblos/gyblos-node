@@ -50,7 +50,8 @@ the four cases skip with a reason.
   finalized deposit/claim pair. Current-account responses and mutated variants
   are labelled synthetic. Never add payment payloads, logs or credentials.
 - `fixtures/identity-devnet-accounts.json`: two public registry accounts,
-  captured by `lab/tools/identity-fixtures.ts`.
+  captured by `lab/tools/identity-fixtures.ts`. `pnpm identity:fixtures`
+  recaptures it from devnet with read-only RPC calls and overwrites the file.
 - `packages/protocol/vectors/public-discovery-v1.json`: synthetic keys and
   signatures only.
 - Raw evidence, measurements and private notes stay out of Git. Keep manual or

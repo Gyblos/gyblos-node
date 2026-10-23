@@ -11,12 +11,10 @@ import {
 
 import {
   DEVNET,
-  DIAGNOSTIC_LIMITS,
   HTTP_STATUS,
   LOCALHOST,
   MAX_ATOMIC,
   ROUTES,
-  TIMEOUTS,
   UNITS,
 } from '@gyblos/config';
 import { CONFIG_ASSET_LABELS, WALLET_ROLES } from '@gyblos/config/constants';
@@ -39,7 +37,9 @@ import {
   FAILURE_EVIDENCE_PATH,
   failureJournalPath,
   failureResultPath,
+  GATE_DIAGNOSTIC_LIMITS,
   GATE_ROUTES,
+  GATE_TIMEOUTS,
   LOCK_PATH,
   SCHEMA_VERSIONS,
 } from './constants.js';
@@ -115,7 +115,7 @@ export async function failureGate() {
               0,
               expiresAt * UNITS.millisecondsPerSecond -
                 Date.now() +
-                TIMEOUTS.expiryGrace,
+                GATE_TIMEOUTS.expiryGrace,
             );
             console.log(
               `F2: waiting ${Math.ceil(wait / UNITS.millisecondsPerSecond)} seconds for authorization expiry.`,
@@ -187,7 +187,7 @@ export async function failureGate() {
         const history = await rpc<unknown[]>(
           config.rpcUrl,
           'getSignaturesForAddress',
-          [channelId, { limit: DIAGNOSTIC_LIMITS.failureHistory }],
+          [channelId, { limit: GATE_DIAGNOSTIC_LIMITS.failureHistory }],
         );
         assert.equal(channel, null);
         assert.equal(history.length, 0);

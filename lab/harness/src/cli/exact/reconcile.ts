@@ -15,11 +15,7 @@ import type { PaymentPayload } from '@x402/core/types';
 import {
   COMMITMENT,
   DEVNET_USDC,
-  DIAGNOSTIC_LIMITS,
   HTTP_STATUS,
-  PAYMENT_LIMITS,
-  RETRIES,
-  RETRY_DELAYS,
   TOKEN_PROGRAM_ADDRESS,
 } from '@gyblos/config';
 import { type Config } from '@gyblos/config/wallet';
@@ -31,7 +27,13 @@ import { lamports, rpc } from '@gyblos/payments-x402/chain';
 import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { ProtocolError } from '@gyblos/protocol/errors';
 
-import { RECONCILIATION_CLASSIFICATIONS } from '../../constants.js';
+import {
+  GATE_DIAGNOSTIC_LIMITS,
+  GATE_FUNDING_LIMITS,
+  GATE_RETRIES,
+  GATE_RETRY_DELAYS,
+  RECONCILIATION_CLASSIFICATIONS,
+} from '../../constants.js';
 import { exactAuthorizationId } from '../../exact/authorization-id.js';
 
 export async function snapshot(config: Config, buyer: string) {
@@ -45,7 +47,7 @@ export async function snapshot(config: Config, buyer: string) {
     ),
   );
   let result: AccountsResponse | undefined;
-  for (let attempt = 0; attempt < RETRIES.exactSnapshot; attempt++) {
+  for (let attempt = 0; attempt < GATE_RETRIES.exactSnapshot; attempt++) {
     try {
       result = await rpc<AccountsResponse>(
         config.rpcUrl,
@@ -61,11 +63,11 @@ export async function snapshot(config: Config, buyer: string) {
         !(error instanceof ProtocolError) ||
         error.code !== PROTOCOL_ERROR_CODES.RPC_HTTP ||
         !error.message.includes(String(HTTP_STATUS.tooManyRequests)) ||
-        attempt === RETRIES.exactSnapshotLastAttempt
+        attempt === GATE_RETRIES.exactSnapshotLastAttempt
       )
         throw error;
       await new Promise((resolve) =>
-        setTimeout(resolve, RETRY_DELAYS.exactSnapshotBase * 2 ** attempt),
+        setTimeout(resolve, GATE_RETRY_DELAYS.exactSnapshotBase * 2 ** attempt),
       );
     }
   }
@@ -75,7 +77,10 @@ export async function snapshot(config: Config, buyer: string) {
     assert.equal(account?.owner, TOKEN_PROGRAM_ADDRESS);
     assert.equal(info?.mint, DEVNET_USDC);
     assert.equal(info?.owner, index === 0 ? buyer : config.addresses.seller);
-    assert.equal(info?.tokenAmount?.decimals, PAYMENT_LIMITS.tokenDecimals);
+    assert.equal(
+      info?.tokenAmount?.decimals,
+      GATE_FUNDING_LIMITS.tokenDecimals,
+    );
     return String(info!.tokenAmount.amount);
   });
   return {
@@ -115,7 +120,10 @@ export async function reconcile(
     'getSignaturesForAddress',
     [
       buyer,
-      { limit: DIAGNOSTIC_LIMITS.transactionHistory, commitment: COMMITMENT },
+      {
+        limit: GATE_DIAGNOSTIC_LIMITS.transactionHistory,
+        commitment: COMMITMENT,
+      },
     ],
   );
   const matches = [];
@@ -142,7 +150,7 @@ export async function reconcile(
   return {
     checkedAt: new Date().toISOString(),
     address: buyer,
-    historyLimit: DIAGNOSTIC_LIMITS.transactionHistory,
+    historyLimit: GATE_DIAGNOSTIC_LIMITS.transactionHistory,
     matches,
     classification: matches.length
       ? RECONCILIATION_CLASSIFICATIONS.MATCHED
