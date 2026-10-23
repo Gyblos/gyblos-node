@@ -167,6 +167,9 @@ importers:
       '@gyblos/node':
         specifier: workspace:*
         version: link:../../packages/node
+      '@gyblos/node-app':
+        specifier: workspace:*
+        version: link:../../apps/node
       '@gyblos/payments-x402':
         specifier: workspace:*
         version: link:../../packages/payments-x402
