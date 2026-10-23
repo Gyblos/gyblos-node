@@ -24,8 +24,7 @@ import {
   DEVNET_TREASURY_OWNER,
   TOKEN_PROGRAM_ADDRESS,
 } from '@gyblos/config';
-import { CONFIG_ASSET_LABELS, WALLET_ROLES } from '@gyblos/config/constants';
-import { configPath, loadConfig, signer } from '@gyblos/config/wallet';
+import { CONFIG_ASSET_LABELS } from '@gyblos/config/constants';
 import {
   account,
   assertProgram,
@@ -38,8 +37,10 @@ import { saveJson } from '@gyblos/runtime';
 import {
   FUNDING_OPERATIONS,
   GATE_FUNDING_LIMITS,
+  WALLET_ROLES,
   type FundingOperation,
 } from './constants.js';
+import { configPath, loadConfig, signer } from './wallet.js';
 
 interface FundingLogEntry {
   operation: FundingOperation;

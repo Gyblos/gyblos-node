@@ -15,9 +15,10 @@ import {
 } from '@solana/kit';
 
 import { COMMITMENT } from '@gyblos/config';
-import { WALLET_ROLES } from '@gyblos/config/constants';
-import { signer, type Config } from '@gyblos/config/wallet';
 import { confirm, rpc } from '@gyblos/payments-x402/chain';
+
+import { WALLET_ROLES } from './constants.js';
+import { signer, type Config } from './wallet.js';
 
 export async function prepareFailureAccounts(config: Config) {
   const sponsor = await signer(config, WALLET_ROLES.FACILITATOR);

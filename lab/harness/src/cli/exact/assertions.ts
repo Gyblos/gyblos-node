@@ -2,8 +2,6 @@
 // before the signer or any public facilitator call is reached.
 import assert from 'node:assert/strict';
 
-import { WALLET_ROLES } from '@gyblos/config/constants';
-import { signer } from '@gyblos/config/wallet';
 import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { ProtocolError } from '@gyblos/protocol/errors';
 
@@ -13,8 +11,10 @@ import {
   EXACT_ENFORCEMENT,
   EXACT_PRICE,
   EXACT_UNTRUSTED_CASES,
+  WALLET_ROLES,
 } from '../../constants.js';
 import { createExactBuyer, validateExactTerms } from '../../exact/index.js';
+import { signer } from '../../wallet.js';
 import type { createChallenge } from './challenge.js';
 import { snapshot } from './reconcile.js';
 import type { ExactContext } from './types.js';

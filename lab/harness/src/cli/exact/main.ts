@@ -8,7 +8,6 @@ import { address } from '@solana/kit';
 import type { SupportedResponse } from '@x402/core/types';
 
 import { DEVNET_USDC, LOCALHOST, ROUTES, TIMEOUTS } from '@gyblos/config';
-import { loadConfig } from '@gyblos/config/wallet';
 import { assertDevnet, tokens } from '@gyblos/payments-x402/chain';
 import { JOURNAL_STATES } from '@gyblos/payments-x402/constants';
 import { withExclusiveLock } from '@gyblos/payments-x402/recovery/lock';
@@ -37,6 +36,7 @@ import {
   createExactSeller,
 } from '../../exact/seller.js';
 import { assertNoUnresolvedAuthorizations } from '../../journal.js';
+import { loadConfig } from '../../wallet.js';
 import { runProvider } from './cases.js';
 import { createEvidence } from './evidence.js';
 

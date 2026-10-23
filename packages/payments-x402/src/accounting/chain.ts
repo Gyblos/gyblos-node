@@ -12,7 +12,6 @@ import {
   RETRY_DELAYS,
   TOKEN_PROGRAM_ADDRESS,
 } from '@gyblos/config';
-import type { Config } from '@gyblos/config/wallet';
 import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { ProtocolError } from '@gyblos/protocol/errors';
 
@@ -22,6 +21,13 @@ import type {
   ChainInstruction,
   ChainTransaction,
 } from './types.js';
+
+// Only the chain-read fields accounting needs; callers pass their own configuration.
+interface ChainReadConfig {
+  rpcUrl: string;
+  mint: string;
+  addresses: { buyer: string; seller: string };
+}
 
 interface Transfer {
   source: string;
@@ -55,7 +61,7 @@ async function readWithBackoff<T>(
 }
 
 export function readChain<T>(
-  config: Pick<Config, 'rpcUrl'>,
+  config: Pick<ChainReadConfig, 'rpcUrl'>,
   method: string,
   params: unknown[],
 ): Promise<T> {
@@ -63,7 +69,7 @@ export function readChain<T>(
 }
 
 export async function confirmInference(
-  config: Pick<Config, 'rpcUrl'>,
+  config: Pick<ChainReadConfig, 'rpcUrl'>,
   signature: string,
 ) {
   return confirm(config.rpcUrl, signature, {
@@ -85,9 +91,7 @@ export async function tokenAddress(owner: string, mint: string) {
 }
 
 export async function inferenceSnapshot(
-  config: Pick<Config, 'rpcUrl' | 'mint'> & {
-    addresses: Pick<Config['addresses'], 'buyer' | 'seller'>;
-  },
+  config: ChainReadConfig,
   channelId?: string,
   minContextSlot?: number,
 ) {
@@ -138,7 +142,7 @@ export async function inferenceSnapshot(
 }
 
 export async function transaction(
-  config: Pick<Config, 'rpcUrl'>,
+  config: Pick<ChainReadConfig, 'rpcUrl'>,
   signature: string,
 ) {
   for (let attempt = 0; attempt < RETRIES.transaction; attempt++) {

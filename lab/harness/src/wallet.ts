@@ -1,17 +1,18 @@
-// Owns explicit loading of operator-selected configuration and isolated key files.
+// Owns explicit loading of the lab devnet configuration and isolated key files.
 // It must not know lab orchestration, payment execution or persistence helpers.
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 import { createKeyPairSignerFromBytes } from '@solana/kit';
 
+import { KEY_LIMITS } from '@gyblos/config';
+import { type ConfigAssetLabel } from '@gyblos/config/constants';
+
 import {
+  CONFIG_PATH,
   CONFIG_SCHEMA_VERSION,
-  type ConfigAssetLabel,
   type WalletRole,
 } from './constants.js';
-import { KEY_LIMITS } from './limits.js';
-import { CONFIG_PATH } from './paths.js';
 
 export interface Config {
   schemaVersion: typeof CONFIG_SCHEMA_VERSION;

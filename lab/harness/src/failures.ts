@@ -17,8 +17,7 @@ import {
   ROUTES,
   UNITS,
 } from '@gyblos/config';
-import { CONFIG_ASSET_LABELS, WALLET_ROLES } from '@gyblos/config/constants';
-import { loadConfig, signer } from '@gyblos/config/wallet';
+import { CONFIG_ASSET_LABELS } from '@gyblos/config/constants';
 import { createBuyer } from '@gyblos/payments-x402';
 import {
   account,
@@ -42,6 +41,7 @@ import {
   GATE_TIMEOUTS,
   LOCK_PATH,
   SCHEMA_VERSIONS,
+  WALLET_ROLES,
 } from './constants.js';
 import { prepareFailureAccounts } from './failure-setup.js';
 import { createGateSeller } from './fixed-seller.js';
@@ -50,6 +50,7 @@ import type {
   FailureGateEvidence,
 } from './fixture-evidence-types.js';
 import { assertNoUnresolvedAuthorizations, saveJournal } from './journal.js';
+import { loadConfig, signer } from './wallet.js';
 
 export async function failureGate() {
   async function failures() {

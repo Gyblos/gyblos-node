@@ -19,8 +19,7 @@ import {
   TIMEOUTS,
   TOKENIZER_FILES,
 } from '@gyblos/config';
-import { CONFIG_ASSET_LABELS, WALLET_ROLES } from '@gyblos/config/constants';
-import { loadConfig, signer } from '@gyblos/config/wallet';
+import { CONFIG_ASSET_LABELS } from '@gyblos/config/constants';
 import { createModelTokenizer, createOllama } from '@gyblos/engine-ollama';
 import { GENERATION } from '@gyblos/engine-ollama/constants';
 import { createOllamaEngine } from '@gyblos/engine-ollama/engine';
@@ -54,9 +53,11 @@ import {
   keyPath,
   LOCK_PATH,
   MIN_FACILITATOR_LAMPORTS,
+  WALLET_ROLES,
 } from '../../constants.js';
 import type { InferenceTrace } from '../../inference-evidence-types.js';
 import { assertNoUnresolvedAuthorizations } from '../../journal.js';
+import { loadConfig, signer } from '../../wallet.js';
 import { createGateBilling } from './billing.js';
 import { runCases } from './cases.js';
 import { initializeEvidence } from './evidence.js';

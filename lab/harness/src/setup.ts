@@ -13,11 +13,11 @@ import {
   KEY_LIMITS,
   LOCAL_DIR,
 } from '@gyblos/config';
-import { CONFIG_ASSET_LABELS, WALLET_ROLES } from '@gyblos/config/constants';
-import { configPath, type Config } from '@gyblos/config/wallet';
+import { CONFIG_ASSET_LABELS } from '@gyblos/config/constants';
 import { saveJson } from '@gyblos/runtime';
 
-import { keyFilename, SCHEMA_VERSIONS } from './constants.js';
+import { keyFilename, SCHEMA_VERSIONS, WALLET_ROLES } from './constants.js';
+import { configPath, type Config } from './wallet.js';
 
 export async function setupGate() {
   const path = configPath();

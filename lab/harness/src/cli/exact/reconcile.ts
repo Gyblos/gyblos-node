@@ -18,7 +18,6 @@ import {
   HTTP_STATUS,
   TOKEN_PROGRAM_ADDRESS,
 } from '@gyblos/config';
-import { type Config } from '@gyblos/config/wallet';
 import {
   type AccountsResponse,
   type ChainTransaction,
@@ -35,6 +34,7 @@ import {
   RECONCILIATION_CLASSIFICATIONS,
 } from '../../constants.js';
 import { exactAuthorizationId } from '../../exact/authorization-id.js';
+import { type Config } from '../../wallet.js';
 
 export async function snapshot(config: Config, buyer: string) {
   const atas = await Promise.all(

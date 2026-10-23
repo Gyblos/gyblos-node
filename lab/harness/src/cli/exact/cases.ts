@@ -5,7 +5,6 @@ import assert from 'node:assert/strict';
 import { encodePaymentSignatureHeader } from '@x402/core/http';
 
 import { COMMITMENT, DEVNET, explorerUrl, HTTP_STATUS } from '@gyblos/config';
-import { WALLET_ROLES } from '@gyblos/config/constants';
 import { type ChainTransaction } from '@gyblos/payments-x402/accounting/types';
 import { confirm, rpc } from '@gyblos/payments-x402/chain';
 import {
@@ -25,6 +24,7 @@ import {
   GATE_TIMEOUTS,
   PUBLIC_CALL_OUTCOMES,
   RECONCILIATION_CLASSIFICATIONS,
+  WALLET_ROLES,
 } from '../../constants.js';
 import { assertExactFallbackSafe } from '../../exact/index.js';
 import { saveJournal } from '../../journal.js';

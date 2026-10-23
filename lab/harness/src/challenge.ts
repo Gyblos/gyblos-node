@@ -11,8 +11,6 @@ import {
   ROUTES,
   X402_SDK_VERSION,
 } from '@gyblos/config';
-import { WALLET_ROLES } from '@gyblos/config/constants';
-import { loadConfig, signer } from '@gyblos/config/wallet';
 import { assertProgram } from '@gyblos/payments-x402/chain';
 import { createFacilitator } from '@gyblos/payments-x402/facilitator';
 import { validateTerms } from '@gyblos/payments-x402/trust';
@@ -24,9 +22,11 @@ import {
   GATE_ROUTES,
   SCHEMA_VERSIONS,
   UPSTREAM_COMMIT,
+  WALLET_ROLES,
 } from './constants.js';
 import { createGateSeller } from './fixed-seller.js';
 import type { ChallengeEvidence } from './fixture-evidence-types.js';
+import { loadConfig, signer } from './wallet.js';
 
 export async function challengeGate() {
   const config = await loadConfig();

@@ -1,12 +1,11 @@
 // Process entry for the fixed-price gate seller: serves one paid resource on loopback, no inference.
 import { HOSTS, LOCALHOST } from '@gyblos/config';
-import { WALLET_ROLES } from '@gyblos/config/constants';
-import { loadConfig, signer } from '@gyblos/config/wallet';
 import { assertProgram } from '@gyblos/payments-x402/chain';
 import { isMain } from '@gyblos/runtime';
 
-import { GATE_HOSTS, GATE_PORTS } from '../src/constants.js';
+import { GATE_HOSTS, GATE_PORTS, WALLET_ROLES } from '../src/constants.js';
 import { createGateSeller } from '../src/fixed-seller.js';
+import { loadConfig, signer } from '../src/wallet.js';
 
 export async function main() {
   const config = await loadConfig();
