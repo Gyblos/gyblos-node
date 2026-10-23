@@ -18,8 +18,12 @@ without sharing keys or journals:
 | `<home>/artifacts/ollama-models/` | Pinned Ollama model layers (re-downloadable).                 |
 
 Lab state (`gate:*`, identity tools) lives in a separate `GYBLOS_LAB_HOME`
-(default `.local/lab`). The lab may reuse `<home>/artifacts/` as a shared cache
-but never reads a role directory.
+(default `.local/lab`). The lab shares `<home>/artifacts/` as a public cache
+(`gate:inference:setup` may write the tokenizer and model there) but never reads
+or writes a role directory.
+
+Keep a custom `GYBLOS_HOME` or `GYBLOS_LAB_HOME` outside the repository or under
+`.local/`; only `.local/` is ignored by git.
 
 ### Moving data from the old layout
 
@@ -27,39 +31,50 @@ Older versions kept role data in `.local/p2p/` (one role per checkout), the
 tokenizer in `.local/devnet/tokenizer/`, models in `.local/ollama/models/` and
 lab state in `.local/devnet/`. Nothing is migrated automatically. When a home
 directory is missing but its old path exists, setup and startup stop with
-`LEGACY_LOCAL_LAYOUT`, naming both paths. A fresh role next to an old, possibly
-uncertain authorization journal could otherwise lose recovery state
-([recovery.md](recovery.md)). The check only tests whether the old path exists
-(it never reads it) and applies whether or not `GYBLOS_HOME` is set, because an
-old journal in the working directory is just as unsafe to ignore when the new
-home is elsewhere.
+`LEGACY_LOCAL_LAYOUT`, naming both paths. For the lab the test is lab state, not
+the directory: an empty or lock-only `.local/lab` does not count, so every lab
+command keeps refusing until the old lab files are moved. A fresh role next to
+an old, possibly uncertain authorization journal could otherwise lose recovery
+state ([recovery.md](recovery.md)). The check only tests whether the old path
+exists (it never reads it) and applies whether or not `GYBLOS_HOME` is set,
+because an old journal in the working directory is just as unsafe to ignore when
+the new home is elsewhere.
 
-Stop every node, buyer and lab process first. Then, from the same working
-directory (`ls .local/p2p` shows `buyer.json` for a buyer or `owner.json` for a
-seller):
+Before you move anything:
+
+- Stop every node, buyer and lab (`gate:*`) process.
+- Never merge into an existing destination: `mv` would put the old directory
+  inside it, hiding its journal one level down. If a destination already exists,
+  stop and compare the two directories by hand. An empty one can be removed with
+  `rmdir`, which refuses a non-empty directory.
+- Run the commands from the same working directory. `ls .local/p2p` shows
+  `buyer.json` for a buyer or `owner.json` for a seller.
+
+Each command below moves only if its destination does not exist yet, and
+otherwise prints which one to check (the same on macOS and Linux):
 
 ```sh
 umask 077
-mkdir -p .local/gyblos/artifacts
-mv .local/p2p .local/gyblos/buyer        # a seller checkout: .local/gyblos/seller
-mv .local/devnet/tokenizer .local/gyblos/artifacts/tokenizer
-mv .local/ollama/models .local/gyblos/artifacts/ollama-models
+move() { if [ -e "$2" ]; then echo "stop: $2 exists; compare by hand" >&2; return 1; fi; mkdir -p "$(dirname "$2")" && mv "$1" "$2"; }
+move .local/p2p .local/gyblos/buyer        # a seller checkout: .local/gyblos/seller
+move .local/devnet/tokenizer .local/gyblos/artifacts/tokenizer
+move .local/ollama/models .local/gyblos/artifacts/ollama-models
 ```
 
 Lab state, after the tokenizer has moved out of `.local/devnet/`. The lab config
-records absolute key paths, so rewrite them in place and review the result:
+records absolute key paths, so rewrite them in place:
 
 ```sh
-mv .local/devnet .local/lab
+move .local/devnet .local/lab
 sed -i.bak 's#/.local/devnet/#/.local/lab/#g' .local/lab/config.json
-mkdir -p .local/lab/identity
-mv .local/identity/keys .local/lab/identity/keys   # only if it exists
+move .local/identity/keys .local/lab/identity/keys   # only if it exists
 ```
 
-If a destination already exists, stop and compare the two directories by hand
-instead of merging them. `.local/identity-validator/` is disposable test scratch
-and is not checked. With a custom `GYBLOS_HOME` or `GYBLOS_LAB_HOME`, move into
-those directories instead.
+Review `.local/lab/config.json`, then delete `.local/lab/config.json.bak`: it is
+the old copy and may hold an RPC URL with an API key.
+`.local/identity-validator/` is disposable test scratch and is not checked. With
+a custom `GYBLOS_HOME` or `GYBLOS_LAB_HOME`, move into those directories
+instead.
 
 ## Roles and files
 

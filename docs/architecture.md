@@ -102,9 +102,10 @@ $GYBLOS_LAB_HOME (default .local/lab)
 ```
 
 Payment adapters receive journal and lock paths from the apps, which take them
-from this layout. The lab reads `artifacts/` as a shared cache and never a role
-directory. `packages/node/src/home.ts` refuses to start with a missing home
-directory when its legacy path exists; see
+from this layout. The lab shares `artifacts/` as a public cache (its setup may
+write the tokenizer and model there) and never reads or writes a role directory.
+`packages/node/src/home.ts` refuses to start with a missing home directory (for
+the lab: a lab home without lab state) when its legacy path exists; see
 [running-a-node.md](running-a-node.md#local-home).
 
 Named values follow their readers: HTTP-over-Iroh framing limits and stream

@@ -111,21 +111,24 @@ using independently confirmed seller identities, run `pnpm buyer:setup`, then
 Set these in the environment; `.env` is **not** loaded
 ([.env.example](.env.example)).
 
-| Variable                                        | Used by       | Meaning                                                     |
-| ----------------------------------------------- | ------------- | ----------------------------------------------------------- |
-| `GYBLOS_RELAY_TOKEN`                            | seller, buyer | **Required.** Relay credential, 32-512 characters.          |
-| `GYBLOS_RELAYS`                                 | seller, buyer | Comma-separated relay URLs; default `na1` only.             |
-| `GYBLOS_RELAY_ONLY`                             | seller        | `1` = relay only; advertise no direct addresses.            |
-| `GYBLOS_BUYER_RELAY_ONLY`                       | buyer         | `1` = loopback binds; dial the seller only via its relay.   |
-| `GYBLOS_IROH_BIND`, `GYBLOS_IROH_EXTERNAL_ADDR` | seller, buyer | UDP bind address; extra public address to advertise.        |
-| `GYBLOS_EXPECTED_ROUTE`                         | buyer         | Require `iroh-direct` or `iroh-relay` before paying.        |
-| `GYBLOS_RPC_URL`                                | all           | Devnet RPC; default `https://api.devnet.solana.com`.        |
-| `GYBLOS_HOME`                                   | seller, buyer | Local home; default `.local/gyblos` (per-role + artifacts). |
-| `GYBLOS_LAB_HOME`                               | lab           | Lab home; default `.local/lab`.                             |
-| `GYBLOS_GATE_CONFIG`                            | lab           | Lab config file; default `.local/lab/config.json`.          |
-| `GYBLOS_P2P_RUN_ID`                             | seller, buyer | Optional label copied into `status.json` and evidence.      |
-| `GYBLOS_GATE_RUN_ID`                            | lab           | Run label set by `gate:run`/`gate:inference` for children.  |
-| `GYBLOS_IDENTITY_INTEGRATION`                   | lab tests     | `1` = run opt-in local-validator identity tests.            |
+| Variable                                        | Used by       | Meaning                                                    |
+| ----------------------------------------------- | ------------- | ---------------------------------------------------------- |
+| `GYBLOS_RELAY_TOKEN`                            | seller, buyer | **Required.** Relay credential, 32-512 characters.         |
+| `GYBLOS_RELAYS`                                 | seller, buyer | Comma-separated relay URLs; default `na1` only.            |
+| `GYBLOS_RELAY_ONLY`                             | seller        | `1` = relay only; advertise no direct addresses.           |
+| `GYBLOS_BUYER_RELAY_ONLY`                       | buyer         | `1` = loopback binds; dial the seller only via its relay.  |
+| `GYBLOS_IROH_BIND`, `GYBLOS_IROH_EXTERNAL_ADDR` | seller, buyer | UDP bind address; extra public address to advertise.       |
+| `GYBLOS_EXPECTED_ROUTE`                         | buyer         | Require `iroh-direct` or `iroh-relay` before paying.       |
+| `GYBLOS_RPC_URL`                                | all           | Devnet RPC; default `https://api.devnet.solana.com`.       |
+| `GYBLOS_HOME`                                   | all           | Local home; default `.local/gyblos`. Lab: artifacts/ only. |
+| `GYBLOS_LAB_HOME`                               | lab           | Lab home; default `.local/lab`.                            |
+| `GYBLOS_GATE_CONFIG`                            | lab           | Lab config file; default `.local/lab/config.json`.         |
+| `GYBLOS_P2P_RUN_ID`                             | seller, buyer | Optional label copied into `status.json` and evidence.     |
+| `GYBLOS_GATE_RUN_ID`                            | lab           | Run label set by `gate:run`/`gate:inference` for children. |
+| `GYBLOS_IDENTITY_INTEGRATION`                   | lab tests     | `1` = run opt-in local-validator identity tests.           |
+
+Keep a custom `GYBLOS_HOME` or `GYBLOS_LAB_HOME` outside the repository or under
+`.local/`, the only ignored local path.
 
 ## Repository layout
 

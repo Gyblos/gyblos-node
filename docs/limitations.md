@@ -120,8 +120,9 @@ The seller limits work per Iroh identity, but identities are free to create.
   migrated automatically; startup refuses until it is moved by hand
   ([running-a-node.md](running-a-node.md#local-home)). The check is local and
   existence-based only.
-- `GYBLOS_GATE_CONFIG` moves only the lab config file, not keys, journals or
-  models. Inference needs the default lab key paths.
+- `GYBLOS_GATE_CONFIG` moves only the lab config file. `gate:setup` writes the
+  keys next to it, but `gate:inference` accepts only keys in the lab home
+  (`GYBLOS_LAB_HOME`); journals and models never follow it.
 - `.env` is not loaded; set variables in the process environment.
 - P2P role funding remains manual. `buyer:trust` creates the trust file only
   from explicit seller identities after checking the signed offer.
