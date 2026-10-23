@@ -24,7 +24,7 @@ import {
   PUBLIC_ORIGINS,
 } from './constants.js';
 
-export async function setupInferenceGate() {
+async function prepareGateArtifacts() {
   const directory = TOKENIZER_DIR;
   await mkdir(directory, {
     recursive: true,
@@ -49,6 +49,9 @@ export async function setupInferenceGate() {
     tokenizer: await readFile(TOKENIZER_FILES.tokenizer, 'utf8'),
     config: await readFile(TOKENIZER_FILES.config, 'utf8'),
   });
+}
+
+async function pullGateModel() {
   const environment = {
     ...process.env,
     OLLAMA_HOST: GATE_HOSTS.ollamaSetupBind,
@@ -97,4 +100,9 @@ export async function setupInferenceGate() {
   } finally {
     if (server.pid && server.exitCode === null) await stopChild(server);
   }
+}
+
+export async function setupInferenceGate() {
+  await prepareGateArtifacts();
+  await pullGateModel();
 }
