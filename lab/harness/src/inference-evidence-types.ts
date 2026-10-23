@@ -2,10 +2,13 @@
 // on-chain open/claim transfers.
 import type { Measurement } from '@gyblos/buyer/measurements';
 import { type ConfigAssetLabel } from '@gyblos/config/constants';
-import type { ObservedDoneReason } from '@gyblos/core/constants';
-import type { PRICES, TOLERANCE } from '@gyblos/core/metering';
-import type { MODEL } from '@gyblos/engine-ollama';
+import {
+  type ObservedDoneReason,
+  type PRICES,
+  type TOLERANCE,
+} from '@gyblos/core/constants';
 import type { GENERATION } from '@gyblos/engine-ollama/constants';
+import { type MODEL } from '@gyblos/engine-ollama/model';
 import type {
   inferenceSnapshot,
   transactionTransfers,

@@ -4,12 +4,17 @@ import assert from 'node:assert/strict';
 
 import { encodePaymentSignatureHeader } from '@x402/core/http';
 
-import { COMMITMENT, HTTP_STATUS, TIMEOUTS } from '@gyblos/config';
+import {
+  COMMITMENT,
+  DEVNET,
+  explorerUrl,
+  HTTP_STATUS,
+  TIMEOUTS,
+} from '@gyblos/config';
 import { WALLET_ROLES } from '@gyblos/config/constants';
 import { type ChainTransaction } from '@gyblos/payments-x402/accounting/types';
-import { confirm, explorer, rpc } from '@gyblos/payments-x402/chain';
+import { confirm, rpc } from '@gyblos/payments-x402/chain';
 import {
-  DEVNET,
   JOURNAL_STATES,
   PUBLIC_CALL_OPERATIONS,
 } from '@gyblos/payments-x402/constants';
@@ -161,7 +166,7 @@ export async function runProvider(context: ExactContext) {
       handlerDelta: 1,
       calls: success.calls,
       transaction: receipt.transaction,
-      explorer: explorer(receipt.transaction),
+      explorer: explorerUrl(receipt.transaction),
       onChain: {
         slot: onChain.slot,
         accountKeys: onChain.transaction.message.accountKeys,

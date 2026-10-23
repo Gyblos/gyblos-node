@@ -83,13 +83,3 @@ export type PublicCallOperation =
 
 export type FinalizedChannelGuardMessage =
   (typeof CHANNEL_GUARDS)[keyof typeof CHANNEL_GUARDS];
-
-export {
-  DEVNET,
-  DEVNET_GENESIS,
-  CHANNEL_PROGRAM,
-  DEVNET_USDC,
-  UPSTREAM_COMMIT,
-  MAX_ATOMIC,
-  ACTUAL_ATOMIC,
-} from '@gyblos/config';

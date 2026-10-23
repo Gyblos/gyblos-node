@@ -11,7 +11,7 @@ import {
   type EngineDescription,
 } from '@gyblos/protocol/engine';
 
-import { PRICES } from './metering.js';
+import { PRICES } from './constants.js';
 
 export interface InferenceOffer {
   schemaVersion: number;
@@ -50,7 +50,7 @@ export interface OfferTrust {
   maxAtomic: string;
 }
 
-export type OfferAddressValidator = (value: string) => unknown;
+type OfferAddressValidator = (value: string) => unknown;
 
 function validOffer(
   offer: InferenceOffer,

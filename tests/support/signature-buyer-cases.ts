@@ -7,15 +7,12 @@ import { generateKeyPairSigner } from '@solana/kit';
 import { encodePaymentResponseHeader } from '@x402/core/http';
 
 import { proofObservation } from '@gyblos/buyer/call-evidence';
+import { DEVNET, DEVNET_USDC } from '@gyblos/config';
 import {
   createBuyer,
   type BuyerResponseObservation,
 } from '@gyblos/payments-x402';
-import {
-  DEVNET,
-  DEVNET_USDC,
-  type BuyerDiagnosticCode,
-} from '@gyblos/payments-x402/constants';
+import { type BuyerDiagnosticCode } from '@gyblos/payments-x402/constants';
 
 import {
   DIAGNOSTIC_CANARY,

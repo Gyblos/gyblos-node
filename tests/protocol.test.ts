@@ -9,7 +9,6 @@ import ts from 'typescript';
 
 import { P2P } from '@gyblos/config';
 import applicationManifest from '@gyblos/core/package.json' with { type: 'json' };
-import { ENGINE_DONE_REASONS as adapterReasons } from '@gyblos/engine-ollama/constants';
 import {
   signInferenceOffer,
   verifyInferenceOffer,
@@ -197,7 +196,6 @@ void test('protocol errors retain one constructor, catalog and Error serializati
 });
 
 void test('engine completion reasons and separate domain/wire usage contracts keep their values', () => {
-  assert.equal(adapterReasons, ENGINE_DONE_REASONS);
   assert.deepEqual(ENGINE_DONE_REASONS, { STOP: 'stop', LENGTH: 'length' });
   const domain: EngineUsage = {
     inputTokens: 1,
@@ -240,7 +238,7 @@ void test('protocol has no SDK dependencies and application imports neither paym
         ts.isStringLiteral(node.moduleSpecifier)
       )
         assert.ok(
-          !/^@gyblos\/(?:payments-x402|inference-ollama)(?:\/|$)/.test(
+          !/^@gyblos\/(?:payments-x402|engine-ollama)(?:\/|$)/.test(
             node.moduleSpecifier.text,
           ),
           `${filename}: ${node.moduleSpecifier.text}`,

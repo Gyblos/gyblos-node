@@ -14,7 +14,7 @@ import {
   MAX_ATOMIC,
   P2P,
 } from '@gyblos/config';
-import { PRICES } from '@gyblos/core/metering';
+import { PRICES } from '@gyblos/core/constants';
 import {
   signInferenceOffer,
   type InferenceOffer,

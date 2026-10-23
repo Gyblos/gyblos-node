@@ -1,6 +1,8 @@
 // Minimal Solana JSON-RPC helpers: devnet genesis and program checks, balances and confirmation polling.
 import {
+  CHANNEL_PROGRAM,
   COMMITMENT,
+  DEVNET_GENESIS,
   DIAGNOSTIC_LIMITS,
   RETRIES,
   RETRY_DELAYS,
@@ -8,8 +10,6 @@ import {
 } from '@gyblos/config';
 import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { ProtocolError } from '@gyblos/protocol/errors';
-
-import { CHANNEL_PROGRAM, DEVNET_GENESIS } from './constants.js';
 
 export async function rpc<T>(
   url: string,
@@ -142,5 +142,3 @@ export async function confirm(
       `Confirmation unknown; reconcile before retrying: ${signature}`,
   );
 }
-
-export { explorerUrl as explorer } from '@gyblos/config';

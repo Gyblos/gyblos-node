@@ -7,9 +7,9 @@ import { test } from 'node:test';
 
 import type { PaymentRequirements } from '@x402/core/types';
 
+import { DEVNET, DEVNET_USDC } from '@gyblos/config';
 import { assertNoUnresolvedAuthorizations } from '@gyblos/lab-harness/journal';
 import { assertDevnet } from '@gyblos/payments-x402/chain';
-import { DEVNET, DEVNET_USDC } from '@gyblos/payments-x402/constants';
 import { withExclusiveLock } from '@gyblos/payments-x402/recovery/lock';
 import { validateSettlement, validateTerms } from '@gyblos/payments-x402/trust';
 

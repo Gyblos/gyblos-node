@@ -5,7 +5,7 @@ import { mkdir, symlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { analyze, compareBaseline, validateBaseline } from './analyze.js';
+import { analyze, validateEntries } from './analyze.js';
 import { layerOf } from './config.js';
 import { fixture, hasRule } from './fixture.js';
 import { parseGraph } from './graph.js';
@@ -235,7 +235,7 @@ void test('unresolved imports, unknown packages and empty scans fail analysis', 
   );
 });
 
-void test('source code is never executed and existing baseline differences are explicit', async () => {
+void test('source code is never executed and boundary entries are validated', async () => {
   await fixture(
     {
       'packages/core/src/a.ts':
@@ -245,23 +245,16 @@ void test('source code is never executed and existing baseline differences are e
       assert.deepEqual((await analyze(files, root)).entries, []);
     },
   );
-  const oldEntry = { rule: 'example', source: 'apps/a.ts', target: 'lab/a.ts' };
-  const newEntry = { rule: 'example', source: 'apps/b.ts', target: 'lab/b.ts' };
-  assert.deepEqual(compareBaseline([newEntry], [oldEntry]), {
-    current: 1,
-    baseline: 1,
-    added: [newEntry],
-    resolved: [oldEntry],
-  });
-  assert.throws(() => validateBaseline([oldEntry, oldEntry]), /Duplicate/);
+  const entry = { rule: 'example', source: 'apps/a.ts', target: 'lab/a.ts' };
+  assert.throws(() => validateEntries([entry, entry]), /Duplicate/);
   for (const target of [
     '/private/tmp/a',
     '../outside.ts',
     '.local/key.ts',
     'lab/evidence/run.json',
   ])
-    assert.throws(() => validateBaseline([{ ...oldEntry, target }]), /Invalid/);
-  assert.throws(() => validateBaseline({}), /Invalid/);
+    assert.throws(() => validateEntries([{ ...entry, target }]), /Invalid/);
+  assert.throws(() => validateEntries({}), /Invalid/);
   assert.deepEqual(parseGraph('{"modules":[],"summary":{"violations":[]}}'), {
     modules: [],
     summary: { violations: [] },

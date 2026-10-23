@@ -42,8 +42,3 @@ export const MODEL_LIMITS = {
   maxFrameCharacters: 1_000_000,
   maxOutputCharacters: 100_000,
 } as const;
-
-export {
-  ENGINE_DONE_REASONS,
-  type EngineDoneReason,
-} from '@gyblos/protocol/constants';

@@ -11,9 +11,8 @@ import { setImmediate } from 'node:timers/promises';
 import { generateKeyPairSigner } from '@solana/kit';
 import { UptoSvmScheme } from '@x402/svm/upto/facilitator';
 
+import { DEVNET, DEVNET_USDC } from '@gyblos/config';
 import {
-  DEVNET,
-  DEVNET_USDC,
   FACILITATOR_PHASES,
   PUBLIC_CALL_OPERATIONS,
   type PublicCallOperation,

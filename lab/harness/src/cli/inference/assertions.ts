@@ -5,10 +5,10 @@ import assert from 'node:assert/strict';
 import { INFERENCE_CASES } from '@gyblos/buyer/constants';
 import type { Measurement } from '@gyblos/buyer/measurements';
 import { HTTP_STATUS } from '@gyblos/config';
-import { CHARGE_ANOMALIES } from '@gyblos/core/constants';
+import { CHARGE_ANOMALIES, OFFER_ID } from '@gyblos/core/constants';
 import type { observeInferenceResponse } from '@gyblos/core/inference-observation';
-import { charge, OFFER_ID } from '@gyblos/core/metering';
-import { MODEL } from '@gyblos/engine-ollama';
+import { charge } from '@gyblos/core/metering';
+import { MODEL } from '@gyblos/engine-ollama/model';
 
 import { type InferenceCaseName } from '../../constants.js';
 import type { InferenceTrace } from '../../types.js';

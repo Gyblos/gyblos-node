@@ -9,12 +9,8 @@ import type {
 } from '@x402/core/types';
 import { ExactSvmScheme } from '@x402/svm/exact/client';
 
-import { PAYMENT_LIMITS } from '@gyblos/config';
-import {
-  DEVNET,
-  DEVNET_USDC,
-  PUBLIC_CALL_OPERATIONS,
-} from '@gyblos/payments-x402/constants';
+import { DEVNET, DEVNET_USDC, PAYMENT_LIMITS } from '@gyblos/config';
+import { PUBLIC_CALL_OPERATIONS } from '@gyblos/payments-x402/constants';
 import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { ProtocolError } from '@gyblos/protocol/errors';
 

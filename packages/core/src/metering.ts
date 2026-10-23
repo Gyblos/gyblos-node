@@ -9,8 +9,6 @@ export interface TokenCounts {
   output: number;
 }
 
-export { PRICES, TOLERANCE, OFFER_ID } from './constants.js';
-
 export function charge(counts: TokenCounts): bigint {
   for (const value of Object.values(counts))
     if (!Number.isSafeInteger(value) || value < 0)

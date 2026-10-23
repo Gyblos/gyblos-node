@@ -4,7 +4,7 @@ import test from 'node:test';
 
 import { observeInferenceResponse } from '@gyblos/core/inference-observation';
 import { assessCharge } from '@gyblos/core/metering';
-import { ENGINE_DONE_REASONS } from '@gyblos/engine-ollama/constants';
+import { ENGINE_DONE_REASONS } from '@gyblos/protocol/constants';
 
 const expected = {
   requestId: 'id',

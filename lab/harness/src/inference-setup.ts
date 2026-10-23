@@ -15,11 +15,8 @@ import {
   TOKENIZER_DIR,
   TOKENIZER_FILES,
 } from '@gyblos/config';
-import {
-  createModelTokenizer,
-  createOllama,
-  MODEL,
-} from '@gyblos/engine-ollama';
+import { createModelTokenizer, createOllama } from '@gyblos/engine-ollama';
+import { MODEL } from '@gyblos/engine-ollama/model';
 import { spawnChild, stopChild, waitReady } from '@gyblos/runtime';
 
 import { PUBLIC_ORIGINS } from './constants.js';

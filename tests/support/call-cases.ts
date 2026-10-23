@@ -13,11 +13,11 @@ import {
   P2P_JOURNAL_STATES,
 } from '@gyblos/buyer/constants';
 import { errorDiagnostic } from '@gyblos/buyer/diagnostics';
+import { DEVNET, DEVNET_USDC } from '@gyblos/config';
 import {
   createBuyer,
   type BuyerResponseObservation,
 } from '@gyblos/payments-x402';
-import { DEVNET, DEVNET_USDC } from '@gyblos/payments-x402/constants';
 import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { ProtocolError } from '@gyblos/protocol/errors';
 

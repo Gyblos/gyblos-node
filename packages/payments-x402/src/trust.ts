@@ -2,11 +2,14 @@
 // amount bounds. Rejects before signing.
 import type { PaymentRequirements, SettleResponse } from '@x402/core/types';
 
-import { PAYMENT_LIMITS, TOKEN_PROGRAM_ADDRESS } from '@gyblos/config';
+import {
+  CHANNEL_PROGRAM,
+  DEVNET,
+  PAYMENT_LIMITS,
+  TOKEN_PROGRAM_ADDRESS,
+} from '@gyblos/config';
 import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { ProtocolError } from '@gyblos/protocol/errors';
-
-import { CHANNEL_PROGRAM, DEVNET } from './constants.js';
 
 export interface TrustPolicy {
   mint: string;

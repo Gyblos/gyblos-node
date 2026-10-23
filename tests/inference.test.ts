@@ -24,9 +24,9 @@ import {
   createModelTokenizer,
   createOllama,
   localOllamaUrl,
-  MODEL,
   renderChat,
 } from '@gyblos/engine-ollama';
+import { MODEL } from '@gyblos/engine-ollama/model';
 import { transactionTransfers } from '@gyblos/payments-x402/accounting/chain';
 
 const secretPrompt = 'private prompt that must never reach storage';

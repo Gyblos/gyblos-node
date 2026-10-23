@@ -20,7 +20,7 @@ function single(text: string, pattern: RegExp) {
   return integer(matches[0]![1]!);
 }
 
-export function parseDarwinMemorySnapshot(input: {
+function parseDarwinMemorySnapshot(input: {
   vmStat: string;
   pressure: string;
   totalBytes: number;

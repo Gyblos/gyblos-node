@@ -10,11 +10,13 @@ import { analyze } from './analyze.js';
 import { fixture, REPOSITORY } from './fixture.js';
 import { sourceFiles } from './inventory.js';
 
-function addedCount(text: string): number {
+function violationCount(text: string): number {
   const value: unknown = JSON.parse(text);
-  assert.ok(typeof value === 'object' && value !== null && 'added' in value);
-  assert.ok(Array.isArray(value.added));
-  return value.added.length;
+  assert.ok(
+    typeof value === 'object' && value !== null && 'violations' in value,
+  );
+  assert.ok(Array.isArray(value.violations));
+  return value.violations.length;
 }
 
 void test('archive enumeration excludes private/generated trees and symlinks before traversal', async () => {
@@ -35,13 +37,12 @@ void test('archive enumeration excludes private/generated trees and symlinks bef
   );
 });
 
-void test('CLI reports new violations without rewriting baseline and fails analyzer errors', async () => {
+void test('CLI reports violations and fails analyzer errors', async () => {
   await fixture(
     {
       'package.json': JSON.stringify({ type: 'module' }),
       'packages/core/src/a.ts': "import '../../engine-ollama/src/a.js';",
       'packages/engine-ollama/src/a.ts': 'export const value = 1;',
-      'tooling/boundaries-baseline.json': '[]\n',
     },
     async (_files, root) => {
       await mkdir(join(root, 'tooling/boundaries'), { recursive: true });
@@ -73,35 +74,18 @@ void test('CLI reports new violations without rewriting baseline and fails analy
         );
       const report = invoke('--json');
       assert.equal(report.status, 1, report.stderr);
-      assert.equal(addedCount(report.stdout), 1);
-      assert.match(report.stdout, /"mode": "enforcing"/);
-      const baseline = join(root, 'tooling/boundaries-baseline.json');
-      assert.equal(await readFile(baseline, 'utf8'), '[]\n');
-      assert.equal(invoke('--update-baseline').status, 1);
-      assert.equal(await readFile(baseline, 'utf8'), '[]\n');
-      assert.equal(addedCount(invoke('--json').stdout), 1);
+      assert.equal(violationCount(report.stdout), 1);
+      assert.equal(invoke().status, 1);
       await writeFile(
         join(root, 'packages/core/src/a.ts'),
         'export const value = 1;',
       );
-      assert.equal(invoke('--json').status, 0);
-      assert.equal(invoke('--update-baseline').status, 0);
-      assert.equal(addedCount(invoke('--json').stdout), 0);
-      const previous: unknown = JSON.parse(report.stdout);
-      assert.ok(
-        typeof previous === 'object' &&
-          previous !== null &&
-          'violations' in previous,
-      );
-      assert.ok(Array.isArray(previous.violations));
-      await writeFile(baseline, JSON.stringify(previous.violations));
-      assert.equal(invoke('--json').status, 1);
-      await writeFile(baseline, '[]');
-      assert.equal(invoke('--json').status, 0);
+      const clean = invoke('--json');
+      assert.equal(clean.status, 0);
+      assert.equal(violationCount(clean.stdout), 0);
+      assert.equal(invoke().status, 0);
+      assert.equal(invoke('--update-baseline').status, 1);
       assert.equal(invoke('--unknown-option').status, 1);
-      await writeFile(baseline, '{}');
-      assert.equal(invoke().status, 1);
-      await writeFile(baseline, '[]');
       await writeFile(
         join(root, 'packages/core/src/a.ts'),
         "import './unresolved-SYNTHETIC-SENSITIVE-MARKER.js';",

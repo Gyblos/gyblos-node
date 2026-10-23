@@ -51,10 +51,8 @@ protocol ◀── core ◀── adapters ◀── node ◀── apps
 
 `pnpm boundaries` (also part of `pnpm lint`) checks these rules statically with
 dependency-cruiser. It parses source without running it, skips private and
-generated paths and fails on any violation, analysis error or nonempty baseline.
-`tooling/boundaries-baseline.json` must stay `[]`; `--update-baseline` can only
-confirm an empty one. `--json` prints a structured report;
-`pnpm boundaries:test` tests the checker itself.
+generated paths and fails on any violation or analysis error. `--json` prints a
+structured report; `pnpm boundaries:test` tests the checker itself.
 
 ## Runtime picture
 

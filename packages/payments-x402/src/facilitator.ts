@@ -14,18 +14,18 @@ import express, { type Request } from 'express';
 
 import {
   CLEANUP,
+  DEVNET,
   DIAGNOSTIC_LIMITS,
   HTTP_LIMITS,
   HTTP_STATUS,
+  MAX_ATOMIC,
   ROUTES,
 } from '@gyblos/config';
 import { requireLoopbackHost } from '@gyblos/runtime/loopback-host';
 
 import {
-  DEVNET,
   FACILITATOR_DIAGNOSTIC_CODES,
   FACILITATOR_STAGES,
-  MAX_ATOMIC,
   PUBLIC_CALL_OPERATIONS,
 } from './constants.js';
 import {

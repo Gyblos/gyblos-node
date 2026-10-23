@@ -1,4 +1,4 @@
-// Owns static graph analysis and deterministic report comparison.
+// Owns static graph analysis and deterministic, validated violation entries.
 // Product modules are parsed, never executed; runtime data must not enter reports.
 import { isAbsolute, relative } from 'node:path';
 
@@ -32,8 +32,8 @@ export function entryKey(entry: BoundaryEntry): string {
   return JSON.stringify([entry.rule, entry.source, entry.target]);
 }
 
-export function validateBaseline(value: unknown): BoundaryEntry[] {
-  if (!Array.isArray(value)) throw new Error('Invalid boundary baseline.');
+export function validateEntries(value: unknown): BoundaryEntry[] {
+  if (!Array.isArray(value)) throw new Error('Invalid boundary entries.');
   const validated: BoundaryEntry[] = [];
   for (const entry of value) {
     if (
@@ -56,7 +56,7 @@ export function validateBaseline(value: unknown): BoundaryEntry[] {
           new RegExp(PRIVATE_PATH).test(part),
       )
     )
-      throw new Error('Invalid boundary baseline entry.');
+      throw new Error('Invalid boundary entry.');
     validated.push({
       rule: entry.rule,
       source: entry.source,
@@ -64,22 +64,8 @@ export function validateBaseline(value: unknown): BoundaryEntry[] {
     });
   }
   if (new Set(validated.map(entryKey)).size !== validated.length)
-    throw new Error('Duplicate boundary baseline entries.');
+    throw new Error('Duplicate boundary entries.');
   return validated;
-}
-
-export function compareBaseline(
-  actual: BoundaryEntry[],
-  baseline: BoundaryEntry[],
-) {
-  const currentKeys = new Set(actual.map(entryKey));
-  const knownKeys = new Set(baseline.map(entryKey));
-  return {
-    current: actual.length,
-    baseline: baseline.length,
-    added: actual.filter((entry) => !knownKeys.has(entryKey(entry))),
-    resolved: baseline.filter((entry) => !currentKeys.has(entryKey(entry))),
-  };
 }
 
 export async function analyze(
@@ -171,7 +157,7 @@ export async function analyze(
     ...new Map(entries.map((entry) => [entryKey(entry), entry])).values(),
   ].sort((left, right) => entryKey(left).localeCompare(entryKey(right), 'en'));
   return {
-    entries: validateBaseline(unique),
+    entries: validateEntries(unique),
     modules: graph.modules.length,
   };
 }

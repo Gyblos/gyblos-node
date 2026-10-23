@@ -4,8 +4,9 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 
 import { HTTP_STATUS, LOCALHOST, P2P, ROUTES } from '@gyblos/config';
+import { OFFER_ID } from '@gyblos/core/constants';
 import { observeInferenceResponse } from '@gyblos/core/inference-observation';
-import { assessCharge, charge, OFFER_ID } from '@gyblos/core/metering';
+import { assessCharge, charge } from '@gyblos/core/metering';
 import { modelTokenizer } from '@gyblos/node/artifacts';
 import { inferenceCeiling } from '@gyblos/node/http/inference';
 import { rolePath, roleSigner } from '@gyblos/node/roles';

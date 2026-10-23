@@ -10,7 +10,7 @@ import {
   type RelayConfigurationCode,
 } from './constants.js';
 
-export interface RelayEnvironment extends NodeJS.ProcessEnv {
+interface RelayEnvironment extends NodeJS.ProcessEnv {
   GYBLOS_RELAYS?: string;
   GYBLOS_RELAY_TOKEN?: string;
 }
@@ -25,9 +25,7 @@ export class RelayConfigurationError extends Error {
   }
 }
 
-export function configuredRelayUrls(
-  environment: RelayEnvironment = process.env,
-) {
+function configuredRelayUrls(environment: RelayEnvironment = process.env) {
   const values = environment.GYBLOS_RELAYS?.split(',') ?? IROH_RELAYS.urls;
   try {
     return [

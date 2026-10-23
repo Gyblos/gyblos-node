@@ -7,13 +7,13 @@ import { CHANNEL_ACCOUNT_SIZE, discoverChannelsByRentPayer } from '@x402/svm';
 import {
   CHANNEL_STATUS,
   COMMITMENT,
+  DEVNET,
   TOKEN_PROGRAM_ADDRESS,
 } from '@gyblos/config';
 import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { ProtocolError } from '@gyblos/protocol/errors';
 
 import { assertDevnet, rpc } from './chain.js';
-import { DEVNET } from './constants.js';
 
 interface ChannelAccountResponse {
   value: { owner: string; data: [string, 'base64'] } | null;

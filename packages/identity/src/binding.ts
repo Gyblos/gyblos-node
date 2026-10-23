@@ -71,7 +71,7 @@ export function nodeIdToBytes(nodeId: string): Uint8Array {
   );
 }
 
-export function nodeIdFromBytes(bytes: Uint8Array): string {
+function nodeIdFromBytes(bytes: Uint8Array): string {
   return Array.from(bytes, (byte) =>
     byte.toString(HEX_RADIX).padStart(2, '0'),
   ).join('');

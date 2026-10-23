@@ -7,10 +7,10 @@ import { readFile } from 'node:fs/promises';
 import { address } from '@solana/kit';
 import type { SupportedResponse } from '@x402/core/types';
 
-import { LOCALHOST, ROUTES, TIMEOUTS } from '@gyblos/config';
+import { DEVNET_USDC, LOCALHOST, ROUTES, TIMEOUTS } from '@gyblos/config';
 import { loadConfig } from '@gyblos/config/wallet';
 import { assertDevnet, tokens } from '@gyblos/payments-x402/chain';
-import { DEVNET_USDC, JOURNAL_STATES } from '@gyblos/payments-x402/constants';
+import { JOURNAL_STATES } from '@gyblos/payments-x402/constants';
 import { withExclusiveLock } from '@gyblos/payments-x402/recovery/lock';
 import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { ProtocolError } from '@gyblos/protocol/errors';

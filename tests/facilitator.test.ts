@@ -6,7 +6,7 @@ import { test } from 'node:test';
 
 import { generateKeyPairSigner } from '@solana/kit';
 
-import { DEVNET, DEVNET_USDC } from '@gyblos/payments-x402/constants';
+import { DEVNET, DEVNET_USDC } from '@gyblos/config';
 import { createFacilitator } from '@gyblos/payments-x402/facilitator';
 
 import { registerFacilitatorHttpCases } from './support/facilitator-http-cases.js';

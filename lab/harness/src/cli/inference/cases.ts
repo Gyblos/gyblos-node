@@ -3,16 +3,17 @@
 import assert from 'node:assert/strict';
 
 import { appendMeasurement, measurementRow } from '@gyblos/buyer/measurements';
-import { TIMEOUTS } from '@gyblos/config';
+import { DEVNET, TIMEOUTS } from '@gyblos/config';
 import { WALLET_ROLES } from '@gyblos/config/constants';
 import { signer } from '@gyblos/config/wallet';
+import { OFFER_ID } from '@gyblos/core/constants';
 import { observeInferenceResponse } from '@gyblos/core/inference-observation';
-import { assessCharge, OFFER_ID } from '@gyblos/core/metering';
-import { MODEL } from '@gyblos/engine-ollama';
+import { assessCharge } from '@gyblos/core/metering';
 import { GENERATION, MODEL_LIMITS } from '@gyblos/engine-ollama/constants';
+import { MODEL } from '@gyblos/engine-ollama/model';
 import { inferenceCeiling } from '@gyblos/node/http/inference';
 import { inferenceSnapshot } from '@gyblos/payments-x402/accounting/chain';
-import { DEVNET, JOURNAL_STATES } from '@gyblos/payments-x402/constants';
+import { JOURNAL_STATES } from '@gyblos/payments-x402/constants';
 import { createInferenceBuyer } from '@gyblos/payments-x402/inference-buyer';
 import { saveJson } from '@gyblos/runtime';
 

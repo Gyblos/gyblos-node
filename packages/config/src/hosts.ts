@@ -19,7 +19,7 @@ export const HOSTS = {
 
 export const IPV6_LOOPBACK = '[::1]';
 
-export const LOCALHOST_NAME = 'localhost';
+const LOCALHOST_NAME = 'localhost';
 
 // Host header names accepted by loopback-bound HTTP servers (DNS rebinding guard).
 export const LOOPBACK_HOST_NAMES = [
@@ -28,7 +28,7 @@ export const LOOPBACK_HOST_NAMES = [
   IPV6_LOOPBACK,
 ] as const;
 
-export const EXPLORER_ORIGIN = 'https://explorer.solana.com';
+const EXPLORER_ORIGIN = 'https://explorer.solana.com';
 
 function formatHostUrl(port: number) {
   return `http://${LOCALHOST}:${port}`;

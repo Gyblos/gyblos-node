@@ -12,10 +12,10 @@ import {
   encodePaymentSignatureHeader,
 } from '@x402/core/http';
 
+import { DEVNET, DEVNET_GENESIS } from '@gyblos/config';
 import { createOllamaEngine } from '@gyblos/engine-ollama/engine';
 import { MODEL } from '@gyblos/engine-ollama/model';
 import { createInferenceSeller } from '@gyblos/node/http/inference';
-import { DEVNET, DEVNET_GENESIS } from '@gyblos/payments-x402/constants';
 
 // The real x402 middleware runs against controlled, non-broadcasting services.
 // No wallet is funded and no RPC method can submit a transaction.

@@ -38,7 +38,7 @@ import type { DetachedSigner } from './signers.js';
 
 type AccountMetaWithSigner = AccountMeta | AccountSignerMeta;
 
-export type RegistryInstruction = Instruction<
+type RegistryInstruction = Instruction<
   string,
   readonly AccountMetaWithSigner[]
 >;
@@ -138,7 +138,7 @@ export async function setMetadataInstruction(
   };
 }
 
-export function walletSetMessage(
+function walletSetMessage(
   asset: Address,
   wallet: Address,
   owner: Address,
@@ -157,7 +157,7 @@ function u16(value: number): Uint8Array {
   return encodeU32(value).subarray(0, 2);
 }
 
-export function ed25519VerifyInstruction(
+function ed25519VerifyInstruction(
   publicKey: Uint8Array,
   signature: Uint8Array,
   message: Uint8Array,
