@@ -1,6 +1,6 @@
 # Architecture
 
-A pnpm workspace of small TypeScript packages, three apps and a lab. The wire
+A pnpm workspace of small TypeScript packages, two apps and a lab. The wire
 format is specified in
 [packages/protocol/SPEC.md](../packages/protocol/SPEC.md). Technology choices
 are in [stack.md](stack.md).
@@ -11,7 +11,7 @@ are in [stack.md](stack.md).
 | ------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `packages/protocol`       | protocol | Canonical JSON, signed offer wire shape, domain and bytes, Iroh ALPN, `Engine` contract, error codes, model catalog, public discovery records. No SDKs.              |
 | `packages/core`           | core     | Pricing and metering math, offer trust rules, charge-anomaly checks. No SDKs or filesystem.                                                                          |
-| `packages/config`         | config   | Devnet addresses, ports, paths, limits, relay defaults, wallet loading.                                                                                              |
+| `packages/config`         | config   | Devnet addresses, ports, paths, limits, relay defaults.                                                                                                              |
 | `packages/runtime`        | runtime  | Atomic JSON writes, private rotating logs, processes, memory probes, loopback `Host` guard.                                                                          |
 | `packages/engine-ollama`  | adapter  | Ollama client, `Engine` adapter, pinned tokenizer and model constants.                                                                                               |
 | `packages/payments-x402`  | adapter  | x402 `upto`, facilitator, buyer signer, on-chain proofs, recovery locks.                                                                                             |
@@ -19,33 +19,34 @@ are in [stack.md](stack.md).
 | `packages/identity`       | adapter  | 8004 registry adapter; not used by the node yet ([identity.md](identity.md)).                                                                                        |
 | `packages/node`           | node     | Local-node library for both roles: seller composition (`createNode`), roles and keys, signed offers, tokenizer artifacts and inference pricing used by `apps/buyer`. |
 
-| App                | Command                          | Responsibility                                                  |
-| ------------------ | -------------------------------- | --------------------------------------------------------------- |
-| `apps/node`        | `node:start` (`main.ts`)         | Seller daemon.                                                  |
-| `apps/buyer`       | `buyer:start`, `buyer:reconcile` | Buyer proxy, one paid call (`call.ts`), measurements, recovery. |
-| `apps/facilitator` | `gate:facilitator`               | Standalone local facilitator.                                   |
+| App          | Command                          | Responsibility                                                  |
+| ------------ | -------------------------------- | --------------------------------------------------------------- |
+| `apps/node`  | `node:start` (`main.ts`)         | Seller daemon with its embedded facilitator.                    |
+| `apps/buyer` | `buyer:start`, `buyer:reconcile` | Buyer proxy, one paid call (`call.ts`), measurements, recovery. |
 
-`lab/harness` holds the `gate:*` proof-of-concept checks (including the x402
-`exact` scheme, the fixed-price test seller and the gate runner), `lab/tools`
-the identity devnet tools and `lab/evidence` the published reports.
-`lab/harness` and `lab/tools` are runnable through the package scripts;
-`lab/evidence` is a historical record of past runs, and the archived Docker/NAT
-lab lives only at tag `archive/poc-lab-2026-10`. `tests/` and `tooling/` verify
-everything and may import any layer.
+"Gate" is a lab word only. `lab/harness` holds the `gate:*` proof-of-concept
+checks (including the x402 `exact` scheme, the fixed-price test seller, the gate
+runner and the devnet wallet configuration), `lab/facilitator` the standalone
+local facilitator (`gate:facilitator`), `lab/tools` the identity devnet tools
+and `lab/evidence` the published reports. `lab/harness`, `lab/facilitator` and
+`lab/tools` are runnable through the package scripts; `lab/evidence` is a
+historical record of past runs, and the archived Docker/NAT lab lives only at
+tag `archive/poc-lab-2026-10`. `tests/` and `tooling/` verify everything and may
+import any layer.
 
 ## Where `@gyblos/*` comes from
 
 These are private local packages in this repository. `@gyblos` is their shared
-namespace. `pnpm-workspace.yaml` registers `packages/*`, `apps/*` and
-`lab/harness`; each package declares its own name in `package.json`.
+namespace. `pnpm-workspace.yaml` registers `packages/*`, `apps/*`, `lab/harness`
+and `lab/facilitator`; each package declares its own name in `package.json`.
 Dependencies such as `"@gyblos/protocol": "workspace:*"` tell pnpm to link the
 local package during installation.
 
 For example, `@gyblos/protocol/errors` resolves through the `./errors` export in
 `packages/protocol/package.json` to `packages/protocol/src/errors.ts`. There is
 no TypeScript path alias or generated package behind that import. P2P role keys
-are loaded by `packages/node/src/roles.ts`; `@gyblos/config/wallet` loads
-operator-selected wallet configuration.
+are loaded by `packages/node/src/roles.ts`; `@gyblos/lab-harness/wallet` loads
+the lab devnet wallet configuration.
 
 ## Dependency rule
 

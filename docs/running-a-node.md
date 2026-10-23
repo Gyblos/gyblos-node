@@ -26,7 +26,7 @@ existing role stops with an error.
 ```sh
 export GYBLOS_RELAY_TOKEN=...    # private; 32-512 printable characters
 pnpm node:setup --role seller --mint MINT --buyer BUYER_ADDRESS --pay-to PAYOUT_ADDRESS
-pnpm gate:inference:setup        # pinned Qwen3 0.6B model and tokenizer
+pnpm gate:inference:setup        # pinned Qwen3 0.6B model and tokenizer (lab command for now)
 pnpm node:start
 ```
 

@@ -13,9 +13,9 @@ top-level `test()` in a `*.test.ts` file.
 
 - `tests/*.test.ts` exercise product packages and apps through their public
   entries. They never import `@gyblos/lab-harness` or `lab/`.
-- `tests/lab/` covers lab code (gate harness, exact scheme, journals, lab tools
-  and entrypoints) and the opt-in identity integration with its validator
-  helper.
+- `tests/lab/` covers lab code (gate harness, standalone lab facilitator, exact
+  scheme, journals, lab tools and entrypoints) and the opt-in identity
+  integration with its validator helper.
 - `tests/support/` holds fixtures, fakes, fault catalogs and helpers only, no
   test cases. Both suites may import it.
 - `tooling/**/*.test.ts` test the repository tooling, not the product, and are
