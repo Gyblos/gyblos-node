@@ -57,12 +57,14 @@ import {
 } from '../../constants.js';
 import type { InferenceTrace } from '../../inference-evidence-types.js';
 import { assertNoUnresolvedAuthorizations } from '../../journal.js';
-import { loadConfig, signer } from '../../wallet.js';
+import { assertLabHome, loadConfig, signer } from '../../wallet.js';
 import { createGateBilling } from './billing.js';
 import { runCases } from './cases.js';
 import { initializeEvidence } from './evidence.js';
 
 export async function main() {
+  // Before the lab lock, which would create the lab home.
+  await assertLabHome();
   const evidencePath = EVIDENCE_PATHS.inference;
   const journalPath = labPaths().journals.inference;
   const ollamaUrl = HOSTS.ollama;

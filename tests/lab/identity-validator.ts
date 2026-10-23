@@ -16,6 +16,7 @@ import {
   LOCALHOST,
 } from '@gyblos/config';
 import { DEVNET_REGISTRY, PROGRAMS } from '@gyblos/identity/constants';
+import { assertLabHome } from '@gyblos/lab-harness/wallet';
 
 import type { SyntheticChain } from '../support/identity-accounts.js';
 
@@ -126,6 +127,8 @@ async function stopProcess(child: ChildProcess): Promise<void> {
 export async function startLocalValidator(
   preload: SyntheticChain = new Map(),
 ): Promise<ValidatorStart> {
+  // Before the scratch mkdir, which would also create the lab home.
+  await assertLabHome();
   mkdirSync(validatorDirectory(), {
     recursive: true,
     mode: FILE_MODES.privateDirectory,

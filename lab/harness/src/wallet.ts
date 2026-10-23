@@ -7,11 +7,12 @@ import { createKeyPairSignerFromBytes } from '@solana/kit';
 
 import { KEY_LIMITS, labLayout } from '@gyblos/config';
 import { type ConfigAssetLabel } from '@gyblos/config/constants';
-import { assertNoLegacyLayout } from '@gyblos/node/home';
+import { assertNoLegacyState } from '@gyblos/node/home';
 
 import {
   CONFIG_SCHEMA_VERSION,
   labPaths,
+  labStatePaths,
   LEGACY_LAB_PATHS,
   type WalletRole,
 } from './constants.js';
@@ -29,8 +30,14 @@ export const configPath = () =>
   resolve(process.env.GYBLOS_GATE_CONFIG ?? labPaths().config);
 
 // Lab journals and keys live in the lab home; never start a fresh one next to legacy .local/devnet state.
+// Decided on lab state files, not on the root directory, which a lock or identity scratch may create.
+// Call it before every lab lock, mkdir or write.
 export function assertLabHome() {
-  return assertNoLegacyLayout(labLayout(process.env).root, LEGACY_LAB_PATHS);
+  return assertNoLegacyState(
+    labLayout(process.env).root,
+    labStatePaths(),
+    LEGACY_LAB_PATHS,
+  );
 }
 
 export async function loadConfig(): Promise<Config> {

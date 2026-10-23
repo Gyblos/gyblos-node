@@ -18,6 +18,7 @@ import {
 } from '@solana/kit';
 
 import { FILE_MODES, labLayout, LEGACY_LOCAL_PATHS } from '@gyblos/config';
+import { assertLabHome } from '@gyblos/lab-harness/wallet';
 import { assertNoLegacyLayout } from '@gyblos/node/home';
 
 const SEED_BYTES = 32;
@@ -44,6 +45,8 @@ export async function loadOrCreateKey(
 ): Promise<{ signer: KeyPairSigner; seed: Uint8Array }> {
   if (!KEY_NAME.test(name)) throw new Error('key name must be [a-z0-9-]+');
   const directory = labLayout(process.env).identityKeys;
+  // Both guards run before the mkdir, which would also create the lab home.
+  await assertLabHome();
   await assertNoLegacyLayout(directory, [LEGACY_LOCAL_PATHS.identityKeys]);
   mkdirSync(directory, { recursive: true, mode: FILE_MODES.privateDirectory });
   chmodSync(directory, FILE_MODES.privateDirectory);

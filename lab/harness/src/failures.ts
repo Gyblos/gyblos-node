@@ -49,9 +49,11 @@ import type {
   FailureGateEvidence,
 } from './fixture-evidence-types.js';
 import { assertNoUnresolvedAuthorizations, saveJournal } from './journal.js';
-import { loadConfig, signer } from './wallet.js';
+import { assertLabHome, loadConfig, signer } from './wallet.js';
 
 export async function failureGate() {
+  // Before the lab lock, which would create the lab home.
+  await assertLabHome();
   async function failures() {
     const config = await loadConfig();
     await assertProgram(config.rpcUrl);

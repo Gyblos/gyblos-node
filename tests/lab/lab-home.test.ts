@@ -1,9 +1,9 @@
 // Checks that lab state lives in its own home (GYBLOS_LAB_HOME, GYBLOS_GATE_CONFIG override) and that
 // legacy .local/devnet lab state fails closed. Synthetic temporary directories only; nothing is read.
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 import test from 'node:test';
 
 import { LEGACY_LOCAL_PATHS } from '@gyblos/config';
@@ -78,7 +78,10 @@ void test('each legacy lab path blocks a missing lab home until it is moved', as
             return true;
           },
         );
+        // An empty lab home is not enough; moving the legacy file is.
         await mkdir('.local/lab');
+        await assert.rejects(assertLabHome());
+        await rename(legacyPath, join('.local/lab', basename(legacyPath)));
         await assertLabHome();
       },
     );

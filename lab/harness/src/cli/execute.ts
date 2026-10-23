@@ -43,7 +43,7 @@ import {
 import type { FixedGateEvidence } from '../fixture-evidence-types.js';
 import { runGate } from '../gate.js';
 import { assertNoUnresolvedAuthorizations, saveJournal } from '../journal.js';
-import { loadConfig, signer } from '../wallet.js';
+import { assertLabHome, loadConfig, signer } from '../wallet.js';
 
 const journalPath = () => labPaths().journals.fixed;
 
@@ -232,5 +232,7 @@ async function executeLocked(signal?: AbortSignal) {
 }
 
 export async function executeGate(signal?: AbortSignal) {
+  // Before the lab lock, which would create the lab home.
+  await assertLabHome();
   return withExclusiveLock(labPaths().lock, () => executeLocked(signal));
 }

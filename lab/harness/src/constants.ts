@@ -7,7 +7,12 @@ import {
   INFERENCE_CASES,
   MEASUREMENT_SCHEMA_VERSION,
 } from '@gyblos/buyer/constants';
-import { labLayout, LEGACY_LOCAL_PATHS, LOCALHOST } from '@gyblos/config';
+import {
+  labLayout,
+  LEGACY_LOCAL_PATHS,
+  LOCALHOST,
+  ROLE_FILES,
+} from '@gyblos/config';
 import { type ConfigAssetLabel } from '@gyblos/config/constants';
 import { type ProtocolErrorCode } from '@gyblos/protocol/constants';
 
@@ -187,15 +192,25 @@ export function labPaths() {
   } as const;
 }
 
-// Former lab state under .local/devnet, checked for existence only before the lab home is created.
-export const LEGACY_LAB_PATHS = [
-  join(LEGACY_LOCAL_PATHS.lab, CONFIG_FILENAME),
-  LEGACY_LOCAL_PATHS.labMeasurements,
-  join(LEGACY_LOCAL_PATHS.lab, LAB_FILENAMES.lock),
-  ...Object.values(LAB_JOURNAL_FILENAMES).map((name) =>
-    join(LEGACY_LOCAL_PATHS.lab, name),
-  ),
+// Files that prove the lab home is in use: config, wallet keys, journals, measurements and their salt.
+// A lock, identity keys or validator scratch are not lab state.
+const LAB_STATE_FILENAMES = [
+  CONFIG_FILENAME,
+  ...Object.values(WALLET_ROLES).map((role) => keyFilename(role)),
+  ...Object.values(LAB_JOURNAL_FILENAMES),
+  ROLE_FILES.measurements,
+  ROLE_FILES.measurementSalt,
 ] as const;
+
+export function labStatePaths() {
+  return LAB_STATE_FILENAMES.map(labPath);
+}
+
+// Former lab state under .local/devnet, checked for existence only while the lab home holds no state.
+export const LEGACY_LAB_PATHS = [
+  ...LAB_STATE_FILENAMES,
+  ...Object.values(LAB_FILENAMES),
+].map((name) => join(LEGACY_LOCAL_PATHS.lab, name));
 
 export const ENTRYPOINTS = {
   seller: 'lab/harness/scripts/seller.ts',

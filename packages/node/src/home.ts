@@ -18,10 +18,11 @@ export class LegacyLayoutError extends NodeError {
   constructor(
     readonly legacyPath: string,
     readonly homePath: string,
+    missing = 'does not',
   ) {
     super(NODE_ERROR_CODES.LEGACY_LOCAL_LAYOUT);
     this.name = 'LegacyLayoutError';
-    this.message = `${NODE_ERROR_CODES.LEGACY_LOCAL_LAYOUT}: ${legacyPath} exists but ${homePath} does not. Move it manually (see ${LEGACY_LAYOUT_GUIDE}); nothing was migrated.`;
+    this.message = `${NODE_ERROR_CODES.LEGACY_LOCAL_LAYOUT}: ${legacyPath} exists but ${homePath} ${missing}. Move it manually (see ${LEGACY_LAYOUT_GUIDE}); nothing was migrated.`;
   }
 }
 
@@ -46,6 +47,19 @@ export async function assertNoLegacyLayout(
   for (const legacyPath of legacyPaths)
     if (await pathExists(legacyPath))
       throw new LegacyLayoutError(legacyPath, homePath);
+}
+
+// For a home whose directory other writers may create first (locks, scratch): the home counts as in use
+// only once one of its state files exists, so an empty or lock-only directory cannot silence legacy state.
+export async function assertNoLegacyState(
+  homePath: string,
+  statePaths: readonly string[],
+  legacyPaths: readonly string[],
+) {
+  for (const statePath of statePaths) if (await pathExists(statePath)) return;
+  for (const legacyPath of legacyPaths)
+    if (await pathExists(legacyPath))
+      throw new LegacyLayoutError(legacyPath, homePath, 'holds no lab state');
 }
 
 export function assertRoleHome(
