@@ -16,7 +16,6 @@
     "./commands/fund": "./scripts/fund.ts",
     "./commands/inference-setup": "./scripts/inference-setup.ts",
     "./commands/setup": "./scripts/setup.ts",
-    "./config": "./src/config.ts",
     "./constants": "./src/constants.ts",
     "./journal": "./src/journal.ts",
     "./types": "./src/types.ts"

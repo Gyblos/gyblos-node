@@ -29,9 +29,6 @@ importers:
       '@gyblos/lab-harness':
         specifier: workspace:*
         version: link:lab/harness
-      '@gyblos/lab-p2p':
-        specifier: workspace:*
-        version: link:lab/p2p
       '@gyblos/node':
         specifier: workspace:*
         version: link:packages/node
@@ -190,53 +187,11 @@ importers:
         specifier: 2.28.0
         version: 2.28.0(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))(@solana/sysvars@6.1.0(typescript@5.9.3))(typescript@5.9.3)
 
-  lab/p2p:
-    dependencies:
-      '@gyblos/buyer':
-        specifier: workspace:*
-        version: link:../../apps/buyer
-      '@gyblos/config':
-        specifier: workspace:*
-        version: link:../../packages/config
-      '@gyblos/engine-ollama':
-        specifier: workspace:*
-        version: link:../../packages/engine-ollama
-      '@gyblos/lab-harness':
-        specifier: workspace:*
-        version: link:../harness
-      '@gyblos/node':
-        specifier: workspace:*
-        version: link:../../packages/node
-      '@gyblos/payments-x402':
-        specifier: workspace:*
-        version: link:../../packages/payments-x402
-      '@gyblos/runtime':
-        specifier: workspace:*
-        version: link:../../packages/runtime
-      '@gyblos/transport-iroh':
-        specifier: workspace:*
-        version: link:../../packages/transport-iroh
-      '@number0/iroh':
-        specifier: 1.1.0
-        version: 1.1.0
-      '@solana-program/system':
-        specifier: 0.10.0
-        version: 0.10.0(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))
-      '@solana-program/token':
-        specifier: 0.9.0
-        version: 0.9.0(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))
-      '@solana/kit':
-        specifier: 5.1.0
-        version: 5.1.0(typescript@5.9.3)(ws@8.21.0)
-
   packages/config:
     dependencies:
       '@huggingface/tokenizers':
         specifier: 0.2.0
         version: 0.2.0
-      '@number0/iroh':
-        specifier: 1.1.0
-        version: 1.1.0
       '@solana-program/token':
         specifier: 0.9.0
         version: 0.9.0(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))

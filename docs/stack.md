@@ -15,7 +15,6 @@ this file describes the code here.
 | P2P transport | Iroh (`@number0/iroh`)                                                              | 1.1.0             | Connect to a public key behind home NAT, QUIC, end-to-end encryption, relay fallback       |
 | HTTP          | Express (sellers, facilitator), Node `http` (buyer proxy)                           | 4.21.2            | Standard x402 middleware; loopback-only servers with Host validation                       |
 | Inference     | Ollama (local engine), `@huggingface/tokenizers`                                    | tokenizers 0.2.0  | Real open-weight model; buyer recounts tokens with the public tokenizer                    |
-| Lab           | Docker Compose (non-root, read-only, no published ports)                            | —                 | Isolated buyer/seller roles and simulated NAT routers                                      |
 | Quality       | ESLint, Prettier, Node test runner (`tsx`)                                          | —                 | Typecheck, lint and offline regression tests on every change                               |
 
 ## Why Iroh

@@ -15,7 +15,6 @@
     "./measurements": "./src/measurements.ts",
     "./offers": "./src/offers.ts",
     "./roles": "./src/roles.ts",
-    "./seller": "./src/seller.ts",
     "./synthetic-cases": "./src/synthetic-cases.ts"
   },
   "dependencies": {

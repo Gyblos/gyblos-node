@@ -10,7 +10,7 @@ This repository contains the Gyblos node and buyer application, not the separate
 - `packages/node`: reusable seller composition, lifecycle and SDK adaptation.
 - `apps/node`, `apps/buyer`, `apps/facilitator`: independent executable applications.
 - `packages/config`: operator configuration and retained legacy shared values; `runtime`: platform support.
-- `lab/harness`, `lab/p2p`, `lab/tools`, `lab/docker`, `lab/evidence`: validation and experiments, outside product ownership.
+- `lab/harness`, `lab/tools`, `lab/evidence`: validation and experiments, outside product ownership. The Docker/NAT laboratory is archived at tag `archive/poc-lab-2026-10`.
 - `tests` and `tooling`: offline verification; no import-time application initialization.
 
 ## Vault context

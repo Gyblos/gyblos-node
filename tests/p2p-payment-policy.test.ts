@@ -10,13 +10,11 @@ import { generateKeyPairSigner } from '@solana/kit';
 import { encodePaymentRequiredHeader } from '@x402/core/http';
 
 import { DEVNET, DEVNET_USDC, P2P } from '@gyblos/config';
-import { fundRoles } from '@gyblos/lab-p2p/docker-fund';
 import { createInferenceBuyer } from '@gyblos/payments-x402/inference-buyer';
 import { withExclusiveLock } from '@gyblos/payments-x402/recovery/lock';
 import { saveJson } from '@gyblos/runtime';
 
 import { registerCallCases } from './support/call-cases.js';
-import { registerExportCases } from './support/export-cases.js';
 import { registerLockCases } from './support/lock-cases.js';
 import { NATIVE_CAPABILITY } from './support/native-runtime.js';
 import { registerRecoveryCases } from './support/recovery-cases.js';
@@ -170,46 +168,8 @@ void test(
   },
 );
 
-void test('Docker funder preserves uncertain journals and refuses concurrent funding without RPC', async () => {
-  const originalDirectory = process.cwd();
-  const originalFetch = globalThis.fetch;
-  const directory = await mkdtemp(join(tmpdir(), 'gyblos-p2p-funding-lock-'));
-  let networkCalls = 0;
-  try {
-    process.chdir(directory);
-    globalThis.fetch = (async () => {
-      networkCalls++;
-      throw new Error('RPC forbidden');
-    }) as typeof fetch;
-    await saveJson(P2P.fundingJournal, {
-      state: 'authorized',
-      signature: 'synthetic-uncertain',
-    });
-    await assert.rejects(
-      fundRoles(directory, 'unused', 'unused'),
-      /Previous funding is uncertain/,
-    );
-    assert.equal(
-      JSON.parse(await readFile(P2P.fundingJournal, 'utf8')).signature,
-      'synthetic-uncertain',
-    );
-    await withExclusiveLock(P2P.fundingLock, async () => {
-      await assert.rejects(
-        fundRoles(directory, 'unused', 'unused'),
-        /holds the gate lock/,
-      );
-    });
-    assert.equal(networkCalls, 0);
-  } finally {
-    process.chdir(originalDirectory);
-    globalThis.fetch = originalFetch;
-    await rm(directory, { recursive: true, force: true });
-  }
-});
-
 registerLockCases();
 registerRecoveryCases();
-registerExportCases();
 
 registerCallCases();
 
