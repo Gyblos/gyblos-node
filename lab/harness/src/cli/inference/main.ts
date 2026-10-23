@@ -23,6 +23,7 @@ import { CONFIG_ASSET_LABELS } from '@gyblos/config/constants';
 import { createModelTokenizer, createOllama } from '@gyblos/engine-ollama';
 import { GENERATION } from '@gyblos/engine-ollama/constants';
 import { createOllamaEngine } from '@gyblos/engine-ollama/engine';
+import { assertOllamaModelsHome } from '@gyblos/node/home';
 import { createInferenceSeller } from '@gyblos/node/http/inference';
 import {
   confirmInference,
@@ -65,6 +66,7 @@ import { initializeEvidence } from './evidence.js';
 export async function main() {
   // Before the lab lock, which would create the lab home.
   await assertLabHome();
+  await assertOllamaModelsHome();
   const evidencePath = EVIDENCE_PATHS.inference;
   const journalPath = labPaths().journals.inference;
   const ollamaUrl = HOSTS.ollama;

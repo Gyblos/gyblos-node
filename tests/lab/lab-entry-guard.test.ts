@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { labLayout, LEGACY_LOCAL_PATHS } from '@gyblos/config';
+import { homeLayout, labLayout, LEGACY_LOCAL_PATHS } from '@gyblos/config';
 import { main as fixedBuyerGate } from '@gyblos/lab-harness/cli/buyer';
 import { main as exactGate } from '@gyblos/lab-harness/cli/exact';
 import { main as inferenceGate } from '@gyblos/lab-harness/cli/inference';
@@ -153,4 +153,28 @@ void test('every lab entry point refuses legacy lab state before writing lab sta
             );
         },
       );
+});
+
+void test('inference refuses legacy models before any lock, network call or engine startup', async () => {
+  await inLegacyLabCwd({ emptyLabHome: true, legacyFiles: [] }, async () => {
+    await mkdir(LEGACY_LOCAL_PATHS.ollamaModels, { recursive: true });
+    await writeFile(join(labLayout(process.env).root, CONFIG_FILENAME), '{}');
+    const originalFetch = globalThis.fetch;
+    let fetches = 0;
+    process.env.PATH = '';
+    globalThis.fetch = async () => {
+      fetches++;
+      throw new Error('Unexpected network');
+    };
+    try {
+      await assert.rejects(inferenceGate(), isLegacyLayout);
+      assert.equal(fetches, 0);
+      assert.deepEqual(await labHomeEntries(), [CONFIG_FILENAME]);
+      await assert.rejects(readdir(homeLayout(process.env).root), {
+        code: 'ENOENT',
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
 });

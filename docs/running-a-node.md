@@ -50,31 +50,67 @@ Before you move anything:
 - Run the commands from the same working directory. `ls .local/p2p` shows
   `buyer.json` for a buyer or `owner.json` for a seller.
 
-Each command below moves only if its destination does not exist yet, and
-otherwise prints which one to check (the same on macOS and Linux):
+Run this block after choosing the role destination (`buyer` below, or `seller`).
+It uses `GYBLOS_HOME` and `GYBLOS_LAB_HOME` when set, stops on the first
+failure, and runs in a subshell so failure does not close your terminal.
+Existing destinations, including dangling symlinks, are refused. Omit moves
+whose source never existed.
+
+The lab config records absolute key paths. After moving it, the block rewrites
+only keys directly inside the old lab directory to the actual new directory. It
+preserves the original config exclusively as `config.json.bak` and stages the
+replacement before renaming it. Unexpected key paths require manual review; no
+keys or journals are read or rewritten.
 
 ```sh
-umask 077
-move() { if [ -e "$2" ]; then echo "stop: $2 exists; compare by hand" >&2; return 1; fi; mkdir -p "$(dirname "$2")" && mv "$1" "$2"; }
-move .local/p2p .local/gyblos/buyer        # a seller checkout: .local/gyblos/seller
-move .local/devnet/tokenizer .local/gyblos/artifacts/tokenizer
-move .local/ollama/models .local/gyblos/artifacts/ollama-models
+(
+  umask 077
+  product_home=${GYBLOS_HOME:-.local/gyblos}
+  lab_home=${GYBLOS_LAB_HOME:-.local/lab}
+  move() {
+    if [ -e "$2" ] || [ -L "$2" ]; then
+      echo "stop: destination exists; compare by hand" >&2
+      return 1
+    fi
+    mkdir -p "$(dirname "$2")" && mv "$1" "$2"
+  }
+  move .local/p2p "$product_home/buyer" || exit 1  # seller checkout: use seller
+  move .local/devnet/tokenizer "$product_home/artifacts/tokenizer" || exit 1
+  move .local/ollama/models "$product_home/artifacts/ollama-models" || exit 1
+  move .local/devnet "$lab_home" || exit 1
+  node --input-type=module - "$lab_home/config.json" <<'NODE' || exit 1
+import { readFileSync, writeFileSync, renameSync } from 'node:fs';
+import { basename, dirname, isAbsolute, resolve } from 'node:path';
+try {
+  const file = resolve(process.argv[2]);
+  const original = readFileSync(file, 'utf8');
+  const config = JSON.parse(original);
+  for (const [role, path] of Object.entries(config.keys)) {
+    if (typeof path !== 'string' || !isAbsolute(path) ||
+        dirname(path) !== resolve('.local/devnet')) throw new Error();
+    config.keys[role] = resolve(dirname(file), basename(path));
+  }
+  writeFileSync(file + '.bak', original, { flag: 'wx', mode: 0o600 });
+  writeFileSync(file + '.migrating', JSON.stringify(config, null, 2) + '\n',
+    { flag: 'wx', mode: 0o600 });
+  renameSync(file + '.migrating', file);
+} catch {
+  console.error('stop: review the moved config and any backup manually');
+  process.exitCode = 1;
+}
+NODE
+  if [ -e .local/identity/keys ] || [ -L .local/identity/keys ]; then
+    move .local/identity/keys "$lab_home/identity/keys" || exit 1
+  fi
+)
 ```
 
-Lab state, after the tokenizer has moved out of `.local/devnet/`. The lab config
-records absolute key paths, so rewrite them in place:
-
-```sh
-move .local/devnet .local/lab
-sed -i.bak 's#/.local/devnet/#/.local/lab/#g' .local/lab/config.json
-move .local/identity/keys .local/lab/identity/keys   # only if it exists
-```
-
-Review `.local/lab/config.json`, then delete `.local/lab/config.json.bak`: it is
-the old copy and may hold an RPC URL with an API key.
-`.local/identity-validator/` is disposable test scratch and is not checked. With
-a custom `GYBLOS_HOME` or `GYBLOS_LAB_HOME`, move into those directories
-instead.
+Review the moved `config.json` and its key paths before restarting anything,
+then delete `config.json.bak`: the old copy may hold an RPC URL with an API key.
+After any failure, inspect the source and destination and resume only the
+remaining moves; do not repeat the whole block blindly. An incomplete config
+rewrite leaves the moved config and original backup for manual recovery.
+`.local/identity-validator/` is disposable test scratch and is not checked.
 
 ## Roles and files
 
