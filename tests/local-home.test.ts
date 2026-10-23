@@ -251,6 +251,28 @@ void test(
 );
 
 void test(
+  'seller start refuses legacy role data before its first status write',
+  { skip: NATIVE_CAPABILITY.bindingSkip },
+  async () => {
+    const { createNode } = await import('@gyblos/node');
+    const previous = process.env.GYBLOS_HOME;
+    await inTemporaryCwd(async (directory) => {
+      process.env.GYBLOS_HOME = join(directory, 'home');
+      await mkdir(LEGACY_LOCAL_PATHS.roles, { recursive: true });
+      await assert.rejects(createNode().start(), {
+        code: NODE_ERROR_CODES.LEGACY_LOCAL_LAYOUT,
+      });
+      await assert.rejects(lstat(homeLayout(process.env).roles.seller), {
+        code: 'ENOENT',
+      });
+    }).finally(() => {
+      if (previous === undefined) delete process.env.GYBLOS_HOME;
+      else process.env.GYBLOS_HOME = previous;
+    });
+  },
+);
+
+void test(
   'buyer and seller set up in one home keep separate role directories',
   { skip: NATIVE_CAPABILITY.bindingSkip },
   async () => {
