@@ -193,3 +193,9 @@ addresses, lowercase hex NodeIds, HTTP(S) RPC URLs and positive decimal-string
 budgets up to the local maximum. Existing malformed configurations now fail
 explicitly. Operator RPC URLs may contain provider credentials; validation
 errors never echo them.
+
+Role and trust files reject unknown fields. Trust budgets must be canonical
+positive decimal strings (`"10"`, not `"0010"`). Files produced by `node:setup`
+and trust files with canonical budgets remain valid. Older `buyer:trust`
+versions accepted leading-zero budgets; remove those leading zeros before
+loading such a file. Validation errors do not echo field names or values.

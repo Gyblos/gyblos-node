@@ -9,8 +9,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-export function configurationObject(value: unknown, code: NodeErrorCode) {
+export function configurationObject(
+  value: unknown,
+  code: NodeErrorCode,
+  allowedFields?: readonly string[],
+) {
   if (!isRecord(value)) throw new NodeError(code);
+  if (
+    allowedFields &&
+    Object.keys(value).some((key) => !allowedFields.includes(key))
+  )
+    throw new NodeError(code);
   return value;
 }
 

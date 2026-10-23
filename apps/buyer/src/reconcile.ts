@@ -112,7 +112,7 @@ export async function main(args = process.argv.slice(2)) {
   });
   const operation = async () => {
     const config = await loadRole(P2P_ROLES.BUYER);
-    assert.equal(config.role, 'buyer');
+    assert.equal(config.role, P2P_ROLES.BUYER);
     const journal = await loadJson<RecoveryJournal>(
       buyerPath(ROLE_FILES.journal),
     );

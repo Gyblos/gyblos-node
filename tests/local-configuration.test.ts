@@ -242,3 +242,49 @@ void test(
     );
   },
 );
+
+void test('local trust rejects noncanonical decimal budgets with static typed errors', async () => {
+  const { parseOfferTrust } = await import('@gyblos/node/offers');
+  for (const maxAtomic of ['0010', '01', '00', '+10', '1e1', '1.0', ' 10'])
+    assert.throws(() => parseOfferTrust({ ...TRUST, maxAtomic }), {
+      code: NODE_ERROR_CODES.INVALID_OFFER_TRUST,
+      message: NODE_ERROR_CODES.INVALID_OFFER_TRUST,
+    });
+  assert.equal(parseOfferTrust({ ...TRUST, maxAtomic: '10' }).maxAtomic, '10');
+});
+
+void test('local trust rejects unknown fields without echoing input', async () => {
+  const { parseOfferTrust } = await import('@gyblos/node/offers');
+  assert.throws(
+    () => parseOfferTrust({ ...TRUST, PRIVATE_SENTINEL: 'PRIVATE_VALUE' }),
+    {
+      code: NODE_ERROR_CODES.INVALID_OFFER_TRUST,
+      message: NODE_ERROR_CODES.INVALID_OFFER_TRUST,
+    },
+  );
+});
+
+void test(
+  'local roles reject unknown and cross-role fields without echoing input',
+  { skip: NATIVE_CAPABILITY.bindingSkip },
+  async () => {
+    const { parseRoleConfig } = await import('@gyblos/node/roles');
+    const seller = {
+      ...ROLE,
+      role: P2P_ROLES.SELLER,
+      owner: ADDRESS,
+      authorizer: ADDRESS,
+      facilitator: ADDRESS,
+      payTo: ADDRESS,
+    };
+    for (const value of [
+      { ...ROLE, PRIVATE_SENTINEL: 'PRIVATE_VALUE' },
+      { ...ROLE, owner: ADDRESS },
+      { ...seller, PRIVATE_SENTINEL: 'PRIVATE_VALUE' },
+    ])
+      assert.throws(() => parseRoleConfig(value), {
+        code: NODE_ERROR_CODES.INVALID_ROLE_CONFIGURATION,
+        message: NODE_ERROR_CODES.INVALID_ROLE_CONFIGURATION,
+      });
+  },
+);

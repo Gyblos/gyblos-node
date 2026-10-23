@@ -64,10 +64,18 @@ export async function verifyInferenceOffer(
 // Trust is supplied independently by the buyer; never infer trusted identities from an unverified offer.
 export function parseOfferTrust(value: unknown): OfferTrust {
   const code = NODE_ERROR_CODES.INVALID_OFFER_TRUST;
-  const input = configurationObject(value, code);
+  const input = configurationObject(value, code, [
+    'owner',
+    'nodeId',
+    'mint',
+    'payTo',
+    'buyer',
+    'maxAtomic',
+  ]);
   const maxAtomic = configurationString(input.maxAtomic, code);
   if (
     /[^0-9]/.test(maxAtomic) ||
+    maxAtomic.startsWith('0') ||
     BigInt(maxAtomic) <= 0n ||
     BigInt(maxAtomic) > BigInt(MAX_ATOMIC)
   )
