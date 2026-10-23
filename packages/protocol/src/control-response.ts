@@ -11,9 +11,8 @@ import {
   controlFail,
   controlHex,
   controlObject,
-  controlText,
 } from './control-validation.js';
-import { parseOfferV2 } from './offer-v2.js';
+import { parseOfferSignatureV2, parseOfferV2 } from './offer-v2.js';
 import { parsePublicV2 } from './public-v2.js';
 
 export function parseControlResponse(value: unknown): ControlResponse {
@@ -59,10 +58,7 @@ export function parseControlResponse(value: unknown): ControlResponse {
       method,
       offer: {
         offer: parseOfferV2(envelope.offer),
-        signature: controlText(
-          envelope.signature,
-          CONTROL_LIMITS.responseBytes,
-        ),
+        signature: parseOfferSignatureV2(envelope.signature),
       },
     },
   };

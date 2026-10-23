@@ -31,6 +31,12 @@ function signatureV2(value: unknown): Uint8Array<ArrayBuffer> {
     return controlFail(CONTROL_CODES.SIGNATURE);
   return bytes;
 }
+// Checks the detached signature encoding only; it does not authenticate the offer.
+export function parseOfferSignatureV2(value: unknown): string {
+  if (typeof value !== 'string') return controlFail(CONTROL_CODES.SIGNATURE);
+  signatureV2(value);
+  return value;
+}
 export function validateOfferV2Time(offer: InferenceOfferV2, now: number) {
   controlInteger(now);
   if (

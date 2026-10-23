@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import {
+  CONTROL_CODES,
   CONTROL_DOMAINS,
   CONTROL_LIMITS,
   CONTROL_METHODS,
@@ -147,4 +148,30 @@ void test('control v2 public family and owner offer signatures verify with WebCr
     Buffer.from(vector.signedOffer.signature, 'base64').length,
     CONTROL_LIMITS.signatureBytes,
   );
+});
+void test('control response parsing rejects offer signatures that are not canonical 64-byte Base64', async () => {
+  const vector: Vector = JSON.parse(
+    await readFile(
+      new URL(import.meta.resolve('@gyblos/protocol/vectors/control-v2.json')),
+      'utf8',
+    ),
+  );
+  const reply = (signature: string) => ({
+    version: CONTROL_VERSION,
+    requestId: '0'.repeat(32),
+    result: {
+      method: CONTROL_METHODS.OFFER,
+      offer: { ...vector.signedOffer, signature },
+    },
+  });
+  for (const signature of [
+    'PRIVATE_SENTINEL!',
+    Buffer.alloc(CONTROL_LIMITS.signatureBytes - 1).toString('base64'),
+    Buffer.alloc(CONTROL_LIMITS.signatureBytes + 1).toString('base64'),
+    vector.signedOffer.signature.replace(/=+$/, ''),
+    Buffer.from(vector.signedOffer.signature, 'base64').toString('hex'),
+  ])
+    assert.throws(() => parseControlResponse(reply(signature)), {
+      code: CONTROL_CODES.SIGNATURE,
+    });
 });
