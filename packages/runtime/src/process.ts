@@ -45,8 +45,7 @@ export async function stopChild(
 
 export async function assertPortFree(
   url: string,
-  error: () => Error = () =>
-    new Error('Host requires an unused local port.'),
+  error: () => Error = () => new Error('Host requires an unused local port.'),
 ) {
   try {
     await fetch(url, {
@@ -86,9 +85,7 @@ export async function waitReady(
       (options.checkSignalCode !== false && child.signalCode !== null) ||
       options.startupError?.()
     )
-      throw new Error(
-        options.exitMessage ?? 'Host exited during startup.',
-      );
+      throw new Error(options.exitMessage ?? 'Host exited during startup.');
     let mismatchError: Error | undefined;
     let responseWasOk = false;
     try {
