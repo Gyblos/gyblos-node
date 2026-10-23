@@ -236,7 +236,9 @@ is not a reservation, wallet proof, one-use token or payment authorization.
 with a monotonic fake-clock-testable policy. Future transport composition must
 admit before buffering/parsing, aggregate peers across connections, check leases
 on input and before publishing, release in every terminal path, and enforce SDK
-connection/stream limits. No timer, endpoint or registry lookup starts on import.
+connection/stream limits. A full peer table evicts the least recently touched
+entry with no open connection or query; it refuses only when every entry is
+active. No timer, endpoint or registry lookup starts on import.
 
 `vectors/control-v2.json` fixes request framing/digest, all three public records
 and owner-signed offer bytes using an independent Node/OpenSSL oracle. Only

@@ -94,6 +94,17 @@ export class ControlAdmission {
       )
         this.peers.delete(id);
   }
+  // A full table drops the least recently touched idle entry; it refuses only when every entry is active.
+  private evictIdlePeer() {
+    let oldest: [string, PeerState] | undefined;
+    for (const entry of this.peers) {
+      const [, peer] = entry;
+      if (peer.connections || peer.queries) continue;
+      if (!oldest || peer.touched < oldest[1].touched) oldest = entry;
+    }
+    if (!oldest) return controlFail(CONTROL_CODES.LIMIT);
+    this.peers.delete(oldest[0]);
+  }
   private refill(bucket: Bucket, rate: number, burst: number, now: number) {
     bucket.tokens = Math.min(
       burst,
@@ -130,8 +141,7 @@ export class ControlAdmission {
       return controlFail(CONTROL_CODES.LIMIT);
     let peer = this.peers.get(peerId);
     if (!peer) {
-      if (this.peers.size >= CONTROL_CAPACITY.peers)
-        return controlFail(CONTROL_CODES.LIMIT);
+      if (this.peers.size >= CONTROL_CAPACITY.peers) this.evictIdlePeer();
       peer = {
         connections: 0,
         queries: 0,

@@ -95,10 +95,38 @@ void test('control bounds peer accounting without evicting active peers and expi
   const active = admission.openConnection(peer(0));
   for (let index = 1; index < CONTROL_CAPACITY.peers; index++)
     admission.openConnection(peer(index)).close();
-  assert.throws(() => admission.openConnection(peer(CONTROL_CAPACITY.peers)), {
-    code: CONTROL_CODES.LIMIT,
-  });
+  // A full table evicts an idle entry for a new peer instead of refusing it.
+  admission.openConnection(peer(CONTROL_CAPACITY.peers)).close();
   active.check();
   now += CONTROL_CAPACITY.peerIdleMs;
-  admission.openConnection(peer(CONTROL_CAPACITY.peers)).close();
+  admission.openConnection(peer(CONTROL_CAPACITY.peers + 1)).close();
+});
+void test('control admits a new peer after a full table of churned zero-use peers at the same instant', () => {
+  const admission = new ControlAdmission(() => 0);
+  for (let index = 0; index < CONTROL_CAPACITY.peers; index++)
+    admission.openConnection(peer(index)).close();
+  const fresh = admission.openConnection(peer(CONTROL_CAPACITY.peers));
+  fresh.beginQuery().finish();
+  fresh.close();
+});
+void test('control peer eviction never removes entries with open connections or queries', () => {
+  const admission = new ControlAdmission(() => 0);
+  const held = Array.from({ length: CONTROL_CAPACITY.connectionsPerPeer }, () =>
+    admission.openConnection(peer(0)),
+  );
+  const querying = admission.openConnection(peer(1));
+  const query = querying.beginQuery();
+  for (let index = 2; index < CONTROL_CAPACITY.peers; index++)
+    admission.openConnection(peer(index)).close();
+  // Churn twice the table size so every idle entry is evicted at least once.
+  for (let index = 0; index < 2 * CONTROL_CAPACITY.peers; index++)
+    admission.openConnection(peer(CONTROL_CAPACITY.peers + index)).close();
+  // An evicted peer would restart at zero connections and be admitted again.
+  assert.throws(() => admission.openConnection(peer(0)), {
+    code: CONTROL_CODES.LIMIT,
+  });
+  held.forEach((connection) => connection.check());
+  query.check();
+  query.finish();
+  querying.close();
 });
