@@ -16,6 +16,14 @@
     "./signing": "./src/signing.ts",
     "./vectors/public-discovery-v1.json": "./vectors/public-discovery-v1.json",
     "./vectors/signed-inference-offer-v1.json": "./vectors/signed-inference-offer-v1.json",
-    "./wire-usage": "./src/wire-usage.ts"
+    "./wire-usage": "./src/wire-usage.ts",
+    "./control-types": "./src/control-types.ts",
+    "./control-validation": "./src/control-validation.ts",
+    "./control-requests": "./src/control-requests.ts",
+    "./control-framing": "./src/control-framing.ts",
+    "./control-response": "./src/control-response.ts",
+    "./public-v2": "./src/public-v2.ts",
+    "./offer-v2": "./src/offer-v2.ts",
+    "./vectors/control-v2.json": "./vectors/control-v2.json"
   }
 }

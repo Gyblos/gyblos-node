@@ -200,3 +200,45 @@ OpenSSL, wrong domains, changed payloads and reordered JSON properties. These
 are public discovery signatures, not signed payment authorizations. The
 signed-offer vectors in `vectors/signed-inference-offer-v1.json` are a separate
 set.
+
+## Additive control contracts (not a running listener)
+
+`./control-requests`, `./control-response`, `./control-framing` and
+`./control-types` expose the free `gyblos/control/1` contract. Requests are
+`{ version: 1, requestId, method, params }`; methods are `catalog.get` and
+`offer.request`. Responses contain exactly one `result` or static typed `error`.
+`parseControlQuery` and `parseControlResponse` return detached validated values;
+parsing a response alone does not authenticate its signed result.
+
+Each stream contains one uint32 big-endian byte length, canonical UTF-8 JSON and
+EOF. `ControlFrameReader` publishes only at `finish()`; the caller must enforce
+its absolute deadline, admission lease and EOF. Limits are 8 KiB requests,
+64 KiB responses and depth 16. Unknown fields, duplicate JSON keys, noncanonical
+numbers/encoding, extra frames and invalid UTF-8 are rejected. A malformed frame
+may be closed without replying; error replies require a validated request ID.
+
+`./public-v2` adds node-signed catalog/presence/withdrawal records, with reasoning
+levels and separate v2 domains. `./offer-v2` adds owner-signed quotes binding the
+complete request digest and exact buyer/model/reasoning terms. Public signatures
+remain lowercase hex; private signatures remain Base64. V1 exports, domains and
+vectors are unchanged. V2 cache/sequence namespaces must be distinct from v1;
+presence and withdrawal references cannot cross versions.
+
+`gyblos/http/2` is a reserved future identifier, not a supported paid ALPN.
+The current paid v1 validator rejects v2. The pure policy in
+`@gyblos/core/control-quotes` verifies caller-trusted identities, catalog and
+request terms. Its caller supplies engine/readiness snapshots and increments
+readiness generation when those change; no engine or payment adapter runs here.
+Free prices are representable, not an implemented free-inference path. A quote
+is not a reservation, wallet proof, one-use token or payment authorization.
+
+`@gyblos/core/control-admission` supplies caller-owned connection/query leases
+with a monotonic fake-clock-testable policy. Future transport composition must
+admit before buffering/parsing, aggregate peers across connections, check leases
+on input and before publishing, release in every terminal path, and enforce SDK
+connection/stream limits. No timer, endpoint or registry lookup starts on import.
+
+`vectors/control-v2.json` fixes request framing/digest, all three public records
+and owner-signed offer bytes using an independent Node/OpenSSL oracle. Only
+synthetic public keys/signatures are retained. The complete design and rollout
+constraints live in vault GYB-DOC-022, control-contract appendix.

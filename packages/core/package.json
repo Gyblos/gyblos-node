@@ -8,7 +8,9 @@
     "./inference-observation": "./src/inference-observation.ts",
     "./metering": "./src/metering.ts",
     "./offers": "./src/offers.ts",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./control-quotes": "./src/control-quotes.ts",
+    "./control-admission": "./src/control-admission.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",
