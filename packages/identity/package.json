@@ -1,0 +1,16 @@
+{
+  "name": "@gyblos/identity",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./codec": "./src/codec.ts",
+    "./constants": "./src/constants.ts"
+  },
+  "dependencies": {
+    "@gyblos/config": "workspace:*",
+    "@solana-program/system": "0.10.0",
+    "@solana/kit": "5.1.0"
+  }
+}
