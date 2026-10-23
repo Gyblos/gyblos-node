@@ -22,6 +22,7 @@ import { NATIVE_CAPABILITY } from './native-runtime.js';
 
 interface FixtureOptions {
   freeBody?: Buffer;
+  holdFirstFreeResponse?: boolean;
   freeStatus?: number;
   dropPaidResponse?: boolean;
 }
@@ -75,6 +76,7 @@ export async function within<T>(operation: Promise<T>, milliseconds = 3500) {
 export async function fixture({
   freeStatus = HTTP_STATUS.paymentRequired,
   dropPaidResponse = false,
+  holdFirstFreeResponse = false,
   freeBody = Buffer.from('{"synthetic":true}'),
 }: FixtureOptions = {}) {
   const seller = await endpoint();
@@ -122,6 +124,8 @@ export async function fixture({
   >();
   let executed = 0;
   let holdResponse: (() => void) | undefined;
+  let freeResponseHeld = false;
+  let shouldHoldFreeResponse = holdFirstFreeResponse;
   let onPaid: (() => void) | undefined;
   const paidReached = new Promise<void>((resolve) => {
     onPaid = resolve;
@@ -137,6 +141,14 @@ export async function fixture({
       !authorization ||
       authorization !== 'synthetic-authorization-not-a-signature'
     ) {
+      if (shouldHoldFreeResponse) {
+        shouldHoldFreeResponse = false;
+        freeResponseHeld = true;
+        await new Promise<void>((resolve) => {
+          holdResponse = resolve;
+        });
+        freeResponseHeld = false;
+      }
       response.writeHead(freeStatus, {
         'content-type': 'application/json',
         'payment-required': 'synthetic-only',
@@ -187,6 +199,9 @@ export async function fixture({
     paidReached,
     get executions() {
       return executed;
+    },
+    get freeResponseHeld() {
+      return freeResponseHeld;
     },
     releaseResponse() {
       holdResponse?.();
