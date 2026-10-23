@@ -200,28 +200,32 @@ void test(
   },
 );
 
-void test('local role and trust reject uppercase NodeIds before offer matching', async () => {
-  const { parseRoleConfig } = await import('@gyblos/node/roles');
-  const { parseOfferTrust } = await import('@gyblos/node/offers');
-  const lowercase = 'ab'.repeat(32);
-  assert.equal(
-    parseRoleConfig({ ...ROLE, nodeId: lowercase }).nodeId,
-    lowercase,
-  );
-  assert.equal(
-    parseOfferTrust({ ...TRUST, nodeId: lowercase }).nodeId,
-    lowercase,
-  );
-  assert.throws(
-    () => parseRoleConfig({ ...ROLE, nodeId: lowercase.toUpperCase() }),
-    {
-      code: NODE_ERROR_CODES.INVALID_ROLE_CONFIGURATION,
-    },
-  );
-  assert.throws(
-    () => parseOfferTrust({ ...TRUST, nodeId: lowercase.toUpperCase() }),
-    {
-      code: NODE_ERROR_CODES.INVALID_OFFER_TRUST,
-    },
-  );
-});
+void test(
+  'local role and trust reject uppercase NodeIds before offer matching',
+  { skip: NATIVE_CAPABILITY.bindingSkip },
+  async () => {
+    const { parseRoleConfig } = await import('@gyblos/node/roles');
+    const { parseOfferTrust } = await import('@gyblos/node/offers');
+    const lowercase = 'ab'.repeat(32);
+    assert.equal(
+      parseRoleConfig({ ...ROLE, nodeId: lowercase }).nodeId,
+      lowercase,
+    );
+    assert.equal(
+      parseOfferTrust({ ...TRUST, nodeId: lowercase }).nodeId,
+      lowercase,
+    );
+    assert.throws(
+      () => parseRoleConfig({ ...ROLE, nodeId: lowercase.toUpperCase() }),
+      {
+        code: NODE_ERROR_CODES.INVALID_ROLE_CONFIGURATION,
+      },
+    );
+    assert.throws(
+      () => parseOfferTrust({ ...TRUST, nodeId: lowercase.toUpperCase() }),
+      {
+        code: NODE_ERROR_CODES.INVALID_OFFER_TRUST,
+      },
+    );
+  },
+);

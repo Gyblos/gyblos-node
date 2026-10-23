@@ -130,7 +130,7 @@ Facilitator diagnostics for the seller are written privately under
 `.local/p2p/facilitator-diagnostics/`; see [payments.md](payments.md).
 
 Local role/trust JSON is validated before use: required fields, Solana
-addresses, hex NodeIds, HTTP(S) RPC URLs and positive decimal-string budgets up
-to the local maximum. Existing malformed configurations now fail explicitly.
-Operator RPC URLs may contain provider credentials; validation errors never echo
-them.
+addresses, lowercase hex NodeIds, HTTP(S) RPC URLs and positive decimal-string
+budgets up to the local maximum. Existing malformed configurations now fail
+explicitly. Operator RPC URLs may contain provider credentials; validation
+errors never echo them.
