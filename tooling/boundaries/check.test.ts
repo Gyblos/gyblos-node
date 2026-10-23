@@ -13,8 +13,6 @@ import { parseGraph } from './graph.js';
 void test('current and future names map to the intended layers', () => {
   const examples = {
     'packages/core/src/a.ts': 'core',
-    'packages/inference-ollama/src/a.ts': 'adapter',
-    'packages/transport/src/a.ts': 'adapter',
     'packages/transport-iroh/src/a.ts': 'adapter',
     'packages/payments-x402/src/a.ts': 'adapter',
     'packages/engine-openai/src/a.ts': 'adapter',
@@ -34,7 +32,8 @@ void test('current and future names map to the intended layers', () => {
   };
   for (const [name, layer] of Object.entries(examples))
     assert.equal(layerOf(name), layer);
-  assert.equal(layerOf('packages/unmapped/src/a.ts'), null);
+  for (const retired of ['inference-ollama', 'transport', 'unmapped'])
+    assert.equal(layerOf(`packages/${retired}/src/a.ts`), null);
 });
 
 void test('upper layers may use lower layers, own-package modules and shared support', async () => {
