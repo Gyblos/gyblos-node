@@ -10,9 +10,24 @@ import { ESLint, Linter } from 'eslint';
 import standards from './code-standards.js';
 
 const eslint = new ESLint();
-const filePath = resolve('packages/core/src/metering.ts');
+// Snippets are linted as a virtual file that is not on disk. Reusing a real
+// source path lets the typed program mix the on-disk file with the snippet.
+const fixture = 'packages/core/src/standards-fixture.ts';
+const snippetLint = new ESLint({
+  overrideConfig: {
+    files: [fixture],
+    languageOptions: {
+      parserOptions: {
+        project: null,
+        projectService: { allowDefaultProject: [fixture] },
+        tsconfigRootDir: resolve('.'),
+      },
+    },
+  },
+});
+const filePath = resolve(fixture);
 async function rules(code: string) {
-  const [result] = await eslint.lintText(code, { filePath });
+  const [result] = await snippetLint.lintText(code, { filePath });
   return result!.messages.map((message) => message.ruleId);
 }
 
