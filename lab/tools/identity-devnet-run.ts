@@ -4,21 +4,20 @@ import {
   createKeyPairFromPrivateKeyBytes,
   createSolanaRpc,
   devnet,
+  isSolanaError,
   lamports,
-  type Rpc,
-  type SolanaRpcApi,
 } from '@solana/kit';
 
 import { DEVNET_RPC_URL } from '@gyblos/config';
 import { detachedSignerFromKeyPair } from '@gyblos/identity';
 import { assertDevnet } from '@gyblos/payments-x402/chain';
+import { isMain } from '@gyblos/runtime';
 
 import { confirm, printable, runSponsoredFlow } from './identity-flow.js';
 import { loadOrCreateKey } from './identity-keys.js';
 
 const AIRDROP_LAMPORTS = 1_000_000_000n;
 const MIN_SPONSOR_LAMPORTS = 60_000_000n;
-const ERROR_PREVIEW_CHARACTERS = 200;
 const AGENT_URI = 'https://gyblos.com/.well-known/node.json';
 
 async function detached(name: string) {
@@ -28,28 +27,33 @@ async function detached(name: string) {
   );
 }
 
-async function fundSponsor(
-  rpc: Rpc<SolanaRpcApi>,
-  sponsor: Awaited<ReturnType<typeof loadOrCreateKey>>['signer'],
+export interface SponsorFunding {
+  balance(): Promise<bigint>;
+  airdrop(): Promise<void>;
+  log(line: string): void;
+}
+
+// RPC errors can echo provider URLs with credentials, so only a static reason
+// and the numeric SDK error code ever reach the console.
+export function airdropFailureReason(error: unknown) {
+  const code = isSolanaError(error)
+    ? ` (SolanaError ${error.context.__code})`
+    : '';
+  return `SKIPPED devnet run: faucet refused airdrop${code}`;
+}
+
+export async function fundSponsor(
+  funding: SponsorFunding,
 ): Promise<bigint | undefined> {
-  const funded = (await rpc.getBalance(sponsor.address).send()).value;
+  const funded = await funding.balance();
   if (funded >= MIN_SPONSOR_LAMPORTS) return funded;
   try {
-    await confirm(
-      rpc,
-      await rpc
-        .requestAirdrop(sponsor.address, lamports(AIRDROP_LAMPORTS))
-        .send(),
-    );
+    await funding.airdrop();
   } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error);
-    console.log(
-      'SKIPPED devnet run: faucet refused airdrop:',
-      detail.slice(0, ERROR_PREVIEW_CHARACTERS),
-    );
+    funding.log(airdropFailureReason(error));
     return undefined;
   }
-  return (await rpc.getBalance(sponsor.address).send()).value;
+  return funding.balance();
 }
 
 async function main(): Promise<void> {
@@ -58,7 +62,17 @@ async function main(): Promise<void> {
   const rpc = createSolanaRpc(devnet(url));
   const sponsor = (await loadOrCreateKey('devnet-sponsor')).signer;
   console.log('sponsor', sponsor.address);
-  const funded = await fundSponsor(rpc, sponsor);
+  const funded = await fundSponsor({
+    balance: async () => (await rpc.getBalance(sponsor.address).send()).value,
+    airdrop: async () =>
+      confirm(
+        rpc,
+        await rpc
+          .requestAirdrop(sponsor.address, lamports(AIRDROP_LAMPORTS))
+          .send(),
+      ),
+    log: (line) => console.log(line),
+  });
   if (funded === undefined) return;
   console.log('sponsor balance', String(funded));
   const participants = {
@@ -78,4 +92,4 @@ async function main(): Promise<void> {
   );
 }
 
-await main();
+if (isMain(import.meta.url)) await main();
