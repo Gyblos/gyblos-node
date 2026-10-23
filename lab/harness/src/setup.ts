@@ -11,7 +11,6 @@ import {
   DEVNET_USDC,
   FILE_MODES,
   KEY_LIMITS,
-  labLayout,
 } from '@gyblos/config';
 import { CONFIG_ASSET_LABELS } from '@gyblos/config/constants';
 import { saveJson } from '@gyblos/runtime';
@@ -96,7 +95,7 @@ export async function setupGate() {
     console.log(
       JSON.stringify(
         {
-          message: `Isolated devnet wallets created. Private keys stay in ${labLayout(process.env).root}.`,
+          message: `Isolated devnet wallets created. Private keys stay in ${dirname(path)}.`,
           addresses,
         },
         null,

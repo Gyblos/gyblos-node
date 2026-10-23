@@ -8,6 +8,7 @@ import test from 'node:test';
 
 import { LEGACY_LOCAL_PATHS } from '@gyblos/config';
 import { labPaths, LEGACY_LAB_PATHS } from '@gyblos/lab-harness/constants';
+import { setupGate } from '@gyblos/lab-harness/setup';
 import { assertLabHome, configPath } from '@gyblos/lab-harness/wallet';
 import { NODE_ERROR_CODES } from '@gyblos/node/constants';
 
@@ -93,6 +94,29 @@ void test('a legacy product tokenizer alone does not block the lab home', async 
     async () => {
       await mkdir(LEGACY_LOCAL_PATHS.tokenizer, { recursive: true });
       await assertLabHome();
+    },
+  );
+});
+
+void test('lab setup names the directory that holds the new keys', async () => {
+  await withLabEnvironment(
+    { GYBLOS_LAB_HOME: undefined, GYBLOS_GATE_CONFIG: undefined },
+    async (directory) => {
+      const keyDirectory = join(directory, 'elsewhere');
+      process.env.GYBLOS_GATE_CONFIG = join(keyDirectory, 'config.json');
+      const messages: unknown[] = [];
+      const original = console.log;
+      console.log = (...args: unknown[]) => messages.push(...args);
+      try {
+        await setupGate();
+      } finally {
+        console.log = original;
+      }
+      const output = messages.join(' ');
+      assert.ok(
+        output.includes(`Private keys stay in ${keyDirectory}.`),
+        output,
+      );
     },
   );
 });
