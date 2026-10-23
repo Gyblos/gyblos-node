@@ -8,10 +8,7 @@ import {
   INFERENCE_CASES,
   MEASUREMENT_SCHEMA_VERSION,
 } from '@gyblos/node/constants';
-import {
-  JOURNAL_STATES,
-  type GateErrorCode,
-} from '@gyblos/payments-x402/constants';
+import { type GateErrorCode } from '@gyblos/payments-x402/constants';
 
 export const EXACT_EVIDENCE_CODES = {
   GATE_ERROR: 'GATE_ERROR',
@@ -106,12 +103,8 @@ export type InferenceEvidenceErrorCode =
   | GateErrorCode
   | (typeof INFERENCE_EVIDENCE_CODES)[keyof typeof INFERENCE_EVIDENCE_CODES];
 
-export type JournalState = (typeof JOURNAL_STATES)[keyof typeof JOURNAL_STATES];
-
 export type EvidenceStatus =
   (typeof EVIDENCE_STATUSES)[keyof typeof EVIDENCE_STATUSES];
-
-export type CaseStatus = (typeof CASE_STATUSES)[keyof typeof CASE_STATUSES];
 
 export type ReconciliationClassification =
   (typeof RECONCILIATION_CLASSIFICATIONS)[keyof typeof RECONCILIATION_CLASSIFICATIONS];
@@ -120,9 +113,6 @@ export type ExactCaseName = (typeof EXACT_CASES)[keyof typeof EXACT_CASES];
 
 export type InferenceCaseName =
   (typeof INFERENCE_CASES)[keyof typeof INFERENCE_CASES];
-
-export type FailureCaseName =
-  (typeof FAILURE_CASES)[keyof typeof FAILURE_CASES];
 
 export type EvidenceId = (typeof EVIDENCE_IDS)[keyof typeof EVIDENCE_IDS];
 

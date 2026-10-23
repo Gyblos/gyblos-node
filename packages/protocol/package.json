@@ -5,7 +5,6 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./canonical": "./src/canonical.ts",
     "./constants": "./src/constants.ts",
     "./engine": "./src/engine.ts",
     "./errors": "./src/errors.ts",

@@ -62,7 +62,6 @@ const structure = {
       binding: 'Use a descriptive binding instead of "{{name}}".',
       boundary:
         'Import other packages by workspace name; relative imports stay inside their package.',
-      scripts: 'Application and package code must not import scripts.',
     },
   },
   create(context) {
@@ -87,8 +86,6 @@ const structure = {
           : literal?.value;
       if (typeof source !== 'string') return;
       if (!source || context.options[0]?.bindings) return;
-      if (root && /(^|\/)scripts\//.test(source))
-        context.report({ node, messageId: 'scripts' });
       if (root && source.startsWith('.')) {
         const target = resolve(dirname(filename), source);
         if (relative(root, target).startsWith('..'))

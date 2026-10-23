@@ -5,22 +5,14 @@ import type {
   IRegularForbiddenRuleType,
 } from 'dependency-cruiser';
 
-export const SOURCE_ROOTS = [
-  'apps',
-  'packages',
-  'scripts',
-  'lab',
-  'tooling',
-  'tests',
-];
+export const SOURCE_ROOTS = ['apps', 'packages', 'lab', 'tooling', 'tests'];
 export const PRIVATE_PATH =
   '(^|/)(?:\\.local|\\.git|dist|coverage|evidence|captures)(?:/|$)|(^|/)\\.env(?:\\.|$)|\\.(?:key|pem|log)$';
-export const LAB_PATH =
-  '^(?:lab/|scripts/|packages/gate/|tooling/(?:lab-[^/]+|nat-regression|native-nat-probe|public-path-(?:audit|counters)|udp-probe|iroh-probe)\\.mjs$)';
+export const LAB_PATH = '^lab/';
 const ADAPTER_NAME =
   /^(?:inference-ollama|transport|payments-x402|identity|engine-.+|transport-.+|discovery-.+)$/;
 const PACKAGE_PATH = '^packages/';
-const CORE_PATH = '^packages/(?:application|core)/';
+const CORE_PATH = '^packages/core/';
 const PROTOCOL_PATH = '^packages/protocol/';
 const PRODUCT_PATH = '^(?:packages/|apps/)';
 const SDK_PATH =
@@ -51,8 +43,7 @@ export function layerOf(source: string): BoundaryLayer | null {
     return BOUNDARY_LAYERS.VERIFICATION;
   if (source.startsWith('apps/')) return BOUNDARY_LAYERS.APPS;
   const name = source.match(/^packages\/([^/]+)\//)?.[1];
-  if (name === 'application' || name === BOUNDARY_LAYERS.CORE)
-    return BOUNDARY_LAYERS.CORE;
+  if (name === BOUNDARY_LAYERS.CORE) return BOUNDARY_LAYERS.CORE;
   if (ADAPTER_NAME.test(name ?? '')) return BOUNDARY_LAYERS.ADAPTER;
   if (
     name === BOUNDARY_LAYERS.PROTOCOL ||
@@ -85,7 +76,7 @@ export function boundaryConfig(
         'protocol-is-independent',
         { path: PROTOCOL_PATH },
         {
-          path: '^(?:packages/(?!protocol/)|apps/|scripts/|lab/|tooling/)',
+          path: '^(?:packages/(?!protocol/)|apps/|lab/|tooling/)',
         },
       ),
       rule(
@@ -110,7 +101,7 @@ export function boundaryConfig(
       rule('domain-has-no-sdk', { path: CORE_PATH }, { path: SDK_PATH }),
       rule(
         'domain-has-no-filesystem',
-        { path: '^packages/(?:protocol|application|core)/' },
+        { path: '^packages/(?:protocol|core)/' },
         {
           path: '^(?:node:)?fs(?:/|$)',
         },
@@ -119,14 +110,14 @@ export function boundaryConfig(
         'config-is-a-leaf',
         { path: '^packages/config/' },
         {
-          path: '^(?:packages/(?!config/)|apps/|scripts/|lab/|tooling/)',
+          path: '^(?:packages/(?!config/)|apps/|lab/|tooling/)',
         },
       ),
       rule(
         'runtime-only-uses-config',
         { path: '^packages/runtime/' },
         {
-          path: '^(?:packages/(?!(?:config|runtime)/)|apps/|scripts/|lab/|tooling/)',
+          path: '^(?:packages/(?!(?:config|runtime)/)|apps/|lab/|tooling/)',
         },
       ),
       rule(
@@ -141,12 +132,12 @@ export function boundaryConfig(
       ),
       rule(
         'product-does-not-import-lab',
-        { path: PRODUCT_PATH, pathNot: '^packages/gate/' },
+        { path: PRODUCT_PATH },
         { path: LAB_PATH },
       ),
       rule(
         'product-does-not-import-verification',
-        { path: PRODUCT_PATH, pathNot: '^packages/gate/' },
+        { path: PRODUCT_PATH },
         {
           path: '^(?:tests/|tooling/)',
           pathNot: LAB_PATH,

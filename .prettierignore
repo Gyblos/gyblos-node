@@ -7,6 +7,5 @@ node_modules/
 pnpm-lock.yaml
 dist/
 coverage/
-evidence/
 tests/fixtures/tokenizer_config.json
 tests/fixtures/Qwen-LICENSE

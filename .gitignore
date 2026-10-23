@@ -18,10 +18,6 @@ private/
 internal/
 *.private.*
 *-private.*
-/docs/internal/
-/docs/private/
-/tests/private/
-/tests/gate-error-codes.test.ts
 AGENTS.local.md
 **/agents.md
 **/claude.md
