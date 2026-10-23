@@ -1,25 +1,22 @@
-// Downloads the pinned tokenizer files and pulls the pinned model into a private Ollama models dir
-// using a temporary loopback Ollama server, then verifies both.
+// Downloads the pinned tokenizer files and pulls the pinned model into the shared product artifacts
+// directory using a temporary loopback Ollama server, then verifies both. Never touches role data.
 import { once } from 'node:events';
 import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-import {
-  FILE_MODES,
-  OLLAMA_MODELS_PATH,
-  ROUTES,
-  TIMEOUTS,
-} from '@gyblos/config';
+import { FILE_MODES, homeLayout, ROUTES, TIMEOUTS } from '@gyblos/config';
 import { createOllama } from '@gyblos/engine-ollama';
 import { MODEL } from '@gyblos/engine-ollama/model';
 import { prepareModelTokenizer } from '@gyblos/node/artifacts';
+import { assertOllamaModelsHome } from '@gyblos/node/home';
 import { spawnChild, stopChild, waitReady } from '@gyblos/runtime';
 
 import { GATE_HOSTS, GATE_PORTS, GATE_RETRIES } from './constants.js';
 
 async function prepareGateArtifacts() {
   await prepareModelTokenizer();
-  await mkdir(OLLAMA_MODELS_PATH, {
+  await assertOllamaModelsHome();
+  await mkdir(homeLayout(process.env).artifacts.ollamaModels, {
     recursive: true,
     mode: FILE_MODES.privateDirectory,
   });
@@ -29,7 +26,7 @@ async function pullGateModel() {
   const environment = {
     ...process.env,
     OLLAMA_HOST: GATE_HOSTS.ollamaSetupBind,
-    OLLAMA_MODELS: resolve(OLLAMA_MODELS_PATH),
+    OLLAMA_MODELS: resolve(homeLayout(process.env).artifacts.ollamaModels),
     OLLAMA_NO_CLOUD: '1',
   };
   const origin = GATE_HOSTS.ollamaSetup;

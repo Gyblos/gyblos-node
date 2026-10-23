@@ -4,7 +4,7 @@ import { isIP } from 'node:net';
 
 import type { IncomingAddr } from '@number0/iroh';
 
-import { P2P } from '@gyblos/config';
+import { TRANSPORT_LIMITS } from '@gyblos/config';
 
 export function connectionSource(source: IncomingAddr): string | undefined {
   if (source.kind === 'relay' && source.endpointId)
@@ -37,8 +37,8 @@ export function createConnectionAdmission() {
   return {
     pending(source: string) {
       if (
-        pending >= P2P.maxPendingConnections ||
-        (sources.get(source) ?? 0) >= P2P.maxPendingPerSource
+        pending >= TRANSPORT_LIMITS.maxPendingConnections ||
+        (sources.get(source) ?? 0) >= TRANSPORT_LIMITS.maxPendingPerSource
       )
         return undefined;
       pending++;
@@ -55,8 +55,8 @@ export function createConnectionAdmission() {
     },
     established(peer: string) {
       if (
-        established >= P2P.maxConnections ||
-        (peers.get(peer) ?? 0) >= P2P.maxPeerConnections
+        established >= TRANSPORT_LIMITS.maxConnections ||
+        (peers.get(peer) ?? 0) >= TRANSPORT_LIMITS.maxPeerConnections
       )
         return undefined;
       established++;

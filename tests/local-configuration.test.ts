@@ -6,7 +6,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { DEVNET_RPC_URL, MAX_ATOMIC, P2P } from '@gyblos/config';
+import {
+  DEVNET_RPC_URL,
+  homeLayout,
+  MAX_ATOMIC,
+  ROLE_FILES,
+} from '@gyblos/config';
 import { CONFIG_ASSET_LABELS } from '@gyblos/config/constants';
 import {
   NODE_ERROR_CODES,
@@ -35,6 +40,10 @@ const TRUST = {
   maxAtomic: MAX_ATOMIC,
 };
 
+function buyerDirectory() {
+  return homeLayout(process.env).roles.buyer;
+}
+
 async function withConfig(
   run: (
     write: (file: string, value: unknown) => Promise<void>,
@@ -44,10 +53,10 @@ async function withConfig(
   const original = process.cwd();
   try {
     process.chdir(directory);
-    await mkdir(P2P.root, { recursive: true });
+    await mkdir(buyerDirectory(), { recursive: true });
     const write = (file: string, value: unknown) =>
-      writeFile(join(P2P.root, file), JSON.stringify(value));
-    await write(P2P.roleConfig, ROLE);
+      writeFile(join(buyerDirectory(), file), JSON.stringify(value));
+    await write(ROLE_FILES.roleConfig, ROLE);
     await run(write);
   } finally {
     process.chdir(original);
@@ -61,12 +70,12 @@ void test(
   async () => {
     const { loadRole } = await import('@gyblos/node/roles');
     await withConfig(async (write) => {
-      await write(P2P.roleConfig, {
+      await write(ROLE_FILES.roleConfig, {
         schemaVersion: ROLE_CONFIG_SCHEMA_VERSION,
         role: ROLE.role,
         assetLabel: ROLE.assetLabel,
       });
-      await assert.rejects(loadRole());
+      await assert.rejects(loadRole(P2P_ROLES.BUYER));
     });
   },
 );
@@ -77,7 +86,7 @@ void test(
   async () => {
     const { trustedOffer } = await import('@gyblos/buyer/buyer');
     await withConfig(async (write) => {
-      await write(P2P.trustFilename, {
+      await write(ROLE_FILES.trust, {
         ...TRUST,
         maxAtomic: Number(MAX_ATOMIC),
       });
@@ -161,13 +170,13 @@ void test(
     const { trustedOffer } = await import('@gyblos/buyer/buyer');
     await withConfig(async (write) => {
       const malformed = 'https://PRIVATE_RPC_CREDENTIAL_SENTINEL';
-      await writeFile(join(P2P.root, P2P.roleConfig), malformed);
-      await assert.rejects(loadRole(), {
+      await writeFile(join(buyerDirectory(), ROLE_FILES.roleConfig), malformed);
+      await assert.rejects(loadRole(P2P_ROLES.BUYER), {
         code: NODE_ERROR_CODES.INVALID_ROLE_CONFIGURATION,
         message: NODE_ERROR_CODES.INVALID_ROLE_CONFIGURATION,
       });
-      await write(P2P.roleConfig, ROLE);
-      await writeFile(join(P2P.root, P2P.trustFilename), malformed);
+      await write(ROLE_FILES.roleConfig, ROLE);
+      await writeFile(join(buyerDirectory(), ROLE_FILES.trust), malformed);
       await assert.rejects(trustedOffer(), {
         code: NODE_ERROR_CODES.INVALID_OFFER_TRUST,
         message: NODE_ERROR_CODES.INVALID_OFFER_TRUST,
@@ -192,7 +201,9 @@ void test(
         { code: NODE_ERROR_CODES.INVALID_ROLE_CONFIGURATION },
       );
       const { lstat } = await import('node:fs/promises');
-      await assert.rejects(lstat(P2P.root), { code: 'ENOENT' });
+      await assert.rejects(lstat(homeLayout(process.env).root), {
+        code: 'ENOENT',
+      });
     } finally {
       if (previousRpc === undefined) delete process.env.GYBLOS_RPC_URL;
       else process.env.GYBLOS_RPC_URL = previousRpc;

@@ -21,6 +21,12 @@ app ─▶ buyer proxy ══ Iroh (direct or na1 relay) ══▶ seller node �
         signs ceiling ─▶ Solana devnet channel ◀─ facilitator settles usage
 ```
 
+## Desktop compatibility probe
+
+An isolated macOS arm64 Electron/Iroh experiment is available in `apps/desktop`.
+It performs local synthetic checks only; Chat, Connect and payments stay
+disabled. See [running and packaging the probe](docs/desktop-probe.md).
+
 ## Status
 
 - **Paid on devnet:** three sequential inferences, VPS buyer to Mac seller over
@@ -51,7 +57,7 @@ The `gate:*` commands are lab proof-of-concept checks, not seller or buyer
 setup.
 
 ```sh
-pnpm gate:setup              # creates isolated keys in .local/devnet/
+pnpm gate:setup              # creates isolated keys in .local/lab/
 # fund the printed facilitator address with at least 0.05 devnet SOL
 pnpm gate:fund --test-mint   # creates the six-decimal test token
 pnpm gate:preflight          # checks devnet, program, mint and funding
@@ -64,18 +70,19 @@ Details: [docs/payments.md](docs/payments.md).
 
 ### 3. Run a seller and a buyer
 
-Use a separate working directory per role. Seller:
+Each role keeps its own directory under one local home (`.local/gyblos/`).
+Seller:
 
 ```sh
 export GYBLOS_RELAY_TOKEN=...   # 32-512 characters; never commit it
 pnpm node:setup --role seller --mint MINT --buyer BUYER_ADDRESS --pay-to PAYOUT_ADDRESS
 pnpm gate:inference:setup       # downloads the pinned model (lab command for now)
-pnpm node:start                 # writes the signed offer to .local/p2p/offer.json
+pnpm node:start                 # writes the signed offer to .local/gyblos/seller/offer.json
 ```
 
 Buyer: same token, `pnpm node:setup --role buyer --mint MINT`, put the seller's
-`offer.json` in `.local/p2p/`, create trust with `pnpm buyer:trust` using
-independently confirmed seller identities, run `pnpm buyer:setup`, then
+`offer.json` in `.local/gyblos/buyer/`, create trust with `pnpm buyer:trust`
+using independently confirmed seller identities, run `pnpm buyer:setup`, then
 `pnpm buyer:start`. Full steps:
 [docs/running-a-node.md](docs/running-a-node.md).
 
@@ -119,10 +126,15 @@ Set these in the environment; `.env` is **not** loaded
 | `GYBLOS_IROH_BIND`, `GYBLOS_IROH_EXTERNAL_ADDR` | seller, buyer | UDP bind address; extra public address to advertise.       |
 | `GYBLOS_EXPECTED_ROUTE`                         | buyer         | Require `iroh-direct` or `iroh-relay` before paying.       |
 | `GYBLOS_RPC_URL`                                | all           | Devnet RPC; default `https://api.devnet.solana.com`.       |
-| `GYBLOS_GATE_CONFIG`                            | lab           | Lab config file; default `.local/devnet/config.json`.      |
+| `GYBLOS_HOME`                                   | all           | Local home; default `.local/gyblos`. Lab: artifacts/ only. |
+| `GYBLOS_LAB_HOME`                               | lab           | Lab home; default `.local/lab`.                            |
+| `GYBLOS_GATE_CONFIG`                            | lab           | Lab config file; default `.local/lab/config.json`.         |
 | `GYBLOS_P2P_RUN_ID`                             | seller, buyer | Optional label copied into `status.json` and evidence.     |
 | `GYBLOS_GATE_RUN_ID`                            | lab           | Run label set by `gate:run`/`gate:inference` for children. |
 | `GYBLOS_IDENTITY_INTEGRATION`                   | lab tests     | `1` = run opt-in local-validator identity tests.           |
+
+Keep a custom `GYBLOS_HOME` or `GYBLOS_LAB_HOME` outside the repository or under
+`.local/`, the only ignored local path.
 
 ## Repository layout
 

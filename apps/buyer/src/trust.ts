@@ -3,7 +3,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { parseArgs } from 'node:util';
 
-import { FILE_MODES, P2P } from '@gyblos/config';
+import { FILE_MODES, ROLE_FILES } from '@gyblos/config';
 import { P2P_ROLES } from '@gyblos/node/constants';
 import {
   parseOfferTrust,
@@ -12,6 +12,7 @@ import {
 } from '@gyblos/node/offers';
 import { loadRole, rolePath } from '@gyblos/node/roles';
 import { isMain } from '@gyblos/runtime';
+import { HTTP_OVER_IROH } from '@gyblos/transport-iroh/constants';
 import { assertConfiguredRelay } from '@gyblos/transport-iroh/endpoint';
 
 export async function main(args = process.argv.slice(2)) {
@@ -24,7 +25,7 @@ export async function main(args = process.argv.slice(2)) {
       'max-atomic': { type: 'string' },
     },
   });
-  const config = await loadRole();
+  const config = await loadRole(P2P_ROLES.BUYER);
   if (config.role !== P2P_ROLES.BUYER) throw new Error('Buyer role required.');
   const trust = parseOfferTrust({
     owner: values.owner,
@@ -34,13 +35,14 @@ export async function main(args = process.argv.slice(2)) {
     buyer: config.buyer,
     mint: config.mint,
   });
-  const bytes = await readFile(rolePath(P2P.offerFilename));
-  if (bytes.length > P2P.bodyBytes) throw new Error('Offer exceeds bounds.');
+  const bytes = await readFile(rolePath(P2P_ROLES.BUYER, ROLE_FILES.offer));
+  if (bytes.length > HTTP_OVER_IROH.bodyBytes)
+    throw new Error('Offer exceeds bounds.');
   const value = parseSignedOfferJson(bytes.toString('utf8'));
   const offer = await verifyInferenceOffer(value, trust);
   if (offer.endpoint.relayUrl) assertConfiguredRelay(offer.endpoint.relayUrl);
   await writeFile(
-    rolePath(P2P.trustFilename),
+    rolePath(P2P_ROLES.BUYER, ROLE_FILES.trust),
     JSON.stringify(trust, null, 2) + '\n',
     {
       flag: 'wx',

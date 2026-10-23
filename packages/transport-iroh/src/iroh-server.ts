@@ -2,16 +2,28 @@
 // local inference origin under ingress and egress deadlines.
 import type { BiStream, Connection, Endpoint } from '@number0/iroh';
 
-import { HTTP_STATUS, P2P } from '@gyblos/config';
+import {
+  HTTP_STATUS,
+  TRANSPORT_LIMITS,
+  TRANSPORT_TIMEOUTS,
+} from '@gyblos/config';
 
 import { connectionSource, createConnectionAdmission } from './admission.js';
-import { TRANSPORT_ROUTES } from './constants.js';
+import {
+  HTTP_OVER_IROH,
+  IROH_DEADLINES,
+  TRANSPORT_ROUTES,
+} from './constants.js';
 import { withDeadline } from './deadline.js';
 import { handleIrohConnection } from './iroh-connection.js';
 import { createPeerLimiter } from './limiter.js';
 import { loopbackRequest } from './loopback.js';
 import { selectedRoute } from './paths.js';
 import { decodeRequest, encodeResponse } from './wire.js';
+
+const { streamCloseCode } = HTTP_OVER_IROH;
+const { connectMs, requestMs } = TRANSPORT_TIMEOUTS;
+const REQUEST_BYTES = HTTP_OVER_IROH.bodyBytes + HTTP_OVER_IROH.headerBytes;
 
 export function serveIroh(
   endpoint: Endpoint,
@@ -31,8 +43,11 @@ export function serveIroh(
     signal: AbortSignal,
   ) {
     const peer = connection.remoteId().toString();
-    const close = () => connection.close(P2P.streamCloseCode, []);
-    if (streamsActive >= P2P.maxEgressConcurrent || streamPeers.has(peer)) {
+    const close = () => connection.close(streamCloseCode, []);
+    if (
+      streamsActive >= TRANSPORT_LIMITS.maxEgressConcurrent ||
+      streamPeers.has(peer)
+    ) {
       close();
       return;
     }
@@ -40,8 +55,8 @@ export function serveIroh(
     streamPeers.add(peer);
     try {
       const bytes = await withDeadline(
-        stream.recv.readToEnd(P2P.bodyBytes + P2P.headerBytes),
-        P2P.ingressMs,
+        stream.recv.readToEnd(REQUEST_BYTES),
+        IROH_DEADLINES.ingressMs,
         close,
       );
       const request = decodeRequest(Uint8Array.from(bytes));
@@ -73,7 +88,7 @@ export function serveIroh(
             release();
           }
         })();
-        response = await withDeadline(source, P2P.requestMs, () => {
+        response = await withDeadline(source, requestMs, () => {
           abort();
           close();
         });
@@ -86,7 +101,7 @@ export function serveIroh(
       })();
       let expired = false;
       try {
-        await withDeadline(sending, P2P.egressMs, () => {
+        await withDeadline(sending, IROH_DEADLINES.egressMs, () => {
           expired = true;
           close(); // Native reset shares the blocked writer's mutex.
         });
@@ -108,7 +123,7 @@ export function serveIroh(
     const releaseQuota = releasePeer ? limiter.register(peer) : undefined;
     if (!releasePeer || !releaseQuota) {
       releasePeer?.();
-      connection.close(P2P.streamCloseCode, []);
+      connection.close(streamCloseCode, []);
       return;
     }
     connections.add(connection);
@@ -155,14 +170,14 @@ export function serveIroh(
           const native = (async () => (await incoming.accept()).connect())();
           let connection: Connection;
           try {
-            connection = await withDeadline(native, P2P.connectMs, () => {
+            connection = await withDeadline(native, connectMs, () => {
               expired = true;
             });
           } catch {
             // Reserve uncancellable native work until it actually settles.
             if (expired)
               await native.then(
-                (late) => late.close(P2P.streamCloseCode, []),
+                (late) => late.close(streamCloseCode, []),
                 () => undefined,
               );
             return;
@@ -170,11 +185,11 @@ export function serveIroh(
             releasePending();
           }
           if (closed) {
-            connection.close(P2P.streamCloseCode, []);
+            connection.close(streamCloseCode, []);
             return;
           }
           void handle(connection).catch(() =>
-            connection.close(P2P.streamCloseCode, []),
+            connection.close(streamCloseCode, []),
           );
         })().catch(() => undefined);
       } catch {
@@ -184,8 +199,7 @@ export function serveIroh(
   })();
   void running.catch(() => {
     closed = true;
-    for (const connection of connections)
-      connection.close(P2P.streamCloseCode, []);
+    for (const connection of connections) connection.close(streamCloseCode, []);
     void endpoint.close();
   });
   return {
@@ -193,7 +207,7 @@ export function serveIroh(
     async close() {
       closed = true;
       for (const connection of connections)
-        connection.close(P2P.streamCloseCode, []);
+        connection.close(streamCloseCode, []);
       await endpoint.close();
       await running;
     },

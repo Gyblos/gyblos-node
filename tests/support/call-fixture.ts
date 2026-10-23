@@ -14,7 +14,7 @@ import {
   type ErrorDiagnosticCode,
   type P2pJournalState,
 } from '@gyblos/buyer/constants';
-import { P2P } from '@gyblos/config';
+import { homeLayout, ROLE_FILES } from '@gyblos/config';
 
 const SOURCE = new URL('../../', import.meta.url);
 const SIGNATURE = '1'.repeat(64);
@@ -57,7 +57,7 @@ function bootstrap(faults: CallFaults) {
   const config = new URL(import.meta.resolve('@gyblos/config')).href;
   const errors = new URL(import.meta.resolve('@gyblos/protocol/errors')).href;
   const codes = new URL(import.meta.resolve('@gyblos/protocol/constants')).href;
-  const roles = `import {P2P} from '${config}'; export function rolePath(name){return P2P.root+'/'+name} export async function roleSigner(){return {address:'synthetic-buyer'}}`;
+  const roles = `import {homeLayout} from '${config}'; export function roleDirectory(role){return homeLayout(process.env).roles[role]} export function rolePath(role,name){return homeLayout(process.env).roles[role]+'/'+name} export async function roleSigner(){return {address:'synthetic-buyer'}}`;
   const proof = `import {ProtocolError} from '${errors}'; import {PROTOCOL_ERROR_CODES} from '${codes}';
     export async function paymentProof(...args){
       if(${Boolean(faults.afterDiscovery)})await args[5]?.({depositSignature:'${DEPOSIT_SIGNATURE}',claimSignature:'${SIGNATURE}'});
@@ -65,12 +65,12 @@ function bootstrap(faults: CallFaults) {
       if(${Boolean(faults.hostileError)})throw new Proxy({},{getPrototypeOf(){throw Error('PRIVATE_SENTINEL')}});
       throw new ProtocolError(PROTOCOL_ERROR_CODES.TRANSACTION_UNKNOWN,'https://private.invalid/?api_key=PRIVATE_SENTINEL');
     }`;
-  const inference = `import {appendFile} from 'node:fs/promises'; import {P2P} from '${config}';
+  const inference = `import {appendFile} from 'node:fs/promises'; import {homeLayout,ROLE_FILES} from '${config}';
     export function createInferenceBuyer(_signer,_rpc,_policy,hooks){return async(_url,request)=>{
       globalThis.attempts++;
       await hooks.authorized('synthetic-channel','556');
       if(${Boolean(faults.lostResponse)})throw Error('PRIVATE_SENTINEL response lost');
-      for(const status of [402,200])await appendFile(P2P.root+'/'+P2P.metricsFilename,JSON.stringify({requestId:request.requestId,status,transport:'iroh-direct',connectMs:1,directObserved:true,relayObserved:false,body:'PRIVATE_SENTINEL'})+'\\n');
+      for(const status of [402,200])await appendFile(homeLayout(process.env).roles.buyer+'/'+ROLE_FILES.metrics,JSON.stringify({requestId:request.requestId,status,transport:'iroh-direct',connectMs:1,directObserved:true,relayObserved:false,body:'PRIVATE_SENTINEL'})+'\\n');
       await hooks.responseObserved?.({status:200,claimSignature:'${SIGNATURE}'});
       if(${Boolean(faults.invalidBody)})throw new SyntaxError('PRIVATE_SENTINEL prompt response');
       return {status:200,body:{},receipt:{transaction:'${SIGNATURE}',payer:'synthetic-buyer',amount:'140',success:false}};
@@ -93,15 +93,16 @@ function bootstrap(faults: CallFaults) {
   };
   return `import {register} from 'node:module';
     import {readFile,mkdir} from 'node:fs/promises';
-    import {P2P} from '${config}';
+    import {homeLayout,ROLE_FILES} from '${config}';
+    const root=homeLayout(process.env).roles.buyer;
     const entry=${JSON.stringify(entry)},stubs=${JSON.stringify(stubs)};
     globalThis.attempts=0;globalThis.rpcRequests=0;
     globalThis.fetch=async()=>{globalThis.rpcRequests++;throw Error('NETWORK_FORBIDDEN')};
-    await mkdir(P2P.root,{recursive:true});
+    await mkdir(root,{recursive:true});
     register('data:text/javascript,'+encodeURIComponent(\`let entry,stubs;export function initialize(data){({entry,stubs}=data)} export function resolve(specifier,context,next){if(context.parentURL?.split('?')[0]===entry&&Object.hasOwn(stubs,specifier))return {url:'data:text/javascript,'+encodeURIComponent(stubs[specifier]),shortCircuit:true};return next(specifier,context)}\`),{data:{entry,stubs}});
     process.argv[2]='0';const {main}=await import(entry);await main();
-    const journal=JSON.parse(await readFile(P2P.root+'/'+P2P.journalFilename,'utf8'));
-    const calls=JSON.parse(await readFile(P2P.root+'/'+P2P.callsFilename,'utf8'));
+    const journal=JSON.parse(await readFile(root+'/'+ROLE_FILES.journal,'utf8'));
+    const calls=JSON.parse(await readFile(root+'/'+ROLE_FILES.calls,'utf8'));
     process.stdout.write('PROBE_RESULT '+JSON.stringify({journal,call:calls.at(-1),attempts:globalThis.attempts,rpcRequests:globalThis.rpcRequests})+'\\n');`;
 }
 
@@ -163,7 +164,13 @@ export async function callFault(faults: CallFaults = {}): Promise<CallProbe> {
         !stderr.includes('PRIVATE_SENTINEL'),
     );
     await assert.rejects(
-      lstat(join(directory, P2P.root, P2P.buyerLockFilename)),
+      lstat(
+        join(
+          directory,
+          homeLayout(process.env).roles.buyer,
+          ROLE_FILES.buyerLock,
+        ),
+      ),
       { code: 'ENOENT' },
     );
     const result: CallProbe = JSON.parse(

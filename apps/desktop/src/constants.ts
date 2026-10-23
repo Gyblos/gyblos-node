@@ -1,0 +1,22 @@
+// Owns the bounded desktop compatibility probe's values, not payment or discovery policy.
+export const PROBE_STATUS = {
+  WAITING: 'waiting',
+  PASSED: 'passed',
+  FAILED: 'failed',
+} as const;
+export const DESKTOP = {
+  CHANNEL: 'desktop:probe',
+  FINISH_ACK: 'desktop:probe-finished',
+  TITLE: 'Gyblos · Desktop compatibility probe',
+  DEADLINE_MS: 15000,
+  STARTUP_DEADLINE_MS: 20000,
+  EXIT_DELAY_MS: 300,
+  WIDTH: 1000,
+  HEIGHT: 740,
+  MIN_WIDTH: 640,
+  MIN_HEIGHT: 560,
+  CYCLES: 2,
+  MAX_BYTES: 64,
+  PAYLOAD: 'gyblos-desktop-loopback-probe',
+  SMOKE_FLAG: '--smoke',
+} as const;

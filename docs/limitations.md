@@ -113,11 +113,16 @@ The seller limits work per Iroh identity, but identities are free to create.
 
 ## Local files
 
-- Keys, journals and diagnostics live under `.local/devnet/` (lab) and
-  `.local/p2p/` (node roles). Models are in `.local/ollama/models/`. Never share
-  these.
-- `GYBLOS_GATE_CONFIG` moves only the config file, not keys, journals or models.
-  Inference needs the default key paths.
+- Keys, journals and diagnostics live in the product home (`.local/gyblos/`, one
+  directory per role) and the lab home (`.local/lab/`). Models and the tokenizer
+  are in `.local/gyblos/artifacts/`. Never share role or lab directories.
+- Legacy `.local/p2p`, `.local/devnet` and `.local/ollama/models` data is never
+  migrated automatically; startup refuses until it is moved by hand
+  ([running-a-node.md](running-a-node.md#local-home)). The check is local and
+  existence-based only.
+- `GYBLOS_GATE_CONFIG` moves only the lab config file. `gate:setup` writes the
+  keys next to it, but `gate:inference` accepts only keys in the lab home
+  (`GYBLOS_LAB_HOME`); journals and models never follow it.
 - `.env` is not loaded; set variables in the process environment.
 - P2P role funding remains manual. `buyer:trust` creates the trust file only
   from explicit seller identities after checking the signed offer.

@@ -1,6 +1,7 @@
 // Forwards one bridged inference POST to the seller's literal loopback origin with bounded response size.
-import { LOCALHOST, P2P, ROUTES } from '@gyblos/config';
+import { LOCALHOST, ROUTES, TRANSPORT_TIMEOUTS } from '@gyblos/config';
 
+import { HTTP_OVER_IROH } from './constants.js';
 import type { HttpRequest, HttpResponse } from './types.js';
 
 export async function loopbackRequest(
@@ -22,7 +23,7 @@ export async function loopbackRequest(
   if (
     request.method !== 'POST' ||
     request.path !== ROUTES.inference ||
-    request.body.length > P2P.bodyBytes
+    request.body.length > HTTP_OVER_IROH.bodyBytes
   )
     throw new Error('Inference route required.');
   const response = await fetch(new URL(ROUTES.inference, url), {
@@ -31,7 +32,7 @@ export async function loopbackRequest(
     body: Buffer.from(request.body),
     redirect: 'error',
     signal: AbortSignal.any([
-      AbortSignal.timeout(P2P.requestMs),
+      AbortSignal.timeout(TRANSPORT_TIMEOUTS.requestMs),
       ...(signal ? [signal] : []),
     ]),
   });
@@ -44,7 +45,7 @@ export async function loopbackRequest(
         const part = await reader.read();
         if (part.done) break;
         length += part.value.length;
-        if (length > P2P.responseBytes)
+        if (length > HTTP_OVER_IROH.responseBytes)
           throw new Error('Response exceeds limit.');
         parts.push(part.value);
       }

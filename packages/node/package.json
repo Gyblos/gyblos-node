@@ -12,7 +12,8 @@
     "./lifecycle": "./src/lifecycle.ts",
     "./offers": "./src/offers.ts",
     "./roles": "./src/roles.ts",
-    "./errors": "./src/errors.ts"
+    "./errors": "./src/errors.ts",
+    "./home": "./src/home.ts"
   },
   "dependencies": {
     "@gyblos/core": "workspace:*",

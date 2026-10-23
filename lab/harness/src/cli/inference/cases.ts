@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 
 import { appendMeasurement, measurementRow } from '@gyblos/buyer/measurements';
-import { DEVNET } from '@gyblos/config';
+import { DEVNET, labLayout } from '@gyblos/config';
 import { OFFER_ID } from '@gyblos/core/constants';
 import { observeInferenceResponse } from '@gyblos/core/inference-observation';
 import { assessCharge } from '@gyblos/core/metering';
@@ -15,11 +15,7 @@ import { JOURNAL_STATES } from '@gyblos/payments-x402/constants';
 import { createInferenceBuyer } from '@gyblos/payments-x402/inference-buyer';
 import { saveJson } from '@gyblos/runtime';
 
-import {
-  GATE_TIMEOUTS,
-  INFERENCE_TRANSPORT_PATH,
-  WALLET_ROLES,
-} from '../../constants.js';
+import { GATE_TIMEOUTS, labPaths, WALLET_ROLES } from '../../constants.js';
 import {
   assertNoUnresolvedAuthorizations,
   saveJournal,
@@ -90,7 +86,7 @@ export async function runCases({
       },
     );
     const response = await buyer(url, request, controller.signal);
-    await saveJson(INFERENCE_TRANSPORT_PATH, {
+    await saveJson(labPaths().inferenceTransport, {
       requestId: request.requestId,
       httpStatus: response.status,
       receipt: response.receipt,
@@ -163,7 +159,7 @@ export async function runCases({
       },
       salt,
     );
-    await appendMeasurement(row);
+    await appendMeasurement(row, labLayout(process.env).measurements);
     const result = {
       case: testCase.name,
       measurement: row,

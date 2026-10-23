@@ -7,9 +7,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { HTTP_STATUS, LOCALHOST, P2P, ROUTES } from '@gyblos/config';
+import { homeLayout, HTTP_STATUS, LOCALHOST, ROUTES } from '@gyblos/config';
 import type { Transport } from '@gyblos/transport-iroh';
-import { TRANSPORT_ROUTES } from '@gyblos/transport-iroh/constants';
+import {
+  HTTP_OVER_IROH,
+  TRANSPORT_ROUTES,
+} from '@gyblos/transport-iroh/constants';
 
 import { fixture, within } from './support/native-fixture.js';
 import {
@@ -69,7 +72,7 @@ async function withProxy(
   });
   try {
     process.chdir(directory);
-    await mkdir(P2P.root, { recursive: true });
+    await mkdir(homeLayout(process.env).roles.buyer, { recursive: true });
     server.listen(0, LOCALHOST);
     await once(server, 'listening');
     const address = server.address();
@@ -321,7 +324,7 @@ void test(
         try {
           await waitFor(() => bodies() >= 2);
           assert.equal(forwards, 1);
-          setup.serverConnections[0]!.close(P2P.streamCloseCode, []);
+          setup.serverConnections[0]!.close(HTTP_OVER_IROH.streamCloseCode, []);
           const responses = await within(Promise.all([first, second]));
           assert.deepEqual(
             responses.map((response) => response.status),

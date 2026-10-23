@@ -1,6 +1,7 @@
 // Encodes and decodes the bounded HTTP/1-style wire format, keeping only allowlisted headers.
-import { HTTP_STATUS, P2P, ROUTES } from '@gyblos/config';
+import { HTTP_STATUS, ROUTES } from '@gyblos/config';
 
+import { HTTP_OVER_IROH } from './constants.js';
 import type { HttpMessage, HttpRequest, HttpResponse } from './types.js';
 
 const REQUEST_HEADERS = new Set(['content-type', 'payment-signature', 'host']);
@@ -26,7 +27,7 @@ function encode(firstLine: string, message: HttpMessage) {
       '',
     ].join('\r\n'),
   );
-  if (prefix.length > P2P.headerBytes)
+  if (prefix.length > HTTP_OVER_IROH.headerBytes)
     throw new Error('HTTP headers exceed the limit.');
   return Buffer.concat([prefix, message.body]);
 }
@@ -40,15 +41,15 @@ function decode(
   const boundary = buffer.indexOf('\r\n\r\n');
   if (
     boundary < 0 ||
-    boundary > P2P.headerBytes ||
-    buffer.length - boundary - P2P.headerTerminatorBytes > limit
+    boundary > HTTP_OVER_IROH.headerBytes ||
+    buffer.length - boundary - HTTP_OVER_IROH.headerTerminatorBytes > limit
   )
     throw new Error('HTTP frame exceeds its bounds.');
   const [firstLine, ...lines] = buffer
     .subarray(0, boundary)
     .toString('latin1')
     .split('\r\n');
-  if (!firstLine || lines.length > P2P.maxHeaders)
+  if (!firstLine || lines.length > HTTP_OVER_IROH.maxHeaders)
     throw new Error('Invalid HTTP header count.');
   const headers: Record<string, string> = {};
   const names = new Set<string>();
@@ -74,7 +75,7 @@ function decode(
     else if (!['content-length', 'connection', 'host'].includes(name))
       throw new Error('Unsupported HTTP header.');
   }
-  const body = buffer.subarray(boundary + P2P.headerTerminatorBytes);
+  const body = buffer.subarray(boundary + HTTP_OVER_IROH.headerTerminatorBytes);
   if (!Number.isSafeInteger(length) || length !== body.length)
     throw new Error('HTTP body length mismatch.');
   return { firstLine, headers, body };
@@ -84,7 +85,7 @@ export function encodeRequest(request: HttpRequest) {
   if (
     request.method !== 'POST' ||
     request.path !== ROUTES.inference ||
-    request.body.length > P2P.bodyBytes
+    request.body.length > HTTP_OVER_IROH.bodyBytes
   )
     throw new Error('Only bounded paid inference is exposed.');
   const headers = Object.fromEntries(
@@ -96,7 +97,7 @@ export function encodeRequest(request: HttpRequest) {
 }
 
 export function decodeRequest(bytes: Uint8Array): HttpRequest {
-  const message = decode(bytes, P2P.bodyBytes, REQUEST_HEADERS);
+  const message = decode(bytes, HTTP_OVER_IROH.bodyBytes, REQUEST_HEADERS);
   if (
     message.firstLine !== `POST ${ROUTES.inference} HTTP/1.1` ||
     message.headers['content-type'] !== 'application/json'
@@ -114,8 +115,8 @@ export function encodeResponse(response: HttpResponse) {
   if (
     !Number.isInteger(response.status) ||
     response.status < HTTP_STATUS.ok ||
-    response.status > P2P.maxHttpStatus ||
-    response.body.length > P2P.responseBytes
+    response.status > HTTP_OVER_IROH.maxHttpStatus ||
+    response.body.length > HTTP_OVER_IROH.responseBytes
   )
     throw new Error('Invalid bounded HTTP response.');
   const headers = Object.fromEntries(
@@ -127,7 +128,7 @@ export function encodeResponse(response: HttpResponse) {
 }
 
 export function decodeResponse(bytes: Uint8Array): HttpResponse {
-  const message = decode(bytes, P2P.responseBytes, RESPONSE_HEADERS);
+  const message = decode(bytes, HTTP_OVER_IROH.responseBytes, RESPONSE_HEADERS);
   const match = /^HTTP\/1\.1 ([2-5]\d\d) Result$/.exec(message.firstLine);
   if (!match) throw new Error('Invalid HTTP response.');
   return {

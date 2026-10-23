@@ -23,7 +23,8 @@
     "./gate": "./src/gate.ts",
     "./journal": "./src/journal.ts",
     "./types": "./src/types.ts",
-    "./wallet": "./src/wallet.ts"
+    "./wallet": "./src/wallet.ts",
+    "./setup": "./src/setup.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",

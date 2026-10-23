@@ -1,4 +1,5 @@
-// Downloads, verifies and loads the pinned public recount tokenizer. No engines, wallets or RPC.
+// Downloads, verifies and loads the pinned public recount tokenizer in <home>/artifacts/tokenizer/.
+// No engines, wallets or RPC.
 import {
   mkdir,
   mkdtemp,
@@ -9,7 +10,7 @@ import {
 } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 
-import { FILE_MODES, TOKENIZER_DIR, TOKENIZER_FILES } from '@gyblos/config';
+import { FILE_MODES, homeLayout } from '@gyblos/config';
 import { createModelTokenizer } from '@gyblos/engine-ollama';
 import { MODEL } from '@gyblos/engine-ollama/model';
 
@@ -20,11 +21,14 @@ import {
   TOKENIZER_ORIGIN,
 } from './constants.js';
 import { NodeError } from './errors.js';
+import { assertTokenizerHome } from './home.js';
 
 export async function modelTokenizer() {
+  await assertTokenizerHome();
+  const files = homeLayout(process.env).artifacts.tokenizerFiles;
   return createModelTokenizer({
-    tokenizer: await readFile(TOKENIZER_FILES.tokenizer, 'utf8'),
-    config: await readFile(TOKENIZER_FILES.config, 'utf8'),
+    tokenizer: await readFile(files.tokenizer, 'utf8'),
+    config: await readFile(files.config, 'utf8'),
   });
 }
 
@@ -54,7 +58,11 @@ async function boundedArtifactBody(response: Response) {
 
 // Verify both downloads before publishing either file so a bad response cannot replace a good tokenizer.
 export async function prepareModelTokenizer() {
-  const paths = [TOKENIZER_FILES.tokenizer, TOKENIZER_FILES.config];
+  await assertTokenizerHome();
+  const { tokenizer: directory, tokenizerFiles: files } = homeLayout(
+    process.env,
+  ).artifacts;
+  const paths = [files.tokenizer, files.config];
   const bodies: string[] = [];
   for (const path of paths) {
     const response = await fetch(
@@ -68,11 +76,11 @@ export async function prepareModelTokenizer() {
   const tokenizer = bodies[0]!;
   const config = bodies[1]!;
   createModelTokenizer({ tokenizer, config });
-  await mkdir(TOKENIZER_DIR, {
+  await mkdir(directory, {
     recursive: true,
     mode: FILE_MODES.privateDirectory,
   });
-  const staging = await mkdtemp(join(TOKENIZER_DIR, '.tokenizer-'));
+  const staging = await mkdtemp(join(directory, '.tokenizer-'));
   try {
     for (const [index, path] of paths.entries())
       await writeFile(join(staging, basename(path)), bodies[index]!, {

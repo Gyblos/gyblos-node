@@ -3,13 +3,16 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 
-import { HTTP_STATUS, LOCALHOST, P2P, ROUTES } from '@gyblos/config';
+import { HTTP_STATUS, LOCALHOST, PORTS, ROUTES } from '@gyblos/config';
+import { ROLE_FILES } from '@gyblos/config/home';
 import { OFFER_ID } from '@gyblos/core/constants';
 import { observeInferenceResponse } from '@gyblos/core/inference-observation';
 import { assessCharge, charge } from '@gyblos/core/metering';
 import { modelTokenizer } from '@gyblos/node/artifacts';
+import { P2P_ROLES } from '@gyblos/node/constants';
+import { assertRoleHome } from '@gyblos/node/home';
 import { inferenceCeiling } from '@gyblos/node/http/inference';
-import { rolePath, roleSigner } from '@gyblos/node/roles';
+import { roleDirectory, rolePath, roleSigner } from '@gyblos/node/roles';
 import { inferenceSnapshot } from '@gyblos/payments-x402/accounting/chain';
 import { assertProgram } from '@gyblos/payments-x402/chain';
 import {
@@ -36,6 +39,7 @@ import {
 import {
   CALL_OUTCOMES,
   CALL_PHASES,
+  MINIMUM_REQUESTS,
   P2P_JOURNAL_STATES,
   type CallPhase,
 } from './constants.js';
@@ -47,6 +51,8 @@ import {
 } from './measurements.js';
 import { paymentProof } from './proof.js';
 import { createCases } from './synthetic-cases.js';
+
+const buyerPath = (name: string) => rolePath(P2P_ROLES.BUYER, name);
 
 type CallContext = Awaited<ReturnType<typeof prepareCall>>;
 type CallResponse = Awaited<
@@ -66,9 +72,9 @@ async function prepareCall() {
   const requiredRoute = expectedIrohRoute(process.env.GYBLOS_EXPECTED_ROUTE);
   const { config, offer, trust } = await trustedOffer();
   await assertProgram(config.rpcUrl);
-  await assertPriorCallResolved(rolePath(P2P.journalFilename));
+  await assertPriorCallResolved(buyerPath(ROLE_FILES.journal));
   const index = Number(process.argv[2]);
-  if (!Number.isInteger(index) || index < 0 || index >= P2P.minimumRequests)
+  if (!Number.isInteger(index) || index < 0 || index >= MINIMUM_REQUESTS)
     throw new Error('Select a synthetic case index.');
   const testCase = createCases(randomUUID(), randomUUID())[index]!;
   const request = {
@@ -88,7 +94,7 @@ async function prepareCall() {
     offer.model.digest === undefined
   )
     throw new Error('Local budget or model mismatch.');
-  const buyer = await roleSigner('buyer');
+  const buyer = await roleSigner(P2P_ROLES.BUYER, 'buyer');
   const accounts = {
     rpcUrl: config.rpcUrl,
     mint: config.mint,
@@ -121,7 +127,7 @@ async function prepareCall() {
 async function retainCallAuthorization(context: CallContext, state: CallState) {
   const { request, before, paymentExpectation } = context;
   assert.ok(state.authorization);
-  await saveJson(rolePath(P2P.journalFilename), {
+  await saveJson(buyerPath(ROLE_FILES.journal), {
     state: P2P_JOURNAL_STATES.AUTHORIZED,
     requestId: request.requestId,
     ...state.authorization,
@@ -196,7 +202,7 @@ async function confirmCallPayment(
     },
   );
   state.confirmedProof = proof;
-  await saveJson(rolePath(P2P.journalFilename), {
+  await saveJson(buyerPath(ROLE_FILES.journal), {
     state: JOURNAL_STATES.CONFIRMED,
     requestId: request.requestId,
     channelId: state.authorization.channelId,
@@ -268,9 +274,9 @@ async function measureCallDelivery(
       responseText: observation.text,
       meteringMode: offer.meteringMode,
     },
-    await measurementSalt(P2P.root),
+    await measurementSalt(roleDirectory(P2P_ROLES.BUYER)),
   );
-  await appendMeasurement(row, rolePath(P2P.measurementsFilename));
+  await appendMeasurement(row, buyerPath(ROLE_FILES.measurements));
   return row;
 }
 
@@ -283,7 +289,7 @@ async function recordCallSuccess(
   const { requiredRoute, request, testCase, ceiling } = context;
   state.phase = CALL_PHASES.METRICS;
   const metrics = await readCallMetrics(
-    rolePath(P2P.metricsFilename),
+    buyerPath(ROLE_FILES.metrics),
     request.requestId,
   );
   const paid = metrics.find((metric) => metric.status === HTTP_STATUS.ok);
@@ -308,8 +314,8 @@ async function recordCallSuccess(
       : {}),
   };
   state.phase = CALL_PHASES.PERSISTENCE;
-  await saveJson(rolePath(P2P.callsFilename), [
-    ...(await priorCalls(rolePath(P2P.callsFilename))),
+  await saveJson(buyerPath(ROLE_FILES.calls), [
+    ...(await priorCalls(buyerPath(ROLE_FILES.calls))),
     result,
   ]);
   console.log(JSON.stringify(result));
@@ -330,7 +336,7 @@ async function recordCallFailure(
       ? { responseObservation: state.responseObservation }
       : {}),
     metrics: await readCallMetrics(
-      rolePath(P2P.metricsFilename),
+      buyerPath(ROLE_FILES.metrics),
       request.requestId,
     ).catch(() => []),
     requestId: request.requestId,
@@ -348,12 +354,12 @@ async function recordCallFailure(
     ...(state.confirmedProof ?? {}),
   };
   if (state.authorization && !state.confirmedProof)
-    await saveJson(rolePath(P2P.journalFilename), {
+    await saveJson(buyerPath(ROLE_FILES.journal), {
       state: JOURNAL_STATES.UNCERTAIN,
       ...result,
     });
-  await saveJson(rolePath(P2P.callsFilename), [
-    ...(await priorCalls(rolePath(P2P.callsFilename))),
+  await saveJson(buyerPath(ROLE_FILES.calls), [
+    ...(await priorCalls(buyerPath(ROLE_FILES.calls))),
     result,
   ]);
   console.error(JSON.stringify(result));
@@ -370,7 +376,7 @@ async function run() {
   const invoke = callInvoker(context, state, retainAuthorization);
   try {
     const response = await invoke(
-      `http://${LOCALHOST}:${P2P.buyerProxyPort}${ROUTES.inference}`,
+      `http://${LOCALHOST}:${PORTS.buyerProxy}${ROUTES.inference}`,
       context.request,
     );
     const proof = await confirmCallPayment(
@@ -387,7 +393,8 @@ async function run() {
 }
 
 export async function main() {
-  return withExclusiveLock(rolePath(P2P.buyerLockFilename), run);
+  await assertRoleHome(P2P_ROLES.BUYER); // The lock would create the directory.
+  return withExclusiveLock(buyerPath(ROLE_FILES.buyerLock), run);
 }
 
 if (isMain(import.meta.url)) await main();

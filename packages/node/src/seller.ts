@@ -9,15 +9,16 @@ import {
   CLEANUP,
   DEVNET,
   DIAGNOSTICS,
-  FACILITATOR_LOG_PATHS,
+  homeLayout,
   HOSTS,
   INFERENCE_REQUEST_LIMITS,
   LOCALHOST,
   MAX_ATOMIC,
-  OLLAMA_MODELS_PATH,
-  P2P,
   PORTS,
+  ROLE_FILES,
   ROUTES,
+  TRANSPORT_LIMITS,
+  TRANSPORT_TIMEOUTS,
 } from '@gyblos/config';
 import { PRICES } from '@gyblos/core/constants';
 import {
@@ -49,6 +50,7 @@ import {
   assertReadinessCurrent,
   prepareSellerEngine,
 } from './engine-readiness.js';
+import { assertOllamaModelsHome, assertRoleHome } from './home.js';
 import { createInferenceSeller } from './http/inference.js';
 import { signInferenceOffer } from './offers.js';
 import { loadRole, nodeSecret, rolePath, roleSigner } from './roles.js';
@@ -68,13 +70,15 @@ export async function startSeller() {
   };
   try {
     const stage = (phase: string) =>
-      saveJson(rolePath(P2P.statusFilename), {
+      saveJson(rolePath(P2P_ROLES.SELLER, ROLE_FILES.status), {
         status: 'starting',
         phase,
         runId: process.env.GYBLOS_P2P_RUN_ID,
       });
+    // Before the first status write, which would create the new role directory.
+    await assertRoleHome(P2P_ROLES.SELLER);
     await stage('configuration');
-    const config = await loadRole();
+    const config = await loadRole(P2P_ROLES.SELLER);
     if (config.role !== P2P_ROLES.SELLER)
       throw new Error('Seller role required.');
     await stage('devnet-program');
@@ -82,19 +86,20 @@ export async function startSeller() {
     await assertPortFree(`${HOSTS.ollama}${ROUTES.ollamaVersion}`);
     await assertPortFree(`${HOSTS.facilitator}${ROUTES.health}`);
     await stage('ollama-startup');
+    await assertOllamaModelsHome();
     const child = spawnChild('ollama', ['serve'], {
       env: {
         PATH: process.env.PATH,
-        HOME: resolve(P2P.root),
+        HOME: resolve(homeLayout(process.env).roles.seller),
         TMPDIR: process.env.TMPDIR,
         OLLAMA_HOST: HOSTS.ollamaBind,
-        OLLAMA_MODELS: resolve(OLLAMA_MODELS_PATH),
+        OLLAMA_MODELS: resolve(homeLayout(process.env).artifacts.ollamaModels),
         OLLAMA_NO_CLOUD: '1',
         OLLAMA_DEBUG: '0',
         OLLAMA_CONTEXT_LENGTH: String(GENERATION.numCtx),
         OLLAMA_NUM_PARALLEL: String(READINESS_GENERATION.parallel),
         OLLAMA_MAX_LOADED_MODELS: String(READINESS_GENERATION.loadedModels),
-        OLLAMA_MAX_QUEUE: String(P2P.maxConcurrent),
+        OLLAMA_MAX_QUEUE: String(TRANSPORT_LIMITS.maxConcurrent),
       },
       stdio: 'ignore',
     });
@@ -116,14 +121,17 @@ export async function startSeller() {
     const { model, offerExpiresAt } = await prepareSellerEngine(engine, {
       snapshot: memorySnapshot,
       record: (record) =>
-        saveJson(rolePath(DIAGNOSTICS.readinessFilename), record),
+        saveJson(
+          rolePath(P2P_ROLES.SELLER, DIAGNOSTICS.readinessFilename),
+          record,
+        ),
     });
     await stage('role-signers');
-    const owner = await roleSigner('owner');
-    const authorizer = await roleSigner('authorizer');
-    const facilitator = await roleSigner('facilitator');
+    const owner = await roleSigner(P2P_ROLES.SELLER, 'owner');
+    const authorizer = await roleSigner(P2P_ROLES.SELLER, 'authorizer');
+    const facilitator = await roleSigner(P2P_ROLES.SELLER, 'facilitator');
     const diagnosticLog = await createPrivateLog(
-      rolePath(FACILITATOR_LOG_PATHS.roleDirectory),
+      rolePath(P2P_ROLES.SELLER, ROLE_FILES.facilitatorDiagnostics),
     );
     disposers.push(async () => {
       await diagnosticLog.close();
@@ -156,7 +164,9 @@ export async function startSeller() {
     });
     let traces: Trace[] = [];
     try {
-      traces = await loadJson<Trace[]>(rolePath(P2P.traceFilename));
+      traces = await loadJson<Trace[]>(
+        rolePath(P2P_ROLES.SELLER, ROLE_FILES.traces),
+      );
       if (!Array.isArray(traces)) throw new Error('Invalid trace history.');
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
@@ -186,10 +196,10 @@ export async function startSeller() {
           preInferenceObservedAt: new Date().toISOString(),
           during,
         });
-        await saveJson(rolePath(P2P.traceFilename), traces);
+        await saveJson(rolePath(P2P_ROLES.SELLER, ROLE_FILES.traces), traces);
       },
     });
-    const sellerServer = seller.app.listen(P2P.sellerPort, LOCALHOST);
+    const sellerServer = seller.app.listen(PORTS.seller, LOCALHOST);
     await once(sellerServer, 'listening');
     disposers.push(async () => {
       sellerServer.closeAllConnections();
@@ -197,7 +207,7 @@ export async function startSeller() {
     });
     await stage('iroh-endpoint');
     const relayOnly = process.env.GYBLOS_RELAY_ONLY === '1';
-    const endpoint = await bindEndpoint(await nodeSecret(), {
+    const endpoint = await bindEndpoint(await nodeSecret(P2P_ROLES.SELLER), {
       relayOnly,
       bindAddress: process.env.GYBLOS_IROH_BIND,
       externalAddress: process.env.GYBLOS_IROH_EXTERNAL_ADDR || undefined,
@@ -205,7 +215,7 @@ export async function startSeller() {
     disposers.push(() => endpoint.close());
     if (endpoint.id().toString() !== config.nodeId)
       throw new Error('Node key changed unexpectedly.');
-    await withDeadline(endpoint.online(), P2P.connectMs, () => {
+    await withDeadline(endpoint.online(), TRANSPORT_TIMEOUTS.connectMs, () => {
       void endpoint.close();
     });
     const endpointAddress = endpoint.addr();
@@ -240,13 +250,13 @@ export async function startSeller() {
       },
       owner,
     );
-    await saveJson(rolePath(P2P.offerFilename), signed);
+    await saveJson(rolePath(P2P_ROLES.SELLER, ROLE_FILES.offer), signed);
     const bridge = serveIroh(
       endpoint,
-      `http://${LOCALHOST}:${P2P.sellerPort}`,
+      `http://${LOCALHOST}:${PORTS.seller}`,
       relayOnly,
     );
-    await saveJson(rolePath(P2P.statusFilename), {
+    await saveJson(rolePath(P2P_ROLES.SELLER, ROLE_FILES.status), {
       status: 'ready',
       runId: process.env.GYBLOS_P2P_RUN_ID,
       role: P2P_ROLES.SELLER,

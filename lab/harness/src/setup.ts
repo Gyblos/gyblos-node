@@ -1,5 +1,5 @@
 // Creates the isolated devnet gate config: generates or reuses one key file per wallet role under
-// .local/devnet (private file modes) and never overwrites existing keys. Prints addresses only.
+// the lab home (private file modes) and never overwrites existing keys. Prints addresses only.
 import { generateKeyPairSync } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
@@ -11,15 +11,15 @@ import {
   DEVNET_USDC,
   FILE_MODES,
   KEY_LIMITS,
-  LOCAL_DIR,
 } from '@gyblos/config';
 import { CONFIG_ASSET_LABELS } from '@gyblos/config/constants';
 import { saveJson } from '@gyblos/runtime';
 
 import { keyFilename, SCHEMA_VERSIONS, WALLET_ROLES } from './constants.js';
-import { configPath, type Config } from './wallet.js';
+import { assertLabHome, configPath, type Config } from './wallet.js';
 
 export async function setupGate() {
+  await assertLabHome();
   const path = configPath();
   await mkdir(dirname(path), {
     recursive: true,
@@ -95,7 +95,7 @@ export async function setupGate() {
     console.log(
       JSON.stringify(
         {
-          message: `Isolated devnet wallets created. Private keys stay in ${LOCAL_DIR}.`,
+          message: `Isolated devnet wallets created. Private keys stay in ${dirname(path)}.`,
           addresses,
         },
         null,

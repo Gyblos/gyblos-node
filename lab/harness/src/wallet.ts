@@ -1,16 +1,19 @@
-// Owns explicit loading of the lab devnet configuration and isolated key files.
-// It must not know lab orchestration, payment execution or persistence helpers.
+// Owns explicit loading of the lab devnet configuration and isolated key files in the lab home, and
+// the fail-closed legacy check for that home. It must not know lab orchestration or payment execution.
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 import { createKeyPairSignerFromBytes } from '@solana/kit';
 
-import { KEY_LIMITS } from '@gyblos/config';
+import { KEY_LIMITS, labLayout } from '@gyblos/config';
 import { type ConfigAssetLabel } from '@gyblos/config/constants';
+import { assertNoLegacyState } from '@gyblos/node/home';
 
 import {
-  CONFIG_PATH,
   CONFIG_SCHEMA_VERSION,
+  labPaths,
+  labStatePaths,
+  LEGACY_LAB_PATHS,
   type WalletRole,
 } from './constants.js';
 
@@ -24,9 +27,21 @@ export interface Config {
 }
 
 export const configPath = () =>
-  resolve(process.env.GYBLOS_GATE_CONFIG ?? CONFIG_PATH);
+  resolve(process.env.GYBLOS_GATE_CONFIG ?? labPaths().config);
+
+// Lab journals and keys live in the lab home; never start a fresh one next to legacy .local/devnet state.
+// Decided on lab state files, not on the root directory, which a lock or identity scratch may create.
+// Call it before every lab lock, mkdir or write.
+export function assertLabHome() {
+  return assertNoLegacyState(
+    labLayout(process.env).root,
+    labStatePaths(),
+    LEGACY_LAB_PATHS,
+  );
+}
 
 export async function loadConfig(): Promise<Config> {
+  await assertLabHome();
   const config = JSON.parse(await readFile(configPath(), 'utf8')) as Config;
   if (config.schemaVersion !== CONFIG_SCHEMA_VERSION)
     throw new Error('Unsupported config. Run pnpm gate:setup.');

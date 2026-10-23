@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx"
+  },
+  "include": [
+    "src/renderer.tsx",
+    "src/theme.ts",
+    "src/constants.ts",
+    "src/probe-model.ts"
+  ],
+  "exclude": []
+}

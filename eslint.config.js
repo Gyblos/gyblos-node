@@ -22,6 +22,7 @@ export default [
   {
     files: [
       'apps/**/*.ts',
+      'apps/**/*.tsx',
       'packages/**/*.ts',
       'lab/**/*.ts',
       'tests/**/*.ts',
@@ -30,7 +31,11 @@ export default [
     languageOptions: {
       parser: tseslint.parser,
       parserOptions: {
-        project: ['./tsconfig.json', './tsconfig.tests.json'],
+        project: [
+          './tsconfig.json',
+          './tsconfig.tests.json',
+          './apps/desktop/tsconfig.renderer.json',
+        ],
         tsconfigRootDir: ROOT,
       },
     },
@@ -71,7 +76,7 @@ export default [
     },
   },
   {
-    files: ['apps/**/*.ts', 'packages/**/*.ts', 'lab/**/*.ts'],
+    files: ['apps/**/*.ts', 'apps/**/*.tsx', 'packages/**/*.ts', 'lab/**/*.ts'],
     rules: {
       'gyblos/package-boundaries': 'error',
       'gyblos/structure': 'warn',

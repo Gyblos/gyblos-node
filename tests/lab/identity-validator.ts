@@ -1,14 +1,22 @@
 // Owns a throwaway solana-test-validator cloned from public devnet (8004 program, mpl-core, registry configs),
-// optionally preloaded with synthetic accounts. Clone source is fixed to devnet; ledger and log stay in .local/.
+// optionally preloaded with synthetic accounts. Clone source is fixed to devnet; ledger and log stay in the lab home.
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
 import { mkdirSync, openSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
+import { pathToFileURL } from 'node:url';
 
 import { createSolanaRpc } from '@solana/kit';
 
-import { DEVNET_RPC_URL, FILE_MODES, LOCALHOST } from '@gyblos/config';
+import {
+  DEVNET_RPC_URL,
+  FILE_MODES,
+  labLayout,
+  LOCALHOST,
+} from '@gyblos/config';
 import { DEVNET_REGISTRY, PROGRAMS } from '@gyblos/identity/constants';
+import { assertLabHome } from '@gyblos/lab-harness/wallet';
 
 import type { SyntheticChain } from '../support/identity-accounts.js';
 
@@ -21,8 +29,12 @@ const GOSSIP_PORT = 18001;
 const DYNAMIC_PORT_RANGE = '18100-18200';
 const STARTUP_POLLS = 120;
 const POLL_MS = 500;
-const LOCAL_DIR = new URL('../../.local/identity-validator/', import.meta.url);
-const PRELOAD_DIR = new URL('accounts/', LOCAL_DIR);
+
+// Disposable validator scratch in the lab home, resolved when used.
+function validatorDirectory() {
+  return pathToFileURL(`${resolve(labLayout(process.env).identityValidator)}/`);
+}
+
 const PRELOAD_LAMPORTS = 10_000_000;
 
 export interface LocalValidator {
@@ -51,12 +63,13 @@ export const VALIDATOR_SKIP: false | string = validatorSkip();
 
 // Writes each synthetic account as a `solana account --output json` file and returns --account flags.
 function preloadArgs(chain: SyntheticChain): string[] {
-  mkdirSync(PRELOAD_DIR, {
+  mkdirSync(new URL('accounts/', validatorDirectory()), {
     recursive: true,
     mode: FILE_MODES.privateDirectory,
   });
   return [...chain].flatMap(([pubkey, account]) => {
-    const file = new URL(`${pubkey}.json`, PRELOAD_DIR).pathname;
+    const file = new URL(`accounts/${pubkey}.json`, validatorDirectory())
+      .pathname;
     const json = {
       pubkey,
       account: {
@@ -114,13 +127,18 @@ async function stopProcess(child: ChildProcess): Promise<void> {
 export async function startLocalValidator(
   preload: SyntheticChain = new Map(),
 ): Promise<ValidatorStart> {
-  mkdirSync(LOCAL_DIR, { recursive: true, mode: FILE_MODES.privateDirectory });
+  // Before the scratch mkdir, which would also create the lab home.
+  await assertLabHome();
+  mkdirSync(validatorDirectory(), {
+    recursive: true,
+    mode: FILE_MODES.privateDirectory,
+  });
   const log = openSync(
-    new URL('validator.log', LOCAL_DIR),
+    new URL('validator.log', validatorDirectory()),
     'w',
     FILE_MODES.privateFile,
   );
-  const ledger = new URL('ledger', LOCAL_DIR).pathname;
+  const ledger = new URL('ledger', validatorDirectory()).pathname;
   const url = `http://${LOCALHOST}:${RPC_PORT}`;
   const child = spawn(VALIDATOR_BINARY, validatorArgs(ledger, preload), {
     stdio: ['ignore', log, log],
@@ -132,7 +150,7 @@ export async function startLocalValidator(
     return {
       ok: false,
       reason:
-        'validator did not become healthy (devnet clone unreachable?); see .local/identity-validator/validator.log',
+        'validator did not become healthy (devnet clone unreachable?); see identity-validator/validator.log in the lab home',
     };
   }
   return { ok: true, validator: { url, stop: () => stopProcess(child) } };
