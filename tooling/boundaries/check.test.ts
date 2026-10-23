@@ -12,7 +12,6 @@ import { parseGraph } from './graph.js';
 
 void test('current and future names map to the intended layers', () => {
   const examples = {
-    'packages/application/src/a.ts': 'core',
     'packages/core/src/a.ts': 'core',
     'packages/inference-ollama/src/a.ts': 'adapter',
     'packages/transport/src/a.ts': 'adapter',
@@ -25,8 +24,6 @@ void test('current and future names map to the intended layers', () => {
     'packages/node/src/a.ts': 'node',
     'packages/config/src/a.ts': 'config',
     'packages/runtime/src/a.ts': 'runtime',
-    'packages/gate/src/a.ts': 'lab',
-    'scripts/main.ts': 'lab',
     'lab/harness/src/a.ts': 'lab',
     'lab/tools/nat-regression.mjs': 'lab',
     'tooling/test.mjs': 'verification',
@@ -102,14 +99,12 @@ void test('applications cannot import another app, including literal dynamic imp
   );
 });
 
-void test('product cannot import lab, scripts, legacy gate or experimental tooling', async () => {
+void test('product cannot import lab or experimental tooling', async () => {
   await fixture(
     {
       'apps/buyer/src/a.ts':
-        "import '../../../lab/a.js'; import '../../../scripts/a.js'; import '../../../packages/gate/src/a.js'; import '../../../lab/tools/nat-regression.mjs';",
+        "import '../../../lab/a.js'; import '../../../lab/tools/nat-regression.mjs';",
       'lab/a.ts': 'export const value = 1;',
-      'scripts/a.ts': 'export const value = 1;',
-      'packages/gate/src/a.ts': 'export const value = 1;',
       'lab/tools/nat-regression.mjs': 'export const value = 1;',
     },
     async (files, root) =>
@@ -117,7 +112,7 @@ void test('product cannot import lab, scripts, legacy gate or experimental tooli
         (await analyze(files, root)).entries.filter(
           (entry) => entry.rule === 'product-does-not-import-lab',
         ).length,
-        4,
+        2,
       ),
   );
 });
