@@ -3,11 +3,11 @@
 import { readFile } from 'node:fs/promises';
 
 import { JOURNAL_FILENAMES, JOURNAL_PATHS } from '@gyblos/config';
+import { JOURNAL_STATES } from '@gyblos/payments-x402/constants';
 import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { ProtocolError } from '@gyblos/protocol/errors';
 import { saveJson } from '@gyblos/runtime';
 
-import { JOURNAL_STATES } from './constants.js';
 import type { GateJournalRecord, JournalStateRecord } from './journal-types.js';
 
 export async function assertNoUnresolvedAuthorizations(

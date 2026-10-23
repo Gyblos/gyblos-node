@@ -12,6 +12,7 @@ import {
   ROUTES,
   TIMEOUTS,
 } from '@gyblos/config';
+import { loadConfig } from '@gyblos/config/wallet';
 import { assertProgram, lamports, tokens } from '@gyblos/payments-x402/chain';
 import { MAX_ATOMIC } from '@gyblos/payments-x402/constants';
 import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
@@ -24,7 +25,6 @@ import {
   waitReady,
 } from '@gyblos/runtime';
 
-import { loadConfig } from '../config.js';
 import { executeGate } from './execute.js';
 
 export async function main() {

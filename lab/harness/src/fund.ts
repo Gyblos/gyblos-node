@@ -25,6 +25,8 @@ import {
   PAYMENT_LIMITS,
   TOKEN_PROGRAM_ADDRESS,
 } from '@gyblos/config';
+import { CONFIG_ASSET_LABELS, WALLET_ROLES } from '@gyblos/config/constants';
+import { configPath, loadConfig, signer } from '@gyblos/config/wallet';
 import {
   account,
   assertProgram,
@@ -32,14 +34,9 @@ import {
   lamports,
   rpc,
 } from '@gyblos/payments-x402/chain';
+import { saveJson } from '@gyblos/runtime';
 
-import { configPath, loadConfig, saveJson, signer } from './config.js';
-import {
-  CONFIG_ASSET_LABELS,
-  FUNDING_OPERATIONS,
-  WALLET_ROLES,
-  type FundingOperation,
-} from './constants.js';
+import { FUNDING_OPERATIONS, type FundingOperation } from './constants.js';
 
 interface FundingLogEntry {
   operation: FundingOperation;

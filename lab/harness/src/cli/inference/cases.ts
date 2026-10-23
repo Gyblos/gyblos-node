@@ -3,6 +3,8 @@
 import assert from 'node:assert/strict';
 
 import { INFERENCE_TRANSPORT_PATH, TIMEOUTS } from '@gyblos/config';
+import { WALLET_ROLES } from '@gyblos/config/constants';
+import { signer } from '@gyblos/config/wallet';
 import { observeInferenceResponse } from '@gyblos/core/inference-observation';
 import { assessCharge, OFFER_ID } from '@gyblos/core/metering';
 import { MODEL } from '@gyblos/engine-ollama';
@@ -10,11 +12,10 @@ import { GENERATION, MODEL_LIMITS } from '@gyblos/engine-ollama/constants';
 import { inferenceCeiling } from '@gyblos/node/http/inference';
 import { appendMeasurement, measurementRow } from '@gyblos/node/measurements';
 import { inferenceSnapshot } from '@gyblos/payments-x402/accounting/chain';
-import { DEVNET } from '@gyblos/payments-x402/constants';
+import { DEVNET, JOURNAL_STATES } from '@gyblos/payments-x402/constants';
 import { createInferenceBuyer } from '@gyblos/payments-x402/inference-buyer';
+import { saveJson } from '@gyblos/runtime';
 
-import { saveJson, signer } from '../../config.js';
-import { JOURNAL_STATES, WALLET_ROLES } from '../../constants.js';
 import {
   assertNoUnresolvedAuthorizations,
   saveJournal,

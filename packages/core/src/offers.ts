@@ -6,8 +6,11 @@ import {
   MAX_ATOMIC,
   P2P,
 } from '@gyblos/config';
+import {
+  type EngineCapabilities,
+  type EngineDescription,
+} from '@gyblos/protocol/engine';
 
-import type { EngineCapabilities, EngineDescription } from './engine.js';
 import { PRICES } from './metering.js';
 
 export interface InferenceOffer {

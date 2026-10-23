@@ -8,7 +8,6 @@ import { address, generateKeyPairSigner, getAddressEncoder } from '@solana/kit';
 import ts from 'typescript';
 
 import { P2P } from '@gyblos/config';
-import { inferenceWireUsage as applicationWireUsage } from '@gyblos/core/engine';
 import applicationManifest from '@gyblos/core/package.json' with { type: 'json' };
 import { ENGINE_DONE_REASONS as adapterReasons } from '@gyblos/engine-ollama/constants';
 import {
@@ -200,7 +199,6 @@ void test('protocol errors retain one constructor, catalog and Error serializati
 void test('engine completion reasons and separate domain/wire usage contracts keep their values', () => {
   assert.equal(adapterReasons, ENGINE_DONE_REASONS);
   assert.deepEqual(ENGINE_DONE_REASONS, { STOP: 'stop', LENGTH: 'length' });
-  assert.equal(applicationWireUsage, inferenceWireUsage);
   const domain: EngineUsage = {
     inputTokens: 1,
     outputTokens: 2,

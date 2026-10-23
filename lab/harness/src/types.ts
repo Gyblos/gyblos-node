@@ -1,5 +1,4 @@
-// Type barrel for the harness: accounting types plus exact and inference evidence types.
-export type * from '@gyblos/payments-x402/accounting/types';
+// Type barrel for the harness evidence: exact and inference gate records.
 
 export type {
   ExactGateEvidence,

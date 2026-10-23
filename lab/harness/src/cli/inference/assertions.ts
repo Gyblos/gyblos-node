@@ -7,9 +7,10 @@ import { CHARGE_ANOMALIES } from '@gyblos/core/constants';
 import type { observeInferenceResponse } from '@gyblos/core/inference-observation';
 import { charge, OFFER_ID } from '@gyblos/core/metering';
 import { MODEL } from '@gyblos/engine-ollama';
+import { INFERENCE_CASES } from '@gyblos/node/constants';
 import type { Measurement } from '@gyblos/node/measurements';
 
-import { INFERENCE_CASES, type InferenceCaseName } from '../../constants.js';
+import { type InferenceCaseName } from '../../constants.js';
 import type { InferenceTrace } from '../../types.js';
 
 interface CaseAssertion {

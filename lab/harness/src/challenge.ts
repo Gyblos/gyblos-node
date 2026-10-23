@@ -12,18 +12,16 @@ import {
   ROUTES,
   X402_SDK_VERSION,
 } from '@gyblos/config';
+import { WALLET_ROLES } from '@gyblos/config/constants';
+import { loadConfig, signer } from '@gyblos/config/wallet';
 import { assertProgram } from '@gyblos/payments-x402/chain';
 import { UPSTREAM_COMMIT } from '@gyblos/payments-x402/constants';
 import { createFacilitator } from '@gyblos/payments-x402/facilitator';
 import { createGateSeller } from '@gyblos/payments-x402/seller';
 import { validateTerms } from '@gyblos/payments-x402/trust';
+import { saveJson } from '@gyblos/runtime';
 
-import { loadConfig, saveJson, signer } from './config.js';
-import {
-  CHALLENGE_STAGES,
-  SCHEMA_VERSIONS,
-  WALLET_ROLES,
-} from './constants.js';
+import { CHALLENGE_STAGES, SCHEMA_VERSIONS } from './constants.js';
 import type { ChallengeEvidence } from './fixture-evidence-types.js';
 
 export async function challengeGate() {

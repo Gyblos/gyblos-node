@@ -1,6 +1,7 @@
 // Read-only devnet readiness check: prints facilitator SOL and buyer token balances; exits 2 if the
 // fixed gate is not yet funded.
 import { FIXED_MIN_FACILITATOR_LAMPORTS, MAX_ATOMIC } from '@gyblos/config';
+import { loadConfig } from '@gyblos/config/wallet';
 import {
   account,
   assertProgram,
@@ -8,8 +9,6 @@ import {
   tokens,
 } from '@gyblos/payments-x402/chain';
 import { isMain } from '@gyblos/runtime';
-
-import { loadConfig } from '../config.js';
 
 export async function main() {
   try {

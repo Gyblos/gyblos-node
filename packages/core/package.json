@@ -6,7 +6,6 @@
   "exports": {
     ".": "./src/gate.ts",
     "./constants": "./src/constants.ts",
-    "./engine": "./src/engine.ts",
     "./inference-observation": "./src/inference-observation.ts",
     "./metering": "./src/metering.ts",
     "./offers": "./src/offers.ts",

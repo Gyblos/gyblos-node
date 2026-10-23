@@ -3,11 +3,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import type { Engine } from '@gyblos/core/engine';
 import {
   assertReadinessCurrent,
   prepareSellerEngine,
 } from '@gyblos/node/engine-readiness';
+import { type Engine } from '@gyblos/protocol/engine';
 import type { MemorySnapshot } from '@gyblos/runtime/memory';
 
 function fixture() {

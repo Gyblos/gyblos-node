@@ -23,6 +23,8 @@ import {
   TIMEOUTS,
   TOKENIZER_FILES,
 } from '@gyblos/config';
+import { CONFIG_ASSET_LABELS, WALLET_ROLES } from '@gyblos/config/constants';
+import { loadConfig, signer } from '@gyblos/config/wallet';
 import { createModelTokenizer, createOllama } from '@gyblos/engine-ollama';
 import { GENERATION } from '@gyblos/engine-ollama/constants';
 import { createOllamaEngine } from '@gyblos/engine-ollama/engine';
@@ -43,17 +45,15 @@ import { ProtocolError } from '@gyblos/protocol/errors';
 import {
   assertPortFree,
   onShutdown,
+  saveJson,
   spawnChild,
   stopChild,
   waitReady,
 } from '@gyblos/runtime';
 
-import { loadConfig, saveJson, signer } from '../../config.js';
 import {
-  CONFIG_ASSET_LABELS,
   EVIDENCE_STATUSES,
   INFERENCE_EVIDENCE_CODES,
-  WALLET_ROLES,
 } from '../../constants.js';
 import type { InferenceTrace } from '../../inference-evidence-types.js';
 import { assertNoUnresolvedAuthorizations } from '../../journal.js';

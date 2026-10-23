@@ -14,11 +14,10 @@ import {
 } from '@solana/kit';
 
 import { COMMITMENT } from '@gyblos/config';
+import { WALLET_ROLES } from '@gyblos/config/constants';
+import { signer, type Config } from '@gyblos/config/wallet';
 import { assertDevnet, confirm, rpc } from '@gyblos/payments-x402/chain';
 import { DEVNET_USDC } from '@gyblos/payments-x402/constants';
-
-import { signer, type Config } from './config.js';
-import { WALLET_ROLES } from './constants.js';
 
 export async function prepareExactAccounts(config: Config) {
   await assertDevnet(config.rpcUrl);

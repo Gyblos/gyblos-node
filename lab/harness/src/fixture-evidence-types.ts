@@ -2,13 +2,13 @@
 import type { PaymentRequirements } from '@x402/core/types';
 
 import type { DEVNET, HTTP_STATUS } from '@gyblos/config';
+import { type ConfigAssetLabel } from '@gyblos/config/constants';
 import type { runGate } from '@gyblos/core';
 import type { createFacilitator } from '@gyblos/payments-x402/facilitator';
 
 import type {
   CASE_STATUSES,
   CHALLENGE_STAGES,
-  ConfigAssetLabel,
   EVIDENCE_STATUSES,
   FAILURE_CASES,
   SCHEMA_VERSIONS,

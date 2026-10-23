@@ -1,12 +1,12 @@
 // Shared context and provider types for the exact-gate modules.
 import type { SupportedResponse } from '@x402/core/types';
 
+import { type Config } from '@gyblos/config/wallet';
 import type {
   AuditedPublicFacilitator,
   createExactSeller,
 } from '@gyblos/node/http/exact';
 
-import type { Config } from '../../config.js';
 import type { ExactGateEvidence } from '../../types.js';
 import type { authorizationMetadata } from './reconcile.js';
 

@@ -21,15 +21,18 @@ import {
   RETRY_DELAYS,
   TOKEN_PROGRAM_ADDRESS,
 } from '@gyblos/config';
+import { type Config } from '@gyblos/config/wallet';
+import {
+  type AccountsResponse,
+  type ChainTransaction,
+} from '@gyblos/payments-x402/accounting/types';
 import { lamports, rpc } from '@gyblos/payments-x402/chain';
 import { DEVNET_USDC } from '@gyblos/payments-x402/constants';
 import { exactAuthorizationId } from '@gyblos/payments-x402/exact/authorization-id';
 import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { ProtocolError } from '@gyblos/protocol/errors';
 
-import { type Config } from '../../config.js';
 import { RECONCILIATION_CLASSIFICATIONS } from '../../constants.js';
-import type { AccountsResponse, ChainTransaction } from '../../types.js';
 
 export async function snapshot(config: Config, buyer: string) {
   const atas = await Promise.all(

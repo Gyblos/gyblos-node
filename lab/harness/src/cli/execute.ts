@@ -14,6 +14,8 @@ import {
   ROUTES,
   X402_SDK_VERSION,
 } from '@gyblos/config';
+import { WALLET_ROLES } from '@gyblos/config/constants';
+import { loadConfig, signer } from '@gyblos/config/wallet';
 import { runGate } from '@gyblos/core';
 import { createBuyer } from '@gyblos/payments-x402';
 import {
@@ -27,6 +29,7 @@ import {
 import {
   ACTUAL_ATOMIC,
   DEVNET,
+  JOURNAL_STATES,
   MAX_ATOMIC,
   UPSTREAM_COMMIT,
 } from '@gyblos/payments-x402/constants';
@@ -35,14 +38,9 @@ import { withExclusiveLock } from '@gyblos/payments-x402/recovery/lock';
 import { validateSettlement } from '@gyblos/payments-x402/trust';
 import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { ProtocolError } from '@gyblos/protocol/errors';
+import { saveJson } from '@gyblos/runtime';
 
-import { loadConfig, saveJson, signer } from '../config.js';
-import {
-  EVIDENCE_STATUSES,
-  JOURNAL_STATES,
-  SCHEMA_VERSIONS,
-  WALLET_ROLES,
-} from '../constants.js';
+import { EVIDENCE_STATUSES, SCHEMA_VERSIONS } from '../constants.js';
 import type { FixedGateEvidence } from '../fixture-evidence-types.js';
 import { assertNoUnresolvedAuthorizations, saveJournal } from '../journal.js';
 

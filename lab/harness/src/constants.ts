@@ -1,5 +1,5 @@
 // Harness-only vocabulary: evidence IDs and statuses, case names, funding operations and schema
-// versions, plus re-exports of the shared wallet, journal and guard constants it uses.
+// versions. Shared wallet, journal and guard values are imported from their owning packages.
 import {
   CONFIG_SCHEMA_VERSION,
   type ConfigAssetLabel,
@@ -123,26 +123,3 @@ export type EvidenceAssetLabel =
 
 export type FundingOperation =
   (typeof FUNDING_OPERATIONS)[keyof typeof FUNDING_OPERATIONS];
-
-export {
-  CONFIG_ASSET_LABELS,
-  WALLET_ROLES,
-  type ConfigAssetLabel,
-  type WalletRole,
-} from '@gyblos/config/constants';
-
-export { INFERENCE_CASES } from '@gyblos/node/constants';
-
-export {
-  RENT_GUARDS,
-  TOKEN_GUARDS,
-  PROOF_GUARDS,
-  type FinancialGuardMessage,
-} from '@gyblos/payments-x402/accounting/constants';
-
-export { JOURNAL_STATES } from '@gyblos/payments-x402/constants';
-
-export {
-  ERROR_DIAGNOSTICS,
-  type ErrorDiagnosticCode,
-} from '@gyblos/node/constants';

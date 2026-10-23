@@ -8,10 +8,8 @@ import { assessCharge, charge, OFFER_ID } from '@gyblos/core/metering';
 import { MODEL } from '@gyblos/engine-ollama';
 import { ENGINE_DONE_REASONS } from '@gyblos/engine-ollama/constants';
 import { assertInferenceCase } from '@gyblos/lab-harness/cli/inference/assertions';
-import {
-  INFERENCE_CASES,
-  type InferenceCaseName,
-} from '@gyblos/lab-harness/constants';
+import { type InferenceCaseName } from '@gyblos/lab-harness/constants';
+import { INFERENCE_CASES } from '@gyblos/node/constants';
 import { measurementRow } from '@gyblos/node/measurements';
 
 function fixture(
