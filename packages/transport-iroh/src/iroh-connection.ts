@@ -1,7 +1,9 @@
 // Serves the streams of one accepted Iroh connection with idle and lifetime limits.
 import type { BiStream, Connection } from '@number0/iroh';
 
-import { P2P } from '@gyblos/config';
+import { TRANSPORT_LIMITS } from '@gyblos/config';
+
+import { HTTP_OVER_IROH, IROH_DEADLINES } from './constants.js';
 
 export async function handleIrohConnection(
   connection: Connection,
@@ -13,38 +15,45 @@ export async function handleIrohConnection(
   let finished = false;
   let idle: ReturnType<typeof setTimeout> | undefined;
   const closeIfIdle = () => {
-    if (inFlight === 0) connection.close(P2P.streamCloseCode, []);
+    if (inFlight === 0) connection.close(HTTP_OVER_IROH.streamCloseCode, []);
   };
   const armIdle = () => {
     clearTimeout(idle);
     if (inFlight === 0 && !isClosed() && !finished) {
       if (retiring) closeIfIdle();
-      else idle = setTimeout(closeIfIdle, P2P.connectionIdleMs);
+      else idle = setTimeout(closeIfIdle, IROH_DEADLINES.connectionIdleMs);
     }
   };
   const lifetime = setTimeout(() => {
     retiring = true;
     closeIfIdle();
-  }, P2P.connectionLifetimeMs);
+  }, IROH_DEADLINES.connectionLifetimeMs);
   try {
     connection.setReceiveWindow(
-      BigInt(P2P.bodyBytes + P2P.headerBytes) * BigInt(P2P.maxPeerConcurrent),
+      BigInt(HTTP_OVER_IROH.bodyBytes + HTTP_OVER_IROH.headerBytes) *
+        BigInt(TRANSPORT_LIMITS.maxPeerConcurrent),
     );
-    connection.setMaxConcurrentBiStreams(BigInt(P2P.maxPeerConcurrent));
+    connection.setMaxConcurrentBiStreams(
+      BigInt(TRANSPORT_LIMITS.maxPeerConcurrent),
+    );
     connection.setMaxConcurrentUniStreams(0n);
     armIdle();
     while (!isClosed()) {
       const stream = await connection.acceptBi();
       if (retiring) {
-        void stream.recv.stop(P2P.streamCloseCode).catch(() => undefined);
-        void stream.send.reset(P2P.streamCloseCode).catch(() => undefined);
+        void stream.recv
+          .stop(HTTP_OVER_IROH.streamCloseCode)
+          .catch(() => undefined);
+        void stream.send
+          .reset(HTTP_OVER_IROH.streamCloseCode)
+          .catch(() => undefined);
         closeIfIdle();
         continue;
       }
       clearTimeout(idle);
       inFlight++;
       void respond(stream)
-        .catch(() => connection.close(P2P.streamCloseCode, []))
+        .catch(() => connection.close(HTTP_OVER_IROH.streamCloseCode, []))
         .finally(() => {
           inFlight--;
           armIdle();

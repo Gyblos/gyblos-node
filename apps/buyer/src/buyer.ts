@@ -11,6 +11,7 @@ import { loadRole, nodeSecret, rolePath } from '@gyblos/node/roles';
 import { assertProgram } from '@gyblos/payments-x402/chain';
 import type { InferenceOffer } from '@gyblos/protocol/offer';
 import { saveJson } from '@gyblos/runtime';
+import { HTTP_OVER_IROH } from '@gyblos/transport-iroh/constants';
 import {
   assertConfiguredRelay,
   bindEndpoint,
@@ -35,7 +36,8 @@ export async function trustedOffer() {
   )
     throw new Error('Local buyer trust configuration mismatch.');
   const bytes = await readFile(rolePath(P2P.offerFilename));
-  if (bytes.length > P2P.bodyBytes) throw new Error('Offer exceeds bounds.');
+  if (bytes.length > HTTP_OVER_IROH.bodyBytes)
+    throw new Error('Offer exceeds bounds.');
   const offer = await verifyInferenceOffer(
     JSON.parse(bytes.toString('utf8')),
     trust,

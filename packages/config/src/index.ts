@@ -13,6 +13,8 @@ export * from './limits.js';
 
 export * from './p2p.js';
 
+export * from './transport.js';
+
 export * from './diagnostics.js';
 
 export * from './identity.js';

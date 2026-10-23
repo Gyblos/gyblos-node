@@ -3,7 +3,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { P2P, ROUTES } from '@gyblos/config';
+import { ROUTES, TRANSPORT_LIMITS } from '@gyblos/config';
+import { HTTP_OVER_IROH } from '@gyblos/transport-iroh/constants';
 import { withDeadline } from '@gyblos/transport-iroh/deadline';
 import { createPeerLimiter } from '@gyblos/transport-iroh/limiter';
 import {
@@ -55,7 +56,10 @@ void test('HTTP wire rejects non-inference routes and request smuggling or overs
     assert.throws(() => encodeRequest({ ...REQUEST, path }));
   assert.throws(() => encodeRequest({ ...REQUEST, method: 'CONNECT' }));
   assert.throws(() =>
-    encodeRequest({ ...REQUEST, body: Buffer.alloc(P2P.bodyBytes + 1) }),
+    encodeRequest({
+      ...REQUEST,
+      body: Buffer.alloc(HTTP_OVER_IROH.bodyBytes + 1),
+    }),
   );
   for (const extra of [
     'content-length: 0\r\n',
@@ -90,15 +94,15 @@ void test('per-peer and global limits cannot be bypassed with duplicate release 
   first();
   assert.ok(limiter.enter('three'));
   second();
-  now += P2P.rateWindowMs;
+  now += TRANSPORT_LIMITS.rateWindowMs;
   const rate = createPeerLimiter(() => now);
-  for (let index = 0; index < P2P.requestsPerWindow; index++) {
+  for (let index = 0; index < TRANSPORT_LIMITS.requestsPerWindow; index++) {
     const release = rate.enter('same');
     assert.ok(release);
     release();
   }
   assert.equal(rate.enter('same'), undefined);
-  now += P2P.rateWindowMs;
+  now += TRANSPORT_LIMITS.rateWindowMs;
   assert.ok(rate.enter('same'));
 });
 

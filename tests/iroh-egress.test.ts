@@ -11,7 +11,11 @@ import type {
   SendStream,
 } from '@number0/iroh';
 
-import { HTTP_STATUS, P2P } from '@gyblos/config';
+import { HTTP_STATUS, TRANSPORT_LIMITS } from '@gyblos/config';
+import {
+  HTTP_OVER_IROH,
+  IROH_DEADLINES,
+} from '@gyblos/transport-iroh/constants';
 
 import {
   fixture,
@@ -79,7 +83,7 @@ void test(
     assert.ok(NATIVE_CAPABILITY.sdk);
     const { SendStream } = NATIVE_CAPABILITY.sdk;
     const lab = await fixture({
-      freeBody: Buffer.alloc(P2P.responseBytes, 48),
+      freeBody: Buffer.alloc(HTTP_OVER_IROH.responseBytes, 48),
       holdFirstFreeResponse: true,
     });
     let closePeer = async () => {};
@@ -115,7 +119,7 @@ void test(
       target = address; // Direct IPv4/IPv6 recovery is deliberately available.
       return address;
     });
-    probe.connection.close(P2P.streamCloseCode, []);
+    probe.connection.close(HTTP_OVER_IROH.streamCloseCode, []);
     await within(probe.connection.closed());
     await waitFor(() => lab.retired.has(probe.endpoint.id().toString()));
     assert.ok(target);
@@ -123,7 +127,7 @@ void test(
     closePeer = unread.close;
     // Handshakes finish outside the measured egress interval.
     const holders: Awaited<ReturnType<typeof lab.client>>[] = [];
-    for (let index = 1; index < P2P.maxEgressConcurrent; index++)
+    for (let index = 1; index < TRANSPORT_LIMITS.maxEgressConcurrent; index++)
       holders.push(await lab.client());
     await unread.request(0);
     await waitFor(
@@ -151,13 +155,16 @@ void test(
     );
     const blocked = writes[0]!;
     await assert.rejects(
-      within(blocked.done, P2P.egressMs / 10),
+      within(blocked.done, IROH_DEADLINES.egressMs / 10),
       NativeTestDeadlineError,
     );
     assert.equal(blocked.settled, false);
     assert.equal(server.closeReason(), null);
     await delay(
-      Math.max(0, blocked.started + P2P.egressMs / 2 - performance.now()),
+      Math.max(
+        0,
+        blocked.started + IROH_DEADLINES.egressMs / 2 - performance.now(),
+      ),
     );
     const heldStreams: BiStream[] = [];
     const previousStreams = lab.serverStreams;
@@ -175,7 +182,8 @@ void test(
       undefined,
       'all other slots occupied',
     );
-    const expiryDeadline = blocked.started + P2P.egressMs + EXPIRY_MARGIN_MS;
+    const expiryDeadline =
+      blocked.started + IROH_DEADLINES.egressMs + EXPIRY_MARGIN_MS;
     await assert.rejects(
       within(blocked.done, Math.max(1, expiryDeadline - performance.now())),
       (error) => {
@@ -189,7 +197,7 @@ void test(
     );
     assert.ok(
       performance.now() - blocked.started >=
-        P2P.egressMs - TIMER_EARLY_MARGIN_MS,
+        IROH_DEADLINES.egressMs - TIMER_EARLY_MARGIN_MS,
     );
     assert.notEqual(server.closeReason(), null);
     assert.equal(blocked.settled, true);
@@ -206,7 +214,7 @@ void test(
         .status,
       HTTP_STATUS.paymentRequired,
     );
-    assert.equal(holders.length + 1, P2P.maxEgressConcurrent);
+    assert.equal(holders.length + 1, TRANSPORT_LIMITS.maxEgressConcurrent);
     assert.equal(heldStreams.length, holders.length);
     assert.ok(
       holders.every((holder) => holder.connection.closeReason() === null),

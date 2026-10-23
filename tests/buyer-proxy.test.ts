@@ -9,7 +9,10 @@ import test from 'node:test';
 
 import { HTTP_STATUS, LOCALHOST, P2P, ROUTES } from '@gyblos/config';
 import type { Transport } from '@gyblos/transport-iroh';
-import { TRANSPORT_ROUTES } from '@gyblos/transport-iroh/constants';
+import {
+  HTTP_OVER_IROH,
+  TRANSPORT_ROUTES,
+} from '@gyblos/transport-iroh/constants';
 
 import { fixture, within } from './support/native-fixture.js';
 import {
@@ -321,7 +324,7 @@ void test(
         try {
           await waitFor(() => bodies() >= 2);
           assert.equal(forwards, 1);
-          setup.serverConnections[0]!.close(P2P.streamCloseCode, []);
+          setup.serverConnections[0]!.close(HTTP_OVER_IROH.streamCloseCode, []);
           const responses = await within(Promise.all([first, second]));
           assert.deepEqual(
             responses.map((response) => response.status),

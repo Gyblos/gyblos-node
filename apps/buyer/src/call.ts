@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 
-import { HTTP_STATUS, LOCALHOST, P2P, ROUTES } from '@gyblos/config';
+import { HTTP_STATUS, LOCALHOST, P2P, PORTS, ROUTES } from '@gyblos/config';
 import { OFFER_ID } from '@gyblos/core/constants';
 import { observeInferenceResponse } from '@gyblos/core/inference-observation';
 import { assessCharge, charge } from '@gyblos/core/metering';
@@ -370,7 +370,7 @@ async function run() {
   const invoke = callInvoker(context, state, retainAuthorization);
   try {
     const response = await invoke(
-      `http://${LOCALHOST}:${P2P.buyerProxyPort}${ROUTES.inference}`,
+      `http://${LOCALHOST}:${PORTS.buyerProxy}${ROUTES.inference}`,
       context.request,
     );
     const proof = await confirmCallPayment(

@@ -18,6 +18,8 @@ import {
   P2P,
   PORTS,
   ROUTES,
+  TRANSPORT_LIMITS,
+  TRANSPORT_TIMEOUTS,
 } from '@gyblos/config';
 import { PRICES } from '@gyblos/core/constants';
 import {
@@ -92,7 +94,7 @@ export async function startSeller() {
         OLLAMA_CONTEXT_LENGTH: String(GENERATION.numCtx),
         OLLAMA_NUM_PARALLEL: String(READINESS_GENERATION.parallel),
         OLLAMA_MAX_LOADED_MODELS: String(READINESS_GENERATION.loadedModels),
-        OLLAMA_MAX_QUEUE: String(P2P.maxConcurrent),
+        OLLAMA_MAX_QUEUE: String(TRANSPORT_LIMITS.maxConcurrent),
       },
       stdio: 'ignore',
     });
@@ -187,7 +189,7 @@ export async function startSeller() {
         await saveJson(rolePath(P2P.traceFilename), traces);
       },
     });
-    const sellerServer = seller.app.listen(P2P.sellerPort, LOCALHOST);
+    const sellerServer = seller.app.listen(PORTS.seller, LOCALHOST);
     await once(sellerServer, 'listening');
     disposers.push(async () => {
       sellerServer.closeAllConnections();
@@ -203,7 +205,7 @@ export async function startSeller() {
     disposers.push(() => endpoint.close());
     if (endpoint.id().toString() !== config.nodeId)
       throw new Error('Node key changed unexpectedly.');
-    await withDeadline(endpoint.online(), P2P.connectMs, () => {
+    await withDeadline(endpoint.online(), TRANSPORT_TIMEOUTS.connectMs, () => {
       void endpoint.close();
     });
     const endpointAddress = endpoint.addr();
@@ -241,7 +243,7 @@ export async function startSeller() {
     await saveJson(rolePath(P2P.offerFilename), signed);
     const bridge = serveIroh(
       endpoint,
-      `http://${LOCALHOST}:${P2P.sellerPort}`,
+      `http://${LOCALHOST}:${PORTS.seller}`,
       relayOnly,
     );
     await saveJson(rolePath(P2P.statusFilename), {

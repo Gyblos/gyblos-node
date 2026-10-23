@@ -6,7 +6,13 @@ import { once } from 'node:events';
 import { createServer } from 'node:http';
 import test from 'node:test';
 
-import { HTTP_STATUS, LOCALHOST, P2P, ROUTES } from '@gyblos/config';
+import {
+  HTTP_STATUS,
+  LOCALHOST,
+  P2P,
+  ROUTES,
+  TRANSPORT_LIMITS,
+} from '@gyblos/config';
 import { createIrohTransport } from '@gyblos/transport-iroh/iroh-client';
 import { serveIroh } from '@gyblos/transport-iroh/iroh-server';
 
@@ -114,7 +120,7 @@ void test(
         );
       }
       const newcomer = await lab.transport();
-      for (let index = 0; index < P2P.requestsPerWindow; index++)
+      for (let index = 0; index < TRANSPORT_LIMITS.requestsPerWindow; index++)
         assert.equal(
           (await newcomer.exchange(fixtureRequest('newcomer-' + index))).status,
           HTTP_STATUS.paymentRequired,
@@ -124,7 +130,7 @@ void test(
           .status,
         HTTP_STATUS.tooManyRequests,
       );
-      assert.equal(lab.accepted.length, 9 + P2P.requestsPerWindow);
+      assert.equal(lab.accepted.length, 9 + TRANSPORT_LIMITS.requestsPerWindow);
       assert.equal(lab.executions, 0);
       assert.equal(lab.paid.size, 0);
     } finally {
@@ -156,7 +162,7 @@ void test(
       );
       const returning = await lab.transport(secret);
       assert.equal(lab.nodeId(returning), identity);
-      for (let index = 4; index < P2P.requestsPerWindow; index++)
+      for (let index = 4; index < TRANSPORT_LIMITS.requestsPerWindow; index++)
         assert.equal(
           (await returning.exchange(fixtureRequest('after-' + index))).status,
           402,
@@ -165,7 +171,7 @@ void test(
         (await returning.exchange(fixtureRequest('over-budget'))).status,
         HTTP_STATUS.tooManyRequests,
       );
-      assert.equal(lab.accepted.length, P2P.requestsPerWindow);
+      assert.equal(lab.accepted.length, TRANSPORT_LIMITS.requestsPerWindow);
       assert.equal(lab.executions, 0);
       assert.equal(lab.paid.size, 0);
     } finally {

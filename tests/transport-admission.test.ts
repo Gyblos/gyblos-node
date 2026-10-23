@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { P2P } from '@gyblos/config';
+import { TRANSPORT_LIMITS } from '@gyblos/config';
 import {
   connectionSource,
   createConnectionAdmission,
@@ -12,8 +12,10 @@ import {
 void test('established per-peer admission cap applies while the global pool has capacity', () => {
   const admission = createConnectionAdmission();
   const leases: (() => void)[] = [];
-  assert.ok(P2P.maxPeerConnections < P2P.maxConnections);
-  for (let index = 0; index < P2P.maxPeerConnections; index++) {
+  assert.ok(
+    TRANSPORT_LIMITS.maxPeerConnections < TRANSPORT_LIMITS.maxConnections,
+  );
+  for (let index = 0; index < TRANSPORT_LIMITS.maxPeerConnections; index++) {
     const lease = admission.established('one-peer');
     assert.ok(lease);
     leases.push(lease);
@@ -66,15 +68,15 @@ void test('pending and established pools have independent global and per-source 
   const admission = createConnectionAdmission();
   const pending: (() => void)[] = [];
   const established: (() => void)[] = [];
-  for (let index = 0; index < P2P.maxPendingConnections; index++) {
+  for (let index = 0; index < TRANSPORT_LIMITS.maxPendingConnections; index++) {
     const release = admission.pending(
-      'source-' + Math.floor(index / P2P.maxPendingPerSource),
+      'source-' + Math.floor(index / TRANSPORT_LIMITS.maxPendingPerSource),
     );
     assert.ok(release);
     pending.push(release);
   }
   assert.equal(admission.pending('other-source'), undefined);
-  for (let index = 0; index < P2P.maxConnections; index++) {
+  for (let index = 0; index < TRANSPORT_LIMITS.maxConnections; index++) {
     const release = admission.established('peer-' + index);
     assert.ok(release);
     established.push(release);
@@ -97,7 +99,7 @@ void test('pending and established pools have independent global and per-source 
 void test('one source cannot bypass its pending limit using multiple connections', () => {
   const admission = createConnectionAdmission();
   const leases: (() => void)[] = [];
-  for (let index = 0; index < P2P.maxPendingPerSource; index++) {
+  for (let index = 0; index < TRANSPORT_LIMITS.maxPendingPerSource; index++) {
     const lease = admission.pending('one-source');
     assert.ok(lease);
     leases.push(lease);

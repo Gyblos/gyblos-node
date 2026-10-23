@@ -7,15 +7,12 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 import type { Connection, Endpoint, EndpointAddr } from '@number0/iroh';
 
-import {
-  HTTP_STATUS,
-  IPV6_LOOPBACK,
-  LOCALHOST,
-  P2P,
-  ROUTES,
-} from '@gyblos/config';
+import { HTTP_STATUS, IPV6_LOOPBACK, LOCALHOST, ROUTES } from '@gyblos/config';
 import { GYBLOS_ALPN } from '@gyblos/protocol/constants';
-import { TRANSPORT_ROUTES } from '@gyblos/transport-iroh/constants';
+import {
+  HTTP_OVER_IROH,
+  TRANSPORT_ROUTES,
+} from '@gyblos/transport-iroh/constants';
 import { createIrohTransport } from '@gyblos/transport-iroh/iroh-client';
 import { serveIroh } from '@gyblos/transport-iroh/iroh-server';
 import { decodeResponse, encodeRequest } from '@gyblos/transport-iroh/wire';
@@ -258,7 +255,9 @@ export async function exchange(
   await stream.send.finish();
   return decodeResponse(
     Uint8Array.from(
-      await stream.recv.readToEnd(P2P.responseBytes + P2P.headerBytes),
+      await stream.recv.readToEnd(
+        HTTP_OVER_IROH.responseBytes + HTTP_OVER_IROH.headerBytes,
+      ),
     ),
   );
 }
