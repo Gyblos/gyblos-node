@@ -47,25 +47,30 @@ Native sellers and buyers use `https://na1.relay.gyblos.com/` by default, with
 QUIC address discovery on UDP 7842. Set `GYBLOS_RELAY_TOKEN` privately in each
 process environment before starting either role. There is no built-in token;
 missing, invalid or out-of-bounds (32 to 512 printable characters) configuration
-stops endpoint binding. The token is attached only to owned relay hosts under
-`.relay.gyblos.com`; other configured relays receive no token. Never put the
-token in a relay URL, a signed offer, a config file or a committed environment
-file.
+stops endpoint binding. The token is attached only to relays whose normalized
+hostname exactly matches the owned allowlist (`na1.relay.gyblos.com` and
+`na2.relay.gyblos.com`); other configured relays, including other
+`*.relay.gyblos.com` names, receive no token. Never put the token in a relay
+URL, a signed offer, a config file or a committed environment file.
 
 `GYBLOS_RELAYS` optionally overrides the comma-separated HTTPS relay origins.
 Both roles must use the same set and credentials. The buyer accepts a signed
 offer's relay only if its normalized URL belongs to that configured set. Relay
-URLs, the owned host suffix and the QUIC port defaults live in `@gyblos/config`.
-The default set contains only `na1`. A future `na2` slot is added by listing it
-in `GYBLOS_RELAYS` (for example
+Both buyer modes then dial that normalized URL (an equivalent origin, for
+example with a trailing slash added) rather than the offer's raw string. Relay
+URLs, the owned host allowlist and the QUIC port defaults live in
+`@gyblos/config`. The default set contains only `na1`. A future `na2` slot is
+added by listing it in `GYBLOS_RELAYS` (for example
 `https://na1.relay.gyblos.com/,https://na2.relay.gyblos.com/`) once that relay
-exists; it receives the token because it is under the owned suffix. The built-in
-default changes only after `na2` is deployed.
+exists; it receives the token because it is on the owned host allowlist. The
+built-in default changes only after `na2` is deployed.
 
 `GYBLOS_BUYER_RELAY_ONLY=1` binds the buyer endpoint to loopback only, like the
-seller's relay-only mode, ignores the seller's advertised direct addresses and
-dials only the offer's normalized configured relay. An offer without a relay is
-rejected in this mode. The default buyer behavior is unchanged.
+seller's relay-only mode, ignores `GYBLOS_IROH_BIND` and the seller's advertised
+direct addresses, and dials only the offer's normalized configured relay. An
+offer without a relay, or a `GYBLOS_IROH_EXTERNAL_ADDR` candidate, is rejected
+in this mode. Without it, the buyer keeps its operator binds and seller direct
+addresses.
 
 The n0 preset still initializes crypto and DNS/pkarr address discovery before
 the custom map replaces its relays. Public n0 relays are not an automatic

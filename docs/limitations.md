@@ -303,16 +303,19 @@ Native routes are sampled observations. Direct connections reveal peer IPs.
 endpoint unless `GYBLOS_BUYER_RELAY_ONLY=1` is set; without it, asking for a
 relay route or omitting seller direct candidates does not prevent buyer IP
 disclosure. Buyer relay-only mode binds loopback sockets only, ignores seller
-direct addresses and requires a configured relay in the offer; it is verified
-offline with a fake endpoint builder only. Off-host relay-only privacy for
-either role remains untested. The relay token is attached only to owned
-`.relay.gyblos.com` hosts; tests check that it is not printed on the tested
-configuration success and failure paths. The built-in default stays `na1` until
-an `na2` relay exists; `GYBLOS_RELAYS` can then add the `na2` slot. Docker
-NAT-direct readiness did not pass; a separate inbound-UDP-blocked relay session
-did complete paid calls. An in-session direct-to-relay transition and broader
-success rates are unproven. The later native Mac–VPS result does not explain the
-original Docker return path.
+direct addresses and requires a configured relay in the offer; `startBuyer` is
+verified offline only against a fake endpoint builder that records binds and the
+dial target. Off-host relay-only privacy for either role remains untested. The
+relay token is attached only to the exact owned hosts `na1.relay.gyblos.com` and
+`na2.relay.gyblos.com`. Tests check that it is not printed on the tested
+configuration paths and on real native bind failures with native trace logging
+enabled; a successful native bind, the relay handshake and its logs are not
+covered offline because they contact the configured relay. The built-in default
+stays `na1` until an `na2` relay exists; `GYBLOS_RELAYS` can then add the `na2`
+slot. Docker NAT-direct readiness did not pass; a separate inbound-UDP-blocked
+relay session did complete paid calls. An in-session direct-to-relay transition
+and broader success rates are unproven. The later native Mac–VPS result does not
+explain the original Docker return path.
 
 Request ingress has a separate five-second deadline. Execution allows one active
 request per NodeId and two globally. Its permits are released when the origin
