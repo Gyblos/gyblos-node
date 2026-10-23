@@ -22,7 +22,7 @@
     "gate:run": "node --import tsx lab/harness/src/cli/run.ts",
     "gate:buyer": "node --import tsx lab/harness/src/cli/buyer.ts",
     "gate:seller": "node --import tsx lab/harness/scripts/seller.ts",
-    "gate:facilitator": "node --import tsx apps/facilitator/src/main.ts",
+    "gate:facilitator": "node --import tsx lab/facilitator/src/main.ts",
     "gate:fund": "node --import tsx lab/harness/scripts/fund.ts",
     "gate:challenge": "node --import tsx lab/harness/scripts/challenge.ts",
     "gate:failures": "node --import tsx lab/harness/scripts/failures.ts",
@@ -58,7 +58,7 @@
     "@gyblos/node": "workspace:*",
     "@gyblos/buyer": "workspace:*",
     "@gyblos/node-app": "workspace:*",
-    "@gyblos/facilitator": "workspace:*",
+    "@gyblos/lab-facilitator": "workspace:*",
     "@gyblos/identity": "workspace:*"
   },
   "devDependencies": {

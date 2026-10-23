@@ -78,7 +78,6 @@ void test('all executable modules are inert when imported', async (context) => {
   assert.equal(racingStops, 2);
   assert.equal(racing.health().state, NODE_STATES.STOPPED);
   await assertImportsInert(async () => {
-    await import('@gyblos/facilitator/main');
     await import('@gyblos/buyer/setup');
     await context.test(
       'native role setup entry is inert when imported',

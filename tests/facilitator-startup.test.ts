@@ -26,11 +26,12 @@ interface StartupResult {
 }
 
 function startupProbe(directory: string) {
-  const entry = new URL(import.meta.resolve('@gyblos/facilitator/main')).href;
+  const entry = new URL(import.meta.resolve('@gyblos/lab-facilitator/main'))
+    .href;
   const runtime = new URL(import.meta.resolve('@gyblos/runtime/private-log'))
     .href;
   const stubs = {
-    '@gyblos/config/wallet':
+    '@gyblos/lab-harness/wallet':
       'export async function loadConfig(){return {rpcUrl:"https://forbidden.invalid/",addresses:{buyer:"synthetic",seller:"synthetic",authorizer:"synthetic"}}} export async function signer(){throw Error("Synthetic startup refusal")}',
     '@gyblos/payments-x402/chain': 'export async function assertProgram(){}',
     '@gyblos/runtime': 'export function isMain(){return false}',
