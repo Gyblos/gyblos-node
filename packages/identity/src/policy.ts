@@ -1,6 +1,6 @@
 // Owns the sponsorship decision: one sponsored registration per canonical device key and owner, a cap, a
 // budget, and a required online check answered by the node key. Must not know about RPC or storage.
-// Wiring is blocked until a real Iroh + catalog online check exists; see docs/stack.md.
+// Wiring is blocked until a real Iroh + catalog online check exists; see docs/identity.md.
 import { address, getAddressEncoder, isAddress } from '@solana/kit';
 
 import {
