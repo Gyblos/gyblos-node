@@ -55,12 +55,12 @@ URL, a signed offer, a config file or a committed environment file.
 
 `GYBLOS_RELAYS` optionally overrides the comma-separated HTTPS relay origins.
 Both roles must use the same set and credentials. The buyer accepts a signed
-offer's relay only if its normalized URL belongs to that configured set.
-Both buyer modes then dial that normalized URL (an equivalent origin, for
-example with a trailing slash added) rather than the offer's raw string. Relay
-URLs, the owned host allowlist and the QUIC port defaults live in
-`@gyblos/config`. The default set contains only `na1`. A future `na2` slot is
-added by listing it in `GYBLOS_RELAYS` (for example
+offer's relay only if its normalized URL belongs to that configured set. Both
+buyer modes then dial that normalized URL (an equivalent origin, for example
+with a trailing slash added) rather than the offer's raw string. Relay URLs, the
+owned host allowlist and the QUIC port defaults live in `@gyblos/config`. The
+default set contains only `na1`. A future `na2` slot is added by listing it in
+`GYBLOS_RELAYS` (for example
 `https://na1.relay.gyblos.com/,https://na2.relay.gyblos.com/`) once that relay
 exists; it receives the token because it is on the owned host allowlist. The
 built-in default changes only after `na2` is deployed.
