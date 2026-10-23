@@ -1,13 +1,17 @@
-// Owns offline egress cases regression cases; no funded wallets or live services.
+// Proves real native egress expiry and slot reclamation with deterministic setup.
+// Test-only preloading and process control never change product transport or payments.
 import assert from 'node:assert/strict';
-import { createSocket, type RemoteInfo } from 'node:dgram';
-import { once } from 'node:events';
 import test from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
 
-import type { BiStream, EndpointAddr, SendStream } from '@number0/iroh';
+import type {
+  BiStream,
+  Connection,
+  EndpointAddr,
+  SendStream,
+} from '@number0/iroh';
 
-import { HTTP_STATUS, LOCALHOST, P2P } from '@gyblos/config';
+import { HTTP_STATUS, P2P } from '@gyblos/config';
 
 import {
   fixture,
@@ -22,6 +26,10 @@ import {
   waitFor,
 } from './native-runtime.js';
 
+const CHUNK_BYTES = 64 * 1024;
+const STREAM_BYTES = 512 * 1024;
+const MAX_PRELOAD_BYTES = 32 * 1024 * 1024;
+
 const EXPIRY_MARGIN_MS = 1500;
 const TIMER_EARLY_MARGIN_MS = 20;
 const PROCESS_CONTROL_SKIP =
@@ -33,75 +41,31 @@ interface ObservedWrite {
   started: number;
   done: Promise<void>;
   settled: boolean;
-  finishSettled?: boolean;
-  finishSucceeded?: boolean;
 }
 
-// Only owned loopback UDP sockets are affected. No host firewall or relay changes.
-async function stalledReturnPath() {
-  assert.ok(NATIVE_CAPABILITY.sdk);
-  const { EndpointAddr } = NATIVE_CAPABILITY.sdk;
-  const front = createSocket('udp4');
-  const back = createSocket('udp4');
-  let peer: RemoteInfo | undefined;
-  let sellerPort = 0;
-  let paused = false;
-  let lastPacket: Buffer | undefined;
-  front.on('message', (packet, remote) => {
-    peer = remote;
-    back.send(packet, sellerPort, LOCALHOST);
-  });
-  back.on('message', (packet) => {
-    if (paused) lastPacket = packet;
-    else if (peer) front.send(packet, peer.port, peer.address);
-  });
-  const listening = Promise.all([
-    once(front, 'listening'),
-    once(back, 'listening'),
-  ]);
-  try {
-    front.bind(0, LOCALHOST);
-    back.bind(0, LOCALHOST);
-    await listening;
-  } catch (error) {
-    for (const socket of [front, back]) {
-      try {
-        socket.close();
-      } catch (closeError) {
-        if (
-          (closeError as NodeJS.ErrnoException).code !==
-          'ERR_SOCKET_DGRAM_NOT_RUNNING'
-        )
-          throw closeError;
-      }
+async function preloadNativeSendWindow(connection: Connection) {
+  const chunk = Array<number>(CHUNK_BYTES).fill(48);
+  const streams: SendStream[] = [];
+  let queuedBytes = 0;
+  let streamBytes = STREAM_BYTES;
+  let stream: SendStream | undefined;
+  while (queuedBytes < MAX_PRELOAD_BYTES) {
+    if (!stream || streamBytes >= STREAM_BYTES) {
+      stream = await within(connection.openUni());
+      streams.push(stream);
+      streamBytes = 0;
     }
-    await listening.catch(() => undefined);
-    throw error;
+    const written = await within(stream.write(chunk));
+    assert.ok(written > 0 && written <= chunk.length);
+    queuedBytes += written;
+    streamBytes += written;
+    // Below the per-stream allowance: a short write observes connection credit.
+    if (written < chunk.length)
+      return { streams, queuedBytes, partialBytes: written };
   }
-  return {
-    async address(seller: EndpointAddr) {
-      const address = seller
-        .directAddresses()
-        .find((value) => value.startsWith(LOCALHOST + ':'));
-      assert.ok(address, 'A loopback-only IPv4 seller address is required.');
-      sellerPort = Number(address.split(':').at(-1));
-      return new EndpointAddr(seller.id(), null, [
-        LOCALHOST + ':' + front.address().port,
-      ]);
-    },
-    pause() {
-      paused = true;
-    },
-    resume() {
-      paused = false;
-      if (lastPacket && peer) front.send(lastPacket, peer.port, peer.address);
-      lastPacket = undefined;
-    },
-    close() {
-      front.close();
-      back.close();
-    },
-  };
+  assert.fail(
+    'Native send credit must reach a partial write within the preload budget.',
+  );
 }
 
 export function registerEgressCases() {
@@ -115,44 +79,29 @@ export function registerEgressCases() {
     async (context) => {
       assert.ok(NATIVE_CAPABILITY.sdk);
       const { SendStream } = NATIVE_CAPABILITY.sdk;
-      let windowTime = 0;
-      context.mock.method(Date, 'now', () => windowTime);
-      const path = await stalledReturnPath();
-      let closeLab = async () => {};
+      const lab = await fixture({
+        freeBody: Buffer.alloc(P2P.responseBytes, 48),
+        holdFirstFreeResponse: true,
+      });
       let closePeer = async () => {};
       context.after(async () => {
-        path.resume();
         try {
           await closePeer();
         } finally {
-          try {
-            await closeLab();
-          } finally {
-            path.close();
-            context.mock.restoreAll();
-          }
+          await lab.close();
+          context.mock.restoreAll();
         }
       });
-      const lab = await fixture({
-        freeBody: Buffer.alloc(P2P.responseBytes, 48),
-      });
-      closeLab = lab.close;
       const writes: ObservedWrite[] = [];
       const originalWrite = SendStream.prototype.writeAll;
-      let returnPathPaused = false;
       context.mock.method(
         SendStream.prototype,
         'writeAll',
         function (this: SendStream, data: number[]) {
-          const response =
-            Buffer.from(data).subarray(0, 5).toString() === 'HTTP/';
-          if (response && !returnPathPaused) {
-            path.pause();
-            returnPathPaused = true;
-          }
+          const started = performance.now();
           const done = originalWrite.call(this, data);
-          if (response) {
-            const record = { started: performance.now(), done, settled: false };
+          if (Buffer.from(data).subarray(0, 5).toString() === 'HTTP/') {
+            const record = { started, done, settled: false };
             writes.push(record);
             const settled = () => {
               record.settled = true;
@@ -162,33 +111,9 @@ export function registerEgressCases() {
           return done;
         },
       );
-      let warmingUp = true;
-      const originalFinish = SendStream.prototype.finish;
-      context.mock.method(
-        SendStream.prototype,
-        'finish',
-        function (this: SendStream) {
-          const record = warmingUp ? writes.at(-1) : undefined;
-          const done = originalFinish.call(this);
-          const settled = (succeeded: boolean) =>
-            setImmediate(() => {
-              if (record) {
-                record.finishSucceeded = succeeded;
-                record.finishSettled = true;
-              }
-            });
-          if (record)
-            void done.then(
-              () => settled(true),
-              () => settled(false),
-            );
-          return done;
-        },
-      );
-      // Obtain only the seller's loopback descriptor; retire this unfunded probe.
       let target: EndpointAddr | undefined;
       const probe = await lab.client(undefined, async (address) => {
-        target = await path.address(address);
+        target = address; // Direct IPv4/IPv6 recovery is deliberately available.
         return address;
       });
       probe.connection.close(P2P.streamCloseCode, []);
@@ -197,60 +122,55 @@ export function registerEgressCases() {
       assert.ok(target);
       const unread = await unreadPeer(target);
       closePeer = unread.close;
-      let blocked: ObservedWrite | undefined;
-      // Only admission Date.now is advanced; native clocks and deadlines stay real.
-      for (let index = 0; index < P2P.requestsPerWindow * 2; index++) {
-        if (index > 0 && index % P2P.requestsPerWindow === 0)
-          windowTime += P2P.rateWindowMs;
-        await unread.request(index);
-        await waitFor(
-          () => writes.length > index,
-          undefined,
-          'native response write start',
-        );
-        const record = writes[index]!;
-        try {
-          await within(record.done, P2P.egressMs / 10);
-          await waitFor(
-            () => record.finishSettled === true,
-            undefined,
-            'native finish cleanup',
-          );
-          assert.equal(record.finishSucceeded, true);
-        } catch (error) {
-          if (!(error instanceof NativeTestDeadlineError)) throw error;
-          blocked = record;
-          break;
-        }
-      }
-      assert.ok(
-        blocked,
-        'The real native write must block within the bounded warm-up.',
+      // Handshakes finish outside the measured egress interval.
+      const holders: Awaited<ReturnType<typeof lab.client>>[] = [];
+      for (let index = 1; index < P2P.maxEgressConcurrent; index++)
+        holders.push(await lab.client());
+      await unread.request(0);
+      await waitFor(
+        () => lab.freeResponseHeld,
+        undefined,
+        'held free HTTP response',
       );
-      warmingUp = false;
-      unread.pause(); // Only the owned buyer child; prevents IPv6 path recovery too.
-      assert.equal(blocked.settled, false);
+      assert.equal(writes.length, 0);
+      unread.pause(); // Stop native ACKs on every path before occupying send credit.
       const server = lab.serverConnections.find(
         (connection) => connection.remoteId().toString() === unread.nodeId,
       );
       assert.ok(server);
+      const preload = await preloadNativeSendWindow(server);
+      // Retain all native send handles until cleanup, avoiding implicit stream reset.
+      context.after(() => {
+        void preload.streams.length;
+      });
+      assert.ok(preload.queuedBytes > 0 && preload.partialBytes > 0);
+      lab.releaseResponse();
+      await waitFor(
+        () => writes.length === 1,
+        undefined,
+        'native HTTP write start',
+      );
+      const blocked = writes[0]!;
+      await assert.rejects(
+        within(blocked.done, P2P.egressMs / 10),
+        NativeTestDeadlineError,
+      );
+      assert.equal(blocked.settled, false);
       assert.equal(server.closeReason(), null);
       await delay(
         Math.max(0, blocked.started + P2P.egressMs / 2 - performance.now()),
       );
-      // Seven independent incomplete ingress streams retain every other slot.
-      const holders: Awaited<ReturnType<typeof lab.client>>[] = [];
       const heldStreams: BiStream[] = [];
       const previousStreams = lab.serverStreams;
-      for (let index = 1; index < P2P.maxEgressConcurrent; index++) {
-        const holder = await lab.client();
-        holders.push(holder);
-        const stream = await holder.connection.openBi();
-        heldStreams.push(stream);
-        await stream.send.writeAll([
-          ...Buffer.from('POST /inference HTTP/1.1\r\n'),
-        ]);
-      }
+      await Promise.all(
+        holders.map(async (holder) => {
+          const stream = await holder.connection.openBi();
+          heldStreams.push(stream);
+          await stream.send.writeAll([
+            ...Buffer.from('POST /inference HTTP/1.1\r\n'),
+          ]);
+        }),
+      );
       await waitFor(
         () => lab.serverStreams === previousStreams + holders.length,
         undefined,
@@ -274,7 +194,6 @@ export function registerEgressCases() {
       );
       assert.notEqual(server.closeReason(), null);
       assert.equal(blocked.settled, true);
-      path.resume();
       unread.resume();
       await unread.closed();
       await waitFor(

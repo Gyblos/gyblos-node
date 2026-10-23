@@ -9,8 +9,12 @@
     "./constants": "./src/constants.ts",
     "./engine": "./src/engine.ts",
     "./errors": "./src/errors.ts",
+    "./models": "./src/models.ts",
     "./package.json": "./package.json",
+    "./public-records": "./src/public-records.ts",
+    "./public-types": "./src/public-types.ts",
     "./signing": "./src/signing.ts",
+    "./vectors/public-discovery-v1.json": "./vectors/public-discovery-v1.json",
     "./vectors/signed-inference-offer-v1.json": "./vectors/signed-inference-offer-v1.json",
     "./wire-usage": "./src/wire-usage.ts"
   }
