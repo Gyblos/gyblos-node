@@ -16,14 +16,14 @@ import {
   DEVNET_GENESIS,
   FINALIZED_COMMITMENT,
 } from '@gyblos/config';
-import type { FinancialGuardMessage } from '@gyblos/lab-harness/constants';
-import type { ChainInstruction } from '@gyblos/lab-harness/types';
 import { tokenAddress } from '@gyblos/payments-x402/accounting/chain';
+import type { FinancialGuardMessage } from '@gyblos/payments-x402/accounting/constants';
 import type { EscrowTokenTransaction } from '@gyblos/payments-x402/accounting/escrow-tokens';
 import {
   finalizedPaymentProof,
   type FinalizedPaymentExpectation,
 } from '@gyblos/payments-x402/accounting/finalized-proof';
+import type { ChainInstruction } from '@gyblos/payments-x402/accounting/types';
 import type { FinalizedChannelGuardMessage } from '@gyblos/payments-x402/constants';
 
 export interface PaymentTransaction extends EscrowTokenTransaction {
