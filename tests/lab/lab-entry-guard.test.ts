@@ -24,7 +24,12 @@ import { NODE_ERROR_CODES } from '@gyblos/node/constants';
 import { loadOrCreateKey } from '../../lab/tools/identity-keys.js';
 import { startLocalValidator } from './identity-validator.js';
 
-const LAB_ENVIRONMENT = ['GYBLOS_LAB_HOME', 'GYBLOS_GATE_CONFIG', 'PATH'];
+const LAB_ENVIRONMENT = [
+  'GYBLOS_HOME',
+  'GYBLOS_LAB_HOME',
+  'GYBLOS_GATE_CONFIG',
+  'PATH',
+];
 
 async function inLegacyLabCwd(
   options: { emptyLabHome: boolean; legacyFiles: readonly string[] },
@@ -35,6 +40,7 @@ async function inLegacyLabCwd(
   const saved = LAB_ENVIRONMENT.map((name) => [name, process.env[name]]);
   try {
     process.chdir(directory);
+    delete process.env.GYBLOS_HOME;
     delete process.env.GYBLOS_LAB_HOME;
     delete process.env.GYBLOS_GATE_CONFIG;
     await mkdir(LEGACY_LOCAL_PATHS.lab, { recursive: true });
