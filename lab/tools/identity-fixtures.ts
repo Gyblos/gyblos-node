@@ -16,6 +16,7 @@ import {
   PROGRAMS,
 } from '@gyblos/identity/constants';
 import { assertDevnet } from '@gyblos/payments-x402/chain';
+import { isMain } from '@gyblos/runtime';
 
 const FIXTURE = new URL(
   '../../tests/fixtures/identity-devnet-accounts.json',
@@ -76,4 +77,4 @@ async function main(): Promise<void> {
   console.log({ agents: agent.total, metadata: metadata.total });
 }
 
-await main();
+if (isMain(import.meta.url)) await main();

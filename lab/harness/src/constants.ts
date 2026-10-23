@@ -5,7 +5,7 @@ import {
   INFERENCE_CASES,
   MEASUREMENT_SCHEMA_VERSION,
 } from '@gyblos/buyer/constants';
-import { LOCAL_DIR } from '@gyblos/config';
+import { LOCAL_DIR, LOCALHOST } from '@gyblos/config';
 import {
   CONFIG_SCHEMA_VERSION,
   type ConfigAssetLabel,
@@ -136,7 +136,7 @@ export type FundingOperation =
 export type PublicCallOutcome =
   (typeof PUBLIC_CALL_OUTCOMES)[keyof typeof PUBLIC_CALL_OUTCOMES];
 
-// Gate-only paths, entrypoints, routes, funding floors and public endpoints (formerly in @gyblos/config).
+// Gate-only paths, entrypoints, routes, funding floors and public endpoints.
 export const LOCK_PATH = `${LOCAL_DIR}/buyer.lock`;
 
 export const JOURNAL_PATHS = {
@@ -215,4 +215,55 @@ export const GATE_ROUTES = {
   exact: '/api/exact',
   fixedDefinition: 'GET /api/generate',
   exactDefinition: 'GET /api/exact',
+} as const;
+
+// Gate-only timeouts, retries, limits, ports and hosts; product values stay in @gyblos/config.
+export const ACTUAL_ATOMIC = '4000';
+
+export const UPSTREAM_COMMIT = 'faa1c694c66a3732aaabbce93bdae140e521a67d';
+
+export const GATE_TIMEOUTS = {
+  publicRequest: 25_000,
+  publicPayment: 50_000,
+  artifactDownload: 60_000,
+  fixedStop: 5_000,
+  rpcCooldown: 12_000,
+  expiryGrace: 2_000,
+} as const;
+
+export const GATE_RETRIES = {
+  fixedStartup: 80,
+  exactSnapshot: 4,
+  exactSnapshotLastAttempt: 3,
+} as const;
+
+export const GATE_RETRY_DELAYS = { exactSnapshotBase: 1_000 } as const;
+
+export const GATE_HTTP_STATUS = { conflict: 409 } as const;
+
+export const GATE_FUNDING_LIMITS = {
+  airdropThreshold: 50_000_000n,
+  airdropLamports: 1_000_000_000,
+  mintAccountBytes: 82,
+  mintAccountSpace: 82n,
+  tokenDecimals: 6,
+  testMintAmount: 1_000_000n,
+} as const;
+
+export const GATE_DIAGNOSTIC_LIMITS = {
+  publicErrorMessageCharacters: 500,
+  errorStackEnd: 3,
+  transactionHistory: 50,
+  failureHistory: 10,
+} as const;
+
+export const GATE_PORTS = {
+  seller: 4021,
+  ollamaSetup: 11437,
+} as const;
+
+export const GATE_HOSTS = {
+  seller: `http://${LOCALHOST}:${GATE_PORTS.seller}`,
+  ollamaSetup: `http://${LOCALHOST}:${GATE_PORTS.ollamaSetup}`,
+  ollamaSetupBind: `${LOCALHOST}:${GATE_PORTS.ollamaSetup}`,
 } as const;

@@ -7,8 +7,6 @@ export const CHANNEL_PROGRAM = 'CHNLxYvVA28MJP9PrFuDXccuoGXAx7jBacfLEkahyGsX';
 
 export const DEVNET_USDC = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU';
 
-export const UPSTREAM_COMMIT = 'faa1c694c66a3732aaabbce93bdae140e521a67d';
-
 export const COMMITMENT = 'confirmed' as const;
 
 export const FINALIZED_COMMITMENT = 'finalized' as const;

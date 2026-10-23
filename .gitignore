@@ -26,7 +26,7 @@ AGENTS.local.md
 !/AGENTS.md
 !/CLAUDE.md
 
-# Preserve old and current evidence exclusions. Only curated reports are public.
+# Run evidence stays local (root and lab paths). Only curated reports are public.
 /evidence/
 /lab/evidence/*
 !/lab/evidence/gate-0006.json

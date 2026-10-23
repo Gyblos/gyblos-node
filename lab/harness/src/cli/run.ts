@@ -3,14 +3,7 @@
 import { type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 
-import {
-  HOSTS,
-  MAX_ATOMIC,
-  RETRIES,
-  RETRY_DELAYS,
-  ROUTES,
-  TIMEOUTS,
-} from '@gyblos/config';
+import { HOSTS, MAX_ATOMIC, RETRY_DELAYS, ROUTES } from '@gyblos/config';
 import { loadConfig } from '@gyblos/config/wallet';
 import { assertProgram, lamports, tokens } from '@gyblos/payments-x402/chain';
 import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
@@ -23,7 +16,13 @@ import {
   waitReady,
 } from '@gyblos/runtime';
 
-import { ENTRYPOINTS, FIXED_MIN_FACILITATOR_LAMPORTS } from '../constants.js';
+import {
+  ENTRYPOINTS,
+  FIXED_MIN_FACILITATOR_LAMPORTS,
+  GATE_HOSTS,
+  GATE_RETRIES,
+  GATE_TIMEOUTS,
+} from '../constants.js';
 import { executeGate } from './execute.js';
 
 export async function main() {
@@ -69,7 +68,7 @@ export async function main() {
     await waitReady(facilitator, `${HOSTS.facilitator}${ROUTES.health}`, {
       signal: controller.signal,
       expectedRunId: runId,
-      attempts: RETRIES.fixedStartup,
+      attempts: GATE_RETRIES.fixedStartup,
       requestTimeout: RETRY_DELAYS.confirmation,
       checkSignalCode: false,
       retryResponseErrors: false,
@@ -87,10 +86,10 @@ export async function main() {
     children.push(seller);
     seller.on('error', (error) => controller.abort(error));
     seller.stderr?.pipe(process.stderr);
-    await waitReady(seller, `${HOSTS.seller}${ROUTES.health}`, {
+    await waitReady(seller, `${GATE_HOSTS.seller}${ROUTES.health}`, {
       signal: controller.signal,
       expectedRunId: runId,
-      attempts: RETRIES.fixedStartup,
+      attempts: GATE_RETRIES.fixedStartup,
       requestTimeout: RETRY_DELAYS.confirmation,
       checkSignalCode: false,
       retryResponseErrors: false,
@@ -106,7 +105,7 @@ export async function main() {
     process.exitCode = 1;
   } finally {
     for (const child of children.reverse())
-      await stopChild(child, 'SIGTERM', TIMEOUTS.fixedStop);
+      await stopChild(child, 'SIGTERM', GATE_TIMEOUTS.fixedStop);
     dispose();
   }
 }

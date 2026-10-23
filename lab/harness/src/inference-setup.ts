@@ -6,10 +6,7 @@ import { basename, resolve } from 'node:path';
 
 import {
   FILE_MODES,
-  HOSTS,
   OLLAMA_MODELS_PATH,
-  PORTS,
-  RETRIES,
   ROUTES,
   TIMEOUTS,
   TOKENIZER_DIR,
@@ -19,7 +16,13 @@ import { createModelTokenizer, createOllama } from '@gyblos/engine-ollama';
 import { MODEL } from '@gyblos/engine-ollama/model';
 import { spawnChild, stopChild, waitReady } from '@gyblos/runtime';
 
-import { PUBLIC_ORIGINS } from './constants.js';
+import {
+  GATE_HOSTS,
+  GATE_PORTS,
+  GATE_RETRIES,
+  GATE_TIMEOUTS,
+  PUBLIC_ORIGINS,
+} from './constants.js';
 
 export async function setupInferenceGate() {
   const directory = TOKENIZER_DIR;
@@ -35,7 +38,7 @@ export async function setupInferenceGate() {
     const name = basename(path);
     const response = await fetch(
       `${PUBLIC_ORIGINS.tokenizer}/${MODEL.publicModel}/resolve/${MODEL.revision}/${name}`,
-      { signal: AbortSignal.timeout(TIMEOUTS.artifactDownload) },
+      { signal: AbortSignal.timeout(GATE_TIMEOUTS.artifactDownload) },
     );
     if (!response.ok) throw new Error('Pinned tokenizer download failed.');
     await writeFile(path, await response.text(), {
@@ -48,11 +51,11 @@ export async function setupInferenceGate() {
   });
   const environment = {
     ...process.env,
-    OLLAMA_HOST: HOSTS.ollamaSetupBind,
+    OLLAMA_HOST: GATE_HOSTS.ollamaSetupBind,
     OLLAMA_MODELS: resolve(OLLAMA_MODELS_PATH),
     OLLAMA_NO_CLOUD: '1',
   };
-  const origin = HOSTS.ollamaSetup;
+  const origin = GATE_HOSTS.ollamaSetup;
   let occupied = false;
   try {
     await fetch(`${origin}${ROUTES.ollamaVersion}`, {
@@ -63,7 +66,9 @@ export async function setupInferenceGate() {
     /* no listener */
   }
   if (occupied)
-    throw new Error(`Setup needs unused loopback port ${PORTS.ollamaSetup}.`);
+    throw new Error(
+      `Setup needs unused loopback port ${GATE_PORTS.ollamaSetup}.`,
+    );
   const server = spawnChild('ollama', ['serve'], {
     env: environment,
     stdio: 'ignore',
@@ -74,7 +79,7 @@ export async function setupInferenceGate() {
   });
   try {
     await waitReady(server, `${origin}${ROUTES.ollamaVersion}`, {
-      attempts: RETRIES.fixedStartup,
+      attempts: GATE_RETRIES.fixedStartup,
       parseBody: false,
       startupError: () => startupError,
       checkSignalCode: false,

@@ -1,23 +1,15 @@
 // Shared payment amounts, timeouts, retry counts, HTTP statuses, file modes and size limits.
 export const MAX_ATOMIC = '10000';
 
-export const ACTUAL_ATOMIC = '4000';
-
 export const TIMEOUTS = {
   rpc: 20_000,
   buyer: 120_000,
   inference: 180_000,
   startupPoll: 250,
   stop: 2000,
-  publicRequest: 25_000,
-  publicPayment: 50_000,
   events: 5_000,
   generation: 90_000,
-  artifactDownload: 60_000,
   readinessRequest: 500,
-  fixedStop: 5_000,
-  rpcCooldown: 12_000,
-  expiryGrace: 2_000,
 } as const;
 
 export const RETRIES = {
@@ -25,15 +17,11 @@ export const RETRIES = {
   rpc: 4,
   transaction: 4,
   startup: 120,
-  fixedStartup: 80,
-  exactSnapshot: 4,
-  exactSnapshotLastAttempt: 3,
 } as const;
 
 export const HTTP_STATUS = {
   ok: 200,
   paymentRequired: 402,
-  conflict: 409,
   misdirectedRequest: 421,
   tooManyRequests: 429,
   badGateway: 502,
@@ -45,7 +33,6 @@ export const HTTP_STATUS = {
 export const RETRY_DELAYS = {
   confirmation: 1_000,
   rpcBase: 1_500,
-  exactSnapshotBase: 1_000,
   transactionVisibility: 500,
 } as const;
 
@@ -70,21 +57,11 @@ export const PAYMENT_LIMITS = {
   maxWithdrawDelay: 900,
   maxTimeoutSeconds: 120,
   ceilingMultiplier: 2n,
-  airdropThreshold: 50_000_000n,
-  airdropLamports: 1_000_000_000,
-  mintAccountBytes: 82,
-  mintAccountSpace: 82n,
-  tokenDecimals: 6,
-  testMintAmount: 1_000_000n,
 } as const;
 
 export const DIAGNOSTIC_LIMITS = {
   rpcMessageCharacters: 180,
   recordedErrorCharacters: 1200,
-  publicErrorMessageCharacters: 500,
-  errorStackEnd: 3,
-  transactionHistory: 50,
-  failureHistory: 10,
 } as const;
 
 export const CHANNEL_STATUS = { open: 0, distributed: 3 } as const;

@@ -9,7 +9,6 @@ import {
   LOCALHOST,
   MAX_ATOMIC,
   ROUTES,
-  UPSTREAM_COMMIT,
   X402_SDK_VERSION,
 } from '@gyblos/config';
 import { WALLET_ROLES } from '@gyblos/config/constants';
@@ -24,6 +23,7 @@ import {
   CHALLENGE_STAGES,
   GATE_ROUTES,
   SCHEMA_VERSIONS,
+  UPSTREAM_COMMIT,
 } from './constants.js';
 import { createGateSeller } from './fixed-seller.js';
 import type { ChallengeEvidence } from './fixture-evidence-types.js';

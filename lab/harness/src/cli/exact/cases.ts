@@ -4,13 +4,7 @@ import assert from 'node:assert/strict';
 
 import { encodePaymentSignatureHeader } from '@x402/core/http';
 
-import {
-  COMMITMENT,
-  DEVNET,
-  explorerUrl,
-  HTTP_STATUS,
-  TIMEOUTS,
-} from '@gyblos/config';
+import { COMMITMENT, DEVNET, explorerUrl, HTTP_STATUS } from '@gyblos/config';
 import { WALLET_ROLES } from '@gyblos/config/constants';
 import { type ChainTransaction } from '@gyblos/payments-x402/accounting/types';
 import { confirm, rpc } from '@gyblos/payments-x402/chain';
@@ -27,6 +21,8 @@ import {
   EXACT_CASES,
   EXACT_PRICE,
   EXACT_REPLAY_SCOPE,
+  GATE_HTTP_STATUS,
+  GATE_TIMEOUTS,
   PUBLIC_CALL_OUTCOMES,
   RECONCILIATION_CLASSIFICATIONS,
 } from '../../constants.js';
@@ -188,9 +184,9 @@ export async function runProvider(context: ExactContext) {
       headers: {
         'PAYMENT-SIGNATURE': encodePaymentSignatureHeader(success.payload),
       },
-      signal: AbortSignal.timeout(TIMEOUTS.publicRequest),
+      signal: AbortSignal.timeout(GATE_TIMEOUTS.publicRequest),
     });
-    assert.equal(replay.status, HTTP_STATUS.conflict);
+    assert.equal(replay.status, GATE_HTTP_STATUS.conflict);
     const replayAfter = await snapshot(config, config.addresses.buyer);
     assert.deepEqual(replayAfter, replayBefore);
     assert.equal(host.handlerCalls(), handlers);
@@ -198,7 +194,7 @@ export async function runProvider(context: ExactContext) {
     cases.push({
       case: EXACT_CASES.REPLAY,
       status: CASE_STATUSES.PASSED,
-      httpStatus: HTTP_STATUS.conflict,
+      httpStatus: GATE_HTTP_STATUS.conflict,
       before: replayBefore,
       after: replayAfter,
       handlerDelta: 0,

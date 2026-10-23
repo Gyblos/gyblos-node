@@ -3,7 +3,6 @@
 import { discoverChannelsByRentPayer, toFacilitatorSvmSigner } from '@x402/svm';
 
 import {
-  ACTUAL_ATOMIC,
   CHANNEL_STATUS,
   DEVNET,
   explorerUrl,
@@ -11,7 +10,6 @@ import {
   HTTP_STATUS,
   MAX_ATOMIC,
   ROUTES,
-  UPSTREAM_COMMIT,
   X402_SDK_VERSION,
 } from '@gyblos/config';
 import { WALLET_ROLES } from '@gyblos/config/constants';
@@ -33,14 +31,17 @@ import { ProtocolError } from '@gyblos/protocol/errors';
 import { saveJson } from '@gyblos/runtime';
 
 import {
+  ACTUAL_ATOMIC,
   EVIDENCE_STATUSES,
   FAILED_REQUEST_PATH,
   FIXED_MIN_FACILITATOR_LAMPORTS,
   fixedEvidencePath,
+  GATE_HOSTS,
   GATE_ROUTES,
   JOURNAL_PATHS,
   LOCK_PATH,
   SCHEMA_VERSIONS,
+  UPSTREAM_COMMIT,
 } from '../constants.js';
 import type { FixedGateEvidence } from '../fixture-evidence-types.js';
 import { runGate } from '../gate.js';
@@ -109,7 +110,7 @@ async function executeLocked(signal?: AbortSignal) {
     async request() {
       signal?.throwIfAborted();
       const response = await buyer.request(
-        `${HOSTS.seller}${GATE_ROUTES.fixed}`,
+        `${GATE_HOSTS.seller}${GATE_ROUTES.fixed}`,
         signal,
       );
       if (

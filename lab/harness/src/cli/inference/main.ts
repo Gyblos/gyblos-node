@@ -12,7 +12,6 @@ import { measurementSalt } from '@gyblos/buyer/measurements';
 import { createCases } from '@gyblos/buyer/synthetic-cases';
 import {
   DEVNET_USDC,
-  DIAGNOSTIC_LIMITS,
   HOSTS,
   LOCALHOST,
   OLLAMA_MODELS_PATH,
@@ -49,6 +48,7 @@ import {
   ENTRYPOINTS,
   EVIDENCE_PATHS,
   EVIDENCE_STATUSES,
+  GATE_DIAGNOSTIC_LIMITS,
   INFERENCE_EVIDENCE_CODES,
   JOURNAL_PATHS,
   keyPath,
@@ -260,7 +260,7 @@ export async function main() {
         error instanceof Error
           ? error.stack
               ?.split('\n')
-              .slice(1, DIAGNOSTIC_LIMITS.errorStackEnd)
+              .slice(1, GATE_DIAGNOSTIC_LIMITS.errorStackEnd)
               .map((line) => line.trim())
           : [];
       await saveJson(evidencePath, evidence);

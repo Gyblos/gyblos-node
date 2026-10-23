@@ -73,9 +73,8 @@ time; a second waits and a third gets 429. Malformed JSON gets 400
 `MALFORMED_JSON`. A transport failure returns 503 and is treated as an uncertain
 payment, never retried.
 
-One paid synthetic call through a running proxy:
-`node --import tsx apps/buyer/src/call.ts 0` (case 0, 1 or 2). It records
-journals and measurements in `.local/p2p/`.
+One paid synthetic call through a running proxy: `pnpm buyer:call 0` (case 0, 1
+or 2). It records journals and measurements in `.local/p2p/`.
 
 ## Relays
 

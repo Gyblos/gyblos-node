@@ -27,12 +27,14 @@
     "gate:challenge": "node --import tsx lab/harness/scripts/challenge.ts",
     "gate:failures": "node --import tsx lab/harness/scripts/failures.ts",
     "gate:exact": "node --import tsx lab/harness/src/cli/exact.ts",
-    "p2p:reconcile": "node --import tsx apps/buyer/src/reconcile.ts",
     "identity:devnet-run": "node --import tsx lab/tools/identity-devnet-run.ts",
+    "identity:fixtures": "node --import tsx lab/tools/identity-fixtures.ts",
     "boundaries": "node --import tsx tooling/check-boundaries.ts",
     "tooling:test": "node --import tsx --test \"tooling/**/*.test.ts\"",
     "node:start": "node --import tsx apps/node/src/main.ts",
-    "buyer:start": "node --import tsx apps/buyer/src/main.ts"
+    "buyer:start": "node --import tsx apps/buyer/src/main.ts",
+    "buyer:call": "node --import tsx apps/buyer/src/call.ts",
+    "buyer:reconcile": "node --import tsx apps/buyer/src/reconcile.ts"
   },
   "dependencies": {
     "@gyblos/core": "workspace:*",

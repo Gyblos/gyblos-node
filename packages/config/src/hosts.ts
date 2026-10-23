@@ -2,19 +2,14 @@
 export const LOCALHOST = '127.0.0.1';
 
 export const PORTS = {
-  seller: 4021,
   facilitator: 4022,
   ollama: 11436,
-  ollamaSetup: 11437,
 } as const;
 
 export const HOSTS = {
-  seller: formatHostUrl(PORTS.seller),
   facilitator: formatHostUrl(PORTS.facilitator),
   ollama: formatHostUrl(PORTS.ollama),
-  ollamaSetup: formatHostUrl(PORTS.ollamaSetup),
   ollamaBind: `${LOCALHOST}:${PORTS.ollama}`,
-  ollamaSetupBind: `${LOCALHOST}:${PORTS.ollamaSetup}`,
 } as const;
 
 export const IPV6_LOOPBACK = '[::1]';

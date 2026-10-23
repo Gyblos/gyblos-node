@@ -20,6 +20,7 @@ import {
   type EXACT_UNTRUSTED_CASES,
   type ExactEvidenceErrorCode,
   type FACILITATOR_STATUSES,
+  type GATE_HTTP_STATUS,
 } from './constants.js';
 import type {
   AuthorizationMetadata,
@@ -83,7 +84,7 @@ export type ExactCaseResult =
   | {
       case: typeof EXACT_CASES.REPLAY;
       status: typeof CASE_STATUSES.PASSED;
-      httpStatus: typeof HTTP_STATUS.conflict;
+      httpStatus: typeof GATE_HTTP_STATUS.conflict;
       before: ExactSnapshot;
       after: ExactSnapshot;
       handlerDelta: 0;

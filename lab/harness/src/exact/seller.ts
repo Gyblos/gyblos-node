@@ -14,7 +14,6 @@ import express from 'express';
 import {
   DEVNET,
   DEVNET_USDC,
-  DIAGNOSTIC_LIMITS,
   HTTP_STATUS,
   PAYMENT_LIMITS,
   ROUTES,
@@ -29,6 +28,8 @@ import { requireLoopbackHost } from '@gyblos/runtime/loopback-host';
 
 import {
   EXACT_PRICE,
+  GATE_DIAGNOSTIC_LIMITS,
+  GATE_HTTP_STATUS,
   GATE_ROUTES,
   PUBLIC_CALL_OUTCOMES,
 } from '../constants.js';
@@ -110,7 +111,7 @@ export class AuditedPublicFacilitator extends HTTPFacilitatorClient {
       transaction: errorDetails.transaction,
       message: (errorDetails.invalidMessage ?? errorDetails.errorMessage)
         ?.replace(/https?:\/\/\S+/g, '[URL]')
-        .slice(0, DIAGNOSTIC_LIMITS.publicErrorMessageCharacters),
+        .slice(0, GATE_DIAGNOSTIC_LIMITS.publicErrorMessageCharacters),
     });
   }
 }
@@ -149,7 +150,7 @@ export async function createExactSeller(options: {
       }
       const authorizationId = exactAuthorizationId(payload.payload.transaction);
       if (authorizations.has(authorizationId)) {
-        response.status(HTTP_STATUS.conflict).json({
+        response.status(GATE_HTTP_STATUS.conflict).json({
           error:
             'Authorization already attempted; reconcile instead of replaying.',
         });

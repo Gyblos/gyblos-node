@@ -25,7 +25,7 @@ Run from the buyer's working directory, with the original role, trust, offer,
 journal and call history in place:
 
 ```sh
-pnpm p2p:reconcile --deposit DEPOSIT_SIGNATURE --claim CLAIM_SIGNATURE
+pnpm buyer:reconcile --deposit DEPOSIT_SIGNATURE --claim CLAIM_SIGNATURE
 ```
 
 It reads finalized transactions and checks token and SOL movements, the
@@ -42,7 +42,7 @@ missing identities. Missing history is never invented.
 
 ```sh
 umask 077
-pnpm --silent p2p:reconcile --audit-only --deposit DEPOSIT_SIGNATURE --claim CLAIM_SIGNATURE > .local/p2p/finalized-audit.json
+pnpm --silent buyer:reconcile --audit-only --deposit DEPOSIT_SIGNATURE --claim CLAIM_SIGNATURE > .local/p2p/finalized-audit.json
 ```
 
 This prints the verified financial proof for a charged or zero-charge payment
@@ -69,7 +69,7 @@ deliberate: unsupported cases need manual investigation, not an inferred refund.
 
 ## Stale locks
 
-Default `p2p:reconcile` can remove a stale `buyer.lock` only after proving its
+Default `buyer:reconcile` can remove a stale `buyer.lock` only after proving its
 owner process is gone: the file must be private, regular and unchanged, and its
 host, boot and PID identity must match (Linux: boot ID and PID namespace; macOS:
 boot session). An audit line is written before removal. Legacy, mismatched or

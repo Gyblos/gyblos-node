@@ -2,3 +2,10 @@ packages:
   - apps/*
   - packages/*
   - lab/harness
+
+# @x402/svm pulls @solana-program/token-2022, whose @solana/sysvars ^5 peer is
+# otherwise unmet; pin the version @solana/kit 5.1.0 already uses.
+packageExtensions:
+  '@x402/svm@2.28.0':
+    dependencies:
+      '@solana/sysvars': 5.1.0

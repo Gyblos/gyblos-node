@@ -22,7 +22,6 @@ import {
 import {
   COMMITMENT,
   DEVNET_TREASURY_OWNER,
-  PAYMENT_LIMITS,
   TOKEN_PROGRAM_ADDRESS,
 } from '@gyblos/config';
 import { CONFIG_ASSET_LABELS, WALLET_ROLES } from '@gyblos/config/constants';
@@ -36,7 +35,11 @@ import {
 } from '@gyblos/payments-x402/chain';
 import { saveJson } from '@gyblos/runtime';
 
-import { FUNDING_OPERATIONS, type FundingOperation } from './constants.js';
+import {
+  FUNDING_OPERATIONS,
+  GATE_FUNDING_LIMITS,
+  type FundingOperation,
+} from './constants.js';
 
 interface FundingLogEntry {
   operation: FundingOperation;
@@ -51,11 +54,11 @@ export async function fundGate() {
     const feePayer = await signer(config, WALLET_ROLES.FACILITATOR);
     if (
       (await lamports(config.rpcUrl, feePayer.address)) <
-      PAYMENT_LIMITS.airdropThreshold
+      GATE_FUNDING_LIMITS.airdropThreshold
     ) {
       const signature = await rpc<string>(config.rpcUrl, 'requestAirdrop', [
         feePayer.address,
-        PAYMENT_LIMITS.airdropLamports,
+        GATE_FUNDING_LIMITS.airdropLamports,
       ]);
       await confirm(config.rpcUrl, signature);
       console.log(
@@ -76,7 +79,7 @@ export async function fundGate() {
         const rent = await rpc<number>(
           config.rpcUrl,
           'getMinimumBalanceForRentExemption',
-          [PAYMENT_LIMITS.mintAccountBytes],
+          [GATE_FUNDING_LIMITS.mintAccountBytes],
         );
         const [buyerAta] = await findAssociatedTokenPda({
           owner: address(config.addresses.buyer),
@@ -90,12 +93,12 @@ export async function fundGate() {
                   payer: feePayer,
                   newAccount: mint,
                   lamports: BigInt(rent),
-                  space: PAYMENT_LIMITS.mintAccountSpace,
+                  space: GATE_FUNDING_LIMITS.mintAccountSpace,
                   programAddress: TOKEN_PROGRAM_ADDRESS,
                 }),
                 getInitializeMint2Instruction({
                   mint: mint.address,
-                  decimals: PAYMENT_LIMITS.tokenDecimals,
+                  decimals: GATE_FUNDING_LIMITS.tokenDecimals,
                   mintAuthority: feePayer.address,
                   freezeAuthority: null,
                 }),
@@ -128,7 +131,7 @@ export async function fundGate() {
                   mint: mint.address,
                   token: buyerAta,
                   mintAuthority: feePayer,
-                  amount: PAYMENT_LIMITS.testMintAmount,
+                  amount: GATE_FUNDING_LIMITS.testMintAmount,
                 }),
               ]
             : []),
