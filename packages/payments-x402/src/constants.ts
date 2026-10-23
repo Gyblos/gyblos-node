@@ -101,8 +101,3 @@ export {
   MAX_ATOMIC,
   ACTUAL_ATOMIC,
 } from '@gyblos/config';
-
-export {
-  PROTOCOL_ERROR_CODES as GATE_ERROR_CODES,
-  type ProtocolErrorCode as GateErrorCode,
-} from '@gyblos/protocol/constants';

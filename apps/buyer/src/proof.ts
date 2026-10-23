@@ -12,8 +12,8 @@ import {
   transaction,
   transactionTransfers,
 } from '@gyblos/payments-x402/accounting/chain';
-import { GateError } from '@gyblos/payments-x402/chain';
-import { GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
+import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
+import { ProtocolError } from '@gyblos/protocol/errors';
 
 export interface PaymentAccounts {
   rpcUrl: string;
@@ -91,8 +91,8 @@ export async function paymentProof(
       await delay(RETRY_DELAYS.transactionVisibility);
   }
   if (!deposit)
-    throw new GateError(
-      GATE_ERROR_CODES.TRANSACTION_UNKNOWN,
+    throw new ProtocolError(
+      PROTOCOL_ERROR_CODES.TRANSACTION_UNKNOWN,
       'Confirmed deposit is not yet visible; reconcile before another authorization.',
     );
   await observed?.({ depositSignature: deposit.signature, claimSignature });

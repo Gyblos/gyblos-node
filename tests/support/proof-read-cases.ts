@@ -8,8 +8,8 @@ import {
   type PaymentProofObservation,
 } from '@gyblos/buyer/proof';
 import { COMMITMENT, RETRIES, TOKEN_PROGRAM_ADDRESS } from '@gyblos/config';
-import { GateError } from '@gyblos/payments-x402/chain';
-import { GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
+import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
+import { ProtocolError } from '@gyblos/protocol/errors';
 
 import { paymentFixture } from './payment-fixture.js';
 
@@ -200,8 +200,8 @@ export function registerProofReadCases() {
       await assert.rejects(
         run,
         (error: unknown) =>
-          error instanceof GateError &&
-          error.code === GATE_ERROR_CODES.TRANSACTION_UNKNOWN,
+          error instanceof ProtocolError &&
+          error.code === PROTOCOL_ERROR_CODES.TRANSACTION_UNKNOWN,
       );
       assert.equal(histories(), RETRIES.transaction);
     });

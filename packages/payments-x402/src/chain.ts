@@ -6,15 +6,10 @@ import {
   RETRY_DELAYS,
   TIMEOUTS,
 } from '@gyblos/config';
-import { ProtocolError as GateError } from '@gyblos/protocol/errors';
+import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
+import { ProtocolError } from '@gyblos/protocol/errors';
 
-import {
-  CHANNEL_PROGRAM,
-  DEVNET_GENESIS,
-  GATE_ERROR_CODES,
-} from './constants.js';
-
-export { ProtocolError as GateError } from '@gyblos/protocol/errors';
+import { CHANNEL_PROGRAM, DEVNET_GENESIS } from './constants.js';
 
 export async function rpc<T>(
   url: string,
@@ -28,8 +23,8 @@ export async function rpc<T>(
     signal: AbortSignal.timeout(TIMEOUTS.rpc),
   });
   if (!response.ok)
-    throw new GateError(
-      GATE_ERROR_CODES.RPC_HTTP,
+    throw new ProtocolError(
+      PROTOCOL_ERROR_CODES.RPC_HTTP,
       `${method}: HTTP ${response.status}`,
     );
   const body = (await response.json()) as {
@@ -37,8 +32,8 @@ export async function rpc<T>(
     error?: { code: number; message: string };
   };
   if (body.error)
-    throw new GateError(
-      GATE_ERROR_CODES.RPC_ERROR,
+    throw new ProtocolError(
+      PROTOCOL_ERROR_CODES.RPC_ERROR,
       `${method}: RPC ${body.error.code} ${body.error.message.slice(0, DIAGNOSTIC_LIMITS.rpcMessageCharacters)}`,
     );
   return body.result;
@@ -47,8 +42,8 @@ export async function rpc<T>(
 export async function assertDevnet(url: string): Promise<void> {
   const genesis = await rpc<string>(url, 'getGenesisHash');
   if (genesis !== DEVNET_GENESIS)
-    throw new GateError(
-      GATE_ERROR_CODES.WRONG_CLUSTER,
+    throw new ProtocolError(
+      PROTOCOL_ERROR_CODES.WRONG_CLUSTER,
       'Only Solana devnet is allowed.',
     );
 }
@@ -73,8 +68,8 @@ export async function assertProgram(url: string): Promise<void> {
   await assertDevnet(url);
   const program = await account(url, CHANNEL_PROGRAM);
   if (!program?.executable)
-    throw new GateError(
-      GATE_ERROR_CODES.PROGRAM_UNAVAILABLE,
+    throw new ProtocolError(
+      PROTOCOL_ERROR_CODES.PROGRAM_UNAVAILABLE,
       'Canonical payment-channels program is not executable.',
     );
 }
@@ -131,8 +126,8 @@ export async function confirm(
     ]);
     const status = result.value[0];
     if (status?.err)
-      throw new GateError(
-        GATE_ERROR_CODES.TRANSACTION_FAILED,
+      throw new ProtocolError(
+        PROTOCOL_ERROR_CODES.TRANSACTION_FAILED,
         options.failedMessage ?? `Transaction failed: ${signature}`,
       );
     if (status && [COMMITMENT, 'finalized'].includes(status.confirmationStatus))
@@ -141,8 +136,8 @@ export async function confirm(
       setTimeout(resolve, RETRY_DELAYS.confirmation),
     );
   }
-  throw new GateError(
-    GATE_ERROR_CODES.TRANSACTION_UNKNOWN,
+  throw new ProtocolError(
+    PROTOCOL_ERROR_CODES.TRANSACTION_UNKNOWN,
     options.unknownMessage ??
       `Confirmation unknown; reconcile before retrying: ${signature}`,
   );

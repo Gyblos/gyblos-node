@@ -20,13 +20,15 @@ import {
   AuditedPublicFacilitator,
   createExactSeller,
 } from '@gyblos/node/http/exact';
-import { assertDevnet, GateError, tokens } from '@gyblos/payments-x402/chain';
-import { DEVNET_USDC, GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
+import { assertDevnet, tokens } from '@gyblos/payments-x402/chain';
+import { DEVNET_USDC } from '@gyblos/payments-x402/constants';
 import {
   assertExactSupport,
   PUBLIC_FACILITATORS,
 } from '@gyblos/payments-x402/exact/index';
 import { withExclusiveLock } from '@gyblos/payments-x402/recovery/lock';
+import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
+import { ProtocolError } from '@gyblos/protocol/errors';
 import { UNKNOWN_ERROR_NAME } from '@gyblos/runtime/constants';
 
 import { loadConfig, saveJson } from '../../config.js';
@@ -70,8 +72,8 @@ export async function main() {
           previousJournal.state,
         )
       )
-        throw new GateError(
-          GATE_ERROR_CODES.UNRESOLVED_EXACT,
+        throw new ProtocolError(
+          PROTOCOL_ERROR_CODES.UNRESOLVED_EXACT,
           'Previous exact payment is uncertain. Reconcile before another attempt.',
         );
     } catch (error) {
@@ -101,8 +103,8 @@ export async function main() {
         providers.push({ ...provider, supported });
       } catch (error) {
         if (
-          error instanceof GateError &&
-          error.code === GATE_ERROR_CODES.SUPPORT_CHANGED
+          error instanceof ProtocolError &&
+          error.code === PROTOCOL_ERROR_CODES.SUPPORT_CHANGED
         )
           throw error;
         evidence.facilitators.push({
@@ -114,8 +116,8 @@ export async function main() {
       }
     }
     if (!providers.length)
-      throw new GateError(
-        GATE_ERROR_CODES.NO_PUBLIC_FACILITATOR,
+      throw new ProtocolError(
+        PROTOCOL_ERROR_CODES.NO_PUBLIC_FACILITATOR,
         'Both public facilitators unavailable.',
       );
     evidence.setupTransaction = await prepareExactAccounts(config);
@@ -124,8 +126,8 @@ export async function main() {
       (await tokens(config.rpcUrl, config.addresses.buyer, DEVNET_USDC)) <
       BigInt(EXACT_PRICE)
     )
-      throw new GateError(
-        GATE_ERROR_CODES.NEEDS_CIRCLE_USDC,
+      throw new ProtocolError(
+        PROTOCOL_ERROR_CODES.NEEDS_CIRCLE_USDC,
         `Fund buyer ${config.addresses.buyer} using faucet.circle.com on Solana Devnet.`,
       );
     for (const provider of providers) {
@@ -142,8 +144,8 @@ export async function main() {
         });
       } catch (error) {
         if (
-          error instanceof GateError &&
-          error.code === GATE_ERROR_CODES.SUPPORT_CHANGED
+          error instanceof ProtocolError &&
+          error.code === PROTOCOL_ERROR_CODES.SUPPORT_CHANGED
         )
           throw error;
         evidence.results.push({
@@ -180,8 +182,8 @@ export async function main() {
         await new Promise<void>((resolve) => server.close(() => resolve()));
       }
     }
-    throw new GateError(
-      GATE_ERROR_CODES.PUBLIC_PROVIDERS_REJECTED,
+    throw new ProtocolError(
+      PROTOCOL_ERROR_CODES.PUBLIC_PROVIDERS_REJECTED,
       'No public facilitator completed the exact payment; inspect evidence.',
     );
   }
@@ -196,12 +198,12 @@ export async function main() {
       evidence.status = EVIDENCE_STATUSES.BLOCKED;
     evidence.error = {
       code:
-        error instanceof GateError
+        error instanceof ProtocolError
           ? error.code
           : EXACT_EVIDENCE_CODES.GATE_ERROR,
       name: error instanceof Error ? error.name : UNKNOWN_ERROR_NAME,
       message:
-        error instanceof GateError
+        error instanceof ProtocolError
           ? error.message
           : 'Check public results and local journal; no automatic retry.',
     };

@@ -6,15 +6,13 @@ import {
 } from '@x402/core/http';
 
 import { HTTP_STATUS, TIMEOUTS } from '@gyblos/config';
-import { GateError } from '@gyblos/payments-x402/chain';
-import {
-  GATE_ERROR_CODES,
-  PUBLIC_CALL_OUTCOMES,
-} from '@gyblos/payments-x402/constants';
+import { PUBLIC_CALL_OUTCOMES } from '@gyblos/payments-x402/constants';
 import {
   createExactBuyer,
   validateExactTerms,
 } from '@gyblos/payments-x402/exact/index';
+import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
+import { ProtocolError } from '@gyblos/protocol/errors';
 
 import { signer } from '../../config.js';
 import {
@@ -81,8 +79,8 @@ export function createPaidRequest(
       calls.some((call) => call.outcome === PUBLIC_CALL_OUTCOMES.UNCERTAIN) ||
       response.status >= HTTP_STATUS.internalServerError
     )
-      throw new GateError(
-        GATE_ERROR_CODES.PUBLIC_OUTCOME_UNCERTAIN,
+      throw new ProtocolError(
+        PROTOCOL_ERROR_CODES.PUBLIC_OUTCOME_UNCERTAIN,
         'Public facilitator response is uncertain; reconcile on-chain.',
       );
     return {

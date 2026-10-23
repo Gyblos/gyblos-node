@@ -9,7 +9,7 @@ import {
   INFERENCE_CASES,
   MEASUREMENT_SCHEMA_VERSION,
 } from '@gyblos/node/constants';
-import { type GateErrorCode } from '@gyblos/payments-x402/constants';
+import { type ProtocolErrorCode } from '@gyblos/protocol/constants';
 
 export const EXACT_EVIDENCE_CODES = {
   GATE_ERROR: 'GATE_ERROR',
@@ -97,11 +97,11 @@ export const SCHEMA_VERSIONS = {
 export const EXACT_REPLAY_SCOPE = 'same-process replay guard' as const;
 
 export type ExactEvidenceErrorCode =
-  | GateErrorCode
+  | ProtocolErrorCode
   | (typeof EXACT_EVIDENCE_CODES)[keyof typeof EXACT_EVIDENCE_CODES];
 
 export type InferenceEvidenceErrorCode =
-  | GateErrorCode
+  | ProtocolErrorCode
   | (typeof INFERENCE_EVIDENCE_CODES)[keyof typeof INFERENCE_EVIDENCE_CODES];
 
 export type EvidenceStatus =

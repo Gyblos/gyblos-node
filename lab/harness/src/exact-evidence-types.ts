@@ -8,8 +8,8 @@ import type {
 import type { HTTP_STATUS } from '@gyblos/config';
 import type { EXACT_PRICE } from '@gyblos/core/constants';
 import type { ChainTransaction } from '@gyblos/payments-x402/accounting/types';
-import type { GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
 import type { PublicCall } from '@gyblos/payments-x402/exact/types';
+import type { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
 
 import type {
   CASE_STATUSES,
@@ -46,7 +46,7 @@ export type ExactCaseResult =
       case: typeof EXACT_CASES.INSUFFICIENT_USDC;
       status: typeof CASE_STATUSES.PASSED;
       enforcement: typeof EXACT_ENFORCEMENT.BUYER_PREFLIGHT;
-      reason: typeof GATE_ERROR_CODES.INSUFFICIENT_EXACT_USDC;
+      reason: typeof PROTOCOL_ERROR_CODES.INSUFFICIENT_EXACT_USDC;
       signed: false;
       before: ExactSnapshot;
       after: ExactSnapshot;

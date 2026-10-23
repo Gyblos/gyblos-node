@@ -9,8 +9,8 @@ import {
   transaction,
   transactionTransfers,
 } from '@gyblos/payments-x402/accounting/chain';
-import { GateError } from '@gyblos/payments-x402/chain';
-import { GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
+import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
+import { ProtocolError } from '@gyblos/protocol/errors';
 
 import { registerProofReadCases } from './support/proof-read-cases.js';
 import { registerRentCases } from './support/rent-cases.js';
@@ -169,8 +169,8 @@ void test('bounded transaction visibility retries preserve unknown state and do 
         'sig',
       ),
       (error: unknown) =>
-        error instanceof GateError &&
-        error.code === GATE_ERROR_CODES.TRANSACTION_UNKNOWN,
+        error instanceof ProtocolError &&
+        error.code === PROTOCOL_ERROR_CODES.TRANSACTION_UNKNOWN,
     );
     assert.equal(calls, 4);
     for (const tx of [

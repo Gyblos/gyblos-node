@@ -111,6 +111,9 @@ importers:
       '@gyblos/payments-x402':
         specifier: workspace:*
         version: link:../../packages/payments-x402
+      '@gyblos/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
       '@gyblos/runtime':
         specifier: workspace:*
         version: link:../../packages/runtime
@@ -168,6 +171,9 @@ importers:
       '@gyblos/payments-x402':
         specifier: workspace:*
         version: link:../../packages/payments-x402
+      '@gyblos/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
       '@gyblos/runtime':
         specifier: workspace:*
         version: link:../../packages/runtime

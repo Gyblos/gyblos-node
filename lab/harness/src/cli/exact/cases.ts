@@ -6,14 +6,15 @@ import { encodePaymentSignatureHeader } from '@x402/core/http';
 
 import { COMMITMENT, HTTP_STATUS, TIMEOUTS } from '@gyblos/config';
 import { EXACT_PRICE } from '@gyblos/core/constants';
-import { confirm, explorer, GateError, rpc } from '@gyblos/payments-x402/chain';
+import { confirm, explorer, rpc } from '@gyblos/payments-x402/chain';
 import {
   DEVNET,
-  GATE_ERROR_CODES,
   PUBLIC_CALL_OPERATIONS,
   PUBLIC_CALL_OUTCOMES,
 } from '@gyblos/payments-x402/constants';
 import { assertExactFallbackSafe } from '@gyblos/payments-x402/exact/index';
+import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
+import { ProtocolError } from '@gyblos/protocol/errors';
 
 import {
   CASE_STATUSES,
@@ -77,8 +78,8 @@ export async function runProvider(context: ExactContext) {
         success.metadata.buyerSignature,
       );
       if (reconciliation.matches.length)
-        throw new GateError(
-          GATE_ERROR_CODES.PUBLIC_OUTCOME_UNCERTAIN,
+        throw new ProtocolError(
+          PROTOCOL_ERROR_CODES.PUBLIC_OUTCOME_UNCERTAIN,
           'Payment transaction observed without successful delivery.',
         );
       cases.push({

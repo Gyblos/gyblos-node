@@ -21,20 +21,20 @@ import {
   assertProgram,
   confirm,
   explorer,
-  GateError,
   lamports,
   tokens,
 } from '@gyblos/payments-x402/chain';
 import {
   ACTUAL_ATOMIC,
   DEVNET,
-  GATE_ERROR_CODES,
   MAX_ATOMIC,
   UPSTREAM_COMMIT,
 } from '@gyblos/payments-x402/constants';
 import type { SettlementEvent } from '@gyblos/payments-x402/facilitator';
 import { withExclusiveLock } from '@gyblos/payments-x402/recovery/lock';
 import { validateSettlement } from '@gyblos/payments-x402/trust';
+import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
+import { ProtocolError } from '@gyblos/protocol/errors';
 
 import { loadConfig, saveJson, signer } from '../config.js';
 import {
@@ -80,16 +80,16 @@ async function executeLocked(signal?: AbortSignal) {
         (await lamports(config.rpcUrl, config.addresses.facilitator)) <
         FIXED_MIN_FACILITATOR_LAMPORTS
       )
-        throw new GateError(
-          GATE_ERROR_CODES.NEEDS_SOL,
+        throw new ProtocolError(
+          PROTOCOL_ERROR_CODES.NEEDS_SOL,
           `Fund facilitator ${config.addresses.facilitator} with devnet SOL.`,
         );
       if (
         (await tokens(config.rpcUrl, config.addresses.buyer, config.mint)) <
         BigInt(MAX_ATOMIC)
       )
-        throw new GateError(
-          GATE_ERROR_CODES.NEEDS_TOKENS,
+        throw new ProtocolError(
+          PROTOCOL_ERROR_CODES.NEEDS_TOKENS,
           'Buyer does not have enough test tokens for the ceiling.',
         );
     },
@@ -128,8 +128,8 @@ async function executeLocked(signal?: AbortSignal) {
         console.error(
           JSON.stringify({ status: response.status, events: diagnostics }),
         );
-        throw new GateError(
-          GATE_ERROR_CODES.PAID_REQUEST_FAILED,
+        throw new ProtocolError(
+          PROTOCOL_ERROR_CODES.PAID_REQUEST_FAILED,
           `Paid request HTTP ${response.status}; inspect journal and chain before retrying.`,
         );
       }
@@ -157,8 +157,8 @@ async function executeLocked(signal?: AbortSignal) {
         !claim?.transaction ||
         claim.transaction !== response.settlement.transaction
       )
-        throw new GateError(
-          GATE_ERROR_CODES.MISSING_EVIDENCE,
+        throw new ProtocolError(
+          PROTOCOL_ERROR_CODES.MISSING_EVIDENCE,
           'Could not correlate deposit, claim and response receipt.',
         );
       await confirm(config.rpcUrl, open.transaction);
@@ -184,8 +184,8 @@ async function executeLocked(signal?: AbortSignal) {
         open.amount !== response.authorization.requirements.amount ||
         claim.amount !== ACTUAL_ATOMIC
       )
-        throw new GateError(
-          GATE_ERROR_CODES.AMOUNT_MISMATCH,
+        throw new ProtocolError(
+          PROTOCOL_ERROR_CODES.AMOUNT_MISMATCH,
           'Unexpected settlement amount.',
         );
       return {

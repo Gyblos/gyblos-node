@@ -1,6 +1,6 @@
 // Node measurement schema version, error diagnostic codes, synthetic inference case names and lifecycle
 // states. Values only; no wallet, network or process actions.
-import type { GateErrorCode } from '@gyblos/payments-x402/constants';
+import type { ProtocolErrorCode } from '@gyblos/protocol/constants';
 
 export const MEASUREMENT_SCHEMA_VERSION = 1;
 
@@ -29,4 +29,5 @@ export const NODE_STATES = {
 export type NodeState = (typeof NODE_STATES)[keyof typeof NODE_STATES];
 
 export type ErrorDiagnosticCode =
-  GateErrorCode | (typeof ERROR_DIAGNOSTICS)[keyof typeof ERROR_DIAGNOSTICS];
+  | ProtocolErrorCode
+  | (typeof ERROR_DIAGNOSTICS)[keyof typeof ERROR_DIAGNOSTICS];

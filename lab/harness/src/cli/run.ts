@@ -12,13 +12,10 @@ import {
   ROUTES,
   TIMEOUTS,
 } from '@gyblos/config';
-import {
-  assertProgram,
-  GateError,
-  lamports,
-  tokens,
-} from '@gyblos/payments-x402/chain';
-import { GATE_ERROR_CODES, MAX_ATOMIC } from '@gyblos/payments-x402/constants';
+import { assertProgram, lamports, tokens } from '@gyblos/payments-x402/chain';
+import { MAX_ATOMIC } from '@gyblos/payments-x402/constants';
+import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
+import { ProtocolError } from '@gyblos/protocol/errors';
 import {
   isMain,
   onShutdown,
@@ -48,16 +45,16 @@ export async function main() {
       (await lamports(config.rpcUrl, config.addresses.facilitator)) <
       FIXED_MIN_FACILITATOR_LAMPORTS
     )
-      throw new GateError(
-        GATE_ERROR_CODES.NEEDS_SOL,
+      throw new ProtocolError(
+        PROTOCOL_ERROR_CODES.NEEDS_SOL,
         `Fund devnet facilitator ${config.addresses.facilitator} first.`,
       );
     if (
       (await tokens(config.rpcUrl, config.addresses.buyer, config.mint)) <
       BigInt(MAX_ATOMIC)
     )
-      throw new GateError(
-        GATE_ERROR_CODES.NEEDS_TOKENS,
+      throw new ProtocolError(
+        PROTOCOL_ERROR_CODES.NEEDS_TOKENS,
         'Fund the buyer or run gate:fund --test-mint first.',
       );
     controller.signal.throwIfAborted();

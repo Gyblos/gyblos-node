@@ -20,6 +20,7 @@
     "@gyblos/runtime": "workspace:*",
     "@gyblos/node": "workspace:*",
     "@gyblos/payments-x402": "workspace:*",
+    "@gyblos/protocol": "workspace:*",
     "@gyblos/transport-iroh": "workspace:*",
     "@number0/iroh": "1.1.0",
     "@solana/kit": "5.1.0"

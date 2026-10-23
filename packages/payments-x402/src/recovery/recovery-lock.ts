@@ -5,9 +5,9 @@ import { constants } from 'node:fs';
 import { lstat, open, unlink, type FileHandle } from 'node:fs/promises';
 
 import { FILE_MODES, P2P } from '@gyblos/config';
+import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
+import { ProtocolError } from '@gyblos/protocol/errors';
 
-import { GateError } from '../chain.js';
-import { GATE_ERROR_CODES } from '../constants.js';
 import { currentLockOwner } from './lock-owner.js';
 import { withExclusiveLock } from './lock.js';
 
@@ -75,8 +75,8 @@ async function removeDeadBuyerLock(paths: RecoveryLockPaths) {
       absent = true;
     }
     if (!absent)
-      throw new GateError(
-        GATE_ERROR_CODES.BUYER_BUSY,
+      throw new ProtocolError(
+        PROTOCOL_ERROR_CODES.BUYER_BUSY,
         'The original buyer process is still present; preserve its lock.',
       );
     const audit = await open(

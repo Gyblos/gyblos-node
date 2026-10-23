@@ -21,9 +21,11 @@ import {
   RETRY_DELAYS,
   TOKEN_PROGRAM_ADDRESS,
 } from '@gyblos/config';
-import { GateError, lamports, rpc } from '@gyblos/payments-x402/chain';
-import { DEVNET_USDC, GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
+import { lamports, rpc } from '@gyblos/payments-x402/chain';
+import { DEVNET_USDC } from '@gyblos/payments-x402/constants';
 import { exactAuthorizationId } from '@gyblos/payments-x402/exact/authorization-id';
+import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
+import { ProtocolError } from '@gyblos/protocol/errors';
 
 import { type Config } from '../../config.js';
 import { RECONCILIATION_CLASSIFICATIONS } from '../../constants.js';
@@ -53,8 +55,8 @@ export async function snapshot(config: Config, buyer: string) {
       break;
     } catch (error) {
       if (
-        !(error instanceof GateError) ||
-        error.code !== GATE_ERROR_CODES.RPC_HTTP ||
+        !(error instanceof ProtocolError) ||
+        error.code !== PROTOCOL_ERROR_CODES.RPC_HTTP ||
         !error.message.includes(String(HTTP_STATUS.tooManyRequests)) ||
         attempt === RETRIES.exactSnapshotLastAttempt
       )

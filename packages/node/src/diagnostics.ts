@@ -1,16 +1,16 @@
 // Maps any thrown value to a fixed diagnostic code, so logs and measurements never carry error text.
 import { AssertionError } from 'node:assert';
 
-import { GateError } from '@gyblos/payments-x402/chain';
-import { GATE_ERROR_CODES } from '@gyblos/payments-x402/constants';
+import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
+import { ProtocolError } from '@gyblos/protocol/errors';
 
 import { ERROR_DIAGNOSTICS, type ErrorDiagnosticCode } from './constants.js';
 
 export function errorDiagnostic(error: unknown): ErrorDiagnosticCode {
   try {
-    if (error instanceof GateError) {
+    if (error instanceof ProtocolError) {
       const candidate = error.code;
-      const canonical = Object.values(GATE_ERROR_CODES).find(
+      const canonical = Object.values(PROTOCOL_ERROR_CODES).find(
         (code) => code === candidate,
       );
       if (canonical) return canonical;

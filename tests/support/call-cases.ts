@@ -17,12 +17,9 @@ import {
   createBuyer,
   type BuyerResponseObservation,
 } from '@gyblos/payments-x402';
-import { GateError } from '@gyblos/payments-x402/chain';
-import {
-  DEVNET,
-  DEVNET_USDC,
-  GATE_ERROR_CODES,
-} from '@gyblos/payments-x402/constants';
+import { DEVNET, DEVNET_USDC } from '@gyblos/payments-x402/constants';
+import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
+import { ProtocolError } from '@gyblos/protocol/errors';
 
 import { callFault } from './call-fixture.js';
 
@@ -33,7 +30,7 @@ export function registerCallCases() {
     assert.equal(call.outcome, CALL_OUTCOMES.UNCERTAIN);
     assert.deepEqual(call.failure, {
       phase: CALL_PHASES.PROOF,
-      code: GATE_ERROR_CODES.TRANSACTION_UNKNOWN,
+      code: PROTOCOL_ERROR_CODES.TRANSACTION_UNKNOWN,
     });
     assert.deepEqual(journal.failure, call.failure);
     assert.deepEqual(call.observedPayment, {
@@ -58,7 +55,7 @@ export function registerCallCases() {
     assert.equal(call.outcome, CALL_OUTCOMES.UNCERTAIN);
     assert.deepEqual(call.failure, {
       phase: CALL_PHASES.PROOF,
-      code: GATE_ERROR_CODES.TRANSACTION_UNKNOWN,
+      code: PROTOCOL_ERROR_CODES.TRANSACTION_UNKNOWN,
     });
     assert.equal(
       journal.observedPayment?.depositSignature,
@@ -97,7 +94,7 @@ export function registerCallCases() {
     assert.equal(call.outcome, CALL_OUTCOMES.CONFIRMED_ERROR);
     assert.deepEqual(call.failure, {
       phase: CALL_PHASES.SETTLEMENT,
-      code: GATE_ERROR_CODES.UNTRUSTED_RECEIPT,
+      code: PROTOCOL_ERROR_CODES.UNTRUSTED_RECEIPT,
     });
     assert.equal(journal.claimSignature, '1'.repeat(64));
   });
@@ -111,13 +108,13 @@ export function registerCallCases() {
     assert.equal(journal.observedPayment?.status, 200);
   });
   void test('diagnostic codes discard arbitrary messages, causes and invalid owned codes', () => {
-    for (const code of Object.values(GATE_ERROR_CODES))
+    for (const code of Object.values(PROTOCOL_ERROR_CODES))
       assert.equal(
-        errorDiagnostic(new GateError(code, 'PRIVATE_SENTINEL')),
+        errorDiagnostic(new ProtocolError(code, 'PRIVATE_SENTINEL')),
         code,
       );
-    const invalid = new GateError(
-      GATE_ERROR_CODES.RPC_HTTP,
+    const invalid = new ProtocolError(
+      PROTOCOL_ERROR_CODES.RPC_HTTP,
       'PRIVATE_SENTINEL',
     );
     Object.defineProperty(invalid, 'code', { value: 'PRIVATE_SENTINEL' });
@@ -147,8 +144,8 @@ export function registerCallCases() {
     );
   });
   void test('a stateful error code getter cannot replace a matched canonical diagnostic', () => {
-    const canonical = Object.values(GATE_ERROR_CODES)[0]!;
-    const error = new GateError(canonical, 'PRIVATE_SENTINEL');
+    const canonical = Object.values(PROTOCOL_ERROR_CODES)[0]!;
+    const error = new ProtocolError(canonical, 'PRIVATE_SENTINEL');
     let reads = 0;
     Object.defineProperty(error, 'code', {
       get() {

@@ -13,9 +13,10 @@ import {
   TOKEN_PROGRAM_ADDRESS,
 } from '@gyblos/config';
 import type { Config } from '@gyblos/config/wallet';
+import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
+import { ProtocolError } from '@gyblos/protocol/errors';
 
-import { rpc as baseRpc, confirm, GateError } from '../chain.js';
-import { GATE_ERROR_CODES } from '../constants.js';
+import { rpc as baseRpc, confirm } from '../chain.js';
 import type {
   AccountsResponse,
   ChainInstruction,
@@ -41,8 +42,8 @@ export async function rpc<T>(
       if (
         attempt >= RETRIES.rpc ||
         !method.startsWith('get') ||
-        !(error instanceof GateError) ||
-        error.code !== GATE_ERROR_CODES.RPC_HTTP ||
+        !(error instanceof ProtocolError) ||
+        error.code !== PROTOCOL_ERROR_CODES.RPC_HTTP ||
         !error.message.includes(String(HTTP_STATUS.tooManyRequests))
       )
         throw error;
@@ -164,8 +165,8 @@ export async function transaction(
     assert.equal(transaction.transaction.signatures[0], signature);
     return transaction;
   }
-  throw new GateError(
-    GATE_ERROR_CODES.TRANSACTION_UNKNOWN,
+  throw new ProtocolError(
+    PROTOCOL_ERROR_CODES.TRANSACTION_UNKNOWN,
     'Confirmed transaction is not yet visible; reconcile before another authorization.',
   );
 }
@@ -198,8 +199,8 @@ export function transactionTransfers(
         'closeAccount',
       ].includes(parsed?.type ?? '')
     ) {
-      throw new GateError(
-        GATE_ERROR_CODES.UNSUPPORTED_TOKEN_INSTRUCTION,
+      throw new ProtocolError(
+        PROTOCOL_ERROR_CODES.UNSUPPORTED_TOKEN_INSTRUCTION,
         'Unsupported token instruction in inference accounting.',
       );
     }
