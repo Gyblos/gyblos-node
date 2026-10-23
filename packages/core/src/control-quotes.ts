@@ -130,6 +130,7 @@ function checkReadiness(
   controlInteger(state.generation);
   controlInteger(state.observedAt);
   controlInteger(state.validUntil);
+  if (typeof state.busy !== 'boolean') return controlFail();
   if (state.busy) return controlFail(CONTROL_CODES.BUSY);
   if (state.observedAt > now || state.validUntil <= now)
     return controlFail(CONTROL_CODES.EXPIRED);
@@ -198,12 +199,30 @@ async function buildQuote(
     availability: { state: CONTROL_AVAILABILITY, observedAt: state.observedAt },
   });
 }
+// Copies only contract fields so later canonical comparison sees validated values.
+function readReadiness(context: QuoteContext): QuoteReadiness {
+  const current = context.readiness();
+  return {
+    generation: current.generation,
+    busy: current.busy,
+    observedAt: current.observedAt,
+    validUntil: current.validUntil,
+  };
+}
+// Returns undefined for a noncanonical caller catalog instead of an untyped canonicalJson error.
+function catalogSnapshot(catalog: unknown): string | undefined {
+  try {
+    return canonicalJson(catalog);
+  } catch {
+    return undefined;
+  }
+}
 function unchangedReadiness(
   context: QuoteContext,
   initial: QuoteReadiness,
   now: number,
 ) {
-  const current = context.readiness();
+  const current = readReadiness(context);
   checkReadiness(context, current, now);
   if (canonicalJson(current) !== canonicalJson(initial))
     return controlFail(CONTROL_CODES.STALE);
@@ -215,8 +234,8 @@ export async function createControlQuote(
 ): Promise<SignedOfferV2> {
   const query = parseOfferQuery(value, context.remoteNodeId);
   const now = controlInteger(context.now());
-  const state = { ...context.readiness() };
-  const catalogSnapshot = canonicalJson(context.catalog);
+  const state = readReadiness(context);
+  const initialCatalog = catalogSnapshot(context.catalog) ?? controlFail();
   checkReadiness(context, state, now);
   const catalog = await trustedCatalog(context, now);
   const offer = await buildQuote(query, context, state, catalog, now);
@@ -227,7 +246,7 @@ export async function createControlQuote(
   unchangedReadiness(context, state, finishedAt);
   if (
     finishedAt >= offer.expiresAt ||
-    canonicalJson(context.catalog) !== catalogSnapshot
+    catalogSnapshot(context.catalog) !== initialCatalog
   )
     return controlFail(CONTROL_CODES.STALE);
   return signed;

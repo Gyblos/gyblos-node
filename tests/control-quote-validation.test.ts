@@ -93,3 +93,20 @@ void test('control rejects an invalid clock reading before signing a quote', asy
   );
   assert.equal(calls, 0);
 });
+void test('control reports noncanonical caller catalog or readiness values with a typed code', async () => {
+  const catalogFixture = await controlFixture();
+  catalogFixture.context.catalog = {
+    ...catalogFixture.context.catalog,
+    record: { ...catalogFixture.catalog, sequence: 1.5 },
+  };
+  const readinessFixture = await controlFixture();
+  const readiness = readinessFixture.context.readiness();
+  // Deliberately invalid caller value that canonical JSON cannot encode.
+  Reflect.set(readiness, 'busy', undefined);
+  readinessFixture.context.readiness = () => readiness;
+  for (const fixture of [catalogFixture, readinessFixture])
+    await assert.rejects(
+      createControlQuote(fixture.request, fixture.context, fixture.ownerSigner),
+      { code: CONTROL_CODES.INVALID },
+    );
+});
