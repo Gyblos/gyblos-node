@@ -204,9 +204,10 @@ set.
 ## Additive control contracts (not a running listener)
 
 `./control-requests`, `./control-response`, `./control-framing` and
-`./control-types` expose the free `gyblos/control/1` contract. Requests are
-`{ version: 1, requestId, method, params }`; methods are `catalog.get` and
-`offer.request`. Responses contain exactly one `result` or static typed `error`.
+`./control-types` expose the free `gyblos/control/1` contract;
+`./control-validation` exports `ControlError` and the bounded primitives that
+core reuses. Requests are `{ version: 1, requestId, method, params }`; methods
+are `catalog.get` and `offer.request`. Responses contain exactly one `result` or static typed `error`.
 `parseControlQuery` and `parseControlResponse` return detached validated values;
 parsing a response alone does not authenticate its signed result.
 
@@ -222,13 +223,20 @@ levels and separate v2 domains. `./offer-v2` adds owner-signed quotes binding th
 complete request digest and exact buyer/model/reasoning terms. Public signatures
 remain lowercase hex; private signatures remain Base64. V1 exports, domains and
 vectors are unchanged. V2 cache/sequence namespaces must be distinct from v1;
-presence and withdrawal references cannot cross versions.
+presence and withdrawal references cannot cross versions. Time validation has
+zero clock-skew tolerance (`issuedAt > now` is rejected), as in v1; a bounded
+skew is an open decision before the listener lands.
 
-`gyblos/http/2` is a reserved future identifier, not a supported paid ALPN.
-The current paid v1 validator rejects v2. The pure policy in
-`@gyblos/core/control-quotes` verifies caller-trusted identities, catalog and
-request terms. Its caller supplies engine/readiness snapshots and increments
-readiness generation when those change; no engine or payment adapter runs here.
+Version mapping: the `gyblos/control/1` ALPN (control version 1) carries v2
+records and offers; `gyblos/http/2` is a reserved future identifier, not a
+supported paid ALPN. The current paid v1 validator rejects v2. The pure policy
+in `@gyblos/core/control-quotes` (`createControlQuote` for sellers,
+`acceptControlQuote` for buyers) verifies caller-trusted identities, catalog and
+request terms. It does not carry v1 payment checks (payTo distinct from
+owner/feePayer/authorizer, capability and metering requirements); payment
+admission must enforce them when paid v2 is wired. Its caller supplies
+engine/readiness snapshots and increments readiness generation when those
+change; no engine or payment adapter runs here.
 Free prices are representable, not an implemented free-inference path. A quote
 is not a reservation, wallet proof, one-use token or payment authorization.
 
@@ -238,7 +246,11 @@ admit before buffering/parsing, aggregate peers across connections, check leases
 on input and before publishing, release in every terminal path, and enforce SDK
 connection/stream limits. A full peer table evicts the least recently touched
 entry with no open connection or query; it refuses only when every entry is
-active. No timer, endpoint or registry lookup starts on import.
+active. No timer, endpoint or registry lookup starts on import. Intended rule,
+pending wiring: `CONTROL_CAPACITY` is a separate per-ALPN budget for control
+streams, applied after the shared transport-iroh endpoint admission and its
+configured transport connection/peer limits, so a control connection must pass
+both. These values are proposed and may move to operator config.
 
 `vectors/control-v2.json` fixes request framing/digest, all three public records
 and owner-signed offer bytes using an independent Node/OpenSSL oracle. Only
