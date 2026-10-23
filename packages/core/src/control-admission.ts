@@ -18,7 +18,6 @@ interface QueryState {
   peer: PeerState;
   deadline: number;
   active: boolean;
-  cancelled: boolean;
   connection: ConnectionState;
 }
 interface ConnectionState {
@@ -59,10 +58,9 @@ export class ControlAdmission {
     this.sweep(now);
     return now;
   }
-  private release(query: QueryState, cancelled: boolean, now: number) {
+  private release(query: QueryState, now: number) {
     if (!query.active) return;
     query.active = false;
-    query.cancelled = cancelled;
     query.peer.queries--;
     query.peer.touched = now;
     query.connection.touched = now;
@@ -71,7 +69,7 @@ export class ControlAdmission {
   }
   private close(connection: ConnectionState, now: number) {
     if (!connection.active) return;
-    for (const query of connection.queries) this.release(query, true, now);
+    for (const query of connection.queries) this.release(query, now);
     connection.active = false;
     connection.peer.connections--;
     connection.peer.touched = now;
@@ -79,7 +77,7 @@ export class ControlAdmission {
   }
   private sweep(now: number) {
     for (const query of this.queries)
-      if (now >= query.deadline) this.release(query, true, query.deadline);
+      if (now >= query.deadline) this.release(query, query.deadline);
     for (const connection of this.connections)
       if (
         !connection.queries.size &&
@@ -185,7 +183,6 @@ export class ControlAdmission {
       connection,
       deadline: now + CONTROL_CAPACITY.queryMs,
       active: true,
-      cancelled: false,
     };
     connection.peer.queries++;
     connection.touched = now;
@@ -199,11 +196,11 @@ export class ControlAdmission {
     };
     return {
       check,
-      finish: () => this.release(query, false, this.now()),
-      cancel: () => this.release(query, true, this.now()),
+      finish: () => this.release(query, this.now()),
+      cancel: () => this.release(query, this.now()),
       publish: <T>(value: T) => {
         const now = check();
-        this.release(query, false, now);
+        this.release(query, now);
         return value;
       },
     };
