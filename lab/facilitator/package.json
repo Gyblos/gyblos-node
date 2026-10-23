@@ -1,5 +1,5 @@
 {
-  "name": "@gyblos/facilitator",
+  "name": "@gyblos/lab-facilitator",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",
+    "@gyblos/lab-harness": "workspace:*",
     "@gyblos/payments-x402": "workspace:*",
     "@gyblos/runtime": "workspace:*"
   }

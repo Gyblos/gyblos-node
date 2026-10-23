@@ -65,9 +65,10 @@ prompts, answers, IPs, RPC URLs or raw logs.
 
 ## Local facilitator
 
-The facilitator (`apps/facilitator`, also embedded in the seller node) signs and
-pays for channel settlement with its own devnet key. It keeps channel state in
-memory; there is no durable channel storage.
+The facilitator (embedded in the seller node; `lab/facilitator` runs it
+standalone for lab checks) signs and pays for channel settlement with its own
+devnet key. It keeps channel state in memory; there is no durable channel
+storage.
 
 It writes private diagnostics as JSONL to
 `.local/devnet/facilitator-diagnostics/` (standalone) or
@@ -80,7 +81,8 @@ It writes private diagnostics as JSONL to
 - Size is bounded: 128 queued records, 4 KiB per record, 4 MiB per file, 3
   rotations per process, 16 files (64 MiB). When full, the oldest file is
   deleted, so copy anything you need to keep.
-- `GET /gate/diagnostics` on the loopback facilitator shows health and counters.
+- `GET /facilitator/diagnostics` on the loopback facilitator shows health and
+  counters.
 - Logging never blocks or changes a payment. A diagnostic record is not proof of
   settlement, refund or delivery.
 

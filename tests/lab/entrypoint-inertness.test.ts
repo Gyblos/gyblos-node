@@ -1,4 +1,4 @@
-// Owns offline import-inertness regressions for lab-harness executable entrypoints; product entrypoints are
+// Owns offline import-inertness regressions for lab executable entrypoints; product entrypoints are
 // checked in tests/entrypoint-inertness.test.ts. No funded wallets or live services.
 import test from 'node:test';
 
@@ -18,6 +18,7 @@ void test('lab executable modules are inert when imported', async (context) => {
       '@gyblos/lab-harness/commands/fund',
       '@gyblos/lab-harness/commands/failures',
       '@gyblos/lab-harness/commands/inference-setup',
+      '@gyblos/lab-facilitator/main',
     ])
       await import(file);
     await context.test(

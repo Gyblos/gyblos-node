@@ -3,7 +3,6 @@
 import { readFile } from 'node:fs/promises';
 
 import { DEVNET, X402_SDK_VERSION } from '@gyblos/config';
-import { type Config } from '@gyblos/config/wallet';
 import { PRICES, TOLERANCE } from '@gyblos/core/constants';
 import { GENERATION } from '@gyblos/engine-ollama/constants';
 import { MODEL } from '@gyblos/engine-ollama/model';
@@ -15,6 +14,7 @@ import {
   SCHEMA_VERSIONS,
 } from '../../constants.js';
 import type { InferenceGateEvidence } from '../../types.js';
+import { type Config } from '../../wallet.js';
 
 export async function initializeEvidence(
   config: Config,

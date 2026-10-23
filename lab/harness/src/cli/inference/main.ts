@@ -19,8 +19,7 @@ import {
   TIMEOUTS,
   TOKENIZER_FILES,
 } from '@gyblos/config';
-import { CONFIG_ASSET_LABELS, WALLET_ROLES } from '@gyblos/config/constants';
-import { loadConfig, signer } from '@gyblos/config/wallet';
+import { CONFIG_ASSET_LABELS } from '@gyblos/config/constants';
 import { createModelTokenizer, createOllama } from '@gyblos/engine-ollama';
 import { GENERATION } from '@gyblos/engine-ollama/constants';
 import { createOllamaEngine } from '@gyblos/engine-ollama/engine';
@@ -49,14 +48,17 @@ import {
   EVIDENCE_PATHS,
   EVIDENCE_STATUSES,
   GATE_DIAGNOSTIC_LIMITS,
+  GATE_HOST_MESSAGES,
   INFERENCE_EVIDENCE_CODES,
   JOURNAL_PATHS,
   keyPath,
   LOCK_PATH,
   MIN_FACILITATOR_LAMPORTS,
+  WALLET_ROLES,
 } from '../../constants.js';
 import type { InferenceTrace } from '../../inference-evidence-types.js';
 import { assertNoUnresolvedAuthorizations } from '../../journal.js';
+import { loadConfig, signer } from '../../wallet.js';
 import { createGateBilling } from './billing.js';
 import { runCases } from './cases.js';
 import { initializeEvidence } from './evidence.js';
@@ -137,6 +139,8 @@ export async function main() {
       ollama.on('error', stop);
       await waitReady(ollama, `${ollamaUrl}${ROUTES.ollamaVersion}`, {
         signal: controller.signal,
+        exitMessage: GATE_HOST_MESSAGES.exit,
+        timeoutMessage: GATE_HOST_MESSAGES.timeout,
       });
       await createOllama(ollamaUrl).assertModel();
       evidence.ollamaVersion = (
@@ -156,6 +160,8 @@ export async function main() {
       await waitReady(facilitator, `${facilitatorUrl}${ROUTES.health}`, {
         signal: controller.signal,
         expectedRunId: runId,
+        exitMessage: GATE_HOST_MESSAGES.exit,
+        timeoutMessage: GATE_HOST_MESSAGES.timeout,
         onMismatch: () =>
           new ProtocolError(
             PROTOCOL_ERROR_CODES.PORT_BUSY,

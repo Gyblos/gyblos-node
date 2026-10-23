@@ -12,8 +12,6 @@ import {
   ROUTES,
   X402_SDK_VERSION,
 } from '@gyblos/config';
-import { WALLET_ROLES } from '@gyblos/config/constants';
-import { loadConfig, signer } from '@gyblos/config/wallet';
 import { createBuyer } from '@gyblos/payments-x402';
 import {
   account,
@@ -42,10 +40,12 @@ import {
   LOCK_PATH,
   SCHEMA_VERSIONS,
   UPSTREAM_COMMIT,
+  WALLET_ROLES,
 } from '../constants.js';
 import type { FixedGateEvidence } from '../fixture-evidence-types.js';
 import { runGate } from '../gate.js';
 import { assertNoUnresolvedAuthorizations, saveJournal } from '../journal.js';
+import { loadConfig, signer } from '../wallet.js';
 
 const JOURNAL_PATH = JOURNAL_PATHS.fixed;
 

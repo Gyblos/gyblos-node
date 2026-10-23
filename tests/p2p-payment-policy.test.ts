@@ -131,7 +131,7 @@ void test('exclusive buyer lock preserves an unresolved authorization against co
       withExclusiveLock(lock, async () => {
         await saveJson(journal, { state: 'confirmed' });
       }),
-      /holds the gate lock/,
+      /holds the buyer lock/,
     );
     assert.equal(
       JSON.parse(await readFile(journal, 'utf8')).state,
@@ -156,7 +156,7 @@ void test(
     try {
       process.chdir(directory);
       await withExclusiveLock(rolePath(P2P.buyerLockFilename), async () => {
-        await assert.rejects(paidCall(), /holds the gate lock/);
+        await assert.rejects(paidCall(), /holds the buyer lock/);
       });
     } finally {
       process.chdir(original);

@@ -26,7 +26,7 @@ existing role stops with an error.
 ```sh
 export GYBLOS_RELAY_TOKEN=...    # private; 32-512 printable characters
 pnpm node:setup --role seller --mint MINT --buyer BUYER_ADDRESS --pay-to PAYOUT_ADDRESS
-pnpm gate:inference:setup        # pinned Qwen3 0.6B model and tokenizer
+pnpm gate:inference:setup        # pinned Qwen3 0.6B model and tokenizer (lab command for now)
 pnpm node:start
 ```
 
@@ -124,7 +124,7 @@ not been measured.
 - `GYBLOS_RPC_URL`: devnet RPC; the genesis hash is checked before use.
 - `GYBLOS_P2P_RUN_ID`: optional label copied into `status.json` and evidence.
 - Ports: buyer proxy 4031, seller HTTP 4032 (loopback only), facilitator 4022,
-  Ollama 11436. Stop other gates before starting a seller.
+  Ollama 11436. Stop any lab runs (`gate:*`) before starting a seller.
 
 Facilitator diagnostics for the seller are written privately under
 `.local/p2p/facilitator-diagnostics/`; see [payments.md](payments.md).

@@ -39,7 +39,7 @@ export async function withExclusiveLock<T>(
       if ((error as NodeJS.ErrnoException).code === 'EEXIST')
         throw new ProtocolError(
           PROTOCOL_ERROR_CODES.BUYER_BUSY,
-          'Another buyer or an interrupted process holds the gate lock. Reconcile before removing a stale lock.',
+          'Another buyer or an interrupted process holds the buyer lock. Reconcile before removing a stale lock.',
         );
       throw error;
     },

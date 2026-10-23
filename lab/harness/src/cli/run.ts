@@ -4,7 +4,6 @@ import { type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 
 import { HOSTS, MAX_ATOMIC, RETRY_DELAYS, ROUTES } from '@gyblos/config';
-import { loadConfig } from '@gyblos/config/wallet';
 import { assertProgram, lamports, tokens } from '@gyblos/payments-x402/chain';
 import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { ProtocolError } from '@gyblos/protocol/errors';
@@ -19,10 +18,12 @@ import {
 import {
   ENTRYPOINTS,
   FIXED_MIN_FACILITATOR_LAMPORTS,
+  GATE_HOST_MESSAGES,
   GATE_HOSTS,
   GATE_RETRIES,
   GATE_TIMEOUTS,
 } from '../constants.js';
+import { loadConfig } from '../wallet.js';
 import { executeGate } from './execute.js';
 
 export async function main() {
@@ -73,6 +74,7 @@ export async function main() {
       checkSignalCode: false,
       retryResponseErrors: false,
       exitMessage: 'Gate host exited during startup.',
+      timeoutMessage: GATE_HOST_MESSAGES.timeout,
       onMismatch: () =>
         new Error(
           'Gate port belongs to a different process. No payment attempted.',
@@ -94,6 +96,7 @@ export async function main() {
       checkSignalCode: false,
       retryResponseErrors: false,
       exitMessage: 'Gate host exited during startup.',
+      timeoutMessage: GATE_HOST_MESSAGES.timeout,
       onMismatch: () =>
         new Error(
           'Gate port belongs to a different process. No payment attempted.',

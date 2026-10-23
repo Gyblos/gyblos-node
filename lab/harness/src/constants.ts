@@ -1,16 +1,27 @@
-// Harness-only vocabulary: evidence IDs and statuses, case names, funding operations and schema
-// versions. Shared wallet, journal and guard values are imported from their owning packages.
+// Harness-only vocabulary: devnet wallet roles and config file, evidence IDs and statuses, case
+// names, funding operations and schema versions. Shared journal and guard values come from their owners.
 import {
   ERROR_DIAGNOSTICS,
   INFERENCE_CASES,
   MEASUREMENT_SCHEMA_VERSION,
 } from '@gyblos/buyer/constants';
 import { LOCAL_DIR, LOCALHOST } from '@gyblos/config';
-import {
-  CONFIG_SCHEMA_VERSION,
-  type ConfigAssetLabel,
-} from '@gyblos/config/constants';
+import { type ConfigAssetLabel } from '@gyblos/config/constants';
 import { type ProtocolErrorCode } from '@gyblos/protocol/constants';
+
+export const WALLET_ROLES = {
+  BUYER: 'buyer',
+  SELLER: 'seller',
+  AUTHORIZER: 'authorizer',
+  FACILITATOR: 'facilitator',
+  MINT: 'mint',
+} as const;
+
+export type WalletRole = (typeof WALLET_ROLES)[keyof typeof WALLET_ROLES];
+
+export const CONFIG_SCHEMA_VERSION = 1;
+
+export const CONFIG_PATH = `${LOCAL_DIR}/config.json`;
 
 export const EXACT_PRICE = '10000';
 
@@ -157,7 +168,7 @@ export const INFERENCE_TRANSPORT_PATH = `${LOCAL_DIR}/inference-last-transport.j
 
 export const ENTRYPOINTS = {
   seller: 'lab/harness/scripts/seller.ts',
-  facilitator: 'apps/facilitator/src/main.ts',
+  facilitator: 'lab/facilitator/src/main.ts',
 } as const;
 
 export const JOURNAL_FILENAMES = {
@@ -255,6 +266,12 @@ export const GATE_DIAGNOSTIC_LIMITS = {
   errorStackEnd: 3,
   transactionHistory: 50,
   failureHistory: 10,
+} as const;
+
+// Lab wording for host startup failures; product runtime defaults are neutral.
+export const GATE_HOST_MESSAGES = {
+  exit: 'Gate-owned host exited during startup.',
+  timeout: 'Gate host startup timeout.',
 } as const;
 
 export const GATE_PORTS = {

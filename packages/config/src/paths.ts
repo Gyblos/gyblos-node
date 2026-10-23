@@ -1,8 +1,6 @@
 // Local file paths, file names and HTTP routes shared by node, buyer and facilitator.
 export const LOCAL_DIR = '.local/devnet';
 
-export const CONFIG_PATH = `${LOCAL_DIR}/config.json`;
-
 export const TOKENIZER_DIR = `${LOCAL_DIR}/tokenizer`;
 
 export const TOKENIZER_FILES = {
@@ -19,9 +17,9 @@ export const MEASUREMENT_FILENAMES = { salt: 'measurement-salt' } as const;
 export const ROUTES = {
   health: '/health',
   inference: '/v1/chat/completions',
-  events: '/gate/events',
-  verifications: '/gate/verifications',
-  facilitatorDiagnostics: '/gate/diagnostics',
+  events: '/facilitator/events',
+  verifications: '/facilitator/verifications',
+  facilitatorDiagnostics: '/facilitator/diagnostics',
   verify: '/verify',
   supported: '/supported',
   ollamaVersion: '/api/version',

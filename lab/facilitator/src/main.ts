@@ -11,8 +11,8 @@ import {
   PORTS,
   ROUTES,
 } from '@gyblos/config';
-import { WALLET_ROLES } from '@gyblos/config/constants';
-import { loadConfig, signer } from '@gyblos/config/wallet';
+import { WALLET_ROLES } from '@gyblos/lab-harness/constants';
+import { loadConfig, signer } from '@gyblos/lab-harness/wallet';
 import { assertProgram } from '@gyblos/payments-x402/chain';
 import { createFacilitator } from '@gyblos/payments-x402/facilitator';
 import { isMain } from '@gyblos/runtime';

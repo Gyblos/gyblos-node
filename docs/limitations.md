@@ -58,8 +58,8 @@ See [recovery.md](recovery.md) for how recovery works.
   bound; a deleted file still held open by a process keeps its disk space.
 - File checks protect cooperative POSIX storage on macOS/Linux only. Windows
   permissions are unvalidated.
-- The older in-memory `/gate/events` and `/gate/verifications` are not
-  sanitized; do not publish them.
+- The older in-memory `/facilitator/events` and `/facilitator/verifications` are
+  not sanitized; do not publish them.
 - Loopback `Host` checks stop browser DNS rebinding, not other local processes.
   Ollama is not covered by them.
 
@@ -113,7 +113,7 @@ The seller limits work per Iroh identity, but identities are free to create.
 
 ## Local files
 
-- Keys, journals and diagnostics live under `.local/devnet/` (gates) and
+- Keys, journals and diagnostics live under `.local/devnet/` (lab) and
   `.local/p2p/` (node roles). Models are in `.local/ollama/models/`. Never share
   these.
 - `GYBLOS_GATE_CONFIG` moves only the config file, not keys, journals or models.

@@ -6,8 +6,6 @@ import {
 } from '@x402/core/http';
 
 import { HTTP_STATUS } from '@gyblos/config';
-import { type WALLET_ROLES } from '@gyblos/config/constants';
-import { signer } from '@gyblos/config/wallet';
 import { JOURNAL_STATES } from '@gyblos/payments-x402/constants';
 import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { ProtocolError } from '@gyblos/protocol/errors';
@@ -16,9 +14,11 @@ import {
   GATE_TIMEOUTS,
   PUBLIC_CALL_OUTCOMES,
   type ExactCaseName,
+  type WALLET_ROLES,
 } from '../../constants.js';
 import { createExactBuyer, validateExactTerms } from '../../exact/index.js';
 import { saveJournal } from '../../journal.js';
+import { signer } from '../../wallet.js';
 import type { createChallenge } from './challenge.js';
 import { authorizationMetadata, snapshot } from './reconcile.js';
 import type { ActiveAuthorization, ExactContext } from './types.js';

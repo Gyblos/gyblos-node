@@ -45,7 +45,10 @@ pnpm check
 
 No wallet, model or network needed; unsupported native cases skip explicitly.
 
-### 2. A devnet payment on one machine
+### 2. Lab: a devnet payment on one machine
+
+The `gate:*` commands are lab proof-of-concept checks, not seller or buyer
+setup.
 
 ```sh
 pnpm gate:setup              # creates isolated keys in .local/devnet/
@@ -66,7 +69,7 @@ Use a separate working directory per role. Seller:
 ```sh
 export GYBLOS_RELAY_TOKEN=...   # 32-512 characters; never commit it
 pnpm node:setup --role seller --mint MINT --buyer BUYER_ADDRESS --pay-to PAYOUT_ADDRESS
-pnpm gate:inference:setup       # downloads the pinned model
+pnpm gate:inference:setup       # downloads the pinned model (lab command for now)
 pnpm node:start                 # writes the signed offer to .local/p2p/offer.json
 ```
 
@@ -85,14 +88,14 @@ independently confirmed seller identities, run `pnpm buyer:setup`, then
 | Node   | `pnpm buyer:setup`                                   | Download and verify the buyer tokenizer without an inference engine.  |
 | Node   | `pnpm buyer:trust`                                   | Verify the offer against explicit seller identities and create trust. |
 | Node   | `pnpm buyer:call`, `buyer:reconcile`                 | One paid synthetic call; verify a payment, clear a zero-charge block. |
-| Gate   | `pnpm gate:setup`                                    | Create devnet keys; `--role buyer\|seller` for P2P.                   |
-| Gate   | `pnpm gate:fund`                                     | Provision accounts; `--test-mint` makes a test token.                 |
-| Gate   | `pnpm gate:preflight`, `gate:challenge`              | Check devnet and balances; check that unpaid gets 402.                |
-| Gate   | `pnpm gate:run`                                      | Run the fixed-resource `upto` payment end to end.                     |
-| Gate   | `pnpm gate:failures`                                 | Empty buyer and expired authorization (about 62 s).                   |
-| Gate   | `pnpm gate:facilitator`, `gate:seller`, `gate:buyer` | Run the fixed-resource roles separately (ports 4022, 4021).           |
-| Gate   | `pnpm gate:exact`                                    | Fixed price through the public x402.org facilitator.                  |
-| Gate   | `pnpm gate:inference:setup`, `gate:inference`        | Download the model; run six metered cases.                            |
+| Lab    | `pnpm gate:setup`                                    | Create isolated lab devnet keys.                                      |
+| Lab    | `pnpm gate:fund`                                     | Provision accounts; `--test-mint` makes a test token.                 |
+| Lab    | `pnpm gate:preflight`, `gate:challenge`              | Check devnet and balances; check that unpaid gets 402.                |
+| Lab    | `pnpm gate:run`                                      | Run the fixed-resource `upto` payment end to end.                     |
+| Lab    | `pnpm gate:failures`                                 | Empty buyer and expired authorization (about 62 s).                   |
+| Lab    | `pnpm gate:facilitator`, `gate:seller`, `gate:buyer` | Run the fixed-resource roles separately (ports 4022, 4021).           |
+| Lab    | `pnpm gate:exact`                                    | Fixed price through the public x402.org facilitator.                  |
+| Lab    | `pnpm gate:inference:setup`, `gate:inference`        | Download the model; run six metered cases.                            |
 | Lab    | `pnpm identity:devnet-run`                           | Try the sponsored 8004 registration on devnet.                        |
 | Lab    | `pnpm identity:fixtures`                             | Recapture the public registry fixture (read-only devnet).             |
 | Checks | `pnpm test`, `test:lab`, `test:all`                  | Product tests (PR gate), lab tests, both.                             |
@@ -116,17 +119,17 @@ Set these in the environment; `.env` is **not** loaded
 | `GYBLOS_IROH_BIND`, `GYBLOS_IROH_EXTERNAL_ADDR` | seller, buyer | UDP bind address; extra public address to advertise.       |
 | `GYBLOS_EXPECTED_ROUTE`                         | buyer         | Require `iroh-direct` or `iroh-relay` before paying.       |
 | `GYBLOS_RPC_URL`                                | all           | Devnet RPC; default `https://api.devnet.solana.com`.       |
-| `GYBLOS_GATE_CONFIG`                            | gates         | Gate config file; default `.local/devnet/config.json`.     |
+| `GYBLOS_GATE_CONFIG`                            | lab           | Lab config file; default `.local/devnet/config.json`.      |
 | `GYBLOS_P2P_RUN_ID`                             | seller, buyer | Optional label copied into `status.json` and evidence.     |
-| `GYBLOS_GATE_RUN_ID`                            | gates         | Run label set by `gate:run`/`gate:inference` for children. |
+| `GYBLOS_GATE_RUN_ID`                            | lab           | Run label set by `gate:run`/`gate:inference` for children. |
 | `GYBLOS_IDENTITY_INTEGRATION`                   | lab tests     | `1` = run opt-in local-validator identity tests.           |
 
 ## Repository layout
 
-`apps/` holds the executables (seller node, buyer, facilitator), `packages/` the
-libraries they share, `lab/` the gate checks and their evidence, and `tests/`
-and `tooling/` the offline checks. Package-by-package map:
-[docs/architecture.md](docs/architecture.md).
+`apps/` holds the product executables (seller node, buyer), `packages/` the
+libraries they share, `lab/` the gate checks, the standalone lab facilitator and
+their evidence, and `tests/` and `tooling/` the offline checks.
+Package-by-package map: [docs/architecture.md](docs/architecture.md).
 
 ## Safety
 

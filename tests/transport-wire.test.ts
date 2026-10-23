@@ -47,7 +47,9 @@ void test('HTTP wire rejects non-inference routes and request smuggling or overs
   for (const path of [
     '/api/generate',
     '/supported',
-    '/gate/events',
+    ROUTES.events,
+    ROUTES.verifications,
+    ROUTES.facilitatorDiagnostics,
     'http://localhost/other',
   ])
     assert.throws(() => encodeRequest({ ...REQUEST, path }));

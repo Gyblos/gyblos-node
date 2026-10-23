@@ -4,8 +4,6 @@ import assert from 'node:assert/strict';
 
 import { appendMeasurement, measurementRow } from '@gyblos/buyer/measurements';
 import { DEVNET } from '@gyblos/config';
-import { WALLET_ROLES } from '@gyblos/config/constants';
-import { signer } from '@gyblos/config/wallet';
 import { OFFER_ID } from '@gyblos/core/constants';
 import { observeInferenceResponse } from '@gyblos/core/inference-observation';
 import { assessCharge } from '@gyblos/core/metering';
@@ -17,11 +15,16 @@ import { JOURNAL_STATES } from '@gyblos/payments-x402/constants';
 import { createInferenceBuyer } from '@gyblos/payments-x402/inference-buyer';
 import { saveJson } from '@gyblos/runtime';
 
-import { GATE_TIMEOUTS, INFERENCE_TRANSPORT_PATH } from '../../constants.js';
+import {
+  GATE_TIMEOUTS,
+  INFERENCE_TRANSPORT_PATH,
+  WALLET_ROLES,
+} from '../../constants.js';
 import {
   assertNoUnresolvedAuthorizations,
   saveJournal,
 } from '../../journal.js';
+import { signer } from '../../wallet.js';
 import { assertInferenceCase } from './assertions.js';
 import { reconcileCase } from './reconcile.js';
 import type { CaseContext } from './types.js';
