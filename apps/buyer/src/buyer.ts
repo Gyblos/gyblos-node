@@ -3,14 +3,20 @@ import { readFile } from 'node:fs/promises';
 
 import { EndpointAddr, EndpointId } from '@number0/iroh';
 
-import { MAX_ATOMIC, P2P } from '@gyblos/config';
-import { verifyInferenceOffer, type OfferTrust } from '@gyblos/node/offers';
+import { BUYER_RELAY_ONLY_ENV, MAX_ATOMIC, P2P } from '@gyblos/config';
+import {
+  verifyInferenceOffer,
+  type InferenceOffer,
+  type OfferTrust,
+} from '@gyblos/node/offers';
 import { loadRole, nodeSecret, rolePath } from '@gyblos/node/roles';
 import { assertProgram } from '@gyblos/payments-x402/chain';
 import { saveJson } from '@gyblos/runtime';
 import {
   assertConfiguredRelay,
   bindEndpoint,
+  requireConfiguredRelay,
+  type BindEndpointOptions,
 } from '@gyblos/transport-iroh/endpoint';
 import { createIrohTransport } from '@gyblos/transport-iroh/iroh-client';
 import { expectedIrohRoute } from '@gyblos/transport-iroh/route-policy';
@@ -39,22 +45,45 @@ export async function trustedOffer() {
   return { config, offer, trust };
 }
 
+// The single buyer decision point for relay-only binding and seller dialing.
+export function buyerConnectionPlan(
+  offer: Pick<InferenceOffer, 'nodeId' | 'relayOnly' | 'endpoint'>,
+  environment: NodeJS.ProcessEnv = process.env,
+) {
+  const relayOnly = environment[BUYER_RELAY_ONLY_ENV] === '1';
+  const offeredRelay = offer.endpoint.relayUrl;
+  let relayUrl: string | undefined;
+  if (relayOnly) relayUrl = requireConfiguredRelay(offeredRelay, environment);
+  else if (offeredRelay)
+    relayUrl = assertConfiguredRelay(offeredRelay, environment);
+  const bindOptions: BindEndpointOptions = {
+    relayOnly,
+    bindAddress: relayOnly ? undefined : environment.GYBLOS_IROH_BIND,
+    externalAddress: environment.GYBLOS_IROH_EXTERNAL_ADDR || undefined,
+  };
+  const remote = {
+    nodeId: offer.nodeId,
+    relayUrl,
+    directAddresses:
+      relayOnly || offer.relayOnly ? [] : offer.endpoint.directAddresses,
+  };
+  return { relayOnly, bindOptions, remote };
+}
+
 export async function startBuyer() {
   const { config, offer } = await trustedOffer();
+  const plan = buyerConnectionPlan(offer);
+  const remote = new EndpointAddr(
+    EndpointId.fromString(plan.remote.nodeId),
+    plan.remote.relayUrl,
+    plan.remote.directAddresses,
+  );
   await assertProgram(config.rpcUrl);
-  const endpoint = await bindEndpoint(await nodeSecret(), {
-    bindAddress: process.env.GYBLOS_IROH_BIND,
-    externalAddress: process.env.GYBLOS_IROH_EXTERNAL_ADDR || undefined,
-  });
+  const endpoint = await bindEndpoint(await nodeSecret(), plan.bindOptions);
   let cleanup = () => endpoint.close();
   try {
     if (endpoint.id().toString() !== config.nodeId)
       throw new Error('Buyer node key mismatch.');
-    const remote = new EndpointAddr(
-      EndpointId.fromString(offer.nodeId),
-      offer.endpoint.relayUrl,
-      offer.relayOnly ? [] : offer.endpoint.directAddresses,
-    );
     const transport = createIrohTransport(endpoint, remote, offer.nodeId);
     cleanup = () => transport.close();
     const expected = expectedIrohRoute(process.env.GYBLOS_EXPECTED_ROUTE);

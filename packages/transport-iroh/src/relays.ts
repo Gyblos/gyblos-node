@@ -1,11 +1,12 @@
 // Owns the shared operator relay map and public relay admission policy.
-// Credentials come only from the environment and must never enter diagnostics or URLs.
+// Credentials come only from the environment, reach only owned relays and never enter diagnostics.
 import { RelayMap, RelayMode } from '@number0/iroh';
 
 import { IROH_RELAYS } from '@gyblos/config';
 
 import {
   RELAY_CONFIGURATION_CODES,
+  RELAY_TOKEN_LENGTH,
   type RelayConfigurationCode,
 } from './constants.js';
 
@@ -57,8 +58,7 @@ export function configuredRelayUrls(
   }
 }
 
-export function relayModeFromEnv(environment: RelayEnvironment = process.env) {
-  const urls = configuredRelayUrls(environment);
+function relayToken(environment: RelayEnvironment) {
   const authToken = environment.GYBLOS_RELAY_TOKEN;
   if (!authToken)
     throw new RelayConfigurationError(
@@ -70,10 +70,33 @@ export function relayModeFromEnv(environment: RelayEnvironment = process.env) {
       RELAY_CONFIGURATION_CODES.INVALID_TOKEN,
       'GYBLOS_RELAY_TOKEN must be a nonempty token without whitespace or control characters.',
     );
+  if (
+    authToken.length < RELAY_TOKEN_LENGTH.min ||
+    authToken.length > RELAY_TOKEN_LENGTH.max
+  )
+    throw new RelayConfigurationError(
+      RELAY_CONFIGURATION_CODES.INVALID_TOKEN_LENGTH,
+      `GYBLOS_RELAY_TOKEN must contain ${RELAY_TOKEN_LENGTH.min} to ${RELAY_TOKEN_LENGTH.max} characters.`,
+    );
+  return authToken;
+}
+
+function isOwnedRelay(url: string) {
+  const { hostname } = new URL(url);
+  return IROH_RELAYS.ownedHosts.some((host) => host === hostname);
+}
+
+export function relayModeFromEnv(environment: RelayEnvironment = process.env) {
+  const urls = configuredRelayUrls(environment);
+  const authToken = relayToken(environment);
   try {
     const map = RelayMap.empty();
     for (const url of urls)
-      map.insert({ url, quicPort: IROH_RELAYS.quicPort, authToken });
+      map.insert(
+        isOwnedRelay(url)
+          ? { url, quicPort: IROH_RELAYS.quicPort, authToken }
+          : { url, quicPort: IROH_RELAYS.quicPort },
+      );
     return RelayMode.custom(map);
   } catch {
     throw new RelayConfigurationError(
@@ -99,4 +122,17 @@ export function assertConfiguredRelay(
       RELAY_CONFIGURATION_CODES.UNCONFIGURED,
       'Unconfigured relay rejected.',
     );
+  return normalized;
+}
+
+export function requireConfiguredRelay(
+  relayUrl: string | null | undefined,
+  environment: RelayEnvironment = process.env,
+) {
+  if (!relayUrl)
+    throw new RelayConfigurationError(
+      RELAY_CONFIGURATION_CODES.REQUIRED,
+      'Relay-only mode requires a configured relay in the seller offer.',
+    );
+  return assertConfiguredRelay(relayUrl, environment);
 }
