@@ -77,7 +77,7 @@ export class ControlAdmission {
   }
   private sweep(now: number) {
     for (const query of this.queries)
-      if (now >= query.deadline) this.release(query, true, now);
+      if (now >= query.deadline) this.release(query, true, query.deadline);
     for (const connection of this.connections)
       if (
         !connection.queries.size &&

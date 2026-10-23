@@ -45,6 +45,12 @@ void test('control query deadline is absolute while connection idle deadlines ar
   assert.throws(() => connection.beginQuery(), {
     code: CONTROL_CODES.CANCELLED,
   });
+  let delayedNow = 0;
+  const delayed = new ControlAdmission(() => delayedNow);
+  const abandoned = delayed.openConnection(peer(2));
+  abandoned.beginQuery();
+  delayedNow = CONTROL_CAPACITY.queryMs + CONTROL_CAPACITY.connectionIdleMs + 1;
+  assert.throws(() => abandoned.check(), { code: CONTROL_CODES.CANCELLED });
 });
 void test('control rate limits count repeated and malformed attempts before parsing and refill by time', () => {
   let now = 0;
