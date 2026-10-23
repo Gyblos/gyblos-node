@@ -1,11 +1,11 @@
 // Evidence types for the inference gate (GYB-GATE-0005): per-case results, engine traces and
 // on-chain open/claim transfers.
+import type { Measurement } from '@gyblos/buyer/measurements';
 import { type ConfigAssetLabel } from '@gyblos/config/constants';
 import type { ObservedDoneReason } from '@gyblos/core/constants';
 import type { PRICES, TOLERANCE } from '@gyblos/core/metering';
 import type { MODEL } from '@gyblos/engine-ollama';
 import type { GENERATION } from '@gyblos/engine-ollama/constants';
-import type { Measurement } from '@gyblos/node/measurements';
 import type {
   inferenceSnapshot,
   transactionTransfers,

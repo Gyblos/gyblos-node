@@ -1,14 +1,14 @@
 // Harness-only vocabulary: evidence IDs and statuses, case names, funding operations and schema
 // versions. Shared wallet, journal and guard values are imported from their owning packages.
 import {
-  CONFIG_SCHEMA_VERSION,
-  type ConfigAssetLabel,
-} from '@gyblos/config/constants';
-import {
   ERROR_DIAGNOSTICS,
   INFERENCE_CASES,
   MEASUREMENT_SCHEMA_VERSION,
-} from '@gyblos/node/constants';
+} from '@gyblos/buyer/constants';
+import {
+  CONFIG_SCHEMA_VERSION,
+  type ConfigAssetLabel,
+} from '@gyblos/config/constants';
 import { type ProtocolErrorCode } from '@gyblos/protocol/constants';
 
 export const EXACT_PRICE = '10000';

@@ -8,13 +8,13 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import type { CallPaymentObservation } from '@gyblos/buyer/call-evidence';
-import type {
-  CallOutcome,
-  CallPhase,
-  P2pJournalState,
+import {
+  type CallOutcome,
+  type CallPhase,
+  type ErrorDiagnosticCode,
+  type P2pJournalState,
 } from '@gyblos/buyer/constants';
 import { P2P } from '@gyblos/config';
-import type { ErrorDiagnosticCode } from '@gyblos/node/constants';
 
 const SOURCE = new URL('../../', import.meta.url);
 const SIGNATURE = '1'.repeat(64);

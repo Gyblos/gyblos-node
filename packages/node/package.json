@@ -7,14 +7,11 @@
     ".": "./src/index.ts",
     "./artifacts": "./src/artifacts.ts",
     "./constants": "./src/constants.ts",
-    "./diagnostics": "./src/diagnostics.ts",
     "./engine-readiness": "./src/engine-readiness.ts",
     "./http/inference": "./src/http/inference.ts",
     "./lifecycle": "./src/lifecycle.ts",
-    "./measurements": "./src/measurements.ts",
     "./offers": "./src/offers.ts",
-    "./roles": "./src/roles.ts",
-    "./synthetic-cases": "./src/synthetic-cases.ts"
+    "./roles": "./src/roles.ts"
   },
   "dependencies": {
     "@gyblos/core": "workspace:*",

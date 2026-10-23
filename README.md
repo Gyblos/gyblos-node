@@ -126,7 +126,7 @@ packages/engine-ollama/ Ollama client and tokenizer
 packages/payments-x402/ x402 payments, facilitator, chain proofs, recovery locks
 packages/transport-iroh/ HTTP over Iroh, relays, admission limits
 packages/identity/      8004 registry adapter (not wired yet)
-packages/node/          seller composition used by apps/node and apps/buyer
+packages/node/          seller composition; roles and offers shared with apps/buyer
 lab/harness/            gate:* proof-of-concept checks, exact scheme, fixed-price test seller (Docker/NAT lab: tag archive/poc-lab-2026-10)
 lab/tools/              identity devnet tools
 lab/evidence/           three published, redacted run reports

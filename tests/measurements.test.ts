@@ -5,8 +5,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
+import { measurementRow, measurementSalt } from '@gyblos/buyer/measurements';
 import { CHARGE_ANOMALIES } from '@gyblos/core/constants';
-import { measurementRow, measurementSalt } from '@gyblos/node/measurements';
 
 void test('invalid elapsed time never becomes infinite throughput', () => {
   const input = {

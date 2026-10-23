@@ -9,10 +9,10 @@ import { encodePaymentResponseHeader } from '@x402/core/http';
 import {
   CALL_OUTCOMES,
   CALL_PHASES,
+  ERROR_DIAGNOSTICS,
   P2P_JOURNAL_STATES,
 } from '@gyblos/buyer/constants';
-import { ERROR_DIAGNOSTICS } from '@gyblos/node/constants';
-import { errorDiagnostic } from '@gyblos/node/diagnostics';
+import { errorDiagnostic } from '@gyblos/buyer/diagnostics';
 import {
   createBuyer,
   type BuyerResponseObservation,

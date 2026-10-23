@@ -8,6 +8,8 @@ import { readFile } from 'node:fs/promises';
 import type { Server } from 'node:http';
 import { resolve } from 'node:path';
 
+import { measurementSalt } from '@gyblos/buyer/measurements';
+import { createCases } from '@gyblos/buyer/synthetic-cases';
 import {
   DIAGNOSTIC_LIMITS,
   ENTRYPOINTS,
@@ -29,8 +31,6 @@ import { createModelTokenizer, createOllama } from '@gyblos/engine-ollama';
 import { GENERATION } from '@gyblos/engine-ollama/constants';
 import { createOllamaEngine } from '@gyblos/engine-ollama/engine';
 import { createInferenceSeller } from '@gyblos/node/http/inference';
-import { measurementSalt } from '@gyblos/node/measurements';
-import { createCases } from '@gyblos/node/synthetic-cases';
 import {
   confirmInference,
   inferenceSnapshot,

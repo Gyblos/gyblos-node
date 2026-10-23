@@ -2,6 +2,7 @@
 // measurement and evidence, then journals the result. Pauses between cases for RPC rate limits.
 import assert from 'node:assert/strict';
 
+import { appendMeasurement, measurementRow } from '@gyblos/buyer/measurements';
 import { INFERENCE_TRANSPORT_PATH, TIMEOUTS } from '@gyblos/config';
 import { WALLET_ROLES } from '@gyblos/config/constants';
 import { signer } from '@gyblos/config/wallet';
@@ -10,7 +11,6 @@ import { assessCharge, OFFER_ID } from '@gyblos/core/metering';
 import { MODEL } from '@gyblos/engine-ollama';
 import { GENERATION, MODEL_LIMITS } from '@gyblos/engine-ollama/constants';
 import { inferenceCeiling } from '@gyblos/node/http/inference';
-import { appendMeasurement, measurementRow } from '@gyblos/node/measurements';
 import { inferenceSnapshot } from '@gyblos/payments-x402/accounting/chain';
 import { DEVNET, JOURNAL_STATES } from '@gyblos/payments-x402/constants';
 import { createInferenceBuyer } from '@gyblos/payments-x402/inference-buyer';

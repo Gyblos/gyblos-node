@@ -17,13 +17,13 @@ are in [stack.md](stack.md).
 | `packages/payments-x402`  | adapter  | x402 `upto`, facilitator, buyer signer, on-chain proofs, recovery locks.                                              |
 | `packages/transport-iroh` | adapter  | Iroh endpoint, HTTP over QUIC, relay policy, admission limits.                                                        |
 | `packages/identity`       | adapter  | 8004 registry adapter; not used by the node yet ([identity.md](identity.md)).                                         |
-| `packages/node`           | node     | Seller composition (`createNode`), roles and keys, signed offers, measurements.                                       |
+| `packages/node`           | node     | Seller composition (`createNode`), roles and keys, signed offers.                                                     |
 
-| App                | Command                        | Responsibility                                    |
-| ------------------ | ------------------------------ | ------------------------------------------------- |
-| `apps/node`        | `node:start` (`main.ts`)       | Seller daemon.                                    |
-| `apps/buyer`       | `buyer:start`, `p2p:reconcile` | Buyer proxy, one paid call (`call.ts`), recovery. |
-| `apps/facilitator` | `gate:facilitator`             | Standalone local facilitator.                     |
+| App                | Command                        | Responsibility                                                  |
+| ------------------ | ------------------------------ | --------------------------------------------------------------- |
+| `apps/node`        | `node:start` (`main.ts`)       | Seller daemon.                                                  |
+| `apps/buyer`       | `buyer:start`, `p2p:reconcile` | Buyer proxy, one paid call (`call.ts`), measurements, recovery. |
+| `apps/facilitator` | `gate:facilitator`             | Standalone local facilitator.                                   |
 
 `lab/harness` holds the `gate:*` proof-of-concept checks (including the x402
 `exact` scheme, the fixed-price test seller and the gate runner), `lab/tools`

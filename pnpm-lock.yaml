@@ -105,6 +105,9 @@ importers:
       '@gyblos/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@gyblos/engine-ollama':
+        specifier: workspace:*
+        version: link:../../packages/engine-ollama
       '@gyblos/node':
         specifier: workspace:*
         version: link:../../packages/node
@@ -156,6 +159,9 @@ importers:
 
   lab/harness:
     dependencies:
+      '@gyblos/buyer':
+        specifier: workspace:*
+        version: link:../../apps/buyer
       '@gyblos/config':
         specifier: workspace:*
         version: link:../../packages/config

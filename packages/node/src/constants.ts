@@ -1,33 +1,7 @@
-// Node measurement schema version, error diagnostic codes, synthetic inference case names and lifecycle
-// states. Values only; no wallet, network or process actions.
-import type { ProtocolErrorCode } from '@gyblos/protocol/constants';
-
-export const MEASUREMENT_SCHEMA_VERSION = 1;
-
-export const ERROR_DIAGNOSTICS = {
-  ASSERTION: 'ASSERTION_FAILED',
-  UNKNOWN: 'EXECUTION_INTERRUPTED_OR_UNKNOWN',
-  ABORTED: 'REQUEST_ABORTED',
-  TIMEOUT: 'REQUEST_TIMEOUT',
-  RESPONSE_INVALID: 'RESPONSE_INVALID',
-} as const;
-
-export const INFERENCE_CASES = {
-  HONEST_1: 'honest-1',
-  HONEST_2: 'honest-2',
-  HONEST_3: 'honest-3',
-  OVERCHARGE: 'overcharge',
-  UNDERCHARGE: 'undercharge',
-  ENGINE_INTERRUPTED: 'engine-interrupted',
-} as const;
-
+// Seller node lifecycle states. Values only; no wallet, network or process actions.
 export const NODE_STATES = {
   STOPPED: 'stopped',
   STARTING: 'starting',
   RUNNING: 'running',
 } as const;
 export type NodeState = (typeof NODE_STATES)[keyof typeof NODE_STATES];
-
-export type ErrorDiagnosticCode =
-  | ProtocolErrorCode
-  | (typeof ERROR_DIAGNOSTICS)[keyof typeof ERROR_DIAGNOSTICS];
