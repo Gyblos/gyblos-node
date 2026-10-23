@@ -1,4 +1,4 @@
-// Registers finalized-proof read cases: lagging or missing deposit reads retry within budget and claim
+// Checks finalized-proof read cases: lagging or missing deposit reads retry within budget and claim
 // slot, without relaxing conservation or picking among duplicate deposits.
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -11,7 +11,7 @@ import { COMMITMENT, RETRIES, TOKEN_PROGRAM_ADDRESS } from '@gyblos/config';
 import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { ProtocolError } from '@gyblos/protocol/errors';
 
-import { paymentFixture } from './payment-fixture.js';
+import { paymentFixture } from './support/payment-fixture.js';
 
 interface ReadFaults {
   laggingIndex?: boolean;
@@ -141,84 +141,79 @@ async function withProofReads(
   }
 }
 
-export function registerProofReadCases() {
-  void test('a lagging deposit index is reread without another payment', async () => {
-    await withProofReads({ laggingIndex: true }, async ({ run, histories }) => {
-      const proof = await run();
-      assert.equal(histories(), 2);
-      assert.ok(BigInt(proof.chargedAtomic) > 0n);
-    });
+void test('a lagging deposit index is reread without another payment', async () => {
+  await withProofReads({ laggingIndex: true }, async ({ run, histories }) => {
+    const proof = await run();
+    assert.equal(histories(), 2);
+    assert.ok(BigInt(proof.chargedAtomic) > 0n);
   });
-  void test('the known claim slot constrains subsequent history and account reads', async () => {
-    await withProofReads({ requireContext: true }, async ({ run }) => {
-      await run();
-    });
+});
+void test('the known claim slot constrains subsequent history and account reads', async () => {
+  await withProofReads({ requireContext: true }, async ({ run }) => {
+    await run();
   });
-  void test('a post-claim snapshot older than the claim slot cannot pass coincidentally matching balances', async () => {
-    await withProofReads({ staleSnapshot: true }, async ({ run }) => {
-      await assert.rejects(run, /snapshot.*claim slot/i);
-    });
+});
+void test('a post-claim snapshot older than the claim slot cannot pass coincidentally matching balances', async () => {
+  await withProofReads({ staleSnapshot: true }, async ({ run }) => {
+    await assert.rejects(run, /snapshot.*claim slot/i);
   });
-  void test('deposit discovery is observable before a later snapshot guard rejects the proof', async () => {
-    const { expected } = await paymentFixture();
-    const observed: PaymentProofObservation[] = [];
-    await withProofReads({ staleSnapshot: true }, async ({ run }) => {
-      await assert.rejects(
-        run((value) => {
-          observed.push(value);
-        }),
-        /snapshot.*claim slot/i,
-      );
-    });
-    assert.deepEqual(observed, [
-      {
-        depositSignature: expected.depositSignature,
-        claimSignature: expected.claimSignature,
-      },
-    ]);
-  });
-  void test('malformed or missing claim slots stop before history or snapshot reads', async () => {
-    for (const claimSlot of [
-      undefined,
-      null,
-      -1,
-      1.5,
-      Number.MAX_SAFE_INTEGER + 1,
-      '1',
-    ])
-      await withProofReads(
-        { claimSlot },
-        async ({ run, histories, methods }) => {
-          await assert.rejects(run, /claim.*invalid slot/i);
-          assert.equal(histories(), 0);
-          assert.equal(methods.includes('getMultipleAccounts'), false);
-        },
-      );
-  });
-  void test('missing deposit visibility stops at the configured read budget', async () => {
-    await withProofReads({ missingIndex: true }, async ({ run, histories }) => {
-      await assert.rejects(
-        run,
-        (error: unknown) =>
-          error instanceof ProtocolError &&
-          error.code === PROTOCOL_ERROR_CODES.TRANSACTION_UNKNOWN,
-      );
-      assert.equal(histories(), RETRIES.transaction);
-    });
-  });
-  void test('read retries do not relax charge-plus-refund conservation', async () => {
-    await withProofReads({ wrongCeiling: true }, async ({ run, histories }) => {
-      await assert.rejects(run, assert.AssertionError);
-      assert.equal(histories(), 0);
-    });
-  });
-  void test('ambiguous duplicate deposits fail instead of selecting one through retries', async () => {
-    await withProofReads(
-      { duplicateDeposit: true },
-      async ({ run, histories }) => {
-        await assert.rejects(run, assert.AssertionError);
-        assert.equal(histories(), 1);
-      },
+});
+void test('deposit discovery is observable before a later snapshot guard rejects the proof', async () => {
+  const { expected } = await paymentFixture();
+  const observed: PaymentProofObservation[] = [];
+  await withProofReads({ staleSnapshot: true }, async ({ run }) => {
+    await assert.rejects(
+      run((value) => {
+        observed.push(value);
+      }),
+      /snapshot.*claim slot/i,
     );
   });
-}
+  assert.deepEqual(observed, [
+    {
+      depositSignature: expected.depositSignature,
+      claimSignature: expected.claimSignature,
+    },
+  ]);
+});
+void test('malformed or missing claim slots stop before history or snapshot reads', async () => {
+  for (const claimSlot of [
+    undefined,
+    null,
+    -1,
+    1.5,
+    Number.MAX_SAFE_INTEGER + 1,
+    '1',
+  ])
+    await withProofReads({ claimSlot }, async ({ run, histories, methods }) => {
+      await assert.rejects(run, /claim.*invalid slot/i);
+      assert.equal(histories(), 0);
+      assert.equal(methods.includes('getMultipleAccounts'), false);
+    });
+});
+void test('missing deposit visibility stops at the configured read budget', async () => {
+  await withProofReads({ missingIndex: true }, async ({ run, histories }) => {
+    await assert.rejects(
+      run,
+      (error: unknown) =>
+        error instanceof ProtocolError &&
+        error.code === PROTOCOL_ERROR_CODES.TRANSACTION_UNKNOWN,
+    );
+    assert.equal(histories(), RETRIES.transaction);
+  });
+});
+void test('read retries do not relax charge-plus-refund conservation', async () => {
+  await withProofReads({ wrongCeiling: true }, async ({ run, histories }) => {
+    await assert.rejects(run, assert.AssertionError);
+    assert.equal(histories(), 0);
+  });
+});
+void test('ambiguous duplicate deposits fail instead of selecting one through retries', async () => {
+  await withProofReads(
+    { duplicateDeposit: true },
+    async ({ run, histories }) => {
+      await assert.rejects(run, assert.AssertionError);
+      assert.equal(histories(), 1);
+    },
+  );
+});

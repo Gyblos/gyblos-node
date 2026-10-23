@@ -1,5 +1,5 @@
 // Checks P2P buyer payment policy: per-request ceilings before signing, the exclusive buyer lock and
-// single-process CLI, plus the call, lock, recovery and signature-hint suites.
+// single-process CLI.
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -15,11 +15,7 @@ import { createInferenceBuyer } from '@gyblos/payments-x402/inference-buyer';
 import { withExclusiveLock } from '@gyblos/payments-x402/recovery/lock';
 import { saveJson } from '@gyblos/runtime';
 
-import { registerCallCases } from './support/call-cases.js';
-import { registerLockCases } from './support/lock-cases.js';
 import { NATIVE_CAPABILITY } from './support/native-runtime.js';
-import { registerRecoveryCases } from './support/recovery-cases.js';
-import { registerSignatureBuyerCases } from './support/signature-buyer-cases.js';
 
 void test('request-specific ceiling rejects altered challenges before any signature or paid request', async () => {
   const original = globalThis.fetch;
@@ -168,10 +164,3 @@ void test(
     }
   },
 );
-
-registerLockCases();
-registerRecoveryCases();
-
-registerCallCases();
-
-registerSignatureBuyerCases();

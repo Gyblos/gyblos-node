@@ -1,5 +1,5 @@
 // Checks the bounded HTTP wire: raw request and x402 header preservation, route and smuggling rejection,
-// peer limits and deadlines, plus the admission and limiter suites.
+// peer limits and deadlines.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -12,9 +12,6 @@ import {
   encodeRequest,
   encodeResponse,
 } from '@gyblos/transport-iroh/wire';
-
-import { registerAdmissionCases } from './support/admission-cases.js';
-import { registerLimiterCases } from './support/limiter-cases.js';
 
 const REQUEST = {
   method: 'POST',
@@ -113,6 +110,3 @@ void test('deadline closes the native connection rather than waiting for a locke
   );
   assert.equal(closed, true);
 });
-
-registerAdmissionCases();
-registerLimiterCases();

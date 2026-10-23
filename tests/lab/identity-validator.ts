@@ -10,7 +10,7 @@ import { createSolanaRpc } from '@solana/kit';
 import { DEVNET_RPC_URL, FILE_MODES, LOCALHOST } from '@gyblos/config';
 import { DEVNET_REGISTRY, PROGRAMS } from '@gyblos/identity/constants';
 
-import type { SyntheticChain } from './identity-accounts.js';
+import type { SyntheticChain } from '../support/identity-accounts.js';
 
 const VALIDATOR_BINARY = 'solana-test-validator';
 // Synthetic loopback ports kept inside 18000-19999: RPC (plus RPC_PORT + 1 for websockets), faucet, gossip

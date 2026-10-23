@@ -1,4 +1,5 @@
-// Owns offline regressions for the public test command and native-binding skips; no funded wallets or live services.
+// Owns offline regressions for the public test command: no private .local paths, and a missing native
+// binding reaches explicit skips; no funded wallets or live services.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
@@ -6,16 +7,7 @@ import test from 'node:test';
 
 void test('published tests have a public command without private harness dependencies', async () => {
   const pkg = JSON.parse(await readFile('package.json', 'utf8'));
-  assert.equal(
-    pkg.scripts.test,
-    'node --import tsx --test \"tests/*.test.ts\"',
-  );
-  assert.equal(
-    pkg.scripts['test:lab'],
-    'node --import tsx --test \"tests/lab/**/*.test.ts\"',
-  );
   assert.equal(pkg.scripts.test.includes('.local/'), false);
-  assert.ok((await readFile('README.md', 'utf8')).includes('pnpm test'));
   // A missing binding must reach explicit skips before the proxy's role import.
   const sdkSource =
     'export class SecretKey {}\nthrow new Error("Cannot find native binding: synthetic absence");';

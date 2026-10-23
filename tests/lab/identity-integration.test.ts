@@ -44,17 +44,17 @@ import {
   runSponsoredFlow,
   type FlowParticipants,
   type FlowResult,
-} from '../lab/tools/identity-flow.js';
+} from '../../lab/tools/identity-flow.js';
 import {
   addClaimant,
   burnedCoreAssetBytes,
   type SyntheticChain,
-} from './support/identity-accounts.js';
+} from '../support/identity-accounts.js';
 import {
   startLocalValidator,
   VALIDATOR_SKIP,
   type LocalValidator,
-} from './support/identity-validator.js';
+} from './identity-validator.js';
 
 const SPONSOR_AIRDROP = lamports(2_000_000_000n);
 const AGENT_URI = 'https://gyblos.com/.well-known/node.json';

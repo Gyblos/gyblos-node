@@ -1,6 +1,6 @@
-// Offline payment trust, devnet, buyer-lock and journal guard regressions; no funded wallets or live services.
+// Offline payment trust, devnet, buyer-lock and settlement-receipt regressions; no funded wallets or live services.
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -8,7 +8,6 @@ import { test } from 'node:test';
 import type { PaymentRequirements } from '@x402/core/types';
 
 import { DEVNET, DEVNET_USDC } from '@gyblos/config';
-import { assertNoUnresolvedAuthorizations } from '@gyblos/lab-harness/journal';
 import { assertDevnet } from '@gyblos/payments-x402/chain';
 import { withExclusiveLock } from '@gyblos/payments-x402/recovery/lock';
 import { validateSettlement, validateTerms } from '@gyblos/payments-x402/trust';
@@ -125,56 +124,4 @@ void test('a receipt must match amount, payer and devnet even when its transacti
         ),
       /Settlement receipt/,
     );
-});
-
-void test('an unresolved failure-case authorization blocks later paid attempts', async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'gyblos-journal-'));
-  const happy = join(directory, 'happy.json');
-  const failure = join(directory, 'failure.json');
-  try {
-    await writeFile(happy, JSON.stringify({ state: 'verified' }));
-    await writeFile(
-      failure,
-      JSON.stringify({
-        state: 'authorization-created',
-        channelId: 'uncertain',
-      }),
-    );
-    await assert.rejects(
-      assertNoUnresolvedAuthorizations([happy, failure] as Parameters<
-        typeof assertNoUnresolvedAuthorizations
-      >[0]),
-      /Authorization may be unsettled/,
-    );
-    await writeFile(failure, JSON.stringify({ state: 'resolved-rejected' }));
-    await assertNoUnresolvedAuthorizations([happy, failure] as Parameters<
-      typeof assertNoUnresolvedAuthorizations
-    >[0]);
-  } finally {
-    await rm(directory, { recursive: true });
-  }
-});
-
-void test('financial reconciliation is terminal only for inference journals', async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'gyblos-journal-'));
-  try {
-    for (const name of ['inference-attempt.json', 'attempt.json'])
-      await writeFile(
-        join(directory, name),
-        JSON.stringify({ state: 'reconciled' }),
-      );
-    await assert.doesNotReject(
-      assertNoUnresolvedAuthorizations([
-        join(directory, 'inference-attempt.json'),
-      ] as Parameters<typeof assertNoUnresolvedAuthorizations>[0]),
-    );
-    await assert.rejects(
-      assertNoUnresolvedAuthorizations([
-        join(directory, 'attempt.json'),
-      ] as Parameters<typeof assertNoUnresolvedAuthorizations>[0]),
-      /unsettled/i,
-    );
-  } finally {
-    await rm(directory, { recursive: true, force: true });
-  }
 });

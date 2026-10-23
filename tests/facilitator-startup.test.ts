@@ -1,4 +1,4 @@
-// Registers a child-process case checking that the standalone facilitator closes its diagnostic log
+// Checks a child-process case checking that the standalone facilitator closes its diagnostic log
 // after a startup refusal.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -7,10 +7,13 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { diagnosticDirectory, rm } from './facilitator-diagnostic-fixture.js';
-import { PRIVATE_LOG_PLATFORM_SKIP } from './private-log-fixture.js';
+import {
+  diagnosticDirectory,
+  rm,
+} from './support/facilitator-diagnostic-fixture.js';
+import { PRIVATE_LOG_PLATFORM_SKIP } from './support/private-log-fixture.js';
 
-const SOURCE = new URL('../../', import.meta.url);
+const SOURCE = new URL('../', import.meta.url);
 const CHILD_TIMEOUT_MS = 15000;
 const CHILD_OUTPUT_BYTES = 64 * 1024;
 
@@ -53,52 +56,50 @@ function startupProbe(directory: string) {
     process.stdout.write('DIAG_STARTUP '+JSON.stringify(result)+'\\n');`;
 }
 
-export function registerFacilitatorStartupCases() {
-  void test(
-    'standalone facilitator closes its real diagnostic log after startup refusal',
-    { timeout: 20000, skip: PRIVATE_LOG_PLATFORM_SKIP },
-    async () => {
-      const directory = await diagnosticDirectory();
-      try {
-        const script = join(directory, 'startup.mjs');
-        await writeFile(script, startupProbe(directory), { mode: 0o600 });
-        const child = spawnSync(
-          process.execPath,
-          [
-            '--import',
-            fileURLToPath(new URL('node_modules/tsx/dist/loader.mjs', SOURCE)),
-            script,
-          ],
-          {
-            cwd: directory,
-            timeout: CHILD_TIMEOUT_MS,
-            killSignal: 'SIGKILL',
-            maxBuffer: CHILD_OUTPUT_BYTES,
-            encoding: 'utf8',
-            env: {
-              PATH: process.env.PATH,
-              TMPDIR: process.env.TMPDIR,
-              HOME: directory,
-            },
+void test(
+  'standalone facilitator closes its real diagnostic log after startup refusal',
+  { timeout: 20000, skip: PRIVATE_LOG_PLATFORM_SKIP },
+  async () => {
+    const directory = await diagnosticDirectory();
+    try {
+      const script = join(directory, 'startup.mjs');
+      await writeFile(script, startupProbe(directory), { mode: 0o600 });
+      const child = spawnSync(
+        process.execPath,
+        [
+          '--import',
+          fileURLToPath(new URL('node_modules/tsx/dist/loader.mjs', SOURCE)),
+          script,
+        ],
+        {
+          cwd: directory,
+          timeout: CHILD_TIMEOUT_MS,
+          killSignal: 'SIGKILL',
+          maxBuffer: CHILD_OUTPUT_BYTES,
+          encoding: 'utf8',
+          env: {
+            PATH: process.env.PATH,
+            TMPDIR: process.env.TMPDIR,
+            HOME: directory,
           },
-        );
-        assert.ifError(child.error);
-        assert.equal(child.signal, null);
-        assert.equal(child.status, 0, child.stderr);
-        assert.ok(child.stdout.includes('DIAG_STARTUP '), child.stderr);
-        const result: StartupResult = JSON.parse(
-          child.stdout.split('DIAG_STARTUP ')[1]!.split('\n')[0]!,
-        );
-        assert.deepEqual(result, {
-          rejected: true,
-          logCreated: true,
-          closeCalls: 1,
-          closed: true,
-          network: 0,
-        });
-      } finally {
-        await rm(directory, { recursive: true });
-      }
-    },
-  );
-}
+        },
+      );
+      assert.ifError(child.error);
+      assert.equal(child.signal, null);
+      assert.equal(child.status, 0, child.stderr);
+      assert.ok(child.stdout.includes('DIAG_STARTUP '), child.stderr);
+      const result: StartupResult = JSON.parse(
+        child.stdout.split('DIAG_STARTUP ')[1]!.split('\n')[0]!,
+      );
+      assert.deepEqual(result, {
+        rejected: true,
+        logCreated: true,
+        closeCalls: 1,
+        closed: true,
+        network: 0,
+      });
+    } finally {
+      await rm(directory, { recursive: true });
+    }
+  },
+);
