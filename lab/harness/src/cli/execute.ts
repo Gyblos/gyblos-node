@@ -16,7 +16,6 @@ import {
 } from '@gyblos/config';
 import { WALLET_ROLES } from '@gyblos/config/constants';
 import { loadConfig, signer } from '@gyblos/config/wallet';
-import { runGate } from '@gyblos/core';
 import { createBuyer } from '@gyblos/payments-x402';
 import {
   account,
@@ -42,6 +41,7 @@ import { saveJson } from '@gyblos/runtime';
 
 import { EVIDENCE_STATUSES, SCHEMA_VERSIONS } from '../constants.js';
 import type { FixedGateEvidence } from '../fixture-evidence-types.js';
+import { runGate } from '../gate.js';
 import { assertNoUnresolvedAuthorizations, saveJournal } from '../journal.js';
 
 const JOURNAL_PATH = JOURNAL_PATHS.fixed;

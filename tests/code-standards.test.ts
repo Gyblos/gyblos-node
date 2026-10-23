@@ -18,7 +18,7 @@ import { JOURNAL_STATES } from '@gyblos/payments-x402/constants';
 import standards from '../tooling/code-standards.js';
 
 const eslint = new ESLint();
-const filePath = resolve('packages/core/src/gate.ts');
+const filePath = resolve('packages/core/src/metering.ts');
 async function rules(code: string) {
   const [result] = await eslint.lintText(code, { filePath });
   return result!.messages.map((message) => message.ruleId);

@@ -4,11 +4,6 @@ import assert from 'node:assert/strict';
 
 import { WALLET_ROLES } from '@gyblos/config/constants';
 import { signer } from '@gyblos/config/wallet';
-import { EXACT_PRICE } from '@gyblos/core/constants';
-import {
-  createExactBuyer,
-  validateExactTerms,
-} from '@gyblos/payments-x402/exact/index';
 import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { ProtocolError } from '@gyblos/protocol/errors';
 
@@ -16,8 +11,10 @@ import {
   CASE_STATUSES,
   EXACT_CASES,
   EXACT_ENFORCEMENT,
+  EXACT_PRICE,
   EXACT_UNTRUSTED_CASES,
 } from '../../constants.js';
+import { createExactBuyer, validateExactTerms } from '../../exact/index.js';
 import type { createChallenge } from './challenge.js';
 import { snapshot } from './reconcile.js';
 import type { ExactContext } from './types.js';

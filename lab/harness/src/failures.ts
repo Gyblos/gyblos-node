@@ -37,11 +37,11 @@ import {
 } from '@gyblos/payments-x402/constants';
 import { createFacilitator } from '@gyblos/payments-x402/facilitator';
 import { withExclusiveLock } from '@gyblos/payments-x402/recovery/lock';
-import { createGateSeller } from '@gyblos/payments-x402/seller';
 import { saveJson } from '@gyblos/runtime';
 
 import { CASE_STATUSES, FAILURE_CASES, SCHEMA_VERSIONS } from './constants.js';
 import { prepareFailureAccounts } from './failure-setup.js';
+import { createGateSeller } from './fixed-seller.js';
 import type {
   FailureCaseResult,
   FailureGateEvidence,

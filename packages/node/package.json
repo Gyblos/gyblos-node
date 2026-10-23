@@ -9,7 +9,6 @@
     "./constants": "./src/constants.ts",
     "./diagnostics": "./src/diagnostics.ts",
     "./engine-readiness": "./src/engine-readiness.ts",
-    "./http/exact": "./src/http/exact.ts",
     "./http/inference": "./src/http/inference.ts",
     "./lifecycle": "./src/lifecycle.ts",
     "./measurements": "./src/measurements.ts",

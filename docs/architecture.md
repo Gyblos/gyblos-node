@@ -14,19 +14,20 @@ are in [stack.md](stack.md).
 | `packages/config`         | config   | Devnet addresses, ports, paths, limits, relay defaults, wallet loading.                                               |
 | `packages/runtime`        | runtime  | Atomic JSON writes, private rotating logs, processes, memory probes, loopback `Host` guard.                           |
 | `packages/engine-ollama`  | adapter  | Ollama client, `Engine` adapter, pinned tokenizer and model constants.                                                |
-| `packages/payments-x402`  | adapter  | x402 `upto`/`exact`, facilitator, buyer signer, on-chain proofs, recovery locks.                                      |
+| `packages/payments-x402`  | adapter  | x402 `upto`, facilitator, buyer signer, on-chain proofs, recovery locks.                                              |
 | `packages/transport-iroh` | adapter  | Iroh endpoint, HTTP over QUIC, relay policy, admission limits.                                                        |
 | `packages/identity`       | adapter  | 8004 registry adapter; not used by the node yet ([identity.md](identity.md)).                                         |
 | `packages/node`           | node     | Seller composition (`createNode`), roles and keys, signed offers, measurements.                                       |
 
-| App                | Command                                              | Responsibility                                    |
-| ------------------ | ---------------------------------------------------- | ------------------------------------------------- |
-| `apps/node`        | `node:start` (`main.ts`), `gate:seller` (`fixed.ts`) | Seller daemon; fixed-price test seller.           |
-| `apps/buyer`       | `buyer:start`, `p2p:reconcile`                       | Buyer proxy, one paid call (`call.ts`), recovery. |
-| `apps/facilitator` | `gate:facilitator`                                   | Standalone local facilitator.                     |
+| App                | Command                        | Responsibility                                    |
+| ------------------ | ------------------------------ | ------------------------------------------------- |
+| `apps/node`        | `node:start` (`main.ts`)       | Seller daemon.                                    |
+| `apps/buyer`       | `buyer:start`, `p2p:reconcile` | Buyer proxy, one paid call (`call.ts`), recovery. |
+| `apps/facilitator` | `gate:facilitator`             | Standalone local facilitator.                     |
 
-`lab/harness` holds the `gate:*` proof-of-concept checks, `lab/tools` the
-identity devnet tools and `lab/evidence` the published reports. `tests/` and
+`lab/harness` holds the `gate:*` proof-of-concept checks (including the x402
+`exact` scheme, the fixed-price test seller and the gate runner), `lab/tools`
+the identity devnet tools and `lab/evidence` the published reports. `tests/` and
 `tooling/` verify everything and may import any layer.
 
 ## Dependency rule

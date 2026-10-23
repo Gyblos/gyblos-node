@@ -11,6 +11,14 @@ import {
 } from '@gyblos/node/constants';
 import { type ProtocolErrorCode } from '@gyblos/protocol/constants';
 
+export const EXACT_PRICE = '10000';
+
+export const PUBLIC_CALL_OUTCOMES = {
+  SUCCESS: 'success',
+  REJECTED: 'rejected',
+  UNCERTAIN: 'uncertain',
+} as const;
+
 export const EXACT_EVIDENCE_CODES = {
   GATE_ERROR: 'GATE_ERROR',
 } as const;
@@ -123,3 +131,6 @@ export type EvidenceAssetLabel =
 
 export type FundingOperation =
   (typeof FUNDING_OPERATIONS)[keyof typeof FUNDING_OPERATIONS];
+
+export type PublicCallOutcome =
+  (typeof PUBLIC_CALL_OUTCOMES)[keyof typeof PUBLIC_CALL_OUTCOMES];

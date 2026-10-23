@@ -6,16 +6,13 @@ import { encodePaymentSignatureHeader } from '@x402/core/http';
 
 import { COMMITMENT, HTTP_STATUS, TIMEOUTS } from '@gyblos/config';
 import { WALLET_ROLES } from '@gyblos/config/constants';
-import { EXACT_PRICE } from '@gyblos/core/constants';
 import { type ChainTransaction } from '@gyblos/payments-x402/accounting/types';
 import { confirm, explorer, rpc } from '@gyblos/payments-x402/chain';
 import {
   DEVNET,
   JOURNAL_STATES,
   PUBLIC_CALL_OPERATIONS,
-  PUBLIC_CALL_OUTCOMES,
 } from '@gyblos/payments-x402/constants';
-import { assertExactFallbackSafe } from '@gyblos/payments-x402/exact/index';
 import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { ProtocolError } from '@gyblos/protocol/errors';
 
@@ -23,9 +20,12 @@ import {
   CASE_STATUSES,
   EVIDENCE_STATUSES,
   EXACT_CASES,
+  EXACT_PRICE,
   EXACT_REPLAY_SCOPE,
+  PUBLIC_CALL_OUTCOMES,
   RECONCILIATION_CLASSIFICATIONS,
 } from '../../constants.js';
+import { assertExactFallbackSafe } from '../../exact/index.js';
 import { saveJournal } from '../../journal.js';
 import { assertEmpty, assertUntrusted } from './assertions.js';
 import { createChallenge } from './challenge.js';

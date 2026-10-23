@@ -15,8 +15,12 @@
     "./commands/failures": "./scripts/failures.ts",
     "./commands/fund": "./scripts/fund.ts",
     "./commands/inference-setup": "./scripts/inference-setup.ts",
+    "./commands/seller": "./scripts/seller.ts",
     "./commands/setup": "./scripts/setup.ts",
     "./constants": "./src/constants.ts",
+    "./exact/authorization-id": "./src/exact/authorization-id.ts",
+    "./exact/index": "./src/exact/index.ts",
+    "./gate": "./src/gate.ts",
     "./journal": "./src/journal.ts",
     "./types": "./src/types.ts"
   },
@@ -32,6 +36,8 @@
     "@solana/kit": "5.1.0",
     "@gyblos/node": "workspace:*",
     "@solana-program/system": "0.10.0",
-    "@x402/svm": "2.28.0"
+    "@x402/svm": "2.28.0",
+    "@x402/express": "2.28.0",
+    "express": "4.21.2"
   }
 }

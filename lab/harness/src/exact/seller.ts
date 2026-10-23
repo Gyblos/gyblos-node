@@ -18,24 +18,19 @@ import {
   ROUTES,
   TIMEOUTS,
 } from '@gyblos/config';
-import { EXACT_PRICE } from '@gyblos/core/constants';
 import {
   DEVNET,
   DEVNET_USDC,
   PUBLIC_CALL_OPERATIONS,
-  PUBLIC_CALL_OUTCOMES,
   type PublicCallOperation,
 } from '@gyblos/payments-x402/constants';
-import { exactAuthorizationId } from '@gyblos/payments-x402/exact/authorization-id';
-import {
-  assertExactSupport,
-  validateExactTerms,
-} from '@gyblos/payments-x402/exact/index';
-import type { PublicCall } from '@gyblos/payments-x402/exact/types';
 import { UNKNOWN_ERROR_NAME } from '@gyblos/runtime/constants';
 import { requireLoopbackHost } from '@gyblos/runtime/loopback-host';
 
-export type { PublicCall } from '@gyblos/payments-x402/exact/types';
+import { EXACT_PRICE, PUBLIC_CALL_OUTCOMES } from '../constants.js';
+import { exactAuthorizationId } from './authorization-id.js';
+import { assertExactSupport, validateExactTerms } from './index.js';
+import type { PublicCall } from './types.js';
 
 export class AuditedPublicFacilitator extends HTTPFacilitatorClient {
   readonly calls: PublicCall[] = [];

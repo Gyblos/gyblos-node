@@ -10,15 +10,15 @@ import type {
 import { ExactSvmScheme } from '@x402/svm/exact/client';
 
 import { PAYMENT_LIMITS } from '@gyblos/config';
-import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
-import { ProtocolError } from '@gyblos/protocol/errors';
-
 import {
   DEVNET,
   DEVNET_USDC,
   PUBLIC_CALL_OPERATIONS,
-  PUBLIC_CALL_OUTCOMES,
-} from '../constants.js';
+} from '@gyblos/payments-x402/constants';
+import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
+import { ProtocolError } from '@gyblos/protocol/errors';
+
+import { PUBLIC_CALL_OUTCOMES } from '../constants.js';
 import type { PublicCall } from './types.js';
 
 export interface ExactPolicy {
@@ -26,8 +26,6 @@ export interface ExactPolicy {
   feePayer: string;
   amount: string;
 }
-
-export { PUBLIC_FACILITATORS } from '@gyblos/config';
 
 export function assertExactSupport(body: SupportedResponse, feePayer: string) {
   const kind = body.kinds.find(

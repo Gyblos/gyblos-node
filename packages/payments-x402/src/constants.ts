@@ -14,12 +14,6 @@ export const PUBLIC_CALL_OPERATIONS = {
   SETTLE: 'settle',
 } as const;
 
-export const PUBLIC_CALL_OUTCOMES = {
-  SUCCESS: 'success',
-  REJECTED: 'rejected',
-  UNCERTAIN: 'uncertain',
-} as const;
-
 export const CHANNEL_GUARDS = {
   AVAILABLE: 'Finalized channel account unavailable.',
   ENCODING: 'Finalized channel account must use base64 encoding.',
@@ -86,8 +80,6 @@ export type FacilitatorDiagnosticCode =
 
 export type PublicCallOperation =
   (typeof PUBLIC_CALL_OPERATIONS)[keyof typeof PUBLIC_CALL_OPERATIONS];
-export type PublicCallOutcome =
-  (typeof PUBLIC_CALL_OUTCOMES)[keyof typeof PUBLIC_CALL_OUTCOMES];
 
 export type FinalizedChannelGuardMessage =
   (typeof CHANNEL_GUARDS)[keyof typeof CHANNEL_GUARDS];

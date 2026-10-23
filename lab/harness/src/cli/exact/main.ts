@@ -12,21 +12,13 @@ import {
   JOURNAL_PATHS,
   LOCALHOST,
   LOCK_PATH,
+  PUBLIC_FACILITATORS,
   ROUTES,
   TIMEOUTS,
 } from '@gyblos/config';
 import { loadConfig } from '@gyblos/config/wallet';
-import { EXACT_PRICE } from '@gyblos/core/constants';
-import {
-  AuditedPublicFacilitator,
-  createExactSeller,
-} from '@gyblos/node/http/exact';
 import { assertDevnet, tokens } from '@gyblos/payments-x402/chain';
 import { DEVNET_USDC, JOURNAL_STATES } from '@gyblos/payments-x402/constants';
-import {
-  assertExactSupport,
-  PUBLIC_FACILITATORS,
-} from '@gyblos/payments-x402/exact/index';
 import { withExclusiveLock } from '@gyblos/payments-x402/recovery/lock';
 import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { ProtocolError } from '@gyblos/protocol/errors';
@@ -38,9 +30,15 @@ import {
   EVIDENCE_STATUSES,
   EXACT_CASES,
   EXACT_EVIDENCE_CODES,
+  EXACT_PRICE,
   FACILITATOR_STATUSES,
 } from '../../constants.js';
 import { prepareExactAccounts } from '../../exact-accounts.js';
+import { assertExactSupport } from '../../exact/index.js';
+import {
+  AuditedPublicFacilitator,
+  createExactSeller,
+} from '../../exact/seller.js';
 import { assertNoUnresolvedAuthorizations } from '../../journal.js';
 import { runProvider } from './cases.js';
 import { createEvidence } from './evidence.js';

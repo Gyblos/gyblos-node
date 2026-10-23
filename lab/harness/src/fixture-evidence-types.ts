@@ -3,7 +3,6 @@ import type { PaymentRequirements } from '@x402/core/types';
 
 import type { DEVNET, HTTP_STATUS } from '@gyblos/config';
 import { type ConfigAssetLabel } from '@gyblos/config/constants';
-import type { runGate } from '@gyblos/core';
 import type { createFacilitator } from '@gyblos/payments-x402/facilitator';
 
 import type {
@@ -13,6 +12,7 @@ import type {
   FAILURE_CASES,
   SCHEMA_VERSIONS,
 } from './constants.js';
+import { type runGate } from './gate.js';
 
 export type FixedGateEvidence = Awaited<ReturnType<typeof runGate>> & {
   schemaVersion: typeof SCHEMA_VERSIONS.EVIDENCE;

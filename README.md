@@ -115,7 +115,7 @@ Set these in the environment; `.env` is **not** loaded
 ## Repository layout
 
 ```text
-apps/node/              seller daemon (node:start) and the fixed-price test seller
+apps/node/              seller daemon (node:start)
 apps/buyer/             buyer proxy, one paid call, and p2p:reconcile
 apps/facilitator/       local x402 facilitator process
 packages/protocol/      wire format: signed bytes, Engine contract, error codes (SPEC.md)
@@ -127,7 +127,7 @@ packages/payments-x402/ x402 payments, facilitator, chain proofs, recovery locks
 packages/transport-iroh/ HTTP over Iroh, relays, admission limits
 packages/identity/      8004 registry adapter (not wired yet)
 packages/node/          seller composition used by apps/node and apps/buyer
-lab/harness/            gate:* proof-of-concept checks (Docker/NAT lab: tag archive/poc-lab-2026-10)
+lab/harness/            gate:* proof-of-concept checks, exact scheme, fixed-price test seller (Docker/NAT lab: tag archive/poc-lab-2026-10)
 lab/tools/              identity devnet tools
 lab/evidence/           three published, redacted run reports
 tests/, tooling/        offline tests and fixtures; boundary checker and lint rules

@@ -8,18 +8,12 @@ import {
 import { HTTP_STATUS, TIMEOUTS } from '@gyblos/config';
 import { type WALLET_ROLES } from '@gyblos/config/constants';
 import { signer } from '@gyblos/config/wallet';
-import {
-  JOURNAL_STATES,
-  PUBLIC_CALL_OUTCOMES,
-} from '@gyblos/payments-x402/constants';
-import {
-  createExactBuyer,
-  validateExactTerms,
-} from '@gyblos/payments-x402/exact/index';
+import { JOURNAL_STATES } from '@gyblos/payments-x402/constants';
 import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { ProtocolError } from '@gyblos/protocol/errors';
 
-import { type ExactCaseName } from '../../constants.js';
+import { PUBLIC_CALL_OUTCOMES, type ExactCaseName } from '../../constants.js';
+import { createExactBuyer, validateExactTerms } from '../../exact/index.js';
 import { saveJournal } from '../../journal.js';
 import type { createChallenge } from './challenge.js';
 import { authorizationMetadata, snapshot } from './reconcile.js';

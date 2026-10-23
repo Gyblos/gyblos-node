@@ -17,11 +17,11 @@ import { loadConfig, signer } from '@gyblos/config/wallet';
 import { assertProgram } from '@gyblos/payments-x402/chain';
 import { UPSTREAM_COMMIT } from '@gyblos/payments-x402/constants';
 import { createFacilitator } from '@gyblos/payments-x402/facilitator';
-import { createGateSeller } from '@gyblos/payments-x402/seller';
 import { validateTerms } from '@gyblos/payments-x402/trust';
 import { saveJson } from '@gyblos/runtime';
 
 import { CHALLENGE_STAGES, SCHEMA_VERSIONS } from './constants.js';
+import { createGateSeller } from './fixed-seller.js';
 import type { ChallengeEvidence } from './fixture-evidence-types.js';
 
 export async function challengeGate() {
