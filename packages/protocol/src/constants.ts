@@ -128,3 +128,68 @@ export const MODEL_IDS = {
 } as const;
 
 export type CatalogModelId = (typeof MODEL_IDS)[keyof typeof MODEL_IDS];
+
+// Control contracts are additive; HTTP v2 is reserved, never registered by this package.
+export const CONTROL_ALPN = 'gyblos/control/1';
+export const CONTROL_PAID_ALPN = 'gyblos/http/2';
+export const CONTROL_VERSION = 1;
+export const CONTROL_RECORD_VERSION = 2;
+export const CONTROL_METHODS = {
+  CATALOG: 'catalog.get',
+  OFFER: 'offer.request',
+} as const;
+export const REASONING_LEVELS = {
+  OFF: 'off',
+  LOW: 'low',
+  MEDIUM: 'medium',
+  HIGH: 'high',
+} as const;
+export type ReasoningLevel =
+  (typeof REASONING_LEVELS)[keyof typeof REASONING_LEVELS];
+export const CONTROL_CODES = {
+  INVALID: 'INVALID_CONTROL_REQUEST',
+  VERSION: 'UNSUPPORTED_CONTROL_VERSION',
+  STALE: 'STALE_CONTROL_CATALOG',
+  MODEL: 'CONTROL_MODEL_UNSUPPORTED',
+  LEVEL: 'CONTROL_LEVEL_UNSUPPORTED',
+  POLICY: 'CONTROL_POLICY_MISMATCH',
+  BUSY: 'CONTROL_BUSY',
+  LIMIT: 'CONTROL_LIMIT_EXCEEDED',
+  INTERNAL: 'CONTROL_INTERNAL_ERROR',
+  SIGNATURE: 'INVALID_CONTROL_SIGNATURE',
+  EXPIRED: 'EXPIRED_CONTROL_RECORD',
+  CANCELLED: 'CONTROL_CANCELLED',
+} as const;
+export type ControlCode = (typeof CONTROL_CODES)[keyof typeof CONTROL_CODES];
+export const CONTROL_DOMAINS = {
+  REQUEST: 'gyblos/control-request/v1\n',
+  OFFER: 'gyblos/signed-inference-offer/v2\n',
+} as const;
+export const PUBLIC_V2_DOMAINS = {
+  [PUBLIC_RECORD_KINDS.CATALOG]: 'gyblos/catalog/v2\n',
+  [PUBLIC_RECORD_KINDS.PRESENCE]: 'gyblos/presence/v2\n',
+  [PUBLIC_RECORD_KINDS.WITHDRAWAL]: 'gyblos/withdrawal/v2\n',
+} as const satisfies Record<PublicRecordKind, string>;
+export const CONTROL_LIMITS = {
+  maxDirectAddresses: 16,
+  requestBytes: 8192,
+  responseBytes: 65536,
+  depth: 16,
+  prefixBytes: 4,
+  requestIdBytes: 16,
+  quoteLifetimeMs: 30000,
+  signatureBytes: 64,
+  digestBytes: 32,
+} as const;
+export const CONTROL_AVAILABILITY = 'ready';
+
+export const CONTROL_METERING_MODES = {
+  RECOUNTED: 'recounted',
+  DECLARED: 'declared',
+} as const;
+export type ControlMeteringMode =
+  (typeof CONTROL_METERING_MODES)[keyof typeof CONTROL_METERING_MODES];
+export const MODEL_IDENTITIES = {
+  DIGEST: 'digest',
+  NAME_ONLY: 'name-only',
+} as const;

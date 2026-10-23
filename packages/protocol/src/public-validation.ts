@@ -116,3 +116,19 @@ export function bytesHex(value: Readonly<Uint8Array>): string {
       .padStart(PUBLIC_RECORD_LIMITS.hexCharactersPerByte, '0'),
   ).join('');
 }
+
+// Decode a validated Solana public address without a wallet SDK.
+export function publicAddressBytes(value: unknown): Uint8Array<ArrayBuffer> {
+  const text = publicAddress(value);
+  let decoded = 0n;
+  for (const character of text)
+    decoded =
+      decoded * BigInt(BASE58_ALPHABET.length) +
+      BigInt(BASE58_ALPHABET.indexOf(character));
+  const result = new Uint8Array(PUBLIC_RECORD_LIMITS.publicKeyBytes);
+  for (let index = result.length - 1; index >= 0; index--) {
+    result[index] = Number(decoded % BYTE_RADIX);
+    decoded /= BYTE_RADIX;
+  }
+  return result;
+}
