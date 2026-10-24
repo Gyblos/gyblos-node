@@ -327,7 +327,13 @@ export function selectSellers(
   input: SellerSelectionInput,
 ): SellerSelectionResult {
   try {
-    const count = checkInput(input);
+    if (!input || typeof input !== 'object') invalid();
+    // Only an omitted count takes the default; null is malformed input.
+    const count =
+      input.count === undefined
+        ? SELLER_SELECTION_POLICY.defaultCandidates
+        : input.count;
+    checkInput(input, count);
     return input.pinnedNodeId === undefined
       ? selectAutomatic(input, count)
       : selectPinned(input, input.pinnedNodeId);

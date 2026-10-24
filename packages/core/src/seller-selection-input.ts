@@ -82,26 +82,37 @@ export function isAtomic(value: unknown): value is string {
     BigInt(value) <= BigInt(PUBLIC_RECORD_LIMITS.maxAtomic)
   );
 }
-const isRecord = (value: unknown) =>
-  value !== null && typeof value === 'object' && !Array.isArray(value);
 const isCount = (value: unknown) =>
   typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+const isLabel = (value: unknown) => value === null || typeof value === 'string';
+const isLevel = (value: unknown): value is ReasoningLevel =>
+  LEVEL_ORDER.some((level) => level === value);
 export const levelRank = (level: ReasoningLevel) => LEVEL_ORDER.indexOf(level);
 
+function isSelection(selection: unknown) {
+  return (
+    isRecord(selection) &&
+    typeof selection.modelId === 'string' &&
+    isLabel(selection.variant) &&
+    isLabel(selection.quantization)
+  );
+}
 function checkRequest(request: SellerRequest) {
-  if (!isRecord(request)) invalid();
+  if (!isRecord(request) || !isRecord(request.priceCeilings)) invalid();
   const lowest = request.lowestReasoning;
   if (
     !LEVEL_ORDER.includes(request.reasoning) ||
     (lowest !== null &&
       (!LEVEL_ORDER.includes(lowest) ||
         levelRank(lowest) >= levelRank(request.reasoning))) ||
-    typeof request.selection?.modelId !== 'string' ||
+    !isSelection(request.selection) ||
     typeof request.network !== 'string' ||
     typeof request.asset !== 'string' ||
     !isCount(request.maxTokens) ||
     request.maxTokens < 1 ||
-    !isAtomic(request.priceCeilings?.inputAtomic) ||
+    !isAtomic(request.priceCeilings.inputAtomic) ||
     !isAtomic(request.priceCeilings.outputAtomic) ||
     !isAtomic(request.maxAtomic) ||
     !SELLER_BADGE_ORDER.includes(request.minimumBadge) ||
@@ -126,9 +137,49 @@ function checkStats(stats: SellerStats) {
   )
     invalid();
 }
-export function checkInput(input: SellerSelectionInput) {
-  if (!isRecord(input)) invalid();
-  const count = input.count ?? SELLER_SELECTION_POLICY.defaultCandidates;
+// Only the fields selection reads; signatures and digests are the caller's verification step.
+function isListing(listing: unknown) {
+  return (
+    isSelection(listing) &&
+    isRecord(listing) &&
+    isCount(listing.contextTokens) &&
+    isRecord(listing.pricing) &&
+    typeof listing.pricing.network === 'string' &&
+    typeof listing.pricing.asset === 'string' &&
+    typeof listing.pricing.inputAtomic === 'string' &&
+    typeof listing.pricing.outputAtomic === 'string' &&
+    Array.isArray(listing.reasoning) &&
+    listing.reasoning.every(isLevel)
+  );
+}
+function isHeader(record: unknown): record is Record<string, unknown> {
+  return (
+    isRecord(record) &&
+    typeof record.owner === 'string' &&
+    typeof record.nodeId === 'string' &&
+    isCount(record.sequence) &&
+    isCount(record.issuedAt) &&
+    isCount(record.expiresAt)
+  );
+}
+function checkSeller(seller: KnownSeller) {
+  if (!isRecord(seller)) invalid();
+  const { catalog, presence, withdrawal } = seller;
+  if (
+    !isHeader(catalog) ||
+    !isRecord(catalog.dataPolicy) ||
+    typeof catalog.dataPolicy.retention !== 'string' ||
+    !Array.isArray(catalog.models) ||
+    catalog.models.length > PUBLIC_RECORD_LIMITS.maxModels ||
+    !catalog.models.every(isListing) ||
+    (presence !== null && !isHeader(presence)) ||
+    (withdrawal !== null && !isHeader(withdrawal)) ||
+    !SELLER_BADGE_ORDER.includes(seller.badge) ||
+    typeof seller.openChannel !== 'boolean'
+  )
+    invalid();
+}
+export function checkInput(input: SellerSelectionInput, count: number) {
   if (
     !isCount(input.now) ||
     typeof input.random !== 'function' ||
@@ -142,17 +193,14 @@ export function checkInput(input: SellerSelectionInput) {
   )
     invalid();
   checkRequest(input.request);
-  for (const stats of input.stats.values()) checkStats(stats);
+  for (const [key, stats] of input.stats) {
+    if (typeof key !== 'string') invalid();
+    checkStats(stats);
+  }
   const seen = new Set<string>();
   for (const seller of input.sellers) {
-    if (
-      !isRecord(seller) ||
-      !isRecord(seller.catalog) ||
-      !SELLER_BADGE_ORDER.includes(seller.badge) ||
-      seen.has(seller.catalog.nodeId)
-    )
-      invalid();
+    checkSeller(seller);
+    if (seen.has(seller.catalog.nodeId)) invalid();
     seen.add(seller.catalog.nodeId);
   }
-  return count;
 }

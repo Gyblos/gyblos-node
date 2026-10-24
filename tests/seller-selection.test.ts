@@ -1,6 +1,6 @@
-// Exercises pure buyer seller selection with synthetic records and a seeded RNG; no I/O beyond reading its source.
+// Exercises pure buyer seller selection with synthetic records and a seeded RNG; no I/O beyond reading its sources.
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import {
@@ -312,17 +312,22 @@ void test('candidate count is bounded and invalid input returns only a typed cod
     assert.deepEqual(select(sellers, overrides), invalid);
 });
 void test('seller selection source reads no global clock, randomness, filesystem or network', async () => {
-  const source = await readFile(
-    new URL('../packages/core/src/seller-selection.ts', import.meta.url),
-    'utf8',
+  const directory = new URL('../packages/core/src/', import.meta.url);
+  const modules = (await readdir(directory)).filter((name) =>
+    name.startsWith('seller-selection'),
   );
-  for (const forbidden of [
-    'Date.now',
-    'new Date',
-    'Math.random',
-    'node:',
-    'fetch(',
-    'performance.',
-  ])
-    assert.equal(source.includes(forbidden), false, forbidden);
+  assert.ok(modules.includes('seller-selection.ts'));
+  assert.ok(modules.includes('seller-selection-input.ts'));
+  for (const name of modules) {
+    const source = await readFile(new URL(name, directory), 'utf8');
+    for (const forbidden of [
+      'Date.now',
+      'new Date',
+      'Math.random',
+      'node:',
+      'fetch(',
+      'performance.',
+    ])
+      assert.equal(source.includes(forbidden), false, `${name}: ${forbidden}`);
+  }
 });
