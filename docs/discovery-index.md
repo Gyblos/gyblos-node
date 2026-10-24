@@ -134,24 +134,31 @@ npx wrangler@4.151.1 d1 migrations list gyblos-discovery --remote   # 0001 appli
 # rate-limit namespace ids 42621004-42621006 must not collide with the website's
 # web/wrangler.jsonc (it uses 42621001-42621003); then uncomment ratelimits and
 # routes (custom domain discovery.gyblos.com, zone gyblos.com in this account)
-# publish allowlist: paste comma-separated approved NodeIds at the prompt
-# (or `*` to open publishing); without it the index serves reads but answers
-# 503 to every publish
-npx wrangler@4.151.1 secret put DISCOVERY_PUBLISH_ALLOWLIST
+# deploy closed first: the Worker must exist before its secret is set
+# (secret put on a missing Worker uploads an empty draft Worker, which would
+# become the rollback target)
 npx wrangler@4.151.1 deploy
 curl -s https://discovery.gyblos.com/v1/health
-# expected: 200 {"ok":true,"records":0,"publish":"allowlist"}
+# expected: 200 {"ok":true,"records":0,"publish":"closed"} (reads work,
+# publishes answer 503)
+# publish allowlist: paste comma-separated approved NodeIds at the prompt;
+# this deploys a new version with the secret
+npx wrangler@4.151.1 secret put DISCOVERY_PUBLISH_ALLOWLIST
+curl -s https://discovery.gyblos.com/v1/health
+# expected: "publish":"allowlist" (or "open" if the value was `*`)
 curl -si https://discovery.gyblos.com/nope | grep -i x-robots-tag
 # expected: 404 with noindex
 curl -si 'https://discovery.gyblos.com/v1/sellers?model=x' | grep -i access-control
 # expected: Access-Control-Allow-Origin: *
 ```
 
-Rollback: `npx wrangler@4.151.1 rollback` returns to the previous version; or
-comment out `d1_databases` (or a rate limit) and deploy again; the index then
-answers `503 DISCOVERY_UNAVAILABLE` everywhere without losing data. Removing the
-custom domain takes it offline entirely. Clients treat `503` as
-`DISCOVERY_UNAVAILABLE` and keep their own state.
+Rollback: `npx wrangler@4.151.1 rollback` returns to the previous version (it
+asks for confirmation when secrets changed since that version; decline unless
+you mean to run the older code with the current secret); or comment out
+`d1_databases` (or a rate limit) and deploy again; the index then answers
+`503 DISCOVERY_UNAVAILABLE` everywhere without losing data. Removing the custom
+domain takes it offline entirely. Clients treat `503` as `DISCOVERY_UNAVAILABLE`
+and keep their own state.
 
 To change who may publish, run `secret put DISCOVERY_PUBLISH_ALLOWLIST` again
 with the full new list (it replaces the old value; do not rely on `rollback` to

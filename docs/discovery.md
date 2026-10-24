@@ -207,11 +207,11 @@ All paths below are relative to the base URL. Error bodies are
 | `400`  | `INVALID_SIGNATURE`     | Signature does not verify.                                         |
 | `400`  | `EXPIRED_RECORD`        | Not yet valid, expired, or lifetime too long.                      |
 | `400`  | `UNKNOWN_CATALOG`       | Reference does not match a live, non-withdrawn stored catalog.     |
-| `409`  | `STALE_RECORD`          | Sequence at or below the NodeId's high-water mark.                 |
 | `403`  | `PUBLISH_NOT_ALLOWED`   | The index accepts records only from listed NodeIds (an allowlist). |
+| `409`  | `STALE_RECORD`          | Sequence at or below the NodeId's high-water mark.                 |
 | `413`  | `PAYLOAD_TOO_LARGE`     | Body over 34816 bytes.                                             |
 | `429`  | `RATE_LIMITED`          | Per-IP, per-NodeId or capacity limit; `Retry-After` in seconds.    |
-| `503`  | `DISCOVERY_UNAVAILABLE` | Storage, limits or publishers not configured, or storage failure.  |
+| `503`  | `DISCOVERY_UNAVAILABLE` | Storage, limits or publishing not configured, or storage failure.  |
 
 There is no session or CAPTCHA: publishers authenticate by signature, and abuse
 is bounded by rate limits, the size cap and one stored record per kind per
