@@ -1,0 +1,321 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:gyblos:node-config:1",
+  "title": "gyblos.toml",
+  "description": "Gyblos node configuration, schema version 1 (GYB-DOC-026). Secrets never go in this file: keys ending in _env name environment variables instead. Precedence: CLI flags > GYBLOS_* environment > gyblos.toml > defaults. Run `gyblos config validate` for the authoritative check.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "node"],
+  "properties": {
+    "version": {
+      "description": "Schema version of this file.",
+      "type": "integer",
+      "const": 1
+    },
+    "node": {
+      "$ref": "#/definitions/node"
+    },
+    "relays": {
+      "$ref": "#/definitions/relays"
+    },
+    "transport": {
+      "$ref": "#/definitions/transport"
+    },
+    "buyer": {
+      "$ref": "#/definitions/buyer"
+    },
+    "discovery": {
+      "$ref": "#/definitions/discovery"
+    },
+    "offers": {
+      "description": "Models this node sells or gives away; each model at most once.",
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "$ref": "#/definitions/offer"
+      }
+    }
+  },
+  "definitions": {
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["network"],
+      "properties": {
+        "network": {
+          "description": "Only devnet is supported; mainnet is refused.",
+          "enum": ["devnet"]
+        },
+        "data_dir": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048,
+          "pattern": "^[^\\u0000-\\u001f\\u007f]*$",
+          "description": "Local home, same as GYBLOS_HOME (default .local/gyblos); relative paths resolve against the working directory."
+        },
+        "payout_wallet": {
+          "description": "Cold Solana address that receives payments; never one of the node's hot keys.",
+          "type": "string",
+          "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$"
+        },
+        "rpc_url": {
+          "description": "Devnet RPC URL without credentials (default https://api.devnet.solana.com). Put a keyed URL in GYBLOS_RPC_URL instead.",
+          "type": "string",
+          "maxLength": 2048,
+          "pattern": "^(https://[A-Za-z0-9.-]+(:[0-9]{1,5})?|http://(127\\.0\\.0\\.1|localhost|\\[::1\\])(:[0-9]{1,5})?)(/[^\\s?#@]*)?$"
+        }
+      }
+    },
+    "relays": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "urls": {
+          "description": "HTTPS relay origins (default https://na1.relay.gyblos.com/).",
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "maxLength": 2048,
+            "pattern": "^https://[A-Za-z0-9.-]+(:[0-9]{1,5})?/?$"
+          }
+        },
+        "relay_token_env": {
+          "type": "string",
+          "pattern": "^[A-Z_][A-Z0-9_]*$",
+          "maxLength": 128,
+          "description": "Environment variable holding the relay token (default GYBLOS_RELAY_TOKEN)."
+        }
+      }
+    },
+    "transport": {
+      "type": "object",
+      "additionalProperties": false,
+      "not": {
+        "required": ["relay_only", "external_addr"],
+        "properties": {
+          "relay_only": {
+            "const": true
+          }
+        }
+      },
+      "properties": {
+        "relay_only": {
+          "description": "Seller binds loopback only and advertises no direct address (GYBLOS_RELAY_ONLY).",
+          "type": "boolean"
+        },
+        "bind": {
+          "description": "UDP bind address ip:port (GYBLOS_IROH_BIND).",
+          "type": "string",
+          "pattern": "^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(\\.(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|\\[[0-9A-Fa-f:.]+\\]):[0-9]{1,5}$"
+        },
+        "external_addr": {
+          "description": "Public ip:port to advertise (GYBLOS_IROH_EXTERNAL_ADDR); not with relay_only.",
+          "type": "string",
+          "pattern": "^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(\\.(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}|\\[[0-9A-Fa-f:.]+\\]):[0-9]{1,5}$"
+        }
+      }
+    },
+    "buyer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "relay_only": {
+          "description": "Buyer dials only through the offer's relay (GYBLOS_BUYER_RELAY_ONLY).",
+          "type": "boolean"
+        }
+      }
+    },
+    "discovery": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "publish": {
+          "description": "Publish signed catalog and presence to the discovery index (default false).",
+          "type": "boolean"
+        },
+        "url": {
+          "description": "Discovery index base URL (default https://discovery.gyblos.com/v1).",
+          "type": "string",
+          "maxLength": 2048,
+          "pattern": "^(https://[A-Za-z0-9.-]+(:[0-9]{1,5})?|http://(127\\.0\\.0\\.1|localhost|\\[::1\\])(:[0-9]{1,5})?)(/[^\\s?#@]*)?$"
+        }
+      }
+    },
+    "catalogModel": {
+      "description": "Canonical model ids and aliases from the protocol catalog.",
+      "enum": [
+        "qwen3-30b-a3b",
+        "qwen3:30b-a3b",
+        "qwen3-235b-a22b",
+        "deepseek-v4.1-flash",
+        "kimi-k3",
+        "glm-5.3-flash",
+        "gpt-oss-120b",
+        "gpt-oss-20b",
+        "llama-3.3-70b",
+        "gemma-4-26b",
+        "qwen3-0.6b",
+        "qwen3:0.6b"
+      ]
+    },
+    "offer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["model", "engine"],
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "required": ["price"]
+            },
+            {
+              "required": ["free"]
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "properties": {
+                "model": {
+                  "$ref": "#/definitions/catalogModel"
+                },
+                "custom": {
+                  "const": false
+                }
+              }
+            },
+            {
+              "required": ["custom"],
+              "properties": {
+                "model": {
+                  "not": {
+                    "$ref": "#/definitions/catalogModel"
+                  }
+                },
+                "custom": {
+                  "const": true
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "model": {
+          "description": "A catalog id or alias, or any id with custom = true.",
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]*(/[a-zA-Z0-9][a-zA-Z0-9._:-]*)*$"
+        },
+        "custom": {
+          "description": "Required (true) for a model outside the catalog.",
+          "type": "boolean"
+        },
+        "engine": {
+          "$ref": "#/definitions/engine"
+        },
+        "reasoning": {
+          "description": "Reasoning levels served (GYB-DOC-028); default [\"off\"].",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["off", "low", "medium", "high"]
+          }
+        },
+        "price": {
+          "$ref": "#/definitions/price"
+        },
+        "free": {
+          "$ref": "#/definitions/free"
+        }
+      }
+    },
+    "engine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "url"],
+      "properties": {
+        "kind": {
+          "description": "API shape of the engine.",
+          "enum": ["ollama", "openai", "anthropic"]
+        },
+        "url": {
+          "description": "Engine base URL; plain http only for loopback or host.docker.internal; no credentials or query.",
+          "type": "string",
+          "maxLength": 2048,
+          "pattern": "^(https://[A-Za-z0-9.-]+(:[0-9]{1,5})?|http://(127\\.0\\.0\\.1|localhost|\\[::1\\]|host\\.docker\\.internal)(:[0-9]{1,5})?)(/[^\\s?#@]*)?$"
+        },
+        "api_key_env": {
+          "type": "string",
+          "pattern": "^[A-Z_][A-Z0-9_]*$",
+          "maxLength": 128,
+          "description": "Environment variable holding the upstream API key."
+        },
+        "upstream_model": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[^\\u0000-\\u001f\\u007f]*$",
+          "description": "Model name the engine expects, when it differs from model."
+        }
+      }
+    },
+    "price": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["input_per_mtok", "output_per_mtok", "currency"],
+      "not": {
+        "required": ["input_per_mtok", "output_per_mtok"],
+        "properties": {
+          "input_per_mtok": {
+            "const": "0"
+          },
+          "output_per_mtok": {
+            "const": "0"
+          }
+        }
+      },
+      "properties": {
+        "input_per_mtok": {
+          "description": "USDC per million input tokens as a canonical decimal string, e.g. \"0.1\".",
+          "$ref": "#/definitions/decimal"
+        },
+        "output_per_mtok": {
+          "description": "USDC per million output tokens as a canonical decimal string.",
+          "$ref": "#/definitions/decimal"
+        },
+        "currency": {
+          "enum": ["USDC"]
+        }
+      }
+    },
+    "decimal": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,3})(\\.[0-9]{0,5}[1-9])?$"
+    },
+    "free": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["daily_token_cap", "per_buyer_cap"],
+      "properties": {
+        "daily_token_cap": {
+          "description": "Tokens given away per day across all buyers.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000000000
+        },
+        "per_buyer_cap": {
+          "description": "Tokens per buyer per day; at most daily_token_cap.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000000000
+        }
+      }
+    }
+  }
+}
