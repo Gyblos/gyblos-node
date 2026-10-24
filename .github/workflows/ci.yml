@@ -35,7 +35,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       # Disposable keys and fake OS encryption only, not native keystore proof.
-      - run: pnpm exec tsx --test tests/desktop-wallet.test.ts tests/desktop-wallet-lifecycle.test.ts
+      - run: pnpm exec tsx --test tests/desktop-wallet.test.ts tests/desktop-wallet-lifecycle.test.ts tests/desktop-wallet-protection.test.ts
       - run: pnpm desktop:build
   check:
     runs-on: ubuntu-24.04

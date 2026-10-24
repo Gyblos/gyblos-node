@@ -3,6 +3,19 @@ import { lstatSync, mkdirSync } from 'node:fs';
 
 import { WALLET } from './constants.js';
 
+export interface ExistingWindow {
+  isDestroyed(): boolean;
+  isMinimized(): boolean;
+  restore(): void;
+  focus(): void;
+}
+
+export function focusExistingWindow(window: ExistingWindow) {
+  if (window.isDestroyed()) return;
+  if (window.isMinimized()) window.restore();
+  window.focus();
+}
+
 export function prepareWalletProfile(path: string) {
   try {
     mkdirSync(path, { mode: WALLET.PRIVATE_DIRECTORY });

@@ -27,3 +27,19 @@ export const WALLET_PROVIDER = {
 } as const;
 export type WalletProvider =
   (typeof WALLET_PROVIDER)[keyof typeof WALLET_PROVIDER];
+
+// Pinned Chromium compatibility parameters, not wallet credentials. Public weak
+// passwords must never be accepted as local custody, even with a secure backend.
+export const STORAGE_CBC = {
+  MAC_PREFIX: 'v10',
+  LINUX_PREFIX: 'v11',
+  PREFIX_BYTES: 3,
+  ALGORITHM: 'aes-128-cbc',
+  KEY_BYTES: 16,
+  IV_BYTES: 16,
+  IV_BYTE: 32,
+  LEGACY_SALT: 'saltysalt',
+  LEGACY_ITERATIONS: 1,
+  LEGACY_DIGEST: 'sha1',
+  LEGACY_PASSWORDS: ['', 'peanuts'],
+} as const;

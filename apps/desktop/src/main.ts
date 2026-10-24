@@ -12,6 +12,7 @@ import { failedProbe, type ProbeResult } from './probe-model.js';
 import { armSmokeWatchdog } from './smoke-watchdog.js';
 import { WALLET, WALLET_STATUS } from './wallet/constants.js';
 import {
+  focusExistingWindow,
   prepareWalletProfile,
   waitForWalletBeforeQuit,
 } from './wallet/lifecycle.js';
@@ -108,8 +109,7 @@ async function main() {
   const window = createProbeWindow(smoke);
   registerWalletStatus(window, walletRoot, smoke);
   app.on('second-instance', () => {
-    if (window.isMinimized()) window.restore();
-    window.focus();
+    focusExistingWindow(window);
   });
   if (smoke) window.webContents.on('render-process-gone', fail);
   let pending: Promise<ProbeResult> | undefined;

@@ -1,6 +1,10 @@
 // Public testable desktop wallet contracts; importing them never initializes a wallet.
 export { createWalletService } from './service.js';
-export { prepareWalletProfile, waitForWalletBeforeQuit } from './lifecycle.js';
+export {
+  focusExistingWindow,
+  prepareWalletProfile,
+  waitForWalletBeforeQuit,
+} from './lifecycle.js';
 export {
   parseWalletSummary,
   WALLET,

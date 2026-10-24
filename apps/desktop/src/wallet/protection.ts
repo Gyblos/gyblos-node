@@ -1,5 +1,10 @@
 // Adapts Electron OS encryption, rejecting weak Linux storage; no filesystem or keys.
-import { WALLET_PROVIDER, type WalletProvider } from './constants.js';
+import { restrictCbcProtection } from './cbc-protection.js';
+import {
+  STORAGE_CBC,
+  WALLET_PROVIDER,
+  type WalletProvider,
+} from './constants.js';
 
 export interface SafeStoragePort {
   isAsyncEncryptionAvailable(): Promise<boolean>;
@@ -36,27 +41,33 @@ export function walletProtection(
     const available = () =>
       storage.isEncryptionAvailable() &&
       allowed.has(storage.getSelectedStorageBackend());
-    return {
-      provider: WALLET_PROVIDER.LINUX,
-      available: async () => available(),
-      encrypt: async (value) => {
-        if (!available())
-          throw new Error('Protected wallet storage unavailable.');
-        return storage.encryptString(value);
+    return restrictCbcProtection(
+      {
+        provider: WALLET_PROVIDER.LINUX,
+        available: async () => available(),
+        encrypt: async (value) => {
+          if (!available())
+            throw new Error('Protected wallet storage unavailable.');
+          return storage.encryptString(value);
+        },
+        decrypt: async (value) => {
+          if (!available())
+            throw new Error('Protected wallet storage unavailable.');
+          return storage.decryptString(value);
+        },
       },
-      decrypt: async (value) => {
-        if (!available())
-          throw new Error('Protected wallet storage unavailable.');
-        return storage.decryptString(value);
-      },
-    };
+      STORAGE_CBC.LINUX_PREFIX,
+    );
   }
   if (platform !== 'darwin' && platform !== 'win32') return null;
-  return {
+  const native: WalletProtection = {
     provider:
       platform === 'darwin' ? WALLET_PROVIDER.MAC : WALLET_PROVIDER.WINDOWS,
     available: () => storage.isAsyncEncryptionAvailable(),
     encrypt: (value) => storage.encryptStringAsync(value),
     decrypt: async (value) => (await storage.decryptStringAsync(value)).result,
   };
+  return platform === 'darwin'
+    ? restrictCbcProtection(native, STORAGE_CBC.MAC_PREFIX)
+    : native;
 }

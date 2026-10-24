@@ -271,15 +271,31 @@ void test('desktop wallet bridge rejects secrets, malformed status and any fundi
 });
 
 function storageDouble(backend: string, enabled = true): SafeStoragePort {
+  const key = randomBytes(16);
+  const encrypt = (prefix: string, text: string) => {
+    const cipher = createCipheriv('aes-128-cbc', key, Buffer.alloc(16, 32));
+    return Buffer.concat([
+      Buffer.from(prefix),
+      cipher.update(text, 'utf8'),
+      cipher.final(),
+    ]);
+  };
+  const decrypt = (bytes: Buffer) => {
+    const decipher = createDecipheriv('aes-128-cbc', key, Buffer.alloc(16, 32));
+    return Buffer.concat([
+      decipher.update(bytes.subarray(3)),
+      decipher.final(),
+    ]).toString('utf8');
+  };
   return {
     isEncryptionAvailable: () => enabled,
     getSelectedStorageBackend: () => backend,
     isAsyncEncryptionAvailable: async () => enabled,
-    encryptString: (value) => Buffer.from(value),
-    decryptString: (value) => value.toString(),
-    encryptStringAsync: async (value) => Buffer.from(value),
+    encryptString: (value) => encrypt('v11', value),
+    decryptString: decrypt,
+    encryptStringAsync: async (value) => encrypt('v10', value),
     decryptStringAsync: async (value) => ({
-      result: value.toString(),
+      result: decrypt(value),
       shouldReEncrypt: false,
     }),
   };

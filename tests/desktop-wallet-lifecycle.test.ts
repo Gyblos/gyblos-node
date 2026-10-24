@@ -6,9 +6,55 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 
 import {
+  focusExistingWindow,
   prepareWalletProfile,
   waitForWalletBeforeQuit,
 } from '@gyblos/desktop/wallet';
+
+void test('desktop second launch ignores a destroyed window during deferred quit', async () => {
+  let finish: (() => void) | undefined;
+  let quits = 0;
+  const pending = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  const beforeQuit = waitForWalletBeforeQuit(pending, () => {
+    quits += 1;
+  });
+  beforeQuit({ preventDefault() {} });
+  const destroyed = {
+    isDestroyed: () => true,
+    isMinimized: () => {
+      throw new Error('Object has been destroyed');
+    },
+    restore: () => {
+      throw new Error('Object has been destroyed');
+    },
+    focus: () => {
+      throw new Error('Object has been destroyed');
+    },
+  };
+  assert.doesNotThrow(() => focusExistingWindow(destroyed));
+  assert.equal(quits, 0);
+  finish!();
+  await pending;
+  await Promise.resolve();
+  assert.equal(quits, 1);
+});
+
+void test('desktop second launch still restores and focuses an existing live window', () => {
+  const calls: string[] = [];
+  focusExistingWindow({
+    isDestroyed: () => false,
+    isMinimized: () => true,
+    restore: () => {
+      calls.push('restore');
+    },
+    focus: () => {
+      calls.push('focus');
+    },
+  });
+  assert.deepEqual(calls, ['restore', 'focus']);
+});
 
 void test('desktop creates its persistent profile before Electron setPath can use it', async (context) => {
   const root = await mkdtemp(join(tmpdir(), 'gyblos-wallet-profile-'));
