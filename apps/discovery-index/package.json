@@ -7,6 +7,7 @@
     "./app": "./src/app.ts",
     "./constants": "./src/constants.ts",
     "./ip-key": "./src/ip-key.ts",
+    "./publishers": "./src/publishers.ts",
     "./storage": "./src/storage.ts",
     "./storage-d1": "./src/storage-d1.ts",
     "./worker": "./src/worker.ts"

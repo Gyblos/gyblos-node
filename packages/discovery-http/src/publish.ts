@@ -8,7 +8,7 @@ import {
   DISCOVERY_PATHS,
   HTTP_STATUS,
   INDEX_ERROR_MAP,
-  STATUS_ERROR_MAP,
+  PUBLISH_STATUS_ERROR_MAP,
 } from './constants.js';
 import { DiscoveryError, discoveryFail } from './errors.js';
 import {
@@ -54,7 +54,7 @@ function rejectionCode(body: unknown) {
 }
 
 async function readPublish(response: Response, aborted: Promise<never>) {
-  const mapped = STATUS_ERROR_MAP.get(response.status);
+  const mapped = PUBLISH_STATUS_ERROR_MAP.get(response.status);
   if (mapped) failStatus(response, mapped);
   if (
     response.status !== HTTP_STATUS.CREATED &&

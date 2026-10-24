@@ -4,9 +4,9 @@
   // Wrangler is deliberately not a workspace dependency; run the pinned version with
   // `npx wrangler@4.151.1 ...` from this directory.
   //
-  // Everything that touches Cloudflare resources is commented out, so nothing is bound,
-  // routed or created by accident. Until the bindings exist the Worker fails closed with
-  // 503 DISCOVERY_UNAVAILABLE on every route.
+  // Resources were created with founder approval on 2026-10-24 (D1 gyblos-discovery in ENAM).
+  // Removing the d1_databases block and redeploying makes every route fail closed with
+  // 503 DISCOVERY_UNAVAILABLE without losing data.
   "name": "gyblos-discovery",
   "main": "./src/worker.ts",
   "compatibility_date": "2026-10-01",
@@ -14,22 +14,36 @@
   "preview_urls": false,
   // No request logs: the index must not store or log client IPs.
   "observability": { "enabled": false },
-  // After approval, uncomment and fill in the id printed by `d1 create gyblos-discovery`:
-  // "d1_databases": [
-  //   {
-  //     "binding": "DISCOVERY_DB",
-  //     "database_name": "gyblos-discovery",
-  //     "database_id": "<from d1 create>",
-  //     "migrations_dir": "migrations"
-  //   }
-  // ],
+  "d1_databases": [
+    {
+      "binding": "DISCOVERY_DB",
+      "database_name": "gyblos-discovery",
+      "database_id": "d6270b3c-bc9e-4535-8612-d869359266ac",
+      "migrations_dir": "migrations",
+    },
+  ],
   // Rate limits (Cloudflare counts 10 or 60 second windows). namespace_id values must be
-  // unused in the account; the website uses 42621001-42621003. Verify before uncommenting.
+  // unused in the account; the website uses 42621001-42621003.
   //   all requests per IP(/64), publishes per IP(/64), publishes per verified NodeId.
-  // "ratelimits": [
-  //   { "name": "DISCOVERY_IP_LIMITER", "namespace_id": "42621004", "simple": { "limit": 120, "period": 60 } },
-  //   { "name": "DISCOVERY_PUBLISH_LIMITER", "namespace_id": "42621005", "simple": { "limit": 30, "period": 60 } },
-  //   { "name": "DISCOVERY_NODE_LIMITER", "namespace_id": "42621006", "simple": { "limit": 10, "period": 60 } }
-  // ],
-  // "routes": [{ "pattern": "discovery.gyblos.com", "custom_domain": true }],
+  "ratelimits": [
+    {
+      "name": "DISCOVERY_IP_LIMITER",
+      "namespace_id": "42621004",
+      "simple": { "limit": 120, "period": 60 },
+    },
+    {
+      "name": "DISCOVERY_PUBLISH_LIMITER",
+      "namespace_id": "42621005",
+      "simple": { "limit": 30, "period": 60 },
+    },
+    {
+      "name": "DISCOVERY_NODE_LIMITER",
+      "namespace_id": "42621006",
+      "simple": { "limit": 10, "period": 60 },
+    },
+  ],
+  "routes": [{ "pattern": "discovery.gyblos.com", "custom_domain": true }],
+  // Publishing also needs the DISCOVERY_PUBLISH_ALLOWLIST secret (approved NodeIds or `*`), set
+  // with `secret put` after the first deploy, never here; without it publishes answer 503 and
+  // reads keep working.
 }

@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import { createDiscoveryIndex } from '@gyblos/discovery-index/app';
+import { PUBLISH_MODES } from '@gyblos/discovery-index/constants';
 import { createMemoryStorage } from '@gyblos/discovery-index/storage';
 
 import {
@@ -45,7 +46,11 @@ eachStorage(
     assert.ok(text.includes(`{"catalog":${compact},`));
     assert.equal((await sellers('model=other-model')).body.sellers.length, 0);
     response = await call('/v1/health');
-    assert.deepEqual(await response.json(), { ok: true, records: 2 });
+    assert.deepEqual(await response.json(), {
+      ok: true,
+      records: 2,
+      publish: 'open',
+    });
   },
 );
 
@@ -315,6 +320,7 @@ void test('the protocol golden v2 records publish, list byte-for-byte and withdr
     storage: createMemoryStorage(),
     limiters: allLimiters(),
     now: () => T0 + 1000,
+    publishers: { mode: PUBLISH_MODES.OPEN },
   });
   for (const signed of [catalog, presence])
     assert.equal((await app.fetch(post(json(signed)))).status, 201);

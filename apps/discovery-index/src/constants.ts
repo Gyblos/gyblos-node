@@ -13,6 +13,8 @@ export const INDEX_ERRORS = {
   RATE_LIMITED: 'RATE_LIMITED',
   INVALID_QUERY: 'INVALID_QUERY',
   NOT_FOUND: 'NOT_FOUND',
+  // The claimed NodeId is not on the publish allowlist (checked before the signature).
+  PUBLISH_NOT_ALLOWED: 'PUBLISH_NOT_ALLOWED',
   UNAVAILABLE: 'DISCOVERY_UNAVAILABLE',
 } as const;
 export type IndexErrorCode = (typeof INDEX_ERRORS)[keyof typeof INDEX_ERRORS];
@@ -21,6 +23,7 @@ export const INDEX_STATUS = {
   OK: 200,
   CREATED: 201,
   BAD_REQUEST: 400,
+  FORBIDDEN: 403,
   NOT_FOUND: 404,
   CONFLICT: 409,
   PAYLOAD_TOO_LARGE: 413,
@@ -92,6 +95,24 @@ export type DiscoveryLimiterName =
   (typeof DISCOVERY_LIMITERS)[keyof typeof DISCOVERY_LIMITERS];
 
 export const DISCOVERY_DB_BINDING = 'DISCOVERY_DB';
+
+// Worker secret naming who may publish: `*` (open) or comma-separated NodeIds. Missing,
+// empty or malformed closes publishing (503); reads stay public either way.
+export const DISCOVERY_PUBLISH_ALLOWLIST_BINDING =
+  'DISCOVERY_PUBLISH_ALLOWLIST';
+export const PUBLISH_ALLOWLIST = {
+  open: '*',
+  separator: ',',
+  maxEntries: 1000,
+  nodeId: /^[0-9a-f]{64}$/,
+} as const;
+// Publish modes, also reported by /v1/health (never the NodeIds themselves).
+export const PUBLISH_MODES = {
+  CLOSED: 'closed',
+  ALLOWLIST: 'allowlist',
+  OPEN: 'open',
+} as const;
+export type PublishMode = (typeof PUBLISH_MODES)[keyof typeof PUBLISH_MODES];
 
 // Loopback-only development counters (never used by the Worker entry). The host list is local
 // because the @gyblos/config root also exports Node path helpers that a Worker bundle cannot load.

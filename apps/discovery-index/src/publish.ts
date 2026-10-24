@@ -1,4 +1,4 @@
-// Owns acceptance of one published record: decode, verify, replay and rate checks, then an atomic put.
+// Owns acceptance of one published record: decode, allowlist, verify, replay and rate checks, then an atomic put.
 // It stores only signed public data and never sees or keeps the client address.
 import { PUBLIC_RECORD_KINDS } from '@gyblos/protocol/constants';
 import type { PublicRecordV2 } from '@gyblos/protocol/control-types';
@@ -12,12 +12,14 @@ import {
 } from './constants.js';
 import { indexFail } from './errors.js';
 import { allowed, type ResolvedLimiters } from './limits.js';
+import { publisherAllowed, type DiscoveryPublishers } from './publishers.js';
 import type { DiscoveryStorage, StoredEntry } from './storage.js';
 import { verifyAgainstStored, verifySelfSigned } from './verify.js';
 
 export interface PublishContext {
   storage: DiscoveryStorage;
   limiters: ResolvedLimiters;
+  publishers: DiscoveryPublishers;
   now: number;
   maxNodes: number;
   // Throttled pruning, run only before admitting a new NodeId.
@@ -56,6 +58,10 @@ export async function acceptRecord(
 ) {
   const { storage, now } = context;
   const { envelope, json } = readPublishBody(bytes);
+  // The claimed NodeId is refused before the signature, storage or the per-NodeId limit,
+  // so an unlisted publisher costs one parse and consumes no NodeId allowance.
+  if (!publisherAllowed(context.publishers, envelope))
+    indexFail(INDEX_ERRORS.PUBLISH_NOT_ALLOWED);
   const { record, signature } = await verifySelfSigned(envelope, now);
   // Stale records are rejected before the per-NodeId limit, so replaying a seller's public
   // records cannot exhaust its allowance; the signature already proved the NodeId.

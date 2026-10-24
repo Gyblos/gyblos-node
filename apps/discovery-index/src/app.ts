@@ -25,6 +25,7 @@ import {
   type ResolvedLimiters,
 } from './limits.js';
 import { acceptRecord, type PublishContext } from './publish.js';
+import { publishModeOf, type DiscoveryPublishers } from './publishers.js';
 import {
   parseSellersQuery,
   sellersPage,
@@ -36,6 +37,9 @@ export interface DiscoveryIndexOptions {
   // Missing storage or any missing limiter fails closed with 503 DISCOVERY_UNAVAILABLE.
   storage?: DiscoveryStorage;
   limiters?: DiscoveryLimiters;
+  // Who may publish. Missing means closed: every publish is 503 DISCOVERY_UNAVAILABLE,
+  // reads are unaffected. Development never relaxes it.
+  publishers?: DiscoveryPublishers;
   now?: () => number;
   // Loopback hosts only: missing limiters become in-memory counters. Storage is never relaxed.
   // The Worker entry always passes false.
@@ -98,6 +102,7 @@ function pruneThrottle(
 interface IndexSettings {
   now: () => number;
   storage: DiscoveryStorage | undefined;
+  publishers: DiscoveryPublishers | undefined;
   resolve: (url: string) => ResolvedLimiters | null;
   prune: (now: number) => Promise<void>;
   maxNodes: number;
@@ -109,6 +114,7 @@ function settingsOf(options: DiscoveryIndexOptions): IndexSettings {
   return {
     now,
     storage: options.storage,
+    publishers: options.publishers,
     resolve: limiterResolver(
       options.limiters ?? {},
       options.development === true,
@@ -143,7 +149,10 @@ function gate(settings: IndexSettings) {
   };
 }
 
-function publishHandler(settings: IndexSettings) {
+function publishHandler(
+  settings: IndexSettings,
+  publishers: DiscoveryPublishers,
+) {
   return async (context: IndexContext) => {
     if (!(await clientAllowed(context, DISCOVERY_LIMITERS.PUBLISH)))
       return rejection(context, INDEX_ERRORS.RATE_LIMITED);
@@ -155,6 +164,7 @@ function publishHandler(settings: IndexSettings) {
     const publish: PublishContext = {
       storage: context.get('storage'),
       limiters: context.get('limiters'),
+      publishers,
       now: settings.now(),
       maxNodes: settings.maxNodes,
       prune: settings.prune,
@@ -200,19 +210,29 @@ export function createDiscoveryIndex(options: DiscoveryIndexOptions = {}) {
     rejection(context, INDEX_ERRORS.UNAVAILABLE),
   );
   app.notFound((context) => rejection(context, INDEX_ERRORS.NOT_FOUND));
-  app.post(
-    INDEX_ROUTES.RECORDS,
-    bodyLimit({
-      maxSize: DISCOVERY_INDEX_LIMITS.maxBodyBytes,
-      onError: (context) => rejection(context, INDEX_ERRORS.PAYLOAD_TOO_LARGE),
-    }),
-    publishHandler(settings),
-  );
+  const publishers = settings.publishers;
+  // Closed publishing answers 503 before the body is read or any publish limit is consumed.
+  if (!publishers)
+    app.post(INDEX_ROUTES.RECORDS, (context) =>
+      rejection(context, INDEX_ERRORS.UNAVAILABLE),
+    );
+  else
+    app.post(
+      INDEX_ROUTES.RECORDS,
+      bodyLimit({
+        maxSize: DISCOVERY_INDEX_LIMITS.maxBodyBytes,
+        onError: (context) =>
+          rejection(context, INDEX_ERRORS.PAYLOAD_TOO_LARGE),
+      }),
+      publishHandler(settings, publishers),
+    );
   app.get(INDEX_ROUTES.SELLERS, sellersHandler(settings));
+  // Reports the publish mode only, never the allowlisted NodeIds.
   app.get(INDEX_ROUTES.HEALTH, async (context) =>
     context.json({
       ok: true,
       records: await context.get('storage').count(settings.now()),
+      publish: publishModeOf(publishers),
     }),
   );
   return app;
