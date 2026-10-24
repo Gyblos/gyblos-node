@@ -91,29 +91,30 @@ using independently confirmed seller identities, run `pnpm buyer:setup`, then
 
 ## Commands
 
-| Group  | Command                                              | What it does                                                          |
-| ------ | ---------------------------------------------------- | --------------------------------------------------------------------- |
-| Node   | `pnpm node:start`, `buyer:start`                     | Start the seller node; start the buyer proxy (`:4031`).               |
-| Node   | `pnpm node:setup --role buyer\|seller --mint MINT`   | Create isolated role keys without RPC or funding.                     |
-| Node   | `pnpm buyer:setup`                                   | Download and verify the buyer tokenizer without an inference engine.  |
-| Node   | `pnpm buyer:trust`                                   | Verify the offer against explicit seller identities and create trust. |
-| Node   | `pnpm buyer:call`, `buyer:reconcile`                 | One paid synthetic call; verify a payment, clear a zero-charge block. |
-| Lab    | `pnpm gate:setup`                                    | Create isolated lab devnet keys.                                      |
-| Lab    | `pnpm gate:fund`                                     | Provision accounts; `--test-mint` makes a test token.                 |
-| Lab    | `pnpm gate:preflight`, `gate:challenge`              | Check devnet and balances; check that unpaid gets 402.                |
-| Lab    | `pnpm gate:run`                                      | Run the fixed-resource `upto` payment end to end.                     |
-| Lab    | `pnpm gate:failures`                                 | Empty buyer and expired authorization (about 62 s).                   |
-| Lab    | `pnpm gate:facilitator`, `gate:seller`, `gate:buyer` | Run the fixed-resource roles separately (ports 4022, 4021).           |
-| Lab    | `pnpm gate:exact`                                    | Fixed price through the public x402.org facilitator.                  |
-| Lab    | `pnpm gate:inference:setup`, `gate:inference`        | Download the model; run six metered cases.                            |
-| Lab    | `pnpm identity:devnet-run`                           | Try the sponsored 8004 registration on devnet.                        |
-| Lab    | `pnpm identity:fixtures`                             | Recapture the public registry fixture (read-only devnet).             |
-| Checks | `pnpm test`, `test:lab`, `test:all`                  | Product tests (PR gate), lab tests, both.                             |
-| Checks | `pnpm typecheck`                                     | TypeScript, including tests.                                          |
-| Checks | `pnpm check`                                         | Typecheck, lint (including tooling), product and lab tests.           |
-| Checks | `pnpm lint`                                          | ESLint, Prettier, tooling tests and import boundaries.                |
-| Checks | `pnpm boundaries`, `tooling:test`                    | Boundary check (`--json`); tests of the checker and lint rules.       |
-| Checks | `pnpm format`, `format:check`                        | Format and sort imports; check only.                                  |
+| Group  | Command                                              | What it does                                                                           |
+| ------ | ---------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Node   | `pnpm node:start`, `buyer:start`                     | Start the seller node; start the buyer proxy (`:4031`).                                |
+| Node   | `pnpm gyblos config validate --config gyblos.toml`   | Check a node config file and the environment ([configuration](docs/configuration.md)). |
+| Node   | `pnpm node:setup --role buyer\|seller --mint MINT`   | Create isolated role keys without RPC or funding.                                      |
+| Node   | `pnpm buyer:setup`                                   | Download and verify the buyer tokenizer without an inference engine.                   |
+| Node   | `pnpm buyer:trust`                                   | Verify the offer against explicit seller identities and create trust.                  |
+| Node   | `pnpm buyer:call`, `buyer:reconcile`                 | One paid synthetic call; verify a payment, clear a zero-charge block.                  |
+| Lab    | `pnpm gate:setup`                                    | Create isolated lab devnet keys.                                                       |
+| Lab    | `pnpm gate:fund`                                     | Provision accounts; `--test-mint` makes a test token.                                  |
+| Lab    | `pnpm gate:preflight`, `gate:challenge`              | Check devnet and balances; check that unpaid gets 402.                                 |
+| Lab    | `pnpm gate:run`                                      | Run the fixed-resource `upto` payment end to end.                                      |
+| Lab    | `pnpm gate:failures`                                 | Empty buyer and expired authorization (about 62 s).                                    |
+| Lab    | `pnpm gate:facilitator`, `gate:seller`, `gate:buyer` | Run the fixed-resource roles separately (ports 4022, 4021).                            |
+| Lab    | `pnpm gate:exact`                                    | Fixed price through the public x402.org facilitator.                                   |
+| Lab    | `pnpm gate:inference:setup`, `gate:inference`        | Download the model; run six metered cases.                                             |
+| Lab    | `pnpm identity:devnet-run`                           | Try the sponsored 8004 registration on devnet.                                         |
+| Lab    | `pnpm identity:fixtures`                             | Recapture the public registry fixture (read-only devnet).                              |
+| Checks | `pnpm test`, `test:lab`, `test:all`                  | Product tests (PR gate), lab tests, both.                                              |
+| Checks | `pnpm typecheck`                                     | TypeScript, including tests.                                                           |
+| Checks | `pnpm check`                                         | Typecheck, lint (including tooling), product and lab tests.                            |
+| Checks | `pnpm lint`                                          | ESLint, Prettier, tooling tests and import boundaries.                                 |
+| Checks | `pnpm boundaries`, `tooling:test`                    | Boundary check (`--json`); tests of the checker and lint rules.                        |
+| Checks | `pnpm format`, `format:check`                        | Format and sort imports; check only.                                                   |
 
 ## Configuration
 
@@ -157,9 +158,10 @@ checks, the standalone lab facilitator and their evidence, and `tests/` and
 ## Documentation
 
 [Architecture](docs/architecture.md) · [Running a node](docs/running-a-node.md)
-· [Payments](docs/payments.md) · [Inference](docs/inference.md) ·
-[Recovery](docs/recovery.md) · [Identity](docs/identity.md) ·
-[Discovery](docs/discovery.md) · [Discovery index](docs/discovery-index.md) ·
-[Stack](docs/stack.md) · [Limitations](docs/limitations.md) ·
-[Protocol spec](packages/protocol/SPEC.md) · [Tests](tests/README.md) ·
-[Code standards](docs/code-standards.md) · [Contributing](AGENTS.md)
+· [Configuration](docs/configuration.md) · [Payments](docs/payments.md) ·
+[Inference](docs/inference.md) · [Recovery](docs/recovery.md) ·
+[Identity](docs/identity.md) · [Discovery](docs/discovery.md) ·
+[Discovery index](docs/discovery-index.md) · [Stack](docs/stack.md) ·
+[Limitations](docs/limitations.md) · [Protocol spec](packages/protocol/SPEC.md)
+· [Tests](tests/README.md) · [Code standards](docs/code-standards.md) ·
+[Contributing](AGENTS.md)
