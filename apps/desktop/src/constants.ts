@@ -21,3 +21,11 @@ export const DESKTOP = {
   PAYLOAD: 'gyblos-desktop-loopback-probe',
   SMOKE_FLAG: '--smoke',
 } as const;
+
+export const STARTUP_WINDOW = {
+  WIDTH: 420,
+  HEIGHT: 250,
+  QUERY: 'startup',
+  QUERY_VALUE: '1',
+  BARS: 20,
+} as const;
