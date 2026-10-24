@@ -249,3 +249,92 @@ void test(
     }
   },
 );
+
+void test(
+  'native HTTP-discovered trusted seller passes persistent replay admission before quote-only v1 authorization guard',
+  { skip: NATIVE_CAPABILITY.transportSkip },
+  async () => {
+    const run = await fixture();
+    const { discoveryHome, discoveryResponse } =
+      await import('./support/buyer-discovery.js');
+    const home = await discoveryHome();
+    try {
+      const { runtimeProxySelection } =
+        await import('@gyblos/buyer/selection-runtime');
+      const { selectionStats } = await import('@gyblos/buyer/selection-stats');
+      const { SELLER_BADGES } = await import('@gyblos/core/constants');
+      const catalog = await run.client.getCatalog();
+      const presence = await run.client.getPresence();
+      const quote = await run.client.requestOffer(run.request.params);
+      await run.client.close();
+      const {
+        buyer: _buyer,
+        buyerNodeId: _node,
+        catalogDigest: _digest,
+        ...request
+      } = run.request.params;
+      const config = {
+        request: {
+          ...request,
+          lowestReasoning: null,
+          minimumBadge: SELLER_BADGES.DECLARED_USAGE,
+          retention: [run.catalog.dataPolicy.retention],
+        },
+        sellers: [
+          {
+            owner: run.catalog.owner,
+            nodeId: run.catalog.nodeId,
+            relayUrl: null,
+            directAddresses: run.seller.addr().directAddresses(),
+          },
+        ],
+        discovery: { baseUrl: 'https://index.test', maxPages: 1 },
+      };
+      // Synthetic legacy trust fixture only; product never converts a v2 quote into a v1 offer.
+      const trusted = {
+        ...quote.offer,
+        schemaVersion: 1,
+        protocol: GYBLOS_ALPN,
+      };
+      let fetches = 0;
+      const guard = runtimeProxySelection(
+        {
+          config,
+          stats: await selectionStats(home.environment),
+          discovery: home.state,
+        },
+        {
+          endpoint: run.buyer,
+          trusted,
+          buyer: run.request.params.buyer,
+          relayOnly: false,
+          retireIdle: async () => true,
+          now: run.context.now,
+          fetch: async () => {
+            fetches++;
+            return discoveryResponse([{ catalog, presence }]);
+          },
+        },
+      );
+      const body = Buffer.from(
+        JSON.stringify({
+          requestId: 'synthetic-native',
+          maxTokens: request.maxTokens,
+        }),
+      );
+      assert.deepEqual(
+        await guard.admit(body, false, new AbortController().signal),
+        { ok: true },
+      );
+      assert.deepEqual(
+        await guard.admit(body, true, new AbortController().signal),
+        { ok: true },
+      );
+      assert.equal(fetches, 1);
+      assert.equal(run.httpRequests, 0);
+    } finally {
+      await home.close();
+      await run.close();
+    }
+  },
+);

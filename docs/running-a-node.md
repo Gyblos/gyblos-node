@@ -275,7 +275,7 @@ and trust files with canonical budgets remain valid. Older `buyer:trust`
 versions accepted leading-zero budgets; remove those leading zeros before
 loading such a file. Validation errors do not echo field names or values.
 
-### Optional static buyer selection
+### Optional buyer selection and discovery
 
 A buyer may opt into local selection by placing `selection.json` in its buyer
 home (`homeLayout`: `$GYBLOS_HOME/buyer`, default `.local/gyblos/buyer`).
@@ -295,7 +295,13 @@ contains:
 - optional `pinnedNodeId` for “choose myself”. A pinned seller still passes all
   filters; `PINNED_SELLER_IN_COOLDOWN` includes `cooldownUntil` for the UI.
 
-This is a static candidate list, not discovery. Every badge is `declared-usage`
+Without a `discovery` option this is a static candidate list. With optional
+`"discovery": {}` (or
+`{ "baseUrl": "https://your-index.example/api/v1/discovery", "maxPages": 3 }`),
+the HTTP index supplies availability hints filtered by these independent
+identity/endpoint bindings. Unknown identities are never enrolled. See
+[discovery.md](discovery.md#buyer-runtime-integration) for durable replay state,
+pagination, cache lifetime and failure behavior. Every badge is `declared-usage`
 until a real checkability source exists; a catalog cannot elevate it.
 `openChannel` is always false until payment channel reuse exists.
 

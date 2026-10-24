@@ -30,6 +30,10 @@ import {
 import { parsePublicV2 } from '@gyblos/protocol/public-v2';
 
 import { BUYER_SELECTION, BUYER_SELECTION_CODES } from './constants.js';
+import {
+  parseBuyerDiscoveryConfig,
+  type BuyerDiscoveryConfig,
+} from './discovery-config.js';
 
 export class BuyerSelectionError extends Error {
   constructor(
@@ -50,6 +54,7 @@ export interface BuyerSelectionConfig {
   request: SellerRequest;
   sellers: StaticControlSeller[];
   pinnedNodeId?: string;
+  discovery?: BuyerDiscoveryConfig;
 }
 function parseRequest(value: unknown): SellerRequest {
   const row = controlObject(value, [
@@ -115,7 +120,11 @@ export function parseBuyerSelectionConfig(
   value: unknown,
 ): BuyerSelectionConfig {
   try {
-    const row = optionalObject(value, ['request', 'sellers'], ['pinnedNodeId']);
+    const row = optionalObject(
+      value,
+      ['request', 'sellers'],
+      ['pinnedNodeId', 'discovery'],
+    );
     const request = parseRequest(row.request);
     const validation = selectSellers({
       request,
@@ -175,6 +184,9 @@ export function parseBuyerSelectionConfig(
     return {
       request,
       sellers,
+      ...(row.discovery === undefined
+        ? {}
+        : { discovery: parseBuyerDiscoveryConfig(row.discovery) }),
       ...(row.pinnedNodeId === undefined
         ? {}
         : { pinnedNodeId: controlHex(row.pinnedNodeId) }),
