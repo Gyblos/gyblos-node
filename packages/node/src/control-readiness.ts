@@ -50,6 +50,9 @@ class SellerReadiness {
         this.checking?.abort();
         try {
           return await engine.generate(input);
+        } catch (error) {
+          this.validUntil = 0;
+          throw error;
         } finally {
           this.active--;
           this.generation++;
@@ -131,15 +134,23 @@ class SellerReadiness {
     this.generation++;
     return true;
   }
-  start(onRenewed?: () => Promise<unknown>) {
+  start(onAvailable?: () => Promise<unknown>) {
     if (!this.renewal || this.stopped || this.running) return;
     this.running = true;
     const schedule = () => {
       this.loop = setTimeout(() => {
         this.loop = undefined;
         void this.tick()
-          .then(async (renewed) => {
-            if (renewed && !this.stopped) await onRenewed?.();
+          .then(async () => {
+            const state = this.readiness();
+            const now = this.now();
+            if (
+              !this.stopped &&
+              !state.busy &&
+              state.observedAt <= now &&
+              state.validUntil > now
+            )
+              await onAvailable?.();
           })
           .catch(() => {
             this.validUntil = 0;

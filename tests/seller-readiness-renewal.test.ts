@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { observeControlReadiness } from '@gyblos/node/control-readiness';
-import { ENGINE_DONE_REASONS } from '@gyblos/protocol/constants';
+import {
+  ENGINE_DONE_REASONS,
+  MODEL_IDENTITIES,
+} from '@gyblos/protocol/constants';
 import type { Engine } from '@gyblos/protocol/engine';
 
 function fixture() {
@@ -29,7 +32,7 @@ function fixture() {
       logprobs: false,
       cancellable: true,
       recountable: true,
-      modelIdentity: 'digest',
+      modelIdentity: MODEL_IDENTITIES.DIGEST,
     }),
     generate: async () => result,
   };
@@ -202,12 +205,37 @@ void test('scheduled idle observation refreshes records after busy without anoth
   const source = fixture();
   let updated = 0;
   try {
-    await source.observed.engine.generate({ prompt: 'synthetic', maxTokens: 1 });
-    source.observed.start(async () => { updated++; });
+    await source.observed.engine.generate({
+      prompt: 'synthetic',
+      maxTokens: 1,
+    });
+    source.observed.start(async () => {
+      updated++;
+    });
     const until = Date.now() + 1000;
     while (!updated && Date.now() < until)
       await new Promise((resolve) => setTimeout(resolve, 5));
     assert.ok(updated > 0);
     assert.equal(source.checks(), 0);
-  } finally { await source.observed.stop(); }
+  } finally {
+    await source.observed.stop();
+  }
+});
+
+void test('failed inference invalidates the observation without retrying or changing the original error', async () => {
+  const source = fixture();
+  const failure = new Error('synthetic inference failure');
+  let calls = 0;
+  source.engine.generate = async () => {
+    calls++;
+    throw failure;
+  };
+  await assert.rejects(
+    source.observed.engine.generate({ prompt: 'synthetic', maxTokens: 1 }),
+    (error) => error === failure,
+  );
+  assert.equal(calls, 1);
+  assert.ok(source.observed.readiness().validUntil <= 10000);
+  assert.equal(await source.observed.tick(), true);
+  await source.observed.stop();
 });

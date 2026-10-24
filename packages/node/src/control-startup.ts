@@ -27,7 +27,7 @@ import { createSellerControlService } from './control.js';
 import { createSellerRecords } from './public-records.js';
 import type { SellerSequence } from './public-sequence.js';
 
-export async function prepareSellerControl(options: {
+interface SellerControlStartupOptions {
   owner: KeyPairSigner;
   nodeId: string;
   nodeSigner: Signer;
@@ -43,10 +43,12 @@ export async function prepareSellerControl(options: {
   readiness: () => QuoteReadiness;
   sequence: SellerSequence;
   catalogMs?: number;
-}) {
+}
+
+function startupRecords(options: SellerControlStartupOptions) {
   const now = Date.now();
   const { selection, reasoning } = startupSelection();
-  const records = await createSellerRecords({
+  return createSellerRecords({
     template: {
       schemaVersion: CONTROL_RECORD_VERSION,
       kind: PUBLIC_RECORD_KINDS.CATALOG,
@@ -77,6 +79,13 @@ export async function prepareSellerControl(options: {
     readiness: options.readiness,
     catalogMs: options.catalogMs ?? PUBLIC_RECORD_LIMITS.catalogLifetimeMs,
   });
+}
+
+export async function prepareSellerControl(
+  options: SellerControlStartupOptions,
+) {
+  const { selection, reasoning } = startupSelection();
+  const records = await startupRecords(options);
   const service = createSellerControlService({
     records,
     context: {

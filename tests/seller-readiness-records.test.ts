@@ -114,10 +114,19 @@ void test('a changed observation during asynchronous presence signing rejects th
 void test('a catalog lookup rechecks readiness after asynchronous signature verification', async () => {
   const run = await fixture();
   try {
-    const response = run.service.respond({ version: CONTROL_VERSION,
-      requestId: 'b'.repeat(32), method: CONTROL_METHODS.CATALOG, params: {} },
-      run.request.params.buyerNodeId, new AbortController().signal);
+    const response = run.service.respond(
+      {
+        version: CONTROL_VERSION,
+        requestId: 'b'.repeat(32),
+        method: CONTROL_METHODS.CATALOG,
+        params: {},
+      },
+      run.request.params.buyerNodeId,
+      new AbortController().signal,
+    );
     run.setReadiness({ generation: 2, validUntil: 0 });
-    assert.ok('error' in await response);
-  } finally { await run.close(); }
+    assert.ok('error' in (await response));
+  } finally {
+    await run.close();
+  }
 });
