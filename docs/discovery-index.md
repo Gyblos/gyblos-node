@@ -9,8 +9,10 @@ record verification has a single source: every record check goes through
 `@gyblos/protocol` (`parsePublicV2`, `validatePublicV2Time`, `controlVerify` and
 `verifyPublicV2`); the app keeps no copy of the record rules.
 
-**It is not deployed.** Creating Cloudflare resources and deploying are
-founder-approved manual steps (see [Operations](#operations)).
+It is deployed at `https://discovery.gyblos.com` with the D1 database
+`gyblos-discovery`. Changing Cloudflare resources, applying migrations to the
+remote database and deploying are founder-approved manual steps (see
+[Operations](#operations)).
 
 ## Endpoints
 
@@ -22,6 +24,13 @@ Routes sit at the root of the index host; the client base URL is
 | `POST /v1/records` | Publish one signed public v2 catalog, presence or withdrawal. |
 | `GET /v1/sellers`  | List live sellers of one model, paged by an opaque cursor.    |
 | `GET /v1/health`   | `{ ok: true, records, publish }` (see below).                 |
+
+The index is HTTPS only: a request whose URL is not `https` gets
+`400 {"error":"HTTPS_REQUIRED"}` for every method and path, before storage or
+any rate limit is touched. There is deliberately no redirect, so a `POST` body
+sent over plain `http` is never replayed and clients learn to fix their base
+URL. The check reads the scheme of the request URL, which on Workers is the
+scheme the client used; it needs no `CF-Visitor` header.
 
 Anything else is a real `404 {"error":"NOT_FOUND"}`. Every response carries
 `X-Robots-Tag: noindex`; responses other than `/v1/sellers` carry
@@ -72,9 +81,11 @@ signed a record; clients re-verify everything.
   any storage failure. Without a valid publish allowlist, only publishing is
   `503`. Errors are static codes; input is never echoed, and nothing is logged.
 - **Development relaxation:** `createDiscoveryIndex({ development: true })`
-  replaces missing limiters with in-memory counters, only for requests to a
-  loopback host, and never relaxes storage or the publish allowlist. The Worker
-  entry (`src/worker.ts`) always passes `development: false`.
+  replaces missing limiters with in-memory counters and accepts plain `http`,
+  only for requests to a loopback host, and never relaxes storage or the publish
+  allowlist. The Worker entry (`src/worker.ts`) always passes
+  `development: false`, so a local `wrangler dev` needs
+  `--local-protocol https`.
 - **Rate limits:** `DISCOVERY_IP_LIMITER` on every request and
   `DISCOVERY_PUBLISH_LIMITER` on publishes, keyed by client address (IPv4 by
   full address, IPv6 by its /64 prefix); `DISCOVERY_NODE_LIMITER` keyed by the
@@ -98,10 +109,28 @@ signed a record; clients re-verify everything.
   `UNKNOWN_CATALOG`. A withdrawal hides the seller; only a higher catalog
   revives it.
 - **Capacity:** at most 10,000 tracked NodeIds (new NodeIds beyond that are
-  `429`). Expired rows are pruned when a new NodeId publishes, at most once a
-  minute per isolate, with index-only deletes.
+  `429`). When publishing is an allowlist no larger than that cap, the list
+  itself bounds new NodeIds and the count is skipped (NodeIds kept from an
+  earlier list leave with their retention). Expired rows are pruned when a new
+  NodeId publishes, at most once a minute per isolate, with index-only deletes.
 - **Privacy:** no IP address, header, session or request metadata is stored or
   logged; rate-limit keys go only to Cloudflare limiters.
+
+## Caching
+
+- **Sellers pages:** `GET /v1/sellers` answers
+  `Cache-Control: public, max-age=10`, and the Worker also keeps `200` pages in
+  the Workers Cache API (`caches.default`, per Cloudflare location) for those 10
+  seconds. The key is normalized from the parsed query: `cursor`, `limit` (the
+  effective value, so `limit=5000` and `limit=200` share it) and `model`, in
+  that order, on `/v1/sellers` of the request's origin. Invalid queries are
+  rejected before the cache, and errors, publishes and health are never cached.
+  CORS, `noindex` and `nosniff` headers are added to cached pages exactly as to
+  fresh ones. A cache failure falls back to storage.
+  `createDiscoveryIndex({ cache })` takes any object with `match(key)` and
+  `put(key, response)`; without it there is no response cache.
+- **Health:** each isolate reuses its `records` count for 30 seconds and counts
+  again after it accepts a publish. `publish` always reflects the current mode.
 
 ## Storage
 
@@ -113,10 +142,29 @@ interfaces instead of `@cloudflare/workers-types`. A publish is one D1 batch
 `migrations/0001_discovery_index.sql` creates the five tables and their indexes.
 The website's draft `0001` and `0002` (prune indexes) were never applied to any
 database, so they are combined into this one clean migration.
+`migrations/0002_listing_indexes.sql` changes indexes only (idempotent
+`CREATE INDEX IF NOT EXISTS` / `DROP INDEX IF EXISTS`): covering listing indexes
+on catalogs `(node_id, digest, issued_at, expires_at)`, presence
+`(node_id, catalog_digest, issued_at, expires_at)` and withdrawals
+`(node_id, catalog_digest)`, and it drops the unused
+`discovery_presence_by_issue`.
+
+- **Listing is two-phase.** A `page` CTE filters, sorts and limits only keys,
+  digests and times read from those covering indexes; the signed JSON of the
+  page rows is then read by primary key. The sort never carries a blob, and a
+  page reads at most `limit + 1` catalog and presence blobs. The query names the
+  indexes with `INDEXED BY` (D1 may have no statistics to choose them), so
+  `0002` must be applied before code that uses them is deployed; without it
+  listing answers `503`.
+- **Writes update in place.** Catalog, presence and withdrawal rows are upserted
+  (`ON CONFLICT (node_id) DO UPDATE`) under the same high-water guard, and a
+  catalog republish deletes and inserts only the model ids that changed, so an
+  unchanged model list writes no model row.
 
 Tests run the same HTTP cases against the in-memory adapter and a `node:sqlite`
-D1 double that applies the real migration (`tests/support/d1-sqlite.ts`); CI
-needs no Cloudflare account.
+D1 double that applies every real migration in order
+(`tests/support/d1-sqlite.ts`), check the listing query plan and count written
+rows; CI needs no Cloudflare account.
 
 ## Operations
 
@@ -151,6 +199,28 @@ curl -si https://discovery.gyblos.com/nope | grep -i x-robots-tag
 curl -si 'https://discovery.gyblos.com/v1/sellers?model=x' | grep -i access-control
 # expected: Access-Control-Allow-Origin: *
 ```
+
+### Updating the deployed index
+
+Apply new migrations before deploying the code that needs them (for `0002`, the
+listing query names its indexes). Migration `0002` only adds and drops indexes,
+so the running version keeps working while it applies:
+
+```sh
+npx wrangler@4.151.1 d1 migrations list gyblos-discovery --remote    # 0002 pending
+npx wrangler@4.151.1 d1 migrations apply gyblos-discovery --remote
+npx wrangler@4.151.1 d1 migrations list gyblos-discovery --remote    # nothing pending
+npx wrangler@4.151.1 deploy
+curl -s https://discovery.gyblos.com/v1/health
+curl -s -o /dev/null -w '%{http_code}\n' 'https://discovery.gyblos.com/v1/sellers?model=x'
+# expected: 200
+curl -s http://discovery.gyblos.com/v1/health
+# expected: 400 {"error":"HTTPS_REQUIRED"} (unless the zone's Always Use HTTPS
+# redirects first; either way nothing is served over http)
+```
+
+Rolling the code back does not require reverting `0002`: earlier code names no
+index and no query used `discovery_presence_by_issue`.
 
 Rollback: `npx wrangler@4.151.1 rollback` returns to the previous version (it
 asks for confirmation when secrets changed since that version; decline unless
