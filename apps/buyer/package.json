@@ -18,7 +18,13 @@
     "./proxy": "./src/proxy.ts",
     "./setup": "./src/setup.ts",
     "./trust": "./src/trust.ts",
-    "./control": "./src/control.ts"
+    "./control": "./src/control.ts",
+    "./selection": "./src/selection.ts",
+    "./selection-config": "./src/selection-config.ts",
+    "./selection-stats": "./src/selection-stats.ts",
+    "./selection-proxy": "./src/selection-proxy.ts",
+    "./offer-race": "./src/offer-race.ts",
+    "./selection-v1": "./src/selection-v1.ts"
   },
   "dependencies": {
     "@gyblos/core": "workspace:*",
