@@ -21,11 +21,12 @@ app ─▶ buyer proxy ══ Iroh (direct or na1 relay) ══▶ seller node �
         signs ceiling ─▶ Solana devnet channel ◀─ facilitator settles usage
 ```
 
-## Desktop compatibility probe
+## Desktop preview
 
-An isolated macOS arm64 Electron/Iroh experiment is available in `apps/desktop`.
-It performs local synthetic checks only; Chat, Connect and payments stay
-disabled. See [running and packaging the probe](docs/desktop-probe.md).
+The macOS arm64 Electron preview in `apps/desktop` reuses the compact Chat and
+Connect mockup, with in-memory conversations and simulated
+responses/connections. A separate smoke retains the isolated Iroh loopback
+check. See [running and packaging the preview](docs/desktop-probe.md).
 
 ## Status
 

@@ -45,6 +45,7 @@ await packager({
   arch: 'arm64',
   electronVersion: manifest.devDependencies.electron,
   appBundleId: 'com.gyblos.desktop-probe',
+  icon: resolve('resources/gyblos.icns'),
   asar: false,
   overwrite: true,
   prune: false,
