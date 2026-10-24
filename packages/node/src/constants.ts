@@ -171,3 +171,17 @@ export const NODE_SETTINGS = {
   OFFERS: 'offers',
 } as const;
 export type NodeSettingKey = (typeof NODE_SETTINGS)[keyof typeof NODE_SETTINGS];
+
+// Future CLI flag spellings for each overridable setting; the resolver names them in explanations.
+export const NODE_CONFIG_FLAGS = {
+  home: '--home',
+  rpcUrl: '--rpc-url',
+  payoutWallet: '--payout-wallet',
+  relayUrls: '--relay',
+  relayOnly: '--relay-only',
+  irohBind: '--iroh-bind',
+  irohExternalAddress: '--iroh-external-addr',
+  buyerRelayOnly: '--buyer-relay-only',
+  discoveryPublish: '--discovery-publish',
+  discoveryUrl: '--discovery-url',
+} as const;
