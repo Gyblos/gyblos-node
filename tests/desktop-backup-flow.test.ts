@@ -1,6 +1,8 @@
 // Exercises user-approved backup orchestration with disposable wallets and dialogs.
 // No real keystore, user wallet, payments or external services are accessed.
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import fs, { constants as fsConstants } from 'node:fs';
 import {
   lstat,
   mkdir,
@@ -9,6 +11,7 @@ import {
   rm,
   writeFile,
 } from 'node:fs/promises';
+import { syncBuiltinESMExports } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -270,5 +273,106 @@ void test('backup flow rejects directories, oversized files and unavailable wall
     );
     assert.equal(await denied.run(request), BACKUP_RESULT.FAILED);
     await assert.rejects(lstat(missing), { code: 'ENOENT' });
+  });
+});
+
+void test(
+  'backup verification rejects a regular file replaced by FIFO without blocking shutdown',
+  { skip: process.platform === 'win32' },
+  async () => {
+    await fixture(async ({ file, wallet, controller }) => {
+      await writeFile(file, '{}');
+      const original = fs.promises.lstat;
+      const patched: typeof original = async (...args) => {
+        const metadata = await original(...args);
+        if (args[0] === file) {
+          await fs.promises.unlink(file);
+          execFileSync('mkfifo', [file]);
+        }
+        return metadata;
+      };
+      fs.promises.lstat = patched;
+      syncBuiltinESMExports();
+      let rescued = false;
+      const rescue = setTimeout(() => {
+        rescued = true;
+        const fd = fs.openSync(
+          file,
+          fsConstants.O_WRONLY | fsConstants.O_NONBLOCK,
+        );
+        fs.closeSync(fd);
+      }, 500);
+      try {
+        const flow = createBackupFlow(
+          wallet,
+          {
+            approve: async () => true,
+            save: async () => file,
+            select: async () => file,
+          },
+          controller.signal,
+        );
+        assert.equal(
+          await flow.run({
+            action: BACKUP_ACTION.VERIFY,
+            password: TEST_BACKUP_PASSWORD,
+          }),
+          BACKUP_RESULT.FAILED,
+        );
+        await flow.settled();
+        assert.equal(
+          rescued,
+          false,
+          'verification required FIFO rescue to finish',
+        );
+      } finally {
+        clearTimeout(rescue);
+        fs.promises.lstat = original;
+        syncBuiltinESMExports();
+      }
+    });
+  },
+);
+void test('backup creation suppresses saved status when cancelled during file sync', async () => {
+  await fixture(async ({ file, wallet, controller }) => {
+    const original = fs.promises.open;
+    fs.promises.open = async (...args) => {
+      const handle = await original(...args);
+      if (args[0] === file) {
+        const sync = handle.sync.bind(handle);
+        handle.sync = async () => {
+          await sync();
+          controller.abort();
+        };
+      }
+      return handle;
+    };
+    syncBuiltinESMExports();
+    try {
+      const flow = createBackupFlow(
+        wallet,
+        {
+          approve: async () => true,
+          save: async () => file,
+          select: async () => file,
+        },
+        controller.signal,
+      );
+      assert.equal(
+        await flow.run({
+          action: BACKUP_ACTION.CREATE,
+          password: TEST_BACKUP_PASSWORD,
+        }),
+        BACKUP_RESULT.CANCELLED,
+      );
+      assert.equal((await wallet.summary()).fundingEnabled, false);
+      assert.ok(
+        (await lstat(file)).isFile(),
+        'encrypted write is retained once writing has started',
+      );
+    } finally {
+      fs.promises.open = original;
+      syncBuiltinESMExports();
+    }
   });
 });
