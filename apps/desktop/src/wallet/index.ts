@@ -16,3 +16,12 @@ export {
   type WalletProtection,
   type SafeStoragePort,
 } from './protection.js';
+
+export { createBackupFlow, type BackupDialogs } from './backup-flow.js';
+export {
+  BACKUP_ACTION,
+  BACKUP_RESULT,
+  BACKUP_FLOW,
+  parseBackupRequest,
+  parseBackupResult,
+} from './backup-flow-model.js';

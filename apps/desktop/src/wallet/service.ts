@@ -3,6 +3,8 @@
 import { lstat, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 
+import { BACKUP_ERROR } from './backup/constants.js';
+import { BackupError } from './backup/error.js';
 import { WALLET, WALLET_STATUS } from './constants.js';
 import {
   ensureWalletRoot,
@@ -94,5 +96,27 @@ export function createWalletService(
   protection: WalletProtection | null,
 ) {
   let pending: Promise<WalletSummary> | undefined;
-  return { summary: () => (pending ??= initialize(root, protection)) };
+  const summary = () => (pending ??= initialize(root, protection));
+  return {
+    summary,
+    async withSecret<T>(
+      consume: (secret: string, address: string) => Promise<T>,
+    ) {
+      const current = await summary();
+      if (
+        !protection ||
+        current.status !== WALLET_STATUS.READY ||
+        !current.address ||
+        !(await protection.available())
+      )
+        throw new BackupError(BACKUP_ERROR.INVALID_INPUT);
+      const record = await readWalletRecord(join(root, WALLET.DIRECTORY));
+      const secret = await protection.decrypt(
+        encryptedBytes(record, protection),
+      );
+      if (walletAddress(secret) !== current.address)
+        throw new BackupError(BACKUP_ERROR.IDENTITY);
+      return consume(secret, current.address);
+    },
+  };
 }

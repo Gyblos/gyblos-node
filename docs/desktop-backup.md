@@ -2,9 +2,12 @@
 
 The Node-only `@gyblos/desktop/wallet-backup` codec seals supplied Ed25519 PKCS8
 material and opens it only after authenticated decryption and comparison with a
-caller-supplied expected address. It is not connected to the application,
-preload or renderer, does not read a wallet, and has no filesystem operations.
-There is no user export/import, backup verification or funding feature yet.
+caller-supplied expected address. The codec itself has no filesystem operations.
+Wallet now offers an explicit, main-process-confirmed encrypted-file backup and
+same-address verification through native file dialogs. The renderer sends a
+password and receives a fixed status; it never receives a key, path, file
+contents or decrypted material. Funding and persistent backup approval remain
+disabled; there is no application restore/import flow.
 
 Version 1 is compact UTF-8 JSON with exactly these fields: `format`, `version`,
 `kdf`, `cipher`, `keyFormat`, `salt`, `nonce`, `ciphertext`, `tag`. Duplicate
@@ -42,8 +45,29 @@ wallet-service instance. Only encrypted disposable fixtures and public expected
 addresses are uploaded, with one-day retention and public synthetic test
 credentials. No existing keys, user passwords or operational state participate.
 
-This demonstrates portable bytes and identity preservation, not real
-Keychain/DPAPI/Linux-store acceptance, a user-saved backup, or an operational
-restore flow. Both `backupVerified` and `fundingEnabled` remain false. UI,
-sensitive authorization, live-wallet export, secure save/reopen, production
-restore and identity-bound verification require a later reviewed change.
+The exchange harness demonstrates portable bytes and identity preservation, not
+real Keychain/DPAPI/Linux-store acceptance or operational restore. The desktop
+file flow below adds user-controlled save/reopen verification. Both
+`backupVerified` and `fundingEnabled` remain false; native acceptance,
+production restore and persistent identity-bound backup approval remain separate
+work.
+
+## Desktop file flow
+
+Choose **Create backup** in Wallet, enter and confirm at least 12 characters,
+approve the native confirmation and choose a new filename. Files are encrypted
+before writing and created exclusively: existing files are never replaced. A
+write failure may retain an incomplete encrypted file; choose another name on
+retry. The selected file is not a persistent approval or a funding capability.
+
+Choose **Verify saved file**, enter the password again and select the saved
+file. Reading is bounded and rejects directories and symlinks; authenticated
+decryption must recover the current address. This does not replace the installed
+wallet. Wrong passwords, altered files, another identity and inaccessible
+storage return sanitized failure status. Closing the app aborts before a write
+starts and waits for in-flight work. A write already started is allowed to
+finish with its encrypted file retained, but reports cancellation rather than
+success. Native derivation itself is not immediately interruptible. Passwords
+are not persisted or logged; JavaScript strings cannot be reliably erased.
+Native confirmation is consent, not biometric authentication or malware
+protection.

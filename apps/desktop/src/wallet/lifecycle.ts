@@ -29,7 +29,7 @@ export function prepareWalletProfile(path: string) {
 }
 
 export function waitForWalletBeforeQuit(
-  pending: Promise<unknown>,
+  pending: Promise<unknown> | (() => Promise<unknown>),
   quit: () => void,
 ) {
   let finished = false;
@@ -43,6 +43,9 @@ export function waitForWalletBeforeQuit(
       finished = true;
       quit();
     };
-    void pending.then(complete, complete);
+    void (typeof pending === 'function' ? pending() : pending).then(
+      complete,
+      complete,
+    );
   };
 }
