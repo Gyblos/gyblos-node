@@ -44,3 +44,45 @@ export const CONTROL_CAPACITY = {
   connectionIdleMs: 10000,
   millisecondsPerSecond: 1000,
 } as const;
+
+// Buyer seller-selection policy (GYB-DOC-029), owned by seller-selection.ts; proposed values.
+export const SELLER_SELECTION_CODES = {
+  INVALID: 'INVALID_SELECTION_INPUT',
+  NO_CANDIDATES: 'NO_SELLER_CANDIDATES',
+  LEVEL_UNSUPPORTED: 'SELECTION_LEVEL_UNSUPPORTED',
+  PINNED_REJECTED: 'PINNED_SELLER_REJECTED',
+} as const;
+export type SellerSelectionCode =
+  (typeof SELLER_SELECTION_CODES)[keyof typeof SELLER_SELECTION_CODES];
+
+// Checkability badges (GYB-DOC-001). The v2 catalog carries none, so the caller derives them.
+export const SELLER_BADGES = {
+  DECLARED_USAGE: 'declared-usage',
+  MEASURABLE_USAGE: 'measurable-usage',
+  VERIFIED_MODEL: 'verified-model',
+} as const;
+export type SellerBadge = (typeof SELLER_BADGES)[keyof typeof SELLER_BADGES];
+// Weakest first; a minimum badge accepts every later entry.
+export const SELLER_BADGE_ORDER = [
+  SELLER_BADGES.DECLARED_USAGE,
+  SELLER_BADGES.MEASURABLE_USAGE,
+  SELLER_BADGES.VERIFIED_MODEL,
+] as const satisfies readonly SellerBadge[];
+
+// Proposed local router policy (GYB-DOC-029); tune per release, never per request.
+export const SELLER_SELECTION_POLICY = {
+  defaultCandidates: 3,
+  maxCandidates: 5,
+  maxSellers: 4096,
+  // Free or near-free offers weigh as if priced at this fraction of the cheapest paid survivor.
+  freePriceFraction: 0.5,
+  // An open payment channel makes a seller look this much cheaper (no new deposit rent).
+  openChannelPriceFactor: 0.8,
+  reputationMin: 0.25,
+  reputationMax: 2,
+  latencyReferenceMs: 1000,
+  latencyFactorMin: 0.5,
+  latencyFactorMax: 1.5,
+  successFactorBase: 0.5,
+  waitFactorBase: 0.5,
+} as const;
