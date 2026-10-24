@@ -173,6 +173,12 @@ publication and attempts one higher signed withdrawal while the reference
 catalog is still valid. A failed/unreachable withdrawal is not a guarantee of
 immediate remote removal: signed presence/catalog expiration remains the
 fallback. A signature already started cannot escape after local retirement.
+Cancelled control requests are checked before queued reservations and before
+signing. The shared presence-work queue is capped at the control query capacity
+(32); if a disk operation stalls, cancelled queued slots stay occupied until it
+settles, so later requests are refused instead of accumulating unbounded work.
+An already-started durable reservation cannot be interrupted; cancellation may
+burn that sequence without starting a signature.
 
 `ROLE_FILES.publicSequence` under the seller home stores the public-v2 sequence
 high-water mark, bound to its NodeId. Catalogs, HTTP presence, Iroh presence and

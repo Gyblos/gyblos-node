@@ -77,14 +77,8 @@ export function createSellerControlService(
             result: { method: query.method, offer },
           };
         }
+        const record = await verifiedCatalog(context, signal);
         const now = context.now();
-        const record = await verifyPublicV2(context.catalog, {
-          owner: context.owner,
-          nodeId: context.nodeId,
-          now,
-        });
-        if (record.kind !== PUBLIC_RECORD_KINDS.CATALOG) return controlFail();
-        validatePublicV2Time(record, context.now());
         if (query.method === CONTROL_METHODS.CATALOG)
           return {
             version: CONTROL_VERSION,
@@ -102,7 +96,9 @@ export function createSellerControlService(
           record,
           sequence,
           now,
+          signal,
         );
+        assertUncancelled(signal);
         validatePublicV2Time(presence.record, context.now());
         return {
           version: CONTROL_VERSION,
@@ -126,15 +122,36 @@ export function createSellerControlService(
 }
 
 async function currentPresence(
-  options: Parameters<typeof createSellerControlService>[0],
+  options: SellerControlOptions,
   context: Omit<QuoteContext, 'remoteNodeId' | 'signal'>,
   record: PublicCatalogV2,
   sequence: number,
   now: number,
+  signal: AbortSignal,
 ) {
   return options.records
-    ? options.records.presence()
-    : signPresence(context, record, sequence, now, options.nodeSigner);
+    ? options.records.presence(signal)
+    : signPresence(context, record, sequence, now, async (bytes) => {
+        assertUncancelled(signal);
+        return options.nodeSigner(bytes);
+      });
+}
+async function verifiedCatalog(
+  context: Omit<QuoteContext, 'remoteNodeId' | 'signal'>,
+  signal: AbortSignal,
+) {
+  const record = await verifyPublicV2(context.catalog, {
+    owner: context.owner,
+    nodeId: context.nodeId,
+    now: context.now(),
+  });
+  assertUncancelled(signal);
+  if (record.kind !== PUBLIC_RECORD_KINDS.CATALOG) return controlFail();
+  validatePublicV2Time(record, context.now());
+  return record;
+}
+function assertUncancelled(signal: AbortSignal) {
+  if (signal.aborted) return controlFail(CONTROL_CODES.CANCELLED);
 }
 
 async function signPresence(

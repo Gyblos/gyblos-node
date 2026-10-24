@@ -114,7 +114,9 @@ class SellerPublisher {
         if (this.stopped) return false;
         this.sent = catalog;
       }
-      const presence = await this.options.records.presence();
+      const presence = await this.options.records.presence(
+        this.controller.signal,
+      );
       if (this.stopped) return false;
       await this.options.publish(presence, this.controller.signal);
       if (this.stopped) return false;

@@ -1,5 +1,6 @@
 // Owns catalog/presence/withdrawal snapshots over one durable public-v2 allocator.
 // Advertised lifetimes never extend observed readiness; no engine, payment or journal calls.
+import { CONTROL_CAPACITY } from '@gyblos/core/constants';
 import {
   CONTROL_CODES,
   PUBLIC_PRESENCE_STATE,
@@ -28,7 +29,7 @@ import type { SellerSequence } from './public-sequence.js';
 export interface SellerPublicRecords {
   current(): SignedPublicV2;
   refresh(force?: boolean): Promise<SignedPublicV2>;
-  presence(): Promise<SignedPublicV2>;
+  presence(signal?: AbortSignal): Promise<SignedPublicV2>;
   withdraw(): Promise<SignedPublicV2 | undefined>;
 }
 export interface SellerRecordOptions {
@@ -46,6 +47,7 @@ class SellerRecords implements SellerPublicRecords {
   private failed = false;
   private epoch = 0;
   private previous = Promise.resolve();
+  private pendingPresences = 0;
   private readonly lifetime: number;
   private readonly renewBefore: number;
   constructor(private readonly options: SellerRecordOptions) {
@@ -67,6 +69,12 @@ class SellerRecords implements SellerPublicRecords {
       try {
         return await operation();
       } catch (error) {
+        if (
+          error instanceof ControlError &&
+          (error.code === CONTROL_CODES.CANCELLED ||
+            error.code === CONTROL_CODES.BUSY)
+        )
+          throw error;
         this.active = false;
         if (!(error instanceof ControlError)) this.failed = true;
         throw error;
@@ -123,36 +131,53 @@ class SellerRecords implements SellerPublicRecords {
       return signed;
     });
   }
-  presence() {
+  async presence(signal?: AbortSignal) {
+    cancelled(signal);
+    if (this.pendingPresences >= CONTROL_CAPACITY.queries)
+      return controlFail(CONTROL_CODES.BUSY);
+    this.pendingPresences++;
     const generation = this.epoch;
-    return this.enqueue(async () => {
-      const held = this.current();
-      const now = this.options.now();
-      const sequence = await this.options.sequence.next(held.record.sequence);
-      const signed = await signPublicV2(
-        {
-          schemaVersion: held.record.schemaVersion,
-          kind: PUBLIC_RECORD_KINDS.PRESENCE,
-          owner: held.record.owner,
-          nodeId: held.record.nodeId,
-          sequence,
-          issuedAt: now,
-          expiresAt: Math.min(
-            held.record.expiresAt,
-            now + PUBLIC_RECORD_LIMITS.presenceLifetimeMs,
-          ),
-          catalogDigest: await catalogDigestV2(held.record),
-          state: PUBLIC_PRESENCE_STATE,
-        },
-        this.options.signer,
-      );
-      if (generation !== this.epoch)
-        return controlFail(CONTROL_CODES.CANCELLED);
-      this.current();
-      validatePublicV2Time(signed.record, this.options.now());
-      return signed;
-    });
+    try {
+      return await this.enqueue(async () => {
+        cancelled(signal);
+        const held = this.current();
+        const now = this.options.now();
+        const sequence = await this.options.sequence.next(held.record.sequence);
+        cancelled(signal);
+        const digest = await catalogDigestV2(held.record);
+        cancelled(signal);
+        const signed = await signPublicV2(
+          {
+            schemaVersion: held.record.schemaVersion,
+            kind: PUBLIC_RECORD_KINDS.PRESENCE,
+            owner: held.record.owner,
+            nodeId: held.record.nodeId,
+            sequence,
+            issuedAt: now,
+            expiresAt: Math.min(
+              held.record.expiresAt,
+              now + PUBLIC_RECORD_LIMITS.presenceLifetimeMs,
+            ),
+            catalogDigest: digest,
+            state: PUBLIC_PRESENCE_STATE,
+          },
+          async (bytes) => {
+            cancelled(signal);
+            return this.options.signer(bytes);
+          },
+        );
+        cancelled(signal);
+        if (generation !== this.epoch)
+          return controlFail(CONTROL_CODES.CANCELLED);
+        this.current();
+        validatePublicV2Time(signed.record, this.options.now());
+        return signed;
+      });
+    } finally {
+      this.pendingPresences--;
+    }
   }
+
   withdraw() {
     const wasActive = this.active;
     this.active = false;
@@ -193,4 +218,8 @@ export async function createSellerRecords(
   const records = new SellerRecords(options);
   await records.refresh();
   return records;
+}
+
+function cancelled(signal?: AbortSignal) {
+  if (signal?.aborted) return controlFail(CONTROL_CODES.CANCELLED);
 }
