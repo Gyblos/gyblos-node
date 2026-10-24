@@ -175,6 +175,14 @@ its own host. This client refuses redirects, so configure the exact base URL.
 All paths below are relative to the base URL. Error bodies are
 `{"error":"<CODE>"}` with a static code; an index never echoes request input.
 
+An index is HTTPS only. Any request that does not arrive over `https`, whatever
+its method or path, gets `400 {"error":"HTTPS_REQUIRED"}` before any other
+check; it is never redirected, so a request body is never resent in the clear.
+(A reference index created for development also accepts plain `http` on a
+loopback host.) This client maps that code on a publish to
+`DISCOVERY_INSECURE_URL`; it already refuses non-loopback `http` base URLs
+before sending anything.
+
 ### `POST /records`
 
 - Request: `Content-Type: application/json` (optionally `; charset=utf-8`), body
@@ -209,6 +217,7 @@ All paths below are relative to the base URL. Error bodies are
 | `400`  | `UNKNOWN_CATALOG`       | Reference does not match a live, non-withdrawn stored catalog.     |
 | `403`  | `PUBLISH_NOT_ALLOWED`   | The index accepts records only from listed NodeIds (an allowlist). |
 | `409`  | `STALE_RECORD`          | Sequence at or below the NodeId's high-water mark.                 |
+| `400`  | `HTTPS_REQUIRED`        | The request did not use `https` (any route).                       |
 | `413`  | `PAYLOAD_TOO_LARGE`     | Body over 34816 bytes.                                             |
 | `429`  | `RATE_LIMITED`          | Per-IP, per-NodeId or capacity limit; `Retry-After` in seconds.    |
 | `503`  | `DISCOVERY_UNAVAILABLE` | Storage, limits or publishing not configured, or storage failure.  |
@@ -239,8 +248,11 @@ before verifying the signature. Reads stay public.
 - The response is at most 1 MiB; an index stops adding entries before that size
   and returns `next`, so a page can hold fewer than `limit` entries.
 - Headers: `Content-Type: application/json; charset=UTF-8`,
-  `Cache-Control: public, max-age=10`, `Access-Control-Allow-Origin: *`.
-- Errors: `400 INVALID_QUERY`, `429 RATE_LIMITED`, `503 DISCOVERY_UNAVAILABLE`.
+  `Cache-Control: public, max-age=10`, `Access-Control-Allow-Origin: *`. An
+  index may serve a `200` page from a cache for up to those 10 seconds, so
+  `generatedAt` can be that old; errors are never cached.
+- Errors: `400 INVALID_QUERY`, `400 HTTPS_REQUIRED`, `429 RATE_LIMITED`,
+  `503 DISCOVERY_UNAVAILABLE`.
 
 ### `GET /health`
 

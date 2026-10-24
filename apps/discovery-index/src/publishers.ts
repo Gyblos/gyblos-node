@@ -57,3 +57,15 @@ export function publisherAllowed(
   const nodeId = claimedNodeId(envelope);
   return typeof nodeId === 'string' && publishers.nodeIds.has(nodeId);
 }
+
+// True when the allowlist alone keeps new NodeIds within `maxNodes`, so the node cap needs no
+// storage count. NodeIds stored under an earlier list are still bounded by their retention.
+export function allowlistWithin(
+  publishers: DiscoveryPublishers,
+  maxNodes: number,
+) {
+  return (
+    publishers.mode === PUBLISH_MODES.ALLOWLIST &&
+    publishers.nodeIds.size <= maxNodes
+  );
+}

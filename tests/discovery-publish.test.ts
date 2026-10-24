@@ -86,6 +86,7 @@ void test('publishRecord maps index rejections and statuses to static codes', as
     [400, { error: 'EXPIRED_RECORD' }, DISCOVERY_ERROR_CODES.EXPIRED_RECORD],
     [400, { error: 'UNKNOWN_CATALOG' }, DISCOVERY_ERROR_CODES.UNKNOWN_CATALOG],
     [400, { error: 'STALE_RECORD' }, DISCOVERY_ERROR_CODES.STALE_RECORD],
+    [400, { error: 'HTTPS_REQUIRED' }, DISCOVERY_ERROR_CODES.INSECURE_URL],
     [400, { error: 'SOMETHING_NEW' }, DISCOVERY_ERROR_CODES.RECORD_REJECTED],
     [
       400,

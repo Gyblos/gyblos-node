@@ -15,6 +15,8 @@ export const INDEX_ERRORS = {
   NOT_FOUND: 'NOT_FOUND',
   // The claimed NodeId is not on the publish allowlist (checked before the signature).
   PUBLISH_NOT_ALLOWED: 'PUBLISH_NOT_ALLOWED',
+  // The request did not use https (400 for every method, never a redirect).
+  HTTPS_REQUIRED: 'HTTPS_REQUIRED',
   UNAVAILABLE: 'DISCOVERY_UNAVAILABLE',
 } as const;
 export type IndexErrorCode = (typeof INDEX_ERRORS)[keyof typeof INDEX_ERRORS];
@@ -78,6 +80,8 @@ export const DISCOVERY_INDEX_LIMITS = {
   maxNodes: 10_000,
   // Expired rows are pruned when a new NodeId publishes, at most once per interval per app instance.
   pruneIntervalMs: 60_000,
+  // /v1/health reuses its record count this long per app instance.
+  healthCacheMs: 30_000,
   // High-water marks outlive the record by one maximum catalog lifetime.
   retentionMs: PUBLIC_RECORD_LIMITS.catalogLifetimeMs,
   maxJsonDepth: 16,
@@ -120,6 +124,11 @@ export const DEVELOPMENT_LIMITS = {
   perMinute: 120,
   windowMs: 60_000,
   maxBuckets: 2_000,
+} as const;
+// Requests must use https; development apps also accept http on a loopback host.
+export const INDEX_PROTOCOLS = {
+  SECURE: 'https:',
+  LOOPBACK: 'http:',
 } as const;
 export const LOOPBACK_HOSTS: ReadonlySet<string> = new Set([
   'localhost',

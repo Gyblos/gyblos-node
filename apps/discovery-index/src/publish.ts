@@ -12,7 +12,11 @@ import {
 } from './constants.js';
 import { indexFail } from './errors.js';
 import { allowed, type ResolvedLimiters } from './limits.js';
-import { publisherAllowed, type DiscoveryPublishers } from './publishers.js';
+import {
+  allowlistWithin,
+  publisherAllowed,
+  type DiscoveryPublishers,
+} from './publishers.js';
 import type { DiscoveryStorage, StoredEntry } from './storage.js';
 import { verifyAgainstStored, verifySelfSigned } from './verify.js';
 
@@ -75,7 +79,10 @@ export async function acceptRecord(
   await verifyAgainstStored(envelope, record, state?.catalog ?? null, now);
   if (!state) {
     await context.prune(now);
-    if ((await storage.nodeCount()) >= context.maxNodes)
+    if (
+      !allowlistWithin(context.publishers, context.maxNodes) &&
+      (await storage.nodeCount()) >= context.maxNodes
+    )
       indexFail(INDEX_ERRORS.RATE_LIMITED);
   }
   if (!(await storage.put(await storedEntry(record, signature, json))))

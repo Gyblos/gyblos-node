@@ -104,7 +104,7 @@ void test('development relaxes only limiters, only on loopback, never storage', 
   );
   const production = createDiscoveryIndex({ storage, now: () => T0 });
   assert.equal(
-    (await production.fetch(new Request('http://localhost/v1/health'))).status,
+    (await production.fetch(new Request('https://localhost/v1/health'))).status,
     503,
   );
 });
@@ -370,7 +370,7 @@ void test('the Worker entry fails closed without bindings and serves health with
     publish: 'closed',
   });
   // Loopback hosts get no development relaxation from the Worker entry.
-  const local = await worker.fetch(new Request('http://localhost/v1/health'), {
+  const local = await worker.fetch(new Request('https://localhost/v1/health'), {
     DISCOVERY_DB: db,
   });
   assert.equal(local.status, 503);
