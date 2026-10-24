@@ -6,6 +6,8 @@ import type { IncomingAddr } from '@number0/iroh';
 
 import { TRANSPORT_LIMITS } from '@gyblos/config';
 
+import { createConnectionRate } from './connection-rate.js';
+
 export function connectionSource(source: IncomingAddr): string | undefined {
   if (source.kind === 'relay' && source.endpointId)
     return `relay:${source.endpointId.toLowerCase()}`;
@@ -29,12 +31,16 @@ export function connectionSource(source: IncomingAddr): string | undefined {
   }
 }
 
-export function createConnectionAdmission() {
+export function createConnectionAdmission(
+  now: () => number = () => performance.now(),
+) {
   const sources = new Map<string, number>();
   const peers = new Map<string, number>();
+  const rate = createConnectionRate(now);
   let pending = 0;
   let established = 0;
   return {
+    attempt: rate.attempt,
     pending(source: string) {
       if (
         pending >= TRANSPORT_LIMITS.maxPendingConnections ||
@@ -54,6 +60,7 @@ export function createConnectionAdmission() {
       };
     },
     established(peer: string) {
+      if (!rate.peer(peer)) return undefined;
       if (
         established >= TRANSPORT_LIMITS.maxConnections ||
         (peers.get(peer) ?? 0) >= TRANSPORT_LIMITS.maxPeerConnections

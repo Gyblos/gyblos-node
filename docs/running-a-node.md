@@ -145,7 +145,9 @@ pnpm node:start
   on 4022 (both loopback), checks memory headroom, runs one private warmup and
   only then signs the offer. The offer expires four minutes after warmup;
   restart the node to publish a fresh one.
-- Only `/v1/chat/completions` is reachable over Iroh. Stop with Ctrl-C.
+- The paid HTTP bridge exposes only `/v1/chat/completions`. A separate
+  `gyblos/control/1` ALPN serves signed catalog, presence and quote queries.
+  Stop with Ctrl-C.
 
 ## Buyer
 
@@ -193,6 +195,28 @@ payment, never retried.
 
 One paid synthetic call through a running proxy: `pnpm buyer:call 0` (case 0, 1
 or 2). It records journals and measurements in `.local/gyblos/buyer/`.
+
+## Control queries
+
+The seller exposes `catalog.get`, `presence.get` and `offer.request` over a
+separate control ALPN. A query never runs inference, takes a payment or reserves
+capacity. Startup still performs its normal warmup. The catalog currently lists
+the pinned model with reasoning `off`; unsupported levels and busy state are
+refused. Catalog/readiness validity ends at the existing warmup deadline.
+
+The programmatic `@gyblos/buyer/control` client connects to one chosen seller
+using a caller-owned Iroh endpoint and independently confirmed owner/NodeId and
+relay policy. Its `getCatalog`, `getPresence` and `requestOffer` methods verify
+request correlation, signatures and exact quote terms. It does not choose a
+seller or change proxy behavior. Call `close()` when finished; the endpoint
+remains owned by the caller. There is no control CLI yet.
+
+Quotes are `offer/v2` and are rejected by the current paid flow. They indicate
+observed availability, not guaranteed admission. Both clocks must be
+synchronized: v2 retains zero clock-skew tolerance and no expiration grace.
+Queries have a 10-second absolute deadline and share endpoint admission before
+their separate control quotas. See
+[the protocol specification](../packages/protocol/SPEC.md).
 
 ## Relays
 

@@ -13,7 +13,9 @@
     "./offers": "./src/offers.ts",
     "./roles": "./src/roles.ts",
     "./errors": "./src/errors.ts",
-    "./home": "./src/home.ts"
+    "./home": "./src/home.ts",
+    "./control": "./src/control.ts",
+    "./control-readiness": "./src/control-readiness.ts"
   },
   "dependencies": {
     "@gyblos/core": "workspace:*",

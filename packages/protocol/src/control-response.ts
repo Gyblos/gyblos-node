@@ -48,6 +48,21 @@ export function parseControlResponse(value: unknown): ControlResponse {
     };
     return { version: CONTROL_VERSION, requestId, result: { method, catalog } };
   }
+  if (method === CONTROL_METHODS.PRESENCE) {
+    const result = controlObject(input.result, ['method', 'presence']);
+    const envelope = controlObject(result.presence, ['record', 'signature']);
+    const record = parsePublicV2(envelope.record);
+    if (record.kind !== PUBLIC_RECORD_KINDS.PRESENCE) return controlFail();
+    const presence: SignedPublicV2 = {
+      record,
+      signature: controlHex(envelope.signature, CONTROL_LIMITS.signatureBytes),
+    };
+    return {
+      version: CONTROL_VERSION,
+      requestId,
+      result: { method, presence },
+    };
+  }
   if (method !== CONTROL_METHODS.OFFER) return controlFail();
   const result = controlObject(input.result, ['method', 'offer']);
   const envelope = controlObject(result.offer, ['offer', 'signature']);
@@ -62,4 +77,19 @@ export function parseControlResponse(value: unknown): ControlResponse {
       },
     },
   };
+}
+
+// Correlation is checked before any remote error or result can affect caller state.
+export function matchControlResponse(
+  value: unknown,
+  request: import('./control-types.js').ControlQuery,
+) {
+  const response = parseControlResponse(value);
+  if (
+    response.requestId !== request.requestId ||
+    (response.result && response.result.method !== request.method)
+  )
+    return controlFail(CONTROL_CODES.POLICY);
+  if (response.error) return controlFail(response.error.code);
+  return response.result;
 }

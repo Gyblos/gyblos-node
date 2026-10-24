@@ -46,6 +46,8 @@ import { serveIroh } from '@gyblos/transport-iroh/iroh-server';
 
 import { modelTokenizer } from './artifacts.js';
 import { P2P_ROLES } from './constants.js';
+import { observeControlReadiness } from './control-readiness.js';
+import { prepareSellerControl } from './control-startup.js';
 import {
   assertReadinessCurrent,
   prepareSellerEngine,
@@ -172,11 +174,12 @@ export async function startSeller() {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
     }
     await stage('seller-middleware');
+    const controlReadiness = observeControlReadiness(engine, offerExpiresAt);
     const seller = await createInferenceSeller({
       rpcUrl: config.rpcUrl,
       facilitatorUrl: HOSTS.facilitator,
       feePayer: facilitator.address,
-      engine,
+      engine: controlReadiness.engine,
       mint: config.mint,
       payTo: config.payTo,
       authorizer,
@@ -209,6 +212,7 @@ export async function startSeller() {
     const relayOnly = process.env.GYBLOS_RELAY_ONLY === '1';
     const endpoint = await bindEndpoint(await nodeSecret(P2P_ROLES.SELLER), {
       relayOnly,
+      control: true,
       bindAddress: process.env.GYBLOS_IROH_BIND,
       externalAddress: process.env.GYBLOS_IROH_EXTERNAL_ADDR || undefined,
     });
@@ -251,10 +255,32 @@ export async function startSeller() {
       owner,
     );
     await saveJson(rolePath(P2P_ROLES.SELLER, ROLE_FILES.offer), signed);
+    const control = await prepareSellerControl({
+      owner,
+      nodeId: config.nodeId,
+      nodeSigner: async (bytes) =>
+        Uint8Array.from(
+          endpoint
+            .secretKey()
+            .sign([...bytes])
+            .toBytes(),
+        ),
+      mint: config.mint,
+      payTo: config.payTo,
+      feePayer: facilitator.address,
+      authorizer: authorizer.address,
+      endpoint: signed.offer.endpoint,
+      relayOnly,
+      model,
+      capabilities: engine.capabilities(),
+      validUntil: offerExpiresAt,
+      readiness: controlReadiness.readiness,
+    });
     const bridge = serveIroh(
       endpoint,
       `http://${LOCALHOST}:${PORTS.seller}`,
       relayOnly,
+      control,
     );
     await saveJson(rolePath(P2P_ROLES.SELLER, ROLE_FILES.status), {
       status: 'ready',

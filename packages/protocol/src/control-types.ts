@@ -42,11 +42,15 @@ export interface CatalogQuery extends Query {
   method: typeof CONTROL_METHODS.CATALOG;
   params: Record<string, never>;
 }
+export interface PresenceQuery extends Query {
+  method: typeof CONTROL_METHODS.PRESENCE;
+  params: Record<string, never>;
+}
 export interface OfferQuery extends Query {
   method: typeof CONTROL_METHODS.OFFER;
   params: ControlOfferParams;
 }
-export type ControlQuery = CatalogQuery | OfferQuery;
+export type ControlQuery = CatalogQuery | PresenceQuery | OfferQuery;
 export interface PublicModelV2 extends PublicModelListing {
   reasoning: ReasoningLevel[];
 }
@@ -122,6 +126,13 @@ export type ControlResponse = {
     }
   | {
       result: { method: typeof CONTROL_METHODS.OFFER; offer: SignedOfferV2 };
+      error?: never;
+    }
+  | {
+      result: {
+        method: typeof CONTROL_METHODS.PRESENCE;
+        presence: SignedPublicV2;
+      };
       error?: never;
     }
   | { error: { code: ControlCode }; result?: never }

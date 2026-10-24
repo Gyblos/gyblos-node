@@ -45,6 +45,9 @@ void test('HTTP-over-Iroh wire limits and internal deadlines keep their values',
 
 void test('operator-tunable transport limits, timeouts and ports keep their values', () => {
   assert.deepEqual(TRANSPORT_LIMITS, {
+    connectionAttemptsPerWindow: 256,
+    connectionAttemptsPerSource: 32,
+    connectionAttemptsPerPeer: 30,
     maxConcurrent: 2,
     maxPeerConcurrent: 1,
     maxConnections: 8,
