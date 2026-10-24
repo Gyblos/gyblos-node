@@ -1,4 +1,6 @@
 // Canonical desktop wallet states and local record limits; no payment policy.
+import { BACKUP } from './backup/constants.js';
+
 export const WALLET_STATUS = {
   LOADING: 'loading',
   READY: 'ready',
@@ -42,4 +44,19 @@ export const STORAGE_CBC = {
   LEGACY_ITERATIONS: 1,
   LEGACY_DIGEST: 'sha1',
   LEGACY_PASSWORDS: ['', 'peanuts'],
+} as const;
+
+export const BACKUP_ACTION = { CREATE: 'create', VERIFY: 'verify' } as const;
+export const BACKUP_RESULT = {
+  SAVED: 'saved',
+  VERIFIED: 'verified',
+  CANCELLED: 'cancelled',
+  FAILED: 'failed',
+  BUSY: 'busy',
+} as const;
+export const BACKUP_FLOW = {
+  CHANNEL: 'desktop:wallet-backup',
+  MIN_PASSWORD_CHARACTERS: 12,
+  MAX_PASSWORD_BYTES: BACKUP.MAX_PASSWORD_BYTES,
+  FILENAME: 'gyblos-wallet-backup.json',
 } as const;

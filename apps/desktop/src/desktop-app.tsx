@@ -661,7 +661,7 @@ export function DesktopApp() {
         {modal === UI_DIALOG.BALANCE && (
           <Modal
             title="Your wallet"
-            description="Local wallet · funding disabled until verified backup."
+            description="Local wallet · funding disabled in this experimental build."
             close={() => setModal(null)}
           >
             <WalletDetails />

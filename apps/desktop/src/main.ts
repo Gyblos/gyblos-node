@@ -4,12 +4,14 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { app, BrowserWindow, ipcMain, safeStorage } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, safeStorage } from 'electron';
 
 import { DESKTOP, PROBE_STATUS } from './constants.js';
 import { probeInUtility } from './probe-host.js';
 import { failedProbe, type ProbeResult } from './probe-model.js';
 import { armSmokeWatchdog } from './smoke-watchdog.js';
+import { BACKUP_FLOW, BACKUP_RESULT } from './wallet/backup-flow-model.js';
+import { createBackupFlow } from './wallet/backup-flow.js';
 import { WALLET, WALLET_STATUS } from './wallet/constants.js';
 import {
   focusExistingWindow,
@@ -55,17 +57,70 @@ function registerWalletStatus(
   walletRoot: string,
   smoke: boolean,
 ) {
+  const controller = new AbortController();
+  const wallet = createWalletService(
+    walletRoot,
+    smoke ? null : walletProtection(process.platform, safeStorage),
+  );
   const summary = smoke
     ? Promise.resolve(walletSummary(WALLET_STATUS.UNAVAILABLE))
-    : createWalletService(
-        walletRoot,
-        walletProtection(process.platform, safeStorage),
-      ).summary();
+    : wallet.summary();
+  const backup = createBackupFlow(
+    wallet,
+    {
+      async approve() {
+        const result = await dialog.showMessageBox(window, {
+          type: 'question',
+          title: 'Wallet backup',
+          message: 'Allow this wallet backup operation?',
+          detail:
+            'Your password protects the file. Gyblos cannot recover a lost file or password. Funding stays disabled.',
+          buttons: ['Cancel', 'Continue'],
+          defaultId: 0,
+          cancelId: 0,
+        });
+        return result.response === 1;
+      },
+      async save() {
+        const result = await dialog.showSaveDialog(window, {
+          title: 'Save encrypted wallet backup',
+          defaultPath: BACKUP_FLOW.FILENAME,
+          filters: [{ name: 'Gyblos encrypted backup', extensions: ['json'] }],
+        });
+        return result.canceled ? null : (result.filePath ?? null);
+      },
+      async select() {
+        const result = await dialog.showOpenDialog(window, {
+          title: 'Choose the saved wallet backup',
+          properties: ['openFile'],
+          filters: [{ name: 'Gyblos encrypted backup', extensions: ['json'] }],
+        });
+        return result.canceled ? null : (result.filePaths[0] ?? null);
+      },
+    },
+    controller.signal,
+  );
+  window.once('closed', () => controller.abort());
   if (!smoke)
     app.on(
       'before-quit',
-      waitForWalletBeforeQuit(summary, () => app.quit()),
+      waitForWalletBeforeQuit(
+        () => {
+          controller.abort();
+          return summary.then(() => backup.settled());
+        },
+        () => app.quit(),
+      ),
     );
+  ipcMain.handle(BACKUP_FLOW.CHANNEL, (event, ...args: unknown[]) => {
+    if (
+      event.sender !== window.webContents ||
+      event.senderFrame !== window.webContents.mainFrame ||
+      args.length !== 1
+    )
+      throw new Error('Unsupported wallet backup sender.');
+    return smoke ? BACKUP_RESULT.FAILED : backup.run(args[0]);
+  });
   ipcMain.handle(WALLET.CHANNEL, (event, ...args: unknown[]) => {
     if (
       event.sender !== window.webContents ||
