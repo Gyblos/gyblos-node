@@ -14,14 +14,23 @@ function fixture() {
     text: '',
     finishReason: ENGINE_DONE_REASONS.STOP,
     usage: {
-      inputTokens: 0, outputTokens: 0, totalDurationNs: 0,
-      loadDurationNs: 0, inputDurationNs: 0, outputDurationNs: 0,
+      inputTokens: 0,
+      outputTokens: 0,
+      totalDurationNs: 0,
+      loadDurationNs: 0,
+      inputDurationNs: 0,
+      outputDurationNs: 0,
     },
   };
   const engine: Engine = {
     describe: async () => model,
-    capabilities: () => ({ reportsUsage: true, logprobs: false, cancellable: true,
-      recountable: true, modelIdentity: 'digest' }),
+    capabilities: () => ({
+      reportsUsage: true,
+      logprobs: false,
+      cancellable: true,
+      recountable: true,
+      modelIdentity: 'digest',
+    }),
     generate: async () => result,
   };
   const options = {
@@ -34,9 +43,23 @@ function fixture() {
       return { model, offerExpiresAt: now + 100 };
     },
   };
-  const observed = observeControlReadiness(engine, now + 100, () => now, options);
-  return { observed, engine, options, model, result,
-    checks: () => checks, setNow: (value: number) => { now = value; } };
+  const observed = observeControlReadiness(
+    engine,
+    now + 100,
+    () => now,
+    options,
+  );
+  return {
+    observed,
+    engine,
+    options,
+    model,
+    result,
+    checks: () => checks,
+    setNow: (value: number) => {
+      now = value;
+    },
+  };
 }
 
 void test('renewal extends only a freshly checked deadline and changes observation generation', async () => {
@@ -56,10 +79,15 @@ void test('renewal extends only a freshly checked deadline and changes observati
 void test('expired readiness can recover; a failed check never extends it', async () => {
   const source = fixture();
   source.setNow(10100);
-  source.options.check = async () => { throw new Error('PRIVATE_FAILURE'); };
+  source.options.check = async () => {
+    throw new Error('PRIVATE_FAILURE');
+  };
   assert.equal(await source.observed.tick(), false);
   assert.ok(source.observed.readiness().validUntil <= 10100);
-  source.options.check = async () => ({ model: source.model, offerExpiresAt: 10200 });
+  source.options.check = async () => ({
+    model: source.model,
+    offerExpiresAt: 10200,
+  });
   assert.equal(await source.observed.tick(), true);
   assert.equal(source.observed.readiness().validUntil, 10200);
   await source.observed.stop();
@@ -69,10 +97,15 @@ void test('active inference prevents a readiness check and recovery does not rep
   const source = fixture();
   let finish!: () => void;
   source.engine.generate = async () => {
-    await new Promise<void>((resolve) => { finish = resolve; });
+    await new Promise<void>((resolve) => {
+      finish = resolve;
+    });
     return source.result;
   };
-  const generating = source.observed.engine.generate({ prompt: 'synthetic', maxTokens: 1 });
+  const generating = source.observed.engine.generate({
+    prompt: 'synthetic',
+    maxTokens: 1,
+  });
   source.setNow(10100);
   assert.equal(await source.observed.tick(), false);
   assert.equal(source.checks(), 0);
@@ -90,7 +123,9 @@ void test('inference cancels a pending check; its late success cannot restore re
   let signal!: AbortSignal;
   source.options.check = async (input) => {
     signal = input;
-    await new Promise<void>((resolve) => { finish = resolve; });
+    await new Promise<void>((resolve) => {
+      finish = resolve;
+    });
     return { model: source.model, offerExpiresAt: 10500 };
   };
   source.setNow(10080);
@@ -110,12 +145,15 @@ void test('timed out checks retain their actual work slot until settlement witho
   let finish!: () => void;
   source.options.check = async () => {
     attempts++;
-    await new Promise<void>((resolve) => { finish = resolve; });
+    await new Promise<void>((resolve) => {
+      finish = resolve;
+    });
     return { model: source.model, offerExpiresAt: 10500 };
   };
   source.setNow(10100);
   assert.equal(await source.observed.tick(), false);
-  for (let index = 0; index < 10; index++) assert.equal(await source.observed.tick(), false);
+  for (let index = 0; index < 10; index++)
+    assert.equal(await source.observed.tick(), false);
   assert.equal(attempts, 1);
   await source.observed.stop();
   finish();
@@ -145,7 +183,9 @@ void test('stop invalidates immediately and rejects a late successful check', as
   const source = fixture();
   let finish!: () => void;
   source.options.check = async () => {
-    await new Promise<void>((resolve) => { finish = resolve; });
+    await new Promise<void>((resolve) => {
+      finish = resolve;
+    });
     return { model: source.model, offerExpiresAt: 10500 };
   };
   source.setNow(10080);
@@ -156,4 +196,18 @@ void test('stop invalidates immediately and rejects a late successful check', as
   finish();
   assert.equal(await checking, false);
   assert.equal(await source.observed.tick(), false);
+});
+
+void test('scheduled idle observation refreshes records after busy without another warmup', async () => {
+  const source = fixture();
+  let updated = 0;
+  try {
+    await source.observed.engine.generate({ prompt: 'synthetic', maxTokens: 1 });
+    source.observed.start(async () => { updated++; });
+    const until = Date.now() + 1000;
+    while (!updated && Date.now() < until)
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    assert.ok(updated > 0);
+    assert.equal(source.checks(), 0);
+  } finally { await source.observed.stop(); }
 });

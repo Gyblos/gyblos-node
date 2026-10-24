@@ -226,15 +226,30 @@ void test('renewable probe holds actual engine settlement and honors cancellatio
   let finished = false;
   let snapshots = 0;
   value.engine.generate = async () => {
-    await new Promise<void>((resolve) => { finish = resolve; });
-    return { text: '', finishReason: 'stop', usage: {
-      inputTokens: 0, outputTokens: 0, totalDurationNs: 0, loadDurationNs: 0,
-      inputDurationNs: 0, outputDurationNs: 0,
-    } };
+    await new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    return {
+      text: '',
+      finishReason: 'stop',
+      usage: {
+        inputTokens: 0,
+        outputTokens: 0,
+        totalDurationNs: 0,
+        loadDurationNs: 0,
+        inputDurationNs: 0,
+        outputDurationNs: 0,
+      },
+    };
   };
   const operation = probeSellerEngine(value.engine, controller.signal, {
-    snapshot: async () => { snapshots++; return value.snapshot; },
-  }).finally(() => { finished = true; });
+    snapshot: async () => {
+      snapshots++;
+      return value.snapshot;
+    },
+  }).finally(() => {
+    finished = true;
+  });
   const rejected = assert.rejects(operation);
   while (!finish) await new Promise((resolve) => setImmediate(resolve));
   controller.abort();
@@ -248,9 +263,14 @@ void test('renewable probe holds actual engine settlement and honors cancellatio
 void test('renewable probe bounds residency from the injected clock and does not write diagnostics', async () => {
   const { probeSellerEngine } = await import('@gyblos/node/engine-readiness');
   const value = fixture();
-  const result = await probeSellerEngine(value.engine, new AbortController().signal, {
-    snapshot: async () => value.snapshot, now: () => 10000,
-  });
+  const result = await probeSellerEngine(
+    value.engine,
+    new AbortController().signal,
+    {
+      snapshot: async () => value.snapshot,
+      now: () => 10000,
+    },
+  );
   assert.equal(result.offerExpiresAt, 250000);
   assert.equal(result.model.name, 'synthetic-model');
   assert.equal(value.generations(), 1);

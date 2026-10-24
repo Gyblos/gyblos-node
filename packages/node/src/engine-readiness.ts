@@ -47,7 +47,8 @@ export async function probeSellerEngine(
 class EngineReadinessCheck {
   before: MemorySnapshot | null = null;
   after: MemorySnapshot | null = null;
-  reason: ReadinessRecord['reason'] = READINESS_REASONS.MEMORY_OBSERVATION_FAILED;
+  reason: ReadinessRecord['reason'] =
+    READINESS_REASONS.MEMORY_OBSERVATION_FAILED;
   private readonly start = performance.now();
   constructor(
     private readonly engine: Engine,
@@ -77,8 +78,11 @@ class EngineReadinessCheck {
     this.after = await this.dependencies.snapshot();
     this.signal.throwIfAborted();
     this.reason = READINESS_REASONS.WARMUP_FAILED;
-    if (this.before.cgroup && this.after.cgroup &&
-      this.after.cgroup.events.oomKill > this.before.cgroup.events.oomKill)
+    if (
+      this.before.cgroup &&
+      this.after.cgroup &&
+      this.after.cgroup.events.oomKill > this.before.cgroup.events.oomKill
+    )
       throw new Error('OOM observed during private warmup.');
     this.reason = READINESS_REASONS.INSUFFICIENT_HEADROOM;
     assertMemoryHeadroom(this.after);
@@ -105,7 +109,11 @@ export async function prepareSellerEngine(
   },
 ): Promise<{ model: EngineDescription; offerExpiresAt: number }> {
   const controller = new AbortController();
-  const check = new EngineReadinessCheck(engine, controller.signal, dependencies);
+  const check = new EngineReadinessCheck(
+    engine,
+    controller.signal,
+    dependencies,
+  );
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     const result = await Promise.race([

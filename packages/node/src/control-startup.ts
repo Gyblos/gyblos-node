@@ -1,4 +1,4 @@
-// Builds the seller's public control snapshot from startup observations, never from live engine calls.
+// Builds the seller's public control snapshot from cached observations, never from live engine calls.
 // Catalog model identity maps explicitly to the already warmed engine description.
 import { createSignableMessage, type KeyPairSigner } from '@solana/kit';
 
@@ -74,6 +74,7 @@ export async function prepareSellerControl(options: {
     signer: options.nodeSigner,
     now: Date.now,
     validUntil: () => options.readiness().validUntil,
+    readiness: options.readiness,
     catalogMs: options.catalogMs ?? PUBLIC_RECORD_LIMITS.catalogLifetimeMs,
   });
   const service = createSellerControlService({

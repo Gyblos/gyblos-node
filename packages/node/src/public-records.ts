@@ -1,6 +1,7 @@
 // Owns catalog/presence/withdrawal snapshots over one durable public-v2 allocator.
 // Advertised lifetimes never extend observed readiness; no engine, payment or journal calls.
 import { CONTROL_CAPACITY } from '@gyblos/core/constants';
+import type { QuoteReadiness } from '@gyblos/core/control-quotes';
 import {
   CONTROL_CODES,
   PUBLIC_PRESENCE_STATE,
@@ -38,6 +39,7 @@ export interface SellerRecordOptions {
   signer: Signer;
   now: () => number;
   validUntil: () => number;
+  readiness?: () => QuoteReadiness;
   catalogMs?: number;
   renewBeforeMs?: number;
 }
@@ -48,6 +50,7 @@ class SellerRecords implements SellerPublicRecords {
   private epoch = 0;
   private previous = Promise.resolve();
   private pendingPresences = 0;
+  private observationGeneration: number | undefined;
   private readonly lifetime: number;
   private readonly renewBefore: number;
   constructor(private readonly options: SellerRecordOptions) {
@@ -90,7 +93,20 @@ class SellerRecords implements SellerPublicRecords {
     if (this.failed || !this.active || !this.catalog)
       return controlFail(CONTROL_CODES.STALE);
     validatePublicV2Time(this.catalog.record, this.options.now());
+    this.assertObservation(this.observationGeneration);
+    if (this.catalog.record.expiresAt > this.options.validUntil())
+      return controlFail(CONTROL_CODES.STALE);
     return this.catalog;
+  }
+  private assertObservation(generation?: number) {
+    const state = this.options.readiness?.();
+    const now = this.options.now();
+    if (state?.busy) return controlFail(CONTROL_CODES.BUSY);
+    if (this.options.validUntil() <= now || (state && state.observedAt > now))
+      return controlFail(CONTROL_CODES.EXPIRED);
+    if (state && generation !== undefined && state.generation !== generation)
+      return controlFail(CONTROL_CODES.STALE);
+    return state?.generation;
   }
   refresh(force = false) {
     const generation = this.epoch;
@@ -99,6 +115,7 @@ class SellerRecords implements SellerPublicRecords {
         return controlFail(CONTROL_CODES.CANCELLED);
       const now = controlInteger(this.options.now());
       const deadline = controlInteger(this.options.validUntil());
+      const observation = this.assertObservation();
       if (
         deadline <= now ||
         (this.catalog && this.catalog.record.issuedAt > now)
@@ -107,6 +124,7 @@ class SellerRecords implements SellerPublicRecords {
       if (
         !force &&
         this.active &&
+        observation === this.observationGeneration &&
         this.catalog &&
         this.catalog.record.expiresAt - now > this.renewBefore
       )
@@ -126,7 +144,11 @@ class SellerRecords implements SellerPublicRecords {
       if (generation !== this.epoch)
         return controlFail(CONTROL_CODES.CANCELLED);
       validatePublicV2Time(signed.record, this.options.now());
+      this.assertObservation(observation);
+      if (signed.record.expiresAt > this.options.validUntil())
+        return controlFail(CONTROL_CODES.STALE);
       this.catalog = signed;
+      this.observationGeneration = observation;
       this.active = true;
       return signed;
     });

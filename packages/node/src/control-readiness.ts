@@ -2,12 +2,15 @@
 // Control queries only read snapshots; checks never authorize payments or renew the legacy offer.
 import { SELLER_READINESS } from '@gyblos/config';
 import type { QuoteReadiness } from '@gyblos/core/control-quotes';
+import { controlInteger } from '@gyblos/protocol/control-validation';
 import type { Engine, EngineDescription } from '@gyblos/protocol/engine';
 
 export interface SellerReadinessRenewal {
   model: EngineDescription;
   // Must settle only when its underlying work settles, even after cancellation.
-  check: (signal: AbortSignal) => Promise<{ model: EngineDescription; offerExpiresAt: number }>;
+  check: (
+    signal: AbortSignal,
+  ) => Promise<{ model: EngineDescription; offerExpiresAt: number }>;
   tickMs?: number;
   renewBeforeMs?: number;
   timeoutMs?: number;
@@ -19,6 +22,7 @@ class SellerReadiness {
   private observedAt: number;
   private validUntil: number;
   private stopped = false;
+  private running = false;
   private checking: AbortController | undefined;
   private loop: ReturnType<typeof setTimeout> | undefined;
   constructor(
@@ -27,6 +31,14 @@ class SellerReadiness {
     private readonly now: () => number,
     private readonly renewal?: SellerReadinessRenewal,
   ) {
+    if (renewal) {
+      for (const milliseconds of [
+        renewal.tickMs,
+        renewal.renewBeforeMs,
+        renewal.timeoutMs,
+      ])
+        if (milliseconds !== undefined) controlInteger(milliseconds, 1);
+    }
     this.observedAt = now();
     this.validUntil = validUntil;
     this.engine = {
@@ -36,8 +48,12 @@ class SellerReadiness {
         this.active++;
         this.generation++;
         this.checking?.abort();
-        try { return await engine.generate(input); }
-        finally { this.active--; this.generation++; }
+        try {
+          return await engine.generate(input);
+        } finally {
+          this.active--;
+          this.generation++;
+        }
       },
     };
   }
@@ -50,23 +66,42 @@ class SellerReadiness {
   async tick(): Promise<boolean> {
     const renewal = this.renewal;
     const now = this.now();
-    if (!renewal || this.stopped || this.checking || this.active > 0 ||
-      (now >= this.observedAt && this.validUntil - now >
-        (renewal.renewBeforeMs ?? SELLER_READINESS.renewBeforeMs))) return false;
+    if (
+      !renewal ||
+      this.stopped ||
+      this.checking ||
+      this.active > 0 ||
+      (now >= this.observedAt &&
+        this.validUntil - now >
+          (renewal.renewBeforeMs ?? SELLER_READINESS.renewBeforeMs))
+    )
+      return false;
     this.validUntil = 0;
     const generation = ++this.generation;
     const controller = new AbortController();
     this.checking = controller;
     const cancelled = new Promise<false>((resolve) => {
-      controller.signal.addEventListener('abort', () => resolve(false), { once: true });
+      controller.signal.addEventListener('abort', () => resolve(false), {
+        once: true,
+      });
     });
-    const timer = setTimeout(() => controller.abort(), renewal.timeoutMs ?? SELLER_READINESS.timeoutMs);
-    const operation = Promise.resolve().then(() => renewal.check(controller.signal)).then(
-      (result) => this.accept(result, generation, now, controller), () => false,
-    ).finally(() => {
-      clearTimeout(timer);
-      if (this.checking === controller) this.checking = undefined;
-    });
+    const timer = setTimeout(
+      () => controller.abort(),
+      renewal.timeoutMs ?? SELLER_READINESS.timeoutMs,
+    );
+    const operation = Promise.resolve()
+      .then(() => {
+        controller.signal.throwIfAborted();
+        return renewal.check(controller.signal);
+      })
+      .then(
+        (result) => this.accept(result, generation, now, controller),
+        () => false,
+      )
+      .finally(() => {
+        clearTimeout(timer);
+        if (this.checking === controller) this.checking = undefined;
+      });
     // Keep checking occupied until actual settlement; an ignored abort cannot spawn another check.
     return Promise.race([operation, cancelled]);
   }
@@ -78,22 +113,41 @@ class SellerReadiness {
   ) {
     const now = this.now();
     const expected = this.renewal!.model;
-    if (this.stopped || controller.signal.aborted || this.generation !== generation ||
-      now < startedAt || this.active > 0 || !Number.isSafeInteger(result.offerExpiresAt) ||
-      result.offerExpiresAt <= now || result.model.name !== expected.name ||
-      result.model.digest !== expected.digest || result.model.contextTokens !== expected.contextTokens)
+    if (
+      this.stopped ||
+      controller.signal.aborted ||
+      this.generation !== generation ||
+      now < startedAt ||
+      this.active > 0 ||
+      !Number.isSafeInteger(result.offerExpiresAt) ||
+      result.offerExpiresAt <= now ||
+      result.model.name !== expected.name ||
+      result.model.digest !== expected.digest ||
+      result.model.contextTokens !== expected.contextTokens
+    )
       return false;
     this.observedAt = now;
     this.validUntil = result.offerExpiresAt;
     this.generation++;
     return true;
   }
-  start() {
-    if (!this.renewal || this.stopped || this.loop) return;
+  start(onRenewed?: () => Promise<unknown>) {
+    if (!this.renewal || this.stopped || this.running) return;
+    this.running = true;
     const schedule = () => {
       this.loop = setTimeout(() => {
         this.loop = undefined;
-        void this.tick().finally(() => { if (!this.stopped) schedule(); });
+        void this.tick()
+          .then(async (renewed) => {
+            if (renewed && !this.stopped) await onRenewed?.();
+          })
+          .catch(() => {
+            this.validUntil = 0;
+            this.generation++;
+          })
+          .finally(() => {
+            if (!this.stopped) schedule();
+          });
       }, this.renewal!.tickMs ?? SELLER_READINESS.tickMs);
     };
     schedule();
