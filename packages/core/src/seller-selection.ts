@@ -12,6 +12,7 @@ import {
   SELLER_SELECTION_CODES,
   SELLER_SELECTION_POLICY,
   type SellerSelectionCode,
+  type SellerSelectionPolicy,
 } from './constants.js';
 import {
   checkInput,
@@ -25,6 +26,13 @@ import {
   type SellerSelectionInput,
   type SellerStats,
 } from './seller-selection-input.js';
+import {
+  checkPolicy,
+  isFree,
+  weigh,
+  type Eligible,
+  type Weighted,
+} from './seller-selection-weight.js';
 
 export type {
   KnownSeller,
@@ -46,19 +54,6 @@ export interface SellerCandidate {
 export type SellerSelectionResult =
   | { ok: true; candidates: SellerCandidate[] }
   | { ok: false; code: SellerSelectionCode };
-
-interface Eligible {
-  seller: KnownSeller;
-  listing: PublicModelV2;
-  stats: SellerStats | undefined;
-}
-interface Weighted {
-  entry: Eligible;
-  reasoning: ReasoningLevel;
-  downgrade: boolean;
-  weight: number;
-  fresh: boolean;
-}
 
 const withinLifetime = (
   record: { issuedAt: number; expiresAt: number },
@@ -92,10 +87,6 @@ function passesSellerFilters(
     (stats?.cooldownUntil == null || stats.cooldownUntil <= now)
   );
 }
-const isFree = (listing: PublicModelV2) =>
-  BigInt(listing.pricing.inputAtomic) === 0n &&
-  BigInt(listing.pricing.outputAtomic) === 0n;
-
 // A paid budget must cover at least one input plus one output token at the listed prices.
 function passesListingFilters(listing: PublicModelV2, request: SellerRequest) {
   const { pricing } = listing;
@@ -135,67 +126,6 @@ function acceptableLevels(request: SellerRequest) {
   const bottom =
     request.lowestReasoning === null ? top : levelRank(request.lowestReasoning);
   return LEVEL_ORDER.slice(bottom, top + 1).reverse();
-}
-
-const clamp = (value: number, minimum: number, maximum: number) =>
-  Math.min(maximum, Math.max(minimum, value));
-const hasHistory = (stats: SellerStats | undefined) =>
-  stats !== undefined && stats.successes + stats.failures > 0;
-
-// Bounded local factor: smoothed success rate times latency and wait-accuracy factors.
-function reputation(stats: SellerStats | undefined) {
-  if (!stats || !hasHistory(stats)) return 1;
-  const policy = SELLER_SELECTION_POLICY;
-  const rate = (stats.successes + 1) / (stats.successes + stats.failures + 2);
-  const success = policy.successFactorBase + rate;
-  const latency =
-    stats.latencyMs === null
-      ? 1
-      : clamp(
-          policy.latencyReferenceMs / Math.max(stats.latencyMs, 1),
-          policy.latencyFactorMin,
-          policy.latencyFactorMax,
-        );
-  const wait =
-    stats.waitAccuracy === null
-      ? 1
-      : policy.waitFactorBase + policy.waitFactorBase * stats.waitAccuracy;
-  return clamp(
-    success * latency * wait,
-    policy.reputationMin,
-    policy.reputationMax,
-  );
-}
-// Reference price is one input plus one output token, discounted for an open channel.
-function unitPrice(entry: Eligible) {
-  const { pricing } = entry.listing;
-  const total = Number(
-    BigInt(pricing.inputAtomic) + BigInt(pricing.outputAtomic),
-  );
-  return entry.seller.openChannel
-    ? total * SELLER_SELECTION_POLICY.openChannelPriceFactor
-    : total;
-}
-// Weight is (floor / price)^2 * reputation, so free offers are capped at the floor price.
-function weigh(
-  entries: readonly Eligible[],
-  reasoning: ReasoningLevel,
-  downgrade: boolean,
-): Weighted[] {
-  const prices = entries.map(unitPrice);
-  const paid = prices.filter((price) => price > 0);
-  const floor = paid.length
-    ? Math.min(...paid) * SELLER_SELECTION_POLICY.freePriceFraction
-    : 1;
-  return entries.map((entry, index) => ({
-    entry,
-    reasoning,
-    downgrade,
-    weight:
-      (floor / Math.max(prices[index] ?? floor, floor)) ** 2 *
-      reputation(entry.stats),
-    fresh: !hasHistory(entry.stats),
-  }));
 }
 
 function draw(random: () => number) {
@@ -269,6 +199,7 @@ function sampleTier(
 function selectPinned(
   input: SellerSelectionInput,
   pinnedNodeId: string,
+  policy: SellerSelectionPolicy,
 ): SellerSelectionResult {
   const rejected = {
     ok: false,
@@ -282,12 +213,18 @@ function selectPinned(
   const levels = acceptableLevels(input.request);
   const level = levels.find((item) => entry.listing.reasoning.includes(item));
   if (level === undefined) return rejected;
-  const [weighted] = weigh([entry], level, level !== input.request.reasoning);
+  const [weighted] = weigh(
+    [entry],
+    level,
+    level !== input.request.reasoning,
+    policy,
+  );
   return { ok: true, candidates: [toCandidate(weighted!, false)] };
 }
 function selectAutomatic(
   input: SellerSelectionInput,
   count: number,
+  policy: SellerSelectionPolicy,
 ): SellerSelectionResult {
   const pool = input.sellers.flatMap((seller) => eligible(input, seller) ?? []);
   const [exact, ...lower] = acceptableLevels(input.request);
@@ -295,7 +232,7 @@ function selectAutomatic(
     entry.listing.reasoning.includes(exact!),
   );
   const candidates = sampleTier(
-    weigh(exactTier, exact!, false),
+    weigh(exactTier, exact!, false, policy),
     count,
     input.random,
   );
@@ -309,7 +246,7 @@ function selectAutomatic(
   if (candidates.length < count && fallback !== undefined)
     candidates.push(
       ...sampleTier(
-        weigh(supportsOnly(fallback), fallback, true),
+        weigh(supportsOnly(fallback), fallback, true, policy),
         count - candidates.length,
         input.random,
       ),
@@ -328,15 +265,16 @@ export function selectSellers(
 ): SellerSelectionResult {
   try {
     if (!input || typeof input !== 'object') invalid();
-    // Only an omitted count takes the default; null is malformed input.
+    // Only an omitted policy or count takes the default; null is malformed input.
+    const policy = checkPolicy(
+      input.policy === undefined ? SELLER_SELECTION_POLICY : input.policy,
+    );
     const count =
-      input.count === undefined
-        ? SELLER_SELECTION_POLICY.defaultCandidates
-        : input.count;
-    checkInput(input, count);
+      input.count === undefined ? policy.defaultCandidates : input.count;
+    checkInput(input, count, policy);
     return input.pinnedNodeId === undefined
-      ? selectAutomatic(input, count)
-      : selectPinned(input, input.pinnedNodeId);
+      ? selectAutomatic(input, count, policy)
+      : selectPinned(input, input.pinnedNodeId, policy);
   } catch (error) {
     if (error instanceof SelectionInputError)
       return { ok: false, code: SELLER_SELECTION_CODES.INVALID };

@@ -17,8 +17,8 @@ import type {
 import {
   SELLER_BADGE_ORDER,
   SELLER_SELECTION_CODES,
-  SELLER_SELECTION_POLICY,
   type SellerBadge,
+  type SellerSelectionPolicy,
 } from './constants.js';
 
 export const LEVEL_ORDER: readonly ReasoningLevel[] = [
@@ -67,6 +67,8 @@ export interface SellerSelectionInput {
   // Returns a value in [0, 1); the caller owns seeding.
   random: () => number;
   count?: number;
+  // Defaults to SELLER_SELECTION_POLICY; a gateway may run the same selection with its own values.
+  policy?: SellerSelectionPolicy;
 }
 // Internal signal for invalid caller input; converted to a typed result, never echoed.
 export class SelectionInputError extends Error {}
@@ -179,15 +181,19 @@ function checkSeller(seller: KnownSeller) {
   )
     invalid();
 }
-export function checkInput(input: SellerSelectionInput, count: number) {
+export function checkInput(
+  input: SellerSelectionInput,
+  count: number,
+  policy: SellerSelectionPolicy,
+) {
   if (
     !isCount(input.now) ||
     typeof input.random !== 'function' ||
     !Number.isSafeInteger(count) ||
     count < 1 ||
-    count > SELLER_SELECTION_POLICY.maxCandidates ||
+    count > policy.maxCandidates ||
     !Array.isArray(input.sellers) ||
-    input.sellers.length > SELLER_SELECTION_POLICY.maxSellers ||
+    input.sellers.length > policy.maxSellers ||
     !(input.stats instanceof Map) ||
     (input.pinnedNodeId !== undefined && typeof input.pinnedNodeId !== 'string')
   )

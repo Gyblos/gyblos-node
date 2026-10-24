@@ -70,19 +70,31 @@ export const SELLER_BADGE_ORDER = [
 ] as const satisfies readonly SellerBadge[];
 
 // Proposed local router policy (GYB-DOC-029); tune per release, never per request.
+// A caller such as the managed gateway may inject its own values of the same shape.
 export const SELLER_SELECTION_POLICY = {
   defaultCandidates: 3,
   maxCandidates: 5,
   maxSellers: 4096,
-  // Free or near-free offers weigh as if priced at this fraction of the cheapest paid survivor.
-  freePriceFraction: 0.5,
+  // A free offer weighs this many times the cheapest paid survivor of its tier.
+  freeWeightMultiple: 2,
   // An open payment channel makes a seller look this much cheaper (no new deposit rent).
   openChannelPriceFactor: 0.8,
-  reputationMin: 0.25,
+  // A failing seller keeps a small chance to recover, never zero.
+  reputationMin: 0.03,
   reputationMax: 2,
+  // Added to the smoothed success rate; 0 lets failures scale the weight down directly.
+  successFactorBase: 0,
   latencyReferenceMs: 1000,
   latencyFactorMin: 0.5,
   latencyFactorMax: 1.5,
-  successFactorBase: 0.5,
   waitFactorBase: 0.5,
+  // Wait accuracy assumed without observations: neutral, not perfect.
+  neutralWaitAccuracy: 0.5,
+  // Pseudo-samples that shrink latency and wait factors toward neutral while history is short.
+  historyPriorSamples: 5,
+  // A previous seller keeps the first slot while its weight is at least this fraction of the best.
+  stickyWeightFraction: 0.8,
 } as const;
+export type SellerSelectionPolicy = {
+  readonly [Key in keyof typeof SELLER_SELECTION_POLICY]: number;
+};

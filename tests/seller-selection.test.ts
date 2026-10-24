@@ -164,8 +164,8 @@ void test('free offers weigh as a capped price and all-free pools sample evenly'
     ),
   );
   const free = (counts.get(nodeId(1)) ?? 0) / 4000;
-  // Free weighs as half the cheapest paid price: (1 / 0.5)^2 = 4 times, so about 80%.
-  assert.ok(free > 0.77 && free < 0.83, String(free));
+  // Free weighs twice the cheapest paid offer, so about 67%.
+  assert.ok(free > 0.64 && free < 0.69, String(free));
   const allFree = [1, 2].map((index) =>
     seller(index, { input: '0', output: '0' }),
   );
@@ -229,8 +229,9 @@ void test('local reputation and open channels shift weight within bounds', () =>
     ),
   );
   const poor = (counts.get(nodeId(1)) ?? 0) / 4000;
-  // Bounded factors: the 0.25 floor versus (0.5 + 6/7) * 1 * 1 gives about 16%, never zero.
-  assert.ok(poor > 0.13 && poor < 0.19, String(poor));
+  // Bounded factors: the 0.03 floor versus 6/7 * 1 * 0.875 (wait accuracy shrunk over five samples)
+  // gives about 4%, never zero.
+  assert.ok(poor > 0.025 && poor < 0.055, String(poor));
   const channel = frequency(4000, (seed) =>
     chosen(
       select([seller(1, { openChannel: true }), seller(2)], {
