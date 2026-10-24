@@ -28,5 +28,4 @@ export const STARTUP_WINDOW = {
   QUERY: 'startup',
   QUERY_VALUE: '1',
   BARS: 20,
-  BAR_PHASE_MS: 65,
 } as const;

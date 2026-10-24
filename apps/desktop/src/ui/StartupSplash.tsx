@@ -10,17 +10,11 @@ export function StartupSplash() {
       </div>
       <div className="startup-ascii" aria-hidden="true">
         <span>[</span>
-        {Array.from({ length: STARTUP_WINDOW.BARS }, (_, index) => (
-          <span
-            className="startup-ascii-bar"
-            key={index}
-            style={{
-              animationDelay: `${-index * STARTUP_WINDOW.BAR_PHASE_MS}ms`,
-            }}
-          >
-            |
-          </span>
-        ))}
+        <span className="startup-ascii-cells">
+          {Array.from({ length: STARTUP_WINDOW.BARS }, (_, index) => (
+            <span className="startup-ascii-bar" key={index} />
+          ))}
+        </span>
         <span>]</span>
       </div>
       <p role="status">Preparing your app…</p>

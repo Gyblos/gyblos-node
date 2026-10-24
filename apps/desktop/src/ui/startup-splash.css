@@ -26,11 +26,33 @@
   font:
     20px/1 GeistMono,
     monospace;
-  letter-spacing: 2px;
+  align-items: center;
+  gap: 7px;
+}
+.startup-ascii-cells {
+  --bar-width: 12px;
+  --bar-gap: 3px;
+  position: relative;
+  display: flex;
+  gap: var(--bar-gap);
+  height: 22px;
 }
 .startup-ascii-bar {
-  animation: startup-bar-flow 1.3s ease-in-out infinite;
+  width: var(--bar-width);
+  background: var(--soft);
 }
+.startup-ascii-cells::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    to right,
+    var(--accent) 0 var(--bar-width),
+    transparent var(--bar-width) calc(var(--bar-width) + var(--bar-gap))
+  );
+  animation: startup-battery-charge 2.8s steps(20, end) infinite;
+}
+
 .startup-splash p {
   margin: 0;
   font-size: 13px;
@@ -40,17 +62,19 @@
   color: var(--muted);
   font-size: 11px;
 }
-@keyframes startup-bar-flow {
+@keyframes startup-battery-charge {
   0%,
   100% {
-    opacity: 0.2;
+    clip-path: inset(0 100% 0 0);
   }
-  50% {
-    opacity: 1;
+  45%,
+  55% {
+    clip-path: inset(0 0 0 0);
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .startup-ascii-bar {
+  .startup-ascii-cells::after {
     animation: none;
+    clip-path: inset(0 45% 0 0);
   }
 }
