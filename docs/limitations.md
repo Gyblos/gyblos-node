@@ -148,5 +148,11 @@ public-v2 sequence allocator shared with control Iroh; it does not establish a
 live public index, automatic 8004 identity, off-host reliability or production
 load capacity. Unreachable withdrawal delivery relies on signed-record expiry.
 Deleting/restoring local sequence state and automatic crash-lock recovery are
-unsupported; Windows power-loss durability is unverified. Renewal never extends
-the original readiness observation or enables free/paid v2 execution.
+unsupported; Windows power-loss durability is unverified. A separate background
+warmup/memory check can establish fresh v2 readiness; publication itself cannot.
+Checks are skipped while inference is active and cancelled when inference
+starts. An engine ignoring abort holds the single check slot and keeps
+availability closed until it settles; no queued retry can accumulate. Shutdown
+invalidates snapshots without waiting for an uncooperative engine. Timing is
+locally tested, not a production load/cancellation guarantee. The legacy paid
+offer retains its original expiry, and no free/paid v2 execution is enabled.

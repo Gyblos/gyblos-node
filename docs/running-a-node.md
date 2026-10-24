@@ -202,7 +202,11 @@ The seller exposes `catalog.get`, `presence.get` and `offer.request` over a
 separate control ALPN. A query never runs inference, takes a payment or reserves
 capacity. Startup still performs its normal warmup. The catalog currently lists
 the pinned model with reasoning `off`; unsupported levels and busy state are
-refused. Catalog/readiness validity ends at the existing warmup deadline.
+refused. A separate background lifecycle renews v2 availability through bounded
+private warmup and memory checks; queries never trigger them. Failed/expired
+checks and busy inference block availability; recovery produces a higher
+catalog. The existing paid v1 offer and its original expiry are not renewed. See
+[discovery.md](discovery.md#seller-duties) for timing and cancellation limits.
 
 The programmatic `@gyblos/buyer/control` client connects to one chosen seller
 using a caller-owned Iroh endpoint and independently confirmed owner/NodeId and
@@ -344,6 +348,6 @@ base URL; publication is off by default. See
 [discovery.md](discovery.md#seller-duties) for renewal, retry, shutdown and
 sequence-state recovery limits. Do not reset `public-sequence-v2.json` or
 automatically remove a leftover sequence lock. Catalogs and quotes never outlive
-the seller's existing readiness observation; publication does not run an engine
-or enable v2 payments. Creating/deploying an index is a separate operator
+the seller's current checked readiness observation; publication does not run an
+engine or enable v2 payments. Creating/deploying an index is a separate operator
 action, described in [discovery-index.md](discovery-index.md).
