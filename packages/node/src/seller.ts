@@ -17,10 +17,12 @@ import {
   PORTS,
   ROLE_FILES,
   ROUTES,
+  SELLER_DISCOVERY,
   TRANSPORT_LIMITS,
   TRANSPORT_TIMEOUTS,
 } from '@gyblos/config';
 import { PRICES } from '@gyblos/core/constants';
+import { publishRecord } from '@gyblos/discovery-http';
 import {
   GENERATION,
   READINESS_GENERATION,
@@ -45,7 +47,7 @@ import { bindEndpoint } from '@gyblos/transport-iroh/endpoint';
 import { serveIroh } from '@gyblos/transport-iroh/iroh-server';
 
 import { modelTokenizer } from './artifacts.js';
-import { P2P_ROLES } from './constants.js';
+import { P2P_ROLES, SELLER_PUBLIC_RECORDS } from './constants.js';
 import { observeControlReadiness } from './control-readiness.js';
 import { prepareSellerControl } from './control-startup.js';
 import {
@@ -55,6 +57,9 @@ import {
 import { assertOllamaModelsHome, assertRoleHome } from './home.js';
 import { createInferenceSeller } from './http/inference.js';
 import { signInferenceOffer } from './offers.js';
+import { openSellerSequence } from './public-sequence.js';
+import { sellerPublicationConfig } from './publisher-config.js';
+import { createSellerPublisher } from './publisher.js';
 import { loadRole, nodeSecret, rolePath, roleSigner } from './roles.js';
 
 interface Trace {
@@ -83,6 +88,11 @@ export async function startSeller() {
     const config = await loadRole(P2P_ROLES.SELLER);
     if (config.role !== P2P_ROLES.SELLER)
       throw new Error('Seller role required.');
+    const publicationConfig = sellerPublicationConfig(process.env);
+    const publicSequence = await openSellerSequence({
+      environment: process.env,
+      nodeId: config.nodeId,
+    });
     await stage('devnet-program');
     await assertProgram(config.rpcUrl);
     await assertPortFree(`${HOSTS.ollama}${ROUTES.ollamaVersion}`);
@@ -216,6 +226,7 @@ export async function startSeller() {
       bindAddress: process.env.GYBLOS_IROH_BIND,
       externalAddress: process.env.GYBLOS_IROH_EXTERNAL_ADDR || undefined,
     });
+    const endpointDisposeIndex = disposers.length;
     disposers.push(() => endpoint.close());
     if (endpoint.id().toString() !== config.nodeId)
       throw new Error('Node key changed unexpectedly.');
@@ -257,6 +268,10 @@ export async function startSeller() {
     await saveJson(rolePath(P2P_ROLES.SELLER, ROLE_FILES.offer), signed);
     const control = await prepareSellerControl({
       owner,
+      sequence: publicSequence,
+      catalogMs: publicationConfig
+        ? SELLER_PUBLIC_RECORDS.catalogMs
+        : undefined,
       nodeId: config.nodeId,
       nodeSigner: async (bytes) =>
         Uint8Array.from(
@@ -276,12 +291,42 @@ export async function startSeller() {
       validUntil: offerExpiresAt,
       readiness: controlReadiness.readiness,
     });
+    disposers.push(async () => {
+      await control.records.withdraw();
+    });
     const bridge = serveIroh(
       endpoint,
       `http://${LOCALHOST}:${PORTS.seller}`,
       relayOnly,
-      control,
+      control.service,
     );
+    disposers[endpointDisposeIndex] = () => bridge.close();
+    const publication = publicationConfig
+      ? createSellerPublisher({
+          records: control.records,
+          canPublish: () => {
+            const observed = controlReadiness.readiness();
+            return (
+              !observed.busy &&
+              observed.observedAt <= Date.now() &&
+              observed.validUntil > Date.now()
+            );
+          },
+          publish: async (record, signal) => {
+            await publishRecord({
+              baseUrl: publicationConfig.baseUrl,
+              record,
+              signal,
+              fetch: globalThis.fetch,
+              timeoutMs: SELLER_DISCOVERY.requestMs,
+            });
+          },
+        })
+      : undefined;
+    if (publication) {
+      disposers.push(() => publication.stop());
+      publication.start();
+    }
     await saveJson(rolePath(P2P_ROLES.SELLER, ROLE_FILES.status), {
       status: 'ready',
       runId: process.env.GYBLOS_P2P_RUN_ID,
@@ -292,9 +337,10 @@ export async function startSeller() {
       model,
       offerTicket: EndpointTicket.fromAddr(endpointAddress).toString(),
     });
-    disposers.pop();
-    disposers.push(() => bridge.close());
-    return { close };
+    return {
+      close,
+      publication: publication ? () => publication.health() : undefined,
+    };
   } catch (error) {
     await close();
     throw error;

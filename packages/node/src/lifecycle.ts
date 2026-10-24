@@ -1,9 +1,11 @@
 // Owns the node's explicit start, stop and health lifecycle.
 // Resource construction is injected; this module knows no SDKs or wallets.
 import { NODE_STATES, type NodeState } from './constants.js';
+import type { createSellerPublisher } from './publisher.js';
 
 export interface NodeHost {
   close(): Promise<void>;
+  publication?: ReturnType<typeof createSellerPublisher>['health'];
 }
 
 export function createNodeLifecycle(startHost: () => Promise<NodeHost>) {
@@ -38,7 +40,10 @@ export function createNodeLifecycle(startHost: () => Promise<NodeHost>) {
       });
     },
     health() {
-      return { state };
+      return {
+        state,
+        ...(host?.publication ? { publication: host.publication() } : {}),
+      };
     },
   };
 }

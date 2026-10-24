@@ -15,7 +15,11 @@
     "./errors": "./src/errors.ts",
     "./home": "./src/home.ts",
     "./control": "./src/control.ts",
-    "./control-readiness": "./src/control-readiness.ts"
+    "./control-readiness": "./src/control-readiness.ts",
+    "./public-sequence": "./src/public-sequence.ts",
+    "./public-records": "./src/public-records.ts",
+    "./publisher": "./src/publisher.ts",
+    "./publisher-config": "./src/publisher-config.ts"
   },
   "dependencies": {
     "@gyblos/core": "workspace:*",
@@ -30,6 +34,7 @@
     "@x402/express": "2.28.0",
     "@x402/svm": "2.28.0",
     "express": "4.21.2",
-    "@gyblos/protocol": "workspace:*"
+    "@gyblos/protocol": "workspace:*",
+    "@gyblos/discovery-http": "workspace:*"
   }
 }

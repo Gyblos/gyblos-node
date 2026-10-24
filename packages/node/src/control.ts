@@ -35,17 +35,21 @@ import {
 import type { Signer } from '@gyblos/protocol/signing';
 import type { ControlService } from '@gyblos/transport-iroh/control-server';
 
-export function createSellerControlService(options: {
+import type { SellerPublicRecords } from './public-records.js';
+
+export interface SellerControlOptions {
   context: Omit<QuoteContext, 'remoteNodeId' | 'signal'>;
   ownerSigner: Signer;
   nodeSigner: Signer;
   monotonic?: () => number;
-}): ControlService {
-  const admission = new ControlAdmission(
-    options.monotonic ?? (() => performance.now()),
-  );
-  const context = options.context;
-  let sequence = context.catalog.record.sequence;
+  records?: SellerPublicRecords;
+}
+
+export function createSellerControlService(
+  options: SellerControlOptions,
+): ControlService {
+  const admission = admissionFor(options.monotonic);
+  let sequence = options.context.catalog.record.sequence;
   return {
     queryMs: CONTROL_CAPACITY.queryMs,
     idleMs: CONTROL_CAPACITY.connectionIdleMs,
@@ -54,6 +58,10 @@ export function createSellerControlService(options: {
       const requestId = validatedRequestId(value);
       try {
         const query = parseControlQuery(value);
+        const context = {
+          ...options.context,
+          catalog: options.records?.current() ?? options.context.catalog,
+        };
         if (signal.aborted) return controlFail(CONTROL_CODES.CANCELLED);
         if (query.method === CONTROL_METHODS.OFFER) {
           const offer = await createControlQuote(
@@ -61,20 +69,16 @@ export function createSellerControlService(options: {
             { ...context, remoteNodeId: peer, signal },
             options.ownerSigner,
           );
+          if (options.records && options.records.current() !== context.catalog)
+            return controlFail(CONTROL_CODES.STALE);
           return {
             version: CONTROL_VERSION,
             requestId,
             result: { method: query.method, offer },
           };
         }
+        const record = await verifiedCatalog(context, signal);
         const now = context.now();
-        const record = await verifyPublicV2(context.catalog, {
-          owner: context.owner,
-          nodeId: context.nodeId,
-          now,
-        });
-        if (record.kind !== PUBLIC_RECORD_KINDS.CATALOG) return controlFail();
-        validatePublicV2Time(record, context.now());
         if (query.method === CONTROL_METHODS.CATALOG)
           return {
             version: CONTROL_VERSION,
@@ -84,14 +88,17 @@ export function createSellerControlService(options: {
               catalog: { record, signature: context.catalog.signature },
             },
           };
-        sequence = Math.max(sequence, record.sequence) + 1;
-        const presence = await signPresence(
+        if (!options.records)
+          sequence = Math.max(sequence, record.sequence) + 1;
+        const presence = await currentPresence(
+          options,
           context,
           record,
           sequence,
           now,
-          options.nodeSigner,
+          signal,
         );
+        assertUncancelled(signal);
         validatePublicV2Time(presence.record, context.now());
         return {
           version: CONTROL_VERSION,
@@ -112,6 +119,39 @@ export function createSellerControlService(options: {
       }
     },
   };
+}
+
+async function currentPresence(
+  options: SellerControlOptions,
+  context: Omit<QuoteContext, 'remoteNodeId' | 'signal'>,
+  record: PublicCatalogV2,
+  sequence: number,
+  now: number,
+  signal: AbortSignal,
+) {
+  return options.records
+    ? options.records.presence(signal)
+    : signPresence(context, record, sequence, now, async (bytes) => {
+        assertUncancelled(signal);
+        return options.nodeSigner(bytes);
+      });
+}
+async function verifiedCatalog(
+  context: Omit<QuoteContext, 'remoteNodeId' | 'signal'>,
+  signal: AbortSignal,
+) {
+  const record = await verifyPublicV2(context.catalog, {
+    owner: context.owner,
+    nodeId: context.nodeId,
+    now: context.now(),
+  });
+  assertUncancelled(signal);
+  if (record.kind !== PUBLIC_RECORD_KINDS.CATALOG) return controlFail();
+  validatePublicV2Time(record, context.now());
+  return record;
+}
+function assertUncancelled(signal: AbortSignal) {
+  if (signal.aborted) return controlFail(CONTROL_CODES.CANCELLED);
 }
 
 async function signPresence(
@@ -147,4 +187,8 @@ function validatedRequestId(value: unknown) {
       : undefined,
     CONTROL_LIMITS.requestIdBytes,
   );
+}
+
+function admissionFor(monotonic?: () => number) {
+  return new ControlAdmission(monotonic ?? (() => performance.now()));
 }
