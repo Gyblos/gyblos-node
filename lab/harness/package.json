@@ -30,7 +30,8 @@
     "./acceptance/options": "./src/acceptance/options.ts",
     "./acceptance/workspace": "./src/acceptance/workspace.ts",
     "./acceptance/index": "./src/acceptance/index.ts",
-    "./cli/node-discovery-acceptance": "./src/cli/node-discovery-acceptance.ts"
+    "./cli/node-discovery-acceptance": "./src/cli/node-discovery-acceptance.ts",
+    "./acceptance/engine": "./src/acceptance/engine.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",
