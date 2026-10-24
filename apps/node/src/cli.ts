@@ -1,12 +1,15 @@
 // The `gyblos` command: today only `config validate`, which checks gyblos.toml and the GYBLOS_* environment.
-// Prints codes, key paths and environment variable names; never a value read from the environment.
+// Prints codes, key paths and environment variable names; never a value read from the environment, and
+// URLs only as origins, because providers embed API keys in URL paths.
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
 import {
   NODE_CONFIG_FILENAME,
   NODE_CONFIG_SOURCES,
+  NODE_SETTINGS,
   OFFER_PRICING_KINDS,
+  type NodeSettingKey,
 } from '@gyblos/node/constants';
 import {
   readNodeConfigFile,
@@ -31,6 +34,14 @@ const EXIT = { ok: 0, failure: 1 } as const;
 const USAGE = 'Usage: gyblos config validate [--config <path>]\n';
 const DOCUMENT_PATH = '(file)';
 const COLUMN = 22;
+const URL_SETTINGS: ReadonlySet<NodeSettingKey> = new Set([
+  NODE_SETTINGS.RPC_URL,
+  NODE_SETTINGS.RELAY_URLS,
+  NODE_SETTINGS.DISCOVERY_URL,
+]);
+const PATH_HIDDEN = '<path hidden>';
+const URL_HIDDEN = '<url hidden>';
+const ROOT_PATH = '/';
 
 function issueLine(issue: NodeConfigIssue | NodeConfigWarning) {
   const where = issue.path || DOCUMENT_PATH;
@@ -41,8 +52,32 @@ function issueLine(issue: NodeConfigIssue | NodeConfigWarning) {
   return `  ${issue.code.padEnd(COLUMN)} ${where}${position}\n`;
 }
 
-function describeValue(value: NodeSettings[keyof NodeSettings]) {
+// scheme://host[:port] only; a path, query or fragment may hold a key (Alchemy /v2/<key>, QuickNode).
+function urlOrigin(raw: string) {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return URL_HIDDEN;
+  }
+  const hidden = url.pathname !== ROOT_PATH || url.search || url.hash;
+  return hidden ? `${url.origin} ${PATH_HIDDEN}` : url.origin;
+}
+
+function describeValue(
+  setting: NodeSettingKey,
+  value: NodeSettings[keyof NodeSettings],
+) {
   if (value === undefined) return '(unset)';
+  if (URL_SETTINGS.has(setting)) {
+    if (typeof value === 'string') return urlOrigin(value);
+    if (Array.isArray(value))
+      return value
+        .map((item) =>
+          typeof item === 'string' ? urlOrigin(item) : URL_HIDDEN,
+        )
+        .join(', ');
+  }
   if (!Array.isArray(value)) return String(value);
   return value.every((item) => typeof item === 'string')
     ? value.join(', ')
@@ -54,7 +89,7 @@ function settingLine(settings: NodeSettings, origin: SettingOrigin) {
   const value =
     origin.source === NODE_CONFIG_SOURCES.ENV
       ? `<from ${origin.name}>`
-      : describeValue(settings[origin.setting]);
+      : describeValue(origin.setting, settings[origin.setting]);
   const source =
     origin.source === NODE_CONFIG_SOURCES.DEFAULT
       ? 'default'
@@ -67,7 +102,7 @@ function offerLine(entry: NodeOffer, index: number) {
     entry.pricing.kind === OFFER_PRICING_KINDS.PAID
       ? `${entry.pricing.inputPerMtok} in / ${entry.pricing.outputPerMtok} out ${entry.pricing.currency} per Mtok`
       : `free, ${entry.pricing.dailyTokenCap} tokens/day, ${entry.pricing.perBuyerCap} per buyer`;
-  return `  [${index}] ${entry.model.id} (${entry.model.kind}) via ${entry.engine.kind} ${entry.engine.url}; reasoning ${entry.reasoning.join(',')}; ${pricing}\n`;
+  return `  [${index}] ${entry.model.id} (${entry.model.kind}) via ${entry.engine.kind} ${urlOrigin(entry.engine.url)}; reasoning ${entry.reasoning.join(',')}; ${pricing}\n`;
 }
 
 async function validate(path: string, context: CliContext) {

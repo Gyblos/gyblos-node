@@ -92,6 +92,61 @@ void test('the summary names environment sources and secret variables without th
   });
 });
 
+void test('file URLs are printed as origins only, so keys embedded in a path never reach output', async () => {
+  // Providers such as Alchemy and QuickNode put the API key in the URL path.
+  const toml = [
+    'version = 1',
+    '[node]',
+    'network = "devnet"',
+    `rpc_url = "https://solana-devnet.g.alchemy.com/v2/${FAKE_SECRET}"`,
+    '[discovery]',
+    `url = "https://index.example.com/${FAKE_SECRET}/v1"`,
+    offer({
+      engine: `{ kind = "openai", url = "https://api.example.com:8443/${FAKE_SECRET}/v1" }`,
+    }),
+  ].join('\n');
+  await withFile(toml, async (path) => {
+    const result = await run(['config', 'validate', '--config', path]);
+    assert.equal(result.code, 0, result.output);
+    assert.equal(result.output.includes('FAKE0SECRET'), false, result.output);
+    assert.match(
+      result.stdout,
+      /rpcUrl\s+https:\/\/solana-devnet\.g\.alchemy\.com <path hidden>/,
+    );
+    assert.match(
+      result.stdout,
+      /discoveryUrl\s+https:\/\/index\.example\.com <path hidden>/,
+    );
+    assert.match(
+      result.stdout,
+      /via openai https:\/\/api\.example\.com:8443 <path hidden>;/,
+    );
+  });
+  await withFile(
+    `${BASE}rpc_url = "https://api.devnet.solana.com"\n`,
+    async (path) => {
+      const result = await run(['config', 'validate', '--config', path]);
+      assert.match(
+        result.stdout,
+        /rpcUrl\s+https:\/\/api\.devnet\.solana\.com {2}\(file/,
+      );
+    },
+  );
+});
+
+void test('an env name that looks like a pasted token is refused, never listed as a secret name', async () => {
+  const pasted = 'A1B2C3D4E5F6G7H8J9K0L1M2N3';
+  await withFile(
+    `${BASE.replace('[node]', `[relays]\nrelay_token_env = "${pasted}"\n[node]`)}`,
+    async (path) => {
+      const result = await run(['config', 'validate', '--config', path]);
+      assert.equal(result.code, 1, result.output);
+      assert.match(result.stderr, /INLINE_SECRET\s+relays\.relay_token_env/);
+      assert.equal(result.output.includes(pasted), false);
+    },
+  );
+});
+
 void test('validate exits 1 and lists codes with paths for every invalid fixture, without values', async () => {
   for (const fixture of INVALID_FIXTURES)
     await withFile(fixture.toml, async (path) => {
