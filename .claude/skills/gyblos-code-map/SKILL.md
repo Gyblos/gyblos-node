@@ -24,9 +24,10 @@ they disagree, `AGENTS.md` and `tooling/boundaries/config.ts` win.
    core, config, runtime and its SDK; never another adapter, `node` or apps.
 4. Composes adapters into a running local node for either role (lifecycle,
    roles/keys, seller HTTP, facilitator, control startup)? -> `packages/node`.
-5. A process the user starts (CLI flags, proxy, reconcile, Electron)? ->
-   `apps/node`, `apps/buyer` or `apps/desktop`. Apps never import each other;
-   shared logic moves down to `packages/node` or core.
+5. A process the user starts or deploys (CLI flags, proxy, reconcile, Electron,
+   a Worker)? -> `apps/node`, `apps/buyer`, `apps/desktop` or
+   `apps/discovery-index`. Apps never import each other; shared logic moves down
+   to `packages/node` or core.
 6. Operator-changeable value (port, limit, timeout, relay, index URL) or a local
    path? -> `packages/config` (`src/home.ts` for paths). Fixed operational
    values stay in the owning package's `constants.ts`.
@@ -56,6 +57,7 @@ Splitting by concern inside a package uses a filename prefix, as in
 | seller facilitator wiring                   | `packages/node/src/seller.ts`                                   | composition of `payments-x402`                  |
 | buyer selection proxy, offer race           | `apps/buyer/src/selection-proxy.ts`, `offer-race.ts`            | executable wiring                               |
 | discovery index client                      | `packages/discovery-http`                                       | HTTP adapter; index defaults in `config`        |
+| discovery index server (Worker)             | `apps/discovery-index`                                          | deployable app; verification via protocol only  |
 | `GYBLOS_HOME` / `GYBLOS_LAB_HOME` layout    | `packages/config/src/home.ts`                                   | single path owner                               |
 | devnet wallet config, `gate:*`              | `lab/harness`                                                   | lab-only                                        |
 

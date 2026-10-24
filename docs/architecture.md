@@ -1,9 +1,10 @@
 # Architecture
 
-A pnpm workspace of small TypeScript packages, three apps (seller node, buyer
-and the provisional Electron desktop host) and a lab. The wire format is
-specified in [packages/protocol/SPEC.md](../packages/protocol/SPEC.md).
-Technology choices are in [stack.md](stack.md).
+A pnpm workspace of small TypeScript packages, four apps (seller node, buyer,
+the provisional Electron desktop host and the discovery index Worker) and a lab.
+The wire format is specified in
+[packages/protocol/SPEC.md](../packages/protocol/SPEC.md). Technology choices
+are in [stack.md](stack.md).
 
 ## Packages
 
@@ -17,14 +18,15 @@ Technology choices are in [stack.md](stack.md).
 | `packages/payments-x402`  | adapter  | x402 `upto`, facilitator, buyer signer, on-chain proofs, recovery locks.                                                                                                                                                                                                                    |
 | `packages/transport-iroh` | adapter  | Iroh endpoint, HTTP over QUIC and its wire framing limits, relay policy, admission, control client/server and frame I/O (`control-*`).                                                                                                                                                      |
 | `packages/identity`       | adapter  | 8004 registry adapter; not used by the node yet ([identity.md](identity.md)).                                                                                                                                                                                                               |
-| `packages/discovery-http` | adapter  | HTTP discovery index client; re-verifies every record, index untrusted; not used yet ([discovery.md](discovery.md)).                                                                                                                                                                        |
+| `packages/discovery-http` | adapter  | HTTP discovery index client; re-verifies every record, index untrusted; not used yet ([discovery.md](discovery.md)). The index itself is `apps/discovery-index`.                                                                                                                            |
 | `packages/node`           | node     | Local-node library for both roles: seller composition (`createNode`, including the facilitator from `payments-x402` and the control service, startup snapshot and readiness in `control-*`), roles and keys, signed offers, tokenizer artifacts and inference pricing used by `apps/buyer`. |
 
-| App            | Command                          | Responsibility                                                                                                                                                      |
-| -------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/node`    | `node:start` (`main.ts`)         | Seller daemon; starts `createNode`, which composes the facilitator.                                                                                                 |
-| `apps/buyer`   | `buyer:start`, `buyer:reconcile` | Buyer proxy, one paid call (`call.ts`), measurements, recovery, one-seller control client, opt-in seller selection and offer race (`selection-*`, `offer-race.ts`). |
-| `apps/desktop` | `desktop:start`, `desktop:smoke` | Electron desktop host (provisional): simulated Chat/Connect preview and loopback Iroh probe ([desktop-probe.md](desktop-probe.md)).                                 |
+| App                    | Command                                 | Responsibility                                                                                                                                                      |
+| ---------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/node`            | `node:start` (`main.ts`)                | Seller daemon; starts `createNode`, which composes the facilitator.                                                                                                 |
+| `apps/buyer`           | `buyer:start`, `buyer:reconcile`        | Buyer proxy, one paid call (`call.ts`), measurements, recovery, one-seller control client, opt-in seller selection and offer race (`selection-*`, `offer-race.ts`). |
+| `apps/desktop`         | `desktop:start`, `desktop:smoke`        | Electron desktop host (provisional): simulated Chat/Connect preview and loopback Iroh probe ([desktop-probe.md](desktop-probe.md)).                                 |
+| `apps/discovery-index` | none (Cloudflare Worker, manual deploy) | Reference HTTP discovery index for `discovery.gyblos.com` (Hono, D1); verifies records only through protocol ([discovery-index.md](discovery-index.md)).            |
 
 "Gate" is a lab word only. `lab/harness` holds the `gate:*` proof-of-concept
 checks (including the x402 `exact` scheme, the fixed-price test seller, the gate

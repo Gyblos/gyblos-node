@@ -14,6 +14,7 @@ this file describes the code here.
 | Chain         | Solana devnet (`@solana/kit`, `@solana-program/token`, `@solana-program/system`)    | kit 5.1.0         | Fast, cheap settlement; payment channels from the x402 SVM scheme                            |
 | P2P transport | Iroh (`@number0/iroh`)                                                              | 1.1.0             | Connect to a public key behind home NAT, QUIC, end-to-end encryption, relay fallback         |
 | HTTP          | Express (sellers, facilitator), Node `http` (buyer proxy)                           | 4.21.2            | Standard x402 middleware; loopback-only servers with Host validation                         |
+| Index Worker  | Hono on Cloudflare Workers with D1 (`apps/discovery-index`)                         | hono 4.13.13      | Same stack as the website Worker; public discovery index, manual founder-approved deploy     |
 | Inference     | Ollama (local engine), `@huggingface/tokenizers`                                    | tokenizers 0.2.0  | Real open-weight model; buyer recounts tokens with the public tokenizer                      |
 | Quality       | ESLint, Prettier, Node test runner (`tsx`)                                          | —                 | Typecheck, lint and offline regression tests on every change                                 |
 

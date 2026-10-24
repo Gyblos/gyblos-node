@@ -2,7 +2,7 @@
 
 ## Repository and scope
 
-- GitHub repo `Gyblos/gyblos-node`; the local checkout directory is still named `gyblos-payments`. It holds the node, buyer and desktop applications, not the landing website in `../gyblos` (`web-gyblos`).
+- GitHub repo `Gyblos/gyblos-node`; the local checkout directory is still named `gyblos-payments`. It holds the node, buyer, desktop and discovery index applications, not the landing website in `../gyblos` (`web-gyblos`).
 - Use English for repository content, comments, commits and PRs; conversation language follows the founder.
 - This file is the single public source of agent rules. `CLAUDE.md` imports it and `CONTRIBUTING.md` points here. Detailed style is in [docs/code-standards.md](docs/code-standards.md); Claude Code skills in `.claude/skills/` add procedures, never rules. Optional personal notes go in ignored `AGENTS.local.md`.
 
@@ -14,7 +14,7 @@ Dependency direction is protocol → core → adapters → node → apps; config
 - `packages/core`: pure policy (metering, offer trust `offers`, `control-admission`, `control-quotes`, `seller-selection*`). No SDKs, filesystem, or clock/random of its own.
 - Adapters are the packages matching `payments-x402`, `identity`, `engine-*`, `transport-*`, `discovery-*` (`tooling/boundaries/config.ts`). They never import each other, `node` or apps. Inference knows no wallets; payment code knows no engines.
 - `packages/node`: local-node library for both roles; composes adapters, including the seller's facilitator and control service.
-- `apps/node` (seller), `apps/buyer` and `apps/desktop` (Electron, the provisional desktop host per vault GYB-DOC-001) are independent executables; apps never import each other.
+- `apps/node` (seller), `apps/buyer`, `apps/desktop` (Electron, the provisional desktop host per vault GYB-DOC-001) and `apps/discovery-index` (the discovery index Cloudflare Worker; deploy needs founder approval) are independent executables; apps never import each other.
 - `packages/config`: operator values; `config/src/home.ts` is the only owner of local paths. `packages/runtime`: platform helpers.
 - `lab/`: validation outside product (`harness`, `facilitator`, `tools`; `evidence` is historical). "Gate" is a lab word only: no product code, route, variable, message or product script uses it.
 - Product never imports `lab/`, `tests/` or `tooling/`. Import other workspaces by name through explicit `exports`; relative imports stay inside one package.
