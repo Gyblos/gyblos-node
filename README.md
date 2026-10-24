@@ -23,10 +23,12 @@ app ─▶ buyer proxy ══ Iroh (direct or na1 relay) ══▶ seller node �
 
 ## Desktop preview
 
-The macOS arm64 Electron preview in `apps/desktop` reuses the compact Chat and
-Connect mockup, with in-memory conversations and simulated
-responses/connections. A separate smoke retains the isolated Iroh loopback
-check. See [running and packaging the preview](docs/desktop-probe.md).
+The Electron preview in `apps/desktop` targets macOS, Windows and Linux and
+reuses the compact Chat and Connect mockup, with in-memory conversations and
+simulated responses/connections. Normal startup prepares a protected local
+wallet; portable backup is pending and funding remains disabled. Local packaging
+is macOS arm64 only. A separate wallet-free smoke retains the isolated Iroh
+loopback check. See [running and packaging the preview](docs/desktop-probe.md).
 
 ## Status
 

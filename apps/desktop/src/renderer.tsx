@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 
 import { CompatibilityView } from './compatibility-view.js';
 import { DesktopApp } from './desktop-app.js';
+import { DesktopWalletProvider } from './ui/WalletState.js';
 
 import './mockup-base.css';
 import './ui/motion.css';
@@ -22,6 +23,8 @@ createRoot(root).render(
   new URLSearchParams(window.location.search).get('probe') === '1' ? (
     <CompatibilityView />
   ) : (
-    <DesktopApp />
+    <DesktopWalletProvider>
+      <DesktopApp />
+    </DesktopWalletProvider>
   ),
 );
