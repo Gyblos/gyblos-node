@@ -35,7 +35,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       # Disposable keys and fake OS encryption only, not native keystore proof.
-      - run: pnpm exec tsx --test tests/desktop-wallet.test.ts tests/desktop-wallet-lifecycle.test.ts tests/desktop-wallet-protection.test.ts tests/desktop-startup.test.ts tests/desktop-startup-window.test.ts
+      - run: pnpm exec tsx --test tests/desktop-wallet.test.ts tests/desktop-wallet-lifecycle.test.ts tests/desktop-wallet-protection.test.ts tests/desktop-startup.test.ts tests/desktop-startup-window.test.ts tests/desktop-session-cleanup.test.ts
       - run: pnpm exec tsx --test tests/desktop-wallet-backup.test.ts tests/desktop-backup-recovery.test.ts tests/desktop-backup-flow.test.ts
       - run: pnpm desktop:build
       # Only encrypted generated-key fixtures and public expected addresses.

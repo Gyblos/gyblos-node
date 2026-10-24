@@ -1,6 +1,6 @@
 // Hosts simulated inference and a local protected wallet; never starts paid services.
 // The renderer receives public metadata only; smoke never creates a wallet.
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -9,6 +9,7 @@ import { app, BrowserWindow, dialog, ipcMain, safeStorage } from 'electron';
 import { DESKTOP, PROBE_STATUS, STARTUP_WINDOW } from './constants.js';
 import { probeInUtility } from './probe-host.js';
 import { failedProbe, type ProbeResult } from './probe-model.js';
+import { cleanupDesktopSession } from './session-cleanup.js';
 import { armSmokeWatchdog } from './smoke-watchdog.js';
 import { startupHandoff } from './startup-window.js';
 import { BRAND_COLORS } from './theme.js';
@@ -197,7 +198,11 @@ async function main() {
   const home = mkdtempSync(join(tmpdir(), 'gyblos-desktop-probe-'));
   if (smoke) app.setPath('userData', home);
   app.setPath('sessionData', home);
-  app.on('quit', () => rmSync(home, { recursive: true, force: true }));
+  app.on('quit', () =>
+    cleanupDesktopSession(home, () => {
+      process.stderr.write('Temporary desktop session cleanup failed.\n');
+    }),
+  );
   await app.whenReady();
   app.dock?.setIcon(join(__dirname, 'renderer', DESKTOP.ICON_FILE));
   const window = createProbeWindow();

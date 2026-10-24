@@ -2,11 +2,23 @@
 // Cleanup failures are reported without exposing private paths or blocking exit.
 import { rmSync } from 'node:fs';
 
+import { DESKTOP } from './constants.js';
+
 export function cleanupDesktopSession(
   directory: string,
   report: () => void,
   remove = rmSync,
 ) {
-  remove(directory, { recursive: true, force: true });
-  return true;
+  try {
+    remove(directory, {
+      recursive: true,
+      force: true,
+      maxRetries: DESKTOP.SESSION_CLEANUP_RETRIES,
+      retryDelay: DESKTOP.SESSION_CLEANUP_RETRY_MS,
+    });
+    return true;
+  } catch {
+    report();
+    return false;
+  }
 }
