@@ -64,8 +64,10 @@ Choose **Verify saved file**, enter the password again and select the saved
 file. Reading is bounded and rejects directories and symlinks; authenticated
 decryption must recover the current address. This does not replace the installed
 wallet. Wrong passwords, altered files, another identity and inaccessible
-storage return sanitized failure status. Closing the app aborts pending
-publication and waits for in-flight work; native derivation itself is not
-immediately interruptible. Passwords are not persisted or logged; JavaScript
-strings cannot be reliably erased. Native confirmation is consent, not biometric
-authentication or malware protection.
+storage return sanitized failure status. Closing the app aborts before a write
+starts and waits for in-flight work. A write already started is allowed to
+finish with its encrypted file retained, but reports cancellation rather than
+success. Native derivation itself is not immediately interruptible. Passwords
+are not persisted or logged; JavaScript strings cannot be reliably erased.
+Native confirmation is consent, not biometric authentication or malware
+protection.

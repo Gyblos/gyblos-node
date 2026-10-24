@@ -21,10 +21,8 @@ export function WalletDetails() {
           </div>
           <span className="modal-note">Balance: not queried</span>
           <Note>
-            Your key is encrypted using this operating system’s secret storage.
-            Encrypted backup is available below; app restore is not available
-            yet. Do not send funds to this address; external transfers cannot be
-            blocked by this app.
+            Your local key is protected. Do not send funds: this app cannot
+            block external transfers.
           </Note>
         </>
       ) : (
@@ -38,7 +36,7 @@ export function WalletDetails() {
       )}
       {ready && <WalletBackup />}
       <Button disabled className="wide">
-        Add funds · backup verification required
+        Add funds · disabled in this build
       </Button>
       <Note>
         Funding is disabled in this experimental build, even after a successful

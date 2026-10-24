@@ -44,7 +44,7 @@ export function createBackupFlow(
         } finally {
           encrypted.fill(0);
         }
-        return BACKUP_RESULT.SAVED;
+        return stopped() ? BACKUP_RESULT.CANCELLED : BACKUP_RESULT.SAVED;
       }
       const summary = await wallet.summary();
       if (!summary.address) return BACKUP_RESULT.FAILED;

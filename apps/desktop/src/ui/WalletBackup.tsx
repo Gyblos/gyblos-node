@@ -37,7 +37,9 @@ function useWalletBackup() {
           'Saved file verified: it recovers this wallet address. Funding remains disabled.',
         );
       } else if (result === BACKUP_RESULT.CANCELLED)
-        setMessage('Cancelled. Your wallet was not changed.');
+        setMessage(
+          'Cancelled. Your wallet was not changed. If writing had started, the encrypted file may remain.',
+        );
       else if (result === BACKUP_RESULT.BUSY)
         setMessage('A backup operation is already running.');
       else
@@ -112,8 +114,8 @@ export function WalletBackup() {
     <section className="wallet-details" aria-label="Encrypted backup">
       <strong>Encrypted backup</strong>
       <Note>
-        Keep the file and password safe. Losing either loses this recovery
-        route. App restore is not available yet.
+        Keep both file and password safe. Gyblos cannot recover either. App
+        restore is not available yet.
       </Note>
       <div
         className="connection-location"
@@ -168,7 +170,7 @@ export function WalletBackup() {
             ? 'Save encrypted file…'
             : 'Choose file and verify…'}
       </Button>
-      <p role="status" aria-live="polite">
+      <p className="modal-note" role="status" aria-live="polite">
         {message}
       </p>
     </section>

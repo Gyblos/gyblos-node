@@ -1,20 +1,8 @@
 // Owns the sanitized backup interaction contract; no Node or secret imports.
-import { BACKUP } from './backup/constants.js';
+import { BACKUP_ACTION, BACKUP_FLOW, BACKUP_RESULT } from './constants.js';
 
-export const BACKUP_ACTION = { CREATE: 'create', VERIFY: 'verify' } as const;
-export const BACKUP_RESULT = {
-  SAVED: 'saved',
-  VERIFIED: 'verified',
-  CANCELLED: 'cancelled',
-  FAILED: 'failed',
-  BUSY: 'busy',
-} as const;
-export const BACKUP_FLOW = {
-  CHANNEL: 'desktop:wallet-backup',
-  MIN_PASSWORD_CHARACTERS: 12,
-  MAX_PASSWORD_BYTES: BACKUP.MAX_PASSWORD_BYTES,
-  FILENAME: 'gyblos-wallet-backup.json',
-} as const;
+export { BACKUP_ACTION, BACKUP_RESULT, BACKUP_FLOW } from './constants.js';
+
 export type BackupAction = (typeof BACKUP_ACTION)[keyof typeof BACKUP_ACTION];
 export type BackupResult = (typeof BACKUP_RESULT)[keyof typeof BACKUP_RESULT];
 export interface BackupRequest {

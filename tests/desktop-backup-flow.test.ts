@@ -283,7 +283,7 @@ void test(
     await fixture(async ({ file, wallet, controller }) => {
       await writeFile(file, '{}');
       const original = fs.promises.lstat;
-      const patched: typeof original = async (...args) => {
+      const patched = async (...args: Parameters<typeof original>) => {
         const metadata = await original(...args);
         if (args[0] === file) {
           await fs.promises.unlink(file);
@@ -291,7 +291,8 @@ void test(
         }
         return metadata;
       };
-      fs.promises.lstat = patched;
+      // External Node overload double; this case invokes lstat without bigint options.
+      fs.promises.lstat = patched as typeof original;
       syncBuiltinESMExports();
       let rescued = false;
       const rescue = setTimeout(() => {

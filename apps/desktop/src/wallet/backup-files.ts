@@ -21,7 +21,10 @@ export async function readBackupFile(path: string) {
   const metadata = await lstat(path);
   if (!metadata.isFile() || metadata.isSymbolicLink())
     throw new BackupError(BACKUP_ERROR.INVALID_FILE);
-  const file = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+  const file = await open(
+    path,
+    constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
+  );
   try {
     const opened = await file.stat();
     if (
