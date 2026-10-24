@@ -11,7 +11,8 @@
     "./connection-state": "./src/ui/connection-state.ts",
     "./catalog-state": "./src/ui/catalog-state.ts",
     "./demo-account": "./src/ui/demo-account.ts",
-    "./wallet": "./src/wallet/index.ts"
+    "./wallet": "./src/wallet/index.ts",
+    "./startup-state": "./src/ui/startup-state.ts"
   },
   "scripts": {
     "build": "tsx scripts/build.ts",

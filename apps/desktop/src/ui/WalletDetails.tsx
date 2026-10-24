@@ -1,41 +1,10 @@
 // Displays public wallet status only; backup, funding and signing remain disabled.
-import { useEffect, useState } from 'react';
-
-import {
-  parseWalletSummary,
-  WALLET_STATUS,
-  walletSummary,
-  type WalletSummary,
-} from '../wallet/model.js';
+import { WALLET_STATUS } from '../wallet/model.js';
 import { Badge, Button, Note } from './UI.js';
-
-declare global {
-  interface Window {
-    desktopWallet?: { summary(): Promise<WalletSummary> };
-  }
-}
+import { useDesktopWallet } from './WalletState.js';
 
 export function WalletDetails() {
-  const [wallet, setWallet] = useState(() =>
-    walletSummary(WALLET_STATUS.LOADING),
-  );
-  useEffect(() => {
-    let active = true;
-    const request =
-      window.desktopWallet?.summary() ??
-      Promise.resolve(walletSummary(WALLET_STATUS.UNAVAILABLE));
-    void request.then(
-      (value) => {
-        if (active) setWallet(parseWalletSummary(value));
-      },
-      () => {
-        if (active) setWallet(walletSummary(WALLET_STATUS.UNAVAILABLE));
-      },
-    );
-    return () => {
-      active = false;
-    };
-  }, []);
+  const wallet = useDesktopWallet();
   const ready = wallet.status === WALLET_STATUS.READY;
   return (
     <section className="wallet-details" aria-label="Wallet details">

@@ -62,6 +62,8 @@ import {
 import { NetworkStatus, usePreviewNetwork } from './ui/NetworkStatus.js';
 import { ResizeHandle } from './ui/ResizeHandle.js';
 import { SidebarIcon, type SidebarSection } from './ui/SidebarIcon.js';
+import { startupPending } from './ui/startup-state.js';
+import { StartupScreen } from './ui/StartupScreen.js';
 import type { ToolId } from './ui/tools.js';
 import {
   Avatar,
@@ -80,6 +82,7 @@ import {
   StatCard,
 } from './ui/UI.js';
 import { WalletDetails } from './ui/WalletDetails.js';
+import { useDesktopWallet } from './ui/WalletState.js';
 
 const money = (value: number) => '$' + value.toFixed(2);
 function ModelIcon({ model }: { model: Pick<Model, 'name' | 'image'> }) {
@@ -134,6 +137,11 @@ export function DesktopApp() {
     ...themeStyle(light),
   };
   const network = usePreviewNetwork();
+  const wallet = useDesktopWallet();
+  const [startupComplete, setStartupComplete] = useState(false);
+  useEffect(() => {
+    if (!startupPending(wallet, network.state)) setStartupComplete(true);
+  }, [wallet, network.state]);
   const online = network.online;
   const [model, setModel] = useState(MODELS[0]);
   const [credits, setCredits] = useState(0);
@@ -238,6 +246,15 @@ export function DesktopApp() {
         (sidebarMoving ? 'sidebar-moving' : '')
       }
     >
+      <MotionPresence>
+        {!startupComplete && (
+          <StartupScreen
+            wallet={wallet}
+            network={network.state}
+            onContinue={() => setStartupComplete(true)}
+          />
+        )}
+      </MotionPresence>
       <div className="sidebar-restore">
         <IconButton
           className="sidebar-toggle"
