@@ -140,9 +140,18 @@ void test('presence response rechecks readiness after the signed presence promis
       run.setReadiness({ generation: 2, validUntil: 0 });
       return signed;
     };
-    const response = await run.service.respond({ version: CONTROL_VERSION,
-      requestId: 'c'.repeat(32), method: CONTROL_METHODS.PRESENCE, params: {} },
-      run.request.params.buyerNodeId, new AbortController().signal);
+    const response = await run.service.respond(
+      {
+        version: CONTROL_VERSION,
+        requestId: 'c'.repeat(32),
+        method: CONTROL_METHODS.PRESENCE,
+        params: {},
+      },
+      run.request.params.buyerNodeId,
+      new AbortController().signal,
+    );
     assert.ok('error' in response);
-  } finally { await run.close(); }
+  } finally {
+    await run.close();
+  }
 });

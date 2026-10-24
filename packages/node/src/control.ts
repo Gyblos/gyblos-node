@@ -101,6 +101,8 @@ export function createSellerControlService(
           signal,
         );
         assertUncancelled(signal);
+        if (options.records && options.records.current() !== context.catalog)
+          return controlFail(CONTROL_CODES.STALE);
         validatePublicV2Time(presence.record, context.now());
         return {
           version: CONTROL_VERSION,
