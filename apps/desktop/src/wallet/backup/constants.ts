@@ -16,6 +16,7 @@ export const BACKUP = {
   MAX_FILE_BYTES: 8192,
   MAX_PASSWORD_BYTES: 1024,
   MIN_PASSWORD_BYTES: 12,
+  FIELDS: 'cipher,ciphertext,format,kdf,keyFormat,nonce,salt,tag,version',
 } as const;
 export const BACKUP_ERROR = {
   INVALID_INPUT: 'BACKUP_INVALID_INPUT',
