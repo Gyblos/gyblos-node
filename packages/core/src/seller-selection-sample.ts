@@ -13,12 +13,15 @@ export interface SellerCandidate {
   reasoning: ReasoningLevel;
   downgrade: boolean;
   exploration: boolean;
+  // The previous seller kept in the first slot because it was still competitive.
+  sticky: boolean;
   free: boolean;
   openChannel: boolean;
 }
 interface Choice {
   item: Weighted;
   exploration: boolean;
+  sticky: boolean;
 }
 
 function draw(random: () => number) {
@@ -49,6 +52,7 @@ function take(
 export function toCandidate(
   item: Weighted,
   exploration: boolean,
+  sticky: boolean,
 ): SellerCandidate {
   const { seller, listing } = item.entry;
   return {
@@ -58,6 +62,7 @@ export function toCandidate(
     reasoning: item.reasoning,
     downgrade: item.downgrade,
     exploration,
+    sticky,
     free: isFree(listing),
     openChannel: seller.openChannel,
   };
@@ -78,6 +83,19 @@ export function onePerOwner(
   return tier.filter((item) => best.get(ownerOf(item)) === item);
 }
 
+// The previous seller stays when it survived every filter here and weighs at least the policy
+// fraction of the tier's best weight; otherwise it is sampled like any other seller.
+export function findSticky(
+  tier: readonly Weighted[],
+  previousSeller: string | undefined,
+  fraction: number,
+) {
+  const previous = tier.find(
+    (item) => item.entry.seller.catalog.nodeId === previousSeller,
+  );
+  const best = Math.max(...tier.map((item) => item.weight));
+  return previous && previous.weight >= fraction * best ? previous : undefined;
+}
 // Weighted sampling without replacement; the last slot goes to a no-history seller when none won one.
 // Once the tier has `slots - 1` sellers with history, no-history sellers compete only for that last
 // slot, so cheap new identities cannot crowd out known sellers; otherwise everyone competes.
@@ -85,28 +103,37 @@ export function sampleTier(
   tier: readonly Weighted[],
   slots: number,
   random: () => number,
+  sticky?: Weighted,
 ): SellerCandidate[] {
-  const remaining = [...tier];
-  const seasoned = remaining.filter((item) => !item.fresh);
+  const remaining = tier.filter((item) => item !== sticky);
+  const seasonedCount = tier.filter((item) => !item.fresh).length;
   const reserve =
-    slots >= 2 && seasoned.length > 0 && seasoned.length < remaining.length;
-  const bounded = seasoned.length > 0 && seasoned.length >= slots - 1;
-  const regularPool = bounded ? seasoned : remaining;
+    slots >= 2 && seasonedCount > 0 && seasonedCount < tier.length;
+  const bounded = seasonedCount > 0 && seasonedCount >= slots - 1;
+  const regularPool = bounded
+    ? remaining.filter((item) => !item.fresh)
+    : remaining;
   const regular = reserve ? slots - 1 : slots;
-  const picked: Choice[] = [];
+  const picked: Choice[] = sticky
+    ? [{ item: sticky, exploration: false, sticky: true }]
+    : [];
   while (picked.length < regular && regularPool.length)
     picked.push({
       item: take(regularPool, remaining, random),
       exploration: false,
+      sticky: false,
     });
-  if (reserve && remaining.length) {
+  if (reserve && remaining.length && picked.length < slots) {
     const newcomers = remaining.filter((item) => item.fresh);
     const explore =
       newcomers.length > 0 && !picked.some((choice) => choice.item.fresh);
     picked.push({
       item: take(explore ? newcomers : remaining, remaining, random),
       exploration: explore,
+      sticky: false,
     });
   }
-  return picked.map((choice) => toCandidate(choice.item, choice.exploration));
+  return picked.map((choice) =>
+    toCandidate(choice.item, choice.exploration, choice.sticky),
+  );
 }

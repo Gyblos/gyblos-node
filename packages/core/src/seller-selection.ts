@@ -27,6 +27,7 @@ import {
   type SellerStats,
 } from './seller-selection-input.js';
 import {
+  findSticky,
   onePerOwner,
   sampleTier,
   toCandidate,
@@ -47,9 +48,12 @@ export type {
   SellerStats,
 } from './seller-selection-input.js';
 
+type CooldownCode = typeof SELLER_SELECTION_CODES.PINNED_IN_COOLDOWN;
 export type SellerSelectionResult =
   | { ok: true; candidates: SellerCandidate[] }
-  | { ok: false; code: SellerSelectionCode };
+  // Only the cooldown end is returned, never other caller input.
+  | { ok: false; code: CooldownCode; cooldownUntil: number }
+  | { ok: false; code: Exclude<SellerSelectionCode, CooldownCode> };
 
 const withinLifetime = (
   record: { issuedAt: number; expiresAt: number },
@@ -69,18 +73,18 @@ function isLive(seller: KnownSeller, now: number) {
     (withdrawal === null || withdrawal.sequence <= catalog.sequence)
   );
 }
+const isCooling = (stats: SellerStats | undefined, now: number) =>
+  stats?.cooldownUntil != null && stats.cooldownUntil > now;
 function passesSellerFilters(
   seller: KnownSeller,
   request: SellerRequest,
-  stats: SellerStats | undefined,
   now: number,
 ) {
   return (
     isLive(seller, now) &&
     SELLER_BADGE_ORDER.indexOf(seller.badge) >=
       SELLER_BADGE_ORDER.indexOf(request.minimumBadge) &&
-    request.retention.includes(seller.catalog.dataPolicy.retention) &&
-    (stats?.cooldownUntil == null || stats.cooldownUntil <= now)
+    request.retention.includes(seller.catalog.dataPolicy.retention)
   );
 }
 // A paid budget must cover at least one input plus one output token at the listed prices.
@@ -108,9 +112,15 @@ function findListing(catalog: PublicCatalogV2, selection: ModelSelection) {
   );
 }
 // Every hard filter except the reasoning level, which decides tiers and the unsupported-level code.
-function eligible(input: SellerSelectionInput, seller: KnownSeller) {
+// The pinned path checks cooldown itself so it can report when the seller returns.
+function eligible(
+  input: SellerSelectionInput,
+  seller: KnownSeller,
+  honorCooldown = true,
+) {
   const stats = input.stats.get(seller.catalog.nodeId);
-  if (!passesSellerFilters(seller, input.request, stats, input.now)) return;
+  if (honorCooldown && isCooling(stats, input.now)) return;
+  if (!passesSellerFilters(seller, input.request, input.now)) return;
   const listing = findListing(seller.catalog, input.request.selection);
   if (!listing || !passesListingFilters(listing, input.request)) return;
   const entry: Eligible = { seller, listing, stats };
@@ -136,18 +146,25 @@ function selectPinned(
   const seller = input.sellers.find(
     (item) => item.catalog.nodeId === pinnedNodeId,
   );
-  const entry = seller && eligible(input, seller);
+  const entry = seller && eligible(input, seller, false);
   if (!entry) return rejected;
   const levels = acceptableLevels(input.request);
   const level = levels.find((item) => entry.listing.reasoning.includes(item));
   if (level === undefined) return rejected;
+  const cooldownUntil = entry.stats?.cooldownUntil;
+  if (cooldownUntil != null && isCooling(entry.stats, input.now))
+    return {
+      ok: false,
+      code: SELLER_SELECTION_CODES.PINNED_IN_COOLDOWN,
+      cooldownUntil,
+    };
   const [weighted] = weigh(
     [entry],
     level,
     level !== input.request.reasoning,
     policy,
   );
-  return { ok: true, candidates: [toCandidate(weighted!, false)] };
+  return { ok: true, candidates: [toCandidate(weighted!, false, false)] };
 }
 // Exact-level candidates first; remaining slots fall to each permitted lower level, closest first.
 // Every tier is computed only while slots remain, and no seller or owner appears twice.
@@ -167,10 +184,15 @@ function selectAutomatic(
     );
     for (const entry of tier) used.add(entry);
     const weighted = onePerOwner(weigh(tier, level, rank > 0, policy), owners);
+    // Only the first tier that yields candidates can keep the previous seller first.
+    const sticky = candidates.length
+      ? undefined
+      : findSticky(weighted, input.previousSeller, policy.stickyWeightFraction);
     const picked = sampleTier(
       weighted,
       count - candidates.length,
       input.random,
+      sticky,
     );
     for (const candidate of picked) owners.add(candidate.owner);
     candidates.push(...picked);

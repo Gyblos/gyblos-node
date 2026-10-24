@@ -63,6 +63,8 @@ export interface SellerSelectionInput {
   sellers: readonly KnownSeller[];
   stats: ReadonlyMap<string, SellerStats>;
   pinnedNodeId?: string;
+  // NodeId that served this conversation before; it keeps the first slot while competitive.
+  previousSeller?: string;
   now: number;
   // Returns a value in [0, 1); the caller owns seeding.
   random: () => number;
@@ -195,7 +197,10 @@ export function checkInput(
     !Array.isArray(input.sellers) ||
     input.sellers.length > policy.maxSellers ||
     !(input.stats instanceof Map) ||
-    (input.pinnedNodeId !== undefined && typeof input.pinnedNodeId !== 'string')
+    (input.pinnedNodeId !== undefined &&
+      typeof input.pinnedNodeId !== 'string') ||
+    (input.previousSeller !== undefined &&
+      typeof input.previousSeller !== 'string')
   )
     invalid();
   checkRequest(input.request);

@@ -51,6 +51,8 @@ export const SELLER_SELECTION_CODES = {
   NO_CANDIDATES: 'NO_SELLER_CANDIDATES',
   LEVEL_UNSUPPORTED: 'SELECTION_LEVEL_UNSUPPORTED',
   PINNED_REJECTED: 'PINNED_SELLER_REJECTED',
+  // The pinned seller passes every filter except a local cooldown; the result carries its end.
+  PINNED_IN_COOLDOWN: 'PINNED_SELLER_IN_COOLDOWN',
 } as const;
 export type SellerSelectionCode =
   (typeof SELLER_SELECTION_CODES)[keyof typeof SELLER_SELECTION_CODES];

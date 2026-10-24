@@ -165,10 +165,25 @@ void test('a pinned seller is the only candidate when it passes and a typed refu
     lowered.map((item) => [item.reasoning, item.downgrade]),
     [[OFF, true]],
   );
+  // Cooldown alone yields its own code and the time it ends, so the app can say when it returns.
   const cooling = new Map([[nodeId(2), history({ cooldownUntil: NOW + 1 })]]);
-  assert.equal(
-    select(sellers, { pinnedNodeId: nodeId(2), stats: cooling }).ok,
-    false,
+  assert.deepEqual(
+    select(sellers, { pinnedNodeId: nodeId(2), stats: cooling }),
+    {
+      ok: false,
+      code: SELLER_SELECTION_CODES.PINNED_IN_COOLDOWN,
+      cooldownUntil: NOW + 1,
+    },
+  );
+  const staleAndCooling = new Map([
+    [nodeId(4), history({ cooldownUntil: NOW + 1 })],
+  ]);
+  assert.deepEqual(
+    select([...sellers, seller(4, { presence: 'stale' })], {
+      pinnedNodeId: nodeId(4),
+      stats: staleAndCooling,
+    }),
+    { ok: false, code: SELLER_SELECTION_CODES.PINNED_REJECTED },
   );
 });
 void test('weights favor cheaper sellers without always choosing the same one', () => {
