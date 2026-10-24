@@ -164,7 +164,7 @@ void test('validate warns about unverified reasoning levels by code and path and
     const result = await run(['config', 'validate', '--config', path]);
     assert.equal(result.code, 0, result.output);
     assert.equal(result.stderr, '');
-    assert.match(result.stdout, /reasoning medium;/);
+    assert.match(result.stdout, /reasoning low;/);
   });
 });
 

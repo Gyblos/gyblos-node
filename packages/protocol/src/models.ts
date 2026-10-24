@@ -1,4 +1,5 @@
-// Owns the initial shared model catalog and explicit, case-sensitive aliases.
+// Owns the initial shared model catalog, explicit case-sensitive aliases and each model's supported
+// reasoning levels with the offer default.
 // Catalog membership is naming metadata, never proof of weights, availability or audits.
 import {
   MODEL_CLASSIFICATIONS,
@@ -66,7 +67,8 @@ function entry(
 
 // Reasoning sets, verified 2026-10-24 against primary sources (table in docs/configuration.md):
 // - gpt-oss: OpenAI gpt-oss model card ("three reasoning levels: low, medium, and high") and the harmony
-//   guide ("By default, the model will do medium level reasoning"); there is no off level.
+//   guide ("By default, the model will do medium level reasoning"); there is no off level. The offer
+//   default is low (founder decision 2026-10-24): gpt-oss always reasons and thinking is not metered yet.
 // - Qwen3: Qwen model cards, enable_thinking hard switch (on/off), mapped to off/high per GYB-DOC-028. The
 //   vendor default is thinking on; the offer default is off because thinking is not metered yet and the
 //   Ollama adapter runs Qwen3 with thinking disabled (GYB-DOC-028 decisions 4-5).
@@ -85,7 +87,7 @@ const GPT_OSS_EFFORT: ReasoningSupport = {
     REASONING_LEVELS.MEDIUM,
     REASONING_LEVELS.HIGH,
   ],
-  defaultReasoning: REASONING_LEVELS.MEDIUM,
+  defaultReasoning: REASONING_LEVELS.LOW,
 };
 const NO_REASONING: ReasoningSupport = {
   levels: [REASONING_LEVELS.OFF],
@@ -96,7 +98,9 @@ const NO_REASONING: ReasoningSupport = {
 // Only the tiny tokenizer has a pre-existing pinned local-adapter reference.
 export const MODEL_CATALOG: readonly Readonly<CatalogModel>[] = Object.freeze([
   entry(MODEL_IDS.QWEN3_30B_A3B, {
-    aliases: ['qwen3:30b-a3b'],
+    // Ollama's bare qwen3:30b-a3b tag now points at the thinking-only 2507 build; the hybrid q4_K_M tag
+    // keeps the on/off switch, so only it is an alias.
+    aliases: ['qwen3:30b-a3b-q4_K_M'],
     reasoning: THINKING_SWITCH,
   }),
   entry(MODEL_IDS.QWEN3_235B_A22B, { reasoning: THINKING_SWITCH }),

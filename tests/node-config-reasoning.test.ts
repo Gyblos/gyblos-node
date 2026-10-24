@@ -31,7 +31,7 @@ void test('a catalog model refuses reasoning levels it does not support', () => 
       parseNodeConfig(
         BASE +
           offer({
-            model: 'qwen3:30b-a3b',
+            model: 'qwen3:30b-a3b-q4_K_M',
             extra: 'reasoning = ["off", "low", "medium", "high"]',
           }),
       ),
@@ -62,7 +62,7 @@ void test('omitted reasoning uses the catalog model default level', () => {
   assert.ok(result.ok, JSON.stringify(result));
   assert.deepEqual(
     result.config.offers.map((entry) => entry.reasoning),
-    [['medium'], ['off'], ['off'], ['off']],
+    [['low'], ['off'], ['off'], ['off']],
   );
   assert.deepEqual(result.warnings, []);
 });

@@ -174,7 +174,7 @@ IP privacy or Sybil resistance is established by a signature.
 
 `MODEL_CATALOG` / `resolveModel` live at `./models`. Initial canonical IDs copy
 the nine names in GYB-DOC-026 / the website's `web/src/content.ts`, plus
-`qwen3-0.6b` for small tests. Explicit aliases currently cover `qwen3:30b-a3b`
+`qwen3-0.6b` for small tests. Explicit aliases currently cover `qwen3:30b-a3b-q4_K_M` (the hybrid build; the bare tag now points at a thinking-only build)
 and `qwen3:0.6b` from documented setup examples. Matching is exact and
 case-sensitive; suffixes/quantizations are not stripped. Unknown valid IDs are
 returned as `custom`; membership is naming metadata, not proof of availability,

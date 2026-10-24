@@ -148,7 +148,7 @@
       "description": "Canonical model ids and aliases from the protocol catalog.",
       "enum": [
         "qwen3-30b-a3b",
-        "qwen3:30b-a3b",
+        "qwen3:30b-a3b-q4_K_M",
         "qwen3-235b-a22b",
         "deepseek-v4.1-flash",
         "kimi-k3",

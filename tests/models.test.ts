@@ -109,11 +109,11 @@ void test('catalog reasoning levels follow primary model sources; unverified mod
     'glm-5.3-flash': null,
     'gpt-oss-120b': {
       levels: ['low', 'medium', 'high'],
-      defaultReasoning: 'medium',
+      defaultReasoning: 'low',
     },
     'gpt-oss-20b': {
       levels: ['low', 'medium', 'high'],
-      defaultReasoning: 'medium',
+      defaultReasoning: 'low',
     },
     'llama-3.3-70b': { levels: ['off'], defaultReasoning: 'off' },
     'gemma-4-26b': { levels: ['off', 'high'], defaultReasoning: 'off' },
@@ -130,7 +130,7 @@ void test('catalog reasoning levels follow primary model sources; unverified mod
 void test('alias resolution keeps the catalog reasoning levels', () => {
   for (const [alias, id] of [
     ['qwen3:0.6b', MODEL_IDS.QWEN3_0_6B],
-    ['qwen3:30b-a3b', MODEL_IDS.QWEN3_30B_A3B],
+    ['qwen3:30b-a3b-q4_K_M', MODEL_IDS.QWEN3_30B_A3B],
   ] as const) {
     const byAlias = resolveModel(alias);
     const byId = resolveModel(id);
