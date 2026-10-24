@@ -9,6 +9,7 @@ import {
   RELAY_TOKEN_LENGTH,
   type RelayConfigurationCode,
 } from './constants.js';
+import { relayOrigins } from './relay-origins.js';
 
 export interface RelayEnvironment extends NodeJS.ProcessEnv {
   GYBLOS_RELAYS?: string;
@@ -27,33 +28,13 @@ export class RelayConfigurationError extends Error {
 
 function configuredRelayUrls(environment: RelayEnvironment = process.env) {
   const values = environment.GYBLOS_RELAYS?.split(',') ?? IROH_RELAYS.urls;
-  try {
-    return [
-      ...new Set(
-        values.map((value) => {
-          const url = new URL(value.trim());
-          if (
-            url.protocol !== 'https:' ||
-            url.username ||
-            url.password ||
-            url.search ||
-            url.hash ||
-            url.pathname !== '/'
-          )
-            throw new RelayConfigurationError(
-              RELAY_CONFIGURATION_CODES.INVALID_URLS,
-              'Invalid relay origin.',
-            );
-          return url.href;
-        }),
-      ),
-    ];
-  } catch {
+  const origins = relayOrigins(values);
+  if (!origins)
     throw new RelayConfigurationError(
       RELAY_CONFIGURATION_CODES.INVALID_URLS,
       'GYBLOS_RELAYS must contain HTTPS relay origins without credentials, paths, queries or fragments.',
     );
-  }
+  return origins;
 }
 
 function relayToken(environment: RelayEnvironment) {
