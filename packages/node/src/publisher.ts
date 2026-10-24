@@ -95,7 +95,6 @@ class SellerPublisher {
   }
   private async step() {
     if (this.stopped) return false;
-    if (this.now() < this.retryAt) return false;
     try {
       if (!this.options.canPublish()) {
         const withdrawal = await this.options.records.withdraw();
@@ -103,9 +102,12 @@ class SellerPublisher {
         this.forceCatalog = true;
         if (withdrawal)
           await this.options.publish(withdrawal, this.controller.signal);
-        this.status = SELLER_PUBLICATION_STATES.IDLE;
+        this.status = this.lastError
+          ? SELLER_PUBLICATION_STATES.DEGRADED
+          : SELLER_PUBLICATION_STATES.IDLE;
         return false;
       }
+      if (this.now() < this.retryAt) return false;
       const catalog = await this.options.records.refresh(this.forceCatalog);
       if (catalog !== this.sent) {
         await this.options.publish(catalog, this.controller.signal);

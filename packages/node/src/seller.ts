@@ -47,7 +47,7 @@ import { bindEndpoint } from '@gyblos/transport-iroh/endpoint';
 import { serveIroh } from '@gyblos/transport-iroh/iroh-server';
 
 import { modelTokenizer } from './artifacts.js';
-import { P2P_ROLES } from './constants.js';
+import { P2P_ROLES, SELLER_PUBLIC_RECORDS } from './constants.js';
 import { observeControlReadiness } from './control-readiness.js';
 import { prepareSellerControl } from './control-startup.js';
 import {
@@ -269,7 +269,9 @@ export async function startSeller() {
     const control = await prepareSellerControl({
       owner,
       sequence: publicSequence,
-      catalogMs: publicationConfig ? undefined : offerExpiresAt - Date.now(),
+      catalogMs: publicationConfig
+        ? SELLER_PUBLIC_RECORDS.catalogMs
+        : undefined,
       nodeId: config.nodeId,
       nodeSigner: async (bytes) =>
         Uint8Array.from(

@@ -182,14 +182,34 @@ void test('publication scheduler starts only once and shutdown cancels its idle 
   }
 });
 
-void test('retirement bypasses publication backoff and immediately disables the local snapshot',async()=>{
- const run=await sellerPublicationFixture();const sent:SignedPublicV2[]=[];let enabled=true;let failPresence=false;
- const publisher=createSellerPublisher({records:run.records,canPublish:()=>enabled,now:run.context.now,retryMs:1000,publish:async record=>{
-  sent.push(record);if(failPresence && record.record.kind===PUBLIC_RECORD_KINDS.PRESENCE){failPresence=false;throw new Error('Synthetic presence failure');}
- }});
- try {
-  assert.equal(await publisher.tick(),true);failPresence=true;assert.equal(await publisher.tick(),false);
-  enabled=false;assert.equal(await publisher.tick(),false);
-  assert.throws(()=>run.records.current());assert.equal(sent.at(-1)!.record.kind,PUBLIC_RECORD_KINDS.WITHDRAWAL);
- }finally{await publisher.stop();await run.close();}
+void test('retirement bypasses publication backoff and immediately disables the local snapshot', async () => {
+  const run = await sellerPublicationFixture();
+  const sent: SignedPublicV2[] = [];
+  let enabled = true;
+  let failPresence = false;
+  const publisher = createSellerPublisher({
+    records: run.records,
+    canPublish: () => enabled,
+    now: run.context.now,
+    retryMs: 1000,
+    publish: async (record) => {
+      sent.push(record);
+      if (failPresence && record.record.kind === PUBLIC_RECORD_KINDS.PRESENCE) {
+        failPresence = false;
+        throw new Error('Synthetic presence failure');
+      }
+    },
+  });
+  try {
+    assert.equal(await publisher.tick(), true);
+    failPresence = true;
+    assert.equal(await publisher.tick(), false);
+    enabled = false;
+    assert.equal(await publisher.tick(), false);
+    assert.throws(() => run.records.current());
+    assert.equal(sent.at(-1)!.record.kind, PUBLIC_RECORD_KINDS.WITHDRAWAL);
+  } finally {
+    await publisher.stop();
+    await run.close();
+  }
 });

@@ -8,10 +8,10 @@ can explicitly opt into publication through the same verified record lifecycle
 used by its Iroh control service.
 
 The default base URL is `DISCOVERY_INDEX_URL` in `@gyblos/config`
-(`https://discovery.gyblos.com/v1`). It is an operator value; there is no
-environment variable for it yet. Anyone can run an index; the reference one is
-`apps/discovery-index` ([discovery-index.md](discovery-index.md)), not deployed
-yet.
+(`https://discovery.gyblos.com/v1`). Buyers override it in `selection.json`;
+sellers use `GYBLOS_DISCOVERY_URL` when publication is enabled. Anyone can run
+an index; the reference implementation is `apps/discovery-index`
+([configuration and operations](discovery-index.md)).
 
 ## Trust model
 
