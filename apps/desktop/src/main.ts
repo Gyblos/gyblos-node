@@ -141,13 +141,14 @@ async function loadDesktopWindows(
   window: BrowserWindow,
   loading: BrowserWindow | null,
   preparation: Promise<unknown>,
+  signal: AbortSignal,
 ) {
   const file = join(__dirname, 'renderer', 'index.html');
   if (!loading) {
     await window.loadFile(file, { query: { probe: '1' } });
     return;
   }
-  const handoff = startupHandoff(window, loading);
+  const handoff = startupHandoff(window, loading, signal);
   // Storage errors are displayed by the main wallet UI, never by the splash.
   const settled = preparation.then(
     () => handoff.prepared(),
@@ -187,6 +188,8 @@ async function main() {
     app.exit(1);
   };
   const cancelWatchdog = smoke ? armSmokeWatchdog(fail) : () => {};
+  // Stop window reveals immediately; wallet/backup settlement still owns quit.
+  app.once('before-quit', () => controller.abort());
   app.on('quit', () => {
     cancelWatchdog();
     controller.abort();
@@ -228,7 +231,7 @@ async function main() {
     controller.abort();
     app.quit();
   });
-  await loadDesktopWindows(window, loading, prepared);
+  await loadDesktopWindows(window, loading, prepared, controller.signal);
 }
 void main().catch(() => {
   process.stderr.write('Desktop probe startup failed.\n');

@@ -8,15 +8,26 @@ export interface StartupWindow {
   once(event: 'closed' | 'ready-to-show', callback: () => void): unknown;
 }
 
-export function startupHandoff(main: StartupWindow, loading: StartupWindow) {
+export function startupHandoff(
+  main: StartupWindow,
+  loading: StartupWindow,
+  signal?: AbortSignal,
+) {
   let prepared = false;
   let painted = false;
   let cancelled = false;
   let completed = false;
+  const cancel = () => {
+    cancelled = true;
+    signal?.removeEventListener('abort', cancel);
+  };
+  if (signal?.aborted) cancel();
+  else signal?.addEventListener('abort', cancel, { once: true });
   const reveal = () => {
     if (!prepared || !painted || cancelled || completed || main.isDestroyed())
       return;
     completed = true;
+    signal?.removeEventListener('abort', cancel);
     main.show();
     if (!loading.isDestroyed()) loading.destroy();
   };
@@ -29,11 +40,11 @@ export function startupHandoff(main: StartupWindow, loading: StartupWindow) {
   });
   loading.once('closed', () => {
     if (completed || cancelled) return;
-    cancelled = true;
+    cancel();
     if (!main.isDestroyed()) main.close();
   });
   main.once('closed', () => {
-    cancelled = true;
+    cancel();
     if (!loading.isDestroyed()) loading.destroy();
   });
   return {
