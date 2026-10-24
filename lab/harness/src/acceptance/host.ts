@@ -14,6 +14,7 @@ import { controlDeadline } from '@gyblos/transport-iroh/control-io';
 
 import type { AcceptanceClock } from './clock.js';
 import type { AcceptanceEngine } from './engine.js';
+import { assertAcceptanceActive } from './errors.js';
 import type { AcceptanceIndex } from './index.js';
 import type { AcceptanceWire } from './native.js';
 import type { AcceptanceWorkspace } from './workspace.js';
@@ -39,7 +40,9 @@ export async function startAcceptanceHost(options: AcceptanceHostOptions) {
   const wire = options.wire;
   let observation: ReturnType<typeof observeControlReadiness> | undefined;
   let publication: ReturnType<typeof createSellerPublisher> | undefined;
+  let detach = () => {};
   try {
+    assertAcceptanceActive(signal);
     const initial = await controlDeadline(
       (deadline) =>
         probeSellerEngine(engine.engine, deadline, {
@@ -57,13 +60,25 @@ export async function startAcceptanceHost(options: AcceptanceHostOptions) {
       {
         model: initial.model,
         check: (deadline) =>
-          probeSellerEngine(engine.engine, deadline, {
-            snapshot: engine.snapshot,
-            now: clock.now,
-          }),
+          probeSellerEngine(
+            engine.engine,
+            AbortSignal.any([deadline, signal]),
+            {
+              snapshot: engine.snapshot,
+              now: clock.now,
+            },
+          ),
       },
     );
     const current = observation;
+    const abort = () => {
+      // stop() only invalidates state/timers synchronously; it performs no I/O and never rejects.
+      void current.stop();
+    };
+    signal.addEventListener('abort', abort, { once: true });
+    detach = () => signal.removeEventListener('abort', abort);
+    if (signal.aborted) abort();
+    assertAcceptanceActive(signal);
     const sequence = await openSellerSequence({
       environment: options.workspace.environment,
       nodeId: wire.nodeId,
@@ -117,6 +132,7 @@ export async function startAcceptanceHost(options: AcceptanceHostOptions) {
       control,
       sent,
       async close() {
+        detach();
         engine.release();
         await current.stop();
         try {
@@ -127,6 +143,7 @@ export async function startAcceptanceHost(options: AcceptanceHostOptions) {
       },
     };
   } catch (error) {
+    detach();
     engine.release();
     await observation?.stop();
     try {

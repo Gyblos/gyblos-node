@@ -126,14 +126,7 @@ export async function withdrawAndRestart(run: AcceptanceSession) {
   acceptanceAssert((await listed(run)).sellers.length === 0);
   await rejectReplay(run, old);
   await run.restart();
-  acceptanceAssert(run.host().wire.nodeId === old.record.nodeId);
-  acceptanceAssert(
-    run.host().control.records.current().record.sequence >
-      withdrawn.record.sequence,
-  );
-  acceptanceAssert(await run.host().publisher.tick());
-  const fresh = await acceptQuote(run);
-  acceptanceAssert(fresh.quote.offer.catalogDigest !== oldDigest);
+  // Check the reopened high-water mark before fresh discovery/quotes could repair a lost store.
   acceptanceAssert(
     !(await run.state().observe({
       catalog: prior.catalog,
@@ -143,6 +136,14 @@ export async function withdrawAndRestart(run: AcceptanceSession) {
       openChannel: false,
     })),
   );
+  acceptanceAssert(run.host().wire.nodeId === old.record.nodeId);
+  acceptanceAssert(
+    run.host().control.records.current().record.sequence >
+      withdrawn.record.sequence,
+  );
+  acceptanceAssert(await run.host().publisher.tick());
+  const fresh = await acceptQuote(run);
+  acceptanceAssert(fresh.quote.offer.catalogDigest !== oldDigest);
   acceptanceAssert(
     !(await run
       .state()

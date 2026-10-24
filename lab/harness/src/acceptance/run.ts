@@ -23,7 +23,7 @@ import {
   renewalCycles,
   withdrawAndRestart,
 } from './phases.js';
-import { createAcceptanceSession } from './session.js';
+import { createAcceptanceSession, type AcceptanceSession } from './session.js';
 
 export interface AcceptanceOptions {
   mode?: AcceptanceMode;
@@ -55,7 +55,7 @@ export async function runNodeDiscoveryAcceptance(
   ]);
   assertAcceptanceActive(signal);
   const started = performance.now();
-  const run = await createAcceptanceSession(mode, signal);
+  let run: AcceptanceSession | undefined;
   const cases: AcceptanceCase[] = [];
   const record = (value: AcceptanceCase) => {
     assertAcceptanceActive(signal);
@@ -63,8 +63,9 @@ export async function runNodeDiscoveryAcceptance(
     options.onCase?.(value);
     assertAcceptanceActive(signal);
   };
-  const clockStart = run.clock.now();
   try {
+    run = await createAcceptanceSession(mode, signal);
+    const clockStart = run.clock.now();
     acceptanceAssert(await run.host().publisher.tick());
     await acceptQuote(run);
     record(ACCEPTANCE_CASES.DISCOVERY_QUOTE);
@@ -103,6 +104,6 @@ export async function runNodeDiscoveryAcceptance(
     assertAcceptanceActive(signal);
     throw error;
   } finally {
-    await run.close();
+    await run?.close();
   }
 }
