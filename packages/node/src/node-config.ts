@@ -13,6 +13,7 @@ import {
 import {
   envName,
   flag,
+  integer,
   IssueList,
   optional,
   requiredField,
@@ -34,6 +35,11 @@ import {
 } from './node-config-values.js';
 
 export type { NodeConfigIssue } from './node-config-fields.js';
+export {
+  pricePerMtokToAtomicPerMtok,
+  readPriceDecimal,
+  type PriceDecimal,
+} from './node-config-price.js';
 export type {
   NodeOffer,
   OfferEngine,
@@ -95,6 +101,8 @@ export function parseTomlDocument(source: string): TomlDocumentResult {
       document: parse(source, {
         unsafeKeyBehaviour: 'throw',
         maxDepth: NODE_CONFIG_LIMITS.maxDepth,
+        // Keeps integers apart from floats (1 vs 1.0) and exact beyond 2^53, so range checks see the value.
+        integersAsBigInt: true,
       }),
     };
   } catch (error) {
@@ -112,9 +120,9 @@ export function parseTomlDocument(source: string): TomlDocumentResult {
 
 function readVersion(owner: Record<string, unknown>, issues: IssueList) {
   return requiredField(owner, 'version', [], issues, (value, path) => {
-    if (typeof value !== 'number' || !Number.isInteger(value))
-      return issues.add(NODE_CONFIG_ISSUE_CODES.WRONG_TYPE, path);
-    if (value !== NODE_CONFIG_VERSION)
+    const version = integer(value, path, issues);
+    if (version === undefined) return undefined;
+    if (version !== BigInt(NODE_CONFIG_VERSION))
       return issues.add(NODE_CONFIG_ISSUE_CODES.UNSUPPORTED_VERSION, path);
     return NODE_CONFIG_VERSION;
   });
@@ -234,7 +242,7 @@ function readDiscovery(value: unknown, path: ConfigPath, issues: IssueList) {
   return withoutUndefined({ publish, url });
 }
 
-// Validates an already parsed TOML document (or any JSON-like value) against schema version 1.
+// Validates a document as parseTomlDocument returns it (integers as bigint) against schema version 1.
 export function validateNodeConfig(document: unknown): NodeConfigResult {
   const issues = new IssueList();
   const root = table(document, [], issues);

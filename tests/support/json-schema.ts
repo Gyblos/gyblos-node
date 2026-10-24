@@ -1,5 +1,6 @@
 // A minimal draft-07 JSON Schema evaluator for the keywords the gyblos.toml schema uses; test-only.
 // Unknown keywords throw, so the schema cannot rely on a rule this evaluator silently ignores.
+// Values come from smol-toml with integersAsBigInt, as editors see TOML: integers are bigint, floats number.
 type Schema = Record<string, unknown>;
 
 const ANNOTATIONS = new Set([
@@ -29,16 +30,26 @@ function typeMatches(type: unknown, value: unknown) {
     case 'boolean':
       return typeof value === 'boolean';
     case 'integer':
-      return Number.isInteger(value);
+      return typeof value === 'bigint';
     case 'number':
-      return typeof value === 'number';
+      return typeof value === 'number' || typeof value === 'bigint';
     default:
       throw new Error(`Unsupported type ${String(type)}`);
   }
 }
 
+function serialize(value: unknown) {
+  return JSON.stringify(value, (_key, item: unknown) =>
+    typeof item === 'bigint' ? Number(item) : item,
+  );
+}
+
 function deepEqual(left: unknown, right: unknown) {
-  return JSON.stringify(left) === JSON.stringify(right);
+  return serialize(left) === serialize(right);
+}
+
+function numeric(value: unknown) {
+  return typeof value === 'number' || typeof value === 'bigint';
 }
 
 export function createValidator(root: Schema) {
@@ -80,9 +91,9 @@ export function createValidator(root: Schema) {
       case 'maxLength':
         return typeof value !== 'string' || value.length <= Number(argument);
       case 'minimum':
-        return typeof value !== 'number' || value >= Number(argument);
+        return !numeric(value) || Number(value) >= Number(argument);
       case 'maximum':
-        return typeof value !== 'number' || value <= Number(argument);
+        return !numeric(value) || Number(value) <= Number(argument);
       case 'minItems':
         return !Array.isArray(value) || value.length >= Number(argument);
       case 'maxItems':
@@ -91,8 +102,7 @@ export function createValidator(root: Schema) {
         return (
           !Array.isArray(value) ||
           !argument ||
-          new Set(value.map((item) => JSON.stringify(item))).size ===
-            value.length
+          new Set(value.map((item) => serialize(item))).size === value.length
         );
       case 'items':
         return (

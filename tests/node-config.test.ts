@@ -9,9 +9,12 @@ import test from 'node:test';
 import {
   NODE_CONFIG_ISSUE_CODES,
   NODE_CONFIG_LIMITS,
+  NODE_ERROR_CODES,
 } from '@gyblos/node/constants';
+import { NodeError } from '@gyblos/node/errors';
 import {
   parseNodeConfig,
+  pricePerMtokToAtomicPerMtok,
   readNodeConfigFile,
   type NodeConfigResult,
 } from '@gyblos/node/node-config';
@@ -270,4 +273,118 @@ void test('unsafe keys and deep nesting are syntax errors, not prototype writes'
     assert.equal(issues[0]?.code, NODE_CONFIG_ISSUE_CODES.TOML_SYNTAX, toml);
   }
   assert.equal(Object.prototype.hasOwnProperty.call({}, 'polluted'), false);
+});
+
+void test('prices with trailing fractional zeros are accepted and normalized to the canonical form', () => {
+  const cases: [string, string][] = [
+    ['0.10', '0.1'],
+    ['1.50', '1.5'],
+    ['2.0', '2'],
+    ['0.1000000', '0.1'],
+    ['0.000001', '0.000001'],
+    ['9999.999999', '9999.999999'],
+    ['0.00', '0'],
+    ['12', '12'],
+  ];
+  for (const [written, canonical] of cases) {
+    const result = parseNodeConfig(
+      BASE +
+        offer({
+          pricing: `price = { input_per_mtok = "${written}", output_per_mtok = "1", currency = "USDC" }`,
+        }),
+    );
+    assert.ok(result.ok, `${written}: ${JSON.stringify(result)}`);
+    const [entry] = result.config.offers;
+    assert.equal(entry?.pricing.kind, 'paid');
+    if (entry?.pricing.kind === 'paid')
+      assert.equal(entry.pricing.inputPerMtok, canonical, written);
+  }
+});
+
+void test('USDC per million tokens converts exactly to atomic units per million tokens', () => {
+  const cases: [string, bigint][] = [
+    ['0.1', 100_000n],
+    ['1.5', 1_500_000n],
+    ['0.000001', 1n],
+    ['0', 0n],
+    ['2', 2_000_000n],
+    ['0.10', 100_000n],
+    ['9999.999999', 9_999_999_999n],
+  ];
+  for (const [decimal, atomic] of cases)
+    assert.equal(pricePerMtokToAtomicPerMtok(decimal), atomic, decimal);
+  for (const invalid of ['', '00.1', '1.', '-1', '1e3', '0.0000001', '12345'])
+    assert.throws(
+      () => pricePerMtokToAtomicPerMtok(invalid),
+      (error: unknown) =>
+        error instanceof NodeError &&
+        error.code === NODE_ERROR_CODES.INVALID_PRICE,
+      invalid,
+    );
+});
+
+void test('examples follow the reasoning levels each model supports and do not publish by default', () => {
+  for (const example of exampleFiles()) {
+    const result = parseNodeConfig(example.toml);
+    assert.ok(result.ok, example.name);
+    assert.notEqual(result.config.discovery?.publish, true, example.name);
+    for (const entry of result.config.offers) {
+      // gpt-oss has low/medium/high effort and no off switch; Qwen3 is on/off (GYB-DOC-028).
+      if (entry.model.id.startsWith('gpt-oss'))
+        assert.equal(entry.reasoning.includes('off'), false, example.name);
+      if (entry.model.id.startsWith('qwen3'))
+        assert.deepEqual(entry.reasoning, ['off', 'high'], example.name);
+    }
+  }
+});
+
+void test('integer settings come from TOML integers; floats and exponents are refused', () => {
+  const result = parseNodeConfig(
+    BASE +
+      offer({
+        pricing:
+          'free = { daily_token_cap = 1_000_000_000_000, per_buyer_cap = 0x10 }',
+      }),
+  );
+  assert.ok(result.ok, JSON.stringify(result));
+  assert.equal(result.config.version, 1);
+  assert.deepEqual(result.config.offers[0]?.pricing, {
+    kind: 'free',
+    dailyTokenCap: 1_000_000_000_000,
+    perBuyerCap: 16,
+  });
+  assert.deepEqual(
+    issuesOf(parseNodeConfig(BASE.replace('version = 1', 'version = 1e0'))),
+    [{ code: 'WRONG_TYPE', path: 'version' }],
+  );
+  assert.deepEqual(
+    issuesOf(
+      parseNodeConfig(
+        BASE.replace('version = 1', 'version = 99999999999999999999'),
+      ),
+    ),
+    [{ code: 'UNSUPPORTED_VERSION', path: 'version' }],
+  );
+});
+
+void test('unknown key names that look like pasted tokens are redacted in issue paths', () => {
+  const token = 'abc123def456ghi789jkl012mno345';
+  const issues = issuesOf(
+    parseNodeConfig(
+      `version = 1\n[node]\n${token} = "x"\nnetwork = "devnet"\n`,
+    ),
+  );
+  assert.deepEqual(
+    issues.map((issue) => [issue.code, issue.path]),
+    [['UNKNOWN_KEY', 'node.<key>']],
+  );
+  assert.equal(JSON.stringify(issues).includes(token), false);
+  assert.deepEqual(
+    issuesOf(
+      parseNodeConfig(
+        'version = 1\n[node]\nnetwork = "devnet"\nmax_tokens_per_request_2026 = 1\n',
+      ),
+    ).map((issue) => issue.path),
+    ['node.max_tokens_per_request_2026'],
+  );
 });

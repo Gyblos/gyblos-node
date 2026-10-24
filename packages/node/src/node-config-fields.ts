@@ -33,6 +33,8 @@ const ENV_NAME = /^[A-Z_][A-Z0-9_]*$/;
 // Characters typical of pasted tokens (sk-..., base64) and never valid in an environment variable name.
 const TOKEN_CHARACTERS = /[-.+/=]/;
 const CONTROL_CHARACTERS = /\p{Cc}/u;
+const ALPHANUMERIC_RUN = /[A-Za-z0-9]+/g;
+const DIGIT = /[0-9]/;
 const SOCKET_PORT = /^[0-9]+$/;
 const HTTPS = 'https:';
 const HTTP = 'http:';
@@ -41,11 +43,21 @@ const LOCAL_HTTP_HOSTS: ReadonlySet<string> = new Set([
   DOCKER_HOST_ALIAS,
 ]);
 
+// Long names with a digit-bearing alphanumeric run read as pasted credentials, not identifiers.
+export function looksLikeToken(name: string) {
+  if (name.length < NODE_CONFIG_LIMITS.tokenLikeCharacters) return false;
+  return (name.match(ALPHANUMERIC_RUN) ?? []).some(
+    (run) =>
+      run.length >= NODE_CONFIG_LIMITS.tokenRunCharacters && DIGIT.test(run),
+  );
+}
+
 function pathSegment(segment: string | number, index: number) {
   if (typeof segment === 'number') return `[${segment}]`;
   const key =
     ECHOABLE_KEY.test(segment) &&
-    segment.length <= NODE_CONFIG_LIMITS.echoedKeyCharacters
+    segment.length <= NODE_CONFIG_LIMITS.echoedKeyCharacters &&
+    !looksLikeToken(segment)
       ? segment
       : REDACTED_KEY;
   return index === 0 ? key : `.${key}`;
@@ -181,6 +193,13 @@ export function text(
   return value;
 }
 
+// TOML integers arrive as bigint (parseTomlDocument); a number is a TOML float such as 1.0 or 1e3.
+export function integer(value: unknown, path: ConfigPath, issues: IssueList) {
+  if (typeof value !== 'bigint')
+    return issues.add(NODE_CONFIG_ISSUE_CODES.WRONG_TYPE, path);
+  return value;
+}
+
 export function flag(value: unknown, path: ConfigPath, issues: IssueList) {
   if (typeof value !== 'boolean')
     return issues.add(NODE_CONFIG_ISSUE_CODES.WRONG_TYPE, path);
@@ -206,10 +225,12 @@ export function envName(value: unknown, path: ConfigPath, issues: IssueList) {
     return issues.add(NODE_CONFIG_ISSUE_CODES.WRONG_TYPE, path);
   if (
     ENV_NAME.test(value) &&
-    value.length <= NODE_CONFIG_LIMITS.envNameCharacters
+    value.length <= NODE_CONFIG_LIMITS.envNameCharacters &&
+    !looksLikeToken(value)
   )
     return value;
   if (
+    looksLikeToken(value) ||
     TOKEN_CHARACTERS.test(value) ||
     value.length > NODE_CONFIG_LIMITS.envNameCharacters / 2
   )

@@ -273,20 +273,20 @@
         "required": ["input_per_mtok", "output_per_mtok"],
         "properties": {
           "input_per_mtok": {
-            "const": "0"
+            "pattern": "^0(\\.0+)?$"
           },
           "output_per_mtok": {
-            "const": "0"
+            "pattern": "^0(\\.0+)?$"
           }
         }
       },
       "properties": {
         "input_per_mtok": {
-          "description": "USDC per million input tokens as a canonical decimal string, e.g. \"0.1\".",
+          "description": "USDC per million input tokens as a decimal string, e.g. \"0.1\" (\"0.10\" is the same price).",
           "$ref": "#/definitions/decimal"
         },
         "output_per_mtok": {
-          "description": "USDC per million output tokens as a canonical decimal string.",
+          "description": "USDC per million output tokens as a decimal string.",
           "$ref": "#/definitions/decimal"
         },
         "currency": {
@@ -296,7 +296,8 @@
     },
     "decimal": {
       "type": "string",
-      "pattern": "^(0|[1-9][0-9]{0,3})(\\.[0-9]{0,5}[1-9])?$"
+      "description": "USDC per million tokens as a decimal string: no sign, exponent or leading zeros; trailing fractional zeros are allowed and dropped (\"0.10\" is 0.1); at most 4 integer digits and 6 decimals after dropping them.",
+      "pattern": "^(0|[1-9][0-9]{0,3})(\\.([0-9]{0,5}[1-9]0*|0+))?$"
     },
     "free": {
       "type": "object",

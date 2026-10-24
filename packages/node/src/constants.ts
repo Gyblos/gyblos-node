@@ -24,6 +24,7 @@ export const NODE_ERROR_CODES = {
   LEGACY_LOCAL_LAYOUT: 'LEGACY_LOCAL_LAYOUT',
   PUBLIC_SEQUENCE_UNAVAILABLE: 'PUBLIC_SEQUENCE_UNAVAILABLE',
   DISCOVERY_PUBLISH_FAILED: 'DISCOVERY_PUBLISH_FAILED',
+  INVALID_PRICE: 'INVALID_PRICE',
 } as const;
 export type NodeErrorCode =
   (typeof NODE_ERROR_CODES)[keyof typeof NODE_ERROR_CODES];
@@ -98,14 +99,22 @@ export const NODE_CONFIG_LIMITS = {
   maxRelays: 8,
   envNameCharacters: 128,
   upstreamModelCharacters: 256,
-  // Price per million tokens: at most 9999 USDC, with USDC's 6 decimal places.
+  // Price per million tokens: at most 9999 USDC, with USDC's 6 decimal places once trailing zeros are dropped.
   priceIntegerDigits: 4,
   priceFractionDigits: 6,
   maxTokenCap: 1_000_000_000_000,
   maxPort: 65_535,
   // Unknown keys are named in an issue path only when they look like ordinary identifiers.
   echoedKeyCharacters: 64,
+  // A name at least this long with a digit-bearing alphanumeric run of tokenRunCharacters looks like a
+  // pasted credential: refused as an env name, redacted as an echoed key.
+  tokenLikeCharacters: 24,
+  tokenRunCharacters: 16,
 } as const;
+
+// gyblos.toml prices are USDC per million tokens; protocol v2 will charge atomic units (10^-6 USDC) per
+// million tokens, so the conversion is exact.
+export const USDC_ATOMIC_UNITS_PER_USDC = 1_000_000n;
 
 export const NODE_CONFIG_ISSUE_CODES = {
   TOML_SYNTAX: 'TOML_SYNTAX',

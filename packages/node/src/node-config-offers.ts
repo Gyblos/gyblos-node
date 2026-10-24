@@ -1,5 +1,5 @@
 // Validates gyblos.toml [[offers]]: catalog or flagged custom model, engine by URL, reasoning levels and
-// either a canonical USDC price or a capped free offer. Values are checked, never echoed.
+// either a USDC price (normalized to its canonical decimal) or a capped free offer. Values are checked, never echoed.
 import { PublicRecordError, resolveModel } from '@gyblos/protocol';
 import {
   MODEL_CLASSIFICATIONS,
@@ -21,6 +21,7 @@ import {
   ENGINE_URL_POLICY,
   envName,
   flag,
+  integer,
   oneOf,
   optional,
   requiredField,
@@ -33,6 +34,7 @@ import {
   type ConfigTable,
   type IssueList,
 } from './node-config-fields.js';
+import { readPriceDecimal } from './node-config-price.js';
 
 export type OfferModel =
   | {
@@ -76,8 +78,6 @@ const PRICE_KEYS = ['input_per_mtok', 'output_per_mtok', 'currency'];
 const FREE_KEYS = ['daily_token_cap', 'per_buyer_cap'];
 // Only `off` is implemented today (GYB-DOC-028), so it is the default.
 const DEFAULT_REASONING: readonly ReasoningLevel[] = [REASONING_LEVELS.OFF];
-// One spelling per value: no sign, exponent, leading zeros or trailing fractional zeros.
-const CANONICAL_DECIMAL = /^(0|[1-9][0-9]*)(?:\.([0-9]*[1-9]))?$/;
 const ZERO = '0';
 
 function offerModel(
@@ -170,16 +170,8 @@ function offerReasoning(value: unknown, path: ConfigPath, issues: IssueList) {
 function decimal(value: unknown, path: ConfigPath, issues: IssueList) {
   if (typeof value !== 'string')
     return issues.add(NODE_CONFIG_ISSUE_CODES.WRONG_TYPE, path);
-  const match = CANONICAL_DECIMAL.exec(value);
-  if (!match)
-    return issues.add(NODE_CONFIG_ISSUE_CODES.NON_CANONICAL_DECIMAL, path);
-  const [, integer = '', fraction = ''] = match;
-  if (
-    integer.length > NODE_CONFIG_LIMITS.priceIntegerDigits ||
-    fraction.length > NODE_CONFIG_LIMITS.priceFractionDigits
-  )
-    return issues.add(NODE_CONFIG_ISSUE_CODES.PRICE_OUT_OF_RANGE, path);
-  return value;
+  const price = readPriceDecimal(value);
+  return price.ok ? price.canonical : issues.add(price.code, path);
 }
 
 function paidPricing(
@@ -225,12 +217,13 @@ function paidPricing(
   };
 }
 
+// A TOML integer (never a float such as 10.0 or 1e3); any out-of-range size is a cap issue.
 function tokenCap(value: unknown, path: ConfigPath, issues: IssueList) {
-  if (typeof value !== 'number' || !Number.isSafeInteger(value))
-    return issues.add(NODE_CONFIG_ISSUE_CODES.WRONG_TYPE, path);
-  if (value < 1 || value > NODE_CONFIG_LIMITS.maxTokenCap)
+  const cap = integer(value, path, issues);
+  if (cap === undefined) return undefined;
+  if (cap < 1n || cap > BigInt(NODE_CONFIG_LIMITS.maxTokenCap))
     return issues.add(NODE_CONFIG_ISSUE_CODES.INVALID_CAP, path);
-  return value;
+  return Number(cap);
 }
 
 function freePricing(

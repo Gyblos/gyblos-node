@@ -1,6 +1,7 @@
 // Invalid gyblos.toml fixtures: each maps to one static issue code and key path. Test data only; the
 // fake secret marker must never appear in any output.
 import { BASE, FAKE_SECRET, offer } from './node-config-fixtures.js';
+import { NUMBER_FIXTURES } from './node-config-invalid-numbers.js';
 
 export interface InvalidConfigFixture {
   name: string;
@@ -272,11 +273,17 @@ export const INVALID_FIXTURES: readonly InvalidConfigFixture[] = [
     code: 'INVALID_VALUE',
     path: 'offers[0].reasoning',
   },
+  ...NUMBER_FIXTURES,
   {
-    name: 'non-canonical price',
-    toml: BASE + offer({ pricing: price('"0.10"', '"0.4"') }),
-    code: 'NON_CANONICAL_DECIMAL',
-    path: 'offers[0].price.input_per_mtok',
+    name: 'env name that looks like a pasted token',
+    toml: BASE.replace(
+      '[node]',
+      '[relays]\nrelay_token_env = "A1B2C3D4E5F6G7H8J9K0L1M2N3"\n[node]',
+    ),
+    code: 'INLINE_SECRET',
+    path: 'relays.relay_token_env',
+    // The schema checks the variable-name shape only; the token heuristic is the validator's.
+    schemaAccepts: true,
   },
   {
     name: 'price as a float',

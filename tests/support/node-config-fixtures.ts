@@ -55,6 +55,21 @@ export const VALID_FIXTURES: readonly { name: string; toml: string }[] = [
       }),
   },
   {
+    // The GYB-DOC-026 decision example writes prices with trailing zeros.
+    name: 'decision example prices with trailing zeros',
+    toml:
+      BASE +
+      offer({
+        pricing:
+          'price = { input_per_mtok = "0.10", output_per_mtok = "0.40", currency = "USDC" }',
+      }) +
+      offer({
+        model: 'qwen3-30b-a3b',
+        pricing:
+          'price = { input_per_mtok = "0.30", output_per_mtok = "0.60", currency = "USDC" }',
+      }),
+  },
+  {
     name: 'free offer',
     toml:
       BASE +

@@ -16,7 +16,9 @@ import { REASONING_LEVELS } from '@gyblos/protocol/constants';
 
 import { createValidator } from './support/json-schema.js';
 import {
+  BASE,
   exampleFiles,
+  offer,
   SCHEMA_PATH,
   VALID_FIXTURES,
 } from './support/node-config-fixtures.js';
@@ -99,4 +101,42 @@ void test('schema vocabularies come from the canonical catalogs', () => {
     property(definition('free'), 'daily_token_cap')?.maximum,
     NODE_CONFIG_LIMITS.maxTokenCap,
   );
+});
+
+void test('the schema decimal pattern and the validator agree on every price spelling', () => {
+  const spellings = [
+    '0',
+    '0.1',
+    '0.10',
+    '1.50',
+    '2.0',
+    '0.000001',
+    '0.0000010',
+    '9999.999999',
+    '9999.9999990',
+    '0.0000001',
+    '10000',
+    '00.1',
+    '01',
+    '1.',
+    '.5',
+    '+1',
+    '-1',
+    '1e3',
+    '1.5.0',
+    ' 1',
+    '',
+  ];
+  for (const spelling of spellings) {
+    const toml =
+      BASE +
+      offer({
+        pricing: `price = { input_per_mtok = "${spelling}", output_per_mtok = "1", currency = "USDC" }`,
+      });
+    assert.equal(
+      validate(parse(toml)),
+      parseNodeConfig(toml).ok,
+      JSON.stringify(spelling),
+    );
+  }
 });
