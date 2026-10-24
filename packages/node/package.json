@@ -20,7 +20,9 @@
     "./public-records": "./src/public-records.ts",
     "./publisher": "./src/publisher.ts",
     "./publisher-config": "./src/publisher-config.ts",
-    "./control-startup": "./src/control-startup.ts"
+    "./control-startup": "./src/control-startup.ts",
+    "./node-config": "./src/node-config.ts",
+    "./node-config-resolve": "./src/node-config-resolve.ts"
   },
   "dependencies": {
     "@gyblos/core": "workspace:*",
@@ -36,6 +38,7 @@
     "@x402/svm": "2.28.0",
     "express": "4.21.2",
     "@gyblos/protocol": "workspace:*",
-    "@gyblos/discovery-http": "workspace:*"
+    "@gyblos/discovery-http": "workspace:*",
+    "smol-toml": "1.9.1"
   }
 }

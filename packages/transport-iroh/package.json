@@ -12,6 +12,7 @@
     "./iroh-client": "./src/iroh-client.ts",
     "./iroh-server": "./src/iroh-server.ts",
     "./limiter": "./src/limiter.ts",
+    "./relay-origins": "./src/relay-origins.ts",
     "./route-policy": "./src/route-policy.ts",
     "./wire": "./src/wire.ts",
     "./control-io": "./src/control-io.ts",

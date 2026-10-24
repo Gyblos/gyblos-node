@@ -32,6 +32,7 @@
     "boundaries": "node --import tsx tooling/check-boundaries.ts",
     "tooling:test": "node --import tsx --test \"tooling/**/*.test.ts\"",
     "node:start": "node --import tsx apps/node/src/main.ts",
+    "gyblos": "node --import tsx apps/node/src/cli.ts",
     "buyer:start": "node --import tsx apps/buyer/src/main.ts",
     "buyer:call": "node --import tsx apps/buyer/src/call.ts",
     "buyer:reconcile": "node --import tsx apps/buyer/src/reconcile.ts",
