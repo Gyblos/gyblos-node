@@ -121,8 +121,93 @@ void test(
 );
 
 void test('acceptance refuses temporary roots inside operational local state before filesystem allocation', async () => {
-  const { assertAcceptanceTempBase } = await import('@gyblos/lab-harness/acceptance/workspace');
-  for (const value of ['/tmp/.local', '/home/user/.local/gyblos', 'relative', '/tmp/../.local'])
-    assert.throws(() => assertAcceptanceTempBase(value), { code: 'ACCEPTANCE_UNSAFE_TEMP' });
+  const { assertAcceptanceTempBase } =
+    await import('@gyblos/lab-harness/acceptance/workspace');
+  for (const value of [
+    '/tmp/.local',
+    '/home/user/.local/gyblos',
+    'relative',
+    '/tmp/../.local',
+  ])
+    assert.throws(() => assertAcceptanceTempBase(value), {
+      code: 'ACCEPTANCE_UNSAFE_TEMP',
+    });
   assert.doesNotThrow(() => assertAcceptanceTempBase('/private/tmp'));
+});
+
+void test('acceptance CLI rejects unknown options before invoking its runner', async () => {
+  const { main } =
+    await import('@gyblos/lab-harness/cli/node-discovery-acceptance');
+  let invoked = 0;
+  const messages: string[] = [];
+  const exit = await main(['--index', 'PRIVATE_REMOTE_URL'], {
+    write: (value) => messages.push(value),
+    run: async () => {
+      invoked++;
+      throw new Error('must not run');
+    },
+  });
+  assert.equal(exit, 1);
+  assert.equal(invoked, 0);
+  assert.deepEqual(
+    messages.map((value) => JSON.parse(value)),
+    [{ ok: false, code: 'ACCEPTANCE_INVALID_OPTIONS' }],
+  );
+});
+
+void test(
+  'acceptance cancellation after its first real local quote closes its resources and reports cancellation',
+  { skip: NATIVE_CAPABILITY.transportSkip },
+  async () => {
+    const { runNodeDiscoveryAcceptance } =
+      await import('@gyblos/lab-harness/acceptance');
+    const controller = new AbortController();
+    let completed = 0;
+    await assert.rejects(
+      runNodeDiscoveryAcceptance({
+        signal: controller.signal,
+        onCase: () => {
+          completed++;
+          controller.abort();
+        },
+      }),
+      { code: 'ACCEPTANCE_CANCELLED' },
+    );
+    assert.equal(completed, 1);
+  },
+);
+
+void test('acceptance reports unavailable native Iroh without synthetic transport fallback or raw errors', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const sdkSource =
+    'throw new Error("Cannot find native binding PRIVATE_VALUE");';
+  const resolver = `export function resolve(specifier,context,next){
+    if(specifier==='@number0/iroh')return {url:${JSON.stringify('data:text/javascript,' + encodeURIComponent(sdkSource))},shortCircuit:true};
+    return next(specifier,context);
+  }`;
+  const bootstrap = `import { register } from 'node:module';register(${JSON.stringify('data:text/javascript,' + encodeURIComponent(resolver))});`;
+  const result = spawnSync(
+    process.execPath,
+    [
+      '--import',
+      'data:text/javascript,' + encodeURIComponent(bootstrap),
+      '--import',
+      'tsx',
+      '--input-type=module',
+      '--eval',
+      "const {main}=await import('@gyblos/lab-harness/cli/node-discovery-acceptance');process.exitCode=await main([]);",
+    ],
+    {
+      encoding: 'utf8',
+      timeout: 10000,
+      maxBuffer: 65536,
+      env: { PATH: process.env.PATH, TMPDIR: process.env.TMPDIR },
+    },
+  );
+  assert.equal(result.status, 1, result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout), {
+    ok: false,
+    code: 'ACCEPTANCE_NATIVE_UNAVAILABLE',
+  });
+  assert.equal(result.stderr, '');
 });

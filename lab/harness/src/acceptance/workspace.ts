@@ -1,14 +1,23 @@
 // Owns a freshly allocated temporary acceptance home; never accepts an existing path or reads .local.
-import { mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, realpath, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { isAbsolute, join, resolve } from 'node:path';
 
 import { FILE_MODES, homeLayout } from '@gyblos/config';
 
-import { ACCEPTANCE } from './constants.js';
+import { ACCEPTANCE, ACCEPTANCE_CODES } from './constants.js';
+import { AcceptanceError } from './errors.js';
+
+export function assertAcceptanceTempBase(value: string) {
+  if (!isAbsolute(value) || resolve(value).split(/[\\/]/).includes('.local'))
+    throw new AcceptanceError(ACCEPTANCE_CODES.UNSAFE_TEMP);
+}
 
 export async function createAcceptanceWorkspace() {
-  const root = await mkdtemp(join(tmpdir(), ACCEPTANCE.temporaryPrefix));
+  assertAcceptanceTempBase(tmpdir());
+  const base = await realpath(tmpdir());
+  assertAcceptanceTempBase(base);
+  const root = await mkdtemp(join(base, ACCEPTANCE.temporaryPrefix));
   try {
     const environment = { GYBLOS_HOME: root, GYBLOS_LAB_HOME: root };
     const layout = homeLayout(environment);

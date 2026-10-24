@@ -13,6 +13,7 @@ void test('lab executable modules are inert when imported', async (context) => {
       '@gyblos/lab-harness/cli/inference',
       '@gyblos/lab-harness/cli/run',
       '@gyblos/lab-harness/cli/preflight',
+      '@gyblos/lab-harness/cli/node-discovery-acceptance',
       '@gyblos/lab-harness/commands/seller',
       '@gyblos/lab-harness/commands/challenge',
       '@gyblos/lab-harness/commands/fund',

@@ -62,3 +62,13 @@ binary, or if devnet is unreachable, the four cases skip with a reason.
   signatures only.
 - Raw evidence, measurements and private notes stay out of Git. Keep manual or
   private probes outside the discovered test tree.
+
+## Node and discovery acceptance
+
+`tests/lab/node-discovery-acceptance.test.ts` covers the reusable local lab
+command, its default synthetic engine, native Iroh capability boundary, private
+temporary homes, in-process index, cancellation and static output. It exercises
+renewal, failure/expiry/busy recovery, durable restart and replay refusal
+without payments or RPC. Native cases use the same explicit capability gating as
+other Iroh tests. The command has a separate real-Ollama opt-in that CI never
+runs; see [the acceptance procedure](../docs/node-discovery-acceptance.md).
