@@ -19,11 +19,15 @@ export function createIrohTransport(
   endpoint: Endpoint,
   remote: EndpointAddr,
   expectedNodeId: string,
-): Transport & { ready(expected?: TransportRoute): Promise<void> } {
+): Transport & {
+  ready(expected?: TransportRoute): Promise<void>;
+  retireIdle(): Promise<boolean>;
+} {
   let connection: Connection | undefined;
   let connecting: Promise<Connection> | undefined;
   let connectMs = 0;
   let poisoned = false;
+  let exchanging = false;
   let expectedRoute: TransportRoute | undefined;
   async function connected() {
     if (poisoned)
@@ -60,6 +64,16 @@ export function createIrohTransport(
   }
   return {
     kind: 'iroh',
+    async retireIdle() {
+      if (exchanging || connecting || poisoned) return false;
+      const idle = connection;
+      connection = undefined;
+      if (idle) {
+        idle.close(HTTP_OVER_IROH.streamCloseCode, []);
+        await idle.closed();
+      }
+      return true;
+    },
     async ready(expected) {
       const current = await connected();
       if (!expected) return;
@@ -79,6 +93,7 @@ export function createIrohTransport(
     async exchange(request: HttpRequest) {
       const bytes = encodeRequest(request);
       const current = await connected();
+      exchanging = true;
       let directObserved = false;
       let relayObserved = false;
       const observe = () => {
@@ -120,6 +135,7 @@ export function createIrohTransport(
         current.close(HTTP_OVER_IROH.streamCloseCode, []);
         throw error;
       } finally {
+        exchanging = false;
         clearInterval(poll);
       }
     },

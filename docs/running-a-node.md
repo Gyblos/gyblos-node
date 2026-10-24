@@ -274,3 +274,58 @@ positive decimal strings (`"10"`, not `"0010"`). Files produced by `node:setup`
 and trust files with canonical budgets remain valid. Older `buyer:trust`
 versions accepted leading-zero budgets; remove those leading zeros before
 loading such a file. Validation errors do not echo field names or values.
+
+### Optional static buyer selection
+
+A buyer may opt into local selection by placing `selection.json` in its buyer
+home (`homeLayout`: `$GYBLOS_HOME/buyer`, default `.local/gyblos/buyer`).
+Without this file, the existing trusted v1 proxy path is unchanged. The file
+contains:
+
+- `request`: `selection` (`modelId`, nullable `variant` and `quantization`),
+  exact `reasoning`, nullable `lowestReasoning`, `network`, `asset`,
+  `maxTokens`, canonical decimal `maxAtomic`, `priceCeilings` (`inputAtomic`,
+  `outputAtomic`), `minimumBadge: "declared-usage"`, and an accepted `retention`
+  array;
+- `sellers`: at most 16 operator-trusted
+  `{ owner, nodeId, relayUrl, directAddresses }` entries; an optional signed
+  `withdrawal` is checked against the exact catalog. These identity bindings
+  must come from an independent source, never the seller's own declaration.
+  Relay origins must be configured;
+- optional `pinnedNodeId` for “choose myself”. A pinned seller still passes all
+  filters; `PINNED_SELLER_IN_COOLDOWN` includes `cooldownUntil` for the UI.
+
+This is a static candidate list, not discovery. Every badge is `declared-usage`
+until a real checkability source exists; a catalog cannot elevate it.
+`openChannel` is always false until payment channel reuse exists.
+
+The buyer verifies catalog, presence and withdrawal signatures and bindings,
+selects candidates, then requests signed quotes in parallel without the prompt.
+Snapshots have a 10-second collection budget; a timed-out peer does not discard
+healthy snapshots. The quote window is 300 ms, a proposed initial value rather
+than measured production performance. A downgrade cannot win while an exact
+candidate is pending, including at window expiry. Quotes reserve no capacity.
+Idle HTTP connections are retired before control queries so the shared transport
+admission still applies. Control connections close before v1 HTTP forwarding.
+
+A different seller returns `SELECTED_SELLER_NOT_TRUSTED` (HTTP 409), with no
+inference forwarding or payment. The trusted seller can proceed only through its
+unchanged stored v1 offer. Quotes are never converted into v1. Because v1 has no
+reasoning selection or separate selection-budget enforcement, execution requires
+`off` reasoning, matching engine description/payment identities/prices/metering,
+and the same maximum budget as the stored v1 offer. Other terms return
+`QUOTE_REQUIRES_UNSUPPORTED_V2_EXECUTION`. Free v2 execution remains disabled.
+
+The signed follow-up must match the original request ID and exact body bytes; no
+new selection occurs after a payment header appears. A lost authorized response
+blocks further routing until the existing reconciliation workflow has resolved
+the uncertainty. Restarting the proxy is not reconciliation; the existing call
+journal checks remain authoritative. The in-memory session admits at most 1,024
+decisions, retaining authorized IDs to prevent replay until restart.
+
+`selection-stats.json` stores only local quote successes/failures, latency,
+cooldown and nullable wait metadata, via staged replacement with file mode 0600
+and buyer-directory mode 0700. Quote latency is not inference latency; v2 quotes
+provide no predicted wait, so quoted/observed wait and accuracy remain null
+until an actual observation source exists. No prompts, offers or payment
+payloads are stored there. No payments v2 are enabled.

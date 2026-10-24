@@ -22,6 +22,10 @@ import { createIrohTransport } from '@gyblos/transport-iroh/iroh-client';
 import { expectedIrohRoute } from '@gyblos/transport-iroh/route-policy';
 
 import { startBuyerProxy } from './proxy.js';
+import {
+  prepareBuyerSelection,
+  runtimeProxySelection,
+} from './selection-runtime.js';
 
 export async function trustedOffer() {
   const config = await loadRole(P2P_ROLES.BUYER);
@@ -73,6 +77,7 @@ export function buyerConnectionPlan(
 
 export async function startBuyer() {
   const { config, offer } = await trustedOffer();
+  const preparedSelection = await prepareBuyerSelection(process.env);
   const plan = buyerConnectionPlan(offer);
   const remote = new EndpointAddr(
     EndpointId.fromString(plan.remote.nodeId),
@@ -91,8 +96,26 @@ export async function startBuyer() {
     const transport = createIrohTransport(endpoint, remote, offer.nodeId);
     cleanup = () => transport.close();
     const expected = expectedIrohRoute(process.env.GYBLOS_EXPECTED_ROUTE);
-    await transport.ready(expected);
-    const proxy = await startBuyerProxy(transport);
+    if (!preparedSelection) await transport.ready(expected);
+    const selection = preparedSelection
+      ? runtimeProxySelection(preparedSelection, {
+          endpoint,
+          trusted: offer,
+          buyer: config.buyer,
+          relayOnly: plan.relayOnly,
+          retireIdle: () => transport.retireIdle(),
+        })
+      : undefined;
+    const proxyTransport = preparedSelection
+      ? {
+          ...transport,
+          async exchange(request: Parameters<typeof transport.exchange>[0]) {
+            await transport.ready(expected);
+            return transport.exchange(request);
+          },
+        }
+      : transport;
+    const proxy = await startBuyerProxy(proxyTransport, selection);
     cleanup = () => proxy.close();
     await saveJson(rolePath(P2P_ROLES.BUYER, ROLE_FILES.status), {
       status: 'ready',

@@ -1,0 +1,213 @@
+// Builds verified selector inputs, races signed quotes and returns a trusted-v1 or quote-only decision.
+// Static operator identity trust stays independent of seller declarations; never executes payments.
+import { randomInt } from 'node:crypto';
+
+import { SELLER_BADGES } from '@gyblos/core/constants';
+import {
+  selectSellers,
+  type KnownSeller,
+  type SellerCandidate,
+  type SellerSelectionResult,
+} from '@gyblos/core/seller-selection';
+import { PUBLIC_RECORD_KINDS } from '@gyblos/protocol/constants';
+import { validateOfferV2Time } from '@gyblos/protocol/offer-v2';
+import { verifyPublicV2 } from '@gyblos/protocol/public-v2';
+
+import { BUYER_SELECTION, BUYER_SELECTION_CODES } from './constants.js';
+import type { createBuyerControlClient } from './control.js';
+import { raceControlOffers, type WinningQuote } from './offer-race.js';
+import {
+  BuyerSelectionError,
+  type BuyerSelectionConfig,
+  type StaticControlSeller,
+} from './selection-config.js';
+import type { LocalSellerStats } from './selection-stats.js';
+
+export type BuyerControlClient = Pick<
+  ReturnType<typeof createBuyerControlClient>,
+  'getCatalog' | 'getPresence' | 'requestOffer' | 'close'
+>;
+export type SelectionDecision =
+  | { ok: true; winner: WinningQuote }
+  | {
+      ok: false;
+      code: typeof BUYER_SELECTION_CODES.QUOTE_ONLY;
+      winner: WinningQuote;
+    }
+  | { ok: false; code: typeof BUYER_SELECTION_CODES.NO_OFFER }
+  | Exclude<SellerSelectionResult, { ok: true }>;
+export interface SelectionDependencies {
+  connect: (seller: StaticControlSeller) => Promise<BuyerControlClient>;
+  buyer: string;
+  trusted: { owner: string; nodeId: string };
+  stats: Map<string, LocalSellerStats>;
+  now?: () => number;
+  random?: () => number;
+  windowMs?: number;
+  snapshotMs?: number;
+}
+async function verifiedSeller(
+  client: BuyerControlClient,
+  seller: StaticControlSeller,
+  now: () => number,
+  signal: AbortSignal,
+): Promise<KnownSeller> {
+  const signed = await client.getCatalog(signal);
+  const trust = { owner: seller.owner, nodeId: seller.nodeId, now: now() };
+  const catalog = await verifyPublicV2(signed, trust);
+  if (catalog.kind !== PUBLIC_RECORD_KINDS.CATALOG)
+    throw new BuyerSelectionError(BUYER_SELECTION_CODES.INVALID);
+  const presence = await verifyPublicV2(await client.getPresence(signal), {
+    ...trust,
+    now: now(),
+    catalog,
+  });
+  if (presence.kind !== PUBLIC_RECORD_KINDS.PRESENCE)
+    throw new BuyerSelectionError(BUYER_SELECTION_CODES.INVALID);
+  const withdrawal = seller.withdrawal
+    ? await verifyPublicV2(seller.withdrawal, { ...trust, now: now(), catalog })
+    : null;
+  if (withdrawal && withdrawal.kind !== PUBLIC_RECORD_KINDS.WITHDRAWAL)
+    throw new BuyerSelectionError(BUYER_SELECTION_CODES.INVALID);
+  return {
+    catalog,
+    presence,
+    withdrawal,
+    badge: SELLER_BADGES.DECLARED_USAGE,
+    openChannel: false,
+  };
+}
+function recordQuote(
+  stats: Map<string, LocalSellerStats>,
+  nodeId: string,
+  success: boolean,
+  latencyMs: number,
+  now: number,
+) {
+  const prior = stats.get(nodeId);
+  stats.set(nodeId, {
+    successes: (prior?.successes ?? 0) + Number(success),
+    failures: (prior?.failures ?? 0) + Number(!success),
+    latencyMs: Math.max(0, Math.round(latencyMs)),
+    waitAccuracy: prior?.waitAccuracy ?? null,
+    cooldownUntil: success ? null : now + BUYER_SELECTION.cooldownMs,
+    // v2 has no predicted wait and control latency is not inference waiting time.
+    quotedWaitMs: prior?.quotedWaitMs ?? null,
+    observedWaitMs: prior?.observedWaitMs ?? null,
+  });
+}
+export async function selectBuyerQuote(
+  config: BuyerSelectionConfig,
+  dependencies: SelectionDependencies,
+  signal?: AbortSignal,
+): Promise<SelectionDecision> {
+  const now = dependencies.now ?? Date.now;
+  const deadline = AbortSignal.any([
+    AbortSignal.timeout(dependencies.snapshotMs ?? BUYER_SELECTION.snapshotMs),
+    ...(signal ? [signal] : []),
+  ]);
+  const clients = new Map<string, BuyerControlClient>();
+  try {
+    const snapshots = await Promise.all(
+      config.sellers.map(async (seller) => {
+        try {
+          const client = await dependencies.connect(seller);
+          clients.set(seller.nodeId, client);
+          return await verifiedSeller(client, seller, now, deadline);
+        } catch {
+          recordQuote(dependencies.stats, seller.nodeId, false, 0, now());
+          return undefined;
+        }
+      }),
+    );
+    if (signal?.aborted)
+      return { ok: false, code: BUYER_SELECTION_CODES.NO_OFFER };
+    const selected = selectSellers({
+      request: config.request,
+      sellers: snapshots.filter((item) => item !== undefined),
+      stats: dependencies.stats,
+      pinnedNodeId: config.pinnedNodeId,
+      now: now(),
+      random:
+        dependencies.random ??
+        (() =>
+          randomInt(BUYER_SELECTION.randomRange) / BUYER_SELECTION.randomRange),
+    });
+    if (!selected.ok) return selected;
+    const winner = await raceControlOffers(
+      selected.candidates,
+      (candidate, querySignal) =>
+        requestCandidate(
+          candidate,
+          clients,
+          config,
+          dependencies,
+          now,
+          querySignal,
+        ),
+      { signal, windowMs: dependencies.windowMs },
+    );
+    if (!winner) return { ok: false, code: BUYER_SELECTION_CODES.NO_OFFER };
+    try {
+      validateOfferV2Time(winner.quote.offer, now());
+    } catch {
+      return { ok: false, code: BUYER_SELECTION_CODES.NO_OFFER };
+    }
+    const trusted = dependencies.trusted;
+    return winner.candidate.nodeId === trusted.nodeId &&
+      winner.candidate.owner === trusted.owner
+      ? { ok: true, winner }
+      : { ok: false, code: BUYER_SELECTION_CODES.QUOTE_ONLY, winner };
+  } finally {
+    await Promise.allSettled(
+      [...clients.values()].map((client) => client.close()),
+    );
+  }
+}
+
+async function requestCandidate(
+  candidate: SellerCandidate,
+  clients: ReadonlyMap<string, BuyerControlClient>,
+  config: BuyerSelectionConfig,
+  dependencies: SelectionDependencies,
+  now: () => number,
+  querySignal: AbortSignal,
+) {
+  const start = now();
+  const request = config.request;
+  try {
+    const quote = await clients.get(candidate.nodeId)!.requestOffer(
+      {
+        buyer: dependencies.buyer,
+        selection: request.selection,
+        reasoning: candidate.reasoning,
+        maxTokens: request.maxTokens,
+        maxAtomic: candidate.free ? '0' : request.maxAtomic,
+        priceCeilings: request.priceCeilings,
+        network: request.network,
+        asset: request.asset,
+      },
+      querySignal,
+    );
+    if (querySignal.aborted)
+      throw new BuyerSelectionError(BUYER_SELECTION_CODES.INVALID);
+    recordQuote(
+      dependencies.stats,
+      candidate.nodeId,
+      true,
+      now() - start,
+      now(),
+    );
+    return quote;
+  } catch (error) {
+    if (!querySignal.aborted)
+      recordQuote(
+        dependencies.stats,
+        candidate.nodeId,
+        false,
+        now() - start,
+        now(),
+      );
+    throw error;
+  }
+}

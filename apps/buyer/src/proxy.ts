@@ -25,8 +25,10 @@ import { HTTP_OVER_IROH } from '@gyblos/transport-iroh/constants';
 
 import {
   BUYER_PROXY_ERROR_CODES,
+  BUYER_SELECTION,
   type BuyerProxyErrorCode,
 } from './constants.js';
+import type { ProxySelection } from './selection-proxy.js';
 
 interface ProxyError {
   code: BuyerProxyErrorCode;
@@ -43,7 +45,10 @@ function rejectMalformedJson(response: ServerResponse) {
     .end(JSON.stringify(error));
 }
 
-export function buyerProxyHandler(transport: Transport) {
+export function buyerProxyHandler(
+  transport: Transport,
+  selection?: ProxySelection,
+) {
   let active = 0;
   let previous = Promise.resolve();
   return async (request: IncomingMessage, response: ServerResponse) => {
@@ -88,28 +93,23 @@ export function buyerProxyHandler(transport: Transport) {
       });
       await pending;
       if (response.destroyed || request.aborted) return;
+      if (
+        selection &&
+        !(await admitSelection(selection, request, response, body))
+      )
+        return;
       const result = await transport.exchange({
         method: 'POST',
         path: ROUTES.inference,
         headers,
         body,
       });
-      const metric = {
-        requestId: typeof identifier === 'string' ? identifier : null,
-        status: result.status,
-        transport: result.transport,
-        connectMs: result.connectMs,
-        directObserved: result.directObserved,
-        relayObserved: result.relayObserved,
-      };
-      await appendFile(
-        rolePath(P2P_ROLES.BUYER, ROLE_FILES.metrics),
-        JSON.stringify(metric) + '\n',
-        { mode: FILE_MODES.privateFile },
-      ).catch(() => undefined); // Telemetry must not replace a settled response.
+      await appendProxyMetric(identifier, result);
       response.writeHead(result.status, result.headers);
       response.end(Buffer.from(result.body));
     } catch {
+      if (request.headers['payment-signature'] !== undefined)
+        selection?.authorizationUncertain();
       response
         .writeHead(HTTP_STATUS.serviceUnavailable, {
           'content-type': 'application/json',
@@ -124,13 +124,16 @@ export function buyerProxyHandler(transport: Transport) {
   };
 }
 
-export async function startBuyerProxy(transport: Transport) {
+export async function startBuyerProxy(
+  transport: Transport,
+  selection?: ProxySelection,
+) {
   const server = createServer(
     {
       maxHeaderSize: HTTP_OVER_IROH.headerBytes,
       requestTimeout: TRANSPORT_TIMEOUTS.requestMs,
     },
-    buyerProxyHandler(transport),
+    buyerProxyHandler(transport, selection),
   );
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject);
@@ -143,4 +146,59 @@ export async function startBuyerProxy(transport: Transport) {
       await transport.close();
     },
   };
+}
+
+async function appendProxyMetric(
+  identifier: unknown,
+  result: Awaited<ReturnType<Transport['exchange']>>,
+) {
+  const metric = {
+    requestId: typeof identifier === 'string' ? identifier : null,
+    status: result.status,
+    transport: result.transport,
+    connectMs: result.connectMs,
+    directObserved: result.directObserved,
+    relayObserved: result.relayObserved,
+  };
+  await appendFile(
+    rolePath(P2P_ROLES.BUYER, ROLE_FILES.metrics),
+    JSON.stringify(metric) + '\n',
+    { mode: FILE_MODES.privateFile },
+  ).catch(() => undefined); // Telemetry must not replace a settled response.
+}
+
+async function admitSelection(
+  selection: ProxySelection,
+  request: IncomingMessage,
+  response: ServerResponse,
+  body: Buffer,
+) {
+  const controller = new AbortController();
+  const cancel = () => controller.abort();
+  response.once('close', cancel);
+  let decision;
+  try {
+    decision = await selection.admit(
+      body,
+      request.headers['payment-signature'] !== undefined,
+      controller.signal,
+    );
+  } finally {
+    response.removeListener('close', cancel);
+  }
+  if (response.destroyed || request.aborted) return false;
+  if (decision.ok) return true;
+  response
+    .writeHead(BUYER_SELECTION.conflictStatus, {
+      'content-type': 'application/json',
+    })
+    .end(
+      JSON.stringify({
+        code: decision.code,
+        ...('cooldownUntil' in decision
+          ? { cooldownUntil: decision.cooldownUntil }
+          : {}),
+      }),
+    );
+  return false;
 }

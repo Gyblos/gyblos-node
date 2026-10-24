@@ -42,6 +42,33 @@ export const BUYER_PROXY_ERROR_CODES = {
   MALFORMED_JSON: 'MALFORMED_JSON',
 } as const;
 
+export const BUYER_SELECTION_CODES = {
+  QUOTE_ONLY: 'SELECTED_SELLER_NOT_TRUSTED',
+  V1_INCOMPATIBLE: 'QUOTE_REQUIRES_UNSUPPORTED_V2_EXECUTION',
+  NO_OFFER: 'NO_ACCEPTABLE_CONTROL_OFFER',
+  INVALID: 'INVALID_BUYER_SELECTION_CONFIG',
+  AUTHORIZATION_REQUIRED: 'TRUSTED_SELECTION_REQUIRED',
+  RECONCILE: 'AUTHORIZATION_OUTCOME_REQUIRES_RECONCILIATION',
+  LIMIT: 'BUYER_SELECTION_LIMIT',
+} as const;
+export const BUYER_SELECTION = {
+  configFile: 'selection.json',
+  statsFile: 'selection-stats.json',
+  maxConfigBytes: 65536,
+  maxSellers: 16,
+  maxDecisions: 1024,
+  snapshotMs: 10000,
+  windowMs: 300,
+  conflictStatus: 409,
+  requestIdCharacters: 128,
+  endpointCharacters: 2048,
+  directAddressCharacters: 256,
+  directAddresses: 16,
+  signatureHexCharacters: 128,
+  randomRange: 0x100000000,
+  cooldownMs: 30000,
+} as const;
+
 export type BuyerProxyErrorCode =
   (typeof BUYER_PROXY_ERROR_CODES)[keyof typeof BUYER_PROXY_ERROR_CODES];
 
