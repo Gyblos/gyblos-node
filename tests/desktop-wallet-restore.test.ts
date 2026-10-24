@@ -84,12 +84,12 @@ void test('wallet restore rejects existing empty, partial, corrupt and file dest
   await fixture(async ({ home, backup, protection }) => {
     for (const kind of ['empty', 'partial', 'corrupt', 'file']) {
       const root = join(home, kind);
-      await mkdir(root, { mode: 0o700 });
+      await mkdir(root, { mode: WALLET.PRIVATE_DIRECTORY });
       const directory = join(root, WALLET.DIRECTORY);
       const sentinel = 'synthetic existing wallet data';
       if (kind === 'file') await writeFile(directory, sentinel);
       else {
-        await mkdir(directory, { mode: 0o700 });
+        await mkdir(directory, { mode: WALLET.PRIVATE_DIRECTORY });
         if (kind !== 'empty')
           await writeFile(
             join(
@@ -137,7 +137,7 @@ void test(
   { skip: process.platform === 'win32' },
   async () => {
     await fixture(async ({ root, home, backup, protection }) => {
-      await mkdir(root, { mode: 0o700 });
+      await mkdir(root, { mode: WALLET.PRIVATE_DIRECTORY });
       const directory = join(root, WALLET.DIRECTORY);
       await symlink(join(home, 'missing-target'), directory);
       await assert.rejects(

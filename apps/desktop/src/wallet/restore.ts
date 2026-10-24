@@ -9,7 +9,7 @@ import {
   ensureWalletRoot,
   isMissing,
   syncWalletDirectory,
-  writeNewWallet,
+  writeRestoredWallet,
 } from './files.js';
 import type { WalletSummary } from './model.js';
 import type { WalletProtection } from './protection.js';
@@ -84,7 +84,7 @@ export function createWalletRestorer(
       cancelled(signal);
       await syncWalletDirectory(root);
       cancelled(signal);
-      await writeNewWallet(
+      await writeRestoredWallet(
         join(root, WALLET.DIRECTORY),
         JSON.stringify({
           format: WALLET.FORMAT,

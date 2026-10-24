@@ -89,15 +89,15 @@ creation and restoration share that directory claim, so one can win and the
 other must refuse the existing destination.
 
 The recovered key is re-encrypted with the destination protection adapter,
-persisted through the existing record writer, and reloaded through a read-only
+persisted by exclusive final-file creation, and reloaded through a read-only
 loader that cannot initialize a replacement identity. Success returns only the
 public address/status and both flags remain false. Cancellation before the claim
 installs nothing; cancellation or failure after the claim returns
-`RECOVERY_REQUIRED` and preserves the encrypted record/staging or directory
-marker for inspection. A completed record may exist after interrupted
-confirmation. There is no automatic rollback, stale-marker removal or retry that
-replaces that state. Filesystem errors are sanitized and the restorer limits
-itself to one operation at a time.
+`RECOVERY_REQUIRED` and preserves the encrypted record or directory marker for
+inspection. A completed record may exist after interrupted confirmation. There
+is no automatic rollback, stale-marker removal or retry that replaces that
+state. Filesystem errors are sanitized and the restorer limits itself to one
+operation at a time.
 
 This service is not connected to Electron, preload, the UI or automatic startup.
 A separate entry before automatic creation remains future work. Tests use fresh
@@ -106,3 +106,12 @@ producer/reader combinations; native Keychain/DPAPI/Linux-store acceptance and
 power-loss durability are not established. Funding, persistent backup approval,
 signing, payment-state recovery and mobile linking remain disabled or outside
 this service.
+
+Restoration validates its reserved directory before writing and checks its
+identity again around descriptor I/O. Final record creation is exclusive and
+never uses a replacing rename, so a concurrently appearing record is preserved.
+This deliberately allows an incomplete encrypted final record after a crash; it
+is not atomic whole-record visibility or proof of power-loss durability. The
+existing automatic-creation publication path is unchanged. Protected-record
+reload now reads at most the configured maximum plus one byte and rejects a
+changed descriptor size, including growth after the initial stat.

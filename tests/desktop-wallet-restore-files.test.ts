@@ -66,15 +66,21 @@ void test(
   },
 );
 
-void test('wallet restore retains interrupted encrypted staging and prevents automatic replacement', async () => {
+void test('wallet restore retains an interrupted encrypted record and prevents automatic replacement', async () => {
   await fixture(async ({ root, backup, protection, identity }) => {
     const original = fs.promises.open;
     fs.promises.open = async (...args) => {
       const handle = await original(...args);
-      if (args[0] === join(root, WALLET.DIRECTORY, WALLET.STAGING))
-        handle.sync = async () => {
+      if (args[0] === join(root, WALLET.DIRECTORY, WALLET.RECORD)) {
+        const write = handle.writeFile.bind(handle);
+        handle.writeFile = async (data, options) => {
+          assert.equal(typeof data, 'string');
+          if (typeof data !== 'string')
+            throw new Error('Expected encrypted JSON fixture');
+          await write(data.slice(0, Math.floor(data.length / 2)), options);
           throw new Error('synthetic private disk failure');
         };
+      }
       return handle;
     };
     syncBuiltinESMExports();
@@ -91,7 +97,7 @@ void test('wallet restore retains interrupted encrypted staging and prevents aut
       syncBuiltinESMExports();
     }
     const pending = await readFile(
-      join(root, WALLET.DIRECTORY, WALLET.STAGING),
+      join(root, WALLET.DIRECTORY, WALLET.RECORD),
       'utf8',
     );
     assert.equal(pending.includes(identity.secret), false);
@@ -107,7 +113,7 @@ void test('wallet restore retains interrupted encrypted staging and prevents aut
       restoreError(WALLET_RESTORE_ERROR.DESTINATION_EXISTS),
     );
     assert.equal(
-      await readFile(join(root, WALLET.DIRECTORY, WALLET.STAGING), 'utf8'),
+      await readFile(join(root, WALLET.DIRECTORY, WALLET.RECORD), 'utf8'),
       pending,
     );
   });
@@ -118,7 +124,7 @@ void test('wallet restore reports interrupted confirmation after cancellation du
     const controller = new AbortController();
     fs.promises.open = async (...args) => {
       const handle = await original(...args);
-      if (args[0] === join(root, WALLET.DIRECTORY, WALLET.STAGING)) {
+      if (args[0] === join(root, WALLET.DIRECTORY, WALLET.RECORD)) {
         const sync = handle.sync.bind(handle);
         handle.sync = async () => {
           await sync();
