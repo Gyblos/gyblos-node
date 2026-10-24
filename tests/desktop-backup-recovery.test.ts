@@ -1,6 +1,13 @@
 // Proves identity persistence in disposable injected stores, not native OS acceptance.
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import {
+  lstat,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -15,7 +22,7 @@ import {
 } from './support/portable-backup-fixture.js';
 
 async function assertAbsent(path: string) {
-  await assert.rejects(readFile(path));
+  await assert.rejects(lstat(path), { code: 'ENOENT' });
 }
 
 void test('portable recovery absence check accepts a missing path and rejects existing directories and files', async () => {
@@ -94,6 +101,7 @@ void test('portable recovery harness never creates a destination after cancellat
         controller.signal,
       ),
     );
+    await assertAbsent(destination);
     await assert.rejects(
       restoreDisposable(destination, backup, original.address, {
         ...disposableProtection(),
