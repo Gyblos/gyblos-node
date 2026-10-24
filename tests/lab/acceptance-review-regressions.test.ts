@@ -6,23 +6,30 @@ import { resolve } from 'node:path';
 import test from 'node:test';
 import { pathToFileURL } from 'node:url';
 
+import { CONTROL_CODES } from '@gyblos/protocol/constants';
+
 import { NATIVE_TEST_OPTIONS } from '../support/native-runtime.js';
 
-function child(source: string, intercepted?: { name: string; module: string }) {
+function child(
+  source: string,
+  intercepted: readonly { name: string; module: string }[] = [],
+) {
   const args: string[] = [];
-  if (intercepted) {
-    const wrapper =
-      'data:text/javascript,' + encodeURIComponent(intercepted.module);
+  if (intercepted.length) {
+    const wrappers = intercepted.map((entry) => ({
+      name: entry.name,
+      url: 'data:text/javascript,' + encodeURIComponent(entry.module),
+      actual: import.meta.resolve(entry.name),
+    }));
     const parent = pathToFileURL(resolve('package.json')).href;
-    const actual = import.meta.resolve(intercepted.name);
-    const resolver = `export async function resolve(specifier,context,next){
-      if(context.parentURL===${JSON.stringify(wrapper)})
-        return next(specifier,{...context,parentURL:${JSON.stringify(parent)}});
-      const resolved=await next(specifier,context);
-      if(specifier===${JSON.stringify(intercepted.name)} || resolved.url===${JSON.stringify(actual)})
-        return {url:${JSON.stringify(wrapper)},shortCircuit:true};
-      return resolved;
-    }`;
+    const resolver = `const wrappers=${JSON.stringify(wrappers)};
+      export async function resolve(specifier,context,next){
+        if(wrappers.some(entry=>context.parentURL===entry.url))
+          return next(specifier,{...context,parentURL:${JSON.stringify(parent)}});
+        const resolved=await next(specifier,context);
+        const intercepted=wrappers.find(entry=>specifier===entry.name || resolved.url===entry.actual);
+        return intercepted?{url:intercepted.url,shortCircuit:true}:resolved;
+      }`;
     const bootstrap = `import {register} from 'node:module';register(${JSON.stringify('data:text/javascript,' + encodeURIComponent(resolver))});`;
     args.push(
       '--import',
@@ -84,7 +91,7 @@ void test(
       finally{await state.cleanup();}
       console.log(JSON.stringify({rejected,opens:state.opens}));
     `,
-      { name: '@gyblos/buyer/discovery-storage', module: wrapper },
+      [{ name: '@gyblos/buyer/discovery-storage', module: wrapper }],
     );
     assert.equal(result.status, 0, result.stderr);
     assert.equal(result.stderr, '');
@@ -125,7 +132,7 @@ void test(
       finally{engine.cleanup();}
       console.log(JSON.stringify({cancelled,early,aborted}));
     `,
-      { name: '@gyblos/lab-harness/acceptance/engine', module: wrapper },
+      [{ name: '@gyblos/lab-harness/acceptance/engine', module: wrapper }],
     );
     assert.equal(result.status, 0, result.stderr);
     assert.equal(result.stderr, '');
@@ -134,5 +141,70 @@ void test(
       early: true,
       aborted: true,
     });
+  },
+);
+
+void test(
+  'acceptance rejects inference triggered by busy, stale or expired control refusals',
+  NATIVE_TEST_OPTIONS,
+  () => {
+    const codes = [
+      CONTROL_CODES.BUSY,
+      CONTROL_CODES.STALE,
+      CONTROL_CODES.EXPIRED,
+    ];
+    const observations: unknown[] = [];
+    for (const code of codes) {
+      const engine = `
+        import {createAcceptanceEngine as actual} from '@gyblos/lab-harness/acceptance/engine';
+        export function createAcceptanceEngine(mode){
+          const managed=actual(mode);globalThis.acceptanceEngine=managed;return managed;
+        }
+      `;
+      const control = `
+        import {createSellerControlService as actual} from '@gyblos/node/control';
+        import {CONTROL_CODES} from '@gyblos/protocol/constants';
+        import {READINESS_GENERATION} from '@gyblos/engine-ollama/constants';
+        export let injected=0;
+        export function createSellerControlService(options){
+          const service=actual(options);const respond=service.respond.bind(service);
+          service.respond=async(...args)=>{
+            const result=await respond(...args);
+            if(result.error?.code===${JSON.stringify(code)}){
+              const managed=globalThis.acceptanceEngine;
+              const failed=result.error.code===CONTROL_CODES.STALE;
+              if(failed)managed.fail(false);
+              try{
+                const before=managed.generations();
+                await managed.engine.generate({...READINESS_GENERATION,signal:args[2]});
+                injected+=managed.generations()-before;
+              }finally{if(failed)managed.fail(true);}
+            }
+            return result;
+          };return service;
+        }
+      `;
+      const result = child(
+        `
+        const control=await import('@gyblos/node/control');
+        const {runNodeDiscoveryAcceptance}=await import('@gyblos/lab-harness/acceptance');
+        let rejected=false;
+        try{await runNodeDiscoveryAcceptance();}
+        catch(error){rejected=error.code==='ACCEPTANCE_FAILED';}
+        console.log(JSON.stringify({rejected,injected:control.injected}));
+        `,
+        [
+          { name: '@gyblos/lab-harness/acceptance/engine', module: engine },
+          { name: '@gyblos/node/control', module: control },
+        ],
+      );
+      assert.equal(result.status, 0, result.stderr);
+      assert.equal(result.stderr, '');
+      observations.push(JSON.parse(result.stdout));
+    }
+    assert.deepEqual(
+      observations,
+      codes.map(() => ({ rejected: true, injected: 1 })),
+    );
   },
 );
