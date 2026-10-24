@@ -572,6 +572,11 @@
 .desktop-frame .compact-picker .ui-row-trailing {
   gap: 6px;
 }
+.startup-brand {
+  display: flex;
+  justify-content: center;
+  margin: var(--overlay-row-gap) 0 var(--dialog-inset);
+}
 .desktop-frame .agent-search-field {
   margin: 8px;
   flex-shrink: 0;

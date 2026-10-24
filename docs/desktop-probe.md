@@ -1,11 +1,14 @@
 # Desktop preview and compatibility probe
 
-An experimental macOS Apple Silicon Electron app, built inside this workspace.
-The normal window reuses the approved mockup's Chat, shared controls, searchable
-model/tool dropdowns, history, motion, SVG signature, palette and local artwork.
-Connect reuses its tool list and model/budget editor; no external tool is
-launched. Models, Activity, demo wallet, Settings, appearance, the adjustable
+An experimental Electron app, targeting macOS, Windows and Linux. Local
+packaging currently supports macOS Apple Silicon only; other installers are not
+provided. The normal window reuses the approved mockup's Chat, shared controls,
+searchable model/tool dropdowns, history, motion, SVG signature, palette and
+local artwork. Connect reuses its tool list and model/budget editor; no external
+tool is launched. Models, Activity, Wallet, Settings, appearance, the adjustable
 sidebar and full-width status footer use the same mockup components and styles.
+The personal wallet is local and protected; inference and Connect remain
+simulated.
 
 Chat responses stream synthetic text. Stop preserves the generated prefix; new
 chats and history keep their own drafts. Switching Chat/Connect preserves
@@ -16,10 +19,50 @@ product home.
 The five sample models, prices, free labels and connection budgets are
 illustrative, not live availability, payment authorization or enforced tool
 spending limits. The chat daily-limit check uses demo credits only. The footer
-explicitly labels the connection as simulated and the wallet as a demo. The
-synthetic address cannot receive funds; copying it may be unavailable under
-Electron isolation. No inference, web tool, gateway, wallet, existing
+explicitly labels the connection as simulated. Preview credits are not the
+personal wallet balance. No inference, web tool, gateway, existing node
 configuration or remote network is used by this UI.
+
+## Protected local wallet
+
+On normal first launch, the main process creates one Ed25519 wallet under
+`app.getPath('appData')/gyblos-wallet/wallet-v1`. It stores only OS-encrypted
+private material on disk. Chat/Connect receive only the public address and
+status; there is no signing, export, import or funding API. Backup verification
+and funding remain unconditionally disabled. Do not fund this experimental
+wallet: portable backup/recovery is not implemented, and external transfers to
+an address cannot be blocked by the app. No balance is queried.
+
+| Platform | Protection and limits                                                                                                                                                                       |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| macOS    | Electron asynchronous `safeStorage` backed by Keychain. Consistent code signing is needed before claiming continuity across distributed app updates.                                        |
+| Windows  | Asynchronous `safeStorage` backed by DPAPI. This protects against other users, not arbitrary processes in the same user account.                                                            |
+| Linux    | Electron 45 synchronous `safeStorage`, restricted to `gnome_libsecret` or KWallet backends. Missing, `basic_text`, unknown and unrecognized backends block creation; no plaintext fallback. |
+
+Linux deliberately uses the encryptor whose backend can be checked. Electron 45
+does not expose equivalent async-provider identification; migrating this adapter
+is required before upgrading to Electron 46, which removes synchronous methods.
+See
+[Electron safeStorage](https://www.electronjs.org/docs/latest/api/safe-storage).
+
+The persistent instance-lock profile is separate from disposable Chromium
+session data. Initialization is shared, and orderly quit waits for it; an
+unresponsive OS secret-store prompt may delay quit. Existing, interrupted,
+corrupt or inaccessible wallet data is never silently replaced. POSIX
+directories/files use owner-only permissions and file/directory flushes; Windows
+uses the OS user profile and DPAPI, without claiming equivalent
+sudden-power-loss durability. Repeated launches reuse the stored identity.
+Missing/corrupt data requires a later recovery mechanism.
+
+OS encryption protects stored data, not a compromised app or account. Plaintext
+is temporarily present in main-process memory; JavaScript strings cannot be
+reliably zeroed. This is not a Secure Enclave wallet or a portable recovery
+backup.
+
+Offline wallet tests use disposable keys and fake OS encryption on the three CI
+systems. They do not establish native Keychain, DPAPI or Linux keystore
+acceptance, cross-platform recovery or signed-update continuity. Those remain
+separate checks.
 
 ## Run locally
 
@@ -29,9 +72,9 @@ Use Node 22+ and the repository's pinned pnpm. After a frozen install:
 pnpm desktop:start
 ```
 
-The app creates a fresh temporary Chromium profile and retains renderer
-isolation and network denial. Normal Chat does not invoke native services. The
-separate `--smoke` mode mounts the compatibility view and its one fixed IPC
+The app creates fresh temporary Chromium session data and retains renderer
+isolation and network denial. Normal Chat does not invoke inference services.
+The separate `--smoke` mode mounts the compatibility view and its one fixed IPC
 operation. A utility process imports the pinned Iroh binding and
 `@gyblos/node/lifecycle`, performs two synthetic loopback echo cycles, closes
 both endpoints after each cycle, reports a closed summary and exits after the
@@ -64,8 +107,8 @@ packages explicitly; it does not copy the repository or operational directories.
 The packaged executable accepts `--smoke` too. It needs neither a globally
 installed Node runtime nor workspace links at runtime.
 
-This is not a signed/notarized installer, release, updater or final stack
-adoption. Windows, Intel Mac, real P2P connectivity, application recovery and
+This is not a signed/notarized installer, release or updater. Windows/Linux
+installers, Intel Mac packaging, real P2P connectivity, application recovery and
 real inference, authenticated Connect and persistent conversation storage remain
 outside this preview. Generated apps, captures and run evidence stay outside
 Git. The normal root checks cover its TypeScript/TSX, lint rules and synthetic

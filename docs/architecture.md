@@ -1,29 +1,30 @@
 # Architecture
 
-A pnpm workspace of small TypeScript packages, two product apps, a local desktop
-compatibility probe and a lab. The wire format is specified in
-[packages/protocol/SPEC.md](../packages/protocol/SPEC.md). Technology choices
-are in [stack.md](stack.md).
+A pnpm workspace of small TypeScript packages, three apps (seller node, buyer
+and the provisional Electron desktop host) and a lab. The wire format is
+specified in [packages/protocol/SPEC.md](../packages/protocol/SPEC.md).
+Technology choices are in [stack.md](stack.md).
 
 ## Packages
 
-| Package                   | Layer    | Responsibility                                                                                                                                                            |
-| ------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `packages/protocol`       | protocol | Canonical JSON, signed offer wire shape, domain and bytes, Iroh ALPN, `Engine` contract, error codes, model catalog, public discovery records. No SDKs.                   |
-| `packages/core`           | core     | Pricing and metering math, offer trust rules, charge-anomaly checks, buyer seller selection. No SDKs or filesystem.                                                       |
-| `packages/config`         | config   | Devnet addresses, ports, operator limits, relay and discovery index defaults and the local home layout (`home.ts`).                                                       |
-| `packages/runtime`        | runtime  | Atomic JSON writes, private rotating logs, processes, memory probes, loopback `Host` guard.                                                                               |
-| `packages/engine-ollama`  | adapter  | Ollama client, `Engine` adapter, pinned tokenizer and model constants.                                                                                                    |
-| `packages/payments-x402`  | adapter  | x402 `upto`, facilitator, buyer signer, on-chain proofs, recovery locks.                                                                                                  |
-| `packages/transport-iroh` | adapter  | Iroh endpoint, HTTP over QUIC and its wire framing limits, relay policy, admission.                                                                                       |
-| `packages/identity`       | adapter  | 8004 registry adapter; not used by the node yet ([identity.md](identity.md)).                                                                                             |
-| `packages/discovery-http` | adapter  | HTTP discovery index client; untrusted records re-verified; optional buyer integration with independent trust and persistent replay state ([discovery.md](discovery.md)). |
-| `packages/node`           | node     | Local-node library for both roles: seller composition (`createNode`), roles and keys, signed offers, tokenizer artifacts and inference pricing used by `apps/buyer`.      |
+| Package                   | Layer    | Responsibility                                                                                                                                                                                                                                                                              |
+| ------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/protocol`       | protocol | Canonical JSON, signing domains and bytes, Iroh ALPNs, `Engine` contract, error codes, model catalog; v1 signed offers and public records, v2 public records (`public-v2`), quotes (`offer-v2`) and `control-*` contracts, golden vectors. No SDKs.                                         |
+| `packages/core`           | core     | Pricing and metering math, offer trust rules (`offers`), charge-anomaly checks, control admission leases (`control-admission`), control quote policy (`control-quotes`), buyer seller selection (`seller-selection*`). No SDKs or filesystem.                                               |
+| `packages/config`         | config   | Devnet addresses, ports, operator limits, relay and discovery index defaults and the local home layout (`home.ts`).                                                                                                                                                                         |
+| `packages/runtime`        | runtime  | Atomic JSON writes, private rotating logs, processes, memory probes, loopback `Host` guard.                                                                                                                                                                                                 |
+| `packages/engine-ollama`  | adapter  | Ollama client, `Engine` adapter, pinned tokenizer and model constants.                                                                                                                                                                                                                      |
+| `packages/payments-x402`  | adapter  | x402 `upto`, facilitator, buyer signer, on-chain proofs, recovery locks.                                                                                                                                                                                                                    |
+| `packages/transport-iroh` | adapter  | Iroh endpoint, HTTP over QUIC and its wire framing limits, relay policy, admission, control client/server and frame I/O (`control-*`).                                                                                                                                                      |
+| `packages/identity`       | adapter  | 8004 registry adapter; not used by the node yet ([identity.md](identity.md)).                                                                                                                                                                                                               |
+| `packages/discovery-http` | adapter  | HTTP discovery index client; untrusted records re-verified; optional buyer integration with independent trust and persistent replay state ([discovery.md](discovery.md)).                                                                                                                   |
+| `packages/node`           | node     | Local-node library for both roles: seller composition (`createNode`, including the facilitator from `payments-x402` and the control service, startup snapshot and readiness in `control-*`), roles and keys, signed offers, tokenizer artifacts and inference pricing used by `apps/buyer`. |
 
-| App          | Command                          | Responsibility                                                  |
-| ------------ | -------------------------------- | --------------------------------------------------------------- |
-| `apps/node`  | `node:start` (`main.ts`)         | Seller daemon with its embedded facilitator.                    |
-| `apps/buyer` | `buyer:start`, `buyer:reconcile` | Buyer proxy, one paid call (`call.ts`), measurements, recovery. |
+| App            | Command                          | Responsibility                                                                                                                                                      |
+| -------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/node`    | `node:start` (`main.ts`)         | Seller daemon; starts `createNode`, which composes the facilitator.                                                                                                 |
+| `apps/buyer`   | `buyer:start`, `buyer:reconcile` | Buyer proxy, one paid call (`call.ts`), measurements, recovery, one-seller control client, opt-in seller selection and offer race (`selection-*`, `offer-race.ts`). |
+| `apps/desktop` | `desktop:start`, `desktop:smoke` | Electron desktop host (provisional): simulated Chat/Connect preview and loopback Iroh probe ([desktop-probe.md](desktop-probe.md)).                                 |
 
 "Gate" is a lab word only. `lab/harness` holds the `gate:*` proof-of-concept
 checks (including the x402 `exact` scheme, the fixed-price test seller, the gate

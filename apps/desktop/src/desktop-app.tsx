@@ -1,5 +1,5 @@
 // Explores a buyer desktop app with Chat and local gateway connections.
-// All responses, prices and actions are simulated in memory; no product services run.
+// Inference/Connect remain simulated; Wallet receives public local metadata only.
 import {
   ArrowRight,
   ArrowUp,
@@ -62,6 +62,8 @@ import {
 import { NetworkStatus, usePreviewNetwork } from './ui/NetworkStatus.js';
 import { ResizeHandle } from './ui/ResizeHandle.js';
 import { SidebarIcon, type SidebarSection } from './ui/SidebarIcon.js';
+import { startupPending } from './ui/startup-state.js';
+import { StartupScreen } from './ui/StartupScreen.js';
 import type { ToolId } from './ui/tools.js';
 import {
   Avatar,
@@ -80,6 +82,7 @@ import {
   StatCard,
 } from './ui/UI.js';
 import { WalletDetails } from './ui/WalletDetails.js';
+import { useDesktopWallet } from './ui/WalletState.js';
 
 const money = (value: number) => '$' + value.toFixed(2);
 function ModelIcon({ model }: { model: Pick<Model, 'name' | 'image'> }) {
@@ -134,6 +137,11 @@ export function DesktopApp() {
     ...themeStyle(light),
   };
   const network = usePreviewNetwork();
+  const wallet = useDesktopWallet();
+  const [startupComplete, setStartupComplete] = useState(false);
+  useEffect(() => {
+    if (!startupPending(wallet, network.state)) setStartupComplete(true);
+  }, [wallet, network.state]);
   const online = network.online;
   const [model, setModel] = useState(MODELS[0]);
   const [credits, setCredits] = useState(0);
@@ -238,6 +246,15 @@ export function DesktopApp() {
         (sidebarMoving ? 'sidebar-moving' : '')
       }
     >
+      <MotionPresence>
+        {!startupComplete && (
+          <StartupScreen
+            wallet={wallet}
+            network={network.state}
+            onContinue={() => setStartupComplete(true)}
+          />
+        )}
+      </MotionPresence>
       <div className="sidebar-restore">
         <IconButton
           className="sidebar-toggle"
@@ -283,8 +300,7 @@ export function DesktopApp() {
             onClick={() => setModal(UI_DIALOG.BALANCE)}
           >
             <Wallet size={17} />
-            {money(credits)}
-            <Plus size={14} />
+            Wallet
           </Button>
         </div>
       </header>
@@ -528,7 +544,7 @@ export function DesktopApp() {
                   }
                 />
                 <StatCard
-                  label="Available balance"
+                  label="Demo credits"
                   value={money(credits)}
                   detail="Reserved in this preview: $0.00"
                 />
@@ -584,7 +600,7 @@ export function DesktopApp() {
         <NetworkStatus state={network.state} onToggle={network.toggle} />
         <Button onClick={() => setModal(UI_DIALOG.BALANCE)}>
           <Wallet size={14} />
-          Demo wallet
+          Wallet
         </Button>
         <span
           className="footer-version"
@@ -630,7 +646,10 @@ export function DesktopApp() {
                     </Button>
                   }
                 >
-                  <RowCopy title="Wallet" detail="Demo account" />
+                  <RowCopy
+                    title="Wallet"
+                    detail="Local protection and backup status"
+                  />
                 </ListRow>
               </List>
               <Note>Preferences apply to this preview only.</Note>
@@ -642,40 +661,10 @@ export function DesktopApp() {
         {modal === UI_DIALOG.BALANCE && (
           <Modal
             title="Your wallet"
-            description="Demo wallet · no real account or funds."
+            description="Local wallet · funding disabled until verified backup."
             close={() => setModal(null)}
           >
             <WalletDetails />
-            <div className="balance-display">
-              <Wallet size={27} />
-              <strong>{money(credits)}</strong>
-              <span>Available demo credits</span>
-            </div>
-            <p className="modal-note">
-              Free offers work with no balance. Adding demo credits simulates
-              the paid-model experience; no money moves.
-            </p>
-            <Button
-              variant={BUTTON_VARIANT.PRIMARY}
-              className="wide"
-              onClick={() => {
-                setCredits((value) => value + DEMO_ACCOUNT.TOP_UP);
-                setModal(null);
-                setToast('$10.00 demo credits added');
-              }}
-            >
-              Add $10 demo credits
-              <Plus size={16} />
-            </Button>
-            <Button
-              className="text-button"
-              onClick={() => {
-                setBudgetDraft(String(budget));
-                setModal(UI_DIALOG.BUDGET);
-              }}
-            >
-              Manage spending limit <ArrowRight size={16} />
-            </Button>
           </Modal>
         )}
       </MotionPresence>
