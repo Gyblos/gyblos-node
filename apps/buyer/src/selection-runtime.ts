@@ -3,19 +3,23 @@
 import { EndpointAddr, EndpointId, type Endpoint } from '@number0/iroh';
 
 import type { HomeEnvironment } from '@gyblos/config/home';
+import type { DiscoveryFetch } from '@gyblos/discovery-http';
 import type { InferenceOffer } from '@gyblos/protocol/offer';
 import { assertConfiguredRelay } from '@gyblos/transport-iroh/endpoint';
 
 import { BUYER_SELECTION_CODES } from './constants.js';
 import { connectBuyerControl } from './control.js';
+import { buyerDiscoveryState } from './discovery-storage.js';
+import { discoverBuyerSellers } from './discovery.js';
 import {
   BuyerSelectionError,
   loadBuyerSelectionConfig,
+  type StaticControlSeller,
 } from './selection-config.js';
 import { createProxySelection } from './selection-proxy.js';
 import { selectionStats } from './selection-stats.js';
 import { requireLegacyQuoteCompatibility } from './selection-v1.js';
-import { selectBuyerQuote } from './selection.js';
+import { selectBuyerQuote, type SelectionDecision } from './selection.js';
 
 export async function prepareBuyerSelection(environment: HomeEnvironment) {
   const config = await loadBuyerSelectionConfig(environment);
@@ -24,55 +28,100 @@ export async function prepareBuyerSelection(environment: HomeEnvironment) {
   const configured = new Set(config.sellers.map((seller) => seller.nodeId));
   for (const nodeId of stats.rows.keys())
     if (!configured.has(nodeId)) stats.rows.delete(nodeId);
-  return { config, stats };
+  const discovery = config.discovery
+    ? await buyerDiscoveryState(environment)
+    : undefined;
+  return { config, stats, discovery };
 }
 export function runtimeProxySelection(
   prepared: NonNullable<Awaited<ReturnType<typeof prepareBuyerSelection>>>,
   options: {
     endpoint: Endpoint;
+    now?: () => number;
+    fetch?: DiscoveryFetch;
     trusted: InferenceOffer;
     buyer: string;
     relayOnly: boolean;
     retireIdle: () => Promise<boolean>;
   },
 ) {
-  return createProxySelection(async (signal) => {
-    if (!(await options.retireIdle()))
-      throw new BuyerSelectionError(BUYER_SELECTION_CODES.RECONCILE);
-    const result = await selectBuyerQuote(
-      prepared.config,
-      {
-        buyer: options.buyer,
-        trusted: options.trusted,
-        stats: prepared.stats.rows,
-        async connect(seller) {
-          const remote = new EndpointAddr(
-            EndpointId.fromString(seller.nodeId),
-            seller.relayUrl ?? undefined,
-            options.relayOnly ? [] : seller.directAddresses,
-          );
-          return connectBuyerControl(
-            options.endpoint,
-            remote,
-            {
-              owner: seller.owner,
-              nodeId: seller.nodeId,
-              relayAllowed: (origin) => {
-                try {
-                  assertConfiguredRelay(origin);
-                  return true;
-                } catch {
-                  return false;
-                }
-              },
-            },
-            options.relayOnly,
-          );
+  const now = options.now ?? Date.now;
+  return createProxySelection(
+    async (signal) => {
+      if (!(await options.retireIdle()))
+        throw new BuyerSelectionError(BUYER_SELECTION_CODES.RECONCILE);
+      const config =
+        prepared.config.discovery && prepared.discovery
+          ? await discoverBuyerSellers(
+              { ...prepared.config, discovery: prepared.config.discovery },
+              prepared.discovery,
+              { fetch: options.fetch ?? globalThis.fetch, now, signal },
+            )
+          : prepared.config;
+      const result = await selectBuyerQuote(
+        config,
+        {
+          buyer: options.buyer,
+          now,
+          trusted: options.trusted,
+          stats: prepared.stats.rows,
+          observeVerified: prepared.discovery
+            ? (seller) => prepared.discovery!.observe(seller)
+            : undefined,
+          connect: (seller) => connectSelectedSeller(seller, options, now),
         },
+        signal,
+      );
+      if (
+        'winner' in result &&
+        prepared.discovery &&
+        !(await prepared.discovery.permits(
+          result.winner.candidate.owner,
+          result.winner.candidate.nodeId,
+          result.winner.quote.offer.catalogDigest,
+          now(),
+        ))
+      ) {
+        const stopped: SelectionDecision = {
+          ok: false,
+          code: BUYER_SELECTION_CODES.NO_OFFER,
+        };
+        return stopped;
+      }
+      await prepared.stats.save();
+      return requireLegacyQuoteCompatibility(result, options.trusted);
+    },
+    prepared.config.request.maxTokens,
+    now,
+  );
+}
+
+async function connectSelectedSeller(
+  seller: StaticControlSeller,
+  options: Parameters<typeof runtimeProxySelection>[1],
+  now: () => number,
+) {
+  const remote = new EndpointAddr(
+    EndpointId.fromString(seller.nodeId),
+    seller.relayUrl ?? undefined,
+    options.relayOnly ? [] : seller.directAddresses,
+  );
+  return connectBuyerControl(
+    options.endpoint,
+    remote,
+    {
+      owner: seller.owner,
+      nodeId: seller.nodeId,
+      now,
+      relayAllowed: (origin) => {
+        try {
+          assertConfiguredRelay(origin);
+          return true;
+        } catch {
+          return false;
+        }
       },
-      signal,
-    );
-    await prepared.stats.save();
-    return requireLegacyQuoteCompatibility(result, options.trusted);
-  }, prepared.config.request.maxTokens);
+    },
+    options.relayOnly,
+  );
 }

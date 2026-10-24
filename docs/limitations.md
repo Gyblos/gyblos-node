@@ -17,8 +17,8 @@ only; never import mainnet keys.
   Hotspot/CGNAT and wider NAT coverage are untested, as is a direct-to-relay
   switch during a session.
 - The PayAI backup facilitator has never been used for a payment.
-- Mainnet, MPP, mobile apps, reputation, penalties and seller discovery are not
-  implemented.
+- Mainnet, MPP, mobile apps, reputation, penalties and decentralized seller
+  discovery are not implemented.
 
 ## Payments and recovery
 
@@ -136,3 +136,10 @@ one saved public finalized payment pair. It does not establish a fresh chain
 audit, public relay compatibility, exactly-once settlement or physical recovery
 of a signed offer. Unsigned modified payment variants in the fixture were never
 executed on-chain. See [tests/README.md](../tests/README.md).
+
+HTTP discovery is opt-in and limited to independently configured owner–NodeId
+bindings. It does not prove registration, enroll unknown sellers, publish seller
+heartbeats, provide DHT discovery or establish live-index production
+availability. Replay state and withdrawal barriers persist; a retained lock or
+unsafe/corrupt state fails closed. Payment execution remains the compatible
+trusted v1 flow.

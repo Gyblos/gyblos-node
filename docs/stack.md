@@ -76,5 +76,5 @@ reason says otherwise.
 ## Identity and planned work
 
 The 8004 identity adapter is described in [identity.md](identity.md); what is
-not built yet (including seller discovery) is in
-[limitations.md](limitations.md).
+not built yet (including decentralized discovery and the seller publishing loop)
+is in [limitations.md](limitations.md).
