@@ -20,8 +20,12 @@ problem, an issue code and a key path such as
 for a valid configuration and `1` otherwise (including usage errors).
 
 The command never prints a value that came from the environment, only the
-variable's name, and issue lines never include the value that failed. A TOML
-syntax error reports a line and column only.
+variable's name, and issue lines never include the value that failed. URLs from
+the file or defaults (`rpc_url`, relays, `discovery.url`, engine `url`) are
+printed as their origin only (`scheme://host[:port]`), followed by
+`<path hidden>` when the URL has a path, because providers such as Alchemy and
+QuickNode put the API key in the path. A TOML syntax error reports a line and
+column only.
 
 The command also checks the current `GYBLOS_*` environment, because those
 variables override the file.
@@ -84,18 +88,25 @@ The validator refuses, with `INLINE_SECRET`:
 - a key named like a credential (`api_key`, `token`, `secret`, `password`,
   `private_key`, `auth`, `credentials`, ...) holding a literal value, anywhere
   in the file, including inside unknown tables;
-- a `*_env` value that looks like a pasted token rather than a variable name;
+- a `*_env` value that looks like a pasted token rather than a variable name:
+  characters a variable name cannot hold, or at least 24 characters with a run
+  of 16 or more letters and digits that includes a digit;
 - a URL with user info or a credential-named query parameter, and any query on
   `node.rpc_url` (RPC providers put keys there). A keyed RPC URL belongs in
   `GYBLOS_RPC_URL`.
 
-These checks catch common mistakes; they cannot recognize every secret, for
-example a token embedded in a URL path. Review a file before sharing it.
+Unknown key names that look like tokens by the same rule are reported as
+`<key>`. These checks catch common mistakes; they cannot recognize every secret,
+for example a token embedded in a URL path (which `config validate` does not
+print). Review a file before sharing it.
 
 ## File reference (version 1)
 
 `version = 1` and a `[node]` table with `network` are required; everything else
-is optional. Unknown keys are errors (`UNKNOWN_KEY`).
+is optional. Unknown keys are errors (`UNKNOWN_KEY`). Integer settings
+(`version`, the free caps) must be TOML integers: a float such as `1.0`, `10.0`
+or `1e3` is `WRONG_TYPE`, and an integer too large for the setting is out of
+range (`UNSUPPORTED_VERSION` or `INVALID_CAP`), however many digits it has.
 
 - `[node]`
   - `network`: `"devnet"`. `"mainnet"` is refused with `MAINNET_UNSUPPORTED`.
@@ -121,14 +132,26 @@ is optional. Unknown keys are errors (`UNKNOWN_KEY`).
     `high` (GYB-DOC-028); default `["off"]`.
   - exactly one of:
     - `price = { input_per_mtok, output_per_mtok, currency = "USDC" }`: USDC per
-      million tokens as canonical decimal strings: no sign, exponent, leading
-      zeros or trailing fractional zeros (`"0.1"`, not `"0.10"`), at most 4
-      integer digits and 6 decimals, not both zero;
+      million tokens as decimal strings. Trailing fractional zeros are accepted
+      and dropped, so `"0.10"`, `"1.50"` and `"2.0"` become `"0.1"`, `"1.5"` and
+      `"2"` in the typed config. A sign, exponent, leading zero (`"00.1"`) or
+      empty part (`"1."`, `".5"`) is `NON_CANONICAL_DECIMAL`; more than 4
+      integer digits or more than 6 decimals after dropping trailing zeros is
+      `PRICE_OUT_OF_RANGE`; both sides zero is `PRICE_ZERO`;
     - `free = { daily_token_cap, per_buyer_cap }`: positive integers, the
       per-buyer cap not above the daily cap.
 
-Prices and free caps are validated but not yet enforced: the paid path still
-uses the fixed proof-of-concept prices.
+Prices and free caps are validated but not yet enforced: the v1 proof-of-concept
+paid path keeps its fixed per-token prices until the file is wired into startup.
+
+### Price unit
+
+A `gyblos.toml` price is USDC per million tokens. Protocol v2 will charge in
+USDC atomic units (10^-6 USDC) per million tokens; that protocol change is
+pending and lands separately. Because a price has at most 6 decimals, the
+conversion is exact: atomic per million tokens = USDC per million tokens × 10^6.
+`pricePerMtokToAtomicPerMtok` (from `@gyblos/node/node-config`) performs it, for
+example `"0.1"` → `100000n`, `"1.5"` → `1500000n`, `"0.000001"` → `1n`.
 
 ## Issue codes
 
@@ -151,21 +174,24 @@ The schema cannot express a few cross-field rules (per-buyer cap above the daily
 cap, a model offered twice through an alias, relays that are equal after
 normalization); `gyblos config validate` is authoritative.
 
-Commented examples to copy, all valid:
+Commented examples to copy, all valid. Their `#:schema` line is relative to this
+repository; in a copy elsewhere, update or delete it. Reasoning levels follow
+each model (GYB-DOC-028): gpt-oss offers `low`, `medium` and `high` (no `off`);
+Qwen3 thinking is on or off, written `["off", "high"]`.
 
-| File                                                                    | Shows                                                       |
-| ----------------------------------------------------------------------- | ----------------------------------------------------------- |
-| [examples/ollama-local.toml](../examples/ollama-local.toml)             | One model from an Ollama on this machine.                   |
-| [examples/lm-studio.toml](../examples/lm-studio.toml)                   | LM Studio's OpenAI-compatible server, all reasoning levels. |
-| [examples/openai-reseller.toml](../examples/openai-reseller.toml)       | Reselling an OpenAI-compatible API with `api_key_env`.      |
-| [examples/anthropic-reseller.toml](../examples/anthropic-reseller.toml) | An Anthropic-compatible API and a custom model.             |
-| [examples/free-offer.toml](../examples/free-offer.toml)                 | A free offer with caps, Docker host engine, publication.    |
-| [examples/multi-model.toml](../examples/multi-model.toml)               | Several models on one node.                                 |
+| File                                                                    | Shows                                                        |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------ |
+| [examples/ollama-local.toml](../examples/ollama-local.toml)             | One model from an Ollama on this machine.                    |
+| [examples/lm-studio.toml](../examples/lm-studio.toml)                   | LM Studio's OpenAI-compatible server, gpt-oss effort levels. |
+| [examples/openai-reseller.toml](../examples/openai-reseller.toml)       | Reselling an OpenAI-compatible API with `api_key_env`.       |
+| [examples/anthropic-reseller.toml](../examples/anthropic-reseller.toml) | An Anthropic-compatible API and a custom model.              |
+| [examples/free-offer.toml](../examples/free-offer.toml)                 | A free offer with caps, Docker host engine, publication off. |
+| [examples/multi-model.toml](../examples/multi-model.toml)               | Several models on one node.                                  |
 
 ## Code
 
 - `@gyblos/node/node-config`: `parseNodeConfig`, `validateNodeConfig`,
-  `readNodeConfigFile` and the `NodeConfig` type.
+  `readNodeConfigFile`, `pricePerMtokToAtomicPerMtok` and the `NodeConfig` type.
 - `@gyblos/node/node-config-resolve`: `resolveNodeConfig({ file, env, flags })`,
   returning settings, origins, secret references and warnings, or issues.
 - `apps/node/src/cli.ts`: the `gyblos` command (`pnpm gyblos`).
