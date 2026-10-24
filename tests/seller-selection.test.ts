@@ -50,7 +50,7 @@ void test('seller selection never downgrades silently', () => {
     code: SELLER_SELECTION_CODES.NO_CANDIDATES,
   });
 });
-void test('permitted downgrade uses only the closest lower level of the same model after exact candidates', () => {
+void test('permitted downgrade fills from the closest lower level down to the floor after exact candidates', () => {
   const sellers = [
     seller(1),
     seller(2, { reasoning: [MEDIUM] }),
@@ -104,6 +104,33 @@ void test('permitted downgrade uses only the closest lower level of the same mod
     exactOnly.map((item) => item.nodeId),
     [nodeId(1)],
   );
+  // Remaining slots continue to farther levels, closest first, each seller at most once.
+  const ladder = [
+    seller(1),
+    seller(2, { reasoning: [MEDIUM, LOW] }),
+    seller(3, { reasoning: [LOW] }),
+    seller(6, { reasoning: [OFF] }),
+    seller(7, { reasoning: [LOW, OFF] }),
+    seller(4, { reasoning: [LOW], modelId: 'other-model' }),
+  ];
+  for (let seed = 1; seed <= 50; seed++) {
+    const filled = chosen(
+      select(ladder, { request: permitted, count: 5, random: seeded(seed) }),
+    );
+    assert.deepEqual(
+      filled.map((item) => item.reasoning),
+      [HIGH, MEDIUM, LOW, LOW, OFF],
+    );
+    assert.deepEqual(filled.map((item) => item.nodeId).slice(0, 2), [
+      nodeId(1),
+      nodeId(2),
+    ]);
+    assert.deepEqual(
+      new Set(filled.slice(2, 4).map((item) => item.nodeId)),
+      new Set([nodeId(3), nodeId(7)]),
+    );
+    assert.equal(filled[4]?.nodeId, nodeId(6));
+  }
   const floor = select([seller(3, { reasoning: [LOW] })], {
     request: request({ lowestReasoning: MEDIUM }),
   });

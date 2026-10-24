@@ -30,6 +30,7 @@ export const MODEL = {
 const { OFF, HIGH } = REASONING_LEVELS;
 
 interface SellerOptions {
+  owner?: string;
   input?: string;
   output?: string;
   reasoning?: ReasoningLevel[];
@@ -51,7 +52,7 @@ export function seller(
     'schemaVersion' | 'owner' | 'nodeId' | 'issuedAt'
   > = {
     schemaVersion: CONTROL_RECORD_VERSION,
-    owner: `Owner${index}`,
+    owner: options.owner ?? `Owner${index}`,
     nodeId: nodeId(index),
     issuedAt: NOW - 1000,
   };

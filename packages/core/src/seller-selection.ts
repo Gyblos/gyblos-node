@@ -27,13 +27,19 @@ import {
   type SellerStats,
 } from './seller-selection-input.js';
 import {
+  onePerOwner,
+  sampleTier,
+  toCandidate,
+  type SellerCandidate,
+} from './seller-selection-sample.js';
+import {
   checkPolicy,
   isFree,
   weigh,
   type Eligible,
-  type Weighted,
 } from './seller-selection-weight.js';
 
+export type { SellerCandidate } from './seller-selection-sample.js';
 export type {
   KnownSeller,
   SellerRequest,
@@ -41,16 +47,6 @@ export type {
   SellerStats,
 } from './seller-selection-input.js';
 
-export interface SellerCandidate {
-  owner: string;
-  nodeId: string;
-  listing: PublicModelV2;
-  reasoning: ReasoningLevel;
-  downgrade: boolean;
-  exploration: boolean;
-  free: boolean;
-  openChannel: boolean;
-}
 export type SellerSelectionResult =
   | { ok: true; candidates: SellerCandidate[] }
   | { ok: false; code: SellerSelectionCode };
@@ -128,74 +124,6 @@ function acceptableLevels(request: SellerRequest) {
   return LEVEL_ORDER.slice(bottom, top + 1).reverse();
 }
 
-function draw(random: () => number) {
-  const value = random();
-  if (typeof value !== 'number' || !(value >= 0 && value < 1)) invalid();
-  return value;
-}
-// Removes and returns one weighted item from `pool` (and from `remaining` when distinct).
-function take(
-  pool: Weighted[],
-  remaining: Weighted[],
-  random: () => number,
-): Weighted {
-  const total = pool.reduce((sum, item) => sum + item.weight, 0);
-  let target = draw(random) * total;
-  let index = pool.length - 1;
-  for (let cursor = 0; cursor < pool.length; cursor++) {
-    target -= pool[cursor]!.weight;
-    if (target < 0) {
-      index = cursor;
-      break;
-    }
-  }
-  const [chosen] = pool.splice(index, 1);
-  if (pool !== remaining) remaining.splice(remaining.indexOf(chosen!), 1);
-  return chosen!;
-}
-function toCandidate(item: Weighted, exploration: boolean): SellerCandidate {
-  const { seller, listing } = item.entry;
-  return {
-    owner: seller.catalog.owner,
-    nodeId: seller.catalog.nodeId,
-    listing,
-    reasoning: item.reasoning,
-    downgrade: item.downgrade,
-    exploration,
-    free: isFree(listing),
-    openChannel: seller.openChannel,
-  };
-}
-// Weighted sampling without replacement; the last slot goes to a no-history seller when none won one.
-function sampleTier(
-  tier: Weighted[],
-  slots: number,
-  random: () => number,
-): SellerCandidate[] {
-  const remaining = [...tier];
-  const reserve =
-    slots >= 2 &&
-    remaining.some((item) => item.fresh) &&
-    remaining.some((item) => !item.fresh);
-  const picked: { item: Weighted; exploration: boolean }[] = [];
-  const regular = reserve ? slots - 1 : slots;
-  while (picked.length < regular && remaining.length)
-    picked.push({
-      item: take(remaining, remaining, random),
-      exploration: false,
-    });
-  if (reserve && remaining.length) {
-    const newcomers = remaining.filter((item) => item.fresh);
-    const explore =
-      newcomers.length > 0 && !picked.some((choice) => choice.item.fresh);
-    picked.push({
-      item: take(explore ? newcomers : remaining, remaining, random),
-      exploration: explore,
-    });
-  }
-  return picked.map((choice) => toCandidate(choice.item, choice.exploration));
-}
-
 function selectPinned(
   input: SellerSelectionInput,
   pinnedNodeId: string,
@@ -221,36 +149,32 @@ function selectPinned(
   );
   return { ok: true, candidates: [toCandidate(weighted!, false)] };
 }
+// Exact-level candidates first; remaining slots fall to each permitted lower level, closest first.
+// Every tier is computed only while slots remain, and no seller or owner appears twice.
 function selectAutomatic(
   input: SellerSelectionInput,
   count: number,
   policy: SellerSelectionPolicy,
 ): SellerSelectionResult {
   const pool = input.sellers.flatMap((seller) => eligible(input, seller) ?? []);
-  const [exact, ...lower] = acceptableLevels(input.request);
-  const exactTier = pool.filter((entry) =>
-    entry.listing.reasoning.includes(exact!),
-  );
-  const candidates = sampleTier(
-    weigh(exactTier, exact!, false, policy),
-    count,
-    input.random,
-  );
-  // Only the closest lower level with any non-exact survivor fills slots, after every exact candidate.
-  const supportsOnly = (level: ReasoningLevel) =>
-    pool.filter(
-      (entry) =>
-        !exactTier.includes(entry) && entry.listing.reasoning.includes(level),
+  const used = new Set<Eligible>();
+  const owners = new Set<string>();
+  const candidates: SellerCandidate[] = [];
+  for (const [rank, level] of acceptableLevels(input.request).entries()) {
+    if (candidates.length >= count) break;
+    const tier = pool.filter(
+      (entry) => !used.has(entry) && entry.listing.reasoning.includes(level),
     );
-  const fallback = lower.find((level) => supportsOnly(level).length > 0);
-  if (candidates.length < count && fallback !== undefined)
-    candidates.push(
-      ...sampleTier(
-        weigh(supportsOnly(fallback), fallback, true, policy),
-        count - candidates.length,
-        input.random,
-      ),
+    for (const entry of tier) used.add(entry);
+    const weighted = onePerOwner(weigh(tier, level, rank > 0, policy), owners);
+    const picked = sampleTier(
+      weighted,
+      count - candidates.length,
+      input.random,
     );
+    for (const candidate of picked) owners.add(candidate.owner);
+    candidates.push(...picked);
+  }
   if (candidates.length) return { ok: true, candidates };
   return {
     ok: false,
