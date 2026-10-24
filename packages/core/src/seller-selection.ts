@@ -326,9 +326,8 @@ function selectAutomatic(
 export function selectSellers(
   input: SellerSelectionInput,
 ): SellerSelectionResult {
-  const count = input.count ?? SELLER_SELECTION_POLICY.defaultCandidates;
   try {
-    checkInput(input, count);
+    const count = checkInput(input);
     return input.pinnedNodeId === undefined
       ? selectAutomatic(input, count)
       : selectPinned(input, input.pinnedNodeId);

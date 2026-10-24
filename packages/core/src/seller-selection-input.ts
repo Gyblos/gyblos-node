@@ -82,11 +82,14 @@ export function isAtomic(value: unknown): value is string {
     BigInt(value) <= BigInt(PUBLIC_RECORD_LIMITS.maxAtomic)
   );
 }
+const isRecord = (value: unknown) =>
+  value !== null && typeof value === 'object' && !Array.isArray(value);
 const isCount = (value: unknown) =>
   typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
 export const levelRank = (level: ReasoningLevel) => LEVEL_ORDER.indexOf(level);
 
 function checkRequest(request: SellerRequest) {
+  if (!isRecord(request)) invalid();
   const lowest = request.lowestReasoning;
   if (
     !LEVEL_ORDER.includes(request.reasoning) ||
@@ -109,6 +112,7 @@ function checkRequest(request: SellerRequest) {
     invalid();
 }
 function checkStats(stats: SellerStats) {
+  if (!isRecord(stats)) invalid();
   const { latencyMs, waitAccuracy, cooldownUntil } = stats;
   if (
     !isCount(stats.successes) ||
@@ -122,7 +126,9 @@ function checkStats(stats: SellerStats) {
   )
     invalid();
 }
-export function checkInput(input: SellerSelectionInput, count: number) {
+export function checkInput(input: SellerSelectionInput) {
+  if (!isRecord(input)) invalid();
+  const count = input.count ?? SELLER_SELECTION_POLICY.defaultCandidates;
   if (
     !isCount(input.now) ||
     typeof input.random !== 'function' ||
@@ -140,10 +146,13 @@ export function checkInput(input: SellerSelectionInput, count: number) {
   const seen = new Set<string>();
   for (const seller of input.sellers) {
     if (
+      !isRecord(seller) ||
+      !isRecord(seller.catalog) ||
       !SELLER_BADGE_ORDER.includes(seller.badge) ||
       seen.has(seller.catalog.nodeId)
     )
       invalid();
     seen.add(seller.catalog.nodeId);
   }
+  return count;
 }
