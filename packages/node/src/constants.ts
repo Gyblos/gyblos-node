@@ -37,3 +37,8 @@ export const NODE_CONFIGURATION_LIMITS = {
 } as const;
 
 export const PUBLIC_SEQUENCE = { schemaVersion: 1, maxBytes: 2048 } as const;
+
+export const SELLER_PUBLIC_RECORDS = {
+  catalogMs: 60_000,
+  renewBeforeMs: 20_000,
+} as const;

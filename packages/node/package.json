@@ -17,7 +17,8 @@
     "./control": "./src/control.ts",
     "./control-readiness": "./src/control-readiness.ts",
     "./public-sequence": "./src/public-sequence.ts",
-    "./public-records": "./src/public-records.ts"
+    "./public-records": "./src/public-records.ts",
+    "./publisher": "./src/publisher.ts"
   },
   "dependencies": {
     "@gyblos/core": "workspace:*",

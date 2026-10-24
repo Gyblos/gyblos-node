@@ -18,7 +18,7 @@ import {
   controlObject,
 } from '@gyblos/protocol/control-validation';
 
-import { NODE_ERROR_CODES, P2P_ROLES, PUBLIC_SEQUENCE } from './constants.js';
+import { NODE_ERROR_CODES, NODE_KEY_BYTES, P2P_ROLES, PUBLIC_SEQUENCE } from './constants.js';
 import { NodeError } from './errors.js';
 import { assertRoleHome } from './home.js';
 
@@ -113,7 +113,7 @@ export async function openSellerSequence(options: {
   initialFloor?: number;
 }) {
   try {
-    controlHex(options.nodeId, 32);
+    controlHex(options.nodeId, NODE_KEY_BYTES);
     const floor = controlInteger(options.initialFloor ?? Date.now());
     await assertRoleHome(P2P_ROLES.SELLER, options.environment);
     const directory = homeLayout(options.environment).roles.seller;

@@ -35,17 +35,19 @@ import {
 import type { Signer } from '@gyblos/protocol/signing';
 import type { ControlService } from '@gyblos/transport-iroh/control-server';
 
+import type { SellerPublicRecords } from './public-records.js';
+
 export function createSellerControlService(options: {
   context: Omit<QuoteContext, 'remoteNodeId' | 'signal'>;
   ownerSigner: Signer;
   nodeSigner: Signer;
   monotonic?: () => number;
+  records?: SellerPublicRecords;
 }): ControlService {
   const admission = new ControlAdmission(
     options.monotonic ?? (() => performance.now()),
   );
-  const context = options.context;
-  let sequence = context.catalog.record.sequence;
+  let sequence = options.context.catalog.record.sequence;
   return {
     queryMs: CONTROL_CAPACITY.queryMs,
     idleMs: CONTROL_CAPACITY.connectionIdleMs,
@@ -54,6 +56,10 @@ export function createSellerControlService(options: {
       const requestId = validatedRequestId(value);
       try {
         const query = parseControlQuery(value);
+        const context = {
+          ...options.context,
+          catalog: options.records?.current() ?? options.context.catalog,
+        };
         if (signal.aborted) return controlFail(CONTROL_CODES.CANCELLED);
         if (query.method === CONTROL_METHODS.OFFER) {
           const offer = await createControlQuote(
@@ -61,6 +67,8 @@ export function createSellerControlService(options: {
             { ...context, remoteNodeId: peer, signal },
             options.ownerSigner,
           );
+          if (options.records && options.records.current() !== context.catalog)
+            return controlFail(CONTROL_CODES.STALE);
           return {
             version: CONTROL_VERSION,
             requestId,
@@ -85,13 +93,15 @@ export function createSellerControlService(options: {
             },
           };
         sequence = Math.max(sequence, record.sequence) + 1;
-        const presence = await signPresence(
-          context,
-          record,
-          sequence,
-          now,
-          options.nodeSigner,
-        );
+        const presence = options.records
+          ? await options.records.presence()
+          : await signPresence(
+              context,
+              record,
+              sequence,
+              now,
+              options.nodeSigner,
+            );
         validatePublicV2Time(presence.record, context.now());
         return {
           version: CONTROL_VERSION,
