@@ -25,6 +25,9 @@ importers:
       '@gyblos/discovery-http':
         specifier: workspace:*
         version: link:packages/discovery-http
+      '@gyblos/discovery-index':
+        specifier: workspace:*
+        version: link:apps/discovery-index
       '@gyblos/engine-ollama':
         specifier: workspace:*
         version: link:packages/engine-ollama
@@ -180,6 +183,15 @@ importers:
       vite:
         specifier: 6.4.2
         version: 6.4.2(@types/node@24.19.2)(tsx@4.21.0)
+
+  apps/discovery-index:
+    dependencies:
+      '@gyblos/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
+      hono:
+        specifier: 4.13.13
+        version: 4.13.13
 
   apps/node:
     dependencies:
@@ -2372,6 +2384,10 @@ packages:
   hasown@2.0.4:
     resolution: {integrity: sha512-T2UbfbBEF32wiepXIsMlTW9+dDYC6wMh/t/vYA4tuOMKqWz/n3vr1NFSxQiyP+zk2mXsoMA/i/7qV6LKut1t1A==}
     engines: {node: '>= 0.4'}
+
+  hono@4.13.13:
+    resolution: {integrity: sha512-CQ46U0ZkAGmbT/4UxdzzGJpacP2IeKgY4a5/tOI9AABbpOMfK739wfDXmv1usCk+3RkKj1hQy4/fjhiwa2xlrA==}
+    engines: {node: '>=16.9.0'}
 
   http-errors@2.0.0:
     resolution: {integrity: sha512-FtwrG/euBzaEjYeRqOgly7G0qviiXoJWnvEH2Z1plBdXgbyjv34pHTSb9zoeHMyDy33+DWy5Wt9Wo+TURtOYSQ==}
@@ -5021,6 +5037,8 @@ snapshots:
   hasown@2.0.4:
     dependencies:
       function-bind: 1.1.2
+
+  hono@4.13.13: {}
 
   http-errors@2.0.0:
     dependencies:
