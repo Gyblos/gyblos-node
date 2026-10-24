@@ -8,7 +8,9 @@
     "./probe-model": "./src/probe-model.ts",
     "./probe-session": "./src/probe-session.ts",
     "./chat-state": "./src/ui/chat-state.ts",
-    "./connection-state": "./src/ui/connection-state.ts"
+    "./connection-state": "./src/ui/connection-state.ts",
+    "./catalog-state": "./src/ui/catalog-state.ts",
+    "./demo-account": "./src/ui/demo-account.ts"
   },
   "scripts": {
     "build": "tsx scripts/build.ts",

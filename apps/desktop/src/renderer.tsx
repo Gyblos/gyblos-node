@@ -12,7 +12,9 @@ import './ui/geometry.css';
 import './ui/chat.css';
 import './ui/signal.css';
 import './ui/dropdown.css';
-import './desktop-shell.css';
+import './ui/appearance.css';
+import './ui/network-status.css';
+import './ui/icon-motion.css';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Missing desktop root.');

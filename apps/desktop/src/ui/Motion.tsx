@@ -183,9 +183,7 @@ export function animateChange(
   if (!document.startViewTransition) {
     pushWithoutNative(
       update,
-      surface === SLIDE_SURFACE.WORKSPACE
-        ? '.desktop-content'
-        : '#output-content',
+      surface === SLIDE_SURFACE.WORKSPACE ? '.content' : '#output-content',
       direction,
     );
     return;

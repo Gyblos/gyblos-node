@@ -11,3 +11,13 @@ export type ModelOption = ChatModel & {
   output: number;
   family?: string;
 };
+
+export type CatalogModel = ModelOption & {
+  family: string;
+  category: (typeof import('./constants.js').MODEL_CATEGORY)[keyof typeof import('./constants.js').MODEL_CATEGORY];
+  context: string;
+  providers: number;
+};
+export type View =
+  (typeof import('./constants.js').UI_VIEW)[keyof typeof import('./constants.js').UI_VIEW];
+export type Mode = (typeof import('./constants.js').MODES)[number];

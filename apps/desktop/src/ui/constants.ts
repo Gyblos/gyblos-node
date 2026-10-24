@@ -1,5 +1,5 @@
 // Owns simulated UI catalogs and precomputed brand morph paths; never live network state.
-import type { ModelOption } from './model-types.js';
+import type { CatalogModel } from './model-types.js';
 
 export const CHAT_PHASE = {
   CONNECTING: 'connecting',
@@ -44,37 +44,6 @@ export const BUTTON_VARIANT = {
   SECONDARY: 'secondary',
   PRIMARY: 'primary',
 } as const;
-
-export const PREVIEW_MODE = { CHAT: 'Chat', CONNECT: 'Connect' } as const;
-export const PREVIEW_MODELS = [
-  {
-    id: 'qwen',
-    name: 'Qwen3 30B-A3B',
-    family: 'Qwen',
-    image: { src: './assets/models/qwen-color.svg' },
-    free: true,
-    input: 0,
-    output: 0,
-  },
-  {
-    id: 'gpt-oss',
-    name: 'gpt-oss 20B',
-    family: 'OpenAI',
-    image: { src: './assets/models/openai.svg', monochrome: true },
-    free: true,
-    input: 0,
-    output: 0,
-  },
-  {
-    id: 'llama',
-    name: 'Llama 3.3 70B',
-    family: 'Meta',
-    image: { src: './assets/models/meta-color.svg' },
-    free: false,
-    input: 0.12,
-    output: 0.35,
-  },
-] satisfies [ModelOption, ...ModelOption[]];
 
 // Derived once from the bundled Gyblos letter with the mockup geometry algorithm.
 export const SIGNATURE_GEOMETRY = {
@@ -154,3 +123,136 @@ export const MENU_GEOMETRY = {
 } as const;
 export const MOTION_CLEANUP_MS = 450;
 export const CONNECTION_BUDGET = { MAX_DAILY: 10000, CENTS: 100 } as const;
+
+export const UI_VIEW = {
+  CHAT: 'Chat',
+  CONNECT: 'Connect',
+  MODELS: 'Models',
+  ACTIVITY: 'Activity',
+} as const;
+export const UI_DIALOG = { BALANCE: 'balance', BUDGET: 'budget' } as const;
+export const MODEL_CATEGORY = {
+  EVERYDAY: 'Everyday',
+  REASONING: 'Reasoning',
+  WRITING: 'Writing',
+  CODING: 'Coding',
+} as const;
+export const MODEL_FILTER = {
+  ALL: 'All models',
+  FREE: 'Free',
+  REASONING: MODEL_CATEGORY.REASONING,
+  CODING: MODEL_CATEGORY.CODING,
+} as const;
+
+export const MODELS: [CatalogModel, CatalogModel, ...CatalogModel[]] = [
+  {
+    id: 'qwen',
+    name: 'Qwen3 30B-A3B',
+    family: 'Qwen',
+    image: { src: './assets/models/qwen-color.svg' },
+    category: MODEL_CATEGORY.EVERYDAY,
+    context: '32K',
+    providers: 12,
+    free: true,
+    input: 0,
+    output: 0,
+  },
+  {
+    id: 'oss',
+    name: 'gpt-oss 20B',
+    family: 'OpenAI',
+    image: { src: './assets/models/openai.svg', monochrome: true },
+    category: MODEL_CATEGORY.REASONING,
+    context: '128K',
+    providers: 8,
+    free: true,
+    input: 0,
+    output: 0,
+  },
+  {
+    id: 'llama',
+    name: 'Llama 3.3 70B',
+    family: 'Meta',
+    image: { src: './assets/models/meta-color.svg' },
+    category: MODEL_CATEGORY.WRITING,
+    context: '128K',
+    providers: 7,
+    free: false,
+    input: 0.12,
+    output: 0.35,
+  },
+  {
+    id: 'gemma',
+    name: 'Gemma 4 26B',
+    family: 'Google',
+    image: { src: './assets/models/gemma-color.svg' },
+    category: MODEL_CATEGORY.EVERYDAY,
+    context: '128K',
+    providers: 5,
+    free: false,
+    input: 0.08,
+    output: 0.24,
+  },
+  {
+    id: 'deepseek',
+    name: 'DeepSeek V4.1 Flash',
+    family: 'DeepSeek',
+    image: { src: './assets/models/deepseek-color.svg' },
+    category: MODEL_CATEGORY.CODING,
+    context: '128K',
+    providers: 16,
+    free: false,
+    input: 0.14,
+    output: 0.28,
+  },
+];
+
+export const MODES = [UI_VIEW.CHAT, UI_VIEW.CONNECT] as const;
+export const MODE_NAV = {
+  [UI_VIEW.CHAT]: [
+    { name: UI_VIEW.CHAT, label: 'Chat' },
+    { name: UI_VIEW.MODELS, label: 'Models' },
+    { name: UI_VIEW.ACTIVITY, label: 'Activity' },
+  ],
+  [UI_VIEW.CONNECT]: [
+    { name: UI_VIEW.CONNECT, label: 'Applications' },
+    { name: UI_VIEW.MODELS, label: 'Models' },
+    { name: UI_VIEW.ACTIVITY, label: 'Activity' },
+  ],
+} as const;
+export const ROUTE_ORDER = [
+  UI_VIEW.CHAT,
+  UI_VIEW.CONNECT,
+  UI_VIEW.MODELS,
+  UI_VIEW.ACTIVITY,
+] as const;
+export const SIDEBAR_MOTION_MS = 620;
+
+export const NETWORK_STATE = {
+  CONNECTING: 'connecting',
+  CONNECTED: 'connected',
+  PAUSED: 'paused',
+} as const;
+
+export const PREVIEW_CONNECT_MS = 1200;
+export const NETWORK_LABELS = {
+  [NETWORK_STATE.CONNECTING]: 'Connecting',
+  [NETWORK_STATE.CONNECTED]: 'Connected',
+  [NETWORK_STATE.PAUSED]: 'Paused',
+} as const;
+
+export const DEMO_AUTH = {
+  APPROVED: 'approved',
+  OFFLINE: 'offline',
+  BALANCE: 'balance',
+  LIMIT: 'limit',
+} as const;
+export const DEMO_ACCOUNT = {
+  REQUEST_COST: 0.001,
+  UNITS_PER_CREDIT: 1000,
+  TOP_UP: 10,
+  DEFAULT_BUDGET: 2,
+  TOAST_MS: 3000,
+  SAMPLE_REQUESTS: 4,
+} as const;
+export const NAVIGATION_WIDTH = { MIN: 96, MAX: 112 } as const;

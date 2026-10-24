@@ -1,0 +1,180 @@
+/* SVG motion follows each symbol; interactions run once and settle at rest. */
+.nav-glyph {
+  flex: 0 0 auto;
+  overflow: visible;
+  transform-origin: center;
+}
+.chat-dots {
+  opacity: 0;
+}
+.robot-eyes {
+  transform-origin: 128px 108px;
+}
+.chart-trace {
+  clip-path: inset(0 0 0 0);
+}
+.nav-item:is(:hover, :focus-visible) .chat-dots,
+.sidebar-moving .chat-dots {
+  opacity: 1;
+}
+.nav-item:is(:hover, :focus-visible) .typing-dot,
+.sidebar-moving .typing-dot {
+  animation: chat-type 480ms ease-in-out both;
+}
+.nav-item:is(:hover, :focus-visible) .typing-dot-1,
+.sidebar-moving .typing-dot-1 {
+  animation-delay: 55ms;
+}
+.nav-item:is(:hover, :focus-visible) .typing-dot-2,
+.sidebar-moving .typing-dot-2 {
+  animation-delay: 110ms;
+}
+.nav-item:is(:hover, :focus-visible) .robot-eyes,
+.sidebar-moving .robot-eyes {
+  animation: robot-blink 460ms ease-in-out;
+}
+/* Reveal the genuine globe artwork through ordered drawing masks; never rotate. */
+.globe-trace {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+}
+.nav-item:is(:hover, :focus-visible) .globe-rest,
+.sidebar-moving .globe-rest {
+  animation: globe-build-rest 760ms linear;
+}
+.nav-item:is(:hover, :focus-visible) .globe-trace,
+.sidebar-moving .globe-trace {
+  animation: globe-build-line 400ms var(--motion-ease) both;
+}
+.nav-item:is(:hover, :focus-visible) .globe-trace--latitude,
+.sidebar-moving .globe-trace--latitude {
+  animation-delay: 130ms;
+}
+.nav-item:is(:hover, :focus-visible) .globe-trace--meridian,
+.sidebar-moving .globe-trace--meridian {
+  animation-delay: 260ms;
+}
+.nav-item:is(:hover, :focus-visible) .plug-lower,
+.sidebar-moving .plug-lower {
+  animation: plug-connect-lower 460ms var(--motion-ease);
+}
+.nav-item:is(:hover, :focus-visible) .plug-upper,
+.sidebar-moving .plug-upper {
+  animation: plug-connect-upper 460ms var(--motion-ease);
+}
+.nav-item:is(:hover, :focus-visible) .chart-trace,
+.sidebar-moving .chart-trace {
+  animation: chart-draw 520ms var(--motion-ease);
+}
+
+/* Keep icon layout stable while the complete sidebar slides away. */
+.desktop-frame .sidebar .nav-item {
+  transition:
+    background-color 150ms ease,
+    color 150ms ease;
+}
+.desktop-frame .navigation-resizer {
+  width: 6px;
+  overflow: hidden;
+}
+.desktop-frame.sidebar-collapsed .navigation-resizer {
+  opacity: 0;
+  pointer-events: none;
+}
+.desktop-frame .sidebar-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 4px;
+  color: var(--muted);
+}
+.model-artwork.monochrome {
+  filter: brightness(0) invert(1);
+}
+.light .model-artwork.monochrome {
+  filter: brightness(0);
+}
+
+@keyframes chat-type {
+  0%,
+  100% {
+    opacity: 0;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-12px);
+  }
+  65% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes robot-blink {
+  0%,
+  30%,
+  70%,
+  100% {
+    transform: scaleY(1);
+  }
+  45%,
+  55% {
+    transform: scaleY(0.08);
+  }
+}
+@keyframes globe-build-rest {
+  0%,
+  99% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes globe-build-line {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes plug-connect-lower {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  30% {
+    transform: translate(-15px, 15px);
+  }
+}
+@keyframes plug-connect-upper {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  30% {
+    transform: translate(15px, -15px);
+  }
+}
+@keyframes chart-draw {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .desktop-frame *,
+  .desktop-frame ::before,
+  .desktop-frame ::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  .chat-dots {
+    display: none;
+  }
+}

@@ -11,6 +11,13 @@
 .motion-presence {
   display: contents;
 }
+.motion-presence[data-motion='enter'] > :not(.resize-handle) {
+  animation: surface-in var(--motion-enter) var(--motion-ease) both;
+}
+.motion-presence[data-motion='exit'] > :not(.resize-handle) {
+  animation: surface-out var(--motion-exit) var(--motion-leave-ease) both;
+  pointer-events: none;
+}
 .motion-presence[data-motion='enter'] > .modal::backdrop {
   animation: backdrop-in var(--motion-enter) ease-out both;
 }
@@ -42,6 +49,15 @@
   to {
     translate: calc(50vw + 50%) 0;
   }
+}
+.motion-presence[data-motion='enter'] > .desktop-library {
+  animation-name: library-in;
+}
+.motion-presence[data-motion='exit'] > .desktop-library {
+  animation-name: library-out;
+}
+.desktop-library {
+  overflow: clip;
 }
 /* Both snapshots travel the same distance and timing without cross-fading. */
 html[data-slide-direction='backward'] {
@@ -113,12 +129,19 @@ html[data-slide-surface='agent-output'] #output-content {
 ::view-transition {
   pointer-events: none;
 }
-.messages > .message {
+.messages > .message,
+.thinking,
+.output-scroll > * {
   animation: content-in 180ms var(--motion-ease) both;
 }
+.desktop-frame .app-body,
 .desktop-frame .sidebar,
+.desktop-frame .topbar,
 .desktop-frame .chat-page,
-.desktop-frame .composer {
+.desktop-frame .composer,
+.desktop-frame .desktop-editor,
+.desktop-frame .desktop-output,
+.desktop-frame .desktop-library {
   transition:
     background-color 180ms ease,
     color 180ms ease;
@@ -231,7 +254,18 @@ button {
 }
 
 /* Backdrops stay anchored while their panel moves. */
+.motion-presence[data-motion='enter'] > .library-backdrop {
+  animation: backdrop-in var(--motion-enter) ease both;
+}
+.motion-presence[data-motion='exit'] > .library-backdrop {
+  animation: backdrop-out var(--motion-exit) ease both;
+}
 /* Navigation, task signature and network flow may move; other controls stay still. */
+.desktop-frame svg:not(.nav-glyph):not(.signal-mark):not(.network-glyph),
+.desktop-frame svg:not(.nav-glyph):not(.signal-mark):not(.network-glyph) * {
+  animation: none !important;
+  transition: none !important;
+}
 
 /* Intrinsic-height expansion works without experimental details interpolation. */
 .motion-presence.motion-expand {

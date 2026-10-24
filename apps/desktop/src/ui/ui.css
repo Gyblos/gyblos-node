@@ -36,6 +36,21 @@
   background: var(--raised);
   color: var(--ink);
 }
+.desktop-frame .ui-button--secondary {
+  background: var(--raised);
+  color: var(--ink);
+}
+.desktop-frame .ui-button--secondary:hover:not(:disabled) {
+  background: var(--line);
+}
+.desktop-frame .ui-button--primary {
+  background: var(--accent);
+  color: var(--primary-ink, #10232d);
+}
+.desktop-frame .ui-button--primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent), white 12%);
+  color: var(--primary-ink, #10232d);
+}
 .desktop-frame .ui-button:disabled {
   opacity: 0.4;
   cursor: default;
@@ -126,6 +141,34 @@
   padding: 0;
   margin: 0;
 }
+.desktop-frame .breadcrumb h1 {
+  margin: 0;
+  font-size: var(--ui-font);
+  line-height: 18px;
+  font-weight: 500;
+}
+.desktop-frame .ui-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.desktop-frame .ui-toolbar > .ui-search {
+  flex: 1;
+  min-width: 180px;
+  max-width: 360px;
+}
+.desktop-frame .ui-segmented {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  background: var(--side-elevated);
+}
+.desktop-frame .ui-segmented .ui-button[aria-pressed='true'] {
+  color: var(--selected-ink);
+  background: var(--selected-surface);
+}
 .desktop-frame .ui-section-title {
   display: flex;
   align-items: center;
@@ -208,6 +251,22 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.desktop-frame .ui-price {
+  min-width: 116px;
+  text-align: right;
+}
+.desktop-frame .ui-price strong {
+  font-size: var(--ui-font);
+  font-weight: 500;
+  line-height: 17px;
+  color: var(--blue);
+}
+.desktop-frame .ui-price small {
+  display: block;
+  font-size: 10px;
+  line-height: 15px;
+  color: var(--dim);
+}
 .desktop-frame .ui-info-bar {
   display: flex;
   align-items: center;
@@ -244,6 +303,13 @@
   height: 16px;
   flex: 0 0 16px;
 }
+.desktop-frame .ui-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border: 1px solid var(--subtle-line);
+  background: var(--panel);
+  overflow: hidden;
+}
 .desktop-frame .ui-stat {
   min-width: 0;
   min-height: 88px;
@@ -271,6 +337,23 @@
   font-size: 10px;
   line-height: 14px;
   color: var(--dim);
+}
+.desktop-frame .ui-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted);
+  font-size: var(--ui-detail);
+}
+.desktop-frame .ui-row-time {
+  font-size: var(--ui-detail);
+  color: var(--dim);
+  min-width: 62px;
+}
+.desktop-frame .ui-amount {
+  font-size: var(--ui-font);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
 }
 .desktop-frame .ui-list-empty {
   padding: 12px;
@@ -338,6 +421,7 @@
   overflow: hidden;
 }
 .desktop-frame .chat-stage.is-empty {
+  justify-content: center;
   justify-content: safe center;
   overflow: auto;
   padding-block: 16px;
@@ -482,8 +566,27 @@
 .desktop-frame .modal > .ui-list {
   margin-bottom: 8px;
 }
+.desktop-frame .modal > .quiet {
+  margin: 8px 0;
+}
 .desktop-frame .compact-picker .ui-row-trailing {
   gap: 6px;
+}
+.desktop-frame .agent-search-field {
+  margin: 8px;
+  flex-shrink: 0;
+}
+.desktop-frame .output-scroll > .ui-empty {
+  min-height: 100%;
+}
+.desktop-frame .sidebar-meta .ui-icon-button {
+  width: var(--control-size);
+  height: var(--control-size);
+}
+.desktop-frame .sidebar-toggle > svg {
+  animation: none;
+  transition: none;
+  transform: none;
 }
 @media (max-width: 700px) {
   .desktop-frame {
@@ -493,13 +596,30 @@
   .desktop-frame .ui-row-trailing {
     gap: 8px;
   }
+  .desktop-frame .ui-row-time {
+    display: none;
+  }
   .desktop-frame .composer-wrap {
     padding: 8px 10px 10px;
   }
 }
 @media (max-width: 480px) {
+  .desktop-frame .ui-toolbar > .ui-search {
+    max-width: none;
+    flex-basis: 100%;
+  }
   .desktop-frame .composer-actions > span {
     display: none;
+  }
+  .desktop-frame .ui-status {
+    font-size: 0;
+    gap: 0;
+  }
+  .desktop-frame .ui-price {
+    min-width: 84px;
+  }
+  .desktop-frame .ui-price small {
+    max-width: 100px;
   }
   .desktop-frame .ui-stat {
     padding: 8px;
@@ -507,6 +627,27 @@
 }
 
 /* Compact dialog details and header metadata share the same scale. */
+.desktop-frame .balance-display {
+  padding: 12px;
+  gap: 8px;
+}
+.desktop-frame .balance-display > strong {
+  font-size: 24px;
+  line-height: 28px;
+}
+.desktop-frame .balance-display > svg {
+  width: 24px;
+  height: 24px;
+}
+.desktop-frame .paid-terms > div {
+  padding: 8px 0;
+  font-size: var(--ui-font);
+  line-height: 18px;
+}
+.desktop-frame .paid-model-summary {
+  margin: 8px 0;
+  font-size: var(--ui-font);
+}
 .desktop-frame .modal-note {
   margin: 10px 0;
   font-size: var(--ui-detail);
@@ -516,6 +657,19 @@
   height: var(--control-size);
   padding: 0 8px;
   font-size: var(--ui-font);
+}
+.desktop-frame .command-trigger kbd {
+  margin-left: 2px;
+}
+.desktop-frame .balance-button > svg:last-child {
+  margin-left: 0;
+}
+.desktop-frame .output-tabs > .ui-button[aria-selected='true'] {
+  color: var(--ink);
+  background: var(--raised);
+}
+.desktop-frame .library-scroll > .ui-row {
+  padding-inline: 8px;
 }
 
 /* Compact choice rows are shared by all searchable menus. */
@@ -649,11 +803,82 @@
 .desktop-frame .tool-connections {
   margin-top: 18px;
 }
+
+/* Shared status footer: compact metadata, no duplicate sidebar status. */
+.desktop-frame .app-footer {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 30px;
+  padding: 0 8px 4px;
+  font-size: 10px;
+  color: var(--muted);
+}
+.desktop-frame .app-footer .ui-button {
+  height: 24px;
+  min-height: 24px;
+  font-size: 10px;
+  padding: 0 4px;
+}
+.footer-version {
+  margin-left: auto;
+  white-space: nowrap;
+}
+.desktop-frame .app-footer .network-status {
+  flex-direction: row;
+  width: auto;
+  padding: 3px 4px;
+  background: transparent;
+  gap: 6px;
+}
+.app-footer .network-status-copy {
+  flex-direction: row;
+  align-items: center;
+  gap: 5px;
+}
+.app-footer .network-status-symbol svg {
+  width: 14px;
+  height: 14px;
+}
+.desktop-frame .app-footer .network-status-copy > span {
+  display: none;
+}
+.desktop-frame .app-footer .network-status-copy strong {
+  max-width: none;
+  font-size: 10px;
+}
+.app-footer
+  .network-status[data-state='connected']
+  :is(.network-status-symbol, strong, .network-glyph) {
+  color: var(--connected);
+}
+.app-footer .network-status[data-state='connected'] .network-status-dot {
+  background: var(--connected);
+}
 .connection-location {
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: var(--ui-font);
+  color: var(--muted);
+}
+.wallet-details {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.wallet-address {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.wallet-address code {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 11px;
   color: var(--muted);
 }
 .desktop-frame .connection-form .instructions-toggle {
@@ -662,17 +887,203 @@
 .desktop-frame .connection-form .ui-row small {
   white-space: normal;
 }
+.desktop-frame .wallet-details :is(.field-label, .modal-note, .ui-note) {
+  margin: 0;
+}
+
+/* Work reuses the agent workflow, with independent result/activity scroll areas. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.work-panel-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--ui-font);
+  font-weight: 500;
+}
+.desktop-frame .desktop-output > .motion-presence {
+  flex-shrink: 0;
+}
+.work-activity {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.work-activity-scroll {
+  min-height: 0;
+  overflow: auto;
+  padding: 0 10px 6px;
+}
+.desktop-frame .work-activity .pane-heading {
+  min-height: 28px;
+  padding: 4px 10px;
+  flex-shrink: 0;
+}
+.work-activity .agent-steps {
+  margin: 4px 0;
+}
+.work-activity .agent-steps li {
+  font-size: 11px;
+  padding: 3px 0;
+}
+.desktop-frame .app-footer {
+  border-top: 1px solid var(--subtle-line);
+}
+
+/* The status strip spans both navigation and work area. */
 .app.desktop-frame {
   display: grid;
   grid-template-columns: var(--navigation-width) 8px minmax(0, 1fr);
   grid-template-rows: 48px minmax(0, 1fr) 30px;
 }
+.desktop-frame > .sidebar {
+  grid-column: 1;
+  grid-row: 1 / 3;
+  min-height: 0;
+}
+.desktop-frame > .navigation-resizer {
+  grid-column: 2;
+  grid-row: 2;
+}
+.desktop-frame > .app-body {
+  grid-column: 3;
+  grid-row: 2;
+  min-height: 0;
+}
+.desktop-frame > .app-footer {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  padding: 0 8px;
+}
+.app.desktop-frame.sidebar-collapsed {
+  grid-template-columns: 0 0 minmax(0, 1fr);
+}
+@media (max-width: 700px) {
+  .app.desktop-frame:not(.sidebar-collapsed) {
+    grid-template-columns: var(--navigation-width) 0 minmax(0, 1fr);
+  }
+}
 
 /* Theme and Settings share one compact baseline in the expanded rail. */
+.desktop-frame .sidebar-bottom {
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Agent selectors share Chat controls; wrap rather than clip on narrow panes. */
+.desktop-frame .editor-controls {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px 8px;
+}
 
 /* Running tasks prioritize output without losing the editable draft. */
+.agent-editor-details {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  opacity: 1;
+  transition: opacity 160ms ease;
+}
+.agent-task-summary {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+.desktop-frame .desktop-output {
+  transition:
+    height 260ms var(--motion-ease),
+    width 260ms var(--motion-ease);
+}
+.desktop-main-panes.is-result-focused {
+  gap: 6px;
+}
+.is-result-focused .agent-editor-details {
+  opacity: 0;
+  visibility: hidden;
+}
+.desktop-frame .is-result-focused .desktop-editor {
+  min-height: 96px;
+}
+.desktop-agent-panes.wide .is-result-focused .desktop-editor {
+  flex: 0 0 250px;
+  min-width: 240px;
+}
+.desktop-agent-panes.wide .is-result-focused .desktop-output {
+  flex: 1;
+}
+.desktop-frame .work-panel-title .signal-mark {
+  width: 32px;
+  height: 24px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .agent-editor-details,
+  .desktop-frame .desktop-output {
+    transition: none;
+  }
+}
+
+.desktop-agent-panes.stacked .is-result-focused .desktop-output {
+  max-height: calc(100% - 102px);
+}
+
+.agent-stream-text {
+  white-space: pre-wrap;
+  line-height: 1.8;
+  margin: 12px 0;
+  font-size: var(--ui-font);
+}
 
 /* Global mode tabs sit next to the brand, above contextual navigation. */
+.desktop-frame > .topbar {
+  grid-column: 3;
+  grid-row: 1;
+  min-width: 0;
+}
+
+.desktop-frame > .topbar .breadcrumb {
+  gap: 8px;
+  min-width: 0;
+}
+.desktop-frame > .sidebar {
+  padding-top: 8px;
+}
+
+/* Sidebar-owned controls start at the window edge, above its own menu. */
+.sidebar-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  width: 100%;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+.desktop-frame .sidebar-controls .ui-icon-button {
+  width: 24px;
+  padding: 4px;
+}
+.desktop-frame .sidebar-controls .ui-segmented {
+  padding: 2px;
+  gap: 0;
+  background: var(--raised);
+}
 .ui-tooltip {
   position: fixed;
   top: anchor(bottom);
@@ -704,6 +1115,16 @@
   opacity: 1;
   translate: 0 0;
 }
+.sidebar .ui-tooltip {
+  top: anchor(top);
+  left: anchor(right);
+  margin: 0 0 0 var(--overlay-gap);
+}
+.sidebar-controls .ui-tooltip {
+  top: anchor(bottom);
+  left: anchor(left);
+  margin: var(--overlay-gap) 0 0;
+}
 @media (prefers-reduced-motion: reduce) {
   .ui-tooltip {
     transition: none;
@@ -714,8 +1135,59 @@
 .app.desktop-frame {
   position: relative;
 }
+.desktop-frame > .sidebar {
+  width: var(--navigation-width);
+  min-width: var(--navigation-width);
+  opacity: 1;
+  visibility: visible;
+  translate: none;
+  transition:
+    opacity 180ms ease,
+    translate var(--motion-push) var(--motion-ease),
+    visibility 0s;
+}
+.app.desktop-frame.sidebar-moving {
+  transition: grid-template-columns var(--motion-push) var(--motion-ease);
+}
+.desktop-frame.sidebar-moving > .sidebar {
+  overflow: hidden;
+}
+.desktop-frame.sidebar-collapsed > .sidebar {
+  opacity: 0;
+  visibility: hidden;
+  translate: -14px 0;
+  pointer-events: none;
+  transition:
+    opacity 150ms ease,
+    translate var(--motion-push) var(--motion-ease),
+    visibility 0s var(--motion-push);
+}
+
+.sidebar-restore {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 100;
+}
+.desktop-frame .sidebar-restore .sidebar-toggle {
+  width: 24px;
+}
+.desktop-frame.sidebar-collapsed > .topbar .breadcrumb {
+  padding-left: 32px;
+}
 
 /* One content inset for Chat, Connect, Models and Activity. */
 .desktop-frame .content {
   padding: var(--page-top) var(--page-gutter) var(--page-gutter);
+}
+.desktop-frame > .topbar {
+  margin: 4px var(--page-gutter) 0;
+  flex-shrink: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .app.desktop-frame.sidebar-moving,
+  .desktop-frame > .sidebar,
+  .desktop-frame.sidebar-collapsed > .sidebar {
+    transition: none;
+  }
 }

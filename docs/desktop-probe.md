@@ -4,7 +4,8 @@ An experimental macOS Apple Silicon Electron app, built inside this workspace.
 The normal window reuses the approved mockup's Chat, shared controls, searchable
 model/tool dropdowns, history, motion, SVG signature, palette and local artwork.
 Connect reuses its tool list and model/budget editor; no external tool is
-launched.
+launched. Models, Activity, demo wallet, Settings, appearance, the adjustable
+sidebar and full-width status footer use the same mockup components and styles.
 
 Chat responses stream synthetic text. Stop preserves the generated prefix; new
 chats and history keep their own drafts. Switching Chat/Connect preserves
@@ -12,9 +13,11 @@ mounted conversation state. All conversations, theme choices and connection
 budgets are in memory and clear when the app closes. They are not saved to the
 product home.
 
-The sample models, prices, free labels and budgets are illustrative, not live
-availability, payment authorization or enforced spending limits. The footer says
-Local simulation and Wallet not connected. No inference, web tool, gateway,
+The five sample models, prices, free labels and connection budgets are illustrative,
+not live availability, payment authorization or enforced tool spending limits.
+The chat daily-limit check uses demo credits only. The footer explicitly labels
+the connection as simulated and the wallet as a demo. The synthetic address
+cannot receive funds; copying it may be unavailable under Electron isolation. No inference, web tool, gateway,
 wallet, existing configuration or remote network is used by this UI.
 
 ## Run locally
