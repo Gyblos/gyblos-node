@@ -9,6 +9,7 @@ export async function handleIrohConnection(
   connection: Connection,
   respond: (stream: BiStream) => Promise<void>,
   isClosed: () => boolean,
+  options: { idleMs?: number; receiveBytes?: number } = {},
 ) {
   let inFlight = 0;
   let retiring = false;
@@ -21,7 +22,11 @@ export async function handleIrohConnection(
     clearTimeout(idle);
     if (inFlight === 0 && !isClosed() && !finished) {
       if (retiring) closeIfIdle();
-      else idle = setTimeout(closeIfIdle, IROH_DEADLINES.connectionIdleMs);
+      else
+        idle = setTimeout(
+          closeIfIdle,
+          options.idleMs ?? IROH_DEADLINES.connectionIdleMs,
+        );
     }
   };
   const lifetime = setTimeout(() => {
@@ -30,8 +35,10 @@ export async function handleIrohConnection(
   }, IROH_DEADLINES.connectionLifetimeMs);
   try {
     connection.setReceiveWindow(
-      BigInt(HTTP_OVER_IROH.bodyBytes + HTTP_OVER_IROH.headerBytes) *
-        BigInt(TRANSPORT_LIMITS.maxPeerConcurrent),
+      BigInt(
+        options.receiveBytes ??
+          HTTP_OVER_IROH.bodyBytes + HTTP_OVER_IROH.headerBytes,
+      ) * BigInt(TRANSPORT_LIMITS.maxPeerConcurrent),
     );
     connection.setMaxConcurrentBiStreams(
       BigInt(TRANSPORT_LIMITS.maxPeerConcurrent),

@@ -1,6 +1,9 @@
 // Operator-tunable P2P capacity, rate and timeout values shared by the Iroh transport, the seller and the
 // buyer proxy. Wire framing limits and internal deadlines belong to @gyblos/transport-iroh.
 export const TRANSPORT_LIMITS = {
+  connectionAttemptsPerWindow: 256,
+  connectionAttemptsPerSource: 32,
+  connectionAttemptsPerPeer: 30,
   maxConcurrent: 2,
   maxPeerConcurrent: 1,
   maxConnections: 8,

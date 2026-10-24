@@ -1,0 +1,35 @@
+{
+  "retrieved": "2026-10-23",
+  "assets": [
+    {
+      "file": "claudecode-color.svg",
+      "source": "https://raw.githubusercontent.com/lobehub/lobe-icons/7d7d0379f18b114a4009dc5cb85a7c375284f31b/packages/static-svg/icons/claudecode-color.svg",
+      "sha256": "670b3d8d749d0815ad8f7e62a59d51cb5e2053cb19403f3541a8aed7036a877f"
+    },
+    {
+      "file": "codex.svg",
+      "source": "https://raw.githubusercontent.com/lobehub/lobe-icons/7d7d0379f18b114a4009dc5cb85a7c375284f31b/packages/static-svg/icons/codex.svg",
+      "sha256": "d08b4e824cd6727e89617f59e4737273ff53e44c1da849d016dd64dfd08b33e1"
+    },
+    {
+      "file": "exa.svg",
+      "source": "https://raw.githubusercontent.com/lobehub/lobe-icons/7d7d0379f18b114a4009dc5cb85a7c375284f31b/packages/static-svg/icons/exa.svg",
+      "sha256": "b1ae01ccce6798d7b9a129807e0fb9b0629cc035f4ead27d6300ab2adde792bb"
+    },
+    {
+      "file": "firecrawl-color.svg",
+      "source": "https://raw.githubusercontent.com/lobehub/lobe-icons/7d7d0379f18b114a4009dc5cb85a7c375284f31b/packages/static-svg/icons/firecrawl-color.svg",
+      "sha256": "98993b111d1cb75edd0b1ce3a1e8bd3f85dcf5548072ffb959ac97ffe69ade59"
+    },
+    {
+      "file": "tinyfish.svg",
+      "source": "https://tinyfish.ai/favicon-for-app/icon0.svg",
+      "sha256": "3141625032019b3d3e5242716d243abb70fb2afa27f4f744a4ccb620013214d1"
+    },
+    {
+      "file": "pi.svg",
+      "source": "https://pi.dev/logo-auto.svg"
+    }
+  ],
+  "license": "Lobe Icons SVGs use MIT; see ../models/lobe-icons-LICENSE.txt. Brand rights remain with their owners. TinyFish mark from official site."
+}

@@ -234,10 +234,18 @@ export async function createControlQuote(
 ): Promise<SignedOfferV2> {
   const query = parseOfferQuery(value, context.remoteNodeId);
   const now = controlInteger(context.now());
-  const state = readReadiness(context);
   const initialCatalog = catalogSnapshot(context.catalog) ?? controlFail();
-  checkReadiness(context, state, now);
   const catalog = await trustedCatalog(context, now);
+  // Selection refusal precedes availability observations, signing and all runtime work.
+  selectedModel(query, catalog);
+  const mapped = context.models.find((item) =>
+    sameSelection(item.selection, query.params.selection),
+  );
+  if (!mapped) return controlFail(CONTROL_CODES.MODEL);
+  if (!mapped.reasoning.includes(query.params.reasoning))
+    return controlFail(CONTROL_CODES.LEVEL);
+  const state = readReadiness(context);
+  checkReadiness(context, state, now);
   const offer = await buildQuote(query, context, state, catalog, now);
   unchangedReadiness(context, state, controlInteger(context.now()));
   // Capture signed data, recheck after asynchronous signing, and never publish a cancelled/stale result.

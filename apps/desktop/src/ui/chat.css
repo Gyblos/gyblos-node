@@ -1,0 +1,287 @@
+/* The Gyblos conversation: calm reading surface, compact controls, a small ASCII signal. */
+.chat-root:not([hidden]) {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+.chat-root[hidden] {
+  display: none;
+}
+.chat-start {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  text-align: center;
+}
+.chat-start h2 {
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 500;
+}
+.chat-start p {
+  color: var(--muted);
+  font-size: 12px;
+}
+.chat-transcript {
+  max-width: 720px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  padding: 20px 0 28px;
+}
+.chat-user {
+  align-self: flex-end;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 86%;
+  padding: 10px 12px;
+  background: var(--raised);
+}
+.chat-user p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.chat-user .ui-icon-button {
+  flex-shrink: 0;
+}
+.chat-answer {
+  color: var(--ink);
+  min-width: 0;
+}
+.answer-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.reply-text {
+  font-size: 13px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.reply-text h3 {
+  font-size: 16px;
+  line-height: 1.5;
+  font-weight: 500;
+  margin: 12px 0 8px;
+}
+.reply-text p {
+  margin: 10px 0;
+  max-width: 76ch;
+}
+.reply-text strong {
+  font-weight: 550;
+}
+.reply-list-item {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 7px 0;
+}
+.reply-list-item > span:first-child {
+  color: var(--blue);
+}
+.reply-text pre {
+  padding: 14px;
+  margin: 12px 0;
+  overflow: auto;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  font:
+    11px/1.8 GeistMono,
+    monospace;
+}
+.run-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 11px;
+  min-height: 28px;
+  margin: 8px 0;
+}
+.ascii-state {
+  font:
+    11px GeistMono,
+    monospace;
+  color: var(--blue);
+}
+.run-preview {
+  color: var(--dim);
+  margin-left: auto;
+  font-size: 10px;
+}
+.answer-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  margin-top: 10px;
+}
+.answer-state {
+  font-size: 10px;
+  color: var(--dim);
+  margin-right: 4px;
+}
+.desktop-frame .run-details-trigger {
+  margin-left: auto;
+  font-size: 10px;
+}
+.run-details {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  padding: 10px 12px;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.8;
+}
+.signal-trace {
+  margin: 0 0 6px;
+  white-space: pre;
+  overflow: auto;
+  font:
+    10px/1.8 GeistMono,
+    monospace;
+  color: var(--blue);
+}
+.stopped-note {
+  color: var(--muted);
+  font-size: 12px;
+}
+.desktop-frame .enhanced-chat .composer textarea {
+  height: auto;
+  max-height: 160px;
+  overflow-y: auto;
+}
+.composer-leading {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 4px;
+}
+.desktop-frame .composer-leading .composer-model {
+  max-width: none;
+  min-width: 0;
+}
+.desktop-frame .chat-tools-button {
+  font-size: 11px;
+}
+.desktop-frame .chat-tools-button.has-tools {
+  color: var(--blue);
+  background: var(--soft);
+}
+.chat-notice {
+  font-size: 11px;
+  color: var(--muted);
+  padding: 8px 4px;
+}
+.latest-wrap {
+  height: 0;
+  position: relative;
+  z-index: 2;
+  display: flex;
+  justify-content: center;
+}
+.latest-wrap > button {
+  position: absolute;
+  bottom: 8px;
+  box-shadow: 0 4px 18px #0003;
+}
+.tool-connections {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.tool-request-preview {
+  max-height: 100px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  background: var(--editor);
+  padding: 10px;
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 700px) {
+  .composer-leading {
+    gap: 2px;
+  }
+  .desktop-frame .composer-model {
+    font-size: 10px;
+  }
+  .desktop-frame .composer-actions > span {
+    display: none;
+  }
+  .chat-transcript {
+    padding: 12px 0 20px;
+    gap: 20px;
+  }
+}
+@media (max-width: 480px) {
+  .composer-leading .composer-model .model-artwork {
+    display: none;
+  }
+  .desktop-frame .chat-tools-button {
+    padding-inline: 4px;
+  }
+}
+
+/* One stationary action shell; only its glyph opacity and surface color change. */
+.desktop-frame .ui-composer-action {
+  position: relative;
+  transition:
+    background var(--motion-overlay) var(--motion-ease),
+    color var(--motion-overlay) var(--motion-ease),
+    opacity var(--motion-overlay) var(--motion-ease);
+}
+.ui-composer-action > span {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  transition: opacity var(--motion-overlay) var(--motion-ease);
+}
+.composer-stop-glyph,
+.ui-composer-action[data-busy='true'] .composer-send-glyph {
+  opacity: 0;
+}
+.ui-composer-action[data-busy='true'] .composer-stop-glyph {
+  opacity: 1;
+}
+.chat-transcript > article {
+  animation: message-arrive var(--motion-enter) var(--motion-ease) both;
+}
+.chat-transcript > .chat-answer {
+  animation-delay: 60ms;
+}
+@keyframes message-arrive {
+  from {
+    opacity: 0;
+    translate: 0 12px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .desktop-frame .ui-composer-action,
+  .ui-composer-action > span {
+    transition: none;
+  }
+  .chat-transcript > article {
+    animation: none;
+  }
+}

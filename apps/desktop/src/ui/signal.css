@@ -1,0 +1,279 @@
+/* One deliberate exception to static control icons: the Gyblos task signature. */
+.signal-mark {
+  --signal-orbit-period: 2400ms;
+  --signal-morph-period: 480ms;
+  --signal-rail-fade: 160ms;
+  display: inline-block;
+  width: 38px;
+  height: 29px;
+  flex-shrink: 0;
+  overflow: visible;
+  vertical-align: middle;
+}
+.signal-mark:is([data-expression='connecting'], [data-expression='working']) {
+  --signal-orbit-period: 1400ms;
+  --signal-morph-period: 460ms;
+  --signal-rail-fade: 100ms;
+}
+.chat-start > .signal-mark {
+  width: 64px;
+  height: 48px;
+  margin-bottom: 4px;
+}
+.signal-mark path {
+  transition:
+    d var(--signal-morph-period) cubic-bezier(0.22, 1, 0.36, 1),
+    transform var(--signal-morph-period) cubic-bezier(0.22, 1, 0.36, 1);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.signal-mark[data-face='true'] .signal-eyes {
+  d: var(--signal-eyes);
+}
+.signal-mark[data-face='true'] .signal-mouth {
+  d: var(--signal-mouth);
+}
+.signal-foil-stop {
+  stop-color: #69c7e8;
+}
+.signal-foil-stop:nth-child(2) {
+  stop-color: #b9b9ed;
+}
+.signal-foil-stop:nth-child(3) {
+  stop-color: #f3cfe0;
+}
+.signal-foil-stop:nth-child(4) {
+  stop-color: #7bd2e4;
+}
+.light .signal-foil-stop {
+  stop-color: #176b91;
+}
+.light .signal-foil-stop:nth-child(2) {
+  stop-color: #695294;
+}
+.light .signal-foil-stop:nth-child(3) {
+  stop-color: #985a80;
+}
+.light .signal-foil-stop:nth-child(4) {
+  stop-color: #287f8c;
+}
+.signal-mark[data-working='true'] .signal-foil-stop {
+  animation: signal-foil-color 3600ms ease-in-out infinite alternate;
+}
+.signal-mark[data-working='true'] .signal-foil-stop:nth-child(2) {
+  animation-delay: -1800ms;
+}
+.signal-mark[data-working='true'] .signal-foil-stop:nth-child(3) {
+  animation-delay: -900ms;
+}
+.signal-mark[data-working='true'] .signal-foil-stop:nth-child(4) {
+  animation-delay: -2700ms;
+}
+.light .signal-mark[data-working='true'] .signal-foil-stop {
+  animation-name: signal-foil-color-light;
+}
+/* Each traveler keeps its own hue through a crossing; the overlap blends light. */
+.signal-trail-stop--left {
+  stop-color: #6cc6ec;
+}
+.signal-trail-stop--left:nth-child(2) {
+  stop-color: #b6edff;
+}
+.signal-trail-stop--right {
+  stop-color: #b9b9ed;
+}
+.signal-trail-stop--right:nth-child(2) {
+  stop-color: #f3cfe0;
+}
+.light .signal-trail-stop--left {
+  stop-color: #176b91;
+}
+.light .signal-trail-stop--left:nth-child(2) {
+  stop-color: #287f8c;
+}
+.light .signal-trail-stop--right {
+  stop-color: #695294;
+}
+.light .signal-trail-stop--right:nth-child(2) {
+  stop-color: #985a80;
+}
+.signal-mark[data-working='true'] .signal-trail-stop {
+  animation: signal-foil-sheen 3600ms ease-in-out infinite alternate;
+}
+.signal-mark[data-working='true'] .signal-trail-stop:nth-child(2) {
+  animation-delay: -1800ms;
+}
+.signal-brackets {
+  isolation: isolate;
+}
+.signal-orbit {
+  mix-blend-mode: screen;
+}
+.light .signal-orbit {
+  mix-blend-mode: multiply;
+}
+@keyframes signal-foil-sheen {
+  from {
+    stop-opacity: 0.78;
+  }
+  to {
+    stop-opacity: 1;
+  }
+}
+.signal-mark .signal-bracket {
+  transition: opacity var(--signal-rail-fade) ease;
+}
+.signal-mark .signal-orbit {
+  opacity: 0;
+  stroke-dasharray: 34 66;
+  transition: opacity var(--signal-rail-fade) ease;
+}
+.signal-orbit-left {
+  stroke-dashoffset: -58;
+}
+.signal-orbit-right {
+  stroke-dashoffset: -8;
+}
+.signal-mark[data-working='true'] .signal-bracket {
+  opacity: 0;
+}
+.signal-mark[data-working='true'] .signal-orbit {
+  opacity: 1;
+}
+.signal-mark[data-working='true'] .signal-orbit-left {
+  animation: signal-square-counterclockwise var(--signal-orbit-period) linear
+    infinite;
+}
+.signal-mark[data-working='true'] .signal-orbit-right {
+  animation: signal-square-clockwise var(--signal-orbit-period) linear infinite;
+}
+.signal-mark[data-expression='connecting'] .signal-eyes {
+  animation: signal-look 1200ms ease-in-out infinite;
+}
+.signal-mark[data-expression='connecting'] .signal-mouth {
+  d: var(--signal-mouthSoft);
+}
+.signal-mark[data-expression='working'] .signal-eyes {
+  animation: signal-scan 1000ms ease-in-out infinite;
+  animation-delay: var(--signal-morph-period);
+}
+.signal-mark[data-expression='working'] .signal-mouth {
+  d: var(--signal-mouthFlat);
+}
+.signal-mark[data-expression='responding'] .signal-mouth {
+  animation: signal-speaking 1700ms ease-in-out infinite;
+  animation-delay: var(--signal-morph-period);
+}
+.signal-mark[data-expression='responding'] .signal-eyes {
+  animation: signal-blink 2400ms ease-in-out infinite;
+}
+.signal-mark[data-expression='complete'] .signal-eyes {
+  d: var(--signal-happy);
+}
+.signal-mark[data-expression='complete'] .signal-mouth {
+  d: var(--signal-mouthHappy);
+}
+.signal-mark[data-expression='stopped'] .signal-mouth,
+.signal-mark[data-expression='paused'] .signal-mouth {
+  d: var(--signal-mouthFlat);
+}
+.signal-mark[data-expression='paused'] .signal-eyes {
+  d: var(--signal-paused);
+}
+/* Original shared square, with continuous travel and no turnaround at overlap. */
+@keyframes signal-square-counterclockwise {
+  from {
+    stroke-dashoffset: -58;
+  }
+  to {
+    stroke-dashoffset: 42;
+  }
+}
+@keyframes signal-square-clockwise {
+  from {
+    stroke-dashoffset: -8;
+  }
+  to {
+    stroke-dashoffset: -108;
+  }
+}
+@keyframes signal-look {
+  0%,
+  100% {
+    transform: translate(-1px, 0);
+  }
+  45%,
+  65% {
+    transform: translate(2px, -1px);
+  }
+}
+@keyframes signal-scan {
+  0%,
+  100% {
+    d: var(--signal-eyes);
+  }
+  45% {
+    d: var(--signal-scanMiddle);
+  }
+  75% {
+    d: var(--signal-scanEnd);
+  }
+}
+@keyframes signal-speaking {
+  0%,
+  100% {
+    d: var(--signal-mouth);
+  }
+  35% {
+    d: var(--signal-mouthOpen);
+  }
+  70% {
+    d: var(--signal-mouthSoft);
+  }
+}
+@keyframes signal-blink {
+  0%,
+  40%,
+  48%,
+  100% {
+    transform: scaleY(1);
+  }
+  44% {
+    transform: scaleY(0.12);
+  }
+}
+@keyframes signal-foil-color {
+  0% {
+    stop-color: #69c7e8;
+  }
+  40% {
+    stop-color: #b9b9ed;
+  }
+  70% {
+    stop-color: #f3cfe0;
+  }
+  100% {
+    stop-color: #7bd2e4;
+  }
+}
+@keyframes signal-foil-color-light {
+  0% {
+    stop-color: #176b91;
+  }
+  40% {
+    stop-color: #695294;
+  }
+  70% {
+    stop-color: #985a80;
+  }
+  100% {
+    stop-color: #287f8c;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .signal-mark,
+  .signal-mark * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

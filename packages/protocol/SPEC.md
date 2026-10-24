@@ -201,13 +201,16 @@ are public discovery signatures, not signed payment authorizations. The
 signed-offer vectors in `vectors/signed-inference-offer-v1.json` are a separate
 set.
 
-## Additive control contracts (not a running listener)
+## Control contracts and Iroh runtime
 
 `./control-requests`, `./control-response`, `./control-framing` and
 `./control-types` expose the free `gyblos/control/1` contract;
 `./control-validation` exports `ControlError` and the bounded primitives that
 core reuses. Requests are `{ version: 1, requestId, method, params }`; methods
-are `catalog.get` and `offer.request`. Responses contain exactly one `result` or static typed `error`.
+are `catalog.get`, `presence.get` and `offer.request`. Catalog and presence queries
+have empty params. Responses contain exactly one `result` or static typed `error`.
+`matchControlResponse` binds every response (including errors) to the validated
+request ID and, for results, its method before the buyer authenticates signatures.
 `parseControlQuery` and `parseControlResponse` return detached validated values;
 parsing a response alone does not authenticate its signed result.
 
@@ -224,8 +227,9 @@ complete request digest and exact buyer/model/reasoning terms. Public signatures
 remain lowercase hex; private signatures remain Base64. V1 exports, domains and
 vectors are unchanged. V2 cache/sequence namespaces must be distinct from v1;
 presence and withdrawal references cannot cross versions. Time validation has
-zero clock-skew tolerance (`issuedAt > now` is rejected), as in v1; a bounded
-skew is an open decision before the listener lands.
+zero clock-skew tolerance (`issuedAt > now` is rejected), as in v1. The runtime
+retains zero: operators must synchronize clocks. A tolerance would widen quote
+acceptance and needs separate policy review; no expiry grace is applied.
 
 Version mapping: the `gyblos/control/1` ALPN (control version 1) carries v2
 records and offers; `gyblos/http/2` is a reserved future identifier, not a
@@ -241,16 +245,49 @@ Free prices are representable, not an implemented free-inference path. A quote
 is not a reservation, wallet proof, one-use token or payment authorization.
 
 `@gyblos/core/control-admission` supplies caller-owned connection/query leases
-with a monotonic fake-clock-testable policy. Future transport composition must
-admit before buffering/parsing, aggregate peers across connections, check leases
-on input and before publishing, release in every terminal path, and enforce SDK
+with a monotonic fake-clock-testable policy. The node runtime admits before
+buffering/parsing, aggregates peers across connections, checks leases on input
+and before publishing, releases in every terminal path, and enforces SDK
 connection/stream limits. A full peer table evicts the least recently touched
 entry with no open connection or query; it refuses only when every entry is
-active. No timer, endpoint or registry lookup starts on import. Intended rule,
-pending wiring: `CONTROL_CAPACITY` is a separate per-ALPN budget for control
+active. No timer, endpoint or registry lookup starts on import.
+`CONTROL_CAPACITY` is a separate per-ALPN budget for control
 streams, applied after the shared transport-iroh endpoint admission and its
 configured transport connection/peer limits, so a control connection must pass
-both. These values are proposed and may move to operator config.
+both. These values are initial safeguards, not measured production capacity.
+
+The shared `TRANSPORT_LIMITS` currently allow 8 established connections, 1 per
+NodeId and 2 active requests globally, 1 per NodeId; these stricter endpoint
+limits apply before the control limits (32/4 connections and active queries).
+Connection-open attempts share a 60-second fixed window: 256 globally, 32 per
+source address before validation and 30 per authenticated NodeId. Disconnecting
+does not reset rate debt. Unknown/invalid attempts consume the pre-auth budget;
+active handshakes retain their pending slot until native work settles.
+
+Each control stream has a 10-second absolute deadline including the complete
+frame and EOF, signing and response write. Control connection inactivity is
+10 seconds; the shared pre-ALPN handshake timeout remains 30 seconds. Request
+receive windows are bounded; oversized lengths are rejected before requesting
+the body. A rejected or timed-out stream closes its connection; no queue or
+late response is published. The buyer retains at most one pending native dial
+until it settles, closing any late connection after cancellation. A buyer
+client serializes its queries without a queue and reuses one connection.
+
+The seller registers `gyblos/control/1` alongside `gyblos/http/1`. Control
+requests never forward to the paid HTTP bridge, whose strict routes are
+unchanged. Catalogs map the startup-cached, warmed engine identity explicitly
+to its public model; only implemented reasoning levels (currently `off`) are
+announced. Busy/readiness state is observed from normal inference lifecycle,
+without querying or loading an engine on the control channel. Catalog and
+readiness expire at the existing warmup deadline; restart is required to
+refresh them. Quotes neither consume nor reserve capacity.
+
+`@gyblos/buyer/control` exposes `connectBuyerControl`, `getCatalog`,
+`getPresence` and `requestOffer` for one independently chosen/trusted seller.
+It binds the authenticated NodeId, configured relay policy, public signatures,
+catalog digest/sequence and exact quote terms using `acceptControlQuote`.
+This does not wire seller selection, the buyer proxy, paid v2 or free execution.
+Closing the client closes its connection, not the caller-owned endpoint.
 
 `vectors/control-v2.json` fixes request framing/digest, all three public records
 and owner-signed offer bytes using an independent Node/OpenSSL oracle. Only

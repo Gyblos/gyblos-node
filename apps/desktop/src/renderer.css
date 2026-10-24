@@ -1,21 +1,21 @@
 /* Compact shell extracted from the approved mockup; one geometry/spacing scale. */
-:root {
+.desktop-probe {
   font-family: Arial, sans-serif;
   font-size: 12px;
   --panel-radius: 16px;
   --control-radius: 10px;
 }
-* {
+.desktop-probe * {
   box-sizing: border-box;
 }
-body {
+.desktop-probe body {
   margin: 0;
 }
-button,
-textarea {
+.desktop-probe button,
+.desktop-probe textarea {
   font: inherit;
 }
-button {
+.desktop-probe button {
   border: 0;
   cursor: pointer;
   color: var(--ink);
@@ -24,10 +24,10 @@ button {
   min-width: 28px;
   height: 28px;
 }
-button:focus-visible {
+.desktop-probe button:focus-visible {
   outline: 2px solid var(--focus);
 }
-button:disabled {
+.desktop-probe button:disabled {
   opacity: 0.4;
   cursor: default;
 }
@@ -39,41 +39,41 @@ button:disabled {
   background: var(--bg);
   color: var(--ink);
 }
-aside {
+.desktop-probe aside {
   padding: 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 16px;
 }
-.modes {
+.desktop-probe .modes {
   display: flex;
   gap: 4px;
 }
-.sidebar-bottom {
+.desktop-probe .sidebar-bottom {
   margin-top: auto;
 }
-main {
+.desktop-probe main {
   min-width: 0;
   min-height: 0;
   padding: 0 16px 12px;
   display: flex;
   flex-direction: column;
 }
-header {
+.desktop-probe header {
   height: 48px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
-.badge {
+.desktop-probe .badge {
   background: var(--soft);
   color: var(--blue);
   padding: 4px 8px;
   border-radius: 999px;
 }
-.chat-panel {
+.desktop-probe .chat-panel {
   flex: 1;
   overflow: auto;
   background: var(--panel);
@@ -82,43 +82,43 @@ header {
   place-items: safe center;
   padding: 24px;
 }
-.welcome {
+.desktop-probe .welcome {
   width: 100%;
   max-width: 680px;
   text-align: center;
 }
-.signature {
+.desktop-probe .signature {
   width: 64px;
   height: 64px;
   object-fit: contain;
   color: var(--blue);
 }
-h1 {
+.desktop-probe h1 {
   font-size: 20px;
   font-weight: 500;
   margin: 16px 0 8px;
 }
-p {
+.desktop-probe p {
   color: var(--muted);
   line-height: 1.6;
 }
-.probe-result {
+.desktop-probe .probe-result {
   padding: 12px;
   margin: 24px 0;
   border-radius: var(--panel-radius);
   background: var(--raised);
 }
-.probe-result p {
+.desktop-probe .probe-result p {
   margin: 4px 0 0;
 }
-.composer {
+.desktop-probe .composer {
   text-align: left;
   background: var(--composer-surface);
   padding: 12px;
   border: 1px solid var(--line);
   border-radius: var(--panel-radius);
 }
-.composer textarea {
+.desktop-probe .composer textarea {
   resize: none;
   border: 0;
   width: 100%;
@@ -126,17 +126,17 @@ p {
   background: transparent;
   color: var(--muted);
 }
-.composer > div {
+.desktop-probe .composer > div {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 8px;
   color: var(--muted);
 }
-.composer button {
+.desktop-probe .composer button {
   border-radius: 50%;
 }
-footer {
+.desktop-probe footer {
   grid-column: 1 / -1;
   display: flex;
   align-items: center;
@@ -147,14 +147,14 @@ footer {
   color: var(--muted);
   font-size: 11px;
 }
-footer > :first-child {
+.desktop-probe footer > :first-child {
   color: var(--connected);
 }
 @media (max-width: 700px) {
-  .chat-panel {
+  .desktop-probe .chat-panel {
     padding: 16px;
   }
-  footer > :nth-child(2) {
+  .desktop-probe footer > :nth-child(2) {
     display: none;
   }
 }

@@ -47,12 +47,15 @@ export function parseControlQuery(value: unknown): ControlQuery {
   if (input.version !== CONTROL_VERSION)
     return controlFail(CONTROL_CODES.VERSION);
   const requestId = controlHex(input.requestId, CONTROL_LIMITS.requestIdBytes);
-  if (input.method === CONTROL_METHODS.CATALOG) {
+  if (
+    input.method === CONTROL_METHODS.CATALOG ||
+    input.method === CONTROL_METHODS.PRESENCE
+  ) {
     controlObject(input.params, []);
     return {
       version: CONTROL_VERSION,
       requestId,
-      method: CONTROL_METHODS.CATALOG,
+      method: input.method,
       params: {},
     };
   }

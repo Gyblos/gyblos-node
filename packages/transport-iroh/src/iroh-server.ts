@@ -7,6 +7,7 @@ import {
   TRANSPORT_LIMITS,
   TRANSPORT_TIMEOUTS,
 } from '@gyblos/config';
+import { CONTROL_ALPN, GYBLOS_ALPN } from '@gyblos/protocol/constants';
 
 import { connectionSource, createConnectionAdmission } from './admission.js';
 import {
@@ -14,6 +15,10 @@ import {
   IROH_DEADLINES,
   TRANSPORT_ROUTES,
 } from './constants.js';
+import {
+  handleControlConnection,
+  type ControlService,
+} from './control-server.js';
 import { withDeadline } from './deadline.js';
 import { handleIrohConnection } from './iroh-connection.js';
 import { createPeerLimiter } from './limiter.js';
@@ -29,6 +34,7 @@ export function serveIroh(
   endpoint: Endpoint,
   origin: string,
   relayOnly = false,
+  control?: ControlService,
 ) {
   const limiter = createPeerLimiter();
   const admission = createConnectionAdmission();
@@ -133,6 +139,30 @@ export function serveIroh(
       () => controller.abort(),
     );
     try {
+      const alpn = Buffer.from(connection.alpn()).toString();
+      if (alpn === CONTROL_ALPN && control) {
+        await handleControlConnection(
+          connection,
+          control,
+          controller.signal,
+          () => {
+            if (
+              relayOnly &&
+              selectedRoute(connection) !== TRANSPORT_ROUTES.RELAY
+            )
+              return undefined;
+            return limiter.enter(peer);
+          },
+          () => closed,
+          () =>
+            !relayOnly || selectedRoute(connection) === TRANSPORT_ROUTES.RELAY,
+        );
+        return;
+      }
+      if (alpn !== GYBLOS_ALPN) {
+        connection.close(streamCloseCode, []);
+        return;
+      }
       await handleIrohConnection(
         connection,
         (stream) => respond(stream, connection, controller.signal),
@@ -152,7 +182,8 @@ export function serveIroh(
       if (!incoming) break;
       try {
         const source = connectionSource(await incoming.remoteAddr());
-        if (!source) {
+        const allowed = admission.attempt(source ?? 'unknown');
+        if (!source || !allowed) {
           await incoming.refuse();
           continue;
         }

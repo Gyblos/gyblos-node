@@ -1,0 +1,110 @@
+/* Landing brand colors share the desktop density, geometry and hierarchy. */
+.appearance-mode {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: var(--ui-font);
+}
+.appearance-mode small {
+  display: block;
+  color: var(--muted);
+  margin-top: 3px;
+}
+.desktop-frame .theme-switch {
+  position: relative;
+  width: 44px;
+  height: 26px;
+  min-height: 26px;
+  padding: 0 5px;
+  gap: 6px;
+  background: var(--raised);
+  isolation: isolate;
+}
+.desktop-frame .theme-switch > svg {
+  width: 14px;
+  height: 14px;
+  z-index: 1;
+}
+.theme-switch-thumb {
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  width: 20px;
+  height: 20px;
+  background: var(--soft);
+  box-shadow: 0 1px 3px #0003;
+  transition:
+    transform 220ms ease,
+    background 220ms ease;
+}
+.theme-switch[aria-checked='true'] .theme-switch-thumb {
+  transform: translateX(18px);
+}
+.theme-switch[aria-checked='false'] > svg:first-of-type,
+.theme-switch[aria-checked='true'] > svg:last-of-type {
+  color: var(--accent);
+}
+.settings-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .theme-switch-thumb {
+    transition: none;
+  }
+}
+/* The landing's neutral layers separate the work surface from the shell. */
+.desktop-frame .chat-page,
+.desktop-frame .desktop-editor {
+  background: var(--canvas);
+}
+.desktop-frame .composer {
+  background: var(--composer-surface);
+}
+/* Reserve the blue accent for active states and meaningful actions. */
+.desktop-frame .ui-price strong {
+  color: var(--ink);
+}
+.desktop-frame .ui-row-trailing > svg,
+.desktop-frame .quick-actions .ui-button svg {
+  color: var(--muted);
+}
+.desktop-frame .ui-row[aria-pressed='true'] .ui-row-trailing > svg,
+.desktop-frame .ui-row[aria-pressed='true'] .ui-price strong {
+  color: var(--blue);
+}
+/* Rows use the same corners on hover/focus as every other compact action. */
+
+.desktop-frame .desktop-instructions {
+  padding: 4px 8px;
+}
+.desktop-frame .instructions-toggle {
+  justify-content: flex-start;
+  width: 100%;
+}
+.desktop-frame .instructions-toggle[aria-expanded='true'] {
+  color: var(--ink);
+  background: var(--raised);
+}
+.desktop-frame .instructions-body p {
+  margin: 8px 4px;
+}
+
+/* Luminance, rather than a color wash, establishes the desktop hierarchy. */
+/* The toolbar is unfilled; its controls provide their own surface contrast. */
+.desktop-frame .topbar {
+  background: transparent;
+}
+.desktop-frame .command-trigger,
+.desktop-frame .balance-button,
+.desktop-frame .ui-search {
+  background: var(--raised);
+}
+.desktop-frame.light .ui-search {
+  background: var(--editor);
+}
+.desktop-frame .ui-empty h2 {
+  color: var(--ink);
+}
