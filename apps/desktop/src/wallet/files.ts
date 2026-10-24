@@ -54,7 +54,10 @@ export async function readWalletRecord(directory: string) {
   privateMetadata(await lstat(directory), true);
   const path = join(directory, WALLET.RECORD);
   privateMetadata(await lstat(path), false);
-  const file = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+  const file = await open(
+    path,
+    constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
+  );
   try {
     const metadata = await file.stat();
     privateMetadata(metadata, false);

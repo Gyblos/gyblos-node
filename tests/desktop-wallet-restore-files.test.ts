@@ -2,11 +2,16 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs, { constants } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { syncBuiltinESMExports } from 'node:module';
 import { join } from 'node:path';
 import { test } from 'node:test';
 
-import { WALLET } from '@gyblos/desktop/wallet';
+import {
+  createWalletService,
+  WALLET,
+  WALLET_STATUS,
+} from '@gyblos/desktop/wallet';
 import {
   createWalletRestorer,
   WALLET_RESTORE_ERROR,
@@ -22,26 +27,27 @@ void test(
     await fixture(async ({ root, backup, protection }) => {
       const path = join(root, WALLET.DIRECTORY, WALLET.RECORD);
       const original = fs.promises.lstat;
+      let rescued = false;
+      let rescue: ReturnType<typeof setTimeout> | undefined;
       const patched = async (...args: Parameters<typeof original>) => {
         const metadata = await original(...args);
         if (args[0] === path) {
           await fs.promises.unlink(path);
           execFileSync('mkfifo', [path]);
+          rescue = setTimeout(() => {
+            rescued = true;
+            const writer = fs.openSync(
+              path,
+              constants.O_WRONLY | constants.O_NONBLOCK,
+            );
+            fs.closeSync(writer);
+          }, 500);
         }
         return metadata;
       };
       // External overloaded Node double: this call never requests bigint stats.
       fs.promises.lstat = patched as typeof original;
       syncBuiltinESMExports();
-      let rescued = false;
-      const rescue = setTimeout(() => {
-        rescued = true;
-        const writer = fs.openSync(
-          path,
-          constants.O_WRONLY | constants.O_NONBLOCK,
-        );
-        fs.closeSync(writer);
-      }, 1500);
       try {
         await assert.rejects(
           createWalletRestorer(root, protection).restore(
@@ -59,3 +65,85 @@ void test(
     });
   },
 );
+
+void test('wallet restore retains interrupted encrypted staging and prevents automatic replacement', async () => {
+  await fixture(async ({ root, backup, protection, identity }) => {
+    const original = fs.promises.open;
+    fs.promises.open = async (...args) => {
+      const handle = await original(...args);
+      if (args[0] === join(root, WALLET.DIRECTORY, WALLET.STAGING))
+        handle.sync = async () => {
+          throw new Error('synthetic private disk failure');
+        };
+      return handle;
+    };
+    syncBuiltinESMExports();
+    try {
+      await assert.rejects(
+        createWalletRestorer(root, protection).restore(
+          backup,
+          TEST_BACKUP_PASSWORD,
+        ),
+        restoreError(WALLET_RESTORE_ERROR.RECOVERY_REQUIRED),
+      );
+    } finally {
+      fs.promises.open = original;
+      syncBuiltinESMExports();
+    }
+    const pending = await readFile(
+      join(root, WALLET.DIRECTORY, WALLET.STAGING),
+      'utf8',
+    );
+    assert.equal(pending.includes(identity.secret), false);
+    assert.equal(
+      (await createWalletService(root, protection).summary()).status,
+      WALLET_STATUS.RECOVERY_REQUIRED,
+    );
+    await assert.rejects(
+      createWalletRestorer(root, protection).restore(
+        backup,
+        TEST_BACKUP_PASSWORD,
+      ),
+      restoreError(WALLET_RESTORE_ERROR.DESTINATION_EXISTS),
+    );
+    assert.equal(
+      await readFile(join(root, WALLET.DIRECTORY, WALLET.STAGING), 'utf8'),
+      pending,
+    );
+  });
+});
+void test('wallet restore reports interrupted confirmation after cancellation during commit without generating another identity', async () => {
+  await fixture(async ({ root, backup, protection, identity }) => {
+    const original = fs.promises.open;
+    const controller = new AbortController();
+    fs.promises.open = async (...args) => {
+      const handle = await original(...args);
+      if (args[0] === join(root, WALLET.DIRECTORY, WALLET.STAGING)) {
+        const sync = handle.sync.bind(handle);
+        handle.sync = async () => {
+          await sync();
+          controller.abort();
+        };
+      }
+      return handle;
+    };
+    syncBuiltinESMExports();
+    try {
+      await assert.rejects(
+        createWalletRestorer(root, protection).restore(
+          backup,
+          TEST_BACKUP_PASSWORD,
+          controller.signal,
+        ),
+        restoreError(WALLET_RESTORE_ERROR.RECOVERY_REQUIRED),
+      );
+    } finally {
+      fs.promises.open = original;
+      syncBuiltinESMExports();
+    }
+    const restarted = await createWalletService(root, protection).summary();
+    assert.equal(restarted.address, identity.address);
+    assert.equal(restarted.fundingEnabled, false);
+    assert.equal(restarted.backupVerified, false);
+  });
+});

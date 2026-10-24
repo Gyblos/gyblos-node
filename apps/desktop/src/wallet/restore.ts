@@ -104,6 +104,8 @@ export function createWalletRestorer(
     } catch (error) {
       if (claimed)
         throw new WalletRestoreError(WALLET_RESTORE_ERROR.RECOVERY_REQUIRED);
+      if (signal?.aborted)
+        throw new WalletRestoreError(WALLET_RESTORE_ERROR.CANCELLED);
       if (error instanceof WalletRestoreError || error instanceof BackupError)
         throw error;
       throw new WalletRestoreError(WALLET_RESTORE_ERROR.FAILED);

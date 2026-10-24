@@ -2,12 +2,13 @@
 
 The Node-only `@gyblos/desktop/wallet-backup` codec seals supplied Ed25519 PKCS8
 material and opens it only after authenticated decryption and comparison with a
-caller-supplied expected address. The codec itself has no filesystem operations.
-Wallet now offers an explicit, main-process-confirmed encrypted-file backup and
-same-address verification through native file dialogs. The renderer sends a
-password and receives a fixed status; it never receives a key, path, file
-contents or decrypted material. Funding and persistent backup approval remain
-disabled; there is no application restore/import flow.
+caller-supplied expected address through `open`; the separate internal `recover`
+operation derives the address after authentication. The codec itself has no
+filesystem operations. Wallet now offers an explicit, main-process-confirmed
+encrypted-file backup and same-address verification through native file dialogs.
+The renderer sends a password and receives a fixed status; it never receives a
+key, path, file contents or decrypted material. Funding and persistent backup
+approval remain disabled; there is no application restore/import UI or IPC flow.
 
 Version 1 is compact UTF-8 JSON with exactly these fields: `format`, `version`,
 `kdf`, `cipher`, `keyFormat`, `salt`, `nonce`, `ciphertext`, `tag`. Duplicate

@@ -3,7 +3,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { lstat, mkdir, readFile, symlink, writeFile } from 'node:fs/promises';
-import { syncBuiltinESMExports } from 'node:module';
 import { join } from 'node:path';
 import { test } from 'node:test';
 
@@ -163,6 +162,34 @@ void test('wallet restore rejects bad password, altered backup and unavailable p
       restorer.restore(Buffer.from('{}'), TEST_BACKUP_PASSWORD),
     );
     await absent(root);
+    const altered: unknown = JSON.parse(backup.toString('utf8'));
+    assert.ok(
+      altered &&
+        typeof altered === 'object' &&
+        'tag' in altered &&
+        typeof altered.tag === 'string',
+    );
+    const tag = Buffer.from(altered.tag, 'base64');
+    tag[0] = (tag[0] ?? 0) ^ 1;
+    altered.tag = tag.toString('base64');
+    await assert.rejects(
+      restorer.restore(
+        Buffer.from(JSON.stringify(altered)),
+        TEST_BACKUP_PASSWORD,
+      ),
+      (error: unknown) =>
+        error instanceof BackupError &&
+        error.code === BACKUP_ERROR.AUTHENTICATION,
+    );
+    await absent(root);
+    await assert.rejects(
+      createWalletRestorer(root, {
+        ...protection,
+        decrypt: async () => disposableIdentity().secret,
+      }).restore(backup, TEST_BACKUP_PASSWORD),
+      restoreError(WALLET_RESTORE_ERROR.FAILED),
+    );
+    await absent(root);
     await assert.rejects(
       createWalletRestorer(root, null).restore(backup, TEST_BACKUP_PASSWORD),
       restoreError(WALLET_RESTORE_ERROR.UNAVAILABLE),
@@ -292,86 +319,5 @@ void test('wallet restore cancels before claiming a destination and bounds opera
     release();
     await assert.rejects(pending, restoreError(WALLET_RESTORE_ERROR.CANCELLED));
     await absent(root);
-  });
-});
-void test('wallet restore retains interrupted encrypted staging and prevents automatic replacement', async () => {
-  await fixture(async ({ root, backup, protection, identity }) => {
-    const original = fs.promises.open;
-    fs.promises.open = async (...args) => {
-      const handle = await original(...args);
-      if (args[0] === join(root, WALLET.DIRECTORY, WALLET.STAGING))
-        handle.sync = async () => {
-          throw new Error('synthetic private disk failure');
-        };
-      return handle;
-    };
-    syncBuiltinESMExports();
-    try {
-      await assert.rejects(
-        createWalletRestorer(root, protection).restore(
-          backup,
-          TEST_BACKUP_PASSWORD,
-        ),
-        restoreError(WALLET_RESTORE_ERROR.RECOVERY_REQUIRED),
-      );
-    } finally {
-      fs.promises.open = original;
-      syncBuiltinESMExports();
-    }
-    const pending = await readFile(
-      join(root, WALLET.DIRECTORY, WALLET.STAGING),
-      'utf8',
-    );
-    assert.equal(pending.includes(identity.secret), false);
-    assert.equal(
-      (await createWalletService(root, protection).summary()).status,
-      WALLET_STATUS.RECOVERY_REQUIRED,
-    );
-    await assert.rejects(
-      createWalletRestorer(root, protection).restore(
-        backup,
-        TEST_BACKUP_PASSWORD,
-      ),
-      restoreError(WALLET_RESTORE_ERROR.DESTINATION_EXISTS),
-    );
-    assert.equal(
-      await readFile(join(root, WALLET.DIRECTORY, WALLET.STAGING), 'utf8'),
-      pending,
-    );
-  });
-});
-void test('wallet restore reports interrupted confirmation after cancellation during commit without generating another identity', async () => {
-  await fixture(async ({ root, backup, protection, identity }) => {
-    const original = fs.promises.open;
-    const controller = new AbortController();
-    fs.promises.open = async (...args) => {
-      const handle = await original(...args);
-      if (args[0] === join(root, WALLET.DIRECTORY, WALLET.STAGING)) {
-        const sync = handle.sync.bind(handle);
-        handle.sync = async () => {
-          await sync();
-          controller.abort();
-        };
-      }
-      return handle;
-    };
-    syncBuiltinESMExports();
-    try {
-      await assert.rejects(
-        createWalletRestorer(root, protection).restore(
-          backup,
-          TEST_BACKUP_PASSWORD,
-          controller.signal,
-        ),
-        restoreError(WALLET_RESTORE_ERROR.RECOVERY_REQUIRED),
-      );
-    } finally {
-      fs.promises.open = original;
-      syncBuiltinESMExports();
-    }
-    const restarted = await createWalletService(root, protection).summary();
-    assert.equal(restarted.address, identity.address);
-    assert.equal(restarted.fundingEnabled, false);
-    assert.equal(restarted.backupVerified, false);
   });
 });
