@@ -1,0 +1,8 @@
+{
+  "asset": "Gyblos official solid favicon [g], dark background",
+  "source": "Gyblos brand kit 1.0.0 (2026-10-20), gyblos-icon-512.png",
+  "sourceSha256": "fb876b4698f2b2885a5377943d5e99a76660ae4d29f66af59f88394a1f949636",
+  "macIconSha256": "f587e36c5b84cf93b3ea3af43d9043cae44664838987ef3f2aa04467c80e4e28",
+  "conversion": "Apple sips generated iconset sizes 16/32/128/256/512 and their @2x representations; iconutil produced ICNS. The 1024 representation is resampled from the official 512 PNG.",
+  "attribution": "Gyblos mark outlines: JetBrains Mono Medium 2.304, JetBrains, SIL Open Font License 1.1; bundled font license at ../JetBrainsMono-OFL.txt. No trademark rights granted."
+}

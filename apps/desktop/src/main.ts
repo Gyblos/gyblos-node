@@ -58,6 +58,7 @@ async function main() {
   app.setPath('sessionData', home);
   app.on('quit', () => rmSync(home, { recursive: true, force: true }));
   await app.whenReady();
+  app.dock?.setIcon(join(__dirname, 'renderer', DESKTOP.ICON_FILE));
   const window = createProbeWindow(smoke);
   if (smoke) window.webContents.on('render-process-gone', fail);
   let pending: Promise<ProbeResult> | undefined;
