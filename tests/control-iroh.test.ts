@@ -6,6 +6,7 @@ import { createServer } from 'node:http';
 import test from 'node:test';
 
 import { createBuyerControlClient } from '@gyblos/buyer/control';
+import { ROUTES } from '@gyblos/config';
 import { createSellerControlService } from '@gyblos/node/control';
 import {
   CONTROL_ALPN,
@@ -163,6 +164,88 @@ void test(
       } finally {
         await run.close();
       }
+    }
+  },
+);
+
+void test(
+  'native selected control quote closes before v1 HTTP and idle HTTP retires before the next control race',
+  { skip: NATIVE_CAPABILITY.transportSkip },
+  async () => {
+    const run = await fixture();
+    try {
+      const { selectBuyerQuote } = await import('@gyblos/buyer/selection');
+      const { SELLER_BADGES } = await import('@gyblos/core/constants');
+      const { createIrohTransport } =
+        await import('@gyblos/transport-iroh/iroh-client');
+      const {
+        buyer: _buyer,
+        buyerNodeId: _node,
+        catalogDigest: _digest,
+        ...request
+      } = run.request.params;
+      const config = {
+        request: {
+          ...request,
+          lowestReasoning: null,
+          minimumBadge: SELLER_BADGES.DECLARED_USAGE,
+          retention: [run.catalog.dataPolicy.retention],
+        },
+        sellers: [
+          {
+            owner: run.catalog.owner,
+            nodeId: run.catalog.nodeId,
+            relayUrl: null,
+            directAddresses: [],
+          },
+        ],
+      };
+      const dependencies = {
+        buyer: run.request.params.buyer,
+        trusted: run.catalog,
+        stats: new Map(),
+        now: run.context.now,
+        windowMs: 2000,
+        async connect() {
+          return createBuyerControlClient(
+            createControlTransport(
+              run.buyer,
+              run.seller.addr(),
+              run.catalog.nodeId,
+              { queryMs: 1000 },
+            ),
+            { ...run.trust(), now: run.context.now },
+          );
+        },
+      };
+      assert.equal(
+        (await within(selectBuyerQuote(config, dependencies))).ok,
+        true,
+      );
+      assert.equal(run.httpRequests, 0);
+      const http = createIrohTransport(
+        run.buyer,
+        run.seller.addr(),
+        run.catalog.nodeId,
+      );
+      const response = await within(
+        http.exchange({
+          method: 'POST',
+          path: ROUTES.inference,
+          headers: { 'content-type': 'application/json' },
+          body: Buffer.from('{"synthetic":true}'),
+        }),
+      );
+      assert.equal(response.status, 403);
+      assert.equal(run.httpRequests, 1);
+      assert.equal(await http.retireIdle(), true);
+      assert.equal(
+        (await within(selectBuyerQuote(config, dependencies))).ok,
+        true,
+      );
+      assert.equal(run.httpRequests, 1);
+    } finally {
+      await run.close();
     }
   },
 );
