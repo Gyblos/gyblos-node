@@ -119,3 +119,10 @@ void test(
     }
   },
 );
+
+void test('acceptance refuses temporary roots inside operational local state before filesystem allocation', async () => {
+  const { assertAcceptanceTempBase } = await import('@gyblos/lab-harness/acceptance/workspace');
+  for (const value of ['/tmp/.local', '/home/user/.local/gyblos', 'relative', '/tmp/../.local'])
+    assert.throws(() => assertAcceptanceTempBase(value), { code: 'ACCEPTANCE_UNSAFE_TEMP' });
+  assert.doesNotThrow(() => assertAcceptanceTempBase('/private/tmp'));
+});
