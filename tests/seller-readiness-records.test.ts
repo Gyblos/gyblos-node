@@ -130,3 +130,19 @@ void test('a catalog lookup rechecks readiness after asynchronous signature veri
     await run.close();
   }
 });
+
+void test('presence response rechecks readiness after the signed presence promise resolves', async () => {
+  const run = await fixture();
+  try {
+    const presence = run.records.presence.bind(run.records);
+    run.records.presence = async (signal) => {
+      const signed = await presence(signal);
+      run.setReadiness({ generation: 2, validUntil: 0 });
+      return signed;
+    };
+    const response = await run.service.respond({ version: CONTROL_VERSION,
+      requestId: 'c'.repeat(32), method: CONTROL_METHODS.PRESENCE, params: {} },
+      run.request.params.buyerNodeId, new AbortController().signal);
+    assert.ok('error' in response);
+  } finally { await run.close(); }
+});
