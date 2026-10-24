@@ -123,9 +123,13 @@ void test('D1 catalog republish writes only the model rows that changed', async 
   assert.equal(await storage.put(catalog(3, ['b', 'c', 'd'])), true);
   assert.equal(modelChanges(written), 2);
   assert.deepEqual(models(), ['b', 'c', 'd']);
-  // A stale catalog changes nothing, models included.
+  // A stale catalog changes nothing, models included. (The guard matches sequence and
+  // signature, so a stale record differs in its signature, as a real one would.)
   written.length = 0;
-  assert.equal(await storage.put(catalog(3, ['x'])), false);
+  assert.equal(
+    await storage.put({ ...catalog(3, ['x']), signature: 'other' }),
+    false,
+  );
   assert.equal(await storage.put(catalog(2, ['y'])), false);
   assert.equal(modelChanges(written), 0);
   assert.deepEqual(models(), ['b', 'c', 'd']);
@@ -192,11 +196,14 @@ CREATE TEMP TRIGGER withdrawal_deleted AFTER DELETE ON discovery_withdrawals BEG
   // The high-water guard still blocks a stale presence.
   assert.equal(
     await storage.put(
-      entry(PUBLIC_RECORD_KINDS.PRESENCE, node, 3, { json: '{"stale":1}' }),
+      entry(PUBLIC_RECORD_KINDS.PRESENCE, node, 3, {
+        json: '{"stale":1}',
+        signature: 'other',
+      }),
     ),
     false,
   );
-  assert.equal(presenceRow()?.sequence, 3);
+  assert.equal(presenceRow()?.json, '{"kind":"presence","sequence":3}');
   await storage.put(
     entry(PUBLIC_RECORD_KINDS.CATALOG, node, 4, { models: ['m'] }),
   );

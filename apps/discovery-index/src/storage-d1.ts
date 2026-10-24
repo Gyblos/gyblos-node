@@ -1,4 +1,4 @@
-// Owns the Cloudflare D1 adapter of the discovery storage contract (migrations/0001_discovery_index.sql).
+// Owns the Cloudflare D1 adapter of the discovery storage contract (schema in migrations/, applied in order).
 // Minimal local D1 interfaces stand in for @cloudflare/workers-types; rows are validated on read.
 import { PUBLIC_RECORD_KINDS } from '@gyblos/protocol/constants';
 
@@ -44,15 +44,25 @@ function text(value: unknown): string {
 const STATE_SQL = `SELECT n.last_sequence AS lastSequence, c.sequence AS sequence, c.expires_at AS expiresAt,
   c.signed_json AS json, EXISTS (SELECT 1 FROM discovery_withdrawals w WHERE w.node_id = n.node_id AND w.catalog_digest = c.digest) AS withdrawn
 FROM discovery_nodes n LEFT JOIN discovery_catalogs c ON c.node_id = n.node_id WHERE n.node_id = ?1`;
-const LIST_SQL = `SELECT p.node_id AS nodeId, p.issued_at AS issuedAt, c.signed_json AS catalogJson, p.signed_json AS presenceJson
-FROM discovery_catalog_models m
-JOIN discovery_catalogs c ON c.node_id = m.node_id
-JOIN discovery_presence p ON p.node_id = m.node_id AND p.catalog_digest = c.digest
-WHERE m.model_id = ?1 AND c.issued_at <= ?2 AND c.expires_at > ?2 AND p.issued_at <= ?2 AND p.expires_at > ?2
-  AND NOT EXISTS (SELECT 1 FROM discovery_withdrawals w WHERE w.node_id = c.node_id AND w.catalog_digest = c.digest)
-  AND (?3 IS NULL OR p.issued_at < ?3 OR (p.issued_at = ?3 AND p.node_id > ?4))
-ORDER BY p.issued_at DESC, p.node_id ASC
-LIMIT ?5`;
+// Two phases: the page CTE filters, sorts and limits keys from covering indexes only (migration
+// 0002), then the signed JSON of just those rows is read by primary key. INDEXED BY pins the plan
+// because D1 may have no statistics; the indexes must exist before this code is deployed.
+const LIST_SQL = `WITH page AS (
+  SELECT p.node_id AS nodeId, p.issued_at AS issuedAt
+  FROM discovery_catalog_models m
+  JOIN discovery_catalogs c INDEXED BY discovery_catalogs_listing ON c.node_id = m.node_id
+  JOIN discovery_presence p INDEXED BY discovery_presence_listing ON p.node_id = m.node_id AND p.catalog_digest = c.digest
+  WHERE m.model_id = ?1 AND c.issued_at <= ?2 AND c.expires_at > ?2 AND p.issued_at <= ?2 AND p.expires_at > ?2
+    AND NOT EXISTS (SELECT 1 FROM discovery_withdrawals w INDEXED BY discovery_withdrawals_listing
+      WHERE w.node_id = c.node_id AND w.catalog_digest = c.digest)
+    AND (?3 IS NULL OR p.issued_at < ?3 OR (p.issued_at = ?3 AND p.node_id > ?4))
+  ORDER BY p.issued_at DESC, p.node_id ASC
+  LIMIT ?5)
+SELECT page.nodeId AS nodeId, page.issuedAt AS issuedAt, c.signed_json AS catalogJson, p.signed_json AS presenceJson
+FROM page
+JOIN discovery_catalogs c ON c.node_id = page.nodeId
+JOIN discovery_presence p ON p.node_id = page.nodeId
+ORDER BY page.issuedAt DESC, page.nodeId ASC`;
 const COUNT_SQL = `SELECT (SELECT count(*) FROM discovery_catalogs WHERE expires_at > ?1)
   + (SELECT count(*) FROM discovery_presence WHERE expires_at > ?1)
   + (SELECT count(*) FROM discovery_withdrawals WHERE expires_at > ?1) AS n`;
@@ -96,6 +106,46 @@ function sellerRow(row: D1Row): SellerRow {
   };
 }
 
+// One row per NodeId, updated in place under the guard: no delete and reinsert of the row and
+// its index entries. ?1 is the NodeId; `values` are the remaining columns' parameters.
+function upsertSql(table: string, columns: readonly string[], values: string) {
+  const updates = columns
+    .map((column) => `${column} = excluded.${column}`)
+    .join(', ');
+  return `INSERT INTO ${table} (node_id, ${columns.join(', ')}) SELECT ?1, ${values} WHERE ${GUARD}
+ON CONFLICT (node_id) DO UPDATE SET ${updates}`;
+}
+
+const RECORD_COLUMNS = [
+  'sequence',
+  'issued_at',
+  'expires_at',
+  'catalog_digest',
+  'signed_json',
+] as const;
+const PRESENCE_SQL = upsertSql(
+  'discovery_presence',
+  RECORD_COLUMNS,
+  '?2, ?4, ?5, ?6, ?7',
+);
+const WITHDRAWAL_SQL = upsertSql(
+  'discovery_withdrawals',
+  RECORD_COLUMNS,
+  '?2, ?4, ?5, ?6, ?7',
+);
+const CATALOG_SQL = upsertSql(
+  'discovery_catalogs',
+  ['owner', 'sequence', 'issued_at', 'expires_at', 'digest', 'signed_json'],
+  '?8, ?2, ?4, ?5, ?6, ?7',
+);
+// Model rows are (node_id, model_id) only, so a republish touches just the ids that changed;
+// an unchanged model list writes no row.
+const DROP_MODELS_SQL = `DELETE FROM discovery_catalog_models WHERE node_id = ?1
+  AND model_id NOT IN (SELECT value FROM json_each(?4)) AND ${GUARD}`;
+const ADD_MODELS_SQL = `INSERT INTO discovery_catalog_models (node_id, model_id) SELECT ?1, value FROM json_each(?4)
+  WHERE ${GUARD} ON CONFLICT (node_id, model_id) DO NOTHING`;
+const CLEAR_PRESENCE_SQL = `DELETE FROM discovery_presence WHERE node_id = ?1 AND ${GUARD}`;
+
 function kindStatements(db: D1Database, entry: StoredEntry) {
   const head = [entry.nodeId, entry.sequence, entry.signature] as const;
   const record = [
@@ -104,42 +154,16 @@ function kindStatements(db: D1Database, entry: StoredEntry) {
     entry.digest,
     entry.json,
   ] as const;
-  const clearPresence = db
-    .prepare(`DELETE FROM discovery_presence WHERE node_id = ?1 AND ${GUARD}`)
-    .bind(...head);
+  const clearPresence = db.prepare(CLEAR_PRESENCE_SQL).bind(...head);
   if (entry.kind === PUBLIC_RECORD_KINDS.PRESENCE)
-    return [
-      db
-        .prepare(
-          `INSERT OR REPLACE INTO discovery_presence (node_id, sequence, issued_at, expires_at, catalog_digest, signed_json) SELECT ?1, ?2, ?4, ?5, ?6, ?7 WHERE ${GUARD}`,
-        )
-        .bind(...head, ...record),
-    ];
+    return [db.prepare(PRESENCE_SQL).bind(...head, ...record)];
   if (entry.kind === PUBLIC_RECORD_KINDS.WITHDRAWAL)
-    return [
-      db
-        .prepare(
-          `INSERT OR REPLACE INTO discovery_withdrawals (node_id, sequence, issued_at, expires_at, catalog_digest, signed_json) SELECT ?1, ?2, ?4, ?5, ?6, ?7 WHERE ${GUARD}`,
-        )
-        .bind(...head, ...record),
-      clearPresence,
-    ];
+    return [db.prepare(WITHDRAWAL_SQL).bind(...head, ...record), clearPresence];
+  const models = JSON.stringify(entry.models);
   return [
-    db
-      .prepare(
-        `INSERT OR REPLACE INTO discovery_catalogs (node_id, owner, sequence, issued_at, expires_at, digest, signed_json) SELECT ?1, ?8, ?2, ?4, ?5, ?6, ?7 WHERE ${GUARD}`,
-      )
-      .bind(...head, ...record, entry.owner),
-    db
-      .prepare(
-        `DELETE FROM discovery_catalog_models WHERE node_id = ?1 AND ${GUARD}`,
-      )
-      .bind(...head),
-    db
-      .prepare(
-        `INSERT INTO discovery_catalog_models (node_id, model_id) SELECT ?1, value FROM json_each(?4) WHERE ${GUARD}`,
-      )
-      .bind(...head, JSON.stringify(entry.models)),
+    db.prepare(CATALOG_SQL).bind(...head, ...record, entry.owner),
+    db.prepare(DROP_MODELS_SQL).bind(...head, models),
+    db.prepare(ADD_MODELS_SQL).bind(...head, models),
     clearPresence,
   ];
 }
