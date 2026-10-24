@@ -13,12 +13,13 @@ mounted conversation state. All conversations, theme choices and connection
 budgets are in memory and clear when the app closes. They are not saved to the
 product home.
 
-The five sample models, prices, free labels and connection budgets are illustrative,
-not live availability, payment authorization or enforced tool spending limits.
-The chat daily-limit check uses demo credits only. The footer explicitly labels
-the connection as simulated and the wallet as a demo. The synthetic address
-cannot receive funds; copying it may be unavailable under Electron isolation. No inference, web tool, gateway,
-wallet, existing configuration or remote network is used by this UI.
+The five sample models, prices, free labels and connection budgets are
+illustrative, not live availability, payment authorization or enforced tool
+spending limits. The chat daily-limit check uses demo credits only. The footer
+explicitly labels the connection as simulated and the wallet as a demo. The
+synthetic address cannot receive funds; copying it may be unavailable under
+Electron isolation. No inference, web tool, gateway, wallet, existing
+configuration or remote network is used by this UI.
 
 ## Run locally
 
