@@ -22,6 +22,7 @@ export const NODE_ERROR_CODES = {
   INVALID_OFFER_TRUST: 'INVALID_OFFER_TRUST',
   INVALID_SIGNED_OFFER: 'INVALID_SIGNED_OFFER',
   LEGACY_LOCAL_LAYOUT: 'LEGACY_LOCAL_LAYOUT',
+  PUBLIC_SEQUENCE_UNAVAILABLE: 'PUBLIC_SEQUENCE_UNAVAILABLE',
 } as const;
 export type NodeErrorCode =
   (typeof NODE_ERROR_CODES)[keyof typeof NODE_ERROR_CODES];
@@ -34,3 +35,5 @@ export const NODE_CONFIGURATION_LIMITS = {
   stringCharacters: 2048,
   nodeIdHexCharacters: 64,
 } as const;
+
+export const PUBLIC_SEQUENCE = { schemaVersion: 1, maxBytes: 2048 } as const;
