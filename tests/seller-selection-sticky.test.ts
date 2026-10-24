@@ -91,3 +91,30 @@ void test('a previous seller is not kept when it is filtered, cooling down, too 
     code: SELLER_SELECTION_CODES.INVALID,
   });
 });
+
+void test('a fresh sticky seller consumes the only newcomer slot when history is available', () => {
+  const seasoned = [seller(1), seller(2), seller(3)];
+  const fresh = [4, 5].map((index) =>
+    seller(index, { input: '0', output: '1' }),
+  );
+  const stats = new Map(
+    seasoned.map((item) => [item.catalog.nodeId, history()]),
+  );
+  for (let seed = 1; seed <= 100; seed++) {
+    const candidates = chosen(
+      select([...seasoned, ...fresh], {
+        stats,
+        previousSeller: nodeId(4),
+        count: 3,
+        random: seeded(seed),
+      }),
+    );
+    assert.equal(candidates[0]?.nodeId, nodeId(4));
+    assert.equal(candidates[0]?.sticky, true);
+    assert.equal(candidates.length, 3);
+    assert.equal(
+      candidates.filter((item) => !stats.has(item.nodeId)).length,
+      1,
+    );
+  }
+});

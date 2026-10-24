@@ -129,3 +129,23 @@ void test('missing wait accuracy is neutral and few latency samples are shrunk',
   );
   assert.ok(manyFast > 0.56, String(manyFast));
 });
+
+void test('unsafe derived weights and sampling totals return the typed invalid code', () => {
+  const sellers = [1, 2].map((index) =>
+    seller(index, { input: '0', output: '0' }),
+  );
+  for (const reputation of [1, 2]) {
+    assert.deepEqual(
+      select(sellers, {
+        count: 1,
+        policy: {
+          ...SELLER_SELECTION_POLICY,
+          freeWeightMultiple: Number.MAX_VALUE,
+          reputationMin: reputation,
+          reputationMax: reputation,
+        },
+      }),
+      { ok: false, code: SELLER_SELECTION_CODES.INVALID },
+    );
+  }
+});

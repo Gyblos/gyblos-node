@@ -36,6 +36,7 @@ function take(
   random: () => number,
 ): Weighted {
   const total = pool.reduce((sum, item) => sum + item.weight, 0);
+  if (!Number.isFinite(total) || total <= 0) invalid();
   let target = draw(random) * total;
   let index = pool.length - 1;
   for (let cursor = 0; cursor < pool.length; cursor++) {
@@ -127,8 +128,15 @@ export function sampleTier(
     const newcomers = remaining.filter((item) => item.fresh);
     const explore =
       newcomers.length > 0 && !picked.some((choice) => choice.item.fresh);
+    // A fresh sticky seller already consumes the bounded newcomer allowance.
+    const pool =
+      bounded && picked.some((choice) => choice.item.fresh)
+        ? remaining.filter((item) => !item.fresh)
+        : explore
+          ? newcomers
+          : remaining;
     picked.push({
-      item: take(explore ? newcomers : remaining, remaining, random),
+      item: take(pool, remaining, random),
       exploration: explore,
       sticky: false,
     });

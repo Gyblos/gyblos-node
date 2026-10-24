@@ -131,11 +131,13 @@ export function weigh(
     const price = prices[index] ?? 0;
     const priceWeight =
       price > 0 ? (cheapest / price) ** 2 : policy.freeWeightMultiple;
+    const weight = priceWeight * reputation(entry.stats, policy);
+    if (!Number.isFinite(weight) || weight <= 0) invalid();
     return {
       entry,
       reasoning,
       downgrade,
-      weight: priceWeight * reputation(entry.stats, policy),
+      weight,
       fresh: !hasHistory(entry.stats),
     };
   });
