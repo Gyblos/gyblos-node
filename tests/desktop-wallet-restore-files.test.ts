@@ -147,3 +147,44 @@ void test('wallet restore reports interrupted confirmation after cancellation du
     assert.equal(restarted.backupVerified, false);
   });
 });
+
+void test('wallet restore reload rejects a protected record growing after descriptor validation', async () => {
+  await fixture(async ({ root, backup, protection }) => {
+    const path = join(root, WALLET.DIRECTORY, WALLET.RECORD);
+    const original = fs.promises.open;
+    fs.promises.open = async (...args) => {
+      const handle = await original(...args);
+      if (args[0] === path) {
+        const stat = handle.stat.bind(handle);
+        // External FileHandle overload double; the reader requests ordinary stats.
+        handle.stat = (async () => {
+          const metadata = await stat();
+          await fs.promises.appendFile(
+            path,
+            ' '.repeat(WALLET.MAX_RECORD_BYTES),
+          );
+          return metadata;
+        }) as typeof handle.stat;
+      }
+      return handle;
+    };
+    syncBuiltinESMExports();
+    try {
+      await assert.rejects(
+        createWalletRestorer(root, protection).restore(
+          backup,
+          TEST_BACKUP_PASSWORD,
+        ),
+        restoreError(WALLET_RESTORE_ERROR.RECOVERY_REQUIRED),
+      );
+    } finally {
+      fs.promises.open = original;
+      syncBuiltinESMExports();
+    }
+    assert.ok((await fs.promises.lstat(path)).size > WALLET.MAX_RECORD_BYTES);
+    assert.equal(
+      (await createWalletService(root, protection).summary()).status,
+      WALLET_STATUS.RECOVERY_REQUIRED,
+    );
+  });
+});
