@@ -66,6 +66,7 @@ void test('missing storage or limiter bindings fail closed with 503', async () =
       });
       assert.equal(response.headers.get('cache-control'), 'no-store');
       assert.equal(response.headers.get('x-robots-tag'), 'noindex');
+      assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
     }
   }
 });

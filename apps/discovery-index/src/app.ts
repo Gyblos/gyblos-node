@@ -79,6 +79,7 @@ function finishHeaders(context: Context) {
   if (read && PUBLIC_READ_ROUTES.has(context.req.path))
     headers.set(INDEX_HEADERS.CORS_ORIGIN, INDEX_HEADER_VALUES.ANY_ORIGIN);
   headers.set(INDEX_HEADERS.ROBOTS, INDEX_HEADER_VALUES.NOINDEX);
+  headers.set(INDEX_HEADERS.CONTENT_TYPE_OPTIONS, INDEX_HEADER_VALUES.NOSNIFF);
 }
 
 // Per-app prune throttle (the Worker keeps one app per isolate).

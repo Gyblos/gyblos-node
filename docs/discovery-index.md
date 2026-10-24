@@ -91,18 +91,25 @@ root. Wrangler is not a workspace dependency (it would add a large toolchain to
 the lockfile for a manual, rare step); use the version the website already pins:
 
 ```sh
+npx wrangler@4.151.1 login   # pick the account that holds the gyblos.com zone
 npx wrangler@4.151.1 d1 create gyblos-discovery
 # put the printed database_id into wrangler.jsonc and uncomment d1_databases
 npx wrangler@4.151.1 d1 migrations apply gyblos-discovery --remote
-# check in the dashboard that rate-limit namespace ids 42621004-42621006 are
-# unused in the account (the website uses 42621001-42621003), then uncomment
-# ratelimits and routes (custom domain discovery.gyblos.com)
+npx wrangler@4.151.1 d1 migrations list gyblos-discovery --remote   # 0001 applied
+# rate-limit namespace ids 42621004-42621006 must not collide with the website's
+# web/wrangler.jsonc (it uses 42621001-42621003); then uncomment ratelimits and
+# routes (custom domain discovery.gyblos.com, zone gyblos.com in this account)
 npx wrangler@4.151.1 deploy
 curl -s https://discovery.gyblos.com/v1/health
 # expected: 200 {"ok":true,"records":0}
+curl -si https://discovery.gyblos.com/nope | grep -i x-robots-tag
+# expected: 404 with noindex
+curl -si 'https://discovery.gyblos.com/v1/sellers?model=x' | grep -i access-control
+# expected: Access-Control-Allow-Origin: *
 ```
 
-Rollback: comment out `d1_databases` (or a rate limit) and deploy again; the
-index then answers `503 DISCOVERY_UNAVAILABLE` everywhere without losing data.
-Removing the custom domain takes it offline entirely. Clients treat `503` as
+Rollback: `npx wrangler@4.151.1 rollback` returns to the previous version; or
+comment out `d1_databases` (or a rate limit) and deploy again; the index then
+answers `503 DISCOVERY_UNAVAILABLE` everywhere without losing data. Removing the
+custom domain takes it offline entirely. Clients treat `503` as
 `DISCOVERY_UNAVAILABLE` and keep their own state.

@@ -47,6 +47,7 @@ export const INDEX_HEADERS = {
   CONTENT_TYPE: 'Content-Type',
   RETRY_AFTER: 'Retry-After',
   ROBOTS: 'X-Robots-Tag',
+  CONTENT_TYPE_OPTIONS: 'X-Content-Type-Options',
   CLIENT_IP: 'CF-Connecting-IP',
 } as const;
 
@@ -55,6 +56,7 @@ export const INDEX_HEADER_VALUES = {
   SELLERS_CACHE: 'public, max-age=10',
   ANY_ORIGIN: '*',
   NOINDEX: 'noindex',
+  NOSNIFF: 'nosniff',
   JSON: 'application/json; charset=UTF-8',
   RETRY_AFTER_SECONDS: '60',
 } as const;
