@@ -122,6 +122,7 @@ export async function refuseCatalog(
     | typeof CONTROL_CODES.EXPIRED
     | typeof CONTROL_CODES.STALE,
 ) {
+  const before = run.engine.generations();
   const wire = await run
     .host()
     .wire.client(run.identity.owner.address, run.clock.now);
@@ -135,5 +136,6 @@ export async function refuseCatalog(
     acceptanceAssert(refused);
   } finally {
     await wire.close();
+    acceptanceAssert(run.engine.generations() === before);
   }
 }
