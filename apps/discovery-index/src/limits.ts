@@ -16,7 +16,6 @@ export type DiscoveryLimiters = Partial<
 >;
 export type ResolvedLimiters = Record<DiscoveryLimiterName, RateLimiter>;
 
-
 function complete(limiters: DiscoveryLimiters): ResolvedLimiters | null {
   const ip = limiters[DISCOVERY_LIMITERS.IP];
   const publish = limiters[DISCOVERY_LIMITERS.PUBLISH];
