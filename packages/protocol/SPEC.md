@@ -180,6 +180,14 @@ case-sensitive; suffixes/quantizations are not stripped. Unknown valid IDs are
 returned as `custom`; membership is naming metadata, not proof of availability,
 model weights, a license or an audit. Entries and aliases are frozen.
 
+`reasoning` lists the levels a model supports (`levels`, in `REASONING_LEVELS`
+order, plus `defaultReasoning`, one of them) from the closed set `off`, `low`,
+`medium`, `high` (GYB-DOC-028); an on/off thinking switch is `off` and `high`.
+`reasoning: null` means not verified from a primary model source or not mapped
+onto the closed set yet. The per-model table and sources are in
+`docs/configuration.md`. This catalog metadata changes no signed record or
+golden vector.
+
 `openWeights: null` means not verified from primary model/license sources in
 this catalog. A nullable tokenizer similarly makes missing metadata explicit.
 Only Qwen3 0.6B carries the already pinned repository/revision/tokenizer SHA-256

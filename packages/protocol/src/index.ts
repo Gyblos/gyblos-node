@@ -60,4 +60,5 @@ export {
   type CatalogModel,
   type ModelResolution,
   type PublicTokenizer,
+  type ReasoningSupport,
 } from './models.js';
