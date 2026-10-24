@@ -1,0 +1,56 @@
+/* Scoped initial-window surface; colors follow the shared Gyblos theme. */
+.startup-splash {
+  box-sizing: border-box;
+  min-height: 100vh;
+  padding: 24px 28px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: Geist, sans-serif;
+}
+.startup-splash-brand {
+  font-size: 15px;
+  font-weight: 500;
+}
+.startup-splash-brand span {
+  color: var(--accent);
+  font-family: GeistMono, monospace;
+  margin-right: 8px;
+}
+.startup-ascii {
+  display: flex;
+  margin: 24px 0 12px;
+  color: var(--accent);
+  font:
+    20px/1 GeistMono,
+    monospace;
+  letter-spacing: 2px;
+}
+.startup-ascii-bar {
+  animation: startup-bar-flow 1.3s ease-in-out infinite;
+}
+.startup-splash p {
+  margin: 0;
+  font-size: 13px;
+}
+.startup-splash small {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
+@keyframes startup-bar-flow {
+  0%,
+  100% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .startup-ascii-bar {
+    animation: none;
+  }
+}

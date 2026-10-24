@@ -9,12 +9,28 @@ class WindowDouble {
   shown = 0;
   closed = 0;
   listeners = new Map<string, () => void>();
-  isDestroyed() { return this.destroyed; }
-  show() { this.shown += 1; }
-  close() { this.closed += 1; this.destroy(); }
-  destroy() { this.destroyed = true; this.emit('closed'); }
-  once(event: string, callback: () => void) { this.listeners.set(event, callback); }
-  emit(event: string) { const callback = this.listeners.get(event); this.listeners.delete(event); callback?.(); }
+  isDestroyed() {
+    return this.destroyed;
+  }
+  show() {
+    this.shown += 1;
+  }
+  close() {
+    this.closed += 1;
+    this.destroy();
+  }
+  destroy() {
+    this.destroyed = true;
+    this.emit('closed');
+  }
+  once(event: string, callback: () => void) {
+    this.listeners.set(event, callback);
+  }
+  emit(event: string) {
+    const callback = this.listeners.get(event);
+    this.listeners.delete(event);
+    callback?.();
+  }
 }
 
 void test('startup reveals the main window only after preparation and paint, exactly once', () => {

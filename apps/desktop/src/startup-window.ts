@@ -9,5 +9,38 @@ export interface StartupWindow {
 }
 
 export function startupHandoff(main: StartupWindow, loading: StartupWindow) {
-  return { prepared() {}, cancelled: () => false };
+  let prepared = false;
+  let painted = false;
+  let cancelled = false;
+  let completed = false;
+  const reveal = () => {
+    if (!prepared || !painted || cancelled || completed || main.isDestroyed())
+      return;
+    completed = true;
+    main.show();
+    if (!loading.isDestroyed()) loading.destroy();
+  };
+  loading.once('ready-to-show', () => {
+    if (!cancelled && !completed && !loading.isDestroyed()) loading.show();
+  });
+  main.once('ready-to-show', () => {
+    painted = true;
+    reveal();
+  });
+  loading.once('closed', () => {
+    if (completed || cancelled) return;
+    cancelled = true;
+    if (!main.isDestroyed()) main.close();
+  });
+  main.once('closed', () => {
+    cancelled = true;
+    if (!loading.isDestroyed()) loading.destroy();
+  });
+  return {
+    prepared() {
+      prepared = true;
+      reveal();
+    },
+    cancelled: () => cancelled,
+  };
 }

@@ -6,10 +6,12 @@ import { join } from 'node:path';
 
 import { app, BrowserWindow, dialog, ipcMain, safeStorage } from 'electron';
 
-import { DESKTOP, PROBE_STATUS } from './constants.js';
+import { DESKTOP, PROBE_STATUS, STARTUP_WINDOW } from './constants.js';
 import { probeInUtility } from './probe-host.js';
 import { failedProbe, type ProbeResult } from './probe-model.js';
 import { armSmokeWatchdog } from './smoke-watchdog.js';
+import { startupHandoff } from './startup-window.js';
+import { BRAND_COLORS } from './theme.js';
 import { BACKUP_FLOW, BACKUP_RESULT } from './wallet/backup-flow-model.js';
 import { createBackupFlow } from './wallet/backup-flow.js';
 import { WALLET, WALLET_STATUS } from './wallet/constants.js';
@@ -22,14 +24,16 @@ import { walletSummary } from './wallet/model.js';
 import { walletProtection } from './wallet/protection.js';
 import { createWalletService } from './wallet/service.js';
 
-function createProbeWindow(smoke: boolean) {
+function createProbeWindow(startup = false) {
   const window = new BrowserWindow({
     title: DESKTOP.TITLE,
-    width: DESKTOP.WIDTH,
-    height: DESKTOP.HEIGHT,
-    minWidth: DESKTOP.MIN_WIDTH,
-    minHeight: DESKTOP.MIN_HEIGHT,
-    show: !smoke,
+    width: startup ? STARTUP_WINDOW.WIDTH : DESKTOP.WIDTH,
+    height: startup ? STARTUP_WINDOW.HEIGHT : DESKTOP.HEIGHT,
+    minWidth: startup ? STARTUP_WINDOW.WIDTH : DESKTOP.MIN_WIDTH,
+    minHeight: startup ? STARTUP_WINDOW.HEIGHT : DESKTOP.MIN_HEIGHT,
+    show: false,
+    resizable: !startup,
+    backgroundColor: BRAND_COLORS.charcoal,
     webPreferences: {
       preload: join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -130,6 +134,38 @@ function registerWalletStatus(
       throw new Error('Unsupported wallet status sender.');
     return summary;
   });
+  return summary;
+}
+
+async function loadDesktopWindows(
+  window: BrowserWindow,
+  loading: BrowserWindow | null,
+  preparation: Promise<unknown>,
+) {
+  const file = join(__dirname, 'renderer', 'index.html');
+  if (!loading) {
+    await window.loadFile(file, { query: { probe: '1' } });
+    return;
+  }
+  const handoff = startupHandoff(window, loading);
+  // Storage errors are displayed by the main wallet UI, never by the splash.
+  const settled = preparation.then(
+    () => handoff.prepared(),
+    () => handoff.prepared(),
+  );
+  try {
+    await loading.loadFile(file, {
+      query: { [STARTUP_WINDOW.QUERY]: STARTUP_WINDOW.QUERY_VALUE },
+    });
+    if (handoff.cancelled()) return;
+    await window.loadFile(file);
+    await settled;
+  } catch (error) {
+    if (handoff.cancelled()) return;
+    if (!loading.isDestroyed()) loading.destroy();
+    await settled;
+    throw error;
+  }
 }
 
 async function main() {
@@ -161,10 +197,11 @@ async function main() {
   app.on('quit', () => rmSync(home, { recursive: true, force: true }));
   await app.whenReady();
   app.dock?.setIcon(join(__dirname, 'renderer', DESKTOP.ICON_FILE));
-  const window = createProbeWindow(smoke);
-  registerWalletStatus(window, walletRoot, smoke);
+  const window = createProbeWindow();
+  const prepared = registerWalletStatus(window, walletRoot, smoke);
+  const loading = smoke ? null : createProbeWindow(true);
   app.on('second-instance', () => {
-    focusExistingWindow(window);
+    focusExistingWindow(loading && !loading.isDestroyed() ? loading : window);
   });
   if (smoke) window.webContents.on('render-process-gone', fail);
   let pending: Promise<ProbeResult> | undefined;
@@ -191,9 +228,7 @@ async function main() {
     controller.abort();
     app.quit();
   });
-  await window.loadFile(join(__dirname, 'renderer', 'index.html'), {
-    query: smoke ? { probe: '1' } : {},
-  });
+  await loadDesktopWindows(window, loading, prepared);
 }
 void main().catch(() => {
   process.stderr.write('Desktop probe startup failed.\n');
