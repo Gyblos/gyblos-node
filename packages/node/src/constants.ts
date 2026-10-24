@@ -52,3 +52,13 @@ export const SELLER_PUBLICATION_STATES = {
 } as const;
 export type SellerPublicationState =
   (typeof SELLER_PUBLICATION_STATES)[keyof typeof SELLER_PUBLICATION_STATES];
+
+// Private engine observations; values preserve the startup diagnostic record contract.
+export const READINESS_STATUSES = { PASSED: 'passed', FAILED: 'failed' } as const;
+export const READINESS_REASONS = {
+  READY: 'ready',
+  MEMORY_OBSERVATION_FAILED: 'memory-observation-failed',
+  INSUFFICIENT_HEADROOM: 'insufficient-headroom',
+  WARMUP_FAILED: 'warmup-failed',
+  WARMUP_TIMEOUT: 'warmup-timeout',
+} as const;

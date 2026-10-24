@@ -9,14 +9,11 @@ import {
   type MemorySnapshot,
 } from '@gyblos/runtime/memory';
 
+import { READINESS_REASONS, READINESS_STATUSES } from './constants.js';
+
 export interface ReadinessRecord {
-  status: 'passed' | 'failed';
-  reason:
-    | 'ready'
-    | 'memory-observation-failed'
-    | 'insufficient-headroom'
-    | 'warmup-failed'
-    | 'warmup-timeout';
+  status: (typeof READINESS_STATUSES)[keyof typeof READINESS_STATUSES];
+  reason: (typeof READINESS_REASONS)[keyof typeof READINESS_REASONS];
   before: MemorySnapshot | null;
   after: MemorySnapshot | null;
   warmupMs: number;
@@ -32,76 +29,103 @@ export function assertReadinessCurrent(
     );
 }
 
+interface ProbeDependencies {
+  snapshot: () => Promise<MemorySnapshot>;
+  now?: () => number;
+}
+
+// Caller owns the deadline. This promise retains the actual engine-work slot after an abort.
+export async function probeSellerEngine(
+  engine: Engine,
+  signal: AbortSignal,
+  dependencies: ProbeDependencies,
+) {
+  const check = new EngineReadinessCheck(engine, signal, dependencies);
+  return check.run();
+}
+
+class EngineReadinessCheck {
+  before: MemorySnapshot | null = null;
+  after: MemorySnapshot | null = null;
+  reason: ReadinessRecord['reason'] = READINESS_REASONS.MEMORY_OBSERVATION_FAILED;
+  private readonly start = performance.now();
+  constructor(
+    private readonly engine: Engine,
+    private readonly signal: AbortSignal,
+    private readonly dependencies: ProbeDependencies,
+  ) {}
+  async run() {
+    this.signal.throwIfAborted();
+    this.before = await this.dependencies.snapshot();
+    this.signal.throwIfAborted();
+    this.reason = READINESS_REASONS.INSUFFICIENT_HEADROOM;
+    assertMemoryHeadroom(this.before);
+    this.reason = READINESS_REASONS.WARMUP_FAILED;
+    if (OFFER_LIFETIME_MS >= READINESS_GENERATION.residencyMs)
+      throw new Error('Offer lifetime exceeds warmed model residency.');
+    const model = await this.engine.describe();
+    this.signal.throwIfAborted();
+    await this.engine.generate({
+      prompt: READINESS_GENERATION.prompt,
+      maxTokens: READINESS_GENERATION.maxTokens,
+      signal: this.signal,
+    });
+    this.signal.throwIfAborted();
+    const now = this.dependencies.now ?? Date.now;
+    const offerExpiresAt = now() + OFFER_LIFETIME_MS;
+    this.reason = READINESS_REASONS.MEMORY_OBSERVATION_FAILED;
+    this.after = await this.dependencies.snapshot();
+    this.signal.throwIfAborted();
+    this.reason = READINESS_REASONS.WARMUP_FAILED;
+    if (this.before.cgroup && this.after.cgroup &&
+      this.after.cgroup.events.oomKill > this.before.cgroup.events.oomKill)
+      throw new Error('OOM observed during private warmup.');
+    this.reason = READINESS_REASONS.INSUFFICIENT_HEADROOM;
+    assertMemoryHeadroom(this.after);
+    this.reason = READINESS_REASONS.WARMUP_FAILED;
+    assertReadinessCurrent(offerExpiresAt, now());
+    return { model, offerExpiresAt };
+  }
+  record(passed: boolean): ReadinessRecord {
+    return {
+      status: passed ? READINESS_STATUSES.PASSED : READINESS_STATUSES.FAILED,
+      reason: passed ? READINESS_REASONS.READY : this.reason,
+      before: this.before,
+      after: this.after,
+      warmupMs: performance.now() - this.start,
+    };
+  }
+}
+
 export async function prepareSellerEngine(
   engine: Engine,
-  dependencies: {
-    snapshot: () => Promise<MemorySnapshot>;
+  dependencies: ProbeDependencies & {
     record: (record: ReadinessRecord) => Promise<void>;
     timeoutMs?: number;
   },
 ): Promise<{ model: EngineDescription; offerExpiresAt: number }> {
-  let before: MemorySnapshot | null = null;
-  let reason: ReadinessRecord['reason'] = 'memory-observation-failed';
-  let timer: ReturnType<typeof setTimeout> | undefined;
   const controller = new AbortController();
-  const start = performance.now();
+  const check = new EngineReadinessCheck(engine, controller.signal, dependencies);
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    before = await dependencies.snapshot();
-    reason = 'insufficient-headroom';
-    assertMemoryHeadroom(before);
-    reason = 'warmup-failed';
-    if (OFFER_LIFETIME_MS >= READINESS_GENERATION.residencyMs)
-      throw new Error('Offer lifetime exceeds warmed model residency.');
-    const model = await engine.describe();
-    await Promise.race([
-      engine.generate({
-        prompt: READINESS_GENERATION.prompt,
-        maxTokens: READINESS_GENERATION.maxTokens,
-        signal: controller.signal,
-      }),
+    const result = await Promise.race([
+      check.run(),
       new Promise<never>((_resolve, reject) => {
         timer = setTimeout(() => {
-          reason = 'warmup-timeout';
+          check.reason = READINESS_REASONS.WARMUP_TIMEOUT;
           controller.abort();
           reject(new Error('Private warmup timed out.'));
         }, dependencies.timeoutMs ?? DIAGNOSTICS.warmupMs);
       }),
     ]);
     clearTimeout(timer);
-    const offerExpiresAt = Date.now() + OFFER_LIFETIME_MS;
-    reason = 'memory-observation-failed';
-    const after = await dependencies.snapshot();
-    reason = 'warmup-failed';
-    if (
-      before.cgroup &&
-      after.cgroup &&
-      after.cgroup.events.oomKill > before.cgroup.events.oomKill
-    )
-      throw new Error('OOM observed during private warmup.');
-    reason = 'insufficient-headroom';
-    assertMemoryHeadroom(after);
-    reason = 'warmup-failed';
-    assertReadinessCurrent(offerExpiresAt);
-    await dependencies.record({
-      status: 'passed',
-      reason: 'ready',
-      before,
-      after,
-      warmupMs: performance.now() - start,
-    });
-    return { model, offerExpiresAt };
+    await dependencies.record(check.record(true));
+    return result;
   } catch {
     controller.abort();
-    const after = await dependencies.snapshot().catch(() => null);
-    await dependencies.record({
-      status: 'failed',
-      reason,
-      before,
-      after,
-      warmupMs: performance.now() - start,
-    });
+    await dependencies.record(check.record(false));
     throw new Error(
-      reason === 'insufficient-headroom'
+      check.reason === READINESS_REASONS.INSUFFICIENT_HEADROOM
         ? 'Insufficient memory headroom; seller not advertised.'
         : 'Private engine warmup failed; seller not advertised.',
     );
