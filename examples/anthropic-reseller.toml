@@ -1,4 +1,5 @@
 #:schema ../packages/node/schemas/gyblos.schema.json
+# (The #:schema path above is relative to this repository; in a copy elsewhere, update or delete it.)
 # Resell a model through an Anthropic-compatible API (Messages format).
 #   export ANTHROPIC_UPSTREAM_KEY=...
 # A model outside the Gyblos catalog must say custom = true; it is listed as custom and earns

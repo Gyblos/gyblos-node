@@ -1,4 +1,5 @@
 #:schema ../packages/node/schemas/gyblos.schema.json
+# (The #:schema path above is relative to this repository; in a copy elsewhere, update or delete it.)
 # Several models on one node: a local Ollama, a local LM Studio and a free tiny model.
 # Each model may appear once; list reasoning levels per offer.
 
@@ -17,16 +18,18 @@ relay_only = false                # true hides this node's IP from buyers (relay
 
 [[offers]]
 model = "qwen3-30b-a3b"
+reasoning = ["off", "high"]       # Qwen3 thinking is on/off (GYB-DOC-028)
 engine = { kind = "ollama", url = "http://127.0.0.1:11434", upstream_model = "qwen3:30b-a3b" }
 price = { input_per_mtok = "0.1", output_per_mtok = "0.4", currency = "USDC" }
 
 [[offers]]
 model = "gpt-oss-20b"
-reasoning = ["off", "low", "medium"]
+reasoning = ["low", "medium"]     # gpt-oss has no "off" level
 engine = { kind = "openai", url = "http://localhost:1234/v1", upstream_model = "openai/gpt-oss-20b" }
 price = { input_per_mtok = "0.05", output_per_mtok = "0.2", currency = "USDC" }
 
 [[offers]]
 model = "qwen3-0.6b"
+reasoning = ["off", "high"]
 engine = { kind = "ollama", url = "http://127.0.0.1:11434", upstream_model = "qwen3:0.6b" }
 free = { daily_token_cap = 100000, per_buyer_cap = 2000 }

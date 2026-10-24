@@ -1,4 +1,5 @@
 #:schema ../packages/node/schemas/gyblos.schema.json
+# (The #:schema path above is relative to this repository; in a copy elsewhere, update or delete it.)
 # Resell a model from any OpenAI-compatible API. The API key stays in the environment:
 #   export UPSTREAM_API_KEY=...
 # A reseller URL earns the "declared usage" badge, and reselling may break the provider's terms;
@@ -15,6 +16,6 @@ relay_token_env = "GYBLOS_RELAY_TOKEN"   # the variable's name, never the token 
 
 [[offers]]
 model = "gpt-oss-20b"
-reasoning = ["off", "low"]
+reasoning = ["low", "medium", "high"]   # gpt-oss effort levels; it has no "off"
 engine = { kind = "openai", url = "https://api.example.com/v1", api_key_env = "UPSTREAM_API_KEY", upstream_model = "gpt-oss-20b" }
 price = { input_per_mtok = "0.08", output_per_mtok = "0.3", currency = "USDC" }

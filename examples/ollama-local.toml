@@ -1,4 +1,5 @@
 #:schema ../packages/node/schemas/gyblos.schema.json
+# (The #:schema path above is relative to this repository; in a copy elsewhere, update or delete it.)
 # Sell one model from an Ollama you already run on this machine.
 # Copy to gyblos.toml and check it with: pnpm gyblos config validate --config gyblos.toml
 # Secrets never go in this file: export GYBLOS_RELAY_TOKEN in the environment instead.
@@ -12,8 +13,8 @@ data_dir = ".local/gyblos"        # same as GYBLOS_HOME; relative to the working
 
 [[offers]]
 model = "qwen3-30b-a3b"           # canonical catalog id (the Ollama alias qwen3:30b-a3b also works)
-reasoning = ["off"]               # levels this offer serves; "off" is the default
+reasoning = ["off", "high"]       # Qwen3 thinking is on/off (GYB-DOC-028); default is ["off"]
 # Plain http is accepted only for loopback and host.docker.internal.
 engine = { kind = "ollama", url = "http://127.0.0.1:11434", upstream_model = "qwen3:30b-a3b" }
-# USDC per million tokens, as canonical decimal strings ("0.1", not "0.10").
+# USDC per million tokens as decimal strings ("0.10" is read as "0.1"); at most 6 decimals.
 price = { input_per_mtok = "0.1", output_per_mtok = "0.4", currency = "USDC" }
