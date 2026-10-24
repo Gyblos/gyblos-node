@@ -32,4 +32,3 @@ export function relayOrigins(values: readonly string[]): string[] | undefined {
   }
   return origins;
 }
-
