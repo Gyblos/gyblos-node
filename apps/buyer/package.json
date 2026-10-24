@@ -17,7 +17,8 @@
     "./synthetic-cases": "./src/synthetic-cases.ts",
     "./proxy": "./src/proxy.ts",
     "./setup": "./src/setup.ts",
-    "./trust": "./src/trust.ts"
+    "./trust": "./src/trust.ts",
+    "./control": "./src/control.ts"
   },
   "dependencies": {
     "@gyblos/core": "workspace:*",

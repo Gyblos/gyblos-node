@@ -13,7 +13,10 @@
     "./iroh-server": "./src/iroh-server.ts",
     "./limiter": "./src/limiter.ts",
     "./route-policy": "./src/route-policy.ts",
-    "./wire": "./src/wire.ts"
+    "./wire": "./src/wire.ts",
+    "./control-io": "./src/control-io.ts",
+    "./control-server": "./src/control-server.ts",
+    "./control-client": "./src/control-client.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",
