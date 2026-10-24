@@ -17,10 +17,10 @@ import { REASONING_LEVELS } from '@gyblos/protocol/constants';
 import { createValidator } from './support/json-schema.js';
 import {
   exampleFiles,
-  INVALID_FIXTURES,
   SCHEMA_PATH,
   VALID_FIXTURES,
 } from './support/node-config-fixtures.js';
+import { INVALID_FIXTURES } from './support/node-config-invalid.js';
 
 const schema: unknown = JSON.parse(readFileSync(SCHEMA_PATH, 'utf8'));
 

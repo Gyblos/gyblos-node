@@ -13,10 +13,10 @@ import {
   BASE,
   exampleFiles,
   FAKE_SECRET,
-  INVALID_FIXTURES,
   offer,
   REPOSITORY_ROOT,
 } from './support/node-config-fixtures.js';
+import { INVALID_FIXTURES } from './support/node-config-invalid.js';
 
 // Every value here is a fake secret or private location that must never be printed.
 const SECRET_ENVIRONMENT = {

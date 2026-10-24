@@ -20,10 +20,10 @@ import {
   BASE,
   exampleFiles,
   FAKE_SECRET,
-  INVALID_FIXTURES,
   offer,
   VALID_FIXTURES,
 } from './support/node-config-fixtures.js';
+import { INVALID_FIXTURES } from './support/node-config-invalid.js';
 
 function issuesOf(result: NodeConfigResult) {
   assert.equal(result.ok, false);
