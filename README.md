@@ -109,7 +109,7 @@ using independently confirmed seller identities, run `pnpm buyer:setup`, then
 | Checks | `pnpm test`, `test:lab`, `test:all`                  | Product tests (PR gate), lab tests, both.                             |
 | Checks | `pnpm typecheck`                                     | TypeScript, including tests.                                          |
 | Checks | `pnpm check`                                         | Typecheck, lint (including tooling), product and lab tests.           |
-| Checks | `pnpm lint`                                          | ESLint, Prettier and import boundaries.                               |
+| Checks | `pnpm lint`                                          | ESLint, Prettier, tooling tests and import boundaries.                |
 | Checks | `pnpm boundaries`, `tooling:test`                    | Boundary check (`--json`); tests of the checker and lint rules.       |
 | Checks | `pnpm format`, `format:check`                        | Format and sort imports; check only.                                  |
 
@@ -158,4 +158,5 @@ Package-by-package map: [docs/architecture.md](docs/architecture.md).
 [Recovery](docs/recovery.md) · [Identity](docs/identity.md) ·
 [Discovery](docs/discovery.md) · [Stack](docs/stack.md) ·
 [Limitations](docs/limitations.md) · [Protocol spec](packages/protocol/SPEC.md)
-· [Tests](tests/README.md) · [Contributing](AGENTS.md)
+· [Tests](tests/README.md) · [Code standards](docs/code-standards.md) ·
+[Contributing](AGENTS.md)
