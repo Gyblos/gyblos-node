@@ -23,6 +23,7 @@ export const NODE_ERROR_CODES = {
   INVALID_SIGNED_OFFER: 'INVALID_SIGNED_OFFER',
   LEGACY_LOCAL_LAYOUT: 'LEGACY_LOCAL_LAYOUT',
   PUBLIC_SEQUENCE_UNAVAILABLE: 'PUBLIC_SEQUENCE_UNAVAILABLE',
+  DISCOVERY_PUBLISH_FAILED: 'DISCOVERY_PUBLISH_FAILED',
 } as const;
 export type NodeErrorCode =
   (typeof NODE_ERROR_CODES)[keyof typeof NODE_ERROR_CODES];
@@ -42,3 +43,12 @@ export const SELLER_PUBLIC_RECORDS = {
   catalogMs: 60_000,
   renewBeforeMs: 20_000,
 } as const;
+
+export const SELLER_PUBLICATION_STATES = {
+  IDLE: 'idle',
+  RUNNING: 'running',
+  DEGRADED: 'degraded',
+  STOPPED: 'stopped',
+} as const;
+export type SellerPublicationState =
+  (typeof SELLER_PUBLICATION_STATES)[keyof typeof SELLER_PUBLICATION_STATES];

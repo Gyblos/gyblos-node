@@ -26,6 +26,7 @@ export interface PublishRecordInput {
   record: SignedPublicV2;
   fetch: DiscoveryFetch;
   timeoutMs?: number;
+  signal?: AbortSignal;
 }
 
 export interface PublishRecordResult {
@@ -73,7 +74,8 @@ async function readPublish(response: Response, aborted: Promise<never>) {
       response.status === HTTP_STATUS.BAD_REQUEST &&
       !(
         error instanceof DiscoveryError &&
-        error.code === DISCOVERY_ERROR_CODES.TIMEOUT
+        (error.code === DISCOVERY_ERROR_CODES.TIMEOUT ||
+          error.code === DISCOVERY_ERROR_CODES.CANCELLED)
       )
     )
       discoveryFail(DISCOVERY_ERROR_CODES.RECORD_REJECTED, response.status);
@@ -94,6 +96,7 @@ export async function publishRecord(
   const body = publishBody(input.record);
   const request = {
     url,
+    signal: input.signal,
     init: {
       method: 'POST',
       headers: {
