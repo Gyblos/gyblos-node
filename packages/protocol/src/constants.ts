@@ -136,6 +136,7 @@ export const CONTROL_VERSION = 1;
 export const CONTROL_RECORD_VERSION = 2;
 export const CONTROL_METHODS = {
   CATALOG: 'catalog.get',
+  PRESENCE: 'presence.get',
   OFFER: 'offer.request',
 } as const;
 export const REASONING_LEVELS = {
