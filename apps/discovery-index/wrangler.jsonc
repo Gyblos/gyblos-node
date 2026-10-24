@@ -32,4 +32,6 @@
   //   { "name": "DISCOVERY_NODE_LIMITER", "namespace_id": "42621006", "simple": { "limit": 10, "period": 60 } }
   // ],
   // "routes": [{ "pattern": "discovery.gyblos.com", "custom_domain": true }],
+  // Publishing also needs the DISCOVERY_PUBLISH_ALLOWLIST secret (approved NodeIds or `*`), set
+  // with `secret put`, never here; without it publishes answer 503 and reads keep working.
 }
