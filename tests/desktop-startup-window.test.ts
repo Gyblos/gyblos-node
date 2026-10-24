@@ -77,3 +77,35 @@ void test('closing the main window also removes startup and cancels handoff', ()
   assert.equal(loading.shown, 0);
   assert.equal(main.shown, 0);
 });
+
+void test('quitting after paint cancels startup before pending preparation settles', () => {
+  const main = new WindowDouble();
+  const loading = new WindowDouble();
+  const controller = new AbortController();
+  const handoff = startupHandoff(main, loading, controller.signal);
+  loading.emit('ready-to-show');
+  main.emit('ready-to-show');
+  controller.abort();
+  assert.equal(main.destroyed, false);
+  handoff.prepared();
+  assert.equal(handoff.cancelled(), true);
+  assert.equal(main.shown, 0);
+  assert.equal(main.closed, 0);
+});
+
+void test('startup cannot show either window after cancellation before paint', () => {
+  for (const alreadyAborted of [false, true]) {
+    const main = new WindowDouble();
+    const loading = new WindowDouble();
+    const controller = new AbortController();
+    if (alreadyAborted) controller.abort();
+    const handoff = startupHandoff(main, loading, controller.signal);
+    controller.abort();
+    handoff.prepared();
+    main.emit('ready-to-show');
+    loading.emit('ready-to-show');
+    assert.equal(handoff.cancelled(), true);
+    assert.equal(main.shown, 0);
+    assert.equal(loading.shown, 0);
+  }
+});
