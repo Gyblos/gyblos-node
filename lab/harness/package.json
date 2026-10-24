@@ -24,7 +24,14 @@
     "./journal": "./src/journal.ts",
     "./types": "./src/types.ts",
     "./wallet": "./src/wallet.ts",
-    "./setup": "./src/setup.ts"
+    "./setup": "./src/setup.ts",
+    "./acceptance": "./src/acceptance/run.ts",
+    "./acceptance/constants": "./src/acceptance/constants.ts",
+    "./acceptance/options": "./src/acceptance/options.ts",
+    "./acceptance/workspace": "./src/acceptance/workspace.ts",
+    "./acceptance/index": "./src/acceptance/index.ts",
+    "./cli/node-discovery-acceptance": "./src/cli/node-discovery-acceptance.ts",
+    "./acceptance/engine": "./src/acceptance/engine.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",
@@ -42,6 +49,13 @@
     "@x402/svm": "2.28.0",
     "@x402/express": "2.28.0",
     "express": "4.21.2",
-    "@gyblos/node-app": "workspace:*"
+    "@gyblos/node-app": "workspace:*",
+    "@gyblos/discovery-index": "workspace:*",
+    "@gyblos/discovery-http": "workspace:*",
+    "@gyblos/transport-iroh": "workspace:*",
+    "@number0/iroh": "1.1.0"
+  },
+  "scripts": {
+    "acceptance:node-discovery": "node --import tsx src/cli/node-discovery-acceptance.ts"
   }
 }

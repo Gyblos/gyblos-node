@@ -54,6 +54,16 @@ pnpm check
 
 No wallet, model or network needed; unsupported native cases skip explicitly.
 
+### Local node and discovery acceptance (no payments)
+
+```sh
+pnpm --filter @gyblos/lab-harness acceptance:node-discovery
+```
+
+Uses a synthetic engine, native loopback Iroh and an in-process memory index.
+Temporary identities/state only; never contacts the deployed index or RPC.
+[Coverage, evidence limits and explicit real-engine mode](docs/node-discovery-acceptance.md).
+
 ### 2. Lab: a devnet payment on one machine
 
 The `gate:*` commands are lab proof-of-concept checks, not seller or buyer

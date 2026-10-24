@@ -43,10 +43,11 @@ interface SellerControlStartupOptions {
   readiness: () => QuoteReadiness;
   sequence: SellerSequence;
   catalogMs?: number;
+  now?: () => number;
 }
 
 function startupRecords(options: SellerControlStartupOptions) {
-  const now = Date.now();
+  const now = (options.now ?? Date.now)();
   const { selection, reasoning } = startupSelection();
   return createSellerRecords({
     template: {
@@ -74,7 +75,7 @@ function startupRecords(options: SellerControlStartupOptions) {
     },
     sequence: options.sequence,
     signer: options.nodeSigner,
-    now: Date.now,
+    now: options.now ?? Date.now,
     validUntil: () => options.readiness().validUntil,
     readiness: options.readiness,
     catalogMs: options.catalogMs ?? PUBLIC_RECORD_LIMITS.catalogLifetimeMs,
@@ -106,7 +107,7 @@ export async function prepareSellerControl(
           meteringMode: CONTROL_METERING_MODES.RECOUNTED,
         },
       ],
-      now: Date.now,
+      now: options.now ?? Date.now,
       readiness: options.readiness,
     },
     nodeSigner: options.nodeSigner,
