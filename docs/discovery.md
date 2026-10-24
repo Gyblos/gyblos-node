@@ -6,8 +6,8 @@ that buyers query by model. **Nothing in the node or apps calls it yet**; the
 seller publishing loop and buyer wiring are separate work.
 
 The default base URL is `DISCOVERY_INDEX_URL` in `@gyblos/config`
-(`https://www.gyblos.com/api/v1/discovery`). It is an operator value; there is
-no environment variable for it yet. Anyone can run an index.
+(`https://gyblos.com/api/v1/discovery`). It is an operator value; there is no
+environment variable for it yet. Anyone can run an index.
 
 ## Trust model
 

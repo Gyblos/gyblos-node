@@ -28,7 +28,7 @@ const MODEL = 'qwen3-0.6b';
 const now = () => DISCOVERY_NOW;
 
 void test('the default index URL is the operator value from config', () => {
-  assert.equal(DISCOVERY_INDEX_URL, 'https://www.gyblos.com/api/v1/discovery');
+  assert.equal(DISCOVERY_INDEX_URL, 'https://gyblos.com/api/v1/discovery');
 });
 
 void test('fetchSellers returns verified sellers shaped for selectSellers', async () => {
