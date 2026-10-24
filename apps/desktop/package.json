@@ -13,7 +13,8 @@
     "./demo-account": "./src/ui/demo-account.ts",
     "./wallet": "./src/wallet/index.ts",
     "./startup-state": "./src/ui/startup-state.ts",
-    "./wallet-backup": "./src/wallet/backup/index.ts"
+    "./wallet-backup": "./src/wallet/backup/index.ts",
+    "./wallet-restore": "./src/wallet/restore.ts"
   },
   "scripts": {
     "build": "tsx scripts/build.ts",

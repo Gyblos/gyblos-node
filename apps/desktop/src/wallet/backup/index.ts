@@ -138,6 +138,12 @@ export function createBackupCodec() {
     }
   }
   return {
+    recover: (
+      _file: Uint8Array,
+      _password: string,
+      _signal?: AbortSignal,
+    ): Promise<{ secret: string; address: string }> =>
+      Promise.reject(new BackupError(BACKUP_ERROR.INVALID_INPUT)),
     seal: (secret: string, password: string, signal?: AbortSignal) =>
       run(() => seal(secret, password), signal),
     open: (
