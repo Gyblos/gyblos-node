@@ -10,6 +10,7 @@ node_modules/
 .DS_Store
 dist/
 coverage/
+.wrangler/
 
 # Private captures, measurements and internal notes; public tests/docs are allowed.
 captures/
