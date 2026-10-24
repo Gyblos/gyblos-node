@@ -156,6 +156,6 @@ Package-by-package map: [docs/architecture.md](docs/architecture.md).
 [Architecture](docs/architecture.md) · [Running a node](docs/running-a-node.md)
 · [Payments](docs/payments.md) · [Inference](docs/inference.md) ·
 [Recovery](docs/recovery.md) · [Identity](docs/identity.md) ·
-[Stack](docs/stack.md) · [Limitations](docs/limitations.md) ·
-[Protocol spec](packages/protocol/SPEC.md) · [Tests](tests/README.md) ·
-[Contributing](AGENTS.md)
+[Discovery](docs/discovery.md) · [Stack](docs/stack.md) ·
+[Limitations](docs/limitations.md) · [Protocol spec](packages/protocol/SPEC.md)
+· [Tests](tests/README.md) · [Contributing](AGENTS.md)
