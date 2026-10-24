@@ -1,5 +1,5 @@
 // Shares sanitized main-process wallet status across startup and Wallet.
-// The UI cannot request a secret, signing, backup verification or funding.
+// The UI cannot receive a key, file contents or signing/funding capability.
 import {
   createContext,
   useContext,
@@ -8,6 +8,10 @@ import {
   type ReactNode,
 } from 'react';
 
+import type {
+  BackupRequest,
+  BackupResult,
+} from '../wallet/backup-flow-model.js';
 import {
   parseWalletSummary,
   WALLET_STATUS,
@@ -17,7 +21,10 @@ import {
 
 declare global {
   interface Window {
-    desktopWallet?: { summary(): Promise<WalletSummary> };
+    desktopWallet?: {
+      summary(): Promise<WalletSummary>;
+      backup(request: BackupRequest): Promise<BackupResult>;
+    };
   }
 }
 

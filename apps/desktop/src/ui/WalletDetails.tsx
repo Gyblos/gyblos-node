@@ -1,6 +1,7 @@
-// Displays public wallet status only; backup, funding and signing remain disabled.
+// Displays public wallet metadata and backup controls; funding and signing remain disabled.
 import { WALLET_STATUS } from '../wallet/model.js';
 import { Badge, Button, Note } from './UI.js';
+import { WalletBackup } from './WalletBackup.js';
 import { useDesktopWallet } from './WalletState.js';
 
 export function WalletDetails() {
@@ -21,9 +22,9 @@ export function WalletDetails() {
           <span className="modal-note">Balance: not queried</span>
           <Note>
             Your key is encrypted using this operating system’s secret storage.
-            Portable backup and recovery are not available yet. Do not send
-            funds to this address; external transfers cannot be blocked by this
-            app.
+            Encrypted backup is available below; app restore is not available
+            yet. Do not send funds to this address; external transfers cannot be
+            blocked by this app.
           </Note>
         </>
       ) : (
@@ -35,12 +36,13 @@ export function WalletDetails() {
               : 'Protected wallet storage is unavailable. On Linux, enable GNOME Keyring or KWallet and restart. Chat remains simulated.'}
         </Note>
       )}
+      {ready && <WalletBackup />}
       <Button disabled className="wide">
         Add funds · backup verification required
       </Button>
       <Note>
-        Funding stays disabled until a portable backup restores this exact
-        address.
+        Funding is disabled in this experimental build, even after a successful
+        file check.
       </Note>
     </section>
   );

@@ -1,7 +1,14 @@
 // Exercises user-approved backup orchestration with disposable wallets and dialogs.
 // No real keystore, user wallet, payments or external services are accessed.
 import assert from 'node:assert/strict';
-import { lstat, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import {
+  lstat,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -222,4 +229,46 @@ void test('backup IPC contract rejects malformed requests and sanitizes response
     parseBackupResult(BACKUP_RESULT.VERIFIED),
     BACKUP_RESULT.VERIFIED,
   );
+});
+
+void test('backup flow rejects directories, oversized files and unavailable wallet without replacement', async () => {
+  await fixture(async ({ home, file, wallet, controller }) => {
+    await mkdir(file);
+    const dialogs = {
+      approve: async () => true,
+      save: async () => file,
+      select: async () => file,
+    };
+    const flow = createBackupFlow(wallet, dialogs, controller.signal);
+    const request = {
+      action: BACKUP_ACTION.CREATE,
+      password: TEST_BACKUP_PASSWORD,
+    };
+    assert.equal(await flow.run(request), BACKUP_RESULT.FAILED);
+    assert.equal((await lstat(file)).isDirectory(), true);
+    assert.equal(
+      await flow.run({ ...request, action: BACKUP_ACTION.VERIFY }),
+      BACKUP_RESULT.FAILED,
+    );
+    const oversized = join(home, 'oversized.json');
+    await writeFile(oversized, Buffer.alloc(8193));
+    const reader = createBackupFlow(
+      wallet,
+      { ...dialogs, select: async () => oversized },
+      controller.signal,
+    );
+    assert.equal(
+      await reader.run({ ...request, action: BACKUP_ACTION.VERIFY }),
+      BACKUP_RESULT.FAILED,
+    );
+    const unavailable = createWalletService(join(home, 'unavailable'), null);
+    const missing = join(home, 'no-backup.json');
+    const denied = createBackupFlow(
+      unavailable,
+      { ...dialogs, save: async () => missing },
+      controller.signal,
+    );
+    assert.equal(await denied.run(request), BACKUP_RESULT.FAILED);
+    await assert.rejects(lstat(missing), { code: 'ENOENT' });
+  });
 });
