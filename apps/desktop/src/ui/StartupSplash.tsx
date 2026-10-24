@@ -11,14 +11,25 @@ export function StartupSplash() {
       <div className="startup-ascii" aria-hidden="true">
         <span>[</span>
         <span className="startup-ascii-cells">
-          {Array.from({ length: STARTUP_WINDOW.BARS }, (_, index) => (
-            <span className="startup-ascii-bar" key={index} />
-          ))}
+          <AsciiBars />
+          <AsciiBars filled />
         </span>
         <span>]</span>
       </div>
       <p role="status">Preparing your app…</p>
       <small>Network preview is simulated.</small>
     </main>
+  );
+}
+
+function AsciiBars({ filled = false }: { filled?: boolean }) {
+  return (
+    <span className={`startup-ascii-row${filled ? ' is-filled' : ''}`}>
+      {Array.from({ length: STARTUP_WINDOW.BARS }, (_, index) => (
+        <span className="startup-ascii-bar" key={index}>
+          |
+        </span>
+      ))}
+    </span>
   );
 }

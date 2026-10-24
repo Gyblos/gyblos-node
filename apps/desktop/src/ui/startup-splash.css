@@ -21,35 +21,31 @@
 }
 .startup-ascii {
   display: flex;
-  margin: 24px 0 12px;
+  margin: 24px 0 16px;
   color: var(--accent);
   font:
-    20px/1 GeistMono,
+    24px/1 GeistMono,
     monospace;
-  align-items: center;
+  -webkit-text-stroke: 0.6px currentColor;
+  align-items: baseline;
   gap: 7px;
+  transform: scaleY(1.2);
+  transform-origin: left center;
 }
 .startup-ascii-cells {
-  --bar-width: 12px;
-  --bar-gap: 3px;
-  position: relative;
+  display: inline-grid;
+}
+.startup-ascii-row {
   display: flex;
-  gap: var(--bar-gap);
-  height: 22px;
+  grid-area: 1 / 1;
+  color: var(--soft);
 }
 .startup-ascii-bar {
-  width: var(--bar-width);
-  background: var(--soft);
+  display: inline-block;
+  transform: scaleX(3.5);
 }
-.startup-ascii-cells::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: repeating-linear-gradient(
-    to right,
-    var(--accent) 0 var(--bar-width),
-    transparent var(--bar-width) calc(var(--bar-width) + var(--bar-gap))
-  );
+.startup-ascii-row.is-filled {
+  color: var(--accent);
   animation: startup-battery-charge 2.8s steps(20, end) infinite;
 }
 
@@ -73,7 +69,7 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .startup-ascii-cells::after {
+  .startup-ascii-row.is-filled {
     animation: none;
     clip-path: inset(0 45% 0 0);
   }
