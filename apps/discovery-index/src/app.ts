@@ -5,13 +5,23 @@ import { bodyLimit } from 'hono/body-limit';
 
 import { isJsonContentType } from './body.js';
 import {
+  cachedPage,
+  recordCounter,
+  sellersCacheKey,
+  storePage,
+  type RecordCounter,
+  type ResponseCache,
+} from './cache.js';
+import {
   DISCOVERY_INDEX_LIMITS,
   DISCOVERY_LIMITERS,
   INDEX_ERRORS,
   INDEX_HEADER_VALUES,
   INDEX_HEADERS,
+  INDEX_PROTOCOLS,
   INDEX_ROUTES,
   INDEX_STATUS,
+  LOOPBACK_HOSTS,
   PUBLIC_READ_ROUTES,
   type DiscoveryLimiterName,
   type IndexErrorCode,
@@ -33,6 +43,8 @@ import {
 } from './sellers.js';
 import type { DiscoveryStorage } from './storage.js';
 
+export type { ResponseCache } from './cache.js';
+
 export interface DiscoveryIndexOptions {
   // Missing storage or any missing limiter fails closed with 503 DISCOVERY_UNAVAILABLE.
   storage?: DiscoveryStorage;
@@ -40,9 +52,11 @@ export interface DiscoveryIndexOptions {
   // Who may publish. Missing means closed: every publish is 503 DISCOVERY_UNAVAILABLE,
   // reads are unaffected. Development never relaxes it.
   publishers?: DiscoveryPublishers;
+  // Response cache for GET /v1/sellers (the Worker passes caches.default). Missing means none.
+  cache?: ResponseCache;
   now?: () => number;
-  // Loopback hosts only: missing limiters become in-memory counters. Storage is never relaxed.
-  // The Worker entry always passes false.
+  // Loopback hosts only: missing limiters become in-memory counters and plain http is accepted.
+  // Storage is never relaxed. The Worker entry always passes false.
   development?: boolean;
   maxNodes?: number;
   maxResponseBytes?: number;
@@ -101,8 +115,11 @@ function pruneThrottle(
 
 interface IndexSettings {
   now: () => number;
+  development: boolean;
   storage: DiscoveryStorage | undefined;
   publishers: DiscoveryPublishers | undefined;
+  cache: ResponseCache | undefined;
+  records: RecordCounter;
   resolve: (url: string) => ResolvedLimiters | null;
   prune: (now: number) => Promise<void>;
   maxNodes: number;
@@ -111,15 +128,15 @@ interface IndexSettings {
 
 function settingsOf(options: DiscoveryIndexOptions): IndexSettings {
   const now = options.now ?? Date.now;
+  const development = options.development === true;
   return {
     now,
+    development,
     storage: options.storage,
     publishers: options.publishers,
-    resolve: limiterResolver(
-      options.limiters ?? {},
-      options.development === true,
-      now,
-    ),
+    cache: options.cache,
+    records: recordCounter(),
+    resolve: limiterResolver(options.limiters ?? {}, development, now),
     prune: pruneThrottle(
       options.storage,
       options.pruneIntervalMs ?? DISCOVERY_INDEX_LIMITS.pruneIntervalMs,
@@ -130,11 +147,24 @@ function settingsOf(options: DiscoveryIndexOptions): IndexSettings {
   };
 }
 
-// Fail closed before routing: storage and every limiter, then the per-IP(/64) limit.
+// https only; development apps also accept plain http on a loopback host.
+function secureRequest(url: string, development: boolean) {
+  const { protocol, hostname } = new URL(url);
+  return (
+    protocol === INDEX_PROTOCOLS.SECURE ||
+    (development &&
+      protocol === INDEX_PROTOCOLS.LOOPBACK &&
+      LOOPBACK_HOSTS.has(hostname))
+  );
+}
+
+// Before routing: https, then fail closed on storage and every limiter, then the per-IP(/64) limit.
 function gate(settings: IndexSettings) {
   return async (context: IndexContext, next: Next) => {
     const limiters = settings.resolve(context.req.url);
-    if (!settings.storage || !limiters)
+    if (!secureRequest(context.req.url, settings.development))
+      context.res = rejection(context, INDEX_ERRORS.HTTPS_REQUIRED);
+    else if (!settings.storage || !limiters)
       context.res = rejection(context, INDEX_ERRORS.UNAVAILABLE);
     else if (
       !(await allowed(limiters[DISCOVERY_LIMITERS.IP], clientKey(context)))
@@ -175,6 +205,7 @@ function publishHandler(
       if (error instanceof IndexError) return rejection(context, error.code);
       throw error;
     }
+    settings.records.reset();
     return context.json({ ok: true }, INDEX_STATUS.CREATED);
   };
 }
@@ -188,17 +219,32 @@ function sellersHandler(settings: IndexSettings) {
       if (error instanceof IndexError) return rejection(context, error.code);
       throw error;
     }
+    const key = sellersCacheKey(context.req.url, query);
+    const cached = await cachedPage(settings.cache, key);
+    if (cached) return cached;
     const body = await sellersPage(
       context.get('storage'),
       query,
       settings.now(),
       settings.maxResponseBytes,
     );
-    return context.body(body, INDEX_STATUS.OK, {
+    const response = context.body(body, INDEX_STATUS.OK, {
       [INDEX_HEADERS.CONTENT_TYPE]: INDEX_HEADER_VALUES.JSON,
       [INDEX_HEADERS.CACHE_CONTROL]: INDEX_HEADER_VALUES.SELLERS_CACHE,
     });
+    await inBackground(context, storePage(settings.cache, key, response));
+    return response;
   };
+}
+
+// Hands work to the Workers execution context when there is one, else awaits it.
+function inBackground(context: IndexContext, task: Promise<void>) {
+  try {
+    context.executionCtx.waitUntil(task);
+    return Promise.resolve();
+  } catch {
+    return task;
+  }
 }
 
 export function createDiscoveryIndex(options: DiscoveryIndexOptions = {}) {
@@ -231,7 +277,10 @@ export function createDiscoveryIndex(options: DiscoveryIndexOptions = {}) {
   app.get(INDEX_ROUTES.HEALTH, async (context) =>
     context.json({
       ok: true,
-      records: await context.get('storage').count(settings.now()),
+      records: await settings.records.read(
+        context.get('storage'),
+        settings.now(),
+      ),
       publish: publishModeOf(publishers),
     }),
   );

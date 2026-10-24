@@ -9,6 +9,9 @@ import type { DiscoveryPublishers } from '@gyblos/discovery-index/publishers';
 import {
   createMemoryStorage,
   type DiscoveryStorage,
+  type SellerCursor,
+  type SellerQuery,
+  type SellerRow,
   type StoredEntry,
 } from '@gyblos/discovery-index/storage';
 import { createD1Storage } from '@gyblos/discovery-index/storage-d1';
@@ -309,11 +312,11 @@ void test('D1 and memory listings are identical across pages', async (context) =
   await seedListing(made.storage);
   await seedListing(memory);
   for (const limit of [1, 4, 7, 50]) {
-    let after = null;
+    let after: SellerCursor | null = null;
     const pages: string[] = [];
     for (let page = 0; page < 40; page++) {
-      const query = { model: 'm', now: T0, limit, after };
-      const fromD1 = await made.storage.list(query);
+      const query: SellerQuery = { model: 'm', now: T0, limit, after };
+      const fromD1: SellerRow[] = await made.storage.list(query);
       assert.deepEqual(fromD1, await memory.list(query));
       pages.push(...fromD1.map((row) => row.nodeId));
       const last = fromD1.at(-1);
