@@ -7,7 +7,7 @@ This repository contains the Gyblos node and buyer application, not the separate
 The full package table is in [docs/architecture.md](docs/architecture.md). Ownership in brief:
 
 - `packages/protocol`: wire contracts and signing (see `SPEC.md`); `core`: metering and trust policy, no SDKs or filesystem.
-- `packages/engine-ollama`, `payments-x402`, `transport-iroh`, `identity`: independent adapters.
+- `packages/engine-ollama`, `payments-x402`, `transport-iroh`, `identity`, `discovery-http`: independent adapters.
 - `packages/node`: local-node library for both roles; `apps/node` (seller, with its embedded facilitator) and `apps/buyer`: independent product executables.
 - `packages/config`: operator values shared by product packages and the local home layout (`home.ts`: product home per role plus artifacts, separate lab home); lab-only values, including the devnet wallet config, live in `lab/harness`; `runtime`: platform support.
 - `lab/`: validation outside product ownership (`harness`, `facilitator`, `tools` runnable; `evidence` historical). "Gate" is a lab word: product code, routes, environment variables, messages and product scripts do not use it. `tests`, `tooling`: offline verification; no import-time initialization.
