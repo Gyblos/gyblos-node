@@ -1,0 +1,18 @@
+#:schema ../packages/node/schemas/gyblos.schema.json
+# Give tokens away on devnet. A free offer has no price and must set both caps.
+# Running from Docker? host.docker.internal reaches an Ollama on the host.
+
+version = 1
+
+[node]
+network = "devnet"
+data_dir = "/data"
+
+[discovery]
+publish = true                    # list this node in the public discovery index (off by default)
+url = "https://discovery.gyblos.com/v1"
+
+[[offers]]
+model = "qwen3:0.6b"              # alias of the catalog id qwen3-0.6b; tiny, good for quick tests
+engine = { kind = "ollama", url = "http://host.docker.internal:11434" }
+free = { daily_token_cap = 200000, per_buyer_cap = 5000 }

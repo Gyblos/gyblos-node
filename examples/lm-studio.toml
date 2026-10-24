@@ -1,0 +1,15 @@
+#:schema ../packages/node/schemas/gyblos.schema.json
+# Sell a model served by LM Studio's OpenAI-compatible server (default port 1234).
+# LM Studio needs no API key locally, so api_key_env is omitted.
+
+version = 1
+
+[node]
+network = "devnet"
+
+[[offers]]
+model = "gpt-oss-20b"
+# gpt-oss supports several reasoning efforts; list the ones you are willing to serve.
+reasoning = ["off", "low", "medium", "high"]
+engine = { kind = "openai", url = "http://127.0.0.1:1234/v1", upstream_model = "openai/gpt-oss-20b" }
+price = { input_per_mtok = "0.05", output_per_mtok = "0.2", currency = "USDC" }

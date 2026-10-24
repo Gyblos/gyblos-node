@@ -1,0 +1,17 @@
+#:schema ../packages/node/schemas/gyblos.schema.json
+# Resell a model through an Anthropic-compatible API (Messages format).
+#   export ANTHROPIC_UPSTREAM_KEY=...
+# A model outside the Gyblos catalog must say custom = true; it is listed as custom and earns
+# only the badge its engine can support (usually "declared usage").
+
+version = 1
+
+[node]
+network = "devnet"
+
+[[offers]]
+model = "example-labs/chat-large"
+custom = true
+reasoning = ["off", "high"]
+engine = { kind = "anthropic", url = "https://anthropic-compatible.example.com", api_key_env = "ANTHROPIC_UPSTREAM_KEY", upstream_model = "chat-large-2026-01" }
+price = { input_per_mtok = "1.5", output_per_mtok = "6", currency = "USDC" }
