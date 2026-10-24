@@ -239,3 +239,31 @@ void test('failed inference invalidates the observation without retrying or chan
   assert.equal(await source.observed.tick(), true);
   await source.observed.stop();
 });
+
+void test('stop and inference abort clear the deadline timer even while the actual check ignores cancellation', async (context) => {
+  const clear = context.mock.method(globalThis, 'clearTimeout');
+  for (const mode of ['stop', 'inference']) {
+    const source = fixture();
+    let finish!: () => void;
+    source.options.check = async () => {
+      await new Promise<void>((resolve) => { finish = resolve; });
+      return { model: source.model, offerExpiresAt: 10500 };
+    };
+    source.setNow(10080);
+    const checking = source.observed.tick();
+    await new Promise((resolve) => setImmediate(resolve));
+    const before = clear.mock.calls.filter((call) => call.arguments[0] !== undefined).length;
+    try {
+      if (mode === 'stop') await source.observed.stop();
+      else await source.observed.engine.generate({ prompt: 'synthetic', maxTokens: 1 });
+      assert.equal(await checking, false);
+      const after = clear.mock.calls.filter((call) => call.arguments[0] !== undefined).length;
+      assert.ok(after > before, mode);
+      assert.equal(await source.observed.tick(), false);
+    } finally {
+      finish();
+      await new Promise((resolve) => setImmediate(resolve));
+      await source.observed.stop();
+    }
+  }
+});
