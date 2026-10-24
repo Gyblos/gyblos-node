@@ -15,7 +15,8 @@
     "./session-cleanup": "./src/session-cleanup.ts",
     "./startup-window": "./src/startup-window.ts",
     "./startup-state": "./src/ui/startup-state.ts",
-    "./wallet-backup": "./src/wallet/backup/index.ts"
+    "./wallet-backup": "./src/wallet/backup/index.ts",
+    "./wallet-restore": "./src/wallet/restore.ts"
   },
   "scripts": {
     "build": "tsx scripts/build.ts",
