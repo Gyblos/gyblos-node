@@ -24,7 +24,11 @@
     "./selection-stats": "./src/selection-stats.ts",
     "./selection-proxy": "./src/selection-proxy.ts",
     "./offer-race": "./src/offer-race.ts",
-    "./selection-v1": "./src/selection-v1.ts"
+    "./selection-v1": "./src/selection-v1.ts",
+    "./discovery": "./src/discovery.ts",
+    "./discovery-state": "./src/discovery-state.ts",
+    "./discovery-storage": "./src/discovery-storage.ts",
+    "./selection-runtime": "./src/selection-runtime.ts"
   },
   "dependencies": {
     "@gyblos/core": "workspace:*",
@@ -36,6 +40,7 @@
     "@gyblos/protocol": "workspace:*",
     "@gyblos/transport-iroh": "workspace:*",
     "@number0/iroh": "1.1.0",
-    "@solana/kit": "5.1.0"
+    "@solana/kit": "5.1.0",
+    "@gyblos/discovery-http": "workspace:*"
   }
 }

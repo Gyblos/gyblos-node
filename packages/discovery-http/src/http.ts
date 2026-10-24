@@ -54,6 +54,7 @@ export interface DeadlineRequest {
   init: RequestInit;
   fetch: DiscoveryFetch;
   timeoutMs: number;
+  signal?: AbortSignal;
 }
 
 // Runs one request under a deadline; `read` consumes the response before the deadline ends.
@@ -63,16 +64,23 @@ export async function withDeadline<T>(
 ): Promise<T> {
   if (typeof request.fetch !== 'function')
     discoveryFail(DISCOVERY_ERROR_CODES.INVALID_INPUT);
+  if (request.signal?.aborted)
+    return discoveryFail(DISCOVERY_ERROR_CODES.CANCELLED);
   const controller = new AbortController();
-  let expire = () => {};
+  let expire = (_code: DiscoveryErrorCode) => {};
   const aborted = new Promise<never>((_resolve, reject) => {
-    expire = () => reject(new DiscoveryError(DISCOVERY_ERROR_CODES.TIMEOUT));
+    expire = (code) => reject(new DiscoveryError(code));
   });
   // Callers may never await `aborted`; keep its rejection observed.
   aborted.catch(() => {});
+  const cancel = () => {
+    controller.abort();
+    expire(DISCOVERY_ERROR_CODES.CANCELLED);
+  };
+  request.signal?.addEventListener('abort', cancel, { once: true });
   const timer = setTimeout(() => {
     controller.abort();
-    expire();
+    expire(DISCOVERY_ERROR_CODES.TIMEOUT);
   }, request.timeoutMs);
   try {
     const response = await Promise.race([
@@ -82,6 +90,7 @@ export async function withDeadline<T>(
     return await read(response, aborted);
   } finally {
     clearTimeout(timer);
+    request.signal?.removeEventListener('abort', cancel);
   }
 }
 
@@ -104,6 +113,10 @@ async function send(request: DeadlineRequest, signal: AbortSignal) {
   }
   if (!(response instanceof Response))
     return discoveryFail(DISCOVERY_ERROR_CODES.MALFORMED_RESPONSE);
+  if (signal.aborted) {
+    discard(response);
+    return discoveryFail(DISCOVERY_ERROR_CODES.CANCELLED);
+  }
   return response;
 }
 

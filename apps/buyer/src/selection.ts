@@ -45,6 +45,7 @@ export interface SelectionDependencies {
   random?: () => number;
   windowMs?: number;
   snapshotMs?: number;
+  observeVerified?: (seller: KnownSeller) => Promise<boolean>;
 }
 async function verifiedSeller(
   client: BuyerControlClient,
@@ -108,17 +109,12 @@ export async function selectBuyerQuote(
   ]);
   const clients = new Map<string, BuyerControlClient>();
   try {
-    const snapshots = await Promise.all(
-      config.sellers.map(async (seller) => {
-        try {
-          const client = await dependencies.connect(seller);
-          clients.set(seller.nodeId, client);
-          return await verifiedSeller(client, seller, now, deadline);
-        } catch {
-          recordQuote(dependencies.stats, seller.nodeId, false, 0, now());
-          return undefined;
-        }
-      }),
+    const snapshots = await refreshSnapshots(
+      config,
+      dependencies,
+      clients,
+      now,
+      deadline,
     );
     if (signal?.aborted)
       return { ok: false, code: BUYER_SELECTION_CODES.NO_OFFER };
@@ -210,4 +206,45 @@ async function requestCandidate(
       );
     throw error;
   }
+}
+
+function settledValues<T>(outcomes: PromiseSettledResult<T>[]) {
+  return outcomes.map((outcome) => {
+    if (outcome.status === 'rejected') throw outcome.reason;
+    return outcome.value;
+  });
+}
+
+async function refreshSnapshots(
+  config: BuyerSelectionConfig,
+  dependencies: SelectionDependencies,
+  clients: Map<string, BuyerControlClient>,
+  now: () => number,
+  deadline: AbortSignal,
+) {
+  return settledValues(
+    await Promise.allSettled(
+      config.sellers.map(async (seller) => {
+        try {
+          const client = await dependencies.connect(seller);
+          clients.set(seller.nodeId, client);
+          const verified = await verifiedSeller(client, seller, now, deadline);
+          if (
+            dependencies.observeVerified &&
+            !(await dependencies.observeVerified(verified))
+          )
+            return undefined;
+          return verified;
+        } catch (error) {
+          if (
+            error instanceof BuyerSelectionError &&
+            error.code === BUYER_SELECTION_CODES.DISCOVERY_STATE
+          )
+            throw error;
+          recordQuote(dependencies.stats, seller.nodeId, false, 0, now());
+          return undefined;
+        }
+      }),
+    ),
+  );
 }

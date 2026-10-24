@@ -348,3 +348,40 @@ void test('invalid model, limit, cursor and timeout inputs are refused before fe
     );
   assert.equal(calls.length, 0);
 });
+
+void test('caller cancellation bounds headers and stalled bodies even when injected fetch ignores its signal', async () => {
+  const controller = new AbortController();
+  let cancelBody = false;
+  const body = new ReadableStream<Uint8Array>({
+    cancel() {
+      cancelBody = true;
+    },
+  });
+  const result = fetchSellers({
+    baseUrl: DISCOVERY_BASE,
+    model: MODEL,
+    now,
+    signal: controller.signal,
+    fetch: async () => new Response(body),
+    timeoutMs: 1000,
+  });
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  controller.abort();
+  await assert.rejects(result, rejectsWith(DISCOVERY_ERROR_CODES.CANCELLED));
+  assert.equal(cancelBody, true);
+  let called = false;
+  await assert.rejects(
+    fetchSellers({
+      baseUrl: DISCOVERY_BASE,
+      model: MODEL,
+      now,
+      signal: controller.signal,
+      fetch: async () => {
+        called = true;
+        return jsonResponse(200, sellersBody([]));
+      },
+    }),
+    rejectsWith(DISCOVERY_ERROR_CODES.CANCELLED),
+  );
+  assert.equal(called, false);
+});

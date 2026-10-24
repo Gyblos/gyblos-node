@@ -113,6 +113,9 @@ importers:
       '@gyblos/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@gyblos/discovery-http':
+        specifier: workspace:*
+        version: link:../../packages/discovery-http
       '@gyblos/engine-ollama':
         specifier: workspace:*
         version: link:../../packages/engine-ollama

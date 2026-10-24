@@ -50,6 +50,8 @@ export const BUYER_SELECTION_CODES = {
   AUTHORIZATION_REQUIRED: 'TRUSTED_SELECTION_REQUIRED',
   RECONCILE: 'AUTHORIZATION_OUTCOME_REQUIRES_RECONCILIATION',
   LIMIT: 'BUYER_SELECTION_LIMIT',
+  DISCOVERY_STATE: 'BUYER_DISCOVERY_STATE_UNAVAILABLE',
+  DISCOVERY_LIMIT: 'BUYER_DISCOVERY_LIMIT',
 } as const;
 export const BUYER_SELECTION = {
   configFile: 'selection.json',
@@ -67,6 +69,19 @@ export const BUYER_SELECTION = {
   signatureHexCharacters: 128,
   randomRange: 0x100000000,
   cooldownMs: 30000,
+} as const;
+
+// Discovery replay metadata is separate from payment authorization journals and selection telemetry.
+export const BUYER_DISCOVERY = {
+  stateFile: 'discovery-state-v2.json',
+  lockFile: 'discovery-state-v2.lock',
+  schemaVersion: 1,
+  defaultPages: 3,
+  maxPages: 8,
+  pageSize: 50,
+  timeoutMs: 10000,
+  maxStateBytes: 1048576,
+  maxStateRows: 1024,
 } as const;
 
 export type BuyerProxyErrorCode =

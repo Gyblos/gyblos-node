@@ -2,8 +2,9 @@
 
 `packages/discovery-http` (`@gyblos/discovery-http`) is an adapter for an HTTP
 discovery index: a cache of node-signed public v2 records (catalog, presence)
-that buyers query by model. **Nothing in the node or apps calls it yet**; the
-seller publishing loop and buyer wiring are separate work.
+that buyers query by model. The buyer can opt into it through `selection.json`
+while preserving independently configured identity/endpoint bindings. The seller
+publishing loop remains separate work.
 
 The default base URL is `DISCOVERY_INDEX_URL` in `@gyblos/config`
 (`https://discovery.gyblos.com/v1`). It is an operator value; there is no
@@ -36,7 +37,7 @@ is self-declared: buyers must still check the owner↔NodeId binding (see
 
 ## API
 
-- `fetchSellers({ baseUrl, model, fetch, now, timeoutMs?, limit?, cursor?, lastSequence? })`
+- `fetchSellers({ baseUrl, model, fetch, now, timeoutMs?, signal?, limit?, cursor?, lastSequence? })`
   returns `{ sellers, dropped, next, generatedAt }`. Each seller is
   `{ catalog, presence, withdrawal: null }` (`DiscoveredSeller`); the caller
   adds `badge` and `openChannel` to form a `KnownSeller`. `limit` (default 50,
@@ -53,7 +54,9 @@ HTTP response was received, its `status`; messages never echo input or response
 text. Index rejections map one-to-one (`INVALID_RECORD`, `INVALID_SIGNATURE`,
 `EXPIRED_RECORD`, `UNKNOWN_CATALOG`, `STALE_RECORD`/`409`), as do `413`, `429`
 and `503`; anything else is `DISCOVERY_HTTP_STATUS`. A deadline is always
-`DISCOVERY_TIMEOUT`, including one that ends while reading a rejection body.
+`DISCOVERY_TIMEOUT`, including one that ends while reading a rejection body. An
+optional caller `signal` cancels headers and body reads with
+`DISCOVERY_CANCELLED`, even when an injected fetch ignores its signal.
 
 ## Buyer duties: replay and withdrawal
 
@@ -82,6 +85,59 @@ merge index results against its own per-NodeId state **before** `selectSellers`:
 
 Cap the number of pages a caller follows: `next` comes from the index and a
 malicious one can return a cursor forever.
+
+## Buyer runtime integration
+
+Add optional `"discovery": {}` to the existing buyer `selection.json` to use the
+configured default index, or set `baseUrl` and `maxPages` inside that object.
+The `sellers` list remains an independent owner–NodeId/endpoint trust allowlist;
+unknown or mismatched index identities are discarded before storage or dialing.
+There is no automatic enrollment or inferred 8004 identity proof. Badges remain
+`declared-usage` and `openChannel` remains false.
+
+The default traversal is three pages of at most 50 entries each, with a maximum
+of eight pages and an absolute 10-second discovery deadline. Cursor cycles or a
+non-final page at the configured cap fail with `BUYER_DISCOVERY_LIMIT`; no
+quotes are requested. Index errors stop preauthorization rather than silently
+switching to a different payment path. Equal signed entries and omitted entries
+can retain an already held candidate ID while its verified presence remains
+live.
+
+`discovery-state-v2.json` under `homeLayout(...).roles.buyer` stores only owner,
+NodeId, shared high-water sequence, catalog/presence digests and expiries, and
+withdrawal/conflict sequence barriers. It caches no signed proof or offer: held
+metadata is only a bounded dialing hint. Every candidate must return fresh
+signed catalog/presence over authenticated Iroh; the buyer rechecks independent
+identity, exact references and replay state, and persists the observation before
+selection. The final quote also rechecks the latest durable catalog/withdrawal
+barrier.
+
+The HTTP adapter is asked to return equal sequences for digest comparison; the
+buyer applies its persistent replay policy after verification. Replayed entries
+never replace newer state. Equal-sequence conflicts block the NodeId; a catalog
+must advance beyond the barrier/high-water mark to reopen it. Withdrawals
+learned from configured signed records are verified against the exact catalog
+and retained through expiry, restarts and config omissions. A newer presence
+cannot revive a withdrawn catalog. The index does not serve withdrawals, so an
+unknown hidden withdrawal remains a discovery limitation, bounded by signed
+presence lifetime.
+
+Replay metadata uses file mode 0600 and buyer-directory mode 0700, staged
+replace, file synchronization and POSIX directory synchronization. Updates
+serialize and reread disk state under a separate exclusive
+`discovery-state-v2.lock`; an existing lock, malformed state, unsafe permissions
+or failed persistence stops selection. The lock is never automatically broken
+after a crash. Tombstones/high-water marks are not pruned on config changes; at
+1,024 historical identities or 1 MiB state the buyer fails closed. Existing
+metadata needs deliberate operator repair rather than automatic reset. Windows
+power-loss durability is not established here.
+
+Discovery runs only in the unsigned preauthorization step. The existing proxy
+binds its decision to exact request ID/body; signed follow-ups never rediscover,
+select again or retry. Non-trusted winners stop after their signed quote.
+Execution still requires the independently trusted compatible v1 offer; no v2
+payment or free-v2 execution is enabled. See
+[running-a-node.md](running-a-node.md).
 
 ## Seller duties
 
