@@ -177,7 +177,7 @@ void test('the typed config maps snake_case keys, resolves aliases and applies o
       }),
       offer({
         model: 'qwen3-0.6b',
-        extra: 'reasoning = ["off", "low"]',
+        extra: 'reasoning = ["off", "high"]',
         pricing: 'free = { daily_token_cap = 200000, per_buyer_cap = 5000 }',
       }),
     ].join('\n'),
@@ -215,7 +215,7 @@ void test('the typed config maps snake_case keys, resolves aliases and applies o
       {
         model: { kind: 'catalog', id: 'qwen3-0.6b', requested: 'qwen3-0.6b' },
         engine: { kind: 'ollama', url: 'http://127.0.0.1:11434' },
-        reasoning: ['off', 'low'],
+        reasoning: ['off', 'high'],
         pricing: { kind: 'free', dailyTokenCap: 200000, perBuyerCap: 5000 },
       },
     ],
@@ -387,4 +387,76 @@ void test('unknown key names that look like pasted tokens are redacted in issue 
     ).map((issue) => issue.path),
     ['node.max_tokens_per_request_2026'],
   );
+});
+
+void test('a catalog model refuses reasoning levels it does not support', () => {
+  // gpt-oss has low/medium/high effort and no off switch.
+  assert.deepEqual(
+    issuesOf(
+      parseNodeConfig(
+        BASE + offer({ extra: 'reasoning = ["off", "low", "medium"]' }),
+      ),
+    ),
+    [{ code: 'REASONING_UNSUPPORTED', path: 'offers[0].reasoning[0]' }],
+  );
+  // Qwen3 thinking is on/off, mapped to off and high (GYB-DOC-028).
+  assert.deepEqual(
+    issuesOf(
+      parseNodeConfig(
+        BASE +
+          offer({
+            model: 'qwen3:30b-a3b',
+            extra: 'reasoning = ["off", "low", "medium", "high"]',
+          }),
+      ),
+    ),
+    [
+      { code: 'REASONING_UNSUPPORTED', path: 'offers[0].reasoning[1]' },
+      { code: 'REASONING_UNSUPPORTED', path: 'offers[0].reasoning[2]' },
+    ],
+  );
+  assert.deepEqual(
+    issuesOf(
+      parseNodeConfig(
+        BASE + offer({ model: 'llama-3.3-70b', extra: 'reasoning = ["high"]' }),
+      ),
+    ),
+    [{ code: 'REASONING_UNSUPPORTED', path: 'offers[0].reasoning[0]' }],
+  );
+});
+
+void test('omitted reasoning uses the catalog model default level', () => {
+  const result = parseNodeConfig(
+    BASE +
+      offer({ model: 'gpt-oss-20b' }) +
+      offer({ model: 'qwen3:0.6b' }) +
+      offer({ model: 'llama-3.3-70b' }) +
+      offer({ model: 'gemma-4-26b' }),
+  );
+  assert.ok(result.ok, JSON.stringify(result));
+  assert.deepEqual(
+    result.config.offers.map((entry) => entry.reasoning),
+    [['medium'], ['off'], ['off'], ['off']],
+  );
+  assert.deepEqual(result.warnings, []);
+});
+
+void test('unverified catalog models and custom models accept any levels with a warning', () => {
+  const result = parseNodeConfig(
+    BASE +
+      offer({ model: 'kimi-k3', extra: 'reasoning = ["off", "low"]' }) +
+      offer({ model: 'deepseek-v4.1-flash' }) +
+      offer({ model: 'acme/chat-large', extra: 'custom = true' }) +
+      offer({ model: 'gpt-oss-120b', extra: 'reasoning = ["high"]' }),
+  );
+  assert.ok(result.ok, JSON.stringify(result));
+  assert.deepEqual(
+    result.config.offers.map((entry) => entry.reasoning),
+    [['off', 'low'], ['off'], ['off'], ['high']],
+  );
+  assert.deepEqual(result.warnings, [
+    { code: 'REASONING_UNVERIFIED', path: 'offers[0].reasoning' },
+    { code: 'REASONING_UNVERIFIED', path: 'offers[1].reasoning' },
+    { code: 'REASONING_UNVERIFIED', path: 'offers[2].reasoning' },
+  ]);
 });
