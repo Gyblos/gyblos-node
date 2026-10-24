@@ -2,12 +2,13 @@
 
 The Node-only `@gyblos/desktop/wallet-backup` codec seals supplied Ed25519 PKCS8
 material and opens it only after authenticated decryption and comparison with a
-caller-supplied expected address. The codec itself has no filesystem operations.
-Wallet now offers an explicit, main-process-confirmed encrypted-file backup and
-same-address verification through native file dialogs. The renderer sends a
-password and receives a fixed status; it never receives a key, path, file
-contents or decrypted material. Funding and persistent backup approval remain
-disabled; there is no application restore/import flow.
+caller-supplied expected address through `open`; the separate internal `recover`
+operation derives the address after authentication. The codec itself has no
+filesystem operations. Wallet now offers an explicit, main-process-confirmed
+encrypted-file backup and same-address verification through native file dialogs.
+The renderer sends a password and receives a fixed status; it never receives a
+key, path, file contents or decrypted material. Funding and persistent backup
+approval remain disabled; there is no application restore/import UI or IPC flow.
 
 Version 1 is compact UTF-8 JSON with exactly these fields: `format`, `version`,
 `kdf`, `cipher`, `keyFormat`, `salt`, `nonce`, `ciphertext`, `tag`. Duplicate
@@ -71,3 +72,46 @@ success. Native derivation itself is not immediately interruptible. Passwords
 are not persisted or logged; JavaScript strings cannot be reliably erased.
 Native confirmation is consent, not biometric authentication or malware
 protection.
+
+## Internal restoration into an absent destination
+
+`@gyblos/desktop/wallet-restore` exposes a Node-only restorer. It accepts
+supplied backup bytes and a password, authenticates the unchanged v1 format and
+derives the address from the recovered Ed25519 key. The original `codec.open`
+still requires an expected address; the separate internal `recover` operation
+does not weaken that verification contract.
+
+Restoration refuses any existing wallet directory, including empty directories,
+files, symlinks and interrupted state. It never reads existing wallet keys,
+deletes a directory or replaces another wallet. Authentication and a local
+protection round trip occur before exclusive destination reservation. Automatic
+creation and restoration share that directory claim, so one can win and the
+other must refuse the existing destination.
+
+The recovered key is re-encrypted with the destination protection adapter,
+persisted by exclusive final-file creation, and reloaded through a read-only
+loader that cannot initialize a replacement identity. Success returns only the
+public address/status and both flags remain false. Cancellation before the claim
+installs nothing; cancellation or failure after the claim returns
+`RECOVERY_REQUIRED` and preserves the encrypted record or directory marker for
+inspection. A completed record may exist after interrupted confirmation. There
+is no automatic rollback, stale-marker removal or retry that replaces that
+state. Filesystem errors are sanitized and the restorer limits itself to one
+operation at a time.
+
+This service is not connected to Electron, preload, the UI or automatic startup.
+A separate entry before automatic creation remains future work. Tests use fresh
+unfunded identities and synthetic protection adapters, including all nine
+producer/reader combinations; native Keychain/DPAPI/Linux-store acceptance and
+power-loss durability are not established. Funding, persistent backup approval,
+signing, payment-state recovery and mobile linking remain disabled or outside
+this service.
+
+Restoration validates its reserved directory before writing and checks its
+identity again around descriptor I/O. Final record creation is exclusive and
+never uses a replacing rename, so a concurrently appearing record is preserved.
+This deliberately allows an incomplete encrypted final record after a crash; it
+is not atomic whole-record visibility or proof of power-loss durability. The
+existing automatic-creation publication path is unchanged. Protected-record
+reload now reads at most the configured maximum plus one byte and rejects a
+changed descriptor size, including growth after the initial stat.

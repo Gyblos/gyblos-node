@@ -12,7 +12,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
+import { createWalletService } from '@gyblos/desktop/wallet';
 import { createBackupCodec } from '@gyblos/desktop/wallet-backup';
+import { createWalletRestorer } from '@gyblos/desktop/wallet-restore';
 
 import {
   disposableIdentity,
@@ -40,6 +42,24 @@ async function produce(directory: string) {
       encrypted: true,
       sealMs: Math.round(performance.now() - started),
     }) + '\n',
+  );
+}
+async function restoreInternal(
+  root: string,
+  backup: Uint8Array,
+  expectedAddress: string,
+) {
+  const protection = disposableProtection();
+  const restored = await createWalletRestorer(root, protection).restore(
+    backup,
+    TEST_BACKUP_PASSWORD,
+  );
+  assert.equal(restored.address, expectedAddress);
+  assert.equal(restored.backupVerified, false);
+  assert.equal(restored.fundingEnabled, false);
+  assert.deepEqual(
+    await createWalletService(root, protection).summary(),
+    restored,
   );
 }
 async function consume(directory: string) {
@@ -74,8 +94,14 @@ async function consume(directory: string) {
         publicData.address,
         disposableProtection(),
       );
+      await restoreInternal(
+        join(home, `${entry}-internal`),
+        backup,
+        publicData.address,
+      );
       process.stdout.write(
         JSON.stringify({
+          internalRestore: true,
           source: publicData.source,
           destination: process.platform,
           sameAddress: true,

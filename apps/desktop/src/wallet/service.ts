@@ -45,6 +45,14 @@ async function load(directory: string, protection: WalletProtection) {
   return walletSummary(WALLET_STATUS.READY, walletAddress(secret));
 }
 
+// Read-only reload for restoration: absence must never initialize another identity.
+export async function readExistingWallet(
+  root: string,
+  protection: WalletProtection,
+) {
+  return load(join(root, WALLET.DIRECTORY), protection);
+}
+
 async function initialize(
   root: string,
   protection: WalletProtection | null,
