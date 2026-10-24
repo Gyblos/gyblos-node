@@ -236,11 +236,13 @@ eachStorage(
     assert.deepEqual(await (await call('/v1/health')).json(), {
       ok: true,
       records: 2,
+      publish: 'open',
     });
     clock.now = T0 + 600_000;
     assert.deepEqual(await (await call('/v1/health')).json(), {
       ok: true,
       records: 0,
+      publish: 'open',
     });
   },
 );

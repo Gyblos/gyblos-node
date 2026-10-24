@@ -183,7 +183,11 @@ void test('without publishers every publish is 503 while reads keep working', as
     { pad: 'x'.repeat(40_000) },
     'not a record',
   ])
-    await expectError(await app.fetch(post(body)), 503, 'DISCOVERY_UNAVAILABLE');
+    await expectError(
+      await app.fetch(post(body)),
+      503,
+      'DISCOVERY_UNAVAILABLE',
+    );
   assert.deepEqual(calls, []);
   const listed = await app.fetch(sellersRequest());
   assert.equal(listed.status, 200);
@@ -225,6 +229,8 @@ void test('the Worker maps the allowlist secret: absent, empty, malformed, open 
   const db = await createSqliteD1();
   if (!db) return context.skip('node:sqlite unavailable');
   const limiters: Record<string, FakeLimiter> = allLimiters(allow);
+  // The Worker uses the wall clock, so these records are issued now.
+  const live = { issuedAt: Date.now() };
   const base = { [DISCOVERY_DB_BINDING]: db, ...limiters };
   const closed = [
     base,
@@ -235,16 +241,19 @@ void test('the Worker maps the allowlist secret: absent, empty, malformed, open 
   for (const bindings of closed) {
     const worker = createWorker();
     await expectError(
-      await worker.fetch(post(allowed.catalog(1)), bindings),
+      await worker.fetch(post(allowed.catalog(1, live)), bindings),
       503,
       'DISCOVERY_UNAVAILABLE',
     );
     assert.equal((await worker.fetch(sellersRequest(), bindings)).status, 200);
-    assert.deepEqual(await (await worker.fetch(healthRequest(), bindings)).json(), {
-      ok: true,
-      records: 0,
-      publish: 'closed',
-    });
+    assert.deepEqual(
+      await (await worker.fetch(healthRequest(), bindings)).json(),
+      {
+        ok: true,
+        records: 0,
+        publish: 'closed',
+      },
+    );
   }
   const listed = createWorker();
   const listedBindings = {
@@ -252,18 +261,18 @@ void test('the Worker maps the allowlist secret: absent, empty, malformed, open 
     [DISCOVERY_PUBLISH_ALLOWLIST_BINDING]: ` ${hex('d')} , ${allowed.nodeId} `,
   };
   assert.equal(
-    (await listed.fetch(post(allowed.catalog(1)), listedBindings)).status,
+    (await listed.fetch(post(allowed.catalog(1, live)), listedBindings)).status,
     201,
   );
   await expectError(
-    await listed.fetch(post(indexNode().catalog(1)), listedBindings),
+    await listed.fetch(post(indexNode().catalog(1, live)), listedBindings),
     403,
     'PUBLISH_NOT_ALLOWED',
   );
   const open = createWorker();
   const openBindings = { ...base, [DISCOVERY_PUBLISH_ALLOWLIST_BINDING]: '*' };
   assert.equal(
-    (await open.fetch(post(indexNode().catalog(1)), openBindings)).status,
+    (await open.fetch(post(indexNode().catalog(1, live)), openBindings)).status,
     201,
   );
   assert.equal(

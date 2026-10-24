@@ -10,6 +10,7 @@ import {
 } from '@gyblos/discovery-index/app';
 import {
   DISCOVERY_LIMITERS,
+  PUBLISH_MODES,
   type DiscoveryLimiterName,
 } from '@gyblos/discovery-index/constants';
 import {
@@ -184,7 +185,8 @@ export interface PublishOptions {
   raw?: BodyInit;
 }
 
-// One app over one storage adapter, with a fake clock and per-request limiter overrides.
+// One app over one storage adapter, with a fake clock, open publishing unless overridden and
+// per-request limiter overrides.
 export async function indexHarness(
   kind: HarnessKind,
   options: DiscoveryIndexOptions = {},
@@ -205,6 +207,7 @@ export async function indexHarness(
       [DISCOVERY_LIMITERS.NODE]: switchable(DISCOVERY_LIMITERS.NODE),
     },
     now: () => clock.now,
+    publishers: { mode: PUBLISH_MODES.OPEN },
     ...options,
   });
   async function call(
