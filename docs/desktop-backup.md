@@ -71,3 +71,37 @@ success. Native derivation itself is not immediately interruptible. Passwords
 are not persisted or logged; JavaScript strings cannot be reliably erased.
 Native confirmation is consent, not biometric authentication or malware
 protection.
+
+## Internal restoration into an absent destination
+
+`@gyblos/desktop/wallet-restore` exposes a Node-only restorer. It accepts
+supplied backup bytes and a password, authenticates the unchanged v1 format and
+derives the address from the recovered Ed25519 key. The original `codec.open`
+still requires an expected address; the separate internal `recover` operation
+does not weaken that verification contract.
+
+Restoration refuses any existing wallet directory, including empty directories,
+files, symlinks and interrupted state. It never reads existing wallet keys,
+deletes a directory or replaces another wallet. Authentication and a local
+protection round trip occur before exclusive destination reservation. Automatic
+creation and restoration share that directory claim, so one can win and the
+other must refuse the existing destination.
+
+The recovered key is re-encrypted with the destination protection adapter,
+persisted through the existing record writer, and reloaded through a read-only
+loader that cannot initialize a replacement identity. Success returns only the
+public address/status and both flags remain false. Cancellation before the claim
+installs nothing; cancellation or failure after the claim returns
+`RECOVERY_REQUIRED` and preserves the encrypted record/staging or directory
+marker for inspection. A completed record may exist after interrupted
+confirmation. There is no automatic rollback, stale-marker removal or retry that
+replaces that state. Filesystem errors are sanitized and the restorer limits
+itself to one operation at a time.
+
+This service is not connected to Electron, preload, the UI or automatic startup.
+A separate entry before automatic creation remains future work. Tests use fresh
+unfunded identities and synthetic protection adapters, including all nine
+producer/reader combinations; native Keychain/DPAPI/Linux-store acceptance and
+power-loss durability are not established. Funding, persistent backup approval,
+signing, payment-state recovery and mobile linking remain disabled or outside
+this service.

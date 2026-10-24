@@ -1,5 +1,5 @@
 // Internal Node-only password codec; no live wallet, Electron, filesystem or IPC.
-// Publishes decrypted material only after authentication and identity checks.
+// Publishes material only after authentication/key validation; open also checks identity.
 import {
   createCipheriv,
   createDecipheriv,
@@ -87,16 +87,7 @@ async function seal(secret: string, password: string) {
     plain.fill(0);
   }
 }
-async function open(
-  file: Uint8Array,
-  password: string,
-  expectedAddress: string,
-) {
-  if (
-    typeof expectedAddress !== 'string' ||
-    !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(expectedAddress)
-  )
-    throw new BackupError(BACKUP_ERROR.INVALID_INPUT);
+async function recover(file: Uint8Array, password: string) {
   const record = parseBackup(file);
   const key = await derive(password, record.salt);
   let chunk = Buffer.alloc(0);
@@ -114,14 +105,27 @@ async function open(
       throw new BackupError(BACKUP_ERROR.AUTHENTICATION);
     }
     const secret = plain.toString('base64');
-    if (addressOf(secret) !== expectedAddress)
-      throw new BackupError(BACKUP_ERROR.IDENTITY);
-    return secret;
+    return { secret, address: addressOf(secret) };
   } finally {
     key.fill(0);
     chunk.fill(0);
     plain.fill(0);
   }
+}
+async function open(
+  file: Uint8Array,
+  password: string,
+  expectedAddress: string,
+) {
+  if (
+    typeof expectedAddress !== 'string' ||
+    !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(expectedAddress)
+  )
+    throw new BackupError(BACKUP_ERROR.INVALID_INPUT);
+  const recovered = await recover(file, password);
+  if (recovered.address !== expectedAddress)
+    throw new BackupError(BACKUP_ERROR.IDENTITY);
+  return recovered.secret;
 }
 export function createBackupCodec() {
   let active = false;
@@ -138,12 +142,8 @@ export function createBackupCodec() {
     }
   }
   return {
-    recover: (
-      _file: Uint8Array,
-      _password: string,
-      _signal?: AbortSignal,
-    ): Promise<{ secret: string; address: string }> =>
-      Promise.reject(new BackupError(BACKUP_ERROR.INVALID_INPUT)),
+    recover: (file: Uint8Array, password: string, signal?: AbortSignal) =>
+      run(() => recover(file, password), signal),
     seal: (secret: string, password: string, signal?: AbortSignal) =>
       run(() => seal(secret, password), signal),
     open: (

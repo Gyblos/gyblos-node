@@ -2,17 +2,8 @@
 // The production primitive remains internal to Node, with no renderer or funding API.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {
-  lstat,
-  mkdir,
-  mkdtemp,
-  readFile,
-  rm,
-  symlink,
-  writeFile,
-} from 'node:fs/promises';
+import { lstat, mkdir, readFile, symlink, writeFile } from 'node:fs/promises';
 import { syncBuiltinESMExports } from 'node:module';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 
@@ -29,51 +20,13 @@ import {
 import {
   createWalletRestorer,
   WALLET_RESTORE_ERROR,
-  WalletRestoreError,
 } from '@gyblos/desktop/wallet-restore';
 
 import {
   disposableIdentity,
-  disposableProtection,
   TEST_BACKUP_PASSWORD,
 } from './support/portable-backup-fixture.js';
-
-async function fixture(
-  run: (value: {
-    home: string;
-    root: string;
-    backup: Buffer;
-    identity: ReturnType<typeof disposableIdentity>;
-    protection: ReturnType<typeof disposableProtection>;
-  }) => Promise<void>,
-) {
-  const home = await mkdtemp(join(tmpdir(), 'gyblos-wallet-restore-'));
-  try {
-    const identity = disposableIdentity();
-    const backup = await createBackupCodec().seal(
-      identity.secret,
-      TEST_BACKUP_PASSWORD,
-    );
-    await run({
-      home,
-      root: join(home, 'destination'),
-      backup,
-      identity,
-      protection: disposableProtection(),
-    });
-  } finally {
-    await rm(home, { recursive: true, force: true });
-  }
-}
-function restoreError(
-  code: (typeof WALLET_RESTORE_ERROR)[keyof typeof WALLET_RESTORE_ERROR],
-) {
-  return (error: unknown) =>
-    error instanceof WalletRestoreError && error.code === code;
-}
-async function absent(path: string) {
-  await assert.rejects(lstat(path), { code: 'ENOENT' });
-}
+import { absent, fixture, restoreError } from './support/wallet-restore.js';
 
 void test('wallet restore derives the authenticated backup identity without weakening expected-address checks', async () => {
   await fixture(async ({ backup, identity }) => {
