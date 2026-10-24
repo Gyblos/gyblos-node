@@ -73,17 +73,31 @@ protocol ◀── core ◀── adapters ◀── node ◀── apps
 ## Seller selection
 
 `@gyblos/core/seller-selection` owns the buyer router's choice of sellers
-(`selectSellers`). It is a pure function: the caller passes already verified v2
-catalogs, presence and withdrawals, a checkability badge per seller, local
-per-seller stats, `now` and a random source. It applies hard filters (exact
-model, reasoning level, badge, data policy, price ceilings, budget, fresh
-presence, cooldown), then draws a few candidates by weighted sampling: cheaper
-is likelier but not certain, local reputation and an open channel shift the odds
-within bounds, and one slot goes to a seller with no local history. A lower
-reasoning level of the same model is used only when the buyer allows it, ranked
-after every exact-level candidate. A pinned seller skips sampling, never the
-filters. Asking candidates for live offers, persisting stats and wiring into the
-buyer app are separate work.
+(`selectSellers`). It is a pure function: the caller passes v2 catalogs,
+presence and withdrawals, a checkability badge per seller (the catalog carries
+none), local per-seller stats, `now`, a random source and optionally its own
+policy (default `SELLER_SELECTION_POLICY`; a gateway may inject its own). Before
+calling, the caller verifies each catalog with `verifyPublicV2` and each
+presence and withdrawal with `verifyPublicV2` against that exact catalog, which
+binds their `catalogDigest`; selection compares only owner, NodeId, sequence and
+lifetimes, and any later withdrawal excludes the seller.
+
+It applies hard filters (exact model, reasoning level, badge, data policy, price
+ceilings, budget, fresh presence, cooldown), then draws a few candidates by
+weighted sampling: cheaper is likelier but not certain, a free offer weighs
+twice the cheapest paid one, an open channel looks cheaper, and local reputation
+(success rate, with latency and wait accuracy shrunk toward neutral while
+samples are few) scales the weight within bounds, so repeated failures outweigh
+a low price. Each owner contributes at most one NodeId. One slot goes to a
+seller with no local history; once the buyer knows enough sellers, such
+newcomers compete only for that slot. A competitive previous seller keeps the
+first slot. Lower reasoning levels of the same model are used only when the
+buyer allows them, closest first down to the buyer's floor, after every
+exact-level candidate; the offer race must never accept a downgrade offer while
+an exact candidate's offer is pending or available. A pinned seller skips
+sampling, never the filters; a pinned seller in cooldown is refused with its
+cooldown end. Asking candidates for live offers, persisting stats and wiring
+into the buyer app are separate work.
 
 ## Boundary checker
 

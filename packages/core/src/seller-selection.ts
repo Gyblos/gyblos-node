@@ -1,5 +1,6 @@
-// Chooses buyer-side seller candidates from caller-validated v2 catalogs, presence and local stats.
+// Chooses buyer-side seller candidates from caller-verified v2 catalogs, presence and local stats.
 // Pure policy: no clock, randomness, filesystem, network or signature checks; callers inject them.
+// The caller contract (verification, badge, offer race) is documented above `selectSellers`.
 import type { ReasoningLevel } from '@gyblos/protocol/constants';
 import type {
   ModelSelection,
@@ -61,6 +62,9 @@ const withinLifetime = (
 ) => record.issuedAt <= now && now < record.expiresAt;
 
 // Presence must be fresh and newer than its catalog; a later withdrawal tombstones that catalog.
+// Only owner, NodeId, sequence and lifetimes are compared here; the catalogDigest binding is the
+// caller's verifyPublicV2 step. A withdrawal's owner/NodeId is not compared: a mismatched
+// withdrawal with a later sequence still excludes the seller, which errs on the safe side.
 function isLive(seller: KnownSeller, now: number) {
   const { catalog, presence, withdrawal } = seller;
   return (
@@ -206,6 +210,14 @@ function selectAutomatic(
   };
 }
 
+// Caller contract:
+// - Verify every catalog with verifyPublicV2, then its presence and any withdrawal with
+//   verifyPublicV2 against this exact catalog (`trust.catalog`), which binds their catalogDigest.
+//   Selection never recomputes digests or signatures.
+// - Supply each seller's checkability badge; the v2 catalog carries none.
+// - Candidates are ordered exact-level first. The live-offer race must never accept a downgrade
+//   offer while an exact candidate's offer is pending or available.
+// - `policy` defaults to SELLER_SELECTION_POLICY; `previousSeller` is a hint, never a pin.
 export function selectSellers(
   input: SellerSelectionInput,
 ): SellerSelectionResult {
