@@ -64,6 +64,10 @@ systems. They do not establish native Keychain, DPAPI or Linux keystore
 acceptance, cross-platform recovery or signed-update continuity. Those remain
 separate checks.
 
+An unwired internal [portable backup codec](desktop-backup.md) is tested with
+generated unfunded identities. It adds no UI or live-wallet export/recovery;
+backup verification and funding remain disabled.
+
 ## Run locally
 
 Use Node 22+ and the repository's pinned pnpm. After a frozen install:
