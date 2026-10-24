@@ -39,6 +39,7 @@ export interface FetchSellersInput {
   // Clock used to check record lifetimes once the response has been read.
   now: () => number;
   timeoutMs?: number;
+  signal?: AbortSignal;
   limit?: number;
   cursor?: string;
   // The caller's persisted high-water sequence for a NodeId (shared by all record kinds), if any.
@@ -228,6 +229,7 @@ export async function fetchSellers(
     init: { method: 'GET', headers: { accept: 'application/json' } },
     fetch: input.fetch,
     timeoutMs: timeoutOf(input.timeoutMs),
+    signal: input.signal,
   };
   const page = await withDeadline(request, async (response, aborted) => {
     if (response.status === HTTP_STATUS.BAD_REQUEST)
