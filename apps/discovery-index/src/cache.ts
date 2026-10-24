@@ -29,7 +29,8 @@ export function sellersCacheKey(url: string, query: SellersQuery) {
 }
 
 // A cache failure is a miss; a hit gets fresh, mutable headers. The edge may rewrite a stored
-// entry's Cache-Control (the zone's Browser Cache TTL), so the sellers policy is re-asserted.
+// entry's Cache-Control and Expires (the zone's Browser Cache TTL), so the sellers policy is
+// re-asserted and any Expires is dropped.
 export async function cachedPage(
   cache: ResponseCache | undefined,
   key: string,
@@ -43,6 +44,7 @@ export async function cachedPage(
       INDEX_HEADERS.CACHE_CONTROL,
       INDEX_HEADER_VALUES.SELLERS_CACHE,
     );
+    page.headers.delete(INDEX_HEADERS.EXPIRES);
     return page;
   } catch {
     return null;

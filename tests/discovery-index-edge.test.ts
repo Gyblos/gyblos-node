@@ -280,10 +280,12 @@ void test('a cache hit is served with the sellers Cache-Control, not the stored 
   assert.ok(stored);
   const rewritten = new Response(await stored.clone().text(), stored);
   rewritten.headers.set('cache-control', 'public, max-age=14400');
+  rewritten.headers.set('expires', 'Sat, 24 Oct 2026 18:00:00 GMT');
   edge.entries.set(key, rewritten);
   const hit = await app.fetch(new Request(url));
   assert.equal(hit.status, 200);
   assert.equal(hit.headers.get('cache-control'), 'public, max-age=10');
+  assert.equal(hit.headers.get('expires'), null);
 });
 
 void test('a failing response cache fails open to storage', async () => {
