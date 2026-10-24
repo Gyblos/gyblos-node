@@ -53,8 +53,8 @@ behind.
   sequence file, outranks the index tombstone and obtains a fresh quote.
   Reopened buyer metadata refuses the older observation/digest.
 - The engine generation counter does not change during discovery/control quotes
-  or typed busy, stale-catalog and expired-availability refusals.
-  No paid ALPN is advertised and no inference/payment HTTP service is started.
+  or typed busy, stale-catalog and expired-availability refusals. No paid ALPN
+  is advertised and no inference/payment HTTP service is started.
 
 The JSON result contains mode, clock mode, fixed case IDs and durations only; no
 addresses, signatures, keys, prompts, responses, paths or raw errors. Its
