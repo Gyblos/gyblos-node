@@ -189,7 +189,9 @@ function resolveDiscovery(
     ],
     DISCOVERY_INDEX_URL,
   );
-  const urlOrigin = resolution.origins.at(-1);
+  const urlOrigin = resolution.origins.find(
+    (entry) => entry.setting === NODE_SETTINGS.DISCOVERY_URL,
+  );
   if (discoveryPublish && urlOrigin?.source === NODE_CONFIG_SOURCES.ENV)
     readDiscoveryUrl(discoveryUrl, originPath(urlOrigin), issues);
   return { buyerRelayOnly, discoveryPublish, discoveryUrl };
