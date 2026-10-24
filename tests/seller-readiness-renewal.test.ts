@@ -246,18 +246,28 @@ void test('stop and inference abort clear the deadline timer even while the actu
     const source = fixture();
     let finish!: () => void;
     source.options.check = async () => {
-      await new Promise<void>((resolve) => { finish = resolve; });
+      await new Promise<void>((resolve) => {
+        finish = resolve;
+      });
       return { model: source.model, offerExpiresAt: 10500 };
     };
     source.setNow(10080);
     const checking = source.observed.tick();
     await new Promise((resolve) => setImmediate(resolve));
-    const before = clear.mock.calls.filter((call) => call.arguments[0] !== undefined).length;
+    const before = clear.mock.calls.filter(
+      (call) => call.arguments[0] !== undefined,
+    ).length;
     try {
       if (mode === 'stop') await source.observed.stop();
-      else await source.observed.engine.generate({ prompt: 'synthetic', maxTokens: 1 });
+      else
+        await source.observed.engine.generate({
+          prompt: 'synthetic',
+          maxTokens: 1,
+        });
       assert.equal(await checking, false);
-      const after = clear.mock.calls.filter((call) => call.arguments[0] !== undefined).length;
+      const after = clear.mock.calls.filter(
+        (call) => call.arguments[0] !== undefined,
+      ).length;
       assert.ok(after > before, mode);
       assert.equal(await source.observed.tick(), false);
     } finally {

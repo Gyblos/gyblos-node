@@ -92,6 +92,8 @@ class SellerReadiness {
       () => controller.abort(),
       renewal.timeoutMs ?? SELLER_READINESS.timeoutMs,
     );
+    const clearDeadline = () => clearTimeout(timer);
+    controller.signal.addEventListener('abort', clearDeadline, { once: true });
     const operation = Promise.resolve()
       .then(() => {
         controller.signal.throwIfAborted();
@@ -103,6 +105,7 @@ class SellerReadiness {
       )
       .finally(() => {
         clearTimeout(timer);
+        controller.signal.removeEventListener('abort', clearDeadline);
         if (this.checking === controller) this.checking = undefined;
       });
     // Keep checking occupied until actual settlement; an ignored abort cannot spawn another check.
