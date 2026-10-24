@@ -37,8 +37,10 @@ Iroh transport cases need the pinned native binding and IPv6 loopback `[::1]`.
 The helpers probe both first; a missing binding or a known IPv6 error gives an
 explicit per-case skip, while unexpected errors fail the suite. The egress case
 that pauses a child with `SIGSTOP` and the lock ownership/FIFO cases skip
-outside macOS/Linux. Report passed, failed, cancelled and skipped counts
-separately; a skipped case proves nothing on that host.
+outside macOS/Linux. The discovery index `sqlite-d1` cases use `node:sqlite`
+(unflagged since Node 22.13) and skip where it is missing. Report passed,
+failed, cancelled and skipped counts separately; a skipped case proves nothing
+on that host.
 
 ## Opt-in identity integration
 

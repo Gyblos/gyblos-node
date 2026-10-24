@@ -7,8 +7,10 @@ while preserving independently configured identity/endpoint bindings. The seller
 publishing loop remains separate work.
 
 The default base URL is `DISCOVERY_INDEX_URL` in `@gyblos/config`
-(`https://gyblos.com/api/v1/discovery`). It is an operator value; there is no
-environment variable for it yet. Anyone can run an index.
+(`https://discovery.gyblos.com/v1`). It is an operator value; there is no
+environment variable for it yet. Anyone can run an index; the reference one is
+`apps/discovery-index` ([discovery-index.md](discovery-index.md)), not deployed
+yet.
 
 ## Trust model
 
@@ -153,11 +155,11 @@ The seller publishing loop is not implemented yet. When it is:
 ## Running an index (wire contract)
 
 Anyone can run an index (GYB-DOC-022). This section is the wire contract the
-client and the reference index (the website Worker) both follow. It lives here
-rather than in `packages/protocol/SPEC.md` because SPEC.md fixes signed record
-formats, domains and signing bytes, which the index stores and serves unchanged;
-the HTTP service around those records is an adapter contract that can change
-without touching signatures or golden vectors.
+client and the reference index (`apps/discovery-index`) both follow. It lives
+here rather than in `packages/protocol/SPEC.md` because SPEC.md fixes signed
+record formats, domains and signing bytes, which the index stores and serves
+unchanged; the HTTP service around those records is an adapter contract that can
+change without touching signatures or golden vectors.
 
 An index is an **untrusted cache** of node-signed public v2 records. It checks
 records to keep junk out, but its acceptance proves only that the NodeId key
@@ -165,11 +167,11 @@ signed them: it never vouches for owner identity, registration or availability,
 and clients must re-verify everything. It does not need, and should not store or
 log, IP addresses, prompts, offers or payments.
 
-The canonical reference index is `https://gyblos.com/api/v1/discovery` (the apex
-host). `https://www.gyblos.com` answers with a `301` redirect to the apex, and
-this client refuses redirects, so configure the apex. All paths below are
-relative to the base URL. Error bodies are `{"error":"<CODE>"}` with a static
-code; an index never echoes request input.
+The reference index base URL is `https://discovery.gyblos.com/v1`: the Worker
+serves `POST /v1/records`, `GET /v1/sellers` and `GET /v1/health` at the root of
+its own host. This client refuses redirects, so configure the exact base URL.
+All paths below are relative to the base URL. Error bodies are
+`{"error":"<CODE>"}` with a static code; an index never echoes request input.
 
 ### `POST /records`
 
@@ -240,4 +242,7 @@ NodeId.
 `200 {"ok":true,"records":<count of stored unexpired records>}`, or
 `503 {"error":"DISCOVERY_UNAVAILABLE"}`. Unknown paths answer
 `404 {"error":"NOT_FOUND"}`. Responses other than `/sellers` carry
-`Cache-Control: no-store`; all carry `X-Robots-Tag: noindex`.
+`Cache-Control: no-store`; all carry `X-Robots-Tag: noindex`. `GET` and `HEAD`
+on `/sellers` and `/health` carry `Access-Control-Allow-Origin: *` on every
+status, errors included. Limits, storage and operations of the reference index
+are in [discovery-index.md](discovery-index.md).

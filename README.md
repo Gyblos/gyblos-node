@@ -141,10 +141,11 @@ Keep a custom `GYBLOS_HOME` or `GYBLOS_LAB_HOME` outside the repository or under
 
 ## Repository layout
 
-`apps/` holds the product executables (seller node, buyer), `packages/` the
-libraries they share, `lab/` the gate checks, the standalone lab facilitator and
-their evidence, and `tests/` and `tooling/` the offline checks.
-Package-by-package map: [docs/architecture.md](docs/architecture.md).
+`apps/` holds the product executables (seller node, buyer, desktop host and the
+discovery index Worker), `packages/` the libraries they share, `lab/` the gate
+checks, the standalone lab facilitator and their evidence, and `tests/` and
+`tooling/` the offline checks. Package-by-package map:
+[docs/architecture.md](docs/architecture.md).
 
 ## Safety
 
@@ -158,7 +159,7 @@ Package-by-package map: [docs/architecture.md](docs/architecture.md).
 [Architecture](docs/architecture.md) · [Running a node](docs/running-a-node.md)
 · [Payments](docs/payments.md) · [Inference](docs/inference.md) ·
 [Recovery](docs/recovery.md) · [Identity](docs/identity.md) ·
-[Discovery](docs/discovery.md) · [Stack](docs/stack.md) ·
-[Limitations](docs/limitations.md) · [Protocol spec](packages/protocol/SPEC.md)
-· [Tests](tests/README.md) · [Code standards](docs/code-standards.md) ·
-[Contributing](AGENTS.md)
+[Discovery](docs/discovery.md) · [Discovery index](docs/discovery-index.md) ·
+[Stack](docs/stack.md) · [Limitations](docs/limitations.md) ·
+[Protocol spec](packages/protocol/SPEC.md) · [Tests](tests/README.md) ·
+[Code standards](docs/code-standards.md) · [Contributing](AGENTS.md)

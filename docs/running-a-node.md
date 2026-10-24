@@ -297,9 +297,9 @@ contains:
 
 Without a `discovery` option this is a static candidate list. With optional
 `"discovery": {}` (or
-`{ "baseUrl": "https://your-index.example/api/v1/discovery", "maxPages": 3 }`),
-the HTTP index supplies availability hints filtered by these independent
-identity/endpoint bindings. Unknown identities are never enrolled. See
+`{ "baseUrl": "https://your-index.example/v1", "maxPages": 3 }`), the HTTP index
+supplies availability hints filtered by these independent identity/endpoint
+bindings. Unknown identities are never enrolled. See
 [discovery.md](discovery.md#buyer-runtime-integration) for durable replay state,
 pagination, cache lifetime and failure behavior. Every badge is `declared-usage`
 until a real checkability source exists; a catalog cannot elevate it.

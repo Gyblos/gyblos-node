@@ -1,0 +1,18 @@
+{
+  "name": "@gyblos/discovery-index",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./app": "./src/app.ts",
+    "./constants": "./src/constants.ts",
+    "./ip-key": "./src/ip-key.ts",
+    "./storage": "./src/storage.ts",
+    "./storage-d1": "./src/storage-d1.ts",
+    "./worker": "./src/worker.ts"
+  },
+  "dependencies": {
+    "@gyblos/protocol": "workspace:*",
+    "hono": "4.13.13"
+  }
+}
