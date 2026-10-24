@@ -1,0 +1,15 @@
+{
+  "name": "@gyblos/discovery-http",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./constants": "./src/constants.ts"
+  },
+  "dependencies": {
+    "@gyblos/config": "workspace:*",
+    "@gyblos/core": "workspace:*",
+    "@gyblos/protocol": "workspace:*"
+  }
+}

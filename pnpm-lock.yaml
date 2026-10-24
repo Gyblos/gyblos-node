@@ -22,6 +22,9 @@ importers:
       '@gyblos/desktop':
         specifier: workspace:*
         version: link:apps/desktop
+      '@gyblos/discovery-http':
+        specifier: workspace:*
+        version: link:packages/discovery-http
       '@gyblos/engine-ollama':
         specifier: workspace:*
         version: link:packages/engine-ollama
@@ -270,6 +273,18 @@ importers:
       '@gyblos/config':
         specifier: workspace:*
         version: link:../config
+      '@gyblos/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+
+  packages/discovery-http:
+    dependencies:
+      '@gyblos/config':
+        specifier: workspace:*
+        version: link:../config
+      '@gyblos/core':
+        specifier: workspace:*
+        version: link:../core
       '@gyblos/protocol':
         specifier: workspace:*
         version: link:../protocol
