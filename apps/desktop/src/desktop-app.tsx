@@ -247,7 +247,7 @@ export function DesktopApp() {
       }
     >
       <MotionPresence>
-        {!startupComplete && (
+        {!window.desktopWallet && !startupComplete && (
           <StartupScreen
             wallet={wallet}
             network={network.state}

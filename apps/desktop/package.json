@@ -12,6 +12,8 @@
     "./catalog-state": "./src/ui/catalog-state.ts",
     "./demo-account": "./src/ui/demo-account.ts",
     "./wallet": "./src/wallet/index.ts",
+    "./session-cleanup": "./src/session-cleanup.ts",
+    "./startup-window": "./src/startup-window.ts",
     "./startup-state": "./src/ui/startup-state.ts",
     "./wallet-backup": "./src/wallet/backup/index.ts",
     "./wallet-restore": "./src/wallet/restore.ts"

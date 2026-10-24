@@ -53,6 +53,7 @@ import { prepareSellerControl } from './control-startup.js';
 import {
   assertReadinessCurrent,
   prepareSellerEngine,
+  probeSellerEngine,
 } from './engine-readiness.js';
 import { assertOllamaModelsHome, assertRoleHome } from './home.js';
 import { createInferenceSeller } from './http/inference.js';
@@ -184,7 +185,16 @@ export async function startSeller() {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
     }
     await stage('seller-middleware');
-    const controlReadiness = observeControlReadiness(engine, offerExpiresAt);
+    const controlReadiness = observeControlReadiness(
+      engine,
+      offerExpiresAt,
+      Date.now,
+      {
+        model,
+        check: (signal) =>
+          probeSellerEngine(engine, signal, { snapshot: memorySnapshot }),
+      },
+    );
     const seller = await createInferenceSeller({
       rpcUrl: config.rpcUrl,
       facilitatorUrl: HOSTS.facilitator,
@@ -327,6 +337,8 @@ export async function startSeller() {
       disposers.push(() => publication.stop());
       publication.start();
     }
+    controlReadiness.start(() => control.records.refresh());
+    disposers.push(() => controlReadiness.stop());
     await saveJson(rolePath(P2P_ROLES.SELLER, ROLE_FILES.status), {
       status: 'ready',
       runId: process.env.GYBLOS_P2P_RUN_ID,

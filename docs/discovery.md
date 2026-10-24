@@ -161,12 +161,25 @@ body. Publication failures are reported as a static degraded health status
 (including `DISCOVERY_PUBLISH_NOT_ALLOWED` for an unapproved NodeId); they do
 not initiate inference, payment, or a different paid route.
 
-Catalog renewal is bounded by the already observed model-readiness deadline. The
-publisher never probes, warms or loads the engine and never extends that
-observation. Busy or expired readiness retires the current catalog. Becoming
-eligible again requires a higher catalog; it does not revive a withdrawn one.
-The current startup observation eventually expires, so continued operation then
-requires a separately established fresh readiness observation/restart.
+Catalog renewal is bounded by the current model-readiness observation. The
+publisher and control queries never probe, warm or load the engine. A separate
+node lifecycle checks every ten seconds and starts a bounded private one-token
+warmup when the observation has two minutes left, or after expiry/failure. It
+checks memory headroom before and after, rejects new OOM events, and verifies
+the startup model name, digest and context. A successful check anchors a new
+four-minute observation to that warmup; it never extends the legacy paid offer.
+
+Busy inference skips a check. Starting inference cancels a pending check; late
+results cannot restore availability. A check has a ninety-second deadline and
+retains its single work slot until underlying work actually settles, even if the
+engine ignores cancellation. There is no overlapping or queued check backlog.
+During checks, failure, expiry or shutdown, local catalogs, presence and quotes
+fail closed immediately. The publisher retires on its next tick; remote expiry
+still bounds an undelivered withdrawal. Recovery requires a higher catalog tied
+to the new observation generation, even if failure/recovery occur between ticks.
+After inference becomes idle, the lifecycle refreshes the catalog independently
+of whether HTTP publication is enabled. These are cached availability
+observations, not capacity reservations or a guarantee of subsequent admission.
 
 Shutdown disables local catalog/quote snapshots first, cancels in-flight
 publication and attempts one higher signed withdrawal while the reference

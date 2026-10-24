@@ -2,6 +2,8 @@
 // fail-open) and the per-app health record count. It never caches errors, publishes or client data.
 import {
   DISCOVERY_INDEX_LIMITS,
+  INDEX_HEADER_VALUES,
+  INDEX_HEADERS,
   INDEX_ROUTES,
   INDEX_STATUS,
 } from './constants.js';
@@ -26,7 +28,9 @@ export function sellersCacheKey(url: string, query: SellersQuery) {
   return `${new URL(url).origin}${INDEX_ROUTES.SELLERS}?${params}`;
 }
 
-// A cache failure is a miss; a hit gets fresh, mutable headers.
+// A cache failure is a miss; a hit gets fresh, mutable headers. The edge may rewrite a stored
+// entry's Cache-Control and Expires (the zone's Browser Cache TTL), so the sellers policy is
+// re-asserted and any Expires is dropped.
 export async function cachedPage(
   cache: ResponseCache | undefined,
   key: string,
@@ -34,7 +38,14 @@ export async function cachedPage(
   if (!cache) return null;
   try {
     const hit = await cache.match(key);
-    return hit?.status === INDEX_STATUS.OK ? new Response(hit.body, hit) : null;
+    if (hit?.status !== INDEX_STATUS.OK) return null;
+    const page = new Response(hit.body, hit);
+    page.headers.set(
+      INDEX_HEADERS.CACHE_CONTROL,
+      INDEX_HEADER_VALUES.SELLERS_CACHE,
+    );
+    page.headers.delete(INDEX_HEADERS.EXPIRES);
+    return page;
   } catch {
     return null;
   }
