@@ -231,6 +231,12 @@ importers:
       '@gyblos/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@gyblos/discovery-http':
+        specifier: workspace:*
+        version: link:../../packages/discovery-http
+      '@gyblos/discovery-index':
+        specifier: workspace:*
+        version: link:../../apps/discovery-index
       '@gyblos/engine-ollama':
         specifier: workspace:*
         version: link:../../packages/engine-ollama
@@ -249,6 +255,12 @@ importers:
       '@gyblos/runtime':
         specifier: workspace:*
         version: link:../../packages/runtime
+      '@gyblos/transport-iroh':
+        specifier: workspace:*
+        version: link:../../packages/transport-iroh
+      '@number0/iroh':
+        specifier: 1.1.0
+        version: 1.1.0
       '@solana-program/system':
         specifier: 0.10.0
         version: 0.10.0(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))
