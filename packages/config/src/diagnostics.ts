@@ -28,6 +28,13 @@ export const DIAGNOSTICS = {
   warmupMs: 90_000,
 } as const;
 
+// Background private checks renew only v2 availability, never the legacy paid offer.
+export const SELLER_READINESS = {
+  tickMs: 10_000,
+  renewBeforeMs: 120_000,
+  timeoutMs: 90_000,
+} as const;
+
 export const PRIVATE_LOG_LIMITS = {
   fileBytes: 4 * 1024 * 1024,
   recordBytes: 4096,
