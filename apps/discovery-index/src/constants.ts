@@ -48,6 +48,7 @@ export const PUBLIC_READ_ROUTES: ReadonlySet<string> = new Set([
 
 export const INDEX_HEADERS = {
   CACHE_CONTROL: 'Cache-Control',
+  EXPIRES: 'Expires',
   CORS_ORIGIN: 'Access-Control-Allow-Origin',
   CONTENT_TYPE: 'Content-Type',
   RETRY_AFTER: 'Retry-After',
