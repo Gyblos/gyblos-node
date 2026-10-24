@@ -1,39 +1,77 @@
-// Synthetic wallet metadata only; never creates a wallet or exposes a real address.
-import { Copy } from '@phosphor-icons/react';
-import { useState } from 'react';
+// Displays public wallet status only; backup, funding and signing remain disabled.
+import { useEffect, useState } from 'react';
 
+import {
+  parseWalletSummary,
+  WALLET_STATUS,
+  walletSummary,
+  type WalletSummary,
+} from '../wallet/model.js';
 import { Badge, Button, Note } from './UI.js';
 
-const DEMO_ADDRESS = 'demo:gyblos-personal-wallet';
+declare global {
+  interface Window {
+    desktopWallet?: { summary(): Promise<WalletSummary> };
+  }
+}
+
 export function WalletDetails() {
-  const [copyState, setCopyState] = useState('Copy demo address');
+  const [wallet, setWallet] = useState(() =>
+    walletSummary(WALLET_STATUS.LOADING),
+  );
+  useEffect(() => {
+    let active = true;
+    const request =
+      window.desktopWallet?.summary() ??
+      Promise.resolve(walletSummary(WALLET_STATUS.UNAVAILABLE));
+    void request.then(
+      (value) => {
+        if (active) setWallet(parseWalletSummary(value));
+      },
+      () => {
+        if (active) setWallet(walletSummary(WALLET_STATUS.UNAVAILABLE));
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, []);
+  const ready = wallet.status === WALLET_STATUS.READY;
   return (
     <section className="wallet-details" aria-label="Wallet details">
       <div className="connection-location">
         <strong>Personal wallet</strong>
-        <Badge>Simulation</Badge>
+        <Badge>{ready ? 'Backup pending' : 'Not available'}</Badge>
       </div>
-      <span className="modal-note">Network: Solana devnet (preview)</span>
-      <span className="field-label">Illustrative address</span>
-      <div className="wallet-address">
-        <code>{DEMO_ADDRESS}</code>
-        <Button
-          onClick={async () => {
-            try {
-              await navigator.clipboard.writeText(DEMO_ADDRESS);
-              setCopyState('Copied');
-            } catch {
-              setCopyState('Copy unavailable');
-            }
-          }}
-        >
-          <Copy size={16} />
-          {copyState}
-        </Button>
-      </div>
+      {ready ? (
+        <>
+          <span className="field-label">Solana address · local wallet</span>
+          <div className="wallet-address">
+            <code>{wallet.address}</code>
+          </div>
+          <span className="modal-note">Balance: not queried</span>
+          <Note>
+            Your key is encrypted using this operating system’s secret storage.
+            Portable backup and recovery are not available yet. Do not send
+            funds to this address; external transfers cannot be blocked by this
+            app.
+          </Note>
+        </>
+      ) : (
+        <Note>
+          {wallet.status === WALLET_STATUS.LOADING
+            ? 'Preparing protected wallet…'
+            : wallet.status === WALLET_STATUS.RECOVERY_REQUIRED
+              ? 'Wallet needs recovery. Existing data was preserved; no replacement was created.'
+              : 'Protected wallet storage is unavailable. On Linux, enable GNOME Keyring or KWallet and restart. Chat remains simulated.'}
+        </Note>
+      )}
+      <Button disabled className="wide">
+        Add funds · backup verification required
+      </Button>
       <Note>
-        This is not a Solana address. No wallet exists and it cannot receive
-        funds.
+        Funding stays disabled until a portable backup restores this exact
+        address.
       </Note>
     </section>
   );
