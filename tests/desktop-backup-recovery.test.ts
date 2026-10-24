@@ -14,6 +14,23 @@ import {
   TEST_BACKUP_PASSWORD,
 } from './support/portable-backup-fixture.js';
 
+async function assertAbsent(path: string) {
+  await assert.rejects(readFile(path));
+}
+
+void test('portable recovery absence check accepts a missing path and rejects existing directories and files', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'gyblos-portable-absence-'));
+  try {
+    await assertAbsent(join(home, 'missing'));
+    await assert.rejects(assertAbsent(home));
+    const file = join(home, 'existing');
+    await writeFile(file, 'synthetic existing file');
+    await assert.rejects(assertAbsent(file));
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
 void test('portable backup survives isolated destination persistence and fresh service reload', async () => {
   const home = await mkdtemp(join(tmpdir(), 'gyblos-portable-'));
   try {
@@ -83,7 +100,7 @@ void test('portable recovery harness never creates a destination after cancellat
         available: async () => false,
       }),
     );
-    await assert.rejects(readFile(destination));
+    await assertAbsent(destination);
   } finally {
     await rm(home, { recursive: true, force: true });
   }
