@@ -2,7 +2,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { fetchSellers, publishRecord } from '@gyblos/discovery-http';
+import {
+  DISCOVERY_ERROR_CODES,
+  fetchSellers,
+  publishRecord,
+} from '@gyblos/discovery-http';
 import { createSellerRecords } from '@gyblos/node/public-records';
 import { openSellerSequence } from '@gyblos/node/public-sequence';
 import { createSellerPublisher } from '@gyblos/node/publisher';
@@ -12,7 +16,7 @@ import { sellerPublicationFixture } from './support/seller-publication.js';
 
 void test('restarted seller keeps the persisted high-water mark and only a newer catalog can reopen a withdrawn HTTP listing', async () => {
   const run = await sellerPublicationFixture();
-  const index = await publicationIndex(run.context.now);
+  const index = await publicationIndex(run.context.now, run.catalog.nodeId);
   const publish = async (
     record: Parameters<typeof publishRecord>[0]['record'],
     signal: AbortSignal,
@@ -67,6 +71,42 @@ void test('restarted seller keeps the persisted high-water mark and only a newer
   } finally {
     await first.stop();
     await second?.stop();
+    await index.close();
+    await run.close();
+  }
+});
+
+void test('seller publisher reports index allowlist refusal without enrollment or a visible listing', async () => {
+  const run = await sellerPublicationFixture();
+  const index = await publicationIndex(run.context.now, '0'.repeat(64));
+  const publisher = createSellerPublisher({
+    records: run.records,
+    canPublish: () => true,
+    now: run.context.now,
+    publish: async (record, signal) => {
+      await publishRecord({
+        baseUrl: index.baseUrl,
+        record,
+        signal,
+        fetch: globalThis.fetch,
+      });
+    },
+  });
+  try {
+    assert.equal(await publisher.tick(), false);
+    assert.equal(
+      publisher.health().lastError,
+      DISCOVERY_ERROR_CODES.PUBLISH_NOT_ALLOWED,
+    );
+    const result = await fetchSellers({
+      baseUrl: index.baseUrl,
+      model: run.catalog.models[0]!.modelId,
+      now: run.context.now,
+      fetch: globalThis.fetch,
+    });
+    assert.equal(result.sellers.length, 0);
+  } finally {
+    await publisher.stop();
     await index.close();
     await run.close();
   }

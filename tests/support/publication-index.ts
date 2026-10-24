@@ -4,11 +4,17 @@ import { once } from 'node:events';
 import { createServer } from 'node:http';
 
 import { createDiscoveryIndex } from '@gyblos/discovery-index/app';
+import { PUBLISH_MODES } from '@gyblos/discovery-index/constants';
 import { createMemoryStorage } from '@gyblos/discovery-index/storage';
 
-export async function publicationIndex(now: () => number) {
+export async function publicationIndex(now: () => number, nodeId: string) {
   const storage = createMemoryStorage();
-  const app = createDiscoveryIndex({ storage, now, development: true });
+  const app = createDiscoveryIndex({
+    storage,
+    now,
+    development: true,
+    publishers: { mode: PUBLISH_MODES.ALLOWLIST, nodeIds: new Set([nodeId]) },
+  });
   const server = createServer((request, response) => {
     void (async () => {
       const chunks: Buffer[] = [];

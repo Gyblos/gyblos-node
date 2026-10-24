@@ -146,17 +146,20 @@ payment or free-v2 execution is enabled. See
 
 The seller publisher is opt-in. Set `GYBLOS_DISCOVERY_PUBLISH=1` when starting
 `node:start`; `GYBLOS_DISCOVERY_URL` optionally overrides the configured index.
-Without the opt-in, the node makes no discovery publication requests. URL policy
-is the adapter's policy: HTTPS, or HTTP on loopback only; credentials, query
-strings and fragments are rejected.
+Without the opt-in, the node makes no discovery publication requests. The index
+operator must separately authorize its NodeId when publication is allowlisted;
+enabling the node publisher never changes that list. URL policy is the adapter's
+policy: HTTPS, or HTTP on loopback only; credentials, query strings and
+fragments are rejected.
 
 The publisher sends a signed catalog before its presence. It checks every ten
 seconds, rotates catalogs before expiry, and backs off failed publication by
 10/20/40/60 seconds (capped at 60 seconds). An uncertain acknowledgement forces
 a fresh, higher-sequence catalog on the next attempt, rather than replaying an
 old write. Requests have an absolute five-second deadline covering headers and
-body. Publication failures are reported as a static degraded health status; they
-do not initiate inference, payment, or a different paid route.
+body. Publication failures are reported as a static degraded health status
+(including `DISCOVERY_PUBLISH_NOT_ALLOWED` for an unapproved NodeId); they do
+not initiate inference, payment, or a different paid route.
 
 Catalog renewal is bounded by the already observed model-readiness deadline. The
 publisher never probes, warms or loads the engine and never extends that

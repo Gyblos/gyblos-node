@@ -64,7 +64,7 @@ async function discoverAndQuote(
   run: Awaited<ReturnType<typeof sellerPublicationFixture>>,
   transport: ControlTransport,
 ) {
-  const index = await publicationIndex(run.context.now);
+  const index = await publicationIndex(run.context.now, run.catalog.nodeId);
   const buyer = await discoveryHome();
   const publication = createSellerPublisher({
     records: run.records,

@@ -1,6 +1,10 @@
 // Schedules bounded public announcements with injected transport; never infers, pays or reserves capacity.
 // Shutdown disables local snapshots first, then attempts one higher withdrawal; expiry covers failed delivery.
 import { SELLER_DISCOVERY } from '@gyblos/config';
+import {
+  DiscoveryError,
+  type DiscoveryErrorCode,
+} from '@gyblos/discovery-http';
 import type { SignedPublicV2 } from '@gyblos/protocol/control-types';
 import { controlInteger } from '@gyblos/protocol/control-validation';
 
@@ -48,8 +52,10 @@ class SellerPublisher {
   private failures = 0;
   private retryAt = 0;
   private status: SellerPublicationState = SELLER_PUBLICATION_STATES.IDLE;
-  private lastError: typeof NODE_ERROR_CODES.DISCOVERY_PUBLISH_FAILED | null =
-    null;
+  private lastError:
+    | DiscoveryErrorCode
+    | typeof NODE_ERROR_CODES.DISCOVERY_PUBLISH_FAILED
+    | null = null;
   constructor(private readonly options: SellerPublisherOptions) {
     this.now = options.now ?? Date.now;
     this.tickMs = controlInteger(
@@ -70,9 +76,12 @@ class SellerPublisher {
       lastError: this.lastError,
     };
   }
-  private failure() {
+  private failure(error?: unknown) {
     this.failures++;
-    this.lastError = NODE_ERROR_CODES.DISCOVERY_PUBLISH_FAILED;
+    this.lastError =
+      error instanceof DiscoveryError
+        ? error.code
+        : NODE_ERROR_CODES.DISCOVERY_PUBLISH_FAILED;
     this.status = SELLER_PUBLICATION_STATES.DEGRADED;
     // Saturate the exponent as well as the delay, even after very long outages.
     const exponent = Math.min(
@@ -113,8 +122,8 @@ class SellerPublisher {
       this.lastError = null;
       this.status = SELLER_PUBLICATION_STATES.RUNNING;
       return true;
-    } catch {
-      if (!this.stopped) this.failure();
+    } catch (error) {
+      if (!this.stopped) this.failure(error);
       return false;
     }
   }
@@ -136,8 +145,8 @@ class SellerPublisher {
     if (this.stopping) return this.stopping;
     this.stopped = true;
     // Invalidate quotes before waiting for a slow/in-flight publication to cancel.
-    const retiring = this.options.records.withdraw().catch(() => {
-      this.failure();
+    const retiring = this.options.records.withdraw().catch((error) => {
+      this.failure(error);
       return undefined;
     });
     this.controller.abort();
@@ -151,8 +160,8 @@ class SellerPublisher {
             withdrawal,
             AbortSignal.timeout(SELLER_DISCOVERY.requestMs),
           );
-        } catch {
-          this.failure();
+        } catch (error) {
+          this.failure(error);
         }
       }
       this.status = SELLER_PUBLICATION_STATES.STOPPED;
