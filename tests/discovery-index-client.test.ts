@@ -11,7 +11,10 @@ import {
   publishRecord,
 } from '@gyblos/discovery-http';
 import { createDiscoveryIndex } from '@gyblos/discovery-index/app';
-import { DISCOVERY_LIMITERS } from '@gyblos/discovery-index/constants';
+import {
+  DISCOVERY_LIMITERS,
+  PUBLISH_MODES,
+} from '@gyblos/discovery-index/constants';
 import { createMemoryStorage } from '@gyblos/discovery-index/storage';
 import {
   PUBLIC_PRESENCE_STATE,
@@ -209,6 +212,7 @@ eachStorage(
       storage: createMemoryStorage(),
       limiters: { ...allLimiters(), [DISCOVERY_LIMITERS.PUBLISH]: deny },
       now,
+      publishers: { mode: PUBLISH_MODES.OPEN },
     });
     await assert.rejects(
       publishRecord({
@@ -230,3 +234,21 @@ eachStorage(
     );
   },
 );
+
+void test('a NodeId outside the index allowlist maps to the typed client code', async () => {
+  const node = await protocolNode();
+  const app = createDiscoveryIndex({
+    storage: createMemoryStorage(),
+    limiters: allLimiters(),
+    now,
+    publishers: { mode: PUBLISH_MODES.ALLOWLIST, nodeIds: new Set() },
+  });
+  await assert.rejects(
+    publishRecord({
+      baseUrl: DISCOVERY_INDEX_URL,
+      record: await node.catalogAt(1),
+      fetch: clientFetch(app),
+    }),
+    rejectsWith(DISCOVERY_ERROR_CODES.PUBLISH_NOT_ALLOWED, 403),
+  );
+});

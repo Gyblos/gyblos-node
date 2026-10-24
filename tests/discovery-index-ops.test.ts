@@ -7,8 +7,10 @@ import { createDiscoveryIndex } from '@gyblos/discovery-index/app';
 import {
   DISCOVERY_INDEX_LIMITS,
   DISCOVERY_LIMITERS,
+  PUBLISH_MODES,
 } from '@gyblos/discovery-index/constants';
 import { ipKey } from '@gyblos/discovery-index/ip-key';
+import type { DiscoveryPublishers } from '@gyblos/discovery-index/publishers';
 import {
   createMemoryStorage,
   type DiscoveryStorage,
@@ -40,6 +42,7 @@ const post = (body: string, headers: Record<string, string> = {}) =>
     body,
   });
 const json = (value: unknown) => JSON.stringify({ record: value });
+const open: DiscoveryPublishers = { mode: PUBLISH_MODES.OPEN };
 
 void test('missing storage or limiter bindings fail closed with 503', async () => {
   const storage = createMemoryStorage();
@@ -52,7 +55,11 @@ void test('missing storage or limiter bindings fail closed with 503', async () =
     }),
   ];
   for (const options of variants) {
-    const app = createDiscoveryIndex({ ...options, now: () => T0 });
+    const app = createDiscoveryIndex({
+      ...options,
+      now: () => T0,
+      publishers: open,
+    });
     for (const request of [
       new Request(`${INDEX_ORIGIN}/v1/health`),
       new Request(`${INDEX_ORIGIN}/v1/sellers?model=a`),
@@ -115,6 +122,7 @@ void test('storage failures return a static 503 and nothing is logged', async ()
     storage: failing,
     limiters: allLimiters(),
     now: () => T0 + 1000,
+    publishers: open,
   });
   const seller = indexNode();
   const logged: unknown[][] = [];
@@ -193,6 +201,7 @@ void test('response size is capped and paging continues from the last included s
     storage: createMemoryStorage(),
     limiters: allLimiters(),
     now: () => T0 + 1000,
+    publishers: open,
     maxResponseBytes: 2500,
   });
   for (let i = 0; i < 3; i++) {
@@ -217,6 +226,7 @@ void test('publish body cap fits a maximal 32 KiB record plus envelope headroom'
     storage: createMemoryStorage(),
     limiters: allLimiters(),
     now: () => T0 + 1000,
+    publishers: open,
   });
   const response = await app.fetch(post(json({ pad: 'x'.repeat(34_816) })));
   await expectError(response, 413, 'PAYLOAD_TOO_LARGE');
@@ -254,6 +264,7 @@ void test('pruning is throttled per app and runs again after the interval', asyn
     storage: spy,
     limiters: allLimiters(),
     now: () => clock.now,
+    publishers: open,
   });
   for (let i = 0; i < 5; i++)
     assert.equal(
@@ -353,7 +364,11 @@ void test('the Worker entry fails closed without bindings and serves health with
   const bindings = { DISCOVERY_DB: db, ...allLimiters() };
   const response = await worker.fetch(health.clone(), bindings);
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { ok: true, records: 0 });
+  assert.deepEqual(await response.json(), {
+    ok: true,
+    records: 0,
+    publish: 'closed',
+  });
   // Loopback hosts get no development relaxation from the Worker entry.
   const local = await worker.fetch(new Request('http://localhost/v1/health'), {
     DISCOVERY_DB: db,

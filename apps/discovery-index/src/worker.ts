@@ -1,8 +1,14 @@
-// Owns the Cloudflare Worker entry for discovery.gyblos.com: maps bindings to the app, fails closed.
+// Owns the Cloudflare Worker entry for discovery.gyblos.com: maps bindings and the publish
+// allowlist secret to the app, fails closed.
 // Development relaxations are never enabled here; nothing runs on import.
 import { createDiscoveryIndex, type DiscoveryIndex } from './app.js';
-import { DISCOVERY_DB_BINDING, DISCOVERY_LIMITERS } from './constants.js';
+import {
+  DISCOVERY_DB_BINDING,
+  DISCOVERY_LIMITERS,
+  DISCOVERY_PUBLISH_ALLOWLIST_BINDING,
+} from './constants.js';
 import type { DiscoveryLimiters, RateLimiter } from './limits.js';
+import { parsePublishAllowlist } from './publishers.js';
 import { createD1Storage, type D1Database } from './storage-d1.js';
 
 function binding(bindings: unknown, name: string): unknown {
@@ -36,7 +42,8 @@ function limitersOf(bindings: unknown): DiscoveryLimiters {
   return limiters;
 }
 
-// Bindings are fixed for an isolate, so one app (and its prune throttle) is kept per bindings object.
+// Bindings are fixed for an isolate, so one app (its prune throttle and the parsed allowlist)
+// is kept per bindings object. A missing or malformed allowlist closes publishing.
 function appFor(bindings: unknown, cache: WeakMap<object, DiscoveryIndex>) {
   const key = bindings && typeof bindings === 'object' ? bindings : cache;
   let app = cache.get(key);
@@ -45,6 +52,9 @@ function appFor(bindings: unknown, cache: WeakMap<object, DiscoveryIndex>) {
     app = createDiscoveryIndex({
       storage: isDatabase(database) ? createD1Storage(database) : undefined,
       limiters: limitersOf(bindings),
+      publishers: parsePublishAllowlist(
+        binding(bindings, DISCOVERY_PUBLISH_ALLOWLIST_BINDING),
+      ),
       development: false,
     });
     cache.set(key, app);

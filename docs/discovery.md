@@ -53,10 +53,12 @@ Both take an injected `fetch` and never use the global one. Failures throw
 HTTP response was received, its `status`; messages never echo input or response
 text. Index rejections map one-to-one (`INVALID_RECORD`, `INVALID_SIGNATURE`,
 `EXPIRED_RECORD`, `UNKNOWN_CATALOG`, `STALE_RECORD`/`409`), as do `413`, `429`
-and `503`; anything else is `DISCOVERY_HTTP_STATUS`. A deadline is always
-`DISCOVERY_TIMEOUT`, including one that ends while reading a rejection body. An
-optional caller `signal` cancels headers and body reads with
-`DISCOVERY_CANCELLED`, even when an injected fetch ignores its signal.
+and `503`; a `403` on publish is `DISCOVERY_PUBLISH_NOT_ALLOWED` (the index does
+not accept this NodeId as a publisher); anything else is
+`DISCOVERY_HTTP_STATUS`. A deadline is always `DISCOVERY_TIMEOUT`, including one
+that ends while reading a rejection body. An optional caller `signal` cancels
+headers and body reads with `DISCOVERY_CANCELLED`, even when an injected fetch
+ignores its signal.
 
 ## Buyer duties: replay and withdrawal
 
@@ -198,21 +200,24 @@ All paths below are relative to the base URL. Error bodies are
   referenced catalog and clears its presence. Only a later, higher-sequence
   catalog reopens a withdrawn NodeId; a presence never revives it.
 
-| Status | Body                    | Meaning                                                             |
-| ------ | ----------------------- | ------------------------------------------------------------------- |
-| `201`  | `{"ok":true}`           | Stored.                                                             |
-| `400`  | `INVALID_RECORD`        | Wrong content type, shape, encoding or size of the record.          |
-| `400`  | `INVALID_SIGNATURE`     | Signature does not verify.                                          |
-| `400`  | `EXPIRED_RECORD`        | Not yet valid, expired, or lifetime too long.                       |
-| `400`  | `UNKNOWN_CATALOG`       | Reference does not match a live, non-withdrawn stored catalog.      |
-| `409`  | `STALE_RECORD`          | Sequence at or below the NodeId's high-water mark.                  |
-| `413`  | `PAYLOAD_TOO_LARGE`     | Body over 34816 bytes.                                              |
-| `429`  | `RATE_LIMITED`          | Per-IP, per-NodeId or capacity limit; `Retry-After` in seconds.     |
-| `503`  | `DISCOVERY_UNAVAILABLE` | Storage or limits not configured, or storage failure (fail closed). |
+| Status | Body                    | Meaning                                                            |
+| ------ | ----------------------- | ------------------------------------------------------------------ |
+| `201`  | `{"ok":true}`           | Stored.                                                            |
+| `400`  | `INVALID_RECORD`        | Wrong content type, shape, encoding or size of the record.         |
+| `400`  | `INVALID_SIGNATURE`     | Signature does not verify.                                         |
+| `400`  | `EXPIRED_RECORD`        | Not yet valid, expired, or lifetime too long.                      |
+| `400`  | `UNKNOWN_CATALOG`       | Reference does not match a live, non-withdrawn stored catalog.     |
+| `403`  | `PUBLISH_NOT_ALLOWED`   | The index accepts records only from listed NodeIds (an allowlist). |
+| `409`  | `STALE_RECORD`          | Sequence at or below the NodeId's high-water mark.                 |
+| `413`  | `PAYLOAD_TOO_LARGE`     | Body over 34816 bytes.                                             |
+| `429`  | `RATE_LIMITED`          | Per-IP, per-NodeId or capacity limit; `Retry-After` in seconds.    |
+| `503`  | `DISCOVERY_UNAVAILABLE` | Storage, limits or publishing not configured, or storage failure.  |
 
 There is no session or CAPTCHA: publishers authenticate by signature, and abuse
 is bounded by rate limits, the size cap and one stored record per kind per
-NodeId.
+NodeId. An index may also restrict publishing to listed NodeIds (the reference
+index does during devnet); it may refuse an unlisted claimed `nodeId` with `403`
+before verifying the signature. Reads stay public.
 
 ### `GET /sellers?model=<modelId>&limit=<n>&cursor=<c>`
 
@@ -239,7 +244,8 @@ NodeId.
 
 ### `GET /health`
 
-`200 {"ok":true,"records":<count of stored unexpired records>}`, or
+`200 {"ok":true,"records":<count of stored unexpired records>}` (the reference
+index adds `"publish"`, its publish mode; clients must not rely on it), or
 `503 {"error":"DISCOVERY_UNAVAILABLE"}`. Unknown paths answer
 `404 {"error":"NOT_FOUND"}`. Responses other than `/sellers` carry
 `Cache-Control: no-store`; all carry `X-Robots-Tag: noindex`. `GET` and `HEAD`
