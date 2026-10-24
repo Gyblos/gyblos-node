@@ -267,6 +267,25 @@ void test('only 200 sellers pages are cached: errors, other routes and POST neve
   assert.deepEqual(edge.puts, []);
 });
 
+// The edge can rewrite a stored entry's Cache-Control (for example the zone's Browser Cache TTL
+// turned max-age=10 into 14400 in production), so a hit must re-assert the sellers policy.
+void test('a cache hit is served with the sellers Cache-Control, not the stored one', async () => {
+  const edge = memoryCache();
+  const { app } = indexApp({ cache: edge.cache });
+  await publishSeller(app);
+  const url = `${INDEX_ORIGIN}/v1/sellers?model=${MODEL}`;
+  assert.equal((await app.fetch(new Request(url))).status, 200);
+  const key = `${INDEX_ORIGIN}/v1/sellers?limit=50&model=${MODEL}`;
+  const stored = edge.entries.get(key);
+  assert.ok(stored);
+  const rewritten = new Response(await stored.clone().text(), stored);
+  rewritten.headers.set('cache-control', 'public, max-age=14400');
+  edge.entries.set(key, rewritten);
+  const hit = await app.fetch(new Request(url));
+  assert.equal(hit.status, 200);
+  assert.equal(hit.headers.get('cache-control'), 'public, max-age=10');
+});
+
 void test('a failing response cache fails open to storage', async () => {
   const { storage, calls } = spiedStorage();
   const broken: ResponseCache = {
