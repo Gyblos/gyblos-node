@@ -44,3 +44,59 @@ export const CONTROL_CAPACITY = {
   connectionIdleMs: 10000,
   millisecondsPerSecond: 1000,
 } as const;
+
+// Buyer seller-selection policy (GYB-DOC-029), owned by seller-selection.ts; proposed values.
+export const SELLER_SELECTION_CODES = {
+  INVALID: 'INVALID_SELECTION_INPUT',
+  NO_CANDIDATES: 'NO_SELLER_CANDIDATES',
+  LEVEL_UNSUPPORTED: 'SELECTION_LEVEL_UNSUPPORTED',
+  PINNED_REJECTED: 'PINNED_SELLER_REJECTED',
+  // The pinned seller passes every filter except a local cooldown; the result carries its end.
+  PINNED_IN_COOLDOWN: 'PINNED_SELLER_IN_COOLDOWN',
+} as const;
+export type SellerSelectionCode =
+  (typeof SELLER_SELECTION_CODES)[keyof typeof SELLER_SELECTION_CODES];
+
+// Checkability badges (GYB-DOC-001). The v2 catalog carries none, so the caller derives them.
+export const SELLER_BADGES = {
+  DECLARED_USAGE: 'declared-usage',
+  MEASURABLE_USAGE: 'measurable-usage',
+  VERIFIED_MODEL: 'verified-model',
+} as const;
+export type SellerBadge = (typeof SELLER_BADGES)[keyof typeof SELLER_BADGES];
+// Weakest first; a minimum badge accepts every later entry.
+export const SELLER_BADGE_ORDER = [
+  SELLER_BADGES.DECLARED_USAGE,
+  SELLER_BADGES.MEASURABLE_USAGE,
+  SELLER_BADGES.VERIFIED_MODEL,
+] as const satisfies readonly SellerBadge[];
+
+// Proposed local router policy (GYB-DOC-029); tune per release, never per request.
+// A caller such as the managed gateway may inject its own values of the same shape.
+export const SELLER_SELECTION_POLICY = {
+  defaultCandidates: 3,
+  maxCandidates: 5,
+  maxSellers: 4096,
+  // A free offer weighs this many times the cheapest paid survivor of its tier.
+  freeWeightMultiple: 2,
+  // An open payment channel makes a seller look this much cheaper (no new deposit rent).
+  openChannelPriceFactor: 0.8,
+  // A failing seller keeps a small chance to recover, never zero.
+  reputationMin: 0.03,
+  reputationMax: 2,
+  // Added to the smoothed success rate; 0 lets failures scale the weight down directly.
+  successFactorBase: 0,
+  latencyReferenceMs: 1000,
+  latencyFactorMin: 0.5,
+  latencyFactorMax: 1.5,
+  waitFactorBase: 0.5,
+  // Wait accuracy assumed without observations: neutral, not perfect.
+  neutralWaitAccuracy: 0.5,
+  // Pseudo-samples that shrink latency and wait factors toward neutral while history is short.
+  historyPriorSamples: 5,
+  // A previous seller keeps the first slot while its weight is at least this fraction of the best.
+  stickyWeightFraction: 0.8,
+} as const;
+export type SellerSelectionPolicy = {
+  readonly [Key in keyof typeof SELLER_SELECTION_POLICY]: number;
+};

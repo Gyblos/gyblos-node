@@ -10,7 +10,7 @@ are in [stack.md](stack.md).
 | Package                   | Layer    | Responsibility                                                                                                                                                       |
 | ------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `packages/protocol`       | protocol | Canonical JSON, signed offer wire shape, domain and bytes, Iroh ALPN, `Engine` contract, error codes, model catalog, public discovery records. No SDKs.              |
-| `packages/core`           | core     | Pricing and metering math, offer trust rules, charge-anomaly checks. No SDKs or filesystem.                                                                          |
+| `packages/core`           | core     | Pricing and metering math, offer trust rules, charge-anomaly checks, buyer seller selection. No SDKs or filesystem.                                                  |
 | `packages/config`         | config   | Devnet addresses, ports, operator limits, relay defaults and the local home layout (`home.ts`).                                                                      |
 | `packages/runtime`        | runtime  | Atomic JSON writes, private rotating logs, processes, memory probes, loopback `Host` guard.                                                                          |
 | `packages/engine-ollama`  | adapter  | Ollama client, `Engine` adapter, pinned tokenizer and model constants.                                                                                               |
@@ -69,6 +69,35 @@ protocol ◀── core ◀── adapters ◀── node ◀── apps
   `tooling/`.
 - Other workspaces are imported by package name and only through their
   `exports`; files inside one package use relative imports.
+
+## Seller selection
+
+`@gyblos/core/seller-selection` owns the buyer router's choice of sellers
+(`selectSellers`). It is a pure function: the caller passes v2 catalogs,
+presence and withdrawals, a checkability badge per seller (the catalog carries
+none), local per-seller stats, `now`, a random source and optionally its own
+policy (default `SELLER_SELECTION_POLICY`; a gateway may inject its own). Before
+calling, the caller verifies each catalog with `verifyPublicV2` and each
+presence and withdrawal with `verifyPublicV2` against that exact catalog, which
+binds their `catalogDigest`; selection compares only owner, NodeId, sequence and
+lifetimes, and any later withdrawal excludes the seller.
+
+It applies hard filters (exact model, reasoning level, badge, data policy, price
+ceilings, budget, fresh presence, cooldown), then draws a few candidates by
+weighted sampling: cheaper is likelier but not certain, a free offer weighs
+twice the cheapest paid one, an open channel looks cheaper, and local reputation
+(success rate, with latency and wait accuracy shrunk toward neutral while
+samples are few) scales the weight within bounds, so repeated failures outweigh
+a low price. Each owner contributes at most one NodeId. One slot goes to a
+seller with no local history; once the buyer knows enough sellers, such
+newcomers compete only for that slot. A competitive previous seller keeps the
+first slot. Lower reasoning levels of the same model are used only when the
+buyer allows them, closest first down to the buyer's floor, after every
+exact-level candidate; the offer race must never accept a downgrade offer while
+an exact candidate's offer is pending or available. A pinned seller skips
+sampling, never the filters; a pinned seller in cooldown is refused with its
+cooldown end. Asking candidates for live offers, persisting stats and wiring
+into the buyer app are separate work.
 
 ## Boundary checker
 

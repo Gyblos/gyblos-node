@@ -10,7 +10,8 @@
     "./offers": "./src/offers.ts",
     "./package.json": "./package.json",
     "./control-quotes": "./src/control-quotes.ts",
-    "./control-admission": "./src/control-admission.ts"
+    "./control-admission": "./src/control-admission.ts",
+    "./seller-selection": "./src/seller-selection.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",
