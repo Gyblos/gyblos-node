@@ -257,6 +257,10 @@ not been measured.
 
 ## Other settings
 
+These variables can also be written in a `gyblos.toml` file, checked with
+`pnpm gyblos config validate`; the variables keep precedence over the file. See
+[configuration.md](configuration.md). Startup does not read the file yet.
+
 - `GYBLOS_HOME`: local home for both roles and shared artifacts (default
   `.local/gyblos`).
 - `GYBLOS_RPC_URL`: devnet RPC; the genesis hash is checked before use.

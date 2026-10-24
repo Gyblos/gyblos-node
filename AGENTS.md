@@ -14,7 +14,7 @@ Dependency direction is protocol → core → adapters → node → apps; config
 - `packages/core`: pure policy (metering, offer trust `offers`, `control-admission`, `control-quotes`, `seller-selection*`). No SDKs, filesystem, or clock/random of its own.
 - Adapters are the packages matching `payments-x402`, `identity`, `engine-*`, `transport-*`, `discovery-*` (`tooling/boundaries/config.ts`). They never import each other, `node` or apps. Inference knows no wallets; payment code knows no engines.
 - `packages/node`: local-node library for both roles; composes adapters, including the seller's facilitator and control service.
-- `apps/node` (seller), `apps/buyer`, `apps/desktop` (Electron, the provisional desktop host per vault GYB-DOC-001) and `apps/discovery-index` (the discovery index Cloudflare Worker; deploy needs founder approval) are independent executables; apps never import each other.
+- `apps/node` (seller daemon and the `gyblos` CLI), `apps/buyer`, `apps/desktop` (Electron, the provisional desktop host per vault GYB-DOC-001) and `apps/discovery-index` (the discovery index Cloudflare Worker; deploy needs founder approval) are independent executables; apps never import each other.
 - `packages/config`: operator values; `config/src/home.ts` is the only owner of local paths. `packages/runtime`: platform helpers.
 - `lab/`: validation outside product (`harness`, `facilitator`, `tools`; `evidence` is historical). "Gate" is a lab word only: no product code, route, variable, message or product script uses it.
 - Product never imports `lab/`, `tests/` or `tooling/`. Import other workspaces by name through explicit `exports`; relative imports stay inside one package.

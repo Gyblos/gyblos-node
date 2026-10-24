@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./cli": "./src/cli.ts",
     "./main": "./src/main.ts",
     "./setup": "./src/setup.ts"
   },
