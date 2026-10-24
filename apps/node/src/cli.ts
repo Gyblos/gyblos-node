@@ -113,7 +113,7 @@ async function validate(path: string, context: CliContext) {
     return EXIT.failure;
   }
   const result = resolveNodeConfig({ file: parsed.config, env: context.env });
-  for (const warning of result.warnings)
+  for (const warning of [...parsed.warnings, ...result.warnings])
     context.stderr(`warning${issueLine(warning)}`);
   if (!result.ok) {
     context.stderr(

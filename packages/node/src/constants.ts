@@ -143,6 +143,8 @@ export const NODE_CONFIG_ISSUE_CODES = {
   PRICING_MISSING: 'PRICING_MISSING',
   INVALID_CAP: 'INVALID_CAP',
   RELAY_ONLY_CONFLICT: 'RELAY_ONLY_CONFLICT',
+  // A catalog model with verified levels (protocol MODEL_CATALOG) does not support the listed level.
+  REASONING_UNSUPPORTED: 'REASONING_UNSUPPORTED',
 } as const;
 export type NodeConfigIssueCode =
   (typeof NODE_CONFIG_ISSUE_CODES)[keyof typeof NODE_CONFIG_ISSUE_CODES];
@@ -150,6 +152,8 @@ export type NodeConfigIssueCode =
 export const NODE_CONFIG_WARNING_CODES = {
   // A switch variable holds something other than 1 or 0; today's reader treats it as off.
   ENV_SWITCH_NOT_STRICT: 'ENV_SWITCH_NOT_STRICT',
+  // An offer's reasoning levels cannot be checked: a custom model or a catalog model without verified levels.
+  REASONING_UNVERIFIED: 'REASONING_UNVERIFIED',
 } as const;
 export type NodeConfigWarningCode =
   (typeof NODE_CONFIG_WARNING_CODES)[keyof typeof NODE_CONFIG_WARNING_CODES];

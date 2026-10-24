@@ -16,8 +16,11 @@ On success it prints `OK`, every effective setting with where it came from
 (flag, environment variable, file key or default), the offers, and the secret
 variables by name with `set` or `not set`. On failure it prints one line per
 problem, an issue code and a key path such as
-`NON_CANONICAL_DECIMAL  offers[1].price.input_per_mtok`. The exit code is `0`
-for a valid configuration and `1` otherwise (including usage errors).
+`NON_CANONICAL_DECIMAL  offers[1].price.input_per_mtok`. Warnings go to standard
+error as `warning` followed by a code and a key path, for example
+`warning  REASONING_UNVERIFIED  offers[0].reasoning`, and never fail the file.
+The exit code is `0` for a valid configuration and `1` otherwise (including
+usage errors).
 
 The command never prints a value that came from the environment, only the
 variable's name, and issue lines never include the value that failed. URLs from
@@ -129,7 +132,13 @@ range (`UNSUPPORTED_VERSION` or `INVALID_CAP`), however many digits it has.
     http only for `127.0.0.1`, `localhost`, `[::1]` or `host.docker.internal`),
     optional `api_key_env` and `upstream_model` (the name the engine expects).
   - `reasoning`: non-empty list of distinct levels from `off`, `low`, `medium`,
-    `high` (GYB-DOC-028); default `["off"]`.
+    `high` (GYB-DOC-028). For a catalog model with verified levels (see
+    [Reasoning levels per model](#reasoning-levels-per-model)) every listed
+    level must be one the model supports, otherwise `REASONING_UNSUPPORTED` at
+    `offers[i].reasoning[j]`; when omitted, the model's default level is used.
+    For a custom model or a catalog model without verified levels any such list
+    is accepted, the default is `["off"]`, and the offer gets the
+    `REASONING_UNVERIFIED` warning.
   - exactly one of:
     - `price = { input_per_mtok, output_per_mtok, currency = "USDC" }`: USDC per
       million tokens as decimal strings. Trailing fractional zeros are accepted
@@ -153,6 +162,38 @@ conversion is exact: atomic per million tokens = USDC per million tokens × 10^6
 `pricePerMtokToAtomicPerMtok` (from `@gyblos/node/node-config`) performs it, for
 example `"0.1"` → `100000n`, `"1.5"` → `1500000n`, `"0.000001"` → `1n`.
 
+### Reasoning levels per model
+
+The catalog (`MODEL_CATALOG` in `packages/protocol/src/models.ts`) declares the
+levels each model supports, from the closed set `off`, `low`, `medium`, `high`
+(GYB-DOC-028). A model with only a thinking on/off switch uses `off` and `high`.
+`null` means the levels were not verified from a primary model source, or the
+vendor's levels do not map one-to-one onto the closed set; such models are
+accepted like custom models, with a warning. Sources checked on 2026-10-24.
+
+| Catalog id            | Levels                  | Default  | Primary source                                                                                                                                                                                                                                             |
+| --------------------- | ----------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `qwen3-30b-a3b`       | `off`, `high`           | `off`    | [Qwen/Qwen3-30B-A3B model card](https://huggingface.co/Qwen/Qwen3-30B-A3B): `enable_thinking` hard switch between thinking and non-thinking modes.                                                                                                         |
+| `qwen3-235b-a22b`     | `off`, `high`           | `off`    | [Qwen/Qwen3-235B-A22B model card](https://huggingface.co/Qwen/Qwen3-235B-A22B): same `enable_thinking` switch.                                                                                                                                             |
+| `qwen3-0.6b`          | `off`, `high`           | `off`    | [Qwen/Qwen3-0.6B model card](https://huggingface.co/Qwen/Qwen3-0.6B): same `enable_thinking` switch.                                                                                                                                                       |
+| `gpt-oss-120b`        | `low`, `medium`, `high` | `medium` | [OpenAI gpt-oss model card](https://cdn.openai.com/pdf/419b6906-9da6-406c-a19d-1bb078ac7637/oai_gpt-oss_model_card.pdf) (three reasoning levels) and the [harmony guide](https://developers.openai.com/cookbook/articles/openai-harmony) (default medium). |
+| `gpt-oss-20b`         | `low`, `medium`, `high` | `medium` | Same as `gpt-oss-120b`; [openai/gpt-oss-20b model card](https://huggingface.co/openai/gpt-oss-20b).                                                                                                                                                        |
+| `llama-3.3-70b`       | `off`                   | `off`    | [meta-llama/Llama-3.3-70B-Instruct model card](https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct): an instruction-tuned text model with no reasoning mode.                                                                                          |
+| `gemma-4-26b`         | `off`, `high`           | `off`    | [google/gemma-4-26B-A4B-it model card](https://huggingface.co/google/gemma-4-26B-A4B-it): the `<\|think\|>` system-prompt token turns thinking on or off; no graded levels.                                                                                |
+| `deepseek-v4.1-flash` | `null`                  |          | [deepseek-ai/DeepSeek-V4.1-Flash model card](https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash): reasoning effort is an integer from 1 to 100 and the card does not document how to turn thinking off.                                                |
+| `kimi-k3`             | `null`                  |          | [moonshotai/Kimi-K3 model card](https://huggingface.co/moonshotai/Kimi-K3): thinking is always on, `reasoning_effort` `low`, `high` or `max` (default `max`).                                                                                              |
+| `glm-5.3-flash`       | `null`                  |          | [zai-org/GLM-5.3-Flash model card](https://huggingface.co/zai-org/GLM-5.3-Flash): `reasoning_effort` `low`, `high` or `max` (default `max`); no off level documented.                                                                                      |
+
+The Qwen3 cards default to thinking on, and the Gemma 4 card states no default.
+The offer default for both is `off`: thinking is not metered yet, and the Ollama
+adapter runs Qwen3 with thinking disabled (GYB-DOC-028 decisions 4 and 5).
+Mapping DeepSeek's 1-100 effort and the `low`/`high`/`max` scales of Kimi K3 and
+GLM 5.3 Flash onto the closed set is a later decision, so those entries stay
+`null`.
+
+The JSON Schema checks only the closed set; the per-model rule is enforced by
+the validator.
+
 ## Issue codes
 
 `TOML_SYNTAX`, `FILE_NOT_FOUND`, `FILE_UNREADABLE`, `FILE_TOO_LARGE` (over 64
@@ -161,8 +202,12 @@ KiB), `UNKNOWN_KEY`, `MISSING_KEY`, `WRONG_TYPE`, `INVALID_VALUE`,
 `INSECURE_URL`, `INVALID_ENV_NAME`, `INLINE_SECRET`, `DUPLICATE_VALUE`,
 `TOO_MANY`, `UNKNOWN_MODEL`, `CUSTOM_MODEL_IN_CATALOG`, `NON_CANONICAL_DECIMAL`,
 `PRICE_OUT_OF_RANGE`, `PRICE_ZERO`, `PRICING_CONFLICT`, `PRICING_MISSING`,
-`INVALID_CAP`, `RELAY_ONLY_CONFLICT`. The canonical list is
-`NODE_CONFIG_ISSUE_CODES` in `packages/node/src/constants.ts`.
+`INVALID_CAP`, `RELAY_ONLY_CONFLICT`, `REASONING_UNSUPPORTED`. The canonical
+list is `NODE_CONFIG_ISSUE_CODES` in `packages/node/src/constants.ts`.
+
+Warnings: `ENV_SWITCH_NOT_STRICT` (a switch variable other than `1` or `0`) and
+`REASONING_UNVERIFIED` (an offer whose levels cannot be checked against the
+catalog). The canonical list is `NODE_CONFIG_WARNING_CODES`.
 
 ## Editor support and examples
 
@@ -172,12 +217,14 @@ The JSON Schema is
 based on Taplo (such as Even Better TOML) use for completion and inline errors.
 The schema cannot express a few cross-field rules (per-buyer cap above the daily
 cap, a model offered twice through an alias, relays that are equal after
-normalization); `gyblos config validate` is authoritative.
+normalization, the reasoning levels a catalog model supports);
+`gyblos config validate` is authoritative.
 
 Commented examples to copy, all valid. Their `#:schema` line is relative to this
 repository; in a copy elsewhere, update or delete it. Reasoning levels follow
 each model (GYB-DOC-028): gpt-oss offers `low`, `medium` and `high` (no `off`);
-Qwen3 thinking is on or off, written `["off", "high"]`.
+Qwen3 thinking is on or off, written `["off", "high"]`. The custom model in
+`anthropic-reseller.toml` validates with the `REASONING_UNVERIFIED` warning.
 
 | File                                                                    | Shows                                                        |
 | ----------------------------------------------------------------------- | ------------------------------------------------------------ |
@@ -191,7 +238,8 @@ Qwen3 thinking is on or off, written `["off", "high"]`.
 ## Code
 
 - `@gyblos/node/node-config`: `parseNodeConfig`, `validateNodeConfig`,
-  `readNodeConfigFile`, `pricePerMtokToAtomicPerMtok` and the `NodeConfig` type.
+  `readNodeConfigFile`, `pricePerMtokToAtomicPerMtok` and the `NodeConfig` type;
+  a valid result also carries `warnings`.
 - `@gyblos/node/node-config-resolve`: `resolveNodeConfig({ file, env, flags })`,
   returning settings, origins, secret references and warnings, or issues.
 - `apps/node/src/cli.ts`: the `gyblos` command (`pnpm gyblos`).

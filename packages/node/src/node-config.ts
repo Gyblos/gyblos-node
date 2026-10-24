@@ -26,6 +26,7 @@ import {
   withoutUndefined,
   type ConfigPath,
   type NodeConfigIssue,
+  type NodeConfigWarning,
 } from './node-config-fields.js';
 import { readOffers, type NodeOffer } from './node-config-offers.js';
 import {
@@ -34,7 +35,10 @@ import {
   readRelayUrl,
 } from './node-config-values.js';
 
-export type { NodeConfigIssue } from './node-config-fields.js';
+export type {
+  NodeConfigIssue,
+  NodeConfigWarning,
+} from './node-config-fields.js';
 export {
   pricePerMtokToAtomicPerMtok,
   readPriceDecimal,
@@ -63,8 +67,10 @@ export interface NodeConfig {
   offers: NodeOffer[];
 }
 
+// Warnings (static codes and paths) never fail validation; a valid file reports them with its config.
 export type NodeConfigResult =
-  { ok: true; config: NodeConfig } | { ok: false; issues: NodeConfigIssue[] };
+  | { ok: true; config: NodeConfig; warnings: NodeConfigWarning[] }
+  | { ok: false; issues: NodeConfigIssue[] };
 
 export type TomlDocumentResult =
   { ok: true; document: unknown } | { ok: false; issues: NodeConfigIssue[] };
@@ -274,6 +280,7 @@ export function validateNodeConfig(document: unknown): NodeConfigResult {
     return failure(issues.issues);
   return {
     ok: true,
+    warnings: issues.warnings,
     config: withoutUndefined({
       version,
       node,
