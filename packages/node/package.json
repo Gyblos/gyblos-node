@@ -19,7 +19,9 @@
     "./public-sequence": "./src/public-sequence.ts",
     "./public-records": "./src/public-records.ts",
     "./publisher": "./src/publisher.ts",
-    "./publisher-config": "./src/publisher-config.ts"
+    "./publisher-config": "./src/publisher-config.ts",
+    "./node-config": "./src/node-config.ts",
+    "./node-config-resolve": "./src/node-config-resolve.ts"
   },
   "dependencies": {
     "@gyblos/core": "workspace:*",
