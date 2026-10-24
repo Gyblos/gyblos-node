@@ -188,3 +188,80 @@ void test('wallet restore reload rejects a protected record growing after descri
     );
   });
 });
+
+void test(
+  'wallet restore refuses a redirected claimed directory without overwriting another record',
+  { skip: process.platform === 'win32' },
+  async () => {
+    await fixture(async ({ root, home, backup, protection }) => {
+      const directory = join(root, WALLET.DIRECTORY);
+      const victim = join(home, 'existing-wallet');
+      const sentinel = 'Synthetic existing wallet record, never replace';
+      await fs.promises.mkdir(victim, { mode: WALLET.PRIVATE_DIRECTORY });
+      await fs.promises.writeFile(join(victim, WALLET.RECORD), sentinel, {
+        mode: WALLET.PRIVATE_FILE,
+      });
+      const original = fs.promises.mkdir;
+      const redirected = async (...args: Parameters<typeof original>) => {
+        const result = await original(...args);
+        if (args[0] === directory) {
+          await fs.promises.rename(directory, join(root, 'reserved-marker'));
+          await fs.promises.symlink(victim, directory, 'dir');
+        }
+        return result;
+      };
+      fs.promises.mkdir = redirected as typeof original;
+      syncBuiltinESMExports();
+      try {
+        await assert.rejects(
+          createWalletRestorer(root, protection).restore(
+            backup,
+            TEST_BACKUP_PASSWORD,
+          ),
+          restoreError(WALLET_RESTORE_ERROR.RECOVERY_REQUIRED),
+        );
+        assert.equal(
+          await readFile(join(victim, WALLET.RECORD), 'utf8'),
+          sentinel,
+        );
+        assert.deepEqual(await fs.promises.readdir(victim), [WALLET.RECORD]);
+      } finally {
+        fs.promises.mkdir = original;
+        syncBuiltinESMExports();
+      }
+    });
+  },
+);
+void test('wallet restore never replaces a record that appears after destination reservation', async () => {
+  await fixture(async ({ root, backup, protection }) => {
+    const directory = join(root, WALLET.DIRECTORY);
+    const record = join(directory, WALLET.RECORD);
+    const staging = join(directory, WALLET.STAGING);
+    const sentinel = 'Synthetic concurrently installed record';
+    const original = fs.promises.open;
+    let installed = false;
+    fs.promises.open = async (...args) => {
+      if (!installed && (args[0] === record || args[0] === staging)) {
+        installed = true;
+        await fs.promises.writeFile(record, sentinel, {
+          mode: WALLET.PRIVATE_FILE,
+        });
+      }
+      return original(...args);
+    };
+    syncBuiltinESMExports();
+    try {
+      await assert.rejects(
+        createWalletRestorer(root, protection).restore(
+          backup,
+          TEST_BACKUP_PASSWORD,
+        ),
+        restoreError(WALLET_RESTORE_ERROR.RECOVERY_REQUIRED),
+      );
+      assert.equal(await readFile(record, 'utf8'), sentinel);
+    } finally {
+      fs.promises.open = original;
+      syncBuiltinESMExports();
+    }
+  });
+});
