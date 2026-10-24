@@ -74,7 +74,8 @@ export const DISCOVERY_LIMITS = {
   // Sellers response cap (index caps at about 1 MiB) plus headroom for JSON framing.
   maxSellersResponseBytes: 1_100_000,
   maxPublishResponseBytes: 4_096,
-  maxPublishBodyBytes: 16_384,
+  // A canonical public v2 record may reach 32 KiB; 2 KiB more covers the envelope (same cap as the index).
+  maxPublishBodyBytes: 34_816,
   defaultSellers: 50,
   maxSellers: 200,
   maxCursorCharacters: 512,

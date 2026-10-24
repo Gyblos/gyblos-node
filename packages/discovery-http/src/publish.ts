@@ -10,7 +10,7 @@ import {
   INDEX_ERROR_MAP,
   STATUS_ERROR_MAP,
 } from './constants.js';
-import { discoveryFail } from './errors.js';
+import { DiscoveryError, discoveryFail } from './errors.js';
 import {
   failStatus,
   indexUrl,
@@ -68,8 +68,14 @@ async function readPublish(response: Response, aborted: Promise<never>) {
       aborted,
     );
   } catch (error) {
-    // A 400 whose body cannot be read is still a rejection, not a transport failure.
-    if (response.status === HTTP_STATUS.BAD_REQUEST)
+    // A 400 whose body cannot be read is still a rejection, unless the deadline ended the read.
+    if (
+      response.status === HTTP_STATUS.BAD_REQUEST &&
+      !(
+        error instanceof DiscoveryError &&
+        error.code === DISCOVERY_ERROR_CODES.TIMEOUT
+      )
+    )
       discoveryFail(DISCOVERY_ERROR_CODES.RECORD_REJECTED, response.status);
     throw error;
   }

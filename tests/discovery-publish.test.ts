@@ -126,7 +126,7 @@ void test('publishRecord maps index rejections and statuses to static codes', as
 void test('publishRecord refuses oversized or malformed records and insecure URLs before fetching', async () => {
   const seller = await discoverySeller();
   const { fetch, calls } = fakeFetch(() => jsonResponse(201, { ok: true }));
-  const oversized = { ...seller.signedCatalog, signature: 'f'.repeat(17_000) };
+  const oversized = { ...seller.signedCatalog, signature: 'f'.repeat(35_000) };
   await assert.rejects(
     publishRecord({ baseUrl: DISCOVERY_BASE, record: oversized, fetch }),
     rejectsWith(DISCOVERY_ERROR_CODES.PAYLOAD_TOO_LARGE),
@@ -148,4 +148,31 @@ void test('publishRecord refuses oversized or malformed records and insecure URL
     rejectsWith(DISCOVERY_ERROR_CODES.INSECURE_URL),
   );
   assert.equal(calls.length, 0);
+});
+
+void test('publishRecord accepts a valid 64-model catalog above 16 KiB', async () => {
+  const seller = await discoverySeller();
+  const record = await seller.largeCatalog(64);
+  const { fetch, calls } = fakeFetch(() => jsonResponse(201, { ok: true }));
+  assert.deepEqual(
+    await publishRecord({ baseUrl: DISCOVERY_BASE, record, fetch }),
+    { ok: true },
+  );
+  const bytes = new TextEncoder().encode(String(calls[0]!.init.body));
+  assert.ok(bytes.byteLength > 20_000 && bytes.byteLength < 34_816);
+});
+
+void test('a deadline while reading a 400 body is a timeout, not a rejection', async () => {
+  const seller = await discoverySeller();
+  const stalled = async () =>
+    new Response(new ReadableStream({ pull() {} }), { status: 400 });
+  await assert.rejects(
+    publishRecord({
+      baseUrl: DISCOVERY_BASE,
+      record: seller.signedCatalog,
+      fetch: stalled,
+      timeoutMs: 20,
+    }),
+    rejectsWith(DISCOVERY_ERROR_CODES.TIMEOUT),
+  );
 });

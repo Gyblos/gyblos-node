@@ -55,6 +55,23 @@ export async function discoverySeller(options: SellerOptions = {}) {
   }
   const signedCatalog = await signPublicV2(catalog, source.signer);
   const signedPresence = await presenceFor(catalog);
+  // A later catalog from the same node with its own presence (sequence + 1).
+  async function entryAt(sequence: number) {
+    const next: PublicCatalogV2 = { ...catalog, sequence };
+    return {
+      catalog: await signPublicV2(next, source.signer),
+      presence: await presenceFor(next, sequence + 1),
+    };
+  }
+  // The same node advertising `count` distinct models (padded identifiers).
+  async function largeCatalog(count: number) {
+    const template = catalog.models[0]!;
+    const models = Array.from({ length: count }, (_unused, index) => ({
+      ...template,
+      modelId: `org/model-${String(index).padStart(3, '0')}-${'x'.repeat(100)}`,
+    }));
+    return signPublicV2({ ...catalog, models }, source.signer);
+  }
   return {
     catalog,
     signedCatalog,
@@ -62,6 +79,8 @@ export async function discoverySeller(options: SellerOptions = {}) {
     entry: { catalog: signedCatalog, presence: signedPresence },
     signer: source.signer,
     presenceFor,
+    entryAt,
+    largeCatalog,
   };
 }
 
