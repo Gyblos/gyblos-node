@@ -37,16 +37,18 @@ import type { ControlService } from '@gyblos/transport-iroh/control-server';
 
 import type { SellerPublicRecords } from './public-records.js';
 
-export function createSellerControlService(options: {
+export interface SellerControlOptions {
   context: Omit<QuoteContext, 'remoteNodeId' | 'signal'>;
   ownerSigner: Signer;
   nodeSigner: Signer;
   monotonic?: () => number;
   records?: SellerPublicRecords;
-}): ControlService {
-  const admission = new ControlAdmission(
-    options.monotonic ?? (() => performance.now()),
-  );
+}
+
+export function createSellerControlService(
+  options: SellerControlOptions,
+): ControlService {
+  const admission = admissionFor(options.monotonic);
   let sequence = options.context.catalog.record.sequence;
   return {
     queryMs: CONTROL_CAPACITY.queryMs,
@@ -92,16 +94,15 @@ export function createSellerControlService(options: {
               catalog: { record, signature: context.catalog.signature },
             },
           };
-        sequence = Math.max(sequence, record.sequence) + 1;
-        const presence = options.records
-          ? await options.records.presence()
-          : await signPresence(
-              context,
-              record,
-              sequence,
-              now,
-              options.nodeSigner,
-            );
+        if (!options.records)
+          sequence = Math.max(sequence, record.sequence) + 1;
+        const presence = await currentPresence(
+          options,
+          context,
+          record,
+          sequence,
+          now,
+        );
         validatePublicV2Time(presence.record, context.now());
         return {
           version: CONTROL_VERSION,
@@ -122,6 +123,18 @@ export function createSellerControlService(options: {
       }
     },
   };
+}
+
+async function currentPresence(
+  options: Parameters<typeof createSellerControlService>[0],
+  context: Omit<QuoteContext, 'remoteNodeId' | 'signal'>,
+  record: PublicCatalogV2,
+  sequence: number,
+  now: number,
+) {
+  return options.records
+    ? options.records.presence()
+    : signPresence(context, record, sequence, now, options.nodeSigner);
 }
 
 async function signPresence(
@@ -157,4 +170,8 @@ function validatedRequestId(value: unknown) {
       : undefined,
     CONTROL_LIMITS.requestIdBytes,
   );
+}
+
+function admissionFor(monotonic?: () => number) {
+  return new ControlAdmission(monotonic ?? (() => performance.now()));
 }

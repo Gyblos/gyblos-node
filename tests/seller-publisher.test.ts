@@ -149,3 +149,35 @@ void test('shutdown aborts an in-flight presence and publishes only a higher wit
     await run.close();
   }
 });
+
+void test('publication scheduler starts only once and shutdown cancels its idle timer without late announcements', async () => {
+  const run = await sellerPublicationFixture();
+  const sent: SignedPublicV2[] = [];
+  let announce = () => {};
+  const announced = new Promise<void>((resolve) => {
+    announce = resolve;
+  });
+  const publisher = createSellerPublisher({
+    records: run.records,
+    canPublish: () => true,
+    now: run.context.now,
+    tickMs: 1000,
+    publish: async (record) => {
+      sent.push(record);
+      if (record.record.kind === PUBLIC_RECORD_KINDS.PRESENCE) announce();
+    },
+  });
+  try {
+    publisher.start();
+    publisher.start();
+    await announced;
+    await publisher.stop();
+    const count = sent.length;
+    await new Promise<void>((resolve) => setTimeout(resolve, 15));
+    assert.equal(sent.length, count);
+    assert.equal(sent.at(-1)!.record.kind, PUBLIC_RECORD_KINDS.WITHDRAWAL);
+  } finally {
+    await publisher.stop();
+    await run.close();
+  }
+});

@@ -335,3 +335,15 @@ and buyer-directory mode 0700. Quote latency is not inference latency; v2 quotes
 provide no predicted wait, so quoted/observed wait and accuracy remain null
 until an actual observation source exists. No prompts, offers or payment
 payloads are stored there. No payments v2 are enabled.
+
+## Optional seller discovery publication
+
+The seller can publish its signed public catalog/presence to the HTTP index with
+`GYBLOS_DISCOVERY_PUBLISH=1`. `GYBLOS_DISCOVERY_URL` overrides the configured
+base URL; publication is off by default. See
+[discovery.md](discovery.md#seller-duties) for renewal, retry, shutdown and
+sequence-state recovery limits. Do not reset `public-sequence-v2.json` or
+automatically remove a leftover sequence lock. Catalogs and quotes never outlive
+the seller's existing readiness observation; publication does not run an engine
+or enable v2 payments. Creating/deploying an index is a separate operator
+action, described in [discovery-index.md](discovery-index.md).

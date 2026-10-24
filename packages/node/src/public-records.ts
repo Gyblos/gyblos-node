@@ -40,87 +40,95 @@ export interface SellerRecordOptions {
   catalogMs?: number;
   renewBeforeMs?: number;
 }
-export async function createSellerRecords(
-  options: SellerRecordOptions,
-): Promise<SellerPublicRecords> {
-  const lifetime = controlInteger(
-    options.catalogMs ?? SELLER_PUBLIC_RECORDS.catalogMs,
-    1,
-    PUBLIC_RECORD_LIMITS.catalogLifetimeMs,
-  );
-  const renewBefore = controlInteger(
-    options.renewBeforeMs ??
-      Math.min(SELLER_PUBLIC_RECORDS.renewBeforeMs, lifetime - 1),
-    0,
-    lifetime - 1,
-  );
-  let catalog: SignedPublicV2 | undefined;
-  let active = false;
-  let failed = false;
-  let epoch = 0;
-  let previous = Promise.resolve();
-  function enqueue<T>(operation: () => Promise<T>): Promise<T> {
-    const result = previous.then(async () => {
-      if (failed) return controlFail(CONTROL_CODES.INTERNAL);
+class SellerRecords implements SellerPublicRecords {
+  private catalog: SignedPublicV2 | undefined;
+  private active = false;
+  private failed = false;
+  private epoch = 0;
+  private previous = Promise.resolve();
+  private readonly lifetime: number;
+  private readonly renewBefore: number;
+  constructor(private readonly options: SellerRecordOptions) {
+    this.lifetime = controlInteger(
+      options.catalogMs ?? SELLER_PUBLIC_RECORDS.catalogMs,
+      1,
+      PUBLIC_RECORD_LIMITS.catalogLifetimeMs,
+    );
+    this.renewBefore = controlInteger(
+      options.renewBeforeMs ??
+        Math.min(SELLER_PUBLIC_RECORDS.renewBeforeMs, this.lifetime - 1),
+      0,
+      this.lifetime - 1,
+    );
+  }
+  private enqueue<T>(operation: () => Promise<T>): Promise<T> {
+    const result = this.previous.then(async () => {
+      if (this.failed) return controlFail(CONTROL_CODES.INTERNAL);
       try {
         return await operation();
       } catch (error) {
-        active = false;
-        if (!(error instanceof ControlError)) failed = true;
+        this.active = false;
+        if (!(error instanceof ControlError)) this.failed = true;
         throw error;
       }
     });
-    previous = result.then(
+    this.previous = result.then(
       () => {},
       () => {},
     );
     return result;
   }
-  function current(): SignedPublicV2 {
-    if (failed || !active || !catalog) return controlFail(CONTROL_CODES.STALE);
-    validatePublicV2Time(catalog.record, options.now());
-    return catalog;
+  current(): SignedPublicV2 {
+    if (this.failed || !this.active || !this.catalog)
+      return controlFail(CONTROL_CODES.STALE);
+    validatePublicV2Time(this.catalog.record, this.options.now());
+    return this.catalog;
   }
-  function refresh(force = false) {
-    const generation = epoch;
-    return enqueue(async () => {
-      if (generation !== epoch) return controlFail(CONTROL_CODES.CANCELLED);
-      const now = controlInteger(options.now());
-      const deadline = controlInteger(options.validUntil());
-      if (deadline <= now || (catalog && catalog.record.issuedAt > now))
+  refresh(force = false) {
+    const generation = this.epoch;
+    return this.enqueue(async () => {
+      if (generation !== this.epoch)
+        return controlFail(CONTROL_CODES.CANCELLED);
+      const now = controlInteger(this.options.now());
+      const deadline = controlInteger(this.options.validUntil());
+      if (
+        deadline <= now ||
+        (this.catalog && this.catalog.record.issuedAt > now)
+      )
         return controlFail(CONTROL_CODES.EXPIRED);
       if (
         !force &&
-        active &&
-        catalog &&
-        catalog.record.expiresAt - now > renewBefore
+        this.active &&
+        this.catalog &&
+        this.catalog.record.expiresAt - now > this.renewBefore
       )
-        return catalog;
-      const sequence = await options.sequence.next(
-        catalog?.record.sequence ?? 0,
+        return this.catalog;
+      const sequence = await this.options.sequence.next(
+        this.catalog?.record.sequence ?? 0,
       );
       const signed = await signPublicV2(
         {
-          ...options.template,
+          ...this.options.template,
           sequence,
           issuedAt: now,
-          expiresAt: Math.min(deadline, now + lifetime),
+          expiresAt: Math.min(deadline, now + this.lifetime),
         },
-        options.signer,
+        this.options.signer,
       );
-      if (generation !== epoch) return controlFail(CONTROL_CODES.CANCELLED);
-      validatePublicV2Time(signed.record, options.now());
-      catalog = signed;
-      active = true;
+      if (generation !== this.epoch)
+        return controlFail(CONTROL_CODES.CANCELLED);
+      validatePublicV2Time(signed.record, this.options.now());
+      this.catalog = signed;
+      this.active = true;
       return signed;
     });
   }
-  async function presence() {
-    const generation = epoch;
-    return enqueue(async () => {
-      const held = current();
-      const now = options.now();
-      const sequence = await options.sequence.next(held.record.sequence);
+  presence() {
+    const generation = this.epoch;
+    return this.enqueue(async () => {
+      const held = this.current();
+      const now = this.options.now();
+      const sequence = await this.options.sequence.next(held.record.sequence);
       const signed = await signPublicV2(
         {
           schemaVersion: held.record.schemaVersion,
@@ -136,21 +144,22 @@ export async function createSellerRecords(
           catalogDigest: await catalogDigestV2(held.record),
           state: PUBLIC_PRESENCE_STATE,
         },
-        options.signer,
+        this.options.signer,
       );
-      if (generation !== epoch) return controlFail(CONTROL_CODES.CANCELLED);
-      current();
-      validatePublicV2Time(signed.record, options.now());
+      if (generation !== this.epoch)
+        return controlFail(CONTROL_CODES.CANCELLED);
+      this.current();
+      validatePublicV2Time(signed.record, this.options.now());
       return signed;
     });
   }
-  function withdraw() {
-    const wasActive = active;
-    active = false;
-    epoch++;
-    return enqueue(async () => {
-      const held = catalog;
-      const now = options.now();
+  withdraw() {
+    const wasActive = this.active;
+    this.active = false;
+    this.epoch++;
+    return this.enqueue(async () => {
+      const held = this.catalog;
+      const now = this.options.now();
       if (
         !wasActive ||
         !held ||
@@ -158,7 +167,7 @@ export async function createSellerRecords(
         now < held.record.issuedAt
       )
         return undefined;
-      const sequence = await options.sequence.next(held.record.sequence);
+      const sequence = await this.options.sequence.next(held.record.sequence);
       return signPublicV2(
         {
           schemaVersion: held.record.schemaVersion,
@@ -173,10 +182,15 @@ export async function createSellerRecords(
           ),
           catalogDigest: await catalogDigestV2(held.record),
         },
-        options.signer,
+        this.options.signer,
       );
     });
   }
-  await refresh();
-  return { current, refresh, presence, withdraw };
+}
+export async function createSellerRecords(
+  options: SellerRecordOptions,
+): Promise<SellerPublicRecords> {
+  const records = new SellerRecords(options);
+  await records.refresh();
+  return records;
 }

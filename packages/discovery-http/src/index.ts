@@ -14,3 +14,6 @@ export {
   type FetchSellersInput,
   type FetchSellersResult,
 } from './sellers.js';
+
+// Reuses the exact adapter URL policy for operator configuration validation.
+export { validateDiscoveryBaseUrl } from './http.js';

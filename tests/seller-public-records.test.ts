@@ -9,11 +9,12 @@ import { createSellerControlService } from '@gyblos/node/control';
 import { createSellerRecords } from '@gyblos/node/public-records';
 import { openSellerSequence } from '@gyblos/node/public-sequence';
 import {
+  CONTROL_CODES,
   CONTROL_METHODS,
   CONTROL_VERSION,
   PUBLIC_RECORD_KINDS,
 } from '@gyblos/protocol/constants';
-import { verifyPublicV2 } from '@gyblos/protocol/public-v2';
+import { catalogDigestV2, verifyPublicV2 } from '@gyblos/protocol/public-v2';
 
 import { controlFixture } from './support/control-fixture.js';
 
@@ -86,9 +87,22 @@ void test('catalog rotation never extends observed readiness and old catalog quo
   const run = await fixture();
   try {
     const old = run.records.current();
+    const service = createSellerControlService({
+      ...run,
+      context: { ...run.context, catalog: old },
+      records: run.records,
+    });
+    run.request.params.catalogDigest = await catalogDigestV2(old.record);
     run.setNow(run.context.now() + 3500);
     const fresh = await run.records.refresh();
     assert.ok(fresh.record.sequence > old.record.sequence);
+    const stale = await service.respond(
+      run.request,
+      run.request.params.buyerNodeId,
+      new AbortController().signal,
+    );
+    assert.ok(stale.error);
+    assert.equal(stale.error.code, CONTROL_CODES.STALE);
     assert.ok(fresh.record.expiresAt <= run.context.readiness().validUntil);
     const record = await verifyPublicV2(await run.records.presence(), {
       owner: run.context.owner,
@@ -131,4 +145,45 @@ void test('failed durable reservation disables records before a signature can es
   await assert.rejects(records.presence());
   assert.equal(signatures, 1);
   assert.throws(() => records.current());
+});
+
+void test('a quote signing during retirement is never returned after the local catalog is disabled', async () => {
+  const run = await fixture();
+  let started = () => {};
+  let release = () => {};
+  const signing = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  try {
+    run.request.params.catalogDigest = await catalogDigestV2(
+      run.records.current().record,
+    );
+    const service = createSellerControlService({
+      ...run,
+      context: { ...run.context, catalog: run.records.current() },
+      records: run.records,
+      ownerSigner: async (bytes) => {
+        started();
+        await held;
+        return run.ownerSigner(bytes);
+      },
+    });
+    const pending = service.respond(
+      run.request,
+      run.request.params.buyerNodeId,
+      new AbortController().signal,
+    );
+    await signing;
+    await run.records.withdraw();
+    release();
+    const result = await pending;
+    assert.ok(result.error);
+    assert.equal(result.error.code, CONTROL_CODES.STALE);
+  } finally {
+    release();
+    await run.close();
+  }
 });

@@ -13,6 +13,7 @@ import {
   MODEL_IDS,
   PUBLIC_PRICE_UNIT,
   PUBLIC_RECORD_KINDS,
+  PUBLIC_RECORD_LIMITS,
   REASONING_LEVELS,
 } from '@gyblos/protocol/constants';
 import type { InferenceOfferV2 } from '@gyblos/protocol/control-types';
@@ -20,10 +21,11 @@ import type {
   EngineCapabilities,
   EngineDescription,
 } from '@gyblos/protocol/engine';
-import { signPublicV2 } from '@gyblos/protocol/public-v2';
 import type { Signer } from '@gyblos/protocol/signing';
 
 import { createSellerControlService } from './control.js';
+import { createSellerRecords } from './public-records.js';
+import type { SellerSequence } from './public-sequence.js';
 
 export async function prepareSellerControl(options: {
   owner: KeyPairSigner;
@@ -39,16 +41,13 @@ export async function prepareSellerControl(options: {
   capabilities: EngineCapabilities;
   validUntil: number;
   readiness: () => QuoteReadiness;
+  sequence: SellerSequence;
+  catalogMs?: number;
 }) {
   const now = Date.now();
-  const selection = {
-    modelId: MODEL_IDS.QWEN3_0_6B,
-    variant: null,
-    quantization: MODEL.quantization,
-  };
-  const reasoning = [REASONING_LEVELS.OFF]; // The pinned template implements no other level.
-  const catalog = await signPublicV2(
-    {
+  const { selection, reasoning } = startupSelection();
+  const records = await createSellerRecords({
+    template: {
       schemaVersion: CONTROL_RECORD_VERSION,
       kind: PUBLIC_RECORD_KINDS.CATALOG,
       owner: options.owner.address,
@@ -71,11 +70,16 @@ export async function prepareSellerControl(options: {
       ],
       dataPolicy: { retention: DATA_RETENTION.NONE },
     },
-    options.nodeSigner,
-  );
-  return createSellerControlService({
+    sequence: options.sequence,
+    signer: options.nodeSigner,
+    now: Date.now,
+    validUntil: () => options.readiness().validUntil,
+    catalogMs: options.catalogMs ?? PUBLIC_RECORD_LIMITS.catalogLifetimeMs,
+  });
+  const service = createSellerControlService({
+    records,
     context: {
-      catalog,
+      catalog: records.current(),
       owner: options.owner.address,
       nodeId: options.nodeId,
       payTo: options.payTo,
@@ -101,4 +105,15 @@ export async function prepareSellerControl(options: {
         options.owner.address
       ]!,
   });
+  return { service, records };
+}
+
+function startupSelection() {
+  const selection = {
+    modelId: MODEL_IDS.QWEN3_0_6B,
+    variant: null,
+    quantization: MODEL.quantization,
+  };
+  // The pinned template implements only this reasoning level.
+  return { selection, reasoning: [REASONING_LEVELS.OFF] };
 }

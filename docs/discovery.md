@@ -4,7 +4,8 @@
 discovery index: a cache of node-signed public v2 records (catalog, presence)
 that buyers query by model. The buyer can opt into it through `selection.json`
 while preserving independently configured identity/endpoint bindings. The seller
-publishing loop remains separate work.
+can explicitly opt into publication through the same verified record lifecycle
+used by its Iroh control service.
 
 The default base URL is `DISCOVERY_INDEX_URL` in `@gyblos/config`
 (`https://discovery.gyblos.com/v1`). It is an operator value; there is no
@@ -141,16 +142,55 @@ payment or free-v2 execution is enabled. See
 
 ## Seller duties
 
-The seller publishing loop is not implemented yet. When it is:
+The seller publisher is opt-in. Set `GYBLOS_DISCOVERY_PUBLISH=1` when starting
+`node:start`; `GYBLOS_DISCOVERY_URL` optionally overrides the configured index.
+Without the opt-in, the node makes no discovery publication requests. URL policy
+is the adapter's policy: HTTPS, or HTTP on loopback only; credentials, query
+strings and fragments are rejected.
 
-- Time checks have zero clock-skew tolerance on both sides. `EXPIRED_RECORD` for
-  a record just signed means the seller clock is wrong: sync it rather than
-  retrying.
-- Publishing a catalog replaces the stored one and clears its presence on the
-  reference index, so publish a presence referencing the new catalog right
-  after; until then the seller is not listed.
-- Every record kind advances the same per-NodeId sequence, so sequences must
-  increase across catalog, presence and withdrawal together.
+The publisher sends a signed catalog before its presence. It checks every ten
+seconds, rotates catalogs before expiry, and backs off failed publication by
+10/20/40/60 seconds (capped at 60 seconds). An uncertain acknowledgement forces
+a fresh, higher-sequence catalog on the next attempt, rather than replaying an
+old write. Requests have an absolute five-second deadline covering headers and
+body. Publication failures are reported as a static degraded health status; they
+do not initiate inference, payment, or a different paid route.
+
+Catalog renewal is bounded by the already observed model-readiness deadline. The
+publisher never probes, warms or loads the engine and never extends that
+observation. Busy or expired readiness retires the current catalog. Becoming
+eligible again requires a higher catalog; it does not revive a withdrawn one.
+The current startup observation eventually expires, so continued operation then
+requires a separately established fresh readiness observation/restart.
+
+Shutdown disables local catalog/quote snapshots first, cancels in-flight
+publication and attempts one higher signed withdrawal while the reference
+catalog is still valid. A failed/unreachable withdrawal is not a guarantee of
+immediate remote removal: signed presence/catalog expiration remains the
+fallback. A signature already started cannot escape after local retirement.
+
+`ROLE_FILES.publicSequence` under the seller home stores the public-v2 sequence
+high-water mark, bound to its NodeId. Catalogs, HTTP presence, Iroh presence and
+withdrawals all reserve from this one allocator **before signing**. State uses
+0600 files, a 0700 seller directory, an exclusive per-update lock, staged atomic
+replacement, file sync and POSIX directory sync. Reservations may be skipped
+when signing or delivery fails, but are never reused by the allocator. Existing
+state is reread on each reservation; malformed/wrong-node state, unsafe paths,
+lock contention, overflow, missing held state or observed rollback fail closed.
+
+Preserve this file across restarts and backup restores. The initial floor uses
+the startup clock for compatibility with earlier timestamp-based catalogs;
+subsequent persisted values remain monotonic even if that clock moves backward.
+A crash during an update may leave a lock: the node never automatically breaks
+it. Operator inspection/repair is required without resetting the high-water
+mark. There is no hardware anti-rollback anchor: deleting/restoring all local
+state across process restarts is not supported recovery, and Windows power-loss
+durability is not established here.
+
+Control quotes remain v2-only observations, without reservations or execution.
+The paid v1 offer and HTTP bridge routes are unchanged. Automatic identity
+registration, public index deployment, off-host/load acceptance and v2 execution
+remain separate work.
 
 ## Running an index (wire contract)
 

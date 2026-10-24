@@ -339,6 +339,9 @@ importers:
       '@gyblos/core':
         specifier: workspace:*
         version: link:../core
+      '@gyblos/discovery-http':
+        specifier: workspace:*
+        version: link:../discovery-http
       '@gyblos/engine-ollama':
         specifier: workspace:*
         version: link:../engine-ollama

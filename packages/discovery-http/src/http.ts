@@ -37,6 +37,10 @@ export function indexUrl(baseUrl: unknown, path: string, query = ''): string {
   return `${base.origin}${base.pathname.replace(/\/+$/, '')}${path}${query}`;
 }
 
+export function validateDiscoveryBaseUrl(value: string) {
+  indexUrl(value, '');
+}
+
 export function timeoutOf(value: unknown): number {
   if (value === undefined) return DISCOVERY_LIMITS.defaultTimeoutMs;
   if (

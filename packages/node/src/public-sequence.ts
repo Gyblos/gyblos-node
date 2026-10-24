@@ -18,7 +18,12 @@ import {
   controlObject,
 } from '@gyblos/protocol/control-validation';
 
-import { NODE_ERROR_CODES, NODE_KEY_BYTES, P2P_ROLES, PUBLIC_SEQUENCE } from './constants.js';
+import {
+  NODE_ERROR_CODES,
+  NODE_KEY_BYTES,
+  P2P_ROLES,
+  PUBLIC_SEQUENCE,
+} from './constants.js';
 import { NodeError } from './errors.js';
 import { assertRoleHome } from './home.js';
 
