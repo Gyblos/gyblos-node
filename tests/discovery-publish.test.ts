@@ -97,6 +97,12 @@ void test('publishRecord maps index rejections and statuses to static codes', as
     [413, {}, DISCOVERY_ERROR_CODES.PAYLOAD_TOO_LARGE],
     [429, {}, DISCOVERY_ERROR_CODES.RATE_LIMITED],
     [
+      403,
+      { error: 'PUBLISH_NOT_ALLOWED' },
+      DISCOVERY_ERROR_CODES.PUBLISH_NOT_ALLOWED,
+    ],
+    [403, 'not json', DISCOVERY_ERROR_CODES.PUBLISH_NOT_ALLOWED],
+    [
       503,
       { error: 'DISCOVERY_UNAVAILABLE' },
       DISCOVERY_ERROR_CODES.UNAVAILABLE,
