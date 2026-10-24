@@ -41,11 +41,15 @@ export interface FetchSellersInput {
   timeoutMs?: number;
   limit?: number;
   cursor?: string;
+  // The caller's persisted high-water sequence for a NodeId (shared by all record kinds), if any.
+  // Entries whose presence sequence is at or below it are dropped as replays.
+  lastSequence?: (nodeId: string) => number | undefined;
 }
 
 export interface FetchSellersResult {
   sellers: DiscoveredSeller[];
-  // Entries the index returned that failed local verification or repeated a NodeId.
+  // Entries the index returned that failed local verification, did not list the model, were at
+  // or below the caller's lastSequence, or lost to a higher-sequence entry for the same NodeId.
   dropped: number;
   next: string | null;
   generatedAt: number;
@@ -75,8 +79,8 @@ function isCursor(value: unknown): value is string {
   );
 }
 
-function checkLimit(value: unknown): number | undefined {
-  if (value === undefined) return undefined;
+function checkLimit(value: unknown): number {
+  if (value === undefined) return DISCOVERY_LIMITS.defaultSellers;
   if (
     typeof value !== 'number' ||
     !Number.isSafeInteger(value) ||
@@ -87,9 +91,9 @@ function checkLimit(value: unknown): number | undefined {
   return value;
 }
 
-function sellersQuery(model: string, limit?: number, cursor?: string) {
+function sellersQuery(model: string, limit: number, cursor?: string) {
   let query = `?model=${encodeURIComponent(model)}`;
-  if (limit !== undefined) query += `&limit=${encodeURIComponent(limit)}`;
+  query += `&limit=${encodeURIComponent(limit)}`;
   if (cursor !== undefined) query += `&cursor=${encodeURIComponent(cursor)}`;
   return query;
 }
@@ -116,12 +120,31 @@ function checkPage(value: unknown, maxSellers: number): SellersPage {
   return { sellers, next, generatedAt };
 }
 
+type LastSequence = (nodeId: string) => number | undefined;
+
+interface VerifyContext {
+  model: string;
+  now: number;
+  lastSequence: LastSequence | undefined;
+}
+
+// Asks the caller for its high-water mark; a malformed answer is a caller bug, not index data.
+function knownSequence(context: VerifyContext, nodeId: string) {
+  const known = context.lastSequence?.(nodeId);
+  if (
+    known !== undefined &&
+    (typeof known !== 'number' || !Number.isSafeInteger(known) || known < 0)
+  )
+    return discoveryFail(DISCOVERY_ERROR_CODES.INVALID_INPUT);
+  return known;
+}
+
 // Returns null for any entry that fails protocol verification; unexpected errors propagate.
 async function verifyEntry(
   entry: unknown,
-  model: string,
-  now: number,
+  context: VerifyContext,
 ): Promise<DiscoveredSeller | null> {
+  const { model, now } = context;
   if (!isPlainObject(entry, ENTRY_KEYS)) return null;
   try {
     const signed = entry.catalog;
@@ -135,9 +158,11 @@ async function verifyEntry(
       !catalog.models.some((listing) => listing.modelId === model)
     )
       return null;
+    // The presence is the entry's highest sequence (it must exceed its catalog's).
     const presence = await verifyPublicV2(entry.presence, {
       ...trust,
       catalog,
+      lastSequence: knownSequence(context, catalog.nodeId),
     });
     if (presence.kind !== PUBLIC_RECORD_KINDS.PRESENCE) return null;
     return { catalog, presence, withdrawal: null };
@@ -147,18 +172,33 @@ async function verifyEntry(
   }
 }
 
-async function verifyPage(page: SellersPage, model: string, now: number) {
+function supersedes(candidate: DiscoveredSeller, held: DiscoveredSeller) {
+  return (
+    candidate.catalog.sequence > held.catalog.sequence ||
+    (candidate.catalog.sequence === held.catalog.sequence &&
+      candidate.presence.sequence > held.presence.sequence)
+  );
+}
+
+// One seller per NodeId: the highest catalog (then presence) sequence wins, in first-seen position.
+async function verifyPage(page: SellersPage, context: VerifyContext) {
   const sellers: DiscoveredSeller[] = [];
-  const seen = new Set<string>();
+  const positions = new Map<string, number>();
   let dropped = 0;
   for (const entry of page.sellers) {
-    const seller = await verifyEntry(entry, model, now);
-    if (!seller || seen.has(seller.catalog.nodeId)) {
+    const seller = await verifyEntry(entry, context);
+    if (!seller) {
       dropped++;
       continue;
     }
-    seen.add(seller.catalog.nodeId);
-    sellers.push(seller);
+    const position = positions.get(seller.catalog.nodeId);
+    if (position === undefined) {
+      positions.set(seller.catalog.nodeId, sellers.length);
+      sellers.push(seller);
+      continue;
+    }
+    dropped++;
+    if (supersedes(seller, sellers[position]!)) sellers[position] = seller;
   }
   return { sellers, dropped, next: page.next, generatedAt: page.generatedAt };
 }
@@ -166,7 +206,13 @@ async function verifyPage(page: SellersPage, model: string, now: number) {
 export async function fetchSellers(
   input: FetchSellersInput,
 ): Promise<FetchSellersResult> {
-  if (!input || typeof input !== 'object' || typeof input.now !== 'function')
+  if (
+    !input ||
+    typeof input !== 'object' ||
+    typeof input.now !== 'function' ||
+    (input.lastSequence !== undefined &&
+      typeof input.lastSequence !== 'function')
+  )
     discoveryFail(DISCOVERY_ERROR_CODES.INVALID_INPUT);
   const model = checkModel(input.model);
   const limit = checkLimit(input.limit);
@@ -197,10 +243,10 @@ export async function fetchSellers(
       DISCOVERY_LIMITS.maxSellersResponseBytes,
       aborted,
     );
-    return checkPage(body, limit ?? DISCOVERY_LIMITS.defaultSellers);
+    return checkPage(body, limit);
   });
   const now = input.now();
   if (!Number.isSafeInteger(now) || now < 0)
     discoveryFail(DISCOVERY_ERROR_CODES.INVALID_INPUT);
-  return verifyPage(page, model, now);
+  return verifyPage(page, { model, now, lastSequence: input.lastSequence });
 }

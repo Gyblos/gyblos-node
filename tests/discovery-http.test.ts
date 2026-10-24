@@ -44,7 +44,10 @@ void test('fetchSellers returns verified sellers shaped for selectSellers', asyn
     now,
   });
   assert.equal(calls.length, 1);
-  assert.equal(calls[0]!.url, `${DISCOVERY_BASE}/sellers?model=qwen3-0.6b`);
+  assert.equal(
+    calls[0]!.url,
+    `${DISCOVERY_BASE}/sellers?model=qwen3-0.6b&limit=50`,
+  );
   assert.equal(calls[0]!.init.method, 'GET');
   assert.equal(calls[0]!.init.redirect, 'error');
   assert.ok(calls[0]!.init.signal instanceof AbortSignal);
@@ -320,7 +323,7 @@ void test('base URLs must be https except loopback, without credentials or query
   assert.equal(calls.length, 3);
   assert.equal(
     calls[0]!.url,
-    'http://127.0.0.1:8787/api/v1/discovery/sellers?model=qwen3-0.6b',
+    'http://127.0.0.1:8787/api/v1/discovery/sellers?model=qwen3-0.6b&limit=50',
   );
 });
 
