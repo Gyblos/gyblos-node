@@ -187,9 +187,20 @@ accepted like custom models, with a warning. Sources checked on 2026-10-24.
 The Qwen3 cards default to thinking on, and the Gemma 4 card states no default.
 The offer default for both is `off`: thinking is not metered yet, and the Ollama
 adapter runs Qwen3 with thinking disabled (GYB-DOC-028 decisions 4 and 5).
+gpt-oss always reasons and has no `off`; its vendor default is `medium`, but the
+offer default is `low` for the same reason (founder decision 2026-10-24).
 Mapping DeepSeek's 1-100 effort and the `low`/`high`/`max` scales of Kimi K3 and
 GLM 5.3 Flash onto the closed set is a later decision, so those entries stay
 `null`.
+
+**Qwen3 30B on Ollama.** Ollama's bare `qwen3:30b-a3b` tag now points at the
+thinking-only `Qwen3-30B-A3B-Thinking-2507` build, which cannot turn thinking
+off. The catalog alias is therefore the hybrid `qwen3:30b-a3b-q4_K_M`, and the
+bare tag is no longer an alias: a file with `model = "qwen3:30b-a3b"` fails with
+`UNKNOWN_MODEL`. Use `model = "qwen3-30b-a3b"` (or the hybrid alias) and set the
+engine's `upstream_model = "qwen3:30b-a3b-q4_K_M"`. The validator does not check
+`upstream_model`, so pointing it at the thinking-only tag would serve a model
+that ignores `off`.
 
 The JSON Schema checks only the closed set; the per-model rule is enforced by
 the validator.
