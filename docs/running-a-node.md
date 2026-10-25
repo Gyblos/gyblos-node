@@ -356,3 +356,29 @@ automatically remove a leftover sequence lock. Catalogs and quotes never outlive
 the seller's current checked readiness observation; publication does not run an
 engine or enable v2 payments. Creating/deploying an index is a separate operator
 action, described in [discovery-index.md](discovery-index.md).
+
+## Free v2 seller execution
+
+A supported `gyblos.toml` free offer starts control plus the separate
+`gyblos/free/2` data channel. It does not start the paid HTTP service or
+facilitator, check a payment program, or write a v1 offer. This is
+complete-response execution for the pinned engine's single user message and
+`off` reasoning; streaming and other engine input forms are not enabled.
+Buyer-proxy wiring is a separate integration; obtaining a quote alone still does
+not send a prompt.
+
+The seller reads daily token caps from the prepared offer: `daily_token_cap`
+applies across all buyers and `per_buyer_cap` per authenticated NodeId, both
+counting input plus output tokens. The buyer cap is best effort: generating a
+new NodeId bypasses that identity's allocation but not the shared offer cap.
+Input plus maximum output is reserved before inference; only a valid recounted
+completion returns unused tokens. Errors/cancellation retain the reservation.
+Caps are in memory and reset on restart, so they do not promise durable daily
+limits. Renewing availability does not reset them.
+
+Quotes are single-use through expiry. Replay state is bounded; startup rejects
+quotes issued at or before its startup timestamp. A trustworthy wall clock is
+required across restarts. Disconnecting or retrying never refunds uncertain work
+or permits reuse of a consumed quote. An engine ignoring cancellation keeps its
+slot occupied until it settles. No fallback is allowed after any prompt bytes
+have been sent. Nothing on this channel authorizes payment.

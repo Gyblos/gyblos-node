@@ -3,7 +3,11 @@
 import { Endpoint } from '@number0/iroh';
 
 import { IPV6_LOOPBACK, LOCALHOST } from '@gyblos/config';
-import { CONTROL_ALPN, GYBLOS_ALPN } from '@gyblos/protocol/constants';
+import {
+  CONTROL_ALPN,
+  FREE_EXECUTION,
+  GYBLOS_ALPN,
+} from '@gyblos/protocol/constants';
 
 import { RELAY_CONFIGURATION_CODES } from './constants.js';
 import {
@@ -18,6 +22,8 @@ export type { RelayEnvironment } from './relays.js';
 export interface BindEndpointOptions {
   relayOnly?: boolean;
   control?: boolean;
+  freeExecution?: boolean;
+  http?: boolean;
   bindAddress?: string;
   externalAddress?: string;
   // Relay origins and token; defaults to the process environment.
@@ -38,9 +44,11 @@ export async function bindEndpoint(
   builder.applyN0();
   builder.secretKey(secret);
   builder.alpns(
-    [GYBLOS_ALPN, ...(options.control ? [CONTROL_ALPN] : [])].map((alpn) => [
-      ...Buffer.from(alpn),
-    ]),
+    [
+      ...(options.http === false ? [] : [GYBLOS_ALPN]),
+      ...(options.control ? [CONTROL_ALPN] : []),
+      ...(options.freeExecution ? [FREE_EXECUTION.alpn] : []),
+    ].map((alpn) => [...Buffer.from(alpn)]),
   );
   if (options.relayOnly) {
     builder.bindAddr(`${LOCALHOST}:0`);

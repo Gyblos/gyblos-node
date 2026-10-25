@@ -7,7 +7,11 @@ import {
   TRANSPORT_LIMITS,
   TRANSPORT_TIMEOUTS,
 } from '@gyblos/config';
-import { CONTROL_ALPN, GYBLOS_ALPN } from '@gyblos/protocol/constants';
+import {
+  CONTROL_ALPN,
+  FREE_EXECUTION,
+  GYBLOS_ALPN,
+} from '@gyblos/protocol/constants';
 
 import { connectionSource, createConnectionAdmission } from './admission.js';
 import {
@@ -20,6 +24,10 @@ import {
   type ControlService,
 } from './control-server.js';
 import { withDeadline } from './deadline.js';
+import {
+  handleFreeExecutionConnection,
+  type FreeExecutionService,
+} from './free-server.js';
 import { handleIrohConnection } from './iroh-connection.js';
 import { createPeerLimiter } from './limiter.js';
 import { loopbackRequest } from './loopback.js';
@@ -35,6 +43,7 @@ export function serveIroh(
   origin: string,
   relayOnly = false,
   control?: ControlService,
+  freeExecution?: FreeExecutionService,
 ) {
   const limiter = createPeerLimiter();
   const admission = createConnectionAdmission();
@@ -153,6 +162,21 @@ export function serveIroh(
               return undefined;
             return limiter.enter(peer);
           },
+          () => closed,
+          () =>
+            !relayOnly || selectedRoute(connection) === TRANSPORT_ROUTES.RELAY,
+        );
+        return;
+      }
+      if (alpn === FREE_EXECUTION.alpn && freeExecution) {
+        await handleFreeExecutionConnection(
+          connection,
+          freeExecution,
+          controller.signal,
+          () =>
+            !relayOnly || selectedRoute(connection) === TRANSPORT_ROUTES.RELAY
+              ? limiter.enter(peer)
+              : undefined,
           () => closed,
           () =>
             !relayOnly || selectedRoute(connection) === TRANSPORT_ROUTES.RELAY,

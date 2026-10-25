@@ -100,3 +100,11 @@ export const SELLER_SELECTION_POLICY = {
 export type SellerSelectionPolicy = {
   readonly [Key in keyof typeof SELLER_SELECTION_POLICY]: number;
 };
+
+// Bounded free execution state for one stable configured offer.
+export const FREE_EXECUTION_ADMISSION = {
+  utcDayMs: 86_400_000,
+  maxReplayEntries: 4096,
+  maxBuyers: 1024,
+  maxConcurrent: 1,
+} as const;

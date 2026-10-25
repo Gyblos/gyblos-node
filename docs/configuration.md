@@ -150,8 +150,8 @@ range (`UNSUPPORTED_VERSION` or `INVALID_CAP`), however many digits it has.
       per-buyer cap not above the daily cap.
 
 At seller startup an offer becomes the node's public v2 listing (see
-[Seller startup](#seller-startup)). Free offers are refused at startup until
-free execution lands; then their caps go to the free execution handler, which
+[Seller startup](#seller-startup)). Free offers use the isolated non-streaming
+free execution channel; their caps go to the free execution handler, which
 enforces them.
 
 ### Price unit
@@ -228,7 +228,7 @@ this daemon. Today it honors:
 | `[discovery]` `publish`, `url`                                                                                                                        | yes                                                                                                                       |
 | `[[offers]]`: at most one, for `qwen3-0.6b` (or `qwen3:0.6b`), engine `ollama` at `http://127.0.0.1:11436` without `api_key_env`, reasoning `["off"]` | yes                                                                                                                       |
 | `price = {...}` on that offer                                                                                                                         | only `input_per_mtok = "1"`, `output_per_mtok = "2"`: paid execution is still the v1 proof of concept at those rates      |
-| `free = {...}` on that offer                                                                                                                          | refused until free execution lands, so no node lists free capacity it cannot serve                                        |
+| `free = {...}` on that offer                                                                                                                          | served over the separate free v2 channel with daily total and per-buyer token caps                                        |
 | `[node]` `data_dir`, `rpc_url`, `payout_wallet`                                                                                                       | not yet: the role files own them, so setting them in the file stops startup (`GYBLOS_HOME` overriding `data_dir` is fine) |
 | `[buyer]`                                                                                                                                             | ignored by the seller                                                                                                     |
 
@@ -236,10 +236,12 @@ Startup stops with a static code: `NODE_CONFIG_INVALID`,
 `SELLER_SETTING_UNSUPPORTED`, `SELLER_OFFER_COUNT_UNSUPPORTED`,
 `SELLER_OFFER_MODEL_UNSUPPORTED`, `SELLER_OFFER_ENGINE_UNSUPPORTED`,
 `SELLER_OFFER_REASONING_UNSUPPORTED`, `SELLER_OFFER_PRICE_UNSUPPORTED` or
-`SELLER_FREE_EXECUTION_UNAVAILABLE`.
-`pnpm gyblos config validate --config "$GYBLOS_CONFIG"` explains file problems
-(it does not read `GYBLOS_CONFIG`, does not check the `SELLER_*` limits above,
-and also checks `GYBLOS_RPC_URL`, which the daemon ignores).
+`SELLER_FREE_EXECUTION_UNAVAILABLE` remains the default guard for callers that
+do not explicitly compose the free handler. The seller daemon opts in only with
+that handler present. `pnpm gyblos config validate --config "$GYBLOS_CONFIG"`
+explains file problems (it does not read `GYBLOS_CONFIG`, does not check the
+`SELLER_*` limits above, and also checks `GYBLOS_RPC_URL`, which the daemon
+ignores).
 
 Most invalid environment values are now caught when settings load, before Ollama
 starts, and report `NODE_CONFIG_INVALID`. Before, they failed later with other
