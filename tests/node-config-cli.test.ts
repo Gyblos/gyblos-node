@@ -147,6 +147,27 @@ void test('an env name that looks like a pasted token is refused, never listed a
   );
 });
 
+void test('validate warns about unverified reasoning levels by code and path and still exits 0', async () => {
+  await withFile(
+    BASE + offer({ model: 'acme/chat-large', extra: 'custom = true' }),
+    async (path) => {
+      const result = await run(['config', 'validate', '--config', path]);
+      assert.equal(result.code, 0, result.output);
+      assert.match(
+        result.stderr,
+        /warning {2}REASONING_UNVERIFIED\s+offers\[0\]\.reasoning/,
+      );
+      assert.match(result.stdout, /reasoning off;/);
+    },
+  );
+  await withFile(BASE + offer({}), async (path) => {
+    const result = await run(['config', 'validate', '--config', path]);
+    assert.equal(result.code, 0, result.output);
+    assert.equal(result.stderr, '');
+    assert.match(result.stdout, /reasoning low;/);
+  });
+});
+
 void test('validate exits 1 and lists codes with paths for every invalid fixture, without values', async () => {
   for (const fixture of INVALID_FIXTURES)
     await withFile(fixture.toml, async (path) => {

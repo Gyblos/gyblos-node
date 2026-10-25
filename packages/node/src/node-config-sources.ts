@@ -17,7 +17,6 @@ import {
   NODE_ERROR_CODES,
   NODE_NETWORKS,
   type NodeConfigSource,
-  type NodeConfigWarningCode,
   type NodeSettingKey,
 } from './constants.js';
 import { NodeError } from './errors.js';
@@ -26,6 +25,7 @@ import {
   IssueList,
   type ConfigPath,
   type NodeConfigIssue,
+  type NodeConfigWarning,
 } from './node-config-fields.js';
 import { readRelayUrl } from './node-config-values.js';
 import type { NodeConfig, NodeOffer } from './node-config.js';
@@ -72,10 +72,7 @@ export interface SecretReference {
   present: boolean;
 }
 
-export interface NodeConfigWarning {
-  code: NodeConfigWarningCode;
-  path: string;
-}
+export type { NodeConfigWarning } from './node-config-fields.js';
 
 export type ResolvedNodeConfig =
   | {

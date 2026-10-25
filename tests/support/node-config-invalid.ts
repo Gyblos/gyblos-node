@@ -263,9 +263,19 @@ export const INVALID_FIXTURES: readonly InvalidConfigFixture[] = [
   },
   {
     name: 'repeated reasoning level',
-    toml: BASE + offer({ extra: 'reasoning = ["off", "off"]' }),
+    toml:
+      BASE +
+      offer({ model: 'qwen3-0.6b', extra: 'reasoning = ["off", "off"]' }),
     code: 'DUPLICATE_VALUE',
     path: 'offers[0].reasoning[1]',
+  },
+  {
+    name: 'reasoning level the catalog model does not support',
+    toml: BASE + offer({ extra: 'reasoning = ["off"]' }),
+    code: 'REASONING_UNSUPPORTED',
+    path: 'offers[0].reasoning[0]',
+    // Per-model level sets are a documented validator-only rule; the schema checks the closed set only.
+    schemaAccepts: true,
   },
   {
     name: 'empty reasoning list',

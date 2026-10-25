@@ -49,6 +49,14 @@ void test('every example in examples/ is a valid gyblos.toml', () => {
   for (const example of examples) {
     const result = parseNodeConfig(example.toml);
     assert.deepEqual(result.ok ? [] : result.issues, [], example.name);
+    // Only the custom-model example warns that its reasoning levels are unverified.
+    assert.deepEqual(
+      result.ok ? result.warnings.map((warning) => warning.code) : [],
+      example.name === 'anthropic-reseller.toml'
+        ? ['REASONING_UNVERIFIED']
+        : [],
+      example.name,
+    );
   }
 });
 
@@ -171,13 +179,13 @@ void test('the typed config maps snake_case keys, resolves aliases and applies o
       '[transport]',
       'relay_only = true',
       offer({
-        model: 'qwen3:30b-a3b',
+        model: 'qwen3:30b-a3b-q4_K_M',
         engine:
           '{ kind = "openai", url = "http://host.docker.internal:1234/v1", api_key_env = "LM_KEY", upstream_model = "qwen/qwen3-30b-a3b" }',
       }),
       offer({
         model: 'qwen3-0.6b',
-        extra: 'reasoning = ["off", "low"]',
+        extra: 'reasoning = ["off", "high"]',
         pricing: 'free = { daily_token_cap = 200000, per_buyer_cap = 5000 }',
       }),
     ].join('\n'),
@@ -196,7 +204,7 @@ void test('the typed config maps snake_case keys, resolves aliases and applies o
         model: {
           kind: 'catalog',
           id: 'qwen3-30b-a3b',
-          requested: 'qwen3:30b-a3b',
+          requested: 'qwen3:30b-a3b-q4_K_M',
         },
         engine: {
           kind: 'openai',
@@ -215,7 +223,7 @@ void test('the typed config maps snake_case keys, resolves aliases and applies o
       {
         model: { kind: 'catalog', id: 'qwen3-0.6b', requested: 'qwen3-0.6b' },
         engine: { kind: 'ollama', url: 'http://127.0.0.1:11434' },
-        reasoning: ['off', 'low'],
+        reasoning: ['off', 'high'],
         pricing: { kind: 'free', dailyTokenCap: 200000, perBuyerCap: 5000 },
       },
     ],
