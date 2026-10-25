@@ -148,6 +148,7 @@ void test('free stream deadline suppresses late engine response and retains its 
   );
   await started;
   await stopped;
+  await new Promise<void>((resolve) => setImmediate(resolve));
   assert.equal(state.releases(), 0);
   settle!();
   await running;
@@ -179,6 +180,7 @@ void test('free stream ingress timeout retains a stuck read slot until actual re
     { ingressMs: 10, requestMs: 100 },
   );
   await stopped;
+  await new Promise<void>((resolve) => setImmediate(resolve));
   assert.equal(state.releases(), 0);
   settle!([0, 0, 0, 0]);
   await running;
