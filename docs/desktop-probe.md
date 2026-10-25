@@ -25,13 +25,19 @@ configuration or remote network is used by this UI.
 
 ## Protected local wallet
 
-On normal first launch, the main process creates one Ed25519 wallet under
-`app.getPath('appData')/gyblos-wallet/wallet-v1`. It stores only OS-encrypted
-private material on disk. Chat/Connect receive only the public address and
-status; there is no signing, export, import or funding API. Backup verification
-and funding remain unconditionally disabled. Do not fund this experimental
-wallet: portable backup/recovery is not implemented, and external transfers to
-an address cannot be blocked by the app. No balance is queried.
+On first launch without an existing wallet, the startup window offers Create
+wallet or Restore backup before any key is generated. Restoration recovers the
+same address for confirmation; existing complete or partial wallet state is
+loaded without replacement. See
+[portable backup and recovery](desktop-backup.md) for the flow and its limits.
+
+The main process stores one Ed25519 wallet under
+`app.getPath('appData')/gyblos-wallet/wallet-v1`, with only OS-encrypted private
+material on disk. Chat/Connect receive only the public address and status;
+private material stays in the host process. Funding remains unconditionally
+disabled, including after backup verification or restoration. Do not fund this
+experimental wallet: external transfers to an address cannot be blocked by the
+app. No balance is queried.
 
 | Platform | Protection and limits                                                                                                                                                                       |
 | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
