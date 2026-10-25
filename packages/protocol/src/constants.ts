@@ -198,3 +198,41 @@ export const MODEL_IDENTITIES = {
   DIGEST: 'digest',
   NAME_ONLY: 'name-only',
 } as const;
+
+// Free execution is a separate data channel; control and reserved HTTP v2 keep their wire contracts.
+export const FREE_EXECUTION = {
+  alpn: 'gyblos/free/2',
+  version: 2,
+  requestDomain: 'gyblos/free-execution-request/v2\n',
+  requestBytes: 131072,
+  responseBytes: 1048576,
+  inputBytes: 65536,
+  outputBytes: 262144,
+  maxMessages: 64,
+} as const;
+export const FREE_CHAT_ROLES = {
+  SYSTEM: 'system',
+  USER: 'user',
+  ASSISTANT: 'assistant',
+} as const;
+export type FreeChatRole = (typeof FREE_CHAT_ROLES)[keyof typeof FREE_CHAT_ROLES];
+export const FREE_EXECUTION_CODES = {
+  INVALID: 'INVALID_FREE_EXECUTION',
+  VERSION: 'UNSUPPORTED_FREE_EXECUTION_VERSION',
+  LIMIT: 'FREE_EXECUTION_LIMIT_EXCEEDED',
+  BINDING: 'FREE_EXECUTION_BINDING_MISMATCH',
+  SIGNATURE: 'INVALID_FREE_EXECUTION_SIGNATURE',
+  EXPIRED: 'EXPIRED_FREE_EXECUTION_QUOTE',
+  PEER: 'FREE_EXECUTION_PEER_MISMATCH',
+  REPLAY: 'FREE_EXECUTION_REPLAY',
+  NOT_FREE: 'FREE_EXECUTION_NOT_FREE',
+  DAILY_CAP: 'FREE_EXECUTION_DAILY_CAP_EXHAUSTED',
+  BUYER_CAP: 'FREE_EXECUTION_BUYER_CAP_EXHAUSTED',
+  UNSUPPORTED: 'FREE_EXECUTION_UNSUPPORTED',
+  BUSY: 'FREE_EXECUTION_BUSY',
+  ENGINE: 'FREE_EXECUTION_ENGINE_UNAVAILABLE',
+  TIMEOUT: 'FREE_EXECUTION_TIMEOUT',
+  CANCELLED: 'FREE_EXECUTION_CANCELLED',
+  INTERNAL: 'FREE_EXECUTION_INTERNAL_ERROR',
+} as const;
+export type FreeExecutionCode = (typeof FREE_EXECUTION_CODES)[keyof typeof FREE_EXECUTION_CODES];
