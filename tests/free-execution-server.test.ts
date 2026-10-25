@@ -182,8 +182,26 @@ void test('free stream ingress timeout retains a stuck read slot until actual re
   await stopped;
   await new Promise<void>((resolve) => setImmediate(resolve));
   assert.equal(state.releases(), 0);
-  settle!([0, 0, 0, 0]);
+  settle!([0, 0, 0, 10]);
   await running;
   assert.equal(state.writes(), 0);
+  assert.equal(state.releases(), 1);
+});
+
+void test('free stream does not finish a response after a timed-out native write settles', async () => {
+  const state = await fixture();
+  let settle: (() => void) | undefined;
+  let finishes = 0;
+  state.stream.send.writeAll = () => new Promise<void>((resolve) => { settle = resolve; });
+  state.stream.send.finish = async () => { finishes++; };
+  let closed: (() => void) | undefined;
+  const stopped = new Promise<void>((resolve) => { closed = resolve; });
+  const running = serveFreeExecutionStream(state.stream, state.service, 'peer', () => { state.close(); closed!(); }, new AbortController().signal, state.enter, () => true, { egressMs: 10 });
+  await stopped;
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  assert.equal(state.releases(), 0);
+  settle!();
+  await running;
+  assert.equal(finishes, 0);
   assert.equal(state.releases(), 1);
 });
