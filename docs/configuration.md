@@ -150,9 +150,9 @@ range (`UNSUPPORTED_VERSION` or `INVALID_CAP`), however many digits it has.
       per-buyer cap not above the daily cap.
 
 At seller startup an offer becomes the node's public v2 listing (see
-[Seller startup](#seller-startup)). Free caps are carried to the seller for the
-free execution handler, which enforces them; until that lands, nothing executes
-free requests.
+[Seller startup](#seller-startup)). Free offers are refused at startup until
+free execution lands; then their caps go to the free execution handler, which
+enforces them.
 
 ### Price unit
 
@@ -238,16 +238,18 @@ Startup stops with a static code: `NODE_CONFIG_INVALID`,
 `SELLER_OFFER_REASONING_UNSUPPORTED`, `SELLER_OFFER_PRICE_UNSUPPORTED` or
 `SELLER_FREE_EXECUTION_UNAVAILABLE`.
 `pnpm gyblos config validate --config "$GYBLOS_CONFIG"` explains file problems
-(it does not read `GYBLOS_CONFIG` and does not check the `SELLER_*` limits
-above).
+(it does not read `GYBLOS_CONFIG`, does not check the `SELLER_*` limits above,
+and also checks `GYBLOS_RPC_URL`, which the daemon ignores).
 
-Invalid environment values are now caught when settings load, before Ollama
-starts, and all report `NODE_CONFIG_INVALID`. Before, they failed later with
-other codes: an invalid `GYBLOS_RELAYS` or `GYBLOS_RELAY_ONLY=1` with
+Most invalid environment values are now caught when settings load, before Ollama
+starts, and report `NODE_CONFIG_INVALID`. Before, they failed later with other
+codes: an invalid `GYBLOS_RELAYS` or `GYBLOS_RELAY_ONLY=1` with
 `GYBLOS_IROH_EXTERNAL_ADDR` failed when binding the endpoint, and an invalid
-`GYBLOS_DISCOVERY_PUBLISH` (such as `yes`) with `INVALID_ROLE_CONFIGURATION`.
-`GYBLOS_RPC_URL` does not affect the daemon, which reads its RPC from the role
-file.
+`GYBLOS_DISCOVERY_PUBLISH` (such as `yes`), or an invalid `GYBLOS_DISCOVERY_URL`
+while publishing, with `INVALID_ROLE_CONFIGURATION`. Malformed
+`GYBLOS_IROH_BIND` or `GYBLOS_IROH_EXTERNAL_ADDR` socket addresses still fail
+when binding, as before. `GYBLOS_RPC_URL` does not affect the daemon, which
+reads its RPC from the role file.
 
 ## Issue codes
 
