@@ -62,7 +62,7 @@ None of these needs a funded wallet, engine or Docker. `gate:*`, funding, identi
 - Small coherent commits; never rewrite pushed commits without authorization.
 - Every substantive PR gets three independent read-only reviews (structure, behavior equivalence, security), each in its own worktree; one writer fixes confirmed findings and re-runs the gates.
 - PRs are merged with merge commits, never squash (GYB-DOC-024, amended 2026-10-23).
-- Opening a PR or green CI never authorizes a merge; merge only on explicit founder approval for that PR. CI (`.github/workflows/ci.yml`) runs the offline checks on every PR and push to `main`.
+- Opening a PR or green CI never authorizes a merge; merge only on explicit founder approval for that PR. CI (`.github/workflows/ci.yml`) runs the offline checks on every PR and push to `main`. It runs on Linux only; the macOS/Windows wallet and backup-exchange jobs are manual (`desktop-platforms.yml`), so run them before desktop distribution or after wallet/backup/restore changes.
 - Procedures and reviewer templates: `.claude/skills/gyblos-pr-workflow/SKILL.md`.
 
 ## Worktrees

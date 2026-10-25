@@ -1,0 +1,75 @@
+# Cross-platform desktop wallet contracts, build and portable backup exchange on
+# Linux, Windows and macOS. Manual only (Actions > Desktop platforms > Run workflow):
+# macOS and Windows runners bill 10x and 2x the minutes. Run it before any desktop
+# distribution and after changes to the wallet, backup or restore code.
+# No secrets, funded wallets, engines, devnet RPC or deployment.
+name: Desktop platforms
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-platforms-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  wallet:
+    name: Wallet contracts (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Disposable keys and fake OS encryption only, not native keystore proof.
+      - run: pnpm exec tsx --test tests/desktop-wallet.test.ts tests/desktop-wallet-lifecycle.test.ts tests/desktop-wallet-protection.test.ts tests/desktop-startup.test.ts tests/desktop-startup-window.test.ts tests/desktop-session-cleanup.test.ts
+      - run: pnpm exec tsx --test tests/desktop-wallet-backup.test.ts tests/desktop-backup-recovery.test.ts tests/desktop-backup-flow.test.ts tests/desktop-wallet-restore.test.ts tests/desktop-wallet-restore-files.test.ts
+      - run: pnpm desktop:build
+      # Only encrypted generated-key fixtures and public expected addresses.
+      - run: pnpm exec tsx tooling/desktop-backup-exchange.ts produce .local/portable-exchange
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: portable-backup-${{ matrix.os }}
+          path: |
+            .local/portable-exchange/backup.json
+            .local/portable-exchange/public.json
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 1
+  backup-exchange:
+    name: Backup exchange (${{ matrix.os }})
+    needs: wallet
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: portable-backup-*
+          path: .local/portable-exchange
+      - run: pnpm exec tsx tooling/desktop-backup-exchange.ts consume .local/portable-exchange
