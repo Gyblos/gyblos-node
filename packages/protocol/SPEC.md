@@ -462,10 +462,13 @@ Concurrent admission must atomically reserve a conservative input-token count
 plus the output maximum against both caps before generation; reconcile actual
 usage only when trustworthy and retain a conservative debit for uncertain work.
 Insufficient cap rejects without generation. Midnight rollover must not erase
-reservations held by running requests. Caps and replay state may be in memory
-for the MVP: restarting resets them and can permit extra free work and replay
-of an otherwise still-live quote. This limitation must be disclosed in seller
-wiring; counters are neither a durable daily guarantee nor Sybil resistance.
+reservations held by running requests. Caps may be in memory for the MVP: restarting resets them and can permit
+extra free work. Replay must still remain single-use through expiry across
+restart: persist consumed identifiers, or reject every quote issued at or
+before a new startup barrier (including the same clock tick) and issue only
+newer quotes. An in-memory replay table alone is insufficient. The caps reset
+limitation must be disclosed in seller wiring; counters are neither a durable
+daily guarantee nor Sybil resistance.
 No handler path may call payments, the facilitator or v1, including failures.
 
 ### Compatibility and rollout
