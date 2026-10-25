@@ -1,6 +1,11 @@
-// Validates gyblos.toml [[offers]]: catalog or flagged custom model, engine by URL, reasoning levels and
-// either a USDC price (normalized to its canonical decimal) or a capped free offer. Values are checked, never echoed.
-import { PublicRecordError, resolveModel } from '@gyblos/protocol';
+// Validates gyblos.toml [[offers]]: catalog or flagged custom model, engine by URL, reasoning levels the
+// model supports (catalog levels, GYB-DOC-028) and either a USDC price (normalized to its canonical
+// decimal) or a capped free offer. Values are checked, never echoed.
+import {
+  PublicRecordError,
+  resolveModel,
+  type ReasoningSupport,
+} from '@gyblos/protocol';
 import {
   MODEL_CLASSIFICATIONS,
   REASONING_LEVELS,
@@ -12,6 +17,7 @@ import {
   ENGINE_KINDS,
   NODE_CONFIG_ISSUE_CODES,
   NODE_CONFIG_LIMITS,
+  NODE_CONFIG_WARNING_CODES,
   OFFER_CURRENCIES,
   OFFER_PRICING_KINDS,
   type EngineKind,
@@ -76,15 +82,23 @@ const OFFER_KEYS = ['model', 'custom', 'engine', 'reasoning', 'price', 'free'];
 const ENGINE_KEYS = ['kind', 'url', 'api_key_env', 'upstream_model'];
 const PRICE_KEYS = ['input_per_mtok', 'output_per_mtok', 'currency'];
 const FREE_KEYS = ['daily_token_cap', 'per_buyer_cap'];
-// Only `off` is implemented today (GYB-DOC-028), so it is the default.
-const DEFAULT_REASONING: readonly ReasoningLevel[] = [REASONING_LEVELS.OFF];
+// Default for models without verified catalog levels; verified models default to their catalog level.
+const UNVERIFIED_DEFAULT_REASONING: readonly ReasoningLevel[] = [
+  REASONING_LEVELS.OFF,
+];
 const ZERO = '0';
+
+interface ResolvedOfferModel {
+  model: OfferModel;
+  // Null for a custom model or a catalog model whose levels are not verified.
+  reasoning: Readonly<ReasoningSupport> | null;
+}
 
 function offerModel(
   entry: ConfigTable,
   path: ConfigPath,
   issues: IssueList,
-): OfferModel | undefined {
+): ResolvedOfferModel | undefined {
   const custom = optional(entry, 'custom', path, (value, at) =>
     flag(value, at, issues),
   );
@@ -108,14 +122,24 @@ function offerModel(
         ...path,
         'custom',
       ]);
-    return { kind: resolution.kind, id: resolution.model.id, requested: name };
+    return {
+      model: {
+        kind: resolution.kind,
+        id: resolution.model.id,
+        requested: name,
+      },
+      reasoning: resolution.model.reasoning,
+    };
   }
   if (custom !== true)
     return issues.add(NODE_CONFIG_ISSUE_CODES.UNKNOWN_MODEL, [
       ...path,
       'model',
     ]);
-  return { kind: resolution.kind, id: resolution.modelId };
+  return {
+    model: { kind: resolution.kind, id: resolution.modelId },
+    reasoning: null,
+  };
 }
 
 function offerEngine(
@@ -144,8 +168,39 @@ function offerEngine(
   return withoutUndefined({ kind, url, apiKeyEnv, upstreamModel });
 }
 
-function offerReasoning(value: unknown, path: ConfigPath, issues: IssueList) {
-  if (value === undefined) return [...DEFAULT_REASONING];
+// Reads the listed levels, then checks them against the model's catalog levels; without verified levels
+// any distinct non-empty subset is accepted and the operator is warned.
+function offerReasoning(
+  value: unknown,
+  path: ConfigPath,
+  issues: IssueList,
+  support: Readonly<ReasoningSupport> | null,
+) {
+  const levels = listedReasoning(value, path, issues);
+  if (levels === undefined) return undefined;
+  if (support === null) {
+    issues.warn(NODE_CONFIG_WARNING_CODES.REASONING_UNVERIFIED, path);
+    return levels ?? [...UNVERIFIED_DEFAULT_REASONING];
+  }
+  if (levels === null) return [support.defaultReasoning];
+  const mark = issues.mark();
+  levels.forEach((level, index) => {
+    if (!support.levels.includes(level))
+      issues.add(NODE_CONFIG_ISSUE_CODES.REASONING_UNSUPPORTED, [
+        ...path,
+        index,
+      ]);
+  });
+  return issues.cleanSince(mark) ? levels : undefined;
+}
+
+// Null when the key is absent; undefined after an issue.
+function listedReasoning(
+  value: unknown,
+  path: ConfigPath,
+  issues: IssueList,
+): ReasoningLevel[] | null | undefined {
+  if (value === undefined) return null;
   if (!Array.isArray(value))
     return issues.add(NODE_CONFIG_ISSUE_CODES.WRONG_TYPE, path);
   if (!value.length)
@@ -283,19 +338,23 @@ function readOffer(
 ): NodeOffer | undefined {
   const entry = table(value, path, issues);
   if (!entry) return undefined;
-  const model = offerModel(entry, path, issues);
+  const resolved = offerModel(entry, path, issues);
   const engine = requiredField(entry, 'engine', path, issues, (item, at) =>
     offerEngine(item, at, issues),
   );
-  const reasoning = offerReasoning(
-    entry.reasoning,
-    [...path, 'reasoning'],
-    issues,
-  );
+  // Levels are only checked once the model is known; a bad model already raised its own issue.
+  const reasoning = resolved
+    ? offerReasoning(
+        entry.reasoning,
+        [...path, 'reasoning'],
+        issues,
+        resolved.reasoning,
+      )
+    : listedReasoning(entry.reasoning, [...path, 'reasoning'], issues);
   const pricing = offerPricing(entry, path, issues);
   unknownKeys(entry, path, OFFER_KEYS, issues);
-  if (!model || !engine || !reasoning || !pricing) return undefined;
-  return { model, engine, reasoning, pricing };
+  if (!resolved || !engine || !reasoning || !pricing) return undefined;
+  return { model: resolved.model, engine, reasoning, pricing };
 }
 
 // Reads the offers array; a model may be offered once per node (aliases count as the same model).
