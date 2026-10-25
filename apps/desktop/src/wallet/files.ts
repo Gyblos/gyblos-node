@@ -40,6 +40,10 @@ function privateMetadata(metadata: Stats, directory: boolean) {
     throw new Error('Invalid wallet storage permissions.');
 }
 
+export async function checkWalletRoot(root: string) {
+  privateMetadata(await lstat(root), true);
+}
+
 export async function ensureWalletRoot(root: string) {
   try {
     await mkdir(root, { mode: WALLET.PRIVATE_DIRECTORY });

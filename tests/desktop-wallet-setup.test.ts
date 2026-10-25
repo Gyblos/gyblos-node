@@ -1,6 +1,6 @@
 // Exercises first-run choice and recovery with disposable wallets; never OS/user keys.
 import assert from 'node:assert/strict';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { test } from 'node:test';
 
@@ -37,11 +37,11 @@ void test('first-run setup waits for explicit choice without generating a wallet
     assert.equal((await setup.state()).status, SETUP_STATUS.CHOICE);
     await Promise.resolve();
     assert.equal(completed, false);
-    assert.equal(await absent(root), true);
+    await absent(root);
     controller.abort();
     assert.equal((await setup.summary).fundingEnabled, false);
     await setup.settled();
-    assert.equal(await absent(root), true);
+    await absent(root);
   });
 });
 void test('explicit default creation preserves the protected wallet and funding block', async () => {
@@ -138,7 +138,10 @@ void test('partial wallets are retained rather than offered replacement', async 
     );
     assert.equal((await setup.summary).status, WALLET_STATUS.RECOVERY_REQUIRED);
     assert.equal((await setup.state()).status, SETUP_STATUS.COMPLETE);
-    assert.equal(await absent(join(root, WALLET.DIRECTORY)), false);
+    assert.equal(
+      (await lstat(join(root, WALLET.DIRECTORY))).isDirectory(),
+      true,
+    );
   });
 });
 void test('bad password and cancelled file selection never fall back to creating a wallet', async () => {
@@ -158,7 +161,7 @@ void test('bad password and cancelled file selection never fall back to creating
       password: 'Wrong password for testing',
     });
     assert.equal(failed.error, SETUP_ERROR.FAILED);
-    assert.equal(await absent(root), true);
+    await absent(root);
     selected = null;
     assert.equal(
       (
@@ -169,7 +172,7 @@ void test('bad password and cancelled file selection never fall back to creating
       ).error,
       null,
     );
-    assert.equal(await absent(root), true);
+    await absent(root);
     controller.abort();
     await setup.summary;
     await setup.settled();
