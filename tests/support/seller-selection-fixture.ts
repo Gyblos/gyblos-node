@@ -13,9 +13,9 @@ import {
   CONTROL_RECORD_VERSION,
   DATA_RETENTION,
   PUBLIC_PRESENCE_STATE,
-  PUBLIC_PRICE_UNIT,
   PUBLIC_RECORD_KINDS,
   REASONING_LEVELS,
+  V2_PRICING,
   type ReasoningLevel,
 } from '@gyblos/protocol/constants';
 
@@ -70,9 +70,9 @@ export function seller(
         pricing: {
           network: NETWORK,
           asset: ASSET,
-          unit: PUBLIC_PRICE_UNIT,
-          inputAtomic: options.input ?? '1',
-          outputAtomic: options.output ?? '2',
+          unit: V2_PRICING.unit,
+          inputAtomicPerMtok: options.input ?? '1',
+          outputAtomicPerMtok: options.output ?? '2',
         },
         reasoning: options.reasoning ?? [OFF, HIGH],
       },
@@ -115,7 +115,7 @@ export function request(overrides: Partial<SellerRequest> = {}): SellerRequest {
     network: NETWORK,
     asset: ASSET,
     maxTokens: 100,
-    priceCeilings: { inputAtomic: '100', outputAtomic: '100' },
+    priceCeilings: { inputAtomicPerMtok: '100', outputAtomicPerMtok: '100' },
     maxAtomic: '1000',
     minimumBadge: SELLER_BADGES.DECLARED_USAGE,
     retention: [DATA_RETENTION.NONE],

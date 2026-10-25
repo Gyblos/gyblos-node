@@ -46,7 +46,9 @@ interface Vector {
 void test('control v2 golden bytes, request digest and frame match an independent oracle', async () => {
   const vector: Vector = JSON.parse(
     await readFile(
-      new URL(import.meta.resolve('@gyblos/protocol/vectors/control-v2.json')),
+      new URL(
+        import.meta.resolve('@gyblos/protocol/vectors/control-v2-mtok.json'),
+      ),
       'utf8',
     ),
   );
@@ -71,7 +73,9 @@ void test('control v2 golden bytes, request digest and frame match an independen
 void test('control v2 public family and owner offer signatures verify with WebCrypto and OpenSSL', async () => {
   const vector: Vector = JSON.parse(
     await readFile(
-      new URL(import.meta.resolve('@gyblos/protocol/vectors/control-v2.json')),
+      new URL(
+        import.meta.resolve('@gyblos/protocol/vectors/control-v2-mtok.json'),
+      ),
       'utf8',
     ),
   );
@@ -152,7 +156,9 @@ void test('control v2 public family and owner offer signatures verify with WebCr
 void test('control response parsing rejects offer signatures that are not canonical 64-byte Base64', async () => {
   const vector: Vector = JSON.parse(
     await readFile(
-      new URL(import.meta.resolve('@gyblos/protocol/vectors/control-v2.json')),
+      new URL(
+        import.meta.resolve('@gyblos/protocol/vectors/control-v2-mtok.json'),
+      ),
       'utf8',
     ),
   );
@@ -178,7 +184,9 @@ void test('control response parsing rejects offer signatures that are not canoni
 void test('control verification maps Web Crypto key import failures to the typed signature code', async (context) => {
   const vector: Vector = JSON.parse(
     await readFile(
-      new URL(import.meta.resolve('@gyblos/protocol/vectors/control-v2.json')),
+      new URL(
+        import.meta.resolve('@gyblos/protocol/vectors/control-v2-mtok.json'),
+      ),
       'utf8',
     ),
   );
@@ -201,5 +209,27 @@ void test('control verification maps Web Crypto key import failures to the typed
       now: catalog.issuedAt,
     }),
     { code: CONTROL_CODES.SIGNATURE },
+  );
+});
+
+void test('historical per-token v2 vectors are rejected without reinterpreting their signed prices', async () => {
+  const vector: Vector = JSON.parse(
+    await readFile(
+      new URL(import.meta.resolve('@gyblos/protocol/vectors/control-v2.json')),
+      'utf8',
+    ),
+  );
+  assert.throws(() => parsePublicV2(vector.records[0]!.record), {
+    code: CONTROL_CODES.INVALID,
+  });
+  await assert.rejects(controlRequestDigest(vector.request), {
+    code: CONTROL_CODES.INVALID,
+  });
+  await assert.rejects(
+    verifyOfferV2(vector.signedOffer, {
+      ...vector.signedOffer.offer,
+      now: vector.signedOffer.offer.issuedAt,
+    }),
+    { code: CONTROL_CODES.INVALID },
   );
 });

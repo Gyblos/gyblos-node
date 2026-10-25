@@ -25,6 +25,12 @@ import { NATIVE_CAPABILITY } from './support/native-runtime.js';
 
 async function fixture(queryMs = 1000) {
   const source = await controlFixture();
+  source.catalog.models[0]!.pricing.inputAtomicPerMtok = '1000000';
+  source.catalog.models[0]!.pricing.outputAtomicPerMtok = '2000000';
+  source.request.params.priceCeilings = {
+    inputAtomicPerMtok: '3000000',
+    outputAtomicPerMtok: '3000000',
+  };
   const seller = await endpoint();
   seller.setAlpns(
     [GYBLOS_ALPN, CONTROL_ALPN].map((alpn) => [...Buffer.from(alpn)]),
@@ -295,6 +301,7 @@ void test(
         ...quote.offer,
         schemaVersion: 1,
         protocol: GYBLOS_ALPN,
+        prices: { inputAtomic: '1', outputAtomic: '2' },
       };
       let fetches = 0;
       const guard = runtimeProxySelection(

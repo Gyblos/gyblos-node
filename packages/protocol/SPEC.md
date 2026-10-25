@@ -231,6 +231,40 @@ zero clock-skew tolerance (`issuedAt > now` is rejected), as in v1. The runtime
 retains zero: operators must synchronize clocks. A tolerance would widen quote
 acceptance and needs separate policy review; no expiry grace is applied.
 
+V2 prices are **atomic asset units per million tokens**, with the explicit
+`inputAtomicPerMtok` and `outputAtomicPerMtok` fields in public listing pricing,
+private offer prices and request price ceilings. Public pricing has
+`unit: "million-tokens"`; v1 retains its `"token"` unit and `inputAtomic` /
+`outputAtomic` keys. The previous per-token v2 shapes and mixed representations
+are rejected, never guessed from values or converted after signature verification.
+This is an intentional update of the not-yet-paid v2 family; v1 wire bytes,
+APIs, signing domains and vectors remain unchanged. Existing v2 records must be
+reissued with the explicit fields and fresh signatures/digests. Rollout must not
+reuse old retained catalogs as if their prices had the new unit; normal sequence,
+cache and withdrawal rules remain in force.
+
+For complete usage, `@gyblos/core/pricing-v2` computes exactly
+`ceil((inputTokens * inputAtomicPerMtok + outputTokens * outputAtomicPerMtok) / 1_000_000)`.
+Round **once over the combined weighted total**, not separately for each side or
+stream chunk. Zero weighted usage costs zero; a positive fraction rounds up to
+one atomic unit. Counts are nonnegative integers bounded by the existing public
+context-token limit; canonical decimal rates and the resulting charge are
+bounded by the existing unsigned 64-bit atomic limit. Arbitrary-precision integer
+intermediates may exceed u64 when the final result fits; overflow of the final
+charge is a static typed limit error, never truncation or floating-point rounding.
+This arithmetic is pure policy, not wired payment execution.
+
+USDC-per-million configuration prices map exactly to atomic-per-million rates
+by multiplying by 1,000,000 (at most six decimal places); there is no division
+by token count during this conversion. Seller startup still advertises the
+unchanged PoC v1 rates multiplied by the million-token scale, and the buyer's
+legacy compatibility check compares those exact economic terms. It does not
+convert a signed v2 quote into a v1 offer or enable v2 payments. Selector weights
+compare the same per-million rate sums (without charge rounding); its minimum
+paid budget covers the once-rounded cost of one input and one output token.
+A quote's total budget remains a ceiling, not a promise that an unknown prompt
+and the requested output fit within it.
+
 Version mapping: the `gyblos/control/1` ALPN (control version 1) carries v2
 records and offers; `gyblos/http/2` is a reserved future identifier, not a
 supported paid ALPN. The current paid v1 validator rejects v2. The pure policy
@@ -289,7 +323,9 @@ catalog digest/sequence and exact quote terms using `acceptControlQuote`.
 This does not wire seller selection, the buyer proxy, paid v2 or free execution.
 Closing the client closes its connection, not the caller-owned endpoint.
 
-`vectors/control-v2.json` fixes request framing/digest, all three public records
+`vectors/control-v2-mtok.json` fixes request framing/digest, all three public records
 and owner-signed offer bytes using an independent Node/OpenSSL oracle. Only
-synthetic public keys/signatures are retained. The complete design and rollout
+synthetic public keys/signatures are retained. The historical `control-v2.json`
+is retained unchanged to verify rejection of the previous per-token v2 shape.
+The complete design and rollout
 constraints live in vault GYB-DOC-022, control-contract appendix.

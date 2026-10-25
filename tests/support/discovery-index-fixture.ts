@@ -23,10 +23,10 @@ import {
   CONTROL_RECORD_VERSION,
   DATA_RETENTION,
   PUBLIC_PRESENCE_STATE,
-  PUBLIC_PRICE_UNIT,
   PUBLIC_RECORD_KINDS,
   PUBLIC_V2_DOMAINS,
   REASONING_LEVELS,
+  V2_PRICING,
 } from '@gyblos/protocol/constants';
 import type {
   PublicCatalogV2,
@@ -119,9 +119,9 @@ export function indexNode() {
           pricing: {
             network: 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1',
             asset: '11111111111111111111111111111111',
-            unit: PUBLIC_PRICE_UNIT,
-            inputAtomic: '0',
-            outputAtomic: '2',
+            unit: V2_PRICING.unit,
+            inputAtomicPerMtok: '0',
+            outputAtomicPerMtok: '2',
           },
           reasoning: [REASONING_LEVELS.OFF],
         })),

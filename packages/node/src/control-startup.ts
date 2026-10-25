@@ -5,16 +5,17 @@ import { createSignableMessage, type KeyPairSigner } from '@solana/kit';
 import { DEVNET } from '@gyblos/config';
 import { PRICES } from '@gyblos/core/constants';
 import type { QuoteReadiness } from '@gyblos/core/control-quotes';
+import { atomicPerTokenPricesV2 } from '@gyblos/core/pricing-v2';
 import { MODEL } from '@gyblos/engine-ollama/model';
 import {
   CONTROL_METERING_MODES,
   CONTROL_RECORD_VERSION,
   DATA_RETENTION,
   MODEL_IDS,
-  PUBLIC_PRICE_UNIT,
   PUBLIC_RECORD_KINDS,
   PUBLIC_RECORD_LIMITS,
   REASONING_LEVELS,
+  V2_PRICING,
 } from '@gyblos/protocol/constants';
 import type { InferenceOfferV2 } from '@gyblos/protocol/control-types';
 import type {
@@ -65,8 +66,8 @@ function startupRecords(options: SellerControlStartupOptions) {
           pricing: {
             network: DEVNET,
             asset: options.mint,
-            unit: PUBLIC_PRICE_UNIT,
-            ...PRICES,
+            unit: V2_PRICING.unit,
+            ...atomicPerTokenPricesV2(PRICES),
           },
           reasoning,
         },

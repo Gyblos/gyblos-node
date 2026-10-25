@@ -4,6 +4,7 @@ import {
   CONTROL_CODES,
   CONTROL_LIMITS,
   CONTROL_RECORD_VERSION,
+  PUBLIC_PRICE_UNIT,
   PUBLIC_RECORD_KINDS,
   PUBLIC_RECORD_LIMITS,
   REASONING_LEVELS,
@@ -16,6 +17,7 @@ import {
   controlPrimitive,
   controlReasoning,
 } from './control-validation.js';
+import { parsePublicPricesV2 } from './pricing-v2.js';
 import { parsePublicRecord } from './public-parser.js';
 
 function modelInputV2(value: unknown) {
@@ -33,14 +35,23 @@ function modelInputV2(value: unknown) {
   ).map(controlReasoning);
   if (!reasoning.length || new Set(reasoning).size !== reasoning.length)
     return controlFail();
+  const pricing = parsePublicPricesV2(input.pricing);
   return {
     reasoning,
+    pricing,
     model: {
       modelId: input.modelId,
       variant: input.variant,
       quantization: input.quantization,
       contextTokens: input.contextTokens,
-      pricing: input.pricing,
+      // Internal metadata-validation projection only; this is never signed or returned as v1.
+      pricing: {
+        network: pricing.network,
+        asset: pricing.asset,
+        unit: PUBLIC_PRICE_UNIT,
+        inputAtomic: pricing.inputAtomicPerMtok,
+        outputAtomic: pricing.outputAtomicPerMtok,
+      },
     },
   };
 }
@@ -93,6 +104,7 @@ export function parsePublicV2(value: unknown): PublicRecordV2 {
           models: legacy.models.map((model, index) => ({
             ...model,
             reasoning: models[index]!.reasoning,
+            pricing: models[index]!.pricing,
           })),
         }
       : { ...legacy, schemaVersion: CONTROL_RECORD_VERSION };

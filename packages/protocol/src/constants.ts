@@ -102,6 +102,10 @@ export const DATA_RETENTION = {
 
 export const PUBLIC_PRESENCE_STATE = 'alive';
 export const PUBLIC_PRICE_UNIT = 'token';
+export const V2_PRICING = {
+  unit: 'million-tokens',
+  tokensPerUnit: 1_000_000,
+} as const;
 export const MODEL_CLASSIFICATIONS = {
   CATALOG: 'catalog',
   CUSTOM: 'custom',

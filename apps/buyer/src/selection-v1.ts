@@ -1,6 +1,6 @@
 // Ensures advisory v2 selection cannot imply new execution semantics for the existing v1 offer.
 // No conversion, authorization or payment execution occurs here.
-import { REASONING_LEVELS } from '@gyblos/protocol/constants';
+import { REASONING_LEVELS, V2_PRICING } from '@gyblos/protocol/constants';
 import type { InferenceOffer } from '@gyblos/protocol/offer';
 
 import { BUYER_SELECTION_CODES } from './constants.js';
@@ -26,8 +26,10 @@ export function requireLegacyQuoteCompatibility(
     quote.payTo !== trusted.payTo ||
     quote.feePayer !== trusted.feePayer ||
     quote.authorizer !== trusted.authorizer ||
-    quote.prices.inputAtomic !== trusted.prices.inputAtomic ||
-    quote.prices.outputAtomic !== trusted.prices.outputAtomic ||
+    BigInt(quote.prices.inputAtomicPerMtok) !==
+      BigInt(trusted.prices.inputAtomic) * BigInt(V2_PRICING.tokensPerUnit) ||
+    BigInt(quote.prices.outputAtomicPerMtok) !==
+      BigInt(trusted.prices.outputAtomic) * BigInt(V2_PRICING.tokensPerUnit) ||
     quote.maxTokens > trusted.maxTokens ||
     quote.maxAtomic !== trusted.maxAtomic ||
     quote.meteringMode !== trusted.meteringMode ||

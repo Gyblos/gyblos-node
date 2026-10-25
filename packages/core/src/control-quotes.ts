@@ -79,14 +79,15 @@ function checkPricing(
   if (
     query.params.network !== prices.network ||
     query.params.asset !== prices.asset ||
-    BigInt(prices.inputAtomic) >
-      BigInt(query.params.priceCeilings.inputAtomic) ||
-    BigInt(prices.outputAtomic) >
-      BigInt(query.params.priceCeilings.outputAtomic)
+    BigInt(prices.inputAtomicPerMtok) >
+      BigInt(query.params.priceCeilings.inputAtomicPerMtok) ||
+    BigInt(prices.outputAtomicPerMtok) >
+      BigInt(query.params.priceCeilings.outputAtomicPerMtok)
   )
     return controlFail(CONTROL_CODES.POLICY);
   const free =
-    BigInt(prices.inputAtomic) === 0n && BigInt(prices.outputAtomic) === 0n;
+    BigInt(prices.inputAtomicPerMtok) === 0n &&
+    BigInt(prices.outputAtomicPerMtok) === 0n;
   if (
     (free && maxAtomic !== '0') ||
     (!free && BigInt(maxAtomic) === 0n) ||
@@ -158,8 +159,8 @@ async function buildQuote(
   if (!mapped.reasoning.includes(query.params.reasoning))
     return controlFail(CONTROL_CODES.LEVEL);
   const free =
-    BigInt(listed.pricing.inputAtomic) === 0n &&
-    BigInt(listed.pricing.outputAtomic) === 0n;
+    BigInt(listed.pricing.inputAtomicPerMtok) === 0n &&
+    BigInt(listed.pricing.outputAtomicPerMtok) === 0n;
   const maxAtomic = free ? '0' : query.params.maxAtomic;
   checkPricing(query, listed, maxAtomic);
   return parseOfferV2({
@@ -188,8 +189,8 @@ async function buildQuote(
     endpoint: context.endpoint,
     relayOnly: context.relayOnly,
     prices: {
-      inputAtomic: listed.pricing.inputAtomic,
-      outputAtomic: listed.pricing.outputAtomic,
+      inputAtomicPerMtok: listed.pricing.inputAtomicPerMtok,
+      outputAtomicPerMtok: listed.pricing.outputAtomicPerMtok,
     },
     maxAtomic,
     maxTokens: query.params.maxTokens,
@@ -291,8 +292,8 @@ export async function acceptControlQuote(
   const model = selectedModel(query, catalog);
   checkPricing(query, model, offer.maxAtomic);
   if (
-    offer.prices.inputAtomic !== model.pricing.inputAtomic ||
-    offer.prices.outputAtomic !== model.pricing.outputAtomic ||
+    offer.prices.inputAtomicPerMtok !== model.pricing.inputAtomicPerMtok ||
+    offer.prices.outputAtomicPerMtok !== model.pricing.outputAtomicPerMtok ||
     offer.model.contextTokens < offer.maxTokens ||
     offer.model.contextTokens !== model.contextTokens
   )
