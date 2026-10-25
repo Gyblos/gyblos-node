@@ -102,8 +102,10 @@ async function initialize(
 export function createWalletService(
   root: string,
   protection: WalletProtection | null,
+  prepared?: Promise<WalletSummary>,
 ) {
-  let pending: Promise<WalletSummary> | undefined;
+  // A supplied startup identity disables all lazy initialization for secret reads.
+  let pending: Promise<WalletSummary> | undefined = prepared;
   const summary = () => (pending ??= initialize(root, protection));
   return {
     summary,

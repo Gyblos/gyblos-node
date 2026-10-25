@@ -8,7 +8,8 @@ filesystem operations. Wallet now offers an explicit, main-process-confirmed
 encrypted-file backup and same-address verification through native file dialogs.
 The renderer sends a password and receives a fixed status; it never receives a
 key, path, file contents or decrypted material. Funding and persistent backup
-approval remain disabled; there is no application restore/import UI or IPC flow.
+approval remain disabled. First launch offers explicit creation or restoration
+before generating a new wallet; existing destinations never offer replacement.
 
 Version 1 is compact UTF-8 JSON with exactly these fields: `format`, `version`,
 `kdf`, `cipher`, `keyFormat`, `salt`, `nonce`, `ciphertext`, `tag`. Duplicate
@@ -101,13 +102,25 @@ is no automatic rollback, stale-marker removal or retry that replaces that
 state. Filesystem errors are sanitized and the restorer limits itself to one
 operation at a time.
 
-This service is not connected to Electron, preload, the UI or automatic startup.
-A separate entry before automatic creation remains future work. Tests use fresh
-unfunded identities and synthetic protection adapters, including all nine
-producer/reader combinations; native Keychain/DPAPI/Linux-store acceptance and
-power-loss durability are not established. Funding, persistent backup approval,
-signing, payment-state recovery and mobile linking remain disabled or outside
-this service.
+First-run Electron setup calls this service only after the user chooses restore,
+enters the backup password and selects a file in the native dialog. It confirms
+the recovered address before opening the main app. The setup bridge accepts no
+file paths or backup bytes and is restricted to the startup window's main frame.
+Existing complete or partial destinations bypass setup through a read-only load;
+restore is never available over an existing wallet. Choosing create is the
+primary default action, but no timer or background call creates a wallet while
+the user is choosing. A cancelled or failed import never falls back to creation.
+A post-claim failure blocks creation and retains state for inspection. Quitting
+cancels startup reveals and waits for actual initialization/restoration and
+backup work to settle. The restore password uses the portable format's exact
+UTF-8 byte bounds, including multibyte characters, without trimming or
+normalization. Backup reads are bound to the completed startup identity and
+cannot generate another wallet if its record disappears or changes. Both public
+wallet flags remain false. Tests use fresh unfunded identities and synthetic
+protection adapters, including all nine producer/reader combinations; native
+Keychain/DPAPI/Linux-store acceptance and power-loss durability are not
+established. Funding, persistent backup approval, signing, payment-state
+recovery and mobile linking remain disabled or outside this service.
 
 Restoration validates its reserved directory before writing and checks its
 identity again around descriptor I/O. Final record creation is exclusive and

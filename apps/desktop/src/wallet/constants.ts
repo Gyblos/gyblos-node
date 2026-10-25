@@ -71,3 +71,23 @@ export const WALLET_RESTORE_ERROR = {
 } as const;
 export type WalletRestoreErrorCode =
   (typeof WALLET_RESTORE_ERROR)[keyof typeof WALLET_RESTORE_ERROR];
+
+export const SETUP_ACTION = {
+  STATUS: 'status',
+  CREATE: 'create',
+  RESTORE: 'restore',
+  CONTINUE: 'continue',
+} as const;
+export const SETUP_STATUS = {
+  CHOICE: 'choice',
+  RESTORED: 'restored',
+  COMPLETE: 'complete',
+  BLOCKED: 'blocked',
+} as const;
+export const SETUP_ERROR = {
+  FAILED: 'failed',
+  BUSY: 'busy',
+  EXISTING: 'existing',
+  RECOVERY_REQUIRED: 'recovery-required',
+} as const;
+export const WALLET_SETUP = { CHANNEL: 'desktop:wallet-setup' } as const;

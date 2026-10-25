@@ -70,18 +70,20 @@ function useWalletBackup() {
     choose,
   };
 }
-function PasswordField({
+export function PasswordField({
   label,
   value,
   change,
   busy,
   creating,
+  autoFocus = false,
 }: {
   label: string;
   value: string;
   change(value: string): void;
   busy: boolean;
   creating: boolean;
+  autoFocus?: boolean;
 }) {
   return (
     <label className="field-label">
@@ -89,6 +91,7 @@ function PasswordField({
       <input
         className="full-input"
         type="password"
+        autoFocus={autoFocus}
         autoComplete={creating ? 'new-password' : 'off'}
         value={value}
         disabled={busy}
@@ -114,8 +117,8 @@ export function WalletBackup() {
     <section className="wallet-details" aria-label="Encrypted backup">
       <strong>Encrypted backup</strong>
       <Note>
-        Keep both file and password safe. Gyblos cannot recover either. App
-        restore is not available yet.
+        Keep both file and password safe. Gyblos cannot recover either. Restore
+        is available on first launch, before creating a new wallet.
       </Note>
       <div
         className="connection-location"
