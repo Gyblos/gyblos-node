@@ -45,7 +45,7 @@ class WalletSetup {
     this.summary = new Promise((resolve) => {
       this.release = resolve;
     });
-    this.inspection = this.inspect();
+    this.inspection = signal.aborted ? Promise.resolve() : this.inspect();
     if (signal.aborted) this.stop();
     else signal.addEventListener('abort', this.stop, { once: true });
   }
@@ -67,11 +67,18 @@ class WalletSetup {
         this.finish(walletSummary(WALLET_STATUS.RECOVERY_REQUIRED));
       return;
     }
+    if (this.signal.aborted) return;
     // Once an existing destination is observed, never call an initializer.
     try {
       await checkWalletRoot(this.root);
-      if (!this.protection || !(await this.protection.available()))
+      if (this.signal.aborted) return;
+      if (!this.protection) {
         this.finish(walletSummary(WALLET_STATUS.UNAVAILABLE));
+        return;
+      }
+      const available = await this.protection.available();
+      if (this.signal.aborted) return;
+      if (!available) this.finish(walletSummary(WALLET_STATUS.UNAVAILABLE));
       else this.finish(await readExistingWallet(this.root, this.protection));
     } catch {
       this.finish(walletSummary(WALLET_STATUS.RECOVERY_REQUIRED));

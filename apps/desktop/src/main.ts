@@ -133,10 +133,10 @@ function registerWalletStatus(
   const protection = smoke
     ? null
     : walletProtection(process.platform, safeStorage);
-  const wallet = createWalletService(walletRoot, protection);
   const setup = registerWalletSetup(loading, walletRoot, protection, signal);
   const summary =
     setup?.summary ?? Promise.resolve(walletSummary(WALLET_STATUS.UNAVAILABLE));
+  const wallet = createWalletService(walletRoot, protection, summary);
   const backup = createBackupFlow(
     wallet,
     {

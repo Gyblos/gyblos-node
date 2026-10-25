@@ -3,12 +3,12 @@
 import { useEffect, useState } from 'react';
 
 import { themeStyle } from '../theme.js';
-import { BACKUP_FLOW } from '../wallet/backup-flow-model.js';
 import {
   parseSetupView,
   SETUP_ACTION,
   SETUP_ERROR,
   SETUP_STATUS,
+  validSetupPassword,
   type SetupRequest,
   type SetupView,
 } from '../wallet/setup-model.js';
@@ -98,7 +98,7 @@ function SetupActions({ setup }: { setup: ReturnType<typeof useWalletSetup> }) {
       <Button
         type="submit"
         variant={BUTTON_VARIANT.PRIMARY}
-        disabled={password.length < BACKUP_FLOW.MIN_PASSWORD_CHARACTERS}
+        disabled={!validSetupPassword(password)}
       >
         Choose file and restore…
       </Button>

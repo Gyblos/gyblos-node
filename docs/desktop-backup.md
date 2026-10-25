@@ -110,12 +110,15 @@ primary default action, but no timer or background call creates a wallet while
 the user is choosing. A cancelled or failed import never falls back to creation.
 A post-claim failure blocks creation and retains state for inspection. Quitting
 cancels startup reveals and waits for actual initialization/restoration and
-backup work to settle. Both public wallet flags remain false. Tests use fresh
-unfunded identities and synthetic protection adapters, including all nine
-producer/reader combinations; native Keychain/DPAPI/Linux-store acceptance and
-power-loss durability are not established. Funding, persistent backup approval,
-signing, payment-state recovery and mobile linking remain disabled or outside
-this service.
+backup work to settle. The restore password uses the portable format's exact
+UTF-8 byte bounds, including multibyte characters, without trimming or
+normalization. Backup reads are bound to the completed startup identity and
+cannot generate another wallet if its record disappears or changes. Both public
+wallet flags remain false. Tests use fresh unfunded identities and synthetic
+protection adapters, including all nine producer/reader combinations; native
+Keychain/DPAPI/Linux-store acceptance and power-loss durability are not
+established. Funding, persistent backup approval, signing, payment-state
+recovery and mobile linking remain disabled or outside this service.
 
 Restoration validates its reserved directory before writing and checks its
 identity again around descriptor I/O. Final record creation is exclusive and

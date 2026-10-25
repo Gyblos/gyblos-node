@@ -18,6 +18,13 @@ import { absent, fixture } from './support/wallet-restore.js';
 void test('first-run restoration accepts a valid multibyte portable-backup password', async () => {
   await fixture(async ({ home, root, identity, protection }) => {
     const password = 'é'.repeat(6);
+    assert.notEqual(
+      parseSetupRequest({
+        action: SETUP_ACTION.RESTORE,
+        password: '\uFEFF' + password,
+      }),
+      null,
+    );
     const backup = await createBackupCodec().seal(identity.secret, password);
     assert.notEqual(
       parseSetupRequest({ action: SETUP_ACTION.RESTORE, password }),

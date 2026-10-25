@@ -1,11 +1,7 @@
 // Public first-run contract: only an action, bounded password and sanitized state cross IPC.
 // Backup bytes, selected paths and wallet keys stay in the host.
-import {
-  BACKUP_FLOW,
-  SETUP_ACTION,
-  SETUP_ERROR,
-  SETUP_STATUS,
-} from './constants.js';
+import { BACKUP } from './backup/constants.js';
+import { SETUP_ACTION, SETUP_ERROR, SETUP_STATUS } from './constants.js';
 import { parseWalletSummary, WALLET_STATUS } from './model.js';
 
 export {
@@ -32,6 +28,14 @@ export function setupView(
 ): SetupView {
   return { status, address, error };
 }
+export function validSetupPassword(password: string) {
+  const bytes = new TextEncoder().encode(password);
+  return (
+    bytes.length >= BACKUP.MIN_PASSWORD_BYTES &&
+    bytes.length <= BACKUP.MAX_PASSWORD_BYTES &&
+    new TextDecoder('utf-8', { ignoreBOM: true }).decode(bytes) === password
+  );
+}
 export function parseSetupRequest(value: unknown): SetupRequest | null {
   if (
     !value ||
@@ -50,9 +54,7 @@ export function parseSetupRequest(value: unknown): SetupRequest | null {
     Object.keys(value).sort().join(',') !== 'action,password' ||
     !('password' in value) ||
     typeof value.password !== 'string' ||
-    value.password.length < BACKUP_FLOW.MIN_PASSWORD_CHARACTERS ||
-    new TextEncoder().encode(value.password).length >
-      BACKUP_FLOW.MAX_PASSWORD_BYTES
+    !validSetupPassword(value.password)
   )
     return null;
   return { action, password: value.password };
