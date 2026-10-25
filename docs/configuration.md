@@ -1,10 +1,9 @@
 # Node configuration file (`gyblos.toml`)
 
 A node can be described by one TOML file, `gyblos.toml`, as decided in vault
-GYB-DOC-026. This page is its reference. Today the file is **validated and
-resolved but not yet read by `pnpm node:start`**: startup still uses the
-`GYBLOS_*` environment variables in [running-a-node.md](running-a-node.md).
-Wiring the file into startup, `gyblos init` and `gyblos doctor` come later.
+GYB-DOC-026. This page is its reference. The seller daemon (`pnpm node:start`)
+reads it at startup; see [Seller startup](#seller-startup) for what it honors
+today. `gyblos init` and `gyblos doctor` come later.
 
 ## Validate a file
 
@@ -150,8 +149,10 @@ range (`UNSUPPORTED_VERSION` or `INVALID_CAP`), however many digits it has.
     - `free = { daily_token_cap, per_buyer_cap }`: positive integers, the
       per-buyer cap not above the daily cap.
 
-Prices and free caps are validated but not yet enforced: the v1 proof-of-concept
-paid path keeps its fixed per-token prices until the file is wired into startup.
+At seller startup an offer becomes the node's public v2 listing (see
+[Seller startup](#seller-startup)). Free caps are carried to the seller for the
+free execution handler, which enforces them; until that lands, nothing executes
+free requests.
 
 ### Price unit
 
@@ -204,6 +205,38 @@ that ignores `off`.
 
 The JSON Schema checks only the closed set; the per-model rule is enforced by
 the validator.
+
+## Seller startup
+
+`pnpm node:start` reads `GYBLOS_CONFIG` (a path; it must exist) or, when that
+variable is unset, `./gyblos.toml` if present. Without a file, startup is the
+same as before: everything comes from the `GYBLOS_*` environment. Values resolve
+with the precedence above, so an environment variable still overrides the file.
+Any problem stops startup with a static code; run `pnpm gyblos config validate`
+for details.
+
+The daemon runs its own Ollama at `http://127.0.0.1:11436` and serves one model,
+the pinned Qwen3 0.6B with reasoning `off`. So today it honors:
+
+| Setting                                                                                                                         | Used                                                                                                                 |
+| ------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `[transport]` `relay_only`, `bind`, `external_addr`                                                                             | yes                                                                                                                  |
+| `[relays]` `urls`, `relay_token_env` (the token stays in that variable)                                                         | yes                                                                                                                  |
+| `[discovery]` `publish`, `url`                                                                                                  | yes                                                                                                                  |
+| `[[offers]]`: at most one, for `qwen3-0.6b` (or `qwen3:0.6b`), engine `ollama` at `http://127.0.0.1:11436`, reasoning `["off"]` | yes                                                                                                                  |
+| `free = {...}` on that offer                                                                                                    | listed with zero prices; caps passed to the seller                                                                   |
+| `price = {...}` on that offer                                                                                                   | only `input_per_mtok = "1"`, `output_per_mtok = "2"`: paid execution is still the v1 proof of concept at those rates |
+| `[node]` `data_dir`, `rpc_url`, `payout_wallet`                                                                                 | not yet: the role files own them, so setting them in the file stops startup                                          |
+
+Startup codes: `NODE_CONFIG_INVALID` (unreadable, invalid or missing explicit
+file, or an invalid `GYBLOS_*` value), `SELLER_SETTING_UNSUPPORTED`,
+`SELLER_OFFER_COUNT_UNSUPPORTED`, `SELLER_OFFER_MODEL_UNSUPPORTED`,
+`SELLER_OFFER_ENGINE_UNSUPPORTED`, `SELLER_OFFER_REASONING_UNSUPPORTED` and
+`SELLER_OFFER_PRICE_UNSUPPORTED`. Environment variables keep their previous
+meaning (for example, any `GYBLOS_RELAY_ONLY` other than `1` is off), except
+that an invalid value the resolver rejects, such as
+`GYBLOS_DISCOVERY_PUBLISH=yes`, now stops startup with `NODE_CONFIG_INVALID` as
+it already did before.
 
 ## Issue codes
 

@@ -59,9 +59,9 @@ import { assertOllamaModelsHome, assertRoleHome } from './home.js';
 import { createInferenceSeller } from './http/inference.js';
 import { signInferenceOffer } from './offers.js';
 import { openSellerSequence } from './public-sequence.js';
-import { sellerPublicationConfig } from './publisher-config.js';
 import { createSellerPublisher } from './publisher.js';
 import { loadRole, nodeSecret, rolePath, roleSigner } from './roles.js';
+import { loadSellerSettings } from './seller-settings.js';
 
 interface Trace {
   requestId: string;
@@ -89,7 +89,8 @@ export async function startSeller() {
     const config = await loadRole(P2P_ROLES.SELLER);
     if (config.role !== P2P_ROLES.SELLER)
       throw new Error('Seller role required.');
-    const publicationConfig = sellerPublicationConfig(process.env);
+    const settings = await loadSellerSettings(process.env);
+    const publicationConfig = settings.publication;
     const publicSequence = await openSellerSequence({
       environment: process.env,
       nodeId: config.nodeId,
@@ -229,12 +230,13 @@ export async function startSeller() {
       await new Promise<void>((done) => sellerServer.close(() => done()));
     });
     await stage('iroh-endpoint');
-    const relayOnly = process.env.GYBLOS_RELAY_ONLY === '1';
+    const { relayOnly } = settings;
     const endpoint = await bindEndpoint(await nodeSecret(P2P_ROLES.SELLER), {
       relayOnly,
       control: true,
-      bindAddress: process.env.GYBLOS_IROH_BIND,
-      externalAddress: process.env.GYBLOS_IROH_EXTERNAL_ADDR || undefined,
+      bindAddress: settings.irohBind,
+      externalAddress: settings.irohExternalAddress,
+      relayEnvironment: settings.relayEnvironment,
     });
     const endpointDisposeIndex = disposers.length;
     disposers.push(() => endpoint.close());
@@ -300,6 +302,7 @@ export async function startSeller() {
       capabilities: engine.capabilities(),
       validUntil: offerExpiresAt,
       readiness: controlReadiness.readiness,
+      offer: settings.offer,
     });
     disposers.push(async () => {
       await control.records.withdraw();
