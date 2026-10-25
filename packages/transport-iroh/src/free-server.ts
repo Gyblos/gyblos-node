@@ -62,17 +62,37 @@ async function deadline<T>(
     clearTimeout(timer);
   }
 }
-async function readRequest(stream: ControlStream) {
+function receiving(signal: AbortSignal) {
+  if (signal.aborted) return fail(FREE_EXECUTION_CODES.CANCELLED);
+}
+async function readRequest(stream: ControlStream, signal: AbortSignal) {
+  receiving(signal);
   const reader = new FreeExecutionRequestReader();
   const prefix = Uint8Array.from(
     await stream.recv.readExact(CONTROL_LIMITS.prefixBytes),
   );
+  receiving(signal);
   reader.push(prefix);
   const length = new DataView(prefix.buffer).getUint32(0);
   reader.push(Uint8Array.from(await stream.recv.readExact(length)));
+  receiving(signal);
   if ((await stream.recv.read(1)).length)
     return fail(FREE_EXECUTION_CODES.INVALID);
+  receiving(signal);
   return reader.finish();
+}
+async function readBoundedRequest(
+  stream: ControlStream,
+  signal: AbortSignal,
+  milliseconds: number,
+  cancel: () => void,
+) {
+  const reading = readRequest(stream, signal);
+  try {
+    return await deadline(reading, milliseconds, cancel);
+  } finally {
+    await reading.catch(() => undefined);
+  }
 }
 export async function serveFreeExecutionStream(
   stream: ControlStream,
@@ -102,8 +122,9 @@ export async function serveFreeExecutionStream(
   if (external.aborted) cancel();
   const operation = Promise.resolve().then(async () => {
     check(controller.signal, routeAllowed);
-    const request = await deadline(
-      readRequest(stream),
+    const request = await readBoundedRequest(
+      stream,
+      controller.signal,
       limits.ingressMs ?? IROH_DEADLINES.ingressMs,
       cancel,
     );

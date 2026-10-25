@@ -9,6 +9,7 @@ import {
   FREE_CHAT_ROLES,
   FREE_EXECUTION,
   FREE_EXECUTION_CODES,
+  MODEL_IDS,
 } from '@gyblos/protocol/constants';
 import type { EngineResult } from '@gyblos/protocol/engine';
 import { freeExecutionDigest } from '@gyblos/protocol/free-execution';
@@ -40,7 +41,7 @@ async function fixture(caps = { dailyTokenCap: 100, perBuyerCap: 50 }) {
     nodeId: source.context.nodeId,
     offer: {
       kind: OFFER_PRICING_KINDS.FREE,
-      modelId: 'qwen3-0.6b',
+      modelId: MODEL_IDS.QWEN3_0_6B,
       reasoning: model.reasoning,
       caps,
     },
