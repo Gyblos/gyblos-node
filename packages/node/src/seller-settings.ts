@@ -1,20 +1,13 @@
-// Seller startup settings from gyblos.toml (GYBLOS_CONFIG, else ./gyblos.toml when present) under
-// flag > env > file > default. Without a file the result equals today's environment-only startup.
+// Seller startup settings from gyblos.toml (GYBLOS_CONFIG, else ./gyblos.toml when present; relative to the
+// working directory) under flag > env > file > default. Without a file the values equal today's
+// environment-only startup; invalid environment values now fail here with NODE_CONFIG_INVALID.
 // The daemon serves one warmed model through its own Ollama, so any offer it cannot honor fails closed.
 import { resolve } from 'node:path';
 
-import { HOSTS, NODE_ENVIRONMENT, type HomeEnvironment } from '@gyblos/config';
-import { PRICES } from '@gyblos/core/constants';
-import { atomicPerTokenPricesV2 } from '@gyblos/core/pricing-v2';
+import { NODE_ENVIRONMENT, type HomeEnvironment } from '@gyblos/config';
 import { validateDiscoveryBaseUrl } from '@gyblos/discovery-http';
 import { MODEL } from '@gyblos/engine-ollama/model';
-import {
-  MODEL_CLASSIFICATIONS,
-  MODEL_IDS,
-  REASONING_LEVELS,
-  type ReasoningLevel,
-} from '@gyblos/protocol/constants';
-import type { TokenPricesV2 } from '@gyblos/protocol/control-types';
+import { MODEL_CLASSIFICATIONS } from '@gyblos/protocol/constants';
 import type { RelayEnvironment } from '@gyblos/transport-iroh/endpoint';
 
 import {
@@ -35,14 +28,12 @@ import {
   type NodeConfig,
   type NodeOffer,
 } from './node-config.js';
-
-export interface SellerCatalogOffer {
-  modelId: typeof MODEL_IDS.QWEN3_0_6B;
-  prices: TokenPricesV2;
-  reasoning: ReasoningLevel[];
-  // Present only for a free offer; the free execution handler enforces these caps.
-  free?: { dailyTokenCap: number; perBuyerCap: number };
-}
+import {
+  defaultSellerOffer,
+  SERVED_OFFER,
+  servedPaidPrices,
+  type SellerCatalogOffer,
+} from './seller-offer.js';
 
 export interface SellerSettings {
   relayOnly: boolean;
@@ -53,99 +44,98 @@ export interface SellerSettings {
   offer: SellerCatalogOffer;
 }
 
-// What the daemon actually runs: its managed Ollama, the pinned Qwen3 0.6B and one reasoning level.
-const SERVED = {
-  modelId: MODEL_IDS.QWEN3_0_6B,
-  engineUrl: HOSTS.ollama,
-  reasoning: [REASONING_LEVELS.OFF] as ReasoningLevel[],
-} as const;
+export interface SellerSettingsOptions {
+  // Free listings are refused until the free execution handler is wired, so none is advertised unserved.
+  freeExecution?: boolean;
+}
+
 // Validated keys the daemon does not consume yet: role files own the home, RPC and payout today.
 const UNSUPPORTED_FILE_SETTINGS = [
   NODE_SETTINGS.HOME,
   NODE_SETTINGS.RPC_URL,
   NODE_SETTINGS.PAYOUT_WALLET,
 ] as const;
+// The daemon reads the RPC from its role file, so this variable must not affect startup as before.
+const UNCONSUMED_ENVIRONMENT = [NODE_ENVIRONMENT.rpcUrl] as const;
 
 const fail = (code: NodeErrorCode): never => {
   throw new NodeError(code);
 };
 
-// Paid execution is still the v1 PoC, so a paid listing must advertise exactly its rates.
-function paidPrices(offer: NodeOffer, served: TokenPricesV2) {
-  if (offer.pricing.kind !== OFFER_PRICING_KINDS.PAID) return undefined;
-  const prices = {
-    inputAtomicPerMtok: pricePerMtokToAtomicPerMtok(
-      offer.pricing.inputPerMtok,
-    ).toString(),
-    outputAtomicPerMtok: pricePerMtokToAtomicPerMtok(
-      offer.pricing.outputPerMtok,
-    ).toString(),
-  };
-  if (
-    prices.inputAtomicPerMtok !== served.inputAtomicPerMtok ||
-    prices.outputAtomicPerMtok !== served.outputAtomicPerMtok
-  )
-    fail(NODE_ERROR_CODES.SELLER_OFFER_PRICE_UNSUPPORTED);
-  return prices;
-}
-
-// Today's listing when gyblos.toml has no offers: the PoC v1 rates on the per-million scale.
-export function defaultSellerOffer(): SellerCatalogOffer {
-  return {
-    modelId: SERVED.modelId,
-    prices: atomicPerTokenPricesV2(PRICES),
-    reasoning: [...SERVED.reasoning],
-  };
-}
-
-function catalogOffer(offers: NodeOffer[]): SellerCatalogOffer {
-  const served = atomicPerTokenPricesV2(PRICES);
+function catalogOffer(
+  offers: NodeOffer[],
+  options: SellerSettingsOptions,
+): SellerCatalogOffer {
   if (!offers.length) return defaultSellerOffer();
   if (offers.length !== 1)
     fail(NODE_ERROR_CODES.SELLER_OFFER_COUNT_UNSUPPORTED);
   const [offer] = offers as [NodeOffer];
   if (
     offer.model.kind !== MODEL_CLASSIFICATIONS.CATALOG ||
-    offer.model.id !== SERVED.modelId
+    offer.model.id !== SERVED_OFFER.modelId
   )
     fail(NODE_ERROR_CODES.SELLER_OFFER_MODEL_UNSUPPORTED);
   if (
     offer.engine.kind !== ENGINE_KINDS.OLLAMA ||
-    new URL(offer.engine.url).origin !== new URL(SERVED.engineUrl).origin ||
+    new URL(offer.engine.url).origin !==
+      new URL(SERVED_OFFER.engineUrl).origin ||
     offer.engine.apiKeyEnv !== undefined ||
     (offer.engine.upstreamModel !== undefined &&
       offer.engine.upstreamModel !== MODEL.name)
   )
     fail(NODE_ERROR_CODES.SELLER_OFFER_ENGINE_UNSUPPORTED);
+  const served: readonly string[] = SERVED_OFFER.reasoning;
   if (
     !offer.reasoning.length ||
-    offer.reasoning.some((level) => !SERVED.reasoning.includes(level))
+    offer.reasoning.some((level) => !served.includes(level))
   )
     fail(NODE_ERROR_CODES.SELLER_OFFER_REASONING_UNSUPPORTED);
-  const reasoning = [...offer.reasoning];
-  if (offer.pricing.kind === OFFER_PRICING_KINDS.FREE)
+  const listing = {
+    modelId: SERVED_OFFER.modelId,
+    reasoning: [...offer.reasoning],
+  };
+  const { pricing } = offer;
+  if (pricing.kind === OFFER_PRICING_KINDS.FREE) {
+    if (!options.freeExecution)
+      fail(NODE_ERROR_CODES.SELLER_FREE_EXECUTION_UNAVAILABLE);
     return {
-      modelId: SERVED.modelId,
-      prices: { inputAtomicPerMtok: '0', outputAtomicPerMtok: '0' },
-      reasoning,
-      free: {
-        dailyTokenCap: offer.pricing.dailyTokenCap,
-        perBuyerCap: offer.pricing.perBuyerCap,
+      ...listing,
+      kind: OFFER_PRICING_KINDS.FREE,
+      caps: {
+        dailyTokenCap: pricing.dailyTokenCap,
+        perBuyerCap: pricing.perBuyerCap,
       },
     };
-  return {
-    modelId: SERVED.modelId,
-    prices: paidPrices(offer, served)!,
-    reasoning,
+  }
+  const prices = {
+    inputAtomicPerMtok: pricePerMtokToAtomicPerMtok(
+      pricing.inputPerMtok,
+    ).toString(),
+    outputAtomicPerMtok: pricePerMtokToAtomicPerMtok(
+      pricing.outputPerMtok,
+    ).toString(),
   };
+  const paid = servedPaidPrices();
+  if (
+    prices.inputAtomicPerMtok !== paid.inputAtomicPerMtok ||
+    prices.outputAtomicPerMtok !== paid.outputAtomicPerMtok
+  )
+    fail(NODE_ERROR_CODES.SELLER_OFFER_PRICE_UNSUPPORTED);
+  return { ...listing, kind: OFFER_PRICING_KINDS.PAID, prices };
 }
 
 // Pure: the parsed file (if any) and the environment produce the settings or a static NodeError.
 export function sellerSettings(
   file: NodeConfig | undefined,
   environment: HomeEnvironment,
+  options: SellerSettingsOptions = {},
 ): SellerSettings {
-  const resolved = resolveNodeConfig({ file, env: environment });
+  const consumed = Object.fromEntries(
+    Object.entries(environment).filter(
+      ([name]) => !(UNCONSUMED_ENVIRONMENT as readonly string[]).includes(name),
+    ),
+  );
+  const resolved = resolveNodeConfig({ file, env: consumed });
   if (!resolved.ok) return fail(NODE_ERROR_CODES.NODE_CONFIG_INVALID);
   const fromFile = new Set(
     resolved.origins
@@ -174,7 +164,7 @@ export function sellerSettings(
       [NODE_ENVIRONMENT.relayToken]: environment[settings.relayTokenEnv],
     },
     publication,
-    offer: catalogOffer(settings.offers),
+    offer: catalogOffer(settings.offers, options),
   };
 }
 
@@ -182,15 +172,17 @@ export function sellerSettings(
 export async function loadSellerSettings(
   environment: HomeEnvironment,
   cwd = process.cwd(),
+  options: SellerSettingsOptions = {},
 ): Promise<SellerSettings> {
   const explicit = environment[NODE_ENVIRONMENT.config];
   const result = await readNodeConfigFile(
     resolve(cwd, explicit || NODE_CONFIG_FILENAME),
   );
-  if (result.ok) return sellerSettings(result.config, environment);
+  if (result.ok) return sellerSettings(result.config, environment, options);
   const missing =
     result.issues.length === 1 &&
     result.issues[0]!.code === NODE_CONFIG_ISSUE_CODES.FILE_NOT_FOUND;
-  if (missing && !explicit) return sellerSettings(undefined, environment);
+  if (missing && !explicit)
+    return sellerSettings(undefined, environment, options);
   return fail(NODE_ERROR_CODES.NODE_CONFIG_INVALID);
 }

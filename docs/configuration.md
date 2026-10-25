@@ -209,34 +209,45 @@ the validator.
 ## Seller startup
 
 `pnpm node:start` reads `GYBLOS_CONFIG` (a path; it must exist) or, when that
-variable is unset, `./gyblos.toml` if present. Without a file, startup is the
-same as before: everything comes from the `GYBLOS_*` environment. Values resolve
-with the precedence above, so an environment variable still overrides the file.
-Any problem stops startup with a static code; run `pnpm gyblos config validate`
-for details.
+variable is unset, `./gyblos.toml` if present. Relative paths resolve against
+the daemon's working directory, which is the repository root under
+`pnpm node:start`. Without a file the effective values are the same as before;
+everything comes from the `GYBLOS_*` environment, and an environment variable
+still overrides the file.
 
 The daemon runs its own Ollama at `http://127.0.0.1:11436` and serves one model,
-the pinned Qwen3 0.6B with reasoning `off`. So today it honors:
+the pinned Qwen3 0.6B with reasoning `off`.
+[examples/seller-daemon.toml](../examples/seller-daemon.toml) is a file it
+accepts as written; the other examples are valid files for future nodes but stop
+this daemon. Today it honors:
 
-| Setting                                                                                                                         | Used                                                                                                                 |
-| ------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `[transport]` `relay_only`, `bind`, `external_addr`                                                                             | yes                                                                                                                  |
-| `[relays]` `urls`, `relay_token_env` (the token stays in that variable)                                                         | yes                                                                                                                  |
-| `[discovery]` `publish`, `url`                                                                                                  | yes                                                                                                                  |
-| `[[offers]]`: at most one, for `qwen3-0.6b` (or `qwen3:0.6b`), engine `ollama` at `http://127.0.0.1:11436`, reasoning `["off"]` | yes                                                                                                                  |
-| `free = {...}` on that offer                                                                                                    | listed with zero prices; caps passed to the seller                                                                   |
-| `price = {...}` on that offer                                                                                                   | only `input_per_mtok = "1"`, `output_per_mtok = "2"`: paid execution is still the v1 proof of concept at those rates |
-| `[node]` `data_dir`, `rpc_url`, `payout_wallet`                                                                                 | not yet: the role files own them, so setting them in the file stops startup                                          |
+| Setting                                                                                                                                               | Used                                                                                                                      |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `[transport]` `relay_only`, `bind`, `external_addr`                                                                                                   | yes                                                                                                                       |
+| `[relays]` `urls`, `relay_token_env` (the token stays in that variable; relay errors still name `GYBLOS_RELAY_TOKEN`)                                 | yes                                                                                                                       |
+| `[discovery]` `publish`, `url`                                                                                                                        | yes                                                                                                                       |
+| `[[offers]]`: at most one, for `qwen3-0.6b` (or `qwen3:0.6b`), engine `ollama` at `http://127.0.0.1:11436` without `api_key_env`, reasoning `["off"]` | yes                                                                                                                       |
+| `price = {...}` on that offer                                                                                                                         | only `input_per_mtok = "1"`, `output_per_mtok = "2"`: paid execution is still the v1 proof of concept at those rates      |
+| `free = {...}` on that offer                                                                                                                          | refused until free execution lands, so no node lists free capacity it cannot serve                                        |
+| `[node]` `data_dir`, `rpc_url`, `payout_wallet`                                                                                                       | not yet: the role files own them, so setting them in the file stops startup (`GYBLOS_HOME` overriding `data_dir` is fine) |
+| `[buyer]`                                                                                                                                             | ignored by the seller                                                                                                     |
 
-Startup codes: `NODE_CONFIG_INVALID` (unreadable, invalid or missing explicit
-file, or an invalid `GYBLOS_*` value), `SELLER_SETTING_UNSUPPORTED`,
-`SELLER_OFFER_COUNT_UNSUPPORTED`, `SELLER_OFFER_MODEL_UNSUPPORTED`,
-`SELLER_OFFER_ENGINE_UNSUPPORTED`, `SELLER_OFFER_REASONING_UNSUPPORTED` and
-`SELLER_OFFER_PRICE_UNSUPPORTED`. Environment variables keep their previous
-meaning (for example, any `GYBLOS_RELAY_ONLY` other than `1` is off), except
-that an invalid value the resolver rejects, such as
-`GYBLOS_DISCOVERY_PUBLISH=yes`, now stops startup with `NODE_CONFIG_INVALID` as
-it already did before.
+Startup stops with a static code: `NODE_CONFIG_INVALID`,
+`SELLER_SETTING_UNSUPPORTED`, `SELLER_OFFER_COUNT_UNSUPPORTED`,
+`SELLER_OFFER_MODEL_UNSUPPORTED`, `SELLER_OFFER_ENGINE_UNSUPPORTED`,
+`SELLER_OFFER_REASONING_UNSUPPORTED`, `SELLER_OFFER_PRICE_UNSUPPORTED` or
+`SELLER_FREE_EXECUTION_UNAVAILABLE`.
+`pnpm gyblos config validate --config "$GYBLOS_CONFIG"` explains file problems
+(it does not read `GYBLOS_CONFIG` and does not check the `SELLER_*` limits
+above).
+
+Invalid environment values are now caught when settings load, before Ollama
+starts, and all report `NODE_CONFIG_INVALID`. Before, they failed later with
+other codes: an invalid `GYBLOS_RELAYS` or `GYBLOS_RELAY_ONLY=1` with
+`GYBLOS_IROH_EXTERNAL_ADDR` failed when binding the endpoint, and an invalid
+`GYBLOS_DISCOVERY_PUBLISH` (such as `yes`) with `INVALID_ROLE_CONFIGURATION`.
+`GYBLOS_RPC_URL` does not affect the daemon, which reads its RPC from the role
+file.
 
 ## Issue codes
 
@@ -277,6 +288,7 @@ Qwen3 thinking is on or off, written `["off", "high"]`. The custom model in
 | [examples/openai-reseller.toml](../examples/openai-reseller.toml)       | Reselling an OpenAI-compatible API with `api_key_env`.       |
 | [examples/anthropic-reseller.toml](../examples/anthropic-reseller.toml) | An Anthropic-compatible API and a custom model.              |
 | [examples/free-offer.toml](../examples/free-offer.toml)                 | A free offer with caps, Docker host engine, publication off. |
+| [examples/seller-daemon.toml](../examples/seller-daemon.toml)           | What the seller daemon serves today; it starts as written.   |
 | [examples/multi-model.toml](../examples/multi-model.toml)               | Several models on one node.                                  |
 
 ## Code

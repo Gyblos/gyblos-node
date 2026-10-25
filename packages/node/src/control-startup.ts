@@ -25,8 +25,9 @@ import { createSellerRecords } from './public-records.js';
 import type { SellerSequence } from './public-sequence.js';
 import {
   defaultSellerOffer,
+  listedPrices,
   type SellerCatalogOffer,
-} from './seller-settings.js';
+} from './seller-offer.js';
 
 interface SellerControlStartupOptions {
   owner: KeyPairSigner;
@@ -72,7 +73,7 @@ function startupRecords(
             network: DEVNET,
             asset: options.mint,
             unit: V2_PRICING.unit,
-            ...offer.prices,
+            ...listedPrices(offer),
           },
           reasoning,
         },

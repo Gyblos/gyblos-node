@@ -2,6 +2,7 @@
 // public listing (paid PoC rates or free caps) and anything the daemon cannot honor fails closed.
 // Offline; files live in a disposable directory and values are synthetic.
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -12,19 +13,30 @@ import { NODE_ERROR_CODES } from '@gyblos/node/constants';
 import { NodeError } from '@gyblos/node/errors';
 import { parseNodeConfig, type NodeConfig } from '@gyblos/node/node-config';
 import { sellerPublicationConfig } from '@gyblos/node/publisher-config';
+import { defaultSellerOffer, listedPrices } from '@gyblos/node/seller-offer';
 import {
   loadSellerSettings,
   sellerSettings,
 } from '@gyblos/node/seller-settings';
 import { assertConfiguredRelay } from '@gyblos/transport-iroh/endpoint';
 
-import { BASE, offer } from './support/node-config-fixtures.js';
+import {
+  BASE,
+  EXAMPLES_DIRECTORY,
+  offer,
+} from './support/node-config-fixtures.js';
 
 const MANAGED = `{ kind = "ollama", url = "${HOSTS.ollama}" }`;
 const FREE = 'free = { daily_token_cap = 200000, per_buyer_cap = 5000 }';
 const POC_PRICE =
   'price = { input_per_mtok = "1", output_per_mtok = "2", currency = "USDC" }';
 const DEFAULT_RELAY = 'https://na1.relay.gyblos.com/';
+const PAID_LISTING = {
+  modelId: 'qwen3-0.6b',
+  reasoning: ['off'],
+  kind: 'paid',
+  prices: { inputAtomicPerMtok: '1000000', outputAtomicPerMtok: '2000000' },
+} as const;
 
 function fileConfig(toml: string): NodeConfig {
   const result = parseNodeConfig(toml);
@@ -52,11 +64,8 @@ function rejects(code: string, run: () => unknown) {
 
 void test('without a file the seller keeps today: PoC listing, no publication, default relays', () => {
   const settings = sellerSettings(undefined, {});
-  assert.deepEqual(settings.offer, {
-    modelId: 'qwen3-0.6b',
-    prices: { inputAtomicPerMtok: '1000000', outputAtomicPerMtok: '2000000' },
-    reasoning: ['off'],
-  });
+  assert.deepEqual(settings.offer, PAID_LISTING);
+  assert.deepEqual(settings.offer, defaultSellerOffer());
   assert.equal(settings.relayOnly, false);
   assert.equal(settings.irohBind, undefined);
   assert.equal(settings.irohExternalAddress, undefined);
@@ -94,22 +103,33 @@ void test('environment-only settings match the previous direct readers', () => {
   );
 });
 
-void test('a free offer for the served model lists zero prices and carries its caps', () => {
-  const settings = sellerSettings(served({ pricing: FREE }), {});
+void test('a free offer is refused until free execution is wired, then lists zero prices with its caps', () => {
+  rejects(NODE_ERROR_CODES.SELLER_FREE_EXECUTION_UNAVAILABLE, () =>
+    sellerSettings(served({ pricing: FREE }), {}),
+  );
+  const settings = sellerSettings(
+    served({ pricing: FREE }),
+    {},
+    { freeExecution: true },
+  );
   assert.deepEqual(settings.offer, {
     modelId: 'qwen3-0.6b',
-    prices: { inputAtomicPerMtok: '0', outputAtomicPerMtok: '0' },
     reasoning: ['off'],
-    free: { dailyTokenCap: 200000, perBuyerCap: 5000 },
+    kind: 'free',
+    caps: { dailyTokenCap: 200000, perBuyerCap: 5000 },
   });
+  assert.deepEqual(listedPrices(settings.offer), {
+    inputAtomicPerMtok: '0',
+    outputAtomicPerMtok: '0',
+  });
+  assert.deepEqual(listedPrices(PAID_LISTING), PAID_LISTING.prices);
 });
 
 void test('a paid offer must advertise exactly the PoC rates the v1 path charges', () => {
-  assert.deepEqual(sellerSettings(served({ pricing: POC_PRICE }), {}).offer, {
-    modelId: 'qwen3-0.6b',
-    prices: { inputAtomicPerMtok: '1000000', outputAtomicPerMtok: '2000000' },
-    reasoning: ['off'],
-  });
+  assert.deepEqual(
+    sellerSettings(served({ pricing: POC_PRICE }), {}).offer,
+    PAID_LISTING,
+  );
   rejects(NODE_ERROR_CODES.SELLER_OFFER_PRICE_UNSUPPORTED, () =>
     sellerSettings(served(), {}),
   );
@@ -201,18 +221,37 @@ void test('file transport, discovery and relay token variable apply; the environ
   assert.equal(overridden.publication, undefined);
 });
 
-void test('invalid environment values fail closed instead of being ignored', () => {
+void test('invalid environment values for consumed settings fail closed; GYBLOS_RPC_URL is not consumed', () => {
   rejects(NODE_ERROR_CODES.NODE_CONFIG_INVALID, () =>
     sellerSettings(undefined, { GYBLOS_DISCOVERY_PUBLISH: 'yes' }),
   );
+  rejects(NODE_ERROR_CODES.NODE_CONFIG_INVALID, () =>
+    sellerSettings(undefined, { GYBLOS_RELAYS: 'http://relay.example.com' }),
+  );
+  for (const value of ['', 'garbage', 'ftp://x'])
+    assert.deepEqual(
+      sellerSettings(undefined, { GYBLOS_RPC_URL: value }).offer,
+      PAID_LISTING,
+    );
+});
+
+void test('the seller-daemon example starts the seller as written', () => {
+  const settings = sellerSettings(
+    fileConfig(
+      readFileSync(join(EXAMPLES_DIRECTORY, 'seller-daemon.toml'), 'utf8'),
+    ),
+    {},
+  );
+  assert.deepEqual(settings.offer, PAID_LISTING);
+  assert.equal(settings.publication, undefined);
 });
 
 void test('loadSellerSettings: optional ./gyblos.toml, required GYBLOS_CONFIG, invalid files fail closed', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'gyblos-seller-settings-'));
   try {
-    assert.equal(
-      (await loadSellerSettings({}, directory)).offer.free,
-      undefined,
+    assert.deepEqual(
+      (await loadSellerSettings({}, directory)).offer,
+      PAID_LISTING,
     );
     await rejectsAsync(NODE_ERROR_CODES.NODE_CONFIG_INVALID, () =>
       loadSellerSettings({ GYBLOS_CONFIG: 'missing.toml' }, directory),
@@ -226,9 +265,13 @@ void test('loadSellerSettings: optional ./gyblos.toml, required GYBLOS_CONFIG, i
         extra: 'reasoning = ["off"]',
       });
     await writeFile(join(directory, 'gyblos.toml'), freeToml);
+    await rejectsAsync(NODE_ERROR_CODES.SELLER_FREE_EXECUTION_UNAVAILABLE, () =>
+      loadSellerSettings({}, directory),
+    );
     assert.equal(
-      (await loadSellerSettings({}, directory)).offer.free?.dailyTokenCap,
-      200000,
+      (await loadSellerSettings({}, directory, { freeExecution: true })).offer
+        .kind,
+      'free',
     );
     await writeFile(join(directory, 'other.toml'), 'version = 1\n[node\n');
     await rejectsAsync(NODE_ERROR_CODES.NODE_CONFIG_INVALID, () =>
