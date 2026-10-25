@@ -15,6 +15,7 @@ import {
   type SellerSelectionCode,
   type SellerSelectionPolicy,
 } from './constants.js';
+import { chargeV2 } from './pricing-v2.js';
 import {
   checkInput,
   invalid,
@@ -94,17 +95,28 @@ function passesSellerFilters(
 // A paid budget must cover at least one input plus one output token at the listed prices.
 function passesListingFilters(listing: PublicModelV2, request: SellerRequest) {
   const { pricing } = listing;
-  if (!isAtomic(pricing.inputAtomic) || !isAtomic(pricing.outputAtomic))
+  if (
+    !isAtomic(pricing.inputAtomicPerMtok) ||
+    !isAtomic(pricing.outputAtomicPerMtok)
+  )
     return false;
-  const input = BigInt(pricing.inputAtomic);
-  const output = BigInt(pricing.outputAtomic);
+  const input = BigInt(pricing.inputAtomicPerMtok);
+  const output = BigInt(pricing.outputAtomicPerMtok);
   return (
     pricing.network === request.network &&
     pricing.asset === request.asset &&
     listing.contextTokens >= request.maxTokens &&
-    input <= BigInt(request.priceCeilings.inputAtomic) &&
-    output <= BigInt(request.priceCeilings.outputAtomic) &&
-    (isFree(listing) || BigInt(request.maxAtomic) >= input + output)
+    input <= BigInt(request.priceCeilings.inputAtomicPerMtok) &&
+    output <= BigInt(request.priceCeilings.outputAtomicPerMtok) &&
+    (isFree(listing) ||
+      BigInt(request.maxAtomic) >=
+        chargeV2(
+          { input: 1, output: 1 },
+          {
+            inputAtomicPerMtok: pricing.inputAtomicPerMtok,
+            outputAtomicPerMtok: pricing.outputAtomicPerMtok,
+          },
+        ))
   );
 }
 function findListing(catalog: PublicCatalogV2, selection: ModelSelection) {

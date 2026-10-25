@@ -183,7 +183,7 @@ eachStorage(
     await expectError(await publish(forged), 400, 'INVALID_SIGNATURE');
     const tampered = seller.catalog(1);
     if (tampered.record.kind === 'catalog')
-      tampered.record.models[0]!.pricing.outputAtomic = '0';
+      tampered.record.models[0]!.pricing.outputAtomicPerMtok = '0';
     await expectError(await publish(tampered), 400, 'INVALID_SIGNATURE');
     const marker = 'zz-echo-marker-zz';
     for (const raw of [
@@ -311,7 +311,9 @@ const json = (value: unknown) => JSON.stringify({ record: value });
 void test('the protocol golden v2 records publish, list byte-for-byte and withdraw', async () => {
   const vector: { records: { record: { kind: string } }[] } = JSON.parse(
     await readFile(
-      new URL(import.meta.resolve('@gyblos/protocol/vectors/control-v2.json')),
+      new URL(
+        import.meta.resolve('@gyblos/protocol/vectors/control-v2-mtok.json'),
+      ),
       'utf8',
     ),
   );

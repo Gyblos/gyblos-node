@@ -292,9 +292,9 @@ contains:
 
 - `request`: `selection` (`modelId`, nullable `variant` and `quantization`),
   exact `reasoning`, nullable `lowestReasoning`, `network`, `asset`,
-  `maxTokens`, canonical decimal `maxAtomic`, `priceCeilings` (`inputAtomic`,
-  `outputAtomic`), `minimumBadge: "declared-usage"`, and an accepted `retention`
-  array;
+  `maxTokens`, canonical decimal `maxAtomic`, `priceCeilings`
+  (`inputAtomicPerMtok`, `outputAtomicPerMtok`, atomic units per million
+  tokens), `minimumBadge: "declared-usage"`, and an accepted `retention` array;
 - `sellers`: at most 16 operator-trusted
   `{ owner, nodeId, relayUrl, directAddresses }` entries; an optional signed
   `withdrawal` is checked against the exact catalog. These identity bindings

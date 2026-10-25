@@ -19,7 +19,15 @@ void test('a smaller selected quote budget cannot authorize against a larger tru
     run.context,
     run.ownerSigner,
   );
-  const trusted: InferenceOffer = { ...quote.offer, maxAtomic: '10000' };
+  quote.offer.prices = {
+    inputAtomicPerMtok: '1000000',
+    outputAtomicPerMtok: '2000000',
+  };
+  const trusted: InferenceOffer = {
+    ...quote.offer,
+    prices: { inputAtomic: '1', outputAtomic: '2' },
+    maxAtomic: '10000',
+  };
   const result: SelectionDecision = {
     ok: true,
     winner: { quote, candidate: {} as SellerCandidate },

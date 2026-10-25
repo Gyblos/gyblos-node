@@ -100,12 +100,12 @@ void test('control supports free and mixed-zero model pricing without authorizin
     ),
     { code: CONTROL_CODES.POLICY },
   );
-  paid.catalog.models[0]!.pricing.inputAtomic = '0';
+  paid.catalog.models[0]!.pricing.inputAtomicPerMtok = '0';
   paid.context.catalog = await signPublicV2(paid.catalog, paid.nodeSigner);
   paid.request.params.catalogDigest = await catalogDigestV2(paid.catalog);
   assert.equal(
     (await createControlQuote(paid.request, paid.context, paid.ownerSigner))
-      .offer.prices.inputAtomic,
+      .offer.prices.inputAtomicPerMtok,
     '0',
   );
 });
@@ -144,7 +144,7 @@ void test('control rejects unavailable models, levels, stale catalogs and excess
     [
       {
         ...fixture.request.params,
-        priceCeilings: { inputAtomic: '0', outputAtomic: '0' },
+        priceCeilings: { inputAtomicPerMtok: '0', outputAtomicPerMtok: '0' },
       },
       CONTROL_CODES.POLICY,
     ],
@@ -180,7 +180,7 @@ void test('control rejects signed substitutions and responses from another reque
     { reasoning: REASONING_LEVELS.LOW },
     { maxAtomic: '1001' },
     { selection: { ...signed.offer.selection, variant: 'different' } },
-    { prices: { inputAtomic: '3', outputAtomic: '3' } },
+    { prices: { inputAtomicPerMtok: '3', outputAtomicPerMtok: '3' } },
     { catalogDigest: '5'.repeat(64) },
     { network: 'solana:other' },
     { mint: fixture.context.owner },
@@ -230,7 +230,7 @@ void test('control request digests cover every field and reject unknown or nonca
     },
     {
       ...fixture.request.params,
-      priceCeilings: { inputAtomic: '2', outputAtomic: '3' },
+      priceCeilings: { inputAtomicPerMtok: '2', outputAtomicPerMtok: '3' },
     },
   ])
     assert.notEqual(
@@ -300,7 +300,7 @@ void test('control serves two independent buyers and custom model tuples without
     modelId: 'custom/model',
     variant: 'fine-tuned',
     quantization: null,
-    pricing: { ...model.pricing, outputAtomic: '3' },
+    pricing: { ...model.pricing, outputAtomicPerMtok: '3' },
   };
   fixture.catalog.models.push(custom);
   fixture.context.catalog = await signPublicV2(
@@ -343,8 +343,8 @@ void test('control serves two independent buyers and custom model tuples without
       fixture.ownerSigner,
     ),
   ]);
-  assert.equal(first.offer.prices.outputAtomic, '2');
-  assert.equal(second.offer.prices.outputAtomic, '3');
+  assert.equal(first.offer.prices.outputAtomicPerMtok, '2');
+  assert.equal(second.offer.prices.outputAtomicPerMtok, '3');
   assert.equal(second.offer.model.name, 'custom-engine');
   await assert.rejects(
     acceptControlQuote(second, fixture.request, fixture.trust()),

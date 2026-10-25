@@ -9,6 +9,7 @@ import {
   CONTROL_VERSION,
   MODEL_IDENTITIES,
   REASONING_LEVELS,
+  V2_PRICING,
 } from '@gyblos/protocol/constants';
 import type {
   OfferQuery,
@@ -33,9 +34,11 @@ export async function controlFixture(free = false) {
     models: source.catalog.models.map((model) => ({
       ...model,
       pricing: {
-        ...model.pricing,
-        inputAtomic: free ? '0' : '1',
-        outputAtomic: free ? '0' : '2',
+        network: model.pricing.network,
+        asset: model.pricing.asset,
+        unit: V2_PRICING.unit,
+        inputAtomicPerMtok: free ? '0' : '1',
+        outputAtomicPerMtok: free ? '0' : '2',
       },
       reasoning: [REASONING_LEVELS.OFF, REASONING_LEVELS.LOW],
     })),
@@ -57,7 +60,7 @@ export async function controlFixture(free = false) {
       reasoning: REASONING_LEVELS.OFF,
       maxTokens: 100,
       maxAtomic: free ? '0' : '1000',
-      priceCeilings: { inputAtomic: '3', outputAtomic: '3' },
+      priceCeilings: { inputAtomicPerMtok: '3', outputAtomicPerMtok: '3' },
       network: catalog.models[0]!.pricing.network,
       asset: catalog.models[0]!.pricing.asset,
       catalogDigest: await catalogDigestV2(catalog),
