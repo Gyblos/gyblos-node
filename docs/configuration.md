@@ -235,7 +235,8 @@ this daemon. Today it honors:
 Startup stops with a static code: `NODE_CONFIG_INVALID`,
 `SELLER_SETTING_UNSUPPORTED`, `SELLER_OFFER_COUNT_UNSUPPORTED`,
 `SELLER_OFFER_MODEL_UNSUPPORTED`, `SELLER_OFFER_ENGINE_UNSUPPORTED`,
-`SELLER_OFFER_REASONING_UNSUPPORTED`, `SELLER_OFFER_PRICE_UNSUPPORTED` or
+`SELLER_OFFER_REASONING_UNSUPPORTED` or `SELLER_OFFER_PRICE_UNSUPPORTED`.
+
 `SELLER_FREE_EXECUTION_UNAVAILABLE` remains the default guard for callers that
 do not explicitly compose the free handler. The seller daemon opts in only with
 that handler present. `pnpm gyblos config validate --config "$GYBLOS_CONFIG"`
