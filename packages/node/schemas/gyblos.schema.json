@@ -148,7 +148,7 @@
       "description": "Canonical model ids and aliases from the protocol catalog.",
       "enum": [
         "qwen3-30b-a3b",
-        "qwen3:30b-a3b",
+        "qwen3:30b-a3b-q4_K_M",
         "qwen3-235b-a22b",
         "deepseek-v4.1-flash",
         "kimi-k3",
@@ -219,7 +219,7 @@
           "$ref": "#/definitions/engine"
         },
         "reasoning": {
-          "description": "Reasoning levels served (GYB-DOC-028); default [\"off\"].",
+          "description": "Reasoning levels served (GYB-DOC-028). A catalog model accepts only the levels it supports and defaults to its catalog level; custom or unverified models default to [\"off\"]. The per-model rule is checked by gyblos config validate.",
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,

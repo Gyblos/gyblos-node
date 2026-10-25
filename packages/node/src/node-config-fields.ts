@@ -10,6 +10,7 @@ import {
   NODE_CONFIG_LIMITS,
   NODE_CONFIGURATION_LIMITS,
   type NodeConfigIssueCode,
+  type NodeConfigWarningCode,
 } from './constants.js';
 
 export interface NodeConfigIssue {
@@ -18,6 +19,12 @@ export interface NodeConfigIssue {
   path: string;
   line?: number;
   column?: number;
+}
+
+// A warning never fails validation; like an issue it carries a static code and a key path only.
+export interface NodeConfigWarning {
+  code: NodeConfigWarningCode;
+  path: string;
 }
 
 export type ConfigPath = readonly (string | number)[];
@@ -69,10 +76,15 @@ export function formatPath(path: ConfigPath) {
 
 export class IssueList {
   readonly issues: NodeConfigIssue[] = [];
+  readonly warnings: NodeConfigWarning[] = [];
 
   add(code: NodeConfigIssueCode, path: ConfigPath) {
     this.issues.push({ code, path: formatPath(path) });
     return undefined;
+  }
+
+  warn(code: NodeConfigWarningCode, path: ConfigPath) {
+    this.warnings.push({ code, path: formatPath(path) });
   }
 
   // A composite reader takes a mark first and returns its value only if no issue was added since.
