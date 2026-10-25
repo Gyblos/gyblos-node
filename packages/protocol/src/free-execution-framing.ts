@@ -2,7 +2,11 @@
 // Call finish only after EOF; transport deadlines, admission and peer authentication remain external.
 import { FREE_EXECUTION } from './constants.js';
 import { ControlFrameReader, encodeControlFrame } from './control-framing.js';
-import { freeExecutionBoundary } from './free-execution-validation.js';
+import {
+  freeExecutionBoundary,
+  freeExecutionFail,
+  rethrowFreeExecution,
+} from './free-execution-validation.js';
 import {
   parseFreeExecutionRequest,
   parseFreeExecutionResponse,
@@ -24,27 +28,42 @@ export function encodeFreeExecutionResponse(value: unknown): Uint8Array {
     ),
   );
 }
-export class FreeExecutionRequestReader {
-  private readonly reader = new ControlFrameReader(FREE_EXECUTION.requestBytes);
+class FreeExecutionReader<T> {
+  private readonly reader: ControlFrameReader;
+  private failed = false;
+  constructor(
+    maximum: number,
+    private readonly parse: (value: unknown) => T,
+  ) {
+    this.reader = new ControlFrameReader(maximum);
+  }
+  private read<R>(operation: () => R): R {
+    if (this.failed) return freeExecutionFail();
+    try {
+      return operation();
+    } catch (error) {
+      this.failed = true;
+      return rethrowFreeExecution(error);
+    }
+  }
   push(chunk: Uint8Array) {
-    return freeExecutionBoundary(() => this.reader.push(chunk));
+    return this.read(() => this.reader.push(chunk));
   }
   finish() {
-    return freeExecutionBoundary(() =>
-      parseFreeExecutionRequest(this.reader.finish()),
-    );
+    return this.read(() => this.parse(this.reader.finish()));
   }
 }
-export class FreeExecutionResponseReader {
-  private readonly reader = new ControlFrameReader(
-    FREE_EXECUTION.responseBytes,
-  );
-  push(chunk: Uint8Array) {
-    return freeExecutionBoundary(() => this.reader.push(chunk));
+export class FreeExecutionRequestReader extends FreeExecutionReader<
+  ReturnType<typeof parseFreeExecutionRequest>
+> {
+  constructor() {
+    super(FREE_EXECUTION.requestBytes, parseFreeExecutionRequest);
   }
-  finish() {
-    return freeExecutionBoundary(() =>
-      parseFreeExecutionResponse(this.reader.finish()),
-    );
+}
+export class FreeExecutionResponseReader extends FreeExecutionReader<
+  ReturnType<typeof parseFreeExecutionResponse>
+> {
+  constructor() {
+    super(FREE_EXECUTION.responseBytes, parseFreeExecutionResponse);
   }
 }
