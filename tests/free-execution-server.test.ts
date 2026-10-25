@@ -158,10 +158,14 @@ void test('free stream deadline suppresses late engine response and retains its 
 void test('free stream ingress timeout retains a stuck read slot until actual read settlement', async () => {
   const state = await fixture();
   let settle: ((value: number[]) => void) | undefined;
-  state.stream.recv.readExact = () =>
-    new Promise((resolve) => {
+  let readCalls = 0;
+  state.stream.recv.readExact = () => {
+    readCalls++;
+    if (readCalls > 1) return Promise.resolve([]);
+    return new Promise((resolve) => {
       settle = resolve;
     });
+  };
   let closed: (() => void) | undefined;
   const stopped = new Promise<void>((resolve) => {
     closed = resolve;
@@ -186,6 +190,7 @@ void test('free stream ingress timeout retains a stuck read slot until actual re
   await running;
   assert.equal(state.writes(), 0);
   assert.equal(state.releases(), 1);
+  assert.equal(readCalls, 1);
 });
 
 void test('free stream does not finish a response after a timed-out native write settles', async () => {
