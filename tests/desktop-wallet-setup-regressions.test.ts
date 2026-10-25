@@ -21,7 +21,7 @@ void test('first-run restoration accepts a valid multibyte portable-backup passw
     assert.notEqual(
       parseSetupRequest({
         action: SETUP_ACTION.RESTORE,
-        password: '\uFEFF' + password,
+        password: String.fromCodePoint(0xfeff) + password,
       }),
       null,
     );
