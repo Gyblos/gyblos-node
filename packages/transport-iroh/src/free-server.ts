@@ -134,6 +134,7 @@ export async function serveFreeExecutionStream(
     const bytes = encodeFreeExecutionResponse(response);
     const sending = (async () => {
       await stream.send.writeAll([...bytes]);
+      check(controller.signal, routeAllowed);
       await stream.send.finish();
     })();
     // The enclosing operation must not settle while a native writer is still pending.

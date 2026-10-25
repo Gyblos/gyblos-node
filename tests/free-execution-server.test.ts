@@ -192,11 +192,30 @@ void test('free stream does not finish a response after a timed-out native write
   const state = await fixture();
   let settle: (() => void) | undefined;
   let finishes = 0;
-  state.stream.send.writeAll = () => new Promise<void>((resolve) => { settle = resolve; });
-  state.stream.send.finish = async () => { finishes++; };
+  state.stream.send.writeAll = () =>
+    new Promise<void>((resolve) => {
+      settle = resolve;
+    });
+  state.stream.send.finish = async () => {
+    finishes++;
+  };
   let closed: (() => void) | undefined;
-  const stopped = new Promise<void>((resolve) => { closed = resolve; });
-  const running = serveFreeExecutionStream(state.stream, state.service, 'peer', () => { state.close(); closed!(); }, new AbortController().signal, state.enter, () => true, { egressMs: 10 });
+  const stopped = new Promise<void>((resolve) => {
+    closed = resolve;
+  });
+  const running = serveFreeExecutionStream(
+    state.stream,
+    state.service,
+    'peer',
+    () => {
+      state.close();
+      closed!();
+    },
+    new AbortController().signal,
+    state.enter,
+    () => true,
+    { egressMs: 10 },
+  );
   await stopped;
   await new Promise<void>((resolve) => setImmediate(resolve));
   assert.equal(state.releases(), 0);
