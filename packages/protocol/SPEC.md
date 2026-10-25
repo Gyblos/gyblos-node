@@ -339,3 +339,145 @@ synthetic public keys/signatures are retained. The historical `control-v2.json`
 is retained unchanged to verify rejection of the previous per-token v2 shape.
 The complete design and rollout
 constraints live in vault GYB-DOC-022, control-contract appendix.
+
+## Free inference execution v2 (contract only)
+
+`@gyblos/protocol/free-execution` and `./free-execution-framing` define a
+non-streaming execution contract for previously verified signed free quotes.
+This contract alone does not register an ALPN, call an engine, change seller
+startup or enable any payment. Seller and buyer wiring follow separately.
+
+### Separate execution channel
+
+The ALPN is **`gyblos/free/2`**. Reusing `gyblos/control/1` would break its
+no-prompt/no-engine invariant, mix long-running inference with short discovery
+queries and make their independent admission budgets ambiguous. A separate
+ALPN preserves that boundary and permits separate execution admission under the
+same endpoint limits. `gyblos/http/2` remains reserved and unregistered; the
+existing v1 HTTP bridge, routes and payment admission are unchanged.
+
+An existing `SignedOfferV2` still signs `protocol: "gyblos/http/2"`: this is the
+unchanged quote-family marker, **not an instruction to dial or register that
+reserved ALPN**. Only an authenticated offer with both atomic-per-million
+prices `"0"` and `maxAtomic: "0"` is eligible for the explicitly free channel.
+Never rewrite/re-sign the quote, strip its terms or convert it to v1. Paid
+quotes are refused even when the buyer declares a zero budget elsewhere.
+
+### Request and response
+
+One bidirectional stream carries one request and one complete response, each
+with a four-byte big-endian unsigned body length, canonical UTF-8 JSON, then
+send EOF. A receiver processes nothing until the full body and EOF arrive.
+
+Request fields (all required; unknown fields at every level are rejected):
+
+- `version: 2`, and `requestId` equal to the quote's validated 128-bit lowercase
+  hexadecimal requestId. A fresh execution identifier cannot make a quote reusable.
+- `quote`: the unmodified seller-signed `SignedOfferV2` envelope.
+- `input`: `messages`, `selection`, `reasoning`, `maxTokens`. `selection` is the
+  quote's exact public `{modelId, variant, quantization}`; the quote already
+  binds its internal engine `model` description. Neither identifier is an
+  arbitrary engine URL or upstream model override.
+- `messages`: 1–64 text-only objects with exactly `role` and `content`. Roles
+  are `system`, `user`, `assistant`; multiline/empty content is representable.
+  Tools, attachments, remote URLs, function calls and streaming options are not
+  supported. A wire role does not imply a particular engine implements it:
+  the seller must refuse unsupported input before generation, without silently
+  flattening messages or downgrading reasoning.
+- `maxTokens` is a positive safe integer no greater than the signed output
+  maximum or model context. The engine-specific input token count plus the
+  requested output maximum must fit the quoted context before generation.
+
+Success response:
+`{version: 2, requestId, requestDigest, result: {text, usage: {inputTokens, outputTokens}, finishReason}}`.
+Usage contains non-negative safe integer counts under the public context bound;
+output must not exceed the requested maximum, and combined usage must fit the
+quoted context. `finishReason` is `stop` or `length`. Empty text/zero counts are
+representable; usage is reported evidence, not a cryptographic proof of work.
+There are no fragments or buyer-visible streaming in this version.
+
+Failure response uses exactly the same header and `error: {code}`, never
+`result` as well. Codes are the closed `FREE_EXECUTION_CODES` catalog: invalid,
+version, limit, binding, signature, expired, wrong peer, replay, not-free,
+daily-cap, buyer-cap, unsupported, busy, engine-unavailable, timeout, cancelled
+and internal. Messages, provider errors and input contents are never reflected.
+If framing/structure is invalid and no complete validated request is available,
+close the stream; do not invent or echo an unvalidated correlation identifier.
+
+`requestDigest` is SHA-256 of UTF-8
+`"gyblos/free-execution-request/v2\n" + canonicalJson(validatedRequest)`.
+It includes the signed quote and the complete chat input, and is distinct from
+the quote's prompt-free control request digest. The buyer matches requestId and
+this digest before acting on either an error or a result. Responses are bound
+to the authenticated seller connection, not independently signed receipts.
+
+### Bounds and admission obligations
+
+Request JSON bodies are at most 128 KiB and response bodies at most 1 MiB.
+Message content totals at most 64 KiB of UTF-8; result text at most 256 KiB.
+The body limit also includes JSON escaping and the quote envelope, so text
+below its own bound can still exceed the frame bound. Lone UTF-16 surrogates
+are invalid. Framing reuses the canonical codec's depth limit 16 and strict
+UTF-8, duplicate/noncanonical-key/number rejection, EOF, no trailing bytes and
+no additional-message rules. Reject an excessive length before body allocation.
+
+Transport integration must apply shared endpoint `TRANSPORT_LIMITS` and
+connection-open rates **before** separate execution admission. Do not borrow
+or bypass control's independent `CONTROL_CAPACITY`. Preserve the existing
+inference ingress/egress bounds (`IROH_DEADLINES`) and absolute inference
+request deadline (`TRANSPORT_TIMEOUTS.requestMs`, currently 180 seconds) from
+stream acceptance; the 10-second control-query total is not an inference
+budget. No unbounded queue, late response or fallback after sending any prompt
+bytes is allowed, including timeout, disconnect and unknown completion.
+Cancellation must not release active engine work early if native cancellation
+has not actually settled. These are integration requirements, not a claim that
+this protocol-only PR enforces socket deadlines or resource admission.
+
+### Quote authentication, replay and free caps
+
+Before any engine generation, the seller verifies its own configured owner and
+NodeId against the quote and verifies the owner's signature; enforces zero
+clock skew (`issuedAt <= now < expiresAt`); matches authenticated Iroh peer to
+`buyerNodeId`; checks free prices/budget, exact selection/reasoning and token
+limits; then enforces one-use replay admission and the configured free caps.
+Expiry must be checked again immediately before admitting generation after any
+asynchronous validation. Expiry after admission does not extend the execution
+deadline or authorize a second request.
+
+The replay key is `(seller NodeId, buyerNodeId, requestId)`. Atomically consume
+it before starting the engine and retain it through the quote's expiry, even
+if the engine fails, the client disconnects or the response is lost. A full
+replay table rejects new work rather than evicting unexpired entries. Parsing
+and signature verification helpers are stateless and **do not consume** it.
+
+The handler takes caps from the prepared `SellerCatalogOffer` free branch,
+not from the client or a second configuration read. Enforce
+`caps.dailyTokenCap` first, then `caps.perBuyerCap`, in total input plus output
+tokens per UTC day. Key the offer budget by stable configured offer identity
+within the seller (including model selection), not a renewing catalog digest
+or requestId. Per-buyer accounting additionally keys by authenticated NodeId;
+it is best effort because NodeIds are free to create.
+
+Concurrent admission must atomically reserve a conservative input-token count
+plus the output maximum against both caps before generation; reconcile actual
+usage only when trustworthy and retain a conservative debit for uncertain work.
+Insufficient cap rejects without generation. Midnight rollover must not erase
+reservations held by running requests. Caps and replay state may be in memory
+for the MVP: restarting resets them and can permit extra free work and replay
+of an otherwise still-live quote. This limitation must be disclosed in seller
+wiring; counters are neither a durable daily guarantee nor Sybil resistance.
+No handler path may call payments, the facilitator or v1, including failures.
+
+### Compatibility and rollout
+
+`vectors/free-execution-v2.json` pins independent Node/OpenSSL quote signature,
+request canonical bytes/domain digest, request framing and success/error
+response framing. All existing v1 and v2 vectors/domains remain unchanged.
+The contract ships first; seller wiring then enables free startup explicitly
+with `loadSellerSettings(process.env, undefined, {freeExecution: true})` only
+when its handler and caps are present. Buyer wiring follows separately.
+Acceptance later covers publication → discovery → selection → free quote →
+execution → answer using an in-process index and synthetic engine, including
+replay, expiry, wrong peer, exhausted caps, engine failure and no fallback once
+prompt transmission begins. Real engines, off-host or production runs require
+separate founder authorization. Streaming and paid v2 remain later work.

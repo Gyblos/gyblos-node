@@ -215,7 +215,8 @@ export const FREE_CHAT_ROLES = {
   USER: 'user',
   ASSISTANT: 'assistant',
 } as const;
-export type FreeChatRole = (typeof FREE_CHAT_ROLES)[keyof typeof FREE_CHAT_ROLES];
+export type FreeChatRole =
+  (typeof FREE_CHAT_ROLES)[keyof typeof FREE_CHAT_ROLES];
 export const FREE_EXECUTION_CODES = {
   INVALID: 'INVALID_FREE_EXECUTION',
   VERSION: 'UNSUPPORTED_FREE_EXECUTION_VERSION',
@@ -235,4 +236,5 @@ export const FREE_EXECUTION_CODES = {
   CANCELLED: 'FREE_EXECUTION_CANCELLED',
   INTERNAL: 'FREE_EXECUTION_INTERNAL_ERROR',
 } as const;
-export type FreeExecutionCode = (typeof FREE_EXECUTION_CODES)[keyof typeof FREE_EXECUTION_CODES];
+export type FreeExecutionCode =
+  (typeof FREE_EXECUTION_CODES)[keyof typeof FREE_EXECUTION_CODES];
