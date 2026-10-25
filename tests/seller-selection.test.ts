@@ -294,8 +294,8 @@ void test('hard filters exclude cooldown, stale, withdrawn, policy, badge and pr
     seller(4, { catalogExpired: true }),
     seller(5, { retention: DATA_RETENTION.MAY_RETAIN }),
     seller(6, { badge: SELLER_BADGES.DECLARED_USAGE }),
-    seller(7, { input: '101' }),
-    seller(8, { input: '60', output: '50' }),
+    seller(7, { input: '101000000' }),
+    seller(8, { input: '60000000', output: '50000000' }),
     seller(9),
   ];
   const stats = new Map([
@@ -305,6 +305,10 @@ void test('hard filters exclude cooldown, stale, withdrawn, policy, badge and pr
   const strict = request({
     minimumBadge: SELLER_BADGES.MEASURABLE_USAGE,
     maxAtomic: '100',
+    priceCeilings: {
+      inputAtomicPerMtok: '100000000',
+      outputAtomicPerMtok: '100000000',
+    },
   });
   const result = select([...excluded, seller(10)], { request: strict, stats });
   assert.deepEqual(

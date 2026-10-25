@@ -12,6 +12,7 @@ import type {
   PublicCatalogV2,
   PublicPresenceV2,
   PublicWithdrawalV2,
+  TokenPricesV2,
 } from '@gyblos/protocol/control-types';
 
 import {
@@ -37,7 +38,7 @@ export interface SellerRequest {
   network: string;
   asset: string;
   maxTokens: number;
-  priceCeilings: { inputAtomic: string; outputAtomic: string };
+  priceCeilings: TokenPricesV2;
   maxAtomic: string;
   minimumBadge: SellerBadge;
   // Seller retention declarations the buyer accepts; a declaration is not a privacy guarantee.
@@ -116,8 +117,8 @@ function checkRequest(request: SellerRequest) {
     typeof request.asset !== 'string' ||
     !isCount(request.maxTokens) ||
     request.maxTokens < 1 ||
-    !isAtomic(request.priceCeilings.inputAtomic) ||
-    !isAtomic(request.priceCeilings.outputAtomic) ||
+    !isAtomic(request.priceCeilings.inputAtomicPerMtok) ||
+    !isAtomic(request.priceCeilings.outputAtomicPerMtok) ||
     !isAtomic(request.maxAtomic) ||
     !SELLER_BADGE_ORDER.includes(request.minimumBadge) ||
     !Array.isArray(request.retention) ||
@@ -150,8 +151,8 @@ function isListing(listing: unknown) {
     isRecord(listing.pricing) &&
     typeof listing.pricing.network === 'string' &&
     typeof listing.pricing.asset === 'string' &&
-    typeof listing.pricing.inputAtomic === 'string' &&
-    typeof listing.pricing.outputAtomic === 'string' &&
+    typeof listing.pricing.inputAtomicPerMtok === 'string' &&
+    typeof listing.pricing.outputAtomicPerMtok === 'string' &&
     Array.isArray(listing.reasoning) &&
     listing.reasoning.every(isLevel)
   );

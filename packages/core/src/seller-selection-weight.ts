@@ -104,14 +104,14 @@ export function reputation(
   );
 }
 export const isFree = (listing: PublicModelV2) =>
-  BigInt(listing.pricing.inputAtomic) === 0n &&
-  BigInt(listing.pricing.outputAtomic) === 0n;
+  BigInt(listing.pricing.inputAtomicPerMtok) === 0n &&
+  BigInt(listing.pricing.outputAtomicPerMtok) === 0n;
 
-// Reference price is one input plus one output token, discounted for an open channel.
+// Reference price is one million input plus one million output tokens, discounted for an open channel.
 function unitPrice(entry: Eligible, policy: SellerSelectionPolicy) {
   const { pricing } = entry.listing;
   const total = Number(
-    BigInt(pricing.inputAtomic) + BigInt(pricing.outputAtomic),
+    BigInt(pricing.inputAtomicPerMtok) + BigInt(pricing.outputAtomicPerMtok),
   );
   return entry.seller.openChannel
     ? total * policy.openChannelPriceFactor

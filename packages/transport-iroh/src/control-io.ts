@@ -38,6 +38,11 @@ export async function controlDeadline<T>(
   cancel: () => void,
   external?: AbortSignal,
 ): Promise<T> {
+  // Fail before building the race: a rejection created with no reader would crash the process.
+  if (external?.aborted) {
+    cancel();
+    return controlFail(CONTROL_CODES.CANCELLED);
+  }
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
   let abort = () => {};
@@ -50,10 +55,8 @@ export async function controlDeadline<T>(
     };
     external?.addEventListener('abort', abort, { once: true });
     timer = setTimeout(abort, milliseconds);
-    if (external?.aborted) abort();
   });
   try {
-    if (controller.signal.aborted) return controlFail(CONTROL_CODES.CANCELLED);
     return await Promise.race([run(controller.signal), cancelled]);
   } finally {
     clearTimeout(timer);

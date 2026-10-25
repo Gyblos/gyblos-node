@@ -23,6 +23,7 @@ import {
   controlReasoning,
   controlText,
 } from './control-validation.js';
+import { parseTokenPricesV2 } from './pricing-v2.js';
 
 function endpointV2(value: unknown, relayOnly: unknown) {
   const input = controlObject(value, ['relayUrl', 'directAddresses']);
@@ -134,7 +135,6 @@ export function parseOfferV2(value: unknown): InferenceOfferV2 {
     input.protocol !== CONTROL_PAID_ALPN
   )
     return controlFail(CONTROL_CODES.VERSION);
-  const prices = controlObject(input.prices, ['inputAtomic', 'outputAtomic']);
   const availability = controlObject(input.availability, [
     'state',
     'observedAt',
@@ -166,10 +166,7 @@ export function parseOfferV2(value: unknown): InferenceOfferV2 {
     issuedAt: controlInteger(input.issuedAt),
     expiresAt: controlInteger(input.expiresAt),
     ...endpointV2(input.endpoint, input.relayOnly),
-    prices: {
-      inputAtomic: controlAtomic(prices.inputAtomic),
-      outputAtomic: controlAtomic(prices.outputAtomic),
-    },
+    prices: parseTokenPricesV2(input.prices),
     maxAtomic: controlAtomic(input.maxAtomic),
     maxTokens: controlInteger(
       input.maxTokens,

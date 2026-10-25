@@ -11,6 +11,7 @@ import {
   PUBLIC_PRESENCE_STATE,
   PUBLIC_RECORD_KINDS,
   REASONING_LEVELS,
+  V2_PRICING,
 } from '@gyblos/protocol/constants';
 import type {
   PublicCatalogV2,
@@ -37,6 +38,13 @@ export async function discoverySeller(options: SellerOptions = {}) {
     models: source.catalog.models.map((model) => ({
       ...model,
       modelId: options.modelId ?? model.modelId,
+      pricing: {
+        network: model.pricing.network,
+        asset: model.pricing.asset,
+        unit: V2_PRICING.unit,
+        inputAtomicPerMtok: model.pricing.inputAtomic,
+        outputAtomicPerMtok: model.pricing.outputAtomic,
+      },
       reasoning: [REASONING_LEVELS.OFF],
     })),
   };

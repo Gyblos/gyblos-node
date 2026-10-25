@@ -40,7 +40,10 @@ export function acceptanceSelection(
       asset: DEVNET_USDC,
       maxTokens: 1,
       maxAtomic: '10',
-      priceCeilings: { inputAtomic: '1', outputAtomic: '2' },
+      priceCeilings: {
+        inputAtomicPerMtok: '1000000',
+        outputAtomicPerMtok: '2000000',
+      },
       minimumBadge: SELLER_BADGES.DECLARED_USAGE,
       retention: [DATA_RETENTION.NONE],
     },

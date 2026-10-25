@@ -27,6 +27,7 @@ import {
   controlReasoning,
   controlText,
 } from '@gyblos/protocol/control-validation';
+import { parseTokenPricesV2 } from '@gyblos/protocol/pricing-v2';
 import { parsePublicV2 } from '@gyblos/protocol/public-v2';
 
 import { BUYER_SELECTION, BUYER_SELECTION_CODES } from './constants.js';
@@ -74,10 +75,6 @@ function parseRequest(value: unknown): SellerRequest {
     'variant',
     'quantization',
   ]);
-  const prices = controlObject(row.priceCeilings, [
-    'inputAtomic',
-    'outputAtomic',
-  ]);
   // Until a real badge source exists, config cannot elevate checkability.
   if (row.minimumBadge !== SELLER_BADGES.DECLARED_USAGE)
     throw new BuyerSelectionError(BUYER_SELECTION_CODES.INVALID);
@@ -108,10 +105,7 @@ function parseRequest(value: unknown): SellerRequest {
     asset: controlAddress(row.asset),
     maxTokens: controlInteger(row.maxTokens, 1),
     maxAtomic: controlAtomic(row.maxAtomic),
-    priceCeilings: {
-      inputAtomic: controlAtomic(prices.inputAtomic),
-      outputAtomic: controlAtomic(prices.outputAtomic),
-    },
+    priceCeilings: parseTokenPricesV2(row.priceCeilings),
     minimumBadge: SELLER_BADGES.DECLARED_USAGE,
     retention,
   };

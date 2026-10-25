@@ -40,12 +40,14 @@ This does not establish an independent cryptographic audit or production safety.
 
 ## Validation boundary
 
-CI produces fresh unfunded encrypted-key fixtures on macOS, Windows and Linux.
-Each system reads all three artifacts, reconstructs the same address and
-persists it into a fresh **injected synthetic store**, then reads it with a new
-wallet-service instance. Only encrypted disposable fixtures and public expected
-addresses are uploaded, with one-day retention and public synthetic test
-credentials. No existing keys, user passwords or operational state participate.
+The manual `Desktop platforms` workflow
+(`.github/workflows/desktop-platforms.yml`) produces fresh unfunded
+encrypted-key fixtures on macOS, Windows and Linux. Each system reads all three
+artifacts, reconstructs the same address and persists it into a fresh **injected
+synthetic store**, then reads it with a new wallet-service instance. Only
+encrypted disposable fixtures and public expected addresses are uploaded, with
+one-day retention and public synthetic test credentials. No existing keys, user
+passwords or operational state participate.
 
 The exchange harness demonstrates portable bytes and identity preservation, not
 real Keychain/DPAPI/Linux-store acceptance or operational restore. The desktop

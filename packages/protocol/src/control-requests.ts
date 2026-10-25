@@ -23,6 +23,7 @@ import {
   controlObject,
   controlReasoning,
 } from './control-validation.js';
+import { parseTokenPricesV2 } from './pricing-v2.js';
 import { bytesHex } from './public-validation.js';
 import { signingBytes } from './signing.js';
 
@@ -72,10 +73,6 @@ export function parseControlQuery(value: unknown): ControlQuery {
     'asset',
     'catalogDigest',
   ]);
-  const prices = controlObject(params.priceCeilings, [
-    'inputAtomic',
-    'outputAtomic',
-  ]);
   return {
     version: CONTROL_VERSION,
     requestId,
@@ -91,10 +88,7 @@ export function parseControlQuery(value: unknown): ControlQuery {
         PUBLIC_RECORD_LIMITS.maxContextTokens,
       ),
       maxAtomic: controlAtomic(params.maxAtomic),
-      priceCeilings: {
-        inputAtomic: controlAtomic(prices.inputAtomic),
-        outputAtomic: controlAtomic(prices.outputAtomic),
-      },
+      priceCeilings: parseTokenPricesV2(params.priceCeilings),
       network: controlNetwork(params.network),
       asset: controlAddress(params.asset),
       catalogDigest: controlHex(params.catalogDigest),

@@ -8,6 +8,7 @@ import type {
   ControlCode,
   ControlMeteringMode,
   ReasoningLevel,
+  V2_PRICING,
 } from './constants.js';
 import type { EngineCapabilities, EngineDescription } from './engine.js';
 import type {
@@ -17,6 +18,15 @@ import type {
   PublicWithdrawal,
 } from './public-types.js';
 
+export interface TokenPricesV2 {
+  inputAtomicPerMtok: string;
+  outputAtomicPerMtok: string;
+}
+export interface PublicPricesV2 extends TokenPricesV2 {
+  network: string;
+  asset: string;
+  unit: typeof V2_PRICING.unit;
+}
 export interface ModelSelection {
   modelId: string;
   variant: string | null;
@@ -29,7 +39,7 @@ export interface ControlOfferParams {
   reasoning: ReasoningLevel;
   maxTokens: number;
   maxAtomic: string;
-  priceCeilings: { inputAtomic: string; outputAtomic: string };
+  priceCeilings: TokenPricesV2;
   network: string;
   asset: string;
   catalogDigest: string;
@@ -51,7 +61,8 @@ export interface OfferQuery extends Query {
   params: ControlOfferParams;
 }
 export type ControlQuery = CatalogQuery | PresenceQuery | OfferQuery;
-export interface PublicModelV2 extends PublicModelListing {
+export interface PublicModelV2 extends Omit<PublicModelListing, 'pricing'> {
+  pricing: PublicPricesV2;
   reasoning: ReasoningLevel[];
 }
 export interface PublicCatalogV2 extends Omit<
@@ -101,7 +112,7 @@ export interface InferenceOfferV2 {
   expiresAt: number;
   endpoint: { relayUrl: string | null; directAddresses: string[] };
   relayOnly: boolean;
-  prices: { inputAtomic: string; outputAtomic: string };
+  prices: TokenPricesV2;
   maxAtomic: string;
   maxTokens: number;
   model: EngineDescription;
