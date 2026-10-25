@@ -61,6 +61,8 @@ class WalletSetup {
   }
   private async inspect() {
     try {
+      await checkWalletRoot(this.root);
+      if (this.signal.aborted) return;
       await lstat(join(this.root, WALLET.DIRECTORY));
     } catch (error) {
       if (!isMissing(error))
@@ -70,8 +72,6 @@ class WalletSetup {
     if (this.signal.aborted) return;
     // Once an existing destination is observed, never call an initializer.
     try {
-      await checkWalletRoot(this.root);
-      if (this.signal.aborted) return;
       if (!this.protection) {
         this.finish(walletSummary(WALLET_STATUS.UNAVAILABLE));
         return;
