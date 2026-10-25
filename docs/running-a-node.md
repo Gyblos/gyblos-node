@@ -259,7 +259,8 @@ not been measured.
 
 These variables can also be written in a `gyblos.toml` file, checked with
 `pnpm gyblos config validate`; the variables keep precedence over the file. See
-[configuration.md](configuration.md). Startup does not read the file yet.
+[configuration.md](configuration.md). The seller reads `GYBLOS_CONFIG` or
+`./gyblos.toml` at startup; see its "Seller startup" section for what it honors.
 
 - `GYBLOS_HOME`: local home for both roles and shared artifacts (default
   `.local/gyblos`).

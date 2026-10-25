@@ -6,15 +6,22 @@ import { IPV6_LOOPBACK, LOCALHOST } from '@gyblos/config';
 import { CONTROL_ALPN, GYBLOS_ALPN } from '@gyblos/protocol/constants';
 
 import { RELAY_CONFIGURATION_CODES } from './constants.js';
-import { RelayConfigurationError, relayModeFromEnv } from './relays.js';
+import {
+  RelayConfigurationError,
+  relayModeFromEnv,
+  type RelayEnvironment,
+} from './relays.js';
 
 export { assertConfiguredRelay, requireConfiguredRelay } from './relays.js';
+export type { RelayEnvironment } from './relays.js';
 
 export interface BindEndpointOptions {
   relayOnly?: boolean;
   control?: boolean;
   bindAddress?: string;
   externalAddress?: string;
+  // Relay origins and token; defaults to the process environment.
+  relayEnvironment?: RelayEnvironment;
 }
 
 export async function bindEndpoint(
@@ -26,7 +33,7 @@ export async function bindEndpoint(
       RELAY_CONFIGURATION_CODES.DIRECT_CANDIDATE,
       'Relay-only mode rejects manual direct candidates.',
     );
-  const relayMode = relayModeFromEnv();
+  const relayMode = relayModeFromEnv(options.relayEnvironment);
   const builder = Endpoint.builder();
   builder.applyN0();
   builder.secretKey(secret);

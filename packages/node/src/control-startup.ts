@@ -3,18 +3,14 @@
 import { createSignableMessage, type KeyPairSigner } from '@solana/kit';
 
 import { DEVNET } from '@gyblos/config';
-import { PRICES } from '@gyblos/core/constants';
 import type { QuoteReadiness } from '@gyblos/core/control-quotes';
-import { atomicPerTokenPricesV2 } from '@gyblos/core/pricing-v2';
 import { MODEL } from '@gyblos/engine-ollama/model';
 import {
   CONTROL_METERING_MODES,
   CONTROL_RECORD_VERSION,
   DATA_RETENTION,
-  MODEL_IDS,
   PUBLIC_RECORD_KINDS,
   PUBLIC_RECORD_LIMITS,
-  REASONING_LEVELS,
   V2_PRICING,
 } from '@gyblos/protocol/constants';
 import type { InferenceOfferV2 } from '@gyblos/protocol/control-types';
@@ -27,6 +23,11 @@ import type { Signer } from '@gyblos/protocol/signing';
 import { createSellerControlService } from './control.js';
 import { createSellerRecords } from './public-records.js';
 import type { SellerSequence } from './public-sequence.js';
+import {
+  defaultSellerOffer,
+  listedPrices,
+  type SellerCatalogOffer,
+} from './seller-offer.js';
 
 interface SellerControlStartupOptions {
   owner: KeyPairSigner;
@@ -45,11 +46,16 @@ interface SellerControlStartupOptions {
   sequence: SellerSequence;
   catalogMs?: number;
   now?: () => number;
+  // The listing from gyblos.toml; defaults to today's paid PoC listing.
+  offer?: SellerCatalogOffer;
 }
 
-function startupRecords(options: SellerControlStartupOptions) {
+function startupRecords(
+  options: SellerControlStartupOptions,
+  offer: SellerCatalogOffer,
+) {
   const now = (options.now ?? Date.now)();
-  const { selection, reasoning } = startupSelection();
+  const { selection, reasoning } = startupSelection(offer);
   return createSellerRecords({
     template: {
       schemaVersion: CONTROL_RECORD_VERSION,
@@ -67,7 +73,7 @@ function startupRecords(options: SellerControlStartupOptions) {
             network: DEVNET,
             asset: options.mint,
             unit: V2_PRICING.unit,
-            ...atomicPerTokenPricesV2(PRICES),
+            ...listedPrices(offer),
           },
           reasoning,
         },
@@ -86,8 +92,9 @@ function startupRecords(options: SellerControlStartupOptions) {
 export async function prepareSellerControl(
   options: SellerControlStartupOptions,
 ) {
-  const { selection, reasoning } = startupSelection();
-  const records = await startupRecords(options);
+  const offer = options.offer ?? defaultSellerOffer();
+  const { selection, reasoning } = startupSelection(offer);
+  const records = await startupRecords(options, offer);
   const service = createSellerControlService({
     records,
     context: {
@@ -117,15 +124,15 @@ export async function prepareSellerControl(
         options.owner.address
       ]!,
   });
-  return { service, records };
+  return { service, records, offer };
 }
 
-function startupSelection() {
+// seller-settings admits only levels the pinned template implements (today, off).
+function startupSelection(offer: SellerCatalogOffer) {
   const selection = {
-    modelId: MODEL_IDS.QWEN3_0_6B,
+    modelId: offer.modelId,
     variant: null,
     quantization: MODEL.quantization,
   };
-  // The pinned template implements only this reasoning level.
-  return { selection, reasoning: [REASONING_LEVELS.OFF] };
+  return { selection, reasoning: [...offer.reasoning] };
 }

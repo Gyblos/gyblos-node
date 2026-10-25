@@ -20,6 +20,8 @@
     "./public-records": "./src/public-records.ts",
     "./publisher": "./src/publisher.ts",
     "./publisher-config": "./src/publisher-config.ts",
+    "./seller-offer": "./src/seller-offer.ts",
+    "./seller-settings": "./src/seller-settings.ts",
     "./control-startup": "./src/control-startup.ts",
     "./node-config": "./src/node-config.ts",
     "./node-config-resolve": "./src/node-config-resolve.ts"

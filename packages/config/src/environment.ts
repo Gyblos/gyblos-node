@@ -7,6 +7,8 @@ export const NODE_ENVIRONMENT = {
   relayOnly: 'GYBLOS_RELAY_ONLY',
   irohBind: 'GYBLOS_IROH_BIND',
   irohExternalAddress: 'GYBLOS_IROH_EXTERNAL_ADDR',
+  // Path to gyblos.toml for the seller daemon; without it ./gyblos.toml is read when present.
+  config: 'GYBLOS_CONFIG',
 } as const;
 
 // Value an operator sets to turn an environment switch on; today's readers compare against it exactly.
