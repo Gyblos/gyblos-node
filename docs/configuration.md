@@ -150,9 +150,9 @@ range (`UNSUPPORTED_VERSION` or `INVALID_CAP`), however many digits it has.
       per-buyer cap not above the daily cap.
 
 At seller startup an offer becomes the node's public v2 listing (see
-[Seller startup](#seller-startup)). Free offers use the isolated non-streaming
-free execution channel; their caps go to the free execution handler, which
-enforces them.
+[Seller startup](#seller-startup)). Free offers use isolated complete-response
+and streaming free execution channels; both share the same replay state and
+free-cap handler. No paid-v2 execution is enabled.
 
 ### Price unit
 
