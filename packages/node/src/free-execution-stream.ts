@@ -68,6 +68,9 @@ export function createFreeStreamOutput(
         if (entered) inFlight = false;
       }
     },
+    stop() {
+      active = false;
+    },
     complete(output: string) {
       check();
       active = false;

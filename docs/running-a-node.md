@@ -488,22 +488,22 @@ use `error.code`; arbitrary exception contents are never returned. No prompt or
 response is written to logs, journals or selection metadata. A free seller can
 still observe the submitted text; free does not imply private or verified.
 
-Control connections close before execution connects on `gyblos/free/2`. The
-client verifies the seller peer, signed quote, local buyer NodeId, exact terms
-and zero-skew expiry again before sending. Request/response bounds and
-correlation use the free protocol codec. A query has an absolute 180-second
-budget including discovery, quotes and execution; each transport also retains
-its stage bounds. A failed seller may be excluded and selection repeated only
-before sending begins, and no seller is executed twice in one local request. The
-free runtime admits one orchestration at a time with no queue; overlapping
-requests return `FREE_BUYER_BUSY` rather than racing the per-peer connection
-limit or poisoning another request's cooldown. Cancelled selection attempts do
-not commit quote statistics. Control and execution admission remain occupied
-until pending native work settles. The client marks sending before the first
-frame write: partial writes, remote errors, timeouts and lost responses never
-cause automatic failover afterward. Native work that ignores cancellation
-retains its execution resource until it actually settles. The v1 paid proxy
-remains a separate command.
+Control connections close before execution connects on `gyblos/free/2` or
+`gyblos/free-stream/2`. The client verifies the seller peer, signed quote, local
+buyer NodeId, exact terms and zero-skew expiry again before sending.
+Request/response bounds and correlation use the free protocol codec. A query has
+an absolute 180-second budget including discovery, quotes and execution; each
+transport also retains its stage bounds. A failed seller may be excluded and
+selection repeated only before sending begins, and no seller is executed twice
+in one local request. The free runtime admits one orchestration at a time with
+no queue; overlapping requests return `FREE_BUYER_BUSY` rather than racing the
+per-peer connection limit or poisoning another request's cooldown. Cancelled
+selection attempts do not commit quote statistics. Control and execution
+admission remain occupied until pending native work settles. The client marks
+sending before the first frame write: partial writes, remote errors, timeouts
+and lost responses never cause automatic failover afterward. Native work that
+ignores cancellation retains its execution resource until it actually settles.
+The v1 paid proxy remains a separate command.
 
 Product contract tests use a synthetic engine and native encrypted loopback.
 They are not the complete publication-to-answer acceptance: the separate lab

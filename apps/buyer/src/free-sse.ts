@@ -4,14 +4,28 @@ import { randomUUID } from 'node:crypto';
 import type { ServerResponse } from 'node:http';
 
 import { HTTP_STATUS, UNITS } from '@gyblos/config';
-import { FREE_CHAT_ROLES, FREE_EXECUTION } from '@gyblos/protocol/constants';
+import {
+  FREE_CHAT_ROLES,
+  FREE_EXECUTION,
+  type FreeExecutionCode,
+} from '@gyblos/protocol/constants';
 import type {
   FreeExecutionBuildInput,
   FreeExecutionResult,
 } from '@gyblos/protocol/free-execution';
 
-import { FREE_BUYER, FREE_BUYER_CODES } from './constants.js';
+import {
+  FREE_BUYER,
+  FREE_BUYER_CODES,
+  type FreeBuyerCode,
+} from './constants.js';
 import { FreeBuyerError } from './free-chat.js';
+import type { SelectionDecision } from './selection.js';
+
+type FreeStreamErrorCode =
+  | FreeBuyerCode
+  | FreeExecutionCode
+  | Exclude<SelectionDecision, { ok: true }>['code'];
 
 export type FreeChatStreamExecutor = (
   input: FreeExecutionBuildInput,
@@ -118,7 +132,10 @@ export async function executeFreeSse(
   active(response, signal);
   response.end(`data: ${FREE_BUYER.streamDone}\n\n`);
 }
-export function replyFreeSseError(response: ServerResponse, code: string) {
+export function replyFreeSseError(
+  response: ServerResponse,
+  code: FreeStreamErrorCode,
+) {
   if (response.destroyed || response.writableEnded) return;
   response.end(
     `data: ${JSON.stringify({ error: { message: code, type: FREE_BUYER.errorType, param: null, code } })}\n\n`,

@@ -18,6 +18,7 @@ import type {
   Engine,
   EngineCapabilities,
   EngineDescription,
+  EngineResult,
   RecountTokenizer,
 } from '@gyblos/protocol/engine';
 import {
@@ -209,14 +210,19 @@ async function generateResponse(
         onDelta,
       )
     : undefined;
-  const output = await options.engine.generate({
-    prompt,
-    maxTokens: request.input.maxTokens,
-    signal,
-    ...(streaming ? { onText: streaming.onText } : {}),
-  });
-  checkSignal(signal);
-  streaming?.complete(output.text);
+  let output: EngineResult;
+  try {
+    output = await options.engine.generate({
+      prompt,
+      maxTokens: request.input.maxTokens,
+      signal,
+      ...(streaming ? { onText: streaming.onText } : {}),
+    });
+    checkSignal(signal);
+    streaming?.complete(output.text);
+  } finally {
+    streaming?.stop();
+  }
   const preliminary = parseFreeExecutionResponse({
     ...header,
     result: {
