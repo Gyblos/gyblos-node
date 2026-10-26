@@ -322,3 +322,25 @@ void test('manual overrides require no registry observation and return detached 
     assert.equal(unavailable.code, IDENTITY_POLICY_CODES.UNAVAILABLE);
   assert.deepEqual(unavailable.state, previous);
 });
+
+void test('identity lookup discriminators are rejected without invoking accessors', async () => {
+  const {
+    evaluateIdentityPolicy,
+    IDENTITY_LOOKUP_KINDS,
+    IDENTITY_POLICY_CODES,
+  } = await api();
+  let reads = 0;
+  const lookup = {
+    get kind() {
+      reads++;
+      return IDENTITY_LOOKUP_KINDS.BOUND;
+    },
+    scope,
+    binding,
+  };
+  const result = evaluateIdentityPolicy({ ...target, previous, lookup });
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.equal(result.code, IDENTITY_POLICY_CODES.INVALID);
+  assert.equal(reads, 0);
+  assert.deepEqual(result.state, previous);
+});
