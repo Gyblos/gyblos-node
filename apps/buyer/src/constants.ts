@@ -115,3 +115,22 @@ export const INFERENCE_CASES = {
 export type ErrorDiagnosticCode =
   | ProtocolErrorCode
   | (typeof ERROR_DIAGNOSTICS)[keyof typeof ERROR_DIAGNOSTICS];
+
+// Local non-streaming compatibility surface; execution wire codes stay protocol-owned.
+export const FREE_BUYER = {
+  path: '/v1/chat/completions',
+  completionObject: 'chat.completion',
+  errorType: 'gyblos_error',
+  requestMs: 180000,
+  headerMs: 10000,
+  headers: 16384,
+  maxOutputTokens: 128,
+} as const;
+export const FREE_BUYER_CODES = {
+  INVALID: 'FREE_BUYER_INVALID_REQUEST',
+  UNAVAILABLE: 'FREE_BUYER_NO_OFFER',
+  CONFIG: 'FREE_BUYER_CONFIGURATION_REQUIRED',
+  BUSY: 'FREE_BUYER_BUSY',
+  INTERNAL: 'FREE_BUYER_INTERNAL',
+} as const;
+export type FreeBuyerCode = (typeof FREE_BUYER_CODES)[keyof typeof FREE_BUYER_CODES];

@@ -28,7 +28,9 @@
     "./discovery": "./src/discovery.ts",
     "./discovery-state": "./src/discovery-state.ts",
     "./discovery-storage": "./src/discovery-storage.ts",
-    "./selection-runtime": "./src/selection-runtime.ts"
+    "./selection-runtime": "./src/selection-runtime.ts",
+    "./free-chat": "./src/free-chat.ts",
+    "./free-execution": "./src/free-execution.ts"
   },
   "dependencies": {
     "@gyblos/core": "workspace:*",

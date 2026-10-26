@@ -36,10 +36,9 @@ export type SelectionDecision =
     }
   | { ok: false; code: typeof BUYER_SELECTION_CODES.NO_OFFER }
   | Exclude<SellerSelectionResult, { ok: true }>;
-export interface SelectionDependencies {
+export interface VerifiedSelectionDependencies {
   connect: (seller: StaticControlSeller) => Promise<BuyerControlClient>;
   buyer: string;
-  trusted: { owner: string; nodeId: string };
   stats: Map<string, LocalSellerStats>;
   now?: () => number;
   random?: () => number;
@@ -97,9 +96,9 @@ function recordQuote(
     observedWaitMs: prior?.observedWaitMs ?? null,
   });
 }
-export async function selectBuyerQuote(
+export async function selectVerifiedBuyerQuote(
   config: BuyerSelectionConfig,
-  dependencies: SelectionDependencies,
+  dependencies: VerifiedSelectionDependencies,
   signal?: AbortSignal,
 ): Promise<SelectionDecision> {
   const now = dependencies.now ?? Date.now;
@@ -149,11 +148,7 @@ export async function selectBuyerQuote(
     } catch {
       return { ok: false, code: BUYER_SELECTION_CODES.NO_OFFER };
     }
-    const trusted = dependencies.trusted;
-    return winner.candidate.nodeId === trusted.nodeId &&
-      winner.candidate.owner === trusted.owner
-      ? { ok: true, winner }
-      : { ok: false, code: BUYER_SELECTION_CODES.QUOTE_ONLY, winner };
+    return { ok: true, winner };
   } finally {
     await Promise.allSettled(
       [...clients.values()].map((client) => client.close()),
@@ -165,7 +160,7 @@ async function requestCandidate(
   candidate: SellerCandidate,
   clients: ReadonlyMap<string, BuyerControlClient>,
   config: BuyerSelectionConfig,
-  dependencies: SelectionDependencies,
+  dependencies: VerifiedSelectionDependencies,
   now: () => number,
   querySignal: AbortSignal,
 ) {
@@ -217,7 +212,7 @@ function settledValues<T>(outcomes: PromiseSettledResult<T>[]) {
 
 async function refreshSnapshots(
   config: BuyerSelectionConfig,
-  dependencies: SelectionDependencies,
+  dependencies: VerifiedSelectionDependencies,
   clients: Map<string, BuyerControlClient>,
   now: () => number,
   deadline: AbortSignal,
@@ -247,4 +242,15 @@ async function refreshSnapshots(
       }),
     ),
   );
+}
+
+export interface SelectionDependencies extends VerifiedSelectionDependencies {
+  trusted: { owner: string; nodeId: string };
+}
+// Legacy authorization is applied only by the paid entry, after the shared verified selection.
+export async function selectBuyerQuote(config: BuyerSelectionConfig, dependencies: SelectionDependencies, signal?: AbortSignal): Promise<SelectionDecision> {
+  const result = await selectVerifiedBuyerQuote(config, dependencies, signal);
+  if (!result.ok) return result;
+  return result.winner.candidate.nodeId === dependencies.trusted.nodeId && result.winner.candidate.owner === dependencies.trusted.owner
+    ? result : { ok: false, code: BUYER_SELECTION_CODES.QUOTE_ONLY, winner: result.winner };
 }
