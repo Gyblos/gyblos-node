@@ -1,4 +1,4 @@
-// Builds verified selector inputs, races signed quotes and returns a trusted-v1 or quote-only decision.
+// Builds verified selector inputs and races signed quotes; legacy trust authorization is an explicit wrapper.
 // Static operator identity trust stays independent of seller declarations; never executes payments.
 import { randomInt } from 'node:crypto';
 
@@ -248,9 +248,19 @@ export interface SelectionDependencies extends VerifiedSelectionDependencies {
   trusted: { owner: string; nodeId: string };
 }
 // Legacy authorization is applied only by the paid entry, after the shared verified selection.
-export async function selectBuyerQuote(config: BuyerSelectionConfig, dependencies: SelectionDependencies, signal?: AbortSignal): Promise<SelectionDecision> {
+export async function selectBuyerQuote(
+  config: BuyerSelectionConfig,
+  dependencies: SelectionDependencies,
+  signal?: AbortSignal,
+): Promise<SelectionDecision> {
   const result = await selectVerifiedBuyerQuote(config, dependencies, signal);
   if (!result.ok) return result;
-  return result.winner.candidate.nodeId === dependencies.trusted.nodeId && result.winner.candidate.owner === dependencies.trusted.owner
-    ? result : { ok: false, code: BUYER_SELECTION_CODES.QUOTE_ONLY, winner: result.winner };
+  return result.winner.candidate.nodeId === dependencies.trusted.nodeId &&
+    result.winner.candidate.owner === dependencies.trusted.owner
+    ? result
+    : {
+        ok: false,
+        code: BUYER_SELECTION_CODES.QUOTE_ONLY,
+        winner: result.winner,
+      };
 }

@@ -94,6 +94,9 @@ void test('all executable modules are inert when imported', async (context) => {
         await import('@gyblos/node-app/main');
         await import('@gyblos/node-app/setup');
         await import('@gyblos/buyer/main');
+        await import('@gyblos/buyer/free-main');
+        await import('@gyblos/buyer/free-startup');
+        await import('@gyblos/transport-iroh/free-client');
         await import('@gyblos/buyer/trust');
       },
     );

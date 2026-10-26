@@ -124,7 +124,6 @@ export const FREE_BUYER = {
   requestMs: 180000,
   headerMs: 10000,
   headers: 16384,
-  maxOutputTokens: 128,
 } as const;
 export const FREE_BUYER_CODES = {
   INVALID: 'FREE_BUYER_INVALID_REQUEST',
@@ -133,4 +132,5 @@ export const FREE_BUYER_CODES = {
   BUSY: 'FREE_BUYER_BUSY',
   INTERNAL: 'FREE_BUYER_INTERNAL',
 } as const;
-export type FreeBuyerCode = (typeof FREE_BUYER_CODES)[keyof typeof FREE_BUYER_CODES];
+export type FreeBuyerCode =
+  (typeof FREE_BUYER_CODES)[keyof typeof FREE_BUYER_CODES];

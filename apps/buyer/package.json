@@ -30,7 +30,11 @@
     "./discovery-storage": "./src/discovery-storage.ts",
     "./selection-runtime": "./src/selection-runtime.ts",
     "./free-chat": "./src/free-chat.ts",
-    "./free-execution": "./src/free-execution.ts"
+    "./free-execution": "./src/free-execution.ts",
+    "./free-http": "./src/free-http.ts",
+    "./free-selection": "./src/free-selection.ts",
+    "./free-startup": "./src/free-startup.ts",
+    "./free-main": "./src/free-main.ts"
   },
   "dependencies": {
     "@gyblos/core": "workspace:*",

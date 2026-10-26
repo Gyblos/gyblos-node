@@ -43,7 +43,8 @@
     "desktop:build": "pnpm --filter @gyblos/desktop build",
     "desktop:start": "pnpm desktop:build && pnpm --filter @gyblos/desktop start",
     "desktop:smoke": "pnpm desktop:build && pnpm --filter @gyblos/desktop smoke",
-    "desktop:package": "pnpm desktop:build && pnpm --filter @gyblos/desktop package"
+    "desktop:package": "pnpm desktop:build && pnpm --filter @gyblos/desktop package",
+    "buyer:free": "node --import tsx apps/buyer/src/free-main.ts"
   },
   "dependencies": {
     "@gyblos/core": "workspace:*",
