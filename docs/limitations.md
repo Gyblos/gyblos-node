@@ -70,7 +70,9 @@ See [recovery.md](recovery.md) for how recovery works.
   it.
 - Model pins check local artifacts only. The buyer cannot verify the remote
   seller's model or the correctness of an answer.
-- Responses are buffered: no buyer-facing streaming and no first-word latency.
+- Paid v1 responses remain buffered, without first-word latency measurement.
+  Free v2 supports incremental SSE; its synthetic native-loopback acceptance
+  does not establish real-model or production streaming performance.
 - Only the pinned Qwen3 0.6B engine is validated end to end.
 - The seller's 1.5 GiB memory reserve is an admission policy, not a guarantee.
   Later memory pressure or model eviction can still break a request. The model

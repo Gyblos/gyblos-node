@@ -33,12 +33,14 @@ export interface FreeBuyerDependencies {
     winner: FreeWinner,
     request: FreeExecutionRequest,
     signal: AbortSignal,
+    onDelta?: (text: string) => Promise<void>,
   ): Promise<FreeExecutionResult>;
 }
 export async function executeBuyerFree(
   input: FreeExecutionBuildInput,
   dependencies: FreeBuyerDependencies,
   external?: AbortSignal,
+  onDelta?: (text: string) => Promise<void>,
 ) {
   const release = dependencies.enter?.();
   try {
@@ -54,12 +56,31 @@ export async function executeBuyerFree(
         throw new FreeBuyerError(FREE_BUYER_CODES.UNAVAILABLE);
       excluded.add(winner.nodeId);
       const request = buildFreeExecutionRequest(winner.quote, input);
+      let delivered = false;
+      const emit = onDelta
+        ? async (text: string) => {
+            signal.throwIfAborted();
+            delivered = true;
+            await onDelta(text);
+            signal.throwIfAborted();
+          }
+        : undefined;
       try {
-        const result = await dependencies.execute(winner, request, signal);
+        const result = await dependencies.execute(
+          winner,
+          request,
+          signal,
+          emit,
+        );
         signal.throwIfAborted();
         return result;
       } catch (error) {
-        if (!(error instanceof FreeClientError) || error.sent || signal.aborted)
+        if (
+          !(error instanceof FreeClientError) ||
+          error.sent ||
+          delivered ||
+          signal.aborted
+        )
           throw error;
       }
     }

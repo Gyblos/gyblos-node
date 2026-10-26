@@ -50,7 +50,7 @@ export function freeBuyerDependencies(
     },
     select: (excluded, signal) =>
       selectFreeWinner(prepared, options, excluded, signal),
-    async execute(winner, request, signal) {
+    async execute(winner, request, signal, onDelta) {
       const seller = sellers.get(winner.nodeId);
       if (!seller || !(await permits(winner)))
         throw new FreeBuyerError(FREE_BUYER_CODES.UNAVAILABLE);
@@ -58,7 +58,7 @@ export function freeBuyerDependencies(
         options.endpoint,
         address(seller),
         seller,
-        { now, relayOnly: options.relayOnly, relayAllowed },
+        { now, relayOnly: options.relayOnly, relayAllowed, onDelta },
       );
       try {
         return await client.execute(request, signal);

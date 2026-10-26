@@ -361,12 +361,12 @@ action, described in [discovery-index.md](discovery-index.md).
 ## Free v2 seller execution
 
 A supported `gyblos.toml` free offer starts control plus the separate
-`gyblos/free/2` data channel. It does not start the paid HTTP service or
-facilitator, check a payment program, or write a v1 offer. This is
-complete-response execution for the pinned engine's single user message and
-`off` reasoning; streaming and other engine input forms are not enabled. The
-separate `buyer:free` entry executes free quotes; obtaining a control quote
-alone still does not send a prompt.
+`gyblos/free/2` complete-response and `gyblos/free-stream/2` streaming data
+channels. It does not start the paid HTTP service or facilitator, check a
+payment program, or write a v1 offer. This is execution for the pinned engine's
+single user message and `off` reasoning; other engine input forms are not
+enabled. The separate `buyer:free` entry executes free quotes; obtaining a
+control quote alone still does not send a prompt.
 
 The seller reads daily token caps from the prepared offer: `daily_token_cap`
 applies across all buyers and `per_buyer_cap` per authenticated NodeId, both
@@ -446,15 +446,31 @@ Supported request shape for `POST /v1/chat/completions`:
 `max_tokens` defaults to the configured maximum and cannot exceed it. `model`
 selects the exact configured model/variant/quantization tuple; it is not an
 engine name. Only one text user message is supported. History, system messages,
-tools, sampling options, alternate modalities, unknown options and streaming are
-rejected before selection or prompt transmission. This is a limited compatible
-subset, not the complete OpenAI API. Requests must send
+tools, sampling options, alternate modalities and unknown options are rejected
+before selection or prompt transmission. This is a limited compatible subset,
+not the complete OpenAI API. Requests must send
 `Content-Type: application/json`. Invalid UTF-8, foreign Host headers, requests
 with an Origin header and other content types get 400 (a foreign Host gets 421),
 so a web page cannot reach the endpoint; there is no CORS browser interface. A
 body declared larger than 128 KiB gets 413 before it is read; a larger streamed
 body gets the same 413 once it passes the limit. Both close the connection. Use
 a local client, and apply normal trust to local processes.
+
+Set `stream` to `true` for incremental `text/event-stream` responses. Each
+`data:` event is an OpenAI-compatible `chat.completion.chunk` with a content
+delta. Successful completion sends a finish reason and usage, then `[DONE]`. The
+default (absent or `false`) remains one complete JSON response. Streaming
+supports the same single-user, reasoning-off input and rejects unsupported
+options such as `stream_options` rather than silently dropping them.
+
+Fragments are provisional until a verified terminal and clean end of the Iroh
+stream. A failure after SSE starts sends a static error and closes without
+`[DONE]`; an error before SSE starts uses the JSON error response below. The
+stream sets `x-should-retry: false`. A disconnect or deadline cancels execution;
+after possible prompt transmission the buyer never retries or switches seller,
+even before the first fragment. Writes await backpressure. Complete and
+streaming execution share replay/caps; cancellation keeps a conservative full
+token reservation. No paid-v2 path is enabled.
 
 Status codes: 400 for an invalid request or a request beyond the quote's limits,
 413 for an oversized body, 429 when the endpoint is already running a request
@@ -472,22 +488,22 @@ use `error.code`; arbitrary exception contents are never returned. No prompt or
 response is written to logs, journals or selection metadata. A free seller can
 still observe the submitted text; free does not imply private or verified.
 
-Control connections close before execution connects on `gyblos/free/2`. The
-client verifies the seller peer, signed quote, local buyer NodeId, exact terms
-and zero-skew expiry again before sending. Request/response bounds and
-correlation use the free protocol codec. A query has an absolute 180-second
-budget including discovery, quotes and execution; each transport also retains
-its stage bounds. A failed seller may be excluded and selection repeated only
-before sending begins, and no seller is executed twice in one local request. The
-free runtime admits one orchestration at a time with no queue; overlapping
-requests return `FREE_BUYER_BUSY` rather than racing the per-peer connection
-limit or poisoning another request's cooldown. Cancelled selection attempts do
-not commit quote statistics. Control and execution admission remain occupied
-until pending native work settles. The client marks sending before the first
-frame write: partial writes, remote errors, timeouts and lost responses never
-cause automatic failover afterward. Native work that ignores cancellation
-retains its execution resource until it actually settles. The v1 paid proxy
-remains a separate command.
+Control connections close before execution connects on `gyblos/free/2` or
+`gyblos/free-stream/2`. The client verifies the seller peer, signed quote, local
+buyer NodeId, exact terms and zero-skew expiry again before sending.
+Request/response bounds and correlation use the free protocol codec. A query has
+an absolute 180-second budget including discovery, quotes and execution; each
+transport also retains its stage bounds. A failed seller may be excluded and
+selection repeated only before sending begins, and no seller is executed twice
+in one local request. The free runtime admits one orchestration at a time with
+no queue; overlapping requests return `FREE_BUYER_BUSY` rather than racing the
+per-peer connection limit or poisoning another request's cooldown. Cancelled
+selection attempts do not commit quote statistics. Control and execution
+admission remain occupied until pending native work settles. The client marks
+sending before the first frame write: partial writes, remote errors, timeouts
+and lost responses never cause automatic failover afterward. Native work that
+ignores cancellation retains its execution resource until it actually settles.
+The v1 paid proxy remains a separate command.
 
 Product contract tests use a synthetic engine and native encrypted loopback.
 They are not the complete publication-to-answer acceptance: the separate lab

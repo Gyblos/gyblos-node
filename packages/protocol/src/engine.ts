@@ -39,6 +39,7 @@ export type EngineInput = (
   maxTokens: number;
   signal?: AbortSignal;
   onFragment?: () => Promise<void>;
+  onText?: (text: string) => Promise<void>;
 };
 
 export interface Engine {
