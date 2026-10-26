@@ -382,3 +382,31 @@ required across restarts. Disconnecting or retrying never refunds uncertain work
 or permits reuse of a consumed quote. An engine ignoring cancellation keeps its
 slot occupied until it settles. No fallback is allowed after any prompt bytes
 have been sent. Nothing on this channel authorizes payment.
+
+### Free-service availability limits
+
+The per-offer buyer table is bounded at 1,024 NodeIds per UTC day. A peer that
+controls many cheap NodeIds can fill it while using only a small part of the
+daily token budget; further new buyers then receive `FREE_EXECUTION_BUSY` until
+the next UTC day or restart. Existing tracked buyers retain their own limits. A
+shared overflow policy is a follow-up; the current bound protects memory and
+does not guarantee fair access.
+
+After admission, cancellation retains the full input-plus-output reservation,
+even when no answer was received. Repeated cancellations across cheap NodeIds
+can exhaust the shared daily budget. No output is not proof that the engine did
+no work, so refunds for proven pre-execution cancellation need separate engine
+lifecycle evidence; they are not enabled here. A generation rejection, including
+cancellation, also invalidates cached readiness. Quotes remain closed until the
+next successful background check (normally scheduled on a 10-second tick, plus
+probe time; longer outages can take longer).
+
+Free quotes retain the shared v2 metadata shape: `authorizer` and `feePayer`
+contain the owner's address as placeholders. Both prices and `maxAtomic` are
+zero; these fields assign no payment authority and no auxiliary payment signer
+is loaded. Paid v2 requires separate admission checks before it can exist.
+
+Switching a home from paid to free can leave a prior `offer.json` in place. It
+is not renewed or advertised by the free service, whose endpoint exposes only
+control and free ALPNs. Startup deliberately preserves existing role files;
+operators should use current signed v2 quotes rather than that old file.

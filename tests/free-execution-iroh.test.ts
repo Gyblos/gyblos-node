@@ -4,13 +4,17 @@ import test from 'node:test';
 
 import { createControlQuote } from '@gyblos/core/control-quotes';
 import { OFFER_PRICING_KINDS } from '@gyblos/node/constants';
-import { createSellerFreeExecution } from '@gyblos/node/free-execution';
+import { createSellerControlService } from '@gyblos/node/control';
+import type { SellerFreeExecutionOptions } from '@gyblos/node/free-execution';
+import { createSellerRecords } from '@gyblos/node/public-records';
+import { serveSellerTransport } from '@gyblos/node/seller-transport';
 import {
   ENGINE_DONE_REASONS,
   FREE_CHAT_ROLES,
   FREE_EXECUTION,
   FREE_EXECUTION_CODES,
   MODEL_IDS,
+  PUBLIC_RECORD_KINDS,
 } from '@gyblos/protocol/constants';
 import { matchFreeExecutionResponse } from '@gyblos/protocol/free-execution';
 import {
@@ -18,7 +22,6 @@ import {
   FreeExecutionResponseReader,
 } from '@gyblos/protocol/free-execution-framing';
 import { catalogDigestV2, signPublicV2 } from '@gyblos/protocol/public-v2';
-import { serveIroh } from '@gyblos/transport-iroh/iroh-server';
 
 import { controlFixture } from './support/control-fixture.js';
 import { endpoint, within } from './support/native-fixture.js';
@@ -29,6 +32,11 @@ void test(
   { skip: NATIVE_CAPABILITY.transportSkip },
   async () => {
     const source = await controlFixture(true);
+    const now = Date.now();
+    source.setNow(now);
+    source.setReadiness({ observedAt: now, validUntil: now + 20000 });
+    source.catalog.issuedAt = now;
+    source.catalog.expiresAt = now + 60000;
     const seller = await endpoint();
     seller.setAlpns([[...Buffer.from(FREE_EXECUTION.alpn)]]);
     const buyer = await endpoint();
@@ -47,7 +55,7 @@ void test(
     source.request.params.catalogDigest = await catalogDigestV2(source.catalog);
     const model = source.context.models[0]!;
     let calls = 0;
-    const free = createSellerFreeExecution({
+    const runtime: SellerFreeExecutionOptions = {
       owner: source.context.owner,
       nodeId: source.context.nodeId,
       offer: {
@@ -82,14 +90,39 @@ void test(
           };
         },
       },
+    };
+    let sequence = source.catalog.sequence;
+    const records = await createSellerRecords({
+      template: source.catalog,
+      signer: nodeSigner,
+      now: source.context.now,
+      validUntil: () => source.context.readiness().validUntil,
+      sequence: {
+        next: async (minimum = 0) => {
+          sequence = Math.max(sequence, minimum) + 1;
+          return sequence;
+        },
+      },
     });
-    const server = serveIroh(
-      seller,
-      'http://127.0.0.1:1',
-      false,
-      undefined,
-      free,
+    source.context.catalog = records.current();
+    if (source.context.catalog.record.kind !== PUBLIC_RECORD_KINDS.CATALOG)
+      throw new Error('Synthetic catalog required');
+    source.request.params.catalogDigest = await catalogDigestV2(
+      source.context.catalog.record,
     );
+    const control = {
+      offer: runtime.offer,
+      records,
+      service: createSellerControlService({
+        context: source.context,
+        ownerSigner: source.ownerSigner,
+        nodeSigner,
+      }),
+    };
+    const server = serveSellerTransport(seller, control, {
+      ...runtime,
+      relayOnly: false,
+    });
     try {
       const quote = await createControlQuote(
         {

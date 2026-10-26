@@ -35,6 +35,7 @@ type ProbeAction = (typeof PROBE_ACTIONS)[keyof typeof PROBE_ACTIONS];
 export interface EndpointProbe {
   events: string[];
   binds: string[];
+  alpns?: string[];
   relays?: { url: string; quicPort?: number; token: string }[];
   remote?: { relayUrl: string | null; directAddresses: string[] };
   error?: { code?: string; message: string };
@@ -55,7 +56,7 @@ function probeScript() {
       let secret;
       return {
         applyN0(){globalThis.probe.events.push('n0');},
-        secretKey(value){secret=value;},alpns(){},
+        secretKey(value){secret=value;},alpns(values){globalThis.probe.alpns=values.map(value=>Buffer.from(value).toString('utf8'));},
         bindAddr(address){globalThis.probe.binds.push(address);},
         relayMode(mode){
           globalThis.probe.events.push('relay-mode');
@@ -112,6 +113,9 @@ function probeScript() {
         else {
           const endpoint=await bindEndpoint([...Array(32).keys()],{
             relayOnly:process.env.PROBE_RELAY_ONLY==='1',
+            control:process.env.PROBE_CONTROL==='1',
+            freeExecution:process.env.PROBE_FREE_EXECUTION==='1',
+            http:process.env.PROBE_HTTP!=='0',
             bindAddress:process.env.PROBE_BIND_ADDRESS});
           await endpoint.close();
         }

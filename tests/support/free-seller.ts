@@ -1,6 +1,7 @@
 // Builds ephemeral free quotes and an injectable synthetic engine; no files, payment services or real keys.
 import { createControlQuote } from '@gyblos/core/control-quotes';
 import { OFFER_PRICING_KINDS } from '@gyblos/node/constants';
+import type { SellerFreeExecutionOptions } from '@gyblos/node/free-execution';
 import {
   ENGINE_DONE_REASONS,
   FREE_CHAT_ROLES,
@@ -19,10 +20,11 @@ export async function freeSellerFixture(
   let calls = 0;
   let now = source.context.now();
   let busy = false;
+  let text = 'answer';
   let inputCount = 4;
   let outputCount = 2;
   let run = async (): Promise<EngineResult> => ({
-    text: 'answer',
+    text,
     usage: {
       inputTokens: 4,
       outputTokens: 2,
@@ -34,7 +36,7 @@ export async function freeSellerFixture(
     finishReason: ENGINE_DONE_REASONS.STOP,
   });
   const model = source.context.models[0]!;
-  const service = api.createSellerFreeExecution({
+  const options: SellerFreeExecutionOptions = {
     owner: source.context.owner,
     nodeId: source.context.nodeId,
     offer: {
@@ -62,7 +64,8 @@ export async function freeSellerFixture(
     readiness: () => ({ ...source.context.readiness(), busy }),
     now: () => now,
     startedAt: now - 1,
-  });
+  };
+  const service = api.createSellerFreeExecution(options);
   async function request(
     sequence = 1,
     peer = source.request.params.buyerNodeId,
@@ -91,9 +94,13 @@ export async function freeSellerFixture(
   }
   return {
     service,
+    options,
     source,
     request,
     calls: () => calls,
+    setText(value: string) {
+      text = value;
+    },
     setCounts(input: number, output: number) {
       inputCount = input;
       outputCount = output;

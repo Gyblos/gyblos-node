@@ -407,6 +407,10 @@ daily-cap, buyer-cap, unsupported, busy, engine-unavailable, timeout, cancelled
 and internal. Messages, provider errors and input contents are never reflected.
 If framing/structure is invalid and no complete validated request is available,
 close the stream; do not invent or echo an unvalidated correlation identifier.
+In the current seller, structural parse failures (including version, binding
+and not-free failures) close the stream before a reply header exists. Those
+error codes are eligible for a reply only if raised after successful parsing;
+the error catalog does not promise every rejection has a wire response.
 
 `requestDigest` is SHA-256 of UTF-8
 `"gyblos/free-execution-request/v2\n" + canonicalJson(validatedRequest)`.
@@ -414,13 +418,22 @@ It includes the signed quote and the complete chat input, and is distinct from
 the quote's prompt-free control request digest. The buyer matches requestId and
 this digest before acting on either an error or a result. Responses are bound
 to the authenticated seller connection, not independently signed receipts.
+`FreeExecutionError.remote` defaults to false for local checks.
+`matchFreeExecutionResponse` sets it to true only for a parsed error whose
+requestId and digest match; it is local metadata, never a wire field. This
+flag does not authorize fallback or retry after any prompt bytes were sent.
+The exported `FreeChatMessage` type and `buildFreeExecutionRequest` helper
+build a detached request from the quote's selection/reasoning. Building does
+not authenticate/consume a quote, flatten chat or change its model.
 
 ### Bounds and admission obligations
 
 Request JSON bodies are at most 128 KiB and response bodies at most 1 MiB.
 Message content totals at most 64 KiB of UTF-8; result text at most 256 KiB.
 The body limit also includes JSON escaping and the quote envelope, so text
-below its own bound can still exceed the frame bound. Lone UTF-16 surrogates
+below its own bound can still exceed the frame bound. A response containing
+256 KiB of control characters can JSON-escape beyond 1 MiB; the seller returns
+a bounded `FREE_EXECUTION_LIMIT_EXCEEDED` error instead of publishing that result. Lone UTF-16 surrogates
 are invalid. Framing reuses the canonical codec's depth limit 16 and strict
 UTF-8, duplicate/noncanonical-key/number rejection, EOF, no trailing bytes and
 no additional-message rules. Reject an excessive length before body allocation.
@@ -505,7 +518,7 @@ engine-reported usage for cap refunds. Admission reserves templated input plus
 maximum output, refunds only a successfully recounted completion and keeps the
 full debit for engine errors, cancellation or uncertain work. UTC-day counters
 reset on restart; per-buyer counters are best effort. The in-memory replay table
-is bounded at4096 live identifiers and the daily buyer table at1024 entries.
+is bounded at 4096 live identifiers and the daily buyer table at 1024 entries.
 Capacity exhaustion refuses new work without evicting unexpired accounting.
 A startup-time barrier rejects quotes issued at or before startup, including
 the same millisecond; backward clock movement during a process fails closed.

@@ -25,7 +25,8 @@
     "./control-startup": "./src/control-startup.ts",
     "./node-config": "./src/node-config.ts",
     "./node-config-resolve": "./src/node-config-resolve.ts",
-    "./free-execution": "./src/free-execution.ts"
+    "./free-execution": "./src/free-execution.ts",
+    "./seller-transport": "./src/seller-transport.ts"
   },
   "dependencies": {
     "@gyblos/core": "workspace:*",
