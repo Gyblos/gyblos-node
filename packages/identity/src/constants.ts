@@ -4,6 +4,7 @@ import { SYSTEM_PROGRAM_ADDRESS } from '@solana-program/system';
 import { address } from '@solana/kit';
 
 import { IDENTITY_REGISTRY_DEVNET } from '@gyblos/config';
+import { IDENTITY_POLICY_LIMITS } from '@gyblos/core/constants';
 
 export const PROGRAMS = {
   registry: address(IDENTITY_REGISTRY_DEVNET.program),
@@ -84,7 +85,7 @@ export const BINDING = {
   nodeIdBytes: 32,
   signatureBytes: 64,
   legacySequence: 0n,
-  maxSequence: 0xffff_ffff_ffff_ffffn,
+  maxSequence: IDENTITY_POLICY_LIMITS.maxSequence,
 } as const;
 
 export const BINDING_STATUSES = {
@@ -171,4 +172,9 @@ export const ONLINE_CHALLENGE = {
 export const REGISTRATION_DEFAULTS = {
   probeLamports: 50_000_000n,
   walletDeadlineSeconds: 120n,
+} as const;
+
+export const IDENTITY_RESOLUTION_LIMITS = {
+  timeoutMs: 5000,
+  maxTimeoutMs: 30000,
 } as const;

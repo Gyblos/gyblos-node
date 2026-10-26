@@ -1,6 +1,6 @@
 // Owns resolving NodeId → owner from on-chain gyblos.nodeId claims: the highest valid signed sequence wins.
 // Builds on read.ts for account reads; must not know registration, sponsorship or caching.
-import type { Address, Rpc, SolanaRpcApi } from '@solana/kit';
+import type { Address } from '@solana/kit';
 
 import { decodeMetadataEntry } from './accounts.js';
 import { nodeIdMetadataPrefix } from './binding.js';
@@ -17,10 +17,11 @@ import {
   readClaimants,
   registryAssets,
   type IdentityReadOptions,
+  type IdentityReadRpc,
   type NodeIdentity,
 } from './read.js';
 
-type IdentityRpc = Rpc<SolanaRpcApi>;
+type IdentityRpc = IdentityReadRpc;
 
 interface ValidClaim {
   owner: Address;
@@ -33,6 +34,7 @@ const NO_SEQUENCE = -1n;
 async function assetsClaimingNodeId(
   rpc: IdentityRpc,
   nodeId: string,
+  options: IdentityReadOptions,
 ): Promise<Address[]> {
   const versions = Object.values(BINDING_VERSIONS);
   const scans = await Promise.all(
@@ -50,6 +52,7 @@ async function assetsClaimingNodeId(
           ),
         ],
         decodeMetadataEntry,
+        options,
       ),
     ),
   );
@@ -95,7 +98,47 @@ export async function resolveOwner(
   nodeId: string,
   options: IdentityReadOptions = {},
 ): Promise<Address | undefined> {
-  const assets = await assetsClaimingNodeId(rpc, nodeId);
+  const assets = await assetsClaimingNodeId(rpc, nodeId, options);
   const identities = await readClaimants(rpc, assets, options);
   return latestOwner(validClaims(identities, nodeId));
+}
+
+// Enriched reads require a unique asset as well as owner; legacy owner-only selection above is unchanged.
+export async function resolveNodeBinding(
+  rpc: IdentityRpc,
+  nodeId: string,
+  options: IdentityReadOptions,
+) {
+  const assets = await assetsClaimingNodeId(rpc, nodeId, options);
+  const identities = await readClaimants(rpc, assets, options);
+  const claims = identities.flatMap((identity) =>
+    identity?.bindingStatus === BINDING_STATUSES.VALID &&
+    identity.nodeId === nodeId &&
+    identity.bindingSequence !== undefined
+      ? [
+          {
+            nodeId,
+            owner: identity.owner,
+            asset: identity.asset,
+            sequence: identity.bindingSequence,
+          },
+        ]
+      : [],
+  );
+  const top = claims.reduce(
+    (sequence, claim) =>
+      claim.sequence > sequence ? claim.sequence : sequence,
+    NO_SEQUENCE,
+  );
+  const newest = claims.filter((claim) => claim.sequence === top);
+  if (
+    new Set(newest.map((claim) => claim.asset)).size > 1 ||
+    new Set(newest.map((claim) => claim.owner)).size > 1
+  )
+    throw new IdentityError(
+      IDENTITY_ERROR_CODES.NODE_ID_AMBIGUOUS,
+      'Newest identity binding is ambiguous.',
+    );
+  options.signal?.throwIfAborted();
+  return newest[0];
 }

@@ -8,7 +8,7 @@ import {
   type SolanaRpcApi,
 } from '@solana/kit';
 
-import { COMMITMENT } from '@gyblos/config';
+import { COMMITMENT, FINALIZED_COMMITMENT } from '@gyblos/config';
 
 import {
   decodeAgentAccount,
@@ -50,9 +50,15 @@ export interface NodeIdentity {
 export interface IdentityReadOptions {
   // Defaults to the configured Gyblos/8004 collection; COLLECTION_POLICY.ANY accepts any collection.
   collection?: Address | CollectionPolicy;
+  commitment?: typeof COMMITMENT | typeof FINALIZED_COMMITMENT;
+  signal?: AbortSignal;
 }
 
-type IdentityRpc = Rpc<SolanaRpcApi>;
+export type IdentityReadRpc = Pick<
+  Rpc<SolanaRpcApi>,
+  'getProgramAccounts' | 'getMultipleAccounts'
+>;
+type IdentityRpc = IdentityReadRpc;
 
 interface RawAccount {
   owner: Address;
@@ -95,13 +101,15 @@ function chunked<T>(items: readonly T[], size: number): T[][] {
 async function fetchBatch(
   rpc: IdentityRpc,
   addresses: readonly Address[],
+  options: IdentityReadOptions,
 ): Promise<(RawAccount | undefined)[]> {
+  options.signal?.throwIfAborted();
   const { value } = await rpc
     .getMultipleAccounts(addresses, {
       encoding: BASE64_ENCODING,
-      commitment: COMMITMENT,
+      commitment: options.commitment ?? COMMITMENT,
     })
-    .send();
+    .send(options.signal ? { abortSignal: options.signal } : undefined);
   return value.map((account) =>
     account === null
       ? undefined
@@ -116,10 +124,11 @@ async function fetchBatch(
 async function fetchAccounts(
   rpc: IdentityRpc,
   addresses: readonly Address[],
+  options: IdentityReadOptions,
 ): Promise<(RawAccount | undefined)[]> {
   const batches = await Promise.all(
     chunked(addresses, READ_LIMITS.accountsPerRequest).map((batch) =>
-      fetchBatch(rpc, batch),
+      fetchBatch(rpc, batch, options),
     ),
   );
   return batches.flat();
@@ -282,7 +291,7 @@ export async function readClaimants(
   const assets = [...new Set(claimants)];
   assertClaimantCount(assets.length);
   const addresses = await Promise.all(assets.map(claimantAddresses));
-  const accounts = await fetchAccounts(rpc, addresses.flat());
+  const accounts = await fetchAccounts(rpc, addresses.flat(), options);
   return Promise.all(
     assets.map((asset, index) =>
       judgedAlone(asset, claimantAccounts(accounts, index), options),
@@ -295,7 +304,11 @@ async function readAsset(
   asset: Address,
   options: IdentityReadOptions,
 ): Promise<NodeIdentity | undefined> {
-  const accounts = await fetchAccounts(rpc, await claimantAddresses(asset));
+  const accounts = await fetchAccounts(
+    rpc,
+    await claimantAddresses(asset),
+    options,
+  );
   return identityFrom(asset, claimantAccounts(accounts, 0), options);
 }
 
@@ -316,14 +329,16 @@ export async function registryAssets(
   rpc: IdentityRpc,
   filters: ReturnType<typeof memcmpFilter>[],
   decode: (bytes: Uint8Array) => { asset: Address },
+  options: IdentityReadOptions = {},
 ): Promise<Address[]> {
+  options.signal?.throwIfAborted();
   const accounts = await rpc
     .getProgramAccounts(PROGRAMS.registry, {
       encoding: BASE64_ENCODING,
-      commitment: COMMITMENT,
+      commitment: options.commitment ?? COMMITMENT,
       filters,
     })
-    .send();
+    .send(options.signal ? { abortSignal: options.signal } : undefined);
   return accounts.flatMap((item) =>
     assetOf(
       new Uint8Array(BASE64_TEXT_TO_BYTES.encode(item.account.data[0])),
@@ -332,7 +347,11 @@ export async function registryAssets(
   );
 }
 
-function assetsOwnedBy(rpc: IdentityRpc, owner: Address): Promise<Address[]> {
+function assetsOwnedBy(
+  rpc: IdentityRpc,
+  owner: Address,
+  options: IdentityReadOptions,
+): Promise<Address[]> {
   const filters = [
     memcmpFilter(ACCOUNT_OFFSETS.discriminator, ACCOUNT_DISCRIMINATORS.agent),
     memcmpFilter(
@@ -340,7 +359,7 @@ function assetsOwnedBy(rpc: IdentityRpc, owner: Address): Promise<Address[]> {
       new Uint8Array(ADDRESS_ENCODER.encode(owner)),
     ),
   ];
-  return registryAssets(rpc, filters, decodeAgentAccount);
+  return registryAssets(rpc, filters, decodeAgentAccount, options);
 }
 
 // By asset, broken accounts throw a typed error; by owner, each asset is judged alone and more than
@@ -361,7 +380,7 @@ export async function readNodeIdentity(
   options: IdentityReadOptions = {},
 ): Promise<NodeIdentity | undefined | NodeIdentity[]> {
   if ('asset' in query) return readAsset(rpc, query.asset, options);
-  const assets = await assetsOwnedBy(rpc, query.owner);
+  const assets = await assetsOwnedBy(rpc, query.owner, options);
   const identities = await readClaimants(rpc, assets, options);
   // Cached owner may be stale; keep only assets whose Core owner really is the queried owner.
   return identities.filter(

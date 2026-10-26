@@ -151,3 +151,11 @@ deadlines are `transport-iroh` constants, the offer lifetime is a `core` trust
 rule, call and proof bounds belong to the buyer app, and only operator-tunable
 capacity, rate, timeout and port values stay in `config` (`TRANSPORT_LIMITS`,
 `TRANSPORT_TIMEOUTS`, `PORTS`).
+
+### Identity reading policy
+
+`@gyblos/identity/resolution` owns pinned, bounded read-only 8004 account
+resolution. `@gyblos/core/identity-policy` owns manual precedence and scoped
+binding high-water/tombstone decisions without SDKs or I/O. Callers must retain
+returned state even on denial; persistence and buyer/discovery wiring are
+separate. See [identity](identity.md#read-only-resolution-and-trust-policy).

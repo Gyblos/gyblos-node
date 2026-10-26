@@ -4,6 +4,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { DEVNET, FINALIZED_COMMITMENT } from '@gyblos/config';
+import {
+  IDENTITY_LOOKUP_FAILURES as F,
+  IDENTITY_LOOKUP_KINDS as K,
+} from '@gyblos/core/identity-policy';
 import { resolveOwner } from '@gyblos/identity';
 import { nodeIdFromAddress } from '@gyblos/identity/codec';
 import {
@@ -53,7 +57,7 @@ void test('read-only resolution returns verified binding provenance using finali
       await import('@gyblos/identity/resolution');
     const result = await readRegistryIdentity(state.rpc, state.nodeId);
     assert.deepEqual(result, {
-      kind: 'bound',
+      kind: K.BOUND,
       scope: {
         network: DEVNET,
         program: PROGRAMS.registry,
@@ -78,12 +82,15 @@ void test('read-only resolution returns verified binding provenance using finali
     );
     for (const call of state.state.configs.filter(
       (call) => call.method !== 'getGenesisHash',
-    ))
-      {
-        const config = call.params[1];
-        assert.ok(config && typeof config === 'object' && 'commitment' in config);
-        assert.equal(config.commitment, FINALIZED_COMMITMENT);
-      }
+    )) {
+      const config = call.params[1];
+      assert.ok(config && typeof config === 'object');
+      // Kit omits finalized because it is the JSON-RPC default. Confirmed must never appear.
+      assert.equal(
+        'commitment' in config ? config.commitment : FINALIZED_COMMITMENT,
+        FINALIZED_COMMITMENT,
+      );
+    }
   } finally {
     await state.close();
   }
@@ -100,8 +107,8 @@ void test('read-only resolution follows a higher signed owner binding and preser
     const { readRegistryIdentity } =
       await import('@gyblos/identity/resolution');
     const result = await readRegistryIdentity(state.rpc, state.nodeId);
-    assert.equal(result.kind, 'bound');
-    if (result.kind === 'bound') {
+    assert.equal(result.kind, K.BOUND);
+    if (result.kind === K.BOUND) {
       assert.equal(result.binding.owner, state.nextOwner);
       assert.equal(result.binding.sequence, 6n);
     }
@@ -180,8 +187,8 @@ void test('registry genesis mismatch refuses lookup before any account scan', as
     const { readRegistryIdentity } =
       await import('@gyblos/identity/resolution');
     const result = await readRegistryIdentity(state.rpc, state.nodeId);
-    assert.equal(result.kind, 'unavailable');
-    if (result.kind === 'unavailable') assert.equal(result.reason, 'network');
+    assert.equal(result.kind, K.UNAVAILABLE);
+    if (result.kind === K.UNAVAILABLE) assert.equal(result.reason, F.NETWORK);
     assert.deepEqual(state.state.calls, ['getGenesisHash']);
   } finally {
     await state.close();
@@ -194,7 +201,7 @@ void test('RPC outages are unavailable rather than missing and never expose prov
     const { readRegistryIdentity } =
       await import('@gyblos/identity/resolution');
     const result = await readRegistryIdentity(state.rpc, state.nodeId);
-    assert.equal(result.kind, 'unavailable');
+    assert.equal(result.kind, K.UNAVAILABLE);
     assert.doesNotMatch(
       JSON.stringify(result),
       /synthetic outage|https?:|127\.0\.0\.1/,
@@ -216,8 +223,8 @@ void test('claimant fan-out limit is unavailable rather than an arbitrary identi
     const { readRegistryIdentity } =
       await import('@gyblos/identity/resolution');
     const result = await readRegistryIdentity(state.rpc, state.nodeId);
-    assert.equal(result.kind, 'unavailable');
-    if (result.kind === 'unavailable') assert.equal(result.reason, 'limit');
+    assert.equal(result.kind, K.UNAVAILABLE);
+    if (result.kind === K.UNAVAILABLE) assert.equal(result.reason, F.LIMIT);
   } finally {
     await state.close();
   }
@@ -231,10 +238,105 @@ void test('invalid NodeIds are rejected before any RPC call', async () => {
       state.rpc,
       'PRIVATE_NON_CANONICAL_NODE',
     );
-    assert.equal(result.kind, 'unavailable');
-    if (result.kind === 'unavailable') assert.equal(result.reason, 'invalid');
+    assert.equal(result.kind, K.UNAVAILABLE);
+    if (result.kind === K.UNAVAILABLE) assert.equal(result.reason, F.INVALID);
     assert.equal(state.state.calls.length, 0);
     assert.doesNotMatch(JSON.stringify(result), /PRIVATE/);
+  } finally {
+    await state.close();
+  }
+});
+
+void test('verified owner rotation advances policy state and prevents fallback when the newest claim disappears', async () => {
+  const state = await fixture();
+  try {
+    const { readRegistryIdentity, IDENTITY_RESOLUTION_SCOPE } =
+      await import('@gyblos/identity/resolution');
+    const { evaluateIdentityPolicy, IDENTITY_POLICY_CODES: C } =
+      await import('@gyblos/core/identity-policy');
+    const input = {
+      nodeId: state.nodeId,
+      owner: state.owner,
+      scope: IDENTITY_RESOLUTION_SCOPE,
+    };
+    const first = evaluateIdentityPolicy({
+      ...input,
+      lookup: await readRegistryIdentity(state.rpc, state.nodeId),
+    });
+    assert.equal(first.ok, true);
+    const next = await addClaimant(state.chain, {
+      owner: state.nextOwner,
+      asset: state.nextAsset,
+      node: state.node,
+      sequence: 6n,
+    });
+    const rotated = evaluateIdentityPolicy({
+      ...input,
+      previous: first.state,
+      lookup: await readRegistryIdentity(state.rpc, state.nodeId),
+    });
+    assert.equal(rotated.ok, false);
+    if (!rotated.ok) assert.equal(rotated.code, C.OWNER_CHANGED);
+    assert.equal(rotated.state?.binding.sequence, 6n);
+    state.chain.delete(next.metadata);
+    const rollback = evaluateIdentityPolicy({
+      ...input,
+      previous: rotated.state,
+      lookup: await readRegistryIdentity(state.rpc, state.nodeId),
+    });
+    assert.equal(rollback.ok, false);
+    if (!rollback.ok) assert.equal(rollback.code, C.STALE);
+    assert.equal(rollback.state?.binding.owner, state.nextOwner);
+  } finally {
+    await state.close();
+  }
+});
+void test('missing registry binding becomes a tombstone that survives explicit manual override and its removal', async () => {
+  const state = await fixture();
+  try {
+    const { readRegistryIdentity, IDENTITY_RESOLUTION_SCOPE } =
+      await import('@gyblos/identity/resolution');
+    const {
+      evaluateIdentityPolicy,
+      IDENTITY_POLICY_CODES: C,
+      IDENTITY_TRUST_SOURCES: S,
+    } = await import('@gyblos/core/identity-policy');
+    const input = {
+      nodeId: state.nodeId,
+      owner: state.owner,
+      scope: IDENTITY_RESOLUTION_SCOPE,
+    };
+    const first = evaluateIdentityPolicy({
+      ...input,
+      lookup: await readRegistryIdentity(state.rpc, state.nodeId),
+    });
+    const metadata = state.chain.get(state.accounts.metadata)!;
+    state.chain.delete(state.accounts.metadata);
+    const revoked = evaluateIdentityPolicy({
+      ...input,
+      previous: first.state,
+      lookup: await readRegistryIdentity(state.rpc, state.nodeId),
+    });
+    assert.equal(revoked.ok, false);
+    if (!revoked.ok) assert.equal(revoked.code, C.REVOKED);
+    const count = state.state.calls.length;
+    const manual = evaluateIdentityPolicy({
+      ...input,
+      previous: revoked.state,
+      manual: { nodeId: state.nodeId, owner: state.owner },
+    });
+    assert.equal(manual.ok, true);
+    if (manual.ok) assert.equal(manual.source, S.MANUAL);
+    assert.equal(state.state.calls.length, count);
+    assert.equal(manual.state?.revoked, true);
+    state.chain.set(state.accounts.metadata, metadata);
+    const restored = evaluateIdentityPolicy({
+      ...input,
+      previous: manual.state,
+      lookup: await readRegistryIdentity(state.rpc, state.nodeId),
+    });
+    assert.equal(restored.ok, false);
+    if (!restored.ok) assert.equal(restored.code, C.REVOKED);
   } finally {
     await state.close();
   }
