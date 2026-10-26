@@ -148,6 +148,9 @@ class BuyerControlClient {
   close() {
     return this.transport.close();
   }
+  async settled() {
+    await this.transport.settled?.();
+  }
 }
 export function createBuyerControlClient(
   transport: ControlTransport,

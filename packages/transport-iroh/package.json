@@ -18,7 +18,8 @@
     "./control-io": "./src/control-io.ts",
     "./control-server": "./src/control-server.ts",
     "./control-client": "./src/control-client.ts",
-    "./free-server": "./src/free-server.ts"
+    "./free-server": "./src/free-server.ts",
+    "./free-client": "./src/free-client.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",

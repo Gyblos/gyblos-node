@@ -329,7 +329,8 @@ unchanged stored v1 offer. Quotes are never converted into v1. Because v1 has no
 reasoning selection or separate selection-budget enforcement, execution requires
 `off` reasoning, matching engine description/payment identities/prices/metering,
 and the same maximum budget as the stored v1 offer. Other terms return
-`QUOTE_REQUIRES_UNSUPPORTED_V2_EXECUTION`. Free v2 execution remains disabled.
+`QUOTE_REQUIRES_UNSUPPORTED_V2_EXECUTION`. This paid entry never executes free
+v2; use the separate free buyer endpoint below.
 
 The signed follow-up must match the original request ID and exact body bytes; no
 new selection occurs after a payment header appears. A lost authorized response
@@ -363,9 +364,9 @@ A supported `gyblos.toml` free offer starts control plus the separate
 `gyblos/free/2` data channel. It does not start the paid HTTP service or
 facilitator, check a payment program, or write a v1 offer. This is
 complete-response execution for the pinned engine's single user message and
-`off` reasoning; streaming and other engine input forms are not enabled.
-Buyer-proxy wiring is a separate integration; obtaining a quote alone still does
-not send a prompt.
+`off` reasoning; streaming and other engine input forms are not enabled. The
+separate `buyer:free` entry executes free quotes; obtaining a control quote
+alone still does not send a prompt.
 
 The seller reads daily token caps from the prepared offer: `daily_token_cap`
 applies across all buyers and `per_buyer_cap` per authenticated NodeId, both
@@ -410,3 +411,86 @@ Switching a home from paid to free can leave a prior `offer.json` in place. It
 is not renewed or advertised by the free service, whose endpoint exposes only
 control and free ALPNs. Startup deliberately preserves existing role files;
 operators should use current signed v2 quotes rather than that old file.
+
+## Free v2 buyer endpoint
+
+`pnpm buyer:free` starts a separate loopback endpoint on the buyer proxy port
+(default `127.0.0.1:4031`). Stop `buyer:start` first; both commands use that
+port. It needs the buyer role's public configuration, node key and the
+`selection.json` policy described above. It does not load a wallet signer,
+trust/offer files or a tokenizer, and does not check a payment program or
+contact RPC. Existing role configuration retains its legacy asset/RPC fields,
+but this entry does not use RPC. Keep seller owner–NodeId bindings independently
+verified; discovery only supplies signed availability hints for those configured
+identities.
+
+Set `request.reasoning` to `"off"`, `lowestReasoning` to `null`, and `maxTokens`
+to at most 128 (the current engine maximum). For a clear operator policy, set
+`maxAtomic`, `inputAtomicPerMtok` and `outputAtomicPerMtok` ceilings to `"0"`.
+The free entry enforces those zero ceilings/budget even if a shared selection
+file permits paid quotes. `pinnedNodeId`, data-retention filters and configured
+relays still apply; `PINNED_SELLER_IN_COOLDOWN` retains `cooldownUntil` in the
+error object. Badges stay `declared-usage` and `openChannel` stays false.
+
+Supported request shape for `POST /v1/chat/completions`:
+
+```json
+{
+  "model": "the-exact-configured-model-id",
+  "messages": [{ "role": "user", "content": "Your text" }],
+  "max_tokens": 64,
+  "stream": false
+}
+```
+
+`max_tokens` defaults to the configured maximum and cannot exceed it. `model`
+selects the exact configured model/variant/quantization tuple; it is not an
+engine name. Only one text user message is supported. History, system messages,
+tools, sampling options, alternate modalities, unknown options and streaming are
+rejected before selection or prompt transmission. This is a limited compatible
+subset, not the complete OpenAI API. Requests must send
+`Content-Type: application/json`. Invalid UTF-8, foreign Host headers, requests
+with an Origin header and other content types get 400 (a foreign Host gets 421),
+so a web page cannot reach the endpoint; there is no CORS browser interface. A
+body declared larger than 128 KiB gets 413 before it is read; a larger streamed
+body gets the same 413 once it passes the limit. Both close the connection. Use
+a local client, and apply normal trust to local processes.
+
+Status codes: 400 for an invalid request or a request beyond the quote's limits,
+413 for an oversized body, 429 when the endpoint is already running a request
+(safe to retry), 503 when no seller could take the request, 504 when the
+endpoint's 180-second deadline expires, and 500 for an unexpected failure.
+Whenever the prompt may already have reached a seller, or the request is the
+caller's fault, the error carries `x-should-retry: false`, the header the
+official OpenAI SDKs honor to skip their automatic retries. Clients that retry
+5xx on their own must check it: retrying would resend the prompt, possibly to
+another seller.
+
+The response contains one `choices` entry, its text/finish reason and
+`usage.prompt_tokens`, `completion_tokens` and `total_tokens`. Static failures
+use `error.code`; arbitrary exception contents are never returned. No prompt or
+response is written to logs, journals or selection metadata. A free seller can
+still observe the submitted text; free does not imply private or verified.
+
+Control connections close before execution connects on `gyblos/free/2`. The
+client verifies the seller peer, signed quote, local buyer NodeId, exact terms
+and zero-skew expiry again before sending. Request/response bounds and
+correlation use the free protocol codec. A query has an absolute 180-second
+budget including discovery, quotes and execution; each transport also retains
+its stage bounds. A failed seller may be excluded and selection repeated only
+before sending begins, and no seller is executed twice in one local request. The
+free runtime admits one orchestration at a time with no queue; overlapping
+requests return `FREE_BUYER_BUSY` rather than racing the per-peer connection
+limit or poisoning another request's cooldown. Cancelled selection attempts do
+not commit quote statistics. Control and execution admission remain occupied
+until pending native work settles. The client marks sending before the first
+frame write: partial writes, remote errors, timeouts and lost responses never
+cause automatic failover afterward. Native work that ignores cancellation
+retains its execution resource until it actually settles. The v1 paid proxy
+remains a separate command.
+
+Product contract tests use a synthetic engine and native encrypted loopback.
+They are not the complete publication-to-answer acceptance: the separate lab
+scenario with an in-process discovery index follows this buyer's integration.
+Real Ollama, off-host/relay/CGNAT and production acceptance remain separate
+operations. Streaming, 8004 identity reading and paid v2 are subsequent work.

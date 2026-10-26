@@ -115,3 +115,26 @@ export const INFERENCE_CASES = {
 export type ErrorDiagnosticCode =
   | ProtocolErrorCode
   | (typeof ERROR_DIAGNOSTICS)[keyof typeof ERROR_DIAGNOSTICS];
+
+// Local non-streaming compatibility surface; execution wire codes stay protocol-owned.
+export const FREE_BUYER = {
+  completionObject: 'chat.completion',
+  errorType: 'gyblos_error',
+  contentType: 'application/json',
+  // Header the official OpenAI SDKs honor to skip their automatic retries.
+  noRetryHeader: 'x-should-retry',
+  requestMs: 180000,
+  headerMs: 10000,
+  headers: 16384,
+} as const;
+export const FREE_BUYER_CODES = {
+  INVALID: 'FREE_BUYER_INVALID_REQUEST',
+  UNAVAILABLE: 'FREE_BUYER_NO_OFFER',
+  CONFIG: 'FREE_BUYER_CONFIGURATION_REQUIRED',
+  BUSY: 'FREE_BUYER_BUSY',
+  INTERNAL: 'FREE_BUYER_INTERNAL',
+  TOO_LARGE: 'FREE_BUYER_REQUEST_TOO_LARGE',
+  TIMEOUT: 'FREE_BUYER_TIMEOUT',
+} as const;
+export type FreeBuyerCode =
+  (typeof FREE_BUYER_CODES)[keyof typeof FREE_BUYER_CODES];
