@@ -116,8 +116,10 @@ void test('free execution reads fragmented prefixes/bodies and returns only afte
   for (const byte of Buffer.from(source.requestFrameHex, 'hex'))
     reader.push(Uint8Array.of(byte));
   assert.deepEqual(reader.finish(), source.request);
-  assert.throws(() => reader.finish());
-  assert.throws(() => reader.push(Uint8Array.of(0)));
+  assert.throws(() => reader.finish(), { code: FREE_EXECUTION_CODES.INVALID });
+  assert.throws(() => reader.push(Uint8Array.of(0)), {
+    code: FREE_EXECUTION_CODES.INVALID,
+  });
   const response = new FreeExecutionResponseReader();
   response.push(Buffer.from(source.responseFrameHex, 'hex'));
   assert.deepEqual(response.finish(), source.response);
@@ -132,9 +134,10 @@ void test('free execution rejects excessive lengths before bodies, incomplete an
   const frame = Buffer.from(source.requestFrameHex, 'hex');
   const short = new FreeExecutionRequestReader();
   short.push(frame.subarray(0, frame.length - 1));
-  assert.throws(() => short.finish());
-  assert.throws(() =>
-    new FreeExecutionRequestReader().push(Buffer.concat([frame, frame])),
+  assert.throws(() => short.finish(), { code: FREE_EXECUTION_CODES.INVALID });
+  assert.throws(
+    () => new FreeExecutionRequestReader().push(Buffer.concat([frame, frame])),
+    { code: FREE_EXECUTION_CODES.INVALID },
   );
 });
 void test('free execution rejects ambiguous JSON, duplicate keys, deep objects and invalid UTF-8', () => {
@@ -146,17 +149,23 @@ void test('free execution rejects ambiguous JSON, duplicate keys, deep objects a
   ]) {
     const reader = new FreeExecutionRequestReader();
     reader.push(rawFrame(text));
-    assert.throws(() => reader.finish());
+    assert.throws(() => reader.finish(), {
+      code: text.startsWith('[')
+        ? FREE_EXECUTION_CODES.LIMIT
+        : FREE_EXECUTION_CODES.INVALID,
+    });
   }
   const reader = new FreeExecutionRequestReader();
   reader.push(Uint8Array.of(0, 0, 0, 1, 255));
-  assert.throws(() => reader.finish());
+  assert.throws(() => reader.finish(), { code: FREE_EXECUTION_CODES.INVALID });
 });
 
 void test('free execution reader cannot resume a valid request after a framing violation', async () => {
   const source = await vector();
   const reader = new FreeExecutionRequestReader();
   reader.push(Buffer.from(source.requestFrameHex, 'hex'));
-  assert.throws(() => reader.push(Uint8Array.of(0)));
+  assert.throws(() => reader.push(Uint8Array.of(0)), {
+    code: FREE_EXECUTION_CODES.INVALID,
+  });
   assert.throws(() => reader.finish(), { code: FREE_EXECUTION_CODES.INVALID });
 });
