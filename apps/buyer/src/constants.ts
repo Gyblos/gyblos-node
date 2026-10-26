@@ -134,6 +134,7 @@ export const FREE_BUYER_CODES = {
   BUSY: 'FREE_BUYER_BUSY',
   INTERNAL: 'FREE_BUYER_INTERNAL',
   TOO_LARGE: 'FREE_BUYER_REQUEST_TOO_LARGE',
+  TIMEOUT: 'FREE_BUYER_TIMEOUT',
 } as const;
 export type FreeBuyerCode =
   (typeof FREE_BUYER_CODES)[keyof typeof FREE_BUYER_CODES];

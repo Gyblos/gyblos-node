@@ -296,3 +296,57 @@ void test('free HTTP tells clients never to retry a possibly sent prompt; caller
     }
   }
 });
+
+void test('free HTTP answers its own deadline with 504 and no-retry instead of a socket reset', async () => {
+  const api = await import('@gyblos/buyer/free-http');
+  const { FreeClientError } =
+    await import('@gyblos/transport-iroh/free-client');
+  const { FREE_EXECUTION_CODES } = await import('@gyblos/protocol/constants');
+  const { FreeBuyerError } = await import('@gyblos/buyer/free-chat');
+  const { FREE_BUYER_CODES } = await import('@gyblos/buyer/constants');
+  let cancelled = 0;
+  const server = await api.startFreeBuyerHttp(
+    async (_input, signal) => {
+      // Behaves as if the prompt was written before the deadline.
+      await new Promise<void>((resolve) =>
+        signal.addEventListener('abort', () => resolve(), { once: true }),
+      );
+      cancelled++;
+      throw new FreeClientError(FREE_EXECUTION_CODES.CANCELLED, true);
+    },
+    SETTINGS,
+    { port: 0, requestMs: 100 },
+  );
+  try {
+    const response = await fetch(server.url, {
+      method: 'POST',
+      headers: JSON_HEADERS,
+      body: CHAT,
+    });
+    assert.equal(response.status, 504);
+    assert.equal(response.headers.get('x-should-retry'), 'false');
+    assert.equal((await response.json()).error.code, 'FREE_BUYER_TIMEOUT');
+    assert.equal(cancelled, 1);
+    const unavailable = await api.startFreeBuyerHttp(
+      async () => {
+        throw new FreeBuyerError(FREE_BUYER_CODES.UNAVAILABLE);
+      },
+      SETTINGS,
+      { port: 0 },
+    );
+    try {
+      const retryable = await fetch(unavailable.url, {
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body: CHAT,
+      });
+      assert.equal(retryable.status, 503);
+      assert.equal(retryable.headers.get('x-should-retry'), null);
+      await retryable.body?.cancel();
+    } finally {
+      await unavailable.close();
+    }
+  } finally {
+    await server.close();
+  }
+});

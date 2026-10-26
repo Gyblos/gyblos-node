@@ -67,15 +67,16 @@ async function readBody(
 function neverSent(error: unknown) {
   if (error instanceof FreeClientError) return !error.sent && !error.remote;
   if (error instanceof FreeExecutionError) return !error.remote;
-  return (
-    error instanceof FreeBuyerError || error instanceof FreeSelectionFailure
-  );
+  if (error instanceof FreeBuyerError)
+    return error.code !== FREE_BUYER_CODES.TIMEOUT;
+  return error instanceof FreeSelectionFailure;
 }
 function errorStatus(error: unknown, code: string) {
   if (code === FREE_BUYER_CODES.INVALID) return HTTP_STATUS.badRequest;
   if (code === FREE_BUYER_CODES.TOO_LARGE) return HTTP_STATUS.payloadTooLarge;
   if (code === FREE_EXECUTION_CODES.LIMIT) return HTTP_STATUS.badRequest;
   if (code === FREE_BUYER_CODES.BUSY) return HTTP_STATUS.tooManyRequests;
+  if (code === FREE_BUYER_CODES.TIMEOUT) return HTTP_STATUS.gatewayTimeout;
   if (
     error instanceof FreeClientError ||
     error instanceof FreeExecutionError ||
@@ -87,6 +88,12 @@ function errorStatus(error: unknown, code: string) {
 }
 function replyError(response: ServerResponse, error: unknown) {
   if (response.destroyed || response.writableEnded) return;
+  // A body cut off mid-stream leaves unread bytes, so the connection cannot be reused.
+  if (
+    error instanceof FreeBuyerError &&
+    error.code === FREE_BUYER_CODES.TOO_LARGE
+  )
+    response.shouldKeepAlive = false;
   const known =
     error instanceof FreeClientError ||
     error instanceof FreeExecutionError ||
@@ -164,6 +171,7 @@ function replyCompletion(
 export function freeBuyerHandler(
   execute: FreeChatExecutor,
   settings: ChatSettings,
+  requestMs: number = FREE_BUYER.requestMs,
 ) {
   let active = 0;
   return async (request: IncomingMessage, response: ServerResponse) => {
@@ -179,7 +187,6 @@ export function freeBuyerHandler(
     }
     // Refused before admission and before reading, so a stalled oversize body holds no slot.
     if (declaredTooLarge(request)) {
-      response.shouldKeepAlive = false;
       replyError(response, new FreeBuyerError(FREE_BUYER_CODES.TOO_LARGE));
       return;
     }
@@ -190,11 +197,17 @@ export function freeBuyerHandler(
     active++;
     const controller = new AbortController();
     const cancel = () => controller.abort();
+    // The prompt may already be on its way, so the deadline answers with no-retry rather than a
+    // bare socket reset, which OpenAI SDKs would retry. The socket closes once the reply is out.
     const timer = setTimeout(() => {
       cancel();
-      request.destroy();
-      response.destroy();
-    }, FREE_BUYER.requestMs);
+      response.shouldKeepAlive = false;
+      replyError(response, new FreeBuyerError(FREE_BUYER_CODES.TIMEOUT));
+      if (!response.writableEnded) {
+        request.destroy();
+        response.destroy();
+      }
+    }, requestMs);
     response.once('close', cancel);
     try {
       const input = parseFreeChat(
@@ -217,7 +230,7 @@ export function freeBuyerHandler(
 export async function startFreeBuyerHttp(
   execute: FreeChatExecutor,
   settings: ChatSettings,
-  options: { port?: number } = {},
+  options: { port?: number; requestMs?: number } = {},
 ) {
   const server = createServer(
     {
@@ -225,7 +238,7 @@ export async function startFreeBuyerHttp(
       headersTimeout: FREE_BUYER.headerMs,
       requestTimeout: FREE_BUYER.requestMs,
     },
-    freeBuyerHandler(execute, settings),
+    freeBuyerHandler(execute, settings, options.requestMs),
   );
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject);
