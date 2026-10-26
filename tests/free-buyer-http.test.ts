@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 import { request as httpRequest } from 'node:http';
 import test from 'node:test';
 
-import { ENGINE_DONE_REASONS } from '@gyblos/protocol/constants';
+import {
+  ENGINE_DONE_REASONS,
+  FREE_CHAT_ROLES,
+} from '@gyblos/protocol/constants';
 
 void test('free HTTP returns a complete completion and refuses unsupported input before execution', async () => {
   const api = await import('@gyblos/buyer/free-http');
@@ -26,7 +29,7 @@ void test('free HTTP returns a complete completion and refuses unsupported input
   try {
     const body = {
       model: 'synthetic',
-      messages: [{ role: 'user', content: 'hello' }],
+      messages: [{ role: FREE_CHAT_ROLES.USER, content: 'hello' }],
     };
     const response = await fetch(server.url, {
       method: 'POST',
@@ -100,7 +103,7 @@ void test('free HTTP cancellation reaches execution and admission rejects excess
   );
   const body = JSON.stringify({
     model: 'synthetic',
-    messages: [{ role: 'user', content: 'hello' }],
+    messages: [{ role: FREE_CHAT_ROLES.USER, content: 'hello' }],
   });
   const pending = controllers.map((controller) =>
     fetch(server.url, {

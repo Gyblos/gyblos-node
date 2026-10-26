@@ -11,6 +11,7 @@ import {
   HTTP_STATUS,
   LOCALHOST,
   PORTS,
+  ROUTES,
   TRANSPORT_LIMITS,
   UNITS,
 } from '@gyblos/config';
@@ -124,7 +125,7 @@ export function freeBuyerHandler(
     if (!acceptLoopbackHost(request, response)) return;
     if (
       request.method !== 'POST' ||
-      request.url !== FREE_BUYER.path ||
+      request.url !== ROUTES.inference ||
       request.headers.origin !== undefined
     ) {
       replyError(response, new FreeBuyerError(FREE_BUYER_CODES.INVALID));
@@ -185,7 +186,7 @@ export async function startFreeBuyerHttp(
   if (!address || typeof address === 'string')
     throw new FreeBuyerError(FREE_BUYER_CODES.INTERNAL);
   return {
-    url: `http://${LOCALHOST}:${address.port}${FREE_BUYER.path}`,
+    url: `http://${LOCALHOST}:${address.port}${ROUTES.inference}`,
     async close() {
       server.closeAllConnections();
       await new Promise<void>((resolve) => server.close(() => resolve()));

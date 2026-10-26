@@ -118,7 +118,6 @@ export type ErrorDiagnosticCode =
 
 // Local non-streaming compatibility surface; execution wire codes stay protocol-owned.
 export const FREE_BUYER = {
-  path: '/v1/chat/completions',
   completionObject: 'chat.completion',
   errorType: 'gyblos_error',
   requestMs: 180000,

@@ -24,6 +24,7 @@ export function freeBuyerDependencies(
   prepared: PreparedSelection,
   options: FreeSelectionOptions,
 ): FreeBuyerDependencies {
+  let active = false;
   const now = options.now ?? Date.now;
   const policy = prepared.config;
   if (
@@ -40,6 +41,13 @@ export function freeBuyerDependencies(
     permitsFreeWinner(prepared, winner, now());
 
   return {
+    enter() {
+      if (active) throw new FreeBuyerError(FREE_BUYER_CODES.BUSY);
+      active = true;
+      return () => {
+        active = false;
+      };
+    },
     select: (excluded, signal) =>
       selectFreeWinner(prepared, options, excluded, signal),
     async execute(winner, request, signal) {
@@ -110,8 +118,6 @@ async function selectFreeWinner(
 ) {
   const now = options.now ?? Date.now;
   const policy = prepared.config;
-  const address = (seller: StaticControlSeller) =>
-    sellerAddress(seller, options.relayOnly);
   const base = {
     ...policy,
     request: {
@@ -129,30 +135,23 @@ async function selectFreeWinner(
           { fetch: options.fetch ?? globalThis.fetch, now, signal },
         )
       : base;
+  const stats = new Map(prepared.stats.rows);
   const result = await selectVerifiedBuyerQuote(
     config,
     {
       buyer: options.buyer,
       now,
-      stats: prepared.stats.rows,
+      stats,
       observeVerified: prepared.discovery
         ? (seller) => prepared.discovery!.observe(seller)
         : undefined,
-      connect: (seller) =>
-        connectBuyerControl(
-          options.endpoint,
-          address(seller),
-          {
-            owner: seller.owner,
-            nodeId: seller.nodeId,
-            now,
-            relayAllowed,
-          },
-          options.relayOnly,
-        ),
+      connect: (seller) => connectFreeControl(seller, options, now),
     },
     signal,
   );
+  signal.throwIfAborted();
+  prepared.stats.rows.clear();
+  for (const [nodeId, row] of stats) prepared.stats.rows.set(nodeId, row);
   await prepared.stats.save();
   if (!result.ok) throw new FreeSelectionFailure(result);
   const winner = {
@@ -162,4 +161,32 @@ async function selectFreeWinner(
   if (!(await permitsFreeWinner(prepared, winner, now())))
     throw new FreeBuyerError(FREE_BUYER_CODES.UNAVAILABLE);
   return winner;
+}
+
+async function connectFreeControl(
+  seller: StaticControlSeller,
+  options: FreeSelectionOptions,
+  now: () => number,
+) {
+  const client = await connectBuyerControl(
+    options.endpoint,
+    sellerAddress(seller, options.relayOnly),
+    { owner: seller.owner, nodeId: seller.nodeId, now, relayAllowed },
+    options.relayOnly,
+  );
+  return {
+    getCatalog: (...args: Parameters<typeof client.getCatalog>) =>
+      client.getCatalog(...args),
+    getPresence: (...args: Parameters<typeof client.getPresence>) =>
+      client.getPresence(...args),
+    requestOffer: (...args: Parameters<typeof client.requestOffer>) =>
+      client.requestOffer(...args),
+    async close() {
+      try {
+        await client.close();
+      } finally {
+        await client.settled();
+      }
+    },
+  };
 }

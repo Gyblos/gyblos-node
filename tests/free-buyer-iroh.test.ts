@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { FREE_BUYER_CODES } from '@gyblos/buyer/constants';
 import { executeBuyerFree } from '@gyblos/buyer/free-execution';
 import { startFreeBuyerHttp } from '@gyblos/buyer/free-http';
 import { freeBuyerDependencies } from '@gyblos/buyer/free-selection';
@@ -11,7 +12,12 @@ import { SELLER_BADGES } from '@gyblos/core/constants';
 import { createSellerControlService } from '@gyblos/node/control';
 import { createSellerRecords } from '@gyblos/node/public-records';
 import { serveSellerTransport } from '@gyblos/node/seller-transport';
-import { CONTROL_ALPN, FREE_EXECUTION } from '@gyblos/protocol/constants';
+import {
+  CONTROL_ALPN,
+  ENGINE_DONE_REASONS,
+  FREE_CHAT_ROLES,
+  FREE_EXECUTION,
+} from '@gyblos/protocol/constants';
 import { signPublicV2 } from '@gyblos/protocol/public-v2';
 
 import { freeSellerFixture } from './support/free-seller.js';
@@ -138,7 +144,7 @@ void test(
           method: 'POST',
           body: JSON.stringify({
             model: request.selection.modelId,
-            messages: [{ role: 'user', content: 'hello' }],
+            messages: [{ role: FREE_CHAT_ROLES.USER, content: 'hello' }],
             max_tokens: 10,
           }),
         }),
@@ -147,6 +153,64 @@ void test(
       assert.equal(response.status, 200, JSON.stringify(result));
       assert.equal(result.choices[0].message.content, 'answer');
       assert.equal(fixture.calls(), 1);
+      let engineBegan = () => {};
+      const began = new Promise<void>((resolve) => {
+        engineBegan = resolve;
+      });
+      let releaseEngine = () => {};
+      const released = new Promise<void>((resolve) => {
+        releaseEngine = resolve;
+      });
+      fixture.setRun(async () => {
+        engineBegan();
+        await released;
+        return {
+          text: 'answer',
+          finishReason: ENGINE_DONE_REASONS.STOP,
+          usage: {
+            inputTokens: 4,
+            outputTokens: 2,
+            totalDurationNs: 0,
+            loadDurationNs: 0,
+            inputDurationNs: 0,
+            outputDurationNs: 0,
+          },
+        };
+      });
+      const body = JSON.stringify({
+        model: request.selection.modelId,
+        messages: [{ role: FREE_CHAT_ROLES.USER, content: 'hello' }],
+        max_tokens: 10,
+      });
+      const overlapping = Promise.all([
+        fetch(host.url, { method: 'POST', body }),
+        fetch(host.url, { method: 'POST', body }),
+      ]);
+      try {
+        assert.equal(
+          await within(
+            Promise.race([
+              began.then(() => 'engine'),
+              overlapping.then(() => 'done'),
+            ]),
+          ),
+          'engine',
+        );
+        releaseEngine();
+        const responses = await within(overlapping);
+        assert.deepEqual(
+          responses.map((item) => item.status).sort(),
+          [200, 503],
+        );
+        const rejected = responses.find((item) => item.status === 503)!;
+        assert.equal((await rejected.json()).error.code, FREE_BUYER_CODES.BUSY);
+        for (const row of prepared.stats.rows.values())
+          assert.equal(row.failures, 0);
+        assert.equal(fixture.calls(), 2);
+      } finally {
+        releaseEngine();
+        await overlapping;
+      }
     } finally {
       await host.close();
       await buyer.close();

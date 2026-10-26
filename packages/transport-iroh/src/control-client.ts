@@ -21,14 +21,16 @@ export interface ControlTransport {
   readonly remoteNodeId: string;
   exchange(value: unknown, signal?: AbortSignal): Promise<unknown>;
   close(): Promise<void>;
+  settled?(): Promise<void>;
 }
 export function createControlTransport(
   endpoint: Endpoint,
   remote: EndpointAddr,
   expectedNodeId: string,
   options: { queryMs: number; relayOnly?: boolean },
-): ControlTransport {
+): ControlTransport & { settled(): Promise<void> } {
   const lifetime = new AbortController();
+  const operations = new Set<Promise<unknown>>();
   let current: Connection | undefined;
   let querying = false;
   let pendingConnect = false;
@@ -50,37 +52,42 @@ export function createControlTransport(
       };
       try {
         return await controlDeadline(
-          async (deadline) => {
-            if (!current || current.closeReason() !== null) {
-              pendingConnect = true;
-              let connection: Connection;
-              try {
-                connection = await endpoint.connect(remote, [
-                  ...Buffer.from(CONTROL_ALPN),
-                ]);
-              } finally {
-                pendingConnect = false;
+          (deadline) =>
+            trackControlOperation(operations, async () => {
+              if (!current || current.closeReason() !== null) {
+                pendingConnect = true;
+                let connection: Connection;
+                try {
+                  connection = await endpoint.connect(remote, [
+                    ...Buffer.from(CONTROL_ALPN),
+                  ]);
+                } finally {
+                  pendingConnect = false;
+                }
+                if (expired || deadline.aborted || lifetime.signal.aborted) {
+                  connection.close(HTTP_OVER_IROH.streamCloseCode, []);
+                  return controlFail(CONTROL_CODES.CANCELLED);
+                }
+                current = connection;
               }
-              if (expired || deadline.aborted || lifetime.signal.aborted) {
-                connection.close(HTTP_OVER_IROH.streamCloseCode, []);
-                return controlFail(CONTROL_CODES.CANCELLED);
-              }
-              current = connection;
-            }
-            const connection = current;
-            if (connection.remoteId().toString() !== expectedNodeId)
-              return controlFail(CONTROL_CODES.POLICY);
-            assertControlRoute(connection, options.relayOnly);
-            const stream = await connection.openBi();
-            assertControlRoute(connection, options.relayOnly);
-            await writeControlFrame(stream, value, CONTROL_LIMITS.requestBytes);
-            const response = await readControlFrame(
-              stream,
-              CONTROL_LIMITS.responseBytes,
-            );
-            assertControlRoute(connection, options.relayOnly);
-            return response;
-          },
+              const connection = current;
+              if (connection.remoteId().toString() !== expectedNodeId)
+                return controlFail(CONTROL_CODES.POLICY);
+              assertControlRoute(connection, options.relayOnly);
+              const stream = await connection.openBi();
+              assertControlRoute(connection, options.relayOnly);
+              await writeControlFrame(
+                stream,
+                value,
+                CONTROL_LIMITS.requestBytes,
+              );
+              const response = await readControlFrame(
+                stream,
+                CONTROL_LIMITS.responseBytes,
+              );
+              assertControlRoute(connection, options.relayOnly);
+              return response;
+            }),
           options.queryMs,
           close,
           signal ? AbortSignal.any([signal, lifetime.signal]) : lifetime.signal,
@@ -92,6 +99,9 @@ export function createControlTransport(
         querying = false;
       }
     },
+    async settled() {
+      await Promise.allSettled(operations);
+    },
     async close() {
       lifetime.abort();
       retire(); // Caller owns the endpoint, which may also carry HTTP v1.
@@ -102,4 +112,17 @@ export function createControlTransport(
 function assertControlRoute(connection: Connection, relayOnly?: boolean) {
   if (relayOnly && selectedRoute(connection) !== TRANSPORT_ROUTES.RELAY)
     return controlFail(CONTROL_CODES.POLICY);
+}
+
+function trackControlOperation<T>(
+  operations: Set<Promise<unknown>>,
+  run: () => Promise<T>,
+) {
+  const operation = run();
+  operations.add(operation);
+  void operation.then(
+    () => operations.delete(operation),
+    () => operations.delete(operation),
+  );
+  return operation;
 }

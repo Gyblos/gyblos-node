@@ -24,6 +24,7 @@ export interface FreeWinner {
   quote: SignedOfferV2;
 }
 export interface FreeBuyerDependencies {
+  enter?(): () => void;
   select(
     excluded: ReadonlySet<string>,
     signal: AbortSignal,
@@ -39,26 +40,31 @@ export async function executeBuyerFree(
   dependencies: FreeBuyerDependencies,
   external?: AbortSignal,
 ) {
-  const signal = AbortSignal.any([
-    AbortSignal.timeout(FREE_BUYER.requestMs),
-    ...(external ? [external] : []),
-  ]);
-  const excluded = new Set<string>();
-  while (!signal.aborted) {
-    const winner = await dependencies.select(excluded, signal);
-    signal.throwIfAborted();
-    if (excluded.has(winner.nodeId))
-      throw new FreeBuyerError(FREE_BUYER_CODES.UNAVAILABLE);
-    excluded.add(winner.nodeId);
-    const request = buildFreeExecutionRequest(winner.quote, input);
-    try {
-      const result = await dependencies.execute(winner, request, signal);
+  const release = dependencies.enter?.();
+  try {
+    const signal = AbortSignal.any([
+      AbortSignal.timeout(FREE_BUYER.requestMs),
+      ...(external ? [external] : []),
+    ]);
+    const excluded = new Set<string>();
+    while (!signal.aborted) {
+      const winner = await dependencies.select(excluded, signal);
       signal.throwIfAborted();
-      return result;
-    } catch (error) {
-      if (!(error instanceof FreeClientError) || error.sent || signal.aborted)
-        throw error;
+      if (excluded.has(winner.nodeId))
+        throw new FreeBuyerError(FREE_BUYER_CODES.UNAVAILABLE);
+      excluded.add(winner.nodeId);
+      const request = buildFreeExecutionRequest(winner.quote, input);
+      try {
+        const result = await dependencies.execute(winner, request, signal);
+        signal.throwIfAborted();
+        return result;
+      } catch (error) {
+        if (!(error instanceof FreeClientError) || error.sent || signal.aborted)
+          throw error;
+      }
     }
+    throw new FreeBuyerError(FREE_BUYER_CODES.UNAVAILABLE);
+  } finally {
+    release?.();
   }
-  throw new FreeBuyerError(FREE_BUYER_CODES.UNAVAILABLE);
 }
