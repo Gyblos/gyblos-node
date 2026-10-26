@@ -81,7 +81,10 @@ void test('backup flow saves encrypted file and verifies same address without en
       }),
       BACKUP_RESULT.VERIFIED,
     );
-    assert.deepEqual(await wallet.summary(), before);
+    assert.deepEqual(await wallet.summary(), {
+      ...before,
+      backupVerified: true,
+    });
     assert.equal(before.backupVerified, false);
     assert.equal(before.fundingEnabled, false);
     const bytes = await readFile(file, 'utf8');

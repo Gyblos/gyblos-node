@@ -2,8 +2,10 @@
 // The UI cannot receive a key, file contents or signing/funding capability.
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -28,36 +30,44 @@ declare global {
   }
 }
 
-const WalletContext = createContext<WalletSummary>(
-  walletSummary(WALLET_STATUS.LOADING),
-);
+const WalletContext = createContext<{
+  wallet: WalletSummary;
+  refresh(): Promise<void>;
+}>({ wallet: walletSummary(WALLET_STATUS.LOADING), refresh: async () => {} });
 
 export function DesktopWalletProvider({ children }: { children: ReactNode }) {
   const [wallet, setWallet] = useState(() =>
     walletSummary(WALLET_STATUS.LOADING),
   );
-  useEffect(() => {
-    let active = true;
-    const request =
-      window.desktopWallet?.summary() ??
-      Promise.resolve(walletSummary(WALLET_STATUS.UNAVAILABLE));
-    void request.then(
-      (value) => {
-        if (active) setWallet(parseWalletSummary(value));
-      },
-      () => {
-        if (active) setWallet(walletSummary(WALLET_STATUS.UNAVAILABLE));
-      },
-    );
-    return () => {
-      active = false;
-    };
+  const active = useRef(false);
+  const sequence = useRef(0);
+  const refresh = useCallback(async () => {
+    const request = ++sequence.current;
+    let current = walletSummary(WALLET_STATUS.UNAVAILABLE);
+    try {
+      current = parseWalletSummary(await window.desktopWallet?.summary());
+    } catch {
+      // A failed public-status request must never leave a stale verified badge.
+    }
+    if (active.current && request === sequence.current) setWallet(current);
   }, []);
+  useEffect(() => {
+    active.current = true;
+    void refresh();
+    return () => {
+      active.current = false;
+    };
+  }, [refresh]);
   return (
-    <WalletContext.Provider value={wallet}>{children}</WalletContext.Provider>
+    <WalletContext.Provider value={{ wallet, refresh }}>
+      {children}
+    </WalletContext.Provider>
   );
 }
 
 export function useDesktopWallet() {
-  return useContext(WalletContext);
+  return useContext(WalletContext).wallet;
+}
+export function useRefreshDesktopWallet() {
+  return useContext(WalletContext).refresh;
 }

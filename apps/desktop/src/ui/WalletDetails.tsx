@@ -1,17 +1,29 @@
 // Displays public wallet metadata and backup controls; funding and signing remain disabled.
+import { useEffect } from 'react';
+
 import { WALLET_STATUS } from '../wallet/model.js';
 import { Badge, Button, Note } from './UI.js';
 import { WalletBackup } from './WalletBackup.js';
-import { useDesktopWallet } from './WalletState.js';
+import { useDesktopWallet, useRefreshDesktopWallet } from './WalletState.js';
 
 export function WalletDetails() {
   const wallet = useDesktopWallet();
+  const refresh = useRefreshDesktopWallet();
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
   const ready = wallet.status === WALLET_STATUS.READY;
   return (
     <section className="wallet-details" aria-label="Wallet details">
       <div className="connection-location">
         <strong>Personal wallet</strong>
-        <Badge>{ready ? 'Backup pending' : 'Not available'}</Badge>
+        <Badge>
+          {ready
+            ? wallet.backupVerified
+              ? 'Backup verified'
+              : 'Backup pending'
+            : 'Not available'}
+        </Badge>
       </div>
       {ready ? (
         <>

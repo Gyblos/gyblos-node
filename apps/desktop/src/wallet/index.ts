@@ -25,3 +25,5 @@ export {
   parseBackupRequest,
   parseBackupResult,
 } from './backup-flow-model.js';
+
+export { BACKUP_VERIFICATION } from './constants.js';

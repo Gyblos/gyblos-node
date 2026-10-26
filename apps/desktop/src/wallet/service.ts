@@ -16,6 +16,7 @@ import {
 import { createWalletSecret, walletAddress } from './key.js';
 import { walletSummary, type WalletSummary } from './model.js';
 import type { WalletProtection } from './protection.js';
+import { createBackupVerification } from './verification.js';
 
 function encryptedBytes(record: unknown, protection: WalletProtection) {
   if (
@@ -106,27 +107,36 @@ export function createWalletService(
 ) {
   // A supplied startup identity disables all lazy initialization for secret reads.
   let pending: Promise<WalletSummary> | undefined = prepared;
-  const summary = () => (pending ??= initialize(root, protection));
+  const identity = () => (pending ??= initialize(root, protection));
+  async function withSecret<T>(
+    consume: (secret: string, address: string) => Promise<T>,
+  ) {
+    const current = await identity();
+    if (
+      !protection ||
+      current.status !== WALLET_STATUS.READY ||
+      !current.address ||
+      !(await protection.available())
+    )
+      throw new BackupError(BACKUP_ERROR.INVALID_INPUT);
+    const record = await readWalletRecord(join(root, WALLET.DIRECTORY));
+    const secret = await protection.decrypt(encryptedBytes(record, protection));
+    if (walletAddress(secret) !== current.address)
+      throw new BackupError(BACKUP_ERROR.IDENTITY);
+    return consume(secret, current.address);
+  }
+  const verification = createBackupVerification(root, protection, withSecret);
   return {
-    summary,
-    async withSecret<T>(
-      consume: (secret: string, address: string) => Promise<T>,
-    ) {
-      const current = await summary();
-      if (
-        !protection ||
-        current.status !== WALLET_STATUS.READY ||
-        !current.address ||
-        !(await protection.available())
-      )
-        throw new BackupError(BACKUP_ERROR.INVALID_INPUT);
-      const record = await readWalletRecord(join(root, WALLET.DIRECTORY));
-      const secret = await protection.decrypt(
-        encryptedBytes(record, protection),
-      );
-      if (walletAddress(secret) !== current.address)
-        throw new BackupError(BACKUP_ERROR.IDENTITY);
-      return consume(secret, current.address);
+    async summary() {
+      const current = await identity();
+      return {
+        ...current,
+        backupVerified:
+          current.status === WALLET_STATUS.READY &&
+          (await verification.verified()),
+      };
     },
+    withSecret,
+    rememberBackup: verification.remember,
   };
 }
