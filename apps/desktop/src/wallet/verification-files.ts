@@ -5,6 +5,8 @@ import { lstat, rename, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { readBackupFile, writeBackupFile } from './backup-files.js';
+import { BACKUP_ERROR } from './backup/constants.js';
+import { BackupError } from './backup/error.js';
 import { BACKUP_VERIFICATION, WALLET } from './constants.js';
 import { checkWalletRoot, syncWalletDirectory } from './files.js';
 
@@ -23,7 +25,7 @@ export async function readVerification(root: string) {
       ((metadata.mode & WALLET.PERMISSION_MASK) !== WALLET.PRIVATE_FILE ||
         metadata.uid !== process.getuid?.()))
   )
-    throw new Error('Invalid backup metadata storage.');
+    throw new BackupError(BACKUP_ERROR.INVALID_FILE);
   return readBackupFile(path);
 }
 export async function writeVerification(
@@ -38,7 +40,7 @@ export async function writeVerification(
     `${BACKUP_VERIFICATION.RECORD}.${randomUUID()}.pending`,
   );
   try {
-    if (signal.aborted) throw new Error('Backup metadata cancelled.');
+    if (signal.aborted) throw new BackupError(BACKUP_ERROR.CANCELLED);
     await writeBackupFile(temporary, ciphertext);
     const current = await lstat(await directory(root));
     if (
@@ -46,7 +48,7 @@ export async function writeVerification(
       current.dev !== reserved.dev ||
       current.ino !== reserved.ino
     )
-      throw new Error('Backup metadata cancelled or unavailable.');
+      throw new BackupError(BACKUP_ERROR.CANCELLED);
     // Publishing is the commit point. An already-started rename may finish on quit.
     await rename(temporary, join(path, BACKUP_VERIFICATION.RECORD));
     await syncWalletDirectory(path);

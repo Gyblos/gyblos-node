@@ -7,9 +7,11 @@ operation derives the address after authentication. The codec itself has no
 filesystem operations. Wallet now offers an explicit, main-process-confirmed
 encrypted-file backup and same-address verification through native file dialogs.
 The renderer sends a password and receives a fixed status; it never receives a
-key, path, file contents or decrypted material. Funding and persistent backup
-approval remain disabled. First launch offers explicit creation or restoration
-before generating a new wallet; existing destinations never offer replacement.
+key, path, file contents or decrypted material. Funding remains disabled.
+Successful saved-file checks can now be remembered for the current address; this
+indicator is not a spending authorization. First launch offers explicit creation
+or restoration before generating a new wallet; existing destinations never offer
+replacement.
 
 Version 1 is compact UTF-8 JSON with exactly these fields: `format`, `version`,
 `kdf`, `cipher`, `keyFormat`, `salt`, `nonce`, `ciphertext`, `tag`. Duplicate
@@ -51,10 +53,10 @@ passwords or operational state participate.
 
 The exchange harness demonstrates portable bytes and identity preservation, not
 real Keychain/DPAPI/Linux-store acceptance or operational restore. The desktop
-file flow below adds user-controlled save/reopen verification. Both
-`backupVerified` and `fundingEnabled` remain false; native acceptance,
-production restore and persistent identity-bound backup approval remain separate
-work.
+file flow below adds user-controlled save/reopen verification. `backupVerified`
+is true only after a saved-file check and validation of its protected
+identity-bound metadata. `fundingEnabled` remains false in every state; native
+custody acceptance and operational recovery remain separate work.
 
 ## Desktop file flow
 
@@ -62,7 +64,8 @@ Choose **Create backup** in Wallet, enter and confirm at least 12 characters,
 approve the native confirmation and choose a new filename. Files are encrypted
 before writing and created exclusively: existing files are never replaced. A
 write failure may retain an incomplete encrypted file; choose another name on
-retry. The selected file is not a persistent approval or a funding capability.
+retry. Saving alone does not record verification or provide a funding
+capability.
 
 Choose **Verify saved file**, enter the password again and select the saved
 file. Reading is bounded and rejects directories and symlinks; authenticated
@@ -94,7 +97,8 @@ other must refuse the existing destination.
 The recovered key is re-encrypted with the destination protection adapter,
 persisted by exclusive final-file creation, and reloaded through a read-only
 loader that cannot initialize a replacement identity. Success returns only the
-public address/status and both flags remain false. Cancellation before the claim
+public address/status and both flags remain false; restoration does not copy the
+previous installation's remembered verification. Cancellation before the claim
 installs nothing; cancellation or failure after the claim returns
 `RECOVERY_REQUIRED` and preserves the encrypted record or directory marker for
 inspection. A completed record may exist after interrupted confirmation. There
@@ -115,12 +119,14 @@ cancels startup reveals and waits for actual initialization/restoration and
 backup work to settle. The restore password uses the portable format's exact
 UTF-8 byte bounds, including multibyte characters, without trimming or
 normalization. Backup reads are bound to the completed startup identity and
-cannot generate another wallet if its record disappears or changes. Both public
-wallet flags remain false. Tests use fresh unfunded identities and synthetic
-protection adapters, including all nine producer/reader combinations; native
-Keychain/DPAPI/Linux-store acceptance and power-loss durability are not
-established. Funding, persistent backup approval, signing, payment-state
-recovery and mobile linking remain disabled or outside this service.
+cannot generate another wallet if its record disappears or changes. The setup
+result leaves both flags false; a later explicit saved-file check can persist
+verification, while funding stays disabled. Tests use fresh unfunded identities
+and synthetic protection adapters, including all nine producer/reader
+combinations; native Keychain/DPAPI/Linux-store acceptance and power-loss
+durability are not established. Funding, signing, payment-state recovery and
+mobile linking remain disabled or outside this service. Remembered verification
+is handled separately by Wallet.
 
 Restoration validates its reserved directory before writing and checks its
 identity again around descriptor I/O. Final record creation is exclusive and
@@ -130,3 +136,25 @@ is not atomic whole-record visibility or proof of power-loss durability. The
 existing automatic-creation publication path is unchanged. Protected-record
 reload now reads at most the configured maximum plus one byte and rejects a
 changed descriptor size, including growth after the initial stat.
+
+## Remembered verification
+
+After authenticated saved-file verification, the host rereads the current
+protected wallet and atomically stores a separate OS-encrypted metadata record.
+It contains only the address, verification schema version, backup format/version
+and a domain-separated HMAC-SHA256 tag bound to the current wallet key. No
+password, selected path, backup file or private key is stored in that record.
+The existing portable backup and wallet record formats are unchanged.
+
+Wallet revalidates this record on restart, when opened and after an operation.
+Missing, malformed, oversized, altered, wrong-identity, unsupported-version or
+inaccessible metadata means unverified; invalid metadata is retained until a
+successful check replaces only that metadata. POSIX storage must be private;
+Windows does not claim equivalent POSIX permission enforcement.
+
+Saving a file or restoring a wallet does not create this record. A failed check
+does not erase an earlier valid verification. Cancellation before publication
+stores no new approval; an atomic rename already started on quit may finish and
+its valid record may remain. The app waits for that work. This records a past
+check, not continued possession of a usable backup, malware resistance or a
+payment capability. Funding remains unconditionally disabled.

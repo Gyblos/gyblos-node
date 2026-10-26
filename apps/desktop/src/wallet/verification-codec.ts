@@ -2,7 +2,8 @@
 // This is not a payment signature, a portable backup or proof that the file still exists.
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
-import { BACKUP } from './backup/constants.js';
+import { BACKUP, BACKUP_ERROR } from './backup/constants.js';
+import { BackupError } from './backup/error.js';
 import { BACKUP_VERIFICATION } from './constants.js';
 import type { WalletProtection } from './protection.js';
 
@@ -40,7 +41,7 @@ export async function sealVerification(
     });
     const ciphertext = await protection.encrypt(plaintext);
     if ((await protection.decrypt(ciphertext)) !== plaintext)
-      throw new Error('Backup metadata protection failed.');
+      throw new BackupError(BACKUP_ERROR.AUTHENTICATION);
     return ciphertext;
   } finally {
     mac.fill(0);

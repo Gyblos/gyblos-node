@@ -70,9 +70,11 @@ systems. They do not establish native Keychain, DPAPI or Linux keystore
 acceptance, cross-platform recovery or signed-update continuity. Those remain
 separate checks.
 
-An unwired internal [portable backup codec](desktop-backup.md) is tested with
-generated unfunded identities. It adds no UI or live-wallet export/recovery;
-backup verification and funding remain disabled.
+The [portable backup flow](desktop-backup.md) supports saving, same-address
+verification and first-run restoration. Successful saved-file checks persist
+protected identity-bound metadata and can set the public backup indicator;
+funding remains unconditionally disabled. Current cross-platform automation and
+real OS secret-store acceptance must be verified separately.
 
 ## Run locally
 
