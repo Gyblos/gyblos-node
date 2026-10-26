@@ -70,23 +70,12 @@ export function createControlTransport(
                 }
                 current = connection;
               }
-              const connection = current;
-              if (connection.remoteId().toString() !== expectedNodeId)
-                return controlFail(CONTROL_CODES.POLICY);
-              assertControlRoute(connection, options.relayOnly);
-              const stream = await connection.openBi();
-              assertControlRoute(connection, options.relayOnly);
-              await writeControlFrame(
-                stream,
+              return exchangeControlStream(
+                current,
                 value,
-                CONTROL_LIMITS.requestBytes,
+                expectedNodeId,
+                options.relayOnly,
               );
-              const response = await readControlFrame(
-                stream,
-                CONTROL_LIMITS.responseBytes,
-              );
-              assertControlRoute(connection, options.relayOnly);
-              return response;
             }),
           options.queryMs,
           close,
@@ -125,4 +114,21 @@ function trackControlOperation<T>(
     () => operations.delete(operation),
   );
   return operation;
+}
+
+async function exchangeControlStream(
+  connection: Connection,
+  value: unknown,
+  expectedNodeId: string,
+  relayOnly?: boolean,
+) {
+  if (connection.remoteId().toString() !== expectedNodeId)
+    return controlFail(CONTROL_CODES.POLICY);
+  assertControlRoute(connection, relayOnly);
+  const stream = await connection.openBi();
+  assertControlRoute(connection, relayOnly);
+  await writeControlFrame(stream, value, CONTROL_LIMITS.requestBytes);
+  const response = await readControlFrame(stream, CONTROL_LIMITS.responseBytes);
+  assertControlRoute(connection, relayOnly);
+  return response;
 }
