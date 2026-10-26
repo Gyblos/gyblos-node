@@ -11,7 +11,7 @@ import {
   type SolanaRpcApi,
 } from '@solana/kit';
 
-import { LOCALHOST } from '@gyblos/config';
+import { DEVNET_GENESIS, LOCALHOST } from '@gyblos/config';
 
 import type { SyntheticChain } from './identity-accounts.js';
 
@@ -40,6 +40,9 @@ export interface FakeRpcState {
   spend: SimulatedSpend;
   // JSON-RPC method names in arrival order, so tests can count round trips.
   calls: string[];
+  configs: { method: string; params: unknown[] }[];
+  genesisHash: string;
+  failingMethods: Set<string>;
 }
 
 export interface FakeRpc {
@@ -173,7 +176,12 @@ function simulation(state: FakeRpcState) {
 function respond(state: FakeRpcState, call: JsonRpcCall): object {
   const context = { slot: SLOT };
   state.calls.push(call.method);
+  state.configs.push({ method: call.method, params: call.params });
+  if (state.failingMethods.has(call.method))
+    return { error: { code: RPC_ERROR_CODE, message: 'synthetic outage' } };
   switch (call.method) {
+    case 'getGenesisHash':
+      return { result: state.genesisHash };
     case 'getMultipleAccounts':
       return multipleAccounts(state, call.params);
     case 'getProgramAccounts':
@@ -236,6 +244,9 @@ export async function startFakeRpc(
     failingAddresses: new Set(),
     spend,
     calls: [],
+    configs: [],
+    genesisHash: DEVNET_GENESIS,
+    failingMethods: new Set(),
   };
   const server = serve(state);
   server.listen(0, LOCALHOST);
