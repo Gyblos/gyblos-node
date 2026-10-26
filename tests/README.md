@@ -84,3 +84,10 @@ or real-engine option is supplied by the free command.
 and choice index, plus cleanup on control-client initialization failure. An
 owned endpoint closes on failure; a borrowed endpoint stays caller-owned. The
 initialization probes use in-memory doubles and never bind native sockets.
+
+Free streaming cases cover the ordered/correlated wire frames and new golden
+vectors, bounded engine callbacks and cancellation, shared seller replay/caps,
+possible-send tracking, OpenAI-compatible SSE and no post-send failover.
+`tests/lab/free-stream-acceptance.test.ts` exercises the real local index,
+native Iroh, synthetic engine and product HTTP endpoint, including early
+fragment delivery and cancellation that reaches the seller engine.

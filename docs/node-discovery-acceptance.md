@@ -156,3 +156,27 @@ control components, not paid seller startup or the future TOML wiring.
 No production URL is accepted. Publishing to the deployed index remains closed
 until the founder approves seller NodeIds. Production, off-host/relay/CGNAT,
 registration and paid execution require separate acceptance and authorization.
+
+## Free streaming acceptance
+
+Run `pnpm --filter @gyblos/lab-harness acceptance:free-stream` for the
+synthetic-only streaming scenario. It accepts no options and uses the same
+in-process memory index, temporary homes and native encrypted loopback as the
+complete free acceptance. It publishes a seller, selects it, obtains a verified
+free quote and sends `stream: true` to the product buyer HTTP endpoint.
+
+The synthetic engine is held after its first fragment: HTTP must deliver that
+fragment before the engine is released. The successful response must then have
+both fragments, the finish reason, final usage and `[DONE]`. A second request
+closes HTTP after its first fragment and must cancel the actual seller engine,
+with one selection and one execution attempt for each request. Reports contain
+only counters and flags; no content or endpoints. Native unavailability is a
+failure of the standalone command, never a successful fallback.
+
+This verifies composed product services, not full CLI/TOML bootstrap, real model
+performance, off-host routing, production discovery or load capacity. Existing
+free caps and replay are shared between complete and streaming execution.
+Cancellation conservatively keeps the full reserved token budget; counters
+remain in memory and reset on restart. Partial text is provisional until a valid
+terminal; a stream error or missing terminal is not a successful answer. No
+retry or seller switch is allowed after possible prompt transmission.
