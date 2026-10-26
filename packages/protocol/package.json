@@ -26,6 +26,9 @@
     "./offer-v2": "./src/offer-v2.ts",
     "./vectors/control-v2.json": "./vectors/control-v2.json",
     "./pricing-v2": "./src/pricing-v2.ts",
-    "./vectors/control-v2-mtok.json": "./vectors/control-v2-mtok.json"
+    "./vectors/control-v2-mtok.json": "./vectors/control-v2-mtok.json",
+    "./free-execution": "./src/free-execution.ts",
+    "./free-execution-framing": "./src/free-execution-framing.ts",
+    "./vectors/free-execution-v2.json": "./vectors/free-execution-v2.json"
   }
 }
