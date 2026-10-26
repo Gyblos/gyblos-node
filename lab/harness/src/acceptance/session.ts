@@ -1,4 +1,4 @@
-// Owns one acceptance session and its restartable control-only seller; all resources are ephemeral.
+// Owns one acceptance session and its restartable seller, control-only by default; all resources are ephemeral.
 // The index survives restart to retain high-water marks; no role keys, paid host or RPC is started.
 import { randomBytes } from 'node:crypto';
 
@@ -7,17 +7,25 @@ import { generateKeyPairSigner } from '@solana/kit';
 import { buyerDiscoveryState } from '@gyblos/buyer/discovery-storage';
 import { NODE_KEY_BYTES } from '@gyblos/node/constants';
 
-import { createAcceptanceClock } from './clock.js';
+import { createAcceptanceClock, type AcceptanceClock } from './clock.js';
 import type { AcceptanceMode } from './constants.js';
 import { createAcceptanceEngine } from './engine.js';
-import { startAcceptanceHost, type AcceptanceHost } from './host.js';
-import { createAcceptanceIndex } from './index.js';
+import {
+  startAcceptanceHost,
+  type AcceptanceHost,
+  type AcceptanceHostOptions,
+} from './host.js';
+import { createAcceptanceIndex, type AcceptanceIndex } from './index.js';
 import { createNativeAcceptanceNode } from './native.js';
 import { createAcceptanceWorkspace } from './workspace.js';
 
 export async function createAcceptanceSession(
   mode: AcceptanceMode,
   signal: AbortSignal,
+  extras: Pick<AcceptanceHostOptions, 'offer' | 'tokenizer'> & {
+    index?: AcceptanceIndex;
+    clock?: AcceptanceClock;
+  } = {},
 ) {
   const workspace = await createAcceptanceWorkspace();
   const engine = createAcceptanceEngine(mode);
@@ -32,11 +40,24 @@ export async function createAcceptanceSession(
       authorizer: await generateKeyPairSigner(),
     };
     const secret = [...randomBytes(NODE_KEY_BYTES)];
-    const wire = await createNativeAcceptanceNode(secret);
+    const wire = await createNativeAcceptanceNode(
+      secret,
+      extras.tokenizer !== undefined,
+    );
     closeWire = wire.close;
-    const clock = createAcceptanceClock(mode, signal);
-    const index = createAcceptanceIndex(clock.now, wire.nodeId);
-    const options = { identity, engine, clock, index, workspace, signal };
+    const clock = extras.clock ?? createAcceptanceClock(mode, signal);
+    const index = extras.index ?? createAcceptanceIndex(clock.now, wire.nodeId);
+    index.allowPublisher(wire.nodeId);
+    const options = {
+      identity,
+      engine,
+      clock,
+      index,
+      workspace,
+      signal,
+      offer: extras.offer,
+      tokenizer: extras.tokenizer,
+    };
     host = await startAcceptanceHost({ ...options, wire });
     let state = await buyerDiscoveryState(workspace.environment);
     return {
@@ -46,7 +67,10 @@ export async function createAcceptanceSession(
       async restart() {
         await host!.close();
         host = undefined;
-        const next = await createNativeAcceptanceNode(secret);
+        const next = await createNativeAcceptanceNode(
+          secret,
+          extras.tokenizer !== undefined,
+        );
         closeWire = next.close;
         host = await startAcceptanceHost({ ...options, wire: next });
         state = await buyerDiscoveryState(workspace.environment);

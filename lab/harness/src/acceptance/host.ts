@@ -7,9 +7,12 @@ import { publishRecord } from '@gyblos/discovery-http';
 import { observeControlReadiness } from '@gyblos/node/control-readiness';
 import { prepareSellerControl } from '@gyblos/node/control-startup';
 import { probeSellerEngine } from '@gyblos/node/engine-readiness';
+import { prepareSellerFreeExecution } from '@gyblos/node/free-execution';
 import { openSellerSequence } from '@gyblos/node/public-sequence';
 import { createSellerPublisher } from '@gyblos/node/publisher';
+import type { SellerCatalogOffer } from '@gyblos/node/seller-offer';
 import type { SignedPublicV2 } from '@gyblos/protocol/control-types';
+import type { RecountTokenizer } from '@gyblos/protocol/engine';
 import { controlDeadline } from '@gyblos/transport-iroh/control-io';
 
 import type { AcceptanceClock } from './clock.js';
@@ -27,6 +30,8 @@ export interface AcceptanceIdentity {
   authorizer: KeyPairSigner;
 }
 export interface AcceptanceHostOptions {
+  offer?: SellerCatalogOffer;
+  tokenizer?: RecountTokenizer;
   wire: AcceptanceWire;
   identity: AcceptanceIdentity;
   clock: AcceptanceClock;
@@ -85,6 +90,7 @@ export async function startAcceptanceHost(options: AcceptanceHostOptions) {
       initialFloor: 1,
     });
     const control = await prepareSellerControl({
+      offer: options.offer,
       owner: identity.owner,
       nodeId: wire.nodeId,
       nodeSigner: wire.nodeSigner,
@@ -124,7 +130,22 @@ export async function startAcceptanceHost(options: AcceptanceHostOptions) {
       },
     });
     const publisher = publication;
-    wire.start(control.service);
+    const freeExecution = options.tokenizer
+      ? prepareSellerFreeExecution({
+          owner: identity.owner.address,
+          nodeId: wire.nodeId,
+          offer: control.offer,
+          catalog: control.records.current(),
+          model: initial.model,
+          capabilities: engine.engine.capabilities(),
+          engine: current.engine,
+          tokenizer: options.tokenizer,
+          readiness: current.readiness,
+          now: clock.now,
+          startedAt: clock.now(),
+        })
+      : undefined;
+    wire.start(control.service, freeExecution);
     return {
       wire,
       observation: current,

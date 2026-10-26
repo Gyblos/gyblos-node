@@ -53,6 +53,7 @@ export function createAcceptanceEngine(mode: AcceptanceMode) {
       : syntheticEngine();
   let failed = false;
   let generations = 0;
+  let attempts = 0;
   let blocked: Promise<void> | undefined;
   let release = () => {};
   const engine: Engine = {
@@ -63,6 +64,7 @@ export function createAcceptanceEngine(mode: AcceptanceMode) {
       return source.describe();
     },
     generate: async (input) => {
+      attempts++;
       const held = blocked;
       blocked = undefined;
       if (held) await held;
@@ -85,6 +87,7 @@ export function createAcceptanceEngine(mode: AcceptanceMode) {
     engine,
     snapshot,
     generations: () => generations,
+    attempts: () => attempts,
     fail: (value: boolean) => {
       failed = value;
     },
