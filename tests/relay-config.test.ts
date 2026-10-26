@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import test, { type TestContext } from 'node:test';
 
 import { IPV6_LOOPBACK, LOCALHOST } from '@gyblos/config';
+import { CONTROL_ALPN, FREE_EXECUTION } from '@gyblos/protocol/constants';
 import {
   RELAY_CONFIGURATION_CODES,
   RELAY_TOKEN_LENGTH,
@@ -304,5 +305,20 @@ void test(
       traced.nativeLogLines > 0,
       'Native trace logging was not active.',
     );
+  },
+);
+
+void test(
+  'free endpoint advertises only control and free execution ALPNs',
+  OPTIONS,
+  () => {
+    const result = endpointProbe({
+      GYBLOS_RELAY_TOKEN: TOKEN,
+      PROBE_CONTROL: '1',
+      PROBE_FREE_EXECUTION: '1',
+      PROBE_HTTP: '0',
+    });
+    assert.equal(result.error, undefined);
+    assert.deepEqual(result.alpns, [CONTROL_ALPN, FREE_EXECUTION.alpn]);
   },
 );

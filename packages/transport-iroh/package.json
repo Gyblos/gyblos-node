@@ -17,7 +17,8 @@
     "./wire": "./src/wire.ts",
     "./control-io": "./src/control-io.ts",
     "./control-server": "./src/control-server.ts",
-    "./control-client": "./src/control-client.ts"
+    "./control-client": "./src/control-client.ts",
+    "./free-server": "./src/free-server.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",

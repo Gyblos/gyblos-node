@@ -181,27 +181,37 @@ void test('free execution rejects unknown fields, getters and unsupported chat r
 void test('free execution bounds UTF-8 input and rejects unpaired surrogates', async () => {
   const api = await import('@gyblos/protocol/free-execution');
   const { request } = await fixture();
-  for (const content of ['🌍'.repeat(FREE_EXECUTION.inputBytes), '\ud800'])
-    assert.throws(() =>
+  for (const item of [
+    {
+      content: '🌍'.repeat(FREE_EXECUTION.inputBytes),
+      code: FREE_EXECUTION_CODES.LIMIT,
+    },
+    { content: '\ud800', code: FREE_EXECUTION_CODES.INVALID },
+  ])
+    assert.throws(
+      () =>
+        api.parseFreeExecutionRequest({
+          ...request,
+          input: {
+            ...request.input,
+            messages: [{ role: FREE_CHAT_ROLES.USER, content: item.content }],
+          },
+        }),
+      { code: item.code },
+    );
+  assert.throws(
+    () =>
       api.parseFreeExecutionRequest({
         ...request,
         input: {
           ...request.input,
-          messages: [{ role: FREE_CHAT_ROLES.USER, content }],
+          messages: Array.from(
+            { length: FREE_EXECUTION.maxMessages + 1 },
+            () => ({ role: FREE_CHAT_ROLES.USER, content: 'x' }),
+          ),
         },
       }),
-    );
-  assert.throws(() =>
-    api.parseFreeExecutionRequest({
-      ...request,
-      input: {
-        ...request.input,
-        messages: Array.from(
-          { length: FREE_EXECUTION.maxMessages + 1 },
-          () => ({ role: FREE_CHAT_ROLES.USER, content: 'x' }),
-        ),
-      },
-    }),
+    { code: FREE_EXECUTION_CODES.INVALID },
   );
 });
 
@@ -266,20 +276,24 @@ void test('free execution response correlation and usage are bound to the execut
     ),
     { code: FREE_EXECUTION_CODES.LIMIT },
   );
-  assert.throws(() =>
-    api.parseFreeExecutionResponse({
-      ...response,
-      result: { ...response.result, finishReason: 'unknown' },
-    }),
+  assert.throws(
+    () =>
+      api.parseFreeExecutionResponse({
+        ...response,
+        result: { ...response.result, finishReason: 'unknown' },
+      }),
+    { code: FREE_EXECUTION_CODES.INVALID },
   );
-  assert.throws(() =>
-    api.parseFreeExecutionResponse({
-      ...response,
-      result: {
-        ...response.result,
-        usage: { inputTokens: -1, outputTokens: 0 },
-      },
-    }),
+  assert.throws(
+    () =>
+      api.parseFreeExecutionResponse({
+        ...response,
+        result: {
+          ...response.result,
+          usage: { inputTokens: -1, outputTokens: 0 },
+        },
+      }),
+    { code: FREE_EXECUTION_CODES.INVALID },
   );
 });
 
@@ -302,20 +316,25 @@ void test('free execution errors are static, exclusive and correlated before pro
     ),
     { code: FREE_EXECUTION_CODES.BINDING },
   );
-  assert.throws(() =>
-    api.parseFreeExecutionResponse({
-      ...response,
-      error: { code: 'arbitrary secret' },
-    }),
+  assert.throws(
+    () =>
+      api.parseFreeExecutionResponse({
+        ...response,
+        error: { code: 'arbitrary secret' },
+      }),
+    { code: FREE_EXECUTION_CODES.INVALID },
   );
-  assert.throws(() =>
-    api.parseFreeExecutionResponse({
-      ...response,
-      error: { code: FREE_EXECUTION_CODES.INTERNAL, message: 'secret' },
-    }),
+  assert.throws(
+    () =>
+      api.parseFreeExecutionResponse({
+        ...response,
+        error: { code: FREE_EXECUTION_CODES.INTERNAL, message: 'secret' },
+      }),
+    { code: FREE_EXECUTION_CODES.INVALID },
   );
-  assert.throws(() =>
-    api.parseFreeExecutionResponse({ ...response, result: {} }),
+  assert.throws(
+    () => api.parseFreeExecutionResponse({ ...response, result: {} }),
+    { code: FREE_EXECUTION_CODES.INVALID },
   );
 });
 

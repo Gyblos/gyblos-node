@@ -12,7 +12,8 @@
     "./control-quotes": "./src/control-quotes.ts",
     "./control-admission": "./src/control-admission.ts",
     "./seller-selection": "./src/seller-selection.ts",
-    "./pricing-v2": "./src/pricing-v2.ts"
+    "./pricing-v2": "./src/pricing-v2.ts",
+    "./free-admission": "./src/free-admission.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",

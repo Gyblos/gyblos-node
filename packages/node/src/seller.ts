@@ -44,10 +44,13 @@ import { assertMemoryHeadroom, memorySnapshot } from '@gyblos/runtime/memory';
 import { createPrivateLog } from '@gyblos/runtime/private-log';
 import { withDeadline } from '@gyblos/transport-iroh/deadline';
 import { bindEndpoint } from '@gyblos/transport-iroh/endpoint';
-import { serveIroh } from '@gyblos/transport-iroh/iroh-server';
 
 import { modelTokenizer } from './artifacts.js';
-import { P2P_ROLES, SELLER_PUBLIC_RECORDS } from './constants.js';
+import {
+  OFFER_PRICING_KINDS,
+  P2P_ROLES,
+  SELLER_PUBLIC_RECORDS,
+} from './constants.js';
 import { observeControlReadiness } from './control-readiness.js';
 import { prepareSellerControl } from './control-startup.js';
 import {
@@ -62,6 +65,7 @@ import { openSellerSequence } from './public-sequence.js';
 import { createSellerPublisher } from './publisher.js';
 import { loadRole, nodeSecret, rolePath, roleSigner } from './roles.js';
 import { loadSellerSettings } from './seller-settings.js';
+import { serveSellerTransport } from './seller-transport.js';
 
 interface Trace {
   requestId: string;
@@ -71,6 +75,7 @@ interface Trace {
 }
 
 export async function startSeller() {
+  const startedAt = Date.now();
   const disposers: (() => Promise<void>)[] = [];
   const close = async () => {
     for (const dispose of disposers.splice(0).reverse())
@@ -89,16 +94,21 @@ export async function startSeller() {
     const config = await loadRole(P2P_ROLES.SELLER);
     if (config.role !== P2P_ROLES.SELLER)
       throw new Error('Seller role required.');
-    const settings = await loadSellerSettings(process.env);
+    const settings = await loadSellerSettings(process.env, undefined, {
+      freeExecution: true,
+    });
+    const isFree = settings.offer.kind === OFFER_PRICING_KINDS.FREE;
     const publicationConfig = settings.publication;
     const publicSequence = await openSellerSequence({
       environment: process.env,
       nodeId: config.nodeId,
     });
-    await stage('devnet-program');
-    await assertProgram(config.rpcUrl);
+    if (!isFree) {
+      await stage('devnet-program');
+      await assertProgram(config.rpcUrl);
+    }
     await assertPortFree(`${HOSTS.ollama}${ROUTES.ollamaVersion}`);
-    await assertPortFree(`${HOSTS.facilitator}${ROUTES.health}`);
+    if (!isFree) await assertPortFree(`${HOSTS.facilitator}${ROUTES.health}`);
     await stage('ollama-startup');
     await assertOllamaModelsHome();
     const child = spawnChild('ollama', ['serve'], {
@@ -142,48 +152,58 @@ export async function startSeller() {
     });
     await stage('role-signers');
     const owner = await roleSigner(P2P_ROLES.SELLER, 'owner');
-    const authorizer = await roleSigner(P2P_ROLES.SELLER, 'authorizer');
-    const facilitator = await roleSigner(P2P_ROLES.SELLER, 'facilitator');
-    const diagnosticLog = await createPrivateLog(
-      rolePath(P2P_ROLES.SELLER, ROLE_FILES.facilitatorDiagnostics),
-    );
-    disposers.push(async () => {
-      await diagnosticLog.close();
-    });
-    const host = createFacilitator(
-      facilitator,
-      config.rpcUrl,
-      {
-        buyer: config.buyer,
-        mint: config.mint,
-        payTo: config.payTo,
-        authorizer: authorizer.address,
-      },
-      undefined,
-      { onDiagnostic: diagnosticLog.write },
-    );
-    host.app.get(ROUTES.facilitatorDiagnostics, (_request, response) => {
-      response.json(diagnosticLog.health());
-    });
-    const facilitatorServer = host.app.listen(PORTS.facilitator, LOCALHOST);
-    await once(facilitatorServer, 'listening');
-    disposers.push(async () => {
-      await host.cleanup.stop();
-      facilitatorServer.closeAllConnections();
-      await new Promise<void>((done) => facilitatorServer.close(() => done()));
-    });
-    host.cleanup.start({
-      intervalSecs: CLEANUP.intervalSeconds,
-      abandonGraceSecs: CLEANUP.abandonGraceSeconds,
-    });
-    let traces: Trace[] = [];
-    try {
-      traces = await loadJson<Trace[]>(
-        rolePath(P2P_ROLES.SELLER, ROLE_FILES.traces),
+    const authorizer = isFree
+      ? owner
+      : await roleSigner(P2P_ROLES.SELLER, 'authorizer');
+    const facilitator = isFree
+      ? owner
+      : await roleSigner(P2P_ROLES.SELLER, 'facilitator');
+    if (!isFree) {
+      const diagnosticLog = await createPrivateLog(
+        rolePath(P2P_ROLES.SELLER, ROLE_FILES.facilitatorDiagnostics),
       );
-      if (!Array.isArray(traces)) throw new Error('Invalid trace history.');
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      disposers.push(async () => {
+        await diagnosticLog.close();
+      });
+      const host = createFacilitator(
+        facilitator,
+        config.rpcUrl,
+        {
+          buyer: config.buyer,
+          mint: config.mint,
+          payTo: config.payTo,
+          authorizer: authorizer.address,
+        },
+        undefined,
+        { onDiagnostic: diagnosticLog.write },
+      );
+      host.app.get(ROUTES.facilitatorDiagnostics, (_request, response) => {
+        response.json(diagnosticLog.health());
+      });
+      const facilitatorServer = host.app.listen(PORTS.facilitator, LOCALHOST);
+      await once(facilitatorServer, 'listening');
+      disposers.push(async () => {
+        await host.cleanup.stop();
+        facilitatorServer.closeAllConnections();
+        await new Promise<void>((done) =>
+          facilitatorServer.close(() => done()),
+        );
+      });
+      host.cleanup.start({
+        intervalSecs: CLEANUP.intervalSeconds,
+        abandonGraceSecs: CLEANUP.abandonGraceSeconds,
+      });
+    }
+    let traces: Trace[] = [];
+    if (!isFree) {
+      try {
+        traces = await loadJson<Trace[]>(
+          rolePath(P2P_ROLES.SELLER, ROLE_FILES.traces),
+        );
+        if (!Array.isArray(traces)) throw new Error('Invalid trace history.');
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      }
     }
     await stage('seller-middleware');
     const controlReadiness = observeControlReadiness(
@@ -196,44 +216,49 @@ export async function startSeller() {
           probeSellerEngine(engine, signal, { snapshot: memorySnapshot }),
       },
     );
-    const seller = await createInferenceSeller({
-      rpcUrl: config.rpcUrl,
-      facilitatorUrl: HOSTS.facilitator,
-      feePayer: facilitator.address,
-      engine: controlReadiness.engine,
-      mint: config.mint,
-      payTo: config.payTo,
-      authorizer,
-      tokenizer: await modelTokenizer(),
-      async beforeInference(requestId, channelId) {
-        const during = await inferenceSnapshot(
-          {
-            rpcUrl: config.rpcUrl,
-            mint: config.mint,
-            addresses: { buyer: config.buyer, seller: config.payTo },
-          },
-          channelId,
-        );
-        traces.push({
-          requestId,
-          channelId,
-          preInferenceObservedAt: new Date().toISOString(),
-          during,
-        });
-        await saveJson(rolePath(P2P_ROLES.SELLER, ROLE_FILES.traces), traces);
-      },
-    });
-    const sellerServer = seller.app.listen(PORTS.seller, LOCALHOST);
-    await once(sellerServer, 'listening');
-    disposers.push(async () => {
-      sellerServer.closeAllConnections();
-      await new Promise<void>((done) => sellerServer.close(() => done()));
-    });
+    const tokenizer = await modelTokenizer();
+    if (!isFree) {
+      const seller = await createInferenceSeller({
+        rpcUrl: config.rpcUrl,
+        facilitatorUrl: HOSTS.facilitator,
+        feePayer: facilitator.address,
+        engine: controlReadiness.engine,
+        mint: config.mint,
+        payTo: config.payTo,
+        authorizer,
+        tokenizer,
+        async beforeInference(requestId, channelId) {
+          const during = await inferenceSnapshot(
+            {
+              rpcUrl: config.rpcUrl,
+              mint: config.mint,
+              addresses: { buyer: config.buyer, seller: config.payTo },
+            },
+            channelId,
+          );
+          traces.push({
+            requestId,
+            channelId,
+            preInferenceObservedAt: new Date().toISOString(),
+            during,
+          });
+          await saveJson(rolePath(P2P_ROLES.SELLER, ROLE_FILES.traces), traces);
+        },
+      });
+      const sellerServer = seller.app.listen(PORTS.seller, LOCALHOST);
+      await once(sellerServer, 'listening');
+      disposers.push(async () => {
+        sellerServer.closeAllConnections();
+        await new Promise<void>((done) => sellerServer.close(() => done()));
+      });
+    }
     await stage('iroh-endpoint');
     const { relayOnly } = settings;
     const endpoint = await bindEndpoint(await nodeSecret(P2P_ROLES.SELLER), {
       relayOnly,
       control: true,
+      freeExecution: isFree,
+      http: !isFree,
       bindAddress: settings.irohBind,
       externalAddress: settings.irohExternalAddress,
       relayEnvironment: settings.relayEnvironment,
@@ -249,35 +274,38 @@ export async function startSeller() {
     assertMemoryHeadroom(await memorySnapshot());
     const now = Date.now();
     assertReadinessCurrent(offerExpiresAt, now);
-    const signed = await signInferenceOffer(
-      {
-        schemaVersion: OFFER_SCHEMA_VERSION,
-        protocol: GYBLOS_ALPN,
-        owner: owner.address,
-        nodeId: config.nodeId,
-        endpoint: {
-          relayUrl: endpointAddress.relayUrl(),
-          directAddresses: relayOnly ? [] : endpointAddress.directAddresses(),
+    const endpointInfo = {
+      relayUrl: endpointAddress.relayUrl(),
+      directAddresses: relayOnly ? [] : endpointAddress.directAddresses(),
+    };
+    if (!isFree) {
+      const signed = await signInferenceOffer(
+        {
+          schemaVersion: OFFER_SCHEMA_VERSION,
+          protocol: GYBLOS_ALPN,
+          owner: owner.address,
+          nodeId: config.nodeId,
+          endpoint: endpointInfo,
+          relayOnly,
+          network: DEVNET,
+          mint: config.mint,
+          payTo: config.payTo,
+          feePayer: facilitator.address,
+          authorizer: authorizer.address,
+          buyer: config.buyer,
+          issuedAt: now,
+          expiresAt: offerExpiresAt,
+          prices: PRICES,
+          maxAtomic: MAX_ATOMIC,
+          maxTokens: INFERENCE_REQUEST_LIMITS.maxOutputTokens,
+          model,
+          capabilities: engine.capabilities(),
+          meteringMode: 'recounted',
         },
-        relayOnly,
-        network: DEVNET,
-        mint: config.mint,
-        payTo: config.payTo,
-        feePayer: facilitator.address,
-        authorizer: authorizer.address,
-        buyer: config.buyer,
-        issuedAt: now,
-        expiresAt: offerExpiresAt,
-        prices: PRICES,
-        maxAtomic: MAX_ATOMIC,
-        maxTokens: INFERENCE_REQUEST_LIMITS.maxOutputTokens,
-        model,
-        capabilities: engine.capabilities(),
-        meteringMode: 'recounted',
-      },
-      owner,
-    );
-    await saveJson(rolePath(P2P_ROLES.SELLER, ROLE_FILES.offer), signed);
+        owner,
+      );
+      await saveJson(rolePath(P2P_ROLES.SELLER, ROLE_FILES.offer), signed);
+    }
     const control = await prepareSellerControl({
       owner,
       sequence: publicSequence,
@@ -296,7 +324,7 @@ export async function startSeller() {
       payTo: config.payTo,
       feePayer: facilitator.address,
       authorizer: authorizer.address,
-      endpoint: signed.offer.endpoint,
+      endpoint: endpointInfo,
       relayOnly,
       model,
       capabilities: engine.capabilities(),
@@ -307,12 +335,16 @@ export async function startSeller() {
     disposers.push(async () => {
       await control.records.withdraw();
     });
-    const bridge = serveIroh(
-      endpoint,
-      `http://${LOCALHOST}:${PORTS.seller}`,
+    const bridge = serveSellerTransport(endpoint, control, {
+      owner: owner.address,
+      nodeId: config.nodeId,
+      model,
+      engine: controlReadiness.engine,
+      tokenizer,
+      readiness: controlReadiness.readiness,
+      startedAt,
       relayOnly,
-      control.service,
-    );
+    });
     disposers[endpointDisposeIndex] = () => bridge.close();
     const publication = publicationConfig
       ? createSellerPublisher({

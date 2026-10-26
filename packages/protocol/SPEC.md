@@ -285,8 +285,10 @@ owner/feePayer/authorizer, capability and metering requirements); payment
 admission must enforce them when paid v2 is wired. Its caller supplies
 engine/readiness snapshots and increments readiness generation when those
 change; no engine or payment adapter runs here.
-Free prices are representable, not an implemented free-inference path. A quote
-is not a reservation, wallet proof, one-use token or payment authorization.
+Free quotes can be consumed by the separate free-execution service described
+below. Quote creation remains stateless: only execution admission consumes the
+single-use identifier. A quote is not a reservation, wallet proof or payment
+authorization.
 
 `@gyblos/core/control-admission` supplies caller-owned connection/query leases
 with a monotonic fake-clock-testable policy. The node runtime admits before
@@ -340,12 +342,14 @@ is retained unchanged to verify rejection of the previous per-token v2 shape.
 The complete design and rollout
 constraints live in vault GYB-DOC-022, control-contract appendix.
 
-## Free inference execution v2 (contract only)
+## Free inference execution v2
 
 `@gyblos/protocol/free-execution` and `./free-execution-framing` define a
 non-streaming execution contract for previously verified signed free quotes.
-This contract alone does not register an ALPN, call an engine, change seller
-startup or enable any payment. Seller and buyer wiring follow separately.
+The seller registers this ALPN only for its configured free offer, composing
+quote authentication, token admission and its pinned engine. The protocol
+helpers alone do not enforce state or execute work. Buyer wiring is separate;
+no v2 payment path is enabled.
 
 ### Separate execution channel
 
@@ -403,6 +407,10 @@ daily-cap, buyer-cap, unsupported, busy, engine-unavailable, timeout, cancelled
 and internal. Messages, provider errors and input contents are never reflected.
 If framing/structure is invalid and no complete validated request is available,
 close the stream; do not invent or echo an unvalidated correlation identifier.
+In the current seller, structural parse failures (including version, binding
+and not-free failures) close the stream before a reply header exists. Those
+error codes are eligible for a reply only if raised after successful parsing;
+the error catalog does not promise every rejection has a wire response.
 
 `requestDigest` is SHA-256 of UTF-8
 `"gyblos/free-execution-request/v2\n" + canonicalJson(validatedRequest)`.
@@ -410,13 +418,22 @@ It includes the signed quote and the complete chat input, and is distinct from
 the quote's prompt-free control request digest. The buyer matches requestId and
 this digest before acting on either an error or a result. Responses are bound
 to the authenticated seller connection, not independently signed receipts.
+`FreeExecutionError.remote` defaults to false for local checks.
+`matchFreeExecutionResponse` sets it to true only for a parsed error whose
+requestId and digest match; it is local metadata, never a wire field. This
+flag does not authorize fallback or retry after any prompt bytes were sent.
+The exported `FreeChatMessage` type and `buildFreeExecutionRequest` helper
+build a detached request from the quote's selection/reasoning. Building does
+not authenticate/consume a quote, flatten chat or change its model.
 
 ### Bounds and admission obligations
 
 Request JSON bodies are at most 128 KiB and response bodies at most 1 MiB.
 Message content totals at most 64 KiB of UTF-8; result text at most 256 KiB.
 The body limit also includes JSON escaping and the quote envelope, so text
-below its own bound can still exceed the frame bound. Lone UTF-16 surrogates
+below its own bound can still exceed the frame bound. A response containing
+256 KiB of control characters can JSON-escape beyond 1 MiB; the seller returns
+a bounded `FREE_EXECUTION_LIMIT_EXCEEDED` error instead of publishing that result. Lone UTF-16 surrogates
 are invalid. Framing reuses the canonical codec's depth limit 16 and strict
 UTF-8, duplicate/noncanonical-key/number rejection, EOF, no trailing bytes and
 no additional-message rules. Reject an excessive length before body allocation.
@@ -484,3 +501,39 @@ execution → answer using an in-process index and synthetic engine, including
 replay, expiry, wrong peer, exhausted caps, engine failure and no fallback once
 prompt transmission begins. Real engines, off-host or production runs require
 separate founder authorization. Streaming and paid v2 remain later work.
+
+### Seller runtime scope
+
+`packages/core/free-admission` owns bounded per-offer replay and token budgets;
+`packages/node/free-execution` composes signature/peer/time checks with the
+prepared listing and engine; `packages/transport-iroh/free-server` owns the
+framed data stream. `seller-transport` connects those pieces once at startup.
+Renewing public records never recreates token counters.
+
+The pinned Ollama adapter currently supports one user message and reasoning
+`off`. Other contract-valid roles/conversations are refused with
+`FREE_EXECUTION_UNSUPPORTED` before generation; no message flattening occurs.
+Input and output are recounted with the pinned tokenizer, rather than trusting
+engine-reported usage for cap refunds. Admission reserves templated input plus
+maximum output, refunds only a successfully recounted completion and keeps the
+full debit for engine errors, cancellation or uncertain work. UTC-day counters
+reset on restart; per-buyer counters are best effort. The in-memory replay table
+is bounded at 4096 live identifiers and the daily buyer table at 1024 entries.
+Capacity exhaustion refuses new work without evicting unexpired accounting.
+A startup-time barrier rejects quotes issued at or before startup, including
+the same millisecond; backward clock movement during a process fails closed.
+This assumes a trustworthy wall clock across restarts, as does zero-skew expiry.
+
+Native ingress, generation and egress share endpoint request admission. A
+read, engine or writer ignoring cancellation retains its request permit until
+actual settlement. Timeout closes the connection and suppresses late output.
+The free-configured seller starts neither the facilitator nor the paid HTTP
+service, does not check the devnet payment program or load the auxiliary
+payment signers, and writes no legacy v1 offer. Paid-configured startup keeps
+the existing v1 service. The free branch advertises only control and free
+ALPNs. Transport still allows only one connection per authenticated peer, so
+the buyer must close its control connection before dialing the data channel.
+
+Synthetic service tests, bounded-stream tests and native loopback execution
+cover this seller slice. No real engine, devnet, deployed index, production
+startup or full publish-to-answer lab acceptance is claimed by these tests.

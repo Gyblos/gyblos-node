@@ -10,6 +10,7 @@ import {
   type FreeChatRole,
 } from './constants.js';
 import { parseModelSelection } from './control-requests.js';
+import type { SignedOfferV2 } from './control-types.js';
 import {
   controlArray,
   controlHex,
@@ -18,6 +19,8 @@ import {
   controlReasoning,
 } from './control-validation.js';
 import type {
+  FreeChatMessage,
+  FreeExecutionBuildInput,
   FreeExecutionRequest,
   FreeExecutionResponse,
   FreeExecutionResult,
@@ -25,6 +28,7 @@ import type {
 } from './free-execution-types.js';
 import {
   freeExecutionBoundary,
+  FreeExecutionError,
   freeExecutionFail,
   freeExecutionText,
   rethrowFreeExecution,
@@ -38,12 +42,17 @@ import { bytesHex } from './public-validation.js';
 import { signingBytes } from './signing.js';
 
 export type {
+  FreeChatMessage,
+  FreeExecutionBuildInput,
   FreeExecutionRequest,
   FreeExecutionResponse,
   FreeExecutionResult,
   FreeExecutionTrust,
 } from './free-execution-types.js';
-export { FreeExecutionError } from './free-execution-validation.js';
+export {
+  FreeExecutionError,
+  freeExecutionFail,
+} from './free-execution-validation.js';
 
 function role(value: unknown): FreeChatRole {
   for (const accepted of Object.values(FREE_CHAT_ROLES))
@@ -223,7 +232,7 @@ export async function matchFreeExecutionResponse(
     response.requestDigest !== (await freeExecutionDigest(request))
   )
     return freeExecutionFail(FREE_EXECUTION_CODES.BINDING);
-  if (response.error) return freeExecutionFail(response.error.code);
+  if (response.error) throw new FreeExecutionError(response.error.code, true);
   if (
     response.result.usage.outputTokens > request.input.maxTokens ||
     response.result.usage.inputTokens + response.result.usage.outputTokens >
@@ -231,4 +240,27 @@ export async function matchFreeExecutionResponse(
   )
     return freeExecutionFail(FREE_EXECUTION_CODES.LIMIT);
   return response.result;
+}
+
+// Builds a detached request from quote-bound terms; this does not authenticate or consume the quote.
+export function buildFreeExecutionRequest(
+  quote: SignedOfferV2,
+  input: FreeExecutionBuildInput,
+): FreeExecutionRequest {
+  return freeExecutionBoundary(() => {
+    const envelope = controlObject(quote, ['offer', 'signature']);
+    const offer = parseOfferV2(envelope.offer);
+    const params = controlObject(input, ['messages', 'maxTokens']);
+    return parseFreeExecutionRequest({
+      version: FREE_EXECUTION.version,
+      requestId: offer.requestId,
+      quote,
+      input: {
+        messages: params.messages,
+        maxTokens: params.maxTokens,
+        selection: offer.selection,
+        reasoning: offer.reasoning,
+      },
+    });
+  });
 }

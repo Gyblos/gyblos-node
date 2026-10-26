@@ -1,0 +1,217 @@
+// Composes free quote authentication, admission and one pinned-engine generation.
+// No payments, facilitator, v1, config reads, files or journals are reachable from this service.
+import { INFERENCE_REQUEST_LIMITS } from '@gyblos/config';
+import type { QuoteReadiness } from '@gyblos/core/control-quotes';
+import { FreeExecutionAdmission } from '@gyblos/core/free-admission';
+import { canonicalJson } from '@gyblos/protocol';
+import {
+  FREE_CHAT_ROLES,
+  FREE_EXECUTION,
+  FREE_EXECUTION_CODES,
+  PUBLIC_RECORD_KINDS,
+} from '@gyblos/protocol/constants';
+import type {
+  ModelSelection,
+  SignedPublicV2,
+} from '@gyblos/protocol/control-types';
+import type {
+  Engine,
+  EngineCapabilities,
+  EngineDescription,
+  RecountTokenizer,
+} from '@gyblos/protocol/engine';
+import {
+  freeExecutionFail as fail,
+  freeExecutionDigest,
+  FreeExecutionError,
+  parseFreeExecutionRequest,
+  parseFreeExecutionResponse,
+  verifyFreeExecutionRequest,
+  type FreeExecutionRequest,
+  type FreeExecutionResponse,
+} from '@gyblos/protocol/free-execution';
+import type { FreeExecutionService } from '@gyblos/transport-iroh/free-server';
+
+import { OFFER_PRICING_KINDS } from './constants.js';
+import type { SellerCatalogOffer } from './seller-offer.js';
+
+export interface SellerFreeExecutionOptions {
+  owner: string;
+  nodeId: string;
+  offer: Extract<SellerCatalogOffer, { kind: typeof OFFER_PRICING_KINDS.FREE }>;
+  selection: ModelSelection;
+  model: EngineDescription;
+  capabilities: EngineCapabilities;
+  engine: Engine;
+  tokenizer: RecountTokenizer;
+  readiness: () => QuoteReadiness;
+  now: () => number;
+  startedAt: number;
+}
+function checkSignal(signal: AbortSignal) {
+  if (signal.aborted) return fail(FREE_EXECUTION_CODES.CANCELLED);
+}
+function supportedInput(
+  request: FreeExecutionRequest,
+  options: SellerFreeExecutionOptions,
+) {
+  const offer = request.quote.offer;
+  if (
+    canonicalJson(offer.selection) !== canonicalJson(options.selection) ||
+    canonicalJson(offer.model) !== canonicalJson(options.model) ||
+    canonicalJson(offer.capabilities) !== canonicalJson(options.capabilities) ||
+    !options.offer.reasoning.includes(offer.reasoning)
+  )
+    return fail(FREE_EXECUTION_CODES.UNSUPPORTED);
+  if (
+    request.input.messages.length !== 1 ||
+    request.input.messages[0]!.role !== FREE_CHAT_ROLES.USER
+  )
+    return fail(FREE_EXECUTION_CODES.UNSUPPORTED);
+  if (request.input.maxTokens > INFERENCE_REQUEST_LIMITS.maxOutputTokens)
+    return fail(FREE_EXECUTION_CODES.LIMIT);
+  return request.input.messages[0]!.content;
+}
+function ready(options: SellerFreeExecutionOptions) {
+  const state = options.readiness();
+  const now = options.now();
+  if (state.busy) return fail(FREE_EXECUTION_CODES.BUSY);
+  if (state.observedAt > now || state.validUntil <= now)
+    return fail(FREE_EXECUTION_CODES.ENGINE);
+}
+export function createSellerFreeExecution(
+  options: SellerFreeExecutionOptions,
+): FreeExecutionService {
+  const admission = new FreeExecutionAdmission(
+    options.offer.caps,
+    options.startedAt,
+  );
+  return {
+    async respond(value, peer, signal): Promise<FreeExecutionResponse> {
+      const request = parseFreeExecutionRequest(value);
+      const header = {
+        version: FREE_EXECUTION.version,
+        requestId: request.requestId,
+        requestDigest: await freeExecutionDigest(request),
+      };
+      try {
+        checkSignal(signal);
+        await verifyFreeExecutionRequest(request, {
+          owner: options.owner,
+          nodeId: options.nodeId,
+          remoteNodeId: peer,
+          now: options.now(),
+        });
+        checkSignal(signal);
+        const prompt = supportedInput(request, options);
+        ready(options);
+        const inputTokens = options.tokenizer.input(prompt);
+        if (
+          !Number.isSafeInteger(inputTokens) ||
+          inputTokens < 0 ||
+          inputTokens + request.input.maxTokens > options.model.contextTokens
+        )
+          return fail(FREE_EXECUTION_CODES.LIMIT);
+        const lease = admission.enter(request, inputTokens, options.now());
+        let actual: number | undefined;
+        try {
+          checkSignal(signal);
+          const response = await generateResponse(
+            request,
+            prompt,
+            inputTokens,
+            header,
+            options,
+            signal,
+          );
+          if (!response.result) return fail(FREE_EXECUTION_CODES.INTERNAL);
+          actual =
+            response.result.usage.inputTokens +
+            response.result.usage.outputTokens;
+          return response;
+        } finally {
+          lease.complete(actual);
+        }
+      } catch (error) {
+        return {
+          ...header,
+          error: {
+            code: signal.aborted
+              ? FREE_EXECUTION_CODES.CANCELLED
+              : error instanceof FreeExecutionError
+                ? error.code
+                : FREE_EXECUTION_CODES.ENGINE,
+          },
+        };
+      }
+    },
+  };
+}
+
+// Startup passes the already prepared offer and catalog; no configuration is read again.
+export function prepareSellerFreeExecution(
+  options: Omit<SellerFreeExecutionOptions, 'selection' | 'offer'> & {
+    offer: SellerCatalogOffer;
+    catalog: SignedPublicV2;
+  },
+) {
+  if (options.offer.kind !== OFFER_PRICING_KINDS.FREE) return undefined;
+  const record = options.catalog.record;
+  if (record.kind !== PUBLIC_RECORD_KINDS.CATALOG)
+    return fail(FREE_EXECUTION_CODES.INTERNAL);
+  const listing = record.models.find(
+    (model) => model.modelId === options.offer.modelId,
+  );
+  if (!listing) return fail(FREE_EXECUTION_CODES.INTERNAL);
+  return createSellerFreeExecution({
+    ...options,
+    offer: options.offer,
+    selection: {
+      modelId: listing.modelId,
+      variant: listing.variant,
+      quantization: listing.quantization,
+    },
+  });
+}
+
+async function generateResponse(
+  request: FreeExecutionRequest,
+  prompt: string,
+  inputTokens: number,
+  header: Pick<
+    FreeExecutionResponse,
+    'version' | 'requestId' | 'requestDigest'
+  >,
+  options: SellerFreeExecutionOptions,
+  signal: AbortSignal,
+): Promise<FreeExecutionResponse> {
+  const output = await options.engine.generate({
+    prompt,
+    maxTokens: request.input.maxTokens,
+    signal,
+  });
+  checkSignal(signal);
+  const preliminary = parseFreeExecutionResponse({
+    ...header,
+    result: {
+      text: output.text,
+      usage: { inputTokens, outputTokens: 0 },
+      finishReason: output.finishReason,
+    },
+  });
+  if (!preliminary.result) return fail(FREE_EXECUTION_CODES.INTERNAL);
+  const outputTokens = options.tokenizer.count(preliminary.result.text);
+  if (
+    !Number.isSafeInteger(outputTokens) ||
+    outputTokens < 0 ||
+    outputTokens > request.input.maxTokens
+  )
+    return fail(FREE_EXECUTION_CODES.LIMIT);
+  return parseFreeExecutionResponse({
+    ...header,
+    result: {
+      ...preliminary.result,
+      usage: { inputTokens, outputTokens },
+    },
+  });
+}
