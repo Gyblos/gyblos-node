@@ -203,7 +203,10 @@ export function freeBuyerHandler(
       cancel();
       response.shouldKeepAlive = false;
       replyError(response, new FreeBuyerError(FREE_BUYER_CODES.TIMEOUT));
-      if (!response.writableEnded) {
+      // Destroying the request also ends a stalled body read, so its finally frees the slot.
+      if (response.writableEnded)
+        response.once('close', () => request.destroy());
+      else {
         request.destroy();
         response.destroy();
       }

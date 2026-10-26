@@ -350,3 +350,56 @@ void test('free HTTP answers its own deadline with 504 and no-retry instead of a
     await server.close();
   }
 });
+
+void test('free HTTP frees the admission slot when the deadline hits a stalled body upload', async () => {
+  const api = await import('@gyblos/buyer/free-http');
+  const { TRANSPORT_LIMITS } = await import('@gyblos/config');
+  const server = await api.startFreeBuyerHttp(async () => ANSWER, SETTINGS, {
+    port: 0,
+    requestMs: 100,
+  });
+  const stalled: ReturnType<typeof httpRequest>[] = [];
+  try {
+    const statuses = await Promise.all(
+      Array.from(
+        { length: TRANSPORT_LIMITS.maxConcurrent },
+        () =>
+          new Promise<number>((resolve, reject) => {
+            const request = httpRequest(
+              server.url,
+              {
+                method: 'POST',
+                headers: { ...JSON_HEADERS, 'content-length': '500' },
+              },
+              (response) => {
+                response.resume();
+                resolve(response.statusCode!);
+              },
+            );
+            request.on('error', () => undefined);
+            request.write('{"model":');
+            stalled.push(request);
+            setTimeout(() => reject(new Error('no deadline reply')), 2000);
+          }),
+      ),
+    );
+    for (const status of statuses) assert.equal(status, 504);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const after = await Promise.all(
+      Array.from({ length: TRANSPORT_LIMITS.maxConcurrent }, () =>
+        fetch(server.url, {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: CHAT,
+        }),
+      ),
+    );
+    assert.deepEqual(
+      after.map((response) => response.status),
+      after.map(() => 200),
+    );
+  } finally {
+    for (const request of stalled) request.destroy();
+    await server.close();
+  }
+});
