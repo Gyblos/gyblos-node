@@ -39,10 +39,13 @@ export function localOllamaUrl(base: string): URL {
 
 export function createOllama(base: string, fetchImpl: typeof fetch = fetch) {
   const origin = localOllamaUrl(base);
-  async function assertModel() {
+  async function assertModel(signal?: AbortSignal) {
     const response = await fetchImpl(new URL(ROUTES.ollamaTags, origin), {
       redirect: 'error',
-      signal: AbortSignal.timeout(TIMEOUTS.events),
+      signal: AbortSignal.any([
+        AbortSignal.timeout(TIMEOUTS.events),
+        ...(signal ? [signal] : []),
+      ]),
     });
     if (!response.ok) throw new Error('Local model inventory unavailable.');
     const body = (await response.json()) as {
@@ -68,7 +71,7 @@ export function createOllama(base: string, fetchImpl: typeof fetch = fetch) {
       )
         throw new Error('Invalid output token limit.');
       input.signal?.throwIfAborted();
-      await assertModel();
+      await assertModel(input.signal);
       input.signal?.throwIfAborted();
       const signal = AbortSignal.any([
         AbortSignal.timeout(TIMEOUTS.generation),
