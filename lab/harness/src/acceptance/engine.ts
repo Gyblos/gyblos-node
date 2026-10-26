@@ -32,18 +32,24 @@ function syntheticEngine(): Engine {
       recountable: true,
       modelIdentity: MODEL_IDENTITIES.DIGEST,
     }),
-    generate: async () => ({
-      text: 'synthetic',
-      finishReason: ENGINE_DONE_REASONS.STOP,
-      usage: {
-        inputTokens: 1,
-        outputTokens: 1,
-        totalDurationNs: 1,
-        loadDurationNs: 0,
-        inputDurationNs: 0,
-        outputDurationNs: 0,
-      },
-    }),
+    generate: async (input) => {
+      await input.onText?.('syn');
+      input.signal?.throwIfAborted();
+      await input.onText?.('thetic');
+      input.signal?.throwIfAborted();
+      return {
+        text: 'synthetic',
+        finishReason: ENGINE_DONE_REASONS.STOP,
+        usage: {
+          inputTokens: 1,
+          outputTokens: 1,
+          totalDurationNs: 1,
+          loadDurationNs: 0,
+          inputDurationNs: 0,
+          outputDurationNs: 0,
+        },
+      };
+    },
   };
 }
 export function createAcceptanceEngine(mode: AcceptanceMode) {
@@ -54,6 +60,9 @@ export function createAcceptanceEngine(mode: AcceptanceMode) {
   let failed = false;
   let generations = 0;
   let attempts = 0;
+  let cancellations = 0;
+  let heldText: Promise<void> | undefined;
+  let releaseText = () => {};
   let blocked: Promise<void> | undefined;
   let release = () => {};
   const engine: Engine = {
@@ -72,7 +81,22 @@ export function createAcceptanceEngine(mode: AcceptanceMode) {
       if (failed)
         throw new AcceptanceError(ACCEPTANCE_CODES.ENGINE_UNAVAILABLE);
       generations++;
-      return source.generate(input);
+      try {
+        return await source.generate({
+          ...input,
+          onText: input.onText
+            ? async (text) => {
+                await input.onText!(text);
+                const held = heldText;
+                heldText = undefined;
+                if (held) await holdText(held, input.signal);
+              }
+            : undefined,
+        });
+      } catch (error) {
+        if (input.signal?.aborted) cancellations++;
+        throw error;
+      }
     },
   };
   const snapshot = (): Promise<MemorySnapshot> =>
@@ -88,6 +112,13 @@ export function createAcceptanceEngine(mode: AcceptanceMode) {
     snapshot,
     generations: () => generations,
     attempts: () => attempts,
+    cancellations: () => cancellations,
+    holdAfterText() {
+      heldText = new Promise<void>((resolve) => {
+        releaseText = resolve;
+      });
+      return () => releaseText();
+    },
     fail: (value: boolean) => {
       failed = value;
     },
@@ -97,7 +128,28 @@ export function createAcceptanceEngine(mode: AcceptanceMode) {
       });
       return () => release();
     },
-    release: () => release(),
+    release: () => {
+      release();
+      releaseText();
+    },
   };
 }
 export type AcceptanceEngine = ReturnType<typeof createAcceptanceEngine>;
+
+async function holdText(held: Promise<void>, signal?: AbortSignal) {
+  signal?.throwIfAborted();
+  let abort = () => {};
+  try {
+    await Promise.race([
+      held,
+      new Promise<never>((_resolve, reject) => {
+        abort = () => reject(signal?.reason);
+        signal?.addEventListener('abort', abort, { once: true });
+        if (signal?.aborted) abort();
+      }),
+    ]);
+    signal?.throwIfAborted();
+  } finally {
+    signal?.removeEventListener('abort', abort);
+  }
+}

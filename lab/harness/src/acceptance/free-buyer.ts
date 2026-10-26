@@ -5,7 +5,8 @@ import type { Connection, Endpoint } from '@number0/iroh';
 import { executeBuyerFree } from '@gyblos/buyer/free-execution';
 import { startFreeBuyerHttp } from '@gyblos/buyer/free-http';
 import { selectionStats } from '@gyblos/buyer/selection-stats';
-import { FREE_EXECUTION } from '@gyblos/protocol/constants';
+import { FREE_EXECUTION, FREE_STREAM } from '@gyblos/protocol/constants';
+import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
 
 import { acceptanceSelection } from './buyer.js';
 import { acceptanceAssert } from './errors.js';
@@ -23,7 +24,9 @@ function injectFault(endpoint: Endpoint, fault?: FreeAcceptanceFault) {
   const dials: string[] = [];
   let injected = false;
   endpoint.connect = async (...args) => {
-    const free = Buffer.from(args[1]).toString('utf8') === FREE_EXECUTION.alpn;
+    const free = [FREE_EXECUTION.alpn, FREE_STREAM.alpn].some(
+      (alpn) => Buffer.from(args[1]).toString('utf8') === alpn,
+    );
     if (free) dials.push(args[0].id().toString());
     if (free && fault === FREE_ACCEPTANCE_FAULTS.DIAL && !injected) {
       injected = true;
@@ -90,44 +93,51 @@ export async function createFreeBuyer(
     let queryEngineAttempts = 0;
     const generations = () =>
       sellers.reduce((sum, seller) => sum + seller.engine.generations(), 0);
-    const host = await startFreeBuyerHttp(
-      (input, signal) =>
-        executeBuyerFree(
-          input,
-          {
-            ...dependencies,
-            select: async (excluded, deadline) => {
-              const before = generations();
-              const attempts = sellers.reduce(
-                (sum, seller) => sum + seller.engine.attempts(),
-                0,
-              );
-              selections++;
-              try {
-                return await dependencies.select(excluded, deadline);
-              } finally {
-                const delta = generations() - before;
-                queryGenerations += delta;
-                const attempted =
-                  sellers.reduce(
-                    (sum, seller) => sum + seller.engine.attempts(),
-                    0,
-                  ) - attempts;
-                queryEngineAttempts += attempted;
-                acceptanceAssert(delta === 0 && attempted === 0);
-              }
-            },
+    const execute = (
+      input: FreeExecutionBuildInput,
+      signal: AbortSignal,
+      onDelta?: (text: string) => Promise<void>,
+    ) =>
+      executeBuyerFree(
+        input,
+        {
+          ...dependencies,
+          select: async (excluded, deadline) => {
+            const before = generations();
+            const attempts = sellers.reduce(
+              (sum, seller) => sum + seller.engine.attempts(),
+              0,
+            );
+            selections++;
+            try {
+              return await dependencies.select(excluded, deadline);
+            } finally {
+              const delta = generations() - before;
+              queryGenerations += delta;
+              const attempted =
+                sellers.reduce(
+                  (sum, seller) => sum + seller.engine.attempts(),
+                  0,
+                ) - attempts;
+              queryEngineAttempts += attempted;
+              acceptanceAssert(delta === 0 && attempted === 0);
+            }
           },
-          AbortSignal.any([signal, run.signal]),
-        ),
+        },
+        AbortSignal.any([signal, run.signal]),
+        onDelta,
+      );
+    const host = await startFreeBuyerHttp(
+      execute,
       {
         selection: config.request.selection,
         maxTokens: config.request.maxTokens,
       },
-      { port: 0 },
+      { port: 0, stream: execute },
     );
     closeHttp = host.close;
     return {
+      url: host.url,
       endpoint,
       dials,
       generations,

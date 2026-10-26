@@ -229,17 +229,18 @@ export function freeBuyerHandler(
         settings.maxTokens,
         stream !== undefined,
       );
+      const payload = { messages: input.messages, maxTokens: input.maxTokens };
       if (input.stream && stream) {
         await executeFreeSse(
           stream,
-          input,
+          payload,
           controller.signal,
           response,
           settings.selection.modelId,
         );
         return;
       }
-      const result = await execute(input, controller.signal);
+      const result = await execute(payload, controller.signal);
       if (!controller.signal.aborted)
         replyCompletion(response, settings.selection.modelId, result);
     } catch (error) {

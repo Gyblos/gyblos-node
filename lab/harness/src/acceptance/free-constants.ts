@@ -33,3 +33,8 @@ export const FREE_ACCEPTANCE = {
   limitedDailyCap: 5,
   limitedBuyerCap: 3,
 } as const;
+
+export const FREE_STREAM_ACCEPTANCE = {
+  cancelPollMs: 10,
+  cancelPollAttempts: 100,
+} as const;

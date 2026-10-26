@@ -43,6 +43,7 @@ void test('free HTTP delivers the first SSE delta before generation finishes and
     {
       port: 0,
       stream: async (_input, signal, onDelta) => {
+        assert.deepEqual(Object.keys(_input).sort(), ['maxTokens', 'messages']);
         await onDelta('first');
         await waiting;
         signal.throwIfAborted();
