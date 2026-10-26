@@ -27,6 +27,7 @@ import {
   expectError,
   INDEX_ORIGIN,
   indexNode,
+  memoryCache,
   MODEL,
   T0,
 } from './support/discovery-index-fixture.js';
@@ -57,24 +58,6 @@ function spiedStorage(storage: DiscoveryStorage = createMemoryStorage()) {
     },
   });
   return { storage: spied, calls };
-}
-
-// In-memory stand-in for the Workers Cache API (caches.default).
-function memoryCache() {
-  const entries = new Map<string, Response>();
-  const puts: string[] = [];
-  const matches: string[] = [];
-  const cache: ResponseCache = {
-    async match(key) {
-      matches.push(key);
-      return entries.get(key)?.clone();
-    },
-    async put(key, response) {
-      puts.push(key);
-      entries.set(key, response.clone());
-    },
-  };
-  return { cache, entries, puts, matches };
 }
 
 function indexApp(options: DiscoveryIndexOptions = {}) {

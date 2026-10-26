@@ -142,6 +142,7 @@ void test('a NodeId outside the allowlist gets 403 before signature, storage or 
       [DISCOVERY_LIMITERS.IP]: ip.limiter,
       [DISCOVERY_LIMITERS.PUBLISH]: publishLimiter.limiter,
       [DISCOVERY_LIMITERS.NODE]: node.limiter,
+      [DISCOVERY_LIMITERS.READ]: allow,
     },
     now: () => T0 + 1000,
     publishers: allowlist(allowed.nodeId),

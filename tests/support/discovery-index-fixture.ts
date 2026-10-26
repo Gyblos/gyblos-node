@@ -7,6 +7,7 @@ import test from 'node:test';
 import {
   createDiscoveryIndex,
   type DiscoveryIndexOptions,
+  type ResponseCache,
 } from '@gyblos/discovery-index/app';
 import {
   DISCOVERY_LIMITERS,
@@ -59,6 +60,7 @@ export const allLimiters = (limiter: FakeLimiter = allow) => ({
   [DISCOVERY_LIMITERS.IP]: limiter,
   [DISCOVERY_LIMITERS.PUBLISH]: limiter,
   [DISCOVERY_LIMITERS.NODE]: limiter,
+  [DISCOVERY_LIMITERS.READ]: limiter,
 });
 
 // Fixed-window counter shaped like a Cloudflare rate-limit binding.
@@ -72,6 +74,24 @@ export function counting(cap: number) {
     },
   };
   return { counts, limiter };
+}
+
+// In-memory stand-in for the Workers Cache API (caches.default).
+export function memoryCache() {
+  const entries = new Map<string, Response>();
+  const puts: string[] = [];
+  const matches: string[] = [];
+  const cache: ResponseCache = {
+    async match(key) {
+      matches.push(key);
+      return entries.get(key)?.clone();
+    },
+    async put(key, response) {
+      puts.push(key);
+      entries.set(key, response.clone());
+    },
+  };
+  return { cache, entries, puts, matches };
 }
 
 function signWith(
@@ -205,6 +225,7 @@ export async function indexHarness(
       [DISCOVERY_LIMITERS.IP]: switchable(DISCOVERY_LIMITERS.IP),
       [DISCOVERY_LIMITERS.PUBLISH]: switchable(DISCOVERY_LIMITERS.PUBLISH),
       [DISCOVERY_LIMITERS.NODE]: switchable(DISCOVERY_LIMITERS.NODE),
+      [DISCOVERY_LIMITERS.READ]: switchable(DISCOVERY_LIMITERS.READ),
     },
     now: () => clock.now,
     publishers: { mode: PUBLISH_MODES.OPEN },
