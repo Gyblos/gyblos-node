@@ -113,7 +113,7 @@ void test('portable backup preserves the exact Ed25519 identity without enabling
       [flag]: true,
     });
     assert.equal(summary.fundingEnabled, false);
-    assert.equal(summary.backupVerified, false);
+    assert.equal(summary.backupVerified, flag === 'backupVerified');
   }
 });
 void test('portable backup randomizes salt and nonce and fixes supported algorithms', async () => {

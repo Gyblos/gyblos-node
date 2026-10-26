@@ -1,5 +1,5 @@
 // Compact backup controls reuse wallet/dialog styles; only passwords and status cross IPC.
-// A successful file check is session feedback, never funding or persistent backup approval.
+// A successful saved-file check persists identity-bound metadata, never a funding capability.
 import { useState } from 'react';
 
 import {
@@ -10,8 +10,10 @@ import {
 } from '../wallet/backup-flow-model.js';
 import { BUTTON_VARIANT } from './constants.js';
 import { Button, Note } from './UI.js';
+import { useRefreshDesktopWallet } from './WalletState.js';
 
 function useWalletBackup() {
+  const refresh = useRefreshDesktopWallet();
   const [action, setAction] = useState<BackupAction>(BACKUP_ACTION.CREATE);
   const [password, setPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
@@ -27,6 +29,7 @@ function useWalletBackup() {
     setConfirmation('');
     try {
       const result = await window.desktopWallet?.backup(request);
+      await refresh();
       if (result === BACKUP_RESULT.SAVED) {
         setAction(BACKUP_ACTION.VERIFY);
         setMessage(

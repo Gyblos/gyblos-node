@@ -91,3 +91,11 @@ export const SETUP_ERROR = {
   RECOVERY_REQUIRED: 'recovery-required',
 } as const;
 export const WALLET_SETUP = { CHANNEL: 'desktop:wallet-setup' } as const;
+
+export const BACKUP_VERIFICATION = {
+  VERSION: 1,
+  RECORD: 'backup-verified.enc',
+  DOMAIN: 'gyblos-desktop-backup-verification-v1',
+  MAC_ALGORITHM: 'sha256',
+  MAX_PLAINTEXT_BYTES: 1024,
+} as const;

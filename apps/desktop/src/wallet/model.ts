@@ -4,7 +4,7 @@ import { WALLET_STATUS } from './constants.js';
 export interface WalletSummary {
   status: (typeof WALLET_STATUS)[keyof typeof WALLET_STATUS];
   address: string | null;
-  backupVerified: false;
+  backupVerified: boolean;
   fundingEnabled: false;
 }
 
@@ -29,7 +29,7 @@ export function parseWalletSummary(value: unknown): WalletSummary {
     !('address' in value) ||
     !('backupVerified' in value) ||
     !('fundingEnabled' in value) ||
-    value.backupVerified !== false ||
+    typeof value.backupVerified !== 'boolean' ||
     value.fundingEnabled !== false
   )
     return failed();
@@ -43,9 +43,14 @@ export function parseWalletSummary(value: unknown): WalletSummary {
       !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value.address)
     )
       return failed();
-    return walletSummary(status, value.address);
+    return {
+      ...walletSummary(status, value.address),
+      backupVerified: value.backupVerified,
+    };
   }
-  return value.address === null ? walletSummary(status) : failed();
+  return value.address === null && value.backupVerified === false
+    ? walletSummary(status)
+    : failed();
 }
 
 export { WALLET, WALLET_STATUS, WALLET_PROVIDER } from './constants.js';

@@ -49,7 +49,18 @@ export function createBackupFlow(
       const summary = await wallet.summary();
       if (!summary.address) return BACKUP_RESULT.FAILED;
       const bytes = await readBackupFile(path);
-      await codec.open(bytes, request.password, summary.address, signal);
+      try {
+        const secret = await codec.open(
+          bytes,
+          request.password,
+          summary.address,
+          signal,
+        );
+        if (stopped()) return BACKUP_RESULT.CANCELLED;
+        await wallet.rememberBackup(secret, signal);
+      } finally {
+        bytes.fill(0);
+      }
       return BACKUP_RESULT.VERIFIED;
     } catch {
       return stopped() ? BACKUP_RESULT.CANCELLED : BACKUP_RESULT.FAILED;

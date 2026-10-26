@@ -194,7 +194,7 @@ function registerWalletStatus(
       args.length !== 0
     )
       throw new Error('Unsupported wallet status sender.');
-    return summary;
+    return wallet.summary();
   });
   return summary;
 }
