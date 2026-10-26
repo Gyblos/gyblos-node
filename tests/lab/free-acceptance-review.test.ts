@@ -88,7 +88,8 @@ function initializationFailure(borrowed: boolean) {
   );
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.stderr, '');
-  return JSON.parse(result.stdout) as unknown;
+  const value: unknown = JSON.parse(result.stdout);
+  return value;
 }
 void test('free acceptance closes an owned endpoint when control initialization fails', () => {
   assert.deepEqual(initializationFailure(false), {

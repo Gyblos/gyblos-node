@@ -79,3 +79,8 @@ endpoint. It checks renewal answers, typed execution refusals, persistent public
 replay state, caps and pre-/post-send failures. It also checks early
 cancellation, CLI privacy and native-unavailable behavior; no TCP/mock fallback
 or real-engine option is supplied by the free command.
+
+`tests/lab/free-acceptance-review.test.ts` pins the synthetic HTTP finish reason
+and choice index, plus cleanup on control-client initialization failure. An
+owned endpoint closes on failure; a borrowed endpoint stays caller-owned. The
+initialization probes use in-memory doubles and never bind native sockets.

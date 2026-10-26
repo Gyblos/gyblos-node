@@ -4,7 +4,11 @@ import { request } from 'node:http';
 
 import { FREE_BUYER } from '@gyblos/buyer/constants';
 import { HTTP_STATUS, ROUTES } from '@gyblos/config';
-import { FREE_CHAT_ROLES, MODEL_IDS } from '@gyblos/protocol/constants';
+import {
+  ENGINE_DONE_REASONS,
+  FREE_CHAT_ROLES,
+  MODEL_IDS,
+} from '@gyblos/protocol/constants';
 import { controlObject } from '@gyblos/protocol/control-validation';
 
 import { ACCEPTANCE, ACCEPTANCE_CODES } from './constants.js';
@@ -99,6 +103,9 @@ export function assertChatAnswer(
     'message',
     'finish_reason',
   ]);
+  acceptanceAssert(
+    choice.index === 0 && choice.finish_reason === ENGINE_DONE_REASONS.STOP,
+  );
   const message = controlObject(choice.message, ['role', 'content']);
   acceptanceAssert(
     message.role === FREE_CHAT_ROLES.ASSISTANT &&

@@ -38,19 +38,20 @@ export async function acquireFreeQuote(
   existing?: Endpoint,
 ) {
   const endpoint = existing ?? (await createAcceptanceBuyerEndpoint());
-  const control = await connectBuyerControl(
-    endpoint,
-    run.host().wire.endpoint.addr(),
-    {
-      owner: run.identity.owner.address,
-      nodeId: run.host().wire.nodeId,
-      relayAllowed: () => false,
-      now: run.clock.now,
-    },
-  );
-  const before = run.engine.generations();
-  const attempts = run.engine.attempts();
+  let control: Awaited<ReturnType<typeof connectBuyerControl>> | undefined;
   try {
+    control = await connectBuyerControl(
+      endpoint,
+      run.host().wire.endpoint.addr(),
+      {
+        owner: run.identity.owner.address,
+        nodeId: run.host().wire.nodeId,
+        relayAllowed: () => false,
+        now: run.clock.now,
+      },
+    );
+    const before = run.engine.generations();
+    const attempts = run.engine.attempts();
     await control.getCatalog(run.signal);
     await control.getPresence(run.signal);
     const policy = acceptanceSelection(run).request;
@@ -87,8 +88,8 @@ export async function acquireFreeQuote(
     if (!existing) await endpoint.close();
     throw error;
   } finally {
-    await control.close();
-    await control.settled();
+    await control?.close();
+    await control?.settled();
   }
 }
 export async function executeFreeQuote(
