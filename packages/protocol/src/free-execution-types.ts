@@ -8,12 +8,20 @@ import type {
 } from './constants.js';
 import type { ModelSelection, SignedOfferV2 } from './control-types.js';
 
+export interface FreeChatMessage {
+  role: FreeChatRole;
+  content: string;
+}
+export interface FreeExecutionBuildInput {
+  messages: readonly FreeChatMessage[];
+  maxTokens: number;
+}
 export interface FreeExecutionRequest {
   version: typeof FREE_EXECUTION.version;
   requestId: string;
   quote: SignedOfferV2;
   input: {
-    messages: { role: FreeChatRole; content: string }[];
+    messages: FreeChatMessage[];
     selection: ModelSelection;
     reasoning: ReasoningLevel;
     maxTokens: number;

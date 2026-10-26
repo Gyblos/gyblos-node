@@ -7,7 +7,10 @@ import {
 import { ControlError } from './control-validation.js';
 
 export class FreeExecutionError extends Error {
-  constructor(readonly code: FreeExecutionCode) {
+  constructor(
+    readonly code: FreeExecutionCode,
+    readonly remote = false,
+  ) {
     super(code);
     this.name = 'FreeExecutionError';
   }

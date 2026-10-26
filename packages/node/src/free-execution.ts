@@ -21,6 +21,7 @@ import type {
   RecountTokenizer,
 } from '@gyblos/protocol/engine';
 import {
+  freeExecutionFail as fail,
   freeExecutionDigest,
   FreeExecutionError,
   parseFreeExecutionRequest,
@@ -47,11 +48,6 @@ export interface SellerFreeExecutionOptions {
   now: () => number;
   startedAt: number;
 }
-const fail = (
-  code: ConstructorParameters<typeof FreeExecutionError>[0],
-): never => {
-  throw new FreeExecutionError(code);
-};
 function checkSignal(signal: AbortSignal) {
   if (signal.aborted) return fail(FREE_EXECUTION_CODES.CANCELLED);
 }

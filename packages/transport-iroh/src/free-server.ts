@@ -9,6 +9,7 @@ import {
   FREE_EXECUTION_CODES,
 } from '@gyblos/protocol/constants';
 import {
+  freeExecutionFail as fail,
   FreeExecutionError,
   type FreeExecutionResponse,
 } from '@gyblos/protocol/free-execution';
@@ -32,11 +33,6 @@ interface FreeStreamDeadlines {
   ingressMs?: number;
   requestMs?: number;
   egressMs?: number;
-}
-function fail(
-  code: ConstructorParameters<typeof FreeExecutionError>[0],
-): never {
-  throw new FreeExecutionError(code);
 }
 function check(signal: AbortSignal, allowed: () => boolean) {
   if (signal.aborted) return fail(FREE_EXECUTION_CODES.CANCELLED);

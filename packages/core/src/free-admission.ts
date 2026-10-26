@@ -1,7 +1,7 @@
 // Pure single-use admission and daily token reservations; caller supplies time, no I/O or payments.
 import { FREE_EXECUTION_CODES } from '@gyblos/protocol/constants';
 import {
-  FreeExecutionError,
+  freeExecutionFail as fail,
   type FreeExecutionRequest,
 } from '@gyblos/protocol/free-execution';
 
@@ -15,11 +15,6 @@ export interface FreeTokenCaps {
   dailyTokenCap: number;
   perBuyerCap: number;
 }
-const fail = (
-  code: ConstructorParameters<typeof FreeExecutionError>[0],
-): never => {
-  throw new FreeExecutionError(code);
-};
 const count = (value: number) => {
   if (!Number.isSafeInteger(value) || value < 0)
     return fail(FREE_EXECUTION_CODES.LIMIT);
