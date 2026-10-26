@@ -34,7 +34,9 @@
     "./acceptance/engine": "./src/acceptance/engine.ts",
     "./acceptance/free": "./src/acceptance/free-run.ts",
     "./acceptance/free-constants": "./src/acceptance/free-constants.ts",
-    "./cli/free-acceptance": "./src/cli/free-acceptance.ts"
+    "./cli/free-acceptance": "./src/cli/free-acceptance.ts",
+    "./acceptance/free-http": "./src/acceptance/free-http.ts",
+    "./acceptance/free-quotes": "./src/acceptance/free-quotes.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",
