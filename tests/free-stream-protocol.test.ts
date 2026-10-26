@@ -87,3 +87,26 @@ void test('free stream frames bound sizes, canonical JSON and Unicode-safe delta
   assert.equal(chunks.join(''), text);
   assert.ok(chunks.every((chunk) => Buffer.byteLength(chunk) <= 8192));
 });
+void test('free stream golden frames preserve canonical bytes independently of existing vectors', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const api = await import('@gyblos/protocol/free-stream');
+  const fixture: { events: { event: unknown; frameHex: string }[] } =
+    JSON.parse(
+      await readFile(
+        new URL(
+          import.meta.resolve('@gyblos/protocol/vectors/free-stream-v2.json'),
+        ),
+        'utf8',
+      ),
+    );
+  for (const row of fixture.events) {
+    assert.equal(
+      Buffer.from(api.encodeFreeStreamEvent(row.event)).toString('hex'),
+      row.frameHex,
+    );
+    assert.deepEqual(
+      api.decodeFreeStreamEvent(Buffer.from(row.frameHex, 'hex')),
+      row.event,
+    );
+  }
+});

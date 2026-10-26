@@ -537,3 +537,41 @@ the buyer must close its control connection before dialing the data channel.
 Synthetic service tests, bounded-stream tests and native loopback execution
 cover this seller slice. No real engine, devnet, deployed index, production
 startup or full publish-to-answer lab acceptance is claimed by these tests.
+
+### Free streaming execution v2
+
+`gyblos/free-stream/2` is a separate execution ALPN. It reuses the unchanged
+`gyblos/free/2` request and its digest domain. This keeps one-shot consumers and
+all existing vectors intact, without overloading the control ALPN or enabling
+`gyblos/http/2`. The seller shares one policy/admission instance across both
+free execution ALPNs: the buyer-bound quote/requestId is consumed once across
+modes, not once per mode. Free still requires both prices and maxAtomic zero.
+
+Each response event is canonical UTF-8 JSON prefixed with a four-byte big-endian
+length. Events carry version2, requestId, requestDigest and a zero-based,
+strictly consecutive sequence. `delta` adds text; `terminal` carries the existing
+complete FreeExecutionResponse. Successful terminal text must equal the exact
+concatenated deltas, and terminal usage/context bounds are checked as for the
+complete response. An error terminal is unsuccessful, including after partial
+text. EOF before terminal, bytes after terminal, unknown fields, invalid UTF-8,
+noncanonical or duplicate JSON fields, changed bindings and reordered events
+are rejected. Fragments are provisional until a valid terminal and EOF.
+
+A delta contains at most8192 UTF-8 bytes; splitting preserves Unicode scalar
+values. There are at most4096 events including terminal, at most
+FREE_EXECUTION.responseBytes+1024 canonical body bytes per event, and at most
+twice FREE_EXECUTION.responseBytes across all framed events. The original
+256KiB output-text cap also applies across deltas. JSON escaping counts toward
+wire limits; legal text can exceed a wire bound after escaping and must fail
+with LIMIT, never be silently truncated. The consumer validates declared frame
+length before allocating/reading its body. Per-frame ingress/egress and whole
+request deadlines, relay/peer authentication, endpoint quotas and free caps
+remain enforced. Writes and consumer callbacks are awaited for backpressure.
+
+Cancellation closes the connection and reaches the engine's abort signal;
+late deltas are forbidden. A writer ignoring abort retains its admission permit
+until it actually settles. The buyer marks possible transmission before its
+first write, so partial/failed writes and any later failure prohibit failover.
+Zero clock skew remains: quote expiry is rechecked immediately before the first
+write, with no grace interval. Streaming does not authorize payments, call a
+facilitator, modify the v1 flow or reserve capacity during quotation.

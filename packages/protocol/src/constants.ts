@@ -238,3 +238,12 @@ export const FREE_EXECUTION_CODES = {
 } as const;
 export type FreeExecutionCode =
   (typeof FREE_EXECUTION_CODES)[keyof typeof FREE_EXECUTION_CODES];
+
+export const FREE_STREAM = {
+  alpn: 'gyblos/free-stream/2',
+  deltaBytes: 8192,
+  eventBytes: FREE_EXECUTION.responseBytes + 1024,
+  maxEvents: 4096,
+  totalBytes: FREE_EXECUTION.responseBytes * 2,
+  events: { DELTA: 'delta', TERMINAL: 'terminal' },
+} as const;

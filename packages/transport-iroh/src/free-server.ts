@@ -20,9 +20,16 @@ import {
 
 import { HTTP_OVER_IROH, IROH_DEADLINES } from './constants.js';
 import type { ControlStream } from './control-io.js';
+import { streamFreeResponse } from './free-stream-server.js';
 import { handleIrohConnection } from './iroh-connection.js';
 
 export interface FreeExecutionService {
+  stream?(
+    value: unknown,
+    peer: string,
+    signal: AbortSignal,
+    onDelta: (text: string) => Promise<void>,
+  ): Promise<FreeExecutionResponse>;
   respond(
     value: unknown,
     peer: string,
@@ -90,6 +97,68 @@ async function readBoundedRequest(
     await reading.catch(() => undefined);
   }
 }
+async function sendStreamingResponse(
+  stream: ControlStream,
+  request: Awaited<ReturnType<typeof readRequest>>,
+  service: FreeExecutionService,
+  peer: string,
+  signal: AbortSignal,
+  check: () => void,
+  limits: FreeStreamDeadlines,
+  cancel: () => void,
+) {
+  await streamFreeResponse(
+    request,
+    service,
+    peer,
+    signal,
+    check,
+    async (frame) => {
+      const writing = stream.send.writeAll([...frame]);
+      try {
+        await deadline(
+          writing,
+          limits.egressMs ?? IROH_DEADLINES.egressMs,
+          cancel,
+        );
+      } finally {
+        await writing.catch(() => undefined);
+      }
+    },
+  );
+  check();
+  const finishing = stream.send.finish();
+  try {
+    await deadline(
+      finishing,
+      limits.egressMs ?? IROH_DEADLINES.egressMs,
+      cancel,
+    );
+  } finally {
+    await finishing.catch(() => undefined);
+  }
+  check();
+}
+async function sendCompleteResponse(
+  stream: ControlStream,
+  response: FreeExecutionResponse,
+  check: () => void,
+  limits: FreeStreamDeadlines,
+  cancel: () => void,
+) {
+  const bytes = encodeFreeExecutionResponse(response);
+  const sending = (async () => {
+    await stream.send.writeAll([...bytes]);
+    check();
+    await stream.send.finish();
+  })();
+  // The enclosing operation must not settle while a native writer is still pending.
+  try {
+    await deadline(sending, limits.egressMs ?? IROH_DEADLINES.egressMs, cancel);
+  } finally {
+    await sending.catch(() => undefined);
+  }
+}
 export async function serveFreeExecutionStream(
   stream: ControlStream,
   service: FreeExecutionService,
@@ -99,6 +168,7 @@ export async function serveFreeExecutionStream(
   enter: () => (() => void) | undefined,
   routeAllowed: () => boolean = () => true,
   limits: FreeStreamDeadlines = {},
+  streaming = false,
 ) {
   const release = enter();
   if (!release) {
@@ -125,24 +195,28 @@ export async function serveFreeExecutionStream(
       cancel,
     );
     check(controller.signal, routeAllowed);
-    const response = await service.respond(request, peer, controller.signal);
-    check(controller.signal, routeAllowed);
-    const bytes = encodeFreeExecutionResponse(response);
-    const sending = (async () => {
-      await stream.send.writeAll([...bytes]);
-      check(controller.signal, routeAllowed);
-      await stream.send.finish();
-    })();
-    // The enclosing operation must not settle while a native writer is still pending.
-    try {
-      await deadline(
-        sending,
-        limits.egressMs ?? IROH_DEADLINES.egressMs,
+    if (streaming) {
+      await sendStreamingResponse(
+        stream,
+        request,
+        service,
+        peer,
+        controller.signal,
+        () => check(controller.signal, routeAllowed),
+        limits,
         cancel,
       );
-    } finally {
-      await sending.catch(() => undefined);
+      return;
     }
+    const response = await service.respond(request, peer, controller.signal);
+    check(controller.signal, routeAllowed);
+    await sendCompleteResponse(
+      stream,
+      response,
+      () => check(controller.signal, routeAllowed),
+      limits,
+      cancel,
+    );
     check(controller.signal, routeAllowed);
   });
   try {
@@ -167,6 +241,7 @@ export async function handleFreeExecutionConnection(
   enter: () => (() => void) | undefined,
   isClosed: () => boolean,
   routeAllowed: () => boolean,
+  streaming = false,
 ) {
   const peer = connection.remoteId().toString();
   const close = () => connection.close(HTTP_OVER_IROH.streamCloseCode, []);
@@ -181,6 +256,8 @@ export async function handleFreeExecutionConnection(
         signal,
         enter,
         routeAllowed,
+        {},
+        streaming,
       ),
     isClosed,
     { receiveBytes: FREE_EXECUTION.requestBytes + CONTROL_LIMITS.prefixBytes },

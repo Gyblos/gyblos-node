@@ -319,6 +319,10 @@ void test(
       PROBE_HTTP: '0',
     });
     assert.equal(result.error, undefined);
-    assert.deepEqual(result.alpns, [CONTROL_ALPN, FREE_EXECUTION.alpn]);
+    assert.deepEqual(result.alpns, [
+      CONTROL_ALPN,
+      FREE_EXECUTION.alpn,
+      FREE_STREAM.alpn,
+    ]);
   },
 );
