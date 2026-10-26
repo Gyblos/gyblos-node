@@ -2,112 +2,19 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createControlQuote } from '@gyblos/core/control-quotes';
-import { OFFER_PRICING_KINDS } from '@gyblos/node/constants';
 import {
   ENGINE_DONE_REASONS,
   FREE_CHAT_ROLES,
   FREE_EXECUTION,
   FREE_EXECUTION_CODES,
-  MODEL_IDS,
 } from '@gyblos/protocol/constants';
-import type { EngineResult } from '@gyblos/protocol/engine';
 import { freeExecutionDigest } from '@gyblos/protocol/free-execution';
 import { signOfferV2 } from '@gyblos/protocol/offer-v2';
 
-import { controlFixture } from './support/control-fixture.js';
-
-async function fixture(caps = { dailyTokenCap: 100, perBuyerCap: 50 }) {
-  const api = await import('@gyblos/node/free-execution');
-  const source = await controlFixture(true);
-  let calls = 0;
-  let now = source.context.now();
-  let busy = false;
-  let run = async (): Promise<EngineResult> => ({
-    text: 'answer',
-    usage: {
-      inputTokens: 4,
-      outputTokens: 2,
-      totalDurationNs: 0,
-      loadDurationNs: 0,
-      inputDurationNs: 0,
-      outputDurationNs: 0,
-    },
-    finishReason: ENGINE_DONE_REASONS.STOP,
-  });
-  const model = source.context.models[0]!;
-  const service = api.createSellerFreeExecution({
-    owner: source.context.owner,
-    nodeId: source.context.nodeId,
-    offer: {
-      kind: OFFER_PRICING_KINDS.FREE,
-      modelId: MODEL_IDS.QWEN3_0_6B,
-      reasoning: model.reasoning,
-      caps,
-    },
-    selection: model.selection,
-    model: model.model,
-    capabilities: model.capabilities,
-    engine: {
-      describe: async () => {
-        throw new Error('unexpected describe');
-      },
-      capabilities: () => {
-        throw new Error('unexpected capabilities');
-      },
-      generate: async () => {
-        calls++;
-        return run();
-      },
-    },
-    tokenizer: { input: () => 4, count: () => 2 },
-    readiness: () => ({ ...source.context.readiness(), busy }),
-    now: () => now,
-    startedAt: now - 1,
-  });
-  async function request(
-    sequence = 1,
-    peer = source.request.params.buyerNodeId,
-  ) {
-    const query = {
-      ...source.request,
-      requestId: sequence.toString(16).padStart(32, '0'),
-      params: { ...source.request.params, buyerNodeId: peer, maxTokens: 10 },
-    };
-    const quote = await createControlQuote(
-      query,
-      { ...source.context, remoteNodeId: peer },
-      source.ownerSigner,
-    );
-    return {
-      version: FREE_EXECUTION.version,
-      requestId: quote.offer.requestId,
-      quote,
-      input: {
-        messages: [{ role: FREE_CHAT_ROLES.USER, content: 'hello' }],
-        selection: quote.offer.selection,
-        reasoning: quote.offer.reasoning,
-        maxTokens: 10,
-      },
-    };
-  }
-  return {
-    service,
-    source,
-    request,
-    calls: () => calls,
-    setNow: (value: number) => {
-      now = value;
-    },
-    setBusy: (value: boolean) => {
-      busy = value;
-    },
-    setRun: (value: typeof run) => {
-      run = value;
-    },
-  };
-}
-const signal = () => new AbortController().signal;
+import {
+  freeSellerFixture as fixture,
+  freeSellerSignal as signal,
+} from './support/free-seller.js';
 
 void test('free seller executes one authenticated request and returns bounded recounted usage', async () => {
   const state = await fixture();
@@ -340,4 +247,67 @@ void test('free seller refuses quotes issued before its startup barrier', async 
     FREE_EXECUTION_CODES.EXPIRED,
   );
   assert.equal(state.calls(), 0);
+});
+
+void test('free seller refuses stale or future readiness before generation', async () => {
+  for (const stale of ['future', 'expired']) {
+    const state = await fixture();
+    const request = await state.request();
+    const now = state.source.context.now();
+    state.source.setReadiness(
+      stale === 'future' ? { observedAt: now + 1 } : { validUntil: now },
+    );
+    const response = await state.service.respond(
+      request,
+      request.quote.offer.buyerNodeId,
+      signal(),
+    );
+    assert.equal(response.error?.code, FREE_EXECUTION_CODES.ENGINE);
+    assert.equal(state.calls(), 0);
+  }
+});
+void test('free seller requires exact configured selection, model and capabilities before generation', async () => {
+  for (const mismatch of ['selection', 'model', 'capabilities']) {
+    const state = await fixture();
+    const request = await state.request();
+    const configured = state.source.context.models[0]!;
+    if (mismatch === 'selection') configured.selection.variant = 'other';
+    if (mismatch === 'model') configured.model.name = 'other';
+    if (mismatch === 'capabilities') configured.capabilities.logprobs = true;
+    const response = await state.service.respond(
+      request,
+      request.quote.offer.buyerNodeId,
+      signal(),
+    );
+    assert.equal(response.error?.code, FREE_EXECUTION_CODES.UNSUPPORTED);
+    assert.equal(state.calls(), 0);
+  }
+});
+void test('free seller refuses recounted input plus requested output beyond context before generation', async () => {
+  const state = await fixture({ dailyTokenCap: 10000, perBuyerCap: 10000 });
+  const request = await state.request();
+  state.setCounts(
+    request.quote.offer.model.contextTokens - request.input.maxTokens + 1,
+    2,
+  );
+  const response = await state.service.respond(
+    request,
+    request.quote.offer.buyerNodeId,
+    signal(),
+  );
+  assert.equal(response.error?.code, FREE_EXECUTION_CODES.LIMIT);
+  assert.equal(state.calls(), 0);
+});
+void test('free seller refuses recounted output beyond the requested maximum after one generation', async () => {
+  const state = await fixture();
+  const request = await state.request();
+  state.setCounts(4, request.input.maxTokens + 1);
+  const response = await state.service.respond(
+    request,
+    request.quote.offer.buyerNodeId,
+    signal(),
+  );
+  assert.equal(response.error?.code, FREE_EXECUTION_CODES.LIMIT);
+  assert.equal(response.result, undefined);
+  assert.equal(state.calls(), 1);
 });
