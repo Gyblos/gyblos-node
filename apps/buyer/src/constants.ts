@@ -120,6 +120,9 @@ export type ErrorDiagnosticCode =
 export const FREE_BUYER = {
   completionObject: 'chat.completion',
   errorType: 'gyblos_error',
+  contentType: 'application/json',
+  // Header the official OpenAI SDKs honor to skip their automatic retries.
+  noRetryHeader: 'x-should-retry',
   requestMs: 180000,
   headerMs: 10000,
   headers: 16384,
@@ -130,6 +133,7 @@ export const FREE_BUYER_CODES = {
   CONFIG: 'FREE_BUYER_CONFIGURATION_REQUIRED',
   BUSY: 'FREE_BUYER_BUSY',
   INTERNAL: 'FREE_BUYER_INTERNAL',
+  TOO_LARGE: 'FREE_BUYER_REQUEST_TOO_LARGE',
 } as const;
 export type FreeBuyerCode =
   (typeof FREE_BUYER_CODES)[keyof typeof FREE_BUYER_CODES];

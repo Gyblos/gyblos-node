@@ -15,7 +15,11 @@ import {
   TRANSPORT_LIMITS,
   UNITS,
 } from '@gyblos/config';
-import { FREE_CHAT_ROLES, FREE_EXECUTION } from '@gyblos/protocol/constants';
+import {
+  FREE_CHAT_ROLES,
+  FREE_EXECUTION,
+  FREE_EXECUTION_CODES,
+} from '@gyblos/protocol/constants';
 import type { ModelSelection } from '@gyblos/protocol/control-types';
 import {
   FreeExecutionError,
@@ -47,7 +51,7 @@ async function readBody(
     signal.throwIfAborted();
     size += chunk.length;
     if (size > FREE_EXECUTION.requestBytes)
-      throw new FreeBuyerError(FREE_BUYER_CODES.INVALID);
+      throw new FreeBuyerError(FREE_BUYER_CODES.TOO_LARGE);
     chunks.push(Buffer.from(chunk));
   }
   signal.throwIfAborted();
@@ -58,6 +62,28 @@ async function readBody(
   } catch {
     throw new FreeBuyerError(FREE_BUYER_CODES.INVALID);
   }
+}
+// True only when the prompt certainly never left this process; anything else may have been sent.
+function neverSent(error: unknown) {
+  if (error instanceof FreeClientError) return !error.sent && !error.remote;
+  if (error instanceof FreeExecutionError) return !error.remote;
+  return (
+    error instanceof FreeBuyerError || error instanceof FreeSelectionFailure
+  );
+}
+function errorStatus(error: unknown, code: string) {
+  if (code === FREE_BUYER_CODES.INVALID) return HTTP_STATUS.badRequest;
+  if (code === FREE_BUYER_CODES.TOO_LARGE) return HTTP_STATUS.payloadTooLarge;
+  if (code === FREE_EXECUTION_CODES.LIMIT) return HTTP_STATUS.badRequest;
+  if (code === FREE_BUYER_CODES.BUSY) return HTTP_STATUS.tooManyRequests;
+  if (
+    error instanceof FreeClientError ||
+    error instanceof FreeExecutionError ||
+    error instanceof FreeBuyerError ||
+    error instanceof FreeSelectionFailure
+  )
+    return HTTP_STATUS.serviceUnavailable;
+  return HTTP_STATUS.internalServerError;
 }
 function replyError(response: ServerResponse, error: unknown) {
   if (response.destroyed || response.writableEnded) return;
@@ -70,15 +96,24 @@ function replyError(response: ServerResponse, error: unknown) {
   const code = known
     ? error.code
     : (selected?.code ?? FREE_BUYER_CODES.INTERNAL);
-  const status =
-    error instanceof FreeBuyerError && error.code === FREE_BUYER_CODES.INVALID
-      ? HTTP_STATUS.badRequest
-      : HTTP_STATUS.serviceUnavailable;
-  response.writeHead(status, { 'content-type': 'application/json' }).end(
+  const status = errorStatus(error, code);
+  const headers: Record<string, string> = {
+    'content-type': 'application/json',
+  };
+  // OpenAI SDKs retry 408/409/429/5xx by default; a resend after a possible send would repeat the
+  // prompt, possibly to another seller. Only local BUSY and unsent unavailability stay retryable.
+  const callerFault = status < HTTP_STATUS.internalServerError;
+  if (
+    status !== HTTP_STATUS.tooManyRequests &&
+    (callerFault || !neverSent(error))
+  )
+    headers[FREE_BUYER.noRetryHeader] = 'false';
+  response.writeHead(status, headers).end(
     JSON.stringify({
       error: {
         message: code,
         type: FREE_BUYER.errorType,
+        param: null,
         code,
         ...(selected && 'cooldownUntil' in selected
           ? { cooldownUntil: selected.cooldownUntil }
@@ -86,6 +121,16 @@ function replyError(response: ServerResponse, error: unknown) {
       },
     }),
   );
+}
+// Browsers can send "simple" cross-site POSTs only as form or text bodies; requiring JSON forces a
+// preflight, which is refused, on top of the Origin rejection.
+function isJson(request: IncomingMessage) {
+  const type = request.headers['content-type']?.split(';')[0]?.trim();
+  return type?.toLowerCase() === FREE_BUYER.contentType;
+}
+function declaredTooLarge(request: IncomingMessage) {
+  const length = Number(request.headers['content-length']);
+  return Number.isFinite(length) && length > FREE_EXECUTION.requestBytes;
 }
 function replyCompletion(
   response: ServerResponse,
@@ -126,9 +171,16 @@ export function freeBuyerHandler(
     if (
       request.method !== 'POST' ||
       request.url !== ROUTES.inference ||
-      request.headers.origin !== undefined
+      request.headers.origin !== undefined ||
+      !isJson(request)
     ) {
       replyError(response, new FreeBuyerError(FREE_BUYER_CODES.INVALID));
+      return;
+    }
+    // Refused before admission and before reading, so a stalled oversize body holds no slot.
+    if (declaredTooLarge(request)) {
+      response.shouldKeepAlive = false;
+      replyError(response, new FreeBuyerError(FREE_BUYER_CODES.TOO_LARGE));
       return;
     }
     if (active >= TRANSPORT_LIMITS.maxConcurrent) {

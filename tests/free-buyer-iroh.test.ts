@@ -24,6 +24,8 @@ import { freeSellerFixture } from './support/free-seller.js';
 import { endpoint, within } from './support/native-fixture.js';
 import { NATIVE_CAPABILITY } from './support/native-runtime.js';
 
+const JSON_HEADERS = { 'content-type': 'application/json' };
+
 void test(
   'native free buyer selects, verifies a quote and returns the answer without v1 trust',
   { skip: NATIVE_CAPABILITY.transportSkip },
@@ -142,6 +144,7 @@ void test(
       const response = await within(
         fetch(host.url, {
           method: 'POST',
+          headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
             model: request.selection.modelId,
             messages: [{ role: FREE_CHAT_ROLES.USER, content: 'hello' }],
@@ -183,8 +186,8 @@ void test(
         max_tokens: 10,
       });
       const overlapping = Promise.all([
-        fetch(host.url, { method: 'POST', body }),
-        fetch(host.url, { method: 'POST', body }),
+        fetch(host.url, { method: 'POST', headers: JSON_HEADERS, body }),
+        fetch(host.url, { method: 'POST', headers: JSON_HEADERS, body }),
       ]);
       try {
         assert.equal(
@@ -200,9 +203,9 @@ void test(
         const responses = await within(overlapping);
         assert.deepEqual(
           responses.map((item) => item.status).sort(),
-          [200, 503],
+          [200, 429],
         );
-        const rejected = responses.find((item) => item.status === 503)!;
+        const rejected = responses.find((item) => item.status === 429)!;
         assert.equal((await rejected.json()).error.code, FREE_BUYER_CODES.BUSY);
         for (const row of prepared.stats.rows.values())
           assert.equal(row.failures, 0);

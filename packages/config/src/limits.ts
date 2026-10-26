@@ -26,6 +26,7 @@ export const HTTP_STATUS = {
   tooManyRequests: 429,
   badGateway: 502,
   badRequest: 400,
+  payloadTooLarge: 413,
   internalServerError: 500,
   serviceUnavailable: 503,
 } as const;

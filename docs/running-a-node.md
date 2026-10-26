@@ -448,10 +448,21 @@ selects the exact configured model/variant/quantization tuple; it is not an
 engine name. Only one text user message is supported. History, system messages,
 tools, sampling options, alternate modalities, unknown options and streaming are
 rejected before selection or prompt transmission. This is a limited compatible
-subset, not the complete OpenAI API. Invalid UTF-8, excessive bodies, foreign
-Host headers and requests with an Origin header are rejected. There is no CORS
-browser interface. Use a local client, and apply normal trust to local
-processes.
+subset, not the complete OpenAI API. Requests must send
+`Content-Type: application/json`. Invalid UTF-8, foreign Host headers, requests
+with an Origin header and other content types get 400, so a web page cannot
+reach the endpoint; there is no CORS browser interface. A body declared larger
+than 128 KiB gets 413 before it is read (a larger streamed body is cut off the
+same way). Use a local client, and apply normal trust to local processes.
+
+Status codes: 400 for an invalid request or a request beyond the quote's limits,
+413 for an oversized body, 429 when the endpoint is already running a request
+(safe to retry), 503 when no seller could take the request, and 500 for an
+unexpected failure. Whenever the prompt may already have reached a seller, or
+the request is the caller's fault, the error carries `x-should-retry: false`,
+the header the official OpenAI SDKs honor to skip their automatic retries.
+Clients that retry 5xx on their own must check it: retrying would resend the
+prompt, possibly to another seller.
 
 The response contains one `choices` entry, its text/finish reason and
 `usage.prompt_tokens`, `completion_tokens` and `total_tokens`. Static failures
