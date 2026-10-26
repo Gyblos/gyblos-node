@@ -19,6 +19,7 @@ import {
   encodeFreeExecutionRequest,
   FreeExecutionResponseReader,
 } from '@gyblos/protocol/free-execution-framing';
+import { validateOfferV2Time } from '@gyblos/protocol/offer-v2';
 
 import {
   HTTP_OVER_IROH,
@@ -131,6 +132,12 @@ async function runFreeRequest(
   // Opening a stream can take time; validate zero-skew expiry immediately before transmission.
   await authenticate(request);
   route();
+  // Authentication yields during crypto; resample time without awaiting before the first write.
+  try {
+    validateOfferV2Time(request.quote.offer, (options.now ?? Date.now)());
+  } catch {
+    throw new FreeExecutionError(FREE_EXECUTION_CODES.EXPIRED);
+  }
   state.sent = true;
   await stage(
     (async () => {
