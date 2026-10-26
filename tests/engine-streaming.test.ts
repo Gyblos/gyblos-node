@@ -268,3 +268,38 @@ void test('engine without a text callback preserves buffering and the existing f
   assert.equal(result.finishReason, ENGINE_DONE_REASONS.STOP);
   assert.equal(fragments, 2);
 });
+
+void test('engine cancellation aborts model inventory before generation starts', async () => {
+  const controller = new AbortController();
+  const entered = deferred();
+  let rejectInventory: (error: Error) => void = () => {};
+  let inventorySignal: AbortSignal | null | undefined;
+  const fake: typeof fetch = async (input, init) => {
+    assert.equal(new URL(String(input)).pathname, ROUTES.ollamaTags);
+    inventorySignal = init?.signal;
+    entered.resolve();
+    return new Promise<Response>((_resolve, reject) => {
+      rejectInventory = reject;
+      inventorySignal?.addEventListener(
+        'abort',
+        () => reject(inventorySignal?.reason),
+        { once: true },
+      );
+    });
+  };
+  const engine = createOllamaEngine('http://127.0.0.1:11434', fake);
+  const generation = engine.generate({
+    prompt: 'synthetic',
+    maxTokens: 2,
+    signal: controller.signal,
+  });
+  try {
+    await bounded(entered.promise);
+    controller.abort();
+    assert.equal(inventorySignal?.aborted, true);
+    await assert.rejects(bounded(generation), { name: 'AbortError' });
+  } finally {
+    rejectInventory(new Error('Synthetic cleanup'));
+    await generation.catch(() => {});
+  }
+});
