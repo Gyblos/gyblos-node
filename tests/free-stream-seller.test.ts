@@ -304,3 +304,28 @@ void test('free seller authenticates peers and refuses busy streaming before eng
   assert.equal(delivered, 0);
   assert.equal(state.calls(), 0);
 });
+
+void test('free seller seals retained engine callbacks after generation rejects', async () => {
+  const state = await fixture();
+  const request = await state.request();
+  let retained: ((text: string) => Promise<void>) | undefined;
+  state.setGenerate(async (input) => {
+    retained = input.onText;
+    throw new Error('Synthetic engine rejection');
+  });
+  const fragments: string[] = [];
+  const response = await state.service.stream(
+    request,
+    request.quote.offer.buyerNodeId,
+    new AbortController().signal,
+    async (text) => {
+      fragments.push(text);
+    },
+  );
+  assert.equal(response.error?.code, FREE_EXECUTION_CODES.ENGINE);
+  assert.ok(retained);
+  await assert.rejects(retained('an'), {
+    code: FREE_EXECUTION_CODES.CANCELLED,
+  });
+  assert.deepEqual(fragments, []);
+});
