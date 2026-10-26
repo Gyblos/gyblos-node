@@ -10,11 +10,12 @@ import { AcceptanceError } from './errors.js';
 
 export function createAcceptanceIndex(now: () => number, nodeId: string) {
   const storage = createMemoryStorage();
+  const nodeIds = new Set([nodeId]);
   const app = createDiscoveryIndex({
     storage,
     now,
     development: true,
-    publishers: { mode: PUBLISH_MODES.ALLOWLIST, nodeIds: new Set([nodeId]) },
+    publishers: { mode: PUBLISH_MODES.ALLOWLIST, nodeIds },
   });
   const fetch: DiscoveryFetch = async (input, init) => {
     const url = new URL(input);
@@ -28,6 +29,11 @@ export function createAcceptanceIndex(now: () => number, nodeId: string) {
     init.signal?.throwIfAborted();
     return app.request(new Request(input, init));
   };
-  return { baseUrl: ACCEPTANCE.baseUrl, fetch, storage };
+  return {
+    baseUrl: ACCEPTANCE.baseUrl,
+    fetch,
+    storage,
+    allowPublisher: (value: string) => nodeIds.add(value),
+  };
 }
 export type AcceptanceIndex = ReturnType<typeof createAcceptanceIndex>;

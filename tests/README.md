@@ -72,3 +72,10 @@ renewal, failure/expiry/busy recovery, durable restart and replay refusal
 without payments or RPC. Native cases use the same explicit capability gating as
 other Iroh tests. The command has a separate real-Ollama opt-in that CI never
 runs; see [the acceptance procedure](../docs/node-discovery-acceptance.md).
+
+`tests/lab/free-acceptance.test.ts` adds the synthetic-only complete free
+journey through the actual local index, native Iroh and product buyer HTTP
+endpoint. It checks renewal answers, typed execution refusals, persistent public
+replay state, caps and pre-/post-send failures. It also checks early
+cancellation, CLI privacy and native-unavailable behavior; no TCP/mock fallback
+or real-engine option is supplied by the free command.

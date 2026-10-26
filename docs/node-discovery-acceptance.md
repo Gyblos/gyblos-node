@@ -61,6 +61,75 @@ addresses, signatures, keys, prompts, responses, paths or raw errors. Its
 `paymentsEnabled` field is always false. Unknown flags and failures emit only a
 static error code. SIGINT/SIGTERM cancel waits and trigger cleanup.
 
+## Complete free inference acceptance
+
+```sh
+pnpm --filter @gyblos/lab-harness acceptance:free
+```
+
+This separate synthetic-only scenario extends the existing control procedure;
+`acceptance:node-discovery` still stops at a quote. The free command accepts no
+arguments, including no engine, index URL, home or configuration override. It
+never contacts the deployed index or Ollama. Native unavailability produces a
+static failure and nonzero exit status; there is no substitute transport.
+
+The product publisher feeds the actual in-process index with memory storage and
+an explicit ephemeral publisher allowlist. The buyer uses independently supplied
+owner–NodeId bindings, private persistent replay metadata and local selection,
+then verifies a signed zero-price/zero-budget quote. Its actual loopback chat
+endpoint sends the input over the separate free Iroh ALPN and returns a complete
+response with usage. Seller control, readiness, sequence, publication, free
+admission and execution are product components; the lab supplies deterministic
+fake generation and token counts. Tokenizer accuracy, TOML/daemon bootstrap and
+real model behavior are not accepted by this run.
+
+The cases require:
+
+- A complete HTTP answer after publication/discovery/selection/verification,
+  followed by answers across three advancing readiness/sequence cycles on the
+  same running seller. Background ticks are driven explicitly with accelerated
+  record time. Transport deadlines, admission and rate quotas keep real time;
+  none of their limits is relaxed.
+- Busy, check failure and exact availability expiry remove the listing and
+  return the expected control refusal; recovery establishes newer observations
+  and permits another complete answer. Control queries share a connection for
+  these cases so accelerated time does not manufacture connection-rate debt.
+- Seller restart reuses the in-memory NodeId key and reopens its private public
+  sequence file. Old signed records are rejected by the index and the reopened
+  buyer store. A still-unexpired quote from before startup is refused by the
+  replay barrier. The harness refreshes the configured loopback address after
+  restart; this is not automatic endpoint rediscovery.
+- Execution replay, an expired quote and a different authenticated peer are
+  refused without generation. Expiry and wrong-peer frames intentionally bypass
+  only buyer preflight to exercise the seller's actual guards. A model failure
+  after quoting returns a typed engine error, followed by recovery.
+- A separate fresh free seller exhausts both per-buyer and total daily token
+  caps without restarting its admission state. These in-memory counters remain
+  resettable by a real seller restart, as documented for the MVP.
+- Two separately signed sellers share a local index for failure testing. A
+  native data dial fails before sending: the buyer excludes that seller and
+  executes once on the other. A response is then deliberately lost after real
+  native response bytes arrive: generation has occurred exactly once, the HTTP
+  error disallows client retry, and no second data dial or selection occurs.
+- Query-time engine attempts and successful generations stay zero, including
+  refusal paths. Each successful HTTP answer has exactly one generation, and the
+  paid HTTP ALPN is refused. No paid host, facilitator, payment command, RPC
+  transport, wallet file or journal is started. Test guards reject any use of
+  global fetch; index access is injected and HTTP stays on loopback.
+
+Only the allocated private temporary homes hold sequence/replay/statistics
+metadata. Keys, signed quotes and synthetic content remain in memory. Cleanup
+runs on success, failure and handled cancellation; forced kills can still leave
+the disposable directory. The JSON evidence reports fixed case IDs, HTTP answer
+counts, zero query-engine deltas and elapsed/simulated time. It never includes
+identities, addresses, signatures, input/output text, paths or raw errors.
+
+This is local, synthetic, non-streaming acceptance. It does not establish
+production capacity, durable daily caps, actual engine crash recovery,
+relay/CGNAT/off-host connectivity, registry identity or paid execution. Real
+Ollama, a second machine or the production index needs separate founder
+approval. Streaming and 8004 remain subsequent work.
+
 ## Explicit real-engine mode
 
 The following is a separate, opt-in local operation. Run it only when

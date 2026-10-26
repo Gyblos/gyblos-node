@@ -31,7 +31,10 @@
     "./acceptance/workspace": "./src/acceptance/workspace.ts",
     "./acceptance/index": "./src/acceptance/index.ts",
     "./cli/node-discovery-acceptance": "./src/cli/node-discovery-acceptance.ts",
-    "./acceptance/engine": "./src/acceptance/engine.ts"
+    "./acceptance/engine": "./src/acceptance/engine.ts",
+    "./acceptance/free": "./src/acceptance/free-run.ts",
+    "./acceptance/free-constants": "./src/acceptance/free-constants.ts",
+    "./cli/free-acceptance": "./src/cli/free-acceptance.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",
@@ -56,6 +59,7 @@
     "@number0/iroh": "1.1.0"
   },
   "scripts": {
-    "acceptance:node-discovery": "node --import tsx src/cli/node-discovery-acceptance.ts"
+    "acceptance:node-discovery": "node --import tsx src/cli/node-discovery-acceptance.ts",
+    "acceptance:free": "node --import tsx src/cli/free-acceptance.ts"
   }
 }
