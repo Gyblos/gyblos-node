@@ -1,4 +1,4 @@
-// Owns one acceptance session and its restartable control-only seller; all resources are ephemeral.
+// Owns one acceptance session and its restartable seller, control-only by default; all resources are ephemeral.
 // The index survives restart to retain high-water marks; no role keys, paid host or RPC is started.
 import { randomBytes } from 'node:crypto';
 
