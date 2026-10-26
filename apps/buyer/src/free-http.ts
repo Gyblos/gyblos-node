@@ -1,4 +1,4 @@
-// Loopback-only non-streaming chat compatibility; validates input before selection or prompt transmission.
+// Loopback-only complete/streaming chat compatibility; validates input before selection or prompt transmission.
 // Responses and errors contain no transport details; request content is never persisted.
 import { randomUUID } from 'node:crypto';
 import {
@@ -32,6 +32,11 @@ import { FreeClientError } from '@gyblos/transport-iroh/free-client';
 import { FREE_BUYER, FREE_BUYER_CODES } from './constants.js';
 import { FreeBuyerError, parseFreeChat } from './free-chat.js';
 import { FreeSelectionFailure } from './free-execution.js';
+import {
+  executeFreeSse,
+  replyFreeSseError,
+  type FreeChatStreamExecutor,
+} from './free-sse.js';
 
 type FreeChatExecutor = (
   input: FreeExecutionBuildInput,
@@ -103,6 +108,10 @@ function replyError(response: ServerResponse, error: unknown) {
   const code = known
     ? error.code
     : (selected?.code ?? FREE_BUYER_CODES.INTERNAL);
+  if (response.headersSent) {
+    replyFreeSseError(response, code);
+    return;
+  }
   const status = errorStatus(error, code);
   const headers: Record<string, string> = {
     'content-type': 'application/json',
@@ -172,6 +181,7 @@ export function freeBuyerHandler(
   execute: FreeChatExecutor,
   settings: ChatSettings,
   requestMs: number = FREE_BUYER.requestMs,
+  stream?: FreeChatStreamExecutor,
 ) {
   let active = 0;
   return async (request: IncomingMessage, response: ServerResponse) => {
@@ -217,7 +227,18 @@ export function freeBuyerHandler(
         await readBody(request, controller.signal),
         settings.selection,
         settings.maxTokens,
+        stream !== undefined,
       );
+      if (input.stream && stream) {
+        await executeFreeSse(
+          stream,
+          input,
+          controller.signal,
+          response,
+          settings.selection.modelId,
+        );
+        return;
+      }
       const result = await execute(input, controller.signal);
       if (!controller.signal.aborted)
         replyCompletion(response, settings.selection.modelId, result);
@@ -233,7 +254,11 @@ export function freeBuyerHandler(
 export async function startFreeBuyerHttp(
   execute: FreeChatExecutor,
   settings: ChatSettings,
-  options: { port?: number; requestMs?: number } = {},
+  options: {
+    port?: number;
+    requestMs?: number;
+    stream?: FreeChatStreamExecutor;
+  } = {},
 ) {
   const server = createServer(
     {
@@ -241,7 +266,7 @@ export async function startFreeBuyerHttp(
       headersTimeout: FREE_BUYER.headerMs,
       requestTimeout: FREE_BUYER.requestMs,
     },
-    freeBuyerHandler(execute, settings, options.requestMs),
+    freeBuyerHandler(execute, settings, options.requestMs, options.stream),
   );
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject);

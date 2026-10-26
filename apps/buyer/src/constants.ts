@@ -119,6 +119,9 @@ export type ErrorDiagnosticCode =
 // Local non-streaming compatibility surface; execution wire codes stay protocol-owned.
 export const FREE_BUYER = {
   completionObject: 'chat.completion',
+  chunkObject: 'chat.completion.chunk',
+  streamContentType: 'text/event-stream',
+  streamDone: '[DONE]',
   errorType: 'gyblos_error',
   contentType: 'application/json',
   // Header the official OpenAI SDKs honor to skip their automatic retries.
