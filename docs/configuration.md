@@ -254,6 +254,37 @@ while publishing, with `INVALID_ROLE_CONFIGURATION`. Malformed
 when binding, as before. `GYBLOS_RPC_URL` does not affect the daemon, which
 reads its RPC from the role file.
 
+## Seller preflight (`gyblos doctor`)
+
+```sh
+pnpm gyblos doctor                      # same file choice as node:start
+pnpm gyblos doctor --config my.toml     # explicit file
+pnpm gyblos doctor --online             # also checks devnet for a paid offer
+```
+
+`doctor` runs, read-only, the checks `pnpm node:start` would fail on, and prints
+one line per check (`OK`, `WARN` or `FAIL`) with a static code and a hint:
+
+| Check       | What it verifies                                                                                                                                              |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `config`    | the file and environment as seller startup reads them, with the same `NODE_CONFIG_INVALID` / `SELLER_*` codes (file problems are listed with their key paths) |
+| `home`      | no legacy `.local` layout under the role, tokenizer or Ollama directories                                                                                     |
+| `role`      | the seller `role.json` exists and is valid (`ROLE_MISSING` hints `node:setup`)                                                                                |
+| `keys`      | the key files exist and are mode 0600 (permissions only; their contents are never read)                                                                       |
+| `tokenizer` | the pinned tokenizer files are present and match their hashes                                                                                                 |
+| `ollama`    | an `ollama` executable is on `PATH` (it is not run)                                                                                                           |
+| `model`     | the pinned model's manifest is in the models directory (a warning: only Ollama can confirm it)                                                                |
+| `ports`     | nothing answers on `127.0.0.1:11436`, nor on `:4022` for a paid offer                                                                                         |
+| `relays`    | relay URLs and token as the endpoint would build them (the token is never printed)                                                                            |
+| `program`   | with `--online` and a paid offer, the devnet payment program (RPC shown as origin only)                                                                       |
+
+It then prints the seller's public **NodeId and owner** address from
+`role.json`; share those to be enrolled in a discovery index. The exit code is 0
+when no check fails and 1 otherwise. It starts, spawns and writes nothing. It
+never prints the home location, the RPC URL, the relay token or key material,
+and only reaches loopback ports unless `--online`. Memory headroom is checked at
+startup only.
+
 ## Issue codes
 
 `TOML_SYNTAX`, `FILE_NOT_FOUND`, `FILE_UNREADABLE`, `FILE_TOO_LARGE` (over 64

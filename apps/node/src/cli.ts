@@ -1,6 +1,6 @@
-// The `gyblos` command: today only `config validate`, which checks gyblos.toml and the GYBLOS_* environment.
-// Prints codes, key paths and environment variable names; never a value read from the environment, and
-// URLs only as origins, because providers embed API keys in URL paths.
+// The `gyblos` command: `config validate` checks gyblos.toml and the GYBLOS_* environment; `doctor` runs the
+// seller's read-only startup preflight. Prints codes, key paths and environment variable names; never a
+// value read from the environment, and URLs only as origins, because providers embed API keys in URL paths.
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
@@ -11,58 +11,36 @@ import {
   OFFER_PRICING_KINDS,
   type NodeSettingKey,
 } from '@gyblos/node/constants';
-import {
-  readNodeConfigFile,
-  type NodeConfigIssue,
-  type NodeOffer,
-} from '@gyblos/node/node-config';
+import { readNodeConfigFile, type NodeOffer } from '@gyblos/node/node-config';
 import {
   resolveNodeConfig,
-  type NodeConfigWarning,
   type NodeSettings,
   type SettingOrigin,
 } from '@gyblos/node/node-config-resolve';
+import type { DoctorProbes } from '@gyblos/node/seller-doctor';
 import { isMain } from '@gyblos/runtime';
+
+import { doctor } from './cli-doctor.js';
+import { COLUMN, issueLine, URL_HIDDEN, urlOrigin } from './cli-format.js';
 
 export interface CliContext {
   env: Readonly<Record<string, string | undefined>>;
   stdout: (text: string) => void;
   stderr: (text: string) => void;
+  // Defaults to the process working directory; tests inject a temporary one.
+  cwd?: string;
+  // Loopback and devnet probes for `doctor`; tests inject fakes.
+  doctor?: DoctorProbes;
 }
 
 const EXIT = { ok: 0, failure: 1 } as const;
-const USAGE = 'Usage: gyblos config validate [--config <path>]\n';
-const DOCUMENT_PATH = '(file)';
-const COLUMN = 22;
+const USAGE =
+  'Usage: gyblos config validate [--config <path>]\n       gyblos doctor [--config <path>] [--online]\n';
 const URL_SETTINGS: ReadonlySet<NodeSettingKey> = new Set([
   NODE_SETTINGS.RPC_URL,
   NODE_SETTINGS.RELAY_URLS,
   NODE_SETTINGS.DISCOVERY_URL,
 ]);
-const PATH_HIDDEN = '<path hidden>';
-const URL_HIDDEN = '<url hidden>';
-const ROOT_PATH = '/';
-
-function issueLine(issue: NodeConfigIssue | NodeConfigWarning) {
-  const where = issue.path || DOCUMENT_PATH;
-  const position =
-    'line' in issue && issue.line !== undefined
-      ? ` line ${issue.line} column ${issue.column ?? 0}`
-      : '';
-  return `  ${issue.code.padEnd(COLUMN)} ${where}${position}\n`;
-}
-
-// scheme://host[:port] only; a path, query or fragment may hold a key (Alchemy /v2/<key>, QuickNode).
-function urlOrigin(raw: string) {
-  let url: URL;
-  try {
-    url = new URL(raw);
-  } catch {
-    return URL_HIDDEN;
-  }
-  const hidden = url.pathname !== ROOT_PATH || url.search || url.hash;
-  return hidden ? `${url.origin} ${PATH_HIDDEN}` : url.origin;
-}
 
 function describeValue(
   setting: NodeSettingKey,
@@ -143,7 +121,10 @@ function parseCommand(args: readonly string[]) {
   try {
     return parseArgs({
       args: [...args],
-      options: { config: { type: 'string' } },
+      options: {
+        config: { type: 'string' },
+        online: { type: 'boolean' },
+      },
       allowPositionals: true,
     });
   } catch {
@@ -154,7 +135,26 @@ function parseCommand(args: readonly string[]) {
 export async function runCli(args: readonly string[], context: CliContext) {
   const parsed = parseCommand(args);
   const [group, command, ...rest] = parsed?.positionals ?? [];
-  if (!parsed || group !== 'config' || command !== 'validate' || rest.length) {
+  if (parsed && group === 'doctor' && command === undefined) {
+    const ready = await doctor(
+      {
+        env: context.env,
+        cwd: context.cwd ?? process.cwd(),
+        configPath: parsed.values.config,
+        online: parsed.values.online === true,
+        probes: context.doctor,
+      },
+      context,
+    );
+    return ready ? EXIT.ok : EXIT.failure;
+  }
+  if (
+    !parsed ||
+    group !== 'config' ||
+    command !== 'validate' ||
+    rest.length ||
+    parsed.values.online !== undefined
+  ) {
     context.stderr(USAGE);
     return EXIT.failure;
   }

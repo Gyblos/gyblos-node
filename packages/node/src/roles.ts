@@ -19,6 +19,7 @@ import {
   ROLE_FILES,
   ROLE_KEY_FILES,
   rolePathIn,
+  type HomeEnvironment,
   type RoleKey,
 } from '@gyblos/config';
 import { CONFIG_ASSET_LABELS } from '@gyblos/config/constants';
@@ -69,8 +70,12 @@ export interface SetupOptions {
   payTo?: string;
 }
 
-function file(role: P2PRole, name: string) {
-  return resolve(rolePathIn(process.env, role, name));
+function file(
+  role: P2PRole,
+  name: string,
+  environment: HomeEnvironment = process.env,
+) {
+  return resolve(rolePathIn(environment, role, name));
 }
 
 export function roleDirectory(role: P2PRole) {
@@ -166,10 +171,13 @@ export function parseRoleConfig(value: unknown): RoleConfig {
   };
 }
 
-export async function loadRole(role: P2PRole): Promise<RoleConfig> {
-  await assertRoleHome(role);
+export async function loadRole(
+  role: P2PRole,
+  environment: HomeEnvironment = process.env,
+): Promise<RoleConfig> {
+  await assertRoleHome(role, environment);
   const value = configurationJson(
-    await readFile(file(role, ROLE_FILES.roleConfig), 'utf8'),
+    await readFile(file(role, ROLE_FILES.roleConfig, environment), 'utf8'),
     NODE_ERROR_CODES.INVALID_ROLE_CONFIGURATION,
   );
   return parseRoleConfig(value);
@@ -291,8 +299,11 @@ export async function setupRole(options: SetupOptions) {
   return config;
 }
 
-export async function publicRole(role: P2PRole) {
-  const config = await loadRole(role);
+export async function publicRole(
+  role: P2PRole,
+  environment: HomeEnvironment = process.env,
+) {
+  const config = await loadRole(role, environment);
   const names =
     config.role === P2P_ROLES.BUYER
       ? [ROLE_KEY_FILES.buyer, ROLE_FILES.nodeKey]
@@ -305,7 +316,9 @@ export async function publicRole(role: P2PRole) {
   const keys = await Promise.all(
     names.map(async (name) => ({
       name,
-      mode: (await lstat(file(role, name))).mode & FILE_MODES.permissionMask,
+      mode:
+        (await lstat(file(role, name, environment))).mode &
+        FILE_MODES.permissionMask,
     })),
   );
   const common = {
