@@ -36,12 +36,12 @@ export async function streamFreeResponse(
   let sealed = false;
   let outputBytes = 0;
   let emitting = false;
-  async function send(event: unknown) {
+  async function send(event: unknown, maximum = FREE_STREAM.totalBytes) {
     check();
     const frame = encodeFreeStreamEvent(event);
-    bytes += frame.length;
-    if (bytes > FREE_STREAM.totalBytes)
+    if (bytes + frame.length > maximum)
       return freeExecutionFail(FREE_EXECUTION_CODES.LIMIT);
+    bytes += frame.length;
     await write(frame);
     check();
     sequence++;
@@ -57,12 +57,15 @@ export async function streamFreeResponse(
           return freeExecutionFail(FREE_EXECUTION_CODES.LIMIT);
         if (sequence >= FREE_STREAM.maxEvents - 1)
           return freeExecutionFail(FREE_EXECUTION_CODES.LIMIT);
-        await send({
-          ...header,
-          sequence,
-          type: FREE_STREAM.events.DELTA,
-          text: chunk,
-        });
+        await send(
+          {
+            ...header,
+            sequence,
+            type: FREE_STREAM.events.DELTA,
+            text: chunk,
+          },
+          FREE_STREAM.totalBytes - FREE_STREAM.terminalReserveBytes,
+        );
       }
     } finally {
       emitting = false;
@@ -84,7 +87,9 @@ export async function streamFreeResponse(
     response,
   };
   try {
-    encodeFreeStreamEvent(terminal);
+    const frame = encodeFreeStreamEvent(terminal);
+    if (bytes + frame.length > FREE_STREAM.totalBytes)
+      return freeExecutionFail(FREE_EXECUTION_CODES.LIMIT);
   } catch {
     terminal = {
       ...terminal,

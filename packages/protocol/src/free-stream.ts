@@ -58,6 +58,11 @@ export function parseFreeStreamEvent(value: unknown): FreeStreamEvent {
     ]);
     if (input.version !== FREE_EXECUTION.version)
       return freeExecutionFail(FREE_EXECUTION_CODES.VERSION);
+    if (
+      typeof input.sequence === 'number' &&
+      input.sequence >= FREE_STREAM.maxEvents
+    )
+      return freeExecutionFail(FREE_EXECUTION_CODES.LIMIT);
     const header = {
       version: FREE_EXECUTION.version,
       requestId: controlHex(input.requestId, CONTROL_LIMITS.requestIdBytes),

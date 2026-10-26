@@ -245,5 +245,6 @@ export const FREE_STREAM = {
   eventBytes: FREE_EXECUTION.responseBytes + 1024,
   maxEvents: 4096,
   totalBytes: FREE_EXECUTION.responseBytes * 2,
+  terminalReserveBytes: 1024,
   events: { DELTA: 'delta', TERMINAL: 'terminal' },
 } as const;

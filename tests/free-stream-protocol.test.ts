@@ -110,3 +110,64 @@ void test('free stream golden frames preserve canonical bytes independently of e
     );
   }
 });
+void test('free stream rejects aggregate text, wire and event-count excess', async () => {
+  const api = await import('@gyblos/protocol/free-stream');
+  const fixture = await messages();
+  const text = await api.createFreeStreamVerifier(fixture.request);
+  for (let sequence = 0; sequence < 32; sequence++)
+    await text.accept({ ...fixture.delta, sequence, text: 'a'.repeat(8192) });
+  await assert.rejects(
+    text.accept({ ...fixture.delta, sequence: 32, text: 'a' }),
+    { code: FREE_EXECUTION_CODES.LIMIT },
+  );
+  const wire = await api.createFreeStreamVerifier(fixture.request);
+  let exceeded = false;
+  for (let sequence = 0; sequence < 4096; sequence++) {
+    try {
+      await wire.accept({
+        ...fixture.delta,
+        sequence,
+        text: '\u0000'.repeat(64),
+      });
+    } catch (error) {
+      assert.equal(
+        error instanceof Error && 'code' in error ? error.code : undefined,
+        FREE_EXECUTION_CODES.LIMIT,
+      );
+      exceeded = true;
+      break;
+    }
+  }
+  assert.equal(exceeded, true);
+  const count = await api.createFreeStreamVerifier(fixture.request);
+  await assert.rejects(count.accept({ ...fixture.delta, sequence: 4096 }), {
+    code: FREE_EXECUTION_CODES.LIMIT,
+  });
+});
+void test('free stream rejects ambiguous JSON and preserves remote error provenance', async () => {
+  const api = await import('@gyblos/protocol/free-stream');
+  const fixture = await messages();
+  const body = Buffer.from(
+    JSON.stringify(fixture.delta).replace(
+      '"type":"delta"',
+      '"type":"delta","type":"delta"',
+    ),
+  );
+  const prefix = Buffer.alloc(4);
+  prefix.writeUInt32BE(body.length);
+  assert.throws(() => api.decodeFreeStreamEvent(Buffer.concat([prefix, body])));
+  const stream = await api.createFreeStreamVerifier(fixture.request);
+  await stream.accept(fixture.delta);
+  await assert.rejects(
+    stream.accept({
+      ...fixture.terminal,
+      response: {
+        version: fixture.terminal.response.version,
+        requestId: fixture.terminal.response.requestId,
+        requestDigest: fixture.terminal.response.requestDigest,
+        error: { code: FREE_EXECUTION_CODES.ENGINE },
+      },
+    }),
+    { code: FREE_EXECUTION_CODES.ENGINE, remote: true },
+  );
+});
