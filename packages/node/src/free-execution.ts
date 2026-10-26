@@ -30,9 +30,9 @@ import {
   type FreeExecutionRequest,
   type FreeExecutionResponse,
 } from '@gyblos/protocol/free-execution';
-import type { FreeExecutionService } from '@gyblos/transport-iroh/free-server';
 
 import { OFFER_PRICING_KINDS } from './constants.js';
+import { createFreeStreamOutput } from './free-execution-stream.js';
 import type { SellerCatalogOffer } from './seller-offer.js';
 
 export interface SellerFreeExecutionOptions {
@@ -79,73 +79,86 @@ function ready(options: SellerFreeExecutionOptions) {
   if (state.observedAt > now || state.validUntil <= now)
     return fail(FREE_EXECUTION_CODES.ENGINE);
 }
-export function createSellerFreeExecution(
-  options: SellerFreeExecutionOptions,
-): FreeExecutionService {
+export function createSellerFreeExecution(options: SellerFreeExecutionOptions) {
   const admission = new FreeExecutionAdmission(
     options.offer.caps,
     options.startedAt,
   );
   return {
-    async respond(value, peer, signal): Promise<FreeExecutionResponse> {
-      const request = parseFreeExecutionRequest(value);
-      const header = {
-        version: FREE_EXECUTION.version,
-        requestId: request.requestId,
-        requestDigest: await freeExecutionDigest(request),
-      };
-      try {
-        checkSignal(signal);
-        await verifyFreeExecutionRequest(request, {
-          owner: options.owner,
-          nodeId: options.nodeId,
-          remoteNodeId: peer,
-          now: options.now(),
-        });
-        checkSignal(signal);
-        const prompt = supportedInput(request, options);
-        ready(options);
-        const inputTokens = options.tokenizer.input(prompt);
-        if (
-          !Number.isSafeInteger(inputTokens) ||
-          inputTokens < 0 ||
-          inputTokens + request.input.maxTokens > options.model.contextTokens
-        )
-          return fail(FREE_EXECUTION_CODES.LIMIT);
-        const lease = admission.enter(request, inputTokens, options.now());
-        let actual: number | undefined;
-        try {
-          checkSignal(signal);
-          const response = await generateResponse(
-            request,
-            prompt,
-            inputTokens,
-            header,
-            options,
-            signal,
-          );
-          if (!response.result) return fail(FREE_EXECUTION_CODES.INTERNAL);
-          actual =
-            response.result.usage.inputTokens +
-            response.result.usage.outputTokens;
-          return response;
-        } finally {
-          lease.complete(actual);
-        }
-      } catch (error) {
-        return {
-          ...header,
-          error: {
-            code: signal.aborted
-              ? FREE_EXECUTION_CODES.CANCELLED
-              : error instanceof FreeExecutionError
-                ? error.code
-                : FREE_EXECUTION_CODES.ENGINE,
-          },
-        };
-      }
-    },
+    respond: (value: unknown, peer: string, signal: AbortSignal) =>
+      respond(value, peer, signal, options, admission),
+    stream: (
+      value: unknown,
+      peer: string,
+      signal: AbortSignal,
+      onDelta: (text: string) => Promise<void>,
+    ) => respond(value, peer, signal, options, admission, onDelta),
   };
+}
+async function respond(
+  value: unknown,
+  peer: string,
+  signal: AbortSignal,
+  options: SellerFreeExecutionOptions,
+  admission: FreeExecutionAdmission,
+  onDelta?: (text: string) => Promise<void>,
+): Promise<FreeExecutionResponse> {
+  const request = parseFreeExecutionRequest(value);
+  const header = {
+    version: FREE_EXECUTION.version,
+    requestId: request.requestId,
+    requestDigest: await freeExecutionDigest(request),
+  };
+  try {
+    checkSignal(signal);
+    await verifyFreeExecutionRequest(request, {
+      owner: options.owner,
+      nodeId: options.nodeId,
+      remoteNodeId: peer,
+      now: options.now(),
+    });
+    checkSignal(signal);
+    const prompt = supportedInput(request, options);
+    ready(options);
+    const inputTokens = options.tokenizer.input(prompt);
+    if (
+      !Number.isSafeInteger(inputTokens) ||
+      inputTokens < 0 ||
+      inputTokens + request.input.maxTokens > options.model.contextTokens
+    )
+      return fail(FREE_EXECUTION_CODES.LIMIT);
+    const lease = admission.enter(request, inputTokens, options.now());
+    let actual: number | undefined;
+    try {
+      checkSignal(signal);
+      const response = await generateResponse(
+        request,
+        prompt,
+        inputTokens,
+        header,
+        options,
+        signal,
+        onDelta,
+      );
+      if (!response.result) return fail(FREE_EXECUTION_CODES.INTERNAL);
+      actual =
+        response.result.usage.inputTokens + response.result.usage.outputTokens;
+      return response;
+    } finally {
+      lease.complete(actual);
+    }
+  } catch (error) {
+    return {
+      ...header,
+      error: {
+        code: signal.aborted
+          ? FREE_EXECUTION_CODES.CANCELLED
+          : error instanceof FreeExecutionError
+            ? error.code
+            : FREE_EXECUTION_CODES.ENGINE,
+      },
+    };
+  }
 }
 
 // Startup passes the already prepared offer and catalog; no configuration is read again.
@@ -184,13 +197,26 @@ async function generateResponse(
   >,
   options: SellerFreeExecutionOptions,
   signal: AbortSignal,
+  onDelta?: (text: string) => Promise<void>,
 ): Promise<FreeExecutionResponse> {
+  const streaming = onDelta
+    ? createFreeStreamOutput(
+        request,
+        header,
+        options.tokenizer,
+        inputTokens,
+        signal,
+        onDelta,
+      )
+    : undefined;
   const output = await options.engine.generate({
     prompt,
     maxTokens: request.input.maxTokens,
     signal,
+    ...(streaming ? { onText: streaming.onText } : {}),
   });
   checkSignal(signal);
+  streaming?.complete(output.text);
   const preliminary = parseFreeExecutionResponse({
     ...header,
     result: {
