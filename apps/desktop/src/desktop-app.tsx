@@ -215,19 +215,11 @@ export function DesktopApp() {
       model.free,
       online,
     );
-    if (result.status === DEMO_AUTH.OFFLINE) return false;
-    if (result.status === DEMO_AUTH.BALANCE) {
-      setModal(UI_DIALOG.BALANCE);
-      return false;
-    }
-    if (result.status === DEMO_AUTH.LIMIT) {
-      setToast('Your device limit is reached. Update it to continue.');
-      return false;
-    }
+    if (result.status !== DEMO_AUTH.APPROVED) return result.status;
     setSpent(result.spent);
     setCredits(result.credits);
     setChatRequestCount((value) => value + 1);
-    return true;
+    return result.status;
   }
   function toggleTool(id: ToolId) {
     setConnectedTools((previous) =>
