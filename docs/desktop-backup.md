@@ -144,7 +144,9 @@ protected wallet and atomically stores a separate OS-encrypted metadata record.
 It contains only the address, verification schema version, backup format/version
 and a domain-separated HMAC-SHA256 tag bound to the current wallet key. No
 password, selected path, backup file or private key is stored in that record.
-The existing portable backup and wallet record formats are unchanged.
+Equivalent PKCS8 encodings are accepted when they derive the current address;
+metadata authentication still uses the installed wallet material. The existing
+portable backup and wallet record formats are unchanged.
 
 Wallet revalidates this record on restart, when opened and after an operation.
 Missing, malformed, oversized, altered, wrong-identity, unsupported-version or
