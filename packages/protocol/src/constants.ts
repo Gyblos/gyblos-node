@@ -277,7 +277,7 @@ export const RECEIPT_DISPUTE_FIELDS = {
 } as const;
 export type ReceiptDisputeField =
   (typeof RECEIPT_DISPUTE_FIELDS)[keyof typeof RECEIPT_DISPUTE_FIELDS];
-// Node roles, engine families and offer pricing kinds shared by node composition, receipts and telemetry.
+// Node roles, engine families and offer pricing kinds shared across layers (node composition today).
 export const P2P_ROLES = { BUYER: 'buyer', SELLER: 'seller' } as const;
 export type P2PRole = (typeof P2P_ROLES)[keyof typeof P2P_ROLES];
 

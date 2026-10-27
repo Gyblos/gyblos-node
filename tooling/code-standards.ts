@@ -152,7 +152,7 @@ const packageBoundaries = {
 };
 
 // Relative modules resolve without an extension (Bundler resolution); assets such as JSON or CSS keep theirs.
-const CODE_EXTENSION = /\.(?:[cm]?[jt]sx?|[cm]ts)$/;
+const CODE_EXTENSION = /\.[cm]?[jt]sx?$/;
 
 function sourceText(literal: SourceNode['source']) {
   return literal?.type === 'TemplateLiteral' &&
