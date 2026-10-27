@@ -302,8 +302,9 @@ streams, applied after the shared transport-iroh endpoint admission and its
 configured transport connection/peer limits, so a control connection must pass
 both. These values are initial safeguards, not measured production capacity.
 
-The shared `TRANSPORT_LIMITS` currently allow 8 established connections, 1 per
-NodeId and 2 active requests globally, 1 per NodeId; these stricter endpoint
+The shared `TRANSPORT_LIMITS` currently allow 8 established connections (per
+NodeId, 1 control and 1 data connection) and 2 active requests globally, 1 per
+NodeId; these stricter endpoint
 limits apply before the control limits (32/4 connections and active queries).
 Connection-open attempts share a 60-second fixed window: 256 globally, 32 per
 source address before validation and 30 per authenticated NodeId. Disconnecting

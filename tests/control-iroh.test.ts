@@ -80,6 +80,30 @@ void test(
   },
 );
 void test(
+  'native NodeId admission still refuses a second concurrent control connection from the same peer',
+  { skip: NATIVE_CAPABILITY.transportSkip },
+  async () => {
+    const run = await fixture();
+    try {
+      const held = await within(
+        run.buyer.connect(run.seller.addr(), [...Buffer.from(CONTROL_ALPN)]),
+      );
+      // A partial frame keeps the first control connection admitted without completing a query.
+      await held.openBi().then(async (stream) => {
+        await stream.send.writeAll([0]);
+      });
+      const second = await within(
+        run.buyer.connect(run.seller.addr(), [...Buffer.from(CONTROL_ALPN)]),
+      );
+      await within(second.closed());
+      assert.equal(held.closeReason(), null);
+      held.close(1n, []);
+    } finally {
+      await run.close();
+    }
+  },
+);
+void test(
   'native oversized and slow control frames close connections before any HTTP forwarding',
   { skip: NATIVE_CAPABILITY.transportSkip },
   async () => {

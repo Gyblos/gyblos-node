@@ -1,7 +1,7 @@
 // Per-peer and global request quotas per window; consumed quota survives reconnects and eviction.
 import { TRANSPORT_LIMITS } from '@gyblos/config';
 
-import { CONNECTION_FAMILIES, type ConnectionFamily } from './constants.js';
+import type { ConnectionFamily } from './constants.js';
 
 interface PeerWindow {
   active: number;
@@ -76,10 +76,7 @@ export function createPeerLimiter(now: () => number = Date.now) {
   }
 
   return {
-    register(
-      nodeId: string,
-      family: ConnectionFamily = CONNECTION_FAMILIES.DATA,
-    ) {
+    register(nodeId: string, family: ConnectionFamily) {
       refresh();
       const requests = requestCounts.get(nodeId) ?? 0;
       if (
@@ -104,9 +101,9 @@ export function createPeerLimiter(now: () => number = Date.now) {
         if (released) return;
         released = true;
         window.leases--;
-        const remaining = (window.families.get(family) ?? 1) - 1;
-        if (remaining === 0) window.families.delete(family);
-        else window.families.set(family, remaining);
+        const held = (window.families.get(family) ?? 1) - 1;
+        if (held === 0) window.families.delete(family);
+        else window.families.set(family, held);
         // Disconnected, inactive grace can be reclaimed by another admission.
         if (
           window.leases === 0 &&

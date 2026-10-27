@@ -139,7 +139,8 @@ export function serveIroh(
 
   async function handle(connection: Connection) {
     const peer = connection.remoteId().toString();
-    const family = connectionFamily(Buffer.from(connection.alpn()).toString());
+    const alpn = Buffer.from(connection.alpn()).toString();
+    const family = connectionFamily(alpn);
     const releasePeer = admission.established(peer, family);
     const releaseQuota = releasePeer
       ? limiter.register(peer, family)
@@ -156,7 +157,6 @@ export function serveIroh(
       () => controller.abort(),
     );
     try {
-      const alpn = Buffer.from(connection.alpn()).toString();
       if (alpn === CONTROL_ALPN && control) {
         await handleControlConnection(
           connection,

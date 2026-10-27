@@ -67,11 +67,9 @@ export function createConnectionAdmission(
         else sources.set(source, remaining);
       };
     },
-    // The connection-rate budget and the global pool are per peer and shared; only the cap is per family.
-    established(
-      peer: string,
-      family: ConnectionFamily = CONNECTION_FAMILIES.DATA,
-    ) {
+    // The per-peer connection-rate budget and the global pool are shared across families; only the
+    // per-peer connection cap is per family.
+    established(peer: string, family: ConnectionFamily) {
       if (!rate.peer(peer)) return undefined;
       const key = `${family}:${peer}`;
       if (
