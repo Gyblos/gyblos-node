@@ -156,3 +156,21 @@ void test('cached v1 decision rechecks identity once before forwarding authoriza
     await run.wire.close();
   }
 });
+
+void test('a quote expiring during the final identity lookup cannot return an accepted winner', async () => {
+  const run = await discoveryRun();
+  try {
+    let checks = 0;
+    const result = await selectVerifiedBuyerQuote(run.config, {
+      ...run.dependencies,
+      verifyIdentity: async () => {
+        if (++checks === 2) run.setNow(run.context.now() + 60000);
+        return true;
+      },
+    });
+    assert.equal(checks, 2);
+    assert.equal(result.ok, false);
+  } finally {
+    await run.wire.close();
+  }
+});

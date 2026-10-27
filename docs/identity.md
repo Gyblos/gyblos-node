@@ -105,23 +105,24 @@ and any refusal stops with reconciliation, without retry or reselection. Paid v2
 remains disabled. Free streaming never changes seller or retries after sending
 begins.
 
-The files `identity-state-v1.json` and `identity-state-v1.lock` live only under
-`homeLayout(...).roles.buyer`. The private 0700 role directory and 0600 files
-contain scoped public binding metadata and local tombstones, never prompts,
-responses, signatures, RPC URLs, keys or payment journals. Sequences are
-canonical u64 decimal strings (including values above JavaScript's exact-number
-range). Canonical JSON rejects duplicate/unknown fields and duplicate NodeIds.
-Limits are 1,024 rows and 1 MiB; no expiry or eviction can remove security
-history. Writes use an exclusive lock, a unique temporary file, file sync,
-atomic rename and parent sync on supported platforms. Contention, stale locks,
-malformed or unsafe files, failed writes and observed rollback/disappearance
-fail closed; operators must investigate rather than automatically clear state or
-locks. Symlinked path components, symlinks, hardlinks and special files are
-refused. Use a canonical home path rather than a symlink alias. Filesystem
-rollback or complete deletion across a fresh process cannot be detected without
-an external anchor; restoring an old backup can lose previously observed
-history. The local filesystem must be trusted. Windows and crash/power-loss
-behavior have not been operationally certified by the synthetic tests.
+The files `identity-state-8004.json` and `identity-state-8004.lock` live only
+under `homeLayout(...).roles.buyer`. The private 0700 role directory and 0600
+files contain scoped public binding metadata and local tombstones, never
+prompts, responses, signatures, RPC URLs, keys or payment journals. Sequences
+are canonical u64 decimal strings (including values above JavaScript's
+exact-number range). Canonical JSON rejects duplicate/unknown fields and
+duplicate NodeIds. Limits are 1,024 rows and 1 MiB; no expiry or eviction can
+remove security history. Writes use an exclusive lock, a unique temporary file,
+file sync, atomic rename and parent sync on supported platforms. Contention,
+stale locks, malformed or unsafe files, failed writes and observed
+rollback/disappearance fail closed; operators must investigate rather than
+automatically clear state or locks. Symlinked path components, symlinks,
+hardlinks and special files are refused. Use a canonical home path rather than a
+symlink alias. Filesystem rollback or complete deletion across a fresh process
+cannot be detected without an external anchor; restoring an old backup can lose
+previously observed history. The local filesystem must be trusted. Windows and
+crash/power-loss behavior have not been operationally certified by the synthetic
+tests.
 
 Lookup decisions are never cached as usable trust. Caller cancellation reaches
 RPC; cancelled/late results cannot admit a quote or prompt. Static configured

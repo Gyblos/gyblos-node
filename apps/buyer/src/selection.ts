@@ -167,6 +167,11 @@ export async function selectVerifiedBuyerQuote(
       return { ok: false, code: BUYER_SELECTION_CODES.NO_OFFER };
     if (signal?.aborted)
       return { ok: false, code: BUYER_SELECTION_CODES.NO_OFFER };
+    try {
+      validateOfferV2Time(winner.quote.offer, now());
+    } catch {
+      return { ok: false, code: BUYER_SELECTION_CODES.NO_OFFER };
+    }
     return { ok: true, winner };
   } finally {
     await Promise.allSettled(
