@@ -7,6 +7,7 @@ import {
   readRegistryIdentity,
   type IdentityResolutionRpc,
 } from '@gyblos/identity/resolution';
+import { createIdentityResolutionRpc } from '@gyblos/identity/resolution-rpc';
 
 import { openBuyerIdentityState } from './identity-state.js';
 
@@ -23,8 +24,10 @@ export interface BuyerIdentityVerifier {
 }
 export async function openBuyerIdentityVerifier(
   environment: HomeEnvironment,
-  rpc: IdentityResolutionRpc,
+  rpc: IdentityResolutionRpc | string,
 ): Promise<BuyerIdentityVerifier> {
+  const source =
+    typeof rpc === 'string' ? createIdentityResolutionRpc(rpc) : rpc;
   const state = await openBuyerIdentityState(
     environment,
     IDENTITY_RESOLUTION_SCOPE,
@@ -35,7 +38,7 @@ export async function openBuyerIdentityVerifier(
       const lookup =
         subject.manualTrust === true
           ? undefined
-          : await readRegistryIdentity(rpc, subject.nodeId, { signal });
+          : await readRegistryIdentity(source, subject.nodeId, { signal });
       signal?.throwIfAborted();
       const decision = await state.evaluate({
         nodeId: subject.nodeId,

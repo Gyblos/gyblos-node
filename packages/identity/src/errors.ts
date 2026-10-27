@@ -13,3 +13,8 @@ export class IdentityError extends Error {
     super(message, options);
   }
 }
+
+// New read-only transport errors are static and never retain URLs, bodies or remote causes.
+export function identityRpcFail(code: IdentityErrorCode): never {
+  throw new IdentityError(code, code);
+}

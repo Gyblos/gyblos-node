@@ -1,7 +1,5 @@
 // Composes opt-in identity verification for buyer admission; discovery and seller claims supply no trust.
 // Storage faults abort the whole request, while normal registry refusals only exclude that identity.
-import { createSolanaRpc } from '@solana/kit';
-
 import { DEVNET } from '@gyblos/config';
 import type { HomeEnvironment } from '@gyblos/config/home';
 import { NODE_ERROR_CODES } from '@gyblos/node/constants';
@@ -25,10 +23,7 @@ export async function prepareBuyerIdentity(
   if (!config.identity) return undefined;
   if (config.request.network !== DEVNET)
     throw new BuyerSelectionError(BUYER_SELECTION_CODES.IDENTITY);
-  return openBuyerIdentityVerifier(
-    environment,
-    createSolanaRpc(config.identity.rpcUrl),
-  );
+  return openBuyerIdentityVerifier(environment, config.identity.rpcUrl);
 }
 export async function verifyBuyerIdentity(
   verifier: BuyerIdentityVerifier | undefined,

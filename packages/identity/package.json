@@ -7,12 +7,14 @@
     ".": "./src/index.ts",
     "./codec": "./src/codec.ts",
     "./constants": "./src/constants.ts",
-    "./resolution": "./src/resolution.ts"
+    "./resolution": "./src/resolution.ts",
+    "./resolution-rpc": "./src/resolution-rpc.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",
     "@solana-program/system": "0.10.0",
     "@solana/kit": "5.1.0",
-    "@gyblos/core": "workspace:*"
+    "@gyblos/core": "workspace:*",
+    "@solana/rpc-spec-types": "5.1.0"
   }
 }
