@@ -2,6 +2,23 @@
 // It is intentionally independent of payment SDKs, signing and product metering policy.
 import { DEMO_ACCOUNT, DEMO_AUTH } from './constants.js';
 
+export type DemoAuthorizationStatus =
+  (typeof DEMO_AUTH)[keyof typeof DEMO_AUTH];
+export function chatAuthorizationNotice(
+  status: DemoAuthorizationStatus,
+): string {
+  switch (status) {
+    case DEMO_AUTH.BALANCE:
+      return 'Insufficient balance for this model. Choose a free model to continue. Your draft is kept.';
+    case DEMO_AUTH.LIMIT:
+      return 'The daily spending limit is reached. Choose a free model to continue. Your draft is kept.';
+    case DEMO_AUTH.OFFLINE:
+      return 'Connection paused. Resume the connection to send. Your draft is kept.';
+    case DEMO_AUTH.APPROVED:
+      return '';
+  }
+}
+
 export interface DemoAccount {
   credits: number;
   spent: number;

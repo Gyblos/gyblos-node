@@ -10,11 +10,15 @@ adjustable sidebar and full-width status footer use the same mockup components
 and styles. The personal wallet is local and protected; inference and Connect
 remain simulated.
 
-Chat responses stream synthetic text. Stop preserves the generated prefix; new
-chats and history keep their own drafts. Switching Chat/Connect preserves
-mounted conversation state. All conversations, theme choices and connection
-budgets are in memory and clear when the app closes. They are not saved to the
-product home.
+Chat responses stream synthetic text independently per conversation. New chats,
+history selection and switching Chat/Connect leave other responses running and
+preserve separate drafts. Stop affects only the visible conversation and keeps
+its generated prefix; pausing the simulated connection stops every response
+without clearing drafts. Blocked sends explain missing credits or a daily limit
+inside the chat instead of opening wallet settings. Choosing a free model clears
+only the corresponding paid-model block. All conversations, drafts, theme
+choices and connection budgets are in memory and clear when the app closes. They
+are not saved to the product home.
 
 The five sample models, prices, free labels and connection budgets are
 illustrative, not live availability, payment authorization or enforced tool

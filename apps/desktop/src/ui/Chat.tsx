@@ -20,18 +20,15 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  useSyncExternalStore,
   type Ref,
 } from 'react';
 
+import { ChatController } from './chat-controller.js';
 import {
-  advanceRun,
   CHAT_PHASE,
-  createSession,
   MESSAGE_STATE,
-  startRun,
-  stopRun,
   toggleToolSelection,
-  type ChatSession,
 } from './chat-state.js';
 import { ToolsDropdown } from './ChatTools.js';
 import {
@@ -40,6 +37,7 @@ import {
   CHAT_ROLE,
   MOTION_VARIANT,
 } from './constants.js';
+import type { DemoAuthorizationStatus } from './demo-account.js';
 import { MessageText } from './MessageText.js';
 import { Modal } from './Modal.js';
 import { ModelDropdown, type ModelOption } from './ModelDropdown.js';
@@ -72,7 +70,7 @@ type Props = {
   models: readonly ModelOption[];
   onSelectModel: (id: string) => void;
   onBrowseModels: () => void;
-  onAuthorize: () => boolean;
+  onAuthorize: () => DemoAuthorizationStatus;
 };
 type PendingSend = { text: string; tools: ToolId[] };
 const PHASE_LABEL = {
@@ -109,10 +107,11 @@ export function Chat({
   onBrowseModels,
   onAuthorize,
 }: Props) {
-  const [sessions, setSessions] = useState<ChatSession[]>(() => [
-    createSession('first-chat'),
-  ]);
-  const [activeId, setActiveId] = useState('first-chat');
+  const [chat] = useState(() => new ChatController('first-chat'));
+  const { sessions, activeId } = useSyncExternalStore(
+    chat.subscribe,
+    chat.getSnapshot,
+  );
   const session = sessions.find((item) => item.id === activeId)!;
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historySearch, setHistorySearch] = useState('');
@@ -121,7 +120,7 @@ export function Chat({
   const [pendingSend, setPendingSend] = useState<PendingSend | null>(null);
   const [details, setDetails] = useState<string[]>([]);
   const [copied, setCopied] = useState('');
-  const [notice, setNotice] = useState('');
+  const notice = session.notice;
   const [nearBottom, setNearBottom] = useState(true);
   const [modelPulse, setModelPulse] = useState(false);
   const input = useRef<HTMLTextAreaElement>(null);
@@ -140,16 +139,11 @@ export function Chat({
     .reverse()
     .find((message) => message.role === CHAT_ROLE.USER);
 
-  function updateSession(update: (previous: ChatSession) => ChatSession) {
-    setSessions((previous) =>
-      previous.map((item) => (item.id === activeId ? update(item) : item)),
-    );
-  }
   function setDraft(text: string) {
-    updateSession((previous) => ({ ...previous, draft: text }));
+    chat.setDraft(text);
   }
   function stop() {
-    updateSession(stopRun);
+    chat.stop();
   }
   function captureComposer() {
     conversationOpacity.current =
@@ -161,16 +155,11 @@ export function Chat({
   function reset(text = '') {
     captureComposer();
     const id = crypto.randomUUID();
-    setSessions((previous) => [
-      ...previous.map(stopRun),
-      { ...createSession(id), draft: text },
-    ]);
-    setActiveId(id);
+    chat.newChat(id, text);
     setSelectedTools([]);
     setAllowedTools([]);
     setPendingSend(null);
     setDetails([]);
-    setNotice('');
     follow.current = true;
     setNearBottom(true);
   }
@@ -179,30 +168,18 @@ export function Chat({
     prefill: (text) => reset(text),
   }));
 
-  useEffect(() => {
-    if (!run || !online) return;
-    const sessionId = session.id;
-    const runId = run.id;
-    const delay =
-      run.phase === CHAT_PHASE.RESPONDING
-        ? CHAT_PREVIEW.STREAM_DELAY_MS
-        : run.phase === CHAT_PHASE.TOOLS
-          ? CHAT_PREVIEW.TOOL_DELAY_MS
-          : CHAT_PREVIEW.CONNECT_DELAY_MS;
-    const timer = window.setTimeout(
-      () =>
-        setSessions((previous) =>
-          previous.map((item) =>
-            item.id === sessionId ? advanceRun(item, runId) : item,
-          ),
-        ),
-      delay,
-    );
-    return () => window.clearTimeout(timer);
-  }, [session.id, run?.id, run?.phase, run?.offset, online]);
-  useEffect(() => {
-    if (!online) setSessions((previous) => previous.map(stopRun));
-  }, [online]);
+  useEffect(
+    () =>
+      chat.attachScheduler({
+        schedule(callback, delay) {
+          const timer = window.setTimeout(callback, delay);
+          return () => window.clearTimeout(timer);
+        },
+      }),
+    [chat],
+  );
+  useEffect(() => chat.setOnline(online), [chat, online]);
+  useEffect(() => chat.modelChanged(model.free), [chat, model.id, model.free]);
   useEffect(() => {
     if (!active) return;
     function key(event: KeyboardEvent) {
@@ -277,13 +254,15 @@ export function Chat({
   }, [activeId, session.messages.length > 0]);
 
   function start(text: string, tools: ToolId[]) {
-    if (!text.trim() || !online || busy || !onAuthorize()) return;
+    if (!text.trim() || busy) return;
     if (!session.messages.length) captureComposer();
     const runId = crypto.randomUUID();
-    updateSession((previous) => startRun(previous, text, model, tools, runId));
+    if (!chat.start(text, model, tools, runId, onAuthorize)) {
+      composerOrigin.current = null;
+      return;
+    }
     follow.current = true;
     setNearBottom(true);
-    setNotice('');
     input.current?.focus();
   }
   function submit() {
@@ -299,21 +278,21 @@ export function Chat({
       return;
     }
     captureComposer();
-    setSessions((previous) => previous.map(stopRun));
-    setActiveId(id);
+    chat.openChat(id);
     setHistoryOpen(false);
     setSelectedTools([]);
     setAllowedTools([]);
-    setNotice('');
     follow.current = true;
   }
   async function copy(text: string, id: string) {
+    const originSession = activeId;
     try {
       await navigator.clipboard.writeText(text);
       setCopied(id);
     } catch {
-      setNotice(
+      chat.setNotice(
         'Copy is unavailable. You can select the response text instead.',
+        originSession,
       );
     }
   }
@@ -601,7 +580,14 @@ export function Chat({
                   type={busy ? 'button' : 'submit'}
                   label={busy ? 'Stop response' : 'Send message'}
                   data-busy={busy}
-                  onClick={busy ? stop : undefined}
+                  onClick={
+                    busy
+                      ? (event) => {
+                          event.preventDefault();
+                          stop();
+                        }
+                      : undefined
+                  }
                   disabled={!busy && (!session.draft.trim() || !online)}
                 >
                   <span className="composer-send-glyph" aria-hidden="true">

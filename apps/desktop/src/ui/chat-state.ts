@@ -6,6 +6,7 @@ import {
   CHAT_ROLE,
   MESSAGE_STATE,
 } from './constants.js';
+import type { DemoAuthorizationStatus } from './demo-account.js';
 import type { ChatModel } from './model-types.js';
 import type { ToolId } from './tools.js';
 
@@ -35,11 +36,21 @@ export type ChatSession = {
   id: string;
   title: string;
   draft: string;
+  notice: string;
+  blocked: DemoAuthorizationStatus | null;
   messages: ChatMessage[];
   run: ChatRun | null;
 };
 export function createSession(id: string): ChatSession {
-  return { id, title: 'New conversation', draft: '', messages: [], run: null };
+  return {
+    id,
+    title: 'New conversation',
+    draft: '',
+    notice: '',
+    blocked: null,
+    messages: [],
+    run: null,
+  };
 }
 export function sampleReply(prompt: string, tools: readonly ToolId[]) {
   if (tools.length)
