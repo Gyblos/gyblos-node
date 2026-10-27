@@ -117,7 +117,8 @@ export function assertIdentityMonotonic(
       !next ||
       next.binding.sequence < previous.binding.sequence ||
       (next.binding.sequence === previous.binding.sequence &&
-        !sameIdentityState(next, previous))
+        (!sameIdentityState({ ...next, revoked: previous.revoked }, previous) ||
+          (previous.revoked && !next.revoked)))
     )
       identityStateUnavailable();
   }

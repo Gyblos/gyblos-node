@@ -25,6 +25,7 @@ import {
 } from '@gyblos/core/identity-policy';
 import { NODE_ERROR_CODES } from '@gyblos/node/constants';
 import { openBuyerIdentityState } from '@gyblos/node/identity-state';
+import { canonicalJson } from '@gyblos/protocol';
 
 const scope = {
   network: DEVNET,
@@ -217,7 +218,7 @@ for (const corruption of [
           'wrong scope',
         ].includes(corruption)
       )
-        await writeFile(source.path, JSON.stringify(value));
+        await writeFile(source.path, canonicalJson(value));
       if (corruption === 'permissive') await chmod(source.path, 0o644);
       if (corruption === 'symlink') {
         await rm(source.path);
@@ -242,22 +243,98 @@ void test('live instances accept strengthening tombstones and never clear them a
     const second = await openBuyerIdentityState(source.environment, scope);
     await first.evaluate({ nodeId, owner, lookup: bound(2n) });
     await second.evaluate({ nodeId, owner, lookup: bound(2n) });
-    await first.evaluate({ nodeId, owner, lookup: { kind: IDENTITY_LOOKUP_KINDS.MISSING, scope, nodeId } });
+    await first.evaluate({
+      nodeId,
+      owner,
+      lookup: { kind: IDENTITY_LOOKUP_KINDS.MISSING, scope, nodeId },
+    });
     const denied = await second.evaluate({ nodeId, owner, lookup: bound(2n) });
     assert.equal(!denied.ok && denied.code, IDENTITY_POLICY_CODES.REVOKED);
-  } finally { await source.cleanup(); }
+  } finally {
+    await source.cleanup();
+  }
 });
 void test('identity state never evicts old nodes when its bounded table is full', async () => {
   const source = await fixture();
   try {
-    const { canonicalJson } = await import('@gyblos/protocol');
     const { IDENTITY_STATE } = await import('@gyblos/node/constants');
     await openBuyerIdentityState(source.environment, scope);
-    const rows = Array.from({ length: IDENTITY_STATE.maxRows }, (_, index) => ({ binding: { nodeId: index.toString(16).padStart(64, '0'), owner, asset: owner, sequence: '1' }, revoked: false }));
-    await writeFile(source.path, canonicalJson({ schemaVersion: IDENTITY_STATE.schemaVersion, scope, rows }), { mode: FILE_MODES.privateFile });
+    const rows = Array.from({ length: IDENTITY_STATE.maxRows }, (_, index) => ({
+      binding: {
+        nodeId: index.toString(16).padStart(64, '0'),
+        owner,
+        asset: owner,
+        sequence: '1',
+      },
+      revoked: false,
+    }));
+    await writeFile(
+      source.path,
+      canonicalJson({
+        schemaVersion: IDENTITY_STATE.schemaVersion,
+        scope,
+        rows,
+      }),
+      { mode: FILE_MODES.privateFile },
+    );
     const store = await openBuyerIdentityState(source.environment, scope);
     const before = await readFile(source.path, 'utf8');
-    await assert.rejects(store.evaluate({ nodeId, owner, lookup: bound(1n) }), { code: NODE_ERROR_CODES.IDENTITY_STATE_UNAVAILABLE });
+    await assert.rejects(store.evaluate({ nodeId, owner, lookup: bound(1n) }), {
+      code: NODE_ERROR_CODES.IDENTITY_STATE_UNAVAILABLE,
+    });
     assert.equal(await readFile(source.path, 'utf8'), before);
-  } finally { await source.cleanup(); }
+  } finally {
+    await source.cleanup();
+  }
+});
+
+void test('one identity store serializes concurrent decisions without losing floors', async () => {
+  const source = await fixture();
+  try {
+    const store = await openBuyerIdentityState(source.environment, scope);
+    const results = await Promise.all(
+      [1n, 2n, 3n].map((sequence) =>
+        store.evaluate({ nodeId, owner, lookup: bound(sequence) }),
+      ),
+    );
+    assert.ok(results.every((result) => result.ok));
+    const restarted = await openBuyerIdentityState(source.environment, scope);
+    const denied = await restarted.evaluate({
+      nodeId,
+      owner,
+      lookup: bound(2n),
+    });
+    assert.equal(!denied.ok && denied.code, IDENTITY_POLICY_CODES.STALE);
+  } finally {
+    await source.cleanup();
+  }
+});
+void test('identity store refuses oversized metadata before parsing it', async () => {
+  const source = await fixture();
+  try {
+    const { IDENTITY_STATE } = await import('@gyblos/node/constants');
+    await openBuyerIdentityState(source.environment, scope);
+    await writeFile(source.path, ' '.repeat(IDENTITY_STATE.maxBytes + 1), {
+      mode: FILE_MODES.privateFile,
+    });
+    await assert.rejects(openBuyerIdentityState(source.environment, scope), {
+      code: NODE_ERROR_CODES.IDENTITY_STATE_UNAVAILABLE,
+    });
+  } finally {
+    await source.cleanup();
+  }
+});
+void test('identity store refuses a symlinked product-home ancestor without creating role state', async () => {
+  const source = await fixture();
+  try {
+    const alias = join(source.root, 'alias');
+    await symlink(source.root, alias);
+    await assert.rejects(
+      openBuyerIdentityState({ GYBLOS_HOME: alias }, scope),
+      { code: NODE_ERROR_CODES.IDENTITY_STATE_UNAVAILABLE },
+    );
+    await assert.rejects(stat(source.directory), { code: 'ENOENT' });
+  } finally {
+    await source.cleanup();
+  }
 });
