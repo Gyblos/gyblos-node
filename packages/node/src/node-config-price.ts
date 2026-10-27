@@ -5,8 +5,8 @@ import {
   NODE_CONFIG_LIMITS,
   NODE_ERROR_CODES,
   USDC_ATOMIC_UNITS_PER_USDC,
-} from './constants.js';
-import { NodeError } from './errors.js';
+} from './constants';
+import { NodeError } from './errors';
 
 // No sign, exponent, leading zeros or empty part; trailing fractional zeros are dropped afterwards.
 const PRICE_DECIMAL = /^(0|[1-9][0-9]*)(?:\.([0-9]+))?$/;

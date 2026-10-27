@@ -4,7 +4,7 @@ import test from 'node:test';
 
 import { selectVerifiedBuyerQuote } from '@gyblos/buyer/selection';
 
-import { selectionFixture } from './support/buyer-selection.js';
+import { selectionFixture } from './support/buyer-selection';
 
 void test('zero-price selection filters a paid listing before requesting a quote', async () => {
   const source = await selectionFixture();

@@ -5,7 +5,7 @@ import { existsSync } from 'node:fs';
 import { lstat, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { PRIVATE_PATH, SOURCE_ROOTS } from './config.js';
+import { PRIVATE_PATH, SOURCE_ROOTS } from './config';
 
 const EXCLUDED = new RegExp(`(?:${PRIVATE_PATH})|(^|/)node_modules(?:/|$)`);
 const SOURCE_FILE = /\.(?:[cm]?js|[cm]?tsx?)$/;

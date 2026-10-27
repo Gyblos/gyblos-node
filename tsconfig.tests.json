@@ -5,7 +5,7 @@
   },
   "include": [
     "tests/**/*.ts",
-    "tooling/code-standards.js",
+    "tooling/code-standards.ts",
     "tooling/code-standards.test.ts"
   ],
   "exclude": []

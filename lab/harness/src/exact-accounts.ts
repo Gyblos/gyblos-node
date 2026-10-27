@@ -16,8 +16,8 @@ import {
 import { COMMITMENT, DEVNET_USDC } from '@gyblos/config';
 import { assertDevnet, confirm, rpc } from '@gyblos/payments-x402/chain';
 
-import { WALLET_ROLES } from './constants.js';
-import { signer, type Config } from './wallet.js';
+import { WALLET_ROLES } from './constants';
+import { signer, type Config } from './wallet';
 
 export async function prepareExactAccounts(config: Config) {
   await assertDevnet(config.rpcUrl);

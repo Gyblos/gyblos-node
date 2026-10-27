@@ -15,14 +15,14 @@ import {
   RELAY_TOKEN_LENGTH,
 } from '@gyblos/transport-iroh/constants';
 
-import { NATIVE_CAPABILITY } from './support/native-runtime.js';
+import { NATIVE_CAPABILITY } from './support/native-runtime';
 import {
   endpointProbe,
   PROBE_ACTIONS,
   RELAY_TOKEN_SENTINEL,
   UNASSIGNED_BIND_ADDRESS,
   withRelayOffer,
-} from './support/relay-fixture.js';
+} from './support/relay-fixture';
 
 const OPTIONS = { skip: NATIVE_CAPABILITY.bindingSkip };
 const TOKEN = `${RELAY_TOKEN_SENTINEL}-synthetic-relay-token`;

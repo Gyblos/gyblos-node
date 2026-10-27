@@ -2,11 +2,11 @@
 import { Archive, Plus } from '@phosphor-icons/react';
 import { useEffect } from 'react';
 
-import { WALLET_STATUS, type WalletSummary } from '../wallet/model.js';
-import { BUTTON_VARIANT } from './constants.js';
-import { CopyButton } from './CopyButton.js';
-import { Badge, Button, List, ListRow, Note, RowCopy } from './UI.js';
-import { useDesktopWallet, useRefreshDesktopWallet } from './WalletState.js';
+import { WALLET_STATUS, type WalletSummary } from '../wallet/model';
+import { BUTTON_VARIANT } from './constants';
+import { CopyButton } from './CopyButton';
+import { Badge, Button, List, ListRow, Note, RowCopy } from './UI';
+import { useDesktopWallet, useRefreshDesktopWallet } from './WalletState';
 
 async function copyAddress(address: string) {
   if (!(await window.desktopWallet?.copyAddress(address)))

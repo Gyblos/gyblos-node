@@ -19,7 +19,7 @@ import {
   encodeU32,
   encodeVecU8,
   utf8,
-} from './bytes.js';
+} from './bytes';
 import {
   DEVNET_REGISTRY,
   IDENTITY_ERROR_CODES,
@@ -27,14 +27,10 @@ import {
   LIMITS,
   PROGRAMS,
   WALLET_SET_MESSAGE_PREFIX,
-} from './constants.js';
-import { IdentityError } from './errors.js';
-import {
-  findAgentAddress,
-  findMetadataAddress,
-  metadataKeyHash,
-} from './pda.js';
-import type { DetachedSigner } from './signers.js';
+} from './constants';
+import { IdentityError } from './errors';
+import { findAgentAddress, findMetadataAddress, metadataKeyHash } from './pda';
+import type { DetachedSigner } from './signers';
 
 type AccountMetaWithSigner = AccountMeta | AccountSignerMeta;
 

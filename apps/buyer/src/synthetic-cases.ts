@@ -1,7 +1,7 @@
 // The fixed synthetic prompts for paid inference cases, with the request ids used for failure and billing cases.
 import { randomUUID } from 'node:crypto';
 
-import { INFERENCE_CASES } from './constants.js';
+import { INFERENCE_CASES } from './constants';
 
 export function createCases(
   debugRequestId: string,

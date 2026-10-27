@@ -8,7 +8,7 @@ import { createControlQuote } from '@gyblos/core/control-quotes';
 import { CONTROL_CODES } from '@gyblos/protocol/constants';
 import { signOfferV2, verifyOfferV2 } from '@gyblos/protocol/offer-v2';
 
-import { controlFixture } from './support/control-fixture.js';
+import { controlFixture } from './support/control-fixture';
 
 function advancingClock() {
   let value = 0;

@@ -1,16 +1,16 @@
 // Owns public SDK-independent protocol exports.
 // Policy, wallets, engines, transport and process lifecycle stay outside this package.
-export type { EngineWireUsage } from './wire-usage.js';
+export type { EngineWireUsage } from './wire-usage';
 
-export { canonicalJson } from './canonical.js';
+export { canonicalJson } from './canonical';
 export {
   ENGINE_DONE_REASONS,
   PROTOCOL_ERROR_CODES,
   type EngineDoneReason,
   type ProtocolErrorCode,
-} from './constants.js';
-export { ProtocolError } from './errors.js';
-export { sign, signingBytes, verify, type Signer } from './signing.js';
+} from './constants';
+export { ProtocolError } from './errors';
+export { sign, signingBytes, verify, type Signer } from './signing';
 export {
   inferenceWireUsage,
   type Engine,
@@ -20,7 +20,7 @@ export {
   type EngineResult,
   type EngineUsage,
   type RecountTokenizer,
-} from './engine.js';
+} from './engine';
 
 export {
   DATA_RETENTION,
@@ -36,14 +36,14 @@ export {
   type DataRetention,
   type PublicRecordErrorCode,
   type PublicRecordKind,
-} from './constants.js';
+} from './constants';
 export {
   catalogDigest,
   parsePublicRecord,
   PublicRecordError,
   signPublicRecord,
   verifyPublicRecord,
-} from './public-records.js';
+} from './public-records';
 export type {
   PublicCatalog,
   PublicModelListing,
@@ -53,7 +53,7 @@ export type {
   PublicRecordTrust,
   PublicWithdrawal,
   SignedPublicRecord,
-} from './public-types.js';
+} from './public-types';
 export {
   MODEL_CATALOG,
   resolveModel,
@@ -61,4 +61,4 @@ export {
   type ModelResolution,
   type PublicTokenizer,
   type ReasoningSupport,
-} from './models.js';
+} from './models';

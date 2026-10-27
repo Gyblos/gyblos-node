@@ -5,8 +5,8 @@ import type {
   FreeChatRole,
   FreeExecutionCode,
   ReasoningLevel,
-} from './constants.js';
-import type { ModelSelection, SignedOfferV2 } from './control-types.js';
+} from './constants';
+import type { ModelSelection, SignedOfferV2 } from './control-types';
 
 export interface FreeChatMessage {
   role: FreeChatRole;

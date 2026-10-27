@@ -2,14 +2,14 @@
 // Must not know how accounts are fetched or what Gyblos stores inside metadata values.
 import { getAddressDecoder, type Address } from '@solana/kit';
 
-import { ByteReader, bytesEqual } from './bytes.js';
+import { ByteReader, bytesEqual } from './bytes';
 import {
   ACCOUNT_DISCRIMINATORS,
   IDENTITY_ERROR_CODES,
   LIMITS,
   MPL_CORE_ASSET_V1_KEY,
-} from './constants.js';
-import { IdentityError } from './errors.js';
+} from './constants';
+import { IdentityError } from './errors';
 
 const ADDRESS_BYTES = 32;
 const DIGEST_BYTES = 32;

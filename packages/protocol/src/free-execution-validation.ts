@@ -3,8 +3,8 @@ import {
   CONTROL_CODES,
   FREE_EXECUTION_CODES,
   type FreeExecutionCode,
-} from './constants.js';
-import { ControlError } from './control-validation.js';
+} from './constants';
+import { ControlError } from './control-validation';
 
 export class FreeExecutionError extends Error {
   constructor(

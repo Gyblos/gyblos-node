@@ -12,13 +12,13 @@ import {
   IDENTITY_LOOKUP_FAILURES,
   IDENTITY_LOOKUP_KINDS,
   IDENTITY_POLICY_LIMITS,
-} from './constants.js';
+} from './constants';
 import type {
   IdentityBinding,
   IdentityLookup,
   IdentityRegistryScope,
   IdentityState,
-} from './identity-policy-types.js';
+} from './identity-policy-types';
 
 export function identityScope(value: unknown): IdentityRegistryScope {
   const row = controlObject(value, ['network', 'program', 'collection']);

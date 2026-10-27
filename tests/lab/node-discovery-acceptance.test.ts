@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { lstat } from 'node:fs/promises';
 import test from 'node:test';
 
-import { NATIVE_CAPABILITY } from '../support/native-runtime.js';
+import { NATIVE_CAPABILITY } from '../support/native-runtime';
 
 void test('acceptance defaults to synthetic and refuses configuration, index and home overrides', async () => {
   const { parseAcceptanceArgs } =

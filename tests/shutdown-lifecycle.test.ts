@@ -6,7 +6,7 @@ import test from 'node:test';
 import {
   SHUTDOWN_PROBE_ENTRIES,
   shutdownProbe,
-} from './support/shutdown-probe.js';
+} from './support/shutdown-probe';
 
 for (const entry of Object.values(SHUTDOWN_PROBE_ENTRIES)) {
   void test(

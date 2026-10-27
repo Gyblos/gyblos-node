@@ -14,15 +14,15 @@ import { parseNodeConfig, parseTomlDocument } from '@gyblos/node/node-config';
 import { MODEL_CATALOG } from '@gyblos/protocol';
 import { REASONING_LEVELS } from '@gyblos/protocol/constants';
 
-import { createValidator } from './support/json-schema.js';
+import { createValidator } from './support/json-schema';
 import {
   BASE,
   exampleFiles,
   offer,
   SCHEMA_PATH,
   VALID_FIXTURES,
-} from './support/node-config-fixtures.js';
-import { INVALID_FIXTURES } from './support/node-config-invalid.js';
+} from './support/node-config-fixtures';
+import { INVALID_FIXTURES } from './support/node-config-invalid';
 
 const schema: unknown = JSON.parse(readFileSync(SCHEMA_PATH, 'utf8'));
 

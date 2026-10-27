@@ -14,8 +14,8 @@ import type {
 import { GYBLOS_ALPN } from '@gyblos/protocol/constants';
 import { isMain } from '@gyblos/runtime';
 
-import { bytes, endpoint, within } from './native-fixture.js';
-import { NATIVE_CAPABILITY } from './native-runtime.js';
+import { bytes, endpoint, within } from './native-fixture';
+import { NATIVE_CAPABILITY } from './native-runtime';
 
 const READER_ACTIONS = {
   CONNECT: 'connect',

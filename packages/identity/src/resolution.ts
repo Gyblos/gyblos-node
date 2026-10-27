@@ -10,16 +10,16 @@ import {
   type IdentityRegistryScope,
 } from '@gyblos/core/identity-policy';
 
-import { isCanonicalNodeId } from './binding.js';
+import { isCanonicalNodeId } from './binding';
 import {
   DEVNET_REGISTRY,
   IDENTITY_ERROR_CODES,
   IDENTITY_RESOLUTION_LIMITS,
   PROGRAMS,
-} from './constants.js';
-import { IdentityError } from './errors.js';
-import { assertIdentityReadActive } from './read.js';
-import { resolveNodeBinding } from './resolve.js';
+} from './constants';
+import { IdentityError } from './errors';
+import { assertIdentityReadActive } from './read';
+import { resolveNodeBinding } from './resolve';
 
 export type IdentityResolutionRpc = Pick<
   Rpc<SolanaRpcApi>,

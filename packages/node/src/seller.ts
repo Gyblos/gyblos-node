@@ -45,27 +45,27 @@ import { createPrivateLog } from '@gyblos/runtime/private-log';
 import { withDeadline } from '@gyblos/transport-iroh/deadline';
 import { bindEndpoint } from '@gyblos/transport-iroh/endpoint';
 
-import { modelTokenizer } from './artifacts.js';
+import { modelTokenizer } from './artifacts';
 import {
   OFFER_PRICING_KINDS,
   P2P_ROLES,
   SELLER_PUBLIC_RECORDS,
-} from './constants.js';
-import { observeControlReadiness } from './control-readiness.js';
-import { prepareSellerControl } from './control-startup.js';
+} from './constants';
+import { observeControlReadiness } from './control-readiness';
+import { prepareSellerControl } from './control-startup';
 import {
   assertReadinessCurrent,
   prepareSellerEngine,
   probeSellerEngine,
-} from './engine-readiness.js';
-import { assertOllamaModelsHome, assertRoleHome } from './home.js';
-import { createInferenceSeller } from './http/inference.js';
-import { signInferenceOffer } from './offers.js';
-import { openSellerSequence } from './public-sequence.js';
-import { createSellerPublisher } from './publisher.js';
-import { loadRole, nodeSecret, rolePath, roleSigner } from './roles.js';
-import { loadSellerSettings } from './seller-settings.js';
-import { serveSellerTransport } from './seller-transport.js';
+} from './engine-readiness';
+import { assertOllamaModelsHome, assertRoleHome } from './home';
+import { createInferenceSeller } from './http/inference';
+import { signInferenceOffer } from './offers';
+import { openSellerSequence } from './public-sequence';
+import { createSellerPublisher } from './publisher';
+import { loadRole, nodeSecret, rolePath, roleSigner } from './roles';
+import { loadSellerSettings } from './seller-settings';
+import { serveSellerTransport } from './seller-transport';
 
 interface Trace {
   requestId: string;

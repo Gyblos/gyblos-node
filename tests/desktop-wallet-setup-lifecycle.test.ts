@@ -16,8 +16,8 @@ import {
   SETUP_STATUS,
 } from '@gyblos/desktop/wallet-setup-model';
 
-import { TEST_BACKUP_PASSWORD } from './support/portable-backup-fixture.js';
-import { absent, fixture } from './support/wallet-restore.js';
+import { TEST_BACKUP_PASSWORD } from './support/portable-backup-fixture';
+import { absent, fixture } from './support/wallet-restore';
 
 function deferred<T>() {
   let release: (value: T) => void = () => {};

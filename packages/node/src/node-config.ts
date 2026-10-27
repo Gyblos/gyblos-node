@@ -9,7 +9,7 @@ import {
   NODE_CONFIG_LIMITS,
   NODE_CONFIG_VERSION,
   NODE_NETWORKS,
-} from './constants.js';
+} from './constants';
 import {
   envName,
   flag,
@@ -27,31 +27,28 @@ import {
   type ConfigPath,
   type NodeConfigIssue,
   type NodeConfigWarning,
-} from './node-config-fields.js';
-import { readLimits, type NodeLimits } from './node-config-limits.js';
-import { readOffers, type NodeOffer } from './node-config-offers.js';
+} from './node-config-fields';
+import { readLimits, type NodeLimits } from './node-config-limits';
+import { readOffers, type NodeOffer } from './node-config-offers';
 import {
   readAddress,
   readDiscoveryUrl,
   readRelayUrl,
-} from './node-config-values.js';
+} from './node-config-values';
 
-export type {
-  NodeConfigIssue,
-  NodeConfigWarning,
-} from './node-config-fields.js';
+export type { NodeConfigIssue, NodeConfigWarning } from './node-config-fields';
 export {
   pricePerMtokToAtomicPerMtok,
   readPriceDecimal,
   type PriceDecimal,
-} from './node-config-price.js';
-export type { NodeLimits } from './node-config-limits.js';
+} from './node-config-price';
+export type { NodeLimits } from './node-config-limits';
 export type {
   NodeOffer,
   OfferEngine,
   OfferModel,
   OfferPricing,
-} from './node-config-offers.js';
+} from './node-config-offers';
 
 export interface NodeConfig {
   version: typeof NODE_CONFIG_VERSION;

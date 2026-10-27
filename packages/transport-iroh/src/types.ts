@@ -1,5 +1,5 @@
 // HTTP message, route observation and Transport interface shared by buyer and seller sides.
-import { TRANSPORT_ROUTES } from './constants.js';
+import { TRANSPORT_ROUTES } from './constants';
 
 export type TransportRoute =
   (typeof TRANSPORT_ROUTES)[keyof typeof TRANSPORT_ROUTES];

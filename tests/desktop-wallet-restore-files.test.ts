@@ -17,8 +17,8 @@ import {
   WALLET_RESTORE_ERROR,
 } from '@gyblos/desktop/wallet-restore';
 
-import { TEST_BACKUP_PASSWORD } from './support/portable-backup-fixture.js';
-import { fixture, restoreError } from './support/wallet-restore.js';
+import { TEST_BACKUP_PASSWORD } from './support/portable-backup-fixture';
+import { fixture, restoreError } from './support/wallet-restore';
 
 void test(
   'wallet restore reload refuses a file replaced by FIFO without blocking recovery',

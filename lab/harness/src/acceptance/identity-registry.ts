@@ -5,23 +5,23 @@ import { createServer, type Server } from 'node:http';
 import { HTTP_STATUS, LOCALHOST } from '@gyblos/config';
 import { IDENTITY_RPC_LIMITS } from '@gyblos/identity/constants';
 
-import { ACCEPTANCE_CODES } from './constants.js';
+import { ACCEPTANCE_CODES } from './constants';
 import {
   acceptanceAssert,
   AcceptanceError,
   assertAcceptanceActive,
-} from './errors.js';
+} from './errors';
 import {
   registryClaim,
   type RegistryClaim,
   type RegistrySubject,
-} from './identity-registry-accounts.js';
-import { REGISTRY_FIXTURE } from './identity-registry-constants.js';
+} from './identity-registry-accounts';
+import { REGISTRY_FIXTURE } from './identity-registry-constants';
 import {
   registryMethodAllowed,
   registryReadCall,
   registryReadResult,
-} from './identity-registry-rpc.js';
+} from './identity-registry-rpc';
 
 function listen(server: Server, signal: AbortSignal) {
   return new Promise<void>((resolve, reject) => {

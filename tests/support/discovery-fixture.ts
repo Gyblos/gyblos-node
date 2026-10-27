@@ -20,7 +20,7 @@ import type {
 } from '@gyblos/protocol/control-types';
 import { catalogDigestV2, signPublicV2 } from '@gyblos/protocol/public-v2';
 
-import { PUBLIC_TEST_NOW, publicFixture } from './public-records.js';
+import { PUBLIC_TEST_NOW, publicFixture } from './public-records';
 
 export const DISCOVERY_NOW = PUBLIC_TEST_NOW + 1_000;
 export const DISCOVERY_BASE = 'https://index.test/api/v1/discovery';

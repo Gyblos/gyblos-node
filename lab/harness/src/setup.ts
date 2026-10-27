@@ -15,8 +15,8 @@ import {
 import { CONFIG_ASSET_LABELS } from '@gyblos/config/constants';
 import { saveJson } from '@gyblos/runtime';
 
-import { keyFilename, SCHEMA_VERSIONS, WALLET_ROLES } from './constants.js';
-import { assertLabHome, configPath, type Config } from './wallet.js';
+import { keyFilename, SCHEMA_VERSIONS, WALLET_ROLES } from './constants';
+import { assertLabHome, configPath, type Config } from './wallet';
 
 export async function setupGate() {
   await assertLabHome();

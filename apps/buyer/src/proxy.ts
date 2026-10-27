@@ -27,8 +27,8 @@ import {
   BUYER_PROXY_ERROR_CODES,
   BUYER_SELECTION,
   type BuyerProxyErrorCode,
-} from './constants.js';
-import type { ProxySelection } from './selection-proxy.js';
+} from './constants';
+import type { ProxySelection } from './selection-proxy';
 
 interface ProxyError {
   code: BuyerProxyErrorCode;

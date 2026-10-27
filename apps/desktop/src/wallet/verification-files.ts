@@ -4,11 +4,11 @@ import { randomUUID } from 'node:crypto';
 import { lstat, rename, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { readBackupFile, writeBackupFile } from './backup-files.js';
-import { BACKUP_ERROR } from './backup/constants.js';
-import { BackupError } from './backup/error.js';
-import { BACKUP_VERIFICATION, WALLET } from './constants.js';
-import { checkWalletRoot, syncWalletDirectory } from './files.js';
+import { readBackupFile, writeBackupFile } from './backup-files';
+import { BACKUP_ERROR } from './backup/constants';
+import { BackupError } from './backup/error';
+import { BACKUP_VERIFICATION, WALLET } from './constants';
+import { checkWalletRoot, syncWalletDirectory } from './files';
 
 async function directory(root: string) {
   await checkWalletRoot(root);

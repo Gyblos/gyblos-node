@@ -2,8 +2,8 @@
 // Must not know which 8004 fields are filtered on; callers pass offsets.
 import { getBase58Decoder, type Base58EncodedBytes } from '@solana/kit';
 
-import { IDENTITY_ERROR_CODES } from './constants.js';
-import { IdentityError } from './errors.js';
+import { IDENTITY_ERROR_CODES } from './constants';
+import { IdentityError } from './errors';
 
 const BASE58 = getBase58Decoder();
 const BASE58_ALPHABET = /^[1-9A-HJ-NP-Za-km-z]*$/;

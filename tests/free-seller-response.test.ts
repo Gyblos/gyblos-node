@@ -13,7 +13,7 @@ import {
 import type { ControlStream } from '@gyblos/transport-iroh/control-io';
 import { serveFreeExecutionStream } from '@gyblos/transport-iroh/free-server';
 
-import { freeSellerFixture } from './support/free-seller.js';
+import { freeSellerFixture } from './support/free-seller';
 
 void test('free seller sends an encodable LIMIT error when legal text expands beyond the response frame', async () => {
   const state = await freeSellerFixture();

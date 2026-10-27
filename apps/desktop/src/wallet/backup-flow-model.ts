@@ -1,7 +1,7 @@
 // Owns the sanitized backup interaction contract; no Node or secret imports.
-import { BACKUP_ACTION, BACKUP_FLOW, BACKUP_RESULT } from './constants.js';
+import { BACKUP_ACTION, BACKUP_FLOW, BACKUP_RESULT } from './constants';
 
-export { BACKUP_ACTION, BACKUP_RESULT, BACKUP_FLOW } from './constants.js';
+export { BACKUP_ACTION, BACKUP_RESULT, BACKUP_FLOW } from './constants';
 
 export type BackupAction = (typeof BACKUP_ACTION)[keyof typeof BACKUP_ACTION];
 export type BackupResult = (typeof BACKUP_RESULT)[keyof typeof BACKUP_RESULT];

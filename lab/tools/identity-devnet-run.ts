@@ -13,8 +13,8 @@ import { detachedSignerFromKeyPair } from '@gyblos/identity';
 import { assertDevnet } from '@gyblos/payments-x402/chain';
 import { isMain } from '@gyblos/runtime';
 
-import { confirm, printable, runSponsoredFlow } from './identity-flow.js';
-import { loadOrCreateKey } from './identity-keys.js';
+import { confirm, printable, runSponsoredFlow } from './identity-flow';
+import { loadOrCreateKey } from './identity-keys';
 
 const AIRDROP_LAMPORTS = 1_000_000_000n;
 const MIN_SPONSOR_LAMPORTS = 60_000_000n;

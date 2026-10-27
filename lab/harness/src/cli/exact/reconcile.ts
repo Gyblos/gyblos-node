@@ -32,9 +32,9 @@ import {
   GATE_RETRIES,
   GATE_RETRY_DELAYS,
   RECONCILIATION_CLASSIFICATIONS,
-} from '../../constants.js';
-import { exactAuthorizationId } from '../../exact/authorization-id.js';
-import { type Config } from '../../wallet.js';
+} from '../../constants';
+import { exactAuthorizationId } from '../../exact/authorization-id';
+import { type Config } from '../../wallet';
 
 export async function snapshot(config: Config, buyer: string) {
   const atas = await Promise.all(

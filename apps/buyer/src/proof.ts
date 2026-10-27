@@ -15,7 +15,7 @@ import {
 import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { ProtocolError } from '@gyblos/protocol/errors';
 
-import { MAX_CHANNEL_SIGNATURES } from './constants.js';
+import { MAX_CHANNEL_SIGNATURES } from './constants';
 
 export interface PaymentAccounts {
   rpcUrl: string;

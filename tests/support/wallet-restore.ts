@@ -14,7 +14,7 @@ import {
   disposableIdentity,
   disposableProtection,
   TEST_BACKUP_PASSWORD,
-} from './portable-backup-fixture.js';
+} from './portable-backup-fixture';
 
 export async function fixture(
   run: (value: {

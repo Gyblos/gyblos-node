@@ -8,10 +8,7 @@ import {
   publishRecord,
 } from '@gyblos/discovery-http';
 
-import {
-  DISCOVERY_BASE,
-  discoverySeller,
-} from './support/discovery-fixture.js';
+import { DISCOVERY_BASE, discoverySeller } from './support/discovery-fixture';
 
 void test('publish caller cancellation cuts off stalled success and rejection bodies, and an already aborted call never fetches', async () => {
   const source = await discoverySeller();

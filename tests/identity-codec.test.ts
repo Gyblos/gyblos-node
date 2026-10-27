@@ -43,7 +43,7 @@ import {
   devnetAccounts,
   fixedSigner,
   hex,
-} from './support/identity-fixture.js';
+} from './support/identity-fixture';
 
 const FIXTURES = devnetAccounts();
 

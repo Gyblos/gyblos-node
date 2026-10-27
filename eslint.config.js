@@ -2,9 +2,13 @@
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { tsImport } from 'tsx/esm/api';
 import tseslint from 'typescript-eslint';
 
-import standards from './tooling/code-standards.js';
+const { default: standards } = await tsImport(
+  './tooling/code-standards.ts',
+  import.meta.url,
+);
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 

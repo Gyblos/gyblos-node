@@ -5,25 +5,25 @@ import {
   PUBLIC_RECORD_ERROR_CODES,
   PUBLIC_RECORD_KINDS,
   PUBLIC_RECORD_LIMITS,
-} from './constants.js';
-import { parsePublicRecord } from './public-parser.js';
+} from './constants';
+import { parsePublicRecord } from './public-parser';
 import type {
   PublicCatalog,
   PublicRecord,
   PublicRecordTrust,
   SignedPublicRecord,
-} from './public-types.js';
+} from './public-types';
 import {
   bytesHex,
   hexBytes,
   invalidRecord,
   publicObject,
   PublicRecordError,
-} from './public-validation.js';
-import { sign, signingBytes, verify, type Signer } from './signing.js';
+} from './public-validation';
+import { sign, signingBytes, verify, type Signer } from './signing';
 
-export { parsePublicRecord } from './public-parser.js';
-export { PublicRecordError } from './public-validation.js';
+export { parsePublicRecord } from './public-parser';
+export { PublicRecordError } from './public-validation';
 
 function validateTime(record: PublicRecord, now: number) {
   const lifetime =

@@ -21,11 +21,11 @@ import {
 import { createIrohTransport } from '@gyblos/transport-iroh/iroh-client';
 import { expectedIrohRoute } from '@gyblos/transport-iroh/route-policy';
 
-import { startBuyerProxy } from './proxy.js';
+import { startBuyerProxy } from './proxy';
 import {
   prepareBuyerSelection,
   runtimeProxySelection,
-} from './selection-runtime.js';
+} from './selection-runtime';
 
 export async function trustedOffer() {
   const config = await loadRole(P2P_ROLES.BUYER);

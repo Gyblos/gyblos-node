@@ -3,13 +3,13 @@
 import { lstat } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { readBackupFile } from './backup-files.js';
-import { WALLET, WALLET_RESTORE_ERROR } from './constants.js';
-import { checkWalletRoot, isMissing } from './files.js';
-import { WALLET_STATUS, walletSummary, type WalletSummary } from './model.js';
-import type { WalletProtection } from './protection.js';
-import { createWalletRestorer, WalletRestoreError } from './restore.js';
-import { createWalletService, readExistingWallet } from './service.js';
+import { readBackupFile } from './backup-files';
+import { WALLET, WALLET_RESTORE_ERROR } from './constants';
+import { checkWalletRoot, isMissing } from './files';
+import { WALLET_STATUS, walletSummary, type WalletSummary } from './model';
+import type { WalletProtection } from './protection';
+import { createWalletRestorer, WalletRestoreError } from './restore';
+import { createWalletService, readExistingWallet } from './service';
 import {
   parseSetupRequest,
   SETUP_ACTION,
@@ -18,7 +18,7 @@ import {
   setupView,
   type SetupRequest,
   type SetupView,
-} from './setup-model.js';
+} from './setup-model';
 
 interface SetupDialogs {
   select(): Promise<string | null>;

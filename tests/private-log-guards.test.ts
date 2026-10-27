@@ -27,11 +27,11 @@ import {
   diagnosticRows,
   rm,
   withDiagnosticHost,
-} from './support/facilitator-diagnostic-fixture.js';
+} from './support/facilitator-diagnostic-fixture';
 import {
   PRIVATE_LOG_PLATFORM_SKIP,
   withLogIo,
-} from './support/private-log-fixture.js';
+} from './support/private-log-fixture';
 
 for (const fault of [
   'symlink-parent',

@@ -27,7 +27,7 @@ import {
 import { controlHex } from '@gyblos/protocol/control-validation';
 import type { Signer } from '@gyblos/protocol/signing';
 
-import { REGISTRY_FIXTURE } from './identity-registry-constants.js';
+import { REGISTRY_FIXTURE } from './identity-registry-constants';
 
 export interface RegistrySubject {
   nodeId: string;

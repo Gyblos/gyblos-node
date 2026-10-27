@@ -6,8 +6,8 @@ import {
   type Address,
 } from '@solana/kit';
 
-import { utf8 } from './bytes.js';
-import { LIMITS, PROGRAMS, SEEDS } from './constants.js';
+import { utf8 } from './bytes';
+import { LIMITS, PROGRAMS, SEEDS } from './constants';
 
 const ADDRESS_ENCODER = getAddressEncoder();
 

@@ -5,7 +5,7 @@ import type {
   IdentityLookupFailure,
   IdentityPolicyCode,
   IdentityTrustSource,
-} from './constants.js';
+} from './constants';
 
 export interface IdentityRegistryScope {
   network: string;

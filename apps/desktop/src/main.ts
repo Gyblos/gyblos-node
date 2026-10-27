@@ -13,30 +13,27 @@ import {
   safeStorage,
 } from 'electron';
 
-import { DESKTOP, PROBE_STATUS, STARTUP_WINDOW } from './constants.js';
-import { probeInUtility } from './probe-host.js';
-import { failedProbe, type ProbeResult } from './probe-model.js';
-import { cleanupDesktopSession } from './session-cleanup.js';
-import { armSmokeWatchdog } from './smoke-watchdog.js';
-import { startupHandoff } from './startup-window.js';
-import { BRAND_COLORS } from './theme.js';
-import { BACKUP_FLOW, BACKUP_RESULT } from './wallet/backup-flow-model.js';
-import { createBackupFlow } from './wallet/backup-flow.js';
-import { WALLET, WALLET_STATUS } from './wallet/constants.js';
-import { copyPublicWalletAddress } from './wallet/copy-address.js';
+import { DESKTOP, PROBE_STATUS, STARTUP_WINDOW } from './constants';
+import { probeInUtility } from './probe-host';
+import { failedProbe, type ProbeResult } from './probe-model';
+import { cleanupDesktopSession } from './session-cleanup';
+import { armSmokeWatchdog } from './smoke-watchdog';
+import { startupHandoff } from './startup-window';
+import { BRAND_COLORS } from './theme';
+import { createBackupFlow } from './wallet/backup-flow';
+import { BACKUP_FLOW, BACKUP_RESULT } from './wallet/backup-flow-model';
+import { WALLET, WALLET_STATUS } from './wallet/constants';
+import { copyPublicWalletAddress } from './wallet/copy-address';
 import {
   focusExistingWindow,
   prepareWalletProfile,
   waitForWalletBeforeQuit,
-} from './wallet/lifecycle.js';
-import { walletSummary, type WalletSummary } from './wallet/model.js';
-import {
-  walletProtection,
-  type WalletProtection,
-} from './wallet/protection.js';
-import { createWalletService } from './wallet/service.js';
-import { SETUP_STATUS, WALLET_SETUP } from './wallet/setup-model.js';
-import { createWalletSetup } from './wallet/setup.js';
+} from './wallet/lifecycle';
+import { walletSummary, type WalletSummary } from './wallet/model';
+import { walletProtection, type WalletProtection } from './wallet/protection';
+import { createWalletService } from './wallet/service';
+import { createWalletSetup } from './wallet/setup';
+import { SETUP_STATUS, WALLET_SETUP } from './wallet/setup-model';
 
 function createProbeWindow(startup = false) {
   const window = new BrowserWindow({

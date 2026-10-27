@@ -8,7 +8,7 @@ import {
 } from '@gyblos/protocol/constants';
 import { freeExecutionDigest } from '@gyblos/protocol/free-execution';
 
-import { freeSellerFixture } from './support/free-seller.js';
+import { freeSellerFixture } from './support/free-seller';
 
 async function messages() {
   const source = await freeSellerFixture();

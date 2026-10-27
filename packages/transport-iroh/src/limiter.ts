@@ -1,7 +1,7 @@
 // Per-peer and global request quotas per window; consumed quota survives reconnects and eviction.
 import { TRANSPORT_LIMITS, type TransportLimits } from '@gyblos/config';
 
-import type { ConnectionFamily } from './constants.js';
+import type { ConnectionFamily } from './constants';
 
 interface PeerWindow {
   active: number;

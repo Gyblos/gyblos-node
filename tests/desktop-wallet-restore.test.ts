@@ -24,8 +24,8 @@ import {
 import {
   disposableIdentity,
   TEST_BACKUP_PASSWORD,
-} from './support/portable-backup-fixture.js';
-import { absent, fixture, restoreError } from './support/wallet-restore.js';
+} from './support/portable-backup-fixture';
+import { absent, fixture, restoreError } from './support/wallet-restore';
 
 void test('wallet restore derives the authenticated backup identity without weakening expected-address checks', async () => {
   await fixture(async ({ backup, identity }) => {

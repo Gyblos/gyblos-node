@@ -15,8 +15,8 @@ import {
   controlObject,
 } from '@gyblos/protocol/control-validation';
 
-import { IDENTITY_STATE, NODE_ERROR_CODES } from './constants.js';
-import { NodeError } from './errors.js';
+import { IDENTITY_STATE, NODE_ERROR_CODES } from './constants';
+import { NodeError } from './errors';
 
 export function identityStateUnavailable(): never {
   throw new NodeError(NODE_ERROR_CODES.IDENTITY_STATE_UNAVAILABLE);

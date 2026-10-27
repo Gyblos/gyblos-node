@@ -22,9 +22,9 @@ import {
   GATE_HOSTS,
   GATE_RETRIES,
   GATE_TIMEOUTS,
-} from '../constants.js';
-import { loadConfig } from '../wallet.js';
-import { executeGate } from './execute.js';
+} from '../constants';
+import { loadConfig } from '../wallet';
+import { executeGate } from './execute';
 
 export async function main() {
   const children: ChildProcess[] = [];

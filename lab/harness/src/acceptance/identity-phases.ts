@@ -9,12 +9,12 @@ import {
   IDENTITY_TRUST_SOURCES,
 } from '@gyblos/core/identity-policy';
 
-import { ACCEPTANCE } from './constants.js';
-import { acceptanceAssert } from './errors.js';
+import { ACCEPTANCE } from './constants';
+import { acceptanceAssert } from './errors';
 import {
   IDENTITY_ACCEPTANCE,
   IDENTITY_ACCEPTANCE_CASES,
-} from './identity-constants.js';
+} from './identity-constants';
 import {
   acceptedAnswer,
   completed,
@@ -23,9 +23,9 @@ import {
   registrySubject,
   withIdentityBuyer,
   type IdentityAcceptanceContext,
-} from './identity-context.js';
-import { identityStreamAnswer } from './identity-http.js';
-import { pump, rejectReplay } from './phases.js';
+} from './identity-context';
+import { identityStreamAnswer } from './identity-http';
+import { pump, rejectReplay } from './phases';
 
 export async function positiveIdentityPhases(
   context: IdentityAcceptanceContext,

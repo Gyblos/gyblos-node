@@ -6,8 +6,8 @@ import {
   DISCOVERY_ERROR_CODES,
   DISCOVERY_LIMITS,
   type DiscoveryErrorCode,
-} from './constants.js';
-import { DiscoveryError, discoveryFail } from './errors.js';
+} from './constants';
+import { DiscoveryError, discoveryFail } from './errors';
 
 export type DiscoveryFetch = (
   input: string,

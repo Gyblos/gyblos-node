@@ -15,9 +15,9 @@ import {
   READ_LIMITS,
 } from '@gyblos/identity/constants';
 
-import { addClaimant, coreAssetBytes } from './support/identity-accounts.js';
-import { fixedSigner } from './support/identity-fixture.js';
-import { identityResolutionFixture as fixture } from './support/identity-resolution-fixture.js';
+import { addClaimant, coreAssetBytes } from './support/identity-accounts';
+import { fixedSigner } from './support/identity-fixture';
+import { identityResolutionFixture as fixture } from './support/identity-resolution-fixture';
 
 void test('read-only resolution returns verified binding provenance using finalized reads and no writes', async () => {
   const state = await fixture();

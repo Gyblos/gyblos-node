@@ -1,31 +1,31 @@
 // Public testable desktop wallet contracts; importing them never initializes a wallet.
-export { createWalletService } from './service.js';
+export { createWalletService } from './service';
 export {
   focusExistingWindow,
   prepareWalletProfile,
   waitForWalletBeforeQuit,
-} from './lifecycle.js';
+} from './lifecycle';
 export {
   parseWalletSummary,
   WALLET,
   WALLET_STATUS,
   WALLET_PROVIDER,
-} from './model.js';
+} from './model';
 export {
   walletProtection,
   type WalletProtection,
   type SafeStoragePort,
-} from './protection.js';
+} from './protection';
 
-export { createBackupFlow, type BackupDialogs } from './backup-flow.js';
+export { createBackupFlow, type BackupDialogs } from './backup-flow';
 export {
   BACKUP_ACTION,
   BACKUP_RESULT,
   BACKUP_FLOW,
   parseBackupRequest,
   parseBackupResult,
-} from './backup-flow-model.js';
+} from './backup-flow-model';
 
-export { BACKUP_VERIFICATION } from './constants.js';
+export { BACKUP_VERIFICATION } from './constants';
 
-export { copyPublicWalletAddress } from './copy-address.js';
+export { copyPublicWalletAddress } from './copy-address';

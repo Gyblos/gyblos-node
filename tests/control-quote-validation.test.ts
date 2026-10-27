@@ -9,7 +9,7 @@ import {
 import { CONTROL_CODES, REASONING_LEVELS } from '@gyblos/protocol/constants';
 import { catalogDigestV2, signPublicV2 } from '@gyblos/protocol/public-v2';
 
-import { controlFixture } from './support/control-fixture.js';
+import { controlFixture } from './support/control-fixture';
 
 void test('control rejects inconsistent engine context before invoking a signer', async () => {
   const fixture = await controlFixture();

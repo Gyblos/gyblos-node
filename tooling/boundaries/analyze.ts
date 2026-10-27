@@ -4,9 +4,9 @@ import { isAbsolute, relative } from 'node:path';
 
 import { cruise } from 'dependency-cruiser';
 
-import { boundaryConfig, layerOf, PRIVATE_PATH } from './config.js';
-import { isRecord, parseGraph } from './graph.js';
-import { isSafeSource } from './inventory.js';
+import { boundaryConfig, layerOf, PRIVATE_PATH } from './config';
+import { isRecord, parseGraph } from './graph';
+import { isSafeSource } from './inventory';
 
 export interface BoundaryEntry {
   rule: string;

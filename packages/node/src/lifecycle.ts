@@ -1,7 +1,7 @@
 // Owns the node's explicit start, stop and health lifecycle.
 // Resource construction is injected; this module knows no SDKs or wallets.
-import { NODE_STATES, type NodeState } from './constants.js';
-import type { createSellerPublisher } from './publisher.js';
+import { NODE_STATES, type NodeState } from './constants';
+import type { createSellerPublisher } from './publisher';
 
 export interface NodeHost {
   close(): Promise<void>;

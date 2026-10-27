@@ -21,7 +21,7 @@ import {
   disposableIdentity,
   disposableProtection,
   TEST_BACKUP_PASSWORD,
-} from './support/portable-backup-fixture.js';
+} from './support/portable-backup-fixture';
 
 function equivalentPkcs8(secret: string) {
   const original = Buffer.from(secret, 'base64');

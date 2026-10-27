@@ -7,8 +7,8 @@ import {
 } from '@gyblos/protocol/constants';
 import type { EngineWireUsage } from '@gyblos/protocol/wire-usage';
 
-import { GENERATION, MODEL_LIMITS } from './constants.js';
-import { MODEL, renderChat } from './model.js';
+import { GENERATION, MODEL_LIMITS } from './constants';
+import { MODEL, renderChat } from './model';
 
 export interface InferenceResult {
   text: string;
@@ -17,9 +17,9 @@ export interface InferenceResult {
   doneReason: EngineDoneReason;
 }
 
-export { renderChat } from './model.js';
+export { renderChat } from './model';
 
-export { createModelTokenizer, type ModelTokenizer } from './tokenizer.js';
+export { createModelTokenizer, type ModelTokenizer } from './tokenizer';
 
 export function localOllamaUrl(base: string): URL {
   const url = new URL(base);

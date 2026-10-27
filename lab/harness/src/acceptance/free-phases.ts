@@ -6,14 +6,14 @@ import { READINESS_GENERATION } from '@gyblos/engine-ollama/constants';
 import { CONTROL_CODES } from '@gyblos/protocol/constants';
 import { ControlError } from '@gyblos/protocol/control-validation';
 
-import { listed } from './buyer.js';
-import { acceptanceAssert } from './errors.js';
+import { listed } from './buyer';
+import { acceptanceAssert } from './errors';
 import {
   FREE_ACCEPTANCE_CASES,
   type FreeAcceptanceCase,
-} from './free-constants.js';
-import { pump } from './phases.js';
-import type { AcceptanceSession } from './session.js';
+} from './free-constants';
+import { pump } from './phases';
+import type { AcceptanceSession } from './session';
 
 export async function freeAvailability(
   run: AcceptanceSession,

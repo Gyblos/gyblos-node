@@ -1,7 +1,7 @@
 // Validates untrusted portable bytes before KDF work; no filesystem or native stores.
-import { WALLET } from '../constants.js';
-import { BACKUP, BACKUP_ERROR } from './constants.js';
-import { BackupError } from './error.js';
+import { WALLET } from '../constants';
+import { BACKUP, BACKUP_ERROR } from './constants';
+import { BackupError } from './error';
 
 export function header(salt: Buffer, nonce: Buffer) {
   return {

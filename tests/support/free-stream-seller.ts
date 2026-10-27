@@ -4,7 +4,7 @@ import { createSellerFreeExecution } from '@gyblos/node/free-execution';
 import { ENGINE_DONE_REASONS } from '@gyblos/protocol/constants';
 import type { EngineInput, EngineResult } from '@gyblos/protocol/engine';
 
-import { freeSellerFixture } from './free-seller.js';
+import { freeSellerFixture } from './free-seller';
 
 export function streamResult(text = 'answer'): EngineResult {
   return {

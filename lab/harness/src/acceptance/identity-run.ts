@@ -2,34 +2,34 @@
 // The only external boundary is ephemeral loopback HTTP/Iroh; operational inputs are not accepted.
 import { HTTP_STATUS, SELLER_DISCOVERY } from '@gyblos/config';
 
-import { ACCEPTANCE_INDEX } from './constants.js';
-import { acceptanceAssert, assertAcceptanceActive } from './errors.js';
-import { FREE_ACCEPTANCE_FAULTS } from './free-constants.js';
-import { createFreeSeller } from './free-session.js';
+import { ACCEPTANCE_INDEX } from './constants';
+import { acceptanceAssert, assertAcceptanceActive } from './errors';
+import { FREE_ACCEPTANCE_FAULTS } from './free-constants';
+import { createFreeSeller } from './free-session';
 import {
   IDENTITY_ACCEPTANCE,
   IDENTITY_ACCEPTANCE_CASES,
   type IdentityAcceptanceCase,
-} from './identity-constants.js';
+} from './identity-constants';
 import {
   completed,
   registrySubject,
   withIdentityBuyer,
   type IdentityAcceptanceContext,
-} from './identity-context.js';
-import { identityStreamCancellation } from './identity-http.js';
+} from './identity-context';
+import { identityStreamCancellation } from './identity-http';
 import {
   positiveIdentityPhases,
   providerIdentityPhases,
   revokedIdentityPhases,
   rotatedIdentityPhases,
-} from './identity-phases.js';
+} from './identity-phases';
 import {
   createAcceptanceRegistry,
   type AcceptanceRegistry,
-} from './identity-registry.js';
-import { pump } from './phases.js';
-import type { AcceptanceSession } from './session.js';
+} from './identity-registry';
+import { pump } from './phases';
+import type { AcceptanceSession } from './session';
 
 export interface IdentityAcceptanceOptions {
   signal?: AbortSignal;

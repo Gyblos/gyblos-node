@@ -18,7 +18,7 @@ import type {
 import { catalogDigestV2, signPublicV2 } from '@gyblos/protocol/public-v2';
 import type { Signer } from '@gyblos/protocol/signing';
 
-import { PUBLIC_TEST_NOW, publicFixture } from './public-records.js';
+import { PUBLIC_TEST_NOW, publicFixture } from './public-records';
 
 export async function controlFixture(free = false) {
   const source = publicFixture();

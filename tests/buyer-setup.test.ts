@@ -7,10 +7,7 @@ import test from 'node:test';
 
 import { NODE_ERROR_CODES } from '@gyblos/node/constants';
 
-import {
-  artifactLayout,
-  preparation,
-} from './support/tokenizer-preparation.js';
+import { artifactLayout, preparation } from './support/tokenizer-preparation';
 
 void test('a fresh buyer prepares pinned tokenizer files without an engine or role setup', async () => {
   const { directory, result, artifacts } = await preparation();

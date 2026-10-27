@@ -8,11 +8,11 @@ import { FREE_BUYER } from '@gyblos/buyer/constants';
 import { HTTP_STATUS } from '@gyblos/config';
 import { FREE_CHAT_ROLES, MODEL_IDS } from '@gyblos/protocol/constants';
 
-import { ACCEPTANCE } from './constants.js';
-import { acceptanceAssert, assertAcceptanceActive } from './errors.js';
-import type { FreeAcceptanceBuyer } from './free-buyer.js';
-import { FREE_ACCEPTANCE, FREE_STREAM_ACCEPTANCE } from './free-constants.js';
-import type { IdentityAcceptanceContext } from './identity-context.js';
+import { ACCEPTANCE } from './constants';
+import { acceptanceAssert, assertAcceptanceActive } from './errors';
+import type { FreeAcceptanceBuyer } from './free-buyer';
+import { FREE_ACCEPTANCE, FREE_STREAM_ACCEPTANCE } from './free-constants';
+import type { IdentityAcceptanceContext } from './identity-context';
 
 export async function readIdentityFirstDelta(
   reader: AsyncIterator<Uint8Array>,

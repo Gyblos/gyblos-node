@@ -11,8 +11,8 @@ import { IDENTITY_POLICY_CODES } from '@gyblos/core/identity-policy';
 import { FREE_CHAT_ROLES } from '@gyblos/protocol/constants';
 import { buildFreeExecutionRequest } from '@gyblos/protocol/free-execution';
 
-import { selectionFixture } from './support/buyer-selection.js';
-import { freeSellerFixture } from './support/free-seller.js';
+import { selectionFixture } from './support/buyer-selection';
+import { freeSellerFixture } from './support/free-seller';
 
 void test('a free quote cannot send a prompt after independent identity is revoked', async () => {
   const run = await selectionFixture();

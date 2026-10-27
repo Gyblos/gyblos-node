@@ -19,22 +19,22 @@ import {
   NODE_SETTINGS,
   OFFER_PRICING_KINDS,
   type NodeErrorCode,
-} from './constants.js';
-import { NodeError } from './errors.js';
-import { sellerLimits, type SellerLimits } from './node-config-limits.js';
-import { pricePerMtokToAtomicPerMtok } from './node-config-price.js';
-import { resolveNodeConfig } from './node-config-resolve.js';
+} from './constants';
+import { NodeError } from './errors';
 import {
   readNodeConfigFile,
   type NodeConfig,
   type NodeOffer,
-} from './node-config.js';
+} from './node-config';
+import { sellerLimits, type SellerLimits } from './node-config-limits';
+import { pricePerMtokToAtomicPerMtok } from './node-config-price';
+import { resolveNodeConfig } from './node-config-resolve';
 import {
   defaultSellerOffer,
   SERVED_OFFER,
   servedPaidPrices,
   type SellerCatalogOffer,
-} from './seller-offer.js';
+} from './seller-offer';
 
 export interface SellerSettings {
   relayOnly: boolean;

@@ -19,8 +19,8 @@ import type {
   EVIDENCE_IDS,
   InferenceCaseName,
   InferenceEvidenceErrorCode,
-} from './constants.js';
-import type { EvidenceBase } from './evidence-types.js';
+} from './constants';
+import type { EvidenceBase } from './evidence-types';
 
 export type InferenceSnapshot = Awaited<ReturnType<typeof inferenceSnapshot>>;
 

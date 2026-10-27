@@ -8,7 +8,7 @@ import {
   controlText,
 } from '@gyblos/protocol/control-validation';
 
-import { BUYER_DISCOVERY, BUYER_SELECTION } from './constants.js';
+import { BUYER_DISCOVERY, BUYER_SELECTION } from './constants';
 
 export interface BuyerDiscoveryConfig {
   baseUrl: string;

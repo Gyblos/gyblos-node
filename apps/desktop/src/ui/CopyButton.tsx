@@ -7,8 +7,8 @@ import {
   writeClipboardText,
   type ClipboardWriter,
   type CopyResult,
-} from './clipboard.js';
-import { IconButton } from './UI.js';
+} from './clipboard';
+import { IconButton } from './UI';
 
 export function CopyButton({
   value,

@@ -25,9 +25,9 @@ import {
   addClaimant,
   metadataBytes,
   type SyntheticChain,
-} from './support/identity-accounts.js';
-import { fixedSigner } from './support/identity-fixture.js';
-import { startFakeRpc, type FakeRpc } from './support/identity-rpc-fake.js';
+} from './support/identity-accounts';
+import { fixedSigner } from './support/identity-fixture';
+import { startFakeRpc, type FakeRpc } from './support/identity-rpc-fake';
 
 // Historical v1 gyblos.nodeId value signed by fixedSigner(1) for asset fixedSigner(3), owner fixedSigner(2).
 const LEGACY_V1_VALUE =

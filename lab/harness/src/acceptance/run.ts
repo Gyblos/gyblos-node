@@ -1,6 +1,6 @@
 // Runs bounded, local-only node/discovery acceptance and returns sanitized evidence.
 // Only an explicit engine mode can use local Ollama; no production index, paid path or on-chain operation.
-import { acceptQuote } from './buyer.js';
+import { acceptQuote } from './buyer';
 import {
   ACCEPTANCE,
   ACCEPTANCE_CASES,
@@ -10,20 +10,20 @@ import {
   ACCEPTANCE_MODES,
   type AcceptanceCase,
   type AcceptanceMode,
-} from './constants.js';
+} from './constants';
 import {
   acceptanceAssert,
   AcceptanceError,
   assertAcceptanceActive,
-} from './errors.js';
+} from './errors';
 import {
   busyRecovery,
   expiryRecovery,
   failureRecovery,
   renewalCycles,
   withdrawAndRestart,
-} from './phases.js';
-import { createAcceptanceSession, type AcceptanceSession } from './session.js';
+} from './phases';
+import { createAcceptanceSession, type AcceptanceSession } from './session';
 
 export interface AcceptanceOptions {
   mode?: AcceptanceMode;

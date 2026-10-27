@@ -9,15 +9,15 @@ import {
   guardFailure,
   paymentFixture,
   verifyPayment,
-} from './support/payment-fixture.js';
+} from './support/payment-fixture';
 import {
   fullPrincipalRefund,
   lamportCredits,
   paymentAccounts,
   reconcileZeroCharge,
   tokenCredit,
-} from './support/payment-mutations.js';
-import { TOKEN_FAULTS } from './support/token-faults.js';
+} from './support/payment-mutations';
+import { TOKEN_FAULTS } from './support/token-faults';
 
 void test('saved real finalized pair retains original charge, refund and zero surplus', async () => {
   const fixture = await paymentFixture();

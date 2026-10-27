@@ -1,8 +1,8 @@
 // Adapts the Ollama client to the protocol Engine port: one user message, digest identity, recountable usage.
 import type { Engine, EngineInput } from '@gyblos/protocol/engine';
 
-import { GENERATION, MODEL } from './constants.js';
-import { createOllama } from './index.js';
+import { GENERATION, MODEL } from './constants';
+import { createOllama } from './index';
 
 function userPrompt(input: EngineInput) {
   if (input.prompt !== undefined) return input.prompt;

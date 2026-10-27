@@ -23,10 +23,10 @@ import {
   SCHEMA_VERSIONS,
   UPSTREAM_COMMIT,
   WALLET_ROLES,
-} from './constants.js';
-import { createGateSeller } from './fixed-seller.js';
-import type { ChallengeEvidence } from './fixture-evidence-types.js';
-import { loadConfig, signer } from './wallet.js';
+} from './constants';
+import { createGateSeller } from './fixed-seller';
+import type { ChallengeEvidence } from './fixture-evidence-types';
+import { loadConfig, signer } from './wallet';
 
 export async function challengeGate() {
   const config = await loadConfig();

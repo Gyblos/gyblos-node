@@ -9,7 +9,7 @@ import { homeLayout } from '@gyblos/config/home';
 import { SELLER_BADGES } from '@gyblos/core/constants';
 import type { KnownSeller } from '@gyblos/core/seller-selection';
 
-import { selectionFixture } from './buyer-selection.js';
+import { selectionFixture } from './buyer-selection';
 
 export async function discoveryHome() {
   const directory = await mkdtemp(join(tmpdir(), 'buyer-discovery-'));

@@ -11,7 +11,7 @@ import { SELLER_SELECTION_CODES } from '@gyblos/core/constants';
 import { PUBLIC_RECORD_KINDS } from '@gyblos/protocol/constants';
 import { catalogDigestV2, signPublicV2 } from '@gyblos/protocol/public-v2';
 
-import { selectionFixture } from './support/buyer-selection.js';
+import { selectionFixture } from './support/buyer-selection';
 
 void test('loopback selection returns trusted v1 eligibility and binds signed follow-up without requoting', async () => {
   const run = await selectionFixture();

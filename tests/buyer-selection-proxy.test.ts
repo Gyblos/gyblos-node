@@ -19,7 +19,7 @@ import { homeLayout, ROUTES } from '@gyblos/config';
 import type { Transport } from '@gyblos/transport-iroh';
 import { TRANSPORT_ROUTES } from '@gyblos/transport-iroh/constants';
 
-import { selectionFixture } from './support/buyer-selection.js';
+import { selectionFixture } from './support/buyer-selection';
 
 async function proxy(
   selection: ProxySelection,

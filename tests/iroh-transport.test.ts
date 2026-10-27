@@ -16,8 +16,8 @@ import { NODE_KEY_BYTES } from '@gyblos/node/constants';
 import { createIrohTransport } from '@gyblos/transport-iroh/iroh-client';
 import { serveIroh } from '@gyblos/transport-iroh/iroh-server';
 
-import { endpoint, fixture, fixtureRequest } from './support/native-fixture.js';
-import { NATIVE_TEST_OPTIONS, waitFor } from './support/native-runtime.js';
+import { endpoint, fixture, fixtureRequest } from './support/native-fixture';
+import { NATIVE_TEST_OPTIONS, waitFor } from './support/native-runtime';
 
 async function exercise(relayOnly: boolean, wrongIdentity: boolean) {
   const seller = await endpoint();

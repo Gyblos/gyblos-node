@@ -21,11 +21,8 @@ import {
   scenario,
   snapshot,
   withOllama,
-} from './support/doctor-fixture.js';
-import {
-  FAKE_SECRET,
-  REPOSITORY_ROOT,
-} from './support/node-config-fixtures.js';
+} from './support/doctor-fixture';
+import { FAKE_SECRET, REPOSITORY_ROOT } from './support/node-config-fixtures';
 
 void test('doctor: a ready free seller exits 0, prints its public identity and changes nothing', () =>
   scenario({}, async (run) => {

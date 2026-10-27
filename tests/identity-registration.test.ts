@@ -19,12 +19,12 @@ import {
 } from '@gyblos/identity';
 import { REGISTRATION_DEFAULTS } from '@gyblos/identity/constants';
 
-import { fixedSigner } from './support/identity-fixture.js';
+import { fixedSigner } from './support/identity-fixture';
 import {
   startFakeRpc,
   type FakeRpc,
   type SimulatedSpend,
-} from './support/identity-rpc-fake.js';
+} from './support/identity-rpc-fake';
 
 // A 0-SOL owner that spends 12,524,640 lamports of rent during the probe run, and a 20,000 lamport fee.
 const RENT = 12_524_640;

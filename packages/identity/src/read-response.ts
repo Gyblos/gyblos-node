@@ -2,12 +2,8 @@
 // Malformed provider data is a lookup failure, never a disqualified or revoked chain identity.
 import { getBase64Decoder, getBase64Encoder, isAddress } from '@solana/kit';
 
-import {
-  BASE64_ENCODING,
-  IDENTITY_ERROR_CODES,
-  PROGRAMS,
-} from './constants.js';
-import { IdentityError } from './errors.js';
+import { BASE64_ENCODING, IDENTITY_ERROR_CODES, PROGRAMS } from './constants';
+import { IdentityError } from './errors';
 
 const BASE64_PATTERN =
   /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;

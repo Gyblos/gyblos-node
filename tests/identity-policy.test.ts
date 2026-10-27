@@ -20,7 +20,7 @@ import {
 } from '@gyblos/identity';
 import { nodeIdFromAddress } from '@gyblos/identity/codec';
 
-import { fixedSigner } from './support/identity-fixture.js';
+import { fixedSigner } from './support/identity-fixture';
 
 const CONFIG = {
   budgetLamports: 20_000_000n,

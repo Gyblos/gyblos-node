@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { NATIVE_CAPABILITY } from '../support/native-runtime.js';
+import { NATIVE_CAPABILITY } from '../support/native-runtime';
 
 void test('free acceptance refuses all operational overrides before running and sanitizes failures', async () => {
   const { main } = await import('@gyblos/lab-harness/cli/free-acceptance');

@@ -9,14 +9,14 @@ import {
 import { PUBLIC_RECORD_KINDS } from '@gyblos/protocol/constants';
 import { verifyPublicV2 } from '@gyblos/protocol/public-v2';
 
-import { BUYER_DISCOVERY, BUYER_SELECTION_CODES } from './constants.js';
-import type { BuyerDiscoveryConfig } from './discovery-config.js';
-import type { BuyerDiscoveryState } from './discovery-storage.js';
+import { BUYER_DISCOVERY, BUYER_SELECTION_CODES } from './constants';
+import type { BuyerDiscoveryConfig } from './discovery-config';
+import type { BuyerDiscoveryState } from './discovery-storage';
 import {
   BuyerSelectionError,
   type BuyerSelectionConfig,
   type StaticControlSeller,
-} from './selection-config.js';
+} from './selection-config';
 
 async function rememberEntry(
   entry: DiscoveredSeller,

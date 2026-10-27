@@ -10,7 +10,7 @@ import { parseControlQuery } from '@gyblos/protocol/control-requests';
 import { parseOfferV2 } from '@gyblos/protocol/offer-v2';
 import { parsePublicV2 } from '@gyblos/protocol/public-v2';
 
-import { controlFixture } from './support/control-fixture.js';
+import { controlFixture } from './support/control-fixture';
 
 const prices = (input = '100000', output = '200000') => ({
   inputAtomicPerMtok: input,

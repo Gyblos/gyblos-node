@@ -21,9 +21,9 @@ import {
 } from '@gyblos/protocol/constants';
 import { signPublicV2 } from '@gyblos/protocol/public-v2';
 
-import { freeSellerFixture } from './support/free-seller.js';
-import { endpoint, within } from './support/native-fixture.js';
-import { NATIVE_CAPABILITY } from './support/native-runtime.js';
+import { freeSellerFixture } from './support/free-seller';
+import { endpoint, within } from './support/native-fixture';
+import { NATIVE_CAPABILITY } from './support/native-runtime';
 
 const JSON_HEADERS = { 'content-type': 'application/json' };
 

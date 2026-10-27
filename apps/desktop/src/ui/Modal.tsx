@@ -2,8 +2,8 @@
 import { X } from '@phosphor-icons/react';
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 
-import { useExiting } from './Motion.js';
-import { IconButton } from './UI.js';
+import { useExiting } from './Motion';
+import { IconButton } from './UI';
 
 export function Modal({
   title,

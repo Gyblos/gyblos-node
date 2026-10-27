@@ -26,10 +26,13 @@ import { withExclusiveLock } from '@gyblos/payments-x402/recovery/lock';
 import { currentLockOwner } from '@gyblos/payments-x402/recovery/lock-owner';
 import { withP2pRecoveryLock } from '@gyblos/payments-x402/recovery/recovery-lock';
 
-import { lockFixture } from './support/lock-fixture.js';
+import { lockFixture } from './support/lock-fixture';
 
 const LOCAL_OWNER_SUPPORTED =
   process.platform === 'darwin' || process.platform === 'linux';
+// Include TypeScript loader startup and subprocess scheduling in the deadline.
+const FIFO_PROBE_TIMEOUT_MS = 10_000;
+const FIFO_TEST_TIMEOUT_MS = 15_000;
 
 void test(
   'local lock owner contains the current host, boot identity and PID namespace',
@@ -139,7 +142,7 @@ for (const fault of [
 for (const target of ['buyer', 'audit'] as const)
   void test(
     'FIFO ' + target + ' is refused without entering or blocking recovery',
-    { skip: !LOCAL_OWNER_SUPPORTED, timeout: 5000 },
+    { skip: !LOCAL_OWNER_SUPPORTED, timeout: FIFO_TEST_TIMEOUT_MS },
     async () => {
       const fixture = await lockFixture();
       try {
@@ -156,7 +159,7 @@ for (const target of ['buyer', 'audit'] as const)
             fileURLToPath(new URL('./support/lock-probe.ts', import.meta.url)),
             JSON.stringify(fixture.paths),
           ],
-          { timeout: 2000 },
+          { timeout: FIFO_PROBE_TIMEOUT_MS },
         );
         assert.deepEqual(JSON.parse(result.stdout), {
           rejected: true,

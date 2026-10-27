@@ -1,6 +1,6 @@
 // Owns domain-separated bytes and Ed25519 verification through Web Crypto.
 // Wallet adaptation and signature serialization belong to callers.
-import { canonicalJson } from './canonical.js';
+import { canonicalJson } from './canonical';
 
 export type Signer = (
   bytes: Uint8Array<ArrayBuffer>,

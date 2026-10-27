@@ -15,8 +15,8 @@ import {
   FAKE_SECRET,
   offer,
   REPOSITORY_ROOT,
-} from './support/node-config-fixtures.js';
-import { INVALID_FIXTURES } from './support/node-config-invalid.js';
+} from './support/node-config-fixtures';
+import { INVALID_FIXTURES } from './support/node-config-invalid';
 
 // Every value here is a fake secret or private location that must never be printed.
 const SECRET_ENVIRONMENT = {

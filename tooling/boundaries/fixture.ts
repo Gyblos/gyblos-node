@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import type { BoundaryAnalysis } from './analyze.js';
+import type { BoundaryAnalysis } from './analyze';
 
 export const REPOSITORY = fileURLToPath(new URL('../../', import.meta.url));
 

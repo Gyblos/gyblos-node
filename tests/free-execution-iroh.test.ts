@@ -27,9 +27,9 @@ import {
 } from '@gyblos/protocol/free-execution-framing';
 import { catalogDigestV2, signPublicV2 } from '@gyblos/protocol/public-v2';
 
-import { controlFixture } from './support/control-fixture.js';
-import { endpoint, within } from './support/native-fixture.js';
-import { NATIVE_CAPABILITY } from './support/native-runtime.js';
+import { controlFixture } from './support/control-fixture';
+import { endpoint, within } from './support/native-fixture';
+import { NATIVE_CAPABILITY } from './support/native-runtime';
 
 // Runs one signed free request twice over one connection under the seller's [limits].
 async function exchangeTwice(limits: SellerLimits) {

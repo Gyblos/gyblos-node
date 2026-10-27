@@ -7,7 +7,7 @@ import {
 } from '@gyblos/protocol/control-validation';
 import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
 
-import { FREE_BUYER_CODES, type FreeBuyerCode } from './constants.js';
+import { FREE_BUYER_CODES, type FreeBuyerCode } from './constants';
 
 export class FreeBuyerError extends Error {
   constructor(readonly code: FreeBuyerCode) {

@@ -1,7 +1,7 @@
 // Copies only caller-supplied text after a user action; never reads the clipboard.
-import { COPY_RESULT } from './constants.js';
+import { COPY_RESULT } from './constants';
 
-export { COPY_RESULT } from './constants.js';
+export { COPY_RESULT } from './constants';
 export type ClipboardWriter = { writeText: (text: string) => Promise<void> };
 export type CopyResult = (typeof COPY_RESULT)[keyof typeof COPY_RESULT];
 

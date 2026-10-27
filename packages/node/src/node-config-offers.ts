@@ -22,7 +22,7 @@ import {
   OFFER_PRICING_KINDS,
   type EngineKind,
   type OfferCurrency,
-} from './constants.js';
+} from './constants';
 import {
   ENGINE_URL_POLICY,
   envName,
@@ -39,8 +39,8 @@ import {
   type ConfigPath,
   type ConfigTable,
   type IssueList,
-} from './node-config-fields.js';
-import { readPriceDecimal } from './node-config-price.js';
+} from './node-config-fields';
+import { readPriceDecimal } from './node-config-price';
 
 export type OfferModel =
   | {

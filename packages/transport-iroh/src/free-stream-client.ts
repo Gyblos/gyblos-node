@@ -7,8 +7,8 @@ import {
   decodeFreeStreamEvent,
 } from '@gyblos/protocol/free-stream';
 
-import { IROH_DEADLINES } from './constants.js';
-import type { ControlStream } from './control-io.js';
+import { IROH_DEADLINES } from './constants';
+import type { ControlStream } from './control-io';
 
 export async function readFreeStreamResponse(
   stream: ControlStream,

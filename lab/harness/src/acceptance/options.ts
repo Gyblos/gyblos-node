@@ -3,8 +3,8 @@ import {
   ACCEPTANCE_CODES,
   ACCEPTANCE_MODES,
   type AcceptanceMode,
-} from './constants.js';
-import { AcceptanceError } from './errors.js';
+} from './constants';
+import { AcceptanceError } from './errors';
 
 export function parseAcceptanceArgs(args: readonly string[]): {
   mode: AcceptanceMode;

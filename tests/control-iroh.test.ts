@@ -14,9 +14,9 @@ import {
 } from '@gyblos/protocol/constants';
 import { createControlTransport } from '@gyblos/transport-iroh/control-client';
 
-import { nativeControlFixture as fixture } from './support/native-control.js';
-import { within } from './support/native-fixture.js';
-import { NATIVE_CAPABILITY } from './support/native-runtime.js';
+import { nativeControlFixture as fixture } from './support/native-control';
+import { within } from './support/native-fixture';
+import { NATIVE_CAPABILITY } from './support/native-runtime';
 
 void test(
   'native control fetches catalog/presence and exact quote while paid HTTP v2 stays unsupported',
@@ -211,7 +211,7 @@ void test(
   async () => {
     const run = await fixture();
     const { discoveryHome, discoveryResponse } =
-      await import('./support/buyer-discovery.js');
+      await import('./support/buyer-discovery');
     const home = await discoveryHome();
     try {
       const { runtimeProxySelection } =

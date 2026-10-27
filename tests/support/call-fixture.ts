@@ -83,12 +83,12 @@ function bootstrap(faults: CallFaults) {
       'export async function inferenceSnapshot(){return {slot:1,buyer:"10000",seller:"0",escrow:null,buyerLamports:"0"}}',
     '@gyblos/node/http/inference':
       'export function inferenceCeiling(){return "556"}',
-    './buyer.js':
+    './buyer':
       'export async function trustedOffer(){return {config:{rpcUrl:"https://private.invalid/?api_key=PRIVATE_SENTINEL",mint:"synthetic-mint",buyer:"synthetic-buyer"},trust:{maxAtomic:"10000"},offer:{maxTokens:128,maxAtomic:"10000",expiresAt:Date.now()+240000,payTo:"synthetic-seller",feePayer:"synthetic-fee-payer",authorizer:"synthetic-authorizer",model:{name:"synthetic-model",digest:"synthetic-digest",contextTokens:2048}}}}',
     '@gyblos/node/roles': roles,
     '@gyblos/node/artifacts':
       'export async function modelTokenizer(){return {input:()=>22,count:()=>1}}',
-    './proof.js': proof,
+    './proof': proof,
     '@gyblos/payments-x402/inference-buyer': inference,
   };
   return `import {register} from 'node:module';

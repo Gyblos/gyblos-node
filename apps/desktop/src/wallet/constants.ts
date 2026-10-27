@@ -1,5 +1,5 @@
 // Canonical desktop wallet states and local record limits; no payment policy.
-import { BACKUP } from './backup/constants.js';
+import { BACKUP } from './backup/constants';
 
 export const WALLET_STATUS = {
   LOADING: 'loading',

@@ -8,7 +8,7 @@ import {
 } from '@gyblos/config';
 import { relayOrigins } from '@gyblos/transport-iroh/relay-origins';
 
-import { configurationRpcUrl } from './configuration.js';
+import { configurationRpcUrl } from './configuration';
 import {
   NODE_CONFIG_FLAGS,
   NODE_CONFIG_ISSUE_CODES,
@@ -18,17 +18,17 @@ import {
   NODE_NETWORKS,
   type NodeConfigSource,
   type NodeSettingKey,
-} from './constants.js';
-import { NodeError } from './errors.js';
+} from './constants';
+import { NodeError } from './errors';
+import type { NodeConfig, NodeOffer } from './node-config';
 import {
   formatPath,
   IssueList,
   type ConfigPath,
   type NodeConfigIssue,
   type NodeConfigWarning,
-} from './node-config-fields.js';
-import { readRelayUrl } from './node-config-values.js';
-import type { NodeConfig, NodeOffer } from './node-config.js';
+} from './node-config-fields';
+import { readRelayUrl } from './node-config-values';
 
 export interface NodeConfigFlags {
   home?: string;
@@ -72,7 +72,7 @@ export interface SecretReference {
   present: boolean;
 }
 
-export type { NodeConfigWarning } from './node-config-fields.js';
+export type { NodeConfigWarning } from './node-config-fields';
 
 export type ResolvedNodeConfig =
   | {

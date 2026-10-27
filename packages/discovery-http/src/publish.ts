@@ -9,8 +9,8 @@ import {
   HTTP_STATUS,
   INDEX_ERROR_MAP,
   PUBLISH_STATUS_ERROR_MAP,
-} from './constants.js';
-import { DiscoveryError, discoveryFail } from './errors.js';
+} from './constants';
+import { DiscoveryError, discoveryFail } from './errors';
 import {
   failStatus,
   indexUrl,
@@ -19,7 +19,7 @@ import {
   timeoutOf,
   withDeadline,
   type DiscoveryFetch,
-} from './http.js';
+} from './http';
 
 export interface PublishRecordInput {
   baseUrl: string;

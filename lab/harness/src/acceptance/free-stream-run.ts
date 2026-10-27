@@ -7,16 +7,16 @@ import { FREE_BUYER } from '@gyblos/buyer/constants';
 import { HTTP_STATUS } from '@gyblos/config';
 import { FREE_CHAT_ROLES, MODEL_IDS } from '@gyblos/protocol/constants';
 
-import { ACCEPTANCE, ACCEPTANCE_CODES, ACCEPTANCE_INDEX } from './constants.js';
+import { ACCEPTANCE, ACCEPTANCE_CODES, ACCEPTANCE_INDEX } from './constants';
 import {
   acceptanceAssert,
   AcceptanceError,
   assertAcceptanceActive,
-} from './errors.js';
-import { createFreeBuyer, type FreeAcceptanceBuyer } from './free-buyer.js';
-import { FREE_ACCEPTANCE, FREE_STREAM_ACCEPTANCE } from './free-constants.js';
-import { createFreeSeller } from './free-session.js';
-import { pump } from './phases.js';
+} from './errors';
+import { createFreeBuyer, type FreeAcceptanceBuyer } from './free-buyer';
+import { FREE_ACCEPTANCE, FREE_STREAM_ACCEPTANCE } from './free-constants';
+import { createFreeSeller } from './free-session';
+import { pump } from './phases';
 
 function openStream(url: string, signal: AbortSignal) {
   const address = new URL(url);

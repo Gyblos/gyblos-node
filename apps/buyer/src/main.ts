@@ -2,7 +2,7 @@
 // Payment and call workflows remain explicit separate commands.
 import { isMain, onShutdown } from '@gyblos/runtime';
 
-import { startBuyer } from './buyer.js';
+import { startBuyer } from './buyer';
 
 export async function main() {
   const host = await startBuyer();

@@ -5,18 +5,13 @@ import {
   FREE_EXECUTION,
   FREE_EXECUTION_CODES,
   FREE_STREAM,
-} from './constants.js';
-import { ControlFrameReader, encodeControlFrame } from './control-framing.js';
+} from './constants';
+import { ControlFrameReader, encodeControlFrame } from './control-framing';
 import {
   controlHex,
   controlInteger,
   controlObject,
-} from './control-validation.js';
-import {
-  freeExecutionBoundary,
-  freeExecutionFail,
-  freeExecutionText,
-} from './free-execution-validation.js';
+} from './control-validation';
 import {
   freeExecutionDigest,
   matchFreeExecutionResponse,
@@ -25,7 +20,12 @@ import {
   type FreeExecutionRequest,
   type FreeExecutionResponse,
   type FreeExecutionResult,
-} from './free-execution.js';
+} from './free-execution';
+import {
+  freeExecutionBoundary,
+  freeExecutionFail,
+  freeExecutionText,
+} from './free-execution-validation';
 
 interface FreeStreamHeader {
   version: typeof FREE_EXECUTION.version;

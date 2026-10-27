@@ -9,13 +9,13 @@ import { createControlQuote } from '@gyblos/core/control-quotes';
 import type { SellerCandidate } from '@gyblos/core/seller-selection';
 import type { InferenceOffer } from '@gyblos/protocol/offer';
 
-import { controlFixture } from './support/control-fixture.js';
+import { controlFixture } from './support/control-fixture';
 import {
   chosen,
   request,
   select,
   seller,
-} from './support/seller-selection-fixture.js';
+} from './support/seller-selection-fixture';
 
 void test('seller minimum budget rounds the combined per-million cost of one input and output token', () => {
   const result = select([seller(1)], { request: request({ maxAtomic: '1' }) });

@@ -16,8 +16,8 @@ import {
   fixtureRequest,
   NativeTestDeadlineError,
   within,
-} from './support/native-fixture.js';
-import { NATIVE_TEST_OPTIONS, waitFor } from './support/native-runtime.js';
+} from './support/native-fixture';
+import { NATIVE_TEST_OPTIONS, waitFor } from './support/native-runtime';
 
 const TIMEOUT = 20_000;
 

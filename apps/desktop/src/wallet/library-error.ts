@@ -1,5 +1,5 @@
 // Static internal collection failures; never exposes paths, secrets or native errors.
-import { WALLET_LIBRARY_ERROR } from './constants.js';
+import { WALLET_LIBRARY_ERROR } from './constants';
 
 export class WalletLibraryError extends Error {
   constructor(

@@ -9,9 +9,9 @@ import {
 } from '@gyblos/protocol/free-execution';
 import { FreeClientError } from '@gyblos/transport-iroh/free-client';
 
-import { FREE_BUYER, FREE_BUYER_CODES } from './constants.js';
-import { FreeBuyerError } from './free-chat.js';
-import type { SelectionDecision } from './selection.js';
+import { FREE_BUYER, FREE_BUYER_CODES } from './constants';
+import { FreeBuyerError } from './free-chat';
+import type { SelectionDecision } from './selection';
 
 export class FreeSelectionFailure extends Error {
   constructor(readonly decision: Exclude<SelectionDecision, { ok: true }>) {

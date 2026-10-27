@@ -19,7 +19,7 @@ import {
   diagnosticBarrier,
   diagnosticUntil,
   withDiagnosticHost,
-} from './support/facilitator-diagnostic-fixture.js';
+} from './support/facilitator-diagnostic-fixture';
 
 void test(
   'diagnostic response-error monitoring preserves unhandled error propagation',

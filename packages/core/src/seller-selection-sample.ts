@@ -3,8 +3,8 @@
 import type { ReasoningLevel } from '@gyblos/protocol/constants';
 import type { PublicModelV2 } from '@gyblos/protocol/control-types';
 
-import { invalid } from './seller-selection-input.js';
-import { isFree, type Weighted } from './seller-selection-weight.js';
+import { invalid } from './seller-selection-input';
+import { isFree, type Weighted } from './seller-selection-weight';
 
 export interface SellerCandidate {
   owner: string;

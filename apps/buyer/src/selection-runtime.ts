@@ -8,25 +8,25 @@ import type { BuyerIdentityVerifier } from '@gyblos/node/identity-verifier';
 import type { InferenceOffer } from '@gyblos/protocol/offer';
 import { assertConfiguredRelay } from '@gyblos/transport-iroh/endpoint';
 
-import { BUYER_SELECTION_CODES } from './constants.js';
-import { connectBuyerControl } from './control.js';
-import { buyerDiscoveryState } from './discovery-storage.js';
-import { discoverBuyerSellers } from './discovery.js';
+import { BUYER_SELECTION_CODES } from './constants';
+import { connectBuyerControl } from './control';
+import { discoverBuyerSellers } from './discovery';
+import { buyerDiscoveryState } from './discovery-storage';
 import {
   prepareBuyerIdentity,
   requireBuyerIdentity,
   verifyBuyerIdentity,
-} from './identity.js';
+} from './identity';
+import { selectBuyerQuote, type SelectionDecision } from './selection';
 import {
   BuyerSelectionError,
   loadBuyerSelectionConfig,
   type BuyerSelectionConfig,
   type StaticControlSeller,
-} from './selection-config.js';
-import { createProxySelection } from './selection-proxy.js';
-import { selectionStats } from './selection-stats.js';
-import { requireLegacyQuoteCompatibility } from './selection-v1.js';
-import { selectBuyerQuote, type SelectionDecision } from './selection.js';
+} from './selection-config';
+import { createProxySelection } from './selection-proxy';
+import { selectionStats } from './selection-stats';
+import { requireLegacyQuoteCompatibility } from './selection-v1';
 
 export interface PreparedBuyerSelection {
   config: BuyerSelectionConfig;

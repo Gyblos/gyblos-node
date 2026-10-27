@@ -4,10 +4,10 @@ import type { SupportedResponse } from '@x402/core/types';
 import {
   type AuditedPublicFacilitator,
   type createExactSeller,
-} from '../../exact/seller.js';
-import type { ExactGateEvidence } from '../../types.js';
-import { type Config } from '../../wallet.js';
-import type { authorizationMetadata } from './reconcile.js';
+} from '../../exact/seller';
+import type { ExactGateEvidence } from '../../types';
+import { type Config } from '../../wallet';
+import type { authorizationMetadata } from './reconcile';
 
 export interface ExactProvider {
   url: string;

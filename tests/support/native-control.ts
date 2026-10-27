@@ -11,8 +11,8 @@ import { signPublicV2 } from '@gyblos/protocol/public-v2';
 import { createControlTransport } from '@gyblos/transport-iroh/control-client';
 import { serveIroh } from '@gyblos/transport-iroh/iroh-server';
 
-import { controlFixture } from './control-fixture.js';
-import { endpoint } from './native-fixture.js';
+import { controlFixture } from './control-fixture';
+import { endpoint } from './native-fixture';
 
 export async function nativeControlFixture(queryMs = 1000) {
   const source = await controlFixture();

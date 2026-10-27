@@ -32,9 +32,9 @@ import {
   type FreeExecutionResponse,
 } from '@gyblos/protocol/free-execution';
 
-import { OFFER_PRICING_KINDS } from './constants.js';
-import { createFreeStreamOutput } from './free-execution-stream.js';
-import type { SellerCatalogOffer } from './seller-offer.js';
+import { OFFER_PRICING_KINDS } from './constants';
+import { createFreeStreamOutput } from './free-execution-stream';
+import type { SellerCatalogOffer } from './seller-offer';
 
 export interface SellerFreeExecutionOptions {
   owner: string;

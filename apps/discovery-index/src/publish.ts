@@ -4,21 +4,21 @@ import { PUBLIC_RECORD_KINDS } from '@gyblos/protocol/constants';
 import type { PublicRecordV2 } from '@gyblos/protocol/control-types';
 import { catalogDigestV2 } from '@gyblos/protocol/public-v2';
 
-import { readPublishBody } from './body.js';
+import { readPublishBody } from './body';
 import {
   DISCOVERY_INDEX_LIMITS,
   DISCOVERY_LIMITERS,
   INDEX_ERRORS,
-} from './constants.js';
-import { indexFail } from './errors.js';
-import { allowed, type ResolvedLimiters } from './limits.js';
+} from './constants';
+import { indexFail } from './errors';
+import { allowed, type ResolvedLimiters } from './limits';
 import {
   allowlistWithin,
   publisherAllowed,
   type DiscoveryPublishers,
-} from './publishers.js';
-import type { DiscoveryStorage, StoredEntry } from './storage.js';
-import { verifyAgainstStored, verifySelfSigned } from './verify.js';
+} from './publishers';
+import type { DiscoveryStorage, StoredEntry } from './storage';
+import { verifyAgainstStored, verifySelfSigned } from './verify';
 
 export interface PublishContext {
   storage: DiscoveryStorage;

@@ -1,11 +1,7 @@
 // Owns one utility worker until its exit; does not initialize Electron or native transport.
 // The injected factory permits deterministic lifecycle regressions without real processes.
-import { DESKTOP, PROBE_STATUS } from './constants.js';
-import {
-  failedProbe,
-  parseProbeResult,
-  type ProbeResult,
-} from './probe-model.js';
+import { DESKTOP, PROBE_STATUS } from './constants';
+import { failedProbe, parseProbeResult, type ProbeResult } from './probe-model';
 
 export interface ProbeWorker {
   on(event: 'spawn', listener: () => void): unknown;

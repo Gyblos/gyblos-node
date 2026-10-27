@@ -19,9 +19,9 @@ import { catalogDigestV2, signPublicV2 } from '@gyblos/protocol/public-v2';
 import { createFreeExecutionClient } from '@gyblos/transport-iroh/free-client';
 import { serveIroh } from '@gyblos/transport-iroh/iroh-server';
 
-import { controlFixture } from './support/control-fixture.js';
-import { endpoint, within } from './support/native-fixture.js';
-import { NATIVE_CAPABILITY } from './support/native-runtime.js';
+import { controlFixture } from './support/control-fixture';
+import { endpoint, within } from './support/native-fixture';
+import { NATIVE_CAPABILITY } from './support/native-runtime';
 
 void test(
   'native streaming ALPN returns correlated deltas and forwards buyer cancellation to policy',

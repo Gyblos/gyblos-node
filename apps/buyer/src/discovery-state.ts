@@ -13,8 +13,8 @@ import {
 import { catalogDigestV2 } from '@gyblos/protocol/public-v2';
 import { signingBytes } from '@gyblos/protocol/signing';
 
-import { BUYER_SELECTION_CODES } from './constants.js';
-import { BuyerSelectionError } from './selection-config.js';
+import { BUYER_SELECTION_CODES } from './constants';
+import { BuyerSelectionError } from './selection-config';
 
 export interface DiscoveryRow {
   owner: string;

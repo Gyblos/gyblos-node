@@ -6,13 +6,13 @@ import test from 'node:test';
 import { BUYER_RELAY_ONLY_ENV, IPV6_LOOPBACK, LOCALHOST } from '@gyblos/config';
 import { RELAY_CONFIGURATION_CODES } from '@gyblos/transport-iroh/constants';
 
-import { NATIVE_CAPABILITY } from './support/native-runtime.js';
+import { NATIVE_CAPABILITY } from './support/native-runtime';
 import {
   endpointProbe,
   PROBE_ACTIONS,
   RELAY_TOKEN_SENTINEL,
   withRelayOffer,
-} from './support/relay-fixture.js';
+} from './support/relay-fixture';
 
 const OPTIONS = { skip: NATIVE_CAPABILITY.bindingSkip };
 const TOKEN = `${RELAY_TOKEN_SENTINEL}-synthetic-relay-token`;

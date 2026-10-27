@@ -2,7 +2,7 @@
 // the separate lab home and the legacy paths they replace. Pure path computation; never touches files.
 import { join } from 'node:path';
 
-import { CONFIG_PATH_ERROR } from './constants.js';
+import { CONFIG_PATH_ERROR } from './constants';
 
 export const HOME_ENVIRONMENT = {
   product: 'GYBLOS_HOME',

@@ -5,7 +5,7 @@ import {
   DISCOVERY_LIMITERS,
   LOOPBACK_HOSTS,
   type DiscoveryLimiterName,
-} from './constants.js';
+} from './constants';
 
 // The subset of a Cloudflare rate-limit binding the index uses.
 export interface RateLimiter {

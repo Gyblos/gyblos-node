@@ -7,10 +7,10 @@ import {
   Wrench,
 } from '@phosphor-icons/react';
 
-import { BUTTON_VARIANT } from './constants.js';
-import { Dropdown } from './Dropdown.js';
-import { ServiceLogo } from './ServiceLogo.js';
-import { TOOLS, type ToolId } from './tools.js';
+import { BUTTON_VARIANT } from './constants';
+import { Dropdown } from './Dropdown';
+import { ServiceLogo } from './ServiceLogo';
+import { TOOLS, type ToolId } from './tools';
 import {
   Avatar,
   Badge,
@@ -21,7 +21,7 @@ import {
   Note,
   RowCopy,
   SectionTitle,
-} from './UI.js';
+} from './UI';
 
 export function ToolConnections({
   connected,

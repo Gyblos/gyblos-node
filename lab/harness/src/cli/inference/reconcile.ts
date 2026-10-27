@@ -13,8 +13,8 @@ import { JOURNAL_STATES } from '@gyblos/payments-x402/constants';
 import { createInferenceBuyer } from '@gyblos/payments-x402/inference-buyer';
 import { validateSettlement } from '@gyblos/payments-x402/trust';
 
-import { saveJournal } from '../../journal.js';
-import type { CaseContext } from './types.js';
+import { saveJournal } from '../../journal';
+import type { CaseContext } from './types';
 
 export async function reconcileCase({
   config: config,

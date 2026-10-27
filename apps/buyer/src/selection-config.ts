@@ -30,15 +30,15 @@ import {
 import { parseTokenPricesV2 } from '@gyblos/protocol/pricing-v2';
 import { parsePublicV2 } from '@gyblos/protocol/public-v2';
 
-import { BUYER_SELECTION, BUYER_SELECTION_CODES } from './constants.js';
+import { BUYER_SELECTION, BUYER_SELECTION_CODES } from './constants';
 import {
   parseBuyerDiscoveryConfig,
   type BuyerDiscoveryConfig,
-} from './discovery-config.js';
+} from './discovery-config';
 import {
   parseBuyerIdentityConfig,
   type BuyerIdentityConfig,
-} from './identity-config.js';
+} from './identity-config';
 
 export class BuyerSelectionError extends Error {
   constructor(

@@ -24,8 +24,8 @@ import {
 } from '@gyblos/protocol/public-v2';
 import type { Signer } from '@gyblos/protocol/signing';
 
-import { SELLER_PUBLIC_RECORDS } from './constants.js';
-import type { SellerSequence } from './public-sequence.js';
+import { SELLER_PUBLIC_RECORDS } from './constants';
+import type { SellerSequence } from './public-sequence';
 
 export interface SellerPublicRecords {
   current(): SignedPublicV2;

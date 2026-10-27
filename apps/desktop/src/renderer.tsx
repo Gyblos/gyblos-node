@@ -2,11 +2,11 @@
 // The normal Chat/Connect flow never invokes the native probe or any product service.
 import { createRoot } from 'react-dom/client';
 
-import { CompatibilityView } from './compatibility-view.js';
-import { STARTUP_WINDOW } from './constants.js';
-import { DesktopApp } from './desktop-app.js';
-import { WalletSetup } from './ui/WalletSetup.js';
-import { DesktopWalletProvider } from './ui/WalletState.js';
+import { CompatibilityView } from './compatibility-view';
+import { STARTUP_WINDOW } from './constants';
+import { DesktopApp } from './desktop-app';
+import { WalletSetup } from './ui/WalletSetup';
+import { DesktopWalletProvider } from './ui/WalletState';
 
 import './mockup-base.css';
 import './ui/motion.css';

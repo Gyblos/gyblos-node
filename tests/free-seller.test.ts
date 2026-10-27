@@ -14,7 +14,7 @@ import { signOfferV2 } from '@gyblos/protocol/offer-v2';
 import {
   freeSellerFixture as fixture,
   freeSellerSignal as signal,
-} from './support/free-seller.js';
+} from './support/free-seller';
 
 void test('free seller executes one authenticated request and returns bounded recounted usage', async () => {
   const state = await fixture();

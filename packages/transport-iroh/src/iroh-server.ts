@@ -19,26 +19,19 @@ import {
   connectionFamily,
   connectionSource,
   createConnectionAdmission,
-} from './admission.js';
-import {
-  HTTP_OVER_IROH,
-  IROH_DEADLINES,
-  TRANSPORT_ROUTES,
-} from './constants.js';
-import {
-  handleControlConnection,
-  type ControlService,
-} from './control-server.js';
-import { withDeadline } from './deadline.js';
+} from './admission';
+import { HTTP_OVER_IROH, IROH_DEADLINES, TRANSPORT_ROUTES } from './constants';
+import { handleControlConnection, type ControlService } from './control-server';
+import { withDeadline } from './deadline';
 import {
   handleFreeExecutionConnection,
   type FreeExecutionService,
-} from './free-server.js';
-import { handleIrohConnection } from './iroh-connection.js';
-import { createPeerLimiter } from './limiter.js';
-import { loopbackRequest } from './loopback.js';
-import { selectedRoute } from './paths.js';
-import { decodeRequest, encodeResponse } from './wire.js';
+} from './free-server';
+import { handleIrohConnection } from './iroh-connection';
+import { createPeerLimiter } from './limiter';
+import { loopbackRequest } from './loopback';
+import { selectedRoute } from './paths';
+import { decodeRequest, encodeResponse } from './wire';
 
 const { streamCloseCode } = HTTP_OVER_IROH;
 const { connectMs, requestMs } = TRANSPORT_TIMEOUTS;

@@ -20,7 +20,7 @@ import {
   SELLER_SELECTION_CODES,
   type SellerBadge,
   type SellerSelectionPolicy,
-} from './constants.js';
+} from './constants';
 
 export const LEVEL_ORDER: readonly ReasoningLevel[] = [
   REASONING_LEVELS.OFF,

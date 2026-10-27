@@ -1,7 +1,7 @@
 // Waits for parent acknowledgement before terminating the completed utility probe.
 // The result must already represent closed resources; no SDK or process starts here.
-import { DESKTOP, PROBE_STATUS } from './constants.js';
-import type { ProbeResult } from './probe-model.js';
+import { DESKTOP, PROBE_STATUS } from './constants';
+import type { ProbeResult } from './probe-model';
 
 export interface ResultPort {
   once(

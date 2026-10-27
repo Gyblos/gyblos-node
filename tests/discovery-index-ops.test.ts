@@ -23,7 +23,7 @@ import {
   namedParams,
   namedSql,
   type SqliteStatement,
-} from './support/d1-sqlite.js';
+} from './support/d1-sqlite';
 import {
   allLimiters,
   CLIENT_IP,
@@ -33,7 +33,7 @@ import {
   INDEX_OWNER,
   indexNode,
   T0,
-} from './support/discovery-index-fixture.js';
+} from './support/discovery-index-fixture';
 
 const post = (body: string, headers: Record<string, string> = {}) =>
   new Request(`${INDEX_ORIGIN}/v1/records`, {

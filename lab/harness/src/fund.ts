@@ -39,8 +39,8 @@ import {
   GATE_FUNDING_LIMITS,
   WALLET_ROLES,
   type FundingOperation,
-} from './constants.js';
-import { configPath, loadConfig, signer } from './wallet.js';
+} from './constants';
+import { configPath, loadConfig, signer } from './wallet';
 
 interface FundingLogEntry {
   operation: FundingOperation;

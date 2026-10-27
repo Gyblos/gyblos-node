@@ -2,7 +2,7 @@
 // Cleanup failures are reported without exposing private paths or blocking exit.
 import { rmSync } from 'node:fs';
 
-import { DESKTOP } from './constants.js';
+import { DESKTOP } from './constants';
 
 export function cleanupDesktopSession(
   directory: string,

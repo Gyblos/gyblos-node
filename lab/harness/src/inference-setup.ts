@@ -11,7 +11,7 @@ import { prepareModelTokenizer } from '@gyblos/node/artifacts';
 import { assertOllamaModelsHome } from '@gyblos/node/home';
 import { spawnChild, stopChild, waitReady } from '@gyblos/runtime';
 
-import { GATE_HOSTS, GATE_PORTS, GATE_RETRIES } from './constants.js';
+import { GATE_HOSTS, GATE_PORTS, GATE_RETRIES } from './constants';
 
 async function prepareGateArtifacts() {
   await prepareModelTokenizer();

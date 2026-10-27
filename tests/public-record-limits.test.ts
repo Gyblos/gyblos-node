@@ -18,7 +18,7 @@ import {
   PUBLIC_TEST_NOW,
   publicFixture,
   publicLifecycleFixture,
-} from './support/public-records.js';
+} from './support/public-records';
 
 void test('public lifecycle rejects excess lifetimes, catalog expiry and changed catalog identities', async () => {
   const { catalog, presence, withdrawal, signed, linked } =

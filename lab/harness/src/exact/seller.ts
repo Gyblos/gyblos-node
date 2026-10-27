@@ -32,10 +32,10 @@ import {
   GATE_HTTP_STATUS,
   GATE_ROUTES,
   PUBLIC_CALL_OUTCOMES,
-} from '../constants.js';
-import { exactAuthorizationId } from './authorization-id.js';
-import { assertExactSupport, validateExactTerms } from './index.js';
-import type { PublicCall } from './types.js';
+} from '../constants';
+import { exactAuthorizationId } from './authorization-id';
+import { assertExactSupport, validateExactTerms } from './index';
+import type { PublicCall } from './types';
 
 export class AuditedPublicFacilitator extends HTTPFacilitatorClient {
   readonly calls: PublicCall[] = [];

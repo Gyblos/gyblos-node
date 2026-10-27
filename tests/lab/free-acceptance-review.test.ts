@@ -60,7 +60,7 @@ function initializationFailure(borrowed: boolean) {
   const sources = {
     '@gyblos/buyer/control':
       'data:text/javascript,' + encodeURIComponent(constructor),
-    './native.js': 'data:text/javascript,' + encodeURIComponent(native),
+    './native': 'data:text/javascript,' + encodeURIComponent(native),
   };
   const source = `
     import {registerHooks} from 'node:module';

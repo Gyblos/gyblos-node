@@ -2,7 +2,7 @@
 import { CONTROL_CODES } from '@gyblos/protocol/constants';
 import { controlFail, controlHex } from '@gyblos/protocol/control-validation';
 
-import { CONTROL_CAPACITY } from './constants.js';
+import { CONTROL_CAPACITY } from './constants';
 
 interface Bucket {
   tokens: number;

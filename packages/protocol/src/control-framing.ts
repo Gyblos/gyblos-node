@@ -1,7 +1,7 @@
 // Encodes and incrementally reads one bounded canonical JSON frame; the caller supplies EOF and deadlines.
-import { canonicalJson } from './canonical.js';
-import { CONTROL_CODES, CONTROL_LIMITS } from './constants.js';
-import { controlFail } from './control-validation.js';
+import { canonicalJson } from './canonical';
+import { CONTROL_CODES, CONTROL_LIMITS } from './constants';
+import { controlFail } from './control-validation';
 
 function validateDepth(value: unknown) {
   const pending = [{ value, depth: 0 }];
