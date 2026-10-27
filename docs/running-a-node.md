@@ -148,7 +148,10 @@ pnpm node:start
   restart the node to publish a fresh one.
 - The paid HTTP bridge exposes only `/v1/chat/completions`. A separate
   `gyblos/control/1` ALPN serves signed catalog, presence and quote queries.
-  Stop with Ctrl-C.
+  Stop with Ctrl-C (not Ctrl-Z, which only suspends the process). Stopping
+  withdraws from discovery and saves the public sequence; further Ctrl-C presses
+  during that stop are ignored with a notice, so wait for the prompt. A forced
+  kill can leave a sequence lock (see `pnpm gyblos doctor`).
 
 ## Buyer
 
@@ -255,6 +258,13 @@ A direct connection shows each peer's IP address to the other.
 
 The relay still sees both peers' IP addresses. Off-host relay-only privacy has
 not been measured.
+
+A relay-only seller cannot be tested with its buyer on the same machine: after
+the first exchange Iroh switches to a direct loopback path, and the seller's
+relay-only policy closes that connection, so the buyer reports
+`NO_SELLER_CANDIDATES`. For a single-machine test set `relay_only = false` (no
+address leaves the machine); keep relay-only for sellers reached from other
+machines.
 
 ## Other settings
 
@@ -432,6 +442,13 @@ The free entry enforces those zero ceilings/budget even if a shared selection
 file permits paid quotes. `pinnedNodeId`, data-retention filters and configured
 relays still apply; `PINNED_SELLER_IN_COOLDOWN` retains `cooldownUntil` in the
 error object. Badges stay `declared-usage` and `openChannel` stays false.
+
+If startup fails, `buyer:free` prints `FREE_BUYER_CONFIGURATION_REQUIRED` with a
+reason and a next step, for example `BUYER_ROLE_MISSING` (run `node:setup`),
+`SELECTION_CONFIG_MISSING` or `SELECTION_CONFIG_INVALID` (create or fix
+`selection.json` in the buyer home), `SELECTION_MAX_TOKENS_TOO_HIGH`,
+`MISSING_RELAY_TOKEN` or `BUYER_PORT_IN_USE`. No path or file content is
+printed.
 
 Supported request shape for `POST /v1/chat/completions`:
 

@@ -1,4 +1,5 @@
-// Child-process helpers: spawn, stop with SIGKILL fallback, port-free and readiness polling, main checks.
+// Child-process helpers: spawn, stop with SIGKILL fallback, port-free and readiness polling, main checks,
+// and shutdown signal handling.
 import {
   spawn,
   type ChildProcess,
@@ -24,6 +25,35 @@ export function onShutdown(handler: () => void) {
   return () => {
     process.removeListener('SIGINT', handler);
     process.removeListener('SIGTERM', handler);
+  };
+}
+
+// Resolves `signalled` on the first SIGINT/SIGTERM and keeps a listener installed until `dispose()`, so
+// a repeated Ctrl-C while the caller stops prints a notice instead of killing the process mid-write.
+export function shutdownSignal(
+  notice: (text: string) => void = (text) => process.stderr.write(text),
+) {
+  let resolve: () => void = () => {};
+  const signalled = new Promise<void>((done) => {
+    resolve = done;
+  });
+  let received = 0;
+  const handler = () => {
+    received++;
+    if (received === 1) resolve();
+    else if (received === 2)
+      notice(
+        'Stopping: finishing state writes and withdrawing; please wait (Ctrl-C again is ignored).\n',
+      );
+  };
+  process.on('SIGINT', handler);
+  process.on('SIGTERM', handler);
+  return {
+    signalled,
+    dispose() {
+      process.removeListener('SIGINT', handler);
+      process.removeListener('SIGTERM', handler);
+    },
   };
 }
 
