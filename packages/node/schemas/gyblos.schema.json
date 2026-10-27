@@ -132,7 +132,7 @@
       }
     },
     "limits": {
-      "description": "Seller capacity; omitted keys keep the built-in value shown. A per-buyer value above its total is refused by the validator.",
+      "description": "Seller capacity; omitted keys keep the built-in value shown. The validator also requires max_connections x requests_per_minute <= global_requests_per_minute, using the defaults for omitted keys.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -142,23 +142,17 @@
           "minimum": 1,
           "maximum": 64
         },
-        "max_peer_connections": {
-          "description": "Connections per buyer NodeId and kind, control or data (default 1); at most max_connections.",
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 4
-        },
         "requests_per_minute": {
-          "description": "Requests per buyer NodeId per minute (default 30); at most global_requests_per_minute.",
+          "description": "Requests per buyer NodeId per minute (default 30).",
           "type": "integer",
           "minimum": 1,
-          "maximum": 600
+          "maximum": 120
         },
         "global_requests_per_minute": {
           "description": "Requests per minute across all buyers (default 256).",
           "type": "integer",
           "minimum": 1,
-          "maximum": 4096
+          "maximum": 1024
         },
         "max_free_buyers_per_day": {
           "description": "Distinct buyers a free offer serves per UTC day (default 1024).",

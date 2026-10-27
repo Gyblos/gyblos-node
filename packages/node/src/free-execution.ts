@@ -48,7 +48,8 @@ export interface SellerFreeExecutionOptions {
   readiness: () => QuoteReadiness;
   now: () => number;
   startedAt: number;
-  maxFreeBuyers?: number;
+  // Distinct buyers per UTC day, from gyblos.toml [limits].
+  maxFreeBuyers: number;
 }
 function checkSignal(signal: AbortSignal) {
   if (signal.aborted) return fail(FREE_EXECUTION_CODES.CANCELLED);

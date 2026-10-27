@@ -267,32 +267,43 @@ Each value is an integer from 1 to a hard ceiling, so a typo cannot let one
 seller exhaust its machine. A value out of range is `INVALID_LIMIT`, and startup
 stops with `NODE_CONFIG_INVALID`.
 
-| Key                          | Default | Ceiling | Meaning                                                                           |
-| ---------------------------- | ------- | ------- | --------------------------------------------------------------------------------- |
-| `max_connections`            | 8       | 64      | open buyer connections in total                                                   |
-| `max_peer_connections`       | 1       | 4       | connections per buyer NodeId, counted separately for control and data connections |
-| `requests_per_minute`        | 30      | 600     | requests per buyer NodeId per minute                                              |
-| `global_requests_per_minute` | 256     | 4096    | requests per minute across all buyers                                             |
-| `max_free_buyers_per_day`    | 1024    | 65536   | distinct buyers a free offer serves per UTC day                                   |
+| Key                          | Default | Ceiling | Meaning                                         |
+| ---------------------------- | ------- | ------- | ----------------------------------------------- |
+| `max_connections`            | 8       | 64      | open buyer connections in total                 |
+| `requests_per_minute`        | 30      | 120     | requests per buyer NodeId per minute            |
+| `global_requests_per_minute` | 256     | 1024    | requests per minute across all buyers           |
+| `max_free_buyers_per_day`    | 1024    | 65536   | distinct buyers a free offer serves per UTC day |
 
 ```toml
 [limits]
 max_connections = 16
 requests_per_minute = 60
+global_requests_per_minute = 1024
 ```
 
-A per-buyer value above its total (`max_peer_connections` above
-`max_connections`, or `requests_per_minute` above `global_requests_per_minute`)
-can never be reached and is refused with `INVALID_LIMIT`. The comparison uses
-the effective total, which may be the default. The editor schema cannot check
-this rule; `config validate` does.
+Each connected buyer reserves its `requests_per_minute` from the global budget,
+so the budget must cover a full pool:
+`max_connections × requests_per_minute ≤ global_requests_per_minute`, with the
+default for any key the file omits (the defaults give 8 × 30 = 240 ≤ 256).
+Otherwise later buyers would be refused and one buyer could hold the whole
+budget, so the file is refused with `INVALID_LIMIT` on the first key it sets
+among `global_requests_per_minute`, `requests_per_minute` and `max_connections`.
+The editor schema cannot check this rule; `config validate` does.
 
-Request concurrency is not configurable. The daemon's managed Ollama runs one
-generation at a time, so each buyer has one request in flight and the seller at
-most two at once (one for a free offer). Wire sizes, deadlines and the
-connection-attempt limits protect the protocol, not capacity, and stay fixed.
-`[limits]` is file-only: there are no `GYBLOS_*` variables for it, and the buyer
-ignores it. `pnpm gyblos doctor` prints the limits the seller will serve with.
+Free execution opens one connection per request, so the connection-attempt
+limits rise with a raised request rate (per buyer and per source to
+`requests_per_minute`, in total to `global_requests_per_minute`) and never fall
+below their built-in values. Up to 8 handshakes are pending at once whatever
+`max_connections` is, so a large pool fills gradually.
+
+Request concurrency and connections per buyer are not configurable. The daemon's
+managed Ollama runs one generation at a time, so each buyer has one request in
+flight and the seller at most two in flight (one running, one queued; one for a
+free offer). Each buyer keeps one control and one data connection. Wire sizes
+and deadlines protect the protocol, not capacity, and stay fixed. `[limits]` is
+file-only: there are no `GYBLOS_*` variables for it, and the buyer ignores it.
+`config validate` checks the section but does not print the values;
+`pnpm gyblos doctor` prints the limits the seller will serve with.
 
 ## Seller preflight (`gyblos doctor`)
 
@@ -339,7 +350,7 @@ KiB), `UNKNOWN_KEY`, `MISSING_KEY`, `WRONG_TYPE`, `INVALID_VALUE`,
 `INSECURE_URL`, `INVALID_ENV_NAME`, `INLINE_SECRET`, `DUPLICATE_VALUE`,
 `TOO_MANY`, `UNKNOWN_MODEL`, `CUSTOM_MODEL_IN_CATALOG`, `NON_CANONICAL_DECIMAL`,
 `PRICE_OUT_OF_RANGE`, `PRICE_ZERO`, `PRICING_CONFLICT`, `PRICING_MISSING`,
-`INVALID_CAP`, `RELAY_ONLY_CONFLICT`, `REASONING_UNSUPPORTED`, `INVALID_LIMIT`.
+`INVALID_CAP`, `RELAY_ONLY_CONFLICT`, `INVALID_LIMIT`, `REASONING_UNSUPPORTED`.
 The canonical list is `NODE_CONFIG_ISSUE_CODES` in
 `packages/node/src/constants.ts`.
 

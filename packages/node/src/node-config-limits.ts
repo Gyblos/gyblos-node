@@ -1,6 +1,7 @@
 // gyblos.toml [limits]: the seller capacity values an operator may tune, each between 1 and a hard
-// ceiling, checked against the built-in value of any total it is part of. Request concurrency stays
-// fixed because the managed engine serves one generation at a time.
+// ceiling, and together within the global request budget. Request concurrency and per-buyer
+// connections stay fixed: the managed engine runs one generation at a time, so each buyer has one
+// request in flight and the seller at most two (one running, one queued).
 import { TRANSPORT_LIMITS, type TransportLimits } from '@gyblos/config';
 import { FREE_EXECUTION_ADMISSION } from '@gyblos/core/constants';
 
@@ -17,7 +18,6 @@ import {
 
 export interface NodeLimits {
   maxConnections?: number;
-  maxPeerConnections?: number;
   requestsPerMinute?: number;
   globalRequestsPerMinute?: number;
   maxFreeBuyersPerDay?: number;
@@ -30,11 +30,16 @@ export interface SellerLimits {
 
 const LIMIT_KEYS = {
   max_connections: 'maxConnections',
-  max_peer_connections: 'maxPeerConnections',
   requests_per_minute: 'requestsPerMinute',
   global_requests_per_minute: 'globalRequestsPerMinute',
   max_free_buyers_per_day: 'maxFreeBuyersPerDay',
 } as const satisfies Record<string, keyof NodeLimits>;
+// The key blamed when the budget does not fit: the first one the file sets, totals first.
+const BUDGET_KEYS = [
+  'global_requests_per_minute',
+  'requests_per_minute',
+  'max_connections',
+] as const;
 
 function limit(
   value: unknown,
@@ -49,19 +54,33 @@ function limit(
   return Number(parsed);
 }
 
-// The values the seller serves with: the file's [limits] over the built-in defaults.
+// The values the seller serves with: the file's [limits] over the built-in defaults. "Per minute" holds
+// because the rate window (TRANSPORT_LIMITS.rateWindowMs) is fixed at one minute.
 export function sellerLimits(limits: NodeLimits = {}): SellerLimits {
+  const requestsPerWindow =
+    limits.requestsPerMinute ?? TRANSPORT_LIMITS.requestsPerWindow;
+  const globalRequestsPerWindow =
+    limits.globalRequestsPerMinute ?? TRANSPORT_LIMITS.globalRequestsPerWindow;
   return {
     transport: {
       ...TRANSPORT_LIMITS,
       maxConnections: limits.maxConnections ?? TRANSPORT_LIMITS.maxConnections,
-      maxPeerConnections:
-        limits.maxPeerConnections ?? TRANSPORT_LIMITS.maxPeerConnections,
-      requestsPerWindow:
-        limits.requestsPerMinute ?? TRANSPORT_LIMITS.requestsPerWindow,
-      globalRequestsPerWindow:
-        limits.globalRequestsPerMinute ??
-        TRANSPORT_LIMITS.globalRequestsPerWindow,
+      requestsPerWindow,
+      globalRequestsPerWindow,
+      // Free execution opens one connection per request, so connection attempts must not cap a raised
+      // request rate below what was configured; they never drop below the built-in values.
+      connectionAttemptsPerPeer: Math.max(
+        TRANSPORT_LIMITS.connectionAttemptsPerPeer,
+        requestsPerWindow,
+      ),
+      connectionAttemptsPerSource: Math.max(
+        TRANSPORT_LIMITS.connectionAttemptsPerSource,
+        requestsPerWindow,
+      ),
+      connectionAttemptsPerWindow: Math.max(
+        TRANSPORT_LIMITS.connectionAttemptsPerWindow,
+        globalRequestsPerWindow,
+      ),
     },
     maxFreeBuyers:
       limits.maxFreeBuyersPerDay ?? FREE_EXECUTION_ADMISSION.maxBuyers,
@@ -75,6 +94,7 @@ export function readLimits(
 ): NodeLimits | undefined {
   const section = table(value, path, issues);
   if (!section) return undefined;
+  const mark = issues.mark();
   const read: NodeLimits = {};
   for (const [key, field] of Object.entries(LIMIT_KEYS) as [
     keyof typeof LIMIT_KEYS,
@@ -84,17 +104,17 @@ export function readLimits(
       limit(item, at, issues, SELLER_LIMIT_CEILINGS[field]),
     );
   unknownKeys(section, path, Object.keys(LIMIT_KEYS), issues);
+  if (!issues.cleanSince(mark)) return undefined;
+  // Every connected buyer reserves its per-minute requests from the global budget, so the budget must
+  // cover a full pool; otherwise later buyers are refused and one buyer can hold the whole budget.
   const effective = sellerLimits(read).transport;
-  // A part larger than its whole could never be reached; name the part, since it is what was set.
-  if (effective.maxPeerConnections > effective.maxConnections)
+  if (
+    effective.maxConnections * effective.requestsPerWindow >
+    effective.globalRequestsPerWindow
+  )
     issues.add(NODE_CONFIG_ISSUE_CODES.INVALID_LIMIT, [
       ...path,
-      'max_peer_connections',
-    ]);
-  if (effective.requestsPerWindow > effective.globalRequestsPerWindow)
-    issues.add(NODE_CONFIG_ISSUE_CODES.INVALID_LIMIT, [
-      ...path,
-      'requests_per_minute',
+      BUDGET_KEYS.find((key) => section[key] !== undefined)!,
     ]);
   return withoutUndefined(read);
 }

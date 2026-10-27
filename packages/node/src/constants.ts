@@ -164,9 +164,8 @@ export const NODE_CONFIG_LIMITS = {
 // value must be at least 1; omitted keys keep TRANSPORT_LIMITS and FREE_EXECUTION_ADMISSION.
 export const SELLER_LIMIT_CEILINGS = {
   maxConnections: 64,
-  maxPeerConnections: 4,
-  requestsPerMinute: 600,
-  globalRequestsPerMinute: 4096,
+  requestsPerMinute: 120,
+  globalRequestsPerMinute: 1024,
   maxFreeBuyersPerDay: 65_536,
 } as const;
 
@@ -201,7 +200,7 @@ export const NODE_CONFIG_ISSUE_CODES = {
   PRICING_MISSING: 'PRICING_MISSING',
   INVALID_CAP: 'INVALID_CAP',
   RELAY_ONLY_CONFLICT: 'RELAY_ONLY_CONFLICT',
-  // A [limits] value outside its range, or larger than the total it is part of.
+  // A [limits] value outside its range, or a request budget that cannot cover every connection.
   INVALID_LIMIT: 'INVALID_LIMIT',
   // A catalog model with verified levels (protocol MODEL_CATALOG) does not support the listed level.
   REASONING_UNSUPPORTED: 'REASONING_UNSUPPORTED',

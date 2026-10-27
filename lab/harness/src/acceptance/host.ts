@@ -8,6 +8,7 @@ import { observeControlReadiness } from '@gyblos/node/control-readiness';
 import { prepareSellerControl } from '@gyblos/node/control-startup';
 import { probeSellerEngine } from '@gyblos/node/engine-readiness';
 import { prepareSellerFreeExecution } from '@gyblos/node/free-execution';
+import { sellerLimits } from '@gyblos/node/node-config-limits';
 import { openSellerSequence } from '@gyblos/node/public-sequence';
 import { createSellerPublisher } from '@gyblos/node/publisher';
 import type { SellerCatalogOffer } from '@gyblos/node/seller-offer';
@@ -143,6 +144,7 @@ export async function startAcceptanceHost(options: AcceptanceHostOptions) {
           readiness: current.readiness,
           now: clock.now,
           startedAt: clock.now(),
+          maxFreeBuyers: sellerLimits().maxFreeBuyers,
         })
       : undefined;
     wire.start(control.service, freeExecution);

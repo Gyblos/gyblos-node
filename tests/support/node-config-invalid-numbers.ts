@@ -105,11 +105,11 @@ export const NUMBER_FIXTURES: readonly InvalidConfigFixture[] = [
     path: 'limits.max_concurrent',
   },
   {
-    name: 'per-buyer requests above the built-in total',
-    toml: `${BASE}[limits]\nrequests_per_minute = 300\n`,
+    name: 'request budget that cannot cover the connection pool',
+    toml: `${BASE}[limits]\nrequests_per_minute = 60\n`,
     code: 'INVALID_LIMIT',
     path: 'limits.requests_per_minute',
-    // Compared with the effective total, which may be a built-in default.
+    // 8 connections x 60 exceeds the built-in 256 total; a cross-field rule.
     schemaAccepts: true,
   },
 ];

@@ -104,9 +104,13 @@ export async function doctor(
   }
   if (report.limits) {
     const { transport, maxFreeBuyers } = report.limits;
+    stdout('Limits (effective; gyblos.toml [limits] over the defaults):\n');
+    stdout(`  connections ${transport.maxConnections} total\n`);
     stdout(
-      `Limits (gyblos.toml [limits]):\n  connections ${transport.maxConnections} total, ${transport.maxPeerConnections} per buyer\n  requests    ${transport.requestsPerWindow}/min per buyer, ${transport.globalRequestsPerWindow}/min total\n  free buyers ${maxFreeBuyers}/day\n`,
+      `  requests    ${transport.requestsPerWindow}/min per buyer, ${transport.globalRequestsPerWindow}/min total\n`,
     );
+    if (report.offer?.kind === OFFER_PRICING_KINDS.FREE)
+      stdout(`  free buyers ${maxFreeBuyers}/day\n`);
   }
   const failures = report.checks.filter(
     (check) => check.status === DOCTOR_STATUS.FAIL,

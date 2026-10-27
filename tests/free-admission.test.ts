@@ -133,4 +133,26 @@ void test('free replay and buyer tables reject pressure without evicting live st
     () => buyers.enter(request(2000, now, 'f'.repeat(64)), 0, now),
     { code: FREE_EXECUTION_CODES.BUSY },
   );
+  // A seller's [limits] max_free_buyers_per_day replaces the default.
+  const few = new FreeExecutionAdmission(
+    { dailyTokenCap: 100000, perBuyerCap: 100000 },
+    now - 1,
+    2,
+  );
+  for (const index of [1, 2])
+    few
+      .enter(request(index, now, index.toString(16).padStart(64, '0')), 0, now)
+      .complete(0);
+  assert.throws(() => few.enter(request(3, now, 'e'.repeat(64)), 0, now), {
+    code: FREE_EXECUTION_CODES.BUSY,
+  });
+  assert.throws(
+    () =>
+      new FreeExecutionAdmission(
+        { dailyTokenCap: 1, perBuyerCap: 1 },
+        now - 1,
+        0,
+      ),
+    { code: FREE_EXECUTION_CODES.LIMIT },
+  );
 });
