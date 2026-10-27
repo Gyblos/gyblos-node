@@ -302,8 +302,9 @@ streams, applied after the shared transport-iroh endpoint admission and its
 configured transport connection/peer limits, so a control connection must pass
 both. These values are initial safeguards, not measured production capacity.
 
-The shared `TRANSPORT_LIMITS` currently allow 8 established connections, 1 per
-NodeId and 2 active requests globally, 1 per NodeId; these stricter endpoint
+The shared `TRANSPORT_LIMITS` currently allow 8 established connections (per
+NodeId, 1 control and 1 data connection) and 2 active requests globally, 1 per
+NodeId; these stricter endpoint
 limits apply before the control limits (32/4 connections and active queries).
 Connection-open attempts share a 60-second fixed window: 256 globally, 32 per
 source address before validation and 30 per authenticated NodeId. Disconnecting
@@ -531,8 +532,11 @@ The free-configured seller starts neither the facilitator nor the paid HTTP
 service, does not check the devnet payment program or load the auxiliary
 payment signers, and writes no legacy v1 offer. Paid-configured startup keeps
 the existing v1 service. The free branch advertises only control and free
-ALPNs. Transport still allows only one connection per authenticated peer, so
-the buyer must close its control connection before dialing the data channel.
+ALPNs. Transport allows one control connection and one data connection per
+authenticated peer at a time (the global connection pool and the per-peer
+request quota stay shared). The buyer still closes its control connection
+before dialing the data channel; the separate data allowance covers the moment
+when the seller, over a relay, has not yet observed that close.
 
 Synthetic service tests, bounded-stream tests and native loopback execution
 cover this seller slice. No real engine, devnet, deployed index, production
