@@ -38,14 +38,14 @@ applications in Connect; model artwork and compact selectors are shared.
 
 Both the corner balance and footer backup reminder navigate to Settings. Only
 its explicit Back up wallet action opens the existing backup flow. Copy address
-uses a narrow host action: only the completed startup wallet's public address
+uses a narrow host action: only the currently selected wallet's public address
 can be copied, from the owning main frame while its lifecycle is active. No
 arbitrary clipboard access, private key or signing capability is exposed.
 
 Add funds opens a local amount form. It rejects an unavailable wallet or missing
 verified backup, then always reports payment unavailable. It cannot authorize
-payment, change a balance, or enable funding. The existing first-run wallet and
-empty-destination restore behavior below is unchanged.
+payment, change a balance, or enable funding. Automatic startup and the
+Settings-only recovery flow are described below.
 
 ## Internal wallet library
 

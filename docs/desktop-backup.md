@@ -117,14 +117,14 @@ dialog. Restoration alone does not mark the imported wallet's backup verified.
 
 The bridge accepts only bounded action/password/address requests from the main
 window's current main frame; paths, backup bytes and keys stay in the host. The
-startup window renders only the shared ASCII loader and has no wallet-action
-bridge. Public reads are coalesced, and restore/select/backup/copy are
-serialized so an overlapping status request cannot invalidate or change the
-selected wallet. Quit cancels the handoff and waits for automatic
-initialization, native file dialogs and in-flight backup/restore work. An
-already-started encrypted write may finish; the main window must not appear
-afterward. The legacy first-run setup helper remains internally testable but is
-no longer registered with Electron.
+startup window renders only the shared ASCII loader and is not authorized to
+perform wallet actions; the host rejects calls originating from its frame.
+Public reads are coalesced, and restore/select/backup/copy are serialized so an
+overlapping status request cannot invalidate or change the selected wallet. Quit
+cancels the handoff and waits for automatic initialization, native file dialogs
+and in-flight backup/restore work. An already-started encrypted write may
+finish; the main window must not appear afterward. The legacy first-run setup
+helper remains internally testable but is no longer registered with Electron.
 
 ## Remembered verification
 
