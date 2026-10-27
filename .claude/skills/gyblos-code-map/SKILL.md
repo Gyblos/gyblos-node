@@ -66,7 +66,7 @@ Splitting by concern inside a package uses a filename prefix, as in
 ## 3. Add a package, adapter or app
 
 1. Name it so `layerOf` in `tooling/boundaries/config.ts` maps it: adapters
-   must match `payments-x402|identity|engine-*|transport-*|discovery-*`. Any
+   must match `payments-*|identity|engine-*|transport-*|discovery-*|telemetry-*`. Any
    other new package name fails with "Unmapped source package"; extending the
    map is a tooling change with a case in `tooling/boundaries/check.test.ts`.
    Every `apps/<name>` maps to the apps layer and gets its own independence
