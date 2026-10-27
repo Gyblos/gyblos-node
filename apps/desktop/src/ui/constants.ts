@@ -1,5 +1,5 @@
 // Owns simulated UI catalogs and precomputed brand morph paths; never live network state.
-import type { CatalogModel } from './model-types.js';
+import type { CatalogModel } from './model-types';
 
 export const TOP_UP_STATUS = {
   INVALID_AMOUNT: 'invalid-amount',

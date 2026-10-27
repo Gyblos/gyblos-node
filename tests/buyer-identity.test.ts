@@ -13,7 +13,7 @@ import {
   discoveryHome,
   discoveryResponse,
   discoveryRun,
-} from './support/buyer-discovery.js';
+} from './support/buyer-discovery';
 
 void test('registry selection config opts in without turning existing manual identities into registry proof', async () => {
   const run = await discoveryRun();

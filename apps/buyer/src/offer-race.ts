@@ -3,7 +3,7 @@
 import type { SellerCandidate } from '@gyblos/core/seller-selection';
 import type { SignedOfferV2 } from '@gyblos/protocol/control-types';
 
-import { BUYER_SELECTION } from './constants.js';
+import { BUYER_SELECTION } from './constants';
 
 export interface WinningQuote {
   candidate: SellerCandidate;

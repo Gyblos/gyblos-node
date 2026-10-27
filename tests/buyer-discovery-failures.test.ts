@@ -10,7 +10,7 @@ import {
 } from '@gyblos/buyer/selection';
 import { BuyerSelectionError } from '@gyblos/buyer/selection-config';
 
-import { discoveryRun } from './support/buyer-discovery.js';
+import { discoveryRun } from './support/buyer-discovery';
 
 void test('fatal replay persistence failure waits for pending connects and closes every client without quoting', async () => {
   const first = await discoveryRun();

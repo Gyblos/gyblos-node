@@ -2,7 +2,7 @@
 // request IDs so overcharge and undercharge detection can be exercised.
 import type { TokenCounts } from '@gyblos/core/metering';
 
-import { GATE_CASES } from '../../constants.js';
+import { GATE_CASES } from '../../constants';
 
 export function createGateBilling(
   feePayer: string,

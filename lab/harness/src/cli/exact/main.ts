@@ -27,17 +27,17 @@ import {
   GATE_ROUTES,
   labPaths,
   PUBLIC_FACILITATORS,
-} from '../../constants.js';
-import { prepareExactAccounts } from '../../exact-accounts.js';
-import { assertExactSupport } from '../../exact/index.js';
+} from '../../constants';
+import { prepareExactAccounts } from '../../exact-accounts';
+import { assertExactSupport } from '../../exact/index';
 import {
   AuditedPublicFacilitator,
   createExactSeller,
-} from '../../exact/seller.js';
-import { assertNoUnresolvedAuthorizations } from '../../journal.js';
-import { assertLabHome, loadConfig } from '../../wallet.js';
-import { runProvider } from './cases.js';
-import { createEvidence } from './evidence.js';
+} from '../../exact/seller';
+import { assertNoUnresolvedAuthorizations } from '../../journal';
+import { assertLabHome, loadConfig } from '../../wallet';
+import { runProvider } from './cases';
+import { createEvidence } from './evidence';
 
 export async function main() {
   // Before the lab lock, which would create the lab home.

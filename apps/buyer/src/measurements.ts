@@ -10,7 +10,7 @@ import type { TokenCounts } from '@gyblos/core/metering';
 import { MODEL } from '@gyblos/engine-ollama/model';
 import { type EngineDescription } from '@gyblos/protocol/engine';
 
-import { MEASUREMENT_SCHEMA_VERSION } from './constants.js';
+import { MEASUREMENT_SCHEMA_VERSION } from './constants';
 
 export interface MeasurementInput {
   requestId: string;

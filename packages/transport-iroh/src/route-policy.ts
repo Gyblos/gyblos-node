@@ -1,6 +1,6 @@
 // Parses the required route (direct or relay) and checks every observation used only that route.
-import { TRANSPORT_ROUTES } from './constants.js';
-import type { RouteObservation } from './types.js';
+import { TRANSPORT_ROUTES } from './constants';
+import type { RouteObservation } from './types';
 
 export function expectedIrohRoute(value: string | undefined) {
   if (!value) return undefined;

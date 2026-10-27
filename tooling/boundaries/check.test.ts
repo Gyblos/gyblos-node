@@ -5,10 +5,10 @@ import { mkdir, symlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { analyze, validateEntries } from './analyze.js';
-import { layerOf } from './config.js';
-import { fixture, hasRule } from './fixture.js';
-import { parseGraph } from './graph.js';
+import { analyze, validateEntries } from './analyze';
+import { layerOf } from './config';
+import { fixture, hasRule } from './fixture';
+import { parseGraph } from './graph';
 
 void test('current and future names map to the intended layers', () => {
   const examples = {
@@ -63,7 +63,7 @@ void test('core-to-adapter is detected for relative type-only imports', async ()
   await fixture(
     {
       'packages/core/src/a.ts':
-        "import type { Engine } from '../../engine-ollama/src/a.js'; export type Result = Engine;",
+        "import type { Engine } from '../../engine-ollama/src/a'; export type Result = Engine;",
       'packages/engine-ollama/src/a.ts': 'export interface Engine {}',
     },
     async (files, root) =>

@@ -11,7 +11,7 @@ import {
 } from '@gyblos/node/node-config-resolve';
 import { sellerPublicationConfig } from '@gyblos/node/publisher-config';
 
-import { BASE, FAKE_SECRET, offer } from './support/node-config-fixtures.js';
+import { BASE, FAKE_SECRET, offer } from './support/node-config-fixtures';
 
 function fileConfig(toml: string): NodeConfig {
   const result = parseNodeConfig(toml);

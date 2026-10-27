@@ -6,20 +6,20 @@ import {
   IDENTITY_POLICY_CODES,
   IDENTITY_TRUST_SOURCES,
   type IdentityPolicyCode,
-} from './constants.js';
+} from './constants';
 import type {
   IdentityBinding,
   IdentityLookup,
   IdentityPolicyDecision,
   IdentityState,
-} from './identity-policy-types.js';
+} from './identity-policy-types';
 import {
   identityLookup,
   identityPolicyEnvelope,
   manualIdentity,
   previousIdentityState,
   sameIdentityScope,
-} from './identity-policy-validation.js';
+} from './identity-policy-validation';
 
 export {
   IDENTITY_LOOKUP_KINDS,
@@ -29,7 +29,7 @@ export {
   type IdentityLookupFailure,
   type IdentityPolicyCode,
   type IdentityTrustSource,
-} from './constants.js';
+} from './constants';
 export type {
   IdentityRegistryScope,
   IdentityBinding,
@@ -37,7 +37,7 @@ export type {
   IdentityState,
   IdentityPolicyInput,
   IdentityPolicyDecision,
-} from './identity-policy-types.js';
+} from './identity-policy-types';
 
 function denied(
   code: IdentityPolicyCode,

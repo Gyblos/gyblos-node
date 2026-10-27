@@ -11,7 +11,7 @@ import type { SignedInferenceOffer } from '@gyblos/protocol/offer';
 import { loadJson } from '@gyblos/runtime';
 import { RELAY_CONFIGURATION_CODES } from '@gyblos/transport-iroh/constants';
 
-import { NATIVE_CAPABILITY } from './support/native-runtime.js';
+import { NATIVE_CAPABILITY } from './support/native-runtime';
 
 const OPTIONS = { skip: NATIVE_CAPABILITY.bindingSkip };
 
@@ -23,7 +23,7 @@ async function withTrust(
   ) => Promise<void>,
   relayUrl: string | null = null,
 ) {
-  const { withRelayOffer } = await import('./support/relay-fixture.js');
+  const { withRelayOffer } = await import('./support/relay-fixture');
   const { main } = await import('@gyblos/buyer/trust');
   const { rolePath } = await import('@gyblos/node/roles');
   await withRelayOffer(relayUrl, async () => {

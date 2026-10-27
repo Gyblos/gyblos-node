@@ -8,8 +8,8 @@ import {
   EXACT_ASSET_LABELS,
   EXACT_PRICE,
   SCHEMA_VERSIONS,
-} from '../../constants.js';
-import type { ExactGateEvidence } from '../../types.js';
+} from '../../constants';
+import type { ExactGateEvidence } from '../../types';
 
 export function createEvidence() {
   const limitations = [

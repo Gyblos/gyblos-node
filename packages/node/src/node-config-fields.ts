@@ -11,7 +11,7 @@ import {
   NODE_CONFIGURATION_LIMITS,
   type NodeConfigIssueCode,
   type NodeConfigWarningCode,
-} from './constants.js';
+} from './constants';
 
 export interface NodeConfigIssue {
   code: NodeConfigIssueCode;

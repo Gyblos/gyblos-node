@@ -6,9 +6,9 @@ import {
   INDEX_HEADERS,
   INDEX_ROUTES,
   INDEX_STATUS,
-} from './constants.js';
-import type { SellersQuery } from './sellers.js';
-import type { DiscoveryStorage } from './storage.js';
+} from './constants';
+import type { SellersQuery } from './sellers';
+import type { DiscoveryStorage } from './storage';
 
 // The subset of the Workers Cache API (caches.default) the index uses. Entries live as long as
 // the stored response's Cache-Control allows (public, max-age=10 for sellers pages).

@@ -3,8 +3,8 @@ import { constants, type Stats } from 'node:fs';
 import { lstat, mkdir, open, rename } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
-import { WALLET, WALLET_RESTORE_ERROR } from './constants.js';
-import { WalletRestoreError } from './restore-error.js';
+import { WALLET, WALLET_RESTORE_ERROR } from './constants';
+import { WalletRestoreError } from './restore-error';
 
 export function isMissing(error: unknown) {
   return error instanceof Error && 'code' in error && error.code === 'ENOENT';

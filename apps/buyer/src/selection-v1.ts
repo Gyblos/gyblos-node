@@ -3,8 +3,8 @@
 import { REASONING_LEVELS, V2_PRICING } from '@gyblos/protocol/constants';
 import type { InferenceOffer } from '@gyblos/protocol/offer';
 
-import { BUYER_SELECTION_CODES } from './constants.js';
-import type { SelectionDecision } from './selection.js';
+import { BUYER_SELECTION_CODES } from './constants';
+import type { SelectionDecision } from './selection';
 
 export function requireLegacyQuoteCompatibility(
   result: SelectionDecision,

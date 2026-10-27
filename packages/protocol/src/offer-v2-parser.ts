@@ -8,9 +8,9 @@ import {
   CONTROL_RECORD_VERSION,
   MODEL_IDENTITIES,
   PUBLIC_RECORD_LIMITS,
-} from './constants.js';
-import { parseModelSelection } from './control-requests.js';
-import type { InferenceOfferV2 } from './control-types.js';
+} from './constants';
+import { parseModelSelection } from './control-requests';
+import type { InferenceOfferV2 } from './control-types';
 import {
   controlAddress,
   controlArray,
@@ -22,8 +22,8 @@ import {
   controlObject,
   controlReasoning,
   controlText,
-} from './control-validation.js';
-import { parseTokenPricesV2 } from './pricing-v2.js';
+} from './control-validation';
+import { parseTokenPricesV2 } from './pricing-v2';
 
 function endpointV2(value: unknown, relayOnly: unknown) {
   const input = controlObject(value, ['relayUrl', 'directAddresses']);

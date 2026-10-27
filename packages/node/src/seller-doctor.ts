@@ -24,7 +24,7 @@ import {
   relayModeFromEnv,
 } from '@gyblos/transport-iroh/relays';
 
-import { modelTokenizer } from './artifacts.js';
+import { modelTokenizer } from './artifacts';
 import {
   DOCTOR_CHECKS,
   DOCTOR_CODES,
@@ -38,20 +38,20 @@ import {
   type DoctorCode,
   type DoctorStatus,
   type NodeErrorCode,
-} from './constants.js';
-import { NodeError } from './errors.js';
+} from './constants';
+import { NodeError } from './errors';
 import {
   assertOllamaModelsHome,
   assertRoleHome,
   assertTokenizerHome,
-} from './home.js';
-import type { NodeConfigIssue } from './node-config-fields.js';
-import type { SellerLimits } from './node-config-limits.js';
-import { readNodeConfigFile, type NodeConfig } from './node-config.js';
-import { inspectSellerSequence } from './public-sequence.js';
-import { loadRole, roleKeyFilesStatus } from './roles.js';
-import type { SellerCatalogOffer } from './seller-offer.js';
-import { sellerSettings, type SellerSettings } from './seller-settings.js';
+} from './home';
+import { readNodeConfigFile, type NodeConfig } from './node-config';
+import type { NodeConfigIssue } from './node-config-fields';
+import type { SellerLimits } from './node-config-limits';
+import { inspectSellerSequence } from './public-sequence';
+import { loadRole, roleKeyFilesStatus } from './roles';
+import type { SellerCatalogOffer } from './seller-offer';
+import { sellerSettings, type SellerSettings } from './seller-settings';
 
 export type DoctorResultCode =
   DoctorCode | NodeErrorCode | RelayConfigurationCode;

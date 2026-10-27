@@ -39,11 +39,11 @@ import {
   SCHEMA_VERSIONS,
   UPSTREAM_COMMIT,
   WALLET_ROLES,
-} from '../constants.js';
-import type { FixedGateEvidence } from '../fixture-evidence-types.js';
-import { runGate } from '../gate.js';
-import { assertNoUnresolvedAuthorizations, saveJournal } from '../journal.js';
-import { assertLabHome, loadConfig, signer } from '../wallet.js';
+} from '../constants';
+import type { FixedGateEvidence } from '../fixture-evidence-types';
+import { runGate } from '../gate';
+import { assertNoUnresolvedAuthorizations, saveJournal } from '../journal';
+import { assertLabHome, loadConfig, signer } from '../wallet';
 
 const journalPath = () => labPaths().journals.fixed;
 

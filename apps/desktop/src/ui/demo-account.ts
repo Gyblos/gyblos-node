@@ -1,6 +1,6 @@
 // Pure arithmetic for the wallet preview; these numbers never represent funds or authorizations.
 // It is intentionally independent of payment SDKs, signing and product metering policy.
-import { DEMO_ACCOUNT, DEMO_AUTH } from './constants.js';
+import { DEMO_ACCOUNT, DEMO_AUTH } from './constants';
 
 export type DemoAuthorizationStatus =
   (typeof DEMO_AUTH)[keyof typeof DEMO_AUTH];
@@ -47,4 +47,4 @@ export function authorizeDemo(
     spent: nextSpent,
   };
 }
-export { DEMO_ACCOUNT, DEMO_AUTH } from './constants.js';
+export { DEMO_ACCOUNT, DEMO_AUTH } from './constants';

@@ -11,7 +11,7 @@ import {
 } from '@gyblos/protocol/constants';
 import { FreeClientError } from '@gyblos/transport-iroh/free-client';
 
-import { freeSellerFixture } from './support/free-seller.js';
+import { freeSellerFixture } from './support/free-seller';
 
 const settings = {
   selection: { modelId: 'synthetic', variant: null, quantization: null },

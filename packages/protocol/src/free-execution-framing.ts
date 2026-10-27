@@ -1,16 +1,16 @@
 // Reuses the canonical single-frame codec with separate free-execution bounds and typed errors.
 // Call finish only after EOF; transport deadlines, admission and peer authentication remain external.
-import { FREE_EXECUTION } from './constants.js';
-import { ControlFrameReader, encodeControlFrame } from './control-framing.js';
+import { FREE_EXECUTION } from './constants';
+import { ControlFrameReader, encodeControlFrame } from './control-framing';
+import {
+  parseFreeExecutionRequest,
+  parseFreeExecutionResponse,
+} from './free-execution';
 import {
   freeExecutionBoundary,
   freeExecutionFail,
   rethrowFreeExecution,
-} from './free-execution-validation.js';
-import {
-  parseFreeExecutionRequest,
-  parseFreeExecutionResponse,
-} from './free-execution.js';
+} from './free-execution-validation';
 
 export function encodeFreeExecutionRequest(value: unknown): Uint8Array {
   return freeExecutionBoundary(() =>

@@ -16,7 +16,7 @@ import {
 } from '@gyblos/config';
 import { P2P_ROLES } from '@gyblos/node/constants';
 
-import { NATIVE_CAPABILITY } from './support/native-runtime.js';
+import { NATIVE_CAPABILITY } from './support/native-runtime';
 
 const ROLE_OPTIONS = { skip: NATIVE_CAPABILITY.bindingSkip };
 const MINT = '2vXUXK2rJTPtb7Wx9em4W9FdgtfD6HTnFxZz5oirLVcH';

@@ -1,5 +1,5 @@
 // Parses and authenticates free execution terms; no engine, replay mutation, clock, transport or payments.
-import { canonicalJson } from './canonical.js';
+import { canonicalJson } from './canonical';
 import {
   CONTROL_LIMITS,
   ENGINE_DONE_REASONS,
@@ -8,16 +8,16 @@ import {
   FREE_EXECUTION_CODES,
   PUBLIC_RECORD_LIMITS,
   type FreeChatRole,
-} from './constants.js';
-import { parseModelSelection } from './control-requests.js';
-import type { SignedOfferV2 } from './control-types.js';
+} from './constants';
+import { parseModelSelection } from './control-requests';
+import type { SignedOfferV2 } from './control-types';
 import {
   controlArray,
   controlHex,
   controlInteger,
   controlObject,
   controlReasoning,
-} from './control-validation.js';
+} from './control-validation';
 import type {
   FreeChatMessage,
   FreeExecutionBuildInput,
@@ -25,21 +25,17 @@ import type {
   FreeExecutionResponse,
   FreeExecutionResult,
   FreeExecutionTrust,
-} from './free-execution-types.js';
+} from './free-execution-types';
 import {
   freeExecutionBoundary,
   FreeExecutionError,
   freeExecutionFail,
   freeExecutionText,
   rethrowFreeExecution,
-} from './free-execution-validation.js';
-import {
-  parseOfferSignatureV2,
-  parseOfferV2,
-  verifyOfferV2,
-} from './offer-v2.js';
-import { bytesHex } from './public-validation.js';
-import { signingBytes } from './signing.js';
+} from './free-execution-validation';
+import { parseOfferSignatureV2, parseOfferV2, verifyOfferV2 } from './offer-v2';
+import { bytesHex } from './public-validation';
+import { signingBytes } from './signing';
 
 export type {
   FreeChatMessage,
@@ -48,11 +44,11 @@ export type {
   FreeExecutionResponse,
   FreeExecutionResult,
   FreeExecutionTrust,
-} from './free-execution-types.js';
+} from './free-execution-types';
 export {
   FreeExecutionError,
   freeExecutionFail,
-} from './free-execution-validation.js';
+} from './free-execution-validation';
 
 function role(value: unknown): FreeChatRole {
   for (const accepted of Object.values(FREE_CHAT_ROLES))

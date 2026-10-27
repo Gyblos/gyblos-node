@@ -1,8 +1,8 @@
 // Classifies a connection's selected path as direct, relay or unknown.
 import type { Connection } from '@number0/iroh';
 
-import { TRANSPORT_ROUTES } from './constants.js';
-import type { TransportRoute } from './types.js';
+import { TRANSPORT_ROUTES } from './constants';
+import type { TransportRoute } from './types';
 
 export function selectedRoute(connection: Connection): TransportRoute {
   const paths = connection.paths().filter((path) => path.isSelected);

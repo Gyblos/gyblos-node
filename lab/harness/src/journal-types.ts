@@ -2,12 +2,12 @@
 import type { DEVNET } from '@gyblos/config';
 import { type JOURNAL_STATES } from '@gyblos/payments-x402/constants';
 
-import type { ExactCaseName, FAILURE_CASES } from './constants.js';
+import type { ExactCaseName, FAILURE_CASES } from './constants';
 import type {
   AuthorizationMetadata,
   ExactSnapshot,
   Reconciliation,
-} from './evidence-types.js';
+} from './evidence-types';
 
 // Historical input stays open: unknown states must continue to block new payments.
 export interface JournalStateRecord {

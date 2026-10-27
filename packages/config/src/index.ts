@@ -1,22 +1,22 @@
 // Public surface of @gyblos/config: shared constants only; nothing here reads files or opens sockets.
-export * from './network.js';
+export * from './network';
 
-export * from './hosts.js';
+export * from './hosts';
 
-export * from './paths.js';
+export * from './paths';
 
-export * from './home.js';
+export * from './home';
 
-export * from './versions.js';
+export * from './versions';
 
-export * from './limits.js';
+export * from './limits';
 
-export * from './transport.js';
+export * from './transport';
 
-export * from './diagnostics.js';
+export * from './diagnostics';
 
-export * from './identity.js';
+export * from './identity';
 
-export * from './discovery.js';
+export * from './discovery';
 
-export * from './environment.js';
+export * from './environment';

@@ -18,7 +18,7 @@ import {
   disposableIdentity,
   disposableProtection,
   TEST_BACKUP_PASSWORD,
-} from './support/portable-backup-fixture.js';
+} from './support/portable-backup-fixture';
 
 void test('concurrent public collection reads all retain the ready wallet instead of a transient unavailable state', async (context) => {
   const home = await mkdtemp(join(tmpdir(), 'gyblos-wallet-read-'));

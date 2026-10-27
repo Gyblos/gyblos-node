@@ -1,6 +1,6 @@
 // Owns the identity error class carrying a code from IDENTITY_ERROR_CODES.
 // It must not know RPC transports, policy storage or UI wording.
-import type { IdentityErrorCode } from './constants.js';
+import type { IdentityErrorCode } from './constants';
 
 export class IdentityError extends Error {
   override readonly name = 'IdentityError';

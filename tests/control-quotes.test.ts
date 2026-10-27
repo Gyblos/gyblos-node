@@ -25,7 +25,7 @@ import {
 } from '@gyblos/protocol/offer-v2';
 import { catalogDigestV2, signPublicV2 } from '@gyblos/protocol/public-v2';
 
-import { controlFixture } from './support/control-fixture.js';
+import { controlFixture } from './support/control-fixture';
 
 void test('control quotes bind the complete request and round-trip without reserving capacity', async () => {
   const fixture = await controlFixture();

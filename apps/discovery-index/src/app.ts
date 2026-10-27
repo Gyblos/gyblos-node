@@ -3,7 +3,7 @@
 import { Hono, type Context, type Next } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 
-import { isJsonContentType } from './body.js';
+import { isJsonContentType } from './body';
 import {
   cachedPage,
   recordCounter,
@@ -11,7 +11,7 @@ import {
   storePage,
   type RecordCounter,
   type ResponseCache,
-} from './cache.js';
+} from './cache';
 import {
   DISCOVERY_INDEX_LIMITS,
   DISCOVERY_LIMITERS,
@@ -26,25 +26,21 @@ import {
   READ_LIMIT_KEY,
   type DiscoveryLimiterName,
   type IndexErrorCode,
-} from './constants.js';
-import { IndexError, statusOf } from './errors.js';
-import { ipKey } from './ip-key.js';
+} from './constants';
+import { IndexError, statusOf } from './errors';
+import { ipKey } from './ip-key';
 import {
   allowed,
   limiterResolver,
   type DiscoveryLimiters,
   type ResolvedLimiters,
-} from './limits.js';
-import { acceptRecord, type PublishContext } from './publish.js';
-import { publishModeOf, type DiscoveryPublishers } from './publishers.js';
-import {
-  parseSellersQuery,
-  sellersPage,
-  type SellersQuery,
-} from './sellers.js';
-import type { DiscoveryStorage } from './storage.js';
+} from './limits';
+import { acceptRecord, type PublishContext } from './publish';
+import { publishModeOf, type DiscoveryPublishers } from './publishers';
+import { parseSellersQuery, sellersPage, type SellersQuery } from './sellers';
+import type { DiscoveryStorage } from './storage';
 
-export type { ResponseCache } from './cache.js';
+export type { ResponseCache } from './cache';
 
 export interface DiscoveryIndexOptions {
   // Missing storage or any missing limiter fails closed with 503 DISCOVERY_UNAVAILABLE.

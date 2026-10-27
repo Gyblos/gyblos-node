@@ -26,18 +26,18 @@ import {
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 
 import manifest from '../package.json';
-import { themeStyle } from './theme.js';
-import { AddFunds } from './ui/AddFunds.js';
-import { Appearance } from './ui/Appearance.js';
-import { matchesCatalog, type ModelFilter } from './ui/catalog-state.js';
-import { Chat, type ChatHandle } from './ui/Chat.js';
-import { ToolConnections } from './ui/ChatTools.js';
+import { themeStyle } from './theme';
+import { AddFunds } from './ui/AddFunds';
+import { Appearance } from './ui/Appearance';
+import { matchesCatalog, type ModelFilter } from './ui/catalog-state';
+import { Chat, type ChatHandle } from './ui/Chat';
+import { ToolConnections } from './ui/ChatTools';
 import {
   saveConnection,
   type ConnectionTool,
   type PreviewConnection,
-} from './ui/connection-state.js';
-import { ConnectionDialog, ConnectionList } from './ui/Connections.js';
+} from './ui/connection-state';
+import { ConnectionDialog, ConnectionList } from './ui/Connections';
 import {
   BUTTON_VARIANT,
   MODE_NAV,
@@ -49,21 +49,21 @@ import {
   SIDEBAR_MOTION_MS,
   UI_DIALOG,
   UI_VIEW,
-} from './ui/constants.js';
-import { authorizeDemo, DEMO_ACCOUNT, DEMO_AUTH } from './ui/demo-account.js';
-import { Modal } from './ui/Modal.js';
-import type { Mode, CatalogModel as Model, View } from './ui/model-types.js';
-import { ModelImage, type ModelArtwork } from './ui/ModelImage.js';
+} from './ui/constants';
+import { authorizeDemo, DEMO_ACCOUNT, DEMO_AUTH } from './ui/demo-account';
+import { Modal } from './ui/Modal';
+import type { Mode, CatalogModel as Model, View } from './ui/model-types';
+import { ModelImage, type ModelArtwork } from './ui/ModelImage';
 import {
   animateChange,
   MotionPresence,
   SLIDE_DIRECTION,
   SLIDE_SURFACE,
-} from './ui/Motion.js';
-import { NetworkStatus, usePreviewNetwork } from './ui/NetworkStatus.js';
-import { ResizeHandle } from './ui/ResizeHandle.js';
-import { SidebarIcon, type SidebarSection } from './ui/SidebarIcon.js';
-import type { ToolId } from './ui/tools.js';
+} from './ui/Motion';
+import { NetworkStatus, usePreviewNetwork } from './ui/NetworkStatus';
+import { ResizeHandle } from './ui/ResizeHandle';
+import { SidebarIcon, type SidebarSection } from './ui/SidebarIcon';
+import type { ToolId } from './ui/tools';
 import {
   Avatar,
   Badge,
@@ -80,11 +80,11 @@ import {
   SectionTitle,
   SettingsGroup,
   StatCard,
-} from './ui/UI.js';
-import { WalletBackup } from './ui/WalletBackup.js';
-import { WalletDetails } from './ui/WalletDetails.js';
-import { useDesktopWallet } from './ui/WalletState.js';
-import { WALLET_STATUS } from './wallet/model.js';
+} from './ui/UI';
+import { WalletBackup } from './ui/WalletBackup';
+import { WalletDetails } from './ui/WalletDetails';
+import { useDesktopWallet } from './ui/WalletState';
+import { WALLET_STATUS } from './wallet/model';
 
 const money = (value: number) => '$' + value.toFixed(2);
 function ModelIcon({ model }: { model: Pick<Model, 'name' | 'image'> }) {

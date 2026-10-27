@@ -16,7 +16,7 @@ import {
   INDEX_ORIGIN,
   indexNode,
   T0,
-} from './support/discovery-index-fixture.js';
+} from './support/discovery-index-fixture';
 
 eachStorage(
   'publish then list round trip returns signed envelopes byte-for-byte',

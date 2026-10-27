@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { REPOSITORY_ROOT } from './support/node-config-fixtures.js';
+import { REPOSITORY_ROOT } from './support/node-config-fixtures';
 
 const MINT = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU';
 const SELECTION = {

@@ -13,15 +13,15 @@ import { PUBLIC_RECORD_KINDS } from '@gyblos/protocol/constants';
 import { validateOfferV2Time } from '@gyblos/protocol/offer-v2';
 import { verifyPublicV2 } from '@gyblos/protocol/public-v2';
 
-import { BUYER_SELECTION, BUYER_SELECTION_CODES } from './constants.js';
-import type { createBuyerControlClient } from './control.js';
-import { raceControlOffers, type WinningQuote } from './offer-race.js';
+import { BUYER_SELECTION, BUYER_SELECTION_CODES } from './constants';
+import type { createBuyerControlClient } from './control';
+import { raceControlOffers, type WinningQuote } from './offer-race';
 import {
   BuyerSelectionError,
   type BuyerSelectionConfig,
   type StaticControlSeller,
-} from './selection-config.js';
-import type { LocalSellerStats } from './selection-stats.js';
+} from './selection-config';
+import type { LocalSellerStats } from './selection-stats';
 
 export type BuyerControlClient = Pick<
   ReturnType<typeof createBuyerControlClient>,

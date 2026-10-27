@@ -2,18 +2,18 @@
 import { Archive, ArrowCounterClockwise, Plus } from '@phosphor-icons/react';
 import { useEffect, useState } from 'react';
 
-import { WALLET_STATUS, type WalletSummary } from '../wallet/model.js';
-import { BUTTON_VARIANT } from './constants.js';
-import { CopyButton } from './CopyButton.js';
-import { MotionPresence } from './Motion.js';
-import { Badge, Button, List, ListRow, Note, RowCopy } from './UI.js';
-import { WalletRestore } from './WalletRestore.js';
-import { WalletSelector } from './WalletSelector.js';
+import { WALLET_STATUS, type WalletSummary } from '../wallet/model';
+import { BUTTON_VARIANT } from './constants';
+import { CopyButton } from './CopyButton';
+import { MotionPresence } from './Motion';
+import { Badge, Button, List, ListRow, Note, RowCopy } from './UI';
+import { WalletRestore } from './WalletRestore';
+import { WalletSelector } from './WalletSelector';
 import {
   useDesktopWallet,
   useDesktopWalletActions,
   useRefreshDesktopWallet,
-} from './WalletState.js';
+} from './WalletState';
 
 async function copyAddress(address: string) {
   if (!(await window.desktopWallet?.copyAddress(address)))

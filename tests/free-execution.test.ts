@@ -11,7 +11,7 @@ import {
 } from '@gyblos/protocol/constants';
 import { signOfferV2 } from '@gyblos/protocol/offer-v2';
 
-import { controlFixture } from './support/control-fixture.js';
+import { controlFixture } from './support/control-fixture';
 
 async function fixture() {
   const source = await controlFixture(true);

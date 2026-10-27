@@ -21,7 +21,7 @@ import {
   PUBLIC_TEST_NOW,
   publicFixture,
   publicLifecycleFixture,
-} from './support/public-records.js';
+} from './support/public-records';
 
 void test('public catalog signing round-trips with a node key and a caller-trusted owner binding', async () => {
   const { catalog, signer, signed, trust } = publicFixture();

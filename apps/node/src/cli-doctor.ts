@@ -16,7 +16,7 @@ import {
 } from '@gyblos/node/seller-doctor';
 import { RELAY_CONFIGURATION_CODES } from '@gyblos/transport-iroh/constants';
 
-import { issueLine, urlOrigin } from './cli-format.js';
+import { issueLine, urlOrigin } from './cli-format';
 
 const STATUS_COLUMN = 4;
 const CHECK_COLUMN = 10;

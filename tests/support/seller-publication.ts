@@ -7,7 +7,7 @@ import { createSellerRecords } from '@gyblos/node/public-records';
 import { openSellerSequence } from '@gyblos/node/public-sequence';
 import type { Signer } from '@gyblos/protocol/signing';
 
-import { controlFixture } from './control-fixture.js';
+import { controlFixture } from './control-fixture';
 
 export async function sellerPublicationFixture(identity?: {
   nodeId: string;

@@ -10,8 +10,8 @@ import type { observeInferenceResponse } from '@gyblos/core/inference-observatio
 import { charge } from '@gyblos/core/metering';
 import { MODEL } from '@gyblos/engine-ollama/model';
 
-import { type InferenceCaseName } from '../../constants.js';
-import type { InferenceTrace } from '../../types.js';
+import { type InferenceCaseName } from '../../constants';
+import type { InferenceTrace } from '../../types';
 
 interface CaseAssertion {
   caseName: InferenceCaseName;

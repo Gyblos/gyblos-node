@@ -1,6 +1,6 @@
 // Shows a visual-only startup indicator; never reads wallet metadata or starts a connection.
-import { STARTUP_WINDOW } from '../constants.js';
-import { themeStyle } from '../theme.js';
+import { STARTUP_WINDOW } from '../constants';
+import { themeStyle } from '../theme';
 
 export function StartupSplash() {
   return (

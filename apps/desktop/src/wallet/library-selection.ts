@@ -1,8 +1,8 @@
 // Authenticates the active address with its protected wallet key; no custody changes.
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
-import { WALLET_LIBRARY, WALLET_LIBRARY_ERROR } from './constants.js';
-import { WalletLibraryError } from './library-error.js';
+import { WALLET_LIBRARY, WALLET_LIBRARY_ERROR } from './constants';
+import { WalletLibraryError } from './library-error';
 
 function tag(secret: string, address: string) {
   const key = Buffer.from(secret, 'base64');

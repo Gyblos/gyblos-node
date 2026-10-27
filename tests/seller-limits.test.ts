@@ -11,7 +11,7 @@ import { createConnectionAdmission } from '@gyblos/transport-iroh/admission';
 import { CONNECTION_FAMILIES } from '@gyblos/transport-iroh/constants';
 import { createPeerLimiter } from '@gyblos/transport-iroh/limiter';
 
-import { BASE } from './support/node-config-fixtures.js';
+import { BASE } from './support/node-config-fixtures';
 
 function settings(limits: string) {
   const parsed = parseNodeConfig(`${BASE}[limits]\n${limits}\n`);

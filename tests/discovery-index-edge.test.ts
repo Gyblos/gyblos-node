@@ -18,7 +18,7 @@ import {
 } from '@gyblos/discovery-index/storage';
 import { createWorker } from '@gyblos/discovery-index/worker';
 
-import { createSqliteD1 } from './support/d1-sqlite.js';
+import { createSqliteD1 } from './support/d1-sqlite';
 import {
   allLimiters,
   CLIENT_IP,
@@ -30,7 +30,7 @@ import {
   memoryCache,
   MODEL,
   T0,
-} from './support/discovery-index-fixture.js';
+} from './support/discovery-index-fixture';
 
 const HTTP_ORIGIN = 'http://discovery.gyblos.com';
 

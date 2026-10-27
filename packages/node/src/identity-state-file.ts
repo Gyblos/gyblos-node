@@ -14,8 +14,8 @@ import { dirname, join, parse, resolve, sep } from 'node:path';
 
 import { FILE_MODES } from '@gyblos/config';
 
-import { IDENTITY_STATE } from './constants.js';
-import { identityStateUnavailable } from './identity-state-schema.js';
+import { IDENTITY_STATE } from './constants';
+import { identityStateUnavailable } from './identity-state-schema';
 
 function owned(info: Stats) {
   return !process.getuid || info.uid === process.getuid();

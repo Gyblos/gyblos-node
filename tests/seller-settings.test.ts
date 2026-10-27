@@ -24,7 +24,7 @@ import {
   BASE,
   EXAMPLES_DIRECTORY,
   offer,
-} from './support/node-config-fixtures.js';
+} from './support/node-config-fixtures';
 
 const MANAGED = `{ kind = "ollama", url = "${HOSTS.ollama}" }`;
 const FREE = 'free = { daily_token_cap = 200000, per_buyer_cap = 5000 }';

@@ -3,8 +3,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { addClaimant } from './support/identity-accounts.js';
-import { identityResolutionFixture as fixture } from './support/identity-resolution-fixture.js';
+import { addClaimant } from './support/identity-accounts';
+import { identityResolutionFixture as fixture } from './support/identity-resolution-fixture';
 
 void test('verified owner rotation advances policy state and prevents fallback when the newest claim disappears', async () => {
   const state = await fixture();

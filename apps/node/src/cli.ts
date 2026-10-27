@@ -20,8 +20,8 @@ import {
 import type { DoctorProbes } from '@gyblos/node/seller-doctor';
 import { isMain } from '@gyblos/runtime';
 
-import { doctor } from './cli-doctor.js';
-import { COLUMN, issueLine, URL_HIDDEN, urlOrigin } from './cli-format.js';
+import { doctor } from './cli-doctor';
+import { COLUMN, issueLine, URL_HIDDEN, urlOrigin } from './cli-format';
 
 export interface CliContext {
   env: Readonly<Record<string, string | undefined>>;

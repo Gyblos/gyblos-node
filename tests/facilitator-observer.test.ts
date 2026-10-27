@@ -21,7 +21,7 @@ import {
   DIAGNOSTIC_SIGNATURE,
   diagnosticUntil,
   withDiagnosticHost,
-} from './support/facilitator-diagnostic-fixture.js';
+} from './support/facilitator-diagnostic-fixture';
 
 void test(
   'facilitator records received, SDK success and local finish with one attempt',

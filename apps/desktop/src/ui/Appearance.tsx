@@ -2,7 +2,7 @@
 // Changes local preview appearance only; no preferences are persisted.
 import { Moon, Sun } from '@phosphor-icons/react';
 
-import { Button } from './UI.js';
+import { Button } from './UI';
 
 export function Appearance({
   light,

@@ -9,7 +9,7 @@ import { CONTROL_CODES, REASONING_LEVELS } from '@gyblos/protocol/constants';
 import { createConnectionAdmission } from '@gyblos/transport-iroh/admission';
 import { CONNECTION_FAMILIES } from '@gyblos/transport-iroh/constants';
 
-import { controlFixture } from './support/control-fixture.js';
+import { controlFixture } from './support/control-fixture';
 
 void test('unsupported reasoning is refused before readiness or signing even when busy', async () => {
   const fixture = await controlFixture();

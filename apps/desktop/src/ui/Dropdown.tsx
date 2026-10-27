@@ -8,8 +8,8 @@ import {
   type ReactNode,
 } from 'react';
 
-import { MENU_GEOMETRY } from './constants.js';
-import { Button, SearchField } from './UI.js';
+import { MENU_GEOMETRY } from './constants';
+import { Button, SearchField } from './UI';
 
 export function Dropdown({
   label,

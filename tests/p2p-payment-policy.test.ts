@@ -16,7 +16,7 @@ import { createInferenceBuyer } from '@gyblos/payments-x402/inference-buyer';
 import { withExclusiveLock } from '@gyblos/payments-x402/recovery/lock';
 import { saveJson } from '@gyblos/runtime';
 
-import { NATIVE_CAPABILITY } from './support/native-runtime.js';
+import { NATIVE_CAPABILITY } from './support/native-runtime';
 
 void test('request-specific ceiling rejects altered challenges before any signature or paid request', async () => {
   const original = globalThis.fetch;

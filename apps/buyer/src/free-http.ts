@@ -29,14 +29,14 @@ import {
 import { acceptLoopbackHost } from '@gyblos/runtime/loopback-host';
 import { FreeClientError } from '@gyblos/transport-iroh/free-client';
 
-import { FREE_BUYER, FREE_BUYER_CODES } from './constants.js';
-import { FreeBuyerError, parseFreeChat } from './free-chat.js';
-import { FreeSelectionFailure } from './free-execution.js';
+import { FREE_BUYER, FREE_BUYER_CODES } from './constants';
+import { FreeBuyerError, parseFreeChat } from './free-chat';
+import { FreeSelectionFailure } from './free-execution';
 import {
   executeFreeSse,
   replyFreeSseError,
   type FreeChatStreamExecutor,
-} from './free-sse.js';
+} from './free-sse';
 
 type FreeChatExecutor = (
   input: FreeExecutionBuildInput,

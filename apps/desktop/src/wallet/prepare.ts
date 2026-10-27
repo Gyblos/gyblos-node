@@ -2,15 +2,12 @@
 // Any retained state is read without creating a replacement identity.
 import { readdir } from 'node:fs/promises';
 
-import { WALLET_LIBRARY_ERROR, WALLET_STATUS } from './constants.js';
-import { checkWalletRoot, isMissing } from './files.js';
-import { createWalletLibrary, WalletLibraryError } from './library.js';
-import type { WalletProtection } from './protection.js';
-import { createWalletService } from './service.js';
-import {
-  unavailableCollection,
-  type WalletCollection,
-} from './settings-model.js';
+import { WALLET_LIBRARY_ERROR, WALLET_STATUS } from './constants';
+import { checkWalletRoot, isMissing } from './files';
+import { createWalletLibrary, WalletLibraryError } from './library';
+import type { WalletProtection } from './protection';
+import { createWalletService } from './service';
+import { unavailableCollection, type WalletCollection } from './settings-model';
 
 export async function readWalletCollection(
   root: string,

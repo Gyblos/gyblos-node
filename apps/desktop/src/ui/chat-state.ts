@@ -5,14 +5,14 @@ import {
   CHAT_PREVIEW,
   CHAT_ROLE,
   MESSAGE_STATE,
-} from './constants.js';
-import type { DemoAuthorizationStatus } from './demo-account.js';
-import type { ChatModel } from './model-types.js';
-import type { ToolId } from './tools.js';
+} from './constants';
+import type { DemoAuthorizationStatus } from './demo-account';
+import type { ChatModel } from './model-types';
+import type { ToolId } from './tools';
 
-export type { ChatModel } from './model-types.js';
+export type { ChatModel } from './model-types';
 
-export { CHAT_PHASE, MESSAGE_STATE } from './constants.js';
+export { CHAT_PHASE, MESSAGE_STATE } from './constants';
 
 export type ChatPhase = (typeof CHAT_PHASE)[keyof typeof CHAT_PHASE];
 export type MessageState = (typeof MESSAGE_STATE)[keyof typeof MESSAGE_STATE];

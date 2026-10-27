@@ -18,7 +18,7 @@ import {
   disposableIdentity,
   disposableProtection,
   TEST_BACKUP_PASSWORD,
-} from './support/portable-backup-fixture.js';
+} from './support/portable-backup-fixture';
 
 void test('a backup targets the selected wallet and verification does not transfer to the original', async (context) => {
   const home = await mkdtemp(join(tmpdir(), 'gyblos-active-backup-'));

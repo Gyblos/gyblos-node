@@ -6,8 +6,8 @@ import { getTokenSize } from '@solana-program/token';
 
 import { SYSTEM_PROGRAM_ADDRESS, TOKEN_PROGRAM_ADDRESS } from '@gyblos/config';
 
-import { RENT_GUARDS } from './constants.js';
-import type { ChainTransaction } from './types.js';
+import { RENT_GUARDS } from './constants';
+import type { ChainTransaction } from './types';
 
 export interface RentTransaction extends ChainTransaction {
   meta: ChainTransaction['meta'] & {

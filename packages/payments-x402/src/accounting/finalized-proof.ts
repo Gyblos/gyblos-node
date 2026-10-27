@@ -4,17 +4,17 @@ import assert from 'node:assert/strict';
 
 import { FINALIZED_COMMITMENT, SVM_TRANSACTION_VERSION } from '@gyblos/config';
 
-import { verifyFinalizedChannel } from '../finalized-channel.js';
-import { readChain, tokenAddress } from './chain.js';
-import { PROOF_GUARDS } from './constants.js';
+import { verifyFinalizedChannel } from '../finalized-channel';
+import { readChain, tokenAddress } from './chain';
+import { PROOF_GUARDS } from './constants';
 import {
   transactionLamports as lamports,
   verifyEscrowRent,
-} from './escrow-rent.js';
+} from './escrow-rent';
 import {
   verifyEscrowTokens,
   type EscrowTokenTransaction,
-} from './escrow-tokens.js';
+} from './escrow-tokens';
 
 interface FinalizedTransaction extends EscrowTokenTransaction {
   meta: EscrowTokenTransaction['meta'] & {

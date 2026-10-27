@@ -14,10 +14,10 @@ export type ModelOption = ChatModel & {
 
 export type CatalogModel = ModelOption & {
   family: string;
-  category: (typeof import('./constants.js').MODEL_CATEGORY)[keyof typeof import('./constants.js').MODEL_CATEGORY];
+  category: (typeof import('./constants').MODEL_CATEGORY)[keyof typeof import('./constants').MODEL_CATEGORY];
   context: string;
   providers: number;
 };
 export type View =
-  (typeof import('./constants.js').UI_VIEW)[keyof typeof import('./constants.js').UI_VIEW];
-export type Mode = (typeof import('./constants.js').MODES)[number];
+  (typeof import('./constants').UI_VIEW)[keyof typeof import('./constants').UI_VIEW];
+export type Mode = (typeof import('./constants').MODES)[number];

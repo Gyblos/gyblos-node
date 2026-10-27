@@ -19,7 +19,7 @@ import {
   ROLE_CONFIG_SCHEMA_VERSION,
 } from '@gyblos/node/constants';
 
-import { NATIVE_CAPABILITY } from './support/native-runtime.js';
+import { NATIVE_CAPABILITY } from './support/native-runtime';
 
 const ADDRESS = '2vXUXK2rJTPtb7Wx9em4W9FdgtfD6HTnFxZz5oirLVcH';
 const ROLE = {

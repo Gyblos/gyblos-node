@@ -12,9 +12,9 @@ import {
   EVIDENCE_IDS,
   EVIDENCE_STATUSES,
   SCHEMA_VERSIONS,
-} from '../../constants.js';
-import type { InferenceGateEvidence } from '../../types.js';
-import { type Config } from '../../wallet.js';
+} from '../../constants';
+import type { InferenceGateEvidence } from '../../types';
+import { type Config } from '../../wallet';
 
 export async function initializeEvidence(
   config: Config,

@@ -22,13 +22,13 @@ import {
   fixtureRequest,
   NativeTestDeadlineError,
   within,
-} from './support/native-fixture.js';
-import { unreadPeer } from './support/native-reader.js';
+} from './support/native-fixture';
+import { unreadPeer } from './support/native-reader';
 import {
   NATIVE_CAPABILITY,
   NATIVE_TEST_OPTIONS,
   waitFor,
-} from './support/native-runtime.js';
+} from './support/native-runtime';
 
 const CHUNK_BYTES = 64 * 1024;
 const STREAM_BYTES = 512 * 1024;

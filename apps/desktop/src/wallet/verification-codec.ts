@@ -2,10 +2,10 @@
 // This is not a payment signature, a portable backup or proof that the file still exists.
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
-import { BACKUP, BACKUP_ERROR } from './backup/constants.js';
-import { BackupError } from './backup/error.js';
-import { BACKUP_VERIFICATION } from './constants.js';
-import type { WalletProtection } from './protection.js';
+import { BACKUP, BACKUP_ERROR } from './backup/constants';
+import { BackupError } from './backup/error';
+import { BACKUP_VERIFICATION } from './constants';
+import type { WalletProtection } from './protection';
 
 function tag(secret: string, address: string) {
   const key = Buffer.from(secret, 'base64');

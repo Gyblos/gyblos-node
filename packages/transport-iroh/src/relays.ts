@@ -8,8 +8,8 @@ import {
   RELAY_CONFIGURATION_CODES,
   RELAY_TOKEN_LENGTH,
   type RelayConfigurationCode,
-} from './constants.js';
-import { relayOrigins } from './relay-origins.js';
+} from './constants';
+import { relayOrigins } from './relay-origins';
 
 export interface RelayEnvironment extends NodeJS.ProcessEnv {
   GYBLOS_RELAYS?: string;

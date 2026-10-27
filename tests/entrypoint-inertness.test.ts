@@ -6,8 +6,8 @@ import test from 'node:test';
 import { NODE_STATES } from '@gyblos/node/constants';
 import { createNodeLifecycle } from '@gyblos/node/lifecycle';
 
-import { assertImportsInert } from './support/inertness.js';
-import { NATIVE_CAPABILITY } from './support/native-runtime.js';
+import { assertImportsInert } from './support/inertness';
+import { NATIVE_CAPABILITY } from './support/native-runtime';
 
 void test('all executable modules are inert when imported', async (context) => {
   let starts = 0;

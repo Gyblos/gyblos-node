@@ -12,10 +12,10 @@ import { CONTROL_CODES, PUBLIC_RECORD_KINDS } from '@gyblos/protocol/constants';
 import type { SignedPublicV2 } from '@gyblos/protocol/control-types';
 import { catalogDigestV2 } from '@gyblos/protocol/public-v2';
 
-import { acceptQuote, listed, refuseCatalog } from './buyer.js';
-import { ACCEPTANCE } from './constants.js';
-import { acceptanceAssert, assertAcceptanceActive } from './errors.js';
-import type { AcceptanceSession } from './session.js';
+import { acceptQuote, listed, refuseCatalog } from './buyer';
+import { ACCEPTANCE } from './constants';
+import { acceptanceAssert, assertAcceptanceActive } from './errors';
+import type { AcceptanceSession } from './session';
 
 export async function pump(run: AcceptanceSession, milliseconds: number) {
   let remaining = milliseconds;

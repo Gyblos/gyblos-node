@@ -1,12 +1,12 @@
 // Compact shared-modal startup status; connection progress is explicitly simulated.
 import { Globe, ShieldCheck } from '@phosphor-icons/react';
 
-import { WALLET_STATUS, type WalletSummary } from '../wallet/model.js';
-import { NETWORK_STATE } from './constants.js';
-import { Modal } from './Modal.js';
-import type { NetworkState } from './NetworkStatus.js';
-import { SIGNAL_STATE, SignalMark } from './Signal.js';
-import { Badge, Button, List, ListRow, Note, RowCopy } from './UI.js';
+import { WALLET_STATUS, type WalletSummary } from '../wallet/model';
+import { NETWORK_STATE } from './constants';
+import { Modal } from './Modal';
+import type { NetworkState } from './NetworkStatus';
+import { SIGNAL_STATE, SignalMark } from './Signal';
+import { Badge, Button, List, ListRow, Note, RowCopy } from './UI';
 
 export function StartupScreen({
   wallet,

@@ -7,10 +7,7 @@ import test from 'node:test';
 import { LEGACY_LOCAL_PATHS } from '@gyblos/config';
 import { NODE_ERROR_CODES } from '@gyblos/node/constants';
 
-import {
-  artifactLayout,
-  preparation,
-} from '../support/tokenizer-preparation.js';
+import { artifactLayout, preparation } from '../support/tokenizer-preparation';
 
 void test('lab setup verifies before replacing either artifact', async () => {
   const { directory, result, artifacts } = await preparation(

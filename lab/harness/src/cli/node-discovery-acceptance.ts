@@ -2,10 +2,10 @@
 // Imports are inert; native endpoints and any explicitly selected real engine are created inside main.
 import { isMain, onShutdown } from '@gyblos/runtime';
 
-import { ACCEPTANCE_CODES } from '../acceptance/constants.js';
-import { AcceptanceError } from '../acceptance/errors.js';
-import { parseAcceptanceArgs } from '../acceptance/options.js';
-import { runNodeDiscoveryAcceptance } from '../acceptance/run.js';
+import { ACCEPTANCE_CODES } from '../acceptance/constants';
+import { AcceptanceError } from '../acceptance/errors';
+import { parseAcceptanceArgs } from '../acceptance/options';
+import { runNodeDiscoveryAcceptance } from '../acceptance/run';
 
 export async function main(
   args = process.argv.slice(2),

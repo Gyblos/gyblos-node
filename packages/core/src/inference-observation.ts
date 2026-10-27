@@ -3,8 +3,8 @@
 import { HTTP_STATUS } from '@gyblos/config';
 import type { EngineWireUsage } from '@gyblos/protocol/wire-usage';
 
-import { OBSERVED_DONE_REASONS, type ObservedDoneReason } from './constants.js';
-import { charge, compareUsage, type TokenCounts } from './metering.js';
+import { OBSERVED_DONE_REASONS, type ObservedDoneReason } from './constants';
+import { charge, compareUsage, type TokenCounts } from './metering';
 
 export interface ObservedBody {
   requestId: string;

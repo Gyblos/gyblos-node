@@ -7,8 +7,8 @@ import {
   REASONING_LEVELS,
   type CatalogModelId,
   type ReasoningLevel,
-} from './constants.js';
-import { publicIdentifier } from './public-validation.js';
+} from './constants';
+import { publicIdentifier } from './public-validation';
 
 export interface PublicTokenizer {
   repository: string;
@@ -94,7 +94,7 @@ const NO_REASONING: ReasoningSupport = {
   defaultReasoning: REASONING_LEVELS.OFF,
 };
 
-// Initial names: GYB-DOC-026 / web/src/content.ts. Future consumers use this source.
+// The shared catalog is the canonical source for model names, aliases and reasoning support.
 // Only the tiny tokenizer has a pre-existing pinned local-adapter reference.
 export const MODEL_CATALOG: readonly Readonly<CatalogModel>[] = Object.freeze([
   entry(MODEL_IDS.QWEN3_30B_A3B, {

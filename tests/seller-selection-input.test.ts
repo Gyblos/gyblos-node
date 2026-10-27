@@ -19,7 +19,7 @@ import {
   seeded,
   select,
   seller,
-} from './support/seller-selection-fixture.js';
+} from './support/seller-selection-fixture';
 
 function validInput(): SellerSelectionInput {
   return {

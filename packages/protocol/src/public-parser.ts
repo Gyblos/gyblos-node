@@ -1,14 +1,14 @@
 // Parses public catalog/presence/withdrawal JSON into detached, allowlisted values.
 // Rejects private endpoint/engine fields; it does not parse the private paid offer.
-import { canonicalJson } from './canonical.js';
+import { canonicalJson } from './canonical';
 import {
   DATA_RETENTION,
   PUBLIC_PRESENCE_STATE,
   PUBLIC_PRICE_UNIT,
   PUBLIC_RECORD_KINDS,
   PUBLIC_RECORD_LIMITS,
-} from './constants.js';
-import type { PublicModelListing, PublicRecord } from './public-types.js';
+} from './constants';
+import type { PublicModelListing, PublicRecord } from './public-types';
 import {
   invalidRecord,
   publicAddress,
@@ -16,7 +16,7 @@ import {
   publicIdentifier,
   publicInteger,
   publicObject,
-} from './public-validation.js';
+} from './public-validation';
 
 const HEADER_KEYS = [
   'schemaVersion',

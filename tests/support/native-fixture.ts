@@ -17,7 +17,7 @@ import { createIrohTransport } from '@gyblos/transport-iroh/iroh-client';
 import { serveIroh } from '@gyblos/transport-iroh/iroh-server';
 import { decodeResponse, encodeRequest } from '@gyblos/transport-iroh/wire';
 
-import { NATIVE_CAPABILITY } from './native-runtime.js';
+import { NATIVE_CAPABILITY } from './native-runtime';
 
 interface FixtureOptions {
   freeBody?: Buffer;

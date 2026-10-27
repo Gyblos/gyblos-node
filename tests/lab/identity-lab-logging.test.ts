@@ -10,7 +10,7 @@ import {
 import {
   airdropFailureReason,
   fundSponsor,
-} from '../../lab/tools/identity-devnet-run.js';
+} from '../../lab/tools/identity-devnet-run';
 
 const SENTINEL = 'SYNTHETIC_CREDENTIAL_SENTINEL';
 const CREDENTIALED_URL = `https://rpc.example.invalid/?api-key=${SENTINEL}`;

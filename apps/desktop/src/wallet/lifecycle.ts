@@ -1,7 +1,7 @@
 // Coordinates desktop profile setup and orderly quit, without starting Electron.
 import { lstatSync, mkdirSync } from 'node:fs';
 
-import { WALLET } from './constants.js';
+import { WALLET } from './constants';
 
 export interface ExistingWindow {
   isDestroyed(): boolean;

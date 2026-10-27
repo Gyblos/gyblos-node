@@ -1,6 +1,6 @@
 // Owns the wire shape of the signed private inference offer ({ offer, signature }).
 // Types only: trust policy lives in core, wallet signing in node; no SDK dependencies.
-import type { EngineCapabilities, EngineDescription } from './engine.js';
+import type { EngineCapabilities, EngineDescription } from './engine';
 
 export interface InferenceOffer {
   schemaVersion: number;

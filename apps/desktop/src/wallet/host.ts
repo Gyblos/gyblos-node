@@ -9,13 +9,13 @@ import {
   type BrowserWindow,
 } from 'electron';
 
-import { BACKUP_FLOW } from './backup-flow-model.js';
-import { WALLET } from './constants.js';
-import { createWalletHandlers } from './handlers.js';
-import { waitForWalletBeforeQuit } from './lifecycle.js';
-import { walletProtection } from './protection.js';
-import { createDesktopWalletSession } from './session.js';
-import { unavailableCollection, WALLET_SETTINGS } from './settings-model.js';
+import { BACKUP_FLOW } from './backup-flow-model';
+import { WALLET } from './constants';
+import { createWalletHandlers } from './handlers';
+import { waitForWalletBeforeQuit } from './lifecycle';
+import { walletProtection } from './protection';
+import { createDesktopWalletSession } from './session';
+import { unavailableCollection, WALLET_SETTINGS } from './settings-model';
 
 function walletDialogs(window: BrowserWindow) {
   return {

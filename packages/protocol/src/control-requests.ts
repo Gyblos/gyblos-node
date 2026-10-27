@@ -6,12 +6,8 @@ import {
   CONTROL_METHODS,
   CONTROL_VERSION,
   PUBLIC_RECORD_LIMITS,
-} from './constants.js';
-import type {
-  ControlQuery,
-  ModelSelection,
-  OfferQuery,
-} from './control-types.js';
+} from './constants';
+import type { ControlQuery, ModelSelection, OfferQuery } from './control-types';
 import {
   controlAddress,
   controlAtomic,
@@ -22,10 +18,10 @@ import {
   controlNetwork,
   controlObject,
   controlReasoning,
-} from './control-validation.js';
-import { parseTokenPricesV2 } from './pricing-v2.js';
-import { bytesHex } from './public-validation.js';
-import { signingBytes } from './signing.js';
+} from './control-validation';
+import { parseTokenPricesV2 } from './pricing-v2';
+import { bytesHex } from './public-validation';
+import { signingBytes } from './signing';
 
 export function parseModelSelection(value: unknown): ModelSelection {
   const input = controlObject(value, ['modelId', 'variant', 'quantization']);

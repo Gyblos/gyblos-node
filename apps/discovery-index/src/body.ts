@@ -1,7 +1,7 @@
 // Owns strict decoding of a publish body into its signed envelope and that envelope's verbatim text.
 // It must not verify records (protocol does) or echo input; every failure is INVALID_RECORD.
-import { DISCOVERY_INDEX_LIMITS } from './constants.js';
-import { indexFail } from './errors.js';
+import { DISCOVERY_INDEX_LIMITS } from './constants';
+import { indexFail } from './errors';
 
 export interface PublishBody {
   // The signed envelope `{ record, signature }`, still unverified.

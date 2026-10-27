@@ -15,7 +15,7 @@ import {
   labStatePaths,
   LEGACY_LAB_PATHS,
   type WalletRole,
-} from './constants.js';
+} from './constants';
 
 export interface Config {
   schemaVersion: typeof CONFIG_SCHEMA_VERSION;

@@ -9,8 +9,8 @@ import {
 } from '@gyblos/payments-x402/chain';
 import { isMain } from '@gyblos/runtime';
 
-import { FIXED_MIN_FACILITATOR_LAMPORTS } from '../constants.js';
-import { loadConfig } from '../wallet.js';
+import { FIXED_MIN_FACILITATOR_LAMPORTS } from '../constants';
+import { loadConfig } from '../wallet';
 
 export async function main() {
   try {

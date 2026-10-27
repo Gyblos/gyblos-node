@@ -26,7 +26,7 @@ import type {
 } from '@gyblos/protocol/control-types';
 import { catalogDigestV2, signPublicV2 } from '@gyblos/protocol/public-v2';
 
-import { rejectsWith } from './support/discovery-fixture.js';
+import { rejectsWith } from './support/discovery-fixture';
 import {
   allLimiters,
   deny,
@@ -35,7 +35,7 @@ import {
   MODEL,
   T0,
   type IndexHarness,
-} from './support/discovery-index-fixture.js';
+} from './support/discovery-index-fixture';
 
 // The client calls `${DISCOVERY_INDEX_URL}/records` and `/sellers`; route them into the app.
 function clientFetch(app: {

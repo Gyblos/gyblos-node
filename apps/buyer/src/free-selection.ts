@@ -7,19 +7,19 @@ import { REASONING_LEVELS } from '@gyblos/protocol/constants';
 import { assertConfiguredRelay } from '@gyblos/transport-iroh/endpoint';
 import { createFreeExecutionClient } from '@gyblos/transport-iroh/free-client';
 
-import { FREE_BUYER_CODES } from './constants.js';
-import { connectBuyerControl } from './control.js';
-import { discoverBuyerSellers } from './discovery.js';
-import { FreeBuyerError } from './free-chat.js';
+import { FREE_BUYER_CODES } from './constants';
+import { connectBuyerControl } from './control';
+import { discoverBuyerSellers } from './discovery';
+import { FreeBuyerError } from './free-chat';
 import {
   FreeSelectionFailure,
   type FreeBuyerDependencies,
   type FreeWinner,
-} from './free-execution.js';
-import { requireBuyerIdentity, verifyBuyerIdentity } from './identity.js';
-import type { StaticControlSeller } from './selection-config.js';
-import type { prepareBuyerSelection } from './selection-runtime.js';
-import { selectVerifiedBuyerQuote } from './selection.js';
+} from './free-execution';
+import { requireBuyerIdentity, verifyBuyerIdentity } from './identity';
+import { selectVerifiedBuyerQuote } from './selection';
+import type { StaticControlSeller } from './selection-config';
+import type { prepareBuyerSelection } from './selection-runtime';
 
 export function freeBuyerDependencies(
   prepared: PreparedSelection,

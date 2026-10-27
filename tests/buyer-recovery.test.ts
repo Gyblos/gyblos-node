@@ -11,8 +11,8 @@ import { CALL_OUTCOMES, RECONCILED_ZERO_CHARGE } from '@gyblos/buyer/constants';
 import { ROLE_FILES, ROLE_KEY_FILES } from '@gyblos/config';
 import { JOURNAL_STATES } from '@gyblos/payments-x402/constants';
 
-import { NATIVE_CAPABILITY } from './support/native-runtime.js';
-import { recoveryFixture } from './support/recovery-fixture.js';
+import { NATIVE_CAPABILITY } from './support/native-runtime';
+import { recoveryFixture } from './support/recovery-fixture';
 
 const RECOVERY_OPTIONS = { skip: NATIVE_CAPABILITY.bindingSkip };
 

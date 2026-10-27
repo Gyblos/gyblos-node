@@ -15,8 +15,8 @@ import {
   controlObject,
 } from '@gyblos/protocol/control-validation';
 
-import { BUYER_SELECTION, BUYER_SELECTION_CODES } from './constants.js';
-import { BuyerSelectionError } from './selection-config.js';
+import { BUYER_SELECTION, BUYER_SELECTION_CODES } from './constants';
+import { BuyerSelectionError } from './selection-config';
 
 export interface LocalSellerStats extends SellerStats {
   quotedWaitMs: number | null;

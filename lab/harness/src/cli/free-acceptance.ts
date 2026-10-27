@@ -1,9 +1,9 @@
 // Synthetic-only acceptance CLI. No endpoint/home/engine options; errors and reports are sanitized.
 import { isMain, onShutdown } from '@gyblos/runtime';
 
-import { ACCEPTANCE_CODES } from '../acceptance/constants.js';
-import { AcceptanceError } from '../acceptance/errors.js';
-import { runFreeAcceptance } from '../acceptance/free-run.js';
+import { ACCEPTANCE_CODES } from '../acceptance/constants';
+import { AcceptanceError } from '../acceptance/errors';
+import { runFreeAcceptance } from '../acceptance/free-run';
 
 export async function main(
   args = process.argv.slice(2),

@@ -9,7 +9,7 @@ import {
   PUBLIC_RECORD_KINDS,
 } from '@gyblos/protocol/constants';
 
-import { freeSellerFixture, freeSellerSignal } from './support/free-seller.js';
+import { freeSellerFixture, freeSellerSignal } from './support/free-seller';
 
 void test('free startup omits the handler for a prepared paid offer without invoking an engine', async () => {
   const state = await freeSellerFixture();

@@ -1,15 +1,15 @@
 // Exposes fixed probe, public wallet status/copy and bounded setup/backup interactions; no signing or raw IPC.
 import { contextBridge, ipcRenderer } from 'electron';
 
-import { DESKTOP } from './constants.js';
-import { parseProbeResult } from './probe-model.js';
-import { BACKUP_FLOW, parseBackupResult } from './wallet/backup-flow-model.js';
-import { parseWalletSummary, WALLET } from './wallet/model.js';
+import { DESKTOP } from './constants';
+import { parseProbeResult } from './probe-model';
+import { BACKUP_FLOW, parseBackupResult } from './wallet/backup-flow-model';
+import { parseWalletSummary, WALLET } from './wallet/model';
 import {
   parseWalletCollection,
   parseWalletSettingsResult,
   WALLET_SETTINGS,
-} from './wallet/settings-model.js';
+} from './wallet/settings-model';
 
 contextBridge.exposeInMainWorld('desktopProbe', {
   run: async () => parseProbeResult(await ipcRenderer.invoke(DESKTOP.CHANNEL)),

@@ -15,8 +15,8 @@ import {
   accountIndex,
   accountInstruction,
   type PaymentFixture,
-} from './payment-fixture.js';
-import { lamportCredits, rentInfo } from './payment-mutations.js';
+} from './payment-fixture';
+import { lamportCredits, rentInfo } from './payment-mutations';
 
 type Fault = readonly [
   FinancialGuardMessage | FinalizedChannelGuardMessage,

@@ -1,9 +1,9 @@
 // Runs only the isolated synthetic 8004/free acceptance scenario; accepts no operational arguments.
 import { isMain, onShutdown } from '@gyblos/runtime';
 
-import { ACCEPTANCE_CODES } from '../acceptance/constants.js';
-import { AcceptanceError } from '../acceptance/errors.js';
-import { runIdentityAcceptance } from '../acceptance/identity-run.js';
+import { ACCEPTANCE_CODES } from '../acceptance/constants';
+import { AcceptanceError } from '../acceptance/errors';
+import { runIdentityAcceptance } from '../acceptance/identity-run';
 
 export async function main(
   args = process.argv.slice(2),

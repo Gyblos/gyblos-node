@@ -4,7 +4,7 @@ import {
   PUBLIC_RECORD_ERROR_CODES,
   PUBLIC_RECORD_LIMITS,
   type PublicRecordErrorCode,
-} from './constants.js';
+} from './constants';
 
 const BASE58_ALPHABET =
   '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';

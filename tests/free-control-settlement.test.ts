@@ -8,7 +8,7 @@ import type { LocalSellerStats } from '@gyblos/buyer/selection-stats';
 import { CONTROL_CODES, FREE_CHAT_ROLES } from '@gyblos/protocol/constants';
 import { createControlTransport } from '@gyblos/transport-iroh/control-client';
 
-import { NATIVE_CAPABILITY } from './support/native-runtime.js';
+import { NATIVE_CAPABILITY } from './support/native-runtime';
 
 void test('control settlement retains a cancelled native dial until its late connection is closed', async () => {
   let began = () => {};
@@ -67,7 +67,7 @@ void test(
     const { executeBuyerFree } = await import('@gyblos/buyer/free-execution');
     const { FREE_BUYER_CODES } = await import('@gyblos/buyer/constants');
     const { SELLER_BADGES } = await import('@gyblos/core/constants');
-    const { controlFixture } = await import('./support/control-fixture.js');
+    const { controlFixture } = await import('./support/control-fixture');
     const source = await controlFixture(true);
     let began = () => {};
     const started = new Promise<void>((resolve) => {

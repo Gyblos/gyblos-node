@@ -18,7 +18,7 @@ import {
 } from '@gyblos/config';
 import { requireLoopbackHost } from '@gyblos/runtime/loopback-host';
 
-import { ACTUAL_ATOMIC, GATE_ROUTES } from './constants.js';
+import { ACTUAL_ATOMIC, GATE_ROUTES } from './constants';
 
 export async function createGateSeller(options: {
   rpcUrl: string;

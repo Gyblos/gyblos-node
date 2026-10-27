@@ -8,13 +8,13 @@ import {
 } from '@gyblos/protocol/constants';
 import { controlFail } from '@gyblos/protocol/control-validation';
 
-import { HTTP_OVER_IROH, TRANSPORT_ROUTES } from './constants.js';
+import { HTTP_OVER_IROH, TRANSPORT_ROUTES } from './constants';
 import {
   controlDeadline,
   readControlFrame,
   writeControlFrame,
-} from './control-io.js';
-import { selectedRoute } from './paths.js';
+} from './control-io';
+import { selectedRoute } from './paths';
 
 export interface ControlTransport {
   readonly localNodeId: string;

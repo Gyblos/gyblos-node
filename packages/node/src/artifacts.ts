@@ -19,9 +19,9 @@ import {
   TOKENIZER_DOWNLOAD_MAX_BYTES,
   TOKENIZER_DOWNLOAD_TIMEOUT_MS,
   TOKENIZER_ORIGIN,
-} from './constants.js';
-import { NodeError } from './errors.js';
-import { assertTokenizerHome } from './home.js';
+} from './constants';
+import { NodeError } from './errors';
+import { assertTokenizerHome } from './home';
 
 export async function modelTokenizer(
   environment: HomeEnvironment = process.env,

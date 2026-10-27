@@ -3,20 +3,20 @@
 import { lstat, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { BACKUP_ERROR } from './backup/constants.js';
-import { BackupError } from './backup/error.js';
-import { WALLET, WALLET_STATUS } from './constants.js';
+import { BACKUP_ERROR } from './backup/constants';
+import { BackupError } from './backup/error';
+import { WALLET, WALLET_STATUS } from './constants';
 import {
   ensureWalletRoot,
   isMissing,
   readWalletRecord,
   syncWalletDirectory,
   writeNewWallet,
-} from './files.js';
-import { createWalletSecret, walletAddress } from './key.js';
-import { walletSummary, type WalletSummary } from './model.js';
-import type { WalletProtection } from './protection.js';
-import { createBackupVerification } from './verification.js';
+} from './files';
+import { createWalletSecret, walletAddress } from './key';
+import { walletSummary, type WalletSummary } from './model';
+import type { WalletProtection } from './protection';
+import { createBackupVerification } from './verification';
 
 function encryptedBytes(record: unknown, protection: WalletProtection) {
   if (

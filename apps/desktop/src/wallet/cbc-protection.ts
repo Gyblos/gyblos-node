@@ -2,8 +2,8 @@
 // This is a downgrade guard, not general authentication of deterministic CBC.
 import { createCipheriv, pbkdf2Sync, timingSafeEqual } from 'node:crypto';
 
-import { STORAGE_CBC } from './constants.js';
-import type { WalletProtection } from './protection.js';
+import { STORAGE_CBC } from './constants';
+import type { WalletProtection } from './protection';
 
 function sameBytes(left: Buffer, right: Buffer) {
   return left.length === right.length && timingSafeEqual(left, right);

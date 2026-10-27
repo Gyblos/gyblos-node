@@ -19,13 +19,14 @@ import {
   NODE_CONFIG_SOURCES,
   NODE_NETWORKS,
   NODE_SETTINGS,
-} from './constants.js';
+} from './constants';
+import type { NodeConfig } from './node-config';
 import {
   RPC_URL_POLICY,
   serviceUrl,
   socketAddress,
   text,
-} from './node-config-fields.js';
+} from './node-config-fields';
 import {
   fileCandidate,
   nonEmpty,
@@ -39,9 +40,8 @@ import {
   type ResolvedNodeConfig,
   type ResolveNodeConfigInput,
   type SecretReference,
-} from './node-config-sources.js';
-import { readAddress, readDiscoveryUrl } from './node-config-values.js';
-import type { NodeConfig } from './node-config.js';
+} from './node-config-sources';
+import { readAddress, readDiscoveryUrl } from './node-config-values';
 
 export type {
   NodeConfigFlags,
@@ -51,7 +51,7 @@ export type {
   ResolveNodeConfigInput,
   SecretReference,
   SettingOrigin,
-} from './node-config-sources.js';
+} from './node-config-sources';
 
 function resolveLocation(resolution: Resolution, file: NodeConfig | undefined) {
   const { issues } = resolution;

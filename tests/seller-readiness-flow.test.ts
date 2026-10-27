@@ -13,9 +13,9 @@ import { createSellerPublisher } from '@gyblos/node/publisher';
 import { ENGINE_DONE_REASONS } from '@gyblos/protocol/constants';
 import type { Engine } from '@gyblos/protocol/engine';
 
-import { controlLoopback } from './support/control-loopback.js';
-import { publicationIndex } from './support/publication-index.js';
-import { sellerPublicationFixture } from './support/seller-publication.js';
+import { controlLoopback } from './support/control-loopback';
+import { publicationIndex } from './support/publication-index';
+import { sellerPublicationFixture } from './support/seller-publication';
 
 void test('seller expiry, failed check, recovery and busy transitions reach fresh verified quotes without inference from queries', async () => {
   const run = await sellerPublicationFixture();

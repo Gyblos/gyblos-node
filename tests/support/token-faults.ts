@@ -16,14 +16,14 @@ import {
   accountIndex,
   instructions,
   type PaymentFixture,
-} from './payment-fixture.js';
+} from './payment-fixture';
 import {
   paymentAccounts,
   shiftTokenBalance,
   tokenBalance,
   tokenCredit,
   tokenLeg,
-} from './payment-mutations.js';
+} from './payment-mutations';
 
 type Fault = readonly [
   FinancialGuardMessage | FinalizedChannelGuardMessage,

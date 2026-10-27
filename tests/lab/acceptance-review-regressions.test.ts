@@ -8,7 +8,7 @@ import { pathToFileURL } from 'node:url';
 
 import { CONTROL_CODES } from '@gyblos/protocol/constants';
 
-import { NATIVE_TEST_OPTIONS } from '../support/native-runtime.js';
+import { NATIVE_TEST_OPTIONS } from '../support/native-runtime';
 
 function child(
   source: string,

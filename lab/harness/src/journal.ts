@@ -7,8 +7,8 @@ import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { ProtocolError } from '@gyblos/protocol/errors';
 import { saveJson } from '@gyblos/runtime';
 
-import { JOURNAL_FILENAMES, labPaths } from './constants.js';
-import type { GateJournalRecord, JournalStateRecord } from './journal-types.js';
+import { JOURNAL_FILENAMES, labPaths } from './constants';
+import type { GateJournalRecord, JournalStateRecord } from './journal-types';
 
 export async function assertNoUnresolvedAuthorizations(
   paths: readonly string[] = Object.values(labPaths().journals),

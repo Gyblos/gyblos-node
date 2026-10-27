@@ -1,7 +1,7 @@
 // Owns Borsh-style primitive encoding and a bounds-checked reader for account data.
 // Must not know any 8004 account layout or instruction; callers compose these.
-import { IDENTITY_ERROR_CODES } from './constants.js';
-import { IdentityError } from './errors.js';
+import { IDENTITY_ERROR_CODES } from './constants';
+import { IdentityError } from './errors';
 
 const U32_BYTES = 4;
 const I64_BYTES = 8;

@@ -3,9 +3,9 @@ import { HOSTS, LOCALHOST } from '@gyblos/config';
 import { assertProgram } from '@gyblos/payments-x402/chain';
 import { isMain } from '@gyblos/runtime';
 
-import { GATE_HOSTS, GATE_PORTS, WALLET_ROLES } from '../src/constants.js';
-import { createGateSeller } from '../src/fixed-seller.js';
-import { loadConfig, signer } from '../src/wallet.js';
+import { GATE_HOSTS, GATE_PORTS, WALLET_ROLES } from '../src/constants';
+import { createGateSeller } from '../src/fixed-seller';
+import { loadConfig, signer } from '../src/wallet';
 
 export async function main() {
   const config = await loadConfig();

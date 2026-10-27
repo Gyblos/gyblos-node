@@ -5,8 +5,8 @@ import test from 'node:test';
 import { BUYER_SELECTION_CODES } from '@gyblos/buyer/constants';
 import { GYBLOS_ALPN } from '@gyblos/protocol/constants';
 
-import { nativeControlFixture as fixture } from './support/native-control.js';
-import { NATIVE_CAPABILITY } from './support/native-runtime.js';
+import { nativeControlFixture as fixture } from './support/native-control';
+import { NATIVE_CAPABILITY } from './support/native-runtime';
 
 void test(
   'native registry identity revocation between quote and authorization stops cached v1 admission without reselection',
@@ -14,7 +14,7 @@ void test(
   async () => {
     const run = await fixture();
     const { discoveryHome, discoveryResponse } =
-      await import('./support/buyer-discovery.js');
+      await import('./support/buyer-discovery');
     const home = await discoveryHome();
     try {
       const { runtimeProxySelection } =

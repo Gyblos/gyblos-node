@@ -1,13 +1,13 @@
 // Parses explicit per-million v2 prices; never accepts or converts per-token wire terms.
-import { V2_PRICING } from './constants.js';
-import type { PublicPricesV2, TokenPricesV2 } from './control-types.js';
+import { V2_PRICING } from './constants';
+import type { PublicPricesV2, TokenPricesV2 } from './control-types';
 import {
   controlAddress,
   controlAtomic,
   controlFail,
   controlNetwork,
   controlObject,
-} from './control-validation.js';
+} from './control-validation';
 
 export function parseTokenPricesV2(value: unknown): TokenPricesV2 {
   const prices = controlObject(value, [

@@ -5,7 +5,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { REPOSITORY_ROOT } from './node-config-fixtures.js';
+import { REPOSITORY_ROOT } from './node-config-fixtures';
 
 export const SHUTDOWN_PROBE_ENTRIES = {
   HELPER: 'helper',
@@ -41,7 +41,7 @@ function childSource(options: ShutdownProbeOptions) {
   const resolver = `
     export function resolve(specifier, context, next) {
       if (specifier === '@gyblos/node' ||
-          (specifier === './free-startup.js' && context.parentURL?.endsWith('/apps/buyer/src/free-main.ts')))
+          (specifier === './free-startup' && context.parentURL?.endsWith('/apps/buyer/src/free-main.ts')))
         return { url: ${JSON.stringify(hostUrl)}, shortCircuit: true };
       if (specifier === '@gyblos/transport-iroh/relays')
         return { url: ${JSON.stringify(relaysUrl)}, shortCircuit: true };

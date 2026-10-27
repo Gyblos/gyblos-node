@@ -11,7 +11,7 @@ import {
 } from '@gyblos/protocol/constants';
 import type { EngineResult } from '@gyblos/protocol/engine';
 
-import { controlFixture } from './control-fixture.js';
+import { controlFixture } from './control-fixture';
 
 export async function freeSellerFixture(
   caps = { dailyTokenCap: 100, perBuyerCap: 50 },

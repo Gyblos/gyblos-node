@@ -16,7 +16,7 @@ import {
   memoryCache,
   MODEL,
   type IndexHarness,
-} from './support/discovery-index-fixture.js';
+} from './support/discovery-index-fixture';
 
 // Pinned literal, not READ_LIMIT_KEY, so a changed key fails here.
 const READ_KEY = 'global';

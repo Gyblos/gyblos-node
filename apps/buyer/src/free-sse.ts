@@ -14,13 +14,9 @@ import type {
   FreeExecutionResult,
 } from '@gyblos/protocol/free-execution';
 
-import {
-  FREE_BUYER,
-  FREE_BUYER_CODES,
-  type FreeBuyerCode,
-} from './constants.js';
-import { FreeBuyerError } from './free-chat.js';
-import type { SelectionDecision } from './selection.js';
+import { FREE_BUYER, FREE_BUYER_CODES, type FreeBuyerCode } from './constants';
+import { FreeBuyerError } from './free-chat';
+import type { SelectionDecision } from './selection';
 
 type FreeStreamErrorCode =
   | FreeBuyerCode

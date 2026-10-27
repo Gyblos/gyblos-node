@@ -16,12 +16,12 @@ import type { SignedPublicV2 } from '@gyblos/protocol/control-types';
 import type { RecountTokenizer } from '@gyblos/protocol/engine';
 import { controlDeadline } from '@gyblos/transport-iroh/control-io';
 
-import type { AcceptanceClock } from './clock.js';
-import type { AcceptanceEngine } from './engine.js';
-import { assertAcceptanceActive } from './errors.js';
-import type { AcceptanceIndex } from './index.js';
-import type { AcceptanceWire } from './native.js';
-import type { AcceptanceWorkspace } from './workspace.js';
+import type { AcceptanceClock } from './clock';
+import type { AcceptanceEngine } from './engine';
+import { assertAcceptanceActive } from './errors';
+import type { AcceptanceIndex } from './index';
+import type { AcceptanceWire } from './native';
+import type { AcceptanceWorkspace } from './workspace';
 
 export interface AcceptanceIdentity {
   owner: KeyPairSigner;

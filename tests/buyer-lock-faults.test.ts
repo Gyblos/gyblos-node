@@ -21,7 +21,7 @@ import {
   interceptOpen,
   lockFixture,
   restoreFileMocks,
-} from './support/lock-fixture.js';
+} from './support/lock-fixture';
 
 const LOCAL_OWNER_SUPPORTED =
   process.platform === 'darwin' || process.platform === 'linux';

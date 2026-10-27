@@ -19,7 +19,7 @@ import {
   disposableIdentity,
   disposableProtection,
   TEST_BACKUP_PASSWORD,
-} from './support/portable-backup-fixture.js';
+} from './support/portable-backup-fixture';
 
 async function fixture(context: { after(fn: () => Promise<void>): void }) {
   const home = await filesystem.mkdtemp(

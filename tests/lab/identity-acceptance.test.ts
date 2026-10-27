@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { NATIVE_TEST_OPTIONS } from '../support/native-runtime.js';
+import { NATIVE_TEST_OPTIONS } from '../support/native-runtime';
 
 void test('identity acceptance CLI refuses operational overrides and never reflects raw failures', async () => {
   const { main } = await import('@gyblos/lab-harness/cli/identity-acceptance');

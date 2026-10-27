@@ -9,8 +9,8 @@ import {
   type HomeRole,
 } from '@gyblos/config';
 
-import { NODE_ERROR_CODES } from './constants.js';
-import { NodeError } from './errors.js';
+import { NODE_ERROR_CODES } from './constants';
+import { NodeError } from './errors';
 
 export const LEGACY_LAYOUT_GUIDE = 'docs/running-a-node.md#local-home';
 

@@ -5,14 +5,14 @@ import { CONTROL_CODES, CONTROL_LIMITS } from '@gyblos/protocol/constants';
 import type { ControlResponse } from '@gyblos/protocol/control-types';
 import { controlFail } from '@gyblos/protocol/control-validation';
 
-import { HTTP_OVER_IROH } from './constants.js';
+import { HTTP_OVER_IROH } from './constants';
 import {
   controlDeadline,
   readControlFrame,
   writeControlFrame,
   type ControlStream,
-} from './control-io.js';
-import { handleIrohConnection } from './iroh-connection.js';
+} from './control-io';
+import { handleIrohConnection } from './iroh-connection';
 
 export interface ControlQueryLease {
   check(): void;

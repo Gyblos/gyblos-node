@@ -14,7 +14,7 @@ import { freeExecutionDigest } from '@gyblos/protocol/free-execution';
 import { encodeFreeStreamEvent } from '@gyblos/protocol/free-stream';
 import { createFreeExecutionClient } from '@gyblos/transport-iroh/free-client';
 
-import { freeSellerFixture } from './support/free-seller.js';
+import { freeSellerFixture } from './support/free-seller';
 
 async function fixture(
   options: {

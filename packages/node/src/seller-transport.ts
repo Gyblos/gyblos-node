@@ -10,9 +10,9 @@ import type {
 } from '@gyblos/protocol/engine';
 import { serveIroh } from '@gyblos/transport-iroh/iroh-server';
 
-import type { prepareSellerControl } from './control-startup.js';
-import { prepareSellerFreeExecution } from './free-execution.js';
-import type { SellerLimits } from './node-config-limits.js';
+import type { prepareSellerControl } from './control-startup';
+import { prepareSellerFreeExecution } from './free-execution';
+import type { SellerLimits } from './node-config-limits';
 
 export function serveSellerTransport(
   endpoint: Endpoint,

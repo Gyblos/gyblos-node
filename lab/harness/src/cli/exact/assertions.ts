@@ -12,12 +12,12 @@ import {
   EXACT_PRICE,
   EXACT_UNTRUSTED_CASES,
   WALLET_ROLES,
-} from '../../constants.js';
-import { createExactBuyer, validateExactTerms } from '../../exact/index.js';
-import { signer } from '../../wallet.js';
-import type { createChallenge } from './challenge.js';
-import { snapshot } from './reconcile.js';
-import type { ExactContext } from './types.js';
+} from '../../constants';
+import { createExactBuyer, validateExactTerms } from '../../exact/index';
+import { signer } from '../../wallet';
+import type { createChallenge } from './challenge';
+import { snapshot } from './reconcile';
+import type { ExactContext } from './types';
 
 export async function assertUntrusted(
   { config: config, host, persist, evidence }: ExactContext,

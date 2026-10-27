@@ -2,12 +2,12 @@
 // The second seller is independently signed, allowlisted only in this in-process index and never paid.
 import { HTTP_STATUS } from '@gyblos/config';
 
-import { acceptanceAssert } from './errors.js';
-import { createFreeBuyer } from './free-buyer.js';
-import { FREE_ACCEPTANCE_FAULTS } from './free-constants.js';
-import { createFreeSeller } from './free-session.js';
-import { pump } from './phases.js';
-import type { AcceptanceSession } from './session.js';
+import { acceptanceAssert } from './errors';
+import { createFreeBuyer } from './free-buyer';
+import { FREE_ACCEPTANCE_FAULTS } from './free-constants';
+import { createFreeSeller } from './free-session';
+import { pump } from './phases';
+import type { AcceptanceSession } from './session';
 
 export async function failoverCases(run: AcceptanceSession) {
   const second = await createFreeSeller(run.signal, run);

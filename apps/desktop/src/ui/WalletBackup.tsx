@@ -7,10 +7,10 @@ import {
   BACKUP_FLOW,
   BACKUP_RESULT,
   type BackupAction,
-} from '../wallet/backup-flow-model.js';
-import { BUTTON_VARIANT } from './constants.js';
-import { Button, Note } from './UI.js';
-import { useDesktopWallet, useDesktopWalletActions } from './WalletState.js';
+} from '../wallet/backup-flow-model';
+import { BUTTON_VARIANT } from './constants';
+import { Button, Note } from './UI';
+import { useDesktopWallet, useDesktopWalletActions } from './WalletState';
 
 function useWalletBackup() {
   const wallet = useDesktopWallet();

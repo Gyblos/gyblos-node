@@ -15,13 +15,13 @@ import {
   PUBLIC_CALL_OUTCOMES,
   type ExactCaseName,
   type WALLET_ROLES,
-} from '../../constants.js';
-import { createExactBuyer, validateExactTerms } from '../../exact/index.js';
-import { saveJournal } from '../../journal.js';
-import { signer } from '../../wallet.js';
-import type { createChallenge } from './challenge.js';
-import { authorizationMetadata, snapshot } from './reconcile.js';
-import type { ActiveAuthorization, ExactContext } from './types.js';
+} from '../../constants';
+import { createExactBuyer, validateExactTerms } from '../../exact/index';
+import { saveJournal } from '../../journal';
+import { signer } from '../../wallet';
+import type { createChallenge } from './challenge';
+import { authorizationMetadata, snapshot } from './reconcile';
+import type { ActiveAuthorization, ExactContext } from './types';
 
 export function createPaidRequest(
   {

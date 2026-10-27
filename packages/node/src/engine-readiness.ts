@@ -9,7 +9,7 @@ import {
   type MemorySnapshot,
 } from '@gyblos/runtime/memory';
 
-import { READINESS_REASONS, READINESS_STATUSES } from './constants.js';
+import { READINESS_REASONS, READINESS_STATUSES } from './constants';
 
 export interface ReadinessRecord {
   status: (typeof READINESS_STATUSES)[keyof typeof READINESS_STATUSES];

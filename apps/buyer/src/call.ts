@@ -28,29 +28,29 @@ import {
   routesMatchRequired,
 } from '@gyblos/transport-iroh/route-policy';
 
-import { trustedOffer } from './buyer.js';
+import { trustedOffer } from './buyer';
 import {
   assertPriorCallResolved,
   priorCalls,
   proofObservation,
   readCallMetrics,
   type CallPaymentObservation,
-} from './call-evidence.js';
+} from './call-evidence';
 import {
   CALL_OUTCOMES,
   CALL_PHASES,
   MINIMUM_REQUESTS,
   P2P_JOURNAL_STATES,
   type CallPhase,
-} from './constants.js';
-import { errorDiagnostic } from './diagnostics.js';
+} from './constants';
+import { errorDiagnostic } from './diagnostics';
 import {
   appendMeasurement,
   measurementRow,
   measurementSalt,
-} from './measurements.js';
-import { paymentProof } from './proof.js';
-import { createCases } from './synthetic-cases.js';
+} from './measurements';
+import { paymentProof } from './proof';
+import { createCases } from './synthetic-cases';
 
 const buyerPath = (name: string) => rolePath(P2P_ROLES.BUYER, name);
 

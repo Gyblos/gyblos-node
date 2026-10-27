@@ -17,7 +17,7 @@ import {
   discoveryHome,
   discoveryResponse,
   discoveryRun,
-} from './support/buyer-discovery.js';
+} from './support/buyer-discovery';
 
 void test('loopback HTTP discovery selects only independently trusted identities and refreshes signed Iroh quotes', async () => {
   const home = await discoveryHome();

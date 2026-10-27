@@ -2,18 +2,18 @@
 // Each refusal asserts that synthetic engine generation did not increase.
 import { FREE_EXECUTION_CODES } from '@gyblos/protocol/constants';
 
-import { acceptanceAssert } from './errors.js';
-import { FREE_ACCEPTANCE } from './free-constants.js';
+import { acceptanceAssert } from './errors';
+import { FREE_ACCEPTANCE } from './free-constants';
 import {
   acquireFreeQuote,
   executeFreeQuote,
   expectFreeRefusal,
   rawFreeQuote,
-} from './free-quotes.js';
-import { createFreeSeller } from './free-session.js';
-import { createAcceptanceBuyerEndpoint } from './native.js';
-import { pump } from './phases.js';
-import type { AcceptanceSession } from './session.js';
+} from './free-quotes';
+import { createFreeSeller } from './free-session';
+import { createAcceptanceBuyerEndpoint } from './native';
+import { pump } from './phases';
+import type { AcceptanceSession } from './session';
 
 export async function executionReplay(run: AcceptanceSession) {
   const quoted = await acquireFreeQuote(run);

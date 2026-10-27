@@ -24,26 +24,22 @@ import {
   type Ref,
 } from 'react';
 
-import { ChatController } from './chat-controller.js';
-import {
-  CHAT_PHASE,
-  MESSAGE_STATE,
-  toggleToolSelection,
-} from './chat-state.js';
-import { ToolsDropdown } from './ChatTools.js';
+import { ChatController } from './chat-controller';
+import { CHAT_PHASE, MESSAGE_STATE, toggleToolSelection } from './chat-state';
+import { ToolsDropdown } from './ChatTools';
 import {
   BUTTON_VARIANT,
   CHAT_PREVIEW,
   CHAT_ROLE,
   MOTION_VARIANT,
-} from './constants.js';
-import type { DemoAuthorizationStatus } from './demo-account.js';
-import { MessageText } from './MessageText.js';
-import { Modal } from './Modal.js';
-import { ModelDropdown, type ModelOption } from './ModelDropdown.js';
-import { MotionPresence } from './Motion.js';
-import { SIGNAL_STATE, SignalMark, SignalTrace } from './Signal.js';
-import { toolName, TOOLS, type ToolId } from './tools.js';
+} from './constants';
+import type { DemoAuthorizationStatus } from './demo-account';
+import { MessageText } from './MessageText';
+import { Modal } from './Modal';
+import { ModelDropdown, type ModelOption } from './ModelDropdown';
+import { MotionPresence } from './Motion';
+import { SIGNAL_STATE, SignalMark, SignalTrace } from './Signal';
+import { toolName, TOOLS, type ToolId } from './tools';
 import {
   Avatar,
   Badge,
@@ -54,7 +50,7 @@ import {
   Note,
   RowCopy,
   SearchField,
-} from './UI.js';
+} from './UI';
 
 export type ChatHandle = {
   newChat: () => void;

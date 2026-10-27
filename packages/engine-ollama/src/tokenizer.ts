@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 
 import { Tokenizer } from '@huggingface/tokenizers';
 
-import { MODEL, renderChat } from './model.js';
+import { MODEL, renderChat } from './model';
 
 export type ModelTokenizer = ReturnType<typeof createModelTokenizer>;
 

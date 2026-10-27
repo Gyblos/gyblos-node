@@ -18,10 +18,10 @@ import {
   FreeExecutionRequestReader,
 } from '@gyblos/protocol/free-execution-framing';
 
-import { HTTP_OVER_IROH, IROH_DEADLINES } from './constants.js';
-import type { ControlStream } from './control-io.js';
-import { streamFreeResponse } from './free-stream-server.js';
-import { handleIrohConnection } from './iroh-connection.js';
+import { HTTP_OVER_IROH, IROH_DEADLINES } from './constants';
+import type { ControlStream } from './control-io';
+import { streamFreeResponse } from './free-stream-server';
+import { handleIrohConnection } from './iroh-connection';
 
 export interface FreeExecutionService {
   stream?(

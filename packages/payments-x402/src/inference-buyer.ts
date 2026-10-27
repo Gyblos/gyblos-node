@@ -3,9 +3,9 @@ import type { KeyPairSigner } from '@solana/kit';
 
 import { TIMEOUTS } from '@gyblos/config';
 
-import { createBuyer, type BuyerResponseObservation } from './buyer.js';
-import type { BuyerDiagnosticCode } from './constants.js';
-import type { TrustPolicy } from './trust.js';
+import { createBuyer, type BuyerResponseObservation } from './buyer';
+import type { BuyerDiagnosticCode } from './constants';
+import type { TrustPolicy } from './trust';
 
 export function createInferenceBuyer(
   signer: KeyPairSigner,

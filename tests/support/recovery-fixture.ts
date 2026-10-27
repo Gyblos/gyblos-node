@@ -24,8 +24,8 @@ import { GYBLOS_ALPN, OFFER_SCHEMA_VERSION } from '@gyblos/protocol/constants';
 import type { InferenceOffer } from '@gyblos/protocol/offer';
 import { loadJson, saveJson } from '@gyblos/runtime';
 
-import { paymentFixture, withOfflineProof } from './payment-fixture.js';
-import { fullPrincipalRefund, tokenCredit } from './payment-mutations.js';
+import { paymentFixture, withOfflineProof } from './payment-fixture';
+import { fullPrincipalRefund, tokenCredit } from './payment-mutations';
 
 export async function recoveryFixture(fullRefund = true) {
   const financial = await paymentFixture();

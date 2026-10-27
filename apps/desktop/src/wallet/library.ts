@@ -4,37 +4,34 @@ import { mkdir } from 'node:fs/promises';
 
 import { desktopWalletLibraryPaths } from '@gyblos/config/home';
 
-import { createBackupFlow, type BackupDialogs } from './backup-flow.js';
-import { BACKUP, createBackupCodec } from './backup/index.js';
+import { createBackupFlow, type BackupDialogs } from './backup-flow';
+import { BACKUP, createBackupCodec } from './backup/index';
 import {
   WALLET,
   WALLET_LIBRARY,
   WALLET_LIBRARY_ERROR,
   WALLET_STATUS,
-} from './constants.js';
-import { checkWalletRoot, syncWalletDirectory } from './files.js';
-import {
-  checkLibraryCancellation,
-  WalletLibraryError,
-} from './library-error.js';
+} from './constants';
+import { checkWalletRoot, syncWalletDirectory } from './files';
+import { checkLibraryCancellation, WalletLibraryError } from './library-error';
 import {
   libraryAddresses,
   libraryExists,
   publishSelection,
   readSelection,
   withLibraryLock,
-} from './library-files.js';
+} from './library-files';
 import {
   checkSelection,
   selectedAddress,
   selectionText,
-} from './library-selection.js';
-import type { WalletProtection } from './protection.js';
-import { createWalletRestorer } from './restore.js';
-import { createWalletService, readExistingWallet } from './service.js';
+} from './library-selection';
+import type { WalletProtection } from './protection';
+import { createWalletRestorer } from './restore';
+import { createWalletService, readExistingWallet } from './service';
 
-export { WALLET_LIBRARY_ERROR } from './constants.js';
-export { WalletLibraryError } from './library-error.js';
+export { WALLET_LIBRARY_ERROR } from './constants';
+export { WalletLibraryError } from './library-error';
 
 function requireAddress(address: string | null): asserts address is string {
   if (!address)

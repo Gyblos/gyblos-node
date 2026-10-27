@@ -5,7 +5,7 @@ import {
   type FreeExecutionRequest,
 } from '@gyblos/protocol/free-execution';
 
-import { FREE_EXECUTION_ADMISSION } from './constants.js';
+import { FREE_EXECUTION_ADMISSION } from './constants';
 
 interface DayBudget {
   total: number;

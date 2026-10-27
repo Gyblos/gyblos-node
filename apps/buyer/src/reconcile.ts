@@ -21,12 +21,12 @@ import {
   P2P_JOURNAL_STATES,
   type CallOutcome,
   type P2pJournalState,
-} from './constants.js';
+} from './constants';
 import {
   verifyZeroChargeReconciliation,
   type RecoveryAccounts,
   type UncertainAttempt,
-} from './reconciliation.js';
+} from './reconciliation';
 
 const buyerPath = (name: string) => rolePath(P2P_ROLES.BUYER, name);
 

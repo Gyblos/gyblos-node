@@ -6,9 +6,9 @@ import { mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { analyze } from './analyze.js';
-import { fixture, REPOSITORY } from './fixture.js';
-import { sourceFiles } from './inventory.js';
+import { analyze } from './analyze';
+import { fixture, REPOSITORY } from './fixture';
+import { sourceFiles } from './inventory';
 
 function violationCount(text: string): number {
   const value: unknown = JSON.parse(text);

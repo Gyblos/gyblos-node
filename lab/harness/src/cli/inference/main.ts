@@ -55,13 +55,13 @@ import {
   labPaths,
   MIN_FACILITATOR_LAMPORTS,
   WALLET_ROLES,
-} from '../../constants.js';
-import type { InferenceTrace } from '../../inference-evidence-types.js';
-import { assertNoUnresolvedAuthorizations } from '../../journal.js';
-import { assertLabHome, loadConfig, signer } from '../../wallet.js';
-import { createGateBilling } from './billing.js';
-import { runCases } from './cases.js';
-import { initializeEvidence } from './evidence.js';
+} from '../../constants';
+import type { InferenceTrace } from '../../inference-evidence-types';
+import { assertNoUnresolvedAuthorizations } from '../../journal';
+import { assertLabHome, loadConfig, signer } from '../../wallet';
+import { createGateBilling } from './billing';
+import { runCases } from './cases';
+import { initializeEvidence } from './evidence';
 
 export async function main() {
   // Before the lab lock, which would create the lab home.

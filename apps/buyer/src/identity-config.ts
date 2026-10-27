@@ -7,7 +7,7 @@ import {
   controlText,
 } from '@gyblos/protocol/control-validation';
 
-import { BUYER_SELECTION } from './constants.js';
+import { BUYER_SELECTION } from './constants';
 
 export interface BuyerIdentityConfig {
   rpcUrl: string;

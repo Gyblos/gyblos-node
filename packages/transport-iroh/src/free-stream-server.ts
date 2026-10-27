@@ -16,7 +16,7 @@ import {
   freeStreamDeltas,
 } from '@gyblos/protocol/free-stream';
 
-import type { FreeExecutionService } from './free-server.js';
+import type { FreeExecutionService } from './free-server';
 
 export async function streamFreeResponse(
   request: FreeExecutionRequest,

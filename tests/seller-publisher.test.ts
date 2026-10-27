@@ -6,7 +6,7 @@ import { createSellerPublisher } from '@gyblos/node/publisher';
 import { PUBLIC_RECORD_KINDS } from '@gyblos/protocol/constants';
 import type { SignedPublicV2 } from '@gyblos/protocol/control-types';
 
-import { sellerPublicationFixture } from './support/seller-publication.js';
+import { sellerPublicationFixture } from './support/seller-publication';
 
 void test('seller publishes catalog before presence, refreshes catalog and retires without engine calls', async () => {
   const run = await sellerPublicationFixture();

@@ -1,8 +1,8 @@
 // Renders genuine model-family artwork consistently across the desktop concept.
 // Images identify catalog entries visually; they do not attest provider authenticity.
-import type { ModelArtwork } from './model-types.js';
+import type { ModelArtwork } from './model-types';
 
-export type { ModelArtwork } from './model-types.js';
+export type { ModelArtwork } from './model-types';
 
 export function ModelImage({
   artwork,

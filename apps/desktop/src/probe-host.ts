@@ -4,8 +4,8 @@ import { join } from 'node:path';
 
 import { utilityProcess } from 'electron';
 
-import type { ProbeResult } from './probe-model.js';
-import { runProbeSession } from './probe-session.js';
+import type { ProbeResult } from './probe-model';
+import { runProbeSession } from './probe-session';
 
 export function probeInUtility(
   directory: string,

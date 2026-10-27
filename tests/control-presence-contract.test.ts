@@ -13,7 +13,7 @@ import { parseControlQuery } from '@gyblos/protocol/control-requests';
 import { matchControlResponse } from '@gyblos/protocol/control-response';
 import { catalogDigestV2, signPublicV2 } from '@gyblos/protocol/public-v2';
 
-import { controlFixture } from './support/control-fixture.js';
+import { controlFixture } from './support/control-fixture';
 
 void test('presence lookup carries a v2 node-signed presence and exact request correlation', async () => {
   const source = await controlFixture();

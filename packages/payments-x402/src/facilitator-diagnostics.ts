@@ -28,8 +28,8 @@ import {
   type FacilitatorPhase,
   type FacilitatorStage,
   type PublicCallOperation,
-} from './constants.js';
-import { signatureHint } from './signature-hint.js';
+} from './constants';
+import { signatureHint } from './signature-hint';
 
 export interface FacilitatorDiagnosticRecord {
   schemaVersion: typeof FACILITATOR_DIAGNOSTIC_SCHEMA;

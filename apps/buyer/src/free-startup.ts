@@ -9,12 +9,12 @@ import {
   BUYER_SELECTION_CODES,
   FREE_BUYER_STARTUP,
   type FreeBuyerStartupReason,
-} from './constants.js';
-import { executeBuyerFree } from './free-execution.js';
-import { startFreeBuyerHttp } from './free-http.js';
-import { freeBuyerDependencies } from './free-selection.js';
-import { loadBuyerSelectionConfig } from './selection-config.js';
-import { prepareConfiguredBuyerSelection } from './selection-runtime.js';
+} from './constants';
+import { executeBuyerFree } from './free-execution';
+import { startFreeBuyerHttp } from './free-http';
+import { freeBuyerDependencies } from './free-selection';
+import { loadBuyerSelectionConfig } from './selection-config';
+import { prepareConfiguredBuyerSelection } from './selection-runtime';
 
 // A startup refusal with a static reason; it never carries paths or file contents.
 export class FreeBuyerStartupError extends Error {

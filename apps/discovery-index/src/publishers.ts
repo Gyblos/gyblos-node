@@ -4,7 +4,7 @@ import {
   PUBLISH_ALLOWLIST,
   PUBLISH_MODES,
   type PublishMode,
-} from './constants.js';
+} from './constants';
 
 // Undefined (no publishers configured) means publishing is closed.
 export type DiscoveryPublishers =

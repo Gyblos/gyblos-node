@@ -7,17 +7,17 @@ import { generateKeyPairSigner } from '@solana/kit';
 import { buyerDiscoveryState } from '@gyblos/buyer/discovery-storage';
 import { NODE_KEY_BYTES } from '@gyblos/node/constants';
 
-import { createAcceptanceClock, type AcceptanceClock } from './clock.js';
-import type { AcceptanceMode } from './constants.js';
-import { createAcceptanceEngine } from './engine.js';
+import { createAcceptanceClock, type AcceptanceClock } from './clock';
+import type { AcceptanceMode } from './constants';
+import { createAcceptanceEngine } from './engine';
 import {
   startAcceptanceHost,
   type AcceptanceHost,
   type AcceptanceHostOptions,
-} from './host.js';
-import { createAcceptanceIndex, type AcceptanceIndex } from './index.js';
-import { createNativeAcceptanceNode } from './native.js';
-import { createAcceptanceWorkspace } from './workspace.js';
+} from './host';
+import { createAcceptanceIndex, type AcceptanceIndex } from './index';
+import { createNativeAcceptanceNode } from './native';
+import { createAcceptanceWorkspace } from './workspace';
 
 export async function createAcceptanceSession(
   mode: AcceptanceMode,

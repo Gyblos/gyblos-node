@@ -1,7 +1,7 @@
 // Filters the single illustrative catalog for both its list and empty state.
 // No discovery, provider availability check or inference call is made.
-import { MODEL_FILTER } from './constants.js';
-import type { CatalogModel } from './model-types.js';
+import { MODEL_FILTER } from './constants';
+import type { CatalogModel } from './model-types';
 
 export type ModelFilter = (typeof MODEL_FILTER)[keyof typeof MODEL_FILTER];
 export function matchesCatalog(
@@ -18,4 +18,4 @@ export function matchesCatalog(
       model.category === filter)
   );
 }
-export { MODEL_FILTER, MODELS, MODE_NAV, UI_VIEW } from './constants.js';
+export { MODEL_FILTER, MODELS, MODE_NAV, UI_VIEW } from './constants';

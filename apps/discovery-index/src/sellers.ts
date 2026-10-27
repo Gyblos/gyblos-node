@@ -2,9 +2,9 @@
 // Signed envelopes are embedded byte-for-byte as published; ranking is the buyer's job.
 import { controlIdentifier } from '@gyblos/protocol/control-validation';
 
-import { DISCOVERY_INDEX_LIMITS, INDEX_ERRORS } from './constants.js';
-import { indexFail, protocolStep } from './errors.js';
-import type { DiscoveryStorage, SellerCursor, SellerQuery } from './storage.js';
+import { DISCOVERY_INDEX_LIMITS, INDEX_ERRORS } from './constants';
+import { indexFail, protocolStep } from './errors';
+import type { DiscoveryStorage, SellerCursor, SellerQuery } from './storage';
 
 const QUERY_KEYS: ReadonlySet<string> = new Set(['model', 'limit', 'cursor']);
 const LIMIT = new RegExp(

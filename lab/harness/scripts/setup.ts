@@ -3,7 +3,7 @@
 import { main as setupP2PRole } from '@gyblos/node-app/setup';
 import { isMain } from '@gyblos/runtime';
 
-import { setupGate } from '../src/setup.js';
+import { setupGate } from '../src/setup';
 
 if (isMain(import.meta.url)) {
   if (process.argv.includes('--role')) await setupP2PRole();

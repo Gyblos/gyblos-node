@@ -37,8 +37,8 @@ import type {
 import { catalogDigestV2 } from '@gyblos/protocol/public-v2';
 import { signingBytes } from '@gyblos/protocol/signing';
 
-import { createSqliteD1 } from './d1-sqlite.js';
-import { PUBLIC_TEST_NOW } from './public-records.js';
+import { createSqliteD1 } from './d1-sqlite';
+import { PUBLIC_TEST_NOW } from './public-records';
 
 export const T0 = PUBLIC_TEST_NOW;
 export const INDEX_OWNER = 'HF7czidh6AtTmrAwa9S9obGXsvg7588CxSqEL3FQR2VS';

@@ -11,8 +11,8 @@ import type {
   EVIDENCE_STATUSES,
   FAILURE_CASES,
   SCHEMA_VERSIONS,
-} from './constants.js';
-import { type runGate } from './gate.js';
+} from './constants';
+import { type runGate } from './gate';
 
 export type FixedGateEvidence = Awaited<ReturnType<typeof runGate>> & {
   schemaVersion: typeof SCHEMA_VERSIONS.EVIDENCE;

@@ -6,14 +6,14 @@ import {
   startRun,
   stopRun,
   type ChatSession,
-} from './chat-state.js';
-import { CHAT_PHASE, CHAT_PREVIEW, DEMO_AUTH } from './constants.js';
+} from './chat-state';
+import { CHAT_PHASE, CHAT_PREVIEW, DEMO_AUTH } from './constants';
 import {
   chatAuthorizationNotice,
   type DemoAuthorizationStatus,
-} from './demo-account.js';
-import type { ChatModel } from './model-types.js';
-import type { ToolId } from './tools.js';
+} from './demo-account';
+import type { ChatModel } from './model-types';
+import type { ToolId } from './tools';
 
 export type ChatScheduler = {
   schedule: (callback: () => void, delay: number) => () => void;

@@ -6,7 +6,7 @@ import { FILE_MODES } from '@gyblos/config';
 import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { ProtocolError } from '@gyblos/protocol/errors';
 
-import { currentLockOwner } from './lock-owner.js';
+import { currentLockOwner } from './lock-owner';
 
 async function removeOwnedLock(path: string, handle: FileHandle) {
   const owned = await handle.stat({ bigint: true });

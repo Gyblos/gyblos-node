@@ -3,8 +3,8 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { analyze } from './boundaries/analyze.js';
-import { sourceFiles } from './boundaries/inventory.js';
+import { analyze } from './boundaries/analyze';
+import { sourceFiles } from './boundaries/inventory';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const ARGUMENTS = process.argv.slice(2);

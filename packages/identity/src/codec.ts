@@ -6,7 +6,7 @@ export {
   decodeMetadataEntry,
   type AgentAccount,
   type MetadataEntry,
-} from './accounts.js';
+} from './accounts';
 export {
   bindingMessage,
   decodeBindingValue,
@@ -18,22 +18,18 @@ export {
   verifyNodeBinding,
   type BindingClaim,
   type NodeBinding,
-} from './binding.js';
+} from './binding';
 export {
   concatBytes,
   encodeBool,
   encodeString,
   encodeU64,
   encodeVecU8,
-} from './bytes.js';
-export { memcmpFilter } from './filters.js';
+} from './bytes';
+export { memcmpFilter } from './filters';
 export {
   registerInstruction,
   setAgentWalletInstructions,
   setMetadataInstruction,
-} from './instructions.js';
-export {
-  findAgentAddress,
-  findMetadataAddress,
-  metadataKeyHash,
-} from './pda.js';
+} from './instructions';
+export { findAgentAddress, findMetadataAddress, metadataKeyHash } from './pda';

@@ -22,7 +22,7 @@ import {
   jsonResponse,
   rejectsWith,
   sellersBody,
-} from './support/discovery-fixture.js';
+} from './support/discovery-fixture';
 
 const MODEL = 'qwen3-0.6b';
 const now = () => DISCOVERY_NOW;

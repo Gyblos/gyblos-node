@@ -5,8 +5,8 @@ import { isAbsolute, join, resolve } from 'node:path';
 
 import { FILE_MODES, homeLayout } from '@gyblos/config';
 
-import { ACCEPTANCE, ACCEPTANCE_CODES } from './constants.js';
-import { AcceptanceError } from './errors.js';
+import { ACCEPTANCE, ACCEPTANCE_CODES } from './constants';
+import { AcceptanceError } from './errors';
 
 export function assertAcceptanceTempBase(value: string) {
   if (!isAbsolute(value) || resolve(value).split(/[\\/]/).includes('.local'))

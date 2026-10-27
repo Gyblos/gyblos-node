@@ -5,9 +5,9 @@ import { decodePaymentRequiredHeader } from '@x402/core/http';
 
 import { HTTP_STATUS } from '@gyblos/config';
 
-import { GATE_TIMEOUTS } from '../../constants.js';
-import { validateExactTerms } from '../../exact/index.js';
-import type { ExactContext } from './types.js';
+import { GATE_TIMEOUTS } from '../../constants';
+import { validateExactTerms } from '../../exact/index';
+import type { ExactContext } from './types';
 
 export function createChallenge(
   { url }: ExactContext,

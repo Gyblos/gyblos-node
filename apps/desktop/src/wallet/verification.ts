@@ -1,14 +1,11 @@
 // Remembers a completed saved-file check for one identity, without enabling funding.
 // Missing, inaccessible, stale or unauthentic metadata always means unverified.
-import { BACKUP_ERROR } from './backup/constants.js';
-import { BackupError } from './backup/error.js';
-import { walletAddress } from './key.js';
-import type { WalletProtection } from './protection.js';
-import {
-  authenticVerification,
-  sealVerification,
-} from './verification-codec.js';
-import { readVerification, writeVerification } from './verification-files.js';
+import { BACKUP_ERROR } from './backup/constants';
+import { BackupError } from './backup/error';
+import { walletAddress } from './key';
+import type { WalletProtection } from './protection';
+import { authenticVerification, sealVerification } from './verification-codec';
+import { readVerification, writeVerification } from './verification-files';
 
 export type ConsumeWalletSecret = <T>(
   consume: (secret: string, address: string) => Promise<T>,

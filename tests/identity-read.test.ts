@@ -31,9 +31,9 @@ import {
   metadataBytes,
   type ClaimantAddresses,
   type SyntheticChain,
-} from './support/identity-accounts.js';
-import { fixedSigner } from './support/identity-fixture.js';
-import { startFakeRpc, type FakeRpc } from './support/identity-rpc-fake.js';
+} from './support/identity-accounts';
+import { fixedSigner } from './support/identity-fixture';
+import { startFakeRpc, type FakeRpc } from './support/identity-rpc-fake';
 
 const OTHER_COLLECTION = address('KmqkyFGfhrwu1gm1HjgkQGW61mecANEAjMGz8H51wWK');
 

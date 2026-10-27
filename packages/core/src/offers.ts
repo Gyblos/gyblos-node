@@ -7,7 +7,7 @@ import type {
   SignedInferenceOffer,
 } from '@gyblos/protocol/offer';
 
-import { OFFER_LIFETIME_MS, PRICES } from './constants.js';
+import { OFFER_LIFETIME_MS, PRICES } from './constants';
 
 export interface OfferTrust {
   owner: string;

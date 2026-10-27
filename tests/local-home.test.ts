@@ -27,7 +27,7 @@ import {
   assertTokenizerHome,
 } from '@gyblos/node/home';
 
-import { NATIVE_CAPABILITY } from './support/native-runtime.js';
+import { NATIVE_CAPABILITY } from './support/native-runtime';
 
 const DEFAULT_ENV = {};
 

@@ -9,9 +9,9 @@ import {
   guardFailure,
   paymentFixture,
   verifyPayment,
-} from './support/payment-fixture.js';
-import { lamportCredits } from './support/payment-mutations.js';
-import { RENT_FAULTS } from './support/rent-faults.js';
+} from './support/payment-fixture';
+import { lamportCredits } from './support/payment-mutations';
+import { RENT_FAULTS } from './support/rent-faults';
 
 void test('real-pair sponsor accounting includes escrow creation and return in each transaction', async () => {
   const fixture = await paymentFixture();

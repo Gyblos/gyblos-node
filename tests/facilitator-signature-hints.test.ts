@@ -31,8 +31,8 @@ import {
   diagnosticRows,
   rm,
   withDiagnosticHost,
-} from './support/facilitator-diagnostic-fixture.js';
-import { PRIVATE_LOG_PLATFORM_SKIP } from './support/private-log-fixture.js';
+} from './support/facilitator-diagnostic-fixture';
+import { PRIVATE_LOG_PLATFORM_SKIP } from './support/private-log-fixture';
 
 const INVALID_SIGNATURES = [
   '0'.repeat(64),
