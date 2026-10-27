@@ -167,8 +167,9 @@ async function respond(
   }
 }
 // An engine that stops after admission tells the buyer why and, on a stream, how much it delivered.
-// Delivered text was already recounted within maxTokens before delivery, so its count is bounded; a
-// non-empty delivery always reports at least one token, as the buyer's verifier requires.
+// Delivered text was already recounted within maxTokens before delivery. The report mirrors the buyer's
+// verifier: at least one token for non-empty text and never more than its UTF-8 bytes, which a
+// normalising tokenizer could otherwise exceed.
 function cannotContinue(
   error: EngineError,
   tokenizer: RecountTokenizer,
@@ -186,7 +187,10 @@ function cannotContinue(
       ...(deliveredText
         ? {
             delivered: {
-              outputTokens: Math.max(1, tokenizer.count(deliveredText)),
+              outputTokens: Math.min(
+                Math.max(1, tokenizer.count(deliveredText)),
+                new TextEncoder().encode(deliveredText).length,
+              ),
             },
           }
         : {}),

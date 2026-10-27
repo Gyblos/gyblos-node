@@ -188,11 +188,24 @@ async function checkModel(
       await response.body?.cancel().catch(() => {});
       throw new EngineError(ENGINE_ERROR_CODES.UNAVAILABLE);
     }
-    const body = (await response.json()) as {
-      models: { name: string; digest: string; remote_model?: string }[];
-    };
-    const model = body.models.find((item) => item.name === MODEL.name);
-    if (model?.digest !== MODEL.digest || model.remote_model)
+    const body: unknown = await response.json();
+    const models: unknown =
+      body && typeof body === 'object'
+        ? Reflect.get(body, 'models')
+        : undefined;
+    const model = Array.isArray(models)
+      ? models.find(
+          (item: unknown) =>
+            !!item &&
+            typeof item === 'object' &&
+            Reflect.get(item, 'name') === MODEL.name,
+        )
+      : undefined;
+    if (
+      !model ||
+      Reflect.get(model, 'digest') !== MODEL.digest ||
+      Reflect.get(model, 'remote_model')
+    )
       throw new EngineError(ENGINE_ERROR_CODES.UNAVAILABLE);
   } catch (error) {
     throw engineFailure(error, attempt);

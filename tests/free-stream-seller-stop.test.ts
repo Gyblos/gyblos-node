@@ -114,3 +114,36 @@ void test('free seller reports at least one delivered token and refuses codes ou
     { code: FREE_EXECUTION_CODES.ENGINE },
   );
 });
+void test('free seller never reports more delivered tokens than delivered bytes', async () => {
+  const state = await fixture();
+  const { createSellerFreeExecution } =
+    await import('@gyblos/node/free-execution');
+  const service = createSellerFreeExecution({
+    ...state.options,
+    // Within maxTokens during delivery, then a normalising recount of the stopped text exceeds its bytes.
+    tokenizer: {
+      input: () => 4,
+      count: (text: string) => (text === 'an' ? 9 : 1),
+    },
+    engine: {
+      ...state.options.engine,
+      async generate(input) {
+        await input.onText?.('a');
+        await input.onText?.('n');
+        throw new EngineError(ENGINE_ERROR_CODES.QUOTA_EXHAUSTED);
+      },
+    },
+  });
+  const request = await state.request();
+  const response = await service.stream(
+    request,
+    request.quote.offer.buyerNodeId,
+    new AbortController().signal,
+    async () => {},
+  );
+  assert.deepEqual(response.error, {
+    code: FREE_EXECUTION_CODES.SELLER_CANNOT_CONTINUE,
+    reason: FREE_EXECUTION_STOP_REASONS.QUOTA_EXHAUSTED,
+    delivered: { outputTokens: 2 },
+  });
+});
