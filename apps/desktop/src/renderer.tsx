@@ -5,7 +5,7 @@ import { createRoot } from 'react-dom/client';
 import { CompatibilityView } from './compatibility-view';
 import { STARTUP_WINDOW } from './constants';
 import { DesktopApp } from './desktop-app';
-import { WalletSetup } from './ui/WalletSetup';
+import { StartupSplash } from './ui/StartupSplash';
 import { DesktopWalletProvider } from './ui/WalletState';
 
 import './mockup-base.css';
@@ -25,7 +25,7 @@ if (!root) throw new Error('Missing desktop root.');
 createRoot(root).render(
   new URLSearchParams(window.location.search).get(STARTUP_WINDOW.QUERY) ===
     STARTUP_WINDOW.QUERY_VALUE ? (
-    <WalletSetup />
+    <StartupSplash />
   ) : new URLSearchParams(window.location.search).get('probe') === '1' ? (
     <CompatibilityView />
   ) : (

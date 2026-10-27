@@ -4,6 +4,7 @@ import { mkdir } from 'node:fs/promises';
 
 import { desktopWalletLibraryPaths } from '@gyblos/config/home';
 
+import { createBackupFlow, type BackupDialogs } from './backup-flow';
 import { BACKUP, createBackupCodec } from './backup/index';
 import {
   WALLET,
@@ -12,7 +13,10 @@ import {
   WALLET_STATUS,
 } from './constants';
 import { checkWalletRoot, syncWalletDirectory } from './files';
-import { checkLibraryCancellation, WalletLibraryError } from './library-error';
+import {
+  checkLibraryCancellation,
+  WalletLibraryError,
+} from './library-error';
 import {
   libraryAddresses,
   libraryExists,
@@ -236,6 +240,21 @@ export function createWalletLibrary(
         snapshot.fill(0);
       }
     },
+    backup: (
+      address: string,
+      request: unknown,
+      dialogs: BackupDialogs,
+      signal: AbortSignal,
+    ) =>
+      run(async (store) => {
+        const collection = await entries(root, store);
+        if ((await selected(root, store, collection)) !== address)
+          throw new WalletLibraryError(WALLET_LIBRARY_ERROR.RECOVERY_REQUIRED);
+        const wallet = collection.wallets.get(address);
+        if (!wallet)
+          throw new WalletLibraryError(WALLET_LIBRARY_ERROR.RECOVERY_REQUIRED);
+        return createBackupFlow(wallet, dialogs, signal).run(request);
+      }, signal),
     verifyBackup: (
       address: string,
       file: Uint8Array,

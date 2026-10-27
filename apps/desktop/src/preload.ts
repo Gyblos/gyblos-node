@@ -5,21 +5,28 @@ import { DESKTOP } from './constants';
 import { parseProbeResult } from './probe-model';
 import { BACKUP_FLOW, parseBackupResult } from './wallet/backup-flow-model';
 import { parseWalletSummary, WALLET } from './wallet/model';
-import { parseSetupView, WALLET_SETUP } from './wallet/setup-model';
+import {
+  parseWalletCollection,
+  parseWalletSettingsResult,
+  WALLET_SETTINGS,
+} from './wallet/settings-model';
 
 contextBridge.exposeInMainWorld('desktopProbe', {
   run: async () => parseProbeResult(await ipcRenderer.invoke(DESKTOP.CHANNEL)),
 });
 contextBridge.exposeInMainWorld('desktopWallet', {
+  collection: async () =>
+    parseWalletCollection(
+      await ipcRenderer.invoke(WALLET_SETTINGS.COLLECTION_CHANNEL),
+    ),
+  manage: async (request: unknown) =>
+    parseWalletSettingsResult(
+      await ipcRenderer.invoke(WALLET_SETTINGS.CHANNEL, request),
+    ),
   copyAddress: async (address: unknown) =>
     (await ipcRenderer.invoke(WALLET.COPY_CHANNEL, address)) === true,
   backup: async (request: unknown) =>
     parseBackupResult(await ipcRenderer.invoke(BACKUP_FLOW.CHANNEL, request)),
   summary: async () =>
     parseWalletSummary(await ipcRenderer.invoke(WALLET.CHANNEL)),
-});
-
-contextBridge.exposeInMainWorld('desktopWalletSetup', {
-  run: async (request: unknown) =>
-    parseSetupView(await ipcRenderer.invoke(WALLET_SETUP.CHANNEL, request)),
 });

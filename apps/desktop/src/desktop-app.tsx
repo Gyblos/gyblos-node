@@ -63,8 +63,6 @@ import {
 import { NetworkStatus, usePreviewNetwork } from './ui/NetworkStatus';
 import { ResizeHandle } from './ui/ResizeHandle';
 import { SidebarIcon, type SidebarSection } from './ui/SidebarIcon';
-import { startupPending } from './ui/startup-state';
-import { StartupScreen } from './ui/StartupScreen';
 import type { ToolId } from './ui/tools';
 import {
   Avatar,
@@ -141,10 +139,6 @@ export function DesktopApp() {
   };
   const network = usePreviewNetwork();
   const wallet = useDesktopWallet();
-  const [startupComplete, setStartupComplete] = useState(false);
-  useEffect(() => {
-    if (!startupPending(wallet, network.state)) setStartupComplete(true);
-  }, [wallet, network.state]);
   const online = network.online;
   const [model, setModel] = useState(MODELS[0]);
   const [credits, setCredits] = useState(0);
@@ -241,15 +235,6 @@ export function DesktopApp() {
         (sidebarMoving ? 'sidebar-moving' : '')
       }
     >
-      <MotionPresence>
-        {!window.desktopWallet && !startupComplete && (
-          <StartupScreen
-            wallet={wallet}
-            network={network.state}
-            onContinue={() => setStartupComplete(true)}
-          />
-        )}
-      </MotionPresence>
       <header className="topbar">
         <div className="breadcrumb">
           <IconButton
@@ -655,7 +640,12 @@ export function DesktopApp() {
             description="Choose how much to add to your wallet."
             close={() => setModal(null)}
           >
-            <AddFunds onBackup={() => setModal(UI_DIALOG.BACKUP)} />
+            <AddFunds
+              onBackup={() => {
+                setModal(null);
+                navigate(UI_VIEW.SETTINGS);
+              }}
+            />
           </Modal>
         )}
       </MotionPresence>
