@@ -144,9 +144,19 @@ export async function createFreeStreamVerifier(value: FreeExecutionRequest) {
           return { delta: event.text };
         }
         ended = true;
+        // Delivered usage accompanies exactly a cannot-continue stop after at least one delta.
+        const stopped = event.response.error;
+        if (
+          stopped &&
+          !!stopped.delivered !==
+            (stopped.code === FREE_EXECUTION_CODES.SELLER_CANNOT_CONTINUE &&
+              text.length > 0)
+        )
+          return freeExecutionFail();
         const result = await matchFreeExecutionResponse(
           event.response,
           request,
+          'stream',
         );
         if (result.text !== text)
           return freeExecutionFail(FREE_EXECUTION_CODES.BINDING);

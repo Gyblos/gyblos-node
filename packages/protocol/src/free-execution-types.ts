@@ -4,6 +4,7 @@ import type {
   FREE_EXECUTION,
   FreeChatRole,
   FreeExecutionCode,
+  FreeExecutionStopReason,
   ReasoningLevel,
 } from './constants';
 import type { ModelSelection, SignedOfferV2 } from './control-types';
@@ -32,6 +33,14 @@ export interface FreeExecutionResult {
   usage: { inputTokens: number; outputTokens: number };
   finishReason: EngineDoneReason;
 }
+// Present only with SELLER_CANNOT_CONTINUE; delivered only on a stream that already sent text.
+export interface FreeExecutionStop {
+  reason?: FreeExecutionStopReason;
+  delivered?: { outputTokens: number };
+}
+export type FreeExecutionFailure = {
+  code: FreeExecutionCode;
+} & FreeExecutionStop;
 interface FreeExecutionReply {
   version: typeof FREE_EXECUTION.version;
   requestId: string;
@@ -40,7 +49,7 @@ interface FreeExecutionReply {
 export type FreeExecutionResponse = FreeExecutionReply &
   (
     | { result: FreeExecutionResult; error?: never }
-    | { error: { code: FreeExecutionCode }; result?: never }
+    | { error: FreeExecutionFailure; result?: never }
   );
 export interface FreeExecutionTrust {
   owner: string;

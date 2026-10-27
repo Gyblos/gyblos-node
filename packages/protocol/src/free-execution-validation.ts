@@ -3,16 +3,23 @@ import {
   CONTROL_CODES,
   FREE_EXECUTION_CODES,
   type FreeExecutionCode,
+  type FreeExecutionStopReason,
 } from './constants';
 import { ControlError } from './control-validation';
+import type { FreeExecutionStop } from './free-execution-types';
 
 export class FreeExecutionError extends Error {
+  readonly reason?: FreeExecutionStopReason;
+  readonly delivered?: { outputTokens: number };
   constructor(
     readonly code: FreeExecutionCode,
     readonly remote = false,
+    stop: FreeExecutionStop = {},
   ) {
     super(code);
     this.name = 'FreeExecutionError';
+    if (stop.reason) this.reason = stop.reason;
+    if (stop.delivered) this.delivered = { ...stop.delivered };
   }
 }
 export function freeExecutionFail(

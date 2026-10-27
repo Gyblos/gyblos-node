@@ -1,13 +1,24 @@
 // Ollama HTTP client restricted to a literal loopback origin: checks the pinned model is present and runs
-// bounded, deterministic raw generations. It must not know wallets or payments.
+// bounded, deterministic raw generations. Failures follow the Engine port contract in @gyblos/protocol/engine.
+// It must not know wallets or payments.
 import { IPV6_LOOPBACK, LOCALHOST, ROUTES, TIMEOUTS } from '@gyblos/config';
 import {
   ENGINE_DONE_REASONS,
+  ENGINE_ERROR_CODES,
   type EngineDoneReason,
 } from '@gyblos/protocol/constants';
+import { EngineError } from '@gyblos/protocol/engine';
 import type { EngineWireUsage } from '@gyblos/protocol/wire-usage';
 
 import { GENERATION, MODEL_LIMITS } from './constants';
+import {
+  BoundFailure,
+  callerCallback,
+  engineFailure,
+  FrameFailure,
+  statusFailure,
+  type EngineAttempt,
+} from './failures';
 import { MODEL, renderChat } from './model';
 
 export interface InferenceResult {
@@ -37,33 +48,162 @@ export function localOllamaUrl(base: string): URL {
   return url;
 }
 
-export function createOllama(base: string, fetchImpl: typeof fetch = fetch) {
-  const origin = localOllamaUrl(base);
-  async function assertModel(signal?: AbortSignal) {
-    const response = await fetchImpl(new URL(ROUTES.ollamaTags, origin), {
-      redirect: 'error',
-      signal: AbortSignal.any([
-        AbortSignal.timeout(TIMEOUTS.events),
-        ...(signal ? [signal] : []),
-      ]),
-    });
-    if (!response.ok) throw new Error('Local model inventory unavailable.');
-    const body = (await response.json()) as {
-      models: { name: string; digest: string; remote_model?: string }[];
+export interface OllamaOptions {
+  generationTimeoutMs?: number;
+  modelCheckTimeoutMs?: number;
+}
+interface GenerateInput {
+  prompt: string;
+  maxTokens: number;
+  signal?: AbortSignal;
+  onFragment?: () => Promise<void>;
+  onText?: (text: string) => Promise<void>;
+}
+
+function frameEvent(line: string): Record<string, unknown> {
+  let event: unknown;
+  try {
+    event = JSON.parse(line);
+  } catch {
+    throw new FrameFailure();
+  }
+  if (!event || typeof event !== 'object' || Array.isArray(event))
+    throw new FrameFailure();
+  return Object.fromEntries(Object.entries(event));
+}
+function terminalUsage(terminal: Record<string, unknown>): EngineWireUsage {
+  const usageValue = (key: keyof EngineWireUsage): number => {
+    const value = terminal[key];
+    if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0)
+      throw new FrameFailure();
+    return value;
+  };
+  return {
+    prompt_eval_count: usageValue('prompt_eval_count'),
+    eval_count: usageValue('eval_count'),
+    total_duration: usageValue('total_duration'),
+    load_duration: usageValue('load_duration'),
+    prompt_eval_duration: usageValue('prompt_eval_duration'),
+    eval_duration: usageValue('eval_duration'),
+  };
+}
+function doneReason(terminal: Record<string, unknown>): EngineDoneReason {
+  const reason = terminal.done_reason;
+  if (reason === ENGINE_DONE_REASONS.STOP) return ENGINE_DONE_REASONS.STOP;
+  if (reason === ENGINE_DONE_REASONS.LENGTH) return ENGINE_DONE_REASONS.LENGTH;
+  throw new FrameFailure();
+}
+
+// The optional text callback receives bounded fragments with backpressure.
+// Callers without it, including paid HTTP, retain the complete buffered result.
+async function readGeneration(
+  body: ReadableStream<Uint8Array>,
+  input: GenerateInput,
+  signal: AbortSignal,
+  attempt: EngineAttempt,
+): Promise<InferenceResult> {
+  let buffer = '';
+  let text = '';
+  let terminal: Record<string, unknown> | undefined;
+  const decoder = new TextDecoder('utf-8', { fatal: true });
+  const reader = body.getReader();
+  const cancel = () => {
+    void reader.cancel().catch(() => {});
+  };
+  signal.addEventListener('abort', cancel, { once: true });
+  if (signal.aborted) cancel();
+  try {
+    for (;;) {
+      signal.throwIfAborted();
+      const part = await reader.read();
+      signal.throwIfAborted();
+      try {
+        buffer += decoder.decode(part.value, { stream: !part.done });
+      } catch {
+        throw new FrameFailure();
+      }
+      if (buffer.length > MODEL_LIMITS.maxFrameCharacters)
+        throw new BoundFailure();
+      let newline: number;
+      while ((newline = buffer.indexOf('\n')) !== -1) {
+        const line = buffer.slice(0, newline);
+        buffer = buffer.slice(newline + 1);
+        if (!line.trim()) continue;
+        const event = frameEvent(line);
+        if (event.error) throw new FrameFailure(true);
+        if (
+          terminal ||
+          event.model !== MODEL.name ||
+          (event.thinking !== undefined && event.thinking !== '') ||
+          typeof event.response !== 'string' ||
+          /[\uD800-\uDFFF]/u.test(event.response)
+        )
+          throw new FrameFailure();
+        text += event.response;
+        if (text.length > MODEL_LIMITS.maxOutputCharacters)
+          throw new BoundFailure();
+        if (event.response) {
+          const fragment = event.response;
+          attempt.fragments++;
+          signal.throwIfAborted();
+          await callerCallback(attempt, input.onFragment);
+          signal.throwIfAborted();
+          await callerCallback(
+            attempt,
+            input.onText && (() => input.onText!(fragment)),
+          );
+          signal.throwIfAborted();
+        }
+        if (event.done === true) terminal = event;
+      }
+      if (part.done) break;
+    }
+    if (buffer.trim() || !terminal || !attempt.fragments)
+      throw new FrameFailure();
+    return {
+      text,
+      usage: terminalUsage(terminal),
+      done: true,
+      doneReason: doneReason(terminal),
     };
-    const model = body.models.find((item) => item.name === MODEL.name);
-    if (model?.digest !== MODEL.digest || model.remote_model)
-      throw new Error('Pinned local model is missing or changed.');
+  } finally {
+    signal.removeEventListener('abort', cancel);
+    await reader.cancel().catch(() => {});
+  }
+}
+
+export function createOllama(
+  base: string,
+  fetchImpl: typeof fetch = fetch,
+  options: OllamaOptions = {},
+) {
+  const origin = localOllamaUrl(base);
+  const generationTimeoutMs =
+    options.generationTimeoutMs ?? TIMEOUTS.generation;
+  const modelCheckTimeoutMs = options.modelCheckTimeoutMs ?? TIMEOUTS.events;
+  async function assertModel(signal?: AbortSignal) {
+    const deadline = AbortSignal.timeout(modelCheckTimeoutMs);
+    const attempt: EngineAttempt = { caller: signal, deadline, fragments: 0 };
+    try {
+      const response = await fetchImpl(new URL(ROUTES.ollamaTags, origin), {
+        redirect: 'error',
+        signal: AbortSignal.any([deadline, ...(signal ? [signal] : [])]),
+      });
+      // Ollama's own inventory is local: any refusal or a changed pin means the model is unavailable.
+      if (!response.ok) throw new EngineError(ENGINE_ERROR_CODES.UNAVAILABLE);
+      const body = (await response.json()) as {
+        models: { name: string; digest: string; remote_model?: string }[];
+      };
+      const model = body.models.find((item) => item.name === MODEL.name);
+      if (model?.digest !== MODEL.digest || model.remote_model)
+        throw new EngineError(ENGINE_ERROR_CODES.UNAVAILABLE);
+    } catch (error) {
+      throw engineFailure(error, attempt);
+    }
   }
   return {
     assertModel,
-    async generate(input: {
-      prompt: string;
-      maxTokens: number;
-      signal?: AbortSignal;
-      onFragment?: () => Promise<void>;
-      onText?: (text: string) => Promise<void>;
-    }): Promise<InferenceResult> {
+    async generate(input: GenerateInput): Promise<InferenceResult> {
       if (
         !Number.isSafeInteger(input.maxTokens) ||
         input.maxTokens < 1 ||
@@ -73,121 +213,46 @@ export function createOllama(base: string, fetchImpl: typeof fetch = fetch) {
       input.signal?.throwIfAborted();
       await assertModel(input.signal);
       input.signal?.throwIfAborted();
+      const deadline = AbortSignal.timeout(generationTimeoutMs);
+      const attempt: EngineAttempt = {
+        caller: input.signal,
+        deadline,
+        fragments: 0,
+      };
       const signal = AbortSignal.any([
-        AbortSignal.timeout(TIMEOUTS.generation),
+        deadline,
         ...(input.signal ? [input.signal] : []),
       ]);
-      const response = await fetchImpl(new URL(ROUTES.ollamaGenerate, origin), {
-        method: 'POST',
-        redirect: 'error',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          model: MODEL.name,
-          prompt: renderChat(input.prompt),
-          raw: true,
-          stream: true,
-          keep_alive: GENERATION.keepAlive,
-          options: {
-            temperature: GENERATION.temperature,
-            seed: GENERATION.seed,
-            num_predict: input.maxTokens,
-            num_ctx: GENERATION.numCtx,
-          },
-        }),
-        signal,
-      });
-      if (!response.ok || !response.body)
-        throw new Error('Local engine generation failed.');
-      // The optional text callback receives bounded fragments with backpressure.
-      // Callers without it, including paid HTTP, retain the complete buffered result.
-      let buffer = '';
-      let text = '';
-      let terminal: Record<string, unknown> | undefined;
-      let fragments = 0;
-      const decoder = new TextDecoder('utf-8', { fatal: true });
-      const reader = response.body.getReader();
-      const cancel = () => {
-        void reader.cancel().catch(() => {});
-      };
-      signal.addEventListener('abort', cancel, { once: true });
-      if (signal.aborted) cancel();
       try {
-        for (;;) {
-          signal.throwIfAborted();
-          const part = await reader.read();
-          signal.throwIfAborted();
-          buffer += decoder.decode(part.value, { stream: !part.done });
-          if (buffer.length > MODEL_LIMITS.maxFrameCharacters)
-            throw new Error('Engine frame exceeds limit.');
-          let newline: number;
-          while ((newline = buffer.indexOf('\n')) !== -1) {
-            const line = buffer.slice(0, newline);
-            buffer = buffer.slice(newline + 1);
-            if (!line.trim()) continue;
-            const event = JSON.parse(line) as Record<string, unknown>;
-            if (
-              terminal ||
-              event.error ||
-              event.model !== MODEL.name ||
-              (event.thinking !== undefined && event.thinking !== '')
-            )
-              throw new Error('Invalid or unexpected engine frame.');
-            if (
-              typeof event.response !== 'string' ||
-              /[\uD800-\uDFFF]/u.test(event.response)
-            )
-              throw new Error('Missing engine text.');
-            text += event.response;
-            if (text.length > MODEL_LIMITS.maxOutputCharacters)
-              throw new Error('Engine output exceeds limit.');
-            if (event.response) {
-              fragments++;
-              signal.throwIfAborted();
-              await input.onFragment?.();
-              signal.throwIfAborted();
-              await input.onText?.(event.response);
-              signal.throwIfAborted();
-            }
-            if (event.done === true) terminal = event;
-          }
-          if (part.done) break;
+        const response = await fetchImpl(
+          new URL(ROUTES.ollamaGenerate, origin),
+          {
+            method: 'POST',
+            redirect: 'error',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              model: MODEL.name,
+              prompt: renderChat(input.prompt),
+              raw: true,
+              stream: true,
+              keep_alive: GENERATION.keepAlive,
+              options: {
+                temperature: GENERATION.temperature,
+                seed: GENERATION.seed,
+                num_predict: input.maxTokens,
+                num_ctx: GENERATION.numCtx,
+              },
+            }),
+            signal,
+          },
+        );
+        if (!response.ok || !response.body) {
+          await response.body?.cancel().catch(() => {});
+          throw statusFailure(response.status);
         }
-        if (buffer.trim() || !terminal || !fragments)
-          throw new Error('Incomplete engine response.');
-        const doneReason = String(terminal.done_reason);
-        if (
-          doneReason !== ENGINE_DONE_REASONS.STOP &&
-          doneReason !== ENGINE_DONE_REASONS.LENGTH
-        )
-          throw new Error('Incomplete engine response.');
-        const terminalFrame = terminal;
-        const usageValue = (key: keyof EngineWireUsage): number => {
-          const value = terminalFrame[key];
-          if (
-            typeof value !== 'number' ||
-            !Number.isSafeInteger(value) ||
-            value < 0
-          )
-            throw new Error('Invalid engine usage.');
-          return value;
-        };
-        const usage: EngineWireUsage = {
-          prompt_eval_count: usageValue('prompt_eval_count'),
-          eval_count: usageValue('eval_count'),
-          total_duration: usageValue('total_duration'),
-          load_duration: usageValue('load_duration'),
-          prompt_eval_duration: usageValue('prompt_eval_duration'),
-          eval_duration: usageValue('eval_duration'),
-        };
-        return {
-          text,
-          usage,
-          done: true,
-          doneReason,
-        };
-      } finally {
-        signal.removeEventListener('abort', cancel);
-        await reader.cancel().catch(() => {});
+        return await readGeneration(response.body, input, signal, attempt);
+      } catch (error) {
+        throw engineFailure(error, attempt);
       }
     },
   };

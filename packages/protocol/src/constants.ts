@@ -201,9 +201,9 @@ export const MODEL_IDENTITIES = {
 
 // Free execution is a separate data channel; control and reserved HTTP v2 keep their wire contracts.
 export const FREE_EXECUTION = {
-  alpn: 'gyblos/free/2',
-  version: 2,
-  requestDomain: 'gyblos/free-execution-request/v2\n',
+  alpn: 'gyblos/free/3',
+  version: 3,
+  requestDomain: 'gyblos/free-execution-request/v3\n',
   requestBytes: 131072,
   responseBytes: 1048576,
   inputBytes: 65536,
@@ -235,12 +235,14 @@ export const FREE_EXECUTION_CODES = {
   TIMEOUT: 'FREE_EXECUTION_TIMEOUT',
   CANCELLED: 'FREE_EXECUTION_CANCELLED',
   INTERNAL: 'FREE_EXECUTION_INTERNAL_ERROR',
+  // A started generation stopped on an engine failure; carries a stop reason (v3).
+  SELLER_CANNOT_CONTINUE: 'FREE_EXECUTION_SELLER_CANNOT_CONTINUE',
 } as const;
 export type FreeExecutionCode =
   (typeof FREE_EXECUTION_CODES)[keyof typeof FREE_EXECUTION_CODES];
 
 export const FREE_STREAM = {
-  alpn: 'gyblos/free-stream/2',
+  alpn: 'gyblos/free-stream/3',
   deltaBytes: 8192,
   eventBytes: FREE_EXECUTION.responseBytes + 1024,
   maxEvents: 4096,

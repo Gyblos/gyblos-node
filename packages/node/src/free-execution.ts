@@ -5,6 +5,7 @@ import type { QuoteReadiness } from '@gyblos/core/control-quotes';
 import { FreeExecutionAdmission } from '@gyblos/core/free-admission';
 import { canonicalJson } from '@gyblos/protocol';
 import {
+  ENGINE_ERROR_STOP_REASON,
   FREE_CHAT_ROLES,
   FREE_EXECUTION,
   FREE_EXECUTION_CODES,
@@ -15,12 +16,13 @@ import type {
   ModelSelection,
   SignedPublicV2,
 } from '@gyblos/protocol/control-types';
-import type {
-  Engine,
-  EngineCapabilities,
-  EngineDescription,
-  EngineResult,
-  RecountTokenizer,
+import {
+  EngineError,
+  type Engine,
+  type EngineCapabilities,
+  type EngineDescription,
+  type EngineResult,
+  type RecountTokenizer,
 } from '@gyblos/protocol/engine';
 import {
   freeExecutionFail as fail,
@@ -152,17 +154,37 @@ async function respond(
       lease.complete(actual);
     }
   } catch (error) {
+    if (signal.aborted)
+      return { ...header, error: { code: FREE_EXECUTION_CODES.CANCELLED } };
+    if (!(error instanceof FreeExecutionError))
+      return { ...header, error: { code: FREE_EXECUTION_CODES.ENGINE } };
     return {
       ...header,
       error: {
-        code: signal.aborted
-          ? FREE_EXECUTION_CODES.CANCELLED
-          : error instanceof FreeExecutionError
-            ? error.code
-            : FREE_EXECUTION_CODES.ENGINE,
+        code: error.code,
+        ...(error.reason ? { reason: error.reason } : {}),
+        ...(error.delivered ? { delivered: error.delivered } : {}),
       },
     };
   }
+}
+// An engine that stops after admission tells the buyer why and, on a stream, how much it delivered.
+function cannotContinue(
+  error: EngineError,
+  tokenizer: RecountTokenizer,
+  deliveredText = '',
+): never {
+  const outputTokens = deliveredText ? tokenizer.count(deliveredText) : 0;
+  throw new FreeExecutionError(
+    FREE_EXECUTION_CODES.SELLER_CANNOT_CONTINUE,
+    false,
+    {
+      reason: ENGINE_ERROR_STOP_REASON[error.code],
+      ...(Number.isSafeInteger(outputTokens) && outputTokens > 0
+        ? { delivered: { outputTokens } }
+        : {}),
+    },
+  );
 }
 
 // Startup passes the already prepared offer and catalog; no configuration is read again.
@@ -223,6 +245,10 @@ async function generateResponse(
     });
     checkSignal(signal);
     streaming?.complete(output.text);
+  } catch (error) {
+    if (error instanceof EngineError && !signal.aborted)
+      return cannotContinue(error, options.tokenizer, streaming?.delivered());
+    throw error;
   } finally {
     streaming?.stop();
   }

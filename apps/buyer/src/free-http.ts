@@ -25,6 +25,7 @@ import {
   FreeExecutionError,
   type FreeExecutionBuildInput,
   type FreeExecutionResult,
+  type FreeExecutionStop,
 } from '@gyblos/protocol/free-execution';
 import { acceptLoopbackHost } from '@gyblos/runtime/loopback-host';
 import { FreeClientError } from '@gyblos/transport-iroh/free-client';
@@ -108,8 +109,12 @@ function replyError(response: ServerResponse, error: unknown) {
   const code = known
     ? error.code
     : (selected?.code ?? FREE_BUYER_CODES.INTERNAL);
+  const stop: FreeExecutionStop =
+    error instanceof FreeClientError || error instanceof FreeExecutionError
+      ? error
+      : {};
   if (response.headersSent) {
-    replyFreeSseError(response, code);
+    replyFreeSseError(response, code, stop);
     return;
   }
   const status = errorStatus(error, code);
@@ -131,6 +136,7 @@ function replyError(response: ServerResponse, error: unknown) {
         type: FREE_BUYER.errorType,
         param: null,
         code,
+        ...(stop.reason ? { reason: stop.reason } : {}),
         ...(selected && 'cooldownUntil' in selected
           ? { cooldownUntil: selected.cooldownUntil }
           : {}),

@@ -3,9 +3,12 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  ENGINE_ERROR_CODES,
   FREE_EXECUTION,
   FREE_EXECUTION_CODES,
+  FREE_EXECUTION_STOP_REASONS,
 } from '@gyblos/protocol/constants';
+import { EngineError } from '@gyblos/protocol/engine';
 
 import {
   freeStreamSellerFixture as fixture,
@@ -328,4 +331,70 @@ void test('free seller seals retained engine callbacks after generation rejects'
     code: FREE_EXECUTION_CODES.CANCELLED,
   });
   assert.deepEqual(fragments, []);
+});
+
+void test('free seller reports delivered usage when the engine stops mid-stream', async () => {
+  const state = await fixture();
+  state.setGenerate(async (input) => {
+    await input.onText?.('an');
+    await input.onText?.('swer');
+    throw new EngineError(ENGINE_ERROR_CODES.INTERRUPTED);
+  });
+  const request = await state.request();
+  const fragments: string[] = [];
+  const response = await state.service.stream(
+    request,
+    request.quote.offer.buyerNodeId,
+    new AbortController().signal,
+    async (text) => {
+      fragments.push(text);
+    },
+  );
+  assert.deepEqual(fragments, ['an', 'swer']);
+  assert.deepEqual(response.error, {
+    code: FREE_EXECUTION_CODES.SELLER_CANNOT_CONTINUE,
+    reason: FREE_EXECUTION_STOP_REASONS.ENGINE_INTERRUPTED,
+    delivered: { outputTokens: 2 },
+  });
+});
+void test('free seller counts only fragments whose delivery resolved', async () => {
+  const state = await fixture();
+  state.setGenerate(async (input) => {
+    await input.onText?.('an');
+    await input.onText?.('swer').catch(() => {});
+    throw new EngineError(ENGINE_ERROR_CODES.QUOTA_EXHAUSTED);
+  });
+  const request = await state.request();
+  let deliveries = 0;
+  const response = await state.service.stream(
+    request,
+    request.quote.offer.buyerNodeId,
+    new AbortController().signal,
+    async () => {
+      deliveries++;
+      if (deliveries === 2) throw new Error('synthetic delivery failure');
+    },
+  );
+  assert.deepEqual(response.error, {
+    code: FREE_EXECUTION_CODES.SELLER_CANNOT_CONTINUE,
+    reason: FREE_EXECUTION_STOP_REASONS.QUOTA_EXHAUSTED,
+    delivered: { outputTokens: 1 },
+  });
+});
+void test('free seller omits delivered usage when the engine stops before any fragment', async () => {
+  const state = await fixture();
+  state.setGenerate(async () => {
+    throw new EngineError(ENGINE_ERROR_CODES.RATE_LIMITED);
+  });
+  const request = await state.request();
+  const response = await state.service.stream(
+    request,
+    request.quote.offer.buyerNodeId,
+    new AbortController().signal,
+    async () => {},
+  );
+  assert.deepEqual(response.error, {
+    code: FREE_EXECUTION_CODES.SELLER_CANNOT_CONTINUE,
+    reason: FREE_EXECUTION_STOP_REASONS.RATE_LIMITED,
+  });
 });

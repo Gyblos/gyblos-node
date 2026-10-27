@@ -275,3 +275,43 @@ void test('free HTTP frees the admission slot when the deadline hits a stalled b
     await server.close();
   }
 });
+
+void test('free HTTP reports why a seller could not continue, without retry', async () => {
+  const api = await import('@gyblos/buyer/free-http');
+  const { FreeClientError } =
+    await import('@gyblos/transport-iroh/free-client');
+  const { FREE_EXECUTION_CODES, FREE_EXECUTION_STOP_REASONS } =
+    await import('@gyblos/protocol/constants');
+  const server = await api.startFreeBuyerHttp(
+    async () => {
+      throw new FreeClientError(
+        FREE_EXECUTION_CODES.SELLER_CANNOT_CONTINUE,
+        true,
+        true,
+        { reason: FREE_EXECUTION_STOP_REASONS.QUOTA_EXHAUSTED },
+      );
+    },
+    SETTINGS,
+    { port: 0 },
+  );
+  try {
+    const response = await fetch(server.url, {
+      method: 'POST',
+      headers: JSON_HEADERS,
+      body: CHAT,
+    });
+    assert.equal(response.status, 503);
+    assert.equal(response.headers.get('x-should-retry'), 'false');
+    assert.deepEqual(await response.json(), {
+      error: {
+        message: FREE_EXECUTION_CODES.SELLER_CANNOT_CONTINUE,
+        type: 'gyblos_error',
+        param: null,
+        code: FREE_EXECUTION_CODES.SELLER_CANNOT_CONTINUE,
+        reason: FREE_EXECUTION_STOP_REASONS.QUOTA_EXHAUSTED,
+      },
+    });
+  } finally {
+    await server.close();
+  }
+});
