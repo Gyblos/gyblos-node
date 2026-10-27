@@ -150,8 +150,10 @@ pnpm node:start
   `gyblos/control/1` ALPN serves signed catalog, presence and quote queries.
   Stop with Ctrl-C (not Ctrl-Z, which only suspends the process). Stopping
   withdraws from discovery and saves the public sequence; further Ctrl-C presses
-  during that stop are ignored with a notice, so wait for the prompt. A forced
-  kill can leave a sequence lock (see `pnpm gyblos doctor`).
+  during that stop are ignored with a notice (SIGTERM from a supervisor too), so
+  wait for the prompt. If a stop ever hangs, Ctrl-\\ (SIGQUIT) still ends the
+  process; the sequence write has finished by then. A Ctrl-C during startup, a
+  crash or `kill -9` can leave a sequence lock (see `pnpm gyblos doctor`).
 
 ## Buyer
 
@@ -262,9 +264,11 @@ not been measured.
 A relay-only seller cannot be tested with its buyer on the same machine: after
 the first exchange Iroh switches to a direct loopback path, and the seller's
 relay-only policy closes that connection, so the buyer reports
-`NO_SELLER_CANDIDATES`. For a single-machine test set `relay_only = false` (no
-address leaves the machine); keep relay-only for sellers reached from other
-machines.
+`NO_SELLER_CANDIDATES`. For a local single-machine test set `relay_only = false`
+under `[transport]` in `gyblos.toml` (or `GYBLOS_RELAY_ONLY=0`). That is for
+local testing only: without relay-only the seller binds public sockets and its
+quotes carry its direct addresses to any buyer. Keep relay-only for sellers
+reached from other machines.
 
 ## Other settings
 
@@ -446,9 +450,11 @@ error object. Badges stay `declared-usage` and `openChannel` stays false.
 If startup fails, `buyer:free` prints `FREE_BUYER_CONFIGURATION_REQUIRED` with a
 reason and a next step, for example `BUYER_ROLE_MISSING` (run `node:setup`),
 `SELECTION_CONFIG_MISSING` or `SELECTION_CONFIG_INVALID` (create or fix
-`selection.json` in the buyer home), `SELECTION_MAX_TOKENS_TOO_HIGH`,
-`MISSING_RELAY_TOKEN` or `BUYER_PORT_IN_USE`. No path or file content is
-printed.
+`selection.json` in the buyer home), `SELECTION_STATS_INVALID`,
+`DISCOVERY_STATE_UNAVAILABLE` or `IDENTITY_STATE_UNAVAILABLE` (a state file
+beside it), `SELECTION_MAX_TOKENS_TOO_HIGH`, `SELECTION_REASONING_UNSUPPORTED`,
+`BUYER_NODE_KEY_MISMATCH`, a relay code such as `MISSING_RELAY_TOKEN`, or
+`BUYER_PORT_IN_USE`. No path or file content is printed.
 
 Supported request shape for `POST /v1/chat/completions`:
 

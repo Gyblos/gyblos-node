@@ -2,12 +2,12 @@
 // parent sends more signals. Writes `done` only if the stop completed.
 import { writeFile } from 'node:fs/promises';
 
-import { shutdownSignal } from '@gyblos/runtime/process';
+import { shutdownSignal } from '@gyblos/runtime';
 
 const [marker] = process.argv.slice(2);
 // Stands in for the node's sockets and timers, which keep a real daemon's event loop alive.
 const alive = setInterval(() => undefined, 1000);
-const shutdown = shutdownSignal((text) => process.stderr.write(text));
+const shutdown = shutdownSignal();
 process.stdout.write('ready\n');
 try {
   await shutdown.signalled;
