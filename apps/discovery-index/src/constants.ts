@@ -91,7 +91,7 @@ export const DISCOVERY_INDEX_LIMITS = {
 } as const;
 
 // Cloudflare rate-limit binding names (wrangler.jsonc); keyed by IP(/64) or NodeId, never stored,
-// except READ, which caps storage reads under one constant key.
+// except READ, keyed by READ_LIMIT_KEY.
 export const DISCOVERY_LIMITERS = {
   IP: 'DISCOVERY_IP_LIMITER',
   PUBLISH: 'DISCOVERY_PUBLISH_LIMITER',

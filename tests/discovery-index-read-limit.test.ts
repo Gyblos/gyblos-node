@@ -18,6 +18,7 @@ import {
   type IndexHarness,
 } from './support/discovery-index-fixture.js';
 
+// Pinned literal, not READ_LIMIT_KEY, so a changed key fails here.
 const READ_KEY = 'global';
 
 // One case per storage adapter, each with its own response cache.
@@ -143,6 +144,39 @@ eachCachedStorage(
     assert.equal(limited.headers.get('retry-after'), '60');
     await expectError(limited, 429, 'RATE_LIMITED');
     assert.equal((await call('/v1/health', {}, counted)).status, 200);
+    assert.deepEqual([...read.counts], [[READ_KEY, 2]]);
+  },
+);
+
+eachCachedStorage(
+  'HEAD reads follow the same read limit as GET',
+  async (harness, edge) => {
+    await publishSeller(harness);
+    const read = counting(1);
+    const limiters = { [DISCOVERY_LIMITERS.READ]: read.limiter };
+    const head = { method: 'HEAD' };
+    const path = `/v1/sellers?model=${MODEL}`;
+    assert.equal((await harness.call(path, head, limiters)).status, 200);
+    assert.equal((await harness.call(path, head, limiters)).status, 200);
+    assert.deepEqual([...read.counts], [[READ_KEY, 1]]);
+    const limited = await harness.call(`${path}&limit=5`, head, limiters);
+    assert.equal(limited.status, 429);
+    assert.equal(limited.headers.get('cache-control'), 'no-store');
+    assert.equal(edge.puts.length, 1);
+    const health = await harness.call('/v1/health', head, limiters);
+    assert.equal(health.status, 429);
+  },
+);
+
+eachCachedStorage(
+  'an accepted publish makes the next health read consume the read limit',
+  async (harness) => {
+    const read = counting(1000);
+    const limiters = { [DISCOVERY_LIMITERS.READ]: read.limiter };
+    assert.equal((await harness.call('/v1/health', {}, limiters)).status, 200);
+    await publishSeller(harness);
+    const health = await harness.call('/v1/health', {}, limiters);
+    assert.equal((await health.json()).records, 2);
     assert.deepEqual([...read.counts], [[READ_KEY, 2]]);
   },
 );

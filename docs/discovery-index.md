@@ -98,9 +98,12 @@ signed a record; clients re-verify everything.
   health counts never consume it, so many cursors or clients cannot multiply D1
   reads past it. Cloudflare counts rate limits per location, so this is a cap
   per Cloudflare location, not an exact worldwide one; a Durable Object counter
-  would be the exact alternative if that is ever needed. Its `429` is `no-store`
-  and never enters the response cache. The per-IP limit still applies first to
-  every request.
+  would be the exact alternative if that is ever needed. Any well-formed cursor,
+  `limit` or `model` makes a cache miss, so a few clients at one location can
+  spend its budget; the other clients there then get `429` on uncached pages for
+  up to 60 seconds while cached pages keep serving. This is the accepted cost of
+  one shared key. Its `429` is `no-store` and never enters the response cache.
+  The per-IP limit still applies first to every request.
 - **Publish order:** per-IP limit, the 34816-byte body cap (`413`), publish
   limit, content type, strict JSON, the allowlist check on the claimed NodeId
   (`403`), then shape, lifetime and the self-signature. Only then is the stored
@@ -232,8 +235,8 @@ The global read limiter (`DISCOVERY_READ_LIMITER`, namespace `42621007`) ships
 in the same deploy as the code that requires it; deploying the code without the
 binding answers `503` everywhere. After deploying it, check that sellers pages
 still answer `200` and a repeat within 10 seconds is a cache hit. To roll it
-back, `npx wrangler@4.151.1 rollback` to the version before it (it has neither
-the binding nor the code).
+back, `npx wrangler@4.151.1 rollback 916eb7c0` (the version before it, which has
+neither the binding nor the code).
 
 Rolling the code back does not require reverting `0002`: earlier code names no
 index and no query used `discovery_presence_by_issue`.
