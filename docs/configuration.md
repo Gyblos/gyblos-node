@@ -290,6 +290,9 @@ budget, so the file is refused with `INVALID_LIMIT` on the first key it sets
 among `global_requests_per_minute`, `requests_per_minute` and `max_connections`.
 The editor schema cannot check this rule; `config validate` does.
 
+A free chat usually counts as two requests (its quote and its execution), so 30
+per minute is about 15 free chats per buyer.
+
 Free execution opens one connection per request, so the connection-attempt
 limits rise with a raised request rate (per buyer and per source to
 `requests_per_minute`, in total to `global_requests_per_minute`) and never fall
