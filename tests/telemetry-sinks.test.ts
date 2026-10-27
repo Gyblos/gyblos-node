@@ -14,6 +14,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 
 import { PRIVATE_LOG_LIMITS } from '@gyblos/config';
+import { P2P_ROLES } from '@gyblos/protocol/constants';
 import { createConsoleTelemetrySink } from '@gyblos/telemetry-console';
 import { createFileTelemetrySink } from '@gyblos/telemetry-file';
 
@@ -33,6 +34,9 @@ telemetrySinkContract('console telemetry', {
       async output() {
         return output;
       },
+      async assertInert() {
+        assert.equal(output, '');
+      },
       async cleanup() {},
     };
   },
@@ -43,11 +47,12 @@ telemetrySinkContract('file telemetry', {
       await mkdtemp(join(tmpdir(), 'gyblos-telemetry-')),
     );
     if (broken) await writeFile(join(root, 'seller'), 'synthetic obstruction');
+    const before = await readdir(root);
     const directory = join(root, 'seller', 'telemetry');
     return {
       sink: createFileTelemetrySink({
         environment: { GYBLOS_HOME: root },
-        role: 'seller',
+        role: P2P_ROLES.SELLER,
       }),
       async output() {
         try {
@@ -72,6 +77,9 @@ telemetrySinkContract('file telemetry', {
           throw error;
         }
       },
+      async assertInert() {
+        assert.deepEqual(await readdir(root), before);
+      },
       async cleanup() {
         await rm(root, { recursive: true, force: true });
       },
@@ -84,7 +92,7 @@ void test('file telemetry bounds the pending open buffer and records overflow', 
   );
   const sink = createFileTelemetrySink({
     environment: { GYBLOS_HOME: root },
-    role: 'buyer',
+    role: P2P_ROLES.BUYER,
   });
   try {
     for (let index = 0; index < PRIVATE_LOG_LIMITS.pendingRecords + 5; index++)

@@ -1,6 +1,6 @@
 // Shared telemetry sink contract; every plugin must preserve fields without leaking unknown content.
 import assert from 'node:assert/strict';
-import test from 'node:test';
+import test, { type TestContext } from 'node:test';
 
 import type { TelemetrySink } from '@gyblos/protocol/telemetry';
 
@@ -10,12 +10,31 @@ export interface TelemetryHarness {
   start(broken?: boolean): Promise<{
     sink: TelemetrySink;
     output(): Promise<string>;
+    assertInert(): Promise<void>;
     cleanup(): Promise<void>;
   }>;
 }
-export function telemetrySinkContract(name: string, harness: TelemetryHarness) {
-  void test(`${name}: all events, privacy, lazy construction and idempotent lifecycle`, async () => {
+async function inertStart(context: TestContext, harness: TelemetryHarness) {
+  let timers = 0;
+  const unexpectedTimer = () => {
+    timers++;
+    throw new Error('Unexpected telemetry timer before emit');
+  };
+  context.mock.method(globalThis, 'setTimeout', unexpectedTimer);
+  context.mock.method(globalThis, 'setInterval', unexpectedTimer);
+  try {
     const fixture = await harness.start();
+    await fixture.sink.flush();
+    await fixture.assertInert();
+    assert.equal(timers, 0);
+    return fixture;
+  } finally {
+    context.mock.restoreAll();
+  }
+}
+export function telemetrySinkContract(name: string, harness: TelemetryHarness) {
+  void test(`${name}: all events, privacy, lazy construction and idempotent lifecycle`, async (context) => {
+    const fixture = await inertStart(context, harness);
     try {
       assert.equal(await fixture.output(), '');
       await fixture.sink.flush();
@@ -63,8 +82,8 @@ export function telemetrySinkContract(name: string, harness: TelemetryHarness) {
       await fixture.cleanup();
     }
   });
-  void test(`${name}: close before emit is inert`, async () => {
-    const fixture = await harness.start();
+  void test(`${name}: close before emit is inert`, async (context) => {
+    const fixture = await inertStart(context, harness);
     try {
       assert.deepEqual(await fixture.sink.close(), {
         emitted: 0,
@@ -72,6 +91,7 @@ export function telemetrySinkContract(name: string, harness: TelemetryHarness) {
         failed: false,
       });
       assert.equal(await fixture.output(), '');
+      await fixture.assertInert();
     } finally {
       await fixture.cleanup();
     }

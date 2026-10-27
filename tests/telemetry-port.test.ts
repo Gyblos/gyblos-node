@@ -89,3 +89,10 @@ void test('telemetry rejects malformed known fields without executing getters or
   assert.throws(() => toTelemetryRecord(getter));
   assert.equal(invoked, false);
 });
+void test('refused telemetry requires seller and engine identity to be absent together', () => {
+  const event = telemetryEvents().find((event) => event.type === 'refused')!;
+  for (const patch of [{ sellerNodeId: null }, { engineKind: null }])
+    assert.throws(() =>
+      toTelemetryRecord({ ...event, ...patch } as typeof event),
+    );
+});

@@ -139,9 +139,7 @@
               "totalMs": 44
             },
             "verdict": "disputed",
-            "disputed": [
-              "outputTokens"
-            ]
+            "disputed": ["outputTokens"]
           },
           "signature": "ee89b6e2b4b0bf5fffa9bd75fe908de53fa61340494c9fbbb591ee2ec2fde62f2ba2f33cf99b210dc76753d36a726b3ed9a5535dbccb88f7b010e4f9c6ec8904"
         }
