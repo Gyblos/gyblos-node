@@ -1,5 +1,5 @@
-// Shares sanitized main-process wallet status across startup and Wallet.
-// The UI cannot receive a key, file contents or signing/funding capability.
+// Shares sanitized wallet collection and serial Settings actions with the renderer.
+// The bridge exposes no paths, backup bytes, private keys or signing capability.
 import {
   createContext,
   useCallback,
@@ -10,48 +10,97 @@ import {
   type ReactNode,
 } from 'react';
 
-import type {
-  BackupRequest,
-  BackupResult,
-} from '../wallet/backup-flow-model.js';
 import {
-  parseWalletSummary,
-  WALLET_STATUS,
-  walletSummary,
-  type WalletSummary,
-} from '../wallet/model.js';
+  BACKUP_RESULT,
+  type BackupResult,
+} from '../wallet/backup-flow-model.js';
+import { WALLET_STATUS, type WalletSummary } from '../wallet/model.js';
+import {
+  parseWalletCollection,
+  parseWalletSettingsResult,
+  unavailableCollection,
+  WALLET_SETTINGS_RESULT,
+  type ActiveBackupRequest,
+  type WalletCollection,
+  type WalletSettingsRequest,
+  type WalletSettingsResult,
+} from '../wallet/settings-model.js';
 
 declare global {
   interface Window {
     desktopWallet?: {
       summary(): Promise<WalletSummary>;
+      collection(): Promise<WalletCollection>;
+      manage(request: WalletSettingsRequest): Promise<WalletSettingsResult>;
       copyAddress(address: string): Promise<boolean>;
-      backup(request: BackupRequest): Promise<BackupResult>;
+      backup(request: ActiveBackupRequest): Promise<BackupResult>;
     };
   }
 }
-
-const WalletContext = createContext<{
-  wallet: WalletSummary;
-  refresh(): Promise<void>;
-}>({ wallet: walletSummary(WALLET_STATUS.LOADING), refresh: async () => {} });
-
+function useWalletActions(refresh: () => Promise<void>) {
+  const [busy, setBusy] = useState(false);
+  const pending = useRef(false);
+  async function run<T>(busyResult: T, failed: T, action: () => Promise<T>) {
+    if (pending.current) return busyResult;
+    pending.current = true;
+    setBusy(true);
+    try {
+      return await action();
+    } catch {
+      return failed;
+    } finally {
+      await refresh();
+      pending.current = false;
+      setBusy(false);
+    }
+  }
+  return {
+    busy,
+    manage: (request: WalletSettingsRequest) =>
+      run(
+        WALLET_SETTINGS_RESULT.BUSY,
+        WALLET_SETTINGS_RESULT.FAILED,
+        async () =>
+          parseWalletSettingsResult(
+            await window.desktopWallet?.manage(request),
+          ),
+      ),
+    backup: (request: ActiveBackupRequest) =>
+      run(
+        BACKUP_RESULT.BUSY,
+        BACKUP_RESULT.FAILED,
+        async () =>
+          (await window.desktopWallet?.backup(request)) ?? BACKUP_RESULT.FAILED,
+      ),
+  };
+}
+const WalletContext = createContext({
+  collection: unavailableCollection(WALLET_STATUS.LOADING),
+  refresh: async () => {},
+  busy: false,
+  manage: async (
+    _request: WalletSettingsRequest,
+  ): Promise<WalletSettingsResult> => WALLET_SETTINGS_RESULT.FAILED,
+  backup: async (_request: ActiveBackupRequest): Promise<BackupResult> =>
+    BACKUP_RESULT.FAILED,
+});
 export function DesktopWalletProvider({ children }: { children: ReactNode }) {
-  const [wallet, setWallet] = useState(() =>
-    walletSummary(WALLET_STATUS.LOADING),
+  const [collection, setCollection] = useState(() =>
+    unavailableCollection(WALLET_STATUS.LOADING),
   );
   const active = useRef(false);
   const sequence = useRef(0);
   const refresh = useCallback(async () => {
     const request = ++sequence.current;
-    let current = walletSummary(WALLET_STATUS.UNAVAILABLE);
+    let current = unavailableCollection();
     try {
-      current = parseWalletSummary(await window.desktopWallet?.summary());
+      current = parseWalletCollection(await window.desktopWallet?.collection());
     } catch {
-      // A failed public-status request must never leave a stale verified badge.
+      /* Public status fails closed without a stale verified badge. */
     }
-    if (active.current && request === sequence.current) setWallet(current);
+    if (active.current && request === sequence.current) setCollection(current);
   }, []);
+  const actions = useWalletActions(refresh);
   useEffect(() => {
     active.current = true;
     void refresh();
@@ -60,15 +109,21 @@ export function DesktopWalletProvider({ children }: { children: ReactNode }) {
     };
   }, [refresh]);
   return (
-    <WalletContext.Provider value={{ wallet, refresh }}>
+    <WalletContext.Provider value={{ collection, refresh, ...actions }}>
       {children}
     </WalletContext.Provider>
   );
 }
-
 export function useDesktopWallet() {
-  return useContext(WalletContext).wallet;
+  return useContext(WalletContext).collection.wallet;
+}
+export function useDesktopWallets() {
+  return useContext(WalletContext).collection.wallets;
 }
 export function useRefreshDesktopWallet() {
   return useContext(WalletContext).refresh;
+}
+export function useDesktopWalletActions() {
+  const { busy, manage, backup } = useContext(WalletContext);
+  return { busy, manage, backup };
 }

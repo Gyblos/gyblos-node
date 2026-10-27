@@ -10,10 +10,12 @@ import {
 } from '../wallet/backup-flow-model.js';
 import { BUTTON_VARIANT } from './constants.js';
 import { Button, Note } from './UI.js';
-import { useRefreshDesktopWallet } from './WalletState.js';
+import { useDesktopWallet, useDesktopWalletActions } from './WalletState.js';
 
 function useWalletBackup() {
-  const refresh = useRefreshDesktopWallet();
+  const wallet = useDesktopWallet();
+  const [address] = useState(wallet.address);
+  const actions = useDesktopWalletActions();
   const [action, setAction] = useState<BackupAction>(BACKUP_ACTION.CREATE);
   const [password, setPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
@@ -21,15 +23,16 @@ function useWalletBackup() {
   const [message, setMessage] = useState('');
   const creating = action === BACKUP_ACTION.CREATE;
   async function submit() {
-    if (busy) return;
+    if (busy || actions.busy) return;
     setBusy(true);
     setMessage('');
-    const request = { action, password };
+    const request = { action, password, address };
     setPassword('');
     setConfirmation('');
     try {
-      const result = await window.desktopWallet?.backup(request);
-      await refresh();
+      const result = address
+        ? await actions.backup({ ...request, address })
+        : BACKUP_RESULT.FAILED;
       if (result === BACKUP_RESULT.SAVED) {
         setAction(BACKUP_ACTION.VERIFY);
         setMessage('File saved. Verify it to confirm your address.');
@@ -63,7 +66,7 @@ function useWalletBackup() {
     setPassword,
     confirmation,
     setConfirmation,
-    busy,
+    busy: busy || actions.busy,
     message,
     submit,
     choose,
@@ -115,8 +118,7 @@ export function WalletBackup() {
   return (
     <section className="wallet-details" aria-label="Encrypted backup">
       <Note>
-        Keep the file and password safe. Restore on first launch before creating
-        a wallet.
+        Keep the file and password safe. Restore from Settings on any device.
       </Note>
       <div
         className="connection-location"

@@ -1,12 +1,19 @@
 // Displays public wallet metadata; funding and signing remain disabled.
-import { Archive, Plus } from '@phosphor-icons/react';
-import { useEffect } from 'react';
+import { Archive, ArrowCounterClockwise, Plus } from '@phosphor-icons/react';
+import { useEffect, useState } from 'react';
 
 import { WALLET_STATUS, type WalletSummary } from '../wallet/model.js';
 import { BUTTON_VARIANT } from './constants.js';
 import { CopyButton } from './CopyButton.js';
+import { MotionPresence } from './Motion.js';
 import { Badge, Button, List, ListRow, Note, RowCopy } from './UI.js';
-import { useDesktopWallet, useRefreshDesktopWallet } from './WalletState.js';
+import { WalletRestore } from './WalletRestore.js';
+import { WalletSelector } from './WalletSelector.js';
+import {
+  useDesktopWallet,
+  useDesktopWalletActions,
+  useRefreshDesktopWallet,
+} from './WalletState.js';
 
 async function copyAddress(address: string) {
   if (!(await window.desktopWallet?.copyAddress(address)))
@@ -54,6 +61,7 @@ export function WalletDetails({
   useEffect(() => {
     void refresh();
   }, [refresh]);
+  const { busy } = useDesktopWalletActions();
   const ready = wallet.status === WALLET_STATUS.READY;
   return (
     <section className="wallet-details" aria-label="Wallet details">
@@ -76,7 +84,7 @@ export function WalletDetails({
         </div>
         <Button
           variant={BUTTON_VARIANT.PRIMARY}
-          disabled={!ready}
+          disabled={!ready || busy}
           onClick={onAddFunds}
         >
           <Plus size={16} aria-hidden="true" /> Add funds
@@ -93,13 +101,31 @@ export function WalletDetails({
               : 'Protected wallet storage is unavailable. On Linux, enable GNOME Keyring or KWallet and restart. You can still use free models.'}
         </Note>
       )}
+      <WalletSelector />
+      <WalletRecovery ready={ready} onBackup={onBackup} />
+    </section>
+  );
+}
+
+function WalletRecovery({
+  ready,
+  onBackup,
+}: {
+  ready: boolean;
+  onBackup: () => void;
+}) {
+  const wallet = useDesktopWallet();
+  const { busy } = useDesktopWalletActions();
+  const [restoring, setRestoring] = useState(false);
+  return (
+    <>
       <List label="Wallet recovery">
         <ListRow
           leading={null}
           trailing={
             <Button
               variant={BUTTON_VARIANT.TONAL}
-              disabled={!ready}
+              disabled={!ready || busy}
               onClick={onBackup}
             >
               <Archive size={16} aria-hidden="true" />
@@ -118,7 +144,28 @@ export function WalletDetails({
             }
           />
         </ListRow>
+        <ListRow
+          leading={null}
+          trailing={
+            <Button
+              variant={BUTTON_VARIANT.TONAL}
+              disabled={!ready || busy}
+              onClick={() => setRestoring((value) => !value)}
+            >
+              <ArrowCounterClockwise size={16} aria-hidden="true" />
+              Restore backup
+            </Button>
+          }
+        >
+          <RowCopy
+            title="Restore a wallet"
+            detail="Add a saved wallet without replacing this one."
+          />
+        </ListRow>
       </List>
-    </section>
+      <MotionPresence>
+        {restoring && <WalletRestore close={() => setRestoring(false)} />}
+      </MotionPresence>
+    </>
   );
 }

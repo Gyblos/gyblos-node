@@ -38,20 +38,21 @@ applications in Connect; model artwork and compact selectors are shared.
 
 Both the corner balance and footer backup reminder navigate to Settings. Only
 its explicit Back up wallet action opens the existing backup flow. Copy address
-uses a narrow host action: only the completed startup wallet's public address
+uses a narrow host action: only the currently selected wallet's public address
 can be copied, from the owning main frame while its lifecycle is active. No
 arbitrary clipboard access, private key or signing capability is exposed.
 
 Add funds opens a local amount form. It rejects an unavailable wallet or missing
 verified backup, then always reports payment unavailable. It cannot authorize
-payment, change a balance, or enable funding. The existing first-run wallet and
-empty-destination restore behavior below is unchanged.
+payment, change a balance, or enable funding. Automatic startup and the
+Settings-only recovery flow are described below.
 
 ## Internal wallet library
 
-The Node-only `@gyblos/desktop/wallet-library` entry is not connected to the
-host, preload or renderer. It requires an existing protected desktop wallet. It
-never creates a replacement for missing, partial or inaccessible custody.
+The Node-only `@gyblos/desktop/wallet-library` entry is composed by the host
+session; the renderer receives public summaries and fixed operation results. It
+requires an existing protected desktop wallet. It never creates a replacement
+for missing, partial or inaccessible custody.
 
 `summary()` returns only public addresses/statuses. `restore(bytes, password)`
 authenticates a portable backup and imports it into a separate address-named
@@ -72,24 +73,29 @@ as a legacy-only installation. Selection publication by atomic rename is the
 commit point; cancellation after publication cannot roll it back. Fresh service
 instances reload selection from disk; process-crash recovery, Windows directory
 fsync and sudden-power-loss recovery are not established. No payment state,
-transfer, balance query, deletion or export API is added. Loader-only startup
-and Settings integration are separate work.
+transfer, balance query or raw secret-export API is added. Settings backup
+reuses the existing approved encrypted-file workflow, pinned to the selected
+address and serialized with restore/select.
 
 ## Protected local wallet
 
-On first launch without an existing wallet, the startup window offers Create
-wallet or Restore backup before any key is generated. Restoration recovers the
-same address for confirmation; existing complete or partial wallet state is
-loaded without replacement. See
+On first launch the small ASCII loader automatically prepares a protected wallet
+only when its dedicated root is absent or empty. It offers no creation choice,
+backup prompt or startup wallet modal. Existing state is read without
+initialization; a missing original inside a retained library never generates a
+replacement. Settings can restore an encrypted backup alongside the original,
+then explicitly select which wallet to use. The selected address and its
+verified-backup indicator are reloaded on the next launch. See
 [portable backup and recovery](desktop-backup.md) for the flow and its limits.
 
-The main process stores one Ed25519 wallet under
-`app.getPath('appData')/gyblos-wallet/wallet-v1`, with only OS-encrypted private
-material on disk. Chat/Connect receive only the public address and status;
-private material stays in the host process. Funding remains unconditionally
-disabled, including after backup verification or restoration. Do not fund this
-experimental wallet: external transfers to an address cannot be blocked by the
-app. No balance is queried.
+The main process retains the original Ed25519 wallet under
+`app.getPath('appData')/gyblos-wallet/wallet-v1`. Imported identities have
+separate address-named stores in the config-owned wallet library, with only
+OS-encrypted private material on disk. Chat/Connect receive only the public
+address and status; private material stays in the host process. Funding remains
+unconditionally disabled, including after backup verification or restoration. Do
+not fund this experimental wallet: external transfers to an address cannot be
+blocked by the app. No balance is queried.
 
 | Platform | Protection and limits                                                                                                                                                                       |
 | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -110,7 +116,8 @@ corrupt or inaccessible wallet data is never silently replaced. POSIX
 directories/files use owner-only permissions and file/directory flushes; Windows
 uses the OS user profile and DPAPI, without claiming equivalent
 sudden-power-loss durability. Repeated launches reuse the stored identity.
-Missing/corrupt data requires a later recovery mechanism.
+Partial/corrupt local state is retained for inspection; importing a backup does
+not silently repair or replace that state.
 
 OS encryption protects stored data, not a compromised app or account. Plaintext
 is temporarily present in main-process memory; JavaScript strings cannot be
@@ -123,10 +130,11 @@ acceptance, cross-platform recovery or signed-update continuity. Those remain
 separate checks.
 
 The [portable backup flow](desktop-backup.md) supports saving, same-address
-verification and first-run restoration. Successful saved-file checks persist
-protected identity-bound metadata and can set the public backup indicator;
-funding remains unconditionally disabled. Current cross-platform automation and
-real OS secret-store acceptance must be verified separately.
+verification and Settings-only restoration alongside the current wallet.
+Successful saved-file checks persist protected identity-bound metadata and can
+set the public backup indicator; funding remains unconditionally disabled.
+Current cross-platform automation and real OS secret-store acceptance must be
+verified separately.
 
 ## Run locally
 

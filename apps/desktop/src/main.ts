@@ -4,14 +4,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import {
-  app,
-  BrowserWindow,
-  clipboard,
-  dialog,
-  ipcMain,
-  safeStorage,
-} from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 
 import { DESKTOP, PROBE_STATUS, STARTUP_WINDOW } from './constants.js';
 import { probeInUtility } from './probe-host.js';
@@ -20,23 +13,12 @@ import { cleanupDesktopSession } from './session-cleanup.js';
 import { armSmokeWatchdog } from './smoke-watchdog.js';
 import { startupHandoff } from './startup-window.js';
 import { BRAND_COLORS } from './theme.js';
-import { BACKUP_FLOW, BACKUP_RESULT } from './wallet/backup-flow-model.js';
-import { createBackupFlow } from './wallet/backup-flow.js';
-import { WALLET, WALLET_STATUS } from './wallet/constants.js';
-import { copyPublicWalletAddress } from './wallet/copy-address.js';
+import { WALLET } from './wallet/constants.js';
+import { registerDesktopWallet } from './wallet/host.js';
 import {
   focusExistingWindow,
   prepareWalletProfile,
-  waitForWalletBeforeQuit,
 } from './wallet/lifecycle.js';
-import { walletSummary, type WalletSummary } from './wallet/model.js';
-import {
-  walletProtection,
-  type WalletProtection,
-} from './wallet/protection.js';
-import { createWalletService } from './wallet/service.js';
-import { SETUP_STATUS, WALLET_SETUP } from './wallet/setup-model.js';
-import { createWalletSetup } from './wallet/setup.js';
 
 function createProbeWindow(startup = false) {
   const window = new BrowserWindow({
@@ -68,165 +50,6 @@ function createProbeWindow(startup = false) {
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   window.webContents.on('will-navigate', (event) => event.preventDefault());
   return window;
-}
-
-function registerWalletCopy(
-  window: BrowserWindow,
-  summary: Promise<WalletSummary>,
-  signal: AbortSignal,
-) {
-  ipcMain.handle(WALLET.COPY_CHANNEL, async (event, ...args: unknown[]) => {
-    if (
-      event.sender !== window.webContents ||
-      event.senderFrame !== window.webContents.mainFrame
-    )
-      throw new Error('Unsupported wallet copy sender.');
-    const current = await summary;
-    return (
-      !signal.aborted &&
-      copyPublicWalletAddress(current, args, (text) =>
-        clipboard.writeText(text),
-      )
-    );
-  });
-}
-
-function registerWalletSetup(
-  loading: BrowserWindow | null,
-  walletRoot: string,
-  protection: WalletProtection | null,
-  signal: AbortSignal,
-) {
-  if (!loading) return null;
-  const setup = createWalletSetup(
-    walletRoot,
-    protection,
-    {
-      async select() {
-        const result = await dialog.showOpenDialog(loading, {
-          title: 'Restore encrypted wallet backup',
-          properties: ['openFile'],
-          filters: [{ name: 'Gyblos encrypted backup', extensions: ['json'] }],
-        });
-        return result.canceled ? null : (result.filePaths[0] ?? null);
-      },
-    },
-    signal,
-  );
-  ipcMain.handle(WALLET_SETUP.CHANNEL, async (event, ...args: unknown[]) => {
-    if (
-      !loading ||
-      !setup ||
-      event.sender !== loading.webContents ||
-      event.senderFrame !== loading.webContents.mainFrame ||
-      args.length !== 1
-    )
-      throw new Error('Unsupported wallet setup sender.');
-    const result = await setup.run(args[0]);
-    if (!loading.isDestroyed() && result.status !== SETUP_STATUS.COMPLETE)
-      loading.setSize(STARTUP_WINDOW.WIDTH, STARTUP_WINDOW.SETUP_HEIGHT);
-    return result;
-  });
-  return setup;
-}
-
-function registerWalletBackup(
-  window: BrowserWindow,
-  summary: Promise<WalletSummary>,
-  backup: ReturnType<typeof createBackupFlow>,
-  signal: AbortSignal,
-  smoke: boolean,
-) {
-  ipcMain.handle(BACKUP_FLOW.CHANNEL, async (event, ...args: unknown[]) => {
-    if (
-      event.sender !== window.webContents ||
-      event.senderFrame !== window.webContents.mainFrame ||
-      args.length !== 1
-    )
-      throw new Error('Unsupported wallet backup sender.');
-    const ready = await summary;
-    return !smoke && !signal.aborted && ready.status === WALLET_STATUS.READY
-      ? backup.run(args[0])
-      : BACKUP_RESULT.FAILED;
-  });
-}
-
-function registerWalletStatus(
-  window: BrowserWindow,
-  walletRoot: string,
-  smoke: boolean,
-  loading: BrowserWindow | null,
-  signal: AbortSignal,
-) {
-  const controller = new AbortController();
-  const protection = smoke
-    ? null
-    : walletProtection(process.platform, safeStorage);
-  const setup = registerWalletSetup(loading, walletRoot, protection, signal);
-  const summary =
-    setup?.summary ?? Promise.resolve(walletSummary(WALLET_STATUS.UNAVAILABLE));
-  const wallet = createWalletService(walletRoot, protection, summary);
-  const backup = createBackupFlow(
-    wallet,
-    {
-      async approve() {
-        const result = await dialog.showMessageBox(window, {
-          type: 'question',
-          title: 'Wallet backup',
-          message: 'Allow this wallet backup operation?',
-          detail:
-            'Your password protects the file. Gyblos cannot recover a lost file or password.',
-          buttons: ['Cancel', 'Continue'],
-          defaultId: 0,
-          cancelId: 0,
-        });
-        return result.response === 1;
-      },
-      async save() {
-        const result = await dialog.showSaveDialog(window, {
-          title: 'Save encrypted wallet backup',
-          defaultPath: BACKUP_FLOW.FILENAME,
-          filters: [{ name: 'Gyblos encrypted backup', extensions: ['json'] }],
-        });
-        return result.canceled ? null : (result.filePath ?? null);
-      },
-      async select() {
-        const result = await dialog.showOpenDialog(window, {
-          title: 'Choose the saved wallet backup',
-          properties: ['openFile'],
-          filters: [{ name: 'Gyblos encrypted backup', extensions: ['json'] }],
-        });
-        return result.canceled ? null : (result.filePaths[0] ?? null);
-      },
-    },
-    controller.signal,
-  );
-  window.once('closed', () => controller.abort());
-  if (!smoke)
-    app.on(
-      'before-quit',
-      waitForWalletBeforeQuit(
-        () => {
-          controller.abort();
-          return summary
-            .then(() => setup?.settled())
-            .then(() => backup.settled());
-        },
-        () => app.quit(),
-      ),
-    );
-  registerWalletBackup(window, summary, backup, controller.signal, smoke);
-  registerWalletCopy(window, summary, controller.signal);
-  ipcMain.handle(WALLET.CHANNEL, (event, ...args: unknown[]) => {
-    if (
-      event.sender !== window.webContents ||
-      event.senderFrame !== window.webContents.mainFrame ||
-      args.length !== 0
-    )
-      throw new Error('Unsupported wallet status sender.');
-    return wallet.summary();
-  });
-  return summary;
 }
 
 async function loadDesktopWindows(
@@ -298,11 +121,10 @@ async function main() {
   app.dock?.setIcon(join(__dirname, 'renderer', DESKTOP.ICON_FILE));
   const window = createProbeWindow();
   const loading = smoke ? null : createProbeWindow(true);
-  const prepared = registerWalletStatus(
+  const prepared = registerDesktopWallet(
     window,
     walletRoot,
     smoke,
-    loading,
     controller.signal,
   );
   app.on('second-instance', () => {
