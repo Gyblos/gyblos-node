@@ -515,10 +515,10 @@ When a seller's engine fails after it accepted the request (for example a
 reseller out of quota, rate limited, or an engine that stops mid-answer), the
 error code is `FREE_EXECUTION_SELLER_CANNOT_CONTINUE` and `error.reason` says
 why: `quota_exhausted`, `rate_limited`, `engine_auth`, `engine_unavailable`,
-`engine_interrupted`, `engine_timeout` or `engine_invalid_response`. Before
-the first token this is a 503 JSON error. Mid-stream it is the final SSE error
-event, which also carries `error.usage.completion_tokens`: the tokens the
-seller delivered before it stopped. The buyer does not retry or reroute.
+`engine_interrupted`, `engine_timeout` or `engine_invalid_response`. Before the
+first token this is a 503 JSON error. Mid-stream it is the final SSE error
+event, which also carries `error.usage.completion_tokens`: the tokens the seller
+delivered before it stopped. The buyer does not retry or reroute.
 `FREE_EXECUTION_ENGINE_UNAVAILABLE` remains the refusal before generation, for
 example when the seller's engine readiness has expired. A pinned model that
 disappears during a request is reported as `engine_unavailable`.
