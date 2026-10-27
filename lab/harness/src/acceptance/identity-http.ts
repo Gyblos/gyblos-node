@@ -1,6 +1,7 @@
 // Verifies early product SSE delivery and cancellation without reporting response content.
 // HTTP targets are allocated loopback addresses only; the engine remains synthetic.
 import { request, type IncomingMessage } from 'node:http';
+import { StringDecoder } from 'node:string_decoder';
 import { setTimeout as delay } from 'node:timers/promises';
 
 import { FREE_BUYER } from '@gyblos/buyer/constants';
@@ -8,11 +9,33 @@ import { HTTP_STATUS } from '@gyblos/config';
 import { FREE_CHAT_ROLES, MODEL_IDS } from '@gyblos/protocol/constants';
 
 import { ACCEPTANCE } from './constants.js';
-import { acceptanceAssert } from './errors.js';
+import { acceptanceAssert, assertAcceptanceActive } from './errors.js';
 import type { FreeAcceptanceBuyer } from './free-buyer.js';
 import { FREE_ACCEPTANCE, FREE_STREAM_ACCEPTANCE } from './free-constants.js';
 import type { IdentityAcceptanceContext } from './identity-context.js';
 
+export async function readIdentityFirstDelta(
+  reader: AsyncIterator<Uint8Array>,
+  signal: AbortSignal,
+): Promise<string> {
+  const decoder = new StringDecoder('utf8');
+  let bytes = 0;
+  let text = '';
+  for (;;) {
+    assertAcceptanceActive(signal);
+    const part = await reader.next();
+    assertAcceptanceActive(signal);
+    acceptanceAssert(!part.done);
+    bytes += part.value.byteLength;
+    acceptanceAssert(bytes <= FREE_ACCEPTANCE.httpResponseBytes);
+    text += decoder.write(Buffer.from(part.value));
+    const content = text.indexOf('"content":"syn"');
+    if (content >= 0 && text.indexOf('\n\n', content) >= 0) {
+      acceptanceAssert(!text.includes(FREE_BUYER.streamDone));
+      return text;
+    }
+  }
+}
 async function firstDelta(buyer: FreeAcceptanceBuyer, signal: AbortSignal) {
   acceptanceAssert(
     new URL(buyer.url).origin.startsWith(`${ACCEPTANCE.origin}:`),
@@ -49,11 +72,7 @@ async function firstDelta(buyer: FreeAcceptanceBuyer, signal: AbortSignal) {
     );
     acceptanceAssert(response.headers[FREE_BUYER.noRetryHeader] === 'false');
     const reader = response[Symbol.asyncIterator]();
-    const first = await reader.next();
-    const text = String(first.value);
-    acceptanceAssert(
-      text.includes('"content":"syn"') && !text.includes(FREE_BUYER.streamDone),
-    );
+    const text = await readIdentityFirstDelta(reader, signal);
     return { response, reader, text };
   } catch (error) {
     response.destroy();

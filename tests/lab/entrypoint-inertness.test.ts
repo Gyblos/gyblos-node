@@ -16,6 +16,7 @@ void test('lab executable modules are inert when imported', async (context) => {
       '@gyblos/lab-harness/cli/node-discovery-acceptance',
       '@gyblos/lab-harness/cli/free-acceptance',
       '@gyblos/lab-harness/cli/free-stream-acceptance',
+      '@gyblos/lab-harness/cli/identity-acceptance',
       '@gyblos/lab-harness/commands/seller',
       '@gyblos/lab-harness/commands/challenge',
       '@gyblos/lab-harness/commands/fund',

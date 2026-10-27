@@ -178,3 +178,37 @@ void test(
     }
   },
 );
+
+void test('identity SSE reader accepts split UTF-8 and event boundaries and rejects incomplete, oversized or cancelled streams', async () => {
+  const { readIdentityFirstDelta } =
+    await import('@gyblos/lab-harness/acceptance/identity-http');
+  const { FREE_ACCEPTANCE } =
+    await import('@gyblos/lab-harness/acceptance/free-constants');
+  async function* fragments(parts: Uint8Array[]) {
+    for (const part of parts) yield part;
+  }
+  const bytes = Buffer.from('data: {"content":"syn","extra":"é"}\n\n');
+  const reader = fragments([...bytes].map((value) => Uint8Array.of(value)));
+  assert.equal(
+    await readIdentityFirstDelta(reader, new AbortController().signal),
+    bytes.toString(),
+  );
+  await assert.rejects(
+    readIdentityFirstDelta(
+      fragments([Buffer.from('data: {"content":"syn"}')]),
+      new AbortController().signal,
+    ),
+    { code: 'ACCEPTANCE_FAILED' },
+  );
+  await assert.rejects(
+    readIdentityFirstDelta(
+      fragments([new Uint8Array(FREE_ACCEPTANCE.httpResponseBytes + 1)]),
+      new AbortController().signal,
+    ),
+    { code: 'ACCEPTANCE_FAILED' },
+  );
+  await assert.rejects(
+    readIdentityFirstDelta(fragments([bytes]), AbortSignal.abort()),
+    { code: 'ACCEPTANCE_CANCELLED' },
+  );
+});

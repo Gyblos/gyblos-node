@@ -41,6 +41,7 @@
     "./cli/free-stream-acceptance": "./src/cli/free-stream-acceptance.ts",
     "./acceptance/identity": "./src/acceptance/identity-run.ts",
     "./acceptance/identity-constants": "./src/acceptance/identity-constants.ts",
+    "./acceptance/identity-http": "./src/acceptance/identity-http.ts",
     "./acceptance/identity-registry": "./src/acceptance/identity-registry.ts",
     "./cli/identity-acceptance": "./src/cli/identity-acceptance.ts"
   },

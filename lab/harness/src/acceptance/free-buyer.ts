@@ -86,9 +86,15 @@ export async function createFreeBuyer(
       inputAtomicPerMtok: '0',
       outputAtomicPerMtok: '0',
     };
-    config.sellers = sellers.flatMap(
-      (seller) => acceptanceSelection(seller).sellers,
-    );
+    const configuredSellers = () =>
+      sellers
+        .flatMap((seller) => acceptanceSelection(seller).sellers)
+        .map((seller) =>
+          identity
+            ? { ...seller, manualTrust: identity.manualTrust ?? false }
+            : seller,
+        );
+    config.sellers = configuredSellers();
     let prepared: PreparedBuyerSelection;
     if (identity) {
       const url = new URL(identity.rpcUrl);
@@ -101,10 +107,7 @@ export async function createFreeBuyer(
           !url.hash,
       );
       config.identity = { rpcUrl: identity.rpcUrl };
-      config.sellers = config.sellers.map((seller) => ({
-        ...seller,
-        manualTrust: identity.manualTrust ?? false,
-      }));
+
       const path = join(
         homeLayout(run.workspace.environment).roles.buyer,
         BUYER_SELECTION.configFile,
@@ -197,9 +200,7 @@ export async function createFreeBuyer(
         acceptanceAssert(generations() === before + 1);
       },
       refresh() {
-        prepared.config.sellers = sellers.flatMap(
-          (seller) => acceptanceSelection(seller).sellers,
-        );
+        prepared.config.sellers = configuredSellers();
         prepared.discovery = run.state();
         dependencies = freeBuyerDependencies(prepared, {
           endpoint,

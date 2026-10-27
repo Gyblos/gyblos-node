@@ -115,6 +115,7 @@ export async function revokedIdentityPhases(
           result.source === IDENTITY_TRUST_SOURCES.MANUAL &&
           result.state?.revoked === true,
       );
+      buyer.refresh();
       await acceptedAnswer(context, buyer);
       acceptanceAssert(context.registry.counts().reads === before);
     },
