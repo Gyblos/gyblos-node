@@ -66,17 +66,23 @@ export async function storePage(
 }
 
 // Unexpired record count for /v1/health, reused for healthCacheMs per app; reset after an
-// accepted publish so this app's own writes show at once.
+// accepted publish so this app's own writes show at once. A stale count reads storage only when
+// `admit` allows it, else read returns null.
 export function recordCounter() {
   let cached: { value: number; at: number } | null = null;
   return {
-    async read(storage: DiscoveryStorage, now: number) {
+    async read(
+      storage: DiscoveryStorage,
+      now: number,
+      admit: () => Promise<boolean>,
+    ) {
       if (
         cached &&
         now >= cached.at &&
         now - cached.at < DISCOVERY_INDEX_LIMITS.healthCacheMs
       )
         return cached.value;
+      if (!(await admit())) return null;
       const value = await storage.count(now);
       cached = { value, at: now };
       return value;

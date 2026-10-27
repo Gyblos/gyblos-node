@@ -28,7 +28,11 @@ eachStorage(
   async ({ publish, call }) => {
     const seller = indexNode();
     const catalog = seller.catalog(1);
-    for (const name of Object.values(DISCOVERY_LIMITERS))
+    // The global read limiter guards storage reads only; publishes never consume it.
+    const publishLimiters = Object.values(DISCOVERY_LIMITERS).filter(
+      (name) => name !== DISCOVERY_LIMITERS.READ,
+    );
+    for (const name of publishLimiters)
       for (const limiter of [deny, broken]) {
         const response = await publish(catalog, {
           limiters: { [name]: limiter },
@@ -49,6 +53,7 @@ eachStorage(
         [DISCOVERY_LIMITERS.IP]: spy('ip'),
         [DISCOVERY_LIMITERS.PUBLISH]: spy('publish'),
         [DISCOVERY_LIMITERS.NODE]: spy('node'),
+        [DISCOVERY_LIMITERS.READ]: spy('read'),
       },
     });
     assert.deepEqual(keys, [
