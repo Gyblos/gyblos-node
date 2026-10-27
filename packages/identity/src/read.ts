@@ -2,7 +2,6 @@
 // Fan-out is capped and batched; each claimant is judged alone. Must not know registration, sponsorship or caching.
 import {
   getAddressEncoder,
-  getBase64Encoder,
   type Address,
   type Rpc,
   type SolanaRpcApi,
@@ -34,7 +33,7 @@ import {
 import { IdentityError } from './errors.js';
 import { memcmpFilter } from './filters.js';
 import { findAgentAddress, findMetadataAddress } from './pda.js';
-import { decodeAccountBatch } from './read-response.js';
+import { decodeAccountBatch, decodeProgramAccounts } from './read-response.js';
 
 export interface NodeIdentity {
   asset: Address;
@@ -80,8 +79,6 @@ interface BindingResult {
   bindingStatus: BindingStatus;
 }
 
-// Kit's base64 "encoder" turns RPC base64 text into bytes.
-const BASE64_TEXT_TO_BYTES = getBase64Encoder();
 const ADDRESS_ENCODER = getAddressEncoder();
 const MISSING_BINDING: BindingResult = {
   nodeId: undefined,
@@ -329,7 +326,7 @@ export async function registryAssets(
   options: IdentityReadOptions = {},
 ): Promise<Address[]> {
   assertIdentityReadActive(options);
-  const accounts = await rpc
+  const response = await rpc
     .getProgramAccounts(PROGRAMS.registry, {
       encoding: BASE64_ENCODING,
       commitment: options.commitment ?? COMMITMENT,
@@ -337,12 +334,8 @@ export async function registryAssets(
     })
     .send(options.signal ? { abortSignal: options.signal } : undefined);
   assertIdentityReadActive(options);
-  return accounts.flatMap((item) =>
-    assetOf(
-      new Uint8Array(BASE64_TEXT_TO_BYTES.encode(item.account.data[0])),
-      decode,
-    ),
-  );
+  const accounts = decodeProgramAccounts(response);
+  return accounts.flatMap((item) => assetOf(item.data, decode));
 }
 
 function assetsOwnedBy(

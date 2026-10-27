@@ -20,9 +20,9 @@ genesis, registry program and collection. A wrong genesis is refused before
 account scans; no automatic mainnet switch or deployment-address change is made.
 Account reads request finalized commitment (Kit may omit that option because
 finalized is the JSON-RPC default). One absolute lookup deadline is 5 seconds by
-default, configurable from 1 to 30 seconds. Cancellation is propagated to RPC
-and late results cannot become lookup success; an uncooperative provider may
-still retain its own work after the caller returns.
+default, configurable from 1 millisecond to 30 seconds. Cancellation is
+propagated to RPC and late results cannot become lookup success; an
+uncooperative provider may still retain its own work after the caller returns.
 
 Every result is bound to its queried `nodeId`, including negative evidence.
 Invalid NodeId input uses a sanitized null query marker. Results are `bound`

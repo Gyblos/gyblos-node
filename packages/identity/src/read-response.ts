@@ -2,7 +2,11 @@
 // Malformed provider data is a lookup failure, never a disqualified or revoked chain identity.
 import { getBase64Decoder, getBase64Encoder, isAddress } from '@solana/kit';
 
-import { BASE64_ENCODING, IDENTITY_ERROR_CODES } from './constants.js';
+import {
+  BASE64_ENCODING,
+  IDENTITY_ERROR_CODES,
+  PROGRAMS,
+} from './constants.js';
 import { IdentityError } from './errors.js';
 
 const BASE64_PATTERN =
@@ -47,4 +51,23 @@ export function decodeAccountBatch(value: unknown, requested: number) {
   if (!Array.isArray(value) || value.length !== requested) return invalid();
   const accounts: unknown[] = value;
   return accounts.map(account);
+}
+
+export function decodeProgramAccounts(value: unknown) {
+  if (!Array.isArray(value)) return invalid();
+  const rows: unknown[] = value;
+  return rows.map((row) => {
+    if (
+      !row ||
+      typeof row !== 'object' ||
+      !('pubkey' in row) ||
+      typeof row.pubkey !== 'string' ||
+      !isAddress(row.pubkey) ||
+      !('account' in row)
+    )
+      return invalid();
+    const decoded = account(row.account);
+    if (!decoded || decoded.owner !== PROGRAMS.registry) return invalid();
+    return decoded;
+  });
 }

@@ -107,9 +107,10 @@ void test('elapsed registry deadline rejects a synchronous late genesis before a
   const genesis = DEVNET_GENESIS;
   assert.ok(isBase58(genesis));
   let scans = 0;
-  const base = createSolanaRpcFromTransport(
-    async () => new Promise<never>(() => {}),
-  );
+  const base = createSolanaRpcFromTransport(async () => {
+    scans++;
+    return new Promise<never>(() => {});
+  });
   const rpc = {
     getGenesisHash: () => ({
       send: async () => {
@@ -120,16 +121,16 @@ void test('elapsed registry deadline rejects a synchronous late genesis before a
         return genesis;
       },
     }),
-    getProgramAccounts: () => ({
-      send: async () => {
-        scans++;
-        return [];
-      },
-    }),
+    getProgramAccounts: base.getProgramAccounts,
     getMultipleAccounts: base.getMultipleAccounts,
   };
-  const result = await readRegistryIdentity(rpc, NODE, { timeoutMs: 1 });
-  assert.equal(result.kind, K.UNAVAILABLE);
-  if (result.kind === K.UNAVAILABLE) assert.equal(result.reason, F.TIMEOUT);
-  assert.equal(scans, 0);
+  const keepAlive = setTimeout(() => {}, 1000);
+  try {
+    const result = await readRegistryIdentity(rpc, NODE, { timeoutMs: 1 });
+    assert.equal(result.kind, K.UNAVAILABLE);
+    if (result.kind === K.UNAVAILABLE) assert.equal(result.reason, F.TIMEOUT);
+    assert.equal(scans, 0);
+  } finally {
+    clearTimeout(keepAlive);
+  }
 });
