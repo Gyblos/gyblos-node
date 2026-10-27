@@ -110,3 +110,14 @@ loopback HTTP. They cover exact limits, absent/incorrect length headers, UTF-8,
 fragmentation, cancellation, monotonic deadlines, late-body disposal and exact
 SDK BigInts. A buyer regression compares valid padded JSON on the old transport
 with the bounded default and proves overflow cannot revoke persisted identity.
+
+`tests/lab/identity-acceptance.test.ts` composes the real buyer identity
+startup, bounded HTTP RPC reader and durable registry policy with native
+free/streaming inference, a local in-process index and a fake engine. Signed
+synthetic 8004 accounts are served on allocated loopback HTTP only. It covers
+renewal, outage, response limits, revocation before send, explicit manual
+override/removal, durable owner/sequence barriers, seller restart, cancellation
+and no post-send retry. Native unavailability is explicitly skipped in tests and
+fails the standalone `acceptance:identity` command; it never counts as
+successful acceptance. No live RPC, chain registration, real engine, payments or
+desktop is exercised.

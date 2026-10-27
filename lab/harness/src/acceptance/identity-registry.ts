@@ -67,18 +67,16 @@ export async function createAcceptanceRegistry(signal: AbortSignal) {
       .then((call) => {
         if (!registryMethodAllowed(call.method)) {
           forbidden++;
-          response
-            .writeHead(HTTP_STATUS.badRequest)
-            .end(
-              JSON.stringify({
-                jsonrpc: '2.0',
-                id: call.id,
-                error: {
-                  code: REGISTRY_FIXTURE.rpcInvalidMethod,
-                  message: 'Method unavailable',
-                },
-              }),
-            );
+          response.writeHead(HTTP_STATUS.badRequest).end(
+            JSON.stringify({
+              jsonrpc: '2.0',
+              id: call.id,
+              error: {
+                code: REGISTRY_FIXTURE.rpcInvalidMethod,
+                message: 'Method unavailable',
+              },
+            }),
+          );
           return;
         }
         reads++;
@@ -103,18 +101,16 @@ export async function createAcceptanceRegistry(signal: AbortSignal) {
       })
       .catch(() => {
         if (!response.destroyed)
-          response
-            .writeHead(HTTP_STATUS.badRequest)
-            .end(
-              JSON.stringify({
-                jsonrpc: '2.0',
-                id: null,
-                error: {
-                  code: REGISTRY_FIXTURE.rpcInvalidRequest,
-                  message: 'Invalid request',
-                },
-              }),
-            );
+          response.writeHead(HTTP_STATUS.badRequest).end(
+            JSON.stringify({
+              jsonrpc: '2.0',
+              id: null,
+              error: {
+                code: REGISTRY_FIXTURE.rpcInvalidRequest,
+                message: 'Invalid request',
+              },
+            }),
+          );
       });
   });
   server.requestTimeout = REGISTRY_FIXTURE.requestMs;
