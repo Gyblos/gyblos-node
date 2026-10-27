@@ -4,7 +4,7 @@ import { mkdir } from 'node:fs/promises';
 
 import { desktopWalletLibraryPaths } from '@gyblos/config/home';
 
-import { createBackupCodec } from './backup/index.js';
+import { BACKUP, createBackupCodec } from './backup/index.js';
 import {
   WALLET,
   WALLET_LIBRARY,
@@ -79,7 +79,7 @@ async function writeActive(
       throw new WalletLibraryError(WALLET_LIBRARY_ERROR.UNAVAILABLE);
     checkLibraryCancellation(signal);
     // Atomic publication is the commit point; a cancellation after it cannot undo selection.
-    await publishSelection(root, ciphertext);
+    await publishSelection(root, ciphertext, signal);
   } finally {
     ciphertext.fill(0);
   }
@@ -147,6 +147,57 @@ async function verifyAddressBackup(
   );
   await wallet.rememberBackup(secret, signal ?? new AbortController().signal);
 }
+function backupSnapshot(file: Uint8Array) {
+  if (
+    !(file instanceof Uint8Array) ||
+    file.byteLength === 0 ||
+    file.byteLength > BACKUP.MAX_FILE_BYTES
+  )
+    throw new WalletLibraryError(WALLET_LIBRARY_ERROR.RECOVERY_REQUIRED);
+  return Buffer.from(file);
+}
+async function importBackup(
+  root: string,
+  store: WalletProtection,
+  file: Uint8Array,
+  password: string,
+  signal?: AbortSignal,
+) {
+  const collection = await entries(root, store);
+  await selected(root, store, collection);
+  const recovered = await createBackupCodec().recover(file, password, signal);
+  if (collection.wallets.has(recovered.address))
+    throw new WalletLibraryError(WALLET_LIBRARY_ERROR.EXISTS);
+  if (collection.wallets.size >= WALLET_LIBRARY.MAX_IDENTITIES)
+    throw new WalletLibraryError(WALLET_LIBRARY_ERROR.RECOVERY_REQUIRED);
+  checkLibraryCancellation(signal);
+  if (!(await libraryExists(root))) {
+    await mkdir(desktopWalletLibraryPaths(root).directory, {
+      mode: WALLET.PRIVATE_DIRECTORY,
+    });
+    await syncWalletDirectory(root);
+    await writeActive(
+      root,
+      store,
+      collection.wallets.get(collection.originalAddress)!,
+      signal,
+    );
+  }
+  const destination = desktopWalletLibraryPaths(
+    root,
+    recovered.address,
+  ).identityRoot;
+  // Reuses authenticated portable recovery and exclusive protected publication.
+  await createWalletRestorer(destination, store).restore(
+    file,
+    password,
+    signal,
+  );
+  const restored = await (await existing(destination, store)).summary();
+  if (restored.address !== recovered.address)
+    throw new WalletLibraryError(WALLET_LIBRARY_ERROR.RECOVERY_REQUIRED);
+  return restored;
+}
 export function createWalletLibrary(
   root: string,
   protection: WalletProtection | null,
@@ -172,44 +223,22 @@ export function createWalletLibrary(
         if (active === address) return;
         await writeActive(root, store, wallet, signal);
       }, signal),
-    restore: (file: Uint8Array, password: string, signal?: AbortSignal) =>
-      run(async (store) => {
-        const collection = await entries(root, store);
-        await selected(root, store, collection);
-        const recovered = await createBackupCodec().recover(
-          file,
-          password,
+    restore: async (
+      file: Uint8Array,
+      password: string,
+      signal?: AbortSignal,
+    ) => {
+      // Own bounded input before any await, including protection checks and locking.
+      const snapshot = backupSnapshot(file);
+      try {
+        return await run(
+          (store) => importBackup(root, store, snapshot, password, signal),
           signal,
         );
-        if (collection.wallets.has(recovered.address))
-          throw new WalletLibraryError(WALLET_LIBRARY_ERROR.EXISTS);
-        if (collection.wallets.size >= WALLET_LIBRARY.MAX_IDENTITIES)
-          throw new WalletLibraryError(WALLET_LIBRARY_ERROR.RECOVERY_REQUIRED);
-        checkLibraryCancellation(signal);
-        if (!(await libraryExists(root))) {
-          await mkdir(desktopWalletLibraryPaths(root).directory, {
-            mode: WALLET.PRIVATE_DIRECTORY,
-          });
-          await syncWalletDirectory(root);
-          await writeActive(
-            root,
-            store,
-            collection.wallets.get(collection.originalAddress)!,
-            signal,
-          );
-        }
-        const destination = desktopWalletLibraryPaths(
-          root,
-          recovered.address,
-        ).identityRoot;
-        // Reuses authenticated portable recovery and exclusive protected publication.
-        await createWalletRestorer(destination, store).restore(
-          file,
-          password,
-          signal,
-        );
-        return (await existing(destination, store)).summary();
-      }, signal),
+      } finally {
+        snapshot.fill(0);
+      }
+    },
     verifyBackup: (
       address: string,
       file: Uint8Array,

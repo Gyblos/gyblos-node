@@ -10,7 +10,10 @@ import {
 import { readBackupFile, writeBackupFile } from './backup-files.js';
 import { WALLET, WALLET_LIBRARY, WALLET_LIBRARY_ERROR } from './constants.js';
 import { checkWalletRoot, isMissing, syncWalletDirectory } from './files.js';
-import { WalletLibraryError } from './library-error.js';
+import {
+  checkLibraryCancellation,
+  WalletLibraryError,
+} from './library-error.js';
 
 export async function libraryExists(root: string) {
   try {
@@ -50,7 +53,11 @@ export async function readSelection(root: string) {
     throw new WalletLibraryError(WALLET_LIBRARY_ERROR.RECOVERY_REQUIRED);
   return readBackupFile(paths.active);
 }
-export async function publishSelection(root: string, bytes: Buffer) {
+export async function publishSelection(
+  root: string,
+  bytes: Buffer,
+  signal?: AbortSignal,
+) {
   const paths = desktopWalletLibraryPaths(root);
   await checkWalletRoot(paths.directory);
   const reserved = await lstat(paths.directory);
@@ -59,6 +66,7 @@ export async function publishSelection(root: string, bytes: Buffer) {
   await checkWalletRoot(paths.directory);
   if (current.dev !== reserved.dev || current.ino !== reserved.ino)
     throw new WalletLibraryError(WALLET_LIBRARY_ERROR.RECOVERY_REQUIRED);
+  checkLibraryCancellation(signal);
   await rename(paths.pending, paths.active);
   await syncWalletDirectory(paths.directory);
 }

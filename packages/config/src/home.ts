@@ -2,6 +2,8 @@
 // the separate lab home and the legacy paths they replace. Pure path computation; never touches files.
 import { join } from 'node:path';
 
+import { CONFIG_PATH_ERROR } from './constants.js';
+
 export const HOME_ENVIRONMENT = {
   product: 'GYBLOS_HOME',
   lab: 'GYBLOS_LAB_HOME',
@@ -159,9 +161,16 @@ export const DESKTOP_WALLET_LIBRARY = {
   ACTIVE: 'active.enc',
   PENDING: 'active.pending',
 } as const;
+export class ConfigPathError extends Error {
+  readonly code = CONFIG_PATH_ERROR.INVALID_WALLET_LIBRARY_ADDRESS;
+  constructor() {
+    super('Invalid wallet library address.');
+    this.name = 'ConfigPathError';
+  }
+}
 export function desktopWalletLibraryPaths(root: string, address?: string) {
   if (address !== undefined && !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address))
-    throw new Error('Invalid wallet library address.');
+    throw new ConfigPathError();
   const directory = join(root, DESKTOP_WALLET_LIBRARY.DIRECTORY);
   return {
     directory,
