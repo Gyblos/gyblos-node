@@ -211,9 +211,18 @@ the startup clock for compatibility with earlier timestamp-based catalogs;
 subsequent persisted values remain monotonic even if that clock moves backward.
 A crash during an update may leave a lock: the node never automatically breaks
 it. Operator inspection/repair is required without resetting the high-water
-mark. There is no hardware anti-rollback anchor: deleting/restoring all local
-state across process restarts is not supported recovery, and Windows power-loss
-durability is not established here.
+mark. Recovery: `pnpm gyblos doctor` reports `SEQUENCE_LOCK_PRESENT`; confirm no
+seller is running with this `GYBLOS_HOME` (the daemon, or a lab harness using
+it; for example `pgrep -fl apps/node/src/main.ts`), then remove only
+`public-sequence-v2.lock` and any `public-sequence-v2.json.*.tmp` left beside it
+in the seller directory. Never edit or delete `public-sequence-v2.json`. Since
+the first signal after startup starts a stop that ignores further Ctrl-C until
+withdrawal and this write finish, a lock is expected only after a crash, a
+forced kill (`kill -9`), power loss, or a Ctrl-C during startup (startup signs
+its first catalog before the stop handler is installed). There is no hardware
+anti-rollback anchor: deleting/restoring all local state across process restarts
+is not supported recovery, and Windows power-loss durability is not established
+here.
 
 Control quotes remain v2-only observations, without reservations or execution.
 The paid v1 offer and HTTP bridge routes are unchanged. Automatic identity

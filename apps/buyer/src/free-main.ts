@@ -1,27 +1,80 @@
 // Owns the free buyer process lifetime. Importing this entry creates no endpoint, timer or files.
-import { isMain, onShutdown } from '@gyblos/runtime';
+import { PORTS } from '@gyblos/config';
+import { isMain, shutdownSignal } from '@gyblos/runtime';
+import type { RelayConfigurationCode } from '@gyblos/transport-iroh/constants';
+import { RelayConfigurationError } from '@gyblos/transport-iroh/relays';
 
-import { FREE_BUYER_CODES } from './constants.js';
-import { startFreeBuyer } from './free-startup.js';
+import {
+  FREE_BUYER_CODES,
+  FREE_BUYER_STARTUP,
+  type FreeBuyerStartupReason,
+} from './constants.js';
+import { FreeBuyerStartupError, startFreeBuyer } from './free-startup.js';
+
+const BUYER_DOCS = 'docs/running-a-node.md "Free v2 buyer endpoint"';
+// Next steps by reason; static text only, never a path from the environment.
+const HINTS: Readonly<Record<FreeBuyerStartupReason, string>> = {
+  [FREE_BUYER_STARTUP.ROLE_MISSING]:
+    'run `pnpm node:setup --role buyer --mint MINT` first',
+  [FREE_BUYER_STARTUP.ROLE_INVALID]:
+    'the buyer role directory or role.json is invalid (owner, mode or content)',
+  [FREE_BUYER_STARTUP.NOT_BUYER]:
+    'the role.json in the buyer directory does not describe a buyer',
+  [FREE_BUYER_STARTUP.SELECTION_MISSING]: `create selection.json in the buyer home (.local/gyblos/buyer by default); see ${BUYER_DOCS}`,
+  [FREE_BUYER_STARTUP.SELECTION_INVALID]: `selection.json is not valid; compare it with ${BUYER_DOCS}`,
+  [FREE_BUYER_STARTUP.STATS_INVALID]:
+    'selection-stats.json in the buyer home is unreadable or invalid',
+  [FREE_BUYER_STARTUP.DISCOVERY_STATE]:
+    'discovery-state-v2.json in the buyer home is unavailable; see docs/discovery.md',
+  [FREE_BUYER_STARTUP.IDENTITY_STATE]:
+    'the buyer identity state or its configuration is unavailable',
+  [FREE_BUYER_STARTUP.MAX_TOKENS]:
+    'request.maxTokens in selection.json must be at most 128',
+  [FREE_BUYER_STARTUP.REASONING]:
+    'request.reasoning must be "off" and lowestReasoning null',
+  [FREE_BUYER_STARTUP.NODE_KEY]:
+    'node.key is missing, unreadable or does not match role.json',
+  [FREE_BUYER_STARTUP.PORT_IN_USE]: `port ${PORTS.buyerProxy} is in use; stop buyer:start or the other process first`,
+  [FREE_BUYER_STARTUP.UNKNOWN]: 'unexpected startup failure',
+};
+const RELAY_HINT =
+  'check GYBLOS_RELAY_TOKEN and GYBLOS_RELAYS (docs/running-a-node.md "Relays")';
+
+export function startupReason(
+  error: unknown,
+): FreeBuyerStartupReason | RelayConfigurationCode {
+  if (error instanceof FreeBuyerStartupError) return error.reason;
+  if (error instanceof RelayConfigurationError) return error.code;
+  return FREE_BUYER_STARTUP.UNKNOWN;
+}
+export function startupMessage(error: unknown) {
+  const reason = startupReason(error);
+  const hint =
+    reason in HINTS ? HINTS[reason as FreeBuyerStartupReason] : RELAY_HINT;
+  return `${FREE_BUYER_CODES.CONFIG} ${reason}: ${hint}`;
+}
 
 export async function main() {
-  const host = await startFreeBuyer();
+  let host: Awaited<ReturnType<typeof startFreeBuyer>>;
   try {
-    await new Promise<void>((resolve) => {
-      const dispose = onShutdown(() => {
-        dispose();
-        resolve();
-      });
-    });
-  } finally {
-    await host.close();
-  }
-}
-if (isMain(import.meta.url)) {
-  try {
-    await main();
-  } catch {
-    console.error(FREE_BUYER_CODES.CONFIG);
+    host = await startFreeBuyer();
+  } catch (error) {
+    console.error(startupMessage(error));
     process.exitCode = 1;
+    return;
+  }
+  const shutdown = shutdownSignal();
+  try {
+    await shutdown.signalled;
+  } finally {
+    try {
+      await host.close();
+    } catch {
+      console.error(FREE_BUYER_CODES.INTERNAL);
+      process.exitCode = 1;
+    } finally {
+      shutdown.dispose();
+    }
   }
 }
+if (isMain(import.meta.url)) await main();
