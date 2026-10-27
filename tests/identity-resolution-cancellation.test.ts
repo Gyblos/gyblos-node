@@ -102,3 +102,34 @@ void test('invalid registry deadlines fail before the RPC provider is called', a
   }
   assert.equal(calls, 0);
 });
+
+void test('elapsed registry deadline rejects a synchronous late genesis before account scans', async () => {
+  const genesis = DEVNET_GENESIS;
+  assert.ok(isBase58(genesis));
+  let scans = 0;
+  const base = createSolanaRpcFromTransport(
+    async () => new Promise<never>(() => {}),
+  );
+  const rpc = {
+    getGenesisHash: () => ({
+      send: async () => {
+        const end = performance.now() + 40;
+        while (performance.now() < end) {
+          /* Synthetic provider blocks timer dispatch. */
+        }
+        return genesis;
+      },
+    }),
+    getProgramAccounts: () => ({
+      send: async () => {
+        scans++;
+        return [];
+      },
+    }),
+    getMultipleAccounts: base.getMultipleAccounts,
+  };
+  const result = await readRegistryIdentity(rpc, NODE, { timeoutMs: 1 });
+  assert.equal(result.kind, K.UNAVAILABLE);
+  if (result.kind === K.UNAVAILABLE) assert.equal(result.reason, F.TIMEOUT);
+  assert.equal(scans, 0);
+});

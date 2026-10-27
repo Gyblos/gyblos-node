@@ -43,6 +43,7 @@ export interface FakeRpcState {
   configs: { method: string; params: unknown[] }[];
   genesisHash: string;
   failingMethods: Set<string>;
+  batchValue?: unknown;
 }
 
 export interface FakeRpc {
@@ -143,7 +144,9 @@ function multipleAccounts(state: FakeRpcState, params: unknown[]) {
   return {
     result: {
       context: { slot: SLOT },
-      value: keys.map((key) => accountJson(state.chain, key)),
+      value: Object.hasOwn(state, 'batchValue')
+        ? state.batchValue
+        : keys.map((key) => accountJson(state.chain, key)),
     },
   };
 }

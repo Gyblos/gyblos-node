@@ -341,3 +341,45 @@ void test('missing registry binding becomes a tombstone that survives explicit m
     await state.close();
   }
 });
+
+void test('malformed RPC account batches are unavailable and cannot create a revocation tombstone', async () => {
+  const state = await fixture();
+  try {
+    const { readRegistryIdentity, IDENTITY_RESOLUTION_SCOPE } =
+      await import('@gyblos/identity/resolution');
+    const { evaluateIdentityPolicy, IDENTITY_POLICY_CODES: C } =
+      await import('@gyblos/core/identity-policy');
+    const input = {
+      nodeId: state.nodeId,
+      owner: state.owner,
+      scope: IDENTITY_RESOLUTION_SCOPE,
+    };
+    const accepted = evaluateIdentityPolicy({
+      ...input,
+      lookup: await readRegistryIdentity(state.rpc, state.nodeId),
+    });
+    assert.equal(accepted.ok, true);
+    for (const batchValue of [
+      [],
+      [null],
+      [null, null, null, null],
+      [{ owner: PROGRAMS.registry, data: ['', 'base58'] }, null, null],
+      [{ owner: PROGRAMS.registry, data: ['!!!', 'base64'] }, null, null],
+    ]) {
+      state.state.batchValue = batchValue;
+      const lookup = await readRegistryIdentity(state.rpc, state.nodeId);
+      assert.equal(lookup.kind, K.UNAVAILABLE);
+      const denied = evaluateIdentityPolicy({
+        ...input,
+        previous: accepted.state,
+        lookup,
+      });
+      assert.equal(denied.ok, false);
+      if (!denied.ok) assert.equal(denied.code, C.UNAVAILABLE);
+      assert.deepEqual(denied.state, accepted.state);
+      assert.equal(denied.state?.revoked, false);
+    }
+  } finally {
+    await state.close();
+  }
+});
