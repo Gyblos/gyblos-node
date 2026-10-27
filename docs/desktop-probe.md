@@ -65,13 +65,15 @@ summary retains `fundingEnabled: false`, including after verification.
 Library paths are owned by config. A private directory lock serializes
 instances; a remaining lock is reported busy, never stolen. Failed encrypted
 writes and incomplete destinations remain for inspection, never automatically
-replaced or deleted. Missing/corrupt selection metadata after library creation
-fails closed rather than selecting another identity. Selection publication by
-atomic rename is the commit point; cancellation after publication cannot roll it
-back. Normal restart is covered; Windows directory fsync and sudden-power-loss
-recovery are not guaranteed. No payment state, transfer, balance query, deletion
-or export API is added. Loader-only startup and Settings integration are
-separate work.
+replaced or deleted. Missing/corrupt selection metadata while the library
+directory remains present fails closed rather than selecting another identity.
+Deleting or rolling back the entire library is not detected; absence is treated
+as a legacy-only installation. Selection publication by atomic rename is the
+commit point; cancellation after publication cannot roll it back. Fresh service
+instances reload selection from disk; process-crash recovery, Windows directory
+fsync and sudden-power-loss recovery are not established. No payment state,
+transfer, balance query, deletion or export API is added. Loader-only startup
+and Settings integration are separate work.
 
 ## Protected local wallet
 
