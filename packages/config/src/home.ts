@@ -40,6 +40,8 @@ export const ROLE_FILES = {
   reconciliations: 'reconciliations.json',
   calls: 'calls.json',
   offer: 'offer.json',
+  identityState: 'identity-state-8004.json',
+  identityStateLock: 'identity-state-8004.lock',
   publicSequence: 'public-sequence-v2.json',
   publicSequenceLock: 'public-sequence-v2.lock',
   facilitatorDiagnostics: 'facilitator-diagnostics',

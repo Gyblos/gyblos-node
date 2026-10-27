@@ -140,10 +140,12 @@ of a signed offer. Unsigned modified payment variants in the fixture were never
 executed on-chain. See [tests/README.md](../tests/README.md).
 
 HTTP discovery is opt-in and limited to independently configured owner–NodeId
-bindings. It does not prove registration, enroll unknown sellers, provide DHT
-discovery or establish live-index production availability. Replay state and
-withdrawal barriers persist; a retained lock or unsafe/corrupt state fails
-closed. Payment execution remains the compatible trusted v1 flow.
+bindings. Opt-in read-only 8004 admission verifies expected bindings
+independently and persists scoped high-water/tombstone state, with explicit
+manual overrides. It does not enroll unknown sellers, provide DHT discovery or
+establish live-index production availability. Replay state and withdrawal
+barriers persist; a retained lock or unsafe/corrupt state fails closed. Payment
+execution remains the compatible trusted v1 flow.
 
 Seller discovery publication is opt-in and locally tested. It uses one durable
 public-v2 sequence allocator shared with control Iroh; it does not establish a

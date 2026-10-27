@@ -23,6 +23,7 @@ export const NODE_ERROR_CODES = {
   INVALID_SIGNED_OFFER: 'INVALID_SIGNED_OFFER',
   LEGACY_LOCAL_LAYOUT: 'LEGACY_LOCAL_LAYOUT',
   PUBLIC_SEQUENCE_UNAVAILABLE: 'PUBLIC_SEQUENCE_UNAVAILABLE',
+  IDENTITY_STATE_UNAVAILABLE: 'IDENTITY_STATE_UNAVAILABLE',
   DISCOVERY_PUBLISH_FAILED: 'DISCOVERY_PUBLISH_FAILED',
   INVALID_PRICE: 'INVALID_PRICE',
   // gyblos.toml at seller startup; `pnpm gyblos config validate` explains file problems.
@@ -244,4 +245,11 @@ export const NODE_CONFIG_FLAGS = {
   buyerRelayOnly: '--buyer-relay-only',
   discoveryPublish: '--discovery-publish',
   discoveryUrl: '--discovery-url',
+} as const;
+
+// Durable identity floors are never evicted; full stores fail closed.
+export const IDENTITY_STATE = {
+  schemaVersion: 1,
+  maxRows: 1024,
+  maxBytes: 1024 * 1024,
 } as const;

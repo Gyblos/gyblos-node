@@ -29,6 +29,7 @@ interface Decision {
   digest: string;
   expiresAt: number;
   authorized: boolean;
+  identity: { owner: string; nodeId: string };
 }
 export function createProxySelection(
   quote: (
@@ -38,6 +39,10 @@ export function createProxySelection(
   >,
   maxTokens: number,
   now: () => number = Date.now,
+  verifyIdentity?: (
+    identity: { owner: string; nodeId: string },
+    signal: AbortSignal,
+  ) => Promise<boolean>,
 ): ProxySelection {
   const decisions = new Map<string, Decision>();
   let uncertain = false;
@@ -70,7 +75,10 @@ export function createProxySelection(
           uncertain = true;
           return { ok: false, code: BUYER_SELECTION_CODES.RECONCILE };
         }
-        prior.authorized = true;
+        if (!(await authorizeIdentity(prior, signal, now, verifyIdentity))) {
+          uncertain = true;
+          return { ok: false, code: BUYER_SELECTION_CODES.RECONCILE };
+        }
         return { ok: true };
       }
       if (prior && prior.digest !== digest)
@@ -92,8 +100,33 @@ export function createProxySelection(
         digest,
         expiresAt: result.winner.quote.offer.expiresAt,
         authorized: false,
+        identity: {
+          owner: result.winner.candidate.owner,
+          nodeId: result.winner.candidate.nodeId,
+        },
       });
       return { ok: true };
     },
   };
+}
+
+async function authorizeIdentity(
+  prior: Decision,
+  signal: AbortSignal,
+  now: () => number,
+  verifyIdentity?: (
+    identity: Decision['identity'],
+    signal: AbortSignal,
+  ) => Promise<boolean>,
+) {
+  prior.authorized = true;
+  try {
+    return (
+      (!verifyIdentity || (await verifyIdentity(prior.identity, signal))) &&
+      !signal.aborted &&
+      prior.expiresAt > now()
+    );
+  } catch {
+    return false;
+  }
 }

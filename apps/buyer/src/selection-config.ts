@@ -35,6 +35,10 @@ import {
   parseBuyerDiscoveryConfig,
   type BuyerDiscoveryConfig,
 } from './discovery-config.js';
+import {
+  parseBuyerIdentityConfig,
+  type BuyerIdentityConfig,
+} from './identity-config.js';
 
 export class BuyerSelectionError extends Error {
   constructor(
@@ -50,12 +54,14 @@ export interface StaticControlSeller {
   relayUrl: string | null;
   directAddresses: string[];
   withdrawal?: SignedPublicV2;
+  manualTrust?: boolean;
 }
 export interface BuyerSelectionConfig {
   request: SellerRequest;
   sellers: StaticControlSeller[];
   pinnedNodeId?: string;
   discovery?: BuyerDiscoveryConfig;
+  identity?: BuyerIdentityConfig;
 }
 function parseRequest(value: unknown): SellerRequest {
   const row = controlObject(value, [
@@ -110,6 +116,44 @@ function parseRequest(value: unknown): SellerRequest {
     retention,
   };
 }
+function parseStaticSeller(value: unknown): StaticControlSeller {
+  const seller = optionalObject(
+    value,
+    ['owner', 'nodeId', 'relayUrl', 'directAddresses'],
+    ['withdrawal', 'manualTrust'],
+  );
+  const result: StaticControlSeller = {
+    owner: controlAddress(seller.owner),
+    nodeId: controlHex(seller.nodeId),
+    relayUrl:
+      seller.relayUrl === null
+        ? null
+        : controlText(seller.relayUrl, BUYER_SELECTION.endpointCharacters),
+    directAddresses: controlArray(
+      seller.directAddresses,
+      BUYER_SELECTION.directAddresses,
+    ).map((value) =>
+      controlText(value, BUYER_SELECTION.directAddressCharacters),
+    ),
+  };
+  if (seller.manualTrust !== undefined) {
+    if (typeof seller.manualTrust !== 'boolean')
+      throw new BuyerSelectionError(BUYER_SELECTION_CODES.INVALID);
+    result.manualTrust = seller.manualTrust;
+  }
+  // Full signature, shape and exact-catalog validation is done before selection, not here.
+  if (seller.withdrawal !== undefined) {
+    const signed = controlObject(seller.withdrawal, ['record', 'signature']);
+    result.withdrawal = {
+      record: parseWithdrawal(signed.record),
+      signature: controlText(
+        signed.signature,
+        BUYER_SELECTION.signatureHexCharacters,
+      ),
+    };
+  }
+  return result;
+}
 export function parseBuyerSelectionConfig(
   value: unknown,
 ): BuyerSelectionConfig {
@@ -117,7 +161,7 @@ export function parseBuyerSelectionConfig(
     const row = optionalObject(
       value,
       ['request', 'sellers'],
-      ['pinnedNodeId', 'discovery'],
+      ['pinnedNodeId', 'discovery', 'identity'],
     );
     const request = parseRequest(row.request);
     const validation = selectSellers({
@@ -130,45 +174,7 @@ export function parseBuyerSelectionConfig(
     if (!validation.ok && validation.code === SELLER_SELECTION_CODES.INVALID)
       throw new BuyerSelectionError(BUYER_SELECTION_CODES.INVALID);
     const sellers = controlArray(row.sellers, BUYER_SELECTION.maxSellers).map(
-      (value) => {
-        const seller = optionalObject(
-          value,
-          ['owner', 'nodeId', 'relayUrl', 'directAddresses'],
-          ['withdrawal'],
-        );
-        const result: StaticControlSeller = {
-          owner: controlAddress(seller.owner),
-          nodeId: controlHex(seller.nodeId),
-          relayUrl:
-            seller.relayUrl === null
-              ? null
-              : controlText(
-                  seller.relayUrl,
-                  BUYER_SELECTION.endpointCharacters,
-                ),
-          directAddresses: controlArray(
-            seller.directAddresses,
-            BUYER_SELECTION.directAddresses,
-          ).map((value) =>
-            controlText(value, BUYER_SELECTION.directAddressCharacters),
-          ),
-        };
-        // Full signature, shape and exact-catalog validation is done before selection, not here.
-        if (seller.withdrawal !== undefined) {
-          const signed = controlObject(seller.withdrawal, [
-            'record',
-            'signature',
-          ]);
-          result.withdrawal = {
-            record: parseWithdrawal(signed.record),
-            signature: controlText(
-              signed.signature,
-              BUYER_SELECTION.signatureHexCharacters,
-            ),
-          };
-        }
-        return result;
-      },
+      parseStaticSeller,
     );
     if (
       !sellers.length ||
@@ -178,6 +184,9 @@ export function parseBuyerSelectionConfig(
     return {
       request,
       sellers,
+      ...(row.identity === undefined
+        ? {}
+        : { identity: parseBuyerIdentityConfig(row.identity) }),
       ...(row.discovery === undefined
         ? {}
         : { discovery: parseBuyerDiscoveryConfig(row.discovery) }),

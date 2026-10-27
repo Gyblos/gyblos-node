@@ -157,5 +157,8 @@ capacity, rate, timeout and port values stay in `config` (`TRANSPORT_LIMITS`,
 `@gyblos/identity/resolution` owns pinned, bounded read-only 8004 account
 resolution. `@gyblos/core/identity-policy` owns manual precedence and scoped
 binding high-water/tombstone decisions without SDKs or I/O. Callers must retain
-returned state even on denial; persistence and buyer/discovery wiring are
-separate. See [identity](identity.md#read-only-resolution-and-trust-policy).
+returned state even on denial. Node `identity-state*` owns durable scoped buyer
+metadata; `identity-verifier` composes independent registry reads with it.
+Opt-in buyer selection/discovery admission uses these APIs while explicit manual
+trust remains available. See
+[identity](identity.md#read-only-resolution-and-trust-policy).

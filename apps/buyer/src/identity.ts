@@ -1,0 +1,57 @@
+// Composes opt-in identity verification for buyer admission; discovery and seller claims supply no trust.
+// Storage faults abort the whole request, while normal registry refusals only exclude that identity.
+import { createSolanaRpc } from '@solana/kit';
+
+import { DEVNET } from '@gyblos/config';
+import type { HomeEnvironment } from '@gyblos/config/home';
+import { NODE_ERROR_CODES } from '@gyblos/node/constants';
+import { NodeError } from '@gyblos/node/errors';
+import {
+  openBuyerIdentityVerifier,
+  type BuyerIdentityVerifier,
+} from '@gyblos/node/identity-verifier';
+
+import { BUYER_SELECTION_CODES } from './constants.js';
+import {
+  BuyerSelectionError,
+  type BuyerSelectionConfig,
+  type StaticControlSeller,
+} from './selection-config.js';
+
+export async function prepareBuyerIdentity(
+  environment: HomeEnvironment,
+  config: BuyerSelectionConfig,
+) {
+  if (!config.identity) return undefined;
+  if (config.request.network !== DEVNET)
+    throw new BuyerSelectionError(BUYER_SELECTION_CODES.IDENTITY);
+  return openBuyerIdentityVerifier(
+    environment,
+    createSolanaRpc(config.identity.rpcUrl),
+  );
+}
+export async function verifyBuyerIdentity(
+  verifier: BuyerIdentityVerifier | undefined,
+  seller: StaticControlSeller,
+  signal?: AbortSignal,
+) {
+  if (!verifier) return true;
+  try {
+    return (await verifier.verify(seller, signal)).ok;
+  } catch (error) {
+    if (
+      error instanceof NodeError &&
+      error.code === NODE_ERROR_CODES.IDENTITY_STATE_UNAVAILABLE
+    )
+      throw new BuyerSelectionError(BUYER_SELECTION_CODES.IDENTITY_STATE);
+    throw error;
+  }
+}
+
+export function requireBuyerIdentity(
+  config: BuyerSelectionConfig,
+  verifier: BuyerIdentityVerifier | undefined,
+) {
+  if (config.identity && !verifier)
+    throw new BuyerSelectionError(BUYER_SELECTION_CODES.IDENTITY);
+}
