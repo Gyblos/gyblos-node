@@ -14,7 +14,7 @@ import { executeBuyerFree } from './free-execution.js';
 import { startFreeBuyerHttp } from './free-http.js';
 import { freeBuyerDependencies } from './free-selection.js';
 import { loadBuyerSelectionConfig } from './selection-config.js';
-import { prepareBuyerSelection } from './selection-runtime.js';
+import { prepareConfiguredBuyerSelection } from './selection-runtime.js';
 
 // A startup refusal with a static reason; it never carries paths or file contents.
 export class FreeBuyerStartupError extends Error {
@@ -62,14 +62,11 @@ function stateReason(error: unknown): FreeBuyerStartupReason {
   return FREE_BUYER_STARTUP.UNKNOWN;
 }
 async function buyerSelection() {
-  (await selectionConfig()) ?? refuse(FREE_BUYER_STARTUP.SELECTION_MISSING);
+  const config =
+    (await selectionConfig()) ?? refuse(FREE_BUYER_STARTUP.SELECTION_MISSING);
   try {
-    return (
-      (await prepareBuyerSelection(process.env)) ??
-      refuse(FREE_BUYER_STARTUP.SELECTION_MISSING)
-    );
+    return await prepareConfiguredBuyerSelection(process.env, config);
   } catch (error) {
-    if (error instanceof FreeBuyerStartupError) throw error;
     return refuse(stateReason(error));
   }
 }

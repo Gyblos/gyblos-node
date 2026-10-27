@@ -2,7 +2,9 @@
 // on selection.json. In-process against a disposable home with a fake endpoint; no network or relay.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { promises as fs } from 'node:fs';
 import { mkdtemp, readFile, rm, unlink, writeFile } from 'node:fs/promises';
+import { syncBuiltinESMExports } from 'node:module';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -175,6 +177,83 @@ void test('buyer:free names state, role, key, reasoning and port failures separa
   } finally {
     occupied.close();
     delete process.env.GYBLOS_HOME;
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
+void test('free startup uses one validated selection snapshot if the file changes during startup', async (context) => {
+  const home = await mkdtemp(join(tmpdir(), 'gyblos-free-snapshot-'));
+  const previousHome = process.env.GYBLOS_HOME;
+  const previousLab = process.env.GYBLOS_LAB_HOME;
+  process.env.GYBLOS_HOME = join(home, 'product');
+  process.env.GYBLOS_LAB_HOME = join(home, 'lab');
+  let host:
+    | Awaited<
+        ReturnType<typeof import('@gyblos/buyer/free-startup').startFreeBuyer>
+      >
+    | undefined;
+  try {
+    const setup = spawnSync(
+      process.execPath,
+      [
+        '--import',
+        'tsx',
+        'apps/node/src/setup.ts',
+        '--role',
+        'buyer',
+        '--mint',
+        MINT,
+      ],
+      {
+        cwd: REPOSITORY_ROOT,
+        encoding: 'utf8',
+        env: {
+          PATH: process.env.PATH,
+          TMPDIR: process.env.TMPDIR,
+          GYBLOS_HOME: process.env.GYBLOS_HOME,
+          GYBLOS_LAB_HOME: process.env.GYBLOS_LAB_HOME,
+        },
+      },
+    );
+    assert.equal(setup.status, 0, setup.stderr);
+    const buyer = join(process.env.GYBLOS_HOME, 'buyer');
+    const role: unknown = JSON.parse(
+      await readFile(join(buyer, 'role.json'), 'utf8'),
+    );
+    assert.ok(
+      role &&
+        typeof role === 'object' &&
+        'nodeId' in role &&
+        typeof role.nodeId === 'string',
+    );
+    const selection = join(buyer, 'selection.json');
+    await writeFile(selection, JSON.stringify(SELECTION), { mode: 0o600 });
+    const original = fs.readFile;
+    let reads = 0;
+    context.mock.method(
+      fs,
+      'readFile',
+      async (...args: Parameters<typeof readFile>) => {
+        const result = await original(...args);
+        if (String(args[0]) === selection) {
+          reads++;
+          if (reads === 1) await writeFile(selection, '{');
+        }
+        return result;
+      },
+    );
+    syncBuiltinESMExports();
+    const { startFreeBuyer } = await import('@gyblos/buyer/free-startup');
+    host = await startFreeBuyer({ bind: fakeBind(role.nodeId), port: 0 });
+    assert.equal(reads, 1);
+  } finally {
+    context.mock.restoreAll();
+    syncBuiltinESMExports();
+    await host?.close();
+    if (previousHome === undefined) delete process.env.GYBLOS_HOME;
+    else process.env.GYBLOS_HOME = previousHome;
+    if (previousLab === undefined) delete process.env.GYBLOS_LAB_HOME;
+    else process.env.GYBLOS_LAB_HOME = previousLab;
     await rm(home, { recursive: true, force: true });
   }
 });
