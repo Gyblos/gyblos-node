@@ -1,10 +1,14 @@
 // Per-peer and global request quotas per window; consumed quota survives reconnects and eviction.
 import { TRANSPORT_LIMITS } from '@gyblos/config';
 
+import { CONNECTION_FAMILIES, type ConnectionFamily } from './constants.js';
+
 interface PeerWindow {
   active: number;
   leases: number;
   reserved: number;
+  // Leases by connection family; `leases` stays the total the quota logic uses.
+  families: Map<ConnectionFamily, number>;
 }
 
 export function createPeerLimiter(now: () => number = Date.now) {
@@ -55,7 +59,7 @@ export function createPeerLimiter(now: () => number = Date.now) {
         // Eviction returns only unused quota; consumed debt has separate storage.
         windows.delete(oldest[0]);
       }
-      window = { active: 0, leases: 0, reserved: 0 };
+      window = { active: 0, leases: 0, reserved: 0, families: new Map() };
     }
     windows.delete(nodeId);
     windows.set(nodeId, window);
@@ -72,13 +76,16 @@ export function createPeerLimiter(now: () => number = Date.now) {
   }
 
   return {
-    register(nodeId: string) {
+    register(
+      nodeId: string,
+      family: ConnectionFamily = CONNECTION_FAMILIES.DATA,
+    ) {
       refresh();
       const requests = requestCounts.get(nodeId) ?? 0;
       if (
         requests >= TRANSPORT_LIMITS.requestsPerWindow ||
         globalRequests >= TRANSPORT_LIMITS.globalRequestsPerWindow ||
-        (windows.get(nodeId)?.leases ?? 0) >=
+        (windows.get(nodeId)?.families.get(family) ?? 0) >=
           TRANSPORT_LIMITS.maxPeerConnections
       )
         return undefined;
@@ -90,12 +97,16 @@ export function createPeerLimiter(now: () => number = Date.now) {
       const additional = Math.min(needed, remaining());
       if (window.reserved + additional <= 0) return undefined;
       window.leases++;
+      window.families.set(family, (window.families.get(family) ?? 0) + 1);
       window.reserved += additional;
       let released = false;
       return () => {
         if (released) return;
         released = true;
         window.leases--;
+        const remaining = (window.families.get(family) ?? 1) - 1;
+        if (remaining === 0) window.families.delete(family);
+        else window.families.set(family, remaining);
         // Disconnected, inactive grace can be reclaimed by another admission.
         if (
           window.leases === 0 &&

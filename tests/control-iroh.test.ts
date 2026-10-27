@@ -55,7 +55,7 @@ void test(
   },
 );
 void test(
-  'native HTTP and control connections share endpoint NodeId admission before ALPN budgets',
+  'native NodeId admission allows one control and one data connection; a second data connection is refused',
   { skip: NATIVE_CAPABILITY.transportSkip },
   async () => {
     const run = await fixture();
@@ -67,7 +67,12 @@ void test(
       await http.openBi().then(async (stream) => {
         await stream.send.writeAll([0]);
       });
-      await assert.rejects(within(run.client.getCatalog()));
+      // A held data connection no longer blocks the same peer's control connection.
+      await within(run.client.getCatalog());
+      const second = await within(
+        run.buyer.connect(run.seller.addr(), [...Buffer.from(GYBLOS_ALPN)]),
+      );
+      await within(second.closed());
       http.close(1n, []);
     } finally {
       await run.close();

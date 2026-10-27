@@ -97,9 +97,9 @@ Details: [inference.md](inference.md).
 
 The seller limits work per Iroh identity, but identities are free to create.
 
-- Limits: one connection and one active request per NodeId, two active requests
-  globally, eight pending handshakes (two per source address), and 30 requests
-  per NodeId within a shared 256-request minute.
+- Limits: one control and one data connection and one active request per NodeId,
+  two active requests globally, eight pending handshakes (two per source
+  address), and 30 requests per NodeId within a shared 256-request minute.
 - Free challenges and failed requests count. About nine identities sending 30
   free requests each can deny new peers for the rest of the minute. No payment
   is needed for that; there is no Sybil resistance or availability guarantee.

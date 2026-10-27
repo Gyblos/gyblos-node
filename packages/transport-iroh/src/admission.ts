@@ -5,8 +5,16 @@ import { isIP } from 'node:net';
 import type { IncomingAddr } from '@number0/iroh';
 
 import { TRANSPORT_LIMITS } from '@gyblos/config';
+import { CONTROL_ALPN } from '@gyblos/protocol/constants';
 
 import { createConnectionRate } from './connection-rate.js';
+import { CONNECTION_FAMILIES, type ConnectionFamily } from './constants.js';
+
+export function connectionFamily(alpn: string): ConnectionFamily {
+  return alpn === CONTROL_ALPN
+    ? CONNECTION_FAMILIES.CONTROL
+    : CONNECTION_FAMILIES.DATA;
+}
 
 export function connectionSource(source: IncomingAddr): string | undefined {
   if (source.kind === 'relay' && source.endpointId)
@@ -59,23 +67,28 @@ export function createConnectionAdmission(
         else sources.set(source, remaining);
       };
     },
-    established(peer: string) {
+    // The connection-rate budget and the global pool are per peer and shared; only the cap is per family.
+    established(
+      peer: string,
+      family: ConnectionFamily = CONNECTION_FAMILIES.DATA,
+    ) {
       if (!rate.peer(peer)) return undefined;
+      const key = `${family}:${peer}`;
       if (
         established >= TRANSPORT_LIMITS.maxConnections ||
-        (peers.get(peer) ?? 0) >= TRANSPORT_LIMITS.maxPeerConnections
+        (peers.get(key) ?? 0) >= TRANSPORT_LIMITS.maxPeerConnections
       )
         return undefined;
       established++;
-      peers.set(peer, (peers.get(peer) ?? 0) + 1);
+      peers.set(key, (peers.get(key) ?? 0) + 1);
       let released = false;
       return () => {
         if (released) return;
         released = true;
         established--;
-        const remaining = (peers.get(peer) ?? 1) - 1;
-        if (remaining === 0) peers.delete(peer);
-        else peers.set(peer, remaining);
+        const remaining = (peers.get(key) ?? 1) - 1;
+        if (remaining === 0) peers.delete(key);
+        else peers.set(key, remaining);
       };
     },
   };

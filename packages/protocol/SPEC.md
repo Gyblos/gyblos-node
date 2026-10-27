@@ -531,8 +531,11 @@ The free-configured seller starts neither the facilitator nor the paid HTTP
 service, does not check the devnet payment program or load the auxiliary
 payment signers, and writes no legacy v1 offer. Paid-configured startup keeps
 the existing v1 service. The free branch advertises only control and free
-ALPNs. Transport still allows only one connection per authenticated peer, so
-the buyer must close its control connection before dialing the data channel.
+ALPNs. Transport allows one control connection and one data connection per
+authenticated peer at a time (the global connection pool and the per-peer
+request quota stay shared). The buyer still closes its control connection
+before dialing the data channel; the separate data allowance covers the moment
+when the seller, over a relay, has not yet observed that close.
 
 Synthetic service tests, bounded-stream tests and native loopback execution
 cover this seller slice. No real engine, devnet, deployed index, production

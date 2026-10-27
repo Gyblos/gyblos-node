@@ -14,7 +14,11 @@ import {
   GYBLOS_ALPN,
 } from '@gyblos/protocol/constants';
 
-import { connectionSource, createConnectionAdmission } from './admission.js';
+import {
+  connectionFamily,
+  connectionSource,
+  createConnectionAdmission,
+} from './admission.js';
 import {
   HTTP_OVER_IROH,
   IROH_DEADLINES,
@@ -135,8 +139,11 @@ export function serveIroh(
 
   async function handle(connection: Connection) {
     const peer = connection.remoteId().toString();
-    const releasePeer = admission.established(peer);
-    const releaseQuota = releasePeer ? limiter.register(peer) : undefined;
+    const family = connectionFamily(Buffer.from(connection.alpn()).toString());
+    const releasePeer = admission.established(peer, family);
+    const releaseQuota = releasePeer
+      ? limiter.register(peer, family)
+      : undefined;
     if (!releasePeer || !releaseQuota) {
       releasePeer?.();
       connection.close(streamCloseCode, []);
