@@ -45,6 +45,7 @@ export interface FakeRpcState {
   failingMethods: Set<string>;
   batchValue?: unknown;
   programValue?: unknown;
+  responsePadding: Map<string, number>;
 }
 
 export interface FakeRpc {
@@ -234,7 +235,7 @@ function serve(state: FakeRpcState): Server {
             jsonrpc: '2.0',
             id: call.id,
             ...respond(state, call),
-          }),
+          }) + ' '.repeat(state.responsePadding.get(call.method) ?? 0),
         );
       })
       .catch((error: unknown) => {
@@ -256,6 +257,7 @@ export async function startFakeRpc(
     configs: [],
     genesisHash: DEVNET_GENESIS,
     failingMethods: new Set(),
+    responsePadding: new Map(),
   };
   const server = serve(state);
   server.listen(0, LOCALHOST);

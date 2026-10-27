@@ -50,6 +50,8 @@ function envelope(text: string, id: string): unknown {
     Object.hasOwn(value, 'result') === Object.hasOwn(value, 'error')
   )
     return identityRpcFail(IDENTITY_ERROR_CODES.RPC_RESPONSE_INVALID);
+  if (Object.hasOwn(value, 'error'))
+    return identityRpcFail(IDENTITY_ERROR_CODES.RPC_TRANSPORT_FAILED);
   return value;
 }
 export function createIdentityResolutionRpc(

@@ -155,7 +155,9 @@ capacity, rate, timeout and port values stay in `config` (`TRANSPORT_LIMITS`,
 ### Identity reading policy
 
 `@gyblos/identity/resolution` owns pinned, bounded read-only 8004 account
-resolution. `@gyblos/core/identity-policy` owns manual precedence and scoped
+resolution. Its `resolution-rpc` entry owns the default buyer's
+decoded-byte-limited read-only HTTP transport; SDK parsing occurs only after the
+response limit. `@gyblos/core/identity-policy` owns manual precedence and scoped
 binding high-water/tombstone decisions without SDKs or I/O. Callers must retain
 returned state even on denial. Node `identity-state*` owns durable scoped buyer
 metadata; `identity-verifier` composes independent registry reads with it.

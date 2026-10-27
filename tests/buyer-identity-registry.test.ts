@@ -1,7 +1,7 @@
 // Runs configured buyer discovery/selection against a synthetic loopback registry and control seller.
 // State lives in canonical temporary homes; no real registry, private content or payments.
 import assert from 'node:assert/strict';
-import { realpath, writeFile } from 'node:fs/promises';
+import { readFile, realpath, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import test from 'node:test';
 
@@ -24,6 +24,8 @@ import {
   IDENTITY_POLICY_CODES,
   IDENTITY_TRUST_SOURCES,
 } from '@gyblos/core/identity-policy';
+import { IDENTITY_RPC_LIMITS } from '@gyblos/identity/constants';
+import { readRegistryIdentity } from '@gyblos/identity/resolution';
 import { openBuyerIdentityVerifier } from '@gyblos/node/identity-verifier';
 
 import {
@@ -206,6 +208,37 @@ void test('configured identity trust rejects a request network outside the pinne
       { code: BUYER_SELECTION_CODES.IDENTITY },
     );
     assert.equal(source.rpc.state.calls.length, 0);
+  } finally {
+    await source.close();
+  }
+});
+
+void test('oversized RPC cannot become missing identity or erase a persisted buyer binding', async () => {
+  const source = await fixture();
+  try {
+    const prepared = await prepareBuyerSelection(source.environment);
+    assert.ok(prepared?.identity);
+    const subject = source.config.sellers[0]!;
+    assert.equal((await prepared.identity.verify(subject)).ok, true);
+    const path = join(
+      homeLayout(source.environment).roles.buyer,
+      ROLE_FILES.identityState,
+    );
+    const before = await readFile(path, 'utf8');
+    source.rpc.state.programValue = [];
+    source.rpc.state.responsePadding.set(
+      'getProgramAccounts',
+      IDENTITY_RPC_LIMITS.maxResponseBytes + 1,
+    );
+    // The old standard SDK buffers and accepts this valid, padded JSON as absence.
+    const legacy = await readRegistryIdentity(source.rpc.rpc, subject.nodeId);
+    assert.equal(legacy.kind, IDENTITY_LOOKUP_KINDS.MISSING);
+    const result = await prepared.identity.verify(subject);
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.code, IDENTITY_POLICY_CODES.LIMIT);
+    assert.equal(result.state?.revoked, false);
+    assert.equal(result.state?.binding.sequence, 9007199254740993n);
+    assert.equal(await readFile(path, 'utf8'), before);
   } finally {
     await source.close();
   }

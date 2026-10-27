@@ -7,9 +7,9 @@ import type { IdentityRpcConfig } from './resolution-rpc-options.js';
 function discard(response: Response) {
   response.body?.cancel().catch(() => {});
 }
-function abortPromise(signal: AbortSignal) {
+async function abortable<T>(operation: () => Promise<T>, signal: AbortSignal) {
   let abort = () => {};
-  const promise = new Promise<never>((_resolve, reject) => {
+  const interrupted = new Promise<never>((_resolve, reject) => {
     abort = () =>
       reject(
         new IdentityError(
@@ -20,10 +20,16 @@ function abortPromise(signal: AbortSignal) {
     signal.addEventListener('abort', abort, { once: true });
     if (signal.aborted) abort();
   });
-  // A synchronous failure before the first race must not leave an unobserved rejection.
-  promise.catch(() => {});
-  return { promise, close: () => signal.removeEventListener('abort', abort) };
+  interrupted.catch(() => {});
+  try {
+    if (signal.aborted)
+      return identityRpcFail(IDENTITY_ERROR_CODES.RPC_CANCELLED);
+    return await Promise.race([operation(), interrupted]);
+  } finally {
+    signal.removeEventListener('abort', abort);
+  }
 }
+
 function active(signal: AbortSignal, deadline: number) {
   if (signal.aborted)
     return identityRpcFail(IDENTITY_ERROR_CODES.RPC_CANCELLED);
@@ -62,7 +68,6 @@ async function read(
   config: IdentityRpcConfig,
   signal: AbortSignal,
   deadline: number,
-  aborted: Promise<never>,
 ) {
   const declared = response.headers.get('content-length');
   if (declared !== null && Number(declared) > config.maxResponseBytes) {
@@ -77,7 +82,7 @@ async function read(
   let size = 0;
   try {
     for (;;) {
-      const chunk = await Promise.race([reader.read(), aborted]);
+      const chunk = await abortable(() => reader.read(), signal);
       active(signal, deadline);
       if (chunk.done) break;
       if (chunk.value.byteLength > config.maxResponseBytes - size)
@@ -114,21 +119,12 @@ export async function readIdentityRpcResponse(
     timeout,
     ...(external ? [external] : []),
   ]);
-  const aborted = abortPromise(signal);
+  let response: Response | undefined;
   try {
     active(signal, deadline);
-    const response = await Promise.race([
-      send(config, body, signal),
-      aborted.promise,
-    ]);
+    response = await abortable(() => send(config, body, signal), signal);
     active(signal, deadline);
-    const text = await read(
-      response,
-      config,
-      signal,
-      deadline,
-      aborted.promise,
-    );
+    const text = await read(response, config, signal, deadline);
     active(signal, deadline);
     const value = parse(text);
     active(signal, deadline);
@@ -141,7 +137,7 @@ export async function readIdentityRpcResponse(
     if (error instanceof IdentityError) throw error;
     return identityRpcFail(IDENTITY_ERROR_CODES.RPC_TRANSPORT_FAILED);
   } finally {
-    aborted.close();
     lifetime.abort();
+    if (response) discard(response);
   }
 }

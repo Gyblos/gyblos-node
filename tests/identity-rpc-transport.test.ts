@@ -261,11 +261,74 @@ void test('invalid RPC URL and limit configuration fail before any fetch', async
 void test('an elapsed RPC deadline discards an already returned unread body when timer dispatch was blocked', async () => {
   const { createIdentityResolutionRpc } = await factory();
   let cancelled = 0;
-  const rpc = createIdentityResolutionRpc(URL, { timeoutMs: 20, fetch: async () => {
-    const end = performance.now() + 40;
-    while (performance.now() < end) { /* Synthetic blocked timer dispatch. */ }
-    return new Response(new ReadableStream<Uint8Array>({ cancel() { cancelled++; } }), { headers });
-  } });
-  await assert.rejects(rpc.getGenesisHash().send(), { code: 'IDENTITY_READ_TIMEOUT' });
+  const rpc = createIdentityResolutionRpc(URL, {
+    timeoutMs: 20,
+    fetch: async () => {
+      const end = performance.now() + 40;
+      while (performance.now() < end) {
+        /* Synthetic blocked timer dispatch. */
+      }
+      return new Response(
+        new ReadableStream<Uint8Array>({
+          cancel() {
+            cancelled++;
+          },
+        }),
+        { headers },
+      );
+    },
+  });
+  await assert.rejects(rpc.getGenesisHash().send(), {
+    code: 'IDENTITY_READ_TIMEOUT',
+  });
   assert.equal(cancelled, 1);
+});
+
+void test('RPC error envelopes do not expose arbitrary provider messages', async () => {
+  const { createIdentityResolutionRpc } = await factory();
+  const rpc = createIdentityResolutionRpc(URL, {
+    fetch: async (_url, init) => {
+      const request: unknown = JSON.parse(String(init.body));
+      assert.ok(request && typeof request === 'object' && 'id' in request);
+      return new Response(
+        JSON.stringify({
+          jsonrpc: '2.0',
+          id: request.id,
+          error: { code: -32603, message: 'secret provider text' },
+        }),
+      );
+    },
+  });
+  await assert.rejects(rpc.getGenesisHash().send(), {
+    code: 'IDENTITY_RPC_TRANSPORT_FAILED',
+    message: 'IDENTITY_RPC_TRANSPORT_FAILED',
+  });
+});
+void test('fragmented and empty chunks stay within the same decoded-byte budget', async () => {
+  const { createIdentityResolutionRpc } = await factory();
+  const rpc = createIdentityResolutionRpc(URL, {
+    maxResponseBytes: LIMIT,
+    fetch: async (_url, init) => {
+      const bytes = new TextEncoder().encode(responseBody(init).padEnd(LIMIT));
+      let offset = 0;
+      let empty = true;
+      return new Response(
+        new ReadableStream<Uint8Array>(
+          {
+            pull(controller) {
+              if (offset === bytes.length) {
+                controller.close();
+                return;
+              }
+              if (empty) controller.enqueue(new Uint8Array());
+              else controller.enqueue(bytes.subarray(offset++, offset));
+              empty = !empty;
+            },
+          },
+          { highWaterMark: 0 },
+        ),
+      );
+    },
+  });
+  assert.equal(await rpc.getGenesisHash().send(), DEVNET_GENESIS);
 });
