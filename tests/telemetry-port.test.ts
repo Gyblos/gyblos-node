@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { fanOut, toTelemetryRecord } from '@gyblos/core/telemetry';
-import type { TelemetrySink } from '@gyblos/protocol/telemetry';
+import {
+  TELEMETRY_EVENTS,
+  type TelemetrySink,
+} from '@gyblos/protocol/telemetry';
 
 import { telemetryEvents } from './support/receipt-fixture';
 
@@ -90,7 +93,9 @@ void test('telemetry rejects malformed known fields without executing getters or
   assert.equal(invoked, false);
 });
 void test('refused telemetry requires seller and engine identity to be absent together', () => {
-  const event = telemetryEvents().find((event) => event.type === 'refused')!;
+  const event = telemetryEvents().find(
+    (event) => event.type === TELEMETRY_EVENTS.REFUSED,
+  )!;
   for (const patch of [{ sellerNodeId: null }, { engineKind: null }])
     assert.throws(() =>
       toTelemetryRecord({ ...event, ...patch } as typeof event),

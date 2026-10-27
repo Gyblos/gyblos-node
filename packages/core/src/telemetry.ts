@@ -78,6 +78,7 @@ export function toTelemetryRecord(event: TelemetryEvent): object {
           (sellerNodeId === null || engineKind === null))
   )
     return controlFail();
+  if ((sellerNodeId === null) !== (engineKind === null)) return controlFail();
   const common = {
     type,
     at: controlInteger(telemetryField(event, 'at')),

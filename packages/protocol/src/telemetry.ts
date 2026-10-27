@@ -75,10 +75,11 @@ export type TelemetryEvent =
   | (CommonEvent & {
       type: typeof TELEMETRY_EVENTS.REFUSED;
       requestId: string;
-      sellerNodeId: string | null;
-      engineKind: EngineKind | null;
       refusal: TelemetryRefusal;
-    })
+    } & (
+        | { sellerNodeId: string; engineKind: EngineKind }
+        | { sellerNodeId: null; engineKind: null }
+      ))
   | (CommonEvent & {
       type: typeof TELEMETRY_EVENTS.UNSERVED;
       requestId: null;

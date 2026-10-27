@@ -661,7 +661,7 @@ idempotent. Events are `request_received`, `first_token`, `completed`, `failed`,
 `charged`, `receipt`, `refused` and `unserved`. They have common `at`, `role`,
 `requestId`, `buyerNodeId`, `sellerNodeId`, `selection`, `engineKind`, `streaming`.
 Only unserved has a null requestId; unserved and refused without a seller can
-have null sellerNodeId/engineKind. A refusal carries one static reason:
+have null sellerNodeId/engineKind; those two fields are absent together. A refusal carries one static reason:
 `seller_busy`, `daily_cap`, `buyer_cap`, `quote_rejected`, `connect_failed`,
 `engine_not_ready`. There are no free-text fields.
 

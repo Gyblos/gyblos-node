@@ -14,7 +14,10 @@ export interface TelemetryHarness {
     cleanup(): Promise<void>;
   }>;
 }
-async function inertStart(context: TestContext, harness: TelemetryHarness) {
+async function withoutTimers<T>(
+  context: TestContext,
+  work: () => Promise<T>,
+): Promise<T> {
   let timers = 0;
   const unexpectedTimer = () => {
     timers++;
@@ -23,14 +26,26 @@ async function inertStart(context: TestContext, harness: TelemetryHarness) {
   context.mock.method(globalThis, 'setTimeout', unexpectedTimer);
   context.mock.method(globalThis, 'setInterval', unexpectedTimer);
   try {
-    const fixture = await harness.start();
-    await fixture.sink.flush();
-    await fixture.assertInert();
+    const result = await work();
     assert.equal(timers, 0);
-    return fixture;
+    return result;
   } finally {
     context.mock.restoreAll();
   }
+}
+async function inertStart(context: TestContext, harness: TelemetryHarness) {
+  return withoutTimers(context, async () => {
+    const fixture = await harness.start();
+    try {
+      await fixture.sink.flush();
+      await fixture.assertInert();
+      return fixture;
+    } catch (error) {
+      await fixture.sink.close();
+      await fixture.cleanup();
+      throw error;
+    }
+  });
 }
 export function telemetrySinkContract(name: string, harness: TelemetryHarness) {
   void test(`${name}: all events, privacy, lazy construction and idempotent lifecycle`, async (context) => {
@@ -85,11 +100,14 @@ export function telemetrySinkContract(name: string, harness: TelemetryHarness) {
   void test(`${name}: close before emit is inert`, async (context) => {
     const fixture = await inertStart(context, harness);
     try {
-      assert.deepEqual(await fixture.sink.close(), {
-        emitted: 0,
-        dropped: 0,
-        failed: false,
-      });
+      assert.deepEqual(
+        await withoutTimers(context, () => fixture.sink.close()),
+        {
+          emitted: 0,
+          dropped: 0,
+          failed: false,
+        },
+      );
       assert.equal(await fixture.output(), '');
       await fixture.assertInert();
     } finally {

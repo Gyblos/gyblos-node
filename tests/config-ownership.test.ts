@@ -82,6 +82,7 @@ void test('role file and key names inside a role directory are unchanged', () =>
     trust: 'trust.json',
     status: 'status.json',
     traces: 'traces.json',
+    telemetry: 'telemetry',
     metrics: 'transport.jsonl',
     measurements: 'measurements.jsonl',
     measurementSalt: 'measurement-salt',
