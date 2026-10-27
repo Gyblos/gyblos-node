@@ -27,7 +27,8 @@
     "./node-config-resolve": "./src/node-config-resolve.ts",
     "./free-execution": "./src/free-execution.ts",
     "./seller-transport": "./src/seller-transport.ts",
-    "./identity-verifier": "./src/identity-verifier.ts"
+    "./identity-verifier": "./src/identity-verifier.ts",
+    "./identity-state": "./src/identity-state.ts"
   },
   "dependencies": {
     "@gyblos/core": "workspace:*",
