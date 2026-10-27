@@ -1,4 +1,5 @@
 // Owns synthetic identity acceptance bookkeeping; reports counters, never identities or private content.
+import { HTTP_STATUS } from '@gyblos/config';
 import { openBuyerIdentityVerifier } from '@gyblos/node/identity-verifier';
 
 import { acceptanceAssert, assertAcceptanceActive } from './errors.js';
@@ -84,7 +85,7 @@ export async function refusedAnswer(
   const before = buyer.generations();
   const dials = buyer.dials.length;
   const response = await buyer.chat();
-  acceptanceAssert(response.status >= 400);
+  acceptanceAssert(response.status >= HTTP_STATUS.badRequest);
   acceptanceAssert(
     response.noRetry === undefined || response.noRetry === 'false',
   );

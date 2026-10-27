@@ -1,6 +1,6 @@
 // Runs the full free path with independent signed synthetic 8004 accounts and durable buyer state.
 // The only external boundary is ephemeral loopback HTTP/Iroh; operational inputs are not accepted.
-import { SELLER_DISCOVERY } from '@gyblos/config';
+import { HTTP_STATUS, SELLER_DISCOVERY } from '@gyblos/config';
 
 import { ACCEPTANCE_INDEX } from './constants.js';
 import { acceptanceAssert, assertAcceptanceActive } from './errors.js';
@@ -49,7 +49,8 @@ async function noPostSendRetry(context: IdentityAcceptanceContext) {
         const before = buyer.generations();
         const response = await buyer.chat();
         acceptanceAssert(
-          response.status >= 400 && response.noRetry === 'false',
+          response.status >= HTTP_STATUS.badRequest &&
+            response.noRetry === 'false',
         );
         acceptanceAssert(
           buyer.dials.length === 1 &&
