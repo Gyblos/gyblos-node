@@ -19,12 +19,13 @@ export interface ShutdownProbeOptions {
   closedStderr?: boolean;
   throwingNotice?: boolean;
   rejectStop?: boolean;
+  repeatSignal?: NodeJS.Signals;
 }
 function childSource(options: ShutdownProbeOptions) {
-  const stop = `
+  const stop = String.raw`
     async function stop() {
-      process.stdout.write('stopping\\n');
-      await new Promise(resolve => setTimeout(resolve, 600));
+      process.stdout.write('stopping\n');
+      await new Promise(resolve => process.stdin.once('data', resolve));
       if (${Boolean(options.rejectStop)}) throw new Error('Synthetic stop failure');
     }
   `;
@@ -69,21 +70,34 @@ function childSource(options: ShutdownProbeOptions) {
       const { main } = await import(${JSON.stringify(entry)});
       const task = main();
     `;
-  return `
+  // Test observers acknowledge signals but require the separate production guards to remain.
+  // Removing entry wiring must still fail even though these observers keep a signal listener.
+  return String.raw`
     const signals = ['SIGINT', 'SIGTERM'];
     const before = signals.map(signal => process.listenerCount(signal));
+    let receivedSignals = 0;
+    const observe = () => {
+      if (++receivedSignals === 1) return;
+      if (signals.some((signal, index) => process.listenerCount(signal) <= before[index] + 1))
+        throw new Error('Production shutdown guard was removed before cleanup');
+      process.stdout.write('repeated\n');
+    };
+    for (const signal of signals) process.on(signal, observe);
     const alive = setInterval(() => {}, 1000);
     let rejected = false;
     ${invoke}
     const settled = task.catch(() => { rejected = true; process.exitCode = 1; });
-    while (process.listenerCount('SIGINT') === before[0])
+    while (process.listenerCount('SIGINT') === before[0] + 1)
       await new Promise(resolve => setImmediate(resolve));
-    process.stdout.write('ready\\n');
+    process.stdout.write('ready\n');
     try {
       await settled;
-      const listeners = signals.map((signal, index) => process.listenerCount(signal) - before[index]);
-      process.stdout.write(JSON.stringify({ completed: true, rejected, listeners }) + '\\n');
-    } finally { clearInterval(alive); }
+      const listeners = signals.map((signal, index) => process.listenerCount(signal) - before[index] - 1);
+      process.stdout.write(JSON.stringify({ completed: true, rejected, listeners }) + '\n');
+    } finally {
+      for (const signal of signals) process.removeListener(signal, observe);
+      clearInterval(alive);
+    }
   `;
 }
 
@@ -100,13 +114,14 @@ export async function shutdownProbe(options: ShutdownProbeOptions) {
         GYBLOS_HOME: join(directory, 'product'),
         GYBLOS_LAB_HOME: join(directory, 'lab'),
       },
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ['pipe', 'pipe', 'pipe'],
     },
   );
   let output = '';
   let stderr = '';
   let first = false;
   let repeated = false;
+  let released = false;
   const timer = setTimeout(() => child.kill('SIGKILL'), 15000);
   const exited = new Promise<{
     code: number | null;
@@ -124,8 +139,11 @@ export async function shutdownProbe(options: ShutdownProbeOptions) {
     }
     if (!repeated && output.includes('stopping')) {
       repeated = true;
-      child.kill('SIGINT');
-      child.kill('SIGTERM');
+      child.kill(options.repeatSignal ?? 'SIGINT');
+    }
+    if (!released && output.includes('repeated')) {
+      released = true;
+      child.stdin.end('release\n');
     }
   });
   child.stderr.on('data', (chunk: Buffer) => {

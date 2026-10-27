@@ -52,7 +52,7 @@ for (const entry of [
     `${entry} production entry keeps signal handlers throughout successful cleanup`,
     { timeout: 30000 },
     async () => {
-      const result = await shutdownProbe({ entry });
+      const result = await shutdownProbe({ entry, repeatSignal: 'SIGTERM' });
       assert.equal(result.signal, null, result.stderr);
       assert.equal(result.code, 0, result.stderr);
       assert.match(result.stderr, /Stopping/);
