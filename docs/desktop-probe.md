@@ -5,10 +5,10 @@ packaging currently supports macOS Apple Silicon only; other installers are not
 provided. The normal window reuses the approved mockup's Chat, shared controls,
 searchable model/tool dropdowns, history, motion, SVG signature, palette and
 local artwork. Connect reuses its tool list and model/budget editor; no external
-tool is launched. Models, Activity, Wallet, Settings, appearance, the adjustable
-sidebar and full-width status footer use the same mockup components and styles.
-The personal wallet is local and protected; inference and Connect remain
-simulated.
+tool is launched. Models, Activity, full-page Settings, appearance, the
+adjustable sidebar and full-width status footer use the same mockup components
+and styles. The personal wallet is local and protected; inference and Connect
+remain simulated.
 
 Chat responses stream synthetic text. Stop preserves the generated prefix; new
 chats and history keep their own drafts. Switching Chat/Connect preserves
@@ -19,9 +19,29 @@ product home.
 The five sample models, prices, free labels and connection budgets are
 illustrative, not live availability, payment authorization or enforced tool
 spending limits. The chat daily-limit check uses demo credits only. The footer
-explicitly labels the connection as simulated. Preview credits are not the
-personal wallet balance. No inference, web tool, gateway, existing node
+shows the local connection state, wallet backup reminder and app version; its
+presentation does not establish a live network connection. The visible 0.0
+balance is a placeholder, not a queried or funded balance. Preview credits are
+not the personal wallet balance. No inference, web tool, gateway, existing node
 configuration or remote network is used by this UI.
+
+## Navigation and wallet settings
+
+The shared header shows the current route and the sidebar toggle. The sidebar
+owns its full-height divider; the header rule starts at that edge. Settings is
+above the appearance switch. Chat-only web tools are separate from inference
+applications in Connect; model artwork and compact selectors are shared.
+
+Both the corner balance and footer backup reminder navigate to Settings. Only
+its explicit Back up wallet action opens the existing backup flow. Copy address
+uses a narrow host action: only the completed startup wallet's public address
+can be copied, from the owning main frame while its lifecycle is active. No
+arbitrary clipboard access, private key or signing capability is exposed.
+
+Add funds opens a local amount form. It rejects an unavailable wallet or missing
+verified backup, then always reports payment unavailable. It cannot authorize
+payment, change a balance, or enable funding. The existing first-run wallet and
+empty-destination restore behavior below is unchanged.
 
 ## Protected local wallet
 

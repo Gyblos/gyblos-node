@@ -25,6 +25,7 @@ declare global {
   interface Window {
     desktopWallet?: {
       summary(): Promise<WalletSummary>;
+      copyAddress(address: string): Promise<boolean>;
       backup(request: BackupRequest): Promise<BackupResult>;
     };
   }

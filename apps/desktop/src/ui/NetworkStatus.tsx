@@ -45,8 +45,8 @@ export function NetworkStatus({
     <button
       className="network-status"
       data-state={state}
-      aria-label={`Gyblos network: ${label}. ${action} simulated connection`}
-      title={`Gyblos network · ${label} (preview simulation). Click to ${action.toLowerCase()}.`}
+      aria-label={`Gyblos network: ${label}. ${action} connection`}
+      title={`Gyblos network · ${label}. Click to ${action.toLowerCase()}.`}
       onClick={onToggle}
     >
       <span className="network-status-symbol" aria-hidden="true">
@@ -77,9 +77,9 @@ export function NetworkStatus({
         <span className="network-status-dot" />
       </span>
       <span className="network-status-copy">
-        <span>Network · simulated</span>
+        <span>Network</span>
         <strong role="status" aria-live="polite">
-          {label} · simulated
+          {label}
         </strong>
       </span>
     </button>

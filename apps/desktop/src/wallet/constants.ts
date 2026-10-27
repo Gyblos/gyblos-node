@@ -9,6 +9,7 @@ export const WALLET_STATUS = {
 } as const;
 export const WALLET = {
   CHANNEL: 'desktop:wallet-status',
+  COPY_CHANNEL: 'desktop:wallet-copy-address',
   DIRECTORY: 'wallet-v1',
   RECORD: 'wallet.enc',
   STAGING: 'wallet.pending',

@@ -32,13 +32,9 @@ function useWalletBackup() {
       await refresh();
       if (result === BACKUP_RESULT.SAVED) {
         setAction(BACKUP_ACTION.VERIFY);
-        setMessage(
-          'File saved. Choose it again and enter your password to verify the same address.',
-        );
+        setMessage('File saved. Verify it to confirm your address.');
       } else if (result === BACKUP_RESULT.VERIFIED) {
-        setMessage(
-          'Saved file verified: it recovers this wallet address. Funding remains disabled.',
-        );
+        setMessage('Backup verified for this wallet.');
       } else if (result === BACKUP_RESULT.CANCELLED)
         setMessage(
           'Cancelled. Your wallet was not changed. If writing had started, the encrypted file may remain.',
@@ -118,10 +114,8 @@ export function WalletBackup() {
   } = useWalletBackup();
   return (
     <section className="wallet-details" aria-label="Encrypted backup">
-      <strong>Encrypted backup</strong>
       <Note>
-        Keep both file and password safe. Gyblos cannot recover either. Restore
-        is available on first launch, before creating a new wallet.
+        Keep the file and password safe. Restore is not available yet.
       </Note>
       <div
         className="connection-location"
