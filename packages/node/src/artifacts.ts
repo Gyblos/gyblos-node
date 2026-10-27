@@ -10,7 +10,7 @@ import {
 } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 
-import { FILE_MODES, homeLayout } from '@gyblos/config';
+import { FILE_MODES, homeLayout, type HomeEnvironment } from '@gyblos/config';
 import { createModelTokenizer } from '@gyblos/engine-ollama';
 import { MODEL } from '@gyblos/engine-ollama/model';
 
@@ -23,9 +23,11 @@ import {
 import { NodeError } from './errors.js';
 import { assertTokenizerHome } from './home.js';
 
-export async function modelTokenizer() {
-  await assertTokenizerHome();
-  const files = homeLayout(process.env).artifacts.tokenizerFiles;
+export async function modelTokenizer(
+  environment: HomeEnvironment = process.env,
+) {
+  await assertTokenizerHome(environment);
+  const files = homeLayout(environment).artifacts.tokenizerFiles;
   return createModelTokenizer({
     tokenizer: await readFile(files.tokenizer, 'utf8'),
     config: await readFile(files.config, 'utf8'),

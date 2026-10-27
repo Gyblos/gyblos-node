@@ -3,7 +3,9 @@
 A node can be described by one TOML file, `gyblos.toml`, as decided in vault
 GYB-DOC-026. This page is its reference. The seller daemon (`pnpm node:start`)
 reads it at startup; see [Seller startup](#seller-startup) for what it honors
-today. `gyblos init` and `gyblos doctor` come later.
+today. `gyblos doctor` checks a seller before startup
+([Seller preflight](#seller-preflight-gyblos-doctor)); `gyblos init` comes
+later.
 
 ## Validate a file
 
@@ -253,6 +255,42 @@ while publishing, with `INVALID_ROLE_CONFIGURATION`. Malformed
 `GYBLOS_IROH_BIND` or `GYBLOS_IROH_EXTERNAL_ADDR` socket addresses still fail
 when binding, as before. `GYBLOS_RPC_URL` does not affect the daemon, which
 reads its RPC from the role file.
+
+## Seller preflight (`gyblos doctor`)
+
+```sh
+pnpm gyblos doctor                         # reads ./gyblos.toml, like node:start
+GYBLOS_CONFIG=my.toml pnpm gyblos doctor   # the file node:start will read
+pnpm gyblos doctor --online                # also checks devnet for a paid offer
+```
+
+`doctor` has no `--config` flag on purpose: it reads exactly the file
+`pnpm node:start` reads (`GYBLOS_CONFIG`, else `./gyblos.toml`), so a passing
+doctor and a starting node never look at different files. It runs, read-only,
+the checks startup would fail on, and prints one line per check (`OK`, `WARN` or
+`FAIL`) with a static code and a hint:
+
+| Check       | What it verifies                                                                                                                                                                                                                               |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `config`    | the file and environment as seller startup reads them, with the same `NODE_CONFIG_INVALID` / `SELLER_*` codes (file problems are listed with their key paths)                                                                                  |
+| `home`      | no legacy `.local` layout under the role, tokenizer or Ollama directories                                                                                                                                                                      |
+| `role`      | the seller `role.json` exists and is valid (`ROLE_MISSING` hints `node:setup`)                                                                                                                                                                 |
+| `keys`      | the key files startup loads are regular, non-symlinked files owned by you with mode 0600: owner and node keys for a free offer, plus authorizer and facilitator for a paid one. Metadata only, so a corrupt key is still found only at startup |
+| `sequence`  | the seller directory is mode 0700 and its public-sequence file is valid for this node; a leftover sequence lock fails, because it blocks every publication (inspect it, never delete it blindly)                                               |
+| `tokenizer` | the pinned tokenizer files are present and match their hashes                                                                                                                                                                                  |
+| `ollama`    | an executable `ollama` file is on `PATH` (it is not run)                                                                                                                                                                                       |
+| `model`     | the pinned model's manifest is in the managed models directory (startup never downloads it; only Ollama can confirm it works)                                                                                                                  |
+| `ports`     | nothing answers on `127.0.0.1:11436`, nor on `:4022` and `:4032` for a paid offer                                                                                                                                                              |
+| `relays`    | relay URLs and token as the endpoint would build them (the token is never printed)                                                                                                                                                             |
+| `program`   | with `--online` and a paid offer, the devnet payment program through the role's RPC (never printed)                                                                                                                                            |
+
+It then prints the seller's public **NodeId and owner** address from
+`role.json`; share those to be enrolled in a discovery index. The exit code is 0
+when no check fails (warnings do not fail) and 1 otherwise. It starts, spawns
+and writes nothing. It never prints the home location, the RPC URL, the relay
+token or key material, and only reaches loopback ports unless `--online`. Memory
+headroom, key contents, a stale seller trace file and the NodeId matching
+`node.key` are checked at startup only.
 
 ## Issue codes
 
