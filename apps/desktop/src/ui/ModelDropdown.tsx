@@ -1,5 +1,5 @@
 // Quick model selection for chat; the full catalog remains a separate screen.
-import { ArrowRight, CaretDown, Check } from '@phosphor-icons/react';
+import { CaretDown, Check } from '@phosphor-icons/react';
 
 import { MENU_GEOMETRY } from './constants.js';
 import { Dropdown } from './Dropdown.js';
@@ -89,7 +89,6 @@ export function ModelDropdown({
               <MenuItem
                 footer
                 label="View all models"
-                trailing={<ArrowRight size={16} />}
                 onClick={() => {
                   close();
                   onBrowse();

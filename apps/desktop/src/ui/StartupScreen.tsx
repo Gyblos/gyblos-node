@@ -45,7 +45,7 @@ export function StartupScreen({
                 ? 'Preparing this device…'
                 : protectedWallet
                   ? 'Stored locally · backup pending'
-                  : 'Preview remains available'
+                  : 'You can continue to Gyblos'
             }
           />
         </ListRow>
@@ -53,13 +53,13 @@ export function StartupScreen({
           leading={<Globe size={17} />}
           trailing={<Badge>{connected ? 'Ready' : 'Preparing'}</Badge>}
         >
-          <RowCopy title="Preview network" detail="Simulated connection" />
+          <RowCopy title="Network" detail="Connecting to Gyblos" />
         </ListRow>
       </List>
       <Button className="wide" onClick={onContinue}>
-        Continue to preview
+        Continue
       </Button>
-      <Note>Funding is disabled. You can continue while setup finishes.</Note>
+      <Note>You can continue while setup finishes.</Note>
     </Modal>
   );
 }

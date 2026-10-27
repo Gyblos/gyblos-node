@@ -50,7 +50,11 @@ void test('desktop catalog category and search combine rather than override each
 void test('desktop contextual navigation shares Models and Activity without duplicate modes', () => {
   assert.equal(MODE_NAV.Chat[0].name, UI_VIEW.CHAT);
   assert.equal(MODE_NAV.Connect[0].name, UI_VIEW.CONNECT);
-  assert.deepEqual(MODE_NAV.Chat.slice(1), MODE_NAV.Connect.slice(1));
+  assert.deepEqual(
+    MODE_NAV.Chat.filter((item) => item.name !== UI_VIEW.TOOLS).slice(1),
+    MODE_NAV.Connect.slice(1),
+  );
+  assert.equal(MODE_NAV.Chat.at(-1)?.name, UI_VIEW.TOOLS);
 });
 void test('desktop demo free request succeeds with no credits and a zero limit', () => {
   assert.equal(

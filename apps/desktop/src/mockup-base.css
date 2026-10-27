@@ -2462,8 +2462,3 @@ kbd {
   margin: 12px 0 16px;
   font-size: 14px;
 }
-
-/* Labels retain breathing room even in narrow desktop windows. */
-.desktop-frame:not(.sidebar-collapsed) .sidebar {
-  min-width: 96px;
-}

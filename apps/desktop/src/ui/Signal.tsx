@@ -150,7 +150,7 @@ export function SignalMark({
 }
 export function SignalTrace({ model }: { model: string }) {
   return (
-    <pre className="signal-trace" aria-label="Illustrative provider route">
+    <pre className="signal-trace" aria-label="Provider route">
       {`[you] ── [g] ── [${model}]`}
     </pre>
   );

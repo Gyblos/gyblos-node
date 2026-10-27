@@ -232,6 +232,34 @@ export function List({
     </div>
   );
 }
+export function SettingsGroup({
+  leading,
+  title,
+  description,
+  trailing,
+  children,
+}: {
+  title: string;
+  description: string;
+  leading?: ReactNode;
+  trailing?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section className="ui-settings-group" aria-label={title}>
+      <header className="ui-settings-group-header">
+        <SectionTitle trailing={trailing}>
+          <span className="ui-settings-title">
+            {leading}
+            {title}
+          </span>
+        </SectionTitle>
+        <p>{description}</p>
+      </header>
+      <div className="ui-settings-group-body">{children}</div>
+    </section>
+  );
+}
 export function ListRow({
   leading,
   children,
@@ -247,7 +275,7 @@ export function ListRow({
 }) {
   const content = (
     <>
-      <span className="ui-row-leading">{leading}</span>
+      {leading != null && <span className="ui-row-leading">{leading}</span>}
       <div className="ui-row-content">{children}</div>
       {trailing && <div className="ui-row-trailing">{trailing}</div>}
     </>

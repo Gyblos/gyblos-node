@@ -67,7 +67,7 @@ export function ConnectionList({
                 title={tool}
                 detail={
                   connection
-                    ? `${model?.name ?? 'Model unavailable'} · $${connection.dailyBudget.toFixed(2)}/day · This computer · Preview`
+                    ? `${model?.name ?? 'Model unavailable'} · $${connection.dailyBudget.toFixed(2)}/day · This computer`
                     : 'Use Gyblos inference in your tool'
                 }
               />
@@ -208,15 +208,12 @@ export function ConnectionDialog({
                 </ListRow>
               </List>
               <p className="modal-note">
-                Future setup options. No server or tunnel is started.
+                Server and remote access will be available in a future update.
               </p>
             </div>
           )}
         </MotionPresence>
-        <Note>
-          Simulated setup: no tool is launched, settings changed or credentials
-          created. Compatibility and budgets are not enforced in this preview.
-        </Note>
+        <Note>Each application uses its own model and spending limit.</Note>
         <div className="connection-actions">
           {existing && (
             <Button onClick={() => onRemove(selectedTool)}>
