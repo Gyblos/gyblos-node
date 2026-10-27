@@ -91,13 +91,19 @@ export function discoveryRowLive(row: DiscoveryRow, now: number) {
 export function mergeDiscoveryRow(
   held: DiscoveryRow | undefined,
   incoming: DiscoveryRow,
+  allowOwnerChange = false,
 ): { row: DiscoveryRow; accepted: boolean } {
   if (!held)
     return {
       row: incoming,
       accepted: unblocked(incoming),
     };
-  if (held.owner !== incoming.owner) return { row: held, accepted: false };
+  if (held.owner !== incoming.owner) {
+    if (!allowOwnerChange || incoming.catalogSequence <= held.highWater)
+      return { row: held, accepted: false };
+    const row = { ...incoming, withdrawnThrough: Math.max(held.withdrawnThrough, incoming.withdrawnThrough), conflictedThrough: Math.max(held.conflictedThrough, incoming.conflictedThrough) };
+    return { row, accepted: unblocked(row) };
+  }
   if (incoming.catalogSequence < held.catalogSequence)
     return {
       row:

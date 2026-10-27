@@ -10,6 +10,7 @@ import { createFreeExecutionClient } from '@gyblos/transport-iroh/free-client';
 import { FREE_BUYER_CODES } from './constants.js';
 import { connectBuyerControl } from './control.js';
 import { discoverBuyerSellers } from './discovery.js';
+import { verifyBuyerIdentity, requireBuyerIdentity } from './identity.js';
 import { FreeBuyerError } from './free-chat.js';
 import {
   FreeSelectionFailure,
@@ -24,6 +25,7 @@ export function freeBuyerDependencies(
   prepared: PreparedSelection,
   options: FreeSelectionOptions,
 ): FreeBuyerDependencies {
+  requireBuyerIdentity(prepared.config, prepared.identity);
   let active = false;
   const now = options.now ?? Date.now;
   const policy = prepared.config;
@@ -52,8 +54,9 @@ export function freeBuyerDependencies(
       selectFreeWinner(prepared, options, excluded, signal),
     async execute(winner, request, signal, onDelta) {
       const seller = sellers.get(winner.nodeId);
-      if (!seller || !(await permits(winner)))
+      if (!seller || !(await permits(winner)) || !(await verifyBuyerIdentity(prepared.identity, seller, signal)))
         throw new FreeBuyerError(FREE_BUYER_CODES.UNAVAILABLE);
+      signal.throwIfAborted();
       const client = createFreeExecutionClient(
         options.endpoint,
         address(seller),
@@ -132,7 +135,7 @@ async function selectFreeWinner(
       ? await discoverBuyerSellers(
           { ...base, discovery: base.discovery },
           prepared.discovery,
-          { fetch: options.fetch ?? globalThis.fetch, now, signal },
+          { fetch: options.fetch ?? globalThis.fetch, now, signal, verifyIdentity: (seller, querySignal) => verifyBuyerIdentity(prepared.identity, seller, querySignal) },
         )
       : base;
   const stats = new Map(prepared.stats.rows);
@@ -140,10 +143,11 @@ async function selectFreeWinner(
     config,
     {
       buyer: options.buyer,
+      verifyIdentity: (seller, querySignal) => verifyBuyerIdentity(prepared.identity, seller, querySignal),
       now,
       stats,
       observeVerified: prepared.discovery
-        ? (seller) => prepared.discovery!.observe(seller)
+        ? (seller) => prepared.discovery!.observe(seller, { allowOwnerChange: Boolean(prepared.identity) })
         : undefined,
       connect: (seller) => connectFreeControl(seller, options, now),
     },

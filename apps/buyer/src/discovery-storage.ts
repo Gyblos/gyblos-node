@@ -92,7 +92,7 @@ async function readMonotonicRows(
     const current = next.get(nodeId);
     if (
       !current ||
-      current.owner !== row.owner ||
+      (current.owner !== row.owner && current.catalogSequence <= row.highWater) ||
       current.highWater < row.highWater ||
       current.catalogSequence < row.catalogSequence ||
       current.withdrawnThrough < row.withdrawnThrough ||
@@ -166,7 +166,7 @@ export async function buyerDiscoveryState(environment: HomeEnvironment) {
         discoveryRowLive(row, now)
       );
     },
-    async observe(seller: KnownSeller) {
+    async observe(seller: KnownSeller, options: { allowOwnerChange?: boolean } = {}) {
       const incoming = await discoveryObservation(seller);
       const pending = previous;
       let release = () => {};
@@ -188,6 +188,7 @@ export async function buyerDiscoveryState(environment: HomeEnvironment) {
         const result = mergeDiscoveryRow(
           current.get(incoming.nodeId),
           incoming,
+          options.allowOwnerChange,
         );
         current.set(incoming.nodeId, result.row);
         await writeRows(path, directory, current);

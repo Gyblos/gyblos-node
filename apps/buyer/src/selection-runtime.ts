@@ -7,21 +7,31 @@ import type { DiscoveryFetch } from '@gyblos/discovery-http';
 import type { InferenceOffer } from '@gyblos/protocol/offer';
 import { assertConfiguredRelay } from '@gyblos/transport-iroh/endpoint';
 
+import type { BuyerIdentityVerifier } from '@gyblos/node/identity-verifier';
+
 import { BUYER_SELECTION_CODES } from './constants.js';
 import { connectBuyerControl } from './control.js';
 import { buyerDiscoveryState } from './discovery-storage.js';
 import { discoverBuyerSellers } from './discovery.js';
+import { prepareBuyerIdentity, verifyBuyerIdentity, requireBuyerIdentity } from './identity.js';
 import {
   BuyerSelectionError,
   loadBuyerSelectionConfig,
   type StaticControlSeller,
+  type BuyerSelectionConfig,
 } from './selection-config.js';
 import { createProxySelection } from './selection-proxy.js';
 import { selectionStats } from './selection-stats.js';
 import { requireLegacyQuoteCompatibility } from './selection-v1.js';
 import { selectBuyerQuote, type SelectionDecision } from './selection.js';
 
-export async function prepareBuyerSelection(environment: HomeEnvironment) {
+export interface PreparedBuyerSelection {
+  config: BuyerSelectionConfig;
+  stats: Awaited<ReturnType<typeof selectionStats>>;
+  discovery: Awaited<ReturnType<typeof buyerDiscoveryState>> | undefined;
+  identity?: BuyerIdentityVerifier;
+}
+export async function prepareBuyerSelection(environment: HomeEnvironment): Promise<PreparedBuyerSelection | undefined> {
   const config = await loadBuyerSelectionConfig(environment);
   if (!config) return undefined;
   const stats = await selectionStats(environment);
@@ -31,7 +41,8 @@ export async function prepareBuyerSelection(environment: HomeEnvironment) {
   const discovery = config.discovery
     ? await buyerDiscoveryState(environment)
     : undefined;
-  return { config, stats, discovery };
+  const identity = await prepareBuyerIdentity(environment, config);
+  return { config, stats, discovery, identity };
 }
 export function runtimeProxySelection(
   prepared: NonNullable<Awaited<ReturnType<typeof prepareBuyerSelection>>>,
@@ -45,6 +56,7 @@ export function runtimeProxySelection(
     retireIdle: () => Promise<boolean>;
   },
 ) {
+  requireBuyerIdentity(prepared.config, prepared.identity);
   const now = options.now ?? Date.now;
   return createProxySelection(
     async (signal) => {
@@ -55,18 +67,19 @@ export function runtimeProxySelection(
           ? await discoverBuyerSellers(
               { ...prepared.config, discovery: prepared.config.discovery },
               prepared.discovery,
-              { fetch: options.fetch ?? globalThis.fetch, now, signal },
+              { fetch: options.fetch ?? globalThis.fetch, now, signal, verifyIdentity: (seller, querySignal) => verifyBuyerIdentity(prepared.identity, seller, querySignal) },
             )
           : prepared.config;
       const result = await selectBuyerQuote(
         config,
         {
           buyer: options.buyer,
+          verifyIdentity: (seller, querySignal) => verifyBuyerIdentity(prepared.identity, seller, querySignal),
           now,
           trusted: options.trusted,
           stats: prepared.stats.rows,
           observeVerified: prepared.discovery
-            ? (seller) => prepared.discovery!.observe(seller)
+            ? (seller) => prepared.discovery!.observe(seller, { allowOwnerChange: Boolean(prepared.identity) })
             : undefined,
           connect: (seller) => connectSelectedSeller(seller, options, now),
         },
@@ -93,6 +106,10 @@ export function runtimeProxySelection(
     },
     prepared.config.request.maxTokens,
     now,
+    prepared.identity ? async (identity, signal) => {
+      const seller = prepared.config.sellers.find(item => item.nodeId === identity.nodeId && item.owner === identity.owner);
+      return Boolean(seller && await verifyBuyerIdentity(prepared.identity, seller, signal));
+    } : undefined,
   );
 }
 

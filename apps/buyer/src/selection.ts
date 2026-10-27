@@ -44,6 +44,7 @@ export interface VerifiedSelectionDependencies {
   random?: () => number;
   windowMs?: number;
   snapshotMs?: number;
+  verifyIdentity?: (seller: StaticControlSeller, signal?: AbortSignal) => Promise<boolean>;
   observeVerified?: (seller: KnownSeller) => Promise<boolean>;
 }
 async function verifiedSeller(
@@ -101,6 +102,7 @@ export async function selectVerifiedBuyerQuote(
   dependencies: VerifiedSelectionDependencies,
   signal?: AbortSignal,
 ): Promise<SelectionDecision> {
+  if (config.identity && !dependencies.verifyIdentity) throw new BuyerSelectionError(BUYER_SELECTION_CODES.IDENTITY);
   const now = dependencies.now ?? Date.now;
   const deadline = AbortSignal.any([
     AbortSignal.timeout(dependencies.snapshotMs ?? BUYER_SELECTION.snapshotMs),
@@ -148,6 +150,10 @@ export async function selectVerifiedBuyerQuote(
     } catch {
       return { ok: false, code: BUYER_SELECTION_CODES.NO_OFFER };
     }
+    const seller = config.sellers.find(item => item.nodeId === winner.candidate.nodeId && item.owner === winner.candidate.owner);
+    if (!seller || (dependencies.verifyIdentity && !(await dependencies.verifyIdentity(seller, signal))))
+      return { ok: false, code: BUYER_SELECTION_CODES.NO_OFFER };
+    if (signal?.aborted) return { ok: false, code: BUYER_SELECTION_CODES.NO_OFFER };
     return { ok: true, winner };
   } finally {
     await Promise.allSettled(
@@ -221,6 +227,8 @@ async function refreshSnapshots(
     await Promise.allSettled(
       config.sellers.map(async (seller) => {
         try {
+          if (dependencies.verifyIdentity && !(await dependencies.verifyIdentity(seller, deadline))) return undefined;
+          deadline.throwIfAborted();
           const client = await dependencies.connect(seller);
           clients.set(seller.nodeId, client);
           const verified = await verifiedSeller(client, seller, now, deadline);
@@ -233,7 +241,7 @@ async function refreshSnapshots(
         } catch (error) {
           if (
             error instanceof BuyerSelectionError &&
-            error.code === BUYER_SELECTION_CODES.DISCOVERY_STATE
+            [BUYER_SELECTION_CODES.DISCOVERY_STATE, BUYER_SELECTION_CODES.IDENTITY_STATE].some(code => error.code === code)
           )
             throw error;
           recordQuote(dependencies.stats, seller.nodeId, false, 0, now());
