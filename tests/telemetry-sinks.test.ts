@@ -4,6 +4,7 @@ import {
   mkdtemp,
   readdir,
   readFile,
+  realpath,
   rm,
   stat,
   writeFile,
@@ -38,7 +39,9 @@ telemetrySinkContract('console telemetry', {
 });
 telemetrySinkContract('file telemetry', {
   async start(broken) {
-    const root = await mkdtemp(join(tmpdir(), 'gyblos-telemetry-'));
+    const root = await realpath(
+      await mkdtemp(join(tmpdir(), 'gyblos-telemetry-')),
+    );
     if (broken) await writeFile(join(root, 'seller'), 'synthetic obstruction');
     const directory = join(root, 'seller', 'telemetry');
     return {
@@ -76,7 +79,9 @@ telemetrySinkContract('file telemetry', {
   },
 });
 void test('file telemetry bounds the pending open buffer and records overflow', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'gyblos-telemetry-buffer-'));
+  const root = await realpath(
+    await mkdtemp(join(tmpdir(), 'gyblos-telemetry-buffer-')),
+  );
   const sink = createFileTelemetrySink({
     environment: { GYBLOS_HOME: root },
     role: 'buyer',

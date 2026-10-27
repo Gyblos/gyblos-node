@@ -91,6 +91,7 @@ export interface TelemetryHealth {
   failed: boolean;
 }
 export interface TelemetrySink {
+  // Synchronous and observational: implementations never throw to the caller.
   emit(event: TelemetryEvent): void;
   flush(): Promise<void>;
   close(): Promise<TelemetryHealth>;

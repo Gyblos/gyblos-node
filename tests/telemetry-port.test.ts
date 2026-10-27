@@ -59,3 +59,33 @@ void test('fanOut isolates throwing emit, flush and close and accounts for loss'
     failed: true,
   });
 });
+void test('telemetry rejects malformed known fields without executing getters or serializers', () => {
+  const event = telemetryEvents()[0]!;
+  let invoked = false;
+  const hostile = {
+    toJSON() {
+      invoked = true;
+      return 'PROMPT-SECRET-MARKER';
+    },
+  };
+  for (const patch of [
+    { type: 'PROMPT-SECRET-MARKER' },
+    { role: 'PROMPT-SECRET-MARKER' },
+    { buyerNodeId: hostile },
+    { streaming: hostile },
+    { at: Infinity },
+  ])
+    assert.throws(() =>
+      toTelemetryRecord({ ...event, ...patch } as typeof event),
+    );
+  const getter = { ...event };
+  Object.defineProperty(getter, 'buyerNodeId', {
+    enumerable: true,
+    get() {
+      invoked = true;
+      return event.buyerNodeId;
+    },
+  });
+  assert.throws(() => toTelemetryRecord(getter));
+  assert.equal(invoked, false);
+});

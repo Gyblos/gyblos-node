@@ -7,9 +7,7 @@ import type { TelemetrySink } from '@gyblos/protocol/telemetry';
 import { telemetryEvents } from './receipt-fixture';
 
 export interface TelemetryHarness {
-  start(
-    broken?: boolean,
-  ): Promise<{
+  start(broken?: boolean): Promise<{
     sink: TelemetrySink;
     output(): Promise<string>;
     cleanup(): Promise<void>;
@@ -22,11 +20,10 @@ export function telemetrySinkContract(name: string, harness: TelemetryHarness) {
       assert.equal(await fixture.output(), '');
       await fixture.sink.flush();
       assert.equal(await fixture.output(), '');
-      for (const event of telemetryEvents())
-        fixture.sink.emit({
-          ...event,
-          prompt: 'PROMPT-SECRET-MARKER',
-        } as typeof event);
+      for (const event of telemetryEvents()) {
+        const enriched = { ...event, prompt: 'PROMPT-SECRET-MARKER' };
+        fixture.sink.emit(enriched);
+      }
       await fixture.sink.flush();
       await fixture.sink.flush();
       const output = await fixture.output();

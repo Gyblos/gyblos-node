@@ -1,6 +1,9 @@
 // Detaches only declared telemetry fields without executing getters or serializers; no I/O.
-import { OFFER_PRICING_KINDS } from '@gyblos/protocol/constants';
-import { controlFail } from '@gyblos/protocol/control-validation';
+import {
+  CONTROL_LIMITS,
+  OFFER_PRICING_KINDS,
+} from '@gyblos/protocol/constants';
+import { controlFail, controlHex } from '@gyblos/protocol/control-validation';
 import {
   parseBuyerReceipt,
   parseSellerReceipt,
@@ -78,7 +81,10 @@ export function telemetryReceipt(value: unknown) {
   const result = {
     seller: {
       record: cleanSeller(telemetryField(seller, 'record')),
-      signature: telemetryField(seller, 'signature'),
+      signature: controlHex(
+        telemetryField(seller, 'signature'),
+        CONTROL_LIMITS.signatureBytes,
+      ),
     },
   };
   if (!value || typeof value !== 'object' || !Object.hasOwn(value, 'buyer'))
@@ -106,7 +112,10 @@ export function telemetryReceipt(value: unknown) {
           'totalMs',
         ]),
       }),
-      signature: telemetryField(buyer, 'signature'),
+      signature: controlHex(
+        telemetryField(buyer, 'signature'),
+        CONTROL_LIMITS.signatureBytes,
+      ),
     },
   };
 }

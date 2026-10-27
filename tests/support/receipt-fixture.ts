@@ -4,6 +4,10 @@ import { generateKeyPairSync, sign } from 'node:crypto';
 import {
   CONTROL_METERING_MODES,
   ENGINE_DONE_REASONS,
+  ENGINE_KINDS,
+  FREE_EXECUTION_CODES,
+  OFFER_PRICING_KINDS,
+  P2P_ROLES,
   REASONING_LEVELS,
   RECEIPT,
   RECEIPT_OUTCOMES,
@@ -43,10 +47,10 @@ export function sellerRecord(
       quantization: null,
     },
     reasoning: REASONING_LEVELS.OFF,
-    engineKind: 'ollama',
+    engineKind: ENGINE_KINDS.OLLAMA,
     metering: CONTROL_METERING_MODES.RECOUNTED,
     streaming: true,
-    pricing: { kind: 'free' },
+    pricing: { kind: OFFER_PRICING_KINDS.FREE },
     amountAtomic: '0',
     feeAtomic: '0',
     usage: { inputTokens: 7, outputTokens: 5, reasoningTokens: null },
@@ -82,12 +86,12 @@ export function buyerRecord(
 export function telemetryEvents(): TelemetryEvent[] {
   const common = {
     at: 1700000000000,
-    role: 'seller' as const,
+    role: P2P_ROLES.SELLER,
     requestId: '33'.repeat(16),
     buyerNodeId: '22'.repeat(32),
     sellerNodeId: '11'.repeat(32),
     selection: sellerRecord().selection,
-    engineKind: 'ollama' as const,
+    engineKind: ENGINE_KINDS.OLLAMA,
     streaming: true,
   };
   return [
@@ -104,7 +108,7 @@ export function telemetryEvents(): TelemetryEvent[] {
     {
       ...common,
       type: TELEMETRY_EVENTS.FAILED,
-      code: 'FREE_EXECUTION_ENGINE_UNAVAILABLE',
+      code: FREE_EXECUTION_CODES.ENGINE,
       reason: null,
       totalMs: 40,
     },

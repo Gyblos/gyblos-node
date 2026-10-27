@@ -175,3 +175,46 @@ void test('buyer receipt enforces dispute order, verdict equivalence and nullabl
     null,
   );
 });
+void test('receipt rejects oversized, hostile and noncanonical nested values before signing', async () => {
+  const record = sellerRecord();
+  let invoked = false;
+  const getter = { ...record };
+  Object.defineProperty(getter, 'owner', {
+    enumerable: true,
+    get() {
+      invoked = true;
+      return record.owner;
+    },
+  });
+  for (const value of [
+    getter,
+    {
+      ...record,
+      selection: { ...record.selection, modelId: 'x'.repeat(2049) },
+    },
+    { ...record, amountAtomic: '18446744073709551616' },
+    { ...record, buyerNodeId: 'FF'.repeat(32) },
+    { ...record, usage: { ...record.usage, outputTokens: NaN } },
+  ])
+    assert.throws(() => parseSellerReceipt(value), {
+      code: CONTROL_CODES.INVALID,
+    });
+  assert.equal(invoked, false);
+  const signer = receiptSigner();
+  const envelope = await signSellerReceipt(
+    sellerRecord(signer.nodeId),
+    signer.sign,
+  );
+  await assert.rejects(
+    verifyReceipt({
+      seller: { ...envelope, signature: envelope.signature.toUpperCase() },
+    }),
+    { code: CONTROL_CODES.INVALID },
+  );
+  await assert.rejects(
+    verifyReceipt({
+      seller: { ...envelope, record: { ...envelope.record, streaming: false } },
+    }),
+    { code: CONTROL_CODES.SIGNATURE },
+  );
+});
