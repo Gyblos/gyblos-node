@@ -433,11 +433,14 @@ Shape rules, checked by `parseFreeExecutionResponse` without context:
 - `reason` is present if and only if the code is
   `FREE_EXECUTION_SELLER_CANNOT_CONTINUE`, and is one of
   `FREE_EXECUTION_STOP_REASONS`: `quota_exhausted`, `rate_limited`,
-  `engine_auth`, `engine_unavailable`, `engine_interrupted`, `engine_timeout`,
-  `engine_invalid_response`. Each comes from exactly one uniform engine error
-  (`ENGINE_ERROR_STOP_REASON`).
-- `delivered`, when present, is exactly `{outputTokens}` with a safe integer of
-  at least 1, and appears only beside `FREE_EXECUTION_SELLER_CANNOT_CONTINUE`.
+  `engine_unavailable`, `engine_interrupted`, `engine_timeout`,
+  `engine_invalid_response`. `ENGINE_ERROR_STOP_REASON` maps each uniform engine
+  error to one reason. An upstream authentication failure is reported as
+  `engine_unavailable`: the credential state of a seller's provider account is
+  not revealed to buyers. The seller keeps the exact engine code locally.
+- `delivered`, when present, is exactly `{outputTokens}` with a safe integer
+  from 1 to the public context bound (`PUBLIC_RECORD_LIMITS.maxContextTokens`),
+  and appears only beside `FREE_EXECUTION_SELLER_CANNOT_CONTINUE`.
 
 Context rules, checked by `matchFreeExecutionResponse(response, request, mode)`:
 a complete response (`mode` `'complete'`, the default) never carries
@@ -539,10 +542,10 @@ success/error/seller-cannot-continue response framing. Its request digest,
 canonical bytes and frames come from an independent one-shot Python oracle that
 first reproduced every v2 vector; the oracle is not committed. The v1 vectors,
 control v2 vectors and their domains remain unchanged.
-Each protocol change ships in this order: the contract first, then the seller,
-then the buyer. The contract ships first; seller wiring then enables free startup explicitly
-with `loadSellerSettings(process.env, undefined, {freeExecution: true})` only
-when its handler and caps are present. Buyer wiring follows separately.
+Each protocol change ships the contract first, then the seller, then the buyer.
+Seller wiring enables free startup explicitly with
+`loadSellerSettings(process.env, undefined, {freeExecution: true})` only when
+its handler and caps are present.
 Acceptance later covers publication → discovery → selection → free quote →
 execution → answer using an in-process index and synthetic engine, including
 replay, expiry, wrong peer, exhausted caps, engine failure and no fallback once
@@ -605,11 +608,12 @@ concatenated deltas, and terminal usage/context bounds are checked as for the
 complete response. An error terminal is unsuccessful, including after partial
 text. A `FREE_EXECUTION_SELLER_CANNOT_CONTINUE` terminal carries `delivered`
 if and only if at least one delta preceded it; every other error terminal,
-for example `LIMIT` after partial text, never carries `delivered`.
-`vectors/free-stream-v3.json` pins two deltas followed by such a terminal with
-reason `engine_interrupted`. EOF before terminal, bytes after terminal, unknown fields, invalid UTF-8,
-noncanonical or duplicate JSON fields, changed bindings and reordered events
-are rejected. Fragments are provisional until a valid terminal and EOF.
+for example `LIMIT` after partial text, never carries `delivered`. Its
+`outputTokens` may not exceed the UTF-8 bytes of the delivered deltas, since
+every token covers at least one byte. `vectors/free-stream-v3.json` pins two
+deltas followed by such a terminal with reason `engine_interrupted`. EOF before
+terminal, bytes after terminal, unknown fields, invalid UTF-8, noncanonical or
+duplicate JSON fields, changed bindings and reordered events are rejected. Fragments are provisional until a valid terminal and EOF.
 
 A delta contains at most 8192 UTF-8 bytes; splitting preserves Unicode scalar
 values. There are at most 4096 events including terminal, at most

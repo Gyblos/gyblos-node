@@ -36,6 +36,8 @@ export const CONTRACT_TEXT = ['Hello', ' world.'] as const;
 
 export interface EngineHarness {
   // Starts a synthetic upstream for one behavior; the engine's own timeout is generationTimeoutMs.
+  // 'ok', 'ok-stream', 'caller-abort' and 'callback-throws' serve CONTRACT_TEXT successfully; the
+  // last two let the caller abort or fail from its own callback.
   start(
     behavior: EngineBehavior,
     options: { generationTimeoutMs: number },
@@ -59,7 +61,8 @@ const FAILURES: Partial<Record<EngineBehavior, EngineErrorCode>> = {
 const TIMEOUT_MS = 200;
 const TEST_TIMEOUT_MS = 10_000;
 
-function assertPrivate(error: unknown) {
+// Asserts no upstream marker reaches the error, its stack, own properties or cause chain.
+export function assertPrivate(error: unknown): void {
   assert.ok(error instanceof Error);
   const seen = [
     error.message,
@@ -70,18 +73,19 @@ function assertPrivate(error: unknown) {
     ),
   ];
   for (const text of seen) assert.ok(!text.includes(UPSTREAM_MARKER), text);
+  if (error.cause !== undefined) assertPrivate(error.cause);
 }
 
 async function run(
   harness: EngineHarness,
   behavior: EngineBehavior,
-  check: (engine: Engine, fragments: string[]) => Promise<void>,
+  check: (engine: Engine) => Promise<void>,
 ) {
   const started = await harness.start(behavior, {
     generationTimeoutMs: TIMEOUT_MS,
   });
   try {
-    await check(started.engine, []);
+    await check(started.engine);
   } finally {
     await started.close();
   }
@@ -99,14 +103,15 @@ export function engineContract(name: string, harness: EngineHarness) {
           maxTokens: 8,
         });
         assert.equal(result.text, CONTRACT_TEXT.join(''));
-        assert.ok(result.usage.outputTokens >= 0);
+        assert.ok(result.usage.outputTokens > 0);
       }),
   );
   void test(
     `${name}: streaming delivers every fragment before resolving`,
     options,
     () =>
-      run(harness, 'ok-stream', async (engine, fragments) => {
+      run(harness, 'ok-stream', async (engine) => {
+        const fragments: string[] = [];
         const result = await engine.generate({
           prompt: 'synthetic',
           maxTokens: 8,
@@ -118,12 +123,15 @@ export function engineContract(name: string, harness: EngineHarness) {
         assert.ok(fragments.length >= 2);
       }),
   );
-  for (const [behavior, code] of Object.entries(FAILURES))
+  for (const behavior of ENGINE_BEHAVIORS) {
+    const code = FAILURES[behavior];
+    if (!code) continue;
     void test(
       `${name}: ${behavior} rejects with EngineError ${code}`,
       options,
       () =>
-        run(harness, behavior as EngineBehavior, async (engine, fragments) => {
+        run(harness, behavior, async (engine) => {
+          const fragments: string[] = [];
           const error = await engine
             .generate({
               prompt: 'synthetic',
@@ -144,6 +152,7 @@ export function engineContract(name: string, harness: EngineHarness) {
             assert.ok(fragments.length >= 1);
         }),
     );
+  }
   void test(
     `${name}: caller abort rejects with the caller's reason`,
     options,

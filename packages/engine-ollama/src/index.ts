@@ -148,10 +148,8 @@ async function readGeneration(
           signal.throwIfAborted();
           await callerCallback(attempt, input.onFragment);
           signal.throwIfAborted();
-          await callerCallback(
-            attempt,
-            input.onText && (() => input.onText!(fragment)),
-          );
+          const onText = input.onText;
+          await callerCallback(attempt, onText && (() => onText(fragment)));
           signal.throwIfAborted();
         }
         if (event.done === true) terminal = event;
@@ -172,6 +170,35 @@ async function readGeneration(
   }
 }
 
+// Ollama's own inventory is local: any refusal or a changed pin means the model is unavailable.
+async function checkModel(
+  origin: URL,
+  fetchImpl: typeof fetch,
+  timeoutMs: number,
+  signal?: AbortSignal,
+) {
+  const deadline = AbortSignal.timeout(timeoutMs);
+  const attempt: EngineAttempt = { caller: signal, deadline, fragments: 0 };
+  try {
+    const response = await fetchImpl(new URL(ROUTES.ollamaTags, origin), {
+      redirect: 'error',
+      signal: AbortSignal.any([deadline, ...(signal ? [signal] : [])]),
+    });
+    if (!response.ok) {
+      await response.body?.cancel().catch(() => {});
+      throw new EngineError(ENGINE_ERROR_CODES.UNAVAILABLE);
+    }
+    const body = (await response.json()) as {
+      models: { name: string; digest: string; remote_model?: string }[];
+    };
+    const model = body.models.find((item) => item.name === MODEL.name);
+    if (model?.digest !== MODEL.digest || model.remote_model)
+      throw new EngineError(ENGINE_ERROR_CODES.UNAVAILABLE);
+  } catch (error) {
+    throw engineFailure(error, attempt);
+  }
+}
+
 export function createOllama(
   base: string,
   fetchImpl: typeof fetch = fetch,
@@ -181,26 +208,8 @@ export function createOllama(
   const generationTimeoutMs =
     options.generationTimeoutMs ?? TIMEOUTS.generation;
   const modelCheckTimeoutMs = options.modelCheckTimeoutMs ?? TIMEOUTS.events;
-  async function assertModel(signal?: AbortSignal) {
-    const deadline = AbortSignal.timeout(modelCheckTimeoutMs);
-    const attempt: EngineAttempt = { caller: signal, deadline, fragments: 0 };
-    try {
-      const response = await fetchImpl(new URL(ROUTES.ollamaTags, origin), {
-        redirect: 'error',
-        signal: AbortSignal.any([deadline, ...(signal ? [signal] : [])]),
-      });
-      // Ollama's own inventory is local: any refusal or a changed pin means the model is unavailable.
-      if (!response.ok) throw new EngineError(ENGINE_ERROR_CODES.UNAVAILABLE);
-      const body = (await response.json()) as {
-        models: { name: string; digest: string; remote_model?: string }[];
-      };
-      const model = body.models.find((item) => item.name === MODEL.name);
-      if (model?.digest !== MODEL.digest || model.remote_model)
-        throw new EngineError(ENGINE_ERROR_CODES.UNAVAILABLE);
-    } catch (error) {
-      throw engineFailure(error, attempt);
-    }
-  }
+  const assertModel = (signal?: AbortSignal) =>
+    checkModel(origin, fetchImpl, modelCheckTimeoutMs, signal);
   return {
     assertModel,
     async generate(input: GenerateInput): Promise<InferenceResult> {
@@ -210,6 +219,8 @@ export function createOllama(
         input.maxTokens > MODEL_LIMITS.adapterMaxOutputTokens
       )
         throw new Error('Invalid output token limit.');
+      // An unsupported prompt is a programming error, raised before any engine call.
+      const prompt = renderChat(input.prompt);
       input.signal?.throwIfAborted();
       await assertModel(input.signal);
       input.signal?.throwIfAborted();
@@ -232,7 +243,7 @@ export function createOllama(
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({
               model: MODEL.name,
-              prompt: renderChat(input.prompt),
+              prompt,
               raw: true,
               stream: true,
               keep_alive: GENERATION.keepAlive,

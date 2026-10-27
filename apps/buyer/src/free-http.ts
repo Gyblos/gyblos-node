@@ -136,6 +136,7 @@ function replyError(response: ServerResponse, error: unknown) {
         type: FREE_BUYER.errorType,
         param: null,
         code,
+        // Delivered usage only exists mid-stream, so a JSON error carries the reason alone.
         ...(stop.reason ? { reason: stop.reason } : {}),
         ...(selected && 'cooldownUntil' in selected
           ? { cooldownUntil: selected.cooldownUntil }

@@ -240,6 +240,13 @@ export const FREE_EXECUTION_CODES = {
 } as const;
 export type FreeExecutionCode =
   (typeof FREE_EXECUTION_CODES)[keyof typeof FREE_EXECUTION_CODES];
+// COMPLETE is a one-shot response; STREAM is the terminal after deltas the caller already verified.
+export const FREE_EXECUTION_MATCH_MODES = {
+  COMPLETE: 'complete',
+  STREAM: 'stream',
+} as const;
+export type FreeExecutionMatchMode =
+  (typeof FREE_EXECUTION_MATCH_MODES)[keyof typeof FREE_EXECUTION_MATCH_MODES];
 
 export const FREE_STREAM = {
   alpn: 'gyblos/free-stream/3',
@@ -279,11 +286,10 @@ export const ENGINE_ERROR_CODES = {
 export type EngineErrorCode =
   (typeof ENGINE_ERROR_CODES)[keyof typeof ENGINE_ERROR_CODES];
 
-// Why a seller could not continue a started generation, as a buyer may see it; one per engine error.
+// Why a seller could not continue a started generation, as a buyer may see it.
 export const FREE_EXECUTION_STOP_REASONS = {
   QUOTA_EXHAUSTED: 'quota_exhausted',
   RATE_LIMITED: 'rate_limited',
-  ENGINE_AUTH: 'engine_auth',
   ENGINE_UNAVAILABLE: 'engine_unavailable',
   ENGINE_INTERRUPTED: 'engine_interrupted',
   ENGINE_TIMEOUT: 'engine_timeout',
@@ -298,7 +304,8 @@ export const ENGINE_ERROR_STOP_REASON: Readonly<
   [ENGINE_ERROR_CODES.QUOTA_EXHAUSTED]:
     FREE_EXECUTION_STOP_REASONS.QUOTA_EXHAUSTED,
   [ENGINE_ERROR_CODES.RATE_LIMITED]: FREE_EXECUTION_STOP_REASONS.RATE_LIMITED,
-  [ENGINE_ERROR_CODES.AUTH]: FREE_EXECUTION_STOP_REASONS.ENGINE_AUTH,
+  // Credential state of the seller's upstream account is private to the seller (founder decision).
+  [ENGINE_ERROR_CODES.AUTH]: FREE_EXECUTION_STOP_REASONS.ENGINE_UNAVAILABLE,
   [ENGINE_ERROR_CODES.UNAVAILABLE]:
     FREE_EXECUTION_STOP_REASONS.ENGINE_UNAVAILABLE,
   [ENGINE_ERROR_CODES.INTERRUPTED]:

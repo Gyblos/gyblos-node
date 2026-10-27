@@ -9,6 +9,7 @@ import {
   FREE_CHAT_ROLES,
   FREE_EXECUTION,
   FREE_EXECUTION_CODES,
+  FREE_EXECUTION_STOP_REASONS,
 } from '@gyblos/protocol/constants';
 import { EngineError } from '@gyblos/protocol/engine';
 import { freeExecutionDigest } from '@gyblos/protocol/free-execution';
@@ -332,4 +333,14 @@ void test('free seller reports an engine failure as seller-cannot-continue with 
       reason: ENGINE_ERROR_STOP_REASON[code],
     });
   }
+  // Buyers never learn the credential state of the seller's upstream account.
+  assert.equal(
+    ENGINE_ERROR_STOP_REASON[ENGINE_ERROR_CODES.AUTH],
+    'engine_unavailable',
+  );
+  assert.ok(
+    !Object.values(FREE_EXECUTION_STOP_REASONS).some((reason) =>
+      reason.includes('auth'),
+    ),
+  );
 });

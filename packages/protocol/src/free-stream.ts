@@ -4,6 +4,7 @@ import {
   CONTROL_LIMITS,
   FREE_EXECUTION,
   FREE_EXECUTION_CODES,
+  FREE_EXECUTION_MATCH_MODES,
   FREE_STREAM,
 } from './constants';
 import { ControlFrameReader, encodeControlFrame } from './control-framing';
@@ -144,19 +145,21 @@ export async function createFreeStreamVerifier(value: FreeExecutionRequest) {
           return { delta: event.text };
         }
         ended = true;
-        // Delivered usage accompanies exactly a cannot-continue stop after at least one delta.
+        // Delivered usage accompanies exactly a cannot-continue stop after at least one delta, and
+        // cannot exceed the delivered UTF-8 bytes: every token covers at least one byte.
         const stopped = event.response.error;
         if (
           stopped &&
-          !!stopped.delivered !==
+          (!!stopped.delivered !==
             (stopped.code === FREE_EXECUTION_CODES.SELLER_CANNOT_CONTINUE &&
-              text.length > 0)
+              text.length > 0) ||
+            (stopped.delivered?.outputTokens ?? 0) > outputBytes)
         )
           return freeExecutionFail();
         const result = await matchFreeExecutionResponse(
           event.response,
           request,
-          'stream',
+          FREE_EXECUTION_MATCH_MODES.STREAM,
         );
         if (result.text !== text)
           return freeExecutionFail(FREE_EXECUTION_CODES.BINDING);

@@ -203,6 +203,7 @@ void test('free execution error shape ties reason and delivered to seller-cannot
   for (const error of [
     { code: cannot },
     { code: cannot, reason: 'unknown_reason' },
+    { code: cannot, reason: 'engine_auth' },
     { code: FREE_EXECUTION_CODES.BUSY, reason: 'quota_exhausted' },
     { code: FREE_EXECUTION_CODES.ENGINE, delivered },
     { code: cannot, reason: 'quota_exhausted', delivered: { outputTokens: 0 } },

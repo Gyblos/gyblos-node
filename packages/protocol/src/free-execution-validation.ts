@@ -6,11 +6,26 @@ import {
   type FreeExecutionStopReason,
 } from './constants';
 import { ControlError } from './control-validation';
-import type { FreeExecutionStop } from './free-execution-types';
+import type {
+  FreeExecutionDelivered,
+  FreeExecutionStop,
+} from './free-execution-types';
 
+// Copies only the stop fields that are present, so canonical JSON never sees undefined.
+export function freeExecutionStop(
+  source: FreeExecutionStop,
+): FreeExecutionStop {
+  return {
+    ...(source.reason ? { reason: source.reason } : {}),
+    ...(source.delivered
+      ? { delivered: { outputTokens: source.delivered.outputTokens } }
+      : {}),
+  };
+}
 export class FreeExecutionError extends Error {
-  readonly reason?: FreeExecutionStopReason;
-  readonly delivered?: { outputTokens: number };
+  // Declared only: absent fields stay absent rather than own undefined properties.
+  declare readonly reason?: FreeExecutionStopReason;
+  declare readonly delivered?: FreeExecutionDelivered;
   constructor(
     readonly code: FreeExecutionCode,
     readonly remote = false,
@@ -18,8 +33,7 @@ export class FreeExecutionError extends Error {
   ) {
     super(code);
     this.name = 'FreeExecutionError';
-    if (stop.reason) this.reason = stop.reason;
-    if (stop.delivered) this.delivered = { ...stop.delivered };
+    Object.assign(this, freeExecutionStop(stop));
   }
 }
 export function freeExecutionFail(

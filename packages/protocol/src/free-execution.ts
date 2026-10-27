@@ -6,9 +6,11 @@ import {
   FREE_CHAT_ROLES,
   FREE_EXECUTION,
   FREE_EXECUTION_CODES,
+  FREE_EXECUTION_MATCH_MODES,
   FREE_EXECUTION_STOP_REASONS,
   PUBLIC_RECORD_LIMITS,
   type FreeChatRole,
+  type FreeExecutionMatchMode,
 } from './constants';
 import { parseModelSelection } from './control-requests';
 import type { SignedOfferV2 } from './control-types';
@@ -42,6 +44,7 @@ import { signingBytes } from './signing';
 export type {
   FreeChatMessage,
   FreeExecutionBuildInput,
+  FreeExecutionDelivered,
   FreeExecutionRequest,
   FreeExecutionResponse,
   FreeExecutionResult,
@@ -51,6 +54,7 @@ export type {
 export {
   FreeExecutionError,
   freeExecutionFail,
+  freeExecutionStop,
 } from './free-execution-validation';
 
 function role(value: unknown): FreeChatRole {
@@ -252,12 +256,10 @@ export function parseFreeExecutionResponse(
     return response;
   });
 }
-// 'complete' is a one-shot response; 'stream' is the terminal after deltas the caller already verified.
-export type FreeExecutionMatchMode = 'complete' | 'stream';
 export async function matchFreeExecutionResponse(
   value: unknown,
   valueRequest: unknown,
-  mode: FreeExecutionMatchMode = 'complete',
+  mode: FreeExecutionMatchMode = FREE_EXECUTION_MATCH_MODES.COMPLETE,
 ): Promise<FreeExecutionResult> {
   const request = parseFreeExecutionRequest(valueRequest);
   const response = parseFreeExecutionResponse(value);
@@ -268,7 +270,8 @@ export async function matchFreeExecutionResponse(
     return freeExecutionFail(FREE_EXECUTION_CODES.BINDING);
   if (response.error) {
     const { code, ...stop } = response.error;
-    if (stop.delivered && mode === 'complete') return freeExecutionFail();
+    if (stop.delivered && mode === FREE_EXECUTION_MATCH_MODES.COMPLETE)
+      return freeExecutionFail();
     if (stop.delivered && stop.delivered.outputTokens > request.input.maxTokens)
       return freeExecutionFail(FREE_EXECUTION_CODES.LIMIT);
     throw new FreeExecutionError(code, true, stop);

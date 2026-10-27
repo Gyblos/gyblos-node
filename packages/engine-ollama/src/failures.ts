@@ -42,6 +42,10 @@ export interface EngineAttempt {
   callback?: { error: unknown };
 }
 
+// Follows the Engine port precedence, then the adapter table: deadline is TIMEOUT; an EngineError
+// already classified (status, model check) stays; a bound is INVALID_RESPONSE even after text; any
+// other failure after text is INTERRUPTED; before text an upstream error frame or a connection-level
+// failure is UNAVAILABLE and malformed output is INVALID_RESPONSE.
 export function engineFailure(error: unknown, attempt: EngineAttempt): unknown {
   if (attempt.caller?.aborted) return attempt.caller.reason;
   if (attempt.callback) return attempt.callback.error;

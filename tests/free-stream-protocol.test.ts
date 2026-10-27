@@ -258,6 +258,15 @@ void test('free stream requires delivered usage exactly when it cannot continue 
     code: FREE_EXECUTION_CODES.SELLER_CANNOT_CONTINUE,
     remote: true,
   });
+  // 'answer' is 6 UTF-8 bytes; a claim of 7 delivered tokens is impossible.
+  const inflated = await api.createFreeStreamVerifier(fixture.request);
+  await inflated.accept(fixture.delta);
+  await assert.rejects(
+    inflated.accept(
+      cannotContinue(fixture, 1, { delivered: { outputTokens: 7 } }),
+    ),
+    { code: FREE_EXECUTION_CODES.INVALID },
+  );
   const limit = await api.createFreeStreamVerifier(fixture.request);
   await limit.accept(fixture.delta);
   await assert.rejects(

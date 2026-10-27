@@ -34,9 +34,12 @@ export interface FreeExecutionResult {
   finishReason: EngineDoneReason;
 }
 // Present only with SELLER_CANNOT_CONTINUE; delivered only on a stream that already sent text.
+export interface FreeExecutionDelivered {
+  outputTokens: number;
+}
 export interface FreeExecutionStop {
   reason?: FreeExecutionStopReason;
-  delivered?: { outputTokens: number };
+  delivered?: FreeExecutionDelivered;
 }
 export type FreeExecutionFailure = {
   code: FreeExecutionCode;
