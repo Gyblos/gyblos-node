@@ -380,7 +380,7 @@ action, described in [discovery-index.md](discovery-index.md).
 ## Free v2 seller execution
 
 A supported `gyblos.toml` free offer starts control plus the separate
-`gyblos/free/2` complete-response and `gyblos/free-stream/2` streaming data
+`gyblos/free/3` complete-response and `gyblos/free-stream/3` streaming data
 channels. It does not start the paid HTTP service or facilitator, check a
 payment program, or write a v1 offer. This is execution for the pinned engine's
 single user message and `off` reasoning; other engine input forms are not
@@ -511,14 +511,26 @@ official OpenAI SDKs honor to skip their automatic retries. Clients that retry
 5xx on their own must check it: retrying would resend the prompt, possibly to
 another seller.
 
+When a seller's engine fails after it accepted the request (for example a
+reseller out of quota, rate limited, or an engine that stops mid-answer), the
+error code is `FREE_EXECUTION_SELLER_CANNOT_CONTINUE` and `error.reason` says
+why: `quota_exhausted`, `rate_limited`, `engine_unavailable`,
+`engine_interrupted`, `engine_timeout` or `engine_invalid_response`. Before the
+first token this is a 503 JSON error. Mid-stream it is the final SSE error
+event, which also carries `error.usage.completion_tokens`: the tokens the seller
+delivered before it stopped. The buyer does not retry or reroute.
+`FREE_EXECUTION_ENGINE_UNAVAILABLE` remains the refusal before generation, for
+example when the seller's engine readiness has expired. A pinned model that
+disappears during a request is reported as `engine_unavailable`.
+
 The response contains one `choices` entry, its text/finish reason and
 `usage.prompt_tokens`, `completion_tokens` and `total_tokens`. Static failures
 use `error.code`; arbitrary exception contents are never returned. No prompt or
 response is written to logs, journals or selection metadata. A free seller can
 still observe the submitted text; free does not imply private or verified.
 
-Control connections close before execution connects on `gyblos/free/2` or
-`gyblos/free-stream/2`. The client verifies the seller peer, signed quote, local
+Control connections close before execution connects on `gyblos/free/3` or
+`gyblos/free-stream/3`. The client verifies the seller peer, signed quote, local
 buyer NodeId, exact terms and zero-skew expiry again before sending.
 Request/response bounds and correlation use the free protocol codec. A query has
 an absolute 180-second budget including discovery, quotes and execution; each

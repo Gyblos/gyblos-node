@@ -2,7 +2,7 @@
 import type { Engine, EngineInput } from '@gyblos/protocol/engine';
 
 import { GENERATION, MODEL } from './constants';
-import { createOllama } from './index';
+import { createOllama, type OllamaOptions } from './index';
 
 function userPrompt(input: EngineInput) {
   if (input.prompt !== undefined) return input.prompt;
@@ -18,8 +18,9 @@ function userPrompt(input: EngineInput) {
 export function createOllamaEngine(
   base: string,
   fetchImpl: typeof fetch = fetch,
+  options: OllamaOptions = {},
 ): Engine {
-  const adapter = createOllama(base, fetchImpl);
+  const adapter = createOllama(base, fetchImpl, options);
   return {
     capabilities: () => ({
       reportsUsage: true,

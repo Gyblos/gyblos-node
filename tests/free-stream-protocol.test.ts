@@ -5,6 +5,7 @@ import test from 'node:test';
 import {
   ENGINE_DONE_REASONS,
   FREE_EXECUTION_CODES,
+  FREE_EXECUTION_STOP_REASONS,
 } from '@gyblos/protocol/constants';
 import { freeExecutionDigest } from '@gyblos/protocol/free-execution';
 
@@ -14,7 +15,7 @@ async function messages() {
   const source = await freeSellerFixture();
   const request = await source.request();
   const header = {
-    version: 2,
+    version: 3,
     requestId: request.requestId,
     requestDigest: await freeExecutionDigest(request),
   };
@@ -94,7 +95,7 @@ void test('free stream golden frames preserve canonical bytes independently of e
     JSON.parse(
       await readFile(
         new URL(
-          import.meta.resolve('@gyblos/protocol/vectors/free-stream-v2.json'),
+          import.meta.resolve('@gyblos/protocol/vectors/free-stream-v3.json'),
         ),
         'utf8',
       ),
@@ -169,5 +170,113 @@ void test('free stream rejects ambiguous JSON and preserves remote error provena
       },
     }),
     { code: FREE_EXECUTION_CODES.ENGINE, remote: true },
+  );
+});
+
+async function streamVectors(): Promise<{
+  events: { event: Record<string, unknown>; frameHex: string }[];
+  interrupted: { event: Record<string, unknown>; frameHex: string }[];
+}> {
+  const { readFile } = await import('node:fs/promises');
+  return JSON.parse(
+    await readFile(
+      new URL(
+        import.meta.resolve('@gyblos/protocol/vectors/free-stream-v3.json'),
+      ),
+      'utf8',
+    ),
+  );
+}
+function cannotContinue(
+  fixture: Awaited<ReturnType<typeof messages>>,
+  sequence: number,
+  extra: Record<string, unknown> = {},
+) {
+  const { version, requestId, requestDigest } = fixture.terminal.response;
+  return {
+    ...fixture.terminal,
+    sequence,
+    response: {
+      version,
+      requestId,
+      requestDigest,
+      error: {
+        code: FREE_EXECUTION_CODES.SELLER_CANNOT_CONTINUE,
+        reason: FREE_EXECUTION_STOP_REASONS.QUOTA_EXHAUSTED,
+        ...extra,
+      },
+    },
+  };
+}
+void test('free stream v3 golden interrupted frames keep canonical bytes', async () => {
+  const api = await import('@gyblos/protocol/free-stream');
+  const source = await streamVectors();
+  const terminal = source.interrupted.at(-1)?.event;
+  assert.equal(Reflect.get(terminal ?? {}, 'version'), 3);
+  for (const row of source.interrupted) {
+    assert.equal(
+      Buffer.from(api.encodeFreeStreamEvent(row.event)).toString('hex'),
+      row.frameHex,
+    );
+    assert.deepEqual(
+      api.decodeFreeStreamEvent(Buffer.from(row.frameHex, 'hex')),
+      row.event,
+    );
+  }
+});
+void test('free stream requires delivered usage exactly when it cannot continue after text', async () => {
+  const api = await import('@gyblos/protocol/free-stream');
+  const fixture = await messages();
+  const delivered = { outputTokens: 2 };
+  const reported = await api.createFreeStreamVerifier(fixture.request);
+  await reported.accept(fixture.delta);
+  await assert.rejects(
+    reported.accept(cannotContinue(fixture, 1, { delivered })),
+    (error: unknown) =>
+      error instanceof Error &&
+      Reflect.get(error, 'code') ===
+        FREE_EXECUTION_CODES.SELLER_CANNOT_CONTINUE &&
+      Reflect.get(error, 'reason') ===
+        FREE_EXECUTION_STOP_REASONS.QUOTA_EXHAUSTED &&
+      Reflect.get(error, 'remote') === true &&
+      Reflect.get(Reflect.get(error, 'delivered') ?? {}, 'outputTokens') === 2,
+  );
+  const missing = await api.createFreeStreamVerifier(fixture.request);
+  await missing.accept(fixture.delta);
+  await assert.rejects(missing.accept(cannotContinue(fixture, 1)), {
+    code: FREE_EXECUTION_CODES.INVALID,
+  });
+  const early = await api.createFreeStreamVerifier(fixture.request);
+  await assert.rejects(
+    early.accept(cannotContinue(fixture, 0, { delivered })),
+    {
+      code: FREE_EXECUTION_CODES.INVALID,
+    },
+  );
+  const before = await api.createFreeStreamVerifier(fixture.request);
+  await assert.rejects(before.accept(cannotContinue(fixture, 0)), {
+    code: FREE_EXECUTION_CODES.SELLER_CANNOT_CONTINUE,
+    remote: true,
+  });
+  // 'answer' is 6 UTF-8 bytes; a claim of 7 delivered tokens is impossible.
+  const inflated = await api.createFreeStreamVerifier(fixture.request);
+  await inflated.accept(fixture.delta);
+  await assert.rejects(
+    inflated.accept(
+      cannotContinue(fixture, 1, { delivered: { outputTokens: 7 } }),
+    ),
+    { code: FREE_EXECUTION_CODES.INVALID },
+  );
+  const limit = await api.createFreeStreamVerifier(fixture.request);
+  await limit.accept(fixture.delta);
+  await assert.rejects(
+    limit.accept({
+      ...cannotContinue(fixture, 1),
+      response: {
+        ...cannotContinue(fixture, 1).response,
+        error: { code: FREE_EXECUTION_CODES.LIMIT },
+      },
+    }),
+    { code: FREE_EXECUTION_CODES.LIMIT, remote: true },
   );
 });

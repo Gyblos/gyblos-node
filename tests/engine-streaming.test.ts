@@ -5,7 +5,10 @@ import test from 'node:test';
 import { ROUTES } from '@gyblos/config';
 import { MODEL, MODEL_LIMITS } from '@gyblos/engine-ollama/constants';
 import { createOllamaEngine } from '@gyblos/engine-ollama/engine';
-import { ENGINE_DONE_REASONS } from '@gyblos/protocol/constants';
+import {
+  ENGINE_DONE_REASONS,
+  ENGINE_ERROR_CODES,
+} from '@gyblos/protocol/constants';
 
 function deferred() {
   let resolve = () => {};
@@ -247,7 +250,7 @@ void test('engine validates output bounds before incremental delivery', async ()
         fragments.push(text);
       },
     }),
-    /Engine output exceeds limit/,
+    { name: 'EngineError', code: ENGINE_ERROR_CODES.INVALID_RESPONSE },
   );
   assert.deepEqual(fragments, []);
   assert.equal(run.cancelled(), 1);

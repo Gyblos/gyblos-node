@@ -9,12 +9,16 @@ import {
   FREE_EXECUTION_CODES,
   FREE_STREAM,
   type FreeExecutionCode,
+  type FreeExecutionStopReason,
 } from '@gyblos/protocol/constants';
 import {
   FreeExecutionError,
+  freeExecutionStop,
   matchFreeExecutionResponse,
   verifyFreeExecutionRequest,
+  type FreeExecutionDelivered,
   type FreeExecutionRequest,
+  type FreeExecutionStop,
 } from '@gyblos/protocol/free-execution';
 import {
   encodeFreeExecutionRequest,
@@ -28,13 +32,17 @@ import { readFreeStreamResponse } from './free-stream-client';
 import { selectedRoute } from './paths';
 
 export class FreeClientError extends Error {
+  declare readonly reason?: FreeExecutionStopReason;
+  declare readonly delivered?: FreeExecutionDelivered;
   constructor(
     readonly code: FreeExecutionCode,
     readonly sent: boolean,
     readonly remote = false,
+    stop: FreeExecutionStop = {},
   ) {
     super(code);
     this.name = 'FreeClientError';
+    Object.assign(this, freeExecutionStop(stop));
   }
 }
 async function readResponse(
@@ -253,13 +261,9 @@ export function createFreeExecutionClient(
 
 function clientError(error: unknown, sent: boolean) {
   if (error instanceof FreeClientError) return error;
-  return new FreeClientError(
-    error instanceof FreeExecutionError
-      ? error.code
-      : FREE_EXECUTION_CODES.INTERNAL,
-    sent,
-    error instanceof FreeExecutionError && error.remote,
-  );
+  if (!(error instanceof FreeExecutionError))
+    return new FreeClientError(FREE_EXECUTION_CODES.INTERNAL, sent);
+  return new FreeClientError(error.code, sent, error.remote, error);
 }
 
 function authenticateFreeRequest(
