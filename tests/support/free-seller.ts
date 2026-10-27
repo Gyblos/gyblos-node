@@ -2,6 +2,7 @@
 import { createControlQuote } from '@gyblos/core/control-quotes';
 import { OFFER_PRICING_KINDS } from '@gyblos/node/constants';
 import type { SellerFreeExecutionOptions } from '@gyblos/node/free-execution';
+import { sellerLimits } from '@gyblos/node/node-config-limits';
 import {
   ENGINE_DONE_REASONS,
   FREE_CHAT_ROLES,
@@ -64,6 +65,7 @@ export async function freeSellerFixture(
     readiness: () => ({ ...source.context.readiness(), busy }),
     now: () => now,
     startedAt: now - 1,
+    maxFreeBuyers: sellerLimits().maxFreeBuyers,
   };
   const service = api.createSellerFreeExecution(options);
   async function request(

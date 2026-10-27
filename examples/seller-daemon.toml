@@ -14,6 +14,11 @@ network = "devnet"
 # Off so a test node is not listed by accident; set publish = true to appear in discovery.
 publish = false
 
+# Optional capacity limits; omitted keys keep these defaults (docs/configuration.md#seller-limits).
+# [limits]
+# max_connections = 8
+# requests_per_minute = 30
+
 [[offers]]
 model = "qwen3:0.6b"
 reasoning = ["off"]

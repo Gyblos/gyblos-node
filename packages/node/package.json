@@ -26,6 +26,7 @@
     "./control-startup": "./src/control-startup.ts",
     "./node-config": "./src/node-config.ts",
     "./node-config-resolve": "./src/node-config-resolve.ts",
+    "./node-config-limits": "./src/node-config-limits.ts",
     "./free-execution": "./src/free-execution.ts",
     "./seller-transport": "./src/seller-transport.ts",
     "./identity-verifier": "./src/identity-verifier.ts",

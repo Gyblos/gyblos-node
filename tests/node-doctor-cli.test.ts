@@ -54,6 +54,30 @@ void test('doctor: a ready free seller exits 0, prints its public identity and c
     assert.match(result.output, new RegExp(`owner\\s+${run.owner}`));
     assert.match(result.output, /offer\s+free qwen3-0\.6b/);
     assert.match(result.output, /publish\s+off/);
+    assert.match(result.output, /connections 8 total/);
+    assert.match(result.output, /requests\s+30\/min per buyer, 256\/min total/);
+    assert.match(result.output, /free buyers 1024\/day/);
+  }));
+
+void test('doctor: prints the [limits] the seller will serve with', () =>
+  scenario({}, async (run) => {
+    await withOllama(run);
+    await writeFile(
+      join(run.root, 'gyblos.toml'),
+      `${FREE_TOML}\n[limits]\nrequests_per_minute = 60\nglobal_requests_per_minute = 512\n`,
+    );
+    const result = await doctor(run);
+    assert.equal(result.code, 0, result.output);
+    assert.match(result.output, /connections 8 total/);
+    assert.match(result.output, /requests\s+60\/min per buyer, 512\/min total/);
+    await writeFile(
+      join(run.root, 'gyblos.toml'),
+      `${FREE_TOML}\n[limits]\nrequests_per_minute = 60\n`,
+    );
+    const invalid = await doctor(run);
+    assert.equal(invalid.code, 1);
+    assert.match(invalid.output, /INVALID_LIMIT\s+limits\.requests_per_minute/);
+    assert.doesNotMatch(invalid.output, /Limits/);
   }));
 
 void test('doctor: an empty home fails the role check with a setup hint and exits 1', () =>
@@ -253,6 +277,8 @@ void test('doctor: probes the paid ports only for a paid offer', () =>
       paid.probed.map((url) => new URL(url).port),
       ['11436', '4022', '4032'],
     );
+    assert.match(paid.output, /connections 8 total/);
+    assert.doesNotMatch(paid.output, /free buyers/);
   }));
 
 void test('doctor: --online checks the devnet program only for a paid offer and hides the RPC', () =>

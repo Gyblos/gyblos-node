@@ -28,6 +28,7 @@ import {
   type NodeConfigIssue,
   type NodeConfigWarning,
 } from './node-config-fields.js';
+import { readLimits, type NodeLimits } from './node-config-limits.js';
 import { readOffers, type NodeOffer } from './node-config-offers.js';
 import {
   readAddress,
@@ -44,6 +45,7 @@ export {
   readPriceDecimal,
   type PriceDecimal,
 } from './node-config-price.js';
+export type { NodeLimits } from './node-config-limits.js';
 export type {
   NodeOffer,
   OfferEngine,
@@ -64,6 +66,8 @@ export interface NodeConfig {
   transport?: { relayOnly?: boolean; bind?: string; externalAddress?: string };
   buyer?: { relayOnly?: boolean };
   discovery?: { publish?: boolean; url?: string };
+  // Seller capacity; see node-config-limits.ts.
+  limits?: NodeLimits;
   offers: NodeOffer[];
 }
 
@@ -82,6 +86,7 @@ const ROOT_KEYS = [
   'transport',
   'buyer',
   'discovery',
+  'limits',
   'offers',
 ];
 const NODE_KEYS = ['network', 'data_dir', 'payout_wallet', 'rpc_url'];
@@ -269,6 +274,9 @@ export function validateNodeConfig(document: unknown): NodeConfigResult {
   const discovery = optional(root, 'discovery', [], (value, path) =>
     readDiscovery(value, path, issues),
   );
+  const limits = optional(root, 'limits', [], (value, path) =>
+    readLimits(value, path, issues),
+  );
   const offers = readOffers(root.offers, ['offers'], issues);
   unknownKeys(root, [], ROOT_KEYS, issues);
   if (
@@ -288,6 +296,7 @@ export function validateNodeConfig(document: unknown): NodeConfigResult {
       transport,
       buyer,
       discovery,
+      limits,
       offers,
     }),
   };

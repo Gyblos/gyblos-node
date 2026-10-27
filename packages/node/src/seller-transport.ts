@@ -12,6 +12,7 @@ import { serveIroh } from '@gyblos/transport-iroh/iroh-server';
 
 import type { prepareSellerControl } from './control-startup.js';
 import { prepareSellerFreeExecution } from './free-execution.js';
+import type { SellerLimits } from './node-config-limits.js';
 
 export function serveSellerTransport(
   endpoint: Endpoint,
@@ -25,10 +26,12 @@ export function serveSellerTransport(
     tokenizer: RecountTokenizer;
     readiness: () => QuoteReadiness;
     startedAt: number;
+    limits: SellerLimits;
   },
 ) {
   const freeExecution = prepareSellerFreeExecution({
     ...options,
+    maxFreeBuyers: options.limits.maxFreeBuyers,
     offer: control.offer,
     catalog: control.records.current(),
     capabilities: options.engine.capabilities(),
@@ -40,5 +43,6 @@ export function serveSellerTransport(
     options.relayOnly,
     control.service,
     freeExecution,
+    options.limits.transport,
   );
 }

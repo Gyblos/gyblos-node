@@ -21,6 +21,7 @@ import {
   type NodeErrorCode,
 } from './constants.js';
 import { NodeError } from './errors.js';
+import { sellerLimits, type SellerLimits } from './node-config-limits.js';
 import { pricePerMtokToAtomicPerMtok } from './node-config-price.js';
 import { resolveNodeConfig } from './node-config-resolve.js';
 import {
@@ -42,6 +43,7 @@ export interface SellerSettings {
   relayEnvironment: RelayEnvironment;
   publication: { baseUrl: string } | undefined;
   offer: SellerCatalogOffer;
+  limits: SellerLimits;
 }
 
 export interface SellerSettingsOptions {
@@ -165,6 +167,8 @@ export function sellerSettings(
     },
     publication,
     offer: catalogOffer(settings.offers, options),
+    // File only: [limits] has no environment variables or flags.
+    limits: sellerLimits(file?.limits),
   };
 }
 

@@ -4,7 +4,7 @@ import { isIP } from 'node:net';
 
 import type { IncomingAddr } from '@number0/iroh';
 
-import { TRANSPORT_LIMITS } from '@gyblos/config';
+import { TRANSPORT_LIMITS, type TransportLimits } from '@gyblos/config';
 import { CONTROL_ALPN } from '@gyblos/protocol/constants';
 
 import { createConnectionRate } from './connection-rate.js';
@@ -41,18 +41,19 @@ export function connectionSource(source: IncomingAddr): string | undefined {
 
 export function createConnectionAdmission(
   now: () => number = () => performance.now(),
+  limits: TransportLimits = TRANSPORT_LIMITS,
 ) {
   const sources = new Map<string, number>();
   const peers = new Map<string, number>();
-  const rate = createConnectionRate(now);
+  const rate = createConnectionRate(now, limits);
   let pending = 0;
   let established = 0;
   return {
     attempt: rate.attempt,
     pending(source: string) {
       if (
-        pending >= TRANSPORT_LIMITS.maxPendingConnections ||
-        (sources.get(source) ?? 0) >= TRANSPORT_LIMITS.maxPendingPerSource
+        pending >= limits.maxPendingConnections ||
+        (sources.get(source) ?? 0) >= limits.maxPendingPerSource
       )
         return undefined;
       pending++;
@@ -73,8 +74,8 @@ export function createConnectionAdmission(
       if (!rate.peer(peer)) return undefined;
       const key = `${family}:${peer}`;
       if (
-        established >= TRANSPORT_LIMITS.maxConnections ||
-        (peers.get(key) ?? 0) >= TRANSPORT_LIMITS.maxPeerConnections
+        established >= limits.maxConnections ||
+        (peers.get(key) ?? 0) >= limits.maxPeerConnections
       )
         return undefined;
       established++;

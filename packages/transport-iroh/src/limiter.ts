@@ -1,5 +1,5 @@
 // Per-peer and global request quotas per window; consumed quota survives reconnects and eviction.
-import { TRANSPORT_LIMITS } from '@gyblos/config';
+import { TRANSPORT_LIMITS, type TransportLimits } from '@gyblos/config';
 
 import type { ConnectionFamily } from './constants.js';
 
@@ -11,7 +11,10 @@ interface PeerWindow {
   families: Map<ConnectionFamily, number>;
 }
 
-export function createPeerLimiter(now: () => number = Date.now) {
+export function createPeerLimiter(
+  now: () => number = Date.now,
+  limits: TransportLimits = TRANSPORT_LIMITS,
+) {
   const windows = new Map<string, PeerWindow>();
   // Only admitted work adds an entry, bounded by the global window budget.
   const requestCounts = new Map<string, number>();
@@ -21,7 +24,7 @@ export function createPeerLimiter(now: () => number = Date.now) {
 
   function remaining() {
     return (
-      TRANSPORT_LIMITS.globalRequestsPerWindow -
+      limits.globalRequestsPerWindow -
       globalRequests -
       [...windows.values()].reduce((sum, window) => sum + window.reserved, 0)
     );
@@ -29,7 +32,7 @@ export function createPeerLimiter(now: () => number = Date.now) {
 
   function refresh() {
     const time = now();
-    if (time - globalStarted < TRANSPORT_LIMITS.rateWindowMs) return;
+    if (time - globalStarted < limits.rateWindowMs) return;
     globalStarted = time;
     globalRequests = 0;
     requestCounts.clear();
@@ -39,16 +42,13 @@ export function createPeerLimiter(now: () => number = Date.now) {
     }
     for (const window of windows.values())
       if (window.leases > 0)
-        window.reserved = Math.min(
-          TRANSPORT_LIMITS.requestsPerWindow,
-          remaining(),
-        );
+        window.reserved = Math.min(limits.requestsPerWindow, remaining());
   }
 
   function windowFor(nodeId: string) {
     let window = windows.get(nodeId);
     if (!window) {
-      if (windows.size >= TRANSPORT_LIMITS.maxPeers) {
+      if (windows.size >= limits.maxPeers) {
         const inactive = ([, peer]: [string, PeerWindow]) =>
           peer.active === 0 && peer.leases === 0;
         const oldest =
@@ -80,16 +80,15 @@ export function createPeerLimiter(now: () => number = Date.now) {
       refresh();
       const requests = requestCounts.get(nodeId) ?? 0;
       if (
-        requests >= TRANSPORT_LIMITS.requestsPerWindow ||
-        globalRequests >= TRANSPORT_LIMITS.globalRequestsPerWindow ||
+        requests >= limits.requestsPerWindow ||
+        globalRequests >= limits.globalRequestsPerWindow ||
         (windows.get(nodeId)?.families.get(family) ?? 0) >=
-          TRANSPORT_LIMITS.maxPeerConnections
+          limits.maxPeerConnections
       )
         return undefined;
       const window = windowFor(nodeId);
       if (!window) return undefined;
-      const needed =
-        TRANSPORT_LIMITS.requestsPerWindow - requests - window.reserved;
+      const needed = limits.requestsPerWindow - requests - window.reserved;
       reclaim(nodeId, needed);
       const additional = Math.min(needed, remaining());
       if (window.reserved + additional <= 0) return undefined;
@@ -117,13 +116,13 @@ export function createPeerLimiter(now: () => number = Date.now) {
       refresh();
       const requests = requestCounts.get(nodeId) ?? 0;
       if (
-        active >= TRANSPORT_LIMITS.maxConcurrent ||
-        requests >= TRANSPORT_LIMITS.requestsPerWindow ||
-        globalRequests >= TRANSPORT_LIMITS.globalRequestsPerWindow
+        active >= limits.maxConcurrent ||
+        requests >= limits.requestsPerWindow ||
+        globalRequests >= limits.globalRequestsPerWindow
       )
         return undefined;
       const window = windowFor(nodeId);
-      if (!window || window.active >= TRANSPORT_LIMITS.maxPeerConcurrent)
+      if (!window || window.active >= limits.maxPeerConcurrent)
         return undefined;
       if (window.reserved === 0) {
         if (window.leases > 0) return undefined;

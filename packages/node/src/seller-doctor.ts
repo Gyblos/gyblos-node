@@ -46,6 +46,7 @@ import {
   assertTokenizerHome,
 } from './home.js';
 import type { NodeConfigIssue } from './node-config-fields.js';
+import type { SellerLimits } from './node-config-limits.js';
 import { readNodeConfigFile, type NodeConfig } from './node-config.js';
 import { inspectSellerSequence } from './public-sequence.js';
 import { loadRole, roleKeyFilesStatus } from './roles.js';
@@ -66,6 +67,7 @@ export interface DoctorReport {
   seller: { nodeId: string; owner: string } | undefined;
   offer: SellerCatalogOffer | undefined;
   publication: string | undefined;
+  limits: SellerLimits | undefined;
 }
 export interface DoctorProbes {
   // True when nothing answers on the loopback URL, as startup requires.
@@ -347,5 +349,6 @@ export async function sellerDoctor(
     seller: role.seller,
     offer: config.settings?.offer,
     publication: config.settings?.publication?.baseUrl,
+    limits: config.settings?.limits,
   };
 }

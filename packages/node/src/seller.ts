@@ -344,6 +344,7 @@ export async function startSeller() {
       readiness: controlReadiness.readiness,
       startedAt,
       relayOnly,
+      limits: settings.limits,
     });
     disposers[endpointDisposeIndex] = () => bridge.close();
     const publication = publicationConfig

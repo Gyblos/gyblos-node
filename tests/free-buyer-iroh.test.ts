@@ -10,6 +10,7 @@ import type { BuyerSelectionConfig } from '@gyblos/buyer/selection-config';
 import type { LocalSellerStats } from '@gyblos/buyer/selection-stats';
 import { SELLER_BADGES } from '@gyblos/core/constants';
 import { createSellerControlService } from '@gyblos/node/control';
+import { sellerLimits } from '@gyblos/node/node-config-limits';
 import { createSellerRecords } from '@gyblos/node/public-records';
 import { serveSellerTransport } from '@gyblos/node/seller-transport';
 import {
@@ -95,6 +96,7 @@ void test(
         nodeId: seller.id().toString(),
         startedAt: now - 1,
         relayOnly: false,
+        limits: sellerLimits(),
       },
     );
     const {
