@@ -1,6 +1,5 @@
 // Builds ephemeral free quotes and an injectable synthetic engine; no files, payment services or real keys.
 import { createControlQuote } from '@gyblos/core/control-quotes';
-import { OFFER_PRICING_KINDS } from '@gyblos/node/constants';
 import type { SellerFreeExecutionOptions } from '@gyblos/node/free-execution';
 import { sellerLimits } from '@gyblos/node/node-config-limits';
 import {
@@ -8,6 +7,7 @@ import {
   FREE_CHAT_ROLES,
   FREE_EXECUTION,
   MODEL_IDS,
+  OFFER_PRICING_KINDS,
 } from '@gyblos/protocol/constants';
 import type { EngineResult } from '@gyblos/protocol/engine';
 

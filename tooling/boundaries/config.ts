@@ -10,7 +10,7 @@ export const PRIVATE_PATH =
   '(^|/)(?:\\.local|\\.git|dist|coverage|evidence|captures)(?:/|$)|(^|/)\\.env(?:\\.|$)|\\.(?:key|pem|log)$';
 export const LAB_PATH = '^lab/';
 const ADAPTER_NAME =
-  /^(?:payments-x402|identity|engine-.+|transport-.+|discovery-.+)$/;
+  /^(?:payments-.+|identity|engine-.+|transport-.+|discovery-.+|telemetry-.+)$/;
 const PACKAGE_PATH = '^packages/';
 const CORE_PATH = '^packages/core/';
 const PROTOCOL_PATH = '^packages/protocol/';

@@ -133,11 +133,7 @@ const packageBoundaries = {
     const filename = context.filename.replaceAll('\\', '/');
     const root = packageRoot(filename);
     function checkSource(node: SourceNode) {
-      const literal = node.source;
-      const source =
-        literal?.type === 'TemplateLiteral' && literal.expressions?.length === 0
-          ? literal.quasis?.[0]?.value.cooked
-          : literal?.value;
+      const source = sourceText(node.source);
       if (typeof source !== 'string') return;
       if (!source) return;
       if (root && source.startsWith('.')) {
@@ -151,6 +147,45 @@ const packageBoundaries = {
       ExportNamedDeclaration: checkSource,
       ExportAllDeclaration: checkSource,
       ImportExpression: checkSource,
+    };
+  },
+};
+
+// Relative modules resolve without an extension (Bundler resolution); assets such as JSON or CSS keep theirs.
+const CODE_EXTENSION = /\.[cm]?[jt]sx?$/;
+
+function sourceText(literal: SourceNode['source']) {
+  return literal?.type === 'TemplateLiteral' &&
+    literal.expressions?.length === 0
+    ? literal.quasis?.[0]?.value.cooked
+    : literal?.value;
+}
+
+const importExtensions = {
+  meta: {
+    type: 'suggestion',
+    schema: [],
+    messages: {
+      extension: 'Import relative TypeScript modules without an extension.',
+    },
+  },
+  create(context: RuleContext) {
+    function checkSource(node: SourceNode) {
+      const source = sourceText(node.source);
+      if (
+        typeof source === 'string' &&
+        source.startsWith('.') &&
+        CODE_EXTENSION.test(source)
+      )
+        context.report({ node, messageId: 'extension' });
+    }
+    return {
+      ImportDeclaration: checkSource,
+      ExportNamedDeclaration: checkSource,
+      ExportAllDeclaration: checkSource,
+      ImportExpression: checkSource,
+      // `import('./x').T` in type positions; `source` replaces the deprecated `argument`.
+      TSImportType: checkSource,
     };
   },
 };
@@ -207,6 +242,7 @@ export default {
   rules: {
     structure,
     'package-boundaries': packageBoundaries,
+    'import-extensions': importExtensions,
     'version-pins': versionPins,
   },
 };

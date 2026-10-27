@@ -66,8 +66,10 @@ protocol ◀── core ◀── adapters ◀── node ◀── apps
 
 - Protocol imports nothing else and no SDK.
 - Core imports only protocol (and config/runtime); no SDKs, no filesystem.
-- Adapters do not import each other. Inference knows no wallets; payment code
-  knows no engines.
+- Adapters are plugins: packages named by family (`engine-*`, `payments-*`,
+  `transport-*`, `discovery-*`, `telemetry-*`, plus `identity`), each
+  implementing a port, chosen by composition in `packages/node`. They do not
+  import each other. Inference knows no wallets; payment code knows no engines.
 - Apps do not import other apps.
 - Product code (`packages/`, `apps/`) never imports `lab/`, `tests/` or
   `tooling/`.

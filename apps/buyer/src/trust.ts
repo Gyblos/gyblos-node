@@ -4,13 +4,13 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { parseArgs } from 'node:util';
 
 import { FILE_MODES, ROLE_FILES } from '@gyblos/config';
-import { P2P_ROLES } from '@gyblos/node/constants';
 import {
   parseOfferTrust,
   parseSignedOfferJson,
   verifyInferenceOffer,
 } from '@gyblos/node/offers';
 import { loadRole, rolePath } from '@gyblos/node/roles';
+import { P2P_ROLES } from '@gyblos/protocol/constants';
 import { isMain } from '@gyblos/runtime';
 import { HTTP_OVER_IROH } from '@gyblos/transport-iroh/constants';
 import { assertConfiguredRelay } from '@gyblos/transport-iroh/endpoint';

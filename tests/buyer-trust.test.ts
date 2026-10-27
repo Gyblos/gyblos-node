@@ -6,7 +6,8 @@ import test from 'node:test';
 
 import { FILE_MODES, MAX_ATOMIC, ROLE_FILES } from '@gyblos/config';
 import type { OfferTrust } from '@gyblos/core/offers';
-import { NODE_ERROR_CODES, P2P_ROLES } from '@gyblos/node/constants';
+import { NODE_ERROR_CODES } from '@gyblos/node/constants';
+import { P2P_ROLES } from '@gyblos/protocol/constants';
 import type { SignedInferenceOffer } from '@gyblos/protocol/offer';
 import { loadJson } from '@gyblos/runtime';
 import { RELAY_CONFIGURATION_CODES } from '@gyblos/transport-iroh/constants';

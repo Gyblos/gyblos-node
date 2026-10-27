@@ -1,8 +1,8 @@
 // CLI for isolated P2P role provisioning; it does not contact RPC, fund wallets or start the node.
 import { parseArgs } from 'node:util';
 
-import { P2P_ROLES } from '@gyblos/node/constants';
 import { publicRole, setupRole } from '@gyblos/node/roles';
+import { P2P_ROLES } from '@gyblos/protocol/constants';
 import { isMain } from '@gyblos/runtime';
 
 export async function main(args = process.argv.slice(2)) {

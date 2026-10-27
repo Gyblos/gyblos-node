@@ -6,7 +6,6 @@ import {
   DOCTOR_CODES,
   DOCTOR_STATUS,
   NODE_ERROR_CODES,
-  OFFER_PRICING_KINDS,
 } from '@gyblos/node/constants';
 import {
   sellerDoctor,
@@ -14,6 +13,7 @@ import {
   type DoctorProbes,
   type DoctorResultCode,
 } from '@gyblos/node/seller-doctor';
+import { OFFER_PRICING_KINDS } from '@gyblos/protocol/constants';
 import { RELAY_CONFIGURATION_CODES } from '@gyblos/transport-iroh/constants';
 
 import { issueLine, urlOrigin } from './cli-format';

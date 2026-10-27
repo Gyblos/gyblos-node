@@ -9,7 +9,8 @@
     "./setup": "./src/setup.ts"
   },
   "dependencies": {
-    "@gyblos/runtime": "workspace:*",
-    "@gyblos/node": "workspace:*"
+    "@gyblos/node": "workspace:*",
+    "@gyblos/protocol": "workspace:*",
+    "@gyblos/runtime": "workspace:*"
   }
 }

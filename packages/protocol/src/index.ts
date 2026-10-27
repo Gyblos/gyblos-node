@@ -1,5 +1,5 @@
 // Owns public SDK-independent protocol exports.
-// Policy, wallets, engines, transport and process lifecycle stay outside this package.
+// Policy, wallets, engine implementations, transport and process lifecycle stay outside this package.
 export type { EngineWireUsage } from './wire-usage';
 
 export { canonicalJson } from './canonical';
