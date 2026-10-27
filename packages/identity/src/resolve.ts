@@ -14,6 +14,7 @@ import {
 import { IdentityError } from './errors.js';
 import { memcmpFilter } from './filters.js';
 import {
+  assertIdentityReadActive,
   readClaimants,
   registryAssets,
   type IdentityReadOptions,
@@ -139,6 +140,6 @@ export async function resolveNodeBinding(
       IDENTITY_ERROR_CODES.NODE_ID_AMBIGUOUS,
       'Newest identity binding is ambiguous.',
     );
-  options.signal?.throwIfAborted();
+  assertIdentityReadActive(options);
   return newest[0];
 }

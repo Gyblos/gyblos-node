@@ -34,6 +34,7 @@ import {
 import { IdentityError } from './errors.js';
 import { memcmpFilter } from './filters.js';
 import { findAgentAddress, findMetadataAddress } from './pda.js';
+import { decodeAccountBatch } from './read-response.js';
 
 export interface NodeIdentity {
   asset: Address;
@@ -52,6 +53,8 @@ export interface IdentityReadOptions {
   collection?: Address | CollectionPolicy;
   commitment?: typeof COMMITMENT | typeof FINALIZED_COMMITMENT;
   signal?: AbortSignal;
+  // Optional absolute performance.now() deadline for bounded read composition.
+  deadline?: number;
 }
 
 export type IdentityReadRpc = Pick<
@@ -103,21 +106,15 @@ async function fetchBatch(
   addresses: readonly Address[],
   options: IdentityReadOptions,
 ): Promise<(RawAccount | undefined)[]> {
-  options.signal?.throwIfAborted();
+  assertIdentityReadActive(options);
   const { value } = await rpc
     .getMultipleAccounts(addresses, {
       encoding: BASE64_ENCODING,
       commitment: options.commitment ?? COMMITMENT,
     })
     .send(options.signal ? { abortSignal: options.signal } : undefined);
-  return value.map((account) =>
-    account === null
-      ? undefined
-      : {
-          owner: account.owner,
-          data: new Uint8Array(BASE64_TEXT_TO_BYTES.encode(account.data[0])),
-        },
-  );
+  assertIdentityReadActive(options);
+  return decodeAccountBatch(value, addresses.length);
 }
 
 // One getMultipleAccounts call per accountsPerRequest addresses, in order.
@@ -331,7 +328,7 @@ export async function registryAssets(
   decode: (bytes: Uint8Array) => { asset: Address },
   options: IdentityReadOptions = {},
 ): Promise<Address[]> {
-  options.signal?.throwIfAborted();
+  assertIdentityReadActive(options);
   const accounts = await rpc
     .getProgramAccounts(PROGRAMS.registry, {
       encoding: BASE64_ENCODING,
@@ -339,6 +336,7 @@ export async function registryAssets(
       filters,
     })
     .send(options.signal ? { abortSignal: options.signal } : undefined);
+  assertIdentityReadActive(options);
   return accounts.flatMap((item) =>
     assetOf(
       new Uint8Array(BASE64_TEXT_TO_BYTES.encode(item.account.data[0])),
@@ -386,4 +384,13 @@ export async function readNodeIdentity(
   return identities.filter(
     (identity): identity is NodeIdentity => identity?.owner === query.owner,
   );
+}
+
+export function assertIdentityReadActive(options: IdentityReadOptions) {
+  options.signal?.throwIfAborted();
+  if (options.deadline !== undefined && performance.now() >= options.deadline)
+    throw new IdentityError(
+      IDENTITY_ERROR_CODES.READ_TIMEOUT,
+      'Registry lookup deadline elapsed.',
+    );
 }

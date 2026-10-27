@@ -24,8 +24,10 @@ default, configurable from 1 to 30 seconds. Cancellation is propagated to RPC
 and late results cannot become lookup success; an uncooperative provider may
 still retain its own work after the caller returns.
 
-Results are `bound` with verified `{nodeId, owner, asset, sequence}`, `missing`,
-or `unavailable` with a closed static reason. The adapter reuses existing
+Every result is bound to its queried `nodeId`, including negative evidence.
+Invalid NodeId input uses a sanitized null query marker. Results are `bound`
+with verified `{nodeId, owner, asset, sequence}`, `missing`, or `unavailable`
+with a closed static reason. The adapter reuses existing
 program/collection/Core-owner/node-proof validation and claimant bounds. The
 highest valid signed sequence must identify one asset: equal highest claims on
 different assets are ambiguous, even for the same owner. The legacy
@@ -73,13 +75,15 @@ registry's cached owner. Primary references:
 Those source revisions are not proof of the deployed bytecode; existing
 fixture-pinned layouts and upgrade-authority limits below remain applicable.
 
-Finalized reads span several requests, not one atomic snapshot. The RPC provider
-must be trusted for completeness and chain responses; genesis pinning is not
-cryptographic proof of provider honesty. Removing a newer claim may reveal an
-older valid one. A retained high-water mark rejects that rollback; a first-time
-reader cannot reconstruct unseen history. Without caller persistence this
-protection does not survive restart. Identity establishes a binding, not model
-quality, capacity, reputation, payment authority or correctness of an answer.
+Finalized reads span several requests, not one atomic snapshot. Claimant fan-out
+is capped; response-size and concurrency limits still belong to the RPC
+transport/caller, not this stateless API. The RPC provider must be trusted for
+completeness and chain responses; genesis pinning is not cryptographic proof of
+provider honesty. Removing a newer claim may reveal an older valid one. A
+retained high-water mark rejects that rollback; a first-time reader cannot
+reconstruct unseen history. Without caller persistence this protection does not
+survive restart. Identity establishes a binding, not model quality, capacity,
+reputation, payment authority or correctness of an answer.
 
 Synthetic tests cover these reads and transitions; no live RPC, chain write,
 payment or deployed-registry acceptance was run for this implementation.

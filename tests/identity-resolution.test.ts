@@ -58,6 +58,7 @@ void test('read-only resolution returns verified binding provenance using finali
     const result = await readRegistryIdentity(state.rpc, state.nodeId);
     assert.deepEqual(result, {
       kind: K.BOUND,
+      nodeId: state.nodeId,
       scope: {
         network: DEVNET,
         program: PROGRAMS.registry,

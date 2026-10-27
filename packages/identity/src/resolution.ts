@@ -18,6 +18,7 @@ import {
   PROGRAMS,
 } from './constants.js';
 import { IdentityError } from './errors.js';
+import { assertIdentityReadActive } from './read.js';
 import { resolveNodeBinding } from './resolve.js';
 
 export type IdentityResolutionRpc = Pick<
@@ -55,6 +56,8 @@ export async function readRegistryIdentity(
   options: IdentityResolutionOptions = {},
 ): Promise<IdentityLookup> {
   const scope = { ...IDENTITY_RESOLUTION_SCOPE };
+  const queryNodeId =
+    typeof nodeId === 'string' && isCanonicalNodeId(nodeId) ? nodeId : null;
   const unavailable = (
     reason: Extract<
       IdentityLookup,
@@ -63,6 +66,7 @@ export async function readRegistryIdentity(
   ): IdentityLookup => ({
     kind: IDENTITY_LOOKUP_KINDS.UNAVAILABLE,
     scope,
+    nodeId: queryNodeId,
     reason,
   });
   const timeout = options.timeoutMs ?? IDENTITY_RESOLUTION_LIMITS.timeoutMs;
@@ -74,37 +78,49 @@ export async function readRegistryIdentity(
     timeout > IDENTITY_RESOLUTION_LIMITS.maxTimeoutMs
   )
     return unavailable(IDENTITY_LOOKUP_FAILURES.INVALID);
+  const deadlineAt = performance.now() + timeout;
   const deadline = AbortSignal.timeout(timeout);
+  const lifetime = new AbortController();
   const signal = AbortSignal.any([
     deadline,
+    lifetime.signal,
     ...(options.signal ? [options.signal] : []),
   ]);
+  const readOptions = {
+    collection: DEVNET_REGISTRY.collection,
+    commitment: FINALIZED_COMMITMENT,
+    signal,
+    deadline: deadlineAt,
+  };
   try {
-    return await bounded(async () => {
+    const result = await bounded(async () => {
+      assertIdentityReadActive(readOptions);
       const genesis = await rpc.getGenesisHash().send({ abortSignal: signal });
-      signal.throwIfAborted();
+      assertIdentityReadActive(readOptions);
       if (genesis !== DEVNET_GENESIS)
         return unavailable(IDENTITY_LOOKUP_FAILURES.NETWORK);
-      const binding = await resolveNodeBinding(rpc, nodeId, {
-        collection: DEVNET_REGISTRY.collection,
-        commitment: FINALIZED_COMMITMENT,
-        signal,
-      });
-      signal.throwIfAborted();
+      const binding = await resolveNodeBinding(rpc, nodeId, readOptions);
+      assertIdentityReadActive(readOptions);
       return binding
-        ? { kind: IDENTITY_LOOKUP_KINDS.BOUND, scope, binding }
-        : { kind: IDENTITY_LOOKUP_KINDS.MISSING, scope };
+        ? { kind: IDENTITY_LOOKUP_KINDS.BOUND, scope, nodeId, binding }
+        : { kind: IDENTITY_LOOKUP_KINDS.MISSING, scope, nodeId };
     }, signal);
+    assertIdentityReadActive(readOptions);
+    return result;
   } catch (error) {
     if (options.signal?.aborted)
       return unavailable(IDENTITY_LOOKUP_FAILURES.CANCELLED);
     if (deadline.aborted) return unavailable(IDENTITY_LOOKUP_FAILURES.TIMEOUT);
     if (error instanceof IdentityError) {
+      if (error.code === IDENTITY_ERROR_CODES.READ_TIMEOUT)
+        return unavailable(IDENTITY_LOOKUP_FAILURES.TIMEOUT);
       if (error.code === IDENTITY_ERROR_CODES.NODE_ID_AMBIGUOUS)
         return unavailable(IDENTITY_LOOKUP_FAILURES.AMBIGUOUS);
       if (error.code === IDENTITY_ERROR_CODES.TOO_MANY_CLAIMANTS)
         return unavailable(IDENTITY_LOOKUP_FAILURES.LIMIT);
     }
     return unavailable(IDENTITY_LOOKUP_FAILURES.UNAVAILABLE);
+  } finally {
+    lifetime.abort();
   }
 }
