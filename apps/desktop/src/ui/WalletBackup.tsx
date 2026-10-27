@@ -115,7 +115,8 @@ export function WalletBackup() {
   return (
     <section className="wallet-details" aria-label="Encrypted backup">
       <Note>
-        Keep the file and password safe. Restore is not available yet.
+        Keep the file and password safe. Restore on first launch before creating
+        a wallet.
       </Note>
       <div
         className="connection-location"
