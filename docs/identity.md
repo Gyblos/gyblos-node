@@ -126,11 +126,57 @@ tests.
 
 Lookup decisions are never cached as usable trust. Caller cancellation reaches
 RPC; cancelled/late results cannot admit a quote or prompt. Static configured
-candidate limits bound lookup fan-out; the standard SDK RPC transport still
-requires an operator-trusted provider and does not impose a response-byte cap.
-Read deadlines do not make multi-request chain observations atomic and no read
-can freeze ownership after its last observation. Real-registry/off-host/mainnet
-acceptance remains separate from local synthetic tests.
+candidate limits bound lookup fan-out. The default buyer uses the bounded RPC
+transport described below. Read deadlines do not make multi-request chain
+observations atomic and no read can freeze ownership after its last observation.
+Real-registry/off-host/mainnet acceptance remains separate from local synthetic
+tests.
+
+### Bounded read-only RPC transport
+
+`@gyblos/identity/resolution-rpc` exposes
+`createIdentityResolutionRpc(url, options?)`. Node composition accepts either a
+URL (the default buyer path, always bounded) or an injected read-only RPC port
+(for callers/tests that explicitly own its transport). Legacy registration,
+sponsorship and direct RPC APIs retain their existing transports.
+
+The default limit is **1 MiB per decoded HTTP response**, including JSON framing
+and whitespace. The fetch stream is counted after HTTP decompression; compressed
+or absent/incorrect Content-Length cannot bypass the counter. An excessive
+advertised length is rejected before allocating the bounded buffer. The reader
+uses fixed storage rather than accumulating chunks, accepts fragmentation and
+empty chunks, decodes strict UTF-8, then uses the pinned Solana BigInt JSON
+helpers and SDK method transformers. Response IDs must match the request and a
+JSON-RPC result/error envelope must be unambiguous. Remote error contents never
+appear in the transport's static typed errors.
+
+Each HTTP operation has one absolute deadline (default 5 seconds), covering
+headers, body and parsing, and honors caller cancellation. Monotonic checks also
+refuse late success when timer dispatch was delayed. Timeout, cancellation, HTTP
+error and overflow release bodies without waiting for an uncooperative producer;
+a late fetch response is discarded. Cleanup does not await late work. JavaScript
+parsing is synchronous: deadlines refuse a late parsed result but do not preempt
+parser CPU time. Fetch/decompression and parsed objects have their own
+allocations; the byte limit is not a process-wide heap or aggregate-query
+budget. Independently injected ports remain the caller's responsibility.
+
+Options may lower `maxResponseBytes` (1 through 1,048,576) and set `timeoutMs`
+(1 through 30,000); production selection configuration does not override the
+byte ceiling. An injected `fetch` supports synthetic tests without replacing its
+global counterpart. URLs must be HTTPS or loopback HTTP, without credentials,
+query or fragment; redirects are refused. Only `getGenesisHash`,
+`getProgramAccounts` and `getMultipleAccounts` are permitted by the transport,
+even through an untyped caller. No transaction/signing/payment method is added.
+There is no transport retry or request coalescing; independent requests keep
+independent cancellation. SDK Solana request conversion, commitment defaults,
+integer-overflow checks and exact BigInt response conversion are preserved.
+
+An oversized response raises `IDENTITY_RPC_RESPONSE_TOO_LARGE` and becomes a
+correlated unavailable lookup with reason `LIMIT`. It is never interpreted as a
+missing binding, so a previously accepted binding does not become revoked. Other
+provider faults remain unavailable, and explicit manual override and durable
+history semantics are unchanged. RPC completeness, chain authenticity,
+non-atomic observations and operational acceptance remain separate limitations.
 
 ### Revocation and evidence limits
 

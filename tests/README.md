@@ -104,3 +104,9 @@ synthetic signed registry accounts and loopback RPC/control doubles. They cover
 manual provenance, owner rotation, tombstones, exact u64 floors, unsafe storage
 and refusal before prompt/authorization forwarding, without live-registry or
 mainnet acceptance. No opt-in identity integration is needed for these suites.
+
+Bounded identity RPC suites use injected decoded streams and actual gzip over
+loopback HTTP. They cover exact limits, absent/incorrect length headers, UTF-8,
+fragmentation, cancellation, monotonic deadlines, late-body disposal and exact
+SDK BigInts. A buyer regression compares valid padded JSON on the old transport
+with the bounded default and proves overflow cannot revoke persisted identity.

@@ -112,6 +112,8 @@ export async function readRegistryIdentity(
       return unavailable(IDENTITY_LOOKUP_FAILURES.CANCELLED);
     if (deadline.aborted) return unavailable(IDENTITY_LOOKUP_FAILURES.TIMEOUT);
     if (error instanceof IdentityError) {
+      if (error.code === IDENTITY_ERROR_CODES.RPC_RESPONSE_TOO_LARGE)
+        return unavailable(IDENTITY_LOOKUP_FAILURES.LIMIT);
       if (error.code === IDENTITY_ERROR_CODES.READ_TIMEOUT)
         return unavailable(IDENTITY_LOOKUP_FAILURES.TIMEOUT);
       if (error.code === IDENTITY_ERROR_CODES.NODE_ID_AMBIGUOUS)
