@@ -55,7 +55,7 @@ void test(
   },
 );
 void test(
-  'native HTTP and control connections share endpoint NodeId admission before ALPN budgets',
+  'native NodeId admission allows one control and one data connection; a second data connection is refused',
   { skip: NATIVE_CAPABILITY.transportSkip },
   async () => {
     const run = await fixture();
@@ -67,8 +67,37 @@ void test(
       await http.openBi().then(async (stream) => {
         await stream.send.writeAll([0]);
       });
-      await assert.rejects(within(run.client.getCatalog()));
+      // A held data connection no longer blocks the same peer's control connection.
+      await within(run.client.getCatalog());
+      const second = await within(
+        run.buyer.connect(run.seller.addr(), [...Buffer.from(GYBLOS_ALPN)]),
+      );
+      await within(second.closed());
       http.close(1n, []);
+    } finally {
+      await run.close();
+    }
+  },
+);
+void test(
+  'native NodeId admission still refuses a second concurrent control connection from the same peer',
+  { skip: NATIVE_CAPABILITY.transportSkip },
+  async () => {
+    const run = await fixture();
+    try {
+      const held = await within(
+        run.buyer.connect(run.seller.addr(), [...Buffer.from(CONTROL_ALPN)]),
+      );
+      // A partial frame keeps the first control connection admitted without completing a query.
+      await held.openBi().then(async (stream) => {
+        await stream.send.writeAll([0]);
+      });
+      const second = await within(
+        run.buyer.connect(run.seller.addr(), [...Buffer.from(CONTROL_ALPN)]),
+      );
+      await within(second.closed());
+      assert.equal(held.closeReason(), null);
+      held.close(1n, []);
     } finally {
       await run.close();
     }

@@ -8,6 +8,7 @@ import {
   connectionSource,
   createConnectionAdmission,
 } from '@gyblos/transport-iroh/admission';
+import { CONNECTION_FAMILIES } from '@gyblos/transport-iroh/constants';
 
 void test('established per-peer admission cap applies while the global pool has capacity', () => {
   const admission = createConnectionAdmission();
@@ -16,18 +17,27 @@ void test('established per-peer admission cap applies while the global pool has 
     TRANSPORT_LIMITS.maxPeerConnections < TRANSPORT_LIMITS.maxConnections,
   );
   for (let index = 0; index < TRANSPORT_LIMITS.maxPeerConnections; index++) {
-    const lease = admission.established('one-peer');
+    const lease = admission.established('one-peer', CONNECTION_FAMILIES.DATA);
     assert.ok(lease);
     leases.push(lease);
   }
-  assert.equal(admission.established('one-peer'), undefined);
-  const other = admission.established('different-peer');
+  assert.equal(
+    admission.established('one-peer', CONNECTION_FAMILIES.DATA),
+    undefined,
+  );
+  const other = admission.established(
+    'different-peer',
+    CONNECTION_FAMILIES.DATA,
+  );
   assert.ok(other);
   leases[0]!();
   leases[0]!();
-  const returning = admission.established('one-peer');
+  const returning = admission.established('one-peer', CONNECTION_FAMILIES.DATA);
   assert.ok(returning);
-  assert.equal(admission.established('one-peer'), undefined);
+  assert.equal(
+    admission.established('one-peer', CONNECTION_FAMILIES.DATA),
+    undefined,
+  );
   returning();
   other();
   for (const release of leases) release();
@@ -77,20 +87,35 @@ void test('pending and established pools have independent global and per-source 
   }
   assert.equal(admission.pending('other-source'), undefined);
   for (let index = 0; index < TRANSPORT_LIMITS.maxConnections; index++) {
-    const release = admission.established('peer-' + index);
+    const release = admission.established(
+      'peer-' + index,
+      CONNECTION_FAMILIES.DATA,
+    );
     assert.ok(release);
     established.push(release);
   }
-  assert.equal(admission.established('another-peer'), undefined);
-  assert.equal(admission.established('peer-0'), undefined);
+  assert.equal(
+    admission.established('another-peer', CONNECTION_FAMILIES.DATA),
+    undefined,
+  );
+  assert.equal(
+    admission.established('peer-0', CONNECTION_FAMILIES.DATA),
+    undefined,
+  );
   pending[0]!();
   pending[0]!();
   const nextPending = admission.pending('source-0');
   assert.ok(nextPending);
-  assert.equal(admission.established('another-peer'), undefined);
+  assert.equal(
+    admission.established('another-peer', CONNECTION_FAMILIES.DATA),
+    undefined,
+  );
   established[0]!();
   established[0]!();
-  const nextEstablished = admission.established('another-peer');
+  const nextEstablished = admission.established(
+    'another-peer',
+    CONNECTION_FAMILIES.DATA,
+  );
   assert.ok(nextEstablished);
   nextPending();
   nextEstablished();
