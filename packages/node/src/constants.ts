@@ -38,6 +38,44 @@ export const NODE_ERROR_CODES = {
 export type NodeErrorCode =
   (typeof NODE_ERROR_CODES)[keyof typeof NODE_ERROR_CODES];
 
+// `gyblos doctor` check names and static result codes; startup codes are reused verbatim.
+export const DOCTOR_CHECKS = {
+  CONFIG: 'config',
+  HOME: 'home',
+  ROLE: 'role',
+  KEYS: 'keys',
+  SEQUENCE: 'sequence',
+  TOKENIZER: 'tokenizer',
+  OLLAMA: 'ollama',
+  MODEL: 'model',
+  PORTS: 'ports',
+  RELAYS: 'relays',
+  PROGRAM: 'program',
+} as const;
+export type DoctorCheckName =
+  (typeof DOCTOR_CHECKS)[keyof typeof DOCTOR_CHECKS];
+export const DOCTOR_STATUS = { OK: 'OK', WARN: 'WARN', FAIL: 'FAIL' } as const;
+export type DoctorStatus = (typeof DOCTOR_STATUS)[keyof typeof DOCTOR_STATUS];
+export const DOCTOR_CODES = {
+  READY: 'READY',
+  NO_CONFIG_FILE: 'NO_CONFIG_FILE',
+  ROLE_MISSING: 'ROLE_MISSING',
+  ROLE_NOT_SELLER: 'ROLE_NOT_SELLER',
+  KEYS_MISSING: 'KEYS_MISSING',
+  KEY_PERMISSIONS: 'KEY_PERMISSIONS',
+  SEQUENCE_LOCK_PRESENT: 'SEQUENCE_LOCK_PRESENT',
+  TOKENIZER_UNAVAILABLE: 'TOKENIZER_UNAVAILABLE',
+  OLLAMA_NOT_FOUND: 'OLLAMA_NOT_FOUND',
+  MODEL_NOT_DOWNLOADED: 'MODEL_NOT_DOWNLOADED',
+  PORT_IN_USE: 'PORT_IN_USE',
+  NOT_CHECKED: 'NOT_CHECKED',
+  NOT_NEEDED: 'NOT_NEEDED',
+  ONLINE_CHECK_SKIPPED: 'ONLINE_CHECK_SKIPPED',
+  DEVNET_PROGRAM_UNAVAILABLE: 'DEVNET_PROGRAM_UNAVAILABLE',
+  CHECK_FAILED: 'DOCTOR_CHECK_FAILED',
+} as const;
+export type DoctorCode = (typeof DOCTOR_CODES)[keyof typeof DOCTOR_CODES];
+
 export const P2P_ROLES = { BUYER: 'buyer', SELLER: 'seller' } as const;
 export type P2PRole = (typeof P2P_ROLES)[keyof typeof P2P_ROLES];
 // Iroh secret key length stored in a role's node.key.

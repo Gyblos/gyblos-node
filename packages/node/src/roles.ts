@@ -19,6 +19,7 @@ import {
   ROLE_FILES,
   ROLE_KEY_FILES,
   rolePathIn,
+  type HomeEnvironment,
   type RoleKey,
 } from '@gyblos/config';
 import { CONFIG_ASSET_LABELS } from '@gyblos/config/constants';
@@ -69,22 +70,31 @@ export interface SetupOptions {
   payTo?: string;
 }
 
-function file(role: P2PRole, name: string) {
-  return resolve(rolePathIn(process.env, role, name));
+function file(
+  role: P2PRole,
+  name: string,
+  environment: HomeEnvironment = process.env,
+) {
+  return resolve(rolePathIn(environment, role, name));
 }
 
 export function roleDirectory(role: P2PRole) {
   return resolve(homeLayout(process.env).roles[role]);
 }
 
+// A regular, non-symlinked file owned by this user with mode 0600; checked from metadata only.
+function privateKeyMetadata(metadata: Awaited<ReturnType<typeof lstat>>) {
+  return (
+    metadata.isFile() &&
+    !metadata.isSymbolicLink() &&
+    (Number(metadata.mode) & FILE_MODES.permissionMask) ===
+      FILE_MODES.privateFile &&
+    (!process.getuid || Number(metadata.uid) === process.getuid())
+  );
+}
+
 async function privateBytes(path: string, length: number) {
-  const metadata = await lstat(path);
-  if (
-    !metadata.isFile() ||
-    metadata.isSymbolicLink() ||
-    (metadata.mode & FILE_MODES.permissionMask) !== FILE_MODES.privateFile ||
-    (process.getuid && metadata.uid !== process.getuid())
-  )
+  if (!privateKeyMetadata(await lstat(path)))
     throw new Error('Role key permissions or owner are invalid.');
   const value: unknown = JSON.parse(await readFile(path, 'utf8'));
   if (
@@ -166,10 +176,13 @@ export function parseRoleConfig(value: unknown): RoleConfig {
   };
 }
 
-export async function loadRole(role: P2PRole): Promise<RoleConfig> {
-  await assertRoleHome(role);
+export async function loadRole(
+  role: P2PRole,
+  environment: HomeEnvironment = process.env,
+): Promise<RoleConfig> {
+  await assertRoleHome(role, environment);
   const value = configurationJson(
-    await readFile(file(role, ROLE_FILES.roleConfig), 'utf8'),
+    await readFile(file(role, ROLE_FILES.roleConfig, environment), 'utf8'),
     NODE_ERROR_CODES.INVALID_ROLE_CONFIGURATION,
   );
   return parseRoleConfig(value);
@@ -291,8 +304,31 @@ export async function setupRole(options: SetupOptions) {
   return config;
 }
 
-export async function publicRole(role: P2PRole) {
-  const config = await loadRole(role);
+// Metadata-only key check for preflight: never opens a key file. `missing` if any file is absent.
+export async function roleKeyFilesStatus(
+  role: P2PRole,
+  names: readonly string[],
+  environment: HomeEnvironment = process.env,
+): Promise<'ok' | 'missing' | 'invalid'> {
+  let invalid = false;
+  for (const name of names) {
+    let metadata;
+    try {
+      metadata = await lstat(file(role, name, environment));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return 'missing';
+      throw error;
+    }
+    if (!privateKeyMetadata(metadata)) invalid = true;
+  }
+  return invalid ? 'invalid' : 'ok';
+}
+
+export async function publicRole(
+  role: P2PRole,
+  environment: HomeEnvironment = process.env,
+) {
+  const config = await loadRole(role, environment);
   const names =
     config.role === P2P_ROLES.BUYER
       ? [ROLE_KEY_FILES.buyer, ROLE_FILES.nodeKey]
@@ -305,7 +341,9 @@ export async function publicRole(role: P2PRole) {
   const keys = await Promise.all(
     names.map(async (name) => ({
       name,
-      mode: (await lstat(file(role, name))).mode & FILE_MODES.permissionMask,
+      mode:
+        (await lstat(file(role, name, environment))).mode &
+        FILE_MODES.permissionMask,
     })),
   );
   const common = {

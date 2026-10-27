@@ -134,6 +134,7 @@ never overwrites existing keys; a mismatched existing role stops with an error.
 export GYBLOS_RELAY_TOKEN=...    # private; 32-512 printable characters
 pnpm node:setup --role seller --mint MINT --buyer BUYER_ADDRESS --pay-to PAYOUT_ADDRESS
 pnpm gate:inference:setup        # pinned Qwen3 0.6B model and tokenizer (lab command for now)
+pnpm gyblos doctor               # read-only preflight; prints the public NodeId and owner
 pnpm node:start
 ```
 
