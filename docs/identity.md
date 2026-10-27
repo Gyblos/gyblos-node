@@ -2,9 +2,10 @@
 
 `packages/identity` (`@gyblos/identity`) is an adapter for node identity on the
 8004 Solana agent registry, devnet only, built on `@solana/kit` without Anchor
-or an indexer. **Nothing in the node or apps calls it yet.** The lab command
-`pnpm identity:devnet-run` tries the sponsored flow on devnet, and opt-in tests
-run it against a local validator (see [tests/README.md](../tests/README.md)).
+or an indexer. Buyer selection can opt into its read-only resolver; registration
+and sponsorship remain lab-only. The lab command `pnpm identity:devnet-run`
+tries the sponsored flow on devnet, and opt-in tests run it against a local
+validator (see [tests/README.md](../tests/README.md)).
 
 ## Read-only resolution and trust policy
 
@@ -12,8 +13,8 @@ run it against a local validator (see [tests/README.md](../tests/README.md)).
 `readRegistryIdentity(rpc, nodeId, options?)`. Its RPC port contains only
 `getGenesisHash`, `getProgramAccounts` and `getMultipleAccounts`. It constructs
 no transactions, loads no signer, reads/writes no local files and uses no
-discovery index. The caller supplies the RPC client; this change does not wire
-any node or buyer startup.
+discovery index. The caller supplies the RPC client. Node composition and opt-in
+buyer wiring are described below.
 
 The profile is deliberately pinned to the existing configured **devnet**
 genesis, registry program and collection. A wrong genesis is refused before
@@ -56,10 +57,79 @@ owner-only semantics; use the new entry for the new policy.
   Without an explicit pin, registry failure never enables manual fallback.
 
 The policy owns no storage, cache, clock or RPC. `sequence` remains a bigint;
-future persistence must encode it exactly and retain state across restarts. An
-omitted state in a denial is not permission to delete persisted state. Neither
-durable state storage nor discovery/selector/buyer integration is part of this
-slice; existing manual trust configuration remains unchanged.
+the durable node store encodes it exactly and retains state across restarts. An
+omitted state in a denial is not permission to delete persisted state.
+
+## Durable buyer identity admission
+
+`@gyblos/node/identity-state` owns `openBuyerIdentityState(environment, scope)`.
+Its `evaluate()` transaction rereads persisted state under an exclusive lock,
+applies the pure policy and atomically commits returned state **before
+returning, including denials**. `@gyblos/node/identity-verifier` composes that
+transaction with independent `readRegistryIdentity` observations; it never
+registers agents, loads signers or invokes payments.
+
+Opt in through the existing buyer `selection.json`:
+
+```json
+"identity": { "rpcUrl": "https://rpc.example" }
+```
+
+The value must be HTTPS or loopback HTTP, without credentials, query or
+fragment. The profile and request network remain devnet-only. No implicit RPC
+URL is used. The existing `sellers` list still owns allowed NodeIds, expected
+owners and Iroh endpoints: public catalogs intentionally contain no connection
+addresses. This slice does not enroll arbitrary sellers returned by the index.
+
+With no `identity` property, existing configured owner–NodeId bindings retain
+their manual semantics and no registry client/state is opened. In registry mode,
+each seller requires independent registry verification unless that configured
+seller explicitly sets `"manualTrust": true`. That override skips lookup and
+returns manual provenance; it never erases a binding floor or tombstone, and it
+cannot bypass unsafe or failed storage. An expected `owner` alone is never a
+fallback when registry lookup fails. Adopting a newly verified owner requires a
+deliberate expected-owner configuration update; the denied lookup still advances
+the persisted registry floor.
+
+The buyer independently verifies configured identities before admitting index
+records (including held entries omitted by an index), before opening control,
+after quoting, and immediately before free execution. Public catalog/presence/
+withdrawal signatures, exact-catalog binding, request correlation, authenticated
+Iroh peer and signed quote validation remain mandatory. Public replay metadata
+is separate from registry u64 sequences. An independently allowed owner rotation
+requires a public catalog newer than the old node-global high-water mark and
+retains withdrawal/conflict floors. Identity checks never reset public replay
+state. The paid v1 proxy still requires its separate compatible trusted v1
+offer; a cached decision checks identity again before forwarding authorization
+and any refusal stops with reconciliation, without retry or reselection. Paid v2
+remains disabled. Free streaming never changes seller or retries after sending
+begins.
+
+The files `identity-state-v1.json` and `identity-state-v1.lock` live only under
+`homeLayout(...).roles.buyer`. The private 0700 role directory and 0600 files
+contain scoped public binding metadata and local tombstones, never prompts,
+responses, signatures, RPC URLs, keys or payment journals. Sequences are
+canonical u64 decimal strings (including values above JavaScript's exact-number
+range). Canonical JSON rejects duplicate/unknown fields and duplicate NodeIds.
+Limits are 1,024 rows and 1 MiB; no expiry or eviction can remove security
+history. Writes use an exclusive lock, a unique temporary file, file sync,
+atomic rename and parent sync on supported platforms. Contention, stale locks,
+malformed or unsafe files, failed writes and observed rollback/disappearance
+fail closed; operators must investigate rather than automatically clear state or
+locks. Symlinked path components, symlinks, hardlinks and special files are
+refused. Use a canonical home path rather than a symlink alias. Filesystem
+rollback or complete deletion across a fresh process cannot be detected without
+an external anchor; restoring an old backup can lose previously observed
+history. The local filesystem must be trusted. Windows and crash/power-loss
+behavior have not been operationally certified by the synthetic tests.
+
+Lookup decisions are never cached as usable trust. Caller cancellation reaches
+RPC; cancelled/late results cannot admit a quote or prompt. Static configured
+candidate limits bound lookup fan-out; the standard SDK RPC transport still
+requires an operator-trusted provider and does not impose a response-byte cap.
+Read deadlines do not make multi-request chain observations atomic and no read
+can freeze ownership after its last observation. Real-registry/off-host/mainnet
+acceptance remains separate from local synthetic tests.
 
 ### Revocation and evidence limits
 

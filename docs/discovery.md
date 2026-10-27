@@ -93,7 +93,11 @@ malicious one can return a cursor forever.
 
 Add optional `"discovery": {}` to the existing buyer `selection.json` to use the
 configured default index, or set `baseUrl` and `maxPages` inside that object.
-The `sellers` list remains an independent owner–NodeId/endpoint trust allowlist;
+The `sellers` list remains an independent NodeId/endpoint allowlist with
+expected owners. Optional `identity` uses read-only 8004 verification and
+durable binding floors; only explicit per-seller `manualTrust: true` overrides
+it. Without identity configuration, existing owner–NodeId pairs retain manual
+trust. See [identity admission](identity.md#durable-buyer-identity-admission);
 unknown or mismatched index identities are discarded before storage or dialing.
 There is no automatic enrollment or inferred 8004 identity proof. Badges remain
 `declared-usage` and `openChannel` remains false.

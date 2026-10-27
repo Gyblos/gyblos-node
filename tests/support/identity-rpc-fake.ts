@@ -48,6 +48,7 @@ export interface FakeRpcState {
 }
 
 export interface FakeRpc {
+  url: string;
   rpc: Rpc<SolanaRpcApi>;
   state: FakeRpcState;
   close(): Promise<void>;
@@ -261,6 +262,7 @@ export async function startFakeRpc(
   await once(server, 'listening');
   const { port } = server.address() as AddressInfo;
   return {
+    url: `http://${LOCALHOST}:${port}`,
     rpc: createSolanaRpc(`http://${LOCALHOST}:${port}`),
     state,
     close: async () => {

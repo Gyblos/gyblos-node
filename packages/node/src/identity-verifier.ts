@@ -16,22 +16,33 @@ export interface BuyerIdentitySubject {
   manualTrust?: boolean;
 }
 export interface BuyerIdentityVerifier {
-  verify(subject: BuyerIdentitySubject, signal?: AbortSignal): Promise<IdentityPolicyDecision>;
+  verify(
+    subject: BuyerIdentitySubject,
+    signal?: AbortSignal,
+  ): Promise<IdentityPolicyDecision>;
 }
 export async function openBuyerIdentityVerifier(
   environment: HomeEnvironment,
   rpc: IdentityResolutionRpc,
 ): Promise<BuyerIdentityVerifier> {
-  const state = await openBuyerIdentityState(environment, IDENTITY_RESOLUTION_SCOPE);
+  const state = await openBuyerIdentityState(
+    environment,
+    IDENTITY_RESOLUTION_SCOPE,
+  );
   return {
     async verify(subject, signal) {
       signal?.throwIfAborted();
-      const lookup = subject.manualTrust ? undefined : await readRegistryIdentity(rpc, subject.nodeId, { signal });
+      const lookup =
+        subject.manualTrust === true
+          ? undefined
+          : await readRegistryIdentity(rpc, subject.nodeId, { signal });
       signal?.throwIfAborted();
       const decision = await state.evaluate({
         nodeId: subject.nodeId,
         owner: subject.owner,
-        ...(subject.manualTrust ? { manual: { nodeId: subject.nodeId, owner: subject.owner } } : { lookup }),
+        ...(subject.manualTrust === true
+          ? { manual: { nodeId: subject.nodeId, owner: subject.owner } }
+          : { lookup }),
       });
       signal?.throwIfAborted();
       return decision;

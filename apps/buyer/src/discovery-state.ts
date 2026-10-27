@@ -98,12 +98,8 @@ export function mergeDiscoveryRow(
       row: incoming,
       accepted: unblocked(incoming),
     };
-  if (held.owner !== incoming.owner) {
-    if (!allowOwnerChange || incoming.catalogSequence <= held.highWater)
-      return { row: held, accepted: false };
-    const row = { ...incoming, withdrawnThrough: Math.max(held.withdrawnThrough, incoming.withdrawnThrough), conflictedThrough: Math.max(held.conflictedThrough, incoming.conflictedThrough) };
-    return { row, accepted: unblocked(row) };
-  }
+  if (held.owner !== incoming.owner)
+    return rotateDiscoveryOwner(held, incoming, allowOwnerChange);
   if (incoming.catalogSequence < held.catalogSequence)
     return {
       row:
@@ -173,4 +169,25 @@ function unblocked(row: DiscoveryRow) {
   // A withdrawal/conflict must be newer than a nonnegative catalog sequence; zero means absent.
   const through = Math.max(row.withdrawnThrough, row.conflictedThrough);
   return through === 0 || row.catalogSequence > through;
+}
+
+function rotateDiscoveryOwner(
+  held: DiscoveryRow,
+  incoming: DiscoveryRow,
+  allowOwnerChange: boolean,
+): { row: DiscoveryRow; accepted: boolean } {
+  if (!allowOwnerChange || incoming.catalogSequence <= held.highWater)
+    return { row: held, accepted: false };
+  const row = {
+    ...incoming,
+    withdrawnThrough: Math.max(
+      held.withdrawnThrough,
+      incoming.withdrawnThrough,
+    ),
+    conflictedThrough: Math.max(
+      held.conflictedThrough,
+      incoming.conflictedThrough,
+    ),
+  };
+  return { row, accepted: unblocked(row) };
 }

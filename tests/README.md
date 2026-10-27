@@ -98,3 +98,9 @@ read-only methods, owner transfer, metadata removal/burn, ambiguous assets,
 claimant limits, cancellation/late results, high-water rollback refusal and
 manual override/tombstone retention. No opt-in identity integration is enabled
 for these tests. Legacy resolver tests remain separate compatibility coverage.
+
+Identity persistence and buyer admission suites use canonical temporary homes,
+synthetic signed registry accounts and loopback RPC/control doubles. They cover
+manual provenance, owner rotation, tombstones, exact u64 floors, unsafe storage
+and refusal before prompt/authorization forwarding, without live-registry or
+mainnet acceptance. No opt-in identity integration is needed for these suites.

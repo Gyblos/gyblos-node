@@ -4,21 +4,24 @@ import { EndpointAddr, EndpointId, type Endpoint } from '@number0/iroh';
 
 import type { HomeEnvironment } from '@gyblos/config/home';
 import type { DiscoveryFetch } from '@gyblos/discovery-http';
+import type { BuyerIdentityVerifier } from '@gyblos/node/identity-verifier';
 import type { InferenceOffer } from '@gyblos/protocol/offer';
 import { assertConfiguredRelay } from '@gyblos/transport-iroh/endpoint';
-
-import type { BuyerIdentityVerifier } from '@gyblos/node/identity-verifier';
 
 import { BUYER_SELECTION_CODES } from './constants.js';
 import { connectBuyerControl } from './control.js';
 import { buyerDiscoveryState } from './discovery-storage.js';
 import { discoverBuyerSellers } from './discovery.js';
-import { prepareBuyerIdentity, verifyBuyerIdentity, requireBuyerIdentity } from './identity.js';
+import {
+  prepareBuyerIdentity,
+  requireBuyerIdentity,
+  verifyBuyerIdentity,
+} from './identity.js';
 import {
   BuyerSelectionError,
   loadBuyerSelectionConfig,
-  type StaticControlSeller,
   type BuyerSelectionConfig,
+  type StaticControlSeller,
 } from './selection-config.js';
 import { createProxySelection } from './selection-proxy.js';
 import { selectionStats } from './selection-stats.js';
@@ -31,7 +34,9 @@ export interface PreparedBuyerSelection {
   discovery: Awaited<ReturnType<typeof buyerDiscoveryState>> | undefined;
   identity?: BuyerIdentityVerifier;
 }
-export async function prepareBuyerSelection(environment: HomeEnvironment): Promise<PreparedBuyerSelection | undefined> {
+export async function prepareBuyerSelection(
+  environment: HomeEnvironment,
+): Promise<PreparedBuyerSelection | undefined> {
   const config = await loadBuyerSelectionConfig(environment);
   if (!config) return undefined;
   const stats = await selectionStats(environment);
@@ -67,19 +72,29 @@ export function runtimeProxySelection(
           ? await discoverBuyerSellers(
               { ...prepared.config, discovery: prepared.config.discovery },
               prepared.discovery,
-              { fetch: options.fetch ?? globalThis.fetch, now, signal, verifyIdentity: (seller, querySignal) => verifyBuyerIdentity(prepared.identity, seller, querySignal) },
+              {
+                fetch: options.fetch ?? globalThis.fetch,
+                now,
+                signal,
+                verifyIdentity: (seller, querySignal) =>
+                  verifyBuyerIdentity(prepared.identity, seller, querySignal),
+              },
             )
           : prepared.config;
       const result = await selectBuyerQuote(
         config,
         {
           buyer: options.buyer,
-          verifyIdentity: (seller, querySignal) => verifyBuyerIdentity(prepared.identity, seller, querySignal),
+          verifyIdentity: (seller, querySignal) =>
+            verifyBuyerIdentity(prepared.identity, seller, querySignal),
           now,
           trusted: options.trusted,
           stats: prepared.stats.rows,
           observeVerified: prepared.discovery
-            ? (seller) => prepared.discovery!.observe(seller, { allowOwnerChange: Boolean(prepared.identity) })
+            ? (seller) =>
+                prepared.discovery!.observe(seller, {
+                  allowOwnerChange: Boolean(prepared.identity),
+                })
             : undefined,
           connect: (seller) => connectSelectedSeller(seller, options, now),
         },
@@ -106,10 +121,7 @@ export function runtimeProxySelection(
     },
     prepared.config.request.maxTokens,
     now,
-    prepared.identity ? async (identity, signal) => {
-      const seller = prepared.config.sellers.find(item => item.nodeId === identity.nodeId && item.owner === identity.owner);
-      return Boolean(seller && await verifyBuyerIdentity(prepared.identity, seller, signal));
-    } : undefined,
+    identityAdmission(prepared),
   );
 }
 
@@ -141,4 +153,20 @@ async function connectSelectedSeller(
     },
     options.relayOnly,
   );
+}
+
+function identityAdmission(prepared: PreparedBuyerSelection) {
+  if (!prepared.identity) return undefined;
+  return async (
+    identity: { owner: string; nodeId: string },
+    signal: AbortSignal,
+  ) => {
+    const seller = prepared.config.sellers.find(
+      (item) =>
+        item.nodeId === identity.nodeId && item.owner === identity.owner,
+    );
+    return Boolean(
+      seller && (await verifyBuyerIdentity(prepared.identity, seller, signal)),
+    );
+  };
 }
