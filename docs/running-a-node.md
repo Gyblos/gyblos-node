@@ -152,8 +152,10 @@ pnpm node:start
   withdraws from discovery and saves the public sequence; further Ctrl-C presses
   during that stop are ignored with a notice (SIGTERM from a supervisor too), so
   wait for the prompt. If a stop ever hangs, Ctrl-\\ (SIGQUIT) still ends the
-  process; the sequence write has finished by then. A Ctrl-C during startup, a
-  crash or `kill -9` can leave a sequence lock (see `pnpm gyblos doctor`).
+  process; withdrawal, which writes the sequence, runs first in the stop, so
+  that is rarely mid-write. A Ctrl-C during startup, a forced kill during that
+  write, a crash or `kill -9` can leave a sequence lock (see
+  `pnpm gyblos doctor`).
 
 ## Buyer
 
