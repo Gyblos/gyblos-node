@@ -14,7 +14,7 @@ import {
   ROLE_FILES,
   ROLE_KEY_FILES,
 } from '@gyblos/config';
-import { P2P_ROLES } from '@gyblos/node/constants';
+import { P2P_ROLES } from '@gyblos/protocol/constants';
 
 import { NATIVE_CAPABILITY } from './support/native-runtime';
 

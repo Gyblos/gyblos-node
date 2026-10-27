@@ -1,8 +1,8 @@
 // Starts the isolated free buyer using local role identity and selection policy, without paid bootstrap.
 import { BUYER_RELAY_ONLY_ENV, INFERENCE_REQUEST_LIMITS } from '@gyblos/config';
-import { NODE_ERROR_CODES, P2P_ROLES } from '@gyblos/node/constants';
+import { NODE_ERROR_CODES } from '@gyblos/node/constants';
 import { loadRole, nodeSecret } from '@gyblos/node/roles';
-import { REASONING_LEVELS } from '@gyblos/protocol/constants';
+import { P2P_ROLES, REASONING_LEVELS } from '@gyblos/protocol/constants';
 import { bindEndpoint } from '@gyblos/transport-iroh/endpoint';
 
 import {

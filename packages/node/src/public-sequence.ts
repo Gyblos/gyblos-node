@@ -13,6 +13,7 @@ import {
 } from '@gyblos/config';
 import {
   CONTROL_RECORD_VERSION,
+  P2P_ROLES,
   PUBLIC_RECORD_LIMITS,
 } from '@gyblos/protocol/constants';
 import {
@@ -21,7 +22,7 @@ import {
   controlObject,
 } from '@gyblos/protocol/control-validation';
 
-import { NODE_ERROR_CODES, P2P_ROLES, PUBLIC_SEQUENCE } from './constants';
+import { NODE_ERROR_CODES, PUBLIC_SEQUENCE } from './constants';
 import { NodeError } from './errors';
 import { assertRoleHome } from './home';
 

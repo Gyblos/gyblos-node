@@ -15,9 +15,9 @@ import {
 import { CONFIG_ASSET_LABELS } from '@gyblos/config/constants';
 import {
   NODE_ERROR_CODES,
-  P2P_ROLES,
   ROLE_CONFIG_SCHEMA_VERSION,
 } from '@gyblos/node/constants';
+import { P2P_ROLES } from '@gyblos/protocol/constants';
 
 import { NATIVE_CAPABILITY } from './support/native-runtime';
 

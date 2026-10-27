@@ -5,10 +5,10 @@ import { readFile } from 'node:fs/promises';
 import { EndpointAddr, EndpointId } from '@number0/iroh';
 
 import { BUYER_RELAY_ONLY_ENV, MAX_ATOMIC, ROLE_FILES } from '@gyblos/config';
-import { P2P_ROLES } from '@gyblos/node/constants';
 import { parseOfferTrustJson, verifyInferenceOffer } from '@gyblos/node/offers';
 import { loadRole, nodeSecret, rolePath } from '@gyblos/node/roles';
 import { assertProgram } from '@gyblos/payments-x402/chain';
+import { P2P_ROLES } from '@gyblos/protocol/constants';
 import type { InferenceOffer } from '@gyblos/protocol/offer';
 import { saveJson } from '@gyblos/runtime';
 import { HTTP_OVER_IROH } from '@gyblos/transport-iroh/constants';

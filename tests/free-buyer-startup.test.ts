@@ -12,7 +12,8 @@ import { startFreeBuyer } from '@gyblos/buyer/free-startup';
 import { FILE_MODES, ROLE_FILES } from '@gyblos/config';
 import { CONFIG_ASSET_LABELS } from '@gyblos/config/constants';
 import { SELLER_BADGES } from '@gyblos/core/constants';
-import { P2P_ROLES, ROLE_CONFIG_SCHEMA_VERSION } from '@gyblos/node/constants';
+import { ROLE_CONFIG_SCHEMA_VERSION } from '@gyblos/node/constants';
+import { P2P_ROLES } from '@gyblos/protocol/constants';
 
 import { controlFixture } from './support/control-fixture';
 import { endpoint } from './support/native-fixture';

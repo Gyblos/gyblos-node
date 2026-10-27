@@ -7,17 +7,19 @@ import { resolve } from 'node:path';
 import { NODE_ENVIRONMENT, type HomeEnvironment } from '@gyblos/config';
 import { validateDiscoveryBaseUrl } from '@gyblos/discovery-http';
 import { MODEL } from '@gyblos/engine-ollama/model';
-import { MODEL_CLASSIFICATIONS } from '@gyblos/protocol/constants';
+import {
+  ENGINE_KINDS,
+  MODEL_CLASSIFICATIONS,
+  OFFER_PRICING_KINDS,
+} from '@gyblos/protocol/constants';
 import type { RelayEnvironment } from '@gyblos/transport-iroh/endpoint';
 
 import {
-  ENGINE_KINDS,
   NODE_CONFIG_FILENAME,
   NODE_CONFIG_ISSUE_CODES,
   NODE_CONFIG_SOURCES,
   NODE_ERROR_CODES,
   NODE_SETTINGS,
-  OFFER_PRICING_KINDS,
   type NodeErrorCode,
 } from './constants';
 import { NodeError } from './errors';

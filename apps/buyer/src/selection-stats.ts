@@ -7,8 +7,8 @@ import { join } from 'node:path';
 import { FILE_MODES } from '@gyblos/config';
 import { homeLayout, type HomeEnvironment } from '@gyblos/config/home';
 import type { SellerStats } from '@gyblos/core/seller-selection';
-import { P2P_ROLES } from '@gyblos/node/constants';
 import { assertRoleHome } from '@gyblos/node/home';
+import { P2P_ROLES } from '@gyblos/protocol/constants';
 import {
   controlHex,
   controlInteger,
