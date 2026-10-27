@@ -2,6 +2,7 @@
 import { X } from '@phosphor-icons/react';
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 
+import { createModalDismissal } from './modal-model.js';
 import { useExiting } from './Motion.js';
 import { IconButton } from './UI.js';
 
@@ -21,6 +22,7 @@ export function Modal({
   const titleId = useId();
   const ref = useRef<HTMLDialogElement>(null);
   const exiting = useExiting();
+  const dismissal = useRef(createModalDismissal());
   useEffect(() => {
     ref.current?.showModal();
     if (compact) ref.current?.querySelector<HTMLInputElement>('input')?.focus();
@@ -35,9 +37,22 @@ export function Modal({
         event.preventDefault();
         close();
       }}
-      onClick={(event) => {
-        if (event.target === event.currentTarget) close();
+      onPointerDown={(event) => {
+        dismissal.current.start(
+          event,
+          event.currentTarget.getBoundingClientRect(),
+        );
       }}
+      onPointerUp={(event) => {
+        if (
+          dismissal.current.end(
+            event,
+            event.currentTarget.getBoundingClientRect(),
+          )
+        )
+          close();
+      }}
+      onPointerCancel={() => dismissal.current.cancel()}
     >
       <header>
         <div>

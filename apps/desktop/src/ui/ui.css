@@ -994,6 +994,12 @@
 .desktop-frame .wallet-details :is(.field-label, .modal-note, .ui-note) {
   margin: 0;
 }
+.desktop-frame .field-label input[aria-invalid='true'] {
+  border-color: var(--warm);
+}
+.desktop-frame .field-label .modal-note[role='alert'] {
+  color: var(--warm);
+}
 
 /* Work reuses the agent workflow, with independent result/activity scroll areas. */
 .visually-hidden {

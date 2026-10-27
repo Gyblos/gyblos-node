@@ -1,6 +1,6 @@
 // Compact backup controls reuse wallet/dialog styles; only passwords and status cross IPC.
 // A successful saved-file check persists identity-bound metadata, never a funding capability.
-import { useState } from 'react';
+import { useId, useState } from 'react';
 
 import {
   BACKUP_ACTION,
@@ -8,6 +8,7 @@ import {
   BACKUP_RESULT,
   type BackupAction,
 } from '../wallet/backup-flow-model.js';
+import { backupPasswordFeedback } from './backup-feedback.js';
 import { BUTTON_VARIANT } from './constants.js';
 import { Button, Note } from './UI.js';
 import { useDesktopWallet, useDesktopWalletActions } from './WalletState.js';
@@ -23,7 +24,12 @@ function useWalletBackup() {
   const [message, setMessage] = useState('');
   const creating = action === BACKUP_ACTION.CREATE;
   async function submit() {
-    if (busy || actions.busy) return;
+    if (
+      busy ||
+      actions.busy ||
+      !backupPasswordFeedback(action, password, confirmation).canSubmit
+    )
+      return;
     setBusy(true);
     setMessage('');
     const request = { action, password, address };
@@ -61,6 +67,7 @@ function useWalletBackup() {
     setMessage('');
   }
   return {
+    feedback: backupPasswordFeedback(action, password, confirmation),
     creating,
     password,
     setPassword,
@@ -79,6 +86,8 @@ export function PasswordField({
   busy,
   creating,
   autoFocus = false,
+  hint,
+  invalid = false,
 }: {
   label: string;
   value: string;
@@ -86,7 +95,10 @@ export function PasswordField({
   busy: boolean;
   creating: boolean;
   autoFocus?: boolean;
+  hint?: string;
+  invalid?: boolean;
 }) {
+  const hintId = useId();
   return (
     <label className="field-label">
       {label}
@@ -98,13 +110,25 @@ export function PasswordField({
         value={value}
         disabled={busy}
         maxLength={BACKUP_FLOW.MAX_PASSWORD_BYTES}
+        aria-invalid={invalid || undefined}
+        aria-describedby={hint ? hintId : undefined}
         onChange={(event) => change(event.target.value)}
       />
+      {hint && (
+        <small
+          id={hintId}
+          className="modal-note"
+          role={invalid ? 'alert' : undefined}
+        >
+          {hint}
+        </small>
+      )}
     </label>
   );
 }
 export function WalletBackup() {
   const {
+    feedback,
     creating,
     password,
     setPassword,
@@ -118,7 +142,9 @@ export function WalletBackup() {
   return (
     <section className="wallet-details" aria-label="Encrypted backup">
       <Note>
-        Keep the file and password safe. Restore from Settings on any device.
+        {creating
+          ? 'This password protects your backup file. Keep both to restore your wallet.'
+          : 'Choose your saved backup and enter its password to verify this wallet.'}
       </Note>
       <div
         className="connection-location"
@@ -126,6 +152,7 @@ export function WalletBackup() {
         aria-label="Backup operation"
       >
         <Button
+          variant={creating ? BUTTON_VARIANT.TONAL : BUTTON_VARIANT.GHOST}
           disabled={busy}
           aria-pressed={creating}
           onClick={() => choose(BACKUP_ACTION.CREATE)}
@@ -133,6 +160,7 @@ export function WalletBackup() {
           Create backup
         </Button>
         <Button
+          variant={!creating ? BUTTON_VARIANT.TONAL : BUTTON_VARIANT.GHOST}
           disabled={busy}
           aria-pressed={!creating}
           onClick={() => choose(BACKUP_ACTION.VERIFY)}
@@ -141,11 +169,13 @@ export function WalletBackup() {
         </Button>
       </div>
       <PasswordField
-        label="Password · at least 12 characters"
+        label="Backup password"
         value={password}
         change={setPassword}
         busy={busy}
         creating={creating}
+        hint={feedback.passwordHint}
+        invalid={feedback.passwordInvalid}
       />
       {creating && (
         <PasswordField
@@ -154,18 +184,14 @@ export function WalletBackup() {
           change={setConfirmation}
           busy={busy}
           creating={creating}
+          hint={feedback.confirmationHint}
+          invalid={feedback.confirmationInvalid}
         />
       )}
       <Button
         variant={BUTTON_VARIANT.PRIMARY}
-        disabled={
-          busy ||
-          password.length < BACKUP_FLOW.MIN_PASSWORD_CHARACTERS ||
-          (creating && password !== confirmation)
-        }
-        onClick={() => {
-          void submit();
-        }}
+        disabled={busy || !feedback.canSubmit}
+        onClick={() => void submit()}
       >
         {busy
           ? 'Working…'
