@@ -47,6 +47,32 @@ verified backup, then always reports payment unavailable. It cannot authorize
 payment, change a balance, or enable funding. The existing first-run wallet and
 empty-destination restore behavior below is unchanged.
 
+## Internal wallet library
+
+The Node-only `@gyblos/desktop/wallet-library` entry is not connected to the
+host, preload or renderer. It requires an existing protected desktop wallet. It
+never creates a replacement for missing, partial or inaccessible custody.
+
+`summary()` returns only public addresses/statuses. `restore(bytes, password)`
+authenticates a portable backup and imports it into a separate address-named
+protected store, leaving the original record and active selection unchanged.
+Duplicates are refused. `select(address)` explicitly publishes an authenticated,
+OS-protected selection; reopening the library retains that address.
+`verifyBackup(address, bytes, password)` reuses the existing identity-bound
+verification receipt. Restoring alone does not mark a backup verified. Every
+summary retains `fundingEnabled: false`, including after verification.
+
+Library paths are owned by config. A private directory lock serializes
+instances; a remaining lock is reported busy, never stolen. Failed encrypted
+writes and incomplete destinations remain for inspection, never automatically
+replaced or deleted. Missing/corrupt selection metadata after library creation
+fails closed rather than selecting another identity. Selection publication by
+atomic rename is the commit point; cancellation after publication cannot roll it
+back. Normal restart is covered; Windows directory fsync and sudden-power-loss
+recovery are not guaranteed. No payment state, transfer, balance query, deletion
+or export API is added. Loader-only startup and Settings integration are
+separate work.
+
 ## Protected local wallet
 
 On first launch without an existing wallet, the startup window offers Create
