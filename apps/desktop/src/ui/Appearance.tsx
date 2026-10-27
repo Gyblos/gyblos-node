@@ -8,10 +8,12 @@ export function Appearance({
   light,
   onLightChange,
   compact = false,
+  label = 'Appearance',
 }: {
   light: boolean;
   onLightChange: (light: boolean) => void;
   compact?: boolean;
+  label?: string;
 }) {
   const control = (
     <Button
@@ -32,7 +34,7 @@ export function Appearance({
   ) : (
     <div className="appearance-mode">
       <span>
-        Appearance <small>{light ? 'Light' : 'Dark'}</small>
+        {label} <small>{light ? 'Light' : 'Dark'}</small>
       </span>
       {control}
     </div>

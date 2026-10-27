@@ -1,13 +1,16 @@
 /* One compact desktop scale, shared by UI.tsx across routes and dialogs. */
 .desktop-frame {
+  --shell-header-height: 40px;
+  --shell-control-size: 24px;
+  --shell-divider: color-mix(in srgb, var(--line) 85%, var(--muted));
   --control-size: 28px;
   --control-icon: 16px;
   --row-size: 48px;
   --avatar-size: 28px;
   --ui-font: 12px;
   --ui-detail: 11px;
-  --page-gutter: 16px;
-  --page-top: 2px;
+  --page-gutter: 12px;
+  --page-top: 8px;
   --section-gap: 12px;
 }
 .desktop-frame .ui-button {
@@ -50,6 +53,16 @@
 .desktop-frame .ui-button--primary:hover:not(:disabled) {
   background: color-mix(in srgb, var(--accent), white 12%);
   color: var(--primary-ink, #10232d);
+}
+.desktop-frame .ui-button--tonal {
+  background: var(--soft);
+  border-color: color-mix(in srgb, var(--blue) 28%, transparent);
+  color: var(--blue);
+}
+.desktop-frame .ui-button--tonal:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--blue) 12%, var(--panel));
+  border-color: color-mix(in srgb, var(--blue) 45%, transparent);
+  color: var(--blue);
 }
 .desktop-frame .ui-button:disabled {
   opacity: 0.4;
@@ -444,8 +457,8 @@
 }
 .desktop-frame .composer-wrap {
   width: 100%;
-  max-width: 760px;
-  padding: 8px 16px 12px;
+  max-width: none;
+  padding: 8px var(--page-gutter) 12px;
   margin: 0 auto;
   flex-shrink: 0;
 }
@@ -603,9 +616,6 @@
   }
   .desktop-frame .ui-row-time {
     display: none;
-  }
-  .desktop-frame .composer-wrap {
-    padding: 8px 10px 10px;
   }
 }
 @media (max-width: 480px) {
@@ -870,21 +880,110 @@
 }
 .wallet-details {
   display: grid;
-  gap: 8px;
-  margin-bottom: 12px;
+  gap: 10px;
 }
 .wallet-address {
   display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: space-between;
+  gap: 8px;
   min-width: 0;
+  padding: 4px 8px;
+  background: var(--raised);
+  border: 1px solid var(--line);
 }
 .wallet-address code {
   flex: 1;
   min-width: 0;
   overflow-wrap: anywhere;
   font-size: 11px;
+  color: var(--ink);
+}
+.desktop-frame .ui-settings-group {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+.ui-settings-group-header {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.desktop-frame .ui-settings-group-header .ui-section-title {
+  margin: 0;
+}
+.desktop-frame .ui-settings-group-header h2 {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 20px;
+  color: var(--ink);
+}
+.ui-settings-group-header > p {
+  margin: 4px 0 0;
+  font-size: var(--ui-detail);
+  line-height: 16px;
   color: var(--muted);
+}
+.ui-settings-group-body {
+  padding: 10px 14px;
+}
+.desktop-frame .ui-settings-group .ui-list {
+  border: 0;
+  background: transparent;
+}
+.desktop-frame .ui-settings-group .ui-row {
+  padding: 6px 0;
+}
+.desktop-frame .ui-settings-group .ui-copy small {
+  white-space: normal;
+}
+.wallet-details .connection-location {
+  justify-content: space-between;
+  color: var(--ink);
+}
+.wallet-details .ui-badge--warm {
+  background: var(--panel);
+  border: 1px solid color-mix(in srgb, var(--warm) 35%, transparent);
+  color: var(--warm);
+}
+.wallet-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+.wallet-fact-address {
+  grid-column: 1 / -1;
+}
+.wallet-facts dt {
+  color: var(--muted);
+  font-size: var(--ui-detail);
+}
+.wallet-facts dd {
+  margin: 4px 0 0;
+  color: var(--ink);
+  font-size: var(--ui-font);
+}
+.settings-restriction {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  background: var(--raised);
+}
+.settings-restriction > div {
+  flex: 1;
+  min-width: 0;
+}
+.settings-restriction strong {
+  color: var(--ink);
+  font-size: var(--ui-font);
+  font-weight: 500;
+}
+.settings-restriction p {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: var(--ui-detail);
+  line-height: 16px;
 }
 .desktop-frame .connection-form .instructions-toggle {
   padding-inline: 0;
@@ -941,19 +1040,31 @@
   padding: 3px 0;
 }
 .desktop-frame .app-footer {
-  border-top: 1px solid var(--subtle-line);
+  border-top: 1px solid var(--shell-divider);
 }
 
 /* The status strip spans both navigation and work area. */
 .app.desktop-frame {
   display: grid;
-  grid-template-columns: var(--navigation-width) 8px minmax(0, 1fr);
-  grid-template-rows: 48px minmax(0, 1fr) 30px;
+  grid-template-columns: var(--navigation-width) 0 minmax(0, 1fr);
+  grid-template-rows: var(--shell-header-height) minmax(0, 1fr) 30px;
 }
 .desktop-frame > .sidebar {
   grid-column: 1;
   grid-row: 1 / 3;
   min-height: 0;
+  position: relative;
+  border-inline-end: 0;
+}
+/* The full-height rail owns the edge where the workspace header ends. */
+.desktop-frame > .sidebar::after {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 0;
+  width: 1px;
+  background: var(--shell-divider);
+  pointer-events: none;
 }
 .desktop-frame > .navigation-resizer {
   grid-column: 2;
@@ -972,18 +1083,13 @@
 .app.desktop-frame.sidebar-collapsed {
   grid-template-columns: 0 0 minmax(0, 1fr);
 }
-@media (max-width: 700px) {
-  .app.desktop-frame:not(.sidebar-collapsed) {
-    grid-template-columns: var(--navigation-width) 0 minmax(0, 1fr);
-  }
-}
 
-/* Theme and Settings share one compact baseline in the expanded rail. */
+/* Settings sits above the shared appearance switch in the compact rail. */
 .desktop-frame .sidebar-bottom {
-  flex-direction: row;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
 }
 
 /* Agent selectors share Chat controls; wrap rather than clip on narrow panes. */
@@ -1055,7 +1161,7 @@
   font-size: var(--ui-font);
 }
 
-/* Global mode tabs sit next to the brand, above contextual navigation. */
+/* Shared route header sits beside the sidebar-owned mode controls. */
 .desktop-frame > .topbar {
   grid-column: 3;
   grid-row: 1;
@@ -1067,26 +1173,35 @@
   min-width: 0;
 }
 .desktop-frame > .sidebar {
-  padding-top: 8px;
+  padding: 0 4px 8px;
+}
+.desktop-frame .sidebar nav {
+  gap: 4px;
+}
+.desktop-frame .sidebar .nav-item {
+  height: 52px;
+  padding: 6px 4px;
+  gap: 4px;
 }
 
 /* Sidebar-owned controls start at the window edge, above its own menu. */
 .sidebar-controls {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: center;
   gap: 2px;
   width: 100%;
-  margin-bottom: 12px;
+  height: var(--shell-header-height);
+  margin-bottom: 4px;
   flex-shrink: 0;
 }
-.desktop-frame .sidebar-controls .ui-icon-button {
-  width: 24px;
-  padding: 4px;
+.desktop-frame .sidebar-controls,
+.desktop-frame > .topbar {
+  --control-size: var(--shell-control-size);
 }
 .desktop-frame .sidebar-controls .ui-segmented {
-  padding: 2px;
-  gap: 0;
+  padding: 0;
+  gap: 2px;
   background: var(--raised);
 }
 .ui-tooltip {
@@ -1136,9 +1251,20 @@
   }
 }
 
-/* Hidden means no icon rail; one independent trigger can restore navigation. */
+/* Hidden means no icon rail; its header trigger remains available. */
 .app.desktop-frame {
   position: relative;
+}
+/* Only the workspace header draws a horizontal divider. */
+.app.desktop-frame::before {
+  content: '';
+  grid-column: 3;
+  grid-row: 1;
+  align-self: end;
+  height: 1px;
+  background: var(--shell-divider);
+  pointer-events: none;
+  z-index: 2;
 }
 .desktop-frame > .sidebar {
   width: var(--navigation-width);
@@ -1168,25 +1294,14 @@
     visibility 0s var(--motion-push);
 }
 
-.sidebar-restore {
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  z-index: 100;
-}
-.desktop-frame .sidebar-restore .sidebar-toggle {
-  width: 24px;
-}
-.desktop-frame.sidebar-collapsed > .topbar .breadcrumb {
-  padding-left: 32px;
-}
-
 /* One content inset for Chat, Connect, Models and Activity. */
 .desktop-frame .content {
   padding: var(--page-top) var(--page-gutter) var(--page-gutter);
 }
 .desktop-frame > .topbar {
-  margin: 4px var(--page-gutter) 0;
+  margin: 0 var(--page-gutter);
+  height: auto;
+  min-height: 0;
   flex-shrink: 0;
 }
 @media (prefers-reduced-motion: reduce) {
@@ -1195,4 +1310,52 @@
   .desktop-frame.sidebar-collapsed > .sidebar {
     transition: none;
   }
+}
+
+.ui-settings-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.ui-settings-title > svg,
+.settings-restriction > svg {
+  flex-shrink: 0;
+  color: var(--blue);
+}
+.ui-copy-action {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+}
+.wallet-address .ui-copy-action .ui-button {
+  color: var(--blue);
+  background: var(--panel);
+}
+.ui-copy-error {
+  max-width: 150px;
+  font-family: inherit;
+  font-size: var(--ui-detail);
+  color: var(--ink);
+}
+
+.wallet-balance > div {
+  display: grid;
+  gap: 4px;
+}
+.wallet-balance span {
+  color: var(--muted);
+  font-size: var(--ui-font);
+}
+.wallet-balance strong {
+  font-size: 26px;
+  line-height: 30px;
+  font-weight: 600;
+}
+.wallet-balance small {
+  color: var(--muted);
+  font-size: var(--ui-font);
+  font-weight: 450;
+}
+.top-up-amounts .ui-button {
+  flex: 1;
 }

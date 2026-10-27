@@ -48,7 +48,9 @@
 .settings-content {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
+  max-width: 760px;
+  width: 100%;
 }
 @media (prefers-reduced-motion: reduce) {
   .theme-switch-thumb {

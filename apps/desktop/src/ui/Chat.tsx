@@ -43,7 +43,6 @@ import {
 import { MessageText } from './MessageText.js';
 import { Modal } from './Modal.js';
 import { ModelDropdown, type ModelOption } from './ModelDropdown.js';
-import { ModelImage } from './ModelImage.js';
 import { MotionPresence } from './Motion.js';
 import { SIGNAL_STATE, SignalMark, SignalTrace } from './Signal.js';
 import { toolName, TOOLS, type ToolId } from './tools.js';
@@ -77,8 +76,8 @@ type Props = {
 };
 type PendingSend = { text: string; tools: ToolId[] };
 const PHASE_LABEL = {
-  [CHAT_PHASE.CONNECTING]: 'Connecting to a preview provider',
-  [CHAT_PHASE.TOOLS]: 'Previewing web tools',
+  [CHAT_PHASE.CONNECTING]: 'Connecting to a provider',
+  [CHAT_PHASE.TOOLS]: 'Using web tools',
   [CHAT_PHASE.RESPONDING]: 'Writing response',
 } as const;
 const QUICK_PROMPTS = [
@@ -412,9 +411,7 @@ export function Chat({
                         }
                       />
                       <span>{message.model.name}</span>
-                      <Badge>
-                        {message.model.free ? 'Free' : 'Paid preview'}
-                      </Badge>
+                      <Badge>{message.model.free ? 'Free' : 'Paid'}</Badge>
                     </header>
                     {message.state === MESSAGE_STATE.PENDING && (
                       <div className="run-line" role="status">
@@ -428,7 +425,6 @@ export function Chat({
                         <span>
                           {run ? PHASE_LABEL[run.phase] : 'Preparing response'}
                         </span>
-                        <span className="run-preview">Preview</span>
                       </div>
                     )}
                     {message.text ? (
@@ -446,7 +442,7 @@ export function Chat({
                               ? message.text
                                 ? 'Stopped · partial response'
                                 : 'Stopped'
-                              : 'Preview response'}
+                              : 'Completed'}
                           </span>
                           {message.text && (
                             <IconButton
@@ -500,16 +496,13 @@ export function Chat({
                           className="run-details"
                         >
                           <SignalTrace model={message.model.name} />
-                          <p>Illustrative route · no provider contacted</p>
+                          <p>Model route</p>
                           {message.tools.length > 0 && (
                             <p>
-                              Preview tools:{' '}
-                              {message.tools.map(toolName).join(', ')}
+                              Tools: {message.tools.map(toolName).join(', ')}
                             </p>
                           )}
-                          <p>
-                            Response text is generated locally for this mockup.
-                          </p>
+                          <p>Review the response before using it.</p>
                         </section>
                       )}
                     </MotionPresence>
@@ -600,7 +593,7 @@ export function Chat({
                     ? 'Esc to stop'
                     : model.free
                       ? 'No credits needed'
-                      : 'Demo credits'}
+                      : 'Uses wallet balance'}
                 </span>
                 <IconButton
                   variant={busy ? 'secondary' : 'primary'}
@@ -642,7 +635,7 @@ export function Chat({
             {notice ||
               (busy && session.draft.trim()
                 ? 'Draft kept · stop or wait to send'
-                : 'Enter to send · Shift+Enter for a new line · Local preview')}
+                : 'Enter to send · Shift+Enter for a new line')}
           </p>
         </div>
       </div>
@@ -676,8 +669,8 @@ export function Chat({
                     title={item.title}
                     detail={
                       item.messages.length
-                        ? `${item.messages.filter((message) => message.role === CHAT_ROLE.USER).length} prompts · this preview`
-                        : 'Draft · this preview'
+                        ? `${item.messages.filter((message) => message.role === CHAT_ROLE.USER).length} prompts`
+                        : 'Draft'
                     }
                   />
                 </ListRow>
@@ -716,9 +709,7 @@ export function Chat({
               {pendingSend.tools.map(toolName).join(', ')}.
             </p>
             <div className="tool-request-preview">{pendingSend.text}</div>
-            <Note>
-              Preview only. Nothing leaves this app. No API keys are used.
-            </Note>
+            <Note>These tools can access the web for this request.</Note>
             <Button
               variant={BUTTON_VARIANT.PRIMARY}
               className="wide"
@@ -731,7 +722,7 @@ export function Chat({
                 start(pending.text, pending.tools);
               }}
             >
-              Simulate with these tools
+              Continue with these tools
             </Button>
             <Button
               className="wide"

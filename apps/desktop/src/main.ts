@@ -4,7 +4,14 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { app, BrowserWindow, dialog, ipcMain, safeStorage } from 'electron';
+import {
+  app,
+  BrowserWindow,
+  clipboard,
+  dialog,
+  ipcMain,
+  safeStorage,
+} from 'electron';
 
 import { DESKTOP, PROBE_STATUS, STARTUP_WINDOW } from './constants.js';
 import { probeInUtility } from './probe-host.js';
@@ -16,6 +23,7 @@ import { BRAND_COLORS } from './theme.js';
 import { BACKUP_FLOW, BACKUP_RESULT } from './wallet/backup-flow-model.js';
 import { createBackupFlow } from './wallet/backup-flow.js';
 import { WALLET, WALLET_STATUS } from './wallet/constants.js';
+import { copyPublicWalletAddress } from './wallet/copy-address.js';
 import {
   focusExistingWindow,
   prepareWalletProfile,
@@ -60,6 +68,27 @@ function createProbeWindow(startup = false) {
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   window.webContents.on('will-navigate', (event) => event.preventDefault());
   return window;
+}
+
+function registerWalletCopy(
+  window: BrowserWindow,
+  summary: Promise<WalletSummary>,
+  signal: AbortSignal,
+) {
+  ipcMain.handle(WALLET.COPY_CHANNEL, async (event, ...args: unknown[]) => {
+    if (
+      event.sender !== window.webContents ||
+      event.senderFrame !== window.webContents.mainFrame
+    )
+      throw new Error('Unsupported wallet copy sender.');
+    const current = await summary;
+    return (
+      !signal.aborted &&
+      copyPublicWalletAddress(current, args, (text) =>
+        clipboard.writeText(text),
+      )
+    );
+  });
 }
 
 function registerWalletSetup(
@@ -146,7 +175,7 @@ function registerWalletStatus(
           title: 'Wallet backup',
           message: 'Allow this wallet backup operation?',
           detail:
-            'Your password protects the file. Gyblos cannot recover a lost file or password. Funding stays disabled.',
+            'Your password protects the file. Gyblos cannot recover a lost file or password.',
           buttons: ['Cancel', 'Continue'],
           defaultId: 0,
           cancelId: 0,
@@ -187,6 +216,7 @@ function registerWalletStatus(
       ),
     );
   registerWalletBackup(window, summary, backup, controller.signal, smoke);
+  registerWalletCopy(window, summary, controller.signal);
   ipcMain.handle(WALLET.CHANNEL, (event, ...args: unknown[]) => {
     if (
       event.sender !== window.webContents ||
