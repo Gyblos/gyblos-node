@@ -1,222 +1,125 @@
 // Owns the `gyblos doctor` contract for the seller: read-only checks with static codes, the public
 // NodeId/owner summary, exit codes 0/1 and no secret, home path or RPC path in any output.
-// Offline; synthetic role files in a temporary home, injected port and program probes.
+// Offline; synthetic role files in a temporary home, injected port, tokenizer and program probes.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import {
-  chmod,
-  mkdir,
-  mkdtemp,
-  readdir,
-  rm,
-  writeFile,
-} from 'node:fs/promises';
+import { chmod, mkdir, rm, unlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { generateKeyPairSigner } from '@solana/kit';
+import { runCli } from '@gyblos/node-app/cli';
 
-import { CONFIG_ASSET_LABELS } from '@gyblos/config/constants';
-import { runCli, type CliContext } from '@gyblos/node-app/cli';
-
+import {
+  doctor,
+  FREE_TOML,
+  KEY_FILES,
+  line,
+  NODE_ID,
+  PAID_TOML,
+  RPC_URL,
+  scenario,
+  snapshot,
+  withOllama,
+} from './support/doctor-fixture.js';
 import {
   FAKE_SECRET,
   REPOSITORY_ROOT,
 } from './support/node-config-fixtures.js';
 
-const NODE_ID = 'ab'.repeat(32);
-const RELAY_TOKEN = `${FAKE_SECRET}-relay-token`;
-const RPC_URL = `https://rpc.example.com/v2/${FAKE_SECRET}`;
-const KEY_FILES = [
-  'owner.json',
-  'authorizer.json',
-  'facilitator.json',
-  'node.key',
-];
-const MANAGED = '{ kind = "ollama", url = "http://127.0.0.1:11436" }';
-const FREE_TOML = `version = 1\n[node]\nnetwork = "devnet"\n[[offers]]\nmodel = "qwen3:0.6b"\nreasoning = ["off"]\nengine = ${MANAGED}\nfree = { daily_token_cap = 20000, per_buyer_cap = 2000 }\n`;
-const PAID_TOML = FREE_TOML.replace(
-  'free = { daily_token_cap = 20000, per_buyer_cap = 2000 }',
-  'price = { input_per_mtok = "1", output_per_mtok = "2", currency = "USDC" }',
-);
-
-interface Fixture {
-  root: string;
-  home: string;
-  bin: string;
-  owner: string;
-}
-
-async function fixture(options: { role?: boolean; keyMode?: number } = {}) {
-  const root = await mkdtemp(join(tmpdir(), 'gyblos-doctor-'));
-  const home = join(root, 'home');
-  const bin = join(root, 'bin');
-  const seller = join(home, 'seller');
-  await mkdir(seller, { recursive: true, mode: 0o700 });
-  await mkdir(bin);
-  const [owner, authorizer, facilitator, payTo, buyer, mint] =
-    await Promise.all(
-      Array.from(
-        { length: 6 },
-        async () => (await generateKeyPairSigner()).address,
-      ),
-    );
-  if (options.role !== false) {
-    await writeFile(
-      join(seller, 'role.json'),
-      JSON.stringify({
-        schemaVersion: 1,
-        role: 'seller',
-        rpcUrl: RPC_URL,
-        mint,
-        assetLabel: CONFIG_ASSET_LABELS.TEST_TOKEN,
-        nodeId: NODE_ID,
-        buyer,
-        owner,
-        authorizer,
-        facilitator,
-        payTo,
-      }),
-    );
-    for (const name of KEY_FILES) {
-      // Never real key material: doctor only checks presence and permissions.
-      await writeFile(join(seller, name), '[]');
-      await chmod(join(seller, name), options.keyMode ?? 0o600);
-    }
-  }
-  return { root, home, bin, owner: owner! } satisfies Fixture;
-}
-
-async function withOllama(fixture: Fixture) {
-  const binary = join(fixture.bin, 'ollama');
-  await writeFile(binary, '#!/bin/sh\nexit 0\n');
-  await chmod(binary, 0o755);
-  const manifest = join(
-    fixture.home,
-    'artifacts',
-    'ollama-models',
-    'manifests',
-    'registry.ollama.ai',
-    'library',
-    'qwen3',
-  );
-  await mkdir(manifest, { recursive: true });
-  await writeFile(join(manifest, '0.6b'), '{}');
-}
-
-async function listTree(directory: string): Promise<string[]> {
-  const entries = await readdir(directory, {
-    recursive: true,
-    withFileTypes: true,
-  });
-  return entries.map((entry) => join(entry.parentPath, entry.name)).sort();
-}
-
-async function doctor(
-  fixture: Fixture,
-  args: string[] = [],
-  env: Record<string, string> = {},
-  probes: NonNullable<CliContext['doctor']> = {},
-) {
-  let stdout = '';
-  let stderr = '';
-  const programCalls: string[] = [];
-  const code = await runCli(['doctor', ...args], {
-    env: {
-      GYBLOS_HOME: fixture.home,
-      PATH: fixture.bin,
-      GYBLOS_RELAY_TOKEN: RELAY_TOKEN,
-      ...env,
-    },
-    cwd: fixture.root,
-    stdout: (text) => {
-      stdout += text;
-    },
-    stderr: (text) => {
-      stderr += text;
-    },
-    doctor: {
-      portFree: async () => true,
-      program: async (url) => {
-        programCalls.push(url);
-      },
-      ...probes,
-    },
-  });
-  const output = stdout + stderr;
-  // No secret, home location or RPC path in any output.
-  assert.equal(output.includes('FAKE0SECRET'), false, output);
-  assert.equal(output.includes(fixture.home), false, output);
-  return { code, output, programCalls };
-}
-
-const line = (output: string, check: string) =>
-  output.split('\n').find((entry) => entry.trim().split(/\s+/)[1] === check);
-
-void test('doctor: an empty home fails the role check with a setup hint and exits 1', async () => {
-  const run = await fixture({ role: false });
-  try {
-    await withOllama(run);
-    const result = await doctor(run);
-    assert.equal(result.code, 1);
-    assert.match(
-      line(result.output, 'role') ?? '',
-      /FAIL\s+role\s+ROLE_MISSING/,
-    );
-    assert.match(result.output, /pnpm node:setup --role seller/);
-    assert.match(result.output, /NOT READY/);
-  } finally {
-    await rm(run.root, { recursive: true, force: true });
-  }
-});
-
-void test('doctor: a synthetic seller prints its public NodeId and owner and touches no file', async () => {
-  const run = await fixture();
-  try {
+void test('doctor: a ready free seller exits 0, prints its public identity and changes nothing', () =>
+  scenario({}, async (run) => {
     await withOllama(run);
     await writeFile(join(run.root, 'gyblos.toml'), FREE_TOML);
-    const before = await listTree(run.root);
+    const before = await snapshot(run.root);
     const result = await doctor(run);
-    assert.deepEqual(await listTree(run.root), before);
-    assert.match(line(result.output, 'role') ?? '', /OK\s+role/);
-    assert.match(line(result.output, 'keys') ?? '', /OK\s+keys/);
-    assert.match(line(result.output, 'config') ?? '', /OK\s+config/);
-    assert.match(line(result.output, 'ollama') ?? '', /OK\s+ollama/);
-    assert.match(line(result.output, 'model') ?? '', /OK\s+model/);
-    assert.match(line(result.output, 'relays') ?? '', /OK\s+relays/);
+    assert.deepEqual(await snapshot(run.root), before);
+    assert.equal(result.code, 0, result.output);
+    assert.match(result.output, /Result: READY/);
+    for (const check of [
+      'config',
+      'home',
+      'role',
+      'keys',
+      'sequence',
+      'tokenizer',
+      'ollama',
+      'model',
+      'ports',
+      'relays',
+    ])
+      assert.match(line(result.output, check), /^\s*OK\s/, check);
+    assert.match(line(result.output, 'program'), /OK\s+program\s+NOT_NEEDED/);
     assert.match(result.output, new RegExp(`nodeId\\s+${NODE_ID}`));
     assert.match(result.output, new RegExp(`owner\\s+${run.owner}`));
     assert.match(result.output, /offer\s+free qwen3-0\.6b/);
-    // The pinned tokenizer is not present in a synthetic home.
-    assert.match(
-      line(result.output, 'tokenizer') ?? '',
-      /FAIL\s+tokenizer\s+TOKENIZER_UNAVAILABLE/,
-    );
-    assert.match(result.output, /pnpm gate:inference:setup/);
-  } finally {
-    await rm(run.root, { recursive: true, force: true });
-  }
-});
+    assert.match(result.output, /publish\s+off/);
+  }));
 
-void test('doctor: key files readable by others fail the key check', async () => {
-  const run = await fixture({ keyMode: 0o644 });
-  try {
+void test('doctor: an empty home fails the role check with a setup hint and exits 1', () =>
+  scenario({ role: false }, async (run) => {
     await withOllama(run);
     const result = await doctor(run);
     assert.equal(result.code, 1);
+    assert.match(line(result.output, 'role'), /FAIL\s+role\s+ROLE_MISSING/);
+    assert.match(line(result.output, 'keys'), /WARN\s+keys\s+NOT_CHECKED/);
+    assert.match(result.output, /pnpm node:setup --role seller/);
+    assert.match(result.output, /NOT READY/);
+  }));
+
+void test('doctor: a buyer role in the seller home is refused', () =>
+  scenario({ role: 'buyer' }, async (run) => {
+    await withOllama(run);
+    const result = await doctor(run);
+    assert.match(line(result.output, 'role'), /FAIL\s+role\s+ROLE_NOT_SELLER/);
+  }));
+
+void test('doctor: key files must be private regular files; free sellers need only owner and node keys', () =>
+  scenario({ keyMode: 0o644 }, async (run) => {
+    await withOllama(run);
+    const loose = await doctor(run);
+    assert.equal(loose.code, 1);
+    assert.match(line(loose.output, 'keys'), /FAIL\s+keys\s+KEY_PERMISSIONS/);
+    for (const name of KEY_FILES) await chmod(join(run.seller, name), 0o600);
+    await unlink(join(run.seller, 'owner.json'));
+    await mkdir(join(run.seller, 'owner.json'), { mode: 0o600 });
+    await chmod(join(run.seller, 'owner.json'), 0o600);
+    const directory = await doctor(run);
     assert.match(
-      line(result.output, 'keys') ?? '',
+      line(directory.output, 'keys'),
       /FAIL\s+keys\s+KEY_PERMISSIONS/,
     );
-  } finally {
-    await rm(run.root, { recursive: true, force: true });
-  }
-});
+    await rm(join(run.seller, 'owner.json'), { recursive: true });
+    await writeFile(join(run.seller, 'owner.json'), '[]', { mode: 0o600 });
+    await unlink(join(run.seller, 'facilitator.json'));
+    await writeFile(join(run.root, 'gyblos.toml'), PAID_TOML);
+    const paid = await doctor(run);
+    assert.match(line(paid.output, 'keys'), /FAIL\s+keys\s+KEYS_MISSING/);
+    await writeFile(join(run.root, 'gyblos.toml'), FREE_TOML);
+    const free = await doctor(run);
+    assert.match(line(free.output, 'keys'), /OK\s+keys/);
+  }));
 
-void test('doctor: config the daemon cannot honor reports the same startup code', async () => {
-  const run = await fixture();
-  try {
+void test('doctor: an unsafe seller directory or leftover sequence lock is reported like startup', () =>
+  scenario({}, async (run) => {
+    await withOllama(run);
+    await chmod(run.seller, 0o755);
+    const open = await doctor(run);
+    assert.match(
+      line(open.output, 'sequence'),
+      /FAIL\s+sequence\s+PUBLIC_SEQUENCE_UNAVAILABLE/,
+    );
+    await chmod(run.seller, 0o700);
+    await writeFile(join(run.seller, 'public-sequence-v2.lock'), '');
+    const locked = await doctor(run);
+    assert.match(
+      line(locked.output, 'sequence'),
+      /WARN\s+sequence\s+SEQUENCE_LOCK_PRESENT/,
+    );
+  }));
+
+void test('doctor: config the daemon cannot honor reports the same startup code and file issues', () =>
+  scenario({}, async (run) => {
     await withOllama(run);
     await writeFile(
       join(run.root, 'gyblos.toml'),
@@ -224,83 +127,123 @@ void test('doctor: config the daemon cannot honor reports the same startup code'
     );
     const priced = await doctor(run);
     assert.match(
-      line(priced.output, 'config') ?? '',
+      line(priced.output, 'config'),
       /FAIL\s+config\s+SELLER_OFFER_PRICE_UNSUPPORTED/,
     );
     await writeFile(join(run.root, 'other.toml'), 'version = 1\n[node\n');
-    const broken = await doctor(run, ['--config', 'other.toml']);
+    const broken = await doctor(run, [], { GYBLOS_CONFIG: 'other.toml' });
     assert.match(
-      line(broken.output, 'config') ?? '',
+      line(broken.output, 'config'),
       /FAIL\s+config\s+NODE_CONFIG_INVALID/,
     );
+    assert.match(broken.output, /TOML_SYNTAX/);
     const missing = await doctor(run, [], { GYBLOS_CONFIG: 'missing.toml' });
     assert.match(
-      line(missing.output, 'config') ?? '',
+      line(missing.output, 'config'),
       /FAIL\s+config\s+NODE_CONFIG_INVALID/,
     );
-  } finally {
-    await rm(run.root, { recursive: true, force: true });
-  }
-});
+    await writeFile(
+      join(run.root, 'gyblos.toml'),
+      `${FREE_TOML}[discovery]\npublish = true\nurl = "https://discovery.example.com/v1/${FAKE_SECRET}"\n`,
+    );
+    const published = await doctor(run);
+    assert.match(
+      published.output,
+      /publish\s+https:\/\/discovery\.example\.com <path hidden>/,
+    );
+  }));
 
-void test('doctor: a missing or malformed relay token fails without echoing it', async () => {
-  const run = await fixture();
-  try {
+void test('doctor: a missing or malformed relay token fails without echoing it', () =>
+  scenario({}, async (run) => {
     await withOllama(run);
     const missing = await doctor(run, [], { GYBLOS_RELAY_TOKEN: '' });
     assert.match(
-      line(missing.output, 'relays') ?? '',
+      line(missing.output, 'relays'),
       /FAIL\s+relays\s+MISSING_RELAY_TOKEN/,
     );
-    const short = await doctor(run, [], { GYBLOS_RELAY_TOKEN: 'FAKE0SECRET' });
+    const short = await doctor(run, [], {
+      GYBLOS_RELAY_TOKEN: 'FAKE0SECRET',
+    });
     assert.match(
-      line(short.output, 'relays') ?? '',
-      /FAIL\s+relays\s+INVALID_RELAY_TOKEN/,
+      line(short.output, 'relays'),
+      /FAIL\s+relays\s+INVALID_RELAY_TOKEN_LENGTH/,
     );
-  } finally {
-    await rm(run.root, { recursive: true, force: true });
-  }
-});
+  }));
 
-void test('doctor: engine checks fail for a missing ollama, an absent model and a busy port', async () => {
-  const run = await fixture();
-  try {
-    const result = await doctor(run, [], {}, { portFree: async () => false });
+void test('doctor: engine checks fail without ollama, tokenizer or model, and on a busy port', () =>
+  scenario({}, async (run) => {
+    const nothing = await doctor(
+      run,
+      [],
+      {},
+      { portFree: async () => false, tokenizer: undefined },
+    );
     assert.match(
-      line(result.output, 'ollama') ?? '',
+      line(nothing.output, 'ollama'),
       /FAIL\s+ollama\s+OLLAMA_NOT_FOUND/,
     );
     assert.match(
-      line(result.output, 'model') ?? '',
-      /WARN\s+model\s+MODEL_NOT_DOWNLOADED/,
+      line(nothing.output, 'model'),
+      /FAIL\s+model\s+MODEL_NOT_DOWNLOADED/,
     );
+    assert.match(line(nothing.output, 'ports'), /FAIL\s+ports\s+PORT_IN_USE/);
     assert.match(
-      line(result.output, 'ports') ?? '',
-      /FAIL\s+ports\s+PORT_IN_USE/,
+      line(nothing.output, 'tokenizer'),
+      /FAIL\s+tokenizer\s+TOKENIZER_UNAVAILABLE/,
     );
-  } finally {
-    await rm(run.root, { recursive: true, force: true });
-  }
-});
+    assert.match(nothing.output, /pnpm gate:inference:setup/);
+    // Present but not executable, or a directory: neither is runnable.
+    await writeFile(join(run.bin, 'ollama'), '');
+    await chmod(join(run.bin, 'ollama'), 0o644);
+    const plain = await doctor(run);
+    assert.match(
+      line(plain.output, 'ollama'),
+      /FAIL\s+ollama\s+OLLAMA_NOT_FOUND/,
+    );
+    await rm(join(run.bin, 'ollama'));
+    await mkdir(join(run.bin, 'ollama'), { mode: 0o755 });
+    const folder = await doctor(run);
+    assert.match(
+      line(folder.output, 'ollama'),
+      /FAIL\s+ollama\s+OLLAMA_NOT_FOUND/,
+    );
+  }));
 
-void test('doctor: --online checks the devnet program only for a paid offer and hides the RPC', async () => {
-  const run = await fixture();
-  try {
+void test('doctor: probes the paid ports only for a paid offer', () =>
+  scenario({}, async (run) => {
+    await withOllama(run);
+    await writeFile(join(run.root, 'gyblos.toml'), FREE_TOML);
+    const free = await doctor(run);
+    assert.deepEqual(
+      free.probed.map((url) => new URL(url).port),
+      ['11436'],
+    );
+    await writeFile(join(run.root, 'gyblos.toml'), PAID_TOML);
+    const paid = await doctor(run);
+    assert.deepEqual(
+      paid.probed.map((url) => new URL(url).port),
+      ['11436', '4022', '4032'],
+    );
+  }));
+
+void test('doctor: --online checks the devnet program only for a paid offer and hides the RPC', () =>
+  scenario({}, async (run) => {
     await withOllama(run);
     await writeFile(join(run.root, 'gyblos.toml'), FREE_TOML);
     const free = await doctor(run, ['--online']);
     assert.deepEqual(free.programCalls, []);
-    assert.match(line(free.output, 'program') ?? '', /OK\s+program/);
+    assert.match(line(free.output, 'program'), /OK\s+program/);
     await writeFile(join(run.root, 'gyblos.toml'), PAID_TOML);
     const offline = await doctor(run);
     assert.deepEqual(offline.programCalls, []);
     assert.match(
-      line(offline.output, 'program') ?? '',
+      line(offline.output, 'program'),
       /WARN\s+program\s+ONLINE_CHECK_SKIPPED/,
     );
+    assert.equal(offline.code, 0, 'a warning alone is not a failure');
     const online = await doctor(run, ['--online']);
     assert.deepEqual(online.programCalls, [RPC_URL]);
-    assert.match(line(online.output, 'program') ?? '', /OK\s+program/);
+    assert.match(line(online.output, 'program'), /OK\s+program/);
     const failing = await doctor(
       run,
       ['--online'],
@@ -312,13 +255,29 @@ void test('doctor: --online checks the devnet program only for a paid offer and 
       },
     );
     assert.match(
-      line(failing.output, 'program') ?? '',
+      line(failing.output, 'program'),
       /FAIL\s+program\s+DEVNET_PROGRAM_UNAVAILABLE/,
     );
-  } finally {
-    await rm(run.root, { recursive: true, force: true });
-  }
-});
+  }));
+
+void test('doctor and config validate refuse arguments they do not take', () =>
+  scenario({}, async (run) => {
+    for (const args of [['--config', 'gyblos.toml'], ['extra'], ['--bogus']]) {
+      const result = await doctor(run, args);
+      assert.equal(result.code, 1, args.join(' '));
+      assert.match(result.output, /Usage:/);
+    }
+    let stderr = '';
+    const code = await runCli(['config', 'validate', '--online'], {
+      env: {},
+      stdout: () => undefined,
+      stderr: (text) => {
+        stderr += text;
+      },
+    });
+    assert.equal(code, 1);
+    assert.match(stderr, /Usage:/);
+  }));
 
 void test('doctor: the gyblos script entry sets exit code 1 for an empty home', () => {
   const home = join(tmpdir(), `gyblos-doctor-empty-${process.pid}`);

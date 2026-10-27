@@ -82,14 +82,19 @@ export function roleDirectory(role: P2PRole) {
   return resolve(homeLayout(process.env).roles[role]);
 }
 
+// A regular, non-symlinked file owned by this user with mode 0600; checked from metadata only.
+function privateKeyMetadata(metadata: Awaited<ReturnType<typeof lstat>>) {
+  return (
+    metadata.isFile() &&
+    !metadata.isSymbolicLink() &&
+    (Number(metadata.mode) & FILE_MODES.permissionMask) ===
+      FILE_MODES.privateFile &&
+    (!process.getuid || Number(metadata.uid) === process.getuid())
+  );
+}
+
 async function privateBytes(path: string, length: number) {
-  const metadata = await lstat(path);
-  if (
-    !metadata.isFile() ||
-    metadata.isSymbolicLink() ||
-    (metadata.mode & FILE_MODES.permissionMask) !== FILE_MODES.privateFile ||
-    (process.getuid && metadata.uid !== process.getuid())
-  )
+  if (!privateKeyMetadata(await lstat(path)))
     throw new Error('Role key permissions or owner are invalid.');
   const value: unknown = JSON.parse(await readFile(path, 'utf8'));
   if (
@@ -297,6 +302,26 @@ export async function setupRole(options: SetupOptions) {
   }
   await saveJson(path, config);
   return config;
+}
+
+// Metadata-only key check for preflight: never opens a key file. `missing` if any file is absent.
+export async function roleKeyFilesStatus(
+  role: P2PRole,
+  names: readonly string[],
+  environment: HomeEnvironment = process.env,
+): Promise<'ok' | 'missing' | 'invalid'> {
+  let invalid = false;
+  for (const name of names) {
+    let metadata;
+    try {
+      metadata = await lstat(file(role, name, environment));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return 'missing';
+      throw error;
+    }
+    if (!privateKeyMetadata(metadata)) invalid = true;
+  }
+  return invalid ? 'invalid' : 'ok';
 }
 
 export async function publicRole(

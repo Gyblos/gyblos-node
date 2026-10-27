@@ -35,7 +35,7 @@ export interface CliContext {
 
 const EXIT = { ok: 0, failure: 1 } as const;
 const USAGE =
-  'Usage: gyblos config validate [--config <path>]\n       gyblos doctor [--config <path>] [--online]\n';
+  'Usage: gyblos config validate [--config <path>]\n       gyblos doctor [--online]   (reads GYBLOS_CONFIG or ./gyblos.toml, like node:start)\n';
 const URL_SETTINGS: ReadonlySet<NodeSettingKey> = new Set([
   NODE_SETTINGS.RPC_URL,
   NODE_SETTINGS.RELAY_URLS,
@@ -135,12 +135,17 @@ function parseCommand(args: readonly string[]) {
 export async function runCli(args: readonly string[], context: CliContext) {
   const parsed = parseCommand(args);
   const [group, command, ...rest] = parsed?.positionals ?? [];
-  if (parsed && group === 'doctor' && command === undefined) {
+  // doctor reads exactly what node:start reads (GYBLOS_CONFIG or ./gyblos.toml), so it takes no --config.
+  if (
+    parsed &&
+    group === 'doctor' &&
+    command === undefined &&
+    parsed.values.config === undefined
+  ) {
     const ready = await doctor(
       {
         env: context.env,
         cwd: context.cwd ?? process.cwd(),
-        configPath: parsed.values.config,
         online: parsed.values.online === true,
         probes: context.doctor,
       },
