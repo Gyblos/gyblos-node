@@ -9,11 +9,11 @@ export function chatAuthorizationNotice(
 ): string {
   switch (status) {
     case DEMO_AUTH.BALANCE:
-      return 'No demo credits are available. Choose a free model to continue. Your draft is kept; wallet funds are not used in this preview.';
+      return 'Insufficient balance for this model. Choose a free model to continue. Your draft is kept.';
     case DEMO_AUTH.LIMIT:
-      return 'The demo spending limit is reached. Choose a free model to continue. Your draft is kept.';
+      return 'The daily spending limit is reached. Choose a free model to continue. Your draft is kept.';
     case DEMO_AUTH.OFFLINE:
-      return 'Connection paused. Resume the preview connection to send. Your draft is kept.';
+      return 'Connection paused. Resume the connection to send. Your draft is kept.';
     case DEMO_AUTH.APPROVED:
       return '';
   }
