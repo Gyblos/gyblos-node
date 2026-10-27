@@ -580,7 +580,14 @@ export function Chat({
                   type={busy ? 'button' : 'submit'}
                   label={busy ? 'Stop response' : 'Send message'}
                   data-busy={busy}
-                  onClick={busy ? stop : undefined}
+                  onClick={
+                    busy
+                      ? (event) => {
+                          event.preventDefault();
+                          stop();
+                        }
+                      : undefined
+                  }
                   disabled={!busy && (!session.draft.trim() || !online)}
                 >
                   <span className="composer-send-glyph" aria-hidden="true">
