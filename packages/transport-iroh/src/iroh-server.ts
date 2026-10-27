@@ -10,6 +10,7 @@ import {
 import {
   CONTROL_ALPN,
   FREE_EXECUTION,
+  FREE_STREAM,
   GYBLOS_ALPN,
 } from '@gyblos/protocol/constants';
 
@@ -168,7 +169,10 @@ export function serveIroh(
         );
         return;
       }
-      if (alpn === FREE_EXECUTION.alpn && freeExecution) {
+      if (
+        (alpn === FREE_EXECUTION.alpn || alpn === FREE_STREAM.alpn) &&
+        freeExecution
+      ) {
         await handleFreeExecutionConnection(
           connection,
           freeExecution,
@@ -180,6 +184,7 @@ export function serveIroh(
           () => closed,
           () =>
             !relayOnly || selectedRoute(connection) === TRANSPORT_ROUTES.RELAY,
+          alpn === FREE_STREAM.alpn,
         );
         return;
       }

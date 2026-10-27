@@ -39,10 +39,13 @@ export function localOllamaUrl(base: string): URL {
 
 export function createOllama(base: string, fetchImpl: typeof fetch = fetch) {
   const origin = localOllamaUrl(base);
-  async function assertModel() {
+  async function assertModel(signal?: AbortSignal) {
     const response = await fetchImpl(new URL(ROUTES.ollamaTags, origin), {
       redirect: 'error',
-      signal: AbortSignal.timeout(TIMEOUTS.events),
+      signal: AbortSignal.any([
+        AbortSignal.timeout(TIMEOUTS.events),
+        ...(signal ? [signal] : []),
+      ]),
     });
     if (!response.ok) throw new Error('Local model inventory unavailable.');
     const body = (await response.json()) as {
@@ -59,6 +62,7 @@ export function createOllama(base: string, fetchImpl: typeof fetch = fetch) {
       maxTokens: number;
       signal?: AbortSignal;
       onFragment?: () => Promise<void>;
+      onText?: (text: string) => Promise<void>;
     }): Promise<InferenceResult> {
       if (
         !Number.isSafeInteger(input.maxTokens) ||
@@ -67,8 +71,12 @@ export function createOllama(base: string, fetchImpl: typeof fetch = fetch) {
       )
         throw new Error('Invalid output token limit.');
       input.signal?.throwIfAborted();
-      await assertModel();
+      await assertModel(input.signal);
       input.signal?.throwIfAborted();
+      const signal = AbortSignal.any([
+        AbortSignal.timeout(TIMEOUTS.generation),
+        ...(input.signal ? [input.signal] : []),
+      ]);
       const response = await fetchImpl(new URL(ROUTES.ollamaGenerate, origin), {
         method: 'POST',
         redirect: 'error',
@@ -86,24 +94,28 @@ export function createOllama(base: string, fetchImpl: typeof fetch = fetch) {
             num_ctx: GENERATION.numCtx,
           },
         }),
-        signal: AbortSignal.any([
-          AbortSignal.timeout(TIMEOUTS.generation),
-          ...(input.signal ? [input.signal] : []),
-        ]),
+        signal,
       });
       if (!response.ok || !response.body)
         throw new Error('Local engine generation failed.');
-      // Streaming is internal to the adapter, solely for bounded buffering and fault injection.
-      // The paid HTTP response remains fully buffered until settlement.
+      // The optional text callback receives bounded fragments with backpressure.
+      // Callers without it, including paid HTTP, retain the complete buffered result.
       let buffer = '';
       let text = '';
       let terminal: Record<string, unknown> | undefined;
       let fragments = 0;
-      const decoder = new TextDecoder();
+      const decoder = new TextDecoder('utf-8', { fatal: true });
       const reader = response.body.getReader();
+      const cancel = () => {
+        void reader.cancel().catch(() => {});
+      };
+      signal.addEventListener('abort', cancel, { once: true });
+      if (signal.aborted) cancel();
       try {
         for (;;) {
+          signal.throwIfAborted();
           const part = await reader.read();
+          signal.throwIfAborted();
           buffer += decoder.decode(part.value, { stream: !part.done });
           if (buffer.length > MODEL_LIMITS.maxFrameCharacters)
             throw new Error('Engine frame exceeds limit.');
@@ -120,14 +132,21 @@ export function createOllama(base: string, fetchImpl: typeof fetch = fetch) {
               (event.thinking !== undefined && event.thinking !== '')
             )
               throw new Error('Invalid or unexpected engine frame.');
-            if (typeof event.response !== 'string')
+            if (
+              typeof event.response !== 'string' ||
+              /[\uD800-\uDFFF]/u.test(event.response)
+            )
               throw new Error('Missing engine text.');
             text += event.response;
             if (text.length > MODEL_LIMITS.maxOutputCharacters)
               throw new Error('Engine output exceeds limit.');
             if (event.response) {
               fragments++;
+              signal.throwIfAborted();
               await input.onFragment?.();
+              signal.throwIfAborted();
+              await input.onText?.(event.response);
+              signal.throwIfAborted();
             }
             if (event.done === true) terminal = event;
           }
@@ -167,6 +186,7 @@ export function createOllama(base: string, fetchImpl: typeof fetch = fetch) {
           doneReason,
         };
       } finally {
+        signal.removeEventListener('abort', cancel);
         await reader.cancel().catch(() => {});
       }
     },

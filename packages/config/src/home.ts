@@ -40,6 +40,8 @@ export const ROLE_FILES = {
   reconciliations: 'reconciliations.json',
   calls: 'calls.json',
   offer: 'offer.json',
+  identityState: 'identity-state-8004.json',
+  identityStateLock: 'identity-state-8004.lock',
   publicSequence: 'public-sequence-v2.json',
   publicSequenceLock: 'public-sequence-v2.lock',
   facilitatorDiagnostics: 'facilitator-diagnostics',
@@ -107,6 +109,22 @@ export function homeLayout(environment: HomeEnvironment) {
 }
 
 export type HomeLayout = ReturnType<typeof homeLayout>;
+
+// Where Ollama keeps a library model's manifest inside the managed models directory (Ollama's layout).
+export function ollamaModelManifest(
+  environment: HomeEnvironment,
+  model: string,
+  tag: string,
+) {
+  return join(
+    homeLayout(environment).artifacts.ollamaModels,
+    'manifests',
+    'registry.ollama.ai',
+    'library',
+    model,
+    tag,
+  );
+}
 
 export function rolePathIn(
   environment: HomeEnvironment,

@@ -4,7 +4,11 @@ import type { Endpoint } from '@number0/iroh';
 
 import { createBuyerControlClient } from '@gyblos/buyer/control';
 import { IPV6_LOOPBACK, LOCALHOST } from '@gyblos/config';
-import { CONTROL_ALPN, FREE_EXECUTION } from '@gyblos/protocol/constants';
+import {
+  CONTROL_ALPN,
+  FREE_EXECUTION,
+  FREE_STREAM,
+} from '@gyblos/protocol/constants';
 import type { Signer } from '@gyblos/protocol/signing';
 import { createControlTransport } from '@gyblos/transport-iroh/control-client';
 import type { ControlService } from '@gyblos/transport-iroh/control-server';
@@ -23,9 +27,10 @@ async function endpoint(secret?: number[], free = false): Promise<Endpoint> {
     builder.bindAddr(`${LOCALHOST}:0`);
     builder.bindAddr(`${IPV6_LOOPBACK}:0`);
     builder.alpns(
-      [CONTROL_ALPN, ...(free ? [FREE_EXECUTION.alpn] : [])].map((value) => [
-        ...Buffer.from(value),
-      ]),
+      [
+        CONTROL_ALPN,
+        ...(free ? [FREE_EXECUTION.alpn, FREE_STREAM.alpn] : []),
+      ].map((value) => [...Buffer.from(value)]),
     );
     if (secret) builder.secretKey(secret);
     return await builder.bind();

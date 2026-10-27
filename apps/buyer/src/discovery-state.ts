@@ -91,13 +91,15 @@ export function discoveryRowLive(row: DiscoveryRow, now: number) {
 export function mergeDiscoveryRow(
   held: DiscoveryRow | undefined,
   incoming: DiscoveryRow,
+  allowOwnerChange = false,
 ): { row: DiscoveryRow; accepted: boolean } {
   if (!held)
     return {
       row: incoming,
       accepted: unblocked(incoming),
     };
-  if (held.owner !== incoming.owner) return { row: held, accepted: false };
+  if (held.owner !== incoming.owner)
+    return rotateDiscoveryOwner(held, incoming, allowOwnerChange);
   if (incoming.catalogSequence < held.catalogSequence)
     return {
       row:
@@ -167,4 +169,25 @@ function unblocked(row: DiscoveryRow) {
   // A withdrawal/conflict must be newer than a nonnegative catalog sequence; zero means absent.
   const through = Math.max(row.withdrawnThrough, row.conflictedThrough);
   return through === 0 || row.catalogSequence > through;
+}
+
+function rotateDiscoveryOwner(
+  held: DiscoveryRow,
+  incoming: DiscoveryRow,
+  allowOwnerChange: boolean,
+): { row: DiscoveryRow; accepted: boolean } {
+  if (!allowOwnerChange || incoming.catalogSequence <= held.highWater)
+    return { row: held, accepted: false };
+  const row = {
+    ...incoming,
+    withdrawnThrough: Math.max(
+      held.withdrawnThrough,
+      incoming.withdrawnThrough,
+    ),
+    conflictedThrough: Math.max(
+      held.conflictedThrough,
+      incoming.conflictedThrough,
+    ),
+  };
+  return { row, accepted: unblocked(row) };
 }

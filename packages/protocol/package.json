@@ -29,6 +29,8 @@
     "./vectors/control-v2-mtok.json": "./vectors/control-v2-mtok.json",
     "./free-execution": "./src/free-execution.ts",
     "./free-execution-framing": "./src/free-execution-framing.ts",
-    "./vectors/free-execution-v2.json": "./vectors/free-execution-v2.json"
+    "./vectors/free-execution-v2.json": "./vectors/free-execution-v2.json",
+    "./free-stream": "./src/free-stream.ts",
+    "./vectors/free-stream-v2.json": "./vectors/free-stream-v2.json"
   }
 }

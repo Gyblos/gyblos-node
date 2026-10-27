@@ -5,7 +5,11 @@ import assert from 'node:assert/strict';
 import test, { type TestContext } from 'node:test';
 
 import { IPV6_LOOPBACK, LOCALHOST } from '@gyblos/config';
-import { CONTROL_ALPN, FREE_EXECUTION } from '@gyblos/protocol/constants';
+import {
+  CONTROL_ALPN,
+  FREE_EXECUTION,
+  FREE_STREAM,
+} from '@gyblos/protocol/constants';
 import {
   RELAY_CONFIGURATION_CODES,
   RELAY_TOKEN_LENGTH,
@@ -319,6 +323,10 @@ void test(
       PROBE_HTTP: '0',
     });
     assert.equal(result.error, undefined);
-    assert.deepEqual(result.alpns, [CONTROL_ALPN, FREE_EXECUTION.alpn]);
+    assert.deepEqual(result.alpns, [
+      CONTROL_ALPN,
+      FREE_EXECUTION.alpn,
+      FREE_STREAM.alpn,
+    ]);
   },
 );

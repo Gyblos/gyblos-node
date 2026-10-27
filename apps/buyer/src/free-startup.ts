@@ -46,7 +46,11 @@ export async function startFreeBuyer(
         selection: prepared.config.request.selection,
         maxTokens: prepared.config.request.maxTokens,
       },
-      { port: options.port },
+      {
+        port: options.port,
+        stream: (input, signal, onDelta) =>
+          executeBuyerFree(input, dependencies, signal, onDelta),
+      },
     );
     return {
       async close() {

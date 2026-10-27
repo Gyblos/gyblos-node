@@ -92,7 +92,8 @@ async function readMonotonicRows(
     const current = next.get(nodeId);
     if (
       !current ||
-      current.owner !== row.owner ||
+      (current.owner !== row.owner &&
+        current.catalogSequence <= row.highWater) ||
       current.highWater < row.highWater ||
       current.catalogSequence < row.catalogSequence ||
       current.withdrawnThrough < row.withdrawnThrough ||
@@ -137,10 +138,7 @@ async function writeRows(
 }
 export async function buyerDiscoveryState(environment: HomeEnvironment) {
   await assertRoleHome(P2P_ROLES.BUYER, environment);
-  const directory = homeLayout(environment).roles.buyer;
-  await privateDirectory(directory);
-  const path = join(directory, BUYER_DISCOVERY.stateFile);
-  const lock = join(directory, BUYER_DISCOVERY.lockFile);
+  const { directory, path, lock } = await discoveryPaths(environment);
   let rows = await readRows(path);
   let previous = Promise.resolve();
   let failed = false;
@@ -166,7 +164,10 @@ export async function buyerDiscoveryState(environment: HomeEnvironment) {
         discoveryRowLive(row, now)
       );
     },
-    async observe(seller: KnownSeller) {
+    async observe(
+      seller: KnownSeller,
+      options: { allowOwnerChange?: boolean } = {},
+    ) {
       const incoming = await discoveryObservation(seller);
       const pending = previous;
       let release = () => {};
@@ -188,6 +189,7 @@ export async function buyerDiscoveryState(environment: HomeEnvironment) {
         const result = mergeDiscoveryRow(
           current.get(incoming.nodeId),
           incoming,
+          options.allowOwnerChange,
         );
         current.set(incoming.nodeId, result.row);
         await writeRows(path, directory, current);
@@ -215,3 +217,13 @@ export async function buyerDiscoveryState(environment: HomeEnvironment) {
 export type BuyerDiscoveryState = Awaited<
   ReturnType<typeof buyerDiscoveryState>
 >;
+
+async function discoveryPaths(environment: HomeEnvironment) {
+  const directory = homeLayout(environment).roles.buyer;
+  await privateDirectory(directory);
+  return {
+    directory,
+    path: join(directory, BUYER_DISCOVERY.stateFile),
+    lock: join(directory, BUYER_DISCOVERY.lockFile),
+  };
+}

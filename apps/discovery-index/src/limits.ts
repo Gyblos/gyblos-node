@@ -20,11 +20,13 @@ function complete(limiters: DiscoveryLimiters): ResolvedLimiters | null {
   const ip = limiters[DISCOVERY_LIMITERS.IP];
   const publish = limiters[DISCOVERY_LIMITERS.PUBLISH];
   const node = limiters[DISCOVERY_LIMITERS.NODE];
-  if (!ip || !publish || !node) return null;
+  const read = limiters[DISCOVERY_LIMITERS.READ];
+  if (!ip || !publish || !node || !read) return null;
   return {
     [DISCOVERY_LIMITERS.IP]: ip,
     [DISCOVERY_LIMITERS.PUBLISH]: publish,
     [DISCOVERY_LIMITERS.NODE]: node,
+    [DISCOVERY_LIMITERS.READ]: read,
   };
 }
 
@@ -44,6 +46,7 @@ function developmentLimiters(now: () => number): ResolvedLimiters {
     [DISCOVERY_LIMITERS.IP]: counter(DISCOVERY_LIMITERS.IP),
     [DISCOVERY_LIMITERS.PUBLISH]: counter(DISCOVERY_LIMITERS.PUBLISH),
     [DISCOVERY_LIMITERS.NODE]: counter(DISCOVERY_LIMITERS.NODE),
+    [DISCOVERY_LIMITERS.READ]: counter(DISCOVERY_LIMITERS.READ),
   };
 }
 

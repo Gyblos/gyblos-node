@@ -1,6 +1,19 @@
 // Owns simulated UI catalogs and precomputed brand morph paths; never live network state.
 import type { CatalogModel } from './model-types.js';
 
+export const TOP_UP_STATUS = {
+  INVALID_AMOUNT: 'invalid-amount',
+  WALLET_UNAVAILABLE: 'wallet-unavailable',
+  BACKUP_REQUIRED: 'backup-required',
+  PAYMENT_UNAVAILABLE: 'payment-unavailable',
+} as const;
+export const TOP_UP_AMOUNTS = ['10', '25', '50'] as const;
+
+export const COPY_RESULT = {
+  COPIED: 'copied',
+  UNAVAILABLE: 'unavailable',
+} as const;
+
 export const CHAT_PHASE = {
   CONNECTING: 'connecting',
   TOOLS: 'tools',
@@ -42,6 +55,7 @@ export const CHAT_ROLE = { USER: 'user', ASSISTANT: 'assistant' } as const;
 export const BUTTON_VARIANT = {
   GHOST: 'ghost',
   SECONDARY: 'secondary',
+  TONAL: 'tonal',
   PRIMARY: 'primary',
 } as const;
 
@@ -127,10 +141,16 @@ export const CONNECTION_BUDGET = { MAX_DAILY: 10000, CENTS: 100 } as const;
 export const UI_VIEW = {
   CHAT: 'Chat',
   CONNECT: 'Connect',
+  TOOLS: 'Tools',
   MODELS: 'Models',
   ACTIVITY: 'Activity',
+  SETTINGS: 'Settings',
 } as const;
-export const UI_DIALOG = { BALANCE: 'balance', BUDGET: 'budget' } as const;
+export const UI_DIALOG = {
+  BACKUP: 'backup',
+  BUDGET: 'budget',
+  ADD_FUNDS: 'add-funds',
+} as const;
 export const MODEL_CATEGORY = {
   EVERYDAY: 'Everyday',
   REASONING: 'Reasoning',
@@ -213,6 +233,7 @@ export const MODE_NAV = {
     { name: UI_VIEW.CHAT, label: 'Chat' },
     { name: UI_VIEW.MODELS, label: 'Models' },
     { name: UI_VIEW.ACTIVITY, label: 'Activity' },
+    { name: UI_VIEW.TOOLS, label: 'Tools' },
   ],
   [UI_VIEW.CONNECT]: [
     { name: UI_VIEW.CONNECT, label: 'Applications' },
@@ -225,6 +246,8 @@ export const ROUTE_ORDER = [
   UI_VIEW.CONNECT,
   UI_VIEW.MODELS,
   UI_VIEW.ACTIVITY,
+  UI_VIEW.TOOLS,
+  UI_VIEW.SETTINGS,
 ] as const;
 export const SIDEBAR_MOTION_MS = 620;
 
@@ -255,4 +278,4 @@ export const DEMO_ACCOUNT = {
   TOAST_MS: 3000,
   SAMPLE_REQUESTS: 4,
 } as const;
-export const NAVIGATION_WIDTH = { MIN: 96, MAX: 112 } as const;
+export const NAVIGATION_WIDTH = { MIN: 84, MAX: 112 } as const;

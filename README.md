@@ -59,6 +59,7 @@ No wallet, model or network needed; unsupported native cases skip explicitly.
 ```sh
 pnpm --filter @gyblos/lab-harness acceptance:node-discovery # publication to signed quote
 pnpm --filter @gyblos/lab-harness acceptance:free           # publication to complete answer
+pnpm --filter @gyblos/lab-harness acceptance:free-stream    # early fragments and cancellation
 ```
 
 Uses a synthetic engine, native loopback Iroh and an in-process memory index.
@@ -108,7 +109,7 @@ using independently confirmed seller identities, run `pnpm buyer:setup`, then
 | Node   | `pnpm gyblos config validate --config gyblos.toml`   | Check a node config file and the environment ([configuration](docs/configuration.md)). |
 | Node   | `pnpm node:setup --role buyer\|seller --mint MINT`   | Create isolated role keys without RPC or funding.                                      |
 | Node   | `pnpm buyer:setup`                                   | Download and verify the buyer tokenizer without an inference engine.                   |
-| Node   | `pnpm buyer:free`                                    | Start the separate non-streaming free v2 chat endpoint (`:4031`).                      |
+| Node   | `pnpm buyer:free`                                    | Start the separate free v2 chat endpoint (complete or SSE) (`:4031`).                  |
 | Node   | `pnpm buyer:trust`                                   | Verify the offer against explicit seller identities and create trust.                  |
 | Node   | `pnpm buyer:call`, `buyer:reconcile`                 | One paid synthetic call; verify a payment, clear a zero-charge block.                  |
 | Lab    | `pnpm gate:setup`                                    | Create isolated lab devnet keys.                                                       |

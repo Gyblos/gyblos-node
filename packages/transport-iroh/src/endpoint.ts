@@ -6,6 +6,7 @@ import { IPV6_LOOPBACK, LOCALHOST } from '@gyblos/config';
 import {
   CONTROL_ALPN,
   FREE_EXECUTION,
+  FREE_STREAM,
   GYBLOS_ALPN,
 } from '@gyblos/protocol/constants';
 
@@ -47,7 +48,7 @@ export async function bindEndpoint(
     [
       ...(options.http === false ? [] : [GYBLOS_ALPN]),
       ...(options.control ? [CONTROL_ALPN] : []),
-      ...(options.freeExecution ? [FREE_EXECUTION.alpn] : []),
+      ...(options.freeExecution ? [FREE_EXECUTION.alpn, FREE_STREAM.alpn] : []),
     ].map((alpn) => [...Buffer.from(alpn)]),
   );
   if (options.relayOnly) {

@@ -27,3 +27,5 @@ export {
 } from './backup-flow-model.js';
 
 export { BACKUP_VERIFICATION } from './constants.js';
+
+export { copyPublicWalletAddress } from './copy-address.js';

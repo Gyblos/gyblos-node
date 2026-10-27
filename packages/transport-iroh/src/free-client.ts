@@ -7,6 +7,7 @@ import {
   CONTROL_LIMITS,
   FREE_EXECUTION,
   FREE_EXECUTION_CODES,
+  FREE_STREAM,
   type FreeExecutionCode,
 } from '@gyblos/protocol/constants';
 import {
@@ -27,6 +28,7 @@ import {
   TRANSPORT_ROUTES,
 } from './constants.js';
 import type { ControlStream } from './control-io.js';
+import { readFreeStreamResponse } from './free-stream-client.js';
 import { selectedRoute } from './paths.js';
 
 export class FreeClientError extends Error {
@@ -65,6 +67,7 @@ async function readResponse(
   return reader.finish();
 }
 interface FreeClientOptions {
+  onDelta?: (text: string) => Promise<void>;
   now?: () => number;
   requestMs?: number;
   relayOnly?: boolean;
@@ -98,7 +101,9 @@ async function runFreeRequest(
   )
     throw new FreeExecutionError(FREE_EXECUTION_CODES.PEER);
   const connecting = endpoint
-    .connect(remote, [...Buffer.from(FREE_EXECUTION.alpn)])
+    .connect(remote, [
+      ...Buffer.from(options.onDelta ? FREE_STREAM.alpn : FREE_EXECUTION.alpn),
+    ])
     .then((connected) => {
       if (state.lifetime.signal.aborted) {
         connected.close(HTTP_OVER_IROH.streamCloseCode, []);
@@ -149,6 +154,23 @@ async function runFreeRequest(
     IROH_DEADLINES.egressMs,
     state,
   );
+  return readFreeResult(stream, request, route, state, options);
+}
+async function readFreeResult(
+  stream: ControlStream,
+  request: FreeExecutionRequest,
+  route: () => void,
+  state: FreeClientState,
+  options: FreeClientOptions,
+) {
+  if (options.onDelta)
+    return readFreeStreamResponse(
+      stream,
+      request,
+      route,
+      (operation, milliseconds) => stage(operation, milliseconds, state),
+      options.onDelta,
+    );
   const response = await readResponse(stream, route, state);
   const result = await matchFreeExecutionResponse(response, request);
   route();

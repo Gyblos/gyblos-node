@@ -13,7 +13,8 @@
     "./control-admission": "./src/control-admission.ts",
     "./seller-selection": "./src/seller-selection.ts",
     "./pricing-v2": "./src/pricing-v2.ts",
-    "./free-admission": "./src/free-admission.ts"
+    "./free-admission": "./src/free-admission.ts",
+    "./identity-policy": "./src/identity-policy.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",

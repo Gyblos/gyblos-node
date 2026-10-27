@@ -1,11 +1,10 @@
 // Explores a buyer desktop app with Chat and local gateway connections.
 // Inference/Connect remain simulated; Wallet receives public local metadata only.
 import {
-  ArrowRight,
   ArrowUp,
-  ArrowUpRight,
   CaretDown,
   CaretRight,
+  ChartBar,
   ChatCircle,
   Check,
   CheckCircle,
@@ -14,6 +13,7 @@ import {
   GearSix,
   Globe,
   MagnifyingGlass,
+  Palette,
   PlugsConnected,
   Plus,
   ShieldCheck,
@@ -27,6 +27,7 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 
 import manifest from '../package.json';
 import { themeStyle } from './theme.js';
+import { AddFunds } from './ui/AddFunds.js';
 import { Appearance } from './ui/Appearance.js';
 import { matchesCatalog, type ModelFilter } from './ui/catalog-state.js';
 import { Chat, type ChatHandle } from './ui/Chat.js';
@@ -79,10 +80,13 @@ import {
   RowCopy,
   SearchField,
   SectionTitle,
+  SettingsGroup,
   StatCard,
 } from './ui/UI.js';
+import { WalletBackup } from './ui/WalletBackup.js';
 import { WalletDetails } from './ui/WalletDetails.js';
 import { useDesktopWallet } from './ui/WalletState.js';
+import { WALLET_STATUS } from './wallet/model.js';
 
 const money = (value: number) => '$' + value.toFixed(2);
 function ModelIcon({ model }: { model: Pick<Model, 'name' | 'image'> }) {
@@ -131,7 +135,6 @@ export function DesktopApp() {
   }, [sidebarCollapsed, sidebarMoving]);
   const modifier = /Mac/.test(navigator.platform) ? '⌘' : 'Ctrl+';
   const [light, setLight] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const frameStyle: CSSProperties & { '--navigation-width': string } = {
     '--navigation-width': navigationWidth + 'px',
     ...themeStyle(light),
@@ -185,7 +188,7 @@ export function DesktopApp() {
       } else if (key === 'n' && view === UI_VIEW.CHAT) {
         event.preventDefault();
         chatRef.current?.newChat();
-      } else if (/^[1-3]$/.test(key) && Number(key) <= navigation.length) {
+      } else if (/^[1-9]$/.test(key) && Number(key) <= navigation.length) {
         event.preventDefault();
         const destination = navigation[Number(key) - 1]?.name;
         if (!destination) return;
@@ -247,30 +250,19 @@ export function DesktopApp() {
           />
         )}
       </MotionPresence>
-      <div className="sidebar-restore">
-        <IconButton
-          className="sidebar-toggle"
-          label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          aria-controls="app-sidebar"
-          aria-expanded={!sidebarCollapsed}
-          title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          onClick={toggleSidebar}
-        >
-          <SidebarSimple size={18} aria-hidden="true" />
-        </IconButton>
-      </div>
       <header className="topbar">
         <div className="breadcrumb">
-          <h1
-            id="route-title"
-            className={
-              view === UI_VIEW.CHAT || view === UI_VIEW.CONNECT
-                ? 'visually-hidden'
-                : undefined
-            }
+          <IconButton
+            className="sidebar-toggle"
+            label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-controls="app-sidebar"
+            aria-expanded={!sidebarCollapsed}
+            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            onClick={toggleSidebar}
           >
-            {view}
-          </h1>
+            <SidebarSimple size={16} aria-hidden="true" />
+          </IconButton>
+          <h1 id="route-title">{view}</h1>
         </div>
         <div className="top-actions">
           <Button
@@ -288,11 +280,11 @@ export function DesktopApp() {
           <Button
             variant={BUTTON_VARIANT.SECONDARY}
             className="balance-button"
-            title="Your wallet"
-            onClick={() => setModal(UI_DIALOG.BALANCE)}
+            title="Wallet · 0.0 USDC"
+            onClick={() => navigate(UI_VIEW.SETTINGS)}
           >
             <Wallet size={17} />
-            Wallet
+            <span aria-hidden="true">0.0</span>
           </Button>
         </div>
       </header>
@@ -343,10 +335,14 @@ export function DesktopApp() {
           ))}
         </nav>
         <div className="sidebar-bottom">
-          <Appearance light={light} onLightChange={setLight} compact />
-          <IconButton label="Settings" onClick={() => setSettingsOpen(true)}>
+          <IconButton
+            label="Settings"
+            aria-current={view === UI_VIEW.SETTINGS ? 'page' : undefined}
+            onClick={() => navigate(UI_VIEW.SETTINGS)}
+          >
             <GearSix size={17} />
           </IconButton>
+          <Appearance light={light} onLightChange={setLight} compact />
         </div>
       </aside>
       <div
@@ -412,9 +408,7 @@ export function DesktopApp() {
                   ))}
                 </div>
               </div>
-              <SectionTitle trailing={<Badge>Illustrative prices</Badge>}>
-                Catalog
-              </SectionTitle>
+              <SectionTitle>Catalog</SectionTitle>
               <List label="Model catalog">
                 {MODELS.filter((item) =>
                   matchesCatalog(item, search, filter),
@@ -438,17 +432,13 @@ export function DesktopApp() {
                               : 'In / out per 1M tokens'}
                           </small>
                         </div>
-                        {model.id === item.id ? (
-                          <Check size={16} />
-                        ) : (
-                          <ArrowUpRight size={16} />
-                        )}
+                        {model.id === item.id && <Check size={16} />}
                       </>
                     }
                   >
                     <RowCopy
                       title={item.name}
-                      detail={`${item.family} · ${item.context} context · ${item.providers} sample providers`}
+                      detail={`${item.family} · ${item.context} context · ${item.providers} providers`}
                     />
                   </ListRow>
                 ))}
@@ -470,7 +460,6 @@ export function DesktopApp() {
                     {mode === UI_VIEW.CHAT
                       ? 'Back to chat'
                       : 'Back to applications'}
-                    <ArrowRight size={16} />
                   </Button>
                 }
               >
@@ -496,22 +485,77 @@ export function DesktopApp() {
                   setConnectionOpen(true);
                 }}
               />
-              <Note>
-                Connections are simulated. No app settings or files are changed.
-              </Note>
+              <Note>Each application has its own model and daily budget.</Note>
               <InfoBar leading={<PlugsConnected size={16} />}>
                 <div>
-                  <strong>Local gateway · simulated</strong>
+                  <strong>Local gateway</strong>
                   <p className="modal-note">
                     Your tools use Gyblos while this app is open. Server and
                     remote access are under Advanced in each connection.
                   </p>
                 </div>
               </InfoBar>
+            </PagePanel>
+          )}
+          {view === UI_VIEW.TOOLS && (
+            <PagePanel>
               <ToolConnections
                 connected={connectedTools}
                 onToggle={toggleTool}
               />
+            </PagePanel>
+          )}
+          {view === UI_VIEW.SETTINGS && (
+            <PagePanel>
+              <div className="settings-content">
+                <SettingsGroup
+                  leading={<Wallet size={18} aria-hidden="true" />}
+                  title="Wallet & backup"
+                  description="Your address, key protection and recovery backup."
+                >
+                  <WalletDetails
+                    onBackup={() => setModal(UI_DIALOG.BACKUP)}
+                    onAddFunds={() => setModal(UI_DIALOG.ADD_FUNDS)}
+                  />
+                </SettingsGroup>
+                <SettingsGroup
+                  leading={<ChartBar size={18} aria-hidden="true" />}
+                  title="Chat spending"
+                  description="Choose how much you can spend on chat each day."
+                >
+                  <List label="Chat spending limit">
+                    <ListRow
+                      leading={null}
+                      trailing={
+                        <Button
+                          variant={BUTTON_VARIANT.TONAL}
+                          onClick={() => {
+                            setModal(UI_DIALOG.BUDGET);
+                          }}
+                        >
+                          Edit limit
+                        </Button>
+                      }
+                    >
+                      <RowCopy
+                        title="Daily spending limit"
+                        detail={money(budget) + ' per day'}
+                      />
+                    </ListRow>
+                  </List>
+                </SettingsGroup>
+                <SettingsGroup
+                  leading={<Palette size={18} aria-hidden="true" />}
+                  title="Appearance"
+                  description="Choose a light or dark interface."
+                >
+                  <Appearance
+                    light={light}
+                    onLightChange={setLight}
+                    label="Theme"
+                  />
+                </SettingsGroup>
+              </div>
             </PagePanel>
           )}
           {view === UI_VIEW.ACTIVITY && (
@@ -520,7 +564,7 @@ export function DesktopApp() {
                 <StatCard
                   label="Spent today"
                   value={money(spent)}
-                  detail={`Of your ${money(budget)} device limit`}
+                  detail={`Daily limit: ${money(budget)} per day`}
                 />
                 <StatCard
                   label="Requests"
@@ -531,21 +575,19 @@ export function DesktopApp() {
                   }
                   detail={
                     mode === UI_VIEW.CHAT
-                      ? 'Includes 4 sample free requests'
-                      : 'No tool requests in this preview'
+                      ? 'Requests today'
+                      : 'No application requests yet'
                   }
                 />
                 <StatCard
-                  label="Demo credits"
+                  label="Available balance"
                   value={money(credits)}
-                  detail="Reserved in this preview: $0.00"
+                  detail="USDC"
                 />
               </div>
               <SectionTitle
                 trailing={
-                  <Badge>
-                    {mode === UI_VIEW.CHAT ? 'Sample history' : 'Simulated'}
-                  </Badge>
+                  <Badge>{mode === UI_VIEW.CHAT ? 'Chat' : 'Connect'}</Badge>
                 }
               >
                 Recent requests
@@ -590,85 +632,49 @@ export function DesktopApp() {
       </div>
       <footer className="app-footer" aria-label="Application status">
         <NetworkStatus state={network.state} onToggle={network.toggle} />
-        <Button onClick={() => setModal(UI_DIALOG.BALANCE)}>
-          <Wallet size={14} />
-          Wallet
-        </Button>
-        <span
-          className="footer-version"
-          title="Local prototype package version"
+        <Button
+          title="Wallet settings"
+          onClick={() => navigate(UI_VIEW.SETTINGS)}
         >
-          v{manifest.version} · Prototype
+          <Wallet size={14} />
+          {wallet.status === WALLET_STATUS.READY && !wallet.backupVerified
+            ? 'Wallet · Backup needed'
+            : wallet.status === WALLET_STATUS.RECOVERY_REQUIRED ||
+                wallet.status === WALLET_STATUS.UNAVAILABLE
+              ? 'Wallet · Needs attention'
+              : 'Wallet'}
+        </Button>
+        <span className="footer-version" title="Gyblos version">
+          v{manifest.version}
         </span>
       </footer>
       <MotionPresence>
-        {settingsOpen && (
-          <Modal title="Settings" compact close={() => setSettingsOpen(false)}>
-            <div className="settings-content">
-              <Appearance light={light} onLightChange={setLight} />
-              <List label="Settings shortcuts">
-                <ListRow
-                  leading={null}
-                  trailing={
-                    <Button
-                      onClick={() => {
-                        setSettingsOpen(false);
-                        setModal(UI_DIALOG.BUDGET);
-                      }}
-                    >
-                      Edit
-                    </Button>
-                  }
-                >
-                  <RowCopy
-                    title="Daily spending limit"
-                    detail={money(budget) + ' · simulated'}
-                  />
-                </ListRow>
-                <ListRow
-                  leading={null}
-                  trailing={
-                    <Button
-                      onClick={() => {
-                        setSettingsOpen(false);
-                        setModal(UI_DIALOG.BALANCE);
-                      }}
-                    >
-                      View
-                    </Button>
-                  }
-                >
-                  <RowCopy
-                    title="Wallet"
-                    detail="Local protection and backup status"
-                  />
-                </ListRow>
-              </List>
-              <Note>Preferences apply to this preview only.</Note>
-            </div>
+        {modal === UI_DIALOG.ADD_FUNDS && (
+          <Modal
+            title="Add funds"
+            description="Choose how much to add to your wallet."
+            close={() => setModal(null)}
+          >
+            <AddFunds onBackup={() => setModal(UI_DIALOG.BACKUP)} />
           </Modal>
         )}
       </MotionPresence>
       <MotionPresence>
-        {modal === UI_DIALOG.BALANCE && (
-          <Modal
-            title="Your wallet"
-            description="Local wallet · funding disabled in this experimental build."
-            close={() => setModal(null)}
-          >
-            <WalletDetails />
+        {modal === UI_DIALOG.BACKUP && (
+          <Modal title="Wallet backup" close={() => setModal(null)}>
+            <WalletBackup />
           </Modal>
         )}
       </MotionPresence>
       <MotionPresence>
         {modal === UI_DIALOG.BUDGET && (
           <Modal
-            title="Your daily spending limit"
-            description="For this device only."
+            title="Daily spending limit"
+            description="Applies to paid messages in Chat."
             close={() => setModal(null)}
           >
             <label className="field-label" htmlFor={UI_DIALOG.BUDGET}>
-              Daily limit in USDC
+              Daily limit ($)
             </label>
             <input
               className="full-input"
@@ -678,10 +684,7 @@ export function DesktopApp() {
               value={budgetDraft}
               onChange={(event) => setBudgetDraft(event.target.value)}
             />
-            <p className="modal-note">
-              Free offers do not use this limit. Paid requests stop when the
-              device limit is reached.
-            </p>
+            <p className="modal-note">Free models do not use this limit.</p>
             <Button
               variant={BUTTON_VARIANT.PRIMARY}
               className="wide"
@@ -723,8 +726,8 @@ export function DesktopApp() {
               </div>
             </div>
             <p className="modal-note">
-              Illustrative prices. Your model stays selected; this concept won’t
-              silently switch from a free to a paid offer.
+              Your model stays selected. Gyblos won’t silently switch from a
+              free to a paid offer.
             </p>
             <Button
               variant={BUTTON_VARIANT.PRIMARY}
@@ -732,7 +735,7 @@ export function DesktopApp() {
               onClick={() => {
                 setModel(paidModel);
                 setPaidModel(null);
-                setToast('Paid model selected for this preview');
+                setToast('Model selected');
               }}
             >
               Use this model
@@ -755,8 +758,8 @@ export function DesktopApp() {
               setConnectionOpen(false);
               setToast(
                 selectedApp && apps.some((item) => item.tool === selectedApp)
-                  ? 'Preview connection updated'
-                  : 'Launch simulated — no application was opened.',
+                  ? 'Connection updated'
+                  : 'Connection saved',
               );
             }}
             onRemove={(tool) => {
@@ -764,7 +767,7 @@ export function DesktopApp() {
                 previous.filter((item) => item.tool !== tool),
               );
               setConnectionOpen(false);
-              setToast('Preview connection removed');
+              setToast('Connection removed');
             }}
           />
         )}

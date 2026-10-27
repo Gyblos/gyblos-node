@@ -151,3 +151,16 @@ deadlines are `transport-iroh` constants, the offer lifetime is a `core` trust
 rule, call and proof bounds belong to the buyer app, and only operator-tunable
 capacity, rate, timeout and port values stay in `config` (`TRANSPORT_LIMITS`,
 `TRANSPORT_TIMEOUTS`, `PORTS`).
+
+### Identity reading policy
+
+`@gyblos/identity/resolution` owns pinned, bounded read-only 8004 account
+resolution. Its `resolution-rpc` entry owns the default buyer's
+decoded-byte-limited read-only HTTP transport; SDK parsing occurs only after the
+response limit. `@gyblos/core/identity-policy` owns manual precedence and scoped
+binding high-water/tombstone decisions without SDKs or I/O. Callers must retain
+returned state even on denial. Node `identity-state*` owns durable scoped buyer
+metadata; `identity-verifier` composes independent registry reads with it.
+Opt-in buyer selection/discovery admission uses these APIs while explicit manual
+trust remains available. See
+[identity](identity.md#read-only-resolution-and-trust-policy).

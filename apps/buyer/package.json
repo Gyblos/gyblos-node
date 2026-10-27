@@ -34,7 +34,8 @@
     "./free-http": "./src/free-http.ts",
     "./free-selection": "./src/free-selection.ts",
     "./free-startup": "./src/free-startup.ts",
-    "./free-main": "./src/free-main.ts"
+    "./free-main": "./src/free-main.ts",
+    "./identity": "./src/identity.ts"
   },
   "dependencies": {
     "@gyblos/core": "workspace:*",

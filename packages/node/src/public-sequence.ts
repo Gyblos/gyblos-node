@@ -28,11 +28,7 @@ import { assertRoleHome } from './home.js';
 function unavailable(): never {
   throw new NodeError(NODE_ERROR_CODES.PUBLIC_SEQUENCE_UNAVAILABLE);
 }
-async function privateDirectory(directory: string) {
-  await mkdir(directory, {
-    recursive: true,
-    mode: FILE_MODES.privateDirectory,
-  });
+async function assertPrivateDirectory(directory: string) {
   const info = await lstat(directory);
   if (
     !info.isDirectory() ||
@@ -40,6 +36,13 @@ async function privateDirectory(directory: string) {
     (info.mode & FILE_MODES.permissionMask) !== FILE_MODES.privateDirectory
   )
     unavailable();
+}
+async function privateDirectory(directory: string) {
+  await mkdir(directory, {
+    recursive: true,
+    mode: FILE_MODES.privateDirectory,
+  });
+  await assertPrivateDirectory(directory);
 }
 async function readSequence(
   path: string,
@@ -108,6 +111,40 @@ async function writeSequence(
   } finally {
     await file.close();
     await rm(temporary, { force: true });
+  }
+}
+// Read-only form of the checks openSellerSequence runs first: it never creates the directory, writes the
+// file or takes the lock. Returns whether a leftover lock (which an operator must inspect) is present.
+export async function inspectSellerSequence(options: {
+  environment: HomeEnvironment;
+  nodeId: string;
+}): Promise<{ lockPresent: boolean }> {
+  try {
+    controlHex(options.nodeId, PUBLIC_RECORD_LIMITS.publicKeyBytes);
+    await assertPrivateDirectory(homeLayout(options.environment).roles.seller);
+    await readSequence(
+      rolePathIn(
+        options.environment,
+        P2P_ROLES.SELLER,
+        ROLE_FILES.publicSequence,
+      ),
+      options.nodeId,
+    );
+  } catch (error) {
+    if (error instanceof NodeError) throw error;
+    unavailable();
+  }
+  try {
+    await lstat(
+      rolePathIn(
+        options.environment,
+        P2P_ROLES.SELLER,
+        ROLE_FILES.publicSequenceLock,
+      ),
+    );
+    return { lockPresent: true };
+  } catch {
+    return { lockPresent: false };
   }
 }
 export async function openSellerSequence(options: {

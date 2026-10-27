@@ -336,12 +336,18 @@ importers:
       '@gyblos/config':
         specifier: workspace:*
         version: link:../config
+      '@gyblos/core':
+        specifier: workspace:*
+        version: link:../core
       '@solana-program/system':
         specifier: 0.10.0
         version: 0.10.0(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))
       '@solana/kit':
         specifier: 5.1.0
         version: 5.1.0(typescript@5.9.3)(ws@8.21.0)
+      '@solana/rpc-spec-types':
+        specifier: 5.1.0
+        version: 5.1.0(typescript@5.9.3)
 
   packages/node:
     dependencies:
@@ -357,6 +363,9 @@ importers:
       '@gyblos/engine-ollama':
         specifier: workspace:*
         version: link:../engine-ollama
+      '@gyblos/identity':
+        specifier: workspace:*
+        version: link:../identity
       '@gyblos/payments-x402':
         specifier: workspace:*
         version: link:../payments-x402

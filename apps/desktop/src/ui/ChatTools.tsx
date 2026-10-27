@@ -32,10 +32,9 @@ export function ToolConnections({
 }) {
   return (
     <section className="tool-connections">
-      <SectionTitle trailing={<Badge>Preview</Badge>}>Web tools</SectionTitle>
+      <SectionTitle trailing={<Badge>Optional</Badge>}>Web tools</SectionTitle>
       <p className="connections-description">
-        Enable optional web tools for simulated Chat responses. Separate from
-        inference applications.
+        Add search, page reading and browsing to Chat.
       </p>
       <List label="Web tool connections">
         {TOOLS.map((tool) => {
@@ -50,7 +49,7 @@ export function ToolConnections({
               trailing={
                 <Button
                   variant={BUTTON_VARIANT.SECONDARY}
-                  aria-label={`${connected.includes(tool.id) ? 'Disconnect' : 'Connect'} ${tool.name} preview`}
+                  aria-label={`${connected.includes(tool.id) ? 'Disconnect' : 'Connect'} ${tool.name}`}
                   onClick={() => onToggle(tool.id)}
                 >
                   {connected.includes(tool.id) ? (
@@ -58,9 +57,7 @@ export function ToolConnections({
                   ) : (
                     <PlugsConnected size={16} />
                   )}
-                  {connected.includes(tool.id)
-                    ? 'Ready in preview'
-                    : 'Connect preview'}
+                  {connected.includes(tool.id) ? 'Connected' : 'Connect'}
                 </Button>
               }
             >
@@ -72,10 +69,7 @@ export function ToolConnections({
           );
         })}
       </List>
-      <Note>
-        Connections are simulated. No keys are requested and nothing is sent to
-        these services.
-      </Note>
+      <Note>Choose which tools each conversation can use.</Note>
     </section>
   );
 }
@@ -114,10 +108,10 @@ export function ChatToolChoices({
               enabled ? (
                 <Check size={16} />
               ) : !ready ? (
-                <span className="dropdown-hint">Connect preview</span>
+                <span className="dropdown-hint">Connect</span>
               ) : null
             }
-            aria-label={`${enabled ? 'Disable' : ready ? 'Enable' : 'Connect preview and enable'} ${tool.name}`}
+            aria-label={`${enabled ? 'Disable' : ready ? 'Enable' : 'Connect and enable'} ${tool.name}`}
             onClick={() => {
               if (!ready) onConnect(tool.id);
               onSelect(tool.id);
@@ -130,11 +124,8 @@ export function ChatToolChoices({
           No tools found
         </p>
       )}
-      <p
-        className="dropdown-note"
-        title="No external requests. Tool fees are set by each service and are not quoted in this preview."
-      >
-        Preview · Pricing set by provider
+      <p className="dropdown-note" title="Tool fees are set by each service.">
+        Pricing set by provider
       </p>
     </>
   );

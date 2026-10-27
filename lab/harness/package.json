@@ -36,7 +36,9 @@
     "./acceptance/free-constants": "./src/acceptance/free-constants.ts",
     "./cli/free-acceptance": "./src/cli/free-acceptance.ts",
     "./acceptance/free-http": "./src/acceptance/free-http.ts",
-    "./acceptance/free-quotes": "./src/acceptance/free-quotes.ts"
+    "./acceptance/free-quotes": "./src/acceptance/free-quotes.ts",
+    "./acceptance/free-stream": "./src/acceptance/free-stream-run.ts",
+    "./cli/free-stream-acceptance": "./src/cli/free-stream-acceptance.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",
@@ -62,6 +64,7 @@
   },
   "scripts": {
     "acceptance:node-discovery": "node --import tsx src/cli/node-discovery-acceptance.ts",
-    "acceptance:free": "node --import tsx src/cli/free-acceptance.ts"
+    "acceptance:free": "node --import tsx src/cli/free-acceptance.ts",
+    "acceptance:free-stream": "node --import tsx src/cli/free-stream-acceptance.ts"
   }
 }

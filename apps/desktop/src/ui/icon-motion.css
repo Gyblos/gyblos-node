@@ -73,9 +73,15 @@
     background-color 150ms ease,
     color 150ms ease;
 }
+/* Center the hit target over the divider without adding a second gutter. */
 .desktop-frame .navigation-resizer {
   width: 6px;
+  translate: -50% 0;
   overflow: hidden;
+  background: transparent;
+}
+.desktop-frame .navigation-resizer span {
+  opacity: 0;
 }
 .desktop-frame.sidebar-collapsed .navigation-resizer {
   opacity: 0;
@@ -85,9 +91,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 4px;
+  width: var(--control-size);
+  height: var(--control-size);
+  padding: 0;
   color: var(--muted);
 }
 .model-artwork.monochrome {

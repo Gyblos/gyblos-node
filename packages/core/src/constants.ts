@@ -108,3 +108,48 @@ export const FREE_EXECUTION_ADMISSION = {
   maxBuyers: 1024,
   maxConcurrent: 1,
 } as const;
+
+// Read-only identity observations and trust decisions; signatures and RPC reads belong to adapters.
+export const IDENTITY_LOOKUP_KINDS = {
+  BOUND: 'bound',
+  MISSING: 'missing',
+  UNAVAILABLE: 'unavailable',
+} as const;
+export const IDENTITY_LOOKUP_FAILURES = {
+  INVALID: 'invalid',
+  UNAVAILABLE: 'unavailable',
+  AMBIGUOUS: 'ambiguous',
+  LIMIT: 'limit',
+  TIMEOUT: 'timeout',
+  CANCELLED: 'cancelled',
+  NETWORK: 'network',
+} as const;
+export type IdentityLookupFailure =
+  (typeof IDENTITY_LOOKUP_FAILURES)[keyof typeof IDENTITY_LOOKUP_FAILURES];
+export const IDENTITY_TRUST_SOURCES = {
+  REGISTRY: 'registry',
+  MANUAL: 'manual',
+} as const;
+export type IdentityTrustSource =
+  (typeof IDENTITY_TRUST_SOURCES)[keyof typeof IDENTITY_TRUST_SOURCES];
+export const IDENTITY_POLICY_CODES = {
+  INVALID: 'IDENTITY_POLICY_INVALID',
+  SCOPE: 'IDENTITY_POLICY_SCOPE_MISMATCH',
+  NOT_FOUND: 'IDENTITY_POLICY_NOT_FOUND',
+  UNAVAILABLE: 'IDENTITY_POLICY_UNAVAILABLE',
+  AMBIGUOUS: 'IDENTITY_POLICY_AMBIGUOUS',
+  LIMIT: 'IDENTITY_POLICY_LIMIT',
+  TIMEOUT: 'IDENTITY_POLICY_TIMEOUT',
+  CANCELLED: 'IDENTITY_POLICY_CANCELLED',
+  NETWORK: 'IDENTITY_POLICY_NETWORK_MISMATCH',
+  OWNER_MISMATCH: 'IDENTITY_POLICY_OWNER_MISMATCH',
+  OWNER_CHANGED: 'IDENTITY_POLICY_OWNER_CHANGED',
+  STALE: 'IDENTITY_POLICY_STALE_BINDING',
+  CONFLICT: 'IDENTITY_POLICY_BINDING_CONFLICT',
+  REVOKED: 'IDENTITY_POLICY_REVOKED',
+} as const;
+export type IdentityPolicyCode =
+  (typeof IDENTITY_POLICY_CODES)[keyof typeof IDENTITY_POLICY_CODES];
+export const IDENTITY_POLICY_LIMITS = {
+  maxSequence: 0xffff_ffff_ffff_ffffn,
+} as const;

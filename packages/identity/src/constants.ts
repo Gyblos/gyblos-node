@@ -4,6 +4,7 @@ import { SYSTEM_PROGRAM_ADDRESS } from '@solana-program/system';
 import { address } from '@solana/kit';
 
 import { IDENTITY_REGISTRY_DEVNET } from '@gyblos/config';
+import { IDENTITY_POLICY_LIMITS } from '@gyblos/core/constants';
 
 export const PROGRAMS = {
   registry: address(IDENTITY_REGISTRY_DEVNET.program),
@@ -84,7 +85,7 @@ export const BINDING = {
   nodeIdBytes: 32,
   signatureBytes: 64,
   legacySequence: 0n,
-  maxSequence: 0xffff_ffff_ffff_ffffn,
+  maxSequence: IDENTITY_POLICY_LIMITS.maxSequence,
 } as const;
 
 export const BINDING_STATUSES = {
@@ -104,6 +105,12 @@ export const IDENTITY_ERROR_CODES = {
   ENCODING_INVARIANT: 'IDENTITY_ENCODING_INVARIANT',
   FEE_UNAVAILABLE: 'IDENTITY_FEE_UNAVAILABLE',
   INPUT_INVALID: 'IDENTITY_INPUT_INVALID',
+  READ_TIMEOUT: 'IDENTITY_READ_TIMEOUT',
+  RPC_RESPONSE_INVALID: 'IDENTITY_RPC_RESPONSE_INVALID',
+  RPC_RESPONSE_TOO_LARGE: 'IDENTITY_RPC_RESPONSE_TOO_LARGE',
+  RPC_TRANSPORT_FAILED: 'IDENTITY_RPC_TRANSPORT_FAILED',
+  RPC_CANCELLED: 'IDENTITY_RPC_CANCELLED',
+  RPC_REQUEST_INVALID: 'IDENTITY_RPC_REQUEST_INVALID',
   NODE_ID_AMBIGUOUS: 'IDENTITY_NODE_ID_AMBIGUOUS',
   POLICY_CONFIG_INVALID: 'IDENTITY_POLICY_CONFIG_INVALID',
   SIMULATION_FAILED: 'IDENTITY_SIMULATION_FAILED',
@@ -172,3 +179,16 @@ export const REGISTRATION_DEFAULTS = {
   probeLamports: 50_000_000n,
   walletDeadlineSeconds: 120n,
 } as const;
+
+export const IDENTITY_RESOLUTION_LIMITS = {
+  timeoutMs: 5000,
+  maxTimeoutMs: 30000,
+} as const;
+
+// Per HTTP response, measured on decompressed fetch bytes before SDK JSON parsing.
+export const IDENTITY_RPC_LIMITS = { maxResponseBytes: 1024 * 1024 } as const;
+export const IDENTITY_RPC_METHODS = [
+  'getGenesisHash',
+  'getProgramAccounts',
+  'getMultipleAccounts',
+] as const;

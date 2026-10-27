@@ -11,6 +11,8 @@
     "./chat-controller": "./src/ui/chat-controller.ts",
     "./connection-state": "./src/ui/connection-state.ts",
     "./catalog-state": "./src/ui/catalog-state.ts",
+    "./clipboard": "./src/ui/clipboard.ts",
+    "./add-funds": "./src/ui/add-funds.ts",
     "./demo-account": "./src/ui/demo-account.ts",
     "./wallet": "./src/wallet/index.ts",
     "./session-cleanup": "./src/session-cleanup.ts",

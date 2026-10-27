@@ -52,6 +52,8 @@ export const BUYER_SELECTION_CODES = {
   LIMIT: 'BUYER_SELECTION_LIMIT',
   DISCOVERY_STATE: 'BUYER_DISCOVERY_STATE_UNAVAILABLE',
   DISCOVERY_LIMIT: 'BUYER_DISCOVERY_LIMIT',
+  IDENTITY_STATE: 'BUYER_IDENTITY_STATE_UNAVAILABLE',
+  IDENTITY: 'BUYER_IDENTITY_UNAVAILABLE',
 } as const;
 export const BUYER_SELECTION = {
   configFile: 'selection.json',
@@ -119,6 +121,9 @@ export type ErrorDiagnosticCode =
 // Local non-streaming compatibility surface; execution wire codes stay protocol-owned.
 export const FREE_BUYER = {
   completionObject: 'chat.completion',
+  chunkObject: 'chat.completion.chunk',
+  streamContentType: 'text/event-stream',
+  streamDone: '[DONE]',
   errorType: 'gyblos_error',
   contentType: 'application/json',
   // Header the official OpenAI SDKs honor to skip their automatic retries.

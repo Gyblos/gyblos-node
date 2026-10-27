@@ -7,7 +7,7 @@ export const PROBE_STATUS = {
 export const DESKTOP = {
   CHANNEL: 'desktop:probe',
   FINISH_ACK: 'desktop:probe-finished',
-  TITLE: 'Gyblos · Desktop preview',
+  TITLE: 'Gyblos',
   ICON_FILE: 'assets/brand/gyblos-icon.png',
   DEADLINE_MS: 15000,
   STARTUP_DEADLINE_MS: 20000,

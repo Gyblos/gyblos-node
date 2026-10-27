@@ -84,3 +84,29 @@ or real-engine option is supplied by the free command.
 and choice index, plus cleanup on control-client initialization failure. An
 owned endpoint closes on failure; a borrowed endpoint stays caller-owned. The
 initialization probes use in-memory doubles and never bind native sockets.
+
+Free streaming cases cover the ordered/correlated wire frames and new golden
+vectors, bounded engine callbacks and cancellation, shared seller replay/caps,
+possible-send tracking, OpenAI-compatible SSE and no post-send failover.
+`tests/lab/free-stream-acceptance.test.ts` exercises the real local index,
+native Iroh, synthetic engine and product HTTP endpoint, including early
+fragment delivery and cancellation that reaches the seller engine.
+
+Identity resolution and policy tests use signed synthetic account fixtures and a
+loopback/in-memory RPC double only. They cover finalized/genesis-pinned
+read-only methods, owner transfer, metadata removal/burn, ambiguous assets,
+claimant limits, cancellation/late results, high-water rollback refusal and
+manual override/tombstone retention. No opt-in identity integration is enabled
+for these tests. Legacy resolver tests remain separate compatibility coverage.
+
+Identity persistence and buyer admission suites use canonical temporary homes,
+synthetic signed registry accounts and loopback RPC/control doubles. They cover
+manual provenance, owner rotation, tombstones, exact u64 floors, unsafe storage
+and refusal before prompt/authorization forwarding, without live-registry or
+mainnet acceptance. No opt-in identity integration is needed for these suites.
+
+Bounded identity RPC suites use injected decoded streams and actual gzip over
+loopback HTTP. They cover exact limits, absent/incorrect length headers, UTF-8,
+fragmentation, cancellation, monotonic deadlines, late-body disposal and exact
+SDK BigInts. A buyer regression compares valid padded JSON on the old transport
+with the bounded default and proves overflow cannot revoke persisted identity.

@@ -15,11 +15,15 @@ export class FreeBuyerError extends Error {
     this.name = 'FreeBuyerError';
   }
 }
+export interface FreeChatInput extends FreeExecutionBuildInput {
+  stream?: true;
+}
 export function parseFreeChat(
   value: unknown,
   selection: ModelSelection,
   maximum: number,
-): FreeExecutionBuildInput {
+  allowStreaming = false,
+): FreeChatInput {
   try {
     const optional =
       value && typeof value === 'object'
@@ -28,7 +32,9 @@ export function parseFreeChat(
     const row = controlObject(value, ['model', 'messages', ...optional]);
     if (
       row.model !== selection.modelId ||
-      (Object.hasOwn(row, 'stream') && row.stream !== false) ||
+      (Object.hasOwn(row, 'stream') &&
+        row.stream !== false &&
+        !(allowStreaming && row.stream === true)) ||
       !Array.isArray(row.messages) ||
       row.messages.length !== 1
     )
@@ -45,6 +51,7 @@ export function parseFreeChat(
         { role: FREE_CHAT_ROLES.USER, content: chatText(message.content) },
       ],
       maxTokens,
+      ...(row.stream === true ? { stream: true } : {}),
     };
   } catch {
     throw new FreeBuyerError(FREE_BUYER_CODES.INVALID);

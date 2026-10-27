@@ -23,6 +23,7 @@ import {
   INDEX_STATUS,
   LOOPBACK_HOSTS,
   PUBLIC_READ_ROUTES,
+  READ_LIMIT_KEY,
   type DiscoveryLimiterName,
   type IndexErrorCode,
 } from './constants.js';
@@ -87,6 +88,14 @@ function clientKey(context: Context) {
 
 function clientAllowed(context: IndexContext, name: DiscoveryLimiterName) {
   return allowed(context.get('limiters')[name], clientKey(context));
+}
+
+// One budget for storage reads per Cloudflare location, shared by every client.
+function readAllowed(context: IndexContext) {
+  return allowed(
+    context.get('limiters')[DISCOVERY_LIMITERS.READ],
+    READ_LIMIT_KEY,
+  );
 }
 
 function finishHeaders(context: Context) {
@@ -222,6 +231,8 @@ function sellersHandler(settings: IndexSettings) {
     const key = sellersCacheKey(context.req.url, query);
     const cached = await cachedPage(settings.cache, key);
     if (cached) return cached;
+    if (!(await readAllowed(context)))
+      return rejection(context, INDEX_ERRORS.RATE_LIMITED);
     const body = await sellersPage(
       context.get('storage'),
       query,
@@ -274,16 +285,19 @@ export function createDiscoveryIndex(options: DiscoveryIndexOptions = {}) {
     );
   app.get(INDEX_ROUTES.SELLERS, sellersHandler(settings));
   // Reports the publish mode only, never the allowlisted NodeIds.
-  app.get(INDEX_ROUTES.HEALTH, async (context) =>
-    context.json({
+  app.get(INDEX_ROUTES.HEALTH, async (context) => {
+    const records = await settings.records.read(
+      context.get('storage'),
+      settings.now(),
+      () => readAllowed(context),
+    );
+    if (records === null) return rejection(context, INDEX_ERRORS.RATE_LIMITED);
+    return context.json({
       ok: true,
-      records: await settings.records.read(
-        context.get('storage'),
-        settings.now(),
-      ),
+      records,
       publish: publishModeOf(publishers),
-    }),
-  );
+    });
+  });
   return app;
 }
 

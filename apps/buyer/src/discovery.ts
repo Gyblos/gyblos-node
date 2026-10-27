@@ -23,6 +23,7 @@ async function rememberEntry(
   trusted: StaticControlSeller,
   state: BuyerDiscoveryState,
   now: number,
+  allowOwnerChange: boolean,
 ) {
   const withdrawal = trusted.withdrawal
     ? await verifyPublicV2(trusted.withdrawal, {
@@ -34,12 +35,15 @@ async function rememberEntry(
     : null;
   if (withdrawal && withdrawal.kind !== PUBLIC_RECORD_KINDS.WITHDRAWAL)
     throw new BuyerSelectionError(BUYER_SELECTION_CODES.INVALID);
-  await state.observe({
-    ...entry,
-    withdrawal,
-    badge: SELLER_BADGES.DECLARED_USAGE,
-    openChannel: false,
-  });
+  await state.observe(
+    {
+      ...entry,
+      withdrawal,
+      badge: SELLER_BADGES.DECLARED_USAGE,
+      openChannel: false,
+    },
+    { allowOwnerChange },
+  );
 }
 export async function discoverBuyerSellers(
   config: BuyerSelectionConfig & { discovery: BuyerDiscoveryConfig },
@@ -49,6 +53,10 @@ export async function discoverBuyerSellers(
     now?: () => number;
     signal?: AbortSignal;
     timeoutMs?: number;
+    verifyIdentity?: (
+      seller: StaticControlSeller,
+      signal?: AbortSignal,
+    ) => Promise<boolean>;
   },
 ): Promise<BuyerSelectionConfig> {
   const now = options.now ?? Date.now;
@@ -57,9 +65,19 @@ export async function discoverBuyerSellers(
     ...(options.signal ? [options.signal] : []),
   ]);
   const fetch = options.fetch;
-  const identities = new Map(
-    config.sellers.map((seller) => [seller.nodeId, seller]),
-  );
+  if (config.identity && !options.verifyIdentity)
+    throw new BuyerSelectionError(BUYER_SELECTION_CODES.IDENTITY);
+  const accepted = [];
+  for (const seller of config.sellers) {
+    signal.throwIfAborted();
+    if (
+      !options.verifyIdentity ||
+      (await options.verifyIdentity(seller, signal))
+    )
+      accepted.push(seller);
+    signal.throwIfAborted();
+  }
+  const identities = new Map(accepted.map((seller) => [seller.nodeId, seller]));
   const cursors = new Set<string>();
   let cursor: string | undefined;
   for (let page = 0; page < config.discovery.maxPages; page++) {
@@ -80,7 +98,13 @@ export async function discoverBuyerSellers(
     for (const entry of result.sellers) {
       const trusted = identities.get(entry.catalog.nodeId);
       if (trusted?.owner !== entry.catalog.owner) continue;
-      await rememberEntry(entry, trusted, state, now());
+      await rememberEntry(
+        entry,
+        trusted,
+        state,
+        now(),
+        Boolean(config.identity),
+      );
       signal.throwIfAborted();
     }
     if (result.next === null) break;
@@ -91,7 +115,7 @@ export async function discoverBuyerSellers(
   }
   signal.throwIfAborted();
   const eligible = new Set(
-    state.eligible(config.sellers, now()).map((seller) => seller.nodeId),
+    state.eligible(accepted, now()).map((seller) => seller.nodeId),
   );
   return {
     ...config,

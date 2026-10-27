@@ -24,7 +24,9 @@
   ],
   // Rate limits (Cloudflare counts 10 or 60 second windows). namespace_id values must be
   // unused in the account; the website uses 42621001-42621003.
-  //   all requests per IP(/64), publishes per IP(/64), publishes per verified NodeId.
+  //   all requests per IP(/64), publishes per IP(/64), publishes per verified NodeId, and
+  //   storage reads (sellers cache misses, stale health counts) under one constant key.
+  //   Cloudflare counts per location, so the read cap is per Cloudflare location, not worldwide.
   "ratelimits": [
     {
       "name": "DISCOVERY_IP_LIMITER",
@@ -40,6 +42,11 @@
       "name": "DISCOVERY_NODE_LIMITER",
       "namespace_id": "42621006",
       "simple": { "limit": 10, "period": 60 },
+    },
+    {
+      "name": "DISCOVERY_READ_LIMITER",
+      "namespace_id": "42621007",
+      "simple": { "limit": 300, "period": 60 },
     },
   ],
   "routes": [{ "pattern": "discovery.gyblos.com", "custom_domain": true }],

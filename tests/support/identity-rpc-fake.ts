@@ -11,7 +11,7 @@ import {
   type SolanaRpcApi,
 } from '@solana/kit';
 
-import { LOCALHOST } from '@gyblos/config';
+import { DEVNET_GENESIS, LOCALHOST } from '@gyblos/config';
 
 import type { SyntheticChain } from './identity-accounts.js';
 
@@ -40,9 +40,16 @@ export interface FakeRpcState {
   spend: SimulatedSpend;
   // JSON-RPC method names in arrival order, so tests can count round trips.
   calls: string[];
+  configs: { method: string; params: unknown[] }[];
+  genesisHash: string;
+  failingMethods: Set<string>;
+  batchValue?: unknown;
+  programValue?: unknown;
+  responsePadding: Map<string, number>;
 }
 
 export interface FakeRpc {
+  url: string;
   rpc: Rpc<SolanaRpcApi>;
   state: FakeRpcState;
   close(): Promise<void>;
@@ -140,7 +147,9 @@ function multipleAccounts(state: FakeRpcState, params: unknown[]) {
   return {
     result: {
       context: { slot: SLOT },
-      value: keys.map((key) => accountJson(state.chain, key)),
+      value: Object.hasOwn(state, 'batchValue')
+        ? state.batchValue
+        : keys.map((key) => accountJson(state.chain, key)),
     },
   };
 }
@@ -173,11 +182,20 @@ function simulation(state: FakeRpcState) {
 function respond(state: FakeRpcState, call: JsonRpcCall): object {
   const context = { slot: SLOT };
   state.calls.push(call.method);
+  state.configs.push({ method: call.method, params: call.params });
+  if (state.failingMethods.has(call.method))
+    return { error: { code: RPC_ERROR_CODE, message: 'synthetic outage' } };
   switch (call.method) {
+    case 'getGenesisHash':
+      return { result: state.genesisHash };
     case 'getMultipleAccounts':
       return multipleAccounts(state, call.params);
     case 'getProgramAccounts':
-      return { result: programAccounts(state, call.params) };
+      return {
+        result: Object.hasOwn(state, 'programValue')
+          ? state.programValue
+          : programAccounts(state, call.params),
+      };
     case 'getSlot':
       return { result: SLOT };
     case 'getBlockTime':
@@ -217,7 +235,7 @@ function serve(state: FakeRpcState): Server {
             jsonrpc: '2.0',
             id: call.id,
             ...respond(state, call),
-          }),
+          }) + ' '.repeat(state.responsePadding.get(call.method) ?? 0),
         );
       })
       .catch((error: unknown) => {
@@ -236,12 +254,17 @@ export async function startFakeRpc(
     failingAddresses: new Set(),
     spend,
     calls: [],
+    configs: [],
+    genesisHash: DEVNET_GENESIS,
+    failingMethods: new Set(),
+    responsePadding: new Map(),
   };
   const server = serve(state);
   server.listen(0, LOCALHOST);
   await once(server, 'listening');
   const { port } = server.address() as AddressInfo;
   return {
+    url: `http://${LOCALHOST}:${port}`,
     rpc: createSolanaRpc(`http://${LOCALHOST}:${port}`),
     state,
     close: async () => {

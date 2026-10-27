@@ -17,7 +17,6 @@ export function StartupSplash() {
         <span>]</span>
       </div>
       <p role="status">Preparing your app…</p>
-      <small>Network preview is simulated.</small>
     </main>
   );
 }
