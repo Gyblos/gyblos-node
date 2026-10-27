@@ -121,7 +121,12 @@ export function evaluateIdentityPolicy(value: unknown): IdentityPolicyDecision {
     if (input.lookup === undefined)
       return denied(IDENTITY_POLICY_CODES.UNAVAILABLE, previous);
     const lookup = identityLookup(input.lookup);
-    if (!sameIdentityScope(lookup.scope, input.scope))
+    if (lookup.nodeId === null)
+      return denied(IDENTITY_POLICY_CODES.INVALID, previous);
+    if (
+      lookup.nodeId !== input.nodeId ||
+      !sameIdentityScope(lookup.scope, input.scope)
+    )
       return denied(IDENTITY_POLICY_CODES.SCOPE, previous);
     if (lookup.kind === IDENTITY_LOOKUP_KINDS.UNAVAILABLE)
       return unavailable(lookup, previous);

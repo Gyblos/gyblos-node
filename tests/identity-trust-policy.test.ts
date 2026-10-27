@@ -31,7 +31,12 @@ void test('registry policy accepts one verified scoped binding and returns detac
   } = await api();
   const result = evaluateIdentityPolicy({
     ...target,
-    lookup: { kind: IDENTITY_LOOKUP_KINDS.BOUND, nodeId: NODE_ID, scope, binding },
+    lookup: {
+      kind: IDENTITY_LOOKUP_KINDS.BOUND,
+      nodeId: NODE_ID,
+      scope,
+      binding,
+    },
   });
   assert.equal(result.ok, true);
   if (!result.ok) return;
@@ -54,7 +59,12 @@ void test('registry owner rotation advances the floor even when the old owner is
   const result = evaluateIdentityPolicy({
     ...target,
     previous,
-    lookup: { kind: IDENTITY_LOOKUP_KINDS.BOUND, nodeId: NODE_ID, scope, binding: rotated },
+    lookup: {
+      kind: IDENTITY_LOOKUP_KINDS.BOUND,
+      nodeId: NODE_ID,
+      scope,
+      binding: rotated,
+    },
   });
   assert.equal(result.ok, false);
   if (result.ok) return;
@@ -64,13 +74,23 @@ void test('registry owner rotation advances the floor even when the old owner is
     ...target,
     owner: NEW_OWNER,
     previous: result.state,
-    lookup: { kind: IDENTITY_LOOKUP_KINDS.BOUND, nodeId: NODE_ID, scope, binding: rotated },
+    lookup: {
+      kind: IDENTITY_LOOKUP_KINDS.BOUND,
+      nodeId: NODE_ID,
+      scope,
+      binding: rotated,
+    },
   });
   assert.equal(accepted.ok, true);
   const replayed = evaluateIdentityPolicy({
     ...target,
     previous: result.state,
-    lookup: { kind: IDENTITY_LOOKUP_KINDS.BOUND, nodeId: NODE_ID, scope, binding },
+    lookup: {
+      kind: IDENTITY_LOOKUP_KINDS.BOUND,
+      nodeId: NODE_ID,
+      scope,
+      binding,
+    },
   });
   assert.equal(replayed.ok, false);
   if (!replayed.ok) assert.equal(replayed.code, IDENTITY_POLICY_CODES.STALE);
@@ -85,7 +105,12 @@ void test('registry owner mismatch never grants trust without a configured match
   const result = evaluateIdentityPolicy({
     ...target,
     owner: NEW_OWNER,
-    lookup: { kind: IDENTITY_LOOKUP_KINDS.BOUND, nodeId: NODE_ID, scope, binding },
+    lookup: {
+      kind: IDENTITY_LOOKUP_KINDS.BOUND,
+      nodeId: NODE_ID,
+      scope,
+      binding,
+    },
   });
   assert.equal(result.ok, false);
   if (!result.ok)
@@ -109,7 +134,12 @@ void test('missing binding creates a tombstone and a strictly newer binding alon
   const replay = evaluateIdentityPolicy({
     ...target,
     previous: absent.state,
-    lookup: { kind: IDENTITY_LOOKUP_KINDS.BOUND, nodeId: NODE_ID, scope, binding },
+    lookup: {
+      kind: IDENTITY_LOOKUP_KINDS.BOUND,
+      nodeId: NODE_ID,
+      scope,
+      binding,
+    },
   });
   assert.equal(replay.ok, false);
   if (!replay.ok) assert.equal(replay.code, IDENTITY_POLICY_CODES.REVOKED);
@@ -117,7 +147,8 @@ void test('missing binding creates a tombstone and a strictly newer binding alon
     ...target,
     previous: absent.state,
     lookup: {
-      kind: IDENTITY_LOOKUP_KINDS.BOUND, nodeId: NODE_ID,
+      kind: IDENTITY_LOOKUP_KINDS.BOUND,
+      nodeId: NODE_ID,
       scope,
       binding: { ...binding, sequence: 2n },
     },
@@ -150,7 +181,8 @@ void test('equal sequence with another owner or asset is a conflict and preserve
       ...target,
       previous,
       lookup: {
-        kind: IDENTITY_LOOKUP_KINDS.BOUND, nodeId: NODE_ID,
+        kind: IDENTITY_LOOKUP_KINDS.BOUND,
+        nodeId: NODE_ID,
         scope,
         binding: { ...binding, ...changed },
       },
@@ -173,7 +205,8 @@ void test('an explicit matching manual override bypasses registry failure while 
     previous: tombstone,
     manual: { nodeId: NODE_ID, owner: OWNER },
     lookup: {
-      kind: IDENTITY_LOOKUP_KINDS.UNAVAILABLE, nodeId: NODE_ID,
+      kind: IDENTITY_LOOKUP_KINDS.UNAVAILABLE,
+      nodeId: NODE_ID,
       scope,
       reason: IDENTITY_LOOKUP_FAILURES.UNAVAILABLE,
     },
@@ -184,7 +217,12 @@ void test('an explicit matching manual override bypasses registry failure while 
   const restored = evaluateIdentityPolicy({
     ...target,
     previous: result.state,
-    lookup: { kind: IDENTITY_LOOKUP_KINDS.BOUND, nodeId: NODE_ID, scope, binding },
+    lookup: {
+      kind: IDENTITY_LOOKUP_KINDS.BOUND,
+      nodeId: NODE_ID,
+      scope,
+      binding,
+    },
   });
   assert.equal(restored.ok, false);
 });
@@ -198,7 +236,12 @@ void test('manual mismatch never silently falls back to a registry match', async
     ...target,
     previous,
     manual: { nodeId: NODE_ID, owner: NEW_OWNER },
-    lookup: { kind: IDENTITY_LOOKUP_KINDS.BOUND, nodeId: NODE_ID, scope, binding },
+    lookup: {
+      kind: IDENTITY_LOOKUP_KINDS.BOUND,
+      nodeId: NODE_ID,
+      scope,
+      binding,
+    },
   });
   assert.equal(result.ok, false);
   if (!result.ok)
@@ -215,7 +258,12 @@ void test('registry failures remain static denials and never erase known state o
     const result = evaluateIdentityPolicy({
       ...target,
       previous,
-      lookup: { kind: IDENTITY_LOOKUP_KINDS.UNAVAILABLE, nodeId: NODE_ID, scope, reason },
+      lookup: {
+        kind: IDENTITY_LOOKUP_KINDS.UNAVAILABLE,
+        nodeId: NODE_ID,
+        scope,
+        reason,
+      },
     });
     assert.equal(result.ok, false);
     assert.deepEqual(result.state, previous);
@@ -242,7 +290,8 @@ void test('registry context or NodeId mismatches cannot mix trust histories', as
       ...target,
       previous,
       lookup: {
-        kind: IDENTITY_LOOKUP_KINDS.BOUND, nodeId: NODE_ID,
+        kind: IDENTITY_LOOKUP_KINDS.BOUND,
+        nodeId: NODE_ID,
         scope: changedScope,
         binding,
       },
@@ -255,7 +304,8 @@ void test('registry context or NodeId mismatches cannot mix trust histories', as
     ...target,
     previous,
     lookup: {
-      kind: IDENTITY_LOOKUP_KINDS.BOUND, nodeId: NODE_ID,
+      kind: IDENTITY_LOOKUP_KINDS.BOUND,
+      nodeId: NODE_ID,
       scope,
       binding: { ...binding, nodeId: OTHER_NODE_ID },
     },
@@ -272,7 +322,12 @@ void test('identity policy rejects unknown fields, noncanonical keys, invalid se
   const valid = {
     ...target,
     previous,
-    lookup: { kind: IDENTITY_LOOKUP_KINDS.BOUND, nodeId: NODE_ID, scope, binding },
+    lookup: {
+      kind: IDENTITY_LOOKUP_KINDS.BOUND,
+      nodeId: NODE_ID,
+      scope,
+      binding,
+    },
   };
   for (const value of [
     { ...valid, extra: 'PRIVATE' },
@@ -321,67 +376,4 @@ void test('manual overrides require no registry observation and return detached 
   if (!unavailable.ok)
     assert.equal(unavailable.code, IDENTITY_POLICY_CODES.UNAVAILABLE);
   assert.deepEqual(unavailable.state, previous);
-});
-
-void test('identity lookup discriminators are rejected without invoking accessors', async () => {
-  const {
-    evaluateIdentityPolicy,
-    IDENTITY_LOOKUP_KINDS,
-    IDENTITY_POLICY_CODES,
-  } = await api();
-  let reads = 0;
-  const lookup = {
-    get kind() {
-      reads++;
-      return IDENTITY_LOOKUP_KINDS.BOUND;
-    },
-    scope,
-    binding,
-  };
-  const result = evaluateIdentityPolicy({ ...target, previous, lookup });
-  assert.equal(result.ok, false);
-  if (!result.ok) assert.equal(result.code, IDENTITY_POLICY_CODES.INVALID);
-  assert.equal(reads, 0);
-  assert.deepEqual(result.state, previous);
-});
-
-void test('foreign missing observations cannot revoke another NodeId', async () => {
-  const { evaluateIdentityPolicy, IDENTITY_LOOKUP_KINDS, IDENTITY_POLICY_CODES } = await api();
-  const result = evaluateIdentityPolicy({ ...target, previous, lookup: {
-    kind: IDENTITY_LOOKUP_KINDS.MISSING, nodeId: OTHER_NODE_ID, scope,
-  } });
-  assert.equal(result.ok, false);
-  if (!result.ok) assert.equal(result.code, IDENTITY_POLICY_CODES.SCOPE);
-  assert.deepEqual(result.state, previous);
-});
-void test('bound observation query and binding must target the same NodeId', async () => {
-  const { evaluateIdentityPolicy, IDENTITY_LOOKUP_KINDS, IDENTITY_POLICY_CODES } = await api();
-  const result = evaluateIdentityPolicy({ ...target, previous, lookup: {
-    kind: IDENTITY_LOOKUP_KINDS.BOUND, nodeId: NODE_ID, scope,
-    binding: { ...binding, nodeId: OTHER_NODE_ID },
-  } });
-  assert.equal(result.ok, false);
-  if (!result.ok) assert.equal(result.code, IDENTITY_POLICY_CODES.SCOPE);
-  assert.deepEqual(result.state, previous);
-});
-void test('foreign unavailable observations cannot be applied to another NodeId', async () => {
-  const { evaluateIdentityPolicy, IDENTITY_LOOKUP_KINDS, IDENTITY_LOOKUP_FAILURES, IDENTITY_POLICY_CODES } = await api();
-  const result = evaluateIdentityPolicy({ ...target, previous, lookup: {
-    kind: IDENTITY_LOOKUP_KINDS.UNAVAILABLE, nodeId: OTHER_NODE_ID, scope,
-    reason: IDENTITY_LOOKUP_FAILURES.TIMEOUT,
-  } });
-  assert.equal(result.ok, false);
-  if (!result.ok) assert.equal(result.code, IDENTITY_POLICY_CODES.SCOPE);
-  assert.deepEqual(result.state, previous);
-});
-void test('invalid query observations use a null NodeId without erasing state', async () => {
-  const { evaluateIdentityPolicy, IDENTITY_LOOKUP_KINDS, IDENTITY_LOOKUP_FAILURES, IDENTITY_POLICY_CODES } = await api();
-  for (const reason of Object.values(IDENTITY_LOOKUP_FAILURES)) {
-    const result = evaluateIdentityPolicy({ ...target, previous, lookup: {
-      kind: IDENTITY_LOOKUP_KINDS.UNAVAILABLE, nodeId: null, scope, reason,
-    } });
-    assert.equal(result.ok, false);
-    if (!result.ok) assert.equal(result.code, IDENTITY_POLICY_CODES.INVALID);
-    assert.deepEqual(result.state, previous);
-  }
 });

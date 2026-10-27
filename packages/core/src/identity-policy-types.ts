@@ -21,15 +21,18 @@ export interface IdentityBinding {
 export type IdentityLookup =
   | {
       kind: typeof IDENTITY_LOOKUP_KINDS.BOUND;
+      nodeId: string;
       scope: IdentityRegistryScope;
       binding: IdentityBinding;
     }
   | {
       kind: typeof IDENTITY_LOOKUP_KINDS.MISSING;
+      nodeId: string;
       scope: IdentityRegistryScope;
     }
   | {
       kind: typeof IDENTITY_LOOKUP_KINDS.UNAVAILABLE;
+      nodeId: string | null;
       scope: IdentityRegistryScope;
       reason: IdentityLookupFailure;
     };

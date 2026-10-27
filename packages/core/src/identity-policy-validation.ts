@@ -87,6 +87,7 @@ export function identityLookup(value: unknown): IdentityLookup {
     property && 'value' in property ? property.value : undefined;
   const base = controlObject(value, [
     'kind',
+    'nodeId',
     'scope',
     ...(kind === IDENTITY_LOOKUP_KINDS.BOUND
       ? ['binding']
@@ -98,15 +99,30 @@ export function identityLookup(value: unknown): IdentityLookup {
   if (base.kind === IDENTITY_LOOKUP_KINDS.BOUND)
     return {
       kind: IDENTITY_LOOKUP_KINDS.BOUND,
+      nodeId: controlHex(base.nodeId),
       scope,
       binding: identityBinding(base.binding),
     };
   if (base.kind === IDENTITY_LOOKUP_KINDS.MISSING)
-    return { kind: IDENTITY_LOOKUP_KINDS.MISSING, scope };
+    return {
+      kind: IDENTITY_LOOKUP_KINDS.MISSING,
+      nodeId: controlHex(base.nodeId),
+      scope,
+    };
   if (base.kind === IDENTITY_LOOKUP_KINDS.UNAVAILABLE) {
     for (const reason of Object.values(IDENTITY_LOOKUP_FAILURES))
-      if (reason === base.reason)
-        return { kind: IDENTITY_LOOKUP_KINDS.UNAVAILABLE, scope, reason };
+      if (reason === base.reason) {
+        const nodeId =
+          base.nodeId === null && reason === IDENTITY_LOOKUP_FAILURES.INVALID
+            ? null
+            : controlHex(base.nodeId);
+        return {
+          kind: IDENTITY_LOOKUP_KINDS.UNAVAILABLE,
+          nodeId,
+          scope,
+          reason,
+        };
+      }
   }
   return controlFail();
 }
