@@ -33,7 +33,7 @@ const HINTS: Readonly<Partial<Record<DoctorResultCode, string>>> = {
   [DOCTOR_CODES.KEY_PERMISSIONS]:
     'key files must be regular files owned by you, mode 0600',
   [DOCTOR_CODES.SEQUENCE_LOCK_PRESENT]:
-    'a leftover public-sequence lock exists; inspect it (docs/discovery.md)',
+    'a leftover public-sequence lock blocks publishing; stop other sellers, then inspect it (docs/discovery.md)',
   [NODE_ERROR_CODES.PUBLIC_SEQUENCE_UNAVAILABLE]:
     'the seller directory must be mode 0700 and its public-sequence file valid',
   [DOCTOR_CODES.TOKENIZER_UNAVAILABLE]: 'run `pnpm gate:inference:setup`',

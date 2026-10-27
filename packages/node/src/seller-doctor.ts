@@ -203,8 +203,9 @@ async function roleChecks(
       environment,
       nodeId: config.nodeId,
     });
+    // Every sequence allocation takes this lock exclusively, so a leftover one blocks all publishing.
     sequence = inspected.lockPresent
-      ? warn(DOCTOR_CODES.SEQUENCE_LOCK_PRESENT)
+      ? fail(DOCTOR_CODES.SEQUENCE_LOCK_PRESENT)
       : OK;
   } catch (error) {
     sequence = fail(errorCode(error));

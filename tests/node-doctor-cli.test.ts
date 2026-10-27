@@ -95,9 +95,21 @@ void test('doctor: key files must be private regular files; free sellers need on
     await writeFile(join(run.root, 'gyblos.toml'), PAID_TOML);
     const paid = await doctor(run);
     assert.match(line(paid.output, 'keys'), /FAIL\s+keys\s+KEYS_MISSING/);
+    await writeFile(join(run.seller, 'facilitator.json'), '[]', {
+      mode: 0o600,
+    });
+    await unlink(join(run.seller, 'authorizer.json'));
+    const noAuthorizer = await doctor(run);
+    assert.match(
+      line(noAuthorizer.output, 'keys'),
+      /FAIL\s+keys\s+KEYS_MISSING/,
+    );
     await writeFile(join(run.root, 'gyblos.toml'), FREE_TOML);
     const free = await doctor(run);
     assert.match(line(free.output, 'keys'), /OK\s+keys/);
+    await unlink(join(run.seller, 'node.key'));
+    const noNodeKey = await doctor(run);
+    assert.match(line(noNodeKey.output, 'keys'), /FAIL\s+keys\s+KEYS_MISSING/);
   }));
 
 void test('doctor: an unsafe seller directory or leftover sequence lock is reported like startup', () =>
@@ -114,7 +126,24 @@ void test('doctor: an unsafe seller directory or leftover sequence lock is repor
     const locked = await doctor(run);
     assert.match(
       line(locked.output, 'sequence'),
-      /WARN\s+sequence\s+SEQUENCE_LOCK_PRESENT/,
+      /FAIL\s+sequence\s+SEQUENCE_LOCK_PRESENT/,
+    );
+    assert.equal(locked.code, 1);
+    await rm(join(run.seller, 'public-sequence-v2.lock'));
+    await writeFile(
+      join(run.seller, 'public-sequence-v2.json'),
+      JSON.stringify({
+        schemaVersion: 1,
+        recordVersion: 2,
+        nodeId: 'cd'.repeat(32),
+        highWater: 1,
+      }),
+      { mode: 0o600 },
+    );
+    const foreign = await doctor(run);
+    assert.match(
+      line(foreign.output, 'sequence'),
+      /FAIL\s+sequence\s+PUBLIC_SEQUENCE_UNAVAILABLE/,
     );
   }));
 
