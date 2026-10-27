@@ -9,6 +9,7 @@ export const TRANSPORT_LIMITS = {
   maxConnections: 8,
   maxPendingConnections: 8,
   maxPendingPerSource: 2,
+  // Per connection family (control vs data) per NodeId; see transport-iroh CONNECTION_FAMILIES.
   maxPeerConnections: 1,
   maxEgressConcurrent: 8,
   maxPeers: 128,

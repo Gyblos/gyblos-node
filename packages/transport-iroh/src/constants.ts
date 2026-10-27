@@ -27,6 +27,15 @@ export const TRANSPORT_ROUTES = {
   UNKNOWN: 'unknown',
 } as const;
 
+// Per-peer connection caps apply per family: a buyer may hold one control (quote) and one data
+// (execution) connection at once, because the seller can still hold a just-closed control connection.
+export const CONNECTION_FAMILIES = {
+  CONTROL: 'control',
+  DATA: 'data',
+} as const;
+export type ConnectionFamily =
+  (typeof CONNECTION_FAMILIES)[keyof typeof CONNECTION_FAMILIES];
+
 export const ROUTE_DISCREPANCY = 'route-discrepancy' as const;
 
 export const RELAY_CONFIGURATION_CODES = {

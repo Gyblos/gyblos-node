@@ -7,6 +7,7 @@ import { TRANSPORT_LIMITS } from '@gyblos/config';
 import { createControlQuote } from '@gyblos/core/control-quotes';
 import { CONTROL_CODES, REASONING_LEVELS } from '@gyblos/protocol/constants';
 import { createConnectionAdmission } from '@gyblos/transport-iroh/admission';
+import { CONNECTION_FAMILIES } from '@gyblos/transport-iroh/constants';
 
 import { controlFixture } from './support/control-fixture.js';
 
@@ -66,10 +67,13 @@ void test('authenticated NodeId connection-open rate survives released connectio
     index < TRANSPORT_LIMITS.connectionAttemptsPerPeer;
     index++
   ) {
-    const release = admission.established('one-peer');
+    const release = admission.established('one-peer', CONNECTION_FAMILIES.DATA);
     assert.ok(release);
     release();
   }
-  assert.equal(admission.established('one-peer'), undefined);
-  assert.ok(admission.established('other-peer'));
+  assert.equal(
+    admission.established('one-peer', CONNECTION_FAMILIES.DATA),
+    undefined,
+  );
+  assert.ok(admission.established('other-peer', CONNECTION_FAMILIES.DATA));
 });
