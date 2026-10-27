@@ -9,9 +9,10 @@ encrypted-file backup and same-address verification through native file dialogs.
 The renderer sends a password and receives a fixed status; it never receives a
 key, path, file contents or decrypted material. Funding remains disabled.
 Successful saved-file checks can now be remembered for the current address; this
-indicator is not a spending authorization. First launch offers explicit creation
-or restoration before generating a new wallet; existing destinations never offer
-replacement.
+indicator is not a spending authorization. The loader automatically prepares a
+wallet for a new installation. Settings-only restoration adds a separate
+protected identity without replacing the current wallet or automatically
+selecting the import.
 
 Version 1 is compact UTF-8 JSON with exactly these fields: `format`, `version`,
 `kdf`, `cipher`, `keyFormat`, `salt`, `nonce`, `ciphertext`, `tag`. Duplicate
@@ -60,12 +61,12 @@ custody acceptance and operational recovery remain separate work.
 
 ## Desktop file flow
 
-Choose **Create backup** in Wallet, enter and confirm at least 12 characters,
-approve the native confirmation and choose a new filename. Files are encrypted
-before writing and created exclusively: existing files are never replaced. A
-write failure may retain an incomplete encrypted file; choose another name on
-retry. Saving alone does not record verification or provide a funding
-capability.
+Choose **Back up wallet** in Settings, then **Create backup**, enter and confirm
+at least 12 characters, approve the native confirmation and choose a new
+filename. Files are encrypted before writing and created exclusively: existing
+files are never replaced. A write failure may retain an incomplete encrypted
+file; choose another name on retry. Saving alone does not record verification or
+provide a funding capability.
 
 Choose **Verify saved file**, enter the password again and select the saved
 file. Reading is bounded and rejects directories and symlinks; authenticated
@@ -106,36 +107,24 @@ is no automatic rollback, stale-marker removal or retry that replaces that
 state. Filesystem errors are sanitized and the restorer limits itself to one
 operation at a time.
 
-First-run Electron setup calls this service only after the user chooses restore,
-enters the backup password and selects a file in the native dialog. It confirms
-the recovered address before opening the main app. The setup bridge accepts no
-file paths or backup bytes and is restricted to the startup window's main frame.
-Existing complete or partial destinations bypass setup through a read-only load;
-restore is never available over an existing wallet. Choosing create is the
-primary default action, but no timer or background call creates a wallet while
-the user is choosing. A cancelled or failed import never falls back to creation.
-A post-claim failure blocks creation and retains state for inspection. Quitting
-cancels startup reveals and waits for actual initialization/restoration and
-backup work to settle. The restore password uses the portable format's exact
-UTF-8 byte bounds, including multibyte characters, without trimming or
-normalization. Backup reads are bound to the completed startup identity and
-cannot generate another wallet if its record disappears or changes. The setup
-result leaves both flags false; a later explicit saved-file check can persist
-verification, while funding stays disabled. Tests use fresh unfunded identities
-and synthetic protection adapters, including all nine producer/reader
-combinations; native Keychain/DPAPI/Linux-store acceptance and power-loss
-durability are not established. Funding, signing, payment-state recovery and
-mobile linking remain disabled or outside this service. Remembered verification
-is handled separately by Wallet.
+The Electron host session calls this service from Settings after the user enters
+a password and selects an encrypted file. Restoration adds a separate protected
+store, preserves the original wallet, and leaves selection unchanged. The user
+explicitly chooses **Use wallet** to persist a different active address.
+Settings can create/verify a backup for that active address. Backup requests
+carry the displayed address; a stale address is rejected before opening a file
+dialog. Restoration alone does not mark the imported wallet's backup verified.
 
-Restoration validates its reserved directory before writing and checks its
-identity again around descriptor I/O. Final record creation is exclusive and
-never uses a replacing rename, so a concurrently appearing record is preserved.
-This deliberately allows an incomplete encrypted final record after a crash; it
-is not atomic whole-record visibility or proof of power-loss durability. The
-existing automatic-creation publication path is unchanged. Protected-record
-reload now reads at most the configured maximum plus one byte and rejects a
-changed descriptor size, including growth after the initial stat.
+The bridge accepts only bounded action/password/address requests from the main
+window's current main frame; paths, backup bytes and keys stay in the host. The
+startup window renders only the shared ASCII loader and has no wallet-action
+bridge. Public reads are coalesced, and restore/select/backup/copy are
+serialized so an overlapping status request cannot invalidate or change the
+selected wallet. Quit cancels the handoff and waits for automatic
+initialization, native file dialogs and in-flight backup/restore work. An
+already-started encrypted write may finish; the main window must not appear
+afterward. The legacy first-run setup helper remains internally testable but is
+no longer registered with Electron.
 
 ## Remembered verification
 

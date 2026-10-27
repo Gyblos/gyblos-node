@@ -84,17 +84,49 @@ void test('a Settings selection waits for overlapping public reads and every lat
   assert.ok(later.every((view) => view.wallet.address === identity.address));
 });
 
-void test('quit also waits for an already-started public wallet read',async context=>{
- const home=await mkdtemp(join(tmpdir(),'gyblos-wallet-read-quit-'));context.after(()=>rm(home,{recursive:true,force:true}));
- const protection=disposableProtection();const controller=new AbortController();
- const session=createDesktopWalletSession(join(home,'wallet'),protection,{approve:async()=>false,save:async()=>null,select:async()=>null},controller.signal);
- await session.ready;
- let release:()=>void=()=>{};let entered:()=>void=()=>{};
- const blocked=new Promise<void>(resolve=>{release=resolve;});const reached=new Promise<void>(resolve=>{entered=resolve;});
- const decrypt=protection.decrypt;
- protection.decrypt=async bytes=>{entered();await blocked;return decrypt(bytes);};
- const reading=session.collection();await reached;controller.abort();
- let settled=false;const stopping=session.settled().then(()=>{settled=true;});
- await new Promise(resolve=>setImmediate(resolve));
- try{assert.equal(settled,false);}finally{release();await reading;await stopping;}
+void test('quit also waits for an already-started public wallet read', async (context) => {
+  const home = await mkdtemp(join(tmpdir(), 'gyblos-wallet-read-quit-'));
+  context.after(() => rm(home, { recursive: true, force: true }));
+  const protection = disposableProtection();
+  const controller = new AbortController();
+  const session = createDesktopWalletSession(
+    join(home, 'wallet'),
+    protection,
+    {
+      approve: async () => false,
+      save: async () => null,
+      select: async () => null,
+    },
+    controller.signal,
+  );
+  await session.ready;
+  let release: () => void = () => {};
+  let entered: () => void = () => {};
+  const blocked = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const reached = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const decrypt = protection.decrypt;
+  protection.decrypt = async (bytes) => {
+    entered();
+    await blocked;
+    return decrypt(bytes);
+  };
+  const reading = session.collection();
+  await reached;
+  controller.abort();
+  let settled = false;
+  const stopping = session.settled().then(() => {
+    settled = true;
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  try {
+    assert.equal(settled, false);
+  } finally {
+    release();
+    await reading;
+    await stopping;
+  }
 });

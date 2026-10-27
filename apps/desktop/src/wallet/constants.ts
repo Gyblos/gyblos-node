@@ -115,3 +115,22 @@ export const WALLET_LIBRARY = {
   MAX_IDENTITIES: 64,
   MAX_ACTIVE_BYTES: 2048,
 } as const;
+
+export const WALLET_SETTINGS_ACTION = {
+  RESTORE: 'restore',
+  SELECT: 'select',
+} as const;
+export const WALLET_SETTINGS_RESULT = {
+  RESTORED: 'restored',
+  SELECTED: 'selected',
+  CANCELLED: 'cancelled',
+  BUSY: 'busy',
+  EXISTS: 'exists',
+  FAILED: 'failed',
+  UNAVAILABLE: 'unavailable',
+  RECOVERY_REQUIRED: 'recovery-required',
+} as const;
+export const WALLET_SETTINGS = {
+  CHANNEL: 'desktop:wallet-settings',
+  COLLECTION_CHANNEL: 'desktop:wallet-collection',
+} as const;
