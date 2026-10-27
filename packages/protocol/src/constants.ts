@@ -248,3 +248,18 @@ export const FREE_STREAM = {
   terminalReserveBytes: 1024,
   events: { DELTA: 'delta', TERMINAL: 'terminal' },
 } as const;
+
+// Usage receipts are independently signed attestations, never execution authorization.
+export const RECEIPT = {
+  version: 1,
+  sellerDomain: 'gyblos/receipt-seller/v1\n',
+  buyerDomain: 'gyblos/receipt-buyer/v1\n',
+  sellerRecordBytes: 2048,
+  buyerRecordBytes: 1024,
+} as const;
+export const RECEIPT_OUTCOMES = { COMPLETED: 'completed', FAILED: 'failed', CANCELLED: 'cancelled' } as const;
+export type ReceiptOutcome = (typeof RECEIPT_OUTCOMES)[keyof typeof RECEIPT_OUTCOMES];
+export const RECEIPT_VERDICTS = { AGREED: 'agreed', DISPUTED: 'disputed' } as const;
+export type ReceiptVerdict = (typeof RECEIPT_VERDICTS)[keyof typeof RECEIPT_VERDICTS];
+export const RECEIPT_DISPUTE_FIELDS = { INPUT_TOKENS: 'inputTokens', OUTPUT_TOKENS: 'outputTokens', OUTPUT_BYTES: 'outputBytes' } as const;
+export type ReceiptDisputeField = (typeof RECEIPT_DISPUTE_FIELDS)[keyof typeof RECEIPT_DISPUTE_FIELDS];
