@@ -1,4 +1,4 @@
-// Owns the devnet asset labels shared by role configuration and lab evidence.
+// Owns configuration labels and typed path failures shared with applications.
 // Evidence, payment policy and lab orchestration do not belong here.
 export const CONFIG_ASSET_LABELS = {
   DEVNET_USDC: 'devnet-usdc',
@@ -7,3 +7,7 @@ export const CONFIG_ASSET_LABELS = {
 
 export type ConfigAssetLabel =
   (typeof CONFIG_ASSET_LABELS)[keyof typeof CONFIG_ASSET_LABELS];
+
+export const CONFIG_PATH_ERROR = {
+  INVALID_WALLET_LIBRARY_ADDRESS: 'CONFIG_INVALID_WALLET_LIBRARY_ADDRESS',
+} as const;
