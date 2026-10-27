@@ -44,6 +44,7 @@ export interface FakeRpcState {
   genesisHash: string;
   failingMethods: Set<string>;
   batchValue?: unknown;
+  programValue?: unknown;
 }
 
 export interface FakeRpc {
@@ -188,7 +189,11 @@ function respond(state: FakeRpcState, call: JsonRpcCall): object {
     case 'getMultipleAccounts':
       return multipleAccounts(state, call.params);
     case 'getProgramAccounts':
-      return { result: programAccounts(state, call.params) };
+      return {
+        result: Object.hasOwn(state, 'programValue')
+          ? state.programValue
+          : programAccounts(state, call.params),
+      };
     case 'getSlot':
       return { result: SLOT };
     case 'getBlockTime':

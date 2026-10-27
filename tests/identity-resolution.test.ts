@@ -384,3 +384,55 @@ void test('malformed RPC account batches are unavailable and cannot create a rev
     await state.close();
   }
 });
+
+void test('malformed registry scan envelopes are unavailable instead of missing identity', async () => {
+  const state = await fixture();
+  try {
+    const { readRegistryIdentity } =
+      await import('@gyblos/identity/resolution');
+    for (const programValue of [
+      [
+        {
+          pubkey: state.accounts.metadata,
+          account: { owner: PROGRAMS.registry, data: ['', 'base58'] },
+        },
+      ],
+      [
+        {
+          pubkey: state.accounts.metadata,
+          account: { owner: PROGRAMS.registry, data: ['!!!', 'base64'] },
+        },
+      ],
+      [
+        {
+          pubkey: 'PRIVATE_BAD_PUBKEY',
+          account: { owner: PROGRAMS.registry, data: ['', 'base64'] },
+        },
+      ],
+      [
+        {
+          pubkey: state.accounts.metadata,
+          account: { owner: PROGRAMS.mplCore, data: ['', 'base64'] },
+        },
+      ],
+      [{ pubkey: state.accounts.metadata, account: null }],
+    ]) {
+      state.state.programValue = programValue;
+      const lookup = await readRegistryIdentity(state.rpc, state.nodeId);
+      assert.equal(lookup.kind, K.UNAVAILABLE);
+      assert.doesNotMatch(JSON.stringify(lookup), /PRIVATE_BAD_PUBKEY/);
+    }
+    state.state.programValue = [
+      {
+        pubkey: state.accounts.metadata,
+        account: { owner: PROGRAMS.registry, data: ['', 'base64'] },
+      },
+    ];
+    assert.equal(
+      (await readRegistryIdentity(state.rpc, state.nodeId)).kind,
+      K.MISSING,
+    );
+  } finally {
+    await state.close();
+  }
+});
