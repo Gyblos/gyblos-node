@@ -1,10 +1,17 @@
 // Composes the real free buyer/HTTP endpoint with a local index and independent identity map.
 // Faults cut a native dial or lose an actual native response; no substitute transport executes requests.
+import { writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+
 import type { Connection, Endpoint } from '@number0/iroh';
 
+import { BUYER_SELECTION } from '@gyblos/buyer/constants';
 import { executeBuyerFree } from '@gyblos/buyer/free-execution';
 import { startFreeBuyerHttp } from '@gyblos/buyer/free-http';
+import type { BuyerSelectionConfig } from '@gyblos/buyer/selection-config';
+import type { PreparedBuyerSelection } from '@gyblos/buyer/selection-runtime';
 import { selectionStats } from '@gyblos/buyer/selection-stats';
+import { FILE_MODES, homeLayout } from '@gyblos/config';
 import { FREE_EXECUTION, FREE_STREAM } from '@gyblos/protocol/constants';
 import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
 
@@ -55,10 +62,16 @@ function loseResponse(connection: Connection) {
     return stream;
   };
 }
+export interface FreeBuyerIdentityOptions {
+  rpcUrl: string;
+  manualTrust?: boolean;
+  beforeExecute?: () => Promise<void>;
+}
 export async function createFreeBuyer(
   run: AcceptanceSession,
   sellers: AcceptanceSession[] = [run],
   fault?: FreeAcceptanceFault,
+  identity?: FreeBuyerIdentityOptions,
 ) {
   const { freeBuyerDependencies } =
     await import('@gyblos/buyer/free-selection');
@@ -66,21 +79,53 @@ export async function createFreeBuyer(
   let closeHttp: (() => Promise<void>) | undefined;
   try {
     const dials = injectFault(endpoint, fault);
-    const config = acceptanceSelection(run);
+    const config: BuyerSelectionConfig = acceptanceSelection(run);
     config.request.maxTokens = FREE_ACCEPTANCE.maxTokens;
     config.request.maxAtomic = '0';
     config.request.priceCeilings = {
       inputAtomicPerMtok: '0',
       outputAtomicPerMtok: '0',
     };
-    config.sellers = sellers.flatMap(
-      (seller) => acceptanceSelection(seller).sellers,
-    );
-    const prepared = {
-      config,
-      stats: await selectionStats(run.workspace.environment),
-      discovery: run.state(),
-    };
+    const configuredSellers = () =>
+      sellers
+        .flatMap((seller) => acceptanceSelection(seller).sellers)
+        .map((seller) =>
+          identity
+            ? { ...seller, manualTrust: identity.manualTrust ?? false }
+            : seller,
+        );
+    config.sellers = configuredSellers();
+    let prepared: PreparedBuyerSelection;
+    if (identity) {
+      const url = new URL(identity.rpcUrl);
+      acceptanceAssert(
+        url.origin.startsWith('http://127.0.0.1:') &&
+          url.pathname === '/' &&
+          !url.username &&
+          !url.password &&
+          !url.search &&
+          !url.hash,
+      );
+      config.identity = { rpcUrl: identity.rpcUrl };
+
+      const path = join(
+        homeLayout(run.workspace.environment).roles.buyer,
+        BUYER_SELECTION.configFile,
+      );
+      await writeFile(path, JSON.stringify(config), {
+        mode: FILE_MODES.privateFile,
+      });
+      const { prepareBuyerSelection } =
+        await import('@gyblos/buyer/selection-runtime');
+      const loaded = await prepareBuyerSelection(run.workspace.environment);
+      acceptanceAssert(loaded?.identity);
+      prepared = loaded;
+    } else
+      prepared = {
+        config,
+        stats: await selectionStats(run.workspace.environment),
+        discovery: run.state(),
+      };
     let dependencies = freeBuyerDependencies(prepared, {
       endpoint,
       buyer: run.identity.buyer.address,
@@ -102,6 +147,10 @@ export async function createFreeBuyer(
         input,
         {
           ...dependencies,
+          execute: async (...args) => {
+            await identity?.beforeExecute?.();
+            return dependencies.execute(...args);
+          },
           select: async (excluded, deadline) => {
             const before = generations();
             const attempts = sellers.reduce(
@@ -151,9 +200,7 @@ export async function createFreeBuyer(
         acceptanceAssert(generations() === before + 1);
       },
       refresh() {
-        prepared.config.sellers = sellers.flatMap(
-          (seller) => acceptanceSelection(seller).sellers,
-        );
+        prepared.config.sellers = configuredSellers();
         prepared.discovery = run.state();
         dependencies = freeBuyerDependencies(prepared, {
           endpoint,

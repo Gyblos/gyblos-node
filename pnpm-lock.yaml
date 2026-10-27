@@ -240,6 +240,9 @@ importers:
       '@gyblos/engine-ollama':
         specifier: workspace:*
         version: link:../../packages/engine-ollama
+      '@gyblos/identity':
+        specifier: workspace:*
+        version: link:../../packages/identity
       '@gyblos/node':
         specifier: workspace:*
         version: link:../../packages/node

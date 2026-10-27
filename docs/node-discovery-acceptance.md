@@ -128,7 +128,7 @@ This is local, synthetic, non-streaming acceptance. It does not establish
 production capacity, durable daily caps, actual engine crash recovery,
 relay/CGNAT/off-host connectivity, registry identity or paid execution. Real
 Ollama, a second machine or the production index needs separate founder
-approval. Streaming and 8004 remain subsequent work.
+approval. Separate commands below cover streaming and synthetic 8004 identity.
 
 ## Explicit real-engine mode
 
@@ -180,3 +180,53 @@ Cancellation conservatively keeps the full reserved token budget; counters
 remain in memory and reset on restart. Partial text is provisional until a valid
 terminal; a stream error or missing terminal is not a successful answer. No
 retry or seller switch is allowed after possible prompt transmission.
+
+## Complete acceptance with read-only 8004 identity
+
+```sh
+pnpm --filter @gyblos/lab-harness acceptance:identity
+```
+
+This synthetic-only command loads the product buyer selection configuration from
+its private temporary home with identity resolution enabled. A disposable HTTP
+server on an allocated loopback port serves the three read-only registry methods
+used by the product bounded RPC adapter. Its synthetic program/Core accounts and
+metadata contain real signatures made by ephemeral NodeId keys; the actual 8004
+reader, independent owner binding policy and durable buyer identity store verify
+them. The discovery index supplies records, never identity authority. There is
+no live blockchain, registration, funded wallet or external RPC.
+
+The run requires complete and streaming HTTP answers, three readiness renewal
+cycles, and zero engine calls during discovery/control queries. It then
+exercises RPC outage and an oversized response without downgrading to manual
+trust; revocation between quote selection and possible prompt transmission;
+explicit manual override while retaining the revocation tombstone; removing that
+override; and reopening buyer state after revocation and after a higher-sequence
+owner change. Older claims cannot roll back the durable floor. Updating the
+synthetic owner, restarting the seller with higher public sequences and a higher
+registry binding restores inference; a still-valid old public record is rejected
+by the index. Streaming cancellation reaches the fake engine. With two
+independently resolved sellers, losing a real native response after generation
+never triggers a second selection or execution dial.
+
+The existing free/control scenarios separately cover engine busy/down/recovery,
+quote replay/expiry/wrong peer, caps and pre-send failover. This identity
+scenario adds registry-enabled composition; it does not replace those cases or
+relax any product limits. Background readiness/publication ticks and record time
+are driven explicitly. Reopening real product storage verifies persisted
+barriers; the test runner remains one process. Seller endpoint addresses are
+refreshed explicitly after restart. This is not full CLI/TOML bootstrap or
+automatic address discovery.
+
+The command accepts no arguments. Index access stays injected in-process; RPC
+uses only allocated loopback HTTP and native Iroh uses encrypted loopback with
+relays disabled. No paid services start. A missing native runtime is a nonzero
+static unavailable result, never a successful fallback. Output contains fixed
+case IDs, counters and flags only, with no identity, endpoint, signature or
+content. Cancellation and completion close the registry, buyers, sellers and
+temporary homes; a forced kill can still leave a disposable temporary directory.
+
+Passing proves synthetic local composition, not chain freshness/finality,
+production identity-provider behavior, real model performance, off-host routing,
+load capacity or production discovery. Real Ollama, a second machine, live RPC
+or the production index requires separate founder authorization.

@@ -38,7 +38,12 @@
     "./acceptance/free-http": "./src/acceptance/free-http.ts",
     "./acceptance/free-quotes": "./src/acceptance/free-quotes.ts",
     "./acceptance/free-stream": "./src/acceptance/free-stream-run.ts",
-    "./cli/free-stream-acceptance": "./src/cli/free-stream-acceptance.ts"
+    "./cli/free-stream-acceptance": "./src/cli/free-stream-acceptance.ts",
+    "./acceptance/identity": "./src/acceptance/identity-run.ts",
+    "./acceptance/identity-constants": "./src/acceptance/identity-constants.ts",
+    "./acceptance/identity-http": "./src/acceptance/identity-http.ts",
+    "./acceptance/identity-registry": "./src/acceptance/identity-registry.ts",
+    "./cli/identity-acceptance": "./src/cli/identity-acceptance.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",
@@ -60,11 +65,13 @@
     "@gyblos/discovery-index": "workspace:*",
     "@gyblos/discovery-http": "workspace:*",
     "@gyblos/transport-iroh": "workspace:*",
-    "@number0/iroh": "1.1.0"
+    "@number0/iroh": "1.1.0",
+    "@gyblos/identity": "workspace:*"
   },
   "scripts": {
     "acceptance:node-discovery": "node --import tsx src/cli/node-discovery-acceptance.ts",
     "acceptance:free": "node --import tsx src/cli/free-acceptance.ts",
-    "acceptance:free-stream": "node --import tsx src/cli/free-stream-acceptance.ts"
+    "acceptance:free-stream": "node --import tsx src/cli/free-stream-acceptance.ts",
+    "acceptance:identity": "node --import tsx src/cli/identity-acceptance.ts"
   }
 }
