@@ -311,7 +311,7 @@ void test('selection is authenticated, address-bounded and has no wallet secret 
   await assert.rejects(f.library.summary(), {
     code: WALLET_LIBRARY_ERROR.RECOVERY_REQUIRED,
   });
-  assert.throws(() => desktopWalletLibraryPaths(f.root, '../escape'));
+  assert.throws(() => desktopWalletLibraryPaths(f.root, '../escape'), { code: 'CONFIG_INVALID_WALLET_LIBRARY_ADDRESS' });
 });
 
 void test('same-address selection is a no-op and cannot alter a committed active record', async (context) => {
