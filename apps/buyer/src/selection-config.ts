@@ -9,10 +9,10 @@ import {
   selectSellers,
   type SellerRequest,
 } from '@gyblos/core/seller-selection';
-import { P2P_ROLES } from '@gyblos/node/constants';
 import { assertRoleHome } from '@gyblos/node/home';
 import {
   DATA_RETENTION,
+  P2P_ROLES,
   PUBLIC_RECORD_KINDS,
 } from '@gyblos/protocol/constants';
 import type { SignedPublicV2 } from '@gyblos/protocol/control-types';

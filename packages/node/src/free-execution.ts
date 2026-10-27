@@ -8,6 +8,7 @@ import {
   FREE_CHAT_ROLES,
   FREE_EXECUTION,
   FREE_EXECUTION_CODES,
+  OFFER_PRICING_KINDS,
   PUBLIC_RECORD_KINDS,
 } from '@gyblos/protocol/constants';
 import type {
@@ -32,7 +33,6 @@ import {
   type FreeExecutionResponse,
 } from '@gyblos/protocol/free-execution';
 
-import { OFFER_PRICING_KINDS } from './constants';
 import { createFreeStreamOutput } from './free-execution-stream';
 import type { SellerCatalogOffer } from './seller-offer';
 

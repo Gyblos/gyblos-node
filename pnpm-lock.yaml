@@ -207,6 +207,9 @@ importers:
       '@gyblos/node':
         specifier: workspace:*
         version: link:../../packages/node
+      '@gyblos/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
       '@gyblos/runtime':
         specifier: workspace:*
         version: link:../../packages/runtime

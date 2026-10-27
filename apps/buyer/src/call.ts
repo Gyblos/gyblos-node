@@ -9,7 +9,6 @@ import { OFFER_ID } from '@gyblos/core/constants';
 import { observeInferenceResponse } from '@gyblos/core/inference-observation';
 import { assessCharge, charge } from '@gyblos/core/metering';
 import { modelTokenizer } from '@gyblos/node/artifacts';
-import { P2P_ROLES } from '@gyblos/node/constants';
 import { assertRoleHome } from '@gyblos/node/home';
 import { inferenceCeiling } from '@gyblos/node/http/inference';
 import { roleDirectory, rolePath, roleSigner } from '@gyblos/node/roles';
@@ -22,6 +21,7 @@ import {
 import { createInferenceBuyer } from '@gyblos/payments-x402/inference-buyer';
 import { withExclusiveLock } from '@gyblos/payments-x402/recovery/lock';
 import { validateSettlement } from '@gyblos/payments-x402/trust';
+import { P2P_ROLES } from '@gyblos/protocol/constants';
 import { isMain, saveJson } from '@gyblos/runtime';
 import {
   expectedIrohRoute,

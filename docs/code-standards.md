@@ -8,7 +8,7 @@ two disagree, AGENTS.md wins. Architecture and ownership are in
 ## What lint enforces
 
 `pnpm lint` runs ESLint ([eslint.config.js](../eslint.config.js) with the local
-rules in [tooling/code-standards.js](../tooling/code-standards.js)),
+rules in [tooling/code-standards.ts](../tooling/code-standards.ts)),
 `prettier --check`, `pnpm tooling:test` and `pnpm boundaries`. Errors fail the
 check; warnings are reported and must not grow in a PR.
 
@@ -19,6 +19,7 @@ check; warnings are reported and must not grow in a PR.
 | No object-literal `as` assertion          | error | Product, lab and tooling; allowed in `tests/` for invalid inputs and partial SDK doubles. |
 | `@typescript-eslint/no-floating-promises` | error | All TypeScript.                                                                           |
 | `gyblos/package-boundaries`               | error | `apps`, `packages`, `lab`: a relative import must not leave its package.                  |
+| `gyblos/import-extensions`                | error | All TypeScript: relative code imports have no extension; `.json`/`.css` keep it.          |
 | `gyblos/version-pins`                     | error | `packages/config/src/versions.ts` must match the dependency pins in manifests.            |
 | `pnpm boundaries` (dependency-cruiser)    | error | Layer direction, adapter and app independence, no product import of lab/tests/tooling.    |
 | Import order (prettier sort-imports)      | error | Checked by `prettier --check`; `pnpm format` fixes it.                                    |

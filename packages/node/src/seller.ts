@@ -31,7 +31,12 @@ import { createOllamaEngine } from '@gyblos/engine-ollama/engine';
 import { inferenceSnapshot } from '@gyblos/payments-x402/accounting/chain';
 import { assertProgram } from '@gyblos/payments-x402/chain';
 import { createFacilitator } from '@gyblos/payments-x402/facilitator';
-import { GYBLOS_ALPN, OFFER_SCHEMA_VERSION } from '@gyblos/protocol/constants';
+import {
+  GYBLOS_ALPN,
+  OFFER_PRICING_KINDS,
+  OFFER_SCHEMA_VERSION,
+  P2P_ROLES,
+} from '@gyblos/protocol/constants';
 import {
   assertPortFree,
   loadJson,
@@ -46,11 +51,7 @@ import { withDeadline } from '@gyblos/transport-iroh/deadline';
 import { bindEndpoint } from '@gyblos/transport-iroh/endpoint';
 
 import { modelTokenizer } from './artifacts';
-import {
-  OFFER_PRICING_KINDS,
-  P2P_ROLES,
-  SELLER_PUBLIC_RECORDS,
-} from './constants';
+import { SELLER_PUBLIC_RECORDS } from './constants';
 import { observeControlReadiness } from './control-readiness';
 import { prepareSellerControl } from './control-startup';
 import {

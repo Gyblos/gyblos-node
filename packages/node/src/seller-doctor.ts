@@ -17,6 +17,7 @@ import {
   type HomeEnvironment,
 } from '@gyblos/config';
 import { MODEL } from '@gyblos/engine-ollama/model';
+import { OFFER_PRICING_KINDS, P2P_ROLES } from '@gyblos/protocol/constants';
 import { assertPortFree } from '@gyblos/runtime';
 import type { RelayConfigurationCode } from '@gyblos/transport-iroh/constants';
 import {
@@ -32,8 +33,6 @@ import {
   NODE_CONFIG_FILENAME,
   NODE_CONFIG_ISSUE_CODES,
   NODE_ERROR_CODES,
-  OFFER_PRICING_KINDS,
-  P2P_ROLES,
   type DoctorCheckName,
   type DoctorCode,
   type DoctorStatus,

@@ -14,8 +14,9 @@ import {
   type IdentityRegistryScope,
   type IdentityState,
 } from '@gyblos/core/identity-policy';
+import { P2P_ROLES } from '@gyblos/protocol/constants';
 
-import { IDENTITY_STATE, P2P_ROLES } from './constants';
+import { IDENTITY_STATE } from './constants';
 import { assertRoleHome } from './home';
 import {
   acquireIdentityLock,

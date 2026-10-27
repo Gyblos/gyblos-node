@@ -125,11 +125,36 @@ void test('standards lint rejects layout, opaque names and nonlocal relative imp
   ])
     assert.ok((await rules(dynamic)).includes('gyblos/package-boundaries'));
   assert.deepEqual(
-    await rules(
-      "export async function load() { return import('./local.js'); }",
-    ),
+    await rules("export async function load() { return import('./local'); }"),
     [],
   );
+});
+
+void test('relative imports carry no code extension', async () => {
+  const extension = 'gyblos/import-extensions';
+  for (const code of [
+    "export { a } from './a.ts';",
+    "import { a } from './a.js'; export const b = a;",
+    "export * from '../b.tsx';",
+    "export async function load() { return import('./c.mjs'); }",
+    'export async function load() { return import(`./d.js`); }',
+    "export type T = import('./e.ts').E;",
+    "export { f } from './f.cjs';",
+  ])
+    assert.equal(
+      (await rules(code)).filter((rule) => rule === extension).length,
+      1,
+      code,
+    );
+  for (const code of [
+    "export { a } from './a';",
+    "import manifest from '../package.json' with { type: 'json' }; export const name = manifest;",
+    "import './ui.css';",
+    "export { value } from '@gyblos/config';",
+    "import { readFile } from 'node:fs/promises'; export const read = readFile;",
+    "export type T = import('./e').E;",
+  ])
+    assert.ok(!(await rules(code)).includes(extension), code);
 });
 
 void test('standards lint detects numeric values inside object literals', async () => {
