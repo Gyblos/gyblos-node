@@ -160,6 +160,16 @@ export const NODE_CONFIG_LIMITS = {
   tokenRunCharacters: 16,
 } as const;
 
+// Hard ceilings for gyblos.toml [limits], so a typo cannot let one seller exhaust its machine. Every
+// value must be at least 1; omitted keys keep TRANSPORT_LIMITS and FREE_EXECUTION_ADMISSION.
+export const SELLER_LIMIT_CEILINGS = {
+  maxConnections: 64,
+  maxPeerConnections: 4,
+  requestsPerMinute: 600,
+  globalRequestsPerMinute: 4096,
+  maxFreeBuyersPerDay: 65_536,
+} as const;
+
 // gyblos.toml prices are USDC per million tokens; protocol v2 will charge atomic units (10^-6 USDC) per
 // million tokens, so the conversion is exact.
 export const USDC_ATOMIC_UNITS_PER_USDC = 1_000_000n;
@@ -191,6 +201,8 @@ export const NODE_CONFIG_ISSUE_CODES = {
   PRICING_MISSING: 'PRICING_MISSING',
   INVALID_CAP: 'INVALID_CAP',
   RELAY_ONLY_CONFLICT: 'RELAY_ONLY_CONFLICT',
+  // A [limits] value outside its range, or larger than the total it is part of.
+  INVALID_LIMIT: 'INVALID_LIMIT',
   // A catalog model with verified levels (protocol MODEL_CATALOG) does not support the listed level.
   REASONING_UNSUPPORTED: 'REASONING_UNSUPPORTED',
 } as const;

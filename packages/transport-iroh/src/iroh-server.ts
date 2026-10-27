@@ -6,6 +6,7 @@ import {
   HTTP_STATUS,
   TRANSPORT_LIMITS,
   TRANSPORT_TIMEOUTS,
+  type TransportLimits,
 } from '@gyblos/config';
 import {
   CONTROL_ALPN,
@@ -49,9 +50,10 @@ export function serveIroh(
   relayOnly = false,
   control?: ControlService,
   freeExecution?: FreeExecutionService,
+  limits: TransportLimits = TRANSPORT_LIMITS,
 ) {
-  const limiter = createPeerLimiter();
-  const admission = createConnectionAdmission();
+  const limiter = createPeerLimiter(Date.now, limits);
+  const admission = createConnectionAdmission(undefined, limits);
   const connections = new Set<Connection>();
   const streamPeers = new Set<string>();
   let streamsActive = 0;
@@ -64,10 +66,7 @@ export function serveIroh(
   ) {
     const peer = connection.remoteId().toString();
     const close = () => connection.close(streamCloseCode, []);
-    if (
-      streamsActive >= TRANSPORT_LIMITS.maxEgressConcurrent ||
-      streamPeers.has(peer)
-    ) {
+    if (streamsActive >= limits.maxEgressConcurrent || streamPeers.has(peer)) {
       close();
       return;
     }

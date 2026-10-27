@@ -30,8 +30,11 @@ export class FreeExecutionAdmission {
   constructor(
     caps: FreeTokenCaps,
     private readonly startedAt: number,
+    // Distinct buyers served per UTC day; a seller's gyblos.toml [limits] may set it.
+    private readonly maxBuyers: number = FREE_EXECUTION_ADMISSION.maxBuyers,
   ) {
     count(startedAt);
+    if (!count(maxBuyers)) fail(FREE_EXECUTION_CODES.LIMIT);
     if (!count(caps.dailyTokenCap) || !count(caps.perBuyerCap))
       fail(FREE_EXECUTION_CODES.LIMIT);
     this.caps = {
@@ -67,10 +70,7 @@ export class FreeExecutionAdmission {
     }
     const budget = this.budget;
     const peer = quote.buyerNodeId;
-    if (
-      !budget.buyers.has(peer) &&
-      budget.buyers.size >= FREE_EXECUTION_ADMISSION.maxBuyers
-    )
+    if (!budget.buyers.has(peer) && budget.buyers.size >= this.maxBuyers)
       return fail(FREE_EXECUTION_CODES.BUSY);
     this.seen.set(key, quote.expiresAt);
     const reserved = count(count(inputTokens) + count(request.input.maxTokens));

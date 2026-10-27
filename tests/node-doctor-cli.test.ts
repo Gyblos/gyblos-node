@@ -54,6 +54,22 @@ void test('doctor: a ready free seller exits 0, prints its public identity and c
     assert.match(result.output, new RegExp(`owner\\s+${run.owner}`));
     assert.match(result.output, /offer\s+free qwen3-0\.6b/);
     assert.match(result.output, /publish\s+off/);
+    assert.match(result.output, /connections 8 total, 1 per buyer/);
+    assert.match(result.output, /requests\s+30\/min per buyer, 256\/min total/);
+    assert.match(result.output, /free buyers 1024\/day/);
+  }));
+
+void test('doctor: prints the [limits] the seller will serve with', () =>
+  scenario({}, async (run) => {
+    await withOllama(run);
+    await writeFile(
+      join(run.root, 'gyblos.toml'),
+      `${FREE_TOML}\n[limits]\nmax_connections = 16\nrequests_per_minute = 60\n`,
+    );
+    const result = await doctor(run);
+    assert.equal(result.code, 0, result.output);
+    assert.match(result.output, /connections 16 total, 1 per buyer/);
+    assert.match(result.output, /requests\s+60\/min per buyer, 256\/min total/);
   }));
 
 void test('doctor: an empty home fails the role check with a setup hint and exits 1', () =>

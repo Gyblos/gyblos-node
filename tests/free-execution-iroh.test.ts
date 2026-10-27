@@ -6,6 +6,7 @@ import { createControlQuote } from '@gyblos/core/control-quotes';
 import { OFFER_PRICING_KINDS } from '@gyblos/node/constants';
 import { createSellerControlService } from '@gyblos/node/control';
 import type { SellerFreeExecutionOptions } from '@gyblos/node/free-execution';
+import { sellerLimits } from '@gyblos/node/node-config-limits';
 import { createSellerRecords } from '@gyblos/node/public-records';
 import { serveSellerTransport } from '@gyblos/node/seller-transport';
 import {
@@ -122,6 +123,7 @@ void test(
     const server = serveSellerTransport(seller, control, {
       ...runtime,
       relayOnly: false,
+      limits: sellerLimits(),
     });
     try {
       const quote = await createControlQuote(

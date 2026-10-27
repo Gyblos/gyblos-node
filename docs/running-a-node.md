@@ -403,12 +403,13 @@ have been sent. Nothing on this channel authorizes payment.
 
 ### Free-service availability limits
 
-The per-offer buyer table is bounded at 1,024 NodeIds per UTC day. A peer that
-controls many cheap NodeIds can fill it while using only a small part of the
-daily token budget; further new buyers then receive `FREE_EXECUTION_BUSY` until
-the next UTC day or restart. Existing tracked buyers retain their own limits. A
-shared overflow policy is a follow-up; the current bound protects memory and
-does not guarantee fair access.
+The per-offer buyer table is bounded at 1,024 NodeIds per UTC day by default
+(`max_free_buyers_per_day` in [`[limits]`](configuration.md#seller-limits), at
+most 65,536). A peer that controls many cheap NodeIds can fill it while using
+only a small part of the daily token budget; further new buyers then receive
+`FREE_EXECUTION_BUSY` until the next UTC day or restart. Existing tracked buyers
+retain their own limits. A shared overflow policy is a follow-up; the current
+bound protects memory and does not guarantee fair access.
 
 After admission, cancellation retains the full input-plus-output reservation,
 even when no answer was received. Repeated cancellations across cheap NodeIds

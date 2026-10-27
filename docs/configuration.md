@@ -108,9 +108,10 @@ print). Review a file before sharing it.
 
 `version = 1` and a `[node]` table with `network` are required; everything else
 is optional. Unknown keys are errors (`UNKNOWN_KEY`). Integer settings
-(`version`, the free caps) must be TOML integers: a float such as `1.0`, `10.0`
-or `1e3` is `WRONG_TYPE`, and an integer too large for the setting is out of
-range (`UNSUPPORTED_VERSION` or `INVALID_CAP`), however many digits it has.
+(`version`, the free caps, `[limits]`) must be TOML integers: a float such as
+`1.0`, `10.0` or `1e3` is `WRONG_TYPE`, and an integer too large for the setting
+is out of range (`UNSUPPORTED_VERSION`, `INVALID_CAP` or `INVALID_LIMIT`),
+however many digits it has.
 
 - `[node]`
   - `network`: `"devnet"`. `"mainnet"` is refused with `MAINNET_UNSUPPORTED`.
@@ -124,6 +125,7 @@ range (`UNSUPPORTED_VERSION` or `INVALID_CAP`), however many digits it has.
   IPv6 in brackets).
 - `[buyer]`: `relay_only` (boolean).
 - `[discovery]`: `publish` (boolean) and `url` (https, or http on loopback).
+- `[limits]`: seller capacity (see [Seller limits](#seller-limits)).
 - `[[offers]]`, at most 32, each model at most once (aliases count as the same
   model):
   - `model`: a catalog id or alias from `packages/protocol/src/models.ts` (for
@@ -228,6 +230,7 @@ this daemon. Today it honors:
 | `[transport]` `relay_only`, `bind`, `external_addr`                                                                                                   | yes                                                                                                                       |
 | `[relays]` `urls`, `relay_token_env` (the token stays in that variable; relay errors still name `GYBLOS_RELAY_TOKEN`)                                 | yes                                                                                                                       |
 | `[discovery]` `publish`, `url`                                                                                                                        | yes                                                                                                                       |
+| `[limits]`                                                                                                                                            | yes, see [Seller limits](#seller-limits)                                                                                  |
 | `[[offers]]`: at most one, for `qwen3-0.6b` (or `qwen3:0.6b`), engine `ollama` at `http://127.0.0.1:11436` without `api_key_env`, reasoning `["off"]` | yes                                                                                                                       |
 | `price = {...}` on that offer                                                                                                                         | only `input_per_mtok = "1"`, `output_per_mtok = "2"`: paid execution is still the v1 proof of concept at those rates      |
 | `free = {...}` on that offer                                                                                                                          | served over the separate free v2 channel with daily total and per-buyer token caps                                        |
@@ -255,6 +258,41 @@ while publishing, with `INVALID_ROLE_CONFIGURATION`. Malformed
 `GYBLOS_IROH_BIND` or `GYBLOS_IROH_EXTERNAL_ADDR` socket addresses still fail
 when binding, as before. `GYBLOS_RPC_URL` does not affect the daemon, which
 reads its RPC from the role file.
+
+## Seller limits
+
+`[limits]` sets how much one seller accepts. Every key is optional; an omitted
+key keeps the built-in value, so a file without `[limits]` behaves as before.
+Each value is an integer from 1 to a hard ceiling, so a typo cannot let one
+seller exhaust its machine. A value out of range is `INVALID_LIMIT`, and startup
+stops with `NODE_CONFIG_INVALID`.
+
+| Key                          | Default | Ceiling | Meaning                                                                           |
+| ---------------------------- | ------- | ------- | --------------------------------------------------------------------------------- |
+| `max_connections`            | 8       | 64      | open buyer connections in total                                                   |
+| `max_peer_connections`       | 1       | 4       | connections per buyer NodeId, counted separately for control and data connections |
+| `requests_per_minute`        | 30      | 600     | requests per buyer NodeId per minute                                              |
+| `global_requests_per_minute` | 256     | 4096    | requests per minute across all buyers                                             |
+| `max_free_buyers_per_day`    | 1024    | 65536   | distinct buyers a free offer serves per UTC day                                   |
+
+```toml
+[limits]
+max_connections = 16
+requests_per_minute = 60
+```
+
+A per-buyer value above its total (`max_peer_connections` above
+`max_connections`, or `requests_per_minute` above `global_requests_per_minute`)
+can never be reached and is refused with `INVALID_LIMIT`. The comparison uses
+the effective total, which may be the default. The editor schema cannot check
+this rule; `config validate` does.
+
+Request concurrency is not configurable. The daemon's managed Ollama runs one
+generation at a time, so each buyer has one request in flight and the seller at
+most two at once (one for a free offer). Wire sizes, deadlines and the
+connection-attempt limits protect the protocol, not capacity, and stay fixed.
+`[limits]` is file-only: there are no `GYBLOS_*` variables for it, and the buyer
+ignores it. `pnpm gyblos doctor` prints the limits the seller will serve with.
 
 ## Seller preflight (`gyblos doctor`)
 
@@ -290,7 +328,8 @@ when no check fails (warnings do not fail) and 1 otherwise. It starts, spawns
 and writes nothing. It never prints the home location, the RPC URL, the relay
 token or key material, and only reaches loopback ports unless `--online`. Memory
 headroom, key contents, a stale seller trace file and the NodeId matching
-`node.key` are checked at startup only.
+`node.key` are checked at startup only. With a valid configuration it also
+prints the effective [seller limits](#seller-limits).
 
 ## Issue codes
 
@@ -300,8 +339,9 @@ KiB), `UNKNOWN_KEY`, `MISSING_KEY`, `WRONG_TYPE`, `INVALID_VALUE`,
 `INSECURE_URL`, `INVALID_ENV_NAME`, `INLINE_SECRET`, `DUPLICATE_VALUE`,
 `TOO_MANY`, `UNKNOWN_MODEL`, `CUSTOM_MODEL_IN_CATALOG`, `NON_CANONICAL_DECIMAL`,
 `PRICE_OUT_OF_RANGE`, `PRICE_ZERO`, `PRICING_CONFLICT`, `PRICING_MISSING`,
-`INVALID_CAP`, `RELAY_ONLY_CONFLICT`, `REASONING_UNSUPPORTED`. The canonical
-list is `NODE_CONFIG_ISSUE_CODES` in `packages/node/src/constants.ts`.
+`INVALID_CAP`, `RELAY_ONLY_CONFLICT`, `REASONING_UNSUPPORTED`, `INVALID_LIMIT`.
+The canonical list is `NODE_CONFIG_ISSUE_CODES` in
+`packages/node/src/constants.ts`.
 
 Warnings: `ENV_SWITCH_NOT_STRICT` (a switch variable other than `1` or `0`) and
 `REASONING_UNVERIFIED` (an offer whose levels cannot be checked against the

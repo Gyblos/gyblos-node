@@ -27,6 +27,9 @@
     "discovery": {
       "$ref": "#/definitions/discovery"
     },
+    "limits": {
+      "$ref": "#/definitions/limits"
+    },
     "offers": {
       "description": "Models this node sells or gives away; each model at most once.",
       "type": "array",
@@ -125,6 +128,43 @@
         "relay_only": {
           "description": "Buyer dials only through the offer's relay (GYBLOS_BUYER_RELAY_ONLY).",
           "type": "boolean"
+        }
+      }
+    },
+    "limits": {
+      "description": "Seller capacity; omitted keys keep the built-in value shown. A per-buyer value above its total is refused by the validator.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_connections": {
+          "description": "Open buyer connections in total (default 8).",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        },
+        "max_peer_connections": {
+          "description": "Connections per buyer NodeId and kind, control or data (default 1); at most max_connections.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4
+        },
+        "requests_per_minute": {
+          "description": "Requests per buyer NodeId per minute (default 30); at most global_requests_per_minute.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600
+        },
+        "global_requests_per_minute": {
+          "description": "Requests per minute across all buyers (default 256).",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "max_free_buyers_per_day": {
+          "description": "Distinct buyers a free offer serves per UTC day (default 1024).",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65536
         }
       }
     },

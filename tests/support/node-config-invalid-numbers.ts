@@ -1,5 +1,5 @@
-// Invalid gyblos.toml number fixtures: price decimal spellings and TOML floats where integers are
-// required. Test data only; spread into INVALID_FIXTURES.
+// Invalid gyblos.toml number fixtures: price decimal spellings, TOML floats where integers are
+// required and [limits] ranges. Test data only; spread into INVALID_FIXTURES.
 import { BASE, offer } from './node-config-fixtures.js';
 import type { InvalidConfigFixture } from './node-config-invalid.js';
 
@@ -85,5 +85,31 @@ export const NUMBER_FIXTURES: readonly InvalidConfigFixture[] = [
       }),
     code: 'INVALID_CAP',
     path: 'offers[0].free.daily_token_cap',
+  },
+  {
+    name: 'limit above its ceiling',
+    toml: `${BASE}[limits]\nmax_connections = 65\n`,
+    code: 'INVALID_LIMIT',
+    path: 'limits.max_connections',
+  },
+  {
+    name: 'zero limit',
+    toml: `${BASE}[limits]\nrequests_per_minute = 0\n`,
+    code: 'INVALID_LIMIT',
+    path: 'limits.requests_per_minute',
+  },
+  {
+    name: 'unknown limit',
+    toml: `${BASE}[limits]\nmax_concurrent = 2\n`,
+    code: 'UNKNOWN_KEY',
+    path: 'limits.max_concurrent',
+  },
+  {
+    name: 'per-buyer requests above the built-in total',
+    toml: `${BASE}[limits]\nrequests_per_minute = 300\n`,
+    code: 'INVALID_LIMIT',
+    path: 'limits.requests_per_minute',
+    // Compared with the effective total, which may be a built-in default.
+    schemaAccepts: true,
   },
 ];

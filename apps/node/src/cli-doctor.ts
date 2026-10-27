@@ -102,6 +102,12 @@ export async function doctor(
       `  publish ${report.publication ? urlOrigin(report.publication) : 'off'}\n`,
     );
   }
+  if (report.limits) {
+    const { transport, maxFreeBuyers } = report.limits;
+    stdout(
+      `Limits (gyblos.toml [limits]):\n  connections ${transport.maxConnections} total, ${transport.maxPeerConnections} per buyer\n  requests    ${transport.requestsPerWindow}/min per buyer, ${transport.globalRequestsPerWindow}/min total\n  free buyers ${maxFreeBuyers}/day\n`,
+    );
+  }
   const failures = report.checks.filter(
     (check) => check.status === DOCTOR_STATUS.FAIL,
   ).length;
