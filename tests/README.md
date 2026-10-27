@@ -91,3 +91,10 @@ possible-send tracking, OpenAI-compatible SSE and no post-send failover.
 `tests/lab/free-stream-acceptance.test.ts` exercises the real local index,
 native Iroh, synthetic engine and product HTTP endpoint, including early
 fragment delivery and cancellation that reaches the seller engine.
+
+Identity resolution and policy tests use signed synthetic account fixtures and a
+loopback/in-memory RPC double only. They cover finalized/genesis-pinned
+read-only methods, owner transfer, metadata removal/burn, ambiguous assets,
+claimant limits, cancellation/late results, high-water rollback refusal and
+manual override/tombstone retention. No opt-in identity integration is enabled
+for these tests. Legacy resolver tests remain separate compatibility coverage.

@@ -2,13 +2,12 @@
 // Fan-out is capped and batched; each claimant is judged alone. Must not know registration, sponsorship or caching.
 import {
   getAddressEncoder,
-  getBase64Encoder,
   type Address,
   type Rpc,
   type SolanaRpcApi,
 } from '@solana/kit';
 
-import { COMMITMENT } from '@gyblos/config';
+import { COMMITMENT, FINALIZED_COMMITMENT } from '@gyblos/config';
 
 import {
   decodeAgentAccount,
@@ -34,6 +33,7 @@ import {
 import { IdentityError } from './errors.js';
 import { memcmpFilter } from './filters.js';
 import { findAgentAddress, findMetadataAddress } from './pda.js';
+import { decodeAccountBatch, decodeProgramAccounts } from './read-response.js';
 
 export interface NodeIdentity {
   asset: Address;
@@ -50,9 +50,17 @@ export interface NodeIdentity {
 export interface IdentityReadOptions {
   // Defaults to the configured Gyblos/8004 collection; COLLECTION_POLICY.ANY accepts any collection.
   collection?: Address | CollectionPolicy;
+  commitment?: typeof COMMITMENT | typeof FINALIZED_COMMITMENT;
+  signal?: AbortSignal;
+  // Optional absolute performance.now() deadline for bounded read composition.
+  deadline?: number;
 }
 
-type IdentityRpc = Rpc<SolanaRpcApi>;
+export type IdentityReadRpc = Pick<
+  Rpc<SolanaRpcApi>,
+  'getProgramAccounts' | 'getMultipleAccounts'
+>;
+type IdentityRpc = IdentityReadRpc;
 
 interface RawAccount {
   owner: Address;
@@ -71,8 +79,6 @@ interface BindingResult {
   bindingStatus: BindingStatus;
 }
 
-// Kit's base64 "encoder" turns RPC base64 text into bytes.
-const BASE64_TEXT_TO_BYTES = getBase64Encoder();
 const ADDRESS_ENCODER = getAddressEncoder();
 const MISSING_BINDING: BindingResult = {
   nodeId: undefined,
@@ -95,31 +101,28 @@ function chunked<T>(items: readonly T[], size: number): T[][] {
 async function fetchBatch(
   rpc: IdentityRpc,
   addresses: readonly Address[],
+  options: IdentityReadOptions,
 ): Promise<(RawAccount | undefined)[]> {
+  assertIdentityReadActive(options);
   const { value } = await rpc
     .getMultipleAccounts(addresses, {
       encoding: BASE64_ENCODING,
-      commitment: COMMITMENT,
+      commitment: options.commitment ?? COMMITMENT,
     })
-    .send();
-  return value.map((account) =>
-    account === null
-      ? undefined
-      : {
-          owner: account.owner,
-          data: new Uint8Array(BASE64_TEXT_TO_BYTES.encode(account.data[0])),
-        },
-  );
+    .send(options.signal ? { abortSignal: options.signal } : undefined);
+  assertIdentityReadActive(options);
+  return decodeAccountBatch(value, addresses.length);
 }
 
 // One getMultipleAccounts call per accountsPerRequest addresses, in order.
 async function fetchAccounts(
   rpc: IdentityRpc,
   addresses: readonly Address[],
+  options: IdentityReadOptions,
 ): Promise<(RawAccount | undefined)[]> {
   const batches = await Promise.all(
     chunked(addresses, READ_LIMITS.accountsPerRequest).map((batch) =>
-      fetchBatch(rpc, batch),
+      fetchBatch(rpc, batch, options),
     ),
   );
   return batches.flat();
@@ -282,7 +285,7 @@ export async function readClaimants(
   const assets = [...new Set(claimants)];
   assertClaimantCount(assets.length);
   const addresses = await Promise.all(assets.map(claimantAddresses));
-  const accounts = await fetchAccounts(rpc, addresses.flat());
+  const accounts = await fetchAccounts(rpc, addresses.flat(), options);
   return Promise.all(
     assets.map((asset, index) =>
       judgedAlone(asset, claimantAccounts(accounts, index), options),
@@ -295,7 +298,11 @@ async function readAsset(
   asset: Address,
   options: IdentityReadOptions,
 ): Promise<NodeIdentity | undefined> {
-  const accounts = await fetchAccounts(rpc, await claimantAddresses(asset));
+  const accounts = await fetchAccounts(
+    rpc,
+    await claimantAddresses(asset),
+    options,
+  );
   return identityFrom(asset, claimantAccounts(accounts, 0), options);
 }
 
@@ -316,23 +323,26 @@ export async function registryAssets(
   rpc: IdentityRpc,
   filters: ReturnType<typeof memcmpFilter>[],
   decode: (bytes: Uint8Array) => { asset: Address },
+  options: IdentityReadOptions = {},
 ): Promise<Address[]> {
-  const accounts = await rpc
+  assertIdentityReadActive(options);
+  const response = await rpc
     .getProgramAccounts(PROGRAMS.registry, {
       encoding: BASE64_ENCODING,
-      commitment: COMMITMENT,
+      commitment: options.commitment ?? COMMITMENT,
       filters,
     })
-    .send();
-  return accounts.flatMap((item) =>
-    assetOf(
-      new Uint8Array(BASE64_TEXT_TO_BYTES.encode(item.account.data[0])),
-      decode,
-    ),
-  );
+    .send(options.signal ? { abortSignal: options.signal } : undefined);
+  assertIdentityReadActive(options);
+  const accounts = decodeProgramAccounts(response);
+  return accounts.flatMap((item) => assetOf(item.data, decode));
 }
 
-function assetsOwnedBy(rpc: IdentityRpc, owner: Address): Promise<Address[]> {
+function assetsOwnedBy(
+  rpc: IdentityRpc,
+  owner: Address,
+  options: IdentityReadOptions,
+): Promise<Address[]> {
   const filters = [
     memcmpFilter(ACCOUNT_OFFSETS.discriminator, ACCOUNT_DISCRIMINATORS.agent),
     memcmpFilter(
@@ -340,7 +350,7 @@ function assetsOwnedBy(rpc: IdentityRpc, owner: Address): Promise<Address[]> {
       new Uint8Array(ADDRESS_ENCODER.encode(owner)),
     ),
   ];
-  return registryAssets(rpc, filters, decodeAgentAccount);
+  return registryAssets(rpc, filters, decodeAgentAccount, options);
 }
 
 // By asset, broken accounts throw a typed error; by owner, each asset is judged alone and more than
@@ -361,10 +371,19 @@ export async function readNodeIdentity(
   options: IdentityReadOptions = {},
 ): Promise<NodeIdentity | undefined | NodeIdentity[]> {
   if ('asset' in query) return readAsset(rpc, query.asset, options);
-  const assets = await assetsOwnedBy(rpc, query.owner);
+  const assets = await assetsOwnedBy(rpc, query.owner, options);
   const identities = await readClaimants(rpc, assets, options);
   // Cached owner may be stale; keep only assets whose Core owner really is the queried owner.
   return identities.filter(
     (identity): identity is NodeIdentity => identity?.owner === query.owner,
   );
+}
+
+export function assertIdentityReadActive(options: IdentityReadOptions) {
+  options.signal?.throwIfAborted();
+  if (options.deadline !== undefined && performance.now() >= options.deadline)
+    throw new IdentityError(
+      IDENTITY_ERROR_CODES.READ_TIMEOUT,
+      'Registry lookup deadline elapsed.',
+    );
 }
