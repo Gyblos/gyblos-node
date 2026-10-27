@@ -39,6 +39,13 @@ export async function prepareBuyerSelection(
 ): Promise<PreparedBuyerSelection | undefined> {
   const config = await loadBuyerSelectionConfig(environment);
   if (!config) return undefined;
+  return prepareConfiguredBuyerSelection(environment, config);
+}
+// Compose state from the validated startup snapshot; never reopen selection.json here.
+export async function prepareConfiguredBuyerSelection(
+  environment: HomeEnvironment,
+  config: BuyerSelectionConfig,
+): Promise<PreparedBuyerSelection> {
   const stats = await selectionStats(environment);
   const configured = new Set(config.sellers.map((seller) => seller.nodeId));
   for (const nodeId of stats.rows.keys())
