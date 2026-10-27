@@ -257,9 +257,23 @@ export const RECEIPT = {
   sellerRecordBytes: 2048,
   buyerRecordBytes: 1024,
 } as const;
-export const RECEIPT_OUTCOMES = { COMPLETED: 'completed', FAILED: 'failed', CANCELLED: 'cancelled' } as const;
-export type ReceiptOutcome = (typeof RECEIPT_OUTCOMES)[keyof typeof RECEIPT_OUTCOMES];
-export const RECEIPT_VERDICTS = { AGREED: 'agreed', DISPUTED: 'disputed' } as const;
-export type ReceiptVerdict = (typeof RECEIPT_VERDICTS)[keyof typeof RECEIPT_VERDICTS];
-export const RECEIPT_DISPUTE_FIELDS = { INPUT_TOKENS: 'inputTokens', OUTPUT_TOKENS: 'outputTokens', OUTPUT_BYTES: 'outputBytes' } as const;
-export type ReceiptDisputeField = (typeof RECEIPT_DISPUTE_FIELDS)[keyof typeof RECEIPT_DISPUTE_FIELDS];
+export const RECEIPT_OUTCOMES = {
+  COMPLETED: 'completed',
+  FAILED: 'failed',
+  CANCELLED: 'cancelled',
+} as const;
+export type ReceiptOutcome =
+  (typeof RECEIPT_OUTCOMES)[keyof typeof RECEIPT_OUTCOMES];
+export const RECEIPT_VERDICTS = {
+  AGREED: 'agreed',
+  DISPUTED: 'disputed',
+} as const;
+export type ReceiptVerdict =
+  (typeof RECEIPT_VERDICTS)[keyof typeof RECEIPT_VERDICTS];
+export const RECEIPT_DISPUTE_FIELDS = {
+  INPUT_TOKENS: 'inputTokens',
+  OUTPUT_TOKENS: 'outputTokens',
+  OUTPUT_BYTES: 'outputBytes',
+} as const;
+export type ReceiptDisputeField =
+  (typeof RECEIPT_DISPUTE_FIELDS)[keyof typeof RECEIPT_DISPUTE_FIELDS];

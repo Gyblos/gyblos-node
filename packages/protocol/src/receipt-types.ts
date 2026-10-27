@@ -1,8 +1,16 @@
 // Defines content-free usage attestations; identity policy and collection stay outside the wire port.
 import type {
-  ControlMeteringMode, EngineDoneReason, EngineKind, FreeExecutionCode,
-  FreeExecutionStopReason, OFFER_PRICING_KINDS, RECEIPT, ReceiptOutcome,
-  ReceiptVerdict, ReceiptDisputeField, ReasoningLevel,
+  ControlMeteringMode,
+  EngineDoneReason,
+  EngineKind,
+  FreeExecutionCode,
+  FreeExecutionStopReason,
+  OFFER_PRICING_KINDS,
+  ReasoningLevel,
+  RECEIPT,
+  ReceiptDisputeField,
+  ReceiptOutcome,
+  ReceiptVerdict,
 } from './constants';
 import type { ModelSelection, TokenPricesV2 } from './control-types';
 
@@ -29,12 +37,14 @@ export interface SellerReceiptV1 {
   engineKind: EngineKind;
   metering: ControlMeteringMode;
   streaming: boolean;
-  pricing: { kind: typeof OFFER_PRICING_KINDS.FREE } | {
-    kind: typeof OFFER_PRICING_KINDS.PAID;
-    prices: TokenPricesV2;
-    network: string;
-    asset: string;
-  };
+  pricing:
+    | { kind: typeof OFFER_PRICING_KINDS.FREE }
+    | {
+        kind: typeof OFFER_PRICING_KINDS.PAID;
+        prices: TokenPricesV2;
+        network: string;
+        asset: string;
+      };
   amountAtomic: string;
   feeAtomic: string;
   usage: ReceiptUsage;
@@ -61,7 +71,10 @@ export interface BuyerReceiptV1 {
   verdict: ReceiptVerdict;
   disputed: ReceiptDisputeField[];
 }
-export interface SignedReceipt<T> { record: T; signature: string }
+export interface SignedReceipt<T> {
+  record: T;
+  signature: string;
+}
 export interface ReceiptV1 {
   seller: SignedReceipt<SellerReceiptV1>;
   buyer?: SignedReceipt<BuyerReceiptV1>;
