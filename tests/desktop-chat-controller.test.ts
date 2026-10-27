@@ -187,8 +187,8 @@ void test('offline stops existing runs without dropping drafts or silently resum
   assert.equal(clock.pending, 0);
 });
 for (const [status, expected] of [
-  [DEMO_AUTH.BALANCE, /demo credits.*free model/i],
-  [DEMO_AUTH.LIMIT, /demo.*limit.*free model/i],
+  [DEMO_AUTH.BALANCE, /balance.*free model/i],
+  [DEMO_AUTH.LIMIT, /daily.*limit.*free model/i],
   [DEMO_AUTH.OFFLINE, /connection.*paused.*draft/i],
 ] as const) {
   void test(`a blocked ${status} send stays in its chat, retains the draft and explains the reason`, () => {
