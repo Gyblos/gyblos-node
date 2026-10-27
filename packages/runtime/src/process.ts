@@ -6,6 +6,7 @@ import {
   type SpawnOptions,
 } from 'node:child_process';
 import { once } from 'node:events';
+import { write } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 import { RETRIES, TIMEOUTS } from '@gyblos/config';
@@ -28,10 +29,16 @@ export function onShutdown(handler: () => void) {
   };
 }
 
+// Descriptor writes report failures through a callback rather than emitting Writable errors.
+// Reporting is best-effort and must not interrupt state cleanup.
+function writeShutdownNotice(text: string) {
+  write(process.stderr.fd, text, () => undefined);
+}
+
 // Resolves `signalled` on the first SIGINT/SIGTERM and keeps a listener installed until `dispose()`, so
 // a repeated Ctrl-C while the caller stops prints a notice instead of killing the process mid-write.
 export function shutdownSignal(
-  notice: (text: string) => void = (text) => process.stderr.write(text),
+  notice: (text: string) => void = writeShutdownNotice,
 ) {
   let resolve: () => void = () => {};
   const signalled = new Promise<void>((done) => {
@@ -41,10 +48,15 @@ export function shutdownSignal(
   const handler = () => {
     received++;
     if (received === 1) resolve();
-    else if (received === 2)
-      notice(
-        'Stopping: finishing state writes and withdrawing; please wait (Ctrl-C again is ignored).\n',
-      );
+    else if (received === 2) {
+      try {
+        notice(
+          'Stopping: finishing state writes and withdrawing; please wait (Ctrl-C again is ignored).\n',
+        );
+      } catch {
+        // A custom notice or invalid descriptor must never abort the protected stop.
+      }
+    }
   };
   process.on('SIGINT', handler);
   process.on('SIGTERM', handler);

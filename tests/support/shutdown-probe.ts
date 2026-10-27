@@ -21,16 +21,32 @@ export interface ShutdownProbeOptions {
   rejectStop?: boolean;
 }
 function childSource(options: ShutdownProbeOptions) {
-  const stop = `async function stop(){process.stdout.write('stopping\\n');await new Promise(resolve=>setTimeout(resolve,600));if(${Boolean(options.rejectStop)})throw new Error('Synthetic stop failure');}`;
+  const stop = `
+    async function stop() {
+      process.stdout.write('stopping\\n');
+      await new Promise(resolve => setTimeout(resolve, 600));
+      if (${Boolean(options.rejectStop)}) throw new Error('Synthetic stop failure');
+    }
+  `;
   const host =
     options.entry === SHUTDOWN_PROBE_ENTRIES.SELLER
-      ? `${stop} export function createNode(){return {start:async()=>{},stop};}`
-      : `${stop} export class FreeBuyerStartupError extends Error{} export async function startFreeBuyer(){return {close:stop};}`;
+      ? `${stop} export function createNode() { return { start: async () => {}, stop }; }`
+      : `${stop} export class FreeBuyerStartupError extends Error {}
+       export async function startFreeBuyer() { return { close: stop }; }`;
   const hostUrl = 'data:text/javascript,' + encodeURIComponent(host);
   const relaysUrl =
     'data:text/javascript,' +
     encodeURIComponent('export class RelayConfigurationError extends Error {}');
-  const resolver = `export function resolve(specifier,context,next){if(specifier==='@gyblos/node'||(specifier==='./free-startup.js'&&context.parentURL?.endsWith('/apps/buyer/src/free-main.ts')))return {url:${JSON.stringify(hostUrl)},shortCircuit:true};if(specifier==='@gyblos/transport-iroh/relays')return {url:${JSON.stringify(relaysUrl)},shortCircuit:true};return next(specifier,context);}`;
+  const resolver = `
+    export function resolve(specifier, context, next) {
+      if (specifier === '@gyblos/node' ||
+          (specifier === './free-startup.js' && context.parentURL?.endsWith('/apps/buyer/src/free-main.ts')))
+        return { url: ${JSON.stringify(hostUrl)}, shortCircuit: true };
+      if (specifier === '@gyblos/transport-iroh/relays')
+        return { url: ${JSON.stringify(relaysUrl)}, shortCircuit: true };
+      return next(specifier, context);
+    }
+  `;
   const resolverUrl = 'data:text/javascript,' + encodeURIComponent(resolver);
   const entry =
     options.entry === SHUTDOWN_PROBE_ENTRIES.SELLER
@@ -38,10 +54,39 @@ function childSource(options: ShutdownProbeOptions) {
       : '@gyblos/buyer/free-main';
   const invoke =
     options.entry === SHUTDOWN_PROBE_ENTRIES.HELPER
-      ? `${stop} const {shutdownSignal}=await import('@gyblos/runtime'); const shutdown=shutdownSignal(${options.throwingNotice ? "()=>{throw new Error('Synthetic notice failure')}" : 'undefined'}); const task=(async()=>{try{await shutdown.signalled;await stop();}finally{shutdown.dispose();}})();`
-      : `const {register}=await import('node:module');register(${JSON.stringify(resolverUrl)});const {main}=await import(${JSON.stringify(entry)});const task=main();`;
-  return `const signals=['SIGINT','SIGTERM'];const before=signals.map(signal=>process.listenerCount(signal));const alive=setInterval(()=>{},1000);let rejected=false;${invoke} const settled=task.catch(()=>{rejected=true;process.exitCode=1;});while(process.listenerCount('SIGINT')===before[0])await new Promise(resolve=>setImmediate(resolve));process.stdout.write('ready\\n');try{await settled;process.stdout.write(JSON.stringify({completed:true,rejected,listeners:signals.map(signal=>process.listenerCount(signal)-before[signals.indexOf(signal)])})+'\\n');}finally{clearInterval(alive);}`;
+      ? `
+      ${stop}
+      const { shutdownSignal } = await import('@gyblos/runtime');
+      const shutdown = shutdownSignal(${options.throwingNotice ? "() => { throw new Error('Synthetic notice failure'); }" : 'undefined'});
+      const task = (async () => {
+        try { await shutdown.signalled; await stop(); }
+        finally { shutdown.dispose(); }
+      })();
+    `
+      : `
+      const { register } = await import('node:module');
+      register(${JSON.stringify(resolverUrl)});
+      const { main } = await import(${JSON.stringify(entry)});
+      const task = main();
+    `;
+  return `
+    const signals = ['SIGINT', 'SIGTERM'];
+    const before = signals.map(signal => process.listenerCount(signal));
+    const alive = setInterval(() => {}, 1000);
+    let rejected = false;
+    ${invoke}
+    const settled = task.catch(() => { rejected = true; process.exitCode = 1; });
+    while (process.listenerCount('SIGINT') === before[0])
+      await new Promise(resolve => setImmediate(resolve));
+    process.stdout.write('ready\\n');
+    try {
+      await settled;
+      const listeners = signals.map((signal, index) => process.listenerCount(signal) - before[index]);
+      process.stdout.write(JSON.stringify({ completed: true, rejected, listeners }) + '\\n');
+    } finally { clearInterval(alive); }
+  `;
 }
+
 export async function shutdownProbe(options: ShutdownProbeOptions) {
   const directory = await mkdtemp(join(tmpdir(), 'gyblos-shutdown-probe-'));
   const child = spawn(
