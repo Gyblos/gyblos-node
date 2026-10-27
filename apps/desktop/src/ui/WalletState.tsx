@@ -10,10 +10,7 @@ import {
   type ReactNode,
 } from 'react';
 
-import {
-  BACKUP_RESULT,
-  type BackupResult,
-} from '../wallet/backup-flow-model';
+import { BACKUP_RESULT, type BackupResult } from '../wallet/backup-flow-model';
 import { WALLET_STATUS, type WalletSummary } from '../wallet/model';
 import {
   parseWalletCollection,

@@ -7,10 +7,7 @@ import { checkWalletRoot, isMissing } from './files';
 import { createWalletLibrary, WalletLibraryError } from './library';
 import type { WalletProtection } from './protection';
 import { createWalletService } from './service';
-import {
-  unavailableCollection,
-  type WalletCollection,
-} from './settings-model';
+import { unavailableCollection, type WalletCollection } from './settings-model';
 
 export async function readWalletCollection(
   root: string,

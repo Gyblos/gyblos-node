@@ -1,8 +1,8 @@
 // Coordinates automatic preparation and mutually exclusive Settings operations.
 // Native dialogs and all keys stay in the host; only public status crosses IPC.
 import { readBackupFile } from './backup-files';
-import { BACKUP_RESULT, type BackupResult } from './backup-flow-model';
 import type { BackupDialogs } from './backup-flow';
+import { BACKUP_RESULT, type BackupResult } from './backup-flow-model';
 import { WALLET_LIBRARY_ERROR, WALLET_STATUS } from './constants';
 import { copyPublicWalletAddress } from './copy-address';
 import { createWalletLibrary, WalletLibraryError } from './library';

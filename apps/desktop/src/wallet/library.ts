@@ -13,10 +13,7 @@ import {
   WALLET_STATUS,
 } from './constants';
 import { checkWalletRoot, syncWalletDirectory } from './files';
-import {
-  checkLibraryCancellation,
-  WalletLibraryError,
-} from './library-error';
+import { checkLibraryCancellation, WalletLibraryError } from './library-error';
 import {
   libraryAddresses,
   libraryExists,

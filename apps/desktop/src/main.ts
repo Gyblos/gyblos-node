@@ -15,10 +15,7 @@ import { startupHandoff } from './startup-window';
 import { BRAND_COLORS } from './theme';
 import { WALLET } from './wallet/constants';
 import { registerDesktopWallet } from './wallet/host';
-import {
-  focusExistingWindow,
-  prepareWalletProfile,
-} from './wallet/lifecycle';
+import { focusExistingWindow, prepareWalletProfile } from './wallet/lifecycle';
 
 function createProbeWindow(startup = false) {
   const window = new BrowserWindow({

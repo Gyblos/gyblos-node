@@ -6,11 +6,7 @@ import {
   WALLET_SETTINGS_RESULT,
   WALLET_STATUS,
 } from './constants';
-import {
-  parseWalletSummary,
-  walletSummary,
-  type WalletSummary,
-} from './model';
+import { parseWalletSummary, walletSummary, type WalletSummary } from './model';
 import { validSetupPassword } from './setup-model';
 
 export {
