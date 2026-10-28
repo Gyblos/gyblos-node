@@ -159,7 +159,7 @@ void test('offers the daemon cannot serve fail closed with a static code', () =>
       sellerSettings(
         served({
           pricing: FREE,
-          engine: '{ kind = "ollama", url = "http://127.0.0.1:11434" }',
+          engine: '{ kind = "ollama", url = "http://localhost:11434" }',
         }),
         {},
       ),
@@ -304,3 +304,74 @@ async function rejectsAsync(code: string, run: () => Promise<unknown>) {
     (error) => error instanceof NodeError && error.code === code,
   );
 }
+
+void test('an ollama offer may use any literal loopback URL; names, paths and keys are refused', () => {
+  const engineOf = (url: string, extra = '') =>
+    served({
+      pricing: FREE,
+      engine: `{ kind = "ollama", url = "${url}"${extra} }`,
+    });
+  for (const url of [
+    'http://127.0.0.1:11434/',
+    'http://127.0.0.1:11434',
+    'http://[::1]:11434/',
+  ])
+    assert.equal(sellerSettings(engineOf(url), {}).engineOffer.engine.url, url);
+  for (const url of [
+    'http://localhost:11434/',
+    'http://host.docker.internal:11434/',
+    'http://127.0.0.1:11434/ollama',
+  ])
+    rejects(
+      NODE_ERROR_CODES.SELLER_OFFER_ENGINE_UNSUPPORTED,
+      () => sellerSettings(engineOf(url), {}),
+      0,
+    );
+  rejects(
+    NODE_ERROR_CODES.SELLER_OFFER_ENGINE_UNSUPPORTED,
+    () =>
+      sellerSettings(
+        engineOf('http://127.0.0.1:11434/', ', api_key_env = "OLLAMA_KEY"'),
+        {},
+      ),
+    0,
+  );
+  rejects(
+    NODE_ERROR_CODES.SELLER_OFFER_ENGINE_UNSUPPORTED,
+    () =>
+      sellerSettings(
+        served({
+          pricing: FREE,
+          engine: '{ kind = "openai", url = "https://api.example.com" }',
+        }),
+        {},
+      ),
+    0,
+  );
+  rejects(
+    NODE_ERROR_CODES.SELLER_OFFER_MODEL_UNSUPPORTED,
+    () =>
+      sellerSettings(
+        served({
+          model: 'gpt-oss-20b',
+          pricing: FREE,
+          engine: '{ kind = "ollama", url = "http://127.0.0.1:11434/" }',
+        }),
+        {},
+      ),
+    0,
+  );
+  rejects(
+    NODE_ERROR_CODES.SELLER_OFFER_REASONING_UNSUPPORTED,
+    () =>
+      sellerSettings(
+        served({
+          pricing: FREE,
+          engine: '{ kind = "ollama", url = "http://127.0.0.1:11434/" }',
+          extra: 'reasoning = ["high"]',
+        }),
+        {},
+      ),
+    0,
+  );
+});

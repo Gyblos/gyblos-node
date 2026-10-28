@@ -1,6 +1,7 @@
 // Owns the `gyblos doctor` contract for the seller: read-only checks with static codes, the public
 // NodeId/owner summary, exit codes 0/1 and no secret, home path or RPC path in any output.
-// Offline; synthetic role files in a temporary home, injected port, tokenizer and program probes.
+// Offline; synthetic role files in a temporary home, an injected tokenizer probe and a synthetic Ollama
+// on an ephemeral loopback port.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { chmod, mkdir, rm, unlink, writeFile } from 'node:fs/promises';
@@ -12,11 +13,11 @@ import { runCli } from '@gyblos/node-app/cli';
 
 import {
   doctor,
-  FREE_TOML,
+  freeToml,
   KEY_FILES,
   line,
   NODE_ID,
-  PAID_TOML,
+  paidToml,
   scenario,
   snapshot,
   withOllama,
@@ -26,7 +27,7 @@ import { FAKE_SECRET, REPOSITORY_ROOT } from './support/node-config-fixtures';
 void test('doctor: a ready free seller exits 0, prints its public identity and changes nothing', () =>
   scenario({}, async (run) => {
     await withOllama(run);
-    await writeFile(join(run.root, 'gyblos.toml'), FREE_TOML);
+    await writeFile(join(run.root, 'gyblos.toml'), freeToml(run));
     const before = await snapshot(run.root);
     const result = await doctor(run);
     assert.deepEqual(await snapshot(run.root), before);
@@ -39,9 +40,7 @@ void test('doctor: a ready free seller exits 0, prints its public identity and c
       'keys',
       'sequence',
       'tokenizer',
-      'ollama',
-      'model',
-      'ports',
+      'engine',
       'relays',
     ])
       assert.match(line(result.output, check), /^\s*OK\s/, check);
@@ -61,7 +60,7 @@ void test('doctor: prints the [limits] the seller will serve with', () =>
     await withOllama(run);
     await writeFile(
       join(run.root, 'gyblos.toml'),
-      `${FREE_TOML}\n[limits]\nrequests_per_minute = 60\nglobal_requests_per_minute = 512\n`,
+      `${freeToml(run)}\n[limits]\nrequests_per_minute = 60\nglobal_requests_per_minute = 512\n`,
     );
     const result = await doctor(run);
     assert.equal(result.code, 0, result.output);
@@ -69,7 +68,7 @@ void test('doctor: prints the [limits] the seller will serve with', () =>
     assert.match(result.output, /requests\s+60\/min per buyer, 512\/min total/);
     await writeFile(
       join(run.root, 'gyblos.toml'),
-      `${FREE_TOML}\n[limits]\nrequests_per_minute = 60\n`,
+      `${freeToml(run)}\n[limits]\nrequests_per_minute = 60\n`,
     );
     const invalid = await doctor(run);
     assert.equal(invalid.code, 1);
@@ -115,11 +114,11 @@ void test('doctor: key files must be private regular files; free sellers need on
     // The paid authorizer and facilitator keys are never needed.
     await unlink(join(run.seller, 'facilitator.json'));
     await unlink(join(run.seller, 'authorizer.json'));
-    for (const toml of [FREE_TOML, PAID_TOML]) {
+    for (const toml of [freeToml(run), paidToml(run)]) {
       await writeFile(join(run.root, 'gyblos.toml'), toml);
       assert.match(line((await doctor(run)).output, 'keys'), /OK\s+keys/);
     }
-    await writeFile(join(run.root, 'gyblos.toml'), FREE_TOML);
+    await writeFile(join(run.root, 'gyblos.toml'), freeToml(run));
     const free = await doctor(run);
     assert.match(line(free.output, 'keys'), /OK\s+keys/);
     await unlink(join(run.seller, 'node.key'));
@@ -165,7 +164,7 @@ void test('doctor: an unsafe seller directory or leftover sequence lock is repor
 void test('doctor: config the daemon cannot honor reports the same startup code and file issues', () =>
   scenario({}, async (run) => {
     await withOllama(run);
-    await writeFile(join(run.root, 'gyblos.toml'), PAID_TOML);
+    await writeFile(join(run.root, 'gyblos.toml'), paidToml(run));
     const paid = await doctor(run);
     assert.equal(paid.code, 1);
     assert.match(
@@ -195,7 +194,7 @@ void test('doctor: config the daemon cannot honor reports the same startup code 
     );
     await writeFile(
       join(run.root, 'gyblos.toml'),
-      `${FREE_TOML}[discovery]\npublish = true\nurl = "https://discovery.example.com/v1/${FAKE_SECRET}"\n`,
+      `${freeToml(run)}[discovery]\npublish = true\nurl = "https://discovery.example.com/v1/${FAKE_SECRET}"\n`,
     );
     const published = await doctor(run);
     assert.match(
@@ -207,7 +206,7 @@ void test('doctor: config the daemon cannot honor reports the same startup code 
 void test('doctor: a missing or malformed relay token fails without echoing it', () =>
   scenario({}, async (run) => {
     await withOllama(run);
-    await writeFile(join(run.root, 'gyblos.toml'), FREE_TOML);
+    await writeFile(join(run.root, 'gyblos.toml'), freeToml(run));
     const missing = await doctor(run, [], { GYBLOS_RELAY_TOKEN: '' });
     assert.match(
       line(missing.output, 'relays'),
@@ -222,57 +221,37 @@ void test('doctor: a missing or malformed relay token fails without echoing it',
     );
   }));
 
-void test('doctor: engine checks fail without ollama, tokenizer or model, and on a busy port', () =>
+void test('doctor: a stopped engine at the offer URL fails with the engine code; no tokenizer fails too', () =>
   scenario({}, async (run) => {
-    const nothing = await doctor(
-      run,
-      [],
-      {},
-      { portFree: async () => false, tokenizer: undefined },
+    await writeFile(join(run.root, 'gyblos.toml'), freeToml(run));
+    const stopped = await doctor(run, [], {}, { tokenizer: undefined });
+    assert.equal(stopped.code, 1);
+    assert.match(
+      line(stopped.output, 'engine'),
+      /FAIL\s+engine\s+ENGINE_UNAVAILABLE\s+\[\[offers\]\] entry 1: start Ollama at the offer URL/,
     );
     assert.match(
-      line(nothing.output, 'ollama'),
-      /FAIL\s+ollama\s+OLLAMA_NOT_FOUND/,
-    );
-    assert.match(
-      line(nothing.output, 'model'),
-      /FAIL\s+model\s+MODEL_NOT_DOWNLOADED/,
-    );
-    assert.match(line(nothing.output, 'ports'), /FAIL\s+ports\s+PORT_IN_USE/);
-    assert.match(
-      line(nothing.output, 'tokenizer'),
+      line(stopped.output, 'tokenizer'),
       /FAIL\s+tokenizer\s+TOKENIZER_UNAVAILABLE/,
     );
-    assert.match(nothing.output, /pnpm gate:inference:setup/);
-    // Present but not executable, or a directory: neither is runnable.
-    await writeFile(join(run.bin, 'ollama'), '');
-    await chmod(join(run.bin, 'ollama'), 0o644);
-    const plain = await doctor(run);
-    assert.match(
-      line(plain.output, 'ollama'),
-      /FAIL\s+ollama\s+OLLAMA_NOT_FOUND/,
-    );
-    await rm(join(run.bin, 'ollama'));
-    await mkdir(join(run.bin, 'ollama'), { mode: 0o755 });
-    const folder = await doctor(run);
-    assert.match(
-      line(folder.output, 'ollama'),
-      /FAIL\s+ollama\s+OLLAMA_NOT_FOUND/,
-    );
+    assert.match(stopped.output, /pnpm gate:inference:setup/);
+    // The engine is checked by describing it only: the model list, never a generation.
+    const ollama = await withOllama(run);
+    await writeFile(join(run.root, 'gyblos.toml'), freeToml(run));
+    const ready = await doctor(run);
+    assert.match(line(ready.output, 'engine'), /^\s*OK\s+engine/);
+    assert.deepEqual([...new Set(ollama.paths)], ['/api/tags']);
   }));
 
-void test('doctor: probes only the engine port, whatever the offer, and takes no --online', () =>
+void test('doctor: an offer the daemon refuses leaves the engine unchecked, and doctor takes no --online', () =>
   scenario({}, async (run) => {
-    await withOllama(run);
-    for (const toml of [FREE_TOML, PAID_TOML]) {
-      await writeFile(join(run.root, 'gyblos.toml'), toml);
-      const result = await doctor(run);
-      assert.deepEqual(
-        result.probed.map((url) => new URL(url).port),
-        ['11436'],
-      );
-      assert.doesNotMatch(result.output, /program/);
-    }
+    const ollama = await withOllama(run);
+    await writeFile(join(run.root, 'gyblos.toml'), paidToml(run));
+    const paid = await doctor(run);
+    assert.match(line(paid.output, 'engine'), /WARN\s+engine\s+NOT_CHECKED/);
+    assert.deepEqual(ollama.paths, []);
+    for (const removed of ['ollama', 'model', 'ports'])
+      assert.equal(line(paid.output, removed), '', removed);
     const online = await doctor(run, ['--online']);
     assert.equal(online.code, 1);
     assert.match(online.output, /Usage:/);

@@ -1,5 +1,5 @@
 // Synthetic seller homes for the `gyblos doctor` tests: generated public addresses, empty fake key files
-// with chosen modes, a fake `ollama` and model manifest, and a runner that asserts no secret is printed.
+// with chosen modes, an optional synthetic Ollama on loopback, and a runner that asserts no secret is printed.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import {
@@ -20,6 +20,7 @@ import { generateKeyPairSigner } from '@solana/kit';
 import { CONFIG_ASSET_LABELS } from '@gyblos/config/constants';
 import { runCli, type CliContext } from '@gyblos/node-app/cli';
 
+import { startFakeOllama } from './fake-ollama';
 import { FAKE_SECRET } from './node-config-fixtures';
 
 export const NODE_ID = 'ab'.repeat(32);
@@ -31,14 +32,18 @@ export const KEY_FILES = [
   'facilitator.json',
   'node.key',
 ];
-const MANAGED = '{ kind = "ollama", url = "http://127.0.0.1:11436" }';
-export const FREE_TOML = `version = 1\n[node]\nnetwork = "devnet"\n[[offers]]\nmodel = "qwen3:0.6b"\nreasoning = ["off"]\nengine = ${MANAGED}\nfree = { daily_token_cap = 20000, per_buyer_cap = 2000 }\n`;
-export const PAID_TOML = FREE_TOML.replace(
-  'free = { daily_token_cap = 20000, per_buyer_cap = 2000 }',
-  'price = { input_per_mtok = "1", output_per_mtok = "2", currency = "USDC" }',
-);
+// Nothing listens on the discard port, so an offer here has a stopped engine.
+const STOPPED_ENGINE = 'http://127.0.0.1:9';
+const FREE = 'free = { daily_token_cap = 20000, per_buyer_cap = 2000 }';
+// The fixture's free offer at its engine URL: the synthetic Ollama once withOllama ran.
+export const freeToml = (run: Fixture) =>
+  `version = 1\n[node]\nnetwork = "devnet"\n[[offers]]\nmodel = "qwen3:0.6b"\nreasoning = ["off"]\nengine = { kind = "ollama", url = "${run.engineUrl}" }\n${FREE}\n`;
+export const paidToml = (run: Fixture) =>
+  freeToml(run).replace(
+    FREE,
+    'price = { input_per_mtok = "1", output_per_mtok = "2", currency = "USDC" }',
+  );
 const ALL_OK = {
-  portFree: async () => true,
   tokenizer: async () => undefined,
 } satisfies NonNullable<CliContext['doctor']>;
 
@@ -48,6 +53,8 @@ export interface Fixture {
   seller: string;
   bin: string;
   owner: string;
+  engineUrl: string;
+  cleanup: (() => Promise<void>)[];
 }
 
 export async function fixture(
@@ -92,24 +99,23 @@ export async function fixture(
       await chmod(join(seller, name), options.keyMode ?? 0o600);
     }
   }
-  return { root, home, seller, bin, owner: owner! };
+  return {
+    root,
+    home,
+    seller,
+    bin,
+    owner: owner!,
+    engineUrl: STOPPED_ENGINE,
+    cleanup: [],
+  };
 }
 
+// Serves the pinned model on an ephemeral loopback port and points the fixture's offers at it.
 export async function withOllama(fixture: Fixture) {
-  const binary = join(fixture.bin, 'ollama');
-  await writeFile(binary, '#!/bin/sh\nexit 0\n');
-  await chmod(binary, 0o755);
-  const manifest = join(
-    fixture.home,
-    'artifacts',
-    'ollama-models',
-    'manifests',
-    'registry.ollama.ai',
-    'library',
-    'qwen3',
-  );
-  await mkdir(manifest, { recursive: true });
-  await writeFile(join(manifest, '0.6b'), '{}');
+  const ollama = await startFakeOllama();
+  fixture.engineUrl = ollama.url;
+  fixture.cleanup.push(ollama.close);
+  return ollama;
 }
 
 // Path, mode and content of every entry: doctor must not change any of them.
@@ -142,7 +148,6 @@ export async function doctor(
 ) {
   let stdout = '';
   let stderr = '';
-  const probed: string[] = [];
   const code = await runCli(['doctor', ...args], {
     env: {
       GYBLOS_HOME: fixture.home,
@@ -157,20 +162,13 @@ export async function doctor(
     stderr: (text) => {
       stderr += text;
     },
-    doctor: {
-      ...ALL_OK,
-      portFree: async (url) => {
-        probed.push(url);
-        return true;
-      },
-      ...probes,
-    },
+    doctor: { ...ALL_OK, ...probes },
   });
   const output = stdout + stderr;
   // No secret, home location or RPC path in any output.
   assert.equal(output.includes('FAKE0SECRET'), false, output);
   assert.equal(output.includes(fixture.home), false, output);
-  return { code, output, probed };
+  return { code, output };
 }
 
 export const line = (output: string, check: string) =>
@@ -185,6 +183,7 @@ export async function scenario(
   try {
     await use(run);
   } finally {
+    for (const close of run.cleanup) await close();
     await rm(run.root, { recursive: true, force: true });
   }
 }
