@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { app, BrowserWindow, ipcMain } from 'electron';
 
 import { DESKTOP, PROBE_STATUS, STARTUP_WINDOW } from './constants';
+import { registerDesktopNode } from './node-host';
 import { probeInUtility } from './probe-host';
 import { failedProbe, type ProbeResult } from './probe-model';
 import { cleanupDesktopSession } from './session-cleanup';
@@ -124,6 +125,7 @@ async function main() {
     smoke,
     controller.signal,
   );
+  if (!smoke) registerDesktopNode(window, __dirname, controller.signal);
   app.on('second-instance', () => {
     focusExistingWindow(loading && !loading.isDestroyed() ? loading : window);
   });

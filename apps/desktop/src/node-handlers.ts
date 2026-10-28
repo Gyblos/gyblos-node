@@ -15,13 +15,24 @@ interface NodeSender {
   senderFrame: unknown;
 }
 export function createNodeHandlers(
-  _session: NodeSession | null,
-  _window: NodeWindow,
+  session: NodeSession | null,
+  window: NodeWindow,
 ) {
+  const accepts = (event: NodeSender, args: readonly unknown[]) =>
+    session !== null &&
+    !window.destroyed() &&
+    args.length === 0 &&
+    event.sender === window.contents &&
+    event.senderFrame === window.mainFrame();
   return {
-    summary: (_event: NodeSender, _args: readonly unknown[]): LocalNodeState =>
-      LOCAL_NODE_STATE.ERROR,
-    retry: (_event: NodeSender, _args: readonly unknown[]): LocalNodeState =>
-      LOCAL_NODE_STATE.ERROR,
+    summary: (event: NodeSender, args: readonly unknown[]): LocalNodeState =>
+      accepts(event, args) && session
+        ? session.summary()
+        : LOCAL_NODE_STATE.ERROR,
+    retry: (event: NodeSender, args: readonly unknown[]): LocalNodeState => {
+      if (!accepts(event, args) || !session) return LOCAL_NODE_STATE.ERROR;
+      session.start();
+      return session.summary();
+    },
   };
 }

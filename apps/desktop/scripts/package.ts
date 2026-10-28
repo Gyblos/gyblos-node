@@ -12,7 +12,13 @@ const require = createRequire(import.meta.url);
 const stage = resolve('dist/stage');
 await rm(stage, { recursive: true, force: true });
 await mkdir(stage, { recursive: true });
-for (const file of ['main.cjs', 'preload.cjs', 'worker.cjs', 'renderer'])
+for (const file of [
+  'main.cjs',
+  'preload.cjs',
+  'worker.cjs',
+  'node-worker.cjs',
+  'renderer',
+])
   await cp(join('dist', file), join(stage, file), { recursive: true });
 const manifest: { version: string; devDependencies: { electron: string } } =
   JSON.parse(await readFile('package.json', 'utf8'));

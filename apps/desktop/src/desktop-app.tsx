@@ -60,7 +60,7 @@ import {
   SLIDE_DIRECTION,
   SLIDE_SURFACE,
 } from './ui/Motion';
-import { NetworkStatus, usePreviewNetwork } from './ui/NetworkStatus';
+import { NetworkStatus, useLocalNode } from './ui/NetworkStatus';
 import { ResizeHandle } from './ui/ResizeHandle';
 import { SidebarIcon, type SidebarSection } from './ui/SidebarIcon';
 import type { ToolId } from './ui/tools';
@@ -137,9 +137,10 @@ export function DesktopApp() {
     '--navigation-width': navigationWidth + 'px',
     ...themeStyle(light),
   };
-  const network = usePreviewNetwork();
+  const network = useLocalNode();
   const wallet = useDesktopWallet();
-  const online = network.online;
+  // Chat and Connect remain simulated independently of local endpoint readiness.
+  const online = true;
   const [model, setModel] = useState(MODELS[0]);
   const [credits, setCredits] = useState(0);
   const [spent, setSpent] = useState(0);
@@ -616,7 +617,7 @@ export function DesktopApp() {
         </div>
       </div>
       <footer className="app-footer" aria-label="Application status">
-        <NetworkStatus state={network.state} onToggle={network.toggle} />
+        <NetworkStatus state={network.state} onRetry={network.retry} />
         <Button
           title="Wallet settings"
           onClick={() => navigate(UI_VIEW.SETTINGS)}

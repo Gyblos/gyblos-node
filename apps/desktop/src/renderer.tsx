@@ -1,5 +1,5 @@
 // Mounts either the simulated buyer UI or the existing isolated compatibility smoke.
-// The normal Chat/Connect flow never invokes the native probe or any product service.
+// Chat/Connect remain simulated; the host owns a separate local-only Iroh endpoint.
 import { createRoot } from 'react-dom/client';
 
 import { CompatibilityView } from './compatibility-view';

@@ -13,8 +13,8 @@ remain simulated.
 Chat responses stream synthetic text independently per conversation. New chats,
 history selection and switching Chat/Connect leave other responses running and
 preserve separate drafts. Stop affects only the visible conversation and keeps
-its generated prefix; pausing the simulated connection stops every response
-without clearing drafts. Blocked sends explain missing credits or a daily limit
+its generated prefix. Local-node availability does not authorize inference or
+stop synthetic responses. Blocked sends explain missing credits or a daily limit
 inside the chat instead of opening wallet settings. Choosing a free model clears
 only the corresponding paid-model block. All conversations, drafts, theme
 choices and connection budgets are in memory and clear when the app closes. They
@@ -23,11 +23,12 @@ are not saved to the product home.
 The five sample models, prices, free labels and connection budgets are
 illustrative, not live availability, payment authorization or enforced tool
 spending limits. The chat daily-limit check uses demo credits only. The footer
-shows the local connection state, wallet backup reminder and app version; its
-presentation does not establish a live network connection. The visible 0.0
-balance is a placeholder, not a queried or funded balance. Preview credits are
-not the personal wallet balance. No inference, web tool, gateway, existing node
-configuration or remote network is used by this UI.
+shows actual local-node state, wallet backup reminder and app version. “Node
+ready” means the local Iroh endpoint is bound, not that providers or the public
+network are reachable. The visible 0.0 balance is a placeholder, not a queried
+or funded balance. Preview credits are not the personal wallet balance. No
+inference, web tool, gateway, existing node configuration or remote network is
+used by this UI.
 
 ## Navigation and wallet settings
 
@@ -146,6 +147,15 @@ pnpm desktop:start
 
 The app creates fresh temporary Chromium session data and retains renderer
 isolation and network denial. Normal Chat does not invoke inference services.
+The normal host also starts a resident utility process with the existing
+loopback-only Iroh binder and `@gyblos/node/lifecycle`. It uses an ephemeral
+identity, no relays/discovery, and no operational configuration or wallet. The
+footer reads fixed sanitized host states; readiness requires worker
+acknowledgement, errors permit a single-process retry, and quit waits for
+process exit. Startup and stop deadlines request termination; a forced exit is
+never a clean stop. There is no hard exit bound if the OS refuses process
+termination.
+
 The separate `--smoke` mode mounts the compatibility view and its one fixed IPC
 operation. A utility process imports the pinned Iroh binding and
 `@gyblos/node/lifecycle`, performs two synthetic loopback echo cycles, closes

@@ -32,3 +32,20 @@ export const STARTUP_WINDOW = {
   BARS: 20,
   SETUP_HEIGHT: 420,
 } as const;
+
+export const LOCAL_NODE_STATE = {
+  STARTING: 'starting',
+  READY: 'ready',
+  STOPPING: 'stopping',
+  STOPPED: 'stopped',
+  ERROR: 'error',
+} as const;
+export const LOCAL_NODE = {
+  STATUS_CHANNEL: 'desktop:node-status',
+  RETRY_CHANNEL: 'desktop:node-retry',
+  READY: 'node:ready',
+  STOP: 'node:stop',
+  START_TIMEOUT_MS: 15000,
+  STOP_TIMEOUT_MS: 5000,
+  POLL_MS: 600,
+} as const;

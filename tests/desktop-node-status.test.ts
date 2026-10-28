@@ -22,6 +22,11 @@ class Worker extends EventEmitter {
     this.sent.push(message);
   }
 }
+function workerAt(workers: Worker[], index: number) {
+  const worker = workers[index];
+  assert.ok(worker);
+  return worker;
+}
 function fixture() {
   const controller = new AbortController();
   const workers: Worker[] = [];
@@ -39,11 +44,11 @@ void test('local node readiness requires a worker acknowledgement and never a ti
   assert.equal(session.summary(), LOCAL_NODE_STATE.STARTING);
   context.mock.timers.tick(1000);
   assert.equal(session.summary(), LOCAL_NODE_STATE.STARTING);
-  workers[0].emit('spawn');
-  workers[0].emit('message', LOCAL_NODE.READY);
+  workerAt(workers, 0).emit('spawn');
+  workerAt(workers, 0).emit('message', LOCAL_NODE.READY);
   assert.equal(session.summary(), LOCAL_NODE_STATE.READY);
   const closing = session.close();
-  workers[0].emit('exit', 0);
+  workerAt(workers, 0).emit('exit', 0);
   await closing;
 });
 void test('local node coalesces retries and cannot restart before the failed worker exits', async (context) => {
@@ -52,36 +57,36 @@ void test('local node coalesces retries and cannot restart before the failed wor
   session.start();
   session.start();
   assert.equal(workers.length, 1);
-  workers[0].emit('spawn');
-  workers[0].emit('message', { error: 'synthetic private endpoint' });
+  workerAt(workers, 0).emit('spawn');
+  workerAt(workers, 0).emit('message', { error: 'synthetic private endpoint' });
   assert.equal(session.summary(), LOCAL_NODE_STATE.ERROR);
   session.start();
   assert.equal(workers.length, 1);
-  workers[0].emit('exit', 1);
+  workerAt(workers, 0).emit('exit', 1);
   session.start();
   assert.equal(workers.length, 2);
-  workers[1].emit('spawn');
-  workers[1].emit('message', LOCAL_NODE.READY);
-  workers[0].emit('message', LOCAL_NODE.READY);
+  workerAt(workers, 1).emit('spawn');
+  workerAt(workers, 1).emit('message', LOCAL_NODE.READY);
+  workerAt(workers, 0).emit('message', LOCAL_NODE.READY);
   assert.equal(session.summary(), LOCAL_NODE_STATE.READY);
   const closing = session.close();
-  workers[1].emit('exit', 0);
+  workerAt(workers, 1).emit('exit', 0);
   await closing;
 });
 void test('local node exit is visible and retry creates one fresh worker', async (context) => {
   context.mock.timers.enable({ apis: ['setTimeout'] });
   const { session, workers } = fixture();
   session.start();
-  workers[0].emit('spawn');
-  workers[0].emit('message', LOCAL_NODE.READY);
-  workers[0].emit('exit', 0);
+  workerAt(workers, 0).emit('spawn');
+  workerAt(workers, 0).emit('message', LOCAL_NODE.READY);
+  workerAt(workers, 0).emit('exit', 0);
   assert.equal(session.summary(), LOCAL_NODE_STATE.ERROR);
   session.start();
   session.start();
   assert.equal(workers.length, 2);
   const closing = session.close();
-  workers[1].emit('spawn');
-  workers[1].emit('exit', 0);
+  workerAt(workers, 1).emit('spawn');
+  workerAt(workers, 1).emit('exit', 0);
   await closing;
 });
 void test('local node quit before spawn ignores late readiness and waits for process exit', async (context) => {
@@ -93,13 +98,13 @@ void test('local node quit before spawn ignores late readiness and waits for pro
   const closing = session.close().then(() => {
     finished = true;
   });
-  workers[0].emit('spawn');
-  assert.deepEqual(workers[0].sent, [LOCAL_NODE.STOP]);
-  workers[0].emit('message', LOCAL_NODE.READY);
+  workerAt(workers, 0).emit('spawn');
+  assert.deepEqual(workerAt(workers, 0).sent, [LOCAL_NODE.STOP]);
+  workerAt(workers, 0).emit('message', LOCAL_NODE.READY);
   assert.equal(session.summary(), LOCAL_NODE_STATE.STOPPING);
   await Promise.resolve();
   assert.equal(finished, false);
-  workers[0].emit('exit', 0);
+  workerAt(workers, 0).emit('exit', 0);
   await closing;
   assert.equal(finished, true);
   assert.equal(session.summary(), LOCAL_NODE_STATE.STOPPED);
@@ -112,16 +117,16 @@ void test('local node startup timeout and forced shutdown wait for actual worker
   session.start();
   context.mock.timers.tick(LOCAL_NODE.START_TIMEOUT_MS);
   assert.equal(session.summary(), LOCAL_NODE_STATE.ERROR);
-  assert.equal(workers[0].killed, 1);
-  workers[0].emit('spawn');
-  assert.equal(workers[0].killed, 2);
+  assert.equal(workerAt(workers, 0).killed, 1);
+  workerAt(workers, 0).emit('spawn');
+  assert.equal(workerAt(workers, 0).killed, 2);
   let finished = false;
   const closing = session.close().then(() => {
     finished = true;
   });
   await Promise.resolve();
   assert.equal(finished, false);
-  workers[0].emit('exit', 1);
+  workerAt(workers, 0).emit('exit', 1);
   await closing;
   assert.equal(session.summary(), LOCAL_NODE_STATE.ERROR);
 });
@@ -129,12 +134,12 @@ void test('local node graceful shutdown falls back to termination without claimi
   context.mock.timers.enable({ apis: ['setTimeout'] });
   const { session, workers } = fixture();
   session.start();
-  workers[0].emit('spawn');
-  workers[0].emit('message', LOCAL_NODE.READY);
+  workerAt(workers, 0).emit('spawn');
+  workerAt(workers, 0).emit('message', LOCAL_NODE.READY);
   const closing = session.close();
   context.mock.timers.tick(LOCAL_NODE.STOP_TIMEOUT_MS);
-  assert.equal(workers[0].killed, 1);
-  workers[0].emit('exit', 0);
+  assert.equal(workerAt(workers, 0).killed, 1);
+  workerAt(workers, 0).emit('exit', 0);
   await closing;
   assert.equal(session.summary(), LOCAL_NODE_STATE.ERROR);
 });
