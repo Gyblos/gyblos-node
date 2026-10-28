@@ -12,6 +12,7 @@ import {
 import { FreeSellerLedger } from '@gyblos/core/free-admission';
 import { publishRecord } from '@gyblos/discovery-http';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
+import { ControlError } from '@gyblos/protocol/control-validation';
 import { saveJson } from '@gyblos/runtime';
 import { assertMemoryHeadroom, memorySnapshot } from '@gyblos/runtime/memory';
 import { withDeadline } from '@gyblos/transport-iroh/deadline';
@@ -211,7 +212,13 @@ export async function startSeller() {
       disposers.push(() => publication.stop());
       publication.start();
     }
-    offers.start(() => control.records.refresh());
+    // A refresh refused by a concurrent change (STALE, EXPIRED) is retried at the next tick; it must not
+    // invalidate the offer whose tick ran it. Any other failure still does.
+    offers.start(() =>
+      control.records.refresh().catch((error: unknown) => {
+        if (!(error instanceof ControlError)) throw error;
+      }),
+    );
     disposers.push(() => offers.stop());
     const offerTicket = EndpointTicket.fromAddr(endpointAddress).toString();
     const writeReady = () =>

@@ -4,6 +4,7 @@ import { CONTROL_CAPACITY } from '@gyblos/core/constants';
 import { ControlAdmission } from '@gyblos/core/control-admission';
 import {
   createControlQuote,
+  sameSelection,
   type QuoteContext,
 } from '@gyblos/core/control-quotes';
 import {
@@ -36,11 +37,7 @@ import {
 import type { Signer } from '@gyblos/protocol/signing';
 import type { ControlService } from '@gyblos/transport-iroh/control-server';
 
-import {
-  quoteModel,
-  sameSelection,
-  type ControlOffers,
-} from './control-offers';
+import { quoteModel, type ControlOffers } from './control-offers';
 import type { SellerPublicRecords } from './public-records';
 
 export interface SellerControlOptions {

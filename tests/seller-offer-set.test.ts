@@ -80,28 +80,35 @@ void test('an offer that fails leaves the listing and the catalog follows the ot
   assert.equal(set.readiness().validUntil, 0);
 });
 
-void test('a listed offer stays listed while it renews, but a failed one does not rejoin by renewing', () => {
+void test('an offer that renews or re-checks after a failure is not listed until a new valid observation', () => {
   const a = fakeLiveOffer(0, NOW);
-  const b = fakeLiveOffer(1, NOW);
+  const b = fakeLiveOffer(1, NOW, { validUntil: NOW + 30_000 });
   const set = setOf(a, b);
-  set.listed();
+  // Renewing, and a re-check after an unobserved failure, look the same: neither is listed.
   a.set({ busy: true, validUntil: 0 });
   assert.deepEqual(
     set.listed().map((offer) => offer.index),
-    [0, 1],
+    [1],
   );
-  // The renewal does not shorten the catalog: B alone bounds it.
-  assert.equal(set.readiness().validUntil, b.live.readiness().validUntil);
+  assert.equal(set.readiness().validUntil, NOW + 30_000);
   a.set({ busy: false });
   assert.deepEqual(
     set.listed().map((offer) => offer.index),
     [1],
   );
-  a.set({ busy: true });
+  a.set({ busy: false, observedAt: NOW, validUntil: NOW + 60_000 });
   assert.deepEqual(
     set.listed().map((offer) => offer.index),
-    [1],
+    [0, 1],
   );
+});
+
+void test('with nothing listed the catalog is busy while an offer is checking, as one offer was', () => {
+  const a = fakeLiveOffer(0, NOW, { validUntil: 0 });
+  const set = setOf(a);
+  assert.equal(set.readiness().busy, false);
+  a.set({ busy: true });
+  assert.deepEqual(shape(set.readiness()), shape(a.live.readiness()));
 });
 
 void test('the catalog is busy only when every listed offer is busy', () => {

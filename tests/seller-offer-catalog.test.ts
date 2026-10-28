@@ -73,3 +73,19 @@ void test('one busy offer does not make another offer’s quote BUSY', async () 
   assert.equal(code(quoted), undefined, JSON.stringify(quoted));
   assert.equal(code(await run.quote(run.a.live)), CONTROL_CODES.BUSY);
 });
+
+void test('a renewing offer is never signed into a catalog bounded by the other offers', async () => {
+  const run = await offerControlFixture();
+  run.a.set({ busy: true, validUntil: 0 });
+  run.b.set({
+    observedAt: PUBLIC_TEST_NOW - 1,
+    validUntil: PUBLIC_TEST_NOW + 600_000,
+  });
+  const signed = await run.records.refresh();
+  assert.deepEqual(
+    (signed.record as PublicCatalogV2).models.map((model) => model.modelId),
+    [run.b.live.offer.modelId],
+  );
+  // A quote for the renewing offer is refused as an unlisted model, not served.
+  assert.equal(code(await run.quote(run.a.live)), CONTROL_CODES.MODEL);
+});

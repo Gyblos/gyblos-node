@@ -3,6 +3,7 @@
 // needs one ready offer; the others are warmed again in the background until they are ready or the seller
 // stops. Starts no process and binds no port; the seller runs its engines.
 import { SELLER_READINESS } from '@gyblos/config';
+import type { EngineDescription } from '@gyblos/protocol/engine';
 import type { MemorySnapshot } from '@gyblos/runtime/memory';
 
 import { checkedControlOffer } from './control-offers';
@@ -31,7 +32,7 @@ export interface PendingSellerOffer {
   prepared: PreparedEngine;
 }
 export interface WarmedSellerOffer extends PendingSellerOffer {
-  model: Awaited<ReturnType<typeof prepareSellerEngine>>['model'];
+  model: EngineDescription;
   offerExpiresAt: number;
 }
 
@@ -127,13 +128,21 @@ export function retrySellerOffers(
   const attempt = async () => {
     for (const offer of [...waiting]) {
       if (controller.signal.aborted) return;
+      let warmed: WarmedSellerOffer;
       try {
-        const warmed = await warm(offer, dependencies, controller.signal);
-        if (controller.signal.aborted) return;
-        await dependencies.add(await liveSellerOffer(warmed, dependencies));
-        waiting.splice(waiting.indexOf(offer), 1);
+        warmed = await warm(offer, dependencies, controller.signal);
       } catch {
         // Still pending; its readiness record says why.
+        continue;
+      }
+      // Warmed once: a failure past this point is not transient, so the offer is not retried.
+      waiting.splice(waiting.indexOf(offer), 1);
+      try {
+        const live = await liveSellerOffer(warmed, dependencies);
+        if (controller.signal.aborted) return;
+        await dependencies.add(live);
+      } catch {
+        // Not served; startup would have refused the same offer.
       }
     }
   };

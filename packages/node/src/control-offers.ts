@@ -1,7 +1,6 @@
 // What control needs from the seller's offers: the ones its catalog lists right now, each with its own
 // quote readiness, and the readiness the catalog itself is bound to. Pure types and mappings.
 import type { QuoteModel, QuoteReadiness } from '@gyblos/core/control-quotes';
-import { canonicalJson } from '@gyblos/protocol';
 import type { ControlMeteringMode } from '@gyblos/protocol/constants';
 import type { ModelSelection } from '@gyblos/protocol/control-types';
 import type {
@@ -29,10 +28,6 @@ export interface ControlOffers {
   listed(): readonly ControlOffer[];
   // What the catalog is bound to: busy only when every listed offer is busy.
   readiness(): QuoteReadiness;
-}
-
-export function sameSelection(left: ModelSelection, right: ModelSelection) {
-  return canonicalJson(left) === canonicalJson(right);
 }
 
 // The listing and the engine plugin's selection must name the same model, or the catalog would sign

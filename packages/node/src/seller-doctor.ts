@@ -249,11 +249,23 @@ export async function sellerDoctor(
   add(DOCTOR_CHECKS.KEYS, role.keys ?? notChecked);
   add(DOCTOR_CHECKS.SEQUENCE, role.sequence ?? notChecked);
   add(DOCTOR_CHECKS.TOKENIZER, await tokenizerCheck(options));
-  // One line per offer, in order: startup needs one ready engine and retries the others.
-  if (config.settings)
+  // One line per offer, in order. Startup needs one ready engine and retries the others, so a down
+  // engine fails only when no offer's engine answers.
+  if (config.settings) {
+    const engines: Result[] = [];
     for (const { engine } of config.settings.offers)
-      add(DOCTOR_CHECKS.ENGINE, await engineCheck(engine, environment));
-  else add(DOCTOR_CHECKS.ENGINE, notChecked);
+      engines.push(await engineCheck(engine, environment));
+    const anyReady = engines.some(
+      (result) => result.status === DOCTOR_STATUS.OK,
+    );
+    for (const result of engines)
+      add(
+        DOCTOR_CHECKS.ENGINE,
+        anyReady && result.status === DOCTOR_STATUS.FAIL
+          ? { ...result, status: DOCTOR_STATUS.WARN }
+          : result,
+      );
+  } else add(DOCTOR_CHECKS.ENGINE, notChecked);
   add(
     DOCTOR_CHECKS.RELAYS,
     config.base ? relaysCheck(config.base) : notChecked,

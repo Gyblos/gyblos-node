@@ -67,7 +67,8 @@ export interface QuoteContext {
   readiness: () => QuoteReadiness;
   signal?: AbortSignal;
 }
-function sameSelection(left: ModelSelection, right: ModelSelection) {
+// The one definition of two selections naming the same listed model: exact canonical equality.
+export function sameSelection(left: ModelSelection, right: ModelSelection) {
   return canonicalJson(left) === canonicalJson(right);
 }
 function checkPricing(

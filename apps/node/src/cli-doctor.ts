@@ -83,7 +83,9 @@ export async function doctor(
         ? `${check.check}[${check.offer + 1}]`
         : check.check;
     const where =
-      check.offer === undefined ? '' : `[[offers]] entry ${check.offer + 1}: `;
+      check.offer === undefined || name !== check.check
+        ? ''
+        : `[[offers]] entry ${check.offer + 1}: `;
     const help =
       check.code === DOCTOR_CODES.READY ? '' : where + hint(check.code);
     stdout(

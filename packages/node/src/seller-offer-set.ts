@@ -1,17 +1,17 @@
-// The seller's warmed offers and which of them its catalog lists. An offer is listed while its own
-// readiness is observed and valid, and stays listed while it renews; one that fails leaves until it is
-// warmed again. The catalog's readiness is busy only when every listed offer is busy, valid until the
-// earliest listed validity, and its generation moves only when membership or an observation changes,
-// so one offer's generation activity never makes the catalog stale. With one offer it equals that
-// offer's readiness in everything but the generation number.
-import type { QuoteReadiness } from '@gyblos/core/control-quotes';
-import type { Engine, RecountTokenizer } from '@gyblos/protocol/engine';
-
+// The seller's warmed offers and which of them its catalog lists: exactly those whose own readiness is
+// observed and valid now. An offer that renews or fails leaves the listing and returns only with a new
+// valid observation, so a signed catalog never names an offer that is not ready. The catalog's readiness
+// is busy only when every listed offer is busy (or, with none listed, when one is checking), valid until
+// the earliest listed validity, and its generation moves only when membership or an observation
+// changes, so one offer's generation activity never makes the catalog stale. With one offer it equals
+// that offer's readiness in everything but the generation number.
 import {
   sameSelection,
-  type ControlOffer,
-  type ControlOffers,
-} from './control-offers';
+  type QuoteReadiness,
+} from '@gyblos/core/control-quotes';
+import type { Engine, RecountTokenizer } from '@gyblos/protocol/engine';
+
+import type { ControlOffer, ControlOffers } from './control-offers';
 import type { FreeSellerOffer } from './seller-offer';
 
 export interface SellerOfferObservation {
@@ -32,13 +32,9 @@ export interface LiveSellerOffer extends ControlOffer {
 
 const valid = (state: QuoteReadiness, now: number) =>
   state.observedAt <= now && state.validUntil > now;
-// A renewal check holds the offer busy with no validity until it settles.
-const renewing = (state: QuoteReadiness, now: number) =>
-  state.observedAt <= now && state.busy && state.validUntil === 0;
 
 export class SellerOfferSet implements ControlOffers {
   private readonly offers: LiveSellerOffer[] = [];
-  private members = new Set<number>();
   private key = '';
   private generation = 0;
   private stopped = false;
@@ -65,23 +61,25 @@ export class SellerOfferSet implements ControlOffers {
   }
 
   listed(): readonly LiveSellerOffer[] {
-    return this.observe().map(({ offer }) => offer);
+    return this.observe(this.now()).members.map(({ offer }) => offer);
   }
 
   readiness(): QuoteReadiness {
-    const now = this.now();
-    const members = this.observe();
-    const current = members.filter(({ state }) => valid(state, now));
-    // With nothing listed, the latest observation of any offer, as one offer's own readiness reports.
-    const observed = members.length
-      ? members.map(({ state }) => state.observedAt)
-      : this.offers.map((offer) => offer.readiness().observedAt);
+    const { members, states } = this.observe(this.now());
+    // With nothing listed, as one offer's own readiness reports: busy while a check runs, and its
+    // latest observation.
+    const considered = members.length ? members : states;
     return {
       generation: this.generation,
-      busy: members.length > 0 && members.every(({ state }) => state.busy),
-      observedAt: Math.max(0, ...observed),
-      validUntil: current.length
-        ? Math.min(...current.map(({ state }) => state.validUntil))
+      busy: members.length
+        ? members.every(({ state }) => state.busy)
+        : states.some(({ state }) => state.busy),
+      observedAt: Math.max(
+        0,
+        ...considered.map(({ state }) => state.observedAt),
+      ),
+      validUntil: members.length
+        ? Math.min(...members.map(({ state }) => state.validUntil))
         : 0,
     };
   }
@@ -99,19 +97,15 @@ export class SellerOfferSet implements ControlOffers {
     await Promise.all(this.offers.map((offer) => offer.observation.stop()));
   }
 
-  // Reads every offer once and updates membership; the generation moves when the listed offers or one
-  // of their observations change.
-  private observe() {
-    if (this.stopped) return [];
-    const now = this.now();
-    const members = this.offers
-      .map((offer) => ({ offer, state: offer.readiness() }))
-      .filter(
-        ({ offer, state }) =>
-          valid(state, now) ||
-          (renewing(state, now) && this.members.has(offer.index)),
-      );
-    this.members = new Set(members.map(({ offer }) => offer.index));
+  // Reads every offer once at one instant; the generation moves when the listed offers or one of their
+  // observations change.
+  private observe(now: number) {
+    if (this.stopped) return { members: [], states: [] };
+    const states = this.offers.map((offer) => ({
+      offer,
+      state: offer.readiness(),
+    }));
+    const members = states.filter(({ state }) => valid(state, now));
     const key = members
       .map(({ offer, state }) => `${offer.index}:${state.observedAt}`)
       .join(',');
@@ -119,6 +113,6 @@ export class SellerOfferSet implements ControlOffers {
       this.key = key;
       this.generation++;
     }
-    return members;
+    return { members, states };
   }
 }

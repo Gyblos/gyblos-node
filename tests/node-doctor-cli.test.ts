@@ -228,7 +228,7 @@ void test('doctor: a stopped engine at the offer URL fails with the engine code;
     assert.equal(stopped.code, 1);
     assert.match(
       line(stopped.output, 'engine[1]'),
-      /FAIL\s+engine\[1\]\s+ENGINE_UNAVAILABLE\s+\[\[offers\]\] entry 1: start the engine at the offer URL/,
+      /FAIL\s+engine\[1\]\s+ENGINE_UNAVAILABLE\s+start the engine at the offer URL/,
     );
     assert.match(
       line(stopped.output, 'tokenizer'),
@@ -251,7 +251,7 @@ void test('doctor: an engine that never answers fails with ENGINE_TIMEOUT within
     assert.equal(hung.code, 1);
     assert.match(
       line(hung.output, 'engine[1]'),
-      /FAIL\s+engine\[1\]\s+ENGINE_TIMEOUT\s+\[\[offers\]\] entry 1:/,
+      /FAIL\s+engine\[1\]\s+ENGINE_TIMEOUT\s+the engine at the offer URL/,
     );
   }));
 

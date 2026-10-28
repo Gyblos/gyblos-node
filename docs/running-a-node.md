@@ -143,15 +143,17 @@ pnpm gyblos doctor               # read-only preflight; prints the public NodeId
 pnpm node:start
 ```
 
-- The seller serves the free offer in `gyblos.toml`; without one it does not
+- The seller serves every free offer in `gyblos.toml`; without one it does not
   start (`SELLER_OFFERS_MISSING`). Paid selling is off until it returns as a
   payment plugin, so a paid offer stops startup
   (`SELLER_PAID_EXECUTION_UNAVAILABLE`); the v1 paid path remains in the lab
   gates only. `node:setup` still asks for `--buyer` and `--pay-to`, which free
   selling does not use.
-- The seller runs its own Ollama; the daemon never starts it. Startup checks
-  memory headroom, runs one private warmup at the offer's engine URL (a literal
-  loopback address) and only then signs its public records.
+- The seller runs its own Ollama; the daemon never starts it. Startup warms each
+  offer in order at its own engine URL (a literal loopback address), checking
+  memory headroom for engines on this machine, and signs its public records once
+  one offer is ready; the others are warmed again in the background and listed
+  when they are ready.
 - Use a dedicated Ollama for selling, with its own models directory
   (`OLLAMA_MODELS`) so the Ollama app cannot remove or replace the model. A
   shared one (the Ollama app, or other tools using the same instance) can evict

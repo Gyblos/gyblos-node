@@ -110,6 +110,7 @@ export async function prepareSellerControl(
       authorizer: options.authorizer,
       endpoint: options.endpoint,
       relayOnly: options.relayOnly,
+      // Superseded per query by the listed offers and each quote's own offer readiness.
       models: offers.listed().map(quoteModel),
       now,
       readiness: () => offers.readiness(),
