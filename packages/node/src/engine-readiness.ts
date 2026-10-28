@@ -98,8 +98,8 @@ class EngineReadinessCheck {
   // An engine paid per call: its model list is the whole check, and this machine's memory is not its own,
   // so no snapshot is taken or recorded.
   private async describeOnly() {
-    this.signal.throwIfAborted();
     this.reason = READINESS_REASONS.WARMUP_FAILED;
+    this.signal.throwIfAborted();
     const model = await this.engine.describe();
     this.signal.throwIfAborted();
     const now = this.dependencies.now ?? Date.now;
@@ -107,7 +107,7 @@ class EngineReadinessCheck {
     assertReadinessCurrent(offerExpiresAt, now());
     return { model, offerExpiresAt };
   }
-  // A warmed engine on another machine still records this machine's snapshots without gating on them.
+  // Only an engine on this machine gates on this machine's memory headroom.
   private assertHeadroom(snapshot: MemorySnapshot) {
     if (this.dependencies.policy.localResources) assertMemoryHeadroom(snapshot);
   }
