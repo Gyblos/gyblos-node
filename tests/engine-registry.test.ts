@@ -58,10 +58,7 @@ const OTHER_ENGINE = {
 };
 
 void test('the registry names exactly the engines the seller can serve today', () => {
-  assert.deepEqual(Object.keys(ENGINE_REGISTRY), [
-    ENGINE_KINDS.OLLAMA,
-    ENGINE_KINDS.OPENAI,
-  ]);
+  assert.deepEqual(Object.keys(ENGINE_REGISTRY), Object.values(ENGINE_KINDS));
 });
 
 void test('ollama refusal keeps the previous order: model, then engine, then reasoning', () => {
@@ -94,17 +91,16 @@ void test('ollama refusal keeps the previous order: model, then engine, then rea
 });
 
 void test('an engine kind without a registered plugin is refused as an unsupported engine', () => {
-  assert.equal(
-    engineOfferRefusal({
-      ...SERVED,
-      engine: {
-        kind: ENGINE_KINDS.ANTHROPIC,
-        url: 'https://api.example.com',
-        contextTokens: 200_000,
-      },
-    }),
-    NODE_ERROR_CODES.SELLER_OFFER_ENGINE_UNSUPPORTED,
-  );
+  // Only an unvalidated kind can reach the registry without a plugin; inherited keys never resolve.
+  for (const kind of ['__proto__', 'toString', 'vllm'])
+    assert.equal(
+      engineOfferRefusal({
+        ...SERVED,
+        engine: { kind: kind as EngineKind, url: 'https://api.example.com' },
+      }),
+      NODE_ERROR_CODES.SELLER_OFFER_ENGINE_UNSUPPORTED,
+      kind,
+    );
 });
 
 void test('creating the ollama engine does no I/O and carries its selection, metering and readiness', async () => {

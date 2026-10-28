@@ -38,6 +38,7 @@ void test('every example in examples/ is a valid gyblos.toml', () => {
   assert.deepEqual(
     examples.map((example) => example.name),
     [
+      'anthropic-free.toml',
       'anthropic-reseller.toml',
       'free-offer.toml',
       'lm-studio.toml',
@@ -54,7 +55,7 @@ void test('every example in examples/ is a valid gyblos.toml', () => {
     // Only the custom-model example warns that its reasoning levels are unverified.
     assert.deepEqual(
       result.ok ? result.warnings.map((warning) => warning.code) : [],
-      example.name === 'anthropic-reseller.toml'
+      ['anthropic-free.toml', 'anthropic-reseller.toml'].includes(example.name)
         ? ['REASONING_UNVERIFIED']
         : [],
       example.name,
