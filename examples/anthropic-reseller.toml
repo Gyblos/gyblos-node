@@ -14,5 +14,5 @@ network = "devnet"
 model = "example-labs/chat-large"
 custom = true
 reasoning = ["off", "high"]
-engine = { kind = "anthropic", url = "https://anthropic-compatible.example.com", api_key_env = "ANTHROPIC_UPSTREAM_KEY", upstream_model = "chat-large-2026-01" }
+engine = { kind = "anthropic", url = "https://anthropic-compatible.example.com", api_key_env = "ANTHROPIC_UPSTREAM_KEY", upstream_model = "chat-large-2026-01", context_tokens = 200000 }
 price = { input_per_mtok = "1.5", output_per_mtok = "6", currency = "USDC" }

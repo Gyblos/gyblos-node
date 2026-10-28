@@ -123,7 +123,10 @@ export function createValidator(root: Schema) {
           )
         );
       case 'additionalProperties':
-        return true; // evaluated together with properties in valid()
+      case 'if':
+      case 'then':
+      case 'else':
+        return true; // evaluated with their sibling keywords in valid()
       default:
         throw new Error(`Unsupported keyword ${name}`);
     }
@@ -139,6 +142,10 @@ export function createValidator(root: Schema) {
         isObject(schema.properties) ? schema.properties : {},
       );
       if (Object.keys(value).some((key) => !known.includes(key))) return false;
+    }
+    if (isObject(schema.if)) {
+      const branch = valid(schema.if, value) ? schema.then : schema.else;
+      if (isObject(branch) && !valid(branch, value)) return false;
     }
     return true;
   }

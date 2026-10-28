@@ -3,6 +3,14 @@
 // It must not know wallets or payments.
 import { IPV6_LOOPBACK, LOCALHOST, ROUTES, TIMEOUTS } from '@gyblos/config';
 import {
+  BoundFailure,
+  callerCallback,
+  engineFailure,
+  FrameFailure,
+  statusFailure,
+  type EngineAttempt,
+} from '@gyblos/core/engine-failures';
+import {
   ENGINE_DONE_REASONS,
   ENGINE_ERROR_CODES,
   type EngineDoneReason,
@@ -11,14 +19,6 @@ import { EngineError } from '@gyblos/protocol/engine';
 import type { EngineWireUsage } from '@gyblos/protocol/wire-usage';
 
 import { GENERATION, MODEL_LIMITS } from './constants';
-import {
-  BoundFailure,
-  callerCallback,
-  engineFailure,
-  FrameFailure,
-  statusFailure,
-  type EngineAttempt,
-} from './failures';
 import { MODEL, renderChat } from './model';
 
 export interface InferenceResult {

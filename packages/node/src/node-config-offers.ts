@@ -7,12 +7,10 @@ import {
   type ReasoningSupport,
 } from '@gyblos/protocol';
 import {
-  ENGINE_KINDS,
   MODEL_CLASSIFICATIONS,
   OFFER_PRICING_KINDS,
   REASONING_LEVELS,
   type CatalogModelId,
-  type EngineKind,
   type ReasoningLevel,
 } from '@gyblos/protocol/constants';
 
@@ -23,19 +21,16 @@ import {
   OFFER_CURRENCIES,
   type OfferCurrency,
 } from './constants';
+import { offerEngine, type OfferEngine } from './node-config-engine';
 import {
-  ENGINE_URL_POLICY,
-  envName,
   flag,
   integer,
   oneOf,
   optional,
   requiredField,
-  serviceUrl,
   table,
   text,
   unknownKeys,
-  withoutUndefined,
   type ConfigPath,
   type ConfigTable,
   type IssueList,
@@ -50,13 +45,6 @@ export type OfferModel =
       requested: string;
     }
   | { kind: typeof MODEL_CLASSIFICATIONS.CUSTOM; id: string };
-
-export interface OfferEngine {
-  kind: EngineKind;
-  url: string;
-  apiKeyEnv?: string;
-  upstreamModel?: string;
-}
 
 export type OfferPricing =
   | {
@@ -79,7 +67,6 @@ export interface NodeOffer {
 }
 
 const OFFER_KEYS = ['model', 'custom', 'engine', 'reasoning', 'price', 'free'];
-const ENGINE_KEYS = ['kind', 'url', 'api_key_env', 'upstream_model'];
 const PRICE_KEYS = ['input_per_mtok', 'output_per_mtok', 'currency'];
 const FREE_KEYS = ['daily_token_cap', 'per_buyer_cap'];
 // Default for models without verified catalog levels; verified models default to their catalog level.
@@ -140,32 +127,6 @@ function offerModel(
     model: { kind: resolution.kind, id: resolution.modelId },
     reasoning: null,
   };
-}
-
-function offerEngine(
-  value: unknown,
-  path: ConfigPath,
-  issues: IssueList,
-): OfferEngine | undefined {
-  const engine = table(value, path, issues);
-  if (!engine) return undefined;
-  const mark = issues.mark();
-  const kind = requiredField(engine, 'kind', path, issues, (item, at) =>
-    oneOf(item, Object.values(ENGINE_KINDS), at, issues),
-  );
-  const url = requiredField(engine, 'url', path, issues, (item, at) =>
-    serviceUrl(item, at, issues, ENGINE_URL_POLICY),
-  );
-  const apiKeyEnv = optional(engine, 'api_key_env', path, (item, at) =>
-    envName(item, at, issues),
-  );
-  const upstreamModel = optional(engine, 'upstream_model', path, (item, at) =>
-    text(item, at, issues, NODE_CONFIG_LIMITS.upstreamModelCharacters),
-  );
-  unknownKeys(engine, path, ENGINE_KEYS, issues);
-  if (!issues.cleanSince(mark) || kind === undefined || url === undefined)
-    return undefined;
-  return withoutUndefined({ kind, url, apiKeyEnv, upstreamModel });
 }
 
 // Reads the listed levels, then checks them against the model's catalog levels; without verified levels

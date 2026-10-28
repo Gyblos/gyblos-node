@@ -24,20 +24,31 @@ export type EngineOfferRefusal =
   | typeof NODE_ERROR_CODES.SELLER_OFFER_ENGINE_UNSUPPORTED
   | typeof NODE_ERROR_CODES.SELLER_OFFER_REASONING_UNSUPPORTED;
 
-// How delivered tokens are counted. Remote engines add a provider-declared branch in PR 3; consumers
-// type the mode as ControlMeteringMode so that branch only touches this file.
-export interface OfferMetering {
-  mode: typeof CONTROL_METERING_MODES.RECOUNTED;
-  tokenizer: () => Promise<RecountTokenizer>;
-}
+// How delivered tokens are counted: recounted with the model's public tokenizer, or declared by the
+// engine's provider when no public tokenizer is pinned for the model.
+export type OfferMetering =
+  | {
+      mode: typeof CONTROL_METERING_MODES.RECOUNTED;
+      tokenizer: () => Promise<RecountTokenizer>;
+    }
+  | { mode: typeof CONTROL_METERING_MODES.DECLARED };
 
-// The private warmup that gates advertisement, and how long the warmed model stays resident.
-export interface EngineReadinessPolicy {
-  warmup: { prompt: string; maxTokens: number };
-  residencyMs: number;
-  // True when the engine runs on this machine, so its warmups check this machine's memory headroom.
-  localResources: boolean;
-}
+// What gates advertisement. An engine on this machine runs a private warmup, checks this machine's
+// memory headroom and stays resident for residencyMs; an engine the seller pays per call is ready once
+// it describes its model, so readiness never spends the seller's credit.
+export type EngineReadinessPolicy =
+  | {
+      warmup: { prompt: string; maxTokens: number };
+      residencyMs: number;
+      localResources: boolean;
+    }
+  | { warmup: null; localResources: false };
+
+// The policy the remote engine plugins (openai, anthropic) give an engine outside this machine.
+export const REMOTE_READINESS = {
+  warmup: null,
+  localResources: false,
+} as const satisfies EngineReadinessPolicy;
 
 export interface PreparedEngine {
   engine: Engine;

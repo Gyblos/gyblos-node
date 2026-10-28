@@ -1,6 +1,7 @@
 // Invalid gyblos.toml fixtures: each maps to one static issue code and key path. Test data only; the
 // fake secret marker must never appear in any output.
 import { BASE, FAKE_SECRET, offer } from './node-config-fixtures';
+import { ENGINE_FIXTURES } from './node-config-invalid-engines';
 import { NUMBER_FIXTURES } from './node-config-invalid-numbers';
 
 export interface InvalidConfigFixture {
@@ -283,6 +284,7 @@ export const INVALID_FIXTURES: readonly InvalidConfigFixture[] = [
     code: 'INVALID_VALUE',
     path: 'offers[0].reasoning',
   },
+  ...ENGINE_FIXTURES,
   ...NUMBER_FIXTURES,
   {
     name: 'env name that looks like a pasted token',

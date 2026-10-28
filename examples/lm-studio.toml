@@ -12,5 +12,5 @@ network = "devnet"
 model = "gpt-oss-20b"
 # gpt-oss has low, medium and high reasoning effort and no "off"; list the ones you are willing to serve.
 reasoning = ["low", "medium", "high"]
-engine = { kind = "openai", url = "http://127.0.0.1:1234/v1", upstream_model = "openai/gpt-oss-20b" }
+engine = { kind = "openai", url = "http://127.0.0.1:1234/v1", upstream_model = "openai/gpt-oss-20b", context_tokens = 131072 }
 price = { input_per_mtok = "0.05", output_per_mtok = "0.2", currency = "USDC" }

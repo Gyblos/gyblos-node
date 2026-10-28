@@ -43,12 +43,8 @@ export {
   type PriceDecimal,
 } from './node-config-price';
 export type { NodeLimits } from './node-config-limits';
-export type {
-  NodeOffer,
-  OfferEngine,
-  OfferModel,
-  OfferPricing,
-} from './node-config-offers';
+export type { OfferEngine } from './node-config-engine';
+export type { NodeOffer, OfferModel, OfferPricing } from './node-config-offers';
 
 export interface NodeConfig {
   version: typeof NODE_CONFIG_VERSION;

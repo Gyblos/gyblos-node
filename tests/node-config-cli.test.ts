@@ -73,7 +73,7 @@ void test('the summary names environment sources and secret variables without th
     BASE +
     offer({
       engine:
-        '{ kind = "openai", url = "https://api.example.com/v1", api_key_env = "UPSTREAM_API_KEY" }',
+        '{ kind = "openai", url = "https://api.example.com/v1", api_key_env = "UPSTREAM_API_KEY", context_tokens = 131072 }',
     });
   await withFile(toml, async (path) => {
     const result = await run(
@@ -102,7 +102,7 @@ void test('file URLs are printed as origins only, so keys embedded in a path nev
     '[discovery]',
     `url = "https://index.example.com/${FAKE_SECRET}/v1"`,
     offer({
-      engine: `{ kind = "openai", url = "https://api.example.com:8443/${FAKE_SECRET}/v1" }`,
+      engine: `{ kind = "openai", url = "https://api.example.com:8443/${FAKE_SECRET}/v1", context_tokens = 131072 }`,
     }),
   ].join('\n');
   await withFile(toml, async (path) => {

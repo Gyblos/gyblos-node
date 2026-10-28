@@ -422,6 +422,26 @@ completion returns unused tokens. Errors/cancellation retain the reservation.
 Caps are in memory and reset on restart, so they do not promise durable daily
 limits. Renewing availability does not reset them.
 
+How tokens are counted depends on the offer's metering mode, which every quote
+carries. A model whose public tokenizer is pinned is **recounted**: the seller
+counts the prompt and output with that tokenizer, as the buyer can ("Uso
+medible"). Any other model is **declared** ("Uso declarado"); this applies once
+the remote engine plugins (`openai`, `anthropic`) are enabled. The reported
+usage is then the engine provider's, which the buyer cannot check:
+
+- admission reserves the prompt's UTF-8 bytes plus 64 tokens for the provider's
+  chat template, and the reservation is never refunded;
+- a stream stops with `FREE_EXECUTION_LIMIT_EXCEEDED` once it would deliver more
+  than 32 bytes per allowed output token;
+- a count below one input token, below one output token per 32 delivered bytes,
+  above `maxTokens` or beyond the model's context is the provider's invalid
+  response (`SELLER_CANNOT_CONTINUE`, reason `engine_invalid_response`);
+- a stopped stream reports its delivered bytes, at most `maxTokens`.
+
+An engine on this machine renews readiness with a one-token private warmup and
+memory checks; an engine the seller pays per call renews by describing its model
+only, and never generates for readiness.
+
 Token caps belong to each free offer, and each offer has its own readiness: one
 offer generating or renewing never makes another's quotes busy, and a quote for
 an offer the catalog no longer lists is refused with

@@ -242,7 +242,7 @@ void test('secrets are reported by environment name and presence only', () => {
     ) +
       offer({
         engine:
-          '{ kind = "openai", url = "https://api.example.com/v1", api_key_env = "UPSTREAM_API_KEY" }',
+          '{ kind = "openai", url = "https://api.example.com/v1", api_key_env = "UPSTREAM_API_KEY", context_tokens = 131072 }',
       }),
   );
   const result = resolved(

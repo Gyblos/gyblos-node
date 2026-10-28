@@ -56,7 +56,7 @@ export const VALID_FIXTURES: readonly { name: string; toml: string }[] = [
         model: 'acme/chat-large',
         extra: 'custom = true\nreasoning = ["off", "high"]',
         engine:
-          '{ kind = "anthropic", url = "https://api.example.com", api_key_env = "UPSTREAM_API_KEY", upstream_model = "acme-chat-large-2026" }',
+          '{ kind = "anthropic", url = "https://api.example.com", api_key_env = "UPSTREAM_API_KEY", upstream_model = "acme-chat-large-2026", context_tokens = 200000 }',
       }),
   },
   {

@@ -1,5 +1,6 @@
-// Holds the seller until the engine is ready: checks memory headroom for an engine on this machine, runs one
-// bounded private warmup, records the outcome and anchors offer expiry to the warmed model's residency.
+// Holds the seller until the engine is ready: describes the model, and for an engine on this machine checks
+// memory headroom and runs one bounded private warmup; records the outcome and anchors offer expiry within
+// the warmed model's residency. An engine paid per call is never asked to generate here.
 import { DIAGNOSTICS } from '@gyblos/config';
 import { OFFER_LIFETIME_MS } from '@gyblos/core/constants';
 import { type Engine, type EngineDescription } from '@gyblos/protocol/engine';
@@ -30,7 +31,7 @@ export function assertReadinessCurrent(
 }
 
 interface ProbeDependencies {
-  // From the engine plugin: the warmup to run and how long the warmed model stays resident.
+  // From the engine plugin: the warmup to run, if any, and how long the warmed model stays resident.
   policy: EngineReadinessPolicy;
   snapshot: () => Promise<MemorySnapshot>;
   now?: () => number;
@@ -58,20 +59,21 @@ class EngineReadinessCheck {
     private readonly dependencies: ProbeDependencies,
   ) {}
   async run() {
+    const { policy } = this.dependencies;
+    if (!policy.warmup) return this.describeOnly();
     this.signal.throwIfAborted();
     this.before = await this.dependencies.snapshot();
     this.signal.throwIfAborted();
     this.reason = READINESS_REASONS.INSUFFICIENT_HEADROOM;
     this.assertHeadroom(this.before);
     this.reason = READINESS_REASONS.WARMUP_FAILED;
-    const { warmup, residencyMs } = this.dependencies.policy;
-    if (!(residencyMs > OFFER_LIFETIME_MS))
+    if (!(policy.residencyMs > OFFER_LIFETIME_MS))
       throw new Error('Offer lifetime exceeds warmed model residency.');
     const model = await this.engine.describe();
     this.signal.throwIfAborted();
     await this.engine.generate({
-      prompt: warmup.prompt,
-      maxTokens: warmup.maxTokens,
+      prompt: policy.warmup.prompt,
+      maxTokens: policy.warmup.maxTokens,
       signal: this.signal,
     });
     this.signal.throwIfAborted();
@@ -93,7 +95,19 @@ class EngineReadinessCheck {
     assertReadinessCurrent(offerExpiresAt, now());
     return { model, offerExpiresAt };
   }
-  // A remote engine's memory is not this machine's; snapshots are still recorded.
+  // An engine paid per call: its model list is the whole check, and this machine's memory is not its own,
+  // so no snapshot is taken or recorded.
+  private async describeOnly() {
+    this.reason = READINESS_REASONS.WARMUP_FAILED;
+    this.signal.throwIfAborted();
+    const model = await this.engine.describe();
+    this.signal.throwIfAborted();
+    const now = this.dependencies.now ?? Date.now;
+    const offerExpiresAt = now() + OFFER_LIFETIME_MS;
+    assertReadinessCurrent(offerExpiresAt, now());
+    return { model, offerExpiresAt };
+  }
+  // Only an engine on this machine gates on this machine's memory headroom.
   private assertHeadroom(snapshot: MemorySnapshot) {
     if (this.dependencies.policy.localResources) assertMemoryHeadroom(snapshot);
   }

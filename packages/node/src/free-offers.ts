@@ -1,4 +1,4 @@
-// Free execution over the seller's warmed offers: one service per offer (its engine, tokenizer, readiness
+// Free execution over the seller's warmed offers: one service per offer (its engine, meter, readiness
 // and token caps), all on the seller's one ledger, behind the free router. An offer's service is built
 // once, so its caps survive while it is listed, unlisted and listed again.
 import type { FreeSellerLedger } from '@gyblos/core/free-admission';
@@ -37,7 +37,7 @@ export function createSellerFreeOffers(
         model: live.model,
         capabilities: live.capabilities,
         engine: live.engine,
-        tokenizer: live.tokenizer,
+        meter: live.meter,
         readiness: live.readiness,
       }),
     };

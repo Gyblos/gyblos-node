@@ -25,7 +25,7 @@ price = { input_per_mtok = "0.1", output_per_mtok = "0.4", currency = "USDC" }
 [[offers]]
 model = "gpt-oss-20b"
 reasoning = ["low", "medium"]     # gpt-oss has no "off" level
-engine = { kind = "openai", url = "http://localhost:1234/v1", upstream_model = "openai/gpt-oss-20b" }
+engine = { kind = "openai", url = "http://localhost:1234/v1", upstream_model = "openai/gpt-oss-20b", context_tokens = 131072 }
 price = { input_per_mtok = "0.05", output_per_mtok = "0.2", currency = "USDC" }
 
 [[offers]]

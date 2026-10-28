@@ -14,6 +14,7 @@ import {
   ollamaSelection,
 } from '@gyblos/node/engine-registry-ollama';
 import { prepareSellerFreeExecution } from '@gyblos/node/free-execution';
+import { recountedMeter } from '@gyblos/node/free-meter';
 import { sellerLimits } from '@gyblos/node/node-config-limits';
 import { openSellerSequence } from '@gyblos/node/public-sequence';
 import { createSellerPublisher } from '@gyblos/node/publisher';
@@ -155,7 +156,7 @@ export async function startAcceptanceHost(options: AcceptanceHostOptions) {
           model: initial.model,
           capabilities: engine.engine.capabilities(),
           engine: current.engine,
-          tokenizer: options.tokenizer,
+          meter: recountedMeter(options.tokenizer),
           readiness: current.readiness,
           now: clock.now,
           ledger: new FreeSellerLedger(
