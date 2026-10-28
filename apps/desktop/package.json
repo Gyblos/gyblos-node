@@ -30,7 +30,8 @@
     "./wallet-handlers": "./src/wallet/handlers.ts",
     "./node-status": "./src/node-status.ts",
     "./node-session": "./src/node-session.ts",
-    "./node-handlers": "./src/node-handlers.ts"
+    "./node-handlers": "./src/node-handlers.ts",
+    "./node-runtime": "./src/node-runtime.ts"
   },
   "scripts": {
     "build": "tsx scripts/build.ts",
