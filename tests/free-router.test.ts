@@ -13,9 +13,10 @@ import {
 } from '@gyblos/protocol/free-execution';
 
 import { freeSellerFixture, freeSellerSignal } from './support/free-seller';
+import { freeStreamSellerFixture } from './support/free-stream-seller';
 
 void test('a request reaches the offer its quote selected, for responses and streams', async () => {
-  const seller = await freeSellerFixture();
+  const seller = await freeStreamSellerFixture();
   const routed: ModelSelection[] = [];
   const router = createSellerFreeRouter((selection) => {
     routed.push(selection);

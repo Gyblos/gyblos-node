@@ -419,10 +419,13 @@ completion returns unused tokens. Errors/cancellation retain the reservation.
 Caps are in memory and reset on restart, so they do not promise durable daily
 limits. Renewing availability does not reset them.
 
-Quotes are single-use through expiry. Replay state is bounded; startup rejects
-quotes issued at or before its startup timestamp. A trustworthy wall clock is
-required across restarts. Disconnecting or retrying never refunds uncertain work
-or permits reuse of a consumed quote. An engine ignoring cancellation keeps its
+Caps and the distinct-buyer limit belong to each free offer. Quotes are
+single-use through expiry across the whole seller, which also runs one free
+generation at a time; a request whose selection no offer serves is refused with
+`FREE_EXECUTION_UNSUPPORTED`. Replay state is bounded; startup rejects quotes
+issued at or before its startup timestamp. A trustworthy wall clock is required
+across restarts. Disconnecting or retrying never refunds uncertain work or
+permits reuse of a consumed quote. An engine ignoring cancellation keeps its
 slot occupied until it settles. No fallback is allowed after any prompt bytes
 have been sent. Nothing on this channel authorizes payment.
 

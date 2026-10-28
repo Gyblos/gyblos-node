@@ -2,7 +2,10 @@
 // No payments, facilitator, v1, config reads, files or journals are reachable from this service.
 import { INFERENCE_REQUEST_LIMITS } from '@gyblos/config';
 import type { QuoteReadiness } from '@gyblos/core/control-quotes';
-import { FreeExecutionAdmission } from '@gyblos/core/free-admission';
+import {
+  FreeExecutionAdmission,
+  FreeReplayLedger,
+} from '@gyblos/core/free-admission';
 import { canonicalJson } from '@gyblos/protocol';
 import {
   ENGINE_ERROR_STOP_REASON,
@@ -38,6 +41,7 @@ import {
 } from '@gyblos/protocol/free-execution';
 
 import { createFreeStreamOutput } from './free-execution-stream';
+import { createSellerFreeRouter } from './free-router';
 import type { FreeSellerOffer, SellerCatalogOffer } from './seller-offer';
 
 export interface SellerFreeExecutionOptions {
@@ -54,6 +58,8 @@ export interface SellerFreeExecutionOptions {
   startedAt: number;
   // Distinct buyers per UTC day, from gyblos.toml [limits].
   maxFreeBuyers: number;
+  // The seller's single-use and concurrency ledger, shared by all its free offers.
+  ledger?: FreeReplayLedger;
 }
 function checkSignal(signal: AbortSignal) {
   if (signal.aborted) return fail(FREE_EXECUTION_CODES.CANCELLED);
@@ -91,6 +97,7 @@ export function createSellerFreeExecution(options: SellerFreeExecutionOptions) {
     options.offer.caps,
     options.startedAt,
     options.maxFreeBuyers,
+    options.ledger,
   );
   return {
     respond: (value: unknown, peer: string, signal: AbortSignal) =>
@@ -213,15 +220,21 @@ export function prepareSellerFreeExecution(
     (model) => model.modelId === options.offer.modelId,
   );
   if (!listing) return fail(FREE_EXECUTION_CODES.INTERNAL);
-  return createSellerFreeExecution({
+  const selection = {
+    modelId: listing.modelId,
+    variant: listing.variant,
+    quantization: listing.quantization,
+  };
+  const service = createSellerFreeExecution({
     ...options,
     offer: options.offer,
-    selection: {
-      modelId: listing.modelId,
-      variant: listing.variant,
-      quantization: listing.quantization,
-    },
+    selection,
+    ledger: new FreeReplayLedger(options.startedAt),
   });
+  // One offer today; the router already sends any other selection to UNSUPPORTED.
+  return createSellerFreeRouter((requested) =>
+    canonicalJson(requested) === canonicalJson(selection) ? service : undefined,
+  );
 }
 
 async function generateResponse(

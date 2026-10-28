@@ -32,6 +32,7 @@
     "./node-config-resolve": "./src/node-config-resolve.ts",
     "./node-config-limits": "./src/node-config-limits.ts",
     "./free-execution": "./src/free-execution.ts",
+    "./free-router": "./src/free-router.ts",
     "./seller-transport": "./src/seller-transport.ts",
     "./identity-verifier": "./src/identity-verifier.ts",
     "./identity-state": "./src/identity-state.ts"
