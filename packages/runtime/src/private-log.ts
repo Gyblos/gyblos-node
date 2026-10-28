@@ -8,12 +8,12 @@ import {
   PRIVATE_LOG_WARNING,
   type PrivateLogCode,
   type PrivateLogState,
-} from './constants.js';
+} from './constants';
 import {
   openPrivateLogFile,
   PrivateLogError,
   type PrivateLogFile,
-} from './private-log-file.js';
+} from './private-log-file';
 
 // Queue marker: close the exhausted file and reserve a fresh one in order.
 const ROTATE = Symbol('rotate');

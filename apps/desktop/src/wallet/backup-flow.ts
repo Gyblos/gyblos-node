@@ -1,14 +1,14 @@
 // Coordinates explicitly approved local backup operations in the host process.
 // Returns status only: no paths, private keys, ciphertext or decrypted data cross IPC.
-import { readBackupFile, writeBackupFile } from './backup-files.js';
+import { readBackupFile, writeBackupFile } from './backup-files';
 import {
   BACKUP_ACTION,
   BACKUP_RESULT,
   parseBackupRequest,
   type BackupResult,
-} from './backup-flow-model.js';
-import { createBackupCodec } from './backup/index.js';
-import type { createWalletService } from './service.js';
+} from './backup-flow-model';
+import { createBackupCodec } from './backup/index';
+import type { createWalletService } from './service';
 
 export interface BackupDialogs {
   approve(): Promise<boolean>;

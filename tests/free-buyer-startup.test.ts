@@ -12,11 +12,12 @@ import { startFreeBuyer } from '@gyblos/buyer/free-startup';
 import { FILE_MODES, ROLE_FILES } from '@gyblos/config';
 import { CONFIG_ASSET_LABELS } from '@gyblos/config/constants';
 import { SELLER_BADGES } from '@gyblos/core/constants';
-import { P2P_ROLES, ROLE_CONFIG_SCHEMA_VERSION } from '@gyblos/node/constants';
+import { ROLE_CONFIG_SCHEMA_VERSION } from '@gyblos/node/constants';
+import { P2P_ROLES } from '@gyblos/protocol/constants';
 
-import { controlFixture } from './support/control-fixture.js';
-import { endpoint } from './support/native-fixture.js';
-import { NATIVE_CAPABILITY } from './support/native-runtime.js';
+import { controlFixture } from './support/control-fixture';
+import { endpoint } from './support/native-fixture';
+import { NATIVE_CAPABILITY } from './support/native-runtime';
 
 void test(
   'free buyer startup requires no trusted v1 offer, wallet signer, tokenizer or program RPC',

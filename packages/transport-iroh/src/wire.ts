@@ -1,8 +1,8 @@
 // Encodes and decodes the bounded HTTP/1-style wire format, keeping only allowlisted headers.
 import { HTTP_STATUS, ROUTES } from '@gyblos/config';
 
-import { HTTP_OVER_IROH } from './constants.js';
-import type { HttpMessage, HttpRequest, HttpResponse } from './types.js';
+import { HTTP_OVER_IROH } from './constants';
+import type { HttpMessage, HttpRequest, HttpResponse } from './types';
 
 const REQUEST_HEADERS = new Set(['content-type', 'payment-signature', 'host']);
 const RESPONSE_HEADERS = new Set([

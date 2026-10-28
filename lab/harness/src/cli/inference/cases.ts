@@ -15,15 +15,12 @@ import { JOURNAL_STATES } from '@gyblos/payments-x402/constants';
 import { createInferenceBuyer } from '@gyblos/payments-x402/inference-buyer';
 import { saveJson } from '@gyblos/runtime';
 
-import { GATE_TIMEOUTS, labPaths, WALLET_ROLES } from '../../constants.js';
-import {
-  assertNoUnresolvedAuthorizations,
-  saveJournal,
-} from '../../journal.js';
-import { signer } from '../../wallet.js';
-import { assertInferenceCase } from './assertions.js';
-import { reconcileCase } from './reconcile.js';
-import type { CaseContext } from './types.js';
+import { GATE_TIMEOUTS, labPaths, WALLET_ROLES } from '../../constants';
+import { assertNoUnresolvedAuthorizations, saveJournal } from '../../journal';
+import { signer } from '../../wallet';
+import { assertInferenceCase } from './assertions';
+import { reconcileCase } from './reconcile';
+import type { CaseContext } from './types';
 
 export async function runCases({
   url,

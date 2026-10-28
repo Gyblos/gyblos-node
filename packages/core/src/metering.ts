@@ -2,7 +2,7 @@
 // assesses whether an actual charge is fair. Pure arithmetic; no engines or tokenizers.
 import { UNITS } from '@gyblos/config';
 
-import { CHARGE_ANOMALIES, PRICES, TOLERANCE } from './constants.js';
+import { CHARGE_ANOMALIES, PRICES, TOLERANCE } from './constants';
 
 export interface TokenCounts {
   input: number;

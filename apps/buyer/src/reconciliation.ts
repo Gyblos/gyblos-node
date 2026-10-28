@@ -6,7 +6,7 @@ import {
   type FinalizedPaymentExpectation,
 } from '@gyblos/payments-x402/accounting/finalized-proof';
 
-import { RECONCILED_ZERO_CHARGE } from './constants.js';
+import { RECONCILED_ZERO_CHARGE } from './constants';
 
 export interface UncertainAttempt {
   channelId: string;

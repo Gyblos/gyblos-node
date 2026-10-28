@@ -1,8 +1,8 @@
 // Forwards one bridged inference POST to the seller's literal loopback origin with bounded response size.
 import { LOCALHOST, ROUTES, TRANSPORT_TIMEOUTS } from '@gyblos/config';
 
-import { HTTP_OVER_IROH } from './constants.js';
-import type { HttpRequest, HttpResponse } from './types.js';
+import { HTTP_OVER_IROH } from './constants';
+import type { HttpRequest, HttpResponse } from './types';
 
 export async function loopbackRequest(
   origin: string,

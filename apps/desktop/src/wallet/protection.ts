@@ -1,10 +1,6 @@
 // Adapts Electron OS encryption, rejecting weak Linux storage; no filesystem or keys.
-import { restrictCbcProtection } from './cbc-protection.js';
-import {
-  STORAGE_CBC,
-  WALLET_PROVIDER,
-  type WalletProvider,
-} from './constants.js';
+import { restrictCbcProtection } from './cbc-protection';
+import { STORAGE_CBC, WALLET_PROVIDER, type WalletProvider } from './constants';
 
 export interface SafeStoragePort {
   isAsyncEncryptionAvailable(): Promise<boolean>;

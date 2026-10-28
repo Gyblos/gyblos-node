@@ -5,7 +5,6 @@ import { parseArgs } from 'node:util';
 
 import { ROLE_FILES } from '@gyblos/config';
 import type { OfferTrust } from '@gyblos/core/offers';
-import { P2P_ROLES } from '@gyblos/node/constants';
 import { assertRoleHome } from '@gyblos/node/home';
 import { verifyInferenceOffer } from '@gyblos/node/offers';
 import { loadRole, rolePath } from '@gyblos/node/roles';
@@ -13,6 +12,7 @@ import { finalizedPaymentProof } from '@gyblos/payments-x402/accounting/finalize
 import { JOURNAL_STATES } from '@gyblos/payments-x402/constants';
 import { withExclusiveLock } from '@gyblos/payments-x402/recovery/lock';
 import { withP2pRecoveryLock } from '@gyblos/payments-x402/recovery/recovery-lock';
+import { P2P_ROLES } from '@gyblos/protocol/constants';
 import type { SignedInferenceOffer } from '@gyblos/protocol/offer';
 import { isMain, loadJson, saveJson } from '@gyblos/runtime';
 
@@ -21,12 +21,12 @@ import {
   P2P_JOURNAL_STATES,
   type CallOutcome,
   type P2pJournalState,
-} from './constants.js';
+} from './constants';
 import {
   verifyZeroChargeReconciliation,
   type RecoveryAccounts,
   type UncertainAttempt,
-} from './reconciliation.js';
+} from './reconciliation';
 
 const buyerPath = (name: string) => rolePath(P2P_ROLES.BUYER, name);
 

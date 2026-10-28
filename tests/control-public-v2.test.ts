@@ -27,8 +27,8 @@ import {
 } from '@gyblos/protocol/public-v2';
 import { signingBytes } from '@gyblos/protocol/signing';
 
-import { controlFixture } from './support/control-fixture.js';
-import { publicFixture } from './support/public-records.js';
+import { controlFixture } from './support/control-fixture';
+import { publicFixture } from './support/public-records';
 
 void test('public v2 round-trips catalog, presence and withdrawal with node signatures', async () => {
   const fixture = await controlFixture();

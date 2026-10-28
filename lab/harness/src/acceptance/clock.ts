@@ -1,8 +1,8 @@
 // Separates accelerated evidence time from real transport deadlines; real mode waits on wall time.
 import { setTimeout as delay } from 'node:timers/promises';
 
-import { ACCEPTANCE_MODES, type AcceptanceMode } from './constants.js';
-import { assertAcceptanceActive } from './errors.js';
+import { ACCEPTANCE_MODES, type AcceptanceMode } from './constants';
+import { assertAcceptanceActive } from './errors';
 
 export function createAcceptanceClock(
   mode: AcceptanceMode,

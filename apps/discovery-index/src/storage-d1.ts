@@ -7,7 +7,7 @@ import type {
   NodeState,
   SellerRow,
   StoredEntry,
-} from './storage.js';
+} from './storage';
 
 export type D1Value = string | number | null;
 export type D1Row = Record<string, unknown>;

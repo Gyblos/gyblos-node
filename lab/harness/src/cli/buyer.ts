@@ -2,7 +2,7 @@
 // the evidence JSON; sets a non-zero exit code on failure.
 import { isMain } from '@gyblos/runtime';
 
-import { executeGate } from './execute.js';
+import { executeGate } from './execute';
 
 export async function main() {
   try {

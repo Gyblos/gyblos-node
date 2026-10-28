@@ -7,7 +7,7 @@ import type {
   PUBLIC_RECORD_KINDS,
   PUBLIC_RECORD_LIMITS,
   PublicRecordKind,
-} from './constants.js';
+} from './constants';
 
 export interface PublicRecordHeader {
   schemaVersion: typeof PUBLIC_RECORD_LIMITS.schemaVersion;

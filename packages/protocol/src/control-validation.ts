@@ -6,7 +6,7 @@ import {
   REASONING_LEVELS,
   type ControlCode,
   type ReasoningLevel,
-} from './constants.js';
+} from './constants';
 import {
   publicAddress,
   publicHex,
@@ -14,8 +14,8 @@ import {
   publicInteger,
   publicObject,
   PublicRecordError,
-} from './public-validation.js';
-import { verify } from './signing.js';
+} from './public-validation';
+import { verify } from './signing';
 
 export class ControlError extends Error {
   constructor(readonly code: ControlCode) {

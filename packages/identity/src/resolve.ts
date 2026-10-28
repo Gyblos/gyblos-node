@@ -2,17 +2,17 @@
 // Builds on read.ts for account reads; must not know registration, sponsorship or caching.
 import type { Address } from '@solana/kit';
 
-import { decodeMetadataEntry } from './accounts.js';
-import { nodeIdMetadataPrefix } from './binding.js';
+import { decodeMetadataEntry } from './accounts';
+import { nodeIdMetadataPrefix } from './binding';
 import {
   ACCOUNT_DISCRIMINATORS,
   ACCOUNT_OFFSETS,
   BINDING_STATUSES,
   BINDING_VERSIONS,
   IDENTITY_ERROR_CODES,
-} from './constants.js';
-import { IdentityError } from './errors.js';
-import { memcmpFilter } from './filters.js';
+} from './constants';
+import { IdentityError } from './errors';
+import { memcmpFilter } from './filters';
 import {
   assertIdentityReadActive,
   readClaimants,
@@ -20,7 +20,7 @@ import {
   type IdentityReadOptions,
   type IdentityReadRpc,
   type NodeIdentity,
-} from './read.js';
+} from './read';
 
 type IdentityRpc = IdentityReadRpc;
 

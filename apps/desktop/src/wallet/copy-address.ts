@@ -1,6 +1,6 @@
 // Copies only the selected current public address; no arbitrary text or key access.
-import { WALLET_STATUS } from './constants.js';
-import type { WalletSummary } from './model.js';
+import { WALLET_STATUS } from './constants';
+import type { WalletSummary } from './model';
 
 export function copyPublicWalletAddress(
   current: WalletSummary,

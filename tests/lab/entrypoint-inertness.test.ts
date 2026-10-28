@@ -2,8 +2,8 @@
 // checked in tests/entrypoint-inertness.test.ts. No funded wallets or live services.
 import test from 'node:test';
 
-import { assertImportsInert } from '../support/inertness.js';
-import { NATIVE_CAPABILITY } from '../support/native-runtime.js';
+import { assertImportsInert } from '../support/inertness';
+import { NATIVE_CAPABILITY } from '../support/native-runtime';
 
 void test('lab executable modules are inert when imported', async (context) => {
   await assertImportsInert(async () => {

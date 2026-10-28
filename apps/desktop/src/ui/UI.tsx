@@ -8,8 +8,8 @@ import {
   type ReactNode,
 } from 'react';
 
-import { BUTTON_VARIANT } from './constants.js';
-import { useTooltip } from './Tooltip.js';
+import { BUTTON_VARIANT } from './constants';
+import { useTooltip } from './Tooltip';
 
 type ButtonProps = ComponentPropsWithRef<'button'> & {
   variant?: (typeof BUTTON_VARIANT)[keyof typeof BUTTON_VARIANT];

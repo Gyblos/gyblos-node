@@ -2,17 +2,17 @@
 import { HTTP_STATUS } from '@gyblos/config';
 import { openBuyerIdentityVerifier } from '@gyblos/node/identity-verifier';
 
-import { acceptanceAssert, assertAcceptanceActive } from './errors.js';
+import { acceptanceAssert, assertAcceptanceActive } from './errors';
 import {
   createFreeBuyer,
   type FreeAcceptanceBuyer,
   type FreeBuyerIdentityOptions,
-} from './free-buyer.js';
-import type { FreeAcceptanceFault } from './free-constants.js';
-import type { IdentityAcceptanceCase } from './identity-constants.js';
-import type { AcceptanceRegistry } from './identity-registry.js';
-import { pump } from './phases.js';
-import type { AcceptanceSession } from './session.js';
+} from './free-buyer';
+import type { FreeAcceptanceFault } from './free-constants';
+import type { IdentityAcceptanceCase } from './identity-constants';
+import type { AcceptanceRegistry } from './identity-registry';
+import { pump } from './phases';
+import type { AcceptanceSession } from './session';
 
 export interface IdentityAcceptanceContext {
   run: AcceptanceSession;

@@ -20,22 +20,22 @@ import {
 
 import { COMMITMENT, SVM_TRANSACTION_VERSION } from '@gyblos/config';
 
-import { encodeBindingValue, signNodeBinding } from './binding.js';
+import { encodeBindingValue, signNodeBinding } from './binding';
 import {
   BASE64_ENCODING,
   IDENTITY_ERROR_CODES,
   LIMITS,
   METADATA_KEYS,
   REGISTRATION_DEFAULTS,
-} from './constants.js';
-import { IdentityError } from './errors.js';
+} from './constants';
+import { IdentityError } from './errors';
 import {
   prefundInstruction,
   registerInstruction,
   setAgentWalletInstructions,
   setMetadataInstruction,
-} from './instructions.js';
-import type { DetachedSigner } from './signers.js';
+} from './instructions';
+import type { DetachedSigner } from './signers';
 
 const BASE64_BITS_PER_CHAR = 6;
 const BITS_PER_BYTE = 8;

@@ -7,13 +7,13 @@ import {
   scrypt,
 } from 'node:crypto';
 
-import { walletAddress } from '../key.js';
-import { BACKUP, BACKUP_ERROR } from './constants.js';
-import { BackupError } from './error.js';
-import { authenticatedHeader, header, parseBackup } from './format.js';
+import { walletAddress } from '../key';
+import { BACKUP, BACKUP_ERROR } from './constants';
+import { BackupError } from './error';
+import { authenticatedHeader, header, parseBackup } from './format';
 
-export { BACKUP, BACKUP_ERROR } from './constants.js';
-export { BackupError } from './error.js';
+export { BACKUP, BACKUP_ERROR } from './constants';
+export { BackupError } from './error';
 
 function passwordBytes(password: string) {
   if (typeof password !== 'string')

@@ -4,12 +4,12 @@ import { useState } from 'react';
 import {
   WALLET_SETTINGS_ACTION,
   WALLET_SETTINGS_RESULT,
-} from '../wallet/settings-model.js';
-import { validSetupPassword } from '../wallet/setup-model.js';
-import { BUTTON_VARIANT } from './constants.js';
-import { Button, Note } from './UI.js';
-import { PasswordField } from './WalletBackup.js';
-import { useDesktopWalletActions } from './WalletState.js';
+} from '../wallet/settings-model';
+import { validSetupPassword } from '../wallet/setup-model';
+import { BUTTON_VARIANT } from './constants';
+import { Button, Note } from './UI';
+import { PasswordField } from './WalletBackup';
+import { useDesktopWalletActions } from './WalletState';
 
 const restoreCopy = {
   [WALLET_SETTINGS_RESULT.RESTORED]:

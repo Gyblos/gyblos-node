@@ -10,8 +10,8 @@ import { fileURLToPath } from 'node:url';
 import {
   diagnosticDirectory,
   rm,
-} from '../support/facilitator-diagnostic-fixture.js';
-import { PRIVATE_LOG_PLATFORM_SKIP } from '../support/private-log-fixture.js';
+} from '../support/facilitator-diagnostic-fixture';
+import { PRIVATE_LOG_PLATFORM_SKIP } from '../support/private-log-fixture';
 
 const SOURCE = new URL('../../', import.meta.url);
 const CHILD_TIMEOUT_MS = 15000;

@@ -13,7 +13,7 @@ import {
   seeded,
   select,
   seller,
-} from './support/seller-selection-fixture.js';
+} from './support/seller-selection-fixture';
 
 const SYBIL_START = 100;
 const isSybil = (id: string) => Number.parseInt(id, 16) >= SYBIL_START;

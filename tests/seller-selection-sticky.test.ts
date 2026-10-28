@@ -15,7 +15,7 @@ import {
   seeded,
   select,
   seller,
-} from './support/seller-selection-fixture.js';
+} from './support/seller-selection-fixture';
 
 const { MEDIUM, HIGH } = REASONING_LEVELS;
 const runs = (

@@ -10,9 +10,9 @@
 
 Dependency direction is protocol → core → adapters → node → apps; config and runtime are shared support above protocol. Package table: [docs/architecture.md](docs/architecture.md).
 
-- `packages/protocol`: wire contracts, canonical JSON, signing domains and golden vectors (`vectors/`). v1 signed offers and public records plus v2 (`public-v2`, `offer-v2`, `control-*`, `vectors/control-v2.json`). Only v1 is paid; v2 is not wired into payment ([SPEC.md](packages/protocol/SPEC.md)). No SDKs.
+- `packages/protocol`: wire contracts, canonical JSON, signing domains and golden vectors (`vectors/`). v1 signed offers and public records plus v2 (`public-v2`, `offer-v2`, `control-*`, `vectors/control-v2.json`). Only v1 is paid; v2 is not wired into payment ([SPEC.md](packages/protocol/SPEC.md)). It also owns the ports plugins implement (`Engine` in `engine.ts`) and catalogs shared across layers (node roles, engine kinds, pricing kinds, engine error codes). No SDKs.
 - `packages/core`: pure policy (metering, offer trust `offers`, `control-admission`, `control-quotes`, `seller-selection*`). No SDKs, filesystem, or clock/random of its own.
-- Adapters are the packages matching `payments-x402`, `identity`, `engine-*`, `transport-*`, `discovery-*` (`tooling/boundaries/config.ts`). They never import each other, `node` or apps. Inference knows no wallets; payment code knows no engines.
+- Adapters (plugins) are the packages matching `payments-*`, `identity`, `engine-*`, `transport-*`, `discovery-*`, `telemetry-*` (`tooling/boundaries/config.ts`). Each implements a port and is chosen by composition in `node`; they never import each other, `node` or apps. Inference knows no wallets; payment code knows no engines.
 - `packages/node`: local-node library for both roles; composes adapters, including the seller's facilitator and control service.
 - `apps/node` (seller daemon and the `gyblos` CLI), `apps/buyer`, `apps/desktop` (Electron, the provisional desktop host per vault GYB-DOC-001) and `apps/discovery-index` (the discovery index Cloudflare Worker; deploy needs founder approval) are independent executables; apps never import each other.
 - `packages/config`: operator values; `config/src/home.ts` is the only owner of local paths. `packages/runtime`: platform helpers.

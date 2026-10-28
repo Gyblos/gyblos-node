@@ -6,19 +6,16 @@ import { join } from 'node:path';
 
 import { app, BrowserWindow, ipcMain } from 'electron';
 
-import { DESKTOP, PROBE_STATUS, STARTUP_WINDOW } from './constants.js';
-import { probeInUtility } from './probe-host.js';
-import { failedProbe, type ProbeResult } from './probe-model.js';
-import { cleanupDesktopSession } from './session-cleanup.js';
-import { armSmokeWatchdog } from './smoke-watchdog.js';
-import { startupHandoff } from './startup-window.js';
-import { BRAND_COLORS } from './theme.js';
-import { WALLET } from './wallet/constants.js';
-import { registerDesktopWallet } from './wallet/host.js';
-import {
-  focusExistingWindow,
-  prepareWalletProfile,
-} from './wallet/lifecycle.js';
+import { DESKTOP, PROBE_STATUS, STARTUP_WINDOW } from './constants';
+import { probeInUtility } from './probe-host';
+import { failedProbe, type ProbeResult } from './probe-model';
+import { cleanupDesktopSession } from './session-cleanup';
+import { armSmokeWatchdog } from './smoke-watchdog';
+import { startupHandoff } from './startup-window';
+import { BRAND_COLORS } from './theme';
+import { WALLET } from './wallet/constants';
+import { registerDesktopWallet } from './wallet/host';
+import { focusExistingWindow, prepareWalletProfile } from './wallet/lifecycle';
 
 function createProbeWindow(startup = false) {
   const window = new BrowserWindow({

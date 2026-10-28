@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { REPOSITORY_ROOT } from './support/node-config-fixtures.js';
+import { REPOSITORY_ROOT } from './support/node-config-fixtures';
 
 void test(
   'repeated signals during shutdown are absorbed until the stop finishes',

@@ -23,14 +23,9 @@ import {
   verifyPublicV2,
 } from '@gyblos/protocol/public-v2';
 
-import { INDEX_ERRORS } from './constants.js';
-import {
-  indexFail,
-  protocolStep,
-  recordCode,
-  referenceCode,
-} from './errors.js';
-import type { StoredCatalog } from './storage.js';
+import { INDEX_ERRORS } from './constants';
+import { indexFail, protocolStep, recordCode, referenceCode } from './errors';
+import type { StoredCatalog } from './storage';
 
 const HEX_PAIR = 2;
 const HEX_RADIX = 16;

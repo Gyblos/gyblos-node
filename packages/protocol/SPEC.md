@@ -343,7 +343,7 @@ is retained unchanged to verify rejection of the previous per-token v2 shape.
 The complete design and rollout
 constraints live in vault GYB-DOC-022, control-contract appendix.
 
-## Free inference execution v2
+## Free inference execution v3
 
 `@gyblos/protocol/free-execution` and `./free-execution-framing` define a
 non-streaming execution contract for previously verified signed free quotes.
@@ -352,9 +352,28 @@ quote authentication, token admission and its pinned engine. The protocol
 helpers alone do not enforce state or execute work. Buyer wiring is separate;
 no v2 payment path is enabled.
 
+### Changes from free execution v2
+
+Version 3 adds one terminal code and replaces version 2 on both free ALPNs; the
+two versions do not coexist. A v2 peer facing a v3 peer fails ALPN negotiation,
+before any prompt byte is sent.
+
+- ALPNs `gyblos/free/3` and `gyblos/free-stream/3`, `version: 3` and request
+  digest domain `gyblos/free-execution-request/v3\n`.
+- New code `FREE_EXECUTION_SELLER_CANNOT_CONTINUE`: an admitted generation
+  stopped on an engine failure. `FREE_EXECUTION_ENGINE_UNAVAILABLE` keeps its
+  meaning, a refusal before generation (expired engine readiness, or an engine
+  failure that is not a uniform engine error).
+- The error object may carry `reason` and `delivered`; every other field and
+  bound is unchanged.
+- Vectors move from `free-execution-v2.json` and `free-stream-v2.json` to the
+  `-v3.json` files; the quote envelope and its signature are unchanged.
+
+Receipt exchange is not part of v3; it will use its own channel.
+
 ### Separate execution channel
 
-The ALPN is **`gyblos/free/2`**. Reusing `gyblos/control/1` would break its
+The ALPN is **`gyblos/free/3`**. Reusing `gyblos/control/1` would break its
 no-prompt/no-engine invariant, mix long-running inference with short discovery
 queries and make their independent admission budgets ambiguous. A separate
 ALPN preserves that boundary and permits separate execution admission under the
@@ -376,7 +395,7 @@ send EOF. A receiver processes nothing until the full body and EOF arrive.
 
 Request fields (all required; unknown fields at every level are rejected):
 
-- `version: 2`, and `requestId` equal to the quote's validated 128-bit lowercase
+- `version: 3`, and `requestId` equal to the quote's validated 128-bit lowercase
   hexadecimal requestId. A fresh execution identifier cannot make a quote reusable.
 - `quote`: the unmodified seller-signed `SignedOfferV2` envelope.
 - `input`: `messages`, `selection`, `reasoning`, `maxTokens`. `selection` is the
@@ -394,18 +413,43 @@ Request fields (all required; unknown fields at every level are rejected):
   requested output maximum must fit the quoted context before generation.
 
 Success response:
-`{version: 2, requestId, requestDigest, result: {text, usage: {inputTokens, outputTokens}, finishReason}}`.
+`{version: 3, requestId, requestDigest, result: {text, usage: {inputTokens, outputTokens}, finishReason}}`.
 Usage contains non-negative safe integer counts under the public context bound;
 output must not exceed the requested maximum, and combined usage must fit the
 quoted context. `finishReason` is `stop` or `length`. Empty text/zero counts are
 representable; usage is reported evidence, not a cryptographic proof of work.
 There are no fragments or buyer-visible streaming in this version.
 
-Failure response uses exactly the same header and `error: {code}`, never
-`result` as well. Codes are the closed `FREE_EXECUTION_CODES` catalog: invalid,
-version, limit, binding, signature, expired, wrong peer, replay, not-free,
-daily-cap, buyer-cap, unsupported, busy, engine-unavailable, timeout, cancelled
-and internal. Messages, provider errors and input contents are never reflected.
+Failure response uses exactly the same header and
+`error: {code, reason?, delivered?}`, never `result` as well. Codes are the
+closed `FREE_EXECUTION_CODES` catalog: invalid, version, limit, binding,
+signature, expired, wrong peer, replay, not-free, daily-cap, buyer-cap,
+unsupported, busy, engine-unavailable, timeout, cancelled, internal and
+seller-cannot-continue. Messages, provider errors and input contents are never
+reflected.
+
+Shape rules, checked by `parseFreeExecutionResponse` without context:
+
+- `reason` is present if and only if the code is
+  `FREE_EXECUTION_SELLER_CANNOT_CONTINUE`, and is one of
+  `FREE_EXECUTION_STOP_REASONS`: `quota_exhausted`, `rate_limited`,
+  `engine_unavailable`, `engine_interrupted`, `engine_timeout`,
+  `engine_invalid_response`. `ENGINE_ERROR_STOP_REASON` maps each uniform engine
+  error to one reason. An upstream authentication failure is reported as
+  `engine_unavailable`: the credential state of a seller's provider account is
+  not revealed to buyers. The seller keeps the exact engine code locally.
+- `delivered`, when present, is exactly `{outputTokens}` with a safe integer
+  from 1 to the public context bound (`PUBLIC_RECORD_LIMITS.maxContextTokens`),
+  and appears only beside `FREE_EXECUTION_SELLER_CANNOT_CONTINUE`.
+
+Context rules, checked by `matchFreeExecutionResponse(response, request, mode)`:
+a complete response (`mode` `'complete'`, the default) never carries
+`delivered`; a streaming terminal (`'stream'`) may, and its `outputTokens`
+must not exceed the request's `maxTokens`. The streaming rule for when
+`delivered` is required is under free streaming execution below.
+`delivered.outputTokens` is the seller's recount of the text it already
+delivered; like all usage it is reported evidence, not a proof of work. Free
+admission still keeps the full conservative debit after any engine failure.
 If framing/structure is invalid and no complete validated request is available,
 close the stream; do not invent or echo an unvalidated correlation identifier.
 In the current seller, structural parse failures (including version, binding
@@ -414,12 +458,13 @@ error codes are eligible for a reply only if raised after successful parsing;
 the error catalog does not promise every rejection has a wire response.
 
 `requestDigest` is SHA-256 of UTF-8
-`"gyblos/free-execution-request/v2\n" + canonicalJson(validatedRequest)`.
+`"gyblos/free-execution-request/v3\n" + canonicalJson(validatedRequest)`.
 It includes the signed quote and the complete chat input, and is distinct from
 the quote's prompt-free control request digest. The buyer matches requestId and
 this digest before acting on either an error or a result. Responses are bound
 to the authenticated seller connection, not independently signed receipts.
-`FreeExecutionError.remote` defaults to false for local checks.
+`FreeExecutionError.remote` defaults to false for local checks. A matched
+remote error also exposes its `reason` and `delivered`.
 `matchFreeExecutionResponse` sets it to true only for a parsed error whose
 requestId and digest match; it is local metadata, never a wire field. This
 flag does not authorize fallback or retry after any prompt bytes were sent.
@@ -491,12 +536,16 @@ No handler path may call payments, the facilitator or v1, including failures.
 
 ### Compatibility and rollout
 
-`vectors/free-execution-v2.json` pins independent Node/OpenSSL quote signature,
-request canonical bytes/domain digest, request framing and success/error
-response framing. All existing v1 and v2 vectors/domains remain unchanged.
-The contract ships first; seller wiring then enables free startup explicitly
-with `loadSellerSettings(process.env, undefined, {freeExecution: true})` only
-when its handler and caps are present. Buyer wiring follows separately.
+`vectors/free-execution-v3.json` pins the independent Node/OpenSSL quote
+signature, request canonical bytes/domain digest, request framing and
+success/error/seller-cannot-continue response framing. Its request digest,
+canonical bytes and frames come from an independent one-shot Python oracle that
+first reproduced every v2 vector; the oracle is not committed. The v1 vectors,
+control v2 vectors and their domains remain unchanged.
+Each protocol change ships the contract first, then the seller, then the buyer.
+Seller wiring enables free startup explicitly with
+`loadSellerSettings(process.env, undefined, {freeExecution: true})` only when
+its handler and caps are present.
 Acceptance later covers publication → discovery → selection → free quote →
 execution → answer using an in-process index and synthetic engine, including
 replay, expiry, wrong peer, exhausted caps, engine failure and no fallback once
@@ -542,24 +591,29 @@ Synthetic service tests, bounded-stream tests and native loopback execution
 cover this seller slice. No real engine, devnet, deployed index, production
 startup or full publish-to-answer lab acceptance is claimed by these tests.
 
-### Free streaming execution v2
+### Free streaming execution v3
 
-`gyblos/free-stream/2` is a separate execution ALPN. It reuses the unchanged
-`gyblos/free/2` request and its digest domain. This keeps one-shot consumers and
+`gyblos/free-stream/3` is a separate execution ALPN. It reuses the unchanged
+`gyblos/free/3` request and its digest domain. This keeps one-shot consumers and
 all existing vectors intact, without overloading the control ALPN or enabling
 `gyblos/http/2`. The seller shares one policy/admission instance across both
 free execution ALPNs: the buyer-bound quote/requestId is consumed once across
 modes, not once per mode. Free still requires both prices and maxAtomic zero.
 
 Each response event is canonical UTF-8 JSON prefixed with a four-byte big-endian
-length. Events carry version 2, requestId, requestDigest and a zero-based,
+length. Events carry version 3, requestId, requestDigest and a zero-based,
 strictly consecutive sequence. `delta` adds text; `terminal` carries the existing
 complete FreeExecutionResponse. Successful terminal text must equal the exact
 concatenated deltas, and terminal usage/context bounds are checked as for the
 complete response. An error terminal is unsuccessful, including after partial
-text. EOF before terminal, bytes after terminal, unknown fields, invalid UTF-8,
-noncanonical or duplicate JSON fields, changed bindings and reordered events
-are rejected. Fragments are provisional until a valid terminal and EOF.
+text. A `FREE_EXECUTION_SELLER_CANNOT_CONTINUE` terminal carries `delivered`
+if and only if at least one delta preceded it; every other error terminal,
+for example `LIMIT` after partial text, never carries `delivered`. Its
+`outputTokens` may not exceed the UTF-8 bytes of the delivered deltas, since
+every token covers at least one byte. `vectors/free-stream-v3.json` pins two
+deltas followed by such a terminal with reason `engine_interrupted`. EOF before
+terminal, bytes after terminal, unknown fields, invalid UTF-8, noncanonical or
+duplicate JSON fields, changed bindings and reordered events are rejected. Fragments are provisional until a valid terminal and EOF.
 
 A delta contains at most 8192 UTF-8 bytes; splitting preserves Unicode scalar
 values. There are at most 4096 events including terminal, at most

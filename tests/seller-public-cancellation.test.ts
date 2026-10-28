@@ -13,7 +13,7 @@ import {
 } from '@gyblos/protocol/constants';
 import { ControlError } from '@gyblos/protocol/control-validation';
 
-import { controlFixture } from './support/control-fixture.js';
+import { controlFixture } from './support/control-fixture';
 
 async function fixture() {
   const source = await controlFixture();

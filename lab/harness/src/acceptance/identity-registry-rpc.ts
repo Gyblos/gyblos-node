@@ -7,12 +7,12 @@ import { getBase58Encoder } from '@solana/kit';
 import { DEVNET_GENESIS } from '@gyblos/config';
 import { IDENTITY_RPC_METHODS } from '@gyblos/identity/constants';
 
-import { acceptanceAssert } from './errors.js';
+import { acceptanceAssert } from './errors';
 import {
   registryAccountJson,
   type RegistryAccount,
-} from './identity-registry-accounts.js';
-import { REGISTRY_FIXTURE } from './identity-registry-constants.js';
+} from './identity-registry-accounts';
+import { REGISTRY_FIXTURE } from './identity-registry-constants';
 
 interface RegistryCall {
   id: string;

@@ -22,9 +22,9 @@ import {
   configurationNodeId,
   configurationObject,
   configurationString,
-} from './configuration.js';
-import { NODE_ERROR_CODES } from './constants.js';
-import { NodeError } from './errors.js';
+} from './configuration';
+import { NODE_ERROR_CODES } from './constants';
+import { NodeError } from './errors';
 
 export async function signInferenceOffer(
   offer: InferenceOffer,

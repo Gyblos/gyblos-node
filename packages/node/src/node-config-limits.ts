@@ -5,7 +5,7 @@
 import { TRANSPORT_LIMITS, type TransportLimits } from '@gyblos/config';
 import { FREE_EXECUTION_ADMISSION } from '@gyblos/core/constants';
 
-import { NODE_CONFIG_ISSUE_CODES, SELLER_LIMIT_CEILINGS } from './constants.js';
+import { NODE_CONFIG_ISSUE_CODES, SELLER_LIMIT_CEILINGS } from './constants';
 import {
   integer,
   optional,
@@ -14,7 +14,7 @@ import {
   withoutUndefined,
   type ConfigPath,
   type IssueList,
-} from './node-config-fields.js';
+} from './node-config-fields';
 
 export interface NodeLimits {
   maxConnections?: number;

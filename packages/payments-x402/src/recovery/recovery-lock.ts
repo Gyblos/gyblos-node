@@ -8,9 +8,9 @@ import { FILE_MODES } from '@gyblos/config';
 import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { ProtocolError } from '@gyblos/protocol/errors';
 
-import { LOCK_METADATA_BYTES } from '../constants.js';
-import { currentLockOwner } from './lock-owner.js';
-import { withExclusiveLock } from './lock.js';
+import { LOCK_METADATA_BYTES } from '../constants';
+import { withExclusiveLock } from './lock';
+import { currentLockOwner } from './lock-owner';
 
 interface RecoveryLockPaths {
   buyer: string;

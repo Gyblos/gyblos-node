@@ -16,7 +16,7 @@ import {
 } from '@gyblos/protocol/constants';
 import { catalogDigestV2, verifyPublicV2 } from '@gyblos/protocol/public-v2';
 
-import { controlFixture } from './support/control-fixture.js';
+import { controlFixture } from './support/control-fixture';
 
 async function fixture() {
   const source = await controlFixture();

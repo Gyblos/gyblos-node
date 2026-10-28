@@ -23,6 +23,7 @@ import {
   type RoleKey,
 } from '@gyblos/config';
 import { CONFIG_ASSET_LABELS } from '@gyblos/config/constants';
+import { P2P_ROLES, type P2PRole } from '@gyblos/protocol/constants';
 import { saveJson } from '@gyblos/runtime';
 
 import {
@@ -31,16 +32,14 @@ import {
   configurationNodeId,
   configurationObject,
   configurationRpcUrl,
-} from './configuration.js';
+} from './configuration';
 import {
   NODE_ERROR_CODES,
   NODE_KEY_BYTES,
-  P2P_ROLES,
   ROLE_CONFIG_SCHEMA_VERSION,
-  type P2PRole,
-} from './constants.js';
-import { NodeError } from './errors.js';
-import { assertRoleHome } from './home.js';
+} from './constants';
+import { NodeError } from './errors';
+import { assertRoleHome } from './home';
 
 interface CommonRole {
   schemaVersion: typeof ROLE_CONFIG_SCHEMA_VERSION;

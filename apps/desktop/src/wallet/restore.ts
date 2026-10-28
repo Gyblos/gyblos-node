@@ -3,21 +3,21 @@
 import { lstat, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { BackupError, createBackupCodec } from './backup/index.js';
-import { WALLET, WALLET_RESTORE_ERROR, WALLET_STATUS } from './constants.js';
+import { BackupError, createBackupCodec } from './backup/index';
+import { WALLET, WALLET_RESTORE_ERROR, WALLET_STATUS } from './constants';
 import {
   ensureWalletRoot,
   isMissing,
   syncWalletDirectory,
   writeRestoredWallet,
-} from './files.js';
-import type { WalletSummary } from './model.js';
-import type { WalletProtection } from './protection.js';
-import { WalletRestoreError } from './restore-error.js';
-import { readExistingWallet } from './service.js';
+} from './files';
+import type { WalletSummary } from './model';
+import type { WalletProtection } from './protection';
+import { WalletRestoreError } from './restore-error';
+import { readExistingWallet } from './service';
 
-export { WALLET_RESTORE_ERROR } from './constants.js';
-export { WalletRestoreError } from './restore-error.js';
+export { WALLET_RESTORE_ERROR } from './constants';
+export { WalletRestoreError } from './restore-error';
 
 function cancelled(signal?: AbortSignal) {
   if (signal?.aborted)

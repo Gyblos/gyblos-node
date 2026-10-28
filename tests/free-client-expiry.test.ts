@@ -13,7 +13,7 @@ import { freeExecutionDigest } from '@gyblos/protocol/free-execution';
 import { encodeFreeExecutionResponse } from '@gyblos/protocol/free-execution-framing';
 import { createFreeExecutionClient } from '@gyblos/transport-iroh/free-client';
 
-import { freeSellerFixture } from './support/free-seller.js';
+import { freeSellerFixture } from './support/free-seller';
 
 async function expiryFixture(offset: number) {
   const source = await freeSellerFixture();

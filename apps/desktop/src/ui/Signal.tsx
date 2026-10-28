@@ -2,7 +2,7 @@
 // Decorative state only: never claims a real provider connection or changes chat execution.
 import { useEffect, useId, useRef, useState, type CSSProperties } from 'react';
 
-import { SIGNAL_STATE, SIGNATURE_GEOMETRY } from './constants.js';
+import { SIGNAL_STATE, SIGNATURE_GEOMETRY } from './constants';
 
 type SignatureStyle = CSSProperties & { [key: `--signal-${string}`]: string };
 const GEOMETRY_STYLE: SignatureStyle = Object.fromEntries(
@@ -12,7 +12,7 @@ const GEOMETRY_STYLE: SignatureStyle = Object.fromEntries(
   ]),
 );
 
-export { SIGNAL_STATE } from './constants.js';
+export { SIGNAL_STATE } from './constants';
 
 type SignalState = (typeof SIGNAL_STATE)[keyof typeof SIGNAL_STATE];
 const SETTLE_MS = 1800;

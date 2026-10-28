@@ -9,12 +9,12 @@ import {
   type BuyerIdentityVerifier,
 } from '@gyblos/node/identity-verifier';
 
-import { BUYER_SELECTION_CODES } from './constants.js';
+import { BUYER_SELECTION_CODES } from './constants';
 import {
   BuyerSelectionError,
   type BuyerSelectionConfig,
   type StaticControlSeller,
-} from './selection-config.js';
+} from './selection-config';
 
 export async function prepareBuyerIdentity(
   environment: HomeEnvironment,

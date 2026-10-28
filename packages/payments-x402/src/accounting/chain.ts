@@ -15,12 +15,12 @@ import {
 import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { ProtocolError } from '@gyblos/protocol/errors';
 
-import { rpc as baseRpc, confirm } from '../chain.js';
+import { rpc as baseRpc, confirm } from '../chain';
 import type {
   AccountsResponse,
   ChainInstruction,
   ChainTransaction,
-} from './types.js';
+} from './types';
 
 // Only the chain-read fields accounting needs; callers pass their own configuration.
 interface ChainReadConfig {

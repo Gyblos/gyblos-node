@@ -4,7 +4,7 @@ import test from 'node:test';
 
 import { CONTROL_CODES } from '@gyblos/protocol/constants';
 
-import { controlFixture } from './support/control-fixture.js';
+import { controlFixture } from './support/control-fixture';
 
 void test('seller control quotas aggregate the same NodeId across connections and globally', async () => {
   const { createSellerControlService } = await import('@gyblos/node/control');

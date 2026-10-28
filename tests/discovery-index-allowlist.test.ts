@@ -21,7 +21,7 @@ import {
 } from '@gyblos/discovery-index/storage';
 import { createWorker } from '@gyblos/discovery-index/worker';
 
-import { createSqliteD1 } from './support/d1-sqlite.js';
+import { createSqliteD1 } from './support/d1-sqlite';
 import {
   allLimiters,
   allow,
@@ -34,7 +34,7 @@ import {
   MODEL,
   T0,
   type FakeLimiter,
-} from './support/discovery-index-fixture.js';
+} from './support/discovery-index-fixture';
 
 const post = (signed: unknown) =>
   new Request(`${INDEX_ORIGIN}/v1/records`, {

@@ -11,9 +11,9 @@ import {
 } from '@gyblos/protocol/constants';
 import { controlObject } from '@gyblos/protocol/control-validation';
 
-import { ACCEPTANCE, ACCEPTANCE_CODES } from './constants.js';
-import { acceptanceAssert, AcceptanceError } from './errors.js';
-import { FREE_ACCEPTANCE } from './free-constants.js';
+import { ACCEPTANCE, ACCEPTANCE_CODES } from './constants';
+import { acceptanceAssert, AcceptanceError } from './errors';
+import { FREE_ACCEPTANCE } from './free-constants';
 
 export function acceptanceChat(url: string, signal: AbortSignal) {
   const address = new URL(url);

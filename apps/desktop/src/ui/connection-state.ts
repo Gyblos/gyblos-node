@@ -1,7 +1,7 @@
 // In-memory preview connection policies; never creates credentials or contacts a tool.
-import { CONNECTION_BUDGET, CONNECTION_TOOLS } from './constants.js';
+import { CONNECTION_BUDGET, CONNECTION_TOOLS } from './constants';
 
-export { CONNECTION_TOOLS } from './constants.js';
+export { CONNECTION_TOOLS } from './constants';
 
 export type ConnectionTool = (typeof CONNECTION_TOOLS)[number];
 export type PreviewConnection = {

@@ -9,7 +9,7 @@ import {
 } from '@gyblos/identity/resolution';
 import { createIdentityResolutionRpc } from '@gyblos/identity/resolution-rpc';
 
-import { openBuyerIdentityState } from './identity-state.js';
+import { openBuyerIdentityState } from './identity-state';
 
 export interface BuyerIdentitySubject {
   nodeId: string;

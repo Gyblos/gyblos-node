@@ -19,7 +19,7 @@ import {
   disposableProtection,
   restoreDisposable,
   TEST_BACKUP_PASSWORD,
-} from './support/portable-backup-fixture.js';
+} from './support/portable-backup-fixture';
 
 async function assertAbsent(path: string) {
   await assert.rejects(lstat(path), { code: 'ENOENT' });

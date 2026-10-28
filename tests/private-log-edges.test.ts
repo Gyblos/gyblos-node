@@ -17,11 +17,11 @@ import {
   diagnosticDirectory,
   diagnosticUntil,
   rm,
-} from './support/facilitator-diagnostic-fixture.js';
+} from './support/facilitator-diagnostic-fixture';
 import {
   PRIVATE_LOG_PLATFORM_SKIP,
   withLogIo,
-} from './support/private-log-fixture.js';
+} from './support/private-log-fixture';
 
 for (const hostile of [false, true])
   void test(

@@ -12,8 +12,8 @@ import { signatureHint } from '@gyblos/payments-x402/signature-hint';
 import type { RouteObservation } from '@gyblos/transport-iroh';
 import { TRANSPORT_ROUTES } from '@gyblos/transport-iroh/constants';
 
-import type { P2pJournalState } from './constants.js';
-import type { PaymentProofObservation } from './proof.js';
+import type { P2pJournalState } from './constants';
+import type { PaymentProofObservation } from './proof';
 
 export interface CallPaymentObservation extends BuyerResponseObservation {
   depositSignature?: Signature;

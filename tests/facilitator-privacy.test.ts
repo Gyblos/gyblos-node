@@ -22,7 +22,7 @@ import {
   DIAGNOSTIC_CANARY,
   DIAGNOSTIC_CHANNEL,
   DIAGNOSTIC_SIGNATURE,
-} from './support/facilitator-diagnostic-fixture.js';
+} from './support/facilitator-diagnostic-fixture';
 
 void test('facilitator projection omits arbitrary fields and never coerces hostile metadata', () => {
   const records: FacilitatorDiagnosticRecord[] = [];

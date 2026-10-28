@@ -13,8 +13,8 @@ import {
   decodeAgentAccount,
   decodeCoreAssetOwner,
   decodeMetadataEntry,
-} from './accounts.js';
-import { decodeBindingValue, verifyNodeBinding } from './binding.js';
+} from './accounts';
+import { decodeBindingValue, verifyNodeBinding } from './binding';
 import {
   ACCOUNT_DISCRIMINATORS,
   ACCOUNT_OFFSETS,
@@ -29,11 +29,11 @@ import {
   READ_LIMITS,
   type BindingStatus,
   type CollectionPolicy,
-} from './constants.js';
-import { IdentityError } from './errors.js';
-import { memcmpFilter } from './filters.js';
-import { findAgentAddress, findMetadataAddress } from './pda.js';
-import { decodeAccountBatch, decodeProgramAccounts } from './read-response.js';
+} from './constants';
+import { IdentityError } from './errors';
+import { memcmpFilter } from './filters';
+import { findAgentAddress, findMetadataAddress } from './pda';
+import { decodeAccountBatch, decodeProgramAccounts } from './read-response';
 
 export interface NodeIdentity {
   asset: Address;

@@ -13,7 +13,7 @@ import {
 import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { ProtocolError } from '@gyblos/protocol/errors';
 
-import { assertDevnet, rpc } from './chain.js';
+import { assertDevnet, rpc } from './chain';
 
 interface ChannelAccountResponse {
   value: { owner: string; data: [string, 'base64'] } | null;

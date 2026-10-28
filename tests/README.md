@@ -17,7 +17,9 @@ top-level `test()` in a `*.test.ts` file.
   scheme, journals, lab tools and entrypoints) and the opt-in identity
   integration with its validator helper.
 - `tests/support/` holds fixtures, fakes, fault catalogs and helpers only, no
-  test cases. Both suites may import it.
+  test cases. Both suites may import it. Contract suites that every plugin of a
+  port must pass live there as `*-contract.ts` and are run by one
+  `tests/*.test.ts` per plugin.
 - `tooling/**/*.test.ts` test the repository tooling, not the product, and are
   counted separately.
 

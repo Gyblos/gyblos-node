@@ -7,9 +7,9 @@ import { CHANNEL_ACCOUNT_SIZE, discoverChannelsByRentPayer } from '@x402/svm';
 
 import { CHANNEL_STATUS, DEVNET, FINALIZED_COMMITMENT } from '@gyblos/config';
 
-import { assertDevnet, rpc } from './chain.js';
-import { CHANNEL_GUARDS } from './constants.js';
-import type { DepositExpectation } from './inference-deposit.js';
+import { assertDevnet, rpc } from './chain';
+import { CHANNEL_GUARDS } from './constants';
+import type { DepositExpectation } from './inference-deposit';
 
 interface ChannelAccount {
   owner: string;

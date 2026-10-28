@@ -7,34 +7,36 @@ import { resolve } from 'node:path';
 import { NODE_ENVIRONMENT, type HomeEnvironment } from '@gyblos/config';
 import { validateDiscoveryBaseUrl } from '@gyblos/discovery-http';
 import { MODEL } from '@gyblos/engine-ollama/model';
-import { MODEL_CLASSIFICATIONS } from '@gyblos/protocol/constants';
+import {
+  ENGINE_KINDS,
+  MODEL_CLASSIFICATIONS,
+  OFFER_PRICING_KINDS,
+} from '@gyblos/protocol/constants';
 import type { RelayEnvironment } from '@gyblos/transport-iroh/endpoint';
 
 import {
-  ENGINE_KINDS,
   NODE_CONFIG_FILENAME,
   NODE_CONFIG_ISSUE_CODES,
   NODE_CONFIG_SOURCES,
   NODE_ERROR_CODES,
   NODE_SETTINGS,
-  OFFER_PRICING_KINDS,
   type NodeErrorCode,
-} from './constants.js';
-import { NodeError } from './errors.js';
-import { sellerLimits, type SellerLimits } from './node-config-limits.js';
-import { pricePerMtokToAtomicPerMtok } from './node-config-price.js';
-import { resolveNodeConfig } from './node-config-resolve.js';
+} from './constants';
+import { NodeError } from './errors';
 import {
   readNodeConfigFile,
   type NodeConfig,
   type NodeOffer,
-} from './node-config.js';
+} from './node-config';
+import { sellerLimits, type SellerLimits } from './node-config-limits';
+import { pricePerMtokToAtomicPerMtok } from './node-config-price';
+import { resolveNodeConfig } from './node-config-resolve';
 import {
   defaultSellerOffer,
   SERVED_OFFER,
   servedPaidPrices,
   type SellerCatalogOffer,
-} from './seller-offer.js';
+} from './seller-offer';
 
 export interface SellerSettings {
   relayOnly: boolean;

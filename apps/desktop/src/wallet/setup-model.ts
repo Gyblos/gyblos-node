@@ -1,15 +1,15 @@
 // Public first-run contract: only an action, bounded password and sanitized state cross IPC.
 // Backup bytes, selected paths and wallet keys stay in the host.
-import { BACKUP } from './backup/constants.js';
-import { SETUP_ACTION, SETUP_ERROR, SETUP_STATUS } from './constants.js';
-import { parseWalletSummary, WALLET_STATUS } from './model.js';
+import { BACKUP } from './backup/constants';
+import { SETUP_ACTION, SETUP_ERROR, SETUP_STATUS } from './constants';
+import { parseWalletSummary, WALLET_STATUS } from './model';
 
 export {
   SETUP_ACTION,
   SETUP_ERROR,
   SETUP_STATUS,
   WALLET_SETUP,
-} from './constants.js';
+} from './constants';
 type SetupAction = (typeof SETUP_ACTION)[keyof typeof SETUP_ACTION];
 type SetupStatus = (typeof SETUP_STATUS)[keyof typeof SETUP_STATUS];
 type SetupError = (typeof SETUP_ERROR)[keyof typeof SETUP_ERROR];

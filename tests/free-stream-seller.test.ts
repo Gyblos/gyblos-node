@@ -10,7 +10,7 @@ import {
 import {
   freeStreamSellerFixture as fixture,
   streamResult,
-} from './support/free-stream-seller.js';
+} from './support/free-stream-seller';
 
 void test('free seller emits real fragments before generation finishes and awaits backpressure', async () => {
   const state = await fixture();

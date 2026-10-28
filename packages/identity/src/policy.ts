@@ -7,15 +7,15 @@ import {
   isCanonicalNodeId,
   nodeIdToBytes,
   verifyNodeSignature,
-} from './binding.js';
-import { concatBytes, utf8 } from './bytes.js';
+} from './binding';
+import { concatBytes, utf8 } from './bytes';
 import {
   IDENTITY_ERROR_CODES,
   ONLINE_CHALLENGE,
   SPONSOR_REASONS,
   type SponsorReason,
-} from './constants.js';
-import { IdentityError } from './errors.js';
+} from './constants';
+import { IdentityError } from './errors';
 
 // deviceKey is the canonical NodeId (64 lowercase hex); owner is a base58 Solana address.
 // costLamports is everything the sponsor pays: prefund plus transaction fee.

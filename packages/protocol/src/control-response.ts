@@ -5,15 +5,11 @@ import {
   CONTROL_METHODS,
   CONTROL_VERSION,
   PUBLIC_RECORD_KINDS,
-} from './constants.js';
-import type { ControlResponse, SignedPublicV2 } from './control-types.js';
-import {
-  controlFail,
-  controlHex,
-  controlObject,
-} from './control-validation.js';
-import { parseOfferSignatureV2, parseOfferV2 } from './offer-v2.js';
-import { parsePublicV2 } from './public-v2.js';
+} from './constants';
+import type { ControlResponse, SignedPublicV2 } from './control-types';
+import { controlFail, controlHex, controlObject } from './control-validation';
+import { parseOfferSignatureV2, parseOfferV2 } from './offer-v2';
+import { parsePublicV2 } from './public-v2';
 
 export function parseControlResponse(value: unknown): ControlResponse {
   const failed =
@@ -82,7 +78,7 @@ export function parseControlResponse(value: unknown): ControlResponse {
 // Correlation is checked before any remote error or result can affect caller state.
 export function matchControlResponse(
   value: unknown,
-  request: import('./control-types.js').ControlQuery,
+  request: import('./control-types').ControlQuery,
 ) {
   const response = parseControlResponse(value);
   if (

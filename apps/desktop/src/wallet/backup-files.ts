@@ -3,9 +3,9 @@
 import { constants } from 'node:fs';
 import { lstat, open } from 'node:fs/promises';
 
-import { BACKUP, BACKUP_ERROR } from './backup/constants.js';
-import { BackupError } from './backup/error.js';
-import { WALLET } from './constants.js';
+import { BACKUP, BACKUP_ERROR } from './backup/constants';
+import { BackupError } from './backup/error';
+import { WALLET } from './constants';
 
 export async function writeBackupFile(path: string, bytes: Uint8Array) {
   const file = await open(path, 'wx', WALLET.PRIVATE_FILE);

@@ -4,9 +4,9 @@ import assert from 'node:assert/strict';
 
 import { DEVNET_TREASURY_OWNER } from '@gyblos/config';
 
-import { tokenAddress, transactionTransfers } from './chain.js';
-import { TOKEN_GUARDS } from './constants.js';
-import type { ChainTransaction } from './types.js';
+import { tokenAddress, transactionTransfers } from './chain';
+import { TOKEN_GUARDS } from './constants';
+import type { ChainTransaction } from './types';
 
 interface TokenBalance {
   accountIndex: number;

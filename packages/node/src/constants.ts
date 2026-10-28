@@ -77,8 +77,6 @@ export const DOCTOR_CODES = {
 } as const;
 export type DoctorCode = (typeof DOCTOR_CODES)[keyof typeof DOCTOR_CODES];
 
-export const P2P_ROLES = { BUYER: 'buyer', SELLER: 'seller' } as const;
-export type P2PRole = (typeof P2P_ROLES)[keyof typeof P2P_ROLES];
 // Iroh secret key length stored in a role's node.key.
 export const NODE_KEY_BYTES = 32;
 export const NODE_CONFIGURATION_LIMITS = {
@@ -124,18 +122,9 @@ export const NODE_CONFIG_FILENAME = 'gyblos.toml';
 export const NODE_NETWORKS = { DEVNET: 'devnet', MAINNET: 'mainnet' } as const;
 export type NodeNetwork = (typeof NODE_NETWORKS)[keyof typeof NODE_NETWORKS];
 
-export const ENGINE_KINDS = {
-  OLLAMA: 'ollama',
-  OPENAI: 'openai',
-  ANTHROPIC: 'anthropic',
-} as const;
-export type EngineKind = (typeof ENGINE_KINDS)[keyof typeof ENGINE_KINDS];
-
 export const OFFER_CURRENCIES = { USDC: 'USDC' } as const;
 export type OfferCurrency =
   (typeof OFFER_CURRENCIES)[keyof typeof OFFER_CURRENCIES];
-
-export const OFFER_PRICING_KINDS = { PAID: 'paid', FREE: 'free' } as const;
 
 // Docker Desktop's alias for the host; like loopback, it may serve a local engine over plain HTTP.
 export const DOCKER_HOST_ALIAS = 'host.docker.internal';

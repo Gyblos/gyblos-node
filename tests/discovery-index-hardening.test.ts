@@ -14,7 +14,7 @@ import {
   indexNode,
   T0,
   type FakeLimiter,
-} from './support/discovery-index-fixture.js';
+} from './support/discovery-index-fixture';
 
 const modelIds = (count: number) =>
   Array.from(

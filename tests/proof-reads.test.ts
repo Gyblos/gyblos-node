@@ -11,7 +11,7 @@ import { COMMITMENT, RETRIES, TOKEN_PROGRAM_ADDRESS } from '@gyblos/config';
 import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { ProtocolError } from '@gyblos/protocol/errors';
 
-import { paymentFixture } from './support/payment-fixture.js';
+import { paymentFixture } from './support/payment-fixture';
 
 interface ReadFaults {
   laggingIndex?: boolean;

@@ -7,15 +7,15 @@ import {
   createDiscoveryIndex,
   type DiscoveryIndex,
   type ResponseCache,
-} from './app.js';
+} from './app';
 import {
   DISCOVERY_DB_BINDING,
   DISCOVERY_LIMITERS,
   DISCOVERY_PUBLISH_ALLOWLIST_BINDING,
-} from './constants.js';
-import type { DiscoveryLimiters, RateLimiter } from './limits.js';
-import { parsePublishAllowlist } from './publishers.js';
-import { createD1Storage, type D1Database } from './storage-d1.js';
+} from './constants';
+import type { DiscoveryLimiters, RateLimiter } from './limits';
+import { parsePublishAllowlist } from './publishers';
+import { createD1Storage, type D1Database } from './storage-d1';
 
 function binding(bindings: unknown, name: string): unknown {
   return bindings && typeof bindings === 'object'

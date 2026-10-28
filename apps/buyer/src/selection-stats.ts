@@ -7,16 +7,16 @@ import { join } from 'node:path';
 import { FILE_MODES } from '@gyblos/config';
 import { homeLayout, type HomeEnvironment } from '@gyblos/config/home';
 import type { SellerStats } from '@gyblos/core/seller-selection';
-import { P2P_ROLES } from '@gyblos/node/constants';
 import { assertRoleHome } from '@gyblos/node/home';
+import { P2P_ROLES } from '@gyblos/protocol/constants';
 import {
   controlHex,
   controlInteger,
   controlObject,
 } from '@gyblos/protocol/control-validation';
 
-import { BUYER_SELECTION, BUYER_SELECTION_CODES } from './constants.js';
-import { BuyerSelectionError } from './selection-config.js';
+import { BUYER_SELECTION, BUYER_SELECTION_CODES } from './constants';
+import { BuyerSelectionError } from './selection-config';
 
 export interface LocalSellerStats extends SellerStats {
   quotedWaitMs: number | null;

@@ -16,7 +16,7 @@ import {
   encodeU32,
   encodeU64,
   utf8,
-} from './bytes.js';
+} from './bytes';
 import {
   BINDING,
   BINDING_LAYOUTS,
@@ -25,9 +25,9 @@ import {
   METADATA_KEYS,
   PROGRAMS,
   type BindingVersion,
-} from './constants.js';
-import { IdentityError } from './errors.js';
-import type { DetachedSigner } from './signers.js';
+} from './constants';
+import { IdentityError } from './errors';
+import type { DetachedSigner } from './signers';
 
 const NODE_ID_HEX = /^[0-9a-f]{64}$/;
 const HEX_RADIX = 16;

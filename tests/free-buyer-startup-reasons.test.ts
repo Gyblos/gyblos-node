@@ -15,7 +15,7 @@ import { generateKeyPairSigner } from '@solana/kit';
 import { CONFIG_ASSET_LABELS } from '@gyblos/config/constants';
 import type { bindEndpoint } from '@gyblos/transport-iroh/endpoint';
 
-import { REPOSITORY_ROOT } from './support/node-config-fixtures.js';
+import { REPOSITORY_ROOT } from './support/node-config-fixtures';
 
 const MINT = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU';
 const SELECTION = {

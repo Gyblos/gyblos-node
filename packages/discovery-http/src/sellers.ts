@@ -14,8 +14,8 @@ import {
   DISCOVERY_PATHS,
   HTTP_STATUS,
   STATUS_ERROR_MAP,
-} from './constants.js';
-import { discoveryFail } from './errors.js';
+} from './constants';
+import { discoveryFail } from './errors';
 import {
   failStatus,
   indexUrl,
@@ -24,7 +24,7 @@ import {
   timeoutOf,
   withDeadline,
   type DiscoveryFetch,
-} from './http.js';
+} from './http';
 
 // Shaped for selectSellers: the caller adds `badge` and `openChannel` to form a KnownSeller.
 export type DiscoveredSeller = Pick<KnownSeller, 'catalog'> & {

@@ -13,7 +13,7 @@ import { freeExecutionDigest } from '@gyblos/protocol/free-execution';
 import { encodeFreeExecutionResponse } from '@gyblos/protocol/free-execution-framing';
 import { signOfferV2 } from '@gyblos/protocol/offer-v2';
 
-import { freeSellerFixture } from './support/free-seller.js';
+import { freeSellerFixture } from './support/free-seller';
 
 async function fixture(
   options: { relayOnly?: boolean; requestMs?: number } = {},

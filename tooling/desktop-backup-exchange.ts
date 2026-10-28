@@ -21,7 +21,7 @@ import {
   disposableProtection,
   restoreDisposable,
   TEST_BACKUP_PASSWORD,
-} from '../tests/support/portable-backup-fixture.js';
+} from '../tests/support/portable-backup-fixture';
 
 async function produce(directory: string) {
   await mkdir(directory, { recursive: true });

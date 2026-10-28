@@ -12,8 +12,8 @@ import {
   NODE_ERROR_CODES,
   SELLER_PUBLICATION_STATES,
   type SellerPublicationState,
-} from './constants.js';
-import type { SellerPublicRecords } from './public-records.js';
+} from './constants';
+import type { SellerPublicRecords } from './public-records';
 
 export interface SellerPublisherOptions {
   records: SellerPublicRecords;

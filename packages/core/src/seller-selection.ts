@@ -14,8 +14,8 @@ import {
   SELLER_SELECTION_POLICY,
   type SellerSelectionCode,
   type SellerSelectionPolicy,
-} from './constants.js';
-import { chargeV2 } from './pricing-v2.js';
+} from './constants';
+import { chargeV2 } from './pricing-v2';
 import {
   checkInput,
   invalid,
@@ -27,28 +27,28 @@ import {
   type SellerRequest,
   type SellerSelectionInput,
   type SellerStats,
-} from './seller-selection-input.js';
+} from './seller-selection-input';
 import {
   findSticky,
   onePerOwner,
   sampleTier,
   toCandidate,
   type SellerCandidate,
-} from './seller-selection-sample.js';
+} from './seller-selection-sample';
 import {
   checkPolicy,
   isFree,
   weigh,
   type Eligible,
-} from './seller-selection-weight.js';
+} from './seller-selection-weight';
 
-export type { SellerCandidate } from './seller-selection-sample.js';
+export type { SellerCandidate } from './seller-selection-sample';
 export type {
   KnownSeller,
   SellerRequest,
   SellerSelectionInput,
   SellerStats,
-} from './seller-selection-input.js';
+} from './seller-selection-input';
 
 type CooldownCode = typeof SELLER_SELECTION_CODES.PINNED_IN_COOLDOWN;
 export type SellerSelectionResult =

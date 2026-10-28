@@ -5,8 +5,8 @@ import {
   IDENTITY_ERROR_CODES,
   IDENTITY_RESOLUTION_LIMITS,
   IDENTITY_RPC_LIMITS,
-} from './constants.js';
-import { identityRpcFail } from './errors.js';
+} from './constants';
+import { identityRpcFail } from './errors';
 
 export type IdentityRpcFetch = (
   url: string,

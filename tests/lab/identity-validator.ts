@@ -18,7 +18,7 @@ import {
 import { DEVNET_REGISTRY, PROGRAMS } from '@gyblos/identity/constants';
 import { assertLabHome } from '@gyblos/lab-harness/wallet';
 
-import type { SyntheticChain } from '../support/identity-accounts.js';
+import type { SyntheticChain } from '../support/identity-accounts';
 
 const VALIDATOR_BINARY = 'solana-test-validator';
 // Synthetic loopback ports kept inside 18000-19999: RPC (plus RPC_PORT + 1 for websockets), faucet, gossip

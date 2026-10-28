@@ -1,6 +1,6 @@
 // Validates the utility-process result before it crosses the renderer bridge.
 // Only a closed summary is allowed; native errors, identities and addresses stay out.
-import { DESKTOP, PROBE_STATUS } from './constants.js';
+import { DESKTOP, PROBE_STATUS } from './constants';
 
 export type ProbeStatus = (typeof PROBE_STATUS)[keyof typeof PROBE_STATUS];
 export interface ProbeResult {
@@ -42,8 +42,8 @@ export function parseProbeResult(value: unknown): ProbeResult {
   };
 }
 
-export { DESKTOP, PROBE_STATUS } from './constants.js';
+export { DESKTOP, PROBE_STATUS } from './constants';
 
-export { armSmokeWatchdog } from './smoke-watchdog.js';
+export { armSmokeWatchdog } from './smoke-watchdog';
 
-export { reportProbeResult, type ResultPort } from './worker-result.js';
+export { reportProbeResult, type ResultPort } from './worker-result';

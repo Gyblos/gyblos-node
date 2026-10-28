@@ -9,13 +9,13 @@ import {
 } from '@gyblos/discovery-http';
 import { relayOrigins } from '@gyblos/transport-iroh/relay-origins';
 
-import { NODE_CONFIG_ISSUE_CODES } from './constants.js';
+import { NODE_CONFIG_ISSUE_CODES } from './constants';
 import {
   credentialFree,
   text,
   type ConfigPath,
   type IssueList,
-} from './node-config-fields.js';
+} from './node-config-fields';
 
 const HTTP = 'http:';
 

@@ -8,10 +8,11 @@ import {
   FREE_CHAT_ROLES,
   FREE_EXECUTION,
   FREE_EXECUTION_CODES,
+  FREE_STREAM,
 } from '@gyblos/protocol/constants';
 import { signOfferV2 } from '@gyblos/protocol/offer-v2';
 
-import { controlFixture } from './support/control-fixture.js';
+import { controlFixture } from './support/control-fixture';
 
 async function fixture() {
   const source = await controlFixture(true);
@@ -47,7 +48,8 @@ void test('free execution authenticates a free quote and preserves multiline cha
     await api.verifyFreeExecutionRequest(request, trust),
     request,
   );
-  assert.equal(FREE_EXECUTION.alpn, 'gyblos/free/2');
+  assert.equal(FREE_EXECUTION.alpn, 'gyblos/free/3');
+  assert.equal(FREE_STREAM.alpn, 'gyblos/free-stream/3');
 });
 
 void test('free execution refuses either paid price component and a nonzero budget', async () => {

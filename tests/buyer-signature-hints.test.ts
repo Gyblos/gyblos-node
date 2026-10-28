@@ -17,7 +17,7 @@ import { type BuyerDiagnosticCode } from '@gyblos/payments-x402/constants';
 import {
   DIAGNOSTIC_CANARY,
   DIAGNOSTIC_SIGNATURE,
-} from './support/facilitator-diagnostic-fixture.js';
+} from './support/facilitator-diagnostic-fixture';
 
 const INVALID_SIGNATURES = [
   '0'.repeat(64),

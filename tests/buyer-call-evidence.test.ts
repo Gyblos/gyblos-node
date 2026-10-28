@@ -21,7 +21,7 @@ import {
 import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { ProtocolError } from '@gyblos/protocol/errors';
 
-import { callFault } from './support/call-fixture.js';
+import { callFault } from './support/call-fixture';
 
 void test('actual call preserves the observed receipt and safe proof failure without another invocation', async () => {
   const { journal, call } = await callFault();

@@ -2,9 +2,9 @@
 import { X } from '@phosphor-icons/react';
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 
-import { createModalDismissal } from './modal-model.js';
-import { useExiting } from './Motion.js';
-import { IconButton } from './UI.js';
+import { createModalDismissal } from './modal-model';
+import { useExiting } from './Motion';
+import { IconButton } from './UI';
 
 export function Modal({
   title,

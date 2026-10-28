@@ -21,8 +21,8 @@ import { setupGate } from '@gyblos/lab-harness/setup';
 import { assertLabHome } from '@gyblos/lab-harness/wallet';
 import { NODE_ERROR_CODES } from '@gyblos/node/constants';
 
-import { loadOrCreateKey } from '../../lab/tools/identity-keys.js';
-import { startLocalValidator } from './identity-validator.js';
+import { loadOrCreateKey } from '../../lab/tools/identity-keys';
+import { startLocalValidator } from './identity-validator';
 
 const LAB_ENVIRONMENT = [
   'GYBLOS_HOME',

@@ -25,18 +25,19 @@ import {
   FreeExecutionError,
   type FreeExecutionBuildInput,
   type FreeExecutionResult,
+  type FreeExecutionStop,
 } from '@gyblos/protocol/free-execution';
 import { acceptLoopbackHost } from '@gyblos/runtime/loopback-host';
 import { FreeClientError } from '@gyblos/transport-iroh/free-client';
 
-import { FREE_BUYER, FREE_BUYER_CODES } from './constants.js';
-import { FreeBuyerError, parseFreeChat } from './free-chat.js';
-import { FreeSelectionFailure } from './free-execution.js';
+import { FREE_BUYER, FREE_BUYER_CODES } from './constants';
+import { FreeBuyerError, parseFreeChat } from './free-chat';
+import { FreeSelectionFailure } from './free-execution';
 import {
   executeFreeSse,
   replyFreeSseError,
   type FreeChatStreamExecutor,
-} from './free-sse.js';
+} from './free-sse';
 
 type FreeChatExecutor = (
   input: FreeExecutionBuildInput,
@@ -108,8 +109,12 @@ function replyError(response: ServerResponse, error: unknown) {
   const code = known
     ? error.code
     : (selected?.code ?? FREE_BUYER_CODES.INTERNAL);
+  const stop: FreeExecutionStop =
+    error instanceof FreeClientError || error instanceof FreeExecutionError
+      ? error
+      : {};
   if (response.headersSent) {
-    replyFreeSseError(response, code);
+    replyFreeSseError(response, code, stop);
     return;
   }
   const status = errorStatus(error, code);
@@ -131,6 +136,8 @@ function replyError(response: ServerResponse, error: unknown) {
         type: FREE_BUYER.errorType,
         param: null,
         code,
+        // Delivered usage only exists mid-stream, so a JSON error carries the reason alone.
+        ...(stop.reason ? { reason: stop.reason } : {}),
         ...(selected && 'cooldownUntil' in selected
           ? { cooldownUntil: selected.cooldownUntil }
           : {}),

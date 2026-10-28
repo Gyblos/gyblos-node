@@ -20,7 +20,7 @@ import { generateKeyPairSigner } from '@solana/kit';
 import { CONFIG_ASSET_LABELS } from '@gyblos/config/constants';
 import { runCli, type CliContext } from '@gyblos/node-app/cli';
 
-import { FAKE_SECRET } from './node-config-fixtures.js';
+import { FAKE_SECRET } from './node-config-fixtures';
 
 export const NODE_ID = 'ab'.repeat(32);
 const RELAY_TOKEN = `${FAKE_SECRET}-relay-token`;

@@ -18,8 +18,8 @@ import {
   SETUP_STATUS,
 } from '@gyblos/desktop/wallet-setup-model';
 
-import { TEST_BACKUP_PASSWORD } from './support/portable-backup-fixture.js';
-import { absent, fixture } from './support/wallet-restore.js';
+import { TEST_BACKUP_PASSWORD } from './support/portable-backup-fixture';
+import { absent, fixture } from './support/wallet-restore';
 
 void test('first-run setup waits for explicit choice without generating a wallet', async () => {
   await fixture(async ({ root, protection }) => {

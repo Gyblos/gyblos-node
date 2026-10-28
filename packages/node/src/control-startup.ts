@@ -20,14 +20,14 @@ import type {
 } from '@gyblos/protocol/engine';
 import type { Signer } from '@gyblos/protocol/signing';
 
-import { createSellerControlService } from './control.js';
-import { createSellerRecords } from './public-records.js';
-import type { SellerSequence } from './public-sequence.js';
+import { createSellerControlService } from './control';
+import { createSellerRecords } from './public-records';
+import type { SellerSequence } from './public-sequence';
 import {
   defaultSellerOffer,
   listedPrices,
   type SellerCatalogOffer,
-} from './seller-offer.js';
+} from './seller-offer';
 
 interface SellerControlStartupOptions {
   owner: KeyPairSigner;

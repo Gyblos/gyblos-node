@@ -1,8 +1,8 @@
 // Validates the top-up UI only; never authorizes payment or changes wallet balances.
-import { WALLET_STATUS, type WalletSummary } from '../wallet/model.js';
-import { TOP_UP_STATUS } from './constants.js';
+import { WALLET_STATUS, type WalletSummary } from '../wallet/model';
+import { TOP_UP_STATUS } from './constants';
 
-export { TOP_UP_STATUS } from './constants.js';
+export { TOP_UP_STATUS } from './constants';
 export type TopUpStatus = (typeof TOP_UP_STATUS)[keyof typeof TOP_UP_STATUS];
 
 export function prepareTopUp(

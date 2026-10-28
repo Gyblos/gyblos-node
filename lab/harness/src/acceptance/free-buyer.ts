@@ -15,16 +15,16 @@ import { FILE_MODES, homeLayout } from '@gyblos/config';
 import { FREE_EXECUTION, FREE_STREAM } from '@gyblos/protocol/constants';
 import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
 
-import { acceptanceSelection } from './buyer.js';
-import { acceptanceAssert } from './errors.js';
+import { acceptanceSelection } from './buyer';
+import { acceptanceAssert } from './errors';
 import {
   FREE_ACCEPTANCE,
   FREE_ACCEPTANCE_FAULTS,
   type FreeAcceptanceFault,
-} from './free-constants.js';
-import { acceptanceChat, assertChatAnswer } from './free-http.js';
-import { createAcceptanceBuyerEndpoint } from './native.js';
-import type { AcceptanceSession } from './session.js';
+} from './free-constants';
+import { acceptanceChat, assertChatAnswer } from './free-http';
+import { createAcceptanceBuyerEndpoint } from './native';
+import type { AcceptanceSession } from './session';
 
 function injectFault(endpoint: Endpoint, fault?: FreeAcceptanceFault) {
   const connect = endpoint.connect.bind(endpoint);

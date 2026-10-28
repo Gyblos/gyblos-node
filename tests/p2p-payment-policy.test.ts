@@ -11,12 +11,12 @@ import { generateKeyPairSigner } from '@solana/kit';
 import { encodePaymentRequiredHeader } from '@x402/core/http';
 
 import { DEVNET, DEVNET_USDC, ROLE_FILES } from '@gyblos/config';
-import { P2P_ROLES } from '@gyblos/node/constants';
 import { createInferenceBuyer } from '@gyblos/payments-x402/inference-buyer';
 import { withExclusiveLock } from '@gyblos/payments-x402/recovery/lock';
+import { P2P_ROLES } from '@gyblos/protocol/constants';
 import { saveJson } from '@gyblos/runtime';
 
-import { NATIVE_CAPABILITY } from './support/native-runtime.js';
+import { NATIVE_CAPABILITY } from './support/native-runtime';
 
 void test('request-specific ceiling rejects altered challenges before any signature or paid request', async () => {
   const original = globalThis.fetch;

@@ -1,4 +1,5 @@
 # Generated files and local-only material
+.agents/
 lab/evidence/
 node_modules/
 .local/

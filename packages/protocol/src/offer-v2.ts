@@ -1,17 +1,17 @@
 // Signs private quote terms with the owner key; no quote authorizes payment or reserves capacity.
-import { CONTROL_CODES, CONTROL_DOMAINS, CONTROL_LIMITS } from './constants.js';
-import type { InferenceOfferV2, SignedOfferV2 } from './control-types.js';
+import { CONTROL_CODES, CONTROL_DOMAINS, CONTROL_LIMITS } from './constants';
+import type { InferenceOfferV2, SignedOfferV2 } from './control-types';
 import {
   controlFail,
   controlInteger,
   controlObject,
   controlVerify,
-} from './control-validation.js';
-import { parseOfferV2 } from './offer-v2-parser.js';
-import { publicAddressBytes } from './public-validation.js';
-import { sign, type Signer } from './signing.js';
+} from './control-validation';
+import { parseOfferV2 } from './offer-v2-parser';
+import { publicAddressBytes } from './public-validation';
+import { sign, type Signer } from './signing';
 
-export { parseOfferV2 } from './offer-v2-parser.js';
+export { parseOfferV2 } from './offer-v2-parser';
 function base64Encode(bytes: Readonly<Uint8Array>): string {
   return btoa(String.fromCharCode(...bytes));
 }

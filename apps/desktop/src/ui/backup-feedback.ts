@@ -4,7 +4,7 @@ import {
   BACKUP_FLOW,
   parseBackupRequest,
   type BackupAction,
-} from '../wallet/backup-flow-model.js';
+} from '../wallet/backup-flow-model';
 
 const FEEDBACK = {
   MINIMUM: `Use at least ${BACKUP_FLOW.MIN_PASSWORD_CHARACTERS} characters.`,

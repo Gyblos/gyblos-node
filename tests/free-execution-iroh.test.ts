@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { createControlQuote } from '@gyblos/core/control-quotes';
-import { OFFER_PRICING_KINDS } from '@gyblos/node/constants';
 import { createSellerControlService } from '@gyblos/node/control';
 import type { SellerFreeExecutionOptions } from '@gyblos/node/free-execution';
 import {
@@ -18,6 +17,7 @@ import {
   FREE_EXECUTION,
   FREE_EXECUTION_CODES,
   MODEL_IDS,
+  OFFER_PRICING_KINDS,
   PUBLIC_RECORD_KINDS,
 } from '@gyblos/protocol/constants';
 import { matchFreeExecutionResponse } from '@gyblos/protocol/free-execution';
@@ -27,9 +27,9 @@ import {
 } from '@gyblos/protocol/free-execution-framing';
 import { catalogDigestV2, signPublicV2 } from '@gyblos/protocol/public-v2';
 
-import { controlFixture } from './support/control-fixture.js';
-import { endpoint, within } from './support/native-fixture.js';
-import { NATIVE_CAPABILITY } from './support/native-runtime.js';
+import { controlFixture } from './support/control-fixture';
+import { endpoint, within } from './support/native-fixture';
+import { NATIVE_CAPABILITY } from './support/native-runtime';
 
 // Runs one signed free request twice over one connection under the seller's [limits].
 async function exchangeTwice(limits: SellerLimits) {

@@ -5,10 +5,10 @@ import { readFile } from 'node:fs/promises';
 import { EndpointAddr, EndpointId } from '@number0/iroh';
 
 import { BUYER_RELAY_ONLY_ENV, MAX_ATOMIC, ROLE_FILES } from '@gyblos/config';
-import { P2P_ROLES } from '@gyblos/node/constants';
 import { parseOfferTrustJson, verifyInferenceOffer } from '@gyblos/node/offers';
 import { loadRole, nodeSecret, rolePath } from '@gyblos/node/roles';
 import { assertProgram } from '@gyblos/payments-x402/chain';
+import { P2P_ROLES } from '@gyblos/protocol/constants';
 import type { InferenceOffer } from '@gyblos/protocol/offer';
 import { saveJson } from '@gyblos/runtime';
 import { HTTP_OVER_IROH } from '@gyblos/transport-iroh/constants';
@@ -21,11 +21,11 @@ import {
 import { createIrohTransport } from '@gyblos/transport-iroh/iroh-client';
 import { expectedIrohRoute } from '@gyblos/transport-iroh/route-policy';
 
-import { startBuyerProxy } from './proxy.js';
+import { startBuyerProxy } from './proxy';
 import {
   prepareBuyerSelection,
   runtimeProxySelection,
-} from './selection-runtime.js';
+} from './selection-runtime';
 
 export async function trustedOffer() {
   const config = await loadRole(P2P_ROLES.BUYER);

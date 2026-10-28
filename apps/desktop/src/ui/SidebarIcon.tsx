@@ -9,7 +9,7 @@ import {
 } from '@phosphor-icons/react';
 import { useId } from 'react';
 
-import { UI_VIEW } from './constants.js';
+import { UI_VIEW } from './constants';
 
 const GLYPHS = {
   [UI_VIEW.CHAT]: ChatCircle,

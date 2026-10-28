@@ -26,12 +26,12 @@ import {
   FreeClientError,
 } from '@gyblos/transport-iroh/free-client';
 
-import { acceptanceSelection } from './buyer.js';
-import { ACCEPTANCE } from './constants.js';
-import { acceptanceAssert } from './errors.js';
-import { FREE_ACCEPTANCE } from './free-constants.js';
-import { createAcceptanceBuyerEndpoint } from './native.js';
-import type { AcceptanceSession } from './session.js';
+import { acceptanceSelection } from './buyer';
+import { ACCEPTANCE } from './constants';
+import { acceptanceAssert } from './errors';
+import { FREE_ACCEPTANCE } from './free-constants';
+import { createAcceptanceBuyerEndpoint } from './native';
+import type { AcceptanceSession } from './session';
 
 export async function acquireFreeQuote(
   run: AcceptanceSession,

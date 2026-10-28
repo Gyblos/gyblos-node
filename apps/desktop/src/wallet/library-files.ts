@@ -7,13 +7,10 @@ import {
   desktopWalletLibraryPaths,
 } from '@gyblos/config/home';
 
-import { readBackupFile, writeBackupFile } from './backup-files.js';
-import { WALLET, WALLET_LIBRARY, WALLET_LIBRARY_ERROR } from './constants.js';
-import { checkWalletRoot, isMissing, syncWalletDirectory } from './files.js';
-import {
-  checkLibraryCancellation,
-  WalletLibraryError,
-} from './library-error.js';
+import { readBackupFile, writeBackupFile } from './backup-files';
+import { WALLET, WALLET_LIBRARY, WALLET_LIBRARY_ERROR } from './constants';
+import { checkWalletRoot, isMissing, syncWalletDirectory } from './files';
+import { checkLibraryCancellation, WalletLibraryError } from './library-error';
 
 export async function libraryExists(root: string) {
   try {

@@ -15,8 +15,8 @@ import type { ControlService } from '@gyblos/transport-iroh/control-server';
 import type { FreeExecutionService } from '@gyblos/transport-iroh/free-server';
 import { serveIroh } from '@gyblos/transport-iroh/iroh-server';
 
-import { ACCEPTANCE, ACCEPTANCE_CODES } from './constants.js';
-import { AcceptanceError } from './errors.js';
+import { ACCEPTANCE, ACCEPTANCE_CODES } from './constants';
+import { AcceptanceError } from './errors';
 
 async function endpoint(secret?: number[], free = false): Promise<Endpoint> {
   try {

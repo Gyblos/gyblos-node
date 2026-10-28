@@ -8,7 +8,7 @@ import {
   INDEX_STATUS,
   type IndexErrorCode,
   type IndexStatus,
-} from './constants.js';
+} from './constants';
 
 const STATUS_OF: ReadonlyMap<IndexErrorCode, IndexStatus> = new Map([
   [INDEX_ERRORS.PUBLISH_NOT_ALLOWED, INDEX_STATUS.FORBIDDEN],

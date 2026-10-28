@@ -14,22 +14,23 @@ import {
   type IdentityRegistryScope,
   type IdentityState,
 } from '@gyblos/core/identity-policy';
+import { P2P_ROLES } from '@gyblos/protocol/constants';
 
-import { IDENTITY_STATE, P2P_ROLES } from './constants.js';
-import { assertRoleHome } from './home.js';
+import { IDENTITY_STATE } from './constants';
+import { assertRoleHome } from './home';
 import {
   acquireIdentityLock,
   identityDirectory,
   readIdentityFile,
   writeIdentityFile,
-} from './identity-state-file.js';
+} from './identity-state-file';
 import {
   assertIdentityMonotonic,
   checkedIdentityScope,
   encodeIdentityStates,
   identityStateUnavailable,
   parseIdentityStates,
-} from './identity-state-schema.js';
+} from './identity-state-schema';
 
 export interface BuyerIdentityInput {
   nodeId: string;

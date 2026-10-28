@@ -1,13 +1,13 @@
 // Quick model selection for chat; the full catalog remains a separate screen.
 import { CaretDown, Check } from '@phosphor-icons/react';
 
-import { MENU_GEOMETRY } from './constants.js';
-import { Dropdown } from './Dropdown.js';
-import type { ModelOption } from './model-types.js';
-import { ModelImage } from './ModelImage.js';
-import { Badge, MenuItem } from './UI.js';
+import { MENU_GEOMETRY } from './constants';
+import { Dropdown } from './Dropdown';
+import type { ModelOption } from './model-types';
+import { ModelImage } from './ModelImage';
+import { Badge, MenuItem } from './UI';
 
-export type { ModelOption } from './model-types.js';
+export type { ModelOption } from './model-types';
 
 function priceLabel(model: ModelOption) {
   return model.free

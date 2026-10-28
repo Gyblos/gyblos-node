@@ -13,7 +13,7 @@ import {
   instructions,
   withOfflineProof,
   type PaymentFixture,
-} from './payment-fixture.js';
+} from './payment-fixture';
 
 function setAtomicAmount(instruction: ParsedInstruction, amount: bigint) {
   instruction.info.tokenAmount.amount = amount.toString();

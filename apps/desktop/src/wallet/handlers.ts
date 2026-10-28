@@ -1,12 +1,12 @@
 // Fixed wallet IPC handlers authenticate the current window/main frame and arity.
 // Null sessions (smoke) and foreign callers cannot start custody operations.
-import { BACKUP_RESULT } from './backup-flow-model.js';
-import { WALLET_STATUS, walletSummary } from './model.js';
-import type { createDesktopWalletSession } from './session.js';
+import { BACKUP_RESULT } from './backup-flow-model';
+import { WALLET_STATUS, walletSummary } from './model';
+import type { createDesktopWalletSession } from './session';
 import {
   unavailableCollection,
   WALLET_SETTINGS_RESULT,
-} from './settings-model.js';
+} from './settings-model';
 
 type WalletHandlerSession = Pick<
   ReturnType<typeof createDesktopWalletSession>,

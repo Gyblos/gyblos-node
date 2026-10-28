@@ -21,7 +21,9 @@ export const RETRIES = {
 
 export const HTTP_STATUS = {
   ok: 200,
+  unauthorized: 401,
   paymentRequired: 402,
+  forbidden: 403,
   misdirectedRequest: 421,
   tooManyRequests: 429,
   badGateway: 502,

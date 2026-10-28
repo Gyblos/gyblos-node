@@ -8,10 +8,11 @@ import {
   ENGINE_DONE_REASONS,
   FREE_CHAT_ROLES,
   FREE_EXECUTION_CODES,
+  FREE_EXECUTION_STOP_REASONS,
 } from '@gyblos/protocol/constants';
 import { FreeClientError } from '@gyblos/transport-iroh/free-client';
 
-import { freeSellerFixture } from './support/free-seller.js';
+import { freeSellerFixture } from './support/free-seller';
 
 const settings = {
   selection: { modelId: 'synthetic', variant: null, quantization: null },
@@ -192,4 +193,48 @@ void test('observed streamed content prevents failover even if an injected port 
   );
   assert.equal(selections, 1);
   assert.deepEqual(fragments, ['first']);
+});
+
+void test('free HTTP ends a stream with the stop reason and delivered usage when the seller cannot continue', async () => {
+  const host = await startFreeBuyerHttp(async () => result, settings, {
+    port: 0,
+    stream: async (_input, _signal, onDelta) => {
+      await onDelta('first');
+      throw new FreeClientError(
+        FREE_EXECUTION_CODES.SELLER_CANNOT_CONTINUE,
+        true,
+        true,
+        {
+          reason: FREE_EXECUTION_STOP_REASONS.ENGINE_INTERRUPTED,
+          delivered: { outputTokens: 1 },
+        },
+      );
+    },
+  });
+  try {
+    const response = await fetch(host.url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body,
+      signal: AbortSignal.timeout(5000),
+    });
+    assert.equal(response.status, 200);
+    const text = await response.text();
+    assert.match(text, /"content":"first"/);
+    assert.doesNotMatch(text, /\[DONE\]/);
+    assert.doesNotMatch(text, /"finish_reason":"(stop|length)"/);
+    const last = text.trim().split('\n\n').at(-1) ?? '';
+    assert.deepEqual(JSON.parse(last.replace(/^data: /, '')), {
+      error: {
+        message: FREE_EXECUTION_CODES.SELLER_CANNOT_CONTINUE,
+        type: 'gyblos_error',
+        param: null,
+        code: FREE_EXECUTION_CODES.SELLER_CANNOT_CONTINUE,
+        reason: FREE_EXECUTION_STOP_REASONS.ENGINE_INTERRUPTED,
+        usage: { completion_tokens: 1 },
+      },
+    });
+  } finally {
+    await host.close();
+  }
 });

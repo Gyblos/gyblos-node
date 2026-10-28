@@ -4,7 +4,7 @@ import { freemem } from 'node:os';
 
 import { DIAGNOSTICS } from '@gyblos/config';
 
-import { readDarwinMemorySnapshot } from './darwin-memory.js';
+import { readDarwinMemorySnapshot } from './darwin-memory';
 
 export interface MemorySnapshot {
   source: (typeof DIAGNOSTICS.memorySources)[keyof typeof DIAGNOSTICS.memorySources];

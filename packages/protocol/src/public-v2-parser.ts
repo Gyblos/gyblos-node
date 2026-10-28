@@ -1,5 +1,5 @@
 // Parses the additive public v2 family, reusing v1 primitive rules without changing v1 wire contracts.
-import { canonicalJson } from './canonical.js';
+import { canonicalJson } from './canonical';
 import {
   CONTROL_CODES,
   CONTROL_LIMITS,
@@ -8,17 +8,17 @@ import {
   PUBLIC_RECORD_KINDS,
   PUBLIC_RECORD_LIMITS,
   REASONING_LEVELS,
-} from './constants.js';
-import type { PublicRecordV2 } from './control-types.js';
+} from './constants';
+import type { PublicRecordV2 } from './control-types';
 import {
   controlArray,
   controlFail,
   controlObject,
   controlPrimitive,
   controlReasoning,
-} from './control-validation.js';
-import { parsePublicPricesV2 } from './pricing-v2.js';
-import { parsePublicRecord } from './public-parser.js';
+} from './control-validation';
+import { parsePublicPricesV2 } from './pricing-v2';
+import { parsePublicRecord } from './public-parser';
 
 function modelInputV2(value: unknown) {
   const input = controlObject(value, [

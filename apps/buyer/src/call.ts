@@ -9,7 +9,6 @@ import { OFFER_ID } from '@gyblos/core/constants';
 import { observeInferenceResponse } from '@gyblos/core/inference-observation';
 import { assessCharge, charge } from '@gyblos/core/metering';
 import { modelTokenizer } from '@gyblos/node/artifacts';
-import { P2P_ROLES } from '@gyblos/node/constants';
 import { assertRoleHome } from '@gyblos/node/home';
 import { inferenceCeiling } from '@gyblos/node/http/inference';
 import { roleDirectory, rolePath, roleSigner } from '@gyblos/node/roles';
@@ -22,35 +21,36 @@ import {
 import { createInferenceBuyer } from '@gyblos/payments-x402/inference-buyer';
 import { withExclusiveLock } from '@gyblos/payments-x402/recovery/lock';
 import { validateSettlement } from '@gyblos/payments-x402/trust';
+import { P2P_ROLES } from '@gyblos/protocol/constants';
 import { isMain, saveJson } from '@gyblos/runtime';
 import {
   expectedIrohRoute,
   routesMatchRequired,
 } from '@gyblos/transport-iroh/route-policy';
 
-import { trustedOffer } from './buyer.js';
+import { trustedOffer } from './buyer';
 import {
   assertPriorCallResolved,
   priorCalls,
   proofObservation,
   readCallMetrics,
   type CallPaymentObservation,
-} from './call-evidence.js';
+} from './call-evidence';
 import {
   CALL_OUTCOMES,
   CALL_PHASES,
   MINIMUM_REQUESTS,
   P2P_JOURNAL_STATES,
   type CallPhase,
-} from './constants.js';
-import { errorDiagnostic } from './diagnostics.js';
+} from './constants';
+import { errorDiagnostic } from './diagnostics';
 import {
   appendMeasurement,
   measurementRow,
   measurementSalt,
-} from './measurements.js';
-import { paymentProof } from './proof.js';
-import { createCases } from './synthetic-cases.js';
+} from './measurements';
+import { paymentProof } from './proof';
+import { createCases } from './synthetic-cases';
 
 const buyerPath = (name: string) => rolePath(P2P_ROLES.BUYER, name);
 

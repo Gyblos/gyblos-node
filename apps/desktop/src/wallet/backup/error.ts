@@ -1,5 +1,5 @@
 // Static portable-codec errors; never include passwords, keys or native errors.
-import type { BackupErrorCode } from './constants.js';
+import type { BackupErrorCode } from './constants';
 
 export class BackupError extends Error {
   constructor(readonly code: BackupErrorCode) {

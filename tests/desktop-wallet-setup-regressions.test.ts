@@ -13,7 +13,7 @@ import {
   SETUP_STATUS,
 } from '@gyblos/desktop/wallet-setup-model';
 
-import { absent, fixture } from './support/wallet-restore.js';
+import { absent, fixture } from './support/wallet-restore';
 
 void test('first-run restoration accepts a valid multibyte portable-backup password', async () => {
   await fixture(async ({ home, root, identity, protection }) => {

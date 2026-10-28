@@ -8,23 +8,22 @@ import { join } from 'node:path';
 import { FILE_MODES } from '@gyblos/config';
 import { homeLayout, type HomeEnvironment } from '@gyblos/config/home';
 import type { KnownSeller } from '@gyblos/core/seller-selection';
-import { P2P_ROLES } from '@gyblos/node/constants';
 import { assertRoleHome } from '@gyblos/node/home';
-import { CONTROL_RECORD_VERSION } from '@gyblos/protocol/constants';
+import { CONTROL_RECORD_VERSION, P2P_ROLES } from '@gyblos/protocol/constants';
 import {
   controlArray,
   controlObject,
 } from '@gyblos/protocol/control-validation';
 
-import { BUYER_DISCOVERY, BUYER_SELECTION_CODES } from './constants.js';
+import { BUYER_DISCOVERY, BUYER_SELECTION_CODES } from './constants';
 import {
   discoveryObservation,
   discoveryRowLive,
   mergeDiscoveryRow,
   parseDiscoveryRow,
   type DiscoveryRow,
-} from './discovery-state.js';
-import { BuyerSelectionError } from './selection-config.js';
+} from './discovery-state';
+import { BuyerSelectionError } from './selection-config';
 
 function unavailable(): never {
   throw new BuyerSelectionError(BUYER_SELECTION_CODES.DISCOVERY_STATE);

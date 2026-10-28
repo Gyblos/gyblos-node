@@ -10,15 +10,15 @@ import {
   GYBLOS_ALPN,
 } from '@gyblos/protocol/constants';
 
-import { RELAY_CONFIGURATION_CODES } from './constants.js';
+import { RELAY_CONFIGURATION_CODES } from './constants';
 import {
   RelayConfigurationError,
   relayModeFromEnv,
   type RelayEnvironment,
-} from './relays.js';
+} from './relays';
 
-export { assertConfiguredRelay, requireConfiguredRelay } from './relays.js';
-export type { RelayEnvironment } from './relays.js';
+export { assertConfiguredRelay, requireConfiguredRelay } from './relays';
+export type { RelayEnvironment } from './relays';
 
 export interface BindEndpointOptions {
   relayOnly?: boolean;

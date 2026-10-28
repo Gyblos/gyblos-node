@@ -3,10 +3,10 @@
 export type {
   ExactGateEvidence,
   ExactCaseResult,
-} from './exact-evidence-types.js';
+} from './exact-evidence-types';
 
 export type {
   InferenceGateEvidence,
   InferenceCaseResult,
   InferenceTrace,
-} from './inference-evidence-types.js';
+} from './inference-evidence-types';

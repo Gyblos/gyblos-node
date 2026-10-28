@@ -8,7 +8,6 @@ import {
   NODE_CONFIG_FILENAME,
   NODE_CONFIG_SOURCES,
   NODE_SETTINGS,
-  OFFER_PRICING_KINDS,
   type NodeSettingKey,
 } from '@gyblos/node/constants';
 import { readNodeConfigFile, type NodeOffer } from '@gyblos/node/node-config';
@@ -18,10 +17,11 @@ import {
   type SettingOrigin,
 } from '@gyblos/node/node-config-resolve';
 import type { DoctorProbes } from '@gyblos/node/seller-doctor';
+import { OFFER_PRICING_KINDS } from '@gyblos/protocol/constants';
 import { isMain } from '@gyblos/runtime';
 
-import { doctor } from './cli-doctor.js';
-import { COLUMN, issueLine, URL_HIDDEN, urlOrigin } from './cli-format.js';
+import { doctor } from './cli-doctor';
+import { COLUMN, issueLine, URL_HIDDEN, urlOrigin } from './cli-format';
 
 export interface CliContext {
   env: Readonly<Record<string, string | undefined>>;

@@ -16,9 +16,9 @@ import {
   MOTION_VARIANT,
   SLIDE_DIRECTION,
   SLIDE_SURFACE,
-} from './constants.js';
+} from './constants';
 
-export { SLIDE_DIRECTION, SLIDE_SURFACE } from './constants.js';
+export { SLIDE_DIRECTION, SLIDE_SURFACE } from './constants';
 
 type SlideDirection = (typeof SLIDE_DIRECTION)[keyof typeof SLIDE_DIRECTION];
 type SlideSurface = (typeof SLIDE_SURFACE)[keyof typeof SLIDE_SURFACE];

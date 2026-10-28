@@ -3,16 +3,37 @@ import {
   CONTROL_CODES,
   FREE_EXECUTION_CODES,
   type FreeExecutionCode,
-} from './constants.js';
-import { ControlError } from './control-validation.js';
+  type FreeExecutionStopReason,
+} from './constants';
+import { ControlError } from './control-validation';
+import type {
+  FreeExecutionDelivered,
+  FreeExecutionStop,
+} from './free-execution-types';
 
+// Copies only the stop fields that are present, so canonical JSON never sees undefined.
+export function freeExecutionStop(
+  source: FreeExecutionStop,
+): FreeExecutionStop {
+  return {
+    ...(source.reason ? { reason: source.reason } : {}),
+    ...(source.delivered
+      ? { delivered: { outputTokens: source.delivered.outputTokens } }
+      : {}),
+  };
+}
 export class FreeExecutionError extends Error {
+  // Declared only: absent fields stay absent rather than own undefined properties.
+  declare readonly reason?: FreeExecutionStopReason;
+  declare readonly delivered?: FreeExecutionDelivered;
   constructor(
     readonly code: FreeExecutionCode,
     readonly remote = false,
+    stop: FreeExecutionStop = {},
   ) {
     super(code);
     this.name = 'FreeExecutionError';
+    Object.assign(this, freeExecutionStop(stop));
   }
 }
 export function freeExecutionFail(

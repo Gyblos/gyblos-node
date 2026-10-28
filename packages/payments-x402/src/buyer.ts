@@ -11,12 +11,9 @@ import { UptoSvmScheme } from '@x402/svm/upto/client';
 
 import { DEVNET, TIMEOUTS } from '@gyblos/config';
 
-import {
-  BUYER_DIAGNOSTIC_CODES,
-  type BuyerDiagnosticCode,
-} from './constants.js';
-import { signatureHint } from './signature-hint.js';
-import { validateTerms, type TrustPolicy } from './trust.js';
+import { BUYER_DIAGNOSTIC_CODES, type BuyerDiagnosticCode } from './constants';
+import { signatureHint } from './signature-hint';
+import { validateTerms, type TrustPolicy } from './trust';
 
 export interface BuyerResponseObservation {
   status: number;

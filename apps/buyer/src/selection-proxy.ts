@@ -4,9 +4,9 @@ import { createHash } from 'node:crypto';
 
 import type { SellerSelectionCode } from '@gyblos/core/constants';
 
-import { BUYER_SELECTION, BUYER_SELECTION_CODES } from './constants.js';
-import type { requireLegacyQuoteCompatibility } from './selection-v1.js';
-import type { SelectionDecision } from './selection.js';
+import { BUYER_SELECTION, BUYER_SELECTION_CODES } from './constants';
+import type { SelectionDecision } from './selection';
+import type { requireLegacyQuoteCompatibility } from './selection-v1';
 
 export type ProxySelectionResult =
   | { ok: true }

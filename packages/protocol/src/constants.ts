@@ -201,9 +201,9 @@ export const MODEL_IDENTITIES = {
 
 // Free execution is a separate data channel; control and reserved HTTP v2 keep their wire contracts.
 export const FREE_EXECUTION = {
-  alpn: 'gyblos/free/2',
-  version: 2,
-  requestDomain: 'gyblos/free-execution-request/v2\n',
+  alpn: 'gyblos/free/3',
+  version: 3,
+  requestDomain: 'gyblos/free-execution-request/v3\n',
   requestBytes: 131072,
   responseBytes: 1048576,
   inputBytes: 65536,
@@ -235,12 +235,21 @@ export const FREE_EXECUTION_CODES = {
   TIMEOUT: 'FREE_EXECUTION_TIMEOUT',
   CANCELLED: 'FREE_EXECUTION_CANCELLED',
   INTERNAL: 'FREE_EXECUTION_INTERNAL_ERROR',
+  // A started generation stopped on an engine failure; carries a stop reason (v3).
+  SELLER_CANNOT_CONTINUE: 'FREE_EXECUTION_SELLER_CANNOT_CONTINUE',
 } as const;
 export type FreeExecutionCode =
   (typeof FREE_EXECUTION_CODES)[keyof typeof FREE_EXECUTION_CODES];
+// COMPLETE is a one-shot response; STREAM is the terminal after deltas the caller already verified.
+export const FREE_EXECUTION_MATCH_MODES = {
+  COMPLETE: 'complete',
+  STREAM: 'stream',
+} as const;
+export type FreeExecutionMatchMode =
+  (typeof FREE_EXECUTION_MATCH_MODES)[keyof typeof FREE_EXECUTION_MATCH_MODES];
 
 export const FREE_STREAM = {
-  alpn: 'gyblos/free-stream/2',
+  alpn: 'gyblos/free-stream/3',
   deltaBytes: 8192,
   eventBytes: FREE_EXECUTION.responseBytes + 1024,
   maxEvents: 4096,
@@ -248,3 +257,60 @@ export const FREE_STREAM = {
   terminalReserveBytes: 1024,
   events: { DELTA: 'delta', TERMINAL: 'terminal' },
 } as const;
+
+// Node roles, engine families and offer pricing kinds shared across layers (node composition today).
+export const P2P_ROLES = { BUYER: 'buyer', SELLER: 'seller' } as const;
+export type P2PRole = (typeof P2P_ROLES)[keyof typeof P2P_ROLES];
+
+export const ENGINE_KINDS = {
+  OLLAMA: 'ollama',
+  OPENAI: 'openai',
+  ANTHROPIC: 'anthropic',
+} as const;
+export type EngineKind = (typeof ENGINE_KINDS)[keyof typeof ENGINE_KINDS];
+
+export const OFFER_PRICING_KINDS = { PAID: 'paid', FREE: 'free' } as const;
+export type OfferPricingKind =
+  (typeof OFFER_PRICING_KINDS)[keyof typeof OFFER_PRICING_KINDS];
+
+// Uniform engine failures every engine adapter reports; the message is the code, never provider text.
+export const ENGINE_ERROR_CODES = {
+  QUOTA_EXHAUSTED: 'ENGINE_QUOTA_EXHAUSTED',
+  RATE_LIMITED: 'ENGINE_RATE_LIMITED',
+  AUTH: 'ENGINE_AUTH_FAILED',
+  UNAVAILABLE: 'ENGINE_UNAVAILABLE',
+  INTERRUPTED: 'ENGINE_INTERRUPTED',
+  TIMEOUT: 'ENGINE_TIMEOUT',
+  INVALID_RESPONSE: 'ENGINE_INVALID_RESPONSE',
+} as const;
+export type EngineErrorCode =
+  (typeof ENGINE_ERROR_CODES)[keyof typeof ENGINE_ERROR_CODES];
+
+// Why a seller could not continue a started generation, as a buyer may see it.
+export const FREE_EXECUTION_STOP_REASONS = {
+  QUOTA_EXHAUSTED: 'quota_exhausted',
+  RATE_LIMITED: 'rate_limited',
+  ENGINE_UNAVAILABLE: 'engine_unavailable',
+  ENGINE_INTERRUPTED: 'engine_interrupted',
+  ENGINE_TIMEOUT: 'engine_timeout',
+  ENGINE_INVALID_RESPONSE: 'engine_invalid_response',
+} as const;
+export type FreeExecutionStopReason =
+  (typeof FREE_EXECUTION_STOP_REASONS)[keyof typeof FREE_EXECUTION_STOP_REASONS];
+
+export const ENGINE_ERROR_STOP_REASON: Readonly<
+  Record<EngineErrorCode, FreeExecutionStopReason>
+> = {
+  [ENGINE_ERROR_CODES.QUOTA_EXHAUSTED]:
+    FREE_EXECUTION_STOP_REASONS.QUOTA_EXHAUSTED,
+  [ENGINE_ERROR_CODES.RATE_LIMITED]: FREE_EXECUTION_STOP_REASONS.RATE_LIMITED,
+  // Credential state of the seller's upstream account is private to the seller (founder decision).
+  [ENGINE_ERROR_CODES.AUTH]: FREE_EXECUTION_STOP_REASONS.ENGINE_UNAVAILABLE,
+  [ENGINE_ERROR_CODES.UNAVAILABLE]:
+    FREE_EXECUTION_STOP_REASONS.ENGINE_UNAVAILABLE,
+  [ENGINE_ERROR_CODES.INTERRUPTED]:
+    FREE_EXECUTION_STOP_REASONS.ENGINE_INTERRUPTED,
+  [ENGINE_ERROR_CODES.TIMEOUT]: FREE_EXECUTION_STOP_REASONS.ENGINE_TIMEOUT,
+  [ENGINE_ERROR_CODES.INVALID_RESPONSE]:
+    FREE_EXECUTION_STOP_REASONS.ENGINE_INVALID_RESPONSE,
+};

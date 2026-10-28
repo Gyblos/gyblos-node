@@ -6,37 +6,37 @@ import { FREE_EXECUTION_CODES, GYBLOS_ALPN } from '@gyblos/protocol/constants';
 import { HTTP_OVER_IROH } from '@gyblos/transport-iroh/constants';
 import { controlDeadline } from '@gyblos/transport-iroh/control-io';
 
-import { acceptQuote } from './buyer.js';
+import { acceptQuote } from './buyer';
 import {
   ACCEPTANCE,
   ACCEPTANCE_CLOCKS,
   ACCEPTANCE_INDEX,
   ACCEPTANCE_MODES,
-} from './constants.js';
-import { acceptanceAssert, assertAcceptanceActive } from './errors.js';
-import { createFreeBuyer, type FreeAcceptanceBuyer } from './free-buyer.js';
+} from './constants';
+import { acceptanceAssert, assertAcceptanceActive } from './errors';
+import { createFreeBuyer, type FreeAcceptanceBuyer } from './free-buyer';
 import {
   FREE_ACCEPTANCE,
   FREE_ACCEPTANCE_CASES,
   type FreeAcceptanceCase,
-} from './free-constants.js';
-import { failoverCases } from './free-failover.js';
+} from './free-constants';
+import { failoverCases } from './free-failover';
 import {
   capsExhausted,
   engineDown,
   executionReplay,
   expiredQuote,
   wrongPeer,
-} from './free-negative.js';
-import { freeAvailability } from './free-phases.js';
+} from './free-negative';
+import { freeAvailability } from './free-phases';
 import {
   acquireFreeQuote,
   expectFreeRefusal,
   rawFreeQuote,
-} from './free-quotes.js';
-import { createFreeSeller } from './free-session.js';
-import { pump, withdrawAndRestart } from './phases.js';
-import type { AcceptanceSession } from './session.js';
+} from './free-quotes';
+import { createFreeSeller } from './free-session';
+import { pump, withdrawAndRestart } from './phases';
+import type { AcceptanceSession } from './session';
 
 export interface FreeAcceptanceOptions {
   signal?: AbortSignal;

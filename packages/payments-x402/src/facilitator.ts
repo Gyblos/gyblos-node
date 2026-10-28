@@ -27,11 +27,11 @@ import {
   FACILITATOR_DIAGNOSTIC_CODES,
   FACILITATOR_STAGES,
   PUBLIC_CALL_OPERATIONS,
-} from './constants.js';
+} from './constants';
 import {
   createFacilitatorObserver,
   type FacilitatorDiagnosticOptions,
-} from './facilitator-diagnostics.js';
+} from './facilitator-diagnostics';
 
 export interface SettlementEvent {
   phase: string;

@@ -5,10 +5,10 @@ import { mkdir, symlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { analyze, validateEntries } from './analyze.js';
-import { layerOf } from './config.js';
-import { fixture, hasRule } from './fixture.js';
-import { parseGraph } from './graph.js';
+import { analyze, validateEntries } from './analyze';
+import { layerOf } from './config';
+import { fixture, hasRule } from './fixture';
+import { parseGraph } from './graph';
 
 void test('current and future names map to the intended layers', () => {
   const examples = {
@@ -18,6 +18,9 @@ void test('current and future names map to the intended layers', () => {
     'packages/engine-openai/src/a.ts': 'adapter',
     'packages/discovery-http/src/a.ts': 'adapter',
     'packages/identity/src/a.ts': 'adapter',
+    'packages/telemetry-file/src/a.ts': 'adapter',
+    'packages/telemetry-otel/src/a.ts': 'adapter',
+    'packages/payments-stripe/src/a.ts': 'adapter',
     'packages/protocol/src/a.ts': 'protocol',
     'packages/node/src/a.ts': 'node',
     'packages/config/src/a.ts': 'config',
@@ -63,7 +66,7 @@ void test('core-to-adapter is detected for relative type-only imports', async ()
   await fixture(
     {
       'packages/core/src/a.ts':
-        "import type { Engine } from '../../engine-ollama/src/a.js'; export type Result = Engine;",
+        "import type { Engine } from '../../engine-ollama/src/a'; export type Result = Engine;",
       'packages/engine-ollama/src/a.ts': 'export interface Engine {}',
     },
     async (files, root) =>
@@ -82,6 +85,21 @@ void test('distinct adapters cannot import each other through reexports', async 
       hasRule(
         await analyze(files, root),
         'adapter-engine-ollama-is-independent',
+      ),
+  );
+});
+
+void test('telemetry adapters cannot import engine adapters', async () => {
+  await fixture(
+    {
+      'packages/telemetry-file/src/a.ts':
+        "export * from '../../engine-ollama/src/a';",
+      'packages/engine-ollama/src/a.ts': 'export const value = 1;',
+    },
+    async (files, root) =>
+      hasRule(
+        await analyze(files, root),
+        'adapter-telemetry-file-is-independent',
       ),
   );
 });

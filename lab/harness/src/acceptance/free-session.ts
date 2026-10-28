@@ -1,11 +1,14 @@
 // Builds only synthetic free sellers from shared acceptance components, with injected token counts.
 // Caps and identities are ephemeral; no TOML, wallet file, tokenizer artifact or real engine is loaded.
-import { OFFER_PRICING_KINDS } from '@gyblos/node/constants';
-import { MODEL_IDS, REASONING_LEVELS } from '@gyblos/protocol/constants';
+import {
+  MODEL_IDS,
+  OFFER_PRICING_KINDS,
+  REASONING_LEVELS,
+} from '@gyblos/protocol/constants';
 
-import { ACCEPTANCE_MODES } from './constants.js';
-import { FREE_ACCEPTANCE } from './free-constants.js';
-import { createAcceptanceSession, type AcceptanceSession } from './session.js';
+import { ACCEPTANCE_MODES } from './constants';
+import { FREE_ACCEPTANCE } from './free-constants';
+import { createAcceptanceSession, type AcceptanceSession } from './session';
 
 export async function createFreeSeller(
   signal: AbortSignal,

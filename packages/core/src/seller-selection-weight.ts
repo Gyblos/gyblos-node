@@ -6,12 +6,12 @@ import type { PublicModelV2 } from '@gyblos/protocol/control-types';
 import {
   SELLER_SELECTION_POLICY,
   type SellerSelectionPolicy,
-} from './constants.js';
+} from './constants';
 import {
   invalid,
   type KnownSeller,
   type SellerStats,
-} from './seller-selection-input.js';
+} from './seller-selection-input';
 
 export interface Eligible {
   seller: KnownSeller;

@@ -24,7 +24,7 @@ import {
   createPrivateLog,
   diagnosticDirectory,
   rm,
-} from './support/facilitator-diagnostic-fixture.js';
+} from './support/facilitator-diagnostic-fixture';
 import {
   directorySnapshot,
   PRIVATE_LOG_PLATFORM_SKIP,
@@ -33,7 +33,7 @@ import {
   slotName,
   withFsPatch,
   withLogIo,
-} from './support/private-log-fixture.js';
+} from './support/private-log-fixture';
 
 const OPTIONS = { timeout: 10000, skip: PRIVATE_LOG_PLATFORM_SKIP };
 

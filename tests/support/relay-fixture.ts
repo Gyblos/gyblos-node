@@ -13,7 +13,7 @@ import { signInferenceOffer } from '@gyblos/node/offers';
 import type { RoleConfig } from '@gyblos/node/roles';
 import type { SignedInferenceOffer } from '@gyblos/protocol/offer';
 
-import { recoveryFixture } from './recovery-fixture.js';
+import { recoveryFixture } from './recovery-fixture';
 
 const PROBE_TIMEOUT_MS = 15_000;
 const OUTPUT_LIMIT_BYTES = 65_536;

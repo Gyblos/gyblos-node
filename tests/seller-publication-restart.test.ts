@@ -11,8 +11,8 @@ import { createSellerRecords } from '@gyblos/node/public-records';
 import { openSellerSequence } from '@gyblos/node/public-sequence';
 import { createSellerPublisher } from '@gyblos/node/publisher';
 
-import { publicationIndex } from './support/publication-index.js';
-import { sellerPublicationFixture } from './support/seller-publication.js';
+import { publicationIndex } from './support/publication-index';
+import { sellerPublicationFixture } from './support/seller-publication';
 
 void test('restarted seller keeps the persisted high-water mark and only a newer catalog can reopen a withdrawn HTTP listing', async () => {
   const run = await sellerPublicationFixture();

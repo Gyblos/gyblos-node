@@ -11,7 +11,7 @@ import {
 } from '@gyblos/protocol/constants';
 import type { Signer } from '@gyblos/protocol/signing';
 
-import { sellerPublicationFixture } from './support/seller-publication.js';
+import { sellerPublicationFixture } from './support/seller-publication';
 
 async function fixture() {
   const source = await sellerPublicationFixture();

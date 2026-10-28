@@ -9,7 +9,7 @@ import {
 } from '@gyblos/protocol/constants';
 import { FreeClientError } from '@gyblos/transport-iroh/free-client';
 
-import { freeSellerFixture } from './support/free-seller.js';
+import { freeSellerFixture } from './support/free-seller';
 
 void test('free chat accepts only the configured model, one user message and bounded non-streaming output', async () => {
   const api = await import('@gyblos/buyer/free-chat');

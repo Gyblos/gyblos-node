@@ -5,8 +5,8 @@ import type { LocalSellerStats } from '@gyblos/buyer/selection-stats';
 import { SELLER_BADGES } from '@gyblos/core/constants';
 import { createSellerControlService } from '@gyblos/node/control';
 
-import { controlFixture } from './control-fixture.js';
-import { controlLoopback } from './control-loopback.js';
+import { controlFixture } from './control-fixture';
+import { controlLoopback } from './control-loopback';
 
 export async function selectionFixture() {
   const source = await controlFixture();

@@ -10,7 +10,7 @@ import type {
   RECONCILIATION_CLASSIFICATIONS,
   ReconciliationClassification,
   SCHEMA_VERSIONS,
-} from './constants.js';
+} from './constants';
 
 export interface EvidenceBase {
   schemaVersion: typeof SCHEMA_VERSIONS.EVIDENCE;

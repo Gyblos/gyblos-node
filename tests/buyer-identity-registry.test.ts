@@ -32,13 +32,10 @@ import {
   discoveryHome,
   discoveryResponse,
   discoveryRun,
-} from './support/buyer-discovery.js';
-import {
-  addClaimant,
-  type SyntheticChain,
-} from './support/identity-accounts.js';
-import { fixedSigner } from './support/identity-fixture.js';
-import { startFakeRpc } from './support/identity-rpc-fake.js';
+} from './support/buyer-discovery';
+import { addClaimant, type SyntheticChain } from './support/identity-accounts';
+import { fixedSigner } from './support/identity-fixture';
+import { startFakeRpc } from './support/identity-rpc-fake';
 
 async function fixture() {
   const home = await discoveryHome();

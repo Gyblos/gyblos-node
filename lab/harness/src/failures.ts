@@ -41,15 +41,15 @@ import {
   labPaths,
   SCHEMA_VERSIONS,
   WALLET_ROLES,
-} from './constants.js';
-import { prepareFailureAccounts } from './failure-setup.js';
-import { createGateSeller } from './fixed-seller.js';
+} from './constants';
+import { prepareFailureAccounts } from './failure-setup';
+import { createGateSeller } from './fixed-seller';
 import type {
   FailureCaseResult,
   FailureGateEvidence,
-} from './fixture-evidence-types.js';
-import { assertNoUnresolvedAuthorizations, saveJournal } from './journal.js';
-import { assertLabHome, loadConfig, signer } from './wallet.js';
+} from './fixture-evidence-types';
+import { assertNoUnresolvedAuthorizations, saveJournal } from './journal';
+import { assertLabHome, loadConfig, signer } from './wallet';
 
 export async function failureGate() {
   // Before the lab lock, which would create the lab home.

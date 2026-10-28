@@ -1,58 +1,61 @@
 // Parses and authenticates free execution terms; no engine, replay mutation, clock, transport or payments.
-import { canonicalJson } from './canonical.js';
+import { canonicalJson } from './canonical';
 import {
   CONTROL_LIMITS,
   ENGINE_DONE_REASONS,
   FREE_CHAT_ROLES,
   FREE_EXECUTION,
   FREE_EXECUTION_CODES,
+  FREE_EXECUTION_MATCH_MODES,
+  FREE_EXECUTION_STOP_REASONS,
   PUBLIC_RECORD_LIMITS,
   type FreeChatRole,
-} from './constants.js';
-import { parseModelSelection } from './control-requests.js';
-import type { SignedOfferV2 } from './control-types.js';
+  type FreeExecutionMatchMode,
+} from './constants';
+import { parseModelSelection } from './control-requests';
+import type { SignedOfferV2 } from './control-types';
 import {
   controlArray,
   controlHex,
   controlInteger,
   controlObject,
   controlReasoning,
-} from './control-validation.js';
+} from './control-validation';
 import type {
   FreeChatMessage,
   FreeExecutionBuildInput,
+  FreeExecutionFailure,
   FreeExecutionRequest,
   FreeExecutionResponse,
   FreeExecutionResult,
   FreeExecutionTrust,
-} from './free-execution-types.js';
+} from './free-execution-types';
 import {
   freeExecutionBoundary,
   FreeExecutionError,
   freeExecutionFail,
   freeExecutionText,
   rethrowFreeExecution,
-} from './free-execution-validation.js';
-import {
-  parseOfferSignatureV2,
-  parseOfferV2,
-  verifyOfferV2,
-} from './offer-v2.js';
-import { bytesHex } from './public-validation.js';
-import { signingBytes } from './signing.js';
+} from './free-execution-validation';
+import { parseOfferSignatureV2, parseOfferV2, verifyOfferV2 } from './offer-v2';
+import { bytesHex } from './public-validation';
+import { signingBytes } from './signing';
 
 export type {
   FreeChatMessage,
   FreeExecutionBuildInput,
+  FreeExecutionDelivered,
   FreeExecutionRequest,
   FreeExecutionResponse,
   FreeExecutionResult,
+  FreeExecutionStop,
   FreeExecutionTrust,
-} from './free-execution-types.js';
+} from './free-execution-types';
 export {
   FreeExecutionError,
   freeExecutionFail,
-} from './free-execution-validation.js';
+  freeExecutionStop,
+} from './free-execution-validation';
 
 function role(value: unknown): FreeChatRole {
   for (const accepted of Object.values(FREE_CHAT_ROLES))
@@ -189,6 +192,43 @@ function result(value: unknown): FreeExecutionResult {
     finishReason: input.finishReason,
   };
 }
+const has = (value: unknown, key: string) =>
+  !!value && typeof value === 'object' && Object.hasOwn(value, key);
+// Shape only: a reason exactly with SELLER_CANNOT_CONTINUE, delivered only beside it.
+function failure(value: unknown): FreeExecutionFailure {
+  const hasReason = has(value, 'reason');
+  const hasDelivered = has(value, 'delivered');
+  const error = controlObject(value, [
+    'code',
+    ...(hasReason ? ['reason'] : []),
+    ...(hasDelivered ? ['delivered'] : []),
+  ]);
+  const code = Object.values(FREE_EXECUTION_CODES).find(
+    (entry) => entry === error.code,
+  );
+  if (!code) return freeExecutionFail();
+  const cannotContinue = code === FREE_EXECUTION_CODES.SELLER_CANNOT_CONTINUE;
+  if (hasReason !== cannotContinue || (hasDelivered && !cannotContinue))
+    return freeExecutionFail();
+  if (!cannotContinue) return { code };
+  const reason = Object.values(FREE_EXECUTION_STOP_REASONS).find(
+    (entry) => entry === error.reason,
+  );
+  if (!reason) return freeExecutionFail();
+  if (!hasDelivered) return { code, reason };
+  const delivered = controlObject(error.delivered, ['outputTokens']);
+  return {
+    code,
+    reason,
+    delivered: {
+      outputTokens: controlInteger(
+        delivered.outputTokens,
+        1,
+        PUBLIC_RECORD_LIMITS.maxContextTokens,
+      ),
+    },
+  };
+}
 export function parseFreeExecutionResponse(
   value: unknown,
 ): FreeExecutionResponse {
@@ -210,12 +250,7 @@ export function parseFreeExecutionResponse(
     };
     let response: FreeExecutionResponse;
     if (failed) {
-      const error = controlObject(input.error, ['code']);
-      const code = Object.values(FREE_EXECUTION_CODES).find(
-        (entry) => entry === error.code,
-      );
-      if (!code) return freeExecutionFail();
-      response = { ...base, error: { code } };
+      response = { ...base, error: failure(input.error) };
     } else response = { ...base, result: result(input.result) };
     boundedWire(response, FREE_EXECUTION.responseBytes);
     return response;
@@ -224,6 +259,7 @@ export function parseFreeExecutionResponse(
 export async function matchFreeExecutionResponse(
   value: unknown,
   valueRequest: unknown,
+  mode: FreeExecutionMatchMode = FREE_EXECUTION_MATCH_MODES.COMPLETE,
 ): Promise<FreeExecutionResult> {
   const request = parseFreeExecutionRequest(valueRequest);
   const response = parseFreeExecutionResponse(value);
@@ -232,7 +268,14 @@ export async function matchFreeExecutionResponse(
     response.requestDigest !== (await freeExecutionDigest(request))
   )
     return freeExecutionFail(FREE_EXECUTION_CODES.BINDING);
-  if (response.error) throw new FreeExecutionError(response.error.code, true);
+  if (response.error) {
+    const { code, ...stop } = response.error;
+    if (stop.delivered && mode === FREE_EXECUTION_MATCH_MODES.COMPLETE)
+      return freeExecutionFail();
+    if (stop.delivered && stop.delivered.outputTokens > request.input.maxTokens)
+      return freeExecutionFail(FREE_EXECUTION_CODES.LIMIT);
+    throw new FreeExecutionError(code, true, stop);
+  }
   if (
     response.result.usage.outputTokens > request.input.maxTokens ||
     response.result.usage.inputTokens + response.result.usage.outputTokens >

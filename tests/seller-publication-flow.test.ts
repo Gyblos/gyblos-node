@@ -25,12 +25,12 @@ import {
 } from '@gyblos/transport-iroh/control-client';
 import { serveIroh } from '@gyblos/transport-iroh/iroh-server';
 
-import { discoveryHome } from './support/buyer-discovery.js';
-import { controlLoopback } from './support/control-loopback.js';
-import { endpoint, within } from './support/native-fixture.js';
-import { NATIVE_CAPABILITY } from './support/native-runtime.js';
-import { publicationIndex } from './support/publication-index.js';
-import { sellerPublicationFixture } from './support/seller-publication.js';
+import { discoveryHome } from './support/buyer-discovery';
+import { controlLoopback } from './support/control-loopback';
+import { endpoint, within } from './support/native-fixture';
+import { NATIVE_CAPABILITY } from './support/native-runtime';
+import { publicationIndex } from './support/publication-index';
+import { sellerPublicationFixture } from './support/seller-publication';
 
 function selectionConfig(
   run: Awaited<ReturnType<typeof sellerPublicationFixture>>,

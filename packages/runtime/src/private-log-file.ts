@@ -6,8 +6,8 @@ import { join, parse, resolve, sep } from 'node:path';
 
 import { FILE_MODES, PRIVATE_LOG_LIMITS } from '@gyblos/config';
 
-import { PRIVATE_LOG_CODES, type PrivateLogCode } from './constants.js';
-import { reclaimOldestSlot } from './private-log-reclaim.js';
+import { PRIVATE_LOG_CODES, type PrivateLogCode } from './constants';
+import { reclaimOldestSlot } from './private-log-reclaim';
 
 // Inodes of journals this process holds open; reclamation never removes them.
 const OPEN_LOG_FILES = new Set<string>();

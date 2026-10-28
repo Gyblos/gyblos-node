@@ -17,8 +17,8 @@ import {
   TRANSPORT_LIMITS,
   TRANSPORT_TIMEOUTS,
 } from '@gyblos/config';
-import { P2P_ROLES } from '@gyblos/node/constants';
 import { rolePath } from '@gyblos/node/roles';
+import { P2P_ROLES } from '@gyblos/protocol/constants';
 import { acceptLoopbackHost } from '@gyblos/runtime/loopback-host';
 import type { Transport } from '@gyblos/transport-iroh';
 import { HTTP_OVER_IROH } from '@gyblos/transport-iroh/constants';
@@ -27,8 +27,8 @@ import {
   BUYER_PROXY_ERROR_CODES,
   BUYER_SELECTION,
   type BuyerProxyErrorCode,
-} from './constants.js';
-import type { ProxySelection } from './selection-proxy.js';
+} from './constants';
+import type { ProxySelection } from './selection-proxy';
 
 interface ProxyError {
   code: BuyerProxyErrorCode;

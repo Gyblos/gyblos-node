@@ -16,8 +16,8 @@ import { encodeControlFrame } from '@gyblos/protocol/control-framing';
 import { matchControlResponse } from '@gyblos/protocol/control-response';
 import type { ControlQuery } from '@gyblos/protocol/control-types';
 
-import { controlFixture } from './support/control-fixture.js';
-import { controlLoopback, socketStream } from './support/control-loopback.js';
+import { controlFixture } from './support/control-fixture';
+import { controlLoopback, socketStream } from './support/control-loopback';
 
 async function fixture(queryMs?: number) {
   const source = await controlFixture();

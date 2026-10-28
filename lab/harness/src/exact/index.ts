@@ -14,8 +14,8 @@ import { PUBLIC_CALL_OPERATIONS } from '@gyblos/payments-x402/constants';
 import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { ProtocolError } from '@gyblos/protocol/errors';
 
-import { PUBLIC_CALL_OUTCOMES } from '../constants.js';
-import type { PublicCall } from './types.js';
+import { PUBLIC_CALL_OUTCOMES } from '../constants';
+import type { PublicCall } from './types';
 
 export interface ExactPolicy {
   payTo: string;

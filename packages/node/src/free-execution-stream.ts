@@ -24,6 +24,9 @@ export function createFreeStreamOutput(
   deliver: (text: string) => Promise<void>,
 ) {
   let text = '';
+  // Only text whose delivery resolved; text above may hold a fragment still in flight. A delivery that
+  // rejected after writing its bytes is not counted, so the buyer then rejects the terminal instead.
+  let deliveredText = '';
   let active = true;
   let inFlight = false;
   let failed = false;
@@ -59,6 +62,7 @@ export function createFreeStreamOutput(
         });
         text = combined;
         await deliver(delta);
+        deliveredText = combined;
         check();
       } catch (error) {
         failed = true;
@@ -71,6 +75,7 @@ export function createFreeStreamOutput(
     stop() {
       active = false;
     },
+    delivered: () => deliveredText,
     complete(output: string) {
       check();
       active = false;

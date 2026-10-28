@@ -2,13 +2,9 @@
 // Chat, gateway, wallets and network discovery remain disabled in this probe.
 import { useEffect, useState } from 'react';
 
-import { PROBE_STATUS } from './constants.js';
-import {
-  failedProbe,
-  type ProbeResult,
-  type ProbeStatus,
-} from './probe-model.js';
-import { themeStyle } from './theme.js';
+import { PROBE_STATUS } from './constants';
+import { failedProbe, type ProbeResult, type ProbeStatus } from './probe-model';
+import { themeStyle } from './theme';
 
 import './renderer.css';
 

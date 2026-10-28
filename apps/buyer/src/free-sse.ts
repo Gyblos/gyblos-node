@@ -12,15 +12,12 @@ import {
 import type {
   FreeExecutionBuildInput,
   FreeExecutionResult,
+  FreeExecutionStop,
 } from '@gyblos/protocol/free-execution';
 
-import {
-  FREE_BUYER,
-  FREE_BUYER_CODES,
-  type FreeBuyerCode,
-} from './constants.js';
-import { FreeBuyerError } from './free-chat.js';
-import type { SelectionDecision } from './selection.js';
+import { FREE_BUYER, FREE_BUYER_CODES, type FreeBuyerCode } from './constants';
+import { FreeBuyerError } from './free-chat';
+import type { SelectionDecision } from './selection';
 
 type FreeStreamErrorCode =
   | FreeBuyerCode
@@ -132,12 +129,22 @@ export async function executeFreeSse(
   active(response, signal);
   response.end(`data: ${FREE_BUYER.streamDone}\n\n`);
 }
+// A seller that could not continue adds its reason and, when known, the completion tokens delivered.
 export function replyFreeSseError(
   response: ServerResponse,
   code: FreeStreamErrorCode,
+  stop: FreeExecutionStop = {},
 ) {
   if (response.destroyed || response.writableEnded) return;
-  response.end(
-    `data: ${JSON.stringify({ error: { message: code, type: FREE_BUYER.errorType, param: null, code } })}\n\n`,
-  );
+  const error = {
+    message: code,
+    type: FREE_BUYER.errorType,
+    param: null,
+    code,
+    ...(stop.reason ? { reason: stop.reason } : {}),
+    ...(stop.delivered
+      ? { usage: { completion_tokens: stop.delivered.outputTokens } }
+      : {}),
+  };
+  response.end(`data: ${JSON.stringify({ error })}\n\n`);
 }

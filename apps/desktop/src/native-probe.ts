@@ -6,8 +6,8 @@ import { IPV6_LOOPBACK, LOCALHOST } from '@gyblos/config';
 import { createNodeLifecycle } from '@gyblos/node/lifecycle';
 import { GYBLOS_ALPN } from '@gyblos/protocol/constants';
 
-import { DESKTOP, PROBE_STATUS } from './constants.js';
-import type { ProbeResult } from './probe-model.js';
+import { DESKTOP, PROBE_STATUS } from './constants';
+import type { ProbeResult } from './probe-model';
 
 async function bindLocal() {
   const builder = Endpoint.builder();

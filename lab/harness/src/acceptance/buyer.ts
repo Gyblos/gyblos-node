@@ -17,9 +17,9 @@ import {
 } from '@gyblos/protocol/constants';
 import { ControlError } from '@gyblos/protocol/control-validation';
 
-import { ACCEPTANCE } from './constants.js';
-import { acceptanceAssert, assertAcceptanceActive } from './errors.js';
-import type { AcceptanceSession } from './session.js';
+import { ACCEPTANCE } from './constants';
+import { acceptanceAssert, assertAcceptanceActive } from './errors';
+import type { AcceptanceSession } from './session';
 
 export function acceptanceSelection(
   run: AcceptanceSession,

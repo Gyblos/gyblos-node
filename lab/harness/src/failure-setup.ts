@@ -17,8 +17,8 @@ import {
 import { COMMITMENT } from '@gyblos/config';
 import { confirm, rpc } from '@gyblos/payments-x402/chain';
 
-import { WALLET_ROLES } from './constants.js';
-import { signer, type Config } from './wallet.js';
+import { WALLET_ROLES } from './constants';
+import { signer, type Config } from './wallet';
 
 export async function prepareFailureAccounts(config: Config) {
   const sponsor = await signer(config, WALLET_ROLES.FACILITATOR);

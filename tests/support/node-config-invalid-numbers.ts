@@ -1,7 +1,7 @@
 // Invalid gyblos.toml number fixtures: price decimal spellings, TOML floats where integers are
 // required and [limits] ranges. Test data only; spread into INVALID_FIXTURES.
-import { BASE, offer } from './node-config-fixtures.js';
-import type { InvalidConfigFixture } from './node-config-invalid.js';
+import { BASE, offer } from './node-config-fixtures';
+import type { InvalidConfigFixture } from './node-config-invalid';
 
 const price = (input: string, output: string) =>
   `price = { input_per_mtok = ${input}, output_per_mtok = ${output}, currency = "USDC" }`;

@@ -1,7 +1,21 @@
-// Owns the SDK-independent Engine port and domain usage contract.
+// Owns the SDK-independent Engine port, its uniform failure and the domain usage contract.
 // It must not know wallets, engine implementations or transport.
-import type { EngineDoneReason } from './constants.js';
-import type { EngineWireUsage } from './wire-usage.js';
+//
+// Engine.generate settles in this order of precedence:
+// 1. an aborted caller signal rejects with signal.reason, never an EngineError;
+// 2. a failing onText or onFragment callback rejects with that callback's own error;
+// 3. any engine or upstream failure rejects with EngineError;
+// 4. programming errors (invalid maxTokens, unsupported messages) stay plain Error.
+import type { EngineDoneReason, EngineErrorCode } from './constants';
+import type { EngineWireUsage } from './wire-usage';
+
+// The message is the static code; provider text, bodies and headers never reach it.
+export class EngineError extends Error {
+  constructor(readonly code: EngineErrorCode) {
+    super(code);
+    this.name = 'EngineError';
+  }
+}
 
 export interface EngineCapabilities {
   reportsUsage: boolean;

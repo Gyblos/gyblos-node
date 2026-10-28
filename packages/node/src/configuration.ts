@@ -2,8 +2,8 @@
 // Validation failures use static codes and never include field contents.
 import { isAddress } from '@solana/kit';
 
-import { NODE_CONFIGURATION_LIMITS, type NodeErrorCode } from './constants.js';
-import { NodeError } from './errors.js';
+import { NODE_CONFIGURATION_LIMITS, type NodeErrorCode } from './constants';
+import { NodeError } from './errors';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);

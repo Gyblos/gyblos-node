@@ -35,7 +35,7 @@ import {
 import type { Signer } from '@gyblos/protocol/signing';
 import type { ControlService } from '@gyblos/transport-iroh/control-server';
 
-import type { SellerPublicRecords } from './public-records.js';
+import type { SellerPublicRecords } from './public-records';
 
 export interface SellerControlOptions {
   context: Omit<QuoteContext, 'remoteNodeId' | 'signal'>;

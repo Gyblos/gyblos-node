@@ -4,7 +4,7 @@ import { AssertionError } from 'node:assert';
 import { PROTOCOL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { ProtocolError } from '@gyblos/protocol/errors';
 
-import { ERROR_DIAGNOSTICS, type ErrorDiagnosticCode } from './constants.js';
+import { ERROR_DIAGNOSTICS, type ErrorDiagnosticCode } from './constants';
 
 export function errorDiagnostic(error: unknown): ErrorDiagnosticCode {
   try {

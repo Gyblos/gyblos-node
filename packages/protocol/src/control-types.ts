@@ -9,14 +9,14 @@ import type {
   ControlMeteringMode,
   ReasoningLevel,
   V2_PRICING,
-} from './constants.js';
-import type { EngineCapabilities, EngineDescription } from './engine.js';
+} from './constants';
+import type { EngineCapabilities, EngineDescription } from './engine';
 import type {
   PublicCatalog,
   PublicModelListing,
   PublicPresence,
   PublicWithdrawal,
-} from './public-types.js';
+} from './public-types';
 
 export interface TokenPricesV2 {
   inputAtomicPerMtok: string;

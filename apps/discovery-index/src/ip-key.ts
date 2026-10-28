@@ -1,6 +1,6 @@
 // Owns the rate-limit key for a client address: IPv4 by full address, IPv6 by its /64 prefix.
 // Keys go only to rate limiters; they are never stored or logged.
-import { IPV6, LOCAL_CLIENT_KEY } from './constants.js';
+import { IPV6, LOCAL_CLIENT_KEY } from './constants';
 
 const MAPPED_IPV4 = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/;
 const EMBEDDED_IPV4 = /\.\d+$/;

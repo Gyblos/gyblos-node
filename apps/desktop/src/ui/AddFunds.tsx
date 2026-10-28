@@ -2,10 +2,10 @@
 import { Archive } from '@phosphor-icons/react';
 import { useState } from 'react';
 
-import { prepareTopUp, TOP_UP_STATUS, type TopUpStatus } from './add-funds.js';
-import { BUTTON_VARIANT, TOP_UP_AMOUNTS } from './constants.js';
-import { Button } from './UI.js';
-import { useDesktopWallet } from './WalletState.js';
+import { prepareTopUp, TOP_UP_STATUS, type TopUpStatus } from './add-funds';
+import { BUTTON_VARIANT, TOP_UP_AMOUNTS } from './constants';
+import { Button } from './UI';
+import { useDesktopWallet } from './WalletState';
 
 const messages = {
   [TOP_UP_STATUS.INVALID_AMOUNT]:

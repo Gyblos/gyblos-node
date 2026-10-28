@@ -25,8 +25,8 @@ import {
   FAKE_SECRET,
   offer,
   VALID_FIXTURES,
-} from './support/node-config-fixtures.js';
-import { INVALID_FIXTURES } from './support/node-config-invalid.js';
+} from './support/node-config-fixtures';
+import { INVALID_FIXTURES } from './support/node-config-invalid';
 
 function issuesOf(result: NodeConfigResult) {
   assert.equal(result.ok, false);

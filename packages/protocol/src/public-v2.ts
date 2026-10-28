@@ -6,25 +6,25 @@ import {
   PUBLIC_RECORD_KINDS,
   PUBLIC_RECORD_LIMITS,
   PUBLIC_V2_DOMAINS,
-} from './constants.js';
+} from './constants';
 import type {
   PublicCatalogV2,
   PublicRecordV2,
   PublicTrustV2,
   SignedPublicV2,
-} from './control-types.js';
+} from './control-types';
 import {
   controlFail,
   controlHex,
   controlInteger,
   controlObject,
   controlVerify,
-} from './control-validation.js';
-import { parsePublicV2 } from './public-v2-parser.js';
-import { bytesHex, hexBytes } from './public-validation.js';
-import { sign, signingBytes, type Signer } from './signing.js';
+} from './control-validation';
+import { parsePublicV2 } from './public-v2-parser';
+import { bytesHex, hexBytes } from './public-validation';
+import { sign, signingBytes, type Signer } from './signing';
 
-export { parsePublicV2 } from './public-v2-parser.js';
+export { parsePublicV2 } from './public-v2-parser';
 export function validatePublicV2Time(record: PublicRecordV2, now: number) {
   controlInteger(now);
   const lifetime =

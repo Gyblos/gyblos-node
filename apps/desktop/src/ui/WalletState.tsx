@@ -10,11 +10,8 @@ import {
   type ReactNode,
 } from 'react';
 
-import {
-  BACKUP_RESULT,
-  type BackupResult,
-} from '../wallet/backup-flow-model.js';
-import { WALLET_STATUS, type WalletSummary } from '../wallet/model.js';
+import { BACKUP_RESULT, type BackupResult } from '../wallet/backup-flow-model';
+import { WALLET_STATUS, type WalletSummary } from '../wallet/model';
 import {
   parseWalletCollection,
   parseWalletSettingsResult,
@@ -24,7 +21,7 @@ import {
   type WalletCollection,
   type WalletSettingsRequest,
   type WalletSettingsResult,
-} from '../wallet/settings-model.js';
+} from '../wallet/settings-model';
 
 declare global {
   interface Window {

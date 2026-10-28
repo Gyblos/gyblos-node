@@ -6,8 +6,8 @@ import {
 } from '@gyblos/config';
 import { validateDiscoveryBaseUrl } from '@gyblos/discovery-http';
 
-import { NODE_ERROR_CODES } from './constants.js';
-import { NodeError } from './errors.js';
+import { NODE_ERROR_CODES } from './constants';
+import { NodeError } from './errors';
 
 export function sellerPublicationConfig(
   environment: HomeEnvironment,

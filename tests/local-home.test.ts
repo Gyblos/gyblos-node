@@ -16,18 +16,15 @@ import {
   ROLE_DIRECTORIES,
   type HomeRole,
 } from '@gyblos/config';
-import {
-  NODE_ERROR_CODES,
-  P2P_ROLES,
-  type P2PRole,
-} from '@gyblos/node/constants';
+import { NODE_ERROR_CODES } from '@gyblos/node/constants';
 import {
   assertOllamaModelsHome,
   assertRoleHome,
   assertTokenizerHome,
 } from '@gyblos/node/home';
+import { P2P_ROLES, type P2PRole } from '@gyblos/protocol/constants';
 
-import { NATIVE_CAPABILITY } from './support/native-runtime.js';
+import { NATIVE_CAPABILITY } from './support/native-runtime';
 
 const DEFAULT_ENV = {};
 

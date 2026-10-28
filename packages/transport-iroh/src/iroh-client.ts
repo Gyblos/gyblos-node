@@ -5,15 +5,11 @@ import type { Connection, Endpoint, EndpointAddr } from '@number0/iroh';
 import { TRANSPORT_TIMEOUTS } from '@gyblos/config';
 import { GYBLOS_ALPN } from '@gyblos/protocol/constants';
 
-import {
-  HTTP_OVER_IROH,
-  IROH_DEADLINES,
-  TRANSPORT_ROUTES,
-} from './constants.js';
-import { withDeadline } from './deadline.js';
-import { selectedRoute } from './paths.js';
-import type { HttpRequest, Transport, TransportRoute } from './types.js';
-import { decodeResponse, encodeRequest } from './wire.js';
+import { HTTP_OVER_IROH, IROH_DEADLINES, TRANSPORT_ROUTES } from './constants';
+import { withDeadline } from './deadline';
+import { selectedRoute } from './paths';
+import type { HttpRequest, Transport, TransportRoute } from './types';
+import { decodeResponse, encodeRequest } from './wire';
 
 export function createIrohTransport(
   endpoint: Endpoint,

@@ -13,7 +13,7 @@ import {
 
 import { DEVNET_GENESIS, LOCALHOST } from '@gyblos/config';
 
-import type { SyntheticChain } from './identity-accounts.js';
+import type { SyntheticChain } from './identity-accounts';
 
 const BASE58 = getBase58Encoder();
 const SLOT = 100;

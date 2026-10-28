@@ -21,7 +21,7 @@ import { buyerDiscoveryState } from '@gyblos/buyer/discovery-storage';
 import { homeLayout } from '@gyblos/config/home';
 import { CONTROL_CODES, PUBLIC_RECORD_KINDS } from '@gyblos/protocol/constants';
 
-import { discoveryHome, discoveryRun } from './support/buyer-discovery.js';
+import { discoveryHome, discoveryRun } from './support/buyer-discovery';
 
 void test('discovery replay metadata survives restart and permits only identical equal-sequence refresh', async () => {
   const home = await discoveryHome();

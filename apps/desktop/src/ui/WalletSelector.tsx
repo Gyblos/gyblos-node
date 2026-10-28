@@ -4,14 +4,14 @@ import { useState } from 'react';
 import {
   WALLET_SETTINGS_ACTION,
   WALLET_SETTINGS_RESULT,
-} from '../wallet/settings-model.js';
-import { BUTTON_VARIANT } from './constants.js';
-import { Badge, Button, List, ListRow, RowCopy } from './UI.js';
+} from '../wallet/settings-model';
+import { BUTTON_VARIANT } from './constants';
+import { Badge, Button, List, ListRow, RowCopy } from './UI';
 import {
   useDesktopWallet,
   useDesktopWalletActions,
   useDesktopWallets,
-} from './WalletState.js';
+} from './WalletState';
 
 export function WalletSelector() {
   const wallet = useDesktopWallet();

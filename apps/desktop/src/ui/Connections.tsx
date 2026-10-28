@@ -15,13 +15,13 @@ import {
   connectionPolicy,
   type ConnectionTool,
   type PreviewConnection,
-} from './connection-state.js';
-import { BUTTON_VARIANT, MOTION_VARIANT } from './constants.js';
-import { Modal } from './Modal.js';
-import { ModelDropdown, type ModelOption } from './ModelDropdown.js';
-import { MotionPresence } from './Motion.js';
-import { ServiceLogo } from './ServiceLogo.js';
-import { Avatar, Badge, Button, List, ListRow, Note, RowCopy } from './UI.js';
+} from './connection-state';
+import { BUTTON_VARIANT, MOTION_VARIANT } from './constants';
+import { Modal } from './Modal';
+import { ModelDropdown, type ModelOption } from './ModelDropdown';
+import { MotionPresence } from './Motion';
+import { ServiceLogo } from './ServiceLogo';
+import { Avatar, Badge, Button, List, ListRow, Note, RowCopy } from './UI';
 
 export function ConnectionList({
   connections,

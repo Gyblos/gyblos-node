@@ -21,14 +21,14 @@ import {
   type ExactEvidenceErrorCode,
   type FACILITATOR_STATUSES,
   type GATE_HTTP_STATUS,
-} from './constants.js';
+} from './constants';
 import type {
   AuthorizationMetadata,
   EvidenceBase,
   ExactSnapshot,
   Reconciliation,
-} from './evidence-types.js';
-import { type PublicCall } from './exact/types.js';
+} from './evidence-types';
+import { type PublicCall } from './exact/types';
 
 export type ExactCaseResult =
   | {

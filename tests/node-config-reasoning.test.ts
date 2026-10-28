@@ -8,7 +8,7 @@ import {
   type NodeConfigResult,
 } from '@gyblos/node/node-config';
 
-import { BASE, offer } from './support/node-config-fixtures.js';
+import { BASE, offer } from './support/node-config-fixtures';
 
 function issuesOf(result: NodeConfigResult) {
   assert.equal(result.ok, false);

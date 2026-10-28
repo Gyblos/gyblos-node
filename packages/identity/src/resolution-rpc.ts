@@ -6,19 +6,19 @@ import {
   stringifyJsonWithBigInts,
 } from '@solana/rpc-spec-types';
 
-import { IDENTITY_ERROR_CODES, IDENTITY_RPC_METHODS } from './constants.js';
-import { identityRpcFail } from './errors.js';
-import { readIdentityRpcResponse } from './resolution-rpc-http.js';
+import { IDENTITY_ERROR_CODES, IDENTITY_RPC_METHODS } from './constants';
+import { identityRpcFail } from './errors';
+import type { IdentityResolutionRpc } from './resolution';
+import { readIdentityRpcResponse } from './resolution-rpc-http';
 import {
   identityRpcOptions,
   type IdentityRpcOptions,
-} from './resolution-rpc-options.js';
-import type { IdentityResolutionRpc } from './resolution.js';
+} from './resolution-rpc-options';
 
 export type {
   IdentityRpcFetch,
   IdentityRpcOptions,
-} from './resolution-rpc-options.js';
+} from './resolution-rpc-options';
 function requestId(payload: unknown) {
   if (
     !payload ||

@@ -2,9 +2,9 @@
 // No real chain, keys or writes are available to this fixture.
 import { nodeIdFromAddress } from '@gyblos/identity/codec';
 
-import { addClaimant, type SyntheticChain } from './identity-accounts.js';
-import { fixedSigner } from './identity-fixture.js';
-import { startFakeRpc } from './identity-rpc-fake.js';
+import { addClaimant, type SyntheticChain } from './identity-accounts';
+import { fixedSigner } from './identity-fixture';
+import { startFakeRpc } from './identity-rpc-fake';
 
 export async function identityResolutionFixture() {
   const node = await fixedSigner(1);

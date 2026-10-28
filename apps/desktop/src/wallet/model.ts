@@ -1,5 +1,5 @@
 // Public-only wallet status shared with preload and UI; never serializes a secret.
-import { WALLET_STATUS } from './constants.js';
+import { WALLET_STATUS } from './constants';
 
 export interface WalletSummary {
   status: (typeof WALLET_STATUS)[keyof typeof WALLET_STATUS];
@@ -53,4 +53,4 @@ export function parseWalletSummary(value: unknown): WalletSummary {
     : failed();
 }
 
-export { WALLET, WALLET_STATUS, WALLET_PROVIDER } from './constants.js';
+export { WALLET, WALLET_STATUS, WALLET_PROVIDER } from './constants';

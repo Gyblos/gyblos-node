@@ -2,6 +2,37 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 
+type Identifier = { type: 'Identifier'; name: string };
+type BindingPattern =
+  | Identifier
+  | { type: 'RestElement'; argument: BindingPattern }
+  | { type: 'AssignmentPattern'; left: BindingPattern }
+  | { type: 'ArrayPattern'; elements: (BindingPattern | null)[] }
+  | {
+      type: 'ObjectPattern';
+      properties: (
+        | { type: 'RestElement'; argument: BindingPattern }
+        | { type: 'Property'; value: BindingPattern }
+      )[];
+    }
+  | null;
+type SourceNode = {
+  source: {
+    type: string;
+    value?: unknown;
+    expressions?: unknown[];
+    quasis?: { value: { cooked: string | null } }[];
+  } | null;
+};
+type RuleContext = {
+  filename: string;
+  report: (report: {
+    node: object;
+    messageId: string;
+    data?: Record<string, string>;
+  }) => void;
+};
+
 const SHORT_BINDINGS = new Set([
   'c',
   'sig',
@@ -26,7 +57,7 @@ const SHORT_BINDINGS = new Set([
   'addr',
 ]);
 
-function packageRoot(filename) {
+function packageRoot(filename: string) {
   const parts = filename.split('/');
   const index = parts.findIndex((part) =>
     ['apps', 'packages', 'lab'].includes(part),
@@ -34,7 +65,7 @@ function packageRoot(filename) {
   return index < 0 ? null : parts.slice(0, index + 2).join('/');
 }
 
-function bindingNames(pattern) {
+function bindingNames(pattern: BindingPattern): Identifier[] {
   if (!pattern) return [];
   if (pattern.type === 'Identifier') return [pattern];
   if (pattern.type === 'RestElement') return bindingNames(pattern.argument);
@@ -58,8 +89,8 @@ const structure = {
       binding: 'Use a descriptive binding instead of "{{name}}".',
     },
   },
-  create(context) {
-    function checkBinding(pattern) {
+  create(context: RuleContext) {
+    function checkBinding(pattern: BindingPattern) {
       for (const identifier of bindingNames(pattern)) {
         if (SHORT_BINDINGS.has(identifier.name.replace(/^_+/, '')))
           context.report({
@@ -70,19 +101,19 @@ const structure = {
       }
     }
     return {
-      VariableDeclarator(node) {
+      VariableDeclarator(node: { id: BindingPattern }) {
         checkBinding(node.id);
       },
-      FunctionDeclaration(node) {
+      FunctionDeclaration(node: { params: BindingPattern[] }) {
         node.params.forEach(checkBinding);
       },
-      FunctionExpression(node) {
+      FunctionExpression(node: { params: BindingPattern[] }) {
         node.params.forEach(checkBinding);
       },
-      ArrowFunctionExpression(node) {
+      ArrowFunctionExpression(node: { params: BindingPattern[] }) {
         node.params.forEach(checkBinding);
       },
-      CatchClause(node) {
+      CatchClause(node: { param: BindingPattern }) {
         checkBinding(node.param);
       },
     };
@@ -98,15 +129,11 @@ const packageBoundaries = {
         'Import other packages by workspace name; relative imports stay inside their package.',
     },
   },
-  create(context) {
+  create(context: RuleContext) {
     const filename = context.filename.replaceAll('\\', '/');
     const root = packageRoot(filename);
-    function checkSource(node) {
-      const literal = node.source;
-      const source =
-        literal?.type === 'TemplateLiteral' && literal.expressions.length === 0
-          ? literal.quasis[0]?.value.cooked
-          : literal?.value;
+    function checkSource(node: SourceNode) {
+      const source = sourceText(node.source);
       if (typeof source !== 'string') return;
       if (!source) return;
       if (root && source.startsWith('.')) {
@@ -124,6 +151,45 @@ const packageBoundaries = {
   },
 };
 
+// Relative modules resolve without an extension (Bundler resolution); assets such as JSON or CSS keep theirs.
+const CODE_EXTENSION = /\.[cm]?[jt]sx?$/;
+
+function sourceText(literal: SourceNode['source']) {
+  return literal?.type === 'TemplateLiteral' &&
+    literal.expressions?.length === 0
+    ? literal.quasis?.[0]?.value.cooked
+    : literal?.value;
+}
+
+const importExtensions = {
+  meta: {
+    type: 'suggestion',
+    schema: [],
+    messages: {
+      extension: 'Import relative TypeScript modules without an extension.',
+    },
+  },
+  create(context: RuleContext) {
+    function checkSource(node: SourceNode) {
+      const source = sourceText(node.source);
+      if (
+        typeof source === 'string' &&
+        source.startsWith('.') &&
+        CODE_EXTENSION.test(source)
+      )
+        context.report({ node, messageId: 'extension' });
+    }
+    return {
+      ImportDeclaration: checkSource,
+      ExportNamedDeclaration: checkSource,
+      ExportAllDeclaration: checkSource,
+      ImportExpression: checkSource,
+      // `import('./x').T` in type positions; `source` replaces the deprecated `argument`.
+      TSImportType: checkSource,
+    };
+  },
+};
+
 const versionPins = {
   meta: {
     type: 'problem',
@@ -133,11 +199,11 @@ const versionPins = {
         'Config version metadata must match the dependency pin for {{dependency}}.',
     },
   },
-  create(context) {
+  create(context: RuleContext) {
     return {
-      Program(node) {
+      Program(node: object) {
         const root = resolve(dirname(context.filename), '../../..');
-        const manifest = (path) =>
+        const manifest = (path: string): Record<string, string> =>
           JSON.parse(readFileSync(resolve(root, path), 'utf8')).dependencies;
         const metadata = manifest('packages/config/package.json');
         const paths = [
@@ -176,6 +242,7 @@ export default {
   rules: {
     structure,
     'package-boundaries': packageBoundaries,
+    'import-extensions': importExtensions,
     'version-pins': versionPins,
   },
 };

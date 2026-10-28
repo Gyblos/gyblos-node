@@ -7,7 +7,7 @@ import {
 
 import { getBase58Decoder } from '@solana/kit';
 
-import { WALLET } from './constants.js';
+import { WALLET } from './constants';
 
 export function createWalletSecret() {
   const pair = generateKeyPairSync('ed25519');

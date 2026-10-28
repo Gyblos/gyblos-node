@@ -1,23 +1,19 @@
 // Public Settings contracts only; never imports Node, paths, crypto or keys.
-import { parseBackupRequest, type BackupRequest } from './backup-flow-model.js';
+import { parseBackupRequest, type BackupRequest } from './backup-flow-model';
 import {
   WALLET_LIBRARY,
   WALLET_SETTINGS_ACTION,
   WALLET_SETTINGS_RESULT,
   WALLET_STATUS,
-} from './constants.js';
-import {
-  parseWalletSummary,
-  walletSummary,
-  type WalletSummary,
-} from './model.js';
-import { validSetupPassword } from './setup-model.js';
+} from './constants';
+import { parseWalletSummary, walletSummary, type WalletSummary } from './model';
+import { validSetupPassword } from './setup-model';
 
 export {
   WALLET_SETTINGS,
   WALLET_SETTINGS_ACTION,
   WALLET_SETTINGS_RESULT,
-} from './constants.js';
+} from './constants';
 export type WalletSettingsResult =
   (typeof WALLET_SETTINGS_RESULT)[keyof typeof WALLET_SETTINGS_RESULT];
 export type WalletSettingsRequest =

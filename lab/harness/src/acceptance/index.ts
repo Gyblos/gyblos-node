@@ -5,8 +5,8 @@ import { createDiscoveryIndex } from '@gyblos/discovery-index/app';
 import { PUBLISH_MODES } from '@gyblos/discovery-index/constants';
 import { createMemoryStorage } from '@gyblos/discovery-index/storage';
 
-import { ACCEPTANCE, ACCEPTANCE_CODES } from './constants.js';
-import { AcceptanceError } from './errors.js';
+import { ACCEPTANCE, ACCEPTANCE_CODES } from './constants';
+import { AcceptanceError } from './errors';
 
 export function createAcceptanceIndex(now: () => number, nodeId: string) {
   const storage = createMemoryStorage();

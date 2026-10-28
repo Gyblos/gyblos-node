@@ -25,14 +25,14 @@ import {
   PUBLIC_CALL_OUTCOMES,
   RECONCILIATION_CLASSIFICATIONS,
   WALLET_ROLES,
-} from '../../constants.js';
-import { assertExactFallbackSafe } from '../../exact/index.js';
-import { saveJournal } from '../../journal.js';
-import { assertEmpty, assertUntrusted } from './assertions.js';
-import { createChallenge } from './challenge.js';
-import { createPaidRequest } from './payment.js';
-import { authorizationMetadata, reconcile, snapshot } from './reconcile.js';
-import type { ExactContext } from './types.js';
+} from '../../constants';
+import { assertExactFallbackSafe } from '../../exact/index';
+import { saveJournal } from '../../journal';
+import { assertEmpty, assertUntrusted } from './assertions';
+import { createChallenge } from './challenge';
+import { createPaidRequest } from './payment';
+import { authorizationMetadata, reconcile, snapshot } from './reconcile';
+import type { ExactContext } from './types';
 
 export async function runProvider(context: ExactContext) {
   const {

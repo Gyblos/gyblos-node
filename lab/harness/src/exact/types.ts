@@ -1,7 +1,7 @@
 // Record of one call to a public facilitator (operation, outcome, optional transaction and reason).
 import type { PublicCallOperation } from '@gyblos/payments-x402/constants';
 
-import type { PublicCallOutcome } from '../constants.js';
+import type { PublicCallOutcome } from '../constants';
 
 export interface PublicCall {
   operation: PublicCallOperation;

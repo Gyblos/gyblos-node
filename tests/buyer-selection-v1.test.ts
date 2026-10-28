@@ -10,7 +10,7 @@ import type { SellerCandidate } from '@gyblos/core/seller-selection';
 import { REASONING_LEVELS } from '@gyblos/protocol/constants';
 import type { InferenceOffer } from '@gyblos/protocol/offer';
 
-import { controlFixture } from './support/control-fixture.js';
+import { controlFixture } from './support/control-fixture';
 
 void test('a smaller selected quote budget cannot authorize against a larger trusted v1 maximum', async () => {
   const run = await controlFixture();

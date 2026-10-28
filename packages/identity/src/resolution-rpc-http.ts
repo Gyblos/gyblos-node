@@ -1,8 +1,8 @@
 // Bounds decoded fetch bodies under an absolute deadline before any SDK parser runs.
 // Cancellation discards late work without awaiting a potentially uncooperative provider.
-import { IDENTITY_ERROR_CODES } from './constants.js';
-import { IdentityError, identityRpcFail } from './errors.js';
-import type { IdentityRpcConfig } from './resolution-rpc-options.js';
+import { IDENTITY_ERROR_CODES } from './constants';
+import { IdentityError, identityRpcFail } from './errors';
+import type { IdentityRpcConfig } from './resolution-rpc-options';
 
 function discard(response: Response) {
   response.body?.cancel().catch(() => {});

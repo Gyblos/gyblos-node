@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { NATIVE_TEST_OPTIONS } from '../support/native-runtime.js';
+import { NATIVE_TEST_OPTIONS } from '../support/native-runtime';
 
 void test(
   'native free streaming proves early HTTP delivery and cancellation reaches the seller engine',

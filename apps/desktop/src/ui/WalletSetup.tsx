@@ -2,7 +2,7 @@
 // Native selection and all key/file processing remain in the host.
 import { useEffect, useState } from 'react';
 
-import { themeStyle } from '../theme.js';
+import { themeStyle } from '../theme';
 import {
   parseSetupView,
   SETUP_ACTION,
@@ -11,11 +11,11 @@ import {
   validSetupPassword,
   type SetupRequest,
   type SetupView,
-} from '../wallet/setup-model.js';
-import { BUTTON_VARIANT } from './constants.js';
-import { StartupSplash } from './StartupSplash.js';
-import { Button, Note } from './UI.js';
-import { PasswordField } from './WalletBackup.js';
+} from '../wallet/setup-model';
+import { BUTTON_VARIANT } from './constants';
+import { StartupSplash } from './StartupSplash';
+import { Button, Note } from './UI';
+import { PasswordField } from './WalletBackup';
 
 declare global {
   interface Window {

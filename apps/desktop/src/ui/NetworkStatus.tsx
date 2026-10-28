@@ -2,11 +2,7 @@
 // Connection availability is separate from the selected model and individual chat runs.
 import { useEffect, useState } from 'react';
 
-import {
-  NETWORK_LABELS,
-  NETWORK_STATE,
-  PREVIEW_CONNECT_MS,
-} from './constants.js';
+import { NETWORK_LABELS, NETWORK_STATE, PREVIEW_CONNECT_MS } from './constants';
 
 export type NetworkState = (typeof NETWORK_STATE)[keyof typeof NETWORK_STATE];
 

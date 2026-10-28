@@ -14,12 +14,12 @@ import {
   TRANSPORT_ROUTES,
 } from '@gyblos/transport-iroh/constants';
 
-import { fixture, within } from './support/native-fixture.js';
+import { fixture, within } from './support/native-fixture';
 import {
   NATIVE_CAPABILITY,
   NATIVE_TEST_OPTIONS,
   waitFor,
-} from './support/native-runtime.js';
+} from './support/native-runtime';
 
 const PROXY_TEST_OPTIONS = { skip: NATIVE_CAPABILITY.bindingSkip };
 const buyerProxyHandler = NATIVE_CAPABILITY.bindingSkip

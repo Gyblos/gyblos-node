@@ -7,8 +7,8 @@ import type { IncomingAddr } from '@number0/iroh';
 import { TRANSPORT_LIMITS, type TransportLimits } from '@gyblos/config';
 import { CONTROL_ALPN } from '@gyblos/protocol/constants';
 
-import { createConnectionRate } from './connection-rate.js';
-import { CONNECTION_FAMILIES, type ConnectionFamily } from './constants.js';
+import { createConnectionRate } from './connection-rate';
+import { CONNECTION_FAMILIES, type ConnectionFamily } from './constants';
 
 export function connectionFamily(alpn: string): ConnectionFamily {
   return alpn === CONTROL_ALPN

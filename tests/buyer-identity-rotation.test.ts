@@ -7,7 +7,7 @@ import { mergeDiscoveryRow } from '@gyblos/buyer/discovery-state';
 import { buyerDiscoveryState } from '@gyblos/buyer/discovery-storage';
 import { catalogDigestV2 } from '@gyblos/protocol/public-v2';
 
-import { discoveryHome, discoveryRun } from './support/buyer-discovery.js';
+import { discoveryHome, discoveryRun } from './support/buyer-discovery';
 
 void test('independently authorized owner rotation needs a later catalog and retains old public replay floors', async () => {
   const home = await discoveryHome();

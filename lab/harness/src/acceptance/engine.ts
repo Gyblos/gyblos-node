@@ -15,8 +15,8 @@ import {
   ACCEPTANCE_CODES,
   ACCEPTANCE_MODES,
   type AcceptanceMode,
-} from './constants.js';
-import { AcceptanceError } from './errors.js';
+} from './constants';
+import { AcceptanceError } from './errors';
 
 function syntheticEngine(): Engine {
   return {

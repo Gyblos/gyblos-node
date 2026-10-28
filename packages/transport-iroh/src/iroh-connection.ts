@@ -3,7 +3,7 @@ import type { BiStream, Connection } from '@number0/iroh';
 
 import { TRANSPORT_LIMITS } from '@gyblos/config';
 
-import { HTTP_OVER_IROH, IROH_DEADLINES } from './constants.js';
+import { HTTP_OVER_IROH, IROH_DEADLINES } from './constants';
 
 export async function handleIrohConnection(
   connection: Connection,
