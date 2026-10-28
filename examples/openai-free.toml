@@ -1,0 +1,18 @@
+#:schema ../packages/node/schemas/gyblos.schema.json
+# (The #:schema path above is relative to this repository; in a copy elsewhere, update or delete it.)
+# Give away a model from any OpenAI-compatible API, capped per day and per buyer. The API key stays in
+# the environment:
+#   export UPSTREAM_API_KEY=...
+# Usage is declared by the provider ("Uso declarado"), and reselling may break the provider's terms;
+# that is the seller's responsibility. Check it with `pnpm gyblos doctor --online`.
+
+version = 1
+
+[node]
+network = "devnet"
+
+[[offers]]
+model = "llama-3.3-70b"
+reasoning = ["off"]
+engine = { kind = "openai", url = "https://api.example.com/v1", api_key_env = "UPSTREAM_API_KEY", upstream_model = "llama-3.3-70b-instruct", context_tokens = 131072 }
+free = { daily_token_cap = 200000, per_buyer_cap = 5000 }

@@ -61,7 +61,11 @@ const fail = (code: NodeErrorCode, context?: NodeErrorContext): never => {
   throw new NodeError(code, context);
 };
 
-function offerSettings(offer: NodeOffer, index: number): SellerOfferSettings {
+function offerSettings(
+  offer: NodeOffer,
+  index: number,
+  environment: HomeEnvironment,
+): SellerOfferSettings {
   const engine: SellerEngineOffer = {
     index,
     model: offer.model,
@@ -71,6 +75,10 @@ function offerSettings(offer: NodeOffer, index: number): SellerOfferSettings {
   const refuse = (code: NodeErrorCode) => fail(code, { offer: index });
   const refusal = engineOfferRefusal(engine);
   if (refusal) refuse(refusal);
+  // The key itself stays in the environment; only its presence is checked here.
+  const { apiKeyEnv } = offer.engine;
+  if (apiKeyEnv !== undefined && !environment[apiKeyEnv])
+    refuse(NODE_ERROR_CODES.SELLER_OFFER_API_KEY_MISSING);
   const { pricing } = offer;
   // Paid v1 selling is off until it returns as a payment plugin (phase 2).
   if (pricing.kind !== OFFER_PRICING_KINDS.FREE)
@@ -90,9 +98,12 @@ function offerSettings(offer: NodeOffer, index: number): SellerOfferSettings {
 }
 
 // Every entry must be servable: one refused offer refuses startup with its index.
-function catalogOffers(offers: NodeOffer[]): SellerOfferSettings[] {
+function catalogOffers(
+  offers: NodeOffer[],
+  environment: HomeEnvironment,
+): SellerOfferSettings[] {
   if (!offers.length) fail(NODE_ERROR_CODES.SELLER_OFFERS_MISSING);
-  return offers.map(offerSettings);
+  return offers.map((offer, index) => offerSettings(offer, index, environment));
 }
 
 export type SellerBaseSettings = Omit<SellerSettings, 'offers'>;
@@ -111,7 +122,7 @@ export function sellerSettings(
   environment: HomeEnvironment,
 ): SellerSettings {
   const { base, offers } = resolveSeller(file, environment);
-  return { ...base, offers: catalogOffers(offers) };
+  return { ...base, offers: catalogOffers(offers, environment) };
 }
 
 function resolveSeller(

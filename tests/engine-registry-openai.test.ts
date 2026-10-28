@@ -3,6 +3,8 @@
 // proves readiness (a local server warms up, a remote API is only described) and where its API key
 // comes from. Settings refuse an offer whose key variable is unset. Offline, synthetic values.
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import test from 'node:test';
 
 import { NODE_ERROR_CODES } from '@gyblos/node/constants';
@@ -24,7 +26,11 @@ import {
   REASONING_LEVELS,
 } from '@gyblos/protocol/constants';
 
-import { BASE, FAKE_SECRET } from './support/node-config-fixtures';
+import {
+  BASE,
+  FAKE_SECRET,
+  REPOSITORY_ROOT,
+} from './support/node-config-fixtures';
 
 const REMOTE: SellerEngineOffer = {
   index: 0,
@@ -163,4 +169,22 @@ void test('settings refuse an offer whose API key variable is unset or empty, na
   });
   assert.equal(settings.offers[0]!.engine.engine.kind, ENGINE_KINDS.OPENAI);
   assert.ok(!JSON.stringify(settings).includes(FAKE_SECRET));
+});
+
+void test('examples/openai-free.toml is a file the seller daemon serves as written', () => {
+  const parsed = parseNodeConfig(
+    readFileSync(join(REPOSITORY_ROOT, 'examples/openai-free.toml'), 'utf8'),
+  );
+  assert.ok(parsed.ok, JSON.stringify(parsed));
+  const [offer] = sellerSettings(parsed.config, {
+    UPSTREAM_API_KEY: FAKE_SECRET,
+  }).offers;
+  assert.equal(offer!.engine.engine.kind, ENGINE_KINDS.OPENAI);
+  assert.equal(
+    createSellerEngine(offer!.engine, {
+      fetch: globalThis.fetch,
+      environment: { UPSTREAM_API_KEY: FAKE_SECRET },
+    }).metering.mode,
+    CONTROL_METERING_MODES.DECLARED,
+  );
 });

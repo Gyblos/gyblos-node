@@ -71,7 +71,8 @@
     "@gyblos/discovery-index": "workspace:*",
     "@gyblos/telemetry-file": "workspace:*",
     "@gyblos/telemetry-console": "workspace:*",
-    "@gyblos/telemetry-otel": "workspace:*"
+    "@gyblos/telemetry-otel": "workspace:*",
+    "@gyblos/engine-openai": "workspace:*"
   },
   "devDependencies": {
     "@ianvs/prettier-plugin-sort-imports": "4.7.0",

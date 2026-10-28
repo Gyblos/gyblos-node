@@ -11,10 +11,12 @@ import type {
   SellerEngineOffer,
 } from './engine-factory';
 import { OLLAMA_ENGINE_FACTORY } from './engine-registry-ollama';
+import { OPENAI_ENGINE_FACTORY } from './engine-registry-openai';
 import { NodeError } from './errors';
 
 export const ENGINE_REGISTRY = {
   [ENGINE_KINDS.OLLAMA]: OLLAMA_ENGINE_FACTORY,
+  [ENGINE_KINDS.OPENAI]: OPENAI_ENGINE_FACTORY,
 } as const satisfies Partial<Record<EngineKind, EngineFactory>>;
 
 // Own keys only, so an unvalidated kind such as __proto__ never resolves to an inherited value.

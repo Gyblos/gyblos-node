@@ -40,6 +40,10 @@ const HINTS: Readonly<Partial<Record<DoctorResultCode, string>>> = {
   [ENGINE_ERROR_CODES.TIMEOUT]:
     'the engine at the offer URL did not answer in time; check that Ollama is running',
   [DOCTOR_CODES.NOT_CHECKED]: 'fix the failures above first',
+  [DOCTOR_CODES.REMOTE_NOT_CHECKED]:
+    'remote engine; run `pnpm gyblos doctor --online` to describe it with its API key',
+  [NODE_ERROR_CODES.SELLER_OFFER_API_KEY_MISSING]:
+    'set the variable named by api_key_env',
   [NODE_ERROR_CODES.SELLER_OFFERS_MISSING]:
     'add a free [[offers]] entry to gyblos.toml (examples/seller-daemon.toml)',
   [NODE_ERROR_CODES.SELLER_PAID_EXECUTION_UNAVAILABLE]:
@@ -65,6 +69,7 @@ export async function doctor(
     env: Readonly<Record<string, string | undefined>>;
     cwd: string;
     probes?: DoctorProbes;
+    online: boolean;
   },
   output: { stdout: (text: string) => void },
 ) {
@@ -72,6 +77,7 @@ export async function doctor(
     environment: options.env,
     cwd: options.cwd,
     probes: options.probes,
+    online: options.online,
   });
   const { stdout } = output;
   stdout('Seller doctor (read-only)\n');
