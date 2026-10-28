@@ -92,14 +92,15 @@ Seller:
 export GYBLOS_RELAY_TOKEN=...   # 32-512 characters; never commit it
 pnpm node:setup --role seller --mint MINT --buyer BUYER_ADDRESS --pay-to PAYOUT_ADDRESS
 pnpm gate:inference:setup       # downloads the pinned model (lab command for now)
-pnpm node:start                 # writes the signed offer to .local/gyblos/seller/offer.json
+cp examples/seller-daemon.toml gyblos.toml   # one free offer; paid selling is off for now
+pnpm node:start
 ```
 
-Buyer: same token, `pnpm node:setup --role buyer --mint MINT`, put the seller's
-`offer.json` in `.local/gyblos/buyer/`, create trust with `pnpm buyer:trust`
-using independently confirmed seller identities, run `pnpm buyer:setup`, then
-`pnpm buyer:start`. Full steps:
-[docs/running-a-node.md](docs/running-a-node.md).
+Buyer: same token, `pnpm node:setup --role buyer --mint MINT`, then
+`pnpm buyer:free` for the free chat endpoint (it also needs a `selection.json`;
+see the full steps). The paid v1 buyer flow (`buyer:trust`, `buyer:start`) needs
+a paid seller, which only the lab gates run until paid selling returns. Full
+steps: [docs/running-a-node.md](docs/running-a-node.md).
 
 ## Commands
 

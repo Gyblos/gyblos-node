@@ -17,7 +17,6 @@ import {
   line,
   NODE_ID,
   PAID_TOML,
-  RPC_URL,
   scenario,
   snapshot,
   withOllama,
@@ -46,7 +45,8 @@ void test('doctor: a ready free seller exits 0, prints its public identity and c
       'relays',
     ])
       assert.match(line(result.output, check), /^\s*OK\s/, check);
-    assert.match(line(result.output, 'program'), /OK\s+program\s+NOT_NEEDED/);
+    // Paid v1 selling is off, so there is no devnet program to check.
+    assert.doesNotMatch(result.output, /program/);
     assert.match(result.output, new RegExp(`nodeId\\s+${NODE_ID}`));
     assert.match(result.output, new RegExp(`owner\\s+${run.owner}`));
     assert.match(result.output, /offer\s+free qwen3-0\.6b/);
@@ -112,19 +112,13 @@ void test('doctor: key files must be private regular files; free sellers need on
     );
     await rm(join(run.seller, 'owner.json'), { recursive: true });
     await writeFile(join(run.seller, 'owner.json'), '[]', { mode: 0o600 });
+    // The paid authorizer and facilitator keys are never needed.
     await unlink(join(run.seller, 'facilitator.json'));
-    await writeFile(join(run.root, 'gyblos.toml'), PAID_TOML);
-    const paid = await doctor(run);
-    assert.match(line(paid.output, 'keys'), /FAIL\s+keys\s+KEYS_MISSING/);
-    await writeFile(join(run.seller, 'facilitator.json'), '[]', {
-      mode: 0o600,
-    });
     await unlink(join(run.seller, 'authorizer.json'));
-    const noAuthorizer = await doctor(run);
-    assert.match(
-      line(noAuthorizer.output, 'keys'),
-      /FAIL\s+keys\s+KEYS_MISSING/,
-    );
+    for (const toml of [FREE_TOML, PAID_TOML]) {
+      await writeFile(join(run.root, 'gyblos.toml'), toml);
+      assert.match(line((await doctor(run)).output, 'keys'), /OK\s+keys/);
+    }
     await writeFile(join(run.root, 'gyblos.toml'), FREE_TOML);
     const free = await doctor(run);
     assert.match(line(free.output, 'keys'), /OK\s+keys/);
@@ -171,14 +165,21 @@ void test('doctor: an unsafe seller directory or leftover sequence lock is repor
 void test('doctor: config the daemon cannot honor reports the same startup code and file issues', () =>
   scenario({}, async (run) => {
     await withOllama(run);
-    await writeFile(
-      join(run.root, 'gyblos.toml'),
-      PAID_TOML.replace('input_per_mtok = "1"', 'input_per_mtok = "0.5"'),
-    );
-    const priced = await doctor(run);
+    await writeFile(join(run.root, 'gyblos.toml'), PAID_TOML);
+    const paid = await doctor(run);
+    assert.equal(paid.code, 1);
     assert.match(
-      line(priced.output, 'config'),
-      /FAIL\s+config\s+SELLER_OFFER_PRICE_UNSUPPORTED/,
+      line(paid.output, 'config'),
+      /FAIL\s+config\s+SELLER_PAID_EXECUTION_UNAVAILABLE\s+\[\[offers\]\] entry 1: /,
+    );
+    // A refused offer still leaves the relay settings checked.
+    assert.match(line(paid.output, 'relays'), /^\s*OK\s+relays/);
+    await unlink(join(run.root, 'gyblos.toml'));
+    const none = await doctor(run);
+    assert.equal(none.code, 1);
+    assert.match(
+      line(none.output, 'config'),
+      /FAIL\s+config\s+SELLER_OFFERS_MISSING/,
     );
     await writeFile(join(run.root, 'other.toml'), 'version = 1\n[node\n');
     const broken = await doctor(run, [], { GYBLOS_CONFIG: 'other.toml' });
@@ -206,6 +207,7 @@ void test('doctor: config the daemon cannot honor reports the same startup code 
 void test('doctor: a missing or malformed relay token fails without echoing it', () =>
   scenario({}, async (run) => {
     await withOllama(run);
+    await writeFile(join(run.root, 'gyblos.toml'), FREE_TOML);
     const missing = await doctor(run, [], { GYBLOS_RELAY_TOKEN: '' });
     assert.match(
       line(missing.output, 'relays'),
@@ -259,57 +261,21 @@ void test('doctor: engine checks fail without ollama, tokenizer or model, and on
     );
   }));
 
-void test('doctor: probes the paid ports only for a paid offer', () =>
+void test('doctor: probes only the engine port, whatever the offer, and takes no --online', () =>
   scenario({}, async (run) => {
     await withOllama(run);
-    await writeFile(join(run.root, 'gyblos.toml'), FREE_TOML);
-    const free = await doctor(run);
-    assert.deepEqual(
-      free.probed.map((url) => new URL(url).port),
-      ['11436'],
-    );
-    await writeFile(join(run.root, 'gyblos.toml'), PAID_TOML);
-    const paid = await doctor(run);
-    assert.deepEqual(
-      paid.probed.map((url) => new URL(url).port),
-      ['11436', '4022', '4032'],
-    );
-    assert.match(paid.output, /connections 8 total/);
-    assert.doesNotMatch(paid.output, /free buyers/);
-  }));
-
-void test('doctor: --online checks the devnet program only for a paid offer and hides the RPC', () =>
-  scenario({}, async (run) => {
-    await withOllama(run);
-    await writeFile(join(run.root, 'gyblos.toml'), FREE_TOML);
-    const free = await doctor(run, ['--online']);
-    assert.deepEqual(free.programCalls, []);
-    assert.match(line(free.output, 'program'), /OK\s+program/);
-    await writeFile(join(run.root, 'gyblos.toml'), PAID_TOML);
-    const offline = await doctor(run);
-    assert.deepEqual(offline.programCalls, []);
-    assert.match(
-      line(offline.output, 'program'),
-      /WARN\s+program\s+ONLINE_CHECK_SKIPPED/,
-    );
-    assert.equal(offline.code, 0, 'a warning alone is not a failure');
+    for (const toml of [FREE_TOML, PAID_TOML]) {
+      await writeFile(join(run.root, 'gyblos.toml'), toml);
+      const result = await doctor(run);
+      assert.deepEqual(
+        result.probed.map((url) => new URL(url).port),
+        ['11436'],
+      );
+      assert.doesNotMatch(result.output, /program/);
+    }
     const online = await doctor(run, ['--online']);
-    assert.deepEqual(online.programCalls, [RPC_URL]);
-    assert.match(line(online.output, 'program'), /OK\s+program/);
-    const failing = await doctor(
-      run,
-      ['--online'],
-      {},
-      {
-        program: async () => {
-          throw new Error(`down ${FAKE_SECRET}`);
-        },
-      },
-    );
-    assert.match(
-      line(failing.output, 'program'),
-      /FAIL\s+program\s+DEVNET_PROGRAM_UNAVAILABLE/,
-    );
+    assert.equal(online.code, 1);
+    assert.match(online.output, /Usage:/);
   }));
 
 void test('doctor and config validate refuse arguments they do not take', () =>

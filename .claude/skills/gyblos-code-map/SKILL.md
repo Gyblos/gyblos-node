@@ -23,7 +23,7 @@ they disagree, `AGENTS.md` and `tooling/boundaries/config.ts` win.
    HTTP index)? -> an adapter `packages/<kind>-<name>`. It may use protocol,
    core, config, runtime and its SDK; never another adapter, `node` or apps.
 4. Composes adapters into a running local node for either role (lifecycle,
-   roles/keys, seller HTTP, facilitator, control startup)? -> `packages/node`.
+   roles/keys, seller free channels, control startup)? -> `packages/node`.
 5. A process the user starts or deploys (CLI flags, proxy, reconcile, Electron,
    a Worker)? -> `apps/node`, `apps/buyer`, `apps/desktop` or
    `apps/discovery-index`. Apps never import each other; shared logic moves down
@@ -54,7 +54,7 @@ Splitting by concern inside a package uses a filename prefix, as in
 | `ControlAdmission` leases                   | `packages/core/src/control-admission.ts`                        | pure policy with an injected clock               |
 | Iroh control client/server                  | `packages/transport-iroh/src/control-*.ts`                      | Iroh I/O only                                    |
 | seller control startup/readiness            | `packages/node/src/control-*.ts`                                | composes transport + core                        |
-| seller facilitator wiring                   | `packages/node/src/seller.ts`                                   | composition of `payments-x402`                   |
+| seller daemon composition                   | `packages/node/src/seller.ts`                                   | free offer only; paid selling off until phase 2  |
 | buyer selection proxy, offer race           | `apps/buyer/src/selection-proxy.ts`, `offer-race.ts`            | executable wiring                                |
 | discovery index client                      | `packages/discovery-http`                                       | HTTP adapter; index defaults in `config`         |
 | discovery index server (Worker)             | `apps/discovery-index`                                          | deployable app; verification via protocol only   |

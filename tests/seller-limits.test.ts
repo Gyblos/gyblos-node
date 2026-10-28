@@ -11,16 +11,20 @@ import { createConnectionAdmission } from '@gyblos/transport-iroh/admission';
 import { CONNECTION_FAMILIES } from '@gyblos/transport-iroh/constants';
 import { createPeerLimiter } from '@gyblos/transport-iroh/limiter';
 
-import { BASE } from './support/node-config-fixtures';
+import { BASE, FREE_SELLER_OFFER } from './support/node-config-fixtures';
 
 function settings(limits: string) {
-  const parsed = parseNodeConfig(`${BASE}[limits]\n${limits}\n`);
+  const parsed = parseNodeConfig(
+    `${BASE}${FREE_SELLER_OFFER}[limits]\n${limits}\n`,
+  );
   assert.ok(parsed.ok, JSON.stringify(!parsed.ok && parsed.issues));
   return sellerSettings(parsed.config, {}).limits;
 }
 
 function issues(limits: string) {
-  const parsed = parseNodeConfig(`${BASE}[limits]\n${limits}\n`);
+  const parsed = parseNodeConfig(
+    `${BASE}${FREE_SELLER_OFFER}[limits]\n${limits}\n`,
+  );
   assert.equal(parsed.ok, false, limits);
   return !parsed.ok && parsed.issues.map(({ code, path }) => ({ code, path }));
 }
@@ -37,7 +41,7 @@ function connectedBuyers(limits: ReturnType<typeof settings>) {
 }
 
 void test('without [limits] the seller keeps the built-in limits', () => {
-  const parsed = parseNodeConfig(BASE);
+  const parsed = parseNodeConfig(BASE + FREE_SELLER_OFFER);
   assert.ok(parsed.ok);
   assert.deepEqual(sellerSettings(parsed.config, {}).limits, {
     transport: TRANSPORT_LIMITS,

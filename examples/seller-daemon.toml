@@ -1,9 +1,9 @@
 #:schema ../packages/node/schemas/gyblos.schema.json
 # (The #:schema path above is relative to this repository; in a copy elsewhere, update or delete it.)
-# What the seller daemon (`pnpm node:start`) can serve today: its own Ollama on 127.0.0.1:11436, the
-# pinned Qwen3 0.6B with reasoning off, at the proof-of-concept rates. Start it with
+# What the seller daemon (`pnpm node:start`) can serve today: its own Ollama on 127.0.0.1:11436 and the
+# pinned Qwen3 0.6B with reasoning off, given away free within daily token caps. Start it with
 #   GYBLOS_CONFIG=examples/seller-daemon.toml pnpm node:start
-# Free offers are refused at startup until free execution lands (docs/configuration.md).
+# Paid offers are refused at startup until paid selling returns (docs/configuration.md).
 
 version = 1
 
@@ -23,4 +23,4 @@ publish = false
 model = "qwen3:0.6b"
 reasoning = ["off"]
 engine = { kind = "ollama", url = "http://127.0.0.1:11436" }
-price = { input_per_mtok = "1", output_per_mtok = "2", currency = "USDC" }
+free = { daily_token_cap = 200000, per_buyer_cap = 5000 }

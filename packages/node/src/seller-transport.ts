@@ -1,4 +1,5 @@
-// Wires the prepared seller listing to isolated Iroh services; paid HTTP behavior stays in its bridge.
+// Wires the prepared seller listing to isolated Iroh services: control and the free channels. The daemon
+// binds no HTTP ALPN while paid selling is off, so the bridge's HTTP target is never dialed.
 import type { Endpoint } from '@number0/iroh';
 
 import { LOCALHOST, PORTS } from '@gyblos/config';

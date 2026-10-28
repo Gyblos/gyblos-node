@@ -142,7 +142,6 @@ export async function doctor(
 ) {
   let stdout = '';
   let stderr = '';
-  const programCalls: string[] = [];
   const probed: string[] = [];
   const code = await runCli(['doctor', ...args], {
     env: {
@@ -164,9 +163,6 @@ export async function doctor(
         probed.push(url);
         return true;
       },
-      program: async (url) => {
-        programCalls.push(url);
-      },
       ...probes,
     },
   });
@@ -174,7 +170,7 @@ export async function doctor(
   // No secret, home location or RPC path in any output.
   assert.equal(output.includes('FAKE0SECRET'), false, output);
   assert.equal(output.includes(fixture.home), false, output);
-  return { code, output, programCalls, probed };
+  return { code, output, probed };
 }
 
 export const line = (output: string, check: string) =>

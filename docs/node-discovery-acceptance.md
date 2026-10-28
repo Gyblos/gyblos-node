@@ -3,7 +3,7 @@
 This lab command reuses the product seller-control constructor, readiness probe,
 public-record sequence allocator/publisher, buyer discovery/replay store,
 selector and verified quote client. It stops at a signed v2 quote. It never
-starts the paid seller daemon, facilitator, RPC, registration or a payment flow.
+starts the seller daemon, facilitator, RPC, registration or a payment flow.
 
 ## Reproduce the synthetic run
 
