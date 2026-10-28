@@ -113,8 +113,11 @@ function outcomeInvariant(record: SellerReceiptV1) {
     record.code !== FREE_EXECUTION_CODES.CANCELLED
   )
     return controlFail();
-  // PR 1 owns SELLER_CANNOT_CONTINUE; its reason equivalence is added only after that merge.
-  if (record.reason !== null) return controlFail();
+  if (
+    (record.code === FREE_EXECUTION_CODES.SELLER_CANNOT_CONTINUE) !==
+    (record.reason !== null)
+  )
+    return controlFail();
 }
 export function parseSellerReceipt(value: unknown): SellerReceiptV1 {
   const input = controlObject(value, [

@@ -680,11 +680,12 @@ The seller record has exactly these fields:
 
 Completed records require null code/reason and a non-null finish reason.
 Failed records require a code. Cancelled records require the cancellation code.
-The stop-reason equivalence and failed seller-only vector are pending the
-separately owned `SELLER_CANNOT_CONTINUE` contract; this branch cannot ship
-until those dependent pieces are integrated. Until then, non-null reasons are
-rejected. This is an intermediate development restriction, not the final v1
-receipt contract.
+A non-null reason is required if and only if the code is
+`FREE_EXECUTION_SELLER_CANNOT_CONTINUE`; its value must belong to the public
+`FREE_EXECUTION_STOP_REASONS` catalog. Seller upstream credential state is not
+public: authentication failures use the generic `engine_unavailable` reason,
+never `engine_auth`. The seller-only failed/quota-exhausted golden case covers
+an unconfirmed receipt; it requires no buyer signature.
 
 `firstTokenMs <= totalMs`, and `firstTokenMs === null` iff `outputBytes === 0`.
 Free pricing requires both amounts to be `'0'`; paid pricing requires

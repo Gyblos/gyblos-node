@@ -4,11 +4,21 @@ import test from 'node:test';
 
 import { fanOut, toTelemetryRecord } from '@gyblos/core/telemetry';
 import {
+  FREE_EXECUTION_CODES,
+  FREE_EXECUTION_STOP_REASONS,
+  RECEIPT_OUTCOMES,
+} from '@gyblos/protocol/constants';
+import { signSellerReceipt } from '@gyblos/protocol/receipt';
+import {
   TELEMETRY_EVENTS,
   type TelemetrySink,
 } from '@gyblos/protocol/telemetry';
 
-import { telemetryEvents } from './support/receipt-fixture';
+import {
+  receiptSigner,
+  sellerRecord,
+  telemetryEvents,
+} from './support/receipt-fixture';
 
 void test('telemetry allowlist preserves each event and strips nested unknown fields', () => {
   for (const event of telemetryEvents()) {
@@ -102,14 +112,6 @@ void test('refused telemetry requires seller and engine identity to be absent to
     );
 });
 void test('receipt telemetry retains signed stop metadata and drops nested unknown content', async () => {
-  const { signSellerReceipt } = await import('@gyblos/protocol/receipt');
-  const {
-    FREE_EXECUTION_CODES,
-    FREE_EXECUTION_STOP_REASONS,
-    RECEIPT_OUTCOMES,
-  } = await import('@gyblos/protocol/constants');
-  const { receiptSigner, sellerRecord } =
-    await import('./support/receipt-fixture');
   const signer = receiptSigner();
   const record = {
     ...sellerRecord(signer.nodeId),
@@ -120,7 +122,9 @@ void test('receipt telemetry retains signed stop metadata and drops nested unkno
   };
   const receipt = { seller: await signSellerReceipt(record, signer.sign) };
   const event = {
-    ...telemetryEvents()[0]!,
+    ...telemetryEvents().find(
+      (event) => event.type === TELEMETRY_EVENTS.REQUEST_RECEIVED,
+    )!,
     type: TELEMETRY_EVENTS.RECEIPT,
     receipt,
   };
