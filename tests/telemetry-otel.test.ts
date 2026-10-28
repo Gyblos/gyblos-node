@@ -297,3 +297,40 @@ void test('OTel cumulative flush snapshots do not increment observations and pre
   });
   await sink.close();
 });
+void test('OTel consumes detached validated data without rereading Proxy labels or nested usage', async () => {
+  const fixture = metricExporter();
+  const sink = createOtelTelemetrySink(fixture);
+  const completed = event(TELEMETRY_EVENTS.COMPLETED);
+  const usage = new Proxy(completed.usage, {get() { return 999999; }});
+  const forged = new Proxy({...completed, usage}, {
+    get(target, key, receiver): unknown {
+      if (key === 'role' || key === 'engineKind') return 'PRIVATE-MARKER';
+      if (key === 'totalMs') return 999999;
+      return Reflect.get(target, key, receiver);
+    },
+  });
+  sink.emit(forged);
+  const failure = new Proxy(event(TELEMETRY_EVENTS.FAILED), {
+    get(target, key, receiver): unknown {
+      if (key === 'code' || key === 'reason') return 'PRIVATE-MARKER';
+      return Reflect.get(target, key, receiver);
+    },
+  });
+  sink.emit(failure);
+  await sink.flush();
+  assert.doesNotMatch(JSON.stringify(fixture.batches), /PRIVATE-MARKER|999999/);
+  assert.equal(points(fixture.batches, 'gyblos.input_tokens')[0]?.value, 7);
+  assert.equal(points(fixture.batches, 'gyblos.output_tokens')[0]?.value, 5);
+  await sink.close();
+});
+void test('OTel never reads an inherited delivered getter ignored by the telemetry projection', async () => {
+  const fixture = metricExporter();
+  const sink = createOtelTelemetrySink(fixture);
+  let invoked = false;
+  const failure: TelemetryEvent = Object.assign(Object.create({get delivered() {invoked = true; return {outputTokens:999999};}}), event(TELEMETRY_EVENTS.FAILED));
+  sink.emit(failure);
+  await sink.flush();
+  assert.equal(invoked, false);
+  assert.equal(points(fixture.batches, 'gyblos.delivered_output_tokens').length, 0);
+  await sink.close();
+});
