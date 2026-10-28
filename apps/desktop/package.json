@@ -5,6 +5,8 @@
   "type": "module",
   "main": "dist/main.cjs",
   "exports": {
+    "./modal-model": "./src/ui/modal-model.ts",
+    "./backup-feedback": "./src/ui/backup-feedback.ts",
     "./probe-model": "./src/probe-model.ts",
     "./probe-session": "./src/probe-session.ts",
     "./chat-state": "./src/ui/chat-state.ts",
