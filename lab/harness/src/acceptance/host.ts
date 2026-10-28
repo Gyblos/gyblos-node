@@ -3,6 +3,7 @@
 import type { KeyPairSigner } from '@solana/kit';
 
 import { DEVNET_USDC, SELLER_READINESS } from '@gyblos/config';
+import { FreeSellerLedger } from '@gyblos/core/free-admission';
 import { publishRecord } from '@gyblos/discovery-http';
 import { observeControlReadiness } from '@gyblos/node/control-readiness';
 import { prepareSellerControl } from '@gyblos/node/control-startup';
@@ -155,8 +156,10 @@ export async function startAcceptanceHost(options: AcceptanceHostOptions) {
           tokenizer: options.tokenizer,
           readiness: current.readiness,
           now: clock.now,
-          startedAt: clock.now(),
-          maxFreeBuyers: sellerLimits().maxFreeBuyers,
+          ledger: new FreeSellerLedger(
+            clock.now(),
+            sellerLimits().maxFreeBuyers,
+          ),
         })
       : undefined;
     wire.start(control.service, freeExecution);

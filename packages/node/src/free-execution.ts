@@ -1,8 +1,12 @@
-// Composes free quote authentication, admission and one pinned-engine generation.
-// No payments, facilitator, v1, config reads, files or journals are reachable from this service.
+// Composes free quote authentication, admission and one pinned-engine generation for one free offer, and
+// prepares the seller's offer behind the free router on the seller's ledger. No payments, facilitator,
+// v1, config reads, files or journals are reachable from this service.
 import { INFERENCE_REQUEST_LIMITS } from '@gyblos/config';
 import type { QuoteReadiness } from '@gyblos/core/control-quotes';
-import { FreeExecutionAdmission } from '@gyblos/core/free-admission';
+import {
+  FreeExecutionAdmission,
+  type FreeSellerLedger,
+} from '@gyblos/core/free-admission';
 import { canonicalJson } from '@gyblos/protocol';
 import {
   ENGINE_ERROR_STOP_REASON,
@@ -38,6 +42,7 @@ import {
 } from '@gyblos/protocol/free-execution';
 
 import { createFreeStreamOutput } from './free-execution-stream';
+import { createSellerFreeRouter } from './free-router';
 import type { FreeSellerOffer, SellerCatalogOffer } from './seller-offer';
 
 export interface SellerFreeExecutionOptions {
@@ -51,9 +56,8 @@ export interface SellerFreeExecutionOptions {
   tokenizer: RecountTokenizer;
   readiness: () => QuoteReadiness;
   now: () => number;
-  startedAt: number;
-  // Distinct buyers per UTC day, from gyblos.toml [limits].
-  maxFreeBuyers: number;
+  // The seller's one ledger (single use, concurrency, distinct buyers), shared by all its free offers.
+  ledger: FreeSellerLedger;
 }
 function checkSignal(signal: AbortSignal) {
   if (signal.aborted) return fail(FREE_EXECUTION_CODES.CANCELLED);
@@ -89,8 +93,7 @@ function ready(options: SellerFreeExecutionOptions) {
 export function createSellerFreeExecution(options: SellerFreeExecutionOptions) {
   const admission = new FreeExecutionAdmission(
     options.offer.caps,
-    options.startedAt,
-    options.maxFreeBuyers,
+    options.ledger,
   );
   return {
     respond: (value: unknown, peer: string, signal: AbortSignal) =>
@@ -213,15 +216,18 @@ export function prepareSellerFreeExecution(
     (model) => model.modelId === options.offer.modelId,
   );
   if (!listing) return fail(FREE_EXECUTION_CODES.INTERNAL);
-  return createSellerFreeExecution({
+  const selection = {
+    modelId: listing.modelId,
+    variant: listing.variant,
+    quantization: listing.quantization,
+  };
+  const service = createSellerFreeExecution({
     ...options,
     offer: options.offer,
-    selection: {
-      modelId: listing.modelId,
-      variant: listing.variant,
-      quantization: listing.quantization,
-    },
+    selection,
   });
+  // One offer today; the router already sends any other selection to UNSUPPORTED.
+  return createSellerFreeRouter(() => [{ selection, service }]);
 }
 
 async function generateResponse(
