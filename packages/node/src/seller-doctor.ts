@@ -1,6 +1,7 @@
 // Read-only preflight for the seller daemon: the checks `pnpm node:start` would fail on, without starting,
 // spawning or writing anything. Results carry static codes only; the RPC URL, relay token, key contents and
-// home location never leave this module. Network use is limited to describing the offer's loopback engine.
+// home location never leave this module. Network use is limited to describing each offer's engine: one on
+// this machine always, a remote API only with --online, since that call carries the seller's API key.
 import { resolve } from 'node:path';
 
 import {
@@ -9,7 +10,11 @@ import {
   ROLE_KEY_FILES,
   type HomeEnvironment,
 } from '@gyblos/config';
-import { P2P_ROLES, type EngineErrorCode } from '@gyblos/protocol/constants';
+import {
+  CONTROL_METERING_MODES,
+  P2P_ROLES,
+  type EngineErrorCode,
+} from '@gyblos/protocol/constants';
 import { EngineError } from '@gyblos/protocol/engine';
 import type { RelayConfigurationCode } from '@gyblos/transport-iroh/constants';
 import {
@@ -68,11 +73,15 @@ export interface DoctorReport {
 export interface DoctorProbes {
   // Throws when the pinned tokenizer files are absent or do not match their hashes.
   tokenizer?: (environment: HomeEnvironment) => Promise<unknown>;
+  // The engines' transport; tests serve a synthetic provider.
+  fetch?: typeof fetch;
 }
 export interface DoctorOptions {
   environment: HomeEnvironment;
   cwd: string;
   probes?: DoctorProbes;
+  // Also describe remote engines.
+  online?: boolean;
 }
 
 const OK: Result = { status: DOCTOR_STATUS.OK, code: DOCTOR_CODES.READY };
@@ -194,7 +203,21 @@ async function roleChecks(environment: HomeEnvironment) {
   };
 }
 
-async function tokenizerCheck(options: DoctorOptions): Promise<Result> {
+const engineDependencies = (options: DoctorOptions) => ({
+  fetch: options.probes?.fetch ?? globalThis.fetch,
+  environment: options.environment,
+});
+
+// Needed unless every offer is known to be declared by its provider.
+async function tokenizerCheck(
+  options: DoctorOptions,
+  offers: readonly SellerOfferSettings[] | undefined,
+): Promise<Result> {
+  const recounts = (offer: SellerOfferSettings) =>
+    createSellerEngine(offer.engine, engineDependencies(options)).metering
+      .mode === CONTROL_METERING_MODES.RECOUNTED;
+  if (offers && !offers.some(recounts))
+    return { status: DOCTOR_STATUS.OK, code: DOCTOR_CODES.NOT_NEEDED };
   try {
     await (options.probes?.tokenizer ?? modelTokenizer)(options.environment);
     return OK;
@@ -203,17 +226,23 @@ async function tokenizerCheck(options: DoctorOptions): Promise<Result> {
   }
 }
 
-// Describes one offer's engine the way warmup starts: for Ollama, the model list and pinned digest at the
-// offer URL, within the adapter's own deadline (ENGINE_TIMEOUT). Never generates.
+// Describes one offer's engine the way warmup starts (for Ollama, the model list and pinned digest at the
+// offer URL; for a remote API, its model list), within the adapter's own deadline. Never generates. A
+// remote engine is described only with --online.
 async function engineCheck(
   engineOffer: SellerOfferSettings['engine'],
-  environment: HomeEnvironment,
+  options: DoctorOptions,
 ): Promise<Result> {
   try {
-    const { engine } = createSellerEngine(engineOffer, {
-      fetch: globalThis.fetch,
-      environment,
-    });
+    const { engine, readiness } = createSellerEngine(
+      engineOffer,
+      engineDependencies(options),
+    );
+    if (!readiness.localResources && !options.online)
+      return {
+        ...warn(DOCTOR_CODES.REMOTE_ENGINE_NOT_CHECKED),
+        offer: engineOffer.index,
+      };
     await engine.describe();
     return { ...OK, offer: engineOffer.index };
   } catch (error) {
@@ -225,11 +254,15 @@ async function engineCheck(
 }
 
 // Startup needs one ready engine and retries the others, so a down engine fails only when no offer's
-// engine answers, and is otherwise a warning.
-export function engineStatuses<T extends Pick<DoctorCheck, 'status'>>(
-  engines: readonly T[],
-): T[] {
-  const anyReady = engines.some((result) => result.status === DOCTOR_STATUS.OK);
+// engine answers or may answer (a remote engine left unchecked), and is otherwise a warning.
+export function engineStatuses<
+  T extends Pick<DoctorCheck, 'status'> & { code?: DoctorResultCode },
+>(engines: readonly T[]): T[] {
+  const anyReady = engines.some(
+    (result) =>
+      result.status === DOCTOR_STATUS.OK ||
+      result.code === DOCTOR_CODES.REMOTE_ENGINE_NOT_CHECKED,
+  );
   return engines.map((result) =>
     anyReady && result.status === DOCTOR_STATUS.FAIL
       ? { ...result, status: DOCTOR_STATUS.WARN }
@@ -261,12 +294,15 @@ export async function sellerDoctor(
   add(DOCTOR_CHECKS.ROLE, role.role);
   add(DOCTOR_CHECKS.KEYS, role.keys ?? notChecked);
   add(DOCTOR_CHECKS.SEQUENCE, role.sequence ?? notChecked);
-  add(DOCTOR_CHECKS.TOKENIZER, await tokenizerCheck(options));
+  add(
+    DOCTOR_CHECKS.TOKENIZER,
+    await tokenizerCheck(options, config.settings?.offers),
+  );
   // One line per offer, in order.
   if (config.settings) {
     const engines: Result[] = [];
     for (const { engine } of config.settings.offers)
-      engines.push(await engineCheck(engine, environment));
+      engines.push(await engineCheck(engine, options));
     for (const result of engineStatuses(engines))
       add(DOCTOR_CHECKS.ENGINE, result);
   } else add(DOCTOR_CHECKS.ENGINE, notChecked);

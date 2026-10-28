@@ -31,6 +31,9 @@ importers:
       '@gyblos/engine-ollama':
         specifier: workspace:*
         version: link:packages/engine-ollama
+      '@gyblos/engine-openai':
+        specifier: workspace:*
+        version: link:packages/engine-openai
       '@gyblos/identity':
         specifier: workspace:*
         version: link:packages/identity
@@ -358,6 +361,18 @@ importers:
         specifier: 0.2.0
         version: 0.2.0
 
+  packages/engine-openai:
+    dependencies:
+      '@gyblos/config':
+        specifier: workspace:*
+        version: link:../config
+      '@gyblos/core':
+        specifier: workspace:*
+        version: link:../core
+      '@gyblos/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+
   packages/identity:
     dependencies:
       '@gyblos/config':
@@ -390,6 +405,9 @@ importers:
       '@gyblos/engine-ollama':
         specifier: workspace:*
         version: link:../engine-ollama
+      '@gyblos/engine-openai':
+        specifier: workspace:*
+        version: link:../engine-openai
       '@gyblos/identity':
         specifier: workspace:*
         version: link:../identity

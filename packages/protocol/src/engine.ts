@@ -62,6 +62,18 @@ export interface Engine {
   describe(): Promise<EngineDescription>;
 }
 
+// The one user message every engine adapter serves today; tools and other roles are programming errors.
+export function singleUserPrompt(input: EngineInput): string {
+  if (input.prompt !== undefined) return input.prompt;
+  if (
+    input.messages.length !== 1 ||
+    input.messages[0]?.role !== 'user' ||
+    typeof input.messages[0].content !== 'string'
+  )
+    throw new Error('Only one user message without tools is supported.');
+  return input.messages[0].content;
+}
+
 export interface RecountTokenizer {
   count(text: string): number;
   input(prompt: string): number;

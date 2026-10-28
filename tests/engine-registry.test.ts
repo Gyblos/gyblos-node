@@ -58,7 +58,10 @@ const OTHER_ENGINE = {
 };
 
 void test('the registry names exactly the engines the seller can serve today', () => {
-  assert.deepEqual(Object.keys(ENGINE_REGISTRY), [ENGINE_KINDS.OLLAMA]);
+  assert.deepEqual(Object.keys(ENGINE_REGISTRY), [
+    ENGINE_KINDS.OLLAMA,
+    ENGINE_KINDS.OPENAI,
+  ]);
 });
 
 void test('ollama refusal keeps the previous order: model, then engine, then reasoning', () => {
@@ -94,7 +97,11 @@ void test('an engine kind without a registered plugin is refused as an unsupport
   assert.equal(
     engineOfferRefusal({
       ...SERVED,
-      engine: { kind: ENGINE_KINDS.OPENAI, url: 'https://api.example.com' },
+      engine: {
+        kind: ENGINE_KINDS.ANTHROPIC,
+        url: 'https://api.example.com',
+        contextTokens: 200_000,
+      },
     }),
     NODE_ERROR_CODES.SELLER_OFFER_ENGINE_UNSUPPORTED,
   );

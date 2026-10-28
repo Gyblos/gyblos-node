@@ -5,10 +5,7 @@ import { isLocalOllamaUrl } from '@gyblos/engine-ollama';
 import { READINESS_GENERATION } from '@gyblos/engine-ollama/constants';
 import { createOllamaEngine } from '@gyblos/engine-ollama/engine';
 import { MODEL } from '@gyblos/engine-ollama/model';
-import {
-  CONTROL_METERING_MODES,
-  MODEL_CLASSIFICATIONS,
-} from '@gyblos/protocol/constants';
+import { CONTROL_METERING_MODES } from '@gyblos/protocol/constants';
 
 import { modelTokenizer } from './artifacts';
 import { NODE_ERROR_CODES } from './constants';
@@ -17,7 +14,7 @@ import type {
   EngineReadinessPolicy,
   SellerEngineOffer,
 } from './engine-factory';
-import { SERVED_OFFER } from './seller-offer';
+import { recountsWithPinnedTokenizer, SERVED_OFFER } from './seller-offer';
 
 export const OLLAMA_READINESS = {
   warmup: {
@@ -36,10 +33,7 @@ export function ollamaSelection(modelId: string) {
 
 function refuse(offer: SellerEngineOffer) {
   const { model, engine, reasoning } = offer;
-  if (
-    model.kind !== MODEL_CLASSIFICATIONS.CATALOG ||
-    model.id !== SERVED_OFFER.modelId
-  )
+  if (!recountsWithPinnedTokenizer(model))
     return NODE_ERROR_CODES.SELLER_OFFER_MODEL_UNSUPPORTED;
   if (
     // The adapter's own rule; names such as localhost or host.docker.internal wait for gyblos init.

@@ -36,10 +36,22 @@ const HINTS: Readonly<Partial<Record<DoctorResultCode, string>>> = {
     'the seller directory must be mode 0700 and its public-sequence file valid',
   [DOCTOR_CODES.TOKENIZER_UNAVAILABLE]: 'run `pnpm gate:inference:setup`',
   [ENGINE_ERROR_CODES.UNAVAILABLE]:
-    'start the engine at the offer URL with the pinned model; for Ollama, `ollama pull qwen3:0.6b`, and `ollama list` must show ID 7df6b6e09427',
+    'start the engine at the offer URL with its model; for Ollama, `ollama pull qwen3:0.6b`, and `ollama list` must show ID 7df6b6e09427; for an API, check upstream_model is listed',
   [ENGINE_ERROR_CODES.TIMEOUT]:
-    'the engine at the offer URL did not answer in time; check that Ollama is running',
+    'the engine at the offer URL did not answer in time; check that it is running',
+  [ENGINE_ERROR_CODES.AUTH]:
+    'the engine refused the API key; check the variable named by api_key_env',
+  [ENGINE_ERROR_CODES.QUOTA_EXHAUSTED]:
+    'the API account has no credit left; free offers stop until it is topped up',
+  [ENGINE_ERROR_CODES.RATE_LIMITED]:
+    'the API is rate limiting this key; try again later or raise its limit',
   [DOCTOR_CODES.NOT_CHECKED]: 'fix the failures above first',
+  [DOCTOR_CODES.REMOTE_ENGINE_NOT_CHECKED]:
+    'remote engine; `pnpm gyblos doctor --online` lists its models (some providers list them without checking the key)',
+  [NODE_ERROR_CODES.SELLER_OFFER_API_KEY_MISSING]:
+    'set the variable named by api_key_env',
+  [NODE_ERROR_CODES.SELLER_OFFER_API_KEY_UNSAFE]:
+    'api_key_env must name the provider key itself, never a GYBLOS_* or relay token variable',
   [NODE_ERROR_CODES.SELLER_OFFERS_MISSING]:
     'add a free [[offers]] entry to gyblos.toml (examples/seller-daemon.toml)',
   [NODE_ERROR_CODES.SELLER_PAID_EXECUTION_UNAVAILABLE]:
@@ -65,6 +77,7 @@ export async function doctor(
     env: Readonly<Record<string, string | undefined>>;
     cwd: string;
     probes?: DoctorProbes;
+    online: boolean;
   },
   output: { stdout: (text: string) => void },
 ) {
@@ -72,6 +85,7 @@ export async function doctor(
     environment: options.env,
     cwd: options.cwd,
     probes: options.probes,
+    online: options.online,
   });
   const { stdout } = output;
   stdout('Seller doctor (read-only)\n');

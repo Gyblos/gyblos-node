@@ -1,6 +1,7 @@
 // The `gyblos` command: `config validate` checks gyblos.toml and the GYBLOS_* environment; `doctor` runs the
-// seller's read-only startup preflight. Prints codes, key paths and environment variable names; never a
-// value read from the environment, and URLs only as origins, because providers embed API keys in URL paths.
+// seller's read-only startup preflight, calling remote engines only with --online. Prints codes, key
+// paths and environment variable names; never a value read from the environment, and URLs only as
+// origins, because providers embed API keys in URL paths.
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
@@ -35,7 +36,7 @@ export interface CliContext {
 
 const EXIT = { ok: 0, failure: 1 } as const;
 const USAGE =
-  'Usage: gyblos config validate [--config <path>]\n       gyblos doctor   (reads GYBLOS_CONFIG or ./gyblos.toml, like node:start)\n';
+  'Usage: gyblos config validate [--config <path>]\n       gyblos doctor [--online]   (reads GYBLOS_CONFIG or ./gyblos.toml, like node:start; --online also calls remote engines)\n';
 const URL_SETTINGS: ReadonlySet<NodeSettingKey> = new Set([
   NODE_SETTINGS.RPC_URL,
   NODE_SETTINGS.RELAY_URLS,
@@ -123,6 +124,7 @@ function parseCommand(args: readonly string[]) {
       args: [...args],
       options: {
         config: { type: 'string' },
+        online: { type: 'boolean' },
       },
       allowPositionals: true,
     });
@@ -146,12 +148,19 @@ export async function runCli(args: readonly string[], context: CliContext) {
         env: context.env,
         cwd: context.cwd ?? process.cwd(),
         probes: context.doctor,
+        online: parsed.values.online === true,
       },
       context,
     );
     return ready ? EXIT.ok : EXIT.failure;
   }
-  if (!parsed || group !== 'config' || command !== 'validate' || rest.length) {
+  if (
+    !parsed ||
+    group !== 'config' ||
+    command !== 'validate' ||
+    rest.length ||
+    parsed.values.online !== undefined
+  ) {
     context.stderr(USAGE);
     return EXIT.failure;
   }
