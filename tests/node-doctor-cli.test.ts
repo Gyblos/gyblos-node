@@ -170,8 +170,10 @@ void test('doctor: config the daemon cannot honor reports the same startup code 
     assert.equal(paid.code, 1);
     assert.match(
       line(paid.output, 'config'),
-      /FAIL\s+config\s+SELLER_PAID_EXECUTION_UNAVAILABLE/,
+      /FAIL\s+config\s+SELLER_PAID_EXECUTION_UNAVAILABLE\s+\[\[offers\]\] entry 1: /,
     );
+    // A refused offer still leaves the relay settings checked.
+    assert.match(line(paid.output, 'relays'), /^\s*OK\s+relays/);
     await unlink(join(run.root, 'gyblos.toml'));
     const none = await doctor(run);
     assert.equal(none.code, 1);
@@ -259,20 +261,21 @@ void test('doctor: engine checks fail without ollama, tokenizer or model, and on
     );
   }));
 
-void test('doctor: probes only the engine port and nothing online, whatever the offer', () =>
+void test('doctor: probes only the engine port, whatever the offer, and takes no --online', () =>
   scenario({}, async (run) => {
     await withOllama(run);
     for (const toml of [FREE_TOML, PAID_TOML]) {
       await writeFile(join(run.root, 'gyblos.toml'), toml);
-      for (const args of [[], ['--online']]) {
-        const result = await doctor(run, args);
-        assert.deepEqual(
-          result.probed.map((url) => new URL(url).port),
-          ['11436'],
-        );
-        assert.doesNotMatch(result.output, /program/);
-      }
+      const result = await doctor(run);
+      assert.deepEqual(
+        result.probed.map((url) => new URL(url).port),
+        ['11436'],
+      );
+      assert.doesNotMatch(result.output, /program/);
     }
+    const online = await doctor(run, ['--online']);
+    assert.equal(online.code, 1);
+    assert.match(online.output, /Usage:/);
   }));
 
 void test('doctor and config validate refuse arguments they do not take', () =>

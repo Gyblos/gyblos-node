@@ -59,8 +59,8 @@ For each setting, the first source that sets it wins:
 | discovery index URL   | `--discovery-url`      | `GYBLOS_DISCOVERY_URL`      | `discovery.url`           | `https://discovery.gyblos.com/v1` |
 | offers                |                        |                             | `[[offers]]`              | none                              |
 
-Environment variables keep exactly their current meaning, so a node with no file
-behaves as before:
+Environment variables keep exactly their current meaning. The seller still needs
+a file, because only `[[offers]]` lists what it serves:
 
 - `GYBLOS_HOME`, `GYBLOS_IROH_BIND` and `GYBLOS_IROH_EXTERNAL_ADDR` count only
   when non-empty.
@@ -244,8 +244,8 @@ Startup stops with a static code: `NODE_CONFIG_INVALID`,
 `SELLER_SETTING_UNSUPPORTED`, `SELLER_OFFERS_MISSING`,
 `SELLER_OFFER_COUNT_UNSUPPORTED`, `SELLER_OFFER_MODEL_UNSUPPORTED`,
 `SELLER_OFFER_ENGINE_UNSUPPORTED`, `SELLER_OFFER_REASONING_UNSUPPORTED` or
-`SELLER_PAID_EXECUTION_UNAVAILABLE`. Codes about an offer also carry its
-position in the file.
+`SELLER_PAID_EXECUTION_UNAVAILABLE`. `pnpm gyblos doctor` also names the
+`[[offers]]` entry a code is about.
 
 `pnpm gyblos config validate --config "$GYBLOS_CONFIG"` explains file problems
 (it does not read `GYBLOS_CONFIG`, does not check the `SELLER_*` limits above,
@@ -315,7 +315,6 @@ file-only: there are no `GYBLOS_*` variables for it, and the buyer ignores it.
 ```sh
 pnpm gyblos doctor                         # reads ./gyblos.toml, like node:start
 GYBLOS_CONFIG=my.toml pnpm gyblos doctor   # the file node:start will read
-pnpm gyblos doctor --online                # reserved for remote engines; no effect today
 ```
 
 `doctor` has no `--config` flag on purpose: it reads exactly the file

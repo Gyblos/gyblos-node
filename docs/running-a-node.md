@@ -122,8 +122,8 @@ never overwrites existing keys; a mismatched existing role stops with an error.
 | ------------------------------------------------ | ----- | ------------------------------------------------------- |
 | `role.json`                                      | both  | Role, mint, NodeId and public addresses.                |
 | `node.key`                                       | both  | Iroh secret key (private).                              |
-| `*.json` keys                                    | both  | Buyer key, or seller owner/authorizer/facilitator keys. |
-| `offer.json`                                     | both  | Seller writes its signed offer; buyer reads a copy.     |
+| `*.json` keys                                    | both  | Buyer key, or seller owner key (plus unused paid keys). |
+| `offer.json`                                     | buyer | A paid v1 seller's signed offer (lab gates only).       |
 | `trust.json`                                     | buyer | Which seller and limits the buyer accepts.              |
 | `status.json`                                    | both  | `starting` with a phase, then `ready`.                  |
 | `authorization.json`, `calls.json`, `buyer.lock` | buyer | Payment journal, call history, lock.                    |
@@ -161,6 +161,11 @@ pnpm node:start
   persisted sequence high-water mark.
 
 ## Buyer
+
+Free inference uses `pnpm buyer:free`
+([Free v2 buyer endpoint](#free-v2-buyer-endpoint)). The paid v1 flow below
+needs a paid seller's `offer.json`; the seller daemon no longer writes one while
+paid selling is off, so today it runs only against the lab gates (`gate:*`).
 
 ```sh
 export GYBLOS_RELAY_TOKEN=...

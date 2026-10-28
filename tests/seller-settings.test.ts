@@ -23,6 +23,7 @@ import { assertConfiguredRelay } from '@gyblos/transport-iroh/endpoint';
 import {
   BASE,
   EXAMPLES_DIRECTORY,
+  FREE_SELLER_OFFER,
   offer,
 } from './support/node-config-fixtures';
 
@@ -70,7 +71,7 @@ function rejects(code: string, run: () => unknown, offerIndex?: number) {
       (offerIndex === undefined || error.offer === offerIndex),
   );
 }
-const freeFile = () => served({ pricing: FREE });
+const freeFile = () => fileConfig(BASE + FREE_SELLER_OFFER);
 
 void test('without offers the seller refuses to start; nothing runs that the seller did not ask for', () => {
   rejects(NODE_ERROR_CODES.SELLER_OFFERS_MISSING, () =>
@@ -141,31 +142,40 @@ void test('paid offers fail closed with the offer position: paid v1 selling is o
 });
 
 void test('offers the daemon cannot serve fail closed with a static code', () => {
-  rejects(NODE_ERROR_CODES.SELLER_OFFER_MODEL_UNSUPPORTED, () =>
-    sellerSettings(
-      fileConfig(
-        BASE + offer({ engine: MANAGED, extra: 'reasoning = ["low"]' }),
+  rejects(
+    NODE_ERROR_CODES.SELLER_OFFER_MODEL_UNSUPPORTED,
+    () =>
+      sellerSettings(
+        fileConfig(
+          BASE + offer({ engine: MANAGED, extra: 'reasoning = ["low"]' }),
+        ),
+        {},
       ),
-      {},
-    ),
+    0,
   );
-  rejects(NODE_ERROR_CODES.SELLER_OFFER_ENGINE_UNSUPPORTED, () =>
-    sellerSettings(
-      served({
-        pricing: FREE,
-        engine: '{ kind = "ollama", url = "http://127.0.0.1:11434" }',
-      }),
-      {},
-    ),
+  rejects(
+    NODE_ERROR_CODES.SELLER_OFFER_ENGINE_UNSUPPORTED,
+    () =>
+      sellerSettings(
+        served({
+          pricing: FREE,
+          engine: '{ kind = "ollama", url = "http://127.0.0.1:11434" }',
+        }),
+        {},
+      ),
+    0,
   );
-  rejects(NODE_ERROR_CODES.SELLER_OFFER_ENGINE_UNSUPPORTED, () =>
-    sellerSettings(
-      served({
-        pricing: FREE,
-        engine: `{ kind = "ollama", url = "${HOSTS.ollama}", upstream_model = "qwen3:8b" }`,
-      }),
-      {},
-    ),
+  rejects(
+    NODE_ERROR_CODES.SELLER_OFFER_ENGINE_UNSUPPORTED,
+    () =>
+      sellerSettings(
+        served({
+          pricing: FREE,
+          engine: `{ kind = "ollama", url = "${HOSTS.ollama}", upstream_model = "qwen3:8b" }`,
+        }),
+        {},
+      ),
+    0,
   );
   rejects(
     NODE_ERROR_CODES.SELLER_OFFER_REASONING_UNSUPPORTED,
@@ -193,12 +203,7 @@ void test('offers the daemon cannot serve fail closed with a static code', () =>
 void test('file keys the daemon does not consume yet are refused unless the environment wins', () => {
   const withHome = fileConfig(
     'version = 1\n[node]\nnetwork = "devnet"\ndata_dir = "/data"\n' +
-      offer({
-        model: 'qwen3:0.6b',
-        engine: MANAGED,
-        pricing: FREE,
-        extra: 'reasoning = ["off"]',
-      }),
+      FREE_SELLER_OFFER,
   );
   rejects(NODE_ERROR_CODES.SELLER_SETTING_UNSUPPORTED, () =>
     sellerSettings(withHome, {}),
@@ -212,12 +217,7 @@ void test('file keys the daemon does not consume yet are refused unless the envi
 void test('file transport, discovery and relay token variable apply; the environment overrides them', () => {
   const file = fileConfig(
     BASE +
-      offer({
-        model: 'qwen3:0.6b',
-        engine: MANAGED,
-        pricing: FREE,
-        extra: 'reasoning = ["off"]',
-      }) +
+      FREE_SELLER_OFFER +
       '[relays]\nrelay_token_env = "SYNTHETIC_TOKEN_VAR"\n' +
       '[transport]\nrelay_only = true\n' +
       '[discovery]\npublish = true\nurl = "https://discovery.example.com/v1"\n',

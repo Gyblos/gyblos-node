@@ -3,10 +3,12 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { prepareSellerFreeExecution } from '@gyblos/node/free-execution';
-import { pocPaidListing } from '@gyblos/node/seller-offer';
 import {
   FREE_EXECUTION_CODES,
+  MODEL_IDS,
+  OFFER_PRICING_KINDS,
   PUBLIC_RECORD_KINDS,
+  REASONING_LEVELS,
 } from '@gyblos/protocol/constants';
 
 import { freeSellerFixture, freeSellerSignal } from './support/free-seller';
@@ -16,7 +18,12 @@ void test('free startup omits the handler for a prepared paid offer without invo
   assert.equal(
     prepareSellerFreeExecution({
       ...state.options,
-      offer: pocPaidListing(),
+      offer: {
+        modelId: MODEL_IDS.QWEN3_0_6B,
+        reasoning: [REASONING_LEVELS.OFF],
+        kind: OFFER_PRICING_KINDS.PAID,
+        prices: { inputAtomicPerMtok: '1', outputAtomicPerMtok: '2' },
+      },
       catalog: state.source.context.catalog,
     }),
     undefined,

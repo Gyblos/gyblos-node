@@ -11,10 +11,7 @@ import { prepareSellerFreeExecution } from '@gyblos/node/free-execution';
 import { sellerLimits } from '@gyblos/node/node-config-limits';
 import { openSellerSequence } from '@gyblos/node/public-sequence';
 import { createSellerPublisher } from '@gyblos/node/publisher';
-import {
-  pocPaidListing,
-  type SellerCatalogOffer,
-} from '@gyblos/node/seller-offer';
+import type { SellerCatalogOffer } from '@gyblos/node/seller-offer';
 import type { SignedPublicV2 } from '@gyblos/protocol/control-types';
 import type { RecountTokenizer } from '@gyblos/protocol/engine';
 import { controlDeadline } from '@gyblos/transport-iroh/control-io';
@@ -24,6 +21,7 @@ import type { AcceptanceEngine } from './engine';
 import { assertAcceptanceActive } from './errors';
 import type { AcceptanceIndex } from './index';
 import type { AcceptanceWire } from './native';
+import { pocPaidListing } from './paid-listing';
 import type { AcceptanceWorkspace } from './workspace';
 
 export interface AcceptanceIdentity {

@@ -1,19 +1,17 @@
 // `gyblos doctor`: prints the seller preflight as one line per check with a static code and a hint, then
 // the public NodeId and owner to share for discovery enrollment. Never prints the home location, the RPC
 // URL, the relay token or any key material.
-import { LOCALHOST } from '@gyblos/config';
 import {
   DOCTOR_CODES,
   DOCTOR_STATUS,
   NODE_ERROR_CODES,
 } from '@gyblos/node/constants';
 import {
-  SELLER_PORTS,
   sellerDoctor,
   type DoctorProbes,
   type DoctorResultCode,
 } from '@gyblos/node/seller-doctor';
-import { OFFER_PRICING_KINDS } from '@gyblos/protocol/constants';
+import { SERVED_ENGINE_PROBE } from '@gyblos/node/seller-offer';
 import { RELAY_CONFIGURATION_CODES } from '@gyblos/transport-iroh/constants';
 
 import { issueLine, urlOrigin } from './cli-format';
@@ -38,7 +36,7 @@ const HINTS: Readonly<Partial<Record<DoctorResultCode, string>>> = {
   [DOCTOR_CODES.TOKENIZER_UNAVAILABLE]: 'run `pnpm gate:inference:setup`',
   [DOCTOR_CODES.OLLAMA_NOT_FOUND]: 'install Ollama and put `ollama` on PATH',
   [DOCTOR_CODES.MODEL_NOT_DOWNLOADED]: 'run `pnpm gate:inference:setup`',
-  [DOCTOR_CODES.PORT_IN_USE]: `stop whatever answers on ${LOCALHOST} port ${SELLER_PORTS.join(', ')}`,
+  [DOCTOR_CODES.PORT_IN_USE]: `stop whatever answers on ${urlOrigin(SERVED_ENGINE_PROBE)}`,
   [DOCTOR_CODES.NOT_CHECKED]: 'fix the failures above first',
   [NODE_ERROR_CODES.SELLER_OFFERS_MISSING]:
     'add a free [[offers]] entry to gyblos.toml (examples/seller-daemon.toml)',
@@ -64,7 +62,6 @@ export async function doctor(
   options: {
     env: Readonly<Record<string, string | undefined>>;
     cwd: string;
-    online: boolean;
     probes?: DoctorProbes;
   },
   output: { stdout: (text: string) => void },
@@ -72,14 +69,16 @@ export async function doctor(
   const report = await sellerDoctor({
     environment: options.env,
     cwd: options.cwd,
-    online: options.online,
     probes: options.probes,
   });
   const { stdout } = output;
   stdout('Seller doctor (read-only)\n');
   for (const check of report.checks) {
     const shown = check.code === DOCTOR_CODES.READY ? '' : check.code;
-    const help = check.code === DOCTOR_CODES.READY ? '' : hint(check.code);
+    const where =
+      check.offer === undefined ? '' : `[[offers]] entry ${check.offer + 1}: `;
+    const help =
+      check.code === DOCTOR_CODES.READY ? '' : where + hint(check.code);
     stdout(
       `  ${check.status.padEnd(STATUS_COLUMN)}  ${check.check.padEnd(CHECK_COLUMN)} ${shown.padEnd(CODE_COLUMN)}${help}`.trimEnd() +
         '\n',
@@ -94,9 +93,7 @@ export async function doctor(
   }
   if (report.offer) {
     stdout('Listing:\n');
-    stdout(
-      `  offer   ${report.offer.kind === OFFER_PRICING_KINDS.FREE ? 'free' : 'paid'} ${report.offer.modelId}\n`,
-    );
+    stdout(`  offer   free ${report.offer.modelId}\n`);
     stdout(
       `  publish ${report.publication ? urlOrigin(report.publication) : 'off'}\n`,
     );
@@ -108,8 +105,7 @@ export async function doctor(
     stdout(
       `  requests    ${transport.requestsPerWindow}/min per buyer, ${transport.globalRequestsPerWindow}/min total\n`,
     );
-    if (report.offer?.kind === OFFER_PRICING_KINDS.FREE)
-      stdout(`  free buyers ${maxFreeBuyers}/day\n`);
+    if (report.offer) stdout(`  free buyers ${maxFreeBuyers}/day\n`);
   }
   const failures = report.checks.filter(
     (check) => check.status === DOCTOR_STATUS.FAIL,

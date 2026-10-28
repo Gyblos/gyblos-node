@@ -23,7 +23,7 @@ import {
   NODE_SETTINGS,
   type NodeErrorCode,
 } from './constants';
-import { NodeError } from './errors';
+import { NodeError, type NodeErrorContext } from './errors';
 import {
   readNodeConfigFile,
   type NodeConfig,
@@ -31,7 +31,7 @@ import {
 } from './node-config';
 import { sellerLimits, type SellerLimits } from './node-config-limits';
 import { resolveNodeConfig } from './node-config-resolve';
-import { SERVED_OFFER, type SellerCatalogOffer } from './seller-offer';
+import { SERVED_OFFER, type FreeSellerOffer } from './seller-offer';
 
 export interface SellerSettings {
   relayOnly: boolean;
@@ -39,7 +39,7 @@ export interface SellerSettings {
   irohExternalAddress: string | undefined;
   relayEnvironment: RelayEnvironment;
   publication: { baseUrl: string } | undefined;
-  offer: SellerCatalogOffer;
+  offer: FreeSellerOffer;
   limits: SellerLimits;
 }
 
@@ -52,11 +52,11 @@ const UNSUPPORTED_FILE_SETTINGS = [
 // The daemon reads the RPC from its role file, so this variable must not affect startup as before.
 const UNCONSUMED_ENVIRONMENT = [NODE_ENVIRONMENT.rpcUrl] as const;
 
-const fail = (code: NodeErrorCode, context?: { offer?: number }): never => {
+const fail = (code: NodeErrorCode, context?: NodeErrorContext): never => {
   throw new NodeError(code, context);
 };
 
-function catalogOffer(offers: NodeOffer[]): SellerCatalogOffer {
+function catalogOffer(offers: NodeOffer[]): FreeSellerOffer {
   if (!offers.length) fail(NODE_ERROR_CODES.SELLER_OFFERS_MISSING);
   if (offers.length !== 1)
     fail(NODE_ERROR_CODES.SELLER_OFFER_COUNT_UNSUPPORTED);
@@ -97,11 +97,29 @@ function catalogOffer(offers: NodeOffer[]): SellerCatalogOffer {
   };
 }
 
+export type SellerBaseSettings = Omit<SellerSettings, 'offer'>;
+
+// Pure: everything but the offer, so doctor can still check relays when the offer is refused.
+export function sellerBaseSettings(
+  file: NodeConfig | undefined,
+  environment: HomeEnvironment,
+): SellerBaseSettings {
+  return resolveSeller(file, environment).base;
+}
+
 // Pure: the parsed file (if any) and the environment produce the settings or a static NodeError.
 export function sellerSettings(
   file: NodeConfig | undefined,
   environment: HomeEnvironment,
 ): SellerSettings {
+  const { base, offers } = resolveSeller(file, environment);
+  return { ...base, offer: catalogOffer(offers) };
+}
+
+function resolveSeller(
+  file: NodeConfig | undefined,
+  environment: HomeEnvironment,
+): { base: SellerBaseSettings; offers: NodeOffer[] } {
   const consumed = Object.fromEntries(
     Object.entries(environment).filter(
       ([name]) => !(UNCONSUMED_ENVIRONMENT as readonly string[]).includes(name),
@@ -126,7 +144,7 @@ export function sellerSettings(
     }
     publication = { baseUrl: settings.discoveryUrl };
   }
-  return {
+  const base = {
     relayOnly: settings.relayOnly,
     irohBind: settings.irohBind,
     irohExternalAddress: settings.irohExternalAddress,
@@ -136,10 +154,10 @@ export function sellerSettings(
       [NODE_ENVIRONMENT.relayToken]: environment[settings.relayTokenEnv],
     },
     publication,
-    offer: catalogOffer(settings.offers),
     // File only: [limits] has no environment variables or flags.
     limits: sellerLimits(file?.limits),
   };
+  return { base, offers: settings.offers };
 }
 
 // An explicit GYBLOS_CONFIG must exist; the implicit ./gyblos.toml is optional.

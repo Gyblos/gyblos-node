@@ -9,7 +9,6 @@ import {
   homeLayout,
   HOSTS,
   ROLE_FILES,
-  ROUTES,
   SELLER_DISCOVERY,
   TRANSPORT_LIMITS,
   TRANSPORT_TIMEOUTS,
@@ -45,6 +44,7 @@ import { assertOllamaModelsHome, assertRoleHome } from './home';
 import { openSellerSequence } from './public-sequence';
 import { createSellerPublisher } from './publisher';
 import { loadRole, nodeSecret, rolePath, roleSigner } from './roles';
+import { SERVED_ENGINE_PROBE } from './seller-offer';
 import { loadSellerSettings } from './seller-settings';
 import { serveSellerTransport } from './seller-transport';
 
@@ -75,7 +75,7 @@ export async function startSeller() {
       environment: process.env,
       nodeId: config.nodeId,
     });
-    await assertPortFree(`${HOSTS.ollama}${ROUTES.ollamaVersion}`);
+    await assertPortFree(SERVED_ENGINE_PROBE);
     await stage('ollama-startup');
     await assertOllamaModelsHome();
     const child = spawnChild('ollama', ['serve'], {
@@ -100,7 +100,7 @@ export async function startSeller() {
       processError = true;
     });
     try {
-      await waitReady(child, `${HOSTS.ollama}${ROUTES.ollamaVersion}`, {
+      await waitReady(child, SERVED_ENGINE_PROBE, {
         startupError: () => processError,
       });
     } catch (error) {
@@ -120,7 +120,7 @@ export async function startSeller() {
     await stage('role-signers');
     // Free execution signs only with the owner key; it also fills the quote's unused payment roles.
     const owner = await roleSigner(P2P_ROLES.SELLER, 'owner');
-    await stage('seller-middleware');
+    await stage('control-readiness');
     const controlReadiness = observeControlReadiness(
       engine,
       offerExpiresAt,

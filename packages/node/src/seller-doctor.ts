@@ -1,19 +1,15 @@
 // Read-only preflight for the seller daemon: the checks `pnpm node:start` would fail on, without starting,
 // spawning or writing anything. Results carry static codes only; the RPC URL, relay token, key contents and
-// home location never leave this module. Network use is limited to loopback port probes; `online` is
-// reserved for remote engines, which the daemon cannot serve yet.
+// home location never leave this module. Network use is limited to loopback port probes.
 import { constants } from 'node:fs';
 import { access, stat } from 'node:fs/promises';
 import { delimiter, join, resolve } from 'node:path';
 
 import {
-  HOSTS,
   NODE_ENVIRONMENT,
   ollamaModelManifest,
-  PORTS,
   ROLE_FILES,
   ROLE_KEY_FILES,
-  ROUTES,
   type HomeEnvironment,
 } from '@gyblos/config';
 import { MODEL } from '@gyblos/engine-ollama/model';
@@ -49,8 +45,12 @@ import type { NodeConfigIssue } from './node-config-fields';
 import type { SellerLimits } from './node-config-limits';
 import { inspectSellerSequence } from './public-sequence';
 import { loadRole, roleKeyFilesStatus } from './roles';
-import type { SellerCatalogOffer } from './seller-offer';
-import { sellerSettings, type SellerSettings } from './seller-settings';
+import { SERVED_ENGINE_PROBE, type FreeSellerOffer } from './seller-offer';
+import {
+  sellerBaseSettings,
+  sellerSettings,
+  type SellerBaseSettings,
+} from './seller-settings';
 
 export type DoctorResultCode =
   DoctorCode | NodeErrorCode | RelayConfigurationCode;
@@ -58,13 +58,15 @@ export interface DoctorCheck {
   check: DoctorCheckName;
   status: DoctorStatus;
   code: DoctorResultCode;
+  // Zero-based gyblos.toml [[offers]] entry a config failure is about.
+  offer?: number;
 }
 type Result = Omit<DoctorCheck, 'check'>;
 export interface DoctorReport {
   checks: DoctorCheck[];
   configIssues: NodeConfigIssue[];
   seller: { nodeId: string; owner: string } | undefined;
-  offer: SellerCatalogOffer | undefined;
+  offer: FreeSellerOffer | undefined;
   publication: string | undefined;
   limits: SellerLimits | undefined;
 }
@@ -77,7 +79,6 @@ export interface DoctorProbes {
 export interface DoctorOptions {
   environment: HomeEnvironment;
   cwd: string;
-  online: boolean;
   probes?: DoctorProbes;
 }
 
@@ -125,9 +126,22 @@ async function configCheck(options: DoctorOptions) {
   }
   try {
     const settings = sellerSettings(file, options.environment);
-    return { issues: [], settings, result: OK };
+    return { issues: [], settings, base: settings, result: OK };
   } catch (error) {
-    return { issues: [], result: fail(errorCode(error)) };
+    const result: Result = {
+      ...fail(errorCode(error)),
+      ...(error instanceof NodeError && error.offer !== undefined
+        ? { offer: error.offer }
+        : {}),
+    };
+    // An offer the daemon refuses still leaves transport and relays checkable.
+    let base: SellerBaseSettings | undefined;
+    try {
+      base = sellerBaseSettings(file, options.environment);
+    } catch {
+      base = undefined;
+    }
+    return { issues: [], base, result };
   }
 }
 
@@ -236,17 +250,15 @@ async function modelCheck(environment: HomeEnvironment): Promise<Result> {
 }
 
 // The only loopback port startup binds: its managed Ollama.
-export const SELLER_PORTS = [PORTS.ollama] as const;
-
 async function portsCheck(
   portFree: (url: string) => Promise<boolean>,
 ): Promise<Result> {
-  return (await portFree(`${HOSTS.ollama}${ROUTES.ollamaVersion}`))
+  return (await portFree(SERVED_ENGINE_PROBE))
     ? OK
     : fail(DOCTOR_CODES.PORT_IN_USE);
 }
 
-function relaysCheck(settings: SellerSettings): Result {
+function relaysCheck(settings: SellerBaseSettings): Result {
   try {
     relayModeFromEnv(settings.relayEnvironment);
     return OK;
@@ -279,7 +291,7 @@ export async function sellerDoctor(
   );
   add(
     DOCTOR_CHECKS.RELAYS,
-    config.settings ? relaysCheck(config.settings) : notChecked,
+    config.base ? relaysCheck(config.base) : notChecked,
   );
   return {
     checks,

@@ -23,7 +23,7 @@ they disagree, `AGENTS.md` and `tooling/boundaries/config.ts` win.
    HTTP index)? -> an adapter `packages/<kind>-<name>`. It may use protocol,
    core, config, runtime and its SDK; never another adapter, `node` or apps.
 4. Composes adapters into a running local node for either role (lifecycle,
-   roles/keys, seller HTTP, facilitator, control startup)? -> `packages/node`.
+   roles/keys, seller free channels, control startup)? -> `packages/node`.
 5. A process the user starts or deploys (CLI flags, proxy, reconcile, Electron,
    a Worker)? -> `apps/node`, `apps/buyer`, `apps/desktop` or
    `apps/discovery-index`. Apps never import each other; shared logic moves down
