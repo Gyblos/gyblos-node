@@ -5,6 +5,7 @@ import type { KeyPairSigner } from '@solana/kit';
 import { DEVNET_USDC, SELLER_READINESS } from '@gyblos/config';
 import { FreeSellerLedger } from '@gyblos/core/free-admission';
 import { publishRecord } from '@gyblos/discovery-http';
+import { singleControlOffer } from '@gyblos/node/control-offers';
 import { observeControlReadiness } from '@gyblos/node/control-readiness';
 import { prepareSellerControl } from '@gyblos/node/control-startup';
 import { probeSellerEngine } from '@gyblos/node/engine-readiness';
@@ -102,9 +103,14 @@ export async function startAcceptanceHost(options: AcceptanceHostOptions) {
     // Paid acceptance still quotes the v1 PoC listing, which the daemon no longer serves.
     const offer = options.offer ?? pocPaidListing();
     const control = await prepareSellerControl({
-      offer,
-      selection: ollamaSelection(offer.modelId),
-      meteringMode: CONTROL_METERING_MODES.RECOUNTED,
+      offers: singleControlOffer({
+        offer,
+        selection: ollamaSelection(offer.modelId),
+        meteringMode: CONTROL_METERING_MODES.RECOUNTED,
+        model: initial.model,
+        capabilities: engine.engine.capabilities(),
+        readiness: current.readiness,
+      }),
       owner: identity.owner,
       nodeId: wire.nodeId,
       nodeSigner: wire.nodeSigner,
@@ -114,10 +120,6 @@ export async function startAcceptanceHost(options: AcceptanceHostOptions) {
       authorizer: identity.authorizer.address,
       endpoint: { relayUrl: null, directAddresses: wire.directAddresses },
       relayOnly: false,
-      model: initial.model,
-      capabilities: engine.engine.capabilities(),
-      validUntil: initial.offerExpiresAt,
-      readiness: current.readiness,
       sequence,
       now: clock.now,
     });
@@ -148,7 +150,7 @@ export async function startAcceptanceHost(options: AcceptanceHostOptions) {
       ? prepareSellerFreeExecution({
           owner: identity.owner.address,
           nodeId: wire.nodeId,
-          offer: control.offer,
+          offer,
           catalog: control.records.current(),
           model: initial.model,
           capabilities: engine.engine.capabilities(),

@@ -29,7 +29,7 @@ async function fixture() {
     release = resolve;
   });
   const records = await createSellerRecords({
-    template: source.catalog,
+    template: () => source.catalog,
     sequence: {
       next: async () => {
         reservations++;

@@ -46,7 +46,7 @@ void test('restarted seller keeps the persisted high-water mark and only a newer
       initialFloor: 1,
     });
     const records = await createSellerRecords({
-      template: run.catalog,
+      template: () => run.catalog,
       sequence,
       signer: run.nodeSigner,
       now: run.context.now,

@@ -2,6 +2,7 @@
 // the public NodeId and owner to share for discovery enrollment. Never prints the home location, the RPC
 // URL, the relay token or any key material.
 import {
+  DOCTOR_CHECKS,
   DOCTOR_CODES,
   DOCTOR_STATUS,
   NODE_ERROR_CODES,
@@ -76,12 +77,17 @@ export async function doctor(
   stdout('Seller doctor (read-only)\n');
   for (const check of report.checks) {
     const shown = check.code === DOCTOR_CODES.READY ? '' : check.code;
+    // A per-offer check names its [[offers]] entry, counted from 1 as in the hints.
+    const name =
+      check.check === DOCTOR_CHECKS.ENGINE && check.offer !== undefined
+        ? `${check.check}[${check.offer + 1}]`
+        : check.check;
     const where =
       check.offer === undefined ? '' : `[[offers]] entry ${check.offer + 1}: `;
     const help =
       check.code === DOCTOR_CODES.READY ? '' : where + hint(check.code);
     stdout(
-      `  ${check.status.padEnd(STATUS_COLUMN)}  ${check.check.padEnd(CHECK_COLUMN)} ${shown.padEnd(CODE_COLUMN)}${help}`.trimEnd() +
+      `  ${check.status.padEnd(STATUS_COLUMN)}  ${name.padEnd(CHECK_COLUMN)} ${shown.padEnd(CODE_COLUMN)}${help}`.trimEnd() +
         '\n',
     );
   }
@@ -92,9 +98,11 @@ export async function doctor(
     stdout(`  nodeId  ${report.seller.nodeId}\n`);
     stdout(`  owner   ${report.seller.owner}\n`);
   }
-  if (report.offer) {
+  if (report.offers) {
     stdout('Listing:\n');
-    stdout(`  offer   free ${report.offer.modelId}\n`);
+    report.offers.forEach((offer, index) =>
+      stdout(`  offer[${index + 1}] free ${offer.modelId}\n`),
+    );
     stdout(
       `  publish ${report.publication ? urlOrigin(report.publication) : 'off'}\n`,
     );
@@ -106,7 +114,8 @@ export async function doctor(
     stdout(
       `  requests    ${transport.requestsPerWindow}/min per buyer, ${transport.globalRequestsPerWindow}/min total\n`,
     );
-    if (report.offer) stdout(`  free buyers ${maxFreeBuyers}/day\n`);
+    if (report.offers)
+      stdout(`  free buyers ${maxFreeBuyers}/day across all offers\n`);
   }
   const failures = report.checks.filter(
     (check) => check.status === DOCTOR_STATUS.FAIL,

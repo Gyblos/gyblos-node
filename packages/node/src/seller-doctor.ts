@@ -43,7 +43,7 @@ import {
   sellerBaseSettings,
   sellerSettings,
   type SellerBaseSettings,
-  type SellerSettings,
+  type SellerOfferSettings,
 } from './seller-settings';
 
 export type DoctorResultCode =
@@ -60,7 +60,8 @@ export interface DoctorReport {
   checks: DoctorCheck[];
   configIssues: NodeConfigIssue[];
   seller: { nodeId: string; owner: string } | undefined;
-  offer: FreeSellerOffer | undefined;
+  // gyblos.toml [[offers]] in order, once every entry is servable.
+  offers: FreeSellerOffer[] | undefined;
   publication: string | undefined;
   limits: SellerLimits | undefined;
 }
@@ -202,20 +203,19 @@ async function tokenizerCheck(options: DoctorOptions): Promise<Result> {
   }
 }
 
-// Describes the offer's engine the way warmup starts: for Ollama, the model list and pinned digest at the
+// Describes one offer's engine the way warmup starts: for Ollama, the model list and pinned digest at the
 // offer URL, within the adapter's own deadline (ENGINE_TIMEOUT). Never generates.
 async function engineCheck(
-  settings: SellerSettings,
+  engineOffer: SellerOfferSettings['engine'],
   environment: HomeEnvironment,
 ): Promise<Result> {
-  const { engineOffer } = settings;
   try {
     const { engine } = createSellerEngine(engineOffer, {
       fetch: globalThis.fetch,
       environment,
     });
     await engine.describe();
-    return OK;
+    return { ...OK, offer: engineOffer.index };
   } catch (error) {
     return {
       ...fail(error instanceof EngineError ? error.code : errorCode(error)),
@@ -249,12 +249,11 @@ export async function sellerDoctor(
   add(DOCTOR_CHECKS.KEYS, role.keys ?? notChecked);
   add(DOCTOR_CHECKS.SEQUENCE, role.sequence ?? notChecked);
   add(DOCTOR_CHECKS.TOKENIZER, await tokenizerCheck(options));
-  add(
-    DOCTOR_CHECKS.ENGINE,
-    config.settings
-      ? await engineCheck(config.settings, environment)
-      : notChecked,
-  );
+  // One line per offer, in order: startup needs one ready engine and retries the others.
+  if (config.settings)
+    for (const { engine } of config.settings.offers)
+      add(DOCTOR_CHECKS.ENGINE, await engineCheck(engine, environment));
+  else add(DOCTOR_CHECKS.ENGINE, notChecked);
   add(
     DOCTOR_CHECKS.RELAYS,
     config.base ? relaysCheck(config.base) : notChecked,
@@ -263,7 +262,7 @@ export async function sellerDoctor(
     checks,
     configIssues: config.issues,
     seller: role.seller,
-    offer: config.settings?.offer,
+    offers: config.settings?.offers.map(({ offer }) => offer),
     publication: config.settings?.publication?.baseUrl,
     limits: config.settings?.limits,
   };

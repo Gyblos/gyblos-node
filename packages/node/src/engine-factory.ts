@@ -1,6 +1,5 @@
 // The contract every seller engine plugin implements: a pure offer check for settings and doctor, and a
 // factory that builds the engine with its listed selection, metering and readiness policy without I/O.
-// Not yet covered: remote engines, which have no local memory headroom to check.
 import type { HomeEnvironment } from '@gyblos/config';
 import type {
   CONTROL_METERING_MODES,
@@ -36,6 +35,8 @@ export interface OfferMetering {
 export interface EngineReadinessPolicy {
   warmup: { prompt: string; maxTokens: number };
   residencyMs: number;
+  // True when the engine runs on this machine, so its warmups check this machine's memory headroom.
+  localResources: boolean;
 }
 
 export interface PreparedEngine {

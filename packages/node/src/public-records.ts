@@ -34,7 +34,8 @@ export interface SellerPublicRecords {
   withdraw(): Promise<SignedPublicV2 | undefined>;
 }
 export interface SellerRecordOptions {
-  template: PublicCatalogV2;
+  // Read on every signing: the catalog to sign now, or undefined when no model may be listed.
+  template: () => PublicCatalogV2 | undefined;
   sequence: SellerSequence;
   signer: Signer;
   now: () => number;
@@ -129,12 +130,15 @@ class SellerRecords implements SellerPublicRecords {
         this.catalog.record.expiresAt - now > this.renewBefore
       )
         return this.catalog;
+      // A catalog never lists zero models; with none listable there is nothing current to sign.
+      const template = this.options.template();
+      if (!template?.models.length) return controlFail(CONTROL_CODES.EXPIRED);
       const sequence = await this.options.sequence.next(
         this.catalog?.record.sequence ?? 0,
       );
       const signed = await signPublicV2(
         {
-          ...this.options.template,
+          ...template,
           sequence,
           issuedAt: now,
           expiresAt: Math.min(deadline, now + this.lifetime),

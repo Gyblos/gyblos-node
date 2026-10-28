@@ -28,7 +28,7 @@ export async function sellerPublicationFixture(identity?: {
     initialFloor: source.catalog.sequence + 1,
   });
   const records = await createSellerRecords({
-    template: source.catalog,
+    template: () => source.catalog,
     sequence,
     signer: source.nodeSigner,
     now: source.context.now,

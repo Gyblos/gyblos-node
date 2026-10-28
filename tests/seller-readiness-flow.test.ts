@@ -63,7 +63,7 @@ void test('seller expiry, failed check, recovery and busy transitions reach fres
     },
   );
   const records = await createSellerRecords({
-    template: run.catalog,
+    template: () => run.catalog,
     signer: run.nodeSigner,
     sequence: await openSellerSequence({
       environment: run.environment,

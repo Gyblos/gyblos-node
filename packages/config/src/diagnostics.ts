@@ -33,6 +33,8 @@ export const SELLER_READINESS = {
   tickMs: 10_000,
   renewBeforeMs: 120_000,
   timeoutMs: 90_000,
+  // How often an offer that was not ready at startup is warmed again.
+  retryMs: 60_000,
 } as const;
 
 export const PRIVATE_LOG_LIMITS = {

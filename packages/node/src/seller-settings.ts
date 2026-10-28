@@ -1,8 +1,8 @@
 // Seller startup settings from gyblos.toml (GYBLOS_CONFIG, else ./gyblos.toml when present; relative to the
 // working directory) under flag > env > file > default. Without a file the values equal today's
 // environment-only startup; invalid environment values now fail here with NODE_CONFIG_INVALID.
-// The daemon serves one warmed free model; its engine plugin refuses any offer it cannot honor and paid
-// offers are refused until paid selling returns as a plugin (phase 2).
+// The daemon serves every listed free offer it can warm; each offer's engine plugin refuses what it cannot
+// honor, and paid offers are refused until paid selling returns as a plugin (phase 2).
 import { resolve } from 'node:path';
 
 import { NODE_ENVIRONMENT, type HomeEnvironment } from '@gyblos/config';
@@ -28,7 +28,7 @@ import {
 } from './node-config';
 import { sellerLimits, type SellerLimits } from './node-config-limits';
 import { resolveNodeConfig } from './node-config-resolve';
-import { SERVED_OFFER, type FreeSellerOffer } from './seller-offer';
+import type { FreeSellerOffer } from './seller-offer';
 
 export interface SellerSettings {
   relayOnly: boolean;
@@ -36,10 +36,16 @@ export interface SellerSettings {
   irohExternalAddress: string | undefined;
   relayEnvironment: RelayEnvironment;
   publication: { baseUrl: string } | undefined;
+  // gyblos.toml [[offers]], in order.
+  offers: SellerOfferSettings[];
+  limits: SellerLimits;
+}
+
+export interface SellerOfferSettings {
+  // The listing: catalog model, reasoning and free caps.
   offer: FreeSellerOffer;
   // The same offer as its engine plugin sees it.
-  engineOffer: SellerEngineOffer;
-  limits: SellerLimits;
+  engine: SellerEngineOffer;
 }
 
 // Validated keys the daemon does not consume yet: role files own the home, RPC and payout today.
@@ -55,22 +61,15 @@ const fail = (code: NodeErrorCode, context?: NodeErrorContext): never => {
   throw new NodeError(code, context);
 };
 
-function catalogOffer(
-  offers: NodeOffer[],
-): Pick<SellerSettings, 'offer' | 'engineOffer'> {
-  if (!offers.length) fail(NODE_ERROR_CODES.SELLER_OFFERS_MISSING);
-  if (offers.length !== 1)
-    fail(NODE_ERROR_CODES.SELLER_OFFER_COUNT_UNSUPPORTED);
-  const [offer] = offers as [NodeOffer];
-  const engineOffer: SellerEngineOffer = {
-    index: 0,
+function offerSettings(offer: NodeOffer, index: number): SellerOfferSettings {
+  const engine: SellerEngineOffer = {
+    index,
     model: offer.model,
     engine: offer.engine,
     reasoning: [...offer.reasoning],
   };
-  const refuse = (code: NodeErrorCode) =>
-    fail(code, { offer: engineOffer.index });
-  const refusal = engineOfferRefusal(engineOffer);
+  const refuse = (code: NodeErrorCode) => fail(code, { offer: index });
+  const refusal = engineOfferRefusal(engine);
   if (refusal) refuse(refusal);
   const { pricing } = offer;
   // Paid v1 selling is off until it returns as a payment plugin (phase 2).
@@ -78,7 +77,7 @@ function catalogOffer(
     return refuse(NODE_ERROR_CODES.SELLER_PAID_EXECUTION_UNAVAILABLE);
   return {
     offer: {
-      modelId: SERVED_OFFER.modelId,
+      modelId: offer.model.id,
       reasoning: [...offer.reasoning],
       kind: OFFER_PRICING_KINDS.FREE,
       caps: {
@@ -86,11 +85,17 @@ function catalogOffer(
         perBuyerCap: pricing.perBuyerCap,
       },
     },
-    engineOffer,
+    engine,
   };
 }
 
-export type SellerBaseSettings = Omit<SellerSettings, 'offer' | 'engineOffer'>;
+// Every entry must be servable: one refused offer refuses startup with its index.
+function catalogOffers(offers: NodeOffer[]): SellerOfferSettings[] {
+  if (!offers.length) fail(NODE_ERROR_CODES.SELLER_OFFERS_MISSING);
+  return offers.map(offerSettings);
+}
+
+export type SellerBaseSettings = Omit<SellerSettings, 'offers'>;
 
 // Pure: everything but the offer, so doctor can still check relays when the offer is refused.
 export function sellerBaseSettings(
@@ -106,7 +111,7 @@ export function sellerSettings(
   environment: HomeEnvironment,
 ): SellerSettings {
   const { base, offers } = resolveSeller(file, environment);
-  return { ...base, ...catalogOffer(offers) };
+  return { ...base, offers: catalogOffers(offers) };
 }
 
 function resolveSeller(

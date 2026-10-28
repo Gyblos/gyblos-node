@@ -5,7 +5,10 @@ import test from 'node:test';
 import { createControlQuote } from '@gyblos/core/control-quotes';
 import { FreeSellerLedger } from '@gyblos/core/free-admission';
 import { createSellerControlService } from '@gyblos/node/control';
-import type { SellerFreeExecutionOptions } from '@gyblos/node/free-execution';
+import {
+  prepareSellerFreeExecution,
+  type SellerFreeExecutionOptions,
+} from '@gyblos/node/free-execution';
 import {
   sellerLimits,
   type SellerLimits,
@@ -99,7 +102,7 @@ async function exchangeTwice(limits: SellerLimits) {
   };
   let sequence = source.catalog.sequence;
   const records = await createSellerRecords({
-    template: source.catalog,
+    template: () => source.catalog,
     signer: nodeSigner,
     now: source.context.now,
     validUntil: () => source.context.readiness().validUntil,
@@ -116,21 +119,21 @@ async function exchangeTwice(limits: SellerLimits) {
   source.request.params.catalogDigest = await catalogDigestV2(
     source.context.catalog.record,
   );
-  const control = {
-    offer: runtime.offer,
-    records,
-    service: createSellerControlService({
-      context: source.context,
-      ownerSigner: source.ownerSigner,
-      nodeSigner,
-    }),
-  };
-  const server = serveSellerTransport(seller, control, {
-    ...runtime,
-    startedAt: source.context.now() - 1,
-    relayOnly: false,
-    limits,
-  });
+  const server = serveSellerTransport(
+    seller,
+    {
+      control: createSellerControlService({
+        context: source.context,
+        ownerSigner: source.ownerSigner,
+        nodeSigner,
+      }),
+      free: prepareSellerFreeExecution({
+        ...runtime,
+        catalog: records.current(),
+      }),
+    },
+    { relayOnly: false, limits },
+  );
   try {
     const quote = await createControlQuote(
       {
