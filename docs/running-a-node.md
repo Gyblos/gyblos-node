@@ -417,10 +417,21 @@ The seller reads daily token caps from the prepared offer: `daily_token_cap`
 applies across all buyers and `per_buyer_cap` per authenticated NodeId, both
 counting input plus output tokens. The buyer cap is best effort: generating a
 new NodeId bypasses that identity's allocation but not the shared offer cap.
-Input plus maximum output is reserved before inference; only a valid recounted
+Input plus maximum output is reserved before inference; only a valid counted
 completion returns unused tokens. Errors/cancellation retain the reservation.
-Caps are in memory and reset on restart, so they do not promise durable daily
-limits. Renewing availability does not reset them.
+
+How tokens are counted depends on the offer's metering mode, which every quote
+carries. A model whose public tokenizer is pinned is **recounted**: the seller
+counts the prompt and output with that tokenizer, as the buyer can ("Uso
+medible"). Any other model is **declared**: the reported usage is the engine
+provider's, refused when the output exceeds `maxTokens` or the total exceeds the
+model's context, and not checkable by the buyer ("Uso declarado"). A declared
+offer reserves the prompt's UTF-8 bytes plus 64 tokens for the provider's chat
+template, and a stopped stream reports its delivered bytes, at most `maxTokens`.
+An engine on this machine renews readiness with a one-token private warmup; an
+engine the seller pays per call renews by describing its model and never
+generates for readiness. Caps are in memory and reset on restart, so they do not
+promise durable daily limits. Renewing availability does not reset them.
 
 Token caps belong to each free offer, and each offer has its own readiness: one
 offer generating or renewing never makes another's quotes busy, and a quote for

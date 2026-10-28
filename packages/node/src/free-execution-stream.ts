@@ -1,10 +1,9 @@
-// Bounds and recounts incremental engine output before delivery; a failed callback permanently stops publication.
+// Bounds and counts incremental engine output before delivery; a failed callback permanently stops publication.
 // The final complete engine text must equal the already delivered prefix, never a synthesized fallback.
 import {
   ENGINE_DONE_REASONS,
   FREE_EXECUTION_CODES,
 } from '@gyblos/protocol/constants';
-import type { RecountTokenizer } from '@gyblos/protocol/engine';
 import {
   freeExecutionFail as fail,
   parseFreeExecutionResponse,
@@ -12,13 +11,15 @@ import {
   type FreeExecutionResponse,
 } from '@gyblos/protocol/free-execution';
 
+import type { FreeMeter } from './free-meter';
+
 export function createFreeStreamOutput(
   request: FreeExecutionRequest,
   header: Pick<
     FreeExecutionResponse,
     'version' | 'requestId' | 'requestDigest'
   >,
-  tokenizer: RecountTokenizer,
+  meter: FreeMeter,
   inputTokens: number,
   signal: AbortSignal,
   deliver: (text: string) => Promise<void>,
@@ -45,7 +46,7 @@ export function createFreeStreamOutput(
         entered = true;
         if (!delta) return;
         const combined = text + delta;
-        const tokens = tokenizer.count(combined);
+        const tokens = meter.streamed(combined);
         if (
           !Number.isSafeInteger(tokens) ||
           tokens < 0 ||

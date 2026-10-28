@@ -2,6 +2,7 @@
 import { createControlQuote } from '@gyblos/core/control-quotes';
 import { FreeSellerLedger } from '@gyblos/core/free-admission';
 import type { SellerFreeExecutionOptions } from '@gyblos/node/free-execution';
+import { recountedMeter, type FreeMeter } from '@gyblos/node/free-meter';
 import { sellerLimits } from '@gyblos/node/node-config-limits';
 import {
   ENGINE_DONE_REASONS,
@@ -16,6 +17,7 @@ import { controlFixture } from './control-fixture';
 
 export async function freeSellerFixture(
   caps = { dailyTokenCap: 100, perBuyerCap: 50 },
+  overrides: { meter?: FreeMeter } = {},
 ) {
   const api = await import('@gyblos/node/free-execution');
   const source = await controlFixture(true);
@@ -62,7 +64,9 @@ export async function freeSellerFixture(
         return run();
       },
     },
-    tokenizer: { input: () => inputCount, count: () => outputCount },
+    meter:
+      overrides.meter ??
+      recountedMeter({ input: () => inputCount, count: () => outputCount }),
     readiness: () => ({ ...source.context.readiness(), busy }),
     now: () => now,
     ledger: new FreeSellerLedger(now - 1, sellerLimits().maxFreeBuyers),

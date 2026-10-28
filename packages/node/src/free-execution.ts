@@ -27,7 +27,6 @@ import {
   type EngineCapabilities,
   type EngineDescription,
   type EngineResult,
-  type RecountTokenizer,
 } from '@gyblos/protocol/engine';
 import {
   freeExecutionFail as fail,
@@ -42,6 +41,7 @@ import {
 } from '@gyblos/protocol/free-execution';
 
 import { createFreeStreamOutput } from './free-execution-stream';
+import type { FreeMeter } from './free-meter';
 import { createSellerFreeRouter } from './free-router';
 import type { FreeSellerOffer, SellerCatalogOffer } from './seller-offer';
 
@@ -53,7 +53,8 @@ export interface SellerFreeExecutionOptions {
   model: EngineDescription;
   capabilities: EngineCapabilities;
   engine: Engine;
-  tokenizer: RecountTokenizer;
+  // Recounted with the model's tokenizer, or declared by the engine's provider.
+  meter: FreeMeter;
   readiness: () => QuoteReadiness;
   now: () => number;
   // The seller's one ledger (single use, concurrency, distinct buyers), shared by all its free offers.
@@ -131,7 +132,7 @@ async function respond(
     checkSignal(signal);
     const prompt = supportedInput(request, options);
     ready(options);
-    const inputTokens = options.tokenizer.input(prompt);
+    const inputTokens = options.meter.input(prompt);
     if (
       !Number.isSafeInteger(inputTokens) ||
       inputTokens < 0 ||
@@ -169,13 +170,13 @@ async function respond(
     };
   }
 }
-// An engine that stops after admission tells the buyer why and, on a stream, how much it delivered.
-// Delivered text was already recounted within maxTokens before delivery. The report mirrors the buyer's
-// verifier: at least one token for non-empty text and never more than its UTF-8 bytes, which a
-// normalising tokenizer could otherwise exceed.
+// An engine that stops after admission tells the buyer why and, on a stream, how much it delivered,
+// as the buyer's verifier bounds it: at least one token for non-empty text, never more than its UTF-8
+// bytes or maxTokens.
 function cannotContinue(
   error: EngineError,
-  tokenizer: RecountTokenizer,
+  meter: FreeMeter,
+  maxTokens: number,
   deliveredText = '',
 ): never {
   const reason: FreeExecutionStopReason | undefined =
@@ -190,10 +191,7 @@ function cannotContinue(
       ...(deliveredText
         ? {
             delivered: {
-              outputTokens: Math.min(
-                Math.max(1, tokenizer.count(deliveredText)),
-                new TextEncoder().encode(deliveredText).length,
-              ),
+              outputTokens: meter.delivered(deliveredText, maxTokens),
             },
           }
         : {}),
@@ -246,7 +244,7 @@ async function generateResponse(
     ? createFreeStreamOutput(
         request,
         header,
-        options.tokenizer,
+        options.meter,
         inputTokens,
         signal,
         onDelta,
@@ -264,7 +262,12 @@ async function generateResponse(
     streaming?.complete(output.text);
   } catch (error) {
     if (error instanceof EngineError && !signal.aborted)
-      return cannotContinue(error, options.tokenizer, streaming?.delivered());
+      return cannotContinue(
+        error,
+        options.meter,
+        request.input.maxTokens,
+        streaming?.delivered(),
+      );
     throw error;
   } finally {
     streaming?.stop();
@@ -278,18 +281,23 @@ async function generateResponse(
     },
   });
   if (!preliminary.result) return fail(FREE_EXECUTION_CODES.INTERNAL);
-  const outputTokens = options.tokenizer.count(preliminary.result.text);
+  const usage = options.meter.usage(
+    preliminary.result.text,
+    output.usage,
+    inputTokens,
+  );
+  // The buyer's own bounds, so a declared count is refused here rather than by the buyer.
   if (
-    !Number.isSafeInteger(outputTokens) ||
-    outputTokens < 0 ||
-    outputTokens > request.input.maxTokens
+    !Number.isSafeInteger(usage.inputTokens) ||
+    !Number.isSafeInteger(usage.outputTokens) ||
+    usage.inputTokens < 0 ||
+    usage.outputTokens < 0 ||
+    usage.outputTokens > request.input.maxTokens ||
+    usage.inputTokens + usage.outputTokens > options.model.contextTokens
   )
     return fail(FREE_EXECUTION_CODES.LIMIT);
   return parseFreeExecutionResponse({
     ...header,
-    result: {
-      ...preliminary.result,
-      usage: { inputTokens, outputTokens },
-    },
+    result: { ...preliminary.result, usage },
   });
 }

@@ -118,6 +118,10 @@ export type OfferCurrency =
 // Docker Desktop's alias for the host; like loopback, it may serve a local engine over plain HTTP.
 export const DOCKER_HOST_ALIAS = 'host.docker.internal';
 
+// Declared metering reserves a prompt's UTF-8 bytes (never fewer than its tokens) plus room for the
+// provider's chat template, which the seller cannot see.
+export const FREE_METERING = { declaredTemplateTokens: 64 } as const;
+
 export const NODE_CONFIG_LIMITS = {
   fileBytes: 64 * 1024,
   maxDepth: 8,
@@ -125,6 +129,9 @@ export const NODE_CONFIG_LIMITS = {
   maxRelays: 8,
   envNameCharacters: 128,
   upstreamModelCharacters: 256,
+  // A remote engine's context size, which its API does not report (gyblos.toml engine.context_tokens).
+  minContextTokens: 1_024,
+  maxContextTokens: 2_000_000,
   // Price per million tokens: at most 9999 USDC, with USDC's 6 decimal places once trailing zeros are dropped.
   priceIntegerDigits: 4,
   priceFractionDigits: 6,

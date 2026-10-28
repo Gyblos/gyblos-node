@@ -1,5 +1,6 @@
-// Maps Ollama HTTP, timeout and stream failures to the uniform EngineError catalog in a fixed precedence.
-// Errors never carry upstream bodies, headers or text; callers' own aborts and callback errors pass through.
+// Maps an engine adapter's HTTP, timeout and stream failures to the uniform EngineError catalog in a fixed
+// precedence shared by every adapter. Errors never carry upstream bodies, headers or text; callers' own
+// aborts and callback errors pass through. Pure.
 import { HTTP_STATUS } from '@gyblos/config';
 import {
   ENGINE_ERROR_CODES,
@@ -7,7 +8,7 @@ import {
 } from '@gyblos/protocol/constants';
 import { EngineError } from '@gyblos/protocol/engine';
 
-// A malformed generation frame; `upstream` marks an explicit error frame from Ollama.
+// A malformed generation frame; `upstream` marks an explicit error frame from the engine.
 export class FrameFailure extends Error {
   constructor(readonly upstream = false) {
     super('Invalid engine frame.');

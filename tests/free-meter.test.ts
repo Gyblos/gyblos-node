@@ -4,12 +4,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { FREE_METERING } from '@gyblos/node/constants';
 import {
   DECLARED_METER,
   offerMeter,
   recountedMeter,
 } from '@gyblos/node/free-meter';
-import { FREE_METERING } from '@gyblos/node/constants';
 import { CONTROL_METERING_MODES } from '@gyblos/protocol/constants';
 import type { EngineUsage } from '@gyblos/protocol/engine';
 

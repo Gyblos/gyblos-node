@@ -1,6 +1,7 @@
 // Creates a seller with an incremental synthetic engine and temporary in-memory quote state.
 // It never starts transport, payments, real engines or local identities.
 import { createSellerFreeExecution } from '@gyblos/node/free-execution';
+import { recountedMeter, type FreeMeter } from '@gyblos/node/free-meter';
 import { ENGINE_DONE_REASONS } from '@gyblos/protocol/constants';
 import type { EngineInput, EngineResult } from '@gyblos/protocol/engine';
 
@@ -22,8 +23,9 @@ export function streamResult(text = 'answer'): EngineResult {
 }
 export async function freeStreamSellerFixture(
   caps = { dailyTokenCap: 100, perBuyerCap: 50 },
+  overrides: { meter?: FreeMeter } = {},
 ) {
-  const base = await freeSellerFixture(caps);
+  const base = await freeSellerFixture(caps, overrides);
   let calls = 0;
   let generate = async (input: EngineInput) => {
     await input.onText?.('an');
@@ -39,10 +41,12 @@ export async function freeStreamSellerFixture(
         return generate(input);
       },
     },
-    tokenizer: {
-      input: () => 4,
-      count: (text: string) => Math.ceil(text.length / 3),
-    },
+    meter:
+      overrides.meter ??
+      recountedMeter({
+        input: () => 4,
+        count: (text: string) => Math.ceil(text.length / 3),
+      }),
   };
   return {
     ...base,

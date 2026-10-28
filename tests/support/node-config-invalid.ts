@@ -1,6 +1,7 @@
 // Invalid gyblos.toml fixtures: each maps to one static issue code and key path. Test data only; the
 // fake secret marker must never appear in any output.
 import { BASE, FAKE_SECRET, offer } from './node-config-fixtures';
+import { ENGINE_FIXTURES } from './node-config-invalid-engines';
 import { NUMBER_FIXTURES } from './node-config-invalid-numbers';
 
 export interface InvalidConfigFixture {
@@ -194,59 +195,6 @@ export const INVALID_FIXTURES: readonly InvalidConfigFixture[] = [
     path: 'offers[0].engine.url',
   },
   {
-    name: 'remote engine without its context size',
-    toml:
-      BASE +
-      offer({
-        engine: '{ kind = "openai", url = "https://api.example.com/v1" }',
-      }),
-    code: 'MISSING_KEY',
-    path: 'offers[0].engine.context_tokens',
-  },
-  {
-    name: 'anthropic engine without its context size',
-    toml:
-      BASE +
-      offer({
-        engine: '{ kind = "anthropic", url = "https://api.example.com" }',
-      }),
-    code: 'MISSING_KEY',
-    path: 'offers[0].engine.context_tokens',
-  },
-  {
-    name: 'context size below the minimum',
-    toml:
-      BASE +
-      offer({
-        engine:
-          '{ kind = "openai", url = "https://api.example.com/v1", context_tokens = 1023 }',
-      }),
-    code: 'INVALID_VALUE',
-    path: 'offers[0].engine.context_tokens',
-  },
-  {
-    name: 'context size above the maximum',
-    toml:
-      BASE +
-      offer({
-        engine:
-          '{ kind = "openai", url = "https://api.example.com/v1", context_tokens = 2000001 }',
-      }),
-    code: 'INVALID_VALUE',
-    path: 'offers[0].engine.context_tokens',
-  },
-  {
-    name: 'context size as a float',
-    toml:
-      BASE +
-      offer({
-        engine:
-          '{ kind = "openai", url = "https://api.example.com/v1", context_tokens = 131072.0 }',
-      }),
-    code: 'WRONG_TYPE',
-    path: 'offers[0].engine.context_tokens',
-  },
-  {
     name: 'remote engine over plain http',
     toml:
       BASE +
@@ -336,6 +284,7 @@ export const INVALID_FIXTURES: readonly InvalidConfigFixture[] = [
     code: 'INVALID_VALUE',
     path: 'offers[0].reasoning',
   },
+  ...ENGINE_FIXTURES,
   ...NUMBER_FIXTURES,
   {
     name: 'env name that looks like a pasted token',

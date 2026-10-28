@@ -84,7 +84,7 @@ a secret:
 relay_token_env = "GYBLOS_RELAY_TOKEN"
 
 [[offers]]
-engine = { kind = "openai", url = "https://api.example.com/v1", api_key_env = "UPSTREAM_API_KEY" }
+engine = { kind = "openai", url = "https://api.example.com/v1", api_key_env = "UPSTREAM_API_KEY", context_tokens = 131072 }
 ```
 
 The validator refuses, with `INLINE_SECRET`:
@@ -134,6 +134,9 @@ however many digits it has.
   - `engine`: `kind` (`ollama`, `openai` or `anthropic`), `url` (https; plain
     http only for `127.0.0.1`, `localhost`, `[::1]` or `host.docker.internal`),
     optional `api_key_env` and `upstream_model` (the name the engine expects).
+    `openai` and `anthropic` engines also need `context_tokens`, the model's
+    context size (1,024 to 2,000,000), because their APIs do not report it; an
+    `ollama` engine reports its own, so the daemon refuses the key there.
   - `reasoning`: non-empty list of distinct levels from `off`, `low`, `medium`,
     `high` (GYB-DOC-028). For a catalog model with verified levels (see
     [Reasoning levels per model](#reasoning-levels-per-model)) every listed

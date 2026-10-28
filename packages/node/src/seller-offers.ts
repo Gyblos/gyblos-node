@@ -15,6 +15,7 @@ import {
   type ReadinessRecord,
 } from './engine-readiness';
 import { createSellerEngine } from './engine-registry';
+import { offerMeter } from './free-meter';
 import type { LiveSellerOffer } from './seller-offer-set';
 import type { SellerOfferSettings, SellerSettings } from './seller-settings';
 
@@ -105,7 +106,7 @@ export async function liveSellerOffer(
     meteringMode: prepared.metering.mode,
     readiness: observation.readiness,
     engine: observation.engine,
-    tokenizer: await prepared.metering.tokenizer(),
+    meter: await offerMeter(prepared.metering),
     observation,
   };
   checkedControlOffer(live);

@@ -45,6 +45,7 @@ function refuse(offer: SellerEngineOffer) {
     // The adapter's own rule; names such as localhost or host.docker.internal wait for gyblos init.
     !isLocalOllamaUrl(engine.url) ||
     engine.apiKeyEnv !== undefined ||
+    engine.contextTokens !== undefined ||
     (engine.upstreamModel !== undefined && engine.upstreamModel !== MODEL.name)
   )
     return NODE_ERROR_CODES.SELLER_OFFER_ENGINE_UNSUPPORTED;

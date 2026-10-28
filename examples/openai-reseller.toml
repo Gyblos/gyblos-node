@@ -17,5 +17,5 @@ relay_token_env = "GYBLOS_RELAY_TOKEN"   # the variable's name, never the token 
 [[offers]]
 model = "gpt-oss-20b"
 reasoning = ["low", "medium", "high"]   # gpt-oss effort levels; it has no "off"
-engine = { kind = "openai", url = "https://api.example.com/v1", api_key_env = "UPSTREAM_API_KEY", upstream_model = "gpt-oss-20b" }
+engine = { kind = "openai", url = "https://api.example.com/v1", api_key_env = "UPSTREAM_API_KEY", upstream_model = "gpt-oss-20b", context_tokens = 131072 }
 price = { input_per_mtok = "0.08", output_per_mtok = "0.3", currency = "USDC" }

@@ -9,6 +9,7 @@ import {
   prepareSellerFreeExecution,
   type SellerFreeExecutionOptions,
 } from '@gyblos/node/free-execution';
+import { recountedMeter } from '@gyblos/node/free-meter';
 import {
   sellerLimits,
   type SellerLimits,
@@ -79,7 +80,7 @@ async function exchangeTwice(limits: SellerLimits) {
       limits.maxFreeBuyers,
     ),
     readiness: source.context.readiness,
-    tokenizer: { input: () => 4, count: () => 2 },
+    meter: recountedMeter({ input: () => 4, count: () => 2 }),
     engine: {
       describe: async () => model.model,
       capabilities: () => model.capabilities,

@@ -18,6 +18,8 @@ import { freeSellerFixture, freeSellerSignal } from './support/free-seller';
 import { freeStreamSellerFixture } from './support/free-stream-seller';
 
 const declared = { meter: DECLARED_METER };
+// Room for the declared reservation of a 'hello' prompt and 10 output tokens.
+const CAPS = { dailyTokenCap: 1_000, perBuyerCap: 500 };
 const reported = (inputTokens: number, outputTokens: number) => async () => ({
   text: 'answer',
   usage: {
@@ -41,20 +43,20 @@ async function respond(state: Awaited<ReturnType<typeof freeSellerFixture>>) {
 }
 
 void test('the buyer receives the provider’s declared usage', async () => {
-  const state = await freeSellerFixture(undefined, declared);
+  const state = await freeSellerFixture(CAPS, declared);
   state.setRun(reported(9, 3));
   const response = await respond(state);
   assert.deepEqual(response.result?.usage, { inputTokens: 9, outputTokens: 3 });
 });
 
 void test('declared output above maxTokens is refused as the buyer would', async () => {
-  const state = await freeSellerFixture(undefined, declared);
+  const state = await freeSellerFixture(CAPS, declared);
   state.setRun(reported(9, 11));
   assert.equal((await respond(state)).error?.code, FREE_EXECUTION_CODES.LIMIT);
 });
 
 void test('declared usage beyond the model context is refused as the buyer would', async () => {
-  const state = await freeSellerFixture(undefined, declared);
+  const state = await freeSellerFixture(CAPS, declared);
   state.setRun(reported(state.options.model.contextTokens, 1));
   assert.equal((await respond(state)).error?.code, FREE_EXECUTION_CODES.LIMIT);
 });
@@ -83,7 +85,7 @@ void test('a declared stream that stops reports its delivered bytes, bounded by 
     [['an', 'swer'], 6],
     [['hello ', 'world!'], 10],
   ] as const) {
-    const state = await freeStreamSellerFixture(undefined, declared);
+    const state = await freeStreamSellerFixture(CAPS, declared);
     state.setGenerate(async (input) => {
       for (const fragment of fragments) await input.onText?.(fragment);
       throw new EngineError(ENGINE_ERROR_CODES.INTERRUPTED);
@@ -104,7 +106,7 @@ void test('a declared stream that stops reports its delivered bytes, bounded by 
 });
 
 void test('a declared stream completes with the provider’s usage', async () => {
-  const state = await freeStreamSellerFixture(undefined, declared);
+  const state = await freeStreamSellerFixture(CAPS, declared);
   state.setGenerate(async (input) => {
     await input.onText?.('an');
     await input.onText?.('swer');

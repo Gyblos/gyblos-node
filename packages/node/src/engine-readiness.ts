@@ -1,5 +1,6 @@
-// Holds the seller until the engine is ready: checks memory headroom for an engine on this machine, runs one
-// bounded private warmup, records the outcome and anchors offer expiry to the warmed model's residency.
+// Holds the seller until the engine is ready: describes the model, and for an engine on this machine checks
+// memory headroom and runs one bounded private warmup; records the outcome and anchors offer expiry within
+// the warmed model's residency. An engine paid per call is never asked to generate here.
 import { DIAGNOSTICS } from '@gyblos/config';
 import { OFFER_LIFETIME_MS } from '@gyblos/core/constants';
 import { type Engine, type EngineDescription } from '@gyblos/protocol/engine';
@@ -30,7 +31,7 @@ export function assertReadinessCurrent(
 }
 
 interface ProbeDependencies {
-  // From the engine plugin: the warmup to run and how long the warmed model stays resident.
+  // From the engine plugin: the warmup to run, if any, and how long the warmed model stays resident.
   policy: EngineReadinessPolicy;
   snapshot: () => Promise<MemorySnapshot>;
   now?: () => number;
@@ -64,17 +65,19 @@ class EngineReadinessCheck {
     this.reason = READINESS_REASONS.INSUFFICIENT_HEADROOM;
     this.assertHeadroom(this.before);
     this.reason = READINESS_REASONS.WARMUP_FAILED;
-    const { warmup, residencyMs } = this.dependencies.policy;
-    if (!(residencyMs > OFFER_LIFETIME_MS))
+    const { policy } = this.dependencies;
+    if (policy.warmup && !(policy.residencyMs > OFFER_LIFETIME_MS))
       throw new Error('Offer lifetime exceeds warmed model residency.');
     const model = await this.engine.describe();
     this.signal.throwIfAborted();
-    await this.engine.generate({
-      prompt: warmup.prompt,
-      maxTokens: warmup.maxTokens,
-      signal: this.signal,
-    });
-    this.signal.throwIfAborted();
+    if (policy.warmup) {
+      await this.engine.generate({
+        prompt: policy.warmup.prompt,
+        maxTokens: policy.warmup.maxTokens,
+        signal: this.signal,
+      });
+      this.signal.throwIfAborted();
+    }
     const now = this.dependencies.now ?? Date.now;
     const offerExpiresAt = now() + OFFER_LIFETIME_MS;
     this.reason = READINESS_REASONS.MEMORY_OBSERVATION_FAILED;

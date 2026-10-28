@@ -9,9 +9,10 @@ import {
   sameSelection,
   type QuoteReadiness,
 } from '@gyblos/core/control-quotes';
-import type { Engine, RecountTokenizer } from '@gyblos/protocol/engine';
+import type { Engine } from '@gyblos/protocol/engine';
 
 import type { ControlOffer, ControlOffers } from './control-offers';
+import type { FreeMeter } from './free-meter';
 import type { FreeSellerOffer } from './seller-offer';
 
 export interface SellerOfferObservation {
@@ -26,7 +27,7 @@ export interface LiveSellerOffer extends ControlOffer {
   offer: FreeSellerOffer;
   // The readiness-tracking engine: generation marks this offer busy.
   engine: Engine;
-  tokenizer: RecountTokenizer;
+  meter: FreeMeter;
   observation: SellerOfferObservation;
 }
 

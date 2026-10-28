@@ -273,6 +273,17 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["kind", "url"],
+      "if": {
+        "required": ["kind"],
+        "properties": {
+          "kind": {
+            "enum": ["openai", "anthropic"]
+          }
+        }
+      },
+      "then": {
+        "required": ["context_tokens"]
+      },
       "properties": {
         "kind": {
           "description": "API shape of the engine.",
@@ -296,6 +307,12 @@
           "maxLength": 256,
           "pattern": "^[^\\u0000-\\u001f\\u007f]*$",
           "description": "Model name the engine expects, when it differs from model."
+        },
+        "context_tokens": {
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 2000000,
+          "description": "The model's context size in tokens; required for openai and anthropic engines, whose APIs do not report it."
         }
       }
     },

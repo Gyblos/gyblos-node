@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { recountedMeter } from '@gyblos/node/free-meter';
 import {
   ENGINE_ERROR_CODES,
   FREE_EXECUTION_CODES,
@@ -83,7 +84,7 @@ void test('free seller reports at least one delivered token and refuses codes ou
     .createSellerFreeExecution;
   const zero = service({
     ...state.options,
-    tokenizer: { input: () => 4, count: () => 0 },
+    meter: recountedMeter({ input: () => 4, count: () => 0 }),
     engine: {
       ...state.options.engine,
       async generate(input) {
@@ -121,10 +122,10 @@ void test('free seller never reports more delivered tokens than delivered bytes'
   const service = createSellerFreeExecution({
     ...state.options,
     // Within maxTokens during delivery, then a normalising recount of the stopped text exceeds its bytes.
-    tokenizer: {
+    meter: recountedMeter({
       input: () => 4,
       count: (text: string) => (text === 'an' ? 9 : 1),
-    },
+    }),
     engine: {
       ...state.options.engine,
       async generate(input) {

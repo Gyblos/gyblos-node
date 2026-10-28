@@ -10,6 +10,7 @@
     "./offers": "./src/offers.ts",
     "./package.json": "./package.json",
     "./control-quotes": "./src/control-quotes.ts",
+    "./engine-failures": "./src/engine-failures.ts",
     "./control-admission": "./src/control-admission.ts",
     "./seller-selection": "./src/seller-selection.ts",
     "./pricing-v2": "./src/pricing-v2.ts",
