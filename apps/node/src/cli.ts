@@ -35,7 +35,7 @@ export interface CliContext {
 
 const EXIT = { ok: 0, failure: 1 } as const;
 const USAGE =
-  'Usage: gyblos config validate [--config <path>]\n       gyblos doctor [--online]   (reads GYBLOS_CONFIG or ./gyblos.toml, like node:start)\n';
+  'Usage: gyblos config validate [--config <path>]\n       gyblos doctor   (reads GYBLOS_CONFIG or ./gyblos.toml, like node:start)\n';
 const URL_SETTINGS: ReadonlySet<NodeSettingKey> = new Set([
   NODE_SETTINGS.RPC_URL,
   NODE_SETTINGS.RELAY_URLS,
@@ -123,7 +123,6 @@ function parseCommand(args: readonly string[]) {
       args: [...args],
       options: {
         config: { type: 'string' },
-        online: { type: 'boolean' },
       },
       allowPositionals: true,
     });
@@ -146,20 +145,13 @@ export async function runCli(args: readonly string[], context: CliContext) {
       {
         env: context.env,
         cwd: context.cwd ?? process.cwd(),
-        online: parsed.values.online === true,
         probes: context.doctor,
       },
       context,
     );
     return ready ? EXIT.ok : EXIT.failure;
   }
-  if (
-    !parsed ||
-    group !== 'config' ||
-    command !== 'validate' ||
-    rest.length ||
-    parsed.values.online !== undefined
-  ) {
+  if (!parsed || group !== 'config' || command !== 'validate' || rest.length) {
     context.stderr(USAGE);
     return EXIT.failure;
   }

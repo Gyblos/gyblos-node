@@ -21,6 +21,7 @@ import type { AcceptanceEngine } from './engine';
 import { assertAcceptanceActive } from './errors';
 import type { AcceptanceIndex } from './index';
 import type { AcceptanceWire } from './native';
+import { pocPaidListing } from './paid-listing';
 import type { AcceptanceWorkspace } from './workspace';
 
 export interface AcceptanceIdentity {
@@ -91,7 +92,8 @@ export async function startAcceptanceHost(options: AcceptanceHostOptions) {
       initialFloor: 1,
     });
     const control = await prepareSellerControl({
-      offer: options.offer,
+      // Paid acceptance still quotes the v1 PoC listing, which the daemon no longer serves.
+      offer: options.offer ?? pocPaidListing(),
       owner: identity.owner,
       nodeId: wire.nodeId,
       nodeSigner: wire.nodeSigner,

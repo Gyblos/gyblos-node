@@ -1,8 +1,6 @@
 // The seller's public listing: what the daemon serves and its paid or free terms. No config loading here,
 // so control startup and the lab host stay independent of gyblos.toml reading.
-import { HOSTS } from '@gyblos/config';
-import { PRICES } from '@gyblos/core/constants';
-import { atomicPerTokenPricesV2 } from '@gyblos/core/pricing-v2';
+import { HOSTS, ROUTES } from '@gyblos/config';
 import {
   MODEL_IDS,
   OFFER_PRICING_KINDS,
@@ -27,25 +25,20 @@ export type SellerCatalogOffer = {
   | { kind: typeof OFFER_PRICING_KINDS.FREE; caps: FreeOfferCaps }
 );
 
-// What the daemon actually runs: its managed Ollama, the pinned Qwen3 0.6B and one reasoning level.
+// What the daemon actually runs: its managed Ollama, the pinned Qwen3 0.6B and one reasoning level, free.
 export const SERVED_OFFER = {
   modelId: MODEL_IDS.QWEN3_0_6B,
   engineUrl: HOSTS.ollama,
   reasoning: [REASONING_LEVELS.OFF] satisfies readonly ReasoningLevel[],
 } as const;
+// Nothing may answer here before startup spawns its Ollama; startup and doctor probe the same URL.
+export const SERVED_ENGINE_PROBE = `${SERVED_OFFER.engineUrl}${ROUTES.ollamaVersion}`;
 
-// Paid execution is the v1 PoC, so a paid listing advertises exactly its rates per million tokens.
-export const servedPaidPrices = () => atomicPerTokenPricesV2(PRICES);
-
-// Today's listing when gyblos.toml has no offers.
-export function defaultSellerOffer(): SellerCatalogOffer {
-  return {
-    modelId: SERVED_OFFER.modelId,
-    reasoning: [...SERVED_OFFER.reasoning],
-    kind: OFFER_PRICING_KINDS.PAID,
-    prices: servedPaidPrices(),
-  };
-}
+// The only listing the seller daemon serves while paid selling is off (phase 2 brings it back as a plugin).
+export type FreeSellerOffer = Extract<
+  SellerCatalogOffer,
+  { kind: typeof OFFER_PRICING_KINDS.FREE }
+>;
 
 // A free listing is zero on both sides, which is what quotes and selection key on.
 export function listedPrices(offer: SellerCatalogOffer): TokenPricesV2 {

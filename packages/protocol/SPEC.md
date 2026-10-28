@@ -544,9 +544,8 @@ canonical bytes and frames come from an independent one-shot Python oracle that
 first reproduced every v2 vector; the oracle is not committed. The v1 vectors,
 control v2 vectors and their domains remain unchanged.
 Each protocol change ships the contract first, then the seller, then the buyer.
-Seller wiring enables free startup explicitly with
-`loadSellerSettings(process.env, undefined, {freeExecution: true})` only when
-its handler and caps are present.
+The seller daemon serves only a free offer with its handler and caps present;
+paid selling is off until phase 2.
 Acceptance later covers publication → discovery → selection → free quote →
 execution → answer using an in-process index and synthetic engine, including
 replay, expiry, wrong peer, exhausted caps, engine failure and no fallback once

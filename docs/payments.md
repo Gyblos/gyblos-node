@@ -66,13 +66,12 @@ prompts, answers, IPs, RPC URLs or raw logs.
 
 ## Local facilitator
 
-The facilitator (embedded in the seller node; `lab/facilitator` runs it
-standalone for lab checks) signs and pays for channel settlement with its own
-devnet key. It keeps channel state in memory; there is no durable channel
-storage.
+The facilitator (run by the lab gates; `lab/facilitator` runs it standalone for
+lab checks; the seller daemon no longer starts it while paid selling is off)
+signs and pays for channel settlement with its own devnet key. It keeps channel
+state in memory; there is no durable channel storage.
 
-It writes private diagnostics as JSONL to `.local/lab/facilitator-diagnostics/`
-(standalone) or `.local/gyblos/seller/facilitator-diagnostics/` (seller node):
+It writes private diagnostics as JSONL to `.local/lab/facilitator-diagnostics/`:
 
 - Files are mode `0600`, the directory `0700`. Keep them out of Git.
 - Records hold only allowlisted fields: SDK version, attempt, operation, phase,

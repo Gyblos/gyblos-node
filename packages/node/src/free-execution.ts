@@ -38,12 +38,12 @@ import {
 } from '@gyblos/protocol/free-execution';
 
 import { createFreeStreamOutput } from './free-execution-stream';
-import type { SellerCatalogOffer } from './seller-offer';
+import type { FreeSellerOffer, SellerCatalogOffer } from './seller-offer';
 
 export interface SellerFreeExecutionOptions {
   owner: string;
   nodeId: string;
-  offer: Extract<SellerCatalogOffer, { kind: typeof OFFER_PRICING_KINDS.FREE }>;
+  offer: FreeSellerOffer;
   selection: ModelSelection;
   model: EngineDescription;
   capabilities: EngineCapabilities;

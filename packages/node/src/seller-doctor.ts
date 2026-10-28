@@ -1,23 +1,19 @@
 // Read-only preflight for the seller daemon: the checks `pnpm node:start` would fail on, without starting,
 // spawning or writing anything. Results carry static codes only; the RPC URL, relay token, key contents and
-// home location never leave this module. Network use is limited to loopback port probes unless `online`.
+// home location never leave this module. Network use is limited to loopback port probes.
 import { constants } from 'node:fs';
 import { access, stat } from 'node:fs/promises';
 import { delimiter, join, resolve } from 'node:path';
 
 import {
-  HOSTS,
-  LOCALHOST,
   NODE_ENVIRONMENT,
   ollamaModelManifest,
-  PORTS,
   ROLE_FILES,
   ROLE_KEY_FILES,
-  ROUTES,
   type HomeEnvironment,
 } from '@gyblos/config';
 import { MODEL } from '@gyblos/engine-ollama/model';
-import { OFFER_PRICING_KINDS, P2P_ROLES } from '@gyblos/protocol/constants';
+import { P2P_ROLES } from '@gyblos/protocol/constants';
 import { assertPortFree } from '@gyblos/runtime';
 import type { RelayConfigurationCode } from '@gyblos/transport-iroh/constants';
 import {
@@ -49,8 +45,12 @@ import type { NodeConfigIssue } from './node-config-fields';
 import type { SellerLimits } from './node-config-limits';
 import { inspectSellerSequence } from './public-sequence';
 import { loadRole, roleKeyFilesStatus } from './roles';
-import type { SellerCatalogOffer } from './seller-offer';
-import { sellerSettings, type SellerSettings } from './seller-settings';
+import { SERVED_ENGINE_PROBE, type FreeSellerOffer } from './seller-offer';
+import {
+  sellerBaseSettings,
+  sellerSettings,
+  type SellerBaseSettings,
+} from './seller-settings';
 
 export type DoctorResultCode =
   DoctorCode | NodeErrorCode | RelayConfigurationCode;
@@ -58,28 +58,27 @@ export interface DoctorCheck {
   check: DoctorCheckName;
   status: DoctorStatus;
   code: DoctorResultCode;
+  // Zero-based gyblos.toml [[offers]] entry a config failure is about.
+  offer?: number;
 }
 type Result = Omit<DoctorCheck, 'check'>;
 export interface DoctorReport {
   checks: DoctorCheck[];
   configIssues: NodeConfigIssue[];
   seller: { nodeId: string; owner: string } | undefined;
-  offer: SellerCatalogOffer | undefined;
+  offer: FreeSellerOffer | undefined;
   publication: string | undefined;
   limits: SellerLimits | undefined;
 }
 export interface DoctorProbes {
   // True when nothing answers on the loopback URL, as startup requires.
   portFree?: (url: string) => Promise<boolean>;
-  // Throws when the devnet payment program is unusable; only called with `online` for a paid offer.
-  program?: (rpcUrl: string) => Promise<void>;
   // Throws when the pinned tokenizer files are absent or do not match their hashes.
   tokenizer?: (environment: HomeEnvironment) => Promise<unknown>;
 }
 export interface DoctorOptions {
   environment: HomeEnvironment;
   cwd: string;
-  online: boolean;
   probes?: DoctorProbes;
 }
 
@@ -106,13 +105,8 @@ async function defaultPortFree(url: string) {
   }
 }
 
-async function defaultProgram(rpcUrl: string) {
-  // Loaded only for --online so the offline doctor never pulls in the payment client.
-  const { assertProgram } = await import('@gyblos/payments-x402/chain');
-  await assertProgram(rpcUrl);
-}
-
-// Exactly seller startup's file choice: GYBLOS_CONFIG must exist; the implicit ./gyblos.toml is optional.
+// Exactly seller startup's file choice: GYBLOS_CONFIG must exist; without ./gyblos.toml the settings fail
+// with SELLER_OFFERS_MISSING, as startup does.
 async function configCheck(options: DoctorOptions) {
   const explicit = options.environment[NODE_ENVIRONMENT.config];
   const read = await readNodeConfigFile(
@@ -131,16 +125,23 @@ async function configCheck(options: DoctorOptions) {
       };
   }
   try {
-    const settings = sellerSettings(file, options.environment, {
-      freeExecution: true,
-    });
-    return {
-      issues: [],
-      settings,
-      result: file ? OK : { ...OK, code: DOCTOR_CODES.NO_CONFIG_FILE },
-    };
+    const settings = sellerSettings(file, options.environment);
+    return { issues: [], settings, base: settings, result: OK };
   } catch (error) {
-    return { issues: [], result: fail(errorCode(error)) };
+    const result: Result = {
+      ...fail(errorCode(error)),
+      ...(error instanceof NodeError && error.offer !== undefined
+        ? { offer: error.offer }
+        : {}),
+    };
+    // An offer the daemon refuses still leaves transport and relays checkable.
+    let base: SellerBaseSettings | undefined;
+    try {
+      base = sellerBaseSettings(file, options.environment);
+    } catch {
+      base = undefined;
+    }
+    return { issues: [], base, result };
   }
 }
 
@@ -155,19 +156,10 @@ async function homeCheck(environment: HomeEnvironment): Promise<Result> {
   }
 }
 
-// Free sellers sign only with the owner key; paid ones also load the authorizer and facilitator.
-function keyNames(free: boolean | undefined) {
-  return [
-    ROLE_KEY_FILES.owner,
-    ...(free ? [] : [ROLE_KEY_FILES.authorizer, ROLE_KEY_FILES.facilitator]),
-    ROLE_FILES.nodeKey,
-  ];
-}
+// The seller signs only with the owner key and its node key.
+const KEY_NAMES = [ROLE_KEY_FILES.owner, ROLE_FILES.nodeKey];
 
-async function roleChecks(
-  environment: HomeEnvironment,
-  free: boolean | undefined,
-) {
+async function roleChecks(environment: HomeEnvironment) {
   let config: Awaited<ReturnType<typeof loadRole>>;
   try {
     config = await loadRole(P2P_ROLES.SELLER, environment);
@@ -184,7 +176,7 @@ async function roleChecks(
   try {
     const status = await roleKeyFilesStatus(
       P2P_ROLES.SELLER,
-      keyNames(free),
+      KEY_NAMES,
       environment,
     );
     keys =
@@ -216,7 +208,6 @@ async function roleChecks(
     keys,
     sequence,
     seller: { nodeId: config.nodeId, owner: config.owner },
-    rpcUrl: config.rpcUrl,
   };
 }
 
@@ -258,50 +249,21 @@ async function modelCheck(environment: HomeEnvironment): Promise<Result> {
   }
 }
 
-// The loopback ports startup binds: Ollama always; the facilitator and the paid HTTP seller when paid.
-export function sellerPorts(free: boolean) {
-  return free
-    ? [PORTS.ollama]
-    : [PORTS.ollama, PORTS.facilitator, PORTS.seller];
-}
-const PROBE_URLS: Readonly<Record<number, string>> = {
-  [PORTS.ollama]: `${HOSTS.ollama}${ROUTES.ollamaVersion}`,
-  [PORTS.facilitator]: `${HOSTS.facilitator}${ROUTES.health}`,
-  [PORTS.seller]: `http://${LOCALHOST}:${PORTS.seller}${ROUTES.health}`,
-};
-
+// The only loopback port startup binds: its managed Ollama.
 async function portsCheck(
-  free: boolean,
   portFree: (url: string) => Promise<boolean>,
 ): Promise<Result> {
-  for (const port of sellerPorts(free))
-    if (!(await portFree(PROBE_URLS[port]!)))
-      return fail(DOCTOR_CODES.PORT_IN_USE);
-  return OK;
+  return (await portFree(SERVED_ENGINE_PROBE))
+    ? OK
+    : fail(DOCTOR_CODES.PORT_IN_USE);
 }
 
-function relaysCheck(settings: SellerSettings): Result {
+function relaysCheck(settings: SellerBaseSettings): Result {
   try {
     relayModeFromEnv(settings.relayEnvironment);
     return OK;
   } catch (error) {
     return fail(errorCode(error));
-  }
-}
-
-async function programCheck(
-  options: DoctorOptions,
-  free: boolean,
-  rpcUrl: string | undefined,
-): Promise<Result> {
-  if (free) return { ...OK, code: DOCTOR_CODES.NOT_NEEDED };
-  if (rpcUrl === undefined) return warn(DOCTOR_CODES.NOT_CHECKED);
-  if (!options.online) return warn(DOCTOR_CODES.ONLINE_CHECK_SKIPPED);
-  try {
-    await (options.probes?.program ?? defaultProgram)(rpcUrl);
-    return OK;
-  } catch {
-    return fail(DOCTOR_CODES.DEVNET_PROGRAM_UNAVAILABLE);
   }
 }
 
@@ -314,12 +276,9 @@ export async function sellerDoctor(
     checks.push({ check, ...result });
   const notChecked = warn(DOCTOR_CODES.NOT_CHECKED);
   const config = await configCheck(options);
-  const free = config.settings
-    ? config.settings.offer.kind === OFFER_PRICING_KINDS.FREE
-    : undefined;
   add(DOCTOR_CHECKS.CONFIG, config.result);
   add(DOCTOR_CHECKS.HOME, await homeCheck(environment));
-  const role = await roleChecks(environment, free);
+  const role = await roleChecks(environment);
   add(DOCTOR_CHECKS.ROLE, role.role);
   add(DOCTOR_CHECKS.KEYS, role.keys ?? notChecked);
   add(DOCTOR_CHECKS.SEQUENCE, role.sequence ?? notChecked);
@@ -328,19 +287,11 @@ export async function sellerDoctor(
   add(DOCTOR_CHECKS.MODEL, await modelCheck(environment));
   add(
     DOCTOR_CHECKS.PORTS,
-    free === undefined
-      ? notChecked
-      : await portsCheck(free, options.probes?.portFree ?? defaultPortFree),
+    await portsCheck(options.probes?.portFree ?? defaultPortFree),
   );
   add(
     DOCTOR_CHECKS.RELAYS,
-    config.settings ? relaysCheck(config.settings) : notChecked,
-  );
-  add(
-    DOCTOR_CHECKS.PROGRAM,
-    free === undefined
-      ? notChecked
-      : await programCheck(options, free, role.rpcUrl),
+    config.base ? relaysCheck(config.base) : notChecked,
   );
   return {
     checks,
