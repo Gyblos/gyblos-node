@@ -4,14 +4,23 @@
 // requests to the offer's base URL, which never follow redirects. Failures follow the Engine port
 // contract in @gyblos/protocol/engine; provider bodies, headers and text never reach them.
 import {
-  BoundFailure,
-  callerCallback,
   engineFailure,
   FrameFailure,
   statusFailure,
   type EngineAttempt,
 } from '@gyblos/core/engine-failures';
 import { boundedText, serverSentData } from '@gyblos/core/engine-http';
+import {
+  deliverText,
+  elapsedNanoseconds,
+  errorFields,
+  generationAttempt,
+  isJsonFields,
+  jsonFields,
+  providerCount,
+  providerRoute,
+  type JsonFields,
+} from '@gyblos/core/engine-provider';
 import {
   ENGINE_DONE_REASONS,
   ENGINE_ERROR_CODES,
@@ -53,12 +62,7 @@ export interface OpenAiOptions {
   describeTimeoutMs?: number;
 }
 
-type Fields = Record<string, unknown>;
 const HTTP_TOO_MANY_REQUESTS = 429;
-const NANOSECONDS_PER_MILLISECOND = 1_000_000;
-
-const isFields = (value: unknown): value is Fields =>
-  !!value && typeof value === 'object' && !Array.isArray(value);
 
 // OpenAI's own API and its regional hosts (eu.api.openai.com).
 const isOpenAi = (base: string) => {
@@ -66,29 +70,8 @@ const isOpenAi = (base: string) => {
   return host === OPENAI_HOST || host.endsWith(`.${OPENAI_HOST}`);
 };
 
-function route(base: string, path: string) {
-  return new URL(path, base.endsWith('/') ? base : `${base}/`);
-}
-
 function authorization(settings: OpenAiEngineSettings): Record<string, string> {
   return settings.apiKey ? { authorization: `Bearer ${settings.apiKey}` } : {};
-}
-
-function parseFields(text: string): Fields {
-  let value: unknown;
-  try {
-    value = JSON.parse(text);
-  } catch {
-    throw new FrameFailure();
-  }
-  if (!isFields(value)) throw new FrameFailure();
-  return value;
-}
-
-function count(value: unknown) {
-  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0)
-    throw new EngineError(ENGINE_ERROR_CODES.INVALID_RESPONSE);
-  return value;
 }
 
 // Compatible servers name the same two endings differently; any other ending (a filter, a tool call,
@@ -108,19 +91,8 @@ function doneReason(value: unknown): EngineDoneReason {
 // The body is read only for its error code, within a bound, and never kept.
 async function refusal(response: Response) {
   if (response.status === HTTP_TOO_MANY_REQUESTS) {
-    const body = await boundedText(response, OPENAI_LIMITS.errorBytes).catch(
-      () => '',
-    );
-    let error: unknown;
-    try {
-      error = Reflect.get(parseFields(body), 'error');
-    } catch {
-      error = undefined;
-    }
-    if (
-      isFields(error) &&
-      (error.code === OPENAI_QUOTA_CODE || error.type === OPENAI_QUOTA_CODE)
-    )
+    const error = await errorFields(response, OPENAI_LIMITS.errorBytes);
+    if (error?.code === OPENAI_QUOTA_CODE || error?.type === OPENAI_QUOTA_CODE)
       return new EngineError(ENGINE_ERROR_CODES.QUOTA_EXHAUSTED);
   } else await response.body?.cancel().catch(() => {});
   return statusFailure(response.status);
@@ -135,7 +107,7 @@ async function describeModel(
   const attempt: EngineAttempt = { deadline, fragments: 0 };
   try {
     const response = await fetchImpl(
-      route(settings.base, OPENAI_ROUTES.models),
+      providerRoute(settings.base, OPENAI_ROUTES.models),
       {
         redirect: 'error',
         headers: authorization(settings),
@@ -143,12 +115,12 @@ async function describeModel(
       },
     );
     if (!response.ok) throw await refusal(response);
-    const data = parseFields(
+    const data = jsonFields(
       await boundedText(response, OPENAI_LIMITS.modelsBytes),
     ).data;
     if (
       !Array.isArray(data) ||
-      !data.some((item) => isFields(item) && item.id === settings.model)
+      !data.some((item) => isJsonFields(item) && item.id === settings.model)
     )
       throw new EngineError(ENGINE_ERROR_CODES.UNAVAILABLE);
     return { name: settings.model, contextTokens: settings.contextTokens };
@@ -165,21 +137,21 @@ interface Completion {
 }
 
 // Applies one streamed event; returns the visible text it carried. Hidden reasoning is never delivered.
-function applyEvent(event: Fields, completion: Completion) {
+function applyEvent(event: JsonFields, completion: Completion) {
   if (event.error !== undefined) throw new FrameFailure(true);
-  if (isFields(event.usage))
+  if (isJsonFields(event.usage))
     completion.usage = {
-      inputTokens: count(event.usage.prompt_tokens),
-      outputTokens: count(event.usage.completion_tokens),
+      inputTokens: providerCount(event.usage.prompt_tokens),
+      outputTokens: providerCount(event.usage.completion_tokens),
     };
   const { choices } = event;
   // Some servers send the final usage alone, without choices.
-  if (choices === undefined && isFields(event.usage)) return '';
+  if (choices === undefined && isJsonFields(event.usage)) return '';
   if (!Array.isArray(choices) || choices.length > 1) throw new FrameFailure();
   const choice: unknown = choices[0];
   if (choice === undefined) return '';
-  if (!isFields(choice)) throw new FrameFailure();
-  const content = isFields(choice.delta) ? choice.delta.content : undefined;
+  if (!isJsonFields(choice)) throw new FrameFailure();
+  const content = isJsonFields(choice.delta) ? choice.delta.content : undefined;
   let text = '';
   if (content !== undefined && content !== null) {
     if (
@@ -195,24 +167,6 @@ function applyEvent(event: Fields, completion: Completion) {
   return text;
 }
 
-async function deliver(
-  fragment: string,
-  completion: Completion,
-  input: EngineInput,
-  signal: AbortSignal,
-  attempt: EngineAttempt,
-) {
-  completion.text += fragment;
-  if (completion.text.length > OPENAI_LIMITS.outputCharacters)
-    throw new BoundFailure();
-  attempt.fragments++;
-  await callerCallback(attempt, input.onFragment);
-  signal.throwIfAborted();
-  const onText = input.onText;
-  await callerCallback(attempt, onText && (() => onText(fragment)));
-  signal.throwIfAborted();
-}
-
 async function readCompletion(
   body: ReadableStream<Uint8Array>,
   input: EngineInput,
@@ -223,12 +177,20 @@ async function readCompletion(
   for await (const data of serverSentData(body, OPENAI_LIMITS.stream)) {
     signal.throwIfAborted();
     if (data === OPENAI_STREAM_END) break;
-    const event = parseFields(data);
+    const event = jsonFields(data);
     const fragment = applyEvent(event, completion);
-    if (fragment) await deliver(fragment, completion, input, signal, attempt);
+    if (fragment)
+      await deliverText(
+        fragment,
+        completion,
+        OPENAI_LIMITS.outputCharacters,
+        input,
+        signal,
+        attempt,
+      );
     // Finished, then counted by this event: a proxy that keeps the stream open cannot hold a complete
     // answer, and an earlier running count is never taken for the final one.
-    if (completion.finish && isFields(event.usage)) break;
+    if (completion.finish && isJsonFields(event.usage)) break;
   }
   const { text, finish, usage } = completion;
   if (!finish) throw new FrameFailure();
@@ -245,46 +207,35 @@ async function generate(
   timeoutMs: number,
   input: EngineInput,
 ): Promise<EngineResult> {
-  if (
-    !Number.isSafeInteger(input.maxTokens) ||
-    input.maxTokens < 1 ||
-    input.maxTokens > OPENAI_LIMITS.maxOutputTokens
-  )
-    throw new Error('Invalid output token limit.');
+  const { attempt, signal, started } = generationAttempt(input, {
+    maxOutputTokens: OPENAI_LIMITS.maxOutputTokens,
+    timeoutMs,
+  });
   const prompt = singleUserPrompt(input);
-  input.signal?.throwIfAborted();
-  const deadline = AbortSignal.timeout(timeoutMs);
-  const attempt: EngineAttempt = {
-    caller: input.signal,
-    deadline,
-    fragments: 0,
-  };
-  const signal = AbortSignal.any([
-    deadline,
-    ...(input.signal ? [input.signal] : []),
-  ]);
-  const started = performance.now();
   try {
-    const response = await fetchImpl(route(settings.base, OPENAI_ROUTES.chat), {
-      method: 'POST',
-      redirect: 'error',
-      headers: {
-        ...authorization(settings),
-        'content-type': 'application/json',
-        accept: 'text/event-stream',
+    const response = await fetchImpl(
+      providerRoute(settings.base, OPENAI_ROUTES.chat),
+      {
+        method: 'POST',
+        redirect: 'error',
+        headers: {
+          ...authorization(settings),
+          'content-type': 'application/json',
+          accept: 'text/event-stream',
+        },
+        body: JSON.stringify({
+          model: settings.model,
+          messages: [{ role: 'user', content: prompt }],
+          // OpenAI's own API takes the newer name, which its reasoning models require; compatible
+          // servers take max_tokens.
+          [isOpenAi(settings.base) ? 'max_completion_tokens' : 'max_tokens']:
+            input.maxTokens,
+          stream: true,
+          stream_options: { include_usage: true },
+        }),
+        signal,
       },
-      body: JSON.stringify({
-        model: settings.model,
-        messages: [{ role: 'user', content: prompt }],
-        // OpenAI's own API takes the newer name, which its reasoning models require; compatible
-        // servers take max_tokens.
-        [isOpenAi(settings.base) ? 'max_completion_tokens' : 'max_tokens']:
-          input.maxTokens,
-        stream: true,
-        stream_options: { include_usage: true },
-      }),
-      signal,
-    });
+    );
     if (!response.ok || !response.body) throw await refusal(response);
     const { text, finish, usage } = await readCompletion(
       response.body,
@@ -297,9 +248,7 @@ async function generate(
       finishReason: finish,
       usage: {
         ...usage,
-        totalDurationNs: Math.round(
-          (performance.now() - started) * NANOSECONDS_PER_MILLISECOND,
-        ),
+        totalDurationNs: elapsedNanoseconds(started),
         loadDurationNs: 0,
         inputDurationNs: 0,
         outputDurationNs: 0,

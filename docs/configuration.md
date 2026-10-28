@@ -229,7 +229,7 @@ code. Startup warms the offers one at a time, starts as soon as one is ready,
 and warms the others again every minute in the background; the signed catalog
 lists only the offers that are ready now: an offer leaves it while it renews or
 after it fails a check, and returns with its next good observation. A model may
-be listed once. Two plugins serve offers today.
+be listed once. Three plugins serve offers today.
 
 The `openai` plugin serves any model through an OpenAI-compatible API (vLLM, LM
 Studio, llama.cpp, OpenRouter, OpenAI) with reasoning `["off"]` only; other
@@ -254,6 +254,18 @@ whose whole budget went to hidden reasoning is refused as an invalid response.
 OpenAI's own API (`api.openai.com` and its regional hosts) gets
 `max_completion_tokens`; other servers get `max_tokens`.
 
+The `anthropic` plugin serves any model through the Anthropic Messages API (or a
+compatible one) with reasoning `["off"]`; no thinking is requested. Its URL is
+the API root without `/v1` (`https://api.anthropic.com`), on https or a literal
+loopback proxy; a URL ending in `/v1` is refused with
+`SELLER_OFFER_ENGINE_UNSUPPORTED`. `api_key_env` is required
+(`SELLER_OFFER_API_KEY_MISSING` without it) and the key is sent only as the
+`x-api-key` header to that URL. Usage is declared by the provider, input
+counting cached prompt tokens too. Readiness only fetches the model
+(`GET /v1/models/{model}`, which also checks the key), even on loopback, since
+any Anthropic-compatible URL is paid per call. A `billing_error` is quota
+exhaustion; an overloaded API (529) is unavailable.
+
 The Ollama plugin serves the pinned Qwen3 0.6B with reasoning `off`. It runs on
 the seller's own Ollama at the offer's engine URL and never starts Ollama: run a
 dedicated one yourself (see [Seller](running-a-node.md#seller)). The URL must be
@@ -270,18 +282,19 @@ v1 paid path remains in the lab gates (`pnpm gate:*`) only.
 accepts as written; the other examples are valid files for future nodes but stop
 this daemon. Today it honors:
 
-| Setting                                                                                                                                     | Used                                                                                                                      |
-| ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `[transport]` `relay_only`, `bind`, `external_addr`                                                                                         | yes                                                                                                                       |
-| `[relays]` `urls`, `relay_token_env` (the token stays in that variable; relay errors still name `GYBLOS_RELAY_TOKEN`)                       | yes                                                                                                                       |
-| `[discovery]` `publish`, `url`                                                                                                              | yes                                                                                                                       |
-| `[limits]`                                                                                                                                  | yes, see [Seller limits](#seller-limits)                                                                                  |
-| `[[offers]]`: each for `qwen3-0.6b` (or `qwen3:0.6b`), engine `ollama` at a literal loopback URL without `api_key_env`, reasoning `["off"]` | yes                                                                                                                       |
-| `[[offers]]`: any model, engine `openai` at an https or literal loopback URL with `context_tokens`, reasoning `["off"]`                     | yes                                                                                                                       |
-| `free = {...}` on that offer                                                                                                                | served over the free channel with daily total and per-buyer token caps                                                    |
-| `price = {...}` on that offer                                                                                                               | not yet: paid selling is off until phase 2, so a paid offer stops startup                                                 |
-| `[node]` `data_dir`, `rpc_url`, `payout_wallet`                                                                                             | not yet: the role files own them, so setting them in the file stops startup (`GYBLOS_HOME` overriding `data_dir` is fine) |
-| `[buyer]`                                                                                                                                   | ignored by the seller                                                                                                     |
+| Setting                                                                                                                                           | Used                                                                                                                      |
+| ------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `[transport]` `relay_only`, `bind`, `external_addr`                                                                                               | yes                                                                                                                       |
+| `[relays]` `urls`, `relay_token_env` (the token stays in that variable; relay errors still name `GYBLOS_RELAY_TOKEN`)                             | yes                                                                                                                       |
+| `[discovery]` `publish`, `url`                                                                                                                    | yes                                                                                                                       |
+| `[limits]`                                                                                                                                        | yes, see [Seller limits](#seller-limits)                                                                                  |
+| `[[offers]]`: each for `qwen3-0.6b` (or `qwen3:0.6b`), engine `ollama` at a literal loopback URL without `api_key_env`, reasoning `["off"]`       | yes                                                                                                                       |
+| `[[offers]]`: any model, engine `openai` at an https or literal loopback URL with `context_tokens`, reasoning `["off"]`                           | yes                                                                                                                       |
+| `[[offers]]`: any model, engine `anthropic` at an https or literal loopback API root with `api_key_env` and `context_tokens`, reasoning `["off"]` | yes                                                                                                                       |
+| `free = {...}` on that offer                                                                                                                      | served over the free channel with daily total and per-buyer token caps                                                    |
+| `price = {...}` on that offer                                                                                                                     | not yet: paid selling is off until phase 2, so a paid offer stops startup                                                 |
+| `[node]` `data_dir`, `rpc_url`, `payout_wallet`                                                                                                   | not yet: the role files own them, so setting them in the file stops startup (`GYBLOS_HOME` overriding `data_dir` is fine) |
+| `[buyer]`                                                                                                                                         | ignored by the seller                                                                                                     |
 
 Startup stops with a static code: `NODE_CONFIG_INVALID`,
 `SELLER_SETTING_UNSUPPORTED`, `SELLER_OFFERS_MISSING`,

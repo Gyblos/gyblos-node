@@ -45,6 +45,7 @@
     "@gyblos/core": "workspace:*",
     "@gyblos/config": "workspace:*",
     "@gyblos/engine-ollama": "workspace:*",
+    "@gyblos/engine-anthropic": "workspace:*",
     "@gyblos/engine-openai": "workspace:*",
     "@gyblos/runtime": "workspace:*",
     "@number0/iroh": "1.1.0",

@@ -3,7 +3,6 @@
 // pins is recounted; any other is declared by its provider. A loopback server runs on this machine and is
 // warmed like Ollama; a remote API is only described for readiness, so readiness never spends the
 // seller's credit. The API key is read from the variable the offer names and reaches only the engine.
-import { IPV6_LOOPBACK, LOCALHOST } from '@gyblos/config';
 import { OPENAI_LOCAL_READINESS } from '@gyblos/engine-openai/constants';
 import { createOpenAiEngine } from '@gyblos/engine-openai/engine';
 import {
@@ -19,9 +18,8 @@ import {
   type EngineReadinessPolicy,
   type SellerEngineOffer,
 } from './engine-factory';
+import { isLocalEngineUrl, providerEngineUrl } from './engine-urls';
 import { recountsWithPinnedTokenizer } from './seller-offer';
-
-const LOOPBACK_HOSTS: readonly string[] = [LOCALHOST, IPV6_LOOPBACK];
 
 export const OPENAI_READINESS = {
   warmup: {
@@ -32,21 +30,11 @@ export const OPENAI_READINESS = {
   localResources: true,
 } as const satisfies EngineReadinessPolicy;
 
-// A literal loopback server on this machine; names such as localhost wait for gyblos init.
-function isLocal(url: URL) {
-  return url.protocol === 'http:' && LOOPBACK_HOSTS.includes(url.hostname);
-}
-
-// A query or fragment, even an empty one, would replace the base's version path when routes join it.
-function engineUrl(offer: SellerEngineOffer) {
-  if (!URL.canParse(offer.engine.url) || /[?#]/.test(offer.engine.url))
-    return undefined;
-  const url = new URL(offer.engine.url);
-  return url.protocol === 'https:' || isLocal(url) ? url : undefined;
-}
-
 function refuse(offer: SellerEngineOffer) {
-  if (!engineUrl(offer) || offer.engine.contextTokens === undefined)
+  if (
+    !providerEngineUrl(offer.engine.url) ||
+    offer.engine.contextTokens === undefined
+  )
     return NODE_ERROR_CODES.SELLER_OFFER_ENGINE_UNSUPPORTED;
   if (
     offer.reasoning.length !== 1 ||
@@ -59,7 +47,7 @@ function refuse(offer: SellerEngineOffer) {
 export const OPENAI_ENGINE_FACTORY: EngineFactory = {
   refuse,
   create: (offer, { fetch, environment }) => {
-    const url = engineUrl(offer);
+    const url = providerEngineUrl(offer.engine.url);
     const { contextTokens, apiKeyEnv, upstreamModel } = offer.engine;
     if (!url || contextTokens === undefined)
       throw new Error('OpenAI offer was not checked before creation.');
@@ -83,7 +71,7 @@ export const OPENAI_ENGINE_FACTORY: EngineFactory = {
             tokenizer: () => modelTokenizer(environment),
           }
         : { mode: CONTROL_METERING_MODES.DECLARED },
-      readiness: isLocal(url) ? OPENAI_READINESS : REMOTE_READINESS,
+      readiness: isLocalEngineUrl(url) ? OPENAI_READINESS : REMOTE_READINESS,
     };
   },
 };
