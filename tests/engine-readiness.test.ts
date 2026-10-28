@@ -7,6 +7,7 @@ import {
   assertReadinessCurrent,
   prepareSellerEngine,
 } from '@gyblos/node/engine-readiness';
+import { OLLAMA_READINESS } from '@gyblos/node/engine-registry-ollama';
 import { type Engine } from '@gyblos/protocol/engine';
 import type { MemorySnapshot } from '@gyblos/runtime/memory';
 
@@ -66,6 +67,7 @@ void test('insufficient VM or local cgroup headroom blocks warmup and advertisem
         value.snapshot.cgroup!.limitBytes! - 1;
     await assert.rejects(
       prepareSellerEngine(value.engine, {
+        policy: OLLAMA_READINESS,
         snapshot: async () => value.snapshot,
         record: async (record) => {
           records.push(record);
@@ -92,6 +94,7 @@ void test('readiness waits for one successful private warmup and records no gene
     return previous(input);
   };
   const ready = prepareSellerEngine(value.engine, {
+    policy: OLLAMA_READINESS,
     snapshot: async () => value.snapshot,
     record: async (record) => {
       records.push(record);
@@ -120,6 +123,7 @@ void test('failed warmup never advertises and never retries; diagnostics omit er
   };
   await assert.rejects(
     prepareSellerEngine(value.engine, {
+      policy: OLLAMA_READINESS,
       snapshot: async () => value.snapshot,
       record: async (record) => {
         records.push(record);
@@ -146,6 +150,7 @@ void test('a hung engine is aborted before readiness even if it ignores cancella
   };
   await assert.rejects(
     prepareSellerEngine(value.engine, {
+      policy: OLLAMA_READINESS,
       snapshot: async () => value.snapshot,
       record: async (record) => {
         records.push(record);
@@ -179,6 +184,7 @@ void test('a newly observed OOM blocks readiness, while a historical unchanged c
       };
     };
     const ready = prepareSellerEngine(value.engine, {
+      policy: OLLAMA_READINESS,
       snapshot,
       record: async (record) => {
         records.push(record);
@@ -193,6 +199,7 @@ void test('a newly observed OOM blocks readiness, while a historical unchanged c
 void test('offer expiration is anchored to private warmup, and slow startup cannot extend residency', async () => {
   const value = fixture();
   const readiness = await prepareSellerEngine(value.engine, {
+    policy: OLLAMA_READINESS,
     snapshot: async () => value.snapshot,
     record: async () => {},
   });
@@ -243,6 +250,7 @@ void test('renewable probe holds actual engine settlement and honors cancellatio
     };
   };
   const operation = probeSellerEngine(value.engine, controller.signal, {
+    policy: OLLAMA_READINESS,
     snapshot: async () => {
       snapshots++;
       return value.snapshot;
@@ -267,6 +275,7 @@ void test('renewable probe bounds residency from the injected clock and does not
     value.engine,
     new AbortController().signal,
     {
+      policy: OLLAMA_READINESS,
       snapshot: async () => value.snapshot,
       now: () => 10000,
     },

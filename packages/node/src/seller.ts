@@ -18,7 +18,6 @@ import {
   GENERATION,
   READINESS_GENERATION,
 } from '@gyblos/engine-ollama/constants';
-import { createOllamaEngine } from '@gyblos/engine-ollama/engine';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 import {
   assertPortFree,
@@ -31,7 +30,6 @@ import { assertMemoryHeadroom, memorySnapshot } from '@gyblos/runtime/memory';
 import { withDeadline } from '@gyblos/transport-iroh/deadline';
 import { bindEndpoint } from '@gyblos/transport-iroh/endpoint';
 
-import { modelTokenizer } from './artifacts';
 import { SELLER_PUBLIC_RECORDS } from './constants';
 import { observeControlReadiness } from './control-readiness';
 import { prepareSellerControl } from './control-startup';
@@ -40,6 +38,7 @@ import {
   prepareSellerEngine,
   probeSellerEngine,
 } from './engine-readiness';
+import { createSellerEngine } from './engine-registry';
 import { assertOllamaModelsHome, assertRoleHome } from './home';
 import { openSellerSequence } from './public-sequence';
 import { createSellerPublisher } from './publisher';
@@ -108,8 +107,12 @@ export async function startSeller() {
       throw error;
     }
     await stage('private-engine-warmup');
-    const engine = createOllamaEngine(HOSTS.ollama);
+    const prepared = createSellerEngine(settings.engine, {
+      fetch: globalThis.fetch,
+    });
+    const { engine } = prepared;
     const { model, offerExpiresAt } = await prepareSellerEngine(engine, {
+      policy: prepared.readiness,
       snapshot: memorySnapshot,
       record: (record) =>
         saveJson(
@@ -128,10 +131,13 @@ export async function startSeller() {
       {
         model,
         check: (signal) =>
-          probeSellerEngine(engine, signal, { snapshot: memorySnapshot }),
+          probeSellerEngine(engine, signal, {
+            policy: prepared.readiness,
+            snapshot: memorySnapshot,
+          }),
       },
     );
-    const tokenizer = await modelTokenizer();
+    const tokenizer = await prepared.metering.tokenizer(process.env);
     await stage('iroh-endpoint');
     const { relayOnly } = settings;
     const endpoint = await bindEndpoint(await nodeSecret(P2P_ROLES.SELLER), {
@@ -183,6 +189,8 @@ export async function startSeller() {
       validUntil: offerExpiresAt,
       readiness: controlReadiness.readiness,
       offer: settings.offer,
+      selection: prepared.selection,
+      meteringMode: prepared.metering.mode,
     });
     disposers.push(async () => {
       await control.records.withdraw();

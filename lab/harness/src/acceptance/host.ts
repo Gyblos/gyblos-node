@@ -7,11 +7,16 @@ import { publishRecord } from '@gyblos/discovery-http';
 import { observeControlReadiness } from '@gyblos/node/control-readiness';
 import { prepareSellerControl } from '@gyblos/node/control-startup';
 import { probeSellerEngine } from '@gyblos/node/engine-readiness';
+import {
+  OLLAMA_READINESS,
+  ollamaSelection,
+} from '@gyblos/node/engine-registry-ollama';
 import { prepareSellerFreeExecution } from '@gyblos/node/free-execution';
 import { sellerLimits } from '@gyblos/node/node-config-limits';
 import { openSellerSequence } from '@gyblos/node/public-sequence';
 import { createSellerPublisher } from '@gyblos/node/publisher';
 import type { SellerCatalogOffer } from '@gyblos/node/seller-offer';
+import { CONTROL_METERING_MODES } from '@gyblos/protocol/constants';
 import type { SignedPublicV2 } from '@gyblos/protocol/control-types';
 import type { RecountTokenizer } from '@gyblos/protocol/engine';
 import { controlDeadline } from '@gyblos/transport-iroh/control-io';
@@ -53,6 +58,7 @@ export async function startAcceptanceHost(options: AcceptanceHostOptions) {
     const initial = await controlDeadline(
       (deadline) =>
         probeSellerEngine(engine.engine, deadline, {
+          policy: OLLAMA_READINESS,
           snapshot: engine.snapshot,
           now: clock.now,
         }),
@@ -71,6 +77,7 @@ export async function startAcceptanceHost(options: AcceptanceHostOptions) {
             engine.engine,
             AbortSignal.any([deadline, signal]),
             {
+              policy: OLLAMA_READINESS,
               snapshot: engine.snapshot,
               now: clock.now,
             },
@@ -91,9 +98,12 @@ export async function startAcceptanceHost(options: AcceptanceHostOptions) {
       nodeId: wire.nodeId,
       initialFloor: 1,
     });
+    // Paid acceptance still quotes the v1 PoC listing, which the daemon no longer serves.
+    const offer = options.offer ?? pocPaidListing();
     const control = await prepareSellerControl({
-      // Paid acceptance still quotes the v1 PoC listing, which the daemon no longer serves.
-      offer: options.offer ?? pocPaidListing(),
+      offer,
+      selection: ollamaSelection(offer.modelId),
+      meteringMode: CONTROL_METERING_MODES.RECOUNTED,
       owner: identity.owner,
       nodeId: wire.nodeId,
       nodeSigner: wire.nodeSigner,

@@ -10,12 +10,12 @@ import { HOSTS } from '@gyblos/config';
 import { READINESS_GENERATION } from '@gyblos/engine-ollama/constants';
 import { MODEL } from '@gyblos/engine-ollama/model';
 import { NODE_ERROR_CODES } from '@gyblos/node/constants';
+import type { SellerEngineOffer } from '@gyblos/node/engine-factory';
 import {
   ENGINE_REGISTRY,
   engineOfferRefusal,
 } from '@gyblos/node/engine-registry';
 import { OLLAMA_READINESS } from '@gyblos/node/engine-registry-ollama';
-import type { SellerEngineOffer } from '@gyblos/node/engine-factory';
 import { parseNodeConfig } from '@gyblos/node/node-config';
 import { sellerSettings } from '@gyblos/node/seller-settings';
 import {
@@ -93,7 +93,7 @@ void test('creating the ollama engine does no I/O and carries its selection, met
       return new Response('{}', { status: 503 });
     },
   });
-  assert.deepEqual(requests, []);
+  assert.equal(requests.length, 0);
   assert.deepEqual(prepared.selection, {
     modelId: 'qwen3-0.6b',
     variant: null,
