@@ -70,7 +70,8 @@
     "@gyblos/discovery-http": "workspace:*",
     "@gyblos/discovery-index": "workspace:*",
     "@gyblos/telemetry-file": "workspace:*",
-    "@gyblos/telemetry-console": "workspace:*"
+    "@gyblos/telemetry-console": "workspace:*",
+    "@gyblos/telemetry-otel": "workspace:*"
   },
   "devDependencies": {
     "@ianvs/prettier-plugin-sort-imports": "4.7.0",
@@ -81,6 +82,9 @@
     "prettier": "3.9.10",
     "tsx": "4.21.0",
     "typescript": "5.9.3",
-    "typescript-eslint": "8.48.1"
+    "typescript-eslint": "8.48.1",
+    "@opentelemetry/api": "1.9.0",
+    "@opentelemetry/core": "2.6.0",
+    "@opentelemetry/sdk-metrics": "2.6.0"
   }
 }
