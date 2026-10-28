@@ -138,7 +138,7 @@ $GYBLOS_HOME (default .local/gyblos; a container would use /data)
   seller/    role.json, node.key, owner key (setup also writes authorizer and
              facilitator keys, unused while paid selling is off), status,
              readiness, public sequence
-  artifacts/ tokenizer/, ollama-models/   (public, hash-pinned, shared)
+  artifacts/ tokenizer/ (public, hash-pinned, shared), ollama-models/ (lab cache)
 $GYBLOS_LAB_HOME (default .local/lab)
   lab config, keys, journals, measurements, facilitator-diagnostics/, identity/
 ```

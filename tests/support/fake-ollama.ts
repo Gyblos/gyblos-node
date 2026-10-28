@@ -1,5 +1,6 @@
-// A synthetic Ollama on 127.0.0.1 with an ephemeral port: lists the pinned model and answers every
-// generation with one short complete frame. Records request paths; no model or network beyond loopback.
+// A synthetic Ollama on 127.0.0.1 with an ephemeral port: lists the pinned model (or never answers, to
+// exercise deadlines) and answers every generation with one short complete frame. Records request paths;
+// no model or network beyond loopback.
 import { createServer, type ServerResponse } from 'node:http';
 import type { AddressInfo, Socket } from 'node:net';
 
@@ -32,12 +33,15 @@ function json(response: ServerResponse, body: unknown) {
     .end(JSON.stringify(body));
 }
 
-export async function startFakeOllama(): Promise<FakeOllama> {
+export async function startFakeOllama(
+  options: { hang?: boolean } = {},
+): Promise<FakeOllama> {
   const paths: string[] = [];
   const sockets = new Set<Socket>();
   const server = createServer((request, response) => {
     paths.push(request.url ?? '');
     request.resume();
+    if (options.hang) return;
     if (request.url === ROUTES.ollamaTags)
       return json(response, {
         models: [{ name: MODEL.name, digest: MODEL.digest }],

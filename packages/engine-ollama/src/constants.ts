@@ -23,8 +23,6 @@ export const MODEL = {
 export const READINESS_GENERATION = {
   prompt: 'Reply OK.',
   maxTokens: 1,
-  parallel: 1,
-  loadedModels: 1,
   residencyMs: 5 * 60_000,
 } as const;
 

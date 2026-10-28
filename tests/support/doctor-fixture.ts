@@ -32,8 +32,6 @@ export const KEY_FILES = [
   'facilitator.json',
   'node.key',
 ];
-// Nothing listens on the discard port, so an offer here has a stopped engine.
-const STOPPED_ENGINE = 'http://127.0.0.1:9';
 const FREE = 'free = { daily_token_cap = 20000, per_buyer_cap = 2000 }';
 // The fixture's free offer at its engine URL: the synthetic Ollama once withOllama ran.
 export const freeToml = (run: Fixture) =>
@@ -51,7 +49,6 @@ export interface Fixture {
   root: string;
   home: string;
   seller: string;
-  bin: string;
   owner: string;
   engineUrl: string;
   cleanup: (() => Promise<void>)[];
@@ -62,11 +59,9 @@ export async function fixture(
 ): Promise<Fixture> {
   const root = await mkdtemp(join(tmpdir(), 'gyblos-doctor-'));
   const home = join(root, 'home');
-  const bin = join(root, 'bin');
   const seller = join(home, 'seller');
   await mkdir(seller, { recursive: true, mode: 0o700 });
   await chmod(seller, 0o700);
-  await mkdir(bin);
   const [owner, authorizer, facilitator, payTo, buyer, mint] =
     await Promise.all(
       Array.from(
@@ -103,16 +98,25 @@ export async function fixture(
     root,
     home,
     seller,
-    bin,
     owner: owner!,
-    engineUrl: STOPPED_ENGINE,
+    // A just-closed ephemeral port: an offer here has a stopped engine until withOllama runs.
+    engineUrl: await stoppedEngineUrl(),
     cleanup: [],
   };
 }
 
-// Serves the pinned model on an ephemeral loopback port and points the fixture's offers at it.
-export async function withOllama(fixture: Fixture) {
+async function stoppedEngineUrl() {
   const ollama = await startFakeOllama();
+  await ollama.close();
+  return ollama.url;
+}
+
+// Serves the pinned model on an ephemeral loopback port and points the fixture's offers at it.
+export async function withOllama(
+  fixture: Fixture,
+  options: Parameters<typeof startFakeOllama>[0] = {},
+) {
+  const ollama = await startFakeOllama(options);
   fixture.engineUrl = ollama.url;
   fixture.cleanup.push(ollama.close);
   return ollama;
@@ -151,7 +155,6 @@ export async function doctor(
   const code = await runCli(['doctor', ...args], {
     env: {
       GYBLOS_HOME: fixture.home,
-      PATH: fixture.bin,
       GYBLOS_RELAY_TOKEN: RELAY_TOKEN,
       ...env,
     },

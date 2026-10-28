@@ -1,7 +1,7 @@
 // The Ollama engine plugin: refuses offers it cannot serve (model, then engine, then reasoning) and builds
 // the engine at the offer's literal loopback URL with recounted metering and the pinned warmup policy.
 // The seller runs Ollama itself; the daemon never starts it.
-import { localOllamaUrl } from '@gyblos/engine-ollama';
+import { isLocalOllamaUrl } from '@gyblos/engine-ollama';
 import { READINESS_GENERATION } from '@gyblos/engine-ollama/constants';
 import { createOllamaEngine } from '@gyblos/engine-ollama/engine';
 import { MODEL } from '@gyblos/engine-ollama/model';
@@ -32,17 +32,6 @@ export function ollamaSelection(modelId: string) {
   return { modelId, variant: null, quantization: MODEL.quantization };
 }
 
-// The adapter's own rule: http on 127.0.0.1 or [::1], no path, credentials, query or fragment. Names such
-// as localhost or host.docker.internal are refused until gyblos init and Docker settle them.
-function loopbackOrigin(url: string) {
-  try {
-    localOllamaUrl(url);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 function refuse(offer: SellerEngineOffer) {
   const { model, engine, reasoning } = offer;
   if (
@@ -51,7 +40,8 @@ function refuse(offer: SellerEngineOffer) {
   )
     return NODE_ERROR_CODES.SELLER_OFFER_MODEL_UNSUPPORTED;
   if (
-    !loopbackOrigin(engine.url) ||
+    // The adapter's own rule; names such as localhost or host.docker.internal wait for gyblos init.
+    !isLocalOllamaUrl(engine.url) ||
     engine.apiKeyEnv !== undefined ||
     (engine.upstreamModel !== undefined && engine.upstreamModel !== MODEL.name)
   )

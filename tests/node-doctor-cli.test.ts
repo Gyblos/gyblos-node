@@ -228,7 +228,7 @@ void test('doctor: a stopped engine at the offer URL fails with the engine code;
     assert.equal(stopped.code, 1);
     assert.match(
       line(stopped.output, 'engine'),
-      /FAIL\s+engine\s+ENGINE_UNAVAILABLE\s+\[\[offers\]\] entry 1: start Ollama at the offer URL/,
+      /FAIL\s+engine\s+ENGINE_UNAVAILABLE\s+\[\[offers\]\] entry 1: start the engine at the offer URL/,
     );
     assert.match(
       line(stopped.output, 'tokenizer'),
@@ -241,6 +241,18 @@ void test('doctor: a stopped engine at the offer URL fails with the engine code;
     const ready = await doctor(run);
     assert.match(line(ready.output, 'engine'), /^\s*OK\s+engine/);
     assert.deepEqual([...new Set(ollama.paths)], ['/api/tags']);
+  }));
+
+void test('doctor: an engine that never answers fails with ENGINE_TIMEOUT within its deadline', () =>
+  scenario({}, async (run) => {
+    await withOllama(run, { hang: true });
+    await writeFile(join(run.root, 'gyblos.toml'), freeToml(run));
+    const hung = await doctor(run);
+    assert.equal(hung.code, 1);
+    assert.match(
+      line(hung.output, 'engine'),
+      /FAIL\s+engine\s+ENGINE_TIMEOUT\s+\[\[offers\]\] entry 1:/,
+    );
   }));
 
 void test('doctor: an offer the daemon refuses leaves the engine unchecked, and doctor takes no --online', () =>

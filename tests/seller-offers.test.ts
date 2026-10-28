@@ -5,7 +5,9 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 
+import { ROUTES } from '@gyblos/config';
 import { MODEL } from '@gyblos/engine-ollama/constants';
+import { READINESS_STATUSES } from '@gyblos/node/constants';
 import type { ReadinessRecord } from '@gyblos/node/engine-readiness';
 import { parseNodeConfig } from '@gyblos/node/node-config';
 import { prepareSellerOffers } from '@gyblos/node/seller-offers';
@@ -44,9 +46,12 @@ void test('startup warms the engine at the offer URL, not at a managed port', as
     assert.equal(ready.model.digest, MODEL.digest);
     assert.ok(ready.offerExpiresAt > Date.now());
     assert.equal(records.length, 1);
-    assert.equal(records[0]!.status, 'passed');
+    assert.equal(records[0]!.status, READINESS_STATUSES.PASSED);
     // The warmup really generated at the offer URL.
-    assert.ok(ollama.paths.includes('/api/generate'), ollama.paths.join());
+    assert.ok(
+      ollama.paths.includes(ROUTES.ollamaGenerate),
+      ollama.paths.join(),
+    );
   } finally {
     await ollama.close();
   }

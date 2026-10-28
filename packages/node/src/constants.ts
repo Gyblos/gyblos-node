@@ -66,8 +66,6 @@ export const DOCTOR_CODES = {
   CHECK_FAILED: 'DOCTOR_CHECK_FAILED',
 } as const;
 export type DoctorCode = (typeof DOCTOR_CODES)[keyof typeof DOCTOR_CODES];
-// How long doctor waits for the engine to describe its model; it never generates.
-export const DOCTOR_ENGINE_TIMEOUT_MS = 5_000;
 
 // Iroh secret key length stored in a role's node.key.
 export const NODE_KEY_BYTES = 32;

@@ -1,8 +1,11 @@
 #:schema ../packages/node/schemas/gyblos.schema.json
 # (The #:schema path above is relative to this repository; in a copy elsewhere, update or delete it.)
 # What the seller daemon (`pnpm node:start`) can serve today: the pinned Qwen3 0.6B with reasoning off on
-# your own Ollama (`ollama serve`, then `ollama pull qwen3:0.6b`), given away free within daily token caps.
-# The daemon never starts Ollama; the URL must be a literal loopback address. Start it with
+# your own Ollama, given away free within daily token caps. The daemon never starts Ollama; run a
+# dedicated one on loopback, used only for selling (docs/running-a-node.md#seller):
+#   OLLAMA_HOST=127.0.0.1:11435 OLLAMA_NO_CLOUD=1 OLLAMA_NUM_PARALLEL=1 OLLAMA_MAX_LOADED_MODELS=1 ollama serve
+#   OLLAMA_HOST=127.0.0.1:11435 ollama pull qwen3:0.6b
+# Never expose it to the network (no OLLAMA_HOST=0.0.0.0, no "Expose Ollama" app setting). Start with
 #   GYBLOS_CONFIG=examples/seller-daemon.toml pnpm node:start
 # Paid offers are refused at startup until paid selling returns (docs/configuration.md).
 
@@ -23,5 +26,5 @@ publish = false
 [[offers]]
 model = "qwen3:0.6b"
 reasoning = ["off"]
-engine = { kind = "ollama", url = "http://127.0.0.1:11434/" }
+engine = { kind = "ollama", url = "http://127.0.0.1:11435/" }
 free = { daily_token_cap = 200000, per_buyer_cap = 5000 }

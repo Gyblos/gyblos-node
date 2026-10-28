@@ -220,16 +220,17 @@ startup stops with `SELLER_OFFERS_MISSING`. An environment variable still
 overrides the file's settings.
 
 The daemon serves one free offer, the pinned Qwen3 0.6B with reasoning `off`, on
-the seller's own Ollama at the offer's engine URL. It never starts Ollama: run
-`ollama serve` and `ollama pull qwen3:0.6b` yourself. The URL must be a literal
-loopback address, `http://127.0.0.1:<port>/` or `http://[::1]:<port>/`;
-`localhost`, `host.docker.internal` and URLs with a path are refused with
-`SELLER_OFFER_ENGINE_UNSUPPORTED`. Keep Ollama listening on loopback only (do
-not set `OLLAMA_HOST=0.0.0.0`). The pulled model must match the pinned digest,
-or warmup fails and the seller is not advertised. Paid selling is off until it
-returns as a payment plugin; a paid offer stops startup with
-`SELLER_PAID_EXECUTION_UNAVAILABLE`. The v1 paid path remains in the lab gates
-(`pnpm gate:*`) only.
+the seller's own Ollama at the offer's engine URL. It never starts Ollama: run a
+dedicated one yourself (see [Seller](running-a-node.md#seller)). The URL must be
+a literal loopback address, `http://127.0.0.1:<port>/` or
+`http://[::1]:<port>/`; `localhost`, `host.docker.internal` and URLs with a path
+are refused with `SELLER_OFFER_ENGINE_UNSUPPORTED`. Keep Ollama listening on
+loopback only (no `OLLAMA_HOST=0.0.0.0`, no "Expose Ollama to the network" app
+setting): Ollama has no authentication, and the seller cannot detect the
+exposure. The pulled model must match the pinned digest, or warmup fails and the
+seller is not advertised. Paid selling is off until it returns as a payment
+plugin; a paid offer stops startup with `SELLER_PAID_EXECUTION_UNAVAILABLE`. The
+v1 paid path remains in the lab gates (`pnpm gate:*`) only.
 [examples/seller-daemon.toml](../examples/seller-daemon.toml) is a file it
 accepts as written; the other examples are valid files for future nodes but stop
 this daemon. Today it honors:

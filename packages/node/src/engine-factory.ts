@@ -1,7 +1,6 @@
 // The contract every seller engine plugin implements: a pure offer check for settings and doctor, and a
 // factory that builds the engine with its listed selection, metering and readiness policy without I/O.
-// Not yet covered: the managed Ollama process lifecycle (in seller.ts until PR 2c) and remote engines
-// without local memory headroom (PR 3).
+// Not yet covered: remote engines, which have no local memory headroom to check.
 import type { HomeEnvironment } from '@gyblos/config';
 import type {
   CONTROL_METERING_MODES,

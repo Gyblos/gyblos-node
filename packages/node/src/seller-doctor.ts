@@ -9,11 +9,7 @@ import {
   ROLE_KEY_FILES,
   type HomeEnvironment,
 } from '@gyblos/config';
-import {
-  ENGINE_ERROR_CODES,
-  P2P_ROLES,
-  type EngineErrorCode,
-} from '@gyblos/protocol/constants';
+import { P2P_ROLES, type EngineErrorCode } from '@gyblos/protocol/constants';
 import { EngineError } from '@gyblos/protocol/engine';
 import type { RelayConfigurationCode } from '@gyblos/transport-iroh/constants';
 import {
@@ -25,7 +21,6 @@ import { modelTokenizer } from './artifacts';
 import {
   DOCTOR_CHECKS,
   DOCTOR_CODES,
-  DOCTOR_ENGINE_TIMEOUT_MS,
   DOCTOR_STATUS,
   NODE_CONFIG_FILENAME,
   NODE_CONFIG_ISSUE_CODES,
@@ -70,9 +65,6 @@ export interface DoctorReport {
   limits: SellerLimits | undefined;
 }
 export interface DoctorProbes {
-  // The engine's network path; tests point it nowhere else.
-  fetch?: typeof fetch;
-  engineTimeoutMs?: number;
   // Throws when the pinned tokenizer files are absent or do not match their hashes.
   tokenizer?: (environment: HomeEnvironment) => Promise<unknown>;
 }
@@ -211,35 +203,24 @@ async function tokenizerCheck(options: DoctorOptions): Promise<Result> {
 }
 
 // Describes the offer's engine the way warmup starts: for Ollama, the model list and pinned digest at the
-// offer URL. Never generates; a slow engine reports ENGINE_TIMEOUT.
+// offer URL, within the adapter's own deadline (ENGINE_TIMEOUT). Never generates.
 async function engineCheck(
   settings: SellerSettings,
-  options: DoctorOptions,
+  environment: HomeEnvironment,
 ): Promise<Result> {
   const { engineOffer } = settings;
-  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     const { engine } = createSellerEngine(engineOffer, {
-      fetch: options.probes?.fetch ?? globalThis.fetch,
-      environment: options.environment,
+      fetch: globalThis.fetch,
+      environment,
     });
-    await Promise.race([
-      engine.describe(),
-      new Promise<never>((_resolve, reject) => {
-        timer = setTimeout(
-          () => reject(new EngineError(ENGINE_ERROR_CODES.TIMEOUT)),
-          options.probes?.engineTimeoutMs ?? DOCTOR_ENGINE_TIMEOUT_MS,
-        );
-      }),
-    ]);
+    await engine.describe();
     return OK;
   } catch (error) {
     return {
       ...fail(error instanceof EngineError ? error.code : errorCode(error)),
       offer: engineOffer.index,
     };
-  } finally {
-    clearTimeout(timer);
   }
 }
 
@@ -270,7 +251,9 @@ export async function sellerDoctor(
   add(DOCTOR_CHECKS.TOKENIZER, await tokenizerCheck(options));
   add(
     DOCTOR_CHECKS.ENGINE,
-    config.settings ? await engineCheck(config.settings, options) : notChecked,
+    config.settings
+      ? await engineCheck(config.settings, environment)
+      : notChecked,
   );
   add(
     DOCTOR_CHECKS.RELAYS,
