@@ -80,6 +80,7 @@ void test('all executable modules are inert when imported', async (context) => {
   await assertImportsInert(async () => {
     await import('@gyblos/telemetry-file');
     await import('@gyblos/telemetry-console');
+    await import('@gyblos/telemetry-otel');
     await import('@gyblos/buyer/setup');
     await import('@gyblos/node-app/cli');
     await import('@gyblos/desktop/wallet-restore');

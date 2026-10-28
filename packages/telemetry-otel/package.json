@@ -1,0 +1,18 @@
+{
+  "name": "@gyblos/telemetry-otel",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./constants": "./src/constants.ts"
+  },
+  "dependencies": {
+    "@gyblos/core": "workspace:*",
+    "@gyblos/protocol": "workspace:*",
+    "@opentelemetry/api": "1.9.0",
+    "@opentelemetry/resources": "2.6.0",
+    "@opentelemetry/sdk-metrics": "2.6.0",
+    "@opentelemetry/core": "2.6.0"
+  }
+}
