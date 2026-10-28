@@ -223,21 +223,21 @@ The daemon serves every `[[offers]]` entry, each through its engine plugin;
 every entry must be one its plugin can serve, or startup stops with that entry's
 code. Startup warms the offers one at a time, starts as soon as one is ready,
 and warms the others again every minute in the background; the signed catalog
-lists only the offers that are ready, and an offer that fails a check leaves it
-until it is warmed again. Today the only plugin is Ollama, which serves the
-pinned Qwen3 0.6B with reasoning `off`, and a model may be listed once, so in
-practice one entry passes. It runs on the seller's own Ollama at the offer's
-engine URL and never starts Ollama: run a dedicated one yourself (see
-[Seller](running-a-node.md#seller)). The URL must be a literal loopback address,
-`http://127.0.0.1:<port>/` or `http://[::1]:<port>/`; `localhost`,
-`host.docker.internal` and URLs with a path are refused with
-`SELLER_OFFER_ENGINE_UNSUPPORTED`. Keep Ollama listening on loopback only (no
-`OLLAMA_HOST=0.0.0.0`, no "Expose Ollama to the network" app setting): Ollama
-has no authentication, and the seller cannot detect the exposure. The pulled
-model must match the pinned digest, or warmup fails and the seller is not
-advertised. Paid selling is off until it returns as a payment plugin; a paid
-offer stops startup with `SELLER_PAID_EXECUTION_UNAVAILABLE`. The v1 paid path
-remains in the lab gates (`pnpm gate:*`) only.
+lists only the offers that are ready now: an offer leaves it while it renews or
+after it fails a check, and returns with its next good observation. Today the
+only plugin is Ollama, which serves the pinned Qwen3 0.6B with reasoning `off`,
+and a model may be listed once, so in practice one entry passes. It runs on the
+seller's own Ollama at the offer's engine URL and never starts Ollama: run a
+dedicated one yourself (see [Seller](running-a-node.md#seller)). The URL must be
+a literal loopback address, `http://127.0.0.1:<port>/` or
+`http://[::1]:<port>/`; `localhost`, `host.docker.internal` and URLs with a path
+are refused with `SELLER_OFFER_ENGINE_UNSUPPORTED`. Keep Ollama listening on
+loopback only (no `OLLAMA_HOST=0.0.0.0`, no "Expose Ollama to the network" app
+setting): Ollama has no authentication, and the seller cannot detect the
+exposure. The pulled model must match the pinned digest, or warmup fails and the
+seller is not advertised. Paid selling is off until it returns as a payment
+plugin; a paid offer stops startup with `SELLER_PAID_EXECUTION_UNAVAILABLE`. The
+v1 paid path remains in the lab gates (`pnpm gate:*`) only.
 [examples/seller-daemon.toml](../examples/seller-daemon.toml) is a file it
 accepts as written; the other examples are valid files for future nodes but stop
 this daemon. Today it honors:
@@ -351,7 +351,7 @@ It then prints the seller's public **NodeId and owner** address from
 `role.json`; share those to be enrolled in a discovery index. The exit code is 0
 when no check fails (warnings do not fail) and 1 otherwise. It starts, spawns
 and writes nothing. It never prints the home location, the RPC URL, the relay
-token or key material, and only reaches the offer's loopback engine URL. Memory
+token or key material, and only reaches each offer's loopback engine URL. Memory
 headroom, key contents and the NodeId matching `node.key` are checked at startup
 only. With a valid configuration it also prints the effective
 [seller limits](#seller-limits).

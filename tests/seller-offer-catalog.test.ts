@@ -89,3 +89,23 @@ void test('a renewing offer is never signed into a catalog bounded by the other 
   // A quote for the renewing offer is refused as an unlisted model, not served.
   assert.equal(code(await run.quote(run.a.live)), CONTROL_CODES.MODEL);
 });
+
+void test('while one offer renews the other keeps serving a current catalog without waiting for a tick', async () => {
+  const run = await offerControlFixture();
+  run.set.start(() => run.records.refresh());
+  run.a.set({ busy: true, validUntil: 0 });
+  assert.throws(() => run.records.current(), { code: CONTROL_CODES.STALE });
+  // Nothing else refreshes here: the change itself scheduled the re-sign.
+  for (let turn = 0; turn < 100; turn++) {
+    try {
+      run.records.current();
+      break;
+    } catch {
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+  }
+  assert.deepEqual(run.listedModels(), [run.b.live.offer.modelId]);
+  const quoted = await run.quote(run.b.live);
+  assert.equal(code(quoted), undefined, JSON.stringify(quoted));
+  await run.set.stop();
+});

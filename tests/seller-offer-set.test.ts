@@ -160,3 +160,28 @@ void test('the set starts every observation, including later ones, and stops the
   assert.equal(b.stopped(), 1);
   assert.equal(set.readiness().validUntil, 0);
 });
+
+void test('once started, a membership change re-signs at once instead of waiting for a tick', async () => {
+  const a = fakeLiveOffer(0, NOW);
+  const b = fakeLiveOffer(1, NOW);
+  const set = setOf(a, b);
+  let refreshes = 0;
+  set.readiness();
+  set.start(async () => {
+    refreshes++;
+  });
+  set.listed();
+  await Promise.resolve();
+  assert.equal(refreshes, 0);
+  // A starts renewing: the first read sees the change and schedules one re-sign.
+  a.set({ busy: true, validUntil: 0 });
+  set.listed();
+  set.readiness();
+  await Promise.resolve();
+  assert.equal(refreshes, 1);
+  await set.stop();
+  a.set({ busy: false, validUntil: NOW + 1 });
+  set.listed();
+  await Promise.resolve();
+  assert.equal(refreshes, 1);
+});

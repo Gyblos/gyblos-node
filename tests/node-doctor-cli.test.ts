@@ -10,6 +10,8 @@ import { join } from 'node:path';
 import test from 'node:test';
 
 import { runCli } from '@gyblos/node-app/cli';
+import { DOCTOR_STATUS } from '@gyblos/node/constants';
+import { engineStatuses } from '@gyblos/node/seller-doctor';
 
 import {
   doctor,
@@ -306,4 +308,17 @@ void test('doctor: the gyblos script entry sets exit code 1 for an empty home', 
   );
   assert.equal(result.status, 1, result.stderr);
   assert.match(result.stdout + result.stderr, /ROLE_MISSING/);
+});
+
+void test('doctor: a down engine warns while another offer’s engine answers, and fails when none does', () => {
+  const ok = { status: DOCTOR_STATUS.OK };
+  const down = { status: DOCTOR_STATUS.FAIL };
+  assert.deepEqual(
+    engineStatuses([ok, down]).map((result) => result.status),
+    [DOCTOR_STATUS.OK, DOCTOR_STATUS.WARN],
+  );
+  assert.deepEqual(
+    engineStatuses([down, down]).map((result) => result.status),
+    [DOCTOR_STATUS.FAIL, DOCTOR_STATUS.FAIL],
+  );
 });

@@ -224,6 +224,19 @@ async function engineCheck(
   }
 }
 
+// Startup needs one ready engine and retries the others, so a down engine fails only when no offer's
+// engine answers, and is otherwise a warning.
+export function engineStatuses<T extends Pick<DoctorCheck, 'status'>>(
+  engines: readonly T[],
+): T[] {
+  const anyReady = engines.some((result) => result.status === DOCTOR_STATUS.OK);
+  return engines.map((result) =>
+    anyReady && result.status === DOCTOR_STATUS.FAIL
+      ? { ...result, status: DOCTOR_STATUS.WARN }
+      : result,
+  );
+}
+
 function relaysCheck(settings: SellerBaseSettings): Result {
   try {
     relayModeFromEnv(settings.relayEnvironment);
@@ -249,22 +262,13 @@ export async function sellerDoctor(
   add(DOCTOR_CHECKS.KEYS, role.keys ?? notChecked);
   add(DOCTOR_CHECKS.SEQUENCE, role.sequence ?? notChecked);
   add(DOCTOR_CHECKS.TOKENIZER, await tokenizerCheck(options));
-  // One line per offer, in order. Startup needs one ready engine and retries the others, so a down
-  // engine fails only when no offer's engine answers.
+  // One line per offer, in order.
   if (config.settings) {
     const engines: Result[] = [];
     for (const { engine } of config.settings.offers)
       engines.push(await engineCheck(engine, environment));
-    const anyReady = engines.some(
-      (result) => result.status === DOCTOR_STATUS.OK,
-    );
-    for (const result of engines)
-      add(
-        DOCTOR_CHECKS.ENGINE,
-        anyReady && result.status === DOCTOR_STATUS.FAIL
-          ? { ...result, status: DOCTOR_STATUS.WARN }
-          : result,
-      );
+    for (const result of engineStatuses(engines))
+      add(DOCTOR_CHECKS.ENGINE, result);
   } else add(DOCTOR_CHECKS.ENGINE, notChecked);
   add(
     DOCTOR_CHECKS.RELAYS,

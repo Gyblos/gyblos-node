@@ -98,7 +98,8 @@ export class SellerOfferSet implements ControlOffers {
   }
 
   // Reads every offer once at one instant; the generation moves when the listed offers or one of their
-  // observations change.
+  // observations change. Once started, a change re-signs at once, so the first query to see the old
+  // catalog stale is the only one: an offer that starts renewing never stalls the others until a tick.
   private observe(now: number) {
     if (this.stopped) return { members: [], states: [] };
     const states = this.offers.map((offer) => ({
@@ -112,6 +113,9 @@ export class SellerOfferSet implements ControlOffers {
     if (key !== this.key) {
       this.key = key;
       this.generation++;
+      const changed = this.running ? this.onAvailable : undefined;
+      // After the caller's own read; a refused re-sign is retried at the next change or tick.
+      if (changed) queueMicrotask(() => void changed().catch(() => {}));
     }
     return { members, states };
   }

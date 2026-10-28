@@ -11,7 +11,7 @@ import {
 } from '@gyblos/config';
 import { FreeSellerLedger } from '@gyblos/core/free-admission';
 import { publishRecord } from '@gyblos/discovery-http';
-import { P2P_ROLES } from '@gyblos/protocol/constants';
+import { CONTROL_CODES, P2P_ROLES } from '@gyblos/protocol/constants';
 import { ControlError } from '@gyblos/protocol/control-validation';
 import { saveJson } from '@gyblos/runtime';
 import { assertMemoryHeadroom, memorySnapshot } from '@gyblos/runtime/memory';
@@ -37,6 +37,14 @@ import {
 } from './seller-offers';
 import { loadSellerSettings, type SellerSettings } from './seller-settings';
 import { serveSellerTransport } from './seller-transport';
+
+// Refresh refusals that a later observation can clear.
+const TRANSIENT = new Set<string>([
+  CONTROL_CODES.STALE,
+  CONTROL_CODES.EXPIRED,
+  CONTROL_CODES.BUSY,
+  CONTROL_CODES.CANCELLED,
+]);
 
 // Private: each offer's latest warmup outcome, rewritten whole as { offers: [...] } in index order.
 function readinessDiagnostics() {
@@ -212,11 +220,12 @@ export async function startSeller() {
       disposers.push(() => publication.stop());
       publication.start();
     }
-    // A refresh refused by a concurrent change (STALE, EXPIRED) is retried at the next tick; it must not
+    // A refresh refused by a concurrent change is retried at the next change or tick; it must not
     // invalidate the offer whose tick ran it. Any other failure still does.
     offers.start(() =>
       control.records.refresh().catch((error: unknown) => {
-        if (!(error instanceof ControlError)) throw error;
+        if (!(error instanceof ControlError && TRANSIENT.has(error.code)))
+          throw error;
       }),
     );
     disposers.push(() => offers.stop());

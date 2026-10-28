@@ -228,3 +228,27 @@ void test('a live offer refuses an engine selection that is not its listed model
     /does not match/,
   );
 });
+
+void test('an offer that warms but cannot be served is dropped, not warmed again forever', async () => {
+  const run = plugins();
+  run.up.set(0, true);
+  const { pending } = await prepareSellerOffers(SETTINGS, dependencies(run));
+  run.up.set(1, true);
+  let adds = 0;
+  const retry = retrySellerOffers(pending, {
+    ...dependencies(run),
+    retryMs: 1,
+    add: async () => {
+      adds++;
+      throw new Error('refused');
+    },
+  });
+  try {
+    while (!adds) await new Promise((resolve) => setTimeout(resolve, 2));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.equal(adds, 1);
+    assert.deepEqual(retry.pending(), []);
+  } finally {
+    await retry.stop();
+  }
+});
