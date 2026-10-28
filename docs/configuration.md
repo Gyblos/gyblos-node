@@ -258,8 +258,8 @@ The `anthropic` plugin serves any model through the Anthropic Messages API (or a
 compatible one) with reasoning `["off"]`; no thinking is requested. Its URL is
 the API root without `/v1` (`https://api.anthropic.com`), on https or a literal
 loopback proxy; a URL with a `/v1` segment anywhere in its path is refused with
-`SELLER_OFFER_ENGINE_UNSUPPORTED`, as is a dot-only model name
-(`SELLER_OFFER_MODEL_UNSUPPORTED`). `api_key_env` is required
+`SELLER_OFFER_ENGINE_UNSUPPORTED`; a dot-only model name is refused with
+`SELLER_OFFER_MODEL_UNSUPPORTED`. `api_key_env` is required
 (`SELLER_OFFER_API_KEY_MISSING` without it) and the key is sent only as the
 `x-api-key` header to that URL. Usage is declared by the provider, input
 counting cached prompt tokens too (a translating proxy that already folds cached

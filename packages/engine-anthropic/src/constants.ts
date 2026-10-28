@@ -5,7 +5,7 @@ import { ENGINE_DONE_REASONS } from '@gyblos/protocol/constants';
 
 // Relative to the offer's base URL, which is the API root (https://api.anthropic.com); a base that
 // already has a version segment would double it.
-export const ANTHROPIC_VERSION_SEGMENT = /(^|\/)v1(\/|$)/;
+export const ANTHROPIC_VERSION_SEGMENT = /(^|\/)v1(\/|$)/i;
 export const ANTHROPIC_ROUTES = {
   messages: 'v1/messages',
   model: 'v1/models/',

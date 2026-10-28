@@ -336,30 +336,28 @@ void test('engine-anthropic refuses output limits outside the request bounds bef
   }));
 
 void test('engine-anthropic: the usual low-credit 400 is quota exhaustion, other 400s are not', async () => {
-  const lowCredit: Messages = (response) => {
-    response.writeHead(400, HEADERS).end(
-      JSON.stringify({
-        type: 'error',
-        error: {
-          type: 'invalid_request_error',
-          message:
-            'Your credit balance is too low to access the Anthropic API. UPSTREAM-SECRET-MARKER',
-        },
-      }),
-    );
-  };
-  await withServer(lowCredit, async (server) => {
-    assert.equal(
-      await code(engineAt(server.base)),
+  const invalid =
+    (message: string): Messages =>
+    (response) => {
+      response.writeHead(400, HEADERS).end(
+        JSON.stringify({
+          type: 'error',
+          error: { type: 'invalid_request_error', message },
+        }),
+      );
+    };
+  for (const [message, expected] of [
+    [
+      'Your credit balance is too low to access the Anthropic API. UPSTREAM-SECRET-MARKER',
       ENGINE_ERROR_CODES.QUOTA_EXHAUSTED,
-    );
-  });
-  await withServer(refused(400, 'invalid_request_error'), async (server) => {
-    assert.equal(
-      await code(engineAt(server.base)),
-      ENGINE_ERROR_CODES.UNAVAILABLE,
-    );
-  });
+    ],
+    // Matched only near the start of the message.
+    [`${'x'.repeat(512)} credit balance`, ENGINE_ERROR_CODES.UNAVAILABLE],
+    ['UPSTREAM-SECRET-MARKER', ENGINE_ERROR_CODES.UNAVAILABLE],
+  ] as const)
+    await withServer(invalid(message), async (server) => {
+      assert.equal(await code(engineAt(server.base)), expected);
+    });
 });
 
 void test('engine-anthropic: a model window smaller than configured ends as a length stop', () =>

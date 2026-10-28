@@ -58,6 +58,7 @@ void test('anthropic serves https or a literal loopback proxy at the API root, w
     'https://api.anthropic.example?',
     'https://api.anthropic.example/v1/messages',
     'https://proxy.example/v1/anthropic',
+    'https://proxy.example/V1/anthropic',
   ])
     assert.equal(
       engineOfferRefusal(withUrl(url)),
@@ -68,6 +69,15 @@ void test('anthropic serves https or a literal loopback proxy at the API root, w
   assert.equal(
     engineOfferRefusal({ ...OFFER, engine: keyless }),
     NODE_ERROR_CODES.SELLER_OFFER_API_KEY_MISSING,
+  );
+  const { upstreamModel: _named, ...unnamed } = OFFER.engine;
+  assert.equal(
+    engineOfferRefusal({
+      ...OFFER,
+      model: { kind: MODEL_CLASSIFICATIONS.CUSTOM, id: '..' },
+      engine: unnamed,
+    }),
+    NODE_ERROR_CODES.SELLER_OFFER_MODEL_UNSUPPORTED,
   );
   for (const upstreamModel of ['.', '..'])
     assert.equal(
