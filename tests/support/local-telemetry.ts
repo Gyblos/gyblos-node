@@ -5,9 +5,20 @@ export function localTelemetry() {
   const events: TelemetryEvent[] = [];
   let now = 1700000000000;
   const sink: TelemetrySink = {
-    emit(event) { events.push(event); },
+    emit(event) {
+      events.push(event);
+    },
     async flush() {},
-    async close() { return {emitted:events.length, dropped:0, failed:false}; },
+    async close() {
+      return { emitted: events.length, dropped: 0, failed: false };
+    },
   };
-  return {sink, events, now:()=>now, advance:(value:number)=>{now+=value;}};
+  return {
+    sink,
+    events,
+    now: () => now,
+    advance: (value: number) => {
+      now += value;
+    },
+  };
 }

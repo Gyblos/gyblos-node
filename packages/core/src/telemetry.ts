@@ -1,6 +1,7 @@
 // Projects content-free events and isolates sink failures; no clock, filesystem or plugin dependencies.
 import {
   CONTROL_LIMITS,
+  CONTROL_METERING_MODES,
   ENGINE_DONE_REASONS,
   ENGINE_KINDS,
   FREE_EXECUTION_CODES,
@@ -70,19 +71,26 @@ export function toTelemetryRecord(event: TelemetryEvent): object {
   const requestId = nullable(telemetryField(event, 'requestId'), (value) =>
     controlHex(value, CONTROL_LIMITS.requestIdBytes),
   );
-  if (
-    type === TELEMETRY_EVENTS.UNSERVED
-      ? sellerNodeId !== null || engineKind !== null || requestId !== null
-      : requestId === null ||
-        (type !== TELEMETRY_EVENTS.REFUSED &&
-          (sellerNodeId === null || engineKind === null))
-  )
-    return controlFail();
-  if ((sellerNodeId === null) !== (engineKind === null)) return controlFail();
+  const role = member(telemetryField(event, 'role'), P2P_ROLES);
+  if (type === TELEMETRY_EVENTS.UNSERVED) {
+    if (sellerNodeId !== null || engineKind !== null || requestId !== null)
+      return controlFail();
+  } else {
+    if (requestId === null || (sellerNodeId === null && engineKind !== null))
+      return controlFail();
+    if (type !== TELEMETRY_EVENTS.REFUSED && sellerNodeId === null)
+      return controlFail();
+    if (
+      role === P2P_ROLES.SELLER &&
+      sellerNodeId !== null &&
+      engineKind === null
+    )
+      return controlFail();
+  }
   const common = {
     type,
     at: controlInteger(telemetryField(event, 'at')),
-    role: member(telemetryField(event, 'role'), P2P_ROLES),
+    role,
     requestId,
     buyerNodeId: controlHex(telemetryField(event, 'buyerNodeId')),
     sellerNodeId,
@@ -95,6 +103,14 @@ export function toTelemetryRecord(event: TelemetryEvent): object {
       ]),
     ),
     streaming: bool(telemetryField(event, 'streaming')),
+    ...(Object.hasOwn(event, 'meteringMode')
+      ? {
+          meteringMode: member(
+            telemetryField(event, 'meteringMode'),
+            CONTROL_METERING_MODES,
+          ),
+        }
+      : {}),
   };
   return { ...common, ...eventFields(event, type) };
 }
@@ -213,4 +229,9 @@ export function fanOut(sinks: readonly TelemetrySink[]): TelemetrySink {
   };
 }
 
-export { createExecutionTelemetry, emitTelemetry, telemetrySizes, type ExecutionTelemetryOptions } from './telemetry-execution';
+export {
+  createExecutionTelemetry,
+  emitTelemetry,
+  telemetrySizes,
+  type ExecutionTelemetryOptions,
+} from './telemetry-execution';

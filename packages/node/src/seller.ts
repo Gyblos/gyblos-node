@@ -13,6 +13,7 @@ import { FreeSellerLedger } from '@gyblos/core/free-admission';
 import { publishRecord } from '@gyblos/discovery-http';
 import { CONTROL_CODES, P2P_ROLES } from '@gyblos/protocol/constants';
 import { ControlError } from '@gyblos/protocol/control-validation';
+import type { TelemetrySink } from '@gyblos/protocol/telemetry';
 import { saveJson } from '@gyblos/runtime';
 import { assertMemoryHeadroom, memorySnapshot } from '@gyblos/runtime/memory';
 import { withDeadline } from '@gyblos/transport-iroh/deadline';
@@ -80,7 +81,7 @@ function offerStatus(settings: SellerSettings, offers: SellerOfferSet) {
   }));
 }
 
-export async function startSeller() {
+export async function startSeller(options: { telemetry?: TelemetrySink } = {}) {
   const startedAt = Date.now();
   const disposers: (() => Promise<void>)[] = [];
   const close = async () => {
@@ -182,6 +183,13 @@ export async function startSeller() {
       {
         control: control.service,
         free: createSellerFreeOffers(() => offers.all(), {
+          telemetry: options.telemetry
+            ? {
+                sink: options.telemetry,
+                engineKind: (index) =>
+                  settings.offers[index]!.engine.engine.kind,
+              }
+            : undefined,
           owner: owner.address,
           nodeId: config.nodeId,
           now: Date.now,

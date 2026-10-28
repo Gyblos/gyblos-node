@@ -2,6 +2,8 @@
 // and token caps), all on the seller's one ledger, behind the free router. An offer's service is built
 // once, so its caps survive while it is listed, unlisted and listed again.
 import type { FreeSellerLedger } from '@gyblos/core/free-admission';
+import type { EngineKind } from '@gyblos/protocol/constants';
+import type { TelemetrySink } from '@gyblos/protocol/telemetry';
 
 import { createSellerFreeExecution } from './free-execution';
 import {
@@ -12,6 +14,11 @@ import {
 import type { LiveSellerOffer } from './seller-offer-set';
 
 export interface SellerFreeOffersOptions {
+  telemetry?: {
+    sink: TelemetrySink;
+    engineKind: (index: number) => EngineKind;
+    now?: () => number;
+  };
   owner: string;
   nodeId: string;
   now: () => number;
@@ -32,6 +39,12 @@ export function createSellerFreeOffers(
       selection: live.selection,
       service: createSellerFreeExecution({
         ...options,
+        telemetry: options.telemetry
+          ? {
+              ...options.telemetry,
+              engineKind: options.telemetry.engineKind(live.index),
+            }
+          : undefined,
         offer: live.offer,
         selection: live.selection,
         model: live.model,

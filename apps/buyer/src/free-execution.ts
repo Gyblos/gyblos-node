@@ -1,16 +1,26 @@
 // Orchestrates free quote execution with failover only before possible prompt transmission.
 // Selection and I/O are injected; this module never authorizes payments or records content.
-import type { SignedOfferV2 } from '@gyblos/protocol/control-types';
+import type {
+  ModelSelection,
+  SignedOfferV2,
+} from '@gyblos/protocol/control-types';
 import {
   buildFreeExecutionRequest,
   type FreeExecutionBuildInput,
   type FreeExecutionRequest,
   type FreeExecutionResult,
 } from '@gyblos/protocol/free-execution';
+import type { TelemetrySink } from '@gyblos/protocol/telemetry';
 import { FreeClientError } from '@gyblos/transport-iroh/free-client';
 
 import { FREE_BUYER, FREE_BUYER_CODES } from './constants';
 import { FreeBuyerError } from './free-chat';
+import {
+  buyerExecutionTelemetry,
+  buyerUnserved,
+  completeBuyerTelemetry,
+  failBuyerTelemetry,
+} from './free-telemetry';
 import type { SelectionDecision } from './selection';
 
 export class FreeSelectionFailure extends Error {
@@ -23,11 +33,14 @@ export interface FreeWinner {
   nodeId: string;
   quote: SignedOfferV2;
 }
-import type { TelemetrySink } from '@gyblos/protocol/telemetry';
-import type { ModelSelection } from '@gyblos/protocol/control-types';
 
 export interface FreeBuyerDependencies {
-  telemetry?: {sink: TelemetrySink; buyerNodeId: string; selection: ModelSelection; now?: () => number};
+  telemetry?: {
+    sink: TelemetrySink;
+    buyerNodeId: string;
+    selection: ModelSelection;
+    now?: () => number;
+  };
   enter?(): () => void;
   select(
     excluded: ReadonlySet<string>,
@@ -54,12 +67,23 @@ export async function executeBuyerFree(
     ]);
     const excluded = new Set<string>();
     while (!signal.aborted) {
-      const winner = await dependencies.select(excluded, signal);
+      const winner = await dependencies
+        .select(excluded, signal)
+        .catch((error) => {
+          buyerUnserved(dependencies, Boolean(onDelta));
+          throw error;
+        });
       signal.throwIfAborted();
       if (excluded.has(winner.nodeId))
         throw new FreeBuyerError(FREE_BUYER_CODES.UNAVAILABLE);
       excluded.add(winner.nodeId);
       const request = buildFreeExecutionRequest(winner.quote, input);
+      const observer = buyerExecutionTelemetry(
+        request,
+        dependencies,
+        Boolean(onDelta),
+      );
+      observer?.received();
       let delivered = false;
       const emit = onDelta
         ? async (text: string) => {
@@ -67,6 +91,7 @@ export async function executeBuyerFree(
             delivered = true;
             await onDelta(text);
             signal.throwIfAborted();
+            if (text) observer?.firstToken();
           }
         : undefined;
       try {
@@ -77,8 +102,10 @@ export async function executeBuyerFree(
           emit,
         );
         signal.throwIfAborted();
+        completeBuyerTelemetry(observer, request, result);
         return result;
       } catch (error) {
+        failBuyerTelemetry(observer, error, signal, delivered);
         if (
           !(error instanceof FreeClientError) ||
           error.sent ||
