@@ -2,7 +2,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { settleDesktopStartup, startupHandoff } from '@gyblos/desktop/startup-window';
+import {
+  settleDesktopStartup,
+  startupHandoff,
+} from '@gyblos/desktop/startup-window';
 
 class WindowDouble {
   destroyed = false;
@@ -117,9 +120,14 @@ void test('fatal desktop startup waits for node process exit before propagating 
   let escaped = false;
   const pending = settleDesktopStartup(Promise.reject(failure), () => {
     closeStarted = true;
-    return new Promise<void>((resolve) => { completeClose = resolve; });
+    return new Promise<void>((resolve) => {
+      completeClose = resolve;
+    });
   });
-  const outcome = pending.catch((error: unknown) => { escaped = true; return error; });
+  const outcome = pending.catch((error: unknown) => {
+    escaped = true;
+    return error;
+  });
   await new Promise<void>((resolve) => setImmediate(resolve));
   assert.equal(closeStarted, true);
   assert.equal(escaped, false);
@@ -128,6 +136,8 @@ void test('fatal desktop startup waits for node process exit before propagating 
 });
 void test('successful desktop startup retains its resident node', async () => {
   let closed = false;
-  await settleDesktopStartup(Promise.resolve(), async () => { closed = true; });
+  await settleDesktopStartup(Promise.resolve(), async () => {
+    closed = true;
+  });
   assert.equal(closed, false);
 });

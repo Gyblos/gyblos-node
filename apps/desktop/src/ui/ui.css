@@ -864,11 +864,11 @@
   font-size: 10px;
 }
 .app-footer
-  .network-status[data-state='connected']
+  .network-status[data-state='ready']
   :is(.network-status-symbol, strong, .network-glyph) {
   color: var(--connected);
 }
-.app-footer .network-status[data-state='connected'] .network-status-dot {
+.app-footer .network-status[data-state='ready'] .network-status-dot {
   background: var(--connected);
 }
 .connection-location {
