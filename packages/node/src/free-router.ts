@@ -1,6 +1,6 @@
 // Routes each free request to the offer whose selection its signed quote names (exact canonical match);
 // a selection no offer serves is refused with UNSUPPORTED before signature checks or engine work. Each
-// offer's service still verifies the request in full.
+// offer's service still parses and verifies the request in full, as its own boundary.
 import { canonicalJson } from '@gyblos/protocol';
 import {
   FREE_EXECUTION,

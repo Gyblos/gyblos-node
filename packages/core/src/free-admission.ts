@@ -29,7 +29,7 @@ const utcDay = (now: number) =>
 export interface FreeLedgerTicket {
   // Uses the request id until its quote expires, whatever the offer's caps then decide.
   spend(): void;
-  // Counts the buyer for the day and holds the seller's generation slot until released.
+  // Once only: counts the buyer for the day and holds the seller's generation slot until released.
   start(): () => void;
 }
 
@@ -77,11 +77,16 @@ export class FreeSellerLedger {
     if (!this.buyers.has(peer) && this.buyers.size >= this.maxBuyers)
       return fail(FREE_EXECUTION_CODES.BUSY);
     const buyers = this.buyers;
+    let started = false;
     return {
       spend: () => {
         this.seen.set(key, quote.expiresAt);
       },
       start: () => {
+        // Admission is checked and spent synchronously; this guards a ticket used twice or held over.
+        if (started || this.active >= FREE_EXECUTION_ADMISSION.maxConcurrent)
+          return fail(FREE_EXECUTION_CODES.BUSY);
+        started = true;
         buyers.add(peer);
         this.active++;
         let released = false;
