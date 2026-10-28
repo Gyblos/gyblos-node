@@ -59,25 +59,24 @@ class EngineReadinessCheck {
     private readonly dependencies: ProbeDependencies,
   ) {}
   async run() {
+    const { policy } = this.dependencies;
+    if (!policy.warmup) return this.describeOnly();
     this.signal.throwIfAborted();
     this.before = await this.dependencies.snapshot();
     this.signal.throwIfAborted();
     this.reason = READINESS_REASONS.INSUFFICIENT_HEADROOM;
     this.assertHeadroom(this.before);
     this.reason = READINESS_REASONS.WARMUP_FAILED;
-    const { policy } = this.dependencies;
-    if (policy.warmup && !(policy.residencyMs > OFFER_LIFETIME_MS))
+    if (!(policy.residencyMs > OFFER_LIFETIME_MS))
       throw new Error('Offer lifetime exceeds warmed model residency.');
     const model = await this.engine.describe();
     this.signal.throwIfAborted();
-    if (policy.warmup) {
-      await this.engine.generate({
-        prompt: policy.warmup.prompt,
-        maxTokens: policy.warmup.maxTokens,
-        signal: this.signal,
-      });
-      this.signal.throwIfAborted();
-    }
+    await this.engine.generate({
+      prompt: policy.warmup.prompt,
+      maxTokens: policy.warmup.maxTokens,
+      signal: this.signal,
+    });
+    this.signal.throwIfAborted();
     const now = this.dependencies.now ?? Date.now;
     const offerExpiresAt = now() + OFFER_LIFETIME_MS;
     this.reason = READINESS_REASONS.MEMORY_OBSERVATION_FAILED;
@@ -96,7 +95,19 @@ class EngineReadinessCheck {
     assertReadinessCurrent(offerExpiresAt, now());
     return { model, offerExpiresAt };
   }
-  // A remote engine's memory is not this machine's; snapshots are still recorded.
+  // An engine paid per call: its model list is the whole check, and this machine's memory is not its own,
+  // so no snapshot is taken or recorded.
+  private async describeOnly() {
+    this.signal.throwIfAborted();
+    this.reason = READINESS_REASONS.WARMUP_FAILED;
+    const model = await this.engine.describe();
+    this.signal.throwIfAborted();
+    const now = this.dependencies.now ?? Date.now;
+    const offerExpiresAt = now() + OFFER_LIFETIME_MS;
+    assertReadinessCurrent(offerExpiresAt, now());
+    return { model, offerExpiresAt };
+  }
+  // A warmed engine on another machine still records this machine's snapshots without gating on them.
   private assertHeadroom(snapshot: MemorySnapshot) {
     if (this.dependencies.policy.localResources) assertMemoryHeadroom(snapshot);
   }

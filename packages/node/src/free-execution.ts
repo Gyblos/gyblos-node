@@ -9,6 +9,8 @@ import {
 } from '@gyblos/core/free-admission';
 import { canonicalJson } from '@gyblos/protocol';
 import {
+  CONTROL_METERING_MODES,
+  ENGINE_ERROR_CODES,
   ENGINE_ERROR_STOP_REASON,
   FREE_CHAT_ROLES,
   FREE_EXECUTION,
@@ -153,8 +155,11 @@ async function respond(
         onDelta,
       );
       if (!response.result) return fail(FREE_EXECUTION_CODES.INTERNAL);
-      actual =
-        response.result.usage.inputTokens + response.result.usage.outputTokens;
+      // A declared count never returns reserved tokens: the provider's word alone cannot stretch the caps.
+      if (options.meter.refunds)
+        actual =
+          response.result.usage.inputTokens +
+          response.result.usage.outputTokens;
       return response;
     } finally {
       lease.complete(actual);
@@ -286,16 +291,24 @@ async function generateResponse(
     output.usage,
     inputTokens,
   );
-  // The buyer's own bounds, so a declared count is refused here rather than by the buyer.
+  // The buyer's own bounds. A recounted count beyond them is a limit (admission already prevents it);
+  // an implausible or out-of-bounds declared count is the provider's invalid response.
   if (
-    !Number.isSafeInteger(usage.inputTokens) ||
+    !usage ||
     !Number.isSafeInteger(usage.outputTokens) ||
-    usage.inputTokens < 0 ||
     usage.outputTokens < 0 ||
     usage.outputTokens > request.input.maxTokens ||
     usage.inputTokens + usage.outputTokens > options.model.contextTokens
-  )
-    return fail(FREE_EXECUTION_CODES.LIMIT);
+  ) {
+    if (options.meter.mode === CONTROL_METERING_MODES.RECOUNTED)
+      return fail(FREE_EXECUTION_CODES.LIMIT);
+    return cannotContinue(
+      new EngineError(ENGINE_ERROR_CODES.INVALID_RESPONSE),
+      options.meter,
+      request.input.maxTokens,
+      streaming?.delivered(),
+    );
+  }
   return parseFreeExecutionResponse({
     ...header,
     result: { ...preliminary.result, usage },

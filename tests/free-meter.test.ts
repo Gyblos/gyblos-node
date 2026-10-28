@@ -1,15 +1,12 @@
 // How a free offer counts tokens: recounted with the model's public tokenizer exactly as before, or
-// declared by the engine's provider with byte bounds wherever the seller must decide before usage exists.
+// declared by the engine's provider within byte bounds, never refunded.
 // Pure; synthetic tokenizers and results.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { FREE_METERING } from '@gyblos/node/constants';
-import {
-  DECLARED_METER,
-  offerMeter,
-  recountedMeter,
-} from '@gyblos/node/free-meter';
+import { DECLARED_METER, recountedMeter } from '@gyblos/node/free-meter';
+import { offerMeter } from '@gyblos/node/seller-offers';
 import { CONTROL_METERING_MODES } from '@gyblos/protocol/constants';
 import type { EngineUsage } from '@gyblos/protocol/engine';
 
@@ -53,9 +50,12 @@ void test('a declared meter reserves the prompt’s UTF-8 bytes plus the chat te
   );
 });
 
-void test('a declared stream never counts more than one token before the provider reports usage', () => {
+void test('a declared stream counts the fewest tokens its bytes can hold', () => {
+  const per = FREE_METERING.declaredMaxTokenBytes;
   assert.equal(DECLARED_METER.streamed(''), 0);
-  assert.equal(DECLARED_METER.streamed('a long streamed answer'), 1);
+  assert.equal(DECLARED_METER.streamed('a'), 1);
+  assert.equal(DECLARED_METER.streamed('x'.repeat(per)), 1);
+  assert.equal(DECLARED_METER.streamed('x'.repeat(per + 1)), 2);
 });
 
 void test('a declared stop reports its delivered bytes, bounded by maxTokens', () => {
@@ -63,11 +63,32 @@ void test('a declared stop reports its delivered bytes, bounded by maxTokens', (
   assert.equal(DECLARED_METER.delivered('hello world', 4), 4);
 });
 
-void test('declared usage is the provider’s, not the seller’s estimate', () => {
+void test('declared usage is the provider’s when plausible for the text', () => {
   assert.deepEqual(DECLARED_METER.usage('answer', usage(9, 3), 70), {
     inputTokens: 9,
     outputTokens: 3,
   });
+  assert.deepEqual(DECLARED_METER.usage('', usage(9, 0), 70), {
+    inputTokens: 9,
+    outputTokens: 0,
+  });
+});
+
+void test('declared usage below the text’s floor or without input is not plausible', () => {
+  const per = FREE_METERING.declaredMaxTokenBytes;
+  for (const [text, reported] of [
+    ['answer', usage(9, 0)],
+    ['x'.repeat(per * 3 + 1), usage(9, 3)],
+    ['answer', usage(0, 3)],
+    ['answer', usage(Number.NaN, 3)],
+    ['answer', usage(9, 1.5)],
+  ] as const)
+    assert.equal(DECLARED_METER.usage(text, reported, 70), undefined);
+});
+
+void test('only a recounted completion may refund its reservation', () => {
+  assert.equal(recountedMeter(tokenizer).refunds, true);
+  assert.equal(DECLARED_METER.refunds, false);
 });
 
 void test('an offer’s meter follows its metering mode', async () => {

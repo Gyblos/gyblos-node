@@ -3,19 +3,24 @@
 // needs one ready offer; the others are warmed again in the background until they are ready or the seller
 // stops. Starts no process and binds no port; the seller runs its engines.
 import { SELLER_READINESS } from '@gyblos/config';
+import { CONTROL_METERING_MODES } from '@gyblos/protocol/constants';
 import type { EngineDescription } from '@gyblos/protocol/engine';
 import type { MemorySnapshot } from '@gyblos/runtime/memory';
 
 import { checkedControlOffer } from './control-offers';
 import { observeControlReadiness } from './control-readiness';
-import type { EngineDependencies, PreparedEngine } from './engine-factory';
+import type {
+  EngineDependencies,
+  OfferMetering,
+  PreparedEngine,
+} from './engine-factory';
 import {
   prepareSellerEngine,
   probeSellerEngine,
   type ReadinessRecord,
 } from './engine-readiness';
 import { createSellerEngine } from './engine-registry';
-import { offerMeter } from './free-meter';
+import { DECLARED_METER, recountedMeter, type FreeMeter } from './free-meter';
 import type { LiveSellerOffer } from './seller-offer-set';
 import type { SellerOfferSettings, SellerSettings } from './seller-settings';
 
@@ -76,6 +81,12 @@ export async function prepareSellerOffers(
   }
   if (!ready.length) throw failure;
   return { ready, pending };
+}
+
+export async function offerMeter(metering: OfferMetering): Promise<FreeMeter> {
+  return metering.mode === CONTROL_METERING_MODES.RECOUNTED
+    ? recountedMeter(await metering.tokenizer())
+    : DECLARED_METER;
 }
 
 // The warmed offer as the seller serves it: its readiness renews in the background once started.

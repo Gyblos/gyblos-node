@@ -136,7 +136,8 @@ however many digits it has.
     optional `api_key_env` and `upstream_model` (the name the engine expects).
     `openai` and `anthropic` engines also need `context_tokens`, the model's
     context size (1,024 to 2,000,000), because their APIs do not report it; an
-    `ollama` engine reports its own, so the daemon refuses the key there.
+    `ollama` engine reports its own, so the key is refused there
+    (`INVALID_VALUE`).
   - `reasoning`: non-empty list of distinct levels from `off`, `low`, `medium`,
     `high` (GYB-DOC-028). For a catalog model with verified levels (see
     [Reasoning levels per model](#reasoning-levels-per-model)) every listed

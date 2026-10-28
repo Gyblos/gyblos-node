@@ -44,6 +44,7 @@ export type EngineReadinessPolicy =
     }
   | { warmup: null; localResources: false };
 
+// The policy the remote engine plugins (openai, anthropic) give an engine outside this machine.
 export const REMOTE_READINESS = {
   warmup: null,
   localResources: false,

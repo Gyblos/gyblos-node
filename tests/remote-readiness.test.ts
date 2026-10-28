@@ -1,10 +1,11 @@
 // A remote engine the seller pays per call is ready when it describes its model: readiness and renewals
-// never generate, and this machine's memory does not gate it. Synthetic engines and memory snapshots; no
+// never generate, and this machine's memory is not read. Synthetic engines and memory snapshots; no
 // network or processes.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { OFFER_LIFETIME_MS } from '@gyblos/core/constants';
+import { observeControlReadiness } from '@gyblos/node/control-readiness';
 import {
   REMOTE_READINESS,
   type PreparedEngine,
@@ -28,13 +29,6 @@ import type { Engine } from '@gyblos/protocol/engine';
 import type { MemorySnapshot } from '@gyblos/runtime/memory';
 
 const NOW = 1_000_000;
-// No headroom at all: a local engine would be refused.
-const EXHAUSTED: MemorySnapshot = {
-  source: 'linux-memavailable',
-  vmAvailableBytes: 1,
-  cgroup: null,
-};
-
 function remoteEngine() {
   const calls = { describe: 0, generate: 0 };
   const engine: Engine = {
@@ -57,17 +51,46 @@ function remoteEngine() {
   return { engine, calls };
 }
 
-void test('a remote engine is ready once described, without generating or a memory gate', async () => {
+// Memory that cannot be observed at all, as on a host without cgroup memory files.
+const UNOBSERVABLE = async (): Promise<MemorySnapshot> => {
+  throw new Error('memory not observable');
+};
+
+void test('a remote engine is ready once described, without generating or reading memory', async () => {
   const { engine, calls } = remoteEngine();
   const ready = await probeSellerEngine(engine, new AbortController().signal, {
     policy: REMOTE_READINESS,
-    snapshot: async () => EXHAUSTED,
+    snapshot: UNOBSERVABLE,
     now: () => NOW,
   });
   assert.deepEqual(ready, {
     model: { name: 'acme-chat', contextTokens: 131_072 },
     offerExpiresAt: NOW + OFFER_LIFETIME_MS,
   });
+  assert.deepEqual(calls, { describe: 1, generate: 0 });
+});
+
+void test('a remote engine renews readiness by describing its model again, never generating', async () => {
+  const { engine, calls } = remoteEngine();
+  const model = { name: 'acme-chat', contextTokens: 131_072 };
+  let now = NOW;
+  const observation = observeControlReadiness(
+    engine,
+    NOW + OFFER_LIFETIME_MS,
+    () => now,
+    {
+      model,
+      check: (signal) =>
+        probeSellerEngine(engine, signal, {
+          policy: REMOTE_READINESS,
+          snapshot: UNOBSERVABLE,
+          now: () => now,
+        }),
+    },
+  );
+  now = NOW + OFFER_LIFETIME_MS - 1;
+  assert.equal(await observation.tick(), true);
+  assert.equal(observation.readiness().validUntil, now + OFFER_LIFETIME_MS);
   assert.deepEqual(calls, { describe: 1, generate: 0 });
 });
 
@@ -96,7 +119,7 @@ void test('a remote offer is prepared and served with declared metering, never g
   const dependencies = {
     fetch: globalThis.fetch,
     environment: {},
-    snapshot: async () => EXHAUSTED,
+    snapshot: UNOBSERVABLE,
     record: async () => {},
     create: () => prepared,
     now: () => NOW,

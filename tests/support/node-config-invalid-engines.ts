@@ -1,4 +1,5 @@
-// Invalid gyblos.toml engine fixtures: the context size remote engine kinds require. Test data only;
+// Invalid gyblos.toml engine fixtures: the context size remote engine kinds require and
+// Ollama refuses. Test data only;
 // spread into INVALID_FIXTURES.
 import { BASE, offer } from './node-config-fixtures';
 import type { InvalidConfigFixture } from './node-config-invalid';
@@ -55,6 +56,17 @@ export const ENGINE_FIXTURES: readonly InvalidConfigFixture[] = [
           '{ kind = "openai", url = "https://api.example.com/v1", context_tokens = 131072.0 }',
       }),
     code: 'WRONG_TYPE',
+    path: 'offers[0].engine.context_tokens',
+  },
+  {
+    name: 'context size on an ollama engine',
+    toml:
+      BASE +
+      offer({
+        engine:
+          '{ kind = "ollama", url = "http://127.0.0.1:11434", context_tokens = 4096 }',
+      }),
+    code: 'INVALID_VALUE',
     path: 'offers[0].engine.context_tokens',
   },
 ];

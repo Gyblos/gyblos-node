@@ -284,6 +284,11 @@
       "then": {
         "required": ["context_tokens"]
       },
+      "else": {
+        "not": {
+          "required": ["context_tokens"]
+        }
+      },
       "properties": {
         "kind": {
           "description": "API shape of the engine.",
@@ -312,7 +317,7 @@
           "type": "integer",
           "minimum": 1024,
           "maximum": 2000000,
-          "description": "The model's context size in tokens; required for openai and anthropic engines, whose APIs do not report it."
+          "description": "The model's context size in tokens; required for openai and anthropic engines, whose APIs do not report it; not allowed for ollama, which reports its own."
         }
       }
     },

@@ -97,16 +97,6 @@ void test('an ollama offer may use any literal loopback URL; names, paths and ke
       ),
     0,
   );
-  // Ollama reports its own context; a configured size is for remote engines.
-  rejects(
-    NODE_ERROR_CODES.SELLER_OFFER_ENGINE_UNSUPPORTED,
-    () =>
-      sellerSettings(
-        engineOf('http://127.0.0.1:11434/', ', context_tokens = 4096'),
-        {},
-      ),
-    0,
-  );
   rejects(
     NODE_ERROR_CODES.SELLER_OFFER_ENGINE_UNSUPPORTED,
     () =>

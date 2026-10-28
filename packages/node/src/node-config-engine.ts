@@ -63,11 +63,15 @@ export function offerEngine(
   unknownKeys(engine, path, ENGINE_KEYS, issues);
   if (!issues.cleanSince(mark) || kind === undefined || url === undefined)
     return undefined;
-  if (kind !== ENGINE_KINDS.OLLAMA && contextTokens === undefined)
-    return issues.add(NODE_CONFIG_ISSUE_CODES.MISSING_KEY, [
-      ...path,
-      'context_tokens',
-    ]);
+  const local = kind === ENGINE_KINDS.OLLAMA;
+  // Ollama reports its own context size; remote APIs do not.
+  if (local !== (contextTokens === undefined))
+    return issues.add(
+      local
+        ? NODE_CONFIG_ISSUE_CODES.INVALID_VALUE
+        : NODE_CONFIG_ISSUE_CODES.MISSING_KEY,
+      [...path, 'context_tokens'],
+    );
   return withoutUndefined({
     kind,
     url,

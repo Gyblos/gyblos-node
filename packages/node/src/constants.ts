@@ -119,8 +119,13 @@ export type OfferCurrency =
 export const DOCKER_HOST_ALIAS = 'host.docker.internal';
 
 // Declared metering reserves a prompt's UTF-8 bytes (never fewer than its tokens) plus room for the
-// provider's chat template, which the seller cannot see.
-export const FREE_METERING = { declaredTemplateTokens: 64 } as const;
+// provider's chat template, which the seller cannot see. A provider that counts more input than that is
+// not charged the difference. No token is assumed longer than maxTokenBytes, so text of that many bytes
+// per token is a floor the provider's output count must reach and a bound a stream must stay within.
+export const FREE_METERING = {
+  declaredTemplateTokens: 64,
+  declaredMaxTokenBytes: 32,
+} as const;
 
 export const NODE_CONFIG_LIMITS = {
   fileBytes: 64 * 1024,
