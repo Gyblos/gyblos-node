@@ -319,11 +319,15 @@ export const GATE_HOST_MESSAGES = {
 
 export const GATE_PORTS = {
   seller: 4021,
+  // The lab gates' own Ollama; the seller daemon never starts one.
+  ollama: 11436,
   ollamaSetup: 11437,
 } as const;
 
 export const GATE_HOSTS = {
   seller: `http://${LOCALHOST}:${GATE_PORTS.seller}`,
+  ollama: `http://${LOCALHOST}:${GATE_PORTS.ollama}`,
+  ollamaBind: `${LOCALHOST}:${GATE_PORTS.ollama}`,
   ollamaSetup: `http://${LOCALHOST}:${GATE_PORTS.ollamaSetup}`,
   ollamaSetupBind: `${LOCALHOST}:${GATE_PORTS.ollamaSetup}`,
 } as const;

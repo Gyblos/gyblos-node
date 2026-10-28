@@ -6,7 +6,6 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { HOSTS } from '@gyblos/config';
 import { READINESS_GENERATION } from '@gyblos/engine-ollama/constants';
 import { MODEL } from '@gyblos/engine-ollama/model';
 import { NODE_ERROR_CODES } from '@gyblos/node/constants';
@@ -36,6 +35,8 @@ import {
   REPOSITORY_ROOT,
 } from './support/node-config-fixtures';
 
+// Any literal loopback URL; the seller runs Ollama there itself.
+const ENGINE_URL = 'http://127.0.0.1:11434';
 const SERVED: SellerEngineOffer = {
   index: 0,
   model: {
@@ -43,7 +44,7 @@ const SERVED: SellerEngineOffer = {
     id: 'qwen3-0.6b',
     requested: 'qwen3:0.6b',
   },
-  engine: { kind: ENGINE_KINDS.OLLAMA, url: HOSTS.ollama },
+  engine: { kind: ENGINE_KINDS.OLLAMA, url: ENGINE_URL },
   reasoning: [REASONING_LEVELS.OFF],
 };
 const OTHER_MODEL = {
@@ -51,7 +52,10 @@ const OTHER_MODEL = {
   id: 'gpt-oss-20b',
   requested: 'gpt-oss-20b',
 } as const;
-const OTHER_ENGINE = { kind: ENGINE_KINDS.OLLAMA, url: 'http://127.0.0.1:1' };
+const OTHER_ENGINE = {
+  kind: ENGINE_KINDS.OLLAMA,
+  url: 'http://localhost:11434',
+};
 
 void test('the registry names exactly the engines the seller can serve today', () => {
   assert.deepEqual(Object.keys(ENGINE_REGISTRY), [ENGINE_KINDS.OLLAMA]);
@@ -120,10 +124,10 @@ void test('creating the ollama engine does no I/O and carries its selection, met
     },
     residencyMs: READINESS_GENERATION.residencyMs,
   });
-  // The injected fetch is the engine's transport, at the served engine URL.
+  // The injected fetch is the engine's transport, at the offer's engine URL.
   await assert.rejects(prepared.engine.describe());
   assert.ok(requests.length > 0);
-  assert.ok(requests.every((url) => url.startsWith(HOSTS.ollama)));
+  assert.ok(requests.every((url) => url.startsWith(ENGINE_URL)));
 });
 
 void test('seller settings carry the engine offer the registry accepted', () => {

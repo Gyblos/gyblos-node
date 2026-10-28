@@ -47,9 +47,7 @@ export const DOCTOR_CHECKS = {
   KEYS: 'keys',
   SEQUENCE: 'sequence',
   TOKENIZER: 'tokenizer',
-  OLLAMA: 'ollama',
-  MODEL: 'model',
-  PORTS: 'ports',
+  ENGINE: 'engine',
   RELAYS: 'relays',
 } as const;
 export type DoctorCheckName =
@@ -64,9 +62,6 @@ export const DOCTOR_CODES = {
   KEY_PERMISSIONS: 'KEY_PERMISSIONS',
   SEQUENCE_LOCK_PRESENT: 'SEQUENCE_LOCK_PRESENT',
   TOKENIZER_UNAVAILABLE: 'TOKENIZER_UNAVAILABLE',
-  OLLAMA_NOT_FOUND: 'OLLAMA_NOT_FOUND',
-  MODEL_NOT_DOWNLOADED: 'MODEL_NOT_DOWNLOADED',
-  PORT_IN_USE: 'PORT_IN_USE',
   NOT_CHECKED: 'NOT_CHECKED',
   CHECK_FAILED: 'DOCTOR_CHECK_FAILED',
 } as const;

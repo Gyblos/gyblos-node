@@ -31,7 +31,6 @@ export const ROLE_FILES = {
   nodeKey: 'node.key',
   trust: 'trust.json',
   status: 'status.json',
-  traces: 'traces.json',
   telemetry: 'telemetry',
   metrics: 'transport.jsonl',
   measurements: 'measurements.jsonl',
@@ -112,22 +111,6 @@ export function homeLayout(environment: HomeEnvironment) {
 }
 
 export type HomeLayout = ReturnType<typeof homeLayout>;
-
-// Where Ollama keeps a library model's manifest inside the managed models directory (Ollama's layout).
-export function ollamaModelManifest(
-  environment: HomeEnvironment,
-  model: string,
-  tag: string,
-) {
-  return join(
-    homeLayout(environment).artifacts.ollamaModels,
-    'manifests',
-    'registry.ollama.ai',
-    'library',
-    model,
-    tag,
-  );
-}
 
 export function rolePathIn(
   environment: HomeEnvironment,

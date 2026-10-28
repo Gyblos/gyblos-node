@@ -1,20 +1,16 @@
 // Read-only preflight for the seller daemon: the checks `pnpm node:start` would fail on, without starting,
 // spawning or writing anything. Results carry static codes only; the RPC URL, relay token, key contents and
-// home location never leave this module. Network use is limited to loopback port probes.
-import { constants } from 'node:fs';
-import { access, stat } from 'node:fs/promises';
-import { delimiter, join, resolve } from 'node:path';
+// home location never leave this module. Network use is limited to describing the offer's loopback engine.
+import { resolve } from 'node:path';
 
 import {
   NODE_ENVIRONMENT,
-  ollamaModelManifest,
   ROLE_FILES,
   ROLE_KEY_FILES,
   type HomeEnvironment,
 } from '@gyblos/config';
-import { MODEL } from '@gyblos/engine-ollama/model';
-import { P2P_ROLES } from '@gyblos/protocol/constants';
-import { assertPortFree } from '@gyblos/runtime';
+import { P2P_ROLES, type EngineErrorCode } from '@gyblos/protocol/constants';
+import { EngineError } from '@gyblos/protocol/engine';
 import type { RelayConfigurationCode } from '@gyblos/transport-iroh/constants';
 import {
   RelayConfigurationError,
@@ -34,26 +30,24 @@ import {
   type DoctorStatus,
   type NodeErrorCode,
 } from './constants';
+import { createSellerEngine } from './engine-registry';
 import { NodeError } from './errors';
-import {
-  assertOllamaModelsHome,
-  assertRoleHome,
-  assertTokenizerHome,
-} from './home';
+import { assertRoleHome, assertTokenizerHome } from './home';
 import { readNodeConfigFile, type NodeConfig } from './node-config';
 import type { NodeConfigIssue } from './node-config-fields';
 import type { SellerLimits } from './node-config-limits';
 import { inspectSellerSequence } from './public-sequence';
 import { loadRole, roleKeyFilesStatus } from './roles';
-import { SERVED_ENGINE_PROBE, type FreeSellerOffer } from './seller-offer';
+import type { FreeSellerOffer } from './seller-offer';
 import {
   sellerBaseSettings,
   sellerSettings,
   type SellerBaseSettings,
+  type SellerSettings,
 } from './seller-settings';
 
 export type DoctorResultCode =
-  DoctorCode | NodeErrorCode | RelayConfigurationCode;
+  DoctorCode | NodeErrorCode | RelayConfigurationCode | EngineErrorCode;
 export interface DoctorCheck {
   check: DoctorCheckName;
   status: DoctorStatus;
@@ -71,8 +65,6 @@ export interface DoctorReport {
   limits: SellerLimits | undefined;
 }
 export interface DoctorProbes {
-  // True when nothing answers on the loopback URL, as startup requires.
-  portFree?: (url: string) => Promise<boolean>;
   // Throws when the pinned tokenizer files are absent or do not match their hashes.
   tokenizer?: (environment: HomeEnvironment) => Promise<unknown>;
 }
@@ -95,15 +87,6 @@ const errorCode = (error: unknown): DoctorResultCode =>
   error instanceof NodeError || error instanceof RelayConfigurationError
     ? error.code
     : DOCTOR_CODES.CHECK_FAILED;
-
-async function defaultPortFree(url: string) {
-  try {
-    await assertPortFree(url);
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 // Exactly seller startup's file choice: GYBLOS_CONFIG must exist; without ./gyblos.toml the settings fail
 // with SELLER_OFFERS_MISSING, as startup does.
@@ -148,7 +131,6 @@ async function configCheck(options: DoctorOptions) {
 async function homeCheck(environment: HomeEnvironment): Promise<Result> {
   try {
     await assertRoleHome(P2P_ROLES.SELLER, environment);
-    await assertOllamaModelsHome(environment);
     await assertTokenizerHome(environment);
     return OK;
   } catch (error) {
@@ -220,42 +202,26 @@ async function tokenizerCheck(options: DoctorOptions): Promise<Result> {
   }
 }
 
-// Startup spawns `ollama` from PATH; look for an executable file without running it.
-async function ollamaCheck(environment: HomeEnvironment): Promise<Result> {
-  const names =
-    process.platform === 'win32' ? ['ollama.exe', 'ollama'] : ['ollama'];
-  const directories = (environment.PATH ?? '').split(delimiter).filter(Boolean);
-  for (const directory of directories)
-    for (const name of names) {
-      const path = join(directory, name);
-      try {
-        await access(path, constants.X_OK);
-        if ((await stat(path)).isFile()) return OK;
-      } catch {
-        // Try the next PATH entry.
-      }
-    }
-  return fail(DOCTOR_CODES.OLLAMA_NOT_FOUND);
-}
-
-// Startup points Ollama at this directory and never pulls, so an absent manifest fails warmup.
-async function modelCheck(environment: HomeEnvironment): Promise<Result> {
-  const [name, tag] = MODEL.name.split(':');
-  try {
-    await access(ollamaModelManifest(environment, name!, tag!));
-    return OK;
-  } catch {
-    return fail(DOCTOR_CODES.MODEL_NOT_DOWNLOADED);
-  }
-}
-
-// The only loopback port startup binds: its managed Ollama.
-async function portsCheck(
-  portFree: (url: string) => Promise<boolean>,
+// Describes the offer's engine the way warmup starts: for Ollama, the model list and pinned digest at the
+// offer URL, within the adapter's own deadline (ENGINE_TIMEOUT). Never generates.
+async function engineCheck(
+  settings: SellerSettings,
+  environment: HomeEnvironment,
 ): Promise<Result> {
-  return (await portFree(SERVED_ENGINE_PROBE))
-    ? OK
-    : fail(DOCTOR_CODES.PORT_IN_USE);
+  const { engineOffer } = settings;
+  try {
+    const { engine } = createSellerEngine(engineOffer, {
+      fetch: globalThis.fetch,
+      environment,
+    });
+    await engine.describe();
+    return OK;
+  } catch (error) {
+    return {
+      ...fail(error instanceof EngineError ? error.code : errorCode(error)),
+      offer: engineOffer.index,
+    };
+  }
 }
 
 function relaysCheck(settings: SellerBaseSettings): Result {
@@ -283,11 +249,11 @@ export async function sellerDoctor(
   add(DOCTOR_CHECKS.KEYS, role.keys ?? notChecked);
   add(DOCTOR_CHECKS.SEQUENCE, role.sequence ?? notChecked);
   add(DOCTOR_CHECKS.TOKENIZER, await tokenizerCheck(options));
-  add(DOCTOR_CHECKS.OLLAMA, await ollamaCheck(environment));
-  add(DOCTOR_CHECKS.MODEL, await modelCheck(environment));
   add(
-    DOCTOR_CHECKS.PORTS,
-    await portsCheck(options.probes?.portFree ?? defaultPortFree),
+    DOCTOR_CHECKS.ENGINE,
+    config.settings
+      ? await engineCheck(config.settings, environment)
+      : notChecked,
   );
   add(
     DOCTOR_CHECKS.RELAYS,

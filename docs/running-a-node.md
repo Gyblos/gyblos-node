@@ -15,7 +15,7 @@ without sharing keys or journals:
 | `<home>/buyer/`                   | Buyer keys, role, trust, offer copy, journals, lock, calls. |
 | `<home>/seller/`                  | Seller keys, role, status, readiness, public sequence.      |
 | `<home>/artifacts/tokenizer/`     | Pinned public tokenizer (re-downloadable).                  |
-| `<home>/artifacts/ollama-models/` | Pinned Ollama model layers (re-downloadable).               |
+| `<home>/artifacts/ollama-models/` | Lab-only cache of the pinned model for the `gate:*` Ollama. |
 
 Lab state (`gate:*`, identity tools) lives in a separate `GYBLOS_LAB_HOME`
 (default `.local/lab`). The lab shares `<home>/artifacts/` as a public cache
@@ -133,8 +133,11 @@ never overwrites existing keys; a mismatched existing role stops with an error.
 ```sh
 export GYBLOS_RELAY_TOKEN=...    # private; 32-512 printable characters
 pnpm node:setup --role seller --mint MINT --buyer BUYER_ADDRESS --pay-to PAYOUT_ADDRESS
-pnpm gate:inference:setup        # pinned Qwen3 0.6B model and tokenizer (lab command for now)
-cp examples/seller-daemon.toml gyblos.toml   # one free offer; edit the caps
+pnpm gate:inference:setup        # pinned tokenizer (lab command for now; also caches the model for the lab)
+# A dedicated Ollama, used only for selling, on loopback; leave it running in its own terminal:
+OLLAMA_HOST=127.0.0.1:11435 OLLAMA_MODELS=$HOME/.gyblos-ollama OLLAMA_NO_CLOUD=1 OLLAMA_NUM_PARALLEL=1 OLLAMA_MAX_LOADED_MODELS=1 ollama serve
+OLLAMA_HOST=127.0.0.1:11435 ollama pull qwen3:0.6b   # the pinned model
+cp examples/seller-daemon.toml gyblos.toml   # one free offer at http://127.0.0.1:11435/; edit the caps
 pnpm gyblos doctor               # read-only preflight; prints the public NodeId and owner
 pnpm node:start
 ```
@@ -145,8 +148,21 @@ pnpm node:start
   (`SELLER_PAID_EXECUTION_UNAVAILABLE`); the v1 paid path remains in the lab
   gates only. `node:setup` still asks for `--buyer` and `--pay-to`, which free
   selling does not use.
-- Startup starts a private Ollama on loopback port 11436, checks memory
-  headroom, runs one private warmup and only then signs its public records.
+- The seller runs its own Ollama; the daemon never starts it. Startup checks
+  memory headroom, runs one private warmup at the offer's engine URL (a literal
+  loopback address) and only then signs its public records.
+- Use a dedicated Ollama for selling, with its own models directory
+  (`OLLAMA_MODELS`) so the Ollama app cannot remove or replace the model. A
+  shared one (the Ollama app, or other tools using the same instance) can evict
+  the pinned model or slow it down, which shows up to buyers as `ENGINE_TIMEOUT`
+  or a withdrawn offer. Never expose it to the network (`OLLAMA_HOST=0.0.0.0` or
+  the app's "Expose Ollama to the network" setting): Ollama has no
+  authentication, and anyone who can reach it could replace or delete the model.
+  The seller trusts whatever answers on the offer URL, so run it on a machine
+  where only you can bind local ports.
+- `gyblos doctor` reports `ENGINE_UNAVAILABLE` both when Ollama is stopped and
+  when the pulled model's digest differs from the pinned one; `ollama list` must
+  show ID `7df6b6e09427` for `qwen3:0.6b`.
 - The `gyblos/control/1` ALPN serves signed catalog, presence and quote queries;
   the free channels serve execution. Stop with Ctrl-C (not Ctrl-Z, which only
   suspends the process). Stopping withdraws from discovery and saves the public
@@ -291,9 +307,9 @@ These variables can also be written in a `gyblos.toml` file, checked with
   `.local/gyblos`).
 - `GYBLOS_RPC_URL`: devnet RPC; the genesis hash is checked before use.
 - `GYBLOS_P2P_RUN_ID`: optional label copied into `status.json` and evidence.
-- Ports: buyer proxy 4031 and the seller's Ollama 11436 (loopback only). The
-  lab's paid gates also use 4032 and 4022. Stop any lab runs (`gate:*`) before
-  starting a seller.
+- Ports: buyer proxy 4031 and the seller's Ollama at its offer URL (loopback
+  only). The lab gates run their own Ollama on 11436 and the paid gates also use
+  4032 and 4022.
 
 Facilitator diagnostics are written only by the lab's paid gates; see
 [payments.md](payments.md).

@@ -8,7 +8,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { HOSTS } from '@gyblos/config';
 import { NODE_ERROR_CODES } from '@gyblos/node/constants';
 import { NodeError } from '@gyblos/node/errors';
 import { parseNodeConfig, type NodeConfig } from '@gyblos/node/node-config';
@@ -27,7 +26,8 @@ import {
   offer,
 } from './support/node-config-fixtures';
 
-const MANAGED = `{ kind = "ollama", url = "${HOSTS.ollama}" }`;
+const ENGINE_URL = 'http://127.0.0.1:11436';
+const MANAGED = `{ kind = "ollama", url = "${ENGINE_URL}" }`;
 const FREE = 'free = { daily_token_cap = 200000, per_buyer_cap = 5000 }';
 const POC_PRICE =
   'price = { input_per_mtok = "1", output_per_mtok = "2", currency = "USDC" }';
@@ -159,7 +159,7 @@ void test('offers the daemon cannot serve fail closed with a static code', () =>
       sellerSettings(
         served({
           pricing: FREE,
-          engine: '{ kind = "ollama", url = "http://127.0.0.1:11434" }',
+          engine: '{ kind = "ollama", url = "http://localhost:11434" }',
         }),
         {},
       ),
@@ -171,7 +171,7 @@ void test('offers the daemon cannot serve fail closed with a static code', () =>
       sellerSettings(
         served({
           pricing: FREE,
-          engine: `{ kind = "ollama", url = "${HOSTS.ollama}", upstream_model = "qwen3:8b" }`,
+          engine: `{ kind = "ollama", url = "${ENGINE_URL}", upstream_model = "qwen3:8b" }`,
         }),
         {},
       ),

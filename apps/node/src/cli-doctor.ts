@@ -11,7 +11,7 @@ import {
   type DoctorProbes,
   type DoctorResultCode,
 } from '@gyblos/node/seller-doctor';
-import { SERVED_ENGINE_PROBE } from '@gyblos/node/seller-offer';
+import { ENGINE_ERROR_CODES } from '@gyblos/protocol/constants';
 import { RELAY_CONFIGURATION_CODES } from '@gyblos/transport-iroh/constants';
 
 import { issueLine, urlOrigin } from './cli-format';
@@ -34,9 +34,10 @@ const HINTS: Readonly<Partial<Record<DoctorResultCode, string>>> = {
   [NODE_ERROR_CODES.PUBLIC_SEQUENCE_UNAVAILABLE]:
     'the seller directory must be mode 0700 and its public-sequence file valid',
   [DOCTOR_CODES.TOKENIZER_UNAVAILABLE]: 'run `pnpm gate:inference:setup`',
-  [DOCTOR_CODES.OLLAMA_NOT_FOUND]: 'install Ollama and put `ollama` on PATH',
-  [DOCTOR_CODES.MODEL_NOT_DOWNLOADED]: 'run `pnpm gate:inference:setup`',
-  [DOCTOR_CODES.PORT_IN_USE]: `stop whatever answers on ${urlOrigin(SERVED_ENGINE_PROBE)}`,
+  [ENGINE_ERROR_CODES.UNAVAILABLE]:
+    'start the engine at the offer URL with the pinned model; for Ollama, `ollama pull qwen3:0.6b`, and `ollama list` must show ID 7df6b6e09427',
+  [ENGINE_ERROR_CODES.TIMEOUT]:
+    'the engine at the offer URL did not answer in time; check that Ollama is running',
   [DOCTOR_CODES.NOT_CHECKED]: 'fix the failures above first',
   [NODE_ERROR_CODES.SELLER_OFFERS_MISSING]:
     'add a free [[offers]] entry to gyblos.toml (examples/seller-daemon.toml)',

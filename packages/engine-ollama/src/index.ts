@@ -32,20 +32,27 @@ export { renderChat } from './model';
 
 export { createModelTokenizer, type ModelTokenizer } from './tokenizer';
 
-export function localOllamaUrl(base: string): URL {
+// True for a literal loopback HTTP origin: 127.0.0.1 or [::1] on a real port, without credentials, path,
+// query or fragment.
+export function isLocalOllamaUrl(base: string): boolean {
+  if (!URL.canParse(base)) return false;
   const url = new URL(base);
-  if (
-    url.protocol !== 'http:' ||
-    ![LOCALHOST, IPV6_LOOPBACK].includes(url.hostname) ||
-    url.username ||
-    url.password ||
-    url.pathname !== '/' ||
-    url.search ||
-    url.hash
-  ) {
+  return (
+    url.protocol === 'http:' &&
+    [LOCALHOST, IPV6_LOOPBACK].includes(url.hostname) &&
+    url.port !== '0' &&
+    !url.username &&
+    !url.password &&
+    url.pathname === '/' &&
+    !url.search &&
+    !url.hash
+  );
+}
+
+export function localOllamaUrl(base: string): URL {
+  if (!isLocalOllamaUrl(base))
     throw new Error('Ollama must use a literal loopback HTTP origin.');
-  }
-  return url;
+  return new URL(base);
 }
 
 export interface OllamaOptions {

@@ -10,9 +10,10 @@ connectivity. The P2P seller node uses the same model, pricing and recount.
 
 Setup downloads Qwen3 0.6B Q4_K_M, approximately 523 MB of model layers, into
 `.local/gyblos/artifacts/ollama-models/`. Public tokenizer artifacts are stored
-under `.local/gyblos/artifacts/tokenizer/`. Both are public, hash-pinned
-artifacts in the product home that the lab shares as a public cache (its setup
-may write them) ([running-a-node.md](running-a-node.md#local-home)). The
+under `.local/gyblos/artifacts/tokenizer/`. Both are public and hash-pinned; the
+seller daemon uses only the tokenizer (its model comes from the seller's own
+Ollama), so the model layers are a lab cache
+([running-a-node.md](running-a-node.md#local-home)). The
 `@huggingface/tokenizers` dependency provides independent buyer-side counting.
 
 The model manifest digest, public model revision, tokenizer/config hashes and
