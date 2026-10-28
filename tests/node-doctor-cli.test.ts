@@ -257,7 +257,7 @@ void test('doctor: an engine that never answers fails with ENGINE_TIMEOUT within
     );
   }));
 
-void test('doctor: an offer the daemon refuses leaves the engine unchecked, and doctor takes no --online', () =>
+void test('doctor: an offer the daemon refuses leaves the engine unchecked', () =>
   scenario({}, async (run) => {
     const ollama = await withOllama(run);
     await writeFile(join(run.root, 'gyblos.toml'), paidToml(run));
@@ -266,9 +266,6 @@ void test('doctor: an offer the daemon refuses leaves the engine unchecked, and 
     assert.deepEqual(ollama.paths, []);
     for (const removed of ['ollama', 'model', 'ports'])
       assert.equal(line(paid.output, removed), '', removed);
-    const online = await doctor(run, ['--online']);
-    assert.equal(online.code, 1);
-    assert.match(online.output, /Usage:/);
   }));
 
 void test('doctor and config validate refuse arguments they do not take', () =>
