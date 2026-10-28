@@ -503,7 +503,10 @@ Before any engine generation, the seller verifies its own configured owner and
 NodeId against the quote and verifies the owner's signature; enforces zero
 clock skew (`issuedAt <= now < expiresAt`); matches authenticated Iroh peer to
 `buyerNodeId`; checks free prices/budget, exact selection/reasoning and token
-limits; then enforces one-use replay admission and the configured free caps.
+limits; then enforces one-use replay admission and the configured free caps. A
+request whose selection no free offer of the seller serves is refused with
+`FREE_EXECUTION_UNSUPPORTED` first, before these checks and without engine
+work; the catalog already makes the served selections public.
 Expiry must be checked again immediately before admitting generation after any
 asynchronous validation. Expiry after admission does not extend the execution
 deadline or authorize a second request.
@@ -554,11 +557,14 @@ separate founder authorization. Streaming and paid v2 remain later work.
 
 ### Seller runtime scope
 
-`packages/core/free-admission` owns bounded per-offer replay and token budgets;
-`packages/node/free-execution` composes signature/peer/time checks with the
-prepared listing and engine; `packages/transport-iroh/free-server` owns the
-framed data stream. `seller-transport` connects those pieces once at startup.
-Renewing public records never recreates token counters.
+`packages/core/free-admission` owns one bounded seller-wide ledger (single use,
+concurrency and distinct buyers per UTC day across all free offers) and each
+offer's token budget; `packages/node/free-router` sends a request to the offer
+whose selection its quote names; `packages/node/free-execution` composes
+signature/peer/time checks with that offer's listing and engine;
+`packages/transport-iroh/free-server` owns the framed data stream.
+`seller-transport` connects those pieces once at startup. Renewing public
+records never recreates the ledger or token counters.
 
 The pinned Ollama adapter currently supports one user message and reasoning
 `off`. Other contract-valid roles/conversations are refused with
@@ -568,7 +574,8 @@ engine-reported usage for cap refunds. Admission reserves templated input plus
 maximum output, refunds only a successfully recounted completion and keeps the
 full debit for engine errors, cancellation or uncertain work. UTC-day counters
 reset on restart; per-buyer counters are best effort. The in-memory replay table
-is bounded at 4096 live identifiers and the daily buyer table at 1024 entries.
+is bounded at 4096 live identifiers and the seller's daily buyer table at 1024
+entries by default (`[limits] max_free_buyers_per_day`).
 Capacity exhaustion refuses new work without evicting unexpired accounting.
 A startup-time barrier rejects quotes issued at or before startup, including
 the same millisecond; backward clock movement during a process fails closed.

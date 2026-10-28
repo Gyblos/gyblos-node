@@ -79,3 +79,35 @@ void test('free startup refuses a prepared catalog missing its configured offer'
   );
   assert.equal(state.calls(), 0);
 });
+void test('free startup refuses a selection the seller does not serve before checking the signature', async () => {
+  const state = await freeSellerFixture();
+  const service = prepareSellerFreeExecution({
+    ...state.options,
+    catalog: state.source.context.catalog,
+  });
+  assert.ok(service);
+  const signed = await state.request();
+  const other = { ...signed.quote.offer.selection, modelId: 'qwen3-8b' };
+  // Changing the selection also breaks the owner's quote signature.
+  const unsigned = {
+    ...signed,
+    quote: {
+      ...signed.quote,
+      offer: { ...signed.quote.offer, selection: other },
+    },
+    input: { ...signed.input, selection: other },
+  };
+  for (const run of [service.respond, service.stream])
+    assert.equal(
+      (
+        await run(
+          unsigned,
+          signed.quote.offer.buyerNodeId,
+          freeSellerSignal(),
+          async () => {},
+        )
+      ).error?.code,
+      FREE_EXECUTION_CODES.UNSUPPORTED,
+    );
+  assert.equal(state.calls(), 0);
+});

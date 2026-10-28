@@ -1,5 +1,6 @@
 // Builds ephemeral free quotes and an injectable synthetic engine; no files, payment services or real keys.
 import { createControlQuote } from '@gyblos/core/control-quotes';
+import { FreeSellerLedger } from '@gyblos/core/free-admission';
 import type { SellerFreeExecutionOptions } from '@gyblos/node/free-execution';
 import { sellerLimits } from '@gyblos/node/node-config-limits';
 import {
@@ -64,8 +65,7 @@ export async function freeSellerFixture(
     tokenizer: { input: () => inputCount, count: () => outputCount },
     readiness: () => ({ ...source.context.readiness(), busy }),
     now: () => now,
-    startedAt: now - 1,
-    maxFreeBuyers: sellerLimits().maxFreeBuyers,
+    ledger: new FreeSellerLedger(now - 1, sellerLimits().maxFreeBuyers),
   };
   const service = api.createSellerFreeExecution(options);
   async function request(

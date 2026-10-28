@@ -1,5 +1,5 @@
-// Free admission split for several offers: one seller-wide replay ledger (single use, concurrency) and one
-// token budget per offer (daily and per-buyer caps, distinct buyers). Pure; synthetic parsed requests.
+// Free admission split for several offers: one seller-wide ledger (single use, concurrency, distinct buyers
+// per day) and one token budget per offer (daily and per-buyer caps). Pure; synthetic parsed requests.
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
@@ -7,7 +7,7 @@ import test from 'node:test';
 import { FREE_EXECUTION_ADMISSION } from '@gyblos/core/constants';
 import {
   FreeExecutionAdmission,
-  FreeReplayLedger,
+  FreeSellerLedger,
 } from '@gyblos/core/free-admission';
 import { FREE_EXECUTION_CODES } from '@gyblos/protocol/constants';
 import { parseFreeExecutionRequest } from '@gyblos/protocol/free-execution';
@@ -41,11 +41,14 @@ async function fixture() {
   return { now, request };
 }
 
-async function twoOffers(caps = { dailyTokenCap: 14, perBuyerCap: 14 }) {
+async function twoOffers(
+  caps = { dailyTokenCap: 14, perBuyerCap: 14 },
+  maxBuyers?: number,
+) {
   const { now, request } = await fixture();
-  const ledger = new FreeReplayLedger(now - 1);
-  const a = new FreeExecutionAdmission(caps, now - 1, 1024, ledger);
-  const b = new FreeExecutionAdmission(caps, now - 1, 1024, ledger);
+  const ledger = new FreeSellerLedger(now - 1, maxBuyers);
+  const a = new FreeExecutionAdmission(caps, ledger);
+  const b = new FreeExecutionAdmission(caps, ledger);
   return { now, request, a, b };
 }
 
@@ -88,4 +91,19 @@ void test('a refused cap still spends the request id on the shared ledger, as be
   assert.throws(() => b.enter(request(1), 4, now), {
     code: FREE_EXECUTION_CODES.REPLAY,
   });
+});
+
+void test('the distinct-buyer limit counts buyers across the whole seller, not per offer', async () => {
+  const { now, request, a, b } = await twoOffers(
+    { dailyTokenCap: 100, perBuyerCap: 100 },
+    1,
+  );
+  const first = '1'.repeat(64);
+  const second = '2'.repeat(64);
+  a.enter(request(1, first), 4, now).complete(4);
+  assert.throws(() => b.enter(request(2, second), 4, now), {
+    code: FREE_EXECUTION_CODES.BUSY,
+  });
+  // The buyer already served today may still use another offer.
+  b.enter(request(3, first), 4, now).complete(4);
 });

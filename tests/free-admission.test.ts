@@ -42,7 +42,7 @@ async function fixture() {
 }
 void test('free caps reserve full output, refund once, and roll over only the new admission day', async () => {
   const { now, request } = await fixture();
-  const policy = new FreeExecutionAdmission(
+  const policy = FreeExecutionAdmission.standalone(
     { dailyTokenCap: 14, perBuyerCap: 14 },
     now - 1,
   );
@@ -63,7 +63,7 @@ void test('free caps reserve full output, refund once, and roll over only the ne
 void test('free caps retain conservative debit when engine usage is uncertain or invalid', async () => {
   const { now, request } = await fixture();
   for (const actual of [undefined, -1, 15, Number.NaN]) {
-    const policy = new FreeExecutionAdmission(
+    const policy = FreeExecutionAdmission.standalone(
       { dailyTokenCap: 14, perBuyerCap: 14 },
       now - 1,
     );
@@ -75,7 +75,7 @@ void test('free caps retain conservative debit when engine usage is uncertain or
 });
 void test('free replay survives daily rollover and resets only after quote expiry', async () => {
   const { now, request } = await fixture();
-  const policy = new FreeExecutionAdmission(
+  const policy = FreeExecutionAdmission.standalone(
     { dailyTokenCap: 100, perBuyerCap: 100 },
     now - 1,
   );
@@ -87,7 +87,7 @@ void test('free replay survives daily rollover and resets only after quote expir
 });
 void test('free startup barrier rejects prior and same-tick quotes but admits a later quote', async () => {
   const { now, request } = await fixture();
-  const policy = new FreeExecutionAdmission(
+  const policy = FreeExecutionAdmission.standalone(
     { dailyTokenCap: 100, perBuyerCap: 100 },
     now,
   );
@@ -99,7 +99,7 @@ void test('free startup barrier rejects prior and same-tick quotes but admits a 
 });
 void test('free replay and buyer tables reject pressure without evicting live state', async () => {
   const { now, request } = await fixture();
-  const replay = new FreeExecutionAdmission(
+  const replay = FreeExecutionAdmission.standalone(
     { dailyTokenCap: 100000, perBuyerCap: 100000 },
     now - 1,
   );
@@ -121,7 +121,7 @@ void test('free replay and buyer tables reject pressure without evicting live st
   assert.throws(() => replay.enter(request(1), 0, now), {
     code: FREE_EXECUTION_CODES.REPLAY,
   });
-  const buyers = new FreeExecutionAdmission(
+  const buyers = FreeExecutionAdmission.standalone(
     { dailyTokenCap: 100000, perBuyerCap: 100000 },
     now - 1,
   );
@@ -134,7 +134,7 @@ void test('free replay and buyer tables reject pressure without evicting live st
     { code: FREE_EXECUTION_CODES.BUSY },
   );
   // A seller's [limits] max_free_buyers_per_day replaces the default.
-  const few = new FreeExecutionAdmission(
+  const few = FreeExecutionAdmission.standalone(
     { dailyTokenCap: 100000, perBuyerCap: 100000 },
     now - 1,
     2,
@@ -148,7 +148,7 @@ void test('free replay and buyer tables reject pressure without evicting live st
   });
   assert.throws(
     () =>
-      new FreeExecutionAdmission(
+      FreeExecutionAdmission.standalone(
         { dailyTokenCap: 1, perBuyerCap: 1 },
         now - 1,
         0,

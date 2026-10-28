@@ -1,41 +1,62 @@
-// Routes each free request to the offer its signed quote selected; a selection no offer serves is refused
-// with UNSUPPORTED before any engine work. Each offer's service still verifies the request in full.
-import { FREE_EXECUTION_CODES } from '@gyblos/protocol/constants';
+// Routes each free request to the offer whose selection its signed quote names (exact canonical match);
+// a selection no offer serves is refused with UNSUPPORTED before signature checks or engine work. Each
+// offer's service still verifies the request in full.
+import { canonicalJson } from '@gyblos/protocol';
+import {
+  FREE_EXECUTION,
+  FREE_EXECUTION_CODES,
+} from '@gyblos/protocol/constants';
 import type { ModelSelection } from '@gyblos/protocol/control-types';
 import {
   freeExecutionDigest,
   parseFreeExecutionRequest,
+  type FreeExecutionRequest,
   type FreeExecutionResponse,
 } from '@gyblos/protocol/free-execution';
 import type { FreeExecutionService } from '@gyblos/transport-iroh/free-server';
 
-export type FreeOfferRoute = (
-  selection: ModelSelection,
-) => Required<FreeExecutionService> | undefined;
+// One free offer's complete and streaming service.
+export type FreeOfferService = Required<FreeExecutionService>;
+export interface FreeOffer {
+  selection: ModelSelection;
+  service: FreeOfferService;
+}
 
-async function unsupported(value: unknown): Promise<FreeExecutionResponse> {
-  const request = parseFreeExecutionRequest(value);
+async function unsupported(
+  request: FreeExecutionRequest,
+): Promise<FreeExecutionResponse> {
   return {
-    version: request.version,
+    version: FREE_EXECUTION.version,
     requestId: request.requestId,
     requestDigest: await freeExecutionDigest(request),
     error: { code: FREE_EXECUTION_CODES.UNSUPPORTED },
   };
 }
 
-// Throws like a single offer's service when the value is not a free execution request.
-function routed(route: FreeOfferRoute, value: unknown) {
-  return route(parseFreeExecutionRequest(value).quote.offer.selection);
-}
-
+// The offers are read on every request, so an offer that becomes ready later is routed from then on.
 export function createSellerFreeRouter(
-  route: FreeOfferRoute,
-): Required<FreeExecutionService> {
+  offers: () => Iterable<FreeOffer>,
+): FreeOfferService {
+  const route = (request: FreeExecutionRequest) => {
+    const wanted = canonicalJson(request.quote.offer.selection);
+    for (const offer of offers())
+      if (canonicalJson(offer.selection) === wanted) return offer.service;
+    return undefined;
+  };
   return {
-    respond: (value, peer, signal) =>
-      routed(route, value)?.respond(value, peer, signal) ?? unsupported(value),
-    stream: (value, peer, signal, onDelta) =>
-      routed(route, value)?.stream(value, peer, signal, onDelta) ??
-      unsupported(value),
+    async respond(value, peer, signal) {
+      const request = parseFreeExecutionRequest(value);
+      const service = route(request);
+      return service
+        ? service.respond(request, peer, signal)
+        : unsupported(request);
+    },
+    async stream(value, peer, signal, onDelta) {
+      const request = parseFreeExecutionRequest(value);
+      const service = route(request);
+      return service
+        ? service.stream(request, peer, signal, onDelta)
+        : unsupported(request);
+    },
   };
 }

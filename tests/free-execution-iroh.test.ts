@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { createControlQuote } from '@gyblos/core/control-quotes';
+import { FreeSellerLedger } from '@gyblos/core/free-admission';
 import { createSellerControlService } from '@gyblos/node/control';
 import type { SellerFreeExecutionOptions } from '@gyblos/node/free-execution';
 import {
@@ -70,8 +71,10 @@ async function exchangeTwice(limits: SellerLimits) {
     model: model.model,
     capabilities: model.capabilities,
     now: source.context.now,
-    startedAt: source.context.now() - 1,
-    maxFreeBuyers: limits.maxFreeBuyers,
+    ledger: new FreeSellerLedger(
+      source.context.now() - 1,
+      limits.maxFreeBuyers,
+    ),
     readiness: source.context.readiness,
     tokenizer: { input: () => 4, count: () => 2 },
     engine: {
@@ -124,6 +127,7 @@ async function exchangeTwice(limits: SellerLimits) {
   };
   const server = serveSellerTransport(seller, control, {
     ...runtime,
+    startedAt: source.context.now() - 1,
     relayOnly: false,
     limits,
   });

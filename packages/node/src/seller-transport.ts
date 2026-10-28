@@ -4,6 +4,7 @@ import type { Endpoint } from '@number0/iroh';
 
 import { LOCALHOST, PORTS } from '@gyblos/config';
 import type { QuoteReadiness } from '@gyblos/core/control-quotes';
+import { FreeSellerLedger } from '@gyblos/core/free-admission';
 import type {
   Engine,
   EngineDescription,
@@ -32,7 +33,11 @@ export function serveSellerTransport(
 ) {
   const freeExecution = prepareSellerFreeExecution({
     ...options,
-    maxFreeBuyers: options.limits.maxFreeBuyers,
+    // Created once per seller process: renewals never reset single use or the day's buyers.
+    ledger: new FreeSellerLedger(
+      options.startedAt,
+      options.limits.maxFreeBuyers,
+    ),
     offer: control.offer,
     catalog: control.records.current(),
     capabilities: options.engine.capabilities(),

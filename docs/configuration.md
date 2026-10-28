@@ -276,12 +276,12 @@ Each value is an integer from 1 to a hard ceiling, so a typo cannot let one
 seller exhaust its machine. A value out of range is `INVALID_LIMIT`, and startup
 stops with `NODE_CONFIG_INVALID`.
 
-| Key                          | Default | Ceiling | Meaning                                         |
-| ---------------------------- | ------- | ------- | ----------------------------------------------- |
-| `max_connections`            | 8       | 64      | open buyer connections in total                 |
-| `requests_per_minute`        | 30      | 120     | requests per buyer NodeId per minute            |
-| `global_requests_per_minute` | 256     | 1024    | requests per minute across all buyers           |
-| `max_free_buyers_per_day`    | 1024    | 65536   | distinct buyers a free offer serves per UTC day |
+| Key                          | Default | Ceiling | Meaning                                                                        |
+| ---------------------------- | ------- | ------- | ------------------------------------------------------------------------------ |
+| `max_connections`            | 8       | 64      | open buyer connections in total                                                |
+| `requests_per_minute`        | 30      | 120     | requests per buyer NodeId per minute                                           |
+| `global_requests_per_minute` | 256     | 1024    | requests per minute across all buyers                                          |
+| `max_free_buyers_per_day`    | 1024    | 65536   | distinct buyers the seller serves free per UTC day, across all its free offers |
 
 ```toml
 [limits]
