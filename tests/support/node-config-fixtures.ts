@@ -21,10 +21,10 @@ export const FAKE_SECRET = 'sk-FAKE0SECRET0MARKER0DO0NOT0ECHO';
 export const SYNTHETIC_ADDRESS = '11111111111111111111111111111112';
 
 export const BASE = 'version = 1\n[node]\nnetwork = "devnet"\n';
-// The one offer the seller daemon serves today: free Qwen3 0.6B on its managed Ollama.
+// The one offer the seller daemon serves today: free Qwen3 0.6B on the seller's own Ollama.
 export const FREE_SELLER_OFFER =
   '[[offers]]\nmodel = "qwen3:0.6b"\nreasoning = ["off"]\n' +
-  'engine = { kind = "ollama", url = "http://127.0.0.1:11436" }\n' +
+  'engine = { kind = "ollama", url = "http://127.0.0.1:11434" }\n' +
   'free = { daily_token_cap = 200000, per_buyer_cap = 5000 }\n';
 const ENGINE = '{ kind = "ollama", url = "http://127.0.0.1:11434" }';
 const PRICE =

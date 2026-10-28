@@ -24,6 +24,7 @@
     "./publisher": "./src/publisher.ts",
     "./publisher-config": "./src/publisher-config.ts",
     "./seller-offer": "./src/seller-offer.ts",
+    "./seller-offers": "./src/seller-offers.ts",
     "./seller-settings": "./src/seller-settings.ts",
     "./seller-doctor": "./src/seller-doctor.ts",
     "./control-startup": "./src/control-startup.ts",

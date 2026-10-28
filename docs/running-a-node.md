@@ -133,8 +133,10 @@ never overwrites existing keys; a mismatched existing role stops with an error.
 ```sh
 export GYBLOS_RELAY_TOKEN=...    # private; 32-512 printable characters
 pnpm node:setup --role seller --mint MINT --buyer BUYER_ADDRESS --pay-to PAYOUT_ADDRESS
-pnpm gate:inference:setup        # pinned Qwen3 0.6B model and tokenizer (lab command for now)
-cp examples/seller-daemon.toml gyblos.toml   # one free offer; edit the caps
+pnpm gate:inference:setup        # pinned tokenizer (lab command for now)
+ollama serve                     # your own Ollama on 127.0.0.1:11434; leave it running
+ollama pull qwen3:0.6b           # the pinned model
+cp examples/seller-daemon.toml gyblos.toml   # one free offer at that URL; edit the caps
 pnpm gyblos doctor               # read-only preflight; prints the public NodeId and owner
 pnpm node:start
 ```
@@ -145,8 +147,9 @@ pnpm node:start
   (`SELLER_PAID_EXECUTION_UNAVAILABLE`); the v1 paid path remains in the lab
   gates only. `node:setup` still asks for `--buyer` and `--pay-to`, which free
   selling does not use.
-- Startup starts a private Ollama on loopback port 11436, checks memory
-  headroom, runs one private warmup and only then signs its public records.
+- The seller runs its own Ollama; the daemon never starts it. Startup checks
+  memory headroom, runs one private warmup at the offer's engine URL (a literal
+  loopback address) and only then signs its public records.
 - The `gyblos/control/1` ALPN serves signed catalog, presence and quote queries;
   the free channels serve execution. Stop with Ctrl-C (not Ctrl-Z, which only
   suspends the process). Stopping withdraws from discovery and saves the public
@@ -291,9 +294,9 @@ These variables can also be written in a `gyblos.toml` file, checked with
   `.local/gyblos`).
 - `GYBLOS_RPC_URL`: devnet RPC; the genesis hash is checked before use.
 - `GYBLOS_P2P_RUN_ID`: optional label copied into `status.json` and evidence.
-- Ports: buyer proxy 4031 and the seller's Ollama 11436 (loopback only). The
-  lab's paid gates also use 4032 and 4022. Stop any lab runs (`gate:*`) before
-  starting a seller.
+- Ports: buyer proxy 4031 and the seller's Ollama at its offer URL (loopback
+  only). The lab gates run their own Ollama on 11436 and the paid gates also use
+  4032 and 4022.
 
 Facilitator diagnostics are written only by the lab's paid gates; see
 [payments.md](payments.md).

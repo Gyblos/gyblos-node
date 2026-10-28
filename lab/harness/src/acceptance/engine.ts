@@ -1,6 +1,6 @@
 // Wraps a synthetic or explicitly selected local engine with labelled busy/failure injection.
 // Never records prompts, responses or engine errors; no payments, RPC or automatic model downloads.
-import { DIAGNOSTICS, HOSTS } from '@gyblos/config';
+import { DIAGNOSTICS } from '@gyblos/config';
 import { GENERATION, MODEL } from '@gyblos/engine-ollama/constants';
 import { createOllamaEngine } from '@gyblos/engine-ollama/engine';
 import {
@@ -10,6 +10,7 @@ import {
 import type { Engine } from '@gyblos/protocol/engine';
 import { memorySnapshot, type MemorySnapshot } from '@gyblos/runtime/memory';
 
+import { GATE_HOSTS } from '../constants';
 import {
   ACCEPTANCE,
   ACCEPTANCE_CODES,
@@ -55,7 +56,7 @@ function syntheticEngine(): Engine {
 export function createAcceptanceEngine(mode: AcceptanceMode) {
   const source =
     mode === ACCEPTANCE_MODES.OLLAMA
-      ? createOllamaEngine(HOSTS.ollama)
+      ? createOllamaEngine(GATE_HOSTS.ollama)
       : syntheticEngine();
   let failed = false;
   let generations = 0;

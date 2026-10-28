@@ -50,6 +50,7 @@ import {
   EVIDENCE_STATUSES,
   GATE_DIAGNOSTIC_LIMITS,
   GATE_HOST_MESSAGES,
+  GATE_HOSTS,
   INFERENCE_EVIDENCE_CODES,
   keyPath,
   labPaths,
@@ -69,7 +70,7 @@ export async function main() {
   await assertOllamaModelsHome();
   const evidencePath = EVIDENCE_PATHS.inference;
   const journalPath = labPaths().journals.inference;
-  const ollamaUrl = HOSTS.ollama;
+  const ollamaUrl = GATE_HOSTS.ollama;
   const facilitatorUrl = HOSTS.facilitator;
   const runId = randomUUID();
   const children: ChildProcess[] = [];
@@ -136,7 +137,7 @@ export async function main() {
       const ollama = spawnChild('ollama', ['serve'], {
         env: {
           ...process.env,
-          OLLAMA_HOST: HOSTS.ollamaBind,
+          OLLAMA_HOST: GATE_HOSTS.ollamaBind,
           OLLAMA_MODELS: resolve(
             homeLayout(process.env).artifacts.ollamaModels,
           ),

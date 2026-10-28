@@ -1,5 +1,7 @@
-// The Ollama engine plugin: refuses offers the daemon's managed Ollama cannot serve (model, then engine,
-// then reasoning, as before) and builds the engine with recounted metering and the pinned warmup policy.
+// The Ollama engine plugin: refuses offers it cannot serve (model, then engine, then reasoning) and builds
+// the engine at the offer's literal loopback URL with recounted metering and the pinned warmup policy.
+// The seller runs Ollama itself; the daemon never starts it.
+import { localOllamaUrl } from '@gyblos/engine-ollama';
 import { READINESS_GENERATION } from '@gyblos/engine-ollama/constants';
 import { createOllamaEngine } from '@gyblos/engine-ollama/engine';
 import { MODEL } from '@gyblos/engine-ollama/model';
@@ -25,9 +27,20 @@ export const OLLAMA_READINESS = {
   residencyMs: READINESS_GENERATION.residencyMs,
 } as const satisfies EngineReadinessPolicy;
 
-// The listed selection for a model served by the managed Ollama: the pinned quantization, no variant.
+// The listed selection for a model served through Ollama: the pinned quantization, no variant.
 export function ollamaSelection(modelId: string) {
   return { modelId, variant: null, quantization: MODEL.quantization };
+}
+
+// The adapter's own rule: http on 127.0.0.1 or [::1], no path, credentials, query or fragment. Names such
+// as localhost or host.docker.internal are refused until gyblos init and Docker settle them.
+function loopbackOrigin(url: string) {
+  try {
+    localOllamaUrl(url);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function refuse(offer: SellerEngineOffer) {
@@ -38,7 +51,7 @@ function refuse(offer: SellerEngineOffer) {
   )
     return NODE_ERROR_CODES.SELLER_OFFER_MODEL_UNSUPPORTED;
   if (
-    new URL(engine.url).origin !== new URL(SERVED_OFFER.engineUrl).origin ||
+    !loopbackOrigin(engine.url) ||
     engine.apiKeyEnv !== undefined ||
     (engine.upstreamModel !== undefined && engine.upstreamModel !== MODEL.name)
   )
@@ -51,9 +64,8 @@ function refuse(offer: SellerEngineOffer) {
 
 export const OLLAMA_ENGINE_FACTORY: EngineFactory = {
   refuse,
-  // The daemon's managed Ollama; PR 2c moves the engine to the offer URL.
   create: (offer, { fetch, environment }) => ({
-    engine: createOllamaEngine(SERVED_OFFER.engineUrl, fetch),
+    engine: createOllamaEngine(offer.engine.url, fetch),
     selection: ollamaSelection(offer.model.id),
     metering: {
       mode: CONTROL_METERING_MODES.RECOUNTED,

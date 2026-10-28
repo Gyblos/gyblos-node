@@ -1,6 +1,5 @@
 // The seller's public listing: what the daemon serves and its paid or free terms. No config loading here,
 // so control startup and the lab host stay independent of gyblos.toml reading.
-import { HOSTS, ROUTES } from '@gyblos/config';
 import {
   MODEL_IDS,
   OFFER_PRICING_KINDS,
@@ -25,14 +24,11 @@ export type SellerCatalogOffer = {
   | { kind: typeof OFFER_PRICING_KINDS.FREE; caps: FreeOfferCaps }
 );
 
-// What the daemon actually runs: its managed Ollama, the pinned Qwen3 0.6B and one reasoning level, free.
+// What the daemon serves: the pinned Qwen3 0.6B with one reasoning level, free, on the seller's Ollama.
 export const SERVED_OFFER = {
   modelId: MODEL_IDS.QWEN3_0_6B,
-  engineUrl: HOSTS.ollama,
   reasoning: [REASONING_LEVELS.OFF] satisfies readonly ReasoningLevel[],
 } as const;
-// Nothing may answer here before startup spawns its Ollama; startup and doctor probe the same URL.
-export const SERVED_ENGINE_PROBE = `${SERVED_OFFER.engineUrl}${ROUTES.ollamaVersion}`;
 
 // The only listing the seller daemon serves while paid selling is off (phase 2 brings it back as a plugin).
 export type FreeSellerOffer = Extract<

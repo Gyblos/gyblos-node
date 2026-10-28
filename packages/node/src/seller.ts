@@ -1,31 +1,16 @@
-// Starts the P2P seller for its free offer: local Ollama, engine warmup, signed public records and the Iroh
-// bridge; tears everything down in reverse order on failure. Paid selling is off until phase 2.
-import { resolve } from 'node:path';
-
+// Starts the P2P seller for its free offer: warmup of the seller's own engine, signed public records and
+// the Iroh bridge; tears everything down in reverse order on failure. Paid selling is off until phase 2.
 import { EndpointTicket } from '@number0/iroh';
 
 import {
   DIAGNOSTICS,
-  homeLayout,
-  HOSTS,
   ROLE_FILES,
   SELLER_DISCOVERY,
-  TRANSPORT_LIMITS,
   TRANSPORT_TIMEOUTS,
 } from '@gyblos/config';
 import { publishRecord } from '@gyblos/discovery-http';
-import {
-  GENERATION,
-  READINESS_GENERATION,
-} from '@gyblos/engine-ollama/constants';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
-import {
-  assertPortFree,
-  saveJson,
-  spawnChild,
-  stopChild,
-  waitReady,
-} from '@gyblos/runtime';
+import { saveJson } from '@gyblos/runtime';
 import { assertMemoryHeadroom, memorySnapshot } from '@gyblos/runtime/memory';
 import { withDeadline } from '@gyblos/transport-iroh/deadline';
 import { bindEndpoint } from '@gyblos/transport-iroh/endpoint';
@@ -33,17 +18,12 @@ import { bindEndpoint } from '@gyblos/transport-iroh/endpoint';
 import { SELLER_PUBLIC_RECORDS } from './constants';
 import { observeControlReadiness } from './control-readiness';
 import { prepareSellerControl } from './control-startup';
-import {
-  assertReadinessCurrent,
-  prepareSellerEngine,
-  probeSellerEngine,
-} from './engine-readiness';
-import { createSellerEngine } from './engine-registry';
-import { assertOllamaModelsHome, assertRoleHome } from './home';
+import { assertReadinessCurrent, probeSellerEngine } from './engine-readiness';
+import { assertRoleHome } from './home';
 import { openSellerSequence } from './public-sequence';
 import { createSellerPublisher } from './publisher';
 import { loadRole, nodeSecret, rolePath, roleSigner } from './roles';
-import { SERVED_ENGINE_PROBE } from './seller-offer';
+import { prepareSellerOffers } from './seller-offers';
 import { loadSellerSettings } from './seller-settings';
 import { serveSellerTransport } from './seller-transport';
 
@@ -74,53 +54,22 @@ export async function startSeller() {
       environment: process.env,
       nodeId: config.nodeId,
     });
-    await assertPortFree(SERVED_ENGINE_PROBE);
-    await stage('ollama-startup');
-    await assertOllamaModelsHome();
-    const child = spawnChild('ollama', ['serve'], {
-      env: {
-        PATH: process.env.PATH,
-        HOME: resolve(homeLayout(process.env).roles.seller),
-        TMPDIR: process.env.TMPDIR,
-        OLLAMA_HOST: HOSTS.ollamaBind,
-        OLLAMA_MODELS: resolve(homeLayout(process.env).artifacts.ollamaModels),
-        OLLAMA_NO_CLOUD: '1',
-        OLLAMA_DEBUG: '0',
-        OLLAMA_CONTEXT_LENGTH: String(GENERATION.numCtx),
-        OLLAMA_NUM_PARALLEL: String(READINESS_GENERATION.parallel),
-        OLLAMA_MAX_LOADED_MODELS: String(READINESS_GENERATION.loadedModels),
-        OLLAMA_MAX_QUEUE: String(TRANSPORT_LIMITS.maxConcurrent),
-      },
-      stdio: 'ignore',
-    });
-    disposers.push(() => stopChild(child));
-    let processError = false;
-    child.once('error', () => {
-      processError = true;
-    });
-    try {
-      await waitReady(child, SERVED_ENGINE_PROBE, {
-        startupError: () => processError,
-      });
-    } catch (error) {
-      await stopChild(child);
-      throw error;
-    }
     await stage('private-engine-warmup');
-    const prepared = createSellerEngine(settings.engineOffer, {
-      fetch: globalThis.fetch,
-      environment: process.env,
-    });
+    // The seller runs its engine; startup only warms it at the offer URL and never starts it.
+    const { prepared, model, offerExpiresAt } = await prepareSellerOffers(
+      settings,
+      {
+        fetch: globalThis.fetch,
+        environment: process.env,
+        snapshot: memorySnapshot,
+        record: (record) =>
+          saveJson(
+            rolePath(P2P_ROLES.SELLER, DIAGNOSTICS.readinessFilename),
+            record,
+          ),
+      },
+    );
     const { engine } = prepared;
-    const { model, offerExpiresAt } = await prepareSellerEngine(engine, {
-      policy: prepared.readiness,
-      snapshot: memorySnapshot,
-      record: (record) =>
-        saveJson(
-          rolePath(P2P_ROLES.SELLER, DIAGNOSTICS.readinessFilename),
-          record,
-        ),
-    });
     await stage('role-signers');
     // Free execution signs only with the owner key; it also fills the quote's unused payment roles.
     const owner = await roleSigner(P2P_ROLES.SELLER, 'owner');
