@@ -50,8 +50,6 @@ function remoteRefusal(error: FreeClientError): TelemetryRefusal | undefined {
       return TELEMETRY_REFUSALS.DAILY_CAP;
     case FREE_EXECUTION_CODES.BUYER_CAP:
       return TELEMETRY_REFUSALS.BUYER_CAP;
-    case FREE_EXECUTION_CODES.UNSUPPORTED:
-      return TELEMETRY_REFUSALS.QUOTE_REJECTED;
     default:
       return undefined;
   }

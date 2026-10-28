@@ -96,17 +96,63 @@ void test('real seller and buyer execution events reach separate private local l
     await rm(root, { recursive: true, force: true });
   }
 });
-void test('unsupported streaming after engine generation remains a failed buyer attempt',async()=>{
-  const {freeStreamSellerFixture,streamResult}=await import('./support/free-stream-seller');
-  const {localTelemetry}=await import('./support/local-telemetry');
-  const source=await freeStreamSellerFixture();const seller=localTelemetry();const buyer=localTelemetry();
-  source.setGenerate(async()=>streamResult());
-  const service=createSellerFreeExecution({...source.options,telemetry:{...seller,engineKind:ENGINE_KINDS.OLLAMA}});
-  const request=await source.request();
-  const {FreeClientError}=await import('@gyblos/transport-iroh/free-client');
-  const {TELEMETRY_EVENTS}=await import('@gyblos/protocol/telemetry');
-  await assert.rejects(executeBuyerFree({messages:request.input.messages,maxTokens:request.input.maxTokens},{telemetry:{...buyer,buyerNodeId:request.quote.offer.buyerNodeId,selection:request.input.selection},select:async()=>({nodeId:request.quote.offer.nodeId,quote:request.quote}),execute:async(_winner,prepared,signal,onDelta)=>{const reply=await service.stream(prepared,prepared.quote.offer.buyerNodeId,signal,onDelta!);if(reply.error)throw new FreeClientError(reply.error.code,true,true,reply.error);return reply.result;}},undefined,async()=>{}));
-  assert.equal(source.calls(),1);
-  assert.deepEqual(seller.events.map(event=>event.type),[TELEMETRY_EVENTS.REQUEST_RECEIVED,TELEMETRY_EVENTS.FAILED]);
-  assert.deepEqual(buyer.events.map(event=>event.type),[TELEMETRY_EVENTS.REQUEST_RECEIVED,TELEMETRY_EVENTS.FAILED]);
+void test('unsupported streaming after engine generation remains a failed buyer attempt', async () => {
+  const { freeStreamSellerFixture, streamResult } =
+    await import('./support/free-stream-seller');
+  const { localTelemetry } = await import('./support/local-telemetry');
+  const source = await freeStreamSellerFixture();
+  const seller = localTelemetry();
+  const buyer = localTelemetry();
+  source.setGenerate(async () => streamResult());
+  const service = createSellerFreeExecution({
+    ...source.options,
+    telemetry: { ...seller, engineKind: ENGINE_KINDS.OLLAMA },
+  });
+  const request = await source.request();
+  const { FreeClientError } =
+    await import('@gyblos/transport-iroh/free-client');
+  const { TELEMETRY_EVENTS } = await import('@gyblos/protocol/telemetry');
+  await assert.rejects(
+    executeBuyerFree(
+      { messages: request.input.messages, maxTokens: request.input.maxTokens },
+      {
+        telemetry: {
+          ...buyer,
+          buyerNodeId: request.quote.offer.buyerNodeId,
+          selection: request.input.selection,
+        },
+        select: async () => ({
+          nodeId: request.quote.offer.nodeId,
+          quote: request.quote,
+        }),
+        execute: async (_winner, prepared, signal, onDelta) => {
+          const reply = await service.stream(
+            prepared,
+            prepared.quote.offer.buyerNodeId,
+            signal,
+            onDelta!,
+          );
+          if (reply.error)
+            throw new FreeClientError(
+              reply.error.code,
+              true,
+              true,
+              reply.error,
+            );
+          return reply.result;
+        },
+      },
+      undefined,
+      async () => {},
+    ),
+  );
+  assert.equal(source.calls(), 1);
+  assert.deepEqual(
+    seller.events.map((event) => event.type),
+    [TELEMETRY_EVENTS.REQUEST_RECEIVED, TELEMETRY_EVENTS.FAILED],
+  );
+  assert.deepEqual(
+    buyer.events.map((event) => event.type),
+    [TELEMETRY_EVENTS.REQUEST_RECEIVED, TELEMETRY_EVENTS.FAILED],
+  );
 });

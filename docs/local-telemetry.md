@@ -43,10 +43,11 @@ and consent configuration remain separate work.
 - Busy, exhausted caps, invalid policy and stale readiness are static refusals
   before generation. A started execution failure or cancellation emits `failed`.
   Provider messages and arbitrary exception text are never included.
-- The buyer recognizes verified remote busy, caps and unsupported-selection
-  refusals, but still never retries after the prompt was sent. A generic remote
-  engine error is a failed attempt: its wire code cannot prove whether the
-  engine was unavailable before generation or failed after starting.
+- The buyer recognizes verified remote busy and cap refusals, but still never
+  retries after the prompt was sent. Generic remote engine and unsupported
+  errors remain failed attempts: those wire codes can also arise after
+  generation (for example, an engine that returns text without using streaming
+  callbacks). They do not prove the phase.
 - Each observer emits its first-token event at most once and one terminal event.
   Late callbacks produce no additional telemetry. Sink or telemetry-clock
   failure cannot affect results, admission cleanup or retry decisions. Prompt

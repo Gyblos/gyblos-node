@@ -231,7 +231,6 @@ void test('buyer records verified remote busy and cap refusals without enabling 
     [FREE_EXECUTION_CODES.BUSY, TELEMETRY_REFUSALS.SELLER_BUSY],
     [FREE_EXECUTION_CODES.DAILY_CAP, TELEMETRY_REFUSALS.DAILY_CAP],
     [FREE_EXECUTION_CODES.BUYER_CAP, TELEMETRY_REFUSALS.BUYER_CAP],
-    [FREE_EXECUTION_CODES.UNSUPPORTED, TELEMETRY_REFUSALS.QUOTE_REJECTED],
   ] as const) {
     const { request, telemetry, dependencies } = await fixture();
     let calls = 0;
