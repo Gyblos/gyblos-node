@@ -212,3 +212,5 @@ export function fanOut(sinks: readonly TelemetrySink[]): TelemetrySink {
     },
   };
 }
+
+export { createExecutionTelemetry, emitTelemetry, telemetrySizes, type ExecutionTelemetryOptions } from './telemetry-execution';

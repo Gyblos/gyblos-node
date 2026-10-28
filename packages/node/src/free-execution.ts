@@ -47,7 +47,11 @@ import type { FreeMeter } from './free-meter';
 import { createSellerFreeRouter } from './free-router';
 import type { FreeSellerOffer, SellerCatalogOffer } from './seller-offer';
 
+import type { TelemetrySink } from '@gyblos/protocol/telemetry';
+import type { EngineKind } from '@gyblos/protocol/constants';
+
 export interface SellerFreeExecutionOptions {
+  telemetry?: { sink: TelemetrySink; engineKind: EngineKind; now?: () => number }; 
   owner: string;
   nodeId: string;
   offer: FreeSellerOffer;

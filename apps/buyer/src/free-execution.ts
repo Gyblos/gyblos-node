@@ -23,7 +23,11 @@ export interface FreeWinner {
   nodeId: string;
   quote: SignedOfferV2;
 }
+import type { TelemetrySink } from '@gyblos/protocol/telemetry';
+import type { ModelSelection } from '@gyblos/protocol/control-types';
+
 export interface FreeBuyerDependencies {
+  telemetry?: {sink: TelemetrySink; buyerNodeId: string; selection: ModelSelection; now?: () => number};
   enter?(): () => void;
   select(
     excluded: ReadonlySet<string>,
