@@ -65,7 +65,7 @@ class EngineReadinessCheck {
     assertMemoryHeadroom(this.before);
     this.reason = READINESS_REASONS.WARMUP_FAILED;
     const { warmup, residencyMs } = this.dependencies.policy;
-    if (OFFER_LIFETIME_MS >= residencyMs)
+    if (!(residencyMs > OFFER_LIFETIME_MS))
       throw new Error('Offer lifetime exceeds warmed model residency.');
     const model = await this.engine.describe();
     this.signal.throwIfAborted();

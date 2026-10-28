@@ -10,6 +10,7 @@ import {
   PUBLIC_RECORD_KINDS,
   PUBLIC_RECORD_LIMITS,
   V2_PRICING,
+  type ControlMeteringMode,
 } from '@gyblos/protocol/constants';
 import type {
   InferenceOfferV2,
@@ -22,7 +23,6 @@ import type {
 import type { Signer } from '@gyblos/protocol/signing';
 
 import { createSellerControlService } from './control';
-import type { OfferMetering } from './engine-factory';
 import { createSellerRecords } from './public-records';
 import type { SellerSequence } from './public-sequence';
 import { listedPrices, type SellerCatalogOffer } from './seller-offer';
@@ -48,7 +48,7 @@ interface SellerControlStartupOptions {
   offer: SellerCatalogOffer;
   // From the engine plugin: what the catalog lists and how delivered tokens are counted.
   selection: ModelSelection;
-  meteringMode: OfferMetering['mode'];
+  meteringMode: ControlMeteringMode;
 }
 
 function startupRecords(
@@ -128,8 +128,11 @@ export async function prepareSellerControl(
   return { service, records, offer };
 }
 
-// The engine plugin's selection for the listed model; its plugin admits only levels it implements.
+// The listing and the engine plugin's selection must name the same model, or the catalog would sign
+// one model and quote another; the listing's reasoning was already admitted by the plugin.
 function startupSelection(options: SellerControlStartupOptions) {
+  if (options.selection.modelId !== options.offer.modelId)
+    throw new Error('Engine selection does not match the listed model.');
   return {
     selection: { ...options.selection },
     reasoning: [...options.offer.reasoning],

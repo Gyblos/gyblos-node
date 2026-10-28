@@ -107,8 +107,9 @@ export async function startSeller() {
       throw error;
     }
     await stage('private-engine-warmup');
-    const prepared = createSellerEngine(settings.engine, {
+    const prepared = createSellerEngine(settings.engineOffer, {
       fetch: globalThis.fetch,
+      environment: process.env,
     });
     const { engine } = prepared;
     const { model, offerExpiresAt } = await prepareSellerEngine(engine, {

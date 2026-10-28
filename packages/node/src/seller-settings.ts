@@ -38,7 +38,7 @@ export interface SellerSettings {
   publication: { baseUrl: string } | undefined;
   offer: FreeSellerOffer;
   // The same offer as its engine plugin sees it.
-  engine: SellerEngineOffer;
+  engineOffer: SellerEngineOffer;
   limits: SellerLimits;
 }
 
@@ -57,19 +57,20 @@ const fail = (code: NodeErrorCode, context?: NodeErrorContext): never => {
 
 function catalogOffer(
   offers: NodeOffer[],
-): Pick<SellerSettings, 'offer' | 'engine'> {
+): Pick<SellerSettings, 'offer' | 'engineOffer'> {
   if (!offers.length) fail(NODE_ERROR_CODES.SELLER_OFFERS_MISSING);
   if (offers.length !== 1)
     fail(NODE_ERROR_CODES.SELLER_OFFER_COUNT_UNSUPPORTED);
   const [offer] = offers as [NodeOffer];
-  const engine: SellerEngineOffer = {
+  const engineOffer: SellerEngineOffer = {
     index: 0,
     model: offer.model,
     engine: offer.engine,
-    reasoning: offer.reasoning,
+    reasoning: [...offer.reasoning],
   };
-  const refuse = (code: NodeErrorCode) => fail(code, { offer: engine.index });
-  const refusal = engineOfferRefusal(engine);
+  const refuse = (code: NodeErrorCode) =>
+    fail(code, { offer: engineOffer.index });
+  const refusal = engineOfferRefusal(engineOffer);
   if (refusal) refuse(refusal);
   const { pricing } = offer;
   // Paid v1 selling is off until it returns as a payment plugin (phase 2).
@@ -85,11 +86,11 @@ function catalogOffer(
         perBuyerCap: pricing.perBuyerCap,
       },
     },
-    engine,
+    engineOffer,
   };
 }
 
-export type SellerBaseSettings = Omit<SellerSettings, 'offer' | 'engine'>;
+export type SellerBaseSettings = Omit<SellerSettings, 'offer' | 'engineOffer'>;
 
 // Pure: everything but the offer, so doctor can still check relays when the offer is refused.
 export function sellerBaseSettings(
