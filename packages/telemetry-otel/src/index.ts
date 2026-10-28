@@ -1,7 +1,115 @@
-// Implements an explicitly owned metrics sink; never starts node services or global instrumentation.
-import type { PushMetricExporter } from '@opentelemetry/sdk-metrics';
-import type { TelemetrySink } from '@gyblos/protocol/telemetry';
-export interface OtelTelemetryOptions { exporter: PushMetricExporter }
-export function createOtelTelemetrySink(_options: OtelTelemetryOptions): TelemetrySink {
-  return { emit() {}, async flush() {}, async close() { return { emitted: 0, dropped: 0, failed: false }; } };
+// Owns an opt-in, lazy aggregate metrics lifecycle; no node wiring, global provider or default destination.
+import { emptyResource } from '@opentelemetry/resources';
+import {
+  AggregationType,
+  InstrumentType,
+  MeterProvider,
+  type PushMetricExporter,
+} from '@opentelemetry/sdk-metrics';
+
+import { toTelemetryRecord } from '@gyblos/core/telemetry';
+import {
+  TELEMETRY_EVENTS,
+  type TelemetryHealth,
+  type TelemetrySink,
+} from '@gyblos/protocol/telemetry';
+
+import { OTEL_SETTINGS } from './constants';
+import { createMeasurements } from './metrics';
+import { ExplicitMetricReader } from './reader';
+
+export interface OtelTelemetryOptions {
+  exporter: PushMetricExporter;
+}
+function initialize(exporter: PushMetricExporter) {
+  const provider = new MeterProvider({
+    resource: emptyResource(),
+    readers: [new ExplicitMetricReader(exporter)],
+    views: [
+      {
+        instrumentName: 'gyblos.*',
+        aggregationCardinalityLimit: OTEL_SETTINGS.cardinality,
+        instrumentType: InstrumentType.COUNTER,
+      },
+      {
+        instrumentName: 'gyblos.*',
+        instrumentType: InstrumentType.HISTOGRAM,
+        aggregationCardinalityLimit: OTEL_SETTINGS.cardinality,
+        aggregation: {
+          type: AggregationType.EXPLICIT_BUCKET_HISTOGRAM,
+          options: { boundaries: [...OTEL_SETTINGS.latencyBoundaries] },
+        },
+      },
+    ],
+  });
+  return {
+    provider,
+    record: createMeasurements(provider.getMeter(OTEL_SETTINGS.scope)),
+  };
+}
+export function createOtelTelemetrySink({
+  exporter,
+}: OtelTelemetryOptions): TelemetrySink {
+  let active: ReturnType<typeof initialize> | undefined;
+  let emitted = 0;
+  let dropped = 0;
+  let failed = false;
+  let exportFailed = false;
+  let flushing: Promise<void> | undefined;
+  let closing: Promise<TelemetryHealth> | undefined;
+  const exportMetrics = async () => {
+    if (exportFailed) return;
+    try {
+      await active?.provider.forceFlush();
+    } catch {
+      failed = true;
+      exportFailed = true;
+    }
+  };
+  return {
+    emit(event) {
+      if (closing) {
+        dropped++;
+        return;
+      }
+      try {
+        toTelemetryRecord(event);
+        if (
+          event.type !== TELEMETRY_EVENTS.RECEIPT &&
+          event.type !== TELEMETRY_EVENTS.CHARGED
+        ) {
+          active ??= initialize(exporter);
+          active.record(event);
+        }
+        emitted++;
+      } catch {
+        dropped++;
+        failed = true;
+      }
+    },
+    async flush() {
+      if (closing) {
+        await closing;
+        return;
+      }
+      if (!active) return;
+      flushing ??= exportMetrics().finally(() => {
+        flushing = undefined;
+      });
+      await flushing;
+    },
+    close() {
+      closing ??= (async () => {
+        await flushing;
+        await exportMetrics();
+        try {
+          await active?.provider.shutdown();
+        } catch {
+          failed = true;
+        }
+        return { emitted, dropped, failed };
+      })();
+      return closing;
+    },
+  };
 }

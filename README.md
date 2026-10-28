@@ -179,3 +179,9 @@ checks, the standalone lab facilitator and their evidence, and `tests/` and
 [Limitations](docs/limitations.md) · [Protocol spec](packages/protocol/SPEC.md)
 · [Tests](tests/README.md) · [Code standards](docs/code-standards.md) ·
 [Contributing](AGENTS.md)
+
+## Telemetry adapters
+
+The optional [aggregate OpenTelemetry adapter](docs/telemetry-otel.md) exports
+metrics only when explicitly constructed and flushed by a caller. It is not
+wired into node startup. Local record adapters remain separate.
