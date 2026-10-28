@@ -12,6 +12,7 @@ import type {
 import {
   TELEMETRY_EVENTS,
   TELEMETRY_REFUSALS,
+  type TelemetryRefusal,
 } from '@gyblos/protocol/telemetry';
 import { FreeClientError } from '@gyblos/transport-iroh/free-client';
 
@@ -40,28 +41,44 @@ export function buyerExecutionTelemetry(
   });
   return observer;
 }
+function remoteRefusal(error: FreeClientError): TelemetryRefusal | undefined {
+  if (!error.remote) return undefined;
+  switch (error.code) {
+    case FREE_EXECUTION_CODES.BUSY:
+      return TELEMETRY_REFUSALS.SELLER_BUSY;
+    case FREE_EXECUTION_CODES.DAILY_CAP:
+      return TELEMETRY_REFUSALS.DAILY_CAP;
+    case FREE_EXECUTION_CODES.BUYER_CAP:
+      return TELEMETRY_REFUSALS.BUYER_CAP;
+    case FREE_EXECUTION_CODES.UNSUPPORTED:
+      return TELEMETRY_REFUSALS.QUOTE_REJECTED;
+    default:
+      return undefined;
+  }
+}
 export function failBuyerTelemetry(
   observer: ReturnType<typeof buyerExecutionTelemetry>,
   error: unknown,
   signal: AbortSignal,
   delivered: boolean,
 ) {
-  if (
-    error instanceof FreeClientError &&
-    !error.sent &&
-    !delivered &&
-    !signal.aborted
-  )
-    observer?.refused(TELEMETRY_REFUSALS.CONNECT_FAILED);
-  else
-    observer?.failed(
-      signal.aborted
-        ? FREE_EXECUTION_CODES.CANCELLED
-        : error instanceof FreeClientError
-          ? error.code
-          : FREE_EXECUTION_CODES.INTERNAL,
-      error instanceof FreeClientError ? error : {},
-    );
+  if (error instanceof FreeClientError && !delivered && !signal.aborted) {
+    const refusal = error.sent
+      ? remoteRefusal(error)
+      : TELEMETRY_REFUSALS.CONNECT_FAILED;
+    if (refusal) {
+      observer?.refused(refusal);
+      return;
+    }
+  }
+  observer?.failed(
+    signal.aborted
+      ? FREE_EXECUTION_CODES.CANCELLED
+      : error instanceof FreeClientError
+        ? error.code
+        : FREE_EXECUTION_CODES.INTERNAL,
+    error instanceof FreeClientError ? error : {},
+  );
 }
 export function completeBuyerTelemetry(
   observer: ReturnType<typeof buyerExecutionTelemetry>,

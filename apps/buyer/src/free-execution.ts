@@ -70,7 +70,7 @@ export async function executeBuyerFree(
       const winner = await dependencies
         .select(excluded, signal)
         .catch((error) => {
-          buyerUnserved(dependencies, Boolean(onDelta));
+          if (!signal.aborted) buyerUnserved(dependencies, Boolean(onDelta));
           throw error;
         });
       signal.throwIfAborted();

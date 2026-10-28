@@ -226,16 +226,51 @@ void test('buyer telemetry exceptions cannot prevent success or release of local
   assert.equal(output.text, 'answer');
   assert.equal(released, 1);
 });
-void test('buyer records verified remote busy and cap refusals without enabling retry after send',async()=>{
-  for(const [code,refusal] of [[FREE_EXECUTION_CODES.BUSY,TELEMETRY_REFUSALS.SELLER_BUSY],[FREE_EXECUTION_CODES.DAILY_CAP,TELEMETRY_REFUSALS.DAILY_CAP],[FREE_EXECUTION_CODES.BUYER_CAP,TELEMETRY_REFUSALS.BUYER_CAP],[FREE_EXECUTION_CODES.UNSUPPORTED,TELEMETRY_REFUSALS.QUOTE_REJECTED]] as const){
-    const {request,telemetry,dependencies}=await fixture();let calls=0;
-    await assert.rejects(executeBuyerFree(request.input,{...dependencies,execute:async()=>{calls++;throw new FreeClientError(code,true,true);}}));
-    assert.equal(calls,1);assert.deepEqual(telemetry.events.map(event=>event.type),[TELEMETRY_EVENTS.REQUEST_RECEIVED,TELEMETRY_EVENTS.REFUSED]);
-    const terminal=telemetry.events[1];assert.equal(terminal?.type===TELEMETRY_EVENTS.REFUSED?terminal.refusal:null,refusal);
+void test('buyer records verified remote busy and cap refusals without enabling retry after send', async () => {
+  for (const [code, refusal] of [
+    [FREE_EXECUTION_CODES.BUSY, TELEMETRY_REFUSALS.SELLER_BUSY],
+    [FREE_EXECUTION_CODES.DAILY_CAP, TELEMETRY_REFUSALS.DAILY_CAP],
+    [FREE_EXECUTION_CODES.BUYER_CAP, TELEMETRY_REFUSALS.BUYER_CAP],
+    [FREE_EXECUTION_CODES.UNSUPPORTED, TELEMETRY_REFUSALS.QUOTE_REJECTED],
+  ] as const) {
+    const { request, telemetry, dependencies } = await fixture();
+    let calls = 0;
+    await assert.rejects(
+      executeBuyerFree(request.input, {
+        ...dependencies,
+        execute: async () => {
+          calls++;
+          throw new FreeClientError(code, true, true);
+        },
+      }),
+    );
+    assert.equal(calls, 1);
+    assert.deepEqual(
+      telemetry.events.map((event) => event.type),
+      [TELEMETRY_EVENTS.REQUEST_RECEIVED, TELEMETRY_EVENTS.REFUSED],
+    );
+    const terminal = telemetry.events[1];
+    assert.equal(
+      terminal?.type === TELEMETRY_EVENTS.REFUSED ? terminal.refusal : null,
+      refusal,
+    );
   }
 });
-void test('buyer cancelled selection is not counted as unavailable supply',async()=>{
-  const {request,telemetry,dependencies}=await fixture();const controller=new AbortController();
-  await assert.rejects(executeBuyerFree(request.input,{...dependencies,select:async()=>{controller.abort();throw controller.signal.reason;}},controller.signal));
-  assert.deepEqual(telemetry.events,[]);
+void test('buyer cancelled selection is not counted as unavailable supply', async () => {
+  const { request, telemetry, dependencies } = await fixture();
+  const controller = new AbortController();
+  await assert.rejects(
+    executeBuyerFree(
+      request.input,
+      {
+        ...dependencies,
+        select: async () => {
+          controller.abort();
+          throw controller.signal.reason;
+        },
+      },
+      controller.signal,
+    ),
+  );
+  assert.deepEqual(telemetry.events, []);
 });

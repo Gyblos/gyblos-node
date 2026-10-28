@@ -32,7 +32,8 @@ and consent configuration remain separate work.
 - Each buyer execution attempt records its quote-bound request once. A known
   pre-send connection failure emits `refused/connect_failed` and existing policy
   may select another seller. A selection failure emits one `unserved`, without
-  claiming a selected seller or request ID.
+  claiming a selected seller or request ID. Cancelled/timed-out selection does
+  not count as unavailable supply.
 - `first_token` means the first non-empty streaming callback resolved while the
   request was still active. It is not observed for non-streaming responses.
 - Seller `completed` means its validated result is ready to return; it does not
@@ -42,6 +43,10 @@ and consent configuration remain separate work.
 - Busy, exhausted caps, invalid policy and stale readiness are static refusals
   before generation. A started execution failure or cancellation emits `failed`.
   Provider messages and arbitrary exception text are never included.
+- The buyer recognizes verified remote busy, caps and unsupported-selection
+  refusals, but still never retries after the prompt was sent. A generic remote
+  engine error is a failed attempt: its wire code cannot prove whether the
+  engine was unavailable before generation or failed after starting.
 - Each observer emits its first-token event at most once and one terminal event.
   Late callbacks produce no additional telemetry. Sink or telemetry-clock
   failure cannot affect results, admission cleanup or retry decisions. Prompt
