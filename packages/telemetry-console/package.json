@@ -1,0 +1,13 @@
+{
+  "name": "@gyblos/telemetry-console",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@gyblos/core": "workspace:*",
+    "@gyblos/protocol": "workspace:*"
+  }
+}

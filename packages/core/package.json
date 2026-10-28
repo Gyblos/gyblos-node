@@ -14,7 +14,8 @@
     "./seller-selection": "./src/seller-selection.ts",
     "./pricing-v2": "./src/pricing-v2.ts",
     "./free-admission": "./src/free-admission.ts",
-    "./identity-policy": "./src/identity-policy.ts"
+    "./identity-policy": "./src/identity-policy.ts",
+    "./telemetry": "./src/telemetry.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",

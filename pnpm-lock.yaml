@@ -55,6 +55,12 @@ importers:
       '@gyblos/runtime':
         specifier: workspace:*
         version: link:packages/runtime
+      '@gyblos/telemetry-console':
+        specifier: workspace:*
+        version: link:packages/telemetry-console
+      '@gyblos/telemetry-file':
+        specifier: workspace:*
+        version: link:packages/telemetry-file
       '@gyblos/transport-iroh':
         specifier: workspace:*
         version: link:packages/transport-iroh
@@ -443,6 +449,30 @@ importers:
       '@gyblos/config':
         specifier: workspace:*
         version: link:../config
+
+  packages/telemetry-console:
+    dependencies:
+      '@gyblos/core':
+        specifier: workspace:*
+        version: link:../core
+      '@gyblos/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+
+  packages/telemetry-file:
+    dependencies:
+      '@gyblos/config':
+        specifier: workspace:*
+        version: link:../config
+      '@gyblos/core':
+        specifier: workspace:*
+        version: link:../core
+      '@gyblos/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      '@gyblos/runtime':
+        specifier: workspace:*
+        version: link:../runtime
 
   packages/transport-iroh:
     dependencies:

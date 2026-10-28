@@ -31,6 +31,9 @@
     "./free-execution-framing": "./src/free-execution-framing.ts",
     "./vectors/free-execution-v3.json": "./vectors/free-execution-v3.json",
     "./free-stream": "./src/free-stream.ts",
-    "./vectors/free-stream-v3.json": "./vectors/free-stream-v3.json"
+    "./vectors/free-stream-v3.json": "./vectors/free-stream-v3.json",
+    "./receipt": "./src/receipt.ts",
+    "./telemetry": "./src/telemetry.ts",
+    "./vectors/receipt-v1.json": "./vectors/receipt-v1.json"
   }
 }
