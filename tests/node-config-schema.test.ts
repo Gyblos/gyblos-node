@@ -100,6 +100,9 @@ void test('schema vocabularies come from the canonical catalogs', () => {
     property(definition('free'), 'daily_token_cap')?.maximum,
     NODE_CONFIG_LIMITS.maxTokenCap,
   );
+  const context = property(definition('engine'), 'context_tokens');
+  assert.equal(context?.minimum, NODE_CONFIG_LIMITS.minContextTokens);
+  assert.equal(context?.maximum, NODE_CONFIG_LIMITS.maxContextTokens);
 });
 
 void test('the schema decimal pattern and the validator agree on every price spelling', () => {

@@ -182,7 +182,7 @@ void test('the typed config maps snake_case keys, resolves aliases and applies o
       offer({
         model: 'qwen3:30b-a3b-q4_K_M',
         engine:
-          '{ kind = "openai", url = "http://host.docker.internal:1234/v1", api_key_env = "LM_KEY", upstream_model = "qwen/qwen3-30b-a3b" }',
+          '{ kind = "openai", url = "http://host.docker.internal:1234/v1", api_key_env = "LM_KEY", upstream_model = "qwen/qwen3-30b-a3b", context_tokens = 32768 }',
       }),
       offer({
         model: 'qwen3-0.6b',
@@ -212,6 +212,7 @@ void test('the typed config maps snake_case keys, resolves aliases and applies o
           url: 'http://host.docker.internal:1234/v1',
           apiKeyEnv: 'LM_KEY',
           upstreamModel: 'qwen/qwen3-30b-a3b',
+          contextTokens: 32768,
         },
         reasoning: ['off'],
         pricing: {
