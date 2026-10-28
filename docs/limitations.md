@@ -65,9 +65,9 @@ See [recovery.md](recovery.md) for how recovery works.
 
 ## Inference and verification
 
-- There is no signed seller receipt. Token recounts **detect** an overcharge
-  within the ceiling after settlement; they do not prevent, refund or penalize
-  it.
+- Signed usage receipts are defined but not yet emitted. Token recounts
+  **detect** an overcharge within the ceiling after settlement; they do not
+  prevent, refund or penalize it.
 - Model pins check local artifacts only. The buyer cannot verify the remote
   seller's model or the correctness of an answer.
 - Paid v1 responses remain buffered, without first-word latency measurement.

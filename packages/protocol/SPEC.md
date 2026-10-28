@@ -462,7 +462,8 @@ the error catalog does not promise every rejection has a wire response.
 It includes the signed quote and the complete chat input, and is distinct from
 the quote's prompt-free control request digest. The buyer matches requestId and
 this digest before acting on either an error or a result. Responses are bound
-to the authenticated seller connection, not independently signed receipts.
+to the authenticated seller connection. Independent usage receipts are defined
+but not yet emitted; they do not change response authentication.
 `FreeExecutionError.remote` defaults to false for local checks. A matched
 remote error also exposes its `reason` and `delivered`.
 `matchFreeExecutionResponse` sets it to true only for a parsed error whose
@@ -632,3 +633,103 @@ first write, so partial/failed writes and any later failure prohibit failover.
 Zero clock skew remains: quote expiry is rechecked immediately before the first
 write, with no grace interval. Streaming does not authorize payments, call a
 facilitator, modify the v1 flow or reserve capacity during quotation.
+
+## Usage receipts v1
+
+Usage receipts are defined but not yet emitted. No execution channel, seller,
+buyer, collector or payment path is wired to them. They apply to v2-and-later
+quotes; paid v1 does not have the required request identifiers and digests.
+A receipt is evidence of what its signer reports, not proof of model execution,
+correctness or independently measured usage.
+
+`ReceiptV1 = { seller: { record, signature }, buyer?: { record, signature } }`.
+The seller signs `SellerReceiptV1` with its node key; the optional buyer signs a
+separate `BuyerReceiptV1` with its own node key. A seller-only receipt is
+unconfirmed. Each signature is 64 Ed25519 bytes encoded as 128 lowercase hex
+characters. Optional `buyer` is omitted, never `undefined`.
+
+Signing bytes are UTF-8 of the domain followed by the existing canonical JSON:
+`gyblos/receipt-seller/v1\n` and `gyblos/receipt-buyer/v1\n` respectively.
+`sellerReceiptDigest` is SHA-256 of the seller signing bytes, lowercase hex.
+`signSellerReceipt` and `signBuyerReceipt` parse, sign, then self-verify against
+`sellerNodeId` and `buyerNodeId`. `verifyReceipt` strictly parses the envelope,
+verifies both available signatures and checks the buyer's seller digest,
+requestId and both NodeIds against the seller record. It takes no `now`:
+receipts have no expiry. Resolving a node's owner is separate policy.
+
+The seller record has exactly these fields:
+
+- `version: 1`, `requestId` (16-byte lowercase hex), `requestDigest` (32-byte
+  lowercase hex), `sellerNodeId` and `buyerNodeId` (32-byte lowercase hex),
+  `owner` (32-byte base58 address).
+- `selection: { modelId, variant, quantization }`, using the control selection
+  grammar; exact `reasoning`, `engineKind`, `metering` and boolean `streaming`.
+- `pricing: { kind: 'free' }` or `{ kind: 'paid', prices, network, asset }`.
+  Prices use `inputAtomicPerMtok` and `outputAtomicPerMtok`; amounts and prices
+  use the existing canonical decimal/u64 bounds. `amountAtomic`, `feeAtomic`.
+- `usage: { inputTokens, outputTokens, reasoningTokens }`, where reasoning
+  tokens are nullable to mean unmeasured; the other counts are nonnegative safe
+  integers. `sizes: { inputBytes, outputBytes, inputChars, outputChars }` uses
+  nonnegative safe integers; chars count Unicode code points.
+- `timing: { receivedAt, firstTokenMs, totalMs }`: nonnegative safe integers,
+  with `receivedAt` in epoch milliseconds and nullable `firstTokenMs`.
+- `outcome` (`completed`, `failed`, `cancelled`), `code` (free execution code or
+  null), `reason` (stop reason or null), `finishReason` (engine done reason or
+  null).
+
+Completed records require null code/reason and a non-null finish reason.
+Failed records require a code. Cancelled records require the cancellation code.
+A non-null reason is required if and only if the code is
+`FREE_EXECUTION_SELLER_CANNOT_CONTINUE`; its value must belong to the public
+`FREE_EXECUTION_STOP_REASONS` catalog. Seller upstream credential state is not
+public: authentication failures use the generic `engine_unavailable` reason,
+never `engine_auth`. The seller-only failed/quota-exhausted golden case covers
+an unconfirmed receipt; it requires no buyer signature.
+
+`firstTokenMs <= totalMs`, and `firstTokenMs === null` iff `outputBytes === 0`.
+Free pricing requires both amounts to be `'0'`; paid pricing requires
+`feeAtomic <= amountAtomic`. Seller canonical records are capped at 2048 UTF-8
+bytes, buyer records at 1024 bytes. All records and nested objects reject extra
+fields, missing fields, accessors, invalid decimals and `undefined` values.
+
+The buyer record has exactly `version`, `requestId`, `sellerReceiptDigest`,
+`sellerNodeId`, `buyerNodeId`, `observed`, `verdict`, and `disputed`.
+`observed = { inputTokens, outputTokens, outputBytes, firstTokenMs, totalMs }`:
+observed token counts are nullable when the buyer has no tokenizer; bytes and
+timing use the seller's integer and first-token invariants. `verdict` is
+`agreed` iff `disputed` is empty; otherwise it is `disputed`. Dispute fields
+are unique and ordered `inputTokens`, `outputTokens`, `outputBytes`. Timing
+is not disputed: each side signs its own network-dependent measurement.
+
+No prompt, response, IP, key or arbitrary provider message belongs in these
+records. Full receipts go only to Gyblos; individual raw receipts are not
+public. Public data consists of seller/model aggregates, buyer totals and
+signed daily snapshots, per the founder's receipt-privacy decision. Collection,
+consent, retention and public aggregation are outside this contract.
+
+### Telemetry port (not connected)
+
+`TelemetrySink.emit` is synchronous and must never throw. `flush` drains
+accepted work; `close` returns `{ emitted, dropped, failed }`. Both are
+idempotent. Events are `request_received`, `first_token`, `completed`, `failed`,
+`charged`, `receipt`, `refused` and `unserved`. They have common `at`, `role`,
+`requestId`, `buyerNodeId`, `sellerNodeId`, `selection`, `engineKind`, `streaming`.
+Only unserved has a null requestId; unserved and refused without a seller can
+have null sellerNodeId/engineKind; those two fields are absent together. A refusal carries one static reason:
+`seller_busy`, `daily_cap`, `buyer_cap`, `quote_rejected`, `connect_failed`,
+`engine_not_ready`. There are no free-text fields.
+
+`toTelemetryRecord` creates a detached, recursively allowlisted record,
+including nested receipt fields. Invalid closed values fail locally; sinks
+count projection failures as drops. `fanOut` isolates each destination's
+exception, sums sink emitted/dropped counts plus its own caught emit failures,
+and combines failure flags. It has no clock, I/O or plugin dependency.
+
+The private file plugin is lazy and opens only on first emit, under the role's
+`telemetry` directory, using the existing `diagnostic-*.jsonl` private runtime
+log. Its open buffer is bounded by `PRIVATE_LOG_LIMITS.pendingRecords`.
+Serialized records including newline are capped at 4096 bytes. Accepted events
+increment emitted; buffer/projection drops and runtime log drops increment
+dropped; persistence failure sets failed. The console plugin uses only its
+injected write and emits one JSON line per projected event. No plugin is
+installed into a live role by this change.

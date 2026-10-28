@@ -78,6 +78,8 @@ void test('all executable modules are inert when imported', async (context) => {
   assert.equal(racingStops, 2);
   assert.equal(racing.health().state, NODE_STATES.STOPPED);
   await assertImportsInert(async () => {
+    await import('@gyblos/telemetry-file');
+    await import('@gyblos/telemetry-console');
     await import('@gyblos/buyer/setup');
     await import('@gyblos/node-app/cli');
     await import('@gyblos/desktop/wallet-restore');

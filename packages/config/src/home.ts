@@ -32,6 +32,7 @@ export const ROLE_FILES = {
   trust: 'trust.json',
   status: 'status.json',
   traces: 'traces.json',
+  telemetry: 'telemetry',
   metrics: 'transport.jsonl',
   measurements: 'measurements.jsonl',
   measurementSalt: 'measurement-salt',
