@@ -1,5 +1,6 @@
-// Starts the P2P seller for its free offer: warmup of the seller's own engine, signed public records and
-// the Iroh bridge; tears everything down in reverse order on failure. Paid selling is off until phase 2.
+// Starts the P2P seller for its free offers: warmup of the seller's own engines, signed public records and
+// the Iroh bridge; offers not ready at startup are warmed again in the background. Tears everything down
+// in reverse order on failure. Paid selling is off until phase 2.
 import { EndpointTicket } from '@number0/iroh';
 
 import {
@@ -8,24 +9,76 @@ import {
   SELLER_DISCOVERY,
   TRANSPORT_TIMEOUTS,
 } from '@gyblos/config';
+import { FreeSellerLedger } from '@gyblos/core/free-admission';
 import { publishRecord } from '@gyblos/discovery-http';
-import { P2P_ROLES } from '@gyblos/protocol/constants';
+import { CONTROL_CODES, P2P_ROLES } from '@gyblos/protocol/constants';
+import { ControlError } from '@gyblos/protocol/control-validation';
 import { saveJson } from '@gyblos/runtime';
 import { assertMemoryHeadroom, memorySnapshot } from '@gyblos/runtime/memory';
 import { withDeadline } from '@gyblos/transport-iroh/deadline';
 import { bindEndpoint } from '@gyblos/transport-iroh/endpoint';
 
 import { SELLER_PUBLIC_RECORDS } from './constants';
-import { observeControlReadiness } from './control-readiness';
 import { prepareSellerControl } from './control-startup';
-import { assertReadinessCurrent, probeSellerEngine } from './engine-readiness';
+import {
+  assertReadinessCurrent,
+  type ReadinessRecord,
+} from './engine-readiness';
+import { createSellerFreeOffers } from './free-offers';
 import { assertRoleHome } from './home';
 import { openSellerSequence } from './public-sequence';
 import { createSellerPublisher } from './publisher';
 import { loadRole, nodeSecret, rolePath, roleSigner } from './roles';
-import { prepareSellerOffers } from './seller-offers';
-import { loadSellerSettings } from './seller-settings';
+import { SellerOfferSet } from './seller-offer-set';
+import {
+  liveSellerOffer,
+  prepareSellerOffers,
+  retrySellerOffers,
+} from './seller-offers';
+import { loadSellerSettings, type SellerSettings } from './seller-settings';
 import { serveSellerTransport } from './seller-transport';
+
+// Refresh refusals that a later observation can clear.
+const TRANSIENT = new Set<string>([
+  CONTROL_CODES.STALE,
+  CONTROL_CODES.EXPIRED,
+  CONTROL_CODES.BUSY,
+  CONTROL_CODES.CANCELLED,
+]);
+
+// Private: each offer's latest warmup outcome, rewritten whole as { offers: [...] } in index order.
+function readinessDiagnostics() {
+  const outcomes = new Map<number, ReadinessRecord>();
+  let writing = Promise.resolve();
+  return async (index: number, record: ReadinessRecord) => {
+    outcomes.set(index, record);
+    const snapshot = {
+      offers: [...outcomes]
+        .sort(([left], [right]) => left - right)
+        .map(([offer, outcome]) => ({ index: offer, ...outcome })),
+    };
+    writing = writing
+      .catch(() => {})
+      .then(() =>
+        saveJson(
+          rolePath(P2P_ROLES.SELLER, DIAGNOSTICS.readinessFilename),
+          snapshot,
+        ),
+      );
+    await writing;
+  };
+}
+
+// Private status: which gyblos.toml offers are listed now, without engine URLs.
+function offerStatus(settings: SellerSettings, offers: SellerOfferSet) {
+  const listed = new Set(offers.listed().map((offer) => offer.index));
+  return settings.offers.map(({ offer, engine }) => ({
+    index: engine.index,
+    modelId: offer.modelId,
+    engine: engine.engine.kind,
+    listed: listed.has(engine.index),
+  }));
+}
 
 export async function startSeller() {
   const startedAt = Date.now();
@@ -55,39 +108,24 @@ export async function startSeller() {
       nodeId: config.nodeId,
     });
     await stage('private-engine-warmup');
-    // The seller runs its engine; startup only warms it at the offer URL and never starts it.
-    const { prepared, model, offerExpiresAt } = await prepareSellerOffers(
+    // The seller runs its engines; startup only warms each at its offer URL and never starts one.
+    const offerDependencies = {
+      fetch: globalThis.fetch,
+      environment: process.env,
+      snapshot: memorySnapshot,
+      record: readinessDiagnostics(),
+    };
+    const { ready, pending } = await prepareSellerOffers(
       settings,
-      {
-        fetch: globalThis.fetch,
-        environment: process.env,
-        snapshot: memorySnapshot,
-        record: (record) =>
-          saveJson(
-            rolePath(P2P_ROLES.SELLER, DIAGNOSTICS.readinessFilename),
-            record,
-          ),
-      },
+      offerDependencies,
     );
-    const { engine } = prepared;
     await stage('role-signers');
     // Free execution signs only with the owner key; it also fills the quote's unused payment roles.
     const owner = await roleSigner(P2P_ROLES.SELLER, 'owner');
     await stage('control-readiness');
-    const controlReadiness = observeControlReadiness(
-      engine,
-      offerExpiresAt,
-      Date.now,
-      {
-        model,
-        check: (signal) =>
-          probeSellerEngine(engine, signal, {
-            policy: prepared.readiness,
-            snapshot: memorySnapshot,
-          }),
-      },
-    );
-    const tokenizer = await prepared.metering.tokenizer();
+    const offers = new SellerOfferSet();
+    for (const warmed of ready)
+      offers.add(await liveSellerOffer(warmed, offerDependencies));
     await stage('iroh-endpoint');
     const { relayOnly } = settings;
     const endpoint = await bindEndpoint(await nodeSecret(P2P_ROLES.SELLER), {
@@ -107,9 +145,9 @@ export async function startSeller() {
       void endpoint.close();
     });
     const endpointAddress = endpoint.addr();
-    assertMemoryHeadroom(await memorySnapshot());
-    const now = Date.now();
-    assertReadinessCurrent(offerExpiresAt, now);
+    if (ready.some((warmed) => warmed.prepared.readiness.localResources))
+      assertMemoryHeadroom(await memorySnapshot());
+    assertReadinessCurrent(offers.readiness().validUntil, Date.now());
     const endpointInfo = {
       relayUrl: endpointAddress.relayUrl(),
       directAddresses: relayOnly ? [] : endpointAddress.directAddresses(),
@@ -134,34 +172,33 @@ export async function startSeller() {
       authorizer: owner.address,
       endpoint: endpointInfo,
       relayOnly,
-      model,
-      capabilities: engine.capabilities(),
-      validUntil: offerExpiresAt,
-      readiness: controlReadiness.readiness,
-      offer: settings.offer,
-      selection: prepared.selection,
-      meteringMode: prepared.metering.mode,
+      offers,
     });
     disposers.push(async () => {
       await control.records.withdraw();
     });
-    const bridge = serveSellerTransport(endpoint, control, {
-      owner: owner.address,
-      nodeId: config.nodeId,
-      model,
-      engine: controlReadiness.engine,
-      tokenizer,
-      readiness: controlReadiness.readiness,
-      startedAt,
-      relayOnly,
-      limits: settings.limits,
-    });
+    const bridge = serveSellerTransport(
+      endpoint,
+      {
+        control: control.service,
+        free: createSellerFreeOffers(() => offers.all(), {
+          owner: owner.address,
+          nodeId: config.nodeId,
+          now: Date.now,
+          ledger: new FreeSellerLedger(
+            startedAt,
+            settings.limits.maxFreeBuyers,
+          ),
+        }),
+      },
+      { relayOnly, limits: settings.limits },
+    );
     disposers[endpointDisposeIndex] = () => bridge.close();
     const publication = publicationConfig
       ? createSellerPublisher({
           records: control.records,
           canPublish: () => {
-            const observed = controlReadiness.readiness();
+            const observed = offers.readiness();
             return (
               !observed.busy &&
               observed.observedAt <= Date.now() &&
@@ -183,18 +220,37 @@ export async function startSeller() {
       disposers.push(() => publication.stop());
       publication.start();
     }
-    controlReadiness.start(() => control.records.refresh());
-    disposers.push(() => controlReadiness.stop());
-    await saveJson(rolePath(P2P_ROLES.SELLER, ROLE_FILES.status), {
-      status: 'ready',
-      runId: process.env.GYBLOS_P2P_RUN_ID,
-      role: P2P_ROLES.SELLER,
-      nodeId: config.nodeId,
-      relayOnly,
-      capabilities: engine.capabilities(),
-      model,
-      offerTicket: EndpointTicket.fromAddr(endpointAddress).toString(),
+    // A refresh refused by a concurrent change is retried at the next change or tick; it must not
+    // invalidate the offer whose tick ran it. Any other failure still does.
+    offers.start(() =>
+      control.records.refresh().catch((error: unknown) => {
+        if (!(error instanceof ControlError && TRANSIENT.has(error.code)))
+          throw error;
+      }),
+    );
+    disposers.push(() => offers.stop());
+    const offerTicket = EndpointTicket.fromAddr(endpointAddress).toString();
+    const writeReady = () =>
+      saveJson(rolePath(P2P_ROLES.SELLER, ROLE_FILES.status), {
+        status: 'ready',
+        runId: process.env.GYBLOS_P2P_RUN_ID,
+        role: P2P_ROLES.SELLER,
+        nodeId: config.nodeId,
+        relayOnly,
+        offers: offerStatus(settings, offers),
+        offerTicket,
+      });
+    const retry = retrySellerOffers(pending, {
+      ...offerDependencies,
+      add: async (live) => {
+        offers.add(live);
+        // The new membership is signed now rather than at the next renewal tick.
+        await control.records.refresh().catch(() => {});
+        await writeReady().catch(() => {});
+      },
     });
+    disposers.push(() => retry.stop());
+    await writeReady();
     return {
       close,
       publication: publication ? () => publication.health() : undefined,

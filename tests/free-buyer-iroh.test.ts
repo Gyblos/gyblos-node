@@ -9,7 +9,9 @@ import { freeBuyerDependencies } from '@gyblos/buyer/free-selection';
 import type { BuyerSelectionConfig } from '@gyblos/buyer/selection-config';
 import type { LocalSellerStats } from '@gyblos/buyer/selection-stats';
 import { SELLER_BADGES } from '@gyblos/core/constants';
+import { FreeSellerLedger } from '@gyblos/core/free-admission';
 import { createSellerControlService } from '@gyblos/node/control';
+import { prepareSellerFreeExecution } from '@gyblos/node/free-execution';
 import { sellerLimits } from '@gyblos/node/node-config-limits';
 import { createSellerRecords } from '@gyblos/node/public-records';
 import { serveSellerTransport } from '@gyblos/node/seller-transport';
@@ -63,7 +65,7 @@ void test(
     source.context.catalog = await signPublicV2(source.catalog, signer);
     let sequence = source.catalog.sequence;
     const records = await createSellerRecords({
-      template: source.catalog,
+      template: () => source.catalog,
       signer,
       now: source.context.now,
       validUntil: () => source.context.readiness().validUntil,
@@ -78,26 +80,26 @@ void test(
     const server = serveSellerTransport(
       seller,
       {
-        offer: fixture.options.offer,
-        records,
-        service: createSellerControlService({
+        control: createSellerControlService({
           context: source.context,
           ownerSigner: source.ownerSigner,
           nodeSigner: signer,
           records,
         }),
+        free: prepareSellerFreeExecution({
+          ...fixture.options,
+          engine: {
+            ...fixture.options.engine,
+            capabilities: () => fixture.options.capabilities,
+          },
+          nodeId: seller.id().toString(),
+          catalog: records.current(),
+          // The buyer runs on the wall clock.
+          now: Date.now,
+          ledger: new FreeSellerLedger(now - 1, sellerLimits().maxFreeBuyers),
+        }),
       },
-      {
-        ...fixture.options,
-        engine: {
-          ...fixture.options.engine,
-          capabilities: () => fixture.options.capabilities,
-        },
-        nodeId: seller.id().toString(),
-        startedAt: now - 1,
-        relayOnly: false,
-        limits: sellerLimits(),
-      },
+      { relayOnly: false, limits: sellerLimits() },
     );
     const {
       buyer: _buyer,

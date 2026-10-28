@@ -1,0 +1,48 @@
+// Free execution over the seller's warmed offers: one service per offer (its engine, tokenizer, readiness
+// and token caps), all on the seller's one ledger, behind the free router. An offer's service is built
+// once, so its caps survive while it is listed, unlisted and listed again.
+import type { FreeSellerLedger } from '@gyblos/core/free-admission';
+
+import { createSellerFreeExecution } from './free-execution';
+import {
+  createSellerFreeRouter,
+  type FreeOffer,
+  type FreeOfferService,
+} from './free-router';
+import type { LiveSellerOffer } from './seller-offer-set';
+
+export interface SellerFreeOffersOptions {
+  owner: string;
+  nodeId: string;
+  now: () => number;
+  // Created once per seller process: renewals never reset single use or the day's buyers.
+  ledger: FreeSellerLedger;
+}
+
+// Reads the offers on every request, so an offer warmed later is served from then on.
+export function createSellerFreeOffers(
+  offers: () => readonly LiveSellerOffer[],
+  options: SellerFreeOffersOptions,
+): FreeOfferService {
+  const services = new Map<number, FreeOffer>();
+  const serve = (live: LiveSellerOffer) => {
+    const held = services.get(live.index);
+    if (held) return held;
+    const created: FreeOffer = {
+      selection: live.selection,
+      service: createSellerFreeExecution({
+        ...options,
+        offer: live.offer,
+        selection: live.selection,
+        model: live.model,
+        capabilities: live.capabilities,
+        engine: live.engine,
+        tokenizer: live.tokenizer,
+        readiness: live.readiness,
+      }),
+    };
+    services.set(live.index, created);
+    return created;
+  };
+  return createSellerFreeRouter(() => offers().map(serve));
+}

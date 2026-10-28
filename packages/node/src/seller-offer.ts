@@ -17,7 +17,8 @@ export interface FreeOfferCaps {
 }
 
 export type SellerCatalogOffer = {
-  modelId: typeof MODEL_IDS.QWEN3_0_6B;
+  // The catalog model id the offer's engine plugin serves.
+  modelId: string;
   reasoning: readonly ReasoningLevel[];
 } & (
   | { kind: typeof OFFER_PRICING_KINDS.PAID; prices: TokenPricesV2 }

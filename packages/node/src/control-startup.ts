@@ -1,31 +1,31 @@
 // Builds the seller's public control snapshot from cached observations, never from live engine calls.
-// Catalog model identity maps explicitly to the already warmed engine description.
+// The catalog lists exactly the offers listed at signing time, each mapped to its warmed engine.
 import { createSignableMessage, type KeyPairSigner } from '@solana/kit';
 
 import { DEVNET } from '@gyblos/config';
-import type { QuoteReadiness } from '@gyblos/core/control-quotes';
 import {
   CONTROL_RECORD_VERSION,
   DATA_RETENTION,
   PUBLIC_RECORD_KINDS,
   PUBLIC_RECORD_LIMITS,
   V2_PRICING,
-  type ControlMeteringMode,
 } from '@gyblos/protocol/constants';
 import type {
   InferenceOfferV2,
-  ModelSelection,
+  PublicCatalogV2,
 } from '@gyblos/protocol/control-types';
-import type {
-  EngineCapabilities,
-  EngineDescription,
-} from '@gyblos/protocol/engine';
 import type { Signer } from '@gyblos/protocol/signing';
 
 import { createSellerControlService } from './control';
+import {
+  checkedControlOffer,
+  quoteModel,
+  type ControlOffer,
+  type ControlOffers,
+} from './control-offers';
 import { createSellerRecords } from './public-records';
 import type { SellerSequence } from './public-sequence';
-import { listedPrices, type SellerCatalogOffer } from './seller-offer';
+import { listedPrices } from './seller-offer';
 
 interface SellerControlStartupOptions {
   owner: KeyPairSigner;
@@ -37,67 +37,70 @@ interface SellerControlStartupOptions {
   authorizer: string;
   endpoint: InferenceOfferV2['endpoint'];
   relayOnly: boolean;
-  model: EngineDescription;
-  capabilities: EngineCapabilities;
-  validUntil: number;
-  readiness: () => QuoteReadiness;
   sequence: SellerSequence;
   catalogMs?: number;
   now?: () => number;
-  // The listing: from gyblos.toml in the daemon, chosen by the caller in lab acceptance.
-  offer: SellerCatalogOffer;
-  // From the engine plugin: what the catalog lists and how delivered tokens are counted.
-  selection: ModelSelection;
-  meteringMode: ControlMeteringMode;
+  // The daemon's offer set, or one always-listed offer in lab acceptance.
+  offers: ControlOffers;
 }
 
-function startupRecords(
+function publicModel(
   options: SellerControlStartupOptions,
-  offer: SellerCatalogOffer,
-) {
-  const now = (options.now ?? Date.now)();
-  const { selection, reasoning } = startupSelection(options);
-  return createSellerRecords({
-    template: {
+  listed: ControlOffer,
+): PublicCatalogV2['models'][number] {
+  const { selection, offer, model } = checkedControlOffer(listed);
+  return {
+    ...selection,
+    contextTokens: model.contextTokens,
+    pricing: {
+      network: DEVNET,
+      asset: options.mint,
+      unit: V2_PRICING.unit,
+      ...listedPrices(offer),
+    },
+    reasoning: [...offer.reasoning],
+  };
+}
+
+// Evaluated at every signing; signing refreshes sequence and lifetime, and refuses an empty listing.
+function catalogTemplate(
+  options: SellerControlStartupOptions,
+): () => PublicCatalogV2 | undefined {
+  return () => {
+    const listed = options.offers.listed();
+    if (!listed.length) return undefined;
+    const now = (options.now ?? Date.now)();
+    return {
       schemaVersion: CONTROL_RECORD_VERSION,
       kind: PUBLIC_RECORD_KINDS.CATALOG,
       owner: options.owner.address,
       nodeId: options.nodeId,
       sequence: now,
       issuedAt: now,
-      expiresAt: options.validUntil,
-      models: [
-        {
-          ...selection,
-          contextTokens: options.model.contextTokens,
-          pricing: {
-            network: DEVNET,
-            asset: options.mint,
-            unit: V2_PRICING.unit,
-            ...listedPrices(offer),
-          },
-          reasoning,
-        },
-      ],
+      expiresAt: options.offers.readiness().validUntil,
+      models: listed.map((offer) => publicModel(options, offer)),
       dataPolicy: { retention: DATA_RETENTION.NONE },
-    },
-    sequence: options.sequence,
-    signer: options.nodeSigner,
-    now: options.now ?? Date.now,
-    validUntil: () => options.readiness().validUntil,
-    readiness: options.readiness,
-    catalogMs: options.catalogMs ?? PUBLIC_RECORD_LIMITS.catalogLifetimeMs,
-  });
+    };
+  };
 }
 
 export async function prepareSellerControl(
   options: SellerControlStartupOptions,
 ) {
-  const { offer } = options;
-  const { selection, reasoning } = startupSelection(options);
-  const records = await startupRecords(options, offer);
+  const { offers } = options;
+  const now = options.now ?? Date.now;
+  const records = await createSellerRecords({
+    template: catalogTemplate(options),
+    sequence: options.sequence,
+    signer: options.nodeSigner,
+    now,
+    validUntil: () => offers.readiness().validUntil,
+    readiness: () => offers.readiness(),
+    catalogMs: options.catalogMs ?? PUBLIC_RECORD_LIMITS.catalogLifetimeMs,
+  });
   const service = createSellerControlService({
     records,
+    offers,
     context: {
       catalog: records.current(),
       owner: options.owner.address,
@@ -107,17 +110,10 @@ export async function prepareSellerControl(
       authorizer: options.authorizer,
       endpoint: options.endpoint,
       relayOnly: options.relayOnly,
-      models: [
-        {
-          selection,
-          model: options.model,
-          capabilities: options.capabilities,
-          reasoning,
-          meteringMode: options.meteringMode,
-        },
-      ],
-      now: options.now ?? Date.now,
-      readiness: options.readiness,
+      // Superseded per query by the listed offers and each quote's own offer readiness.
+      models: offers.listed().map(quoteModel),
+      now,
+      readiness: () => offers.readiness(),
     },
     nodeSigner: options.nodeSigner,
     ownerSigner: async (bytes) =>
@@ -125,16 +121,5 @@ export async function prepareSellerControl(
         options.owner.address
       ]!,
   });
-  return { service, records, offer };
-}
-
-// The listing and the engine plugin's selection must name the same model, or the catalog would sign
-// one model and quote another; the listing's reasoning was already admitted by the plugin.
-function startupSelection(options: SellerControlStartupOptions) {
-  if (options.selection.modelId !== options.offer.modelId)
-    throw new Error('Engine selection does not match the listed model.');
-  return {
-    selection: { ...options.selection },
-    reasoning: [...options.offer.reasoning],
-  };
+  return { service, records };
 }

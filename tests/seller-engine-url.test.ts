@@ -52,7 +52,10 @@ void test('an ollama offer may use any literal loopback URL; names, paths and ke
     // Numeric spellings of 127.0.0.1 normalize to it, so they still stay on loopback.
     'http://127.1:11434/',
   ])
-    assert.equal(sellerSettings(engineOf(url), {}).engineOffer.engine.url, url);
+    assert.equal(
+      sellerSettings(engineOf(url), {}).offers[0]!.engine.engine.url,
+      url,
+    );
   for (const url of [
     'http://localhost:11434/',
     'http://host.docker.internal:11434/',

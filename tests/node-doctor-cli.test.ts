@@ -10,6 +10,8 @@ import { join } from 'node:path';
 import test from 'node:test';
 
 import { runCli } from '@gyblos/node-app/cli';
+import { DOCTOR_STATUS } from '@gyblos/node/constants';
+import { engineStatuses } from '@gyblos/node/seller-doctor';
 
 import {
   doctor,
@@ -40,7 +42,7 @@ void test('doctor: a ready free seller exits 0, prints its public identity and c
       'keys',
       'sequence',
       'tokenizer',
-      'engine',
+      'engine[1]',
       'relays',
     ])
       assert.match(line(result.output, check), /^\s*OK\s/, check);
@@ -48,11 +50,11 @@ void test('doctor: a ready free seller exits 0, prints its public identity and c
     assert.doesNotMatch(result.output, /program/);
     assert.match(result.output, new RegExp(`nodeId\\s+${NODE_ID}`));
     assert.match(result.output, new RegExp(`owner\\s+${run.owner}`));
-    assert.match(result.output, /offer\s+free qwen3-0\.6b/);
+    assert.match(result.output, /offer\[1\] free qwen3-0\.6b/);
     assert.match(result.output, /publish\s+off/);
     assert.match(result.output, /connections 8 total/);
     assert.match(result.output, /requests\s+30\/min per buyer, 256\/min total/);
-    assert.match(result.output, /free buyers 1024\/day/);
+    assert.match(result.output, /free buyers 1024\/day across all offers/);
   }));
 
 void test('doctor: prints the [limits] the seller will serve with', () =>
@@ -227,8 +229,8 @@ void test('doctor: a stopped engine at the offer URL fails with the engine code;
     const stopped = await doctor(run, [], {}, { tokenizer: undefined });
     assert.equal(stopped.code, 1);
     assert.match(
-      line(stopped.output, 'engine'),
-      /FAIL\s+engine\s+ENGINE_UNAVAILABLE\s+\[\[offers\]\] entry 1: start the engine at the offer URL/,
+      line(stopped.output, 'engine[1]'),
+      /FAIL\s+engine\[1\]\s+ENGINE_UNAVAILABLE\s+start the engine at the offer URL/,
     );
     assert.match(
       line(stopped.output, 'tokenizer'),
@@ -239,7 +241,7 @@ void test('doctor: a stopped engine at the offer URL fails with the engine code;
     const ollama = await withOllama(run);
     await writeFile(join(run.root, 'gyblos.toml'), freeToml(run));
     const ready = await doctor(run);
-    assert.match(line(ready.output, 'engine'), /^\s*OK\s+engine/);
+    assert.match(line(ready.output, 'engine[1]'), /^\s*OK\s+engine\[1\]/);
     assert.deepEqual([...new Set(ollama.paths)], ['/api/tags']);
   }));
 
@@ -250,8 +252,8 @@ void test('doctor: an engine that never answers fails with ENGINE_TIMEOUT within
     const hung = await doctor(run);
     assert.equal(hung.code, 1);
     assert.match(
-      line(hung.output, 'engine'),
-      /FAIL\s+engine\s+ENGINE_TIMEOUT\s+\[\[offers\]\] entry 1:/,
+      line(hung.output, 'engine[1]'),
+      /FAIL\s+engine\[1\]\s+ENGINE_TIMEOUT\s+the engine at the offer URL/,
     );
   }));
 
@@ -306,4 +308,17 @@ void test('doctor: the gyblos script entry sets exit code 1 for an empty home', 
   );
   assert.equal(result.status, 1, result.stderr);
   assert.match(result.stdout + result.stderr, /ROLE_MISSING/);
+});
+
+void test('doctor: a down engine warns while another offer’s engine answers, and fails when none does', () => {
+  const ok = { status: DOCTOR_STATUS.OK };
+  const down = { status: DOCTOR_STATUS.FAIL };
+  assert.deepEqual(
+    engineStatuses([ok, down]).map((result) => result.status),
+    [DOCTOR_STATUS.OK, DOCTOR_STATUS.WARN],
+  );
+  assert.deepEqual(
+    engineStatuses([down, down]).map((result) => result.status),
+    [DOCTOR_STATUS.FAIL, DOCTOR_STATUS.FAIL],
+  );
 });

@@ -118,15 +118,16 @@ rewrite leaves the moved config and original backup for manual recovery.
 node key (`node.key`) and the role's Solana keys with private permissions. It
 never overwrites existing keys; a mismatched existing role stops with an error.
 
-| File                                             | Role  | Contents                                                |
-| ------------------------------------------------ | ----- | ------------------------------------------------------- |
-| `role.json`                                      | both  | Role, mint, NodeId and public addresses.                |
-| `node.key`                                       | both  | Iroh secret key (private).                              |
-| `*.json` keys                                    | both  | Buyer key, or seller owner key (plus unused paid keys). |
-| `offer.json`                                     | buyer | A paid v1 seller's signed offer (lab gates only).       |
-| `trust.json`                                     | buyer | Which seller and limits the buyer accepts.              |
-| `status.json`                                    | both  | `starting` with a phase, then `ready`.                  |
-| `authorization.json`, `calls.json`, `buyer.lock` | buyer | Payment journal, call history, lock.                    |
+| File                                             | Role   | Contents                                                                                                               |
+| ------------------------------------------------ | ------ | ---------------------------------------------------------------------------------------------------------------------- |
+| `role.json`                                      | both   | Role, mint, NodeId and public addresses.                                                                               |
+| `node.key`                                       | both   | Iroh secret key (private).                                                                                             |
+| `*.json` keys                                    | both   | Buyer key, or seller owner key (plus unused paid keys).                                                                |
+| `offer.json`                                     | buyer  | A paid v1 seller's signed offer (lab gates only).                                                                      |
+| `trust.json`                                     | buyer  | Which seller and limits the buyer accepts.                                                                             |
+| `status.json`                                    | both   | `starting` with a phase, then `ready`; a seller lists each offer's index, model, engine kind and whether it is listed. |
+| `engine-readiness.json`                          | seller | Each offer's latest private warmup outcome, by index.                                                                  |
+| `authorization.json`, `calls.json`, `buyer.lock` | buyer  | Payment journal, call history, lock.                                                                                   |
 
 ## Seller
 
@@ -142,15 +143,17 @@ pnpm gyblos doctor               # read-only preflight; prints the public NodeId
 pnpm node:start
 ```
 
-- The seller serves the free offer in `gyblos.toml`; without one it does not
+- The seller serves every free offer in `gyblos.toml`; without one it does not
   start (`SELLER_OFFERS_MISSING`). Paid selling is off until it returns as a
   payment plugin, so a paid offer stops startup
   (`SELLER_PAID_EXECUTION_UNAVAILABLE`); the v1 paid path remains in the lab
   gates only. `node:setup` still asks for `--buyer` and `--pay-to`, which free
   selling does not use.
-- The seller runs its own Ollama; the daemon never starts it. Startup checks
-  memory headroom, runs one private warmup at the offer's engine URL (a literal
-  loopback address) and only then signs its public records.
+- The seller runs its own Ollama; the daemon never starts it. Startup warms each
+  offer in order at its own engine URL (a literal loopback address), checking
+  memory headroom for engines on this machine, and signs its public records once
+  one offer is ready; the others are warmed again in the background and listed
+  when they are ready.
 - Use a dedicated Ollama for selling, with its own models directory
   (`OLLAMA_MODELS`) so the Ollama app cannot remove or replace the model. A
   shared one (the Ollama app, or other tools using the same instance) can evict
@@ -419,20 +422,23 @@ completion returns unused tokens. Errors/cancellation retain the reservation.
 Caps are in memory and reset on restart, so they do not promise durable daily
 limits. Renewing availability does not reset them.
 
-Token caps belong to each free offer. Quotes are single-use through expiry
-across the whole seller, which also runs one free generation at a time and
-counts `max_free_buyers_per_day` across all its offers; a request whose
-selection no offer serves is refused with `FREE_EXECUTION_UNSUPPORTED`. Replay
-state is bounded; startup rejects quotes issued at or before its startup
-timestamp. A trustworthy wall clock is required across restarts. Disconnecting
-or retrying never refunds uncertain work or permits reuse of a consumed quote.
-An engine ignoring cancellation keeps its slot occupied until it settles. No
-fallback is allowed after any prompt bytes have been sent. Nothing on this
-channel authorizes payment.
+Token caps belong to each free offer, and each offer has its own readiness: one
+offer generating or renewing never makes another's quotes busy, and a quote for
+an offer the catalog no longer lists is refused with
+`CONTROL_MODEL_UNSUPPORTED`. Quotes are single-use through expiry across the
+whole seller, which also runs one free generation at a time and counts
+`max_free_buyers_per_day` across all its offers; a request whose selection no
+offer serves is refused with `FREE_EXECUTION_UNSUPPORTED`. Replay state is
+bounded; startup rejects quotes issued at or before its startup timestamp. A
+trustworthy wall clock is required across restarts. Disconnecting or retrying
+never refunds uncertain work or permits reuse of a consumed quote. An engine
+ignoring cancellation keeps its slot occupied until it settles. No fallback is
+allowed after any prompt bytes have been sent. Nothing on this channel
+authorizes payment.
 
 ### Free-service availability limits
 
-The per-offer buyer table is bounded at 1,024 NodeIds per UTC day by default
+The seller's buyer table is bounded at 1,024 NodeIds per UTC day by default
 (`max_free_buyers_per_day` in [`[limits]`](configuration.md#seller-limits), at
 most 65,536). A peer that controls many cheap NodeIds can fill it while using
 only a small part of the daily token budget; further new buyers then receive

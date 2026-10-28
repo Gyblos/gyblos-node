@@ -123,6 +123,7 @@ void test('creating the ollama engine does no I/O and carries its selection, met
       maxTokens: READINESS_GENERATION.maxTokens,
     },
     residencyMs: READINESS_GENERATION.residencyMs,
+    localResources: true,
   });
   // The injected fetch is the engine's transport, at the offer's engine URL.
   await assert.rejects(prepared.engine.describe());
@@ -133,7 +134,7 @@ void test('creating the ollama engine does no I/O and carries its selection, met
 void test('seller settings carry the engine offer the registry accepted', () => {
   const parsed = parseNodeConfig(BASE + FREE_SELLER_OFFER);
   assert.ok(parsed.ok);
-  assert.deepEqual(sellerSettings(parsed.config, {}).engineOffer, SERVED);
+  assert.deepEqual(sellerSettings(parsed.config, {}).offers[0]!.engine, SERVED);
 });
 
 void test('control startup and readiness do not know any engine plugin', () => {
