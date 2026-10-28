@@ -426,8 +426,9 @@ How tokens are counted depends on the offer's metering mode, which every quote
 carries. A model whose public tokenizer is pinned is **recounted**: the seller
 counts the prompt and output with that tokenizer, as the buyer can ("Uso
 medible"). Any other model is **declared** ("Uso declarado"); today that is any
-model the `openai` plugin serves other than Qwen3 0.6B. The reported usage is
-then the engine provider's, which the buyer cannot check:
+model the `openai` plugin serves other than Qwen3 0.6B, and every model the
+`anthropic` plugin serves. The reported usage is then the engine provider's,
+which the buyer cannot check:
 
 - admission reserves the prompt's UTF-8 bytes plus 64 tokens for the provider's
   chat template, and the reservation is never refunded;
