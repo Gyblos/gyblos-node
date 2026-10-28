@@ -10,12 +10,12 @@ in the working directory; a container image would use `/data`). Each role has
 its own directory, so one machine can hold a buyer and a seller side by side
 without sharing keys or journals:
 
-| Path                              | Contents                                                      |
-| --------------------------------- | ------------------------------------------------------------- |
-| `<home>/buyer/`                   | Buyer keys, role, trust, offer copy, journals, lock, calls.   |
-| `<home>/seller/`                  | Seller keys, role, signed offer, status, traces, diagnostics. |
-| `<home>/artifacts/tokenizer/`     | Pinned public tokenizer (re-downloadable).                    |
-| `<home>/artifacts/ollama-models/` | Pinned Ollama model layers (re-downloadable).                 |
+| Path                              | Contents                                                    |
+| --------------------------------- | ----------------------------------------------------------- |
+| `<home>/buyer/`                   | Buyer keys, role, trust, offer copy, journals, lock, calls. |
+| `<home>/seller/`                  | Seller keys, role, status, readiness, public sequence.      |
+| `<home>/artifacts/tokenizer/`     | Pinned public tokenizer (re-downloadable).                  |
+| `<home>/artifacts/ollama-models/` | Pinned Ollama model layers (re-downloadable).               |
 
 Lab state (`gate:*`, identity tools) lives in a separate `GYBLOS_LAB_HOME`
 (default `.local/lab`). The lab shares `<home>/artifacts/` as a public cache
@@ -134,30 +134,31 @@ never overwrites existing keys; a mismatched existing role stops with an error.
 export GYBLOS_RELAY_TOKEN=...    # private; 32-512 printable characters
 pnpm node:setup --role seller --mint MINT --buyer BUYER_ADDRESS --pay-to PAYOUT_ADDRESS
 pnpm gate:inference:setup        # pinned Qwen3 0.6B model and tokenizer (lab command for now)
+cp examples/seller-daemon.toml gyblos.toml   # one free offer; edit the caps
 pnpm gyblos doctor               # read-only preflight; prints the public NodeId and owner
 pnpm node:start
 ```
 
-- `--buyer` is the one buyer address this seller accepts; `--pay-to` is a cold
-  payout address (it must not be one of the seller's hot keys).
-- Fund the seller's `facilitator` address (printed by setup) with devnet SOL; it
-  pays transaction fees and channel rent.
-- Startup checks devnet, starts a private Ollama on port 11436 and a facilitator
-  on 4022 (both loopback), checks memory headroom, runs one private warmup and
-  only then signs the offer. The offer expires four minutes after warmup;
-  restart the node to publish a fresh one.
-- The paid HTTP bridge exposes only `/v1/chat/completions`. A separate
-  `gyblos/control/1` ALPN serves signed catalog, presence and quote queries.
-  Stop with Ctrl-C (not Ctrl-Z, which only suspends the process). Stopping
-  withdraws from discovery and saves the public sequence; further Ctrl-C presses
-  during that stop are ignored with a notice (SIGTERM from a supervisor too), so
-  wait for the prompt. If a stop ever hangs, Ctrl-\\ (SIGQUIT) still ends the
-  process, but can interrupt withdrawal or a state write and leave a sequence
-  lock. A hung write or sync may itself be why shutdown has stalled; the order
-  of cleanup does not make forced termination safe. A Ctrl-C during startup, a
-  crash or `kill -9` can also leave a lock. Use `pnpm gyblos doctor` and the
-  guarded [sequence recovery procedure](discovery.md#seller-duties); never reset
-  the persisted sequence high-water mark.
+- The seller serves the free offer in `gyblos.toml`; without one it does not
+  start (`SELLER_OFFERS_MISSING`). Paid selling is off until it returns as a
+  payment plugin, so a paid offer stops startup
+  (`SELLER_PAID_EXECUTION_UNAVAILABLE`); the v1 paid path remains in the lab
+  gates only. `node:setup` still asks for `--buyer` and `--pay-to`, which free
+  selling does not use.
+- Startup starts a private Ollama on loopback port 11436, checks memory
+  headroom, runs one private warmup and only then signs its public records.
+- The `gyblos/control/1` ALPN serves signed catalog, presence and quote queries;
+  the free channels serve execution. Stop with Ctrl-C (not Ctrl-Z, which only
+  suspends the process). Stopping withdraws from discovery and saves the public
+  sequence; further Ctrl-C presses during that stop are ignored with a notice
+  (SIGTERM from a supervisor too), so wait for the prompt. If a stop ever hangs,
+  Ctrl-\\ (SIGQUIT) still ends the process, but can interrupt withdrawal or a
+  state write and leave a sequence lock. A hung write or sync may itself be why
+  shutdown has stalled; the order of cleanup does not make forced termination
+  safe. A Ctrl-C during startup, a crash or `kill -9` can also leave a lock. Use
+  `pnpm gyblos doctor` and the guarded
+  [sequence recovery procedure](discovery.md#seller-duties); never reset the
+  persisted sequence high-water mark.
 
 ## Buyer
 
@@ -285,11 +286,12 @@ These variables can also be written in a `gyblos.toml` file, checked with
   `.local/gyblos`).
 - `GYBLOS_RPC_URL`: devnet RPC; the genesis hash is checked before use.
 - `GYBLOS_P2P_RUN_ID`: optional label copied into `status.json` and evidence.
-- Ports: buyer proxy 4031, seller HTTP 4032 (loopback only), facilitator 4022,
-  Ollama 11436. Stop any lab runs (`gate:*`) before starting a seller.
+- Ports: buyer proxy 4031 and the seller's Ollama 11436 (loopback only). The
+  lab's paid gates also use 4032 and 4022. Stop any lab runs (`gate:*`) before
+  starting a seller.
 
-Facilitator diagnostics for the seller are written privately under
-`.local/gyblos/seller/facilitator-diagnostics/`; see [payments.md](payments.md).
+Facilitator diagnostics are written only by the lab's paid gates; see
+[payments.md](payments.md).
 
 Local role/trust JSON is validated before use: required fields, Solana
 addresses, lowercase hex NodeIds, HTTP(S) RPC URLs and positive decimal-string
@@ -381,11 +383,11 @@ action, described in [discovery-index.md](discovery-index.md).
 
 A supported `gyblos.toml` free offer starts control plus the separate
 `gyblos/free/3` complete-response and `gyblos/free-stream/3` streaming data
-channels. It does not start the paid HTTP service or facilitator, check a
-payment program, or write a v1 offer. This is execution for the pinned engine's
-single user message and `off` reasoning; other engine input forms are not
-enabled. The separate `buyer:free` entry executes free quotes; obtaining a
-control quote alone still does not send a prompt.
+channels. The daemon has no paid HTTP service, facilitator, payment program
+check or v1 offer: paid selling is off until phase 2. This is execution for the
+pinned engine's single user message and `off` reasoning; other engine input
+forms are not enabled. The separate `buyer:free` entry executes free quotes;
+obtaining a control quote alone still does not send a prompt.
 
 The seller reads daily token caps from the prepared offer: `daily_token_cap`
 applies across all buyers and `per_buyer_cap` per authenticated NodeId, both

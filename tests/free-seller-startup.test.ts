@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { prepareSellerFreeExecution } from '@gyblos/node/free-execution';
-import { defaultSellerOffer } from '@gyblos/node/seller-offer';
+import { pocPaidListing } from '@gyblos/node/seller-offer';
 import {
   FREE_EXECUTION_CODES,
   PUBLIC_RECORD_KINDS,
@@ -16,7 +16,7 @@ void test('free startup omits the handler for a prepared paid offer without invo
   assert.equal(
     prepareSellerFreeExecution({
       ...state.options,
-      offer: defaultSellerOffer(),
+      offer: pocPaidListing(),
       catalog: state.source.context.catalog,
     }),
     undefined,

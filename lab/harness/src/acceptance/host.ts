@@ -11,7 +11,10 @@ import { prepareSellerFreeExecution } from '@gyblos/node/free-execution';
 import { sellerLimits } from '@gyblos/node/node-config-limits';
 import { openSellerSequence } from '@gyblos/node/public-sequence';
 import { createSellerPublisher } from '@gyblos/node/publisher';
-import type { SellerCatalogOffer } from '@gyblos/node/seller-offer';
+import {
+  pocPaidListing,
+  type SellerCatalogOffer,
+} from '@gyblos/node/seller-offer';
 import type { SignedPublicV2 } from '@gyblos/protocol/control-types';
 import type { RecountTokenizer } from '@gyblos/protocol/engine';
 import { controlDeadline } from '@gyblos/transport-iroh/control-io';
@@ -91,7 +94,8 @@ export async function startAcceptanceHost(options: AcceptanceHostOptions) {
       initialFloor: 1,
     });
     const control = await prepareSellerControl({
-      offer: options.offer,
+      // Paid acceptance still quotes the v1 PoC listing, which the daemon no longer serves.
+      offer: options.offer ?? pocPaidListing(),
       owner: identity.owner,
       nodeId: wire.nodeId,
       nodeSigner: wire.nodeSigner,

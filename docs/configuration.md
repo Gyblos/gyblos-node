@@ -213,14 +213,17 @@ the validator.
 ## Seller startup
 
 `pnpm node:start` reads `GYBLOS_CONFIG` (a path; it must exist) or, when that
-variable is unset, `./gyblos.toml` if present. Relative paths resolve against
-the daemon's working directory, which is the repository root under
-`pnpm node:start`. Without a file the effective values are the same as before;
-everything comes from the `GYBLOS_*` environment, and an environment variable
-still overrides the file.
+variable is unset, `./gyblos.toml`. Relative paths resolve against the daemon's
+working directory, which is the repository root under `pnpm node:start`. The
+file must list the offer to serve: without a file, or without `[[offers]]`,
+startup stops with `SELLER_OFFERS_MISSING`. An environment variable still
+overrides the file's settings.
 
-The daemon runs its own Ollama at `http://127.0.0.1:11436` and serves one model,
-the pinned Qwen3 0.6B with reasoning `off`.
+The daemon runs its own Ollama at `http://127.0.0.1:11436` and serves one free
+offer, the pinned Qwen3 0.6B with reasoning `off`. Paid selling is off until it
+returns as a payment plugin; a paid offer stops startup with
+`SELLER_PAID_EXECUTION_UNAVAILABLE`. The v1 paid path remains in the lab gates
+(`pnpm gate:*`) only.
 [examples/seller-daemon.toml](../examples/seller-daemon.toml) is a file it
 accepts as written; the other examples are valid files for future nodes but stop
 this daemon. Today it honors:
@@ -232,22 +235,21 @@ this daemon. Today it honors:
 | `[discovery]` `publish`, `url`                                                                                                                        | yes                                                                                                                       |
 | `[limits]`                                                                                                                                            | yes, see [Seller limits](#seller-limits)                                                                                  |
 | `[[offers]]`: at most one, for `qwen3-0.6b` (or `qwen3:0.6b`), engine `ollama` at `http://127.0.0.1:11436` without `api_key_env`, reasoning `["off"]` | yes                                                                                                                       |
-| `price = {...}` on that offer                                                                                                                         | only `input_per_mtok = "1"`, `output_per_mtok = "2"`: paid execution is still the v1 proof of concept at those rates      |
-| `free = {...}` on that offer                                                                                                                          | served over the separate free v2 channel with daily total and per-buyer token caps                                        |
+| `free = {...}` on that offer                                                                                                                          | served over the free channel with daily total and per-buyer token caps                                                    |
+| `price = {...}` on that offer                                                                                                                         | not yet: paid selling is off until phase 2, so a paid offer stops startup                                                 |
 | `[node]` `data_dir`, `rpc_url`, `payout_wallet`                                                                                                       | not yet: the role files own them, so setting them in the file stops startup (`GYBLOS_HOME` overriding `data_dir` is fine) |
 | `[buyer]`                                                                                                                                             | ignored by the seller                                                                                                     |
 
 Startup stops with a static code: `NODE_CONFIG_INVALID`,
-`SELLER_SETTING_UNSUPPORTED`, `SELLER_OFFER_COUNT_UNSUPPORTED`,
-`SELLER_OFFER_MODEL_UNSUPPORTED`, `SELLER_OFFER_ENGINE_UNSUPPORTED`,
-`SELLER_OFFER_REASONING_UNSUPPORTED` or `SELLER_OFFER_PRICE_UNSUPPORTED`.
+`SELLER_SETTING_UNSUPPORTED`, `SELLER_OFFERS_MISSING`,
+`SELLER_OFFER_COUNT_UNSUPPORTED`, `SELLER_OFFER_MODEL_UNSUPPORTED`,
+`SELLER_OFFER_ENGINE_UNSUPPORTED`, `SELLER_OFFER_REASONING_UNSUPPORTED` or
+`SELLER_PAID_EXECUTION_UNAVAILABLE`. Codes about an offer also carry its
+position in the file.
 
-`SELLER_FREE_EXECUTION_UNAVAILABLE` remains the default guard for callers that
-do not explicitly compose the free handler. The seller daemon opts in only with
-that handler present. `pnpm gyblos config validate --config "$GYBLOS_CONFIG"`
-explains file problems (it does not read `GYBLOS_CONFIG`, does not check the
-`SELLER_*` limits above, and also checks `GYBLOS_RPC_URL`, which the daemon
-ignores).
+`pnpm gyblos config validate --config "$GYBLOS_CONFIG"` explains file problems
+(it does not read `GYBLOS_CONFIG`, does not check the `SELLER_*` limits above,
+and also checks `GYBLOS_RPC_URL`, which the daemon ignores).
 
 Most invalid environment values are now caught when settings load, before Ollama
 starts, and report `NODE_CONFIG_INVALID`. Before, they failed later with other
@@ -313,7 +315,7 @@ file-only: there are no `GYBLOS_*` variables for it, and the buyer ignores it.
 ```sh
 pnpm gyblos doctor                         # reads ./gyblos.toml, like node:start
 GYBLOS_CONFIG=my.toml pnpm gyblos doctor   # the file node:start will read
-pnpm gyblos doctor --online                # also checks devnet for a paid offer
+pnpm gyblos doctor --online                # reserved for remote engines; no effect today
 ```
 
 `doctor` has no `--config` flag on purpose: it reads exactly the file
@@ -322,28 +324,27 @@ doctor and a starting node never look at different files. It runs, read-only,
 the checks startup would fail on, and prints one line per check (`OK`, `WARN` or
 `FAIL`) with a static code and a hint:
 
-| Check       | What it verifies                                                                                                                                                                                                                               |
-| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `config`    | the file and environment as seller startup reads them, with the same `NODE_CONFIG_INVALID` / `SELLER_*` codes (file problems are listed with their key paths)                                                                                  |
-| `home`      | no legacy `.local` layout under the role, tokenizer or Ollama directories                                                                                                                                                                      |
-| `role`      | the seller `role.json` exists and is valid (`ROLE_MISSING` hints `node:setup`)                                                                                                                                                                 |
-| `keys`      | the key files startup loads are regular, non-symlinked files owned by you with mode 0600: owner and node keys for a free offer, plus authorizer and facilitator for a paid one. Metadata only, so a corrupt key is still found only at startup |
-| `sequence`  | the seller directory is mode 0700 and its public-sequence file is valid for this node; a leftover sequence lock fails, because it blocks every publication (inspect it, never delete it blindly)                                               |
-| `tokenizer` | the pinned tokenizer files are present and match their hashes                                                                                                                                                                                  |
-| `ollama`    | an executable `ollama` file is on `PATH` (it is not run)                                                                                                                                                                                       |
-| `model`     | the pinned model's manifest is in the managed models directory (startup never downloads it; only Ollama can confirm it works)                                                                                                                  |
-| `ports`     | nothing answers on `127.0.0.1:11436`, nor on `:4022` and `:4032` for a paid offer                                                                                                                                                              |
-| `relays`    | relay URLs and token as the endpoint would build them (the token is never printed)                                                                                                                                                             |
-| `program`   | with `--online` and a paid offer, the devnet payment program through the role's RPC (never printed)                                                                                                                                            |
+| Check       | What it verifies                                                                                                                                                                                 |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `config`    | the file and environment as seller startup reads them, with the same `NODE_CONFIG_INVALID` / `SELLER_*` codes (file problems are listed with their key paths)                                    |
+| `home`      | no legacy `.local` layout under the role, tokenizer or Ollama directories                                                                                                                        |
+| `role`      | the seller `role.json` exists and is valid (`ROLE_MISSING` hints `node:setup`)                                                                                                                   |
+| `keys`      | the key files startup loads, the owner and node keys, are regular, non-symlinked files owned by you with mode 0600. Metadata only, so a corrupt key is still found only at startup               |
+| `sequence`  | the seller directory is mode 0700 and its public-sequence file is valid for this node; a leftover sequence lock fails, because it blocks every publication (inspect it, never delete it blindly) |
+| `tokenizer` | the pinned tokenizer files are present and match their hashes                                                                                                                                    |
+| `ollama`    | an executable `ollama` file is on `PATH` (it is not run)                                                                                                                                         |
+| `model`     | the pinned model's manifest is in the managed models directory (startup never downloads it; only Ollama can confirm it works)                                                                    |
+| `ports`     | nothing answers on `127.0.0.1:11436`                                                                                                                                                             |
+| `relays`    | relay URLs and token as the endpoint would build them (the token is never printed)                                                                                                               |
 
 It then prints the seller's public **NodeId and owner** address from
 `role.json`; share those to be enrolled in a discovery index. The exit code is 0
 when no check fails (warnings do not fail) and 1 otherwise. It starts, spawns
 and writes nothing. It never prints the home location, the RPC URL, the relay
-token or key material, and only reaches loopback ports unless `--online`. Memory
-headroom, key contents, a stale seller trace file and the NodeId matching
-`node.key` are checked at startup only. With a valid configuration it also
-prints the effective [seller limits](#seller-limits).
+token or key material, and only reaches loopback ports. Memory headroom, key
+contents and the NodeId matching `node.key` are checked at startup only. With a
+valid configuration it also prints the effective
+[seller limits](#seller-limits).
 
 ## Issue codes
 

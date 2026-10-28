@@ -27,23 +27,21 @@ export type SellerCatalogOffer = {
   | { kind: typeof OFFER_PRICING_KINDS.FREE; caps: FreeOfferCaps }
 );
 
-// What the daemon actually runs: its managed Ollama, the pinned Qwen3 0.6B and one reasoning level.
+// What the daemon actually runs: its managed Ollama, the pinned Qwen3 0.6B and one reasoning level, free.
 export const SERVED_OFFER = {
   modelId: MODEL_IDS.QWEN3_0_6B,
   engineUrl: HOSTS.ollama,
   reasoning: [REASONING_LEVELS.OFF] satisfies readonly ReasoningLevel[],
 } as const;
 
-// Paid execution is the v1 PoC, so a paid listing advertises exactly its rates per million tokens.
-export const servedPaidPrices = () => atomicPerTokenPricesV2(PRICES);
-
-// Today's listing when gyblos.toml has no offers.
-export function defaultSellerOffer(): SellerCatalogOffer {
+// The v1 PoC paid listing at its fixed rates per million tokens. The daemon never serves it (paid selling is
+// off until phase 2); lab acceptance and tests quote with it.
+export function pocPaidListing(): SellerCatalogOffer {
   return {
     modelId: SERVED_OFFER.modelId,
     reasoning: [...SERVED_OFFER.reasoning],
     kind: OFFER_PRICING_KINDS.PAID,
-    prices: servedPaidPrices(),
+    prices: atomicPerTokenPricesV2(PRICES),
   };
 }
 

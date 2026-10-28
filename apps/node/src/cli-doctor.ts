@@ -8,8 +8,8 @@ import {
   NODE_ERROR_CODES,
 } from '@gyblos/node/constants';
 import {
+  SELLER_PORTS,
   sellerDoctor,
-  sellerPorts,
   type DoctorProbes,
   type DoctorResultCode,
 } from '@gyblos/node/seller-doctor';
@@ -24,7 +24,6 @@ const CODE_COLUMN = 34;
 const SEE_STARTUP = 'see docs/configuration.md#seller-startup';
 // Short operator hints by code; codes without one are explained in the docs.
 const HINTS: Readonly<Partial<Record<DoctorResultCode, string>>> = {
-  [DOCTOR_CODES.NO_CONFIG_FILE]: 'no gyblos.toml; environment-only startup',
   [DOCTOR_CODES.ROLE_MISSING]:
     'run `pnpm node:setup --role seller --mint MINT --buyer BUYER --pay-to PAYOUT`',
   [DOCTOR_CODES.ROLE_NOT_SELLER]: 'this home holds a buyer role',
@@ -39,12 +38,12 @@ const HINTS: Readonly<Partial<Record<DoctorResultCode, string>>> = {
   [DOCTOR_CODES.TOKENIZER_UNAVAILABLE]: 'run `pnpm gate:inference:setup`',
   [DOCTOR_CODES.OLLAMA_NOT_FOUND]: 'install Ollama and put `ollama` on PATH',
   [DOCTOR_CODES.MODEL_NOT_DOWNLOADED]: 'run `pnpm gate:inference:setup`',
-  [DOCTOR_CODES.PORT_IN_USE]: `stop whatever answers on ${LOCALHOST} ports ${sellerPorts(false).join(', ')}`,
+  [DOCTOR_CODES.PORT_IN_USE]: `stop whatever answers on ${LOCALHOST} port ${SELLER_PORTS.join(', ')}`,
   [DOCTOR_CODES.NOT_CHECKED]: 'fix the failures above first',
-  [DOCTOR_CODES.NOT_NEEDED]: 'free offers do not use the payment program',
-  [DOCTOR_CODES.ONLINE_CHECK_SKIPPED]: 'run with --online to check devnet',
-  [DOCTOR_CODES.DEVNET_PROGRAM_UNAVAILABLE]:
-    'the role RPC is not devnet or the program is missing',
+  [NODE_ERROR_CODES.SELLER_OFFERS_MISSING]:
+    'add a free [[offers]] entry to gyblos.toml (examples/seller-daemon.toml)',
+  [NODE_ERROR_CODES.SELLER_PAID_EXECUTION_UNAVAILABLE]:
+    'paid selling is off until it returns as a plugin; list the offer as free',
   [NODE_ERROR_CODES.NODE_CONFIG_INVALID]:
     'run `pnpm gyblos config validate --config <file>` on the GYBLOS_CONFIG file',
   [NODE_ERROR_CODES.LEGACY_LOCAL_LAYOUT]:

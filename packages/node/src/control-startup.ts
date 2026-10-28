@@ -23,11 +23,7 @@ import type { Signer } from '@gyblos/protocol/signing';
 import { createSellerControlService } from './control';
 import { createSellerRecords } from './public-records';
 import type { SellerSequence } from './public-sequence';
-import {
-  defaultSellerOffer,
-  listedPrices,
-  type SellerCatalogOffer,
-} from './seller-offer';
+import { listedPrices, type SellerCatalogOffer } from './seller-offer';
 
 interface SellerControlStartupOptions {
   owner: KeyPairSigner;
@@ -46,8 +42,8 @@ interface SellerControlStartupOptions {
   sequence: SellerSequence;
   catalogMs?: number;
   now?: () => number;
-  // The listing from gyblos.toml; defaults to today's paid PoC listing.
-  offer?: SellerCatalogOffer;
+  // The listing: from gyblos.toml in the daemon, chosen by the caller in lab acceptance.
+  offer: SellerCatalogOffer;
 }
 
 function startupRecords(
@@ -92,7 +88,7 @@ function startupRecords(
 export async function prepareSellerControl(
   options: SellerControlStartupOptions,
 ) {
-  const offer = options.offer ?? defaultSellerOffer();
+  const { offer } = options;
   const { selection, reasoning } = startupSelection(offer);
   const records = await startupRecords(options, offer);
   const service = createSellerControlService({

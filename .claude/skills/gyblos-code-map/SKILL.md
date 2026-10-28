@@ -54,7 +54,7 @@ Splitting by concern inside a package uses a filename prefix, as in
 | `ControlAdmission` leases                   | `packages/core/src/control-admission.ts`                        | pure policy with an injected clock               |
 | Iroh control client/server                  | `packages/transport-iroh/src/control-*.ts`                      | Iroh I/O only                                    |
 | seller control startup/readiness            | `packages/node/src/control-*.ts`                                | composes transport + core                        |
-| seller facilitator wiring                   | `packages/node/src/seller.ts`                                   | composition of `payments-x402`                   |
+| seller daemon composition                   | `packages/node/src/seller.ts`                                   | free offer only; paid selling off until phase 2  |
 | buyer selection proxy, offer race           | `apps/buyer/src/selection-proxy.ts`, `offer-race.ts`            | executable wiring                                |
 | discovery index client                      | `packages/discovery-http`                                       | HTTP adapter; index defaults in `config`         |
 | discovery index server (Worker)             | `apps/discovery-index`                                          | deployable app; verification via protocol only   |
