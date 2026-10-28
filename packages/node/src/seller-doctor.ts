@@ -203,6 +203,11 @@ async function roleChecks(environment: HomeEnvironment) {
   };
 }
 
+const engineDependencies = (options: DoctorOptions) => ({
+  fetch: options.probes?.fetch ?? globalThis.fetch,
+  environment: options.environment,
+});
+
 // Needed unless every offer is known to be declared by its provider.
 async function tokenizerCheck(
   options: DoctorOptions,
@@ -221,11 +226,6 @@ async function tokenizerCheck(
   }
 }
 
-const engineDependencies = (options: DoctorOptions) => ({
-  fetch: options.probes?.fetch ?? globalThis.fetch,
-  environment: options.environment,
-});
-
 // Describes one offer's engine the way warmup starts (for Ollama, the model list and pinned digest at the
 // offer URL; for a remote API, its model list), within the adapter's own deadline. Never generates. A
 // remote engine is described only with --online.
@@ -240,7 +240,7 @@ async function engineCheck(
     );
     if (!readiness.localResources && !options.online)
       return {
-        ...warn(DOCTOR_CODES.REMOTE_NOT_CHECKED),
+        ...warn(DOCTOR_CODES.REMOTE_ENGINE_NOT_CHECKED),
         offer: engineOffer.index,
       };
     await engine.describe();
@@ -254,11 +254,15 @@ async function engineCheck(
 }
 
 // Startup needs one ready engine and retries the others, so a down engine fails only when no offer's
-// engine answers, and is otherwise a warning.
-export function engineStatuses<T extends Pick<DoctorCheck, 'status'>>(
-  engines: readonly T[],
-): T[] {
-  const anyReady = engines.some((result) => result.status === DOCTOR_STATUS.OK);
+// engine answers or may answer (a remote engine left unchecked), and is otherwise a warning.
+export function engineStatuses<
+  T extends Pick<DoctorCheck, 'status'> & { code?: DoctorResultCode },
+>(engines: readonly T[]): T[] {
+  const anyReady = engines.some(
+    (result) =>
+      result.status === DOCTOR_STATUS.OK ||
+      result.code === DOCTOR_CODES.REMOTE_ENGINE_NOT_CHECKED,
+  );
   return engines.map((result) =>
     anyReady && result.status === DOCTOR_STATUS.FAIL
       ? { ...result, status: DOCTOR_STATUS.WARN }

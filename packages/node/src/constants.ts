@@ -32,9 +32,11 @@ export const NODE_ERROR_CODES = {
   SELLER_OFFER_MODEL_UNSUPPORTED: 'SELLER_OFFER_MODEL_UNSUPPORTED',
   SELLER_OFFER_ENGINE_UNSUPPORTED: 'SELLER_OFFER_ENGINE_UNSUPPORTED',
   SELLER_OFFER_REASONING_UNSUPPORTED: 'SELLER_OFFER_REASONING_UNSUPPORTED',
-  SELLER_OFFERS_MISSING: 'SELLER_OFFERS_MISSING',
   // The variable an offer's api_key_env names is unset or empty.
   SELLER_OFFER_API_KEY_MISSING: 'SELLER_OFFER_API_KEY_MISSING',
+  // api_key_env names a Gyblos variable or the relay token's, which must never go to a provider.
+  SELLER_OFFER_API_KEY_UNSAFE: 'SELLER_OFFER_API_KEY_UNSAFE',
+  SELLER_OFFERS_MISSING: 'SELLER_OFFERS_MISSING',
   SELLER_PAID_EXECUTION_UNAVAILABLE: 'SELLER_PAID_EXECUTION_UNAVAILABLE',
 } as const;
 export type NodeErrorCode =
@@ -67,7 +69,7 @@ export const DOCTOR_CODES = {
   // Every offer's usage is declared by its provider, so no tokenizer is loaded.
   NOT_NEEDED: 'NOT_NEEDED',
   // A remote engine is called only with --online.
-  REMOTE_NOT_CHECKED: 'REMOTE_ENGINE_NOT_CHECKED',
+  REMOTE_ENGINE_NOT_CHECKED: 'REMOTE_ENGINE_NOT_CHECKED',
   CHECK_FAILED: 'DOCTOR_CHECK_FAILED',
 } as const;
 export type DoctorCode = (typeof DOCTOR_CODES)[keyof typeof DOCTOR_CODES];

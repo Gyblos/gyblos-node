@@ -13,7 +13,6 @@ import { basename, join } from 'node:path';
 import { FILE_MODES, homeLayout, type HomeEnvironment } from '@gyblos/config';
 import { createModelTokenizer } from '@gyblos/engine-ollama';
 import { MODEL } from '@gyblos/engine-ollama/model';
-import { MODEL_CLASSIFICATIONS } from '@gyblos/protocol/constants';
 
 import {
   NODE_ERROR_CODES,
@@ -23,16 +22,6 @@ import {
 } from './constants';
 import { NodeError } from './errors';
 import { assertTokenizerHome } from './home';
-import type { OfferModel } from './node-config';
-import { SERVED_OFFER } from './seller-offer';
-
-// The one model whose public tokenizer the seller pins, so its usage is recounted whatever engine serves it.
-export function recountsWithPinnedTokenizer(model: OfferModel) {
-  return (
-    model.kind === MODEL_CLASSIFICATIONS.CATALOG &&
-    model.id === SERVED_OFFER.modelId
-  );
-}
 
 export async function modelTokenizer(
   environment: HomeEnvironment = process.env,

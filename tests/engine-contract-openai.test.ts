@@ -249,3 +249,107 @@ void test('engine-openai refuses output limits outside the request bounds before
       await assert.rejects(engine.generate({ prompt: 'x', maxTokens }));
     assert.equal(server.seen.length, 0);
   }));
+
+void test('engine-openai accepts the stop and length names compatible servers use', async () => {
+  for (const [name, reason] of [
+    ['eos', ENGINE_DONE_REASONS.STOP],
+    ['eos_token', ENGINE_DONE_REASONS.STOP],
+    ['model_length', ENGINE_DONE_REASONS.LENGTH],
+  ] as const)
+    await withServer(
+      stream(chunk('Hello') + finish(name) + usage() + DONE),
+      async (server) => {
+        const result = await engineAt(server.base).generate({
+          prompt: 'x',
+          maxTokens: 8,
+        });
+        assert.equal(result.finishReason, reason, name);
+      },
+    );
+  await withServer(
+    stream(chunk('Hello') + finish('content_filter') + usage() + DONE),
+    async (server) => {
+      const error = await failure(engineAt(server.base));
+      assert.ok(error instanceof EngineError);
+      assert.equal(error.code, ENGINE_ERROR_CODES.INTERRUPTED);
+    },
+  );
+});
+
+void test('engine-openai accepts usage sent alone, without choices', () =>
+  withServer(
+    stream(
+      chunk('Hello') +
+        finish() +
+        sse({ usage: { prompt_tokens: 3, completion_tokens: 1 } }) +
+        DONE,
+    ),
+    async (server) => {
+      const result = await engineAt(server.base).generate({
+        prompt: 'x',
+        maxTokens: 8,
+      });
+      assert.equal(result.usage.outputTokens, 1);
+    },
+  ));
+
+void test('engine-openai returns once finished and counted, even if the stream stays open', () =>
+  withServer(
+    (response) => {
+      response
+        .writeHead(200, { 'content-type': 'text/event-stream' })
+        .write(chunk('Hello') + finish() + usage());
+    },
+    async (server) => {
+      const result = await engineAt(server.base, {
+        generationTimeoutMs: 5_000,
+      }).generate({ prompt: 'x', maxTokens: 8 });
+      assert.equal(result.text, 'Hello');
+    },
+  ));
+
+void test('engine-openai: an answer spent entirely on hidden reasoning is an invalid response', () =>
+  withServer(
+    stream(
+      chunk('', { reasoning_content: 'private thoughts' }) +
+        finish('length') +
+        usage(3, 8) +
+        DONE,
+    ),
+    async (server) => {
+      const error = await failure(engineAt(server.base));
+      assert.ok(error instanceof EngineError);
+      assert.equal(error.code, ENGINE_ERROR_CODES.INVALID_RESPONSE);
+    },
+  ));
+
+void test('engine-openai bounds the whole stream, comments included', () =>
+  withServer(
+    stream(`: ${'x'.repeat(60_000)}\n`.repeat(40) + COMPLETE),
+    async (server) => {
+      const error = await failure(engineAt(server.base));
+      assert.ok(error instanceof EngineError);
+      assert.equal(error.code, ENGINE_ERROR_CODES.INVALID_RESPONSE);
+    },
+  ));
+
+void test('engine-openai asks OpenAI itself for max_completion_tokens', async () => {
+  const bodies: unknown[] = [];
+  const engine = createOpenAiEngine(
+    {
+      base: 'https://api.openai.com/v1',
+      model: 'gpt-x',
+      contextTokens: CONTEXT,
+      recountable: false,
+    },
+    async (_input, init) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      return new Response(COMPLETE, {
+        headers: { 'content-type': 'text/event-stream' },
+      });
+    },
+  );
+  await engine.generate({ prompt: 'x', maxTokens: 8 });
+  assert.equal(Reflect.get(Object(bodies[0]), 'max_completion_tokens'), 8);
+  assert.equal(Reflect.get(Object(bodies[0]), 'max_tokens'), undefined);
+});

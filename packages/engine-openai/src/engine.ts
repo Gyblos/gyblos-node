@@ -20,12 +20,15 @@ import {
 } from '@gyblos/protocol/constants';
 import {
   EngineError,
+  singleUserPrompt,
   type Engine,
   type EngineInput,
   type EngineResult,
 } from '@gyblos/protocol/engine';
 
 import {
+  OPENAI_FINISH_REASONS,
+  OPENAI_HOST,
   OPENAI_LIMITS,
   OPENAI_QUOTA_CODE,
   OPENAI_ROUTES,
@@ -57,23 +60,14 @@ const NANOSECONDS_PER_MILLISECOND = 1_000_000;
 const isFields = (value: unknown): value is Fields =>
   !!value && typeof value === 'object' && !Array.isArray(value);
 
+const isOpenAi = (base: string) => new URL(base).hostname === OPENAI_HOST;
+
 function route(base: string, path: string) {
   return new URL(path, base.endsWith('/') ? base : `${base}/`);
 }
 
 function authorization(settings: OpenAiEngineSettings): Record<string, string> {
   return settings.apiKey ? { authorization: `Bearer ${settings.apiKey}` } : {};
-}
-
-function userPrompt(input: EngineInput) {
-  if (input.prompt !== undefined) return input.prompt;
-  if (
-    input.messages.length !== 1 ||
-    input.messages[0]?.role !== 'user' ||
-    typeof input.messages[0].content !== 'string'
-  )
-    throw new Error('Only one user message without tools is supported.');
-  return input.messages[0].content;
 }
 
 function parseFields(text: string): Fields {
@@ -93,10 +87,17 @@ function count(value: unknown) {
   return value;
 }
 
+// Compatible servers name the same two endings differently; any other ending (a filter, a tool call,
+// an error) is not a served completion.
+const FINISH_REASONS: Readonly<Record<string, EngineDoneReason>> =
+  OPENAI_FINISH_REASONS;
 function doneReason(value: unknown): EngineDoneReason {
-  if (value === ENGINE_DONE_REASONS.STOP) return ENGINE_DONE_REASONS.STOP;
-  if (value === ENGINE_DONE_REASONS.LENGTH) return ENGINE_DONE_REASONS.LENGTH;
-  throw new FrameFailure();
+  const reason =
+    typeof value === 'string' && Object.hasOwn(FINISH_REASONS, value)
+      ? FINISH_REASONS[value]
+      : undefined;
+  if (!reason) throw new FrameFailure();
+  return reason;
 }
 
 // A refused request: an account without credit is quota exhaustion, any other status maps as usual.
@@ -168,6 +169,8 @@ function applyEvent(event: Fields, completion: Completion) {
       outputTokens: count(event.usage.completion_tokens),
     };
   const { choices } = event;
+  // Some servers send the final usage alone, without choices.
+  if (choices === undefined && completion.usage) return '';
   if (!Array.isArray(choices) || choices.length > 1) throw new FrameFailure();
   const choice: unknown = choices[0];
   if (choice === undefined) return '';
@@ -188,6 +191,24 @@ function applyEvent(event: Fields, completion: Completion) {
   return text;
 }
 
+async function deliver(
+  fragment: string,
+  completion: Completion,
+  input: EngineInput,
+  signal: AbortSignal,
+  attempt: EngineAttempt,
+) {
+  completion.text += fragment;
+  if (completion.text.length > OPENAI_LIMITS.outputCharacters)
+    throw new BoundFailure();
+  attempt.fragments++;
+  await callerCallback(attempt, input.onFragment);
+  signal.throwIfAborted();
+  const onText = input.onText;
+  await callerCallback(attempt, onText && (() => onText(fragment)));
+  signal.throwIfAborted();
+}
+
 async function readCompletion(
   body: ReadableStream<Uint8Array>,
   input: EngineInput,
@@ -195,28 +216,20 @@ async function readCompletion(
   attempt: EngineAttempt,
 ): Promise<Required<Completion>> {
   const completion: Completion = { text: '' };
-  for await (const data of serverSentData(
-    body,
-    OPENAI_LIMITS.eventCharacters,
-  )) {
+  for await (const data of serverSentData(body, OPENAI_LIMITS.stream)) {
     signal.throwIfAborted();
     if (data === OPENAI_STREAM_END) break;
     const fragment = applyEvent(parseFields(data), completion);
-    if (!fragment) continue;
-    completion.text += fragment;
-    if (completion.text.length > OPENAI_LIMITS.outputCharacters)
-      throw new BoundFailure();
-    attempt.fragments++;
-    await callerCallback(attempt, input.onFragment);
-    signal.throwIfAborted();
-    const onText = input.onText;
-    await callerCallback(attempt, onText && (() => onText(fragment)));
-    signal.throwIfAborted();
+    if (fragment) await deliver(fragment, completion, input, signal, attempt);
+    // Finished and counted: a proxy that keeps the stream open cannot hold a complete answer.
+    if (completion.finish && completion.usage) break;
   }
   const { text, finish, usage } = completion;
   if (!finish) throw new FrameFailure();
   // Declared usage is the provider's or nothing: a completion without it is not served.
-  if (!usage) throw new EngineError(ENGINE_ERROR_CODES.INVALID_RESPONSE);
+  // So is a completion with no visible text: its budget went to hidden reasoning, which is not served.
+  if (!usage || !text)
+    throw new EngineError(ENGINE_ERROR_CODES.INVALID_RESPONSE);
   return { text, finish, usage };
 }
 
@@ -232,7 +245,7 @@ async function generate(
     input.maxTokens > OPENAI_LIMITS.maxOutputTokens
   )
     throw new Error('Invalid output token limit.');
-  const prompt = userPrompt(input);
+  const prompt = singleUserPrompt(input);
   input.signal?.throwIfAborted();
   const deadline = AbortSignal.timeout(timeoutMs);
   const attempt: EngineAttempt = {
@@ -257,7 +270,10 @@ async function generate(
       body: JSON.stringify({
         model: settings.model,
         messages: [{ role: 'user', content: prompt }],
-        max_tokens: input.maxTokens,
+        // OpenAI's own API takes the newer name, which its reasoning models require; compatible
+        // servers take max_tokens.
+        [isOpenAi(settings.base) ? 'max_completion_tokens' : 'max_tokens']:
+          input.maxTokens,
         stream: true,
         stream_options: { include_usage: true },
       }),

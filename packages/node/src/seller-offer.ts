@@ -1,12 +1,15 @@
 // The seller's public listing: what the daemon serves and its paid or free terms. No config loading here,
 // so control startup and the lab host stay independent of gyblos.toml reading.
 import {
+  MODEL_CLASSIFICATIONS,
   MODEL_IDS,
   OFFER_PRICING_KINDS,
   REASONING_LEVELS,
   type ReasoningLevel,
 } from '@gyblos/protocol/constants';
 import type { TokenPricesV2 } from '@gyblos/protocol/control-types';
+
+import type { OfferModel } from './node-config';
 
 // Token caps from gyblos.toml `free = {...}`; the free execution handler enforces them.
 export interface FreeOfferCaps {
@@ -30,6 +33,14 @@ export const SERVED_OFFER = {
   modelId: MODEL_IDS.QWEN3_0_6B,
   reasoning: [REASONING_LEVELS.OFF] satisfies readonly ReasoningLevel[],
 } as const;
+
+// The served model's public tokenizer is pinned, so its usage is recounted whatever engine serves it.
+export function recountsWithPinnedTokenizer(model: OfferModel) {
+  return (
+    model.kind === MODEL_CLASSIFICATIONS.CATALOG &&
+    model.id === SERVED_OFFER.modelId
+  );
+}
 
 // The only listing the seller daemon serves while paid selling is off (phase 2 brings it back as a plugin).
 export type FreeSellerOffer = Extract<

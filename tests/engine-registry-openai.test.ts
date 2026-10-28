@@ -188,3 +188,34 @@ void test('examples/openai-free.toml is a file the seller daemon serves as writt
     CONTROL_METERING_MODES.DECLARED,
   );
 });
+
+void test('openai refuses a base URL with a query or fragment, which would drop its version path', () => {
+  for (const url of [
+    'https://api.example.com/v1?',
+    'https://api.example.com/v1#',
+  ])
+    assert.equal(
+      engineOfferRefusal({ ...REMOTE, engine: { ...REMOTE.engine, url } }),
+      NODE_ERROR_CODES.SELLER_OFFER_ENGINE_UNSUPPORTED,
+      url,
+    );
+});
+
+void test('settings refuse an API key read from a Gyblos or relay token variable', () => {
+  for (const [env, relay] of [
+    ['GYBLOS_RELAY_TOKEN', ''],
+    ['GYBLOS_ANYTHING', ''],
+    ['MY_RELAY_TOKEN', '[relays]\nrelay_token_env = "MY_RELAY_TOKEN"\n'],
+  ] as const) {
+    const parsed = parseNodeConfig(remoteToml(env).replace(BASE, BASE + relay));
+    assert.ok(parsed.ok, JSON.stringify(parsed));
+    assert.throws(
+      () => sellerSettings(parsed.config, { [env]: FAKE_SECRET }),
+      (error: unknown) =>
+        error instanceof NodeError &&
+        error.code === NODE_ERROR_CODES.SELLER_OFFER_API_KEY_UNSAFE &&
+        error.offer === 0,
+      env,
+    );
+  }
+});

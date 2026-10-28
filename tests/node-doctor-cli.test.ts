@@ -10,7 +10,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 
 import { runCli } from '@gyblos/node-app/cli';
-import { DOCTOR_STATUS } from '@gyblos/node/constants';
+import { DOCTOR_CODES, DOCTOR_STATUS } from '@gyblos/node/constants';
 import { engineStatuses } from '@gyblos/node/seller-doctor';
 
 import {
@@ -317,5 +317,14 @@ void test('doctor: a down engine warns while another offer’s engine answers, a
   assert.deepEqual(
     engineStatuses([down, down]).map((result) => result.status),
     [DOCTOR_STATUS.FAIL, DOCTOR_STATUS.FAIL],
+  );
+  // A remote engine left unchecked may answer, so a down local engine only warns.
+  const unchecked = {
+    status: DOCTOR_STATUS.WARN,
+    code: DOCTOR_CODES.REMOTE_ENGINE_NOT_CHECKED,
+  };
+  assert.deepEqual(
+    engineStatuses([unchecked, down]).map((result) => result.status),
+    [DOCTOR_STATUS.WARN, DOCTOR_STATUS.WARN],
   );
 });

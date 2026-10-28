@@ -1,6 +1,7 @@
 // The `gyblos` command: `config validate` checks gyblos.toml and the GYBLOS_* environment; `doctor` runs the
-// seller's read-only startup preflight, calling remote engines only with --online. Prints codes, key paths and environment variable names; never a
-// value read from the environment, and URLs only as origins, because providers embed API keys in URL paths.
+// seller's read-only startup preflight, calling remote engines only with --online. Prints codes, key
+// paths and environment variable names; never a value read from the environment, and URLs only as
+// origins, because providers embed API keys in URL paths.
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 

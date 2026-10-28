@@ -11,7 +11,7 @@ import {
   REASONING_LEVELS,
 } from '@gyblos/protocol/constants';
 
-import { modelTokenizer, recountsWithPinnedTokenizer } from './artifacts';
+import { modelTokenizer } from './artifacts';
 import { NODE_ERROR_CODES } from './constants';
 import {
   REMOTE_READINESS,
@@ -19,10 +19,11 @@ import {
   type EngineReadinessPolicy,
   type SellerEngineOffer,
 } from './engine-factory';
+import { recountsWithPinnedTokenizer } from './seller-offer';
 
 const LOOPBACK_HOSTS: readonly string[] = [LOCALHOST, IPV6_LOOPBACK];
 
-export const OPENAI_LOCAL_POLICY = {
+export const OPENAI_READINESS = {
   warmup: {
     prompt: OPENAI_LOCAL_READINESS.prompt,
     maxTokens: OPENAI_LOCAL_READINESS.maxTokens,
@@ -36,8 +37,10 @@ function isLocal(url: URL) {
   return url.protocol === 'http:' && LOOPBACK_HOSTS.includes(url.hostname);
 }
 
+// A query or fragment, even an empty one, would replace the base's version path when routes join it.
 function engineUrl(offer: SellerEngineOffer) {
-  if (!URL.canParse(offer.engine.url)) return undefined;
+  if (!URL.canParse(offer.engine.url) || /[?#]/.test(offer.engine.url))
+    return undefined;
   const url = new URL(offer.engine.url);
   return url.protocol === 'https:' || isLocal(url) ? url : undefined;
 }
@@ -80,7 +83,7 @@ export const OPENAI_ENGINE_FACTORY: EngineFactory = {
             tokenizer: () => modelTokenizer(environment),
           }
         : { mode: CONTROL_METERING_MODES.DECLARED },
-      readiness: isLocal(url) ? OPENAI_LOCAL_POLICY : REMOTE_READINESS,
+      readiness: isLocal(url) ? OPENAI_READINESS : REMOTE_READINESS,
     };
   },
 };
