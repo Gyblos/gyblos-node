@@ -16,6 +16,7 @@ import {
 
 import { OTEL_SETTINGS } from './constants';
 import { createMeasurements } from './metrics';
+import { metricType } from './projection';
 import { ExplicitMetricReader } from './reader';
 
 export interface OtelTelemetryOptions {
@@ -73,13 +74,14 @@ export function createOtelTelemetrySink({
         return;
       }
       try {
-        toTelemetryRecord(event);
+        const record = toTelemetryRecord(event);
+        const type = metricType(record);
         if (
-          event.type !== TELEMETRY_EVENTS.RECEIPT &&
-          event.type !== TELEMETRY_EVENTS.CHARGED
+          type !== TELEMETRY_EVENTS.RECEIPT &&
+          type !== TELEMETRY_EVENTS.CHARGED
         ) {
           active ??= initialize(exporter);
-          active.record(event);
+          active.record(record);
         }
         emitted++;
       } catch {
