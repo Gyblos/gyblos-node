@@ -9,7 +9,7 @@ import { GYBLOS_ALPN } from '@gyblos/protocol/constants';
 import { DESKTOP, PROBE_STATUS } from './constants';
 import type { ProbeResult } from './probe-model';
 
-async function bindLocal() {
+export async function bindLocal() {
   const builder = Endpoint.builder();
   builder.applyMinimal();
   builder.relayMode(RelayMode.disabled());

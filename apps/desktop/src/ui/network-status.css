@@ -42,14 +42,14 @@
   font-size: 10px;
   font-weight: 500;
 }
-.network-status[data-state='connecting'] .network-status-dot {
+.network-status[data-state='starting'] .network-status-dot {
   background: var(--warm);
 }
-.network-status[data-state='paused'] .network-status-symbol,
-.network-status[data-state='paused'] strong {
+.network-status[data-state='stopped'] .network-status-symbol,
+.network-status[data-state='stopped'] strong {
   color: var(--muted);
 }
-.network-status[data-state='paused'] .network-status-dot {
+.network-status[data-state='stopped'] .network-status-dot {
   background: var(--muted);
 }
 .desktop-frame.sidebar-collapsed .network-status-copy > span {
@@ -86,14 +86,14 @@
   animation-delay: calc(var(--network-flow-period) * -0.5);
   opacity: 0.65;
 }
-.network-status[data-state='connecting'] .network-glyph {
+.network-status[data-state='starting'] .network-glyph {
   --network-flow-period: 1200ms;
   color: var(--warm);
 }
-.network-status[data-state='connecting'] strong {
+.network-status[data-state='starting'] strong {
   color: var(--warm);
 }
-.network-status[data-state='paused'] .network-flow {
+.network-status[data-state='stopped'] .network-flow {
   display: none;
   animation: none;
 }
@@ -107,4 +107,21 @@
     display: none;
     animation: none !important;
   }
+}
+
+.network-status[data-state='error'] .network-flow,
+.network-status[data-state='stopping'] .network-flow {
+  display: none;
+  animation: none;
+}
+.network-status[data-state='error'] strong,
+.network-status[data-state='error'] .network-status-symbol {
+  color: var(--warm);
+}
+.network-status[data-state='error'] .network-status-dot {
+  background: var(--warm);
+}
+.network-status:disabled {
+  opacity: 1;
+  cursor: default;
 }
