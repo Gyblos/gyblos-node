@@ -71,8 +71,9 @@ class EventLines {
 }
 
 // Server-sent events from a body; the end of the body ends the last event. Lines are read by offset
-// and every received character is scanned once. An event or pending line over eventCharacters, or a
-// stream over streamCharacters, is a bound failure.
+// and every received character is scanned for line ends once; a long pending line still costs its
+// length per chunk to join and keep, which the caps bound. An event or pending line over
+// eventCharacters, or a stream over streamCharacters, is a bound failure.
 export async function* serverSentData(
   body: ReadableStream<Uint8Array>,
   limits: ServerSentLimits,

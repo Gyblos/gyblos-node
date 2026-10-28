@@ -353,3 +353,37 @@ void test('engine-openai asks OpenAI itself for max_completion_tokens', async ()
   assert.equal(Reflect.get(Object(bodies[0]), 'max_completion_tokens'), 8);
   assert.equal(Reflect.get(Object(bodies[0]), 'max_tokens'), undefined);
 });
+
+void test('engine-openai keeps the final usage, not an earlier running count', () =>
+  withServer(
+    stream(chunk('Hello') + usage(3, 1) + finish() + usage(3, 7) + DONE),
+    async (server) => {
+      const result = await engineAt(server.base).generate({
+        prompt: 'x',
+        maxTokens: 8,
+      });
+      assert.equal(result.usage.outputTokens, 7);
+    },
+  ));
+
+void test('engine-openai treats OpenAI regional hosts as OpenAI itself', async () => {
+  for (const base of [
+    'https://eu.api.openai.com/v1',
+    'https://api.openai.com./v1',
+    'https://api.example.com/v1',
+  ]) {
+    let body: unknown;
+    await createOpenAiEngine(
+      { base, model: 'gpt-x', contextTokens: CONTEXT, recountable: false },
+      async (_input, init) => {
+        body = JSON.parse(String(init?.body));
+        return new Response(COMPLETE);
+      },
+    ).generate({ prompt: 'x', maxTokens: 8 });
+    assert.equal(
+      Reflect.has(Object(body), 'max_completion_tokens'),
+      !base.includes('example'),
+      base,
+    );
+  }
+});

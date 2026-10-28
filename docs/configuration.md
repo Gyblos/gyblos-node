@@ -251,8 +251,8 @@ memory-checked like Ollama; a remote API is ready once it lists the model, so
 readiness never spends the seller's credit. Reasoning models must have reasoning
 turned off on the server (for example a non-thinking chat template): an answer
 whose whole budget went to hidden reasoning is refused as an invalid response.
-OpenAI's own API (`api.openai.com`) gets `max_completion_tokens`; other servers
-get `max_tokens`.
+OpenAI's own API (`api.openai.com` and its regional hosts) gets
+`max_completion_tokens`; other servers get `max_tokens`.
 
 The Ollama plugin serves the pinned Qwen3 0.6B with reasoning `off`. It runs on
 the seller's own Ollama at the offer's engine URL and never starts Ollama: run a

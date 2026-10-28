@@ -60,7 +60,11 @@ const NANOSECONDS_PER_MILLISECOND = 1_000_000;
 const isFields = (value: unknown): value is Fields =>
   !!value && typeof value === 'object' && !Array.isArray(value);
 
-const isOpenAi = (base: string) => new URL(base).hostname === OPENAI_HOST;
+// OpenAI's own API and its regional hosts (eu.api.openai.com).
+const isOpenAi = (base: string) => {
+  const host = new URL(base).hostname.replace(/\.$/, '');
+  return host === OPENAI_HOST || host.endsWith(`.${OPENAI_HOST}`);
+};
 
 function route(base: string, path: string) {
   return new URL(path, base.endsWith('/') ? base : `${base}/`);
@@ -170,7 +174,7 @@ function applyEvent(event: Fields, completion: Completion) {
     };
   const { choices } = event;
   // Some servers send the final usage alone, without choices.
-  if (choices === undefined && completion.usage) return '';
+  if (choices === undefined && isFields(event.usage)) return '';
   if (!Array.isArray(choices) || choices.length > 1) throw new FrameFailure();
   const choice: unknown = choices[0];
   if (choice === undefined) return '';
@@ -219,10 +223,12 @@ async function readCompletion(
   for await (const data of serverSentData(body, OPENAI_LIMITS.stream)) {
     signal.throwIfAborted();
     if (data === OPENAI_STREAM_END) break;
-    const fragment = applyEvent(parseFields(data), completion);
+    const event = parseFields(data);
+    const fragment = applyEvent(event, completion);
     if (fragment) await deliver(fragment, completion, input, signal, attempt);
-    // Finished and counted: a proxy that keeps the stream open cannot hold a complete answer.
-    if (completion.finish && completion.usage) break;
+    // Finished, then counted by this event: a proxy that keeps the stream open cannot hold a complete
+    // answer, and an earlier running count is never taken for the final one.
+    if (completion.finish && isFields(event.usage)) break;
   }
   const { text, finish, usage } = completion;
   if (!finish) throw new FrameFailure();
