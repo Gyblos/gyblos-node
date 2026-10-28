@@ -4,7 +4,6 @@ import { Globe, ShieldCheck } from '@phosphor-icons/react';
 import { WALLET_STATUS, type WalletSummary } from '../wallet/model';
 import { NETWORK_STATE } from './constants';
 import { Modal } from './Modal';
-import type { NetworkState } from './NetworkStatus';
 import { SIGNAL_STATE, SignalMark } from './Signal';
 import { Badge, Button, List, ListRow, Note, RowCopy } from './UI';
 
@@ -14,7 +13,7 @@ export function StartupScreen({
   onContinue,
 }: {
   wallet: WalletSummary;
-  network: NetworkState;
+  network: (typeof NETWORK_STATE)[keyof typeof NETWORK_STATE];
   onContinue(): void;
 }) {
   const waiting = wallet.status === WALLET_STATUS.LOADING;

@@ -2,6 +2,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 import { DESKTOP } from './constants';
+import { LOCAL_NODE, parseLocalNodeState } from './node-status';
 import { parseProbeResult } from './probe-model';
 import { BACKUP_FLOW, parseBackupResult } from './wallet/backup-flow-model';
 import { parseWalletSummary, WALLET } from './wallet/model';
@@ -10,6 +11,13 @@ import {
   parseWalletSettingsResult,
   WALLET_SETTINGS,
 } from './wallet/settings-model';
+
+contextBridge.exposeInMainWorld('desktopNode', {
+  summary: async () =>
+    parseLocalNodeState(await ipcRenderer.invoke(LOCAL_NODE.STATUS_CHANNEL)),
+  retry: async () =>
+    parseLocalNodeState(await ipcRenderer.invoke(LOCAL_NODE.RETRY_CHANNEL)),
+});
 
 contextBridge.exposeInMainWorld('desktopProbe', {
   run: async () => parseProbeResult(await ipcRenderer.invoke(DESKTOP.CHANNEL)),

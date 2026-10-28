@@ -1,4 +1,5 @@
 // Owns simulated UI catalogs and precomputed brand morph paths; never live network state.
+import { LOCAL_NODE_STATE } from '../node-status';
 import type { CatalogModel } from './model-types';
 
 export const TOP_UP_STATUS = {
@@ -257,11 +258,12 @@ export const NETWORK_STATE = {
   PAUSED: 'paused',
 } as const;
 
-export const PREVIEW_CONNECT_MS = 1200;
-export const NETWORK_LABELS = {
-  [NETWORK_STATE.CONNECTING]: 'Connecting',
-  [NETWORK_STATE.CONNECTED]: 'Connected',
-  [NETWORK_STATE.PAUSED]: 'Paused',
+export const LOCAL_NODE_LABELS = {
+  [LOCAL_NODE_STATE.STARTING]: 'Starting node',
+  [LOCAL_NODE_STATE.READY]: 'Node ready',
+  [LOCAL_NODE_STATE.STOPPING]: 'Stopping node',
+  [LOCAL_NODE_STATE.STOPPED]: 'Node stopped',
+  [LOCAL_NODE_STATE.ERROR]: 'Node unavailable',
 } as const;
 
 export const DEMO_AUTH = {

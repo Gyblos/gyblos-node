@@ -4,7 +4,12 @@ import { build } from 'esbuild';
 import { build as buildRenderer } from 'vite';
 
 await build({
-  entryPoints: ['src/main.ts', 'src/preload.ts', 'src/worker.ts'],
+  entryPoints: [
+    'src/main.ts',
+    'src/preload.ts',
+    'src/worker.ts',
+    'src/node-worker.ts',
+  ],
   outdir: 'dist',
   outExtension: { '.js': '.cjs' },
   bundle: true,

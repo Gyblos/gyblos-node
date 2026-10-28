@@ -7,11 +7,12 @@ import { join } from 'node:path';
 import { app, BrowserWindow, ipcMain } from 'electron';
 
 import { DESKTOP, PROBE_STATUS, STARTUP_WINDOW } from './constants';
+import { registerDesktopNode } from './node-host';
 import { probeInUtility } from './probe-host';
 import { failedProbe, type ProbeResult } from './probe-model';
 import { cleanupDesktopSession } from './session-cleanup';
 import { armSmokeWatchdog } from './smoke-watchdog';
-import { startupHandoff } from './startup-window';
+import { settleDesktopStartup, startupHandoff } from './startup-window';
 import { BRAND_COLORS } from './theme';
 import { WALLET } from './wallet/constants';
 import { registerDesktopWallet } from './wallet/host';
@@ -124,6 +125,9 @@ async function main() {
     smoke,
     controller.signal,
   );
+  const node = smoke
+    ? null
+    : registerDesktopNode(window, __dirname, controller.signal);
   app.on('second-instance', () => {
     focusExistingWindow(loading && !loading.isDestroyed() ? loading : window);
   });
@@ -152,7 +156,10 @@ async function main() {
     controller.abort();
     app.quit();
   });
-  await loadDesktopWindows(window, loading, prepared, controller.signal);
+  await settleDesktopStartup(
+    loadDesktopWindows(window, loading, prepared, controller.signal),
+    () => node?.close() ?? Promise.resolve(),
+  );
 }
 void main().catch(() => {
   process.stderr.write('Desktop probe startup failed.\n');
