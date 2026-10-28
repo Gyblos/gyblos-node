@@ -30,7 +30,7 @@ export type EngineOfferRefusal =
 // type the mode as ControlMeteringMode so that branch only touches this file.
 export interface OfferMetering {
   mode: typeof CONTROL_METERING_MODES.RECOUNTED;
-  tokenizer: (environment: HomeEnvironment) => Promise<RecountTokenizer>;
+  tokenizer: () => Promise<RecountTokenizer>;
 }
 
 // The private warmup that gates advertisement, and how long the warmed model stays resident.

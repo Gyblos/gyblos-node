@@ -138,7 +138,7 @@ export async function startSeller() {
           }),
       },
     );
-    const tokenizer = await prepared.metering.tokenizer(process.env);
+    const tokenizer = await prepared.metering.tokenizer();
     await stage('iroh-endpoint');
     const { relayOnly } = settings;
     const endpoint = await bindEndpoint(await nodeSecret(P2P_ROLES.SELLER), {

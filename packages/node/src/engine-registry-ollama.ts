@@ -52,12 +52,12 @@ function refuse(offer: SellerEngineOffer) {
 export const OLLAMA_ENGINE_FACTORY: EngineFactory = {
   refuse,
   // The daemon's managed Ollama; PR 2c moves the engine to the offer URL.
-  create: (offer, { fetch }) => ({
+  create: (offer, { fetch, environment }) => ({
     engine: createOllamaEngine(SERVED_OFFER.engineUrl, fetch),
     selection: ollamaSelection(offer.model.id),
     metering: {
       mode: CONTROL_METERING_MODES.RECOUNTED,
-      tokenizer: modelTokenizer,
+      tokenizer: () => modelTokenizer(environment),
     },
     readiness: OLLAMA_READINESS,
   }),
