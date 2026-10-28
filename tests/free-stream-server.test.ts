@@ -17,7 +17,7 @@ async function fixture() {
   const vector: { requestFrameHex: string; response: unknown } = JSON.parse(
     await readFile(
       new URL(
-        import.meta.resolve('@gyblos/protocol/vectors/free-execution-v2.json'),
+        import.meta.resolve('@gyblos/protocol/vectors/free-execution-v3.json'),
       ),
       'utf8',
     ),

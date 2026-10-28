@@ -8,11 +8,13 @@ import {
   CONTROL_DOMAINS,
   FREE_EXECUTION,
   FREE_EXECUTION_CODES,
+  FREE_EXECUTION_STOP_REASONS,
 } from '@gyblos/protocol/constants';
 import {
   freeExecutionDigest,
   matchFreeExecutionResponse,
   parseFreeExecutionRequest,
+  parseFreeExecutionResponse,
   verifyFreeExecutionRequest,
 } from '@gyblos/protocol/free-execution';
 import {
@@ -33,12 +35,14 @@ interface Vector {
   responseFrameHex: string;
   error: unknown;
   errorFrameHex: string;
+  cannotContinue: { error: Record<string, unknown> } & Record<string, unknown>;
+  cannotContinueFrameHex: string;
 }
 async function vector(): Promise<Vector> {
   return JSON.parse(
     await readFile(
       new URL(
-        import.meta.resolve('@gyblos/protocol/vectors/free-execution-v2.json'),
+        import.meta.resolve('@gyblos/protocol/vectors/free-execution-v3.json'),
       ),
       'utf8',
     ),
@@ -168,4 +172,91 @@ void test('free execution reader cannot resume a valid request after a framing v
     code: FREE_EXECUTION_CODES.INVALID,
   });
   assert.throws(() => reader.finish(), { code: FREE_EXECUTION_CODES.INVALID });
+});
+
+void test('free execution v3 pins the seller-cannot-continue terminal and its reason', async () => {
+  const source = await vector();
+  assert.equal(FREE_EXECUTION.version, 3);
+  assert.equal(
+    Buffer.from(encodeFreeExecutionResponse(source.cannotContinue)).toString(
+      'hex',
+    ),
+    source.cannotContinueFrameHex,
+  );
+  await assert.rejects(
+    matchFreeExecutionResponse(source.cannotContinue, source.request),
+    (error: unknown) =>
+      error instanceof Error &&
+      Reflect.get(error, 'code') ===
+        FREE_EXECUTION_CODES.SELLER_CANNOT_CONTINUE &&
+      Reflect.get(error, 'reason') ===
+        FREE_EXECUTION_STOP_REASONS.QUOTA_EXHAUSTED &&
+      Reflect.get(error, 'delivered') === undefined &&
+      Reflect.get(error, 'remote') === true,
+  );
+});
+void test('free execution error shape ties reason and delivered to seller-cannot-continue', async () => {
+  const source = await vector();
+  const base = source.cannotContinue;
+  const cannot = FREE_EXECUTION_CODES.SELLER_CANNOT_CONTINUE;
+  const delivered = { outputTokens: 2 };
+  for (const error of [
+    { code: cannot },
+    { code: cannot, reason: 'unknown_reason' },
+    { code: cannot, reason: 'engine_auth' },
+    { code: FREE_EXECUTION_CODES.BUSY, reason: 'quota_exhausted' },
+    { code: FREE_EXECUTION_CODES.ENGINE, delivered },
+    { code: cannot, reason: 'quota_exhausted', delivered: { outputTokens: 0 } },
+    {
+      code: cannot,
+      reason: 'quota_exhausted',
+      delivered: { outputTokens: 1.5 },
+    },
+    {
+      code: cannot,
+      reason: 'quota_exhausted',
+      delivered: { outputTokens: 1, extra: 1 },
+    },
+    { code: cannot, reason: 'quota_exhausted', extra: true },
+  ])
+    assert.throws(
+      () => parseFreeExecutionResponse({ ...base, error }),
+      { code: FREE_EXECUTION_CODES.INVALID },
+      JSON.stringify(error),
+    );
+  assert.deepEqual(
+    parseFreeExecutionResponse({
+      ...base,
+      error: { code: cannot, reason: 'engine_interrupted', delivered },
+    }).error,
+    { code: cannot, reason: 'engine_interrupted', delivered },
+  );
+});
+void test('free execution delivered usage is rejected for complete responses and bounded for streams', async () => {
+  const source = await vector();
+  const cannot = FREE_EXECUTION_CODES.SELLER_CANNOT_CONTINUE;
+  const response = (outputTokens: number) => ({
+    ...source.cannotContinue,
+    error: {
+      code: cannot,
+      reason: 'engine_interrupted',
+      delivered: { outputTokens },
+    },
+  });
+  await assert.rejects(
+    matchFreeExecutionResponse(response(1), source.request),
+    { code: FREE_EXECUTION_CODES.INVALID },
+  );
+  await assert.rejects(
+    matchFreeExecutionResponse(response(32), source.request, 'stream'),
+    (error: unknown) =>
+      error instanceof Error &&
+      Reflect.get(error, 'code') === cannot &&
+      Reflect.get(error, 'reason') === 'engine_interrupted' &&
+      Reflect.get(Reflect.get(error, 'delivered') ?? {}, 'outputTokens') === 32,
+  );
+  await assert.rejects(
+    matchFreeExecutionResponse(response(33), source.request, 'stream'),
+    { code: FREE_EXECUTION_CODES.LIMIT },
+  );
 });

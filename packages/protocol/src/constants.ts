@@ -201,9 +201,9 @@ export const MODEL_IDENTITIES = {
 
 // Free execution is a separate data channel; control and reserved HTTP v2 keep their wire contracts.
 export const FREE_EXECUTION = {
-  alpn: 'gyblos/free/2',
-  version: 2,
-  requestDomain: 'gyblos/free-execution-request/v2\n',
+  alpn: 'gyblos/free/3',
+  version: 3,
+  requestDomain: 'gyblos/free-execution-request/v3\n',
   requestBytes: 131072,
   responseBytes: 1048576,
   inputBytes: 65536,
@@ -235,12 +235,21 @@ export const FREE_EXECUTION_CODES = {
   TIMEOUT: 'FREE_EXECUTION_TIMEOUT',
   CANCELLED: 'FREE_EXECUTION_CANCELLED',
   INTERNAL: 'FREE_EXECUTION_INTERNAL_ERROR',
+  // A started generation stopped on an engine failure; carries a stop reason (v3).
+  SELLER_CANNOT_CONTINUE: 'FREE_EXECUTION_SELLER_CANNOT_CONTINUE',
 } as const;
 export type FreeExecutionCode =
   (typeof FREE_EXECUTION_CODES)[keyof typeof FREE_EXECUTION_CODES];
+// COMPLETE is a one-shot response; STREAM is the terminal after deltas the caller already verified.
+export const FREE_EXECUTION_MATCH_MODES = {
+  COMPLETE: 'complete',
+  STREAM: 'stream',
+} as const;
+export type FreeExecutionMatchMode =
+  (typeof FREE_EXECUTION_MATCH_MODES)[keyof typeof FREE_EXECUTION_MATCH_MODES];
 
 export const FREE_STREAM = {
-  alpn: 'gyblos/free-stream/2',
+  alpn: 'gyblos/free-stream/3',
   deltaBytes: 8192,
   eventBytes: FREE_EXECUTION.responseBytes + 1024,
   maxEvents: 4096,
@@ -305,11 +314,10 @@ export const ENGINE_ERROR_CODES = {
 export type EngineErrorCode =
   (typeof ENGINE_ERROR_CODES)[keyof typeof ENGINE_ERROR_CODES];
 
-// Why a seller could not continue a started generation, as a buyer may see it; one per engine error.
+// Why a seller could not continue a started generation, as a buyer may see it.
 export const FREE_EXECUTION_STOP_REASONS = {
   QUOTA_EXHAUSTED: 'quota_exhausted',
   RATE_LIMITED: 'rate_limited',
-  ENGINE_AUTH: 'engine_auth',
   ENGINE_UNAVAILABLE: 'engine_unavailable',
   ENGINE_INTERRUPTED: 'engine_interrupted',
   ENGINE_TIMEOUT: 'engine_timeout',
@@ -324,7 +332,8 @@ export const ENGINE_ERROR_STOP_REASON: Readonly<
   [ENGINE_ERROR_CODES.QUOTA_EXHAUSTED]:
     FREE_EXECUTION_STOP_REASONS.QUOTA_EXHAUSTED,
   [ENGINE_ERROR_CODES.RATE_LIMITED]: FREE_EXECUTION_STOP_REASONS.RATE_LIMITED,
-  [ENGINE_ERROR_CODES.AUTH]: FREE_EXECUTION_STOP_REASONS.ENGINE_AUTH,
+  // Credential state of the seller's upstream account is private to the seller (founder decision).
+  [ENGINE_ERROR_CODES.AUTH]: FREE_EXECUTION_STOP_REASONS.ENGINE_UNAVAILABLE,
   [ENGINE_ERROR_CODES.UNAVAILABLE]:
     FREE_EXECUTION_STOP_REASONS.ENGINE_UNAVAILABLE,
   [ENGINE_ERROR_CODES.INTERRUPTED]:
