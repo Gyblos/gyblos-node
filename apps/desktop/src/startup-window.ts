@@ -55,3 +55,8 @@ export function startupHandoff(
     cancelled: () => cancelled,
   };
 }
+
+// Fatal startup must not escape to app.exit while a resident node still owns resources.
+export async function settleDesktopStartup(loading: Promise<void>, _closeNode: () => Promise<void>) {
+  await loading;
+}

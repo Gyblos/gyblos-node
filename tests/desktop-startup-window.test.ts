@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { startupHandoff } from '@gyblos/desktop/startup-window';
+import { settleDesktopStartup, startupHandoff } from '@gyblos/desktop/startup-window';
 
 class WindowDouble {
   destroyed = false;
@@ -108,4 +108,26 @@ void test('startup cannot show either window after cancellation before paint', (
     assert.equal(main.shown, 0);
     assert.equal(loading.shown, 0);
   }
+});
+
+void test('fatal desktop startup waits for node process exit before propagating failure', async () => {
+  const failure = new Error('Synthetic renderer load failure');
+  let completeClose = () => {};
+  let closeStarted = false;
+  let escaped = false;
+  const pending = settleDesktopStartup(Promise.reject(failure), () => {
+    closeStarted = true;
+    return new Promise<void>((resolve) => { completeClose = resolve; });
+  });
+  const outcome = pending.catch((error: unknown) => { escaped = true; return error; });
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  assert.equal(closeStarted, true);
+  assert.equal(escaped, false);
+  completeClose();
+  assert.equal(await outcome, failure);
+});
+void test('successful desktop startup retains its resident node', async () => {
+  let closed = false;
+  await settleDesktopStartup(Promise.resolve(), async () => { closed = true; });
+  assert.equal(closed, false);
 });
