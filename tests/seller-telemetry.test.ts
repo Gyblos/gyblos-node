@@ -102,6 +102,7 @@ void test('seller maps busy and cap refusals without invoking an engine', async 
       TELEMETRY_REFUSALS.SELLER_BUSY,
     ],
     [false, { dailyTokenCap: 1, perBuyerCap: 1 }, TELEMETRY_REFUSALS.DAILY_CAP],
+    [false, {dailyTokenCap:100,perBuyerCap:1},TELEMETRY_REFUSALS.BUYER_CAP],
   ] as const) {
     const source = await freeSellerFixture(caps);
     const telemetry = localTelemetry();
