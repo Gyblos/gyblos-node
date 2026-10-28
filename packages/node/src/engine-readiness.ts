@@ -2,7 +2,6 @@
 // the outcome and anchors offer expiry to the warmed model's residency.
 import { DIAGNOSTICS } from '@gyblos/config';
 import { OFFER_LIFETIME_MS } from '@gyblos/core/constants';
-import { READINESS_GENERATION } from '@gyblos/engine-ollama/constants';
 import { type Engine, type EngineDescription } from '@gyblos/protocol/engine';
 import {
   assertMemoryHeadroom,
@@ -10,6 +9,7 @@ import {
 } from '@gyblos/runtime/memory';
 
 import { READINESS_REASONS, READINESS_STATUSES } from './constants';
+import type { EngineReadinessPolicy } from './engine-factory';
 
 export interface ReadinessRecord {
   status: (typeof READINESS_STATUSES)[keyof typeof READINESS_STATUSES];
@@ -30,6 +30,8 @@ export function assertReadinessCurrent(
 }
 
 interface ProbeDependencies {
+  // From the engine plugin: the warmup to run and how long the warmed model stays resident.
+  policy: EngineReadinessPolicy;
   snapshot: () => Promise<MemorySnapshot>;
   now?: () => number;
 }
@@ -62,13 +64,14 @@ class EngineReadinessCheck {
     this.reason = READINESS_REASONS.INSUFFICIENT_HEADROOM;
     assertMemoryHeadroom(this.before);
     this.reason = READINESS_REASONS.WARMUP_FAILED;
-    if (OFFER_LIFETIME_MS >= READINESS_GENERATION.residencyMs)
+    const { warmup, residencyMs } = this.dependencies.policy;
+    if (!(residencyMs > OFFER_LIFETIME_MS))
       throw new Error('Offer lifetime exceeds warmed model residency.');
     const model = await this.engine.describe();
     this.signal.throwIfAborted();
     await this.engine.generate({
-      prompt: READINESS_GENERATION.prompt,
-      maxTokens: READINESS_GENERATION.maxTokens,
+      prompt: warmup.prompt,
+      maxTokens: warmup.maxTokens,
       signal: this.signal,
     });
     this.signal.throwIfAborted();

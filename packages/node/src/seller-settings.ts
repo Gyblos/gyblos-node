@@ -1,18 +1,13 @@
 // Seller startup settings from gyblos.toml (GYBLOS_CONFIG, else ./gyblos.toml when present; relative to the
 // working directory) under flag > env > file > default. Without a file the values equal today's
 // environment-only startup; invalid environment values now fail here with NODE_CONFIG_INVALID.
-// The daemon serves one warmed free model through its own Ollama, so any offer it cannot honor fails
-// closed; paid offers are refused until paid selling returns as a plugin (phase 2).
+// The daemon serves one warmed free model; its engine plugin refuses any offer it cannot honor and paid
+// offers are refused until paid selling returns as a plugin (phase 2).
 import { resolve } from 'node:path';
 
 import { NODE_ENVIRONMENT, type HomeEnvironment } from '@gyblos/config';
 import { validateDiscoveryBaseUrl } from '@gyblos/discovery-http';
-import { MODEL } from '@gyblos/engine-ollama/model';
-import {
-  ENGINE_KINDS,
-  MODEL_CLASSIFICATIONS,
-  OFFER_PRICING_KINDS,
-} from '@gyblos/protocol/constants';
+import { OFFER_PRICING_KINDS } from '@gyblos/protocol/constants';
 import type { RelayEnvironment } from '@gyblos/transport-iroh/endpoint';
 
 import {
@@ -23,6 +18,8 @@ import {
   NODE_SETTINGS,
   type NodeErrorCode,
 } from './constants';
+import type { SellerEngineOffer } from './engine-factory';
+import { engineOfferRefusal } from './engine-registry';
 import { NodeError, type NodeErrorContext } from './errors';
 import {
   readNodeConfigFile,
@@ -40,6 +37,8 @@ export interface SellerSettings {
   relayEnvironment: RelayEnvironment;
   publication: { baseUrl: string } | undefined;
   offer: FreeSellerOffer;
+  // The same offer as its engine plugin sees it.
+  engineOffer: SellerEngineOffer;
   limits: SellerLimits;
 }
 
@@ -56,48 +55,42 @@ const fail = (code: NodeErrorCode, context?: NodeErrorContext): never => {
   throw new NodeError(code, context);
 };
 
-function catalogOffer(offers: NodeOffer[]): FreeSellerOffer {
+function catalogOffer(
+  offers: NodeOffer[],
+): Pick<SellerSettings, 'offer' | 'engineOffer'> {
   if (!offers.length) fail(NODE_ERROR_CODES.SELLER_OFFERS_MISSING);
   if (offers.length !== 1)
     fail(NODE_ERROR_CODES.SELLER_OFFER_COUNT_UNSUPPORTED);
   const [offer] = offers as [NodeOffer];
-  const refuse = (code: NodeErrorCode) => fail(code, { offer: 0 });
-  if (
-    offer.model.kind !== MODEL_CLASSIFICATIONS.CATALOG ||
-    offer.model.id !== SERVED_OFFER.modelId
-  )
-    refuse(NODE_ERROR_CODES.SELLER_OFFER_MODEL_UNSUPPORTED);
-  if (
-    offer.engine.kind !== ENGINE_KINDS.OLLAMA ||
-    new URL(offer.engine.url).origin !==
-      new URL(SERVED_OFFER.engineUrl).origin ||
-    offer.engine.apiKeyEnv !== undefined ||
-    (offer.engine.upstreamModel !== undefined &&
-      offer.engine.upstreamModel !== MODEL.name)
-  )
-    refuse(NODE_ERROR_CODES.SELLER_OFFER_ENGINE_UNSUPPORTED);
-  const served: readonly string[] = SERVED_OFFER.reasoning;
-  if (
-    !offer.reasoning.length ||
-    offer.reasoning.some((level) => !served.includes(level))
-  )
-    refuse(NODE_ERROR_CODES.SELLER_OFFER_REASONING_UNSUPPORTED);
+  const engineOffer: SellerEngineOffer = {
+    index: 0,
+    model: offer.model,
+    engine: offer.engine,
+    reasoning: [...offer.reasoning],
+  };
+  const refuse = (code: NodeErrorCode) =>
+    fail(code, { offer: engineOffer.index });
+  const refusal = engineOfferRefusal(engineOffer);
+  if (refusal) refuse(refusal);
   const { pricing } = offer;
   // Paid v1 selling is off until it returns as a payment plugin (phase 2).
   if (pricing.kind !== OFFER_PRICING_KINDS.FREE)
     return refuse(NODE_ERROR_CODES.SELLER_PAID_EXECUTION_UNAVAILABLE);
   return {
-    modelId: SERVED_OFFER.modelId,
-    reasoning: [...offer.reasoning],
-    kind: OFFER_PRICING_KINDS.FREE,
-    caps: {
-      dailyTokenCap: pricing.dailyTokenCap,
-      perBuyerCap: pricing.perBuyerCap,
+    offer: {
+      modelId: SERVED_OFFER.modelId,
+      reasoning: [...offer.reasoning],
+      kind: OFFER_PRICING_KINDS.FREE,
+      caps: {
+        dailyTokenCap: pricing.dailyTokenCap,
+        perBuyerCap: pricing.perBuyerCap,
+      },
     },
+    engineOffer,
   };
 }
 
-export type SellerBaseSettings = Omit<SellerSettings, 'offer'>;
+export type SellerBaseSettings = Omit<SellerSettings, 'offer' | 'engineOffer'>;
 
 // Pure: everything but the offer, so doctor can still check relays when the offer is refused.
 export function sellerBaseSettings(
@@ -113,7 +106,7 @@ export function sellerSettings(
   environment: HomeEnvironment,
 ): SellerSettings {
   const { base, offers } = resolveSeller(file, environment);
-  return { ...base, offer: catalogOffer(offers) };
+  return { ...base, ...catalogOffer(offers) };
 }
 
 function resolveSeller(

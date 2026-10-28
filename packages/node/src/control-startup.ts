@@ -4,16 +4,18 @@ import { createSignableMessage, type KeyPairSigner } from '@solana/kit';
 
 import { DEVNET } from '@gyblos/config';
 import type { QuoteReadiness } from '@gyblos/core/control-quotes';
-import { MODEL } from '@gyblos/engine-ollama/model';
 import {
-  CONTROL_METERING_MODES,
   CONTROL_RECORD_VERSION,
   DATA_RETENTION,
   PUBLIC_RECORD_KINDS,
   PUBLIC_RECORD_LIMITS,
   V2_PRICING,
+  type ControlMeteringMode,
 } from '@gyblos/protocol/constants';
-import type { InferenceOfferV2 } from '@gyblos/protocol/control-types';
+import type {
+  InferenceOfferV2,
+  ModelSelection,
+} from '@gyblos/protocol/control-types';
 import type {
   EngineCapabilities,
   EngineDescription,
@@ -44,6 +46,9 @@ interface SellerControlStartupOptions {
   now?: () => number;
   // The listing: from gyblos.toml in the daemon, chosen by the caller in lab acceptance.
   offer: SellerCatalogOffer;
+  // From the engine plugin: what the catalog lists and how delivered tokens are counted.
+  selection: ModelSelection;
+  meteringMode: ControlMeteringMode;
 }
 
 function startupRecords(
@@ -51,7 +56,7 @@ function startupRecords(
   offer: SellerCatalogOffer,
 ) {
   const now = (options.now ?? Date.now)();
-  const { selection, reasoning } = startupSelection(offer);
+  const { selection, reasoning } = startupSelection(options);
   return createSellerRecords({
     template: {
       schemaVersion: CONTROL_RECORD_VERSION,
@@ -89,7 +94,7 @@ export async function prepareSellerControl(
   options: SellerControlStartupOptions,
 ) {
   const { offer } = options;
-  const { selection, reasoning } = startupSelection(offer);
+  const { selection, reasoning } = startupSelection(options);
   const records = await startupRecords(options, offer);
   const service = createSellerControlService({
     records,
@@ -108,7 +113,7 @@ export async function prepareSellerControl(
           model: options.model,
           capabilities: options.capabilities,
           reasoning,
-          meteringMode: CONTROL_METERING_MODES.RECOUNTED,
+          meteringMode: options.meteringMode,
         },
       ],
       now: options.now ?? Date.now,
@@ -123,12 +128,13 @@ export async function prepareSellerControl(
   return { service, records, offer };
 }
 
-// seller-settings admits only levels the pinned template implements (today, off).
-function startupSelection(offer: SellerCatalogOffer) {
-  const selection = {
-    modelId: offer.modelId,
-    variant: null,
-    quantization: MODEL.quantization,
+// The listing and the engine plugin's selection must name the same model, or the catalog would sign
+// one model and quote another; the listing's reasoning was already admitted by the plugin.
+function startupSelection(options: SellerControlStartupOptions) {
+  if (options.selection.modelId !== options.offer.modelId)
+    throw new Error('Engine selection does not match the listed model.');
+  return {
+    selection: { ...options.selection },
+    reasoning: [...options.offer.reasoning],
   };
-  return { selection, reasoning: [...offer.reasoning] };
 }
