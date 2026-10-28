@@ -45,6 +45,7 @@
     "@gyblos/core": "workspace:*",
     "@gyblos/config": "workspace:*",
     "@gyblos/engine-ollama": "workspace:*",
+    "@gyblos/engine-openai": "workspace:*",
     "@gyblos/runtime": "workspace:*",
     "@number0/iroh": "1.1.0",
     "@gyblos/payments-x402": "workspace:*",

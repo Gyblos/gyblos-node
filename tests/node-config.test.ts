@@ -43,6 +43,7 @@ void test('every example in examples/ is a valid gyblos.toml', () => {
       'lm-studio.toml',
       'multi-model.toml',
       'ollama-local.toml',
+      'openai-free.toml',
       'openai-reseller.toml',
       'seller-daemon.toml',
     ],

@@ -228,10 +228,34 @@ every entry must be one its plugin can serve, or startup stops with that entry's
 code. Startup warms the offers one at a time, starts as soon as one is ready,
 and warms the others again every minute in the background; the signed catalog
 lists only the offers that are ready now: an offer leaves it while it renews or
-after it fails a check, and returns with its next good observation. Today the
-only plugin is Ollama, which serves the pinned Qwen3 0.6B with reasoning `off`,
-and a model may be listed once, so in practice one entry passes. It runs on the
-seller's own Ollama at the offer's engine URL and never starts Ollama: run a
+after it fails a check, and returns with its next good observation. A model may
+be listed once. Two plugins serve offers today.
+
+The `openai` plugin serves any model through an OpenAI-compatible API (vLLM, LM
+Studio, llama.cpp, OpenRouter, OpenAI) with reasoning `["off"]` only; other
+levels come later, per provider. Its URL is the API base ending in its version,
+either `https://...` on any host or a literal loopback server
+(`http://127.0.0.1:<port>/v1`, `http://[::1]:<port>/v1`); `localhost` and
+`host.docker.internal` are refused with `SELLER_OFFER_ENGINE_UNSUPPORTED`, as is
+plain http to any other host (a LAN server needs https) and a URL with a query
+or fragment. `upstream_model` is the name the provider expects (the offer's
+model by default), `context_tokens` is required, and an `api_key_env` that names
+an unset or empty variable stops startup with `SELLER_OFFER_API_KEY_MISSING`;
+one that names a `GYBLOS_*` variable or the relay token's stops it with
+`SELLER_OFFER_API_KEY_UNSAFE`. The key is sent only as the `Authorization`
+header to that base URL, never follows a redirect and is never written or
+printed. Usage is recounted with the pinned public tokenizer for Qwen3 0.6B and
+declared by the provider for any other model (see
+[running-a-node.md](running-a-node.md)). A loopback server is warmed and
+memory-checked like Ollama; a remote API is ready once it lists the model, so
+readiness never spends the seller's credit. Reasoning models must have reasoning
+turned off on the server (for example a non-thinking chat template): an answer
+whose whole budget went to hidden reasoning is refused as an invalid response.
+OpenAI's own API (`api.openai.com` and its regional hosts) gets
+`max_completion_tokens`; other servers get `max_tokens`.
+
+The Ollama plugin serves the pinned Qwen3 0.6B with reasoning `off`. It runs on
+the seller's own Ollama at the offer's engine URL and never starts Ollama: run a
 dedicated one yourself (see [Seller](running-a-node.md#seller)). The URL must be
 a literal loopback address, `http://127.0.0.1:<port>/` or
 `http://[::1]:<port>/`; `localhost`, `host.docker.internal` and URLs with a path
@@ -253,6 +277,7 @@ this daemon. Today it honors:
 | `[discovery]` `publish`, `url`                                                                                                              | yes                                                                                                                       |
 | `[limits]`                                                                                                                                  | yes, see [Seller limits](#seller-limits)                                                                                  |
 | `[[offers]]`: each for `qwen3-0.6b` (or `qwen3:0.6b`), engine `ollama` at a literal loopback URL without `api_key_env`, reasoning `["off"]` | yes                                                                                                                       |
+| `[[offers]]`: any model, engine `openai` at an https or literal loopback URL with `context_tokens`, reasoning `["off"]`                     | yes                                                                                                                       |
 | `free = {...}` on that offer                                                                                                                | served over the free channel with daily total and per-buyer token caps                                                    |
 | `price = {...}` on that offer                                                                                                               | not yet: paid selling is off until phase 2, so a paid offer stops startup                                                 |
 | `[node]` `data_dir`, `rpc_url`, `payout_wallet`                                                                                             | not yet: the role files own them, so setting them in the file stops startup (`GYBLOS_HOME` overriding `data_dir` is fine) |
@@ -261,7 +286,8 @@ this daemon. Today it honors:
 Startup stops with a static code: `NODE_CONFIG_INVALID`,
 `SELLER_SETTING_UNSUPPORTED`, `SELLER_OFFERS_MISSING`,
 `SELLER_OFFER_MODEL_UNSUPPORTED`, `SELLER_OFFER_ENGINE_UNSUPPORTED`,
-`SELLER_OFFER_REASONING_UNSUPPORTED` or `SELLER_PAID_EXECUTION_UNAVAILABLE`.
+`SELLER_OFFER_REASONING_UNSUPPORTED`, `SELLER_OFFER_API_KEY_MISSING`,
+`SELLER_OFFER_API_KEY_UNSAFE` or `SELLER_PAID_EXECUTION_UNAVAILABLE`.
 `pnpm gyblos doctor` also names the `[[offers]]` entry a code is about.
 
 `pnpm gyblos config validate --config "$GYBLOS_CONFIG"` explains file problems
@@ -332,6 +358,7 @@ there are no `GYBLOS_*` variables for it, and the buyer ignores it.
 ```sh
 pnpm gyblos doctor                         # reads ./gyblos.toml, like node:start
 GYBLOS_CONFIG=my.toml pnpm gyblos doctor   # the file node:start will read
+pnpm gyblos doctor --online                # also calls remote engine APIs
 ```
 
 `doctor` has no `--config` flag on purpose: it reads exactly the file
@@ -340,24 +367,25 @@ doctor and a starting node never look at different files. It runs, read-only,
 the checks startup would fail on, and prints one line per check (`OK`, `WARN` or
 `FAIL`) with a static code and a hint:
 
-| Check       | What it verifies                                                                                                                                                                                                                                                                                                                                                                                             |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `config`    | the file and environment as seller startup reads them, with the same `NODE_CONFIG_INVALID` / `SELLER_*` codes (file problems are listed with their key paths)                                                                                                                                                                                                                                                |
-| `home`      | no legacy `.local` layout under the role or tokenizer directories                                                                                                                                                                                                                                                                                                                                            |
-| `role`      | the seller `role.json` exists and is valid (`ROLE_MISSING` hints `node:setup`)                                                                                                                                                                                                                                                                                                                               |
-| `keys`      | the key files startup loads, the owner and node keys, are regular, non-symlinked files owned by you with mode 0600. Metadata only, so a corrupt key is still found only at startup                                                                                                                                                                                                                           |
-| `sequence`  | the seller directory is mode 0700 and its public-sequence file is valid for this node; a leftover sequence lock fails, because it blocks every publication (inspect it, never delete it blindly)                                                                                                                                                                                                             |
-| `tokenizer` | the pinned tokenizer files are present and match their hashes                                                                                                                                                                                                                                                                                                                                                |
-| `engine[N]` | one line per `[[offers]]` entry N (counted from 1): its engine answers at its URL with the pinned model, by describing it (for Ollama, the model list and digest); it never generates. A failure shows the engine code, such as `ENGINE_UNAVAILABLE` or `ENGINE_TIMEOUT`; it fails only when no offer's engine answers (startup needs one), and is otherwise a warning. Not checked when an offer is refused |
-| `relays`    | relay URLs and token as the endpoint would build them (the token is never printed)                                                                                                                                                                                                                                                                                                                           |
+| Check       | What it verifies                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `config`    | the file and environment as seller startup reads them, with the same `NODE_CONFIG_INVALID` / `SELLER_*` codes (file problems are listed with their key paths)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `home`      | no legacy `.local` layout under the role or tokenizer directories                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `role`      | the seller `role.json` exists and is valid (`ROLE_MISSING` hints `node:setup`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `keys`      | the key files startup loads, the owner and node keys, are regular, non-symlinked files owned by you with mode 0600. Metadata only, so a corrupt key is still found only at startup                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `sequence`  | the seller directory is mode 0700 and its public-sequence file is valid for this node; a leftover sequence lock fails, because it blocks every publication (inspect it, never delete it blindly)                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `tokenizer` | the pinned tokenizer files are present and match their hashes; `NOT_NEEDED` when every offer's usage is declared by its provider                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `engine[N]` | one line per `[[offers]]` entry N (counted from 1): its engine answers at its URL with its model, by describing it (for Ollama, the model list and pinned digest; for an API, its model list, which some providers serve without checking the key); it never generates. A failure shows the engine code, such as `ENGINE_UNAVAILABLE` or `ENGINE_TIMEOUT`; it fails only when no offer's engine answers (startup needs one), and is otherwise a warning. Not checked when an offer is refused. A remote API is called only with `--online` (the call carries its API key, and a hosted provider may count it); without it the line warns `REMOTE_ENGINE_NOT_CHECKED` |
+| `relays`    | relay URLs and token as the endpoint would build them (the token is never printed)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 
 It then prints the seller's public **NodeId and owner** address from
 `role.json`; share those to be enrolled in a discovery index. The exit code is 0
 when no check fails (warnings do not fail) and 1 otherwise. It starts, spawns
 and writes nothing. It never prints the home location, the RPC URL, the relay
-token or key material, and only reaches each offer's loopback engine URL. Memory
-headroom, key contents and the NodeId matching `node.key` are checked at startup
-only. With a valid configuration it also prints the effective
+token, an API key or key material, and only reaches each offer's loopback engine
+URL, plus each remote engine's model list with `--online`. Memory headroom, key
+contents and the NodeId matching `node.key` are checked at startup only. With a
+valid configuration it also prints the effective
 [seller limits](#seller-limits).
 
 ## Issue codes

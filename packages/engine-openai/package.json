@@ -1,0 +1,15 @@
+{
+  "name": "@gyblos/engine-openai",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./constants": "./src/constants.ts",
+    "./engine": "./src/engine.ts"
+  },
+  "dependencies": {
+    "@gyblos/config": "workspace:*",
+    "@gyblos/core": "workspace:*",
+    "@gyblos/protocol": "workspace:*"
+  }
+}

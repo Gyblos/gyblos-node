@@ -10,7 +10,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 
 import { runCli } from '@gyblos/node-app/cli';
-import { DOCTOR_STATUS } from '@gyblos/node/constants';
+import { DOCTOR_CODES, DOCTOR_STATUS } from '@gyblos/node/constants';
 import { engineStatuses } from '@gyblos/node/seller-doctor';
 
 import {
@@ -257,7 +257,7 @@ void test('doctor: an engine that never answers fails with ENGINE_TIMEOUT within
     );
   }));
 
-void test('doctor: an offer the daemon refuses leaves the engine unchecked, and doctor takes no --online', () =>
+void test('doctor: an offer the daemon refuses leaves the engine unchecked', () =>
   scenario({}, async (run) => {
     const ollama = await withOllama(run);
     await writeFile(join(run.root, 'gyblos.toml'), paidToml(run));
@@ -266,9 +266,6 @@ void test('doctor: an offer the daemon refuses leaves the engine unchecked, and 
     assert.deepEqual(ollama.paths, []);
     for (const removed of ['ollama', 'model', 'ports'])
       assert.equal(line(paid.output, removed), '', removed);
-    const online = await doctor(run, ['--online']);
-    assert.equal(online.code, 1);
-    assert.match(online.output, /Usage:/);
   }));
 
 void test('doctor and config validate refuse arguments they do not take', () =>
@@ -320,5 +317,14 @@ void test('doctor: a down engine warns while another offer’s engine answers, a
   assert.deepEqual(
     engineStatuses([down, down]).map((result) => result.status),
     [DOCTOR_STATUS.FAIL, DOCTOR_STATUS.FAIL],
+  );
+  // A remote engine left unchecked may answer, so a down local engine only warns.
+  const unchecked = {
+    status: DOCTOR_STATUS.WARN,
+    code: DOCTOR_CODES.REMOTE_ENGINE_NOT_CHECKED,
+  };
+  assert.deepEqual(
+    engineStatuses([unchecked, down]).map((result) => result.status),
+    [DOCTOR_STATUS.WARN, DOCTOR_STATUS.WARN],
   );
 });

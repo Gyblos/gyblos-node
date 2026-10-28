@@ -1,19 +1,8 @@
 // Adapts the Ollama client to the protocol Engine port: one user message, digest identity, recountable usage.
-import type { Engine, EngineInput } from '@gyblos/protocol/engine';
+import { singleUserPrompt, type Engine } from '@gyblos/protocol/engine';
 
 import { GENERATION, MODEL } from './constants';
 import { createOllama, type OllamaOptions } from './index';
-
-function userPrompt(input: EngineInput) {
-  if (input.prompt !== undefined) return input.prompt;
-  if (
-    input.messages.length !== 1 ||
-    input.messages[0]?.role !== 'user' ||
-    typeof input.messages[0].content !== 'string'
-  )
-    throw new Error('Only one user message without tools is supported.');
-  return input.messages[0].content;
-}
 
 export function createOllamaEngine(
   base: string,
@@ -40,7 +29,7 @@ export function createOllamaEngine(
     async generate(input) {
       const result = await adapter.generate({
         ...input,
-        prompt: userPrompt(input),
+        prompt: singleUserPrompt(input),
       });
       return {
         text: result.text,

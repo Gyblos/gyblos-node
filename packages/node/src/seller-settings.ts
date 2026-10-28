@@ -61,7 +61,18 @@ const fail = (code: NodeErrorCode, context?: NodeErrorContext): never => {
   throw new NodeError(code, context);
 };
 
-function offerSettings(offer: NodeOffer, index: number): SellerOfferSettings {
+// The environment and the variables no provider key may come from: the relay token's and any GYBLOS_*.
+interface OfferEnvironment {
+  values: HomeEnvironment;
+  relayTokenEnv: string;
+}
+const GYBLOS_VARIABLE = /^GYBLOS_/;
+
+function offerSettings(
+  offer: NodeOffer,
+  index: number,
+  environment: OfferEnvironment,
+): SellerOfferSettings {
   const engine: SellerEngineOffer = {
     index,
     model: offer.model,
@@ -71,6 +82,17 @@ function offerSettings(offer: NodeOffer, index: number): SellerOfferSettings {
   const refuse = (code: NodeErrorCode) => fail(code, { offer: index });
   const refusal = engineOfferRefusal(engine);
   if (refusal) refuse(refusal);
+  // The key itself stays in the environment; only its source and presence are checked here.
+  const { apiKeyEnv } = offer.engine;
+  if (apiKeyEnv !== undefined) {
+    if (
+      GYBLOS_VARIABLE.test(apiKeyEnv) ||
+      apiKeyEnv === environment.relayTokenEnv
+    )
+      refuse(NODE_ERROR_CODES.SELLER_OFFER_API_KEY_UNSAFE);
+    if (!environment.values[apiKeyEnv])
+      refuse(NODE_ERROR_CODES.SELLER_OFFER_API_KEY_MISSING);
+  }
   const { pricing } = offer;
   // Paid v1 selling is off until it returns as a payment plugin (phase 2).
   if (pricing.kind !== OFFER_PRICING_KINDS.FREE)
@@ -90,9 +112,12 @@ function offerSettings(offer: NodeOffer, index: number): SellerOfferSettings {
 }
 
 // Every entry must be servable: one refused offer refuses startup with its index.
-function catalogOffers(offers: NodeOffer[]): SellerOfferSettings[] {
+function catalogOffers(
+  offers: NodeOffer[],
+  environment: OfferEnvironment,
+): SellerOfferSettings[] {
   if (!offers.length) fail(NODE_ERROR_CODES.SELLER_OFFERS_MISSING);
-  return offers.map(offerSettings);
+  return offers.map((offer, index) => offerSettings(offer, index, environment));
 }
 
 export type SellerBaseSettings = Omit<SellerSettings, 'offers'>;
@@ -110,14 +135,17 @@ export function sellerSettings(
   file: NodeConfig | undefined,
   environment: HomeEnvironment,
 ): SellerSettings {
-  const { base, offers } = resolveSeller(file, environment);
-  return { ...base, offers: catalogOffers(offers) };
+  const { base, offers, relayTokenEnv } = resolveSeller(file, environment);
+  return {
+    ...base,
+    offers: catalogOffers(offers, { values: environment, relayTokenEnv }),
+  };
 }
 
 function resolveSeller(
   file: NodeConfig | undefined,
   environment: HomeEnvironment,
-): { base: SellerBaseSettings; offers: NodeOffer[] } {
+): { base: SellerBaseSettings; offers: NodeOffer[]; relayTokenEnv: string } {
   const consumed = Object.fromEntries(
     Object.entries(environment).filter(
       ([name]) => !(UNCONSUMED_ENVIRONMENT as readonly string[]).includes(name),
@@ -155,7 +183,11 @@ function resolveSeller(
     // File only: [limits] has no environment variables or flags.
     limits: sellerLimits(file?.limits),
   };
-  return { base, offers: settings.offers };
+  return {
+    base,
+    offers: settings.offers,
+    relayTokenEnv: settings.relayTokenEnv,
+  };
 }
 
 // An explicit GYBLOS_CONFIG must exist; the implicit ./gyblos.toml is optional.
