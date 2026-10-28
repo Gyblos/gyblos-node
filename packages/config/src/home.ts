@@ -112,7 +112,6 @@ export function homeLayout(environment: HomeEnvironment) {
 
 export type HomeLayout = ReturnType<typeof homeLayout>;
 
-// Where Ollama keeps a library model's manifest inside the managed models directory (Ollama's layout).
 export function rolePathIn(
   environment: HomeEnvironment,
   role: HomeRole,

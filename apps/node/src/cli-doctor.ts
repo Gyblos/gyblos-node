@@ -35,7 +35,7 @@ const HINTS: Readonly<Partial<Record<DoctorResultCode, string>>> = {
     'the seller directory must be mode 0700 and its public-sequence file valid',
   [DOCTOR_CODES.TOKENIZER_UNAVAILABLE]: 'run `pnpm gate:inference:setup`',
   [ENGINE_ERROR_CODES.UNAVAILABLE]:
-    'start the engine at the offer URL with the pinned model; for Ollama, `ollama pull qwen3:0.6b`, and `ollama list` must show the pinned digest',
+    'start the engine at the offer URL with the pinned model; for Ollama, `ollama pull qwen3:0.6b`, and `ollama list` must show ID 7df6b6e09427',
   [ENGINE_ERROR_CODES.TIMEOUT]:
     'the engine at the offer URL did not answer in time; check that Ollama is running',
   [DOCTOR_CODES.NOT_CHECKED]: 'fix the failures above first',
