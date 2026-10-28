@@ -101,3 +101,38 @@ void test('refused telemetry requires seller and engine identity to be absent to
       toTelemetryRecord({ ...event, ...patch } as typeof event),
     );
 });
+void test('receipt telemetry retains signed stop metadata and drops nested unknown content', async () => {
+  const { signSellerReceipt } = await import('@gyblos/protocol/receipt');
+  const {
+    FREE_EXECUTION_CODES,
+    FREE_EXECUTION_STOP_REASONS,
+    RECEIPT_OUTCOMES,
+  } = await import('@gyblos/protocol/constants');
+  const { receiptSigner, sellerRecord } =
+    await import('./support/receipt-fixture');
+  const signer = receiptSigner();
+  const record = {
+    ...sellerRecord(signer.nodeId),
+    outcome: RECEIPT_OUTCOMES.FAILED,
+    code: FREE_EXECUTION_CODES.SELLER_CANNOT_CONTINUE,
+    reason: FREE_EXECUTION_STOP_REASONS.QUOTA_EXHAUSTED,
+    finishReason: null,
+  };
+  const receipt = { seller: await signSellerReceipt(record, signer.sign) };
+  const event = {
+    ...telemetryEvents()[0]!,
+    type: TELEMETRY_EVENTS.RECEIPT,
+    receipt,
+  };
+  const enriched = {
+    ...event,
+    receipt: {
+      ...receipt,
+      seller: {
+        ...receipt.seller,
+        record: { ...record, prompt: 'PROMPT-SECRET-MARKER' },
+      },
+    },
+  };
+  assert.deepEqual(toTelemetryRecord(enriched), event);
+});

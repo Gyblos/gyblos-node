@@ -26,7 +26,15 @@ void test('receipt golden vectors match independent canonical bytes, digest and 
       'utf8',
     ),
   );
-  assert.ok(vectors.cases.length >= 3);
+  assert.deepEqual(
+    vectors.cases.map((vector) => vector.name),
+    [
+      'agreed-free-stream',
+      'disputed-output-tokens',
+      'paid-amounts',
+      'seller-only-quota-exhausted',
+    ],
+  );
   for (const vector of vectors.cases) {
     assert.deepEqual(await verifyReceipt(vector.receipt), vector.receipt);
     assert.equal(

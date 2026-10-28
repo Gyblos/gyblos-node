@@ -5,6 +5,7 @@ import test from 'node:test';
 import {
   CONTROL_CODES,
   FREE_EXECUTION_CODES,
+  FREE_EXECUTION_STOP_REASONS,
   RECEIPT_OUTCOMES,
   RECEIPT_VERDICTS,
 } from '@gyblos/protocol/constants';
@@ -217,4 +218,71 @@ void test('receipt rejects oversized, hostile and noncanonical nested values bef
     }),
     { code: CONTROL_CODES.SIGNATURE },
   );
+});
+void test('failed receipts accept every public seller-cannot-continue stop reason and remain seller-only verifiable', async () => {
+  const seller = receiptSigner();
+  for (const reason of Object.values(FREE_EXECUTION_STOP_REASONS)) {
+    const record = {
+      ...sellerRecord(seller.nodeId),
+      outcome: RECEIPT_OUTCOMES.FAILED,
+      code: FREE_EXECUTION_CODES.SELLER_CANNOT_CONTINUE,
+      reason,
+      finishReason: null,
+    };
+    assert.deepEqual(parseSellerReceipt(record), record);
+    const envelope = { seller: await signSellerReceipt(record, seller.sign) };
+    assert.deepEqual(await verifyReceipt(envelope), envelope);
+    const tampered = {
+      seller: {
+        ...envelope.seller,
+        record: {
+          ...record,
+          reason:
+            reason === FREE_EXECUTION_STOP_REASONS.QUOTA_EXHAUSTED
+              ? FREE_EXECUTION_STOP_REASONS.RATE_LIMITED
+              : FREE_EXECUTION_STOP_REASONS.QUOTA_EXHAUSTED,
+        },
+      },
+    };
+    await assert.rejects(verifyReceipt(tampered), {
+      code: CONTROL_CODES.SIGNATURE,
+    });
+  }
+});
+void test('receipt stop reason is present iff seller-cannot-continue and never exposes upstream authentication', () => {
+  const base = {
+    ...sellerRecord(),
+    outcome: RECEIPT_OUTCOMES.FAILED,
+    finishReason: null,
+  };
+  assert.throws(
+    () =>
+      parseSellerReceipt({
+        ...base,
+        code: FREE_EXECUTION_CODES.SELLER_CANNOT_CONTINUE,
+      }),
+    { code: CONTROL_CODES.INVALID },
+  );
+  for (const code of Object.values(FREE_EXECUTION_CODES)) {
+    if (code === FREE_EXECUTION_CODES.SELLER_CANNOT_CONTINUE) continue;
+    assert.throws(
+      () =>
+        parseSellerReceipt({
+          ...base,
+          code,
+          reason: FREE_EXECUTION_STOP_REASONS.QUOTA_EXHAUSTED,
+        }),
+      { code: CONTROL_CODES.INVALID },
+    );
+  }
+  for (const reason of [undefined, 'engine_auth', 'unknown', {}])
+    assert.throws(
+      () =>
+        parseSellerReceipt({
+          ...base,
+          code: FREE_EXECUTION_CODES.SELLER_CANNOT_CONTINUE,
+          reason,
+        }),
+      { code: CONTROL_CODES.INVALID },
+    );
 });
