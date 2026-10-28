@@ -97,10 +97,10 @@ pnpm node:start
 ```
 
 Buyer: same token, `pnpm node:setup --role buyer --mint MINT`, then
-`pnpm buyer:free` for the free chat endpoint. The paid v1 buyer flow
-(`buyer:trust`, `buyer:start`) needs a paid seller, which only the lab gates run
-until paid selling returns. Full steps:
-[docs/running-a-node.md](docs/running-a-node.md).
+`pnpm buyer:free` for the free chat endpoint (it also needs a `selection.json`;
+see the full steps). The paid v1 buyer flow (`buyer:trust`, `buyer:start`) needs
+a paid seller, which only the lab gates run until paid selling returns. Full
+steps: [docs/running-a-node.md](docs/running-a-node.md).
 
 ## Commands
 
