@@ -201,7 +201,7 @@ function cannotContinue(
   );
 }
 
-// Startup passes the already prepared offer and catalog; no configuration is read again.
+// One offer and its signed catalog, prepared by the caller; no configuration is read again.
 export function prepareSellerFreeExecution(
   options: Omit<SellerFreeExecutionOptions, 'selection' | 'offer'> & {
     offer: SellerCatalogOffer;
@@ -226,7 +226,7 @@ export function prepareSellerFreeExecution(
     offer: options.offer,
     selection,
   });
-  // One offer today; the router already sends any other selection to UNSUPPORTED.
+  // One offer, for lab acceptance and tests; the daemon serves its offer set through free-offers.
   return createSellerFreeRouter(() => [{ selection, service }]);
 }
 

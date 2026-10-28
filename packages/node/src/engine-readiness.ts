@@ -1,5 +1,5 @@
-// Holds the seller until the engine is ready: checks memory headroom, runs one bounded private warmup, records
-// the outcome and anchors offer expiry to the warmed model's residency.
+// Holds the seller until the engine is ready: checks memory headroom for an engine on this machine, runs one
+// bounded private warmup, records the outcome and anchors offer expiry to the warmed model's residency.
 import { DIAGNOSTICS } from '@gyblos/config';
 import { OFFER_LIFETIME_MS } from '@gyblos/core/constants';
 import { type Engine, type EngineDescription } from '@gyblos/protocol/engine';
@@ -62,7 +62,7 @@ class EngineReadinessCheck {
     this.before = await this.dependencies.snapshot();
     this.signal.throwIfAborted();
     this.reason = READINESS_REASONS.INSUFFICIENT_HEADROOM;
-    assertMemoryHeadroom(this.before);
+    this.assertHeadroom(this.before);
     this.reason = READINESS_REASONS.WARMUP_FAILED;
     const { warmup, residencyMs } = this.dependencies.policy;
     if (!(residencyMs > OFFER_LIFETIME_MS))
@@ -88,10 +88,14 @@ class EngineReadinessCheck {
     )
       throw new Error('OOM observed during private warmup.');
     this.reason = READINESS_REASONS.INSUFFICIENT_HEADROOM;
-    assertMemoryHeadroom(this.after);
+    this.assertHeadroom(this.after);
     this.reason = READINESS_REASONS.WARMUP_FAILED;
     assertReadinessCurrent(offerExpiresAt, now());
     return { model, offerExpiresAt };
+  }
+  // A remote engine's memory is not this machine's; snapshots are still recorded.
+  private assertHeadroom(snapshot: MemorySnapshot) {
+    if (this.dependencies.policy.localResources) assertMemoryHeadroom(snapshot);
   }
   record(passed: boolean): ReadinessRecord {
     return {
@@ -109,6 +113,8 @@ export async function prepareSellerEngine(
   dependencies: ProbeDependencies & {
     record: (record: ReadinessRecord) => Promise<void>;
     timeoutMs?: number;
+    // Stops a background warmup when the seller stops.
+    signal?: AbortSignal;
   },
 ): Promise<{ model: EngineDescription; offerExpiresAt: number }> {
   const controller = new AbortController();
@@ -118,6 +124,8 @@ export async function prepareSellerEngine(
     dependencies,
   );
   let timer: ReturnType<typeof setTimeout> | undefined;
+  const stopped = dependencies.signal;
+  let stop = () => {};
   try {
     const result = await Promise.race([
       check.run(),
@@ -127,6 +135,9 @@ export async function prepareSellerEngine(
           controller.abort();
           reject(new Error('Private warmup timed out.'));
         }, dependencies.timeoutMs ?? DIAGNOSTICS.warmupMs);
+        stop = () => reject(new Error('Private warmup stopped.'));
+        if (stopped?.aborted) stop();
+        stopped?.addEventListener('abort', stop, { once: true });
       }),
     ]);
     clearTimeout(timer);
@@ -134,7 +145,8 @@ export async function prepareSellerEngine(
     return result;
   } catch {
     controller.abort();
-    await dependencies.record(check.record(false));
+    // A stopped seller records nothing more.
+    if (!stopped?.aborted) await dependencies.record(check.record(false));
     throw new Error(
       check.reason === READINESS_REASONS.INSUFFICIENT_HEADROOM
         ? 'Insufficient memory headroom; seller not advertised.'
@@ -142,5 +154,6 @@ export async function prepareSellerEngine(
     );
   } finally {
     clearTimeout(timer);
+    stopped?.removeEventListener('abort', stop);
   }
 }

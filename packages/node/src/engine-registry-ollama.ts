@@ -25,6 +25,8 @@ export const OLLAMA_READINESS = {
     maxTokens: READINESS_GENERATION.maxTokens,
   },
   residencyMs: READINESS_GENERATION.residencyMs,
+  // The seller's own Ollama shares this machine's memory.
+  localResources: true,
 } as const satisfies EngineReadinessPolicy;
 
 // The listed selection for a model served through Ollama: the pinned quantization, no variant.

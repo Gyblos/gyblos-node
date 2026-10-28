@@ -18,7 +18,7 @@ async function fixture() {
   let sequence = source.records.current().record.sequence;
   let sign: Signer = source.nodeSigner;
   const records = await createSellerRecords({
-    template: source.catalog,
+    template: () => source.catalog,
     signer: (bytes) => sign(bytes),
     sequence: { next: async () => ++sequence },
     now: source.context.now,

@@ -27,7 +27,7 @@ async function fixture() {
     initialFloor: source.catalog.sequence + 1,
   });
   const records = await createSellerRecords({
-    template: source.catalog,
+    template: () => source.catalog,
     sequence,
     signer: source.nodeSigner,
     now: source.context.now,
@@ -127,7 +127,7 @@ void test('failed durable reservation disables records before a signature can es
   let fail = false;
   let sequence = source.catalog.sequence;
   const records = await createSellerRecords({
-    template: source.catalog,
+    template: () => source.catalog,
     sequence: {
       next: async () => {
         if (fail) throw new Error('synthetic persistence failure');

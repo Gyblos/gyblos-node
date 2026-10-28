@@ -4,6 +4,7 @@ import { CONTROL_CAPACITY } from '@gyblos/core/constants';
 import { ControlAdmission } from '@gyblos/core/control-admission';
 import {
   createControlQuote,
+  sameSelection,
   type QuoteContext,
 } from '@gyblos/core/control-quotes';
 import {
@@ -18,6 +19,7 @@ import {
 } from '@gyblos/protocol/constants';
 import { parseControlQuery } from '@gyblos/protocol/control-requests';
 import type {
+  ControlQuery,
   ControlResponse,
   PublicCatalogV2,
 } from '@gyblos/protocol/control-types';
@@ -35,6 +37,7 @@ import {
 import type { Signer } from '@gyblos/protocol/signing';
 import type { ControlService } from '@gyblos/transport-iroh/control-server';
 
+import { quoteModel, type ControlOffers } from './control-offers';
 import type { SellerPublicRecords } from './public-records';
 
 export interface SellerControlOptions {
@@ -43,6 +46,9 @@ export interface SellerControlOptions {
   nodeSigner: Signer;
   monotonic?: () => number;
   records?: SellerPublicRecords;
+  // The seller's listed offers, read per query: they replace the context's models, and each quote is
+  // bound to its own offer's readiness instead of the catalog's.
+  offers?: Pick<ControlOffers, 'listed'>;
 }
 
 export function createSellerControlService(
@@ -58,10 +64,7 @@ export function createSellerControlService(
       const requestId = validatedRequestId(value);
       try {
         const query = parseControlQuery(value);
-        const context = {
-          ...options.context,
-          catalog: options.records?.current() ?? options.context.catalog,
-        };
+        const context = queryContext(options, query);
         if (signal.aborted) return controlFail(CONTROL_CODES.CANCELLED);
         if (query.method === CONTROL_METHODS.OFFER) {
           const offer = await createControlQuote(
@@ -122,6 +125,23 @@ export function createSellerControlService(
         };
       }
     },
+  };
+}
+
+// The listed offers, read once per query, replace the context's models; a quote is bound to its own
+// offer's readiness. An unlisted selection keeps the catalog's, and the catalog refuses it as MODEL first.
+function queryContext(options: SellerControlOptions, query: ControlQuery) {
+  const listed = options.offers?.listed();
+  const own =
+    query.method === CONTROL_METHODS.OFFER &&
+    listed?.find((offer) =>
+      sameSelection(offer.selection, query.params.selection),
+    );
+  return {
+    ...options.context,
+    catalog: options.records?.current() ?? options.context.catalog,
+    ...(listed ? { models: listed.map(quoteModel) } : {}),
+    ...(own ? { readiness: own.readiness } : {}),
   };
 }
 

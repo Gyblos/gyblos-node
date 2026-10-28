@@ -84,7 +84,7 @@ void test('without offers the seller refuses to start; nothing runs that the sel
 
 void test('a free offer keeps the defaults: no publication, default relays', () => {
   const settings = sellerSettings(freeFile(), {});
-  assert.deepEqual(settings.offer, FREE_LISTING);
+  assert.deepEqual(settings.offers[0]!.offer, FREE_LISTING);
   assert.equal(settings.relayOnly, false);
   assert.equal(settings.irohBind, undefined);
   assert.equal(settings.irohExternalAddress, undefined);
@@ -124,8 +124,8 @@ void test('environment-only settings match the previous direct readers', () => {
 
 void test('a free offer lists zero prices with its caps', () => {
   const settings = sellerSettings(freeFile(), {});
-  assert.deepEqual(settings.offer, FREE_LISTING);
-  assert.deepEqual(listedPrices(settings.offer), {
+  assert.deepEqual(settings.offers[0]!.offer, FREE_LISTING);
+  assert.deepEqual(listedPrices(settings.offers[0]!.offer), {
     inputAtomicPerMtok: '0',
     outputAtomicPerMtok: '0',
   });
@@ -195,8 +195,11 @@ void test('offers the daemon cannot serve fail closed with a static code', () =>
       extra: 'reasoning = ["off"]',
     }) +
     offer({ model: 'gpt-oss-20b', engine: MANAGED });
-  rejects(NODE_ERROR_CODES.SELLER_OFFER_COUNT_UNSUPPORTED, () =>
-    sellerSettings(fileConfig(two), {}),
+  // Every entry must be servable; the refusal names the second entry.
+  rejects(
+    NODE_ERROR_CODES.SELLER_OFFER_MODEL_UNSUPPORTED,
+    () => sellerSettings(fileConfig(two), {}),
+    1,
   );
 });
 
@@ -250,7 +253,7 @@ void test('invalid environment values for consumed settings fail closed; GYBLOS_
   );
   for (const value of ['', 'garbage', 'ftp://x'])
     assert.deepEqual(
-      sellerSettings(freeFile(), { GYBLOS_RPC_URL: value }).offer,
+      sellerSettings(freeFile(), { GYBLOS_RPC_URL: value }).offers[0]!.offer,
       FREE_LISTING,
     );
 });
@@ -262,7 +265,7 @@ void test('the seller-daemon example starts the seller as written', () => {
     ),
     {},
   );
-  assert.deepEqual(settings.offer, FREE_LISTING);
+  assert.deepEqual(settings.offers[0]!.offer, FREE_LISTING);
   assert.equal(settings.publication, undefined);
 });
 
@@ -284,7 +287,10 @@ void test('loadSellerSettings: optional ./gyblos.toml, required GYBLOS_CONFIG, i
         extra: 'reasoning = ["off"]',
       });
     await writeFile(join(directory, 'gyblos.toml'), freeToml);
-    assert.equal((await loadSellerSettings({}, directory)).offer.kind, 'free');
+    assert.equal(
+      (await loadSellerSettings({}, directory)).offers[0]!.offer.kind,
+      'free',
+    );
     await writeFile(join(directory, 'other.toml'), 'version = 1\n[node\n');
     await rejectsAsync(NODE_ERROR_CODES.NODE_CONFIG_INVALID, () =>
       loadSellerSettings({ GYBLOS_CONFIG: 'other.toml' }, directory),

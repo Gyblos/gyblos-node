@@ -1,54 +1,28 @@
-// Wires the prepared seller listing to isolated Iroh services: control and the free channels. The daemon
-// binds no HTTP ALPN while paid selling is off, so the bridge's HTTP target is never dialed.
+// Wires the seller's control and free services to isolated Iroh channels. The daemon binds no HTTP ALPN
+// while paid selling is off, so the bridge's HTTP target is never dialed.
 import type { Endpoint } from '@number0/iroh';
 
 import { LOCALHOST, PORTS } from '@gyblos/config';
-import type { QuoteReadiness } from '@gyblos/core/control-quotes';
-import { FreeSellerLedger } from '@gyblos/core/free-admission';
-import type {
-  Engine,
-  EngineDescription,
-  RecountTokenizer,
-} from '@gyblos/protocol/engine';
+import type { ControlService } from '@gyblos/transport-iroh/control-server';
+import type { FreeExecutionService } from '@gyblos/transport-iroh/free-server';
 import { serveIroh } from '@gyblos/transport-iroh/iroh-server';
 
-import type { prepareSellerControl } from './control-startup';
-import { prepareSellerFreeExecution } from './free-execution';
 import type { SellerLimits } from './node-config-limits';
 
 export function serveSellerTransport(
   endpoint: Endpoint,
-  control: Awaited<ReturnType<typeof prepareSellerControl>>,
-  options: {
-    relayOnly: boolean;
-    owner: string;
-    nodeId: string;
-    model: EngineDescription;
-    engine: Engine;
-    tokenizer: RecountTokenizer;
-    readiness: () => QuoteReadiness;
-    startedAt: number;
-    limits: SellerLimits;
+  services: {
+    control: ControlService;
+    free: FreeExecutionService | undefined;
   },
+  options: { relayOnly: boolean; limits: SellerLimits },
 ) {
-  const freeExecution = prepareSellerFreeExecution({
-    ...options,
-    // Created once per seller process: renewals never reset single use or the day's buyers.
-    ledger: new FreeSellerLedger(
-      options.startedAt,
-      options.limits.maxFreeBuyers,
-    ),
-    offer: control.offer,
-    catalog: control.records.current(),
-    capabilities: options.engine.capabilities(),
-    now: Date.now,
-  });
   return serveIroh(
     endpoint,
     `http://${LOCALHOST}:${PORTS.seller}`,
     options.relayOnly,
-    control.service,
-    freeExecution,
+    services.control,
+    services.free,
     options.limits.transport,
   );
 }

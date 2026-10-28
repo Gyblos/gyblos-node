@@ -35,16 +35,17 @@ void test('startup warms the engine at the offer URL, not at a managed port', as
     assert.ok(parsed.ok);
     const settings = sellerSettings(parsed.config, {});
     const records: ReadinessRecord[] = [];
-    const ready = await prepareSellerOffers(settings, {
+    const { ready, pending } = await prepareSellerOffers(settings, {
       fetch: globalThis.fetch,
       environment: {},
       snapshot: async () => SNAPSHOT,
-      record: async (record) => {
+      record: async (_index, record) => {
         records.push(record);
       },
     });
-    assert.equal(ready.model.digest, MODEL.digest);
-    assert.ok(ready.offerExpiresAt > Date.now());
+    assert.equal(pending.length, 0);
+    assert.equal(ready[0]!.model.digest, MODEL.digest);
+    assert.ok(ready[0]!.offerExpiresAt > Date.now());
     assert.equal(records.length, 1);
     assert.equal(records[0]!.status, READINESS_STATUSES.PASSED);
     // The warmup really generated at the offer URL.
