@@ -334,3 +334,48 @@ void test('engine-anthropic refuses output limits outside the request bounds bef
       await assert.rejects(engine.generate({ prompt: 'x', maxTokens }));
     assert.equal(server.seen.length, 0);
   }));
+
+void test('engine-anthropic: the usual low-credit 400 is quota exhaustion, other 400s are not', async () => {
+  const lowCredit: Messages = (response) => {
+    response.writeHead(400, HEADERS).end(
+      JSON.stringify({
+        type: 'error',
+        error: {
+          type: 'invalid_request_error',
+          message:
+            'Your credit balance is too low to access the Anthropic API. UPSTREAM-SECRET-MARKER',
+        },
+      }),
+    );
+  };
+  await withServer(lowCredit, async (server) => {
+    assert.equal(
+      await code(engineAt(server.base)),
+      ENGINE_ERROR_CODES.QUOTA_EXHAUSTED,
+    );
+  });
+  await withServer(refused(400, 'invalid_request_error'), async (server) => {
+    assert.equal(
+      await code(engineAt(server.base)),
+      ENGINE_ERROR_CODES.UNAVAILABLE,
+    );
+  });
+});
+
+void test('engine-anthropic: a model window smaller than configured ends as a length stop', () =>
+  withServer(
+    stream(
+      start() +
+        block() +
+        text('Hello') +
+        end('model_context_window_exceeded') +
+        STOP,
+    ),
+    async (server) => {
+      const result = await engineAt(server.base).generate({
+        prompt: 'x',
+        maxTokens: 8,
+      });
+      assert.equal(result.finishReason, ENGINE_DONE_REASONS.LENGTH);
+    },
+  ));

@@ -12,6 +12,7 @@ import {
 import { boundedText, serverSentData } from '@gyblos/core/engine-http';
 import {
   deliverText,
+  doneReasonFrom,
   elapsedNanoseconds,
   errorFields,
   generationAttempt,
@@ -19,6 +20,7 @@ import {
   jsonFields,
   providerCount,
   providerRoute,
+  visibleFragment,
   type JsonFields,
 } from '@gyblos/core/engine-provider';
 import {
@@ -28,14 +30,13 @@ import {
 } from '@gyblos/protocol/constants';
 import {
   EngineError,
-  singleUserPrompt,
   type Engine,
   type EngineInput,
   type EngineResult,
 } from '@gyblos/protocol/engine';
 
 import {
-  ANTHROPIC_BILLING_ERROR,
+  ANTHROPIC_CREDIT,
   ANTHROPIC_EVENTS,
   ANTHROPIC_HIDDEN_DELTAS,
   ANTHROPIC_INPUT_FIELDS,
@@ -69,20 +70,28 @@ const headers = (settings: AnthropicEngineSettings) => ({
 
 const STOP_REASONS: Readonly<Record<string, EngineDoneReason>> =
   ANTHROPIC_STOP_REASONS;
-function stopReason(value: unknown): EngineDoneReason {
-  const reason =
-    typeof value === 'string' && Object.hasOwn(STOP_REASONS, value)
-      ? STOP_REASONS[value]
-      : undefined;
-  if (!reason) throw new FrameFailure();
-  return reason;
+const HIDDEN_DELTAS: readonly string[] = ANTHROPIC_HIDDEN_DELTAS;
+
+// The usual no-credit answer, read from a bounded slice of its message that is never kept.
+function noCredit(error: JsonFields | undefined, status: number) {
+  if (!error) return false;
+  if (error.type === ANTHROPIC_CREDIT.billingType) return true;
+  return (
+    status === ANTHROPIC_CREDIT.invalidRequestStatus &&
+    error.type === ANTHROPIC_CREDIT.invalidRequestType &&
+    typeof error.message === 'string' &&
+    ANTHROPIC_CREDIT.message.test(
+      error.message.slice(0, ANTHROPIC_CREDIT.messageCharacters),
+    )
+  );
 }
 
-// A refused request: an account without credit is quota exhaustion whatever the status; any other
-// refusal maps by status. The body is read only for its error type, within a bound, and never kept.
+// A refused request: an account without credit is quota exhaustion, any other refusal maps by status.
+// Unlike OpenAI-compatible servers, the API reports missing credit at more than one status, so every
+// refused body is read, within a bound, only for its error type and never kept.
 async function refusal(response: Response) {
   const error = await errorFields(response, ANTHROPIC_LIMITS.errorBytes);
-  return error?.type === ANTHROPIC_BILLING_ERROR
+  return noCredit(error, response.status)
     ? new EngineError(ENGINE_ERROR_CODES.QUOTA_EXHAUSTED)
     : statusFailure(response.status);
 }
@@ -134,16 +143,9 @@ function readUsage(usage: unknown, completion: Completion, output: boolean) {
 function deltaText(delta: unknown, completion: Completion) {
   if (!isJsonFields(delta) || typeof delta.type !== 'string')
     throw new FrameFailure();
-  if (ANTHROPIC_HIDDEN_DELTAS.includes(delta.type)) return '';
+  if (HIDDEN_DELTAS.includes(delta.type)) return '';
   if (delta.type !== ANTHROPIC_TEXT_DELTA) throw new FrameFailure();
-  const { text } = delta;
-  if (
-    typeof text !== 'string' ||
-    /[\uD800-\uDFFF]/u.test(text) ||
-    (text && completion.finish)
-  )
-    throw new FrameFailure();
-  return text;
+  return visibleFragment(delta.text, !!completion.finish);
 }
 
 // Applies one streamed event and returns the visible text it carried. Events it does not know (pings,
@@ -163,7 +165,7 @@ function applyEvent(event: JsonFields, completion: Completion) {
         ? event.delta.stop_reason
         : undefined;
       if (reason !== undefined && reason !== null)
-        completion.finish = stopReason(reason);
+        completion.finish = doneReasonFrom(STOP_REASONS, reason);
       readUsage(event.usage, completion, true);
       return '';
     }
@@ -221,11 +223,10 @@ async function generate(
   timeoutMs: number,
   input: EngineInput,
 ): Promise<EngineResult> {
-  const { attempt, signal, started } = generationAttempt(input, {
+  const { prompt, attempt, signal, started } = generationAttempt(input, {
     maxOutputTokens: ANTHROPIC_LIMITS.maxOutputTokens,
     timeoutMs,
   });
-  const prompt = singleUserPrompt(input);
   try {
     const response = await fetchImpl(
       providerRoute(settings.base, ANTHROPIC_ROUTES.messages),

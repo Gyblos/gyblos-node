@@ -12,6 +12,7 @@ import {
 import { boundedText, serverSentData } from '@gyblos/core/engine-http';
 import {
   deliverText,
+  doneReasonFrom,
   elapsedNanoseconds,
   errorFields,
   generationAttempt,
@@ -19,6 +20,7 @@ import {
   jsonFields,
   providerCount,
   providerRoute,
+  visibleFragment,
   type JsonFields,
 } from '@gyblos/core/engine-provider';
 import {
@@ -29,7 +31,6 @@ import {
 } from '@gyblos/protocol/constants';
 import {
   EngineError,
-  singleUserPrompt,
   type Engine,
   type EngineInput,
   type EngineResult,
@@ -74,21 +75,13 @@ function authorization(settings: OpenAiEngineSettings): Record<string, string> {
   return settings.apiKey ? { authorization: `Bearer ${settings.apiKey}` } : {};
 }
 
-// Compatible servers name the same two endings differently; any other ending (a filter, a tool call,
-// an error) is not a served completion.
+// Compatible servers name the same two endings differently.
 const FINISH_REASONS: Readonly<Record<string, EngineDoneReason>> =
   OPENAI_FINISH_REASONS;
-function doneReason(value: unknown): EngineDoneReason {
-  const reason =
-    typeof value === 'string' && Object.hasOwn(FINISH_REASONS, value)
-      ? FINISH_REASONS[value]
-      : undefined;
-  if (!reason) throw new FrameFailure();
-  return reason;
-}
 
 // A refused request: an account without credit is quota exhaustion, any other status maps as usual.
-// The body is read only for its error code, within a bound, and never kept.
+// OpenAI-compatible servers report it only with 429, so only that body is read, for its error code,
+// within a bound, and never kept; any other body is discarded unread.
 async function refusal(response: Response) {
   if (response.status === HTTP_TOO_MANY_REQUESTS) {
     const error = await errorFields(response, OPENAI_LIMITS.errorBytes);
@@ -152,18 +145,12 @@ function applyEvent(event: JsonFields, completion: Completion) {
   if (choice === undefined) return '';
   if (!isJsonFields(choice)) throw new FrameFailure();
   const content = isJsonFields(choice.delta) ? choice.delta.content : undefined;
-  let text = '';
-  if (content !== undefined && content !== null) {
-    if (
-      typeof content !== 'string' ||
-      /[\uD800-\uDFFF]/u.test(content) ||
-      (content && completion.finish)
-    )
-      throw new FrameFailure();
-    text = content;
-  }
+  const text =
+    content === undefined || content === null
+      ? ''
+      : visibleFragment(content, !!completion.finish);
   if (choice.finish_reason !== undefined && choice.finish_reason !== null)
-    completion.finish = doneReason(choice.finish_reason);
+    completion.finish = doneReasonFrom(FINISH_REASONS, choice.finish_reason);
   return text;
 }
 
@@ -207,11 +194,10 @@ async function generate(
   timeoutMs: number,
   input: EngineInput,
 ): Promise<EngineResult> {
-  const { attempt, signal, started } = generationAttempt(input, {
+  const { prompt, attempt, signal, started } = generationAttempt(input, {
     maxOutputTokens: OPENAI_LIMITS.maxOutputTokens,
     timeoutMs,
   });
-  const prompt = singleUserPrompt(input);
   try {
     const response = await fetchImpl(
       providerRoute(settings.base, OPENAI_ROUTES.chat),

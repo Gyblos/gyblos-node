@@ -57,7 +57,7 @@ const OTHER_ENGINE = {
   url: 'http://localhost:11434',
 };
 
-void test('the registry names exactly the engines the seller can serve today', () => {
+void test('the registry has a plugin for every engine kind', () => {
   assert.deepEqual(Object.keys(ENGINE_REGISTRY), Object.values(ENGINE_KINDS));
 });
 

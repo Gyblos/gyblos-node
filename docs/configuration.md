@@ -257,14 +257,19 @@ OpenAI's own API (`api.openai.com` and its regional hosts) gets
 The `anthropic` plugin serves any model through the Anthropic Messages API (or a
 compatible one) with reasoning `["off"]`; no thinking is requested. Its URL is
 the API root without `/v1` (`https://api.anthropic.com`), on https or a literal
-loopback proxy; a URL ending in `/v1` is refused with
-`SELLER_OFFER_ENGINE_UNSUPPORTED`. `api_key_env` is required
+loopback proxy; a URL with a `/v1` segment anywhere in its path is refused with
+`SELLER_OFFER_ENGINE_UNSUPPORTED`, as is a dot-only model name
+(`SELLER_OFFER_MODEL_UNSUPPORTED`). `api_key_env` is required
 (`SELLER_OFFER_API_KEY_MISSING` without it) and the key is sent only as the
 `x-api-key` header to that URL. Usage is declared by the provider, input
-counting cached prompt tokens too. Readiness only fetches the model
-(`GET /v1/models/{model}`, which also checks the key), even on loopback, since
-any Anthropic-compatible URL is paid per call. A `billing_error` is quota
-exhaustion; an overloaded API (529) is unavailable.
+counting cached prompt tokens too (a translating proxy that already folds cached
+tokens into `input_tokens` would be counted twice). Readiness only fetches the
+model (`GET /v1/models/{model}`, which also checks the key), even on loopback,
+since any Anthropic-compatible URL is paid per call. A `billing_error`, or the
+usual 400 whose message names the credit balance, is quota exhaustion; an
+overloaded API (529) is unavailable. A compatible server must implement both
+`POST /v1/messages` and `GET /v1/models/{model}`; Amazon Bedrock and Google
+Vertex work only behind a gateway that serves both.
 
 The Ollama plugin serves the pinned Qwen3 0.6B with reasoning `off`. It runs on
 the seller's own Ollama at the offer's engine URL and never starts Ollama: run a

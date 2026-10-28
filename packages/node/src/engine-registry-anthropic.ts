@@ -3,6 +3,7 @@
 // tokenizer, so usage is declared by the provider. Every Anthropic-compatible URL is treated as paid per
 // call: readiness only describes the model, never generating. The key is read from the variable the
 // offer names and reaches only the engine.
+import { ANTHROPIC_VERSION_SEGMENT } from '@gyblos/engine-anthropic/constants';
 import { createAnthropicEngine } from '@gyblos/engine-anthropic/engine';
 import {
   CONTROL_METERING_MODES,
@@ -17,15 +18,18 @@ import {
 } from './engine-factory';
 import { providerEngineUrl } from './engine-urls';
 
-// The routes carry their own version, so a base already ending in it would double it.
-const VERSIONED_PATH = /\/v1\/?$/;
-
 function engineUrl(offer: SellerEngineOffer) {
   const url = providerEngineUrl(offer.engine.url);
-  return url && !VERSIONED_PATH.test(url.pathname) ? url : undefined;
+  return url && !ANTHROPIC_VERSION_SEGMENT.test(url.pathname) ? url : undefined;
 }
 
+// The model names one path segment of the model check; a dot-only name would climb out of it.
+const upstreamModel = (offer: SellerEngineOffer) =>
+  offer.engine.upstreamModel ?? offer.model.id;
+
 function refuse(offer: SellerEngineOffer) {
+  if (/^\.+$/.test(upstreamModel(offer)))
+    return NODE_ERROR_CODES.SELLER_OFFER_MODEL_UNSUPPORTED;
   if (!engineUrl(offer) || offer.engine.contextTokens === undefined)
     return NODE_ERROR_CODES.SELLER_OFFER_ENGINE_UNSUPPORTED;
   if (offer.engine.apiKeyEnv === undefined)
@@ -41,7 +45,7 @@ function refuse(offer: SellerEngineOffer) {
 export const ANTHROPIC_ENGINE_FACTORY: EngineFactory = {
   refuse,
   create: (offer, { fetch, environment }) => {
-    const { contextTokens, apiKeyEnv, upstreamModel } = offer.engine;
+    const { contextTokens, apiKeyEnv } = offer.engine;
     const apiKey = apiKeyEnv ? environment[apiKeyEnv] : undefined;
     if (!engineUrl(offer) || contextTokens === undefined || !apiKey)
       throw new Error('Anthropic offer was not checked before creation.');
@@ -49,7 +53,7 @@ export const ANTHROPIC_ENGINE_FACTORY: EngineFactory = {
       engine: createAnthropicEngine(
         {
           base: offer.engine.url,
-          model: upstreamModel ?? offer.model.id,
+          model: upstreamModel(offer),
           contextTokens,
           apiKey,
         },

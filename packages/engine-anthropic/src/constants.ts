@@ -3,7 +3,9 @@
 import { INFERENCE_REQUEST_LIMITS, TIMEOUTS } from '@gyblos/config';
 import { ENGINE_DONE_REASONS } from '@gyblos/protocol/constants';
 
-// Relative to the offer's base URL, which is the API root (https://api.anthropic.com).
+// Relative to the offer's base URL, which is the API root (https://api.anthropic.com); a base that
+// already has a version segment would double it.
+export const ANTHROPIC_VERSION_SEGMENT = /(^|\/)v1(\/|$)/;
 export const ANTHROPIC_ROUTES = {
   messages: 'v1/messages',
   model: 'v1/models/',
@@ -26,14 +28,24 @@ export const ANTHROPIC_TIMEOUTS = {
   describeMs: 15_000,
 } as const;
 
-// The error type the API returns when the account has no credit, whatever the status.
-export const ANTHROPIC_BILLING_ERROR = 'billing_error';
+// How the API says the account has no credit: a billing error at any status, or the usual 400 invalid
+// request whose message names the credit balance (matched within a bound, never kept).
+export const ANTHROPIC_CREDIT = {
+  billingType: 'billing_error',
+  invalidRequestType: 'invalid_request_error',
+  invalidRequestStatus: 400,
+  message: /credit balance/i,
+  messageCharacters: 512,
+} as const;
 
-// A tool call, a refusal or a paused turn is not a served completion.
+// A tool call, a refusal or a paused turn is not a served completion: before any text it is an invalid
+// response, after text an interruption the buyer sees with what it received.
 export const ANTHROPIC_STOP_REASONS = {
   end_turn: ENGINE_DONE_REASONS.STOP,
   stop_sequence: ENGINE_DONE_REASONS.STOP,
   max_tokens: ENGINE_DONE_REASONS.LENGTH,
+  // The model's window was smaller than the configured context_tokens.
+  model_context_window_exceeded: ENGINE_DONE_REASONS.LENGTH,
 } as const;
 
 export const ANTHROPIC_EVENTS = {
@@ -45,11 +57,11 @@ export const ANTHROPIC_EVENTS = {
 } as const;
 export const ANTHROPIC_TEXT_DELTA = 'text_delta';
 // Deltas that never carry visible text; any other unknown delta (a tool's JSON) is not served.
-export const ANTHROPIC_HIDDEN_DELTAS: readonly string[] = [
+export const ANTHROPIC_HIDDEN_DELTAS = [
   'thinking_delta',
   'signature_delta',
   'citations_delta',
-];
+] as const;
 // Input counted at message start: fresh, written to and read from the prompt cache.
 export const ANTHROPIC_INPUT_FIELDS = [
   'input_tokens',

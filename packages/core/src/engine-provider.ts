@@ -1,8 +1,15 @@
 // What every adapter for a hosted provider API shares: routes under the offer's base URL, JSON objects
 // and provider counts that fail as the Engine port classifies them, an error body read only for its
 // type, the generation deadline and the delivery of each visible fragment. Pure; web APIs only.
-import { ENGINE_ERROR_CODES } from '@gyblos/protocol/constants';
-import { EngineError, type EngineInput } from '@gyblos/protocol/engine';
+import {
+  ENGINE_ERROR_CODES,
+  type EngineDoneReason,
+} from '@gyblos/protocol/constants';
+import {
+  EngineError,
+  singleUserPrompt,
+  type EngineInput,
+} from '@gyblos/protocol/engine';
 
 import {
   BoundFailure,
@@ -54,7 +61,33 @@ export async function errorFields(response: Response, maxBytes: number) {
   }
 }
 
-// Checks the output limit before any call, and joins the caller's signal with the generation deadline.
+// The ending a provider named, looked up in the adapter's own table; any other ending (a filter, a tool
+// call, a refusal) is not a served completion.
+export function doneReasonFrom(
+  table: Readonly<Record<string, EngineDoneReason>>,
+  value: unknown,
+): EngineDoneReason {
+  const reason =
+    typeof value === 'string' && Object.hasOwn(table, value)
+      ? table[value]
+      : undefined;
+  if (!reason) throw new FrameFailure();
+  return reason;
+}
+
+// One streamed piece of visible text: a string without lone surrogates, never after the ending.
+export function visibleFragment(value: unknown, finished: boolean) {
+  if (
+    typeof value !== 'string' ||
+    /[\uD800-\uDFFF]/u.test(value) ||
+    (value && finished)
+  )
+    throw new FrameFailure();
+  return value;
+}
+
+// Checks the output limit and the prompt before any call, then joins the caller's signal with the
+// generation deadline. Programming errors come first, as the Engine port orders them.
 export function generationAttempt(
   input: EngineInput,
   limits: { maxOutputTokens: number; timeoutMs: number },
@@ -65,6 +98,7 @@ export function generationAttempt(
     input.maxTokens > limits.maxOutputTokens
   )
     throw new Error('Invalid output token limit.');
+  const prompt = singleUserPrompt(input);
   input.signal?.throwIfAborted();
   const deadline = AbortSignal.timeout(limits.timeoutMs);
   const attempt: EngineAttempt = {
@@ -76,7 +110,7 @@ export function generationAttempt(
     deadline,
     ...(input.signal ? [input.signal] : []),
   ]);
-  return { attempt, signal, started: performance.now() };
+  return { prompt, attempt, signal, started: performance.now() };
 }
 
 export const elapsedNanoseconds = (started: number) =>

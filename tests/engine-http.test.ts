@@ -54,3 +54,43 @@ void test('a body over its byte cap is a bound failure', async () => {
   assert.equal(await boundedText(new Response('ok'), 2), 'ok');
   await assert.rejects(boundedText(new Response('too long'), 2), BoundFailure);
 });
+
+void test('provider adapters refuse an unsupported prompt before an aborted signal, as the port orders them', async () => {
+  const { createAnthropicEngine } =
+    await import('@gyblos/engine-anthropic/engine');
+  const { createOpenAiEngine } = await import('@gyblos/engine-openai/engine');
+  const controller = new AbortController();
+  controller.abort(new Error('synthetic abort'));
+  const input = {
+    messages: [
+      { role: 'user' as const, content: 'a' },
+      { role: 'user' as const, content: 'b' },
+    ],
+    maxTokens: 8,
+    signal: controller.signal,
+  };
+  const never = async (): Promise<Response> => {
+    throw new Error('no call expected');
+  };
+  for (const engine of [
+    createOpenAiEngine(
+      {
+        base: 'https://api.example.com/v1',
+        model: 'm',
+        contextTokens: 4096,
+        recountable: false,
+      },
+      never,
+    ),
+    createAnthropicEngine(
+      {
+        base: 'https://api.example.com',
+        model: 'm',
+        contextTokens: 4096,
+        apiKey: 'k',
+      },
+      never,
+    ),
+  ])
+    await assert.rejects(engine.generate(input), /one user message/);
+});
