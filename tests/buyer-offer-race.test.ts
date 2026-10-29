@@ -111,3 +111,39 @@ void test('first validated exact quote wins and caller cancellation publishes no
   pending.resolve(quote);
   assert.equal(await result, undefined);
 });
+void test('onExpired reports only candidates still unanswered when the window closes', async () => {
+  const expired: string[][] = [];
+  const onExpired = (pending: readonly SellerCandidate[]) =>
+    expired.push(pending.map((item) => item.nodeId));
+  // A winner, an all-refused race and a caller abort never report.
+  await raceControlOffers([candidate('fast', false)], async () => quote, {
+    windowMs: 1000,
+    onExpired,
+  });
+  await raceControlOffers(
+    [candidate('no', false)],
+    async () => {
+      throw new Error('refused');
+    },
+    { windowMs: 1000, onExpired },
+  );
+  const caller = new AbortController();
+  const aborted = raceControlOffers(
+    [candidate('held', false)],
+    () => new Promise<SignedOfferV2>(() => {}),
+    { windowMs: 1000, onExpired, signal: caller.signal },
+  );
+  caller.abort();
+  await aborted;
+  assert.deepEqual(expired, []);
+  // A refused candidate is not reported with the silent one.
+  await raceControlOffers(
+    [candidate('silent', false), candidate('refused', false)],
+    async (item) => {
+      if (item.nodeId === 'refused') throw new Error('refused');
+      return new Promise<SignedOfferV2>(() => {});
+    },
+    { windowMs: 20, onExpired },
+  );
+  assert.deepEqual(expired, [['silent']]);
+});

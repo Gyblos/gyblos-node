@@ -350,7 +350,10 @@ contains:
   must come from an independent source, never the seller's own declaration.
   Relay origins must be configured;
 - optional `pinnedNodeId` for “choose myself”. A pinned seller still passes all
-  filters; `PINNED_SELLER_IN_COOLDOWN` includes `cooldownUntil` for the UI.
+  filters; `PINNED_SELLER_IN_COOLDOWN` includes `cooldownUntil` for the UI;
+- optional `quoteWindowMs`, how long quotes may race (integer milliseconds, 100
+  to 10000; default 3000). A seller that has not answered when the window closes
+  is cooled down like one that refused.
 
 Without a `discovery` option this is a static candidate list. With optional
 `"discovery": {}` (or
@@ -365,11 +368,14 @@ until a real checkability source exists; a catalog cannot elevate it.
 The buyer verifies catalog, presence and withdrawal signatures and bindings,
 selects candidates, then requests signed quotes in parallel without the prompt.
 Snapshots have a 10-second collection budget; a timed-out peer does not discard
-healthy snapshots. The quote window is 300 ms, a proposed initial value rather
-than measured production performance. A downgrade cannot win while an exact
-candidate is pending, including at window expiry. Quotes reserve no capacity.
-Idle HTTP connections are retired before control queries so the shared transport
-admission still applies. Control connections close before v1 HTTP forwarding.
+healthy snapshots. The quote window defaults to 3 seconds: in the first real
+test a quote through a distant relay took about 250 ms each way, so the earlier
+300 ms often expired before any quote arrived (`NO_ACCEPTABLE_CONTROL_OFFER`). A
+quote still wins as soon as it arrives, so the window only bounds how long a
+slow seller can take. A downgrade cannot win while an exact candidate is
+pending, including at window expiry. Quotes reserve no capacity. Idle HTTP
+connections are retired before control queries so the shared transport admission
+still applies. Control connections close before v1 HTTP forwarding.
 
 A different seller returns `SELECTED_SELLER_NOT_TRUSTED` (HTTP 409), with no
 inference forwarding or payment. The trusted seller can proceed only through its
