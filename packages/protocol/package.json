@@ -36,6 +36,7 @@
     "./telemetry": "./src/telemetry.ts",
     "./vectors/receipt-v1.json": "./vectors/receipt-v1.json",
     "./receipt-channel": "./src/receipt-channel.ts",
-    "./vectors/receipt-channel-v1.json": "./vectors/receipt-channel-v1.json"
+    "./vectors/receipt-channel-v1.json": "./vectors/receipt-channel-v1.json",
+    "./payment": "./src/payment.ts"
   }
 }

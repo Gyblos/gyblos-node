@@ -367,3 +367,26 @@ export const RECEIPT_CHANNEL_CODES = {
 } as const;
 export type ReceiptChannelCode =
   (typeof RECEIPT_CHANNEL_CODES)[keyof typeof RECEIPT_CHANNEL_CODES];
+
+// Payment port failures (`payment.ts`); every adapter maps its own errors onto these.
+export const PAYMENT_ERROR_CODES = {
+  UNTRUSTED_TERMS: 'PAYMENT_UNTRUSTED_TERMS',
+  ALREADY_AUTHORIZED: 'PAYMENT_ALREADY_AUTHORIZED',
+  JOURNAL_UNAVAILABLE: 'PAYMENT_JOURNAL_UNAVAILABLE',
+  AUTHORIZATION_MISMATCH: 'PAYMENT_AUTHORIZATION_MISMATCH',
+  CHANNEL_REUSED: 'PAYMENT_CHANNEL_REUSED',
+  INVALID_CHARGE: 'PAYMENT_INVALID_CHARGE',
+  ALREADY_SETTLED: 'PAYMENT_ALREADY_SETTLED',
+  RECEIPT_MISMATCH: 'PAYMENT_RECEIPT_MISMATCH',
+  UNAVAILABLE: 'PAYMENT_UNAVAILABLE',
+} as const;
+export type PaymentErrorCode =
+  (typeof PAYMENT_ERROR_CODES)[keyof typeof PAYMENT_ERROR_CODES];
+
+// Buyer-journal state of one payment channel.
+export const PAYMENT_CHANNEL_STATES = {
+  OPEN: 'open',
+  SETTLED: 'settled',
+} as const;
+export type PaymentChannelState =
+  (typeof PAYMENT_CHANNEL_STATES)[keyof typeof PAYMENT_CHANNEL_STATES];

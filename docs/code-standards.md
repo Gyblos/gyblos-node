@@ -76,9 +76,10 @@ definition: named constants or an `as const` catalog in the owning package's
   `lab/harness/src/constants.ts`), derive its type, and use the imported member
   when recording an assertion failure. Do not write `'ASSERTION_FAILED'`
   separately in the evidence union and the catch handler.
-- Keep ownership: lab evidence diagnostics belong to `lab/harness`; payment
-  errors belong to `payments-x402`. Do not widen a closed contract to `string`
-  or use casts or `any` to bypass it.
+- Keep ownership: lab evidence diagnostics belong to `lab/harness`; payment port
+  codes (`PAYMENT_ERROR_CODES`) belong to `protocol`, and x402 diagnostics to
+  `payments-x402`. Do not widen a closed contract to `string` or use casts or
+  `any` to bypass it.
 - Search for an existing canonical value before adding one. Do not borrow a
   constant from an unrelated concept because its value matches (an HTTP status
   is not a character limit).
