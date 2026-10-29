@@ -91,7 +91,8 @@ export async function startFreeBuyer(
   options: { bind?: typeof bindEndpoint; port?: number } = {},
 ) {
   const role = await buyerRole();
-  if (role.role !== P2P_ROLES.BUYER) refuse(FREE_BUYER_STARTUP.NOT_BUYER);
+  if (role.role !== P2P_ROLES.BUYER)
+    return refuse(FREE_BUYER_STARTUP.NOT_BUYER);
   const prepared = await buyerSelection();
   const { request } = prepared.config;
   if (request.maxTokens > INFERENCE_REQUEST_LIMITS.maxOutputTokens)

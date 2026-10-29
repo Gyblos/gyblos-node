@@ -1,5 +1,6 @@
 // P2P role setup and loading: per-role key files and role config in <home>/<role>/ with private file modes.
 // Never overwrites existing keys; seller setup keeps the payout wallet cold and stores no buyer key.
+// A free seller has only owner and node keys; the paid fields and keys exist all together or not at all.
 import { generateKeyPairSync } from 'node:crypto';
 import { lstat, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -49,17 +50,21 @@ interface CommonRole {
   nodeId: string;
 }
 
+// Paid selling's role fields, in role.json order; free selling uses none of them.
+const SELLER_PAYMENT_FIELDS = [
+  'authorizer',
+  'facilitator',
+  'payTo',
+  'buyer',
+] as const;
+type SellerPayment = Record<(typeof SELLER_PAYMENT_FIELDS)[number], string>;
+
 export type RoleConfig = CommonRole &
   (
     | { role: typeof P2P_ROLES.BUYER; buyer: string }
-    | {
-        role: typeof P2P_ROLES.SELLER;
-        owner: string;
-        authorizer: string;
-        facilitator: string;
-        payTo: string;
-        buyer: string;
-      }
+    | ({ role: typeof P2P_ROLES.SELLER; owner: string } & (
+        SellerPayment | { [field in keyof SellerPayment]?: never }
+      ))
   );
 
 export interface SetupOptions {
@@ -150,28 +155,38 @@ export function parseRoleConfig(value: unknown): RoleConfig {
     'mint',
     'assetLabel',
     'nodeId',
-    'buyer',
     ...(config.role === P2P_ROLES.SELLER
-      ? ['owner', 'authorizer', 'facilitator', 'payTo']
-      : []),
+      ? ['owner', ...SELLER_PAYMENT_FIELDS]
+      : ['buyer']),
   ]);
-  const common: CommonRole & Pick<RoleConfig, 'buyer'> = {
+  const common: CommonRole = {
     schemaVersion: ROLE_CONFIG_SCHEMA_VERSION,
     rpcUrl: configurationRpcUrl(config.rpcUrl, code),
     mint: configurationAddress(config.mint, code),
     assetLabel: CONFIG_ASSET_LABELS.TEST_TOKEN,
     nodeId: configurationNodeId(config.nodeId, code),
-    buyer: configurationAddress(config.buyer, code),
   };
   if (config.role === P2P_ROLES.BUYER)
-    return { ...common, role: P2P_ROLES.BUYER };
-  return {
+    return {
+      ...common,
+      role: P2P_ROLES.BUYER,
+      buyer: configurationAddress(config.buyer, code),
+    };
+  const seller = {
     ...common,
     role: P2P_ROLES.SELLER,
     owner: configurationAddress(config.owner, code),
+  };
+  const present = SELLER_PAYMENT_FIELDS.filter((field) => field in config);
+  if (!present.length) return seller;
+  if (present.length !== SELLER_PAYMENT_FIELDS.length)
+    throw new NodeError(code);
+  return {
+    ...seller,
     authorizer: configurationAddress(config.authorizer, code),
     facilitator: configurationAddress(config.facilitator, code),
     payTo: configurationAddress(config.payTo, code),
+    buyer: configurationAddress(config.buyer, code),
   };
 }
 
@@ -213,6 +228,8 @@ export async function nodeSecret(role: P2PRole) {
 
 export async function setupRole(options: SetupOptions) {
   address(options.mint);
+  if ((options.buyer === undefined) !== (options.payTo === undefined))
+    throw new Error('Paid seller setup needs both buyer and payTo.');
   const role = options.role;
   const path = file(role, ROLE_FILES.roleConfig);
   try {
@@ -264,9 +281,13 @@ export async function setupRole(options: SetupOptions) {
       role: P2P_ROLES.BUYER,
       buyer: (await wallet(role, 'buyer')).address,
     };
+  else if (options.payTo === undefined || options.buyer === undefined)
+    config = {
+      ...common,
+      role: P2P_ROLES.SELLER,
+      owner: (await wallet(role, 'owner')).address,
+    };
   else {
-    if (!options.payTo || !options.buyer)
-      throw new Error('Seller requires public payout and allowed buyer.');
     address(options.payTo);
     address(options.buyer);
     const payoutBytes = getAddressEncoder().encode(address(options.payTo));
@@ -333,8 +354,9 @@ export async function publicRole(
       ? [ROLE_KEY_FILES.buyer, ROLE_FILES.nodeKey]
       : [
           ROLE_KEY_FILES.owner,
-          ROLE_KEY_FILES.authorizer,
-          ROLE_KEY_FILES.facilitator,
+          ...(config.payTo === undefined
+            ? []
+            : [ROLE_KEY_FILES.authorizer, ROLE_KEY_FILES.facilitator]),
           ROLE_FILES.nodeKey,
         ];
   const keys = await Promise.all(
@@ -351,16 +373,17 @@ export async function publicRole(
     nodeId: config.nodeId,
     mint: config.mint,
     assetLabel: config.assetLabel,
-    buyer: config.buyer,
     keys,
   };
-  return config.role === P2P_ROLES.BUYER
-    ? common
-    : {
-        ...common,
-        owner: config.owner,
-        authorizer: config.authorizer,
-        facilitator: config.facilitator,
-        payTo: config.payTo,
-      };
+  if (config.role === P2P_ROLES.BUYER)
+    return { ...common, buyer: config.buyer };
+  if (config.payTo === undefined) return { ...common, owner: config.owner };
+  return {
+    ...common,
+    owner: config.owner,
+    authorizer: config.authorizer,
+    facilitator: config.facilitator,
+    payTo: config.payTo,
+    buyer: config.buyer,
+  };
 }

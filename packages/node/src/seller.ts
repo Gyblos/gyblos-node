@@ -167,7 +167,7 @@ export async function startSeller() {
             .toBytes(),
         ),
       mint: config.mint,
-      payTo: config.payTo,
+      payTo: config.payTo ?? owner.address,
       feePayer: owner.address,
       authorizer: owner.address,
       endpoint: endpointInfo,
