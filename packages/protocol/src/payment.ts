@@ -6,12 +6,15 @@
 //    signature binds every field of the terms, so no other seller or request can use it;
 // 2. the journal entry is written before the only signature for a requestDigest, never re-signed,
 //    even under concurrent calls;
-// 3. admit takes the terms from the seller's own issued offer, never from the buyer, and rejects
-//    an authorization that does not match them or reuses a channel, moving no funds;
+// 3. admit takes the terms from the seller's own issued offer, never from the buyer, and rejects,
+//    in this order, an authorization that does not match them, a channel already opened, and terms
+//    that expired before the deposit is sent, moving no funds; a caller abort is honoured only
+//    until the deposit is sent, after which admission completes and returns the admission;
 // 4. settle trusts only the server's own channel record, charges at most the ceiling, refunds the
 //    rest, and settles once (repeating the same charge returns the same settlement);
 // 5. checkReceipt verifies the settlement on the ledger, not the seller's word;
-// 6. every failure is a PaymentError whose message is its static code.
+// 6. every failure is a PaymentError whose message is its static code, except that an aborted
+//    caller signal rejects with signal.reason (as Engine.generate does).
 import type { PaymentChannelState, PaymentErrorCode } from './constants';
 import type { InferenceOfferV2 } from './control-types';
 
@@ -75,9 +78,11 @@ export interface PaymentClient {
 
 export interface PaymentServer {
   describe(): Promise<PaymentDescription>;
+  // The signal is honoured only until the deposit is sent; after that, admission runs to the end.
   admit(
     authorization: PaymentAuthorization,
     terms: PaymentTerms,
+    options?: { signal?: AbortSignal },
   ): Promise<PaymentAdmission>;
   settle(
     admission: PaymentAdmission,

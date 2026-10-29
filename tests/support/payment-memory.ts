@@ -30,7 +30,6 @@ import {
 
 import {
   CONTRACT_CEILING,
-  CONTRACT_NOW,
   PAYMENT_EVENTS,
   type PaymentBalances,
   type PaymentEvent,
@@ -44,10 +43,14 @@ const ATOMIC = /^(0|[1-9][0-9]*)$/;
 const DIGEST = /^[0-9a-f]{64}$/;
 const FUNDS = 10n * CONTRACT_CEILING;
 const TERM_MS = 60_000;
+// Synthetic start of the rig clock (epoch ms); a real harness may start at real time.
+const START_MS = 1_800_000_000_000;
 const NETWORK = 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1';
 const MINT = 'mint-synthetic';
 
 interface Ledger {
+  // The synthetic clock both parties read; only the rig's advance() moves it.
+  now: number;
   balances: PaymentBalances;
   events: PaymentEvent[];
   // What actually happened on the synthetic chain, by transaction id.
@@ -102,7 +105,11 @@ function signedBytes(channelId: string, terms: PaymentTerms): Buffer {
   );
 }
 
-function trustedTerms(terms: PaymentTerms, payer: string): boolean {
+function trustedTerms(
+  terms: PaymentTerms,
+  payer: string,
+  now: number,
+): boolean {
   return (
     terms.network === NETWORK &&
     terms.mint === MINT &&
@@ -111,7 +118,7 @@ function trustedTerms(terms: PaymentTerms, payer: string): boolean {
     BigInt(terms.maxAtomic) > 0n &&
     BigInt(terms.maxAtomic) <= CONTRACT_CEILING &&
     DIGEST.test(terms.requestDigest) &&
-    terms.expiresAt > CONTRACT_NOW
+    terms.expiresAt > now
   );
 }
 
@@ -146,7 +153,7 @@ function createClient(
   return {
     payer,
     async authorize(terms) {
-      if (!trustedTerms(terms, payer))
+      if (!trustedTerms(terms, payer, ledger.now))
         fail(PAYMENT_ERROR_CODES.UNTRUSTED_TERMS);
       if (journal.has(terms.requestDigest))
         fail(PAYMENT_ERROR_CODES.ALREADY_AUTHORIZED);
@@ -221,7 +228,6 @@ function matches(
     (Object.keys(own) as (keyof PaymentDescription)[]).every(
       (key) => terms[key] === own[key],
     ) &&
-    terms.expiresAt > CONTRACT_NOW &&
     terms.buyer === authorization.payer &&
     authorization.requestDigest === terms.requestDigest &&
     authorization.maxAtomic === terms.maxAtomic &&
@@ -249,11 +255,13 @@ function createServer(
   ledger: Ledger,
   own: PaymentDescription,
   upstream: () => void,
+  depositSent: () => void,
 ): PaymentServer {
   const channels = new Map<string, Channel>();
   return {
     describe: async () => ({ ...own }),
-    async admit(authorization, terms) {
+    async admit(authorization, terms, options = {}) {
+      options.signal?.throwIfAborted();
       let valid = false;
       try {
         valid = matches(own, authorization, terms);
@@ -263,6 +271,10 @@ function createServer(
       if (!valid) fail(PAYMENT_ERROR_CODES.AUTHORIZATION_MISMATCH);
       if (channels.has(authorization.channelId))
         fail(PAYMENT_ERROR_CODES.CHANNEL_REUSED);
+      if (terms.expiresAt <= ledger.now)
+        fail(PAYMENT_ERROR_CODES.TERMS_EXPIRED);
+      // Last point the caller can still cancel: after this the deposit is sent.
+      options.signal?.throwIfAborted();
       const maxAtomic = BigInt(authorization.maxAtomic);
       try {
         upstream();
@@ -281,6 +293,7 @@ function createServer(
       ledger.balances.payer -= maxAtomic;
       ledger.balances.escrow += maxAtomic;
       ledger.events.push(PAYMENT_EVENTS.DEPOSIT);
+      depositSent();
       return admission;
     },
     async settle(admission, chargedAtomic) {
@@ -319,11 +332,13 @@ function createServer(
 export const memoryPaymentHarness: PaymentHarness = {
   async start(options: PaymentRigOptions): Promise<PaymentRig> {
     const ledger: Ledger = {
+      now: START_MS,
       balances: { payer: FUNDS, payee: 0n, escrow: 0n },
       events: [],
       transactions: new Map(),
     };
     const rpcUrl = `https://rpc.invalid/?api-key=${UPSTREAM_MARKER}`;
+    const depositSent = () => options.onDepositSent?.();
     const upstream = () => {
       if (options.failUpstream) throw new Error(`RPC failed at ${rpcUrl}`);
     };
@@ -335,12 +350,13 @@ export const memoryPaymentHarness: PaymentHarness = {
     const requestDigest = sha256('contract request');
     return {
       client,
-      server: createServer(ledger, own, upstream),
+      server: createServer(ledger, own, upstream, depositSent),
       serverWith: async (field) =>
         createServer(
           ledger,
           { ...own, [field]: description('other')[field] },
           upstream,
+          depositSent,
         ),
       async foreignAuthorization(terms) {
         const keys = generateKeyPairSync('ed25519');
@@ -365,13 +381,17 @@ export const memoryPaymentHarness: PaymentHarness = {
         buyer: client.payer,
         requestDigest,
         maxAtomic: String(CONTRACT_CEILING),
-        expiresAt: CONTRACT_NOW + TERM_MS,
+        expiresAt: ledger.now + TERM_MS,
         ...overrides,
       }),
       observe: () => ({
         events: [...ledger.events],
         balances: { ...ledger.balances },
       }),
+      now: () => ledger.now,
+      advance(ms) {
+        ledger.now += ms;
+      },
       async close() {},
     };
   },

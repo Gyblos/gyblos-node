@@ -15,7 +15,6 @@ import {
   admitted,
   assertPublic,
   CONTRACT_CEILING,
-  CONTRACT_NOW,
   CONTRACT_PARTIAL,
   count,
   delta,
@@ -116,13 +115,86 @@ function admissionContract(name: string, harness: PaymentHarness): void {
       assert.equal(count(rig, PAYMENT_EVENTS.DEPOSIT), 0);
     }));
 
-  // Rejecting terms already past their expiry needs an injectable clock (C2).
+  void test(`${name}: terms that expire before admission are refused without a deposit`, async () =>
+    withRig(harness, async (rig) => {
+      const terms = await rig.terms({ expiresAt: rig.now() + 1_000 });
+      const authorization = await rig.client.authorize(terms);
+      rig.advance(1_000);
+      await rejectsWith(
+        rig.server.admit(authorization, terms),
+        PAYMENT_ERROR_CODES.TERMS_EXPIRED,
+      );
+      assert.equal(count(rig, PAYMENT_EVENTS.DEPOSIT), 0);
+    }));
+
+  void test(`${name}: an aborted admission rejects with the caller's reason and deposits nothing`, async () =>
+    withRig(harness, async (rig) => {
+      const terms = await rig.terms();
+      const authorization = await rig.client.authorize(terms);
+      const reason = new Error('caller cancelled');
+      await assert.rejects(
+        rig.server.admit(authorization, terms, {
+          signal: AbortSignal.abort(reason),
+        }),
+        (error: unknown) => error === reason,
+      );
+      assert.equal(count(rig, PAYMENT_EVENTS.DEPOSIT), 0);
+      assert.ok(await rig.server.admit(authorization, terms));
+    }));
+
+  void test(`${name}: an abort after the deposit is sent does not interrupt admission`, async () => {
+    const lateAbort = new AbortController();
+    await withRig(
+      harness,
+      async (rig) => {
+        const terms = await rig.terms();
+        const authorization = await rig.client.authorize(terms);
+        const admission = await rig.server.admit(authorization, terms, {
+          signal: lateAbort.signal,
+        });
+        assert.ok(lateAbort.signal.aborted);
+        assert.equal(count(rig, PAYMENT_EVENTS.DEPOSIT), 1);
+        assert.equal(
+          (await rig.server.settle(admission, '0')).channelId,
+          authorization.channelId,
+        );
+      },
+      { onDepositSent: () => lateAbort.abort(new Error('too late')) },
+    );
+  });
+
+  void test(`${name}: an open channel stays reused after its terms expire`, async () =>
+    withRig(harness, async (rig) => {
+      const terms = await rig.terms({ expiresAt: rig.now() + 1_000 });
+      const authorization = await rig.client.authorize(terms);
+      await rig.server.admit(authorization, terms);
+      rig.advance(1_000);
+      await rejectsWith(
+        rig.server.admit(authorization, terms),
+        PAYMENT_ERROR_CODES.CHANNEL_REUSED,
+      );
+    }));
+
+  void test(`${name}: a forged authorization for an open channel is a mismatch, not a reuse`, async () =>
+    withRig(harness, async (rig) => {
+      const terms = await rig.terms();
+      const authorization = await rig.client.authorize(terms);
+      await rig.server.admit(authorization, terms);
+      await rejectsWith(
+        rig.server.admit(
+          { ...authorization, payload: `${authorization.payload}x` },
+          terms,
+        ),
+        PAYMENT_ERROR_CODES.AUTHORIZATION_MISMATCH,
+      );
+    }));
+
   void test(`${name}: an authorization cannot be stretched to another expiry`, async () =>
     withRig(harness, async (rig) => {
-      const terms = await rig.terms({ expiresAt: CONTRACT_NOW + 1 });
+      const terms = await rig.terms({ expiresAt: rig.now() + 1 });
       const authorization = await rig.client.authorize(terms);
       await rejectsWith(
-        rig.server.admit(authorization, { ...terms, expiresAt: CONTRACT_NOW }),
+        rig.server.admit(authorization, { ...terms, expiresAt: rig.now() }),
         PAYMENT_ERROR_CODES.AUTHORIZATION_MISMATCH,
       );
       assert.equal(count(rig, PAYMENT_EVENTS.DEPOSIT), 0);
