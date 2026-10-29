@@ -3,6 +3,7 @@
 // no test here moves real funds.
 import { paymentClientContract } from './payment-contract-client';
 import { paymentServerContract } from './payment-contract-server';
+import { paymentSettlementContract } from './payment-contract-settlement';
 import type { PaymentHarness } from './payment-rig';
 
 export type { PaymentHarness, PaymentRig } from './payment-rig';
@@ -11,4 +12,5 @@ export type { PaymentHarness, PaymentRig } from './payment-rig';
 export function paymentContract(name: string, harness: PaymentHarness): void {
   paymentClientContract(name, harness);
   paymentServerContract(name, harness);
+  paymentSettlementContract(name, harness);
 }

@@ -2,20 +2,17 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import {
-  PAYMENT_CHANNEL_STATES,
-  PAYMENT_ERROR_CODES,
-} from '@gyblos/protocol/constants';
+import { PAYMENT_ERROR_CODES } from '@gyblos/protocol/constants';
 import type {
   PaymentAuthorization,
   PaymentTerms,
 } from '@gyblos/protocol/payment';
+import { paymentSplits } from '@gyblos/protocol/payment-binding';
 
 import {
   admitted,
   assertPublic,
   CONTRACT_CEILING,
-  CONTRACT_PARTIAL,
   count,
   delta,
   otherDigest,
@@ -51,6 +48,8 @@ function foreignTerms(terms: PaymentTerms): Partial<PaymentTerms>[] {
     { network: 'solana:other' },
     { mint: terms.payTo },
     { expiresAt: terms.expiresAt + 1 },
+    { protocolFeeBps: terms.protocolFeeBps + 1 },
+    { treasury: terms.buyer },
   ];
 }
 
@@ -86,6 +85,60 @@ function admissionContract(name: string, harness: PaymentHarness): void {
         );
       }
       assert.equal(count(rig, PAYMENT_EVENTS.DEPOSIT), 0);
+    }));
+
+  void test(`${name}: only the distribution the terms prescribe is admitted`, async () =>
+    withRig(harness, async (rig) => {
+      const terms = await rig.terms();
+      const [seller, fee] = paymentSplits(terms);
+      assert.ok(seller && fee);
+      for (const splits of [
+        [{ recipient: terms.payTo, bps: 10_000 }],
+        [seller, { recipient: terms.buyer, bps: fee.bps }],
+        [
+          { recipient: terms.payTo, bps: seller.bps + 1 },
+          { recipient: terms.treasury, bps: fee.bps - 1 },
+        ],
+        [fee, seller],
+      ])
+        await rejectsWith(
+          rig.server.admit(
+            await rig.authorizationWithSplits(terms, splits),
+            terms,
+          ),
+          PAYMENT_ERROR_CODES.AUTHORIZATION_MISMATCH,
+        );
+      const signed = await rig.client.authorize(terms);
+      await rejectsWith(
+        rig.server.admit(
+          await rig.tamperSplits(signed, [
+            { recipient: terms.payTo, bps: 10_000 },
+          ]),
+          terms,
+        ),
+        PAYMENT_ERROR_CODES.AUTHORIZATION_MISMATCH,
+      );
+      // A buyer that signs no fee but presents the prescribed distribution afterwards.
+      await rejectsWith(
+        rig.server.admit(
+          await rig.tamperSplits(
+            await rig.authorizationWithSplits(terms, [
+              { recipient: terms.payTo, bps: 10_000 },
+            ]),
+            paymentSplits(terms),
+          ),
+          terms,
+        ),
+        PAYMENT_ERROR_CODES.AUTHORIZATION_MISMATCH,
+      );
+      assert.equal(count(rig, PAYMENT_EVENTS.DEPOSIT), 0);
+      // The hook itself is sound: the prescribed distribution is admitted.
+      assert.ok(
+        await rig.server.admit(
+          await rig.authorizationWithSplits(terms, paymentSplits(terms)),
+          terms,
+        ),
+      );
     }));
 
   void test(`${name}: only the offer's buyer can deposit for it`, async () =>
@@ -221,6 +274,7 @@ function admissionContract(name: string, harness: PaymentHarness): void {
       assert.deepEqual(delta(before, rig.observe().balances), {
         payer: -CONTRACT_CEILING,
         payee: 0n,
+        treasury: 0n,
         escrow: CONTRACT_CEILING,
       });
       assert.equal(count(rig, PAYMENT_EVENTS.DEPOSIT), 1);
@@ -242,130 +296,9 @@ function admissionContract(name: string, harness: PaymentHarness): void {
     ));
 }
 
-function settlementContract(name: string, harness: PaymentHarness): void {
-  for (const charged of [0n, CONTRACT_PARTIAL, CONTRACT_CEILING])
-    void test(`${name}: settling ${charged} charges it and refunds the rest`, async () =>
-      withRig(harness, async (rig) => {
-        const before = rig.observe().balances;
-        const { authorization, admission } = await admitted(rig);
-        const settlement = await rig.server.settle(admission, String(charged));
-        assert.equal(settlement.channelId, admission.channelId);
-        assert.equal(settlement.chargedAtomic, String(charged));
-        assert.equal(
-          settlement.refundedAtomic,
-          String(CONTRACT_CEILING - charged),
-        );
-        assert.ok(settlement.transaction.length > 0);
-        assertPublic(settlement);
-        assert.deepEqual(delta(before, rig.observe().balances), {
-          payer: -charged,
-          payee: charged,
-          escrow: 0n,
-        });
-        assert.deepEqual(rig.observe().events, [
-          PAYMENT_EVENTS.JOURNAL,
-          PAYMENT_EVENTS.SIGN,
-          PAYMENT_EVENTS.DEPOSIT,
-          PAYMENT_EVENTS.SETTLE,
-        ]);
-        await rig.client.checkReceipt(
-          authorization,
-          settlement,
-          String(charged),
-        );
-        assert.deepEqual(await rig.client.reconcile(), [
-          {
-            channelId: authorization.channelId,
-            requestDigest: authorization.requestDigest,
-            state: PAYMENT_CHANNEL_STATES.SETTLED,
-            chargedAtomic: String(charged),
-          },
-        ]);
-      }));
-
-  void test(`${name}: settlement trusts only the server's own channel record`, async () =>
-    withRig(harness, async (rig) => {
-      const { admission } = await admitted(rig);
-      const before = rig.observe().balances;
-      const bigger = String(CONTRACT_CEILING * 2n);
-      for (const [altered, charged, code] of [
-        [
-          { ...admission, maxAtomic: bigger },
-          bigger,
-          PAYMENT_ERROR_CODES.AUTHORIZATION_MISMATCH,
-        ],
-        [
-          { ...admission, payer: `${admission.payer}x` },
-          '1',
-          PAYMENT_ERROR_CODES.AUTHORIZATION_MISMATCH,
-        ],
-        [
-          { ...admission, requestDigest: otherDigest(admission.requestDigest) },
-          '1',
-          PAYMENT_ERROR_CODES.AUTHORIZATION_MISMATCH,
-        ],
-        [
-          { ...admission, channelId: otherDigest(admission.channelId) },
-          '1',
-          PAYMENT_ERROR_CODES.AUTHORIZATION_MISMATCH,
-        ],
-        [
-          admission,
-          String(CONTRACT_CEILING + 1n),
-          PAYMENT_ERROR_CODES.INVALID_CHARGE,
-        ],
-        [admission, '-1', PAYMENT_ERROR_CODES.INVALID_CHARGE],
-        [admission, '1.5', PAYMENT_ERROR_CODES.INVALID_CHARGE],
-        [admission, '', PAYMENT_ERROR_CODES.INVALID_CHARGE],
-      ] as const)
-        await rejectsWith(rig.server.settle(altered, charged), code);
-      assert.deepEqual(rig.observe().balances, before);
-    }));
-
-  void test(`${name}: concurrent settlements with different charges settle once`, async () =>
-    withRig(harness, async (rig) => {
-      const { admission } = await admitted(rig);
-      const before = rig.observe().balances;
-      const results = await Promise.allSettled([
-        rig.server.settle(admission, String(CONTRACT_PARTIAL)),
-        rig.server.settle(admission, String(CONTRACT_PARTIAL + 1n)),
-      ]);
-      const settled = results.find((result) => result.status === 'fulfilled');
-      const rejected = results.find((result) => result.status === 'rejected');
-      await rejectsWith(
-        Promise.reject(rejected?.reason),
-        PAYMENT_ERROR_CODES.ALREADY_SETTLED,
-      );
-      const charged = BigInt(settled?.value.chargedAtomic ?? '-1');
-      assert.equal(delta(before, rig.observe().balances).payee, charged);
-      assert.equal(count(rig, PAYMENT_EVENTS.SETTLE), 1);
-    }));
-
-  void test(`${name}: a repeated settlement returns the first and never charges twice`, async () =>
-    withRig(harness, async (rig) => {
-      const { admission } = await admitted(rig);
-      const first = await rig.server.settle(
-        admission,
-        String(CONTRACT_PARTIAL),
-      );
-      const settled = rig.observe().balances;
-      assert.deepEqual(
-        await rig.server.settle(admission, String(CONTRACT_PARTIAL)),
-        first,
-      );
-      await rejectsWith(
-        rig.server.settle(admission, String(CONTRACT_PARTIAL + 1n)),
-        PAYMENT_ERROR_CODES.ALREADY_SETTLED,
-      );
-      assert.deepEqual(rig.observe().balances, settled);
-      assert.equal(count(rig, PAYMENT_EVENTS.SETTLE), 1);
-    }));
-}
-
 export function paymentServerContract(
   name: string,
   harness: PaymentHarness,
 ): void {
   admissionContract(name, harness);
-  settlementContract(name, harness);
 }

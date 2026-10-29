@@ -7,12 +7,14 @@
 // 2. the journal entry is written before the only signature for a requestDigest, never re-signed,
 //    even under concurrent calls;
 // 3. admit takes the terms from the seller's own issued offer, never from the buyer, and rejects,
-//    in this order, an authorization that does not match them, a channel already opened, and terms
+//    in this order, an authorization that does not match them (including a channel distribution
+//    other than paymentSplits(terms)), a channel already opened, and terms
 //    that expired before the deposit is sent, moving no funds; a caller abort is honoured only
 //    until the deposit is sent, after which admission completes and returns the admission;
 // 4. settle trusts only the server's own channel record, charges at most the ceiling, refunds the
 //    rest, and settles once (repeating the same charge returns the same settlement);
-// 5. checkReceipt verifies the settlement on the ledger, not the seller's word;
+// 5. checkReceipt verifies the settlement on the ledger, not the seller's word, including the
+//    seller and fee shares actually paid (fixed by the distribution the buyer signed at open);
 // 6. every failure is a PaymentError whose message is its static code, except that an aborted
 //    caller signal rejects with signal.reason (as Engine.generate does).
 import type { PaymentChannelState, PaymentErrorCode } from './constants';
@@ -26,15 +28,23 @@ export class PaymentError extends Error {
   }
 }
 
-// What a seller declares before quoting: where and in what asset it is paid.
+// The network's protocol fee, added on top of the seller's price and split on chain to treasury.
+export interface PaymentFee {
+  protocolFeeBps: number;
+  treasury: string;
+}
+
+// What a seller declares before quoting: where and in what asset it is paid, and the fee it applies.
 export type PaymentDescription = Pick<
   InferenceOfferV2,
   'network' | 'mint' | 'payTo' | 'feePayer' | 'authorizer'
->;
+> &
+  PaymentFee;
 
 // The money-binding fields of a signed v2 offer. The buyer verifies the offer signature first
 // (payTo, feePayer and authorizer are the seller's own choice); network, mint, buyer and the ceiling
-// are then checked against the buyer's policy by authorize.
+// are then checked against the buyer's policy by authorize, as are the fee and treasury, which come
+// from network configuration on both sides rather than from the offer.
 export type PaymentTerms = PaymentDescription &
   Pick<InferenceOfferV2, 'buyer' | 'requestDigest' | 'maxAtomic' | 'expiresAt'>;
 
@@ -50,10 +60,20 @@ export interface PaymentAuthorization {
 // A verified, deposited channel the seller may now serve and later settle.
 export type PaymentAdmission = Omit<PaymentAuthorization, 'payload'>;
 
+// One recipient of a channel's on-chain distribution, in basis points of each charge.
+export interface PaymentSplit {
+  recipient: string;
+  bps: number;
+}
+
+// sellerAtomic and feeAtomic are what payTo and treasury actually received; the program floors
+// each share, so their sum may fall short of chargedAtomic by rounding dust.
 export interface PaymentSettlement {
   channelId: string;
   chargedAtomic: string;
   refundedAtomic: string;
+  sellerAtomic: string;
+  feeAtomic: string;
   transaction: string;
 }
 

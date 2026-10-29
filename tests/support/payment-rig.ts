@@ -9,6 +9,7 @@ import {
   type PaymentClient,
   type PaymentDescription,
   type PaymentServer,
+  type PaymentSplit,
   type PaymentTerms,
 } from '@gyblos/protocol/payment';
 
@@ -25,12 +26,21 @@ export const PAYMENT_EVENTS = {
 } as const;
 export type PaymentEvent = (typeof PAYMENT_EVENTS)[keyof typeof PAYMENT_EVENTS];
 
-export const SELLER_KEYS = ['payTo', 'feePayer', 'authorizer'] as const;
+// Fields a seller declares; a second seller differing in any one of them must not reuse an authorization.
+export const SELLER_KEYS = [
+  'payTo',
+  'feePayer',
+  'authorizer',
+  'protocolFeeBps',
+  'treasury',
+] as const;
 export type SellerKey = (typeof SELLER_KEYS)[number] & keyof PaymentDescription;
 
 export interface PaymentBalances {
   payer: bigint;
   payee: bigint;
+  // The protocol fee recipient named by the terms.
+  treasury: bigint;
   escrow: bigint;
 }
 
@@ -42,6 +52,17 @@ export interface PaymentRig {
   serverWith(field: SellerKey): Promise<PaymentServer>;
   // A valid signature over `terms` by a payer key that is not `terms.buyer` (a malicious buyer).
   foreignAuthorization(terms: PaymentTerms): Promise<PaymentAuthorization>;
+  // The rig buyer's own valid signature over `terms`, but opening a channel with `splits` instead
+  // of paymentSplits(terms) (a modified buyer that drops or redirects the fee).
+  authorizationWithSplits(
+    terms: PaymentTerms,
+    splits: readonly PaymentSplit[],
+  ): Promise<PaymentAuthorization>;
+  // `authorization` with its channel distribution replaced after the buyer signed it.
+  tamperSplits(
+    authorization: PaymentAuthorization,
+    splits: readonly PaymentSplit[],
+  ): Promise<PaymentAuthorization>;
   // Valid terms for `server` at now(), under the buyer's ceiling; overrides make them hostile.
   terms(overrides?: Partial<PaymentTerms>): Promise<PaymentTerms>;
   observe(): { events: readonly PaymentEvent[]; balances: PaymentBalances };
@@ -115,6 +136,7 @@ export function delta(before: PaymentBalances, after: PaymentBalances) {
   return {
     payer: after.payer - before.payer,
     payee: after.payee - before.payee,
+    treasury: after.treasury - before.treasury,
     escrow: after.escrow - before.escrow,
   };
 }
