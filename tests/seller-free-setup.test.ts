@@ -183,3 +183,55 @@ void test(
     }
   },
 );
+
+void test(
+  'node:setup names the flag that holds an invalid Solana address and writes nothing',
+  ROLE_OPTIONS,
+  async () => {
+    const home = await mkdtemp(join(tmpdir(), 'gyblos-setup-address-'));
+    try {
+      const [valid] = await addresses(1);
+      for (const [args, flag] of [
+        [['--role', 'buyer', '--mint', 'MINT'], '--mint'],
+        [
+          [
+            '--role',
+            'seller',
+            '--mint',
+            MINT,
+            '--buyer',
+            valid!,
+            '--pay-to',
+            'nope',
+          ],
+          '--pay-to',
+        ],
+        [
+          [
+            '--role',
+            'seller',
+            '--mint',
+            MINT,
+            '--buyer',
+            'nope',
+            '--pay-to',
+            valid!,
+          ],
+          '--buyer',
+        ],
+      ] as const) {
+        const result = setup(home, [...args]);
+        assert.equal(result.status, 1, flag);
+        assert.match(
+          result.stderr,
+          new RegExp(`${flag} is not a valid Solana address`),
+          flag,
+        );
+        assert.doesNotMatch(result.stderr, /SolanaError/, flag);
+      }
+      assert.deepEqual(await readdir(home), []);
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  },
+);

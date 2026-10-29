@@ -2,6 +2,7 @@
 // A seller needs only --mint to sell for free.
 import { parseArgs } from 'node:util';
 
+import { isSolanaAddress } from '@gyblos/node/configuration';
 import { publicRole, setupRole } from '@gyblos/node/roles';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 import { isMain } from '@gyblos/runtime';
@@ -23,6 +24,14 @@ export async function main(args = process.argv.slice(2)) {
     throw new Error(
       'Specify --role buyer|seller and --mint; a free seller needs nothing else.',
     );
+  // Names the flag instead of the Solana library's error, before anything is written.
+  for (const [flag, value] of [
+    ['--mint', values.mint],
+    ['--pay-to', values['pay-to']],
+    ['--buyer', values.buyer],
+  ] as const)
+    if (value !== undefined && !isSolanaAddress(value))
+      throw new Error(`${flag} is not a valid Solana address.`);
   await setupRole({
     role: values.role,
     mint: values.mint,

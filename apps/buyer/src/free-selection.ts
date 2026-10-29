@@ -21,6 +21,7 @@ import { requireBuyerIdentity, verifyBuyerIdentity } from './identity';
 import { selectVerifiedBuyerQuote } from './selection';
 import type { StaticControlSeller } from './selection-config';
 import type { prepareBuyerSelection } from './selection-runtime';
+import type { SellerFailureReporter } from './seller-failures';
 
 export function freeBuyerDependencies(
   prepared: PreparedSelection,
@@ -90,6 +91,7 @@ type PreparedSelection = NonNullable<
 >;
 interface FreeSelectionOptions {
   telemetry?: TelemetrySink;
+  onSellerFailure?: SellerFailureReporter;
   endpoint: Endpoint;
   buyer: string;
   relayOnly: boolean;
@@ -174,6 +176,7 @@ async function selectFreeWinner(
             })
         : undefined,
       connect: (seller) => connectFreeControl(seller, options, now),
+      onSellerFailure: options.onSellerFailure,
     },
     signal,
   );

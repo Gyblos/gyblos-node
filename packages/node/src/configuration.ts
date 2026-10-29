@@ -39,6 +39,11 @@ export function configurationAddress(value: unknown, code: NodeErrorCode) {
   return text;
 }
 
+// A predicate for CLI boundaries that word their own error and never echo the value.
+export function isSolanaAddress(value: unknown): boolean {
+  return typeof value === 'string' && isAddress(value);
+}
+
 export function configurationNodeId(value: unknown, code: NodeErrorCode) {
   const text = configurationString(value, code);
   if (

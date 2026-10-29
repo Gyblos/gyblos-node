@@ -16,6 +16,7 @@ import { startFreeBuyerHttp } from './free-http';
 import { freeBuyerDependencies } from './free-selection';
 import { loadBuyerSelectionConfig } from './selection-config';
 import { prepareConfiguredBuyerSelection } from './selection-runtime';
+import type { SellerFailureReporter } from './seller-failures';
 
 // A startup refusal with a static reason; it never carries paths or file contents.
 export class FreeBuyerStartupError extends Error {
@@ -93,6 +94,7 @@ export async function startFreeBuyer(
     bind?: typeof bindEndpoint;
     port?: number;
     telemetry?: TelemetrySink;
+    onSellerFailure?: SellerFailureReporter;
   } = {},
 ) {
   const role = await buyerRole();
@@ -123,6 +125,7 @@ export async function startFreeBuyer(
       refuse(FREE_BUYER_STARTUP.NODE_KEY);
     const dependencies = freeBuyerDependencies(prepared, {
       telemetry: options.telemetry,
+      onSellerFailure: options.onSellerFailure,
       endpoint,
       buyer: role.buyer,
       relayOnly,
