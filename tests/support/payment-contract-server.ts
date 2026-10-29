@@ -116,7 +116,33 @@ function admissionContract(name: string, harness: PaymentHarness): void {
       assert.equal(count(rig, PAYMENT_EVENTS.DEPOSIT), 0);
     }));
 
-  // Rejecting terms already past their expiry needs an injectable clock (C2).
+  void test(`${name}: terms that expire before admission are refused without a deposit`, async () =>
+    withRig(harness, async (rig) => {
+      const terms = await rig.terms({ expiresAt: CONTRACT_NOW + 1_000 });
+      const authorization = await rig.client.authorize(terms);
+      rig.advance(1_000);
+      await rejectsWith(
+        rig.server.admit(authorization, terms),
+        PAYMENT_ERROR_CODES.TERMS_EXPIRED,
+      );
+      assert.equal(count(rig, PAYMENT_EVENTS.DEPOSIT), 0);
+    }));
+
+  void test(`${name}: an aborted admission rejects with the caller's reason and deposits nothing`, async () =>
+    withRig(harness, async (rig) => {
+      const terms = await rig.terms();
+      const authorization = await rig.client.authorize(terms);
+      const reason = new Error('caller cancelled');
+      await assert.rejects(
+        rig.server.admit(authorization, terms, {
+          signal: AbortSignal.abort(reason),
+        }),
+        (error: unknown) => error === reason,
+      );
+      assert.equal(count(rig, PAYMENT_EVENTS.DEPOSIT), 0);
+      assert.ok(await rig.server.admit(authorization, terms));
+    }));
+
   void test(`${name}: an authorization cannot be stretched to another expiry`, async () =>
     withRig(harness, async (rig) => {
       const terms = await rig.terms({ expiresAt: CONTRACT_NOW + 1 });

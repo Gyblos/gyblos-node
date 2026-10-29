@@ -7,7 +7,8 @@
 // 2. the journal entry is written before the only signature for a requestDigest, never re-signed,
 //    even under concurrent calls;
 // 3. admit takes the terms from the seller's own issued offer, never from the buyer, and rejects
-//    an authorization that does not match them or reuses a channel, moving no funds;
+//    an authorization that does not match them, reuses a channel or arrives after the terms
+//    expire, moving no funds; an aborted signal rejects with its reason before any deposit;
 // 4. settle trusts only the server's own channel record, charges at most the ceiling, refunds the
 //    rest, and settles once (repeating the same charge returns the same settlement);
 // 5. checkReceipt verifies the settlement on the ledger, not the seller's word;
@@ -75,9 +76,11 @@ export interface PaymentClient {
 
 export interface PaymentServer {
   describe(): Promise<PaymentDescription>;
+  // The signal is honoured only until the deposit is sent; after that, admission runs to the end.
   admit(
     authorization: PaymentAuthorization,
     terms: PaymentTerms,
+    options?: { signal?: AbortSignal },
   ): Promise<PaymentAdmission>;
   settle(
     admission: PaymentAdmission,

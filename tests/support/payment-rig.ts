@@ -46,6 +46,8 @@ export interface PaymentRig {
   // Valid terms for `server` at CONTRACT_NOW, under the buyer's ceiling; overrides make them hostile.
   terms(overrides?: Partial<PaymentTerms>): Promise<PaymentTerms>;
   observe(): { events: readonly PaymentEvent[]; balances: PaymentBalances };
+  // Moves the clock that both client and server read forward by `ms`.
+  advance(ms: number): void;
   close(): Promise<void>;
 }
 
@@ -56,7 +58,7 @@ export interface PaymentRigOptions {
 }
 
 export interface PaymentHarness {
-  // The clock reads CONTRACT_NOW; the buyer's ceiling is CONTRACT_CEILING. Configuration that could
+  // The clock starts at CONTRACT_NOW and moves only through advance(); the buyer's ceiling is CONTRACT_CEILING. Configuration that could
   // be secret (RPC URLs, keys) must contain UPSTREAM_MARKER so the contract can prove it never leaks.
   start(options: PaymentRigOptions): Promise<PaymentRig>;
 }

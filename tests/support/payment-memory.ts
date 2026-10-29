@@ -48,6 +48,8 @@ const NETWORK = 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1';
 const MINT = 'mint-synthetic';
 
 interface Ledger {
+  // The synthetic clock both parties read; only the rig's advance() moves it.
+  now: number;
   balances: PaymentBalances;
   events: PaymentEvent[];
   // What actually happened on the synthetic chain, by transaction id.
@@ -102,7 +104,11 @@ function signedBytes(channelId: string, terms: PaymentTerms): Buffer {
   );
 }
 
-function trustedTerms(terms: PaymentTerms, payer: string): boolean {
+function trustedTerms(
+  terms: PaymentTerms,
+  payer: string,
+  now: number,
+): boolean {
   return (
     terms.network === NETWORK &&
     terms.mint === MINT &&
@@ -111,7 +117,7 @@ function trustedTerms(terms: PaymentTerms, payer: string): boolean {
     BigInt(terms.maxAtomic) > 0n &&
     BigInt(terms.maxAtomic) <= CONTRACT_CEILING &&
     DIGEST.test(terms.requestDigest) &&
-    terms.expiresAt > CONTRACT_NOW
+    terms.expiresAt > now
   );
 }
 
@@ -146,7 +152,7 @@ function createClient(
   return {
     payer,
     async authorize(terms) {
-      if (!trustedTerms(terms, payer))
+      if (!trustedTerms(terms, payer, ledger.now))
         fail(PAYMENT_ERROR_CODES.UNTRUSTED_TERMS);
       if (journal.has(terms.requestDigest))
         fail(PAYMENT_ERROR_CODES.ALREADY_AUTHORIZED);
@@ -221,7 +227,6 @@ function matches(
     (Object.keys(own) as (keyof PaymentDescription)[]).every(
       (key) => terms[key] === own[key],
     ) &&
-    terms.expiresAt > CONTRACT_NOW &&
     terms.buyer === authorization.payer &&
     authorization.requestDigest === terms.requestDigest &&
     authorization.maxAtomic === terms.maxAtomic &&
@@ -253,7 +258,8 @@ function createServer(
   const channels = new Map<string, Channel>();
   return {
     describe: async () => ({ ...own }),
-    async admit(authorization, terms) {
+    async admit(authorization, terms, options = {}) {
+      options.signal?.throwIfAborted();
       let valid = false;
       try {
         valid = matches(own, authorization, terms);
@@ -261,8 +267,12 @@ function createServer(
         valid = false;
       }
       if (!valid) fail(PAYMENT_ERROR_CODES.AUTHORIZATION_MISMATCH);
+      if (terms.expiresAt <= ledger.now)
+        fail(PAYMENT_ERROR_CODES.TERMS_EXPIRED);
       if (channels.has(authorization.channelId))
         fail(PAYMENT_ERROR_CODES.CHANNEL_REUSED);
+      // Last point the caller can still cancel: after this the deposit is sent.
+      options.signal?.throwIfAborted();
       const maxAtomic = BigInt(authorization.maxAtomic);
       try {
         upstream();
@@ -319,6 +329,7 @@ function createServer(
 export const memoryPaymentHarness: PaymentHarness = {
   async start(options: PaymentRigOptions): Promise<PaymentRig> {
     const ledger: Ledger = {
+      now: CONTRACT_NOW,
       balances: { payer: FUNDS, payee: 0n, escrow: 0n },
       events: [],
       transactions: new Map(),
@@ -372,6 +383,9 @@ export const memoryPaymentHarness: PaymentHarness = {
         events: [...ledger.events],
         balances: { ...ledger.balances },
       }),
+      advance(ms) {
+        ledger.now += ms;
+      },
       async close() {},
     };
   },
