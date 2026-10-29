@@ -15,7 +15,12 @@ export function raceControlOffers(
     candidate: SellerCandidate,
     signal: AbortSignal,
   ) => Promise<SignedOfferV2>,
-  options: { signal?: AbortSignal; windowMs?: number } = {},
+  options: {
+    signal?: AbortSignal;
+    windowMs?: number;
+    // Called once, before the race resolves, with the candidates still unanswered when the window closed.
+    onExpired?: (pending: readonly SellerCandidate[]) => void;
+  } = {},
 ): Promise<WinningQuote | undefined> {
   return new Promise((resolve) => {
     const controller = new AbortController();
@@ -23,6 +28,7 @@ export function raceControlOffers(
     let pending = candidates.length;
     let finished = false;
     let lower: WinningQuote | undefined;
+    const unanswered = new Set(candidates);
     const finish = (winner?: WinningQuote) => {
       if (finished) return;
       finished = true;
@@ -33,10 +39,10 @@ export function raceControlOffers(
     };
     const abort = () => finish();
     // A timed-out exact candidate is still unresolved: never choose a buffered downgrade then.
-    const timer = setTimeout(
-      () => finish(),
-      options.windowMs ?? BUYER_SELECTION.windowMs,
-    );
+    const timer = setTimeout(() => {
+      if (!finished) options.onExpired?.([...unanswered]);
+      finish();
+    }, options.windowMs ?? BUYER_SELECTION.windowMs);
     options.signal?.addEventListener('abort', abort, { once: true });
     if (options.signal?.aborted || !pending) return finish();
     for (const candidate of candidates) {
@@ -52,6 +58,7 @@ export function raceControlOffers(
           () => {}, // A refusal is a free preauthorization failure, never a paid retry.
         )
         .then(() => {
+          unanswered.delete(candidate);
           if (finished) return;
           pending--;
           if (!candidate.downgrade) exactPending--;

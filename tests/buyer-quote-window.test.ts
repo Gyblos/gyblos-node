@@ -11,6 +11,7 @@ import {
 import { raceControlOffers } from '@gyblos/buyer/offer-race';
 import { selectBuyerQuote } from '@gyblos/buyer/selection';
 import { parseBuyerSelectionConfig } from '@gyblos/buyer/selection-config';
+import type { LocalSellerStats } from '@gyblos/buyer/selection-stats';
 import type { SellerCandidate } from '@gyblos/core/seller-selection';
 import { REASONING_LEVELS } from '@gyblos/protocol/constants';
 import type { SignedOfferV2 } from '@gyblos/protocol/control-types';
@@ -102,6 +103,40 @@ void test('the configured quote window decides whether a slow seller can answer'
       code: BUYER_SELECTION_CODES.NO_OFFER,
     });
     assert.equal((await select(2 * SLOW_QUOTE_MS + 1000)).ok, true);
+  } finally {
+    await run.wire.close();
+  }
+});
+
+void test('the longest quote window stays well inside a quote lifetime', async () => {
+  const { CONTROL_LIMITS } = await import('@gyblos/protocol/constants');
+  assert.ok(BUYER_SELECTION.maxWindowMs <= CONTROL_LIMITS.quoteLifetimeMs / 3);
+});
+
+void test('a seller that never answers before the window closes is cooled down', async () => {
+  const run = await selectionFixture();
+  try {
+    const { windowMs: _default, ...dependencies } = run.dependencies;
+    // This seller accepts the query and never answers it.
+    run.client.requestOffer = (_params, signal) =>
+      new Promise((_resolve, reject) =>
+        signal?.addEventListener(
+          'abort',
+          () => reject(new Error('synthetic abort')),
+          { once: true },
+        ),
+      );
+    const stats = new Map<string, LocalSellerStats>();
+    assert.deepEqual(
+      await selectBuyerQuote(
+        { ...run.config, quoteWindowMs: BUYER_SELECTION.minWindowMs },
+        { ...dependencies, stats, connect: async () => run.client },
+      ),
+      { ok: false, code: BUYER_SELECTION_CODES.NO_OFFER },
+    );
+    const row = stats.get(run.config.sellers[0]!.nodeId);
+    assert.equal(row?.failures, 1);
+    assert.ok(row?.cooldownUntil);
   } finally {
     await run.wire.close();
   }

@@ -42,6 +42,7 @@ export interface VerifiedSelectionDependencies {
   stats: Map<string, LocalSellerStats>;
   now?: () => number;
   random?: () => number;
+  // The default quote window; a selection.json quoteWindowMs takes precedence.
   windowMs?: number;
   snapshotMs?: number;
   verifyIdentity?: (
@@ -135,19 +136,13 @@ export async function selectVerifiedBuyerQuote(
           randomInt(BUYER_SELECTION.randomRange) / BUYER_SELECTION.randomRange),
     });
     if (!selected.ok) return selected;
-    const winner = await raceControlOffers(
+    const winner = await raceCandidates(
       selected.candidates,
-      (candidate, querySignal) =>
-        requestCandidate(
-          candidate,
-          clients,
-          config,
-          dependencies,
-          now,
-          querySignal,
-        ),
-      // The operator's selection.json wins over the caller's default.
-      { signal, windowMs: config.quoteWindowMs ?? dependencies.windowMs },
+      clients,
+      config,
+      dependencies,
+      now,
+      signal,
     );
     if (!winner) return { ok: false, code: BUYER_SELECTION_CODES.NO_OFFER };
     try {
@@ -179,6 +174,38 @@ export async function selectVerifiedBuyerQuote(
       [...clients.values()].map((client) => client.close()),
     );
   }
+}
+
+function raceCandidates(
+  candidates: readonly SellerCandidate[],
+  clients: ReadonlyMap<string, BuyerControlClient>,
+  config: BuyerSelectionConfig,
+  dependencies: VerifiedSelectionDependencies,
+  now: () => number,
+  signal?: AbortSignal,
+) {
+  return raceControlOffers(
+    candidates,
+    (candidate, querySignal) =>
+      requestCandidate(
+        candidate,
+        clients,
+        config,
+        dependencies,
+        now,
+        querySignal,
+      ),
+    {
+      signal,
+      // The operator's selection.json wins over the caller's default.
+      windowMs: config.quoteWindowMs ?? dependencies.windowMs,
+      // A seller silent for the whole window is cooled down like one that refused.
+      onExpired: (pending) => {
+        for (const candidate of pending)
+          recordQuote(dependencies.stats, candidate.nodeId, false, 0, now());
+      },
+    },
+  );
 }
 
 async function requestCandidate(

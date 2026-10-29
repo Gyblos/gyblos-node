@@ -352,7 +352,8 @@ contains:
 - optional `pinnedNodeId` for “choose myself”. A pinned seller still passes all
   filters; `PINNED_SELLER_IN_COOLDOWN` includes `cooldownUntil` for the UI;
 - optional `quoteWindowMs`, how long quotes may race (integer milliseconds, 100
-  to 30000; default 3000).
+  to 10000; default 3000). A seller that has not answered when the window closes
+  is cooled down like one that refused.
 
 Without a `discovery` option this is a static candidate list. With optional
 `"discovery": {}` (or

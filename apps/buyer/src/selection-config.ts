@@ -62,7 +62,7 @@ export interface BuyerSelectionConfig {
   pinnedNodeId?: string;
   discovery?: BuyerDiscoveryConfig;
   identity?: BuyerIdentityConfig;
-  // Milliseconds quotes may race; BUYER_SELECTION.windowMs when absent.
+  // Milliseconds quotes may race; when absent, the caller's windowMs, else BUYER_SELECTION.windowMs.
   quoteWindowMs?: number;
 }
 function parseRequest(value: unknown): SellerRequest {

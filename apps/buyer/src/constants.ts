@@ -66,7 +66,8 @@ export const BUYER_SELECTION = {
   // first real test, so the default leaves room; selection.json `quoteWindowMs` overrides it.
   windowMs: 3000,
   minWindowMs: 100,
-  maxWindowMs: 30_000,
+  // Well inside CONTROL_LIMITS.quoteLifetimeMs, so a quote that wins late is still fresh.
+  maxWindowMs: 10_000,
   conflictStatus: 409,
   requestIdCharacters: 128,
   endpointCharacters: 2048,
