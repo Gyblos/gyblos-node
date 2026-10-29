@@ -740,3 +740,74 @@ increment emitted; buffer/projection drops and runtime log drops increment
 dropped; persistence failure sets failed. The console plugin uses only its
 injected write and emits one JSON line per projected event. No plugin is
 installed into a live role by this change.
+
+## Receipt exchange channel v1
+
+`gyblos/receipt/1` exchanges historical `receipt/v1` attestations independently
+of control, free inference and the reserved paid HTTP v2 path. It never carries
+inference input, starts generation, reserves capacity or authorizes payment.
+The adapter supports it explicitly; node/buyer startup does not enable it yet.
+
+Each bidirectional stream carries one request and one response, each as a
+four-byte big-endian body length followed by canonical UTF-8 JSON and sending
+EOF. Both bodies are capped at 8192 bytes, with the existing canonical depth
+limit of 16. Reject excessive lengths before allocating/reading the body,
+invalid UTF-8, duplicate fields, extra bytes/messages and incomplete EOF. The
+existing receipt record caps and signatures remain unchanged. New independent
+channel byte vectors are in `vectors/receipt-channel-v1.json`; old vectors and
+signing domains are unchanged.
+
+Request: `{ version: 1, requestId, method, params }`. The RPC requestId is a
+16-byte lowercase-hex correlation ID chosen by the caller; it is distinct from
+the execution requestId embedded in receipts. Methods:
+
+- `receipt.get`: params are exactly `{ executionRequestId, requestDigest }`.
+  The seller returns a seller-only or previously confirmed receipt from its
+  existing store, scoped to its own NodeId and the authenticated buyer NodeId.
+- `receipt.confirm`: params are exactly `{ receipt }`, requiring both signed
+  records. The server verifies both signatures and their cross-binding, checks
+  its local seller identity and authenticated buyer, and compares the seller
+  digest with its existing record. It cannot create an unissued seller receipt.
+  Identical confirmation is idempotent; a different buyer attestation for the
+  same record is a conflict. A store must atomically compare and set so races
+  cannot overwrite the first accepted buyer observation.
+
+Response: `{ version: 1, requestId, result: { receipt } }` or exactly one
+`error: { code }`. The validated RPC ID is echoed. Static codes are
+`RECEIPT_INVALID`, `RECEIPT_VERSION`, `RECEIPT_BINDING`, `RECEIPT_SIGNATURE`,
+`RECEIPT_NOT_FOUND`, `RECEIPT_CONFLICT`, `RECEIPT_BUSY`, `RECEIPT_LIMIT`,
+`RECEIPT_CANCELLED`, `RECEIPT_INTERNAL`. Malformed framing/requests and admission
+failures close the stream without reflecting an unvalidated identifier. Errors
+from storage/native callbacks never expose their messages. Missing and foreign
+buyer records are indistinguishable on lookup. Receipts do not expire here.
+
+The client checks the Iroh peer, configured relay policy, RPC ID, execution
+requestId/digest and both receipt NodeIds, and verifies all returned signatures.
+A confirmation acknowledgment must contain the exact submitted pair. Remote
+static errors are marked remote separately from local failures. Owner trust and
+full selection/measurement policy remain the caller's independent responsibility;
+use the core receipt builders before countersigning, never received claims as
+expected context. A signature is an attestation, not proof of execution or usage.
+
+Endpoint connection-open rates, global/source/peer admission and request quotas
+apply first. Receipt streams use the data connection family, sharing its per-peer
+cap with inference; close the inference connection before opening receipts.
+One independent receipt `ControlAdmission` instance per server then applies the
+existing `CONTROL_CAPACITY` limits (32 connections/queries, 4 per peer, global
+100/s burst100, peer5/s burst10, 1024 peers and existing idle eviction semantics).
+These are provisional shared policy values, not measured capacity. The absolute
+query deadline, including EOF, storage, crypto and response, is at most 10 s;
+connection idle/lifetime and receive/stream windows retain endpoint limits.
+Invalid requests consume quota; no queue is introduced. Client operations on one
+transport are serial; its receipt connection may be reused only for receipt RPCs.
+Cancellation closes its connection and rejects late results. Uncancellable native
+connects remain tracked/busy until settled and are closed if they resolve late.
+The caller owns the endpoint; close never shuts down other ALPNs.
+
+An injected store owns retention, bounded capacity, persistence and atomicity.
+It must honor the abort signal before committing. A confirmation already
+committed when cancellation occurs may have lost its acknowledgment; querying
+or resubmitting that identical pair is safe and never reruns inference. This
+adapter neither retries automatically nor claims durable/collector acceptance.
+No store, signer, collector or daemon configuration is supplied by default.
+Full receipts stay private, with no publication or aggregate export added.

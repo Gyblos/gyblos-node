@@ -20,11 +20,15 @@
     "./control-server": "./src/control-server.ts",
     "./control-client": "./src/control-client.ts",
     "./free-server": "./src/free-server.ts",
-    "./free-client": "./src/free-client.ts"
+    "./free-client": "./src/free-client.ts",
+    "./receipt-client": "./src/receipt-client.ts",
+    "./receipt-server": "./src/receipt-server.ts",
+    "./receipt-service": "./src/receipt-service.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",
     "@gyblos/protocol": "workspace:*",
-    "@number0/iroh": "1.1.0"
+    "@number0/iroh": "1.1.0",
+    "@gyblos/core": "workspace:*"
   }
 }
