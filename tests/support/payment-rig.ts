@@ -25,12 +25,21 @@ export const PAYMENT_EVENTS = {
 } as const;
 export type PaymentEvent = (typeof PAYMENT_EVENTS)[keyof typeof PAYMENT_EVENTS];
 
-export const SELLER_KEYS = ['payTo', 'feePayer', 'authorizer'] as const;
+// Fields a seller declares; a second seller differing in any one of them must not reuse an authorization.
+export const SELLER_KEYS = [
+  'payTo',
+  'feePayer',
+  'authorizer',
+  'protocolFeeBps',
+  'treasury',
+] as const;
 export type SellerKey = (typeof SELLER_KEYS)[number] & keyof PaymentDescription;
 
 export interface PaymentBalances {
   payer: bigint;
   payee: bigint;
+  // The protocol fee recipient named by the terms.
+  treasury: bigint;
   escrow: bigint;
 }
 
@@ -115,6 +124,7 @@ export function delta(before: PaymentBalances, after: PaymentBalances) {
   return {
     payer: after.payer - before.payer,
     payee: after.payee - before.payee,
+    treasury: after.treasury - before.treasury,
     escrow: after.escrow - before.escrow,
   };
 }

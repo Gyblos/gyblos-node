@@ -34,6 +34,8 @@ async function hostileTerms(rig: PaymentRig): Promise<Partial<PaymentTerms>[]> {
     { maxAtomic: 'one' },
     { requestDigest: 'not-a-digest' },
     { expiresAt: rig.now() },
+    { protocolFeeBps: valid.protocolFeeBps + 1 },
+    { treasury: valid.payTo },
   ];
 }
 

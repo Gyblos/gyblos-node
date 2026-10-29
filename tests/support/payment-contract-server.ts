@@ -10,6 +10,7 @@ import type {
   PaymentAuthorization,
   PaymentTerms,
 } from '@gyblos/protocol/payment';
+import { feeSplitBps } from '@gyblos/protocol/payment-binding';
 
 import {
   admitted,
@@ -51,6 +52,8 @@ function foreignTerms(terms: PaymentTerms): Partial<PaymentTerms>[] {
     { network: 'solana:other' },
     { mint: terms.payTo },
     { expiresAt: terms.expiresAt + 1 },
+    { protocolFeeBps: terms.protocolFeeBps + 1 },
+    { treasury: terms.buyer },
   ];
 }
 
@@ -221,6 +224,7 @@ function admissionContract(name: string, harness: PaymentHarness): void {
       assert.deepEqual(delta(before, rig.observe().balances), {
         payer: -CONTRACT_CEILING,
         payee: 0n,
+        treasury: 0n,
         escrow: CONTRACT_CEILING,
       });
       assert.equal(count(rig, PAYMENT_EVENTS.DEPOSIT), 1);
@@ -247,7 +251,7 @@ function settlementContract(name: string, harness: PaymentHarness): void {
     void test(`${name}: settling ${charged} charges it and refunds the rest`, async () =>
       withRig(harness, async (rig) => {
         const before = rig.observe().balances;
-        const { authorization, admission } = await admitted(rig);
+        const { terms, authorization, admission } = await admitted(rig);
         const settlement = await rig.server.settle(admission, String(charged));
         assert.equal(settlement.channelId, admission.channelId);
         assert.equal(settlement.chargedAtomic, String(charged));
@@ -257,11 +261,12 @@ function settlementContract(name: string, harness: PaymentHarness): void {
         );
         assert.ok(settlement.transaction.length > 0);
         assertPublic(settlement);
-        assert.deepEqual(delta(before, rig.observe().balances), {
-          payer: -charged,
-          payee: charged,
-          escrow: 0n,
-        });
+        const moved = delta(before, rig.observe().balances);
+        assert.equal(moved.payer, -charged);
+        assert.equal(moved.escrow, 0n);
+        assert.equal(moved.payee + moved.treasury, charged);
+        const { sellerBps } = feeSplitBps(terms.protocolFeeBps);
+        assert.ok(moved.payee >= (charged * BigInt(sellerBps)) / 10_000n);
         assert.deepEqual(rig.observe().events, [
           PAYMENT_EVENTS.JOURNAL,
           PAYMENT_EVENTS.SIGN,
@@ -337,7 +342,8 @@ function settlementContract(name: string, harness: PaymentHarness): void {
         PAYMENT_ERROR_CODES.ALREADY_SETTLED,
       );
       const charged = BigInt(settled?.value.chargedAtomic ?? '-1');
-      assert.equal(delta(before, rig.observe().balances).payee, charged);
+      const moved = delta(before, rig.observe().balances);
+      assert.equal(moved.payee + moved.treasury, charged);
       assert.equal(count(rig, PAYMENT_EVENTS.SETTLE), 1);
     }));
 

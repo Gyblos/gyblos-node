@@ -26,15 +26,23 @@ export class PaymentError extends Error {
   }
 }
 
-// What a seller declares before quoting: where and in what asset it is paid.
+// The network's protocol fee, added on top of the seller's price and split on chain to treasury.
+export interface PaymentFee {
+  protocolFeeBps: number;
+  treasury: string;
+}
+
+// What a seller declares before quoting: where and in what asset it is paid, and the fee it applies.
 export type PaymentDescription = Pick<
   InferenceOfferV2,
   'network' | 'mint' | 'payTo' | 'feePayer' | 'authorizer'
->;
+> &
+  PaymentFee;
 
 // The money-binding fields of a signed v2 offer. The buyer verifies the offer signature first
 // (payTo, feePayer and authorizer are the seller's own choice); network, mint, buyer and the ceiling
-// are then checked against the buyer's policy by authorize.
+// are then checked against the buyer's policy by authorize, as are the fee and treasury, which come
+// from network configuration on both sides rather than from the offer.
 export type PaymentTerms = PaymentDescription &
   Pick<InferenceOfferV2, 'buyer' | 'requestDigest' | 'maxAtomic' | 'expiresAt'>;
 

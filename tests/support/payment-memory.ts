@@ -27,7 +27,25 @@ import {
   type PaymentSettlement,
   type PaymentTerms,
 } from '@gyblos/protocol/payment';
+import { feeSplitBps } from '@gyblos/protocol/payment-binding';
 
+import {
+  ATOMIC,
+  channelIdOf,
+  confirmedReceipt,
+  description,
+  fail,
+  FUNDS,
+  OTHER_SELLER,
+  sha256,
+  signedBytes,
+  START_MS,
+  TERM_MS,
+  trustedTerms,
+  type Channel,
+  type JournalEntry,
+  type Ledger,
+} from './payment-memory-ledger';
 import {
   CONTRACT_CEILING,
   PAYMENT_EVENTS,
@@ -38,108 +56,6 @@ import {
   type PaymentRigOptions,
 } from './payment-rig';
 import { UPSTREAM_MARKER } from './private-error';
-
-const ATOMIC = /^(0|[1-9][0-9]*)$/;
-const DIGEST = /^[0-9a-f]{64}$/;
-const FUNDS = 10n * CONTRACT_CEILING;
-const TERM_MS = 60_000;
-// Synthetic start of the rig clock (epoch ms); a real harness may start at real time.
-const START_MS = 1_800_000_000_000;
-const NETWORK = 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1';
-const MINT = 'mint-synthetic';
-
-interface Ledger {
-  // The synthetic clock both parties read; only the rig's advance() moves it.
-  now: number;
-  balances: PaymentBalances;
-  events: PaymentEvent[];
-  // What actually happened on the synthetic chain, by transaction id.
-  transactions: Map<string, Omit<PaymentSettlement, 'transaction'>>;
-}
-
-interface JournalEntry extends PaymentReconciliation {
-  maxAtomic: string;
-}
-
-interface Channel extends PaymentAdmission {
-  settlement: PaymentSettlement | null;
-}
-
-function fail(code: PaymentErrorCode): never {
-  throw new PaymentError(code);
-}
-
-function sha256(text: string): string {
-  return createHash('sha256').update(text).digest('hex');
-}
-
-function description(name: string): PaymentDescription {
-  return {
-    network: NETWORK,
-    mint: MINT,
-    payTo: `payee-${name}`,
-    feePayer: `fee-payer-${name}`,
-    authorizer: `authorizer-${name}`,
-  };
-}
-
-function channelIdOf(payer: string, terms: PaymentTerms): string {
-  return sha256(JSON.stringify([payer, terms.payTo, terms.requestDigest]));
-}
-
-// Everything a payer signs: the channel and every money-binding field of the terms.
-function signedBytes(channelId: string, terms: PaymentTerms): Buffer {
-  return Buffer.from(
-    JSON.stringify([
-      channelId,
-      terms.buyer,
-      terms.network,
-      terms.mint,
-      terms.payTo,
-      terms.feePayer,
-      terms.authorizer,
-      terms.requestDigest,
-      terms.maxAtomic,
-      terms.expiresAt,
-    ]),
-  );
-}
-
-function trustedTerms(
-  terms: PaymentTerms,
-  payer: string,
-  now: number,
-): boolean {
-  return (
-    terms.network === NETWORK &&
-    terms.mint === MINT &&
-    terms.buyer === payer &&
-    ATOMIC.test(terms.maxAtomic) &&
-    BigInt(terms.maxAtomic) > 0n &&
-    BigInt(terms.maxAtomic) <= CONTRACT_CEILING &&
-    DIGEST.test(terms.requestDigest) &&
-    terms.expiresAt > now
-  );
-}
-
-function confirmedReceipt(
-  ledger: Ledger,
-  entry: JournalEntry,
-  settlement: PaymentSettlement,
-  expectedChargedAtomic: string,
-): boolean {
-  const onChain = ledger.transactions.get(settlement.transaction);
-  return (
-    onChain !== undefined &&
-    onChain.channelId === entry.channelId &&
-    settlement.channelId === entry.channelId &&
-    onChain.chargedAtomic === settlement.chargedAtomic &&
-    onChain.refundedAtomic === settlement.refundedAtomic &&
-    settlement.chargedAtomic === expectedChargedAtomic &&
-    BigInt(onChain.chargedAtomic) + BigInt(onChain.refundedAtomic) ===
-      BigInt(entry.maxAtomic)
-  );
-}
 
 function createClient(
   ledger: Ledger,
@@ -316,7 +232,10 @@ function createServer(
       };
       channel.settlement = settlement;
       ledger.balances.escrow -= ceiling;
-      ledger.balances.payee += charged;
+      const sellerShare =
+        (charged * BigInt(feeSplitBps(own.protocolFeeBps).sellerBps)) / 10_000n;
+      ledger.balances.payee += sellerShare;
+      ledger.balances.treasury += charged - sellerShare;
       ledger.balances.payer += ceiling - charged;
       ledger.transactions.set(settlement.transaction, {
         channelId: settlement.channelId,
@@ -333,7 +252,7 @@ export const memoryPaymentHarness: PaymentHarness = {
   async start(options: PaymentRigOptions): Promise<PaymentRig> {
     const ledger: Ledger = {
       now: START_MS,
-      balances: { payer: FUNDS, payee: 0n, escrow: 0n },
+      balances: { payer: FUNDS, payee: 0n, treasury: 0n, escrow: 0n },
       events: [],
       transactions: new Map(),
     };
@@ -354,7 +273,7 @@ export const memoryPaymentHarness: PaymentHarness = {
       serverWith: async (field) =>
         createServer(
           ledger,
-          { ...own, [field]: description('other')[field] },
+          { ...own, [field]: OTHER_SELLER[field] },
           upstream,
           depositSent,
         ),
