@@ -11,6 +11,10 @@ export const PRIVATE_PATH =
 export const LAB_PATH = '^lab/';
 const ADAPTER_NAME =
   /^(?:payments-.+|identity|engine-.+|transport-.+|discovery-.+|telemetry-.+)$/;
+// Packages meant to leave the monorepo: they import no workspace code and only
+// payment adapters (and verification) may import them.
+const STANDALONE_NAMES = ['x402-upto-metered'];
+const PAYMENT_ADAPTER = 'payments-[^/]+';
 const PACKAGE_PATH = '^packages/';
 const CORE_PATH = '^packages/core/';
 const PROTOCOL_PATH = '^packages/protocol/';
@@ -28,6 +32,7 @@ export const BOUNDARY_LAYERS = {
   APPS: 'apps',
   LAB: 'lab',
   VERIFICATION: 'verification',
+  STANDALONE: 'standalone',
 } as const;
 
 export type BoundaryLayer =
@@ -44,6 +49,7 @@ export function layerOf(source: string): BoundaryLayer | null {
   if (source.startsWith('apps/')) return BOUNDARY_LAYERS.APPS;
   const name = source.match(/^packages\/([^/]+)\//)?.[1];
   if (name === BOUNDARY_LAYERS.CORE) return BOUNDARY_LAYERS.CORE;
+  if (STANDALONE_NAMES.includes(name ?? '')) return BOUNDARY_LAYERS.STANDALONE;
   if (ADAPTER_NAME.test(name ?? '')) return BOUNDARY_LAYERS.ADAPTER;
   if (
     name === BOUNDARY_LAYERS.PROTOCOL ||
@@ -53,6 +59,26 @@ export function layerOf(source: string): BoundaryLayer | null {
   )
     return name;
   return null;
+}
+
+function standaloneRules(name: string): IRegularForbiddenRuleType[] {
+  const own = `${PACKAGE_PATH}${name}/`;
+  return [
+    rule(
+      `standalone-${name}-is-independent`,
+      { path: own },
+      {
+        path: `^(?:packages/(?!${name}/)|apps/|lab/|tooling/|tests/)`,
+      },
+    ),
+    rule(
+      `standalone-${name}-is-only-used-by-payments`,
+      {
+        path: `^(?:packages/(?!(?:${PAYMENT_ADAPTER}|${name})/)|apps/|lab/)`,
+      },
+      { path: own },
+    ),
+  ];
 }
 
 function rule(
@@ -152,6 +178,9 @@ export function boundaryConfig(
           { path: adapterPath, pathNot: `${PACKAGE_PATH}${name}/` },
         ),
       ),
+      ...packageNames
+        .filter((name) => STANDALONE_NAMES.includes(name))
+        .flatMap(standaloneRules),
       ...appNames.map((name) =>
         rule(
           `app-${name}-is-independent`,

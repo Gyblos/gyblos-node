@@ -1,0 +1,17 @@
+{
+  "name": "x402-upto-metered",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Metered x402 upto payments over any transport: deposit a ceiling, settle what was delivered, refund the rest.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "node --import tsx --test \"test/*.test.ts\""
+  },
+  "devDependencies": {
+    "tsx": "4.21.0"
+  }
+}
