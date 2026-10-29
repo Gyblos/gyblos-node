@@ -110,6 +110,26 @@ void test('control supports free and mixed-zero model pricing without authorizin
   );
 });
 
+void test('a quote that can charge never names a hot key as payout; a free quote may', async () => {
+  const free = await controlFixture(true);
+  free.context.payTo = free.context.owner;
+  const signed = await createControlQuote(
+    free.request,
+    free.context,
+    free.ownerSigner,
+  );
+  assert.equal(signed.offer.payTo, signed.offer.owner);
+  for (const hot of ['owner', 'feePayer', 'authorizer'] as const) {
+    const paid = await controlFixture();
+    paid.context.payTo = paid.context[hot];
+    await assert.rejects(
+      createControlQuote(paid.request, paid.context, paid.ownerSigner),
+      { code: CONTROL_CODES.POLICY },
+      hot,
+    );
+  }
+});
+
 void test('control rejects unavailable models, levels, stale catalogs and excessive terms before signing', async () => {
   const fixture = await controlFixture();
   let signs = 0;

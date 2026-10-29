@@ -6,7 +6,8 @@
   "exports": {
     "./cli": "./src/cli.ts",
     "./main": "./src/main.ts",
-    "./setup": "./src/setup.ts"
+    "./setup": "./src/setup.ts",
+    "./tokenizer": "./src/tokenizer.ts"
   },
   "dependencies": {
     "@gyblos/node": "workspace:*",

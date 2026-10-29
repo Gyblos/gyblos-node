@@ -1,4 +1,5 @@
 // CLI for isolated P2P role provisioning; it does not contact RPC, fund wallets or start the node.
+// A seller needs only --mint to sell for free.
 import { parseArgs } from 'node:util';
 
 import { publicRole, setupRole } from '@gyblos/node/roles';
@@ -20,7 +21,7 @@ export async function main(args = process.argv.slice(2)) {
     !values.mint
   )
     throw new Error(
-      'Specify --role buyer|seller and --mint; seller also requires --buyer and --pay-to.',
+      'Specify --role buyer|seller and --mint; a free seller needs nothing else.',
     );
   await setupRole({
     role: values.role,

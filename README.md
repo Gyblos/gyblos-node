@@ -90,9 +90,11 @@ Seller:
 
 ```sh
 export GYBLOS_RELAY_TOKEN=...   # 32-512 characters; never commit it
-pnpm node:setup --role seller --mint MINT --buyer BUYER_ADDRESS --pay-to PAYOUT_ADDRESS
-pnpm gate:inference:setup       # downloads the pinned model (lab command for now)
+pnpm node:setup --role seller --mint MINT   # free selling needs no payout or buyer address
+pnpm node:tokenizer             # pinned tokenizer, for offers whose usage the seller recounts
+# run your own engine (a dedicated Ollama, or an OpenAI- or Anthropic-compatible API; see the full steps)
 cp examples/seller-daemon.toml gyblos.toml   # one free offer; paid selling is off for now
+pnpm gyblos doctor              # read-only preflight; prints the public NodeId and owner
 pnpm node:start
 ```
 
@@ -109,7 +111,8 @@ steps: [docs/running-a-node.md](docs/running-a-node.md).
 | Node   | `pnpm node:start`, `buyer:start`                     | Start the seller node; start the buyer proxy (`:4031`).                                |
 | Node   | `pnpm gyblos config validate --config gyblos.toml`   | Check a node config file and the environment ([configuration](docs/configuration.md)). |
 | Node   | `pnpm node:setup --role buyer\|seller --mint MINT`   | Create isolated role keys without RPC or funding.                                      |
-| Node   | `pnpm buyer:setup`                                   | Download and verify the buyer tokenizer without an inference engine.                   |
+| Node   | `pnpm node:tokenizer`                                | Download and verify the pinned tokenizer for either role, without an engine.           |
+| Node   | `pnpm buyer:setup`                                   | The same tokenizer download, under the buyer's older name.                             |
 | Node   | `pnpm buyer:free`                                    | Start the separate free v2 chat endpoint (complete or SSE) (`:4031`).                  |
 | Node   | `pnpm buyer:trust`                                   | Verify the offer against explicit seller identities and create trust.                  |
 | Node   | `pnpm buyer:call`, `buyer:reconcile`                 | One paid synthetic call; verify a payment, clear a zero-charge block.                  |

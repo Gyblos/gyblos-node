@@ -85,8 +85,19 @@ void test('doctor: an empty home fails the role check with a setup hint and exit
     assert.equal(result.code, 1);
     assert.match(line(result.output, 'role'), /FAIL\s+role\s+ROLE_MISSING/);
     assert.match(line(result.output, 'keys'), /WARN\s+keys\s+NOT_CHECKED/);
-    assert.match(result.output, /pnpm node:setup --role seller/);
+    assert.match(result.output, /pnpm node:setup --role seller --mint MINT`/);
+    assert.doesNotMatch(result.output, /--pay-to/);
     assert.match(result.output, /NOT READY/);
+  }));
+
+void test('doctor: a free seller role without payment fields is ready', () =>
+  scenario({ free: true }, async (run) => {
+    await withOllama(run);
+    await writeFile(join(run.root, 'gyblos.toml'), freeToml(run));
+    const result = await doctor(run);
+    assert.equal(result.code, 0, result.output);
+    assert.match(line(result.output, 'role'), /^\s*OK\s/);
+    assert.match(result.output, new RegExp(`owner\\s+${run.owner}`));
   }));
 
 void test('doctor: a buyer role in the seller home is refused', () =>
@@ -234,9 +245,8 @@ void test('doctor: a stopped engine at the offer URL fails with the engine code;
     );
     assert.match(
       line(stopped.output, 'tokenizer'),
-      /FAIL\s+tokenizer\s+TOKENIZER_UNAVAILABLE/,
+      /FAIL\s+tokenizer\s+TOKENIZER_UNAVAILABLE\s+run `pnpm node:tokenizer`/,
     );
-    assert.match(stopped.output, /pnpm gate:inference:setup/);
     // The engine is checked by describing it only: the model list, never a generation.
     const ollama = await withOllama(run);
     await writeFile(join(run.root, 'gyblos.toml'), freeToml(run));

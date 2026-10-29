@@ -55,7 +55,12 @@ export interface Fixture {
 }
 
 export async function fixture(
-  options: { role?: 'seller' | 'buyer' | false; keyMode?: number } = {},
+  options: {
+    role?: 'seller' | 'buyer' | false;
+    keyMode?: number;
+    // A free seller's role file, as `node:setup` writes it without --buyer/--pay-to.
+    free?: boolean;
+  } = {},
 ): Promise<Fixture> {
   const root = await mkdtemp(join(tmpdir(), 'gyblos-doctor-'));
   const home = join(root, 'home');
@@ -78,14 +83,15 @@ export async function fixture(
       mint,
       assetLabel: CONFIG_ASSET_LABELS.TEST_TOKEN,
       nodeId: NODE_ID,
-      buyer,
     };
     await writeFile(
       join(seller, 'role.json'),
       JSON.stringify(
-        role === 'seller'
-          ? { ...common, owner, authorizer, facilitator, payTo }
-          : common,
+        role === 'buyer'
+          ? { ...common, buyer }
+          : options.free
+            ? { ...common, owner }
+            : { ...common, owner, authorizer, facilitator, payTo, buyer },
       ),
     );
     for (const name of KEY_FILES) {

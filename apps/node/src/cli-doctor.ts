@@ -24,7 +24,7 @@ const SEE_STARTUP = 'see docs/configuration.md#seller-startup';
 // Short operator hints by code; codes without one are explained in the docs.
 const HINTS: Readonly<Partial<Record<DoctorResultCode, string>>> = {
   [DOCTOR_CODES.ROLE_MISSING]:
-    'run `pnpm node:setup --role seller --mint MINT --buyer BUYER --pay-to PAYOUT`',
+    'run `pnpm node:setup --role seller --mint MINT`',
   [DOCTOR_CODES.ROLE_NOT_SELLER]: 'this home holds a buyer role',
   [DOCTOR_CODES.KEYS_MISSING]:
     'a key file is missing; rerun node:setup (keys are never replaced)',
@@ -34,7 +34,7 @@ const HINTS: Readonly<Partial<Record<DoctorResultCode, string>>> = {
     'a leftover public-sequence lock blocks publishing; stop other sellers, then inspect it (docs/discovery.md)',
   [NODE_ERROR_CODES.PUBLIC_SEQUENCE_UNAVAILABLE]:
     'the seller directory must be mode 0700 and its public-sequence file valid',
-  [DOCTOR_CODES.TOKENIZER_UNAVAILABLE]: 'run `pnpm gate:inference:setup`',
+  [DOCTOR_CODES.TOKENIZER_UNAVAILABLE]: 'run `pnpm node:tokenizer`',
   [ENGINE_ERROR_CODES.UNAVAILABLE]:
     'start the engine at the offer URL with its model; for Ollama, `ollama pull qwen3:0.6b`, and `ollama list` must show ID 7df6b6e09427; for an API, check upstream_model is listed',
   [ENGINE_ERROR_CODES.TIMEOUT]:

@@ -117,12 +117,16 @@ rewrite leaves the moved config and original backup for manual recovery.
 `pnpm node:setup --role` creates the role directory, the role file, the Iroh
 node key (`node.key`) and the role's Solana keys with private permissions. It
 never overwrites existing keys; a mismatched existing role stops with an error.
+A seller needs only `--mint`: it gets an owner key and a node key. The paid
+seller keys (authorizer and facilitator) and fields (`payTo`, allowed `buyer`)
+are created only when `--buyer` and `--pay-to` are given together; paid selling
+is off, so free sellers leave both out.
 
 | File                                             | Role   | Contents                                                                                                               |
 | ------------------------------------------------ | ------ | ---------------------------------------------------------------------------------------------------------------------- |
 | `role.json`                                      | both   | Role, mint, NodeId and public addresses.                                                                               |
 | `node.key`                                       | both   | Iroh secret key (private).                                                                                             |
-| `*.json` keys                                    | both   | Buyer key, or seller owner key (plus unused paid keys).                                                                |
+| `*.json` keys                                    | both   | Buyer key, or seller owner key (paid keys only with `--buyer`/`--pay-to`).                                             |
 | `offer.json`                                     | buyer  | A paid v1 seller's signed offer (lab gates only).                                                                      |
 | `trust.json`                                     | buyer  | Which seller and limits the buyer accepts.                                                                             |
 | `status.json`                                    | both   | `starting` with a phase, then `ready`; a seller lists each offer's index, model, engine kind and whether it is listed. |
@@ -133,8 +137,8 @@ never overwrites existing keys; a mismatched existing role stops with an error.
 
 ```sh
 export GYBLOS_RELAY_TOKEN=...    # private; 32-512 printable characters
-pnpm node:setup --role seller --mint MINT --buyer BUYER_ADDRESS --pay-to PAYOUT_ADDRESS
-pnpm gate:inference:setup        # pinned tokenizer (lab command for now; also caches the model for the lab)
+pnpm node:setup --role seller --mint MINT
+pnpm node:tokenizer              # pinned tokenizer; doctor reports NOT_NEEDED when every offer's usage is declared
 # A dedicated Ollama, used only for selling, on loopback; leave it running in its own terminal:
 OLLAMA_HOST=127.0.0.1:11435 OLLAMA_MODELS=$HOME/.gyblos-ollama OLLAMA_NO_CLOUD=1 OLLAMA_NUM_PARALLEL=1 OLLAMA_MAX_LOADED_MODELS=1 ollama serve
 OLLAMA_HOST=127.0.0.1:11435 ollama pull qwen3:0.6b   # the pinned model
@@ -147,8 +151,7 @@ pnpm node:start
   start (`SELLER_OFFERS_MISSING`). Paid selling is off until it returns as a
   payment plugin, so a paid offer stops startup
   (`SELLER_PAID_EXECUTION_UNAVAILABLE`); the v1 paid path remains in the lab
-  gates only. `node:setup` still asks for `--buyer` and `--pay-to`, which free
-  selling does not use.
+  gates only.
 - The seller runs its own Ollama; the daemon never starts it. Startup warms each
   offer in order at its own engine URL (a literal loopback address), checking
   memory headroom for engines on this machine, and signs its public records once
@@ -189,7 +192,7 @@ paid selling is off, so today it runs only against the lab gates (`gate:*`).
 ```sh
 export GYBLOS_RELAY_TOKEN=...
 pnpm node:setup --role buyer --mint MINT
-pnpm buyer:setup             # download and verify only the pinned tokenizer
+pnpm node:tokenizer          # download and verify only the pinned tokenizer (`buyer:setup` is the same)
 # copy the seller's .local/gyblos/seller/offer.json into .local/gyblos/buyer/
 pnpm buyer:trust --owner SELLER_OWNER_ADDRESS --node-id SELLER_NODE_ID --pay-to PAYOUT_ADDRESS --max-atomic 10000
 pnpm buyer:start
@@ -214,7 +217,7 @@ file. It does not derive trust automatically from the offer or make payments.
 }
 ```
 
-`buyer:setup` downloads public tokenizer files into
+`node:tokenizer` (or `buyer:setup`) downloads public tokenizer files into
 `.local/gyblos/artifacts/tokenizer/`. It does not install Ollama, download model
 weights, read keys or contact Solana. Run it once before the synthetic paid-call
 CLI.

@@ -8,6 +8,11 @@ import { join } from 'node:path';
 
 import { homeLayout } from '@gyblos/config';
 
+const PRODUCT_ENTRIES = {
+  buyer: '@gyblos/buyer/setup',
+  node: '@gyblos/node-app/tokenizer',
+} as const;
+
 // The child runs with a minimal environment, so the default home applies.
 export function artifactLayout() {
   return homeLayout({}).artifacts;
@@ -19,8 +24,10 @@ export async function preparation(
   failure: 'oversize' | 'write' | undefined = undefined,
   lab = false,
   legacyDirectories: readonly string[] = [],
+  // The product entry to run when not in the lab: the buyer's setup or the role-neutral node command.
+  entry: keyof typeof PRODUCT_ENTRIES = 'buyer',
 ) {
-  const directory = await mkdtemp(join(tmpdir(), 'gyblos-buyer-setup-'));
+  const directory = await mkdtemp(join(tmpdir(), 'gyblos-tokenizer-setup-'));
   for (const legacy of legacyDirectories)
     await mkdir(join(directory, legacy), { recursive: true });
   const artifacts = {
@@ -77,7 +84,7 @@ export async function preparation(
       }
       return new Response(String(url).endsWith('tokenizer.json')?${JSON.stringify(corrupt === 'tokenizer' ? 'corrupt' : artifacts.tokenizer)}:${JSON.stringify(corrupt === 'config' ? 'corrupt' : artifacts.config)});
     };
-    await import(${JSON.stringify(import.meta.resolve(lab ? '@gyblos/lab-harness/commands/inference-setup' : '@gyblos/buyer/setup'))}).then(module=>${lab ? 'undefined' : 'module.main()'});`;
+    await import(${JSON.stringify(import.meta.resolve(lab ? '@gyblos/lab-harness/commands/inference-setup' : PRODUCT_ENTRIES[entry]))}).then(module=>${lab ? 'undefined' : 'module.main()'});`;
   const result = spawnSync(
     process.execPath,
     [
