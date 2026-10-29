@@ -9,6 +9,7 @@ import {
   type PaymentClient,
   type PaymentDescription,
   type PaymentServer,
+  type PaymentSplit,
   type PaymentTerms,
 } from '@gyblos/protocol/payment';
 
@@ -16,7 +17,6 @@ import { assertPrivate, UPSTREAM_MARKER } from './private-error';
 
 export const CONTRACT_CEILING = 1_000_000n;
 export const CONTRACT_PARTIAL = 250_000n;
-export const CONTRACT_NOW = 1_800_000_000_000;
 
 export const PAYMENT_EVENTS = {
   JOURNAL: 'journal',
@@ -26,12 +26,21 @@ export const PAYMENT_EVENTS = {
 } as const;
 export type PaymentEvent = (typeof PAYMENT_EVENTS)[keyof typeof PAYMENT_EVENTS];
 
-export const SELLER_KEYS = ['payTo', 'feePayer', 'authorizer'] as const;
+// Fields a seller declares; a second seller differing in any one of them must not reuse an authorization.
+export const SELLER_KEYS = [
+  'payTo',
+  'feePayer',
+  'authorizer',
+  'protocolFeeBps',
+  'treasury',
+] as const;
 export type SellerKey = (typeof SELLER_KEYS)[number] & keyof PaymentDescription;
 
 export interface PaymentBalances {
   payer: bigint;
   payee: bigint;
+  // The protocol fee recipient named by the terms.
+  treasury: bigint;
   escrow: bigint;
 }
 
@@ -43,9 +52,23 @@ export interface PaymentRig {
   serverWith(field: SellerKey): Promise<PaymentServer>;
   // A valid signature over `terms` by a payer key that is not `terms.buyer` (a malicious buyer).
   foreignAuthorization(terms: PaymentTerms): Promise<PaymentAuthorization>;
-  // Valid terms for `server` at CONTRACT_NOW, under the buyer's ceiling; overrides make them hostile.
+  // The rig buyer's own valid signature over `terms`, but opening a channel with `splits` instead
+  // of paymentSplits(terms) (a modified buyer that drops or redirects the fee).
+  authorizationWithSplits(
+    terms: PaymentTerms,
+    splits: readonly PaymentSplit[],
+  ): Promise<PaymentAuthorization>;
+  // `authorization` with its channel distribution replaced after the buyer signed it.
+  tamperSplits(
+    authorization: PaymentAuthorization,
+    splits: readonly PaymentSplit[],
+  ): Promise<PaymentAuthorization>;
+  // Valid terms for `server` at now(), under the buyer's ceiling; overrides make them hostile.
   terms(overrides?: Partial<PaymentTerms>): Promise<PaymentTerms>;
   observe(): { events: readonly PaymentEvent[]; balances: PaymentBalances };
+  // The clock both client and server read (epoch ms); advance() moves it forward by `ms`.
+  now(): number;
+  advance(ms: number): void;
   close(): Promise<void>;
 }
 
@@ -53,11 +76,15 @@ export interface PaymentRigOptions {
   failJournal: boolean;
   // The server's chain or facilitator calls throw upstream text that contains UPSTREAM_MARKER.
   failUpstream: boolean;
+  // Called right after the deposit transaction is submitted (before confirmation); the contract
+  // aborts the caller's signal here.
+  onDepositSent?: () => void;
 }
 
 export interface PaymentHarness {
-  // The clock reads CONTRACT_NOW; the buyer's ceiling is CONTRACT_CEILING. Configuration that could
-  // be secret (RPC URLs, keys) must contain UPSTREAM_MARKER so the contract can prove it never leaks.
+  // The rig clock moves only through advance(); the buyer's ceiling is CONTRACT_CEILING.
+  // Configuration that could be secret (RPC URLs, keys) must contain UPSTREAM_MARKER so the
+  // contract can prove it never leaks.
   start(options: PaymentRigOptions): Promise<PaymentRig>;
 }
 
@@ -109,6 +136,7 @@ export function delta(before: PaymentBalances, after: PaymentBalances) {
   return {
     payer: after.payer - before.payer,
     payee: after.payee - before.payee,
+    treasury: after.treasury - before.treasury,
     escrow: after.escrow - before.escrow,
   };
 }

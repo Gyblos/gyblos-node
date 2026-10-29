@@ -1,0 +1,159 @@
+// Pins the payment terms digest, the on-chain memo and the protocol fee arithmetic.
+// The digest vector was computed independently (Python json sort_keys + hashlib.sha256).
+import assert from 'node:assert/strict';
+import test from 'node:test';
+
+import {
+  PAYMENT_BINDING,
+  PAYMENT_ERROR_CODES,
+} from '@gyblos/protocol/constants';
+import { PaymentError, type PaymentTerms } from '@gyblos/protocol/payment';
+import {
+  feeSplitBps,
+  grossAtomicPerMtok,
+  paymentMemo,
+  paymentSplits,
+  paymentTermsDigest,
+  settlementShares,
+} from '@gyblos/protocol/payment-binding';
+
+const TERMS: PaymentTerms = {
+  buyer: 'Buyer1111111111111111111111111111111111111',
+  network: 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1',
+  mint: 'Mint11111111111111111111111111111111111111',
+  payTo: 'PayTo1111111111111111111111111111111111111',
+  feePayer: 'FeePayer11111111111111111111111111111111111',
+  authorizer: 'Authorizer111111111111111111111111111111111',
+  requestDigest: 'ab'.repeat(32),
+  maxAtomic: '1030000',
+  expiresAt: 1_800_000_060_000,
+  protocolFeeBps: 300,
+  treasury: 'Treasury111111111111111111111111111111111111',
+};
+const DIGEST =
+  '89cd3f9fb5e92462f3b92f70f16b0fa047642732c396a97da0a9756df7ecdfb4';
+
+function rejectsCode(run: () => unknown, code: string) {
+  assert.throws(run, (error: unknown) => {
+    assert.ok(error instanceof PaymentError);
+    assert.equal(error.code, code);
+    return true;
+  });
+}
+
+void test('the terms digest commits to every money field under its own domain', async () => {
+  assert.equal(await paymentTermsDigest(TERMS), DIGEST);
+  for (const [key, value] of Object.entries({
+    buyer: TERMS.payTo,
+    network: 'solana:other',
+    mint: TERMS.payTo,
+    payTo: TERMS.buyer,
+    feePayer: TERMS.buyer,
+    authorizer: TERMS.buyer,
+    requestDigest: 'cd'.repeat(32),
+    maxAtomic: '1030001',
+    expiresAt: TERMS.expiresAt + 1,
+    protocolFeeBps: 299,
+    treasury: TERMS.payTo,
+  }))
+    assert.notEqual(
+      await paymentTermsDigest({ ...TERMS, [key]: value }),
+      DIGEST,
+      key,
+    );
+});
+
+void test('the memo is the prefixed digest and fits the 256-byte on-chain memo', async () => {
+  const memo = await paymentMemo(TERMS);
+  assert.equal(memo, `${PAYMENT_BINDING.memoPrefix}${DIGEST}`);
+  assert.ok(new TextEncoder().encode(memo).length <= PAYMENT_BINDING.memoBytes);
+});
+
+void test('the fee is added on top of the seller price and the split favours the seller', () => {
+  assert.deepEqual(feeSplitBps(300), { sellerBps: 9709, treasuryBps: 291 });
+  assert.deepEqual(feeSplitBps(0), { sellerBps: 10_000, treasuryBps: 0 });
+  assert.equal(grossAtomicPerMtok('1000000', 300), '1030000');
+  assert.equal(grossAtomicPerMtok('0', 300), '0');
+  assert.equal(grossAtomicPerMtok('1', 300), '2');
+  assert.equal(grossAtomicPerMtok('1000000', 0), '1000000');
+  // For every fee the seller's share of the gross price never falls below its own price.
+  for (const fee of [1, 50, 300, 999, PAYMENT_BINDING.maxFeeBps])
+    for (const net of [1n, 7n, 999_999n, 1_000_000n, 123_456_789n]) {
+      const gross = BigInt(grossAtomicPerMtok(String(net), fee));
+      const { sellerBps } = feeSplitBps(fee);
+      assert.ok((gross * BigInt(sellerBps)) / 10_000n >= net, `${fee} ${net}`);
+    }
+});
+
+void test('fees and prices outside policy are refused with a static code', async () => {
+  for (const fee of [-1, 1.5, PAYMENT_BINDING.maxFeeBps + 1])
+    rejectsCode(() => feeSplitBps(fee), PAYMENT_ERROR_CODES.UNTRUSTED_TERMS);
+  for (const price of ['-1', '01', '1.5', ''])
+    rejectsCode(
+      () => grossAtomicPerMtok(price, 300),
+      PAYMENT_ERROR_CODES.UNTRUSTED_TERMS,
+    );
+  for (const hostile of [
+    { ...TERMS, protocolFeeBps: 1.5 },
+    { ...TERMS, maxAtomic: 1030000 },
+    { ...TERMS, expiresAt: 1.5 },
+    { ...TERMS, treasury: '' },
+    { ...TERMS, treasury: undefined },
+  ])
+    await assert.rejects(
+      paymentTermsDigest(hostile as unknown as PaymentTerms),
+      (error: unknown) =>
+        error instanceof PaymentError &&
+        error.code === PAYMENT_ERROR_CODES.UNTRUSTED_TERMS,
+    );
+  // Extra properties (an offer object passed as terms) never change the digest.
+  assert.equal(
+    await paymentTermsDigest({ ...TERMS, extra: 'x' } as PaymentTerms),
+    DIGEST,
+  );
+});
+
+void test('the channel distribution sends the seller and fee shares to payTo and treasury', () => {
+  assert.deepEqual(paymentSplits(TERMS), [
+    { recipient: TERMS.payTo, bps: 9709 },
+    { recipient: TERMS.treasury, bps: 291 },
+  ]);
+  assert.deepEqual(paymentSplits({ ...TERMS, protocolFeeBps: 0 }), [
+    { recipient: TERMS.payTo, bps: 10_000 },
+  ]);
+  assert.deepEqual(settlementShares('13610', 300), {
+    sellerAtomic: '13213',
+    feeAtomic: '396',
+  });
+  assert.deepEqual(settlementShares('0', 300), {
+    sellerAtomic: '0',
+    feeAtomic: '0',
+  });
+});
+
+// A charge is ceil((input * inputPrice + output * outputPrice) / 1e6) at the gross prices; the
+// seller must receive at least its own price for those tokens, rounded down to the atomic unit.
+void test('per charge, the seller receives its own price rounded down to the atomic unit', () => {
+  const MTOK = 1_000_000n;
+  for (const fee of [0, 1, 300, PAYMENT_BINDING.maxFeeBps])
+    for (const [netIn, netOut] of [
+      [150_000n, 600_000n],
+      [1_100_000n, 4_400_000n],
+      [123_456_789n, 3n],
+      [1n, 1n],
+    ] as const) {
+      const grossIn = BigInt(grossAtomicPerMtok(String(netIn), fee));
+      const grossOut = BigInt(grossAtomicPerMtok(String(netOut), fee));
+      for (const input of [0n, 1n, 7n, 10_013n])
+        for (const output of [1n, 3n, 503n, 99_999n]) {
+          const charged =
+            (input * grossIn + output * grossOut + MTOK - 1n) / MTOK;
+          const net = (input * netIn + output * netOut) / MTOK;
+          const shares = settlementShares(String(charged), fee);
+          assert.ok(BigInt(shares.sellerAtomic) >= net, `${fee} ${input}`);
+          assert.ok(
+            BigInt(shares.sellerAtomic) + BigInt(shares.feeAtomic) <= charged,
+          );
+        }
+    }
+});
