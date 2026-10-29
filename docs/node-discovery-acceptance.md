@@ -230,3 +230,51 @@ Passing proves synthetic local composition, not chain freshness/finality,
 production identity-provider behavior, real model performance, off-host routing,
 load capacity or production discovery. Real Ollama, a second machine, live RPC
 or the production index requires separate founder authorization.
+
+## Product startup through private receipt confirmation
+
+```sh
+pnpm acceptance:receipts
+```
+
+This synthetic-only scenario calls the public `createNode().start()` lifecycle
+and `startFreeBuyer()`, loading real temporary role files, `gyblos.toml`,
+selection configuration, discovery/replay state and private receipt stores. The
+actual in-process discovery index uses memory storage and an explicit seller
+allowlist. The OpenAI-compatible engine adapter talks only to a deterministic
+in-memory provider with declared usage; no provider account, API key, model
+download or Ollama process is used. This does not validate independently
+recounted tokens.
+
+Only native endpoint binding is injected: real Iroh uses its minimal preset,
+IPv4/IPv6 loopback, no relays or address discovery, and the ALPN flags passed by
+product startup. Relay-online waiting is unnecessary for this isolated binding.
+This validates the startup composition and encrypted control/free/receipt
+channels, not ordinary Internet/relay bootstrap. The buyer's allocated HTTP URL
+is used to send both complete and streaming requests.
+
+The run checks publication and buyer discovery reads, exact signed quotes,
+complete/streamed answers, matching independently verified signed pairs in both
+role stores, restart of both roles with persistent receipts and higher public
+sequences, and index rejection of the still-valid older signed catalog. It also
+checks receipt-storage failure, engine failure, stream cancellation and a tiny
+configured free cap. Failures never re-send the prompt: execution dials and
+provider attempts are counted. Queries perform no generation before the first
+execution. Unsafe receipt modes are restored after the negative case. Retention
+checks use the production store's clock/entry-bound ports to prove logical
+expiry and eviction with a reduced bound; they do not wait seven days or stress
+the maximum store size. Files remain private and contain metadata only.
+
+The command accepts no arguments or operational overrides. A parent owns the
+fresh home and launches an isolated child with an allowlisted environment. Only
+its synthetic index/provider fetches are allowed; every other fetch is refused,
+including RPC and the deployed index. The paid ALPN is absent. Output contains
+fixed case IDs, counters and flags, without content, identities, signatures,
+addresses or paths. Parent cancellation/deadline closes the child before
+removing the owned home, with a bounded forced-kill fallback. Output/error
+capture is bounded and sanitized. Native failures or test skips never count as
+acceptance.
+
+No payments, devnet transactions, deployments, real engine, live identity RPC,
+production index, second machine or Windows ACL validation is included. Those
+require separate authorization and evidence.

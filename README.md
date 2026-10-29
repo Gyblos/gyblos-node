@@ -60,6 +60,7 @@ No wallet, model or network needed; unsupported native cases skip explicitly.
 pnpm --filter @gyblos/lab-harness acceptance:node-discovery # publication to signed quote
 pnpm --filter @gyblos/lab-harness acceptance:free           # publication to complete answer
 pnpm --filter @gyblos/lab-harness acceptance:free-stream    # early fragments and cancellation
+pnpm acceptance:receipts                                  # product startup to confirmed receipts
 ```
 
 Uses a synthetic engine, native loopback Iroh and an in-process memory index.

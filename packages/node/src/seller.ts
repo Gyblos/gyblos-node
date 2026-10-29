@@ -82,7 +82,9 @@ function offerStatus(settings: SellerSettings, offers: SellerOfferSet) {
   }));
 }
 
-export async function startSeller(options: { telemetry?: TelemetrySink } = {}) {
+export async function startSeller(
+  options: { telemetry?: TelemetrySink; bind?: typeof bindEndpoint } = {},
+) {
   const startedAt = Date.now();
   const disposers: (() => Promise<void>)[] = [];
   const close = async () => {
@@ -130,16 +132,19 @@ export async function startSeller(options: { telemetry?: TelemetrySink } = {}) {
       offers.add(await liveSellerOffer(warmed, offerDependencies));
     await stage('iroh-endpoint');
     const { relayOnly } = settings;
-    const endpoint = await bindEndpoint(await nodeSecret(P2P_ROLES.SELLER), {
-      relayOnly,
-      control: true,
-      freeExecution: true,
-      receipts: true,
-      http: false,
-      bindAddress: settings.irohBind,
-      externalAddress: settings.irohExternalAddress,
-      relayEnvironment: settings.relayEnvironment,
-    });
+    const endpoint = await (options.bind ?? bindEndpoint)(
+      await nodeSecret(P2P_ROLES.SELLER),
+      {
+        relayOnly,
+        control: true,
+        freeExecution: true,
+        receipts: true,
+        http: false,
+        bindAddress: settings.irohBind,
+        externalAddress: settings.irohExternalAddress,
+        relayEnvironment: settings.relayEnvironment,
+      },
+    );
     const endpointDisposeIndex = disposers.length;
     disposers.push(() => endpoint.close());
     if (endpoint.id().toString() !== config.nodeId)
