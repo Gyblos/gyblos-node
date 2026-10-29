@@ -13,6 +13,7 @@ import {
   FREE_EXECUTION,
   FREE_STREAM,
   GYBLOS_ALPN,
+  RECEIPT_CHANNEL,
 } from '@gyblos/protocol/constants';
 
 import {
@@ -31,6 +32,8 @@ import { handleIrohConnection } from './iroh-connection';
 import { createPeerLimiter } from './limiter';
 import { loopbackRequest } from './loopback';
 import { selectedRoute } from './paths';
+import { createReceiptServer } from './receipt-server';
+import type { ReceiptService } from './receipt-service';
 import { decodeRequest, encodeResponse } from './wire';
 
 const { streamCloseCode } = HTTP_OVER_IROH;
@@ -44,7 +47,9 @@ export function serveIroh(
   control?: ControlService,
   freeExecution?: FreeExecutionService,
   limits: TransportLimits = TRANSPORT_LIMITS,
+  receipts?: ReceiptService,
 ) {
+  const receiptServer = receipts ? createReceiptServer(receipts) : undefined;
   const limiter = createPeerLimiter(Date.now, limits);
   const admission = createConnectionAdmission(undefined, limits);
   const connections = new Set<Connection>();
@@ -129,6 +134,23 @@ export function serveIroh(
     }
   }
 
+  async function receiptConnection(
+    connection: Connection,
+    signal: AbortSignal,
+    peer: string,
+  ) {
+    await receiptServer?.handle(
+      connection,
+      signal,
+      () =>
+        !relayOnly || selectedRoute(connection) === TRANSPORT_ROUTES.RELAY
+          ? limiter.enter(peer)
+          : undefined,
+      () => closed,
+      () => !relayOnly || selectedRoute(connection) === TRANSPORT_ROUTES.RELAY,
+    );
+  }
+
   async function handle(connection: Connection) {
     const peer = connection.remoteId().toString();
     const alpn = Buffer.from(connection.alpn()).toString();
@@ -149,6 +171,10 @@ export function serveIroh(
       () => controller.abort(),
     );
     try {
+      if (alpn === RECEIPT_CHANNEL.alpn && receiptServer) {
+        await receiptConnection(connection, controller.signal, peer);
+        return;
+      }
       if (alpn === CONTROL_ALPN && control) {
         await handleControlConnection(
           connection,

@@ -4,7 +4,9 @@ import type { Connection } from '@number0/iroh';
 import { TRANSPORT_ROUTES } from './constants';
 import type { TransportRoute } from './types';
 
-export function selectedRoute(connection: Connection): TransportRoute {
+export function selectedRoute(
+  connection: Pick<Connection, 'paths'>,
+): TransportRoute {
   const paths = connection.paths().filter((path) => path.isSelected);
   if (paths.length !== 1) return TRANSPORT_ROUTES.UNKNOWN;
   const path = paths[0]!;

@@ -8,6 +8,7 @@ import {
   FREE_EXECUTION,
   FREE_STREAM,
   GYBLOS_ALPN,
+  RECEIPT_CHANNEL,
 } from '@gyblos/protocol/constants';
 
 import { RELAY_CONFIGURATION_CODES } from './constants';
@@ -23,6 +24,7 @@ export type { RelayEnvironment } from './relays';
 export interface BindEndpointOptions {
   relayOnly?: boolean;
   control?: boolean;
+  receipts?: boolean;
   freeExecution?: boolean;
   http?: boolean;
   bindAddress?: string;
@@ -48,6 +50,7 @@ export async function bindEndpoint(
     [
       ...(options.http === false ? [] : [GYBLOS_ALPN]),
       ...(options.control ? [CONTROL_ALPN] : []),
+      ...(options.receipts ? [RECEIPT_CHANNEL.alpn] : []),
       ...(options.freeExecution ? [FREE_EXECUTION.alpn, FREE_STREAM.alpn] : []),
     ].map((alpn) => [...Buffer.from(alpn)]),
   );

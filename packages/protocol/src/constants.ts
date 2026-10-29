@@ -344,11 +344,26 @@ export const ENGINE_ERROR_STOP_REASON: Readonly<
 };
 
 // Historical usage-receipt exchange, separate from inference and payments.
-export const RECEIPT_CHANNEL = { version: 1, alpn: 'gyblos/receipt/1', frameBytes: 8192 } as const;
-export const RECEIPT_CHANNEL_METHODS = { GET: 'receipt.get', CONFIRM: 'receipt.confirm' } as const;
-export const RECEIPT_CHANNEL_CODES = {
- INVALID: 'RECEIPT_INVALID', VERSION: 'RECEIPT_VERSION', BINDING: 'RECEIPT_BINDING',
- SIGNATURE: 'RECEIPT_SIGNATURE', NOT_FOUND: 'RECEIPT_NOT_FOUND', CONFLICT: 'RECEIPT_CONFLICT',
- BUSY: 'RECEIPT_BUSY', LIMIT: 'RECEIPT_LIMIT', CANCELLED: 'RECEIPT_CANCELLED', INTERNAL: 'RECEIPT_INTERNAL',
+export const RECEIPT_CHANNEL = {
+  version: 1,
+  alpn: 'gyblos/receipt/1',
+  frameBytes: 8192,
 } as const;
-export type ReceiptChannelCode = (typeof RECEIPT_CHANNEL_CODES)[keyof typeof RECEIPT_CHANNEL_CODES];
+export const RECEIPT_CHANNEL_METHODS = {
+  GET: 'receipt.get',
+  CONFIRM: 'receipt.confirm',
+} as const;
+export const RECEIPT_CHANNEL_CODES = {
+  INVALID: 'RECEIPT_INVALID',
+  VERSION: 'RECEIPT_VERSION',
+  BINDING: 'RECEIPT_BINDING',
+  SIGNATURE: 'RECEIPT_SIGNATURE',
+  NOT_FOUND: 'RECEIPT_NOT_FOUND',
+  CONFLICT: 'RECEIPT_CONFLICT',
+  BUSY: 'RECEIPT_BUSY',
+  LIMIT: 'RECEIPT_LIMIT',
+  CANCELLED: 'RECEIPT_CANCELLED',
+  INTERNAL: 'RECEIPT_INTERNAL',
+} as const;
+export type ReceiptChannelCode =
+  (typeof RECEIPT_CHANNEL_CODES)[keyof typeof RECEIPT_CHANNEL_CODES];
