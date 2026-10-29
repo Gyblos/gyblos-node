@@ -126,7 +126,7 @@ is off, so free sellers leave both out.
 | ------------------------------------------------ | ------ | ---------------------------------------------------------------------------------------------------------------------- |
 | `role.json`                                      | both   | Role, mint, NodeId and public addresses.                                                                               |
 | `node.key`                                       | both   | Iroh secret key (private).                                                                                             |
-| `*.json` keys                                    | both   | Buyer key, or seller owner key (plus unused paid keys).                                                                |
+| `*.json` keys                                    | both   | Buyer key, or seller owner key (paid keys only with `--buyer`/`--pay-to`).                                             |
 | `offer.json`                                     | buyer  | A paid v1 seller's signed offer (lab gates only).                                                                      |
 | `trust.json`                                     | buyer  | Which seller and limits the buyer accepts.                                                                             |
 | `status.json`                                    | both   | `starting` with a phase, then `ready`; a seller lists each offer's index, model, engine kind and whether it is listed. |

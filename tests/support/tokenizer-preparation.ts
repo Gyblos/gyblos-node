@@ -27,7 +27,7 @@ export async function preparation(
   // The product entry to run when not in the lab: the buyer's setup or the role-neutral node command.
   entry: keyof typeof PRODUCT_ENTRIES = 'buyer',
 ) {
-  const directory = await mkdtemp(join(tmpdir(), 'gyblos-buyer-setup-'));
+  const directory = await mkdtemp(join(tmpdir(), 'gyblos-tokenizer-setup-'));
   for (const legacy of legacyDirectories)
     await mkdir(join(directory, legacy), { recursive: true });
   const artifacts = {

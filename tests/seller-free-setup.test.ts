@@ -12,8 +12,11 @@ import { generateKeyPairSigner } from '@solana/kit';
 
 import { homeLayout, ROLE_FILES, ROLE_KEY_FILES } from '@gyblos/config';
 import { CONFIG_ASSET_LABELS } from '@gyblos/config/constants';
-import { NODE_ERROR_CODES } from '@gyblos/node/constants';
-import { parseRoleConfig } from '@gyblos/node/roles';
+import {
+  NODE_ERROR_CODES,
+  ROLE_CONFIG_SCHEMA_VERSION,
+} from '@gyblos/node/constants';
+import { parseRoleConfig, SELLER_PAYMENT_FIELDS } from '@gyblos/node/roles';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 
 import { NATIVE_CAPABILITY } from './support/native-runtime';
@@ -23,7 +26,6 @@ const ROLE_OPTIONS = { skip: NATIVE_CAPABILITY.bindingSkip };
 const MINT = '2vXUXK2rJTPtb7Wx9em4W9FdgtfD6HTnFxZz5oirLVcH';
 const NODE_ID =
   '5482bad2e0f534be4d92525ff99953bc146531e1696d43e92289f246ef0bd738';
-const PAID_FIELDS = ['authorizer', 'facilitator', 'payTo', 'buyer'] as const;
 
 async function addresses(count: number) {
   return Promise.all(
@@ -37,7 +39,7 @@ async function addresses(count: number) {
 async function paidRole() {
   const [owner, authorizer, facilitator, payTo, buyer] = await addresses(5);
   return {
-    schemaVersion: 1,
+    schemaVersion: ROLE_CONFIG_SCHEMA_VERSION,
     role: P2P_ROLES.SELLER,
     rpcUrl: 'https://api.devnet.solana.com',
     mint: MINT,
@@ -73,11 +75,11 @@ void test('a seller role file without payment fields loads; a partial payment se
   assert.deepEqual(parseRoleConfig(paid), paid);
   const free = Object.fromEntries(
     Object.entries(paid).filter(
-      ([key]) => !(PAID_FIELDS as readonly string[]).includes(key),
+      ([key]) => !(SELLER_PAYMENT_FIELDS as readonly string[]).includes(key),
     ),
   );
   assert.deepEqual(parseRoleConfig(free), free);
-  for (const field of PAID_FIELDS)
+  for (const field of SELLER_PAYMENT_FIELDS)
     assert.throws(
       () => parseRoleConfig({ ...free, [field]: paid[field] }),
       { code: NODE_ERROR_CODES.INVALID_ROLE_CONFIGURATION },
@@ -95,9 +97,20 @@ void test(
     const directory = await mkdtemp(join(tmpdir(), 'gyblos-free-seller-'));
     try {
       process.chdir(directory);
+      const [buyer, payTo] = await addresses(2);
+      // A bad paid address is refused before any directory or key is written.
+      await assert.rejects(
+        setupRole({ role: P2P_ROLES.SELLER, mint: MINT, buyer, payTo: '' }),
+      );
+      await assert.rejects(readdir(homeLayout(process.env).roles.seller), {
+        code: 'ENOENT',
+      });
+      // The paid pair is a seller rule; a buyer still ignores a stray buyer option.
+      await setupRole({ role: P2P_ROLES.BUYER, mint: MINT, buyer });
       const first = await setupRole({ role: P2P_ROLES.SELLER, mint: MINT });
       assert.equal(first.role, P2P_ROLES.SELLER);
-      for (const field of PAID_FIELDS) assert.equal(field in first, false);
+      for (const field of SELLER_PAYMENT_FIELDS)
+        assert.equal(field in first, false);
       assert.deepEqual(
         (await readdir(homeLayout(process.env).roles.seller)).sort(),
         [
@@ -115,10 +128,10 @@ void test(
         ROLE_FILES.nodeKey,
         ROLE_KEY_FILES.owner,
       ]);
-      for (const field of PAID_FIELDS) assert.equal(field in report, false);
+      for (const field of SELLER_PAYMENT_FIELDS)
+        assert.equal(field in report, false);
       await roleSigner(P2P_ROLES.SELLER, 'owner');
       await assert.rejects(roleSigner(P2P_ROLES.SELLER, 'authorizer'));
-      const [buyer, payTo] = await addresses(2);
       await assert.rejects(
         setupRole({ role: P2P_ROLES.SELLER, mint: MINT, buyer, payTo }),
         /preserved/,
@@ -147,6 +160,7 @@ void test(
       ]);
       assert.equal(half.status, 1);
       assert.match(half.stderr, /--buyer and --pay-to together/);
+      await assert.rejects(readdir(join(home, 'seller')), { code: 'ENOENT' });
       const result = setup(home, ['--role', 'seller', '--mint', MINT]);
       assert.equal(result.status, 0, result.stderr);
       const printed: unknown = JSON.parse(result.stdout);

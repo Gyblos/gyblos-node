@@ -23,12 +23,6 @@ export async function main(args = process.argv.slice(2)) {
     throw new Error(
       'Specify --role buyer|seller and --mint; a free seller needs nothing else.',
     );
-  // Paid selling is off; its keys are made only when both paid flags are given.
-  if (
-    values.role === P2P_ROLES.SELLER &&
-    (values.buyer === undefined) !== (values['pay-to'] === undefined)
-  )
-    throw new Error('Paid seller keys need --buyer and --pay-to together.');
   await setupRole({
     role: values.role,
     mint: values.mint,

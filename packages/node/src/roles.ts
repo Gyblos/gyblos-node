@@ -51,7 +51,7 @@ interface CommonRole {
 }
 
 // Paid selling's role fields, in role.json order; free selling uses none of them.
-const SELLER_PAYMENT_FIELDS = [
+export const SELLER_PAYMENT_FIELDS = [
   'authorizer',
   'facilitator',
   'payTo',
@@ -228,8 +228,13 @@ export async function nodeSecret(role: P2PRole) {
 
 export async function setupRole(options: SetupOptions) {
   address(options.mint);
-  if ((options.buyer === undefined) !== (options.payTo === undefined))
-    throw new Error('Paid seller setup needs both buyer and payTo.');
+  if (options.role === P2P_ROLES.SELLER) {
+    if ((options.buyer === undefined) !== (options.payTo === undefined))
+      throw new Error('Paid seller keys need --buyer and --pay-to together.');
+    // Checked before anything is written, so a bad paid address leaves no keys behind.
+    if (options.payTo !== undefined) address(options.payTo);
+    if (options.buyer !== undefined) address(options.buyer);
+  }
   const role = options.role;
   const path = file(role, ROLE_FILES.roleConfig);
   try {
@@ -241,7 +246,7 @@ export async function setupRole(options: SetupOptions) {
         (existing.payTo !== options.payTo || existing.buyer !== options.buyer))
     )
       throw new Error(
-        'Existing role configuration does not match; keys preserved.',
+        'Existing role configuration does not match; keys preserved. Use a new GYBLOS_HOME for a different role.',
       );
     return existing;
   } catch (error) {
@@ -281,6 +286,7 @@ export async function setupRole(options: SetupOptions) {
       role: P2P_ROLES.BUYER,
       buyer: (await wallet(role, 'buyer')).address,
     };
+  // Both or neither are set (checked above); both are tested so the paid branch narrows.
   else if (options.payTo === undefined || options.buyer === undefined)
     config = {
       ...common,
