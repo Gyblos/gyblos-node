@@ -43,7 +43,10 @@
     "./acceptance/identity-constants": "./src/acceptance/identity-constants.ts",
     "./acceptance/identity-http": "./src/acceptance/identity-http.ts",
     "./acceptance/identity-registry": "./src/acceptance/identity-registry.ts",
-    "./cli/identity-acceptance": "./src/cli/identity-acceptance.ts"
+    "./cli/identity-acceptance": "./src/cli/identity-acceptance.ts",
+    "./acceptance/receipts": "./src/acceptance/receipt-run.ts",
+    "./acceptance/receipt-constants": "./src/acceptance/receipt-constants.ts",
+    "./cli/receipt-acceptance": "./src/cli/receipt-acceptance.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",
@@ -72,6 +75,7 @@
     "acceptance:node-discovery": "node --import tsx src/cli/node-discovery-acceptance.ts",
     "acceptance:free": "node --import tsx src/cli/free-acceptance.ts",
     "acceptance:free-stream": "node --import tsx src/cli/free-stream-acceptance.ts",
-    "acceptance:identity": "node --import tsx src/cli/identity-acceptance.ts"
+    "acceptance:identity": "node --import tsx src/cli/identity-acceptance.ts",
+    "acceptance:receipts": "node --import tsx src/cli/receipt-acceptance.ts"
   }
 }
