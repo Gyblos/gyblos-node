@@ -17,6 +17,7 @@ import {
   FREE_EXECUTION_CODES,
   OFFER_PRICING_KINDS,
   PUBLIC_RECORD_KINDS,
+  type EngineKind,
   type FreeExecutionStopReason,
 } from '@gyblos/protocol/constants';
 import type {
@@ -41,13 +42,23 @@ import {
   type FreeExecutionRequest,
   type FreeExecutionResponse,
 } from '@gyblos/protocol/free-execution';
+import type { TelemetrySink } from '@gyblos/protocol/telemetry';
 
 import { createFreeStreamOutput } from './free-execution-stream';
 import type { FreeMeter } from './free-meter';
 import { createSellerFreeRouter } from './free-router';
+import {
+  finishSellerTelemetry,
+  sellerExecutionTelemetry,
+} from './free-telemetry';
 import type { FreeSellerOffer, SellerCatalogOffer } from './seller-offer';
 
 export interface SellerFreeExecutionOptions {
+  telemetry?: {
+    sink: TelemetrySink;
+    engineKind: EngineKind;
+    now?: () => number;
+  };
   owner: string;
   nodeId: string;
   offer: FreeSellerOffer;
@@ -123,6 +134,8 @@ async function respond(
     requestId: request.requestId,
     requestDigest: await freeExecutionDigest(request),
   };
+  let observer: ReturnType<typeof sellerExecutionTelemetry>;
+  let started = false;
   try {
     checkSignal(signal);
     await verifyFreeExecutionRequest(request, {
@@ -132,6 +145,7 @@ async function respond(
       now: options.now(),
     });
     checkSignal(signal);
+    observer = sellerExecutionTelemetry(request, options, Boolean(onDelta));
     const prompt = supportedInput(request, options);
     ready(options);
     const inputTokens = options.meter.input(prompt);
@@ -145,6 +159,7 @@ async function respond(
     let actual: number | undefined;
     try {
       checkSignal(signal);
+      started = true;
       const response = await generateResponse(
         request,
         prompt,
@@ -152,7 +167,12 @@ async function respond(
         header,
         options,
         signal,
-        onDelta,
+        onDelta
+          ? async (text) => {
+              await onDelta(text);
+              if (!signal.aborted && text) observer?.firstToken();
+            }
+          : undefined,
       );
       if (!response.result) return fail(FREE_EXECUTION_CODES.INTERNAL);
       // A declared count never returns reserved tokens: the provider's word alone cannot stretch the caps.
@@ -160,19 +180,22 @@ async function respond(
         actual =
           response.result.usage.inputTokens +
           response.result.usage.outputTokens;
+      finishSellerTelemetry(observer, request, response, started);
       return response;
     } finally {
       lease.complete(actual);
     }
   } catch (error) {
-    if (signal.aborted)
-      return { ...header, error: { code: FREE_EXECUTION_CODES.CANCELLED } };
-    if (!(error instanceof FreeExecutionError))
-      return { ...header, error: { code: FREE_EXECUTION_CODES.ENGINE } };
-    return {
+    const response: FreeExecutionResponse = {
       ...header,
-      error: { code: error.code, ...freeExecutionStop(error) },
+      error: signal.aborted
+        ? { code: FREE_EXECUTION_CODES.CANCELLED }
+        : error instanceof FreeExecutionError
+          ? { code: error.code, ...freeExecutionStop(error) }
+          : { code: FREE_EXECUTION_CODES.ENGINE },
     };
+    finishSellerTelemetry(observer, request, response, started);
+    return response;
   }
 }
 // An engine that stops after admission tells the buyer why and, on a stream, how much it delivered,

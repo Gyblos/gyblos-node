@@ -1,5 +1,6 @@
 // Defines the opt-in telemetry port and content-free event catalog; no implementations or I/O.
 import type {
+  ControlMeteringMode,
   EngineDoneReason,
   EngineKind,
   FreeExecutionCode,
@@ -37,11 +38,12 @@ interface CommonEvent {
   buyerNodeId: string;
   selection: ModelSelection;
   streaming: boolean;
+  meteringMode?: ControlMeteringMode;
 }
 interface SellerEvent extends CommonEvent {
   requestId: string;
   sellerNodeId: string;
-  engineKind: EngineKind;
+  engineKind: EngineKind | null;
 }
 type LocatedEvent = SellerEvent &
   (
@@ -77,7 +79,7 @@ export type TelemetryEvent =
       requestId: string;
       refusal: TelemetryRefusal;
     } & (
-        | { sellerNodeId: string; engineKind: EngineKind }
+        | { sellerNodeId: string; engineKind: EngineKind | null }
         | { sellerNodeId: null; engineKind: null }
       ))
   | (CommonEvent & {
