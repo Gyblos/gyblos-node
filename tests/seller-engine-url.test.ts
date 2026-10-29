@@ -104,7 +104,7 @@ void test('an ollama offer may use any literal loopback URL; names, paths and ke
         served({
           pricing: FREE,
           engine:
-            '{ kind = "anthropic", url = "https://api.example.com", context_tokens = 131072 }',
+            '{ kind = "openai", url = "http://localhost:1234/v1", context_tokens = 131072 }',
         }),
         {},
       ),

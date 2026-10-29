@@ -28,6 +28,9 @@ importers:
       '@gyblos/discovery-index':
         specifier: workspace:*
         version: link:apps/discovery-index
+      '@gyblos/engine-anthropic':
+        specifier: workspace:*
+        version: link:packages/engine-anthropic
       '@gyblos/engine-ollama':
         specifier: workspace:*
         version: link:packages/engine-ollama
@@ -346,6 +349,18 @@ importers:
         specifier: workspace:*
         version: link:../protocol
 
+  packages/engine-anthropic:
+    dependencies:
+      '@gyblos/config':
+        specifier: workspace:*
+        version: link:../config
+      '@gyblos/core':
+        specifier: workspace:*
+        version: link:../core
+      '@gyblos/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+
   packages/engine-ollama:
     dependencies:
       '@gyblos/config':
@@ -402,6 +417,9 @@ importers:
       '@gyblos/discovery-http':
         specifier: workspace:*
         version: link:../discovery-http
+      '@gyblos/engine-anthropic':
+        specifier: workspace:*
+        version: link:../engine-anthropic
       '@gyblos/engine-ollama':
         specifier: workspace:*
         version: link:../engine-ollama

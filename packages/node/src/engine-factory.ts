@@ -22,7 +22,8 @@ export interface SellerEngineOffer {
 export type EngineOfferRefusal =
   | typeof NODE_ERROR_CODES.SELLER_OFFER_MODEL_UNSUPPORTED
   | typeof NODE_ERROR_CODES.SELLER_OFFER_ENGINE_UNSUPPORTED
-  | typeof NODE_ERROR_CODES.SELLER_OFFER_REASONING_UNSUPPORTED;
+  | typeof NODE_ERROR_CODES.SELLER_OFFER_REASONING_UNSUPPORTED
+  | typeof NODE_ERROR_CODES.SELLER_OFFER_API_KEY_MISSING;
 
 // How delivered tokens are counted: recounted with the model's public tokenizer, or declared by the
 // engine's provider when no public tokenizer is pinned for the model.
