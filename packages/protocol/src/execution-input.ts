@@ -1,8 +1,9 @@
-// Parses the execution input shared by the free and paid channels and bounds wire sizes; never
+// Parses the execution input and result shared by the free and paid channels and bounds wire sizes; never
 // inspects prompt content beyond its declared bounds. Errors are free-execution codes that the
 // paid boundary maps onto its own.
 import { canonicalJson } from './canonical';
 import {
+  ENGINE_DONE_REASONS,
   FREE_CHAT_ROLES,
   FREE_EXECUTION,
   FREE_EXECUTION_CODES,
@@ -17,7 +18,10 @@ import {
   controlObject,
   controlReasoning,
 } from './control-validation';
-import type { FreeExecutionRequest } from './free-execution-types';
+import type {
+  FreeExecutionRequest,
+  FreeExecutionResult,
+} from './free-execution-types';
 import {
   freeExecutionFail,
   freeExecutionText,
@@ -78,5 +82,32 @@ export function parseExecutionInput(
     selection,
     reasoning,
     maxTokens,
+  };
+}
+
+// A completed generation's text, usage and finish reason, shared by both channels' terminals.
+export function parseExecutionResult(value: unknown): FreeExecutionResult {
+  const input = controlObject(value, ['text', 'usage', 'finishReason']);
+  const usage = controlObject(input.usage, ['inputTokens', 'outputTokens']);
+  if (
+    input.finishReason !== ENGINE_DONE_REASONS.STOP &&
+    input.finishReason !== ENGINE_DONE_REASONS.LENGTH
+  )
+    return freeExecutionFail();
+  return {
+    text: freeExecutionText(input.text, FREE_EXECUTION.outputBytes),
+    usage: {
+      inputTokens: controlInteger(
+        usage.inputTokens,
+        0,
+        PUBLIC_RECORD_LIMITS.maxContextTokens,
+      ),
+      outputTokens: controlInteger(
+        usage.outputTokens,
+        0,
+        PUBLIC_RECORD_LIMITS.maxContextTokens,
+      ),
+    },
+    finishReason: input.finishReason,
   };
 }

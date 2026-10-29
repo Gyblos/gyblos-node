@@ -641,6 +641,57 @@ Zero clock skew remains: quote expiry is rechecked immediately before the first
 write, with no grace interval. Streaming does not authorize payments, call a
 facilitator, modify the v1 flow or reserve capacity during quotation.
 
+## Paid inference execution v1
+
+`@gyblos/protocol/paid-execution`, `./paid-stream` and `./paid/constants` define
+the paid execution wire. They perform no I/O and admit no payment: quote
+authentication, replay, the payment adapter (`PaymentServer`), metering and
+settlement belong to the seller runtime, which does not register this channel
+yet. Vectors: `vectors/paid-execution-v1.json`.
+
+### Channel and request
+
+The ALPN is **`gyblos/paid-stream/1`**, stream-only: a one-shot response cannot
+show delivery before settlement. One bidirectional stream carries one request
+frame, then ordered events, each with a four-byte big-endian length and
+canonical UTF-8 JSON. The free ALPNs are unchanged and never carry payments.
+
+Request: the free v3 request shape with `version: 1`, plus `payment`, a
+`PaymentAuthorization` `{channelId, payer, requestDigest, maxAtomic, payload}`:
+
+- `quote` must be priced (`maxAtomic` above `"0"`), otherwise
+  `PAID_EXECUTION_NOT_PAID`.
+- `payment.requestDigest`, `payment.maxAtomic` and `payment.payer` must equal
+  the quote's `requestDigest`, `maxAtomic` and `buyer`, otherwise
+  `PAID_EXECUTION_PAYMENT_MISMATCH`.
+- `payload` is the scheme's signed channel open in base64, at most 4096
+  characters. For x402 `upto` on Solana, the open transaction's memo is
+  `paymentMemo(terms)` and its distribution is `paymentSplits(terms)`
+  (`payment-binding`), so the buyer's wallet signs every money field and the
+  protocol fee split.
+- The request digest is SHA-256 over `gyblos/paid-execution-request/v1\n` plus
+  the canonical request, so it covers the authorization; the request is bounded
+  to the free bound plus 8 KiB.
+
+### Events and terminal
+
+Deltas are as in free streaming. The terminal is the free result or error with
+paid codes (`PAID_EXECUTION_*`, the free meanings plus `PAYMENT_MISMATCH`,
+`PAYMENT_REJECTED`, `PAYMENT_UNAVAILABLE` and `BUDGET_EXHAUSTED`), and:
+
+- after a deposit, both `charge {inputTokens, outputTokens, chargedAtomic}` and
+  `payment`, which is `{settlement: PaymentSettlement}` or
+  `{pending: {channelId, chargedAtomic, transaction | null}}` while settlement
+  is still being confirmed;
+- when refused before any deposit, neither.
+
+The buyer's verifier enforces that a result always carries both, that the
+charge matches the result's usage or the delivered output of a stop, that a
+stream which delivered no text charges `"0"`, that the charge never exceeds the
+deposited ceiling, and that the settlement names the request's channel and
+refunds the rest of the ceiling. Recomputing the charge from the quote's
+prices and recounted tokens belongs to the buyer runtime.
+
 ## Usage receipts v1
 
 Usage receipts are defined but not yet emitted. No execution channel, seller,

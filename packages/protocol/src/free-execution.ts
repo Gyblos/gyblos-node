@@ -15,7 +15,11 @@ import {
   controlInteger,
   controlObject,
 } from './control-validation';
-import { boundedWire, parseExecutionInput } from './execution-input';
+import {
+  boundedWire,
+  parseExecutionInput,
+  parseExecutionResult,
+} from './execution-input';
 import type {
   FreeExecutionBuildInput,
   FreeExecutionFailure,
@@ -113,31 +117,6 @@ export async function freeExecutionDigest(value: unknown): Promise<string> {
     ),
   );
 }
-function result(value: unknown): FreeExecutionResult {
-  const input = controlObject(value, ['text', 'usage', 'finishReason']);
-  const usage = controlObject(input.usage, ['inputTokens', 'outputTokens']);
-  if (
-    input.finishReason !== ENGINE_DONE_REASONS.STOP &&
-    input.finishReason !== ENGINE_DONE_REASONS.LENGTH
-  )
-    return freeExecutionFail();
-  return {
-    text: freeExecutionText(input.text, FREE_EXECUTION.outputBytes),
-    usage: {
-      inputTokens: controlInteger(
-        usage.inputTokens,
-        0,
-        PUBLIC_RECORD_LIMITS.maxContextTokens,
-      ),
-      outputTokens: controlInteger(
-        usage.outputTokens,
-        0,
-        PUBLIC_RECORD_LIMITS.maxContextTokens,
-      ),
-    },
-    finishReason: input.finishReason,
-  };
-}
 const has = (value: unknown, key: string) =>
   !!value && typeof value === 'object' && Object.hasOwn(value, key);
 // Shape only: a reason exactly with SELLER_CANNOT_CONTINUE, delivered only beside it.
@@ -197,7 +176,7 @@ export function parseFreeExecutionResponse(
     let response: FreeExecutionResponse;
     if (failed) {
       response = { ...base, error: failure(input.error) };
-    } else response = { ...base, result: result(input.result) };
+    } else response = { ...base, result: parseExecutionResult(input.result) };
     boundedWire(response, FREE_EXECUTION.responseBytes);
     return response;
   });
