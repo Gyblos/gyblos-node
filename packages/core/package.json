@@ -18,7 +18,8 @@
     "./pricing-v2": "./src/pricing-v2.ts",
     "./free-admission": "./src/free-admission.ts",
     "./identity-policy": "./src/identity-policy.ts",
-    "./telemetry": "./src/telemetry.ts"
+    "./telemetry": "./src/telemetry.ts",
+    "./receipts": "./src/receipts.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",
