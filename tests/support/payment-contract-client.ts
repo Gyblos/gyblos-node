@@ -12,7 +12,6 @@ import {
   admitted,
   assertPublic,
   CONTRACT_CEILING,
-  CONTRACT_NOW,
   CONTRACT_PARTIAL,
   count,
   PAYMENT_EVENTS,
@@ -34,7 +33,7 @@ async function hostileTerms(rig: PaymentRig): Promise<Partial<PaymentTerms>[]> {
     { maxAtomic: '01' },
     { maxAtomic: 'one' },
     { requestDigest: 'not-a-digest' },
-    { expiresAt: CONTRACT_NOW },
+    { expiresAt: rig.now() },
   ];
 }
 
@@ -61,6 +60,17 @@ function authorizationContract(name: string, harness: PaymentHarness): void {
       assert.equal(authorization.maxAtomic, terms.maxAtomic);
       assert.equal(authorization.payer, terms.buyer);
       assertPublic(authorization);
+    }));
+
+  void test(`${name}: terms that expired on the buyer's clock are never signed`, async () =>
+    withRig(harness, async (rig) => {
+      const terms = await rig.terms({ expiresAt: rig.now() + 1_000 });
+      rig.advance(1_000);
+      await rejectsWith(
+        rig.client.authorize(terms),
+        PAYMENT_ERROR_CODES.UNTRUSTED_TERMS,
+      );
+      assert.deepEqual(rig.observe().events, []);
     }));
 
   void test(`${name}: an unavailable journal prevents signing`, async () =>
