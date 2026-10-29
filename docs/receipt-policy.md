@@ -58,9 +58,9 @@ retry here.
 
 ## Deliberately separate work
 
-The existing design reserves `gyblos/receipt/1` for a later, separate exchange;
-this module neither registers it nor changes the free execution channels. No
-receipt exchange, execution-channel change, event emission, persistence,
+A future separate exchange needs its own transport contract; this module neither
+registers a channel nor changes the free execution channels. No receipt
+exchange, execution-channel change, event emission, persistence,
 consent/configuration, collector or public aggregation is added. A disconnected
 buyer can leave a seller-only receipt; it must never be treated as
 countersigned. Receipt failures must be given explicit lifecycle semantics when

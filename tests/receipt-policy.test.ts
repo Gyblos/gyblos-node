@@ -59,10 +59,12 @@ function context(record: SellerReceiptV1): ReceiptExecutionContext {
     streaming: record.streaming,
   };
 }
-async function fixture() {
+async function fixture(
+  metering: SellerReceiptV1['metering'] = CONTROL_METERING_MODES.RECOUNTED,
+) {
   const seller = receiptSigner();
   const buyer = receiptSigner();
-  const record = sellerRecord(seller.nodeId, buyer.nodeId);
+  const record = { ...sellerRecord(seller.nodeId, buyer.nodeId), metering };
   const envelope = await createFreeSellerReceipt(input(record), seller.sign);
   return {
     seller,
@@ -163,21 +165,25 @@ void test('buyer disputes only known unequal counts and bytes, in canonical orde
     'outputBytes',
   ]);
 });
-void test('unknown independent counts stay null even when seller declares usage', async () => {
-  const f = await fixture();
-  const result = await buildFreeBuyerReceipt({
-    ...f.buyerInput,
-    observed: {
-      ...f.buyerInput.observed,
-      inputTokens: null,
-      outputTokens: null,
-    },
-  });
-  assert.equal(result.observed.inputTokens, null);
-  assert.equal(result.observed.outputTokens, null);
-  assert.equal(result.verdict, RECEIPT_VERDICTS.AGREED);
-  assert.deepEqual(result.disputed, []);
+void test('unknown independent counts stay null for declared and recounted seller usage', async () => {
+  for (const metering of Object.values(CONTROL_METERING_MODES)) {
+    const f = await fixture(metering);
+    assert.equal(f.envelope.seller.record.metering, metering);
+    const result = await buildFreeBuyerReceipt({
+      ...f.buyerInput,
+      observed: {
+        ...f.buyerInput.observed,
+        inputTokens: null,
+        outputTokens: null,
+      },
+    });
+    assert.equal(result.observed.inputTokens, null);
+    assert.equal(result.observed.outputTokens, null);
+    assert.equal(result.verdict, RECEIPT_VERDICTS.AGREED);
+    assert.deepEqual(result.disputed, []);
+  }
 });
+
 void test('buyer context binds every execution identity and exact selection before signing', async () => {
   const f = await fixture();
   let signed = 0;
