@@ -336,8 +336,12 @@ export const memoryPaymentHarness: PaymentHarness = {
     return {
       client,
       server: createServer(ledger, own, upstream),
-      serverWith: (overrides) =>
-        createServer(ledger, { ...own, ...overrides }, upstream),
+      serverWith: async (field) =>
+        createServer(
+          ledger,
+          { ...own, [field]: description('other')[field] },
+          upstream,
+        ),
       async foreignAuthorization(terms) {
         const keys = generateKeyPairSync('ed25519');
         const payer = keys.publicKey

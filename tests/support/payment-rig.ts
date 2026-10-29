@@ -26,6 +26,9 @@ export const PAYMENT_EVENTS = {
 } as const;
 export type PaymentEvent = (typeof PAYMENT_EVENTS)[keyof typeof PAYMENT_EVENTS];
 
+export const SELLER_KEYS = ['payTo', 'feePayer', 'authorizer'] as const;
+export type SellerKey = (typeof SELLER_KEYS)[number] & keyof PaymentDescription;
+
 export interface PaymentBalances {
   payer: bigint;
   payee: bigint;
@@ -35,8 +38,9 @@ export interface PaymentBalances {
 export interface PaymentRig {
   client: PaymentClient;
   server: PaymentServer;
-  // Another seller on the same ledger whose description differs from `server` by `overrides`.
-  serverWith(overrides: Partial<PaymentDescription>): PaymentServer;
+  // Another seller on the same ledger whose description differs from `server` only in `field`;
+  // the rig picks a valid value for its chain.
+  serverWith(field: SellerKey): Promise<PaymentServer>;
   // A valid signature over `terms` by a payer key that is not `terms.buyer` (a malicious buyer).
   foreignAuthorization(terms: PaymentTerms): Promise<PaymentAuthorization>;
   // Valid terms for `server` at CONTRACT_NOW, under the buyer's ceiling; overrides make them hostile.

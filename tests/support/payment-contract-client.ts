@@ -169,6 +169,25 @@ function receiptContract(name: string, harness: PaymentHarness): void {
       );
     }));
 
+  void test(`${name}: a real settlement of another channel is not a receipt for this one`, async () =>
+    withRig(harness, async (rig) => {
+      const { authorization } = await admitted(rig);
+      const terms = await rig.terms({ requestDigest: 'a'.repeat(64) });
+      const other = await rig.server.admit(
+        await rig.client.authorize(terms),
+        terms,
+      );
+      const otherSettlement = await rig.server.settle(other, '0');
+      await rejectsWith(
+        rig.client.checkReceipt(
+          authorization,
+          { ...otherSettlement, channelId: authorization.channelId },
+          '0',
+        ),
+        PAYMENT_ERROR_CODES.RECEIPT_MISMATCH,
+      );
+    }));
+
   void test(`${name}: a receipt for an authorization the buyer never made is rejected`, async () =>
     withRig(harness, async (rig) => {
       const { authorization, admission } = await admitted(rig);

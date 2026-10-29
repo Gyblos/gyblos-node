@@ -22,6 +22,7 @@ import {
   otherDigest,
   PAYMENT_EVENTS,
   rejectsWith,
+  SELLER_KEYS,
   withRig,
   type PaymentHarness,
 } from './payment-rig';
@@ -78,12 +79,8 @@ function admissionContract(name: string, harness: PaymentHarness): void {
     withRig(harness, async (rig) => {
       const terms = await rig.terms();
       const authorization = await rig.client.authorize(terms);
-      for (const overrides of [
-        { payTo: 'payee-other' },
-        { feePayer: 'fee-payer-other' },
-        { authorizer: 'authorizer-other' },
-      ]) {
-        const other = rig.serverWith(overrides);
+      for (const field of SELLER_KEYS) {
+        const other = await rig.serverWith(field);
         await rejectsWith(
           other.admit(authorization, { ...terms, ...(await other.describe()) }),
           PAYMENT_ERROR_CODES.AUTHORIZATION_MISMATCH,
@@ -102,7 +99,25 @@ function admissionContract(name: string, harness: PaymentHarness): void {
       assert.equal(count(rig, PAYMENT_EVENTS.DEPOSIT), 0);
     }));
 
-  void test(`${name}: expired terms are not admitted`, async () =>
+  void test(`${name}: the signature binds the deposited ceiling`, async () =>
+    withRig(harness, async (rig) => {
+      const signed = await rig.terms({
+        maxAtomic: String(CONTRACT_CEILING - 1n),
+      });
+      const authorization = await rig.client.authorize(signed);
+      const ceiling = String(CONTRACT_CEILING);
+      await rejectsWith(
+        rig.server.admit(
+          { ...authorization, maxAtomic: ceiling },
+          { ...signed, maxAtomic: ceiling },
+        ),
+        PAYMENT_ERROR_CODES.AUTHORIZATION_MISMATCH,
+      );
+      assert.equal(count(rig, PAYMENT_EVENTS.DEPOSIT), 0);
+    }));
+
+  // Rejecting terms already past their expiry needs an injectable clock (C2).
+  void test(`${name}: an authorization cannot be stretched to another expiry`, async () =>
     withRig(harness, async (rig) => {
       const terms = await rig.terms({ expiresAt: CONTRACT_NOW + 1 });
       const authorization = await rig.client.authorize(terms);
@@ -233,6 +248,25 @@ function settlementContract(name: string, harness: PaymentHarness): void {
       ] as const)
         await rejectsWith(rig.server.settle(altered, charged), code);
       assert.deepEqual(rig.observe().balances, before);
+    }));
+
+  void test(`${name}: concurrent settlements with different charges settle once`, async () =>
+    withRig(harness, async (rig) => {
+      const { admission } = await admitted(rig);
+      const before = rig.observe().balances;
+      const results = await Promise.allSettled([
+        rig.server.settle(admission, String(CONTRACT_PARTIAL)),
+        rig.server.settle(admission, String(CONTRACT_PARTIAL + 1n)),
+      ]);
+      const settled = results.find((result) => result.status === 'fulfilled');
+      const rejected = results.find((result) => result.status === 'rejected');
+      await rejectsWith(
+        Promise.reject(rejected?.reason),
+        PAYMENT_ERROR_CODES.ALREADY_SETTLED,
+      );
+      const charged = BigInt(settled?.value.chargedAtomic ?? '-1');
+      assert.equal(delta(before, rig.observe().balances).payee, charged);
+      assert.equal(count(rig, PAYMENT_EVENTS.SETTLE), 1);
     }));
 
   void test(`${name}: a repeated settlement returns the first and never charges twice`, async () =>
