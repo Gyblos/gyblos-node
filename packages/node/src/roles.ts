@@ -246,7 +246,7 @@ export async function setupRole(options: SetupOptions) {
         (existing.payTo !== options.payTo || existing.buyer !== options.buyer))
     )
       throw new Error(
-        'Existing role configuration does not match; keys preserved. Use a new GYBLOS_HOME for a different role.',
+        'Existing role configuration does not match; keys preserved. A different mint, payout or buyer needs a new GYBLOS_HOME.',
       );
     return existing;
   } catch (error) {
@@ -294,8 +294,6 @@ export async function setupRole(options: SetupOptions) {
       owner: (await wallet(role, 'owner')).address,
     };
   else {
-    address(options.payTo);
-    address(options.buyer);
     const payoutBytes = getAddressEncoder().encode(address(options.payTo));
     if (
       Buffer.from(payoutBytes).equals(
