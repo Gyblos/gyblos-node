@@ -153,6 +153,12 @@ function observedOutput(
       }
     : undefined;
 }
+function executionFailure(error: unknown, signal: AbortSignal) {
+  if (signal.aborted) return { code: FREE_EXECUTION_CODES.CANCELLED };
+  if (error instanceof FreeExecutionError)
+    return { code: error.code, ...freeExecutionStop(error) };
+  return { code: FREE_EXECUTION_CODES.ENGINE };
+}
 async function respond(
   value: unknown,
   peer: string,
@@ -224,11 +230,7 @@ async function respond(
   } catch (error) {
     const response: FreeExecutionResponse = {
       ...header,
-      error: signal.aborted
-        ? { code: FREE_EXECUTION_CODES.CANCELLED }
-        : error instanceof FreeExecutionError
-          ? { code: error.code, ...freeExecutionStop(error) }
-          : { code: FREE_EXECUTION_CODES.ENGINE },
+      error: executionFailure(error, signal),
     };
     finishSellerTelemetry(observer, request, response, started);
     await receipt?.finish(response);
