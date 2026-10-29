@@ -293,14 +293,11 @@ A direct connection shows each peer's IP address to the other.
 The relay still sees both peers' IP addresses. Off-host relay-only privacy has
 not been measured.
 
-A relay-only seller cannot be tested with its buyer on the same machine: after
-the first exchange Iroh switches to a direct loopback path, and the seller's
-relay-only policy closes that connection, so the buyer reports
-`NO_SELLER_CANDIDATES`. For a local single-machine test set `relay_only = false`
-under `[transport]` in `gyblos.toml` (or `GYBLOS_RELAY_ONLY=0`). That is for
-local testing only: without relay-only the seller binds public sockets and its
-quotes carry its direct addresses to any buyer. Keep relay-only for sellers
-reached from other machines.
+A relay-only seller can be tested with its buyer on the same machine. After the
+first exchange Iroh may switch to a direct loopback path; relay-only accepts a
+direct path only when its remote address is loopback (`127.0.0.0/8` or `::1`). A
+relay-only endpoint binds only loopback, so that path reveals no address, and
+any other direct path is still refused.
 
 ## Other settings
 
@@ -573,6 +570,18 @@ caller's fault, the error carries `x-should-retry: false`, the header the
 official OpenAI SDKs honor to skip their automatic retries. Clients that retry
 5xx on their own must check it: retrying would resend the prompt, possibly to
 another seller.
+
+A refused request (`FREE_BUYER_INVALID_REQUEST`, 400) names the offending field
+in `error.param` (`model`, `messages`, `max_tokens`, `stream`, or an unsupported
+field such as `temperature`) and says why in `error.message`, for example
+`max_tokens must be an integer from 1 to 128`. The reason is fixed text or the
+operator's own limits, never the prompt.
+
+When a seller drops out of a selection, `buyer:free` prints one stderr line:
+`FREE_BUYER_SELLER_FAILED <first 8 hex of the NodeId> <phase> <code>`. The phase
+is `identity`, `connect` (dial, catalog or presence), `discovery`, `quote` (the
+seller refused, for example `CONTROL_MODEL_UNSUPPORTED`) or `timeout` (no quote
+before the window closed). The line carries no address, key or error text.
 
 When a seller's engine fails after it accepted the request (for example a
 reseller out of quota, rate limited, or an engine that stops mid-answer), the

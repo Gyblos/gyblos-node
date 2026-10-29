@@ -12,8 +12,7 @@ import {
   type ReceiptChannelResponse,
 } from '@gyblos/protocol/receipt-channel';
 
-import { TRANSPORT_ROUTES } from './constants';
-import { selectedRoute } from './paths';
+import { relayOnlyAllows } from './paths';
 import type {
   ReceiptConnection,
   ReceiptDestination,
@@ -35,8 +34,7 @@ export function checkReceiptPeer(
   if (
     connection &&
     (connection.remoteId().toString() !== expected ||
-      (options.relayOnly &&
-        selectedRoute(connection) !== TRANSPORT_ROUTES.RELAY))
+      (options.relayOnly && !relayOnlyAllows(connection)))
   )
     throw new ReceiptChannelError(RECEIPT_CHANNEL_CODES.BINDING);
 }

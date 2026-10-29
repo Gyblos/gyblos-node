@@ -26,10 +26,10 @@ import {
 } from '@gyblos/protocol/free-execution-framing';
 import { validateOfferV2Time } from '@gyblos/protocol/offer-v2';
 
-import { HTTP_OVER_IROH, IROH_DEADLINES, TRANSPORT_ROUTES } from './constants';
+import { HTTP_OVER_IROH, IROH_DEADLINES } from './constants';
 import type { ControlStream } from './control-io';
 import { readFreeStreamResponse } from './free-stream-client';
-import { selectedRoute } from './paths';
+import { relayOnlyAllows } from './paths';
 
 export class FreeClientError extends Error {
   declare readonly reason?: FreeExecutionStopReason;
@@ -125,7 +125,7 @@ async function runFreeRequest(
     check();
     if (
       connected.remoteId().toString() !== identity.nodeId ||
-      (options.relayOnly && selectedRoute(connected) !== TRANSPORT_ROUTES.RELAY)
+      (options.relayOnly && !relayOnlyAllows(connected))
     )
       throw new FreeExecutionError(FREE_EXECUTION_CODES.PEER);
   };

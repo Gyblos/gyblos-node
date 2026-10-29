@@ -20,6 +20,13 @@ export const IROH_DEADLINES = {
   routePollMs: 100,
 } as const;
 
+// `net.isIP` results, and the loopback forms relay-only accepts for a same-machine direct path.
+export const LOOPBACK_ADDRESSES = {
+  v4Family: 4,
+  v6Family: 6,
+  v4FirstOctet: '127',
+  v6: '::1',
+} as const;
 export const TRANSPORT_ROUTES = {
   LOOPBACK: 'loopback',
   DIRECT: 'iroh-direct',

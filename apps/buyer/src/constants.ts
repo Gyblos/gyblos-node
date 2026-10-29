@@ -1,7 +1,10 @@
 // Buyer call outcomes, phases, journal states, proxy error codes, measurement schema version, call and
 // proof bounds, error diagnostic codes and synthetic inference case names.
 import { JOURNAL_STATES } from '@gyblos/payments-x402/constants';
-import type { ProtocolErrorCode } from '@gyblos/protocol/constants';
+import {
+  FREE_EXECUTION,
+  type ProtocolErrorCode,
+} from '@gyblos/protocol/constants';
 import { ROUTE_DISCREPANCY } from '@gyblos/transport-iroh/constants';
 
 export const CALL_OUTCOMES = {
@@ -54,6 +57,23 @@ export const BUYER_SELECTION_CODES = {
   DISCOVERY_LIMIT: 'BUYER_DISCOVERY_LIMIT',
   IDENTITY_STATE: 'BUYER_IDENTITY_STATE_UNAVAILABLE',
   IDENTITY: 'BUYER_IDENTITY_UNAVAILABLE',
+} as const;
+// Why one seller dropped out of a selection; printed by the free buyer, never with addresses.
+export const SELLER_FAILURE_PHASES = {
+  IDENTITY: 'identity',
+  CONNECT: 'connect',
+  DISCOVERY: 'discovery',
+  QUOTE: 'quote',
+  TIMEOUT: 'timeout',
+} as const;
+export type SellerFailurePhase =
+  (typeof SELLER_FAILURE_PHASES)[keyof typeof SELLER_FAILURE_PHASES];
+export const SELLER_FAILURES = {
+  LINE: 'FREE_BUYER_SELLER_FAILED',
+  IDENTITY: 'SELLER_IDENTITY_UNVERIFIED',
+  DISCOVERY: 'SELLER_DISCOVERY_REJECTED',
+  UNKNOWN: 'SELLER_ERROR_UNKNOWN',
+  nodeIdChars: 8,
 } as const;
 export const BUYER_SELECTION = {
   configFile: 'selection.json',
@@ -148,6 +168,24 @@ export const FREE_BUYER_CODES = {
 } as const;
 export type FreeBuyerCode =
   (typeof FREE_BUYER_CODES)[keyof typeof FREE_BUYER_CODES];
+// The OpenAI-compatible subset the free buyer accepts, and the fixed reasons it gives for refusing one.
+export const FREE_CHAT_FIELDS = [
+  'model',
+  'messages',
+  'max_tokens',
+  'stream',
+] as const;
+export const FREE_CHAT_DETAILS = {
+  body: 'the body must be a JSON object with model and messages',
+  fields: 'supported fields are model, messages, max_tokens and stream',
+  // An unsupported field is named back only when it looks like a plain field name.
+  fieldName: /^[A-Za-z0-9_]{1,64}$/,
+  stream: 'stream must be true or false',
+  noStream: 'stream must be false or absent',
+  messages: 'messages must hold exactly one user message',
+  content: `message content must be text of at most ${FREE_EXECUTION.inputBytes} bytes`,
+  json: 'the body must be valid UTF-8 JSON',
+} as const;
 // Why `buyer:free` could not start; printed after FREE_BUYER_CODES.CONFIG with a next step.
 export const FREE_BUYER_STARTUP = {
   ROLE_MISSING: 'BUYER_ROLE_MISSING',
