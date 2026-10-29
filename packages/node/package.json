@@ -41,7 +41,8 @@
     "./seller-transport": "./src/seller-transport.ts",
     "./identity-verifier": "./src/identity-verifier.ts",
     "./identity-state": "./src/identity-state.ts",
-    "./receipts": "./src/receipts.ts"
+    "./receipts": "./src/receipts.ts",
+    "./telemetry-startup": "./src/telemetry-startup.ts"
   },
   "dependencies": {
     "@gyblos/core": "workspace:*",
