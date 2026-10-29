@@ -4,6 +4,7 @@ import { EndpointAddr, EndpointId, type Endpoint } from '@number0/iroh';
 
 import type { DiscoveryFetch } from '@gyblos/discovery-http';
 import { REASONING_LEVELS } from '@gyblos/protocol/constants';
+import type { TelemetrySink } from '@gyblos/protocol/telemetry';
 import { assertConfiguredRelay } from '@gyblos/transport-iroh/endpoint';
 import { createFreeExecutionClient } from '@gyblos/transport-iroh/free-client';
 
@@ -43,6 +44,14 @@ export function freeBuyerDependencies(
     permitsFreeWinner(prepared, winner, now());
 
   return {
+    telemetry: options.telemetry
+      ? {
+          sink: options.telemetry,
+          buyerNodeId: options.endpoint.id().toString(),
+          selection: policy.request.selection,
+          now,
+        }
+      : undefined,
     enter() {
       if (active) throw new FreeBuyerError(FREE_BUYER_CODES.BUSY);
       active = true;
@@ -80,6 +89,7 @@ type PreparedSelection = NonNullable<
   Awaited<ReturnType<typeof prepareBuyerSelection>>
 >;
 interface FreeSelectionOptions {
+  telemetry?: TelemetrySink;
   endpoint: Endpoint;
   buyer: string;
   relayOnly: boolean;

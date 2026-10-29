@@ -188,3 +188,7 @@ checks, the standalone lab facilitator and their evidence, and `tests/` and
 The optional [aggregate OpenTelemetry adapter](docs/telemetry-otel.md) exports
 metrics only when explicitly constructed and flushed by a caller. It is not
 wired into node startup. Local record adapters remain separate.
+
+The free seller and buyer APIs support explicitly supplied local event sinks;
+see [local telemetry composition and event semantics](docs/local-telemetry.md).
+CLI startup remains opt-in through a future configuration integration.

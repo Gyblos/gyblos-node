@@ -3,6 +3,7 @@ import { BUYER_RELAY_ONLY_ENV, INFERENCE_REQUEST_LIMITS } from '@gyblos/config';
 import { NODE_ERROR_CODES } from '@gyblos/node/constants';
 import { loadRole, nodeSecret } from '@gyblos/node/roles';
 import { P2P_ROLES, REASONING_LEVELS } from '@gyblos/protocol/constants';
+import type { TelemetrySink } from '@gyblos/protocol/telemetry';
 import { bindEndpoint } from '@gyblos/transport-iroh/endpoint';
 
 import {
@@ -88,7 +89,11 @@ async function buyerNodeSecret() {
 }
 
 export async function startFreeBuyer(
-  options: { bind?: typeof bindEndpoint; port?: number } = {},
+  options: {
+    bind?: typeof bindEndpoint;
+    port?: number;
+    telemetry?: TelemetrySink;
+  } = {},
 ) {
   const role = await buyerRole();
   if (role.role !== P2P_ROLES.BUYER)
@@ -117,6 +122,7 @@ export async function startFreeBuyer(
     if (endpoint.id().toString() !== role.nodeId)
       refuse(FREE_BUYER_STARTUP.NODE_KEY);
     const dependencies = freeBuyerDependencies(prepared, {
+      telemetry: options.telemetry,
       endpoint,
       buyer: role.buyer,
       relayOnly,
