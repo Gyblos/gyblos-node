@@ -9,7 +9,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "node --import tsx --test \"test/*.test.ts\""
+    "test": "node --import tsx --test \"test/**/*.test.ts\""
   },
   "devDependencies": {
     "tsx": "4.21.0"
