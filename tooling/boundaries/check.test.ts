@@ -21,6 +21,8 @@ void test('current and future names map to the intended layers', () => {
     'packages/telemetry-file/src/a.ts': 'adapter',
     'packages/telemetry-otel/src/a.ts': 'adapter',
     'packages/payments-stripe/src/a.ts': 'adapter',
+    'packages/x402-upto-metered/src/a.ts': 'standalone',
+    'packages/x402-upto-metered/test/a.test.ts': 'standalone',
     'packages/protocol/src/a.ts': 'protocol',
     'packages/node/src/a.ts': 'node',
     'packages/config/src/a.ts': 'config',
@@ -284,4 +286,60 @@ void test('source code is never executed and boundary entries are validated', as
     '{"modules":[],"summary":{"violations":[{}]}}',
   ])
     assert.throws(() => parseGraph(text), /Invalid dependency analysis/);
+});
+
+void test('a standalone package imports no workspace, app, lab or verification code', async () => {
+  await fixture(
+    {
+      'packages/x402-upto-metered/src/a.ts':
+        "import '../../protocol/src/a.js'; import '../../../apps/node/src/a.js'; import '../../../tests/a.js';",
+      'packages/protocol/src/a.ts': 'export const value = 1;',
+      'apps/node/src/a.ts': 'export const value = 1;',
+      'tests/a.ts': 'export const value = 1;',
+    },
+    async (files, root) =>
+      assert.equal(
+        (await analyze(files, root)).entries.filter(
+          (entry) =>
+            entry.rule === 'standalone-x402-upto-metered-is-independent',
+        ).length,
+        3,
+      ),
+  );
+});
+
+void test('only payment adapters and verification may import a standalone package', async () => {
+  await fixture(
+    {
+      'packages/x402-upto-metered/src/a.ts': 'export const value = 1;',
+      'packages/payments-x402/src/a.ts':
+        "import '../../x402-upto-metered/src/a.js';",
+      'tests/a.ts': "import '../packages/x402-upto-metered/src/a.js';",
+      'packages/node/src/a.ts': "import '../../x402-upto-metered/src/a.js';",
+      'packages/core/src/a.ts': "import '../../x402-upto-metered/src/a.js';",
+      'packages/engine-ollama/src/a.ts':
+        "import '../../x402-upto-metered/src/a.js';",
+      'apps/node/src/a.ts':
+        "import '../../../packages/x402-upto-metered/src/a.js';",
+      'lab/harness/a.ts': "import '../../packages/x402-upto-metered/src/a.js';",
+    },
+    async (files, root) =>
+      assert.deepEqual(
+        (await analyze(files, root)).entries
+          .filter(
+            (entry) =>
+              entry.rule ===
+              'standalone-x402-upto-metered-is-only-used-by-payments',
+          )
+          .map((entry) => entry.source)
+          .sort(),
+        [
+          'apps/node/src/a.ts',
+          'lab/harness/a.ts',
+          'packages/core/src/a.ts',
+          'packages/engine-ollama/src/a.ts',
+          'packages/node/src/a.ts',
+        ],
+      ),
+  );
 });
