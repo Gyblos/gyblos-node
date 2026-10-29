@@ -12,9 +12,9 @@
     "format": "prettier . --write",
     "format:check": "prettier . --check",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.tests.json && tsc -p apps/desktop/tsconfig.renderer.json",
-    "test": "node --import tsx --test \"tests/*.test.ts\"",
+    "test": "node --import tsx --test \"tests/*.test.ts\" \"packages/*/test/**/*.test.ts\"",
     "test:lab": "node --import tsx --test \"tests/lab/**/*.test.ts\"",
-    "test:all": "node --import tsx --test \"tests/**/*.test.ts\"",
+    "test:all": "node --import tsx --test \"tests/**/*.test.ts\" \"packages/*/test/**/*.test.ts\"",
     "gate:inference": "node --import tsx lab/harness/src/cli/inference.ts",
     "gate:inference:setup": "node --import tsx lab/harness/scripts/inference-setup.ts",
     "gate:setup": "node --import tsx lab/harness/scripts/setup.ts",
@@ -74,7 +74,8 @@
     "@gyblos/telemetry-console": "workspace:*",
     "@gyblos/telemetry-otel": "workspace:*",
     "@gyblos/engine-openai": "workspace:*",
-    "@gyblos/engine-anthropic": "workspace:*"
+    "@gyblos/engine-anthropic": "workspace:*",
+    "x402-upto-metered": "workspace:*"
   },
   "devDependencies": {
     "@ianvs/prettier-plugin-sort-imports": "4.7.0",
