@@ -26,7 +26,13 @@ export function paymentSettlementContract(
   name: string,
   harness: PaymentHarness,
 ): void {
-  for (const charged of [0n, CONTRACT_PARTIAL, CONTRACT_CEILING])
+  // CONTRACT_PARTIAL + 1n leaves rounding dust under any fee split, pinning each share's floor.
+  for (const charged of [
+    0n,
+    CONTRACT_PARTIAL,
+    CONTRACT_PARTIAL + 1n,
+    CONTRACT_CEILING,
+  ])
     void test(`${name}: settling ${charged} charges it and refunds the rest`, async () =>
       withRig(harness, async (rig) => {
         const before = rig.observe().balances;

@@ -14,7 +14,7 @@
 // 4. settle trusts only the server's own channel record, charges at most the ceiling, refunds the
 //    rest, and settles once (repeating the same charge returns the same settlement);
 // 5. checkReceipt verifies the settlement on the ledger, not the seller's word, including the
-//    seller and fee shares that settlementShares(terms) prescribes;
+//    seller and fee shares actually paid (fixed by the distribution the buyer signed at open);
 // 6. every failure is a PaymentError whose message is its static code, except that an aborted
 //    caller signal rejects with signal.reason (as Engine.generate does).
 import type { PaymentChannelState, PaymentErrorCode } from './constants';
