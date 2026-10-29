@@ -55,14 +55,15 @@ export interface PaymentRigOptions {
   failJournal: boolean;
   // The server's chain or facilitator calls throw upstream text that contains UPSTREAM_MARKER.
   failUpstream: boolean;
-  // Called right after the server sends its deposit; the contract aborts the caller's signal here.
+  // Called right after the deposit transaction is submitted (before confirmation); the contract
+  // aborts the caller's signal here.
   onDepositSent?: () => void;
 }
 
 export interface PaymentHarness {
   // The rig clock moves only through advance(); the buyer's ceiling is CONTRACT_CEILING.
-  // Configuration that could
-  // be secret (RPC URLs, keys) must contain UPSTREAM_MARKER so the contract can prove it never leaks.
+  // Configuration that could be secret (RPC URLs, keys) must contain UPSTREAM_MARKER so the
+  // contract can prove it never leaks.
   start(options: PaymentRigOptions): Promise<PaymentRig>;
 }
 

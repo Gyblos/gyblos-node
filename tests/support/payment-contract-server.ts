@@ -175,6 +175,20 @@ function admissionContract(name: string, harness: PaymentHarness): void {
       );
     }));
 
+  void test(`${name}: a forged authorization for an open channel is a mismatch, not a reuse`, async () =>
+    withRig(harness, async (rig) => {
+      const terms = await rig.terms();
+      const authorization = await rig.client.authorize(terms);
+      await rig.server.admit(authorization, terms);
+      await rejectsWith(
+        rig.server.admit(
+          { ...authorization, payload: `${authorization.payload}x` },
+          terms,
+        ),
+        PAYMENT_ERROR_CODES.AUTHORIZATION_MISMATCH,
+      );
+    }));
+
   void test(`${name}: an authorization cannot be stretched to another expiry`, async () =>
     withRig(harness, async (rig) => {
       const terms = await rig.terms({ expiresAt: rig.now() + 1 });
