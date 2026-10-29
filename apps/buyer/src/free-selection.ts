@@ -3,6 +3,7 @@
 import { EndpointAddr, EndpointId, type Endpoint } from '@number0/iroh';
 
 import type { DiscoveryFetch } from '@gyblos/discovery-http';
+import type { createBuyerReceiptRuntime } from '@gyblos/node/receipts';
 import { REASONING_LEVELS } from '@gyblos/protocol/constants';
 import type { TelemetrySink } from '@gyblos/protocol/telemetry';
 import { assertConfiguredRelay } from '@gyblos/transport-iroh/endpoint';
@@ -53,6 +54,14 @@ export function freeBuyerDependencies(
           now,
         }
       : undefined,
+    receiptNow: now,
+    receipt: options.receipts
+      ? async (winner, evidence, signal) => {
+          const seller = sellers.get(winner.nodeId);
+          if (seller)
+            options.receipts!.exchange(address(seller), evidence, signal);
+        }
+      : undefined,
     enter() {
       if (active) throw new FreeBuyerError(FREE_BUYER_CODES.BUSY);
       active = true;
@@ -90,6 +99,7 @@ type PreparedSelection = NonNullable<
   Awaited<ReturnType<typeof prepareBuyerSelection>>
 >;
 interface FreeSelectionOptions {
+  receipts?: ReturnType<typeof createBuyerReceiptRuntime>;
   telemetry?: TelemetrySink;
   onSellerFailure?: SellerFailureReporter;
   endpoint: Endpoint;

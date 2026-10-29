@@ -36,6 +36,7 @@ export const TRANSPORT_ROUTES = {
 export const CONNECTION_FAMILIES = {
   CONTROL: 'control',
   DATA: 'data',
+  RECEIPT: 'receipt',
 } as const;
 export type ConnectionFamily =
   (typeof CONNECTION_FAMILIES)[keyof typeof CONNECTION_FAMILIES];

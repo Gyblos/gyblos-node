@@ -29,6 +29,7 @@ import { createSellerFreeOffers } from './free-offers';
 import { assertRoleHome } from './home';
 import { openSellerSequence } from './public-sequence';
 import { createSellerPublisher } from './publisher';
+import { createSellerReceiptRuntime, openReceiptStore } from './receipts';
 import { loadRole, nodeSecret, rolePath, roleSigner } from './roles';
 import { SellerOfferSet } from './seller-offer-set';
 import {
@@ -133,6 +134,7 @@ export async function startSeller(options: { telemetry?: TelemetrySink } = {}) {
       relayOnly,
       control: true,
       freeExecution: true,
+      receipts: true,
       http: false,
       bindAddress: settings.irohBind,
       externalAddress: settings.irohExternalAddress,
@@ -153,6 +155,23 @@ export async function startSeller(options: { telemetry?: TelemetrySink } = {}) {
       relayUrl: endpointAddress.relayUrl(),
       directAddresses: relayOnly ? [] : endpointAddress.directAddresses(),
     };
+    const nodeSigner = async (bytes: Uint8Array<ArrayBuffer>) =>
+      Uint8Array.from(
+        endpoint
+          .secretKey()
+          .sign([...bytes])
+          .toBytes(),
+      );
+    const receipts = createSellerReceiptRuntime({
+      nodeId: config.nodeId,
+      store: openReceiptStore({
+        environment: process.env,
+        role: P2P_ROLES.SELLER,
+        nodeId: config.nodeId,
+      }),
+      signer: nodeSigner,
+    });
+    disposers.push(receipts.close);
     const control = await prepareSellerControl({
       owner,
       sequence: publicSequence,
@@ -160,13 +179,7 @@ export async function startSeller(options: { telemetry?: TelemetrySink } = {}) {
         ? SELLER_PUBLIC_RECORDS.catalogMs
         : undefined,
       nodeId: config.nodeId,
-      nodeSigner: async (bytes) =>
-        Uint8Array.from(
-          endpoint
-            .secretKey()
-            .sign([...bytes])
-            .toBytes(),
-        ),
+      nodeSigner,
       mint: config.mint,
       payTo: config.payTo ?? owner.address,
       feePayer: owner.address,
@@ -182,6 +195,7 @@ export async function startSeller(options: { telemetry?: TelemetrySink } = {}) {
       endpoint,
       {
         control: control.service,
+        receipts: receipts.service,
         free: createSellerFreeOffers(() => offers.all(), {
           telemetry: options.telemetry
             ? {
@@ -190,6 +204,10 @@ export async function startSeller(options: { telemetry?: TelemetrySink } = {}) {
                   settings.offers[index]!.engine.engine.kind,
               }
             : undefined,
+          receipts: {
+            publisher: receipts.publisher,
+            engineKind: (index) => settings.offers[index]!.engine.engine.kind,
+          },
           owner: owner.address,
           nodeId: config.nodeId,
           now: Date.now,
@@ -262,6 +280,7 @@ export async function startSeller(options: { telemetry?: TelemetrySink } = {}) {
     return {
       close,
       publication: publication ? () => publication.health() : undefined,
+      receipts: receipts.health,
     };
   } catch (error) {
     await close();

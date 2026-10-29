@@ -5,12 +5,13 @@ import { isIP } from 'node:net';
 import type { IncomingAddr } from '@number0/iroh';
 
 import { TRANSPORT_LIMITS, type TransportLimits } from '@gyblos/config';
-import { CONTROL_ALPN } from '@gyblos/protocol/constants';
+import { CONTROL_ALPN, RECEIPT_CHANNEL } from '@gyblos/protocol/constants';
 
 import { createConnectionRate } from './connection-rate';
 import { CONNECTION_FAMILIES, type ConnectionFamily } from './constants';
 
 export function connectionFamily(alpn: string): ConnectionFamily {
+  if (alpn === RECEIPT_CHANNEL.alpn) return CONNECTION_FAMILIES.RECEIPT;
   return alpn === CONTROL_ALPN
     ? CONNECTION_FAMILIES.CONTROL
     : CONNECTION_FAMILIES.DATA;

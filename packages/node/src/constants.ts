@@ -26,6 +26,7 @@ export const NODE_ERROR_CODES = {
   IDENTITY_STATE_UNAVAILABLE: 'IDENTITY_STATE_UNAVAILABLE',
   DISCOVERY_PUBLISH_FAILED: 'DISCOVERY_PUBLISH_FAILED',
   INVALID_PRICE: 'INVALID_PRICE',
+  RECEIPT_STORAGE_UNAVAILABLE: 'RECEIPT_STORAGE_UNAVAILABLE',
   // gyblos.toml at seller startup; `pnpm gyblos config validate` explains file problems.
   NODE_CONFIG_INVALID: 'NODE_CONFIG_INVALID',
   SELLER_SETTING_UNSUPPORTED: 'SELLER_SETTING_UNSUPPORTED',
@@ -262,4 +263,18 @@ export const IDENTITY_STATE = {
   schemaVersion: 1,
   maxRows: 1024,
   maxBytes: 1024 * 1024,
+} as const;
+
+// Receipt retention and best-effort work are bounded independently from inference and payment state.
+export const RECEIPT_STORAGE = {
+  schemaVersion: 1,
+  maxEntries: 256,
+  maxBytes: 1_048_576,
+  retentionMs: 604_800_000,
+} as const;
+export const RECEIPT_WORK = {
+  sellerMs: 500,
+  buyerMs: 2000,
+  retryMs: 40,
+  attempts: 3,
 } as const;

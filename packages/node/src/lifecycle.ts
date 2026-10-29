@@ -2,9 +2,11 @@
 // Resource construction is injected; this module knows no SDKs or wallets.
 import { NODE_STATES, type NodeState } from './constants';
 import type { createSellerPublisher } from './publisher';
+import type { createSellerReceiptRuntime } from './receipt-seller';
 
 export interface NodeHost {
   close(): Promise<void>;
+  receipts?: ReturnType<typeof createSellerReceiptRuntime>['health'];
   publication?: ReturnType<typeof createSellerPublisher>['health'];
 }
 
@@ -42,6 +44,7 @@ export function createNodeLifecycle(startHost: () => Promise<NodeHost>) {
     health() {
       return {
         state,
+        ...(host?.receipts ? { receipts: host.receipts() } : {}),
         ...(host?.publication ? { publication: host.publication() } : {}),
       };
     },

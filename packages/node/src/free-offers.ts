@@ -11,9 +11,14 @@ import {
   type FreeOffer,
   type FreeOfferService,
 } from './free-router';
+import type { SellerReceiptPublisher } from './receipt-seller';
 import type { LiveSellerOffer } from './seller-offer-set';
 
 export interface SellerFreeOffersOptions {
+  receipts?: {
+    publisher: SellerReceiptPublisher;
+    engineKind: (index: number) => EngineKind;
+  };
   telemetry?: {
     sink: TelemetrySink;
     engineKind: (index: number) => EngineKind;
@@ -43,6 +48,12 @@ export function createSellerFreeOffers(
           ? {
               ...options.telemetry,
               engineKind: options.telemetry.engineKind(live.index),
+            }
+          : undefined,
+        receipts: options.receipts
+          ? {
+              publisher: options.receipts.publisher,
+              engineKind: options.receipts.engineKind(live.index),
             }
           : undefined,
         offer: live.offer,
