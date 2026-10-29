@@ -136,6 +136,7 @@ export async function selectVerifiedBuyerQuote(
       clients,
       now,
       deadline,
+      signal,
     );
     if (signal?.aborted)
       return { ok: false, code: BUYER_SELECTION_CODES.NO_OFFER };
@@ -160,16 +161,8 @@ export async function selectVerifiedBuyerQuote(
       signal,
     );
     if (!winner) return { ok: false, code: BUYER_SELECTION_CODES.NO_OFFER };
-    // The winner can still drop out; it is reported like any other seller.
-    const drop = (phase: SellerFailurePhase, code: SellerFailureCode) => {
-      if (!signal?.aborted)
-        reportSellerFailure(dependencies.onSellerFailure, {
-          nodeId: winner.candidate.nodeId,
-          phase,
-          code,
-        });
-      return { ok: false, code: BUYER_SELECTION_CODES.NO_OFFER } as const;
-    };
+    const drop = (phase: SellerFailurePhase, code: SellerFailureCode) =>
+      dropWinner(dependencies, winner, phase, code, signal);
     if (!offerCurrent(winner, now))
       return drop(SELLER_FAILURE_PHASES.QUOTE, CONTROL_CODES.EXPIRED);
     const seller = config.sellers.find(
@@ -193,6 +186,24 @@ export async function selectVerifiedBuyerQuote(
       [...clients.values()].map((client) => client.close()),
     );
   }
+}
+
+// The winner can still drop out after the race; it is reported like any other seller unless the
+// caller cancelled.
+function dropWinner(
+  dependencies: VerifiedSelectionDependencies,
+  winner: WinningQuote,
+  phase: SellerFailurePhase,
+  code: SellerFailureCode,
+  signal?: AbortSignal,
+): SelectionDecision {
+  if (!signal?.aborted)
+    reportSellerFailure(dependencies.onSellerFailure, {
+      nodeId: winner.candidate.nodeId,
+      phase,
+      code,
+    });
+  return { ok: false, code: BUYER_SELECTION_CODES.NO_OFFER };
 }
 
 function offerCurrent(winner: WinningQuote, now: () => number) {
@@ -308,13 +319,15 @@ async function refreshSnapshots(
   clients: Map<string, BuyerControlClient>,
   now: () => number,
   deadline: AbortSignal,
+  // The caller's own signal: its abort is a cancellation, while the snapshot deadline is a failure.
+  signal?: AbortSignal,
 ) {
   return settledValues(
     await Promise.allSettled(
       config.sellers.map(async (seller) => {
         // A request the caller cancelled is not a seller failure.
         const failed = (phase: SellerFailurePhase, code: SellerFailureCode) => {
-          if (!deadline.aborted)
+          if (!signal?.aborted)
             reportSellerFailure(dependencies.onSellerFailure, {
               nodeId: seller.nodeId,
               phase,

@@ -166,6 +166,47 @@ void test('selection reports each failing seller with its phase and a fixed code
   }
 });
 
+void test('a seller that hangs past the snapshot deadline is reported; a cancelled request is not', async () => {
+  const run = await selectionFixture();
+  try {
+    const { windowMs: _default, ...dependencies } = run.dependencies;
+    const nodeId = run.config.sellers[0]!.nodeId;
+    const hang = (_seller: unknown, signal?: AbortSignal) =>
+      new Promise<boolean>((_resolve, reject) =>
+        signal?.addEventListener('abort', () => reject(signal.reason), {
+          once: true,
+        }),
+      );
+    const failures: unknown[] = [];
+    await selectVerifiedBuyerQuote(run.config, {
+      ...dependencies,
+      stats: new Map(),
+      snapshotMs: 50,
+      verifyIdentity: hang,
+      onSellerFailure: (failure) => failures.push(failure),
+    });
+    assert.deepEqual(failures, [
+      { nodeId, phase: 'connect', code: 'REQUEST_TIMEOUT' },
+    ]);
+    const cancelled: unknown[] = [];
+    const caller = new AbortController();
+    setTimeout(() => caller.abort(), 20);
+    await selectVerifiedBuyerQuote(
+      run.config,
+      {
+        ...dependencies,
+        stats: new Map(),
+        verifyIdentity: hang,
+        onSellerFailure: (failure) => cancelled.push(failure),
+      },
+      caller.signal,
+    );
+    assert.deepEqual(cancelled, []);
+  } finally {
+    await run.wire.close();
+  }
+});
+
 void test('a failure line names the seller briefly and carries no address', async () => {
   const { sellerFailureLine } = await import('@gyblos/buyer/free-main');
   const line = sellerFailureLine({

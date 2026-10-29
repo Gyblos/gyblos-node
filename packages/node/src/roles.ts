@@ -33,7 +33,6 @@ import {
   configurationNodeId,
   configurationObject,
   configurationRpcUrl,
-  setupFlagAddress,
 } from './configuration';
 import {
   NODE_ERROR_CODES,
@@ -228,13 +227,13 @@ export async function nodeSecret(role: P2PRole) {
 }
 
 export async function setupRole(options: SetupOptions) {
-  setupFlagAddress(options.mint, '--mint', true);
+  address(options.mint);
   if (options.role === P2P_ROLES.SELLER) {
     if ((options.buyer === undefined) !== (options.payTo === undefined))
       throw new Error('Paid seller keys need --buyer and --pay-to together.');
     // Checked before anything is written, so a bad paid address leaves no keys behind.
-    setupFlagAddress(options.payTo, '--pay-to');
-    setupFlagAddress(options.buyer, '--buyer');
+    if (options.payTo !== undefined) address(options.payTo);
+    if (options.buyer !== undefined) address(options.buyer);
   }
   const role = options.role;
   const path = file(role, ROLE_FILES.roleConfig);
