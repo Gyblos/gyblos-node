@@ -43,6 +43,7 @@ void test('with no file, flags or variables the settings equal today defaults', 
     buyerRelayOnly: false,
     discoveryPublish: false,
     discoveryUrl: 'https://discovery.gyblos.com/v1',
+    telemetryFile: false,
     offers: [],
   });
   assert.ok(result.origins.every((origin) => origin.source === 'default'));

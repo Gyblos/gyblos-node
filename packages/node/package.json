@@ -62,6 +62,7 @@
     "@gyblos/protocol": "workspace:*",
     "@gyblos/discovery-http": "workspace:*",
     "smol-toml": "1.9.1",
-    "@gyblos/identity": "workspace:*"
+    "@gyblos/identity": "workspace:*",
+    "@gyblos/telemetry-file": "workspace:*"
   }
 }

@@ -31,6 +31,7 @@ import { resolveNodeConfig } from './node-config-resolve';
 import type { FreeSellerOffer } from './seller-offer';
 
 export interface SellerSettings {
+  telemetryFile: boolean;
   relayOnly: boolean;
   irohBind: string | undefined;
   irohExternalAddress: string | undefined;
@@ -171,6 +172,7 @@ function resolveSeller(
     publication = { baseUrl: settings.discoveryUrl };
   }
   const base = {
+    telemetryFile: settings.telemetryFile,
     relayOnly: settings.relayOnly,
     irohBind: settings.irohBind,
     irohExternalAddress: settings.irohExternalAddress,

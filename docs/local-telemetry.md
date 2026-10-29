@@ -1,10 +1,45 @@
 # Local free-inference telemetry
 
 Seller and buyer free execution can emit content-free events through the
-existing `TelemetrySink` port. This is a programmatic opt-in; ordinary CLI
-startup remains off. There is no TOML/environment switch, default destination,
-receipt exchange, paid-path instrumentation or external collection in this
-integration.
+existing `TelemetrySink` port. Ordinary seller and free-buyer startup can opt in
+to private local file telemetry through `gyblos.toml`; the default is off.
+Programmatic sinks remain supported. Paid-path instrumentation, external
+collection and OpenTelemetry startup configuration are separate work.
+
+## File telemetry at startup
+
+```toml
+[telemetry]
+file = true
+```
+
+Add this table to a valid `gyblos.toml` and run `pnpm node:start` or
+`pnpm buyer:free`. Both read `GYBLOS_CONFIG`, else optional `./gyblos.toml`. An
+explicit missing file, any invalid TOML configuration, unknown telemetry fields
+and non-boolean `file` values refuse startup with static errors. The buyer
+validates the selected whole TOML before opening sockets, but consumes only
+`telemetry.file`: its role and selection files still own its other settings. No
+environment/flag override or URL is introduced. Omission or `file = false`
+constructs no file sink. Enabling is per process startup, not a hot-reload
+switch.
+
+The existing file plugin opens lazily on the first event under the role's
+`telemetry/` directory owned by `homeLayout`. Startup without execution creates
+no telemetry file. The existing diagnostic filename prefix is unchanged. Files
+are private (0600) in private directories (0700), with the existing per-record,
+queue, file-size and pool/rotation limits; retention is bounded storage, not
+scheduled erasure. Records contain identifiers and operational metadata, so they
+remain private even though content and credentials are excluded.
+
+Startup owns this configured sink and drains/closes it after stopping the role's
+services, also on startup failure. Close is idempotent with a five-second outer
+deadline; the file logger has its own bounded drain. A filesystem call already
+in progress may finish later: the deadline is not a forced I/O abort.
+Persistence failure degrades local health, never inference/admission/retry
+policy. Seller node health exposes a `telemetry` snapshot and the returned buyer
+host exposes `telemetry()` metadata (`enabled`, `owned`, `closed`, `failed`);
+sink failure can become visible on close. No error contents or paths are put in
+health. Nothing sends these files elsewhere.
 
 ## Composition and ownership
 
@@ -15,13 +50,15 @@ local NodeId, configured selection and optional clock through its dependencies.
 Seller startup obtains the engine kind from its own validated offer settings,
 never from a model name. No engine adapter knows about telemetry.
 
-The caller owns the sink, including `flush()` and `close()`. Stop the host
-before closing the sink, and explicitly flush/close when collecting local logs.
-No sink is constructed, closed or written when one is not supplied. For private
-files, compose `createFileTelemetrySink` with an isolated `GYBLOS_HOME` and the
-appropriate role. Existing private runtime log paths, rotation limits and file
-modes apply; no new path or filename convention is introduced. OTel destinations
-and consent configuration remain separate work.
+A programmatically supplied sink takes precedence over the configured file
+plugin; startup never closes or flushes that caller-owned sink. The caller owns
+it, including `flush()` and `close()`. Stop the host before closing the sink,
+and explicitly flush/close when collecting local logs. When file telemetry is
+off and no programmatic sink is supplied, no sink is constructed, closed or
+written. For private files, compose `createFileTelemetrySink` with an isolated
+`GYBLOS_HOME` and the appropriate role. Existing private runtime log paths,
+rotation limits and file modes apply; no new path or filename convention is
+introduced. OTel destinations and consent configuration remain separate work.
 
 ## Event meanings
 
@@ -81,5 +118,9 @@ Synthetic tests cover complete and streaming execution, failover before sending,
 no retry after possible sending, callback errors, cancellation, caps/readiness,
 late observations, declared usage and broken sinks/clocks. A real file-sink test
 runs both product services under fresh homes and checks private modes, event
-counts and absence of content. Production engines, external collectors and the
-paid flow are outside these tests.
+counts and absence of content. The startup receipt acceptance also enables TOML
+file telemetry through real startup APIs and native loopback Iroh, checks
+complete/cancel/failure events once per role/request across restarts, and
+inspects content exclusion, bounds and private modes after shutdown. It uses an
+in-process memory index and fake provider. Production engines, external
+collectors and the paid flow are outside these tests.

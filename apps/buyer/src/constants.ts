@@ -195,6 +195,7 @@ export const FREE_CHAT_DETAILS = {
 } as const;
 // Why `buyer:free` could not start; printed after FREE_BUYER_CODES.CONFIG with a next step.
 export const FREE_BUYER_STARTUP = {
+  TELEMETRY_CONFIG: 'BUYER_TELEMETRY_CONFIG_INVALID',
   ROLE_MISSING: 'BUYER_ROLE_MISSING',
   ROLE_INVALID: 'BUYER_ROLE_INVALID',
   NOT_BUYER: 'BUYER_ROLE_NOT_BUYER',

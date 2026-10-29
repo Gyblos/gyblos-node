@@ -6,6 +6,10 @@ import {
   openReceiptStore,
 } from '@gyblos/node/receipts';
 import { loadRole, nodeSecret } from '@gyblos/node/roles';
+import {
+  createLocalTelemetry,
+  loadLocalTelemetry,
+} from '@gyblos/node/telemetry-startup';
 import { P2P_ROLES, REASONING_LEVELS } from '@gyblos/protocol/constants';
 import type { TelemetrySink } from '@gyblos/protocol/telemetry';
 import {
@@ -136,6 +140,7 @@ export async function startFreeBuyer(
     onSellerFailure?: SellerFailureReporter;
   } = {},
 ) {
+  const telemetryEnabled = await loadLocalTelemetry(process.env);
   const role = await buyerRole();
   if (role.role !== P2P_ROLES.BUYER)
     return refuse(FREE_BUYER_STARTUP.NOT_BUYER);
@@ -159,6 +164,12 @@ export async function startFreeBuyer(
       externalAddress: process.env.GYBLOS_IROH_EXTERNAL_ADDR || undefined,
     },
   );
+  const telemetry = createLocalTelemetry({
+    enabled: telemetryEnabled,
+    environment: process.env,
+    role: P2P_ROLES.BUYER,
+    sink: options.telemetry,
+  });
   let receipts: ReturnType<typeof createBuyerReceiptRuntime> | undefined;
   try {
     if (endpoint.id().toString() !== role.nodeId)
@@ -166,7 +177,7 @@ export async function startFreeBuyer(
     receipts = buyerReceipts(endpoint, role.nodeId, relayOnly);
     const dependencies = freeBuyerDependencies(prepared, {
       receipts,
-      telemetry: options.telemetry,
+      telemetry: telemetry.sink,
       onSellerFailure: options.onSellerFailure,
       endpoint,
       buyer: role.buyer,
@@ -189,18 +200,33 @@ export async function startFreeBuyer(
     return {
       url: host.url,
       receipts: receipts.health,
+      telemetry: telemetry.health,
       async close() {
         try {
           await host.close();
         } finally {
-          await receipts?.close();
-          await endpoint.close();
+          try {
+            await receipts?.close();
+          } finally {
+            try {
+              await endpoint.close();
+            } finally {
+              await telemetry.close();
+            }
+          }
         }
       },
     };
   } catch (error) {
-    await receipts?.close();
-    await endpoint.close();
+    try {
+      await receipts?.close();
+    } finally {
+      try {
+        await endpoint.close();
+      } finally {
+        await telemetry.close();
+      }
+    }
     throw error;
   }
 }

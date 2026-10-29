@@ -56,6 +56,7 @@ export interface NodeSettings {
   buyerRelayOnly: boolean;
   discoveryPublish: boolean;
   discoveryUrl: string;
+  telemetryFile: boolean;
   offers: NodeOffer[];
 }
 
