@@ -62,6 +62,8 @@ export interface BuyerSelectionConfig {
   pinnedNodeId?: string;
   discovery?: BuyerDiscoveryConfig;
   identity?: BuyerIdentityConfig;
+  // Milliseconds quotes may race; BUYER_SELECTION.windowMs when absent.
+  quoteWindowMs?: number;
 }
 function parseRequest(value: unknown): SellerRequest {
   const row = controlObject(value, [
@@ -161,7 +163,7 @@ export function parseBuyerSelectionConfig(
     const row = optionalObject(
       value,
       ['request', 'sellers'],
-      ['pinnedNodeId', 'discovery', 'identity'],
+      ['pinnedNodeId', 'discovery', 'identity', 'quoteWindowMs'],
     );
     const request = parseRequest(row.request);
     const validation = selectSellers({
@@ -193,6 +195,15 @@ export function parseBuyerSelectionConfig(
       ...(row.pinnedNodeId === undefined
         ? {}
         : { pinnedNodeId: controlHex(row.pinnedNodeId) }),
+      ...(row.quoteWindowMs === undefined
+        ? {}
+        : {
+            quoteWindowMs: controlInteger(
+              row.quoteWindowMs,
+              BUYER_SELECTION.minWindowMs,
+              BUYER_SELECTION.maxWindowMs,
+            ),
+          }),
     };
   } catch {
     throw new BuyerSelectionError(BUYER_SELECTION_CODES.INVALID);

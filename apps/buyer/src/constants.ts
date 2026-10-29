@@ -62,7 +62,11 @@ export const BUYER_SELECTION = {
   maxSellers: 16,
   maxDecisions: 1024,
   snapshotMs: 10000,
-  windowMs: 300,
+  // How long quotes may race. A relay round trip to a distant seller took about 250 ms in the
+  // first real test, so the default leaves room; selection.json `quoteWindowMs` overrides it.
+  windowMs: 3000,
+  minWindowMs: 100,
+  maxWindowMs: 30_000,
   conflictStatus: 409,
   requestIdCharacters: 128,
   endpointCharacters: 2048,

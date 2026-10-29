@@ -146,7 +146,8 @@ export async function selectVerifiedBuyerQuote(
           now,
           querySignal,
         ),
-      { signal, windowMs: dependencies.windowMs },
+      // The operator's selection.json wins over the caller's default.
+      { signal, windowMs: config.quoteWindowMs ?? dependencies.windowMs },
     );
     if (!winner) return { ok: false, code: BUYER_SELECTION_CODES.NO_OFFER };
     try {
