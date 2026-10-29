@@ -32,6 +32,7 @@ export const ROLE_FILES = {
   trust: 'trust.json',
   status: 'status.json',
   telemetry: 'telemetry',
+  receipts: 'receipts',
   metrics: 'transport.jsonl',
   measurements: 'measurements.jsonl',
   measurementSalt: 'measurement-salt',
@@ -163,4 +164,11 @@ export function desktopWalletLibraryPaths(root: string, address?: string) {
     pending: join(directory, DESKTOP_WALLET_LIBRARY.PENDING),
     identityRoot: address === undefined ? root : join(directory, address),
   };
+}
+
+// Receipt files stay inside the private per-role receipt directory.
+export const RECEIPT_FILES = { state: 'receipts-v1.json', lock: 'receipts-v1.lock' } as const;
+export function receiptPathsIn(environment: HomeEnvironment,role:HomeRole) {
+ const directory=rolePathIn(environment,role,ROLE_FILES.receipts);
+ return {directory,state:join(directory,RECEIPT_FILES.state),lock:join(directory,RECEIPT_FILES.lock)};
 }
