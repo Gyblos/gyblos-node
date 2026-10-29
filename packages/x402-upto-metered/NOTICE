@@ -2,5 +2,3 @@ x402-upto-metered
 Copyright 2026 Gyblos contributors
 
 This product is licensed under the Apache License, Version 2.0 (see LICENSE).
-It builds on the x402 protocol and its open-source SDKs (@x402/core,
-@x402/svm), which are distributed under their own licenses.

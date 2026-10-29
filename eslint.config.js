@@ -99,12 +99,12 @@ export default [
   },
   // Test cases and lab scripts may be long; product and tooling keep the function-length warning.
   {
-    files: ['tests/**/*.ts', 'lab/**/*.ts'],
+    files: ['tests/**/*.ts', 'lab/**/*.ts', 'packages/*/test/**/*.ts'],
     rules: { 'max-lines-per-function': 'off' },
   },
   // Invalid boundary inputs and deliberately partial SDK doubles are test data.
   {
-    files: ['tests/**/*.ts'],
+    files: ['tests/**/*.ts', 'packages/*/test/**/*.ts'],
     rules: {
       '@typescript-eslint/consistent-type-assertions': [
         'error',

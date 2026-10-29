@@ -1,6 +1,10 @@
 # x402-upto-metered
 
-Status: pre-release, private. The published name is provisional.
+Status: pre-release and private. The published name is provisional. Today the
+package contains only its error codes; everything under "Planned" is not
+implemented yet.
+
+## Planned
 
 Metered payments on top of the x402 `upto` scheme on Solana:
 
@@ -9,13 +13,14 @@ Metered payments on top of the x402 `upto` scheme on Solana:
 - settlement charges only the metered amount (possibly partial, possibly 0) and
   refunds the rest of the deposit.
 
-Unlike the reference x402 middleware, this package does not assume HTTP.
-Authorizations, admissions and settlements are plain values that any transport
-can carry (for example a QUIC peer-to-peer stream).
+Unlike the reference x402 middleware, it will not assume HTTP: authorizations,
+admissions and settlements will be plain values that any transport can carry
+(for example a QUIC peer-to-peer stream).
 
 ## Rules
 
-- No dependency on any Gyblos package; only the x402 and Solana SDKs.
+- No dependency on any Gyblos package. The only runtime dependencies allowed are
+  the x402 and Solana SDKs (none yet).
 - Every failure is an `UptoError` whose message is a static code
   (`UPTO_ERROR_CODES`); RPC URLs, keys and upstream text never appear in it.
 

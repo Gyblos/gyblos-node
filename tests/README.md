@@ -1,12 +1,12 @@
 # Offline regression tests
 
-| Command             | Runs                                                                  |
-| ------------------- | --------------------------------------------------------------------- |
-| `pnpm check`        | Typecheck, lint (including tooling), product and lab tests.           |
-| `pnpm test`         | Product suites `tests/*.test.ts` (the PR gate).                       |
-| `pnpm test:lab`     | Lab-only regressions `tests/lab/**/*.test.ts`.                        |
-| `pnpm test:all`     | Both.                                                                 |
-| `pnpm tooling:test` | Tests of the boundary checker and lint rules, `tooling/**/*.test.ts`. |
+| Command             | Runs                                                                                                        |
+| ------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `pnpm check`        | Typecheck, lint (including tooling), product and lab tests.                                                 |
+| `pnpm test`         | Product suites `tests/*.test.ts` and standalone package tests `packages/*/test/**/*.test.ts` (the PR gate). |
+| `pnpm test:lab`     | Lab-only regressions `tests/lab/**/*.test.ts`.                                                              |
+| `pnpm test:all`     | Product, standalone package and lab tests.                                                                  |
+| `pnpm tooling:test` | Tests of the boundary checker and lint rules, `tooling/**/*.test.ts`.                                       |
 
 Node discovers test files by glob; there is no allowlist, and every case is a
 top-level `test()` in a `*.test.ts` file.
@@ -20,6 +20,9 @@ top-level `test()` in a `*.test.ts` file.
   test cases. Both suites may import it. Contract suites that every plugin of a
   port must pass live there as `*-contract.ts` and are run by one
   `tests/*.test.ts` per plugin.
+- A standalone package (see AGENTS.md) keeps its own tests in
+  `packages/<name>/test/` so they leave the monorepo with it; they import only
+  that package.
 - `tooling/**/*.test.ts` test the repository tooling, not the product, and are
   counted separately.
 
