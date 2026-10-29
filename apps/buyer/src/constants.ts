@@ -1,7 +1,10 @@
 // Buyer call outcomes, phases, journal states, proxy error codes, measurement schema version, call and
 // proof bounds, error diagnostic codes and synthetic inference case names.
 import { JOURNAL_STATES } from '@gyblos/payments-x402/constants';
-import type { ProtocolErrorCode } from '@gyblos/protocol/constants';
+import {
+  FREE_EXECUTION,
+  type ProtocolErrorCode,
+} from '@gyblos/protocol/constants';
 import { ROUTE_DISCREPANCY } from '@gyblos/transport-iroh/constants';
 
 export const CALL_OUTCOMES = {
@@ -54,6 +57,23 @@ export const BUYER_SELECTION_CODES = {
   DISCOVERY_LIMIT: 'BUYER_DISCOVERY_LIMIT',
   IDENTITY_STATE: 'BUYER_IDENTITY_STATE_UNAVAILABLE',
   IDENTITY: 'BUYER_IDENTITY_UNAVAILABLE',
+} as const;
+// Why one seller dropped out of a selection; printed by the free buyer, never with addresses.
+export const SELLER_FAILURE_PHASES = {
+  IDENTITY: 'identity',
+  CONNECT: 'connect',
+  DISCOVERY: 'discovery',
+  QUOTE: 'quote',
+  TIMEOUT: 'timeout',
+} as const;
+export type SellerFailurePhase =
+  (typeof SELLER_FAILURE_PHASES)[keyof typeof SELLER_FAILURE_PHASES];
+export const SELLER_FAILURES = {
+  LINE: 'FREE_BUYER_SELLER_FAILED',
+  IDENTITY: 'SELLER_IDENTITY_UNVERIFIED',
+  DISCOVERY: 'SELLER_DISCOVERY_REJECTED',
+  UNKNOWN: 'SELLER_ERROR_UNKNOWN',
+  nodeIdChars: 8,
 } as const;
 export const BUYER_SELECTION = {
   configFile: 'selection.json',
@@ -148,6 +168,31 @@ export const FREE_BUYER_CODES = {
 } as const;
 export type FreeBuyerCode =
   (typeof FREE_BUYER_CODES)[keyof typeof FREE_BUYER_CODES];
+// The OpenAI-compatible subset the free buyer accepts, and the fixed reasons it gives for refusing one.
+export const FREE_CHAT_FIELDS = {
+  MODEL: 'model',
+  MESSAGES: 'messages',
+  MAX_TOKENS: 'max_tokens',
+  STREAM: 'stream',
+} as const;
+export type FreeChatField =
+  (typeof FREE_CHAT_FIELDS)[keyof typeof FREE_CHAT_FIELDS];
+export const FREE_CHAT_FIELD_LIST: readonly FreeChatField[] =
+  Object.values(FREE_CHAT_FIELDS);
+// An unsupported field is named back only when it looks like a plain field name.
+export const FREE_CHAT_FIELD_NAME = /^[A-Za-z0-9_]{1,64}$/;
+export const FREE_CHAT_DETAILS = {
+  body: 'the body must be a JSON object with model and messages',
+  fields: `supported fields are ${FREE_CHAT_FIELD_LIST.join(', ')}`,
+  model: (modelId: string) => `model must be ${modelId}`,
+  maxTokens: (maximum: number) =>
+    `max_tokens must be an integer from 1 to ${maximum}`,
+  stream: 'stream must be true or false',
+  noStream: 'stream must be false or absent',
+  messages: 'messages must hold exactly one user message',
+  content: `message content must be text of at most ${FREE_EXECUTION.inputBytes} bytes`,
+  json: 'the body must be valid UTF-8 JSON',
+} as const;
 // Why `buyer:free` could not start; printed after FREE_BUYER_CODES.CONFIG with a next step.
 export const FREE_BUYER_STARTUP = {
   ROLE_MISSING: 'BUYER_ROLE_MISSING',

@@ -7,9 +7,11 @@ import { RelayConfigurationError } from '@gyblos/transport-iroh/relays';
 import {
   FREE_BUYER_CODES,
   FREE_BUYER_STARTUP,
+  SELLER_FAILURES,
   type FreeBuyerStartupReason,
 } from './constants';
 import { FreeBuyerStartupError, startFreeBuyer } from './free-startup';
+import type { SellerFailure } from './seller-failures';
 
 const BUYER_DOCS = 'docs/running-a-node.md "Free v2 buyer endpoint"';
 // Next steps by reason; static text only, never a path from the environment.
@@ -54,10 +56,22 @@ export function startupMessage(error: unknown) {
   return `${FREE_BUYER_CODES.CONFIG} ${reason}: ${hint}`;
 }
 
+// One stderr line per seller that dropped out of a selection: a short NodeId, the phase and a code.
+export function sellerFailureLine(failure: SellerFailure) {
+  return [
+    SELLER_FAILURES.LINE,
+    failure.nodeId.slice(0, SELLER_FAILURES.nodeIdChars),
+    failure.phase,
+    failure.code,
+  ].join(' ');
+}
+
 export async function main() {
   let host: Awaited<ReturnType<typeof startFreeBuyer>>;
   try {
-    host = await startFreeBuyer();
+    host = await startFreeBuyer({
+      onSellerFailure: (failure) => console.error(sellerFailureLine(failure)),
+    });
   } catch (error) {
     console.error(startupMessage(error));
     process.exitCode = 1;

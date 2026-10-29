@@ -16,7 +16,11 @@ import { signOfferV2 } from '@gyblos/protocol/offer-v2';
 import { freeSellerFixture } from './support/free-seller';
 
 async function fixture(
-  options: { relayOnly?: boolean; requestMs?: number } = {},
+  options: {
+    relayOnly?: boolean;
+    requestMs?: number;
+    relayAllowed?: (origin: string) => boolean;
+  } = {},
 ) {
   const source = await freeSellerFixture();
   const request = await source.request();
@@ -25,6 +29,7 @@ async function fixture(
   let bodyReads = 0;
   let remoteId = source.options.nodeId;
   let relay: string | null = null;
+  let remoteAddr = '203.0.113.9:443';
   let connect = async () => connection;
   let write = async () => {};
   let frame = encodeFreeExecutionResponse({
@@ -39,7 +44,7 @@ async function fixture(
   });
   const connection = {
     remoteId: () => ({ toString: () => remoteId }),
-    paths: () => [{ isSelected: true, isIp: true, isRelay: false }],
+    paths: () => [{ isSelected: true, isIp: true, isRelay: false, remoteAddr }],
     close: () => {
       closes++;
     },
@@ -86,6 +91,9 @@ async function fixture(
     writes: () => writes,
     closes: () => closes,
     bodyReads: () => bodyReads,
+    setRemoteAddr: (value: string) => {
+      remoteAddr = value;
+    },
     setRelay: (value: string) => {
       relay = value;
     },
@@ -304,6 +312,22 @@ void test('free client rejects unapproved relays and relay-only without a relay 
     sent: false,
   });
   assert.equal(required.writes(), 0);
+});
+
+void test('relay-only free client sends over a same-machine loopback path only', async () => {
+  const relayed = { relayOnly: true, relayAllowed: () => true };
+  const remote = await fixture(relayed);
+  remote.setRelay('https://na1.relay.gyblos.com/');
+  await assert.rejects(remote.client.execute(remote.request), {
+    code: FREE_EXECUTION_CODES.PEER,
+    sent: false,
+  });
+  assert.equal(remote.writes(), 0);
+  const local = await fixture(relayed);
+  local.setRelay('https://na1.relay.gyblos.com/');
+  local.setRemoteAddr('127.0.0.1:51234');
+  assert.equal((await local.client.execute(local.request)).text, 'answer');
+  assert.equal(local.writes(), 1);
 });
 void test('free client cuts slow frames at the absolute deadline and suppresses late writes', async () => {
   const item = await fixture({ requestMs: 30 });

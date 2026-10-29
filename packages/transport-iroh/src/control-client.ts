@@ -8,13 +8,13 @@ import {
 } from '@gyblos/protocol/constants';
 import { controlFail } from '@gyblos/protocol/control-validation';
 
-import { HTTP_OVER_IROH, TRANSPORT_ROUTES } from './constants';
+import { HTTP_OVER_IROH } from './constants';
 import {
   controlDeadline,
   readControlFrame,
   writeControlFrame,
 } from './control-io';
-import { selectedRoute } from './paths';
+import { relayOnlyAllows } from './paths';
 
 export interface ControlTransport {
   readonly localNodeId: string;
@@ -99,7 +99,7 @@ export function createControlTransport(
 }
 
 function assertControlRoute(connection: Connection, relayOnly?: boolean) {
-  if (relayOnly && selectedRoute(connection) !== TRANSPORT_ROUTES.RELAY)
+  if (relayOnly && !relayOnlyAllows(connection))
     return controlFail(CONTROL_CODES.POLICY);
 }
 

@@ -1,5 +1,6 @@
-// Checks HTTP payment traffic over native Iroh: NodeId mismatch and direct-path refusal before signing,
-// and free-request quota across reconnects.
+// Checks HTTP payment traffic over native Iroh: NodeId mismatch refusal before signing, relay-only
+// accepting the same-machine loopback path (any other direct path is refused, see
+// relay-only-loopback.test.ts), and free-request quota across reconnects.
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { once } from 'node:events';
@@ -60,17 +61,13 @@ async function exercise(relayOnly: boolean, wrongIdentity: boolean) {
         headers: { 'content-type': 'application/json' },
         body: Buffer.from('{"requestId":"synthetic"}'),
       });
-    if (relayOnly) {
-      await assert.rejects(invoke());
-      assert.equal(executions, 0);
-    } else {
-      const result = await invoke();
-      assert.equal(result.status, 402);
-      assert.equal(result.headers['payment-required'], 'synthetic-challenge');
-      assert.equal(Buffer.from(result.body).toString(), '{"synthetic":true}');
-      assert.equal(result.transport, 'iroh-direct');
-      assert.equal(executions, 1);
-    }
+    // Both test endpoints are on this machine, so the direct path is loopback even under relay-only.
+    const result = await invoke();
+    assert.equal(result.status, 402);
+    assert.equal(result.headers['payment-required'], 'synthetic-challenge');
+    assert.equal(Buffer.from(result.body).toString(), '{"synthetic":true}');
+    assert.equal(result.transport, 'iroh-direct');
+    assert.equal(executions, 1);
   } finally {
     await transport.close();
     await bridge.close();
@@ -90,7 +87,7 @@ void test(
   () => exercise(false, true),
 );
 void test(
-  'relay-only server refuses an observed direct path before forwarding HTTP',
+  'relay-only server accepts the same-machine loopback path and forwards HTTP',
   NATIVE_TEST_OPTIONS,
   () => exercise(true, false),
 );

@@ -21,7 +21,7 @@ import {
   connectionSource,
   createConnectionAdmission,
 } from './admission';
-import { HTTP_OVER_IROH, IROH_DEADLINES, TRANSPORT_ROUTES } from './constants';
+import { HTTP_OVER_IROH, IROH_DEADLINES } from './constants';
 import { handleControlConnection, type ControlService } from './control-server';
 import { withDeadline } from './deadline';
 import {
@@ -31,7 +31,7 @@ import {
 import { handleIrohConnection } from './iroh-connection';
 import { createPeerLimiter } from './limiter';
 import { loopbackRequest } from './loopback';
-import { selectedRoute } from './paths';
+import { relayOnlyAllows } from './paths';
 import { createReceiptServer } from './receipt-server';
 import type { ReceiptService } from './receipt-service';
 import { decodeRequest, encodeResponse } from './wire';
@@ -56,6 +56,10 @@ export function serveIroh(
   const streamPeers = new Set<string>();
   let streamsActive = 0;
   let closed = false;
+
+  // Relay-only refuses every path except the relay and a same-machine loopback path.
+  const routeAllowed = (connection: Connection) =>
+    !relayOnly || relayOnlyAllows(connection);
 
   async function respond(
     stream: BiStream,
@@ -91,10 +95,7 @@ export function serveIroh(
         const source = (async () => {
           try {
             if (signal.aborted) throw new Error('Connection closed.');
-            if (
-              relayOnly &&
-              selectedRoute(connection) !== TRANSPORT_ROUTES.RELAY
-            )
+            if (!routeAllowed(connection))
               throw new Error('Direct paths disabled by seller policy.');
             return await loopbackRequest(
               origin,
@@ -110,8 +111,7 @@ export function serveIroh(
           close();
         });
       }
-      if (relayOnly && selectedRoute(connection) !== TRANSPORT_ROUTES.RELAY)
-        throw new Error('Unexpected direct path.');
+      if (!routeAllowed(connection)) throw new Error('Unexpected direct path.');
       const sending = (async () => {
         await stream.send.writeAll([...encodeResponse(response)]);
         await stream.send.finish();
@@ -142,12 +142,9 @@ export function serveIroh(
     await receiptServer?.handle(
       connection,
       signal,
-      () =>
-        !relayOnly || selectedRoute(connection) === TRANSPORT_ROUTES.RELAY
-          ? limiter.enter(peer)
-          : undefined,
+      () => (routeAllowed(connection) ? limiter.enter(peer) : undefined),
       () => closed,
-      () => !relayOnly || selectedRoute(connection) === TRANSPORT_ROUTES.RELAY,
+      () => routeAllowed(connection),
     );
   }
 
@@ -181,16 +178,11 @@ export function serveIroh(
           control,
           controller.signal,
           () => {
-            if (
-              relayOnly &&
-              selectedRoute(connection) !== TRANSPORT_ROUTES.RELAY
-            )
-              return undefined;
+            if (!routeAllowed(connection)) return undefined;
             return limiter.enter(peer);
           },
           () => closed,
-          () =>
-            !relayOnly || selectedRoute(connection) === TRANSPORT_ROUTES.RELAY,
+          () => routeAllowed(connection),
         );
         return;
       }
@@ -202,13 +194,9 @@ export function serveIroh(
           connection,
           freeExecution,
           controller.signal,
-          () =>
-            !relayOnly || selectedRoute(connection) === TRANSPORT_ROUTES.RELAY
-              ? limiter.enter(peer)
-              : undefined,
+          () => (routeAllowed(connection) ? limiter.enter(peer) : undefined),
           () => closed,
-          () =>
-            !relayOnly || selectedRoute(connection) === TRANSPORT_ROUTES.RELAY,
+          () => routeAllowed(connection),
           alpn === FREE_STREAM.alpn,
         );
         return;

@@ -15,6 +15,7 @@
     "./lifecycle": "./src/lifecycle.ts",
     "./offers": "./src/offers.ts",
     "./roles": "./src/roles.ts",
+    "./configuration": "./src/configuration.ts",
     "./errors": "./src/errors.ts",
     "./home": "./src/home.ts",
     "./control": "./src/control.ts",

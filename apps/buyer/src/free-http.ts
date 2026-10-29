@@ -30,8 +30,8 @@ import {
 import { acceptLoopbackHost } from '@gyblos/runtime/loopback-host';
 import { FreeClientError } from '@gyblos/transport-iroh/free-client';
 
-import { FREE_BUYER, FREE_BUYER_CODES } from './constants';
-import { FreeBuyerError, parseFreeChat } from './free-chat';
+import { FREE_BUYER, FREE_BUYER_CODES, FREE_CHAT_DETAILS } from './constants';
+import { FreeBuyerError, invalidChat, parseFreeChat } from './free-chat';
 import { FreeSelectionFailure } from './free-execution';
 import {
   executeFreeSse,
@@ -66,7 +66,7 @@ async function readBody(
       new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(chunks)),
     );
   } catch {
-    throw new FreeBuyerError(FREE_BUYER_CODES.INVALID);
+    throw invalidChat(null, FREE_CHAT_DETAILS.json);
   }
 }
 // True only when the prompt certainly never left this process; anything else may have been sent.
@@ -132,9 +132,10 @@ function replyError(response: ServerResponse, error: unknown) {
   response.writeHead(status, headers).end(
     JSON.stringify({
       error: {
-        message: code,
+        // A refused request explains itself; every other error keeps its code as the message.
+        message: (error instanceof FreeBuyerError && error.detail) || code,
         type: FREE_BUYER.errorType,
-        param: null,
+        param: error instanceof FreeBuyerError ? error.param : null,
         code,
         // Delivered usage only exists mid-stream, so a JSON error carries the reason alone.
         ...(stop.reason ? { reason: stop.reason } : {}),
