@@ -10,7 +10,6 @@ import {
   address,
   createKeyPairSignerFromBytes,
   getAddressEncoder,
-  isAddress,
 } from '@solana/kit';
 
 import {
@@ -34,6 +33,7 @@ import {
   configurationNodeId,
   configurationObject,
   configurationRpcUrl,
+  setupFlagAddress,
 } from './configuration';
 import {
   NODE_ERROR_CODES,
@@ -227,20 +227,14 @@ export async function nodeSecret(role: P2PRole) {
   ];
 }
 
-// Names the setup flag instead of surfacing the Solana library's error.
-function flagAddress(value: string | undefined, flag: string) {
-  if (value !== undefined && !isAddress(value))
-    throw new Error(`${flag} is not a valid Solana address.`);
-}
-
 export async function setupRole(options: SetupOptions) {
-  flagAddress(options.mint, '--mint');
+  setupFlagAddress(options.mint, '--mint', true);
   if (options.role === P2P_ROLES.SELLER) {
     if ((options.buyer === undefined) !== (options.payTo === undefined))
       throw new Error('Paid seller keys need --buyer and --pay-to together.');
     // Checked before anything is written, so a bad paid address leaves no keys behind.
-    flagAddress(options.payTo, '--pay-to');
-    flagAddress(options.buyer, '--buyer');
+    setupFlagAddress(options.payTo, '--pay-to');
+    setupFlagAddress(options.buyer, '--buyer');
   }
   const role = options.role;
   const path = file(role, ROLE_FILES.roleConfig);

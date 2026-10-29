@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { BUYER_SELECTION_CODES } from '@gyblos/buyer/constants';
+import { FreeBuyerError, parseFreeChat } from '@gyblos/buyer/free-chat';
 import { selectVerifiedBuyerQuote } from '@gyblos/buyer/selection';
 import {
   CONTROL_CODES,
@@ -23,14 +24,13 @@ const CHAT = {
 };
 
 void test('a refused free chat names the field and why, never the prompt', async () => {
-  const { parseFreeChat } = await import('@gyblos/buyer/free-chat');
   const cases: [unknown, string | null, RegExp][] = [
     [{ ...CHAT, max_tokens: 500 }, 'max_tokens', /from 1 to 128/],
     [{ ...CHAT, max_tokens: 1.5 }, 'max_tokens', /from 1 to 128/],
     [{ ...CHAT, model: 'other' }, 'model', /model must be synthetic/],
     [{ ...CHAT, temperature: 1 }, 'temperature', /supported fields/],
     [{ ...CHAT, 'bad key!': 1 }, null, /supported fields/],
-    [{ ...CHAT, stream: true }, 'stream', /stream/],
+    [{ ...CHAT, stream: true }, 'stream', /stream must be false or absent/],
     [{ model: 'synthetic' }, 'messages', /one user message/],
     [
       { ...CHAT, messages: [...CHAT.messages, ...CHAT.messages] },
@@ -59,9 +59,9 @@ void test('a refused free chat names the field and why, never the prompt', async
     assert.throws(
       () => parseFreeChat(value, SELECTION, 128),
       (error: unknown) => {
-        assert.ok(error instanceof Error, label);
-        assert.equal(Reflect.get(error, 'param'), param, label);
-        const text = String(Reflect.get(error, 'detail'));
+        assert.ok(error instanceof FreeBuyerError, label);
+        assert.equal(error.param, param, label);
+        const text = String(error.detail);
         assert.match(text, detail, label);
         assert.equal(text.includes(SECRET_PROMPT), false, label);
         return true;

@@ -280,7 +280,7 @@ their separate control quotas. See
 A direct connection shows each peer's IP address to the other.
 
 - `GYBLOS_RELAY_ONLY=1` (seller): binds loopback only, advertises no direct
-  addresses and rejects an observed direct path.
+  addresses and rejects an observed non-loopback direct path.
 - `GYBLOS_BUYER_RELAY_ONLY=1` (buyer): binds loopback only, ignores
   `GYBLOS_IROH_BIND` and the seller's direct addresses, and dials only the
   offer's configured relay. An offer without a relay is rejected.
@@ -295,9 +295,11 @@ not been measured.
 
 A relay-only seller can be tested with its buyer on the same machine. After the
 first exchange Iroh may switch to a direct loopback path; relay-only accepts a
-direct path only when its remote address is loopback (`127.0.0.0/8` or `::1`). A
-relay-only endpoint binds only loopback, so that path reveals no address, and
-any other direct path is still refused.
+direct path only when its remote address is loopback (`127.0.0.0/8`, `::1` or
+`::ffff:127.x.y.z`). A relay-only endpoint binds only loopback, so that path
+reveals no address, and any other direct path is still refused. A local UDP
+forwarder listening on loopback (a tunnel or proxy) would also look like
+loopback, so do not run one on a relay-only machine.
 
 ## Other settings
 

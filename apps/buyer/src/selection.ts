@@ -9,7 +9,7 @@ import {
   type SellerCandidate,
   type SellerSelectionResult,
 } from '@gyblos/core/seller-selection';
-import { PUBLIC_RECORD_KINDS } from '@gyblos/protocol/constants';
+import { CONTROL_CODES, PUBLIC_RECORD_KINDS } from '@gyblos/protocol/constants';
 import { validateOfferV2Time } from '@gyblos/protocol/offer-v2';
 import { verifyPublicV2 } from '@gyblos/protocol/public-v2';
 
@@ -32,6 +32,7 @@ import type { LocalSellerStats } from './selection-stats';
 import {
   reportSellerFailure,
   sellerFailureCode,
+  type SellerFailureCode,
   type SellerFailureReporter,
 } from './seller-failures';
 
@@ -159,11 +160,18 @@ export async function selectVerifiedBuyerQuote(
       signal,
     );
     if (!winner) return { ok: false, code: BUYER_SELECTION_CODES.NO_OFFER };
-    try {
-      validateOfferV2Time(winner.quote.offer, now());
-    } catch {
-      return { ok: false, code: BUYER_SELECTION_CODES.NO_OFFER };
-    }
+    // The winner can still drop out; it is reported like any other seller.
+    const drop = (phase: SellerFailurePhase, code: SellerFailureCode) => {
+      if (!signal?.aborted)
+        reportSellerFailure(dependencies.onSellerFailure, {
+          nodeId: winner.candidate.nodeId,
+          phase,
+          code,
+        });
+      return { ok: false, code: BUYER_SELECTION_CODES.NO_OFFER } as const;
+    };
+    if (!offerCurrent(winner, now))
+      return drop(SELLER_FAILURE_PHASES.QUOTE, CONTROL_CODES.EXPIRED);
     const seller = config.sellers.find(
       (item) =>
         item.nodeId === winner.candidate.nodeId &&
@@ -174,19 +182,25 @@ export async function selectVerifiedBuyerQuote(
       (dependencies.verifyIdentity &&
         !(await dependencies.verifyIdentity(seller, signal)))
     )
-      return { ok: false, code: BUYER_SELECTION_CODES.NO_OFFER };
+      return drop(SELLER_FAILURE_PHASES.IDENTITY, SELLER_FAILURES.IDENTITY);
     if (signal?.aborted)
       return { ok: false, code: BUYER_SELECTION_CODES.NO_OFFER };
-    try {
-      validateOfferV2Time(winner.quote.offer, now());
-    } catch {
-      return { ok: false, code: BUYER_SELECTION_CODES.NO_OFFER };
-    }
+    if (!offerCurrent(winner, now))
+      return drop(SELLER_FAILURE_PHASES.QUOTE, CONTROL_CODES.EXPIRED);
     return { ok: true, winner };
   } finally {
     await Promise.allSettled(
       [...clients.values()].map((client) => client.close()),
     );
+  }
+}
+
+function offerCurrent(winner: WinningQuote, now: () => number) {
+  try {
+    validateOfferV2Time(winner.quote.offer, now());
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -298,12 +312,15 @@ async function refreshSnapshots(
   return settledValues(
     await Promise.allSettled(
       config.sellers.map(async (seller) => {
-        const failed = (phase: SellerFailurePhase, code: string) =>
-          reportSellerFailure(dependencies.onSellerFailure, {
-            nodeId: seller.nodeId,
-            phase,
-            code,
-          });
+        // A request the caller cancelled is not a seller failure.
+        const failed = (phase: SellerFailurePhase, code: SellerFailureCode) => {
+          if (!deadline.aborted)
+            reportSellerFailure(dependencies.onSellerFailure, {
+              nodeId: seller.nodeId,
+              phase,
+              code,
+            });
+        };
         try {
           if (
             dependencies.verifyIdentity &&

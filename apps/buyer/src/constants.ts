@@ -169,17 +169,24 @@ export const FREE_BUYER_CODES = {
 export type FreeBuyerCode =
   (typeof FREE_BUYER_CODES)[keyof typeof FREE_BUYER_CODES];
 // The OpenAI-compatible subset the free buyer accepts, and the fixed reasons it gives for refusing one.
-export const FREE_CHAT_FIELDS = [
-  'model',
-  'messages',
-  'max_tokens',
-  'stream',
-] as const;
+export const FREE_CHAT_FIELDS = {
+  MODEL: 'model',
+  MESSAGES: 'messages',
+  MAX_TOKENS: 'max_tokens',
+  STREAM: 'stream',
+} as const;
+export type FreeChatField =
+  (typeof FREE_CHAT_FIELDS)[keyof typeof FREE_CHAT_FIELDS];
+export const FREE_CHAT_FIELD_LIST: readonly FreeChatField[] =
+  Object.values(FREE_CHAT_FIELDS);
+// An unsupported field is named back only when it looks like a plain field name.
+export const FREE_CHAT_FIELD_NAME = /^[A-Za-z0-9_]{1,64}$/;
 export const FREE_CHAT_DETAILS = {
   body: 'the body must be a JSON object with model and messages',
-  fields: 'supported fields are model, messages, max_tokens and stream',
-  // An unsupported field is named back only when it looks like a plain field name.
-  fieldName: /^[A-Za-z0-9_]{1,64}$/,
+  fields: `supported fields are ${FREE_CHAT_FIELD_LIST.join(', ')}`,
+  model: (modelId: string) => `model must be ${modelId}`,
+  maxTokens: (maximum: number) =>
+    `max_tokens must be an integer from 1 to ${maximum}`,
   stream: 'stream must be true or false',
   noStream: 'stream must be false or absent',
   messages: 'messages must hold exactly one user message',

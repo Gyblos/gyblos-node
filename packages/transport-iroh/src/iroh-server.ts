@@ -57,6 +57,10 @@ export function serveIroh(
   let streamsActive = 0;
   let closed = false;
 
+  // Relay-only refuses every path except the relay and a same-machine loopback path.
+  const routeAllowed = (connection: Connection) =>
+    !relayOnly || relayOnlyAllows(connection);
+
   async function respond(
     stream: BiStream,
     connection: Connection,
@@ -91,7 +95,7 @@ export function serveIroh(
         const source = (async () => {
           try {
             if (signal.aborted) throw new Error('Connection closed.');
-            if (relayOnly && !relayOnlyAllows(connection))
+            if (!routeAllowed(connection))
               throw new Error('Direct paths disabled by seller policy.');
             return await loopbackRequest(
               origin,
@@ -107,8 +111,7 @@ export function serveIroh(
           close();
         });
       }
-      if (relayOnly && !relayOnlyAllows(connection))
-        throw new Error('Unexpected direct path.');
+      if (!routeAllowed(connection)) throw new Error('Unexpected direct path.');
       const sending = (async () => {
         await stream.send.writeAll([...encodeResponse(response)]);
         await stream.send.finish();
@@ -139,12 +142,9 @@ export function serveIroh(
     await receiptServer?.handle(
       connection,
       signal,
-      () =>
-        !relayOnly || relayOnlyAllows(connection)
-          ? limiter.enter(peer)
-          : undefined,
+      () => (routeAllowed(connection) ? limiter.enter(peer) : undefined),
       () => closed,
-      () => !relayOnly || relayOnlyAllows(connection),
+      () => routeAllowed(connection),
     );
   }
 
@@ -178,11 +178,11 @@ export function serveIroh(
           control,
           controller.signal,
           () => {
-            if (relayOnly && !relayOnlyAllows(connection)) return undefined;
+            if (!routeAllowed(connection)) return undefined;
             return limiter.enter(peer);
           },
           () => closed,
-          () => !relayOnly || relayOnlyAllows(connection),
+          () => routeAllowed(connection),
         );
         return;
       }
@@ -194,12 +194,9 @@ export function serveIroh(
           connection,
           freeExecution,
           controller.signal,
-          () =>
-            !relayOnly || relayOnlyAllows(connection)
-              ? limiter.enter(peer)
-              : undefined,
+          () => (routeAllowed(connection) ? limiter.enter(peer) : undefined),
           () => closed,
-          () => !relayOnly || relayOnlyAllows(connection),
+          () => routeAllowed(connection),
           alpn === FREE_STREAM.alpn,
         );
         return;

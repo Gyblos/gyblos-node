@@ -10,12 +10,14 @@ import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
 import {
   FREE_BUYER_CODES,
   FREE_CHAT_DETAILS,
+  FREE_CHAT_FIELD_LIST,
+  FREE_CHAT_FIELD_NAME,
   FREE_CHAT_FIELDS,
   type FreeBuyerCode,
 } from './constants';
 
-// `param` names the offending request field and `detail` is fixed text or operator-configured values,
-// never caller content, so both are safe to return to the client.
+// `param` names the offending request field (an unsupported one only when it looks like a plain field
+// name) and `detail` is fixed text or operator-configured values; neither carries the prompt.
 export class FreeBuyerError extends Error {
   constructor(
     readonly code: FreeBuyerCode,
@@ -41,44 +43,49 @@ export function parseFreeChat(
   if (!value || typeof value !== 'object' || Array.isArray(value))
     throw invalidChat(null, FREE_CHAT_DETAILS.body);
   const extra = Object.keys(value).find(
-    (key) => !FREE_CHAT_FIELDS.some((field) => field === key),
+    (key) => !FREE_CHAT_FIELD_LIST.some((field) => field === key),
   );
   if (extra !== undefined)
     throw invalidChat(
-      FREE_CHAT_DETAILS.fieldName.test(extra) ? extra : null,
+      FREE_CHAT_FIELD_NAME.test(extra) ? extra : null,
       FREE_CHAT_DETAILS.fields,
     );
   const row = checked(null, FREE_CHAT_DETAILS.body, () =>
     controlObject(
       value,
-      FREE_CHAT_FIELDS.filter((key) => Object.hasOwn(value, key)),
+      FREE_CHAT_FIELD_LIST.filter((key) => Object.hasOwn(value, key)),
     ),
   );
   if (row.model !== selection.modelId)
-    throw invalidChat('model', `model must be ${selection.modelId}`);
+    throw invalidChat(
+      FREE_CHAT_FIELDS.MODEL,
+      FREE_CHAT_DETAILS.model(selection.modelId),
+    );
   if (
-    Object.hasOwn(row, 'stream') &&
+    Object.hasOwn(row, FREE_CHAT_FIELDS.STREAM) &&
     row.stream !== false &&
     !(allowStreaming && row.stream === true)
   )
     throw invalidChat(
-      'stream',
+      FREE_CHAT_FIELDS.STREAM,
       allowStreaming ? FREE_CHAT_DETAILS.stream : FREE_CHAT_DETAILS.noStream,
     );
   const messages = row.messages;
   if (!Array.isArray(messages) || messages.length !== 1)
-    throw invalidChat('messages', FREE_CHAT_DETAILS.messages);
-  const message = checked('messages', FREE_CHAT_DETAILS.messages, () =>
-    controlObject(messages[0], ['role', 'content']),
+    throw invalidChat(FREE_CHAT_FIELDS.MESSAGES, FREE_CHAT_DETAILS.messages);
+  const message = checked(
+    FREE_CHAT_FIELDS.MESSAGES,
+    FREE_CHAT_DETAILS.messages,
+    () => controlObject(messages[0], ['role', 'content']),
   );
   if (message.role !== FREE_CHAT_ROLES.USER)
-    throw invalidChat('messages', FREE_CHAT_DETAILS.messages);
+    throw invalidChat(FREE_CHAT_FIELDS.MESSAGES, FREE_CHAT_DETAILS.messages);
   const maxTokens =
     row.max_tokens === undefined
       ? maximum
       : checked(
-          'max_tokens',
-          `max_tokens must be an integer from 1 to ${maximum}`,
+          FREE_CHAT_FIELDS.MAX_TOKENS,
+          FREE_CHAT_DETAILS.maxTokens(maximum),
           () => controlInteger(row.max_tokens, 1, maximum),
         );
   return {
@@ -105,6 +112,6 @@ function chatText(value: unknown): string {
     /[\uD800-\uDFFF]/u.test(value) ||
     Buffer.byteLength(value) > FREE_EXECUTION.inputBytes
   )
-    throw invalidChat('messages', FREE_CHAT_DETAILS.content);
+    throw invalidChat(FREE_CHAT_FIELDS.MESSAGES, FREE_CHAT_DETAILS.content);
   return value;
 }

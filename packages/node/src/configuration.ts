@@ -39,6 +39,20 @@ export function configurationAddress(value: unknown, code: NodeErrorCode) {
   return text;
 }
 
+// For setup flags at the CLI boundary: names the flag instead of the Solana library's error, and
+// never echoes the value. An optional flag may be absent; a required one must be an address.
+export function setupFlagAddress(
+  value: unknown,
+  flag: string,
+  required = false,
+) {
+  if (
+    (required || value !== undefined) &&
+    !(typeof value === 'string' && isAddress(value))
+  )
+    throw new Error(`${flag} is not a valid Solana address.`);
+}
+
 export function configurationNodeId(value: unknown, code: NodeErrorCode) {
   const text = configurationString(value, code);
   if (
