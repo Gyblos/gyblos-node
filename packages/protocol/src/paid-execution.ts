@@ -1,11 +1,7 @@
 // Parses and authenticates paid execution terms: the free input bound to a priced quote plus the
 // payment authorization, and terminals that report the charge and its settlement. No engine,
 // payment adapter, replay mutation, clock or transport.
-import {
-  CONTROL_LIMITS,
-  FREE_EXECUTION_STOP_REASONS,
-  PUBLIC_RECORD_LIMITS,
-} from './constants';
+import { CONTROL_LIMITS, PUBLIC_RECORD_LIMITS } from './constants';
 import type { SignedOfferV2 } from './control-types';
 import {
   controlAtomic,
@@ -15,14 +11,15 @@ import {
 } from './control-validation';
 import {
   boundedWire,
+  hasField,
+  parseExecutionFailure,
   parseExecutionInput,
   parseExecutionResult,
-} from './execution-input';
+} from './execution-wire';
 import type { FreeExecutionBuildInput } from './free-execution-types';
 import { parseOfferSignatureV2, parseOfferV2, verifyOfferV2 } from './offer-v2';
 import type {
   PaidCharge,
-  PaidExecutionFailure,
   PaidExecutionRequest,
   PaidExecutionResponse,
   PaidExecutionTrust,
@@ -33,8 +30,15 @@ import {
   paidExecutionFail,
   rethrowPaidExecution,
 } from './paid-execution-validation';
-import { PAID_EXECUTION, PAID_EXECUTION_CODES } from './paid/constants';
+import {
+  PAID_DELIVERED_CODES,
+  PAID_DEPOSITED_CODES,
+  PAID_EXECUTION,
+  PAID_EXECUTION_CODES,
+  PAID_REFUSAL_CODES,
+} from './paid/constants';
 import type { PaymentAuthorization, PaymentSettlement } from './payment';
+import { PAYMENT_BINDING } from './payments/constants';
 import { bytesHex } from './public-validation';
 import { signingBytes } from './signing';
 
@@ -47,8 +51,6 @@ export {
 // Standard padded base64: whole four-character groups, the last possibly padded.
 const BASE64 =
   /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
-const has = (value: unknown, key: string) =>
-  !!value && typeof value === 'object' && Object.hasOwn(value, key);
 
 function identifier(value: unknown): string {
   return typeof value === 'string' && PAID_EXECUTION.identifier.test(value)
@@ -212,16 +214,19 @@ function settlement(value: unknown, charged: string): PaymentSettlement {
     feeAtomic: controlAtomic(input.feeAtomic),
     transaction: identifier(input.transaction),
   };
+  const dust =
+    BigInt(charged) - BigInt(parsed.sellerAtomic) - BigInt(parsed.feeAtomic);
   if (
     parsed.chargedAtomic !== charged ||
-    BigInt(parsed.sellerAtomic) + BigInt(parsed.feeAtomic) > BigInt(charged)
+    dust < 0n ||
+    dust > BigInt(PAYMENT_BINDING.shareDustAtomic)
   )
     return paidExecutionFail(PAID_EXECUTION_CODES.PAYMENT_MISMATCH);
   return parsed;
 }
 
 function payment(value: unknown, charged: string): PaidPayment {
-  if (has(value, 'settlement'))
+  if (hasField(value, 'settlement'))
     return {
       settlement: settlement(
         controlObject(value, ['settlement']).settlement,
@@ -245,41 +250,12 @@ function payment(value: unknown, charged: string): PaidPayment {
   };
 }
 
-// Shape only: a reason exactly with SELLER_CANNOT_CONTINUE, delivered only beside it.
-function failure(value: unknown): PaidExecutionFailure {
-  const hasReason = has(value, 'reason');
-  const hasDelivered = has(value, 'delivered');
-  const error = controlObject(value, [
-    'code',
-    ...(hasReason ? ['reason'] : []),
-    ...(hasDelivered ? ['delivered'] : []),
-  ]);
-  const code = Object.values(PAID_EXECUTION_CODES).find(
-    (entry) => entry === error.code,
-  );
-  if (!code) return paidExecutionFail();
-  const cannotContinue = code === PAID_EXECUTION_CODES.SELLER_CANNOT_CONTINUE;
-  if (hasReason !== cannotContinue || (hasDelivered && !cannotContinue))
-    return paidExecutionFail();
-  if (!cannotContinue) return { code };
-  const reason = Object.values(FREE_EXECUTION_STOP_REASONS).find(
-    (entry) => entry === error.reason,
-  );
-  if (!reason) return paidExecutionFail();
-  if (!hasDelivered) return { code, reason };
-  const delivered = controlObject(error.delivered, ['outputTokens']);
-  return {
-    code,
-    reason,
-    delivered: {
-      outputTokens: controlInteger(
-        delivered.outputTokens,
-        1,
-        PUBLIC_RECORD_LIMITS.maxContextTokens,
-      ),
-    },
-  };
-}
+const FAILURE_RULES = {
+  codes: Object.values(PAID_EXECUTION_CODES),
+  reasonCode: PAID_EXECUTION_CODES.SELLER_CANNOT_CONTINUE,
+  deliveredCodes: PAID_DELIVERED_CODES,
+  fail: () => paidExecutionFail(),
+};
 
 // The charge must describe what the terminal reports: the result's usage, the delivered output of
 // a stop, or nothing at all (charged 0) when no output was delivered.
@@ -299,8 +275,8 @@ function chargeMatches(
 }
 
 function parseResponse(value: unknown): PaidExecutionResponse {
-  const failed = has(value, 'error');
-  const paid = has(value, 'charge') || has(value, 'payment');
+  const failed = hasField(value, 'error');
+  const paid = hasField(value, 'charge') || hasField(value, 'payment');
   const input = controlObject(value, [
     'version',
     'requestId',
@@ -318,8 +294,15 @@ function parseResponse(value: unknown): PaidExecutionResponse {
     requestDigest: controlHex(input.requestDigest),
   };
   const outcome = failed
-    ? { error: failure(input.error) }
+    ? { error: parseExecutionFailure(input.error, FAILURE_RULES) }
     : { result: parseExecutionResult(input.result) };
+  // Refusals precede any deposit; deposited-only stops always follow one.
+  const code = outcome.error?.code;
+  if (
+    (paid && code && PAID_REFUSAL_CODES.includes(code)) ||
+    (!paid && code && PAID_DEPOSITED_CODES.includes(code))
+  )
+    return paidExecutionFail(PAID_EXECUTION_CODES.PAYMENT_MISMATCH);
   if (!paid) return { ...base, ...outcome };
   const charged = charge(input.charge);
   const response = {
@@ -336,5 +319,9 @@ function parseResponse(value: unknown): PaidExecutionResponse {
 export function parsePaidExecutionResponse(
   value: unknown,
 ): PaidExecutionResponse {
-  return paidExecutionBoundary(() => parseResponse(value));
+  return paidExecutionBoundary(() => {
+    const response = parseResponse(value);
+    boundedWire(response, PAID_EXECUTION.responseBytes);
+    return response;
+  });
 }

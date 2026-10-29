@@ -1,17 +1,34 @@
 // Owns the paid execution wire strings and bounds. These are wire strings: changing one breaks
 // peers. Paid execution is stream-only; its codes mirror the free ones under their own names.
+// Not re-exported by ../constants: this module reads FREE_* from there, so a re-export would
+// create an import cycle.
 import { FREE_EXECUTION, FREE_STREAM } from '../constants';
 
+// Room the payment authorization adds to a request, and the charge and payment to a terminal.
+const AUTHORIZATION_BYTES = 8192;
+const PAYMENT_TERMINAL_BYTES = 2048;
+
 export const PAID_EXECUTION = {
-  alpn: 'gyblos/paid-stream/1',
   version: 1,
   requestDomain: 'gyblos/paid-execution-request/v1\n',
-  // The free request bound plus room for the payment authorization.
-  requestBytes: FREE_EXECUTION.requestBytes + 8192,
+  requestBytes: FREE_EXECUTION.requestBytes + AUTHORIZATION_BYTES,
+  responseBytes: FREE_EXECUTION.responseBytes + PAYMENT_TERMINAL_BYTES,
   // The scheme's signed channel open, base64; a Solana transaction is at most 1232 bytes.
   payloadBytes: 4096,
   // Channel ids, payer addresses and transaction signatures (base58, hex or similar).
   identifier: /^[A-Za-z0-9]{1,128}$/,
+} as const;
+
+// Free stream framing with room for the charge and payment in the terminal.
+export const PAID_STREAM = {
+  alpn: 'gyblos/paid-stream/1',
+  deltaBytes: FREE_STREAM.deltaBytes,
+  eventBytes: FREE_STREAM.eventBytes + PAYMENT_TERMINAL_BYTES,
+  maxEvents: FREE_STREAM.maxEvents,
+  totalBytes: FREE_STREAM.totalBytes + PAYMENT_TERMINAL_BYTES,
+  terminalReserveBytes:
+    FREE_STREAM.terminalReserveBytes + PAYMENT_TERMINAL_BYTES,
+  events: FREE_STREAM.events,
 } as const;
 
 export const PAID_EXECUTION_CODES = {
@@ -44,12 +61,32 @@ export const PAID_EXECUTION_CODES = {
 export type PaidExecutionCode =
   (typeof PAID_EXECUTION_CODES)[keyof typeof PAID_EXECUTION_CODES];
 
-// Free stream framing with room for the charge and payment in the terminal.
-export const PAID_STREAM = {
-  deltaBytes: FREE_STREAM.deltaBytes,
-  eventBytes: FREE_STREAM.eventBytes + 2048,
-  maxEvents: FREE_STREAM.maxEvents,
-  totalBytes: FREE_STREAM.totalBytes + 2048,
-  terminalReserveBytes: FREE_STREAM.terminalReserveBytes + 2048,
-  events: FREE_STREAM.events,
-} as const;
+// Refusals before any deposit: their terminals never carry a charge or payment.
+export const PAID_REFUSAL_CODES: readonly PaidExecutionCode[] = [
+  PAID_EXECUTION_CODES.INVALID,
+  PAID_EXECUTION_CODES.VERSION,
+  PAID_EXECUTION_CODES.LIMIT,
+  PAID_EXECUTION_CODES.BINDING,
+  PAID_EXECUTION_CODES.SIGNATURE,
+  PAID_EXECUTION_CODES.EXPIRED,
+  PAID_EXECUTION_CODES.PEER,
+  PAID_EXECUTION_CODES.REPLAY,
+  PAID_EXECUTION_CODES.NOT_PAID,
+  PAID_EXECUTION_CODES.UNSUPPORTED,
+  PAID_EXECUTION_CODES.BUSY,
+  PAID_EXECUTION_CODES.PAYMENT_MISMATCH,
+  PAID_EXECUTION_CODES.PAYMENT_REJECTED,
+  PAID_EXECUTION_CODES.PAYMENT_UNAVAILABLE,
+];
+// Stops that only happen after a deposit, so their terminals always carry a charge and payment.
+export const PAID_DEPOSITED_CODES: readonly PaidExecutionCode[] = [
+  PAID_EXECUTION_CODES.SELLER_CANNOT_CONTINUE,
+  PAID_EXECUTION_CODES.BUDGET_EXHAUSTED,
+];
+// Stops of a started generation that may report delivered output and charge for it.
+export const PAID_DELIVERED_CODES: readonly PaidExecutionCode[] = [
+  PAID_EXECUTION_CODES.SELLER_CANNOT_CONTINUE,
+  PAID_EXECUTION_CODES.BUDGET_EXHAUSTED,
+  PAID_EXECUTION_CODES.TIMEOUT,
+  PAID_EXECUTION_CODES.CANCELLED,
+];

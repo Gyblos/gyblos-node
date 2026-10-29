@@ -2,17 +2,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createControlQuote } from '@gyblos/core/control-quotes';
+import { FREE_EXECUTION_STOP_REASONS } from '@gyblos/protocol/constants';
 import {
-  ENGINE_DONE_REASONS,
-  FREE_CHAT_ROLES,
-  FREE_EXECUTION_STOP_REASONS,
-} from '@gyblos/protocol/constants';
-import {
-  buildPaidExecutionRequest,
   paidExecutionDigest,
   PaidExecutionError,
-  type PaidExecutionRequest,
 } from '@gyblos/protocol/paid-execution';
 import {
   createPaidStreamVerifier,
@@ -25,59 +18,13 @@ import {
   PAID_STREAM,
 } from '@gyblos/protocol/paid/constants';
 
-import { controlFixture } from './support/control-fixture';
-
-async function request(): Promise<PaidExecutionRequest> {
-  const source = await controlFixture(false);
-  const quote = await createControlQuote(
-    source.request,
-    source.context,
-    source.ownerSigner,
-  );
-  return buildPaidExecutionRequest(
-    quote,
-    {
-      messages: [{ role: FREE_CHAT_ROLES.USER, content: 'Hello' }],
-      maxTokens: quote.offer.maxTokens,
-    },
-    {
-      channelId: 'c'.repeat(64),
-      payer: quote.offer.buyer,
-      requestDigest: quote.offer.requestDigest,
-      maxAtomic: quote.offer.maxAtomic,
-      payload: Buffer.from('open').toString('base64'),
-    },
-  );
-}
-
-async function header(paid: PaidExecutionRequest, sequence: number) {
-  return {
-    version: PAID_EXECUTION.version,
-    requestId: paid.requestId,
-    requestDigest: await paidExecutionDigest(paid),
-    sequence,
-  };
-}
-
-function settled(paid: PaidExecutionRequest, charged: string) {
-  return {
-    settlement: {
-      channelId: paid.payment.channelId,
-      chargedAtomic: charged,
-      refundedAtomic: String(BigInt(paid.payment.maxAtomic) - BigInt(charged)),
-      sellerAtomic: '0',
-      feeAtomic: '0',
-      transaction: 't'.repeat(64),
-    },
-  };
-}
-
-const RESULT = {
-  text: 'Hi.',
-  usage: { inputTokens: 3, outputTokens: 2 },
-  finishReason: ENGINE_DONE_REASONS.STOP,
-};
-const CHARGE = { inputTokens: 3, outputTokens: 2, chargedAtomic: '1' };
+import {
+  CHARGE,
+  header,
+  request,
+  RESULT,
+  settled,
+} from './support/paid-fixture';
 
 void test('deltas then a settled terminal yield the result, charge and settlement', async () => {
   const paid = await request();

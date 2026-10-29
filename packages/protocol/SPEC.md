@@ -676,21 +676,33 @@ Request: the free v3 request shape with `version: 1`, plus `payment`, a
 ### Events and terminal
 
 Deltas are as in free streaming. The terminal is the free result or error with
-paid codes (`PAID_EXECUTION_*`, the free meanings plus `PAYMENT_MISMATCH`,
-`PAYMENT_REJECTED`, `PAYMENT_UNAVAILABLE` and `BUDGET_EXHAUSTED`), and:
+paid codes (`PAID_EXECUTION_*`): the free codes except the free-only admission
+caps, plus `NOT_PAID`, `PAYMENT_MISMATCH`, `PAYMENT_REJECTED`,
+`PAYMENT_UNAVAILABLE` and `BUDGET_EXHAUSTED`. After a deposit the terminal
+carries both `charge {inputTokens, outputTokens, chargedAtomic}` and `payment`,
+which is `{settlement: PaymentSettlement}` or
+`{pending: {channelId, chargedAtomic, transaction | null}}` while settlement is
+still being confirmed. Rules:
 
-- after a deposit, both `charge {inputTokens, outputTokens, chargedAtomic}` and
-  `payment`, which is `{settlement: PaymentSettlement}` or
-  `{pending: {channelId, chargedAtomic, transaction | null}}` while settlement
-  is still being confirmed;
-- when refused before any deposit, neither.
+- Refusals before any deposit (request validation codes, `NOT_PAID`, `BUSY`,
+  `PAYMENT_*`) carry neither. `SELLER_CANNOT_CONTINUE` and `BUDGET_EXHAUSTED`
+  only happen after a deposit and always carry both. A result always carries
+  both.
+- Delivered text was always deposited for, so a terminal after any delta
+  carries both.
+- A stop after deltas (`SELLER_CANNOT_CONTINUE`, `BUDGET_EXHAUSTED`, `TIMEOUT`,
+  `CANCELLED`) reports `delivered.outputTokens` and charges exactly that
+  output; only `SELLER_CANNOT_CONTINUE` carries a `reason`. Any other error,
+  or a stream that delivered no text, charges `"0"`.
+- The charge's tokens equal a result's usage. Output tokens never exceed the
+  delivered UTF-8 bytes, and input plus output fit the quoted model context.
+- The charge never exceeds the deposited ceiling. The settlement names the
+  request's channel, refunds the rest of the ceiling, and its seller plus fee
+  shares cover the charge except at most one atomic unit of rounding dust.
+- The terminal is bounded to the free response bound plus 2 KiB.
 
-The buyer's verifier enforces that a result always carries both, that the
-charge matches the result's usage or the delivered output of a stop, that a
-stream which delivered no text charges `"0"`, that the charge never exceeds the
-deposited ceiling, and that the settlement names the request's channel and
-refunds the rest of the ceiling. Recomputing the charge from the quote's
-prices and recounted tokens belongs to the buyer runtime.
+Recomputing the charge from the quote's prices and recounted tokens, and
+checking the settlement on chain, belong to the buyer runtime.
 
 ## Usage receipts v1
 

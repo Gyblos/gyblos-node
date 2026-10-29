@@ -7,6 +7,7 @@ import {
   FREE_CHAT_ROLES,
   FREE_EXECUTION,
   FREE_EXECUTION_CODES,
+  FREE_EXECUTION_STOP_REASONS,
   PUBLIC_RECORD_LIMITS,
   type FreeChatRole,
 } from './constants';
@@ -21,6 +22,7 @@ import {
 import type {
   FreeExecutionRequest,
   FreeExecutionResult,
+  FreeExecutionStop,
 } from './free-execution-types';
 import {
   freeExecutionFail,
@@ -109,5 +111,59 @@ export function parseExecutionResult(value: unknown): FreeExecutionResult {
       ),
     },
     finishReason: input.finishReason,
+  };
+}
+
+export const hasField = (value: unknown, key: string) =>
+  !!value && typeof value === 'object' && Object.hasOwn(value, key);
+
+// Which codes a channel accepts, which one carries a stop reason, and which may report delivered
+// output; `fail` raises the channel's own invalid-shape error.
+export interface FailureRules<Code extends string> {
+  codes: readonly Code[];
+  reasonCode: Code;
+  deliveredCodes: readonly Code[];
+  fail: () => never;
+}
+
+// Shape only: a reason exactly with reasonCode, delivered only with deliveredCodes.
+export function parseExecutionFailure<Code extends string>(
+  value: unknown,
+  rules: FailureRules<Code>,
+): { code: Code } & FreeExecutionStop {
+  const hasReason = hasField(value, 'reason');
+  const hasDelivered = hasField(value, 'delivered');
+  const error = controlObject(value, [
+    'code',
+    ...(hasReason ? ['reason'] : []),
+    ...(hasDelivered ? ['delivered'] : []),
+  ]);
+  const code = rules.codes.find((entry) => entry === error.code);
+  if (!code) return rules.fail();
+  if (
+    hasReason !== (code === rules.reasonCode) ||
+    (hasDelivered && !rules.deliveredCodes.includes(code))
+  )
+    return rules.fail();
+  const reason = hasReason
+    ? Object.values(FREE_EXECUTION_STOP_REASONS).find(
+        (entry) => entry === error.reason,
+      )
+    : undefined;
+  if (hasReason && !reason) return rules.fail();
+  return {
+    code,
+    ...(reason ? { reason } : {}),
+    ...(hasDelivered
+      ? {
+          delivered: {
+            outputTokens: controlInteger(
+              controlObject(error.delivered, ['outputTokens']).outputTokens,
+              1,
+              PUBLIC_RECORD_LIMITS.maxContextTokens,
+            ),
+          },
+        }
+      : {}),
   };
 }

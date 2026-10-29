@@ -21,6 +21,7 @@ import {
   paidExecutionFail,
 } from './paid-execution-validation';
 import {
+  PAID_DELIVERED_CODES,
   PAID_EXECUTION,
   PAID_EXECUTION_CODES,
   PAID_STREAM,
@@ -99,20 +100,33 @@ export function decodePaidStreamEvent(bytes: Uint8Array) {
   });
 }
 
-// The terminal must describe this request's deposit: same channel, a charge within the ceiling, a
-// refund of the rest, and nothing charged when no text was delivered.
+// The terminal must describe this request's deposit: delivered text was always deposited for, the
+// charged tokens fit the delivered bytes (every token covers at least one byte) and the model
+// context, the charge stays within the ceiling and is zero without delivery, and the payment names
+// this channel and refunds the rest.
 function checkPayment(
   request: PaidExecutionRequest,
   response: PaidExecutionResponse,
-  deliveredText: string,
+  text: string,
+  outputBytes: number,
 ): void {
-  if (!response.charge || !response.payment) return;
+  const { charge, payment } = response;
+  if (!charge || !payment) {
+    if (text) return paidExecutionFail(PAID_EXECUTION_CODES.PAYMENT_MISMATCH);
+    return;
+  }
+  if (
+    charge.outputTokens > outputBytes ||
+    charge.inputTokens + charge.outputTokens >
+      request.quote.offer.model.contextTokens
+  )
+    return paidExecutionFail(PAID_EXECUTION_CODES.LIMIT);
   const ceiling = BigInt(request.payment.maxAtomic);
-  const charged = BigInt(response.charge.chargedAtomic);
+  const charged = BigInt(charge.chargedAtomic);
   if (charged > ceiling) return paidExecutionFail(PAID_EXECUTION_CODES.LIMIT);
-  if (!deliveredText && charged !== 0n)
+  if (!text && charged !== 0n)
     return paidExecutionFail(PAID_EXECUTION_CODES.PAYMENT_MISMATCH);
-  const { settlement, pending } = response.payment;
+  const { settlement, pending } = payment;
   const channelId = settlement?.channelId ?? pending?.channelId;
   if (
     channelId !== request.payment.channelId ||
@@ -128,13 +142,11 @@ function checkOutcome(
   outputBytes: number,
 ): void {
   const stopped = response.error;
-  // Delivered usage accompanies exactly a cannot-continue stop after at least one delta, and
-  // cannot exceed the delivered UTF-8 bytes: every token covers at least one byte.
+  // Delivered usage accompanies exactly a stop that may report it, after at least one delta.
   if (
     stopped &&
     (!!stopped.delivered !==
-      (stopped.code === PAID_EXECUTION_CODES.SELLER_CANNOT_CONTINUE &&
-        text.length > 0) ||
+      (PAID_DELIVERED_CODES.includes(stopped.code) && text.length > 0) ||
       (stopped.delivered?.outputTokens ?? 0) > outputBytes ||
       (stopped.delivered?.outputTokens ?? 0) > request.input.maxTokens)
   )
@@ -191,8 +203,8 @@ export async function createPaidStreamVerifier(value: PaidExecutionRequest) {
           response.requestDigest !== digest
         )
           return paidExecutionFail(PAID_EXECUTION_CODES.BINDING);
+        checkPayment(request, response, text, outputBytes);
         checkOutcome(request, response, text, outputBytes);
-        checkPayment(request, response, text);
         return { terminal: response };
       } catch (error) {
         failed = true;

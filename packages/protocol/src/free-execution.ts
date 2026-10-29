@@ -1,28 +1,22 @@
 // Parses and authenticates free execution terms; no engine, replay mutation, clock, transport or payments.
 import {
   CONTROL_LIMITS,
-  ENGINE_DONE_REASONS,
   FREE_EXECUTION,
   FREE_EXECUTION_CODES,
   FREE_EXECUTION_MATCH_MODES,
-  FREE_EXECUTION_STOP_REASONS,
-  PUBLIC_RECORD_LIMITS,
   type FreeExecutionMatchMode,
 } from './constants';
 import type { SignedOfferV2 } from './control-types';
-import {
-  controlHex,
-  controlInteger,
-  controlObject,
-} from './control-validation';
+import { controlHex, controlObject } from './control-validation';
 import {
   boundedWire,
+  hasField,
+  parseExecutionFailure,
   parseExecutionInput,
   parseExecutionResult,
-} from './execution-input';
+} from './execution-wire';
 import type {
   FreeExecutionBuildInput,
-  FreeExecutionFailure,
   FreeExecutionRequest,
   FreeExecutionResponse,
   FreeExecutionResult,
@@ -32,7 +26,6 @@ import {
   freeExecutionBoundary,
   FreeExecutionError,
   freeExecutionFail,
-  freeExecutionText,
   rethrowFreeExecution,
 } from './free-execution-validation';
 import { parseOfferSignatureV2, parseOfferV2, verifyOfferV2 } from './offer-v2';
@@ -117,49 +110,17 @@ export async function freeExecutionDigest(value: unknown): Promise<string> {
     ),
   );
 }
-const has = (value: unknown, key: string) =>
-  !!value && typeof value === 'object' && Object.hasOwn(value, key);
-// Shape only: a reason exactly with SELLER_CANNOT_CONTINUE, delivered only beside it.
-function failure(value: unknown): FreeExecutionFailure {
-  const hasReason = has(value, 'reason');
-  const hasDelivered = has(value, 'delivered');
-  const error = controlObject(value, [
-    'code',
-    ...(hasReason ? ['reason'] : []),
-    ...(hasDelivered ? ['delivered'] : []),
-  ]);
-  const code = Object.values(FREE_EXECUTION_CODES).find(
-    (entry) => entry === error.code,
-  );
-  if (!code) return freeExecutionFail();
-  const cannotContinue = code === FREE_EXECUTION_CODES.SELLER_CANNOT_CONTINUE;
-  if (hasReason !== cannotContinue || (hasDelivered && !cannotContinue))
-    return freeExecutionFail();
-  if (!cannotContinue) return { code };
-  const reason = Object.values(FREE_EXECUTION_STOP_REASONS).find(
-    (entry) => entry === error.reason,
-  );
-  if (!reason) return freeExecutionFail();
-  if (!hasDelivered) return { code, reason };
-  const delivered = controlObject(error.delivered, ['outputTokens']);
-  return {
-    code,
-    reason,
-    delivered: {
-      outputTokens: controlInteger(
-        delivered.outputTokens,
-        1,
-        PUBLIC_RECORD_LIMITS.maxContextTokens,
-      ),
-    },
-  };
-}
+const FAILURE_RULES = {
+  codes: Object.values(FREE_EXECUTION_CODES),
+  reasonCode: FREE_EXECUTION_CODES.SELLER_CANNOT_CONTINUE,
+  deliveredCodes: [FREE_EXECUTION_CODES.SELLER_CANNOT_CONTINUE],
+  fail: () => freeExecutionFail(),
+};
 export function parseFreeExecutionResponse(
   value: unknown,
 ): FreeExecutionResponse {
   return freeExecutionBoundary(() => {
-    const failed =
-      !!value && typeof value === 'object' && Object.hasOwn(value, 'error');
+    const failed = hasField(value, 'error');
     const input = controlObject(value, [
       'version',
       'requestId',
@@ -175,7 +136,10 @@ export function parseFreeExecutionResponse(
     };
     let response: FreeExecutionResponse;
     if (failed) {
-      response = { ...base, error: failure(input.error) };
+      response = {
+        ...base,
+        error: parseExecutionFailure(input.error, FAILURE_RULES),
+      };
     } else response = { ...base, result: parseExecutionResult(input.result) };
     boundedWire(response, FREE_EXECUTION.responseBytes);
     return response;
