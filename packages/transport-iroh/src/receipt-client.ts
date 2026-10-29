@@ -17,6 +17,8 @@ import type {
 } from './receipt-client-types';
 import type { ReceiptClientOptions } from './receipt-client-validation';
 
+export type { ReceiptClientOptions } from './receipt-client-validation';
+
 export type {
   ReceiptConnection,
   ReceiptDestination,

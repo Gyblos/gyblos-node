@@ -1,4 +1,6 @@
 // Synthetic receipt store and signers for exchange contracts; no disk or runtime inference.
+import assert from 'node:assert/strict';
+
 import { createFreeBuyerReceipt } from '@gyblos/core/receipts';
 import {
   RECEIPT_CHANNEL,
@@ -60,11 +62,12 @@ export async function receiptChannelFixture(
     },
     buyer.sign,
   );
+  assert.ok(receipt.buyer);
   const confirm = {
     version: RECEIPT_CHANNEL.version,
     requestId: 'bb'.repeat(16),
     method: RECEIPT_CHANNEL_METHODS.CONFIRM,
-    params: { receipt },
+    params: { receipt: { ...receipt, buyer: receipt.buyer } },
   };
   return {
     seller,
