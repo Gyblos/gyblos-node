@@ -152,6 +152,15 @@ function receiptContract(name: string, harness: PaymentHarness): void {
         // Reports a lower charge but the true refund; only the ledger shows the difference.
         [{ ...settlement, chargedAtomic: lower }, lower],
         [{ ...settlement, refundedAtomic: '0' }, String(CONTRACT_PARTIAL)],
+        // Claims the fee was smaller (or the seller's share larger) than the ledger paid.
+        [{ ...settlement, feeAtomic: '0' }, String(CONTRACT_PARTIAL)],
+        [
+          {
+            ...settlement,
+            sellerAtomic: String(BigInt(settlement.sellerAtomic) + 1n),
+          },
+          String(CONTRACT_PARTIAL),
+        ],
         [{ ...settlement, transaction: '' }, String(CONTRACT_PARTIAL)],
         [
           { ...settlement, channelId: `${settlement.channelId}x` },

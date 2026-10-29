@@ -12,7 +12,9 @@ import {
   feeSplitBps,
   grossAtomicPerMtok,
   paymentMemo,
+  paymentSplits,
   paymentTermsDigest,
+  settlementShares,
 } from '@gyblos/protocol/payment-binding';
 
 const TERMS: PaymentTerms = {
@@ -91,8 +93,67 @@ void test('fees and prices outside policy are refused with a static code', async
       () => grossAtomicPerMtok(price, 300),
       PAYMENT_ERROR_CODES.UNTRUSTED_TERMS,
     );
-  await assert.rejects(
-    paymentTermsDigest({ ...TERMS, protocolFeeBps: 1.5 }),
-    PaymentError,
+  for (const hostile of [
+    { ...TERMS, protocolFeeBps: 1.5 },
+    { ...TERMS, maxAtomic: 1030000 },
+    { ...TERMS, expiresAt: 1.5 },
+    { ...TERMS, treasury: '' },
+    { ...TERMS, treasury: undefined },
+  ])
+    await assert.rejects(
+      paymentTermsDigest(hostile as unknown as PaymentTerms),
+      (error: unknown) =>
+        error instanceof PaymentError &&
+        error.code === PAYMENT_ERROR_CODES.UNTRUSTED_TERMS,
+    );
+  // Extra properties (an offer object passed as terms) never change the digest.
+  assert.equal(
+    await paymentTermsDigest({ ...TERMS, extra: 'x' } as PaymentTerms),
+    DIGEST,
   );
+});
+
+void test('the channel distribution sends the seller and fee shares to payTo and treasury', () => {
+  assert.deepEqual(paymentSplits(TERMS), [
+    { recipient: TERMS.payTo, bps: 9709 },
+    { recipient: TERMS.treasury, bps: 291 },
+  ]);
+  assert.deepEqual(paymentSplits({ ...TERMS, protocolFeeBps: 0 }), [
+    { recipient: TERMS.payTo, bps: 10_000 },
+  ]);
+  assert.deepEqual(settlementShares('13610', 300), {
+    sellerAtomic: '13213',
+    feeAtomic: '396',
+  });
+  assert.deepEqual(settlementShares('0', 300), {
+    sellerAtomic: '0',
+    feeAtomic: '0',
+  });
+});
+
+// A charge is ceil((input * inputPrice + output * outputPrice) / 1e6) at the gross prices; the
+// seller must receive at least its own price for those tokens, rounded down to the atomic unit.
+void test('per charge, the seller receives its own price rounded down to the atomic unit', () => {
+  const MTOK = 1_000_000n;
+  for (const fee of [0, 1, 300, PAYMENT_BINDING.maxFeeBps])
+    for (const [netIn, netOut] of [
+      [150_000n, 600_000n],
+      [1_100_000n, 4_400_000n],
+      [123_456_789n, 3n],
+      [1n, 1n],
+    ] as const) {
+      const grossIn = BigInt(grossAtomicPerMtok(String(netIn), fee));
+      const grossOut = BigInt(grossAtomicPerMtok(String(netOut), fee));
+      for (const input of [0n, 1n, 7n, 10_013n])
+        for (const output of [1n, 3n, 503n, 99_999n]) {
+          const charged =
+            (input * grossIn + output * grossOut + MTOK - 1n) / MTOK;
+          const net = (input * netIn + output * netOut) / MTOK;
+          const shares = settlementShares(String(charged), fee);
+          assert.ok(BigInt(shares.sellerAtomic) >= net, `${fee} ${input}`);
+          assert.ok(
+            BigInt(shares.sellerAtomic) + BigInt(shares.feeAtomic) <= charged,
+          );
+        }
+    }
 });

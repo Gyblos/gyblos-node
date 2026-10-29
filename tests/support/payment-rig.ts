@@ -9,6 +9,7 @@ import {
   type PaymentClient,
   type PaymentDescription,
   type PaymentServer,
+  type PaymentSplit,
   type PaymentTerms,
 } from '@gyblos/protocol/payment';
 
@@ -51,6 +52,17 @@ export interface PaymentRig {
   serverWith(field: SellerKey): Promise<PaymentServer>;
   // A valid signature over `terms` by a payer key that is not `terms.buyer` (a malicious buyer).
   foreignAuthorization(terms: PaymentTerms): Promise<PaymentAuthorization>;
+  // The rig buyer's own valid signature over `terms`, but opening a channel with `splits` instead
+  // of paymentSplits(terms) (a modified buyer that drops or redirects the fee).
+  authorizationWithSplits(
+    terms: PaymentTerms,
+    splits: readonly PaymentSplit[],
+  ): Promise<PaymentAuthorization>;
+  // `authorization` with its channel distribution replaced after the buyer signed it.
+  tamperSplits(
+    authorization: PaymentAuthorization,
+    splits: readonly PaymentSplit[],
+  ): Promise<PaymentAuthorization>;
   // Valid terms for `server` at now(), under the buyer's ceiling; overrides make them hostile.
   terms(overrides?: Partial<PaymentTerms>): Promise<PaymentTerms>;
   observe(): { events: readonly PaymentEvent[]; balances: PaymentBalances };

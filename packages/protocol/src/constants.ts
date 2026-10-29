@@ -369,4 +369,4 @@ export type ReceiptChannelCode =
   (typeof RECEIPT_CHANNEL_CODES)[keyof typeof RECEIPT_CHANNEL_CODES];
 
 // Payment port catalogs live in their own module; re-exported so every caller keeps one import.
-export * from './constants-payment';
+export * from './payments/constants';
