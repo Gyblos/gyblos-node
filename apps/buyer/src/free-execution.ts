@@ -1,5 +1,6 @@
 // Orchestrates free quote execution with failover only before possible prompt transmission.
 // Selection and I/O are injected; this module never authorizes payments or records content.
+import type { BuyerReceiptEvidence } from '@gyblos/node/receipts';
 import type {
   ModelSelection,
   SignedOfferV2,
@@ -15,6 +16,7 @@ import { FreeClientError } from '@gyblos/transport-iroh/free-client';
 
 import { FREE_BUYER, FREE_BUYER_CODES } from './constants';
 import { FreeBuyerError } from './free-chat';
+import { buyerReceiptObservation } from './free-receipts';
 import {
   buyerExecutionTelemetry,
   buyerUnserved,
@@ -35,6 +37,12 @@ export interface FreeWinner {
 }
 
 export interface FreeBuyerDependencies {
+  receipt?: (
+    winner: FreeWinner,
+    evidence: BuyerReceiptEvidence,
+    signal: AbortSignal,
+  ) => Promise<void>;
+  receiptNow?: () => number;
   telemetry?: {
     sink: TelemetrySink;
     buyerNodeId: string;
@@ -84,11 +92,13 @@ export async function executeBuyerFree(
         Boolean(onDelta),
       );
       observer?.received();
+      const receipt = buyerReceiptObservation(dependencies, Boolean(onDelta));
       let delivered = false;
       const emit = onDelta
         ? async (text: string) => {
             signal.throwIfAborted();
             delivered = true;
+            receipt?.text(text);
             await onDelta(text);
             signal.throwIfAborted();
             if (text) observer?.firstToken();
@@ -103,6 +113,7 @@ export async function executeBuyerFree(
         );
         signal.throwIfAborted();
         completeBuyerTelemetry(observer, request, result);
+        await receipt?.finish(winner, request, result, signal);
         return result;
       } catch (error) {
         failBuyerTelemetry(observer, error, signal, delivered);

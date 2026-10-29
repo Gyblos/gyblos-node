@@ -1,10 +1,17 @@
 // Starts the isolated free buyer using local role identity and selection policy, without paid bootstrap.
 import { BUYER_RELAY_ONLY_ENV, INFERENCE_REQUEST_LIMITS } from '@gyblos/config';
 import { NODE_ERROR_CODES } from '@gyblos/node/constants';
+import {
+  createBuyerReceiptRuntime,
+  openReceiptStore,
+} from '@gyblos/node/receipts';
 import { loadRole, nodeSecret } from '@gyblos/node/roles';
 import { P2P_ROLES, REASONING_LEVELS } from '@gyblos/protocol/constants';
 import type { TelemetrySink } from '@gyblos/protocol/telemetry';
-import { bindEndpoint } from '@gyblos/transport-iroh/endpoint';
+import {
+  assertConfiguredRelay,
+  bindEndpoint,
+} from '@gyblos/transport-iroh/endpoint';
 
 import {
   BUYER_SELECTION_CODES,
@@ -89,6 +96,38 @@ async function buyerNodeSecret() {
   }
 }
 
+function buyerReceipts(
+  endpoint: Awaited<ReturnType<typeof bindEndpoint>>,
+  nodeId: string,
+  relayOnly: boolean,
+) {
+  return createBuyerReceiptRuntime({
+    endpoint,
+    store: openReceiptStore({
+      environment: process.env,
+      role: P2P_ROLES.BUYER,
+      nodeId: nodeId,
+    }),
+    signer: async (bytes) =>
+      Uint8Array.from(
+        endpoint
+          .secretKey()
+          .sign([...bytes])
+          .toBytes(),
+      ),
+    transport: {
+      relayOnly,
+      relayAllowed: (origin) => {
+        try {
+          assertConfiguredRelay(origin);
+          return true;
+        } catch {
+          return false;
+        }
+      },
+    },
+  });
+}
 export async function startFreeBuyer(
   options: {
     bind?: typeof bindEndpoint;
@@ -120,10 +159,13 @@ export async function startFreeBuyer(
       externalAddress: process.env.GYBLOS_IROH_EXTERNAL_ADDR || undefined,
     },
   );
+  let receipts: ReturnType<typeof createBuyerReceiptRuntime> | undefined;
   try {
     if (endpoint.id().toString() !== role.nodeId)
       refuse(FREE_BUYER_STARTUP.NODE_KEY);
+    receipts = buyerReceipts(endpoint, role.nodeId, relayOnly);
     const dependencies = freeBuyerDependencies(prepared, {
+      receipts,
       telemetry: options.telemetry,
       onSellerFailure: options.onSellerFailure,
       endpoint,
@@ -145,15 +187,18 @@ export async function startFreeBuyer(
       ),
     );
     return {
+      receipts: receipts.health,
       async close() {
         try {
           await host.close();
         } finally {
+          await receipts?.close();
           await endpoint.close();
         }
       },
     };
   } catch (error) {
+    await receipts?.close();
     await endpoint.close();
     throw error;
   }

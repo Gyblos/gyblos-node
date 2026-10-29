@@ -171,3 +171,15 @@ metadata; `identity-verifier` composes independent registry reads with it.
 Opt-in buyer selection/discovery admission uses these APIs while explicit manual
 trust remains available. See
 [identity](identity.md#read-only-resolution-and-trust-policy).
+
+### Free receipt composition
+
+`@gyblos/node/receipts` owns local receipt orchestration and bounded
+persistence. Its store validates signed snapshots and role identity; filesystem
+checks and atomic replacement live separately from the pure snapshot schema.
+Seller observations go through an injected publisher; buyer observations cross
+into node composition as metadata only. The Iroh adapter remains
+storage-agnostic. The protocol owns wire records, the core owns receipt policy
+and the node owns signers, lifecycle and private files. Neither receipt failures
+nor metadata RPCs enter inference failover. No collector or payment service is
+involved.
