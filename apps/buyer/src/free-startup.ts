@@ -187,6 +187,7 @@ export async function startFreeBuyer(
       ),
     );
     return {
+      url: host.url,
       receipts: receipts.health,
       async close() {
         try {

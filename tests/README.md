@@ -135,3 +135,11 @@ isolation) and `free-receipt-iroh.test.ts` (native complete/streaming exchange
 with temporary homes and a synthetic engine), `free-receipt-deadline.test.ts`
 (slow storage outside inference deadlines) and `receipt-composition.test.ts`
 (per-offer production forwarding). Native skips are not acceptance.
+
+`tests/lab/receipt-acceptance.test.ts` exercises product startup to confirmed
+private receipts through an isolated child, local memory index, native Iroh and
+in-memory provider. It covers both HTTP modes, restarts, old catalog rejection,
+receipt/engine failures, cancellation, configured free caps and retention
+checks. The child inherits no credentials or role settings; parent globals stay
+separate. The standalone command is `pnpm acceptance:receipts`; native skips
+prove nothing.

@@ -94,6 +94,8 @@ void test(
         dropped: 0,
       });
       await host.close();
+      assert.ok('url' in host);
+      assert.equal(typeof host.url, 'string');
       assert.equal(binds, 1);
       assert.equal(rpcCalls, 0);
     } finally {
