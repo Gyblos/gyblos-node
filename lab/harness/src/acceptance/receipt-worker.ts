@@ -19,6 +19,7 @@ import {
 } from './receipt-phases';
 import { startReceiptScenario } from './receipt-startup';
 import { confirmedSnapshots, receiptRetention } from './receipt-state';
+import { receiptTelemetry } from './receipt-telemetry';
 
 export async function receiptScenario(
   signal: AbortSignal,
@@ -56,6 +57,8 @@ export async function receiptScenario(
     await run.close();
     await receiptRetention(run.environment, stored.at(-1)!);
     cases.push(RECEIPT_ACCEPTANCE_CASES.PRIVACY);
+    await receiptTelemetry(run.environment, answers);
+    cases.push(RECEIPT_ACCEPTANCE_CASES.TELEMETRY);
     acceptanceAssert(
       run.externalCalls() === 0 &&
         run.discoveryReads() >= answers &&

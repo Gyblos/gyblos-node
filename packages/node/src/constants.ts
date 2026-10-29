@@ -240,6 +240,7 @@ export const NODE_SETTINGS = {
   BUYER_RELAY_ONLY: 'buyerRelayOnly',
   DISCOVERY_PUBLISH: 'discoveryPublish',
   DISCOVERY_URL: 'discoveryUrl',
+  TELEMETRY_FILE: 'telemetryFile',
   OFFERS: 'offers',
 } as const;
 export type NodeSettingKey = (typeof NODE_SETTINGS)[keyof typeof NODE_SETTINGS];
@@ -278,3 +279,6 @@ export const RECEIPT_WORK = {
   retryMs: 40,
   attempts: 3,
 } as const;
+
+// Startup owns only its configured file sink and bounds shutdown independently of inference.
+export const LOCAL_TELEMETRY = { closeMs: 5000 } as const;

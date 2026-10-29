@@ -39,6 +39,7 @@ import {
 } from './seller-offers';
 import { loadSellerSettings, type SellerSettings } from './seller-settings';
 import { serveSellerTransport } from './seller-transport';
+import { createLocalTelemetry } from './telemetry-startup';
 
 // Refresh refusals that a later observation can clear.
 const TRANSIENT = new Set<string>([
@@ -106,6 +107,13 @@ export async function startSeller(
       throw new Error('Seller role required.');
     // Settings refuse missing and paid offers, so the daemon only ever serves a free listing.
     const settings = await loadSellerSettings(process.env);
+    const telemetry = createLocalTelemetry({
+      enabled: settings.telemetryFile,
+      environment: process.env,
+      role: P2P_ROLES.SELLER,
+      sink: options.telemetry,
+    });
+    disposers.push(telemetry.close);
     const publicationConfig = settings.publication;
     const publicSequence = await openSellerSequence({
       environment: process.env,
@@ -202,9 +210,9 @@ export async function startSeller(
         control: control.service,
         receipts: receipts.service,
         free: createSellerFreeOffers(() => offers.all(), {
-          telemetry: options.telemetry
+          telemetry: telemetry.sink
             ? {
-                sink: options.telemetry,
+                sink: telemetry.sink,
                 engineKind: (index) =>
                   settings.offers[index]!.engine.engine.kind,
               }
@@ -286,6 +294,7 @@ export async function startSeller(
       close,
       publication: publication ? () => publication.health() : undefined,
       receipts: receipts.health,
+      telemetry: telemetry.health,
     };
   } catch (error) {
     await close();

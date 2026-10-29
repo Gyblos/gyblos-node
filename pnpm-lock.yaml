@@ -441,6 +441,9 @@ importers:
       '@gyblos/runtime':
         specifier: workspace:*
         version: link:../runtime
+      '@gyblos/telemetry-file':
+        specifier: workspace:*
+        version: link:../telemetry-file
       '@gyblos/transport-iroh':
         specifier: workspace:*
         version: link:../transport-iroh

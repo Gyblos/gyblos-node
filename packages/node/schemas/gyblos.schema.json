@@ -37,6 +37,9 @@
       "items": {
         "$ref": "#/definitions/offer"
       }
+    },
+    "telemetry": {
+      "$ref": "#/definitions/telemetry"
     }
   },
   "definitions": {
@@ -371,6 +374,17 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 1000000000000
+        }
+      }
+    },
+    "telemetry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "file": {
+          "type": "boolean",
+          "default": false,
+          "description": "Opt in to bounded private file telemetry for each locally started role. No external collection."
         }
       }
     }

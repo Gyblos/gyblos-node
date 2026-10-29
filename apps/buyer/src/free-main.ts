@@ -1,5 +1,7 @@
 // Owns the free buyer process lifetime. Importing this entry creates no endpoint, timer or files.
 import { PORTS } from '@gyblos/config';
+import { NODE_ERROR_CODES } from '@gyblos/node/constants';
+import { NodeError } from '@gyblos/node/errors';
 import { isMain, shutdownSignal } from '@gyblos/runtime';
 import type { RelayConfigurationCode } from '@gyblos/transport-iroh/constants';
 import { RelayConfigurationError } from '@gyblos/transport-iroh/relays';
@@ -16,6 +18,9 @@ import type { SellerFailure } from './seller-failures';
 const BUYER_DOCS = 'docs/running-a-node.md "Free v2 buyer endpoint"';
 // Next steps by reason; static text only, never a path from the environment.
 const HINTS: Readonly<Record<FreeBuyerStartupReason, string>> = {
+  [FREE_BUYER_STARTUP.TELEMETRY_CONFIG]:
+    'check GYBLOS_CONFIG or ./gyblos.toml; telemetry.file must be a boolean',
+
   [FREE_BUYER_STARTUP.ROLE_MISSING]:
     'run `pnpm node:setup --role buyer --mint MINT` first',
   [FREE_BUYER_STARTUP.ROLE_INVALID]:
@@ -46,6 +51,11 @@ export function startupReason(
   error: unknown,
 ): FreeBuyerStartupReason | RelayConfigurationCode {
   if (error instanceof FreeBuyerStartupError) return error.reason;
+  if (
+    error instanceof NodeError &&
+    error.code === NODE_ERROR_CODES.NODE_CONFIG_INVALID
+  )
+    return FREE_BUYER_STARTUP.TELEMETRY_CONFIG;
   if (error instanceof RelayConfigurationError) return error.code;
   return FREE_BUYER_STARTUP.UNKNOWN;
 }
