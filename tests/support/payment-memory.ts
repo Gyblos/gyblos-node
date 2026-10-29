@@ -1,7 +1,9 @@
 // In-memory reference pair for the payment port contract: a synthetic ledger, ed25519 signatures and
 // a journal, so the contract is proven satisfiable before any real adapter exists. Never moves funds.
+// Like a real adapter, the server derives the payer key from its address and keeps its own records.
 import {
   createHash,
+  createPublicKey,
   generateKeyPairSync,
   randomBytes,
   sign,
@@ -29,61 +31,107 @@ import {
 import {
   CONTRACT_CEILING,
   CONTRACT_NOW,
+  PAYMENT_EVENTS,
+  type PaymentBalances,
   type PaymentEvent,
   type PaymentHarness,
   type PaymentRig,
-} from './payment-contract';
+  type PaymentRigOptions,
+} from './payment-rig';
+import { UPSTREAM_MARKER } from './private-error';
 
 const ATOMIC = /^(0|[1-9][0-9]*)$/;
 const DIGEST = /^[0-9a-f]{64}$/;
 const FUNDS = 10n * CONTRACT_CEILING;
-const TERM_SECONDS = 60_000;
-const DESCRIPTION: PaymentDescription = {
-  network: 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1',
-  mint: 'mint-synthetic',
-  payTo: 'payee-synthetic',
-  feePayer: 'fee-payer-synthetic',
-  authorizer: 'authorizer-synthetic',
-};
+const TERM_MS = 60_000;
+const NETWORK = 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1';
+const MINT = 'mint-synthetic';
 
 interface Ledger {
-  balances: { payer: bigint; payee: bigint; escrow: bigint };
+  balances: PaymentBalances;
   events: PaymentEvent[];
-  publicKeys: Map<string, KeyObject>;
+  // What actually happened on the synthetic chain, by transaction id.
+  transactions: Map<string, Omit<PaymentSettlement, 'transaction'>>;
 }
 
-interface Channel {
-  maxAtomic: bigint;
-  settled: boolean;
+interface JournalEntry extends PaymentReconciliation {
+  maxAtomic: string;
+}
+
+interface Channel extends PaymentAdmission {
+  settlement: PaymentSettlement | null;
 }
 
 function fail(code: PaymentErrorCode): never {
   throw new PaymentError(code);
 }
 
-function atomic(value: string, code: PaymentErrorCode): bigint {
-  return ATOMIC.test(value) ? BigInt(value) : fail(code);
-}
-
 function sha256(text: string): string {
   return createHash('sha256').update(text).digest('hex');
 }
 
-// The fields a payer signs: everything that binds the deposit to one request and one payee.
-function signedFields(
-  authorization: Omit<PaymentAuthorization, 'payload'>,
-  terms: PaymentTerms,
-) {
-  return JSON.stringify([
-    authorization.channelId,
-    authorization.payer,
-    authorization.requestDigest,
-    authorization.maxAtomic,
-    terms.network,
-    terms.mint,
-    terms.payTo,
-    terms.expiresAt,
-  ]);
+function description(name: string): PaymentDescription {
+  return {
+    network: NETWORK,
+    mint: MINT,
+    payTo: `payee-${name}`,
+    feePayer: `fee-payer-${name}`,
+    authorizer: `authorizer-${name}`,
+  };
+}
+
+function channelIdOf(payer: string, terms: PaymentTerms): string {
+  return sha256(JSON.stringify([payer, terms.payTo, terms.requestDigest]));
+}
+
+// Everything a payer signs: the channel and every money-binding field of the terms.
+function signedBytes(channelId: string, terms: PaymentTerms): Buffer {
+  return Buffer.from(
+    JSON.stringify([
+      channelId,
+      terms.buyer,
+      terms.network,
+      terms.mint,
+      terms.payTo,
+      terms.feePayer,
+      terms.authorizer,
+      terms.requestDigest,
+      terms.maxAtomic,
+      terms.expiresAt,
+    ]),
+  );
+}
+
+function trustedTerms(terms: PaymentTerms, payer: string): boolean {
+  return (
+    terms.network === NETWORK &&
+    terms.mint === MINT &&
+    terms.buyer === payer &&
+    ATOMIC.test(terms.maxAtomic) &&
+    BigInt(terms.maxAtomic) > 0n &&
+    BigInt(terms.maxAtomic) <= CONTRACT_CEILING &&
+    DIGEST.test(terms.requestDigest) &&
+    terms.expiresAt > CONTRACT_NOW
+  );
+}
+
+function confirmedReceipt(
+  ledger: Ledger,
+  entry: JournalEntry,
+  settlement: PaymentSettlement,
+  expectedChargedAtomic: string,
+): boolean {
+  const onChain = ledger.transactions.get(settlement.transaction);
+  return (
+    onChain !== undefined &&
+    onChain.channelId === entry.channelId &&
+    settlement.channelId === entry.channelId &&
+    onChain.chargedAtomic === settlement.chargedAtomic &&
+    onChain.refundedAtomic === settlement.refundedAtomic &&
+    settlement.chargedAtomic === expectedChargedAtomic &&
+    BigInt(onChain.chargedAtomic) + BigInt(onChain.refundedAtomic) ===
+      BigInt(entry.maxAtomic)
+  );
 }
 
 function createClient(
@@ -94,63 +142,47 @@ function createClient(
   const payer = keys.publicKey
     .export({ format: 'der', type: 'spki' })
     .toString('hex');
-  ledger.publicKeys.set(payer, keys.publicKey);
-  const journal = new Map<string, PaymentReconciliation>();
-  const trusted = (terms: PaymentTerms) =>
-    terms.network === DESCRIPTION.network &&
-    terms.mint === DESCRIPTION.mint &&
-    terms.buyer === payer &&
-    ATOMIC.test(terms.maxAtomic) &&
-    BigInt(terms.maxAtomic) <= CONTRACT_CEILING &&
-    DIGEST.test(terms.requestDigest) &&
-    terms.expiresAt > CONTRACT_NOW;
+  const journal = new Map<string, JournalEntry>();
   return {
     payer,
     async authorize(terms) {
-      if (!trusted(terms)) fail(PAYMENT_ERROR_CODES.UNTRUSTED_TERMS);
+      if (!trustedTerms(terms, payer))
+        fail(PAYMENT_ERROR_CODES.UNTRUSTED_TERMS);
       if (journal.has(terms.requestDigest))
         fail(PAYMENT_ERROR_CODES.ALREADY_AUTHORIZED);
-      // A real journal would also hold the RPC origin for recovery; it is never echoed in errors.
+      // A real journal would also keep the RPC origin for recovery; it is never echoed in errors.
       if (options.failJournal || !options.rpcUrl)
         fail(PAYMENT_ERROR_CODES.JOURNAL_UNAVAILABLE);
-      const channelId = sha256(`${payer}:${terms.requestDigest}`);
+      const channelId = channelIdOf(payer, terms);
       journal.set(terms.requestDigest, {
         channelId,
         requestDigest: terms.requestDigest,
         state: PAYMENT_CHANNEL_STATES.OPEN,
         chargedAtomic: null,
+        maxAtomic: terms.maxAtomic,
       });
-      ledger.events.push('journal');
-      const unsigned = {
+      ledger.events.push(PAYMENT_EVENTS.JOURNAL);
+      const signature = sign(
+        null,
+        signedBytes(channelId, terms),
+        keys.privateKey,
+      );
+      ledger.events.push(PAYMENT_EVENTS.SIGN);
+      return {
         channelId,
         payer,
         requestDigest: terms.requestDigest,
         maxAtomic: terms.maxAtomic,
+        payload: signature.toString('base64'),
       };
-      const signature = sign(
-        null,
-        Buffer.from(signedFields(unsigned, terms)),
-        keys.privateKey,
-      );
-      ledger.events.push('sign');
-      return { ...unsigned, payload: signature.toString('base64') };
     },
     async checkReceipt(authorization, settlement, expectedChargedAtomic) {
-      const charged = atomic(
-        settlement.chargedAtomic,
-        PAYMENT_ERROR_CODES.RECEIPT_MISMATCH,
-      );
-      const refunded = atomic(
-        settlement.refundedAtomic,
-        PAYMENT_ERROR_CODES.RECEIPT_MISMATCH,
-      );
       const entry = journal.get(authorization.requestDigest);
-      if (
-        !entry ||
-        settlement.channelId !== entry.channelId ||
-        settlement.chargedAtomic !== expectedChargedAtomic ||
-        charged + refunded !== BigInt(authorization.maxAtomic)
-      )
+      if (!entry || entry.channelId !== authorization.channelId)
+        fail(PAYMENT_ERROR_CODES.RECEIPT_MISMATCH);
+      if (entry.state === PAYMENT_CHANNEL_STATES.SETTLED)
+        fail(PAYMENT_ERROR_CODES.ALREADY_SETTLED);
+      if (!confirmedReceipt(ledger, entry, settlement, expectedChargedAtomic))
         fail(PAYMENT_ERROR_CODES.RECEIPT_MISMATCH);
       journal.set(authorization.requestDigest, {
         ...entry,
@@ -159,47 +191,72 @@ function createClient(
       });
     },
     async reconcile() {
-      return [...journal.values()];
+      return [...journal.values()].map(
+        ({ channelId, requestDigest, state, chargedAtomic }) => ({
+          channelId,
+          requestDigest,
+          state,
+          chargedAtomic,
+        }),
+      );
     },
   };
 }
 
-function verified(
-  ledger: Ledger,
+function payerKey(payer: string): KeyObject {
+  return createPublicKey({
+    key: Buffer.from(payer, 'hex'),
+    format: 'der',
+    type: 'spki',
+  });
+}
+
+function matches(
+  own: PaymentDescription,
   authorization: PaymentAuthorization,
   terms: PaymentTerms,
 ): boolean {
-  const publicKey = ledger.publicKeys.get(authorization.payer);
+  const payload = Buffer.from(authorization.payload, 'base64');
   return (
-    publicKey !== undefined &&
+    (Object.keys(own) as (keyof PaymentDescription)[]).every(
+      (key) => terms[key] === own[key],
+    ) &&
+    terms.expiresAt > CONTRACT_NOW &&
+    terms.buyer === authorization.payer &&
     authorization.requestDigest === terms.requestDigest &&
     authorization.maxAtomic === terms.maxAtomic &&
-    authorization.channelId ===
-      sha256(`${authorization.payer}:${authorization.requestDigest}`) &&
+    authorization.channelId === channelIdOf(authorization.payer, terms) &&
+    // Base64 decoding ignores trailing garbage; the payload must round-trip exactly.
+    payload.toString('base64') === authorization.payload &&
     verify(
       null,
-      Buffer.from(signedFields(authorization, terms)),
-      publicKey,
-      Buffer.from(authorization.payload, 'base64'),
-    ) &&
-    // Base64 decoding ignores trailing garbage; the payload must round-trip exactly.
-    Buffer.from(authorization.payload, 'base64').toString('base64') ===
-      authorization.payload
+      signedBytes(authorization.channelId, terms),
+      payerKey(authorization.payer),
+      payload,
+    )
   );
 }
 
-function createServer(ledger: Ledger): PaymentServer {
+function sameAdmission(channel: Channel, admission: PaymentAdmission): boolean {
+  return (
+    channel.payer === admission.payer &&
+    channel.requestDigest === admission.requestDigest &&
+    channel.maxAtomic === admission.maxAtomic
+  );
+}
+
+function createServer(
+  ledger: Ledger,
+  own: PaymentDescription,
+  upstream: () => void,
+): PaymentServer {
   const channels = new Map<string, Channel>();
-  const ownTerms = (terms: PaymentTerms) =>
-    (Object.keys(DESCRIPTION) as (keyof PaymentDescription)[]).every(
-      (key) => terms[key] === DESCRIPTION[key],
-    ) && terms.expiresAt > CONTRACT_NOW;
   return {
-    describe: () => ({ ...DESCRIPTION }),
-    async admit(authorization, terms): Promise<PaymentAdmission> {
+    describe: async () => ({ ...own }),
+    async admit(authorization, terms) {
       let valid = false;
       try {
-        valid = ownTerms(terms) && verified(ledger, authorization, terms);
+        valid = matches(own, authorization, terms);
       } catch {
         valid = false;
       }
@@ -207,62 +264,104 @@ function createServer(ledger: Ledger): PaymentServer {
       if (channels.has(authorization.channelId))
         fail(PAYMENT_ERROR_CODES.CHANNEL_REUSED);
       const maxAtomic = BigInt(authorization.maxAtomic);
+      try {
+        upstream();
+      } catch {
+        fail(PAYMENT_ERROR_CODES.UNAVAILABLE);
+      }
       if (ledger.balances.payer < maxAtomic)
         fail(PAYMENT_ERROR_CODES.UNAVAILABLE);
-      channels.set(authorization.channelId, { maxAtomic, settled: false });
-      ledger.balances.payer -= maxAtomic;
-      ledger.balances.escrow += maxAtomic;
-      ledger.events.push('deposit');
-      return {
+      const admission = {
         channelId: authorization.channelId,
         payer: authorization.payer,
         requestDigest: authorization.requestDigest,
         maxAtomic: authorization.maxAtomic,
       };
+      channels.set(authorization.channelId, { ...admission, settlement: null });
+      ledger.balances.payer -= maxAtomic;
+      ledger.balances.escrow += maxAtomic;
+      ledger.events.push(PAYMENT_EVENTS.DEPOSIT);
+      return admission;
     },
-    async settle(admission, chargedAtomic): Promise<PaymentSettlement> {
+    async settle(admission, chargedAtomic) {
       const channel = channels.get(admission.channelId);
-      if (!channel) return fail(PAYMENT_ERROR_CODES.AUTHORIZATION_MISMATCH);
-      if (channel.settled) fail(PAYMENT_ERROR_CODES.ALREADY_SETTLED);
-      const charged = atomic(chargedAtomic, PAYMENT_ERROR_CODES.INVALID_CHARGE);
-      if (charged > channel.maxAtomic) fail(PAYMENT_ERROR_CODES.INVALID_CHARGE);
-      const refunded = channel.maxAtomic - charged;
-      channel.settled = true;
-      ledger.balances.escrow -= channel.maxAtomic;
-      ledger.balances.payee += charged;
-      ledger.balances.payer += refunded;
-      ledger.events.push('settle');
-      return {
-        channelId: admission.channelId,
+      if (!channel || !sameAdmission(channel, admission))
+        return fail(PAYMENT_ERROR_CODES.AUTHORIZATION_MISMATCH);
+      if (channel.settlement)
+        return channel.settlement.chargedAtomic === chargedAtomic
+          ? channel.settlement
+          : fail(PAYMENT_ERROR_CODES.ALREADY_SETTLED);
+      const ceiling = BigInt(channel.maxAtomic);
+      if (!ATOMIC.test(chargedAtomic) || BigInt(chargedAtomic) > ceiling)
+        fail(PAYMENT_ERROR_CODES.INVALID_CHARGE);
+      const charged = BigInt(chargedAtomic);
+      const settlement = {
+        channelId: channel.channelId,
         chargedAtomic: String(charged),
-        refundedAtomic: String(refunded),
+        refundedAtomic: String(ceiling - charged),
         transaction: randomBytes(32).toString('hex'),
       };
+      channel.settlement = settlement;
+      ledger.balances.escrow -= ceiling;
+      ledger.balances.payee += charged;
+      ledger.balances.payer += ceiling - charged;
+      ledger.transactions.set(settlement.transaction, {
+        channelId: settlement.channelId,
+        chargedAtomic: settlement.chargedAtomic,
+        refundedAtomic: settlement.refundedAtomic,
+      });
+      ledger.events.push(PAYMENT_EVENTS.SETTLE);
+      return settlement;
     },
   };
 }
 
 export const memoryPaymentHarness: PaymentHarness = {
-  async start(options): Promise<PaymentRig> {
+  async start(options: PaymentRigOptions): Promise<PaymentRig> {
     const ledger: Ledger = {
       balances: { payer: FUNDS, payee: 0n, escrow: 0n },
       events: [],
-      publicKeys: new Map(),
+      transactions: new Map(),
+    };
+    const rpcUrl = `https://rpc.invalid/?api-key=${UPSTREAM_MARKER}`;
+    const upstream = () => {
+      if (options.failUpstream) throw new Error(`RPC failed at ${rpcUrl}`);
     };
     const client = createClient(ledger, {
       failJournal: options.failJournal,
-      rpcUrl: `https://rpc.invalid/?api-key=${options.secret}`,
+      rpcUrl,
     });
+    const own = description('primary');
     const requestDigest = sha256('contract request');
     return {
       client,
-      server: createServer(ledger),
-      terms: (overrides = {}) => ({
-        ...DESCRIPTION,
+      server: createServer(ledger, own, upstream),
+      serverWith: (overrides) =>
+        createServer(ledger, { ...own, ...overrides }, upstream),
+      async foreignAuthorization(terms) {
+        const keys = generateKeyPairSync('ed25519');
+        const payer = keys.publicKey
+          .export({ format: 'der', type: 'spki' })
+          .toString('hex');
+        const channelId = channelIdOf(payer, terms);
+        return {
+          channelId,
+          payer,
+          requestDigest: terms.requestDigest,
+          maxAtomic: terms.maxAtomic,
+          payload: sign(
+            null,
+            signedBytes(channelId, terms),
+            keys.privateKey,
+          ).toString('base64'),
+        };
+      },
+      terms: async (overrides = {}) => ({
+        ...own,
         buyer: client.payer,
         requestDigest,
         maxAtomic: String(CONTRACT_CEILING),
-        expiresAt: CONTRACT_NOW + TERM_SECONDS,
+        expiresAt: CONTRACT_NOW + TERM_MS,
         ...overrides,
       }),
       observe: () => ({

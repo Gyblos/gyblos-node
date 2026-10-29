@@ -9,7 +9,9 @@ import {
 } from '@gyblos/protocol/constants';
 import { EngineError, type Engine } from '@gyblos/protocol/engine';
 
-export const UPSTREAM_MARKER = 'UPSTREAM-SECRET-MARKER';
+import { assertPrivate } from './private-error';
+
+export { assertPrivate, UPSTREAM_MARKER } from './private-error';
 
 export const ENGINE_BEHAVIORS = [
   'ok',
@@ -60,21 +62,6 @@ const FAILURES: Partial<Record<EngineBehavior, EngineErrorCode>> = {
 };
 const TIMEOUT_MS = 200;
 const TEST_TIMEOUT_MS = 10_000;
-
-// Asserts no upstream marker reaches the error, its stack, own properties or cause chain.
-export function assertPrivate(error: unknown): void {
-  assert.ok(error instanceof Error);
-  const seen = [
-    error.message,
-    String(error),
-    error.stack ?? '',
-    ...Object.getOwnPropertyNames(error).map((key) =>
-      String(Reflect.get(error, key)),
-    ),
-  ];
-  for (const text of seen) assert.ok(!text.includes(UPSTREAM_MARKER), text);
-  if (error.cause !== undefined) assertPrivate(error.cause);
-}
 
 async function run(
   harness: EngineHarness,
