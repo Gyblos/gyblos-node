@@ -790,8 +790,10 @@ use the core receipt builders before countersigning, never received claims as
 expected context. A signature is an attestation, not proof of execution or usage.
 
 Endpoint connection-open rates, global/source/peer admission and request quotas
-apply first. Receipt streams use the data connection family, sharing its per-peer
-cap with inference; close the inference connection before opening receipts.
+apply first. Receipt streams use a separate receipt connection family with the existing
+per-peer family cap; endpoint global/source/open-rate budgets remain shared.
+Close the inference connection before opening receipts. A stalled receipt
+connection cannot consume the inference family cap.
 One independent receipt `ControlAdmission` instance per server then applies the
 existing `CONTROL_CAPACITY` limits (32 connections/queries, 4 per peer, global
 100/s burst100, peer5/s burst10, 1024 peers and existing idle eviction semantics).
@@ -809,5 +811,39 @@ It must honor the abort signal before committing. A confirmation already
 committed when cancellation occurs may have lost its acknowledgment; querying
 or resubmitting that identical pair is safe and never reruns inference. This
 adapter neither retries automatically nor claims durable/collector acceptance.
-No store, signer, collector or daemon configuration is supplied by default.
-Full receipts stay private, with no publication or aggregate export added.
+The transport takes an injected store and signer. Free node startup supplies
+the private local store described below. Full receipts stay private; no
+collector, publication or aggregate export is enabled.
+
+### Free inference receipt composition
+
+After admitted free inference, the seller signs actual observations and stores
+a seller-only record. Completed responses use validated usage; failed or
+cancelled executions may record known recounted usage and partial output sizes.
+Unknown provider usage is never replaced by an admission estimate. Pre-engine
+refusals produce no receipt. A seller completion attests its result, not delivery
+to the buyer. Buyer signatures are produced only for verified successful
+responses, binding their independently held execution context. Independent token
+counts remain null until a buyer-side counter exists. UTF-8 sizes and timings
+are observations; signatures do not prove their truth.
+
+Each role has a content-free private snapshot under its configured home. At
+most 256 records and 1 MiB are retained; oldest entries are evicted to satisfy
+both limits. Records expire logically seven days after first local storage;
+reads ignore expired entries and the next successful write removes them. No
+background purge is claimed. Files are 0600, directories 0700, with bounded
+reads, strict signed parsing, exclusive updates and staged atomic replacement.
+Unsafe/corrupt state fails closed for receipts without resetting or repairing
+files. A crash can leave an exclusive lock; the runtime does not reclaim it.
+
+Receipt work is best effort, one active operation per process/role without a
+queue. Seller signing/storage has a 500 ms budget; buyer lookup, countersigning,
+local persistence and confirmation together have 2 s. Uncancellable work remains
+tracked until settled; later receipt work is dropped meanwhile. Cancellation
+checks precede commits and late results are ignored. Shutdown aborts receipt
+work without waiting indefinitely. The buyer may make three metadata attempts
+on static not-found/busy/internal replies with a 40 ms delay, within its budget.
+It persists its first signed pair before confirming and reuses that exact pair
+after a lost acknowledgment. Conflicting buyer attestations never overwrite it.
+A failed or missing receipt never retries inference, changes the selected seller
+after prompt transmission, discards successful output or enables a payment.

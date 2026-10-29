@@ -123,3 +123,10 @@ and no post-send retry. Native unavailability is explicitly skipped in tests and
 fails the standalone `acceptance:identity` command; it never counts as
 successful acceptance. No live RPC, chain registration, real engine, payments or
 desktop is exercised.
+
+Free receipt integration is covered by `receipt-store.test.ts` (private files,
+strict snapshots, retention and compare-and-set), `free-receipt-seller.test.ts`
+(actual usage and failure isolation), `free-receipt-policy.test.ts` (buyer
+observations and no inference retry), `receipt-family.test.ts` (connection
+isolation) and `free-receipt-iroh.test.ts` (native complete/streaming exchange
+with temporary homes and a synthetic engine). Native skips are not acceptance.

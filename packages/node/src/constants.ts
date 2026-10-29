@@ -266,5 +266,15 @@ export const IDENTITY_STATE = {
 } as const;
 
 // Receipt retention and best-effort work are bounded independently from inference and payment state.
-export const RECEIPT_STORAGE = { schemaVersion: 1, maxEntries: 256, maxBytes: 1_048_576, retentionMs: 604_800_000 } as const;
-export const RECEIPT_WORK = { sellerMs: 500, buyerMs: 2000, retryMs: 40, attempts: 3 } as const;
+export const RECEIPT_STORAGE = {
+  schemaVersion: 1,
+  maxEntries: 256,
+  maxBytes: 1_048_576,
+  retentionMs: 604_800_000,
+} as const;
+export const RECEIPT_WORK = {
+  sellerMs: 500,
+  buyerMs: 2000,
+  retryMs: 40,
+  attempts: 3,
+} as const;

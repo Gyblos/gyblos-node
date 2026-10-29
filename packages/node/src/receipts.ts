@@ -1,2 +1,15 @@
-// Receipt persistence and integration entry points; no import-time I/O or runtime startup.
-export function openReceiptStore(_options: unknown): { put(value: unknown,signal?:AbortSignal):Promise<void>; load(key:unknown,signal:AbortSignal):Promise<unknown>; confirm(value:unknown,signal:AbortSignal):Promise<boolean> } { throw new Error('Not implemented'); }
+// Public receipt integration surface; importing it never reads files, creates signers or starts tasks.
+export {
+  openReceiptStore,
+  type LocalReceiptStore,
+  type ReceiptStoreOptions,
+} from './receipt-store';
+export {
+  createSellerReceiptRuntime,
+  type SellerReceiptOptions,
+  type SellerReceiptPublisher,
+} from './receipt-seller';
+export {
+  createBuyerReceiptRuntime,
+  type BuyerReceiptEvidence,
+} from './receipt-buyer';

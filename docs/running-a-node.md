@@ -614,3 +614,37 @@ They are not the complete publication-to-answer acceptance: the separate lab
 scenario with an in-process discovery index follows this buyer's integration.
 Real Ollama, off-host/relay/CGNAT and production acceptance remain separate
 operations. Streaming, 8004 identity reading and paid v2 are subsequent work.
+
+## Private free-inference receipts
+
+Free sellers advertise `gyblos/receipt/1` alongside execution. After a verified
+successful response, the free buyer requests the seller's signed receipt, checks
+it against its own execution context, stores its countersigned pair and confirms
+it. This is best effort: an unavailable channel, signer, disk or confirmation
+never repeats the prompt or turns a successful answer into an inference failure.
+The seller also retains seller-only failed/cancelled records when actual
+recounted usage is available; unknown provider usage is omitted.
+
+Each role stores a private `receipts/receipts-v1.json` beneath its configured
+home (directories 0700, files 0600). It contains signed metadata, not prompts,
+responses, keys, IPs or payment authorizations. Buyer token counts are null;
+seller counts are not independent buyer measurements. Both signatures are
+attestations, not proof of execution or usage. No collector or export is
+enabled.
+
+Retention is bounded to 256 records and 1 MiB, evicting oldest metadata first.
+Seven-day expiry is logical: reads hide expired records; the next successful
+write removes them physically. No background deletion is promised. Unsafe or
+corrupt state disables receipt work, without repairing or truncating files. A
+crash may leave `receipts-v1.lock`; there is no automatic lock reclamation.
+
+One receipt task per role/process runs at a time, without a queue. The seller
+waits at most 500 ms for its receipt; the buyer at most 2 s for the whole
+receipt exchange. Late uncancellable work keeps that receipt slot occupied and
+later receipt tasks are dropped. Node health exposes content-free `receipts`
+counters (`active`, `saved`, `failed`, `dropped`); `saved` records a finished
+task, not a collector acknowledgment. Shutdown aborts receipt work. Receipt
+connections have their own family cap, sharing endpoint global/source/rate
+limits with inference. Existing inference admission, free caps, replay checks
+and payment paths remain unchanged. No prompt retry is introduced by metadata
+retries.

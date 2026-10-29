@@ -51,9 +51,14 @@ import {
   finishSellerTelemetry,
   sellerExecutionTelemetry,
 } from './free-telemetry';
+import {
+  sellerReceiptObservation,
+  type SellerReceiptOptions,
+} from './receipt-seller';
 import type { FreeSellerOffer, SellerCatalogOffer } from './seller-offer';
 
 export interface SellerFreeExecutionOptions {
+  receipts?: SellerReceiptOptions;
   telemetry?: {
     sink: TelemetrySink;
     engineKind: EngineKind;
@@ -120,6 +125,34 @@ export function createSellerFreeExecution(options: SellerFreeExecutionOptions) {
     ) => respond(value, peer, signal, options, admission, onDelta),
   };
 }
+function freeInputTokens(
+  request: FreeExecutionRequest,
+  prompt: string,
+  options: SellerFreeExecutionOptions,
+) {
+  const inputTokens = options.meter.input(prompt);
+  if (
+    !Number.isSafeInteger(inputTokens) ||
+    inputTokens < 0 ||
+    inputTokens + request.input.maxTokens > options.model.contextTokens
+  )
+    return fail(FREE_EXECUTION_CODES.LIMIT);
+  return inputTokens;
+}
+function observedOutput(
+  deliver: ((text: string) => Promise<void>) | undefined,
+  receipt: ReturnType<typeof sellerReceiptObservation>,
+  observer: ReturnType<typeof sellerExecutionTelemetry>,
+  signal: AbortSignal,
+) {
+  return deliver
+    ? async (text: string) => {
+        await deliver(text);
+        receipt?.text(text);
+        if (!signal.aborted && text) observer?.firstToken();
+      }
+    : undefined;
+}
 async function respond(
   value: unknown,
   peer: string,
@@ -136,30 +169,36 @@ async function respond(
   };
   let observer: ReturnType<typeof sellerExecutionTelemetry>;
   let started = false;
+  let receipt: ReturnType<typeof sellerReceiptObservation>;
   try {
     checkSignal(signal);
+    const verifiedAt = options.now();
     await verifyFreeExecutionRequest(request, {
       owner: options.owner,
       nodeId: options.nodeId,
       remoteNodeId: peer,
-      now: options.now(),
+      now: verifiedAt,
     });
     checkSignal(signal);
     observer = sellerExecutionTelemetry(request, options, Boolean(onDelta));
     const prompt = supportedInput(request, options);
+    receipt = sellerReceiptObservation(
+      request,
+      header.requestDigest,
+      options.meter,
+      options.receipts,
+      Boolean(onDelta),
+      verifiedAt,
+    );
     ready(options);
-    const inputTokens = options.meter.input(prompt);
-    if (
-      !Number.isSafeInteger(inputTokens) ||
-      inputTokens < 0 ||
-      inputTokens + request.input.maxTokens > options.model.contextTokens
-    )
-      return fail(FREE_EXECUTION_CODES.LIMIT);
+    const inputTokens = freeInputTokens(request, prompt, options);
     const lease = admission.enter(request, inputTokens, options.now());
     let actual: number | undefined;
+    let completed: FreeExecutionResponse | undefined;
     try {
       checkSignal(signal);
       started = true;
+      receipt?.started(inputTokens);
       const response = await generateResponse(
         request,
         prompt,
@@ -167,12 +206,7 @@ async function respond(
         header,
         options,
         signal,
-        onDelta
-          ? async (text) => {
-              await onDelta(text);
-              if (!signal.aborted && text) observer?.firstToken();
-            }
-          : undefined,
+        observedOutput(onDelta, receipt, observer, signal),
       );
       if (!response.result) return fail(FREE_EXECUTION_CODES.INTERNAL);
       // A declared count never returns reserved tokens: the provider's word alone cannot stretch the caps.
@@ -181,9 +215,11 @@ async function respond(
           response.result.usage.inputTokens +
           response.result.usage.outputTokens;
       finishSellerTelemetry(observer, request, response, started);
+      completed = response;
       return response;
     } finally {
       lease.complete(actual);
+      if (completed) await receipt?.finish(completed);
     }
   } catch (error) {
     const response: FreeExecutionResponse = {
@@ -195,6 +231,7 @@ async function respond(
           : { code: FREE_EXECUTION_CODES.ENGINE },
     };
     finishSellerTelemetry(observer, request, response, started);
+    await receipt?.finish(response);
     return response;
   }
 }
