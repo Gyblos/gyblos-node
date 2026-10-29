@@ -35,14 +35,12 @@ export function receiptNativeBinding(provider: ReceiptProvider) {
       builder.bindAddr(`${LOCALHOST}:0`);
       builder.bindAddr(`${IPV6_LOOPBACK}:0`);
       builder.secretKey(secret);
-      const alpns = [
-        ...(options.http === false ? [] : [GYBLOS_ALPN]),
-        ...(options.control ? [CONTROL_ALPN] : []),
-        ...(options.freeExecution
-          ? [FREE_EXECUTION.alpn, FREE_STREAM.alpn]
-          : []),
-        ...(options.receipts ? [RECEIPT_CHANNEL.alpn] : []),
-      ];
+      const alpns: AcceptanceAlpn[] = [];
+      if (options.http !== false) alpns.push(GYBLOS_ALPN);
+      if (options.control) alpns.push(CONTROL_ALPN);
+      if (options.freeExecution)
+        alpns.push(FREE_EXECUTION.alpn, FREE_STREAM.alpn);
+      if (options.receipts) alpns.push(RECEIPT_CHANNEL.alpn);
       builder.alpns(alpns.map((value) => [...Buffer.from(value)]));
       protocols.push(alpns);
       const endpoint = await builder.bind();
