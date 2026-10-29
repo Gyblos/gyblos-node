@@ -6,6 +6,9 @@ import { join } from 'node:path';
 import type { Endpoint } from '@number0/iroh';
 
 import { executeBuyerFree } from '@gyblos/buyer/free-execution';
+import { freeBuyerDependencies } from '@gyblos/buyer/free-selection';
+import type { PreparedBuyerSelection } from '@gyblos/buyer/selection-runtime';
+import { SELLER_BADGES } from '@gyblos/core/constants';
 import { createSellerFreeExecution } from '@gyblos/node/free-execution';
 import {
   createBuyerReceiptRuntime,
@@ -20,7 +23,6 @@ import {
   RECEIPT_CHANNEL,
 } from '@gyblos/protocol/constants';
 import { catalogDigestV2, signPublicV2 } from '@gyblos/protocol/public-v2';
-import { createFreeExecutionClient } from '@gyblos/transport-iroh/free-client';
 import { serveIroh } from '@gyblos/transport-iroh/iroh-server';
 
 import { freeSellerFixture } from './free-seller';
@@ -116,38 +118,46 @@ export async function nativeFreeReceiptFixture(receiptEnabled = true) {
   );
   const request = await f.request();
   let selections = 0;
+  const {
+    buyer: wallet,
+    buyerNodeId: _nodeId,
+    catalogDigest: _digest,
+    ...query
+  } = f.source.request.params;
+  const prepared: PreparedBuyerSelection = {
+    config: {
+      request: {
+        ...query,
+        lowestReasoning: null,
+        minimumBadge: SELLER_BADGES.DECLARED_USAGE,
+        retention: [f.source.catalog.dataPolicy.retention],
+      },
+      sellers: [
+        {
+          owner: f.options.owner,
+          nodeId: seller.id().toString(),
+          relayUrl: null,
+          directAddresses: seller.addr().directAddresses(),
+        },
+      ],
+    },
+    stats: { rows: new Map(), save: async () => {} },
+    discovery: undefined,
+  };
   const dependencies = {
+    ...freeBuyerDependencies(prepared, {
+      endpoint: buyer,
+      buyer: wallet,
+      relayOnly: false,
+      now: f.options.now,
+      receipts: buyerReceipts,
+    }),
     select: async () => {
       selections++;
       return { nodeId: seller.id().toString(), quote: request.quote };
     },
-    execute: async (
-      _winner: unknown,
-      value: unknown,
-      signal: AbortSignal,
-      onDelta?: (text: string) => Promise<void>,
-    ) => {
-      const client = createFreeExecutionClient(
-        buyer,
-        seller.addr(),
-        { owner: f.options.owner, nodeId: seller.id().toString() },
-        { now: f.options.now, onDelta },
-      );
-      try {
-        return await client.execute(value, signal);
-      } finally {
-        await client.close();
-        await client.settled();
-      }
-    },
-    receipt: async (
-      _winner: unknown,
-      evidence: Parameters<typeof buyerReceipts.exchange>[1],
-      signal: AbortSignal,
-    ) => {
-      await buyerReceipts.exchange(seller.addr(), evidence, signal);
-    },
   };
+
   return {
     directory,
     environment,

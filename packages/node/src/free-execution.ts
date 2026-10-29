@@ -1,6 +1,6 @@
 // Composes free quote authentication, admission and one pinned-engine generation for one free offer, and
 // prepares the seller's offer behind the free router on the seller's ledger. No payments, facilitator,
-// v1, config reads, files or journals are reachable from this service.
+// No direct config/file/payment access; an injected publisher handles private receipt persistence.
 import { INFERENCE_REQUEST_LIMITS } from '@gyblos/config';
 import type { QuoteReadiness } from '@gyblos/core/control-quotes';
 import {
@@ -225,7 +225,7 @@ async function respond(
       return response;
     } finally {
       lease.complete(actual);
-      if (completed) await receipt?.finish(completed);
+      if (completed) receipt?.finish(completed);
     }
   } catch (error) {
     const response: FreeExecutionResponse = {
@@ -233,7 +233,7 @@ async function respond(
       error: executionFailure(error, signal),
     };
     finishSellerTelemetry(observer, request, response, started);
-    await receipt?.finish(response);
+    receipt?.finish(response);
     return response;
   }
 }

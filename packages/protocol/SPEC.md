@@ -811,7 +811,7 @@ It must honor the abort signal before committing. A confirmation already
 committed when cancellation occurs may have lost its acknowledgment; querying
 or resubmitting that identical pair is safe and never reruns inference. This
 adapter neither retries automatically nor claims durable/collector acceptance.
-The transport takes an injected store and signer. Free node startup supplies
+The transport takes an injected store; node composition owns signing. Free node startup supplies
 the private local store described below. Full receipts stay private; no
 collector, publication or aggregate export is enabled.
 
@@ -836,8 +836,8 @@ reads, strict signed parsing, exclusive updates and staged atomic replacement.
 Unsafe/corrupt state fails closed for receipts without resetting or repairing
 files. A crash can leave an exclusive lock; the runtime does not reclaim it.
 
-Receipt work is best effort, one active operation per process/role without a
-queue. Seller signing/storage has a 500 ms budget; buyer lookup, countersigning,
+Receipt work is scheduled in the background, outside inference response/done
+deadlines, with one active operation per process/role and no queue. Seller signing/storage has a 500 ms budget; buyer lookup, countersigning,
 local persistence and confirmation together have 2 s. Uncancellable work remains
 tracked until settled; later receipt work is dropped meanwhile. Cancellation
 checks precede commits and late results are ignored. Shutdown aborts receipt

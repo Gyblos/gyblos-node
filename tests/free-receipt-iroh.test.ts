@@ -4,7 +4,7 @@ import { readFile, stat } from 'node:fs/promises';
 import test from 'node:test';
 
 import { FILE_MODES, receiptPathsIn } from '@gyblos/config';
-import { P2P_ROLES } from '@gyblos/protocol/constants';
+import { P2P_ROLES, RECEIPT_CHANNEL } from '@gyblos/protocol/constants';
 import { freeExecutionDigest } from '@gyblos/protocol/free-execution';
 import { verifyReceipt } from '@gyblos/protocol/receipt';
 
@@ -20,6 +20,8 @@ for (const streaming of [false, true])
       try {
         const result = await f.execute(streaming);
         assert.equal(result.text, 'é😀');
+        await f.buyerReceipts.settled();
+        await f.sellerReceipts.settled();
         assert.equal(f.calls(), 1);
         assert.equal(f.selections(), 1);
         assert.equal(f.buyerReceipts.health().saved, 1);
@@ -74,11 +76,78 @@ void test(
     const f = await nativeFreeReceiptFixture(false);
     try {
       assert.equal((await f.execute()).text, 'é😀');
+      await f.buyerReceipts.settled();
       assert.equal(f.calls(), 1);
       assert.equal(f.selections(), 1);
       assert.equal(f.buyerReceipts.health().saved, 0);
       assert.equal(f.buyerReceipts.health().failed, 1);
     } finally {
+      await f.close();
+    }
+  },
+);
+
+void test(
+  'background buyer persistence cannot hold the answer and cancellation closes receipt connections before slow storage settles',
+  { skip: NATIVE_CAPABILITY.transportSkip },
+  async () => {
+    const f = await nativeFreeReceiptFixture();
+    let release = () => {};
+    let entered = () => {};
+    const waiting = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    let receiptCloses = 0;
+    const connect = f.buyer.connect.bind(f.buyer);
+    f.buyer.connect = async (...args) => {
+      const connection = await connect(...args);
+      if (Buffer.from(args[1]).toString() === RECEIPT_CHANNEL.alpn) {
+        const close = connection.close.bind(connection);
+        connection.close = (...closeArgs) => {
+          receiptCloses++;
+          return close(...closeArgs);
+        };
+      }
+      return connection;
+    };
+    const put = f.buyerStore.put.bind(f.buyerStore);
+    f.buyerStore.put = async (value, signal) => {
+      entered();
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      signal?.throwIfAborted();
+      await put(value, signal);
+    };
+    try {
+      assert.equal((await f.execute()).text, 'é😀');
+      await waiting;
+      assert.equal(f.calls(), 1);
+      assert.equal(f.selections(), 1);
+      assert.equal(f.buyerReceipts.health().active, true);
+      await f.buyerReceipts.close();
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      assert.ok(receiptCloses > 0);
+      assert.equal(f.buyerReceipts.health().saved, 0);
+      release();
+      await f.buyerReceipts.settled();
+      const key = {
+        executionRequestId: f.request.requestId,
+        requestDigest: await freeExecutionDigest(f.request),
+        sellerNodeId: f.seller.id().toString(),
+        buyerNodeId: f.buyer.id().toString(),
+      };
+      assert.equal(
+        await f.buyerStore.load(key, new AbortController().signal),
+        undefined,
+      );
+      assert.equal(
+        (await f.sellerStore.load(key, new AbortController().signal))?.buyer,
+        undefined,
+      );
+      assert.equal(f.calls(), 1);
+    } finally {
+      release();
       await f.close();
     }
   },

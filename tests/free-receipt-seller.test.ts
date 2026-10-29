@@ -54,6 +54,7 @@ void test('successful seller execution signs actual usage once without persistin
       new AbortController().signal,
     );
     assert.ok(response.result);
+    await runtime.settled();
     const value = memory.value();
     assert.ok(value);
     assert.deepEqual((await verifyReceipt(value)).seller.record.usage, {
@@ -113,6 +114,7 @@ void test('receipt signing or persistence errors cannot change a successful sell
         ).result,
       );
       assert.equal(f.calls(), 1);
+      await runtime.settled();
       assert.equal(runtime.health().failed, 1);
     } finally {
       await runtime.close();
@@ -152,6 +154,7 @@ void test('failed recounted execution gets an unconfirmed receipt but provider a
         new AbortController().signal,
       );
       assert.equal(response.error?.code, FREE_EXECUTION_CODES.ENGINE);
+      await runtime.settled();
       if (declared) assert.equal(memory.value(), undefined);
       else {
         const value = memory.value();
@@ -231,6 +234,7 @@ void test('hung receipt work returns within its budget and does not accumulate m
       new AbortController().signal,
     );
     assert.ok(response.result);
+    await new Promise<void>((resolve) => setTimeout(resolve, 550));
     assert.equal(runtime.health().active, true);
     const next = await f.request(2);
     assert.ok(

@@ -24,7 +24,7 @@ import type { LocalReceiptStore } from './receipt-store';
 import { createReceiptWork } from './receipt-work';
 
 export interface SellerReceiptPublisher {
-  publish(record: FreeSellerReceiptInput): Promise<void>;
+  publish(record: FreeSellerReceiptInput): void;
 }
 export interface SellerReceiptOptions {
   publisher: SellerReceiptPublisher;
@@ -43,12 +43,17 @@ export function createSellerReceiptRuntime(options: {
       store: options.store,
     }),
     publisher: {
-      async publish(record: FreeSellerReceiptInput) {
-        await work.run(async (signal) => {
-          const receipt = await createFreeSellerReceipt(record, options.signer);
-          receiptSignal(signal);
-          await options.store.put(receipt, signal);
-        });
+      publish(record: FreeSellerReceiptInput) {
+        void work
+          .run(async (signal) => {
+            const receipt = await createFreeSellerReceipt(
+              record,
+              options.signer,
+            );
+            receiptSignal(signal);
+            await options.store.put(receipt, signal);
+          })
+          .catch(() => {});
       },
     },
     health: work.health,
@@ -138,7 +143,7 @@ export function sellerReceiptObservation(
           partial = '';
         }
       },
-      async finish(response: FreeExecutionResponse) {
+      finish(response: FreeExecutionResponse) {
         if (terminal) return;
         terminal = true;
         if (inputTokens === undefined || !usable) return;
@@ -157,7 +162,7 @@ export function sellerReceiptObservation(
             Math.floor(clock() - start),
           );
           partial = '';
-          if (record) await options.publisher.publish(record);
+          if (record) options.publisher.publish(record);
         } catch {
           partial = ''; /* Receipt failures never alter the engine outcome. */
         }

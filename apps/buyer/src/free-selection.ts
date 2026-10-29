@@ -59,7 +59,7 @@ export function freeBuyerDependencies(
       ? async (winner, evidence, signal) => {
           const seller = sellers.get(winner.nodeId);
           if (seller)
-            await options.receipts!.exchange(address(seller), evidence, signal);
+            options.receipts!.exchange(address(seller), evidence, signal);
         }
       : undefined,
     enter() {

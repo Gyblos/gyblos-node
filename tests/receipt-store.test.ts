@@ -2,12 +2,15 @@
 import assert from 'node:assert/strict';
 import {
   chmod,
+  link,
   lstat,
   mkdtemp,
   readFile,
   realpath,
+  rename,
   rm,
   symlink,
+  unlink,
   writeFile,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -234,6 +237,56 @@ void test('receipt byte capacity evicts oldest metadata rather than locking out 
         { ...f.key, executionRequestId: seller.record.requestId },
         new AbortController().signal,
       ),
+    );
+  } finally {
+    await f.close();
+  }
+});
+
+void test('hardlinked receipt snapshots and abandoned update locks fail closed without destroying signed data', async () => {
+  const f = await fixture();
+  try {
+    const store = openReceiptStore(f.options);
+    await store.put(f.envelope);
+    const original = await readFile(f.paths.state, 'utf8');
+    const copy = join(f.root, 'synthetic-hardlink');
+    await link(f.paths.state, copy);
+    await assert.rejects(store.load(f.key, new AbortController().signal), {
+      code: NODE_ERROR_CODES.RECEIPT_STORAGE_UNAVAILABLE,
+    });
+    await assert.rejects(store.put(f.envelope), {
+      code: NODE_ERROR_CODES.RECEIPT_STORAGE_UNAVAILABLE,
+    });
+    assert.equal(await readFile(copy, 'utf8'), original);
+    await unlink(copy);
+    await writeFile(f.paths.lock, '', { mode: 0o600 });
+    await assert.rejects(store.put(f.envelope), {
+      code: NODE_ERROR_CODES.RECEIPT_STORAGE_UNAVAILABLE,
+    });
+    assert.equal(await readFile(f.paths.state, 'utf8'), original);
+    assert.deepEqual(
+      await store.load(f.key, new AbortController().signal),
+      f.envelope,
+    );
+  } finally {
+    await f.close();
+  }
+});
+void test('receipt directory symlinks fail before writing to another location', async () => {
+  const f = await fixture();
+  try {
+    const store = openReceiptStore(f.options);
+    await store.put(f.envelope);
+    const moved = join(f.root, 'synthetic-old-receipts');
+    await rename(f.paths.directory, moved);
+    await symlink(moved, f.paths.directory, 'dir');
+    const original = await readFile(join(moved, 'receipts-v1.json'), 'utf8');
+    await assert.rejects(store.put(f.envelope), {
+      code: NODE_ERROR_CODES.RECEIPT_STORAGE_UNAVAILABLE,
+    });
+    assert.equal(
+      await readFile(join(moved, 'receipts-v1.json'), 'utf8'),
+      original,
     );
   } finally {
     await f.close();

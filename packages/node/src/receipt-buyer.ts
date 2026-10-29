@@ -98,62 +98,70 @@ export function createBuyerReceiptRuntime(options: {
 }) {
   const work = createReceiptWork(RECEIPT_WORK.buyerMs);
   return {
-    async exchange(
+    exchange(
       remote: EndpointAddr,
       evidence: BuyerReceiptEvidence,
       external?: AbortSignal,
     ) {
-      await work.run(async (signal) => {
-        const client = createReceiptTransport(
-          options.endpoint,
-          remote,
-          evidence.context.sellerNodeId,
-          options.transport,
-        );
-        const requestId = () =>
-          randomBytes(CONTROL_LIMITS.requestIdBytes).toString('hex');
-        try {
-          const response = await receiptQuery(
-            client,
-            {
-              version: RECEIPT_CHANNEL.version,
-              requestId: requestId(),
-              method: RECEIPT_CHANNEL_METHODS.GET,
-              params: {
-                executionRequestId: evidence.context.requestId,
-                requestDigest: evidence.context.requestDigest,
+      void work
+        .run(async (signal) => {
+          const client = createReceiptTransport(
+            options.endpoint,
+            remote,
+            evidence.context.sellerNodeId,
+            options.transport,
+          );
+          const cancel = () => {
+            void client.close().catch(() => {});
+          };
+          signal.addEventListener('abort', cancel, { once: true });
+          if (signal.aborted) cancel();
+          const requestId = () =>
+            randomBytes(CONTROL_LIMITS.requestIdBytes).toString('hex');
+          try {
+            const response = await receiptQuery(
+              client,
+              {
+                version: RECEIPT_CHANNEL.version,
+                requestId: requestId(),
+                method: RECEIPT_CHANNEL_METHODS.GET,
+                params: {
+                  executionRequestId: evidence.context.requestId,
+                  requestDigest: evidence.context.requestDigest,
+                },
               },
-            },
-            signal,
-          );
-          if (!response.result)
-            throw new ReceiptChannelError(RECEIPT_CHANNEL_CODES.INTERNAL);
-          const receipt = await buyerPair(
-            response.result.receipt,
-            evidence,
-            options.store,
-            options.signer,
-            signal,
-          );
-          receiptSignal(signal);
-          await options.store.put(receipt, signal);
-          if (!receipt.buyer)
-            throw new ReceiptChannelError(RECEIPT_CHANNEL_CODES.INTERNAL);
-          await receiptQuery(
-            client,
-            {
-              version: RECEIPT_CHANNEL.version,
-              requestId: requestId(),
-              method: RECEIPT_CHANNEL_METHODS.CONFIRM,
-              params: { receipt: { ...receipt, buyer: receipt.buyer } },
-            },
-            signal,
-          );
-        } finally {
-          await client.close();
-          await client.settled();
-        }
-      }, external);
+              signal,
+            );
+            if (!response.result)
+              throw new ReceiptChannelError(RECEIPT_CHANNEL_CODES.INTERNAL);
+            const receipt = await buyerPair(
+              response.result.receipt,
+              evidence,
+              options.store,
+              options.signer,
+              signal,
+            );
+            receiptSignal(signal);
+            await options.store.put(receipt, signal);
+            if (!receipt.buyer)
+              throw new ReceiptChannelError(RECEIPT_CHANNEL_CODES.INTERNAL);
+            await receiptQuery(
+              client,
+              {
+                version: RECEIPT_CHANNEL.version,
+                requestId: requestId(),
+                method: RECEIPT_CHANNEL_METHODS.CONFIRM,
+                params: { receipt: { ...receipt, buyer: receipt.buyer } },
+              },
+              signal,
+            );
+          } finally {
+            signal.removeEventListener('abort', cancel);
+            await client.close();
+            await client.settled();
+          }
+        }, external)
+        .catch(() => {});
     },
     health: work.health,
     close: work.close,

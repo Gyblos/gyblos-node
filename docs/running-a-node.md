@@ -649,13 +649,13 @@ write removes them physically. No background deletion is promised. Unsafe or
 corrupt state disables receipt work, without repairing or truncating files. A
 crash may leave `receipts-v1.lock`; there is no automatic lock reclamation.
 
-One receipt task per role/process runs at a time, without a queue. The seller
-waits at most 500 ms for its receipt; the buyer at most 2 s for the whole
-receipt exchange. Late uncancellable work keeps that receipt slot occupied and
-later receipt tasks are dropped. Node health exposes content-free `receipts`
-counters (`active`, `saved`, `failed`, `dropped`); `saved` records a finished
-task, not a collector acknowledgment. Shutdown aborts receipt work. Receipt
-connections have their own family cap, sharing endpoint global/source/rate
-limits with inference. Existing inference admission, free caps, replay checks
-and payment paths remain unchanged. No prompt retry is introduced by metadata
-retries.
+One background receipt task per role/process runs at a time, without a queue.
+Inference response/done frames never wait for receipt persistence. Seller
+receipt work has a 500 ms budget; the whole buyer receipt exchange has 2 s. Late
+uncancellable work keeps that receipt slot occupied and later receipt tasks are
+dropped. Node health exposes content-free `receipts` counters (`active`,
+`saved`, `failed`, `dropped`); `saved` records a finished task, not a collector
+acknowledgment. Shutdown aborts receipt work. Receipt connections have their own
+family cap, sharing endpoint global/source/rate limits with inference. Existing
+inference admission, free caps, replay checks and payment paths remain
+unchanged. No prompt retry is introduced by metadata retries.

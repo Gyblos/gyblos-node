@@ -129,4 +129,6 @@ strict snapshots, retention and compare-and-set), `free-receipt-seller.test.ts`
 (actual usage and failure isolation), `free-receipt-policy.test.ts` (buyer
 observations and no inference retry), `receipt-family.test.ts` (connection
 isolation) and `free-receipt-iroh.test.ts` (native complete/streaming exchange
-with temporary homes and a synthetic engine). Native skips are not acceptance.
+with temporary homes and a synthetic engine), `free-receipt-deadline.test.ts`
+(slow storage outside inference deadlines) and `receipt-composition.test.ts`
+(per-offer production forwarding). Native skips are not acceptance.
