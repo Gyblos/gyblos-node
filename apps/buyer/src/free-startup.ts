@@ -132,6 +132,23 @@ function buyerReceipts(
     },
   });
 }
+// Stop protocol resources before draining the startup-owned local log, even when a close rejects.
+async function closeBuyerResources(
+  receipts: ReturnType<typeof createBuyerReceiptRuntime> | undefined,
+  endpoint: Awaited<ReturnType<typeof bindEndpoint>>,
+  telemetry: ReturnType<typeof createLocalTelemetry>,
+) {
+  try {
+    await receipts?.close();
+  } finally {
+    try {
+      await endpoint.close();
+    } finally {
+      await telemetry.close();
+    }
+  }
+}
+
 export async function startFreeBuyer(
   options: {
     bind?: typeof bindEndpoint;
@@ -205,28 +222,12 @@ export async function startFreeBuyer(
         try {
           await host.close();
         } finally {
-          try {
-            await receipts?.close();
-          } finally {
-            try {
-              await endpoint.close();
-            } finally {
-              await telemetry.close();
-            }
-          }
+          await closeBuyerResources(receipts, endpoint, telemetry);
         }
       },
     };
   } catch (error) {
-    try {
-      await receipts?.close();
-    } finally {
-      try {
-        await endpoint.close();
-      } finally {
-        await telemetry.close();
-      }
-    }
+    await closeBuyerResources(receipts, endpoint, telemetry);
     throw error;
   }
 }
