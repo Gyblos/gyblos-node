@@ -1,28 +1,22 @@
 // Parses and authenticates free execution terms; no engine, replay mutation, clock, transport or payments.
-import { canonicalJson } from './canonical';
 import {
   CONTROL_LIMITS,
   ENGINE_DONE_REASONS,
-  FREE_CHAT_ROLES,
   FREE_EXECUTION,
   FREE_EXECUTION_CODES,
   FREE_EXECUTION_MATCH_MODES,
   FREE_EXECUTION_STOP_REASONS,
   PUBLIC_RECORD_LIMITS,
-  type FreeChatRole,
   type FreeExecutionMatchMode,
 } from './constants';
-import { parseModelSelection } from './control-requests';
 import type { SignedOfferV2 } from './control-types';
 import {
-  controlArray,
   controlHex,
   controlInteger,
   controlObject,
-  controlReasoning,
 } from './control-validation';
+import { boundedWire, parseExecutionInput } from './execution-input';
 import type {
-  FreeChatMessage,
   FreeExecutionBuildInput,
   FreeExecutionFailure,
   FreeExecutionRequest,
@@ -57,28 +51,6 @@ export {
   freeExecutionStop,
 } from './free-execution-validation';
 
-function role(value: unknown): FreeChatRole {
-  for (const accepted of Object.values(FREE_CHAT_ROLES))
-    if (value === accepted) return accepted;
-  return freeExecutionFail();
-}
-function messages(value: unknown) {
-  const entries = controlArray(value, FREE_EXECUTION.maxMessages);
-  if (!entries.length) return freeExecutionFail();
-  let bytes = 0;
-  return entries.map((entry) => {
-    const input = controlObject(entry, ['role', 'content']);
-    const content = freeExecutionText(input.content, FREE_EXECUTION.inputBytes);
-    bytes += new TextEncoder().encode(content).length;
-    if (bytes > FREE_EXECUTION.inputBytes)
-      return freeExecutionFail(FREE_EXECUTION_CODES.LIMIT);
-    return { role: role(input.role), content };
-  });
-}
-function boundedWire(value: unknown, maximum: number) {
-  if (new TextEncoder().encode(canonicalJson(value)).length > maximum)
-    return freeExecutionFail(FREE_EXECUTION_CODES.LIMIT);
-}
 function parseRequest(value: unknown): FreeExecutionRequest {
   const input = controlObject(value, [
     'version',
@@ -101,37 +73,11 @@ function parseRequest(value: unknown): FreeExecutionRequest {
     offered.maxAtomic !== '0'
   )
     return freeExecutionFail(FREE_EXECUTION_CODES.NOT_FREE);
-  const params = controlObject(input.input, [
-    'messages',
-    'selection',
-    'reasoning',
-    'maxTokens',
-  ]);
-  const selection = parseModelSelection(params.selection);
-  const reasoning = controlReasoning(params.reasoning);
-  if (
-    requestId !== offered.requestId ||
-    canonicalJson(selection) !== canonicalJson(offered.selection) ||
-    reasoning !== offered.reasoning
-  )
-    return freeExecutionFail(FREE_EXECUTION_CODES.BINDING);
-  const maxTokens = controlInteger(
-    params.maxTokens,
-    1,
-    PUBLIC_RECORD_LIMITS.maxContextTokens,
-  );
-  if (maxTokens > offered.maxTokens || maxTokens > offered.model.contextTokens)
-    return freeExecutionFail(FREE_EXECUTION_CODES.LIMIT);
   const request: FreeExecutionRequest = {
     version: FREE_EXECUTION.version,
     requestId,
     quote,
-    input: {
-      messages: messages(params.messages),
-      selection,
-      reasoning,
-      maxTokens,
-    },
+    input: parseExecutionInput(input.input, requestId, offered),
   };
   boundedWire(request, FREE_EXECUTION.requestBytes);
   return request;
