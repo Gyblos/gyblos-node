@@ -87,6 +87,12 @@ void test(
           return endpoint(bytes);
         },
       });
+      assert.deepEqual(host.receipts?.(), {
+        active: false,
+        saved: 0,
+        failed: 0,
+        dropped: 0,
+      });
       await host.close();
       assert.equal(binds, 1);
       assert.equal(rpcCalls, 0);

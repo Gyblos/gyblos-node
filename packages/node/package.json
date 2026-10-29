@@ -40,7 +40,8 @@
     "./free-router": "./src/free-router.ts",
     "./seller-transport": "./src/seller-transport.ts",
     "./identity-verifier": "./src/identity-verifier.ts",
-    "./identity-state": "./src/identity-state.ts"
+    "./identity-state": "./src/identity-state.ts",
+    "./receipts": "./src/receipts.ts"
   },
   "dependencies": {
     "@gyblos/core": "workspace:*",
