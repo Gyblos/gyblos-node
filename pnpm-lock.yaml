@@ -91,6 +91,9 @@ importers:
       express:
         specifier: 4.21.2
         version: 4.21.2
+      x402-upto-metered:
+        specifier: workspace:*
+        version: link:packages/x402-upto-metered
     devDependencies:
       '@ianvs/prettier-plugin-sort-imports':
         specifier: 4.7.0
@@ -560,6 +563,12 @@ importers:
       '@number0/iroh':
         specifier: 1.1.0
         version: 1.1.0
+
+  packages/x402-upto-metered:
+    devDependencies:
+      tsx:
+        specifier: 4.21.0
+        version: 4.21.0
 
 packages:
 
