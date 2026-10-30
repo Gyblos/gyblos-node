@@ -75,3 +75,8 @@ The separate
 [private free-receipt collector policy](private-receipt-collector.md) validates
 complete free pairs through an injected atomic storage port. It does not
 activate collection, a backend, an exporter or seller/buyer startup wiring.
+
+An optional private file implementation is available through
+`@gyblos/telemetry-file/receipt-store`; its lifecycle, bounds and persistence
+limitations are documented with the collector policy. It is not wired into
+startup or external collection.
