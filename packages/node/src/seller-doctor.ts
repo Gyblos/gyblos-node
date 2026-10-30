@@ -118,6 +118,8 @@ async function configCheck(options: DoctorOptions) {
       };
   }
   try {
+    // Like the daemon today, which has no payment server: paid offers are refused. Pass paidSelling
+    // here once the daemon builds one.
     const settings = sellerSettings(file, options.environment);
     return { issues: [], settings, base: settings, result: OK };
   } catch (error) {

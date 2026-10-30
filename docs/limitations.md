@@ -22,6 +22,15 @@ only; never import mainnet keys.
 
 ## Payments and recovery
 
+- Paid v2 selling (x402 upto channels) is implemented and tested offline only.
+  The daemon cannot reach the chain yet, so it refuses paid offers; nothing has
+  settled on devnet.
+- A paid v2 claim not confirmed in time is retried in the background for about a
+  minute and a half. The retry queue lives in memory: claims still pending at
+  shutdown are re-driven only by the payment server's own recovery at the next
+  start, and a claim not settled within the channel's window (about two minutes)
+  lapses, so the seller is not paid for it.
+
 - A timeout, a 503 or a missing history entry does not prove that no payment
   happened. Uncertain payments block new ones until reconciled; there is no
   automatic retry or provider switch after settlement was attempted.

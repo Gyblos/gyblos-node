@@ -53,6 +53,7 @@ async function wired(waitMs = 20) {
     },
     {
       owner: options.owner,
+      mint: own.mint,
       nodeId: options.nodeId,
       startedAt: options.now() - 1,
       now: options.now,
@@ -63,14 +64,23 @@ async function wired(waitMs = 20) {
   return { seller, paid, events };
 }
 
-void test('a description off the network fee, network or payout refuses paid selling', async () => {
+void test('a description off the network fee, network, asset or payout refuses paid selling', async () => {
   const { seller } = await wired();
   const valid = await seller.payment.server.describe();
   for (const description of [
     { ...valid, protocolFeeBps: PROTOCOL_FEE.bps + 1 },
     { ...valid, treasury: 'someone-else' },
     { ...valid, network: 'solana:another' },
-    { ...valid, payTo: valid.feePayer },
+    // Distinct signing accounts, so each case is refused for its own reason.
+    { ...valid, feePayer: 'fee-payer', authorizer: 'auth', payTo: 'fee-payer' },
+    { ...valid, feePayer: 'fee-payer', authorizer: 'auth', payTo: 'auth' },
+    {
+      ...valid,
+      feePayer: 'fee-payer',
+      authorizer: 'auth',
+      payTo: seller.options.owner,
+    },
+    { ...valid, mint: 'another-mint' },
   ]) {
     seller.payment.control.description = description;
     await assert.rejects(
@@ -78,6 +88,7 @@ void test('a description off the network fee, network or payout refuses paid sel
         { server: seller.payment.server, close: async () => {} },
         {
           owner: seller.options.owner,
+          mint: valid.mint,
           nodeId: seller.options.nodeId,
           startedAt: 0,
           offers: () => [],
@@ -112,6 +123,7 @@ void test('paid offers are served and settled; a pending claim is retried in the
     async () => {},
   );
   assert.equal(pending.payment?.pending?.chargedAtomic, '10');
+  seller.payment.control.settle = { kind: 'settle' };
   while (paid.health().queued > 0)
     await new Promise((resolve) => setTimeout(resolve, 5));
   assert.equal(paid.health().settled, 1);
@@ -161,6 +173,7 @@ void test('opening paid selling closes the payment server when its description i
       }),
       {
         owner: seller.options.owner,
+        mint: own.mint,
         nodeId: seller.options.nodeId,
         startedAt: 0,
         offers: () => [],
@@ -169,4 +182,61 @@ void test('opening paid selling closes the payment server when its description i
     NodeError,
   );
   assert.equal(closed, 1);
+});
+
+void test('claims left by an earlier run are recovered in the background and closing waits for it', async () => {
+  const { seller } = await wired();
+  const own = await seller.payment.server.describe();
+  const events: string[] = [];
+  let finish = () => {};
+  const paid = await startSellerPaid(
+    {
+      server: seller.payment.server,
+      recover: () =>
+        new Promise<void>((resolve) => {
+          events.push('recovering');
+          finish = () => {
+            events.push('recovered');
+            resolve();
+          };
+        }),
+      close: async () => {
+        events.push('payments closed');
+      },
+    },
+    {
+      owner: seller.options.owner,
+      mint: own.mint,
+      nodeId: seller.options.nodeId,
+      startedAt: 0,
+      offers: () => [],
+    },
+  );
+  assert.deepEqual(events, ['recovering']);
+  const closing = paid.close();
+  // The payment server stays open while recovery still runs.
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.deepEqual(events, ['recovering']);
+  finish();
+  await closing;
+  assert.deepEqual(events, ['recovering', 'recovered', 'payments closed']);
+  const failing = await startSellerPaid(
+    {
+      server: seller.payment.server,
+      recover: async () => {
+        throw new Error('rpc down');
+      },
+      close: async () => {},
+    },
+    {
+      owner: seller.options.owner,
+      mint: own.mint,
+      nodeId: seller.options.nodeId,
+      startedAt: 0,
+      offers: () => [],
+    },
+  );
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(failing.health().recoveryFailed, true);
+  await failing.close();
 });

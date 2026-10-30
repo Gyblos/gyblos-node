@@ -42,6 +42,8 @@ interface SellerControlStartupOptions {
   now?: () => number;
   // The daemon's offer set, or one always-listed offer in lab acceptance.
   offers: ControlOffers;
+  // Added on top of paid prices in the catalog; the v1 lab listing, which has no fee, passes 0.
+  protocolFeeBps?: number;
 }
 
 function publicModel(
@@ -56,7 +58,7 @@ function publicModel(
       network: DEVNET,
       asset: options.mint,
       unit: V2_PRICING.unit,
-      ...listedPrices(offer),
+      ...listedPrices(offer, options.protocolFeeBps),
     },
     reasoning: [...offer.reasoning],
   };

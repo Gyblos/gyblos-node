@@ -1,7 +1,6 @@
-// Retries pending claims in the background with exactly the charge each terminal reported, first at
-// once and then after each delay of a bounded schedule. A settlement or a lapse ends a claim; so does a
-// refusal retrying cannot fix, or the end of the schedule, both counted as failed for the operator.
-// The port settles a channel once, so repeating a charge that already landed returns that settlement.
+// Retries pending claims with exactly the reported charge, at once and then after each delay, every
+// attempt bounded. A settlement, a lapse, a refusal retrying cannot fix or the schedule's end ends a
+// claim; the port settles a channel once, so repeating a landed charge returns that settlement.
 import { PAYMENT_ERROR_CODES } from '@gyblos/protocol/constants';
 import {
   PaymentError,
@@ -9,22 +8,24 @@ import {
   type PaymentServer,
 } from '@gyblos/protocol/payment';
 
+import { PAID_RETRYABLE_PAYMENT_CODES } from './constants';
+
 export interface PaidRetryOptions {
   payment: PaymentServer;
   // Waits between attempts; the claim is given up after the last one fails.
   delaysMs: readonly number[];
+  // How long one attempt may take before it counts as retryable.
+  attemptMs: number;
 }
 
 export interface PaidRetryHealth {
   queued: number;
   settled: number;
+  // Claims the chain refused for good: nothing was charged.
+  lapsed: number;
+  // Claims given up: refused for another reason or out of attempts.
   failed: number;
 }
-
-const RETRYABLE: readonly string[] = [
-  PAYMENT_ERROR_CODES.UNAVAILABLE,
-  PAYMENT_ERROR_CODES.JOURNAL_UNAVAILABLE,
-];
 
 const OUTCOMES = {
   SETTLED: 'settled',
@@ -38,15 +39,30 @@ async function attempt(
   payment: PaymentServer,
   admission: PaymentAdmission,
   chargedAtomic: string,
+  attemptMs: number,
 ): Promise<Outcome> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const settling = Promise.resolve().then(() =>
+    payment.settle(admission, chargedAtomic),
+  );
+  settling.catch(() => undefined);
   try {
-    await payment.settle(admission, chargedAtomic);
-    return OUTCOMES.SETTLED;
+    const settled = await Promise.race([
+      settling.then(() => true),
+      new Promise<false>((resolve) => {
+        timer = setTimeout(() => resolve(false), attemptMs);
+      }),
+    ]);
+    return settled ? OUTCOMES.SETTLED : OUTCOMES.RETRY;
   } catch (error) {
     if (!(error instanceof PaymentError)) return OUTCOMES.FAILED;
     if (error.code === PAYMENT_ERROR_CODES.SETTLEMENT_LAPSED)
       return OUTCOMES.LAPSED;
-    return RETRYABLE.includes(error.code) ? OUTCOMES.RETRY : OUTCOMES.FAILED;
+    return PAID_RETRYABLE_PAYMENT_CODES.includes(error.code)
+      ? OUTCOMES.RETRY
+      : OUTCOMES.FAILED;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -54,7 +70,7 @@ export function createPaidRetry(options: PaidRetryOptions) {
   const claims = new Map<string, Promise<void>>();
   const timers = new Set<ReturnType<typeof setTimeout>>();
   const wakers = new Set<() => void>();
-  const counts = { settled: 0, failed: 0 };
+  const counts = { settled: 0, lapsed: 0, failed: 0 };
   let stopped = false;
   const wait = (ms: number) =>
     new Promise<boolean>((resolve) => {
@@ -74,8 +90,14 @@ export function createPaidRetry(options: PaidRetryOptions) {
     });
   async function run(admission: PaymentAdmission, chargedAtomic: string) {
     for (let index = 0; !stopped; index++) {
-      const outcome = await attempt(options.payment, admission, chargedAtomic);
+      const outcome = await attempt(
+        options.payment,
+        admission,
+        chargedAtomic,
+        options.attemptMs,
+      );
       if (outcome === OUTCOMES.SETTLED) counts.settled++;
+      if (outcome === OUTCOMES.LAPSED) counts.lapsed++;
       if (outcome === OUTCOMES.FAILED) counts.failed++;
       if (outcome !== OUTCOMES.RETRY) return;
       // Stopping while an attempt ran must not start a new wait.

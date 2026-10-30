@@ -1,7 +1,6 @@
-// Starts the P2P seller for its offers: warmup of the seller's own engines, signed public records and the
-// Iroh bridge; offers not ready at startup are warmed again in the background. Paid offers are served
-// only when the caller supplies a payment server; otherwise they refuse startup. Tears everything down
-// in reverse order on failure.
+// Starts the P2P seller: warms its engines, signs public records and serves the Iroh bridge, warming late
+// offers in the background. Paid offers need a caller-supplied payment server, else they refuse
+// startup. Tears everything down in reverse order on failure.
 import { EndpointTicket } from '@number0/iroh';
 
 import {
@@ -171,6 +170,7 @@ export async function startSeller(
       await stage('payments');
       paid = await openSellerPaid(() => payments(config), {
         owner: owner.address,
+        mint: config.mint,
         nodeId: config.nodeId,
         startedAt,
         offers: () => offers.all(),

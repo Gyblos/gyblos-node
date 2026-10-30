@@ -312,9 +312,9 @@ Startup stops with a static code: `NODE_CONFIG_INVALID`,
 `SELLER_OFFER_REASONING_UNSUPPORTED`, `SELLER_OFFER_API_KEY_MISSING`,
 `SELLER_OFFER_API_KEY_UNSAFE`, `SELLER_PAID_EXECUTION_UNAVAILABLE`,
 `SELLER_PAID_METERING_UNRECOUNTED` or `SELLER_PAYMENT_DESCRIPTION_INVALID` (the
-payment server charges another fee, uses another network, or pays out to its own
-fee payer). `pnpm gyblos doctor` also names the `[[offers]]` entry a code is
-about.
+payment server charges another fee or treasury, uses another network or asset,
+or pays out to the owner or to its own fee payer or authorizer).
+`pnpm gyblos doctor` also names the `[[offers]]` entry a code is about.
 
 `pnpm gyblos config validate --config "$GYBLOS_CONFIG"` explains file problems
 (it does not read `GYBLOS_CONFIG`, does not check the `SELLER_*` limits above,

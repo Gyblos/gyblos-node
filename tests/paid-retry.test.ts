@@ -1,5 +1,5 @@
-// The pending-claim worker retries exactly the recorded charge on a bounded schedule, stops on a lapse
-// or a refusal retrying cannot fix, and leaves no timer behind. Synthetic payment server, short delays.
+// The pending-claim worker retries exactly the recorded charge on a bounded schedule with bounded
+// attempts, stops on a lapse or a refusal retrying cannot fix, and leaves no timer behind. Synthetic payment server, short delays.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -55,28 +55,54 @@ const settledAll = (retry: ReturnType<typeof createPaidRetry>) =>
 
 void test('a pending claim is retried with the same charge until it settles', async () => {
   const { payment, charges } = server([unavailable(), unavailable()]);
-  const retry = createPaidRetry({ payment, delaysMs: DELAYS });
+  const retry = createPaidRetry({
+    payment,
+    delaysMs: DELAYS,
+    attemptMs: 1_000,
+  });
   retry.queue(ADMISSION, '7');
   // The same claim queued again is not a second claim.
   retry.queue(ADMISSION, '7');
   await settledAll(retry);
   assert.deepEqual(charges, ['7', '7', '7']);
-  assert.deepEqual(retry.health(), { queued: 0, settled: 1, failed: 0 });
+  assert.deepEqual(retry.health(), {
+    queued: 0,
+    settled: 1,
+    lapsed: 0,
+    failed: 0,
+  });
   await retry.stop();
 });
 
 void test('a claim gives up after the schedule, on a lapse or on a refusal it cannot fix', async () => {
-  for (const [outcomes, settled, failed] of [
-    [[unavailable(), unavailable(), unavailable(), unavailable()], 0, 1],
-    [[new PaymentError(PAYMENT_ERROR_CODES.SETTLEMENT_LAPSED)], 0, 0],
-    [[new PaymentError(PAYMENT_ERROR_CODES.INVALID_CHARGE)], 0, 1],
+  for (const [outcomes, attempts, health] of [
+    [
+      [unavailable(), unavailable(), unavailable(), unavailable()],
+      DELAYS.length + 1,
+      { settled: 0, lapsed: 0, failed: 1 },
+    ],
+    [
+      [new PaymentError(PAYMENT_ERROR_CODES.SETTLEMENT_LAPSED)],
+      1,
+      { settled: 0, lapsed: 1, failed: 0 },
+    ],
+    [
+      [new PaymentError(PAYMENT_ERROR_CODES.INVALID_CHARGE)],
+      1,
+      { settled: 0, lapsed: 0, failed: 1 },
+    ],
+    [[new Error('bug')], 1, { settled: 0, lapsed: 0, failed: 1 }],
   ] as const) {
     const { payment, charges } = server([...outcomes]);
-    const retry = createPaidRetry({ payment, delaysMs: DELAYS });
+    const retry = createPaidRetry({
+      payment,
+      delaysMs: DELAYS,
+      attemptMs: 1_000,
+    });
     retry.queue(ADMISSION, '7');
     await settledAll(retry);
-    assert.ok(charges.length <= DELAYS.length + 1);
-    assert.deepEqual(retry.health(), { queued: 0, settled, failed });
+    assert.equal(charges.length, attempts);
+    assert.deepEqual(retry.health(), { queued: 0, ...health });
     await retry.stop();
   }
 });
@@ -87,7 +113,11 @@ void test('stopping cancels waiting retries and refuses new ones', async () => {
     process.getActiveResourcesInfo().filter((name) => name === 'Timeout')
       .length;
   const before = timers();
-  const retry = createPaidRetry({ payment, delaysMs: [60_000] });
+  const retry = createPaidRetry({
+    payment,
+    delaysMs: [60_000],
+    attemptMs: 1_000,
+  });
   retry.queue(ADMISSION, '7');
   while (charges.length === 0) await new Promise((r) => setImmediate(r));
   await new Promise((r) => setImmediate(r));
@@ -120,7 +150,11 @@ void test('stopping never waits for a hung attempt and starts no new wait', asyn
   const timers = () =>
     process.getActiveResourcesInfo().filter((name) => name === 'Timeout')
       .length;
-  const retry = createPaidRetry({ payment, delaysMs: [60_000] });
+  const retry = createPaidRetry({
+    payment,
+    delaysMs: [60_000],
+    attemptMs: 1_000,
+  });
   retry.queue(ADMISSION, '7');
   await new Promise((r) => setImmediate(r));
   await retry.stop();
@@ -130,6 +164,40 @@ void test('stopping never waits for a hung attempt and starts no new wait', asyn
   release();
   await new Promise((r) => setImmediate(r));
   await new Promise((r) => setImmediate(r));
-  assert.equal(timers(), before);
+  // The attempt's own deadline is cleared; no new timer appears.
+  assert.ok(timers() <= before);
   assert.equal(attempts, 1);
+});
+
+void test('an attempt that never answers is retried, and a second charge for a queued channel is ignored', async () => {
+  let calls = 0;
+  const charges: string[] = [];
+  const payment: PaymentServer = {
+    describe: async () => {
+      throw new Error('unused');
+    },
+    admit: async () => {
+      throw new Error('unused');
+    },
+    settle(admission, chargedAtomic) {
+      calls++;
+      charges.push(chargedAtomic);
+      if (calls === 1) return new Promise(() => {});
+      return Promise.resolve({
+        channelId: admission.channelId,
+        chargedAtomic,
+        refundedAtomic: '0',
+        sellerAtomic: chargedAtomic,
+        feeAtomic: '0',
+        transaction: 't'.repeat(64),
+      });
+    },
+  };
+  const retry = createPaidRetry({ payment, delaysMs: [1], attemptMs: 10 });
+  retry.queue(ADMISSION, '7');
+  retry.queue(ADMISSION, '0');
+  await settledAll(retry);
+  assert.deepEqual(charges, ['7', '7']);
+  assert.equal(retry.health().settled, 1);
+  await retry.stop();
 });
