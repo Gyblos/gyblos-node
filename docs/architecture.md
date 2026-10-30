@@ -185,3 +185,9 @@ storage-agnostic. The protocol owns wire records, the core owns receipt policy
 and the node owns signers, lifecycle and private files. Neither receipt failures
 nor metadata RPCs enter inference failover. No collector or payment service is
 involved.
+
+## Private receipt ingestion
+
+The core [private free-receipt collector policy](private-receipt-collector.md)
+validates existing signed pairs through an injected atomic storage port. It has
+no default backend, endpoint, exporter or seller/buyer startup integration.

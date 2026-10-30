@@ -15,7 +15,10 @@ export interface PrivateFreeReceipt {
 export interface PrivateReceiptStore {
   // Atomically insert absent keys, deduplicate identical fingerprints and preserve conflicts.
   // Enforce capacity/retention, private access and abort-before-commit in the implementation.
-  insert(entry: PrivateFreeReceipt, signal?: AbortSignal): Promise<ReceiptCollectorWrite>;
+  insert(
+    entry: PrivateFreeReceipt,
+    signal?: AbortSignal,
+  ): Promise<ReceiptCollectorWrite>;
 }
 export interface ReceiptCollectorResult {
   status: ReceiptCollectorStatus;
