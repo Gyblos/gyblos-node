@@ -18,74 +18,8 @@ import {
   UptoError,
   type UptoChannelRecord,
 } from '../src/index';
+import { rig } from './chain-rig';
 import { NOW, parties } from './support';
-
-type Settle = (
-  payload: PaymentPayload,
-  requirements: PaymentRequirements,
-) => Promise<{ success: boolean; transaction: string; errorReason?: string }>;
-
-async function rig(
-  settle: Settle,
-  options: {
-    exists?: boolean | (() => Promise<boolean>);
-    sealedBy?: (claim: {
-      chargedAtomic: string;
-      attempts: readonly string[];
-    }) => { transaction: string; chargedAtomic: string } | undefined;
-  } = {},
-) {
-  const party = await parties();
-  const authorization = await createUptoAuthorization(
-    party.payer,
-    party.terms,
-    party.hints,
-  );
-  const calls: { type: unknown; amount: string }[] = [];
-  let now = NOW;
-  const store = memoryUptoChainStore();
-  const chain = createUptoSdkChain({
-    facilitator: {
-      settle: async (payload, requirements) => {
-        calls.push({ type: payload.payload.type, amount: requirements.amount });
-        return {
-          network: requirements.network,
-          payer: '',
-          ...(await settle(payload, requirements)),
-        };
-      },
-    },
-    verify: async () => true,
-    authorizer: party.authorizer,
-    store,
-    channelExists: async () =>
-      typeof options.exists === 'function'
-        ? options.exists()
-        : (options.exists ?? false),
-    settledClaim: async (_channelId, claim) => options.sealedBy?.(claim),
-    now: () => now,
-    openWindowMs: 90_000,
-  });
-  const record: UptoChannelRecord = {
-    channelId: authorization.channelId,
-    payer: authorization.payer,
-    maxAtomic: authorization.maxAtomic,
-    state: UPTO_CHANNEL_STATES.ADMITTED,
-    payload: authorization.payload,
-    terms: party.terms,
-  };
-  return {
-    ...party,
-    authorization,
-    chain,
-    calls,
-    store,
-    record,
-    advance: (ms: number) => {
-      now += ms;
-    },
-  };
-}
 
 const rejected = (error: unknown) =>
   error instanceof UptoError &&
@@ -358,58 +292,4 @@ void test('a deposit refusal is ambiguous when the channel lookup itself fails',
     chain.deposit(authorization, terms),
     (error) => !rejected(error),
   );
-});
-
-void test('a claim sent but not confirmed is remembered and its transaction found by the next attempt', async () => {
-  const seen: (readonly string[])[] = [];
-  let landed = false;
-  const { chain, calls, record, store } = await rig(
-    async () => ({
-      success: false,
-      transaction: 'P'.repeat(64),
-      errorReason: 'settlement_pending',
-    }),
-    {
-      sealedBy: (claim) => {
-        seen.push(claim.attempts);
-        return landed
-          ? {
-              transaction: claim.attempts[0]!,
-              chargedAtomic: claim.chargedAtomic,
-            }
-          : undefined;
-      },
-    },
-  );
-  await assert.rejects(chain.claim(record, '5'));
-  assert.deepEqual((await store.getClaim(record.channelId))?.attempts, [
-    'P'.repeat(64),
-  ]);
-  // The pending transaction landed meanwhile: the retry finds it without sending again.
-  landed = true;
-  assert.deepEqual(await chain.claim(record, '5'), {
-    transaction: 'P'.repeat(64),
-  });
-  assert.equal(calls.length, 1);
-  assert.deepEqual(seen.at(-1), ['P'.repeat(64)]);
-  assert.equal(
-    (await store.getClaim(record.channelId))?.transaction,
-    'P'.repeat(64),
-  );
-});
-
-void test('only the most recent claim attempts are remembered', async () => {
-  let sent = 0;
-  const { chain, record, store } = await rig(async () => ({
-    success: false,
-    transaction: String(++sent).padStart(64, 'T'),
-    errorReason: 'settlement_pending',
-  }));
-  const limit = UPTO_CHANNEL_ACCOUNT.maxClaimAttempts;
-  for (let attempt = 0; attempt <= limit; attempt++)
-    await assert.rejects(chain.claim(record, '5'));
-  const attempts = (await store.getClaim(record.channelId))?.attempts ?? [];
-  assert.equal(attempts.length, limit);
-  assert.equal(attempts.at(-1), String(limit + 1).padStart(64, 'T'));
-  assert.equal(attempts[0], String(2).padStart(64, 'T'));
 });
