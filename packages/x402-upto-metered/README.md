@@ -34,11 +34,13 @@ example a QUIC peer-to-peer stream).
 - `createUptoSdkChain(...)`: the `UptoChain` over the SDK's facilitator settle:
   deposit, voucher-signed claim by the seller's authorizer, outcomes classified
   (refused vs. may-have-landed), and claims idempotent per channel and charge
-  through a durable `UptoChainStore`. Give the facilitator
-  `durablePendingStore(store)` so a retry re-awaits the original signature.
+  through a durable `UptoChainStore` and an on-chain lookup of the sealing
+  transaction; `createUptoFacilitator(signer, store)` builds the facilitator
+  with its pending signatures kept in that store.
 - `terms.splits` distributes each charge between payTo and further recipients
   (for example a protocol fee). This needs the monorepo's patch of
-  `@x402/svm@2.28.0` (`patches/@x402__svm@2.28.0.patch`), proposed upstream.
+  `@x402/svm@2.28.0` (`patches/@x402__svm@2.28.0.patch`); not yet proposed
+  upstream.
 
 Planned: a durable file store and the host wiring.
 

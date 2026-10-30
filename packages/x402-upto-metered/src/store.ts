@@ -1,5 +1,6 @@
-// The in-memory channel store, for tests and single-process use; durable stores implement the same
-// interface (for example an atomic JSON file per seller).
+// In-memory channel and chain stores, for tests and single-process use, and the adapter that lets
+// the SDK keep its pending signatures in the chain store. Durable stores implement the same
+// interfaces (for example an atomic JSON file per seller).
 import type { PendingSettlementStore } from '@x402/core/facilitator';
 
 import type { UptoChainStore, UptoChannelRecord, UptoStore } from './types';
@@ -48,18 +49,22 @@ export function memoryUptoChainStore(): UptoChainStore {
     async putPending(key, signature) {
       pending.set(key, signature);
     },
+    async deletePending(key) {
+      pending.delete(key);
+    },
   };
 }
 
-// The SDK's pending-settlement store, backed by the chain store and never forgetting: after a crash,
-// settle re-awaits the signature it already broadcast instead of opening or claiming again.
+// Adapts the chain store to the SDK's PendingSettlementStore, so a signature the SDK recorded as
+// pending survives a restart and settle re-awaits it instead of sending again. Deletes are kept,
+// so a claim that failed on chain can be rebuilt. A claim that landed and was then forgotten is
+// found through settledTransaction instead.
 export function durablePendingStore(
   store: UptoChainStore,
 ): PendingSettlementStore {
   return {
     get: (key) => store.getPending(key),
     set: (key, signature) => store.putPending(key, signature),
-    // Kept on purpose: the SDK drops the entry once confirmed, which loses it across a crash.
-    delete: async () => {},
+    delete: (key) => store.deletePending(key),
   };
 }

@@ -8,7 +8,7 @@ import { generateKeyPairSigner } from '@solana/kit';
 import { createUptoAuthorization, createUptoVerifier } from '../src/index';
 import { parties } from './support';
 
-void test('a 97/3 distribution is signed by the payer and verified against the same terms', async () => {
+void test('a 9709/291 bps distribution (3% on top of the seller price) is signed by the payer and verified against the same terms', async () => {
   const { payer, feePayer, terms, hints } = await parties();
   const treasury = (await generateKeyPairSigner()).address;
   const split = {

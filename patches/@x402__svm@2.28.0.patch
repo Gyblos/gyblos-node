@@ -39,6 +39,22 @@ index 1b1e89f325f11e719bc0e19ccabcb84776e42e12..55150cd40ef18ca7e1cb2f3fbc8dca1d
    return { feePayer, receiverAuthorizer, splits, withdrawDelay };
  }
  
+diff --git a/dist/cjs/rentCleanup-D91n7iIF.d.ts b/dist/cjs/rentCleanup-D91n7iIF.d.ts
+index 5d50bd15e183bb74ef583d7f8fec8f858c2ac7e3..ee9c5f7c6412d529d18877e23672a07a2e8289c8 100644
+--- a/dist/cjs/rentCleanup-D91n7iIF.d.ts
++++ b/dist/cjs/rentCleanup-D91n7iIF.d.ts
+@@ -36,6 +36,11 @@ interface PaymentChannelRecord {
+     receiverAuthorizer: string;
+     /** Delegated-mode caller identity. Empty when the open was not delegated. */
+     callerIdentity: string;
++    /** gyblos patch: the channel's distribution (from extra.splits); absent means 100% to payTo. Durable stores must keep it, or cleanup cannot distribute a multi-recipient channel. */
++    splits?: ReadonlyArray<{
++        bps: number;
++        recipient: string;
++    }>;
+ }
+ /**
+  * Result of {@link PaymentChannelStorage.recordOpen}. `revertToken` is empty
 diff --git a/dist/cjs/upto/client/index.js b/dist/cjs/upto/client/index.js
 index 24f9d8eaee214bad9a93005708709d074daf19aa..3f3718e7f8cb83b64c55bc0250029d3f73a7cf93 100644
 --- a/dist/cjs/upto/client/index.js
@@ -192,6 +208,22 @@ index 52ac9f0a3502edf04953fcf270b8841eedf44bfc..1d744b0899433ba4bd7f953a06d560ae
      const distribute = await buildDistributeInstruction({
        channelId: record.channelId,
        mint: live.mint,
+diff --git a/dist/esm/rentCleanup-D91n7iIF.d.mts b/dist/esm/rentCleanup-D91n7iIF.d.mts
+index 79dad6680953d2559d2da03184c949908d68975e..4880af59cf9b56969183d936923a310d214fa27d 100644
+--- a/dist/esm/rentCleanup-D91n7iIF.d.mts
++++ b/dist/esm/rentCleanup-D91n7iIF.d.mts
+@@ -36,6 +36,11 @@ interface PaymentChannelRecord {
+     receiverAuthorizer: string;
+     /** Delegated-mode caller identity. Empty when the open was not delegated. */
+     callerIdentity: string;
++    /** gyblos patch: the channel's distribution (from extra.splits); absent means 100% to payTo. Durable stores must keep it, or cleanup cannot distribute a multi-recipient channel. */
++    splits?: ReadonlyArray<{
++        bps: number;
++        recipient: string;
++    }>;
+ }
+ /**
+  * Result of {@link PaymentChannelStorage.recordOpen}. `revertToken` is empty
 diff --git a/dist/esm/upto/facilitator/index.mjs b/dist/esm/upto/facilitator/index.mjs
 index 948ca0e8bc994ac47580ede3d80cc15dd94bcf71..935b74b90534bbb7ae783ddc3961a367c32a9ea2 100644
 --- a/dist/esm/upto/facilitator/index.mjs

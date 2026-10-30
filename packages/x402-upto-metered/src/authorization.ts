@@ -53,7 +53,7 @@ export async function createUptoAuthorization(
 // The SDK payload inside an authorization, or an AUTHORIZATION_MISMATCH error. Oversized,
 // non-canonical base64 or malformed payloads never reach the SDK.
 export function decodeUptoPayload(
-  authorization: UptoAuthorization,
+  authorization: Pick<UptoAuthorization, 'payload'>,
 ): Record<string, unknown> & UptoPayloadFields {
   try {
     if (authorization.payload.length <= UPTO.payloadBytes) {

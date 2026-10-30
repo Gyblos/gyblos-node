@@ -24,7 +24,10 @@ type Settle = (
   requirements: PaymentRequirements,
 ) => Promise<{ success: boolean; transaction: string; errorReason?: string }>;
 
-async function rig(settle: Settle, options: { exists?: boolean } = {}) {
+async function rig(
+  settle: Settle,
+  options: { exists?: boolean; sealedBy?: () => string | undefined } = {},
+) {
   const party = await parties();
   const authorization = await createUptoAuthorization(
     party.payer,
@@ -49,6 +52,7 @@ async function rig(settle: Settle, options: { exists?: boolean } = {}) {
     authorizer: party.authorizer,
     store,
     channelExists: async () => options.exists ?? false,
+    settledTransaction: async () => options.sealedBy?.(),
     now: () => now,
     openWindowMs: 90_000,
   });
@@ -89,16 +93,22 @@ void test('a deposit settles the open for the whole ceiling and records when it 
 });
 
 void test('deposit outcomes: refusals fail at once, pending and thrown failures stay ambiguous', async () => {
-  for (const [reason, definitive] of [
-    ['invalid_upto_svm_settlement_simulation', true],
-    ['transaction_failed', true],
-    ['settlement_pending', false],
+  for (const [reason, transaction, exists, definitive] of [
+    ['invalid_upto_svm_settlement_simulation', '', false, true],
+    ['transaction_failed', '', false, true],
+    ['settlement_pending', '', false, false],
+    // The open was confirmed but reading it back failed: it is on chain.
+    ['invalid_upto_svm_channel_state', 'O'.repeat(64), false, false],
+    ['invalid_upto_svm_channel_broadcast', '', false, false],
+    // A failure that still returns a signature may have landed, whatever its reason.
+    ['transaction_failed', 'T'.repeat(64), false, false],
+    // Any refusal is ambiguous once the channel account exists.
+    ['invalid_upto_svm_settlement_simulation', '', true, false],
   ] as const) {
-    const { chain, authorization, terms } = await rig(async () => ({
-      success: false,
-      transaction: '',
-      errorReason: reason,
-    }));
+    const { chain, authorization, terms } = await rig(
+      async () => ({ success: false, transaction, errorReason: reason }),
+      { exists },
+    );
     await assert.rejects(chain.deposit(authorization, terms), (error) =>
       definitive ? rejected(error) : !rejected(error),
     );
@@ -197,6 +207,7 @@ void test('the voucher is signed by the authorizer and accepted by the real faci
     authorizer: party.authorizer,
     store: memoryUptoChainStore(),
     channelExists: async () => false,
+    settledTransaction: async () => undefined,
     now: () => NOW,
     openWindowMs: 90_000,
   });
@@ -217,10 +228,59 @@ void test('the voucher is signed by the authorizer and accepted by the real faci
   assert.deepEqual(reasons, ['invalid_upto_svm_channel_state']);
 });
 
-void test('the durable pending store never forgets a broadcast signature', async () => {
+void test('the pending store keeps broadcast signatures across restarts and forgets on delete', async () => {
   const store = memoryUptoChainStore();
-  const pending = durablePendingStore(store);
-  await pending.set('upto:claim:x', 'sig');
-  await pending.delete('upto:claim:x');
-  assert.equal(await pending.get('upto:claim:x'), 'sig');
+  await durablePendingStore(store).set('upto:claim:x', 'sig');
+  // A new adapter over the same store (a restart) still sees it.
+  const restarted = durablePendingStore(store);
+  assert.equal(await restarted.get('upto:claim:x'), 'sig');
+  await restarted.delete('upto:claim:x');
+  assert.equal(await restarted.get('upto:claim:x'), undefined);
+});
+
+void test('a claim that landed before it was recorded is found on chain, not claimed again', async () => {
+  let sealed: string | undefined;
+  const { chain, calls, record } = await rig(
+    async () => {
+      sealed = 'S'.repeat(64);
+      throw new Error('crashed after broadcast');
+    },
+    { sealedBy: () => sealed },
+  );
+  await assert.rejects(chain.claim(record, '5'));
+  assert.deepEqual(await chain.claim(record, '5'), {
+    transaction: 'S'.repeat(64),
+  });
+  assert.equal(calls.length, 1);
+});
+
+void test('a claim refused because the channel is sealed returns the sealing transaction', async () => {
+  const { chain, record } = await rig(
+    async () => ({
+      success: false,
+      transaction: '',
+      errorReason: 'invalid_upto_svm_channel_state',
+    }),
+    { sealedBy: () => 'Z'.repeat(64) },
+  );
+  assert.deepEqual(await chain.claim(record, '5'), {
+    transaction: 'Z'.repeat(64),
+  });
+});
+
+void test('an expired claim is a definitive refusal; transient failures are not', async () => {
+  for (const [reason, definitive] of [
+    ['invalid_upto_svm_payload_expired', true],
+    ['transaction_failed', false],
+    ['invalid_upto_svm_channel_state', false],
+  ] as const) {
+    const { chain, record } = await rig(async () => ({
+      success: false,
+      transaction: '',
+      errorReason: reason,
+    }));
+    await assert.rejects(chain.claim(record, '5'), (error) =>
+      definitive ? rejected(error) : !rejected(error),
+    );
+  }
 });

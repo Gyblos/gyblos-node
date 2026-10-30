@@ -5,13 +5,13 @@ import type { Network } from '@x402/core/types';
 
 import type { UptoChannelState, UptoDepositState } from './constants';
 
-// Everything that binds a deposit: who is paid, in what, up to how much and until when.
 // One recipient of each charge, in basis points; the first is always payTo.
 export interface UptoSplit {
   recipient: string;
   bps: number;
 }
 
+// Everything that binds a deposit: who is paid, in what, up to how much and until when.
 // The seller builds these from its own issued offer, never from the buyer's request.
 export interface UptoTerms {
   network: Network;
@@ -118,4 +118,5 @@ export interface UptoChainStore {
   putClaim(record: UptoClaimRecord): Promise<void>;
   getPending(key: string): Promise<string | undefined>;
   putPending(key: string, signature: string): Promise<void>;
+  deletePending(key: string): Promise<void>;
 }

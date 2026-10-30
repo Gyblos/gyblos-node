@@ -21,6 +21,10 @@ export {
   memoryUptoChainStore,
   memoryUptoStore,
 } from './store';
-export { createUptoSdkChain, type UptoSdkChainOptions } from './chain';
+export {
+  createUptoFacilitator,
+  createUptoSdkChain,
+  type UptoSdkChainOptions,
+} from './chain';
 export type * from './types';
 export { createUptoVerifier, type UptoVerifier } from './verify';
