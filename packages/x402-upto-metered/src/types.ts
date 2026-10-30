@@ -5,6 +5,12 @@ import type { Network } from '@x402/core/types';
 
 import type { UptoChannelState, UptoDepositState } from './constants';
 
+// One recipient of each charge, in basis points; the first is always payTo.
+export interface UptoSplit {
+  recipient: string;
+  bps: number;
+}
+
 // Everything that binds a deposit: who is paid, in what, up to how much and until when.
 // The seller builds these from its own issued offer, never from the buyer's request.
 export interface UptoTerms {
@@ -21,6 +27,8 @@ export interface UptoTerms {
   memo: string;
   withdrawDelaySeconds: number;
   maxTimeoutSeconds: number;
+  // How each charge is distributed; absent means all of it to payTo.
+  splits?: readonly UptoSplit[];
 }
 
 // Recent-block hints the payer supplies so the channel open is built without a network call.
@@ -49,6 +57,9 @@ export interface UptoSettlement {
 
 export interface UptoChannelRecord extends UptoAdmission {
   state: UptoChannelState;
+  // The payer's signed open and the terms it was admitted under; a claim needs both.
+  payload: string;
+  terms: UptoTerms;
   // Present from SETTLING on: the only charge this channel may ever settle.
   chargedAtomic?: string;
   settlement?: UptoSettlement;
@@ -87,4 +98,25 @@ export interface UptoStore {
   get(channelId: string): Promise<UptoChannelRecord | undefined>;
   put(record: UptoChannelRecord): Promise<void>;
   list(): Promise<UptoChannelRecord[]>;
+}
+
+// What the SDK-backed chain remembers durably per channel: when a deposit was sent, the one charge
+// claimed and its transaction, and every broadcast signature the SDK asked to keep.
+export interface UptoDepositRecord {
+  channelId: string;
+  sentAt: number;
+}
+export interface UptoClaimRecord {
+  channelId: string;
+  chargedAtomic: string;
+  transaction?: string;
+}
+export interface UptoChainStore {
+  getDeposit(channelId: string): Promise<UptoDepositRecord | undefined>;
+  putDeposit(record: UptoDepositRecord): Promise<void>;
+  getClaim(channelId: string): Promise<UptoClaimRecord | undefined>;
+  putClaim(record: UptoClaimRecord): Promise<void>;
+  getPending(key: string): Promise<string | undefined>;
+  putPending(key: string, signature: string): Promise<void>;
+  deletePending(key: string): Promise<void>;
 }
