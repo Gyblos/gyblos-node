@@ -40,19 +40,19 @@ import {
 import { uptoTestClient } from './payment-upto-client';
 import { ledgerChain, newLedger, type UptoLedger } from './payment-upto-ledger';
 
-const NETWORK = 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1';
-const START_MS = 1_800_000_000_000;
+export const NETWORK = 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1';
+export const START_MS = 1_800_000_000_000;
 const TERM_MS = 60_000;
-const FEE_BPS = 300;
-const SETTINGS: UptoChannelSettings = {
+export const FEE_BPS = 300;
+export const SETTINGS: UptoChannelSettings = {
   tokenProgram: TOKEN_PROGRAM_ADDRESS,
   withdrawDelaySeconds: 60,
   maxTimeoutSeconds: 120,
 };
 
-const newAddress = async () => (await generateKeyPairSigner()).address;
+export const newAddress = async () => (await generateKeyPairSigner()).address;
 
-async function hints(): Promise<UptoClientHints> {
+export async function hints(): Promise<UptoClientHints> {
   return {
     recentBlockhash: await newAddress(),
     lastValidBlockHeight: '500000000',
@@ -60,11 +60,14 @@ async function hints(): Promise<UptoClientHints> {
   };
 }
 
-function seller(
+export function seller(
   ledger: UptoLedger,
   description: PaymentDescription,
   slot: string,
-  options: PaymentRigOptions,
+  options: Pick<PaymentRigOptions, 'failUpstream' | 'onDepositSent'> & {
+    refuseClaim?: boolean;
+  },
+  store = memoryUptoStore(),
 ) {
   const chain = ledgerChain(
     ledger,
@@ -76,15 +79,16 @@ function seller(
     settings: SETTINGS,
     seller: createUptoSeller({
       chain,
-      store: memoryUptoStore(),
+      store,
       now: () => ledger.now,
       own: uptoSellerTerms(description, SETTINGS),
     }),
   });
 }
 
-// A distribution the SDK refuses to sign (for example treasury first) cannot be produced by any
-// honest client; such an authorization carries an open that can never verify.
+// A distribution the SDK refuses to sign (treasury first) cannot be produced through the SDK; for
+// that one contract case this stands in an open that can never verify, so the case only proves
+// such a payload is refused. The distributions the SDK can sign carry the real enforcement.
 async function signedWith(
   payer: KeyPairSigner,
   terms: PaymentTerms,
@@ -160,7 +164,8 @@ export const uptoPaymentHarness: PaymentHarness = {
         ),
       authorizationWithSplits: (terms, splits) =>
         signedWith(payer, terms, splits, recent),
-      // The open of an authorization signed with `splits`, spliced into the original payload.
+      // The open of a separately signed authorization spliced into the original payload. Its channel
+      // and nonce differ too, so this proves a spliced open is refused, not which field refused it.
       async tamperSplits(authorization, splits) {
         const original = JSON.parse(
           Buffer.from(authorization.payload, 'base64').toString(),

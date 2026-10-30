@@ -12,6 +12,9 @@ export const PAYMENT_ERROR_CODES = {
   ALREADY_SETTLED: 'PAYMENT_ALREADY_SETTLED',
   RECEIPT_MISMATCH: 'PAYMENT_RECEIPT_MISMATCH',
   UNAVAILABLE: 'PAYMENT_UNAVAILABLE',
+  // The chain refused the claim for good (for example the payer's authorization expired): nothing
+  // was or will be charged and the deposit returns to the payer. Unlike UNAVAILABLE, never retried.
+  SETTLEMENT_LAPSED: 'PAYMENT_SETTLEMENT_LAPSED',
 } as const;
 export type PaymentErrorCode =
   (typeof PAYMENT_ERROR_CODES)[keyof typeof PAYMENT_ERROR_CODES];

@@ -5,6 +5,8 @@ import { randomBytes } from 'node:crypto';
 
 import {
   UPTO_DEPOSIT_STATES,
+  UPTO_ERROR_CODES,
+  UptoError,
   type UptoChain,
   type UptoVerifier,
 } from 'x402-upto-metered';
@@ -45,7 +47,12 @@ export function newLedger(now: number): UptoLedger {
 export function ledgerChain(
   ledger: UptoLedger,
   verify: UptoVerifier,
-  options: { failUpstream: boolean; onDepositSent?: () => void },
+  options: {
+    failUpstream: boolean;
+    onDepositSent?: () => void;
+    // The chain refuses every claim for good, as for an expired payer authorization.
+    refuseClaim?: boolean;
+  },
 ): UptoChain {
   const claimed = new Map<
     string,
@@ -72,6 +79,8 @@ export function ledgerChain(
         : UPTO_DEPOSIT_STATES.NEVER;
     },
     async claim(record, chargedAtomic) {
+      if (options.refuseClaim)
+        throw new UptoError(UPTO_ERROR_CODES.FACILITATOR_REJECTED);
       const previous = claimed.get(record.channelId);
       if (previous) return { transaction: previous.transaction };
       const charged = BigInt(chargedAtomic);

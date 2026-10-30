@@ -12,7 +12,9 @@
 //    that expired before the deposit is sent, moving no funds; a caller abort is honoured only
 //    until the deposit is sent, after which admission completes and returns the admission;
 // 4. settle trusts only the server's own channel record, charges at most the ceiling, refunds the
-//    rest, and settles once (repeating the same charge returns the same settlement);
+//    rest, and settles once (repeating the same charge returns the same settlement); a claim the
+//    chain refuses for good is SETTLEMENT_LAPSED (nothing charged), distinct from a retryable
+//    UNAVAILABLE that may still land, and the reported shares are those the signed distribution pays;
 // 5. checkReceipt verifies the settlement on the ledger, not the seller's word, including the
 //    seller and fee shares actually paid (fixed by the distribution the buyer signed at open);
 // 6. every failure is a PaymentError whose message is its static code, except that an aborted

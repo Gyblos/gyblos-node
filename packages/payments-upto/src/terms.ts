@@ -3,9 +3,11 @@
 // digest is kept as the channel's reference.
 import type { UptoSellerOptions, UptoTerms } from 'x402-upto-metered';
 
-import type {
-  PaymentDescription,
-  PaymentTerms,
+import { PAYMENT_ERROR_CODES } from '@gyblos/protocol/constants';
+import {
+  PaymentError,
+  type PaymentDescription,
+  type PaymentTerms,
 } from '@gyblos/protocol/payment';
 import { paymentMemo, paymentSplits } from '@gyblos/protocol/payment-binding';
 
@@ -16,9 +18,12 @@ export interface UptoChannelSettings {
   maxTimeoutSeconds: number;
 }
 
-// Gyblos networks are CAIP-2 ids ("solana:<genesis>"), the shape x402 calls a Network.
+// Gyblos networks are CAIP-2 ids ("solana:<genesis>"), the shape x402 calls a Network; anything
+// else is refused, never truncated.
 function networkOf(network: string): UptoTerms['network'] {
-  const [namespace, reference] = network.split(':');
+  const [namespace, reference, ...rest] = network.split(':');
+  if (!namespace || !reference || rest.length)
+    throw new PaymentError(PAYMENT_ERROR_CODES.UNTRUSTED_TERMS);
   return `${namespace}:${reference}`;
 }
 
