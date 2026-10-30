@@ -160,3 +160,26 @@ export type IdentityPolicyCode =
 export const IDENTITY_POLICY_LIMITS = {
   maxSequence: 0xffff_ffff_ffff_ffffn,
 } as const;
+
+// First private free-receipt policy: per-instance active work, no queue or external collection.
+export const RECEIPT_COLLECTOR_LIMITS = { bytes: 4096, depth: 16, active: 4 } as const;
+export const RECEIPT_COLLECTOR_CODES = {
+  INVALID: 'COLLECTOR_INVALID',
+  LIMIT: 'COLLECTOR_LIMIT',
+  SIGNATURE: 'COLLECTOR_SIGNATURE',
+  BINDING: 'COLLECTOR_BINDING',
+  NOT_FREE: 'COLLECTOR_NOT_FREE',
+  PAIR_REQUIRED: 'COLLECTOR_PAIR_REQUIRED',
+  DISPUTE: 'COLLECTOR_DISPUTE',
+  CONFLICT: 'COLLECTOR_CONFLICT',
+  BUSY: 'COLLECTOR_BUSY',
+  CANCELLED: 'COLLECTOR_CANCELLED',
+  STORAGE: 'COLLECTOR_STORAGE',
+} as const;
+export type ReceiptCollectorCode = (typeof RECEIPT_COLLECTOR_CODES)[keyof typeof RECEIPT_COLLECTOR_CODES];
+export const RECEIPT_COLLECTOR_WRITES = {
+  INSERTED: 'inserted', IDENTICAL: 'identical', CONFLICT: 'conflict', FULL: 'full',
+} as const;
+export type ReceiptCollectorWrite = (typeof RECEIPT_COLLECTOR_WRITES)[keyof typeof RECEIPT_COLLECTOR_WRITES];
+export const RECEIPT_COLLECTOR_STATUSES = { STORED: 'stored', DUPLICATE: 'duplicate' } as const;
+export type ReceiptCollectorStatus = (typeof RECEIPT_COLLECTOR_STATUSES)[keyof typeof RECEIPT_COLLECTOR_STATUSES];
