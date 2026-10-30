@@ -1,0 +1,13 @@
+{
+  "name": "@gyblos/payments-upto",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@gyblos/protocol": "workspace:*",
+    "x402-upto-metered": "workspace:*"
+  }
+}

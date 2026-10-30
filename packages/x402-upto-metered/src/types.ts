@@ -29,6 +29,8 @@ export interface UptoTerms {
   maxTimeoutSeconds: number;
   // How each charge is distributed; absent means all of it to payTo.
   splits?: readonly UptoSplit[];
+  // An application reference kept with the channel record (for example the request it pays for).
+  reference?: string;
 }
 
 // Recent-block hints the payer supplies so the channel open is built without a network call.
