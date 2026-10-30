@@ -9,7 +9,11 @@ export {
 export { UptoError, uptoError } from './errors';
 export { createUptoAuthorization, decodeUptoPayload } from './authorization';
 export { uptoRequirements } from './requirements';
-export { createUptoSeller, type UptoSellerOptions } from './seller';
+export {
+  createUptoSeller,
+  type UptoSeller,
+  type UptoSellerOptions,
+} from './seller';
 export { memoryUptoStore } from './store';
 export type * from './types';
-export { createUptoVerifier } from './verify';
+export { createUptoVerifier, type UptoVerifier } from './verify';

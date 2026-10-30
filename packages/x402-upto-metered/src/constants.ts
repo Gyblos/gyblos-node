@@ -18,6 +18,8 @@ export type UptoErrorCode =
 export const UPTO = {
   scheme: 'upto',
   x402Version: 2,
+  // Base64 characters of an authorization payload; a Solana transaction is at most 1232 bytes.
+  payloadBytes: 4096,
 } as const;
 
 // A channel's write-ahead state on the seller: each is recorded before the step it names.
@@ -26,6 +28,8 @@ export const UPTO_CHANNEL_STATES = {
   ADMITTED: 'admitted',
   SETTLING: 'settling',
   SETTLED: 'settled',
+  // The deposit never landed; terminal, kept so the channel is never admitted again.
+  FAILED: 'failed',
 } as const;
 export type UptoChannelState =
   (typeof UPTO_CHANNEL_STATES)[keyof typeof UPTO_CHANNEL_STATES];

@@ -15,14 +15,18 @@ void test('a client-built channel open verifies against the same terms', async (
   const authorization = await createUptoAuthorization(payer, terms, hints);
   assert.equal(authorization.payer, payer.address);
   assert.equal(authorization.maxAtomic, terms.maxAtomic);
-  const verify = createUptoVerifier(feePayer);
+  const verify = createUptoVerifier(feePayer.address, async () =>
+    BigInt(hints.recentSlot),
+  );
   assert.equal(await verify(authorization, terms), true);
 });
 
 void test('any change to the money terms fails verification', async () => {
   const { payer, feePayer, terms, hints } = await parties();
   const authorization = await createUptoAuthorization(payer, terms, hints);
-  const verify = createUptoVerifier(feePayer);
+  const verify = createUptoVerifier(feePayer.address, async () =>
+    BigInt(hints.recentSlot),
+  );
   for (const changed of [
     { memo: `gyblos:${'cd'.repeat(32)}` },
     { maxAtomic: '1029999' },
@@ -55,21 +59,22 @@ void test('requirements carry the terms and the client hints, never anything els
   assert.equal(uptoRequirements(terms).extra?.recentSlot, undefined);
 });
 
-void test('with a slot source, an open from a far older slot is refused', async () => {
+void test('an open from a far older slot than the chain is refused', async () => {
   const { payer, feePayer, terms, hints } = await parties();
   const authorization = await createUptoAuthorization(payer, terms, hints);
   const current = BigInt(hints.recentSlot);
   assert.equal(
-    await createUptoVerifier(feePayer, { slot: async () => current + 2n })(
+    await createUptoVerifier(feePayer.address, async () => current + 2n)(
       authorization,
       terms,
     ),
     true,
   );
   assert.equal(
-    await createUptoVerifier(feePayer, {
-      slot: async () => current + 1_000_000n,
-    })(authorization, terms),
+    await createUptoVerifier(
+      feePayer.address,
+      async () => current + 1_000_000n,
+    )(authorization, terms),
     false,
   );
 });
@@ -77,11 +82,27 @@ void test('with a slot source, an open from a far older slot is refused', async 
 void test('the authorization must describe its own payload', async () => {
   const { payer, feePayer, terms, hints } = await parties();
   const authorization = await createUptoAuthorization(payer, terms, hints);
-  const verify = createUptoVerifier(feePayer);
+  const verify = createUptoVerifier(feePayer.address, async () =>
+    BigInt(hints.recentSlot),
+  );
   for (const changed of [
     { channelId: feePayer.address },
     { maxAtomic: '1' },
     { payer: feePayer.address },
   ])
     assert.equal(await verify({ ...authorization, ...changed }, terms), false);
+});
+
+void test('oversized or non-canonical payloads never reach the SDK', async () => {
+  const { payer, feePayer, terms, hints } = await parties();
+  const authorization = await createUptoAuthorization(payer, terms, hints);
+  const verify = createUptoVerifier(feePayer.address, async () =>
+    BigInt(hints.recentSlot),
+  );
+  for (const payload of [
+    'A'.repeat(4097),
+    `${authorization.payload} `,
+    Buffer.from('[1]').toString('base64'),
+  ])
+    assert.equal(await verify({ ...authorization, payload }, terms), false);
 });

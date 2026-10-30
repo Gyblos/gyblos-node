@@ -12,5 +12,8 @@ export function memoryUptoStore(): UptoStore {
     async put(record) {
       records.set(record.channelId, structuredClone(record));
     },
+    async list() {
+      return [...records.values()].map((record) => structuredClone(record));
+    },
   };
 }

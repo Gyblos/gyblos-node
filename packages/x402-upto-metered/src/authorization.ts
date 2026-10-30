@@ -6,13 +6,29 @@ import { UptoSvmScheme as UptoClientScheme } from '@x402/svm/upto/client';
 import { UPTO, UPTO_ERROR_CODES } from './constants';
 import { UptoError } from './errors';
 import { uptoRequirements } from './requirements';
-import type { UptoAuthorization, UptoClientHints, UptoTerms } from './types';
+import type {
+  UptoAuthorization,
+  UptoClientHints,
+  UptoPayloadFields,
+  UptoTerms,
+} from './types';
 
-// The fields of the SDK's upto payload this package reads; the rest stays opaque.
-export interface UptoPayloadFields {
-  channelId: string;
-  from: string;
-  maxAmount: string;
+function isPayload(
+  value: unknown,
+): value is Record<string, unknown> & UptoPayloadFields {
+  return (
+    !!value &&
+    typeof value === 'object' &&
+    'channelId' in value &&
+    'from' in value &&
+    'maxAmount' in value &&
+    'openSlot' in value &&
+    typeof value.channelId === 'string' &&
+    typeof value.from === 'string' &&
+    typeof value.maxAmount === 'string' &&
+    typeof value.openSlot === 'string' &&
+    /^[0-9]+$/.test(value.openSlot)
+  );
 }
 
 export async function createUptoAuthorization(
@@ -24,34 +40,30 @@ export async function createUptoAuthorization(
     UPTO.x402Version,
     uptoRequirements(terms, hints),
   );
-  const fields = created.payload as unknown as UptoPayloadFields;
+  if (!isPayload(created.payload))
+    throw new UptoError(UPTO_ERROR_CODES.INTERNAL);
   return {
-    channelId: fields.channelId,
-    payer: fields.from,
-    maxAtomic: fields.maxAmount,
+    channelId: created.payload.channelId,
+    payer: created.payload.from,
+    maxAtomic: created.payload.maxAmount,
     payload: Buffer.from(JSON.stringify(created.payload)).toString('base64'),
   };
 }
 
-// The SDK payload inside an authorization, or an AUTHORIZATION_MISMATCH error.
+// The SDK payload inside an authorization, or an AUTHORIZATION_MISMATCH error. Oversized,
+// non-canonical base64 or malformed payloads never reach the SDK.
 export function decodeUptoPayload(
   authorization: UptoAuthorization,
 ): Record<string, unknown> & UptoPayloadFields {
   try {
-    const raw = Buffer.from(authorization.payload, 'base64');
-    if (raw.toString('base64') !== authorization.payload) throw new Error();
-    const decoded: unknown = JSON.parse(raw.toString('utf8'));
-    if (
-      decoded &&
-      typeof decoded === 'object' &&
-      'channelId' in decoded &&
-      'from' in decoded &&
-      'maxAmount' in decoded &&
-      typeof decoded.channelId === 'string' &&
-      typeof decoded.from === 'string' &&
-      typeof decoded.maxAmount === 'string'
-    )
-      return decoded as Record<string, unknown> & UptoPayloadFields;
+    if (authorization.payload.length <= UPTO.payloadBytes) {
+      const raw = Buffer.from(authorization.payload, 'base64');
+      const decoded: unknown =
+        raw.toString('base64') === authorization.payload
+          ? JSON.parse(raw.toString('utf8'))
+          : undefined;
+      if (isPayload(decoded)) return decoded;
+    }
   } catch {
     // Falls through to the static mismatch below.
   }

@@ -5,15 +5,13 @@ import type { PaymentRequirements } from '@x402/core/types';
 import { UPTO } from './constants';
 import type { UptoClientHints, UptoTerms } from './types';
 
-const MS_PER_SECOND = 1000;
-
 export function uptoRequirements(
   terms: UptoTerms,
-  hints?: UptoClientHints,
+  hints?: Partial<UptoClientHints>,
 ): PaymentRequirements {
   return {
     scheme: UPTO.scheme,
-    network: terms.network as PaymentRequirements['network'],
+    network: terms.network,
     asset: terms.asset,
     amount: terms.maxAtomic,
     payTo: terms.payTo,
@@ -27,8 +25,4 @@ export function uptoRequirements(
       ...(hints ?? {}),
     },
   };
-}
-
-export function secondsOf(epochMs: number): number {
-  return Math.floor(epochMs / MS_PER_SECOND);
 }

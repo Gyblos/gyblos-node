@@ -1,9 +1,14 @@
-// The package's own vocabulary for one metered upto payment; no Gyblos or transport types.
+// The package's own vocabulary for one metered upto payment; no Gyblos or transport types. A host
+// adapter maps them onto its own ports (in Gyblos: PaymentAuthorization, PaymentAdmission and
+// PaymentSettlement in @gyblos/protocol/payment, which add the request binding and fee shares).
+import type { Network } from '@x402/core/types';
+
 import type { UptoChannelState } from './constants';
 
 // Everything that binds a deposit: who is paid, in what, up to how much and until when.
+// The seller builds these from its own issued offer, never from the buyer's request.
 export interface UptoTerms {
-  network: string;
+  network: Network;
   asset: string;
   payTo: string;
   feePayer: string;
@@ -50,20 +55,34 @@ export interface UptoChannelRecord extends UptoAdmission {
 }
 
 // The chain operations the seller drives. verify is local; deposit and claim broadcast.
+// deposit throws UptoError(FACILITATOR_REJECTED) only when nothing landed (for example an unfunded
+// payer); any other failure is ambiguous and channelOpen later tells whether it landed. claim is
+// idempotent per channel and charge: repeating it returns the original transaction, never a second
+// claim, and a different charge on a claimed channel is refused.
 export interface UptoChain {
   verify(authorization: UptoAuthorization, terms: UptoTerms): Promise<boolean>;
   deposit(
     authorization: UptoAuthorization,
     terms: UptoTerms,
   ): Promise<{ transaction: string }>;
+  channelOpen(channelId: string): Promise<boolean>;
   claim(
     record: UptoChannelRecord,
     chargedAtomic: string,
   ): Promise<{ transaction: string }>;
 }
 
+// The fields of the SDK's upto payload this package reads; the rest stays opaque.
+export interface UptoPayloadFields {
+  channelId: string;
+  from: string;
+  maxAmount: string;
+  openSlot: string;
+}
+
 // Durable per-channel records; put replaces the record for its channelId.
 export interface UptoStore {
   get(channelId: string): Promise<UptoChannelRecord | undefined>;
   put(record: UptoChannelRecord): Promise<void>;
+  list(): Promise<UptoChannelRecord[]>;
 }

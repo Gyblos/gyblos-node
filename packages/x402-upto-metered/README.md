@@ -15,21 +15,28 @@ example a QUIC peer-to-peer stream).
 
 ## What exists today
 
-- `createUptoAuthorization`: the payer signs the channel open with the x402 upto
-  client, offline given recent-block hints.
-- `createUptoVerifier`: the x402 upto facilitator verifies an open against the
-  terms with no network call.
-- `createUptoSeller`: the seller's state machine (verify, write ahead, deposit
-  once; settle one charge, write ahead, claim once, idempotent retries) over an
-  injected `UptoChain` and `UptoStore`.
+- `createUptoAuthorization(payer, terms, hints)`: the payer signs the channel
+  open with the x402 upto client, offline given recent-block hints.
+- `createUptoVerifier(feePayerAddress, currentSlot)`: the x402 upto facilitator
+  verifies an open against the terms with no network call other than the
+  current-slot source; it needs only the fee payer's address.
+- `createUptoSeller({ chain, store, now, own })`: the seller's write-ahead state
+  machine. Admission verifies, records `depositing`, deposits once and records
+  `admitted`; settlement records `settling` with the one charge, claims once and
+  records `settled`, and same-charge retries return that settlement. `recover()`
+  resolves records a crash left between a chain call and its write. The host
+  supplies `UptoChain` (with idempotent claims) and `UptoStore`;
+  `memoryUptoStore()` is an in-memory store, `uptoRequirements(terms)` the
+  shared x402 requirements, and `decodeUptoPayload` the bounded payload decoder.
+- Terms come from the seller's own offer, never from the buyer's request.
 
 Planned: the chain implementation that deposits and claims through the SDK, a
-durable store, recovery, and multi-recipient splits.
+durable store, and multi-recipient splits.
 
 ## Rules
 
-- No dependency on any Gyblos package. The only runtime dependencies allowed are
-  the x402 and Solana SDKs (none yet).
+- No dependency on any Gyblos package. The only runtime dependencies are the
+  x402 SDK (`@x402/core`, `@x402/svm`) and `@solana/kit`.
 - Every failure is an `UptoError` whose message is a static code
   (`UPTO_ERROR_CODES`); RPC URLs, keys and upstream text never appear in it.
 

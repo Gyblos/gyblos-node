@@ -2,11 +2,14 @@
 import { TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
 import { generateKeyPairSigner, type KeyPairSigner } from '@solana/kit';
 
-import type {
-  UptoAuthorization,
-  UptoChain,
-  UptoChannelRecord,
-  UptoTerms,
+import {
+  UPTO_ERROR_CODES,
+  UptoError,
+  type UptoAuthorization,
+  type UptoChain,
+  type UptoChannelRecord,
+  type UptoClientHints,
+  type UptoTerms,
 } from '../src/index';
 
 export const NETWORK = 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1';
@@ -18,11 +21,7 @@ export interface Parties {
   feePayer: KeyPairSigner;
   authorizer: KeyPairSigner;
   terms: UptoTerms;
-  hints: {
-    recentBlockhash: string;
-    lastValidBlockHeight: string;
-    recentSlot: string;
-  };
+  hints: UptoClientHints;
 }
 
 export async function parties(): Promise<Parties> {
@@ -56,38 +55,61 @@ export async function parties(): Promise<Parties> {
 
 export type ChainEvent = 'verify' | 'deposit' | 'claim';
 
-// A ledger-level chain: verify accepts what `accepts` allows, deposits and claims record events.
+// A ledger-level chain with the guarantees a real one must give: a deposit either lands or not
+// (channelOpen tells), a definitive refusal is a FACILITATOR_REJECTED error, and a claim is
+// idempotent per channel and charge.
 export function fakeChain(
   options: {
     accepts?: (authorization: UptoAuthorization) => boolean;
     failDeposit?: boolean;
+    landThenFailDeposit?: boolean;
+    rejectDeposit?: boolean;
     failClaim?: () => boolean;
     pause?: () => Promise<void>;
   } = {},
 ) {
   const events: ChainEvent[] = [];
   const claims: { channelId: string; chargedAtomic: string }[] = [];
+  const open = new Set<string>();
+  const claimed = new Map<
+    string,
+    { chargedAtomic: string; transaction: string }
+  >();
   const chain: UptoChain = {
     async verify(authorization) {
       events.push('verify');
       return options.accepts?.(authorization) ?? true;
     },
-    async deposit() {
+    async deposit(authorization) {
       await options.pause?.();
+      if (options.rejectDeposit)
+        throw new UptoError(UPTO_ERROR_CODES.FACILITATOR_REJECTED);
       if (options.failDeposit)
         throw new Error(`deposit failed at https://rpc.invalid/?k=${SECRET}`);
       events.push('deposit');
+      open.add(authorization.channelId);
+      if (options.landThenFailDeposit)
+        throw new Error(`confirmation timed out at ${SECRET}`);
       return { transaction: 'd'.repeat(64) };
+    },
+    async channelOpen(channelId) {
+      return open.has(channelId);
     },
     async claim(record: UptoChannelRecord, chargedAtomic: string) {
       await options.pause?.();
+      const previous = claimed.get(record.channelId);
+      if (previous) {
+        if (previous.chargedAtomic !== chargedAtomic)
+          throw new UptoError(UPTO_ERROR_CODES.FACILITATOR_REJECTED);
+        return { transaction: previous.transaction };
+      }
       if (options.failClaim?.())
         throw new Error(`claim failed at https://rpc.invalid/?k=${SECRET}`);
       events.push('claim');
       claims.push({ channelId: record.channelId, chargedAtomic });
-      return {
-        transaction: `${'c'.repeat(60)}${claims.length}`.padEnd(64, '0'),
-      };
+      const transaction = `c${String(claims.length).padStart(63, '0')}`;
+      claimed.set(record.channelId, { chargedAtomic, transaction });
+      return { transaction };
     },
   };
   return { chain, events, claims };

@@ -66,7 +66,7 @@ void test('admission refuses foreign terms, then reuse, then expiry, without dep
   const authorization = authorizationFor(rig.terms);
   for (const terms of [
     { ...rig.terms, payTo: rig.terms.feePayer },
-    { ...rig.terms, network: 'solana:other' },
+    { ...rig.terms, network: 'solana:other' as const },
     { ...rig.terms, asset: rig.terms.payTo },
   ])
     await assert.rejects(
@@ -121,6 +121,7 @@ void test('an unavailable store prevents any deposit', async () => {
   const store = memoryUptoStore();
   const broken: UptoStore = {
     get: store.get,
+    list: store.list,
     put: async () => {
       throw new Error(`disk full at /home/${SECRET}`);
     },
@@ -184,6 +185,33 @@ void test('settlement writes ahead, claims once and repeats the same charge idem
   );
   assert.equal(events.filter((event) => event === 'claim').length, 1);
   assert.equal((await store.get(channelId))?.state, 'settled');
+});
+
+void test('the whole ceiling can be charged', async () => {
+  const { seller, terms } = await setup();
+  const { channelId } = await seller.admit(authorizationFor(terms), terms);
+  assert.equal(
+    (await seller.settle(channelId, terms.maxAtomic)).refundedAtomic,
+    '0',
+  );
+});
+
+void test('a channel still depositing cannot be settled', async () => {
+  const { seller, terms } = await setup({ failDeposit: true });
+  const authorization = authorizationFor(terms);
+  await assert.rejects(seller.admit(authorization, terms));
+  await assert.rejects(
+    seller.settle(authorization.channelId, '0'),
+    rejectsCode(UPTO_ERROR_CODES.AUTHORIZATION_MISMATCH),
+  );
+});
+
+void test('terms without an application memo are refused', async () => {
+  const { seller, terms } = await setup();
+  await assert.rejects(
+    seller.admit(authorizationFor(terms), { ...terms, memo: '' }),
+    rejectsCode(UPTO_ERROR_CODES.AUTHORIZATION_MISMATCH),
+  );
 });
 
 void test('charges above the ceiling, malformed charges and unknown channels are refused', async () => {

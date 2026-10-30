@@ -1,13 +1,16 @@
 // The seller's metered upto state machine: verify, write ahead, deposit once; later settle exactly
 // one charge, write ahead, claim once, and repeat that same settlement on retries. Every failure is
 // an UptoError with a static code; chain and store text never leaves.
-import {
-  UPTO_CHANNEL_STATES,
-  UPTO_ERROR_CODES,
-  type UptoErrorCode,
-} from './constants';
-import { UptoError } from './errors';
+import { UPTO_CHANNEL_STATES, UPTO_ERROR_CODES } from './constants';
 import { keyedLock } from './lock';
+import {
+  attempt,
+  claimOnce,
+  depositOnce,
+  fail,
+  recoverChannels,
+  type SellerContext,
+} from './seller-steps';
 import type {
   UptoAdmission,
   UptoAuthorization,
@@ -37,67 +40,29 @@ export interface UptoSellerOptions {
   own: Pick<UptoTerms, (typeof OWN_FIELDS)[number]>;
 }
 
-function fail(code: UptoErrorCode): never {
-  throw new UptoError(code);
-}
-
-async function attempt<T>(
-  code: UptoErrorCode,
-  run: () => Promise<T>,
-): Promise<T> {
-  try {
-    return await run();
-  } catch {
-    return fail(code);
-  }
-}
-
-// Records the charge before claiming it, so a crash or failed claim can only ever retry that charge.
-async function claimOnce(
-  chain: UptoChain,
-  write: (record: UptoChannelRecord) => Promise<void>,
-  record: UptoChannelRecord,
-  chargedAtomic: string,
-): Promise<UptoSettlement> {
-  await write({
-    ...record,
-    state: UPTO_CHANNEL_STATES.SETTLING,
-    chargedAtomic,
-  });
-  const { transaction } = await attempt(UPTO_ERROR_CODES.UNAVAILABLE, () =>
-    chain.claim(record, chargedAtomic),
+// The terms are this seller's own, carry an application memo, and the open verifies against them.
+async function matches(
+  { chain, own }: Pick<UptoSellerOptions, 'chain' | 'own'>,
+  authorization: UptoAuthorization,
+  terms: UptoTerms,
+): Promise<boolean> {
+  return (
+    OWN_FIELDS.every((field) => terms[field] === own[field]) &&
+    // An empty memo would turn off the payer's signature over the application binding.
+    terms.memo.length > 0 &&
+    authorization.maxAtomic === terms.maxAtomic &&
+    (await chain.verify(authorization, terms).catch(() => false))
   );
-  const settlement = {
-    channelId: record.channelId,
-    chargedAtomic,
-    refundedAtomic: String(BigInt(record.maxAtomic) - BigInt(chargedAtomic)),
-    transaction,
-  };
-  await write({
-    ...record,
-    state: UPTO_CHANNEL_STATES.SETTLED,
-    chargedAtomic,
-    settlement,
-  });
-  return settlement;
 }
+
+export type UptoSeller = ReturnType<typeof createUptoSeller>;
 
 export function createUptoSeller(options: UptoSellerOptions) {
   const { chain, store, now, own } = options;
   const locked = keyedLock();
   const write = (record: UptoChannelRecord) =>
     attempt(UPTO_ERROR_CODES.JOURNAL_UNAVAILABLE, () => store.put(record));
-
-  async function matches(
-    authorization: UptoAuthorization,
-    terms: UptoTerms,
-  ): Promise<boolean> {
-    return (
-      OWN_FIELDS.every((field) => terms[field] === own[field]) &&
-      authorization.maxAtomic === terms.maxAtomic &&
-      (await chain.verify(authorization, terms).catch(() => false))
-    );
-  }
+  const context: SellerContext = { chain, store, locked, write };
 
   async function admit(
     authorization: UptoAuthorization,
@@ -105,7 +70,7 @@ export function createUptoSeller(options: UptoSellerOptions) {
     { signal }: { signal?: AbortSignal } = {},
   ): Promise<UptoAdmission> {
     signal?.throwIfAborted();
-    if (!(await matches(authorization, terms)))
+    if (!(await matches(options, authorization, terms)))
       return fail(UPTO_ERROR_CODES.AUTHORIZATION_MISMATCH);
     return locked(authorization.channelId, async () => {
       if (
@@ -123,7 +88,7 @@ export function createUptoSeller(options: UptoSellerOptions) {
         maxAtomic: authorization.maxAtomic,
       };
       await write({ ...admission, state: UPTO_CHANNEL_STATES.DEPOSITING });
-      await attempt(UPTO_ERROR_CODES.UNAVAILABLE, () =>
+      await depositOnce(context, admission, () =>
         chain.deposit(authorization, terms),
       );
       await write({ ...admission, state: UPTO_CHANNEL_STATES.ADMITTED });
@@ -139,7 +104,11 @@ export function createUptoSeller(options: UptoSellerOptions) {
       const record = await attempt(UPTO_ERROR_CODES.JOURNAL_UNAVAILABLE, () =>
         store.get(channelId),
       );
-      if (!record || record.state === UPTO_CHANNEL_STATES.DEPOSITING)
+      if (
+        !record ||
+        record.state === UPTO_CHANNEL_STATES.DEPOSITING ||
+        record.state === UPTO_CHANNEL_STATES.FAILED
+      )
         return fail(UPTO_ERROR_CODES.AUTHORIZATION_MISMATCH);
       if (
         record.chargedAtomic !== undefined &&
@@ -152,13 +121,14 @@ export function createUptoSeller(options: UptoSellerOptions) {
         BigInt(chargedAtomic) > BigInt(record.maxAtomic)
       )
         return fail(UPTO_ERROR_CODES.CHARGE_EXCEEDS_CEILING);
-      return claimOnce(chain, write, record, chargedAtomic);
+      return claimOnce(context, record, chargedAtomic);
     });
   }
 
   return {
     admit,
     settle,
+    recover: () => recoverChannels(context),
     record: (channelId: string) =>
       attempt(UPTO_ERROR_CODES.JOURNAL_UNAVAILABLE, () => store.get(channelId)),
   };
