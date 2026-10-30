@@ -31,7 +31,11 @@
     "./node-status": "./src/node-status.ts",
     "./node-session": "./src/node-session.ts",
     "./node-handlers": "./src/node-handlers.ts",
-    "./node-runtime": "./src/node-runtime.ts"
+    "./node-runtime": "./src/node-runtime.ts",
+    "./network-catalog": "./src/catalog/model.ts",
+    "./network-catalog-reader": "./src/catalog/reader.ts",
+    "./network-catalog-session": "./src/catalog/session.ts",
+    "./network-catalog-handlers": "./src/catalog/handlers.ts"
   },
   "scripts": {
     "build": "tsx scripts/build.ts",
@@ -47,7 +51,8 @@
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "@phosphor-icons/react": "2.1.10",
-    "@solana/kit": "5.1.0"
+    "@solana/kit": "5.1.0",
+    "@gyblos/discovery-http": "workspace:*"
   },
   "devDependencies": {
     "electron": "45.0.0",
