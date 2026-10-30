@@ -76,3 +76,42 @@ void test('an unreachable RPC is unavailable and never echoes its URL', async ()
       !error.message.includes('api-key'),
   );
 });
+
+void test('only a solana network with a full 32-character reference can match', async () => {
+  const networks: `${string}:${string}`[] = [
+    'eip155:EtWTRABZaYq6iMfeYKouRu166VU2xqa1',
+    'solana:E',
+    'solana:',
+  ];
+  for (const network of networks) {
+    const { double, calls } = rpc(GENESIS);
+    await assert.rejects(
+      createUptoHintReader(double, network).hints(),
+      code(UPTO_ERROR_CODES.INVALID_TERMS),
+      network,
+    );
+    assert.deepEqual(calls, ['genesis']);
+  }
+});
+
+void test('a failed proof is retried on the next call', async () => {
+  let down = true;
+  const { double, calls } = rpc(GENESIS);
+  const reader = createUptoHintReader(
+    {
+      ...double,
+      getGenesisHash: () => ({
+        send: async () => {
+          calls.push('genesis');
+          if (down) throw new Error('rpc down');
+          return GENESIS;
+        },
+      }),
+    },
+    NETWORK,
+  );
+  await assert.rejects(reader.hints(), code(UPTO_ERROR_CODES.UNAVAILABLE));
+  down = false;
+  await reader.hints();
+  assert.deepEqual(calls, ['genesis', 'genesis', 'blockhash', 'slot']);
+});

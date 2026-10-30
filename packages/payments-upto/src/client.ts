@@ -1,8 +1,7 @@
-// The buyer's PaymentClient over x402-upto-metered: it trusts only terms within its own policy (network,
-// asset, protocol fee and treasury from its configuration, never from the seller, and its own
-// ceiling), journals each request before signing its one channel open, and accepts a receipt only
-// when the chain shows that settlement for its own metering.
-import type { TransactionSigner } from '@solana/kit';
+// The buyer's PaymentClient over x402-upto-metered: trusts only terms within its own policy (never the
+// seller's fee or treasury), journals each request before signing its one channel open, and accepts a
+// receipt only when the chain shows that settlement for its own metering.
+import { isAddress, type TransactionSigner } from '@solana/kit';
 import {
   createUptoAuthorization,
   UPTO_ERROR_CODES,
@@ -13,6 +12,7 @@ import {
 import {
   PAYMENT_CHANNEL_STATES,
   PAYMENT_ERROR_CODES,
+  type PaymentErrorCode,
 } from '@gyblos/protocol/constants';
 import {
   PaymentError,
@@ -22,7 +22,7 @@ import {
   type PaymentTerms,
 } from '@gyblos/protocol/payment';
 
-import type { UptoBuyerJournal, UptoJournalEntry } from './buyer-journal';
+import type { UptoBuyerJournal } from './buyer-journal';
 import { uptoTermsFor, type UptoChannelSettings } from './terms';
 
 // What this buyer accepts: its network and asset, the network's fee and treasury, and the most it
@@ -51,12 +51,11 @@ export interface UptoPaymentClientOptions {
   now: () => number;
 }
 
-const ATOMIC = /^(0|[1-9][0-9]*)$/;
+// Atomic amounts are u64, so at most 20 digits.
+const ATOMIC = /^(0|[1-9][0-9]{0,19})$/;
 const DIGEST = /^[0-9a-f]{64}$/;
 
-function fail(
-  code: (typeof PAYMENT_ERROR_CODES)[keyof typeof PAYMENT_ERROR_CODES],
-): never {
+function fail(code: PaymentErrorCode): never {
   throw new PaymentError(code);
 }
 
@@ -69,6 +68,9 @@ function trusted(
   return (
     terms.network === policy.network &&
     terms.mint === policy.mint &&
+    [terms.payTo, terms.feePayer, terms.authorizer].every(isAddress) &&
+    // The fee payer signs and pays the open; the buyer must never be it.
+    terms.feePayer !== payer &&
     terms.protocolFeeBps === policy.protocolFeeBps &&
     terms.treasury === policy.treasury &&
     terms.buyer === payer &&
@@ -103,39 +105,70 @@ async function journaled(run: () => Promise<void>) {
   }
 }
 
+// The channel terms the buyer will sign, or a refusal: built before anything is journaled.
+async function channelTerms(
+  options: UptoPaymentClientOptions,
+  terms: PaymentTerms,
+) {
+  try {
+    return await uptoTermsFor(terms, options.settings);
+  } catch {
+    return fail(PAYMENT_ERROR_CODES.UNTRUSTED_TERMS);
+  }
+}
+
 async function signOpen(
   options: UptoPaymentClientOptions,
   terms: PaymentTerms,
 ): Promise<PaymentAuthorization> {
+  const channel = await channelTerms(options, terms);
   const hints = await hintsFor(options);
-  const entry: UptoJournalEntry = {
+  const entry = {
     requestDigest: terms.requestDigest,
     channelId: null,
     maxAtomic: terms.maxAtomic,
+    expiresAt: terms.expiresAt,
     state: PAYMENT_CHANNEL_STATES.OPEN,
     chargedAtomic: null,
-    updatedAt: options.now(),
   };
   // Durable before the only signature for this request exists.
   await journaled(() => options.journal.put(entry));
-  const signed = await createUptoAuthorization(
-    options.payer,
-    await uptoTermsFor(terms, options.settings),
-    hints,
-  );
-  await journaled(() =>
-    options.journal.put({
-      ...entry,
-      channelId: signed.channelId,
-      updatedAt: options.now(),
-    }),
-  );
+  // On any failure below the open never leaves the buyer, so its unsigned entry is dropped (or
+  // pruned once the terms expire, if dropping fails too).
+  const abandon = async (code: PaymentErrorCode): Promise<never> => {
+    await options.journal.remove(terms.requestDigest).catch(() => undefined);
+    return fail(code);
+  };
+  let signed: Awaited<ReturnType<typeof createUptoAuthorization>>;
+  try {
+    signed = await createUptoAuthorization(options.payer, channel, hints);
+  } catch {
+    return abandon(PAYMENT_ERROR_CODES.UNAVAILABLE);
+  }
+  try {
+    await options.journal.put({ ...entry, channelId: signed.channelId });
+  } catch {
+    return abandon(PAYMENT_ERROR_CODES.JOURNAL_UNAVAILABLE);
+  }
   return { ...signed, requestDigest: terms.requestDigest };
+}
+
+// A policy the buyer could never honor is a configuration error, refused at construction.
+function checkedPolicy(policy: UptoBuyerPolicy): UptoBuyerPolicy {
+  if (
+    !ATOMIC.test(policy.maxAtomic) ||
+    !isAddress(policy.mint) ||
+    !isAddress(policy.treasury) ||
+    !Number.isSafeInteger(policy.protocolFeeBps)
+  )
+    return fail(PAYMENT_ERROR_CODES.UNTRUSTED_TERMS);
+  return policy;
 }
 
 export function createUptoPaymentClient(
   options: UptoPaymentClientOptions,
 ): PaymentClient {
+  checkedPolicy(options.policy);
   // Requests being authorized now, so a concurrent call for the same one is refused before any await.
   const reserved = new Set<string>();
   return {
@@ -188,7 +221,6 @@ export function createUptoPaymentClient(
           ...entry,
           state: PAYMENT_CHANNEL_STATES.SETTLED,
           chargedAtomic: settlement.chargedAtomic,
-          updatedAt: options.now(),
         }),
       );
     },
@@ -196,13 +228,10 @@ export function createUptoPaymentClient(
       const entries = await options.journal
         .list()
         .catch(() => fail(PAYMENT_ERROR_CODES.JOURNAL_UNAVAILABLE));
-      return entries.map(
-        ({ channelId, requestDigest, state, chargedAtomic }) => ({
-          channelId: channelId ?? '',
-          requestDigest,
-          state,
-          chargedAtomic,
-        }),
+      // An entry without a channel never left the buyer: there is nothing to reconcile.
+      return entries.flatMap(
+        ({ channelId, requestDigest, state, chargedAtomic }) =>
+          channelId ? [{ channelId, requestDigest, state, chargedAtomic }] : [],
       );
     },
   };

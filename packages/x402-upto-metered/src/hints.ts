@@ -1,7 +1,12 @@
 // The buyer's hints for signing a channel open offline: the latest blockhash with its last valid height
 // and the current slot, read only after the RPC proved (once) that it serves the terms' network. RPC
 // failures are UNAVAILABLE and never carry the RPC's text. No Gyblos imports.
-import { UPTO_COMMITMENT, UPTO_ERROR_CODES } from './constants';
+import {
+  UPTO_COMMITMENT,
+  UPTO_ERROR_CODES,
+  UPTO_SOLANA_NAMESPACE,
+  UPTO_SOLANA_REFERENCE_LENGTH,
+} from './constants';
 import { UptoError } from './errors';
 import type { UptoClientHints, UptoTerms } from './types';
 
@@ -30,12 +35,15 @@ export function createUptoHintReader(
   rpc: UptoHintRpc,
   network: UptoTerms['network'],
 ) {
-  // A CAIP-2 Solana reference is the genesis hash's first characters.
-  const [, reference = ''] = network.split(':');
+  // A CAIP-2 Solana network is `solana:` and the genesis hash's first 32 characters.
+  const [namespace, reference = ''] = network.split(':');
   let proven: Promise<void> | undefined;
   const prove = async () => {
     const genesis = await read(() => rpc.getGenesisHash().send());
-    if (!reference || !String(genesis).startsWith(reference))
+    if (
+      namespace !== UPTO_SOLANA_NAMESPACE ||
+      String(genesis).slice(0, UPTO_SOLANA_REFERENCE_LENGTH) !== reference
+    )
       throw new UptoError(UPTO_ERROR_CODES.INVALID_TERMS);
   };
   return {

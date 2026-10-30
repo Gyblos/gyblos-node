@@ -16,23 +16,54 @@ import type { PaymentClient } from '@gyblos/protocol/payment';
 import { PAYMENT_EVENTS } from './payment-rig';
 import type { UptoLedger } from './payment-upto-ledger';
 
+// How the memory journal fails: never, on every write, on reads, or on the write after signing.
+export const JOURNAL_FAULTS = {
+  NONE: 'none',
+  WRITES: 'writes',
+  READS: 'reads',
+  SIGNED_WRITE: 'signed-write',
+} as const;
+export type JournalFault = (typeof JOURNAL_FAULTS)[keyof typeof JOURNAL_FAULTS];
+
 // Reports the first write of each request (before its signature) as the contract's journal event.
-function memoryJournal(ledger: UptoLedger, fail: boolean): UptoBuyerJournal {
+export function memoryJournal(
+  ledger: UptoLedger,
+  fault: JournalFault,
+  now: () => number,
+): UptoBuyerJournal & { entries: Map<string, UptoJournalEntry> } {
   const entries = new Map<string, UptoJournalEntry>();
+  const read = () => {
+    if (fault === JOURNAL_FAULTS.READS) throw new Error('journal unavailable');
+  };
   return {
-    get: async (requestDigest) => entries.get(requestDigest),
+    entries,
+    async get(requestDigest) {
+      read();
+      return entries.get(requestDigest);
+    },
     async put(entry) {
-      if (fail) throw new Error('journal unavailable');
+      if (
+        fault === JOURNAL_FAULTS.WRITES ||
+        (fault === JOURNAL_FAULTS.SIGNED_WRITE && entry.channelId !== null)
+      )
+        throw new Error('journal unavailable');
       if (!entries.has(entry.requestDigest))
         ledger.events.push(PAYMENT_EVENTS.JOURNAL);
-      entries.set(entry.requestDigest, { ...entry });
+      entries.set(entry.requestDigest, { ...entry, updatedAt: now() });
     },
-    list: async () => [...entries.values()],
+    async remove(requestDigest) {
+      if (entries.get(requestDigest)?.channelId) throw new Error('signed');
+      entries.delete(requestDigest);
+    },
+    async list() {
+      read();
+      return [...entries.values()];
+    },
     close: async () => {},
   };
 }
 
-function observedSigner(
+export function observedSigner(
   payer: KeyPairSigner,
   ledger: UptoLedger,
 ): TransactionSigner {
@@ -60,7 +91,11 @@ export function uptoContractClient(options: {
     policy: { ...options.policy, maxAtomic: String(options.maxAtomic) },
     settings: options.settings,
     hints: async () => options.hints,
-    journal: memoryJournal(ledger, options.failJournal),
+    journal: memoryJournal(
+      ledger,
+      options.failJournal ? JOURNAL_FAULTS.WRITES : JOURNAL_FAULTS.NONE,
+      () => ledger.now,
+    ),
     confirm: async (settlement) =>
       ledger.transactions.get(settlement.transaction),
     now: () => ledger.now,
