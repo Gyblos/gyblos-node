@@ -344,7 +344,9 @@ void test('a delivery failure mid-stream ends with a terminal and a settled depo
       throw new Error('stream reset');
     },
   );
-  assert.ok(terminal.error);
+  // A delivery that failed outright is not a buyer's cancellation: nothing is charged.
+  assert.deepEqual(terminal.error, { code: PAID_EXECUTION_CODES.ENGINE });
+  assert.equal(terminal.charge?.chargedAtomic, '0');
   assert.ok(terminal.payment?.settlement);
   assert.equal(seller.payment.calls.settle.length, 1);
 });
@@ -369,4 +371,17 @@ void test('a meter that miscounts delivered output charges nothing rather than g
     assert.equal(terminal.charge?.chargedAtomic, '0');
     assert.ok(terminal.payment?.settlement);
   }
+});
+
+void test('a daemon stopping just before the deposit takes no deposit', async () => {
+  const seller = await paidSellerFixture();
+  const describe = seller.payment.server.describe;
+  seller.payment.server.describe = async () => {
+    const own = await describe();
+    seller.daemon.abort();
+    return own;
+  };
+  const { terminal } = await seller.execute(await seller.request());
+  assert.equal(terminal.error?.code, PAID_EXECUTION_CODES.PAYMENT_UNAVAILABLE);
+  assert.equal(seller.payment.calls.admit.length, 0);
 });

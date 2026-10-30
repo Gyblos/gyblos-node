@@ -125,6 +125,9 @@ export async function admitDeposit(
   signal: AbortSignal,
   options: PaidSettlementOptions,
 ): Promise<PaymentAdmission> {
+  // A stopping daemon takes no new deposits.
+  if (options.signal.aborted)
+    return fail(PAID_EXECUTION_CODES.PAYMENT_UNAVAILABLE);
   const admitting = Promise.resolve().then(() =>
     payment.admit(request.payment, terms, { signal }),
   );
