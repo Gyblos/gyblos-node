@@ -10,7 +10,8 @@
     "./memory": "./src/memory.ts",
     "./private-log": "./src/private-log.ts",
     "./private-log-file": "./src/private-log-file.ts",
-    "./process": "./src/process.ts"
+    "./process": "./src/process.ts",
+    "./private-file": "./src/private-file.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*"

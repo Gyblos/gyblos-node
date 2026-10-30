@@ -33,6 +33,7 @@ export const ROLE_FILES = {
   status: 'status.json',
   telemetry: 'telemetry',
   receipts: 'receipts',
+  payments: 'payments',
   metrics: 'transport.jsonl',
   measurements: 'measurements.jsonl',
   measurementSalt: 'measurement-salt',
@@ -177,5 +178,19 @@ export function receiptPathsIn(environment: HomeEnvironment, role: HomeRole) {
     directory,
     state: join(directory, RECEIPT_FILES.state),
     lock: join(directory, RECEIPT_FILES.lock),
+  };
+}
+
+// The seller's durable upto payment ledger stays inside the private per-role payments directory.
+export const PAYMENT_FILES = {
+  state: 'upto-ledger-v1.json',
+  lock: 'upto-ledger-v1.lock',
+} as const;
+export function paymentPathsIn(environment: HomeEnvironment, role: HomeRole) {
+  const directory = rolePathIn(environment, role, ROLE_FILES.payments);
+  return {
+    directory,
+    state: join(directory, PAYMENT_FILES.state),
+    lock: join(directory, PAYMENT_FILES.lock),
   };
 }

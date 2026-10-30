@@ -15,6 +15,7 @@ import {
   createUptoVerifier,
   memoryUptoStore,
   type UptoClientHints,
+  type UptoStore,
 } from 'x402-upto-metered';
 
 import {
@@ -60,6 +61,11 @@ export async function hints(): Promise<UptoClientHints> {
   };
 }
 
+// A fresh channel store for one seller; disposers run when the rig closes.
+export type UptoStoreFactory = (
+  dispose: (cleanup: () => Promise<void>) => void,
+) => Promise<UptoStore>;
+
 export function seller(
   ledger: UptoLedger,
   description: PaymentDescription,
@@ -68,7 +74,7 @@ export function seller(
     PaymentRigOptions,
     'failUpstream' | 'onDepositSent' | 'lapseClaims'
   >,
-  store = memoryUptoStore(),
+  store: UptoStore = memoryUptoStore(),
 ) {
   const chain = ledgerChain(
     ledger,
@@ -115,98 +121,117 @@ async function signedWith(
   }
 }
 
-export const uptoPaymentHarness: PaymentHarness = {
-  async start(options): Promise<PaymentRig> {
-    const ledger = newLedger(START_MS);
-    const recent = await hints();
-    const payer = await generateKeyPairSigner();
-    const description: PaymentDescription = {
-      network: NETWORK,
-      mint: await newAddress(),
-      payTo: await newAddress(),
-      feePayer: await newAddress(),
-      authorizer: await newAddress(),
-      protocolFeeBps: FEE_BPS,
-      treasury: await newAddress(),
-    };
-    const others: Record<SellerKey, PaymentDescription[SellerKey]> = {
-      payTo: await newAddress(),
-      feePayer: await newAddress(),
-      authorizer: await newAddress(),
-      protocolFeeBps: FEE_BPS + 1,
-      treasury: await newAddress(),
-    };
-    const requestDigest = createHash('sha256')
-      .update('contract request')
-      .digest('hex');
-    return {
-      client: uptoTestClient({
-        payer,
-        policy: description,
-        settings: SETTINGS,
-        hints: recent,
-        ledger,
-        failJournal: options.failJournal,
-      }),
-      server: seller(ledger, description, recent.recentSlot, options),
-      serverWith: async (field) =>
-        seller(
-          ledger,
-          { ...description, [field]: others[field] },
-          recent.recentSlot,
-          options,
-        ),
-      foreignAuthorization: async (terms) =>
-        signedWith(
-          await generateKeyPairSigner(),
-          terms,
-          (await uptoTermsFor(terms, SETTINGS)).splits ?? [],
-          recent,
-        ),
-      authorizationWithSplits: (terms, splits) =>
-        signedWith(payer, terms, splits, recent),
-      // The open of a separately signed authorization spliced into the original payload. Its channel
-      // and nonce differ too, so this proves a spliced open is refused, not which field refused it.
-      async tamperSplits(authorization, splits) {
-        const original = JSON.parse(
-          Buffer.from(authorization.payload, 'base64').toString(),
-        );
-        const terms = rigTerms({});
-        const other = await signedWith(payer, terms, splits, recent);
-        const replaced = JSON.parse(
-          Buffer.from(other.payload, 'base64').toString(),
-        );
-        return {
-          ...authorization,
-          payload: Buffer.from(
-            JSON.stringify({
-              ...original,
-              openTransaction: replaced.openTransaction,
-            }),
-          ).toString('base64'),
-        };
-      },
-      terms: async (overrides = {}) => rigTerms(overrides),
-      observe: () => ({
-        events: [...ledger.events],
-        balances: { ...ledger.balances },
-      }),
-      now: () => ledger.now,
-      advance(ms) {
-        ledger.now += ms;
-      },
-      async close() {},
-    };
+export function uptoHarness(newStore: UptoStoreFactory): PaymentHarness {
+  return { start: (options) => startRig(options, newStore) };
+}
 
-    function rigTerms(overrides: Partial<PaymentTerms>): PaymentTerms {
+export const uptoPaymentHarness = uptoHarness(async () => memoryUptoStore());
+
+async function startRig(
+  options: PaymentRigOptions,
+  newStore: UptoStoreFactory,
+): Promise<PaymentRig> {
+  const disposers: (() => Promise<void>)[] = [];
+  const store = () => newStore((cleanup) => disposers.push(cleanup));
+  const ledger = newLedger(START_MS);
+  const recent = await hints();
+  const payer = await generateKeyPairSigner();
+  const description: PaymentDescription = {
+    network: NETWORK,
+    mint: await newAddress(),
+    payTo: await newAddress(),
+    feePayer: await newAddress(),
+    authorizer: await newAddress(),
+    protocolFeeBps: FEE_BPS,
+    treasury: await newAddress(),
+  };
+  const others: Record<SellerKey, PaymentDescription[SellerKey]> = {
+    payTo: await newAddress(),
+    feePayer: await newAddress(),
+    authorizer: await newAddress(),
+    protocolFeeBps: FEE_BPS + 1,
+    treasury: await newAddress(),
+  };
+  const requestDigest = createHash('sha256')
+    .update('contract request')
+    .digest('hex');
+  return {
+    client: uptoTestClient({
+      payer,
+      policy: description,
+      settings: SETTINGS,
+      hints: recent,
+      ledger,
+      failJournal: options.failJournal,
+    }),
+    server: seller(
+      ledger,
+      description,
+      recent.recentSlot,
+      options,
+      await store(),
+    ),
+    serverWith: async (field) =>
+      seller(
+        ledger,
+        { ...description, [field]: others[field] },
+        recent.recentSlot,
+        options,
+        await store(),
+      ),
+    foreignAuthorization: async (terms) =>
+      signedWith(
+        await generateKeyPairSigner(),
+        terms,
+        (await uptoTermsFor(terms, SETTINGS)).splits ?? [],
+        recent,
+      ),
+    authorizationWithSplits: (terms, splits) =>
+      signedWith(payer, terms, splits, recent),
+    // The open of a separately signed authorization spliced into the original payload. Its channel
+    // and nonce differ too, so this proves a spliced open is refused, not which field refused it.
+    async tamperSplits(authorization, splits) {
+      const original = JSON.parse(
+        Buffer.from(authorization.payload, 'base64').toString(),
+      );
+      const terms = rigTerms({});
+      const other = await signedWith(payer, terms, splits, recent);
+      const replaced = JSON.parse(
+        Buffer.from(other.payload, 'base64').toString(),
+      );
       return {
-        ...description,
-        buyer: payer.address,
-        requestDigest,
-        maxAtomic: String(CONTRACT_CEILING),
-        expiresAt: ledger.now + TERM_MS,
-        ...overrides,
+        ...authorization,
+        payload: Buffer.from(
+          JSON.stringify({
+            ...original,
+            openTransaction: replaced.openTransaction,
+          }),
+        ).toString('base64'),
       };
-    }
-  },
-};
+    },
+    terms: async (overrides = {}) => rigTerms(overrides),
+    observe: () => ({
+      events: [...ledger.events],
+      balances: { ...ledger.balances },
+    }),
+    now: () => ledger.now,
+    advance(ms) {
+      ledger.now += ms;
+    },
+    async close() {
+      // Last registered first, like a stack: a store closes before its directory goes.
+      for (const cleanup of disposers.reverse()) await cleanup();
+    },
+  };
+
+  function rigTerms(overrides: Partial<PaymentTerms>): PaymentTerms {
+    return {
+      ...description,
+      buyer: payer.address,
+      requestDigest,
+      maxAtomic: String(CONTRACT_CEILING),
+      expiresAt: ledger.now + TERM_MS,
+      ...overrides,
+    };
+  }
+}
