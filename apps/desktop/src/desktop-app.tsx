@@ -26,8 +26,10 @@ import {
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 
 import manifest from '../package.json';
+import { CATALOG_STATE } from './catalog/model';
 import { themeStyle } from './theme';
 import { AddFunds } from './ui/AddFunds';
+import { announcedModels } from './ui/announced-models';
 import { Appearance } from './ui/Appearance';
 import { matchesCatalog, type ModelFilter } from './ui/catalog-state';
 import { Chat, type ChatHandle } from './ui/Chat';
@@ -42,6 +44,7 @@ import {
   BUTTON_VARIANT,
   MODE_NAV,
   MODEL_FILTER,
+  MODEL_SOURCE,
   MODELS,
   MODES,
   NAVIGATION_WIDTH,
@@ -60,6 +63,7 @@ import {
   SLIDE_DIRECTION,
   SLIDE_SURFACE,
 } from './ui/Motion';
+import { NetworkCatalogPanel, useNetworkCatalog } from './ui/NetworkCatalog';
 import { NetworkStatus, useLocalNode } from './ui/NetworkStatus';
 import { ResizeHandle } from './ui/ResizeHandle';
 import { SidebarIcon, type SidebarSection } from './ui/SidebarIcon';
@@ -139,9 +143,20 @@ export function DesktopApp() {
   };
   const network = useLocalNode();
   const wallet = useDesktopWallet();
+  const announcements = useNetworkCatalog();
+  const networkModels = announcedModels(announcements.snapshot, Date.now());
+  const chatModels = [MODELS[0], ...networkModels, ...MODELS.slice(1)];
   // Chat and Connect remain simulated independently of local endpoint readiness.
   const online = true;
   const [model, setModel] = useState(MODELS[0]);
+  useEffect(() => {
+    if (
+      model.source === MODEL_SOURCE.ANNOUNCED &&
+      announcements.snapshot.state !== CATALOG_STATE.LOADING &&
+      !networkModels.some((item) => item.id === model.id)
+    )
+      setModel(MODELS[0]);
+  }, [announcements.snapshot, model]);
   const [credits, setCredits] = useState(0);
   const [spent, setSpent] = useState(0);
   const [budget, setBudget] = useState<number>(DEMO_ACCOUNT.DEFAULT_BUDGET);
@@ -361,9 +376,9 @@ export function DesktopApp() {
               onAuthorize={authorizeChatRequest}
               connectedTools={connectedTools}
               onToggleTool={toggleTool}
-              models={MODELS}
+              models={chatModels}
               onSelectModel={(id) => {
-                const next = MODELS.find((item) => item.id === id);
+                const next = chatModels.find((item) => item.id === id);
                 if (next) choose(next);
               }}
               onBrowseModels={() => navigate(UI_VIEW.MODELS)}
@@ -371,71 +386,80 @@ export function DesktopApp() {
           </div>
           {view === UI_VIEW.MODELS && (
             <PagePanel>
-              <div className="ui-toolbar">
-                <SearchField
-                  label="Search catalog"
-                  placeholder="Search models or families"
-                  value={search}
-                  onValueChange={setSearch}
-                />
-                <div
-                  className="ui-segmented"
-                  role="group"
-                  aria-label="Filter models"
-                >
-                  {Object.values(MODEL_FILTER).map((value) => (
-                    <Button
-                      key={value}
-                      aria-pressed={filter === value}
-                      onClick={() => setFilter(value)}
-                    >
-                      {value}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-              <SectionTitle>Catalog</SectionTitle>
-              <List label="Model catalog">
-                {MODELS.filter((item) =>
-                  matchesCatalog(item, search, filter),
-                ).map((item) => (
-                  <ListRow
-                    key={item.id}
-                    leading={<ModelIcon model={item} />}
-                    onActivate={() => choose(item)}
-                    selected={model.id === item.id}
-                    trailing={
-                      <>
-                        <div className="ui-price">
-                          <strong>
-                            {item.free
-                              ? 'Free'
-                              : `$${item.input.toFixed(2)} / $${item.output.toFixed(2)}`}
-                          </strong>
-                          <small>
-                            {item.free
-                              ? 'Community supported'
-                              : 'In / out per 1M tokens'}
-                          </small>
-                        </div>
-                        {model.id === item.id && <Check size={16} />}
-                      </>
-                    }
+              <NetworkCatalogPanel
+                snapshot={announcements.snapshot}
+                onLookup={announcements.lookup}
+                onSelect={choose}
+                selected={model.id}
+              />
+              <details>
+                <summary>Preview models</summary>
+                <div className="ui-toolbar">
+                  <SearchField
+                    label="Search catalog"
+                    placeholder="Search models or families"
+                    value={search}
+                    onValueChange={setSearch}
+                  />
+                  <div
+                    className="ui-segmented"
+                    role="group"
+                    aria-label="Filter models"
                   >
-                    <RowCopy
-                      title={item.name}
-                      detail={`${item.family} · ${item.context} context · ${item.providers} providers`}
-                    />
-                  </ListRow>
-                ))}
-                {!MODELS.some((item) =>
-                  matchesCatalog(item, search, filter),
-                ) && (
-                  <p className="ui-list-empty">
-                    No models found. Try another name or filter.
-                  </p>
-                )}
-              </List>
+                    {Object.values(MODEL_FILTER).map((value) => (
+                      <Button
+                        key={value}
+                        aria-pressed={filter === value}
+                        onClick={() => setFilter(value)}
+                      >
+                        {value}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+                <SectionTitle>Preview catalog</SectionTitle>
+                <List label="Model catalog">
+                  {MODELS.filter((item) =>
+                    matchesCatalog(item, search, filter),
+                  ).map((item) => (
+                    <ListRow
+                      key={item.id}
+                      leading={<ModelIcon model={item} />}
+                      onActivate={() => choose(item)}
+                      selected={model.id === item.id}
+                      trailing={
+                        <>
+                          <div className="ui-price">
+                            <strong>
+                              {item.free
+                                ? 'Free'
+                                : `$${item.input.toFixed(2)} / $${item.output.toFixed(2)}`}
+                            </strong>
+                            <small>
+                              {item.free
+                                ? 'Community supported'
+                                : 'In / out per 1M tokens'}
+                            </small>
+                          </div>
+                          {model.id === item.id && <Check size={16} />}
+                        </>
+                      }
+                    >
+                      <RowCopy
+                        title={item.name}
+                        detail={`${item.family} · ${item.context} context · ${item.providers} providers`}
+                      />
+                    </ListRow>
+                  ))}
+                  {!MODELS.some((item) =>
+                    matchesCatalog(item, search, filter),
+                  ) && (
+                    <p className="ui-list-empty">
+                      No models found. Try another name or filter.
+                    </p>
+                  )}
+                </List>
+              </details>
               <InfoBar
                 leading={<Globe size={16} />}
                 trailing={
@@ -449,7 +473,7 @@ export function DesktopApp() {
                   </Button>
                 }
               >
-                <span>Providers are selected for your chosen model.</span>
+                <span>Chat and Connect use simulated responses.</span>
               </InfoBar>
             </PagePanel>
           )}
