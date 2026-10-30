@@ -21,4 +21,16 @@ export const LEDGER_FILE = {
   // Finished channels are kept at least this long: far past any terms expiry, so a pruned channel's
   // authorization can no longer be admitted again.
   minRetentionMs: 86_400_000,
+  // A new channel is refused once the document is this large, so the channels already open can
+  // always still record their claims within maxBytes.
+  // Half the bound: every open channel's remaining records (attempts, claim, pending) still fit.
+  newChannelBytes: 4 * 1024 * 1024,
+} as const;
+
+// The seller's chain wiring: how long a sent open can still land (its blockhash lifetime, with margin),
+// and how many channels the ledger keeps.
+export const UPTO_SELLER = {
+  openWindowMs: 90_000,
+  // A ceiling on the record count; the byte bound (LEDGER_FILE.newChannelBytes) usually binds first.
+  maxChannels: 10_000,
 } as const;

@@ -4,7 +4,14 @@
 // on an ephemeral loopback port.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { chmod, mkdir, rm, unlink, writeFile } from 'node:fs/promises';
+import {
+  chmod,
+  mkdir,
+  readFile,
+  rm,
+  unlink,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -20,6 +27,7 @@ import {
   line,
   NODE_ID,
   paidToml,
+  REMOTE_FREE,
   scenario,
   snapshot,
   withOllama,
@@ -177,15 +185,16 @@ void test('doctor: an unsafe seller directory or leftover sequence lock is repor
 void test('doctor: config the daemon cannot honor reports the same startup code and file issues', () =>
   scenario({}, async (run) => {
     await withOllama(run);
-    await writeFile(join(run.root, 'gyblos.toml'), paidToml(run));
-    const paid = await doctor(run);
-    assert.equal(paid.code, 1);
+    // A remote offer whose API key variable is unset is refused after the file parsed.
+    await writeFile(join(run.root, 'gyblos.toml'), REMOTE_FREE);
+    const refused = await doctor(run);
+    assert.equal(refused.code, 1);
     assert.match(
-      line(paid.output, 'config'),
-      /FAIL\s+config\s+SELLER_PAID_EXECUTION_UNAVAILABLE\s+\[\[offers\]\] entry 1: /,
+      line(refused.output, 'config'),
+      /FAIL\s+config\s+SELLER_OFFER_API_KEY_MISSING/,
     );
     // A refused offer still leaves the relay settings checked.
-    assert.match(line(paid.output, 'relays'), /^\s*OK\s+relays/);
+    assert.match(line(refused.output, 'relays'), /^\s*OK\s+relays/);
     await unlink(join(run.root, 'gyblos.toml'));
     const none = await doctor(run);
     assert.equal(none.code, 1);
@@ -270,12 +279,16 @@ void test('doctor: an engine that never answers fails with ENGINE_TIMEOUT within
 void test('doctor: an offer the daemon refuses leaves the engine unchecked', () =>
   scenario({}, async (run) => {
     const ollama = await withOllama(run);
-    await writeFile(join(run.root, 'gyblos.toml'), paidToml(run));
-    const paid = await doctor(run);
-    assert.match(line(paid.output, 'engine'), /WARN\s+engine\s+NOT_CHECKED/);
+    // A reasoning level the engine cannot honor refuses the offer.
+    await writeFile(
+      join(run.root, 'gyblos.toml'),
+      freeToml(run).replace('["off"]', '["low"]'),
+    );
+    const refused = await doctor(run);
+    assert.match(line(refused.output, 'engine'), /WARN\s+engine\s+NOT_CHECKED/);
     assert.deepEqual(ollama.paths, []);
     for (const removed of ['ollama', 'model', 'ports'])
-      assert.equal(line(paid.output, removed), '', removed);
+      assert.equal(line(refused.output, removed), '', removed);
   }));
 
 void test('doctor and config validate refuse arguments they do not take', () =>

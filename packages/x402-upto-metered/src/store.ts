@@ -3,7 +3,12 @@
 // interfaces (for example an atomic JSON file per seller).
 import type { PendingSettlementStore } from '@x402/core/facilitator';
 
-import type { UptoChainStore, UptoChannelRecord, UptoStore } from './types';
+import type {
+  UptoChainStore,
+  UptoChannelRecord,
+  UptoClaimRecord,
+  UptoStore,
+} from './types';
 
 export function memoryUptoStore(): UptoStore {
   const records = new Map<string, UptoChannelRecord>();
@@ -23,10 +28,7 @@ export function memoryUptoStore(): UptoStore {
 
 export function memoryUptoChainStore(): UptoChainStore {
   const deposits = new Map<string, number>();
-  const claims = new Map<
-    string,
-    { chargedAtomic: string; transaction?: string }
-  >();
+  const claims = new Map<string, Omit<UptoClaimRecord, 'channelId'>>();
   const pending = new Map<string, string>();
   return {
     async getDeposit(channelId) {

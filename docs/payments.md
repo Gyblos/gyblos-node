@@ -66,10 +66,11 @@ prompts, answers, IPs, RPC URLs or raw logs.
 
 ## Local facilitator
 
-The facilitator (run by the lab gates; `lab/facilitator` runs it standalone for
-lab checks; the seller daemon no longer starts it while paid selling is off)
-signs and pays for channel settlement with its own devnet key. It keeps channel
-state in memory; there is no durable channel storage.
+The v1 facilitator (run by the lab gates; `lab/facilitator` runs it standalone
+for lab checks) signs and pays for channel settlement with its own devnet key.
+It keeps channel state in memory; there is no durable channel storage. The paid
+v2 seller daemon runs the facilitator in process instead, with its fee payer key
+and the durable upto ledger in `seller/payments/`.
 
 It writes private diagnostics as JSONL to `.local/lab/facilitator-diagnostics/`:
 

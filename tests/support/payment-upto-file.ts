@@ -62,13 +62,20 @@ export const unavailable = (error: unknown) =>
 
 export async function ledger(
   root: string,
-  options: { now?: () => number; retentionMs?: number } = {},
+  options: {
+    now?: () => number;
+    retentionMs?: number;
+    newChannelBytes?: number;
+  } = {},
 ) {
   return openUptoFileLedger({
     paths: paths(root),
     now: options.now ?? (() => NOW),
     retentionMs: options.retentionMs ?? RETENTION_MS,
     maxChannels: 3,
+    ...(options.newChannelBytes === undefined
+      ? {}
+      : { newChannelBytes: options.newChannelBytes }),
   });
 }
 
