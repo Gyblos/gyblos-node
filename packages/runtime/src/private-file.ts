@@ -188,9 +188,14 @@ interface LockOwner {
   host: string;
 }
 
-// Lock paths this process holds or is acquiring, so its own pid in a lock file it does not hold
-// (an earlier run that reused the pid, such as pid 1 in a restarted container) reads as stale.
+// Lock paths this process holds or is acquiring, so it never acquires one twice.
 const HELD = new Set<string>();
+// Lock files (device and inode) this process created, so its own pid in a lock file that is not
+// one of them (an earlier run that reused the pid, such as pid 1 in a restarted container) reads
+// as stale, however the path to it is spelled.
+const OWN_FILES = new Set<string>();
+
+const identity = (info: Stats) => `${info.dev}:${info.ino}`;
 
 function alive(pid: number): boolean {
   try {
@@ -201,9 +206,10 @@ function alive(pid: number): boolean {
   }
 }
 
-function stale(owner: LockOwner): boolean {
+function stale(owner: LockOwner, inspected: Stats): boolean {
   if (owner.host !== hostname()) return false;
-  return owner.pid === process.pid || !alive(owner.pid);
+  if (owner.pid === process.pid) return !OWN_FILES.has(identity(inspected));
+  return !alive(owner.pid);
 }
 async function ownerAt(path: string): Promise<LockOwner | undefined> {
   const text = await readPrivateFile(path, PROCESS_LOCK.maxBytes);
@@ -224,7 +230,7 @@ async function ownerAt(path: string): Promise<LockOwner | undefined> {
 // Replaces a dead owner's lock. Takeovers are serialized by an exclusive guard file, and the file
 // moved aside must be the one judged dead, so a fresh lock is never removed; anything else, and a
 // guard left by a crash mid-takeover, is refused until removed by hand.
-async function takeOver(path: string): Promise<FileHandle | undefined> {
+async function takeOver(path: string): Promise<Created | undefined> {
   const guard = await open(
     `${path}${PROCESS_LOCK.guardSuffix}`,
     NEW_FILE,
@@ -233,7 +239,7 @@ async function takeOver(path: string): Promise<FileHandle | undefined> {
   try {
     const inspected = await lstat(path);
     const owner = await ownerAt(path);
-    if (!owner || !stale(owner)) fail();
+    if (!owner || !stale(owner, inspected)) fail();
     const aside = `${path}.${randomUUID()}.stale`;
     await rename(path, aside);
     const moved = await lstat(aside);
@@ -250,7 +256,14 @@ async function takeOver(path: string): Promise<FileHandle | undefined> {
   }
 }
 
-async function create(path: string): Promise<FileHandle | undefined> {
+interface Created {
+  file: FileHandle;
+  id: string;
+}
+
+// The file is recorded as this process's own before its owner record is written, so no takeover
+// in this process can judge it stale.
+async function create(path: string): Promise<Created | undefined> {
   let file: FileHandle;
   try {
     file = await open(path, NEW_FILE, FILE_MODES.privateFile);
@@ -258,13 +271,17 @@ async function create(path: string): Promise<FileHandle | undefined> {
     if ((error as NodeJS.ErrnoException).code === 'EEXIST') return undefined;
     throw error;
   }
+  let id: string | undefined;
   try {
+    id = identity(await file.stat());
+    OWN_FILES.add(id);
     await file.writeFile(
       JSON.stringify({ pid: process.pid, host: hostname() }),
     );
     await file.sync();
-    return file;
+    return { file, id };
   } catch (error) {
+    if (id) OWN_FILES.delete(id);
     await file.close();
     await unlink(path).catch(() => {});
     throw error;
@@ -283,8 +300,9 @@ export function acquireProcessLock(path: string): Promise<ProcessLock> {
   // Reserved before any await, so two acquisitions in this process never both proceed.
   HELD.add(key);
   return guarded(async () => {
-    const file = (await create(path)) ?? (await takeOver(path));
-    if (!file) return fail();
+    const created = (await create(path)) ?? (await takeOver(path));
+    if (!created) return fail();
+    const { file, id } = created;
     const verify = () =>
       guarded(async () => {
         await sameFile(file, path, PROCESS_LOCK.maxBytes);
@@ -292,6 +310,7 @@ export function acquireProcessLock(path: string): Promise<ProcessLock> {
     try {
       await verify();
     } catch (error) {
+      OWN_FILES.delete(id);
       await file.close();
       throw error;
     }
@@ -307,6 +326,7 @@ export function acquireProcessLock(path: string): Promise<ProcessLock> {
             await unlink(path);
           } finally {
             HELD.delete(key);
+            OWN_FILES.delete(id);
             await file.close();
           }
         }),

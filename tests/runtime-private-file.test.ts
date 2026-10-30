@@ -213,13 +213,18 @@ void test('processes racing to take over a dead lock never hold it at the same t
     );
   }));
 
-void test('one lock reached through two spellings of its directory is still one lock', () =>
+void test('one lock reached through another spelling of its path is still one lock', () =>
   withRoot(async (root) => {
     await ensurePrivateDirectory(join(root, 'real'));
     await symlink(join(root, 'real'), join(root, 'alias'));
     const lock = await acquireProcessLock(join(root, 'real', 'ledger.lock'));
     await assert.rejects(
       acquireProcessLock(join(root, 'alias', 'ledger.lock')),
+      refused,
+    );
+    // A different case names the same file on case-insensitive volumes; refused there too.
+    await assert.rejects(
+      acquireProcessLock(join(root, 'real', 'LEDGER.lock')),
       refused,
     );
     await lock.verify();
