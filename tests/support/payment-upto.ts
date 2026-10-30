@@ -38,7 +38,7 @@ import {
   type PaymentRigOptions,
   type SellerKey,
 } from './payment-rig';
-import { uptoTestClient } from './payment-upto-client';
+import { uptoContractClient } from './payment-upto-client';
 import { ledgerChain, newLedger, type UptoLedger } from './payment-upto-ledger';
 
 export const NETWORK = 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1';
@@ -156,9 +156,10 @@ async function startRig(
     .update('contract request')
     .digest('hex');
   return {
-    client: uptoTestClient({
+    client: uptoContractClient({
       payer,
       policy: description,
+      maxAtomic: CONTRACT_CEILING,
       settings: SETTINGS,
       hints: recent,
       ledger,

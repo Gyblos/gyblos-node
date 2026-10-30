@@ -181,6 +181,9 @@ importers:
       '@gyblos/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@gyblos/discovery-http':
+        specifier: workspace:*
+        version: link:../../packages/discovery-http
       '@gyblos/node':
         specifier: workspace:*
         version: link:../../packages/node

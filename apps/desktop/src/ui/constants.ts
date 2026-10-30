@@ -152,6 +152,10 @@ export const UI_DIALOG = {
   BUDGET: 'budget',
   ADD_FUNDS: 'add-funds',
 } as const;
+export const MODEL_SOURCE = {
+  ANNOUNCED: 'announced',
+  PREVIEW: 'preview',
+} as const;
 export const MODEL_CATEGORY = {
   EVERYDAY: 'Everyday',
   REASONING: 'Reasoning',

@@ -15,7 +15,18 @@ export {
   type UptoFileLedgerOptions,
   type UptoLedgerPaths,
 } from './file-ledger';
-export { LEDGER_FILE, UPTO_SELLER } from './constants';
+export { BUYER_JOURNAL, LEDGER_FILE, UPTO_SELLER } from './constants';
+export {
+  openUptoBuyerJournal,
+  type UptoBuyerJournal,
+  type UptoJournalEntry,
+} from './buyer-journal';
+export {
+  createUptoPaymentClient,
+  type UptoBuyerPolicy,
+  type UptoPaymentClientOptions,
+  type UptoSettlementView,
+} from './client';
 export {
   openUptoSellerPayments,
   type UptoSellerPayments,

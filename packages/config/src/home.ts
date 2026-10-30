@@ -186,6 +186,19 @@ export const PAYMENT_FILES = {
   state: 'upto-ledger-v1.json',
   lock: 'upto-ledger-v1.lock',
 } as const;
+// The buyer's journal of the channels it authorized, next to the seller's ledger in its own role.
+export const BUYER_JOURNAL_FILES = {
+  state: 'upto-journal-v1.json',
+  lock: 'upto-journal-v1.lock',
+} as const;
+export function buyerJournalPathsIn(environment: HomeEnvironment) {
+  const directory = rolePathIn(environment, 'buyer', ROLE_FILES.payments);
+  return {
+    directory,
+    state: join(directory, BUYER_JOURNAL_FILES.state),
+    lock: join(directory, BUYER_JOURNAL_FILES.lock),
+  };
+}
 export function paymentPathsIn(environment: HomeEnvironment, role: HomeRole) {
   const directory = rolePathIn(environment, role, ROLE_FILES.payments);
   return {

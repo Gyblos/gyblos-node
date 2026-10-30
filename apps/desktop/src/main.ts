@@ -6,6 +6,7 @@ import { join } from 'node:path';
 
 import { app, BrowserWindow, ipcMain } from 'electron';
 
+import { registerNetworkCatalog } from './catalog/host';
 import { DESKTOP, PROBE_STATUS, STARTUP_WINDOW } from './constants';
 import { registerDesktopNode } from './node-host';
 import { probeInUtility } from './probe-host';
@@ -125,6 +126,7 @@ async function main() {
     smoke,
     controller.signal,
   );
+  if (!smoke) registerNetworkCatalog(window, controller.signal);
   const node = smoke
     ? null
     : registerDesktopNode(window, __dirname, controller.signal);

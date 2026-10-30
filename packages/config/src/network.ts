@@ -1,4 +1,8 @@
 // Devnet chain facts: genesis, program and mint addresses, RPC URL and Iroh relays.
+import { TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
+
+import { PAYMENT_LIMITS } from './limits';
+
 export const DEVNET = 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1' as const;
 
 export const DEVNET_GENESIS = 'EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG';
@@ -36,4 +40,12 @@ export const PROTOCOL_FEE = {
 
 export { SYSTEM_PROGRAM_ADDRESS } from '@solana-program/system';
 
-export { TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
+export { TOKEN_PROGRAM_ADDRESS };
+
+// The channel parameters every paid v2 channel uses; buyer and seller must agree on all of them, or
+// the buyer's signed open never verifies on the seller.
+export const UPTO_CHANNEL_SETTINGS = {
+  tokenProgram: TOKEN_PROGRAM_ADDRESS,
+  withdrawDelaySeconds: PAYMENT_LIMITS.withdrawDelay,
+  maxTimeoutSeconds: PAYMENT_LIMITS.maxTimeoutSeconds,
+} as const;

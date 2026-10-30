@@ -60,3 +60,6 @@ export const UPTO_CHANNEL_ACCOUNT = {
 } as const;
 // Commitment for every chain read the seller makes.
 export const UPTO_COMMITMENT = 'confirmed' as const;
+// CAIP-2 Solana networks: the namespace and the genesis-hash prefix length that names the chain.
+export const UPTO_SOLANA_NAMESPACE = 'solana';
+export const UPTO_SOLANA_REFERENCE_LENGTH = 32;

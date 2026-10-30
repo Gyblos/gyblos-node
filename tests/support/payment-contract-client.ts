@@ -104,7 +104,11 @@ function authorizationContract(name: string, harness: PaymentHarness): void {
         Promise.reject(rejected?.reason),
         PAYMENT_ERROR_CODES.ALREADY_AUTHORIZED,
       );
-      assert.equal(count(rig, PAYMENT_EVENTS.SIGN), 1);
+      // Still journaled before the one signature, whichever call won.
+      assert.deepEqual(rig.observe().events, [
+        PAYMENT_EVENTS.JOURNAL,
+        PAYMENT_EVENTS.SIGN,
+      ]);
     }));
 
   void test(`${name}: a lost authorization is never signed again and stays open for reconciliation`, async () =>
