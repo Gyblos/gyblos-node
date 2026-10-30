@@ -1,12 +1,14 @@
 // Owner-only state files: directories created without symlinked components, bounded no-follow reads
 // that refuse special files, atomic durable writes (temp, fsync, rename, directory fsync), and a
-// process lock held for the owner's lifetime that only a dead owner on this host can lose. A lock
-// file left unreadable (a crash between creating and writing it) is refused until removed by hand.
+// process lock held for the owner's lifetime that only a dead owner on this host can lose. The lock
+// assumes one host and one pid namespace with a stable hostname; a lock it cannot judge (another
+// host, a file left unreadable by a crash mid-create) is refused until removed by hand.
 // Every failure is PrivateFileError with a static code. On macOS fsync does not flush the drive
 // cache (no F_FULLFSYNC from Node), so a power loss can still drop the last acknowledged write.
 import { randomUUID } from 'node:crypto';
 import { constants, type Stats } from 'node:fs';
 import {
+  link,
   lstat,
   mkdir,
   open,
@@ -119,11 +121,22 @@ export function readPrivateFile(
     }
     try {
       const info = await sameFile(file, path, maxBytes);
+      // One byte of room past the size seen, so a file that grew is caught rather than cut.
       const bytes = Buffer.alloc(info.size + 1);
-      const { bytesRead } = await file.read(bytes, 0, bytes.length, 0);
-      if (bytesRead !== info.size) fail();
+      let total = 0;
+      let bytesRead: number;
+      do {
+        ({ bytesRead } = await file.read(
+          bytes,
+          total,
+          bytes.length - total,
+          total,
+        ));
+        total += bytesRead;
+      } while (bytesRead > 0 && total < bytes.length);
+      if (total !== info.size) fail();
       return new TextDecoder('utf-8', { fatal: true }).decode(
-        bytes.subarray(0, bytesRead),
+        bytes.subarray(0, total),
       );
     } finally {
       await file.close();
@@ -175,6 +188,10 @@ interface LockOwner {
   host: string;
 }
 
+// Lock paths this process holds or is acquiring, so its own pid in a lock file it does not hold
+// (an earlier run that reused the pid, such as pid 1 in a restarted container) reads as stale.
+const HELD = new Set<string>();
+
 function alive(pid: number): boolean {
   try {
     process.kill(pid, 0);
@@ -184,6 +201,10 @@ function alive(pid: number): boolean {
   }
 }
 
+function stale(owner: LockOwner): boolean {
+  if (owner.host !== hostname()) return false;
+  return owner.pid === process.pid || !alive(owner.pid);
+}
 async function ownerAt(path: string): Promise<LockOwner | undefined> {
   const text = await readPrivateFile(path, PROCESS_LOCK.maxBytes);
   if (text === undefined) return undefined;
@@ -200,12 +221,33 @@ async function ownerAt(path: string): Promise<LockOwner | undefined> {
   return fail();
 }
 
-// Moves a dead owner's lock aside and deletes it. Two processes racing here can move each other's
-// fresh lock too; that is safe because a holder whose file moved fails verify before any write.
-async function takeOver(path: string) {
-  const aside = `${path}.${randomUUID()}.stale`;
-  await rename(path, aside);
-  await unlink(aside);
+// Replaces a dead owner's lock. Takeovers are serialized by an exclusive guard file, and the file
+// moved aside must be the one judged dead, so a fresh lock is never removed; anything else, and a
+// guard left by a crash mid-takeover, is refused until removed by hand.
+async function takeOver(path: string): Promise<FileHandle | undefined> {
+  const guard = await open(
+    `${path}${PROCESS_LOCK.guardSuffix}`,
+    NEW_FILE,
+    FILE_MODES.privateFile,
+  );
+  try {
+    const inspected = await lstat(path);
+    const owner = await ownerAt(path);
+    if (!owner || !stale(owner)) fail();
+    const aside = `${path}.${randomUUID()}.stale`;
+    await rename(path, aside);
+    const moved = await lstat(aside);
+    if (moved.dev !== inspected.dev || moved.ino !== inspected.ino) {
+      await link(aside, path).catch(() => {});
+      await unlink(aside);
+      fail();
+    }
+    await unlink(aside);
+    return await create(path);
+  } finally {
+    await guard.close();
+    await unlink(`${path}${PROCESS_LOCK.guardSuffix}`);
+  }
 }
 
 async function create(path: string): Promise<FileHandle | undefined> {
@@ -230,16 +272,13 @@ async function create(path: string): Promise<FileHandle | undefined> {
 }
 
 export function acquireProcessLock(path: string): Promise<ProcessLock> {
+  const key = resolve(path);
+  if (HELD.has(key)) return guarded(async () => fail());
+  // Reserved before any await, so two acquisitions in this process never both proceed.
+  HELD.add(key);
   return guarded(async () => {
-    let held = await create(path);
-    if (!held) {
-      const owner = await ownerAt(path);
-      if (!owner || owner.host !== hostname() || alive(owner.pid)) fail();
-      await takeOver(path);
-      held = await create(path);
-    }
-    if (!held) return fail();
-    const file = held;
+    const file = (await create(path)) ?? (await takeOver(path));
+    if (!file) return fail();
     const verify = () =>
       guarded(async () => {
         await sameFile(file, path, PROCESS_LOCK.maxBytes);
@@ -258,9 +297,13 @@ export function acquireProcessLock(path: string): Promise<ProcessLock> {
             await sameFile(file, path, PROCESS_LOCK.maxBytes);
             await unlink(path);
           } finally {
+            HELD.delete(key);
             await file.close();
           }
         }),
     };
+  }).catch((error: unknown) => {
+    HELD.delete(key);
+    throw error;
   });
 }

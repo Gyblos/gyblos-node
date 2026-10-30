@@ -50,13 +50,14 @@ const FINISHED: ReadonlySet<UptoChannelState> = new Set([
   UPTO_CHANNEL_STATES.LAPSED,
 ]);
 
+// Maps without a prototype, like the parsed ones, so ids such as `constructor` are plain keys.
 function empty(): LedgerDocument {
   return {
     version: LEDGER_FILE.version,
-    channels: {},
-    deposits: {},
-    claims: {},
-    pending: {},
+    channels: Object.create(null),
+    deposits: Object.create(null),
+    claims: Object.create(null),
+    pending: Object.create(null),
   };
 }
 
@@ -132,6 +133,7 @@ export async function openUptoFileLedger(
     return acquireProcessLock(paths.lock);
   });
   let queue: Promise<unknown> = Promise.resolve();
+  let closing: Promise<void> | undefined;
 
   const load = () =>
     guarded(async () => {
@@ -139,8 +141,10 @@ export async function openUptoFileLedger(
       return text === undefined ? empty() : parseLedger(text);
     });
 
-  // One writer at a time in this process; other processes are kept out by the lock.
+  // One writer at a time in this process; other processes are kept out by the lock. A document
+  // the parser would refuse is never written, so one bad record cannot lock the whole ledger.
   function mutate(change: (document: LedgerDocument) => void): Promise<void> {
+    if (closing) return guarded(async () => unavailable());
     const run = queue.then(() =>
       guarded(async () => {
         await lock.verify();
@@ -148,11 +152,9 @@ export async function openUptoFileLedger(
         // Pruned first, so finished channels never count against the cap.
         prune(document, now() - options.retentionMs);
         change(document);
-        await writePrivateFile(
-          paths.state,
-          JSON.stringify(document),
-          LEDGER_FILE.maxBytes,
-        );
+        const text = JSON.stringify(document);
+        parseLedger(text);
+        await writePrivateFile(paths.state, text, LEDGER_FILE.maxBytes);
       }),
     );
     queue = run.catch(() => {});
@@ -170,7 +172,7 @@ export async function openUptoFileLedger(
     },
     put: (record: UptoChannelRecord) =>
       mutate((document) => {
-        const known = record.channelId in document.channels;
+        const known = Object.hasOwn(document.channels, record.channelId);
         if (
           !known &&
           Object.keys(document.channels).length >= options.maxChannels
@@ -183,6 +185,11 @@ export async function openUptoFileLedger(
   return {
     channels,
     chain: chainStore(load, mutate, now),
-    close: () => guarded(() => queue.then(() => lock.release())),
+    // Refuses new writes at once, lets queued ones finish, then releases; repeat calls share it.
+    close() {
+      closing ??= guarded(() => queue.then(() => lock.release()));
+      queue = closing.catch(() => {});
+      return closing;
+    },
   };
 }

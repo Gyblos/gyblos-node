@@ -284,6 +284,50 @@ void test('a lock lost while open stops writes instead of overwriting', async ()
   }
 });
 
+void test('close refuses new writes at once, finishes queued ones and can be repeated', async () => {
+  const root = await directory();
+  try {
+    const store = await ledger(root);
+    const queued = store.channels.put(record('Chan1'));
+    const closed = store.close();
+    await assert.rejects(store.channels.put(record('Chan2')), unavailable);
+    await queued;
+    await closed;
+    await store.close();
+    assert.deepEqual(
+      (await session(root, (next) => next.channels.list())).map(
+        (entry) => entry.channelId,
+      ),
+      ['Chan1'],
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+void test('a record the ledger could not read back is refused alone, never written', async () => {
+  const root = await directory();
+  try {
+    await session(root, async (store) => {
+      // Ids that are prototype properties are plain keys, on a fresh ledger too.
+      assert.equal(await store.chain.getDeposit('constructor'), undefined);
+      assert.equal(await store.channels.get('constructor'), undefined);
+      await assert.rejects(store.chain.putPending('key', ''), unavailable);
+      await assert.rejects(
+        store.channels.put({ ...record('Chan1'), payer: '' }),
+        unavailable,
+      );
+      await store.channels.put(record('Chan2'));
+      assert.deepEqual(
+        (await store.channels.list()).map((entry) => entry.channelId),
+        ['Chan2'],
+      );
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 void test('retention shorter than the minimum is refused', async () => {
   const root = await directory();
   try {

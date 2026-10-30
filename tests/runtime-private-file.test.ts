@@ -1,7 +1,7 @@
 // Private file primitives and the process lock: owner-only directories without symlinked
 // components, bounded no-follow reads, atomic writes, and a lock only a dead owner can lose.
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import {
   chmod,
   mkdir,
@@ -109,7 +109,7 @@ void test('only a lock whose owner process is gone is taken over', () =>
     await lock.verify();
     await lock.release();
     for (const owner of [
-      { pid: process.pid, host: hostname() },
+      { pid: process.ppid, host: hostname() },
       { pid: dead, host: 'another-host' },
     ]) {
       await writeFile(path, JSON.stringify(owner), { mode: 0o600 });
@@ -141,28 +141,74 @@ void test('a lock moved aside and replaced fails verification', () =>
     await assert.rejects(lock.verify(), refused);
   }));
 
-void test('concurrent takeovers of a dead lock leave at most one verified holder', () =>
+void test('the own pid in a lock it does not hold is stale, as after a container restart', () =>
+  withRoot(async (root) => {
+    await ensurePrivateDirectory(root);
+    const path = join(root, 'ledger.lock');
+    await writeFile(
+      path,
+      JSON.stringify({ pid: process.pid, host: hostname() }),
+      { mode: 0o600 },
+    );
+    const lock = await acquireProcessLock(path);
+    // Held now, so this process's second acquisition is refused.
+    await assert.rejects(acquireProcessLock(path), refused);
+    await lock.release();
+  }));
+
+void test('a takeover guard left by a crash refuses takeover until removed', () =>
   withRoot(async (root) => {
     await ensurePrivateDirectory(root);
     const path = join(root, 'ledger.lock');
     const dead = spawnSync(process.execPath, ['-e', '']).pid;
-    for (let round = 0; round < 10; round++) {
-      await writeFile(path, JSON.stringify({ pid: dead, host: hostname() }), {
-        mode: 0o600,
-      });
-      const results = await Promise.allSettled(
-        Array.from({ length: 8 }, () => acquireProcessLock(path)),
-      );
-      const held = results.flatMap((result) =>
-        result.status === 'fulfilled' ? [result.value] : [],
-      );
-      const verified = await Promise.allSettled(
-        held.map((lock) => lock.verify()),
-      );
-      assert.ok(
-        verified.filter((result) => result.status === 'fulfilled').length <= 1,
-      );
-      for (const lock of held) await lock.release().catch(() => {});
-      await rm(path, { force: true });
-    }
+    await writeFile(path, JSON.stringify({ pid: dead, host: hostname() }), {
+      mode: 0o600,
+    });
+    await writeFile(`${path}.takeover`, '', { mode: 0o600 });
+    await assert.rejects(acquireProcessLock(path), refused);
+    await rm(`${path}.takeover`);
+    await (await acquireProcessLock(path)).release();
+  }));
+
+function contend(path: string, holdMs: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(
+      process.execPath,
+      [
+        '--import',
+        'tsx',
+        join(import.meta.dirname, 'support', 'lock-contender.ts'),
+        path,
+        String(holdMs),
+      ],
+      { stdio: ['ignore', 'pipe', 'inherit'] },
+    );
+    let output = '';
+    child.stdout.on('data', (chunk: Buffer) => (output += chunk.toString()));
+    child.on('error', reject);
+    child.on('close', () => resolve(output.trim()));
+  });
+}
+
+void test('processes racing to take over a dead lock never hold it at the same time', () =>
+  withRoot(async (root) => {
+    await ensurePrivateDirectory(root);
+    const path = join(root, 'ledger.lock');
+    const dead = spawnSync(process.execPath, ['-e', '']).pid;
+    await writeFile(path, JSON.stringify({ pid: dead, host: hostname() }), {
+      mode: 0o600,
+    });
+    const outputs = await Promise.all(
+      Array.from({ length: 6 }, () => contend(path, 300)),
+    );
+    const held = outputs
+      .filter((line) => line.startsWith('held '))
+      .map((line) => line.split(' ').slice(1).map(Number))
+      .sort((a, b) => (a[0] ?? 0) - (b[0] ?? 0));
+    assert.ok(held.length >= 1, outputs.join('\n'));
+    for (let index = 1; index < held.length; index++)
+      assert.ok((held[index]?.[0] ?? 0) >= (held[index - 1]?.[1] ?? 0));
+    assert.ok(
+      outputs.every((line) => line === 'refused' || line.startsWith('held ')),
+    );
   }));

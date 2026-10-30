@@ -31,5 +31,8 @@ export const PRIVATE_FILE_CODES = {
 } as const;
 export type PrivateFileCode =
   (typeof PRIVATE_FILE_CODES)[keyof typeof PRIVATE_FILE_CODES];
-// A process lock file holds only its owner record.
-export const PROCESS_LOCK = { maxBytes: 1024 } as const;
+// A process lock file holds only its owner record; the guard beside it serializes takeovers.
+export const PROCESS_LOCK = {
+  maxBytes: 1024,
+  guardSuffix: '.takeover',
+} as const;
