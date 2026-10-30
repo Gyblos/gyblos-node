@@ -150,7 +150,8 @@ async function deposited(
   return rejected();
 }
 
-// Remembers a claim transaction that was sent but not confirmed, so a later attempt can find it.
+// Remembers a claim transaction that was sent but not confirmed, so a later attempt can find it. The
+// read-then-write is safe because the seller holds the channel's lock for the whole claim.
 async function remember(
   store: UptoChainStore,
   channelId: string,

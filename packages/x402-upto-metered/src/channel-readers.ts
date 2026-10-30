@@ -107,7 +107,8 @@ export interface UptoKitRpc {
   };
 }
 
-const CONFIRMED: readonly (string | null)[] = ['confirmed', 'finalized'];
+const CONFIRMED: readonly (string | null)[] =
+  UPTO_CHANNEL_ACCOUNT.landedStatuses;
 
 export function uptoChannelRpc(rpc: UptoKitRpc): UptoChannelRpc {
   return {

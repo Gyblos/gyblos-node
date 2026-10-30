@@ -23,7 +23,8 @@ export const LEDGER_FILE = {
   minRetentionMs: 86_400_000,
   // A new channel is refused once the document is this large, so the channels already open can
   // always still record their claims within maxBytes.
-  newChannelBytes: 6 * 1024 * 1024,
+  // Half the bound: every open channel's remaining records (attempts, claim, pending) still fit.
+  newChannelBytes: 4 * 1024 * 1024,
 } as const;
 
 // The seller's chain wiring: how long a sent open can still land (its blockhash lifetime, with margin),
