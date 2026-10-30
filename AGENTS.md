@@ -4,7 +4,7 @@
 
 - GitHub repo `Gyblos/gyblos-node`; the local checkout directory is still named `gyblos-payments`. It holds the node, buyer, desktop and discovery index applications, not the landing website in `../gyblos` (`web-gyblos`).
 - Use English for repository content, comments, commits and PRs; conversation language follows the founder.
-- This file is the single public source of agent rules. `CLAUDE.md` imports it and `CONTRIBUTING.md` points here. Detailed style is in [docs/code-standards.md](docs/code-standards.md); Claude Code skills in `.claude/skills/` add procedures, never rules. Optional personal notes go in ignored `AGENTS.local.md`.
+- This file is the single public source of agent rules. `CLAUDE.md` imports it and `CONTRIBUTING.md` points here. Detailed style is in [docs/code-standards.md](docs/code-standards.md); repository skills are canonical in `.agents/skills/` and mirrored to `.claude/skills/`, adding procedures but never rules. Optional personal notes go in ignored `AGENTS.local.md`.
 
 ## Layers and ownership
 
