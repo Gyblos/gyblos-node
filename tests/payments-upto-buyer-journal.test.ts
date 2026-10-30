@@ -25,6 +25,8 @@ const unavailable = (error: unknown) =>
 const ENTRY = {
   requestDigest: DIGEST,
   channelId: null,
+  payTo: 'PayTo11111111111111111111111111111111111111',
+  feePayer: 'FeePayer1111111111111111111111111111111111',
   maxAtomic: '1000',
   expiresAt: NOW + 60_000,
   state: PAYMENT_CHANNEL_STATES.OPEN,
@@ -82,6 +84,7 @@ void test('a valid document reads back; each malformed one is refused', () =>
       document([{ ...valid, maxAtomic: '9'.repeat(20) }]),
       document([{ ...valid, state: 'lost' }]),
       document([{ ...valid, channelId: 'not a channel' }]),
+      document([{ ...valid, payTo: 'not an address' }]),
       document([{ ...valid, expiresAt: '1' }]),
     ]) {
       await writeFile(state, tampered, { mode: 0o600 });

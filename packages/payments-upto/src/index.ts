@@ -23,6 +23,7 @@ export {
 } from './buyer-journal';
 export {
   createUptoPaymentClient,
+  uptoSettlementView,
   type UptoBuyerPolicy,
   type UptoPaymentClientOptions,
   type UptoSettlementView,

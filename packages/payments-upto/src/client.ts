@@ -4,9 +4,11 @@
 import { isAddress, type TransactionSigner } from '@solana/kit';
 import {
   createUptoAuthorization,
+  createUptoReceiptReader,
   UPTO_ERROR_CODES,
   UptoError,
   type UptoClientHints,
+  type UptoTransactionRpc,
 } from 'x402-upto-metered';
 
 import {
@@ -39,7 +41,7 @@ export interface UptoBuyerPolicy {
 // What the chain shows for a settlement transaction on this channel, or undefined when it shows none.
 export type UptoSettlementView = (
   settlement: PaymentSettlement,
-  channel: { channelId: string; maxAtomic: string },
+  channel: { channelId: string; maxAtomic: string; payTo: string },
 ) => Promise<Omit<PaymentSettlement, 'transaction'> | undefined>;
 
 export interface UptoPaymentClientOptions {
@@ -131,6 +133,8 @@ async function signOpen(
   const entry = {
     requestDigest: terms.requestDigest,
     channelId: null,
+    payTo: terms.payTo,
+    feePayer: terms.feePayer,
     maxAtomic: terms.maxAtomic,
     expiresAt: terms.expiresAt,
     state: PAYMENT_CHANNEL_STATES.OPEN,
@@ -211,6 +215,7 @@ export function createUptoPaymentClient(
       const channel = {
         channelId: entry.channelId,
         maxAtomic: entry.maxAtomic,
+        payTo: entry.payTo,
       };
       const onChain = await options
         .confirm(settlement, channel)
@@ -247,4 +252,23 @@ export function createUptoPaymentClient(
       );
     },
   };
+}
+
+// The settlement view over the chain: what the claim transaction itself paid this buyer, the seller
+// and the network's fee treasury.
+export function uptoSettlementView(
+  rpc: UptoTransactionRpc,
+  parties: { mint: string; treasury: string; payer: string },
+): UptoSettlementView {
+  const reader = createUptoReceiptReader(rpc);
+  return (settlement, channel) =>
+    reader.settlement({
+      transaction: settlement.transaction,
+      channelId: channel.channelId,
+      mint: parties.mint,
+      maxAtomic: channel.maxAtomic,
+      payer: parties.payer,
+      payTo: channel.payTo,
+      treasury: parties.treasury,
+    });
 }

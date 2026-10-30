@@ -23,6 +23,18 @@ export interface UptoChannelRpc {
   signaturesSucceeded(signatures: readonly string[]): Promise<boolean[]>;
 }
 
+export type UptoChannelStatus =
+  (typeof UPTO_CHANNEL_ACCOUNT.statuses)[keyof typeof UPTO_CHANNEL_ACCOUNT.statuses];
+const STATUSES: readonly UptoChannelStatus[] = Object.values(
+  UPTO_CHANNEL_ACCOUNT.statuses,
+);
+
+export interface UptoChannelOnChain {
+  status: UptoChannelStatus;
+  depositAtomic: string;
+  settledAtomic: string;
+}
+
 const SEALED: readonly number[] = [
   UPTO_CHANNEL_ACCOUNT.statuses.SEALED,
   UPTO_CHANNEL_ACCOUNT.statuses.DISTRIBUTED,
@@ -56,6 +68,20 @@ export function createUptoChannelReaders(
   return {
     // Only this seller's channel counts: any other account at the address (a plain transfer
     // creates one) is not a landed deposit.
+    // The channel as the chain shows it now, for reconciliation; undefined when no such channel of
+    // this rent payer exists (never opened, or closed and reclaimed).
+    async channelState(
+      channelId: string,
+    ): Promise<UptoChannelOnChain | undefined> {
+      const channel = await decoded(channelId);
+      const status = STATUSES.find((known) => known === channel?.status);
+      if (!channel || status === undefined) return undefined;
+      return {
+        status,
+        depositAtomic: String(channel.deposit),
+        settledAtomic: String(channel.settlement.settled),
+      };
+    },
     async channelExists(channelId: string): Promise<boolean> {
       return (await decoded(channelId)) !== undefined;
     },

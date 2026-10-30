@@ -13,9 +13,17 @@ export {
 export { UptoError, uptoError } from './errors';
 export { createUptoHintReader, type UptoHintRpc } from './hints';
 export {
+  createUptoReceiptReader,
+  type UptoReceiptQuery,
+  type UptoSettlementShown,
+  type UptoTransactionRpc,
+} from './receipt';
+export {
   createUptoChannelReaders,
   uptoChannelRpc,
   type UptoChannelAccount,
+  type UptoChannelOnChain,
+  type UptoChannelStatus,
   type UptoChannelRpc,
   type UptoKitRpc,
 } from './channel-readers';

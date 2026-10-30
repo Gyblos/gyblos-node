@@ -23,6 +23,10 @@ export interface UptoJournalEntry {
   requestDigest: string;
   // Null until the open is signed; an entry without one never left the buyer.
   channelId: string | null;
+  // The seller's payout and fee payer (which fronts the channel's rent), to check the claim and
+  // read the channel later.
+  payTo: string;
+  feePayer: string;
   maxAtomic: string;
   // When the terms expire; an unsigned entry is pruned after it.
   expiresAt: number;
@@ -53,6 +57,8 @@ const IDENTIFIER = /^[A-Za-z0-9]{1,128}$/;
 const FIELDS = [
   'requestDigest',
   'channelId',
+  'payTo',
+  'feePayer',
   'maxAtomic',
   'expiresAt',
   'state',
@@ -94,6 +100,8 @@ function entry(value: unknown): UptoJournalEntry {
   return {
     requestDigest: text(value.requestDigest, DIGEST),
     channelId: channelId === null ? null : text(channelId, IDENTIFIER),
+    payTo: text(value.payTo, IDENTIFIER),
+    feePayer: text(value.feePayer, IDENTIFIER),
     maxAtomic: atomic(value.maxAtomic),
     expiresAt: Number(expiresAt),
     state,
