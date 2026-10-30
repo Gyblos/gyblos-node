@@ -63,6 +63,8 @@ export async function writeReceiptBuyerConfig(
   owner: string,
   nodeId: string,
   directAddresses: string[],
+  rpcUrl: string,
+  manualTrust = false,
 ) {
   const config = {
     request: {
@@ -87,9 +89,11 @@ export async function writeReceiptBuyerConfig(
         nodeId: nodeId,
         relayUrl: null,
         directAddresses,
+        manualTrust,
       },
     ],
     discovery: { baseUrl: ACCEPTANCE.baseUrl, maxPages: 1 },
+    identity: { rpcUrl },
   };
   await writeFile(
     rolePathIn(process.env, P2P_ROLES.BUYER, BUYER_SELECTION.configFile),
