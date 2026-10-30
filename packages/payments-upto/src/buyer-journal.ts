@@ -4,6 +4,7 @@
 import {
   PAYMENT_CHANNEL_STATES,
   PAYMENT_ERROR_CODES,
+  PUBLIC_RECORD_LIMITS,
   type PaymentChannelState,
 } from '@gyblos/protocol/constants';
 import { PaymentError } from '@gyblos/protocol/payment';
@@ -45,7 +46,8 @@ function unavailable(): never {
 }
 
 const ATOMIC = /^(0|[1-9][0-9]{0,19})$/;
-const U64_MAX = 2n ** 64n - 1n;
+// The chain's u64 ceiling for any atomic amount.
+const U64_MAX = BigInt(PUBLIC_RECORD_LIMITS.maxAtomic);
 const DIGEST = /^[0-9a-f]{64}$/;
 const IDENTIFIER = /^[A-Za-z0-9]{1,128}$/;
 const FIELDS = [

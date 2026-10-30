@@ -12,6 +12,7 @@ import {
 import {
   PAYMENT_CHANNEL_STATES,
   PAYMENT_ERROR_CODES,
+  PUBLIC_RECORD_LIMITS,
   type PaymentErrorCode,
 } from '@gyblos/protocol/constants';
 import {
@@ -52,7 +53,8 @@ export interface UptoPaymentClientOptions {
 }
 
 const ATOMIC = /^(0|[1-9][0-9]{0,19})$/;
-const U64_MAX = 2n ** 64n - 1n;
+// The chain's u64 ceiling for any atomic amount.
+const U64_MAX = BigInt(PUBLIC_RECORD_LIMITS.maxAtomic);
 // A canonical atomic amount that fits the chain's u64.
 const atomic = (value: string) =>
   ATOMIC.test(value) && BigInt(value) <= U64_MAX;
