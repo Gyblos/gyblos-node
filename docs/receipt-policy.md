@@ -68,3 +68,9 @@ wiring execution; this module does not decide whether they can affect an already
 delivered answer. Full receipts remain private; this API grants no permission to
 publish or export them. Paid execution and v1 payment contracts remain
 unchanged.
+
+## Private ingestion policy
+
+The separate [private free-receipt collector policy](private-receipt-collector.md)
+validates complete free pairs through an injected atomic storage port. It does
+not activate collection, a backend, an exporter or seller/buyer startup wiring.
