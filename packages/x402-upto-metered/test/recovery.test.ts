@@ -146,3 +146,88 @@ void test('recovery completes a settlement left in progress with its recorded ch
   assert.equal(recovered?.settlement?.chargedAtomic, '7');
   assert.deepEqual(claims, [{ channelId, chargedAtomic: '7' }]);
 });
+
+void test('a deposit that may still land stays depositing', async () => {
+  let undecided = true;
+  const { seller, terms, store } = await rig(
+    { failDeposit: true, undecided: () => undecided },
+    memoryUptoStore(),
+  );
+  const authorization = authorizationFor(terms);
+  await assert.rejects(seller.admit(authorization, terms));
+  assert.deepEqual(await seller.recover(), []);
+  assert.equal(
+    (await store.get(authorization.channelId))?.state,
+    UPTO_CHANNEL_STATES.DEPOSITING,
+  );
+  undecided = false;
+  assert.equal((await seller.recover())[0]?.state, UPTO_CHANNEL_STATES.FAILED);
+});
+
+void test('recovery acts on the current record, not the listing it started from', async () => {
+  let release = () => {};
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const store = memoryUptoStore();
+  const { seller, terms } = await rig(
+    { landThenFailDeposit: true, pauseOpen: () => gate },
+    store,
+  );
+  const first = authorizationFor(terms);
+  const second = authorizationFor(terms, {
+    channelId: 'Second1111111111111111111111111111111111111',
+  });
+  await assert.rejects(seller.admit(first, terms));
+  await assert.rejects(seller.admit(second, terms));
+  const recovering = seller.recover();
+  // While recovery waits on the chain for the first channel, the second one settles elsewhere.
+  await new Promise((resolve) => setImmediate(resolve));
+  const settled = {
+    channelId: second.channelId,
+    payer: second.payer,
+    maxAtomic: second.maxAtomic,
+    state: UPTO_CHANNEL_STATES.SETTLED,
+    chargedAtomic: '5',
+    settlement: {
+      channelId: second.channelId,
+      chargedAtomic: '5',
+      refundedAtomic: '1029995',
+      transaction: 't'.repeat(64),
+    },
+  };
+  await store.put(settled);
+  release();
+  await recovering;
+  assert.deepEqual(await store.get(second.channelId), settled);
+});
+
+void test('one record that cannot recover does not stop the others', async () => {
+  const { seller, terms, store } = await rig({}, memoryUptoStore());
+  const refused = authorizationFor(terms);
+  await seller.admit(refused, terms);
+  // A settlement in progress whose claim the chain refuses (another charge already claimed).
+  await seller.settle(refused.channelId, '1');
+  const record = await store.get(refused.channelId);
+  assert.ok(record);
+  await store.put({
+    ...record,
+    state: UPTO_CHANNEL_STATES.SETTLING,
+    chargedAtomic: '2',
+    settlement: undefined,
+  });
+  const pending = authorizationFor(terms, {
+    channelId: 'Pending111111111111111111111111111111111111',
+  });
+  await store.put({
+    channelId: pending.channelId,
+    payer: pending.payer,
+    maxAtomic: pending.maxAtomic,
+    state: UPTO_CHANNEL_STATES.DEPOSITING,
+  });
+  const changed = await seller.recover();
+  assert.deepEqual(
+    changed.map((entry) => [entry.channelId, entry.state]),
+    [[pending.channelId, UPTO_CHANNEL_STATES.FAILED]],
+  );
+});

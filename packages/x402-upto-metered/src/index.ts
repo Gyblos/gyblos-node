@@ -2,8 +2,10 @@
 export {
   UPTO,
   UPTO_CHANNEL_STATES,
+  UPTO_DEPOSIT_STATES,
   UPTO_ERROR_CODES,
   type UptoChannelState,
+  type UptoDepositState,
   type UptoErrorCode,
 } from './constants';
 export { UptoError, uptoError } from './errors';

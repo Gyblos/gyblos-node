@@ -28,8 +28,20 @@ export const UPTO_CHANNEL_STATES = {
   ADMITTED: 'admitted',
   SETTLING: 'settling',
   SETTLED: 'settled',
-  // The deposit never landed; terminal, kept so the channel is never admitted again.
+  // The deposit was refused or can no longer land; terminal, kept so the channel is never admitted
+  // again.
   FAILED: 'failed',
 } as const;
 export type UptoChannelState =
   (typeof UPTO_CHANNEL_STATES)[keyof typeof UPTO_CHANNEL_STATES];
+
+// What the chain shows for a deposit whose outcome the seller did not observe.
+export const UPTO_DEPOSIT_STATES = {
+  LANDED: 'landed',
+  // The open can no longer land (for example its blockhash expired) and did not.
+  NEVER: 'never',
+  // Not landed yet but still able to.
+  PENDING: 'pending',
+} as const;
+export type UptoDepositState =
+  (typeof UPTO_DEPOSIT_STATES)[keyof typeof UPTO_DEPOSIT_STATES];

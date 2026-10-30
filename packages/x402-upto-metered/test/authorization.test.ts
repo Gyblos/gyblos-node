@@ -99,8 +99,14 @@ void test('oversized or non-canonical payloads never reach the SDK', async () =>
   const verify = createUptoVerifier(feePayer.address, async () =>
     BigInt(hints.recentSlot),
   );
+  const padded = Buffer.from(
+    JSON.stringify({
+      ...JSON.parse(Buffer.from(authorization.payload, 'base64').toString()),
+      padding: 'x'.repeat(4096),
+    }),
+  ).toString('base64');
   for (const payload of [
-    'A'.repeat(4097),
+    padded,
     `${authorization.payload} `,
     Buffer.from('[1]').toString('base64'),
   ])

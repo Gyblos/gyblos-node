@@ -3,6 +3,7 @@ import { TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
 import { generateKeyPairSigner, type KeyPairSigner } from '@solana/kit';
 
 import {
+  UPTO_DEPOSIT_STATES,
   UPTO_ERROR_CODES,
   UptoError,
   type UptoAuthorization,
@@ -64,6 +65,9 @@ export function fakeChain(
     failDeposit?: boolean;
     landThenFailDeposit?: boolean;
     rejectDeposit?: boolean;
+    // channelOpen answers PENDING until this resolves, then what the ledger shows.
+    undecided?: () => boolean;
+    pauseOpen?: () => Promise<void>;
     failClaim?: () => boolean;
     pause?: () => Promise<void>;
   } = {},
@@ -92,8 +96,12 @@ export function fakeChain(
         throw new Error(`confirmation timed out at ${SECRET}`);
       return { transaction: 'd'.repeat(64) };
     },
-    async channelOpen(channelId) {
-      return open.has(channelId);
+    async depositState(channelId) {
+      await options.pauseOpen?.();
+      if (open.has(channelId)) return UPTO_DEPOSIT_STATES.LANDED;
+      return options.undecided?.()
+        ? UPTO_DEPOSIT_STATES.PENDING
+        : UPTO_DEPOSIT_STATES.NEVER;
     },
     async claim(record: UptoChannelRecord, chargedAtomic: string) {
       await options.pause?.();

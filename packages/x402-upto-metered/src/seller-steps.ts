@@ -2,6 +2,7 @@
 // recovery. Every chain or store failure becomes an UptoError with a static code.
 import {
   UPTO_CHANNEL_STATES,
+  UPTO_DEPOSIT_STATES,
   UPTO_ERROR_CODES,
   type UptoErrorCode,
 } from './constants';
@@ -86,46 +87,57 @@ export async function depositOnce(
   }
 }
 
+// Moves one record forward if it is still where the listing saw it; re-read under the channel lock
+// so concurrent admission, settlement or recovery is never overwritten with a stale copy.
+async function recoverOne(
+  context: SellerContext,
+  channelId: string,
+): Promise<UptoChannelRecord | undefined> {
+  const { chain, store, write } = context;
+  const record = await store.get(channelId);
+  if (record?.state === UPTO_CHANNEL_STATES.DEPOSITING) {
+    const deposit = await chain.depositState(channelId);
+    if (deposit === UPTO_DEPOSIT_STATES.PENDING) return undefined;
+    const next = {
+      ...record,
+      state:
+        deposit === UPTO_DEPOSIT_STATES.LANDED
+          ? UPTO_CHANNEL_STATES.ADMITTED
+          : UPTO_CHANNEL_STATES.FAILED,
+    };
+    await write(next);
+    return next;
+  }
+  if (
+    record?.state === UPTO_CHANNEL_STATES.SETTLING &&
+    record.chargedAtomic !== undefined
+  ) {
+    const settlement = await claimOnce(context, record, record.chargedAtomic);
+    return { ...record, state: UPTO_CHANNEL_STATES.SETTLED, settlement };
+  }
+  return undefined;
+}
+
 // Resolves records left between a chain call and its store write: a deposit becomes ADMITTED or
-// FAILED by what the chain shows, and a settlement in progress is claimed again with its own
-// recorded charge (claims are idempotent). Returns the records it changed.
+// FAILED by what the chain shows (or waits while it may still land), and a settlement in progress
+// is claimed again with its own recorded charge (claims are idempotent). A record that cannot move
+// yet never stops the others. Returns the records it changed.
 export async function recoverChannels(
   context: SellerContext,
 ): Promise<UptoChannelRecord[]> {
-  const { chain, store, locked, write } = context;
-  const records = await attempt(UPTO_ERROR_CODES.JOURNAL_UNAVAILABLE, () =>
-    store.list(),
+  const listed = await attempt(UPTO_ERROR_CODES.JOURNAL_UNAVAILABLE, () =>
+    context.store.list(),
   );
   const changed: UptoChannelRecord[] = [];
-  for (const record of records)
-    await locked(record.channelId, async () => {
-      if (record.state === UPTO_CHANNEL_STATES.DEPOSITING) {
-        const open = await attempt(UPTO_ERROR_CODES.UNAVAILABLE, () =>
-          chain.channelOpen(record.channelId),
-        );
-        const next = {
-          ...record,
-          state: open
-            ? UPTO_CHANNEL_STATES.ADMITTED
-            : UPTO_CHANNEL_STATES.FAILED,
-        };
-        await write(next);
-        changed.push(next);
-      } else if (
-        record.state === UPTO_CHANNEL_STATES.SETTLING &&
-        record.chargedAtomic !== undefined
-      ) {
-        const settlement = await claimOnce(
-          context,
-          record,
-          record.chargedAtomic,
-        );
-        changed.push({
-          ...record,
-          state: UPTO_CHANNEL_STATES.SETTLED,
-          settlement,
-        });
-      }
-    });
+  for (const { channelId } of listed) {
+    try {
+      const next = await context.locked(channelId, () =>
+        recoverOne(context, channelId),
+      );
+      if (next) changed.push(next);
+    } catch {
+      // Left as it is; the next recovery tries again.
+    }
+  }
   return changed;
 }
