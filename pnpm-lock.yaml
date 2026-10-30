@@ -485,6 +485,9 @@ importers:
       '@gyblos/protocol':
         specifier: workspace:*
         version: link:../protocol
+      '@gyblos/runtime':
+        specifier: workspace:*
+        version: link:../runtime
       x402-upto-metered:
         specifier: workspace:*
         version: link:../x402-upto-metered

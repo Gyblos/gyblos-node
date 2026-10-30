@@ -9,6 +9,7 @@
   "dependencies": {
     "@gyblos/config": "workspace:*",
     "@gyblos/protocol": "workspace:*",
+    "@gyblos/runtime": "workspace:*",
     "x402-upto-metered": "workspace:*"
   }
 }

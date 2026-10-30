@@ -1,34 +1,61 @@
-// Strict shape of the upto ledger document. Anything unexpected (another version, a missing or
-// mistyped field, an unknown channel state) is refused rather than repaired, so a tampered or
-// corrupted ledger never feeds a deposit or a claim.
+// Strict shape of the upto ledger document. Anything unexpected (another version, a missing,
+// mistyped or unknown field, an unknown channel state) is refused rather than repaired, so a
+// tampered or corrupted ledger never feeds a deposit or a claim.
 import {
   UPTO_CHANNEL_STATES,
+  UPTO_ERROR_CODES,
+  UptoError,
   type UptoChannelRecord,
+  type UptoChannelState,
   type UptoSettlement,
   type UptoSplit,
   type UptoTerms,
 } from 'x402-upto-metered';
 
 import { LEDGER_FILE } from './constants';
-import { unavailable } from './ledger-file';
 
 export interface LedgerDocument {
   version: typeof LEDGER_FILE.version;
   channels: Record<string, { record: UptoChannelRecord; updatedAt: number }>;
   deposits: Record<string, number>;
   claims: Record<string, { chargedAtomic: string; transaction?: string }>;
-  pending: Record<string, string>;
+  // Signatures the SDK recorded for a claim in flight, with when they were stored.
+  pending: Record<string, { signature: string; storedAt: number }>;
+}
+
+export function unavailable(): never {
+  throw new UptoError(UPTO_ERROR_CODES.JOURNAL_UNAVAILABLE);
 }
 
 const ATOMIC = /^(0|[1-9][0-9]*)$/;
-const STATES: readonly string[] = Object.values(UPTO_CHANNEL_STATES);
+const NETWORK = /^[^:]+:[^:]+$/;
 
 type Shape = Record<string, unknown>;
 
-function object(value: unknown): Shape {
-  return value !== null && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Shape)
-    : unavailable();
+function isShape(value: unknown): value is Shape {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+function isState(value: string): value is UptoChannelState {
+  return Object.values(UPTO_CHANNEL_STATES).some((state) => state === value);
+}
+function isNetwork(value: string): value is UptoTerms['network'] {
+  return NETWORK.test(value);
+}
+
+// The object, provided it has every required field and nothing outside the allowed ones.
+function object(
+  value: unknown,
+  required: readonly string[],
+  optional: readonly string[] = [],
+): Shape {
+  if (!isShape(value)) return unavailable();
+  const keys = Object.keys(value);
+  if (
+    required.some((key) => !keys.includes(key)) ||
+    keys.some((key) => !required.includes(key) && !optional.includes(key))
+  )
+    unavailable();
+  return value;
 }
 function text(value: unknown): string {
   return typeof value === 'string' && value.length > 0 ? value : unavailable();
@@ -39,30 +66,47 @@ function atomic(value: unknown): string {
     : unavailable();
 }
 function integer(value: unknown): number {
-  return Number.isSafeInteger(value) ? (value as number) : unavailable();
+  return typeof value === 'number' && Number.isSafeInteger(value)
+    ? value
+    : unavailable();
 }
 function map<T>(
   value: unknown,
   parse: (entry: unknown) => T,
 ): Record<string, T> {
+  if (!isShape(value)) return unavailable();
   const entries: Record<string, T> = Object.create(null);
-  for (const [key, entry] of Object.entries(object(value)))
+  for (const [key, entry] of Object.entries(value))
     entries[text(key)] = parse(entry);
   return entries;
 }
 
 function split(value: unknown): UptoSplit {
-  const input = object(value);
+  const input = object(value, ['recipient', 'bps']);
   return { recipient: text(input.recipient), bps: integer(input.bps) };
 }
 
+const TERMS = [
+  'network',
+  'asset',
+  'payTo',
+  'feePayer',
+  'authorizer',
+  'tokenProgram',
+  'maxAtomic',
+  'expiresAt',
+  'memo',
+  'withdrawDelaySeconds',
+  'maxTimeoutSeconds',
+] as const;
+
 function terms(value: unknown): UptoTerms {
-  const input = object(value);
-  if (!Array.isArray(input.splits) && input.splits !== undefined) unavailable();
+  const input = object(value, TERMS, ['splits', 'reference']);
   const network = text(input.network);
-  if (!/^[^:]+:[^:]+$/.test(network)) unavailable();
+  if (!isNetwork(network)) return unavailable();
+  if (input.splits !== undefined && !Array.isArray(input.splits)) unavailable();
   return {
-    network: network as UptoTerms['network'],
+    network,
     asset: text(input.asset),
     payTo: text(input.payTo),
     feePayer: text(input.feePayer),
@@ -81,7 +125,12 @@ function terms(value: unknown): UptoTerms {
 }
 
 function settlement(value: unknown): UptoSettlement {
-  const input = object(value);
+  const input = object(value, [
+    'channelId',
+    'chargedAtomic',
+    'refundedAtomic',
+    'transaction',
+  ]);
   return {
     channelId: text(input.channelId),
     chargedAtomic: atomic(input.chargedAtomic),
@@ -91,14 +140,18 @@ function settlement(value: unknown): UptoSettlement {
 }
 
 function record(value: unknown): UptoChannelRecord {
-  const input = object(value);
+  const input = object(
+    value,
+    ['channelId', 'payer', 'maxAtomic', 'state', 'payload', 'terms'],
+    ['chargedAtomic', 'settlement'],
+  );
   const state = text(input.state);
-  if (!STATES.includes(state)) unavailable();
+  if (!isState(state)) return unavailable();
   return {
     channelId: text(input.channelId),
     payer: text(input.payer),
     maxAtomic: atomic(input.maxAtomic),
-    state: state as UptoChannelRecord['state'],
+    state,
     payload: text(input.payload),
     terms: terms(input.terms),
     ...(input.chargedAtomic === undefined
@@ -117,12 +170,18 @@ export function parseLedger(source: string): LedgerDocument {
   } catch {
     return unavailable();
   }
-  const input = object(parsed);
+  const input = object(parsed, [
+    'version',
+    'channels',
+    'deposits',
+    'claims',
+    'pending',
+  ]);
   if (input.version !== LEDGER_FILE.version) unavailable();
   return {
     version: LEDGER_FILE.version,
     channels: map(input.channels, (entry) => {
-      const value = object(entry);
+      const value = object(entry, ['record', 'updatedAt']);
       return {
         record: record(value.record),
         updatedAt: integer(value.updatedAt),
@@ -130,7 +189,7 @@ export function parseLedger(source: string): LedgerDocument {
     }),
     deposits: map(input.deposits, integer),
     claims: map(input.claims, (entry) => {
-      const value = object(entry);
+      const value = object(entry, ['chargedAtomic'], ['transaction']);
       return {
         chargedAtomic: atomic(value.chargedAtomic),
         ...(value.transaction === undefined
@@ -138,6 +197,12 @@ export function parseLedger(source: string): LedgerDocument {
           : { transaction: text(value.transaction) }),
       };
     }),
-    pending: map(input.pending, text),
+    pending: map(input.pending, (entry) => {
+      const value = object(entry, ['signature', 'storedAt']);
+      return {
+        signature: text(value.signature),
+        storedAt: integer(value.storedAt),
+      };
+    }),
   };
 }
