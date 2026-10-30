@@ -93,6 +93,7 @@ export default [
       'packages/config/**/*.ts',
       '**/constants.ts',
       'tests/**/*.ts',
+      'packages/*/test/**/*.ts',
       '**/*.test.ts',
     ],
     rules: { 'no-magic-numbers': 'off' },
