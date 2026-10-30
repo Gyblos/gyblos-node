@@ -82,6 +82,7 @@ void test('only a solana network with a full 32-character reference can match', 
     'eip155:EtWTRABZaYq6iMfeYKouRu166VU2xqa1',
     'solana:E',
     'solana:',
+    'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1:extra',
   ];
   for (const network of networks) {
     const { double, calls } = rpc(GENESIS);

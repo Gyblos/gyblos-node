@@ -51,8 +51,11 @@ export interface UptoPaymentClientOptions {
   now: () => number;
 }
 
-// Atomic amounts are u64, so at most 20 digits.
 const ATOMIC = /^(0|[1-9][0-9]{0,19})$/;
+const U64_MAX = 2n ** 64n - 1n;
+// A canonical atomic amount that fits the chain's u64.
+const atomic = (value: string) =>
+  ATOMIC.test(value) && BigInt(value) <= U64_MAX;
 const DIGEST = /^[0-9a-f]{64}$/;
 
 function fail(code: PaymentErrorCode): never {
@@ -74,7 +77,7 @@ function trusted(
     terms.protocolFeeBps === policy.protocolFeeBps &&
     terms.treasury === policy.treasury &&
     terms.buyer === payer &&
-    ATOMIC.test(terms.maxAtomic) &&
+    atomic(terms.maxAtomic) &&
     BigInt(terms.maxAtomic) > 0n &&
     BigInt(terms.maxAtomic) <= BigInt(policy.maxAtomic) &&
     DIGEST.test(terms.requestDigest) &&
@@ -145,18 +148,25 @@ async function signOpen(
   } catch {
     return abandon(PAYMENT_ERROR_CODES.UNAVAILABLE);
   }
+  const authorization = { ...signed, requestDigest: terms.requestDigest };
   try {
     await options.journal.put({ ...entry, channelId: signed.channelId });
   } catch {
+    // A write can land and still report failure (the directory sync after the rename); the open is
+    // then journaled and must be returned rather than stranded as a signed entry nobody holds.
+    const held = await options.journal
+      .get(terms.requestDigest)
+      .catch(() => undefined);
+    if (held?.channelId === signed.channelId) return authorization;
     return abandon(PAYMENT_ERROR_CODES.JOURNAL_UNAVAILABLE);
   }
-  return { ...signed, requestDigest: terms.requestDigest };
+  return authorization;
 }
 
 // A policy the buyer could never honor is a configuration error, refused at construction.
 function checkedPolicy(policy: UptoBuyerPolicy): UptoBuyerPolicy {
   if (
-    !ATOMIC.test(policy.maxAtomic) ||
+    !atomic(policy.maxAtomic) ||
     !isAddress(policy.mint) ||
     !isAddress(policy.treasury) ||
     !Number.isSafeInteger(policy.protocolFeeBps)

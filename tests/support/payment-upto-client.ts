@@ -22,6 +22,8 @@ export const JOURNAL_FAULTS = {
   WRITES: 'writes',
   READS: 'reads',
   SIGNED_WRITE: 'signed-write',
+  // The write after signing lands but still reports failure.
+  SIGNED_WRITE_LANDS: 'signed-write-lands',
 } as const;
 export type JournalFault = (typeof JOURNAL_FAULTS)[keyof typeof JOURNAL_FAULTS];
 
@@ -50,6 +52,11 @@ export function memoryJournal(
       if (!entries.has(entry.requestDigest))
         ledger.events.push(PAYMENT_EVENTS.JOURNAL);
       entries.set(entry.requestDigest, { ...entry, updatedAt: now() });
+      if (
+        fault === JOURNAL_FAULTS.SIGNED_WRITE_LANDS &&
+        entry.channelId !== null
+      )
+        throw new Error('sync failed after rename');
     },
     async remove(requestDigest) {
       if (entries.get(requestDigest)?.channelId) throw new Error('signed');

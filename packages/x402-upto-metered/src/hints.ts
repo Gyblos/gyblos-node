@@ -36,12 +36,13 @@ export function createUptoHintReader(
   network: UptoTerms['network'],
 ) {
   // A CAIP-2 Solana network is `solana:` and the genesis hash's first 32 characters.
-  const [namespace, reference = ''] = network.split(':');
+  const [namespace, reference = '', ...rest] = network.split(':');
   let proven: Promise<void> | undefined;
   const prove = async () => {
     const genesis = await read(() => rpc.getGenesisHash().send());
     if (
       namespace !== UPTO_SOLANA_NAMESPACE ||
+      rest.length > 0 ||
       String(genesis).slice(0, UPTO_SOLANA_REFERENCE_LENGTH) !== reference
     )
       throw new UptoError(UPTO_ERROR_CODES.INVALID_TERMS);

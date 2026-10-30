@@ -143,7 +143,6 @@ void test('untrusted terms, another network or no RPC are refused before anythin
   for (const [overrides, change, expected] of [
     [{}, { maxAtomic: '1001' }, PAYMENT_ERROR_CODES.UNTRUSTED_TERMS],
     [{}, { payTo: 'not an address' }, PAYMENT_ERROR_CODES.UNTRUSTED_TERMS],
-    [{}, { maxAtomic: '1'.repeat(21) }, PAYMENT_ERROR_CODES.UNTRUSTED_TERMS],
     [
       { hints: failing(new UptoError(UPTO_ERROR_CODES.INVALID_TERMS)) },
       {},
@@ -197,6 +196,11 @@ void test('a failure after journaling drops the unsigned entry, leaving nothing 
   );
   assert.equal(journal.entries.size, 0);
   assert.deepEqual(await signing.client.reconcile(), []);
+  // A write that landed despite reporting failure keeps its journaled open.
+  const landed = memory(JOURNAL_FAULTS.SIGNED_WRITE_LANDS);
+  const kept = await buyer(landed);
+  const authorization = await kept.client.authorize(kept.terms);
+  assert.equal(landed.entries.get(DIGEST)?.channelId, authorization.channelId);
 });
 
 void test('an unsigned entry left by a crash blocks its request until the terms expire', () =>
@@ -281,6 +285,8 @@ void test('a policy the buyer could never honor is refused at construction', asy
   const { options } = await buyer(memory());
   for (const policy of [
     { ...options.policy, maxAtomic: 'all' },
+    // Twenty digits, but above the chain's u64.
+    { ...options.policy, maxAtomic: '9'.repeat(20) },
     { ...options.policy, mint: 'not an address' },
     { ...options.policy, treasury: '' },
   ])

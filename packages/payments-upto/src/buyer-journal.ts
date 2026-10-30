@@ -44,8 +44,8 @@ function unavailable(): never {
   throw new PaymentError(PAYMENT_ERROR_CODES.JOURNAL_UNAVAILABLE);
 }
 
-// Atomic amounts are u64, so at most 20 digits.
 const ATOMIC = /^(0|[1-9][0-9]{0,19})$/;
+const U64_MAX = 2n ** 64n - 1n;
 const DIGEST = /^[0-9a-f]{64}$/;
 const IDENTIFIER = /^[A-Za-z0-9]{1,128}$/;
 const FIELDS = [
@@ -69,6 +69,11 @@ function text(value: unknown, pattern: RegExp): string {
     ? value
     : unavailable();
 }
+// A canonical atomic amount that fits the chain's u64.
+function atomic(value: unknown): string {
+  const amount = text(value, ATOMIC);
+  return BigInt(amount) <= U64_MAX ? amount : unavailable();
+}
 
 function entry(value: unknown): UptoJournalEntry {
   if (
@@ -87,10 +92,10 @@ function entry(value: unknown): UptoJournalEntry {
   return {
     requestDigest: text(value.requestDigest, DIGEST),
     channelId: channelId === null ? null : text(channelId, IDENTIFIER),
-    maxAtomic: text(value.maxAtomic, ATOMIC),
+    maxAtomic: atomic(value.maxAtomic),
     expiresAt: Number(expiresAt),
     state,
-    chargedAtomic: chargedAtomic === null ? null : text(chargedAtomic, ATOMIC),
+    chargedAtomic: chargedAtomic === null ? null : atomic(chargedAtomic),
     updatedAt: Number(updatedAt),
   };
 }

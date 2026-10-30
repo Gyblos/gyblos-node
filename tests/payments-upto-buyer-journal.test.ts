@@ -79,6 +79,7 @@ void test('a valid document reads back; each malformed one is refused', () =>
       document([{ ...valid, extra: 1 }]),
       document([{ ...valid, maxAtomic: '-1' }]),
       document([{ ...valid, maxAtomic: '1'.repeat(21) }]),
+      document([{ ...valid, maxAtomic: '9'.repeat(20) }]),
       document([{ ...valid, state: 'lost' }]),
       document([{ ...valid, channelId: 'not a channel' }]),
       document([{ ...valid, expiresAt: '1' }]),
