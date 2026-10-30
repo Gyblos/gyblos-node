@@ -12,6 +12,7 @@ import {
 } from '@gyblos/config';
 import {
   CONTROL_METERING_MODES,
+  OFFER_PRICING_KINDS,
   P2P_ROLES,
   type EngineErrorCode,
 } from '@gyblos/protocol/constants';
@@ -42,7 +43,7 @@ import { readNodeConfigFile, type NodeConfig } from './node-config';
 import type { NodeConfigIssue } from './node-config-fields';
 import type { SellerLimits } from './node-config-limits';
 import { inspectSellerSequence } from './public-sequence';
-import { loadRole, roleKeyFilesStatus } from './roles';
+import { loadRole, roleKeyFilesStatus, type RoleConfig } from './roles';
 import type { SellerCatalogOffer } from './seller-offer';
 import {
   sellerBaseSettings,
@@ -118,9 +119,10 @@ async function configCheck(options: DoctorOptions) {
       };
   }
   try {
-    // Like the daemon today, which has no payment server: paid offers are refused. Pass paidSelling
-    // here once the daemon builds one.
-    const settings = sellerSettings(file, options.environment);
+    // As the daemon does: paid offers are served through the role's payment keys.
+    const settings = sellerSettings(file, options.environment, {
+      paidSelling: true,
+    });
     return { issues: [], settings, base: settings, result: OK };
   } catch (error) {
     const result: Result = {
@@ -201,8 +203,42 @@ async function roleChecks(environment: HomeEnvironment) {
     role: OK,
     keys,
     sequence,
+    config,
     seller: { nodeId: config.nodeId, owner: config.owner },
   };
+}
+
+// The payout and payment keys paid selling uses, as the daemon checks them; metadata only.
+async function paymentsCheck(
+  config: RoleConfig,
+  environment: HomeEnvironment,
+): Promise<Result> {
+  if (
+    config.role !== P2P_ROLES.SELLER ||
+    config.payTo === undefined ||
+    config.facilitator === undefined ||
+    config.authorizer === undefined
+  )
+    return fail(NODE_ERROR_CODES.SELLER_PAYMENT_ROLE_MISSING);
+  if (
+    [config.owner, config.facilitator, config.authorizer].includes(config.payTo)
+  )
+    return fail(NODE_ERROR_CODES.SELLER_PAYMENT_DESCRIPTION_INVALID);
+  try {
+    const status = await roleKeyFilesStatus(
+      P2P_ROLES.SELLER,
+      [ROLE_KEY_FILES.facilitator, ROLE_KEY_FILES.authorizer],
+      environment,
+    );
+    if (status === 'ok') return OK;
+    return fail(
+      status === 'missing'
+        ? DOCTOR_CODES.KEYS_MISSING
+        : DOCTOR_CODES.KEY_PERMISSIONS,
+    );
+  } catch (error) {
+    return fail(errorCode(error));
+  }
 }
 
 const engineDependencies = (options: DoctorOptions) => ({
@@ -312,6 +348,15 @@ export async function sellerDoctor(
     DOCTOR_CHECKS.RELAYS,
     config.base ? relaysCheck(config.base) : notChecked,
   );
+  if (
+    config.settings?.offers.some(
+      ({ offer }) => offer.kind === OFFER_PRICING_KINDS.PAID,
+    )
+  )
+    add(
+      DOCTOR_CHECKS.PAYMENTS,
+      role.config ? await paymentsCheck(role.config, environment) : notChecked,
+    );
   return {
     checks,
     configIssues: config.issues,

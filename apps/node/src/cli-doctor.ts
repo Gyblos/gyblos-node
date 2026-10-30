@@ -55,11 +55,13 @@ const HINTS: Readonly<Partial<Record<DoctorResultCode, string>>> = {
   [NODE_ERROR_CODES.SELLER_OFFERS_MISSING]:
     'add a free [[offers]] entry to gyblos.toml (examples/seller-daemon.toml)',
   [NODE_ERROR_CODES.SELLER_PAID_EXECUTION_UNAVAILABLE]:
-    'the daemon cannot reach the payment chain yet; list the offer as free',
+    'paid offers need the payment chain; list the offer as free',
   [NODE_ERROR_CODES.SELLER_PAID_METERING_UNRECOUNTED]:
     'a paid offer needs a model recounted with its pinned public tokenizer (qwen3-0.6b)',
+  [NODE_ERROR_CODES.SELLER_PAYMENT_ROLE_MISSING]:
+    'paid offers need a seller role set up with a payout: a new GYBLOS_HOME and `pnpm node:setup --role seller --mint <mint> --pay-to <payout> --buyer <address>`',
   [NODE_ERROR_CODES.SELLER_PAYMENT_DESCRIPTION_INVALID]:
-    'the payment server must charge the network fee on devnet and pay out to an account other than its fee payer',
+    'the payout must differ from the owner, fee payer and authorizer keys',
   [NODE_ERROR_CODES.NODE_CONFIG_INVALID]:
     'run `pnpm gyblos config validate --config <file>` on the GYBLOS_CONFIG file',
   [NODE_ERROR_CODES.LEGACY_LOCAL_LAYOUT]:

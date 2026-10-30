@@ -177,16 +177,7 @@ void test('doctor: an unsafe seller directory or leftover sequence lock is repor
 void test('doctor: config the daemon cannot honor reports the same startup code and file issues', () =>
   scenario({}, async (run) => {
     await withOllama(run);
-    await writeFile(join(run.root, 'gyblos.toml'), paidToml(run));
-    const paid = await doctor(run);
-    assert.equal(paid.code, 1);
-    assert.match(
-      line(paid.output, 'config'),
-      /FAIL\s+config\s+SELLER_PAID_EXECUTION_UNAVAILABLE\s+\[\[offers\]\] entry 1: /,
-    );
-    // A refused offer still leaves the relay settings checked.
-    assert.match(line(paid.output, 'relays'), /^\s*OK\s+relays/);
-    await unlink(join(run.root, 'gyblos.toml'));
+    await unlink(join(run.root, 'gyblos.toml')).catch(() => undefined);
     const none = await doctor(run);
     assert.equal(none.code, 1);
     assert.match(
@@ -270,12 +261,16 @@ void test('doctor: an engine that never answers fails with ENGINE_TIMEOUT within
 void test('doctor: an offer the daemon refuses leaves the engine unchecked', () =>
   scenario({}, async (run) => {
     const ollama = await withOllama(run);
-    await writeFile(join(run.root, 'gyblos.toml'), paidToml(run));
-    const paid = await doctor(run);
-    assert.match(line(paid.output, 'engine'), /WARN\s+engine\s+NOT_CHECKED/);
+    // A reasoning level the engine cannot honor refuses the offer.
+    await writeFile(
+      join(run.root, 'gyblos.toml'),
+      freeToml(run).replace('["off"]', '["low"]'),
+    );
+    const refused = await doctor(run);
+    assert.match(line(refused.output, 'engine'), /WARN\s+engine\s+NOT_CHECKED/);
     assert.deepEqual(ollama.paths, []);
     for (const removed of ['ollama', 'model', 'ports'])
-      assert.equal(line(paid.output, removed), '', removed);
+      assert.equal(line(refused.output, removed), '', removed);
   }));
 
 void test('doctor and config validate refuse arguments they do not take', () =>
@@ -338,3 +333,36 @@ void test('doctor: a down engine warns while another offer’s engine answers, a
     [DOCTOR_STATUS.WARN, DOCTOR_STATUS.WARN],
   );
 });
+
+void test('doctor: a paid offer is checked like startup, with the payout and payment keys', () =>
+  scenario({}, async (run) => {
+    await withOllama(run);
+    await writeFile(join(run.root, 'gyblos.toml'), paidToml(run));
+    const paid = await doctor(run);
+    assert.match(line(paid.output, 'config'), /^\s*OK\s+config/);
+    assert.match(line(paid.output, 'payments'), /^\s*OK\s+payments/);
+    assert.match(paid.output, /offer\[1\] paid qwen3-0\.6b/);
+    // Free sellers never see the payments line.
+    await writeFile(join(run.root, 'gyblos.toml'), freeToml(run));
+    assert.doesNotMatch((await doctor(run)).output, /payments/);
+    await writeFile(join(run.root, 'gyblos.toml'), paidToml(run));
+    await unlink(join(run.seller, 'facilitator.json'));
+    const noKey = await doctor(run);
+    assert.equal(noKey.code, 1);
+    assert.match(
+      line(noKey.output, 'payments'),
+      /FAIL\s+payments\s+KEYS_MISSING/,
+    );
+  }));
+
+void test('doctor: a paid offer on a seller set up without a payout fails the payments check', () =>
+  scenario({ free: true }, async (run) => {
+    await withOllama(run);
+    await writeFile(join(run.root, 'gyblos.toml'), paidToml(run));
+    const result = await doctor(run);
+    assert.equal(result.code, 1);
+    assert.match(
+      line(result.output, 'payments'),
+      /FAIL\s+payments\s+SELLER_PAYMENT_ROLE_MISSING/,
+    );
+  }));

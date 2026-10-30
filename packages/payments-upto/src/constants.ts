@@ -22,3 +22,10 @@ export const LEDGER_FILE = {
   // authorization can no longer be admitted again.
   minRetentionMs: 86_400_000,
 } as const;
+
+// The seller's chain wiring: how long a sent open can still land (its blockhash lifetime, with margin),
+// and how many channels the ledger keeps.
+export const UPTO_SELLER = {
+  openWindowMs: 90_000,
+  maxChannels: 10_000,
+} as const;

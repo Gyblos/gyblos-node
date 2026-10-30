@@ -22,9 +22,12 @@ only; never import mainnet keys.
 
 ## Payments and recovery
 
-- Paid v2 selling (x402 upto channels) is implemented and tested offline only.
-  The daemon cannot reach the chain yet, so it refuses paid offers; nothing has
-  settled on devnet.
+- Paid v2 selling (x402 upto channels) is wired to devnet but tested offline
+  only; nothing has settled on devnet yet. Reading a sealed channel takes the
+  first successful transaction after the open as the seal, which the devnet run
+  must confirm.
+- Setting up a paid v2 seller still needs `--buyer`, a v1 setup requirement that
+  v2 does not use.
 - A paid v2 claim not confirmed in time is retried in the background for about a
   minute and a half (at most about three minutes when every attempt times out).
   The retry queue lives in memory: claims still pending at shutdown are

@@ -148,10 +148,12 @@ pnpm node:start
 ```
 
 - The seller serves every free offer in `gyblos.toml`; without one it does not
-  start (`SELLER_OFFERS_MISSING`). Paid v2 selling is implemented, but the
-  daemon has no chain wiring yet, so a paid offer still stops startup
-  (`SELLER_PAID_EXECUTION_UNAVAILABLE`); the v1 paid path remains in the lab
-  gates only.
+  start (`SELLER_OFFERS_MISSING`). A paid offer is sold on devnet over the paid
+  stream when the seller role was set up with a payout
+  (`pnpm node:setup --role seller --mint <mint> --pay-to <payout> --buyer <address>`
+  in a new `GYBLOS_HOME`; `--buyer` is still required by the v1 setup). The fee
+  payer key needs devnet SOL for transaction fees and channel rent. Paid v2 has
+  not settled on devnet yet; the v1 paid path remains in the lab gates only.
 - The seller runs its own Ollama; the daemon never starts it. Startup warms each
   offer in order at its own engine URL (a literal loopback address), checking
   memory headroom for engines on this machine, and signs its public records once

@@ -47,27 +47,29 @@
     "./identity-verifier": "./src/identity-verifier.ts",
     "./identity-state": "./src/identity-state.ts",
     "./receipts": "./src/receipts.ts",
-    "./telemetry-startup": "./src/telemetry-startup.ts"
+    "./telemetry-startup": "./src/telemetry-startup.ts",
+    "./seller-chain": "./src/seller-chain.ts"
   },
   "dependencies": {
-    "@gyblos/core": "workspace:*",
     "@gyblos/config": "workspace:*",
-    "@gyblos/engine-ollama": "workspace:*",
+    "@gyblos/core": "workspace:*",
+    "@gyblos/discovery-http": "workspace:*",
     "@gyblos/engine-anthropic": "workspace:*",
+    "@gyblos/engine-ollama": "workspace:*",
     "@gyblos/engine-openai": "workspace:*",
-    "@gyblos/runtime": "workspace:*",
-    "@number0/iroh": "1.1.0",
+    "@gyblos/identity": "workspace:*",
+    "@gyblos/payments-upto": "workspace:*",
     "@gyblos/payments-x402": "workspace:*",
+    "@gyblos/protocol": "workspace:*",
+    "@gyblos/runtime": "workspace:*",
+    "@gyblos/telemetry-file": "workspace:*",
     "@gyblos/transport-iroh": "workspace:*",
+    "@number0/iroh": "1.1.0",
     "@solana/kit": "5.1.0",
     "@x402/core": "2.28.0",
     "@x402/express": "2.28.0",
     "@x402/svm": "2.28.0",
     "express": "4.21.2",
-    "@gyblos/protocol": "workspace:*",
-    "@gyblos/discovery-http": "workspace:*",
-    "smol-toml": "1.9.1",
-    "@gyblos/identity": "workspace:*",
-    "@gyblos/telemetry-file": "workspace:*"
+    "smol-toml": "1.9.1"
   }
 }

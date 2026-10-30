@@ -48,3 +48,10 @@ export const UPTO_DEPOSIT_STATES = {
 } as const;
 export type UptoDepositState =
   (typeof UPTO_DEPOSIT_STATES)[keyof typeof UPTO_DEPOSIT_STATES];
+
+// The payment-channels program's channel account, as the SDK decodes it.
+export const UPTO_CHANNEL_ACCOUNT = {
+  statuses: { OPEN: 0, SEALED: 1, CLOSING: 2, DISTRIBUTED: 3 },
+  // Signatures read to find the sealing transaction; a channel lives through a handful.
+  signatureLimit: 50,
+} as const;
