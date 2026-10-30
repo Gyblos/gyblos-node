@@ -1,6 +1,7 @@
 // Exposes fixed probe, public wallet status/copy and bounded setup/backup interactions; no signing or raw IPC.
 import { contextBridge, ipcRenderer } from 'electron';
 
+import { NETWORK_CATALOG, parseNetworkCatalog } from './catalog/model';
 import { DESKTOP } from './constants';
 import { LOCAL_NODE, parseLocalNodeState } from './node-status';
 import { parseProbeResult } from './probe-model';
@@ -11,6 +12,17 @@ import {
   parseWalletSettingsResult,
   WALLET_SETTINGS,
 } from './wallet/settings-model';
+
+contextBridge.exposeInMainWorld('desktopCatalog', {
+  summary: async () =>
+    parseNetworkCatalog(
+      await ipcRenderer.invoke(NETWORK_CATALOG.STATUS_CHANNEL),
+    ),
+  lookup: async (model: unknown) =>
+    parseNetworkCatalog(
+      await ipcRenderer.invoke(NETWORK_CATALOG.LOOKUP_CHANNEL, model),
+    ),
+});
 
 contextBridge.exposeInMainWorld('desktopNode', {
   summary: async () =>

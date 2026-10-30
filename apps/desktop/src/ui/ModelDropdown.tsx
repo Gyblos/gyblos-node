@@ -1,7 +1,7 @@
 // Quick model selection for chat; the full catalog remains a separate screen.
 import { CaretDown, Check } from '@phosphor-icons/react';
 
-import { MENU_GEOMETRY } from './constants';
+import { MENU_GEOMETRY, MODEL_SOURCE } from './constants';
 import { Dropdown } from './Dropdown';
 import type { ModelOption } from './model-types';
 import { ModelImage } from './ModelImage';
@@ -13,6 +13,12 @@ function priceLabel(model: ModelOption) {
   return model.free
     ? 'Free'
     : `$${model.input.toFixed(2)} in · $${model.output.toFixed(2)} out / 1M tokens`;
+}
+
+function modelDetail(model: ModelOption) {
+  if (model.source === MODEL_SOURCE.ANNOUNCED)
+    return `${model.family ?? 'Signed announcement'} · Announced · Chat preview`;
+  return model.free ? 'Preview model' : priceLabel(model);
 }
 
 export function ModelDropdown({
@@ -70,7 +76,7 @@ export function ModelDropdown({
                 role="menuitemradio"
                 checked={item.id === model.id}
                 label={item.name}
-                detail={item.free ? undefined : priceLabel(item)}
+                detail={modelDetail(item)}
                 badge={item.free ? <Badge>Free</Badge> : undefined}
                 leading={<ModelImage artwork={item.image} name={item.name} />}
                 trailing={item.id === model.id && <Check size={16} />}
