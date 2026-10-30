@@ -7,7 +7,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { generateKeyPairSigner, type TransactionSigner } from '@solana/kit';
+import {
+  generateKeyPairSigner,
+  getBase58Decoder,
+  type TransactionSigner,
+} from '@solana/kit';
 import { UPTO_ERROR_CODES, UptoError } from 'x402-upto-metered';
 
 import {
@@ -19,6 +23,7 @@ import {
 import {
   createUptoPaymentClient,
   openUptoBuyerJournal,
+  uptoSettlementView,
   type UptoBuyerJournal,
   type UptoPaymentClientOptions,
   type UptoSettlementView,
@@ -163,13 +168,19 @@ void test('untrusted terms, another network or no RPC are refused before anythin
     assert.equal(journal.entries.size, 0);
     assert.equal(counter.signed, 0);
   }
-  // The buyer never pays the fees of its own open.
+  // The buyer never pays the fees of its own open, and each party is its own account.
   const journal = memory();
   const { client, terms } = await buyer(journal);
-  await assert.rejects(
-    client.authorize({ ...terms, feePayer: terms.buyer }),
-    code(PAYMENT_ERROR_CODES.UNTRUSTED_TERMS),
-  );
+  for (const change of [
+    { feePayer: terms.buyer },
+    { payTo: terms.buyer },
+    { payTo: terms.feePayer },
+    { payTo: PROTOCOL_FEE.treasury },
+  ])
+    await assert.rejects(
+      client.authorize({ ...terms, ...change }),
+      code(PAYMENT_ERROR_CODES.UNTRUSTED_TERMS),
+    );
   assert.equal(journal.entries.size, 0);
 });
 
@@ -211,6 +222,8 @@ void test('an unsigned entry left by a crash blocks its request until the terms 
     await journal.put({
       requestDigest: DIGEST,
       channelId: null,
+      payTo: crashed.terms.payTo,
+      feePayer: crashed.terms.feePayer,
       maxAtomic: '1000',
       expiresAt: crashed.terms.expiresAt,
       state: PAYMENT_CHANNEL_STATES.OPEN,
@@ -226,6 +239,8 @@ void test('an unsigned entry left by a crash blocks its request until the terms 
     await journal.put({
       requestDigest: 'cd'.repeat(32),
       channelId: null,
+      payTo: crashed.terms.payTo,
+      feePayer: crashed.terms.feePayer,
       maxAtomic: '1',
       expiresAt: now + 1,
       state: PAYMENT_CHANNEL_STATES.OPEN,
@@ -294,4 +309,66 @@ void test('a policy the buyer could never honor is refused at construction', asy
       () => createUptoPaymentClient({ ...options, policy }),
       code(PAYMENT_ERROR_CODES.UNTRUSTED_TERMS),
     );
+});
+
+void test('a receipt is checked against what the claim transaction itself paid', async () => {
+  let shown: { owner: string; before: bigint; after: bigint }[] = [];
+  let channel = '';
+  const journal = memory();
+  const parties = await buyer(journal);
+  const view = uptoSettlementView(
+    {
+      getTransaction: () => ({
+        send: async () => ({
+          meta: {
+            err: null,
+            preTokenBalances: shown.map((flow) => ({
+              mint: parties.terms.mint,
+              owner: flow.owner,
+              uiTokenAmount: { amount: String(flow.before) },
+            })),
+            postTokenBalances: shown.map((flow) => ({
+              mint: parties.terms.mint,
+              owner: flow.owner,
+              uiTokenAmount: { amount: String(flow.after) },
+            })),
+          },
+          transaction: { message: { accountKeys: [channel] } },
+        }),
+      }),
+    },
+    parties.options.policy,
+    parties.options.payer,
+  );
+  const client = createUptoPaymentClient({ ...parties.options, confirm: view });
+  const authorization = await client.authorize(parties.terms);
+  channel = authorization.channelId;
+  // The claim: 970 back to the buyer, 29 to the seller, 0 fee (floored), escrow emptied.
+  shown = [
+    { owner: channel, before: 1000n, after: 0n },
+    { owner: parties.terms.buyer, before: 0n, after: 970n },
+    { owner: parties.terms.payTo, before: 0n, after: 29n },
+  ];
+  const settlement = {
+    channelId: channel,
+    chargedAtomic: '30',
+    refundedAtomic: '970',
+    sellerAtomic: '29',
+    feeAtomic: '0',
+    transaction: getBase58Decoder().decode(new Uint8Array(64).fill(3)),
+  };
+  // A seller claiming more than the chain shows paid is refused.
+  await assert.rejects(
+    client.checkReceipt(
+      authorization,
+      { ...settlement, sellerAtomic: '30', feeAtomic: '0' },
+      '30',
+    ),
+    code(PAYMENT_ERROR_CODES.RECEIPT_MISMATCH),
+  );
+  await client.checkReceipt(authorization, settlement, '30');
+  assert.equal(
+    journal.entries.get(DIGEST)?.state,
+    PAYMENT_CHANNEL_STATES.SETTLED,
+  );
 });

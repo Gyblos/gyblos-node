@@ -3,6 +3,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { isAddress } from '@solana/kit';
+
+import {
+  DEVNET_GYBLOS_TREASURY,
+  DEVNET_TREASURY_OWNER,
+  PROTOCOL_FEE,
+} from '@gyblos/config';
 import {
   PAYMENT_BINDING,
   PAYMENT_ERROR_CODES,
@@ -156,4 +163,10 @@ void test('per charge, the seller receives its own price rounded down to the ato
           );
         }
     }
+});
+
+void test('the devnet fee treasury is Gyblos own wallet, never the channel program treasury', () => {
+  assert.notEqual(PROTOCOL_FEE.treasury, DEVNET_TREASURY_OWNER);
+  assert.equal(PROTOCOL_FEE.treasury, DEVNET_GYBLOS_TREASURY);
+  assert.ok(isAddress(PROTOCOL_FEE.treasury));
 });
