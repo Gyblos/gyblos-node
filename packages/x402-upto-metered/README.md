@@ -25,7 +25,8 @@ example a QUIC peer-to-peer stream).
   `admitted`; settlement records `settling` with the one charge, claims once and
   records `settled`, and same-charge retries return that settlement. `recover()`
   resolves records a crash left between a chain call and its write. The host
-  supplies `UptoChain` (with idempotent claims) and `UptoStore`;
+  supplies `UptoChain` (claims idempotent per channel and charge and kept
+  durably across crashes, which the SDK alone does not do) and `UptoStore`;
   `memoryUptoStore()` is an in-memory store, `uptoRequirements(terms)` the
   shared x402 requirements, and `decodeUptoPayload` the bounded payload decoder.
 - Terms come from the seller's own offer, never from the buyer's request.
