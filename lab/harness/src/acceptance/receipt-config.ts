@@ -39,7 +39,7 @@ async function freshWorkspace() {
   return root;
 }
 function toml(cap: number) {
-  return `version = 1\n[node]\nnetwork = "${NODE_NETWORKS.DEVNET}"\n[discovery]\npublish = true\nurl = "${ACCEPTANCE.baseUrl}"\n[[offers]]\nmodel = "${RECEIPT_ACCEPTANCE.modelId}"\ncustom = true\nreasoning = ["${REASONING_LEVELS.OFF}"]\nengine = { kind = "${ENGINE_KINDS.OPENAI}", url = "${RECEIPT_ACCEPTANCE.engineOrigin}/v1", context_tokens = ${RECEIPT_ACCEPTANCE.contextTokens} }\nfree = { daily_token_cap = ${RECEIPT_ACCEPTANCE.dailyCap}, per_buyer_cap = ${cap} }\n`;
+  return `version = 1\n[node]\nnetwork = "${NODE_NETWORKS.DEVNET}"\n[discovery]\npublish = true\nurl = "${ACCEPTANCE.baseUrl}"\n[telemetry]\nfile = true\n[[offers]]\nmodel = "${RECEIPT_ACCEPTANCE.modelId}"\ncustom = true\nreasoning = ["${REASONING_LEVELS.OFF}"]\nengine = { kind = "${ENGINE_KINDS.OPENAI}", url = "${RECEIPT_ACCEPTANCE.engineOrigin}/v1", context_tokens = ${RECEIPT_ACCEPTANCE.contextTokens} }\nfree = { daily_token_cap = ${RECEIPT_ACCEPTANCE.dailyCap}, per_buyer_cap = ${cap} }\n`;
 }
 
 export async function receiptRoles() {

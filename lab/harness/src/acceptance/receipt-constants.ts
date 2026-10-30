@@ -30,6 +30,7 @@ export const RECEIPT_ACCEPTANCE_CASES = {
   ENGINE_FAILURE: 'engine-failure-no-retry',
   FREE_CAPS: 'configured-free-cap',
   PRIVACY: 'private-bounded-metadata',
+  TELEMETRY: 'local-telemetry-private',
   NO_EXTERNAL: 'no-external-io-or-payments',
 } as const;
 export type ReceiptAcceptanceCase =

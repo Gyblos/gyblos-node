@@ -12,7 +12,10 @@ import { startFreeBuyer } from '@gyblos/buyer/free-startup';
 import { FILE_MODES, ROLE_FILES } from '@gyblos/config';
 import { CONFIG_ASSET_LABELS } from '@gyblos/config/constants';
 import { SELLER_BADGES } from '@gyblos/core/constants';
-import { ROLE_CONFIG_SCHEMA_VERSION } from '@gyblos/node/constants';
+import {
+  NODE_ERROR_CODES,
+  ROLE_CONFIG_SCHEMA_VERSION,
+} from '@gyblos/node/constants';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 
 import { controlFixture } from './support/control-fixture';
@@ -31,6 +34,7 @@ void test(
     let binds = 0;
     try {
       process.env.GYBLOS_HOME = join(directory, 'product');
+      process.env.GYBLOS_CONFIG = join(directory, 'buyer.toml');
       process.env.GYBLOS_LAB_HOME = join(directory, 'lab');
       const roleDirectory = join(directory, 'product', 'buyer');
       await mkdir(roleDirectory, {
@@ -79,6 +83,24 @@ void test(
         rpcCalls++;
         throw new Error('Unexpected network');
       };
+      await writeFile(
+        process.env.GYBLOS_CONFIG,
+        'version = 1\n[node]\nnetwork = "devnet"\n[telemetry]\nfile = "invalid"\n',
+      );
+      await assert.rejects(
+        startFreeBuyer({
+          bind: async () => {
+            binds++;
+            throw new Error('must not bind');
+          },
+        }),
+        { code: NODE_ERROR_CODES.NODE_CONFIG_INVALID },
+      );
+      assert.equal(binds, 0);
+      await writeFile(
+        process.env.GYBLOS_CONFIG,
+        'version = 1\n[node]\nnetwork = "devnet"\n[telemetry]\nfile = true\n',
+      );
       const host = await startFreeBuyer({
         port: 0,
         bind: async (bytes, options) => {
@@ -93,7 +115,14 @@ void test(
         failed: 0,
         dropped: 0,
       });
+      assert.deepEqual(host.telemetry(), {
+        enabled: true,
+        owned: true,
+        closed: false,
+        failed: false,
+      });
       await host.close();
+      assert.equal(host.telemetry().closed, true);
       assert.ok('url' in host);
       assert.equal(typeof host.url, 'string');
       assert.equal(binds, 1);

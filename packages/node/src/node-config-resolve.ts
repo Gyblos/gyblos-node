@@ -228,6 +228,11 @@ export function resolveNodeConfig(
   const location = resolveLocation(resolution, file);
   const relays = resolveRelays(resolution, file);
   const discovery = resolveDiscovery(resolution, file);
+  const telemetryFile = resolution.choose(
+    NODE_SETTINGS.TELEMETRY_FILE,
+    [fileCandidate('telemetry.file', file?.telemetry?.file)],
+    false,
+  );
   const offers = resolution.choose(
     NODE_SETTINGS.OFFERS,
     [fileCandidate('offers', file?.offers.length ? file.offers : undefined)],
@@ -249,6 +254,7 @@ export function resolveNodeConfig(
     ...location,
     ...relays,
     ...discovery,
+    telemetryFile,
     offers,
   };
   return {

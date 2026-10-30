@@ -61,6 +61,7 @@ export interface NodeConfig {
   discovery?: { publish?: boolean; url?: string };
   // Seller capacity; see node-config-limits.ts.
   limits?: NodeLimits;
+  telemetry?: { file?: boolean };
   offers: NodeOffer[];
 }
 
@@ -81,6 +82,7 @@ const ROOT_KEYS = [
   'discovery',
   'limits',
   'offers',
+  'telemetry',
 ];
 const NODE_KEYS = ['network', 'data_dir', 'payout_wallet', 'rpc_url'];
 const RELAY_KEYS = ['urls', 'relay_token_env'];
@@ -246,6 +248,16 @@ function readDiscovery(value: unknown, path: ConfigPath, issues: IssueList) {
   return withoutUndefined({ publish, url });
 }
 
+function readTelemetry(value: unknown, path: ConfigPath, issues: IssueList) {
+  const telemetry = table(value, path, issues);
+  if (!telemetry) return undefined;
+  const file = optional(telemetry, 'file', path, (item, at) =>
+    flag(item, at, issues),
+  );
+  unknownKeys(telemetry, path, ['file'], issues);
+  return withoutUndefined({ file });
+}
+
 // Validates a document as parseTomlDocument returns it (integers as bigint) against schema version 1.
 export function validateNodeConfig(document: unknown): NodeConfigResult {
   const issues = new IssueList();
@@ -270,6 +282,9 @@ export function validateNodeConfig(document: unknown): NodeConfigResult {
   const limits = optional(root, 'limits', [], (value, path) =>
     readLimits(value, path, issues),
   );
+  const telemetry = optional(root, 'telemetry', [], (value, path) =>
+    readTelemetry(value, path, issues),
+  );
   const offers = readOffers(root.offers, ['offers'], issues);
   unknownKeys(root, [], ROOT_KEYS, issues);
   if (
@@ -290,6 +305,7 @@ export function validateNodeConfig(document: unknown): NodeConfigResult {
       buyer,
       discovery,
       limits,
+      telemetry,
       offers,
     }),
   };

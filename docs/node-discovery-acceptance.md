@@ -278,3 +278,10 @@ acceptance.
 No payments, devnet transactions, deployments, real engine, live identity RPC,
 production index, second machine or Windows ACL validation is included. Those
 require separate authorization and evidence.
+
+The startup receipt scenario also opts both roles into local file telemetry via
+TOML. After shutdown it checks private modes, the existing record/file/pool
+bounds, no content/provider URL, and exactly one request plus terminal event per
+role/request across restarts. Complete, streaming, engine failure, cancellation
+and cap refusal remain part of the same no-retry scenario. This checks local
+records only, not public metrics or external exporters.

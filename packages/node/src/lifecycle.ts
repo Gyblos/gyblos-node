@@ -3,11 +3,13 @@
 import { NODE_STATES, type NodeState } from './constants';
 import type { createSellerPublisher } from './publisher';
 import type { createSellerReceiptRuntime } from './receipt-seller';
+import type { createLocalTelemetry } from './telemetry-startup';
 
 export interface NodeHost {
   close(): Promise<void>;
   receipts?: ReturnType<typeof createSellerReceiptRuntime>['health'];
   publication?: ReturnType<typeof createSellerPublisher>['health'];
+  telemetry?: ReturnType<typeof createLocalTelemetry>['health'];
 }
 
 export function createNodeLifecycle(startHost: () => Promise<NodeHost>) {
@@ -46,6 +48,7 @@ export function createNodeLifecycle(startHost: () => Promise<NodeHost>) {
         state,
         ...(host?.receipts ? { receipts: host.receipts() } : {}),
         ...(host?.publication ? { publication: host.publication() } : {}),
+        ...(host?.telemetry ? { telemetry: host.telemetry() } : {}),
       };
     },
   };
