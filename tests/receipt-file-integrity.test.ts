@@ -2,7 +2,14 @@
 import assert from 'node:assert/strict';
 import { fork } from 'node:child_process';
 import { once } from 'node:events';
-import { link, readFile, stat, writeFile } from 'node:fs/promises';
+import {
+  link,
+  open,
+  readFile,
+  stat,
+  writeFile,
+  type FileHandle,
+} from 'node:fs/promises';
 import { join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -206,4 +213,54 @@ void test('receipt file store rejects invalid missing options with a static type
     ),
     { code: CODES.INVALID_OPTIONS },
   );
+});
+
+function hasSync(value: unknown): value is Pick<FileHandle, 'sync'> {
+  return (
+    !!value &&
+    typeof value === 'object' &&
+    'sync' in value &&
+    typeof value.sync === 'function'
+  );
+}
+void test('receipt file store cancels after staged sync before committing the snapshot', async (context) => {
+  const fixture = await receiptFileFixture(context);
+  const store = await createReceiptFileStore({ path: fixture.path });
+  const before = await readFile(fixture.path);
+  const probe = await open(
+    join(fixture.directory, 'prototype-probe'),
+    'wx',
+    0o600,
+  );
+  const prototype: unknown = Object.getPrototypeOf(probe);
+  await probe.close();
+  assert.ok(hasSync(prototype));
+  const original = prototype.sync;
+  const controller = new AbortController();
+  let staged = false;
+  context.mock.method(prototype, 'sync', async function (this: FileHandle) {
+    await original.call(this);
+    const info = await this.stat();
+    if (!info.isFile()) return;
+    const named = await stat(fixture.path + RECEIPT_FILE_FORMAT.stageSuffix);
+    if (info.dev === named.dev && info.ino === named.ino) {
+      staged = true;
+      controller.abort();
+    }
+  });
+  try {
+    await assert.rejects(store.insert(fixture.entry, controller.signal), {
+      code: CODES.CANCELLED,
+    });
+    assert.equal(staged, true);
+    assert.deepEqual(await readFile(fixture.path), before);
+    await assert.rejects(stat(fixture.path + RECEIPT_FILE_FORMAT.stageSuffix), {
+      code: 'ENOENT',
+    });
+    context.mock.restoreAll();
+    assert.equal(await store.insert(fixture.entry), WRITES.INSERTED);
+  } finally {
+    context.mock.restoreAll();
+    await store.close();
+  }
 });
