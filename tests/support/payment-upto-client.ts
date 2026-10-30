@@ -15,24 +15,17 @@ import {
 } from '@gyblos/protocol/constants';
 import {
   PaymentError,
-  type PaymentAuthorization,
   type PaymentClient,
   type PaymentReconciliation,
-  type PaymentTerms,
 } from '@gyblos/protocol/payment';
 
-import { CONTRACT_CEILING, PAYMENT_EVENTS } from './payment-rig';
+import {
+  buyerTrusts,
+  ledgerConfirms,
+  PAYMENT_EVENTS,
+  type BuyerPolicy,
+} from './payment-rig';
 import type { UptoLedger } from './payment-upto-ledger';
-
-const ATOMIC = /^(0|[1-9][0-9]*)$/;
-const DIGEST = /^[0-9a-f]{64}$/;
-
-export interface UptoBuyerPolicy {
-  network: string;
-  mint: string;
-  protocolFeeBps: number;
-  treasury: string;
-}
 
 interface JournalEntry extends PaymentReconciliation {
   maxAtomic: string;
@@ -42,29 +35,9 @@ function fail(code: PaymentErrorCode): never {
   throw new PaymentError(code);
 }
 
-function trusted(
-  terms: PaymentTerms,
-  policy: UptoBuyerPolicy,
-  payer: string,
-  now: number,
-) {
-  return (
-    terms.network === policy.network &&
-    terms.mint === policy.mint &&
-    terms.protocolFeeBps === policy.protocolFeeBps &&
-    terms.treasury === policy.treasury &&
-    terms.buyer === payer &&
-    ATOMIC.test(terms.maxAtomic) &&
-    BigInt(terms.maxAtomic) > 0n &&
-    BigInt(terms.maxAtomic) <= CONTRACT_CEILING &&
-    DIGEST.test(terms.requestDigest) &&
-    terms.expiresAt > now
-  );
-}
-
 export function uptoTestClient(options: {
   payer: KeyPairSigner;
-  policy: UptoBuyerPolicy;
+  policy: BuyerPolicy;
   settings: UptoChannelSettings;
   hints: UptoClientHints;
   ledger: UptoLedger;
@@ -74,7 +47,7 @@ export function uptoTestClient(options: {
   const journal = new Map<string, JournalEntry>();
   return {
     async authorize(terms) {
-      if (!trusted(terms, options.policy, payer.address, ledger.now))
+      if (!buyerTrusts(terms, options.policy, payer.address, ledger.now))
         fail(PAYMENT_ERROR_CODES.UNTRUSTED_TERMS);
       if (journal.has(terms.requestDigest))
         fail(PAYMENT_ERROR_CODES.ALREADY_AUTHORIZED);
@@ -104,18 +77,13 @@ export function uptoTestClient(options: {
         fail(PAYMENT_ERROR_CODES.RECEIPT_MISMATCH);
       if (entry.state === PAYMENT_CHANNEL_STATES.SETTLED)
         fail(PAYMENT_ERROR_CODES.ALREADY_SETTLED);
-      const onChain = ledger.transactions.get(settlement.transaction);
       if (
-        !onChain ||
-        onChain.channelId !== entry.channelId ||
-        settlement.channelId !== entry.channelId ||
-        onChain.chargedAtomic !== settlement.chargedAtomic ||
-        onChain.refundedAtomic !== settlement.refundedAtomic ||
-        onChain.sellerAtomic !== settlement.sellerAtomic ||
-        onChain.feeAtomic !== settlement.feeAtomic ||
-        settlement.chargedAtomic !== expectedChargedAtomic ||
-        BigInt(onChain.chargedAtomic) + BigInt(onChain.refundedAtomic) !==
-          BigInt(entry.maxAtomic)
+        !ledgerConfirms(
+          ledger.transactions.get(settlement.transaction),
+          entry,
+          settlement,
+          expectedChargedAtomic,
+        )
       )
         fail(PAYMENT_ERROR_CODES.RECEIPT_MISMATCH);
       entry.state = PAYMENT_CHANNEL_STATES.SETTLED;
@@ -133,6 +101,3 @@ export function uptoTestClient(options: {
     },
   };
 }
-
-// Kept for the harness: the authorization a client produced, by request digest.
-export type SignedAuthorizations = Map<string, PaymentAuthorization>;

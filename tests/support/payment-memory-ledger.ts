@@ -23,13 +23,15 @@ import {
 import { paymentMemo } from '@gyblos/protocol/payment-binding';
 
 import {
+  ATOMIC,
+  buyerTrusts,
   CONTRACT_CEILING,
+  ledgerConfirms,
   type PaymentBalances,
   type PaymentEvent,
 } from './payment-rig';
 
-export const ATOMIC = /^(0|[1-9][0-9]*)$/;
-const DIGEST = /^[0-9a-f]{64}$/;
+export { ATOMIC };
 export const FUNDS = 10n * CONTRACT_CEILING;
 export const TERM_MS = 60_000;
 // Synthetic start of the rig clock (epoch ms); a real harness may start at real time.
@@ -185,17 +187,11 @@ export function trustedTerms(
   payer: string,
   now: number,
 ): boolean {
-  return (
-    terms.network === NETWORK &&
-    terms.mint === MINT &&
-    terms.protocolFeeBps === FEE.protocolFeeBps &&
-    terms.treasury === FEE.treasury &&
-    terms.buyer === payer &&
-    ATOMIC.test(terms.maxAtomic) &&
-    BigInt(terms.maxAtomic) > 0n &&
-    BigInt(terms.maxAtomic) <= CONTRACT_CEILING &&
-    DIGEST.test(terms.requestDigest) &&
-    terms.expiresAt > now
+  return buyerTrusts(
+    terms,
+    { network: NETWORK, mint: MINT, ...FEE },
+    payer,
+    now,
   );
 }
 
@@ -205,17 +201,10 @@ export function confirmedReceipt(
   settlement: PaymentSettlement,
   expectedChargedAtomic: string,
 ): boolean {
-  const onChain = ledger.transactions.get(settlement.transaction);
-  return (
-    onChain !== undefined &&
-    onChain.channelId === entry.channelId &&
-    settlement.channelId === entry.channelId &&
-    onChain.chargedAtomic === settlement.chargedAtomic &&
-    onChain.refundedAtomic === settlement.refundedAtomic &&
-    onChain.sellerAtomic === settlement.sellerAtomic &&
-    onChain.feeAtomic === settlement.feeAtomic &&
-    settlement.chargedAtomic === expectedChargedAtomic &&
-    BigInt(onChain.chargedAtomic) + BigInt(onChain.refundedAtomic) ===
-      BigInt(entry.maxAtomic)
+  return ledgerConfirms(
+    ledger.transactions.get(settlement.transaction),
+    entry,
+    settlement,
+    expectedChargedAtomic,
   );
 }

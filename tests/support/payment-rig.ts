@@ -9,6 +9,7 @@ import {
   type PaymentClient,
   type PaymentDescription,
   type PaymentServer,
+  type PaymentSettlement,
   type PaymentSplit,
   type PaymentTerms,
 } from '@gyblos/protocol/payment';
@@ -153,4 +154,59 @@ export async function admitted(rig: PaymentRig) {
 
 export function otherDigest(digest: string): string {
   return `${digest.startsWith('0') ? '1' : '0'}${digest.slice(1)}`;
+}
+
+export const ATOMIC = /^(0|[1-9][0-9]*)$/;
+const DIGEST = /^[0-9a-f]{64}$/;
+
+// The buyer's own policy: the network, asset, protocol fee and treasury it accepts.
+export interface BuyerPolicy {
+  network: string;
+  mint: string;
+  protocolFeeBps: number;
+  treasury: string;
+}
+
+// Terms a contract client may sign: its policy, its own address as buyer, a ceiling within
+// CONTRACT_CEILING, a well-formed request digest and not yet expired.
+export function buyerTrusts(
+  terms: PaymentTerms,
+  policy: BuyerPolicy,
+  payer: string,
+  now: number,
+): boolean {
+  return (
+    terms.network === policy.network &&
+    terms.mint === policy.mint &&
+    terms.protocolFeeBps === policy.protocolFeeBps &&
+    terms.treasury === policy.treasury &&
+    terms.buyer === payer &&
+    ATOMIC.test(terms.maxAtomic) &&
+    BigInt(terms.maxAtomic) > 0n &&
+    BigInt(terms.maxAtomic) <= CONTRACT_CEILING &&
+    DIGEST.test(terms.requestDigest) &&
+    terms.expiresAt > now
+  );
+}
+
+// A receipt matches what the ledger shows for that transaction, this channel and the buyer's own
+// metering, and refunds the rest of the ceiling.
+export function ledgerConfirms(
+  onChain: Omit<PaymentSettlement, 'transaction'> | undefined,
+  channel: { channelId: string; maxAtomic: string },
+  settlement: PaymentSettlement,
+  expectedChargedAtomic: string,
+): boolean {
+  return (
+    onChain !== undefined &&
+    onChain.channelId === channel.channelId &&
+    settlement.channelId === channel.channelId &&
+    onChain.chargedAtomic === settlement.chargedAtomic &&
+    onChain.refundedAtomic === settlement.refundedAtomic &&
+    onChain.sellerAtomic === settlement.sellerAtomic &&
+    onChain.feeAtomic === settlement.feeAtomic &&
+    settlement.chargedAtomic === expectedChargedAtomic &&
+    BigInt(onChain.chargedAtomic) + BigInt(onChain.refundedAtomic) ===
+      BigInt(channel.maxAtomic)
+  );
 }

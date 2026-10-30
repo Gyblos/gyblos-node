@@ -1,24 +1,46 @@
 // The PaymentServer port over x402-upto-metered: admits a buyer's channel open only for terms that are
 // this seller's own (description, fee and treasury) and name the authorization's payer and request,
 // and settles exactly the recorded channel, reporting the seller and fee shares of the charge.
-import type { UptoSeller } from 'x402-upto-metered';
+import type { UptoChannelRecord, UptoSeller } from 'x402-upto-metered';
 
-import { PAYMENT_ERROR_CODES } from '@gyblos/protocol/constants';
+import {
+  PAYMENT_BINDING,
+  PAYMENT_ERROR_CODES,
+} from '@gyblos/protocol/constants';
 import {
   PaymentError,
   type PaymentAdmission,
   type PaymentDescription,
   type PaymentServer,
 } from '@gyblos/protocol/payment';
-import { settlementShares } from '@gyblos/protocol/payment-binding';
 
-import { PAYMENT_PHASES, paymentFailure } from './errors';
-import { uptoTermsFor, type UptoChannelSettings } from './terms';
+import { DESCRIPTION_FIELDS, PAYMENT_PHASES } from './constants';
+import { paymentFailure } from './errors';
+import {
+  uptoSellerTerms,
+  uptoTermsFor,
+  type UptoChannelSettings,
+} from './terms';
 
 export interface UptoPaymentServerOptions {
   description: PaymentDescription;
   settings: UptoChannelSettings;
   seller: UptoSeller;
+}
+
+// What the channel's signed distribution pays for this charge (each share floored, as the program
+// pays it): the first recipient is payTo, the rest is the protocol fee. Independent of the
+// seller's current fee setting, which may have changed since the channel opened.
+function sharesPaid(record: UptoChannelRecord, chargedAtomic: string) {
+  const charged = BigInt(chargedAtomic);
+  const denominator = BigInt(PAYMENT_BINDING.bpsDenominator);
+  const [seller, ...fee] = (record.terms.splits ?? []).map(
+    (split) => (charged * BigInt(split.bps)) / denominator,
+  );
+  return {
+    sellerAtomic: String(seller ?? charged),
+    feeAtomic: String(fee.reduce((total, share) => total + share, 0n)),
+  };
 }
 
 function mismatch(): never {
@@ -29,13 +51,14 @@ export function createUptoPaymentServer(
   options: UptoPaymentServerOptions,
 ): PaymentServer {
   const { description, settings, seller } = options;
-  const own = Object.keys(description) as (keyof PaymentDescription)[];
+  // Fails at construction on a malformed description rather than on the first request.
+  uptoSellerTerms(description, settings);
   return {
     describe: async () => ({ ...description }),
     async admit(authorization, terms, admitOptions = {}) {
       // Fails fast on foreign terms; the payer-signed memo would also refuse them at verify.
       if (
-        !own.every((key) => terms[key] === description[key]) ||
+        !DESCRIPTION_FIELDS.every((key) => terms[key] === description[key]) ||
         terms.buyer !== authorization.payer ||
         terms.requestDigest !== authorization.requestDigest
       )
@@ -62,10 +85,7 @@ export function createUptoPaymentServer(
         )
           return mismatch();
         const settled = await seller.settle(admission.channelId, chargedAtomic);
-        return {
-          ...settled,
-          ...settlementShares(chargedAtomic, description.protocolFeeBps),
-        };
+        return { ...settled, ...sharesPaid(record, chargedAtomic) };
       } catch (error) {
         return paymentFailure(error, PAYMENT_PHASES.SETTLE);
       }
