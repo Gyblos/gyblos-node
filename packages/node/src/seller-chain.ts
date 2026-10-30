@@ -7,10 +7,9 @@ import {
   CLEANUP,
   DEVNET,
   DEVNET_GENESIS,
-  PAYMENT_LIMITS,
   paymentPathsIn,
   PROTOCOL_FEE,
-  TOKEN_PROGRAM_ADDRESS,
+  UPTO_CHANNEL_SETTINGS,
 } from '@gyblos/config';
 import { openUptoSellerPayments } from '@gyblos/payments-upto';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
@@ -52,11 +51,7 @@ export function sellerChainPayments(
         protocolFeeBps: PROTOCOL_FEE.bps,
         treasury: PROTOCOL_FEE.treasury,
       },
-      settings: {
-        tokenProgram: TOKEN_PROGRAM_ADDRESS,
-        withdrawDelaySeconds: PAYMENT_LIMITS.withdrawDelay,
-        maxTimeoutSeconds: PAYMENT_LIMITS.maxTimeoutSeconds,
-      },
+      settings: UPTO_CHANNEL_SETTINGS,
       feePayer: await roleSigner(P2P_ROLES.SELLER, 'facilitator'),
       authorizer: await roleSigner(P2P_ROLES.SELLER, 'authorizer'),
       paths: paymentPathsIn(process.env, P2P_ROLES.SELLER),
