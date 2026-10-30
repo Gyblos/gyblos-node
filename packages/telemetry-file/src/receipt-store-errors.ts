@@ -13,3 +13,14 @@ export function receiptFileFail(code: ReceiptFileCode): never {
 export function receiptFileSignal(signal?: AbortSignal) {
   if (signal?.aborted) receiptFileFail(RECEIPT_FILE_CODES.CANCELLED);
 }
+
+export async function receiptFileBoundary<T>(
+  run: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await run();
+  } catch (error) {
+    if (error instanceof ReceiptFileError) throw error;
+    return receiptFileFail(RECEIPT_FILE_CODES.UNAVAILABLE);
+  }
+}
