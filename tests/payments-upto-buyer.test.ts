@@ -168,13 +168,19 @@ void test('untrusted terms, another network or no RPC are refused before anythin
     assert.equal(journal.entries.size, 0);
     assert.equal(counter.signed, 0);
   }
-  // The buyer never pays the fees of its own open.
+  // The buyer never pays the fees of its own open, and each party is its own account.
   const journal = memory();
   const { client, terms } = await buyer(journal);
-  await assert.rejects(
-    client.authorize({ ...terms, feePayer: terms.buyer }),
-    code(PAYMENT_ERROR_CODES.UNTRUSTED_TERMS),
-  );
+  for (const change of [
+    { feePayer: terms.buyer },
+    { payTo: terms.buyer },
+    { payTo: terms.feePayer },
+    { payTo: PROTOCOL_FEE.treasury },
+  ])
+    await assert.rejects(
+      client.authorize({ ...terms, ...change }),
+      code(PAYMENT_ERROR_CODES.UNTRUSTED_TERMS),
+    );
   assert.equal(journal.entries.size, 0);
 });
 
@@ -331,11 +337,8 @@ void test('a receipt is checked against what the claim transaction itself paid',
         }),
       }),
     },
-    {
-      mint: parties.terms.mint,
-      treasury: PROTOCOL_FEE.treasury,
-      payer: parties.options.payer.address,
-    },
+    parties.options.policy,
+    parties.options.payer,
   );
   const client = createUptoPaymentClient({ ...parties.options, confirm: view });
   const authorization = await client.authorize(parties.terms);

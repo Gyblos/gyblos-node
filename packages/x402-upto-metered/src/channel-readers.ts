@@ -66,8 +66,6 @@ export function createUptoChannelReaders(
       : undefined;
   }
   return {
-    // Only this seller's channel counts: any other account at the address (a plain transfer
-    // creates one) is not a landed deposit.
     // The channel as the chain shows it now, for reconciliation; undefined when no such channel of
     // this rent payer exists (never opened, or closed and reclaimed).
     async channelState(
@@ -82,6 +80,8 @@ export function createUptoChannelReaders(
         settledAtomic: String(channel.settlement.settled),
       };
     },
+    // Only this seller's channel counts: any other account at the address (a plain transfer
+    // creates one) is not a landed deposit.
     async channelExists(channelId: string): Promise<boolean> {
       return (await decoded(channelId)) !== undefined;
     },

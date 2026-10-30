@@ -12,6 +12,19 @@ interface TokenBalance {
   uiTokenAmount: { amount: string };
 }
 
+type FoundTransaction = {
+  meta: {
+    err: unknown;
+    preTokenBalances?: readonly TokenBalance[] | null;
+    postTokenBalances?: readonly TokenBalance[] | null;
+    loadedAddresses?: {
+      writable: readonly string[];
+      readonly: readonly string[];
+    };
+  } | null;
+  transaction: { message: { accountKeys: readonly string[] } };
+} | null;
+
 // The slice of a @solana/kit RPC the reader uses.
 export interface UptoTransactionRpc {
   getTransaction(
@@ -21,20 +34,7 @@ export interface UptoTransactionRpc {
       encoding: 'json';
       maxSupportedTransactionVersion: 0;
     },
-  ): {
-    send(): Promise<{
-      meta: {
-        err: unknown;
-        preTokenBalances?: readonly TokenBalance[] | null;
-        postTokenBalances?: readonly TokenBalance[] | null;
-        loadedAddresses?: {
-          writable: readonly string[];
-          readonly: readonly string[];
-        };
-      } | null;
-      transaction: { message: { accountKeys: readonly string[] } };
-    } | null>;
-  };
+  ): { send(): Promise<FoundTransaction> };
 }
 
 export interface UptoReceiptQuery {
@@ -71,9 +71,7 @@ export function createUptoReceiptReader(rpc: UptoTransactionRpc) {
     async settlement(
       query: UptoReceiptQuery,
     ): Promise<UptoSettlementShown | undefined> {
-      let found: Awaited<
-        ReturnType<ReturnType<UptoTransactionRpc['getTransaction']>['send']>
-      >;
+      let found: FoundTransaction;
       try {
         found = await rpc
           .getTransaction(asSignature(query.transaction), {

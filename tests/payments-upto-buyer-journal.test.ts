@@ -25,8 +25,9 @@ const unavailable = (error: unknown) =>
 const ENTRY = {
   requestDigest: DIGEST,
   channelId: null,
-  payTo: 'PayTo11111111111111111111111111111111111111',
-  feePayer: 'FeePayer1111111111111111111111111111111111',
+  // Any two well-formed addresses.
+  payTo: '11111111111111111111111111111111',
+  feePayer: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
   maxAtomic: '1000',
   expiresAt: NOW + 60_000,
   state: PAYMENT_CHANNEL_STATES.OPEN,

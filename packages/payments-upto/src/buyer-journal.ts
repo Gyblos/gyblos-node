@@ -1,6 +1,8 @@
 // The buyer's durable journal of authorized channels by request digest: one private document, read
 // strictly and rewritten atomically under the process lock. A signed open is never dropped while open;
 // an entry whose open was never signed is dropped once its terms expire, or at once when signing fails.
+import { isAddress } from '@solana/kit';
+
 import {
   PAYMENT_CHANNEL_STATES,
   PAYMENT_ERROR_CODES,
@@ -77,6 +79,10 @@ function text(value: unknown, pattern: RegExp): string {
     ? value
     : unavailable();
 }
+// A Solana address, as the buyer journaled it from trusted terms.
+function address(value: unknown): string {
+  return typeof value === 'string' && isAddress(value) ? value : unavailable();
+}
 // A canonical atomic amount that fits the chain's u64.
 function atomic(value: unknown): string {
   const amount = text(value, ATOMIC);
@@ -100,8 +106,8 @@ function entry(value: unknown): UptoJournalEntry {
   return {
     requestDigest: text(value.requestDigest, DIGEST),
     channelId: channelId === null ? null : text(channelId, IDENTIFIER),
-    payTo: text(value.payTo, IDENTIFIER),
-    feePayer: text(value.feePayer, IDENTIFIER),
+    payTo: address(value.payTo),
+    feePayer: address(value.feePayer),
     maxAtomic: atomic(value.maxAtomic),
     expiresAt: Number(expiresAt),
     state,

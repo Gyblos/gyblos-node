@@ -55,6 +55,7 @@ export interface UptoPaymentClientOptions {
 }
 
 const ATOMIC = /^(0|[1-9][0-9]{0,19})$/;
+const DISTINCT_PARTIES = 4;
 // The chain's u64 ceiling for any atomic amount.
 const U64_MAX = BigInt(PUBLIC_RECORD_LIMITS.maxAtomic);
 // A canonical atomic amount that fits the chain's u64.
@@ -76,8 +77,10 @@ function trusted(
     terms.network === policy.network &&
     terms.mint === policy.mint &&
     [terms.payTo, terms.feePayer, terms.authorizer].every(isAddress) &&
-    // The fee payer signs and pays the open; the buyer must never be it.
-    terms.feePayer !== payer &&
+    // Payout, fee payer, buyer and fee treasury are four different accounts: the fee payer signs and
+    // pays the open, and the receipt check tells each party's payment apart by its owner.
+    new Set([terms.payTo, terms.feePayer, payer, policy.treasury]).size ===
+      DISTINCT_PARTIES &&
     terms.protocolFeeBps === policy.protocolFeeBps &&
     terms.treasury === policy.treasury &&
     terms.buyer === payer &&
@@ -254,21 +257,22 @@ export function createUptoPaymentClient(
   };
 }
 
-// The settlement view over the chain: what the claim transaction itself paid this buyer, the seller
-// and the network's fee treasury.
+// The settlement view over the chain: what the claim transaction itself paid this buyer (the signer),
+// the seller and the policy's fee treasury; built from the client's own policy and signer.
 export function uptoSettlementView(
   rpc: UptoTransactionRpc,
-  parties: { mint: string; treasury: string; payer: string },
+  policy: Pick<UptoBuyerPolicy, 'mint' | 'treasury'>,
+  payer: TransactionSigner,
 ): UptoSettlementView {
   const reader = createUptoReceiptReader(rpc);
   return (settlement, channel) =>
     reader.settlement({
       transaction: settlement.transaction,
       channelId: channel.channelId,
-      mint: parties.mint,
+      mint: policy.mint,
       maxAtomic: channel.maxAtomic,
-      payer: parties.payer,
+      payer: payer.address,
       payTo: channel.payTo,
-      treasury: parties.treasury,
+      treasury: policy.treasury,
     });
 }
