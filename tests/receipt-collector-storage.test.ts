@@ -4,6 +4,7 @@ import test from 'node:test';
 
 import {
   RECEIPT_COLLECTOR_CODES as CODES,
+  RECEIPT_COLLECTOR_LIMITS,
   RECEIPT_COLLECTOR_WRITES,
   RECEIPT_COLLECTOR_STATUSES as STATUSES,
 } from '@gyblos/core/constants';
@@ -123,4 +124,57 @@ void test('collector capacity refusal preserves duplicate acknowledgements at a 
     status: STATUSES.DUPLICATE,
   });
   assert.deepEqual([...memory.entries.values()][0]!.receipt, first.pair);
+});
+
+void test('collector keeps cancelled backend work in its bounded pool until it settles', async () => {
+  const { pair } = await collectorPair();
+  let release = () => {};
+  const pendingStore = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let announce = () => {};
+  const allEntered = new Promise<void>((resolve) => {
+    announce = resolve;
+  });
+  let calls = 0;
+  const store: PrivateReceiptStore = {
+    async insert() {
+      calls++;
+      if (calls > RECEIPT_COLLECTOR_LIMITS.active)
+        return RECEIPT_COLLECTOR_WRITES.IDENTICAL;
+      if (calls === RECEIPT_COLLECTOR_LIMITS.active) announce();
+      await pendingStore;
+      return RECEIPT_COLLECTOR_WRITES.IDENTICAL;
+    },
+  };
+  const controller = new AbortController();
+  const collector = createPrivateReceiptCollector(store);
+  const work = Array.from(
+    { length: RECEIPT_COLLECTOR_LIMITS.active },
+    (_, index) =>
+      collector.collect(
+        receiptBytes(pair),
+        index === 0 ? controller.signal : undefined,
+      ),
+  );
+  const settled = Promise.allSettled(work);
+  await allEntered;
+  controller.abort();
+  try {
+    await assert.rejects(collector.collect(receiptBytes(pair)), {
+      code: CODES.BUSY,
+    });
+  } finally {
+    release();
+    await settled;
+  }
+  const results = await settled;
+  const cancelled = results[0];
+  assert.equal(cancelled?.status, 'rejected');
+  if (cancelled?.status === 'rejected')
+    assert.equal(cancelled.reason.code, CODES.CANCELLED);
+  assert.ok(results.slice(1).every((result) => result.status === 'fulfilled'));
+  assert.deepEqual(await collector.collect(receiptBytes(pair)), {
+    status: STATUSES.DUPLICATE,
+  });
 });

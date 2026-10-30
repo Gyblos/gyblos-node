@@ -196,3 +196,6 @@ export const RECEIPT_COLLECTOR_STATUSES = {
 } as const;
 export type ReceiptCollectorStatus =
   (typeof RECEIPT_COLLECTOR_STATUSES)[keyof typeof RECEIPT_COLLECTOR_STATUSES];
+
+// Hex radix for the private pair fingerprint, not a wire/signing domain.
+export const RECEIPT_COLLECTOR_FINGERPRINT_RADIX = 16;

@@ -8,7 +8,11 @@ import {
 import { ControlError } from '@gyblos/protocol/control-validation';
 import { verifyReceipt, type ReceiptV1 } from '@gyblos/protocol/receipt';
 
-import { RECEIPT_COLLECTOR_CODES, RECEIPT_COLLECTOR_LIMITS } from './constants';
+import {
+  RECEIPT_COLLECTOR_CODES,
+  RECEIPT_COLLECTOR_FINGERPRINT_RADIX,
+  RECEIPT_COLLECTOR_LIMITS,
+} from './constants';
 import {
   collectorFail,
   ReceiptCollectorError,
@@ -91,7 +95,7 @@ export async function prepareCollectedReceipt(
       ),
     );
     const fingerprint = Array.from(digest, (byte) =>
-      byte.toString(16).padStart(2, '0'),
+      byte.toString(RECEIPT_COLLECTOR_FINGERPRINT_RADIX).padStart(2, '0'),
     ).join('');
     return { key, fingerprint, receipt: confirmed };
   } catch (error) {
