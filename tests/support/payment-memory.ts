@@ -149,6 +149,7 @@ function createServer(
   own: PaymentDescription,
   upstream: () => void,
   depositSent: () => void,
+  lapseClaims = false,
 ): PaymentServer {
   const channels = new Map<string, Channel>();
   return {
@@ -204,6 +205,8 @@ function createServer(
       const ceiling = BigInt(channel.maxAtomic);
       if (!ATOMIC.test(chargedAtomic) || BigInt(chargedAtomic) > ceiling)
         fail(PAYMENT_ERROR_CODES.INVALID_CHARGE);
+      // A claim refused for good charges nothing; the payer recovers the deposit on its own.
+      if (lapseClaims) return fail(PAYMENT_ERROR_CODES.SETTLEMENT_LAPSED);
       const charged = BigInt(chargedAtomic);
       const seller = shareOf(channel, own.payTo, charged);
       const fee = shareOf(channel, own.treasury, charged);
@@ -250,7 +253,13 @@ export const memoryPaymentHarness: PaymentHarness = {
     const requestDigest = sha256('contract request');
     return {
       client,
-      server: createServer(ledger, own, upstream, depositSent),
+      server: createServer(
+        ledger,
+        own,
+        upstream,
+        depositSent,
+        options.lapseClaims,
+      ),
       serverWith: async (field) =>
         createServer(
           ledger,

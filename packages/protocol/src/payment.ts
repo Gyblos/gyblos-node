@@ -1,7 +1,8 @@
 // Owns the SDK-independent payment ports (PaymentClient for buyers, PaymentServer for sellers) and
 // their uniform failure. Amounts are decimal atomic strings, as on the v2 wire. No SDK, chain or transport.
 //
-// Money rules every implementation keeps (tests/support/payment-contract.ts):
+// Money rules every implementation keeps (tests/support/payment-contract.ts; a fee change while a
+// channel is open is covered per adapter, since the contract keeps one configuration):
 // 1. authorize rejects untrusted terms before writing the journal or signing anything, and the
 //    signature binds every field of the terms, so no other seller or request can use it;
 // 2. the journal entry is written before the only signature for a requestDigest, never re-signed,

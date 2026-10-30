@@ -97,7 +97,7 @@ void test('a claim the chain refuses for good lapses, distinct from a retryable 
   const { ledger, recent, description, terms, authorization } = await setup();
   const server = seller(ledger, description, recent.recentSlot, {
     failUpstream: false,
-    refuseClaim: true,
+    lapseClaims: true,
   });
   const admission = await server.admit(authorization, terms);
   for (let attempt = 0; attempt < 2; attempt++)
@@ -126,44 +126,48 @@ void test('an unavailable ledger is reported as unavailable on admit and settle'
     { failUpstream: false },
     store,
   );
+  broken = true;
+  await assert.rejects(
+    server.admit(authorization, terms),
+    failsWith(PAYMENT_ERROR_CODES.UNAVAILABLE),
+  );
+  broken = false;
   const admission = await server.admit(authorization, terms);
   broken = true;
   await assert.rejects(
     server.settle(admission, '5'),
     failsWith(PAYMENT_ERROR_CODES.UNAVAILABLE),
   );
-  await assert.rejects(
-    server.admit({ ...authorization, channelId: await newAddress() }, terms),
-    failsWith(PAYMENT_ERROR_CODES.AUTHORIZATION_MISMATCH),
-  );
 });
 
 void test('a malformed network is refused rather than normalised', async () => {
   const { description } = await setup();
   for (const network of ['solana', 'solana:a:b', ':x'])
-    assert.throws(() =>
-      createUptoPaymentServer({
-        description: { ...description, network },
-        settings: SETTINGS,
-        seller: createUptoSeller({
-          chain: {
-            verify: async () => false,
-            deposit: async () => ({ transaction: '' }),
-            depositState: async () => 'never',
-            claim: async () => ({ transaction: '' }),
-          },
-          store: memoryUptoStore(),
-          now: () => START_MS,
-          own: {
-            network: 'solana:x',
-            asset: '',
-            payTo: '',
-            feePayer: '',
-            authorizer: '',
-            tokenProgram: '',
-            withdrawDelaySeconds: 1,
-          },
+    assert.throws(
+      () =>
+        createUptoPaymentServer({
+          description: { ...description, network },
+          settings: SETTINGS,
+          seller: createUptoSeller({
+            chain: {
+              verify: async () => false,
+              deposit: async () => ({ transaction: '' }),
+              depositState: async () => 'never',
+              claim: async () => ({ transaction: '' }),
+            },
+            store: memoryUptoStore(),
+            now: () => START_MS,
+            own: {
+              network: 'solana:x',
+              asset: '',
+              payTo: '',
+              feePayer: '',
+              authorizer: '',
+              tokenProgram: '',
+              withdrawDelaySeconds: 1,
+            },
+          }),
         }),
-      }),
+      failsWith(PAYMENT_ERROR_CODES.UNTRUSTED_TERMS),
     );
 });

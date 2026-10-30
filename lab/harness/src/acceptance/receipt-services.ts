@@ -1,4 +1,4 @@
-// Strict in-process HTTP routing: only the owned index and fake provider can receive startup fetches.
+// Routes startup fetches only to the owned index, fake provider and exact local read-only registry.
 import { fetchSellers } from '@gyblos/discovery-http';
 
 import { ACCEPTANCE } from './constants';
@@ -7,7 +7,12 @@ import { RECEIPT_ACCEPTANCE } from './receipt-constants';
 import { receiptNativeBinding } from './receipt-native';
 import { createReceiptProvider } from './receipt-provider';
 
-export function createReceiptServices(nodeId: string, signal: AbortSignal) {
+export function createReceiptServices(
+  nodeId: string,
+  signal: AbortSignal,
+  registryUrl: string,
+) {
+  const localFetch = globalThis.fetch;
   const provider = createReceiptProvider();
   const binding = receiptNativeBinding(provider);
   const index = createAcceptanceIndex(Date.now, nodeId);
@@ -27,6 +32,8 @@ export function createReceiptServices(nodeId: string, signal: AbortSignal) {
         ...(request.method === 'GET' ? {} : { body: await request.text() }),
       });
     }
+    if (request.url === registryUrl + '/' && request.method === 'POST')
+      return localFetch(request);
     externalCalls++;
     throw new Error('Forbidden external I/O');
   };

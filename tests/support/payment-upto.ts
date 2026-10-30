@@ -70,9 +70,10 @@ export function seller(
   ledger: UptoLedger,
   description: PaymentDescription,
   slot: string,
-  options: Pick<PaymentRigOptions, 'failUpstream' | 'onDepositSent'> & {
-    refuseClaim?: boolean;
-  },
+  options: Pick<
+    PaymentRigOptions,
+    'failUpstream' | 'onDepositSent' | 'lapseClaims'
+  >,
   store: UptoStore = memoryUptoStore(),
 ) {
   const chain = ledgerChain(

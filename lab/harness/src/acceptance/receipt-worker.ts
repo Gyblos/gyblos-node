@@ -9,6 +9,7 @@ import {
   type ReceiptAcceptanceCase,
   type ReceiptAcceptanceReport,
 } from './receipt-constants';
+import { receiptIdentityPhases } from './receipt-identity';
 import {
   cancelledAnswer,
   configuredCap,
@@ -44,6 +45,10 @@ export async function receiptScenario(
     confirmed = await confirmedAnswer(run, false, signal);
     answers++;
     cases.push(RECEIPT_ACCEPTANCE_CASES.RESTART);
+    const identity = await receiptIdentityPhases(run, signal);
+    answers += identity.answers;
+    confirmed = identity.confirmed;
+    cases.push(...identity.cases);
     await missingReceipt(run, signal);
     answers++;
     cases.push(RECEIPT_ACCEPTANCE_CASES.RECEIPT_FAILURE);
@@ -57,10 +62,12 @@ export async function receiptScenario(
     await run.close();
     await receiptRetention(run.environment, stored.at(-1)!);
     cases.push(RECEIPT_ACCEPTANCE_CASES.PRIVACY);
-    await receiptTelemetry(run.environment, answers);
+    await receiptTelemetry(run.environment, answers, identity.refusals);
     cases.push(RECEIPT_ACCEPTANCE_CASES.TELEMETRY);
     acceptanceAssert(
       run.externalCalls() === 0 &&
+        run.registry.counts().reads > 0 &&
+        run.registry.counts().forbidden === 0 &&
         run.discoveryReads() >= answers &&
         run.binding.protocols().every((alpns) => !alpns.includes(GYBLOS_ALPN)),
     );
@@ -69,6 +76,10 @@ export async function receiptScenario(
       ok: true,
       nativeIroh: true,
       paymentsEnabled: false,
+      identityEnabled: true,
+      registryReads: run.registry.counts().reads,
+      forbiddenRpcMethods: run.registry.counts().forbidden,
+      identityRefusals: identity.refusals,
       index: ACCEPTANCE_INDEX,
       cases,
       answers,

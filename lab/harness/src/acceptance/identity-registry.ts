@@ -150,7 +150,18 @@ export async function createAcceptanceRegistry(signal: AbortSignal) {
         claims.push(claim);
       },
       revoke(nodeId: string) {
+        const removed = claims.filter((claim) => claim.nodeId === nodeId);
         claims = claims.filter((claim) => claim.nodeId !== nodeId);
+        // Replay the original signed accounts; signing again creates a different asset/binding.
+        return () => {
+          assertAcceptanceActive(signal);
+          const kept = claims.filter((claim) => claim.nodeId !== nodeId);
+          acceptanceAssert(
+            !closing &&
+              kept.length + removed.length <= REGISTRY_FIXTURE.maxBindings,
+          );
+          claims = [...kept, ...removed];
+        };
       },
       rollback(nodeId: string, sequence: bigint) {
         claims = claims.filter(

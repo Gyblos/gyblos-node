@@ -65,9 +65,10 @@ See [recovery.md](recovery.md) for how recovery works.
 
 ## Inference and verification
 
-- Signed usage receipts are defined but not yet emitted. Token recounts
-  **detect** an overcharge within the ceiling after settlement; they do not
-  prevent, refund or penalize it.
+- Free-inference usage receipts are signed, exchanged and privately stored.
+  Signatures attest to each party’s observation, not independently truthful
+  usage. Token recounts **detect** an overcharge within the ceiling after
+  settlement; they do not prevent, refund or penalize it.
 - Model pins check local artifacts only. The buyer cannot verify the remote
   seller's model or the correctness of an answer.
 - Paid v1 responses remain buffered, without first-word latency measurement.
@@ -160,4 +161,5 @@ starts. An engine ignoring abort holds the single check slot and keeps
 availability closed until it settles; no queued retry can accumulate. Shutdown
 invalidates snapshots without waiting for an uncooperative engine. Timing is
 locally tested, not a production load/cancellation guarantee. The legacy paid
-offer retains its original expiry, and no free/paid v2 execution is enabled.
+offer retains its original expiry, and free execution has separate startup
+acceptance. Paid v2 execution is not enabled.

@@ -1,11 +1,18 @@
 // Composes the actual node lifecycle and free buyer startup; every host belongs to this isolated child.
 import { setTimeout as delay } from 'node:timers/promises';
 
+import { address } from '@solana/kit';
+
 import { startFreeBuyer } from '@gyblos/buyer/free-startup';
 import { createNode } from '@gyblos/node';
 import { FREE_EXECUTION, RECEIPT_CHANNEL } from '@gyblos/protocol/constants';
 
 import { acceptanceAssert, assertAcceptanceActive } from './errors';
+import { IDENTITY_ACCEPTANCE } from './identity-constants';
+import {
+  createAcceptanceRegistry,
+  type AcceptanceRegistry,
+} from './identity-registry';
 import {
   receiptRoles,
   writeReceiptBuyerConfig,
@@ -37,6 +44,7 @@ interface ReceiptHosts {
 async function closeReceiptHosts(
   hosts: ReceiptHosts,
   services: ReceiptServices,
+  registry: AcceptanceRegistry,
 ) {
   try {
     await hosts.buyer?.close();
@@ -47,13 +55,22 @@ async function closeReceiptHosts(
       hosts.seller = undefined;
     } finally {
       services.provider.release();
-      await services.binding.close();
+      try {
+        await services.binding.close();
+      } finally {
+        await registry.close();
+      }
     }
   }
 }
 export async function startReceiptScenario(signal: AbortSignal) {
   const { root, sellerRole } = await receiptRoles();
-  const services = createReceiptServices(sellerRole.nodeId, signal);
+  const registry = await createAcceptanceRegistry(signal);
+  const services = createReceiptServices(
+    sellerRole.nodeId,
+    signal,
+    registry.url,
+  );
   const hosts: ReceiptHosts = {};
   const start = async (cap: number = RECEIPT_ACCEPTANCE.buyerCap) => {
     await writeReceiptSellerConfig(cap);
@@ -64,19 +81,32 @@ export async function startReceiptScenario(signal: AbortSignal) {
       signal,
     );
   };
-  const close = () => closeReceiptHosts(hosts, services);
-  try {
-    await start();
-    const catalog = (await services.listed()).sellers[0]!.catalog;
+  const subject = () => ({
+    nodeId: sellerRole.nodeId,
+    owner: address(sellerRole.owner),
+    nodeSigner: services.binding.nodeSigner,
+  });
+  const restartBuyer = async (manualTrust = false) => {
+    await hosts.buyer?.close();
+    hosts.buyer = undefined;
     await writeReceiptBuyerConfig(
       sellerRole.owner,
       sellerRole.nodeId,
       services.binding.directAddresses(),
+      registry.url,
+      manualTrust,
     );
     hosts.buyer = await startFreeBuyer({
       bind: services.binding.bind,
       port: 0,
     });
+  };
+  const close = () => closeReceiptHosts(hosts, services, registry);
+  try {
+    await start();
+    const catalog = (await services.listed()).sellers[0]!.catalog;
+    await registry.bind(subject(), IDENTITY_ACCEPTANCE.initialSequence);
+    await restartBuyer();
     acceptanceAssert(
       services.provider.calls() === 0 &&
         services.binding.protocols()[0]!.includes(RECEIPT_CHANNEL.alpn) &&
@@ -84,6 +114,9 @@ export async function startReceiptScenario(signal: AbortSignal) {
     );
     return {
       ...services,
+      registry,
+      subject,
+      restartBuyer,
       environment: { GYBLOS_HOME: root },
       initialSequence: catalog.sequence,
       buyer: () => {
@@ -96,15 +129,7 @@ export async function startReceiptScenario(signal: AbortSignal) {
         await hosts.seller!.stop();
         hosts.seller = undefined;
         await start(cap);
-        await writeReceiptBuyerConfig(
-          sellerRole.owner,
-          sellerRole.nodeId,
-          services.binding.directAddresses(),
-        );
-        hosts.buyer = await startFreeBuyer({
-          bind: services.binding.bind,
-          port: 0,
-        });
+        await restartBuyer();
       },
       close,
     };
