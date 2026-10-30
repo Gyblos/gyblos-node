@@ -134,6 +134,25 @@ export function paymentSettlementContract(
       assert.equal(count(rig, PAYMENT_EVENTS.SETTLE), 1);
     }));
 
+  void test(`${name}: a claim the chain refuses for good lapses: nothing charged, never retried`, async () =>
+    withRig(
+      harness,
+      async (rig) => {
+        const { admission } = await admitted(rig);
+        const before = rig.observe().balances;
+        for (let attempt = 0; attempt < 2; attempt++)
+          await rejectsWith(
+            rig.server.settle(admission, String(CONTRACT_PARTIAL)),
+            PAYMENT_ERROR_CODES.SETTLEMENT_LAPSED,
+          );
+        const after = rig.observe().balances;
+        assert.equal(after.payee, before.payee);
+        assert.equal(after.treasury, before.treasury);
+        assert.equal(count(rig, PAYMENT_EVENTS.SETTLE), 0);
+      },
+      { lapseClaims: true },
+    ));
+
   void test(`${name}: a repeated settlement returns the first and never charges twice`, async () =>
     withRig(harness, async (rig) => {
       const { admission } = await admitted(rig);

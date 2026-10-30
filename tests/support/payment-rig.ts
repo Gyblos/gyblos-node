@@ -80,6 +80,8 @@ export interface PaymentRigOptions {
   // Called right after the deposit transaction is submitted (before confirmation); the contract
   // aborts the caller's signal here.
   onDepositSent?: () => void;
+  // The chain refuses every claim for good, as for an expired payer authorization.
+  lapseClaims?: boolean;
 }
 
 export interface PaymentHarness {

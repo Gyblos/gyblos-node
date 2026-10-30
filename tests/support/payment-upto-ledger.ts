@@ -51,7 +51,7 @@ export function ledgerChain(
     failUpstream: boolean;
     onDepositSent?: () => void;
     // The chain refuses every claim for good, as for an expired payer authorization.
-    refuseClaim?: boolean;
+    lapseClaims?: boolean;
   },
 ): UptoChain {
   const claimed = new Map<
@@ -79,7 +79,7 @@ export function ledgerChain(
         : UPTO_DEPOSIT_STATES.NEVER;
     },
     async claim(record, chargedAtomic) {
-      if (options.refuseClaim)
+      if (options.lapseClaims)
         throw new UptoError(UPTO_ERROR_CODES.FACILITATOR_REJECTED);
       const previous = claimed.get(record.channelId);
       if (previous) return { transaction: previous.transaction };
