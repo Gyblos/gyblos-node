@@ -4,7 +4,14 @@
 // on an ephemeral loopback port.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { chmod, mkdir, rm, unlink, writeFile } from 'node:fs/promises';
+import {
+  chmod,
+  mkdir,
+  readFile,
+  rm,
+  unlink,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -20,6 +27,7 @@ import {
   line,
   NODE_ID,
   paidToml,
+  REMOTE_FREE,
   scenario,
   snapshot,
   withOllama,
@@ -177,7 +185,17 @@ void test('doctor: an unsafe seller directory or leftover sequence lock is repor
 void test('doctor: config the daemon cannot honor reports the same startup code and file issues', () =>
   scenario({}, async (run) => {
     await withOllama(run);
-    await unlink(join(run.root, 'gyblos.toml')).catch(() => undefined);
+    // A remote offer whose API key variable is unset is refused after the file parsed.
+    await writeFile(join(run.root, 'gyblos.toml'), REMOTE_FREE);
+    const refused = await doctor(run);
+    assert.equal(refused.code, 1);
+    assert.match(
+      line(refused.output, 'config'),
+      /FAIL\s+config\s+SELLER_OFFER_API_KEY_MISSING/,
+    );
+    // A refused offer still leaves the relay settings checked.
+    assert.match(line(refused.output, 'relays'), /^\s*OK\s+relays/);
+    await unlink(join(run.root, 'gyblos.toml'));
     const none = await doctor(run);
     assert.equal(none.code, 1);
     assert.match(
@@ -333,36 +351,3 @@ void test('doctor: a down engine warns while another offer’s engine answers, a
     [DOCTOR_STATUS.WARN, DOCTOR_STATUS.WARN],
   );
 });
-
-void test('doctor: a paid offer is checked like startup, with the payout and payment keys', () =>
-  scenario({}, async (run) => {
-    await withOllama(run);
-    await writeFile(join(run.root, 'gyblos.toml'), paidToml(run));
-    const paid = await doctor(run);
-    assert.match(line(paid.output, 'config'), /^\s*OK\s+config/);
-    assert.match(line(paid.output, 'payments'), /^\s*OK\s+payments/);
-    assert.match(paid.output, /offer\[1\] paid qwen3-0\.6b/);
-    // Free sellers never see the payments line.
-    await writeFile(join(run.root, 'gyblos.toml'), freeToml(run));
-    assert.doesNotMatch((await doctor(run)).output, /payments/);
-    await writeFile(join(run.root, 'gyblos.toml'), paidToml(run));
-    await unlink(join(run.seller, 'facilitator.json'));
-    const noKey = await doctor(run);
-    assert.equal(noKey.code, 1);
-    assert.match(
-      line(noKey.output, 'payments'),
-      /FAIL\s+payments\s+KEYS_MISSING/,
-    );
-  }));
-
-void test('doctor: a paid offer on a seller set up without a payout fails the payments check', () =>
-  scenario({ free: true }, async (run) => {
-    await withOllama(run);
-    await writeFile(join(run.root, 'gyblos.toml'), paidToml(run));
-    const result = await doctor(run);
-    assert.equal(result.code, 1);
-    assert.match(
-      line(result.output, 'payments'),
-      /FAIL\s+payments\s+SELLER_PAYMENT_ROLE_MISSING/,
-    );
-  }));

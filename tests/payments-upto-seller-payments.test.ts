@@ -22,7 +22,7 @@ const SETTINGS = {
 
 const offline = {
   getAccountInfo: () => ({ send: async () => ({ value: null }) }),
-  getSignaturesForAddress: () => ({ send: async () => [] }),
+  getSignatureStatuses: () => ({ send: async () => ({ value: [] }) }),
   getSlot: () => ({ send: async () => 1n }),
 };
 

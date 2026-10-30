@@ -4,6 +4,7 @@ export {
   UPTO_CHANNEL_STATES,
   UPTO_DEPOSIT_STATES,
   UPTO_CHANNEL_ACCOUNT,
+  UPTO_COMMITMENT,
   UPTO_ERROR_CODES,
   type UptoChannelState,
   type UptoDepositState,

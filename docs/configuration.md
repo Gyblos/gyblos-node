@@ -312,10 +312,12 @@ Startup stops with a static code: `NODE_CONFIG_INVALID`,
 `SELLER_OFFER_MODEL_UNSUPPORTED`, `SELLER_OFFER_ENGINE_UNSUPPORTED`,
 `SELLER_OFFER_REASONING_UNSUPPORTED`, `SELLER_OFFER_API_KEY_MISSING`,
 `SELLER_OFFER_API_KEY_UNSAFE`, `SELLER_PAID_METERING_UNRECOUNTED`,
-`SELLER_PAYMENT_ROLE_MISSING` or `SELLER_PAYMENT_DESCRIPTION_INVALID` (the
-payment server charges another fee or treasury, uses another network or asset,
-or pays out to the owner or to its own fee payer or authorizer).
-`pnpm gyblos doctor` also names the `[[offers]]` entry a code is about.
+`SELLER_PAYMENT_ROLE_MISSING`, `SELLER_PAYMENT_NETWORK_MISMATCH` (the role's RPC
+is not devnet) or `SELLER_PAYMENT_DESCRIPTION_INVALID` (the payout is the owner,
+fee payer or authorizer key). A paid seller's fee payer key needs devnet SOL: it
+pays every channel transaction and fronts each buyer channel's rent until the
+channel is reclaimed. `pnpm gyblos doctor` also names the `[[offers]]` entry a
+code is about.
 
 `pnpm gyblos config validate --config "$GYBLOS_CONFIG"` explains file problems
 (it does not read `GYBLOS_CONFIG`, does not check the `SELLER_*` limits above,

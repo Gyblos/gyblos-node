@@ -1,14 +1,16 @@
-// The daemon's payment server on devnet: the seller role's payout, fee payer and authorizer, its RPC
-// and the network fee, over the durable upto ledger in the role's private payments directory. Paid
-// selling needs a role set up with a payout; a free-only role never reaches this module.
+// The daemon's devnet payment server from the seller role: its payout, fee payer and authorizer keys,
+// its RPC (checked to be devnet) and the network fee, over the ledger in the role's private payments
+// directory. Only paid offers reach this module; it never touches the role's other keys.
+import { createSolanaRpc } from '@solana/kit';
+
 import {
   CLEANUP,
   DEVNET,
+  DEVNET_GENESIS,
   PAYMENT_LIMITS,
   paymentPathsIn,
   PROTOCOL_FEE,
   TOKEN_PROGRAM_ADDRESS,
-  type HomeEnvironment,
 } from '@gyblos/config';
 import { openUptoSellerPayments } from '@gyblos/payments-upto';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
@@ -18,8 +20,14 @@ import { NodeError } from './errors';
 import { roleSigner, type RoleConfig } from './roles';
 import type { SellerPayments } from './seller-paid';
 
+// The chain the RPC serves; tests inject one so they never reach the network.
+type GenesisReader = (rpcUrl: string) => Promise<string>;
+const readGenesis: GenesisReader = async (rpcUrl) =>
+  String(await createSolanaRpc(rpcUrl).getGenesisHash().send());
+
+// Role keys are read from the process home (as every role file is), so the ledger lives there too.
 export function sellerChainPayments(
-  environment: HomeEnvironment = process.env,
+  genesis: GenesisReader = readGenesis,
 ): (role: RoleConfig) => Promise<SellerPayments> {
   return async (role) => {
     if (
@@ -29,6 +37,10 @@ export function sellerChainPayments(
       role.authorizer === undefined
     )
       throw new NodeError(NODE_ERROR_CODES.SELLER_PAYMENT_ROLE_MISSING);
+    // Devnet only: a role set up with another RPC must never spend its fee payer's real SOL.
+    const served = await genesis(role.rpcUrl).catch(() => undefined);
+    if (served !== DEVNET_GENESIS)
+      throw new NodeError(NODE_ERROR_CODES.SELLER_PAYMENT_NETWORK_MISMATCH);
     const payments = await openUptoSellerPayments({
       rpcUrl: role.rpcUrl,
       description: {
@@ -47,7 +59,7 @@ export function sellerChainPayments(
       },
       feePayer: await roleSigner(P2P_ROLES.SELLER, 'facilitator'),
       authorizer: await roleSigner(P2P_ROLES.SELLER, 'authorizer'),
-      paths: paymentPathsIn(environment, P2P_ROLES.SELLER),
+      paths: paymentPathsIn(process.env, P2P_ROLES.SELLER),
       cleanup: {
         intervalSecs: CLEANUP.intervalSeconds,
         abandonGraceSecs: CLEANUP.abandonGraceSeconds,

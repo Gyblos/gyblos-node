@@ -59,7 +59,9 @@ const HINTS: Readonly<Partial<Record<DoctorResultCode, string>>> = {
   [NODE_ERROR_CODES.SELLER_PAID_METERING_UNRECOUNTED]:
     'a paid offer needs a model recounted with its pinned public tokenizer (qwen3-0.6b)',
   [NODE_ERROR_CODES.SELLER_PAYMENT_ROLE_MISSING]:
-    'paid offers need a seller role set up with a payout: a new GYBLOS_HOME and `pnpm node:setup --role seller --mint <mint> --pay-to <payout> --buyer <address>`',
+    'paid offers need a seller role with a payout: in a new GYBLOS_HOME, `pnpm node:setup --role seller --mint <mint> --pay-to <payout> --buyer <any address you control>`; fund the fee payer with devnet SOL',
+  [NODE_ERROR_CODES.SELLER_PAYMENT_NETWORK_MISMATCH]:
+    'paid selling runs on devnet only; set the role up with a devnet RPC',
   [NODE_ERROR_CODES.SELLER_PAYMENT_DESCRIPTION_INVALID]:
     'the payout must differ from the owner, fee payer and authorizer keys',
   [NODE_ERROR_CODES.NODE_CONFIG_INVALID]:

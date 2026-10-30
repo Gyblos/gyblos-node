@@ -9,6 +9,7 @@ import {
   createUptoSdkChain,
   createUptoSeller,
   createUptoVerifier,
+  UPTO_COMMITMENT,
   uptoChannelRpc,
   type UptoKitRpc,
 } from 'x402-upto-metered';
@@ -38,7 +39,9 @@ export interface UptoSellerPaymentsOptions {
   now?: () => number;
   // Tests inject a double; production reads the chain at rpcUrl.
   rpc?: UptoKitRpc & {
-    getSlot(config: { commitment: 'confirmed' }): { send(): Promise<bigint> };
+    getSlot(config: { commitment: typeof UPTO_COMMITMENT }): {
+      send(): Promise<bigint>;
+    };
   };
 }
 
@@ -81,7 +84,7 @@ export async function openUptoSellerPayments(
       chain: createUptoSdkChain({
         facilitator,
         verify: createUptoVerifier(feePayer.address, () =>
-          rpc.getSlot({ commitment: 'confirmed' }).send(),
+          rpc.getSlot({ commitment: UPTO_COMMITMENT }).send(),
         ),
         authorizer: options.authorizer,
         store: ledger.chain,
@@ -94,14 +97,16 @@ export async function openUptoSellerPayments(
       now,
       own,
     });
+    const server = createUptoPaymentServer({ description, settings, seller });
+    // Last, so no failure above leaves its timer signing with the fee payer.
     const cleanup = facilitator.createRentCleanupManager(own.network);
     cleanup.start(options.cleanup);
     return {
-      server: createUptoPaymentServer({ description, settings, seller }),
+      server,
       async recover() {
         await seller.recover();
       },
-      // Rent cleanup first: it may still write through the facilitator's store.
+      // Rent cleanup first: a pass in flight still submits through the facilitator.
       async close() {
         await cleanup.stop();
         await ledger.close();

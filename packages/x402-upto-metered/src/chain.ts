@@ -12,7 +12,12 @@ import { UptoSvmScheme as UptoFacilitatorScheme } from '@x402/svm/upto/facilitat
 import { UptoSvmScheme as UptoServerScheme } from '@x402/svm/upto/server';
 
 import { decodeUptoPayload } from './authorization';
-import { UPTO, UPTO_DEPOSIT_STATES, UPTO_ERROR_CODES } from './constants';
+import {
+  UPTO,
+  UPTO_CHANNEL_ACCOUNT,
+  UPTO_DEPOSIT_STATES,
+  UPTO_ERROR_CODES,
+} from './constants';
 import { UptoError } from './errors';
 import { uptoRequirements } from './requirements';
 import { durablePendingStore } from './store';
@@ -48,11 +53,12 @@ export interface UptoSdkChainOptions {
   store: UptoChainStore;
   // Whether the channel account exists on chain (the deposit landed).
   channelExists(channelId: string): Promise<boolean>;
-  // If this channel is sealed on chain: the sealing transaction and the cumulative amount it
-  // settled (the channel's settled watermark). A seal by the payer's close or rent cleanup
-  // settles another amount (usually 0) and must report it, so it is never taken for our claim.
+  // Whether one of our claim attempts for this charge landed (that transaction), or the channel was
+  // sealed for another amount (by the payer's close or rent cleanup), which a claim can never
+  // change. Undefined when neither is known.
   settledClaim(
     channelId: string,
+    claim: { chargedAtomic: string; attempts: readonly string[] },
   ): Promise<{ transaction: string; chargedAtomic: string } | undefined>;
   now: () => number;
   // How long after sending an open it can still land (its blockhash validity), in ms.
@@ -110,8 +116,9 @@ async function sealedFor(
   settledClaim: UptoSdkChainOptions['settledClaim'],
   channelId: string,
   chargedAtomic: string,
+  attempts: readonly string[],
 ): Promise<string | undefined> {
-  const sealed = await settledClaim(channelId);
+  const sealed = await settledClaim(channelId, { chargedAtomic, attempts });
   if (!sealed) return undefined;
   return sealed.chargedAtomic === chargedAtomic
     ? sealed.transaction
@@ -143,8 +150,24 @@ async function deposited(
   return rejected();
 }
 
+// Remembers a claim transaction that was sent but not confirmed, so a later attempt can find it.
+async function remember(
+  store: UptoChainStore,
+  channelId: string,
+  chargedAtomic: string,
+  signature: string,
+): Promise<readonly string[]> {
+  const previous = await store.getClaim(channelId);
+  const attempts = [
+    ...(previous?.attempts ?? []).filter((sent) => sent !== signature),
+    signature,
+  ].slice(-UPTO_CHANNEL_ACCOUNT.maxClaimAttempts);
+  await store.putClaim({ ...previous, channelId, chargedAtomic, attempts });
+  return attempts;
+}
+
 async function claimed(
-  { facilitator, settledClaim }: UptoSdkChainOptions,
+  { facilitator, settledClaim, store }: UptoSdkChainOptions,
   server: UptoServerScheme,
   record: UptoChannelRecord,
   chargedAtomic: string,
@@ -166,7 +189,20 @@ async function claimed(
     facilitator.settle(payload, requirements),
   );
   if (response.success && response.transaction) return response.transaction;
-  const sealed = await sealedFor(settledClaim, record.channelId, chargedAtomic);
+  const attempts = response.transaction
+    ? await remember(
+        store,
+        record.channelId,
+        chargedAtomic,
+        response.transaction,
+      )
+    : ((await store.getClaim(record.channelId))?.attempts ?? []);
+  const sealed = await sealedFor(
+    settledClaim,
+    record.channelId,
+    chargedAtomic,
+    attempts,
+  );
   if (sealed) return sealed;
   return CLAIM_LAPSED.has(response.errorReason ?? '')
     ? rejected()
@@ -209,6 +245,7 @@ export function createUptoSdkChain(options: UptoSdkChainOptions): UptoChain {
               options.settledClaim,
               record.channelId,
               chargedAtomic,
+              previous.attempts ?? [],
             )
           : undefined);
       if (known) {
@@ -224,6 +261,7 @@ export function createUptoSdkChain(options: UptoSdkChainOptions): UptoChain {
         await store.putClaim({ channelId: record.channelId, chargedAtomic });
       const transaction = await claimed(options, server, record, chargedAtomic);
       await store.putClaim({
+        ...(await store.getClaim(record.channelId)),
         channelId: record.channelId,
         chargedAtomic,
         transaction,

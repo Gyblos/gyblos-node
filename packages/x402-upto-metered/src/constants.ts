@@ -52,6 +52,8 @@ export type UptoDepositState =
 // The payment-channels program's channel account, as the SDK decodes it.
 export const UPTO_CHANNEL_ACCOUNT = {
   statuses: { OPEN: 0, SEALED: 1, CLOSING: 2, DISTRIBUTED: 3 },
-  // Signatures read to find the sealing transaction; a channel lives through a handful.
-  signatureLimit: 50,
+  // Claim attempts remembered per channel; the SDK re-awaits a pending one before sending again.
+  maxClaimAttempts: 16,
 } as const;
+// Commitment for every chain read the seller makes.
+export const UPTO_COMMITMENT = 'confirmed' as const;

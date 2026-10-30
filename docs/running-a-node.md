@@ -119,8 +119,10 @@ node key (`node.key`) and the role's Solana keys with private permissions. It
 never overwrites existing keys; a mismatched existing role stops with an error.
 A seller needs only `--mint`: it gets an owner key and a node key. The paid
 seller keys (authorizer and facilitator) and fields (`payTo`, allowed `buyer`)
-are created only when `--buyer` and `--pay-to` are given together; paid selling
-is off, so free sellers leave both out.
+are created only when `--buyer` and `--pay-to` are given together. A seller with
+a paid `[[offers]]` entry needs them: paid v2 selling uses the payout and both
+keys, and `--buyer` can be any address you control (v2 does not use it). Free
+sellers leave both out.
 
 | File                                             | Role   | Contents                                                                                                               |
 | ------------------------------------------------ | ------ | ---------------------------------------------------------------------------------------------------------------------- |
@@ -188,8 +190,9 @@ pnpm node:start
 
 Free inference uses `pnpm buyer:free`
 ([Free v2 buyer endpoint](#free-v2-buyer-endpoint)). The paid v1 flow below
-needs a paid seller's `offer.json`; the seller daemon no longer writes one while
-paid selling is off, so today it runs only against the lab gates (`gate:*`).
+needs a paid seller's `offer.json`; the seller daemon never writes one (paid v2
+uses its own stream and has no buyer yet), so the v1 flow runs only against the
+lab gates (`gate:*`).
 
 ```sh
 export GYBLOS_RELAY_TOKEN=...
@@ -417,9 +420,9 @@ action, described in [discovery-index.md](discovery-index.md).
 
 A supported `gyblos.toml` free offer starts control plus the separate
 `gyblos/free/3` complete-response and `gyblos/free-stream/3` streaming data
-channels. The daemon has no paid HTTP service, facilitator, payment program
-check or v1 offer: paid selling is off until phase 2. This is execution for the
-pinned engine's single user message and `off` reasoning; other engine input
+channels. The daemon has no paid HTTP service or v1 offer; paid v2 offers use
+the separate paid stream described in the protocol spec. This is execution for
+the pinned engine's single user message and `off` reasoning; other engine input
 forms are not enabled. The separate `buyer:free` entry executes free quotes;
 obtaining a control quote alone still does not send a prompt.
 

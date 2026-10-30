@@ -1,6 +1,6 @@
-// Reads upto channel accounts through a minimal RPC: existence, and the sealed amount with the sealing
-// transaction. Accounts are synthetic bytes in the program's layout at their canonical address, decoded
-// by the SDK's own decoder, so a layout mismatch fails here. No network.
+// Reads upto channels through a minimal RPC: whether the seller's own channel exists, and whether a
+// recorded claim attempt landed or the channel was sealed for another amount. Accounts are synthetic
+// bytes in the program's layout at their canonical address, decoded by the SDK. No network.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -9,6 +9,7 @@ import {
   generateKeyPairSigner,
   getAddressEncoder,
   getArrayEncoder,
+  getBase58Decoder,
   getBase64Decoder,
   getI64Encoder,
   getProgramDerivedAddress,
@@ -112,48 +113,86 @@ async function channel(status: number, settled: bigint) {
 
 function rpc(
   accounts: Map<string, { owner: string; data: [string, 'base64'] }>,
-  signatures: { signature: string; failed: boolean }[] = [],
+  landed: readonly string[] = [],
 ): UptoChannelRpc {
   return {
     getAccountInfo: async (channelId) => accounts.get(channelId) ?? null,
-    getSignatures: async () => signatures,
+    signaturesSucceeded: async (signatures) =>
+      signatures.map((signature) => landed.includes(signature)),
   };
 }
 
-void test('a channel exists exactly when its account does', async () => {
+const SYSTEM_PROGRAM = '11111111111111111111111111111111';
+
+void test('only a channel of this seller exists; a plain account at the address does not', async () => {
   const open = await channel(UPTO_CHANNEL_ACCOUNT.statuses.OPEN, 0n);
   const readers = createUptoChannelReaders(
-    rpc(new Map([[open.channelId, open.account]])),
+    rpc(
+      new Map([
+        [open.channelId, open.account],
+        // A lamport transfer leaves a system-owned, empty account.
+        [open.rentPayer, { owner: SYSTEM_PROGRAM, data: ['', 'base64'] }],
+      ]),
+    ),
     { network: NETWORK, rentPayer: open.rentPayer },
   );
   assert.equal(await readers.channelExists(open.channelId), true);
-  assert.equal(await readers.channelExists(await newAddress()), false);
+  assert.equal(await readers.channelExists(open.rentPayer), false);
+  assert.equal(await readers.channelExists(String(await newAddress())), false);
+  const foreign = createUptoChannelReaders(
+    rpc(new Map([[open.channelId, open.account]])),
+    { network: NETWORK, rentPayer: await newAddress() },
+  );
+  assert.equal(await foreign.channelExists(open.channelId), false);
 });
 
-void test('a sealed or distributed channel reports its settled amount and sealing transaction', async () => {
-  for (const status of [
-    UPTO_CHANNEL_ACCOUNT.statuses.SEALED,
-    UPTO_CHANNEL_ACCOUNT.statuses.DISTRIBUTED,
+void test('a recorded claim attempt that landed is the claim, even after the channel was closed', async () => {
+  const sealed = await channel(UPTO_CHANNEL_ACCOUNT.statuses.DISTRIBUTED, 250n);
+  const claim = { chargedAtomic: '250', attempts: ['first', 'second'] };
+  for (const accounts of [
+    new Map([[sealed.channelId, sealed.account]]),
+    // Rent cleanup reclaimed the account; the transaction stays on record.
+    new Map(),
   ]) {
-    const sealed = await channel(status, 250n);
-    // Newest first, as the chain returns them: distribute, seal, a failed claim, open.
-    const readers = createUptoChannelReaders(
-      rpc(new Map([[sealed.channelId, sealed.account]]), [
-        { signature: 'distribute', failed: false },
-        { signature: 'seal', failed: false },
-        { signature: 'failed-claim', failed: true },
-        { signature: 'open', failed: false },
-      ]),
-      { network: NETWORK, rentPayer: sealed.rentPayer },
-    );
-    assert.deepEqual(await readers.settledClaim(sealed.channelId), {
-      transaction: 'seal',
+    const readers = createUptoChannelReaders(rpc(accounts, ['second']), {
+      network: NETWORK,
+      rentPayer: sealed.rentPayer,
+    });
+    assert.deepEqual(await readers.settledClaim(sealed.channelId, claim), {
+      transaction: 'second',
       chargedAtomic: '250',
     });
   }
 });
 
-void test('an open, closing, missing, foreign or non-canonical channel is not sealed by a claim', async () => {
+void test('a channel sealed for another amount refuses the claim; for ours, without a known transaction, it is unknown', async () => {
+  for (const status of [
+    UPTO_CHANNEL_ACCOUNT.statuses.SEALED,
+    UPTO_CHANNEL_ACCOUNT.statuses.DISTRIBUTED,
+  ]) {
+    const sealed = await channel(status, 0n);
+    const readers = createUptoChannelReaders(
+      rpc(new Map([[sealed.channelId, sealed.account]])),
+      { network: NETWORK, rentPayer: sealed.rentPayer },
+    );
+    assert.deepEqual(
+      await readers.settledClaim(sealed.channelId, {
+        chargedAtomic: '250',
+        attempts: ['lost'],
+      }),
+      { transaction: '', chargedAtomic: '0' },
+    );
+    assert.equal(
+      await readers.settledClaim(sealed.channelId, {
+        chargedAtomic: '0',
+        attempts: [],
+      }),
+      undefined,
+    );
+  }
+});
+
+void test('an open, closing, missing or foreign channel is not settled', async () => {
   const open = await channel(UPTO_CHANNEL_ACCOUNT.statuses.OPEN, 0n);
   const closing = await channel(UPTO_CHANNEL_ACCOUNT.statuses.CLOSING, 0n);
   const sealed = await channel(UPTO_CHANNEL_ACCOUNT.statuses.SEALED, 5n);
@@ -168,6 +207,7 @@ void test('an open, closing, missing, foreign or non-canonical channel is not se
       { ...sealed.account, owner: String(await newAddress()) },
     ],
   ]);
+  const claim = { chargedAtomic: '5', attempts: [] };
   for (const [channelId, rentPayer] of [
     [open.channelId, open.rentPayer],
     [closing.channelId, closing.rentPayer],
@@ -179,29 +219,18 @@ void test('an open, closing, missing, foreign or non-canonical channel is not se
       network: NETWORK,
       rentPayer,
     });
-    assert.equal(await readers.settledClaim(channelId), undefined, channelId);
+    assert.equal(await readers.settledClaim(channelId, claim), undefined);
   }
-  // Another rent payer's channel is not this seller's.
-  const readers = createUptoChannelReaders(
-    rpc(new Map([[sealed.channelId, sealed.account]])),
-    { network: NETWORK, rentPayer: open.rentPayer },
-  );
-  assert.equal(await readers.settledClaim(sealed.channelId), undefined);
 });
 
-void test('a sealed channel without a sealing transaction is an error, never a guess', async () => {
-  const sealed = await channel(UPTO_CHANNEL_ACCOUNT.statuses.SEALED, 5n);
-  const readers = createUptoChannelReaders(
-    rpc(new Map([[sealed.channelId, sealed.account]]), [
-      { signature: 'open', failed: false },
-    ]),
-    { network: NETWORK, rentPayer: sealed.rentPayer },
-  );
-  await assert.rejects(readers.settledClaim(sealed.channelId));
-});
-
-void test('the kit adapter reads base64 accounts and marks failed signatures', async () => {
+void test('the kit adapter reads base64 accounts and counts only confirmed, error-free signatures', async () => {
   const calls: unknown[] = [];
+  const signatures = await Promise.all(
+    Array.from({ length: 4 }, async (_value, index) =>
+      // Any 64-byte base58 string is a well-formed signature.
+      getBase58Decoder().decode(new Uint8Array(64).fill(index + 1)),
+    ),
+  );
   const kit: UptoKitRpc = {
     getAccountInfo: (channel, config) => ({
       send: async () => {
@@ -214,13 +243,20 @@ void test('the kit adapter reads base64 accounts and marks failed signatures', a
         };
       },
     }),
-    getSignaturesForAddress: (channel, config) => ({
+    getSignatureStatuses: (sent, config) => ({
       send: async () => {
-        calls.push(['signatures', channel, config]);
-        return [
-          { signature: 'b', err: null },
-          { signature: 'a', err: { InstructionError: [0, 'Custom'] } },
-        ];
+        calls.push(['statuses', sent, config]);
+        return {
+          value: [
+            { err: null, confirmationStatus: 'finalized' },
+            { err: null, confirmationStatus: 'processed' },
+            {
+              err: { InstructionError: [0, 'Custom'] },
+              confirmationStatus: 'confirmed',
+            },
+            null,
+          ],
+        };
       },
     }),
   };
@@ -230,13 +266,17 @@ void test('the kit adapter reads base64 accounts and marks failed signatures', a
     data: ['AAEC', 'base64'],
   });
   assert.equal(await channels.getAccountInfo(String(await newAddress())), null);
-  assert.deepEqual(await channels.getSignatures(PROGRAM), [
-    { signature: 'b', failed: false },
-    { signature: 'a', failed: true },
+  assert.deepEqual(await channels.signaturesSucceeded(signatures), [
+    true,
+    false,
+    false,
+    false,
   ]);
   assert.deepEqual(calls.at(-1), [
-    'signatures',
-    address(PROGRAM),
-    { limit: UPTO_CHANNEL_ACCOUNT.signatureLimit, commitment: 'confirmed' },
+    'statuses',
+    signatures,
+    { searchTransactionHistory: true },
   ]);
+  // A malformed signature is refused before any request.
+  await assert.rejects(channels.signaturesSucceeded(['not a signature']));
 });

@@ -15,6 +15,7 @@ import test from 'node:test';
 
 import {
   createUptoSeller,
+  UPTO_CHANNEL_ACCOUNT,
   UPTO_CHANNEL_STATES,
   UPTO_DEPOSIT_STATES,
   type UptoChain,
@@ -283,6 +284,67 @@ void test('a restarted seller settles and recovers what the previous process lef
       [['InFlight', UPTO_CHANNEL_STATES.ADMITTED]],
     );
     await opened[1]?.close();
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+void test('claim attempts survive a restart and an overlong list is refused', async () => {
+  const root = await directory();
+  try {
+    const attempts = ['A'.repeat(64), 'B'.repeat(64)];
+    await session(root, (first) =>
+      first.chain.putClaim({
+        channelId: 'Chan1',
+        chargedAtomic: '5',
+        attempts,
+      }),
+    );
+    assert.deepEqual(
+      await session(root, (second) => second.chain.getClaim('Chan1')),
+      { channelId: 'Chan1', chargedAtomic: '5', attempts },
+    );
+    await assert.rejects(
+      session(root, (third) =>
+        third.chain.putClaim({
+          channelId: 'Chan2',
+          chargedAtomic: '5',
+          attempts: Array.from(
+            { length: UPTO_CHANNEL_ACCOUNT.maxClaimAttempts + 1 },
+            (_value, index) => String(index),
+          ),
+        }),
+      ),
+      unavailable,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+void test('past the byte watermark new channels are refused but open ones still write', async () => {
+  const root = await directory();
+  try {
+    const small = await ledger(root, { newChannelBytes: 1 });
+    try {
+      await assert.rejects(small.channels.put(record('Chan1')), unavailable);
+    } finally {
+      await small.close();
+    }
+    await session(root, (first) => first.channels.put(record('Chan1')));
+    const full = await ledger(root, { newChannelBytes: 1 });
+    try {
+      await assert.rejects(full.channels.put(record('Chan2')), unavailable);
+      // The open channel still records its progress and its claim.
+      await full.channels.put(record('Chan1', UPTO_CHANNEL_STATES.SETTLING));
+      await full.chain.putClaim({ channelId: 'Chan1', chargedAtomic: '5' });
+      assert.equal(
+        (await full.channels.get('Chan1'))?.state,
+        UPTO_CHANNEL_STATES.SETTLING,
+      );
+    } finally {
+      await full.close();
+    }
   } finally {
     await rm(root, { recursive: true, force: true });
   }
