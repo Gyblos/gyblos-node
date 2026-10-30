@@ -267,11 +267,11 @@ checks registry outage and oversized replies, revocation, explicit manual
 override and its removal, byte-identical original binding replay after buyer
 restart, and a higher-sequence owner change. The old configured owner is
 refused; an older binding cannot roll back persisted history. A newer binding
-back to that configured owner restores full/streamed execution and confirmed
-receipts after restarting both roles. This tests binding policy, not owner-key
-migration or a live registry. Each identity refusal must leave engine attempts,
-execution dials and confirmed receipt counts unchanged. Manual override
-preserves the revocation tombstone and performs no registry reads.
+back to that configured owner restores streamed execution and confirmed receipts
+after restarting both roles. This tests binding policy, not owner-key migration
+or a live registry. Each identity refusal must leave engine attempts, execution
+dials and confirmed receipt counts unchanged. Manual override preserves the
+revocation tombstone and performs no registry reads.
 
 The run also checks receipt-storage failure, engine failure, stream cancellation
 and a tiny configured free cap. Failures never re-send the prompt: execution
