@@ -726,7 +726,8 @@ terminal, refusals included, and reports `sent` once the authorization may have
 reached the seller. A terminal followed by extra bytes, or by no end of stream
 before the ingress deadline, is an error, so the buyer then reconciles the
 channel on chain. The service must bound its own settlement wait and report the
-charge as pending, since the request lease is held until it returns. The endpoint advertises the ALPN only with `paidExecution`.
+charge as pending, since the request lease is held until it returns. The
+endpoint advertises the ALPN only with `paidExecution`.
 
 ## Usage receipts v1
 

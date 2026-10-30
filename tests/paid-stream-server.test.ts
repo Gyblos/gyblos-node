@@ -362,3 +362,18 @@ void test('deltas stop short of the wire limit so the charged terminal still fit
   assert.equal(value.counts.closed, 0);
   assert.equal(value.counts.finished, 1);
 });
+
+void test('a zero-length request frame is refused without a body read', async () => {
+  const value = await fixture(new Uint8Array(4));
+  await servePaidExecutionStream(
+    value.stream,
+    value.service,
+    'synthetic',
+    value.close,
+    new AbortController().signal,
+    value.enter,
+  );
+  assert.equal(value.counts.reads, 1);
+  assert.equal(value.frames.length, 0);
+  assert.equal(value.counts.closed, 1);
+});

@@ -26,6 +26,7 @@ interface Options {
   stop?: boolean;
   oversized?: boolean;
   expireBeforeWrite?: boolean;
+  zeroLength?: boolean;
 }
 
 async function fixture(options: Options = {}) {
@@ -74,12 +75,14 @@ async function fixture(options: Options = {}) {
       ];
   const oversized = Buffer.alloc(4);
   oversized.writeUInt32BE(PAID_STREAM.eventBytes + 1);
-  const all = options.oversized
-    ? oversized
-    : Buffer.concat([
-        ...frames,
-        ...(options.trailing ? [Buffer.from([0])] : []),
-      ]);
+  const all = options.zeroLength
+    ? Buffer.alloc(4)
+    : options.oversized
+      ? oversized
+      : Buffer.concat([
+          ...frames,
+          ...(options.trailing ? [Buffer.from([0])] : []),
+        ]);
   const deltasEnd = options.refused ? 0 : frames[0]!.length + frames[1]!.length;
   let offset = 0;
   const counts = { dials: 0, writes: 0, closes: 0, reads: 0, alpn: '' };
@@ -91,6 +94,7 @@ async function fixture(options: Options = {}) {
       counts.closes++;
     },
     async openBi() {
+      opened = true;
       return {
         send: {
           async writeAll() {
@@ -125,11 +129,15 @@ async function fixture(options: Options = {}) {
     id: () => ({ toString: () => options.remoteId ?? source.trust.nodeId }),
     relayUrl: () => null,
   } as unknown as EndpointAddr;
-  // Three authentications read the clock before the zero-skew check right before sending.
-  let clockReads = 0;
+  // After the stream opens, the re-authentication still sees a valid quote and the next clock
+  // read, the zero-skew check right before sending, sees it expired.
+  let opened = false;
+  let readsAfterOpen = 0;
   const expiry = paid.quote.offer.expiresAt;
   const now = () =>
-    options.expireBeforeWrite && ++clockReads > 3 ? expiry : source.now();
+    options.expireBeforeWrite && opened && ++readsAfterOpen > 1
+      ? expiry
+      : source.now();
   const client = createPaidExecutionClient(endpoint, remote, source.trust, {
     now,
     requestMs: 1000,
@@ -229,4 +237,13 @@ void test('a stop after delivery is returned with its charge and settlement', as
     terminal.payment?.settlement?.chargedAtomic,
     CHARGE.chargedAtomic,
   );
+});
+
+void test('a zero-length event is invalid', async () => {
+  const value = await fixture({ zeroLength: true });
+  await assert.rejects(value.client.execute(value.paid), {
+    code: PAID_EXECUTION_CODES.INVALID,
+    sent: true,
+  });
+  assert.equal(value.counts.reads, 1);
 });
