@@ -375,11 +375,11 @@ void test('a meter that miscounts delivered output charges nothing rather than g
 
 void test('a daemon stopping just before the deposit takes no deposit', async () => {
   const seller = await paidSellerFixture();
-  const describe = seller.payment.server.describe;
-  seller.payment.server.describe = async () => {
-    const own = await describe();
+  // Readiness is the last check before the deposit.
+  const readiness = seller.options.readiness;
+  seller.options.readiness = () => {
     seller.daemon.abort();
-    return own;
+    return readiness();
   };
   const { terminal } = await seller.execute(await seller.request());
   assert.equal(terminal.error?.code, PAID_EXECUTION_CODES.PAYMENT_UNAVAILABLE);
