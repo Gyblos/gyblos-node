@@ -87,11 +87,12 @@ export function createUptoSeller(options: UptoSellerOptions) {
         payer: authorization.payer,
         maxAtomic: authorization.maxAtomic,
       };
-      await write({ ...admission, state: UPTO_CHANNEL_STATES.DEPOSITING });
-      await depositOnce(context, admission, () =>
+      const opened = { ...admission, payload: authorization.payload, terms };
+      await write({ ...opened, state: UPTO_CHANNEL_STATES.DEPOSITING });
+      await depositOnce(context, opened, () =>
         chain.deposit(authorization, terms),
       );
-      await write({ ...admission, state: UPTO_CHANNEL_STATES.ADMITTED });
+      await write({ ...opened, state: UPTO_CHANNEL_STATES.ADMITTED });
       return admission;
     });
   }

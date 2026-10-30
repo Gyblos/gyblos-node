@@ -31,8 +31,16 @@ example a QUIC peer-to-peer stream).
   shared x402 requirements, and `decodeUptoPayload` the bounded payload decoder.
 - Terms come from the seller's own offer, never from the buyer's request.
 
-Planned: the chain implementation that deposits and claims through the SDK, a
-durable store, and multi-recipient splits.
+- `createUptoSdkChain(...)`: the `UptoChain` over the SDK's facilitator settle:
+  deposit, voucher-signed claim by the seller's authorizer, outcomes classified
+  (refused vs. may-have-landed), and claims idempotent per channel and charge
+  through a durable `UptoChainStore`. Give the facilitator
+  `durablePendingStore(store)` so a retry re-awaits the original signature.
+- `terms.splits` distributes each charge between payTo and further recipients
+  (for example a protocol fee). This needs the monorepo's patch of
+  `@x402/svm@2.28.0` (`patches/@x402__svm@2.28.0.patch`), proposed upstream.
+
+Planned: a durable file store and the host wiring.
 
 ## Rules
 

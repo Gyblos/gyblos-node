@@ -187,6 +187,8 @@ void test('recovery acts on the current record, not the listing it started from'
     channelId: second.channelId,
     payer: second.payer,
     maxAtomic: second.maxAtomic,
+    payload: second.payload,
+    terms,
     state: UPTO_CHANNEL_STATES.SETTLED,
     chargedAtomic: '5',
     settlement: {
@@ -223,6 +225,8 @@ void test('one record that cannot recover does not stop the others', async () =>
     channelId: pending.channelId,
     payer: pending.payer,
     maxAtomic: pending.maxAtomic,
+    payload: pending.payload,
+    terms,
     state: UPTO_CHANNEL_STATES.DEPOSITING,
   });
   const changed = await seller.recover();

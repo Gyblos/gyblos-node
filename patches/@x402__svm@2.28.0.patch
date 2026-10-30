@@ -1,0 +1,206 @@
+diff --git a/dist/cjs/index.js b/dist/cjs/index.js
+index 1b1e89f325f11e719bc0e19ccabcb84776e42e12..55150cd40ef18ca7e1cb2f3fbc8dca1dfd69030c 100644
+--- a/dist/cjs/index.js
++++ b/dist/cjs/index.js
+@@ -1192,6 +1192,27 @@ function requireTokenProgramHint(extra, invalid) {
+ }
+ 
+ // src/upto/shared.ts
++// gyblos patch (x402-upto-metered): multi-recipient distribution from extra.splits, so a protocol
++// fee is split on chain. Without extra.splits behavior is unchanged. Proposed upstream.
++function validateUptoSvmSplits(splits, payTo) {
++  if (!Array.isArray(splits) || splits.length < 1 || splits.length > 4) {
++    throw new Error("extra.splits must list 1 to 4 recipients");
++  }
++  let total = 0;
++  for (const split of splits) {
++    if (!split || typeof split.recipient !== "string" || !Number.isInteger(split.bps) || split.bps < 1 || split.bps > BASIS_POINTS_DENOMINATOR) {
++      throw new Error("extra.splits entries need a recipient and 1 to 10000 bps");
++    }
++    total += split.bps;
++  }
++  if (total !== BASIS_POINTS_DENOMINATOR) {
++    throw new Error("extra.splits must sum to 10000 bps");
++  }
++  if (splits[0].recipient !== payTo) {
++    throw new Error("extra.splits must start with payTo");
++  }
++  return splits.map((split) => ({ bps: split.bps, recipient: split.recipient }));
++}
+ function resolveUptoSvmPaymentChannelConfig(requirements) {
+   const feePayer = requirements.extra?.feePayer;
+   if (typeof feePayer !== "string" || feePayer.length === 0) {
+@@ -1205,7 +1226,7 @@ function resolveUptoSvmPaymentChannelConfig(requirements) {
+   if (typeof withdrawDelay !== "number" || !Number.isInteger(withdrawDelay) || withdrawDelay <= 0) {
+     throw new Error("withdrawDelay must be an integer greater than zero");
+   }
+-  const splits = [{ bps: BASIS_POINTS_DENOMINATOR, recipient: requirements.payTo }];
++  const splits = requirements.extra?.splits === void 0 ? [{ bps: BASIS_POINTS_DENOMINATOR, recipient: requirements.payTo }] : validateUptoSvmSplits(requirements.extra.splits, requirements.payTo);
+   return { feePayer, receiverAuthorizer, splits, withdrawDelay };
+ }
+ 
+diff --git a/dist/cjs/upto/client/index.js b/dist/cjs/upto/client/index.js
+index 24f9d8eaee214bad9a93005708709d074daf19aa..3f3718e7f8cb83b64c55bc0250029d3f73a7cf93 100644
+--- a/dist/cjs/upto/client/index.js
++++ b/dist/cjs/upto/client/index.js
+@@ -633,6 +633,27 @@ function resolveUptoSvmMemo(extra) {
+ }
+ 
+ // src/upto/shared.ts
++// gyblos patch (x402-upto-metered): multi-recipient distribution from extra.splits, so a protocol
++// fee is split on chain. Without extra.splits behavior is unchanged. Proposed upstream.
++function validateUptoSvmSplits(splits, payTo) {
++  if (!Array.isArray(splits) || splits.length < 1 || splits.length > 4) {
++    throw new Error("extra.splits must list 1 to 4 recipients");
++  }
++  let total = 0;
++  for (const split of splits) {
++    if (!split || typeof split.recipient !== "string" || !Number.isInteger(split.bps) || split.bps < 1 || split.bps > BASIS_POINTS_DENOMINATOR) {
++      throw new Error("extra.splits entries need a recipient and 1 to 10000 bps");
++    }
++    total += split.bps;
++  }
++  if (total !== BASIS_POINTS_DENOMINATOR) {
++    throw new Error("extra.splits must sum to 10000 bps");
++  }
++  if (splits[0].recipient !== payTo) {
++    throw new Error("extra.splits must start with payTo");
++  }
++  return splits.map((split) => ({ bps: split.bps, recipient: split.recipient }));
++}
+ function resolveUptoSvmPaymentChannelConfig(requirements) {
+   const feePayer = requirements.extra?.feePayer;
+   if (typeof feePayer !== "string" || feePayer.length === 0) {
+@@ -646,7 +667,7 @@ function resolveUptoSvmPaymentChannelConfig(requirements) {
+   if (typeof withdrawDelay !== "number" || !Number.isInteger(withdrawDelay) || withdrawDelay <= 0) {
+     throw new Error("withdrawDelay must be an integer greater than zero");
+   }
+-  const splits = [{ bps: BASIS_POINTS_DENOMINATOR, recipient: requirements.payTo }];
++  const splits = requirements.extra?.splits === void 0 ? [{ bps: BASIS_POINTS_DENOMINATOR, recipient: requirements.payTo }] : validateUptoSvmSplits(requirements.extra.splits, requirements.payTo);
+   return { feePayer, receiverAuthorizer, splits, withdrawDelay };
+ }
+ 
+diff --git a/dist/cjs/upto/facilitator/index.js b/dist/cjs/upto/facilitator/index.js
+index a01901d7a3e72f7db28a9402618e1205888ab7a0..796d11ca168d427412291ee46192af9c701693d4 100644
+--- a/dist/cjs/upto/facilitator/index.js
++++ b/dist/cjs/upto/facilitator/index.js
+@@ -1922,6 +1922,27 @@ async function revertOpenBestEffort(args, write) {
+ }
+ 
+ // src/upto/shared.ts
++// gyblos patch (x402-upto-metered): multi-recipient distribution from extra.splits, so a protocol
++// fee is split on chain. Without extra.splits behavior is unchanged. Proposed upstream.
++function validateUptoSvmSplits(splits, payTo) {
++  if (!Array.isArray(splits) || splits.length < 1 || splits.length > 4) {
++    throw new Error("extra.splits must list 1 to 4 recipients");
++  }
++  let total = 0;
++  for (const split of splits) {
++    if (!split || typeof split.recipient !== "string" || !Number.isInteger(split.bps) || split.bps < 1 || split.bps > BASIS_POINTS_DENOMINATOR) {
++      throw new Error("extra.splits entries need a recipient and 1 to 10000 bps");
++    }
++    total += split.bps;
++  }
++  if (total !== BASIS_POINTS_DENOMINATOR) {
++    throw new Error("extra.splits must sum to 10000 bps");
++  }
++  if (splits[0].recipient !== payTo) {
++    throw new Error("extra.splits must start with payTo");
++  }
++  return splits.map((split) => ({ bps: split.bps, recipient: split.recipient }));
++}
+ function resolveUptoSvmPaymentChannelConfig(requirements) {
+   const feePayer = requirements.extra?.feePayer;
+   if (typeof feePayer !== "string" || feePayer.length === 0) {
+@@ -1935,7 +1956,7 @@ function resolveUptoSvmPaymentChannelConfig(requirements) {
+   if (typeof withdrawDelay !== "number" || !Number.isInteger(withdrawDelay) || withdrawDelay <= 0) {
+     throw new Error("withdrawDelay must be an integer greater than zero");
+   }
+-  const splits = [{ bps: BASIS_POINTS_DENOMINATOR, recipient: requirements.payTo }];
++  const splits = requirements.extra?.splits === void 0 ? [{ bps: BASIS_POINTS_DENOMINATOR, recipient: requirements.payTo }] : validateUptoSvmSplits(requirements.extra.splits, requirements.payTo);
+   return { feePayer, receiverAuthorizer, splits, withdrawDelay };
+ }
+ 
+@@ -2408,7 +2429,7 @@ var PaymentChannelRentCleanupManager = class {
+    * @returns Broadcast signature
+    */
+   async submitCloseOrDistribute(feePayerSigner, record, live, status) {
+-    const splits = [{ bps: BASIS_POINTS_DENOMINATOR, recipient: record.payTo }];
++    const splits = record.splits ?? [{ bps: BASIS_POINTS_DENOMINATOR, recipient: record.payTo }];
+     const distribute = await buildDistributeInstruction({
+       channelId: record.channelId,
+       mint: live.mint,
+@@ -2999,6 +3020,7 @@ var UptoSvmScheme = class {
+       network: requirements.network,
+       payTo: requirements.payTo,
+       receiverAuthorizer: "",
++      splits: resolveUptoSvmPaymentChannelConfig(requirements).splits,
+       tokenProgram
+     };
+     try {
+diff --git a/dist/esm/chunk-ASYOFNDS.mjs b/dist/esm/chunk-ASYOFNDS.mjs
+index 3aa59423ae02244da7b6db5ab944755a4e3d4677..99b2443b1190af17afd1a5e4510a77e73e66a5e3 100644
+--- a/dist/esm/chunk-ASYOFNDS.mjs
++++ b/dist/esm/chunk-ASYOFNDS.mjs
+@@ -3,6 +3,27 @@ import {
+ } from "./chunk-RXPBSPMZ.mjs";
+ 
+ // src/upto/shared.ts
++// gyblos patch (x402-upto-metered): multi-recipient distribution from extra.splits, so a protocol
++// fee is split on chain. Without extra.splits behavior is unchanged. Proposed upstream.
++function validateUptoSvmSplits(splits, payTo) {
++  if (!Array.isArray(splits) || splits.length < 1 || splits.length > 4) {
++    throw new Error("extra.splits must list 1 to 4 recipients");
++  }
++  let total = 0;
++  for (const split of splits) {
++    if (!split || typeof split.recipient !== "string" || !Number.isInteger(split.bps) || split.bps < 1 || split.bps > BASIS_POINTS_DENOMINATOR) {
++      throw new Error("extra.splits entries need a recipient and 1 to 10000 bps");
++    }
++    total += split.bps;
++  }
++  if (total !== BASIS_POINTS_DENOMINATOR) {
++    throw new Error("extra.splits must sum to 10000 bps");
++  }
++  if (splits[0].recipient !== payTo) {
++    throw new Error("extra.splits must start with payTo");
++  }
++  return splits.map((split) => ({ bps: split.bps, recipient: split.recipient }));
++}
+ function resolveUptoSvmPaymentChannelConfig(requirements) {
+   const feePayer = requirements.extra?.feePayer;
+   if (typeof feePayer !== "string" || feePayer.length === 0) {
+@@ -16,7 +37,7 @@ function resolveUptoSvmPaymentChannelConfig(requirements) {
+   if (typeof withdrawDelay !== "number" || !Number.isInteger(withdrawDelay) || withdrawDelay <= 0) {
+     throw new Error("withdrawDelay must be an integer greater than zero");
+   }
+-  const splits = [{ bps: BASIS_POINTS_DENOMINATOR, recipient: requirements.payTo }];
++  const splits = requirements.extra?.splits === void 0 ? [{ bps: BASIS_POINTS_DENOMINATOR, recipient: requirements.payTo }] : validateUptoSvmSplits(requirements.extra.splits, requirements.payTo);
+   return { feePayer, receiverAuthorizer, splits, withdrawDelay };
+ }
+ 
+diff --git a/dist/esm/chunk-UMK65UDR.mjs b/dist/esm/chunk-UMK65UDR.mjs
+index 52ac9f0a3502edf04953fcf270b8841eedf44bfc..1d744b0899433ba4bd7f953a06d560ae20933027 100644
+--- a/dist/esm/chunk-UMK65UDR.mjs
++++ b/dist/esm/chunk-UMK65UDR.mjs
+@@ -1002,7 +1002,7 @@ var PaymentChannelRentCleanupManager = class {
+    * @returns Broadcast signature
+    */
+   async submitCloseOrDistribute(feePayerSigner, record, live, status) {
+-    const splits = [{ bps: BASIS_POINTS_DENOMINATOR, recipient: record.payTo }];
++    const splits = record.splits ?? [{ bps: BASIS_POINTS_DENOMINATOR, recipient: record.payTo }];
+     const distribute = await buildDistributeInstruction({
+       channelId: record.channelId,
+       mint: live.mint,
+diff --git a/dist/esm/upto/facilitator/index.mjs b/dist/esm/upto/facilitator/index.mjs
+index 948ca0e8bc994ac47580ede3d80cc15dd94bcf71..935b74b90534bbb7ae783ddc3961a367c32a9ea2 100644
+--- a/dist/esm/upto/facilitator/index.mjs
++++ b/dist/esm/upto/facilitator/index.mjs
+@@ -465,6 +465,7 @@ var UptoSvmScheme = class {
+       network: requirements.network,
+       payTo: requirements.payTo,
+       receiverAuthorizer: "",
++      splits: resolveUptoSvmPaymentChannelConfig(requirements).splits,
+       tokenProgram
+     };
+     try {

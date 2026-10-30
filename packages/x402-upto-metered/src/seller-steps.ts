@@ -70,7 +70,7 @@ async function claimOnce(
 // A definitive refusal fails the channel at once; anything else stays DEPOSITING for recover().
 export async function depositOnce(
   { write }: SellerContext,
-  admission: UptoAdmission,
+  opened: Omit<UptoChannelRecord, 'state'>,
   run: () => Promise<unknown>,
 ): Promise<void> {
   try {
@@ -80,7 +80,7 @@ export async function depositOnce(
       error instanceof UptoError &&
       error.code === UPTO_ERROR_CODES.FACILITATOR_REJECTED
     ) {
-      await write({ ...admission, state: UPTO_CHANNEL_STATES.FAILED });
+      await write({ ...opened, state: UPTO_CHANNEL_STATES.FAILED });
       return fail(UPTO_ERROR_CODES.FACILITATOR_REJECTED);
     }
     return fail(UPTO_ERROR_CODES.UNAVAILABLE);

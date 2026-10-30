@@ -16,6 +16,11 @@ export {
   type UptoSeller,
   type UptoSellerOptions,
 } from './seller';
-export { memoryUptoStore } from './store';
+export {
+  durablePendingStore,
+  memoryUptoChainStore,
+  memoryUptoStore,
+} from './store';
+export { createUptoSdkChain, type UptoSdkChainOptions } from './chain';
 export type * from './types';
 export { createUptoVerifier, type UptoVerifier } from './verify';
