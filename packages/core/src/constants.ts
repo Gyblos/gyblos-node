@@ -109,6 +109,13 @@ export const FREE_EXECUTION_ADMISSION = {
   maxConcurrent: 1,
 } as const;
 
+// Paid requests: one generation at a time, like free, and request ids remembered until their quote
+// expires. A paid buyer is never capped per day: each request is paid for.
+export const PAID_EXECUTION_ADMISSION = {
+  maxReplayEntries: 4096,
+  maxConcurrent: 1,
+} as const;
+
 // Read-only identity observations and trust decisions; signatures and RPC reads belong to adapters.
 export const IDENTITY_LOOKUP_KINDS = {
   BOUND: 'bound',

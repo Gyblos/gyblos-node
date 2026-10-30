@@ -17,6 +17,7 @@
     "./seller-selection": "./src/seller-selection.ts",
     "./pricing-v2": "./src/pricing-v2.ts",
     "./paid-charge": "./src/paid-charge.ts",
+    "./paid-admission": "./src/paid-admission.ts",
     "./free-admission": "./src/free-admission.ts",
     "./identity-policy": "./src/identity-policy.ts",
     "./telemetry": "./src/telemetry.ts",

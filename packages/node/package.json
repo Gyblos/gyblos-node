@@ -38,6 +38,8 @@
     "./free-execution": "./src/free-execution.ts",
     "./free-meter": "./src/free-meter.ts",
     "./free-router": "./src/free-router.ts",
+    "./paid-execution": "./src/paid-execution.ts",
+    "./paid-router": "./src/paid-router.ts",
     "./seller-transport": "./src/seller-transport.ts",
     "./identity-verifier": "./src/identity-verifier.ts",
     "./identity-state": "./src/identity-state.ts",

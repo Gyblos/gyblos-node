@@ -147,8 +147,9 @@ function checkPayment(
   if (charged > ceiling) return paidExecutionFail(PAID_EXECUTION_CODES.LIMIT);
   if (!text && charged !== 0n)
     return paidExecutionFail(PAID_EXECUTION_CODES.PAYMENT_MISMATCH);
-  const { settlement, pending } = payment;
-  const channelId = settlement?.channelId ?? pending?.channelId;
+  const { settlement, pending, lapsed } = payment;
+  const channelId =
+    settlement?.channelId ?? pending?.channelId ?? lapsed?.channelId;
   if (
     channelId !== request.payment.channelId ||
     (settlement && charged + BigInt(settlement.refundedAtomic) !== ceiling)

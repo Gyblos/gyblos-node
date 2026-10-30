@@ -680,9 +680,11 @@ paid codes (`PAID_EXECUTION_*`): the free codes except the free-only admission
 caps, plus `NOT_PAID`, `PAYMENT_MISMATCH`, `PAYMENT_REJECTED`,
 `PAYMENT_UNAVAILABLE` and `BUDGET_EXHAUSTED`. After a deposit the terminal
 carries both `charge {inputTokens, outputTokens, chargedAtomic}` and `payment`,
-which is `{settlement: PaymentSettlement}` or
+which is `{settlement: PaymentSettlement}`,
 `{pending: {channelId, chargedAtomic, transaction | null}}` while settlement is
-still being confirmed. Rules:
+still being confirmed, or `{lapsed: {channelId}}` when the chain refused the
+claim for good: nothing was charged and the whole deposit returns to the buyer,
+while `charge` still reports what was metered. Rules:
 
 - Refusals before any deposit (request validation codes, `NOT_PAID`, `BUSY`,
   `PAYMENT_*`) carry neither. `SELLER_CANNOT_CONTINUE` and `BUDGET_EXHAUSTED`
@@ -728,6 +730,28 @@ before the ingress deadline, is an error, so the buyer then reconciles the
 channel on chain. The service must bound its own settlement wait and report the
 charge as pending, since the request lease is held until it returns. The
 endpoint advertises the ALPN only with `paidExecution`.
+
+### Seller execution
+
+`@gyblos/node/paid-execution` serves one paid offer; `./paid-router` routes by
+the quoted selection. In order, the seller authenticates the quote, refuses a
+request outside the offer (selection, model, capabilities, reasoning, a single
+user message, or declared metering) with `UNSUPPORTED`, recounts the input and
+refuses it with `LIMIT` when the ceiling cannot pay for it plus one output
+token, refuses terms that are not its payment server's own (`UNSUPPORTED`),
+spends the request id (`@gyblos/core/paid-admission`: `REPLAY`, `BUSY`,
+`EXPIRED`), checks readiness, and only then admits the deposit. Admission
+refusals map to `PAYMENT_REJECTED`, `EXPIRED` or `PAYMENT_UNAVAILABLE`; an
+unavailable admission may still have deposited, which recovery reconciles.
+
+Generation asks the engine for at most the allowance and recounts every delta
+before delivering it; a delta past the allowance stops the stream with
+`BUDGET_EXHAUSTED`. After the deposit, a stop reports the engine's reason and
+the recounted delivered output, a refusal code becomes `INTERNAL`, and the
+charge covers only delivered output. Settlement runs under the daemon's signal:
+a claim not confirmed within the wait, or retryably failed, is reported pending
+and handed to the caller to retry with the same charge; a lapsed claim is
+reported lapsed.
 
 ## Usage receipts v1
 

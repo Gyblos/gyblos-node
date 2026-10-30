@@ -233,6 +233,12 @@ function payment(value: unknown, charged: string): PaidPayment {
         charged,
       ),
     };
+  if (hasField(value, 'lapsed')) {
+    const lapsed = controlObject(controlObject(value, ['lapsed']).lapsed, [
+      'channelId',
+    ]);
+    return { lapsed: { channelId: identifier(lapsed.channelId) } };
+  }
   const pending = controlObject(controlObject(value, ['pending']).pending, [
     'channelId',
     'chargedAtomic',
