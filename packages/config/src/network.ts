@@ -27,6 +27,13 @@ export const BUYER_RELAY_ONLY_ENV = 'GYBLOS_BUYER_RELAY_ONLY' as const;
 export const DEVNET_TREASURY_OWNER =
   '4zTeC5mVqWLruDexgU2mV66p9t5vCA9JyiZqdGDUspap';
 
+// The network's protocol fee, added on top of every seller's price and split on chain to the treasury
+// in the same claim. Buyers and sellers both read it; changing the fee is changing bps here.
+export const PROTOCOL_FEE = {
+  bps: 300,
+  treasury: DEVNET_TREASURY_OWNER,
+} as const;
+
 export { SYSTEM_PROGRAM_ADDRESS } from '@solana-program/system';
 
 export { TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';

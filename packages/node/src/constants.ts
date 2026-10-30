@@ -39,6 +39,10 @@ export const NODE_ERROR_CODES = {
   SELLER_OFFER_API_KEY_UNSAFE: 'SELLER_OFFER_API_KEY_UNSAFE',
   SELLER_OFFERS_MISSING: 'SELLER_OFFERS_MISSING',
   SELLER_PAID_EXECUTION_UNAVAILABLE: 'SELLER_PAID_EXECUTION_UNAVAILABLE',
+  // A paid offer whose usage cannot be recounted with the model's pinned public tokenizer.
+  SELLER_PAID_METERING_UNRECOUNTED: 'SELLER_PAID_METERING_UNRECOUNTED',
+  // The payment server pays to its own fee payer, charges another fee or uses another network.
+  SELLER_PAYMENT_DESCRIPTION_INVALID: 'SELLER_PAYMENT_DESCRIPTION_INVALID',
 } as const;
 export type NodeErrorCode =
   (typeof NODE_ERROR_CODES)[keyof typeof NODE_ERROR_CODES];
@@ -87,6 +91,14 @@ export const PUBLIC_SEQUENCE = { schemaVersion: 1, maxBytes: 2048 } as const;
 export const SELLER_PUBLIC_RECORDS = {
   catalogMs: 60_000,
   renewBeforeMs: 20_000,
+} as const;
+
+// Paid settlement: how long a terminal waits for the claim (well under the 180 s request deadline,
+// which also covers generation), and the backoff for claims reported pending. The schedule ends well
+// within a channel's lifetime, so a claim never outlives the payer's authorization unnoticed.
+export const PAID_SETTLEMENT = {
+  waitMs: 20_000,
+  retryDelaysMs: [5_000, 15_000, 45_000, 120_000, 300_000],
 } as const;
 
 export const SELLER_PUBLICATION_STATES = {

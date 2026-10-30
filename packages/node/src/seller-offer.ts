@@ -1,5 +1,6 @@
 // The seller's public listing: what the daemon serves and its paid or free terms. No config loading here,
 // so control startup and the lab host stay independent of gyblos.toml reading.
+import { PROTOCOL_FEE } from '@gyblos/config';
 import {
   MODEL_CLASSIFICATIONS,
   MODEL_IDS,
@@ -8,6 +9,7 @@ import {
   type ReasoningLevel,
 } from '@gyblos/protocol/constants';
 import type { TokenPricesV2 } from '@gyblos/protocol/control-types';
+import { grossAtomicPerMtok } from '@gyblos/protocol/payment-binding';
 
 import type { OfferModel } from './node-config';
 
@@ -24,6 +26,7 @@ export type SellerCatalogOffer = {
   modelId: string;
   reasoning: readonly ReasoningLevel[];
 } & (
+  // The seller's own price; buyers pay it plus the protocol fee (listedPrices).
   | { kind: typeof OFFER_PRICING_KINDS.PAID; prices: TokenPricesV2 }
   | { kind: typeof OFFER_PRICING_KINDS.FREE; caps: FreeOfferCaps }
 );
@@ -42,15 +45,28 @@ export function recountsWithPinnedTokenizer(model: OfferModel) {
   );
 }
 
-// The only listing the seller daemon serves while paid selling is off (phase 2 brings it back as a plugin).
 export type FreeSellerOffer = Extract<
   SellerCatalogOffer,
   { kind: typeof OFFER_PRICING_KINDS.FREE }
 >;
+export type PaidSellerOffer = Extract<
+  SellerCatalogOffer,
+  { kind: typeof OFFER_PRICING_KINDS.PAID }
+>;
 
-// A free listing is zero on both sides, which is what quotes and selection key on.
+// What buyers see and pay: zero on both sides for a free listing; for a paid one, the seller's price
+// plus the protocol fee, rounded up, which quotes, ceilings and charges all use.
 export function listedPrices(offer: SellerCatalogOffer): TokenPricesV2 {
-  return offer.kind === OFFER_PRICING_KINDS.FREE
-    ? { inputAtomicPerMtok: '0', outputAtomicPerMtok: '0' }
-    : offer.prices;
+  if (offer.kind === OFFER_PRICING_KINDS.FREE)
+    return { inputAtomicPerMtok: '0', outputAtomicPerMtok: '0' };
+  return {
+    inputAtomicPerMtok: grossAtomicPerMtok(
+      offer.prices.inputAtomicPerMtok,
+      PROTOCOL_FEE.bps,
+    ),
+    outputAtomicPerMtok: grossAtomicPerMtok(
+      offer.prices.outputAtomicPerMtok,
+      PROTOCOL_FEE.bps,
+    ),
+  };
 }

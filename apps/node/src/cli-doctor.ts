@@ -55,7 +55,11 @@ const HINTS: Readonly<Partial<Record<DoctorResultCode, string>>> = {
   [NODE_ERROR_CODES.SELLER_OFFERS_MISSING]:
     'add a free [[offers]] entry to gyblos.toml (examples/seller-daemon.toml)',
   [NODE_ERROR_CODES.SELLER_PAID_EXECUTION_UNAVAILABLE]:
-    'paid selling is off until it returns as a plugin; list the offer as free',
+    'the daemon cannot reach the payment chain yet; list the offer as free',
+  [NODE_ERROR_CODES.SELLER_PAID_METERING_UNRECOUNTED]:
+    'a paid offer needs a model recounted with its pinned public tokenizer (qwen3-0.6b)',
+  [NODE_ERROR_CODES.SELLER_PAYMENT_DESCRIPTION_INVALID]:
+    'the payment server must charge the network fee on devnet and pay out to an account other than its fee payer',
   [NODE_ERROR_CODES.NODE_CONFIG_INVALID]:
     'run `pnpm gyblos config validate --config <file>` on the GYBLOS_CONFIG file',
   [NODE_ERROR_CODES.LEGACY_LOCAL_LAYOUT]:
@@ -117,7 +121,7 @@ export async function doctor(
   if (report.offers) {
     stdout('Listing:\n');
     report.offers.forEach((offer, index) =>
-      stdout(`  offer[${index + 1}] free ${offer.modelId}\n`),
+      stdout(`  offer[${index + 1}] ${offer.kind} ${offer.modelId}\n`),
     );
     stdout(
       `  publish ${report.publication ? urlOrigin(report.publication) : 'off'}\n`,

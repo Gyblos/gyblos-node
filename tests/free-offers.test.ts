@@ -11,6 +11,7 @@ import {
   FREE_CHAT_ROLES,
   FREE_EXECUTION,
   FREE_EXECUTION_CODES,
+  OFFER_PRICING_KINDS,
 } from '@gyblos/protocol/constants';
 import type { SignedOfferV2 } from '@gyblos/protocol/control-types';
 
@@ -22,7 +23,11 @@ import {
 async function fixture() {
   const run = await offerControlFixture();
   // 'hello' is 5 input tokens and 'answer' 6 output tokens; a request reserves 5 + maxTokens 10.
-  run.a.live.offer.caps = { dailyTokenCap: 20, perBuyerCap: 20 };
+  run.a.live.offer = {
+    ...run.a.live.offer,
+    kind: OFFER_PRICING_KINDS.FREE,
+    caps: { dailyTokenCap: 20, perBuyerCap: 20 },
+  };
   const offers: LiveSellerOffer[] = [run.a.live];
   const free = createSellerFreeOffers(() => offers, {
     owner: run.owner,

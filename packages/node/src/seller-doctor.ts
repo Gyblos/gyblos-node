@@ -43,7 +43,7 @@ import type { NodeConfigIssue } from './node-config-fields';
 import type { SellerLimits } from './node-config-limits';
 import { inspectSellerSequence } from './public-sequence';
 import { loadRole, roleKeyFilesStatus } from './roles';
-import type { FreeSellerOffer } from './seller-offer';
+import type { SellerCatalogOffer } from './seller-offer';
 import {
   sellerBaseSettings,
   sellerSettings,
@@ -66,7 +66,7 @@ export interface DoctorReport {
   configIssues: NodeConfigIssue[];
   seller: { nodeId: string; owner: string } | undefined;
   // gyblos.toml [[offers]] in order, once every entry is servable.
-  offers: FreeSellerOffer[] | undefined;
+  offers: SellerCatalogOffer[] | undefined;
   publication: string | undefined;
   limits: SellerLimits | undefined;
 }
