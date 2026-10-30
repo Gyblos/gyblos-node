@@ -12,6 +12,7 @@ import { useState } from 'react';
 
 import {
   CONNECTION_TOOLS,
+  connectionModelId,
   connectionPolicy,
   type ConnectionTool,
   type PreviewConnection,
@@ -103,7 +104,9 @@ export function ConnectionDialog({
     tool ?? CONNECTION_TOOLS[0],
   );
   const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [modelId, setModelId] = useState(existing?.modelId ?? defaultModelId);
+  const [modelId, setModelId] = useState(() =>
+    connectionModelId(existing?.modelId ?? defaultModelId, models),
+  );
   const [budget, setBudget] = useState(
     existing ? String(existing.dailyBudget) : '2',
   );

@@ -10,6 +10,7 @@ export type ModelOption = ChatModel & {
   input: number;
   output: number;
   family?: string;
+  source?: (typeof import('./constants').MODEL_SOURCE)[keyof typeof import('./constants').MODEL_SOURCE];
 };
 
 export type CatalogModel = ModelOption & {

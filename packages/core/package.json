@@ -21,7 +21,8 @@
     "./free-admission": "./src/free-admission.ts",
     "./identity-policy": "./src/identity-policy.ts",
     "./telemetry": "./src/telemetry.ts",
-    "./receipts": "./src/receipts.ts"
+    "./receipts": "./src/receipts.ts",
+    "./receipt-collector": "./src/receipt-collector.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",

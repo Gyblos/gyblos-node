@@ -20,15 +20,35 @@ only the corresponding paid-model block. All conversations, drafts, theme
 choices and connection budgets are in memory and clear when the app closes. They
 are not saved to the product home.
 
-The five sample models, prices, free labels and connection budgets are
-illustrative, not live availability, payment authorization or enforced tool
-spending limits. The chat daily-limit check uses demo credits only. The footer
-shows actual local-node state, wallet backup reminder and app version. “Node
-ready” means the local Iroh endpoint is bound, not that providers or the public
-network are reachable. The visible 0.0 balance is a placeholder, not a queried
-or funded balance. Preview credits are not the personal wallet balance. No
-inference, web tool, gateway, existing node configuration or remote network is
-used by this UI.
+The five sample models and their prices remain under the collapsed Preview
+catalog; connection budgets are illustrative, not enforced tool spending limits.
+Models also supports an explicit exact-ID lookup of signed free announcements
+from the public discovery index. This reads one bounded page and only retains
+listings with zero input and output prices. Signature/lifetime checks reuse the
+discovery adapter. Announcements do not establish registry identity, latest
+withdrawal state, provider availability or a usable inference offer. The chat
+daily-limit check uses demo credits only. The footer shows actual local-node
+state, wallet backup reminder and app version. “Node ready” means the local Iroh
+endpoint is bound, not that providers or the public network are reachable. The
+visible 0.0 balance is a placeholder, not a queried or funded balance. Preview
+credits are not the personal wallet balance. The renderer remains
+network-denied. Only an explicit model lookup allows the host to issue an
+anonymous GET to the fixed public index in an ephemeral, cookieless session,
+with redirects denied and a deadline. No inference, web tool, gateway, provider
+connection or existing node configuration is used by the UI.
+
+Network lookup is lazy: opening the app or Models makes no discovery request.
+The current index searches by exact model ID, not a global model enumeration.
+The UI distinguishes loading, empty, failed and expired results, reports local
+check time and marks a partial first page. It preserves the last submitted ID
+when returning to Models. Results stay in memory, are pruned on signed expiry
+and are cancelled on replacement or quit. Only sanitized model fields reach the
+renderer; no owner, NodeId, signature, endpoint or raw network error crosses the
+catalog bridge. The fixed IPC authenticates the current window/main frame and
+validates arity and bounded identifiers. Announced entries reuse the model rows
+and chat selector with an explicit Chat preview label; selection remains
+simulated and does not enable wallet funding. Connect continues using its sample
+models. No fallback sample is presented as a network announcement.
 
 ## Navigation and wallet settings
 
