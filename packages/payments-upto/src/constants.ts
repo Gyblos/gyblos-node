@@ -34,3 +34,12 @@ export const UPTO_SELLER = {
   // A ceiling on the record count; the byte bound (LEDGER_FILE.newChannelBytes) usually binds first.
   maxChannels: 10_000,
 } as const;
+
+// The buyer's journal of authorized channels: one small private document. Settled entries are kept
+// long past any channel's lifetime, then pruned; open ones are never dropped.
+export const BUYER_JOURNAL = {
+  version: 1,
+  maxBytes: 1024 * 1024,
+  maxEntries: 2_000,
+  settledRetentionMs: 30 * 86_400_000,
+} as const;

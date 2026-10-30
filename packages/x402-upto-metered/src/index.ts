@@ -11,6 +11,7 @@ export {
   type UptoErrorCode,
 } from './constants';
 export { UptoError, uptoError } from './errors';
+export { createUptoHintReader, type UptoHintRpc } from './hints';
 export {
   createUptoChannelReaders,
   uptoChannelRpc,
