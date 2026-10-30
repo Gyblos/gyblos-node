@@ -25,6 +25,8 @@ import {
   type PaymentTerms,
 } from '@gyblos/protocol/payment';
 
+import { PAID_RETRYABLE_PAYMENT_CODES } from './constants';
+
 export interface PaidSettlementOptions {
   // The daemon's lifetime: once aborted, claims are reported pending without being started.
   signal: AbortSignal;
@@ -60,12 +62,6 @@ const ADMIT_CODES: Readonly<Record<PaymentErrorCode, PaidExecutionCode>> = {
     PAID_EXECUTION_CODES.PAYMENT_UNAVAILABLE,
   [PAYMENT_ERROR_CODES.UNAVAILABLE]: PAID_EXECUTION_CODES.PAYMENT_UNAVAILABLE,
 };
-
-// Claim failures a later attempt with the same charge may overcome.
-const RETRYABLE: readonly PaymentErrorCode[] = [
-  PAYMENT_ERROR_CODES.UNAVAILABLE,
-  PAYMENT_ERROR_CODES.JOURNAL_UNAVAILABLE,
-];
 
 const OUTCOMES = { TIMEOUT: 'timeout', STOPPED: 'stopped' } as const;
 type Wait = (typeof OUTCOMES)[keyof typeof OUTCOMES];
@@ -173,7 +169,7 @@ export async function settleCharge(
     if (error instanceof PaymentError) {
       if (error.code === PAYMENT_ERROR_CODES.SETTLEMENT_LAPSED)
         return { lapsed: { channelId: admission.channelId } };
-      if (RETRYABLE.includes(error.code)) return retry();
+      if (PAID_RETRYABLE_PAYMENT_CODES.includes(error.code)) return retry();
     }
     notify(() => options.onFailure?.(admission, chargedAtomic, error));
     return pending;

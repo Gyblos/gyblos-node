@@ -281,9 +281,13 @@ are refused with `SELLER_OFFER_ENGINE_UNSUPPORTED`. Keep Ollama listening on
 loopback only (no `OLLAMA_HOST=0.0.0.0`, no "Expose Ollama to the network" app
 setting): Ollama has no authentication, and the seller cannot detect the
 exposure. The pulled model must match the pinned digest, or warmup fails and the
-seller is not advertised. Paid selling is off until it returns as a payment
-plugin; a paid offer stops startup with `SELLER_PAID_EXECUTION_UNAVAILABLE`. The
-v1 paid path remains in the lab gates (`pnpm gate:*`) only.
+seller is not advertised. Paid v2 selling is implemented, but the daemon cannot
+reach the chain yet, so a paid offer still stops startup with
+`SELLER_PAID_EXECUTION_UNAVAILABLE`. Once enabled, it will run on its own paid
+stream and accept only offers whose usage is recounted with the model's pinned
+public tokenizer (`SELLER_PAID_METERING_UNRECOUNTED` otherwise). Buyers see and
+pay the seller's price plus the protocol fee (`PROTOCOL_FEE`, 3% on devnet),
+rounded up. The v1 paid path remains in the lab gates (`pnpm gate:*`) only.
 [examples/seller-daemon.toml](../examples/seller-daemon.toml) is a file it
 accepts as written; the other examples are valid files for future nodes but stop
 this daemon. Today it honors:
@@ -298,7 +302,7 @@ this daemon. Today it honors:
 | `[[offers]]`: any model, engine `openai` at an https or literal loopback URL with `context_tokens`, reasoning `["off"]`                           | yes                                                                                                                       |
 | `[[offers]]`: any model, engine `anthropic` at an https or literal loopback API root with `api_key_env` and `context_tokens`, reasoning `["off"]` | yes                                                                                                                       |
 | `free = {...}` on that offer                                                                                                                      | served over the free channel with daily total and per-buyer token caps                                                    |
-| `price = {...}` on that offer                                                                                                                     | not yet: paid selling is off until phase 2, so a paid offer stops startup                                                 |
+| `price = {...}` on that offer                                                                                                                     | not yet: the daemon has no chain wiring yet, so a paid offer stops startup                                                |
 | `[node]` `data_dir`, `rpc_url`, `payout_wallet`                                                                                                   | not yet: the role files own them, so setting them in the file stops startup (`GYBLOS_HOME` overriding `data_dir` is fine) |
 | `[buyer]`                                                                                                                                         | ignored by the seller                                                                                                     |
 
@@ -306,7 +310,10 @@ Startup stops with a static code: `NODE_CONFIG_INVALID`,
 `SELLER_SETTING_UNSUPPORTED`, `SELLER_OFFERS_MISSING`,
 `SELLER_OFFER_MODEL_UNSUPPORTED`, `SELLER_OFFER_ENGINE_UNSUPPORTED`,
 `SELLER_OFFER_REASONING_UNSUPPORTED`, `SELLER_OFFER_API_KEY_MISSING`,
-`SELLER_OFFER_API_KEY_UNSAFE` or `SELLER_PAID_EXECUTION_UNAVAILABLE`.
+`SELLER_OFFER_API_KEY_UNSAFE`, `SELLER_PAID_EXECUTION_UNAVAILABLE`,
+`SELLER_PAID_METERING_UNRECOUNTED` or `SELLER_PAYMENT_DESCRIPTION_INVALID` (the
+payment server charges another fee or treasury, uses another network or asset,
+or pays out to the owner or to its own fee payer or authorizer).
 `pnpm gyblos doctor` also names the `[[offers]]` entry a code is about.
 
 `pnpm gyblos config validate --config "$GYBLOS_CONFIG"` explains file problems

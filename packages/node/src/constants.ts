@@ -1,5 +1,7 @@
 // Seller node lifecycle states and the local role-config schema version. Values only; no wallet,
 // network or process actions.
+import { PAYMENT_ERROR_CODES } from '@gyblos/protocol/constants';
+
 export const NODE_STATES = {
   STOPPED: 'stopped',
   STARTING: 'starting',
@@ -39,6 +41,10 @@ export const NODE_ERROR_CODES = {
   SELLER_OFFER_API_KEY_UNSAFE: 'SELLER_OFFER_API_KEY_UNSAFE',
   SELLER_OFFERS_MISSING: 'SELLER_OFFERS_MISSING',
   SELLER_PAID_EXECUTION_UNAVAILABLE: 'SELLER_PAID_EXECUTION_UNAVAILABLE',
+  // A paid offer whose usage cannot be recounted with the model's pinned public tokenizer.
+  SELLER_PAID_METERING_UNRECOUNTED: 'SELLER_PAID_METERING_UNRECOUNTED',
+  // The payment server pays to its own fee payer, charges another fee or uses another network.
+  SELLER_PAYMENT_DESCRIPTION_INVALID: 'SELLER_PAYMENT_DESCRIPTION_INVALID',
 } as const;
 export type NodeErrorCode =
   (typeof NODE_ERROR_CODES)[keyof typeof NODE_ERROR_CODES];
@@ -88,6 +94,20 @@ export const SELLER_PUBLIC_RECORDS = {
   catalogMs: 60_000,
   renewBeforeMs: 20_000,
 } as const;
+
+// Paid settlement: how long a terminal waits for the claim (well under the 180 s request deadline,
+// which also covers generation), and the backoff for claims reported pending. The schedule ends well
+// within a channel's lifetime, so a claim never outlives the payer's authorization unnoticed.
+export const PAID_SETTLEMENT = {
+  waitMs: 20_000,
+  // Front-loaded into the channel's claim window (about two minutes), after which a claim lapses.
+  retryDelaysMs: [2_000, 5_000, 10_000, 20_000, 40_000],
+} as const;
+// Claim failures a later attempt with the same charge may overcome.
+export const PAID_RETRYABLE_PAYMENT_CODES: readonly string[] = [
+  PAYMENT_ERROR_CODES.UNAVAILABLE,
+  PAYMENT_ERROR_CODES.JOURNAL_UNAVAILABLE,
+];
 
 export const SELLER_PUBLICATION_STATES = {
   IDLE: 'idle',

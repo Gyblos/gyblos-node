@@ -13,7 +13,7 @@ import type { Engine } from '@gyblos/protocol/engine';
 
 import type { ControlOffer, ControlOffers } from './control-offers';
 import type { FreeMeter } from './free-meter';
-import type { FreeSellerOffer } from './seller-offer';
+import type { SellerCatalogOffer } from './seller-offer';
 
 export interface SellerOfferObservation {
   // Background renewal; onAvailable runs after a check leaves the offer valid and idle.
@@ -24,7 +24,7 @@ export interface SellerOfferObservation {
 export interface LiveSellerOffer extends ControlOffer {
   // Position in gyblos.toml [[offers]].
   index: number;
-  offer: FreeSellerOffer;
+  offer: SellerCatalogOffer;
   // The readiness-tracking engine: generation marks this offer busy.
   engine: Engine;
   meter: FreeMeter;

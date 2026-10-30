@@ -1,6 +1,6 @@
-// Starts the P2P seller for its free offers: warmup of the seller's own engines, signed public records and
-// the Iroh bridge; offers not ready at startup are warmed again in the background. Tears everything down
-// in reverse order on failure. Paid selling is off until phase 2.
+// Starts the P2P seller: warms its engines, signs public records and serves the Iroh bridge, warming late
+// offers in the background. Paid offers need a caller-supplied payment server, else they refuse
+// startup. Tears everything down in reverse order on failure.
 import { EndpointTicket } from '@number0/iroh';
 
 import {
@@ -11,7 +11,11 @@ import {
 } from '@gyblos/config';
 import { FreeSellerLedger } from '@gyblos/core/free-admission';
 import { publishRecord } from '@gyblos/discovery-http';
-import { CONTROL_CODES, P2P_ROLES } from '@gyblos/protocol/constants';
+import {
+  CONTROL_CODES,
+  OFFER_PRICING_KINDS,
+  P2P_ROLES,
+} from '@gyblos/protocol/constants';
 import { ControlError } from '@gyblos/protocol/control-validation';
 import type { TelemetrySink } from '@gyblos/protocol/telemetry';
 import { saveJson } from '@gyblos/runtime';
@@ -30,13 +34,24 @@ import { assertRoleHome } from './home';
 import { openSellerSequence } from './public-sequence';
 import { createSellerPublisher } from './publisher';
 import { createSellerReceiptRuntime, openReceiptStore } from './receipts';
-import { loadRole, nodeSecret, rolePath, roleSigner } from './roles';
+import {
+  loadRole,
+  nodeSecret,
+  rolePath,
+  roleSigner,
+  type RoleConfig,
+} from './roles';
 import { SellerOfferSet } from './seller-offer-set';
 import {
   liveSellerOffer,
   prepareSellerOffers,
   retrySellerOffers,
 } from './seller-offers';
+import {
+  openSellerPaid,
+  type SellerPaid,
+  type SellerPayments,
+} from './seller-paid';
 import { loadSellerSettings, type SellerSettings } from './seller-settings';
 import { serveSellerTransport } from './seller-transport';
 import { createLocalTelemetry } from './telemetry-startup';
@@ -84,7 +99,13 @@ function offerStatus(settings: SellerSettings, offers: SellerOfferSet) {
 }
 
 export async function startSeller(
-  options: { telemetry?: TelemetrySink; bind?: typeof bindEndpoint } = {},
+  options: {
+    telemetry?: TelemetrySink;
+    bind?: typeof bindEndpoint;
+    // Builds the payment server for paid offers from the seller's role; without it, paid offers
+    // refuse startup with SELLER_PAID_EXECUTION_UNAVAILABLE.
+    payments?: (role: RoleConfig) => Promise<SellerPayments>;
+  } = {},
 ) {
   const startedAt = Date.now();
   const disposers: (() => Promise<void>)[] = [];
@@ -105,8 +126,13 @@ export async function startSeller(
     const config = await loadRole(P2P_ROLES.SELLER);
     if (config.role !== P2P_ROLES.SELLER)
       throw new Error('Seller role required.');
-    // Settings refuse missing and paid offers, so the daemon only ever serves a free listing.
-    const settings = await loadSellerSettings(process.env);
+    // Settings refuse missing offers, and paid offers unless a payment server can be built.
+    const settings = await loadSellerSettings(process.env, undefined, {
+      paidSelling: options.payments !== undefined,
+    });
+    const sellsPaid = settings.offers.some(
+      ({ offer }) => offer.kind === OFFER_PRICING_KINDS.PAID,
+    );
     const telemetry = createLocalTelemetry({
       enabled: settings.telemetryFile,
       environment: process.env,
@@ -138,6 +164,19 @@ export async function startSeller(
     const offers = new SellerOfferSet();
     for (const warmed of ready)
       offers.add(await liveSellerOffer(warmed, offerDependencies));
+    const { payments } = options;
+    let paid: SellerPaid | undefined;
+    if (sellsPaid && payments) {
+      await stage('payments');
+      paid = await openSellerPaid(() => payments(config), {
+        owner: owner.address,
+        mint: config.mint,
+        nodeId: config.nodeId,
+        startedAt,
+        offers: () => offers.all(),
+      });
+      disposers.push(paid.close);
+    }
     await stage('iroh-endpoint');
     const { relayOnly } = settings;
     const endpoint = await (options.bind ?? bindEndpoint)(
@@ -146,6 +185,7 @@ export async function startSeller(
         relayOnly,
         control: true,
         freeExecution: true,
+        paidExecution: paid !== undefined,
         receipts: true,
         http: false,
         bindAddress: settings.irohBind,
@@ -193,10 +233,11 @@ export async function startSeller(
         : undefined,
       nodeId: config.nodeId,
       nodeSigner,
-      mint: config.mint,
-      payTo: config.payTo ?? owner.address,
-      feePayer: owner.address,
-      authorizer: owner.address,
+      // Quotes name the payment server's own terms when selling paid; free quotes never use them.
+      mint: paid?.description.mint ?? config.mint,
+      payTo: paid?.description.payTo ?? config.payTo ?? owner.address,
+      feePayer: paid?.description.feePayer ?? owner.address,
+      authorizer: paid?.description.authorizer ?? owner.address,
       endpoint: endpointInfo,
       relayOnly,
       offers,
@@ -229,6 +270,7 @@ export async function startSeller(
             settings.limits.maxFreeBuyers,
           ),
         }),
+        paid: paid?.service,
       },
       { relayOnly, limits: settings.limits },
     );
@@ -295,6 +337,7 @@ export async function startSeller(
       publication: publication ? () => publication.health() : undefined,
       receipts: receipts.health,
       telemetry: telemetry.health,
+      payments: paid ? () => paid.health() : undefined,
     };
   } catch (error) {
     await close();

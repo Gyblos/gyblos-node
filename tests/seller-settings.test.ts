@@ -1,5 +1,5 @@
-// Seller startup reads gyblos.toml: a servable free offer becomes the public listing, a missing or paid
-// offer fails closed (paid v1 selling is off until phase 2) and so does anything the daemon cannot honor.
+// Seller startup reads gyblos.toml: a servable offer becomes the public listing; a missing offer, a paid
+// offer while paid selling is not wired, and anything the daemon cannot honor fail closed.
 // Offline; files live in a disposable directory and values are synthetic.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -129,16 +129,51 @@ void test('a free offer lists zero prices with its caps', () => {
     inputAtomicPerMtok: '0',
     outputAtomicPerMtok: '0',
   });
-  assert.deepEqual(listedPrices(PAID_LISTING), PAID_LISTING.prices);
+  // Buyers see the seller's price plus the protocol fee, rounded up.
+  assert.deepEqual(listedPrices(PAID_LISTING), {
+    inputAtomicPerMtok: '1030000',
+    outputAtomicPerMtok: '2060000',
+  });
 });
 
-void test('paid offers fail closed with the offer position: paid v1 selling is off until phase 2', () => {
+void test('paid offers fail closed with the offer position unless paid selling is wired', () => {
   for (const file of [served({ pricing: POC_PRICE }), served()])
     rejects(
       NODE_ERROR_CODES.SELLER_PAID_EXECUTION_UNAVAILABLE,
       () => sellerSettings(file, {}),
       0,
     );
+});
+
+void test('with paid selling wired, a recounted paid offer lists the seller price', () => {
+  const settings = sellerSettings(
+    served({ pricing: POC_PRICE }),
+    {},
+    {
+      paidSelling: true,
+    },
+  );
+  assert.deepEqual(settings.offers[0]!.offer, PAID_LISTING);
+  // A model without the pinned public tokenizer cannot be recounted, so it cannot be sold.
+  rejects(
+    NODE_ERROR_CODES.SELLER_PAID_METERING_UNRECOUNTED,
+    () =>
+      sellerSettings(
+        fileConfig(
+          BASE +
+            offer({
+              model: 'acme/chat-small',
+              engine:
+                '{ kind = "openai", url = "https://api.example.com/v1", api_key_env = "UPSTREAM_API_KEY", context_tokens = 131072 }',
+              pricing: POC_PRICE,
+              extra: 'custom = true\nreasoning = ["off"]',
+            }),
+        ),
+        { UPSTREAM_API_KEY: 'synthetic' },
+        { paidSelling: true },
+      ),
+    0,
+  );
 });
 
 void test('offers the daemon cannot serve fail closed with a static code', () => {

@@ -123,6 +123,8 @@ export async function startAcceptanceHost(options: AcceptanceHostOptions) {
       relayOnly: false,
       sequence,
       now: clock.now,
+      // The v1 PoC terms carry no protocol fee.
+      protocolFeeBps: 0,
     });
     const sent: SignedPublicV2[] = [];
     publication = createSellerPublisher({

@@ -148,8 +148,8 @@ pnpm node:start
 ```
 
 - The seller serves every free offer in `gyblos.toml`; without one it does not
-  start (`SELLER_OFFERS_MISSING`). Paid selling is off until it returns as a
-  payment plugin, so a paid offer stops startup
+  start (`SELLER_OFFERS_MISSING`). Paid v2 selling is implemented, but the
+  daemon has no chain wiring yet, so a paid offer still stops startup
   (`SELLER_PAID_EXECUTION_UNAVAILABLE`); the v1 paid path remains in the lab
   gates only.
 - The seller runs its own Ollama; the daemon never starts it. Startup warms each

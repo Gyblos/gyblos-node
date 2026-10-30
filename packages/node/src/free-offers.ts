@@ -2,7 +2,10 @@
 // and token caps), all on the seller's one ledger, behind the free router. An offer's service is built
 // once, so its caps survive while it is listed, unlisted and listed again.
 import type { FreeSellerLedger } from '@gyblos/core/free-admission';
-import type { EngineKind } from '@gyblos/protocol/constants';
+import {
+  OFFER_PRICING_KINDS,
+  type EngineKind,
+} from '@gyblos/protocol/constants';
 import type { TelemetrySink } from '@gyblos/protocol/telemetry';
 
 import { createSellerFreeExecution } from './free-execution';
@@ -12,6 +15,7 @@ import {
   type FreeOfferService,
 } from './free-router';
 import type { SellerReceiptPublisher } from './receipt-seller';
+import type { FreeSellerOffer } from './seller-offer';
 import type { LiveSellerOffer } from './seller-offer-set';
 
 export interface SellerFreeOffersOptions {
@@ -31,13 +35,18 @@ export interface SellerFreeOffersOptions {
   ledger: FreeSellerLedger;
 }
 
-// Reads the offers on every request, so an offer warmed later is served from then on.
+type FreeLiveOffer = LiveSellerOffer & { offer: FreeSellerOffer };
+const isFree = (live: LiveSellerOffer): live is FreeLiveOffer =>
+  live.offer.kind === OFFER_PRICING_KINDS.FREE;
+
+// Reads the free offers on every request, so an offer warmed later is served from then on; paid
+// offers are served by the paid router.
 export function createSellerFreeOffers(
   offers: () => readonly LiveSellerOffer[],
   options: SellerFreeOffersOptions,
 ): FreeOfferService {
   const services = new Map<number, FreeOffer>();
-  const serve = (live: LiveSellerOffer) => {
+  const serve = (live: FreeLiveOffer) => {
     const held = services.get(live.index);
     if (held) return held;
     const created: FreeOffer = {
@@ -68,5 +77,5 @@ export function createSellerFreeOffers(
     services.set(live.index, created);
     return created;
   };
-  return createSellerFreeRouter(() => offers().map(serve));
+  return createSellerFreeRouter(() => offers().filter(isFree).map(serve));
 }

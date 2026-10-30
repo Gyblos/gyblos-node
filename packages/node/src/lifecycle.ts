@@ -3,6 +3,7 @@
 import { NODE_STATES, type NodeState } from './constants';
 import type { createSellerPublisher } from './publisher';
 import type { createSellerReceiptRuntime } from './receipt-seller';
+import type { SellerPaidHealth } from './seller-paid';
 import type { createLocalTelemetry } from './telemetry-startup';
 
 export interface NodeHost {
@@ -10,6 +11,7 @@ export interface NodeHost {
   receipts?: ReturnType<typeof createSellerReceiptRuntime>['health'];
   publication?: ReturnType<typeof createSellerPublisher>['health'];
   telemetry?: ReturnType<typeof createLocalTelemetry>['health'];
+  payments?: () => SellerPaidHealth;
 }
 
 export function createNodeLifecycle(startHost: () => Promise<NodeHost>) {
@@ -49,6 +51,7 @@ export function createNodeLifecycle(startHost: () => Promise<NodeHost>) {
         ...(host?.receipts ? { receipts: host.receipts() } : {}),
         ...(host?.publication ? { publication: host.publication() } : {}),
         ...(host?.telemetry ? { telemetry: host.telemetry() } : {}),
+        ...(host?.payments ? { payments: host.payments() } : {}),
       };
     },
   };

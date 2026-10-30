@@ -1,8 +1,9 @@
 // Seller startup settings from gyblos.toml (GYBLOS_CONFIG, else ./gyblos.toml when present; relative to the
 // working directory) under flag > env > file > default. Without a file the values equal today's
 // environment-only startup; invalid environment values now fail here with NODE_CONFIG_INVALID.
-// The daemon serves every listed free offer it can warm; each offer's engine plugin refuses what it cannot
-// honor, and paid offers are refused until paid selling returns as a plugin (phase 2).
+// The daemon serves every listed offer it can warm; each offer's engine plugin refuses what it cannot
+// honor. Paid offers are refused unless the caller has paid selling wired, and then only when their
+// usage is recounted with the model's pinned public tokenizer.
 import { resolve } from 'node:path';
 
 import { NODE_ENVIRONMENT, type HomeEnvironment } from '@gyblos/config';
@@ -27,8 +28,12 @@ import {
   type NodeOffer,
 } from './node-config';
 import { sellerLimits, type SellerLimits } from './node-config-limits';
+import { pricePerMtokToAtomicPerMtok } from './node-config-price';
 import { resolveNodeConfig } from './node-config-resolve';
-import type { FreeSellerOffer } from './seller-offer';
+import {
+  recountsWithPinnedTokenizer,
+  type SellerCatalogOffer,
+} from './seller-offer';
 
 export interface SellerSettings {
   telemetryFile: boolean;
@@ -43,8 +48,8 @@ export interface SellerSettings {
 }
 
 export interface SellerOfferSettings {
-  // The listing: catalog model, reasoning and free caps.
-  offer: FreeSellerOffer;
+  // The listing: catalog model, reasoning, and free caps or the seller's own price.
+  offer: SellerCatalogOffer;
   // The same offer as its engine plugin sees it.
   engine: SellerEngineOffer;
 }
@@ -66,6 +71,13 @@ const fail = (code: NodeErrorCode, context?: NodeErrorContext): never => {
 interface OfferEnvironment {
   values: HomeEnvironment;
   relayTokenEnv: string;
+  paidSelling: boolean;
+}
+
+// What the caller can serve beyond free offers.
+export interface SellerSettingsOptions {
+  // The daemon has a payment server for paid offers.
+  paidSelling?: boolean;
 }
 const GYBLOS_VARIABLE = /^GYBLOS_/;
 
@@ -95,9 +107,29 @@ function offerSettings(
       refuse(NODE_ERROR_CODES.SELLER_OFFER_API_KEY_MISSING);
   }
   const { pricing } = offer;
-  // Paid v1 selling is off until it returns as a payment plugin (phase 2).
-  if (pricing.kind !== OFFER_PRICING_KINDS.FREE)
-    return refuse(NODE_ERROR_CODES.SELLER_PAID_EXECUTION_UNAVAILABLE);
+  if (pricing.kind === OFFER_PRICING_KINDS.PAID) {
+    if (!environment.paidSelling)
+      return refuse(NODE_ERROR_CODES.SELLER_PAID_EXECUTION_UNAVAILABLE);
+    // Paid charges are what the buyer can recount; a provider's declared usage is not.
+    if (!recountsWithPinnedTokenizer(offer.model))
+      return refuse(NODE_ERROR_CODES.SELLER_PAID_METERING_UNRECOUNTED);
+    return {
+      offer: {
+        modelId: offer.model.id,
+        reasoning: [...offer.reasoning],
+        kind: OFFER_PRICING_KINDS.PAID,
+        prices: {
+          inputAtomicPerMtok: String(
+            pricePerMtokToAtomicPerMtok(pricing.inputPerMtok),
+          ),
+          outputAtomicPerMtok: String(
+            pricePerMtokToAtomicPerMtok(pricing.outputPerMtok),
+          ),
+        },
+      },
+      engine,
+    };
+  }
   return {
     offer: {
       modelId: offer.model.id,
@@ -135,11 +167,16 @@ export function sellerBaseSettings(
 export function sellerSettings(
   file: NodeConfig | undefined,
   environment: HomeEnvironment,
+  options: SellerSettingsOptions = {},
 ): SellerSettings {
   const { base, offers, relayTokenEnv } = resolveSeller(file, environment);
   return {
     ...base,
-    offers: catalogOffers(offers, { values: environment, relayTokenEnv }),
+    offers: catalogOffers(offers, {
+      values: environment,
+      relayTokenEnv,
+      paidSelling: options.paidSelling ?? false,
+    }),
   };
 }
 
@@ -196,15 +233,17 @@ function resolveSeller(
 export async function loadSellerSettings(
   environment: HomeEnvironment,
   cwd = process.cwd(),
+  options: SellerSettingsOptions = {},
 ): Promise<SellerSettings> {
   const explicit = environment[NODE_ENVIRONMENT.config];
   const result = await readNodeConfigFile(
     resolve(cwd, explicit || NODE_CONFIG_FILENAME),
   );
-  if (result.ok) return sellerSettings(result.config, environment);
+  if (result.ok) return sellerSettings(result.config, environment, options);
   const missing =
     result.issues.length === 1 &&
     result.issues[0]!.code === NODE_CONFIG_ISSUE_CODES.FILE_NOT_FOUND;
-  if (missing && !explicit) return sellerSettings(undefined, environment);
+  if (missing && !explicit)
+    return sellerSettings(undefined, environment, options);
   return fail(NODE_ERROR_CODES.NODE_CONFIG_INVALID);
 }

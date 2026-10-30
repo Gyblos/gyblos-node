@@ -1,5 +1,5 @@
-// The v1 proof-of-concept paid listing at its fixed rates per million tokens. Paid acceptance still quotes it;
-// the seller daemon never serves it, since paid selling is off until it returns as a plugin.
+// The v1 proof-of-concept paid listing at its fixed rates per million tokens, without the v2 protocol fee.
+// Paid acceptance still quotes it; the seller daemon never serves it.
 import { PRICES } from '@gyblos/core/constants';
 import { atomicPerTokenPricesV2 } from '@gyblos/core/pricing-v2';
 import type { SellerCatalogOffer } from '@gyblos/node/seller-offer';

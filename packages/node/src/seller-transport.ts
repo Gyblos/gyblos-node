@@ -1,11 +1,12 @@
-// Wires the seller's control and free services to isolated Iroh channels. The daemon binds no HTTP ALPN
-// while paid selling is off, so the bridge's HTTP target is never dialed.
+// Wires the seller's control, free and paid services to isolated Iroh channels. The daemon binds no HTTP
+// ALPN (paid v2 runs on its own stream), so the bridge's HTTP target is never dialed.
 import type { Endpoint } from '@number0/iroh';
 
 import { LOCALHOST, PORTS } from '@gyblos/config';
 import type { ControlService } from '@gyblos/transport-iroh/control-server';
 import type { FreeExecutionService } from '@gyblos/transport-iroh/free-server';
 import { serveIroh } from '@gyblos/transport-iroh/iroh-server';
+import type { PaidExecutionService } from '@gyblos/transport-iroh/paid-server';
 import type { ReceiptService } from '@gyblos/transport-iroh/receipt-service';
 
 import type { SellerLimits } from './node-config-limits';
@@ -16,6 +17,7 @@ export function serveSellerTransport(
     control: ControlService;
     receipts?: ReceiptService;
     free: FreeExecutionService | undefined;
+    paid?: PaidExecutionService;
   },
   options: { relayOnly: boolean; limits: SellerLimits },
 ) {
@@ -27,5 +29,6 @@ export function serveSellerTransport(
     services.free,
     options.limits.transport,
     services.receipts,
+    services.paid,
   );
 }
