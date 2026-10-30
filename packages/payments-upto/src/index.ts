@@ -9,3 +9,8 @@ export {
   uptoTermsFor,
   type UptoChannelSettings,
 } from './terms';
+export {
+  openUptoFileLedger,
+  type UptoFileLedgerOptions,
+  type UptoLedgerPaths,
+} from './file-ledger';

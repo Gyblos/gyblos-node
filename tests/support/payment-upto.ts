@@ -15,6 +15,7 @@ import {
   createUptoVerifier,
   memoryUptoStore,
   type UptoClientHints,
+  type UptoStore,
 } from 'x402-upto-metered';
 
 import {
@@ -60,11 +61,17 @@ async function hints(): Promise<UptoClientHints> {
   };
 }
 
-function seller(
+// A fresh channel store for one seller; disposers run when the rig closes.
+export type UptoStoreFactory = (
+  dispose: (cleanup: () => Promise<void>) => void,
+) => Promise<UptoStore>;
+
+async function seller(
   ledger: UptoLedger,
   description: PaymentDescription,
   slot: string,
   options: PaymentRigOptions,
+  store: UptoStore,
 ) {
   const chain = ledgerChain(
     ledger,
@@ -76,7 +83,7 @@ function seller(
     settings: SETTINGS,
     seller: createUptoSeller({
       chain,
-      store: memoryUptoStore(),
+      store,
       now: () => ledger.now,
       own: uptoSellerTerms(description, SETTINGS),
     }),
@@ -110,8 +117,19 @@ async function signedWith(
   }
 }
 
-export const uptoPaymentHarness: PaymentHarness = {
-  async start(options): Promise<PaymentRig> {
+export function uptoHarness(newStore: UptoStoreFactory): PaymentHarness {
+  return { start: (options) => startRig(options, newStore) };
+}
+
+export const uptoPaymentHarness = uptoHarness(async () => memoryUptoStore());
+
+async function startRig(
+  options: PaymentRigOptions,
+  newStore: UptoStoreFactory,
+): Promise<PaymentRig> {
+  {
+    const disposers: (() => Promise<void>)[] = [];
+    const store = () => newStore((cleanup) => disposers.push(cleanup));
     const ledger = newLedger(START_MS);
     const recent = await hints();
     const payer = await generateKeyPairSigner();
@@ -143,13 +161,20 @@ export const uptoPaymentHarness: PaymentHarness = {
         ledger,
         failJournal: options.failJournal,
       }),
-      server: seller(ledger, description, recent.recentSlot, options),
+      server: await seller(
+        ledger,
+        description,
+        recent.recentSlot,
+        options,
+        await store(),
+      ),
       serverWith: async (field) =>
         seller(
           ledger,
           { ...description, [field]: others[field] },
           recent.recentSlot,
           options,
+          await store(),
         ),
       foreignAuthorization: async (terms) =>
         signedWith(
@@ -189,7 +214,9 @@ export const uptoPaymentHarness: PaymentHarness = {
       advance(ms) {
         ledger.now += ms;
       },
-      async close() {},
+      async close() {
+        for (const cleanup of disposers) await cleanup();
+      },
     };
 
     function rigTerms(overrides: Partial<PaymentTerms>): PaymentTerms {
@@ -202,5 +229,5 @@ export const uptoPaymentHarness: PaymentHarness = {
         ...overrides,
       };
     }
-  },
-};
+  }
+}

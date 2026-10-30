@@ -479,6 +479,9 @@ importers:
 
   packages/payments-upto:
     dependencies:
+      '@gyblos/config':
+        specifier: workspace:*
+        version: link:../config
       '@gyblos/protocol':
         specifier: workspace:*
         version: link:../protocol
