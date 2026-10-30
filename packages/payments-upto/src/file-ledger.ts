@@ -61,6 +61,42 @@ function prune(document: LedgerDocument, cutoff: number): void {
   }
 }
 
+// The chain's deposit, claim and pending-signature records inside the same ledger document.
+function chainStore(
+  load: () => Promise<LedgerDocument>,
+  mutate: (change: (document: LedgerDocument) => void) => Promise<void>,
+): UptoChainStore {
+  return {
+    async getDeposit(channelId) {
+      const sentAt = (await load()).deposits[channelId];
+      return sentAt === undefined ? undefined : { channelId, sentAt };
+    },
+    putDeposit: ({ channelId, sentAt }) =>
+      mutate((document) => {
+        document.deposits[channelId] = sentAt;
+      }),
+    async getClaim(channelId) {
+      const claim = (await load()).claims[channelId];
+      return claim && { channelId, ...claim };
+    },
+    putClaim: ({ channelId, ...claim }) =>
+      mutate((document) => {
+        document.claims[channelId] = claim;
+      }),
+    async getPending(key) {
+      return (await load()).pending[key];
+    },
+    putPending: (key, signature) =>
+      mutate((document) => {
+        document.pending[key] = signature;
+      }),
+    deletePending: (key) =>
+      mutate((document) => {
+        delete document.pending[key];
+      }),
+  };
+}
+
 export async function openUptoFileLedger(
   options: UptoFileLedgerOptions,
 ): Promise<{ channels: UptoStore; chain: UptoChainStore }> {
@@ -122,35 +158,5 @@ export async function openUptoFileLedger(
       }),
   };
 
-  const chain: UptoChainStore = {
-    async getDeposit(channelId) {
-      const sentAt = (await load()).deposits[channelId];
-      return sentAt === undefined ? undefined : { channelId, sentAt };
-    },
-    putDeposit: ({ channelId, sentAt }) =>
-      mutate((document) => {
-        document.deposits[channelId] = sentAt;
-      }),
-    async getClaim(channelId) {
-      const claim = (await load()).claims[channelId];
-      return claim && { channelId, ...claim };
-    },
-    putClaim: ({ channelId, ...claim }) =>
-      mutate((document) => {
-        document.claims[channelId] = claim;
-      }),
-    async getPending(key) {
-      return (await load()).pending[key];
-    },
-    putPending: (key, signature) =>
-      mutate((document) => {
-        document.pending[key] = signature;
-      }),
-    deletePending: (key) =>
-      mutate((document) => {
-        delete document.pending[key];
-      }),
-  };
-
-  return { channels, chain };
+  return { channels, chain: chainStore(load, mutate) };
 }
