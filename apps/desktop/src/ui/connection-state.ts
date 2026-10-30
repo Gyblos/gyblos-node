@@ -40,7 +40,9 @@ export function saveConnection(
 // A tool connection must display and save a model from its own supplied options.
 export function connectionModelId(
   preferred: string,
-  _available: readonly [{ id: string }, ...{ id: string }[]],
+  available: readonly [{ id: string }, ...{ id: string }[]],
 ): string {
-  return preferred;
+  return (
+    available.find((model) => model.id === preferred)?.id ?? available[0].id
+  );
 }
