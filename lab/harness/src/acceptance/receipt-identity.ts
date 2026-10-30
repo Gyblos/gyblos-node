@@ -62,6 +62,7 @@ async function identitySnapshot(run: ReceiptScenario) {
   return {
     sequence: BigInt(controlAtomic(binding.sequence)),
     owner: binding.owner,
+    asset: binding.asset,
     revoked: row.revoked,
   };
 }
@@ -127,9 +128,10 @@ export async function receiptIdentityPhases(
   acceptanceAssert(
     unchanged.sequence === before.sequence &&
       unchanged.owner === before.owner &&
+      unchanged.asset === before.asset &&
       unchanged.revoked === before.revoked,
   );
-  run.registry.revoke(run.subject().nodeId);
+  const restore = run.registry.revoke(run.subject().nodeId);
   await deny(RECEIPT_ACCEPTANCE_CASES.REVOKED);
   acceptanceAssert((await identitySnapshot(run)).revoked);
   await run.restartBuyer(true);
@@ -142,12 +144,13 @@ export async function receiptIdentityPhases(
   cases.push(RECEIPT_ACCEPTANCE_CASES.MANUAL_OVERRIDE);
   await run.restartBuyer();
   await deny(RECEIPT_ACCEPTANCE_CASES.OVERRIDE_REMOVED);
-  await run.registry.bind(run.subject(), initial);
+  restore();
   await run.restartBuyer();
   await deny(RECEIPT_ACCEPTANCE_CASES.REVOCATION_RESTART);
   acceptanceAssert(
     (await identitySnapshot(run)).revoked &&
-      (await identitySnapshot(run)).sequence === initial,
+      (await identitySnapshot(run)).sequence === initial &&
+      (await identitySnapshot(run)).asset === before.asset,
   );
   const changedOwner = await generateKeyPairSigner();
   await run.registry.bind(
