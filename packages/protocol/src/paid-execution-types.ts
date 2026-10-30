@@ -25,9 +25,10 @@ export interface PaidCharge {
   chargedAtomic: string;
 }
 
-// Present once a deposit was admitted: the settlement, or a charge still being settled.
+// Present once a deposit was admitted: the settlement, a charge still being settled, or a claim the
+// chain refused for good, so nothing was charged and the whole deposit returns to the buyer.
 export type PaidPayment =
-  | { settlement: PaymentSettlement; pending?: never }
+  | { settlement: PaymentSettlement; pending?: never; lapsed?: never }
   | {
       pending: {
         channelId: string;
@@ -35,6 +36,12 @@ export type PaidPayment =
         transaction: string | null;
       };
       settlement?: never;
+      lapsed?: never;
+    }
+  | {
+      lapsed: { channelId: string };
+      settlement?: never;
+      pending?: never;
     };
 
 export type PaidExecutionFailure = {

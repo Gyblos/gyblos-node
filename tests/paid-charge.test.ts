@@ -161,7 +161,7 @@ void test('the golden vector charges are the quote prices applied to the recount
     );
     checked++;
   }
-  assert.equal(checked, 4);
+  assert.equal(checked, 5);
 });
 
 void test('no output charges nothing, and huge counts or prices stop at the ceiling', async () => {

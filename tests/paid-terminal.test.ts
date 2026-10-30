@@ -233,3 +233,86 @@ void test('the free channel still reports delivered output only with cannot-cont
     FreeExecutionError,
   );
 });
+
+void test('a lapsed claim names the channel and charges nothing on chain', async () => {
+  const paid = await request();
+  const verifier = await afterDelta(paid, 'Hi');
+  const lapsed = {
+    lapsed: { channelId: paid.payment.channelId },
+  };
+  const accepted = await verifier.accept(
+    await terminal(paid, 1, {
+      error: {
+        code: PAID_EXECUTION_CODES.CANCELLED,
+        delivered: { outputTokens: 1 },
+      },
+      charge: { inputTokens: 3, outputTokens: 1, chargedAtomic: '1' },
+      payment: lapsed,
+    }),
+  );
+  assert.deepEqual(accepted.terminal?.payment, lapsed);
+  // Another channel, or extra fields, are refused.
+  for (const payment of [
+    { lapsed: { channelId: 'd'.repeat(64) } },
+    { lapsed: { channelId: paid.payment.channelId, chargedAtomic: '1' } },
+  ])
+    await assert.rejects(
+      (await afterDelta(paid, 'Hi')).accept(
+        await terminal(paid, 1, {
+          error: {
+            code: PAID_EXECUTION_CODES.CANCELLED,
+            delivered: { outputTokens: 1 },
+          },
+          charge: { inputTokens: 3, outputTokens: 1, chargedAtomic: '1' },
+          payment,
+        }),
+      ),
+      PaidExecutionError,
+    );
+});
+
+void test('a lapsed payment never mixes with another variant or a malformed channel', async () => {
+  const paid = await request();
+  const channelId = paid.payment.channelId;
+  const stop = {
+    code: PAID_EXECUTION_CODES.CANCELLED,
+    delivered: { outputTokens: 1 },
+  };
+  const charge = { inputTokens: 3, outputTokens: 1, chargedAtomic: '1' };
+  for (const payment of [
+    { lapsed: { channelId }, pending: settled(paid, '1').settlement },
+    { lapsed: { channelId }, ...settled(paid, '1') },
+    { lapsed: { channelId: 'c-'.repeat(8) } },
+    { lapsed: {} },
+  ])
+    await assert.rejects(
+      (await afterDelta(paid, 'Hi')).accept(
+        await terminal(paid, 1, { error: stop, charge, payment }),
+      ),
+      PaidExecutionError,
+    );
+  // On a result, and with nothing delivered and nothing charged, lapsed is accepted.
+  const result = await (
+    await afterDelta(paid, 'Hi.')
+  ).accept(
+    await terminal(paid, 1, {
+      result: {
+        text: 'Hi.',
+        usage: { inputTokens: 3, outputTokens: 2 },
+        finishReason: ENGINE_DONE_REASONS.STOP,
+      },
+      charge: { inputTokens: 3, outputTokens: 2, chargedAtomic: '1' },
+      payment: { lapsed: { channelId } },
+    }),
+  );
+  assert.deepEqual(result.terminal?.payment, { lapsed: { channelId } });
+  const quiet = await createPaidStreamVerifier(paid);
+  const none = await quiet.accept(
+    await terminal(paid, 0, {
+      error: { code: PAID_EXECUTION_CODES.ENGINE },
+      charge: { inputTokens: 3, outputTokens: 0, chargedAtomic: '0' },
+      payment: { lapsed: { channelId } },
+    }),
+  );
+  assert.deepEqual(none.terminal?.payment, { lapsed: { channelId } });
+});
