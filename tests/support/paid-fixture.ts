@@ -16,14 +16,15 @@ import { PAID_EXECUTION } from '@gyblos/protocol/paid/constants';
 
 import { controlFixture } from './control-fixture';
 
-export async function request(): Promise<PaidExecutionRequest> {
+// A paid request with the identities and clock its quote verifies against.
+export async function paidSource() {
   const source = await controlFixture(false);
   const quote = await createControlQuote(
     source.request,
     source.context,
     source.ownerSigner,
   );
-  return buildPaidExecutionRequest(
+  const paid = buildPaidExecutionRequest(
     quote,
     {
       messages: [{ role: FREE_CHAT_ROLES.USER, content: 'Hello' }],
@@ -37,6 +38,16 @@ export async function request(): Promise<PaidExecutionRequest> {
       payload: Buffer.from('open').toString('base64'),
     },
   );
+  return {
+    paid,
+    trust: { owner: source.context.owner, nodeId: source.context.nodeId },
+    buyerNodeId: source.context.remoteNodeId,
+    now: source.context.now,
+  };
+}
+
+export async function request(): Promise<PaidExecutionRequest> {
+  return (await paidSource()).paid;
 }
 
 export async function header(paid: PaidExecutionRequest, sequence: number) {

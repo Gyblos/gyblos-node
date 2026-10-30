@@ -704,6 +704,31 @@ still being confirmed. Rules:
 Recomputing the charge from the quote's prices and recounted tokens, and
 checking the settlement on chain, belong to the buyer runtime.
 
+### Charge, budget and transport
+
+`@gyblos/core/paid-charge` prices recounted tokens at the quote's prices, which
+are what the buyer pays with the protocol fee included. `paidOutputAllowance`
+is the most output tokens the ceiling still pays for after the recounted input,
+within the requested tokens and the model context; it is null when the input
+with one output token already exceeds the ceiling or fills the context, so
+nothing is deposited. `paidCharge` charges `"0"` and zero output tokens when no
+text was delivered, and never more than the deposited ceiling.
+
+`@gyblos/transport-iroh/paid-server` and `./paid-client` carry the channel
+under the same admission, peer limits and deadlines as free streaming. The
+server reads one request of at most the paid bound, refusing an oversized
+length before reading its body, streams the service's deltas and sends the
+terminal the service returns. A terminal the wire refuses is never sent. A
+buyer leaving or a deadline aborts the service's signal and closes the
+connection; the admission lease is held until the service returns, because the
+service settles after the buyer leaves. The client returns every verified
+terminal, refusals included, and reports `sent` once the authorization may have
+reached the seller. A terminal followed by extra bytes, or by no end of stream
+before the ingress deadline, is an error, so the buyer then reconciles the
+channel on chain. The service must bound its own settlement wait and report the
+charge as pending, since the request lease is held until it returns. The
+endpoint advertises the ALPN only with `paidExecution`.
+
 ## Usage receipts v1
 
 Usage receipts are defined but not yet emitted. No execution channel, seller,

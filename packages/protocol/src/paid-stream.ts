@@ -9,6 +9,7 @@ import {
   controlObject,
 } from './control-validation';
 import { freeExecutionText } from './free-execution-validation';
+import { freeStreamDeltas } from './free-stream';
 import {
   paidExecutionDigest,
   parsePaidExecutionRequest,
@@ -98,6 +99,26 @@ export function decodePaidStreamEvent(bytes: Uint8Array) {
     reader.push(bytes);
     return parsePaidStreamEvent(reader.finish());
   });
+}
+// The single request frame that opens a paid stream, under the paid request bound.
+export function encodePaidExecutionRequest(value: unknown) {
+  return paidExecutionBoundary(() =>
+    encodeControlFrame(
+      parsePaidExecutionRequest(value),
+      PAID_EXECUTION.requestBytes,
+    ),
+  );
+}
+export function decodePaidExecutionRequest(bytes: Uint8Array) {
+  return paidExecutionBoundary(() => {
+    const reader = new ControlFrameReader(PAID_EXECUTION.requestBytes);
+    reader.push(bytes);
+    return parsePaidExecutionRequest(reader.finish());
+  });
+}
+// Splits delivered text into bounded deltas, with paid codes for text that cannot be sent.
+export function paidStreamDeltas(text: string): string[] {
+  return paidExecutionBoundary(() => [...freeStreamDeltas(text)]);
 }
 
 // The terminal must describe this request's deposit: delivered text was always deposited for, the

@@ -15,6 +15,7 @@ import {
   GYBLOS_ALPN,
   RECEIPT_CHANNEL,
 } from '@gyblos/protocol/constants';
+import { PAID_STREAM } from '@gyblos/protocol/paid/constants';
 
 import {
   connectionFamily,
@@ -31,6 +32,10 @@ import {
 import { handleIrohConnection } from './iroh-connection';
 import { createPeerLimiter } from './limiter';
 import { loopbackRequest } from './loopback';
+import {
+  handlePaidExecutionConnection,
+  type PaidExecutionService,
+} from './paid-server';
 import { relayOnlyAllows } from './paths';
 import { createReceiptServer } from './receipt-server';
 import type { ReceiptService } from './receipt-service';
@@ -48,6 +53,7 @@ export function serveIroh(
   freeExecution?: FreeExecutionService,
   limits: TransportLimits = TRANSPORT_LIMITS,
   receipts?: ReceiptService,
+  paidExecution?: PaidExecutionService,
 ) {
   const receiptServer = receipts ? createReceiptServer(receipts) : undefined;
   const limiter = createPeerLimiter(Date.now, limits);
@@ -198,6 +204,17 @@ export function serveIroh(
           () => closed,
           () => routeAllowed(connection),
           alpn === FREE_STREAM.alpn,
+        );
+        return;
+      }
+      if (alpn === PAID_STREAM.alpn && paidExecution) {
+        await handlePaidExecutionConnection(
+          connection,
+          paidExecution,
+          controller.signal,
+          () => (routeAllowed(connection) ? limiter.enter(peer) : undefined),
+          () => closed,
+          () => routeAllowed(connection),
         );
         return;
       }
