@@ -280,3 +280,37 @@ void test('the kit adapter reads base64 accounts and counts only confirmed, erro
   // A malformed signature is refused before any request.
   await assert.rejects(channels.signaturesSucceeded(['not a signature']));
 });
+
+void test('the channel state shows status, deposit and settled amount for reconciliation', async () => {
+  const open = await channel(UPTO_CHANNEL_ACCOUNT.statuses.OPEN, 0n);
+  const done = await channel(UPTO_CHANNEL_ACCOUNT.statuses.DISTRIBUTED, 250n);
+  for (const [found, expected] of [
+    [
+      open,
+      {
+        status: UPTO_CHANNEL_ACCOUNT.statuses.OPEN,
+        depositAtomic: '1000',
+        settledAtomic: '0',
+      },
+    ],
+    [
+      done,
+      {
+        status: UPTO_CHANNEL_ACCOUNT.statuses.DISTRIBUTED,
+        depositAtomic: '1000',
+        settledAtomic: '250',
+      },
+    ],
+  ] as const) {
+    const readers = createUptoChannelReaders(
+      rpc(new Map([[found.channelId, found.account]])),
+      { network: NETWORK, rentPayer: found.rentPayer },
+    );
+    assert.deepEqual(await readers.channelState(found.channelId), expected);
+    // Gone (closed and reclaimed) or never opened.
+    assert.equal(
+      await readers.channelState(String(await newAddress())),
+      undefined,
+    );
+  }
+});

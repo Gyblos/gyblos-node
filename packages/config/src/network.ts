@@ -28,14 +28,21 @@ export const IROH_RELAYS = {
 
 export const BUYER_RELAY_ONLY_ENV = 'GYBLOS_BUYER_RELAY_ONLY' as const;
 
+// The x402 payment-channels program's own devnet treasury: it receives escrow surplus. Never Gyblos's
+// fee treasury.
 export const DEVNET_TREASURY_OWNER =
   '4zTeC5mVqWLruDexgU2mV66p9t5vCA9JyiZqdGDUspap';
+
+// Gyblos's devnet fee treasury: a public test wallet, devnet only. Its key is held privately by the
+// founder outside any repository; the address is public on purpose.
+export const DEVNET_GYBLOS_TREASURY =
+  '4Ui1dfvqbFx9CtjXNcKajHdr7aKT1nbYRiYjB1s7umNy';
 
 // The network's protocol fee, added on top of every seller's price and split on chain to the treasury
 // in the same claim. Buyers and sellers both read it; changing the fee is changing bps here.
 export const PROTOCOL_FEE = {
   bps: 300,
-  treasury: DEVNET_TREASURY_OWNER,
+  treasury: DEVNET_GYBLOS_TREASURY,
 } as const;
 
 export { SYSTEM_PROGRAM_ADDRESS } from '@solana-program/system';
