@@ -41,7 +41,7 @@ void test('receipt startup acceptance refuses pre-cancellation before allocation
   });
 });
 void test(
-  'native product startup reaches confirmed receipts through the local index without prompt retry',
+  'native product startup verifies registry identity, receipts and telemetry without prompt retry',
   { skip: NATIVE_CAPABILITY.transportSkip },
   async () => {
     const previousFetch = globalThis.fetch;
@@ -53,6 +53,19 @@ void test(
     try {
       const report = await runReceiptAcceptance();
       assert.equal(report.ok, true);
+      assert.equal(report.identityEnabled, true);
+      for (const name of [
+        'registry-rpc-outage',
+        'registry-rpc-limit',
+        'registry-revoked',
+        'registry-manual-override',
+        'registry-override-removed',
+        'registry-revocation-restart',
+        'registry-binding-changed',
+        'registry-rollback-restart',
+        'registry-recovery-confirmed',
+      ])
+        assert.ok(report.cases.some((value) => value === name));
       assert.equal(report.nativeIroh, true);
       assert.equal(report.paymentsEnabled, false);
       assert.equal(report.index, 'in-process-memory');
@@ -60,6 +73,9 @@ void test(
       assert.ok(report.answers >= 3);
       assert.ok(report.confirmed >= 3);
       assert.equal(report.externalCalls, 0);
+      assert.ok(report.registryReads > 0);
+      assert.equal(report.forbiddenRpcMethods, 0);
+      assert.equal(report.identityRefusals, 7);
       assert.equal(parentFetches, 0);
       assert.ok(report.discoveryReads >= report.answers);
       assert.equal(report.engineAttempts, report.answers + 2);

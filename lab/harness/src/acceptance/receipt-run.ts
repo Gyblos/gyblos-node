@@ -37,10 +37,15 @@ function report(text: string): ReceiptAcceptanceReport {
     'confirmed',
     'externalCalls',
     'discoveryReads',
+    'identityEnabled',
+    'registryReads',
+    'forbiddenRpcMethods',
+    'identityRefusals',
   ]);
   acceptanceAssert(
     input.ok === true &&
       input.nativeIroh === true &&
+      input.identityEnabled === true &&
       input.paymentsEnabled === false &&
       input.index === ACCEPTANCE_INDEX,
   );
@@ -62,6 +67,10 @@ function report(text: string): ReceiptAcceptanceReport {
     ok: true,
     nativeIroh: true,
     paymentsEnabled: false,
+    identityEnabled: true,
+    registryReads: controlInteger(input.registryReads, 1),
+    forbiddenRpcMethods: controlInteger(input.forbiddenRpcMethods, 0, 0),
+    identityRefusals: controlInteger(input.identityRefusals, 1),
     index: ACCEPTANCE_INDEX,
     cases,
     answers: controlInteger(input.answers),

@@ -14,7 +14,8 @@ back to the buyer.
 - **Buyer proxy** (`pnpm buyer:start`): checks the offer, listens on `:4031`.
 - **Payments**: x402 `upto`, local facilitator, devnet test token (not USDC).
 - **Transport**: Iroh over our relay `na1.relay.gyblos.com`, or direct.
-- **Identity**: 8004 registry adapter in `packages/identity`, **not wired** yet.
+- **Identity**: opt-in read-only 8004 admission, persistent trust state and
+  explicit manual overrides.
 
 ```text
 app ─▶ buyer proxy ══ Iroh (direct or na1 relay) ══▶ seller node ─▶ Ollama
@@ -192,4 +193,5 @@ wired into node startup. Local record adapters remain separate.
 
 The free seller and buyer APIs support explicitly supplied local event sinks;
 see [local telemetry composition and event semantics](docs/local-telemetry.md).
-CLI startup remains opt-in through a future configuration integration.
+Seller and free-buyer startup can opt in with `[telemetry] file = true` in
+`gyblos.toml`.

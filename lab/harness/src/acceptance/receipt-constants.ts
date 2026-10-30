@@ -25,6 +25,15 @@ export const RECEIPT_ACCEPTANCE_CASES = {
   COMPLETE: 'complete-confirmed',
   STREAM: 'stream-confirmed',
   RESTART: 'restart-persistence-sequences',
+  RPC_OUTAGE: 'registry-rpc-outage',
+  RPC_LIMIT: 'registry-rpc-limit',
+  REVOKED: 'registry-revoked',
+  MANUAL_OVERRIDE: 'registry-manual-override',
+  OVERRIDE_REMOVED: 'registry-override-removed',
+  REVOCATION_RESTART: 'registry-revocation-restart',
+  OWNER_CHANGED: 'registry-binding-changed',
+  ROLLBACK_RESTART: 'registry-rollback-restart',
+  RECOVERY: 'registry-recovery-confirmed',
   RECEIPT_FAILURE: 'receipt-failure-no-retry',
   CANCEL: 'stream-cancellation-no-retry',
   ENGINE_FAILURE: 'engine-failure-no-retry',
@@ -39,6 +48,10 @@ export interface ReceiptAcceptanceReport {
   ok: true;
   nativeIroh: true;
   paymentsEnabled: false;
+  identityEnabled: true;
+  registryReads: number;
+  forbiddenRpcMethods: number;
+  identityRefusals: number;
   index: typeof ACCEPTANCE_INDEX;
   cases: ReceiptAcceptanceCase[];
   answers: number;

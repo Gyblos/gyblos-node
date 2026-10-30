@@ -246,6 +246,12 @@ in-memory provider with declared usage; no provider account, API key, model
 download or Ollama process is used. This does not validate independently
 recounted tokens.
 
+Identity resolution is enabled through the buyer’s ordinary selection file. An
+owned loopback HTTP RPC serves only synthetic 8004 registry reads; the actual
+product reader verifies the signed owner–NodeId binding and persists its trust
+floors. The registry starts with a sequence above JavaScript’s safe integer
+range. Discovery is never identity authority.
+
 Only native endpoint binding is injected: real Iroh uses its minimal preset,
 IPv4/IPv6 loopback, no relays or address discovery, and the ALPN flags passed by
 product startup. Relay-online waiting is unnecessary for this isolated binding.
@@ -257,23 +263,34 @@ The run checks publication and buyer discovery reads, exact signed quotes,
 complete/streamed answers, matching independently verified signed pairs in both
 role stores, restart of both roles with persistent receipts and higher public
 sequences, and index rejection of the still-valid older signed catalog. It also
-checks receipt-storage failure, engine failure, stream cancellation and a tiny
-configured free cap. Failures never re-send the prompt: execution dials and
-provider attempts are counted. Queries perform no generation before the first
-execution. Unsafe receipt modes are restored after the negative case. Retention
-checks use the production store's clock/entry-bound ports to prove logical
-expiry and eviction with a reduced bound; they do not wait seven days or stress
-the maximum store size. Files remain private and contain metadata only.
+checks registry outage and oversized replies, revocation, explicit manual
+override and its removal, replay after buyer restart, and a higher-sequence
+owner change. The old configured owner is refused; an older binding cannot roll
+back persisted history. A newer binding back to that configured owner restores
+full/streamed execution and confirmed receipts after restarting both roles. This
+tests binding policy, not owner-key migration or a live registry. Each identity
+refusal must leave engine attempts, execution dials and confirmed receipt counts
+unchanged. Manual override preserves the revocation tombstone and performs no
+registry reads.
+
+The run also checks receipt-storage failure, engine failure, stream cancellation
+and a tiny configured free cap. Failures never re-send the prompt: execution
+dials and provider attempts are counted. Queries perform no generation before
+the first execution. Unsafe receipt modes are restored after the negative case.
+Retention checks use the production store's clock/entry-bound ports to prove
+logical expiry and eviction with a reduced bound; they do not wait seven days or
+stress the maximum store size. Files remain private and contain metadata only.
 
 The command accepts no arguments or operational overrides. A parent owns the
 fresh home and launches an isolated child with an allowlisted environment. Only
 its synthetic index/provider fetches are allowed; every other fetch is refused,
-including RPC and the deployed index. The paid ALPN is absent. Output contains
-fixed case IDs, counters and flags, without content, identities, signatures,
-addresses or paths. Parent cancellation/deadline closes the child before
-removing the owned home, with a bounded forced-kill fallback. Output/error
-capture is bounded and sanitized. Native failures or test skips never count as
-acceptance.
+including external RPC and the deployed index. Only POSTs to the exact owned
+registry URL may use local HTTP, and forbidden RPC methods must remain zero. The
+paid ALPN is absent. Output contains fixed case IDs, counters and flags, without
+content, identities, signatures, addresses or paths. Parent
+cancellation/deadline closes the child before removing the owned home, with a
+bounded forced-kill fallback. Output/error capture is bounded and sanitized.
+Native failures or test skips never count as acceptance.
 
 No payments, devnet transactions, deployments, real engine, live identity RPC,
 production index, second machine or Windows ACL validation is included. Those
@@ -284,4 +301,8 @@ TOML. After shutdown it checks private modes, the existing record/file/pool
 bounds, no content/provider URL, and exactly one request plus terminal event per
 role/request across restarts. Complete, streaming, engine failure, cancellation
 and cap refusal remain part of the same no-retry scenario. This checks local
-records only, not public metrics or external exporters.
+records only, not public metrics or external exporters. Identity refusals emit
+buyer-only unserved observations with no selected seller or request ID; their
+count must match the refused HTTP requests. The metadata-only report includes
+registry-read, forbidden-method and refusal counters, never registry accounts or
+identity details.
