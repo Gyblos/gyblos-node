@@ -2,7 +2,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { FREE_EXECUTION_STOP_REASONS } from '@gyblos/protocol/constants';
+import {
+  FREE_EXECUTION,
+  FREE_EXECUTION_STOP_REASONS,
+} from '@gyblos/protocol/constants';
 import {
   paidExecutionDigest,
   PaidExecutionError,
@@ -11,6 +14,7 @@ import {
   createPaidStreamVerifier,
   decodePaidStreamEvent,
   encodePaidStreamEvent,
+  paidStreamDeltas,
 } from '@gyblos/protocol/paid-stream';
 import {
   PAID_EXECUTION,
@@ -231,4 +235,21 @@ void test('out-of-order or foreign events fail the stream', async () => {
       error.code === PAID_EXECUTION_CODES.BINDING,
   );
   assert.throws(() => verifier.finish(), PaidExecutionError);
+});
+
+void test('delivered text splits into bounded deltas with paid codes for unsendable text', () => {
+  const text = 'é'.repeat(PAID_STREAM.deltaBytes);
+  const deltas = paidStreamDeltas(text);
+  assert.equal(deltas.join(''), text);
+  for (const delta of deltas)
+    assert.ok(Buffer.byteLength(delta) <= PAID_STREAM.deltaBytes);
+  assert.throws(() => paidStreamDeltas('\uD800'), {
+    code: PAID_EXECUTION_CODES.INVALID,
+  });
+  assert.throws(
+    () => paidStreamDeltas('x'.repeat(FREE_EXECUTION.outputBytes + 1)),
+    {
+      code: PAID_EXECUTION_CODES.LIMIT,
+    },
+  );
 });

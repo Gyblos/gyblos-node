@@ -22,6 +22,8 @@
     "./control-client": "./src/control-client.ts",
     "./free-server": "./src/free-server.ts",
     "./free-client": "./src/free-client.ts",
+    "./paid-server": "./src/paid-server.ts",
+    "./paid-client": "./src/paid-client.ts",
     "./receipt-client": "./src/receipt-client.ts",
     "./receipt-server": "./src/receipt-server.ts",
     "./receipt-service": "./src/receipt-service.ts"

@@ -115,6 +115,7 @@ function probeScript() {
             relayOnly:process.env.PROBE_RELAY_ONLY==='1',
             control:process.env.PROBE_CONTROL==='1',
             freeExecution:process.env.PROBE_FREE_EXECUTION==='1',
+            paidExecution:process.env.PROBE_PAID_EXECUTION==='1',
             http:process.env.PROBE_HTTP!=='0',
             bindAddress:process.env.PROBE_BIND_ADDRESS});
           await endpoint.close();
