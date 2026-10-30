@@ -38,6 +38,10 @@
     "./receipt-channel": "./src/receipt-channel.ts",
     "./vectors/receipt-channel-v1.json": "./vectors/receipt-channel-v1.json",
     "./payment": "./src/payment.ts",
-    "./payment-binding": "./src/payment-binding.ts"
+    "./payment-binding": "./src/payment-binding.ts",
+    "./paid-execution": "./src/paid-execution.ts",
+    "./paid/constants": "./src/paid/constants.ts",
+    "./paid-stream": "./src/paid-stream.ts",
+    "./vectors/paid-execution-v1.json": "./vectors/paid-execution-v1.json"
   }
 }

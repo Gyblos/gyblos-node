@@ -34,4 +34,6 @@ export const PAYMENT_BINDING = {
   bpsDenominator: 10_000,
   // Upper bound on the protocol fee any terms may carry (10%), so a typo cannot drain sellers.
   maxFeeBps: 1_000,
+  // Flooring two shares loses less than two units, so seller + fee falls at most one unit short.
+  shareDustAtomic: 1,
 } as const;
