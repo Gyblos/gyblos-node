@@ -48,8 +48,12 @@ export interface UptoSdkChainOptions {
   store: UptoChainStore;
   // Whether the channel account exists on chain (the deposit landed).
   channelExists(channelId: string): Promise<boolean>;
-  // The transaction that settled and sealed this channel on chain, if any.
-  settledTransaction(channelId: string): Promise<string | undefined>;
+  // If this channel is sealed on chain: the sealing transaction and the cumulative amount it
+  // settled (the channel's settled watermark). A seal by the payer's close or rent cleanup
+  // settles another amount (usually 0) and must report it, so it is never taken for our claim.
+  settledClaim(
+    channelId: string,
+  ): Promise<{ transaction: string; chargedAtomic: string } | undefined>;
   now: () => number;
   // How long after sending an open it can still land (its blockhash validity), in ms.
   openWindowMs: number;
@@ -100,6 +104,20 @@ function settlement(
   return { payload, requirements };
 }
 
+// Our claim landed if the channel is sealed for exactly our charge; sealed for any other amount, it
+// never can (the payer closed it or cleanup sealed it), so the claim is refused for good.
+async function sealedFor(
+  settledClaim: UptoSdkChainOptions['settledClaim'],
+  channelId: string,
+  chargedAtomic: string,
+): Promise<string | undefined> {
+  const sealed = await settledClaim(channelId);
+  if (!sealed) return undefined;
+  return sealed.chargedAtomic === chargedAtomic
+    ? sealed.transaction
+    : rejected();
+}
+
 // A refusal counts only when nothing came back on chain and the channel does not exist.
 async function deposited(
   { facilitator, channelExists }: UptoSdkChainOptions,
@@ -126,7 +144,7 @@ async function deposited(
 }
 
 async function claimed(
-  { facilitator, settledTransaction }: UptoSdkChainOptions,
+  { facilitator, settledClaim }: UptoSdkChainOptions,
   server: UptoServerScheme,
   record: UptoChannelRecord,
   chargedAtomic: string,
@@ -148,7 +166,7 @@ async function claimed(
     facilitator.settle(payload, requirements),
   );
   if (response.success && response.transaction) return response.transaction;
-  const sealed = await settledTransaction(record.channelId);
+  const sealed = await sealedFor(settledClaim, record.channelId, chargedAtomic);
   if (sealed) return sealed;
   return CLAIM_LAPSED.has(response.errorReason ?? '')
     ? rejected()
@@ -180,13 +198,18 @@ export function createUptoSdkChain(options: UptoSdkChainOptions): UptoChain {
     },
     async claim(record, chargedAtomic) {
       const previous = await store.getClaim(record.channelId);
+      // The chain store already holds another charge for this channel: a conflict, not a lapse.
       if (previous && previous.chargedAtomic !== chargedAtomic)
-        return rejected();
+        throw new UptoError(UPTO_ERROR_CODES.ALREADY_SETTLED);
       // A retried claim may already have landed without being recorded.
       const known =
         previous?.transaction ??
         (previous
-          ? await options.settledTransaction(record.channelId)
+          ? await sealedFor(
+              options.settledClaim,
+              record.channelId,
+              chargedAtomic,
+            )
           : undefined);
       if (known) {
         await store.putClaim({

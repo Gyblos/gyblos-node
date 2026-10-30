@@ -55,6 +55,11 @@ async function claimOnce(
   } catch (error) {
     if (
       error instanceof UptoError &&
+      error.code === UPTO_ERROR_CODES.ALREADY_SETTLED
+    )
+      return fail(UPTO_ERROR_CODES.ALREADY_SETTLED);
+    if (
+      error instanceof UptoError &&
       error.code === UPTO_ERROR_CODES.FACILITATOR_REJECTED
     ) {
       await write({
@@ -90,6 +95,11 @@ export async function depositOnce(
   try {
     await run();
   } catch (error) {
+    if (
+      error instanceof UptoError &&
+      error.code === UPTO_ERROR_CODES.ALREADY_SETTLED
+    )
+      return fail(UPTO_ERROR_CODES.ALREADY_SETTLED);
     if (
       error instanceof UptoError &&
       error.code === UPTO_ERROR_CODES.FACILITATOR_REJECTED

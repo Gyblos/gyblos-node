@@ -58,7 +58,7 @@ export function memoryUptoChainStore(): UptoChainStore {
 // Adapts the chain store to the SDK's PendingSettlementStore, so a signature the SDK recorded as
 // pending survives a restart and settle re-awaits it instead of sending again. Deletes are kept,
 // so a claim that failed on chain can be rebuilt. A claim that landed and was then forgotten is
-// found through settledTransaction instead.
+// found through settledClaim instead.
 export function durablePendingStore(
   store: UptoChainStore,
 ): PendingSettlementStore {

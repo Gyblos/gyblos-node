@@ -263,3 +263,25 @@ void test('a claim the chain refuses for good lapses and is not retried', async 
   );
   assert.deepEqual(fake.claims, []);
 });
+
+void test('a charge conflict reported by the chain does not lapse the channel', async () => {
+  const store = memoryUptoStore();
+  const { terms } = await parties();
+  const fake = fakeChain({});
+  const chain = {
+    ...fake.chain,
+    claim: async () => {
+      throw new UptoError(UPTO_ERROR_CODES.ALREADY_SETTLED);
+    },
+  };
+  const seller = createUptoSeller({ chain, store, now: () => NOW, own: terms });
+  const { channelId } = await seller.admit(authorizationFor(terms), terms);
+  await assert.rejects(
+    seller.settle(channelId, '5'),
+    code(UPTO_ERROR_CODES.ALREADY_SETTLED),
+  );
+  assert.equal(
+    (await store.get(channelId))?.state,
+    UPTO_CHANNEL_STATES.SETTLING,
+  );
+});

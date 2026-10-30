@@ -26,7 +26,10 @@ type Settle = (
 
 async function rig(
   settle: Settle,
-  options: { exists?: boolean; sealedBy?: () => string | undefined } = {},
+  options: {
+    exists?: boolean | (() => Promise<boolean>);
+    sealedBy?: () => { transaction: string; chargedAtomic: string } | undefined;
+  } = {},
 ) {
   const party = await parties();
   const authorization = await createUptoAuthorization(
@@ -51,8 +54,11 @@ async function rig(
     verify: async () => true,
     authorizer: party.authorizer,
     store,
-    channelExists: async () => options.exists ?? false,
-    settledTransaction: async () => options.sealedBy?.(),
+    channelExists: async () =>
+      typeof options.exists === 'function'
+        ? options.exists()
+        : (options.exists ?? false),
+    settledClaim: async () => options.sealedBy?.(),
     now: () => now,
     openWindowMs: 90_000,
   });
@@ -162,7 +168,12 @@ void test('a claim is idempotent per channel and charge', async () => {
   await assert.rejects(chain.claim(record, '5'));
   // The charge is recorded before the claim is sent, so only it can be retried.
   assert.equal((await store.getClaim(record.channelId))?.chargedAtomic, '5');
-  await assert.rejects(chain.claim(record, '6'), rejected);
+  await assert.rejects(
+    chain.claim(record, '6'),
+    (error) =>
+      error instanceof UptoError &&
+      error.code === UPTO_ERROR_CODES.ALREADY_SETTLED,
+  );
   fail = false;
   const first = await chain.claim(record, '5');
   assert.deepEqual(await chain.claim(record, '5'), first);
@@ -207,7 +218,7 @@ void test('the voucher is signed by the authorizer and accepted by the real faci
     authorizer: party.authorizer,
     store: memoryUptoChainStore(),
     channelExists: async () => false,
-    settledTransaction: async () => undefined,
+    settledClaim: async () => undefined,
     now: () => NOW,
     openWindowMs: 90_000,
   });
@@ -239,10 +250,10 @@ void test('the pending store keeps broadcast signatures across restarts and forg
 });
 
 void test('a claim that landed before it was recorded is found on chain, not claimed again', async () => {
-  let sealed: string | undefined;
+  let sealed: { transaction: string; chargedAtomic: string } | undefined;
   const { chain, calls, record } = await rig(
     async () => {
-      sealed = 'S'.repeat(64);
+      sealed = { transaction: 'S'.repeat(64), chargedAtomic: '5' };
       throw new Error('crashed after broadcast');
     },
     { sealedBy: () => sealed },
@@ -261,7 +272,9 @@ void test('a claim refused because the channel is sealed returns the sealing tra
       transaction: '',
       errorReason: 'invalid_upto_svm_channel_state',
     }),
-    { sealedBy: () => 'Z'.repeat(64) },
+    {
+      sealedBy: () => ({ transaction: 'Z'.repeat(64), chargedAtomic: '5' }),
+    },
   );
   assert.deepEqual(await chain.claim(record, '5'), {
     transaction: 'Z'.repeat(64),
@@ -283,4 +296,62 @@ void test('an expired claim is a definitive refusal; transient failures are not'
       definitive ? rejected(error) : !rejected(error),
     );
   }
+});
+
+void test('a channel sealed for another amount (payer close, cleanup) is never recorded as our claim', async () => {
+  for (const reason of [
+    'invalid_upto_svm_channel_state',
+    'invalid_upto_svm_payload_expired',
+  ]) {
+    const { chain, record } = await rig(
+      async () => ({ success: false, transaction: '', errorReason: reason }),
+      { sealedBy: () => ({ transaction: 'Z'.repeat(64), chargedAtomic: '0' }) },
+    );
+    await assert.rejects(chain.claim(record, '5'), rejected);
+  }
+  // An expired authorization whose claim did land is still recorded as settled.
+  const landed = await rig(
+    async () => ({
+      success: false,
+      transaction: '',
+      errorReason: 'invalid_upto_svm_payload_expired',
+    }),
+    { sealedBy: () => ({ transaction: 'Y'.repeat(64), chargedAtomic: '5' }) },
+  );
+  assert.deepEqual(await landed.chain.claim(landed.record, '5'), {
+    transaction: 'Y'.repeat(64),
+  });
+});
+
+void test('a different charge already recorded by the chain is a conflict, not a lapse', async () => {
+  const { chain, record, store } = await rig(async () => ({
+    success: true,
+    transaction: 'C'.repeat(64),
+  }));
+  await store.putClaim({ channelId: record.channelId, chargedAtomic: '4' });
+  await assert.rejects(
+    chain.claim(record, '5'),
+    (error) =>
+      error instanceof UptoError &&
+      error.code === UPTO_ERROR_CODES.ALREADY_SETTLED,
+  );
+});
+
+void test('a deposit refusal is ambiguous when the channel lookup itself fails', async () => {
+  const { chain, authorization, terms } = await rig(
+    async () => ({
+      success: false,
+      transaction: '',
+      errorReason: 'invalid_upto_svm_settlement_simulation',
+    }),
+    {
+      exists: async () => {
+        throw new Error('rpc down');
+      },
+    },
+  );
+  await assert.rejects(
+    chain.deposit(authorization, terms),
+    (error) => !rejected(error),
+  );
 });
