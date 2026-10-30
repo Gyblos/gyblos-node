@@ -1,10 +1,6 @@
 # x402-upto-metered
 
-Status: pre-release and private. The published name is provisional. Today the
-package contains only its error codes; everything under "Planned" is not
-implemented yet.
-
-## Planned
+Status: pre-release and private. The published name is provisional.
 
 Metered payments on top of the x402 `upto` scheme on Solana:
 
@@ -13,9 +9,22 @@ Metered payments on top of the x402 `upto` scheme on Solana:
 - settlement charges only the metered amount (possibly partial, possibly 0) and
   refunds the rest of the deposit.
 
-Unlike the reference x402 middleware, it will not assume HTTP: authorizations,
-admissions and settlements will be plain values that any transport can carry
-(for example a QUIC peer-to-peer stream).
+Unlike the reference x402 middleware, it does not assume HTTP: authorizations,
+admissions and settlements are plain values that any transport can carry (for
+example a QUIC peer-to-peer stream).
+
+## What exists today
+
+- `createUptoAuthorization`: the payer signs the channel open with the x402 upto
+  client, offline given recent-block hints.
+- `createUptoVerifier`: the x402 upto facilitator verifies an open against the
+  terms with no network call.
+- `createUptoSeller`: the seller's state machine (verify, write ahead, deposit
+  once; settle one charge, write ahead, claim once, idempotent retries) over an
+  injected `UptoChain` and `UptoStore`.
+
+Planned: the chain implementation that deposits and claims through the SDK, a
+durable store, recovery, and multi-recipient splits.
 
 ## Rules
 
