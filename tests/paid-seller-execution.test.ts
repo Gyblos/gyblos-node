@@ -4,6 +4,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { INFERENCE_REQUEST_LIMITS } from '@gyblos/config';
+import { DECLARED_METER, recountedMeter } from '@gyblos/node/free-meter';
 import {
   ENGINE_ERROR_CODES,
   FREE_EXECUTION_STOP_REASONS,
@@ -138,10 +140,11 @@ void test('a replayed request is refused without a second deposit', async () => 
 void test('a claim not confirmed in time is pending and handed over for retry', async () => {
   const seller = await paidSellerFixture();
   seller.payment.control.settle = { kind: 'hang' };
-  const { terminal } = await seller.execute(await seller.request(1));
+  const first = await seller.request(1);
+  const { terminal } = await seller.execute(first);
   assert.deepEqual(terminal.payment, {
     pending: {
-      channelId: 'c'.repeat(64),
+      channelId: first.payment.channelId,
       chargedAtomic: '10',
       transaction: null,
     },
@@ -157,15 +160,19 @@ void test('a claim not confirmed in time is pending and handed over for retry', 
   };
   const failed = (await seller.execute(await seller.request(2))).terminal;
   assert.equal(failed.payment?.pending?.chargedAtomic, '10');
-  seller.daemon.abort();
-  seller.payment.control.settle = { kind: 'hang' };
-  const started = Date.now();
+  // A daemon stopping mid-generation reports the claim pending without starting it.
+  seller.setScript({
+    deltas: ['Hi', '.'],
+    before: () => seller.daemon.abort(),
+  });
   const stopping = (await seller.execute(await seller.request(3))).terminal;
-  assert.ok(stopping.payment?.pending);
-  assert.ok(Date.now() - started < 50);
+  assert.equal(stopping.payment?.pending?.chargedAtomic, '10');
   assert.equal(seller.pending.length, 3);
-  // A stopping daemon never starts a claim.
   assert.equal(seller.payment.calls.settle.length, 2);
+  // Once stopped, a new request is refused before any deposit.
+  const refused = (await seller.execute(await seller.request(4))).terminal;
+  assert.equal(refused.error?.code, PAID_EXECUTION_CODES.PAYMENT_UNAVAILABLE);
+  assert.equal(seller.payment.calls.admit.length, 3);
 });
 
 void test('a claim the chain refuses for good is reported lapsed', async () => {
@@ -174,9 +181,10 @@ void test('a claim the chain refuses for good is reported lapsed', async () => {
     kind: 'fail',
     error: paymentError(PAYMENT_ERROR_CODES.SETTLEMENT_LAPSED),
   };
-  const { terminal } = await seller.execute(await seller.request());
+  const paid = await seller.request();
+  const { terminal } = await seller.execute(paid);
   assert.deepEqual(terminal.payment, {
-    lapsed: { channelId: 'c'.repeat(64) },
+    lapsed: { channelId: paid.payment.channelId },
   });
   assert.equal(seller.pending.length, 0);
 });
@@ -196,7 +204,6 @@ void test('a busy engine or declared metering is refused before deposit', async 
   const busy = (await seller.execute(await seller.request(1))).terminal;
   assert.equal(busy.error?.code, PAID_EXECUTION_CODES.BUSY);
   assert.equal(seller.payment.calls.admit.length, 0);
-  const { DECLARED_METER } = await import('@gyblos/node/free-meter');
   const declared = await paidSellerFixture({ meter: DECLARED_METER });
   const refused = (await declared.execute(await declared.request())).terminal;
   assert.equal(refused.error?.code, PAID_EXECUTION_CODES.UNSUPPORTED);
@@ -219,4 +226,147 @@ void test('a buyer leaving while the engine runs is a cancellation, not an engin
     code: PAID_EXECUTION_CODES.CANCELLED,
     delivered: { outputTokens: 2 },
   });
+});
+
+void test('more output than free execution allows is refused before any deposit', async () => {
+  const seller = await paidSellerFixture({
+    maxTokens: INFERENCE_REQUEST_LIMITS.maxOutputTokens + 1,
+  });
+  const { terminal } = await seller.execute(await seller.request());
+  assert.equal(terminal.error?.code, PAID_EXECUTION_CODES.LIMIT);
+  assert.equal(seller.payment.calls.admit.length, 0);
+});
+
+void test('an unreachable payment server is unavailable before any deposit', async () => {
+  const seller = await paidSellerFixture();
+  seller.payment.control.describeError = new Error('rpc down');
+  const { terminal } = await seller.execute(await seller.request());
+  assert.equal(terminal.error?.code, PAID_EXECUTION_CODES.PAYMENT_UNAVAILABLE);
+  assert.equal(seller.payment.calls.admit.length, 0);
+});
+
+void test('a deposit that lands after the request gave up is handed over to settle at zero', async () => {
+  const seller = await paidSellerFixture();
+  seller.payment.control.admitDelayMs = 100;
+  const paid = await seller.request();
+  const { terminal } = await seller.execute(paid);
+  assert.equal(terminal.error?.code, PAID_EXECUTION_CODES.PAYMENT_UNAVAILABLE);
+  assert.equal(seller.engineCalls.length, 0);
+  await new Promise((resolve) => setTimeout(resolve, 150));
+  assert.deepEqual(
+    seller.pending.map((entry) => [
+      entry.admission.channelId,
+      entry.chargedAtomic,
+    ]),
+    [[paid.payment.channelId, '0']],
+  );
+});
+
+void test('a slow claim within the wait settles, and a broken one is surfaced, not retried', async () => {
+  const seller = await paidSellerFixture();
+  seller.payment.control.settle = { kind: 'delay', ms: 10 };
+  const slow = (await seller.execute(await seller.request(1))).terminal;
+  assert.equal(slow.payment?.settlement?.chargedAtomic, '10');
+  for (const error of [
+    paymentError(PAYMENT_ERROR_CODES.ALREADY_SETTLED),
+    new Error('bug'),
+  ]) {
+    seller.payment.control.settle = { kind: 'fail', error };
+    const failed = (
+      await seller.execute(await seller.request(2 + seller.failures.length))
+    ).terminal;
+    assert.equal(failed.payment?.pending?.chargedAtomic, '10');
+  }
+  seller.payment.control.settle = { kind: 'throw', error: new Error('sync') };
+  const thrown = (await seller.execute(await seller.request(9))).terminal;
+  assert.equal(thrown.payment?.pending?.chargedAtomic, '10');
+  assert.equal(seller.failures.length, 3);
+  assert.equal(seller.pending.length, 0);
+});
+
+void test('a pending hook that throws neither repeats nor costs the terminal', async () => {
+  const seller = await paidSellerFixture();
+  let calls = 0;
+  seller.setPendingHook(() => {
+    calls++;
+    throw new Error('hook bug');
+  });
+  seller.payment.control.settle = {
+    kind: 'fail',
+    error: paymentError(PAYMENT_ERROR_CODES.UNAVAILABLE),
+  };
+  const { terminal } = await seller.execute(await seller.request());
+  assert.equal(terminal.payment?.pending?.chargedAtomic, '10');
+  assert.equal(calls, 1);
+});
+
+void test('a second request while one generates is busy and deposits nothing', async () => {
+  const seller = await paidSellerFixture();
+  let finish = () => {};
+  seller.setScript({
+    deltas: ['Hi'],
+    hold: new Promise<void>((resolve) => {
+      finish = resolve;
+    }),
+  });
+  const first = seller.execute(await seller.request(1));
+  while (seller.engineCalls.length === 0)
+    await new Promise((resolve) => setImmediate(resolve));
+  const second = (await seller.execute(await seller.request(2))).terminal;
+  assert.equal(second.error?.code, PAID_EXECUTION_CODES.BUSY);
+  assert.equal(seller.payment.calls.admit.length, 1);
+  finish();
+  assert.equal((await first).terminal.result?.text, 'Hi');
+});
+
+void test('engine text that is invalid or differs from the stream stops the generation', async () => {
+  const seller = await paidSellerFixture();
+  seller.setScript({ deltas: ['Hi', '\uD800'] });
+  const invalid = (await seller.execute(await seller.request(1))).terminal;
+  assert.deepEqual(invalid.error, {
+    code: PAID_EXECUTION_CODES.SELLER_CANNOT_CONTINUE,
+    reason: FREE_EXECUTION_STOP_REASONS.ENGINE_INVALID_RESPONSE,
+    delivered: { outputTokens: 2 },
+  });
+  assert.equal(invalid.charge?.chargedAtomic, '8');
+  seller.setScript({ deltas: ['Hi'], final: 'Bye' });
+  const differs = (await seller.execute(await seller.request(2))).terminal;
+  assert.equal(differs.error?.code, PAID_EXECUTION_CODES.ENGINE);
+  assert.equal(differs.charge?.chargedAtomic, '0');
+});
+
+void test('a delivery failure mid-stream ends with a terminal and a settled deposit', async () => {
+  const seller = await paidSellerFixture();
+  const { terminal } = await seller.execute(
+    await seller.request(),
+    new AbortController().signal,
+    async () => {
+      throw new Error('stream reset');
+    },
+  );
+  assert.ok(terminal.error);
+  assert.ok(terminal.payment?.settlement);
+  assert.equal(seller.payment.calls.settle.length, 1);
+});
+
+void test('a meter that miscounts delivered output charges nothing rather than guessing', async () => {
+  for (const miscount of [Number.NaN, 0]) {
+    const seller = await paidSellerFixture({
+      meter: {
+        ...recountedMeter({
+          input: () => 4,
+          count: (text) => [...text].length,
+        }),
+        delivered: () => miscount,
+      },
+    });
+    seller.setScript({
+      deltas: ['Hi'],
+      error: new EngineError(ENGINE_ERROR_CODES.INTERRUPTED),
+    });
+    const { terminal } = await seller.execute(await seller.request());
+    assert.deepEqual(terminal.error, { code: PAID_EXECUTION_CODES.INTERNAL });
+    assert.equal(terminal.charge?.chargedAtomic, '0');
+    assert.ok(terminal.payment?.settlement);
+  }
 });

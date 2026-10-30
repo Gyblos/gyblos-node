@@ -105,11 +105,22 @@ export function stoppedAfterDeposit(
 ): PaidExecutionFailure {
   const { code, reason } = stopCode(output.failure() ?? error, signal);
   const delivered = output.delivered();
+  const reports = delivered !== '' && PAID_DELIVERED_CODES.includes(code);
+  const deliveredTokens = reports ? meter.delivered(delivered, allowance) : 0;
+  // What a stop reports is what the buyer pays for, so a meter that miscounts is a seller bug.
+  if (
+    reports &&
+    (!Number.isSafeInteger(deliveredTokens) ||
+      deliveredTokens < 1 ||
+      deliveredTokens > allowance ||
+      deliveredTokens > new TextEncoder().encode(delivered).length)
+  )
+    return fail(PAID_EXECUTION_CODES.INTERNAL);
   return {
     code,
     ...(reason ? { reason } : {}),
-    ...(delivered && PAID_DELIVERED_CODES.includes(code)
-      ? { delivered: { outputTokens: meter.delivered(delivered, allowance) } }
+    ...(deliveredTokens
+      ? { delivered: { outputTokens: deliveredTokens } }
       : {}),
   };
 }

@@ -1,6 +1,8 @@
 // Bounds and recounts paid engine output before delivery: text whose recounted tokens exceed what the
 // deposit pays for stops the stream with BUDGET_EXHAUSTED before it is delivered. A failed delivery
 // permanently stops publication; the final engine text must equal the delivered prefix.
+import { ENGINE_ERROR_CODES } from '@gyblos/protocol/constants';
+import { EngineError } from '@gyblos/protocol/engine';
 import {
   paidExecutionFail as fail,
   type PaidExecutionResponse,
@@ -47,8 +49,12 @@ export function createPaidStreamOutput(
           return fail(PAID_EXECUTION_CODES.INTERNAL);
         if (tokens > usage.allowance)
           return fail(PAID_EXECUTION_CODES.BUDGET_EXHAUSTED);
-        // The combined text must stay sendable: valid UTF-16 within the output bound.
-        paidStreamDeltas(combined);
+        // The combined text must stay sendable; otherwise the engine produced an invalid response.
+        try {
+          paidStreamDeltas(combined);
+        } catch {
+          throw new EngineError(ENGINE_ERROR_CODES.INVALID_RESPONSE);
+        }
         text = combined;
         await deliver(delta);
         deliveredText = combined;

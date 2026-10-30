@@ -698,9 +698,15 @@ while `charge` still reports what was metered. Rules:
   or a stream that delivered no text, charges `"0"`.
 - The charge's tokens equal a result's usage. Output tokens never exceed the
   delivered UTF-8 bytes, and input plus output fit the quoted model context.
-- The charge never exceeds the deposited ceiling. The settlement names the
-  request's channel, refunds the rest of the ceiling, and its seller plus fee
-  shares cover the charge except at most one atomic unit of rounding dust.
+- The charge never exceeds the deposited ceiling. Every payment variant names
+  the request's channel. The settlement refunds the rest of the ceiling, and its
+  seller plus fee shares cover the charge except at most one atomic unit of
+  rounding dust; a pending charge equals the terminal's charge.
+- `pending` and `lapsed` are the seller's word, not proof. Before treating the
+  charge as paid or the deposit as returned, the buyer reconciles the channel
+  on chain: a pending claim may still land, and a lapsed one leaves the deposit
+  in the channel until the buyer reclaims it after the channel expires. Under
+  `lapsed` the buyer still recomputes `charge`, which is then informational.
 - The terminal is bounded to the free response bound plus 2 KiB.
 
 Recomputing the charge from the quote's prices and recounted tokens, and
@@ -736,22 +742,30 @@ endpoint advertises the ALPN only with `paidExecution`.
 `@gyblos/node/paid-execution` serves one paid offer; `./paid-router` routes by
 the quoted selection. In order, the seller authenticates the quote, refuses a
 request outside the offer (selection, model, capabilities, reasoning, a single
-user message, or declared metering) with `UNSUPPORTED`, recounts the input and
-refuses it with `LIMIT` when the ceiling cannot pay for it plus one output
-token, refuses terms that are not its payment server's own (`UNSUPPORTED`),
-spends the request id (`@gyblos/core/paid-admission`: `REPLAY`, `BUSY`,
-`EXPIRED`), checks readiness, and only then admits the deposit. Admission
-refusals map to `PAYMENT_REJECTED`, `EXPIRED` or `PAYMENT_UNAVAILABLE`; an
-unavailable admission may still have deposited, which recovery reconciles.
+user message, declared metering) with `UNSUPPORTED` or more output tokens than
+free execution allows with `LIMIT`, recounts the input and refuses it with
+`LIMIT` when the ceiling cannot pay for it plus one output token, refuses terms
+that are not its payment server's own (`UNSUPPORTED`, or `PAYMENT_UNAVAILABLE`
+when the server cannot describe them in time), spends the request id
+(`@gyblos/core/paid-admission`: `REPLAY`, `BUSY`, `EXPIRED`), checks readiness,
+and only then admits the deposit. Admission refusals map to
+`PAYMENT_REJECTED`, `EXPIRED` or `PAYMENT_UNAVAILABLE`. An admission that is
+unavailable, or not done within the wait, may still have deposited: one that
+completes later is handed to the caller to settle at zero, and any other is
+left to recovery.
 
 Generation asks the engine for at most the allowance and recounts every delta
 before delivering it; a delta past the allowance stops the stream with
-`BUDGET_EXHAUSTED`. After the deposit, a stop reports the engine's reason and
-the recounted delivered output, a refusal code becomes `INTERNAL`, and the
-charge covers only delivered output. Settlement runs under the daemon's signal:
-a claim not confirmed within the wait, or retryably failed, is reported pending
-and handed to the caller to retry with the same charge; a lapsed claim is
-reported lapsed.
+`BUDGET_EXHAUSTED`, and text that cannot be sent stops it as an invalid engine
+response. After the deposit, a stop reports the engine's reason and the
+recounted delivered output, a refusal code becomes `INTERNAL`, and the charge
+covers only delivered output; any seller-side failure while charging ends as
+`INTERNAL` with nothing charged, so the deposit is always settled. Settlement
+runs under the daemon's signal with a bounded wait: a lapsed claim is reported
+`lapsed`; a claim not confirmed in time, retryably failed, or not started
+because the daemon is stopping is reported `pending` and handed to the caller
+to retry with the same charge; any other failure is reported `pending` and
+handed to the caller as a failure to surface, never retried.
 
 ## Usage receipts v1
 

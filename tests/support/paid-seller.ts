@@ -6,10 +6,14 @@ import assert from 'node:assert/strict';
 import { createControlQuote } from '@gyblos/core/control-quotes';
 import { PaidSellerLedger } from '@gyblos/core/paid-admission';
 import { recountedMeter, type FreeMeter } from '@gyblos/node/free-meter';
-import type { SellerPaidExecutionOptions } from '@gyblos/node/paid-execution';
+import {
+  createSellerPaidExecution,
+  type SellerPaidExecutionOptions,
+} from '@gyblos/node/paid-execution';
 import {
   ENGINE_DONE_REASONS,
   FREE_CHAT_ROLES,
+  PAYMENT_ERROR_CODES,
 } from '@gyblos/protocol/constants';
 import type { EngineInput, EngineResult } from '@gyblos/protocol/engine';
 import {
@@ -40,9 +44,18 @@ export const PAID_CEILING = '20';
 export const FEE = { protocolFeeBps: 300, treasury: 'treasury-synthetic' };
 
 export type SettleBehaviour =
-  { kind: 'settle' } | { kind: 'hang' } | { kind: 'fail'; error: unknown };
+  | { kind: 'settle' }
+  | { kind: 'hang' }
+  | { kind: 'delay'; ms: number }
+  | { kind: 'fail'; error: unknown }
+  | { kind: 'throw'; error: unknown };
 
-// A payment server that admits and settles in memory and records every call.
+const later = (ms: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+// A payment server that admits and settles in memory, records every call and keeps the port's
+// money rules for what it can see: the authorization must match the terms, a charge stays within
+// the deposit and a channel settles once (the same charge again returns the same settlement).
 export function recordingPayment(own: PaymentDescription) {
   const calls = {
     admit: [] as { authorization: PaymentAuthorization; terms: PaymentTerms }[],
@@ -50,32 +63,55 @@ export function recordingPayment(own: PaymentDescription) {
   };
   const control = {
     admitError: undefined as unknown,
+    admitDelayMs: 0,
+    describeError: undefined as unknown,
     settle: { kind: 'settle' } as SettleBehaviour,
     description: own,
   };
+  const settled = new Map<string, PaymentSettlement>();
   const server: PaymentServer = {
-    describe: async () => control.description,
+    describe: async () => {
+      if (control.describeError) throw control.describeError;
+      return control.description;
+    },
     async admit(authorization, terms) {
       calls.admit.push({ authorization, terms });
+      if (control.admitDelayMs) await later(control.admitDelayMs);
       if (control.admitError) throw control.admitError;
+      if (
+        authorization.payer !== terms.buyer ||
+        authorization.requestDigest !== terms.requestDigest ||
+        authorization.maxAtomic !== terms.maxAtomic
+      )
+        throw new PaymentError(PAYMENT_ERROR_CODES.AUTHORIZATION_MISMATCH);
       const { payload: _payload, ...admission } = authorization;
       return admission;
     },
-    async settle(admission, chargedAtomic) {
+    settle(admission, chargedAtomic) {
       calls.settle.push({ admission, chargedAtomic });
       const behaviour = control.settle;
-      if (behaviour.kind === 'hang') return new Promise<never>(() => {});
-      if (behaviour.kind === 'fail') throw behaviour.error;
-      const settlement: PaymentSettlement = {
-        channelId: admission.channelId,
-        chargedAtomic,
-        refundedAtomic: String(
-          BigInt(admission.maxAtomic) - BigInt(chargedAtomic),
-        ),
-        ...settlementShares(chargedAtomic, own.protocolFeeBps),
-        transaction: 't'.repeat(64),
-      };
-      return settlement;
+      if (behaviour.kind === 'throw') throw behaviour.error;
+      return (async () => {
+        if (behaviour.kind === 'hang') return new Promise<never>(() => {});
+        if (behaviour.kind === 'delay') await later(behaviour.ms);
+        if (behaviour.kind === 'fail') throw behaviour.error;
+        if (BigInt(chargedAtomic) > BigInt(admission.maxAtomic))
+          throw new PaymentError(PAYMENT_ERROR_CODES.INVALID_CHARGE);
+        const earlier = settled.get(admission.channelId);
+        if (earlier && earlier.chargedAtomic !== chargedAtomic)
+          throw new PaymentError(PAYMENT_ERROR_CODES.ALREADY_SETTLED);
+        const settlement: PaymentSettlement = earlier ?? {
+          channelId: admission.channelId,
+          chargedAtomic,
+          refundedAtomic: String(
+            BigInt(admission.maxAtomic) - BigInt(chargedAtomic),
+          ),
+          ...settlementShares(chargedAtomic, own.protocolFeeBps),
+          transaction: 't'.repeat(64),
+        };
+        settled.set(admission.channelId, settlement);
+        return settlement;
+      })();
     },
   };
   return { server, calls, control };
@@ -90,14 +126,20 @@ export interface EngineScript {
   deltas: string[];
   // Runs after the deltas and before the error, as a buyer leaving mid-generation would.
   before?: () => void;
+  // Holds the generation open until it settles.
+  hold?: Promise<void>;
   error?: unknown;
+  // The engine's final text, when it differs from what it streamed.
+  final?: string;
 }
 
 export async function paidSellerFixture(
-  overrides: { meter?: FreeMeter; inputTokens?: number } = {},
+  overrides: {
+    meter?: FreeMeter;
+    inputTokens?: number;
+    maxTokens?: number;
+  } = {},
 ) {
-  const { createSellerPaidExecution } =
-    await import('@gyblos/node/paid-execution');
   const source = await controlFixture(false);
   for (const model of source.catalog.models)
     model.pricing = { ...model.pricing, ...PAID_PRICES };
@@ -108,6 +150,8 @@ export async function paidSellerFixture(
   source.request.params.catalogDigest = await catalogDigestV2(source.catalog);
   source.request.params.priceCeilings = PAID_PRICES;
   source.request.params.maxAtomic = PAID_CEILING;
+  if (overrides.maxTokens)
+    source.request.params.maxTokens = overrides.maxTokens;
   const model = source.context.models[0]!;
   const payment = recordingPayment({
     network: source.catalog.models[0]!.pricing.network,
@@ -122,6 +166,10 @@ export async function paidSellerFixture(
   let busy = false;
   const daemon = new AbortController();
   const pending: { admission: PaymentAdmission; chargedAtomic: string }[] = [];
+  const failures: { admission: PaymentAdmission; chargedAtomic: string }[] = [];
+  let pendingHook = (admission: PaymentAdmission, chargedAtomic: string) => {
+    pending.push({ admission, chargedAtomic });
+  };
   const options: SellerPaidExecutionOptions = {
     owner: source.context.owner,
     nodeId: source.context.nodeId,
@@ -144,9 +192,10 @@ export async function paidSellerFixture(
           text += delta;
         }
         script.before?.();
+        await script.hold;
         if (script.error) throw script.error;
         return {
-          text,
+          text: script.final ?? text,
           usage: {
             inputTokens: 0,
             outputTokens: 0,
@@ -174,7 +223,9 @@ export async function paidSellerFixture(
       signal: daemon.signal,
       waitMs: 50,
       onPending: (admission, chargedAtomic) =>
-        pending.push({ admission, chargedAtomic }),
+        pendingHook(admission, chargedAtomic),
+      onFailure: (admission, chargedAtomic) =>
+        failures.push({ admission, chargedAtomic }),
     },
   };
   const service = createSellerPaidExecution(options);
@@ -195,7 +246,8 @@ export async function paidSellerFixture(
         maxTokens: quote.offer.maxTokens,
       },
       {
-        channelId: 'c'.repeat(64),
+        // One channel per request, as each request opens its own.
+        channelId: `${'c'.repeat(60)}${String(sequence).padStart(4, '0')}`,
         payer: quote.offer.buyer,
         requestDigest: quote.offer.requestDigest,
         maxAtomic: quote.offer.maxAtomic,
@@ -251,7 +303,11 @@ export async function paidSellerFixture(
     payment,
     engineCalls,
     pending,
+    failures,
     daemon,
+    setPendingHook(hook: typeof pendingHook) {
+      pendingHook = hook;
+    },
     request,
     execute,
     setScript(next: EngineScript) {

@@ -75,6 +75,7 @@ void test('every stream frames identically and verifies end to end', async () =>
   const fixture = await vectors();
   assert.deepEqual(Object.keys(fixture.streams).sort(), [
     'full',
+    'lapsed',
     'partial',
     'pending',
     'refused',

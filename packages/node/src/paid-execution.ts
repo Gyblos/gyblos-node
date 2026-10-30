@@ -2,6 +2,7 @@
 // input and refuse it when the ceiling cannot pay for it, spend the request id, check readiness, admit
 // the deposit, generate within what the deposit pays for, charge the recounted delivered tokens and
 // settle under the daemon's signal. Recounted metering only; no config, files or transport here.
+import { INFERENCE_REQUEST_LIMITS } from '@gyblos/config';
 import type { QuoteReadiness } from '@gyblos/core/control-quotes';
 import type { PaidSellerLedger } from '@gyblos/core/paid-admission';
 import { paidCharge, paidOutputAllowance } from '@gyblos/core/paid-charge';
@@ -39,6 +40,7 @@ import type { FreeMeter } from './free-meter';
 import { generatePaid, stoppedAfterDeposit } from './paid-generation';
 import {
   admitDeposit,
+  describeOwn,
   settleCharge,
   type PaidSettlementOptions,
 } from './paid-settlement';
@@ -81,6 +83,9 @@ function supportedPrompt(
     request.input.messages[0]!.role !== FREE_CHAT_ROLES.USER
   )
     return fail(PAID_EXECUTION_CODES.UNSUPPORTED);
+  // The same output bound as free execution, which also keeps one-token deltas within the stream.
+  if (request.input.maxTokens > INFERENCE_REQUEST_LIMITS.maxOutputTokens)
+    return fail(PAID_EXECUTION_CODES.LIMIT);
   return request.input.messages[0]!.content;
 }
 
@@ -95,10 +100,10 @@ function ready(options: SellerPaidExecutionOptions) {
 // The quote is the seller's own signed offer; the fee and treasury come from its payment server.
 async function paymentTerms(
   request: PaidExecutionRequest,
-  payment: PaymentServer,
+  options: SellerPaidExecutionOptions,
 ): Promise<PaymentTerms> {
   const offer = request.quote.offer;
-  const own = await payment.describe();
+  const own = await describeOwn(options.payment, options.settlement);
   if (
     own.network !== offer.network ||
     own.mint !== offer.mint ||
@@ -146,7 +151,7 @@ async function admit(
     return fail(PAID_EXECUTION_CODES.LIMIT);
   const allowance = paidOutputAllowance(request, inputTokens);
   if (allowance === null) return fail(PAID_EXECUTION_CODES.LIMIT);
-  const terms = await paymentTerms(request, options.payment);
+  const terms = await paymentTerms(request, options);
   const release = options.ledger.admit(request, options.now());
   try {
     ready(options);
@@ -156,6 +161,7 @@ async function admit(
       request,
       terms,
       signal,
+      options.settlement,
     );
     return { request, prompt, inputTokens, allowance, admission, release };
   } catch (error) {
@@ -200,7 +206,59 @@ function refusal(error: unknown, signal: AbortSignal) {
   );
 }
 
-// Generates, charges what was delivered and settles. Every outcome after the deposit carries both.
+// Generates and charges what was delivered. Any failure here, including a meter or charge bug, ends
+// as an internal stop that charges nothing, so the deposit is always settled.
+async function outcomeAndCharge(
+  admitted: Admitted,
+  signal: AbortSignal,
+  onDelta: (text: string) => Promise<void>,
+  options: SellerPaidExecutionOptions,
+) {
+  const { request, inputTokens, allowance } = admitted;
+  try {
+    const output = createPaidStreamOutput(
+      options.meter,
+      { inputTokens, allowance },
+      signal,
+      onDelta,
+    );
+    const outcome = await generatePaid(
+      { ...admitted, contextTokens: options.model.contextTokens },
+      output,
+      signal,
+      options.engine,
+      options.meter,
+    ).then(
+      (result) => ({ result }),
+      (error: unknown) => ({
+        error: stoppedAfterDeposit(
+          error,
+          signal,
+          output,
+          options.meter,
+          allowance,
+        ),
+      }),
+    );
+    const outputTokens =
+      'result' in outcome
+        ? outcome.result.usage.outputTokens
+        : (outcome.error.delivered?.outputTokens ?? 0);
+    const charge = paidCharge(
+      request,
+      { inputTokens, outputTokens },
+      outputTokens > 0,
+    );
+    return { outcome, charge };
+  } catch {
+    return {
+      outcome: { error: { code: PAID_EXECUTION_CODES.INTERNAL } },
+      charge: paidCharge(request, { inputTokens, outputTokens: 0 }, false),
+    };
+  }
+}
+
+// Every outcome after the deposit carries the charge and its payment.
 async function serve(
   admitted: Admitted,
   header: PaidHeader,
@@ -208,43 +266,15 @@ async function serve(
   onDelta: (text: string) => Promise<void>,
   options: SellerPaidExecutionOptions,
 ): Promise<PaidExecutionResponse> {
-  const { request, inputTokens, allowance, admission } = admitted;
-  const output = createPaidStreamOutput(
-    options.meter,
-    { inputTokens, allowance },
+  const { outcome, charge } = await outcomeAndCharge(
+    admitted,
     signal,
     onDelta,
-  );
-  const outcome = await generatePaid(
-    { ...admitted, contextTokens: options.model.contextTokens },
-    output,
-    signal,
-    options.engine,
-    options.meter,
-  ).then(
-    (result) => ({ result }),
-    (error: unknown) => ({
-      error: stoppedAfterDeposit(
-        error,
-        signal,
-        output,
-        options.meter,
-        allowance,
-      ),
-    }),
-  );
-  const outputTokens =
-    'result' in outcome
-      ? outcome.result.usage.outputTokens
-      : (outcome.error.delivered?.outputTokens ?? 0);
-  const charge = paidCharge(
-    request,
-    { inputTokens, outputTokens },
-    outputTokens > 0,
+    options,
   );
   const payment = await settleCharge(
     options.payment,
-    admission,
+    admitted.admission,
     charge.chargedAtomic,
     options.settlement,
   );
