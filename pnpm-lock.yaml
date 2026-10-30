@@ -57,6 +57,9 @@ importers:
       '@gyblos/node-app':
         specifier: workspace:*
         version: link:apps/node
+      '@gyblos/payments-upto':
+        specifier: workspace:*
+        version: link:packages/payments-upto
       '@gyblos/payments-x402':
         specifier: workspace:*
         version: link:packages/payments-x402
@@ -473,6 +476,15 @@ importers:
       smol-toml:
         specifier: 1.9.1
         version: 1.9.1
+
+  packages/payments-upto:
+    dependencies:
+      '@gyblos/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      x402-upto-metered:
+        specifier: workspace:*
+        version: link:../x402-upto-metered
 
   packages/payments-x402:
     dependencies:
