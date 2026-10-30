@@ -36,3 +36,11 @@ export function saveConnection(
     ? connections.map((item) => (item.tool === policy.tool ? policy : item))
     : [...connections, policy];
 }
+
+// A tool connection must display and save a model from its own supplied options.
+export function connectionModelId(
+  preferred: string,
+  _available: readonly [{ id: string }, ...{ id: string }[]],
+): string {
+  return preferred;
+}
