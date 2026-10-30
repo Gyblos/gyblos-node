@@ -80,6 +80,15 @@ export function receiptNativeBinding(provider: ReceiptProvider) {
       acceptanceAssert(seller);
       return seller.addr().directAddresses();
     },
+    nodeSigner: async (bytes: Uint8Array) => {
+      acceptanceAssert(seller);
+      return Uint8Array.from(
+        seller
+          .secretKey()
+          .sign([...bytes])
+          .toBytes(),
+      );
+    },
     dials: () => dials,
     beforeFirst: () => beforeFirst,
     protocols: () => protocols,

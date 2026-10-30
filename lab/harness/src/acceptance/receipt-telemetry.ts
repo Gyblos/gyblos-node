@@ -19,6 +19,7 @@ import { RECEIPT_ACCEPTANCE } from './receipt-constants';
 export async function receiptTelemetry(
   environment: HomeEnvironment,
   answers: number,
+  identityRefusals: number,
 ) {
   for (const role of [P2P_ROLES.BUYER, P2P_ROLES.SELLER]) {
     const directory = rolePathIn(environment, role, ROLE_FILES.telemetry);
@@ -32,6 +33,7 @@ export async function receiptTelemetry(
       names.length > 0 && names.length <= PRIVATE_LOG_LIMITS.maxFiles,
     );
     const counts = new Map<string, { received: number; terminal: number }>();
+    let unserved = 0;
     let completed = 0;
     let failed = 0;
     let first = 0;
@@ -85,9 +87,17 @@ export async function receiptTelemetry(
         const keys = Object.keys(value);
         acceptanceAssert(keys.every((key) => allowed.includes(key)));
         const event = controlObject(value, keys);
-        acceptanceAssert(
-          event.role === role && typeof event.requestId === 'string',
-        );
+        acceptanceAssert(event.role === role);
+        if (event.type === TELEMETRY_EVENTS.UNSERVED) {
+          acceptanceAssert(
+            role === P2P_ROLES.BUYER &&
+              event.requestId === null &&
+              event.sellerNodeId === null,
+          );
+          unserved++;
+          continue;
+        }
+        acceptanceAssert(typeof event.requestId === 'string');
         const row = counts.get(event.requestId) ?? { received: 0, terminal: 0 };
         if (event.type === TELEMETRY_EVENTS.REQUEST_RECEIVED) row.received++;
         if (
@@ -104,6 +114,9 @@ export async function receiptTelemetry(
         counts.set(event.requestId, row);
       }
     }
+    acceptanceAssert(
+      unserved === (role === P2P_ROLES.BUYER ? identityRefusals : 0),
+    );
     acceptanceAssert(completed === answers && failed === 2 && first > 0);
     acceptanceAssert(
       [...counts.values()].every(
