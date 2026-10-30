@@ -112,6 +112,9 @@ export interface UptoClaimRecord {
   channelId: string;
   chargedAtomic: string;
   transaction?: string;
+  // Signatures of claim transactions sent for this charge that did not confirm in time, oldest
+  // first; one of them may still have landed.
+  attempts?: string[];
 }
 export interface UptoChainStore {
   getDeposit(channelId: string): Promise<UptoDepositRecord | undefined>;

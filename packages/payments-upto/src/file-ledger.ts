@@ -35,6 +35,8 @@ export interface UptoFileLedgerOptions {
   // least LEDGER_FILE.minRetentionMs.
   retentionMs: number;
   maxChannels: number;
+  // Document size past which new channels are refused; defaults to LEDGER_FILE.newChannelBytes.
+  newChannelBytes?: number;
 }
 
 export interface UptoFileLedger {
@@ -175,7 +177,9 @@ export async function openUptoFileLedger(
         const known = Object.hasOwn(document.channels, record.channelId);
         if (
           !known &&
-          Object.keys(document.channels).length >= options.maxChannels
+          (Object.keys(document.channels).length >= options.maxChannels ||
+            JSON.stringify(document).length >=
+              (options.newChannelBytes ?? LEDGER_FILE.newChannelBytes))
         )
           unavailable();
         document.channels[record.channelId] = { record, updatedAt: now() };

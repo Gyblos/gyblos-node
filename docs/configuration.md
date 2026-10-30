@@ -281,13 +281,14 @@ are refused with `SELLER_OFFER_ENGINE_UNSUPPORTED`. Keep Ollama listening on
 loopback only (no `OLLAMA_HOST=0.0.0.0`, no "Expose Ollama to the network" app
 setting): Ollama has no authentication, and the seller cannot detect the
 exposure. The pulled model must match the pinned digest, or warmup fails and the
-seller is not advertised. Paid v2 selling is implemented, but the daemon cannot
-reach the chain yet, so a paid offer still stops startup with
-`SELLER_PAID_EXECUTION_UNAVAILABLE`. Once enabled, it will run on its own paid
-stream and accept only offers whose usage is recounted with the model's pinned
-public tokenizer (`SELLER_PAID_METERING_UNRECOUNTED` otherwise). Buyers see and
-pay the seller's price plus the protocol fee (`PROTOCOL_FEE`, 3% on devnet),
-rounded up. The v1 paid path remains in the lab gates (`pnpm gate:*`) only.
+seller is not advertised. A paid offer is sold on devnet over its own paid
+stream (x402 upto channels), only when its usage is recounted with the model's
+pinned public tokenizer (`SELLER_PAID_METERING_UNRECOUNTED` otherwise) and the
+seller role was set up with a payout and payment keys
+(`SELLER_PAYMENT_ROLE_MISSING` otherwise). Buyers see and pay the seller's price
+plus the protocol fee (`PROTOCOL_FEE`, 3% on devnet), rounded up. Paid v2 has
+not settled on devnet yet; see [limitations](limitations.md). The v1 paid path
+remains in the lab gates (`pnpm gate:*`) only.
 [examples/seller-daemon.toml](../examples/seller-daemon.toml) is a file it
 accepts as written; the other examples are valid files for future nodes but stop
 this daemon. Today it honors:
@@ -302,7 +303,7 @@ this daemon. Today it honors:
 | `[[offers]]`: any model, engine `openai` at an https or literal loopback URL with `context_tokens`, reasoning `["off"]`                           | yes                                                                                                                       |
 | `[[offers]]`: any model, engine `anthropic` at an https or literal loopback API root with `api_key_env` and `context_tokens`, reasoning `["off"]` | yes                                                                                                                       |
 | `free = {...}` on that offer                                                                                                                      | served over the free channel with daily total and per-buyer token caps                                                    |
-| `price = {...}` on that offer                                                                                                                     | not yet: the daemon has no chain wiring yet, so a paid offer stops startup                                                |
+| `price = {...}` on that offer                                                                                                                     | sold over the paid stream on devnet; needs a seller role with a payout                                                    |
 | `[node]` `data_dir`, `rpc_url`, `payout_wallet`                                                                                                   | not yet: the role files own them, so setting them in the file stops startup (`GYBLOS_HOME` overriding `data_dir` is fine) |
 | `[buyer]`                                                                                                                                         | ignored by the seller                                                                                                     |
 
@@ -310,11 +311,13 @@ Startup stops with a static code: `NODE_CONFIG_INVALID`,
 `SELLER_SETTING_UNSUPPORTED`, `SELLER_OFFERS_MISSING`,
 `SELLER_OFFER_MODEL_UNSUPPORTED`, `SELLER_OFFER_ENGINE_UNSUPPORTED`,
 `SELLER_OFFER_REASONING_UNSUPPORTED`, `SELLER_OFFER_API_KEY_MISSING`,
-`SELLER_OFFER_API_KEY_UNSAFE`, `SELLER_PAID_EXECUTION_UNAVAILABLE`,
-`SELLER_PAID_METERING_UNRECOUNTED` or `SELLER_PAYMENT_DESCRIPTION_INVALID` (the
-payment server charges another fee or treasury, uses another network or asset,
-or pays out to the owner or to its own fee payer or authorizer).
-`pnpm gyblos doctor` also names the `[[offers]]` entry a code is about.
+`SELLER_OFFER_API_KEY_UNSAFE`, `SELLER_PAID_METERING_UNRECOUNTED`,
+`SELLER_PAYMENT_ROLE_MISSING`, `SELLER_PAYMENT_NETWORK_MISMATCH` (the role's RPC
+is not devnet) or `SELLER_PAYMENT_DESCRIPTION_INVALID` (the payout is the owner,
+fee payer or authorizer key). A paid seller's fee payer key needs devnet SOL: it
+pays every channel transaction and fronts each buyer channel's rent until the
+channel is reclaimed. `pnpm gyblos doctor` also names the `[[offers]]` entry a
+code is about.
 
 `pnpm gyblos config validate --config "$GYBLOS_CONFIG"` explains file problems
 (it does not read `GYBLOS_CONFIG`, does not check the `SELLER_*` limits above,

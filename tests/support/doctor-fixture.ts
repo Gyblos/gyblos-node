@@ -41,6 +41,10 @@ export const paidToml = (run: Fixture) =>
     FREE,
     'price = { input_per_mtok = "1", output_per_mtok = "2", currency = "USDC" }',
   );
+// A free offer on a remote OpenAI-compatible engine (a custom model), with its key in UPSTREAM_API_KEY.
+export const REMOTE_FREE =
+  'version = 1\n[node]\nnetwork = "devnet"\n[[offers]]\nmodel = "acme/chat-small"\ncustom = true\nreasoning = ["off"]\nengine = { kind = "openai", url = "https://api.example.com/v1", api_key_env = "UPSTREAM_API_KEY", context_tokens = 131072 }\nfree = { daily_token_cap = 20000, per_buyer_cap = 2000 }\n';
+
 const ALL_OK = {
   tokenizer: async () => undefined,
 } satisfies NonNullable<CliContext['doctor']>;

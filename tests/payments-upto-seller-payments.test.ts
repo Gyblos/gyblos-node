@@ -1,0 +1,117 @@
+// The seller's real-chain payment stack, assembled offline: it holds the ledger lock for its lifetime,
+// refuses keys that do not sign for its description, refuses a junk deposit before touching the chain,
+// recovers an empty ledger and releases everything on close. RPC is a double; no network.
+import assert from 'node:assert/strict';
+import { rm } from 'node:fs/promises';
+import test from 'node:test';
+
+import { generateKeyPairSigner } from '@solana/kit';
+
+import { DEVNET, PROTOCOL_FEE, TOKEN_PROGRAM_ADDRESS } from '@gyblos/config';
+import { openUptoSellerPayments } from '@gyblos/payments-upto';
+import { PAYMENT_ERROR_CODES } from '@gyblos/protocol/constants';
+import { PaymentError } from '@gyblos/protocol/payment';
+
+import { directory, paths } from './support/payment-upto-file';
+
+const SETTINGS = {
+  tokenProgram: String(TOKEN_PROGRAM_ADDRESS),
+  withdrawDelaySeconds: 60,
+  maxTimeoutSeconds: 120,
+};
+
+const offline = {
+  getAccountInfo: () => ({ send: async () => ({ value: null }) }),
+  getSignatureStatuses: () => ({ send: async () => ({ value: [] }) }),
+  getSlot: () => ({ send: async () => 1n }),
+};
+
+async function setup() {
+  const root = await directory();
+  const feePayer = await generateKeyPairSigner();
+  const authorizer = await generateKeyPairSigner();
+  const description = {
+    network: DEVNET,
+    mint: (await generateKeyPairSigner()).address,
+    payTo: (await generateKeyPairSigner()).address,
+    feePayer: feePayer.address,
+    authorizer: authorizer.address,
+    protocolFeeBps: PROTOCOL_FEE.bps,
+    treasury: PROTOCOL_FEE.treasury,
+  };
+  const options = {
+    rpcUrl: 'https://rpc.invalid',
+    description,
+    settings: SETTINGS,
+    feePayer,
+    authorizer,
+    paths: paths(root),
+    cleanup: { intervalSecs: 3600, abandonGraceSecs: 30 },
+    rpc: offline,
+  };
+  return { root, options, description };
+}
+
+void test('the stack holds the ledger for its lifetime and releases it on close', async () => {
+  const { root, options, description } = await setup();
+  try {
+    const payments = await openUptoSellerPayments(options);
+    assert.deepEqual(await payments.server.describe(), description);
+    await payments.recover();
+    // A second seller process on the same home is refused while the first runs.
+    await assert.rejects(openUptoSellerPayments(options));
+    await payments.close();
+    const again = await openUptoSellerPayments(options);
+    await again.close();
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+void test('keys that do not sign for the description are refused and leave no lock', async () => {
+  const { root, options } = await setup();
+  try {
+    const other = await generateKeyPairSigner();
+    for (const keys of [{ feePayer: other }, { authorizer: other }])
+      await assert.rejects(
+        openUptoSellerPayments({ ...options, ...keys }),
+        (error) =>
+          error instanceof PaymentError &&
+          error.code === PAYMENT_ERROR_CODES.UNTRUSTED_TERMS,
+      );
+    await (await openUptoSellerPayments(options)).close();
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+void test('a deposit that is not a valid channel open is refused before any transaction', async () => {
+  const { root, options, description } = await setup();
+  try {
+    const payments = await openUptoSellerPayments(options);
+    const buyer = (await generateKeyPairSigner()).address;
+    const terms = {
+      ...description,
+      buyer,
+      requestDigest: 'ab'.repeat(32),
+      maxAtomic: '1000',
+      expiresAt: Date.now() + 60_000,
+    };
+    await assert.rejects(
+      payments.server.admit(
+        {
+          channelId: (await generateKeyPairSigner()).address,
+          payer: buyer,
+          requestDigest: terms.requestDigest,
+          maxAtomic: terms.maxAtomic,
+          payload: Buffer.from('not an open').toString('base64'),
+        },
+        terms,
+      ),
+      PaymentError,
+    );
+    await payments.close();
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

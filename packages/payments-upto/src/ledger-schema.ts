@@ -2,6 +2,7 @@
 // mistyped or unknown field, an unknown channel state) is refused rather than repaired, so a
 // tampered or corrupted ledger never feeds a deposit or a claim.
 import {
+  UPTO_CHANNEL_ACCOUNT,
   UPTO_CHANNEL_STATES,
   UPTO_ERROR_CODES,
   UptoError,
@@ -18,7 +19,10 @@ export interface LedgerDocument {
   version: typeof LEDGER_FILE.version;
   channels: Record<string, { record: UptoChannelRecord; updatedAt: number }>;
   deposits: Record<string, number>;
-  claims: Record<string, { chargedAtomic: string; transaction?: string }>;
+  claims: Record<
+    string,
+    { chargedAtomic: string; transaction?: string; attempts?: string[] }
+  >;
   // Signatures the SDK recorded for a claim in flight, with when they were stored.
   pending: Record<string, { signature: string; storedAt: number }>;
 }
@@ -79,6 +83,16 @@ function map<T>(
   for (const [key, entry] of Object.entries(value))
     entries[text(key)] = parse(entry);
   return entries;
+}
+
+// Claim attempts are a short list of transaction signatures.
+function attempts(value: unknown): string[] {
+  if (
+    !Array.isArray(value) ||
+    value.length > UPTO_CHANNEL_ACCOUNT.maxClaimAttempts
+  )
+    return unavailable();
+  return value.map(text);
 }
 
 function split(value: unknown): UptoSplit {
@@ -189,12 +203,19 @@ export function parseLedger(source: string): LedgerDocument {
     }),
     deposits: map(input.deposits, integer),
     claims: map(input.claims, (entry) => {
-      const value = object(entry, ['chargedAtomic'], ['transaction']);
+      const value = object(
+        entry,
+        ['chargedAtomic'],
+        ['transaction', 'attempts'],
+      );
       return {
         chargedAtomic: atomic(value.chargedAtomic),
         ...(value.transaction === undefined
           ? {}
           : { transaction: text(value.transaction) }),
+        ...(value.attempts === undefined
+          ? {}
+          : { attempts: attempts(value.attempts) }),
       };
     }),
     pending: map(input.pending, (entry) => {

@@ -45,6 +45,10 @@ export const NODE_ERROR_CODES = {
   SELLER_PAID_METERING_UNRECOUNTED: 'SELLER_PAID_METERING_UNRECOUNTED',
   // The payment server pays to its own fee payer, charges another fee or uses another network.
   SELLER_PAYMENT_DESCRIPTION_INVALID: 'SELLER_PAYMENT_DESCRIPTION_INVALID',
+  // A paid offer on a seller role set up without a payout and payment keys.
+  SELLER_PAYMENT_ROLE_MISSING: 'SELLER_PAYMENT_ROLE_MISSING',
+  // The role's RPC is not devnet (or cannot say which chain it is): paid selling stays off.
+  SELLER_PAYMENT_NETWORK_MISMATCH: 'SELLER_PAYMENT_NETWORK_MISMATCH',
 } as const;
 export type NodeErrorCode =
   (typeof NODE_ERROR_CODES)[keyof typeof NODE_ERROR_CODES];
@@ -59,6 +63,8 @@ export const DOCTOR_CHECKS = {
   TOKENIZER: 'tokenizer',
   ENGINE: 'engine',
   RELAYS: 'relays',
+  // Only for a seller with paid offers.
+  PAYMENTS: 'payments',
 } as const;
 export type DoctorCheckName =
   (typeof DOCTOR_CHECKS)[keyof typeof DOCTOR_CHECKS];

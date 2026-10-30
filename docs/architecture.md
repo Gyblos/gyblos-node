@@ -140,9 +140,9 @@ function of the environment; no other module builds `.local/...` paths.
 $GYBLOS_HOME (default .local/gyblos; a container would use /data)
   buyer/     role.json, node.key, buyer.json, trust.json, offer.json, journals,
              locks, calls, status, transport metrics, measurements + salt
-  seller/    role.json, node.key, owner key (setup also writes authorizer and
-             facilitator keys, unused while paid selling is off), status,
-             readiness, public sequence
+  seller/    role.json, node.key, owner key (a paid seller also has authorizer
+             and facilitator keys), payments/ (upto ledger and its lock),
+             status, readiness, public sequence
   artifacts/ tokenizer/ (public, hash-pinned, shared), ollama-models/ (lab cache)
 $GYBLOS_LAB_HOME (default .local/lab)
   lab config, keys, journals, measurements, facilitator-diagnostics/, identity/

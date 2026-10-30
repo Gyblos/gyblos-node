@@ -22,9 +22,18 @@ only; never import mainnet keys.
 
 ## Payments and recovery
 
-- Paid v2 selling (x402 upto channels) is implemented and tested offline only.
-  The daemon cannot reach the chain yet, so it refuses paid offers; nothing has
-  settled on devnet.
+- Paid v2 selling (x402 upto channels) is wired to devnet but tested offline
+  only; nothing has settled on devnet yet.
+- A claim is recognized as landed only through the transactions this seller sent
+  for it. If a claim lands without its signature being recorded (the process
+  stops after sending it, or the RPC fails the send after it propagated), the
+  claim stays unavailable: the seller was paid, but its ledger never marks the
+  channel settled, and it must be reconciled by hand.
+- Rent cleanup only knows the channels this process handled. After a restart, a
+  channel from the previous run that no claim sealed keeps the fee payer's rent
+  until the payer closes it.
+- Setting up a paid v2 seller still needs `--buyer`, a v1 setup requirement that
+  v2 does not use.
 - A paid v2 claim not confirmed in time is retried in the background for about a
   minute and a half (at most about three minutes when every attempt times out).
   The retry queue lives in memory: claims still pending at shutdown are

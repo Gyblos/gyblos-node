@@ -15,4 +15,9 @@ export {
   type UptoFileLedgerOptions,
   type UptoLedgerPaths,
 } from './file-ledger';
-export { LEDGER_FILE } from './constants';
+export { LEDGER_FILE, UPTO_SELLER } from './constants';
+export {
+  openUptoSellerPayments,
+  type UptoSellerPayments,
+  type UptoSellerPaymentsOptions,
+} from './seller-payments';
