@@ -22,11 +22,11 @@ only; never import mainnet keys.
 
 ## Payments and recovery
 
-- The devnet protocol fee treasury (`PROTOCOL_FEE.treasury`) is currently the
-  x402 payment-channels program's own treasury, not a Gyblos account: the 3%
-  would go to x402, and escrow surplus swept there would make buyers refuse
-  honest receipts. It must be replaced by a Gyblos-owned address before any
-  devnet run.
+- The devnet protocol fee treasury is a public Gyblos test wallet
+  (`4Ui1dfvqbFx9CtjXNcKajHdr7aKT1nbYRiYjB1s7umNy`), distinct from the x402
+  program's own treasury. Mainnet has no treasury configured. Before the first
+  devnet claim, the treasury needs a token account for the test mint, since the
+  claim pays its share there.
 - Paid v2 selling (x402 upto channels) is wired to devnet but tested offline
   only; nothing has settled on devnet yet.
 - A claim is recognized as landed only through the transactions this seller sent
