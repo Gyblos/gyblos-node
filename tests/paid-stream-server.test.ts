@@ -4,6 +4,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { FREE_EXECUTION_STOP_REASONS } from '@gyblos/protocol/constants';
 import {
   paidExecutionDigest,
   type PaidExecutionResponse,
@@ -16,6 +17,7 @@ import {
 import {
   PAID_EXECUTION,
   PAID_EXECUTION_CODES,
+  PAID_STREAM,
 } from '@gyblos/protocol/paid/constants';
 import type { ControlStream } from '@gyblos/transport-iroh/control-io';
 import {
@@ -254,4 +256,109 @@ void test('the request deadline aborts generation and closes the stream', async 
   assert.equal(value.counts.closed, 1);
   assert.equal(value.frames.length, 0);
   assert.equal(value.counts.released, 1);
+});
+
+void test('a stalled writer is cut by the egress deadline but the lease waits for it', async () => {
+  const value = await fixture();
+  let unstall = () => {};
+  let stopped = () => {};
+  const closing = new Promise<void>((resolve) => {
+    stopped = resolve;
+  });
+  value.stream.send.writeAll = () =>
+    new Promise<void>((resolve) => {
+      unstall = resolve;
+    });
+  const running = servePaidExecutionStream(
+    value.stream,
+    value.service,
+    'synthetic',
+    () => {
+      value.close();
+      stopped();
+    },
+    new AbortController().signal,
+    value.enter,
+    () => true,
+    { egressMs: 10 },
+  );
+  await closing;
+  assert.equal(value.counts.released, 0);
+  unstall();
+  await running;
+  assert.equal(value.counts.released, 1);
+});
+
+void test('a route revoked mid-stream stops delivery and closes the stream', async () => {
+  const value = await fixture();
+  let allowed = true;
+  let refused: unknown;
+  const service: PaidExecutionService = {
+    async stream(_request, _peer, _signal, onDelta) {
+      await onDelta('Hi');
+      allowed = false;
+      await onDelta('.').catch((error: unknown) => {
+        refused = error;
+      });
+      return value.terminal;
+    },
+  };
+  await servePaidExecutionStream(
+    value.stream,
+    service,
+    'synthetic',
+    value.close,
+    new AbortController().signal,
+    value.enter,
+    () => allowed,
+  );
+  assert.equal(
+    refused instanceof Error && 'code' in refused ? refused.code : undefined,
+    PAID_EXECUTION_CODES.PEER,
+  );
+  assert.equal(value.frames.length, 1);
+  assert.equal(value.counts.closed, 1);
+  assert.equal(value.counts.released, 1);
+});
+
+void test('deltas stop short of the wire limit so the charged terminal still fits', async () => {
+  const value = await fixture();
+  let limited: unknown;
+  const service: PaidExecutionService = {
+    async stream(_request, _peer, _signal, onDelta) {
+      try {
+        // Escaped characters fill the wire long before the output bound.
+        for (let index = 0; index < PAID_STREAM.maxEvents; index++)
+          await onDelta('\u0000'.repeat(64));
+      } catch (error) {
+        limited = error;
+      }
+      const { result: _result, ...stopped } = value.terminal;
+      return {
+        ...stopped,
+        error: {
+          code: PAID_EXECUTION_CODES.SELLER_CANNOT_CONTINUE,
+          reason: FREE_EXECUTION_STOP_REASONS.ENGINE_INTERRUPTED,
+          delivered: { outputTokens: 1 },
+        },
+        charge: { ...CHARGE, outputTokens: 1 },
+      };
+    },
+  };
+  await servePaidExecutionStream(
+    value.stream,
+    service,
+    'synthetic',
+    value.close,
+    new AbortController().signal,
+    value.enter,
+  );
+  assert.equal(
+    limited instanceof Error && 'code' in limited ? limited.code : undefined,
+    PAID_EXECUTION_CODES.LIMIT,
+  );
+  const last = value.frames.at(-1);
+  assert.ok(last && typeof last === 'object' && 'response' in last);
+  assert.equal(value.counts.closed, 0);
+  assert.equal(value.counts.finished, 1);
 });

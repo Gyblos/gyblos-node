@@ -68,7 +68,8 @@ async function readRequest(stream: ControlStream, check: () => void) {
   check();
   // An oversized length is refused before any body is allocated or read.
   const length = new DataView(prefix.buffer).getUint32(0);
-  if (!length || length > PAID_EXECUTION.requestBytes)
+  if (!length) return fail();
+  if (length > PAID_EXECUTION.requestBytes)
     return fail(PAID_EXECUTION_CODES.LIMIT);
   const frame = new Uint8Array(prefix.length + length);
   frame.set(prefix);

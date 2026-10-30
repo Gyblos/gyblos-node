@@ -20,7 +20,9 @@ import {
 
 export interface PaidExecutionService {
   // Resolves only once the charge was settled or recorded as pending, even when the signal
-  // aborts: the buyer leaving stops generation, never settlement.
+  // aborts: the buyer leaving stops generation, never settlement. It must bound its own
+  // settlement wait (reporting the charge as pending), since the request lease is held until
+  // it resolves.
   stream(
     value: unknown,
     peer: string,

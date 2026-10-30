@@ -5,6 +5,7 @@ import test from 'node:test';
 
 import type { Connection, Endpoint, EndpointAddr } from '@number0/iroh';
 
+import { FREE_EXECUTION_STOP_REASONS } from '@gyblos/protocol/constants';
 import { paidExecutionDigest } from '@gyblos/protocol/paid-execution';
 import { encodePaidStreamEvent } from '@gyblos/protocol/paid-stream';
 import {
@@ -22,6 +23,9 @@ interface Options {
   trailing?: boolean;
   cancel?: AbortController;
   remoteId?: string;
+  stop?: boolean;
+  oversized?: boolean;
+  expireBeforeWrite?: boolean;
 }
 
 async function fixture(options: Options = {}) {
@@ -49,21 +53,36 @@ async function fixture(options: Options = {}) {
         event(1, { type: PAID_STREAM.events.DELTA, text: '.' }),
         event(2, {
           type: PAID_STREAM.events.TERMINAL,
-          response: {
-            ...header,
-            result: RESULT,
-            charge: CHARGE,
-            payment: settled(paid, CHARGE.chargedAtomic),
-          },
+          response: options.stop
+            ? {
+                ...header,
+                error: {
+                  code: PAID_EXECUTION_CODES.SELLER_CANNOT_CONTINUE,
+                  reason: FREE_EXECUTION_STOP_REASONS.ENGINE_INTERRUPTED,
+                  delivered: { outputTokens: 1 },
+                },
+                charge: { ...CHARGE, outputTokens: 1 },
+                payment: settled(paid, CHARGE.chargedAtomic),
+              }
+            : {
+                ...header,
+                result: RESULT,
+                charge: CHARGE,
+                payment: settled(paid, CHARGE.chargedAtomic),
+              },
         }),
       ];
-  const all = Buffer.concat([
-    ...frames,
-    ...(options.trailing ? [Buffer.from([0])] : []),
-  ]);
+  const oversized = Buffer.alloc(4);
+  oversized.writeUInt32BE(PAID_STREAM.eventBytes + 1);
+  const all = options.oversized
+    ? oversized
+    : Buffer.concat([
+        ...frames,
+        ...(options.trailing ? [Buffer.from([0])] : []),
+      ]);
   const deltasEnd = options.refused ? 0 : frames[0]!.length + frames[1]!.length;
   let offset = 0;
-  const counts = { dials: 0, writes: 0, closes: 0, alpn: '' };
+  const counts = { dials: 0, writes: 0, closes: 0, reads: 0, alpn: '' };
   const deltas: string[] = [];
   const connection = {
     remoteId: () => ({ toString: () => source.trust.nodeId }),
@@ -81,6 +100,7 @@ async function fixture(options: Options = {}) {
         },
         recv: {
           async readExact(size: number) {
+            counts.reads++;
             if (options.truncate && offset >= deltasEnd) throw new Error('EOF');
             const value = all.subarray(offset, offset + size);
             offset += size;
@@ -105,8 +125,13 @@ async function fixture(options: Options = {}) {
     id: () => ({ toString: () => options.remoteId ?? source.trust.nodeId }),
     relayUrl: () => null,
   } as unknown as EndpointAddr;
+  // Three authentications read the clock before the zero-skew check right before sending.
+  let clockReads = 0;
+  const expiry = paid.quote.offer.expiresAt;
+  const now = () =>
+    options.expireBeforeWrite && ++clockReads > 3 ? expiry : source.now();
   const client = createPaidExecutionClient(endpoint, remote, source.trust, {
-    now: source.now,
+    now,
     requestMs: 1000,
     async onDelta(text) {
       await Promise.resolve();
@@ -171,4 +196,37 @@ void test('another seller is refused before dialing, with nothing sent', async (
   });
   assert.equal(value.counts.dials, 0);
   assert.equal(value.counts.writes, 0);
+});
+
+void test('a quote expiring right before the write is refused with nothing sent', async () => {
+  const value = await fixture({ expireBeforeWrite: true });
+  await assert.rejects(value.client.execute(value.paid), {
+    code: PAID_EXECUTION_CODES.EXPIRED,
+    sent: false,
+  });
+  assert.equal(value.counts.dials, 1);
+  assert.equal(value.counts.writes, 0);
+});
+
+void test('an oversized event length is refused before its body is read', async () => {
+  const value = await fixture({ oversized: true });
+  await assert.rejects(value.client.execute(value.paid), {
+    code: PAID_EXECUTION_CODES.LIMIT,
+    sent: true,
+  });
+  assert.equal(value.counts.reads, 1);
+});
+
+void test('a stop after delivery is returned with its charge and settlement', async () => {
+  const value = await fixture({ stop: true });
+  const terminal = await value.client.execute(value.paid);
+  assert.equal(
+    terminal.error?.code,
+    PAID_EXECUTION_CODES.SELLER_CANNOT_CONTINUE,
+  );
+  assert.equal(terminal.charge?.outputTokens, 1);
+  assert.equal(
+    terminal.payment?.settlement?.chargedAtomic,
+    CHARGE.chargedAtomic,
+  );
 });

@@ -1,9 +1,15 @@
 // Prices a paid execution from recounted tokens and bounds its output by the deposited ceiling.
 // Pure arithmetic over synthetic requests; no engine, tokenizer or chain.
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 
-import { paidCharge, paidOutputAllowance } from '@gyblos/core/paid-charge';
+import {
+  paidCharge,
+  paidOutputAllowance,
+  type PaidUsage,
+} from '@gyblos/core/paid-charge';
 import { chargeV2 } from '@gyblos/core/pricing-v2';
 import type { PaidExecutionRequest } from '@gyblos/protocol/paid-execution';
 
@@ -122,4 +128,79 @@ void test('counts that are not whole non-negative numbers are refused', async ()
     );
     assert.throws(() => paidOutputAllowance(paid, tokens));
   }
+});
+
+void test('the golden vector charges are the quote prices applied to the recounted tokens', async () => {
+  const vectors: {
+    request: PaidExecutionRequest;
+    streams: Record<
+      string,
+      { event: { response?: Record<string, unknown> } }[]
+    >;
+  } = JSON.parse(
+    await readFile(
+      fileURLToPath(
+        import.meta.resolve('@gyblos/protocol/vectors/paid-execution-v1.json'),
+      ),
+      'utf8',
+    ),
+  );
+  let checked = 0;
+  for (const events of Object.values(vectors.streams)) {
+    const response = events.at(-1)?.event.response;
+    const charge = response?.charge;
+    if (!charge || typeof charge !== 'object') continue;
+    const { inputTokens, outputTokens } = charge as PaidUsage;
+    assert.deepEqual(
+      paidCharge(
+        vectors.request,
+        { inputTokens, outputTokens },
+        outputTokens > 0,
+      ),
+      charge,
+    );
+    checked++;
+  }
+  assert.equal(checked, 4);
+});
+
+void test('no output charges nothing, and huge counts or prices stop at the ceiling', async () => {
+  const paid = priced(await request(), PER_TOKEN, '10');
+  assert.equal(
+    paidCharge(paid, { inputTokens: 4, outputTokens: 0 }, true).chargedAtomic,
+    '0',
+  );
+  const huge = priced(
+    paid,
+    {
+      inputAtomicPerMtok: '18446744073709551615',
+      outputAtomicPerMtok: '18446744073709551615',
+    },
+    '10',
+  );
+  assert.equal(
+    paidCharge(
+      huge,
+      { inputTokens: 20_000_000, outputTokens: 20_000_000 },
+      true,
+    ).chargedAtomic,
+    '10',
+  );
+  assert.equal(paidOutputAllowance(huge, 1), null);
+});
+
+void test('free prices allow the requested tokens and charge nothing', async () => {
+  const zero = { inputAtomicPerMtok: '0', outputAtomicPerMtok: '0' };
+  const paid = priced(await request(), zero, '10', 7);
+  assert.equal(paidOutputAllowance(paid, 1_000), 7);
+  assert.equal(
+    paidCharge(paid, { inputTokens: 5, outputTokens: 5 }, true).chargedAtomic,
+    '0',
+  );
+});
+
+void test('the requested tokens bound the allowance below the quoted maximum', async () => {
+  const paid = priced(await request(), PER_TOKEN, '1000', 50);
+  const fewer = { ...paid, input: { ...paid.input, maxTokens: 3 } };
+  assert.equal(paidOutputAllowance(fewer, 4), 3);
 });

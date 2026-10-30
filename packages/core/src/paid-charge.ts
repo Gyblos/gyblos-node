@@ -7,8 +7,6 @@ import type {
   PaidExecutionRequest,
 } from '@gyblos/protocol/paid-execution';
 
-import { chargeV2 } from './pricing-v2';
-
 export interface PaidUsage {
   inputTokens: number;
   outputTokens: number;
@@ -46,26 +44,28 @@ export function paidOutputAllowance(
   );
 }
 
-// The charge for recounted tokens: zero output and zero amount when nothing was delivered, and
-// never above the deposited ceiling.
+// The charge for recounted tokens: zero output and zero amount when no output was delivered, and
+// never above the deposited ceiling, however large the counts or prices.
 export function paidCharge(
   request: PaidExecutionRequest,
   usage: PaidUsage,
   delivered: boolean,
 ): PaidCharge {
-  count(usage.inputTokens);
-  count(usage.outputTokens);
-  if (!delivered)
+  const input = count(usage.inputTokens);
+  const output = count(usage.outputTokens);
+  if (!delivered || output === 0n)
     return {
       inputTokens: usage.inputTokens,
       outputTokens: 0,
       chargedAtomic: '0',
     };
+  const { prices } = request.quote.offer;
+  const unit = BigInt(V2_PRICING.tokensPerUnit);
+  const cost =
+    input * BigInt(prices.inputAtomicPerMtok) +
+    output * BigInt(prices.outputAtomicPerMtok);
+  const priced = (cost + unit - 1n) / unit;
   const ceiling = BigInt(request.payment.maxAtomic);
-  const priced = chargeV2(
-    { input: usage.inputTokens, output: usage.outputTokens },
-    request.quote.offer.prices,
-  );
   return {
     inputTokens: usage.inputTokens,
     outputTokens: usage.outputTokens,
