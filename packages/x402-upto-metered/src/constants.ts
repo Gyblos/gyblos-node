@@ -31,6 +31,9 @@ export const UPTO_CHANNEL_STATES = {
   // The deposit was refused or can no longer land; terminal, kept so the channel is never admitted
   // again.
   FAILED: 'failed',
+  // The chain refused the claim for good (for example the payer's authorization expired); the
+  // deposit returns to the payer and nothing is charged. Terminal.
+  LAPSED: 'lapsed',
 } as const;
 export type UptoChannelState =
   (typeof UPTO_CHANNEL_STATES)[keyof typeof UPTO_CHANNEL_STATES];

@@ -9,7 +9,6 @@ import {
 import { UptoError } from './errors';
 import type { keyedLock } from './lock';
 import type {
-  UptoAdmission,
   UptoChain,
   UptoChannelRecord,
   UptoSettlement,
@@ -38,7 +37,8 @@ export async function attempt<T>(
   }
 }
 
-export // Records the charge before claiming it, so a crash or failed claim can only ever retry that charge.
+export // Records the charge before claiming it, so a crash or failed claim can only ever retry that charge;
+// a claim the chain refuses for good lapses.
 async function claimOnce(
   { chain, write }: SellerContext,
   record: UptoChannelRecord,
@@ -49,9 +49,28 @@ async function claimOnce(
     state: UPTO_CHANNEL_STATES.SETTLING,
     chargedAtomic,
   });
-  const { transaction } = await attempt(UPTO_ERROR_CODES.UNAVAILABLE, () =>
-    chain.claim(record, chargedAtomic),
-  );
+  let transaction: string;
+  try {
+    ({ transaction } = await chain.claim(record, chargedAtomic));
+  } catch (error) {
+    if (
+      error instanceof UptoError &&
+      error.code === UPTO_ERROR_CODES.ALREADY_SETTLED
+    )
+      return fail(UPTO_ERROR_CODES.ALREADY_SETTLED);
+    if (
+      error instanceof UptoError &&
+      error.code === UPTO_ERROR_CODES.FACILITATOR_REJECTED
+    ) {
+      await write({
+        ...record,
+        state: UPTO_CHANNEL_STATES.LAPSED,
+        chargedAtomic,
+      });
+      return fail(UPTO_ERROR_CODES.FACILITATOR_REJECTED);
+    }
+    return fail(UPTO_ERROR_CODES.UNAVAILABLE);
+  }
   const settlement = {
     channelId: record.channelId,
     chargedAtomic,
@@ -70,7 +89,7 @@ async function claimOnce(
 // A definitive refusal fails the channel at once; anything else stays DEPOSITING for recover().
 export async function depositOnce(
   { write }: SellerContext,
-  admission: UptoAdmission,
+  opened: Omit<UptoChannelRecord, 'state'>,
   run: () => Promise<unknown>,
 ): Promise<void> {
   try {
@@ -78,9 +97,14 @@ export async function depositOnce(
   } catch (error) {
     if (
       error instanceof UptoError &&
+      error.code === UPTO_ERROR_CODES.ALREADY_SETTLED
+    )
+      return fail(UPTO_ERROR_CODES.ALREADY_SETTLED);
+    if (
+      error instanceof UptoError &&
       error.code === UPTO_ERROR_CODES.FACILITATOR_REJECTED
     ) {
-      await write({ ...admission, state: UPTO_CHANNEL_STATES.FAILED });
+      await write({ ...opened, state: UPTO_CHANNEL_STATES.FAILED });
       return fail(UPTO_ERROR_CODES.FACILITATOR_REJECTED);
     }
     return fail(UPTO_ERROR_CODES.UNAVAILABLE);

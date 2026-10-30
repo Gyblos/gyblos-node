@@ -22,6 +22,7 @@ export function uptoRequirements(
       withdrawDelay: terms.withdrawDelaySeconds,
       tokenProgram: terms.tokenProgram,
       memo: terms.memo,
+      ...(terms.splits ? { splits: terms.splits } : {}),
       ...(hints ?? {}),
     },
   };

@@ -187,6 +187,8 @@ void test('recovery acts on the current record, not the listing it started from'
     channelId: second.channelId,
     payer: second.payer,
     maxAtomic: second.maxAtomic,
+    payload: second.payload,
+    terms,
     state: UPTO_CHANNEL_STATES.SETTLED,
     chargedAtomic: '5',
     settlement: {
@@ -223,11 +225,63 @@ void test('one record that cannot recover does not stop the others', async () =>
     channelId: pending.channelId,
     payer: pending.payer,
     maxAtomic: pending.maxAtomic,
+    payload: pending.payload,
+    terms,
     state: UPTO_CHANNEL_STATES.DEPOSITING,
   });
   const changed = await seller.recover();
   assert.deepEqual(
     changed.map((entry) => [entry.channelId, entry.state]),
     [[pending.channelId, UPTO_CHANNEL_STATES.FAILED]],
+  );
+});
+
+void test('a claim the chain refuses for good lapses and is not retried', async () => {
+  let refuse = true;
+  const store = memoryUptoStore();
+  const { terms } = await parties();
+  const fake = fakeChain({});
+  const chain = {
+    ...fake.chain,
+    claim: async (...args: Parameters<typeof fake.chain.claim>) => {
+      if (refuse) throw new UptoError(UPTO_ERROR_CODES.FACILITATOR_REJECTED);
+      return fake.chain.claim(...args);
+    },
+  };
+  const seller = createUptoSeller({ chain, store, now: () => NOW, own: terms });
+  const { channelId } = await seller.admit(authorizationFor(terms), terms);
+  await assert.rejects(
+    seller.settle(channelId, '5'),
+    code(UPTO_ERROR_CODES.FACILITATOR_REJECTED),
+  );
+  assert.equal((await store.get(channelId))?.state, UPTO_CHANNEL_STATES.LAPSED);
+  refuse = false;
+  assert.deepEqual(await seller.recover(), []);
+  await assert.rejects(
+    seller.settle(channelId, '5'),
+    code(UPTO_ERROR_CODES.FACILITATOR_REJECTED),
+  );
+  assert.deepEqual(fake.claims, []);
+});
+
+void test('a charge conflict reported by the chain does not lapse the channel', async () => {
+  const store = memoryUptoStore();
+  const { terms } = await parties();
+  const fake = fakeChain({});
+  const chain = {
+    ...fake.chain,
+    claim: async () => {
+      throw new UptoError(UPTO_ERROR_CODES.ALREADY_SETTLED);
+    },
+  };
+  const seller = createUptoSeller({ chain, store, now: () => NOW, own: terms });
+  const { channelId } = await seller.admit(authorizationFor(terms), terms);
+  await assert.rejects(
+    seller.settle(channelId, '5'),
+    code(UPTO_ERROR_CODES.ALREADY_SETTLED),
+  );
+  assert.equal(
+    (await store.get(channelId))?.state,
+    UPTO_CHANNEL_STATES.SETTLING,
   );
 });
