@@ -271,3 +271,40 @@ void test('desktop catalog IPC rejects foreign windows, stale frames, extra argu
   assert.equal(calls, 1);
   assert.equal(handlers.summary(event, ['extra']).state, CATALOG_STATE.ERROR);
 });
+
+void test('announced model presentation reuses zero-price controls with explicit source and local-only artwork', async () => {
+  const { announcedModels } = await import('@gyblos/desktop/announced-models');
+  const free = await entry();
+  const snapshot = await readFreeAnnouncements(async () => jsonResponse(200,sellersBody([free.signed])), 'qwen3:0.6b', () => DISCOVERY_NOW,new AbortController().signal);
+  const models = announcedModels(snapshot,DISCOVERY_NOW);
+  assert.equal(models.length,1); assert.equal(models[0]?.free,true);
+  assert.equal(models[0]?.input,0); assert.equal(models[0]?.output,0);
+  assert.equal(models[0]?.name,'qwen3:0.6b');
+  assert.equal(models[0]?.image.src,'./assets/models/qwen-color.svg');
+  assert.equal(announcedModels(snapshot,snapshot.models[0]?.expiresAt ?? 0).length,0);
+});
+void test('desktop catalog bounds distinct variants and excludes paid output even when input is zero', async () => {
+  const first = await entry(); const second = await entry();
+  const variants = async (source: typeof first, offset: number) => {
+    const template=source.catalog.models[0]; assert.ok(template);
+    const catalog={...source.catalog,models:Array.from({length:NETWORK_CATALOG.MAX_MODELS},(_unused,index)=>({...template,variant:`variant-${index+offset}`}))};
+    return {catalog:await signPublicV2(catalog,source.source.signer),presence:await source.source.presenceFor(catalog)};
+  };
+  const announcements=[await variants(first,0),await variants(second,NETWORK_CATALOG.MAX_MODELS)];
+  const result=await readFreeAnnouncements(async()=>jsonResponse(200,sellersBody(announcements)), 'qwen3:0.6b',()=>DISCOVERY_NOW,new AbortController().signal);
+  assert.equal(result.models.length,NETWORK_CATALOG.MAX_MODELS);assert.equal(result.truncated,true);
+  const paid={...first.catalog,models:first.catalog.models.map(model=>({...model,pricing:{...model.pricing,outputAtomicPerMtok:'1'}}))};
+  const excluded=await readFreeAnnouncements(async()=>jsonResponse(200,sellersBody([{catalog:await signPublicV2(paid,first.source.signer),presence:await first.source.presenceFor(paid)}])), 'qwen3:0.6b',()=>DISCOVERY_NOW,new AbortController().signal);
+  assert.equal(excluded.models.length,0);
+});
+void test('desktop catalog deadlines and pre-cancelled sessions cannot leave loading or issue later requests', async (context) => {
+  context.mock.timers.enable({apis:['setTimeout']});
+  let calls=0;
+  const controller=new AbortController();
+  const session=createCatalogSession(async()=>{calls+=1;return new Promise<Response>(()=>{});},()=>DISCOVERY_NOW,controller.signal);
+  const pending=session.lookup('org/model');context.mock.timers.tick(NETWORK_CATALOG.REQUEST_MS);
+  assert.equal((await pending).state,CATALOG_STATE.ERROR);controller.abort();
+  await session.lookup('org/another');assert.equal(calls,1);
+  let freshCalls=0; const stopped=createCatalogSession(async()=>{freshCalls+=1;throw new Error('must not fetch');},()=>DISCOVERY_NOW,controller.signal);
+  await stopped.lookup('org/model');assert.equal(freshCalls,0);
+});

@@ -35,7 +35,8 @@
     "./network-catalog": "./src/catalog/model.ts",
     "./network-catalog-reader": "./src/catalog/reader.ts",
     "./network-catalog-session": "./src/catalog/session.ts",
-    "./network-catalog-handlers": "./src/catalog/handlers.ts"
+    "./network-catalog-handlers": "./src/catalog/handlers.ts",
+    "./announced-models": "./src/ui/announced-models.ts"
   },
   "scripts": {
     "build": "tsx scripts/build.ts",
