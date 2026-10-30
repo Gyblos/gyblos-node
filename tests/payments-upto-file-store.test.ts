@@ -1,8 +1,7 @@
-// The durable upto ledger file: survives restarts, stays private, refuses tampering, serializes
-// writers, belongs to one live process at a time and prunes only finished channels and stale
-// pending signatures. Temporary directories only.
+// The durable upto ledger file: survives restarts, stays private, refuses tampering and bad
+// records, serializes writers and prunes only finished channels and stale pending signatures.
+// Ownership and close are in payments-upto-file-lock.test.ts. Temporary directories only.
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
 import {
   mkdtemp,
   readFile,
@@ -11,7 +10,6 @@ import {
   symlink,
   writeFile,
 } from 'node:fs/promises';
-import { hostname, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
@@ -19,85 +17,19 @@ import {
   createUptoSeller,
   UPTO_CHANNEL_STATES,
   UPTO_DEPOSIT_STATES,
-  UPTO_ERROR_CODES,
-  UptoError,
   type UptoChain,
-  type UptoChannelRecord,
 } from 'x402-upto-metered';
 
-import { paymentPathsIn } from '@gyblos/config';
-import { LEDGER_FILE, openUptoFileLedger } from '@gyblos/payments-upto';
-
-const NOW = 1_800_000_000_000;
-const RETENTION_MS = LEDGER_FILE.minRetentionMs;
-
-async function directory() {
-  return mkdtemp(join(tmpdir(), 'gyblos-upto-ledger-'));
-}
-
-function paths(root: string) {
-  return paymentPathsIn({ GYBLOS_HOME: root }, 'seller');
-}
-
-function record(
-  channelId: string,
-  state: UptoChannelRecord['state'] = UPTO_CHANNEL_STATES.ADMITTED,
-): UptoChannelRecord {
-  return {
-    channelId,
-    payer: 'Payer1111111111111111111111111111111111111',
-    maxAtomic: '1030000',
-    state,
-    payload: Buffer.from('{}').toString('base64'),
-    terms: {
-      network: 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1',
-      asset: 'Mint111111111111111111111111111111111111111',
-      payTo: 'PayTo11111111111111111111111111111111111111',
-      feePayer: 'Fee11111111111111111111111111111111111111111',
-      authorizer: 'Auth1111111111111111111111111111111111111111',
-      tokenProgram: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
-      maxAtomic: '1030000',
-      expiresAt: NOW + 60_000,
-      memo: `gyblos:${'ab'.repeat(32)}`,
-      withdrawDelaySeconds: 60,
-      maxTimeoutSeconds: 120,
-      splits: [
-        { recipient: 'PayTo11111111111111111111111111111111111111', bps: 9709 },
-        { recipient: 'Treasury11111111111111111111111111111111111', bps: 291 },
-      ],
-      reference: 'cd'.repeat(32),
-    },
-  };
-}
-
-const unavailable = (error: unknown) =>
-  error instanceof UptoError &&
-  error.code === UPTO_ERROR_CODES.JOURNAL_UNAVAILABLE;
-
-async function ledger(
-  root: string,
-  options: { now?: () => number; retentionMs?: number } = {},
-) {
-  return openUptoFileLedger({
-    paths: paths(root),
-    now: options.now ?? (() => NOW),
-    retentionMs: options.retentionMs ?? RETENTION_MS,
-    maxChannels: 3,
-  });
-}
-
-// Opens the ledger, runs one step against it and closes it, as one process lifetime.
-async function session<T>(
-  root: string,
-  run: (store: Awaited<ReturnType<typeof ledger>>) => Promise<T>,
-): Promise<T> {
-  const store = await ledger(root);
-  try {
-    return await run(store);
-  } finally {
-    await store.close();
-  }
-}
+import {
+  directory,
+  ledger,
+  NOW,
+  paths,
+  record,
+  RETENTION_MS,
+  session,
+  unavailable,
+} from './support/payment-upto-file';
 
 void test('channel and chain records survive a restart, in private files', async () => {
   const root = await directory();
@@ -239,72 +171,6 @@ void test('a tampered, linked or malformed ledger is refused, never repaired', a
   }
 });
 
-void test('the ledger belongs to one live process; a dead owner on this host is taken over', async () => {
-  const root = await directory();
-  try {
-    const store = await ledger(root);
-    // A second opener, in this or another live process, is refused while the first holds it.
-    await assert.rejects(ledger(root), unavailable);
-    await store.channels.put(record('Chan1'));
-    await store.close();
-    await assert.rejects(store.channels.put(record('Chan2')), unavailable);
-    const { lock } = paths(root);
-    const dead = spawnSync(process.execPath, ['-e', '']).pid;
-    await writeFile(lock, JSON.stringify({ pid: dead, host: hostname() }), {
-      mode: 0o600,
-    });
-    await session(root, (next) => next.channels.put(record('Chan2')));
-    await writeFile(lock, JSON.stringify({ pid: dead, host: 'another-host' }), {
-      mode: 0o600,
-    });
-    await assert.rejects(ledger(root), unavailable);
-    await rm(lock);
-    assert.equal(
-      (await session(root, (next) => next.channels.list())).length,
-      2,
-    );
-  } finally {
-    await rm(root, { recursive: true, force: true });
-  }
-});
-
-void test('a lock lost while open stops writes instead of overwriting', async () => {
-  const root = await directory();
-  try {
-    const store = await ledger(root);
-    await store.channels.put(record('Chan1'));
-    const { lock } = paths(root);
-    await rm(lock);
-    await writeFile(lock, 'someone else', { mode: 0o600 });
-    await assert.rejects(store.channels.put(record('Chan2')), unavailable);
-    await assert.rejects(store.close(), unavailable);
-    assert.equal(await readFile(lock, 'utf8'), 'someone else');
-  } finally {
-    await rm(root, { recursive: true, force: true });
-  }
-});
-
-void test('close refuses new writes at once, finishes queued ones and can be repeated', async () => {
-  const root = await directory();
-  try {
-    const store = await ledger(root);
-    const queued = store.channels.put(record('Chan1'));
-    const closed = store.close();
-    await assert.rejects(store.channels.put(record('Chan2')), unavailable);
-    await queued;
-    await closed;
-    await store.close();
-    assert.deepEqual(
-      (await session(root, (next) => next.channels.list())).map(
-        (entry) => entry.channelId,
-      ),
-      ['Chan1'],
-    );
-  } finally {
-    await rm(root, { recursive: true, force: true });
-  }
-});
-
 void test('a record the ledger could not read back is refused alone, never written', async () => {
   const root = await directory();
   try {
@@ -323,16 +189,6 @@ void test('a record the ledger could not read back is refused alone, never writt
         ['Chan2'],
       );
     });
-  } finally {
-    await rm(root, { recursive: true, force: true });
-  }
-});
-
-void test('retention shorter than the minimum is refused', async () => {
-  const root = await directory();
-  try {
-    for (const retentionMs of [0, RETENTION_MS - 1, 1.5])
-      await assert.rejects(ledger(root, { retentionMs }), unavailable);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

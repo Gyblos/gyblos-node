@@ -6,7 +6,7 @@
 // Every failure is PrivateFileError with a static code. On macOS fsync does not flush the drive
 // cache (no F_FULLFSYNC from Node), so a power loss can still drop the last acknowledged write.
 import { randomUUID } from 'node:crypto';
-import { constants, type Stats } from 'node:fs';
+import { constants, realpathSync, type Stats } from 'node:fs';
 import {
   link,
   lstat,
@@ -18,7 +18,7 @@ import {
   type FileHandle,
 } from 'node:fs/promises';
 import { hostname } from 'node:os';
-import { dirname, join, parse, resolve, sep } from 'node:path';
+import { basename, dirname, join, parse, resolve, sep } from 'node:path';
 
 import { FILE_MODES } from '@gyblos/config';
 
@@ -245,7 +245,7 @@ async function takeOver(path: string): Promise<FileHandle | undefined> {
     await unlink(aside);
     return await create(path);
   } finally {
-    await guard.close();
+    await guard.close().catch(() => {});
     await unlink(`${path}${PROCESS_LOCK.guardSuffix}`);
   }
 }
@@ -272,7 +272,13 @@ async function create(path: string): Promise<FileHandle | undefined> {
 }
 
 export function acquireProcessLock(path: string): Promise<ProcessLock> {
-  const key = resolve(path);
+  let key: string;
+  try {
+    // The canonical directory, so one directory reached by two spellings is one key.
+    key = join(realpathSync.native(dirname(path)), basename(path));
+  } catch {
+    return guarded(async () => fail());
+  }
   if (HELD.has(key)) return guarded(async () => fail());
   // Reserved before any await, so two acquisitions in this process never both proceed.
   HELD.add(key);
@@ -289,10 +295,13 @@ export function acquireProcessLock(path: string): Promise<ProcessLock> {
       await file.close();
       throw error;
     }
+    let released = false;
     return {
       verify,
       release: () =>
         guarded(async () => {
+          if (released) return;
+          released = true;
           try {
             await sameFile(file, path, PROCESS_LOCK.maxBytes);
             await unlink(path);

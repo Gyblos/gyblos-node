@@ -212,3 +212,29 @@ void test('processes racing to take over a dead lock never hold it at the same t
       outputs.every((line) => line === 'refused' || line.startsWith('held ')),
     );
   }));
+
+void test('one lock reached through two spellings of its directory is still one lock', () =>
+  withRoot(async (root) => {
+    await ensurePrivateDirectory(join(root, 'real'));
+    await symlink(join(root, 'real'), join(root, 'alias'));
+    const lock = await acquireProcessLock(join(root, 'real', 'ledger.lock'));
+    await assert.rejects(
+      acquireProcessLock(join(root, 'alias', 'ledger.lock')),
+      refused,
+    );
+    await lock.verify();
+    await lock.release();
+  }));
+
+void test('releasing a lock again never frees a newer holder', () =>
+  withRoot(async (root) => {
+    await ensurePrivateDirectory(root);
+    const path = join(root, 'ledger.lock');
+    const first = await acquireProcessLock(path);
+    await first.release();
+    const second = await acquireProcessLock(path);
+    await first.release();
+    await assert.rejects(acquireProcessLock(path), refused);
+    await second.verify();
+    await second.release();
+  }));
