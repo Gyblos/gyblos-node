@@ -26,7 +26,8 @@ export interface SellerPayments {
 export interface SellerPaidHealth extends PaidRetryHealth {
   // Claims the payment server refused on the request path for a reason retrying cannot fix.
   refusedClaims: number;
-  // Whether recovery of earlier claims failed; they then wait for the next start.
+  // Whether recovery as a whole failed; the payment server may still skip single claims it cannot
+  // reach, which then wait for the next start.
   recoveryFailed: boolean;
 }
 
@@ -107,11 +108,19 @@ export async function startSellerPaid(
     description,
     service,
     health: () => ({ ...retry.health(), refusedClaims, recoveryFailed }),
-    // Stops waiting on claims first, then retries and recovery, then the payment server itself.
+    // Stops waiting on claims first, then retries, then gives recovery up to one claim wait (a hung
+    // claim must not block shutdown), then closes the payment server, which refuses later writes.
     async close() {
       daemon.abort();
       await retry.stop();
-      await recovering;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      await Promise.race([
+        recovering,
+        new Promise<void>((resolve) => {
+          timer = setTimeout(resolve, timing.waitMs);
+        }),
+      ]);
+      clearTimeout(timer);
       await payments.close();
     },
   };

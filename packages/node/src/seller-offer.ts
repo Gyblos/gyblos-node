@@ -25,12 +25,11 @@ export type SellerCatalogOffer = {
   // The catalog model id the offer's engine plugin serves.
   modelId: string;
   reasoning: readonly ReasoningLevel[];
-} &
-  // The seller's own price; buyers pay it plus the protocol fee (listedPrices).
-  (
-    | { kind: typeof OFFER_PRICING_KINDS.PAID; prices: TokenPricesV2 }
-    | { kind: typeof OFFER_PRICING_KINDS.FREE; caps: FreeOfferCaps }
-  );
+  // A paid offer's prices are the seller's own; buyers pay them plus the protocol fee (listedPrices).
+} & (
+  | { kind: typeof OFFER_PRICING_KINDS.PAID; prices: TokenPricesV2 }
+  | { kind: typeof OFFER_PRICING_KINDS.FREE; caps: FreeOfferCaps }
+);
 
 // The pinned Qwen3 0.6B with one reasoning level on the seller's Ollama; its public tokenizer is what
 // makes an offer recountable, which paid offers require.

@@ -14,7 +14,8 @@ export interface PaidRetryOptions {
   payment: PaymentServer;
   // Waits between attempts; the claim is given up after the last one fails.
   delaysMs: readonly number[];
-  // How long one attempt may take before it counts as retryable.
+  // How long one attempt may take before it counts as retryable. The timed-out claim keeps running
+  // inside the payment server, so the next attempt may queue behind it; the charge is the same.
   attemptMs: number;
 }
 

@@ -1,5 +1,5 @@
 // The pending-claim worker retries exactly the recorded charge on a bounded schedule with bounded
-// attempts, stops on a lapse or a refusal retrying cannot fix, and leaves no timer behind. Synthetic payment server, short delays.
+// attempts, stops on a lapse or a refusal it cannot fix, and leaves no timer behind. Synthetic server.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 

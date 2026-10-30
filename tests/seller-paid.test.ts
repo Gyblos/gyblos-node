@@ -240,3 +240,30 @@ void test('claims left by an earlier run are recovered in the background and clo
   assert.equal(failing.health().recoveryFailed, true);
   await failing.close();
 });
+
+void test('a recovery that never ends delays shutdown by at most one claim wait', async () => {
+  const { seller } = await wired();
+  const own = await seller.payment.server.describe();
+  let closed = false;
+  const paid = await startSellerPaid(
+    {
+      server: seller.payment.server,
+      recover: () => new Promise<void>(() => {}),
+      close: async () => {
+        closed = true;
+      },
+    },
+    {
+      owner: seller.options.owner,
+      mint: own.mint,
+      nodeId: seller.options.nodeId,
+      startedAt: 0,
+      offers: () => [],
+      settlement: { waitMs: 20, retryDelaysMs: [] },
+    },
+  );
+  const started = Date.now();
+  await paid.close();
+  assert.ok(Date.now() - started < 2_000);
+  assert.equal(closed, true);
+});
