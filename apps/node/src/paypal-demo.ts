@@ -54,7 +54,7 @@ function show(state) {
   el('send').disabled = stale || !!pending || state.phase !== PHASE.ACTIVE || state.expired || state.remainingAttempts === 0 || state.spentCents + state.messageCents > state.limitCents;
   el('finish').disabled = stale || !!pending || state.phase !== PHASE.ACTIVE; el('cancel').disabled = stale || state.phase !== PHASE.CREATED;
   el('retryAck').hidden = stale || !(pending && pending.received);
-  if (stale) status.textContent = 'This tab belongs to another session. Reopen the current session link.';
+  if (stale) status.textContent = 'This tab belongs to another session. Open the current session link in a new tab.';
   if (state.expired && state.phase === PHASE.ACTIVE) status.textContent = 'Session expired for new messages. Close it to settle.';
   if (state.remainingAttempts === 0 && state.phase === PHASE.ACTIVE) status.textContent = 'Attempt limit reached. Close the session to settle.';
   if (state.phase === PHASE.MESSAGE_PENDING && !(pending && pending.received)) status.textContent = 'A response was not acknowledged. Reconcile this session before continuing.';

@@ -124,6 +124,7 @@ class PaypalSession {
         currency: PAYPAL_SANDBOX.currency,
         limitCents: PAYPAL_SANDBOX.limitCents,
         messageCents: PAYPAL_SANDBOX.messageCents,
+        maxMessageAttempts: PAYPAL_SANDBOX.maxMessageAttempts,
         spentCents: 0,
         attemptIds: [],
         acknowledgedIds: [],
@@ -206,6 +207,10 @@ class PaypalSession {
         messageId,
         promptDigest: digest,
       });
+      if (signal?.aborted) {
+        await this.save({ ...record, attemptIds });
+        return fail(PAYPAL_ERROR_CODES.INFERENCE_FAILED);
+      }
       let output: Awaited<
         ReturnType<PaypalSessionDependencies['engine']['generate']>
       >;
