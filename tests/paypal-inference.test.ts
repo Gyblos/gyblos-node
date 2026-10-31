@@ -7,6 +7,8 @@ function fixture() {
   const calls: string[] = [];
   let state: unknown = null;
   const payment = {
+    async prepare() {},
+    async isApproved() { return true; },
     async create() {
       calls.push('create');
       return {
@@ -62,6 +64,20 @@ void test('a PayPal authorization pays for one bound inference and is captured o
     JSON.stringify(f.getState()),
     /A synthetic (prompt|answer)/,
   );
+});
+
+void test('unapproved orders and failed credentials do not permanently block a new attempt', async () => {
+  const f = fixture();
+  f.payment.prepare = async () => { throw new Error('credentials'); };
+  const service = await createPaypalInference(f);
+  await assert.rejects(service.create('first', 16));
+  f.payment.prepare = async () => {};
+  await service.create('first', 16);
+  f.payment.isApproved = async () => false;
+  await assert.rejects(service.execute('ORDER1', 'first', 16));
+  f.payment.isApproved = async () => true;
+  await service.execute('ORDER1', 'first', 16);
+  assert.deepEqual(f.calls, ['create', 'authorize', 'generate', 'capture']);
 });
 
 void test('a different prompt cannot use the approved order', async () => {
