@@ -28,6 +28,7 @@ void test('collector acceptance persists signed pairs and reopens in a separate 
       new AbortController().signal,
     ),
     {
+      collectorHttp: true,
       collectorStored: 2,
       collectorDuplicates: 2,
       collectorRestarts: 1,

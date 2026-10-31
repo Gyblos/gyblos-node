@@ -60,6 +60,7 @@ export interface ReceiptAcceptanceReport {
   answers: number;
   engineAttempts: number;
   confirmed: number;
+  collectorHttp: true;
   collectorStored: number;
   collectorDuplicates: number;
   collectorRestarts: number;

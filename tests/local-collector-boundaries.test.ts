@@ -5,6 +5,7 @@ import { request } from 'node:http';
 import { join } from 'node:path';
 import test from 'node:test';
 
+import { maintainCollector } from '@gyblos/receipt-collector/maintenance';
 import {
   startLocalCollector,
   type CollectorOptions,
@@ -13,6 +14,10 @@ import {
   collectorSettings,
   loadCollectorSettings,
 } from '@gyblos/receipt-collector/settings';
+import {
+  createRetainedReceiptStore,
+  openRetainedReceiptStore,
+} from '@gyblos/telemetry-file/retained-receipts';
 
 import { managedReceiptFixture } from './support/local-collector';
 import { receiptBytes } from './support/receipt-collector';
@@ -228,4 +233,47 @@ void test('local collector requires consent, unique credentials and private stri
   await assert.rejects(loadCollectorSettings(path), {
     code: 'COLLECTOR_INVALID',
   });
+});
+
+void test('collector maintenance skips a full storage queue and works after normal writes drain', async (context) => {
+  const f = await managedReceiptFixture(context);
+  const store = f.manage(
+    await createRetainedReceiptStore({
+      path: f.path,
+      retentionMs: 100,
+      now: () => 1000,
+      maxPending: 1,
+    }),
+  );
+  const inserted = store.insert(f.entry);
+  await assert.doesNotReject(maintainCollector(store));
+  assert.equal(await inserted, 'inserted');
+  await maintainCollector(store);
+  assert.equal(await store.insert(f.other), 'inserted');
+});
+void test('collector startup releases storage when the clock fails during post-open initialization', async (context) => {
+  const f = await managedReceiptFixture(context);
+  let calls = 0;
+  let failure: unknown;
+  try {
+    await startLocalCollector({
+      ...options(f.path, f.entry.receipt.seller.record.buyerNodeId),
+      now: () => {
+        if (++calls === 3) throw new Error('Synthetic clock failure');
+        return 1000;
+      },
+    });
+  } catch (error) {
+    failure = error;
+  }
+  const reopened = f.manage(
+    await openRetainedReceiptStore({
+      path: f.path,
+      retentionMs: 100,
+      now: () => 1000,
+    }),
+  );
+  await reopened.close();
+  assert.ok(failure instanceof Error);
+  assert.equal(failure.message, 'COLLECTOR_STORAGE');
 });

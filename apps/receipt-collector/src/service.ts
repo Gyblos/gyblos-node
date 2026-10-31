@@ -20,7 +20,12 @@ import { collectorAccess } from './access';
 import { LOCAL_COLLECTOR, LOCAL_COLLECTOR_CODES } from './constants';
 import { collectorFail, LocalCollectorError } from './errors';
 import { collectorBody, collectorFailure, collectorReply } from './http';
-import { collectorSettings, type CollectorOptions } from './settings';
+import { maintainCollector } from './maintenance';
+import {
+  collectorSettings,
+  type CollectorOptions,
+  type CollectorSettings,
+} from './settings';
 
 export type { CollectorOptions, CollectorPrincipal } from './settings';
 
@@ -129,16 +134,10 @@ async function awaitCollectorClose(work: Promise<void>) {
     clearTimeout(timer);
   }
 }
-export async function startLocalCollector(options: CollectorOptions) {
-  const settings = collectorSettings(options);
-  const storage = {
-    path: settings.path,
-    retentionMs: settings.retentionMs,
-    now: settings.now,
-  };
-  const store = await (settings.create
-    ? createRetainedReceiptStore(storage)
-    : openRetainedReceiptStore(storage));
+async function serveLocalCollector(
+  settings: CollectorSettings,
+  store: RetainedStore,
+) {
   const receiver = handler(settings, store);
   const server = createServer(
     {
@@ -156,8 +155,7 @@ export async function startLocalCollector(options: CollectorOptions) {
   const timer = setInterval(() => {
     if (sweeping) return;
     sweeping = true;
-    void store
-      .sweep()
+    void maintainCollector(store)
       .catch(() => receiver.broken())
       .finally(() => {
         sweeping = false;
@@ -187,6 +185,34 @@ export async function startLocalCollector(options: CollectorOptions) {
   } catch {
     clearInterval(timer);
     server.closeAllConnections();
+    await store.close();
+    return collectorFail(LOCAL_COLLECTOR_CODES.STORAGE);
+  }
+}
+
+export interface CollectorStorage {
+  create: typeof createRetainedReceiptStore;
+  open: typeof openRetainedReceiptStore;
+}
+export async function startLocalCollector(
+  options: CollectorOptions,
+  storage: CollectorStorage = {
+    create: createRetainedReceiptStore,
+    open: openRetainedReceiptStore,
+  },
+) {
+  const settings = collectorSettings(options);
+  const selected = {
+    path: settings.path,
+    retentionMs: settings.retentionMs,
+    now: settings.now,
+  };
+  const store = await (settings.create
+    ? storage.create(selected)
+    : storage.open(selected));
+  try {
+    return await serveLocalCollector(settings, store);
+  } catch {
     await store.close();
     return collectorFail(LOCAL_COLLECTOR_CODES.STORAGE);
   }

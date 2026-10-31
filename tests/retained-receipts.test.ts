@@ -1,8 +1,10 @@
 // Private retention and replay tests use synthetic pairs and disposable files only.
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import test from 'node:test';
 
+import { canonicalJson } from '@gyblos/protocol';
 import {
   createRetainedReceiptStore,
   openRetainedReceiptStore,
@@ -99,4 +101,51 @@ void test('retained receipt cancellation preserves prior bytes and clock rollbac
     null,
   );
   assert.equal(await second.insert(f.entry), 'identical');
+});
+void test('retained receipt reopen verifies signatures and preserves corrupt history without reset', async (context) => {
+  const f = await managedReceiptFixture(context);
+  const options = { path: f.path, retentionMs: 100, now: () => 1000 };
+  const store = f.manage(await createRetainedReceiptStore(options));
+  await store.insert(f.entry);
+  await store.close();
+  const original = await readFile(f.path, 'utf8');
+  const changed = JSON.parse(original);
+  changed.entries[0].receipt.seller.signature = '00'.repeat(64);
+  changed.entries[0].fingerprint = createHash('sha256')
+    .update(canonicalJson(changed.entries[0].receipt))
+    .digest('hex');
+  const forged = canonicalJson(changed) + '\n';
+  await writeFile(f.path, forged);
+  await assert.rejects(openRetainedReceiptStore(options), {
+    code: 'RECEIPT_FILE_CORRUPT',
+  });
+  assert.equal(await readFile(f.path, 'utf8'), forged);
+});
+void test('retained receipt schema rejects premature tombstones, duplicate keys and concurrent owners', async (context) => {
+  const f = await managedReceiptFixture(context);
+  const options = { path: f.path, retentionMs: 100, now: () => 1000 };
+  const store = f.manage(await createRetainedReceiptStore(options));
+  await store.insert(f.entry);
+  await assert.rejects(openRetainedReceiptStore(options), {
+    code: 'RECEIPT_FILE_UNAVAILABLE',
+  });
+  await store.close();
+  const original = await readFile(f.path, 'utf8');
+  for (const change of [
+    (value: Record<string, unknown>) => {
+      const rows = value.entries as { receipt: unknown }[];
+      rows[0]!.receipt = null;
+    },
+    (value: Record<string, unknown>) => {
+      const rows = value.entries as unknown[];
+      rows.push(rows[0]);
+    },
+  ]) {
+    const data = JSON.parse(original);
+    change(data);
+    await writeFile(f.path, canonicalJson(data) + '\n');
+    await assert.rejects(openRetainedReceiptStore(options), {
+      code: 'RECEIPT_FILE_CORRUPT',
+    });
+  }
 });

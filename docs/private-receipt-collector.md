@@ -231,7 +231,8 @@ store loses its replay history and is not an accounting-safe reset.
 
 Retention is logical removal through atomic replacement, not secure erasure:
 filesystem journals/backups may retain old bytes. It cannot erase while the
-process is stopped, and failed I/O can delay removal; maintenance failure stops
+process is stopped, and failed I/O can delay removal; a full work queue skips
+that maintenance tick, while a genuine storage or integrity failure stops
 ingestion. No encryption at rest, power-loss/rollback resistance against old
 snapshots, Windows ACL acceptance or production capacity is claimed. Markers
 remain private metadata. Public accounting still requires separate retention,
@@ -259,3 +260,9 @@ default path, role-home lookup, `.env` loading or network access. The entrypoint
 accepts no command-line arguments and prints only a static startup flag or
 static failure code. Programmatic callers can use `startLocalCollector` with
 explicit options and own its `close()` lifecycle.
+
+The existing synthetic startup acceptance also hands its product-produced
+confirmed pairs to this HTTP loopback receiver, closes/reopens the receiver and
+checks expired bodies with persistent duplicate markers. This is local test
+traffic, not runtime upload integration. Programmatic composition may supply the
+explicit retained-storage port; the application owns its close lifecycle.

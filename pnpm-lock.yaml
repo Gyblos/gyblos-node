@@ -317,6 +317,9 @@ importers:
       '@gyblos/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
+      '@gyblos/receipt-collector':
+        specifier: workspace:*
+        version: link:../../apps/receipt-collector
       '@gyblos/runtime':
         specifier: workspace:*
         version: link:../../packages/runtime
