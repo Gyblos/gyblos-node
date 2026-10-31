@@ -19,7 +19,10 @@ export interface PaypalSandboxPayment {
   isApproved?(orderId: string): Promise<boolean>;
   create(requestId: string): Promise<{ orderId: string; approvalUrl: string }>;
   authorize(orderId: string): Promise<{ authorizationId: string }>;
-  capture(authorizationId: string): Promise<{ captureId: string }>;
+  capture(
+    authorizationId: string,
+    cents?: number,
+  ): Promise<{ captureId: string }>;
   void(authorizationId: string): Promise<void>;
   refund?(captureId: string): Promise<void>;
 }

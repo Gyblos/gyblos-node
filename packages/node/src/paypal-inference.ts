@@ -16,7 +16,7 @@ import {
 
 type Phase = (typeof PHASE)[keyof typeof PHASE];
 
-interface Attempt {
+export interface PaypalAttempt {
   phase: Phase;
   promptDigest: string;
   requestId: string;
@@ -25,6 +25,7 @@ interface Attempt {
   authorizationId?: string;
   captureId?: string;
 }
+type Attempt = PaypalAttempt;
 
 export interface PaypalInferenceDependencies {
   validateRequest?(prompt: string, maxTokens: number): void;
@@ -180,6 +181,11 @@ function isFinished(attempt: Attempt | null) {
     attempt.phase === PHASE.REFUNDED ||
     attempt.phase === PHASE.CANCELLED
   );
+}
+
+// Existing single-request journals must be terminal before a new session starts.
+export function paypalPreviousAttemptFinished(value: unknown) {
+  return isFinished(parseAttempt(value));
 }
 
 class PaypalInference {

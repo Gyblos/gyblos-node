@@ -5,6 +5,8 @@ export const PAYPAL_API = {
   origin: 'https://api-m.sandbox.paypal.com',
   approvalHost: 'www.sandbox.paypal.com',
   timeoutMs: 15_000,
+  limitCents: PAYPAL_SANDBOX.limitCents,
+  centsPerDollar: PAYPAL_SANDBOX.centsPerDollar,
   noContent: 204,
   price: {
     currency_code: PAYPAL_SANDBOX.currency,

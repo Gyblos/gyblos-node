@@ -8,9 +8,9 @@ import {
 
 import { PAYPAL_SANDBOX } from '@gyblos/config/constants';
 import {
-  createPaypalInference,
-  type PaypalInferenceDependencies,
-} from '@gyblos/node/paypal-inference';
+  createPaypalSession,
+  type PaypalSessionDependencies,
+} from '@gyblos/node/paypal-session';
 import { PAYPAL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { PaypalError } from '@gyblos/protocol/paypal-payment';
 
@@ -26,18 +26,25 @@ const SESSION_BYTES = 32;
 
 const PAGE = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Gyblos PayPal Sandbox</title></head>
-<body><main><h1>Gyblos inference · PayPal Sandbox</h1><p>One bounded inference: ${PAYPAL_SANDBOX.currency} ${PAYPAL_SANDBOX.price} in sandbox funds. A seller receives the payment after generation.</p>
-<label for="prompt">Your prompt</label><br><textarea id="prompt" rows="6" cols="60" maxlength="4096"></textarea><br>
-<button id="create">Create sandbox order</button><p><a id="approve" target="_blank" rel="noopener noreferrer" hidden>Approve in PayPal Sandbox</a></p>
-<button id="execute" disabled>I approved the payment · run inference</button><p id="status" role="status"></p><pre id="answer"></pre></main>
-<button id="cancel">Abandon an order that has not been authorized</button>
+<body><main><h1>Gyblos inference · PayPal Sandbox</h1>
+<p>Approve a hold of up to USD ${PAYPAL_SANDBOX.price}. Each completed response costs USD ${PAYPAL_SANDBOX.messagePrice} in sandbox funds. Close the session to capture only the acknowledged responses, up to ten.</p>
+<p>Each message is independent; previous messages are not sent as context. A session accepts messages for 30 minutes after authorization. Close it explicitly to settle or release the hold.</p>
+<button id="create">Create sandbox session</button><p><a id="approve" target="_blank" rel="noopener noreferrer" hidden>Approve in PayPal Sandbox</a></p>
+<button id="authorize" disabled>I approved · start session</button><button id="cancel" disabled>Abandon unapproved order</button>
+<p id="balance"></p><label for="prompt">Your prompt</label><br><textarea id="prompt" rows="6" cols="60" maxlength="4096"></textarea><br>
+<button id="send" disabled>Send message</button><button id="finish" disabled>Close session and settle</button><p id="status" role="status"></p><pre id="answer"></pre></main>
 <script>
-let orderId; let requestPrompt; const maxTokens = 64; const sessionToken = location.hash.slice(1);
-const status = document.getElementById('status');
+let orderId; let pendingId; const maxTokens = 64; const sessionToken = location.hash.slice(1);
+const status = document.getElementById('status'); const balance = document.getElementById('balance');
+const el = (id) => document.getElementById(id);
 async function post(path, body) { const result = await fetch(path, { method: 'POST', headers: {'content-type':'application/json', authorization:'Bearer ' + sessionToken}, body: JSON.stringify(body) }); const data = await result.json(); if (!result.ok) { const error = new Error(data.error); error.retryable = data.retryable; throw error; } return data; }
-document.getElementById('create').onclick = async () => { try { requestPrompt = document.getElementById('prompt').value; const data = await post('/api/order', {prompt: requestPrompt, maxTokens}); orderId = data.orderId; const link = document.getElementById('approve'); link.href = data.approvalUrl; link.hidden = false; document.getElementById('execute').disabled = false; document.getElementById('create').disabled = true; status.textContent = 'Approve the order, then return here.'; } catch (error) { status.textContent = error.message; } };
-document.getElementById('execute').onclick = async () => { document.getElementById('execute').disabled = true; status.textContent = 'Authorizing, generating, and capturing…'; try { const data = await post('/api/execute', {orderId, prompt: requestPrompt, maxTokens}); document.getElementById('answer').textContent = data.text; status.textContent = 'Sandbox payment captured.'; } catch (error) { if (error.retryable) document.getElementById('execute').disabled = false; status.textContent = error.message; } };
-document.getElementById('cancel').onclick = async () => { try { await post('/api/cancel', {}); location.reload(); } catch (error) { status.textContent = error.message; } };
+function show(state) { balance.textContent = 'Recorded usage: USD ' + (state.spentCents / 100).toFixed(2) + ' of USD ' + (state.limitCents / 100).toFixed(2); el('create').disabled = !['ready','completed','voided','cancelled'].includes(state.phase); el('send').disabled = state.phase !== 'active' || state.spentCents + state.messageCents > state.limitCents; el('finish').disabled = state.phase !== 'active'; el('cancel').disabled = state.phase !== 'created'; if (state.phase === 'message_pending') status.textContent = 'A response has not been acknowledged. Reconcile this session before continuing.'; if (['executing','capturing','voiding','authorizing','creating','blocked'].includes(state.phase)) status.textContent = 'The session has an uncertain operation. Check its status before continuing.'; }
+el('create').onclick = async () => { el('create').disabled = true; try { const data = await post('/api/order', {}); orderId = data.orderId; const link = el('approve'); link.href = data.approvalUrl; link.hidden = false; el('authorize').disabled = false; el('cancel').disabled = false; status.textContent = 'Approve the USD ${PAYPAL_SANDBOX.price} hold, then return here.'; } catch (error) { status.textContent = error.message; } };
+el('authorize').onclick = async () => { el('authorize').disabled = true; try { const state = await post('/api/approve', {orderId}); el('approve').hidden = true; show(state); status.textContent = 'Session authorized. Send independent messages, then close the session.'; } catch (error) { if (error.retryable) el('authorize').disabled = false; status.textContent = error.message; } };
+el('send').onclick = async () => { el('send').disabled = true; el('finish').disabled = true; status.textContent = 'Generating…'; try { const data = await post('/api/message', {prompt: el('prompt').value, maxTokens}); pendingId = data.messageId; el('answer').textContent = data.text; const state = await post('/api/acknowledge', {messageId: pendingId}); pendingId = undefined; show(state); status.textContent = 'Response acknowledged.'; } catch (error) { status.textContent = error.message; if (!pendingId) { try { show(await post('/api/status', {})); } catch {} } } };
+el('finish').onclick = async () => { el('send').disabled = true; el('finish').disabled = true; try { const state = await post('/api/finish', {}); show(state); status.textContent = state.spentCents ? 'Sandbox payment captured for acknowledged responses.' : 'Unused authorization voided.'; } catch (error) { status.textContent = error.message; } };
+el('cancel').onclick = async () => { try { await post('/api/cancel', {}); location.reload(); } catch (error) { status.textContent = error.message; } };
+post('/api/status', {}).then(show).catch((error) => { status.textContent = error.message; });
 </script></body></html>`;
 
 async function body(
@@ -92,7 +99,7 @@ function servePage(
 }
 
 function demoHandler(
-  service: Awaited<ReturnType<typeof createPaypalInference>>,
+  service: Awaited<ReturnType<typeof createPaypalSession>>,
   getOrigin: () => string,
   sessionToken: string,
 ) {
@@ -110,22 +117,32 @@ function demoHandler(
       )
         return json(response, HTTP.forbidden, { error: 'Forbidden' });
       const input = await body(request);
+      if (request.url === '/api/status')
+        return json(response, HTTP.ok, service.status());
+      if (request.url === '/api/order')
+        return json(response, HTTP.ok, await service.create());
       if (request.url === '/api/cancel') {
         await service.cancel();
         return json(response, HTTP.ok, { cancelled: true });
       }
+      if (request.url === '/api/approve' && typeof input.orderId === 'string')
+        return json(response, HTTP.ok, await service.approve(input.orderId));
       if (
-        typeof input.prompt !== 'string' ||
-        typeof input.maxTokens !== 'number'
+        request.url === '/api/acknowledge' &&
+        typeof input.messageId === 'string'
       )
-        return json(response, HTTP.badRequest, { error: 'Invalid request' });
-      if (request.url === '/api/order')
         return json(
           response,
           HTTP.ok,
-          await service.create(input.prompt, input.maxTokens),
+          await service.acknowledge(input.messageId),
         );
-      if (request.url === '/api/execute' && typeof input.orderId === 'string') {
+      if (request.url === '/api/finish')
+        return json(response, HTTP.ok, await service.finish());
+      if (
+        request.url === '/api/message' &&
+        typeof input.prompt === 'string' &&
+        typeof input.maxTokens === 'number'
+      ) {
         const controller = new AbortController();
         response.once('close', () => {
           if (!response.writableEnded) controller.abort();
@@ -133,8 +150,7 @@ function demoHandler(
         return json(
           response,
           HTTP.ok,
-          await service.execute(
-            input.orderId,
+          await service.message(
             input.prompt,
             input.maxTokens,
             controller.signal,
@@ -160,9 +176,9 @@ function demoHandler(
 }
 
 export async function startPaypalDemo(
-  options: PaypalInferenceDependencies & { port: number },
+  options: PaypalSessionDependencies & { port: number },
 ) {
-  const service = await createPaypalInference(options);
+  const service = await createPaypalSession(options);
   const sessionToken = randomBytes(SESSION_BYTES).toString('base64url');
   let origin = '';
   const server = createServer(demoHandler(service, () => origin, sessionToken));

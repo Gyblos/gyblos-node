@@ -18,11 +18,14 @@ function id(value: unknown): string {
   return value;
 }
 
-function correctAmount(value: unknown): boolean {
+function correctAmount(
+  value: unknown,
+  expected = PAYPAL_API.price.value,
+): boolean {
   const amount = object(value);
   return (
     amount.currency_code === PAYPAL_API.price.currency_code &&
-    amount.value === PAYPAL_API.price.value
+    amount.value === expected
   );
 }
 
@@ -173,6 +176,39 @@ async function isOrderApproved(
   return data.status === 'APPROVED';
 }
 
+async function captureAuthorized(
+  post: ReturnType<typeof transport>['post'],
+  authorizationId: string,
+  cents?: number,
+) {
+  if (
+    cents !== undefined &&
+    (!Number.isSafeInteger(cents) || cents < 1 || cents > PAYPAL_API.limitCents)
+  )
+    throw new PaypalError(PAYPAL_ERROR_CODES.INVALID_REQUEST);
+  const expected =
+    cents === undefined
+      ? PAYPAL_API.price.value
+      : (cents / PAYPAL_API.centsPerDollar).toFixed(2);
+  const data = object(
+    await post(
+      `/v2/payments/authorizations/${id(authorizationId)}/capture`,
+      {
+        amount: {
+          currency_code: PAYPAL_API.price.currency_code,
+          value: expected,
+        },
+        final_capture: true,
+      },
+      undefined,
+      `capture-${id(authorizationId)}`,
+    ),
+  );
+  if (data.status !== 'COMPLETED' || !correctAmount(data.amount, expected))
+    throw new PaypalError(PAYPAL_ERROR_CODES.UNRESOLVED);
+  return { captureId: id(data.id) };
+}
+
 export function createPaypalSandbox(options: SandboxOptions) {
   const callback = callbackOrigin(options.returnOrigin);
   const { post, prepare, get } = transport(options);
@@ -211,21 +247,8 @@ export function createPaypalSandbox(options: SandboxOptions) {
         orderId,
       );
     },
-    async capture(authorizationId: string) {
-      const data = object(
-        await post(
-          `/v2/payments/authorizations/${id(authorizationId)}/capture`,
-          {
-            amount: PAYPAL_API.price,
-            final_capture: true,
-          },
-          undefined,
-          `capture-${id(authorizationId)}`,
-        ),
-      );
-      if (data.status !== 'COMPLETED' || !correctAmount(data.amount))
-        throw new PaypalError(PAYPAL_ERROR_CODES.UNRESOLVED);
-      return { captureId: id(data.id) };
+    async capture(authorizationId: string, cents?: number) {
+      return captureAuthorized(post, authorizationId, cents);
     },
     async void(authorizationId: string) {
       await post(

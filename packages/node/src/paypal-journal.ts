@@ -7,10 +7,11 @@ import {
   writePrivateFile,
 } from '@gyblos/runtime/private-file';
 
-import type { PaypalInferenceDependencies } from './paypal-inference';
+import type { PaypalAttempt } from './paypal-inference';
+import type { PaypalSessionRecord } from './paypal-session';
 
 const MAX_BYTES = 8192;
-type Value = Parameters<PaypalInferenceDependencies['journal']['write']>[0];
+type Value = PaypalAttempt | PaypalSessionRecord;
 
 export async function openPaypalJournal(root: string) {
   const paths = paypalSandboxPaths(root);
