@@ -254,6 +254,19 @@ export function createUptoPaymentClient(
           channelId ? [{ channelId, requestDigest, state, chargedAtomic }] : [],
       );
     },
+    async discard(authorization) {
+      const entry = await options.journal
+        .get(authorization.requestDigest)
+        .catch(() => fail(PAYMENT_ERROR_CODES.JOURNAL_UNAVAILABLE));
+      if (!entry) return;
+      if (entry.channelId !== authorization.channelId)
+        fail(PAYMENT_ERROR_CODES.RECEIPT_MISMATCH);
+      if (entry.state === PAYMENT_CHANNEL_STATES.SETTLED)
+        fail(PAYMENT_ERROR_CODES.ALREADY_SETTLED);
+      await options.journal
+        .remove(authorization.requestDigest, authorization.channelId)
+        .catch(() => fail(PAYMENT_ERROR_CODES.JOURNAL_UNAVAILABLE));
+    },
   };
 }
 

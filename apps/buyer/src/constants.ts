@@ -180,11 +180,17 @@ export const PAID_BUYER_CODES = {
 } as const;
 export type PaidBuyerCode =
   (typeof PAID_BUYER_CODES)[keyof typeof PAID_BUYER_CODES];
+// A deposit ceiling of zero: a free quote, or a selection.json that buys nothing.
+export const isFreeAtomic = (maxAtomic: string) => maxAtomic === '0';
 export const PAID_BUYER = {
   // The whole request, from selection to the seller's terminal.
   requestMs: 180000,
   // Checking the settlement on chain and recording the outcome, once the terminal arrived.
   receiptMs: 30000,
+  // The HTTP deadline: the request, a stream still connecting (30 s), then the receipt and record.
+  httpMs: 270000,
+  // On shutdown, how long a running paid request may finish its receipt and record.
+  drainMs: 90000,
   // Outcomes for reconciliation, one JSON line each, in the buyer home.
   recordsFile: 'paid-records.jsonl',
   // Past this size new records are refused; reconciliation still reads the journal.

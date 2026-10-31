@@ -10,7 +10,7 @@ import {
 import { PaymentError } from '@gyblos/protocol/payment';
 import { PaidClientError } from '@gyblos/transport-iroh/paid-client';
 
-import { PAID_BUYER_CODES } from './constants';
+import { FREE_BUYER_CODES, PAID_BUYER_CODES } from './constants';
 import type { ChatErrorView } from './free-http';
 import type { ChatPayment, ChatResult } from './free-sse';
 import { PaidBuyerError } from './paid-errors';
@@ -45,6 +45,7 @@ export function paidSummary(outcome: PaidBuyerOutcome): ChatPayment {
     sellerAtomic: settled?.sellerAtomic ?? null,
     feeAtomic: settled?.feeAtomic ?? null,
     refundedAtomic: settled?.refundedAtomic ?? null,
+    recorded: outcome.recorded,
   };
 }
 
@@ -109,5 +110,11 @@ export function classifyPaidError(error: unknown): ChatErrorView | undefined {
     return unavailable(error.code, !error.sent && !error.remote);
   // Payment errors come from authorizing or reading the journal, before anything is sent.
   if (error instanceof PaymentError) return unavailable(error.code, true);
+  // The paid request's own deadline; an open may have been sent by then.
+  if (error instanceof DOMException && error.name === 'TimeoutError')
+    return {
+      ...unavailable(FREE_BUYER_CODES.TIMEOUT, false),
+      status: HTTP_STATUS.gatewayTimeout,
+    };
   return undefined;
 }

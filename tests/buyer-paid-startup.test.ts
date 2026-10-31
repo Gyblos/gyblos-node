@@ -156,6 +156,11 @@ void test('paid startup names each refusal and answers in paid mode once started
       'BUYER_PAYMENT_NETWORK_MISMATCH',
     );
 
+    // A refusal after the journal opened releases it for the next start.
+    assert.equal(
+      await reason({ ...base, bind: fakeBind('0'.repeat(64)) }),
+      'BUYER_NODE_KEY_MISMATCH',
+    );
     const host = await startPaidBuyer(base);
     try {
       // A second buyer cannot hold the same payment journal.

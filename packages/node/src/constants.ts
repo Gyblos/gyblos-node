@@ -312,3 +312,6 @@ export const RECEIPT_WORK = {
 
 // Startup owns only its configured file sink and bounds shutdown independently of inference.
 export const LOCAL_TELEMETRY = { closeMs: 5000 } as const;
+
+// How long a role's RPC may take to say which chain it serves before paid startup refuses it.
+export const GENESIS_READ_MS = 10000;

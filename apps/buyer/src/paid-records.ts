@@ -2,15 +2,12 @@
 // as the buyer counted, appended to a private file in the buyer home for reconciliation. Records hold
 // identifiers and amounts only; a full file refuses new records rather than growing without bound.
 import { constants } from 'node:fs';
-import { lstat, open } from 'node:fs/promises';
+import { open } from 'node:fs/promises';
 
 import { FILE_MODES } from '@gyblos/config';
 
 import { PAID_BUYER } from './constants';
 import type { PaidBuyerRecord } from './paid-execution';
-
-const missing = (error: unknown) =>
-  (error as NodeJS.ErrnoException).code === 'ENOENT';
 
 export function paidRecords(path: string) {
   return {
@@ -23,25 +20,24 @@ export function paidRecords(path: string) {
         expectedAtomic: record.expectedAtomic,
         claimedAtomic: record.claimedAtomic,
       })}\n`;
-      const size = await lstat(path).then(
-        (found) => found.size,
-        (error: unknown) => {
-          if (missing(error)) return 0;
-          throw error;
-        },
-      );
-      if (size + Buffer.byteLength(line) > PAID_BUYER.recordsBytes)
-        throw new Error('paid records full');
-      // Never through a link planted in the home.
+      // Never through a link planted in the home, and never blocking on a FIFO.
       const file = await open(
         path,
         constants.O_WRONLY |
           constants.O_APPEND |
           constants.O_CREAT |
-          constants.O_NOFOLLOW,
+          constants.O_NOFOLLOW |
+          constants.O_NONBLOCK,
         FILE_MODES.privateFile,
       );
       try {
+        const found = await file.stat();
+        // A regular file with no other name (no hard link elsewhere), kept private.
+        if (!found.isFile() || found.nlink !== 1)
+          throw new Error('paid records unsafe');
+        if (found.size + Buffer.byteLength(line) > PAID_BUYER.recordsBytes)
+          throw new Error('paid records full');
+        await file.chmod(FILE_MODES.privateFile);
         await file.appendFile(line);
         await file.datasync();
       } finally {

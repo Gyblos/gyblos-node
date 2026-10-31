@@ -6,28 +6,35 @@ import test from 'node:test';
 
 import type { Endpoint } from '@number0/iroh';
 
-import {
-  FREE_BUYER_CODES,
-  PAID_BUYER,
-  PAID_BUYER_CODES,
-} from '@gyblos/buyer/constants';
+import { PAID_BUYER, PAID_BUYER_CODES } from '@gyblos/buyer/constants';
 import type { PaidWinner } from '@gyblos/buyer/paid-execution';
 import { paidBuyerDependencies } from '@gyblos/buyer/paid-selection';
 import type { BuyerSelectionConfig } from '@gyblos/buyer/selection-config';
 import { PROTOCOL_FEE } from '@gyblos/config';
+import {
+  IDENTITY_POLICY_CODES,
+  IDENTITY_TRUST_SOURCES,
+} from '@gyblos/core/constants';
+import type { BuyerIdentityVerifier } from '@gyblos/node/identity-verifier';
 import { PAYMENT_CHANNEL_STATES } from '@gyblos/protocol/constants';
 import type {
   PaymentClient,
   PaymentReconciliation,
 } from '@gyblos/protocol/payment';
-import type { createPaidExecutionClient } from '@gyblos/transport-iroh/paid-client';
+import {
+  PaidClientError,
+  type createPaidExecutionClient,
+} from '@gyblos/transport-iroh/paid-client';
 
 import { setup } from './support/buyer-paid';
 import { request } from './support/paid-fixture';
 
 const OWNER = '4NxTufBox2MsDggn9yF2vEZ6TE55ZkcgoEY5Kuv1oRTP';
 
-async function harness(channels: PaymentReconciliation[] = []) {
+async function harness(
+  channels: PaymentReconciliation[] = [],
+  identity?: BuyerIdentityVerifier,
+) {
   const buyer = await setup();
   const [paidA, paidB] = buyer.winners;
   const free = (winner: PaidWinner): PaidWinner => ({
@@ -82,6 +89,7 @@ async function harness(channels: PaymentReconciliation[] = []) {
       config,
       stats: { rows: new Map(), save: async () => {} },
       discovery: undefined,
+      identity,
     },
     {
       endpoint: {
@@ -113,13 +121,22 @@ async function harness(channels: PaymentReconciliation[] = []) {
   };
 }
 
-void test('one paid request at a time', async () => {
+void test('one paid request at a time, and shutdown can wait for it', async () => {
   const { dependencies } = await harness();
+  await dependencies.idle();
   const release = dependencies.enter();
+  let idle = false;
+  void dependencies.idle().then(() => {
+    idle = true;
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(idle, false);
   assert.throws(() => dependencies.enter(), {
     code: PAID_BUYER_CODES.BUSY,
   });
   release();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(idle, true);
   dependencies.enter()();
 });
 
@@ -139,7 +156,28 @@ void test('a journal entry not yet settled blocks new payments', async () => {
   }
 });
 
-void test('a free winner is skipped, so a paid buyer always pays a paid seller', async () => {
+void test('a free, unconfigured or unverified winner is skipped before any open is signed', async () => {
+  const refused = await harness([], {
+    verify: async (seller) =>
+      seller.nodeId === refusedNode
+        ? { ok: false, code: IDENTITY_POLICY_CODES.NOT_FOUND }
+        : { ok: true, source: IDENTITY_TRUST_SOURCES.REGISTRY },
+  });
+  const refusedNode = refused.paidA.nodeId;
+  refused.queue.push(refused.paidA, refused.paidB);
+  assert.equal(
+    await refused.dependencies.select(new Set(), new AbortController().signal),
+    refused.paidB,
+  );
+  const unknown = await harness();
+  unknown.queue.push(
+    { ...unknown.paidA, nodeId: 'e'.repeat(64) },
+    unknown.paidB,
+  );
+  assert.equal(
+    await unknown.dependencies.select(new Set(), new AbortController().signal),
+    unknown.paidB,
+  );
   const run = await harness();
   run.queue.push(run.free(run.paidA), run.paidB);
   const winner = await run.dependencies.select(
@@ -168,9 +206,11 @@ void test('execution reaches only a configured seller with a paid quote', async 
     { ...run.paidA, nodeId: 'e'.repeat(64) },
     run.free(run.paidA),
   ])
-    await assert.rejects(execute(winner), {
-      code: FREE_BUYER_CODES.UNAVAILABLE,
-    });
+    // Nothing was sent, so the orchestrator discards the open and may fail over.
+    await assert.rejects(
+      execute(winner),
+      (error) => error instanceof PaidClientError && !error.sent,
+    );
   await assert.rejects(execute(run.paidA), /scripted elsewhere/);
   assert.deepEqual(
     run.executed.map((each) => each.nodeId),

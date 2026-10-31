@@ -1,7 +1,10 @@
 // The paid buyer's outcome records: private JSON lines with identifiers and amounts only, never written
 // through a planted link, and refused once the file is full. Temporary directories; no network.
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import {
+  chmod,
+  link,
   lstat,
   mkdtemp,
   readFile,
@@ -51,10 +54,26 @@ void test('records are private JSON lines holding only identifiers and amounts',
       (await lstat(path)).mode & FILE_MODES.permissionMask,
       FILE_MODES.privateFile,
     );
+    // A file left readable by others is made private again.
+    await chmod(path, 0o644);
+    await records.record(RECORD);
+    assert.equal(
+      (await lstat(path)).mode & FILE_MODES.permissionMask,
+      FILE_MODES.privateFile,
+    );
   }));
 
-void test('a planted link or a full file refuses the record', () =>
+void test('a planted link, FIFO or hard link, or a full file, refuses the record', () =>
   withDirectory(async (directory) => {
+    const fifo = join(directory, 'fifo.jsonl');
+    assert.equal(spawnSync('mkfifo', [fifo]).status, 0);
+    await assert.rejects(paidRecords(fifo).record(RECORD));
+    const shared = join(directory, 'shared');
+    await writeFile(shared, '');
+    const hard = join(directory, 'hard.jsonl');
+    await link(shared, hard);
+    await assert.rejects(paidRecords(hard).record(RECORD));
+    assert.equal(await readFile(shared, 'utf8'), '');
     const target = join(directory, 'elsewhere');
     await writeFile(target, '');
     const linked = join(directory, 'linked.jsonl');

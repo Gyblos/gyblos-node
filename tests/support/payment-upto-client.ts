@@ -58,8 +58,9 @@ export function memoryJournal(
       )
         throw new Error('sync failed after rename');
     },
-    async remove(requestDigest) {
-      if (entries.get(requestDigest)?.channelId) throw new Error('signed');
+    async remove(requestDigest, channelId) {
+      const held = entries.get(requestDigest)?.channelId;
+      if (held && held !== channelId) throw new Error('signed');
       entries.delete(requestDigest);
     },
     async list() {

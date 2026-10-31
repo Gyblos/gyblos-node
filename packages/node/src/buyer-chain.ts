@@ -25,9 +25,11 @@ export function buyerChainPayments(
   rpc?: UptoBuyerPaymentsOptions['rpc'],
 ): (role: RoleConfig, maxAtomic: string) => Promise<UptoBuyerPayments> {
   return async (role, maxAtomic) => {
+    if (role.role !== P2P_ROLES.BUYER)
+      throw new NodeError(NODE_ERROR_CODES.BUYER_PAYMENT_KEY_INVALID);
     // Devnet only: a role set up with another RPC must never spend its wallet's real tokens.
     const served = await genesis(role.rpcUrl).catch(() => undefined);
-    if (role.role !== P2P_ROLES.BUYER || served !== DEVNET_GENESIS)
+    if (served !== DEVNET_GENESIS)
       throw new NodeError(NODE_ERROR_CODES.BUYER_PAYMENT_NETWORK_MISMATCH);
     const payer = await roleSigner(P2P_ROLES.BUYER, P2P_ROLES.BUYER).catch(
       () => {

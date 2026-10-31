@@ -37,6 +37,8 @@ export interface ChatPayment {
   sellerAtomic: string | null;
   feeAtomic: string | null;
   refundedAtomic: string | null;
+  // Whether the buyer kept a record for reconciliation; false for a settled request.
+  recorded: boolean;
 }
 export type ChatResult = FreeExecutionResult & { payment?: ChatPayment };
 

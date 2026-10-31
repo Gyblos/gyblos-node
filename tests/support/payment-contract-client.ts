@@ -131,6 +131,29 @@ function authorizationContract(name: string, harness: PaymentHarness): void {
       ]);
       assertPublic(reconciled);
     }));
+
+  void test(`${name}: an authorization that never left the buyer is discarded, a settled one never`, async () =>
+    withRig(harness, async (rig) => {
+      const terms = await rig.terms();
+      const unsent = await rig.client.authorize(terms);
+      // Another channel's identity cannot discard this one.
+      await rejectsWith(
+        rig.client.discard({ ...unsent, channelId: `${unsent.channelId}x` }),
+        PAYMENT_ERROR_CODES.RECEIPT_MISMATCH,
+      );
+      await rig.client.discard(unsent);
+      assert.deepEqual(await rig.client.reconcile(), []);
+      // Discarding again, or a request never authorized, changes nothing.
+      await rig.client.discard(unsent);
+      const { authorization, admission } = await admitted(rig);
+      const settlement = await rig.server.settle(admission, '0');
+      await rig.client.checkReceipt(authorization, settlement, '0');
+      await rejectsWith(
+        rig.client.discard(authorization),
+        PAYMENT_ERROR_CODES.ALREADY_SETTLED,
+      );
+      assert.equal((await rig.client.reconcile()).length, 1);
+    }));
 }
 
 function receiptContract(name: string, harness: PaymentHarness): void {

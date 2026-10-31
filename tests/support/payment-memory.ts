@@ -103,6 +103,15 @@ function createClient(
         }),
       );
     },
+    async discard(authorization) {
+      const entry = journal.get(authorization.requestDigest);
+      if (!entry) return;
+      if (entry.channelId !== authorization.channelId)
+        fail(PAYMENT_ERROR_CODES.RECEIPT_MISMATCH);
+      if (entry.state === PAYMENT_CHANNEL_STATES.SETTLED)
+        fail(PAYMENT_ERROR_CODES.ALREADY_SETTLED);
+      journal.delete(authorization.requestDigest);
+    },
   };
 }
 

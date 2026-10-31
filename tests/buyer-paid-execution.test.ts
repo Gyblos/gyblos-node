@@ -109,6 +109,12 @@ void test('failover happens only while the signed open never left the buyer', as
     assert.equal(outcome.verdict, PAID_VERDICTS.SETTLED, first);
     assert.equal(outcome.winner.nodeId, B, first);
     assert.deepEqual(buyer.recorded, [], first);
+    // Only an open signed and never sent is forgotten, so it does not block the next request.
+    assert.deepEqual(
+      buyer.calls.discarded,
+      first === 'unsent' ? [buyer.winners[0]!.quote.offer.requestDigest] : [],
+      first,
+    );
   }
 });
 
@@ -134,6 +140,7 @@ void test('a refusal after the open reached the seller is recorded, never failed
         claimedAtomic: null,
       },
     ]);
+    assert.deepEqual(buyer.calls.discarded, [], code);
   }
 });
 

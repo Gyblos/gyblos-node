@@ -12,13 +12,14 @@ import { buyerChainPayments } from '@gyblos/node/buyer-chain';
 import { NODE_ERROR_CODES } from '@gyblos/node/constants';
 import { NodeError } from '@gyblos/node/errors';
 import { rolePath, type RoleConfig } from '@gyblos/node/roles';
-import type { UptoBuyerPayments } from '@gyblos/payments-upto';
 import {
   MODEL_IDS,
   P2P_ROLES,
+  PAYMENT_ERROR_CODES,
   REASONING_LEVELS,
 } from '@gyblos/protocol/constants';
 import type { RecountTokenizer } from '@gyblos/protocol/engine';
+import { PaymentError } from '@gyblos/protocol/payment';
 import { bindEndpoint } from '@gyblos/transport-iroh/endpoint';
 
 import { FREE_BUYER_STARTUP, PAID_BUYER } from './constants';
@@ -74,17 +75,34 @@ async function payments(
       return refuse(FREE_BUYER_STARTUP.PAID_NETWORK);
     if (code === NODE_ERROR_CODES.BUYER_PAYMENT_KEY_INVALID)
       return refuse(FREE_BUYER_STARTUP.PAID_KEY);
-    return refuse(FREE_BUYER_STARTUP.JOURNAL);
+    if (
+      error instanceof PaymentError &&
+      error.code === PAYMENT_ERROR_CODES.JOURNAL_UNAVAILABLE
+    )
+      return refuse(FREE_BUYER_STARTUP.JOURNAL);
+    // A mint or ceiling the payment client refuses: the role or selection.json is not devnet's.
+    if (error instanceof PaymentError)
+      return refuse(FREE_BUYER_STARTUP.PAID_NETWORK);
+    throw error;
   }
 }
 
+type Chain = Awaited<ReturnType<ReturnType<typeof buyerChainPayments>>>;
+
+// The HTTP server first; then a paid request still checking its receipt or writing its record gets
+// a bounded moment before the endpoint and the journal close under it.
 async function closePaidResources(
-  chain: UptoBuyerPayments,
+  chain: Chain,
   endpoint?: Awaited<ReturnType<typeof bindEndpoint>>,
   host?: { close(): Promise<void> },
+  idle?: () => Promise<void>,
 ) {
   try {
     await host?.close();
+    await Promise.race([
+      idle?.(),
+      new Promise((resolve) => setTimeout(resolve, PAID_BUYER.drainMs).unref()),
+    ]);
   } finally {
     try {
       await endpoint?.close();
@@ -130,18 +148,17 @@ export async function startPaidBuyer(
     const records = paidRecords(
       rolePath(P2P_ROLES.BUYER, PAID_BUYER.recordsFile),
     );
-    const chat = paidChat(
-      paidBuyerDependencies(prepared, {
-        endpoint,
-        buyer: role.buyer,
-        relayOnly,
-        onSellerFailure: options.onSellerFailure,
-        payment: chain.client,
-        fee: PROTOCOL_FEE,
-        meter,
-        record: records.record,
-      }),
-    );
+    const dependencies = paidBuyerDependencies(prepared, {
+      endpoint,
+      buyer: role.buyer,
+      relayOnly,
+      onSellerFailure: options.onSellerFailure,
+      payment: chain.client,
+      fee: PROTOCOL_FEE,
+      meter,
+      record: records.record,
+    });
+    const chat = paidChat(dependencies);
     const bound = endpoint;
     const host = await listenOrRefuse(() =>
       startFreeBuyerHttp(
@@ -154,14 +171,13 @@ export async function startPaidBuyer(
           port: options.port,
           stream: chat.stream,
           classify: classifyPaidError,
-          // The request itself, then checking its settlement and recording the outcome.
-          requestMs: PAID_BUYER.requestMs + 2 * PAID_BUYER.receiptMs,
+          requestMs: PAID_BUYER.httpMs,
         },
       ),
     );
     return {
       url: host.url,
-      close: () => closePaidResources(chain, bound, host),
+      close: () => closePaidResources(chain, bound, host, dependencies.idle),
     };
   } catch (error) {
     await closePaidResources(chain, endpoint);

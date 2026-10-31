@@ -647,23 +647,32 @@ Paid mode is devnet only and needs:
   and `asset` the role's mint, with `maxAtomic` the most one request may deposit
   and `priceCeilings` the highest prices it accepts (protocol fee included).
 
-Each request takes one quote from a paid seller (a free winner is skipped),
-signs one channel open for at most `maxAtomic`, streams the answer and checks
-the seller's settlement against the buyer's own count. A completed answer, and
-any error after the open reached a seller, carries `gyblos_payment`: the
-verdict, the ceiling, the buyer's expected charge and the seller's charge,
-payout, fee and refund in atomic units. Only a single user message the model's
-chat template accepts is sent; anything else is refused before paying.
+Each request takes one quote from a paid seller (a free winner, or a seller that
+fails discovery or identity checks, is skipped before anything is signed), signs
+one channel open for at most `maxAtomic`, streams the answer and checks the
+seller's settlement against the buyer's own count. A completed answer, and an
+error the seller answered after receiving the open, carries `gyblos_payment`:
+the verdict, the ceiling, the buyer's expected charge, the seller's charge,
+payout, fee and refund in atomic units, and whether a record was kept. A stream
+cut before the seller answered, or the endpoint's own deadline, carries only the
+error code. Only a single user message the model's chat template accepts is
+sent; anything else is refused before paying.
 
 One paid request runs at a time (`PAID_BUYER_BUSY`) and one buyer process holds
 the payment journal (`BUYER_PAYMENT_JOURNAL_UNAVAILABLE`). The buyer never fails
 over once a seller received the signed open, since that seller could still land
-it. Any channel not settled on the buyer's own count (a refusal, a stop, a
-pending or lapsed claim, a dispute or a settlement the chain could not confirm)
-is written to `paid-records.jsonl` in the buyer home and blocks new payments
-(`PAID_BUYER_UNRESOLVED_PAYMENT`) until it is reconciled. Reconciling paid v2
-channels (`buyer:reconcile`) is the next step and not available yet, so a
-blocked devnet test buyer is reset by hand for now.
+it; an open that never left the buyer is discarded and the next seller is
+tried. Any channel in the journal not settled on the buyer's own count (a
+refusal, a stop, a pending or lapsed claim, a dispute or a settlement the chain
+could not confirm) blocks new payments (`PAID_BUYER_UNRESOLVED_PAYMENT`) until it
+is reconciled; the buyer also appends it to `paid-records.jsonl` in the buyer
+home when it can (`recorded`). Reconciling paid v2 channels (`buyer:reconcile`)
+is the next step and not available yet, so a blocked devnet test buyer is reset
+by hand for now.
+
+The endpoint listens on loopback only and refuses browser requests, but any
+local process can call it and spend up to `maxAtomic` per request: run the paid
+buyer only on a machine you control, with a devnet wallet.
 
 Startup reasons beyond the free ones: `BUYER_PAYMENT_NETWORK_MISMATCH` (RPC,
 network or asset not devnet's test token), `BUYER_PAID_MODEL_UNSUPPORTED`,

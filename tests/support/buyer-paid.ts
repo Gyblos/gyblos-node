@@ -59,6 +59,7 @@ export async function setup() {
   ];
   const authorize: PaymentTerms[] = [];
   const receipts: string[] = [];
+  const discarded: string[] = [];
   const executed: string[] = [];
   const recorded: PaidBuyerRecord[] = [];
   // Errors for successive authorize calls; an empty slot authorizes.
@@ -87,6 +88,9 @@ export async function setup() {
       if (state.receiptError) throw state.receiptError;
     },
     reconcile: async () => [],
+    async discard(authorization) {
+      discarded.push(authorization.requestDigest);
+    },
   };
   const scripts: Script[] = [];
   const counts = { output: (text: string) => [...text].length };
@@ -124,7 +128,7 @@ export async function setup() {
   return {
     winners,
     dependencies,
-    calls: { authorize, receipts, executed },
+    calls: { authorize, receipts, executed, discarded },
     recorded,
     scripts,
     counts,

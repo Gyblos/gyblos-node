@@ -99,6 +99,7 @@ void test('a completed paid request answers its text and what it cost', async ()
       refundedAtomic: String(
         BigInt(buyer.winners[0]!.quote.offer.maxAtomic) - 1n,
       ),
+      recorded: false,
     });
     // The same summary closes a stream, before [DONE].
     const streamed = await (await post(url, chat(true))).text();
@@ -126,7 +127,28 @@ void test('a seller refusal after the open was sent answers its code and summary
       sellerAtomic: null,
       feeAtomic: null,
       refundedAtomic: null,
+      recorded: true,
     });
+    // A refusal after streaming began closes the stream with its code and summary.
+    buyer.scripts.push(async (request, onDelta) => {
+      await onDelta('Hi');
+      return {
+        ...(await header(request)),
+        error: {
+          code: PAID_EXECUTION_CODES.SELLER_CANNOT_CONTINUE,
+          delivered: { outputTokens: 1 },
+        },
+        charge: { inputTokens: 4, outputTokens: 1, chargedAtomic: '1' },
+        payment: { settlement: settlement(request, '1') },
+      };
+    });
+    const streamed = await (await post(url, chat(true))).text();
+    assert.match(streamed, /"content":"Hi"/);
+    assert.match(
+      streamed,
+      /"code":"PAID_EXECUTION_SELLER_CANNOT_CONTINUE".*"gyblos_payment":\{"verdict":"settled"/,
+    );
+    assert.doesNotMatch(streamed, /\[DONE\]/);
   });
 });
 
@@ -163,4 +185,10 @@ void test('local refusals answer their status; only unsent ones stay retryable',
     assert.equal(view?.neverSent, retry === null, error.code);
   }
   assert.equal(classifyPaidError(new Error('other')), undefined);
+  // The paid request's own deadline may come after the open was sent.
+  const timeout = classifyPaidError(
+    new DOMException('The operation timed out.', 'TimeoutError'),
+  );
+  assert.equal(timeout?.status, 504);
+  assert.equal(timeout?.neverSent, false);
 });

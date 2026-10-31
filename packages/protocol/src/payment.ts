@@ -97,6 +97,9 @@ export interface PaymentClient {
     expectedChargedAtomic: string,
   ): Promise<void>;
   reconcile(): Promise<PaymentReconciliation[]>;
+  // Forgets an authorization the caller knows never left this process (nothing was sent), so it no
+  // longer awaits reconciliation; the discarded open must never be sent afterwards.
+  discard(authorization: PaymentAuthorization): Promise<void>;
 }
 
 export interface PaymentServer {

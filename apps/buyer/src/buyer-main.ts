@@ -3,6 +3,7 @@
 // free buyer, which explains the problem.
 import { isMain } from '@gyblos/runtime';
 
+import { isFreeAtomic } from './constants';
 import { main } from './free-main';
 import { startFreeBuyer } from './free-startup';
 import { startPaidBuyer } from './paid-startup';
@@ -12,7 +13,7 @@ export async function paidSelected(): Promise<boolean> {
   const config = await loadBuyerSelectionConfig(process.env).catch(
     () => undefined,
   );
-  return config !== undefined && config.request.maxAtomic !== '0';
+  return config !== undefined && !isFreeAtomic(config.request.maxAtomic);
 }
 
 export async function startBuyer(
