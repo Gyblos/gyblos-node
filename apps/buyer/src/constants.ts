@@ -178,6 +178,8 @@ export const PAID_BUYER_CODES = {
   UNSUPPORTED: 'PAID_BUYER_UNSUPPORTED_INPUT',
   // Another paid request is still running in this buyer.
   BUSY: 'PAID_BUYER_BUSY',
+  // The request did not carry the endpoint's bearer token.
+  UNAUTHORIZED: 'PAID_BUYER_UNAUTHORIZED',
 } as const;
 export type PaidBuyerCode =
   (typeof PAID_BUYER_CODES)[keyof typeof PAID_BUYER_CODES];
@@ -198,6 +200,12 @@ export const PAID_BUYER = {
   freeSkips: 8,
   // The JSON field that carries the payment summary in completions and errors.
   paymentField: 'gyblos_payment',
+  // The endpoint's bearer token, private in the buyer home; OpenAI SDKs send it as their apiKey.
+  tokenFile: 'api-token',
+  tokenBytes: 32,
+  // A larger file is not one this buyer wrote.
+  tokenFileBytes: 256,
+  authScheme: 'Bearer',
 } as const;
 // The paid endpoint's HTTP deadline: the request, a stream still connecting, then the receipt check
 // and the record, each within its own bound.
@@ -271,6 +279,8 @@ export const FREE_BUYER_STARTUP = {
   TOKENIZER: 'BUYER_TOKENIZER_UNAVAILABLE',
   // Unreadable, or held by another buyer process.
   JOURNAL: 'BUYER_PAYMENT_JOURNAL_UNAVAILABLE',
+  // The paid endpoint's token file is not a private regular file holding a token.
+  PAID_TOKEN: 'BUYER_API_TOKEN_INVALID',
   UNKNOWN: 'BUYER_STARTUP_FAILED',
 } as const;
 export type FreeBuyerStartupReason =

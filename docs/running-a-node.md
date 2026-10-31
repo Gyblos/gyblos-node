@@ -670,14 +670,30 @@ when it can (`recorded`). Reconciling paid v2 channels (`buyer:reconcile`) is
 the next step and not available yet, so a blocked devnet test buyer is reset by
 hand for now.
 
-The endpoint listens on loopback only and refuses browser requests, but any
-local process can call it and spend up to `maxAtomic` per request: run the paid
-buyer only on a machine you control, with a devnet wallet.
+The endpoint listens on loopback only and refuses browser requests, but loopback
+is not authentication, so paid mode also requires a bearer token. The first paid
+start creates `api-token` in the buyer home (`.local/gyblos/buyer/` by default),
+a private 0600 file, and later starts reuse it. Every request must send
+`Authorization: Bearer <token>`; OpenAI SDKs send their `apiKey` this way. A
+request without the token gets 401 `PAID_BUYER_UNAUTHORIZED` with
+`x-should-retry: false`, before its body is read or a seller is selected. The
+token is never printed; read it yourself, for example:
+
+```sh
+export OPENAI_API_KEY="$(cat .local/gyblos/buyer/api-token)"
+```
+
+Anyone who can read that file, or run as your user, can still spend up to
+`maxAtomic` per request: run the paid buyer only on a machine you control, with
+a devnet wallet. To rotate the token, stop the buyer, delete `api-token` and
+start it again. The free buyer needs no token.
 
 Startup reasons beyond the free ones: `BUYER_PAYMENT_NETWORK_MISMATCH` (RPC,
 network or asset not devnet's test token), `BUYER_PAID_MODEL_UNSUPPORTED`,
-`BUYER_WALLET_KEY_INVALID`, `BUYER_TOKENIZER_UNAVAILABLE` and
-`BUYER_PAYMENT_JOURNAL_UNAVAILABLE`.
+`BUYER_WALLET_KEY_INVALID`, `BUYER_TOKENIZER_UNAVAILABLE`,
+`BUYER_PAYMENT_JOURNAL_UNAVAILABLE` and `BUYER_API_TOKEN_INVALID` (`api-token`
+is a link, open to other users, not yours or not a token; it is never repaired,
+since its token may already have been read).
 
 ## Private free-inference receipts
 
