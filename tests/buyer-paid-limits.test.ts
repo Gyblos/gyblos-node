@@ -125,7 +125,13 @@ void test('a caller abort stops every stage with its own reason, releasing the s
     else if (stage === 'authorize')
       buyer.dependencies.payment = {
         ...buyer.dependencies.payment,
-        authorize: never,
+        // A wallet that stops once the caller left, without signing.
+        authorize: () =>
+          new Promise((_resolve, reject) =>
+            external.signal.addEventListener('abort', () =>
+              setImmediate(() => reject(new Error('wallet stopped'))),
+            ),
+          ),
       };
     else
       buyer.scripts.push(async (_request, onDelta) => {
@@ -171,16 +177,14 @@ void test('an open that lands after the caller left while signing is forgotten',
       return payment.authorize(terms);
     },
   };
-  await assert.rejects(
-    executeBuyerPaid(INPUT, buyer.dependencies, external.signal),
-    /caller left/,
-  );
-  land();
-  await new Promise((resolve) => setImmediate(resolve));
-  await new Promise((resolve) => setImmediate(resolve));
+  const running = executeBuyerPaid(INPUT, buyer.dependencies, external.signal);
+  setImmediate(land);
+  await assert.rejects(running, /caller left/);
+  // Forgotten before the request ended, so the next one and shutdown never see it.
   assert.deepEqual(buyer.calls.discarded, [
     buyer.winners[0]!.quote.offer.requestDigest,
   ]);
+  assert.equal(buyer.state.held, 0);
   assert.equal(buyer.calls.executed.length, 0);
 });
 

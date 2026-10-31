@@ -154,9 +154,10 @@ async function authorized(
   try {
     return await bounded(signing, signal);
   } catch (error) {
-    // The caller left while signing: an open that still lands was never sent.
+    // The caller left while signing: an open that still lands was never sent. It is discarded
+    // before the request ends, so shutdown and the next request never see it.
     if (signal.aborted)
-      void signing.then(
+      await bounded(signing, AbortSignal.timeout(PAID_BUYER.receiptMs)).then(
         (late) => discard(dependencies, late),
         () => undefined,
       );
@@ -241,11 +242,14 @@ async function attempt(run: Attempt): Promise<PaidBuyerOutcome | undefined> {
   const { dependencies, winner, signal } = run;
   const authorization = await authorized(dependencies, winner, signal);
   if (!authorization) return undefined;
-  const request = buildPaidExecutionRequest(
-    winner.quote,
-    run.input,
-    authorization,
-  );
+  let request: PaidExecutionRequest;
+  try {
+    request = buildPaidExecutionRequest(winner.quote, run.input, authorization);
+  } catch (error) {
+    // Nothing was sent: the open is forgotten before the failure is reported.
+    await discard(dependencies, authorization);
+    throw error;
+  }
   const base = {
     nodeId: winner.nodeId,
     requestDigest: authorization.requestDigest,

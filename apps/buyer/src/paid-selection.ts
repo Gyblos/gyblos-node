@@ -127,12 +127,18 @@ export function paidBuyerDependencies(
         !(await permitsWinner(prepared, winner, now()))
       )
         throw new PaidClientError(PAID_EXECUTION_CODES.PEER, false);
-      const paid = client(
-        options.endpoint,
-        sellerAddress(seller, options.relayOnly),
-        seller,
-        { now, relayOnly: options.relayOnly, relayAllowed, onDelta },
-      );
+      let paid: ReturnType<typeof client>;
+      try {
+        paid = client(
+          options.endpoint,
+          sellerAddress(seller, options.relayOnly),
+          seller,
+          { now, relayOnly: options.relayOnly, relayAllowed, onDelta },
+        );
+      } catch {
+        // An address or relay this buyer cannot use: nothing was sent.
+        throw new PaidClientError(PAID_EXECUTION_CODES.PEER, false);
+      }
       try {
         return await paid.execute(request, signal);
       } finally {

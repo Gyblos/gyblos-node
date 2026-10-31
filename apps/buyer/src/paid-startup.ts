@@ -22,7 +22,11 @@ import type { RecountTokenizer } from '@gyblos/protocol/engine';
 import { PaymentError } from '@gyblos/protocol/payment';
 import { bindEndpoint } from '@gyblos/transport-iroh/endpoint';
 
-import { FREE_BUYER_STARTUP, PAID_BUYER } from './constants';
+import {
+  FREE_BUYER_STARTUP,
+  PAID_BUYER,
+  PAID_BUYER_HTTP_MS,
+} from './constants';
 import { startFreeBuyerHttp } from './free-http';
 import {
   buyerNodeSecret,
@@ -99,10 +103,13 @@ async function closePaidResources(
 ) {
   try {
     await host?.close();
+    let timer: ReturnType<typeof setTimeout> | undefined;
     await Promise.race([
       idle?.(),
-      new Promise((resolve) => setTimeout(resolve, PAID_BUYER.drainMs).unref()),
-    ]);
+      new Promise((resolve) => {
+        timer = setTimeout(resolve, PAID_BUYER.drainMs);
+      }),
+    ]).finally(() => clearTimeout(timer));
   } finally {
     try {
       await endpoint?.close();
@@ -171,7 +178,7 @@ export async function startPaidBuyer(
           port: options.port,
           stream: chat.stream,
           classify: classifyPaidError,
-          requestMs: PAID_BUYER.httpMs,
+          requestMs: PAID_BUYER_HTTP_MS,
         },
       ),
     );
