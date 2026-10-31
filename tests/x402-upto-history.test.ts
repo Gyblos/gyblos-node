@@ -1,57 +1,88 @@
-// The finalized history of a channel address: successful transactions only, oldest first, read at
-// finalized commitment within a bound, and an unreachable RPC reported without its URL. RPC double.
+// The finalized history of a channel address: successful transactions only, oldest first, paged to the
+// end or marked incomplete past the bound; finalized block height, oldest slot and account existence;
+// an unreachable RPC reported without its URL. Chain double.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { signature as asSignature, getBase58Decoder } from '@solana/kit';
 import {
   createUptoChannelHistory,
   UPTO_ERROR_CODES,
   UPTO_HISTORY_LIMIT,
+  UPTO_HISTORY_PAGES,
   UptoError,
 } from 'x402-upto-metered';
 
-const CHANNEL = 'Chan111111111111111111111111111111111111111';
-const signature = (fill: number) =>
-  getBase58Decoder().decode(new Uint8Array(64).fill(fill));
+import {
+  chainDouble,
+  signatureOf,
+  type ChainState,
+} from './support/upto-chain-history';
 
-void test('history lists the successful transactions oldest first, read finalized and bounded', async () => {
-  const configs: unknown[] = [];
-  const history = createUptoChannelHistory({
-    getSignaturesForAddress: (_account, config) => ({
-      send: async () => {
-        configs.push(config);
-        // Newest first, as the RPC lists them.
-        return [
-          { signature: asSignature(signature(3)), err: null },
-          { signature: asSignature(signature(2)), err: { failed: true } },
-          { signature: asSignature(signature(1)), err: null },
-        ];
-      },
-    }),
+const CHANNEL = 'Chan111111111111111111111111111111111111111';
+
+const chain = (count: number, change: Partial<ChainState> = {}) =>
+  chainDouble({
+    mint: CHANNEL,
+    history: new Map([
+      [
+        CHANNEL,
+        Array.from({ length: count }, (_, index) => ({
+          signature: signatureOf(index),
+          // Every third one failed.
+          failed: index % 3 === 2,
+        })),
+      ],
+    ]),
+    blockHeight: 7n,
+    oldestSlot: 3n,
+    accounts: new Set([CHANNEL]),
+    ...change,
   });
-  assert.deepEqual(await history.signatures(CHANNEL), [
-    signature(1),
-    signature(3),
-  ]);
-  assert.deepEqual(configs, [
-    { commitment: 'finalized', limit: UPTO_HISTORY_LIMIT },
-  ]);
+
+void test('history pages to the end and lists successful transactions oldest first', async () => {
+  const count = UPTO_HISTORY_LIMIT * 2 + 5;
+  const { rpc, commitments } = chain(count);
+  const history = createUptoChannelHistory(rpc);
+  const { signatures, complete } = await history.signatures(CHANNEL);
+  assert.equal(complete, true);
+  assert.deepEqual(
+    signatures,
+    Array.from({ length: count }, (_, index) => index)
+      .filter((index) => index % 3 !== 2)
+      .map(signatureOf),
+  );
+  assert.equal(await history.blockHeight(), 7n);
+  assert.equal(await history.oldestSlot(), 3n);
+  assert.equal(await history.accountExists(CHANNEL), true);
+  assert.equal(
+    await createUptoChannelHistory(
+      chain(0, { accounts: new Set() }).rpc,
+    ).accountExists(CHANNEL),
+    false,
+  );
+  assert.deepEqual([...new Set(commitments)], ['finalized']);
 });
 
-void test('an unreachable RPC is unavailable', async () => {
-  const history = createUptoChannelHistory({
-    getSignaturesForAddress: () => ({
-      send: async () => {
-        throw new Error('down at https://rpc.example/?api-key=secret');
-      },
-    }),
-  });
-  await assert.rejects(
-    history.signatures(CHANNEL),
-    (error) =>
-      error instanceof UptoError &&
-      error.code === UPTO_ERROR_CODES.UNAVAILABLE &&
-      !error.message.includes('api-key'),
+void test('history past the bound is incomplete', async () => {
+  const history = createUptoChannelHistory(
+    chain(UPTO_HISTORY_LIMIT * UPTO_HISTORY_PAGES).rpc,
   );
+  assert.equal((await history.signatures(CHANNEL)).complete, false);
+});
+
+void test('an unreachable RPC is unavailable, without its URL', async () => {
+  const history = createUptoChannelHistory(chain(1, { failing: true }).rpc);
+  for (const call of [
+    () => history.signatures(CHANNEL),
+    () => history.blockHeight(),
+    () => history.oldestSlot(),
+    () => history.accountExists(CHANNEL),
+  ])
+    await assert.rejects(
+      call(),
+      (error) =>
+        error instanceof UptoError &&
+        error.code === UPTO_ERROR_CODES.UNAVAILABLE &&
+        !error.message.includes('rpc.example'),
+    );
 });

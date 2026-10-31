@@ -30,6 +30,10 @@ export interface UptoJournalEntry {
   payTo: string;
   feePayer: string;
   maxAtomic: string;
+  // The open's slot (a seed of its channel address) and the last block height its blockhash allows:
+  // past that height an open that never landed never will.
+  openSlot: string;
+  lastValidBlockHeight: string;
   // When the terms expire; an unsigned entry is pruned after it.
   expiresAt: number;
   state: PaymentChannelState;
@@ -63,6 +67,8 @@ const FIELDS = [
   'payTo',
   'feePayer',
   'maxAtomic',
+  'openSlot',
+  'lastValidBlockHeight',
   'expiresAt',
   'state',
   'chargedAtomic',
@@ -110,6 +116,8 @@ function entry(value: unknown): UptoJournalEntry {
     payTo: address(value.payTo),
     feePayer: address(value.feePayer),
     maxAtomic: atomic(value.maxAtomic),
+    openSlot: atomic(value.openSlot),
+    lastValidBlockHeight: atomic(value.lastValidBlockHeight),
     expiresAt: Number(expiresAt),
     state,
     chargedAtomic: chargedAtomic === null ? null : atomic(chargedAtomic),

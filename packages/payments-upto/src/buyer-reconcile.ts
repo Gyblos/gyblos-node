@@ -1,6 +1,6 @@
-// Resolves the buyer's open channels from finalized chain history: an address no transaction touched,
-// once its open can no longer land, was never opened (nothing charged); a transaction that emptied the
-// escrow shows the charge, checked against the buyer's own count. Anything else stays open.
+// Resolves the buyer's open channels from finalized chain history: a transaction that emptied the
+// escrow shows the charge, checked against the buyer's own count; an open that provably never landed
+// charged nothing; anything else stays open. Each result is reported before the journal changes.
 import {
   createUptoChannelHistory,
   createUptoReceiptReader,
@@ -12,7 +12,7 @@ import {
 import { PAYMENT_CHANNEL_STATES } from '@gyblos/protocol/constants';
 
 import type { UptoBuyerJournal, UptoJournalEntry } from './buyer-journal';
-import { BUYER_RECONCILE, RECONCILE_OUTCOMES } from './constants';
+import { RECONCILE_OUTCOMES } from './constants';
 
 export type UptoReconcileOutcome =
   (typeof RECONCILE_OUTCOMES)[keyof typeof RECONCILE_OUTCOMES];
@@ -40,14 +40,21 @@ export interface UptoReconcileOptions {
   treasury: string;
   // The buyer's own count for a request, from its records.
   expected(requestDigest: string): string | undefined;
-  now: () => number;
+  // Called with each result before the journal marks it resolved: if it throws, the entry stays open
+  // and the next run reports it again, so no resolution goes unrecorded.
+  report(result: UptoReconcileResult): Promise<void>;
 }
 
-type Shown = Omit<
+type Signed = UptoJournalEntry & { channelId: string };
+type Shown = Pick<
   UptoReconcileResult,
-  'requestDigest' | 'channelId' | 'expectedAtomic' | 'outcome'
+  | 'chargedAtomic'
+  | 'sellerAtomic'
+  | 'feeAtomic'
+  | 'refundedAtomic'
+  | 'transaction'
 >;
-const OPEN: Shown = {
+const NOTHING: Shown = {
   chargedAtomic: null,
   sellerAtomic: null,
   feeAtomic: null,
@@ -55,38 +62,40 @@ const OPEN: Shown = {
   transaction: null,
 };
 
-async function shown(
-  entry: UptoJournalEntry & { channelId: string },
-  options: UptoReconcileOptions,
-): Promise<Shown | 'never' | 'open'> {
+function readers(options: UptoReconcileOptions) {
   const history = createUptoChannelHistory(options.rpc);
-  const reader = createUptoReceiptReader(options.rpc, UPTO_FINAL_COMMITMENT);
-  const signatures = await history.signatures(entry.channelId);
-  if (!signatures.length)
-    // Signed when the entry was last written; its blockhash has long expired after the window.
-    return options.now() - entry.updatedAt > BUYER_RECONCILE.openLandMs
-      ? 'never'
-      : 'open';
-  for (const transaction of signatures) {
-    const found = await reader.settlement({
-      transaction,
-      channelId: entry.channelId,
-      mint: options.mint,
-      maxAtomic: entry.maxAtomic,
-      payer: options.payer,
-      payTo: entry.payTo,
-      treasury: options.treasury,
-    });
-    if (found)
-      return {
-        chargedAtomic: found.chargedAtomic,
-        sellerAtomic: found.sellerAtomic,
-        feeAtomic: found.feeAtomic,
-        refundedAtomic: found.refundedAtomic,
-        transaction,
-      };
+  const receipts = createUptoReceiptReader(options.rpc, UPTO_FINAL_COMMITMENT);
+
+  // Never opened only on the chain's word: the whole history holds no deposit, the account does not
+  // exist, the open's blockhash has expired by finalized height, and the RPC still holds the open's slot.
+  async function neverOpened(entry: Signed): Promise<boolean> {
+    if (await history.accountExists(entry.channelId)) return false;
+    if ((await history.blockHeight()) <= BigInt(entry.lastValidBlockHeight))
+      return false;
+    return (await history.oldestSlot()) <= BigInt(entry.openSlot);
   }
-  return 'open';
+
+  return async function shown(
+    entry: Signed,
+  ): Promise<Shown | 'never' | 'open'> {
+    const { signatures, complete } = await history.signatures(entry.channelId);
+    let deposited = false;
+    for (const transaction of signatures) {
+      const found = await receipts.transfer({
+        transaction,
+        channelId: entry.channelId,
+        mint: options.mint,
+        maxAtomic: entry.maxAtomic,
+        payer: options.payer,
+        payTo: entry.payTo,
+        treasury: options.treasury,
+      });
+      if (found.settled) return { ...found.settled, transaction };
+      deposited ||= found.deposited;
+    }
+    if (deposited || !complete) return 'open';
+    return (await neverOpened(entry)) ? 'never' : 'open';
+  };
 }
 
 function outcomeOf(
@@ -99,11 +108,12 @@ function outcomeOf(
     : RECONCILE_OUTCOMES.DISPUTED;
 }
 
-// Every open, signed entry is read; a resolved one is written settled with what the chain charged,
-// so it no longer blocks payments. Chain or journal failures reject; nothing is guessed.
+// Every open, signed entry is read; a resolved one is reported, then written settled with what the
+// chain charged, so it no longer blocks payments. Chain, report or journal failures reject.
 export async function reconcileUptoBuyer(
   options: UptoReconcileOptions,
 ): Promise<UptoReconcileResult[]> {
+  const shown = readers(options);
   const results: UptoReconcileResult[] = [];
   for (const entry of await options.journal.list()) {
     const { channelId, updatedAt: _updatedAt, ...rest } = entry;
@@ -114,27 +124,32 @@ export async function reconcileUptoBuyer(
       channelId,
       expectedAtomic,
     };
-    const chain = await shown({ ...entry, channelId }, options);
+    const chain = await shown({ ...entry, channelId });
     if (chain === 'open') {
-      results.push({ ...base, outcome: RECONCILE_OUTCOMES.OPEN, ...OPEN });
+      const open = { ...base, outcome: RECONCILE_OUTCOMES.OPEN, ...NOTHING };
+      await options.report(open);
+      results.push(open);
       continue;
     }
-    const settled = chain === 'never' ? { ...OPEN, chargedAtomic: '0' } : chain;
+    const settled =
+      chain === 'never' ? { ...NOTHING, chargedAtomic: '0' } : chain;
     const charged = settled.chargedAtomic ?? '0';
-    await options.journal.put({
-      ...rest,
-      channelId,
-      state: PAYMENT_CHANNEL_STATES.SETTLED,
-      chargedAtomic: charged,
-    });
-    results.push({
+    const result = {
       ...base,
       ...settled,
       outcome:
         chain === 'never'
           ? RECONCILE_OUTCOMES.NEVER_OPENED
           : outcomeOf(expectedAtomic, charged),
+    };
+    await options.report(result);
+    await options.journal.put({
+      ...rest,
+      channelId,
+      state: PAYMENT_CHANNEL_STATES.SETTLED,
+      chargedAtomic: charged,
     });
+    results.push(result);
   }
   return results;
 }

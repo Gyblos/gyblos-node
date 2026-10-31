@@ -181,6 +181,8 @@ export const PAID_BUYER_CODES = {
 } as const;
 export type PaidBuyerCode =
   (typeof PAID_BUYER_CODES)[keyof typeof PAID_BUYER_CODES];
+// Paid reconciliation's exit codes: 0 when nothing blocks payments.
+export const PAID_RECONCILE_EXIT = { FAILED: 1, OPEN: 2 } as const;
 // Why paid reconciliation stopped, with what to fix; printed alone, never with paths or URLs.
 export const PAID_RECONCILE_CODES = {
   NETWORK:
@@ -202,7 +204,7 @@ export const PAID_BUYER = {
   recordsFile: 'paid-records.jsonl',
   // Channels reconciliation resolved, one JSON line each, beside the records.
   reconciliationsFile: 'paid-reconciliations.jsonl',
-  // Past this size new records are refused; reconciliation still reads the journal.
+  // Past this size the records file, and the reconciliations file, refuse new lines.
   recordsBytes: 1048576,
   // A paid buyer quotes paid sellers only; a free winner is skipped this many times at most.
   freeSkips: 8,

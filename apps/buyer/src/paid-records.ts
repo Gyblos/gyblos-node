@@ -23,9 +23,9 @@ async function privateFile(path: string, flags: number) {
   try {
     const found = await file.stat();
     if (!found.isFile() || found.nlink !== 1)
-      throw new Error('paid records unsafe');
+      throw new Error('private file unsafe');
     if (found.size > PAID_BUYER.recordsBytes)
-      throw new Error('paid records full');
+      throw new Error('private file full');
     await file.chmod(FILE_MODES.privateFile);
     return { file, size: found.size };
   } catch (error) {
@@ -43,7 +43,7 @@ export async function appendPrivateLine(path: string, value: unknown) {
   );
   try {
     if (size + Buffer.byteLength(line) > PAID_BUYER.recordsBytes)
-      throw new Error('paid records full');
+      throw new Error('private file full');
     await file.appendFile(line);
     await file.datasync();
   } finally {

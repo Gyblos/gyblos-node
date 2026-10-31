@@ -64,6 +64,8 @@ export const UPTO_COMMITMENT = 'confirmed' as const;
 export const UPTO_FINAL_COMMITMENT = 'finalized' as const;
 // Transactions read per channel address: an open, a claim and a close, with ample room.
 export const UPTO_HISTORY_LIMIT = 32;
+// Pages read before the history counts as incomplete: past that, a channel is left open.
+export const UPTO_HISTORY_PAGES = 10;
 export type UptoCommitment =
   typeof UPTO_COMMITMENT | typeof UPTO_FINAL_COMMITMENT;
 // CAIP-2 Solana networks: the namespace and the genesis-hash prefix length that names the chain.

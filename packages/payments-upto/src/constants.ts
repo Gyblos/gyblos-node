@@ -38,17 +38,13 @@ export const UPTO_SELLER = {
 // The buyer's journal of authorized channels: one small private document. Settled entries are kept
 // long past any channel's lifetime, then pruned; open ones are never dropped.
 export const BUYER_JOURNAL = {
-  version: 1,
+  // 2 adds each open's slot and blockhash lifetime.
+  version: 2,
   maxBytes: 1024 * 1024,
   maxEntries: 2_000,
   settledRetentionMs: 30 * 86_400_000,
 } as const;
 
-// Reconciling the buyer's journal: an open signed this long ago, with no transaction at its channel,
-// can no longer land (its blockhash lived about a minute).
-export const BUYER_RECONCILE = {
-  openLandMs: 600_000,
-} as const;
 export const RECONCILE_OUTCOMES = {
   // The chain charged exactly the buyer's own count.
   SETTLED: 'settled',
@@ -56,7 +52,7 @@ export const RECONCILE_OUTCOMES = {
   DISPUTED: 'disputed',
   // The chain shows a charge but the buyer's own count was not kept.
   UNCHECKED: 'unchecked',
-  // The open never landed: nothing was charged.
+  // The open provably never landed (blockhash expired, no deposit, no account): nothing was charged.
   NEVER_OPENED: 'never-opened',
   // Still open, or its open may still land: it keeps blocking payments.
   OPEN: 'open',

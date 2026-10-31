@@ -29,6 +29,8 @@ const ENTRY = {
   payTo: '11111111111111111111111111111111',
   feePayer: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
   maxAtomic: '1000',
+  openSlot: '1',
+  lastValidBlockHeight: '100',
   expiresAt: NOW + 60_000,
   state: PAYMENT_CHANNEL_STATES.OPEN,
   chargedAtomic: null,
@@ -68,7 +70,7 @@ void test('a valid document reads back; each malformed one is refused', () =>
     const { state } = buyerJournalPathsIn({ GYBLOS_HOME: root });
     const valid = { ...ENTRY, channelId: 'Chan1', updatedAt: NOW };
     const document = (entries: unknown[], extra = {}) =>
-      JSON.stringify({ version: 1, entries, ...extra });
+      JSON.stringify({ version: BUYER_JOURNAL.version, entries, ...extra });
     // Written by hand, so the refusals below differ from it in exactly one way.
     await (await open(root)).close();
     await writeFile(state, document([valid]), { mode: 0o600 });
@@ -76,7 +78,10 @@ void test('a valid document reads back; each malformed one is refused', () =>
     assert.deepEqual(await reader.list(), [valid]);
     await reader.close();
     for (const tampered of [
-      JSON.stringify({ version: 2, entries: [valid] }),
+      // Another version, including the one before the open's slot and blockhash lifetime.
+      JSON.stringify({ version: BUYER_JOURNAL.version + 1, entries: [valid] }),
+      JSON.stringify({ version: 1, entries: [valid] }),
+      document([{ ...valid, lastValidBlockHeight: '-1' }]),
       document([valid], { extra: 1 }),
       document([valid, valid]),
       document([{ ...valid, extra: 1 }]),

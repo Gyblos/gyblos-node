@@ -671,20 +671,30 @@ when it can (`recorded`).
 To reconcile, stop the paid buyer and run `pnpm buyer:reconcile:paid`. It checks
 that the role's RPC serves devnet, then reads each open channel's finalized
 history; it only reads the chain and never signs. One JSON line per channel
-reports the outcome:
+reports the outcome, then a summary line with the count of each:
 
 - `settled`: the claim charged exactly the buyer's own count;
-- `disputed`: it charged another amount (recorded, no penalty);
+- `disputed`: it charged another amount, more or less (recorded, no penalty);
 - `unchecked`: the chain shows a charge but no record of the buyer's count
   survived;
-- `never-opened`: no transaction touched the channel and its open can no longer
-  land (ten minutes after signing), so nothing was charged;
-- `open`: the channel is open and unclaimed, or its open may still land.
+- `never-opened`: nothing was charged, because the chain shows the open never
+  landed and never can: no deposit in the channel's whole history, no channel
+  account, the open's blockhash expired by finalized block height, and the RPC
+  still holds history back to the open's slot;
+- `open`: the channel is open and unclaimed, its open may still land, or the
+  chain cannot prove otherwise (a pruned RPC, or more history than it reads).
 
-Every outcome but `open` unblocks payments and is appended to
-`paid-reconciliations.jsonl` in the buyer home. An `open` channel keeps blocking
+The charge is what left the escrow minus what came back to the buyer's wallet.
+If the program redirected the refund elsewhere (for example because the buyer's
+token account was closed), it shows as a larger charge and a dispute, never a
+smaller one. Each outcome but `open` is appended to `paid-reconciliations.jsonl`
+in the buyer home before the journal unblocks it, so a failed run loses nothing
+and the next one picks up where it stopped. An `open` channel keeps blocking
 until the seller claims it or the buyer withdraws it after its timeout, which is
-not available yet. Failures print `PAID_RECONCILE_NETWORK_MISMATCH`,
+not available yet.
+
+The command exits 0 when nothing blocks payments, 2 while a channel stays open,
+and 1 when it could not finish, printing `PAID_RECONCILE_NETWORK_MISMATCH`,
 `PAID_RECONCILE_ROLE_INVALID` or `PAID_RECONCILE_INCOMPLETE` (stop the buyer,
 check the RPC and the home). The v1 `buyer:reconcile` is unchanged.
 

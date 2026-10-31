@@ -1,118 +1,99 @@
-// The buyer's reconciliation from finalized history: an untouched channel address is open until its
-// open can no longer land, then never opened; a claim that emptied the escrow settles, disputes or is
-// unchecked against the buyer's own count; anything else stays open. Temporary journal; RPC double.
+// The buyer's reconciliation from finalized history: a claim that emptied the escrow settles, disputes
+// or is unchecked against the buyer's own count, reported before the journal changes; an open is never
+// opened only on the chain's word; anything else stays open. Temporary journal; chain double.
 import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { signature as asSignature, getBase58Decoder } from '@solana/kit';
-import { UPTO_ERROR_CODES, UptoError } from 'x402-upto-metered';
+import {
+  UPTO_ERROR_CODES,
+  UPTO_HISTORY_LIMIT,
+  UPTO_HISTORY_PAGES,
+  UptoError,
+} from 'x402-upto-metered';
 
 import { buyerJournalPathsIn } from '@gyblos/config';
 import {
-  BUYER_RECONCILE,
   openUptoBuyerJournal,
   RECONCILE_OUTCOMES,
   reconcileUptoBuyer,
   type UptoBuyerJournal,
-  type UptoReconcileOptions,
+  type UptoReconcileResult,
 } from '@gyblos/payments-upto';
 import { PAYMENT_CHANNEL_STATES } from '@gyblos/protocol/constants';
 
-const NOW = 1_800_000_000_000;
+import {
+  chainDouble,
+  signatureOf,
+  type ChainState,
+  type HistoryEntry,
+} from './support/upto-chain-history';
+
 const MINT = 'Mint111111111111111111111111111111111111111';
 const CHANNEL = 'Chan111111111111111111111111111111111111111';
+const OTHER = 'Chan211111111111111111111111111111111111111';
 const PAYER = 'Payer11111111111111111111111111111111111111';
 const PAY_TO = 'PayTo11111111111111111111111111111111111111';
-const FEE_PAYER = 'FeePa11111111111111111111111111111111111111';
 const TREASURY = 'Treas11111111111111111111111111111111111111';
+const PROGRAM = 'Progr11111111111111111111111111111111111111';
 const DIGEST = 'ab'.repeat(32);
-const signature = (fill: number) =>
-  getBase58Decoder().decode(new Uint8Array(64).fill(fill));
-const OPEN_TX = signature(1);
-const CLAIM_TX = signature(2);
+const OTHER_DIGEST = 'cd'.repeat(32);
+// The open's slot and the last block height its blockhash allows, as journaled at signing.
+const OPEN_SLOT = 50n;
+const LAST_VALID = 100n;
 
-// The open moved 1000 into the escrow; the claim paid 9 out, 0 fee, and refunded 991.
-function transactionFor(transaction: string) {
-  const balances = (pairs: [string, bigint][]) =>
-    pairs.map(([owner, amount], index) => ({
-      accountIndex: index,
-      mint: MINT,
-      owner,
-      uiTokenAmount: { amount: String(amount) },
-    }));
-  const claim = transaction === CLAIM_TX;
+const OPEN: HistoryEntry = {
+  signature: signatureOf(0),
+  flows: [
+    { owner: PAYER, before: 1000n, after: 0n },
+    { owner: CHANNEL, before: 0n, after: 1000n },
+  ],
+};
+const CLAIM: HistoryEntry = {
+  signature: signatureOf(1),
+  flows: [
+    { owner: CHANNEL, before: 1000n, after: 0n },
+    { owner: PAY_TO, before: 0n, after: 9n },
+    { owner: PAYER, before: 0n, after: 991n },
+  ],
+};
+
+function state(history: HistoryEntry[], change: Partial<ChainState> = {}) {
   return {
-    meta: {
-      err: null,
-      preTokenBalances: balances(
-        claim
-          ? [
-              [CHANNEL, 1000n],
-              [PAY_TO, 0n],
-              [PAYER, 0n],
-            ]
-          : [[PAYER, 1000n]],
-      ),
-      postTokenBalances: balances(
-        claim
-          ? [
-              [CHANNEL, 0n],
-              [PAY_TO, 9n],
-              [PAYER, 991n],
-            ]
-          : [
-              [CHANNEL, 1000n],
-              [PAYER, 0n],
-            ],
-      ),
-    },
-    transaction: { message: { accountKeys: [PAYER, CHANNEL] } },
+    mint: MINT,
+    history: new Map([[CHANNEL, history]]),
+    blockHeight: LAST_VALID + 1n,
+    oldestSlot: OPEN_SLOT,
+    accounts: new Set<string>(),
+    ...change,
   };
 }
 
-// Newest first, as the RPC lists them; `failing` makes every read reject.
-function chain(history: string[], failing = false) {
-  const commitments: string[] = [];
-  const rpc: UptoReconcileOptions['rpc'] = {
-    getSignaturesForAddress: (_account, config) => ({
-      send: async () => {
-        commitments.push(config.commitment);
-        if (failing) throw new Error('rpc down at https://rpc.example/?key=s');
-        return [...history]
-          .reverse()
-          .map((each) => ({ signature: asSignature(each), err: null }));
-      },
-    }),
-    getTransaction: (found, config) => ({
-      send: async () => {
-        commitments.push(config.commitment);
-        return transactionFor(String(found));
-      },
-    }),
-  };
-  return { rpc, commitments };
-}
-
-async function withJournal(run: (journal: UptoBuyerJournal) => Promise<void>) {
+async function withJournal(
+  run: (journal: UptoBuyerJournal) => Promise<void>,
+  digests: [string, string][] = [[DIGEST, CHANNEL]],
+) {
   const root = await mkdtemp(join(tmpdir(), 'gyblos-buyer-reconcile-'));
   const journal = await openUptoBuyerJournal({
     paths: buyerJournalPathsIn({ GYBLOS_HOME: root }),
-    now: () => NOW,
+    now: Date.now,
   });
   try {
-    await journal.put({
-      requestDigest: DIGEST,
-      channelId: CHANNEL,
-      payTo: PAY_TO,
-      feePayer: FEE_PAYER,
-      maxAtomic: '1000',
-      expiresAt: NOW + 60_000,
-      state: PAYMENT_CHANNEL_STATES.OPEN,
-      chargedAtomic: null,
-    });
+    for (const [requestDigest, channelId] of digests)
+      await journal.put({
+        requestDigest,
+        channelId,
+        payTo: PAY_TO,
+        feePayer: PAY_TO,
+        maxAtomic: '1000',
+        openSlot: String(OPEN_SLOT),
+        lastValidBlockHeight: String(LAST_VALID),
+        expiresAt: Date.now() + 60_000,
+        state: PAYMENT_CHANNEL_STATES.OPEN,
+        chargedAtomic: null,
+      });
     await run(journal);
   } finally {
     await journal.close();
@@ -120,89 +101,209 @@ async function withJournal(run: (journal: UptoBuyerJournal) => Promise<void>) {
   }
 }
 
-const reconcile = (
+function reconcile(
   journal: UptoBuyerJournal,
-  rpc: UptoReconcileOptions['rpc'],
-  options: { expected?: string; now?: number } = {},
-) =>
-  reconcileUptoBuyer({
+  chain: ChainState,
+  options: {
+    expected?: string;
+    report?: (result: UptoReconcileResult) => Promise<void>;
+  } = {},
+) {
+  const reported: UptoReconcileResult[] = [];
+  const double = chainDouble(chain);
+  const run = reconcileUptoBuyer({
     journal,
-    rpc,
+    rpc: double.rpc,
     payer: PAYER,
     mint: MINT,
     treasury: TREASURY,
     expected: (digest) => (digest === DIGEST ? options.expected : undefined),
-    now: () => options.now ?? NOW,
+    report:
+      options.report ??
+      (async (result) => {
+        reported.push(result);
+      }),
   });
+  return { run, reported, commitments: double.commitments };
+}
 
-void test('a claim that emptied the escrow settles, disputes or is unchecked against the buyer count', async () => {
+const outcomeOf = async (journal: UptoBuyerJournal, chain: ChainState) =>
+  (await reconcile(journal, chain).run)[0]?.outcome;
+
+void test('a claim that emptied the escrow settles, disputes or is unchecked, reported first', async () => {
   for (const [expected, outcome] of [
     ['9', RECONCILE_OUTCOMES.SETTLED],
     ['5', RECONCILE_OUTCOMES.DISPUTED],
     [undefined, RECONCILE_OUTCOMES.UNCHECKED],
   ] as const)
     await withJournal(async (journal) => {
-      const { rpc, commitments } = chain([OPEN_TX, CLAIM_TX]);
-      assert.deepEqual(await reconcile(journal, rpc, { expected }), [
-        {
-          requestDigest: DIGEST,
-          channelId: CHANNEL,
-          expectedAtomic: expected ?? null,
-          outcome,
-          chargedAtomic: '9',
-          sellerAtomic: '9',
-          feeAtomic: '0',
-          refundedAtomic: '991',
-          transaction: CLAIM_TX,
-        },
-      ]);
-      // Resolved either way: it no longer blocks payments.
+      const { run, reported, commitments } = reconcile(
+        journal,
+        state([OPEN, CLAIM]),
+        { expected },
+      );
+      const result = {
+        requestDigest: DIGEST,
+        channelId: CHANNEL,
+        expectedAtomic: expected ?? null,
+        outcome,
+        chargedAtomic: '9',
+        sellerAtomic: '9',
+        feeAtomic: '0',
+        refundedAtomic: '991',
+        transaction: CLAIM.signature,
+      };
+      assert.deepEqual(await run, [result]);
+      assert.deepEqual(reported, [result]);
       const entry = await journal.get(DIGEST);
       assert.equal(entry?.state, PAYMENT_CHANNEL_STATES.SETTLED);
       assert.equal(entry?.chargedAtomic, '9');
-      // Every read is finalized.
       assert.deepEqual([...new Set(commitments)], ['finalized']);
       // A second run finds nothing left to reconcile.
-      assert.deepEqual(await reconcile(journal, rpc, { expected }), []);
+      assert.deepEqual(await reconcile(journal, state([])).run, []);
     });
 });
 
-void test('an untouched address is open until the open can no longer land, then never opened', () =>
+void test('a report that fails leaves the channel open for the next run', () =>
   withJournal(async (journal) => {
-    const { rpc } = chain([]);
-    const [open] = await reconcile(journal, rpc, {
-      now: NOW + BUYER_RECONCILE.openLandMs,
+    const { run } = reconcile(journal, state([OPEN, CLAIM]), {
+      report: async () => {
+        throw new Error('disk full');
+      },
     });
-    assert.equal(open?.outcome, RECONCILE_OUTCOMES.OPEN);
+    await assert.rejects(run, /disk full/);
     assert.equal(
       (await journal.get(DIGEST))?.state,
       PAYMENT_CHANNEL_STATES.OPEN,
     );
-    const [never] = await reconcile(journal, rpc, {
-      now: NOW + BUYER_RECONCILE.openLandMs + 1,
-      expected: '0',
-    });
+  }));
+
+void test('a top-up or a redirected refund never makes the charge look smaller', () =>
+  withJournal(async (journal) => {
+    // 200 more was topped up: the charge is the outflow minus the refund, not the ceiling.
+    const toppedUp: HistoryEntry = {
+      signature: signatureOf(2),
+      flows: [
+        { owner: CHANNEL, before: 1200n, after: 0n },
+        { owner: PAY_TO, before: 0n, after: 9n },
+        { owner: PAYER, before: 0n, after: 1191n },
+      ],
+    };
+    const [topUp] = await reconcile(journal, state([OPEN, toppedUp]), {
+      expected: '9',
+    }).run;
+    assert.equal(topUp?.chargedAtomic, '9');
+    assert.equal(topUp?.outcome, RECONCILE_OUTCOMES.SETTLED);
+  }).then(() =>
+    withJournal(async (journal) => {
+      // The program sent the payer's refund to its own treasury: reported as charged, a dispute.
+      const redirected: HistoryEntry = {
+        signature: signatureOf(3),
+        flows: [
+          { owner: CHANNEL, before: 1000n, after: 0n },
+          { owner: PAY_TO, before: 0n, after: 9n },
+          { owner: PROGRAM, before: 0n, after: 991n },
+        ],
+      };
+      const [result] = await reconcile(journal, state([OPEN, redirected]), {
+        expected: '9',
+      }).run;
+      assert.equal(result?.chargedAtomic, '1000');
+      assert.equal(result?.outcome, RECONCILE_OUTCOMES.DISPUTED);
+    }),
+  ));
+
+void test('an open is never opened only when the whole chain agrees', () =>
+  withJournal(async (journal) => {
+    const spam = Array.from({ length: UPTO_HISTORY_LIMIT + 5 }, (_, index) => ({
+      signature: signatureOf(100 + index),
+      failed: true,
+    }));
+    // Each one keeps the channel open: an account at the address, a blockhash still valid, an RPC
+    // that no longer holds the open's slot, a deposit, or history past the bound.
+    for (const blocking of [
+      state([], { accounts: new Set([CHANNEL]) }),
+      state([], { blockHeight: LAST_VALID }),
+      state([], { oldestSlot: OPEN_SLOT + 1n }),
+      state([OPEN]),
+      state(
+        Array.from(
+          { length: UPTO_HISTORY_LIMIT * UPTO_HISTORY_PAGES },
+          (_, index) => ({ signature: signatureOf(1000 + index) }),
+        ),
+      ),
+    ])
+      assert.equal(await outcomeOf(journal, blocking), RECONCILE_OUTCOMES.OPEN);
+    assert.equal(
+      (await journal.get(DIGEST))?.state,
+      PAYMENT_CHANNEL_STATES.OPEN,
+    );
+    // Failed transactions moved nothing, however many there are.
+    const { run } = reconcile(journal, state(spam), { expected: '5' });
+    const [never] = await run;
     assert.equal(never?.outcome, RECONCILE_OUTCOMES.NEVER_OPENED);
     assert.equal(never?.chargedAtomic, '0');
     assert.equal((await journal.get(DIGEST))?.chargedAtomic, '0');
   }));
 
-void test('a channel opened but not yet claimed stays open; a failing RPC changes nothing', () =>
-  withJournal(async (journal) => {
-    const [open] = await reconcile(journal, chain([OPEN_TX]).rpc, {
-      expected: '9',
-    });
-    assert.equal(open?.outcome, RECONCILE_OUTCOMES.OPEN);
-    assert.equal(open?.chargedAtomic, null);
-    await assert.rejects(
-      reconcile(journal, chain([OPEN_TX], true).rpc),
-      (error) =>
-        error instanceof UptoError &&
-        error.code === UPTO_ERROR_CODES.UNAVAILABLE &&
-        !error.message.includes('key'),
-    );
-    assert.equal(
-      (await journal.get(DIGEST))?.state,
-      PAYMENT_CHANNEL_STATES.OPEN,
-    );
-  }));
+void test('entries are read in turn; a failing read keeps what was already reported', () =>
+  withJournal(
+    async (journal) => {
+      // An unsigned entry and a settled one are not read.
+      await journal.put({
+        requestDigest: 'ef'.repeat(32),
+        channelId: null,
+        payTo: PAY_TO,
+        feePayer: PAY_TO,
+        maxAtomic: '1000',
+        openSlot: '1',
+        lastValidBlockHeight: '1',
+        expiresAt: Date.now() + 60_000,
+        state: PAYMENT_CHANNEL_STATES.OPEN,
+        chargedAtomic: null,
+      });
+      const chain = state([OPEN, CLAIM]);
+      // The second channel's history is unreadable.
+      const double = chainDouble(chain);
+      const read = double.rpc.getSignaturesForAddress;
+      double.rpc.getSignaturesForAddress = (account, config) =>
+        String(account) === OTHER
+          ? {
+              send: async () => {
+                throw new Error('rpc down');
+              },
+            }
+          : read(account, config);
+      const reported: string[] = [];
+      await assert.rejects(
+        reconcileUptoBuyer({
+          journal,
+          rpc: double.rpc,
+          payer: PAYER,
+          mint: MINT,
+          treasury: TREASURY,
+          expected: () => '9',
+          report: async (result) => {
+            reported.push(result.requestDigest);
+          },
+        }),
+        (error) =>
+          error instanceof UptoError &&
+          error.code === UPTO_ERROR_CODES.UNAVAILABLE &&
+          !error.message.includes('rpc'),
+      );
+      assert.deepEqual(reported, [DIGEST]);
+      assert.equal(
+        (await journal.get(DIGEST))?.state,
+        PAYMENT_CHANNEL_STATES.SETTLED,
+      );
+      assert.equal(
+        (await journal.get(OTHER_DIGEST))?.state,
+        PAYMENT_CHANNEL_STATES.OPEN,
+      );
+    },
+    [
+      [DIGEST, CHANNEL],
+      [OTHER_DIGEST, OTHER],
+    ],
+  ));

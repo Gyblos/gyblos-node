@@ -17,7 +17,6 @@ export {
 } from './file-ledger';
 export {
   BUYER_JOURNAL,
-  BUYER_RECONCILE,
   LEDGER_FILE,
   RECONCILE_OUTCOMES,
   UPTO_SELLER,

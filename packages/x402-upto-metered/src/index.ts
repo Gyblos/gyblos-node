@@ -8,6 +8,7 @@ export {
   UPTO_ERROR_CODES,
   UPTO_FINAL_COMMITMENT,
   UPTO_HISTORY_LIMIT,
+  UPTO_HISTORY_PAGES,
   type UptoCommitment,
   type UptoChannelState,
   type UptoDepositState,
@@ -20,6 +21,7 @@ export {
   createUptoReceiptReader,
   type UptoReceiptQuery,
   type UptoSettlementShown,
+  type UptoChannelTransfer,
   type UptoTransactionRpc,
 } from './receipt';
 export {

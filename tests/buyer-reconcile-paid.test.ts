@@ -1,14 +1,12 @@
 // `pnpm buyer:reconcile:paid` against a disposable home: the buyer's own records give the expected
-// charge, a resolved channel is appended to the reconciliations file and unblocks payments, an open one
-// is printed only, and a non-devnet RPC or a running buyer stops with a static code. RPC double.
+// charge, a resolved channel is kept in the reconciliations file before it unblocks payments, a channel
+// still open exits 2, and a missing role, a non-devnet RPC or a running buyer stop with a static code.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-
-import { signature as asSignature, getBase58Decoder } from '@solana/kit';
 
 import {
   buyerJournalPathsIn,
@@ -19,6 +17,7 @@ import { openUptoBuyerJournal } from '@gyblos/payments-upto';
 import { PAYMENT_CHANNEL_STATES } from '@gyblos/protocol/constants';
 
 import { REPOSITORY_ROOT } from './support/node-config-fixtures';
+import { chainDouble, signatureOf } from './support/upto-chain-history';
 
 const MINT = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU';
 const CHANNEL = 'Chan111111111111111111111111111111111111111';
@@ -26,73 +25,89 @@ const OTHER = 'Chan211111111111111111111111111111111111111';
 const PAY_TO = 'PayTo11111111111111111111111111111111111111';
 const SETTLED_DIGEST = 'ab'.repeat(32);
 const OPEN_DIGEST = 'cd'.repeat(32);
-const CLAIM = getBase58Decoder().decode(new Uint8Array(64).fill(2));
 
-function rpc(payer: string) {
-  const balance = (owner: string, amount: bigint) => ({
+// The first channel was claimed; the other's open was signed with a blockhash still valid.
+const chain = (payer: string) =>
+  chainDouble({
     mint: MINT,
-    owner,
-    uiTokenAmount: { amount: String(amount) },
-  });
-  return {
-    // Only the first channel was claimed; the other was never touched.
-    getSignaturesForAddress: (account: string) => ({
-      send: async () =>
-        String(account) === CHANNEL
-          ? [{ signature: asSignature(CLAIM), err: null }]
-          : [],
-    }),
-    getTransaction: () => ({
-      send: async () => ({
-        meta: {
-          err: null,
-          preTokenBalances: [balance(CHANNEL, 1000n), balance(payer, 0n)],
-          postTokenBalances: [
-            balance(CHANNEL, 0n),
-            balance(PAY_TO, 9n),
-            balance(payer, 991n),
-            balance(PROTOCOL_FEE.treasury, 0n),
-          ],
-        },
-        transaction: { message: { accountKeys: [payer, CHANNEL] } },
-      }),
-    }),
-  };
+    history: new Map([
+      [
+        CHANNEL,
+        [
+          {
+            signature: signatureOf(1),
+            flows: [
+              { owner: CHANNEL, before: 1000n, after: 0n },
+              { owner: PAY_TO, before: 0n, after: 9n },
+              { owner: payer, before: 0n, after: 991n },
+              { owner: PROTOCOL_FEE.treasury, before: 0n, after: 0n },
+            ],
+          },
+        ],
+      ],
+    ]),
+    blockHeight: 100n,
+    oldestSlot: 1n,
+    accounts: new Set(),
+  }).rpc;
+
+async function setupBuyer(home: string) {
+  const setup = spawnSync(
+    process.execPath,
+    [
+      '--import',
+      'tsx',
+      'apps/node/src/setup.ts',
+      '--role',
+      'buyer',
+      '--mint',
+      MINT,
+    ],
+    {
+      cwd: REPOSITORY_ROOT,
+      env: {
+        PATH: process.env.PATH,
+        TMPDIR: process.env.TMPDIR,
+        GYBLOS_HOME: home,
+      },
+      encoding: 'utf8',
+    },
+  );
+  assert.equal(setup.status, 0, setup.stderr);
+  return (
+    JSON.parse(await readFile(join(home, 'buyer', 'role.json'), 'utf8')) as {
+      buyer: string;
+    }
+  ).buyer;
 }
 
-void test('paid reconciliation resolves what the chain settled and reports what it cannot', async () => {
-  const home = await mkdtemp(join(tmpdir(), 'gyblos-reconcile-paid-'));
+// Runs with this home, capturing stderr and the exit code, and restores the process afterwards.
+async function inHome<T>(home: string, run: (errors: string[]) => Promise<T>) {
+  const saved = {
+    home: process.env.GYBLOS_HOME,
+    error: console.error,
+    exitCode: process.exitCode,
+  };
+  const errors: string[] = [];
   process.env.GYBLOS_HOME = home;
-  const buyer = join(home, 'buyer');
+  console.error = (line: string) => errors.push(line);
+  process.exitCode = 0;
+  try {
+    return await run(errors);
+  } finally {
+    if (saved.home === undefined) delete process.env.GYBLOS_HOME;
+    else process.env.GYBLOS_HOME = saved.home;
+    console.error = saved.error;
+    process.exitCode = saved.exitCode;
+  }
+}
+
+void test('paid reconciliation keeps each resolution, then reports what still blocks with exit 2', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'gyblos-reconcile-paid-'));
   const { main } = await import('@gyblos/buyer/reconcile-paid');
   const { buyerChainReconcile } = await import('@gyblos/node/buyer-reconcile');
   try {
-    const setup = spawnSync(
-      process.execPath,
-      [
-        '--import',
-        'tsx',
-        'apps/node/src/setup.ts',
-        '--role',
-        'buyer',
-        '--mint',
-        MINT,
-      ],
-      {
-        cwd: REPOSITORY_ROOT,
-        env: {
-          PATH: process.env.PATH,
-          TMPDIR: process.env.TMPDIR,
-          GYBLOS_HOME: home,
-        },
-        encoding: 'utf8',
-      },
-    );
-    assert.equal(setup.status, 0, setup.stderr);
-    const { buyer: payer } = JSON.parse(
-      await readFile(join(buyer, 'role.json'), 'utf8'),
-    ) as { buyer: string };
-    // One request the seller claimed, one whose open was signed just now.
+    const payer = await setupBuyer(home);
     const journal = await openUptoBuyerJournal({
       paths: buyerJournalPathsIn({ GYBLOS_HOME: home }),
       now: Date.now,
@@ -107,13 +122,15 @@ void test('paid reconciliation resolves what the chain settled and reports what 
         payTo: PAY_TO,
         feePayer: PAY_TO,
         maxAtomic: '1000',
+        openSlot: '5',
+        lastValidBlockHeight: '150',
         expiresAt: Date.now() + 60_000,
         state: PAYMENT_CHANNEL_STATES.OPEN,
         chargedAtomic: null,
       });
     await journal.close();
     await writeFile(
-      join(buyer, 'paid-records.jsonl'),
+      join(home, 'buyer', 'paid-records.jsonl'),
       [
         'not a record',
         JSON.stringify({ requestDigest: SETTLED_DIGEST, expectedAtomic: '8' }),
@@ -122,25 +139,40 @@ void test('paid reconciliation resolves what the chain settled and reports what 
       ].join('\n'),
       { mode: 0o600 },
     );
-
-    const printed: string[] = [];
-    const devnet = buyerChainReconcile(async () => DEVNET_GENESIS, rpc(payer));
-    const results = await main(devnet, (line) => printed.push(line));
-    assert.deepEqual(
-      results?.map(({ requestDigest, outcome, expectedAtomic }) => [
-        requestDigest,
-        outcome,
-        expectedAtomic,
-      ]),
-      [
-        [SETTLED_DIGEST, 'settled', '9'],
-        [OPEN_DIGEST, 'open', null],
-      ],
+    const devnet = buyerChainReconcile(
+      async () => DEVNET_GENESIS,
+      chain(payer),
     );
-    assert.equal(printed.length, 2);
-    assert.equal(printed.join('').includes(home), false);
+    await inHome(home, async (errors) => {
+      const printed: string[] = [];
+      const results = await main(devnet, (line) => printed.push(line));
+      assert.deepEqual(
+        results?.map(({ requestDigest, outcome, expectedAtomic }) => [
+          requestDigest,
+          outcome,
+          expectedAtomic,
+        ]),
+        [
+          [SETTLED_DIGEST, 'settled', '9'],
+          [OPEN_DIGEST, 'open', null],
+        ],
+      );
+      assert.equal(printed.length, 3);
+      assert.deepEqual(JSON.parse(printed[2]!), {
+        summary: {
+          settled: 1,
+          disputed: 0,
+          unchecked: 0,
+          'never-opened': 0,
+          open: 1,
+        },
+      });
+      assert.equal(printed.join('').includes(home), false);
+      assert.equal(process.exitCode, 2);
+      assert.deepEqual(errors, []);
+    });
     const done = (
-      await readFile(join(buyer, 'paid-reconciliations.jsonl'), 'utf8')
+      await readFile(join(home, 'buyer', 'paid-reconciliations.jsonl'), 'utf8')
     )
       .trim()
       .split('\n')
@@ -151,27 +183,34 @@ void test('paid reconciliation resolves what the chain settled and reports what 
     );
 
     // Another RPC than devnet, or a buyer holding the journal, stops with a static code.
-    const errors: string[] = [];
-    const error = console.error;
-    console.error = (line: string) => errors.push(line);
-    try {
-      process.exitCode = 0;
-      await main(buyerChainReconcile(async () => 'mainnet', rpc(payer)));
+    await inHome(home, async (errors) => {
+      await main(buyerChainReconcile(async () => 'mainnet', chain(payer)));
       const held = await openUptoBuyerJournal({
         paths: buyerJournalPathsIn({ GYBLOS_HOME: home }),
         now: Date.now,
       });
       await main(devnet, () => {});
       await held.close();
-    } finally {
-      console.error = error;
-    }
-    assert.equal(process.exitCode, 1);
-    process.exitCode = 0;
-    assert.deepEqual(
-      errors.map((line) => line.split(':')[0]),
-      ['PAID_RECONCILE_NETWORK_MISMATCH', 'PAID_RECONCILE_INCOMPLETE'],
-    );
+      assert.equal(process.exitCode, 1);
+      assert.deepEqual(
+        errors.map((line) => line.split(':')[0]),
+        ['PAID_RECONCILE_NETWORK_MISMATCH', 'PAID_RECONCILE_INCOMPLETE'],
+      );
+    });
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
+void test('a home without a buyer role names the role', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'gyblos-reconcile-norole-'));
+  const { main } = await import('@gyblos/buyer/reconcile-paid');
+  try {
+    await inHome(home, async (errors) => {
+      await main(async () => []);
+      assert.equal(process.exitCode, 1);
+      assert.equal(errors[0]?.split(':')[0], 'PAID_RECONCILE_ROLE_INVALID');
+    });
   } finally {
     await rm(home, { recursive: true, force: true });
   }
