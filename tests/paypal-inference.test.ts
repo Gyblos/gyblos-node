@@ -149,3 +149,13 @@ void test('an order that was never authorized may be abandoned after a restart',
   await restarted.create('second', 16);
   assert.deepEqual(f.calls, ['create', 'create']);
 });
+
+void test('engine-incompatible input is rejected before contacting PayPal', async () => {
+  const f = fixture();
+  const service = await createPaypalInference({
+    ...f, validateRequest() { throw new Error('unsupported prompt'); },
+  });
+  await assert.rejects(service.create('invalid', 16));
+  assert.deepEqual(f.calls, []);
+  assert.equal(f.getState(), null);
+});
