@@ -198,3 +198,8 @@ The free seller and buyer APIs support explicitly supplied local event sinks;
 see [local telemetry composition and event semantics](docs/local-telemetry.md).
 Seller and free-buyer startup can opt in with `[telemetry] file = true` in
 `gyblos.toml`.
+
+## PayPal Sandbox prototype
+
+The local single-seller prototype and its limitations are documented in
+[docs/paypal-sandbox.md](docs/paypal-sandbox.md).

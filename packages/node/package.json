@@ -40,6 +40,8 @@
     "./free-router": "./src/free-router.ts",
     "./paid-execution": "./src/paid-execution.ts",
     "./paid-router": "./src/paid-router.ts",
+    "./paypal-inference": "./src/paypal-inference.ts",
+    "./paypal-journal": "./src/paypal-journal.ts",
     "./paid-retry": "./src/paid-retry.ts",
     "./paid-offers": "./src/paid-offers.ts",
     "./seller-paid": "./src/seller-paid.ts",

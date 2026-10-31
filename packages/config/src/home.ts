@@ -207,3 +207,12 @@ export function paymentPathsIn(environment: HomeEnvironment, role: HomeRole) {
     lock: join(directory, PAYMENT_FILES.lock),
   };
 }
+
+// Explicit, isolated sandbox directory; never shares a journal with the chain payment adapter.
+export function paypalSandboxPaths(root: string) {
+  return {
+    directory: root,
+    state: join(root, 'paypal-sandbox-v1.json'),
+    lock: join(root, 'paypal-sandbox-v1.lock'),
+  };
+}

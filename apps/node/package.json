@@ -6,11 +6,15 @@
   "exports": {
     "./cli": "./src/cli.ts",
     "./main": "./src/main.ts",
+    "./paypal-demo": "./src/paypal-demo.ts",
+    "./paypal-main": "./src/paypal-main.ts",
     "./setup": "./src/setup.ts",
     "./tokenizer": "./src/tokenizer.ts"
   },
   "dependencies": {
     "@gyblos/node": "workspace:*",
+    "@gyblos/engine-ollama": "workspace:*",
+    "@gyblos/payments-paypal": "workspace:*",
     "@gyblos/protocol": "workspace:*",
     "@gyblos/runtime": "workspace:*"
   }

@@ -11,11 +11,25 @@ void test('sandbox payment state persists and excludes a second process owner', 
   try {
     const journal = await openPaypalJournal(root);
     assert.equal(await journal.read(), null);
-    await journal.write({ phase: 'capturing', promptDigest: 'a'.repeat(64), maxTokens: 16, orderId: 'ORDER1', authorizationId: 'AUTH1' });
+    await journal.write({
+      phase: 'capturing',
+      promptDigest: 'a'.repeat(64),
+      maxTokens: 16,
+      orderId: 'ORDER1',
+      authorizationId: 'AUTH1',
+    });
     await assert.rejects(openPaypalJournal(root));
     await journal.close();
     const reopened = await openPaypalJournal(root);
-    assert.deepEqual(await reopened.read(), { phase: 'capturing', promptDigest: 'a'.repeat(64), maxTokens: 16, orderId: 'ORDER1', authorizationId: 'AUTH1' });
+    assert.deepEqual(await reopened.read(), {
+      phase: 'capturing',
+      promptDigest: 'a'.repeat(64),
+      maxTokens: 16,
+      orderId: 'ORDER1',
+      authorizationId: 'AUTH1',
+    });
     await reopened.close();
-  } finally { await rm(root, { recursive: true, force: true }); }
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });

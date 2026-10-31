@@ -116,7 +116,9 @@ void test('a journal failure after capture blocks further orders', async () => {
 void test('a corrupt terminal journal cannot unblock another payment', async () => {
   const f = fixture();
   f.journal.read = async () => ({
-    phase: 'completed', promptDigest: 'a'.repeat(64), maxTokens: 16,
+    phase: 'completed',
+    promptDigest: 'a'.repeat(64),
+    maxTokens: 16,
   });
   await assert.rejects(createPaypalInference(f));
   assert.deepEqual(f.calls, []);
