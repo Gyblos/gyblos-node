@@ -15,8 +15,8 @@ async function submit(url: string, body: Uint8Array, headers: Record<string,stri
  return fetch(url, { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json', ...headers }, body: Buffer.from(body) });
 }
 void test('local collector stores and deduplicates only the authorized buyer pair', async (context) => {
- const f = await fixture(context); let response = await submit(f.server.url, receiptBytes(f.entry.receipt)); assert.equal(response.status, 200); assert.deepEqual(await response.json(), { status: 'STORED' });
- response = await submit(f.server.url, receiptBytes(f.entry.receipt)); assert.deepEqual(await response.json(), { status: 'DUPLICATE' });
+ const f = await fixture(context); let response = await submit(f.server.url, receiptBytes(f.entry.receipt)); assert.equal(response.status, 200); assert.deepEqual(await response.json(), { status: 'stored' });
+ response = await submit(f.server.url, receiptBytes(f.entry.receipt)); assert.deepEqual(await response.json(), { status: 'duplicate' });
  assert.ok((await readFile(f.path,'utf8')).includes(f.entry.fingerprint));
 });
 void test('local collector rejects missing credentials and browser-origin requests before ingestion', async (context) => {
@@ -36,6 +36,6 @@ void test('local collector bounds bytes and refuses noncanonical input without r
 });
 void test('local collector reopens retained history and requires explicit configuration consent', async (context) => {
  const f = await fixture(context); assert.equal((await submit(f.server.url,receiptBytes(f.entry.receipt))).status,200); await f.server.close();
- const reopened = await startLocalCollector({ ...f.options, create: false }); context.after(() => reopened.close()); assert.deepEqual(await (await submit(reopened.url,receiptBytes(f.entry.receipt))).json(), { status: 'DUPLICATE' });
+ const reopened = await startLocalCollector({ ...f.options, create: false }); context.after(() => reopened.close()); assert.deepEqual(await (await submit(reopened.url,receiptBytes(f.entry.receipt))).json(), { status: 'duplicate' });
  await assert.rejects(startLocalCollector({ ...f.options, path: f.path + '-invalid', principals: [] }),{ code: 'COLLECTOR_INVALID' });
 });
