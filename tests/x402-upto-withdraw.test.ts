@@ -7,6 +7,8 @@ import test from 'node:test';
 import {
   address,
   generateKeyPairSigner,
+  SOLANA_ERROR__JSON_RPC__SERVER_ERROR_BLOCK_NOT_AVAILABLE,
+  SolanaError,
   type TransactionSigner,
 } from '@solana/kit';
 import { SOLANA_DEVNET_CAIP2 } from '@x402/svm';
@@ -133,7 +135,25 @@ void test('a closing channel waits out the grace period by block time, then seal
     confirmed: true,
     retryAfterSeconds: UPTO_WITHDRAW.recheckSeconds,
   });
-  assert.equal(early.sent.length + unknown.sent.length, 0);
+  // So does a node that answers the block is not available.
+  const missingBlock = await setup(
+    { status: CLOSING, closureStartedAt: CLOSED_AT },
+    {
+      blockTime: due,
+      blockTimeError: new SolanaError(
+        SOLANA_ERROR__JSON_RPC__SERVER_ERROR_BLOCK_NOT_AVAILABLE,
+        { __serverMessage: 'Block not available for slot 500' },
+      ),
+    },
+  );
+  assert.equal(
+    (await missingBlock.withdrawal().withdraw(missingBlock.query)).step,
+    UPTO_WITHDRAW_STEPS.WAITING,
+  );
+  assert.equal(
+    early.sent.length + unknown.sent.length + missingBlock.sent.length,
+    0,
+  );
 
   const ready = await setup(
     { status: CLOSING, closureStartedAt: CLOSED_AT },
@@ -311,6 +331,21 @@ void test('an unconfirmed send is rechecked later; a landed error or a preflight
     rejected,
   );
   assert.equal(preflight.sent.length, 0);
+
+  // A sent transaction whose status the RPC cannot give keeps its signature, unconfirmed.
+  const lost = await setup({}, { statusError: true });
+  const kept = await lost.withdrawal().withdraw(lost.query);
+  assert.equal(typeof kept.transaction, 'string');
+  assert.equal(kept.confirmed, false);
+
+  const unsent = await setup({}, { sendError: true });
+  await assert.rejects(
+    unsent.withdrawal().withdraw(unsent.query),
+    (error) =>
+      error instanceof UptoError &&
+      error.code === UPTO_ERROR_CODES.UNAVAILABLE &&
+      !error.message.includes('rpc.example'),
+  );
 
   const down = await setup({}, { failing: true });
   await assert.rejects(

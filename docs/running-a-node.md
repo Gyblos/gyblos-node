@@ -733,7 +733,8 @@ shortest `retryAfterSeconds`:
 - `failed`: this channel's step failed with the static code in `failure`
   (`UPTO_UNAVAILABLE` for the RPC, `UPTO_CHAIN_REJECTED` when the chain or its
   preflight refused the transaction, which also happens when an earlier
-  unconfirmed one has since landed). The other channels still take their step.
+  unconfirmed one has since landed or the wallet lacks SOL for the fee or the
+  token account's rent). The other channels still take their step.
 
 Each line also says whether its transaction confirmed within a minute. One that
 did not is checked again after 30 seconds: run again before then and the same

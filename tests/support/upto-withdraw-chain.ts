@@ -153,6 +153,10 @@ export interface WithdrawChainState {
   } | null;
   // Preflight simulation refuses every send, as the RPC does for a transaction that would fail.
   preflightFails?: boolean;
+  // These calls alone fail, with the RPC's own error or a transport one carrying its URL.
+  blockTimeError?: unknown;
+  sendError?: boolean;
+  statusError?: boolean;
   failing?: boolean;
 }
 
@@ -183,7 +187,11 @@ export function withdrawChain(state: WithdrawChainState) {
         value: state.accounts.get(String(account)) ?? null,
       }))(),
     getSlot: (config) => call('slot', config.commitment, () => 500n)(),
-    getBlockTime: () => call('blockTime', undefined, () => state.blockTime)(),
+    getBlockTime: () =>
+      call('blockTime', undefined, () => {
+        if (state.blockTimeError) throw state.blockTimeError;
+        return state.blockTime;
+      })(),
     getLatestBlockhash: (config) =>
       call('blockhash', config.commitment, () => ({
         value: {
@@ -195,6 +203,8 @@ export function withdrawChain(state: WithdrawChainState) {
       }))(),
     sendTransaction: (wire, config) =>
       call('send', config.preflightCommitment, () => {
+        if (state.sendError)
+          throw new Error('send failed at https://rpc.example/?key=s');
         if (state.preflightFails)
           throw new SolanaError(
             SOLANA_ERROR__JSON_RPC__SERVER_ERROR_SEND_TRANSACTION_PREFLIGHT_FAILURE,
@@ -211,13 +221,17 @@ export function withdrawChain(state: WithdrawChainState) {
         return signature(sent.length - 1);
       })(),
     getSignatureStatuses: () =>
-      call('status', undefined, () => ({
-        value: [
-          state.outcome === undefined
-            ? { err: null, confirmationStatus: 'confirmed' as const }
-            : state.outcome,
-        ],
-      }))(),
+      call('status', undefined, () => {
+        if (state.statusError)
+          throw new Error('status failed at https://rpc.example/?key=s');
+        return {
+          value: [
+            state.outcome === undefined
+              ? { err: null, confirmationStatus: 'confirmed' as const }
+              : state.outcome,
+          ],
+        };
+      })(),
   };
   const commitments = () => [
     ...new Set(reads.flatMap(({ commitment }) => commitment ?? [])),

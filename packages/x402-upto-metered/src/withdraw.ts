@@ -11,7 +11,10 @@ import {
   setTransactionMessageFeePayerSigner,
   setTransactionMessageLifetimeUsingBlockhash,
   signTransactionMessageWithSigners,
+  SOLANA_ERROR__JSON_RPC__SERVER_ERROR_BLOCK_NOT_AVAILABLE,
+  SOLANA_ERROR__JSON_RPC__SERVER_ERROR_BLOCK_STATUS_NOT_AVAILABLE_YET,
   SOLANA_ERROR__JSON_RPC__SERVER_ERROR_SEND_TRANSACTION_PREFLIGHT_FAILURE,
+  SOLANA_ERROR__JSON_RPC__SERVER_ERROR_SLOT_SKIPPED,
   type Address,
   type Base64EncodedWireTransaction,
   type Blockhash,
@@ -28,7 +31,7 @@ import {
   UPTO_WITHDRAW_STEPS,
   type UptoWithdrawStep,
 } from './constants';
-import { UptoError } from './errors';
+import { UptoError, uptoError } from './errors';
 import type { UptoSplit } from './types';
 import {
   distributeInstruction,
@@ -112,6 +115,12 @@ const sameBytes = (left: readonly number[], right: Uint8Array) =>
   left.every((value, index) => value === right[index]);
 
 const confirmed = { commitment: UPTO_COMMITMENT };
+// What a node answers for a block whose time it does not know (yet): wait, do not fail.
+const BLOCK_TIME_UNKNOWN = [
+  SOLANA_ERROR__JSON_RPC__SERVER_ERROR_BLOCK_NOT_AVAILABLE,
+  SOLANA_ERROR__JSON_RPC__SERVER_ERROR_BLOCK_STATUS_NOT_AVAILABLE_YET,
+  SOLANA_ERROR__JSON_RPC__SERVER_ERROR_SLOT_SKIPPED,
+] as const;
 const pause = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));
 
 // The channel at its canonical address for this rent payer, decoded by the SDK: undefined when no
@@ -212,9 +221,16 @@ async function send(
         : UPTO_ERROR_CODES.UNAVAILABLE,
     );
   }
+  // Once sent, its signature is kept: a status the RPC could not give leaves it unconfirmed, not lost.
+  const unconfirmed = (error: unknown) => {
+    if (uptoError(error).code === UPTO_ERROR_CODES.CHAIN_REJECTED) throw error;
+    return false;
+  };
   return {
     transaction: String(signature),
-    confirmed: await landed(rpc, options.sleep ?? pause, signature),
+    confirmed: await landed(rpc, options.sleep ?? pause, signature).catch(
+      unconfirmed,
+    ),
   };
 }
 
@@ -245,7 +261,16 @@ const sent = (
 // does not know the block's time yet.
 async function graceLeft(rpc: UptoWithdrawRpc, due: bigint): Promise<number> {
   const slot = await read(rpc.getSlot(confirmed));
-  const now = await read(rpc.getBlockTime(slot));
+  let now: bigint | null;
+  try {
+    now = await rpc
+      .getBlockTime(slot)
+      .send({ abortSignal: AbortSignal.timeout(UPTO_WITHDRAW.rpcMs) });
+  } catch (error) {
+    if (BLOCK_TIME_UNKNOWN.some((code) => isSolanaError(error, code)))
+      return UPTO_WITHDRAW.recheckSeconds;
+    throw new UptoError(UPTO_ERROR_CODES.UNAVAILABLE);
+  }
   if (now === null) return UPTO_WITHDRAW.recheckSeconds;
   return now < due ? Number(due - now) : 0;
 }
