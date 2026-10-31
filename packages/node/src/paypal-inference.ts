@@ -299,7 +299,7 @@ class PaypalInference {
         authorization.authorizationId,
       );
       if (signal?.aborted)
-        return refundCapture(
+        return await refundCapture(
           this.deps,
           (item) => this.save(item),
           authorized,
@@ -307,7 +307,7 @@ class PaypalInference {
         );
       await this.save({ ...authorized, ...capture, phase: PHASE.COMPLETED });
       if (signal?.aborted)
-        return refundCapture(
+        return await refundCapture(
           this.deps,
           (item) => this.save(item),
           authorized,

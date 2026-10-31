@@ -8,6 +8,17 @@ import { PaypalError } from '@gyblos/protocol/paypal-payment';
 
 import { openPaypalJournal } from './paypal-journal';
 
+export function validatePaypalPrompt(prompt: string, maxTokens: number) {
+  let rendered: string;
+  try {
+    rendered = renderChat(prompt);
+  } catch {
+    throw new PaypalError(PAYPAL_ERROR_CODES.INVALID_REQUEST);
+  }
+  if (Buffer.byteLength(rendered, 'utf8') + maxTokens > GENERATION.numCtx)
+    throw new PaypalError(PAYPAL_ERROR_CODES.INVALID_REQUEST);
+}
+
 export async function openPaypalSandbox(options: {
   clientId: string;
   clientSecret: string;
@@ -23,11 +34,7 @@ export async function openPaypalSandbox(options: {
     engine,
     payment,
     journal,
-    validateRequest(prompt: string, maxTokens: number) {
-      const rendered = renderChat(prompt);
-      if (Buffer.byteLength(rendered, 'utf8') + maxTokens > GENERATION.numCtx)
-        throw new PaypalError(PAYPAL_ERROR_CODES.INVALID_REQUEST);
-    },
+    validateRequest: validatePaypalPrompt,
     close: () => journal.close(),
   };
 }

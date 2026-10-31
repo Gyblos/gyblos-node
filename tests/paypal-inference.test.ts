@@ -323,21 +323,36 @@ void test('a refund holds the payment lock until its final journal write complet
   const controller = new AbortController();
   let release = () => {};
   let notify = () => {};
-  const entered = new Promise<void>((resolve) => { notify = resolve; });
-  const hold = new Promise<void>((resolve) => { release = resolve; });
+  const entered = new Promise<void>((resolve) => {
+    notify = resolve;
+  });
+  const hold = new Promise<void>((resolve) => {
+    release = resolve;
+  });
   const write = f.journal.write;
   f.journal.write = async (value: unknown) => {
-    if (JSON.stringify(value).includes('refunded')) { notify(); await hold; }
+    if (JSON.stringify(value).includes('refunded')) {
+      notify();
+      await hold;
+    }
     await write(value);
   };
-  f.payment.capture = async () => { f.calls.push('capture'); controller.abort(); return { captureId: 'CAPTURE1' }; };
+  f.payment.capture = async () => {
+    f.calls.push('capture');
+    controller.abort();
+    return { captureId: 'CAPTURE1' };
+  };
   const service = await createPaypalInference(f);
   await service.create('first', 16);
   const execution = service.execute('ORDER1', 'first', 16, controller.signal);
   const finished = assert.rejects(execution);
   await entered;
-  try { await assert.rejects(service.create('second', 16)); }
-  finally { release(); await finished; }
+  try {
+    await assert.rejects(service.create('second', 16));
+  } finally {
+    release();
+    await finished;
+  }
 });
 
 void test('a refund after completion recording also holds the payment lock', async () => {
@@ -345,23 +360,40 @@ void test('a refund after completion recording also holds the payment lock', asy
   const controller = new AbortController();
   let release = () => {};
   let notify = () => {};
-  const entered = new Promise<void>((resolve) => { notify = resolve; });
-  const hold = new Promise<void>((resolve) => { release = resolve; });
+  const entered = new Promise<void>((resolve) => {
+    notify = resolve;
+  });
+  const hold = new Promise<void>((resolve) => {
+    release = resolve;
+  });
   const write = f.journal.write;
   f.journal.write = async (value: unknown) => {
     if (JSON.stringify(value).includes('completed')) controller.abort();
-    if (JSON.stringify(value).includes('refunded')) { notify(); await hold; }
+    if (JSON.stringify(value).includes('refunded')) {
+      notify();
+      await hold;
+    }
     await write(value);
   };
   const service = await createPaypalInference(f);
   await service.create('first', 16);
-  const finished = assert.rejects(service.execute('ORDER1', 'first', 16, controller.signal));
+  const finished = assert.rejects(
+    service.execute('ORDER1', 'first', 16, controller.signal),
+  );
   await entered;
-  try { await assert.rejects(service.create('second', 16)); }
-  finally { release(); await finished; }
+  try {
+    await assert.rejects(service.create('second', 16));
+  } finally {
+    release();
+    await finished;
+  }
 });
 
 void test('the real engine preflight reports unsupported prompts with a typed code', () => {
-  assert.throws(() => validatePaypalPrompt('<think>bad</think>', 16),
-    (error: unknown) => error instanceof PaypalError && error.code === PAYPAL_ERROR_CODES.INVALID_REQUEST);
+  assert.throws(
+    () => validatePaypalPrompt('<think>bad</think>', 16),
+    (error: unknown) =>
+      error instanceof PaypalError &&
+      error.code === PAYPAL_ERROR_CODES.INVALID_REQUEST,
+  );
 });
