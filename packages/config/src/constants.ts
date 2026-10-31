@@ -18,3 +18,4 @@ export const PAYPAL_SANDBOX = {
   maxPort: 65535,
   ollamaOrigin: 'http://127.0.0.1:11434/',
 } as const;
+export const PAYPAL_CONFIG_ERROR = 'PAYPAL_CONFIG_INVALID';

@@ -1,5 +1,6 @@
 // Parses operator settings for the loopback-only PayPal Sandbox prototype.
 import { PAYPAL_SANDBOX } from './constants';
+import { PaypalConfigError } from './paypal-errors';
 
 export function paypalSandboxSettings(
   environment: Readonly<Record<string, string | undefined>>,
@@ -16,7 +17,7 @@ export function paypalSandboxSettings(
     port > PAYPAL_SANDBOX.maxPort ||
     !URL.canParse(ollamaOrigin)
   )
-    throw new Error('Invalid sandbox configuration');
+    throw new PaypalConfigError();
   const url = new URL(ollamaOrigin);
   if (
     url.protocol !== 'http:' ||
@@ -28,6 +29,6 @@ export function paypalSandboxSettings(
     url.search ||
     url.hash
   )
-    throw new Error('Invalid sandbox configuration');
+    throw new PaypalConfigError();
   return { port, ollamaOrigin: url.href };
 }

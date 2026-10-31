@@ -66,22 +66,35 @@ function parseAttempt(value: unknown): Attempt | null {
     throw new PaypalError(PAYPAL_ERROR_CODES.INVALID_JOURNAL);
   const phase = Object.values(PHASE).find((item) => item === entry.phase);
   if (!phase) throw new PaypalError(PAYPAL_ERROR_CODES.INVALID_JOURNAL);
+  const requiresOrder = phase !== PHASE.CREATING;
+  const requiresAuthorization = [
+    PHASE.EXECUTING,
+    PHASE.CAPTURING,
+    PHASE.COMPLETED,
+    PHASE.VOIDING,
+    PHASE.VOIDED,
+    PHASE.REFUNDING,
+    PHASE.REFUNDED,
+  ].some((item) => item === phase);
+  const requiresCapture = [
+    PHASE.COMPLETED,
+    PHASE.REFUNDING,
+    PHASE.REFUNDED,
+  ].some((item) => item === phase);
+  const allowedKeys = [
+    'phase',
+    'requestId',
+    'promptDigest',
+    'maxTokens',
+    'orderId',
+    'authorizationId',
+    'captureId',
+  ];
   if (
-    (phase !== PHASE.CREATING && typeof entry.orderId !== 'string') ||
-    ([
-      PHASE.EXECUTING,
-      PHASE.CAPTURING,
-      PHASE.COMPLETED,
-      PHASE.VOIDING,
-      PHASE.VOIDED,
-      PHASE.REFUNDING,
-      PHASE.REFUNDED,
-    ].some((item) => item === phase) &&
-      typeof entry.authorizationId !== 'string') ||
-    ([PHASE.COMPLETED, PHASE.REFUNDING, PHASE.REFUNDED].some(
-      (item) => item === phase,
-    ) &&
-      typeof entry.captureId !== 'string')
+    Object.keys(entry).some((key) => !allowedKeys.includes(key)) ||
+    (typeof entry.orderId === 'string') !== requiresOrder ||
+    (typeof entry.authorizationId === 'string') !== requiresAuthorization ||
+    (typeof entry.captureId === 'string') !== requiresCapture
   )
     throw new PaypalError(PAYPAL_ERROR_CODES.INVALID_JOURNAL);
   return {
@@ -129,11 +142,34 @@ async function generateOrVoid(
     signal?.throwIfAborted();
     return output;
   } catch {
-    await save({ ...authorized, phase: PHASE.VOIDING });
-    await deps.payment.void(authorizationId);
-    await save({ ...authorized, phase: PHASE.VOIDED });
+    await voidAuthorization(deps, save, authorized, authorizationId);
     throw new PaypalError(PAYPAL_ERROR_CODES.INFERENCE_FAILED);
   }
+}
+
+async function voidAuthorization(
+  deps: PaypalInferenceDependencies,
+  save: (attempt: Attempt) => Promise<void>,
+  authorized: Attempt,
+  authorizationId: string,
+) {
+  await save({ ...authorized, phase: PHASE.VOIDING });
+  await deps.payment.void(authorizationId);
+  await save({ ...authorized, phase: PHASE.VOIDED });
+}
+
+async function refundCapture(
+  deps: PaypalInferenceDependencies,
+  save: (attempt: Attempt) => Promise<void>,
+  authorized: Attempt,
+  capture: { captureId: string },
+): Promise<never> {
+  await save({ ...authorized, ...capture, phase: PHASE.REFUNDING });
+  if (!deps.payment.refund)
+    throw new PaypalError(PAYPAL_ERROR_CODES.NEEDS_RECONCILIATION);
+  await deps.payment.refund(capture.captureId);
+  await save({ ...authorized, ...capture, phase: PHASE.REFUNDED });
+  throw new PaypalError(PAYPAL_ERROR_CODES.REFUNDED);
 }
 
 function isFinished(attempt: Attempt | null) {
@@ -250,18 +286,33 @@ class PaypalInference {
         signal,
       );
       await this.save({ ...authorized, phase: PHASE.CAPTURING });
+      if (signal?.aborted) {
+        await voidAuthorization(
+          this.deps,
+          (item) => this.save(item),
+          authorized,
+          authorization.authorizationId,
+        );
+        throw new PaypalError(PAYPAL_ERROR_CODES.INFERENCE_FAILED);
+      }
       const capture = await this.deps.payment.capture(
         authorization.authorizationId,
       );
-      if (signal?.aborted) {
-        await this.save({ ...authorized, ...capture, phase: PHASE.REFUNDING });
-        if (!this.deps.payment.refund)
-          throw new PaypalError(PAYPAL_ERROR_CODES.NEEDS_RECONCILIATION);
-        await this.deps.payment.refund(capture.captureId);
-        await this.save({ ...authorized, ...capture, phase: PHASE.REFUNDED });
-        throw new PaypalError(PAYPAL_ERROR_CODES.REFUNDED);
-      }
+      if (signal?.aborted)
+        return refundCapture(
+          this.deps,
+          (item) => this.save(item),
+          authorized,
+          capture,
+        );
       await this.save({ ...authorized, ...capture, phase: PHASE.COMPLETED });
+      if (signal?.aborted)
+        return refundCapture(
+          this.deps,
+          (item) => this.save(item),
+          authorized,
+          capture,
+        );
       return output;
     } finally {
       this.busy = false;

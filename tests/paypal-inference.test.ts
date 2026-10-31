@@ -264,7 +264,9 @@ void test('disconnect during capture preparation voids before sending a capture'
   };
   const service = await createPaypalInference(f);
   await service.create('first', 16);
-  await assert.rejects(service.execute('ORDER1', 'first', 16, controller.signal));
+  await assert.rejects(
+    service.execute('ORDER1', 'first', 16, controller.signal),
+  );
   assert.deepEqual(f.calls, ['create', 'authorize', 'generate', 'void']);
 });
 
@@ -278,15 +280,37 @@ void test('disconnect while recording completion triggers a refund', async () =>
   };
   const service = await createPaypalInference(f);
   await service.create('first', 16);
-  await assert.rejects(service.execute('ORDER1', 'first', 16, controller.signal));
-  assert.deepEqual(f.calls, ['create', 'authorize', 'generate', 'capture', 'refund']);
+  await assert.rejects(
+    service.execute('ORDER1', 'first', 16, controller.signal),
+  );
+  assert.deepEqual(f.calls, [
+    'create',
+    'authorize',
+    'generate',
+    'capture',
+    'refund',
+  ]);
 });
 
 void test('contradictory terminal journal fields cannot unlock payments', async () => {
   const f = fixture();
-  const base = { requestId: 'REQUEST1', promptDigest: 'a'.repeat(64), maxTokens: 16, orderId: 'ORDER1' };
-  f.journal.read = async () => ({ ...base, phase: 'cancelled', authorizationId: 'AUTH1' });
+  const base = {
+    requestId: 'REQUEST1',
+    promptDigest: 'a'.repeat(64),
+    maxTokens: 16,
+    orderId: 'ORDER1',
+  };
+  f.journal.read = async () => ({
+    ...base,
+    phase: 'cancelled',
+    authorizationId: 'AUTH1',
+  });
   await assert.rejects(createPaypalInference(f));
-  f.journal.read = async () => ({ ...base, phase: 'voided', authorizationId: 'AUTH1', captureId: 'CAPTURE1' });
+  f.journal.read = async () => ({
+    ...base,
+    phase: 'voided',
+    authorizationId: 'AUTH1',
+    captureId: 'CAPTURE1',
+  });
   await assert.rejects(createPaypalInference(f));
 });

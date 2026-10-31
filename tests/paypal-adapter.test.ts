@@ -116,3 +116,18 @@ void test('an accepted but unfinished void does not release a payment', async ()
   });
   await assert.rejects(payment.void('AUTH1'));
 });
+
+void test('approval is read from PayPal and bound to the same order', async () => {
+  const fetchMock: typeof fetch = async (input) =>
+    String(input).endsWith('/v1/oauth2/token')
+      ? Response.json({ access_token: 'synthetic-token' })
+      : Response.json({ id: 'ORDER1', status: 'APPROVED' });
+  const payment = createPaypalSandbox({
+    clientId: 'test-id',
+    clientSecret: 'test-secret',
+    returnOrigin: 'http://127.0.0.1:8765',
+    fetch: fetchMock,
+  });
+  assert.equal(await payment.isApproved('ORDER1'), true);
+  await assert.rejects(payment.isApproved('ORDER2'));
+});
