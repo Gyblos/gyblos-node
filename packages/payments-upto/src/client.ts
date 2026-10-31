@@ -184,6 +184,25 @@ function checkedPolicy(policy: UptoBuyerPolicy): UptoBuyerPolicy {
   return policy;
 }
 
+// Drops a signed entry the caller knows never left the buyer; a settled one, or another channel's
+// identity, is refused.
+async function discardUnsent(
+  journal: UptoBuyerJournal,
+  authorization: PaymentAuthorization,
+) {
+  const entry = await journal
+    .get(authorization.requestDigest)
+    .catch(() => fail(PAYMENT_ERROR_CODES.JOURNAL_UNAVAILABLE));
+  if (!entry) return;
+  if (entry.channelId !== authorization.channelId)
+    fail(PAYMENT_ERROR_CODES.RECEIPT_MISMATCH);
+  if (entry.state === PAYMENT_CHANNEL_STATES.SETTLED)
+    fail(PAYMENT_ERROR_CODES.ALREADY_SETTLED);
+  await journal
+    .remove(authorization.requestDigest, authorization.channelId)
+    .catch(() => fail(PAYMENT_ERROR_CODES.JOURNAL_UNAVAILABLE));
+}
+
 export function createUptoPaymentClient(
   options: UptoPaymentClientOptions,
 ): PaymentClient {
@@ -254,19 +273,7 @@ export function createUptoPaymentClient(
           channelId ? [{ channelId, requestDigest, state, chargedAtomic }] : [],
       );
     },
-    async discard(authorization) {
-      const entry = await options.journal
-        .get(authorization.requestDigest)
-        .catch(() => fail(PAYMENT_ERROR_CODES.JOURNAL_UNAVAILABLE));
-      if (!entry) return;
-      if (entry.channelId !== authorization.channelId)
-        fail(PAYMENT_ERROR_CODES.RECEIPT_MISMATCH);
-      if (entry.state === PAYMENT_CHANNEL_STATES.SETTLED)
-        fail(PAYMENT_ERROR_CODES.ALREADY_SETTLED);
-      await options.journal
-        .remove(authorization.requestDigest, authorization.channelId)
-        .catch(() => fail(PAYMENT_ERROR_CODES.JOURNAL_UNAVAILABLE));
-    },
+    discard: (authorization) => discardUnsent(options.journal, authorization),
   };
 }
 

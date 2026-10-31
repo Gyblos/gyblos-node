@@ -661,14 +661,14 @@ sent; anything else is refused before paying.
 One paid request runs at a time (`PAID_BUYER_BUSY`) and one buyer process holds
 the payment journal (`BUYER_PAYMENT_JOURNAL_UNAVAILABLE`). The buyer never fails
 over once a seller received the signed open, since that seller could still land
-it; an open that never left the buyer is discarded and the next seller is
-tried. Any channel in the journal not settled on the buyer's own count (a
-refusal, a stop, a pending or lapsed claim, a dispute or a settlement the chain
-could not confirm) blocks new payments (`PAID_BUYER_UNRESOLVED_PAYMENT`) until it
-is reconciled; the buyer also appends it to `paid-records.jsonl` in the buyer
-home when it can (`recorded`). Reconciling paid v2 channels (`buyer:reconcile`)
-is the next step and not available yet, so a blocked devnet test buyer is reset
-by hand for now.
+it; an open that never left the buyer is discarded and the next seller is tried.
+Any channel in the journal not settled on the buyer's own count (a refusal, a
+stop, a pending or lapsed claim, a dispute or a settlement the chain could not
+confirm) blocks new payments (`PAID_BUYER_UNRESOLVED_PAYMENT`) until it is
+reconciled; the buyer also appends it to `paid-records.jsonl` in the buyer home
+when it can (`recorded`). Reconciling paid v2 channels (`buyer:reconcile`) is
+the next step and not available yet, so a blocked devnet test buyer is reset by
+hand for now.
 
 The endpoint listens on loopback only and refuses browser requests, but any
 local process can call it and spend up to `maxAtomic` per request: run the paid
