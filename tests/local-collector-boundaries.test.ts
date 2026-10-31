@@ -277,3 +277,35 @@ void test('collector startup releases storage when the clock fails during post-o
   assert.ok(failure instanceof Error);
   assert.equal(failure.message, 'COLLECTOR_STORAGE');
 });
+
+void test('local collector has one storage cleanup owner when the port is occupied', async (context) => {
+  const f = await managedReceiptFixture(context);
+  const selected = options(f.path, f.entry.receipt.seller.record.buyerNodeId);
+  const first = f.manage(await startLocalCollector(selected));
+  let closes = 0;
+  const path = f.path + '-occupied';
+  await assert.rejects(
+    startLocalCollector(
+      { ...selected, path, port: Number(new URL(first.url).port) },
+      {
+        open: openRetainedReceiptStore,
+        create: async (settings) => {
+          const store = await createRetainedReceiptStore(settings);
+          return {
+            ...store,
+            async close() {
+              closes++;
+              await store.close();
+            },
+          };
+        },
+      },
+    ),
+    { code: 'COLLECTOR_STORAGE' },
+  );
+  assert.equal(closes, 1);
+  const reopened = f.manage(
+    await openRetainedReceiptStore({ path, retentionMs: 100, now: () => 1000 }),
+  );
+  await reopened.close();
+});

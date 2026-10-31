@@ -185,7 +185,6 @@ async function serveLocalCollector(
   } catch {
     clearInterval(timer);
     server.closeAllConnections();
-    await store.close();
     return collectorFail(LOCAL_COLLECTOR_CODES.STORAGE);
   }
 }
