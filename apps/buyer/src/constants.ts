@@ -168,6 +168,15 @@ export const FREE_BUYER_CODES = {
 } as const;
 export type FreeBuyerCode =
   (typeof FREE_BUYER_CODES)[keyof typeof FREE_BUYER_CODES];
+// The paid buyer's own refusals, before any payment.
+export const PAID_BUYER_CODES = {
+  // An earlier channel is not resolved yet; `pnpm buyer:reconcile` resolves it.
+  UNRESOLVED: 'PAID_BUYER_UNRESOLVED_PAYMENT',
+  UNAVAILABLE: 'PAID_BUYER_NO_OFFER',
+  BUSY: 'PAID_BUYER_BUSY',
+} as const;
+export type PaidBuyerCode =
+  (typeof PAID_BUYER_CODES)[keyof typeof PAID_BUYER_CODES];
 // The OpenAI-compatible subset the free buyer accepts, and the fixed reasons it gives for refusing one.
 export const FREE_CHAT_FIELDS = {
   MODEL: 'model',
