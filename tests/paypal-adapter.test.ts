@@ -131,3 +131,53 @@ void test('approval is read from PayPal and bound to the same order', async () =
   assert.equal(await payment.isApproved('ORDER1'), true);
   await assert.rejects(payment.isApproved('ORDER2'));
 });
+
+void test('a final partial capture sends and verifies only the spent cents', async () => {
+  const requests: string[] = [];
+  const fetchMock: typeof fetch = async (input, init) => {
+    const url = String(input);
+    if (url.endsWith('/v1/oauth2/token'))
+      return Response.json({ access_token: 'synthetic-token' });
+    requests.push(String(init?.body));
+    return Response.json({
+      id: 'CAPTURE1',
+      status: 'COMPLETED',
+      amount: { currency_code: 'USD', value: '0.20' },
+    });
+  };
+  const payment = createPaypalSandbox({
+    clientId: 'test-id',
+    clientSecret: 'test-secret',
+    returnOrigin: 'http://127.0.0.1:8765',
+    fetch: fetchMock,
+  });
+  assert.deepEqual(await payment.capture('AUTH1', 20), {
+    captureId: 'CAPTURE1',
+  });
+  assert.deepEqual(JSON.parse(requests[0] ?? ''), {
+    amount: { currency_code: 'USD', value: '0.20' },
+    final_capture: true,
+  });
+  for (const invalid of [0, 101, 1.5, -1])
+    await assert.rejects(payment.capture('AUTH1', invalid));
+  assert.equal(requests.length, 1);
+});
+
+void test('a partial capture with an unexpected amount or currency remains unresolved', async () => {
+  for (const amount of [
+    { currency_code: 'USD', value: '1.00' },
+    { currency_code: 'EUR', value: '0.20' },
+  ]) {
+    const fetchMock: typeof fetch = async (input) =>
+      String(input).endsWith('/v1/oauth2/token')
+        ? Response.json({ access_token: 'synthetic-token' })
+        : Response.json({ id: 'CAPTURE1', status: 'COMPLETED', amount });
+    const payment = createPaypalSandbox({
+      clientId: 'test-id',
+      clientSecret: 'test-secret',
+      returnOrigin: 'http://127.0.0.1:8765',
+      fetch: fetchMock,
+    });
+    await assert.rejects(payment.capture('AUTH1', 20));
+  }
+});

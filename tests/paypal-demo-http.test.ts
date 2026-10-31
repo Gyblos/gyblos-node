@@ -3,7 +3,7 @@ import { test } from 'node:test';
 
 import { startPaypalDemo } from '@gyblos/node-app/paypal-demo';
 
-void test('loopback demo requires same origin and connects checkout to inference', async () => {
+void test('loopback demo requires same origin and connects one approval to multiple inferences', async () => {
   const operations: string[] = [];
   let state: unknown = null;
   const app = await startPaypalDemo({
@@ -17,6 +17,9 @@ void test('loopback demo requires same origin and connects checkout to inference
       },
     },
     payment: {
+      async isApproved() {
+        return true;
+      },
       async create() {
         operations.push('create');
         return {
@@ -29,8 +32,8 @@ void test('loopback demo requires same origin and connects checkout to inference
         operations.push('authorize');
         return { authorizationId: 'AUTH1' };
       },
-      async capture() {
-        operations.push('capture');
+      async capture(_id: string, cents?: number) {
+        operations.push(`capture:${cents}`);
         return { captureId: 'CAPTURE1' };
       },
       async void() {
@@ -51,44 +54,61 @@ void test('loopback demo requires same origin and connects checkout to inference
       origin: app.url,
       authorization: `Bearer ${session}`,
     };
-    const unauthenticated = await fetch(`${app.url}/api/order`, {
-      method: 'POST',
-      headers: { ...headers, authorization: 'Bearer invalid' },
-      body: '{}',
-    });
-    assert.equal(unauthenticated.status, 403);
-    const rejected = await fetch(`${app.url}/api/order`, {
-      method: 'POST',
-      headers: { ...headers, origin: 'https://attacker.invalid' },
-      body: '{}',
-    });
-    assert.equal(rejected.status, 403);
-    const create = await fetch(`${app.url}/api/order`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ prompt: 'hello', maxTokens: 16 }),
-    });
-    assert.equal(create.status, 200);
-    const order: unknown = await create.json();
-    assert.deepEqual(order, {
+    const post = (path: string, data: unknown, requestHeaders = headers) =>
+      fetch(`${app.url}${path}`, {
+        method: 'POST',
+        headers: requestHeaders,
+        body: JSON.stringify(data),
+      });
+    assert.equal(
+      (
+        await post(
+          '/api/order',
+          {},
+          { ...headers, authorization: 'Bearer invalid' },
+        )
+      ).status,
+      403,
+    );
+    assert.equal(
+      (
+        await post(
+          '/api/order',
+          {},
+          { ...headers, origin: 'https://attacker.invalid' },
+        )
+      ).status,
+      403,
+    );
+    const created = await post('/api/order', {});
+    assert.equal(created.status, 200);
+    assert.deepEqual(await created.json(), {
       orderId: 'ORDER1',
       approvalUrl: 'https://www.sandbox.paypal.com/checkoutnow?token=ORDER1',
     });
-    const execute = await fetch(`${app.url}/api/execute`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        orderId: 'ORDER1',
-        prompt: 'hello',
-        maxTokens: 16,
-      }),
-    });
-    assert.equal(execute.status, 200);
+    assert.equal(
+      (await post('/api/approve', { orderId: 'ORDER1' })).status,
+      200,
+    );
+    for (const prompt of ['hello', 'again']) {
+      const response = await post('/api/message', { prompt, maxTokens: 16 });
+      assert.equal(response.status, 200);
+      const result: unknown = await response.json();
+      assert.ok(result && typeof result === 'object' && 'messageId' in result);
+      assert.equal(
+        (await post('/api/acknowledge', { messageId: result.messageId }))
+          .status,
+        200,
+      );
+    }
+    const finish = await post('/api/finish', {});
+    assert.equal(finish.status, 200);
     assert.deepEqual(operations, [
       'create',
       'authorize',
       'generate',
-      'capture',
+      'generate',
+      'capture:20',
     ]);
   } finally {
     await app.close();
