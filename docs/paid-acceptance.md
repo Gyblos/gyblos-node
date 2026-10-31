@@ -12,9 +12,9 @@ Iroh over loopback with relays disabled. The seller receives a deterministic
 recounted engine through an explicit factory port; its default engine registry
 and pinned artifacts remain unchanged. The real upto client, server, offline
 signing/verifier, seller ledger and buyer journal run over a synthetic chain. No
-RPC or facilitator client is constructed, and no transaction is broadcast. This
-does not validate mainnet, USDC transfer, rent/SOL costs, production RPC
-finality, real tokenization or model performance.
+payment RPC or facilitator client is constructed, and no transaction is
+broadcast. This does not validate mainnet, USDC transfer, rent/SOL costs,
+production RPC finality, real tokenization or model performance.
 
 Coverage includes complete and streamed answers, refusal before prompt
 transmission, discard of an unsent authorization, independent settlement-share
