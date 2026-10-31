@@ -14,6 +14,9 @@ back to the buyer.
 - **Buyer proxy** (`pnpm buyer:start`): checks the offer, listens on `:4031`.
 - **Payments**: x402 `upto`, local facilitator, devnet test token (not USDC).
 - **Transport**: Iroh over our relay `na1.relay.gyblos.com`, or direct.
+- **Private receipt collector**: standalone loopback-only receiver with explicit
+  access and retention
+  ([configuration and limits](docs/private-receipt-collector.md#standalone-local-receiver)).
 - **Identity**: opt-in read-only 8004 admission, persistent trust state and
   explicit manual overrides.
 
