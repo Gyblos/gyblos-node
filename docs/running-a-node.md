@@ -666,9 +666,45 @@ Any channel in the journal not settled on the buyer's own count (a refusal, a
 stop, a pending or lapsed claim, a dispute or a settlement the chain could not
 confirm) blocks new payments (`PAID_BUYER_UNRESOLVED_PAYMENT`) until it is
 reconciled; the buyer also appends it to `paid-records.jsonl` in the buyer home
-when it can (`recorded`). Reconciling paid v2 channels (`buyer:reconcile`) is
-the next step and not available yet, so a blocked devnet test buyer is reset by
-hand for now.
+when it can (`recorded`).
+
+To reconcile, stop the paid buyer and run `pnpm buyer:reconcile:paid`. It checks
+that the role's RPC serves devnet, then reads each open channel's finalized
+history; it only reads the chain and never signs. One JSON line per channel
+reports the outcome, then a summary line with the count of each:
+
+- `settled`: the claim charged exactly the buyer's own count;
+- `disputed`: it charged another amount, more or less (recorded, no penalty);
+- `unchecked`: the chain shows a charge but no record of the buyer's count
+  survived;
+- `never-opened`: nothing was charged, because the chain shows the open never
+  landed and never can: no deposit in the channel's whole history, no channel
+  account, the open's blockhash expired by finalized block height, and the RPC
+  still holds history back to the open's slot;
+- `open`: the channel is open and unclaimed, its open may still land, or the
+  chain cannot prove otherwise (a pruned RPC, or more history than it reads).
+
+The charge is what left the escrow minus what came back to the buyer's wallet.
+If the program redirected the refund elsewhere (for example because the buyer's
+token account was closed), it shows as a larger charge and a dispute, never a
+smaller one. Each outcome but `open` is appended to `paid-reconciliations.jsonl`
+in the buyer home before the journal unblocks it, so a failed run loses nothing
+and the next one picks up where it stopped. An `open` channel keeps blocking
+until the seller claims it or the buyer withdraws it after its timeout, which is
+not available yet.
+
+Use the role's RPC as one endpoint with full transaction history. A pruned or
+load-balanced RPC can only keep a channel `open` (it never makes one look
+unopened), because the command reads the finalized tip first and requires the
+RPC to still serve blocks and ledger back to the open's slot. A journal from
+before this version is read as is: its signed opens can still settle but are
+never reported `never-opened`.
+
+The command exits 0 when nothing blocks payments (disputes included, since they
+are recorded and no longer block), 2 while a channel stays open, and 1 when it
+could not finish, printing `PAID_RECONCILE_NETWORK_MISMATCH`,
+`PAID_RECONCILE_ROLE_INVALID` or `PAID_RECONCILE_INCOMPLETE` (stop the buyer,
+check the RPC and the home). The v1 `buyer:reconcile` is unchanged.
 
 The endpoint listens on loopback only and refuses browser requests, but any
 local process can call it and spend up to `maxAtomic` per request: run the paid
