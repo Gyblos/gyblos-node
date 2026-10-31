@@ -138,6 +138,11 @@ void test('a corrupt terminal journal cannot unblock another payment', async () 
     maxTokens: 16,
   });
   await assert.rejects(createPaypalInference(f));
+  f.journal.read = async () => ({
+    phase: 'completed', promptDigest: 'a'.repeat(64), maxTokens: 16,
+    orderId: '', authorizationId: 'AUTH1', captureId: 'CAPTURE1',
+  });
+  await assert.rejects(createPaypalInference(f));
   assert.deepEqual(f.calls, []);
 });
 
