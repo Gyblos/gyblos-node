@@ -11,12 +11,15 @@ Codex, Claude Code and human contributors. Read `AGENTS.md` first; its rules
 override this procedure.
 
 The public explanation is [docs/ai-assisted-contributing.md](../../../docs/ai-assisted-contributing.md).
+Use [gyblos-pr-workflow](../gyblos-pr-workflow/SKILL.md) for the detached
+worktree, branch, review and PR mechanics.
 Do not rely on a private prompt, provider-specific memory or an uncommitted
 transcript as project context.
 
 ## 1. Establish context
 
-1. Confirm the repository, branch/worktree and clean starting state with
+1. Start in your own detached worktree and task branch using the PR workflow.
+   Confirm the repository and clean starting state with
    `git status --short --branch`.
 2. Read `AGENTS.md` and the relevant sections of `docs/code-standards.md`.
 3. Read `gyblos-code-map` before creating, moving or splitting product modules.
@@ -77,6 +80,7 @@ Hand off using this compact report:
 
 ```text
 Goal: <one sentence>
+Head: <commit SHA>
 Scope: <packages/apps/docs and why>
 Changed: <files or concise groups>
 Validation: <command and exact result/count>

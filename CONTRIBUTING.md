@@ -2,14 +2,16 @@
 
 Read [AGENTS.md](AGENTS.md) for package ownership, rules, checks, privacy and
 the PR workflow, and [docs/code-standards.md](docs/code-standards.md) for
-detailed style. Product decisions remain in the central vault.
+detailed style. See [tests/README.md](tests/README.md) for regression design and
+native prerequisites. Product decisions remain in the central vault.
 
 ## One workflow for every contributor
 
 The repository uses the same workflow for humans, Codex, Claude Code and other
 development tools. See the full [AI-assisted contribution workflow](docs/ai-assisted-contributing.md).
 
-1. Read `AGENTS.md`, inspect the branch/worktree and consult the [code map](.agents/skills/gyblos-code-map/SKILL.md).
+1. Start in your own detached worktree and task branch, read `AGENTS.md`, and
+   consult the [code map](.agents/skills/gyblos-code-map/SKILL.md).
 2. Define the goal, owning layer, non-goals and validation before editing.
 3. Inspect current code and tests; add a failing regression before a behavior
    fix and keep structural work separate.

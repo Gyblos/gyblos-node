@@ -1,8 +1,8 @@
 # AI-assisted contribution workflow
 
-This repository uses one contribution workflow for human contributors,
-Codex, Claude Code and other compatible development tools. The tool may change;
-the repository contract does not.
+This repository uses one contribution workflow for human contributors, Codex,
+Claude Code and other compatible development tools. The tool may change; the
+repository contract does not.
 
 `AGENTS.md` is the authoritative source for repository rules. This document
 explains how to apply those rules during a change. If this document or a skill
@@ -19,18 +19,19 @@ disagrees with `AGENTS.md`, follow `AGENTS.md`.
 | `AGENTS.local.md`                       | Optional ignored personal notes; never a team contract.      |
 
 `CLAUDE.md` imports `AGENTS.md` so Claude Code receives the same rules. A
-provider-specific configuration may help a tool load the repository, but it
-must not redefine ownership, safety, testing or merge decisions.
+provider-specific configuration may help a tool load the repository, but it must
+not redefine ownership, safety, testing or merge decisions.
 
 ## The shared change loop
 
 Every implementation task follows the same sequence:
 
-1. **Orient.** Read `AGENTS.md`, inspect the current branch and worktree, and
-   consult the code map before deciding where code belongs.
+1. **Orient.** Start in your own detached worktree and task branch as described
+   by the [PR workflow](../.agents/skills/gyblos-pr-workflow/SKILL.md). Read
+   `AGENTS.md`, inspect the starting state, and consult the code map before
+   deciding where code belongs.
 2. **Define scope.** State the goal, affected layer/package, assumptions and
-   files likely to change. Keep structural moves separate from behavior
-   changes.
+   files likely to change. Keep structural moves separate from behavior changes.
 3. **Inspect before editing.** Read the relevant public entrypoints, tests,
    exports and existing documentation. Do not rely on chat history as project
    context.
@@ -45,9 +46,9 @@ Every implementation task follows the same sequence:
    counts, anything not run, known risks and the next action. Never describe an
    unavailable CI check as passing.
 
-The merge decision remains a human repository decision. An assistant may
-prepare or review a change, but it does not infer approval from a green check,
-an open pull request or a tool response.
+The merge decision remains a human repository decision. An assistant may prepare
+or review a change, but it does not infer approval from a green check, an open
+pull request or a tool response.
 
 ## Tool-neutral handoff
 
@@ -55,6 +56,7 @@ Use this shape when handing work from one contributor or tool to another:
 
 ```text
 Goal: <one sentence>
+Head: <commit SHA>
 Scope: <packages/apps/docs and why>
 Changed: <files or concise groups>
 Validation: <command and exact result/count>

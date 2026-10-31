@@ -186,7 +186,8 @@ checks, the standalone lab facilitator and their evidence, and `tests/` and
 [Discovery index](docs/discovery-index.md) · [Stack](docs/stack.md) ·
 [Limitations](docs/limitations.md) · [Protocol spec](packages/protocol/SPEC.md)
 · [Tests](tests/README.md) · [Code standards](docs/code-standards.md) ·
-[Contributing](AGENTS.md) · [AI-assisted contribution workflow](docs/ai-assisted-contributing.md)
+[Contributing](CONTRIBUTING.md) · [Repository rules](AGENTS.md) ·
+[AI-assisted contribution workflow](docs/ai-assisted-contributing.md)
 
 ## Telemetry adapters
 
