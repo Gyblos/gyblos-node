@@ -253,3 +253,31 @@ void test('order creation records a request id before contacting PayPal', async 
   const service = await createPaypalInference(f);
   await service.create('first', 16);
 });
+
+void test('disconnect during capture preparation voids before sending a capture', async () => {
+  const f = fixture();
+  const controller = new AbortController();
+  const write = f.journal.write;
+  f.journal.write = async (value: unknown) => {
+    await write(value);
+    if (JSON.stringify(value).includes('capturing')) controller.abort();
+  };
+  const service = await createPaypalInference(f);
+  await service.create('first', 16);
+  await assert.rejects(service.execute('ORDER1', 'first', 16, controller.signal));
+  assert.deepEqual(f.calls, ['create', 'authorize', 'generate', 'void']);
+});
+
+void test('disconnect while recording completion triggers a refund', async () => {
+  const f = fixture();
+  const controller = new AbortController();
+  const write = f.journal.write;
+  f.journal.write = async (value: unknown) => {
+    await write(value);
+    if (JSON.stringify(value).includes('completed')) controller.abort();
+  };
+  const service = await createPaypalInference(f);
+  await service.create('first', 16);
+  await assert.rejects(service.execute('ORDER1', 'first', 16, controller.signal));
+  assert.deepEqual(f.calls, ['create', 'authorize', 'generate', 'capture', 'refund']);
+});
