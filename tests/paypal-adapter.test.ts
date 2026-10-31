@@ -16,6 +16,15 @@ void test('sandbox adapter authorizes and captures only its fixed USD order', as
       'Bearer synthetic-token',
     );
     if (url.endsWith('/v2/checkout/orders')) {
+      const requestBody: unknown = JSON.parse(String(init?.body));
+      assert.deepEqual(requestBody, {
+        intent: 'AUTHORIZE',
+        purchase_units: [{ amount: { currency_code: 'USD', value: '1.00' } }],
+        application_context: {
+          return_url: 'http://127.0.0.1:8765/paypal/approved',
+          cancel_url: 'http://127.0.0.1:8765/paypal/cancelled',
+        },
+      });
       return Response.json({
         id: 'ORDER1',
         links: [
