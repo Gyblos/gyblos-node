@@ -72,6 +72,10 @@ void test(
       assert.deepEqual(report.cases, Object.values(RECEIPT_ACCEPTANCE_CASES));
       assert.ok(report.answers >= 3);
       assert.ok(report.confirmed >= 3);
+      assert.equal(report.collectorStored, report.confirmed);
+      assert.equal(report.collectorDuplicates, report.confirmed);
+      assert.equal(report.collectorRestarts, 1);
+      assert.equal(report.collectorRefusals, 3);
       assert.equal(report.externalCalls, 0);
       assert.ok(report.registryReads > 0);
       assert.equal(report.forbiddenRpcMethods, 0);

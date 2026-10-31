@@ -46,7 +46,8 @@
     "./cli/identity-acceptance": "./src/cli/identity-acceptance.ts",
     "./acceptance/receipts": "./src/acceptance/receipt-run.ts",
     "./acceptance/receipt-constants": "./src/acceptance/receipt-constants.ts",
-    "./cli/receipt-acceptance": "./src/cli/receipt-acceptance.ts"
+    "./cli/receipt-acceptance": "./src/cli/receipt-acceptance.ts",
+    "./acceptance/receipt-collector": "./src/acceptance/receipt-collector.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",
@@ -69,7 +70,8 @@
     "@gyblos/discovery-http": "workspace:*",
     "@gyblos/transport-iroh": "workspace:*",
     "@number0/iroh": "1.1.0",
-    "@gyblos/identity": "workspace:*"
+    "@gyblos/identity": "workspace:*",
+    "@gyblos/telemetry-file": "workspace:*"
   },
   "scripts": {
     "acceptance:node-discovery": "node --import tsx src/cli/node-discovery-acceptance.ts",

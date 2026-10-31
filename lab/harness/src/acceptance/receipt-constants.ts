@@ -38,6 +38,9 @@ export const RECEIPT_ACCEPTANCE_CASES = {
   CANCEL: 'stream-cancellation-no-retry',
   ENGINE_FAILURE: 'engine-failure-no-retry',
   FREE_CAPS: 'configured-free-cap',
+  COLLECTOR: 'collector-private-persistence',
+  COLLECTOR_RESTART: 'collector-process-restart',
+  COLLECTOR_REFUSALS: 'collector-refusals-no-retry',
   PRIVACY: 'private-bounded-metadata',
   TELEMETRY: 'local-telemetry-private',
   NO_EXTERNAL: 'no-external-io-or-payments',
@@ -57,6 +60,10 @@ export interface ReceiptAcceptanceReport {
   answers: number;
   engineAttempts: number;
   confirmed: number;
+  collectorStored: number;
+  collectorDuplicates: number;
+  collectorRestarts: number;
+  collectorRefusals: number;
   externalCalls: number;
   discoveryReads: number;
 }

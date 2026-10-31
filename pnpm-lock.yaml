@@ -299,6 +299,9 @@ importers:
       '@gyblos/runtime':
         specifier: workspace:*
         version: link:../../packages/runtime
+      '@gyblos/telemetry-file':
+        specifier: workspace:*
+        version: link:../../packages/telemetry-file
       '@gyblos/transport-iroh':
         specifier: workspace:*
         version: link:../../packages/transport-iroh
