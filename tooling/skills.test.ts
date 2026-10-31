@@ -133,13 +133,19 @@ void test('rejects an empty canonical skills root', async () => {
   });
 });
 
-void test('rejects symlinked skill roots before materializing', async () => {
+void test('rejects symlinked skill roots before materializing', async (t) => {
   await withFixture(async (root) => {
     const external = join(root, 'external-skills');
     const distribution = join(root, '.claude', 'skills');
     await mkdir(external, { recursive: true });
     await mkdir(dirname(distribution), { recursive: true });
-    await symlink(external, distribution, 'dir');
+    try {
+      await symlink(external, distribution, 'dir');
+    } catch (error: unknown) {
+      if (!symlinkUnavailable(error)) throw error;
+      t.skip('symlinks are unavailable in this checkout');
+      return;
+    }
     await assert.rejects(
       materializeSkills(root, { replace: true }),
       /Claude skills root must be a real directory/,
@@ -148,13 +154,19 @@ void test('rejects symlinked skill roots before materializing', async () => {
   });
 });
 
-void test('rejects a symlinked canonical skills parent before checking', async () => {
+void test('rejects a symlinked canonical skills parent before checking', async (t) => {
   await withFixture(async (root) => {
     const external = join(root, 'external-agents');
     const canonicalParent = join(root, '.agents');
     await mkdir(join(external, 'skills'), { recursive: true });
     await rm(canonicalParent, { recursive: true, force: true });
-    await symlink(external, canonicalParent, 'dir');
+    try {
+      await symlink(external, canonicalParent, 'dir');
+    } catch (error: unknown) {
+      if (!symlinkUnavailable(error)) throw error;
+      t.skip('symlinks are unavailable in this checkout');
+      return;
+    }
     const report = await checkSkillLayout(root);
     assert.match(
       report.issues[0]?.message ?? '',
