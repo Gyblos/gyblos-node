@@ -225,6 +225,7 @@ void test('an open is never opened only when the whole chain agrees', () =>
       state([], { accounts: new Set([CHANNEL]) }),
       state([], { blockHeight: LAST_VALID }),
       state([], { oldestSlot: OPEN_SLOT + 1n }),
+      state([], { firstBlock: OPEN_SLOT + 1n }),
       state([OPEN]),
       state(
         Array.from(
@@ -239,8 +240,27 @@ void test('an open is never opened only when the whole chain agrees', () =>
       PAYMENT_CHANNEL_STATES.OPEN,
     );
     // Failed transactions moved nothing, however many there are.
-    const { run } = reconcile(journal, state(spam), { expected: '5' });
-    const [never] = await run;
+    const double = chainDouble(state(spam));
+    const [never] = await reconcileUptoBuyer({
+      journal,
+      rpc: double.rpc,
+      payer: PAYER,
+      mint: MINT,
+      treasury: TREASURY,
+      expected: () => '5',
+      report: async () => {},
+    });
+    // The finalized tip comes first, and every later read is at least that recent: an open that landed
+    // before the tip is already in the history read after it.
+    assert.deepEqual(double.reads.slice(0, 3), [
+      { call: 'slot' },
+      { call: 'height', minContextSlot: double.tip },
+      { call: 'signatures', minContextSlot: double.tip },
+    ]);
+    assert.deepEqual(
+      double.reads.filter((read) => read.call === 'account'),
+      [{ call: 'account', minContextSlot: double.tip }],
+    );
     assert.equal(never?.outcome, RECONCILE_OUTCOMES.NEVER_OPENED);
     assert.equal(never?.chargedAtomic, '0');
     assert.equal((await journal.get(DIGEST))?.chargedAtomic, '0');

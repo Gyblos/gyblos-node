@@ -51,7 +51,7 @@ void test('history pages to the end and lists successful transactions oldest fir
       .filter((index) => index % 3 !== 2)
       .map(signatureOf),
   );
-  assert.equal(await history.blockHeight(), 7n);
+  assert.deepEqual(await history.tip(), { slot: 1_000n, height: 7n });
   assert.equal(await history.oldestSlot(), 3n);
   assert.equal(await history.accountExists(CHANNEL), true);
   assert.equal(
@@ -61,6 +61,16 @@ void test('history pages to the end and lists successful transactions oldest fir
     false,
   );
   assert.deepEqual([...new Set(commitments)], ['finalized']);
+});
+
+void test('a last page of exactly the limit still ends the history; the oldest slot is the later bound', async () => {
+  const history = createUptoChannelHistory(
+    chain(UPTO_HISTORY_LIMIT * 2, { firstBlock: 9n }).rpc,
+  );
+  const { signatures, complete } = await history.signatures(CHANNEL);
+  assert.equal(complete, true);
+  assert.equal(signatures[0], signatureOf(0));
+  assert.equal(await history.oldestSlot(), 9n);
 });
 
 void test('history past the bound is incomplete', async () => {
@@ -74,7 +84,7 @@ void test('an unreachable RPC is unavailable, without its URL', async () => {
   const history = createUptoChannelHistory(chain(1, { failing: true }).rpc);
   for (const call of [
     () => history.signatures(CHANNEL),
-    () => history.blockHeight(),
+    () => history.tip(),
     () => history.oldestSlot(),
     () => history.accountExists(CHANNEL),
   ])

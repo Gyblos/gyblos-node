@@ -693,8 +693,16 @@ and the next one picks up where it stopped. An `open` channel keeps blocking
 until the seller claims it or the buyer withdraws it after its timeout, which is
 not available yet.
 
-The command exits 0 when nothing blocks payments, 2 while a channel stays open,
-and 1 when it could not finish, printing `PAID_RECONCILE_NETWORK_MISMATCH`,
+Use the role's RPC as one endpoint with full transaction history. A pruned or
+load-balanced RPC can only keep a channel `open` (it never makes one look
+unopened), because the command reads the finalized tip first and requires the
+RPC to still serve blocks and ledger back to the open's slot. A journal from
+before this version is read as is: its signed opens can still settle but are
+never reported `never-opened`.
+
+The command exits 0 when nothing blocks payments (disputes included, since they
+are recorded and no longer block), 2 while a channel stays open, and 1 when it
+could not finish, printing `PAID_RECONCILE_NETWORK_MISMATCH`,
 `PAID_RECONCILE_ROLE_INVALID` or `PAID_RECONCILE_INCOMPLETE` (stop the buyer,
 check the RPC and the home). The v1 `buyer:reconcile` is unchanged.
 

@@ -66,19 +66,23 @@ function readers(options: UptoReconcileOptions) {
   const history = createUptoChannelHistory(options.rpc);
   const receipts = createUptoReceiptReader(options.rpc, UPTO_FINAL_COMMITMENT);
 
-  // Never opened only on the chain's word: the whole history holds no deposit, the account does not
-  // exist, the open's blockhash has expired by finalized height, and the RPC still holds the open's slot.
-  async function neverOpened(entry: Signed): Promise<boolean> {
-    if (await history.accountExists(entry.channelId)) return false;
-    if ((await history.blockHeight()) <= BigInt(entry.lastValidBlockHeight))
-      return false;
+  // Never opened only on the chain's word: the whole history holds no deposit, the open's blockhash had
+  // expired by the finalized tip read first (so a late open is already in that history), the account
+  // does not exist and the RPC still serves history back to the open's slot.
+  async function neverOpened(entry: Signed, tip: bigint, height: bigint) {
+    if (height <= BigInt(entry.lastValidBlockHeight)) return false;
+    if (await history.accountExists(entry.channelId, tip)) return false;
     return (await history.oldestSlot()) <= BigInt(entry.openSlot);
   }
 
   return async function shown(
     entry: Signed,
   ): Promise<Shown | 'never' | 'open'> {
-    const { signatures, complete } = await history.signatures(entry.channelId);
+    const { slot, height } = await history.tip();
+    const { signatures, complete } = await history.signatures(
+      entry.channelId,
+      slot,
+    );
     let deposited = false;
     for (const transaction of signatures) {
       const found = await receipts.transfer({
@@ -94,7 +98,7 @@ function readers(options: UptoReconcileOptions) {
       deposited ||= found.deposited;
     }
     if (deposited || !complete) return 'open';
-    return (await neverOpened(entry)) ? 'never' : 'open';
+    return (await neverOpened(entry, slot, height)) ? 'never' : 'open';
   };
 }
 

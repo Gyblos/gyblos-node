@@ -100,6 +100,38 @@ void test('a valid document reads back; each malformed one is refused', () =>
     }
   }));
 
+void test('a version 1 journal keeps its signed opens, never proven unopened, and drops unsigned ones', () =>
+  withRoot(async (root) => {
+    const { state } = buyerJournalPathsIn({ GYBLOS_HOME: root });
+    const {
+      openSlot: _openSlot,
+      lastValidBlockHeight: _height,
+      ...v1
+    } = { ...ENTRY, updatedAt: NOW };
+    await (await open(root)).close();
+    await writeFile(
+      state,
+      JSON.stringify({
+        version: 1,
+        entries: [
+          { ...v1, channelId: 'Chan1' },
+          { ...v1, requestDigest: OTHER },
+        ],
+      }),
+      { mode: 0o600 },
+    );
+    const journal = await open(root);
+    assert.deepEqual(await journal.list(), [
+      {
+        ...v1,
+        channelId: 'Chan1',
+        openSlot: '0',
+        lastValidBlockHeight: '18446744073709551615',
+      },
+    ]);
+    await journal.close();
+  }));
+
 void test('a full journal refuses new requests, keeps writing open ones and prunes finished ones', () =>
   withRoot(async (root) => {
     let now = NOW;

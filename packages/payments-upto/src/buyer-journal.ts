@@ -96,13 +96,23 @@ function atomic(value: unknown): string {
   return BigInt(amount) <= U64_MAX ? amount : unavailable();
 }
 
-function entry(value: unknown): UptoJournalEntry {
+// Version 1 entries had no open slot or blockhash lifetime.
+const V1_FIELDS = FIELDS.filter(
+  (field) => field !== 'openSlot' && field !== 'lastValidBlockHeight',
+);
+// A version 1 signed entry can still settle but is never proven unopened: its blockhash lifetime is
+// unknown, so it is read as never expiring.
+const V1_UNKNOWN = { openSlot: '0', lastValidBlockHeight: String(U64_MAX) };
+
+function entry(value: unknown, version: number): UptoJournalEntry {
+  const fields: readonly string[] = version === 1 ? V1_FIELDS : FIELDS;
   if (
     !isRecord(value) ||
-    Object.keys(value).length !== FIELDS.length ||
-    !FIELDS.every((field) => Object.hasOwn(value, field))
+    Object.keys(value).length !== fields.length ||
+    !fields.every((field) => Object.hasOwn(value, field))
   )
     return unavailable();
+  if (version === 1) Object.assign(value, V1_UNKNOWN);
   const { state, updatedAt, expiresAt, channelId, chargedAtomic } = value;
   if (
     !isState(state) ||
@@ -133,17 +143,20 @@ function parseJournal(source: string): Map<string, UptoJournalEntry> {
   } catch {
     return unavailable();
   }
+  const version = isRecord(parsed) ? parsed.version : undefined;
   if (
     !isRecord(parsed) ||
-    parsed.version !== BUYER_JOURNAL.version ||
+    (version !== BUYER_JOURNAL.version && version !== 1) ||
     Object.keys(parsed).length !== 2 ||
     !Array.isArray(parsed.entries)
   )
     return unavailable();
   const entries = new Map<string, UptoJournalEntry>();
   for (const value of parsed.entries) {
-    const parsedEntry = entry(value);
+    const parsedEntry = entry(value, Number(version));
     if (entries.has(parsedEntry.requestDigest)) unavailable();
+    // A version 1 open that was never signed never left the buyer: nothing to keep.
+    if (version === 1 && parsedEntry.channelId === null) continue;
     entries.set(parsedEntry.requestDigest, parsedEntry);
   }
   return entries;
@@ -216,7 +229,10 @@ export async function openUptoBuyerJournal(options: {
     mutate((entries) => {
       if (!entries.has(value.requestDigest) && entries.size >= maxEntries)
         unavailable();
-      entries.set(value.requestDigest, entry({ ...value, updatedAt: now() }));
+      entries.set(
+        value.requestDigest,
+        entry({ ...value, updatedAt: now() }, BUYER_JOURNAL.version),
+      );
     });
   const remove = (requestDigest: string, channelId?: string) =>
     mutate((entries) => {

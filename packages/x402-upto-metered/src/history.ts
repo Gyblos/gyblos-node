@@ -1,6 +1,6 @@
-// What finalized chain history says about a channel address, for reconciliation: its successful
-// transactions oldest first (paged to the end, or marked incomplete past a bound), the finalized block
-// height, the oldest slot the RPC still holds, and whether the account exists. No Gyblos imports.
+// What finalized chain history says about a channel address, for reconciliation: the finalized tip
+// (read first, so later reads are at least that recent), its successful transactions oldest first, the
+// oldest slot the RPC still serves, and whether the account exists. No Gyblos imports.
 import { address, type Address, type Signature } from '@solana/kit';
 
 import {
@@ -12,20 +12,24 @@ import {
 import { UptoError } from './errors';
 
 type Final = { commitment: typeof UPTO_FINAL_COMMITMENT };
+// Reads that must reflect at least the finalized tip already seen.
+type AtLeast = Final & { minContextSlot?: bigint };
 
 // The slice of a @solana/kit RPC the history uses.
 export interface UptoSignaturesRpc {
   getSignaturesForAddress(
     account: Address,
-    config: Final & { limit: number; before?: Signature },
+    config: AtLeast & { limit: number; before?: Signature },
   ): {
     send(): Promise<readonly { signature: Signature; err: unknown }[]>;
   };
-  getBlockHeight(config: Final): { send(): Promise<bigint> };
+  getSlot(config: Final): { send(): Promise<bigint> };
+  getBlockHeight(config: AtLeast): { send(): Promise<bigint> };
   minimumLedgerSlot(): { send(): Promise<bigint> };
+  getFirstAvailableBlock(): { send(): Promise<bigint> };
   getAccountInfo(
     account: Address,
-    config: Final & { encoding: 'base64' },
+    config: AtLeast & { encoding: 'base64' },
   ): { send(): Promise<{ value: unknown }> };
 }
 
@@ -54,7 +58,18 @@ export interface UptoChannelHistory {
 export function createUptoChannelHistory(rpc: UptoSignaturesRpc) {
   const final = { commitment: UPTO_FINAL_COMMITMENT };
   return {
-    async signatures(channelId: string): Promise<UptoChannelHistory> {
+    // The finalized slot and block height; pass the slot to the reads after it.
+    async tip() {
+      const slot = await read(() => rpc.getSlot(final).send());
+      const height = await read(() =>
+        rpc.getBlockHeight({ ...final, minContextSlot: slot }).send(),
+      );
+      return { slot, height };
+    },
+    async signatures(
+      channelId: string,
+      minContextSlot?: bigint,
+    ): Promise<UptoChannelHistory> {
       const found: { signature: Signature; err: unknown }[] = [];
       let before: Signature | undefined;
       for (let page = 0; page < UPTO_HISTORY_PAGES; page++) {
@@ -63,6 +78,7 @@ export function createUptoChannelHistory(rpc: UptoSignaturesRpc) {
           rpc
             .getSignaturesForAddress(address(channelId), {
               ...final,
+              ...(minContextSlot === undefined ? {} : { minContextSlot }),
               limit: UPTO_HISTORY_LIMIT,
               ...(before ? { before } : {}),
             })
@@ -75,15 +91,19 @@ export function createUptoChannelHistory(rpc: UptoSignaturesRpc) {
       }
       return { signatures: successful(found), complete: false };
     },
-    blockHeight: () => read(() => rpc.getBlockHeight(final).send()),
-    // The oldest slot whose transactions this RPC still serves.
-    oldestSlot: () => read(() => rpc.minimumLedgerSlot().send()),
-    accountExists: async (channelId: string) =>
+    // The oldest slot this RPC still serves both blocks and ledger for; history before it may be gone.
+    async oldestSlot() {
+      const ledger = await read(() => rpc.minimumLedgerSlot().send());
+      const block = await read(() => rpc.getFirstAvailableBlock().send());
+      return ledger > block ? ledger : block;
+    },
+    accountExists: async (channelId: string, minContextSlot?: bigint) =>
       (
         await read(() =>
           rpc
             .getAccountInfo(address(channelId), {
               ...final,
+              ...(minContextSlot === undefined ? {} : { minContextSlot }),
               encoding: 'base64',
             })
             .send(),

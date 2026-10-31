@@ -1,6 +1,6 @@
-// A finalized chain double for buyer reconciliation: per-address transaction history (listed newest
-// first and paged like the RPC), synthetic token-balance transactions, the finalized block height, the
-// oldest slot held and which accounts exist. Every call records its commitment; no network.
+// A finalized chain double for buyer reconciliation: per-address history (newest first, paged like the
+// RPC), synthetic token-balance transactions, the finalized tip, the oldest slot and block held and
+// which accounts exist. Every call is recorded with its commitment and context slot; no network.
 import {
   address,
   signature as asSignature,
@@ -32,12 +32,17 @@ export interface ChainState {
   history: Map<string, HistoryEntry[]>;
   blockHeight: bigint;
   oldestSlot: bigint;
+  // The oldest block still served; defaults to oldestSlot.
+  firstBlock?: bigint;
   accounts: Set<string>;
   failing?: boolean;
 }
 
 export function chainDouble(state: ChainState) {
   const commitments: string[] = [];
+  // Each read in order, with the context slot it demanded.
+  const reads: { call: string; minContextSlot?: bigint }[] = [];
+  const TIP = 1_000n;
   const unavailable = () => {
     if (state.failing)
       throw new Error('rpc down at https://rpc.example/?key=s');
@@ -58,6 +63,10 @@ export function chainDouble(state: ChainState) {
     getSignaturesForAddress: (account, config) => ({
       send: async () => {
         commitments.push(config.commitment);
+        reads.push({
+          call: 'signatures',
+          minContextSlot: config.minContextSlot,
+        });
         unavailable();
         const newest = [
           ...(state.history.get(String(account)) ?? []),
@@ -90,9 +99,24 @@ export function chainDouble(state: ChainState) {
         };
       },
     }),
+    getSlot: (config) => ({
+      send: async () => {
+        commitments.push(config.commitment);
+        reads.push({ call: 'slot' });
+        unavailable();
+        return TIP;
+      },
+    }),
+    getFirstAvailableBlock: () => ({
+      send: async () => {
+        unavailable();
+        return state.firstBlock ?? state.oldestSlot;
+      },
+    }),
     getBlockHeight: (config) => ({
       send: async () => {
         commitments.push(config.commitment);
+        reads.push({ call: 'height', minContextSlot: config.minContextSlot });
         unavailable();
         return state.blockHeight;
       },
@@ -106,6 +130,7 @@ export function chainDouble(state: ChainState) {
     getAccountInfo: (account, config) => ({
       send: async () => {
         commitments.push(config.commitment);
+        reads.push({ call: 'account', minContextSlot: config.minContextSlot });
         unavailable();
         return {
           value: state.accounts.has(String(account))
@@ -115,5 +140,5 @@ export function chainDouble(state: ChainState) {
       },
     }),
   };
-  return { rpc, commitments };
+  return { rpc, commitments, reads, tip: TIP };
 }
