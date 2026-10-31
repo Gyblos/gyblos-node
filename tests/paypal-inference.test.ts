@@ -8,7 +8,9 @@ function fixture() {
   let state: unknown = null;
   const payment = {
     async prepare() {},
-    async isApproved() { return true; },
+    async isApproved() {
+      return true;
+    },
     async create() {
       calls.push('create');
       return {
@@ -27,7 +29,9 @@ function fixture() {
     async void() {
       calls.push('void');
     },
-    async refund() { calls.push('refund'); },
+    async refund() {
+      calls.push('refund');
+    },
   };
   const journal = {
     async read() {
@@ -69,7 +73,9 @@ void test('a PayPal authorization pays for one bound inference and is captured o
 
 void test('unapproved orders and failed credentials do not permanently block a new attempt', async () => {
   const f = fixture();
-  f.payment.prepare = async () => { throw new Error('credentials'); };
+  f.payment.prepare = async () => {
+    throw new Error('credentials');
+  };
   const service = await createPaypalInference(f);
   await assert.rejects(service.create('first', 16));
   f.payment.prepare = async () => {};
@@ -139,8 +145,12 @@ void test('a corrupt terminal journal cannot unblock another payment', async () 
   });
   await assert.rejects(createPaypalInference(f));
   f.journal.read = async () => ({
-    phase: 'completed', promptDigest: 'a'.repeat(64), maxTokens: 16,
-    orderId: '', authorizationId: 'AUTH1', captureId: 'CAPTURE1',
+    phase: 'completed',
+    promptDigest: 'a'.repeat(64),
+    maxTokens: 16,
+    orderId: '',
+    authorizationId: 'AUTH1',
+    captureId: 'CAPTURE1',
   });
   await assert.rejects(createPaypalInference(f));
   assert.deepEqual(f.calls, []);
@@ -159,7 +169,10 @@ void test('an order that was never authorized may be abandoned after a restart',
 void test('engine-incompatible input is rejected before contacting PayPal', async () => {
   const f = fixture();
   const service = await createPaypalInference({
-    ...f, validateRequest() { throw new Error('unsupported prompt'); },
+    ...f,
+    validateRequest() {
+      throw new Error('unsupported prompt');
+    },
   });
   await assert.rejects(service.create('invalid', 16));
   assert.deepEqual(f.calls, []);
@@ -176,7 +189,9 @@ void test('buyer disconnect before capture voids the authorization', async () =>
   };
   const service = await createPaypalInference(f);
   await service.create('first', 16);
-  await assert.rejects(service.execute('ORDER1', 'first', 16, controller.signal));
+  await assert.rejects(
+    service.execute('ORDER1', 'first', 16, controller.signal),
+  );
   assert.deepEqual(f.calls, ['create', 'authorize', 'generate', 'void']);
 });
 
@@ -190,6 +205,46 @@ void test('buyer disconnect during capture refunds the completed payment', async
   };
   const service = await createPaypalInference(f);
   await service.create('first', 16);
-  await assert.rejects(service.execute('ORDER1', 'first', 16, controller.signal));
-  assert.deepEqual(f.calls, ['create', 'authorize', 'generate', 'capture', 'refund']);
+  await assert.rejects(
+    service.execute('ORDER1', 'first', 16, controller.signal),
+  );
+  assert.deepEqual(f.calls, [
+    'create',
+    'authorize',
+    'generate',
+    'capture',
+    'refund',
+  ]);
+});
+
+void test('uncertain refund stays blocked after restart', async () => {
+  const f = fixture();
+  const controller = new AbortController();
+  f.payment.capture = async () => {
+    controller.abort();
+    return { captureId: 'CAPTURE1' };
+  };
+  f.payment.refund = async () => {
+    throw new Error('timeout');
+  };
+  const service = await createPaypalInference(f);
+  await service.create('first', 16);
+  await assert.rejects(
+    service.execute('ORDER1', 'first', 16, controller.signal),
+  );
+  const restarted = await createPaypalInference(f);
+  await assert.rejects(restarted.create('second', 16));
+});
+
+void test('order creation records a request id before contacting PayPal', async () => {
+  const f = fixture();
+  f.payment.create = async () => {
+    const state = f.getState();
+    assert.ok(state && typeof state === 'object' && 'requestId' in state);
+    const requestId = Reflect.get(state, 'requestId');
+    assert.match(requestId, /^[0-9a-f-]{36}$/);
+    return { orderId: 'ORDER1', approvalUrl: 'https://www.sandbox.paypal.com/checkoutnow?token=ORDER1' };
+  };
+  const service = await createPaypalInference(f);
+  await service.create('first', 16);
 });
