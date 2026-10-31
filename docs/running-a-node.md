@@ -760,11 +760,20 @@ a private 0600 file, and later starts reuse it. Every request must send
 `Authorization: Bearer <token>`; OpenAI SDKs send their `apiKey` this way. A
 request without the token gets 401 `PAID_BUYER_UNAUTHORIZED` with
 `x-should-retry: false`, before its body is read or a seller is selected. The
-token is never printed; read it yourself, for example:
+token is never printed; read it yourself. Every call to the paid endpoint, from
+curl or an SDK, must carry the header:
 
 ```sh
 export OPENAI_API_KEY="$(cat .local/gyblos/buyer/api-token)"
+curl http://127.0.0.1:4031/v1/chat/completions \
+  -H "Authorization: Bearer $OPENAI_API_KEY" \
+  -H 'content-type: application/json' \
+  -d '{"model":"qwen3-0.6b","messages":[{"role":"user","content":"Hello"}]}'
 ```
+
+With an OpenAI SDK, set `baseURL` (`base_url` in Python) to
+`http://127.0.0.1:4031/v1` and `apiKey` to the token; the SDK reads
+`OPENAI_API_KEY` by default and sends it as `Authorization: Bearer`.
 
 Anyone who can read that file, or run as your user, can still spend up to
 `maxAtomic` per request: run the paid buyer only on a machine you control, with
