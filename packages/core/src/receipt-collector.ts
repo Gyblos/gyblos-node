@@ -61,3 +61,5 @@ export function createPrivateReceiptCollector(store: PrivateReceiptStore) {
     },
   };
 }
+
+export { prepareCollectedReceipt } from './receipt-collector-validation';

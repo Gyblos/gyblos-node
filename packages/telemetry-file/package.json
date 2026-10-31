@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./receipt-store": "./src/receipt-store.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",
