@@ -8,7 +8,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "lint": "eslint . && prettier . --check && pnpm tooling:test && pnpm boundaries",
+    "lint": "eslint . && prettier . --check && pnpm tooling:test && pnpm skills:check && pnpm boundaries",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.tests.json && tsc -p apps/desktop/tsconfig.renderer.json",
@@ -30,6 +30,9 @@
     "identity:devnet-run": "node --import tsx lab/tools/identity-devnet-run.ts",
     "identity:fixtures": "node --import tsx lab/tools/identity-fixtures.ts",
     "boundaries": "node --import tsx tooling/check-boundaries.ts",
+    "skills:check": "node --import tsx tooling/skills-cli.ts check",
+    "skills:materialize": "node --import tsx tooling/skills-cli.ts materialize",
+    "skills:materialize:replace": "node --import tsx tooling/skills-cli.ts materialize --replace",
     "tooling:test": "node --import tsx --test \"tooling/**/*.test.ts\"",
     "node:start": "node --import tsx apps/node/src/main.ts",
     "gyblos": "node --import tsx apps/node/src/cli.ts",
@@ -79,7 +82,8 @@
     "@gyblos/engine-openai": "workspace:*",
     "@gyblos/engine-anthropic": "workspace:*",
     "x402-upto-metered": "workspace:*",
-    "@gyblos/payments-upto": "workspace:*"
+    "@gyblos/payments-upto": "workspace:*",
+    "@gyblos/receipt-collector": "workspace:*"
   },
   "devDependencies": {
     "@ianvs/prettier-plugin-sort-imports": "4.7.0",

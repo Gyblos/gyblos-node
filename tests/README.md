@@ -146,3 +146,10 @@ checks bounded refusal without inference retry. Focused synthetic coverage is in
 `tests/lab/collector-acceptance.test.ts`. No uploader is enabled. The child
 inherits no credentials or role settings; parent globals stay separate. The
 standalone command is `pnpm acceptance:receipts`; native skips prove nothing.
+
+The local collector is covered by `local-collector*.test.ts` and
+`retained-receipts.test.ts`: synthetic buyer-scoped capabilities, Host/browser
+refusal, deadlines/quotas, exact duplicate and conflict handling, retention
+tombstones and clean reopen. Existing receipt-file suites protect compatibility
+of the version-1 store. All storage belongs to disposable directories; HTTP uses
+loopback only and no uploader or real credentials are activated.

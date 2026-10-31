@@ -22,6 +22,7 @@ import {
   COLLECTOR_ACCEPTANCE,
   type CollectorAcceptanceReport,
 } from './receipt-collector-constants';
+import { receiptCollectorHttp } from './receipt-collector-http';
 import { restartAcceptanceCollector } from './receipt-collector-restart';
 import {
   collectorBytes,
@@ -147,8 +148,10 @@ export async function collectReceiptAcceptance(
   const reopened = await openReceiptFileStore({ path });
   await reopened.close();
   const refusals = await collectorRefusals(path, receipts, signal);
+  const collectorHttp = await receiptCollectorHttp(root, receipts, signal);
   assertAcceptanceActive(signal);
   return {
+    collectorHttp,
     collectorStored: expected.length,
     collectorDuplicates: duplicates,
     collectorRestarts: 1,

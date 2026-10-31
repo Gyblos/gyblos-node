@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./receipt-store": "./src/receipt-store.ts"
+    "./receipt-store": "./src/receipt-store.ts",
+    "./retained-receipts": "./src/retained-receipts.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",

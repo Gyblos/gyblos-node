@@ -9,8 +9,9 @@ two disagree, AGENTS.md wins. Architecture and ownership are in
 
 `pnpm lint` runs ESLint ([eslint.config.js](../eslint.config.js) with the local
 rules in [tooling/code-standards.ts](../tooling/code-standards.ts)),
-`prettier --check`, `pnpm tooling:test` and `pnpm boundaries`. Errors fail the
-check; warnings are reported and must not grow in a PR.
+`prettier --check`, `pnpm tooling:test`, `pnpm skills:check` and
+`pnpm boundaries`. Errors fail the check; warnings are reported and must not
+grow in a PR.
 
 | Rule                                      | Level | Scope and exceptions                                                                                        |
 | ----------------------------------------- | ----- | ----------------------------------------------------------------------------------------------------------- |

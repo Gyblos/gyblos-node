@@ -36,6 +36,7 @@ function report(text: string): ReceiptAcceptanceReport {
     'answers',
     'engineAttempts',
     'confirmed',
+    'collectorHttp',
     'collectorStored',
     'collectorDuplicates',
     'collectorRestarts',
@@ -70,7 +71,8 @@ function report(text: string): ReceiptAcceptanceReport {
   );
   const collectorStored = controlInteger(input.collectorStored, 2);
   acceptanceAssert(
-    collectorStored === input.confirmed &&
+    input.collectorHttp === true &&
+      collectorStored === input.confirmed &&
       input.collectorDuplicates === collectorStored &&
       input.collectorRestarts === 1 &&
       input.collectorRefusals === COLLECTOR_ACCEPTANCE.refusals,
@@ -88,6 +90,7 @@ function report(text: string): ReceiptAcceptanceReport {
     answers: controlInteger(input.answers),
     engineAttempts: controlInteger(input.engineAttempts),
     confirmed: controlInteger(input.confirmed),
+    collectorHttp: true,
     collectorStored,
     collectorDuplicates: controlInteger(input.collectorDuplicates),
     collectorRestarts: controlInteger(input.collectorRestarts),

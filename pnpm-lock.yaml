@@ -66,6 +66,9 @@ importers:
       '@gyblos/protocol':
         specifier: workspace:*
         version: link:packages/protocol
+      '@gyblos/receipt-collector':
+        specifier: workspace:*
+        version: link:apps/receipt-collector
       '@gyblos/runtime':
         specifier: workspace:*
         version: link:packages/runtime
@@ -246,6 +249,24 @@ importers:
         specifier: workspace:*
         version: link:../../packages/runtime
 
+  apps/receipt-collector:
+    dependencies:
+      '@gyblos/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@gyblos/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@gyblos/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
+      '@gyblos/runtime':
+        specifier: workspace:*
+        version: link:../../packages/runtime
+      '@gyblos/telemetry-file':
+        specifier: workspace:*
+        version: link:../../packages/telemetry-file
+
   lab/facilitator:
     dependencies:
       '@gyblos/config':
@@ -296,6 +317,9 @@ importers:
       '@gyblos/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
+      '@gyblos/receipt-collector':
+        specifier: workspace:*
+        version: link:../../apps/receipt-collector
       '@gyblos/runtime':
         specifier: workspace:*
         version: link:../../packages/runtime

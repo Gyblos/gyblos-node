@@ -72,7 +72,8 @@
     "@gyblos/transport-iroh": "workspace:*",
     "@number0/iroh": "1.1.0",
     "@gyblos/identity": "workspace:*",
-    "@gyblos/telemetry-file": "workspace:*"
+    "@gyblos/telemetry-file": "workspace:*",
+    "@gyblos/receipt-collector": "workspace:*"
   },
   "scripts": {
     "acceptance:node-discovery": "node --import tsx src/cli/node-discovery-acceptance.ts",

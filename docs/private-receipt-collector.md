@@ -154,3 +154,115 @@ Tests use synthetic receipts, real private files in disposable directories and
 an isolated child process to check ownership. They do not validate production
 load, crash/power-loss durability, multi-host storage, hostile local processes,
 Windows ACLs or any external collection service.
+
+## Standalone local receiver
+
+`@gyblos/receipt-collector` composes the core policy with an explicitly selected
+retained store. It never imports buyer/node startup, engines, payments, registry
+adapters or an outbound client. Nothing uploads from a buyer or seller.
+
+The service binds only `127.0.0.1`; it accepts exactly `POST /v1/receipts`.
+There are no read, health, delete, reset, public aggregate or administrative
+HTTP routes. Queries and alternate paths are refused. The existing exact-port
+loopback Host guard rejects DNS rebinding. Browser Origin/Sec-Fetch-Site
+requests are refused; CORS and redirects are not enabled. Loopback is not
+authentication.
+
+Each required configuration grant has one buyer NodeId, one independent random
+32-byte capability (64 lowercase hex characters) and explicit `consent: true`.
+The operator must obtain authorization before provisioning that grant; the
+boolean does not prove a human consent interaction. Missing/false consent, empty
+grants, duplicate buyers/tokens or unknown settings refuse startup. One
+capability authorizes receipt submission for that buyer only. The service checks
+`Authorization: Bearer <token>` before reading the body, then requires the
+cryptographically verified buyer attestation to match the grant. Tokens are
+compared through fixed-length SHA-256 digests and constant-time equality. They
+are not node/wallet signatures, an 8004 proof or payment authorization. Removing
+a grant or rotating a token requires a restart. A host process under the same OS
+account can read its own private configuration; this is not a hostile-user
+security boundary.
+
+Bodies are the existing canonical `{ seller, buyer }` JSON UTF-8 pairs, with
+`Content-Type: application/json`, no content encoding and a 4096-byte cap.
+Unknown/ambiguous input, seller-only pairs, invalid signatures and conflicting
+pairs are refused. Successful replies contain only `status: stored` or
+`status: duplicate`; failures are static `COLLECTOR_*` codes, without input,
+credentials, identity or filesystem detail. Host refusal is an empty 421 from
+the shared runtime guard. HTTP parse/header errors can close the connection
+before a collector response exists. No receipt contents are returned or logged.
+
+Fixed prototype bounds: 16 connections, four active requests globally, one
+active request per granted buyer, ten authenticated requests per buyer/minute,
+and 120 requests/minute globally (including invalid credentials). There is no
+queue. Invalid submissions consume the corresponding quota; grants cap the
+principal table at 32. These are local safety bounds, not measured production
+capacity or protection from a malicious OS user. Every response closes its
+connection. Headers and socket inactivity are bounded; the application deadline
+is five seconds from receiving complete headers, while the Node HTTP fallback
+and inactivity cutoff are twice that bound. Startup settings may lower the
+application deadline. A timeout/disconnect suppresses late success, but an
+already dispatched filesystem rename can still commit. Retry identical receipt
+metadata only, never inference. Close stops admission, closes sockets and waits
+for admitted work; after five seconds it reports timeout while pending native
+I/O retains its ownership until it settles. It never breaks a lock to finish.
+
+### Retention with private replay markers
+
+`@gyblos/telemetry-file/retained-receipts` is a separate, opt-in storage entry.
+The older `receipt-store` API and version-1 snapshot format remain unchanged. No
+existing snapshot is migrated automatically. Shared private snapshot I/O keeps
+the same exclusive process ownership, bounded no-follow reads and staged
+sync/rename. Explicit create refuses an existing file; open refuses missing or
+corrupt history. The retained format records its policy and refuses a different
+retention duration on reopen.
+
+A positive retention duration is required (at most seven days); this is an
+operator choice, not a new network-wide retention decision or default.
+Expiration uses local ingestion time, never the receipt's claimed timestamp. The
+service sweeps once per second while running, and reopening purges expired
+bodies before listening. Ingress also checks expiration. Duplicate submissions
+never extend retention. After expiration, the full signed body becomes `null`; a
+private canonical key, fingerprint and received-at time remain as a replay
+marker. The stored clock floor prevents rollback from reviving erased bodies.
+Markers keep duplicate/conflict decisions and count against the 256-entry/ 1 MiB
+limits forever; a full store refuses new entries without eviction. There is no
+automatic marker pruning, rotation or reset. Deliberately destroying the whole
+store loses its replay history and is not an accounting-safe reset.
+
+Retention is logical removal through atomic replacement, not secure erasure:
+filesystem journals/backups may retain old bytes. It cannot erase while the
+process is stopped, and failed I/O can delay removal; a full work queue skips
+that maintenance tick, while a genuine storage or integrity failure stops
+ingestion. No encryption at rest, power-loss/rollback resistance against old
+snapshots, Windows ACL acceptance or production capacity is claimed. Markers
+remain private metadata. Public accounting still requires separate retention,
+identity, fraud and aggregation policy; signatures attest observations rather
+than independently true usage.
+
+### Explicit private startup
+
+Create a private JSON config (0600 inside an operator-controlled directory),
+provide its absolute path as `GYBLOS_COLLECTOR_CONFIG`, then run:
+
+```sh
+pnpm --filter @gyblos/receipt-collector start
+```
+
+The config has exactly `version`, `path`, `create`, `retentionMs`, `principals`
+and `port`. `version` is 1; `path` is a complete absolute snapshot filename;
+`create` is true only for explicit first creation and false for subsequent
+opens. `retentionMs` is required. `port` is explicit (0 selects an ephemeral
+port for programmatic tests). Each principal has exactly `buyerNodeId`, `token`
+and `consent`. Provision unpredictable credentials outside the repository; never
+reuse a wallet/node key or place credentials in CLI arguments, docs, fixtures or
+logs. Synthetic test capabilities are not operator credentials. There is no
+default path, role-home lookup, `.env` loading or network access. The entrypoint
+accepts no command-line arguments and prints only a static startup flag or
+static failure code. Programmatic callers can use `startLocalCollector` with
+explicit options and own its `close()` lifecycle.
+
+The existing synthetic startup acceptance also hands its product-produced
+confirmed pairs to this HTTP loopback receiver, closes/reopens the receiver and
+checks expired bodies with persistent duplicate markers. This is local test
+traffic, not runtime upload integration. Programmatic composition may supply the
+explicit retained-storage port; the application owns its close lifecycle.
