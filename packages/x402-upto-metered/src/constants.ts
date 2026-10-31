@@ -60,6 +60,12 @@ export const UPTO_CHANNEL_ACCOUNT = {
 } as const;
 // Commitment for every chain read the seller makes.
 export const UPTO_COMMITMENT = 'confirmed' as const;
+// Commitment for reconciliation, which must never act on a transaction that could still roll back.
+export const UPTO_FINAL_COMMITMENT = 'finalized' as const;
+// Transactions read per channel address: an open, a claim and a close, with ample room.
+export const UPTO_HISTORY_LIMIT = 32;
+export type UptoCommitment =
+  typeof UPTO_COMMITMENT | typeof UPTO_FINAL_COMMITMENT;
 // CAIP-2 Solana networks: the namespace and the genesis-hash prefix length that names the chain.
 export const UPTO_SOLANA_NAMESPACE = 'solana';
 export const UPTO_SOLANA_REFERENCE_LENGTH = 32;

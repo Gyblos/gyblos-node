@@ -666,9 +666,27 @@ Any channel in the journal not settled on the buyer's own count (a refusal, a
 stop, a pending or lapsed claim, a dispute or a settlement the chain could not
 confirm) blocks new payments (`PAID_BUYER_UNRESOLVED_PAYMENT`) until it is
 reconciled; the buyer also appends it to `paid-records.jsonl` in the buyer home
-when it can (`recorded`). Reconciling paid v2 channels (`buyer:reconcile`) is
-the next step and not available yet, so a blocked devnet test buyer is reset by
-hand for now.
+when it can (`recorded`).
+
+To reconcile, stop the paid buyer and run `pnpm buyer:reconcile:paid`. It checks
+that the role's RPC serves devnet, then reads each open channel's finalized
+history; it only reads the chain and never signs. One JSON line per channel
+reports the outcome:
+
+- `settled`: the claim charged exactly the buyer's own count;
+- `disputed`: it charged another amount (recorded, no penalty);
+- `unchecked`: the chain shows a charge but no record of the buyer's count
+  survived;
+- `never-opened`: no transaction touched the channel and its open can no longer
+  land (ten minutes after signing), so nothing was charged;
+- `open`: the channel is open and unclaimed, or its open may still land.
+
+Every outcome but `open` unblocks payments and is appended to
+`paid-reconciliations.jsonl` in the buyer home. An `open` channel keeps blocking
+until the seller claims it or the buyer withdraws it after its timeout, which is
+not available yet. Failures print `PAID_RECONCILE_NETWORK_MISMATCH`,
+`PAID_RECONCILE_ROLE_INVALID` or `PAID_RECONCILE_INCOMPLETE` (stop the buyer,
+check the RPC and the home). The v1 `buyer:reconcile` is unchanged.
 
 The endpoint listens on loopback only and refuses browser requests, but any
 local process can call it and spend up to `maxAtomic` per request: run the paid

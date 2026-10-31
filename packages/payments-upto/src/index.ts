@@ -15,7 +15,13 @@ export {
   type UptoFileLedgerOptions,
   type UptoLedgerPaths,
 } from './file-ledger';
-export { BUYER_JOURNAL, LEDGER_FILE, UPTO_SELLER } from './constants';
+export {
+  BUYER_JOURNAL,
+  BUYER_RECONCILE,
+  LEDGER_FILE,
+  RECONCILE_OUTCOMES,
+  UPTO_SELLER,
+} from './constants';
 export {
   openUptoBuyerJournal,
   type UptoBuyerJournal,
@@ -38,3 +44,9 @@ export {
   type UptoBuyerPayments,
   type UptoBuyerPaymentsOptions,
 } from './buyer-payments';
+export {
+  reconcileUptoBuyer,
+  type UptoReconcileOptions,
+  type UptoReconcileOutcome,
+  type UptoReconcileResult,
+} from './buyer-reconcile';

@@ -3,7 +3,11 @@
 // empty. A missing, failed, foreign or unfinished transaction shows no settlement. No Gyblos imports.
 import { signature as asSignature, type Signature } from '@solana/kit';
 
-import { UPTO_COMMITMENT, UPTO_ERROR_CODES } from './constants';
+import {
+  UPTO_COMMITMENT,
+  UPTO_ERROR_CODES,
+  type UptoCommitment,
+} from './constants';
 import { UptoError } from './errors';
 
 interface TokenBalance {
@@ -30,7 +34,7 @@ export interface UptoTransactionRpc {
   getTransaction(
     signature: Signature,
     config: {
-      commitment: typeof UPTO_COMMITMENT;
+      commitment: UptoCommitment;
       encoding: 'json';
       maxSupportedTransactionVersion: 0;
     },
@@ -66,7 +70,10 @@ function held(
     .reduce((total, entry) => total + BigInt(entry.uiTokenAmount.amount), 0n);
 }
 
-export function createUptoReceiptReader(rpc: UptoTransactionRpc) {
+export function createUptoReceiptReader(
+  rpc: UptoTransactionRpc,
+  commitment: UptoCommitment = UPTO_COMMITMENT,
+) {
   return {
     async settlement(
       query: UptoReceiptQuery,
@@ -75,7 +82,7 @@ export function createUptoReceiptReader(rpc: UptoTransactionRpc) {
       try {
         found = await rpc
           .getTransaction(asSignature(query.transaction), {
-            commitment: UPTO_COMMITMENT,
+            commitment,
             encoding: 'json',
             maxSupportedTransactionVersion: 0,
           })

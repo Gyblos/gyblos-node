@@ -6,12 +6,16 @@ export {
   UPTO_CHANNEL_ACCOUNT,
   UPTO_COMMITMENT,
   UPTO_ERROR_CODES,
+  UPTO_FINAL_COMMITMENT,
+  UPTO_HISTORY_LIMIT,
+  type UptoCommitment,
   type UptoChannelState,
   type UptoDepositState,
   type UptoErrorCode,
 } from './constants';
 export { UptoError, uptoError } from './errors';
 export { createUptoHintReader, type UptoHintRpc } from './hints';
+export { createUptoChannelHistory, type UptoSignaturesRpc } from './history';
 export {
   createUptoReceiptReader,
   type UptoReceiptQuery,

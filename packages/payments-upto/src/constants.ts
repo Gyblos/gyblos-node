@@ -43,3 +43,21 @@ export const BUYER_JOURNAL = {
   maxEntries: 2_000,
   settledRetentionMs: 30 * 86_400_000,
 } as const;
+
+// Reconciling the buyer's journal: an open signed this long ago, with no transaction at its channel,
+// can no longer land (its blockhash lived about a minute).
+export const BUYER_RECONCILE = {
+  openLandMs: 600_000,
+} as const;
+export const RECONCILE_OUTCOMES = {
+  // The chain charged exactly the buyer's own count.
+  SETTLED: 'settled',
+  // The chain charged another amount; recorded as a dispute, no longer blocking.
+  DISPUTED: 'disputed',
+  // The chain shows a charge but the buyer's own count was not kept.
+  UNCHECKED: 'unchecked',
+  // The open never landed: nothing was charged.
+  NEVER_OPENED: 'never-opened',
+  // Still open, or its open may still land: it keeps blocking payments.
+  OPEN: 'open',
+} as const;
