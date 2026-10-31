@@ -14,14 +14,18 @@ export const CONFIG_PATH_ERROR = {
 const PAYPAL_LIMIT_CENTS = 100;
 const USD_CENTS_PER_DOLLAR = 100;
 const PAYPAL_MESSAGE_CENTS = 10;
+const PAYPAL_SESSION_MINUTES = 30;
+const MILLISECONDS_PER_MINUTE = 60_000;
 export const PAYPAL_SANDBOX = {
   currency: 'USD',
   price: (PAYPAL_LIMIT_CENTS / USD_CENTS_PER_DOLLAR).toFixed(2),
   limitCents: PAYPAL_LIMIT_CENTS,
   messageCents: PAYPAL_MESSAGE_CENTS,
   messagePrice: (PAYPAL_MESSAGE_CENTS / USD_CENTS_PER_DOLLAR).toFixed(2),
+  maxMessageAttempts: 30,
   centsPerDollar: USD_CENTS_PER_DOLLAR,
-  sessionMs: 30 * 60 * 1000,
+  sessionMinutes: PAYPAL_SESSION_MINUTES,
+  sessionMs: PAYPAL_SESSION_MINUTES * MILLISECONDS_PER_MINUTE,
   port: 8765,
   maxPort: 65535,
   ollamaOrigin: 'http://127.0.0.1:11434/',

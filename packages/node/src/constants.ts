@@ -345,3 +345,7 @@ export const PAYPAL_SESSION_PHASE = {
   VOIDED: 'voided',
   CANCELLED: 'cancelled',
 } as const;
+export const PAYPAL_SESSION_STATUS = {
+  READY: 'ready',
+  BLOCKED: 'blocked',
+} as const;

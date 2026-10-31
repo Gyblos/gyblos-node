@@ -90,8 +90,12 @@ void test('loopback demo requires same origin and connects one approval to multi
       (await post('/api/approve', { orderId: 'ORDER1' })).status,
       200,
     );
-    for (const prompt of ['hello', 'again']) {
-      const response = await post('/api/message', { prompt, maxTokens: 16 });
+    for (const [index, prompt] of ['hello', 'again'].entries()) {
+      const response = await post('/api/message', {
+        prompt,
+        maxTokens: 16,
+        messageId: `MESSAGE${index}`,
+      });
       assert.equal(response.status, 200);
       const result: unknown = await response.json();
       assert.ok(result && typeof result === 'object' && 'messageId' in result);
@@ -99,6 +103,21 @@ void test('loopback demo requires same origin and connects one approval to multi
         (await post('/api/acknowledge', { messageId: result.messageId }))
           .status,
         200,
+      );
+      assert.equal(
+        (await post('/api/acknowledge', { messageId: result.messageId }))
+          .status,
+        200,
+      );
+      assert.equal(
+        (
+          await post('/api/message', {
+            prompt,
+            maxTokens: 16,
+            messageId: `MESSAGE${index}`,
+          })
+        ).status,
+        409,
       );
     }
     const finish = await post('/api/finish', {});

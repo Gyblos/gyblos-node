@@ -57,6 +57,9 @@ failure can block the session; do not remove the journal or lock to bypass this
 state. There is no automatic reconciliation or recovery UI. A previous
 unfinished single-request journal also blocks a new session. An order that has
 not been authorized may be abandoned from the page. A crash can still lose a
-response or its acknowledgment; acknowledgment does not prove delivery exactly
-once. The prompt digest can be checked against guesses by anyone able to read
-the private journal. This prototype is not safe for live money or distribution.
+response or its acknowledgment; when the page has received a response, it can
+retry acknowledgment without charging twice. A buyer who receives a response but
+withholds acknowledgment can block settlement, including earlier usage.
+Acknowledgment does not prove delivery exactly once. The prompt digest can be
+checked against guesses by anyone able to read the private journal. This
+prototype is not safe for live money or distribution.
