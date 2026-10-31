@@ -111,6 +111,8 @@ void test('a full journal refuses new requests, keeps writing open ones and prun
     });
     // A signed entry is never removed; a settled one is pruned once retention passed.
     await assert.rejects(journal.remove(DIGEST), unavailable);
+    // Nor by naming its channel once it settled: only an open the buyer never sent can go.
+    await assert.rejects(journal.remove(DIGEST, 'Chan1'), unavailable);
     now = NOW + BUYER_JOURNAL.settledRetentionMs;
     await journal.put({ ...other, expiresAt: now + 60_000 });
     assert.deepEqual(

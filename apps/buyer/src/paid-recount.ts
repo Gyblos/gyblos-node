@@ -14,11 +14,20 @@ import {
   type PaidExecutionCode,
 } from '@gyblos/protocol/paid/constants';
 
-// The prompt a paid seller would count, or undefined for input no paid seller serves.
-export function paidPrompt(input: FreeExecutionBuildInput): string | undefined {
+// The prompt a paid seller would count, or undefined for input no paid seller serves: more than one
+// message, another role, or a prompt the model's chat template refuses (checked before any payment).
+export function paidPrompt(
+  input: FreeExecutionBuildInput,
+  meter: RecountTokenizer,
+): string | undefined {
   const [message, ...rest] = input.messages;
   if (!message || rest.length > 0 || message.role !== FREE_CHAT_ROLES.USER)
     return undefined;
+  try {
+    meter.input(message.content);
+  } catch {
+    return undefined;
+  }
   return message.content;
 }
 

@@ -49,6 +49,10 @@ export const NODE_ERROR_CODES = {
   SELLER_PAYMENT_ROLE_MISSING: 'SELLER_PAYMENT_ROLE_MISSING',
   // The role's RPC is not devnet (or cannot say which chain it is): paid selling stays off.
   SELLER_PAYMENT_NETWORK_MISMATCH: 'SELLER_PAYMENT_NETWORK_MISMATCH',
+  // The buyer role's RPC does not serve devnet, so paid buying refuses to start.
+  BUYER_PAYMENT_NETWORK_MISMATCH: 'BUYER_PAYMENT_NETWORK_MISMATCH',
+  // The buyer wallet key is missing, unreadable or not the one role.json names.
+  BUYER_PAYMENT_KEY_INVALID: 'BUYER_PAYMENT_KEY_INVALID',
 } as const;
 export type NodeErrorCode =
   (typeof NODE_ERROR_CODES)[keyof typeof NODE_ERROR_CODES];
@@ -308,3 +312,6 @@ export const RECEIPT_WORK = {
 
 // Startup owns only its configured file sink and bounds shutdown independently of inference.
 export const LOCAL_TELEMETRY = { closeMs: 5000 } as const;
+
+// How long a role's RPC may take to say which chain it serves before paid startup refuses it.
+export const GENESIS_READ_MS = 10000;

@@ -42,6 +42,16 @@ const HINTS: Readonly<Record<FreeBuyerStartupReason, string>> = {
   [FREE_BUYER_STARTUP.NODE_KEY]:
     'node.key is missing, unreadable or does not match role.json',
   [FREE_BUYER_STARTUP.PORT_IN_USE]: `port ${PORTS.buyerProxy} is in use; stop buyer:start or the other process first`,
+  [FREE_BUYER_STARTUP.PAID_NETWORK]:
+    'paid mode is devnet only: role.json rpcUrl must serve devnet, and request.network and asset must match the role',
+  [FREE_BUYER_STARTUP.PAID_MODEL]:
+    'paid mode recounts with the pinned public tokenizer; request.selection.modelId must be qwen3-0.6b',
+  [FREE_BUYER_STARTUP.PAID_KEY]:
+    'the buyer wallet key is missing, unreadable or does not match role.json',
+  [FREE_BUYER_STARTUP.TOKENIZER]:
+    'the public tokenizer is missing or altered; run `pnpm node:tokenizer`',
+  [FREE_BUYER_STARTUP.JOURNAL]:
+    'the payment journal is unreadable or another buyer is running; stop the other buyer first',
   [FREE_BUYER_STARTUP.UNKNOWN]: 'unexpected startup failure',
 };
 const RELAY_HINT =
@@ -76,10 +86,15 @@ export function sellerFailureLine(failure: SellerFailure) {
   ].join(' ');
 }
 
-export async function main() {
-  let host: Awaited<ReturnType<typeof startFreeBuyer>>;
+// Starts a buyer; the free one unless `pnpm buyer` picked the paid one.
+type BuyerStarter = (options: {
+  onSellerFailure: (failure: SellerFailure) => void;
+}) => Promise<{ close(): Promise<void> }>;
+
+export async function main(start: BuyerStarter = startFreeBuyer) {
+  let host: Awaited<ReturnType<BuyerStarter>>;
   try {
-    host = await startFreeBuyer({
+    host = await start({
       onSellerFailure: (failure) => console.error(sellerFailureLine(failure)),
     });
   } catch (error) {

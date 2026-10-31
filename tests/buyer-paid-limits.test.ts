@@ -125,7 +125,13 @@ void test('a caller abort stops every stage with its own reason, releasing the s
     else if (stage === 'authorize')
       buyer.dependencies.payment = {
         ...buyer.dependencies.payment,
-        authorize: never,
+        // A wallet that stops once the caller left, without signing.
+        authorize: () =>
+          new Promise((_resolve, reject) =>
+            external.signal.addEventListener('abort', () =>
+              setImmediate(() => reject(new Error('wallet stopped'))),
+            ),
+          ),
       };
     else
       buyer.scripts.push(async (_request, onDelta) => {
@@ -155,6 +161,33 @@ void test('a caller abort stops every stage with its own reason, releasing the s
   }
 });
 
+void test('an open that lands after the caller left while signing is forgotten', async () => {
+  const buyer = await setup();
+  const external = new AbortController();
+  const payment = buyer.dependencies.payment;
+  let land = () => {};
+  const landed = new Promise<void>((resolve) => {
+    land = resolve;
+  });
+  buyer.dependencies.payment = {
+    ...payment,
+    authorize: async (terms) => {
+      external.abort(new Error('caller left'));
+      await landed;
+      return payment.authorize(terms);
+    },
+  };
+  const running = executeBuyerPaid(INPUT, buyer.dependencies, external.signal);
+  setImmediate(land);
+  await assert.rejects(running, /caller left/);
+  // Forgotten before the request ended, so the next one and shutdown never see it.
+  assert.deepEqual(buyer.calls.discarded, [
+    buyer.winners[0]!.quote.offer.requestDigest,
+  ]);
+  assert.equal(buyer.state.held, 0);
+  assert.equal(buyer.calls.executed.length, 0);
+});
+
 void test('an unsent request after the caller left is reported, never failed over', async () => {
   const buyer = await setup();
   const external = new AbortController();
@@ -172,4 +205,5 @@ void test('an unsent request after the caller left is reported, never failed ove
   );
   assert.equal(buyer.calls.authorize.length, 1);
   assert.deepEqual(buyer.recorded, []);
+  assert.equal(buyer.calls.discarded.length, 1);
 });

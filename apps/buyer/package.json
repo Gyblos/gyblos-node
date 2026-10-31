@@ -5,6 +5,12 @@
   "type": "module",
   "exports": {
     "./buyer": "./src/buyer.ts",
+    "./buyer-main": "./src/buyer-main.ts",
+    "./paid-execution": "./src/paid-execution.ts",
+    "./paid-http": "./src/paid-http.ts",
+    "./paid-startup": "./src/paid-startup.ts",
+    "./paid-selection": "./src/paid-selection.ts",
+    "./paid-records": "./src/paid-records.ts",
     "./call": "./src/call.ts",
     "./call-evidence": "./src/call-evidence.ts",
     "./constants": "./src/constants.ts",

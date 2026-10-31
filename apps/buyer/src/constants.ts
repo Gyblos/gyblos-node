@@ -1,5 +1,6 @@
 // Buyer call outcomes, phases, journal states, proxy error codes, measurement schema version, call and
 // proof bounds, error diagnostic codes and synthetic inference case names.
+import { TRANSPORT_TIMEOUTS } from '@gyblos/config';
 import { JOURNAL_STATES } from '@gyblos/payments-x402/constants';
 import {
   FREE_EXECUTION,
@@ -175,15 +176,35 @@ export const PAID_BUYER_CODES = {
   UNAVAILABLE: 'PAID_BUYER_NO_OFFER',
   // Paid sellers serve a single user message; anything else is refused before paying.
   UNSUPPORTED: 'PAID_BUYER_UNSUPPORTED_INPUT',
+  // Another paid request is still running in this buyer.
+  BUSY: 'PAID_BUYER_BUSY',
 } as const;
 export type PaidBuyerCode =
   (typeof PAID_BUYER_CODES)[keyof typeof PAID_BUYER_CODES];
+// A deposit ceiling of zero: a free quote, or a selection.json that buys nothing.
+export const isFreeAtomic = (maxAtomic: string) => maxAtomic === '0';
 export const PAID_BUYER = {
   // The whole request, from selection to the seller's terminal.
   requestMs: 180000,
   // Checking the settlement on chain and recording the outcome, once the terminal arrived.
   receiptMs: 30000,
+  // On shutdown, how long a running paid request may finish its receipt and record.
+  drainMs: 90000,
+  // Outcomes for reconciliation, one JSON line each, in the buyer home.
+  recordsFile: 'paid-records.jsonl',
+  // Past this size new records are refused; reconciliation still reads the journal.
+  recordsBytes: 1048576,
+  // A paid buyer quotes paid sellers only; a free winner is skipped this many times at most.
+  freeSkips: 8,
+  // The JSON field that carries the payment summary in completions and errors.
+  paymentField: 'gyblos_payment',
 } as const;
+// The paid endpoint's HTTP deadline: the request, a stream still connecting, then the receipt check
+// and the record, each within its own bound.
+export const PAID_BUYER_HTTP_MS =
+  PAID_BUYER.requestMs +
+  TRANSPORT_TIMEOUTS.connectMs +
+  2 * PAID_BUYER.receiptMs;
 // How the buyer judges a paid request once the signed open reached the seller.
 export const PAID_VERDICTS = {
   // The chain shows the settlement the buyer's own count expects.
@@ -242,6 +263,14 @@ export const FREE_BUYER_STARTUP = {
   REASONING: 'SELECTION_REASONING_UNSUPPORTED',
   NODE_KEY: 'BUYER_NODE_KEY_MISMATCH',
   PORT_IN_USE: 'BUYER_PORT_IN_USE',
+  // Paid mode: the role's RPC, or the request's network or asset, is not the devnet test token.
+  PAID_NETWORK: 'BUYER_PAYMENT_NETWORK_MISMATCH',
+  // Paid mode recounts with the pinned public tokenizer, so only its model can be bought.
+  PAID_MODEL: 'BUYER_PAID_MODEL_UNSUPPORTED',
+  PAID_KEY: 'BUYER_WALLET_KEY_INVALID',
+  TOKENIZER: 'BUYER_TOKENIZER_UNAVAILABLE',
+  // Unreadable, or held by another buyer process.
+  JOURNAL: 'BUYER_PAYMENT_JOURNAL_UNAVAILABLE',
   UNKNOWN: 'BUYER_STARTUP_FAILED',
 } as const;
 export type FreeBuyerStartupReason =

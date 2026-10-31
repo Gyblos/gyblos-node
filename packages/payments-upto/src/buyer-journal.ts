@@ -42,7 +42,8 @@ export interface UptoBuyerJournal {
   get(requestDigest: string): Promise<UptoJournalEntry | undefined>;
   put(entry: Omit<UptoJournalEntry, 'updatedAt'>): Promise<void>;
   // Drops an entry whose open was never signed; a signed one is refused.
-  remove(requestDigest: string): Promise<void>;
+  // With `channelId`, also drops that signed entry, which the caller knows never left the buyer.
+  remove(requestDigest: string, channelId?: string): Promise<void>;
   list(): Promise<UptoJournalEntry[]>;
   close(): Promise<void>;
 }
@@ -209,9 +210,15 @@ export async function openUptoBuyerJournal(options: {
         unavailable();
       entries.set(value.requestDigest, entry({ ...value, updatedAt: now() }));
     });
-  const remove = (requestDigest: string) =>
+  const remove = (requestDigest: string, channelId?: string) =>
     mutate((entries) => {
-      if (entries.get(requestDigest)?.channelId) unavailable();
+      const held = entries.get(requestDigest);
+      if (
+        held?.channelId &&
+        (held.channelId !== channelId ||
+          held.state !== PAYMENT_CHANNEL_STATES.OPEN)
+      )
+        unavailable();
       entries.delete(requestDigest);
     });
   return {

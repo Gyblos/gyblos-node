@@ -131,17 +131,36 @@ const SKIPPED_AUTHORIZATIONS: readonly PaymentErrorCode[] = [
   PAYMENT_ERROR_CODES.ALREADY_AUTHORIZED,
 ];
 
+// Forgets an open that never left the buyer, so it does not wait for reconciliation; if that fails the
+// journal keeps it and reconciliation resolves it.
+function discard(
+  dependencies: PaidBuyerDependencies,
+  authorization: PaymentAuthorization,
+): Promise<void> {
+  return bounded(
+    dependencies.payment.discard(authorization),
+    AbortSignal.timeout(PAID_BUYER.receiptMs),
+  ).catch(() => undefined);
+}
+
 async function authorized(
   dependencies: PaidBuyerDependencies,
   winner: PaidWinner,
   signal: AbortSignal,
 ): Promise<PaymentAuthorization | undefined> {
+  const signing = dependencies.payment.authorize(
+    termsFor(winner.quote, dependencies.fee),
+  );
   try {
-    return await bounded(
-      dependencies.payment.authorize(termsFor(winner.quote, dependencies.fee)),
-      signal,
-    );
+    return await bounded(signing, signal);
   } catch (error) {
+    // The caller left while signing: an open that still lands was never sent. It is discarded
+    // before the request ends, so shutdown and the next request never see it.
+    if (signal.aborted)
+      await bounded(signing, AbortSignal.timeout(PAID_BUYER.receiptMs)).then(
+        (late) => discard(dependencies, late),
+        () => undefined,
+      );
     if (
       error instanceof PaymentError &&
       SKIPPED_AUTHORIZATIONS.includes(error.code)
@@ -223,11 +242,14 @@ async function attempt(run: Attempt): Promise<PaidBuyerOutcome | undefined> {
   const { dependencies, winner, signal } = run;
   const authorization = await authorized(dependencies, winner, signal);
   if (!authorization) return undefined;
-  const request = buildPaidExecutionRequest(
-    winner.quote,
-    run.input,
-    authorization,
-  );
+  let request: PaidExecutionRequest;
+  try {
+    request = buildPaidExecutionRequest(winner.quote, run.input, authorization);
+  } catch (error) {
+    // Nothing was sent: the open is forgotten before the failure is reported.
+    await discard(dependencies, authorization);
+    throw error;
+  }
   const base = {
     nodeId: winner.nodeId,
     requestDigest: authorization.requestDigest,
@@ -246,6 +268,7 @@ async function attempt(run: Attempt): Promise<PaidBuyerOutcome | undefined> {
     });
   } catch (error) {
     if (error instanceof PaidClientError && !error.sent) {
+      await discard(dependencies, authorization);
       if (!signal.aborted) return undefined;
       throw error;
     }
@@ -288,7 +311,7 @@ export async function executeBuyerPaid(
   external?: AbortSignal,
   onDelta: (text: string) => Promise<void> = async () => {},
 ): Promise<PaidBuyerOutcome> {
-  const prompt = paidPrompt(input);
+  const prompt = paidPrompt(input, dependencies.meter);
   if (prompt === undefined)
     throw new PaidBuyerError(PAID_BUYER_CODES.UNSUPPORTED);
   const release = dependencies.enter();

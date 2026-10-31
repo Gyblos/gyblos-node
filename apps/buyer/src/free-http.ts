@@ -35,14 +35,32 @@ import { FreeBuyerError, invalidChat, parseFreeChat } from './free-chat';
 import { FreeSelectionFailure } from './free-execution';
 import {
   executeFreeSse,
+  paymentFields,
   replyFreeSseError,
+  type ChatErrorCode,
+  type ChatPayment,
+  type ChatResult,
   type FreeChatStreamExecutor,
 } from './free-sse';
 
 type FreeChatExecutor = (
   input: FreeExecutionBuildInput,
   signal: AbortSignal,
-) => Promise<FreeExecutionResult>;
+) => Promise<ChatResult>;
+// How an error is answered: its code and status, whether the prompt certainly never left this
+// process (only then may a client retry), and the stop and payment it carries.
+export interface ChatErrorView {
+  code: ChatErrorCode;
+  status: number;
+  neverSent: boolean;
+  stop: FreeExecutionStop;
+  detail?: string;
+  param?: string | null;
+  cooldownUntil?: number;
+  payment?: ChatPayment;
+}
+// Answers the errors of another executor (the paid one); undefined leaves the free answer.
+export type ChatErrorClassifier = (error: unknown) => ChatErrorView | undefined;
 interface ChatSettings {
   selection: ModelSelection;
   maxTokens: number;
@@ -92,14 +110,7 @@ function errorStatus(error: unknown, code: string) {
     return HTTP_STATUS.serviceUnavailable;
   return HTTP_STATUS.internalServerError;
 }
-function replyError(response: ServerResponse, error: unknown) {
-  if (response.destroyed || response.writableEnded) return;
-  // A body cut off mid-stream leaves unread bytes, so the connection cannot be reused.
-  if (
-    error instanceof FreeBuyerError &&
-    error.code === FREE_BUYER_CODES.TOO_LARGE
-  )
-    response.shouldKeepAlive = false;
+function freeErrorView(error: unknown): ChatErrorView {
   const known =
     error instanceof FreeClientError ||
     error instanceof FreeExecutionError ||
@@ -109,39 +120,65 @@ function replyError(response: ServerResponse, error: unknown) {
   const code = known
     ? error.code
     : (selected?.code ?? FREE_BUYER_CODES.INTERNAL);
-  const stop: FreeExecutionStop =
-    error instanceof FreeClientError || error instanceof FreeExecutionError
-      ? error
-      : {};
+  return {
+    code,
+    status: errorStatus(error, code),
+    neverSent: neverSent(error),
+    stop:
+      error instanceof FreeClientError || error instanceof FreeExecutionError
+        ? error
+        : {},
+    detail: error instanceof FreeBuyerError ? error.detail : undefined,
+    param: error instanceof FreeBuyerError ? error.param : null,
+    cooldownUntil:
+      selected && 'cooldownUntil' in selected
+        ? selected.cooldownUntil
+        : undefined,
+  };
+}
+function replyError(
+  response: ServerResponse,
+  error: unknown,
+  classify?: ChatErrorClassifier,
+) {
+  if (response.destroyed || response.writableEnded) return;
+  // A body cut off mid-stream leaves unread bytes, so the connection cannot be reused.
+  if (
+    error instanceof FreeBuyerError &&
+    error.code === FREE_BUYER_CODES.TOO_LARGE
+  )
+    response.shouldKeepAlive = false;
+  const view = classify?.(error) ?? freeErrorView(error);
+  const { code, stop } = view;
   if (response.headersSent) {
-    replyFreeSseError(response, code, stop);
+    replyFreeSseError(response, code, stop, view.payment);
     return;
   }
-  const status = errorStatus(error, code);
   const headers: Record<string, string> = {
     'content-type': 'application/json',
   };
   // OpenAI SDKs retry 408/409/429/5xx by default; a resend after a possible send would repeat the
   // prompt, possibly to another seller. Only local BUSY and unsent unavailability stay retryable.
-  const callerFault = status < HTTP_STATUS.internalServerError;
+  const callerFault = view.status < HTTP_STATUS.internalServerError;
   if (
-    status !== HTTP_STATUS.tooManyRequests &&
-    (callerFault || !neverSent(error))
+    view.status !== HTTP_STATUS.tooManyRequests &&
+    (callerFault || !view.neverSent)
   )
     headers[FREE_BUYER.noRetryHeader] = 'false';
-  response.writeHead(status, headers).end(
+  response.writeHead(view.status, headers).end(
     JSON.stringify({
       error: {
         // A refused request explains itself; every other error keeps its code as the message.
-        message: (error instanceof FreeBuyerError && error.detail) || code,
+        message: view.detail || code,
         type: FREE_BUYER.errorType,
-        param: error instanceof FreeBuyerError ? error.param : null,
+        param: view.param ?? null,
         code,
         // Delivered usage only exists mid-stream, so a JSON error carries the reason alone.
         ...(stop.reason ? { reason: stop.reason } : {}),
-        ...(selected && 'cooldownUntil' in selected
-          ? { cooldownUntil: selected.cooldownUntil }
+        ...(view.cooldownUntil !== undefined
+          ? { cooldownUntil: view.cooldownUntil }
           : {}),
+        ...paymentFields(view.payment),
       },
     }),
   );
@@ -159,7 +196,7 @@ function declaredTooLarge(request: IncomingMessage) {
 function replyCompletion(
   response: ServerResponse,
   model: string,
-  result: FreeExecutionResult,
+  result: ChatResult,
 ) {
   if (response.destroyed || response.writableEnded) return;
   response
@@ -182,6 +219,7 @@ function replyCompletion(
           completion_tokens: result.usage.outputTokens,
           total_tokens: result.usage.inputTokens + result.usage.outputTokens,
         },
+        ...paymentFields(result.payment),
       }),
     );
 }
@@ -190,6 +228,7 @@ export function freeBuyerHandler(
   settings: ChatSettings,
   requestMs: number = FREE_BUYER.requestMs,
   stream?: FreeChatStreamExecutor,
+  classify?: ChatErrorClassifier,
 ) {
   let active = 0;
   return async (request: IncomingMessage, response: ServerResponse) => {
@@ -220,7 +259,11 @@ export function freeBuyerHandler(
     const timer = setTimeout(() => {
       cancel();
       response.shouldKeepAlive = false;
-      replyError(response, new FreeBuyerError(FREE_BUYER_CODES.TIMEOUT));
+      replyError(
+        response,
+        new FreeBuyerError(FREE_BUYER_CODES.TIMEOUT),
+        classify,
+      );
       // Destroying the request also ends a stalled body read, so its finally frees the slot.
       if (response.writableEnded)
         response.once('close', () => request.destroy());
@@ -252,7 +295,7 @@ export function freeBuyerHandler(
       if (!controller.signal.aborted)
         replyCompletion(response, settings.selection.modelId, result);
     } catch (error) {
-      replyError(response, error);
+      replyError(response, error, classify);
     } finally {
       clearTimeout(timer);
       response.removeListener('close', cancel);
@@ -267,6 +310,7 @@ export async function startFreeBuyerHttp(
     port?: number;
     requestMs?: number;
     stream?: FreeChatStreamExecutor;
+    classify?: ChatErrorClassifier;
   } = {},
 ) {
   const server = createServer(
@@ -275,7 +319,13 @@ export async function startFreeBuyerHttp(
       headersTimeout: FREE_BUYER.headerMs,
       requestTimeout: FREE_BUYER.requestMs,
     },
-    freeBuyerHandler(execute, settings, options.requestMs, options.stream),
+    freeBuyerHandler(
+      execute,
+      settings,
+      options.requestMs,
+      options.stream,
+      options.classify,
+    ),
   );
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject);

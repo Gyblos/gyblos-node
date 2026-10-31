@@ -14,15 +14,19 @@ import {
 import { openUptoSellerPayments } from '@gyblos/payments-upto';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 
-import { NODE_ERROR_CODES } from './constants';
+import { GENESIS_READ_MS, NODE_ERROR_CODES } from './constants';
 import { NodeError } from './errors';
 import { roleSigner, type RoleConfig } from './roles';
 import type { SellerPayments } from './seller-paid';
 
 // The chain the RPC serves; tests inject one so they never reach the network.
-type GenesisReader = (rpcUrl: string) => Promise<string>;
-const readGenesis: GenesisReader = async (rpcUrl) =>
-  String(await createSolanaRpc(rpcUrl).getGenesisHash().send());
+export type GenesisReader = (rpcUrl: string) => Promise<string>;
+export const readGenesis: GenesisReader = async (rpcUrl) =>
+  String(
+    await createSolanaRpc(rpcUrl)
+      .getGenesisHash()
+      .send({ abortSignal: AbortSignal.timeout(GENESIS_READ_MS) }),
+  );
 
 // Role keys are read from the process home (as every role file is), so the ledger lives there too.
 export function sellerChainPayments(

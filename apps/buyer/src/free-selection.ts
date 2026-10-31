@@ -20,7 +20,10 @@ import {
 } from './free-execution';
 import { requireBuyerIdentity, verifyBuyerIdentity } from './identity';
 import { selectVerifiedBuyerQuote } from './selection';
-import type { StaticControlSeller } from './selection-config';
+import type {
+  BuyerSelectionConfig,
+  StaticControlSeller,
+} from './selection-config';
 import type { prepareBuyerSelection } from './selection-runtime';
 import type { SellerFailureReporter } from './seller-failures';
 
@@ -43,7 +46,7 @@ export function freeBuyerDependencies(
   const address = (seller: StaticControlSeller) =>
     sellerAddress(seller, options.relayOnly);
   const permits = (winner: FreeWinner) =>
-    permitsFreeWinner(prepared, winner, now());
+    permitsWinner(prepared, winner, now());
 
   return {
     telemetry: options.telemetry
@@ -95,10 +98,10 @@ export function freeBuyerDependencies(
   };
 }
 
-type PreparedSelection = NonNullable<
+export type PreparedSelection = NonNullable<
   Awaited<ReturnType<typeof prepareBuyerSelection>>
 >;
-interface FreeSelectionOptions {
+export interface FreeSelectionOptions {
   receipts?: ReturnType<typeof createBuyerReceiptRuntime>;
   telemetry?: TelemetrySink;
   onSellerFailure?: SellerFailureReporter;
@@ -108,7 +111,7 @@ interface FreeSelectionOptions {
   now?: () => number;
   fetch?: DiscoveryFetch;
 }
-function sellerAddress(seller: StaticControlSeller, relayOnly: boolean) {
+export function sellerAddress(seller: StaticControlSeller, relayOnly: boolean) {
   if (seller.relayUrl) assertConfiguredRelay(seller.relayUrl);
   return new EndpointAddr(
     EndpointId.fromString(seller.nodeId),
@@ -116,7 +119,7 @@ function sellerAddress(seller: StaticControlSeller, relayOnly: boolean) {
     relayOnly ? [] : seller.directAddresses,
   );
 }
-function relayAllowed(origin: string) {
+export function relayAllowed(origin: string) {
   try {
     assertConfiguredRelay(origin);
     return true;
@@ -124,9 +127,9 @@ function relayAllowed(origin: string) {
     return false;
   }
 }
-async function permitsFreeWinner(
+export async function permitsWinner(
   prepared: PreparedSelection,
-  winner: FreeWinner,
+  winner: Pick<FreeWinner, 'nodeId' | 'quote'>,
   now: number,
 ) {
   return (
@@ -139,21 +142,31 @@ async function permitsFreeWinner(
     )
   );
 }
-async function selectFreeWinner(
+function selectFreeWinner(
   prepared: PreparedSelection,
   options: FreeSelectionOptions,
   excluded: ReadonlySet<string>,
   signal: AbortSignal,
 ) {
+  return selectWinner(prepared, options, excluded, signal, {
+    ...prepared.config.request,
+    maxAtomic: '0',
+    priceCeilings: { inputAtomicPerMtok: '0', outputAtomicPerMtok: '0' },
+  });
+}
+// One verified winner among the configured or discovered sellers not excluded, quoted for `request`.
+export async function selectWinner(
+  prepared: PreparedSelection,
+  options: FreeSelectionOptions,
+  excluded: ReadonlySet<string>,
+  signal: AbortSignal,
+  request: BuyerSelectionConfig['request'],
+): Promise<FreeWinner> {
   const now = options.now ?? Date.now;
   const policy = prepared.config;
   const base = {
     ...policy,
-    request: {
-      ...policy.request,
-      maxAtomic: '0',
-      priceCeilings: { inputAtomicPerMtok: '0', outputAtomicPerMtok: '0' },
-    },
+    request,
     sellers: policy.sellers.filter((seller) => !excluded.has(seller.nodeId)),
   };
   const config =
@@ -199,12 +212,12 @@ async function selectFreeWinner(
     nodeId: result.winner.candidate.nodeId,
     quote: result.winner.quote,
   };
-  if (!(await permitsFreeWinner(prepared, winner, now())))
+  if (!(await permitsWinner(prepared, winner, now())))
     throw new FreeBuyerError(FREE_BUYER_CODES.UNAVAILABLE);
   return winner;
 }
 
-async function connectFreeControl(
+export async function connectFreeControl(
   seller: StaticControlSeller,
   options: FreeSelectionOptions,
   now: () => number,

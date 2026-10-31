@@ -33,3 +33,8 @@ export {
   type UptoSellerPayments,
   type UptoSellerPaymentsOptions,
 } from './seller-payments';
+export {
+  openUptoBuyerPayments,
+  type UptoBuyerPayments,
+  type UptoBuyerPaymentsOptions,
+} from './buyer-payments';
