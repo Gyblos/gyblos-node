@@ -66,6 +66,7 @@ void test('sandbox adapter authorizes and captures only its fixed USD order', as
   const payment = createPaypalSandbox({
     clientId: 'test-id',
     clientSecret: 'test-secret',
+    returnOrigin: 'http://127.0.0.1:8765',
     fetch: fetchMock,
   });
   const order = await payment.create();
@@ -87,7 +88,20 @@ void test('a pending capture is never accepted as completed', async () => {
   const payment = createPaypalSandbox({
     clientId: 'test-id',
     clientSecret: 'test-secret',
+    returnOrigin: 'http://127.0.0.1:8765',
     fetch: fetchMock,
   });
   await assert.rejects(payment.capture('AUTH1'));
+});
+
+void test('an accepted but unfinished void does not release a payment', async () => {
+  const fetchMock: typeof fetch = async (input) =>
+    String(input).endsWith('/v1/oauth2/token')
+      ? Response.json({ access_token: 'synthetic-token' })
+      : Response.json({ status: 'PENDING' }, { status: 202 });
+  const payment = createPaypalSandbox({
+    clientId: 'test-id', clientSecret: 'test-secret',
+    returnOrigin: 'http://127.0.0.1:8765', fetch: fetchMock,
+  });
+  await assert.rejects(payment.void('AUTH1'));
 });
