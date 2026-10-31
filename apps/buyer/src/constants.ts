@@ -168,6 +168,40 @@ export const FREE_BUYER_CODES = {
 } as const;
 export type FreeBuyerCode =
   (typeof FREE_BUYER_CODES)[keyof typeof FREE_BUYER_CODES];
+// The paid buyer's own refusals, before any payment.
+export const PAID_BUYER_CODES = {
+  // An earlier channel is not resolved yet; `pnpm buyer:reconcile` resolves it.
+  UNRESOLVED: 'PAID_BUYER_UNRESOLVED_PAYMENT',
+  UNAVAILABLE: 'PAID_BUYER_NO_OFFER',
+  // Paid sellers serve a single user message; anything else is refused before paying.
+  UNSUPPORTED: 'PAID_BUYER_UNSUPPORTED_INPUT',
+} as const;
+export type PaidBuyerCode =
+  (typeof PAID_BUYER_CODES)[keyof typeof PAID_BUYER_CODES];
+export const PAID_BUYER = {
+  // The whole request, from selection to the seller's terminal.
+  requestMs: 180000,
+  // Checking the settlement on chain and recording the outcome, once the terminal arrived.
+  receiptMs: 30000,
+} as const;
+// How the buyer judges a paid request once the signed open reached the seller.
+export const PAID_VERDICTS = {
+  // The chain shows the settlement the buyer's own count expects.
+  SETTLED: 'settled',
+  // The seller's claim is still being confirmed; reconciliation decides.
+  PENDING: 'pending',
+  // The seller says its claim lapsed; reconciliation confirms nothing was charged.
+  LAPSED: 'lapsed',
+  // The seller claims more or less than the buyer's own count.
+  DISPUTED: 'disputed',
+  // The settlement could not be confirmed on chain now; reconciliation checks it.
+  UNVERIFIED: 'unverified',
+  // The seller refused after receiving the signed open, which it could still land.
+  REFUSED: 'refused',
+  // The request stopped before any terminal arrived, after the signed open was sent.
+  INTERRUPTED: 'interrupted',
+} as const;
+export type PaidVerdict = (typeof PAID_VERDICTS)[keyof typeof PAID_VERDICTS];
 // The OpenAI-compatible subset the free buyer accepts, and the fixed reasons it gives for refusing one.
 export const FREE_CHAT_FIELDS = {
   MODEL: 'model',
