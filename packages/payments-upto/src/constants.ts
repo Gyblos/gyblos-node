@@ -1,5 +1,7 @@
 // Owns the payments-upto catalogs: which port call a failure happened in, the fields of a seller's
 // own payment description, and the ledger file bounds and timing.
+import { UPTO_WITHDRAW_STEPS } from 'x402-upto-metered';
+
 export const PAYMENT_PHASES = { ADMIT: 'admit', SETTLE: 'settle' } as const;
 export type PaymentPhase = (typeof PAYMENT_PHASES)[keyof typeof PAYMENT_PHASES];
 
@@ -38,8 +40,39 @@ export const UPTO_SELLER = {
 // The buyer's journal of authorized channels: one small private document. Settled entries are kept
 // long past any channel's lifetime, then pruned; open ones are never dropped.
 export const BUYER_JOURNAL = {
-  version: 1,
+  // 2 adds each open's slot and blockhash lifetime; 1 is still read.
+  version: 2,
+  legacyVersion: 1,
   maxBytes: 1024 * 1024,
   maxEntries: 2_000,
   settledRetentionMs: 30 * 86_400_000,
+} as const;
+
+export const RECONCILE_OUTCOMES = {
+  // The chain charged exactly the buyer's own count.
+  SETTLED: 'settled',
+  // The chain charged another amount; recorded as a dispute, no longer blocking.
+  DISPUTED: 'disputed',
+  // The chain shows a charge but the buyer's own count was not kept.
+  UNCHECKED: 'unchecked',
+  // The open provably never landed (blockhash expired, no deposit, no account): nothing was charged.
+  NEVER_OPENED: 'never-opened',
+  // Still open, or its open may still land: it keeps blocking payments.
+  OPEN: 'open',
+} as const;
+// What a withdrawal run did with each open channel: the chain step taken, or why it waited.
+export const WITHDRAW_STEPS = {
+  ...UPTO_WITHDRAW_STEPS,
+  // The seller may still claim it with the buyer's authorization; it is left alone until it cannot.
+  CLAIMABLE: 'claimable',
+  // This channel's step failed (its code says why); the run went on with the others.
+  FAILED: 'failed',
+} as const;
+export const BUYER_WITHDRAW = {
+  // Past the payload's own lifetime, room for a claim the seller sent just before it ran out to land
+  // (a blockhash lives about 90 s) and for the seller's clock running behind the buyer's.
+  claimMarginMs: 150_000,
+  msPerSecond: 1_000,
+  // When a failed channel is worth trying again.
+  failedRetrySeconds: 30,
 } as const;

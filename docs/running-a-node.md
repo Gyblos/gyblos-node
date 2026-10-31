@@ -259,7 +259,7 @@ request correlation, signatures and exact quote terms. It does not choose a
 seller or change proxy behavior. Call `close()` when finished; the endpoint
 remains owned by the caller. There is no control CLI yet.
 
-Quotes are `offer/v2` and are rejected by the current paid flow. They indicate
+Quotes are `offer/v2` and are rejected by the legacy paid v1 flow. They indicate
 observed availability, not guaranteed admission. Both clocks must be
 synchronized: v2 retains zero clock-skew tolerance and no expiration grace.
 Queries have a 10-second absolute deadline and share endpoint admission before
@@ -567,7 +567,7 @@ stream sets `x-should-retry: false`. A disconnect or deadline cancels execution;
 after possible prompt transmission the buyer never retries or switches seller,
 even before the first fragment. Writes await backpressure. Complete and
 streaming execution share replay/caps; cancellation keeps a conservative full
-token reservation. No paid-v2 path is enabled.
+token reservation. This free buyer does not invoke the separate paid-v2 path.
 
 Status codes: 400 for an invalid request or a request beyond the quote's limits,
 413 for an oversized body, 429 when the endpoint is already running a request
@@ -630,7 +630,8 @@ Product contract tests use a synthetic engine and native encrypted loopback.
 They are not the complete publication-to-answer acceptance: the separate lab
 scenario with an in-process discovery index follows this buyer's integration.
 Real Ollama, off-host/relay/CGNAT and production acceptance remain separate
-operations. Streaming, 8004 identity reading and paid v2 are subsequent work.
+operations. See the following paid-v2 section and the identity documentation for
+their separate scope and limits.
 
 ## Paid v2 buyer endpoint
 
@@ -646,6 +647,8 @@ Paid mode is devnet only and needs:
 - `request.selection.modelId` `qwen3-0.6b`, reasoning `off`, `network` devnet
   and `asset` the role's mint, with `maxAtomic` the most one request may deposit
   and `priceCeilings` the highest prices it accepts (protocol fee included).
+- every request to carry `Authorization: Bearer <token>`, with the token the
+  first paid start writes to `api-token` in the buyer home (below).
 
 Each request takes one quote from a paid seller (a free winner, or a seller that
 fails discovery or identity checks, is skipped before anything is signed), signs
@@ -666,18 +669,127 @@ Any channel in the journal not settled on the buyer's own count (a refusal, a
 stop, a pending or lapsed claim, a dispute or a settlement the chain could not
 confirm) blocks new payments (`PAID_BUYER_UNRESOLVED_PAYMENT`) until it is
 reconciled; the buyer also appends it to `paid-records.jsonl` in the buyer home
-when it can (`recorded`). Reconciling paid v2 channels (`buyer:reconcile`) is
-the next step and not available yet, so a blocked devnet test buyer is reset by
-hand for now.
+when it can (`recorded`). Never reset or delete a journal or lock to bypass the
+block.
 
-The endpoint listens on loopback only and refuses browser requests, but any
-local process can call it and spend up to `maxAtomic` per request: run the paid
-buyer only on a machine you control, with a devnet wallet.
+To reconcile, stop the paid buyer and run `pnpm buyer:reconcile:paid`. It checks
+that the role's RPC serves devnet, then reads each open channel's finalized
+history; it only reads the chain and never signs. One JSON line per channel
+reports the outcome, then a summary line with the count of each:
+
+- `settled`: the claim charged exactly the buyer's own count;
+- `disputed`: it charged another amount, more or less (recorded, no penalty);
+- `unchecked`: the chain shows a charge but no record of the buyer's count
+  survived;
+- `never-opened`: nothing was charged, because the chain shows the open never
+  landed and never can: no deposit in the channel's whole history, no channel
+  account, the open's blockhash expired by finalized block height, and the RPC
+  still holds history back to the open's slot;
+- `open`: the channel is open and unclaimed, its open may still land, or the
+  chain cannot prove otherwise (a pruned RPC, or more history than it reads).
+
+The charge is what left the escrow minus what came back to the buyer's wallet.
+If the program redirected the refund elsewhere (for example because the buyer's
+token account was closed), it shows as a larger charge and a dispute, never a
+smaller one. Each outcome but `open` is appended to `paid-reconciliations.jsonl`
+in the buyer home before the journal unblocks it, so a failed run loses nothing
+and the next one picks up where it stopped. An `open` channel keeps blocking
+until the seller claims it or the buyer withdraws it (below).
+
+Use the role's RPC as one endpoint with full transaction history. A pruned or
+load-balanced RPC can only keep a channel `open` (it never makes one look
+unopened), because the command reads the finalized tip first and requires the
+RPC to still serve blocks and ledger back to the open's slot. A journal from
+before this version is read as is: its signed opens can still settle but are
+never reported `never-opened`.
+
+The command exits 0 when nothing blocks payments (disputes included, since they
+are recorded and no longer block), 2 while a channel stays open, and 1 when it
+could not finish, printing `PAID_RECONCILE_NETWORK_MISMATCH`,
+`PAID_RECONCILE_ROLE_INVALID` or `PAID_RECONCILE_INCOMPLETE` (stop the buyer,
+check the RPC and the home). The v1 `buyer:reconcile` is unchanged.
+
+A channel that stays `open` because nobody claimed it is withdrawn with
+`pnpm buyer:withdraw:paid` (buyer stopped, devnet only). Unlike reconciliation,
+it signs with the buyer's wallet key and pays each transaction's fee from the
+wallet's devnet SOL. Each run visits every open channel in the journal and takes
+it one step further, chosen from the channel's confirmed state. It prints one
+JSON line per channel, then a summary with the count of each step and the
+shortest `retryAfterSeconds`:
+
+- `claimable`: the seller may still claim it with the buyer's authorization, so
+  it is left alone. That lasts until the quote expires or `maxTimeoutSeconds`
+  after the open was signed, whichever is later, plus 150 seconds for a claim
+  sent just before then to land and for clock differences.
+- `close-requested`: `request_close` was sent, which starts the channel's grace
+  period (`withdrawDelay`, 60 seconds).
+- `waiting`: the grace period has not elapsed by the chain's block time, or the
+  RPC does not know that block's time yet.
+- `distributed`: `seal` and `distribute` were sent, which pay out whatever was
+  settled and refund the rest of the escrow. The same transaction first creates
+  the buyer's token account if it was closed (at the wallet's cost in rent),
+  because the program would otherwise send the refund to its own treasury.
+- `nothing`: already distributed, or no channel account at the address.
+- `refused`: the account is not this buyer's channel with the journaled rent
+  payer and deposit and the current role's mint and network fee distribution, so
+  nothing was signed for it. Restore the role's mint (or run the release the
+  channel was opened with) and run again.
+- `failed`: this channel's step failed with the static code in `failure`
+  (`UPTO_UNAVAILABLE` for the RPC, `UPTO_CHAIN_REJECTED` when the chain or its
+  preflight refused the transaction, which also happens when an earlier
+  unconfirmed one has since landed or the wallet lacks SOL for the fee or the
+  token account's rent). The other channels still take their step.
+
+Each line also says whether its transaction confirmed within a minute. One that
+did not is checked again after 30 seconds: run again before then and the same
+step may be sent twice, and the second only costs a refusal (`failed`). The
+command exits 2 while another run is needed, 0 when none is, and 1 when it
+refused or failed a channel (`PAID_WITHDRAW_REFUSED`, `PAID_WITHDRAW_FAILED`,
+after every channel was visited) or could not run
+(`PAID_WITHDRAW_NETWORK_MISMATCH`, `PAID_WITHDRAW_ROLE_INVALID`,
+`PAID_WITHDRAW_INCOMPLETE`).
+
+It never changes the journal. Once a channel is distributed and finalized,
+`pnpm buyer:reconcile:paid` reads it from history and unblocks payments: the
+charge is what the seller had settled (usually nothing). If the buyer had
+counted a delivered answer that the seller never claimed, that shows as
+`disputed` with a smaller charge. A journal entry from before this version whose
+open never landed shows `nothing` here, and reconciliation cannot prove it
+unopened, so it keeps blocking payments.
+
+The endpoint listens on loopback only and refuses browser requests, but loopback
+is not authentication, so paid mode also requires a bearer token. The first paid
+start creates `api-token` in the buyer home (`.local/gyblos/buyer/` by default),
+a private 0600 file, and later starts reuse it. Every request must send
+`Authorization: Bearer <token>`; OpenAI SDKs send their `apiKey` this way. A
+request without the token gets 401 `PAID_BUYER_UNAUTHORIZED` with
+`x-should-retry: false`, before its body is read or a seller is selected. The
+token is never printed; read it yourself. Every call to the paid endpoint, from
+curl or an SDK, must carry the header:
+
+```sh
+export OPENAI_API_KEY="$(cat .local/gyblos/buyer/api-token)"
+curl http://127.0.0.1:4031/v1/chat/completions \
+  -H "Authorization: Bearer $OPENAI_API_KEY" \
+  -H 'content-type: application/json' \
+  -d '{"model":"qwen3-0.6b","messages":[{"role":"user","content":"Hello"}]}'
+```
+
+With an OpenAI SDK, set `baseURL` (`base_url` in Python) to
+`http://127.0.0.1:4031/v1` and `apiKey` to the token; the SDK reads
+`OPENAI_API_KEY` by default and sends it as `Authorization: Bearer`.
+
+Anyone who can read that file, or run as your user, can still spend up to
+`maxAtomic` per request: run the paid buyer only on a machine you control, with
+a devnet wallet. To rotate the token, stop the buyer, delete `api-token` and
+start it again. The free buyer needs no token.
 
 Startup reasons beyond the free ones: `BUYER_PAYMENT_NETWORK_MISMATCH` (RPC,
 network or asset not devnet's test token), `BUYER_PAID_MODEL_UNSUPPORTED`,
-`BUYER_WALLET_KEY_INVALID`, `BUYER_TOKENIZER_UNAVAILABLE` and
-`BUYER_PAYMENT_JOURNAL_UNAVAILABLE`.
+`BUYER_WALLET_KEY_INVALID`, `BUYER_TOKENIZER_UNAVAILABLE`,
+`BUYER_PAYMENT_JOURNAL_UNAVAILABLE` and `BUYER_API_TOKEN_INVALID` (`api-token`
+is not a private 0600 regular file with one name, owned by you and holding a
+token; it is never repaired, since its token may already have been read).
 
 ## Private free-inference receipts
 

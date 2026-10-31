@@ -12,7 +12,11 @@ import {
   getBase58Decoder,
   type TransactionSigner,
 } from '@solana/kit';
-import { UPTO_ERROR_CODES, UptoError } from 'x402-upto-metered';
+import {
+  decodeUptoPayload,
+  UPTO_ERROR_CODES,
+  UptoError,
+} from 'x402-upto-metered';
 
 import {
   buyerJournalPathsIn,
@@ -122,6 +126,16 @@ void test('a request is signed once, even by the same buyer after a restart', ()
     const first = await buyer(await durable(root));
     const authorization = await first.client.authorize(first.terms);
     assert.equal(first.counter.signed, 1);
+    // The open's own slot and its blockhash lifetime are kept for reconciliation.
+    const journaled = await first.options.journal.get(DIGEST);
+    assert.equal(
+      journaled?.openSlot,
+      decodeUptoPayload(authorization).openSlot,
+    );
+    assert.equal(
+      journaled?.lastValidBlockHeight,
+      (await hints()).lastValidBlockHeight,
+    );
     await first.options.journal.close();
     const journal = await durable(root);
     const again = createUptoPaymentClient({ ...first.options, journal });
@@ -225,6 +239,8 @@ void test('an unsigned entry left by a crash blocks its request until the terms 
       payTo: crashed.terms.payTo,
       feePayer: crashed.terms.feePayer,
       maxAtomic: '1000',
+      openSlot: '1',
+      lastValidBlockHeight: '100',
       expiresAt: crashed.terms.expiresAt,
       state: PAYMENT_CHANNEL_STATES.OPEN,
       chargedAtomic: null,
@@ -242,6 +258,8 @@ void test('an unsigned entry left by a crash blocks its request until the terms 
       payTo: crashed.terms.payTo,
       feePayer: crashed.terms.feePayer,
       maxAtomic: '1',
+      openSlot: '1',
+      lastValidBlockHeight: '100',
       expiresAt: now + 1,
       state: PAYMENT_CHANNEL_STATES.OPEN,
       chargedAtomic: null,

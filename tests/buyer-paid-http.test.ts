@@ -2,6 +2,7 @@
 // refusal answers its code and summary without retry, and local refusals stay retryable only while the
 // prompt never left. Fake selection, payment and seller; synthetic ports only.
 import assert from 'node:assert/strict';
+import { request as httpRequest } from 'node:http';
 import test from 'node:test';
 
 import { PAID_BUYER, PAID_BUYER_CODES } from '@gyblos/buyer/constants';
@@ -25,6 +26,8 @@ import {
   type Script,
 } from './support/buyer-paid';
 
+// A synthetic bearer token; the real one is generated into the buyer home.
+const TOKEN = 't'.repeat(43);
 const SETTINGS = {
   selection: { modelId: 'synthetic', variant: null, quantization: null },
   maxTokens: 10,
@@ -66,6 +69,7 @@ async function withHost(
     port: 0,
     stream,
     classify: classifyPaidError,
+    token: TOKEN,
   });
   try {
     await run(host.url);
@@ -74,10 +78,17 @@ async function withHost(
   }
 }
 
-const post = (url: string, body: string) =>
+const post = (
+  url: string,
+  body: string,
+  authorization: string | null = `Bearer ${TOKEN}`,
+) =>
   fetch(url, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: {
+      'content-type': 'application/json',
+      ...(authorization === null ? {} : { authorization }),
+    },
     body,
     signal: AbortSignal.timeout(5000),
   });
@@ -191,4 +202,61 @@ void test('local refusals answer their status; only unsent ones stay retryable',
   );
   assert.equal(timeout?.status, 504);
   assert.equal(timeout?.neverSent, false);
+});
+
+void test('the paid endpoint answers only its bearer token, before reading the body or selecting', async () => {
+  const buyer = await setup();
+  buyer.scripts.push(serves('Hi.', '1'));
+  await withHost(buyer, async (url) => {
+    for (const authorization of [
+      null,
+      '',
+      'Bearer',
+      'Bearer wrong',
+      `Bearer ${TOKEN}x`,
+      `Bearer ${TOKEN.slice(1)}`,
+      `Basic ${TOKEN}`,
+      `Bearer  ${TOKEN}`,
+      TOKEN,
+    ]) {
+      const response = await post(url, chat(), authorization);
+      assert.equal(response.status, 401, String(authorization));
+      assert.equal(response.headers.get('x-should-retry'), 'false');
+      assert.equal(response.headers.get('www-authenticate'), 'Bearer');
+      const text = await response.text();
+      assert.equal(text.includes(TOKEN), false);
+      assert.equal(
+        (JSON.parse(text) as { error: { code: string } }).error.code,
+        PAID_BUYER_CODES.UNAUTHORIZED,
+      );
+    }
+    // Nothing was selected, signed or sent.
+    assert.deepEqual(buyer.calls.authorize, []);
+    assert.deepEqual(buyer.calls.executed, []);
+
+    // A body that never finishes: the refusal comes without reading it.
+    const status = await new Promise<number | undefined>((resolve, reject) => {
+      const pending = httpRequest(url, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'content-length': '1000',
+          authorization: 'Bearer wrong',
+        },
+      });
+      pending.once('response', (response) => {
+        resolve(response.statusCode);
+        response.resume();
+        pending.destroy();
+      });
+      pending.once('error', reject);
+      pending.write('{');
+    });
+    assert.equal(status, 401);
+
+    // The scheme is case-insensitive, as RFC 9110 says.
+    const response = await post(url, chat(), `bearer ${TOKEN}`);
+    assert.equal(response.status, 200);
+    assert.deepEqual(buyer.calls.executed, [buyer.winners[0]!.nodeId]);
+  });
 });

@@ -186,4 +186,5 @@ availability closed until it settles; no queued retry can accumulate. Shutdown
 invalidates snapshots without waiting for an uncooperative engine. Timing is
 locally tested, not a production load/cancellation guarantee. The legacy paid
 offer retains its original expiry, and free execution has separate startup
-acceptance. Paid v2 execution is not enabled.
+acceptance. Paid v2 uses a separate conditional execution path; its devnet
+settlement remains unverified as described above.
