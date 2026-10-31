@@ -1,13 +1,18 @@
 // Takes the buyer's stuck channels one withdrawal step further once the seller can no longer claim
 // them: the distribution is rebuilt from the buyer's own policy. The journal is left as is;
 // reconciliation resolves each channel from finalized history after its escrow is distributed.
-import type { UptoWithdrawQuery, UptoWithdrawResult } from 'x402-upto-metered';
+import {
+  uptoError,
+  type UptoErrorCode,
+  type UptoWithdrawQuery,
+  type UptoWithdrawResult,
+} from 'x402-upto-metered';
 
 import { PAYMENT_CHANNEL_STATES } from '@gyblos/protocol/constants';
 import { paymentSplits } from '@gyblos/protocol/payment-binding';
 
-import type { UptoBuyerJournal } from './buyer-journal';
-import { WITHDRAW_STEPS } from './constants';
+import type { UptoBuyerJournal, UptoJournalEntry } from './buyer-journal';
+import { BUYER_WITHDRAW, WITHDRAW_STEPS } from './constants';
 
 export type UptoBuyerWithdrawStep =
   (typeof WITHDRAW_STEPS)[keyof typeof WITHDRAW_STEPS];
@@ -19,6 +24,8 @@ export interface UptoBuyerWithdrawResult extends Omit<
   requestDigest: string;
   channelId: string;
   step: UptoBuyerWithdrawStep;
+  // Why a failed step failed, as a static code; null otherwise.
+  failure: UptoErrorCode | null;
 }
 
 export interface UptoBuyerWithdrawOptions {
@@ -30,16 +37,64 @@ export interface UptoBuyerWithdrawOptions {
   mint: string;
   treasury: string;
   protocolFeeBps: number;
-  // How long after the open was signed the seller's claim stays valid (the payload lifetime).
-  claimWindowMs: number;
+  // The lifetime of the payload the buyer signed with each open, in seconds.
+  maxTimeoutSeconds: number;
   now: () => number;
   report(result: UptoBuyerWithdrawResult): Promise<void>;
 }
 
-const MS_PER_SECOND = 1000;
+const { msPerSecond } = BUYER_WITHDRAW;
 
-// Every open, signed entry is visited in journal order; a chain failure rejects, and what was
-// already sent stays on chain for the next run to read.
+// Until when the seller may still claim: the quote's expiry or the signed payload's lifetime, plus the
+// margin. The entry is written when the open is signed and not again while it stays open.
+const claimableUntil = (
+  entry: UptoJournalEntry,
+  options: UptoBuyerWithdrawOptions,
+) =>
+  Math.max(
+    entry.expiresAt,
+    entry.updatedAt + options.maxTimeoutSeconds * msPerSecond,
+  ) + BUYER_WITHDRAW.claimMarginMs;
+
+async function stepFor(
+  entry: UptoJournalEntry & { channelId: string },
+  options: UptoBuyerWithdrawOptions,
+): Promise<Omit<UptoBuyerWithdrawResult, 'requestDigest' | 'channelId'>> {
+  const left = claimableUntil(entry, options) - options.now();
+  if (left >= 0)
+    return {
+      step: WITHDRAW_STEPS.CLAIMABLE,
+      transaction: null,
+      confirmed: true,
+      retryAfterSeconds: Math.ceil((left + 1) / msPerSecond),
+      failure: null,
+    };
+  try {
+    const done = await options.withdrawal.withdraw({
+      channelId: entry.channelId,
+      mint: options.mint,
+      rentPayer: entry.feePayer,
+      maxAtomic: entry.maxAtomic,
+      splits: paymentSplits({
+        payTo: entry.payTo,
+        treasury: options.treasury,
+        protocolFeeBps: options.protocolFeeBps,
+      }),
+    });
+    return { ...done, failure: null };
+  } catch (error) {
+    return {
+      step: WITHDRAW_STEPS.FAILED,
+      transaction: null,
+      confirmed: true,
+      retryAfterSeconds: BUYER_WITHDRAW.failedRetrySeconds,
+      failure: uptoError(error).code,
+    };
+  }
+}
+
+// Every open, signed entry is visited in journal order; one channel's chain failure is reported and
+// the run goes on. Only a report failure rejects, and what was sent stays on chain for the next run.
 export async function withdrawUptoBuyer(
   options: UptoBuyerWithdrawOptions,
 ): Promise<UptoBuyerWithdrawResult[]> {
@@ -47,33 +102,10 @@ export async function withdrawUptoBuyer(
   for (const entry of await options.journal.list()) {
     const { channelId } = entry;
     if (!channelId || entry.state !== PAYMENT_CHANNEL_STATES.OPEN) continue;
-    // The entry is written when the open is signed and not again while it stays open.
-    const claimableUntil = Math.max(
-      entry.expiresAt,
-      entry.updatedAt + options.claimWindowMs,
-    );
-    const left = claimableUntil - options.now();
     const result: UptoBuyerWithdrawResult = {
       requestDigest: entry.requestDigest,
       channelId,
-      ...(left >= 0
-        ? {
-            step: WITHDRAW_STEPS.CLAIMABLE,
-            transaction: null,
-            confirmed: true,
-            retryAfterSeconds: Math.ceil((left + 1) / MS_PER_SECOND),
-          }
-        : await options.withdrawal.withdraw({
-            channelId,
-            mint: options.mint,
-            rentPayer: entry.feePayer,
-            maxAtomic: entry.maxAtomic,
-            splits: paymentSplits({
-              payTo: entry.payTo,
-              treasury: options.treasury,
-              protocolFeeBps: options.protocolFeeBps,
-            }),
-          })),
+      ...(await stepFor({ ...entry, channelId }, options)),
     };
     await options.report(result);
     results.push(result);

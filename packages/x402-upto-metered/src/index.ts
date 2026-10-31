@@ -46,6 +46,7 @@ export {
 } from './withdraw';
 export {
   distributeInstruction,
+  payerTokenAccountInstruction,
   requestCloseInstruction,
   sealInstruction,
   uptoDistributionHash,

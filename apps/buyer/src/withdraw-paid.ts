@@ -4,14 +4,15 @@
 import {
   buyerChainWithdraw,
   WITHDRAW_STEPS,
+  type UptoBuyerWithdrawStep,
 } from '@gyblos/node/buyer-withdraw';
 import { isMain } from '@gyblos/runtime';
 
 import { PAID_WITHDRAW_CODES, PAID_WITHDRAW_EXIT } from './constants';
-import { buyerRole, paidChainFailure } from './reconcile-paid';
+import { buyerRole, paidChainFailure } from './paid-chain';
 
 // Steps after which the channel still needs another run.
-const AGAIN: readonly string[] = [
+const AGAIN: readonly UptoBuyerWithdrawStep[] = [
   WITHDRAW_STEPS.CLAIMABLE,
   WITHDRAW_STEPS.CLOSE_REQUESTED,
   WITHDRAW_STEPS.WAITING,
@@ -37,10 +38,13 @@ export async function main(
       .filter((seconds) => seconds !== null);
     const retryAfterSeconds = waits.length ? Math.min(...waits) : null;
     print(JSON.stringify({ summary, retryAfterSeconds }));
-    if (summary[WITHDRAW_STEPS.REFUSED]) {
-      console.error(PAID_WITHDRAW_CODES.REFUSED);
-      process.exitCode = PAID_WITHDRAW_EXIT.FAILED;
-    } else if (
+    const stopped = [
+      ...(summary[WITHDRAW_STEPS.REFUSED] ? [PAID_WITHDRAW_CODES.REFUSED] : []),
+      ...(summary[WITHDRAW_STEPS.FAILED] ? [PAID_WITHDRAW_CODES.FAILED] : []),
+    ];
+    for (const code of stopped) console.error(code);
+    if (stopped.length) process.exitCode = PAID_WITHDRAW_EXIT.FAILED;
+    else if (
       results.some((result) => AGAIN.includes(result.step) || !result.confirmed)
     )
       process.exitCode = PAID_WITHDRAW_EXIT.AGAIN;

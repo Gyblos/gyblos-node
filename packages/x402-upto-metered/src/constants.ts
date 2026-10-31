@@ -9,6 +9,8 @@ export const UPTO_ERROR_CODES = {
   FACILITATOR_REJECTED: 'UPTO_FACILITATOR_REJECTED',
   TERMS_EXPIRED: 'UPTO_TERMS_EXPIRED',
   UNAVAILABLE: 'UPTO_UNAVAILABLE',
+  // A transaction the payer itself sent landed with an error, or its preflight refused it.
+  CHAIN_REJECTED: 'UPTO_CHAIN_REJECTED',
   INTERNAL: 'UPTO_INTERNAL',
 } as const;
 
@@ -75,6 +77,9 @@ export const UPTO_SOLANA_REFERENCE_LENGTH = 32;
 export const UPTO_PROGRAM = {
   id: 'CHNLxYvVA28MJP9PrFuDXccuoGXAx7jBacfLEkahyGsX',
   associatedTokenProgram: 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
+  systemProgram: '11111111111111111111111111111111',
+  // The associated token program's CreateIdempotent: a no-op when the account already exists.
+  createTokenAccountIdempotent: 1,
   eventAuthoritySeed: 'event_authority',
   discriminators: { REQUEST_CLOSE: 5, SEAL: 6, DISTRIBUTE: 7 },
   // Where each network's program binary sends the payouts it redirects.
@@ -91,7 +96,7 @@ export const UPTO_WITHDRAW_STEPS = {
   WAITING: 'waiting',
   // seal and distribute (or distribute alone) were sent: the escrow pays out and refunds the payer.
   DISTRIBUTED: 'distributed',
-  // Already distributed, or no channel at the address: nothing to send.
+  // Already distributed, or no channel account at the address: nothing to send.
   NOTHING: 'nothing',
   // The account is not this payer's channel with these terms; nothing was signed.
   REFUSED: 'refused',
@@ -102,6 +107,10 @@ export const UPTO_WITHDRAW = {
   // Waiting for a sent transaction to confirm, and how often its status is read.
   confirmMs: 60_000,
   pollMs: 2_000,
+  // Each RPC call's own deadline, so a hung endpoint never holds the caller's lock.
+  rpcMs: 20_000,
   // Added to the grace period before sealing, so clock drift never makes a seal fail.
   graceMarginSeconds: 5,
+  // When to look again at an unconfirmed transaction, or a block whose time is not known yet.
+  recheckSeconds: 30,
 } as const;

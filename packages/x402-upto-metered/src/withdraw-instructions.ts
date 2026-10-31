@@ -105,6 +105,32 @@ export const uptoProgramTreasury = (network: string) =>
     ? UPTO_PROGRAM.treasuryOwners.devnet
     : UPTO_PROGRAM.treasuryOwners.mainnet;
 
+// Creates the payer's token account if it was closed, which costs only rent when it already exists:
+// distribute would otherwise redirect the refund to the program's treasury for good.
+export async function payerTokenAccountInstruction(
+  payer: TransactionSigner,
+  mint: string,
+  tokenProgram: string,
+): Promise<UptoProgramInstruction> {
+  const signer: AccountSignerMeta = {
+    address: payer.address,
+    role: AccountRole.WRITABLE_SIGNER,
+    signer: payer,
+  };
+  return {
+    programAddress: address(UPTO_PROGRAM.associatedTokenProgram),
+    accounts: [
+      signer,
+      writable(await uptoTokenAccount(payer.address, mint, tokenProgram)),
+      readonly(payer.address),
+      readonly(mint),
+      readonly(UPTO_PROGRAM.systemProgram),
+      readonly(tokenProgram),
+    ],
+    data: Uint8Array.of(UPTO_PROGRAM.createTokenAccountIdempotent),
+  };
+}
+
 export interface UptoDistributeQuery {
   channelId: string;
   payer: string;

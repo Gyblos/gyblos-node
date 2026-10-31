@@ -17,6 +17,7 @@ import {
   withdrawUptoBuyer,
   type UptoBuyerWithdrawOptions,
   type UptoBuyerWithdrawResult,
+  type UptoBuyerWithdrawStep,
   type UptoWithdrawRpc,
 } from '@gyblos/payments-upto';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
@@ -26,9 +27,7 @@ import { NodeError } from './errors';
 import { roleSigner, type RoleConfig } from './roles';
 import { readGenesis, type GenesisReader } from './seller-chain';
 
-export { WITHDRAW_STEPS };
-
-const MS_PER_SECOND = 1000;
+export { WITHDRAW_STEPS, type UptoBuyerWithdrawStep };
 
 export function buyerChainWithdraw(
   genesis: GenesisReader = readGenesis,
@@ -64,7 +63,7 @@ export function buyerChainWithdraw(
         mint: role.mint,
         treasury: PROTOCOL_FEE.treasury,
         protocolFeeBps: PROTOCOL_FEE.bps,
-        claimWindowMs: UPTO_CHANNEL_SETTINGS.maxTimeoutSeconds * MS_PER_SECOND,
+        maxTimeoutSeconds: UPTO_CHANNEL_SETTINGS.maxTimeoutSeconds,
         now: Date.now,
         report,
       });

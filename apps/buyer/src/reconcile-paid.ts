@@ -5,9 +5,7 @@ import {
   buyerChainReconcile,
   RECONCILE_OUTCOMES,
 } from '@gyblos/node/buyer-reconcile';
-import { NODE_ERROR_CODES } from '@gyblos/node/constants';
-import { NodeError } from '@gyblos/node/errors';
-import { loadRole, rolePath } from '@gyblos/node/roles';
+import { rolePath } from '@gyblos/node/roles';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 import { isMain } from '@gyblos/runtime';
 
@@ -16,27 +14,8 @@ import {
   PAID_RECONCILE_CODES,
   PAID_RECONCILE_EXIT,
 } from './constants';
+import { buyerRole, paidChainFailure } from './paid-chain';
 import { appendPrivateLine, paidRecords } from './paid-records';
-
-// A failure's static code from a command's own table: what to fix before running it again.
-export function paidChainFailure(
-  error: unknown,
-  codes: { NETWORK: string; ROLE: string; INCOMPLETE: string },
-) {
-  const code = error instanceof NodeError ? error.code : undefined;
-  if (code === NODE_ERROR_CODES.BUYER_PAYMENT_NETWORK_MISMATCH)
-    return codes.NETWORK;
-  if (code === NODE_ERROR_CODES.BUYER_PAYMENT_KEY_INVALID) return codes.ROLE;
-  return codes.INCOMPLETE;
-}
-
-export async function buyerRole() {
-  try {
-    return await loadRole(P2P_ROLES.BUYER);
-  } catch {
-    throw new NodeError(NODE_ERROR_CODES.BUYER_PAYMENT_KEY_INVALID);
-  }
-}
 
 export async function main(
   reconcile: ReturnType<typeof buyerChainReconcile> = buyerChainReconcile(),

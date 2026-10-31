@@ -6,10 +6,12 @@ import {
   appendTransactionMessageInstructions,
   createTransactionMessage,
   getBase64EncodedWireTransaction,
+  isSolanaError,
   pipe,
   setTransactionMessageFeePayerSigner,
   setTransactionMessageLifetimeUsingBlockhash,
   signTransactionMessageWithSigners,
+  SOLANA_ERROR__JSON_RPC__SERVER_ERROR_SEND_TRANSACTION_PREFLIGHT_FAILURE,
   type Address,
   type Base64EncodedWireTransaction,
   type Blockhash,
@@ -30,6 +32,7 @@ import { UptoError } from './errors';
 import type { UptoSplit } from './types';
 import {
   distributeInstruction,
+  payerTokenAccountInstruction,
   requestCloseInstruction,
   sealInstruction,
   uptoDistributionHash,
@@ -37,37 +40,34 @@ import {
 } from './withdraw-instructions';
 
 type Confirmed = { commitment: typeof UPTO_COMMITMENT };
+type Deadline = { abortSignal: AbortSignal };
+type Call<T> = { send(options: Deadline): Promise<T> };
+type Landed = (typeof UPTO_CHANNEL_ACCOUNT.landedStatuses)[number];
 
 // The slice of a @solana/kit RPC the withdrawal uses.
 export interface UptoWithdrawRpc {
   getAccountInfo(
     account: Address,
     config: Confirmed & { encoding: 'base64' },
-  ): {
-    send(): Promise<{
-      value: { owner: Address; data: readonly [string, 'base64'] } | null;
-    }>;
-  };
-  getSlot(config: Confirmed): { send(): Promise<bigint> };
-  // Unix seconds of the block at that slot.
-  getBlockTime(slot: bigint): { send(): Promise<bigint> };
-  getLatestBlockhash(config: Confirmed): {
-    send(): Promise<{
-      value: { blockhash: Blockhash; lastValidBlockHeight: bigint };
-    }>;
-  };
+  ): Call<{
+    value: { owner: Address; data: readonly [string, 'base64'] } | null;
+  }>;
+  getSlot(config: Confirmed): Call<bigint>;
+  // Unix seconds of the block at that slot; a node may not know it yet.
+  getBlockTime(slot: bigint): Call<bigint | null>;
+  getLatestBlockhash(config: Confirmed): Call<{
+    value: { blockhash: Blockhash; lastValidBlockHeight: bigint };
+  }>;
   sendTransaction(
     transaction: Base64EncodedWireTransaction,
     config: { encoding: 'base64'; preflightCommitment: typeof UPTO_COMMITMENT },
-  ): { send(): Promise<Signature> };
-  getSignatureStatuses(signatures: Signature[]): {
-    send(): Promise<{
-      value: readonly ({
-        err: unknown;
-        confirmationStatus: string | null;
-      } | null)[];
-    }>;
-  };
+  ): Call<Signature>;
+  getSignatureStatuses(signatures: Signature[]): Call<{
+    value: readonly ({
+      err: unknown;
+      confirmationStatus: Landed | 'processed' | null;
+    } | null)[];
+  }>;
 }
 
 export interface UptoWithdrawOptions {
@@ -96,9 +96,12 @@ export interface UptoWithdrawResult {
   retryAfterSeconds: number | null;
 }
 
-async function read<T>(call: () => Promise<T>): Promise<T> {
+// One RPC call under its own deadline; any failure is UNAVAILABLE, never the RPC's own text.
+async function read<T>(call: Call<T>): Promise<T> {
   try {
-    return await call();
+    return await call.send({
+      abortSignal: AbortSignal.timeout(UPTO_WITHDRAW.rpcMs),
+    });
   } catch {
     throw new UptoError(UPTO_ERROR_CODES.UNAVAILABLE);
   }
@@ -118,20 +121,16 @@ async function channelAt(
   network: string,
   query: UptoWithdrawQuery,
 ) {
-  const { value } = await read(() =>
-    rpc
-      .getAccountInfo(address(query.channelId), {
-        ...confirmed,
-        encoding: 'base64',
-      })
-      .send(),
+  const channelId = address(query.channelId);
+  const { value } = await read(
+    rpc.getAccountInfo(channelId, { ...confirmed, encoding: 'base64' }),
   );
   if (!value) return undefined;
   const [found] = await discoverChannelsByRentPayer(
     {
       getProgramAccounts: async () => [
         {
-          pubkey: address(query.channelId),
+          pubkey: channelId,
           account: { owner: value.owner, data: [value.data[0], 'base64'] },
         },
       ],
@@ -165,12 +164,10 @@ async function landed(
   signature: Signature,
 ): Promise<boolean> {
   for (let waited = 0; ; waited += UPTO_WITHDRAW.pollMs) {
-    const { value } = await read(() =>
-      rpc.getSignatureStatuses([signature]).send(),
-    );
+    const { value } = await read(rpc.getSignatureStatuses([signature]));
     const status = value[0];
     if (status && status.err !== null)
-      throw new UptoError(UPTO_ERROR_CODES.FACILITATOR_REJECTED);
+      throw new UptoError(UPTO_ERROR_CODES.CHAIN_REJECTED);
     if (
       status &&
       UPTO_CHANNEL_ACCOUNT.landedStatuses.some(
@@ -183,15 +180,13 @@ async function landed(
   }
 }
 
-// Signed by the payer, who also pays the fee; preflight refuses it before any fee is spent.
+// Signed by the payer, who also pays the fee; a preflight refusal costs no fee and is CHAIN_REJECTED.
 async function send(
   rpc: UptoWithdrawRpc,
   options: UptoWithdrawOptions,
   instructions: readonly UptoProgramInstruction[],
 ): Promise<{ transaction: string; confirmed: boolean }> {
-  const { value: lifetime } = await read(() =>
-    rpc.getLatestBlockhash(confirmed).send(),
-  );
+  const { value: lifetime } = await read(rpc.getLatestBlockhash(confirmed));
   const message = pipe(
     createTransactionMessage({ version: 0 }),
     (draft) => setTransactionMessageFeePayerSigner(options.payer, draft),
@@ -199,14 +194,24 @@ async function send(
     (draft) => appendTransactionMessageInstructions(instructions, draft),
   );
   const signed = await signTransactionMessageWithSigners(message);
-  const signature = await read(() =>
-    rpc
+  let signature: Signature;
+  try {
+    signature = await rpc
       .sendTransaction(getBase64EncodedWireTransaction(signed), {
         encoding: 'base64',
         preflightCommitment: UPTO_COMMITMENT,
       })
-      .send(),
-  );
+      .send({ abortSignal: AbortSignal.timeout(UPTO_WITHDRAW.rpcMs) });
+  } catch (error) {
+    throw new UptoError(
+      isSolanaError(
+        error,
+        SOLANA_ERROR__JSON_RPC__SERVER_ERROR_SEND_TRANSACTION_PREFLIGHT_FAILURE,
+      )
+        ? UPTO_ERROR_CODES.CHAIN_REJECTED
+        : UPTO_ERROR_CODES.UNAVAILABLE,
+    );
+  }
   return {
     transaction: String(signature),
     confirmed: await landed(rpc, options.sleep ?? pause, signature),
@@ -223,6 +228,28 @@ const result = (
   retryAfterSeconds,
 });
 
+// A sent step: an unconfirmed one is looked at again soon, whatever came next.
+const sent = (
+  step: UptoWithdrawStep,
+  retryAfterSeconds: number | null,
+  outcome: { transaction: string; confirmed: boolean },
+): UptoWithdrawResult => ({
+  step,
+  ...outcome,
+  retryAfterSeconds: outcome.confirmed
+    ? retryAfterSeconds
+    : Math.max(retryAfterSeconds ?? 0, UPTO_WITHDRAW.recheckSeconds),
+});
+
+// Seconds until the grace period has elapsed by the chain's own clock, or a recheck when the node
+// does not know the block's time yet.
+async function graceLeft(rpc: UptoWithdrawRpc, due: bigint): Promise<number> {
+  const slot = await read(rpc.getSlot(confirmed));
+  const now = await read(rpc.getBlockTime(slot));
+  if (now === null) return UPTO_WITHDRAW.recheckSeconds;
+  return now < due ? Number(due - now) : 0;
+}
+
 export function createUptoWithdrawal(
   rpc: UptoWithdrawRpc,
   options: UptoWithdrawOptions,
@@ -238,19 +265,19 @@ export function createUptoWithdrawal(
         return result(UPTO_WITHDRAW_STEPS.NOTHING);
       const grace = channel.gracePeriod + UPTO_WITHDRAW.graceMarginSeconds;
       if (channel.status === statuses.OPEN)
-        return {
-          step: UPTO_WITHDRAW_STEPS.CLOSE_REQUESTED,
-          retryAfterSeconds: grace,
-          ...(await send(rpc, options, [
+        return sent(
+          UPTO_WITHDRAW_STEPS.CLOSE_REQUESTED,
+          grace,
+          await send(rpc, options, [
             requestCloseInstruction(options.payer, query.channelId),
-          ])),
-        };
+          ]),
+        );
       if (channel.status === statuses.CLOSING) {
-        const slot = await read(() => rpc.getSlot(confirmed).send());
-        const now = await read(() => rpc.getBlockTime(slot).send());
-        const due = channel.closureStartedAt + BigInt(grace);
-        if (now < due)
-          return result(UPTO_WITHDRAW_STEPS.WAITING, Number(due - now));
+        const left = await graceLeft(
+          rpc,
+          channel.closureStartedAt + BigInt(grace),
+        );
+        if (left > 0) return result(UPTO_WITHDRAW_STEPS.WAITING, left);
       }
       const distribute = await distributeInstruction({
         channelId: query.channelId,
@@ -262,17 +289,22 @@ export function createUptoWithdrawal(
         network: options.network,
         splits: query.splits,
       });
-      return {
-        step: UPTO_WITHDRAW_STEPS.DISTRIBUTED,
-        retryAfterSeconds: null,
-        ...(await send(
+      const refundTo = await payerTokenAccountInstruction(
+        options.payer,
+        query.mint,
+        options.tokenProgram,
+      );
+      return sent(
+        UPTO_WITHDRAW_STEPS.DISTRIBUTED,
+        null,
+        await send(
           rpc,
           options,
           channel.status === statuses.SEALED
-            ? [distribute]
-            : [sealInstruction(query.channelId), distribute],
-        )),
-      };
+            ? [refundTo, distribute]
+            : [refundTo, sealInstruction(query.channelId), distribute],
+        ),
+      );
     },
   };
 }

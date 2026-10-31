@@ -18,6 +18,8 @@ import {
   getU32Encoder,
   getU64Encoder,
   getUtf8Encoder,
+  SOLANA_ERROR__JSON_RPC__SERVER_ERROR_SEND_TRANSACTION_PREFLIGHT_FAILURE,
+  SolanaError,
   type Address,
   type Blockhash,
   type Signature,
@@ -113,6 +115,7 @@ export interface SentInstruction {
 export interface SentTransaction {
   feePayer: string;
   signers: string[];
+  writableSigners: number;
   instructions: SentInstruction[];
 }
 
@@ -128,6 +131,9 @@ export function decodeSent(wire: string): SentTransaction {
   return {
     feePayer: keys[0]!,
     signers: keys.slice(0, message.header.numSignerAccounts),
+    writableSigners:
+      message.header.numSignerAccounts -
+      message.header.numReadonlySignerAccounts,
     instructions: message.instructions.map((ix) => ({
       program: keys[ix.programAddressIndex]!,
       accounts: (ix.accountIndices ?? []).map((index) => keys[index]!),
@@ -138,68 +144,83 @@ export function decodeSent(wire: string): SentTransaction {
 
 export interface WithdrawChainState {
   accounts: Map<string, { owner: Address; data: readonly [string, 'base64'] }>;
-  // Unix seconds of the confirmed block.
-  blockTime: bigint;
+  // Unix seconds of the confirmed block; null while the node does not know it.
+  blockTime: bigint | null;
   // The status each sent transaction ends with; null never confirms.
-  outcome?: { err: unknown; confirmationStatus: string | null } | null;
+  outcome?: {
+    err: unknown;
+    confirmationStatus: 'confirmed' | 'finalized' | null;
+  } | null;
+  // Preflight simulation refuses every send, as the RPC does for a transaction that would fail.
+  preflightFails?: boolean;
   failing?: boolean;
 }
 
 export function withdrawChain(state: WithdrawChainState) {
   const sent: SentTransaction[] = [];
-  const commitments: string[] = [];
-  const unavailable = () => {
-    if (state.failing)
-      throw new Error('rpc down at https://rpc.example/?key=s');
-  };
+  // Each read with the commitment it asked for, and every call's deadline.
+  const reads: { call: string; commitment?: string }[] = [];
+  const deadlines: (AbortSignal | undefined)[] = [];
+  const call =
+    <T>(name: string, commitment: string | undefined, answer: () => T) =>
+    () => ({
+      send: async (options?: { abortSignal?: AbortSignal }) => {
+        reads.push({ call: name, commitment });
+        deadlines.push(options?.abortSignal);
+        if (state.failing)
+          throw new Error('rpc down at https://rpc.example/?key=s');
+        return answer();
+      },
+    });
   const signature = (index: number) => {
     const bytes = new Uint8Array(64);
     bytes[0] = index + 1;
     return getBase58Decoder().decode(bytes) as Signature;
   };
   const rpc: UptoWithdrawRpc = {
-    getAccountInfo: (account, config) => ({
-      send: async () => {
-        commitments.push(config.commitment);
-        unavailable();
-        return { value: state.accounts.get(String(account)) ?? null };
-      },
-    }),
-    getSlot: () => ({ send: async () => (unavailable(), 500n) }),
-    getBlockTime: () => ({
-      send: async () => (unavailable(), state.blockTime),
-    }),
-    getLatestBlockhash: () => ({
-      send: async () => {
-        unavailable();
-        return {
-          value: {
-            blockhash: getBase58Decoder().decode(
-              new Uint8Array(32).fill(9),
-            ) as Blockhash,
-            lastValidBlockHeight: 900n,
-          },
-        };
-      },
-    }),
-    sendTransaction: (wire, config) => ({
-      send: async () => {
-        commitments.push(config.preflightCommitment);
-        unavailable();
+    getAccountInfo: (account, config) =>
+      call('account', config.commitment, () => ({
+        value: state.accounts.get(String(account)) ?? null,
+      }))(),
+    getSlot: (config) => call('slot', config.commitment, () => 500n)(),
+    getBlockTime: () => call('blockTime', undefined, () => state.blockTime)(),
+    getLatestBlockhash: (config) =>
+      call('blockhash', config.commitment, () => ({
+        value: {
+          blockhash: getBase58Decoder().decode(
+            new Uint8Array(32).fill(9),
+          ) as Blockhash,
+          lastValidBlockHeight: 900n,
+        },
+      }))(),
+    sendTransaction: (wire, config) =>
+      call('send', config.preflightCommitment, () => {
+        if (state.preflightFails)
+          throw new SolanaError(
+            SOLANA_ERROR__JSON_RPC__SERVER_ERROR_SEND_TRANSACTION_PREFLIGHT_FAILURE,
+            {
+              accounts: null,
+              loadedAccountsDataSize: null,
+              logs: null,
+              replacementBlockhash: null,
+              returnData: null,
+              unitsConsumed: null,
+            },
+          );
         sent.push(decodeSent(wire));
         return signature(sent.length - 1);
-      },
-    }),
-    getSignatureStatuses: () => ({
-      send: async () => {
-        unavailable();
-        const outcome =
+      })(),
+    getSignatureStatuses: () =>
+      call('status', undefined, () => ({
+        value: [
           state.outcome === undefined
-            ? { err: null, confirmationStatus: 'confirmed' }
-            : state.outcome;
-        return { value: [outcome] };
-      },
-    }),
+            ? { err: null, confirmationStatus: 'confirmed' as const }
+            : state.outcome,
+        ],
+      }))(),
   };
-  return { rpc, sent, commitments };
+  const commitments = () => [
+    ...new Set(reads.flatMap(({ commitment }) => commitment ?? [])),
+  ];
+  return { rpc, sent, reads, deadlines, commitments };
 }

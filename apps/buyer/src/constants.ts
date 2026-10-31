@@ -202,6 +202,8 @@ export const PAID_WITHDRAW_CODES = {
     'PAID_WITHDRAW_INCOMPLETE: stop the paid buyer, check the RPC, the wallet SOL and the buyer home, then run again',
   REFUSED:
     'PAID_WITHDRAW_REFUSED: a journaled channel is not this buyer’s with its terms; nothing was signed for it',
+  FAILED:
+    'PAID_WITHDRAW_FAILED: a channel’s step failed (see its failure code); the others went on, run again later',
 } as const;
 // A deposit ceiling of zero: a free quote, or a selection.json that buys nothing.
 export const isFreeAtomic = (maxAtomic: string) => maxAtomic === '0';

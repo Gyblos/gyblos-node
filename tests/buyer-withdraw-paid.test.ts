@@ -161,39 +161,53 @@ void test('a home without a buyer role names the role', async () => {
   }
 });
 
-void test('a refused channel fails the run; an unconfirmed send asks for another; done exits 0', async () => {
+void test('a refused or failed channel fails the run after the others; an unconfirmed send asks for another; done exits 0', async () => {
   const home = await mkdtemp(join(tmpdir(), 'gyblos-withdraw-exit-'));
   const { main } = await import('@gyblos/buyer/withdraw-paid');
   const row = (
     step: UptoBuyerWithdrawStep,
     confirmed = true,
+    retryAfterSeconds: number | null = null,
   ): UptoBuyerWithdrawResult => ({
     requestDigest: STUCK,
     channelId: 'Chan111111111111111111111111111111111111111',
     step,
     transaction: null,
     confirmed,
-    retryAfterSeconds: null,
+    retryAfterSeconds,
+    failure: step === WITHDRAW_STEPS.FAILED ? 'UPTO_CHAIN_REJECTED' : null,
   });
-  const { REFUSED, DISTRIBUTED, NOTHING } = WITHDRAW_STEPS;
-  const cases: [UptoBuyerWithdrawResult[], number, string[]][] = [
-    [[row(REFUSED), row(DISTRIBUTED)], 1, ['PAID_WITHDRAW_REFUSED']],
-    [[row(DISTRIBUTED, false)], 2, []],
-    [[row(DISTRIBUTED), row(NOTHING)], 0, []],
-  ];
+  const { REFUSED, FAILED, DISTRIBUTED, NOTHING } = WITHDRAW_STEPS;
+  const cases: [UptoBuyerWithdrawResult[], number, string[], number | null][] =
+    [
+      [[row(REFUSED), row(DISTRIBUTED)], 1, ['PAID_WITHDRAW_REFUSED'], null],
+      [
+        [row(FAILED, true, 30), row(REFUSED)],
+        1,
+        ['PAID_WITHDRAW_REFUSED', 'PAID_WITHDRAW_FAILED'],
+        30,
+      ],
+      [[row(DISTRIBUTED, false, 30)], 2, [], 30],
+      [[row(DISTRIBUTED), row(NOTHING)], 0, [], null],
+    ];
   try {
     await setupBuyer(home, MINT);
-    for (const [rows, exitCode, codes] of cases)
+    for (const [rows, exitCode, codes, retryAfterSeconds] of cases)
       await inHome(home, async (errors) => {
+        const printed: string[] = [];
         await main(
           async () => rows,
-          () => {},
+          (line) => printed.push(line),
         );
         assert.equal(process.exitCode, exitCode);
         assert.deepEqual(
           errors.map((line) => line.split(':')[0]),
           codes,
         );
+        const summary = JSON.parse(printed.at(-1)!) as {
+          retryAfterSeconds: number | null;
+        };
+        assert.equal(summary.retryAfterSeconds, retryAfterSeconds);
       });
   } finally {
     await rm(home, { recursive: true, force: true });
