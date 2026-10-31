@@ -1,4 +1,4 @@
-// Owns the command-line entrypoint for checking or materializing repository skills.
+// Owns the command-line entrypoint for repository skills; it never loads agents or product code.
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -15,7 +15,7 @@ function usage(): never {
 
 async function main(): Promise<void> {
   const command = ARGUMENTS[0] ?? 'check';
-  if (command === 'check' && ARGUMENTS.length === 1) {
+  if (command === 'check' && ARGUMENTS.length <= 1) {
     const report = await checkSkillLayout(ROOT);
     if (report.issues.length > 0) {
       for (const issue of report.issues)

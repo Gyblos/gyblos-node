@@ -7,6 +7,7 @@ import {
   readFile,
   readlink,
   rm,
+  unlink,
 } from 'node:fs/promises';
 import { dirname, join, relative, sep } from 'node:path';
 
@@ -57,6 +58,66 @@ function canonicalSkill(root: string, name: string): string {
 
 function distributionSkill(root: string, name: string): string {
   return join(distributionRoot(root), name);
+}
+
+async function directoryIssue(
+  root: string,
+  path: string,
+  message: string,
+  required: boolean,
+): Promise<SkillLayoutIssue | undefined> {
+  try {
+    const stat = await lstat(path);
+    if (!stat.isDirectory() || stat.isSymbolicLink())
+      return { path: pathLabel(root, path), message };
+    return undefined;
+  } catch (error: unknown) {
+    if (!isMissing(error)) throw error;
+    if (!required) return undefined;
+    return { path: pathLabel(root, path), message };
+  }
+}
+
+async function layoutRootIssues(root: string): Promise<SkillLayoutIssue[]> {
+  const repositoryIssue = await directoryIssue(
+    root,
+    root,
+    'Repository root must be a real directory.',
+    true,
+  );
+  if (repositoryIssue) return [repositoryIssue];
+
+  const canonicalParentIssue = await directoryIssue(
+    root,
+    join(root, '.agents'),
+    'Canonical skills parent must be a real directory.',
+    true,
+  );
+  if (canonicalParentIssue) return [canonicalParentIssue];
+
+  const canonicalIssue = await directoryIssue(
+    root,
+    canonicalRoot(root),
+    'Canonical skills root must be a real directory.',
+    true,
+  );
+  if (canonicalIssue) return [canonicalIssue];
+
+  const distributionParentIssue = await directoryIssue(
+    root,
+    join(root, '.claude'),
+    'Claude skills parent must be a real directory.',
+    false,
+  );
+  if (distributionParentIssue) return [distributionParentIssue];
+
+  const distributionIssue = await directoryIssue(
+    root,
+    distributionRoot(root),
+    'Claude skills root must be a real directory when present.',
+    false,
+  );
+  return distributionIssue ? [distributionIssue] : [];
 }
 
 function expectedLinkTarget(root: string, name: string): string {
@@ -127,10 +188,7 @@ async function canonicalSkillNames(
 
 async function skillNamesAt(path: string): Promise<string[]> {
   const entries = await directoryEntries(path);
-  const names = entries
-    .filter((entry) => entry.isDirectory() || entry.isSymbolicLink())
-    .map((entry) => entry.name)
-    .sort();
+  const names = entries.map((entry) => entry.name).sort();
   return names;
 }
 
@@ -226,8 +284,16 @@ async function checkSkill(
 export async function checkSkillLayout(
   root: string,
 ): Promise<SkillLayoutReport> {
+  const rootIssues = await layoutRootIssues(root);
+  if (rootIssues.length > 0) return { skills: [], issues: rootIssues };
+
   const canonical = await canonicalSkillNames(root);
   const issues = [...canonical.issues];
+  if (canonical.names.length === 0 && canonical.issues.length === 0)
+    issues.push({
+      path: pathLabel(root, canonicalRoot(root)),
+      message: 'Canonical skills root must contain at least one skill.',
+    });
   const distributionNames = await skillNamesAt(distributionRoot(root));
   const canonicalSet = new Set(canonical.names);
 
@@ -259,14 +325,47 @@ async function copySkill(
   }
 }
 
+async function removeDistribution(
+  path: string,
+  stat: Awaited<ReturnType<typeof lstat>>,
+): Promise<void> {
+  if (stat.isSymbolicLink()) {
+    await unlink(path);
+    return;
+  }
+  await rm(path, { recursive: true, force: true });
+}
+
 export async function materializeSkills(
   root: string,
   options: MaterializeOptions = {},
 ): Promise<void> {
+  const rootIssues = await layoutRootIssues(root);
+  if (rootIssues.length > 0)
+    throw new Error(rootIssues.map((issue) => issue.message).join('\n'));
+
   const canonical = await canonicalSkillNames(root);
   if (canonical.issues.length > 0)
     throw new Error(canonical.issues.map((issue) => issue.message).join('\n'));
+  if (canonical.names.length === 0)
+    throw new Error(
+      `${pathLabel(root, canonicalRoot(root))}: Canonical skills root must contain at least one skill.`,
+    );
   await mkdir(distributionRoot(root), { recursive: true });
+
+  const canonicalSet = new Set(canonical.names);
+  const staleNames = (await skillNamesAt(distributionRoot(root))).filter(
+    (name) => !canonicalSet.has(name),
+  );
+  if (staleNames.length > 0 && !options.replace)
+    throw new Error(
+      `Refusing to replace stale Claude skill mirrors: ${staleNames.join(', ')}; rerun with --replace after reviewing them.`,
+    );
+  for (const name of staleNames) {
+    const distribution = distributionSkill(root, name);
+    const distributionStat = await lstat(distribution);
+    await removeDistribution(distribution, distributionStat);
+  }
 
   for (const name of canonical.names) {
     const distribution = distributionSkill(root, name);
@@ -294,7 +393,7 @@ export async function materializeSkills(
       throw new Error(
         `Refusing to replace ${pathLabel(root, distribution)}; rerun with --replace after reviewing it.`,
       );
-    await rm(distribution, { recursive: true, force: true });
+    await removeDistribution(distribution, distributionStat);
     await copySkill(canonicalSkill(root, name), distribution);
   }
 }

@@ -131,7 +131,7 @@ steps: [docs/running-a-node.md](docs/running-a-node.md).
 | Checks | `pnpm test`, `test:lab`, `test:all`                  | Product tests (PR gate), lab tests, both.                                              |
 | Checks | `pnpm typecheck`                                     | TypeScript, including tests.                                                           |
 | Checks | `pnpm check`                                         | Typecheck, lint (including tooling), product and lab tests.                            |
-| Checks | `pnpm lint`                                          | ESLint, Prettier, tooling tests and import boundaries.                                 |
+| Checks | `pnpm lint`                                          | ESLint, Prettier, tooling tests, skill layout and import boundaries.                   |
 | Checks | `pnpm boundaries`, `tooling:test`                    | Boundary check (`--json`); tests of the checker and lint rules.                        |
 | Checks | `pnpm format`, `format:check`                        | Format and sort imports; check only.                                                   |
 
