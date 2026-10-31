@@ -1,6 +1,6 @@
 // The buyer's own count of a paid request, made exactly as the seller counts: the single user message as
-// input, the streamed text as output, and a stopped stream's text at least one token and at most its
-// bytes. Pure; the tokenizer is the model's public one.
+// input, the streamed text as output, and a stop that reports delivery at least one token and at most
+// its bytes (other stops charge no output). Pure; the tokenizer is the model's public one.
 import { paidCharge } from '@gyblos/core/paid-charge';
 import { FREE_CHAT_ROLES } from '@gyblos/protocol/constants';
 import type { RecountTokenizer } from '@gyblos/protocol/engine';
@@ -9,6 +9,10 @@ import type {
   PaidCharge,
   PaidExecutionRequest,
 } from '@gyblos/protocol/paid-execution';
+import {
+  PAID_DELIVERED_CODES,
+  type PaidExecutionCode,
+} from '@gyblos/protocol/paid/constants';
 
 // The prompt a paid seller would count, or undefined for input no paid seller serves.
 export function paidPrompt(input: FreeExecutionBuildInput): string | undefined {
@@ -20,19 +24,21 @@ export function paidPrompt(input: FreeExecutionBuildInput): string | undefined {
 
 const bytes = (text: string) => new TextEncoder().encode(text).length;
 
-// `completed` is whether the seller's terminal is a result rather than a stop.
+// `stop` is the seller's stop code, or undefined for a completed result.
 export function paidRecount(
   request: PaidExecutionRequest,
   meter: RecountTokenizer,
   prompt: string,
   received: string,
-  completed: boolean,
+  stop: PaidExecutionCode | undefined,
 ): PaidCharge {
-  const counted = received ? meter.count(received) : 0;
-  const outputTokens =
-    completed || !received
-      ? counted
-      : Math.min(Math.max(1, counted), bytes(received));
+  const outputTokens = !received
+    ? 0
+    : stop === undefined
+      ? meter.count(received)
+      : PAID_DELIVERED_CODES.includes(stop)
+        ? Math.min(Math.max(1, meter.count(received)), bytes(received))
+        : 0;
   return paidCharge(
     request,
     { inputTokens: meter.input(prompt), outputTokens },

@@ -183,6 +183,11 @@ void test('pending and lapsed payments are recorded for reconciliation, without 
     assert.equal(outcome.verdict, verdict);
     assert.equal(outcome.recorded, true);
     assert.equal(buyer.recorded[0]?.verdict, verdict);
+    // A lapsed claim charged nothing, whatever the seller had counted.
+    assert.equal(
+      buyer.recorded[0]?.claimedAtomic,
+      kind === 'pending' ? '1' : null,
+    );
     assert.equal(buyer.calls.receipts.length, 0);
   }
 });
@@ -223,17 +228,17 @@ void test('a claim other than the buyer own count is a dispute, whatever the cha
   assert.equal(outcome.verdict, PAID_VERDICTS.DISPUTED);
 });
 
-void test('a matching claim the chain does not confirm now is unverified and recorded', async () => {
-  for (const code of [
-    PAYMENT_ERROR_CODES.UNAVAILABLE,
-    PAYMENT_ERROR_CODES.RECEIPT_MISMATCH,
-  ]) {
+void test('a matching claim the chain does not confirm is disputed, or unverified while unreachable', async () => {
+  for (const [code, verdict] of [
+    [PAYMENT_ERROR_CODES.UNAVAILABLE, PAID_VERDICTS.UNVERIFIED],
+    [PAYMENT_ERROR_CODES.RECEIPT_MISMATCH, PAID_VERDICTS.DISPUTED],
+  ] as const) {
     const buyer = await setup();
     buyer.scripts.push(settles('Hi.', '1'));
     buyer.state.receiptError = new PaymentError(code);
     const outcome = await executeBuyerPaid(INPUT, buyer.dependencies);
-    assert.equal(outcome.verdict, PAID_VERDICTS.UNVERIFIED, code);
+    assert.equal(outcome.verdict, verdict, code);
     assert.deepEqual(buyer.calls.receipts, ['1']);
-    assert.equal(buyer.recorded[0]?.verdict, PAID_VERDICTS.UNVERIFIED);
+    assert.equal(buyer.recorded[0]?.verdict, verdict);
   }
 });

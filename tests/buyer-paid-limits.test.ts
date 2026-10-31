@@ -5,8 +5,13 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { PAYMENT_ERROR_CODES } from '@gyblos/protocol/constants';
-import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
+import {
+  PAID_DELIVERED_CODES,
+  PAID_EXECUTION_CODES,
+  type PaidExecutionCode,
+} from '@gyblos/protocol/paid/constants';
 import { PaymentError } from '@gyblos/protocol/payment';
+import { PaidClientError } from '@gyblos/transport-iroh/paid-client';
 
 import { PAID_BUYER_CODES, PAID_VERDICTS } from '../apps/buyer/src/constants';
 import { executeBuyerPaid } from '../apps/buyer/src/paid-execution';
@@ -19,16 +24,18 @@ import {
   type Script,
 } from './support/buyer-paid';
 
-void test('a stopped stream counts at least one token and at most its bytes, as the seller does', async () => {
+void test('a stop reporting delivery counts at least one token and at most its bytes; others none', async () => {
   const stopped =
-    (text: string): Script =>
+    (text: string, code: PaidExecutionCode): Script =>
     async (request, onDelta) => {
       if (text) await onDelta(text);
       return {
         ...(await header(request)),
         error: {
-          code: PAID_EXECUTION_CODES.TIMEOUT,
-          ...(text ? { delivered: { outputTokens: 1 } } : {}),
+          code,
+          ...(text && PAID_DELIVERED_CODES.includes(code)
+            ? { delivered: { outputTokens: 1 } }
+            : {}),
         },
         charge: {
           inputTokens: 4,
@@ -38,16 +45,20 @@ void test('a stopped stream counts at least one token and at most its bytes, as 
         payment: { settlement: settlement(request, '1') },
       };
     };
-  for (const [text, counted, expected] of [
-    ['ab', 0, 1],
-    ['ab', 10, 2],
-    ['', 0, 0],
+  const { TIMEOUT, ENGINE, INTERNAL } = PAID_EXECUTION_CODES;
+  for (const [text, counted, code, expected] of [
+    ['ab', 0, TIMEOUT, 1],
+    ['ab', 10, TIMEOUT, 2],
+    ['', 0, TIMEOUT, 0],
+    // The seller charges no output for an engine or internal failure, whatever was streamed.
+    ['ab', 2, ENGINE, 0],
+    ['ab', 2, INTERNAL, 0],
   ] as const) {
     const buyer = await setup();
     buyer.counts.output = () => counted;
-    buyer.scripts.push(stopped(text));
+    buyer.scripts.push(stopped(text, code));
     const outcome = await executeBuyerPaid(INPUT, buyer.dependencies);
-    assert.equal(outcome.recount.outputTokens, expected, `${text}/${counted}`);
+    assert.equal(outcome.recount.outputTokens, expected, `${text}/${code}`);
   }
   // A completed result is counted as is.
   const completed = await setup();
@@ -131,6 +142,34 @@ void test('a caller abort stops every stage with its own reason, releasing the s
       setImmediate(() => external.abort(reason));
     await assert.rejects(running, (error) => error === reason, stage);
     assert.equal(buyer.state.held, 0, stage);
+    // Text the seller wrote before the caller left still counts in the record.
+    if (stage === 'stream')
+      assert.deepEqual(
+        buyer.recorded.map(({ verdict, expectedAtomic }) => [
+          verdict,
+          expectedAtomic,
+        ]),
+        [[PAID_VERDICTS.INTERRUPTED, '1']],
+      );
     assert.equal(buyer.calls.executed.length, stage === 'stream' ? 1 : 0);
   }
+});
+
+void test('an unsent request after the caller left is reported, never failed over', async () => {
+  const buyer = await setup();
+  const external = new AbortController();
+  const unsent = new PaidClientError(PAID_EXECUTION_CODES.CANCELLED, false);
+  buyer.scripts.push(
+    async () => {
+      external.abort(new Error('caller left'));
+      throw unsent;
+    },
+    settles('Hi.', '1'),
+  );
+  await assert.rejects(
+    executeBuyerPaid(INPUT, buyer.dependencies, external.signal),
+    unsent,
+  );
+  assert.equal(buyer.calls.authorize.length, 1);
+  assert.deepEqual(buyer.recorded, []);
 });

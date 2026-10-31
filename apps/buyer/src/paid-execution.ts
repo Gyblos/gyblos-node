@@ -15,6 +15,10 @@ import {
   type PaidExecutionResponse,
 } from '@gyblos/protocol/paid-execution';
 import {
+  PAID_EXECUTION_CODES,
+  type PaidExecutionCode,
+} from '@gyblos/protocol/paid/constants';
+import {
   PaymentError,
   type PaymentAuthorization,
   type PaymentClient,
@@ -118,6 +122,9 @@ function termsFor(
   };
 }
 
+// A stream cut before any terminal is counted like a seller's timeout: what arrived was delivered.
+const INTERRUPTED_STOP = PAID_EXECUTION_CODES.TIMEOUT;
+
 // Terms this buyer will not sign, or a request it already signed: another seller may still serve.
 const SKIPPED_AUTHORIZATIONS: readonly PaymentErrorCode[] = [
   PAYMENT_ERROR_CODES.UNTRUSTED_TERMS,
@@ -160,6 +167,8 @@ async function remember(
 
 function claimed(terminal: PaidExecutionResponse): string | null {
   const payment = terminal.payment;
+  // A lapsed claim charged nothing, whatever the seller had counted.
+  if (payment?.lapsed) return null;
   return (
     payment?.settlement?.chargedAtomic ??
     payment?.pending?.chargedAtomic ??
@@ -190,8 +199,12 @@ async function verdictFor(
       AbortSignal.timeout(PAID_BUYER.receiptMs),
     );
     return PAID_VERDICTS.SETTLED;
-  } catch {
-    return PAID_VERDICTS.UNVERIFIED;
+  } catch (error) {
+    // The chain shows another charge than the buyer's own count; anything else is checked later.
+    return error instanceof PaymentError &&
+      error.code === PAYMENT_ERROR_CODES.RECEIPT_MISMATCH
+      ? PAID_VERDICTS.DISPUTED
+      : PAID_VERDICTS.UNVERIFIED;
   }
 }
 
@@ -221,13 +234,14 @@ async function attempt(run: Attempt): Promise<PaidBuyerOutcome | undefined> {
     channelId: authorization.channelId,
   };
   let received = '';
-  const recount = (completed: boolean) =>
-    paidRecount(request, dependencies.meter, run.prompt, received, completed);
+  const recount = (stop: PaidExecutionCode | undefined) =>
+    paidRecount(request, dependencies.meter, run.prompt, received, stop);
   let terminal: PaidExecutionResponse;
   try {
     terminal = await dependencies.execute(winner, request, signal, (text) => {
-      signal.throwIfAborted();
+      // Text the seller already wrote counts as delivered, even if the caller just left.
       received += text;
+      signal.throwIfAborted();
       return run.onDelta(text);
     });
   } catch (error) {
@@ -238,12 +252,12 @@ async function attempt(run: Attempt): Promise<PaidBuyerOutcome | undefined> {
     await remember(dependencies, {
       ...base,
       verdict: PAID_VERDICTS.INTERRUPTED,
-      expectedAtomic: recount(false).chargedAtomic,
+      expectedAtomic: recount(INTERRUPTED_STOP).chargedAtomic,
       claimedAtomic: null,
     });
     throw error;
   }
-  const expected = recount(terminal.result !== undefined);
+  const expected = recount(terminal.error?.code);
   const verdict = await verdictFor(
     dependencies,
     authorization,
@@ -287,7 +301,10 @@ export async function executeBuyerPaid(
       throw new PaidBuyerError(PAID_BUYER_CODES.UNRESOLVED);
     const excluded = new Set<string>();
     while (!signal.aborted) {
-      const winner = await dependencies.select(excluded, signal);
+      const winner = await bounded(
+        dependencies.select(excluded, signal),
+        signal,
+      );
       signal.throwIfAborted();
       if (excluded.has(winner.nodeId)) break;
       excluded.add(winner.nodeId);
