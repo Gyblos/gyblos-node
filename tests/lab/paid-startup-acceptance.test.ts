@@ -1,4 +1,7 @@
 // Actual paid product startup is accepted only over isolated native loopback and simulated chain services.
+import { PAID_VERDICTS } from '@gyblos/buyer/constants';
+import { assertPaidJsonAnswer, assertPaidStreamAnswer } from '../support/paid-acceptance-answers';
+import { finishPaidAcceptance } from '../support/paid-acceptance-finalize';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -106,4 +109,15 @@ void test('paid acceptance cancels its isolated child without changing parent fe
   } finally {
     clearTimeout(timer);
   }
+});
+
+void test('paid delivery assertions reject verdict metadata without the answer', () => {
+  assert.throws(() => assertPaidJsonAnswer(JSON.stringify({ verdict: PAID_VERDICTS.UNVERIFIED }), PAID_VERDICTS.UNVERIFIED));
+});
+void test('paid stream framing rejects an ordinary JSON completion', () => {
+  assert.throws(() => assertPaidStreamAnswer(JSON.stringify({ text: 'synthetic paid answer', verdict: PAID_VERDICTS.SETTLED }), 'application/json'));
+});
+void test('paid acceptance teardown cannot hide swallowed forbidden I/O', async () => {
+  let denied = 0;
+  await assert.rejects(finishPaidAcceptance(async () => { denied++; }, () => { assert.equal(denied, 0); return true; }), { code: 'ERR_ASSERTION' });
 });
