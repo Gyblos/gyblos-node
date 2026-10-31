@@ -18,17 +18,19 @@ import {
 } from './constants';
 import { appendPrivateLine, paidRecords } from './paid-records';
 
-// A failure's static code: what to fix before reconciling again.
-export function reconcileFailure(error: unknown) {
+// A failure's static code from a command's own table: what to fix before running it again.
+export function paidChainFailure(
+  error: unknown,
+  codes: { NETWORK: string; ROLE: string; INCOMPLETE: string },
+) {
   const code = error instanceof NodeError ? error.code : undefined;
   if (code === NODE_ERROR_CODES.BUYER_PAYMENT_NETWORK_MISMATCH)
-    return PAID_RECONCILE_CODES.NETWORK;
-  if (code === NODE_ERROR_CODES.BUYER_PAYMENT_KEY_INVALID)
-    return PAID_RECONCILE_CODES.ROLE;
-  return PAID_RECONCILE_CODES.INCOMPLETE;
+    return codes.NETWORK;
+  if (code === NODE_ERROR_CODES.BUYER_PAYMENT_KEY_INVALID) return codes.ROLE;
+  return codes.INCOMPLETE;
 }
 
-async function buyerRole() {
+export async function buyerRole() {
   try {
     return await loadRole(P2P_ROLES.BUYER);
   } catch {
@@ -67,7 +69,7 @@ export async function main(
       process.exitCode = PAID_RECONCILE_EXIT.OPEN;
     return results;
   } catch (error) {
-    console.error(reconcileFailure(error));
+    console.error(paidChainFailure(error, PAID_RECONCILE_CODES));
     process.exitCode = PAID_RECONCILE_EXIT.FAILED;
     return undefined;
   }

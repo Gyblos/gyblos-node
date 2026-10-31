@@ -1,5 +1,7 @@
 // Owns the payments-upto catalogs: which port call a failure happened in, the fields of a seller's
 // own payment description, and the ledger file bounds and timing.
+import { UPTO_WITHDRAW_STEPS } from 'x402-upto-metered';
+
 export const PAYMENT_PHASES = { ADMIT: 'admit', SETTLE: 'settle' } as const;
 export type PaymentPhase = (typeof PAYMENT_PHASES)[keyof typeof PAYMENT_PHASES];
 
@@ -57,4 +59,10 @@ export const RECONCILE_OUTCOMES = {
   NEVER_OPENED: 'never-opened',
   // Still open, or its open may still land: it keeps blocking payments.
   OPEN: 'open',
+} as const;
+// What a withdrawal run did with each open channel: the chain step taken, or why it waited.
+export const WITHDRAW_STEPS = {
+  ...UPTO_WITHDRAW_STEPS,
+  // The seller may still claim it with the buyer's authorization; it is left alone until it cannot.
+  CLAIMABLE: 'claimable',
 } as const;

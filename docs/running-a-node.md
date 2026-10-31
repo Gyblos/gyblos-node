@@ -690,8 +690,7 @@ token account was closed), it shows as a larger charge and a dispute, never a
 smaller one. Each outcome but `open` is appended to `paid-reconciliations.jsonl`
 in the buyer home before the journal unblocks it, so a failed run loses nothing
 and the next one picks up where it stopped. An `open` channel keeps blocking
-until the seller claims it or the buyer withdraws it after its timeout, which is
-not available yet.
+until the seller claims it or the buyer withdraws it (below).
 
 Use the role's RPC as one endpoint with full transaction history. A pruned or
 load-balanced RPC can only keep a channel `open` (it never makes one look
@@ -705,6 +704,33 @@ are recorded and no longer block), 2 while a channel stays open, and 1 when it
 could not finish, printing `PAID_RECONCILE_NETWORK_MISMATCH`,
 `PAID_RECONCILE_ROLE_INVALID` or `PAID_RECONCILE_INCOMPLETE` (stop the buyer,
 check the RPC and the home). The v1 `buyer:reconcile` is unchanged.
+
+A channel that stays `open` because nobody claimed it is withdrawn with
+`pnpm buyer:withdraw:paid` (buyer stopped, devnet only). Unlike reconciliation,
+it signs with the buyer's wallet key and pays each transaction's fee from the
+wallet's devnet SOL. Each run takes every open channel in the journal one step
+further, chosen from the channel's confirmed state, and prints one JSON line per
+channel, then a summary with the count of each step and `retryAfterSeconds`:
+
+- `claimable`: the seller may still claim it with the buyer's authorization
+  (until the quote expires and `maxTimeoutSeconds` after it was signed), so it
+  is left alone;
+- `close-requested`: `request_close` was sent, which starts the channel's grace
+  period (`withdrawDelay`, 60 seconds); the seller can still claim during it;
+- `waiting`: the grace period has not elapsed by the chain's block time;
+- `distributed`: `seal` and `distribute` were sent, which pay out whatever was
+  settled and refund the rest of the escrow to the buyer;
+- `nothing`: already distributed, or no channel account;
+- `refused`: the account is not this buyer's channel with its journaled mint,
+  deposit, rent payer and distribution, so nothing was signed for it.
+
+Each line also says whether its transaction confirmed within a minute; one that
+did not is read again on the next run. The command exits 2 while another run is
+needed, 0 when none is, and 1 when it failed or refused a channel
+(`PAID_WITHDRAW_NETWORK_MISMATCH`, `PAID_WITHDRAW_ROLE_INVALID`,
+`PAID_WITHDRAW_INCOMPLETE` or `PAID_WITHDRAW_REFUSED`). It never changes the
+journal: once a channel is distributed and finalized,
+`pnpm buyer:reconcile:paid` reads the refund from history and unblocks payments.
 
 The endpoint listens on loopback only and refuses browser requests, but any
 local process can call it and spend up to `maxAtomic` per request: run the paid

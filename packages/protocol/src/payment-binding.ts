@@ -94,7 +94,9 @@ export function feeSplitBps(protocolFeeBps: number): {
 }
 
 // The only channel distribution admit may accept for these terms; no treasury entry without a fee.
-export function paymentSplits(terms: PaymentTerms): PaymentSplit[] {
+export function paymentSplits(
+  terms: Pick<PaymentTerms, 'payTo' | 'treasury' | 'protocolFeeBps'>,
+): PaymentSplit[] {
   const { sellerBps, treasuryBps } = feeSplitBps(terms.protocolFeeBps);
   return [
     { recipient: text(terms.payTo), bps: sellerBps },

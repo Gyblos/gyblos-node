@@ -71,3 +71,37 @@ export type UptoCommitment =
 // CAIP-2 Solana networks: the namespace and the genesis-hash prefix length that names the chain.
 export const UPTO_SOLANA_NAMESPACE = 'solana';
 export const UPTO_SOLANA_REFERENCE_LENGTH = 32;
+// The payment-channels program, for the payer's withdrawal: its instructions as the SDK encodes them.
+export const UPTO_PROGRAM = {
+  id: 'CHNLxYvVA28MJP9PrFuDXccuoGXAx7jBacfLEkahyGsX',
+  associatedTokenProgram: 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
+  eventAuthoritySeed: 'event_authority',
+  discriminators: { REQUEST_CLOSE: 5, SEAL: 6, DISTRIBUTE: 7 },
+  // Where each network's program binary sends the payouts it redirects.
+  treasuryOwners: {
+    devnet: '4zTeC5mVqWLruDexgU2mV66p9t5vCA9JyiZqdGDUspap',
+    mainnet: 'Cs2zdfUNonRdRGsiZUQQLdTxzxVvJZmgiX2mpLYKuEqP',
+  },
+} as const;
+// The payer's withdrawal, one step per run: what it did to each channel.
+export const UPTO_WITHDRAW_STEPS = {
+  // request_close was sent; the grace period runs from when it lands.
+  CLOSE_REQUESTED: 'close-requested',
+  // Closing, but the grace period has not elapsed on chain yet.
+  WAITING: 'waiting',
+  // seal and distribute (or distribute alone) were sent: the escrow pays out and refunds the payer.
+  DISTRIBUTED: 'distributed',
+  // Already distributed, or no channel at the address: nothing to send.
+  NOTHING: 'nothing',
+  // The account is not this payer's channel with these terms; nothing was signed.
+  REFUSED: 'refused',
+} as const;
+export type UptoWithdrawStep =
+  (typeof UPTO_WITHDRAW_STEPS)[keyof typeof UPTO_WITHDRAW_STEPS];
+export const UPTO_WITHDRAW = {
+  // Waiting for a sent transaction to confirm, and how often its status is read.
+  confirmMs: 60_000,
+  pollMs: 2_000,
+  // Added to the grace period before sealing, so clock drift never makes a seal fail.
+  graceMarginSeconds: 5,
+} as const;

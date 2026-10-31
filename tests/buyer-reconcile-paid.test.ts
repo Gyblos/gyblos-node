@@ -2,7 +2,6 @@
 // charge, a resolved channel is kept in the reconciliations file before it unblocks payments, a channel
 // still open exits 2, and a missing role, a non-devnet RPC or a running buyer stop with a static code.
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -16,7 +15,7 @@ import {
 import { openUptoBuyerJournal } from '@gyblos/payments-upto';
 import { PAYMENT_CHANNEL_STATES } from '@gyblos/protocol/constants';
 
-import { REPOSITORY_ROOT } from './support/node-config-fixtures';
+import { inHome, setupBuyer } from './support/buyer-home';
 import { chainDouble, signatureOf } from './support/upto-chain-history';
 
 const MINT = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU';
@@ -51,63 +50,12 @@ const chain = (payer: string) =>
     accounts: new Set(),
   }).rpc;
 
-async function setupBuyer(home: string) {
-  const setup = spawnSync(
-    process.execPath,
-    [
-      '--import',
-      'tsx',
-      'apps/node/src/setup.ts',
-      '--role',
-      'buyer',
-      '--mint',
-      MINT,
-    ],
-    {
-      cwd: REPOSITORY_ROOT,
-      env: {
-        PATH: process.env.PATH,
-        TMPDIR: process.env.TMPDIR,
-        GYBLOS_HOME: home,
-      },
-      encoding: 'utf8',
-    },
-  );
-  assert.equal(setup.status, 0, setup.stderr);
-  return (
-    JSON.parse(await readFile(join(home, 'buyer', 'role.json'), 'utf8')) as {
-      buyer: string;
-    }
-  ).buyer;
-}
-
-// Runs with this home, capturing stderr and the exit code, and restores the process afterwards.
-async function inHome<T>(home: string, run: (errors: string[]) => Promise<T>) {
-  const saved = {
-    home: process.env.GYBLOS_HOME,
-    error: console.error,
-    exitCode: process.exitCode,
-  };
-  const errors: string[] = [];
-  process.env.GYBLOS_HOME = home;
-  console.error = (line: string) => errors.push(line);
-  process.exitCode = 0;
-  try {
-    return await run(errors);
-  } finally {
-    if (saved.home === undefined) delete process.env.GYBLOS_HOME;
-    else process.env.GYBLOS_HOME = saved.home;
-    console.error = saved.error;
-    process.exitCode = saved.exitCode;
-  }
-}
-
 void test('paid reconciliation keeps each resolution, then reports what still blocks with exit 2', async () => {
   const home = await mkdtemp(join(tmpdir(), 'gyblos-reconcile-paid-'));
   const { main } = await import('@gyblos/buyer/reconcile-paid');
   const { buyerChainReconcile } = await import('@gyblos/node/buyer-reconcile');
   try {
-    const payer = await setupBuyer(home);
+    const payer = await setupBuyer(home, MINT);
     const journal = await openUptoBuyerJournal({
       paths: buyerJournalPathsIn({ GYBLOS_HOME: home }),
       now: Date.now,
