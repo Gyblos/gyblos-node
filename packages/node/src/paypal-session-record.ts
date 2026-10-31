@@ -4,14 +4,20 @@ import { PAYPAL_SANDBOX } from '@gyblos/config/constants';
 import { PAYPAL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { isPaypalId, PaypalError } from '@gyblos/protocol/paypal-payment';
 
-import { PAYPAL_SESSION_PHASE as PHASE } from './constants';
+import {
+  PAYPAL_SESSION_RECORD_VERSION,
+  PAYPAL_SESSION_PHASE as PHASE,
+} from './constants';
 import { paypalPreviousAttemptFinished } from './paypal-inference';
 
 type Phase = (typeof PHASE)[keyof typeof PHASE];
 export interface PaypalSessionRecord {
-  version: 2;
+  version: typeof PAYPAL_SESSION_RECORD_VERSION;
   phase: Phase;
   requestId: string;
+  currency: typeof PAYPAL_SANDBOX.currency;
+  limitCents: number;
+  messageCents: number;
   spentCents: number;
   attemptIds: string[];
   acknowledgedIds: string[];
@@ -58,6 +64,9 @@ function validateShape(
     'version',
     'phase',
     'requestId',
+    'currency',
+    'limitCents',
+    'messageCents',
     'spentCents',
     'attemptIds',
     'acknowledgedIds',
@@ -117,7 +126,10 @@ export function parsePaypalSessionState(value: unknown): {
     };
   const phase = Object.values(PHASE).find((entry) => entry === item.phase);
   if (
-    item.version !== 2 ||
+    item.version !== PAYPAL_SESSION_RECORD_VERSION ||
+    item.currency !== PAYPAL_SANDBOX.currency ||
+    item.limitCents !== PAYPAL_SANDBOX.limitCents ||
+    item.messageCents !== PAYPAL_SANDBOX.messageCents ||
     !phase ||
     !isPaypalId(item.requestId) ||
     typeof item.spentCents !== 'number' ||
@@ -128,6 +140,13 @@ export function parsePaypalSessionState(value: unknown): {
     !idList(item.attemptIds) ||
     !idList(item.acknowledgedIds) ||
     item.attemptIds.length > PAYPAL_SANDBOX.maxMessageAttempts ||
+    (hasPhase(phase, [
+      PHASE.CREATING,
+      PHASE.CREATED,
+      PHASE.AUTHORIZING,
+      PHASE.CANCELLED,
+    ]) &&
+      item.attemptIds.length !== 0) ||
     item.acknowledgedIds.some((id) => !item.attemptIds.includes(id)) ||
     item.spentCents !==
       (item.acknowledgedIds.length +
@@ -141,9 +160,12 @@ export function parsePaypalSessionState(value: unknown): {
   validateShape(item, phase, item.spentCents);
   return {
     record: {
-      version: 2,
+      version: PAYPAL_SESSION_RECORD_VERSION,
       phase,
       requestId: item.requestId,
+      currency: PAYPAL_SANDBOX.currency,
+      limitCents: PAYPAL_SANDBOX.limitCents,
+      messageCents: PAYPAL_SANDBOX.messageCents,
       spentCents: item.spentCents,
       attemptIds: item.attemptIds,
       acknowledgedIds: item.acknowledgedIds,

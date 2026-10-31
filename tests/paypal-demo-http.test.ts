@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { request as httpRequest } from 'node:http';
 import { test } from 'node:test';
 
 import { startPaypalDemo } from '@gyblos/node-app/paypal-demo';
@@ -90,8 +91,26 @@ void test('loopback demo requires same origin and connects one approval to multi
       (await post('/api/approve', { orderId: 'ORDER1' })).status,
       200,
     );
+    const interrupted = httpRequest(`${app.url}/api/message`, {
+      method: 'POST',
+      headers: { ...headers, 'content-length': '256' },
+    });
+    interrupted.on('error', () => {});
+    await new Promise<void>((resolve, reject) => {
+      interrupted.write('{"orderId":"ORDER1",', (error) =>
+        error ? reject(error) : resolve(),
+      );
+    });
+    assert.equal((await post('/api/status', {})).status, 200);
+    const disconnected = new Promise<void>((resolve) => {
+      interrupted.once('close', resolve);
+    });
+    interrupted.destroy();
+    await disconnected;
+    assert.deepEqual(operations, ['create', 'authorize']);
     for (const [index, prompt] of ['hello', 'again'].entries()) {
       const response = await post('/api/message', {
+        orderId: 'ORDER1',
         prompt,
         maxTokens: 16,
         messageId: `MESSAGE${index}`,
@@ -100,18 +119,27 @@ void test('loopback demo requires same origin and connects one approval to multi
       const result: unknown = await response.json();
       assert.ok(result && typeof result === 'object' && 'messageId' in result);
       assert.equal(
-        (await post('/api/acknowledge', { messageId: result.messageId }))
-          .status,
+        (
+          await post('/api/acknowledge', {
+            orderId: 'ORDER1',
+            messageId: result.messageId,
+          })
+        ).status,
         200,
       );
       assert.equal(
-        (await post('/api/acknowledge', { messageId: result.messageId }))
-          .status,
+        (
+          await post('/api/acknowledge', {
+            orderId: 'ORDER1',
+            messageId: result.messageId,
+          })
+        ).status,
         200,
       );
       assert.equal(
         (
           await post('/api/message', {
+            orderId: 'ORDER1',
             prompt,
             maxTokens: 16,
             messageId: `MESSAGE${index}`,
@@ -120,7 +148,7 @@ void test('loopback demo requires same origin and connects one approval to multi
         409,
       );
     }
-    const finish = await post('/api/finish', {});
+    const finish = await post('/api/finish', { orderId: 'ORDER1' });
     assert.equal(finish.status, 200);
     assert.deepEqual(operations, [
       'create',

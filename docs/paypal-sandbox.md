@@ -49,16 +49,18 @@ Closing a partially used session captures the acknowledged usage. PayPal
 controls the timing of release of any remaining hold, and an authorization can
 expire or be revoked before capture.
 
-The journal stores payment IDs, accumulated cents, phase, and a temporary prompt
-digest, not prompts or responses. It takes an exclusive process lock. Each
-response must be acknowledged before another inference or settlement. An
-interrupted inference, lost acknowledgment, uncertain payment, or storage
-failure can block the session; do not remove the journal or lock to bypass this
-state. There is no automatic reconciliation or recovery UI. A previous
-unfinished single-request journal also blocks a new session. An order that has
-not been authorized may be abandoned from the page. A crash can still lose a
-response or its acknowledgment; when the page has received a response, it can
-retry acknowledgment without charging twice. A buyer who receives a response but
+The journal stores payment IDs, the approved currency and prices, accumulated
+cents, phase, and a temporary prompt digest, not prompts or responses. It takes
+an exclusive process lock. If the configured terms change, an unfinished session
+does not resume under different prices or limits. Each response must be
+acknowledged before another inference or settlement. An interrupted inference,
+lost acknowledgment, uncertain payment, or storage failure can block the
+session; do not remove the journal or lock to bypass this state. There is no
+automatic payment reconciliation UI. A previous unfinished single-request
+journal also blocks a new session. An order that has not been authorized may be
+abandoned from the page. A crash can still lose a response or its
+acknowledgment; when the page has received a response, it can retry
+acknowledgment without charging twice. A buyer who receives a response but
 withholds acknowledgment can block settlement, including earlier usage.
 Acknowledgment does not prove delivery exactly once. The prompt digest can be
 checked against guesses by anyone able to read the private journal. This

@@ -3,68 +3,7 @@ import { test } from 'node:test';
 
 import { createPaypalSession } from '@gyblos/node/paypal-session';
 
-function fixture() {
-  const calls: string[] = [];
-  let state: unknown = null;
-  const payment = {
-    async prepare() {},
-    async isApproved() {
-      return true;
-    },
-    async create() {
-      calls.push('create');
-      return {
-        orderId: 'ORDER1',
-        approvalUrl: 'https://www.sandbox.paypal.com/checkoutnow?token=ORDER1',
-      };
-    },
-    async authorize() {
-      calls.push('authorize');
-      return { authorizationId: 'AUTH1' };
-    },
-    async capture(_id: string, cents?: number) {
-      calls.push(`capture:${cents}`);
-      return { captureId: 'CAPTURE1' };
-    },
-    async void() {
-      calls.push('void');
-    },
-  };
-  const journal = {
-    async read() {
-      return state;
-    },
-    async write(value: unknown) {
-      state = structuredClone(value);
-    },
-  };
-  const engine = {
-    async generate() {
-      calls.push('generate');
-      return {
-        text: 'a synthetic answer',
-        usage: { inputTokens: 2, outputTokens: 3 },
-      };
-    },
-  };
-  return {
-    calls,
-    payment,
-    journal,
-    engine,
-    getState: () => state,
-    setState(value: unknown) {
-      state = value;
-    },
-  };
-}
-
-async function start(f: ReturnType<typeof fixture>) {
-  const service = await createPaypalSession(f);
-  const order = await service.create();
-  await service.approve(order.orderId);
-  return service;
-}
+import { fixture, start } from './support/paypal-session-fixture';
 
 void test('one approval pays for multiple acknowledged messages with one partial capture', async () => {
   const f = fixture();
@@ -73,11 +12,16 @@ void test('one approval pays for multiple acknowledged messages with one partial
     'first synthetic prompt',
     'second synthetic prompt',
   ].entries()) {
-    const result = await session.message(prompt, 16, `MESSAGE${index}`);
+    const result = await session.message(
+      'ORDER1',
+      prompt,
+      16,
+      `MESSAGE${index}`,
+    );
     assert.equal(result.text, 'a synthetic answer');
-    await session.acknowledge(result.messageId);
+    await session.acknowledge('ORDER1', result.messageId);
   }
-  const result = await session.finish();
+  const result = await session.finish('ORDER1');
   assert.equal(result.spentCents, 20);
   assert.deepEqual(f.calls, [
     'create',
@@ -96,53 +40,53 @@ void test('the authorized ceiling allows ten messages and rejects the eleventh',
   const f = fixture();
   const session = await start(f);
   for (let i = 0; i < 10; i += 1) {
-    const result = await session.message(`message ${i}`, 16, `MESSAGE${i}`);
-    await session.acknowledge(result.messageId);
+    const result = await session.message(
+      'ORDER1',
+      `message ${i}`,
+      16,
+      `MESSAGE${i}`,
+    );
+    await session.acknowledge('ORDER1', result.messageId);
   }
-  await assert.rejects(session.message('over limit', 16, 'OVER'));
-  await session.finish();
+  await assert.rejects(session.message('ORDER1', 'over limit', 16, 'OVER'));
+  await session.finish('ORDER1');
   assert.equal(f.calls.filter((call) => call === 'generate').length, 10);
   assert.equal(f.calls.at(-1), 'capture:100');
 });
 
-void test('an inference failure does not void previous successful messages', async () => {
+void test('an uncertain engine failure preserves previous usage without voiding or capturing', async () => {
   const f = fixture();
   const session = await start(f);
-  const first = await session.message('one', 16, 'MESSAGE1');
-  await session.acknowledge(first.messageId);
+  const first = await session.message('ORDER1', 'one', 16, 'MESSAGE1');
+  await session.acknowledge('ORDER1', first.messageId);
   f.engine.generate = async () => {
     f.calls.push('generate');
     throw new Error('engine');
   };
-  await assert.rejects(session.message('two', 16, 'MESSAGE2'));
-  await session.finish();
-  assert.deepEqual(f.calls, [
-    'create',
-    'authorize',
-    'generate',
-    'generate',
-    'capture:10',
-  ]);
+  await assert.rejects(session.message('ORDER1', 'two', 16, 'MESSAGE2'));
+  await assert.rejects(session.finish('ORDER1'));
+  assert.equal(session.status().spentCents, 10);
+  assert.deepEqual(f.calls, ['create', 'authorize', 'generate', 'generate']);
 });
 
 void test('closing an unused authorization voids it without capture', async () => {
   const f = fixture();
   const session = await start(f);
-  assert.equal((await session.finish()).spentCents, 0);
+  assert.equal((await session.finish('ORDER1')).spentCents, 0);
   assert.deepEqual(f.calls, ['create', 'authorize', 'void']);
 });
 
 void test('an unacknowledged result cannot be captured or followed by another inference', async () => {
   const f = fixture();
   const session = await start(f);
-  const result = await session.message('one', 16, 'MESSAGE1');
-  await assert.rejects(session.finish());
-  await assert.rejects(session.message('two', 16, 'MESSAGE2'));
+  const result = await session.message('ORDER1', 'one', 16, 'MESSAGE1');
+  await assert.rejects(session.finish('ORDER1'));
+  await assert.rejects(session.message('ORDER1', 'two', 16, 'MESSAGE2'));
   const restarted = await createPaypalSession(f);
-  await assert.rejects(restarted.finish());
-  await assert.rejects(restarted.acknowledge('OTHER'));
-  await restarted.acknowledge(result.messageId);
-  await restarted.finish();
+  await assert.rejects(restarted.finish('ORDER1'));
+  await assert.rejects(restarted.acknowledge('ORDER1', 'OTHER'));
+  await restarted.acknowledge('ORDER1', result.messageId);
+  await restarted.finish('ORDER1');
   assert.deepEqual(f.calls, ['create', 'authorize', 'generate', 'capture:10']);
 });
 
@@ -153,12 +97,12 @@ void test('uncertain capture is not retried, even after restart', async () => {
     throw new Error('timeout');
   };
   const session = await start(f);
-  const result = await session.message('one', 16, 'MESSAGE1');
-  await session.acknowledge(result.messageId);
-  await assert.rejects(session.finish());
-  await assert.rejects(session.finish());
+  const result = await session.message('ORDER1', 'one', 16, 'MESSAGE1');
+  await session.acknowledge('ORDER1', result.messageId);
+  await assert.rejects(session.finish('ORDER1'));
+  await assert.rejects(session.finish('ORDER1'));
   const restarted = await createPaypalSession(f);
-  await assert.rejects(restarted.finish());
+  await assert.rejects(restarted.finish('ORDER1'));
   await assert.rejects(restarted.create());
   assert.deepEqual(f.calls, ['create', 'authorize', 'generate', 'capture']);
 });
@@ -192,10 +136,10 @@ void test('a failed write before returning an answer blocks continued use after 
     await write(value);
   };
   const session = await start(f);
-  await assert.rejects(session.message('one', 16, 'MESSAGE1'));
+  await assert.rejects(session.message('ORDER1', 'one', 16, 'MESSAGE1'));
   const restarted = await createPaypalSession(f);
-  await assert.rejects(restarted.finish());
-  await assert.rejects(restarted.message('two', 16, 'MESSAGE2'));
+  await assert.rejects(restarted.finish('ORDER1'));
+  await assert.rejects(restarted.message('ORDER1', 'two', 16, 'MESSAGE2'));
   assert.deepEqual(f.calls, ['create', 'authorize', 'generate']);
 });
 
@@ -216,25 +160,25 @@ void test('only one message can run at a time', async () => {
     return { text: 'answer', usage: { inputTokens: 1, outputTokens: 1 } };
   };
   const session = await start(f);
-  const first = session.message('one', 16, 'MESSAGE1');
+  const first = session.message('ORDER1', 'one', 16, 'MESSAGE1');
   await entered;
   try {
-    await assert.rejects(session.message('two', 16, 'MESSAGE2'));
-    await assert.rejects(session.finish());
+    await assert.rejects(session.message('ORDER1', 'two', 16, 'MESSAGE2'));
+    await assert.rejects(session.finish('ORDER1'));
   } finally {
     release();
   }
   const result = await first;
-  await session.acknowledge(result.messageId);
-  await session.finish();
+  await session.acknowledge('ORDER1', result.messageId);
+  await session.finish('ORDER1');
   assert.deepEqual(f.calls, ['create', 'authorize', 'generate', 'capture:10']);
 });
 
 void test('a disconnected in-flight message blocks settlement pending reconciliation', async () => {
   const f = fixture();
   const session = await start(f);
-  const first = await session.message('one', 16, 'MESSAGE1');
-  await session.acknowledge(first.messageId);
+  const first = await session.message('ORDER1', 'one', 16, 'MESSAGE1');
+  await session.acknowledge('ORDER1', first.messageId);
   const controller = new AbortController();
   f.engine.generate = async () => {
     f.calls.push('generate');
@@ -242,11 +186,11 @@ void test('a disconnected in-flight message blocks settlement pending reconcilia
     return { text: 'lost', usage: { inputTokens: 1, outputTokens: 1 } };
   };
   await assert.rejects(
-    session.message('two', 16, 'MESSAGE2', controller.signal),
+    session.message('ORDER1', 'two', 16, 'MESSAGE2', controller.signal),
   );
-  await assert.rejects(session.finish());
+  await assert.rejects(session.finish('ORDER1'));
   const restarted = await createPaypalSession(f);
-  await assert.rejects(restarted.message('two', 16, 'MESSAGE2'));
+  await assert.rejects(restarted.message('ORDER1', 'two', 16, 'MESSAGE2'));
   assert.deepEqual(f.calls, ['create', 'authorize', 'generate', 'generate']);
 });
 
@@ -257,8 +201,8 @@ void test('an expired session rejects new messages but can be closed', async () 
   assert.ok(state && typeof state === 'object');
   f.setState({ ...state, expiresAt: 1 });
   const expired = await createPaypalSession(f);
-  await assert.rejects(expired.message('late', 16, 'LATE'));
-  await expired.finish();
+  await assert.rejects(expired.message('ORDER1', 'late', 16, 'LATE'));
+  await expired.finish('ORDER1');
   assert.deepEqual(f.calls, ['create', 'authorize', 'void']);
 });
 
@@ -290,13 +234,15 @@ void test('a corrupted session journal cannot unlock another payment', async () 
 void test('a repeated message identifier cannot generate or charge twice after an acknowledgment is lost', async () => {
   const f = fixture();
   const session = await start(f);
-  const response = await session.message('one', 16, 'MESSAGE1');
-  await session.acknowledge(response.messageId);
+  const response = await session.message('ORDER1', 'one', 16, 'MESSAGE1');
+  await session.acknowledge('ORDER1', response.messageId);
   const restarted = await createPaypalSession(f);
-  await restarted.acknowledge('MESSAGE1');
-  await assert.rejects(restarted.message('one', 16, 'MESSAGE1'));
-  await assert.rejects(restarted.message('different input', 16, 'MESSAGE1'));
-  await restarted.finish();
+  await restarted.acknowledge('ORDER1', 'MESSAGE1');
+  await assert.rejects(restarted.message('ORDER1', 'one', 16, 'MESSAGE1'));
+  await assert.rejects(
+    restarted.message('ORDER1', 'different input', 16, 'MESSAGE1'),
+  );
+  await restarted.finish('ORDER1');
   assert.deepEqual(f.calls, ['create', 'authorize', 'generate', 'capture:10']);
 });
 
@@ -308,19 +254,19 @@ void test('a journal failure after capture reports blocked rather than completed
     await write(value);
   };
   const session = await start(f);
-  const result = await session.message('one', 16, 'MESSAGE1');
-  await session.acknowledge(result.messageId);
-  await assert.rejects(session.finish());
+  const result = await session.message('ORDER1', 'one', 16, 'MESSAGE1');
+  await session.acknowledge('ORDER1', result.messageId);
+  await assert.rejects(session.finish('ORDER1'));
   assert.equal(session.status().phase, 'blocked');
   const restarted = await createPaypalSession(f);
-  await assert.rejects(restarted.finish());
+  await assert.rejects(restarted.finish('ORDER1'));
 });
 
 void test('disconnect during pending write releases that undelivered attempt but preserves earlier usage', async () => {
   const f = fixture();
   const session = await start(f);
-  const first = await session.message('one', 16, 'MESSAGE1');
-  await session.acknowledge(first.messageId);
+  const first = await session.message('ORDER1', 'one', 16, 'MESSAGE1');
+  await session.acknowledge('ORDER1', first.messageId);
   const controller = new AbortController();
   const write = f.journal.write;
   f.journal.write = async (value: unknown) => {
@@ -328,10 +274,10 @@ void test('disconnect during pending write releases that undelivered attempt but
     if (JSON.stringify(value).includes('message_pending')) controller.abort();
   };
   await assert.rejects(
-    session.message('two', 16, 'MESSAGE2', controller.signal),
+    session.message('ORDER1', 'two', 16, 'MESSAGE2', controller.signal),
   );
-  await assert.rejects(session.message('two', 16, 'MESSAGE2'));
-  await session.finish();
+  await assert.rejects(session.message('ORDER1', 'two', 16, 'MESSAGE2'));
+  await session.finish('ORDER1');
   assert.deepEqual(f.calls, [
     'create',
     'authorize',
@@ -341,19 +287,116 @@ void test('disconnect during pending write releases that undelivered attempt but
   ]);
 });
 
-void test('failed attempts are remembered and bounded without consuming the authorization', async () => {
+void test('undelivered attempts are remembered and bounded without consuming the authorization', async () => {
   const f = fixture();
-  f.engine.generate = async () => {
-    f.calls.push('generate');
-    throw new Error('engine');
-  };
   const session = await start(f);
+  let controller = new AbortController();
+  const write = f.journal.write;
+  f.journal.write = async (value: unknown) => {
+    await write(value);
+    if (JSON.stringify(value).includes('message_pending')) controller.abort();
+  };
   for (let i = 0; i < 30; i += 1) {
-    await assert.rejects(session.message('one', 16, `ATTEMPT${i}`));
+    controller = new AbortController();
+    await assert.rejects(
+      session.message('ORDER1', 'one', 16, `ATTEMPT${i}`, controller.signal),
+    );
   }
   assert.equal(session.status().remainingAttempts, 0);
-  await assert.rejects(session.message('one', 16, 'ATTEMPT30'));
-  await session.finish();
+  await assert.rejects(session.message('ORDER1', 'one', 16, 'ATTEMPT30'));
+  await session.finish('ORDER1');
   assert.equal(f.calls.filter((call) => call === 'generate').length, 30);
   assert.equal(f.calls.at(-1), 'void');
+  const restarted = await createPaypalSession(f);
+  await restarted.create();
+});
+
+void test('an uncertain engine failure blocks settlement and further messages', async () => {
+  const f = fixture();
+  const session = await start(f);
+  f.engine.generate = async () => {
+    f.calls.push('generate');
+    throw new Error('timeout');
+  };
+  await assert.rejects(session.message('ORDER1', 'one', 16, 'MESSAGE1'));
+  await assert.rejects(session.finish('ORDER1'));
+  const restarted = await createPaypalSession(f);
+  await assert.rejects(restarted.message('ORDER1', 'two', 16, 'MESSAGE2'));
+  assert.deepEqual(f.calls, ['create', 'authorize', 'generate']);
+});
+
+void test('a cancelled journal with inference attempts cannot unlock another order', async () => {
+  const f = fixture();
+  f.setState({
+    version: 2,
+    phase: 'cancelled',
+    requestId: 'REQUEST1',
+    currency: 'USD',
+    limitCents: 100,
+    messageCents: 10,
+    spentCents: 0,
+    attemptIds: ['MESSAGE1'],
+    acknowledgedIds: [],
+    orderId: 'ORDER1',
+  });
+  await assert.rejects(createPaypalSession(f));
+  assert.deepEqual(f.calls, []);
+});
+
+void test('old session messages and close requests cannot act on a new authorization', async () => {
+  const f = fixture();
+  let count = 0;
+  f.payment.create = async () => {
+    count += 1;
+    f.calls.push('create');
+    return {
+      orderId: `ORDER${count}`,
+      approvalUrl: `https://www.sandbox.paypal.com/checkoutnow?token=ORDER${count}`,
+    };
+  };
+  const session = await createPaypalSession(f);
+  await session.create();
+  await session.approve('ORDER1');
+  await session.finish('ORDER1');
+  await session.create();
+  await assert.rejects(session.cancel('ORDER1'));
+  await session.approve('ORDER2');
+  await assert.rejects(session.message('ORDER1', 'late request', 16, 'STALE1'));
+  await assert.rejects(session.finish('ORDER1'));
+  const response = await session.message(
+    'ORDER2',
+    'new request',
+    16,
+    'MESSAGE2',
+  );
+  await assert.rejects(session.acknowledge('ORDER1', response.messageId));
+  await session.acknowledge('ORDER2', response.messageId);
+  await session.finish('ORDER2');
+  assert.deepEqual(f.calls, [
+    'create',
+    'authorize',
+    'void',
+    'create',
+    'authorize',
+    'generate',
+    'capture:10',
+  ]);
+});
+
+void test('a journal with altered price, limit or currency cannot resume', async () => {
+  const f = fixture();
+  await start(f);
+  const value = f.getState();
+  assert.ok(value && typeof value === 'object');
+  assert.equal(Reflect.get(value, 'limitCents'), 100);
+  assert.equal(Reflect.get(value, 'messageCents'), 10);
+  assert.equal(Reflect.get(value, 'currency'), 'USD');
+  for (const mutation of [
+    { limitCents: 200 },
+    { messageCents: 20 },
+    { currency: 'EUR' },
+  ]) {
+    f.setState({ ...value, ...mutation });
+    await assert.rejects(createPaypalSession(f));
+  }
 });

@@ -8,6 +8,7 @@ import { isPaypalId, PaypalError } from '@gyblos/protocol/paypal-payment';
 
 import {
   PAYPAL_REQUEST_LIMITS,
+  PAYPAL_SESSION_RECORD_VERSION,
   PAYPAL_SESSION_PHASE as PHASE,
   PAYPAL_SESSION_STATUS as STATUS,
 } from './constants';
@@ -96,6 +97,7 @@ class PaypalSession {
       spentCents: this.active?.spentCents ?? 0,
       limitCents: PAYPAL_SANDBOX.limitCents,
       messageCents: PAYPAL_SANDBOX.messageCents,
+      orderId: this.active?.orderId,
       remainingAttempts:
         PAYPAL_SANDBOX.maxMessageAttempts -
         (this.active?.attemptIds.length ?? 0),
@@ -116,9 +118,12 @@ class PaypalSession {
     try {
       await this.deps.payment.prepare?.();
       const record: PaypalSessionRecord = {
-        version: 2,
+        version: PAYPAL_SESSION_RECORD_VERSION,
         phase: PHASE.CREATING,
         requestId: randomUUID(),
+        currency: PAYPAL_SANDBOX.currency,
+        limitCents: PAYPAL_SANDBOX.limitCents,
+        messageCents: PAYPAL_SANDBOX.messageCents,
         spentCents: 0,
         attemptIds: [],
         acknowledgedIds: [],
@@ -135,8 +140,10 @@ class PaypalSession {
       this.busy = false;
     }
   }
-  async cancel() {
+  async cancel(orderId: string) {
     const record = this.check(PHASE.CREATED);
+    if (record.orderId !== orderId)
+      return fail(PAYPAL_ERROR_CODES.INVALID_REQUEST);
     this.busy = true;
     try {
       await this.save({ ...record, phase: PHASE.CANCELLED });
@@ -168,6 +175,7 @@ class PaypalSession {
     }
   }
   async message(
+    orderId: string,
     prompt: string,
     maxTokens: number,
     messageId: string,
@@ -176,6 +184,7 @@ class PaypalSession {
     const digest = promptDigest(prompt, maxTokens);
     const record = this.check(PHASE.ACTIVE);
     if (
+      record.orderId !== orderId ||
       !record.expiresAt ||
       Date.now() >= record.expiresAt ||
       !isPaypalId(messageId) ||
@@ -204,7 +213,6 @@ class PaypalSession {
         output = await this.deps.engine.generate({ prompt, maxTokens, signal });
         signal?.throwIfAborted();
       } catch {
-        if (!signal?.aborted) await this.save({ ...record, attemptIds });
         return fail(PAYPAL_ERROR_CODES.INFERENCE_FAILED);
       }
       await this.save({
@@ -224,17 +232,18 @@ class PaypalSession {
       this.busy = false;
     }
   }
-  async acknowledge(messageId: string) {
+  async acknowledge(orderId: string, messageId: string) {
     if (
       !this.busy &&
       !this.journalFailed &&
       !this.legacyBlocked &&
       this.active?.phase === PHASE.ACTIVE &&
+      this.active.orderId === orderId &&
       this.active.acknowledgedIds.includes(messageId)
     )
       return this.status();
     const record = this.check(PHASE.MESSAGE_PENDING);
-    if (record.messageId !== messageId)
+    if (record.orderId !== orderId || record.messageId !== messageId)
       return fail(PAYPAL_ERROR_CODES.INVALID_REQUEST);
     this.busy = true;
     try {
@@ -253,8 +262,10 @@ class PaypalSession {
       this.busy = false;
     }
   }
-  async finish() {
+  async finish(orderId: string) {
     const record = this.check(PHASE.ACTIVE);
+    if (record.orderId !== orderId)
+      return fail(PAYPAL_ERROR_CODES.INVALID_REQUEST);
     if (!record.authorizationId)
       return fail(PAYPAL_ERROR_CODES.INVALID_JOURNAL);
     this.busy = true;

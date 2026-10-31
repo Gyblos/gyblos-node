@@ -349,3 +349,4 @@ export const PAYPAL_SESSION_STATUS = {
   READY: 'ready',
   BLOCKED: 'blocked',
 } as const;
+export const PAYPAL_SESSION_RECORD_VERSION = 2;
