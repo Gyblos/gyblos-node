@@ -68,16 +68,13 @@ async function directoryIssue(
 ): Promise<SkillLayoutIssue | undefined> {
   try {
     const stat = await lstat(path);
-    if (!stat.isDirectory() || stat.isSymbolicLink())
-      return { path: pathLabel(root, path), message };
-    return undefined;
+    if (stat.isDirectory() && !stat.isSymbolicLink()) return undefined;
+    return { path: pathLabel(root, path), message };
   } catch (error: unknown) {
     if (!isMissing(error)) throw error;
-    if (!required) return undefined;
-    return { path: pathLabel(root, path), message };
+    return required ? { path: pathLabel(root, path), message } : undefined;
   }
 }
-
 async function layoutRootIssues(root: string): Promise<SkillLayoutIssue[]> {
   const repositoryIssue = await directoryIssue(
     root,
@@ -119,13 +116,11 @@ async function layoutRootIssues(root: string): Promise<SkillLayoutIssue[]> {
   );
   return distributionIssue ? [distributionIssue] : [];
 }
-
 function expectedLinkTarget(root: string, name: string): string {
   const distribution = distributionSkill(root, name);
   const canonical = canonicalSkill(root, name);
   return relative(dirname(distribution), canonical).split(sep).join('/');
 }
-
 async function directoryEntries(
   path: string,
 ): Promise<import('node:fs').Dirent[]> {
@@ -171,12 +166,21 @@ async function canonicalSkillNames(
         });
         continue;
       }
+      await skillFiles(entryPath);
     } catch (error: unknown) {
-      if (!isMissing(error)) throw error;
-      issues.push({
-        path: pathLabel(root, manifest),
-        message: 'Every skill must contain a SKILL.md file.',
-      });
+      if (isMissing(error))
+        issues.push({
+          path: pathLabel(root, manifest),
+          message: 'Every skill must contain a SKILL.md file.',
+        });
+      else
+        issues.push({
+          path: pathLabel(root, entryPath),
+          message:
+            error instanceof Error
+              ? error.message
+              : 'Skill tree contains a non-regular file.',
+        });
       continue;
     }
     names.push(entry.name);
@@ -185,11 +189,8 @@ async function canonicalSkillNames(
   names.sort();
   return { names, issues };
 }
-
 async function skillNamesAt(path: string): Promise<string[]> {
-  const entries = await directoryEntries(path);
-  const names = entries.map((entry) => entry.name).sort();
-  return names;
+  return (await directoryEntries(path)).map((entry) => entry.name).sort();
 }
 
 async function skillFiles(path: string, prefix = ''): Promise<string[]> {

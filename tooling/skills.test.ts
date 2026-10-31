@@ -175,6 +175,30 @@ void test('rejects a symlinked canonical skills parent before checking', async (
   });
 });
 
+void test('rejects nested canonical symlinks with an exact mirror', async (t) => {
+  await withFixture(async (root) => {
+    const target = join(root, 'external-skill-file');
+    const nested = join(
+      root,
+      '.agents',
+      'skills',
+      'example-skill',
+      'nested-link',
+    );
+    await writeFile(target, 'external\n');
+    try {
+      await symlink(target, nested, 'file');
+    } catch (error: unknown) {
+      if (!symlinkUnavailable(error)) throw error;
+      t.skip('symlinks are unavailable in this checkout');
+      return;
+    }
+    await createSkillSymlink(root);
+    const report = await checkSkillLayout(root);
+    assert.match(report.issues[0]?.message ?? '', /non-regular file/);
+  });
+});
+
 void test('requires explicit replacement before repairing a drifted mirror', async () => {
   await withFixture(async (root) => {
     await materializeSkills(root);
