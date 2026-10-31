@@ -1,4 +1,5 @@
 // Deterministic recounted engine injected only by verification; never loads artifacts or contacts a provider.
+import { MODEL } from '@gyblos/engine-ollama/model';
 import {
   REMOTE_READINESS,
   type PreparedEngine,

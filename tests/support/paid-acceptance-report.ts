@@ -44,16 +44,20 @@ export function parsePaidReport(text: string): PaidAcceptanceReport {
       JSON.stringify(cases) !== JSON.stringify(known)
     )
       throw new Error();
+    const answers = controlInteger(row.answers, 4);
+    const attempts = controlInteger(row.attempts, answers);
+    const deposits = controlInteger(row.deposits, attempts, attempts);
+    const settlements = controlInteger(row.settlements, deposits, deposits);
     return {
       ok: true,
       nativeIroh: true,
       simulatedChain: true,
       realPayments: false,
       cases,
-      answers: controlInteger(row.answers, 4),
-      attempts: controlInteger(row.attempts, 4),
-      deposits: controlInteger(row.deposits, 4),
-      settlements: controlInteger(row.settlements, 4),
+      answers,
+      attempts,
+      deposits,
+      settlements,
       restarts: controlInteger(row.restarts, 2),
       blocked: controlInteger(row.blocked, 2),
       externalCalls: controlInteger(row.externalCalls, 0, 0),

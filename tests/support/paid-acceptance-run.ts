@@ -8,12 +8,25 @@ import {
   createAcceptanceWorkspace,
   type AcceptanceWorkspace,
 } from '@gyblos/lab-harness/acceptance/workspace';
+import { controlObject } from '@gyblos/protocol/control-validation';
 
 import { PAID_ACCEPTANCE } from './paid-acceptance-constants';
 import { parsePaidReport } from './paid-acceptance-report';
 
 export { parsePaidReport } from './paid-acceptance-report';
 
+function childFailure(output: string) {
+  try {
+    const row = controlObject(JSON.parse(output), ['ok', 'code']);
+    const code = Object.values(ACCEPTANCE_CODES).find(
+      (item) => item === row.code,
+    );
+    if (row.ok === false && code) return new AcceptanceError(code);
+  } catch {
+    /* Do not reflect child output. */
+  }
+  return new AcceptanceError(ACCEPTANCE_CODES.FAILED);
+}
 async function child(workspace: AcceptanceWorkspace, signal?: AbortSignal) {
   const processChild = spawn(
     process.execPath,
@@ -75,8 +88,8 @@ async function child(workspace: AcceptanceWorkspace, signal?: AbortSignal) {
       processChild.once('close', resolve);
     });
     if (signal?.aborted) throw new AcceptanceError(ACCEPTANCE_CODES.CANCELLED);
-    if (code !== 0 || failed)
-      throw new AcceptanceError(ACCEPTANCE_CODES.FAILED);
+    if (failed) throw new AcceptanceError(ACCEPTANCE_CODES.FAILED);
+    if (code !== 0) throw childFailure(output);
     return parsePaidReport(output.trim());
   } finally {
     clearTimeout(timer);

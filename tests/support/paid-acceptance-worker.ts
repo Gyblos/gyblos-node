@@ -8,6 +8,7 @@ import {
   ACCEPTANCE,
   ACCEPTANCE_CODES,
 } from '@gyblos/lab-harness/acceptance/constants';
+import { AcceptanceError } from '@gyblos/lab-harness/acceptance/errors';
 import { assertAcceptanceTempBase } from '@gyblos/lab-harness/acceptance/workspace';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 import { isMain } from '@gyblos/runtime';
@@ -172,7 +173,15 @@ async function main() {
     );
     return 0;
   } catch (error) {
-    console.log(JSON.stringify({ ok: false, code: ACCEPTANCE_CODES.FAILED }));
+    console.log(
+      JSON.stringify({
+        ok: false,
+        code:
+          error instanceof AcceptanceError
+            ? error.code
+            : ACCEPTANCE_CODES.FAILED,
+      }),
+    );
     return 1;
   }
 }
