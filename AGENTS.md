@@ -4,7 +4,7 @@
 
 - GitHub repo `Gyblos/gyblos-node`; the local checkout directory is still named `gyblos-payments`. It holds the node, buyer, desktop and discovery index applications, not the landing website in `../gyblos` (`web-gyblos`).
 - Use English for repository content, comments, commits and PRs; conversation language follows the founder.
-- This file is the single public source of agent rules. `CLAUDE.md` imports it and `CONTRIBUTING.md` points here. Detailed style is in [docs/code-standards.md](docs/code-standards.md); repository skills are canonical in `.agents/skills/` and mirrored to `.claude/skills/`, adding procedures but never rules. Optional personal notes go in ignored `AGENTS.local.md`.
+- This file is the single public source of agent rules. `CLAUDE.md` imports it and `CONTRIBUTING.md` points here. Detailed style is in [docs/code-standards.md](docs/code-standards.md); the shared contributor workflow is in [docs/ai-assisted-contributing.md](docs/ai-assisted-contributing.md). Repository skills are canonical in `.agents/skills/` and mirrored to `.claude/skills/`, adding procedures but never rules. Optional personal notes go in ignored `AGENTS.local.md`.
 
 ## Layers and ownership
 
@@ -39,6 +39,11 @@ pnpm desktop:build  # also desktop:start, desktop:smoke, desktop:package
 ```
 
 None of these needs a funded wallet, engine or Docker. `gate:*`, funding, identity devnet and deployment commands are operational actions: never run them to validate a change. A 402 or local test is not proof of an on-chain paid run.
+
+## Shared contributor workflow
+
+- Humans and AI-assisted contributors follow the same change loop: orient, define scope, inspect, implement, verify locally, review and hand off. The procedure is [`.agents/skills/gyblos-contributor-workflow/SKILL.md`](.agents/skills/gyblos-contributor-workflow/SKILL.md); its public onboarding explanation is [docs/ai-assisted-contributing.md](docs/ai-assisted-contributing.md).
+- Provider-specific files may help a tool load this repository, but they do not add rules or replace project context. A handoff must be reproducible from the branch, repository files and reported checks, without a private prompt or transcript.
 
 ## Hard rules
 
