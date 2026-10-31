@@ -281,3 +281,12 @@ void test('disconnect while recording completion triggers a refund', async () =>
   await assert.rejects(service.execute('ORDER1', 'first', 16, controller.signal));
   assert.deepEqual(f.calls, ['create', 'authorize', 'generate', 'capture', 'refund']);
 });
+
+void test('contradictory terminal journal fields cannot unlock payments', async () => {
+  const f = fixture();
+  const base = { requestId: 'REQUEST1', promptDigest: 'a'.repeat(64), maxTokens: 16, orderId: 'ORDER1' };
+  f.journal.read = async () => ({ ...base, phase: 'cancelled', authorizationId: 'AUTH1' });
+  await assert.rejects(createPaypalInference(f));
+  f.journal.read = async () => ({ ...base, phase: 'voided', authorizationId: 'AUTH1', captureId: 'CAPTURE1' });
+  await assert.rejects(createPaypalInference(f));
+});
