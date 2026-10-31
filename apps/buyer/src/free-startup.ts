@@ -36,11 +36,11 @@ export class FreeBuyerStartupError extends Error {
     this.name = 'FreeBuyerStartupError';
   }
 }
-const refuse = (reason: FreeBuyerStartupReason): never => {
+export const refuse = (reason: FreeBuyerStartupReason): never => {
   throw new FreeBuyerStartupError(reason);
 };
 
-async function buyerRole() {
+export async function buyerRole() {
   try {
     return await loadRole(P2P_ROLES.BUYER);
   } catch (error) {
@@ -74,7 +74,7 @@ function stateReason(error: unknown): FreeBuyerStartupReason {
     return FREE_BUYER_STARTUP.STATS_INVALID;
   return FREE_BUYER_STARTUP.UNKNOWN;
 }
-async function buyerSelection() {
+export async function buyerSelection() {
   const config =
     (await selectionConfig()) ?? refuse(FREE_BUYER_STARTUP.SELECTION_MISSING);
   try {
@@ -83,7 +83,7 @@ async function buyerSelection() {
     return refuse(stateReason(error));
   }
 }
-async function listenOrRefuse<T>(listen: () => Promise<T>) {
+export async function listenOrRefuse<T>(listen: () => Promise<T>) {
   try {
     return await listen();
   } catch (error) {
@@ -92,7 +92,7 @@ async function listenOrRefuse<T>(listen: () => Promise<T>) {
     throw error;
   }
 }
-async function buyerNodeSecret() {
+export async function buyerNodeSecret() {
   try {
     return await nodeSecret(P2P_ROLES.BUYER);
   } catch {

@@ -8,27 +8,54 @@ import {
   FREE_CHAT_ROLES,
   FREE_EXECUTION,
   type FreeExecutionCode,
+  type PaymentErrorCode,
 } from '@gyblos/protocol/constants';
 import type {
   FreeExecutionBuildInput,
   FreeExecutionResult,
   FreeExecutionStop,
 } from '@gyblos/protocol/free-execution';
+import type { PaidExecutionCode } from '@gyblos/protocol/paid/constants';
 
-import { FREE_BUYER, FREE_BUYER_CODES, type FreeBuyerCode } from './constants';
+import {
+  FREE_BUYER,
+  FREE_BUYER_CODES,
+  PAID_BUYER,
+  type FreeBuyerCode,
+  type PaidBuyerCode,
+} from './constants';
 import { FreeBuyerError } from './free-chat';
 import type { SelectionDecision } from './selection';
 
-type FreeStreamErrorCode =
+// What a paid request cost, as the buyer counted it and as the seller claimed; amounts are atomic
+// units of the test token. A free request carries none.
+export interface ChatPayment {
+  verdict: string;
+  maxAtomic: string;
+  expectedAtomic: string;
+  chargedAtomic: string | null;
+  sellerAtomic: string | null;
+  feeAtomic: string | null;
+  refundedAtomic: string | null;
+}
+export type ChatResult = FreeExecutionResult & { payment?: ChatPayment };
+
+export type ChatErrorCode =
   | FreeBuyerCode
+  | PaidBuyerCode
   | FreeExecutionCode
+  | PaidExecutionCode
+  | PaymentErrorCode
   | Exclude<SelectionDecision, { ok: true }>['code'];
+
+export const paymentFields = (payment: ChatPayment | undefined) =>
+  payment ? { [PAID_BUYER.paymentField]: payment } : {};
 
 export type FreeChatStreamExecutor = (
   input: FreeExecutionBuildInput,
   signal: AbortSignal,
   onDelta: (text: string) => Promise<void>,
-) => Promise<FreeExecutionResult>;
+) => Promise<ChatResult>;
 function active(response: ServerResponse, signal: AbortSignal) {
   if (signal.aborted || response.destroyed || response.writableEnded)
     throw new FreeBuyerError(FREE_BUYER_CODES.UNAVAILABLE);
@@ -123,6 +150,7 @@ export async function executeFreeSse(
         completion_tokens: result.usage.outputTokens,
         total_tokens: result.usage.inputTokens + result.usage.outputTokens,
       },
+      ...paymentFields(result.payment),
     },
     signal,
   );
@@ -132,8 +160,9 @@ export async function executeFreeSse(
 // A seller that could not continue adds its reason and, when known, the completion tokens delivered.
 export function replyFreeSseError(
   response: ServerResponse,
-  code: FreeStreamErrorCode,
+  code: ChatErrorCode,
   stop: FreeExecutionStop = {},
+  payment?: ChatPayment,
 ) {
   if (response.destroyed || response.writableEnded) return;
   const error = {
@@ -145,6 +174,7 @@ export function replyFreeSseError(
     ...(stop.delivered
       ? { usage: { completion_tokens: stop.delivered.outputTokens } }
       : {}),
+    ...paymentFields(payment),
   };
   response.end(`data: ${JSON.stringify({ error })}\n\n`);
 }

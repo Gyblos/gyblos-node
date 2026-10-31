@@ -20,8 +20,8 @@ import { roleSigner, type RoleConfig } from './roles';
 import type { SellerPayments } from './seller-paid';
 
 // The chain the RPC serves; tests inject one so they never reach the network.
-type GenesisReader = (rpcUrl: string) => Promise<string>;
-const readGenesis: GenesisReader = async (rpcUrl) =>
+export type GenesisReader = (rpcUrl: string) => Promise<string>;
+export const readGenesis: GenesisReader = async (rpcUrl) =>
   String(await createSolanaRpc(rpcUrl).getGenesisHash().send());
 
 // Role keys are read from the process home (as every role file is), so the ledger lives there too.

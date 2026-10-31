@@ -175,6 +175,8 @@ export const PAID_BUYER_CODES = {
   UNAVAILABLE: 'PAID_BUYER_NO_OFFER',
   // Paid sellers serve a single user message; anything else is refused before paying.
   UNSUPPORTED: 'PAID_BUYER_UNSUPPORTED_INPUT',
+  // Another paid request is still running in this buyer.
+  BUSY: 'PAID_BUYER_BUSY',
 } as const;
 export type PaidBuyerCode =
   (typeof PAID_BUYER_CODES)[keyof typeof PAID_BUYER_CODES];
@@ -183,6 +185,14 @@ export const PAID_BUYER = {
   requestMs: 180000,
   // Checking the settlement on chain and recording the outcome, once the terminal arrived.
   receiptMs: 30000,
+  // Outcomes for reconciliation, one JSON line each, in the buyer home.
+  recordsFile: 'paid-records.jsonl',
+  // Past this size new records are refused; reconciliation still reads the journal.
+  recordsBytes: 1048576,
+  // A paid buyer quotes paid sellers only; a free winner is skipped this many times at most.
+  freeSkips: 8,
+  // The JSON field that carries the payment summary in completions and errors.
+  paymentField: 'gyblos_payment',
 } as const;
 // How the buyer judges a paid request once the signed open reached the seller.
 export const PAID_VERDICTS = {
@@ -242,6 +252,14 @@ export const FREE_BUYER_STARTUP = {
   REASONING: 'SELECTION_REASONING_UNSUPPORTED',
   NODE_KEY: 'BUYER_NODE_KEY_MISMATCH',
   PORT_IN_USE: 'BUYER_PORT_IN_USE',
+  // Paid mode: the role's RPC, or the request's network or asset, is not the devnet test token.
+  PAID_NETWORK: 'BUYER_PAYMENT_NETWORK_MISMATCH',
+  // Paid mode recounts with the pinned public tokenizer, so only its model can be bought.
+  PAID_MODEL: 'BUYER_PAID_MODEL_UNSUPPORTED',
+  PAID_KEY: 'BUYER_WALLET_KEY_INVALID',
+  TOKENIZER: 'BUYER_TOKENIZER_UNAVAILABLE',
+  // Unreadable, or held by another buyer process.
+  JOURNAL: 'BUYER_PAYMENT_JOURNAL_UNAVAILABLE',
   UNKNOWN: 'BUYER_STARTUP_FAILED',
 } as const;
 export type FreeBuyerStartupReason =

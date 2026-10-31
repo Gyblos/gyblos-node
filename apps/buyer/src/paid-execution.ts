@@ -288,7 +288,7 @@ export async function executeBuyerPaid(
   external?: AbortSignal,
   onDelta: (text: string) => Promise<void> = async () => {},
 ): Promise<PaidBuyerOutcome> {
-  const prompt = paidPrompt(input);
+  const prompt = paidPrompt(input, dependencies.meter);
   if (prompt === undefined)
     throw new PaidBuyerError(PAID_BUYER_CODES.UNSUPPORTED);
   const release = dependencies.enter();

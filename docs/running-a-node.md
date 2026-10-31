@@ -189,10 +189,11 @@ pnpm node:start
 ## Buyer
 
 Free inference uses `pnpm buyer:free`
-([Free v2 buyer endpoint](#free-v2-buyer-endpoint)). The paid v1 flow below
-needs a paid seller's `offer.json`; the seller daemon never writes one (paid v2
-uses its own stream and has no buyer yet), so the v1 flow runs only against the
-lab gates (`gate:*`).
+([Free v2 buyer endpoint](#free-v2-buyer-endpoint)); `pnpm buyer` serves the
+same endpoint and pays on devnet when `selection.json` sets a deposit ceiling
+([Paid v2 buyer endpoint](#paid-v2-buyer-endpoint)). The paid v1 flow below
+needs a paid seller's `offer.json`; the seller daemon never writes one, so the
+v1 flow runs only against the lab gates (`gate:*`).
 
 ```sh
 export GYBLOS_RELAY_TOKEN=...
@@ -630,6 +631,44 @@ They are not the complete publication-to-answer acceptance: the separate lab
 scenario with an in-process discovery index follows this buyer's integration.
 Real Ollama, off-host/relay/CGNAT and production acceptance remain separate
 operations. Streaming, 8004 identity reading and paid v2 are subsequent work.
+
+## Paid v2 buyer endpoint
+
+`pnpm buyer` reads `selection.json`: with `request.maxAtomic` above `"0"` it
+starts the paid buyer on the same loopback endpoint, otherwise the free one.
+Paid mode is devnet only and needs:
+
+- the buyer role (`pnpm node:setup --role buyer --mint MINT`) whose `rpcUrl`
+  serves devnet (checked by its genesis hash) and whose wallet holds devnet SOL
+  and the test token;
+- the pinned public tokenizer (`pnpm node:tokenizer`), because the buyer
+  recounts every answer itself;
+- `request.selection.modelId` `qwen3-0.6b`, reasoning `off`, `network` devnet
+  and `asset` the role's mint, with `maxAtomic` the most one request may deposit
+  and `priceCeilings` the highest prices it accepts (protocol fee included).
+
+Each request takes one quote from a paid seller (a free winner is skipped),
+signs one channel open for at most `maxAtomic`, streams the answer and checks
+the seller's settlement against the buyer's own count. A completed answer, and
+any error after the open reached a seller, carries `gyblos_payment`: the
+verdict, the ceiling, the buyer's expected charge and the seller's charge,
+payout, fee and refund in atomic units. Only a single user message the model's
+chat template accepts is sent; anything else is refused before paying.
+
+One paid request runs at a time (`PAID_BUYER_BUSY`) and one buyer process holds
+the payment journal (`BUYER_PAYMENT_JOURNAL_UNAVAILABLE`). The buyer never fails
+over once a seller received the signed open, since that seller could still land
+it. Any channel not settled on the buyer's own count (a refusal, a stop, a
+pending or lapsed claim, a dispute or a settlement the chain could not confirm)
+is written to `paid-records.jsonl` in the buyer home and blocks new payments
+(`PAID_BUYER_UNRESOLVED_PAYMENT`) until it is reconciled. Reconciling paid v2
+channels (`buyer:reconcile`) is the next step and not available yet, so a
+blocked devnet test buyer is reset by hand for now.
+
+Startup reasons beyond the free ones: `BUYER_PAYMENT_NETWORK_MISMATCH` (RPC,
+network or asset not devnet's test token), `BUYER_PAID_MODEL_UNSUPPORTED`,
+`BUYER_WALLET_KEY_INVALID`, `BUYER_TOKENIZER_UNAVAILABLE` and
+`BUYER_PAYMENT_JOURNAL_UNAVAILABLE`.
 
 ## Private free-inference receipts
 

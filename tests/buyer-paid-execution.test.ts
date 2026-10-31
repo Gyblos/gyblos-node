@@ -69,6 +69,18 @@ void test('input no paid seller serves, or an unresolved channel, stops before a
       executeBuyerPaid({ ...INPUT, messages }, buyer.dependencies),
       { code: PAID_BUYER_CODES.UNSUPPORTED },
     );
+  // A prompt the model's chat template refuses would only fail after paying.
+  const meter = buyer.dependencies.meter;
+  buyer.dependencies.meter = {
+    ...meter,
+    input: () => {
+      throw new Error('Unsupported prompt for the bounded single-user offer.');
+    },
+  };
+  await assert.rejects(executeBuyerPaid(INPUT, buyer.dependencies), {
+    code: PAID_BUYER_CODES.UNSUPPORTED,
+  });
+  buyer.dependencies.meter = meter;
   buyer.setUnresolved(true);
   await assert.rejects(executeBuyerPaid(INPUT, buyer.dependencies), {
     code: PAID_BUYER_CODES.UNRESOLVED,
