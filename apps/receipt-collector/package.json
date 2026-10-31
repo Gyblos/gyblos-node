@@ -1,0 +1,22 @@
+{
+  "name": "@gyblos/receipt-collector",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./service": "./src/service.ts",
+    "./constants": "./src/constants.ts",
+    "./settings": "./src/settings.ts",
+    "./main": "./src/main.ts"
+  },
+  "scripts": {
+    "start": "node --import tsx src/main.ts"
+  },
+  "dependencies": {
+    "@gyblos/config": "workspace:*",
+    "@gyblos/core": "workspace:*",
+    "@gyblos/protocol": "workspace:*",
+    "@gyblos/runtime": "workspace:*",
+    "@gyblos/telemetry-file": "workspace:*"
+  }
+}
