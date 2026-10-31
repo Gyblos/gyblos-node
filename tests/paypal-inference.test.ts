@@ -77,3 +77,17 @@ void test('uncertain capture blocks another attempt, including after restart', a
   await assert.rejects(restarted.create('second', 16));
   assert.deepEqual(f.calls, ['create', 'authorize', 'generate', 'capture']);
 });
+
+void test('a journal failure after capture blocks further orders', async () => {
+  const f = fixture();
+  const write = f.journal.write;
+  f.journal.write = async (value: unknown) => {
+    if (JSON.stringify(value).includes('completed')) throw new Error('disk');
+    await write(value);
+  };
+  const service = await createPaypalInference(f);
+  await service.create('first', 16);
+  await assert.rejects(service.execute('ORDER1', 'first', 16));
+  await assert.rejects(service.create('second', 16));
+  assert.deepEqual(f.calls, ['create', 'authorize', 'generate', 'capture']);
+});
