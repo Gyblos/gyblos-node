@@ -262,14 +262,15 @@ context-token limit; canonical decimal rates and the resulting charge are
 bounded by the existing unsigned 64-bit atomic limit. Arbitrary-precision integer
 intermediates may exceed u64 when the final result fits; overflow of the final
 charge is a static typed limit error, never truncation or floating-point rounding.
-This arithmetic is pure policy, not wired payment execution.
+This helper is pure policy. Paid execution separately applies combined rounding,
+caps the amount at the authorized ceiling, and charges zero if no output was
+delivered or the output count is zero.
 
 USDC-per-million configuration prices map exactly to atomic-per-million rates
 by multiplying by 1,000,000 (at most six decimal places); there is no division
-by token count during this conversion. Seller startup still advertises the
-unchanged PoC v1 rates multiplied by the million-token scale, and the buyer's
-legacy compatibility check compares those exact economic terms. It does not
-convert a signed v2 quote into a v1 offer or enable v2 payments. Selector weights
+by token count during this conversion. Seller startup advertises configured v2
+rates plus the protocol fee. The legacy buyer's v1 compatibility check does not
+convert a signed v2 quote into a v1 offer. Selector weights
 compare the same per-million rate sums (without charge rounding); its minimum
 paid budget covers the once-rounded cost of one input and one output token.
 A quote's total budget remains a ceiling, not a promise that an unknown prompt
@@ -281,8 +282,8 @@ supported paid ALPN. The current paid v1 validator rejects v2. The pure policy
 in `@gyblos/core/control-quotes` (`createControlQuote` for sellers,
 `acceptControlQuote` for buyers) verifies caller-trusted identities, catalog and
 request terms. It does not carry v1 payment checks (payTo distinct from
-owner/feePayer/authorizer, capability and metering requirements); payment
-paid execution admission enforces its own checks. Its caller supplies
+owner/feePayer/authorizer, capability and metering requirements); paid execution
+admission enforces its own checks. Its caller supplies
 engine/readiness snapshots and increments readiness generation when those
 change; no engine or payment adapter runs here.
 Free quotes can be consumed by the separate free-execution service described
