@@ -4,12 +4,31 @@ import { createPrivateReceiptCollector } from '@gyblos/core/receipt-collector';
 import { isMain } from '@gyblos/runtime';
 import { openReceiptFileStore } from '@gyblos/telemetry-file/receipt-store';
 
-import { acceptanceAssert } from './errors';
+import { ACCEPTANCE_CODES } from './constants';
+import { acceptanceAssert, AcceptanceError } from './errors';
 import {
   collectorBytes,
   collectorPath,
   collectorSnapshot,
 } from './receipt-collector-state';
+
+export async function withCollectorOffline<T>(
+  run: () => Promise<T>,
+): Promise<T> {
+  const previous = globalThis.fetch;
+  let attempts = 0;
+  globalThis.fetch = async () => {
+    attempts++;
+    throw new AcceptanceError(ACCEPTANCE_CODES.EXTERNAL_IO);
+  };
+  try {
+    const result = await run();
+    if (attempts) throw new AcceptanceError(ACCEPTANCE_CODES.EXTERNAL_IO);
+    return result;
+  } finally {
+    globalThis.fetch = previous;
+  }
+}
 
 async function main() {
   const root = process.cwd();
@@ -39,7 +58,7 @@ async function main() {
 }
 if (isMain(import.meta.url)) {
   try {
-    await main();
+    await withCollectorOffline(main);
   } catch {
     process.exitCode = 1;
   } finally {

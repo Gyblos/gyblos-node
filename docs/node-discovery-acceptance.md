@@ -318,7 +318,11 @@ batches, checks their exact keys and fingerprints in the private snapshot,
 closes the writer and starts a separate credential-free process. That process
 reopens and verifies the snapshot and resubmits every retained pair as an exact
 duplicate without changing the file. Its successful exit and a further reopen
-prove that its exclusive ownership was released.
+prove that its exclusive ownership was released. The restart worker installs its
+own lifecycle-scoped fetch guard; even a swallowed fetch attempt fails
+acceptance. Early cancellation is tested immediately after spawning, before the
+child opens the store; cleanup of an already-held lock on forced termination is
+not established by that case.
 
 A separate one-entry snapshot checks capacity refusal without eviction, exact
 duplicates at full capacity, pre-cancellation and a seller-only pair refusal.

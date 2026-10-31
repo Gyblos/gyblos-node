@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 
 import { collectReceiptAcceptance } from '@gyblos/lab-harness/acceptance/receipt-collector';
+import { withCollectorOffline } from '@gyblos/lab-harness/acceptance/receipt-collector-worker';
 import { createAcceptanceWorkspace } from '@gyblos/lab-harness/acceptance/workspace';
 import { openReceiptFileStore } from '@gyblos/telemetry-file/receipt-store';
 
@@ -77,7 +78,7 @@ void test('collector acceptance refuses duplicate evidence before allocating sto
   );
   assert.deepEqual(await readdir(workspace.root), before);
 });
-void test('collector acceptance cancellation terminates its restart child and releases storage', async (context) => {
+void test('collector acceptance cancels before its restart child opens storage and preserves the snapshot', async (context) => {
   const workspace = await createAcceptanceWorkspace();
   context.after(() => workspace.close());
   const first = await collectorPair();
@@ -114,4 +115,43 @@ void test('collector acceptance cancellation terminates its restart child and re
     mock.mock.restore();
     syncBuiltinESMExports();
   }
+});
+
+void test('collector restart guard rejects even a swallowed fetch attempt and restores globals', async () => {
+  const previous = globalThis.fetch;
+  let previousCalls = 0;
+  const syntheticFetch: typeof fetch = async () => {
+    previousCalls++;
+    throw new Error('Synthetic forbidden fetch');
+  };
+  globalThis.fetch = syntheticFetch;
+  try {
+    await assert.rejects(
+      withCollectorOffline(async () => {
+        try {
+          await fetch('https://synthetic.invalid');
+        } catch {
+          /* Probe code swallowing an adapter failure. */
+        }
+        return 1;
+      }),
+      { code: 'ACCEPTANCE_EXTERNAL_IO' },
+    );
+    assert.equal(previousCalls, 0);
+    assert.equal(globalThis.fetch, syntheticFetch);
+  } finally {
+    globalThis.fetch = previous;
+  }
+});
+void test('collector restart guard preserves offline success and callback failures', async () => {
+  const previous = globalThis.fetch;
+  assert.equal(await withCollectorOffline(async () => 1), 1);
+  const failure = new Error('Synthetic callback failure');
+  await assert.rejects(
+    withCollectorOffline(async () => {
+      throw failure;
+    }),
+    (error) => error === failure,
+  );
+  assert.equal(globalThis.fetch, previous);
 });
