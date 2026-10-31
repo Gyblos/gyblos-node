@@ -1,7 +1,6 @@
-// Starts the paid buyer on devnet behind the same loopback endpoint as the free one: the role's wallet
-// and RPC (proven devnet), the pinned public tokenizer for its own recount, the payment journal (one
-// buyer process at a time), the endpoint's bearer token and selection quoted at the configured ceilings.
-// Refusals carry static reasons.
+// Starts the paid buyer on devnet behind the free one's loopback endpoint, guarded by a bearer token: the
+// role's wallet and RPC (proven devnet), the pinned tokenizer for its recount, the payment journal (one
+// buyer at a time) and selection quoted at the configured ceilings. Refusals carry static reasons.
 import {
   BUYER_RELAY_ONLY_ENV,
   DEVNET,

@@ -1,11 +1,14 @@
 // `pnpm buyer` in paid mode: each startup refusal names its own static reason (model, network, tokenizer,
-// wallet key, journal held by another buyer, unsafe API token), and a started buyer answers on the
-// loopback endpoint in paid mode only with the bearer token it keeps in the buyer home. A disposable home, a fake endpoint, an injected tokenizer and an RPC double; no network.
+// wallet key, journal held by another buyer, unsafe API token), and a started buyer answers on the loopback
+// endpoint only with the bearer token it keeps in the buyer home. A disposable home, a fake endpoint, an
+// injected tokenizer and an RPC double; no network.
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import {
   chmod,
+  link,
   mkdtemp,
+  readdir,
   readFile,
   rm,
   stat,
@@ -231,10 +234,24 @@ void test('paid startup names each refusal and answers in paid mode once started
     await writeFile(elsewhere, token, { mode: 0o600 });
     await symlink(elsewhere, tokenFile);
     assert.equal(await reason(base), 'BUYER_API_TOKEN_INVALID');
-    // Removing it makes the next start generate a new one.
+    await rm(tokenFile);
+    // A second name elsewhere, a FIFO (which must not block the start) and an oversized file.
+    await link(elsewhere, tokenFile);
+    assert.equal(await reason(base), 'BUYER_API_TOKEN_INVALID');
+    await rm(tokenFile);
+    execFileSync('mkfifo', ['-m', '600', tokenFile]);
+    assert.equal(await reason(base), 'BUYER_API_TOKEN_INVALID');
+    await rm(tokenFile);
+    await writeFile(tokenFile, `${token}\n`.repeat(8), { mode: 0o600 });
+    assert.equal(await reason(base), 'BUYER_API_TOKEN_INVALID');
+    // Removing it makes the next start generate a new one, and no staged file is left beside it.
     await rm(tokenFile);
     assert.equal(await reason(base), 'STARTED');
     assert.notEqual(await readFile(tokenFile, 'utf8'), token);
+    assert.deepEqual(
+      (await readdir(buyer)).filter((name) => name.startsWith('api-token')),
+      ['api-token'],
+    );
 
     await writeFile(join(buyer, ROLE_KEY_FILES.buyer), '[1,2,3]', {
       mode: 0o600,

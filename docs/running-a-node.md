@@ -646,6 +646,8 @@ Paid mode is devnet only and needs:
 - `request.selection.modelId` `qwen3-0.6b`, reasoning `off`, `network` devnet
   and `asset` the role's mint, with `maxAtomic` the most one request may deposit
   and `priceCeilings` the highest prices it accepts (protocol fee included).
+- every request to carry `Authorization: Bearer <token>`, with the token the
+  first paid start writes to `api-token` in the buyer home (below).
 
 Each request takes one quote from a paid seller (a free winner, or a seller that
 fails discovery or identity checks, is skipped before anything is signed), signs
@@ -784,8 +786,8 @@ Startup reasons beyond the free ones: `BUYER_PAYMENT_NETWORK_MISMATCH` (RPC,
 network or asset not devnet's test token), `BUYER_PAID_MODEL_UNSUPPORTED`,
 `BUYER_WALLET_KEY_INVALID`, `BUYER_TOKENIZER_UNAVAILABLE`,
 `BUYER_PAYMENT_JOURNAL_UNAVAILABLE` and `BUYER_API_TOKEN_INVALID` (`api-token`
-is a link, open to other users, not yours or not a token; it is never repaired,
-since its token may already have been read).
+is not a private 0600 regular file with one name, owned by you and holding a
+token; it is never repaired, since its token may already have been read).
 
 ## Private free-inference receipts
 

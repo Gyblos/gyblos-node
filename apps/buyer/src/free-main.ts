@@ -9,6 +9,7 @@ import { RelayConfigurationError } from '@gyblos/transport-iroh/relays';
 import {
   FREE_BUYER_CODES,
   FREE_BUYER_STARTUP,
+  PAID_BUYER,
   SELLER_FAILURES,
   type FreeBuyerStartupReason,
 } from './constants';
@@ -52,8 +53,7 @@ const HINTS: Readonly<Record<FreeBuyerStartupReason, string>> = {
     'the public tokenizer is missing or altered; run `pnpm node:tokenizer`',
   [FREE_BUYER_STARTUP.JOURNAL]:
     'the payment journal is unreadable or another buyer is running; stop the other buyer first',
-  [FREE_BUYER_STARTUP.PAID_TOKEN]:
-    'api-token in the buyer home must be a private (0600) regular file you own holding a token; remove it to generate a new one',
+  [FREE_BUYER_STARTUP.PAID_TOKEN]: `${PAID_BUYER.tokenFile} in the buyer home must be a private (0600) regular file you own holding a token; remove it to generate a new one`,
   [FREE_BUYER_STARTUP.UNKNOWN]: 'unexpected startup failure',
 };
 const RELAY_HINT =

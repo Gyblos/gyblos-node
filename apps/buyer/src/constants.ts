@@ -229,6 +229,10 @@ export const PAID_BUYER = {
   // The endpoint's bearer token, private in the buyer home; OpenAI SDKs send it as their apiKey.
   tokenFile: 'api-token',
   tokenBytes: 32,
+  // Those bytes as unpadded base64url.
+  tokenChars: 43,
+  // Random hex in the temporary name the token is written under before it is linked into place.
+  stagedSuffixBytes: 8,
   // A larger file is not one this buyer wrote.
   tokenFileBytes: 256,
   authScheme: 'Bearer',
