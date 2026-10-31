@@ -19,6 +19,8 @@
     "./measurements": "./src/measurements.ts",
     "./proof": "./src/proof.ts",
     "./reconcile": "./src/reconcile.ts",
+    "./reconcile-paid": "./src/reconcile-paid.ts",
+    "./withdraw-paid": "./src/withdraw-paid.ts",
     "./reconciliation": "./src/reconciliation.ts",
     "./synthetic-cases": "./src/synthetic-cases.ts",
     "./proxy": "./src/proxy.ts",

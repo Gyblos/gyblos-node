@@ -5,6 +5,7 @@ import { isAddress, type TransactionSigner } from '@solana/kit';
 import {
   createUptoAuthorization,
   createUptoReceiptReader,
+  decodeUptoPayload,
   UPTO_ERROR_CODES,
   UptoError,
   type UptoClientHints,
@@ -139,6 +140,8 @@ async function signOpen(
     payTo: terms.payTo,
     feePayer: terms.feePayer,
     maxAtomic: terms.maxAtomic,
+    openSlot: hints.recentSlot,
+    lastValidBlockHeight: hints.lastValidBlockHeight,
     expiresAt: terms.expiresAt,
     state: PAYMENT_CHANNEL_STATES.OPEN,
     chargedAtomic: null,
@@ -159,7 +162,13 @@ async function signOpen(
   }
   const authorization = { ...signed, requestDigest: terms.requestDigest };
   try {
-    await options.journal.put({ ...entry, channelId: signed.channelId });
+    // The slot the open itself names, which its channel address derives from.
+    const { openSlot } = decodeUptoPayload(signed);
+    await options.journal.put({
+      ...entry,
+      channelId: signed.channelId,
+      openSlot,
+    });
   } catch {
     // A write can land and still report failure (the directory sync after the rename); the open is
     // then journaled and must be returned rather than stranded as a signed entry nobody holds.

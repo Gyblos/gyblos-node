@@ -6,16 +6,26 @@ export {
   UPTO_CHANNEL_ACCOUNT,
   UPTO_COMMITMENT,
   UPTO_ERROR_CODES,
+  UPTO_FINAL_COMMITMENT,
+  UPTO_HISTORY_LIMIT,
+  UPTO_HISTORY_PAGES,
+  UPTO_PROGRAM,
+  UPTO_WITHDRAW,
+  UPTO_WITHDRAW_STEPS,
+  type UptoWithdrawStep,
+  type UptoCommitment,
   type UptoChannelState,
   type UptoDepositState,
   type UptoErrorCode,
 } from './constants';
 export { UptoError, uptoError } from './errors';
 export { createUptoHintReader, type UptoHintRpc } from './hints';
+export { createUptoChannelHistory, type UptoSignaturesRpc } from './history';
 export {
   createUptoReceiptReader,
   type UptoReceiptQuery,
   type UptoSettlementShown,
+  type UptoChannelTransfer,
   type UptoTransactionRpc,
 } from './receipt';
 export {
@@ -27,6 +37,24 @@ export {
   type UptoChannelRpc,
   type UptoKitRpc,
 } from './channel-readers';
+export {
+  createUptoWithdrawal,
+  type UptoWithdrawOptions,
+  type UptoWithdrawQuery,
+  type UptoWithdrawResult,
+  type UptoWithdrawRpc,
+} from './withdraw';
+export {
+  distributeInstruction,
+  payerTokenAccountInstruction,
+  requestCloseInstruction,
+  sealInstruction,
+  uptoDistributionHash,
+  uptoProgramTreasury,
+  uptoTokenAccount,
+  type UptoDistributeQuery,
+  type UptoProgramInstruction,
+} from './withdraw-instructions';
 export { createUptoAuthorization, decodeUptoPayload } from './authorization';
 export { uptoRequirements } from './requirements';
 export {

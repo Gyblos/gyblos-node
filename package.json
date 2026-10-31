@@ -39,6 +39,8 @@
     "buyer:start": "node --import tsx apps/buyer/src/main.ts",
     "buyer:call": "node --import tsx apps/buyer/src/call.ts",
     "buyer:reconcile": "node --import tsx apps/buyer/src/reconcile.ts",
+    "buyer:reconcile:paid": "node --import tsx apps/buyer/src/reconcile-paid.ts",
+    "buyer:withdraw:paid": "node --import tsx apps/buyer/src/withdraw-paid.ts",
     "buyer:setup": "node --import tsx apps/buyer/src/setup.ts",
     "node:setup": "node --import tsx apps/node/src/setup.ts",
     "node:tokenizer": "node --import tsx apps/node/src/tokenizer.ts",
