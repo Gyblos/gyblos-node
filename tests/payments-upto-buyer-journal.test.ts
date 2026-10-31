@@ -2,7 +2,7 @@
 // back, each malformed one is refused), the entry cap with pruning of old settled and expired unsigned
 // entries, and no writes once closing. Temporary homes; no network.
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -12,6 +12,7 @@ import { BUYER_JOURNAL, openUptoBuyerJournal } from '@gyblos/payments-upto';
 import {
   PAYMENT_CHANNEL_STATES,
   PAYMENT_ERROR_CODES,
+  PUBLIC_RECORD_LIMITS,
 } from '@gyblos/protocol/constants';
 import { PaymentError } from '@gyblos/protocol/payment';
 
@@ -126,10 +127,20 @@ void test('a version 1 journal keeps its signed opens, never proven unopened, an
         ...v1,
         channelId: 'Chan1',
         openSlot: '0',
-        lastValidBlockHeight: '18446744073709551615',
+        lastValidBlockHeight: String(BigInt(PUBLIC_RECORD_LIMITS.maxAtomic)),
       },
     ]);
+    // The next write saves it as the current version, which the strict parser reads back.
+    await journal.put({ ...ENTRY, requestDigest: OTHER });
     await journal.close();
+    assert.equal(
+      (JSON.parse(await readFile(state, 'utf8')) as { version: number })
+        .version,
+      BUYER_JOURNAL.version,
+    );
+    const reread = await open(root);
+    assert.equal((await reread.list()).length, 2);
+    await reread.close();
   }));
 
 void test('a full journal refuses new requests, keeps writing open ones and prunes finished ones', () =>

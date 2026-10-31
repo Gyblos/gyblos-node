@@ -99,26 +99,18 @@ export function chainDouble(state: ChainState) {
         };
       },
     }),
-    getSlot: (config) => ({
+    getEpochInfo: (config) => ({
       send: async () => {
         commitments.push(config.commitment);
-        reads.push({ call: 'slot' });
+        reads.push({ call: 'tip' });
         unavailable();
-        return TIP;
+        return { absoluteSlot: TIP, blockHeight: state.blockHeight };
       },
     }),
     getFirstAvailableBlock: () => ({
       send: async () => {
         unavailable();
         return state.firstBlock ?? state.oldestSlot;
-      },
-    }),
-    getBlockHeight: (config) => ({
-      send: async () => {
-        commitments.push(config.commitment);
-        reads.push({ call: 'height', minContextSlot: config.minContextSlot });
-        unavailable();
-        return state.blockHeight;
       },
     }),
     minimumLedgerSlot: () => ({

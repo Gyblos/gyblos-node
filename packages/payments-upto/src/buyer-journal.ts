@@ -96,7 +96,7 @@ function atomic(value: unknown): string {
   return BigInt(amount) <= U64_MAX ? amount : unavailable();
 }
 
-// Version 1 entries had no open slot or blockhash lifetime.
+// Legacy (version 1) entries had no open slot or blockhash lifetime.
 const V1_FIELDS = FIELDS.filter(
   (field) => field !== 'openSlot' && field !== 'lastValidBlockHeight',
 );
@@ -105,14 +105,18 @@ const V1_FIELDS = FIELDS.filter(
 const V1_UNKNOWN = { openSlot: '0', lastValidBlockHeight: String(U64_MAX) };
 
 function entry(value: unknown, version: number): UptoJournalEntry {
-  const fields: readonly string[] = version === 1 ? V1_FIELDS : FIELDS;
+  const legacy = version === BUYER_JOURNAL.legacyVersion;
+  const fields: readonly string[] = legacy ? V1_FIELDS : FIELDS;
   if (
     !isRecord(value) ||
     Object.keys(value).length !== fields.length ||
     !fields.every((field) => Object.hasOwn(value, field))
   )
     return unavailable();
-  if (version === 1) Object.assign(value, V1_UNKNOWN);
+  return checked(legacy ? { ...value, ...V1_UNKNOWN } : value);
+}
+
+function checked(value: Record<string, unknown>): UptoJournalEntry {
   const { state, updatedAt, expiresAt, channelId, chargedAtomic } = value;
   if (
     !isState(state) ||
@@ -146,7 +150,8 @@ function parseJournal(source: string): Map<string, UptoJournalEntry> {
   const version = isRecord(parsed) ? parsed.version : undefined;
   if (
     !isRecord(parsed) ||
-    (version !== BUYER_JOURNAL.version && version !== 1) ||
+    (version !== BUYER_JOURNAL.version &&
+      version !== BUYER_JOURNAL.legacyVersion) ||
     Object.keys(parsed).length !== 2 ||
     !Array.isArray(parsed.entries)
   )
@@ -156,7 +161,11 @@ function parseJournal(source: string): Map<string, UptoJournalEntry> {
     const parsedEntry = entry(value, Number(version));
     if (entries.has(parsedEntry.requestDigest)) unavailable();
     // A version 1 open that was never signed never left the buyer: nothing to keep.
-    if (version === 1 && parsedEntry.channelId === null) continue;
+    if (
+      version === BUYER_JOURNAL.legacyVersion &&
+      parsedEntry.channelId === null
+    )
+      continue;
     entries.set(parsedEntry.requestDigest, parsedEntry);
   }
   return entries;

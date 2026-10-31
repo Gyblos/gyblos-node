@@ -22,7 +22,10 @@ import {
   type UptoBuyerJournal,
   type UptoReconcileResult,
 } from '@gyblos/payments-upto';
-import { PAYMENT_CHANNEL_STATES } from '@gyblos/protocol/constants';
+import {
+  PAYMENT_CHANNEL_STATES,
+  PUBLIC_RECORD_LIMITS,
+} from '@gyblos/protocol/constants';
 
 import {
   chainDouble,
@@ -252,9 +255,8 @@ void test('an open is never opened only when the whole chain agrees', () =>
     });
     // The finalized tip comes first, and every later read is at least that recent: an open that landed
     // before the tip is already in the history read after it.
-    assert.deepEqual(double.reads.slice(0, 3), [
-      { call: 'slot' },
-      { call: 'height', minContextSlot: double.tip },
+    assert.deepEqual(double.reads.slice(0, 2), [
+      { call: 'tip' },
       { call: 'signatures', minContextSlot: double.tip },
     ]);
     assert.deepEqual(
@@ -262,6 +264,20 @@ void test('an open is never opened only when the whole chain agrees', () =>
       [{ call: 'account', minContextSlot: double.tip }],
     );
     assert.equal(never?.outcome, RECONCILE_OUTCOMES.NEVER_OPENED);
+    // A version 1 open, whose blockhash lifetime is unknown, is never proven unopened.
+    const legacy = await journal.get(DIGEST);
+    await journal.put({
+      ...legacy!,
+      state: PAYMENT_CHANNEL_STATES.OPEN,
+      chargedAtomic: null,
+      openSlot: '0',
+      lastValidBlockHeight: String(BigInt(PUBLIC_RECORD_LIMITS.maxAtomic)),
+    });
+    assert.equal(
+      await outcomeOf(journal, state(spam, { oldestSlot: 0n })),
+      RECONCILE_OUTCOMES.OPEN,
+    );
+    await journal.put({ ...legacy!, chargedAtomic: '0' });
     assert.equal(never?.chargedAtomic, '0');
     assert.equal((await journal.get(DIGEST))?.chargedAtomic, '0');
   }));

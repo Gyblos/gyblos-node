@@ -23,8 +23,9 @@ export interface UptoSignaturesRpc {
   ): {
     send(): Promise<readonly { signature: Signature; err: unknown }[]>;
   };
-  getSlot(config: Final): { send(): Promise<bigint> };
-  getBlockHeight(config: AtLeast): { send(): Promise<bigint> };
+  getEpochInfo(config: Final): {
+    send(): Promise<{ absoluteSlot: bigint; blockHeight: bigint }>;
+  };
   minimumLedgerSlot(): { send(): Promise<bigint> };
   getFirstAvailableBlock(): { send(): Promise<bigint> };
   getAccountInfo(
@@ -58,13 +59,10 @@ export interface UptoChannelHistory {
 export function createUptoChannelHistory(rpc: UptoSignaturesRpc) {
   const final = { commitment: UPTO_FINAL_COMMITMENT };
   return {
-    // The finalized slot and block height; pass the slot to the reads after it.
+    // The finalized slot and block height of one bank; pass the slot to the reads after it.
     async tip() {
-      const slot = await read(() => rpc.getSlot(final).send());
-      const height = await read(() =>
-        rpc.getBlockHeight({ ...final, minContextSlot: slot }).send(),
-      );
-      return { slot, height };
+      const epoch = await read(() => rpc.getEpochInfo(final).send());
+      return { slot: epoch.absoluteSlot, height: epoch.blockHeight };
     },
     async signatures(
       channelId: string,

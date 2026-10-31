@@ -38,8 +38,9 @@ export const UPTO_SELLER = {
 // The buyer's journal of authorized channels: one small private document. Settled entries are kept
 // long past any channel's lifetime, then pruned; open ones are never dropped.
 export const BUYER_JOURNAL = {
-  // 2 adds each open's slot and blockhash lifetime.
+  // 2 adds each open's slot and blockhash lifetime; 1 is still read.
   version: 2,
+  legacyVersion: 1,
   maxBytes: 1024 * 1024,
   maxEntries: 2_000,
   settledRetentionMs: 30 * 86_400_000,
