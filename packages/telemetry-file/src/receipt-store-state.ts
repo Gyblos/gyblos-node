@@ -10,14 +10,17 @@ export interface ReceiptFileSettings {
   maxBytes: number;
   maxPending: number;
 }
-export interface ReceiptFileState {
+export interface ReceiptSnapshotState {
   settings: ReceiptFileSettings;
   parent: FileHandle;
   lock: ProcessLock;
   text: string;
+  broken: boolean;
+}
+
+export interface ReceiptFileState extends ReceiptSnapshotState {
   entries: PrivateFreeReceipt[];
   tail: Promise<void>;
   pending: number;
   closed: boolean;
-  broken: boolean;
 }

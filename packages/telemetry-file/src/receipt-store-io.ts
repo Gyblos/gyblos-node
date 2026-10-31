@@ -27,6 +27,7 @@ import { parseReceiptFile, snapshotText } from './receipt-store-schema';
 import type {
   ReceiptFileSettings,
   ReceiptFileState,
+  ReceiptSnapshotState,
 } from './receipt-store-state';
 import type { ReceiptFileOptions } from './receipt-store-types';
 
@@ -63,8 +64,12 @@ async function refuseStage(path: string) {
   }
   receiptFileFail(RECEIPT_FILE_CODES.UNAVAILABLE);
 }
-async function initialize(path: string, parent: FileHandle, maxBytes: number) {
-  const text = snapshotText([]);
+async function initialize(
+  path: string,
+  parent: FileHandle,
+  maxBytes: number,
+  text: string,
+) {
   if (Buffer.byteLength(text) > maxBytes)
     receiptFileFail(RECEIPT_FILE_CODES.INVALID_OPTIONS);
   const file = await open(
@@ -83,7 +88,7 @@ async function initialize(path: string, parent: FileHandle, maxBytes: number) {
     await file.close();
   }
 }
-export async function assertReceiptFile(state: ReceiptFileState) {
+export async function assertReceiptFile(state: ReceiptSnapshotState) {
   await state.lock.verify();
   const opened = await state.parent.stat();
   const named = await lstat(dirname(state.settings.path));
@@ -106,30 +111,51 @@ async function load(
   settings: ReceiptFileSettings,
   parent: FileHandle,
   lock: ProcessLock,
-) {
+): Promise<ReceiptSnapshotState> {
   const text = await readPrivateFile(settings.path, settings.maxBytes);
   if (text === undefined)
     return receiptFileFail(RECEIPT_FILE_CODES.UNAVAILABLE);
-  const entries = await parseReceiptFile(
-    text,
-    settings.maxEntries,
-    settings.maxBytes,
-  );
-  const state: ReceiptFileState = {
-    settings,
-    parent,
-    lock,
-    text,
-    entries,
-    tail: Promise.resolve(),
-    pending: 0,
-    closed: false,
-    broken: false,
-  };
+  const state = { settings, parent, lock, text, broken: false };
   await assertReceiptFile(state);
   return state;
 }
-export function openReceiptState(options: ReceiptFileOptions, create: boolean) {
+export async function releaseReceiptSnapshot(state: ReceiptSnapshotState) {
+  try {
+    await state.lock.release();
+  } finally {
+    await state.parent.close();
+  }
+}
+export async function openReceiptState(
+  options: ReceiptFileOptions,
+  create: boolean,
+): Promise<ReceiptFileState> {
+  return receiptFileBoundary(async () => {
+    const state = await openReceiptSnapshot(options, create, snapshotText([]));
+    try {
+      const entries = await parseReceiptFile(
+        state.text,
+        state.settings.maxEntries,
+        state.settings.maxBytes,
+      );
+      return {
+        ...state,
+        entries,
+        tail: Promise.resolve(),
+        pending: 0,
+        closed: false,
+      };
+    } catch (error) {
+      await releaseReceiptSnapshot(state);
+      throw error;
+    }
+  });
+}
+export function openReceiptSnapshot(
+  options: ReceiptFileOptions,
+  create: boolean,
+  initial: string,
+) {
   const selected = settings(options);
   return receiptFileBoundary(async () => {
     await ensurePrivateDirectory(dirname(selected.path));
@@ -143,7 +169,8 @@ export function openReceiptState(options: ReceiptFileOptions, create: boolean) {
         constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW,
       );
       await refuseStage(selected.path);
-      if (create) await initialize(selected.path, parent, selected.maxBytes);
+      if (create)
+        await initialize(selected.path, parent, selected.maxBytes, initial);
       return await load(selected, parent, lock);
     } catch (error) {
       try {
@@ -170,7 +197,7 @@ async function removeOwnedStage(file: FileHandle, path: string) {
   await unlink(path);
 }
 export async function replaceReceiptFile(
-  state: ReceiptFileState,
+  state: ReceiptSnapshotState,
   text: string,
   signal?: AbortSignal,
 ) {
