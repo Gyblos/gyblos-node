@@ -259,7 +259,7 @@ request correlation, signatures and exact quote terms. It does not choose a
 seller or change proxy behavior. Call `close()` when finished; the endpoint
 remains owned by the caller. There is no control CLI yet.
 
-Quotes are `offer/v2` and are rejected by the current paid flow. They indicate
+Quotes are `offer/v2` and are rejected by the legacy paid v1 flow. They indicate
 observed availability, not guaranteed admission. Both clocks must be
 synchronized: v2 retains zero clock-skew tolerance and no expiration grace.
 Queries have a 10-second absolute deadline and share endpoint admission before
@@ -567,7 +567,7 @@ stream sets `x-should-retry: false`. A disconnect or deadline cancels execution;
 after possible prompt transmission the buyer never retries or switches seller,
 even before the first fragment. Writes await backpressure. Complete and
 streaming execution share replay/caps; cancellation keeps a conservative full
-token reservation. No paid-v2 path is enabled.
+token reservation. This free buyer does not invoke the separate paid-v2 path.
 
 Status codes: 400 for an invalid request or a request beyond the quote's limits,
 413 for an oversized body, 429 when the endpoint is already running a request
@@ -630,7 +630,8 @@ Product contract tests use a synthetic engine and native encrypted loopback.
 They are not the complete publication-to-answer acceptance: the separate lab
 scenario with an in-process discovery index follows this buyer's integration.
 Real Ollama, off-host/relay/CGNAT and production acceptance remain separate
-operations. Streaming, 8004 identity reading and paid v2 are subsequent work.
+operations. See the following paid-v2 section and the identity documentation for
+their separate scope and limits.
 
 ## Paid v2 buyer endpoint
 
@@ -666,7 +667,8 @@ Any channel in the journal not settled on the buyer's own count (a refusal, a
 stop, a pending or lapsed claim, a dispute or a settlement the chain could not
 confirm) blocks new payments (`PAID_BUYER_UNRESOLVED_PAYMENT`) until it is
 reconciled; the buyer also appends it to `paid-records.jsonl` in the buyer home
-when it can (`recorded`).
+when it can (`recorded`). Never reset or delete a journal or lock to bypass the
+block.
 
 To reconcile, stop the paid buyer and run `pnpm buyer:reconcile:paid`. It checks
 that the role's RPC serves devnet, then reads each open channel's finalized

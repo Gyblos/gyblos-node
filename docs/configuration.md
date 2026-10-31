@@ -161,16 +161,17 @@ however many digits it has.
 At seller startup an offer becomes the node's public v2 listing (see
 [Seller startup](#seller-startup)). Free offers use isolated complete-response
 and streaming free execution channels; both share the same replay state and
-free-cap handler. No paid-v2 execution is enabled.
+free-cap handler. Paid offers use a separate paid-v2 stream when the seller has
+a payment server configured; see [limitations](limitations.md).
 
 ### Price unit
 
-A `gyblos.toml` price is USDC per million tokens. Protocol v2 will charge in
-USDC atomic units (10^-6 USDC) per million tokens; that protocol change is
-pending and lands separately. Because a price has at most 6 decimals, the
-conversion is exact: atomic per million tokens = USDC per million tokens × 10^6.
-`pricePerMtokToAtomicPerMtok` (from `@gyblos/node/node-config`) performs it, for
-example `"0.1"` → `100000n`, `"1.5"` → `1500000n`, `"0.000001"` → `1n`.
+A `gyblos.toml` price is USDC per million tokens. Protocol v2 represents rates
+in USDC atomic units (10^-6 USDC) per million tokens. Because a price has at
+most 6 decimals, the conversion is exact: atomic per million tokens = USDC per
+million tokens × 10^6. `pricePerMtokToAtomicPerMtok` (from
+`@gyblos/node/node-config`) performs it, for example `"0.1"` → `100000n`,
+`"1.5"` → `1500000n`, `"0.000001"` → `1n`.
 
 ### Reasoning levels per model
 
