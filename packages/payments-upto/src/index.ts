@@ -17,9 +17,11 @@ export {
 } from './file-ledger';
 export {
   BUYER_JOURNAL,
+  BUYER_WITHDRAW,
   LEDGER_FILE,
   RECONCILE_OUTCOMES,
   UPTO_SELLER,
+  WITHDRAW_STEPS,
 } from './constants';
 export {
   openUptoBuyerJournal,
@@ -49,3 +51,11 @@ export {
   type UptoReconcileOutcome,
   type UptoReconcileResult,
 } from './buyer-reconcile';
+// The chain steps themselves, for the node to build over its RPC and the buyer's key.
+export { createUptoWithdrawal, type UptoWithdrawRpc } from 'x402-upto-metered';
+export {
+  withdrawUptoBuyer,
+  type UptoBuyerWithdrawOptions,
+  type UptoBuyerWithdrawResult,
+  type UptoBuyerWithdrawStep,
+} from './buyer-withdraw';

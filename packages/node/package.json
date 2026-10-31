@@ -50,6 +50,7 @@
     "./telemetry-startup": "./src/telemetry-startup.ts",
     "./buyer-chain": "./src/buyer-chain.ts",
     "./buyer-reconcile": "./src/buyer-reconcile.ts",
+    "./buyer-withdraw": "./src/buyer-withdraw.ts",
     "./seller-chain": "./src/seller-chain.ts"
   },
   "dependencies": {

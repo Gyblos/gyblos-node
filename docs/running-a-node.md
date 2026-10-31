@@ -690,8 +690,7 @@ token account was closed), it shows as a larger charge and a dispute, never a
 smaller one. Each outcome but `open` is appended to `paid-reconciliations.jsonl`
 in the buyer home before the journal unblocks it, so a failed run loses nothing
 and the next one picks up where it stopped. An `open` channel keeps blocking
-until the seller claims it or the buyer withdraws it after its timeout, which is
-not available yet.
+until the seller claims it or the buyer withdraws it (below).
 
 Use the role's RPC as one endpoint with full transaction history. A pruned or
 load-balanced RPC can only keep a channel `open` (it never makes one look
@@ -705,6 +704,54 @@ are recorded and no longer block), 2 while a channel stays open, and 1 when it
 could not finish, printing `PAID_RECONCILE_NETWORK_MISMATCH`,
 `PAID_RECONCILE_ROLE_INVALID` or `PAID_RECONCILE_INCOMPLETE` (stop the buyer,
 check the RPC and the home). The v1 `buyer:reconcile` is unchanged.
+
+A channel that stays `open` because nobody claimed it is withdrawn with
+`pnpm buyer:withdraw:paid` (buyer stopped, devnet only). Unlike reconciliation,
+it signs with the buyer's wallet key and pays each transaction's fee from the
+wallet's devnet SOL. Each run visits every open channel in the journal and takes
+it one step further, chosen from the channel's confirmed state. It prints one
+JSON line per channel, then a summary with the count of each step and the
+shortest `retryAfterSeconds`:
+
+- `claimable`: the seller may still claim it with the buyer's authorization, so
+  it is left alone. That lasts until the quote expires or `maxTimeoutSeconds`
+  after the open was signed, whichever is later, plus 150 seconds for a claim
+  sent just before then to land and for clock differences.
+- `close-requested`: `request_close` was sent, which starts the channel's grace
+  period (`withdrawDelay`, 60 seconds).
+- `waiting`: the grace period has not elapsed by the chain's block time, or the
+  RPC does not know that block's time yet.
+- `distributed`: `seal` and `distribute` were sent, which pay out whatever was
+  settled and refund the rest of the escrow. The same transaction first creates
+  the buyer's token account if it was closed (at the wallet's cost in rent),
+  because the program would otherwise send the refund to its own treasury.
+- `nothing`: already distributed, or no channel account at the address.
+- `refused`: the account is not this buyer's channel with the journaled rent
+  payer and deposit and the current role's mint and network fee distribution, so
+  nothing was signed for it. Restore the role's mint (or run the release the
+  channel was opened with) and run again.
+- `failed`: this channel's step failed with the static code in `failure`
+  (`UPTO_UNAVAILABLE` for the RPC, `UPTO_CHAIN_REJECTED` when the chain or its
+  preflight refused the transaction, which also happens when an earlier
+  unconfirmed one has since landed or the wallet lacks SOL for the fee or the
+  token account's rent). The other channels still take their step.
+
+Each line also says whether its transaction confirmed within a minute. One that
+did not is checked again after 30 seconds: run again before then and the same
+step may be sent twice, and the second only costs a refusal (`failed`). The
+command exits 2 while another run is needed, 0 when none is, and 1 when it
+refused or failed a channel (`PAID_WITHDRAW_REFUSED`, `PAID_WITHDRAW_FAILED`,
+after every channel was visited) or could not run
+(`PAID_WITHDRAW_NETWORK_MISMATCH`, `PAID_WITHDRAW_ROLE_INVALID`,
+`PAID_WITHDRAW_INCOMPLETE`).
+
+It never changes the journal. Once a channel is distributed and finalized,
+`pnpm buyer:reconcile:paid` reads it from history and unblocks payments: the
+charge is what the seller had settled (usually nothing). If the buyer had
+counted a delivered answer that the seller never claimed, that shows as
+`disputed` with a smaller charge. A journal entry from before this version whose
+open never landed shows `nothing` here, and reconciliation cannot prove it
+unopened, so it keeps blocking payments.
 
 The endpoint listens on loopback only and refuses browser requests, but any
 local process can call it and spend up to `maxAtomic` per request: run the paid
