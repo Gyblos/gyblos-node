@@ -1,8 +1,10 @@
 // Orchestrates one paid request: terms from the seller's signed offer plus the network's own fee, one
-// authorization per attempt, failover only while nothing left the buyer, then the buyer's own recount
-// of what it received and a check of the settlement against that count. Selection and I/O are injected.
-import { paidCharge } from '@gyblos/core/paid-charge';
-import { PAYMENT_ERROR_CODES } from '@gyblos/protocol/constants';
+// authorization per attempt, failover only while the signed open never left the buyer, then the buyer's
+// own recount and a verdict on the seller's settlement. Selection, payment and I/O are injected.
+import {
+  PAYMENT_ERROR_CODES,
+  type PaymentErrorCode,
+} from '@gyblos/protocol/constants';
 import type { SignedOfferV2 } from '@gyblos/protocol/control-types';
 import type { RecountTokenizer } from '@gyblos/protocol/engine';
 import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
@@ -20,27 +22,19 @@ import {
 } from '@gyblos/protocol/payment';
 import { PaidClientError } from '@gyblos/transport-iroh/paid-client';
 
-import { FREE_BUYER, PAID_BUYER_CODES } from './constants';
+import {
+  PAID_BUYER,
+  PAID_BUYER_CODES,
+  PAID_VERDICTS,
+  type PaidVerdict,
+} from './constants';
 import { PaidBuyerError } from './paid-errors';
+import { paidPrompt, paidRecount } from './paid-recount';
 
 export interface PaidWinner {
   nodeId: string;
   quote: SignedOfferV2;
 }
-
-export const PAID_VERDICTS = {
-  // The chain shows the settlement the buyer's own count expects.
-  SETTLED: 'settled',
-  // The seller's claim is still being confirmed; reconciliation decides.
-  PENDING: 'pending',
-  // The claim lapsed: nothing was charged and the deposit returns to the buyer.
-  LAPSED: 'lapsed',
-  // The settlement does not match the buyer's own count.
-  DISPUTED: 'disputed',
-  // The settlement could not be checked now; reconciliation checks it.
-  UNVERIFIED: 'unverified',
-} as const;
-export type PaidVerdict = (typeof PAID_VERDICTS)[keyof typeof PAID_VERDICTS];
 
 export interface PaidBuyerOutcome {
   winner: PaidWinner;
@@ -49,12 +43,27 @@ export interface PaidBuyerOutcome {
   // What the buyer itself counts as owed for what it received.
   recount: PaidCharge;
   verdict: PaidVerdict;
+  // Whether a record was kept; every verdict but SETTLED asks for one.
+  recorded: boolean;
+}
+
+// What reconciliation needs later; never the signed open, the prompt or the received text.
+export interface PaidBuyerRecord {
+  nodeId: string;
+  requestDigest: string;
+  channelId: string;
+  verdict: PaidVerdict;
+  expectedAtomic: string;
+  // What the seller said it charged, when it said anything.
+  claimedAtomic: string | null;
 }
 
 export interface PaidBuyerDependencies {
   enter(): () => void;
-  // Whether an earlier channel still needs reconciliation; no new payment is made until it is not.
+  // Whether a channel whose open reached a seller still needs reconciliation. Checked once per
+  // request: failover only follows an open that never left the buyer.
   unresolved(): Promise<boolean>;
+  // Must accept only quotes that match the query and the buyer's price ceilings.
   select(
     excluded: ReadonlySet<string>,
     signal: AbortSignal,
@@ -70,8 +79,23 @@ export interface PaidBuyerDependencies {
     signal: AbortSignal,
     onDelta: (text: string) => Promise<void>,
   ): Promise<PaidExecutionResponse>;
-  // Outcomes that need attention later: disputes, and charges the buyer did not expect.
-  record?(outcome: PaidBuyerOutcome): Promise<void>;
+  record(record: PaidBuyerRecord): Promise<void>;
+}
+
+// Rejects with the signal's reason once it aborts; the operation may still finish in the background.
+function bounded<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) {
+    // Its own outcome no longer matters, but must not surface as an unhandled rejection.
+    operation.catch(() => {});
+    return Promise.reject(signal.reason);
+  }
+  return new Promise<T>((resolve, reject) => {
+    const abort = () => reject(signal.reason);
+    signal.addEventListener('abort', abort, { once: true });
+    operation
+      .then(resolve, reject)
+      .finally(() => signal.removeEventListener('abort', abort));
+  });
 }
 
 function termsFor(
@@ -95,7 +119,7 @@ function termsFor(
 }
 
 // Terms this buyer will not sign, or a request it already signed: another seller may still serve.
-const SKIPPED_AUTHORIZATIONS: readonly string[] = [
+const SKIPPED_AUTHORIZATIONS: readonly PaymentErrorCode[] = [
   PAYMENT_ERROR_CODES.UNTRUSTED_TERMS,
   PAYMENT_ERROR_CODES.ALREADY_AUTHORIZED,
 ];
@@ -103,10 +127,12 @@ const SKIPPED_AUTHORIZATIONS: readonly string[] = [
 async function authorized(
   dependencies: PaidBuyerDependencies,
   winner: PaidWinner,
+  signal: AbortSignal,
 ): Promise<PaymentAuthorization | undefined> {
   try {
-    return await dependencies.payment.authorize(
-      termsFor(winner.quote, dependencies.fee),
+    return await bounded(
+      dependencies.payment.authorize(termsFor(winner.quote, dependencies.fee)),
+      signal,
     );
   } catch (error) {
     if (
@@ -118,20 +144,27 @@ async function authorized(
   }
 }
 
-// The buyer's own count of what it received, priced at the quote.
-function recount(
-  request: PaidExecutionRequest,
-  meter: RecountTokenizer,
-  received: string,
-): PaidCharge {
-  const prompt = request.input.messages
-    .map((message) => message.content)
-    .join('');
-  const outputTokens = received ? meter.count(received) : 0;
-  return paidCharge(
-    request,
-    { inputTokens: meter.input(prompt), outputTokens },
-    outputTokens > 0,
+// Keeps a record within its own deadline; a lost record leaves the journal's open entry to reconcile.
+async function remember(
+  dependencies: PaidBuyerDependencies,
+  record: PaidBuyerRecord,
+): Promise<boolean> {
+  return bounded(
+    dependencies.record(record),
+    AbortSignal.timeout(PAID_BUYER.receiptMs),
+  ).then(
+    () => true,
+    () => false,
+  );
+}
+
+function claimed(terminal: PaidExecutionResponse): string | null {
+  const payment = terminal.payment;
+  return (
+    payment?.settlement?.chargedAtomic ??
+    payment?.pending?.chargedAtomic ??
+    terminal.charge?.chargedAtomic ??
+    null
   );
 }
 
@@ -139,71 +172,100 @@ async function verdictFor(
   dependencies: PaidBuyerDependencies,
   authorization: PaymentAuthorization,
   terminal: PaidExecutionResponse,
-  expected: PaidCharge,
+  expected: string,
 ): Promise<PaidVerdict> {
   const payment = terminal.payment;
-  if (payment?.lapsed) return PAID_VERDICTS.LAPSED;
-  if (payment?.pending)
-    return payment.pending.chargedAtomic === expected.chargedAtomic
-      ? PAID_VERDICTS.PENDING
-      : PAID_VERDICTS.DISPUTED;
-  if (!payment?.settlement) return PAID_VERDICTS.DISPUTED;
+  if (!payment) return PAID_VERDICTS.REFUSED;
+  if (payment.lapsed) return PAID_VERDICTS.LAPSED;
+  // A claim other than the buyer's own count is a dispute, whatever the chain says.
+  if (claimed(terminal) !== expected) return PAID_VERDICTS.DISPUTED;
+  if (payment.pending) return PAID_VERDICTS.PENDING;
   try {
-    await dependencies.payment.checkReceipt(
-      authorization,
-      payment.settlement,
-      expected.chargedAtomic,
+    await bounded(
+      dependencies.payment.checkReceipt(
+        authorization,
+        payment.settlement,
+        expected,
+      ),
+      AbortSignal.timeout(PAID_BUYER.receiptMs),
     );
     return PAID_VERDICTS.SETTLED;
-  } catch (error) {
-    return error instanceof PaymentError &&
-      error.code === PAYMENT_ERROR_CODES.RECEIPT_MISMATCH
-      ? PAID_VERDICTS.DISPUTED
-      : PAID_VERDICTS.UNVERIFIED;
+  } catch {
+    return PAID_VERDICTS.UNVERIFIED;
   }
 }
 
-// One attempt with one seller: undefined when nothing left the buyer and another seller may serve.
-async function attempt(
-  input: FreeExecutionBuildInput,
-  dependencies: PaidBuyerDependencies,
-  winner: PaidWinner,
-  signal: AbortSignal,
-  onDelta: (text: string) => Promise<void>,
-): Promise<PaidBuyerOutcome | undefined> {
-  const authorization = await authorized(dependencies, winner);
+interface Attempt {
+  dependencies: PaidBuyerDependencies;
+  winner: PaidWinner;
+  input: FreeExecutionBuildInput;
+  prompt: string;
+  signal: AbortSignal;
+  onDelta: (text: string) => Promise<void>;
+}
+
+// One attempt with one seller: undefined when the signed open never left the buyer and another
+// seller may serve; otherwise an outcome, or the failure once the stop is recorded.
+async function attempt(run: Attempt): Promise<PaidBuyerOutcome | undefined> {
+  const { dependencies, winner, signal } = run;
+  const authorization = await authorized(dependencies, winner, signal);
   if (!authorization) return undefined;
-  const request = buildPaidExecutionRequest(winner.quote, input, authorization);
+  const request = buildPaidExecutionRequest(
+    winner.quote,
+    run.input,
+    authorization,
+  );
+  const base = {
+    nodeId: winner.nodeId,
+    requestDigest: authorization.requestDigest,
+    channelId: authorization.channelId,
+  };
   let received = '';
+  const recount = (completed: boolean) =>
+    paidRecount(request, dependencies.meter, run.prompt, received, completed);
   let terminal: PaidExecutionResponse;
   try {
-    terminal = await dependencies.execute(
-      winner,
-      request,
-      signal,
-      async (text) => {
-        received += text;
-        await onDelta(text);
-      },
-    );
+    terminal = await dependencies.execute(winner, request, signal, (text) => {
+      signal.throwIfAborted();
+      received += text;
+      return run.onDelta(text);
+    });
   } catch (error) {
-    if (error instanceof PaidClientError && !error.sent && !signal.aborted)
-      return undefined;
+    if (error instanceof PaidClientError && !error.sent) {
+      if (!signal.aborted) return undefined;
+      throw error;
+    }
+    await remember(dependencies, {
+      ...base,
+      verdict: PAID_VERDICTS.INTERRUPTED,
+      expectedAtomic: recount(false).chargedAtomic,
+      claimedAtomic: null,
+    });
     throw error;
   }
-  // Refused before any deposit (the wire allows no delivered text then): another seller may serve.
-  if (!terminal.payment) return undefined;
-  const expected = recount(request, dependencies.meter, received);
-  const outcome: PaidBuyerOutcome = {
+  const expected = recount(terminal.result !== undefined);
+  const verdict = await verdictFor(
+    dependencies,
+    authorization,
+    terminal,
+    expected.chargedAtomic,
+  );
+  const recorded =
+    verdict !== PAID_VERDICTS.SETTLED &&
+    (await remember(dependencies, {
+      ...base,
+      verdict,
+      expectedAtomic: expected.chargedAtomic,
+      claimedAtomic: claimed(terminal),
+    }));
+  return {
     winner,
     authorization,
     terminal,
     recount: expected,
-    verdict: await verdictFor(dependencies, authorization, terminal, expected),
+    verdict,
+    recorded,
   };
-  if (outcome.verdict === PAID_VERDICTS.DISPUTED)
-    await dependencies.record?.(outcome);
-  return outcome;
 }
 
 export async function executeBuyerPaid(
@@ -212,29 +274,28 @@ export async function executeBuyerPaid(
   external?: AbortSignal,
   onDelta: (text: string) => Promise<void> = async () => {},
 ): Promise<PaidBuyerOutcome> {
+  const prompt = paidPrompt(input);
+  if (prompt === undefined)
+    throw new PaidBuyerError(PAID_BUYER_CODES.UNSUPPORTED);
   const release = dependencies.enter();
   try {
-    if (await dependencies.unresolved())
-      throw new PaidBuyerError(PAID_BUYER_CODES.UNRESOLVED);
     const signal = AbortSignal.any([
-      AbortSignal.timeout(FREE_BUYER.requestMs),
+      AbortSignal.timeout(PAID_BUYER.requestMs),
       ...(external ? [external] : []),
     ]);
+    if (await bounded(dependencies.unresolved(), signal))
+      throw new PaidBuyerError(PAID_BUYER_CODES.UNRESOLVED);
     const excluded = new Set<string>();
     while (!signal.aborted) {
       const winner = await dependencies.select(excluded, signal);
       signal.throwIfAborted();
       if (excluded.has(winner.nodeId)) break;
       excluded.add(winner.nodeId);
-      const outcome = await attempt(
-        input,
-        dependencies,
-        winner,
-        signal,
-        onDelta,
-      );
+      const run = { dependencies, winner, input, prompt, signal, onDelta };
+      const outcome = await attempt(run);
       if (outcome) return outcome;
     }
+    signal.throwIfAborted();
     throw new PaidBuyerError(PAID_BUYER_CODES.UNAVAILABLE);
   } finally {
     release();
