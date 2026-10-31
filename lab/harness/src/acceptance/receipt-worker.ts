@@ -4,12 +4,12 @@ import { isMain, onShutdown } from '@gyblos/runtime';
 
 import { ACCEPTANCE_CODES, ACCEPTANCE_INDEX } from './constants';
 import { acceptanceAssert, AcceptanceError } from './errors';
+import { collectReceiptAcceptance } from './receipt-collector';
 import {
   RECEIPT_ACCEPTANCE_CASES,
   type ReceiptAcceptanceCase,
   type ReceiptAcceptanceReport,
 } from './receipt-constants';
-import { collectReceiptAcceptance } from './receipt-collector';
 import { receiptIdentityPhases } from './receipt-identity';
 import {
   cancelledAnswer,
@@ -61,8 +61,21 @@ export async function receiptScenario(
     cases.push(RECEIPT_ACCEPTANCE_CASES.FREE_CAPS);
     const stored = await confirmedSnapshots(run.environment);
     await run.close();
-    const collector = await collectReceiptAcceptance(process.cwd(), stored, signal);
-    cases.push(RECEIPT_ACCEPTANCE_CASES.COLLECTOR, RECEIPT_ACCEPTANCE_CASES.COLLECTOR_RESTART, RECEIPT_ACCEPTANCE_CASES.COLLECTOR_REFUSALS);
+    const attempts = run.provider.calls();
+    const dials = run.binding.dials();
+    const collector = await collectReceiptAcceptance(
+      process.cwd(),
+      stored,
+      signal,
+    );
+    acceptanceAssert(
+      run.provider.calls() === attempts && run.binding.dials() === dials,
+    );
+    cases.push(
+      RECEIPT_ACCEPTANCE_CASES.COLLECTOR,
+      RECEIPT_ACCEPTANCE_CASES.COLLECTOR_RESTART,
+      RECEIPT_ACCEPTANCE_CASES.COLLECTOR_REFUSALS,
+    );
     await receiptRetention(run.environment, stored.at(-1)!);
     cases.push(RECEIPT_ACCEPTANCE_CASES.PRIVACY);
     await receiptTelemetry(run.environment, answers, identity.refusals);

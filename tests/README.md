@@ -140,6 +140,9 @@ with temporary homes and a synthetic engine), `free-receipt-deadline.test.ts`
 private receipts through an isolated child, local memory index, native Iroh and
 in-memory provider. It covers both HTTP modes, restarts, old catalog rejection,
 receipt/engine failures, cancellation, configured free caps and retention
-checks. The child inherits no credentials or role settings; parent globals stay
-separate. The standalone command is `pnpm acceptance:receipts`; native skips
-prove nothing.
+checks. It now also hands the actual confirmed pairs to the private collector,
+persists them, reopens in a separate process, verifies exact duplicates and
+checks bounded refusal without inference retry. Focused synthetic coverage is in
+`tests/lab/collector-acceptance.test.ts`. No uploader is enabled. The child
+inherits no credentials or role settings; parent globals stay separate. The
+standalone command is `pnpm acceptance:receipts`; native skips prove nothing.

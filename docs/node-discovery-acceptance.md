@@ -306,3 +306,29 @@ buyer-only unserved observations with no selected seller or request ID; their
 count must match the refused HTTP requests. The metadata-only report includes
 registry-read, forbidden-method and refusal counters, never registry accounts or
 identity details.
+
+### In-process collector persistence and restart
+
+The same startup scenario takes the confirmed pairs produced by complete and
+streamed inference through `gyblos/receipt/1`, verifies them again with the core
+private collector and persists them with the optional telemetry-file backend.
+There is no HTTP collector, uploader, export or new product startup wiring.
+After stopping both roles, the harness submits pairs in bounded concurrent
+batches, checks their exact keys and fingerprints in the private snapshot,
+closes the writer and starts a separate credential-free process. That process
+reopens and verifies the snapshot and resubmits every retained pair as an exact
+duplicate without changing the file. Its successful exit and a further reopen
+prove that its exclusive ownership was released.
+
+A separate one-entry snapshot checks capacity refusal without eviction, exact
+duplicates at full capacity, pre-cancellation and a seller-only pair refusal.
+The negative cases preserve the snapshot bytes. No collector step changes
+inference attempts or execution dials. Reported collector evidence is limited to
+stored/duplicate/refusal/restart counters and fixed case IDs. Existing file
+bounds, private POSIX modes and no-content receipt contracts apply. All
+snapshots live only in the harness-owned temporary workspace.
+
+This validates clean process restart, not a crash or power loss. It adds no
+automatic retention/purge, rollback resistance, network collection, access or
+consent policy, Windows ACL acceptance or public usage accounting. Receipt
+signatures remain attestations rather than independent proof of truthful usage.

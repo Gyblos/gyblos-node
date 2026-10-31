@@ -14,6 +14,7 @@ import {
   AcceptanceError,
   assertAcceptanceActive,
 } from './errors';
+import { COLLECTOR_ACCEPTANCE } from './receipt-collector-constants';
 import {
   RECEIPT_ACCEPTANCE,
   RECEIPT_ACCEPTANCE_CASES,
@@ -67,6 +68,13 @@ function report(text: string): ReceiptAcceptanceReport {
     JSON.stringify(cases) ===
       JSON.stringify(Object.values(RECEIPT_ACCEPTANCE_CASES)),
   );
+  const collectorStored = controlInteger(input.collectorStored, 2);
+  acceptanceAssert(
+    collectorStored === input.confirmed &&
+      input.collectorDuplicates === collectorStored &&
+      input.collectorRestarts === 1 &&
+      input.collectorRefusals === COLLECTOR_ACCEPTANCE.refusals,
+  );
   return {
     ok: true,
     nativeIroh: true,
@@ -80,7 +88,7 @@ function report(text: string): ReceiptAcceptanceReport {
     answers: controlInteger(input.answers),
     engineAttempts: controlInteger(input.engineAttempts),
     confirmed: controlInteger(input.confirmed),
-    collectorStored: controlInteger(input.collectorStored),
+    collectorStored,
     collectorDuplicates: controlInteger(input.collectorDuplicates),
     collectorRestarts: controlInteger(input.collectorRestarts),
     collectorRefusals: controlInteger(input.collectorRefusals),
