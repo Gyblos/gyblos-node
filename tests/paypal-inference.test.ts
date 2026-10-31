@@ -314,3 +314,25 @@ void test('contradictory terminal journal fields cannot unlock payments', async 
   });
   await assert.rejects(createPaypalInference(f));
 });
+
+void test('a refund holds the payment lock until its final journal write completes', async () => {
+  const f = fixture();
+  const controller = new AbortController();
+  let release = () => {};
+  let notify = () => {};
+  const entered = new Promise<void>((resolve) => { notify = resolve; });
+  const hold = new Promise<void>((resolve) => { release = resolve; });
+  const write = f.journal.write;
+  f.journal.write = async (value: unknown) => {
+    if (JSON.stringify(value).includes('refunded')) { notify(); await hold; }
+    await write(value);
+  };
+  f.payment.capture = async () => { f.calls.push('capture'); controller.abort(); return { captureId: 'CAPTURE1' }; };
+  const service = await createPaypalInference(f);
+  await service.create('first', 16);
+  const execution = service.execute('ORDER1', 'first', 16, controller.signal);
+  const finished = assert.rejects(execution);
+  await entered;
+  try { await assert.rejects(service.create('second', 16)); }
+  finally { release(); await finished; }
+});
