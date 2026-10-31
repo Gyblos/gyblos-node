@@ -139,3 +139,13 @@ void test('a corrupt terminal journal cannot unblock another payment', async () 
   await assert.rejects(createPaypalInference(f));
   assert.deepEqual(f.calls, []);
 });
+
+void test('an order that was never authorized may be abandoned after a restart', async () => {
+  const f = fixture();
+  const service = await createPaypalInference(f);
+  await service.create('first', 16);
+  const restarted = await createPaypalInference(f);
+  await restarted.cancel();
+  await restarted.create('second', 16);
+  assert.deepEqual(f.calls, ['create', 'create']);
+});
