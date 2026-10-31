@@ -159,3 +159,17 @@ void test('engine-incompatible input is rejected before contacting PayPal', asyn
   assert.deepEqual(f.calls, []);
   assert.equal(f.getState(), null);
 });
+
+void test('buyer disconnect before capture voids the authorization', async () => {
+  const f = fixture();
+  const controller = new AbortController();
+  f.engine.generate = async () => {
+    f.calls.push('generate');
+    controller.abort();
+    return { text: 'answer', usage: { inputTokens: 1, outputTokens: 1 } };
+  };
+  const service = await createPaypalInference(f);
+  await service.create('first', 16);
+  await assert.rejects(service.execute('ORDER1', 'first', 16, controller.signal));
+  assert.deepEqual(f.calls, ['create', 'authorize', 'generate', 'void']);
+});
