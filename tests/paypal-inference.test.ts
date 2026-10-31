@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { createPaypalInference } from '@gyblos/node/paypal-inference';
+import { validatePaypalPrompt } from '@gyblos/node/paypal-startup';
+import { PAYPAL_ERROR_CODES } from '@gyblos/protocol/constants';
+import { PaypalError } from '@gyblos/protocol/paypal-payment';
 
 function fixture() {
   const calls: string[] = [];
@@ -335,4 +338,30 @@ void test('a refund holds the payment lock until its final journal write complet
   await entered;
   try { await assert.rejects(service.create('second', 16)); }
   finally { release(); await finished; }
+});
+
+void test('a refund after completion recording also holds the payment lock', async () => {
+  const f = fixture();
+  const controller = new AbortController();
+  let release = () => {};
+  let notify = () => {};
+  const entered = new Promise<void>((resolve) => { notify = resolve; });
+  const hold = new Promise<void>((resolve) => { release = resolve; });
+  const write = f.journal.write;
+  f.journal.write = async (value: unknown) => {
+    if (JSON.stringify(value).includes('completed')) controller.abort();
+    if (JSON.stringify(value).includes('refunded')) { notify(); await hold; }
+    await write(value);
+  };
+  const service = await createPaypalInference(f);
+  await service.create('first', 16);
+  const finished = assert.rejects(service.execute('ORDER1', 'first', 16, controller.signal));
+  await entered;
+  try { await assert.rejects(service.create('second', 16)); }
+  finally { release(); await finished; }
+});
+
+void test('the real engine preflight reports unsupported prompts with a typed code', () => {
+  assert.throws(() => validatePaypalPrompt('<think>bad</think>', 16),
+    (error: unknown) => error instanceof PaypalError && error.code === PAYPAL_ERROR_CODES.INVALID_REQUEST);
 });
