@@ -1,9 +1,13 @@
-// The buyer's view of a claim transaction, from its own token balances: what payTo, the fee treasury
-// and the payer received, and the charge as the ceiling minus the refund once the channel's escrow is
-// empty. A missing, failed, foreign or unfinished transaction shows no settlement. No Gyblos imports.
+// The buyer's view of a channel transaction, from its token balances: a deposit that funded the escrow
+// to the ceiling, or a final claim that emptied it, with what payTo, the fee treasury and the payer
+// received and the charge as the escrow's outflow minus the refund. No Gyblos imports.
 import { signature as asSignature, type Signature } from '@solana/kit';
 
-import { UPTO_COMMITMENT, UPTO_ERROR_CODES } from './constants';
+import {
+  UPTO_COMMITMENT,
+  UPTO_ERROR_CODES,
+  type UptoCommitment,
+} from './constants';
 import { UptoError } from './errors';
 
 interface TokenBalance {
@@ -30,7 +34,7 @@ export interface UptoTransactionRpc {
   getTransaction(
     signature: Signature,
     config: {
-      commitment: typeof UPTO_COMMITMENT;
+      commitment: UptoCommitment;
       encoding: 'json';
       maxSupportedTransactionVersion: 0;
     },
@@ -66,65 +70,80 @@ function held(
     .reduce((total, entry) => total + BigInt(entry.uiTokenAmount.amount), 0n);
 }
 
-export function createUptoReceiptReader(rpc: UptoTransactionRpc) {
-  return {
-    async settlement(
-      query: UptoReceiptQuery,
-    ): Promise<UptoSettlementShown | undefined> {
-      let found: FoundTransaction;
-      try {
-        found = await rpc
-          .getTransaction(asSignature(query.transaction), {
-            commitment: UPTO_COMMITMENT,
-            encoding: 'json',
-            maxSupportedTransactionVersion: 0,
-          })
-          .send();
-      } catch {
-        throw new UptoError(UPTO_ERROR_CODES.UNAVAILABLE);
-      }
-      const meta = found?.meta;
-      if (!found || !meta || meta.err !== null) return undefined;
-      const keys = [
-        ...found.transaction.message.accountKeys,
-        ...(meta.loadedAddresses?.writable ?? []),
-        ...(meta.loadedAddresses?.readonly ?? []),
-      ].map(String);
-      if (!keys.includes(query.channelId)) return undefined;
-      const change = (owner: string) =>
-        held(meta.postTokenBalances, owner, query.mint) -
-        held(meta.preTokenBalances, owner, query.mint);
-      const escrowBefore = held(
-        meta.preTokenBalances,
-        query.channelId,
-        query.mint,
-      );
-      const escrowAfter = held(
-        meta.postTokenBalances,
-        query.channelId,
-        query.mint,
-      );
-      const seller = change(query.payTo);
-      const fee = change(query.treasury);
-      const refund = change(query.payer);
-      const ceiling = BigInt(query.maxAtomic);
-      // A final claim releases the whole deposit, empties the escrow and only ever pays out.
-      if (
-        escrowBefore < ceiling ||
-        escrowAfter !== 0n ||
-        seller < 0n ||
-        fee < 0n ||
-        refund < 0n ||
-        refund > ceiling
-      )
-        return undefined;
-      return {
+// What one transaction did to the channel: a final claim's settlement, and whether it funded the escrow.
+export interface UptoChannelTransfer {
+  settled: UptoSettlementShown | undefined;
+  deposited: boolean;
+}
+
+export function createUptoReceiptReader(
+  rpc: UptoTransactionRpc,
+  commitment: UptoCommitment = UPTO_COMMITMENT,
+) {
+  const transfer = async (
+    query: UptoReceiptQuery,
+  ): Promise<UptoChannelTransfer> => {
+    const none = { settled: undefined, deposited: false };
+    let found: FoundTransaction;
+    try {
+      found = await rpc
+        .getTransaction(asSignature(query.transaction), {
+          commitment,
+          encoding: 'json',
+          maxSupportedTransactionVersion: 0,
+        })
+        .send();
+    } catch {
+      throw new UptoError(UPTO_ERROR_CODES.UNAVAILABLE);
+    }
+    const meta = found?.meta;
+    if (!found || !meta || meta.err !== null) return none;
+    const keys = [
+      ...found.transaction.message.accountKeys,
+      ...(meta.loadedAddresses?.writable ?? []),
+      ...(meta.loadedAddresses?.readonly ?? []),
+    ].map(String);
+    if (!keys.includes(query.channelId)) return none;
+    const change = (owner: string) =>
+      held(meta.postTokenBalances, owner, query.mint) -
+      held(meta.preTokenBalances, owner, query.mint);
+    const before = held(meta.preTokenBalances, query.channelId, query.mint);
+    const after = held(meta.postTokenBalances, query.channelId, query.mint);
+    const ceiling = BigInt(query.maxAtomic);
+    const deposited = before < after && after >= ceiling;
+    const seller = change(query.payTo);
+    const fee = change(query.treasury);
+    const refund = change(query.payer);
+    // A final claim empties an escrow funded to at least the ceiling and only ever pays out. A top-up
+    // makes the outflow larger than the ceiling; a refund the program redirected away from the payer
+    // shows as a larger charge, never a smaller one.
+    const outflow = before - after;
+    if (
+      before < ceiling ||
+      after !== 0n ||
+      seller < 0n ||
+      fee < 0n ||
+      refund < 0n ||
+      refund > outflow
+    )
+      return { settled: undefined, deposited };
+    return {
+      deposited,
+      settled: {
         channelId: query.channelId,
-        chargedAtomic: String(ceiling - refund),
+        chargedAtomic: String(outflow - refund),
         refundedAtomic: String(refund),
         sellerAtomic: String(seller),
         feeAtomic: String(fee),
-      };
+      },
+    };
+  };
+  return {
+    transfer,
+    async settlement(
+      query: UptoReceiptQuery,
+    ): Promise<UptoSettlementShown | undefined> {
+      return (await transfer(query)).settled;
     },
   };
 }

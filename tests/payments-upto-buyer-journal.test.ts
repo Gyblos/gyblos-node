@@ -2,7 +2,7 @@
 // back, each malformed one is refused), the entry cap with pruning of old settled and expired unsigned
 // entries, and no writes once closing. Temporary homes; no network.
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -12,6 +12,7 @@ import { BUYER_JOURNAL, openUptoBuyerJournal } from '@gyblos/payments-upto';
 import {
   PAYMENT_CHANNEL_STATES,
   PAYMENT_ERROR_CODES,
+  PUBLIC_RECORD_LIMITS,
 } from '@gyblos/protocol/constants';
 import { PaymentError } from '@gyblos/protocol/payment';
 
@@ -29,6 +30,8 @@ const ENTRY = {
   payTo: '11111111111111111111111111111111',
   feePayer: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
   maxAtomic: '1000',
+  openSlot: '1',
+  lastValidBlockHeight: '100',
   expiresAt: NOW + 60_000,
   state: PAYMENT_CHANNEL_STATES.OPEN,
   chargedAtomic: null,
@@ -68,7 +71,7 @@ void test('a valid document reads back; each malformed one is refused', () =>
     const { state } = buyerJournalPathsIn({ GYBLOS_HOME: root });
     const valid = { ...ENTRY, channelId: 'Chan1', updatedAt: NOW };
     const document = (entries: unknown[], extra = {}) =>
-      JSON.stringify({ version: 1, entries, ...extra });
+      JSON.stringify({ version: BUYER_JOURNAL.version, entries, ...extra });
     // Written by hand, so the refusals below differ from it in exactly one way.
     await (await open(root)).close();
     await writeFile(state, document([valid]), { mode: 0o600 });
@@ -76,7 +79,10 @@ void test('a valid document reads back; each malformed one is refused', () =>
     assert.deepEqual(await reader.list(), [valid]);
     await reader.close();
     for (const tampered of [
-      JSON.stringify({ version: 2, entries: [valid] }),
+      // Another version, including the one before the open's slot and blockhash lifetime.
+      JSON.stringify({ version: BUYER_JOURNAL.version + 1, entries: [valid] }),
+      JSON.stringify({ version: 1, entries: [valid] }),
+      document([{ ...valid, lastValidBlockHeight: '-1' }]),
       document([valid], { extra: 1 }),
       document([valid, valid]),
       document([{ ...valid, extra: 1 }]),
@@ -93,6 +99,48 @@ void test('a valid document reads back; each malformed one is refused', () =>
       await assert.rejects(journal.list(), unavailable, tampered);
       await journal.close();
     }
+  }));
+
+void test('a version 1 journal keeps its signed opens, never proven unopened, and drops unsigned ones', () =>
+  withRoot(async (root) => {
+    const { state } = buyerJournalPathsIn({ GYBLOS_HOME: root });
+    const {
+      openSlot: _openSlot,
+      lastValidBlockHeight: _height,
+      ...v1
+    } = { ...ENTRY, updatedAt: NOW };
+    await (await open(root)).close();
+    await writeFile(
+      state,
+      JSON.stringify({
+        version: 1,
+        entries: [
+          { ...v1, channelId: 'Chan1' },
+          { ...v1, requestDigest: OTHER },
+        ],
+      }),
+      { mode: 0o600 },
+    );
+    const journal = await open(root);
+    assert.deepEqual(await journal.list(), [
+      {
+        ...v1,
+        channelId: 'Chan1',
+        openSlot: '0',
+        lastValidBlockHeight: String(BigInt(PUBLIC_RECORD_LIMITS.maxAtomic)),
+      },
+    ]);
+    // The next write saves it as the current version, which the strict parser reads back.
+    await journal.put({ ...ENTRY, requestDigest: OTHER });
+    await journal.close();
+    assert.equal(
+      (JSON.parse(await readFile(state, 'utf8')) as { version: number })
+        .version,
+      BUYER_JOURNAL.version,
+    );
+    const reread = await open(root);
+    assert.equal((await reread.list()).length, 2);
+    await reread.close();
   }));
 
 void test('a full journal refuses new requests, keeps writing open ones and prunes finished ones', () =>

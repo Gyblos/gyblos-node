@@ -20,3 +20,9 @@ export const RECEIPT_FILE_CODES = {
 } as const;
 export type ReceiptFileCode =
   (typeof RECEIPT_FILE_CODES)[keyof typeof RECEIPT_FILE_CODES];
+
+export const RECEIPT_RETENTION = {
+  version: 2,
+  maximumMs: 604800000,
+  keyFields: 3,
+} as const;

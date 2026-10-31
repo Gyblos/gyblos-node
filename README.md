@@ -14,6 +14,9 @@ back to the buyer.
 - **Buyer proxy** (`pnpm buyer:start`): checks the offer, listens on `:4031`.
 - **Payments**: x402 `upto`, local facilitator, devnet test token (not USDC).
 - **Transport**: Iroh over our relay `na1.relay.gyblos.com`, or direct.
+- **Private receipt collector**: standalone loopback-only receiver with explicit
+  access and retention
+  ([configuration and limits](docs/private-receipt-collector.md#standalone-local-receiver)).
 - **Identity**: opt-in read-only 8004 admission, persistent trust state and
   explicit manual overrides.
 
@@ -131,7 +134,7 @@ steps: [docs/running-a-node.md](docs/running-a-node.md).
 | Checks | `pnpm test`, `test:lab`, `test:all`                  | Product tests (PR gate), lab tests, both.                                              |
 | Checks | `pnpm typecheck`                                     | TypeScript, including tests.                                                           |
 | Checks | `pnpm check`                                         | Typecheck, lint (including tooling), product and lab tests.                            |
-| Checks | `pnpm lint`                                          | ESLint, Prettier, tooling tests and import boundaries.                                 |
+| Checks | `pnpm lint`                                          | ESLint, Prettier, tooling tests, skill layout and import boundaries.                   |
 | Checks | `pnpm boundaries`, `tooling:test`                    | Boundary check (`--json`); tests of the checker and lint rules.                        |
 | Checks | `pnpm format`, `format:check`                        | Format and sort imports; check only.                                                   |
 

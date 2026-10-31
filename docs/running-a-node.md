@@ -666,9 +666,92 @@ Any channel in the journal not settled on the buyer's own count (a refusal, a
 stop, a pending or lapsed claim, a dispute or a settlement the chain could not
 confirm) blocks new payments (`PAID_BUYER_UNRESOLVED_PAYMENT`) until it is
 reconciled; the buyer also appends it to `paid-records.jsonl` in the buyer home
-when it can (`recorded`). Reconciling paid v2 channels (`buyer:reconcile`) is
-the next step and not available yet, so a blocked devnet test buyer is reset by
-hand for now.
+when it can (`recorded`).
+
+To reconcile, stop the paid buyer and run `pnpm buyer:reconcile:paid`. It checks
+that the role's RPC serves devnet, then reads each open channel's finalized
+history; it only reads the chain and never signs. One JSON line per channel
+reports the outcome, then a summary line with the count of each:
+
+- `settled`: the claim charged exactly the buyer's own count;
+- `disputed`: it charged another amount, more or less (recorded, no penalty);
+- `unchecked`: the chain shows a charge but no record of the buyer's count
+  survived;
+- `never-opened`: nothing was charged, because the chain shows the open never
+  landed and never can: no deposit in the channel's whole history, no channel
+  account, the open's blockhash expired by finalized block height, and the RPC
+  still holds history back to the open's slot;
+- `open`: the channel is open and unclaimed, its open may still land, or the
+  chain cannot prove otherwise (a pruned RPC, or more history than it reads).
+
+The charge is what left the escrow minus what came back to the buyer's wallet.
+If the program redirected the refund elsewhere (for example because the buyer's
+token account was closed), it shows as a larger charge and a dispute, never a
+smaller one. Each outcome but `open` is appended to `paid-reconciliations.jsonl`
+in the buyer home before the journal unblocks it, so a failed run loses nothing
+and the next one picks up where it stopped. An `open` channel keeps blocking
+until the seller claims it or the buyer withdraws it (below).
+
+Use the role's RPC as one endpoint with full transaction history. A pruned or
+load-balanced RPC can only keep a channel `open` (it never makes one look
+unopened), because the command reads the finalized tip first and requires the
+RPC to still serve blocks and ledger back to the open's slot. A journal from
+before this version is read as is: its signed opens can still settle but are
+never reported `never-opened`.
+
+The command exits 0 when nothing blocks payments (disputes included, since they
+are recorded and no longer block), 2 while a channel stays open, and 1 when it
+could not finish, printing `PAID_RECONCILE_NETWORK_MISMATCH`,
+`PAID_RECONCILE_ROLE_INVALID` or `PAID_RECONCILE_INCOMPLETE` (stop the buyer,
+check the RPC and the home). The v1 `buyer:reconcile` is unchanged.
+
+A channel that stays `open` because nobody claimed it is withdrawn with
+`pnpm buyer:withdraw:paid` (buyer stopped, devnet only). Unlike reconciliation,
+it signs with the buyer's wallet key and pays each transaction's fee from the
+wallet's devnet SOL. Each run visits every open channel in the journal and takes
+it one step further, chosen from the channel's confirmed state. It prints one
+JSON line per channel, then a summary with the count of each step and the
+shortest `retryAfterSeconds`:
+
+- `claimable`: the seller may still claim it with the buyer's authorization, so
+  it is left alone. That lasts until the quote expires or `maxTimeoutSeconds`
+  after the open was signed, whichever is later, plus 150 seconds for a claim
+  sent just before then to land and for clock differences.
+- `close-requested`: `request_close` was sent, which starts the channel's grace
+  period (`withdrawDelay`, 60 seconds).
+- `waiting`: the grace period has not elapsed by the chain's block time, or the
+  RPC does not know that block's time yet.
+- `distributed`: `seal` and `distribute` were sent, which pay out whatever was
+  settled and refund the rest of the escrow. The same transaction first creates
+  the buyer's token account if it was closed (at the wallet's cost in rent),
+  because the program would otherwise send the refund to its own treasury.
+- `nothing`: already distributed, or no channel account at the address.
+- `refused`: the account is not this buyer's channel with the journaled rent
+  payer and deposit and the current role's mint and network fee distribution, so
+  nothing was signed for it. Restore the role's mint (or run the release the
+  channel was opened with) and run again.
+- `failed`: this channel's step failed with the static code in `failure`
+  (`UPTO_UNAVAILABLE` for the RPC, `UPTO_CHAIN_REJECTED` when the chain or its
+  preflight refused the transaction, which also happens when an earlier
+  unconfirmed one has since landed or the wallet lacks SOL for the fee or the
+  token account's rent). The other channels still take their step.
+
+Each line also says whether its transaction confirmed within a minute. One that
+did not is checked again after 30 seconds: run again before then and the same
+step may be sent twice, and the second only costs a refusal (`failed`). The
+command exits 2 while another run is needed, 0 when none is, and 1 when it
+refused or failed a channel (`PAID_WITHDRAW_REFUSED`, `PAID_WITHDRAW_FAILED`,
+after every channel was visited) or could not run
+(`PAID_WITHDRAW_NETWORK_MISMATCH`, `PAID_WITHDRAW_ROLE_INVALID`,
+`PAID_WITHDRAW_INCOMPLETE`).
+
+It never changes the journal. Once a channel is distributed and finalized,
+`pnpm buyer:reconcile:paid` reads it from history and unblocks payments: the
+charge is what the seller had settled (usually nothing). If the buyer had
+counted a delivered answer that the seller never claimed, that shows as
+`disputed` with a smaller charge. A journal entry from before this version whose
+open never landed shows `nothing` here, and reconciliation cannot prove it
+unopened, so it keeps blocking payments.
 
 The endpoint listens on loopback only and refuses browser requests, but loopback
 is not authentication, so paid mode also requires a bearer token. The first paid

@@ -171,7 +171,7 @@ export type FreeBuyerCode =
   (typeof FREE_BUYER_CODES)[keyof typeof FREE_BUYER_CODES];
 // The paid buyer's own refusals, before any payment.
 export const PAID_BUYER_CODES = {
-  // An earlier channel is not resolved yet; `pnpm buyer:reconcile` resolves it.
+  // An earlier channel is not resolved yet; `pnpm buyer:reconcile:paid` resolves it.
   UNRESOLVED: 'PAID_BUYER_UNRESOLVED_PAYMENT',
   UNAVAILABLE: 'PAID_BUYER_NO_OFFER',
   // Paid sellers serve a single user message; anything else is refused before paying.
@@ -183,6 +183,30 @@ export const PAID_BUYER_CODES = {
 } as const;
 export type PaidBuyerCode =
   (typeof PAID_BUYER_CODES)[keyof typeof PAID_BUYER_CODES];
+// Paid reconciliation's exit codes: 0 when nothing blocks payments.
+export const PAID_RECONCILE_EXIT = { FAILED: 1, OPEN: 2 } as const;
+// Why paid reconciliation stopped, with what to fix; printed alone, never with paths or URLs.
+export const PAID_RECONCILE_CODES = {
+  NETWORK:
+    'PAID_RECONCILE_NETWORK_MISMATCH: role.json rpcUrl must serve devnet',
+  ROLE: 'PAID_RECONCILE_ROLE_INVALID: run `pnpm node:setup --role buyer` first',
+  INCOMPLETE:
+    'PAID_RECONCILE_INCOMPLETE: stop the paid buyer, check the RPC and the buyer home, then run again',
+} as const;
+// `pnpm buyer:withdraw:paid`: 2 while another run is needed (a claim window or grace period to wait
+// out, or a transaction not yet confirmed); 1 when it failed or refused to sign for a channel.
+export const PAID_WITHDRAW_EXIT = { FAILED: 1, AGAIN: 2 } as const;
+// Why paid withdrawal stopped, with what to fix; printed alone, never with paths or URLs.
+export const PAID_WITHDRAW_CODES = {
+  NETWORK: 'PAID_WITHDRAW_NETWORK_MISMATCH: role.json rpcUrl must serve devnet',
+  ROLE: 'PAID_WITHDRAW_ROLE_INVALID: run `pnpm node:setup --role buyer` first',
+  INCOMPLETE:
+    'PAID_WITHDRAW_INCOMPLETE: stop the paid buyer, check the RPC, the wallet SOL and the buyer home, then run again',
+  REFUSED:
+    'PAID_WITHDRAW_REFUSED: a journaled channel is not this buyer’s with its terms; nothing was signed for it',
+  FAILED:
+    'PAID_WITHDRAW_FAILED: a channel’s step failed (see its failure code); the others went on, run again later',
+} as const;
 // A deposit ceiling of zero: a free quote, or a selection.json that buys nothing.
 export const isFreeAtomic = (maxAtomic: string) => maxAtomic === '0';
 export const PAID_BUYER = {
@@ -194,7 +218,9 @@ export const PAID_BUYER = {
   drainMs: 90000,
   // Outcomes for reconciliation, one JSON line each, in the buyer home.
   recordsFile: 'paid-records.jsonl',
-  // Past this size new records are refused; reconciliation still reads the journal.
+  // Channels reconciliation resolved, one JSON line each, beside the records.
+  reconciliationsFile: 'paid-reconciliations.jsonl',
+  // Past this size the records file, and the reconciliations file, refuse new lines.
   recordsBytes: 1048576,
   // A paid buyer quotes paid sellers only; a free winner is skipped this many times at most.
   freeSkips: 8,

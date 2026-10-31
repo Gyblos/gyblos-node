@@ -30,6 +30,10 @@ export interface UptoJournalEntry {
   payTo: string;
   feePayer: string;
   maxAtomic: string;
+  // The open's slot (a seed of its channel address) and the last block height its blockhash allows:
+  // past that height an open that never landed never will.
+  openSlot: string;
+  lastValidBlockHeight: string;
   // When the terms expire; an unsigned entry is pruned after it.
   expiresAt: number;
   state: PaymentChannelState;
@@ -63,6 +67,8 @@ const FIELDS = [
   'payTo',
   'feePayer',
   'maxAtomic',
+  'openSlot',
+  'lastValidBlockHeight',
   'expiresAt',
   'state',
   'chargedAtomic',
@@ -90,13 +96,27 @@ function atomic(value: unknown): string {
   return BigInt(amount) <= U64_MAX ? amount : unavailable();
 }
 
-function entry(value: unknown): UptoJournalEntry {
+// Legacy (version 1) entries had no open slot or blockhash lifetime.
+const V1_FIELDS = FIELDS.filter(
+  (field) => field !== 'openSlot' && field !== 'lastValidBlockHeight',
+);
+// A version 1 signed entry can still settle but is never proven unopened: its blockhash lifetime is
+// unknown, so it is read as never expiring.
+const V1_UNKNOWN = { openSlot: '0', lastValidBlockHeight: String(U64_MAX) };
+
+function entry(value: unknown, version: number): UptoJournalEntry {
+  const legacy = version === BUYER_JOURNAL.legacyVersion;
+  const fields: readonly string[] = legacy ? V1_FIELDS : FIELDS;
   if (
     !isRecord(value) ||
-    Object.keys(value).length !== FIELDS.length ||
-    !FIELDS.every((field) => Object.hasOwn(value, field))
+    Object.keys(value).length !== fields.length ||
+    !fields.every((field) => Object.hasOwn(value, field))
   )
     return unavailable();
+  return checked(legacy ? { ...value, ...V1_UNKNOWN } : value);
+}
+
+function checked(value: Record<string, unknown>): UptoJournalEntry {
   const { state, updatedAt, expiresAt, channelId, chargedAtomic } = value;
   if (
     !isState(state) ||
@@ -110,6 +130,8 @@ function entry(value: unknown): UptoJournalEntry {
     payTo: address(value.payTo),
     feePayer: address(value.feePayer),
     maxAtomic: atomic(value.maxAtomic),
+    openSlot: atomic(value.openSlot),
+    lastValidBlockHeight: atomic(value.lastValidBlockHeight),
     expiresAt: Number(expiresAt),
     state,
     chargedAtomic: chargedAtomic === null ? null : atomic(chargedAtomic),
@@ -125,17 +147,25 @@ function parseJournal(source: string): Map<string, UptoJournalEntry> {
   } catch {
     return unavailable();
   }
+  const version = isRecord(parsed) ? parsed.version : undefined;
   if (
     !isRecord(parsed) ||
-    parsed.version !== BUYER_JOURNAL.version ||
+    (version !== BUYER_JOURNAL.version &&
+      version !== BUYER_JOURNAL.legacyVersion) ||
     Object.keys(parsed).length !== 2 ||
     !Array.isArray(parsed.entries)
   )
     return unavailable();
   const entries = new Map<string, UptoJournalEntry>();
   for (const value of parsed.entries) {
-    const parsedEntry = entry(value);
+    const parsedEntry = entry(value, Number(version));
     if (entries.has(parsedEntry.requestDigest)) unavailable();
+    // A version 1 open that was never signed never left the buyer: nothing to keep.
+    if (
+      version === BUYER_JOURNAL.legacyVersion &&
+      parsedEntry.channelId === null
+    )
+      continue;
     entries.set(parsedEntry.requestDigest, parsedEntry);
   }
   return entries;
@@ -208,7 +238,10 @@ export async function openUptoBuyerJournal(options: {
     mutate((entries) => {
       if (!entries.has(value.requestDigest) && entries.size >= maxEntries)
         unavailable();
-      entries.set(value.requestDigest, entry({ ...value, updatedAt: now() }));
+      entries.set(
+        value.requestDigest,
+        entry({ ...value, updatedAt: now() }, BUYER_JOURNAL.version),
+      );
     });
   const remove = (requestDigest: string, channelId?: string) =>
     mutate((entries) => {
