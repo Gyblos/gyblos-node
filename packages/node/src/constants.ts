@@ -315,3 +315,20 @@ export const LOCAL_TELEMETRY = { closeMs: 5000 } as const;
 
 // How long a role's RPC may take to say which chain it serves before paid startup refuses it.
 export const GENESIS_READ_MS = 10000;
+export const PAYPAL_PHASE = {
+  CREATING: 'creating',
+  CREATED: 'created',
+  AUTHORIZING: 'authorizing',
+  EXECUTING: 'executing',
+  CAPTURING: 'capturing',
+  COMPLETED: 'completed',
+  VOIDING: 'voiding',
+  VOIDED: 'voided',
+  CANCELLED: 'cancelled',
+  REFUNDING: 'refunding',
+  REFUNDED: 'refunded',
+} as const;
+export const PAYPAL_REQUEST_LIMITS = {
+  maxTokens: 256,
+  promptBytes: 8192,
+} as const;

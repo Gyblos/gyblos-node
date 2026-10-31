@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "dependencies": {
+    "@gyblos/protocol": "workspace:*",
+    "@gyblos/config": "workspace:*"
+  },
   "exports": {
     ".": "./src/index.ts"
   }

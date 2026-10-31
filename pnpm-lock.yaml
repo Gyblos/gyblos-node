@@ -242,15 +242,12 @@ importers:
 
   apps/node:
     dependencies:
-      '@gyblos/engine-ollama':
+      '@gyblos/config':
         specifier: workspace:*
-        version: link:../../packages/engine-ollama
+        version: link:../../packages/config
       '@gyblos/node':
         specifier: workspace:*
         version: link:../../packages/node
-      '@gyblos/payments-paypal':
-        specifier: workspace:*
-        version: link:../../packages/payments-paypal
       '@gyblos/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
@@ -479,6 +476,9 @@ importers:
       '@gyblos/identity':
         specifier: workspace:*
         version: link:../identity
+      '@gyblos/payments-paypal':
+        specifier: workspace:*
+        version: link:../payments-paypal
       '@gyblos/payments-upto':
         specifier: workspace:*
         version: link:../payments-upto
@@ -519,7 +519,14 @@ importers:
         specifier: 1.9.1
         version: 1.9.1
 
-  packages/payments-paypal: {}
+  packages/payments-paypal:
+    dependencies:
+      '@gyblos/config':
+        specifier: workspace:*
+        version: link:../config
+      '@gyblos/protocol':
+        specifier: workspace:*
+        version: link:../protocol
 
   packages/payments-upto:
     dependencies:

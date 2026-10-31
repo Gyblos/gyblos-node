@@ -16,10 +16,19 @@ void test('sandbox adapter authorizes and captures only its fixed USD order', as
       'Bearer synthetic-token',
     );
     if (url.endsWith('/v2/checkout/orders')) {
+      assert.equal(
+        new Headers(init?.headers).get('PayPal-Request-Id'),
+        'REQUEST1',
+      );
       const requestBody: unknown = JSON.parse(String(init?.body));
       assert.deepEqual(requestBody, {
         intent: 'AUTHORIZE',
-        purchase_units: [{ amount: { currency_code: 'USD', value: '1.00' } }],
+        purchase_units: [
+          {
+            amount: { currency_code: 'USD', value: '1.00' },
+            custom_id: 'REQUEST1',
+          },
+        ],
         application_context: {
           return_url: 'http://127.0.0.1:8765/paypal/approved',
           cancel_url: 'http://127.0.0.1:8765/paypal/cancelled',
@@ -69,7 +78,7 @@ void test('sandbox adapter authorizes and captures only its fixed USD order', as
     returnOrigin: 'http://127.0.0.1:8765',
     fetch: fetchMock,
   });
-  const order = await payment.create();
+  const order = await payment.create('REQUEST1');
   const authorization = await payment.authorize(order.orderId);
   const capture = await payment.capture(authorization.authorizationId);
   assert.equal(capture.captureId, 'CAPTURE1');
@@ -100,8 +109,10 @@ void test('an accepted but unfinished void does not release a payment', async ()
       ? Response.json({ access_token: 'synthetic-token' })
       : Response.json({ status: 'PENDING' }, { status: 202 });
   const payment = createPaypalSandbox({
-    clientId: 'test-id', clientSecret: 'test-secret',
-    returnOrigin: 'http://127.0.0.1:8765', fetch: fetchMock,
+    clientId: 'test-id',
+    clientSecret: 'test-secret',
+    returnOrigin: 'http://127.0.0.1:8765',
+    fetch: fetchMock,
   });
   await assert.rejects(payment.void('AUTH1'));
 });

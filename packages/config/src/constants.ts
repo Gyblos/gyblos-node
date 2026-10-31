@@ -11,3 +11,10 @@ export type ConfigAssetLabel =
 export const CONFIG_PATH_ERROR = {
   INVALID_WALLET_LIBRARY_ADDRESS: 'CONFIG_INVALID_WALLET_LIBRARY_ADDRESS',
 } as const;
+export const PAYPAL_SANDBOX = {
+  currency: 'USD',
+  price: '1.00',
+  port: 8765,
+  maxPort: 65535,
+  ollamaOrigin: 'http://127.0.0.1:11434/',
+} as const;

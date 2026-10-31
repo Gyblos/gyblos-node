@@ -46,8 +46,16 @@ void test('loopback demo requires same origin and connects checkout to inference
   });
   try {
     const session = new URL(app.accessUrl).hash.slice(1);
-    const headers = { 'content-type': 'application/json', origin: app.url, authorization: `Bearer ${session}` };
-    const unauthenticated = await fetch(`${app.url}/api/order`, { method: 'POST', headers: { ...headers, authorization: 'Bearer invalid' }, body: '{}' });
+    const headers = {
+      'content-type': 'application/json',
+      origin: app.url,
+      authorization: `Bearer ${session}`,
+    };
+    const unauthenticated = await fetch(`${app.url}/api/order`, {
+      method: 'POST',
+      headers: { ...headers, authorization: 'Bearer invalid' },
+      body: '{}',
+    });
     assert.equal(unauthenticated.status, 403);
     const rejected = await fetch(`${app.url}/api/order`, {
       method: 'POST',

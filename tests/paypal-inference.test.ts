@@ -242,8 +242,13 @@ void test('order creation records a request id before contacting PayPal', async 
     const state = f.getState();
     assert.ok(state && typeof state === 'object' && 'requestId' in state);
     const requestId = Reflect.get(state, 'requestId');
+    assert.equal(typeof requestId, 'string');
+    if (typeof requestId !== 'string') throw new Error('Missing request id');
     assert.match(requestId, /^[0-9a-f-]{36}$/);
-    return { orderId: 'ORDER1', approvalUrl: 'https://www.sandbox.paypal.com/checkoutnow?token=ORDER1' };
+    return {
+      orderId: 'ORDER1',
+      approvalUrl: 'https://www.sandbox.paypal.com/checkoutnow?token=ORDER1',
+    };
   };
   const service = await createPaypalInference(f);
   await service.create('first', 16);

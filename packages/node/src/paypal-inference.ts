@@ -1,23 +1,25 @@
 // Coordinates one sandbox purchase with one bounded inference; the payment and engine are injected.
 // The journal contains only payment metadata and a prompt digest, never prompts or responses.
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
-const PHASE = {
-  CREATING: 'creating',
-  CREATED: 'created',
-  AUTHORIZING: 'authorizing',
-  EXECUTING: 'executing',
-  CAPTURING: 'capturing',
-  COMPLETED: 'completed',
-  VOIDING: 'voiding',
-  VOIDED: 'voided',
-} as const;
-const REQUEST_LIMITS = { maxTokens: 256, promptBytes: 8192 } as const;
+import { PAYPAL_ERROR_CODES } from '@gyblos/protocol/constants';
+import {
+  isPaypalId,
+  PaypalError,
+  type PaypalSandboxPayment,
+} from '@gyblos/protocol/paypal-payment';
+
+import {
+  PAYPAL_PHASE as PHASE,
+  PAYPAL_REQUEST_LIMITS as REQUEST_LIMITS,
+} from './constants';
+
 type Phase = (typeof PHASE)[keyof typeof PHASE];
 
 interface Attempt {
   phase: Phase;
   promptDigest: string;
+  requestId: string;
   maxTokens: number;
   orderId?: string;
   authorizationId?: string;
@@ -25,18 +27,18 @@ interface Attempt {
 }
 
 export interface PaypalInferenceDependencies {
-  payment: {
-    create(): Promise<{ orderId: string; approvalUrl: string }>;
-    authorize(orderId: string): Promise<{ authorizationId: string }>;
-    capture(authorizationId: string): Promise<{ captureId: string }>;
-    void(authorizationId: string): Promise<void>;
-  };
+  validateRequest?(prompt: string, maxTokens: number): void;
+  payment: PaypalSandboxPayment;
   journal: {
     read(): Promise<unknown>;
     write(value: Attempt): Promise<void>;
   };
   engine: {
-    generate(input: { prompt: string; maxTokens: number }): Promise<{
+    generate(input: {
+      prompt: string;
+      maxTokens: number;
+      signal?: AbortSignal;
+    }): Promise<{
       text: string;
       usage: { inputTokens: number; outputTokens: number };
     }>;
@@ -46,23 +48,24 @@ export interface PaypalInferenceDependencies {
 function parseAttempt(value: unknown): Attempt | null {
   if (value === null) return null;
   if (!value || typeof value !== 'object' || Array.isArray(value))
-    throw new Error('Invalid payment journal');
+    throw new PaypalError(PAYPAL_ERROR_CODES.INVALID_JOURNAL);
   const entry = Object.fromEntries(Object.entries(value));
   if (
     !Object.values(PHASE).some((phase) => phase === entry.phase) ||
     typeof entry.promptDigest !== 'string' ||
+    !isPaypalId(entry.requestId) ||
     !/^[a-f0-9]{64}$/.test(entry.promptDigest) ||
     !Number.isSafeInteger(entry.maxTokens) ||
     typeof entry.maxTokens !== 'number' ||
     entry.maxTokens < 1 ||
     entry.maxTokens > REQUEST_LIMITS.maxTokens ||
     ['orderId', 'authorizationId', 'captureId'].some(
-      (key) => entry[key] !== undefined && typeof entry[key] !== 'string',
+      (key) => entry[key] !== undefined && !isPaypalId(entry[key]),
     )
   )
-    throw new Error('Invalid payment journal');
+    throw new PaypalError(PAYPAL_ERROR_CODES.INVALID_JOURNAL);
   const phase = Object.values(PHASE).find((item) => item === entry.phase);
-  if (!phase) throw new Error('Invalid payment journal');
+  if (!phase) throw new PaypalError(PAYPAL_ERROR_CODES.INVALID_JOURNAL);
   if (
     (phase !== PHASE.CREATING && typeof entry.orderId !== 'string') ||
     ([
@@ -71,13 +74,19 @@ function parseAttempt(value: unknown): Attempt | null {
       PHASE.COMPLETED,
       PHASE.VOIDING,
       PHASE.VOIDED,
+      PHASE.REFUNDING,
+      PHASE.REFUNDED,
     ].some((item) => item === phase) &&
       typeof entry.authorizationId !== 'string') ||
-    (phase === PHASE.COMPLETED && typeof entry.captureId !== 'string')
+    ([PHASE.COMPLETED, PHASE.REFUNDING, PHASE.REFUNDED].some(
+      (item) => item === phase,
+    ) &&
+      typeof entry.captureId !== 'string')
   )
-    throw new Error('Invalid payment journal');
+    throw new PaypalError(PAYPAL_ERROR_CODES.INVALID_JOURNAL);
   return {
     phase,
+    requestId: entry.requestId,
     promptDigest: entry.promptDigest,
     maxTokens: entry.maxTokens,
     ...(typeof entry.orderId === 'string' ? { orderId: entry.orderId } : {}),
@@ -99,7 +108,7 @@ function digest(prompt: string, maxTokens: number): string {
     maxTokens < 1 ||
     maxTokens > REQUEST_LIMITS.maxTokens
   )
-    throw new Error('Invalid inference request');
+    throw new PaypalError(PAYPAL_ERROR_CODES.INVALID_REQUEST);
   return createHash('sha256')
     .update(JSON.stringify({ prompt, maxTokens }))
     .digest('hex');
@@ -112,14 +121,18 @@ async function generateOrVoid(
   authorizationId: string,
   prompt: string,
   maxTokens: number,
+  signal?: AbortSignal,
 ) {
   try {
-    return await deps.engine.generate({ prompt, maxTokens });
+    signal?.throwIfAborted();
+    const output = await deps.engine.generate({ prompt, maxTokens, signal });
+    signal?.throwIfAborted();
+    return output;
   } catch {
     await save({ ...authorized, phase: PHASE.VOIDING });
     await deps.payment.void(authorizationId);
     await save({ ...authorized, phase: PHASE.VOIDED });
-    throw new Error('Inference failed');
+    throw new PaypalError(PAYPAL_ERROR_CODES.INFERENCE_FAILED);
   }
 }
 
@@ -127,83 +140,135 @@ function isFinished(attempt: Attempt | null) {
   return (
     !attempt ||
     attempt.phase === PHASE.COMPLETED ||
-    attempt.phase === PHASE.VOIDED
+    attempt.phase === PHASE.VOIDED ||
+    attempt.phase === PHASE.REFUNDED ||
+    attempt.phase === PHASE.CANCELLED
   );
 }
 
-export async function createPaypalInference(deps: PaypalInferenceDependencies) {
-  let active = parseAttempt(await deps.journal.read());
-  let busy = false;
-  let journalFailed = false;
-  async function save(attempt: Attempt) {
-    active = attempt;
+class PaypalInference {
+  private busy = false;
+  private journalFailed = false;
+  constructor(
+    private readonly deps: PaypalInferenceDependencies,
+    private active: Attempt | null,
+  ) {}
+
+  private async save(attempt: Attempt) {
+    this.active = attempt;
     try {
-      await deps.journal.write(attempt);
+      await this.deps.journal.write(attempt);
     } catch (error) {
-      journalFailed = true;
+      this.journalFailed = true;
       throw error;
     }
   }
-  return {
-    async create(prompt: string, maxTokens: number) {
-      const promptDigest = digest(prompt, maxTokens);
-      if (busy || journalFailed || !isFinished(active))
-        throw new Error('Payment needs reconciliation');
-      busy = true;
-      try {
-        await save({ phase: PHASE.CREATING, promptDigest, maxTokens });
-        const order = await deps.payment.create();
-        await save({
-          phase: PHASE.CREATED,
-          promptDigest,
-          maxTokens,
-          orderId: order.orderId,
-        });
-        return order;
-      } finally {
-        busy = false;
-      }
-    },
-    async execute(orderId: string, prompt: string, maxTokens: number) {
-      const promptDigest = digest(prompt, maxTokens);
+  async cancel() {
+    if (
+      this.busy ||
+      this.journalFailed ||
+      !this.active ||
+      this.active.phase !== PHASE.CREATED
+    )
+      throw new PaypalError(PAYPAL_ERROR_CODES.NEEDS_RECONCILIATION);
+    this.busy = true;
+    try {
+      await this.save({ ...this.active, phase: PHASE.CANCELLED });
+    } finally {
+      this.busy = false;
+    }
+  }
+  async create(prompt: string, maxTokens: number) {
+    const promptDigest = digest(prompt, maxTokens);
+    if (this.busy || this.journalFailed || !isFinished(this.active))
+      throw new PaypalError(PAYPAL_ERROR_CODES.NEEDS_RECONCILIATION);
+    this.busy = true;
+    try {
+      this.deps.validateRequest?.(prompt, maxTokens);
+      await this.deps.payment.prepare?.();
+      const requestId = randomUUID();
+      await this.save({
+        phase: PHASE.CREATING,
+        requestId,
+        promptDigest,
+        maxTokens,
+      });
+      const order = await this.deps.payment.create(requestId);
+      await this.save({
+        phase: PHASE.CREATED,
+        requestId,
+        promptDigest,
+        maxTokens,
+        orderId: order.orderId,
+      });
+      return order;
+    } finally {
+      this.busy = false;
+    }
+  }
+  async execute(
+    orderId: string,
+    prompt: string,
+    maxTokens: number,
+    signal?: AbortSignal,
+  ) {
+    const promptDigest = digest(prompt, maxTokens);
+    if (
+      this.busy ||
+      this.journalFailed ||
+      !this.active ||
+      this.active.phase !== PHASE.CREATED ||
+      this.active.orderId !== orderId ||
+      this.active.promptDigest !== promptDigest ||
+      this.active.maxTokens !== maxTokens
+    )
+      throw new PaypalError(PAYPAL_ERROR_CODES.INVALID_REQUEST);
+    this.busy = true;
+    try {
+      const attempt = this.active;
       if (
-        busy ||
-        journalFailed ||
-        !active ||
-        active.phase !== PHASE.CREATED ||
-        active.orderId !== orderId ||
-        active.promptDigest !== promptDigest ||
-        active.maxTokens !== maxTokens
+        this.deps.payment.isApproved &&
+        !(await this.deps.payment.isApproved(orderId))
       )
-        throw new Error('Payment attempt cannot be executed');
-      busy = true;
-      try {
-        const attempt = active;
-        await save({ ...attempt, phase: PHASE.AUTHORIZING });
-        const authorization = await deps.payment.authorize(orderId);
-        const authorized = {
-          ...attempt,
-          ...authorization,
-          phase: PHASE.EXECUTING,
-        };
-        await save(authorized);
-        const output = await generateOrVoid(
-          deps,
-          save,
-          authorized,
-          authorization.authorizationId,
-          prompt,
-          maxTokens,
-        );
-        await save({ ...authorized, phase: PHASE.CAPTURING });
-        const capture = await deps.payment.capture(
-          authorization.authorizationId,
-        );
-        await save({ ...authorized, ...capture, phase: PHASE.COMPLETED });
-        return output;
-      } finally {
-        busy = false;
+        throw new PaypalError(PAYPAL_ERROR_CODES.NOT_APPROVED);
+      signal?.throwIfAborted();
+      await this.save({ ...attempt, phase: PHASE.AUTHORIZING });
+      const authorization = await this.deps.payment.authorize(orderId);
+      const authorized = {
+        ...attempt,
+        ...authorization,
+        phase: PHASE.EXECUTING,
+      };
+      await this.save(authorized);
+      const output = await generateOrVoid(
+        this.deps,
+        (item) => this.save(item),
+        authorized,
+        authorization.authorizationId,
+        prompt,
+        maxTokens,
+        signal,
+      );
+      await this.save({ ...authorized, phase: PHASE.CAPTURING });
+      const capture = await this.deps.payment.capture(
+        authorization.authorizationId,
+      );
+      if (signal?.aborted) {
+        await this.save({ ...authorized, ...capture, phase: PHASE.REFUNDING });
+        if (!this.deps.payment.refund)
+          throw new PaypalError(PAYPAL_ERROR_CODES.NEEDS_RECONCILIATION);
+        await this.deps.payment.refund(capture.captureId);
+        await this.save({ ...authorized, ...capture, phase: PHASE.REFUNDED });
+        throw new PaypalError(PAYPAL_ERROR_CODES.REFUNDED);
       }
-    },
-  };
+      await this.save({ ...authorized, ...capture, phase: PHASE.COMPLETED });
+      return output;
+    } finally {
+      this.busy = false;
+    }
+  }
+}
+
+export async function createPaypalInference(deps: PaypalInferenceDependencies) {
+  return new PaypalInference(deps, parseAttempt(await deps.journal.read()));
 }

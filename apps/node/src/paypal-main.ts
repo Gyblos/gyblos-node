@@ -1,9 +1,8 @@
 // Starts a local-only PayPal Sandbox demo with the pinned Gyblos Ollama engine and private journal.
 import { isAbsolute } from 'node:path';
 
-import { createOllamaEngine } from '@gyblos/engine-ollama/engine';
-import { openPaypalJournal } from '@gyblos/node/paypal-journal';
-import { createPaypalSandbox } from '@gyblos/payments-paypal';
+import { paypalSandboxSettings } from '@gyblos/config/paypal';
+import { openPaypalSandbox } from '@gyblos/node/paypal-startup';
 import { isMain, shutdownSignal } from '@gyblos/runtime';
 
 import { startPaypalDemo } from './paypal-demo';
@@ -21,26 +20,31 @@ export async function main() {
     throw new Error(
       'Set sandbox credentials and an absolute dedicated sandbox state directory.',
     );
-  const engine = createOllamaEngine('http://127.0.0.1:11434/');
-  await engine.describe();
-  const journal = await openPaypalJournal(stateDirectory);
+  const settings = paypalSandboxSettings(process.env);
+  const sandbox = await openPaypalSandbox({
+    clientId,
+    clientSecret,
+    stateDirectory,
+    returnOrigin: `http://127.0.0.1:${settings.port}`,
+    ollamaOrigin: settings.ollamaOrigin,
+  });
   let demo: Awaited<ReturnType<typeof startPaypalDemo>> | undefined;
   let shutdown: ReturnType<typeof shutdownSignal> | undefined;
   try {
     demo = await startPaypalDemo({
-      port: 8765,
-      engine,
-      journal,
-      payment: createPaypalSandbox({ clientId, clientSecret }),
+      port: settings.port,
+      ...sandbox,
     });
-    process.stdout.write(`PayPal Sandbox demo: ${demo.url}\n`);
+    process.stdout.write(
+      `PayPal Sandbox demo (private session link): ${demo.accessUrl}\n`,
+    );
     shutdown = shutdownSignal();
     await shutdown.signalled;
   } finally {
     try {
       await demo?.close();
     } finally {
-      await journal.close();
+      await sandbox.close();
       shutdown?.dispose();
     }
   }

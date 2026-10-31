@@ -13,6 +13,7 @@ void test('sandbox payment state persists and excludes a second process owner', 
     assert.equal(await journal.read(), null);
     await journal.write({
       phase: 'capturing',
+      requestId: 'REQUEST1',
       promptDigest: 'a'.repeat(64),
       maxTokens: 16,
       orderId: 'ORDER1',
@@ -23,6 +24,7 @@ void test('sandbox payment state persists and excludes a second process owner', 
     const reopened = await openPaypalJournal(root);
     assert.deepEqual(await reopened.read(), {
       phase: 'capturing',
+      requestId: 'REQUEST1',
       promptDigest: 'a'.repeat(64),
       maxTokens: 16,
       orderId: 'ORDER1',

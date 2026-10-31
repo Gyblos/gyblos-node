@@ -38,6 +38,7 @@
     "./receipt-channel": "./src/receipt-channel.ts",
     "./vectors/receipt-channel-v1.json": "./vectors/receipt-channel-v1.json",
     "./payment": "./src/payment.ts",
+    "./paypal-payment": "./src/paypal-payment.ts",
     "./payment-binding": "./src/payment-binding.ts",
     "./paid-execution": "./src/paid-execution.ts",
     "./paid/constants": "./src/paid/constants.ts",
