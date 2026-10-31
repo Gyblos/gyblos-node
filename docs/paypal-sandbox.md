@@ -24,6 +24,20 @@ to the page, and run inference. No live endpoint is used. Optional
 `PAYPAL_SANDBOX_PORT` and `PAYPAL_SANDBOX_OLLAMA_ORIGIN` settings select a
 different local port and literal loopback Ollama origin.
 
+For example, in a private macOS zsh terminal, from this repository:
+
+```sh
+read -r 'PAYPAL_SANDBOX_CLIENT_ID?Sandbox client ID: '
+read -rs 'PAYPAL_SANDBOX_CLIENT_SECRET?Sandbox secret: '
+print
+export PAYPAL_SANDBOX_CLIENT_ID PAYPAL_SANDBOX_CLIENT_SECRET
+export PAYPAL_SANDBOX_STATE_DIRECTORY="$HOME/Library/Application Support/Gyblos/paypal-sandbox"
+pnpm paypal:sandbox
+```
+
+The secret is not echoed. Reuse the same state directory on later runs: it is
+needed to preserve unresolved payment attempts. Use sandbox credentials only.
+
 The journal stores payment IDs, phase, token limit and a prompt digest, not the
 prompt or response. It takes an exclusive process lock. A payment or storage
 failure that might have happened remotely blocks another attempt. Do not remove
