@@ -133,22 +133,30 @@ export async function paidAcceptanceHost(signal: AbortSignal) {
       signal,
     );
   };
-  const close = async () => {
-    engine.release();
-    try {
-      await closeBuyer();
-    } finally {
+  let closing: Promise<void> | undefined;
+  const close = () => {
+    closing ??= (async () => {
       try {
-        await seller?.stop();
-        seller = undefined;
-      } finally {
+        engine.release();
         try {
-          await binding.close();
+          await closeBuyer();
         } finally {
-          await registry.close();
+          try {
+            await seller?.stop();
+            seller = undefined;
+          } finally {
+            try {
+              await binding.close();
+            } finally {
+              await registry.close();
+            }
+          }
         }
+      } finally {
+        globalThis.fetch = localFetch;
       }
-    }
+    })();
+    return closing;
   };
   try {
     await startSeller();

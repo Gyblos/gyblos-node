@@ -8,6 +8,7 @@ import {
   CONTROL_METERING_MODES,
   ENGINE_DONE_REASONS,
   ENGINE_ERROR_CODES,
+  MODEL_IDENTITIES,
   MODEL_IDS,
 } from '@gyblos/protocol/constants';
 import { EngineError, type RecountTokenizer } from '@gyblos/protocol/engine';
@@ -41,7 +42,7 @@ export function paidAcceptanceEngine() {
         logprobs: false,
         cancellable: true,
         recountable: true,
-        modelIdentity: 'name-only',
+        modelIdentity: MODEL_IDENTITIES.NAME_ONLY,
       }),
       describe: async () => ({
         name: 'synthetic-paid-model',

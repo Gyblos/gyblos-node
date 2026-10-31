@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readdir, realpath } from 'node:fs/promises';
 import { basename } from 'node:path';
 
+import { PAID_VERDICTS } from '@gyblos/buyer/constants';
 import { homeLayout } from '@gyblos/config';
 import {
   ACCEPTANCE,
@@ -13,11 +14,13 @@ import { assertAcceptanceTempBase } from '@gyblos/lab-harness/acceptance/workspa
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 import { isMain } from '@gyblos/runtime';
 
+import { assertPaidJsonAnswer } from './paid-acceptance-answers';
 import {
   PAID_ACCEPTANCE,
   PAID_ACCEPTANCE_CASES,
   type PaidAcceptanceReport,
 } from './paid-acceptance-constants';
+import { finishPaidAcceptance } from './paid-acceptance-finalize';
 import { paidAcceptanceHost, paidWait } from './paid-acceptance-host';
 import { paidAnswer, paidBody, paidHttp } from './paid-acceptance-http';
 import {
@@ -60,6 +63,7 @@ export async function paidScenario(
       (await readdir(homeLayout(process.env).roles[role])).length,
       0,
     );
+  const originalFetch = globalThis.fetch;
   const run = await paidAcceptanceHost(signal);
   const cases: PaidAcceptanceReport['cases'] = [PAID_ACCEPTANCE_CASES.STARTUP];
   let restarts = 0;
@@ -89,7 +93,7 @@ export async function paidScenario(
     const unverifiedBody = await paidBody(unverified);
     assert.equal(unverified.statusCode, 200);
     answers++;
-    assert.ok(unverifiedBody.includes('unverified'));
+    assertPaidJsonAnswer(unverifiedBody, PAID_VERDICTS.UNVERIFIED);
     await uncertain(run, signal);
     blocked++;
     cases.push(PAID_ACCEPTANCE_CASES.PENDING);
@@ -138,28 +142,34 @@ export async function paidScenario(
     cases.push(PAID_ACCEPTANCE_CASES.CANCEL);
     await paidPrivateRecords();
     cases.push(PAID_ACCEPTANCE_CASES.PRIVACY);
-    assert.equal(run.external(), 0);
-    assert.ok(run.registry.counts().reads > 0);
-    assert.equal(run.registry.counts().forbidden, 0);
-    assert.ok(run.reads() >= answers);
-    assert.equal(run.payments.uniqueChannels(), run.payments.authorizations());
-    cases.push(PAID_ACCEPTANCE_CASES.ISOLATION);
-    return {
-      ok: true,
-      nativeIroh: true,
-      simulatedChain: true,
-      realPayments: false,
-      cases,
-      answers,
-      attempts: run.engine.attempts(),
-      deposits: run.payments.deposits(),
-      settlements: run.payments.settlements(),
-      restarts,
-      blocked,
-      externalCalls: run.external(),
-      registryReads: run.registry.counts().reads,
-      forbiddenRpcMethods: run.registry.counts().forbidden,
-    };
+    return await finishPaidAcceptance(run.close, () => {
+      assert.equal(globalThis.fetch, originalFetch);
+      assert.equal(run.external(), 0);
+      assert.ok(run.registry.counts().reads > 0);
+      assert.equal(run.registry.counts().forbidden, 0);
+      assert.ok(run.reads() >= answers);
+      assert.equal(
+        run.payments.uniqueChannels(),
+        run.payments.authorizations(),
+      );
+      cases.push(PAID_ACCEPTANCE_CASES.ISOLATION);
+      return {
+        ok: true,
+        nativeIroh: true,
+        simulatedChain: true,
+        realPayments: false,
+        cases,
+        answers,
+        attempts: run.engine.attempts(),
+        deposits: run.payments.deposits(),
+        settlements: run.payments.settlements(),
+        restarts,
+        blocked,
+        externalCalls: run.external(),
+        registryReads: run.registry.counts().reads,
+        forbiddenRpcMethods: run.registry.counts().forbidden,
+      };
+    });
   } finally {
     await run.close();
   }

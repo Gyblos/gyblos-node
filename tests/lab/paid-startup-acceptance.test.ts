@@ -1,13 +1,25 @@
 // Actual paid product startup is accepted only over isolated native loopback and simulated chain services.
-import { PAID_VERDICTS } from '@gyblos/buyer/constants';
-import { assertPaidJsonAnswer, assertPaidStreamAnswer } from '../support/paid-acceptance-answers';
-import { finishPaidAcceptance } from '../support/paid-acceptance-finalize';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { FREE_BUYER, PAID_BUYER, PAID_VERDICTS } from '@gyblos/buyer/constants';
+import {
+  ENGINE_DONE_REASONS,
+  FREE_CHAT_ROLES,
+  MODEL_IDS,
+} from '@gyblos/protocol/constants';
+
 import { NATIVE_CAPABILITY } from '../support/native-runtime';
+import {
+  assertPaidJsonAnswer,
+  assertPaidStreamAnswer,
+} from '../support/paid-acceptance-answers';
 import { main } from '../support/paid-acceptance-cli';
-import { PAID_ACCEPTANCE_CASES } from '../support/paid-acceptance-constants';
+import {
+  PAID_ACCEPTANCE,
+  PAID_ACCEPTANCE_CASES,
+} from '../support/paid-acceptance-constants';
+import { finishPaidAcceptance } from '../support/paid-acceptance-finalize';
 import {
   parsePaidReport,
   runPaidAcceptance,
@@ -112,12 +124,66 @@ void test('paid acceptance cancels its isolated child without changing parent fe
 });
 
 void test('paid delivery assertions reject verdict metadata without the answer', () => {
-  assert.throws(() => assertPaidJsonAnswer(JSON.stringify({ verdict: PAID_VERDICTS.UNVERIFIED }), PAID_VERDICTS.UNVERIFIED));
+  const response = {
+    id: 'chatcmpl-synthetic',
+    object: FREE_BUYER.completionObject,
+    created: 0,
+    model: MODEL_IDS.QWEN3_0_6B,
+    choices: [
+      {
+        index: 0,
+        message: { role: FREE_CHAT_ROLES.ASSISTANT, content: '' },
+        finish_reason: ENGINE_DONE_REASONS.STOP,
+      },
+    ],
+    usage: {
+      prompt_tokens: PAID_ACCEPTANCE.inputTokens,
+      completion_tokens: [...PAID_ACCEPTANCE.text].length,
+      total_tokens:
+        PAID_ACCEPTANCE.inputTokens + [...PAID_ACCEPTANCE.text].length,
+    },
+    [PAID_BUYER.paymentField]: {
+      verdict: PAID_VERDICTS.UNVERIFIED,
+      maxAtomic: PAID_ACCEPTANCE.maxAtomic,
+      expectedAtomic: '48',
+      chargedAtomic: '48',
+      sellerAtomic: '46',
+      feeAtomic: '1',
+      refundedAtomic: '952',
+      recorded: true,
+    },
+  };
+  assert.throws(() =>
+    assertPaidJsonAnswer(JSON.stringify(response), PAID_VERDICTS.UNVERIFIED),
+  );
 });
 void test('paid stream framing rejects an ordinary JSON completion', () => {
-  assert.throws(() => assertPaidStreamAnswer(JSON.stringify({ text: 'synthetic paid answer', verdict: PAID_VERDICTS.SETTLED }), 'application/json'));
+  assert.throws(() =>
+    assertPaidStreamAnswer(
+      JSON.stringify({
+        text: 'synthetic paid answer',
+        verdict: PAID_VERDICTS.SETTLED,
+      }),
+      'application/json',
+    ),
+  );
 });
 void test('paid acceptance teardown cannot hide swallowed forbidden I/O', async () => {
   let denied = 0;
-  await assert.rejects(finishPaidAcceptance(async () => { denied++; }, () => { assert.equal(denied, 0); return true; }), { code: 'ERR_ASSERTION' });
+  await assert.rejects(
+    finishPaidAcceptance(
+      async () => {
+        const refusedFetch = async () => {
+          denied++;
+          throw new Error('Synthetic forbidden cleanup I/O');
+        };
+        await refusedFetch().catch(() => {});
+      },
+      () => {
+        assert.equal(denied, 0);
+        return true;
+      },
+    ),
+    { code: 'ERR_ASSERTION' },
+  );
 });

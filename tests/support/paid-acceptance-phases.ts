@@ -7,6 +7,7 @@ import { FILE_MODES, rolePathIn } from '@gyblos/config';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 import { controlObject } from '@gyblos/protocol/control-validation';
 
+import { assertPaidJsonAnswer } from './paid-acceptance-answers';
 import { PAID_ACCEPTANCE } from './paid-acceptance-constants';
 import { paidWait, type PaidAcceptanceHost } from './paid-acceptance-host';
 import { paidBody, paidHttp } from './paid-acceptance-http';
@@ -31,7 +32,7 @@ export async function paidWrongShares(
   const response = await paidHttp(run, signal);
   const body = await paidBody(response);
   assert.equal(response.statusCode, 200);
-  assert.ok(body.includes(PAID_VERDICTS.DISPUTED));
+  assertPaidJsonAnswer(body, PAID_VERDICTS.DISPUTED);
   run.payments.wrongShares(false);
   await run.payments.confirmLast();
 }
@@ -53,7 +54,7 @@ export async function paidRecovery(
   const response = await paidHttp(run, signal);
   const body = await paidBody(response);
   assert.equal(response.statusCode, 200);
-  assert.ok(body.includes(PAID_VERDICTS.PENDING));
+  assertPaidJsonAnswer(body, PAID_VERDICTS.PENDING);
   const row = controlObject(
     JSON.parse((await record()).trim().split('\n').at(-1)!),
     [

@@ -2,8 +2,13 @@
 import assert from 'node:assert/strict';
 import { request, type IncomingMessage } from 'node:http';
 
+import { PAID_VERDICTS } from '@gyblos/buyer/constants';
 import { FREE_CHAT_ROLES, MODEL_IDS } from '@gyblos/protocol/constants';
 
+import {
+  assertPaidJsonAnswer,
+  assertPaidStreamAnswer,
+} from './paid-acceptance-answers';
 import { PAID_ACCEPTANCE } from './paid-acceptance-constants';
 import type { PaidAcceptanceHost } from './paid-acceptance-host';
 
@@ -62,7 +67,7 @@ export async function paidAnswer(
   const response = await paidHttp(run, signal, stream);
   const body = await paidBody(response);
   assert.equal(response.statusCode, 200);
-  assert.ok(body.includes(PAID_ACCEPTANCE.text));
+  if (stream) assertPaidStreamAnswer(body, response.headers['content-type']);
+  else assertPaidJsonAnswer(body, PAID_VERDICTS.SETTLED);
   assert.equal(run.engine.attempts(), before + 1);
-  assert.ok(body.includes('settled'));
 }
