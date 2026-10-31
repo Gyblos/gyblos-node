@@ -29,6 +29,7 @@ import {
   assertReadinessCurrent,
   type ReadinessRecord,
 } from './engine-readiness';
+import type { createSellerEngine } from './engine-registry';
 import { createSellerFreeOffers } from './free-offers';
 import { assertRoleHome } from './home';
 import { openSellerSequence } from './public-sequence';
@@ -101,6 +102,8 @@ function offerStatus(settings: SellerSettings, offers: SellerOfferSet) {
 export async function startSeller(
   options: {
     telemetry?: TelemetrySink;
+    // Explicit composition port; omission keeps the normal engine registry and pinned artifacts.
+    createEngine?: typeof createSellerEngine;
     bind?: typeof bindEndpoint;
     // Builds the payment server for paid offers from the seller's role; without it, paid offers
     // refuse startup with SELLER_PAID_EXECUTION_UNAVAILABLE.
@@ -148,6 +151,7 @@ export async function startSeller(
     await stage('private-engine-warmup');
     // The seller runs its engines; startup only warms each at its offer URL and never starts one.
     const offerDependencies = {
+      create: options.createEngine,
       fetch: globalThis.fetch,
       environment: process.env,
       snapshot: memorySnapshot,

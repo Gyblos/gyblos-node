@@ -50,7 +50,8 @@
     "desktop:package": "pnpm desktop:build && pnpm --filter @gyblos/desktop package",
     "buyer": "node --import tsx apps/buyer/src/buyer-main.ts",
     "buyer:free": "node --import tsx apps/buyer/src/free-main.ts",
-    "acceptance:receipts": "pnpm --filter @gyblos/lab-harness acceptance:receipts"
+    "acceptance:receipts": "pnpm --filter @gyblos/lab-harness acceptance:receipts",
+    "acceptance:paid": "node --import tsx tests/support/paid-acceptance-cli.ts"
   },
   "dependencies": {
     "@gyblos/core": "workspace:*",

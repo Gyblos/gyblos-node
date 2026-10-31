@@ -11,14 +11,18 @@ export const PAID_ACCEPTANCE = {
 } as const;
 export const PAID_ACCEPTANCE_CASES = {
   STARTUP: 'product-startup',
+  PRESEND: 'pre-send-discard-without-generation',
   COMPLETE: 'complete-answer',
   STREAM: 'streamed-answer',
   RESTART: 'role-restart',
+  SHARES: 'independent-ledger-refuses-wrong-shares',
   PENDING: 'unverified-settlement-blocks',
   PERSISTED: 'uncertainty-survives-restart',
   CONFIRMED: 'explicit-simulated-confirmation',
+  RECOVERY: 'seller-recovers-pending-claim-once',
   ENGINE: 'engine-failure-no-retry',
   CANCEL: 'cancellation-no-retry',
+  PRIVACY: 'private-content-free-records',
   ISOLATION: 'no-external-services',
 } as const;
 export interface PaidAcceptanceReport {
@@ -34,4 +38,6 @@ export interface PaidAcceptanceReport {
   restarts: number;
   blocked: number;
   externalCalls: number;
+  registryReads: number;
+  forbiddenRpcMethods: number;
 }

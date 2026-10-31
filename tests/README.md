@@ -153,3 +153,7 @@ refusal, deadlines/quotas, exact duplicate and conflict handling, retention
 tombstones and clean reopen. Existing receipt-file suites protect compatibility
 of the version-1 store. All storage belongs to disposable directories; HTTP uses
 loopback only and no uploader or real credentials are activated.
+
+`tests/lab/paid-startup-acceptance.test.ts` runs actual paid seller/buyer
+startup over native loopback, synthetic chain services and private temporary
+journals. See [the acceptance boundary](../docs/paid-acceptance.md).

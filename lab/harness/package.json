@@ -48,7 +48,9 @@
     "./acceptance/receipt-constants": "./src/acceptance/receipt-constants.ts",
     "./cli/receipt-acceptance": "./src/cli/receipt-acceptance.ts",
     "./acceptance/receipt-collector": "./src/acceptance/receipt-collector.ts",
-    "./acceptance/receipt-collector-worker": "./src/acceptance/receipt-collector-worker.ts"
+    "./acceptance/receipt-collector-worker": "./src/acceptance/receipt-collector-worker.ts",
+    "./acceptance/receipt-native": "./src/acceptance/receipt-native.ts",
+    "./acceptance/errors": "./src/acceptance/errors.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",
