@@ -27,6 +27,7 @@ function fixture() {
     async void() {
       calls.push('void');
     },
+    async refund() { calls.push('refund'); },
   };
   const journal = {
     async read() {
@@ -172,4 +173,18 @@ void test('buyer disconnect before capture voids the authorization', async () =>
   await service.create('first', 16);
   await assert.rejects(service.execute('ORDER1', 'first', 16, controller.signal));
   assert.deepEqual(f.calls, ['create', 'authorize', 'generate', 'void']);
+});
+
+void test('buyer disconnect during capture refunds the completed payment', async () => {
+  const f = fixture();
+  const controller = new AbortController();
+  f.payment.capture = async () => {
+    f.calls.push('capture');
+    controller.abort();
+    return { captureId: 'CAPTURE1' };
+  };
+  const service = await createPaypalInference(f);
+  await service.create('first', 16);
+  await assert.rejects(service.execute('ORDER1', 'first', 16, controller.signal));
+  assert.deepEqual(f.calls, ['create', 'authorize', 'generate', 'capture', 'refund']);
 });
