@@ -98,7 +98,7 @@ export GYBLOS_RELAY_TOKEN=...   # 32-512 characters; never commit it
 pnpm node:setup --role seller --mint MINT   # free selling needs no payout or buyer address
 pnpm node:tokenizer             # pinned tokenizer, for offers whose usage the seller recounts
 # run your own engine (a dedicated Ollama, or an OpenAI- or Anthropic-compatible API; see the full steps)
-cp examples/seller-daemon.toml gyblos.toml   # one free offer; paid selling is off for now
+cp examples/seller-daemon.toml gyblos.toml   # example free offer
 pnpm gyblos doctor              # read-only preflight; prints the public NodeId and owner
 pnpm node:start
 ```
@@ -106,8 +106,8 @@ pnpm node:start
 Buyer: same token, `pnpm node:setup --role buyer --mint MINT`, then
 `pnpm buyer:free` for the free chat endpoint (it also needs a `selection.json`;
 see the full steps). The paid v1 buyer flow (`buyer:trust`, `buyer:start`) needs
-a paid seller, which only the lab gates run until paid selling returns. Full
-steps: [docs/running-a-node.md](docs/running-a-node.md).
+a paid v1 seller, which only the lab gates run. Paid v2 uses a separate path.
+Full steps: [docs/running-a-node.md](docs/running-a-node.md).
 
 ## Commands
 
