@@ -25,6 +25,7 @@ void test('published tests have a public command without private harness depende
       '--import',
       'tsx',
       '--test',
+      '--test-reporter=tap',
       'tests/buyer-proxy.test.ts',
     ],
     {
