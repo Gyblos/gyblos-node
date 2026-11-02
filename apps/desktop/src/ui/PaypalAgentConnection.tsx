@@ -189,9 +189,10 @@ function AgentDetails(props: DetailProps) {
     <div className="connection-form">
       <AgentFields connection={props.connection} />
       <p className="modal-note">
-        Add the provider configuration to OpenCode and set GYBLOS_API_KEY in its
-        environment. This configuration disables automatic session titles. The
-        URL and key change for each PayPal session or when you disconnect.
+        Add the configuration to your project's opencode.json and set
+        GYBLOS_API_KEY in OpenCode's environment. It selects Gyblos and disables
+        automatic titles in that project. The URL and key change for each PayPal
+        session or when you disconnect.
       </p>
       <AgentActions {...props} />
     </div>

@@ -187,8 +187,8 @@ function SessionPanel({ chat, state }: ChatProps) {
       )}
       {phase === PAYPAL_SESSION_PHASE.EXECUTING && (
         <p>
-          Inference is running. If it does not finish, review the session before
-          retrying.
+          Inference is running or needs review if it failed. Do not retry
+          payment or remove its record.
         </p>
       )}
       {phase === PAYPAL_SESSION_PHASE.MESSAGE_PENDING &&

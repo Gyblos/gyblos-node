@@ -36,7 +36,7 @@ export class PaypalAgentConnectionError extends Error {
 }
 export function paypalAgentErrorMessage(error: PaypalAgentResult['error']) {
   if (error === PAYPAL_AGENT_ERROR.MODEL_UNAVAILABLE)
-    return `Check that ${DESKTOP_PAYPAL_AGENT.MODEL} is installed in Ollama. Then settle this session in Chat and start a new one.`;
+    return `Check that ${DESKTOP_PAYPAL_AGENT.MODEL} is installed in Ollama. Settle this session in Chat, restart Gyblos, and start a new session.`;
   if (error === PAYPAL_AGENT_ERROR.NEW_SESSION_REQUIRED)
     return 'Settle the current session in Chat and start a new one to connect the agent.';
   return 'Check that a PayPal Sandbox session is active in Chat, then try again.';
@@ -58,6 +58,7 @@ export function opencodeConfig(
   return JSON.stringify(
     {
       $schema: 'https://opencode.ai/config.json',
+      model: `gyblos/${connection.model}`,
       agent: { title: { disable: true } },
       provider: {
         gyblos: {

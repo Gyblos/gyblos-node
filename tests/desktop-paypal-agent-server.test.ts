@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { request as httpRequest } from 'node:http';
 import { test } from 'node:test';
 
 import { startDesktopPaypalAgent } from '@gyblos/desktop/paypal-agent-server';
@@ -162,5 +163,58 @@ void test('an agent key cannot spend a later sandbox authorization', async () =>
     }
   } finally {
     await first.close();
+  }
+});
+
+void test('a body started in an old session cannot execute after that session is settled', async () => {
+  const f = fixture();
+  const agentEngine = {
+    model: 'synthetic-model',
+    async generate() {
+      throw new Error('must not run');
+    },
+  };
+  const desktop = createDesktopPaypalSession(
+    await createPaypalSession({ ...f, agentEngine }),
+    async () => {},
+  );
+  await desktop.create();
+  await desktop.approve();
+  const endpoint = await startDesktopPaypalAgent(desktop, agentEngine.model);
+  const body = JSON.stringify({
+    model: agentEngine.model,
+    messages: [{ role: 'user', content: 'synthetic' }],
+    max_tokens: 128,
+  });
+  const request = httpRequest(`${endpoint.url}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${endpoint.key}`,
+      'content-type': 'application/json',
+      'content-length': Buffer.byteLength(body),
+    },
+  });
+  const result = new Promise<number | undefined>((resolve, reject) => {
+    request.on('error', reject);
+    request.on('response', (response) => {
+      response.resume();
+      response.on('end', () => resolve(response.statusCode));
+    });
+  });
+  try {
+    request.write(body.slice(0, 10));
+    for (let attempt = 0; attempt < 500 && !endpoint.isBusy(); attempt += 1)
+      await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.equal(endpoint.isBusy(), true);
+    await desktop.finish();
+    await desktop.create();
+    await desktop.approve();
+    request.end(body.slice(10));
+    assert.notEqual(await result, 200);
+    assert.equal(desktop.status().spentCents, 0);
+    await desktop.finish();
+  } finally {
+    request.destroy();
+    await endpoint.close();
   }
 });
