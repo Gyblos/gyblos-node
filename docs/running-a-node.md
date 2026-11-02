@@ -717,10 +717,12 @@ in the buyer home before the journal unblocks it, so a failed run loses nothing
 and the next one picks up where it stopped. An `open` channel keeps blocking
 until the seller claims it or the buyer withdraws it (below).
 
-Use the role's RPC as one endpoint with full transaction history. A pruned or
-load-balanced RPC can only keep a channel `open` (it never makes one look
-unopened), because the command reads the finalized tip first and requires the
-RPC to still serve blocks and ledger back to the open's slot. A signed open
+Use the role's RPC as one endpoint with complete, consistent finalized
+transaction history. The command reads the finalized tip and checks that the
+RPC still serves blocks and ledger back to the open's slot; those checks do not
+prove that its signature history is complete or consistent across backends.
+The operator must verify that history before treating a negative result as proof
+that an open never landed. A signed open
 from an older journal has no recorded network and remains blocked, as described
 below. A journal upgraded to the current format is refused by earlier releases
 (`BUYER_PAYMENT_JOURNAL_UNAVAILABLE`, `PAID_RECONCILE_INCOMPLETE`,
