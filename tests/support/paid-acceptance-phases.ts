@@ -43,6 +43,7 @@ async function record() {
   assert.ok(found.size <= PAID_BUYER.recordsBytes);
   const content = await readFile(path, 'utf8');
   assert.equal(content.includes(PAID_ACCEPTANCE.text), false);
+  assert.equal(content.includes(PAID_ACCEPTANCE.interruptedText), false);
   assert.equal(content.includes('synthetic paid input'), false);
   return content;
 }

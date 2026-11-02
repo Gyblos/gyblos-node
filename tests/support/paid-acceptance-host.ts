@@ -65,10 +65,13 @@ export async function paidAcceptanceHost(signal: AbortSignal) {
   const localFetch = globalThis.fetch;
   let external = 0;
   let reads = 0;
+  let buyer: Awaited<ReturnType<typeof startPaidBuyer>> | undefined;
   globalThis.fetch = async (input, init) => {
     const request = new Request(input, init);
     const url = new URL(request.url);
     if (url.href === registry.url + '/' && request.method === 'POST')
+      return localFetch(request);
+    if (buyer && request.url === buyer.url && request.method === 'POST')
       return localFetch(request);
     if (url.origin !== ACCEPTANCE.origin || !url.pathname.startsWith('/v1/')) {
       external++;
@@ -83,7 +86,6 @@ export async function paidAcceptanceHost(signal: AbortSignal) {
     });
   };
   let seller: ReturnType<typeof createNode> | undefined;
-  let buyer: Awaited<ReturnType<typeof startPaidBuyer>> | undefined;
   let token: string | undefined;
   const closeBuyer = async () => {
     await buyer?.close();
@@ -179,6 +181,7 @@ export async function paidAcceptanceHost(signal: AbortSignal) {
     assert.ok(binding.protocols()[0]?.includes(PAID_STREAM.alpn));
     return {
       engine,
+      roles,
       payments,
       binding,
       registry,
@@ -188,6 +191,10 @@ export async function paidAcceptanceHost(signal: AbortSignal) {
       reads: () => reads,
       external: () => external,
       token: () => token,
+      ownedBuyer() {
+        assert.ok(buyer);
+        return { chat: buyer.chat, close: closeBuyer };
+      },
       url: () => {
         assert.ok(buyer);
         return buyer.url;

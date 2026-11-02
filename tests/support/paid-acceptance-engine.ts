@@ -23,6 +23,7 @@ export function paidAcceptanceEngine() {
   let attempts = 0;
   let cancellations = 0;
   let failure = false;
+  let interrupted = false;
   let held = false;
   let release = () => {};
   const create = (): PreparedEngine => ({
@@ -51,6 +52,11 @@ export function paidAcceptanceEngine() {
       async generate(input) {
         attempts++;
         if (failure) throw new EngineError(ENGINE_ERROR_CODES.UNAVAILABLE);
+        if (interrupted) {
+          interrupted = false;
+          await input.onText?.(PAID_ACCEPTANCE.interruptedText);
+          throw new EngineError(ENGINE_ERROR_CODES.INTERRUPTED);
+        }
         await input.onText?.(PAID_ACCEPTANCE.text);
         if (held) {
           held = false;
@@ -88,6 +94,9 @@ export function paidAcceptanceEngine() {
     attempts: () => attempts,
     fail(value: boolean) {
       failure = value;
+    },
+    interrupt() {
+      interrupted = true;
     },
     hold() {
       held = true;

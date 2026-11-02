@@ -26,6 +26,15 @@ payment verdict; delivery is not proof that accounting has been verified.
 Confirmation uses the buyer's recorded expected charge and the independent
 simulated chain, never a journal reset or another inference call.
 
+The same verification exercises the buyer terminal with synthetic input and
+output, the product terminal loop and a real buyer started with test-injected
+adapters. A fake engine stops after emitting a fragment: the synthetic ledger
+charges 45 atomic units from a 10000-unit ceiling and returns 9955. A second
+interruption also simulates an unavailable settlement confirmation; the real
+reconciliation command reads a synthetic finalized history and resolves the
+record to `settled`. Neither scenario retries the prompt. These values are
+deterministic fixture results, not an on-chain payment or a live-engine run.
+
 The final JSON contains only fixed phase names, simulation flags and aggregate
 counters. No prompts, answers, identities, paths, authorizations or signatures
 are printed. Product outcome records stay private and content-free inside
@@ -41,15 +50,13 @@ path.
 
 ## Buyer experience and demo boundary
 
-The existing `pnpm buyer` entry starts a local OpenAI-compatible endpoint and
-chooses the configured free or paid flow. It is a service launcher, not yet an
-interactive terminal chat. The paid startup currently restricts the model,
-reasoning and network to its supported subset and devnet. The acceptance command
-prints evidence rather than chat content; it must not be presented as real paid
-inference. A buyer-facing chat command should reuse this endpoint and show both
-the answer and economic verdict, including uncertainty, without retrying a sent
-prompt. That user interface is separate work; seller and desktop wiring are not
-changed here.
+`pnpm buyer:chat` starts its own buyer and offers interactive terminal chat;
+`pnpm buyer` remains a local OpenAI-compatible service launcher. Paid startup
+restricts the model, reasoning and network to its supported subset and devnet.
+The acceptance command prints evidence rather than chat content; it must not be
+presented as real paid inference. The acceptance invokes the same terminal loop
+with injected streams and adapters; it does not launch a separate interactive
+terminal process, run a real model or test an internet relay.
 
 Buyer bearer authentication is maintained separately. On versions that provision
 an API token the harness reads only its freshly created private token and sends

@@ -1,7 +1,7 @@
 // Runs a private buyer and presents its actual startup policy; never retries a sent prompt.
 import { stdin, stdout } from 'node:process';
-import type { Readable, Writable } from 'node:stream';
 import { createInterface } from 'node:readline/promises';
+import type { Readable, Writable } from 'node:stream';
 
 import { isMain } from '@gyblos/runtime';
 
@@ -32,7 +32,12 @@ type ChatStarter = (options: { port: number }) => Promise<{
   };
   close(): Promise<void>;
 }>;
-export async function runTerminal(start: ChatStarter, inputStream: Readable, output: Writable, signal?: AbortSignal) {
+export async function runTerminal(
+  start: ChatStarter,
+  inputStream: Readable,
+  output: Writable,
+  signal?: AbortSignal,
+) {
   if (signal?.aborted) return;
   const controller = new AbortController();
   const abort = () => controller.abort();
@@ -41,9 +46,20 @@ export async function runTerminal(start: ChatStarter, inputStream: Readable, out
   const input = createInterface({ input: inputStream, output });
   input.on('SIGINT', abort);
   try {
-    await runOwnedChat(start, async () => {
-      try { return await input.question('\nYou: ', { signal: controller.signal }); } catch { return undefined; }
-    }, (text) => { output.write(text); }, controller.signal);
+    await runOwnedChat(
+      start,
+      async () => {
+        try {
+          return await input.question('\nYou: ', { signal: controller.signal });
+        } catch {
+          return undefined;
+        }
+      },
+      (text) => {
+        output.write(text);
+      },
+      controller.signal,
+    );
   } finally {
     signal?.removeEventListener('abort', abort);
     input.close();

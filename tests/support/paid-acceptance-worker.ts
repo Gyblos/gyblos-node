@@ -29,6 +29,7 @@ import {
   paidRecovery,
   paidWrongShares,
 } from './paid-acceptance-phases';
+import { paidTerminal } from './paid-acceptance-terminal';
 
 async function uncertain(
   run: Awaited<ReturnType<typeof paidAcceptanceHost>>,
@@ -72,6 +73,19 @@ export async function paidScenario(
   try {
     await paidPreSend(run, signal);
     cases.push(PAID_ACCEPTANCE_CASES.PRESEND);
+    await paidTerminal(run, signal, false);
+    answers++;
+    cases.push(PAID_ACCEPTANCE_CASES.CLI_ANSWER);
+    await run.restart(false);
+    restarts++;
+    await paidTerminal(run, signal, true);
+    cases.push(PAID_ACCEPTANCE_CASES.CLI_INTERRUPTED);
+    await run.restart(true);
+    restarts++;
+    await paidTerminal(run, signal, true, true);
+    cases.push(PAID_ACCEPTANCE_CASES.CLI_RECONCILED);
+    await run.restart(true);
+    restarts++;
     await paidAnswer(run, signal);
     answers++;
     cases.push(PAID_ACCEPTANCE_CASES.COMPLETE);
