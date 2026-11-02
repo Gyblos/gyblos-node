@@ -76,6 +76,20 @@ function toolCalls(value: unknown) {
     }
   }
 }
+function textContent(value: unknown) {
+  if (typeof value === 'string') return value;
+  if (!Array.isArray(value) || value.length === 0 || value.length > MAX_ROWS)
+    return invalid();
+  return value
+    .map((item) => {
+      const block = fields(item);
+      allowed(block, ['type', 'text']);
+      if (block.type !== 'text' || typeof block.text !== 'string')
+        return invalid();
+      return block.text;
+    })
+    .join('');
+}
 function message(value: unknown) {
   const row = fields(value);
   const { ROLES } = AGENT_CHAT;
@@ -85,15 +99,14 @@ function message(value: unknown) {
     row.role === ROLES.USER
   ) {
     allowed(row, ['role', 'content', 'name']);
-    if (typeof row.content !== 'string') invalid();
     if (row.name !== undefined) name(row.name);
-    return;
+    return { ...row, content: textContent(row.content) };
   }
   if (row.role === ROLES.TOOL) {
     allowed(row, ['role', 'content', 'tool_call_id']);
     if (typeof row.content !== 'string') invalid();
     name(row.tool_call_id);
-    return;
+    return row;
   }
   if (row.role === ROLES.ASSISTANT) {
     allowed(row, ['role', 'content', 'tool_calls', 'name']);
@@ -110,7 +123,7 @@ function message(value: unknown) {
       row.tool_calls === undefined
     )
       invalid();
-    return;
+    return row;
   }
   invalid();
 }
@@ -153,7 +166,7 @@ export function validatePaypalAgentRequest(
     row.messages.length > MAX_ROWS
   )
     invalid();
-  for (const item of row.messages) message(item);
+  const messages = row.messages.map(message);
   if (row.tools !== undefined) tools(row.tools);
   if (row.stream !== undefined && typeof row.stream !== 'boolean') invalid();
   if (
@@ -182,7 +195,7 @@ export function validatePaypalAgentRequest(
     PAYPAL_REQUEST_LIMITS.maxTokens;
   if (count(maximum, PAYPAL_AGENT_REQUEST_LIMITS.maxTokens) < 1) invalid();
   const { max_completion_tokens: _maxCompletionTokens, ...remaining } = row;
-  return { ...remaining, max_tokens: maximum };
+  return { ...remaining, messages, max_tokens: maximum };
 }
 
 export function validatePaypalAgentResult(

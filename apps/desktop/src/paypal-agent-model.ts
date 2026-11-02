@@ -100,6 +100,42 @@ export function opencodeConfig(
     2,
   );
 }
+export function piConfig(
+  connection: Pick<
+    NonNullable<PaypalAgentResult['connection']>,
+    'url' | 'key' | 'model'
+  >,
+) {
+  return JSON.stringify(
+    {
+      providers: {
+        gyblos: {
+          baseUrl: connection.url,
+          api: 'openai-completions',
+          apiKey: '$GYBLOS_API_KEY',
+          models: [
+            {
+              id: connection.model,
+              name: connection.model,
+              reasoning: false,
+              input: ['text'],
+              contextWindow: SANDBOX_AGENT_LIMITS.contextTokens,
+              maxTokens: SANDBOX_AGENT_LIMITS.maxOutputTokens,
+              compat: {
+                supportsStore: false,
+                supportsDeveloperRole: false,
+                supportsReasoningEffort: false,
+                supportsStrictMode: false,
+              },
+            },
+          ],
+        },
+      },
+    },
+    null,
+    2,
+  );
+}
 export function retainPaypalAgentStatus(
   previous: PaypalAgentResult,
   next: PaypalAgentResult | undefined,
