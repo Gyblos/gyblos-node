@@ -339,6 +339,10 @@ export const PAYPAL_REQUEST_LIMITS = {
   maxTokens: 256,
   promptBytes: 8192,
 } as const;
+export const PAYPAL_AGENT_REQUEST_LIMITS = {
+  maxTokens: 2048,
+  requestBytes: 262144,
+} as const;
 export const PAYPAL_SESSION_PHASE = {
   CREATING: 'creating',
   CREATED: 'created',

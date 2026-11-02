@@ -7,6 +7,7 @@ import { PAYPAL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { isPaypalId, PaypalError } from '@gyblos/protocol/paypal-payment';
 
 import {
+  PAYPAL_AGENT_REQUEST_LIMITS,
   PAYPAL_REQUEST_LIMITS,
   PAYPAL_SESSION_RECORD_VERSION,
   PAYPAL_SESSION_PHASE as PHASE,
@@ -25,6 +26,10 @@ export interface PaypalSessionDependencies {
   payment: PaypalInferenceDependencies['payment'];
   engine: PaypalInferenceDependencies['engine'];
   validateRequest?: PaypalInferenceDependencies['validateRequest'];
+  agentEngine?: {
+    generate(input: unknown, signal?: AbortSignal): Promise<unknown>;
+  };
+  validateAgentRequest?: (input: unknown) => void;
   journal: {
     read(): Promise<unknown>;
     write(value: PaypalSessionRecord): Promise<void>;
@@ -52,6 +57,44 @@ function promptDigest(prompt: string, maxTokens: number) {
   return createHash('sha256')
     .update(JSON.stringify({ prompt, maxTokens }))
     .digest('hex');
+}
+function agentRequest(input: unknown) {
+  let serialized: string | undefined;
+  try {
+    serialized = JSON.stringify(input);
+  } catch {
+    return fail(PAYPAL_ERROR_CODES.INVALID_REQUEST);
+  }
+  if (
+    !serialized ||
+    Buffer.byteLength(serialized, 'utf8') >
+      PAYPAL_AGENT_REQUEST_LIMITS.requestBytes
+  )
+    return fail(PAYPAL_ERROR_CODES.INVALID_REQUEST);
+  const value: unknown = JSON.parse(serialized);
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    return fail(PAYPAL_ERROR_CODES.INVALID_REQUEST);
+  const model: unknown = Reflect.get(value, 'model');
+  const messages: unknown = Reflect.get(value, 'messages');
+  const maxTokens: unknown = Reflect.get(value, 'max_tokens');
+  if (
+    typeof model !== 'string' ||
+    !model.trim() ||
+    !Array.isArray(messages) ||
+    messages.length === 0 ||
+    typeof maxTokens !== 'number' ||
+    !Number.isSafeInteger(maxTokens) ||
+    maxTokens < 1 ||
+    maxTokens > PAYPAL_AGENT_REQUEST_LIMITS.maxTokens
+  )
+    return fail(PAYPAL_ERROR_CODES.INVALID_REQUEST);
+  return {
+    input: value,
+    digest: createHash('sha256')
+      .update('paypal-agent-request-v1:')
+      .update(serialized)
+      .digest('hex'),
+  };
 }
 function terminal(record: PaypalSessionRecord | null) {
   return (
@@ -175,14 +218,14 @@ class PaypalSession {
       this.busy = false;
     }
   }
-  async message(
+  private async runMessage<T>(
     orderId: string,
-    prompt: string,
-    maxTokens: number,
     messageId: string,
-    signal?: AbortSignal,
+    digest: string,
+    generate: () => Promise<T>,
+    validate: () => void,
+    signal: AbortSignal | undefined,
   ) {
-    const digest = promptDigest(prompt, maxTokens);
     const record = this.check(PHASE.ACTIVE);
     if (
       record.orderId !== orderId ||
@@ -195,7 +238,7 @@ class PaypalSession {
         PAYPAL_SANDBOX.limitCents
     )
       return fail(PAYPAL_ERROR_CODES.INVALID_REQUEST);
-    this.deps.validateRequest?.(prompt, maxTokens);
+    validate();
     this.busy = true;
     try {
       signal?.throwIfAborted();
@@ -211,11 +254,9 @@ class PaypalSession {
         await this.save({ ...record, attemptIds });
         return fail(PAYPAL_ERROR_CODES.INFERENCE_FAILED);
       }
-      let output: Awaited<
-        ReturnType<PaypalSessionDependencies['engine']['generate']>
-      >;
+      let output: T;
       try {
-        output = await this.deps.engine.generate({ prompt, maxTokens, signal });
+        output = await generate();
         signal?.throwIfAborted();
       } catch {
         return fail(PAYPAL_ERROR_CODES.INFERENCE_FAILED);
@@ -232,10 +273,47 @@ class PaypalSession {
         await this.save({ ...record, attemptIds });
         return fail(PAYPAL_ERROR_CODES.INFERENCE_FAILED);
       }
-      return { ...output, messageId };
+      return { output, messageId };
     } finally {
       this.busy = false;
     }
+  }
+  async message(
+    orderId: string,
+    prompt: string,
+    maxTokens: number,
+    messageId: string,
+    signal?: AbortSignal,
+  ) {
+    const digest = promptDigest(prompt, maxTokens);
+    const result = await this.runMessage(
+      orderId,
+      messageId,
+      digest,
+      () => this.deps.engine.generate({ prompt, maxTokens, signal }),
+      () => this.deps.validateRequest?.(prompt, maxTokens),
+      signal,
+    );
+    return { ...result.output, messageId: result.messageId };
+  }
+  async agentMessage(
+    orderId: string,
+    input: unknown,
+    messageId: string,
+    signal?: AbortSignal,
+  ) {
+    const request = agentRequest(input);
+    const engine = this.deps.agentEngine;
+    if (!engine) return fail(PAYPAL_ERROR_CODES.INVALID_CONFIG);
+    const result = await this.runMessage(
+      orderId,
+      messageId,
+      request.digest,
+      () => engine.generate(request.input, signal),
+      () => this.deps.validateAgentRequest?.(request.input),
+      signal,
+    );
+    return { response: result.output, messageId: result.messageId };
   }
   async acknowledge(orderId: string, messageId: string) {
     if (

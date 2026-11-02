@@ -88,9 +88,16 @@ void test('an unacknowledged agent answer blocks another inference and settlemen
     max_tokens: 128,
   };
   const first = await session.agentMessage(order.orderId, request, 'MESSAGE1');
-  await assert.rejects(session.agentMessage(order.orderId, request, 'MESSAGE2'));
+  await assert.rejects(
+    session.agentMessage(order.orderId, request, 'MESSAGE2'),
+  );
   await assert.rejects(session.finish(order.orderId));
   await session.acknowledge(order.orderId, first.messageId);
   await session.finish(order.orderId);
-  assert.deepEqual(f.calls, ['create', 'authorize', 'agent-generate', 'capture:10']);
+  assert.deepEqual(f.calls, [
+    'create',
+    'authorize',
+    'agent-generate',
+    'capture:10',
+  ]);
 });
