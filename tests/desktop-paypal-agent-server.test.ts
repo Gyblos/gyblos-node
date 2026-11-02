@@ -143,6 +143,10 @@ void test('an agent key cannot spend a later sandbox authorization', async () =>
       releaseCapture();
     }
     await settling;
+    const retiredCatalog = await fetch(`${first.url}/models`, {
+      headers: { authorization: `Bearer ${first.key}` },
+    });
+    assert.equal(retiredCatalog.status, 401);
     await desktop.create();
     await desktop.approve();
     assert.notEqual((await call(first)).status, 200);
