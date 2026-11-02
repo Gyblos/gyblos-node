@@ -305,5 +305,11 @@ export function createPaypalAgentGateway(options: GatewayOptions) {
       busy = false;
     }
   }
-  return { handle, acknowledgePending };
+  return {
+    handle,
+    acknowledgePending,
+    hasPending: () =>
+      !!pending &&
+      options.service.status().phase === PAYPAL_SESSION_PHASE.MESSAGE_PENDING,
+  };
 }

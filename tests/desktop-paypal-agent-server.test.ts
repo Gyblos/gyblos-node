@@ -18,7 +18,13 @@ void test('a local agent connects through a key and shares the sandbox authoriza
         object: 'chat.completion',
         created: 0,
         model: 'synthetic-model',
-        choices: [{ index: 0, message: { role: 'assistant', content: 'synthetic answer' }, finish_reason: 'stop' }],
+        choices: [
+          {
+            index: 0,
+            message: { role: 'assistant', content: 'synthetic answer' },
+            finish_reason: 'stop',
+          },
+        ],
         usage: { prompt_tokens: 2, completion_tokens: 3, total_tokens: 5 },
       };
     },
@@ -35,15 +41,36 @@ void test('a local agent connects through a key and shares the sandbox authoriza
       messages: [{ role: 'user', content: 'synthetic request' }],
       max_tokens: 128,
     };
-    const headers = { authorization: `Bearer ${agent.key}`, 'content-type': 'application/json' };
-    assert.equal((await fetch(endpoint, { method: 'POST', headers: { ...headers, authorization: 'Bearer wrong' }, body: JSON.stringify(request) })).status, 401);
-    const response = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify(request) });
+    const headers = {
+      authorization: `Bearer ${agent.key}`,
+      'content-type': 'application/json',
+    };
+    assert.equal(
+      (
+        await fetch(endpoint, {
+          method: 'POST',
+          headers: { ...headers, authorization: 'Bearer wrong' },
+          body: JSON.stringify(request),
+        })
+      ).status,
+      401,
+    );
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(request),
+    });
     assert.equal(response.status, 200);
     assert.equal(agent.hasPending(), true);
     await assert.rejects(desktop.finish());
     await agent.acknowledgePending();
     assert.equal((await desktop.finish()).spentCents, 10);
-    assert.deepEqual(f.calls, ['create', 'authorize', 'agent-generate', 'capture:10']);
+    assert.deepEqual(f.calls, [
+      'create',
+      'authorize',
+      'agent-generate',
+      'capture:10',
+    ]);
   } finally {
     await agent.close();
   }
