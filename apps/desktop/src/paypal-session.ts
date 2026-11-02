@@ -135,6 +135,18 @@ export function createDesktopPaypalSession(
         awaitingAcknowledgement = true;
         return { text: answer.text, messageId: answer.messageId };
       }),
+    sendAgent: (input: unknown, signal?: AbortSignal) =>
+      run(async () => {
+        await options.checkEngine?.();
+        const answer = await session.agentMessage(
+          orderId(),
+          input,
+          randomUUID(),
+          signal,
+        );
+        awaitingAcknowledgement = true;
+        return answer;
+      }),
     acknowledge: (messageId: string) =>
       run(async () => {
         await session.acknowledge(orderId(), messageId);

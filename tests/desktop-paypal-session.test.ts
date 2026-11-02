@@ -105,7 +105,13 @@ void test('desktop chat and a local agent share one sandbox session', async () =
   await assert.rejects(desktop.finish());
   await desktop.acknowledge(agent.messageId);
   assert.equal((await desktop.finish()).spentCents, 20);
-  assert.deepEqual(f.calls, ['create', 'authorize', 'generate', 'agent-generate', 'capture:20']);
+  assert.deepEqual(f.calls, [
+    'create',
+    'authorize',
+    'generate',
+    'agent-generate',
+    'capture:20',
+  ]);
 });
 
 void test('an unacknowledged response blocks another message and settlement', async () => {

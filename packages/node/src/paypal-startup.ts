@@ -1,4 +1,5 @@
 // Composes sandbox payment and Ollama adapters for the local one-seller prototype.
+import { createOllamaAgent } from '@gyblos/engine-ollama/agent';
 import { GENERATION, MODEL } from '@gyblos/engine-ollama/constants';
 import { createOllamaEngine } from '@gyblos/engine-ollama/engine';
 import { renderChat } from '@gyblos/engine-ollama/model';
@@ -28,11 +29,13 @@ export async function openPaypalSandbox(options: {
   deferEngineCheck?: boolean;
 }) {
   const engine = createOllamaEngine(options.ollamaOrigin);
+  const agentEngine = createOllamaAgent(options.ollamaOrigin);
   if (!options.deferEngineCheck) await engine.describe();
   const payment = createPaypalSandbox(options);
   const journal = await openPaypalJournal(options.stateDirectory);
   return {
     engine,
+    agentEngine,
     model: MODEL.name,
     payment,
     journal,
