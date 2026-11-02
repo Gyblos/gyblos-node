@@ -101,6 +101,7 @@ void test('Claude Code configuration uses a local root URL without embedding cre
   assert.match(config, /ANTHROPIC_AUTH_TOKEN="\$GYBLOS_API_KEY"/);
   assert.match(config, /CLAUDE_CODE_MAX_OUTPUT_TOKENS=512/);
   assert.match(config, /CLAUDE_CODE_MAX_CONTEXT_TOKENS=8192/);
+  assert.match(config, /CLAUDE_CODE_EFFORT_LEVEL=auto/);
 });
 
 void test('a confirmed disconnect clears an older stalled status warning', () => {

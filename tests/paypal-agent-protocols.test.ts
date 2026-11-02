@@ -78,6 +78,7 @@ void test('Claude Messages maps a streamed tool call and its result to one sessi
     model,
     max_tokens: 128,
     system: 'synthetic instruction',
+    metadata: { user_id: 'synthetic-client' },
     messages: [{ role: 'user', content: 'synthetic request' }],
     tools: [{ name: 'read_file', input_schema: tool.function.parameters }],
     stream: true,
