@@ -53,7 +53,7 @@ const input = {
   max_tokens: 128,
 };
 
-function fixture() {
+function fixture(initialAnswer: unknown = firstAnswer) {
   const calls: string[] = [];
   let phase = 'active';
   let count = 0;
@@ -64,7 +64,7 @@ function fixture() {
       phase = 'message_pending';
       count += 1;
       return {
-        response: count === 1 ? firstAnswer : secondAnswer,
+        response: count === 1 ? initialAnswer : secondAnswer,
         messageId: `MSG${count}`,
       };
     },
@@ -193,15 +193,15 @@ void test('streaming clients receive an SSE representation only after the comple
 });
 
 void test('an identical older assistant message cannot acknowledge a lost new response', async () => {
-  const f = fixture();
-  const firstChoice = firstAnswer.choices[0];
+  const f = fixture(secondAnswer);
+  const firstChoice = secondAnswer.choices[0];
   assert.ok(firstChoice);
   const repeated = {
     ...input,
     messages: [
       ...input.messages,
       firstChoice.message,
-      { role: 'tool', tool_call_id: 'call_1', content: 'synthetic contents' },
+      { role: 'user', content: 'synthetic follow-up' },
     ],
   };
   assert.equal((await f.gateway.handle(post(repeated))).status, 200);
@@ -229,4 +229,16 @@ void test('a slow incoming request cannot block confirmation of a completed resp
   finishBody();
   assert.equal((await pendingRequest).status, 400);
   assert.deepEqual(f.calls, ['generate', 'ack:MSG1']);
+});
+
+void test('an unrelated conversation cannot confirm an unseen agent response', async () => {
+  const f = fixture(secondAnswer);
+  assert.equal((await f.gateway.handle(post(input))).status, 200);
+  const unrelated = { ...input, messages: [
+    { role: 'user', content: 'unrelated question' },
+    { role: 'assistant', content: 'synthetic answer' },
+    { role: 'user', content: 'unrelated follow-up' },
+  ] };
+  assert.equal((await f.gateway.handle(post(unrelated))).status, 409);
+  assert.deepEqual(f.calls, ['generate']);
 });
