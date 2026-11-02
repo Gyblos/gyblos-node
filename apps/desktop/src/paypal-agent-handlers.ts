@@ -4,6 +4,7 @@ import {
   agentFailure,
   PAYPAL_AGENT_ACTION,
   PAYPAL_AGENT_ERROR,
+  PaypalAgentConnectionError,
   type PaypalAgentAction,
   type PaypalAgentResult,
 } from './paypal-agent-model';
@@ -61,7 +62,9 @@ export function createDesktopPaypalAgentHandlers(
             break;
         }
         return { connection: access.status(), error: null };
-      } catch {
+      } catch (error) {
+        if (error instanceof PaypalAgentConnectionError)
+          return agentFailure(error.code);
         return agentFailure();
       }
     },

@@ -233,7 +233,10 @@ void test('background status updates show external usage without blocking the co
   const chat = new PaypalChatController(async (request) => {
     const result = await run(request);
     if (request.action === 'status' && result.status)
-      return { ...result, status: { ...result.status, spentCents: externalSpent } };
+      return {
+        ...result,
+        status: { ...result.status, spentCents: externalSpent },
+      };
     return result;
   });
   await chat.refresh();

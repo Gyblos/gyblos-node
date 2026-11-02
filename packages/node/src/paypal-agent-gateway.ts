@@ -1,6 +1,6 @@
 // Authenticated local agent requests sharing one sandbox session. Responses are buffered;
-// an echoed assistant message acknowledges a prior result, not payment by itself.
-import { createHash, timingSafeEqual } from 'node:crypto';
+// A user explicitly confirms each delivered response before another inference.
+import { timingSafeEqual } from 'node:crypto';
 
 import { HTTP_STATUS, IPV6_LOOPBACK, LOCALHOST, ROUTES } from '@gyblos/config';
 import { AGENT_CHAT, PAYPAL_ERROR_CODES } from '@gyblos/protocol/constants';
@@ -56,12 +56,21 @@ async function body(request: Request) {
     throw new PaypalError(PAYPAL_ERROR_CODES.INVALID_REQUEST);
   if (!request.body) throw new PaypalError(PAYPAL_ERROR_CODES.INVALID_REQUEST);
   const reader = request.body.getReader();
+  const signal = AbortSignal.any([
+    request.signal,
+    AbortSignal.timeout(PAYPAL_AGENT_REQUEST_LIMITS.bodyReadMs),
+  ]);
+  let abort = () => {};
+  const aborted = new Promise<never>((_resolve, reject) => {
+    abort = () => reject(new PaypalError(PAYPAL_ERROR_CODES.INVALID_REQUEST));
+    signal.addEventListener('abort', abort, { once: true });
+  });
   const parts: Uint8Array[] = [];
   let size = 0;
   try {
     for (;;) {
-      request.signal.throwIfAborted();
-      const part = await reader.read();
+      signal.throwIfAborted();
+      const part = await Promise.race([reader.read(), aborted]);
       if (part.done) break;
       size += part.value.byteLength;
       if (size > PAYPAL_AGENT_REQUEST_LIMITS.requestBytes)
@@ -78,43 +87,15 @@ async function body(request: Request) {
       throw new PaypalError(PAYPAL_ERROR_CODES.INVALID_REQUEST);
     }
   } finally {
+    signal.removeEventListener('abort', abort);
     await reader.cancel().catch(() => {});
   }
-}
-
-function assistant(value: unknown) {
-  const row = record(value);
-  if (row.role !== AGENT_CHAT.ROLES.ASSISTANT) return undefined;
-  return JSON.stringify({
-    role: row.role,
-    content: row.content ?? null,
-    tool_calls: row.tool_calls,
-  });
 }
 
 function answer(result: Record<string, unknown>) {
   if (!Array.isArray(result.choices) || result.choices.length !== 1)
     throw new PaypalError(PAYPAL_ERROR_CODES.INVALID_RESPONSE);
   return record(record(result.choices[0]).message);
-}
-
-function fingerprint(value: unknown) {
-  const text = assistant(value);
-  if (!text) throw new PaypalError(PAYPAL_ERROR_CODES.INVALID_RESPONSE);
-  return createHash('sha256').update(text).digest('hex');
-}
-
-function fingerprintCount(messages: unknown, target: string) {
-  if (!Array.isArray(messages)) return 0;
-  let count = 0;
-  for (const item of messages) {
-    try {
-      if (fingerprint(item) === target) count += 1;
-    } catch {
-      continue;
-    }
-  }
-  return count;
 }
 
 function eventStream(result: Record<string, unknown>, includeUsage: boolean) {
@@ -238,9 +219,8 @@ export function createPaypalAgentGateway(options: GatewayOptions) {
   const base = gatewayOrigin(options);
   const key = Buffer.from(options.key);
   let busy = false;
-  let pending:
-    | { messageId: string; fingerprint: string; previousCount: number }
-    | undefined;
+  let reading = false;
+  let pending: { messageId: string } | undefined;
   async function acknowledgePending() {
     if (busy || !pending) throw new Error('No agent response is available.');
     busy = true;
@@ -255,6 +235,20 @@ export function createPaypalAgentGateway(options: GatewayOptions) {
     const rejection = requestError(request, base, key);
     if (rejection) return rejection;
     if (request.method === 'GET') return modelList(options.model);
+    if (busy || reading)
+      return error(
+        HTTP_STATUS.conflict,
+        PAYPAL_ERROR_CODES.NEEDS_RECONCILIATION,
+      );
+    let input: Record<string, unknown>;
+    reading = true;
+    try {
+      input = validatePaypalAgentRequest(await body(request), options.model);
+    } catch (reason) {
+      return agentError(reason);
+    } finally {
+      reading = false;
+    }
     if (busy)
       return error(
         HTTP_STATUS.conflict,
@@ -262,26 +256,16 @@ export function createPaypalAgentGateway(options: GatewayOptions) {
       );
     busy = true;
     try {
-      const input = validatePaypalAgentRequest(
-        await body(request),
-        options.model,
-      );
       if (
         pending &&
         options.service.status().phase !== PAYPAL_SESSION_PHASE.MESSAGE_PENDING
       )
         pending = undefined;
       if (pending) {
-        if (
-          fingerprintCount(input.messages, pending.fingerprint) <=
-          pending.previousCount
-        )
-          return error(
-            HTTP_STATUS.conflict,
-            PAYPAL_ERROR_CODES.NEEDS_RECONCILIATION,
-          );
-        await options.service.acknowledge(pending.messageId);
-        pending = undefined;
+        return error(
+          HTTP_STATUS.conflict,
+          PAYPAL_ERROR_CODES.NEEDS_RECONCILIATION,
+        );
       }
       const result = await options.service.sendAgent(input, request.signal);
       if (typeof input.max_tokens !== 'number')
@@ -292,12 +276,7 @@ export function createPaypalAgentGateway(options: GatewayOptions) {
         input.max_tokens,
         input,
       );
-      const responseFingerprint = fingerprint(answer(response));
-      pending = {
-        messageId: result.messageId,
-        fingerprint: responseFingerprint,
-        previousCount: fingerprintCount(input.messages, responseFingerprint),
-      };
+      pending = { messageId: result.messageId };
       return agentResponse(input, response);
     } catch (reason) {
       return agentError(reason);
@@ -308,6 +287,7 @@ export function createPaypalAgentGateway(options: GatewayOptions) {
   return {
     handle,
     acknowledgePending,
+    isBusy: () => busy || reading,
     hasPending: () =>
       !!pending &&
       options.service.status().phase === PAYPAL_SESSION_PHASE.MESSAGE_PENDING,

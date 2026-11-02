@@ -128,7 +128,7 @@ void test('the authorized model catalog exposes only the configured model', asyn
   assert.deepEqual(f.calls, []);
 });
 
-void test('a following agent request acknowledges the prior response only when its history includes it', async () => {
+void test('a following agent request waits for explicit confirmation of the prior response', async () => {
   const f = fixture();
   const first = await f.gateway.handle(post(input));
   assert.equal(first.status, 200);
@@ -145,6 +145,9 @@ void test('a following agent request acknowledges the prior response only when i
       { role: 'tool', tool_call_id: 'call_1', content: 'synthetic contents' },
     ],
   };
+  assert.equal((await f.gateway.handle(post(second))).status, 409);
+  assert.deepEqual(f.calls, ['generate']);
+  await f.gateway.acknowledgePending();
   const next = await f.gateway.handle(post(second));
   assert.equal(next.status, 200);
   assert.deepEqual(await next.json(), secondAnswer);
@@ -153,26 +156,27 @@ void test('a following agent request acknowledges the prior response only when i
   assert.deepEqual(f.calls, ['generate', 'ack:MSG1', 'generate', 'ack:MSG2']);
 });
 
-void test('assistant tool calls with omitted content acknowledge the equivalent prior response', async () => {
+void test('assistant tool calls with omitted content remain valid after explicit confirmation', async () => {
   const f = fixture();
   assert.equal((await f.gateway.handle(post(input))).status, 200);
   const message = firstAnswer.choices[0]?.message;
   assert.ok(message);
   const { content: _content, ...withoutContent } = message;
-  const next = await f.gateway.handle(
-    post({
-      ...input,
-      messages: [
-        ...input.messages,
-        withoutContent,
-        {
-          role: 'tool',
-          tool_call_id: 'call_1',
-          content: 'synthetic result',
-        },
-      ],
-    }),
-  );
+  const nextInput = {
+    ...input,
+    messages: [
+      ...input.messages,
+      withoutContent,
+      {
+        role: 'tool',
+        tool_call_id: 'call_1',
+        content: 'synthetic result',
+      },
+    ],
+  };
+  assert.equal((await f.gateway.handle(post(nextInput))).status, 409);
+  await f.gateway.acknowledgePending();
+  const next = await f.gateway.handle(post(nextInput));
   assert.equal(next.status, 200);
   assert.deepEqual(f.calls, ['generate', 'ack:MSG1', 'generate']);
 });
@@ -215,14 +219,23 @@ void test('a slow incoming request cannot block confirmation of a completed resp
   let finishBody: () => void = () => {};
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
-      finishBody = () => { controller.enqueue(new TextEncoder().encode('{}')); controller.close(); };
+      finishBody = () => {
+        controller.enqueue(new TextEncoder().encode('{}'));
+        controller.close();
+      };
     },
   });
-  const slow = new Request(`${origin}/v1/chat/completions`, {
-    method: 'POST', headers: {
-      host: '127.0.0.1:12345', authorization: `Bearer ${key}`, 'content-type': 'application/json',
-    }, body: stream, duplex: 'half',
-  });
+  const init: RequestInit & { duplex: 'half' } = {
+    method: 'POST',
+    headers: {
+      host: '127.0.0.1:12345',
+      authorization: `Bearer ${key}`,
+      'content-type': 'application/json',
+    },
+    body: stream,
+    duplex: 'half',
+  };
+  const slow = new Request(`${origin}/v1/chat/completions`, init);
   const pendingRequest = f.gateway.handle(slow);
   await Promise.resolve();
   await f.gateway.acknowledgePending();
@@ -234,11 +247,43 @@ void test('a slow incoming request cannot block confirmation of a completed resp
 void test('an unrelated conversation cannot confirm an unseen agent response', async () => {
   const f = fixture(secondAnswer);
   assert.equal((await f.gateway.handle(post(input))).status, 200);
-  const unrelated = { ...input, messages: [
-    { role: 'user', content: 'unrelated question' },
-    { role: 'assistant', content: 'synthetic answer' },
-    { role: 'user', content: 'unrelated follow-up' },
-  ] };
+  const unrelated = {
+    ...input,
+    messages: [
+      { role: 'user', content: 'unrelated question' },
+      { role: 'assistant', content: 'synthetic answer' },
+      { role: 'user', content: 'unrelated follow-up' },
+    ],
+  };
   assert.equal((await f.gateway.handle(post(unrelated))).status, 409);
   assert.deepEqual(f.calls, ['generate']);
+});
+
+void test('an incomplete request body eventually releases the gateway', async () => {
+  const f = fixture();
+  const init: RequestInit & { duplex: 'half' } = {
+    method: 'POST',
+    headers: {
+      host: '127.0.0.1:12345',
+      authorization: `Bearer ${key}`,
+      'content-type': 'application/json',
+    },
+    body: new ReadableStream<Uint8Array>(),
+    duplex: 'half',
+  };
+  const keepAlive = setInterval(() => {}, 1000);
+  try {
+    assert.equal(
+      (
+        await f.gateway.handle(
+          new Request(`${origin}/v1/chat/completions`, init),
+        )
+      ).status,
+      400,
+    );
+    assert.equal((await f.gateway.handle(post(input))).status, 200);
+    assert.deepEqual(f.calls, ['generate']);
+  } finally {
+    clearInterval(keepAlive);
+  }
 });

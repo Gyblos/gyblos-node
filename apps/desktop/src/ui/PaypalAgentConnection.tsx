@@ -6,6 +6,7 @@ import {
   DESKTOP_PAYPAL_AGENT,
   opencodeConfig,
   PAYPAL_AGENT_ACTION,
+  paypalAgentErrorMessage,
   type PaypalAgentAction,
   type PaypalAgentResult,
 } from '../paypal-agent-model';
@@ -64,7 +65,7 @@ function usePaypalAgentConnection() {
       if (!mounted.current) return;
       setResult(next ?? agentFailure());
       if (!next || next.error)
-        setNotice('Start a PayPal Sandbox session in Chat, then try again.');
+        setNotice(paypalAgentErrorMessage(next?.error ?? null));
     } catch {
       if (mounted.current) {
         setResult(agentFailure());
@@ -165,8 +166,9 @@ function AgentActions({ connection, busy, run, copy }: DetailProps) {
       {connection.pending && (
         <div>
           <p>
-            Confirm the last agent response only after you have received it.
-            Then close and settle the session in Chat.
+            Confirm the last agent response after receiving it. The agent can
+            continue after this confirmation. Settle the session in Chat when
+            finished.
           </p>
           <Button
             disabled={busy}
@@ -188,7 +190,8 @@ function AgentDetails(props: DetailProps) {
       <AgentFields connection={props.connection} />
       <p className="modal-note">
         Add the provider configuration to OpenCode and set GYBLOS_API_KEY in its
-        environment. The URL and key change when you disconnect or close Gyblos.
+        environment. This configuration disables automatic session titles. The
+        URL and key change for each PayPal session or when you disconnect.
       </p>
       <AgentActions {...props} />
     </div>

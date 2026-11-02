@@ -8,6 +8,7 @@ import {
   PAYPAL_SESSION_STATUS,
 } from '@gyblos/node/constants';
 
+import { DESKTOP_PAYPAL_AGENT } from '../paypal-agent-model';
 import { PaypalChatController } from '../paypal-chat';
 import {
   PAYPAL_DESKTOP_ERROR,
@@ -36,10 +37,8 @@ function uncertain(state: Snapshot) {
     phase === PAYPAL_SESSION_STATUS.BLOCKED ||
     phase === PAYPAL_SESSION_PHASE.CREATING ||
     phase === PAYPAL_SESSION_PHASE.AUTHORIZING ||
-    phase === PAYPAL_SESSION_PHASE.EXECUTING ||
     phase === PAYPAL_SESSION_PHASE.CAPTURING ||
-    phase === PAYPAL_SESSION_PHASE.VOIDING ||
-    (phase === PAYPAL_SESSION_PHASE.MESSAGE_PENDING && !state.pendingMessageId)
+    phase === PAYPAL_SESSION_PHASE.VOIDING
   );
 }
 
@@ -128,7 +127,10 @@ function SessionActions({ chat, state }: ChatProps) {
           Retry response acknowledgment
         </Button>
       )}
-      {uncertain(state) && (
+      {(uncertain(state) ||
+        phase === PAYPAL_SESSION_PHASE.EXECUTING ||
+        (phase === PAYPAL_SESSION_PHASE.MESSAGE_PENDING &&
+          !state.pendingMessageId)) && (
         <Button
           disabled={state.busy}
           onClick={() => {
@@ -183,6 +185,19 @@ function SessionPanel({ chat, state }: ChatProps) {
       {uncertain(state) && (
         <p>Session needs review. Do not retry payment or remove its record.</p>
       )}
+      {phase === PAYPAL_SESSION_PHASE.EXECUTING && (
+        <p>
+          Inference is running. If it does not finish, review the session before
+          retrying.
+        </p>
+      )}
+      {phase === PAYPAL_SESSION_PHASE.MESSAGE_PENDING &&
+        !state.pendingMessageId && (
+          <p>
+            Check Connect for an agent response to confirm. If none is
+            available, the session needs review.
+          </p>
+        )}
       <SessionActions chat={chat} state={state} />
       {state.notice && (
         <p className="chat-notice" role="status">
@@ -295,7 +310,12 @@ export function PaypalChat({ active }: { active: boolean }) {
   );
   const state = useSyncExternalStore(chat.subscribe, chat.getSnapshot);
   useEffect(() => {
-    if (active) void chat.refresh();
+    if (!active) return;
+    void chat.refresh();
+    const interval = window.setInterval(() => {
+      void chat.poll();
+    }, DESKTOP_PAYPAL_AGENT.POLL_MS);
+    return () => window.clearInterval(interval);
   }, [active, chat]);
   return (
     <main className="chat-page enhanced-chat paypal-chat">

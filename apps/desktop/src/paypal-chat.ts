@@ -71,6 +71,7 @@ export class PaypalChatController {
     pendingMessageId: null,
   };
   private readonly listeners = new Set<() => void>();
+  private polling = false;
   constructor(private readonly run: Run) {}
   getSnapshot = () => this.snapshot;
   subscribe = (listener: () => void) => {
@@ -100,7 +101,7 @@ export class PaypalChatController {
     const notice = result.error
       ? failure(result)
       : needsReview(result.status, this.snapshot.pendingMessageId)
-        ? 'A response was not confirmed. Check the session before continuing.'
+        ? 'A response awaits confirmation. Check Connect; if none is available, review the session.'
         : '';
     this.update({
       status: result.status,
@@ -115,6 +116,22 @@ export class PaypalChatController {
     });
   }
   refresh = () => this.command({ action: PAYPAL_ACTION.STATUS });
+  async poll() {
+    if (this.snapshot.busy || this.polling) return;
+    this.polling = true;
+    const previous = this.snapshot.status;
+    try {
+      const result = await this.call({ action: PAYPAL_ACTION.STATUS });
+      if (
+        !result.error &&
+        !this.snapshot.busy &&
+        this.snapshot.status === previous
+      )
+        this.update({ status: result.status, model: result.model });
+    } finally {
+      this.polling = false;
+    }
+  }
   create = () => {
     const phase = this.snapshot.status?.phase;
     if (

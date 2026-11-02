@@ -198,16 +198,26 @@ void test('an empty response cannot become an acknowledged charge', async () => 
     model: 'synthetic-model',
     async generate() {
       const response = completion(1);
-      response.choices[0].message.content = '';
+      const choice = response.choices[0];
+      assert.ok(choice);
+      choice.message.content = '';
       return response;
     },
   };
   const session = await createPaypalSession({ ...f, agentEngine });
   const order = await session.create();
   await session.approve(order.orderId);
-  await assert.rejects(session.agentMessage(order.orderId, {
-    model: 'synthetic-model', messages: [{ role: 'user', content: 'synthetic' }], max_tokens: 128,
-  }, 'MESSAGE1'));
+  await assert.rejects(
+    session.agentMessage(
+      order.orderId,
+      {
+        model: 'synthetic-model',
+        messages: [{ role: 'user', content: 'synthetic' }],
+        max_tokens: 128,
+      },
+      'MESSAGE1',
+    ),
+  );
   assert.equal(session.status().spentCents, 0);
 });
 

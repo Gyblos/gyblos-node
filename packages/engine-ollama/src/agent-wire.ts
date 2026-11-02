@@ -5,7 +5,11 @@ import { SANDBOX_AGENT_LIMITS, UNITS } from '@gyblos/config';
 import { isJsonFields } from '@gyblos/core/engine-provider';
 import { AGENT_CHAT } from '@gyblos/protocol/constants';
 
-import { checkToolSchema, matchesToolSchema } from './agent-schema';
+import {
+  checkToolSchema,
+  matchesToolSchema,
+  ollamaToolSchema,
+} from './agent-schema';
 
 function invalid(): never {
   throw new Error('Unsupported agent request.');
@@ -73,6 +77,8 @@ function tools(value: unknown) {
     if (fn.strict === true) return invalid();
     if (fn.parameters !== undefined) checkToolSchema(fn.parameters);
     const { strict: _strict, ...remaining } = fn;
+    if (fn.parameters !== undefined)
+      remaining.parameters = ollamaToolSchema(fn.parameters);
     return { type: tool.type, function: remaining };
   });
 }
@@ -125,6 +131,13 @@ function responseToolCalls(
     message.tool_calls.length === 0
   )
     return invalid();
+  const seen = new Set<string>();
+  if (!Array.isArray(inputRequest.messages)) return invalid();
+  for (const item of inputRequest.messages) {
+    const earlier = row(item);
+    if (!Array.isArray(earlier.tool_calls)) continue;
+    for (const call of earlier.tool_calls) seen.add(text(row(call).id));
+  }
   return message.tool_calls.map((entry) => {
     const call = row(entry);
     const fn = row(call.function);
@@ -140,7 +153,8 @@ function responseToolCalls(
     if (parameters !== undefined && !matchesToolSchema(parameters, args))
       return invalid();
     const id = call.id === undefined ? `call_${randomUUID()}` : text(call.id);
-    if (!name || !id) return invalid();
+    if (!name || !id || seen.has(id)) return invalid();
+    seen.add(id);
     return {
       id,
       type: AGENT_CHAT.FUNCTION,
@@ -171,6 +185,7 @@ export function ollamaAgentResponse(
   )
     return invalid();
   const toolCalls = responseToolCalls(value, message, request);
+  if (!toolCalls && !message.content.trim()) return invalid();
   return {
     id: `chatcmpl-${randomUUID()}`,
     object: AGENT_CHAT.COMPLETION,

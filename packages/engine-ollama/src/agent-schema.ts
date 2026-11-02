@@ -2,6 +2,7 @@
 import { isJsonFields } from '@gyblos/core/engine-provider';
 
 const SCHEMA_FIELDS = [
+  '$schema',
   'type',
   'description',
   'properties',
@@ -10,6 +11,12 @@ const SCHEMA_FIELDS = [
   'enum',
   'anyOf',
   'additionalProperties',
+  'minimum',
+  'maximum',
+];
+const SCHEMA_DIALECTS = [
+  'https://json-schema.org/draft/2020-12/schema',
+  'http://json-schema.org/draft-07/schema#',
 ];
 const SCHEMA_TYPES = [
   'object',
@@ -39,6 +46,24 @@ export function checkToolSchema(input: unknown, depth = 0): void {
   if (
     schema.type !== undefined &&
     (typeof schema.type !== 'string' || !SCHEMA_TYPES.includes(schema.type))
+  )
+    return invalid();
+  if (
+    schema.$schema !== undefined &&
+    (typeof schema.$schema !== 'string' ||
+      !SCHEMA_DIALECTS.includes(schema.$schema))
+  )
+    return invalid();
+  for (const bound of [schema.minimum, schema.maximum])
+    if (
+      bound !== undefined &&
+      (typeof bound !== 'number' || !Number.isFinite(bound))
+    )
+      return invalid();
+  if (
+    typeof schema.minimum === 'number' &&
+    typeof schema.maximum === 'number' &&
+    schema.minimum > schema.maximum
   )
     return invalid();
   if (
@@ -98,6 +123,18 @@ export function matchesToolSchema(input: unknown, value: unknown): boolean {
   )
     return false;
   if (
+    typeof value === 'number' &&
+    typeof schema.minimum === 'number' &&
+    value < schema.minimum
+  )
+    return false;
+  if (
+    typeof value === 'number' &&
+    typeof schema.maximum === 'number' &&
+    value > schema.maximum
+  )
+    return false;
+  if (
     (schema.type === 'string' || schema.type === 'boolean') &&
     typeof value !== schema.type
   )
@@ -125,4 +162,37 @@ export function matchesToolSchema(input: unknown, value: unknown): boolean {
     }
   }
   return true;
+}
+
+export function ollamaToolSchema(input: unknown): Record<string, unknown> {
+  const schema = fields(input);
+  const {
+    $schema: _dialect,
+    minimum,
+    maximum,
+    additionalProperties,
+    ...output
+  } = schema;
+  const details = [
+    typeof schema.description === 'string' ? schema.description : '',
+    typeof minimum === 'number' ? `Minimum: ${minimum}.` : '',
+    typeof maximum === 'number' ? `Maximum: ${maximum}.` : '',
+    additionalProperties === false
+      ? 'Do not include unspecified properties.'
+      : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+  if (details) output.description = details;
+  if (schema.properties !== undefined)
+    output.properties = Object.fromEntries(
+      Object.entries(fields(schema.properties)).map(([key, value]) => [
+        key,
+        ollamaToolSchema(value),
+      ]),
+    );
+  if (schema.items !== undefined) output.items = ollamaToolSchema(schema.items);
+  if (Array.isArray(schema.anyOf))
+    output.anyOf = schema.anyOf.map(ollamaToolSchema);
+  return output;
 }

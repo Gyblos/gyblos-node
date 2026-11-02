@@ -72,9 +72,28 @@ function agentDescription(origin: URL, model: string, fetchImpl: typeof fetch) {
         !/^[a-f0-9]{64}$/.test(entry.digest) ||
         entry.remote_host ||
         entry.remote_model ||
-        !Array.isArray(entry.capabilities) ||
-        !entry.capabilities.includes('tools') ||
         (pinnedDigest && entry.digest !== pinnedDigest)
+      )
+        throw new EngineError(ENGINE_ERROR_CODES.UNAVAILABLE);
+      const showResponse = await fetchImpl(new URL(ROUTES.ollamaShow, origin), {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ model }),
+        redirect: 'error',
+        signal: deadline,
+      });
+      if (!showResponse.ok) {
+        await showResponse.body?.cancel().catch(() => {});
+        throw statusFailure(showResponse.status);
+      }
+      const details = jsonFields(
+        await boundedText(showResponse, MODEL_LIMITS.maxFrameCharacters),
+      );
+      if (
+        details.remote_host ||
+        details.remote_model ||
+        !Array.isArray(details.capabilities) ||
+        !details.capabilities.includes('tools')
       )
         throw new EngineError(ENGINE_ERROR_CODES.UNAVAILABLE);
       pinnedDigest = entry.digest;

@@ -8,6 +8,11 @@ import {
 } from '@gyblos/node/constants';
 import type { createPaypalSession } from '@gyblos/node/paypal-session';
 
+import {
+  PAYPAL_AGENT_ERROR,
+  PaypalAgentConnectionError,
+} from './paypal-agent-model';
+
 type PaypalSession = Awaited<ReturnType<typeof createPaypalSession>>;
 export type DesktopPaypalStatus = Omit<
   ReturnType<PaypalSession['status']>,
@@ -138,6 +143,64 @@ function sendAgent(
   return session.agentMessage(id, input, randomUUID(), signal);
 }
 
+function agentCheck(
+  options: DesktopPaypalSessionOptions,
+  ready: () => boolean,
+  unavailable: () => boolean,
+) {
+  return async () => {
+    if (!ready())
+      throw new PaypalAgentConnectionError(
+        unavailable()
+          ? PAYPAL_AGENT_ERROR.MODEL_UNAVAILABLE
+          : PAYPAL_AGENT_ERROR.NEW_SESSION_REQUIRED,
+      );
+    try {
+      await options.checkAgentEngine?.();
+    } catch {
+      throw new PaypalAgentConnectionError(
+        PAYPAL_AGENT_ERROR.MODEL_UNAVAILABLE,
+      );
+    }
+  };
+}
+
+function agentOperations(
+  session: PaypalSession,
+  run: ReturnType<typeof serialOperations>['run'],
+  check: () => Promise<void>,
+  orderId: () => string,
+  onPending: () => void,
+) {
+  return {
+    sendAgent: (input: unknown, signal?: AbortSignal) =>
+      run(async () => {
+        await check();
+        const answer = await sendAgent(session, orderId(), input, signal);
+        onPending();
+        return answer;
+      }),
+    prepareAgent: () => run(check),
+  };
+}
+
+type AgentReadiness = {
+  prepared: boolean;
+  unavailable: boolean;
+  scope: string | undefined;
+};
+function clearAgent(state: AgentReadiness) {
+  state.prepared = false;
+  state.unavailable = false;
+  state.scope = undefined;
+}
+
+function currentOrderId(session: PaypalSession) {
+  const id = session.status().orderId;
+  if (!id) throw new Error('No sandbox order.');
+  return id;
+}
+
 export function createDesktopPaypalSession(
   session: PaypalSession,
   openExternal: (url: string) => Promise<void>,
@@ -146,19 +209,19 @@ export function createDesktopPaypalSession(
   let approvalUrl: string | undefined;
   let awaitingAcknowledgement = false;
   let checkoutOpened = false;
-  let agentPreparedForSession = false;
+  const agent: AgentReadiness = {
+    prepared: false,
+    unavailable: false,
+    scope: undefined,
+  };
   const { run, close, isBusy } = serialOperations();
-  function orderId() {
-    const id = session.status().orderId;
-    if (!id) throw new Error('No sandbox order.');
-    return id;
-  }
+  const orderId = () => currentOrderId(session);
   const status = () => visibleStatus(session, approvalUrl);
-  async function checkAgent() {
-    if (!agentPreparedForSession)
-      throw new Error('A fresh agent session is required.');
-    await options.checkAgentEngine?.();
-  }
+  const checkAgent = agentCheck(
+    options,
+    () => agent.prepared,
+    () => agent.unavailable,
+  );
   return {
     status,
     isCloseBlocked: () => isBusy() || awaitingAcknowledgement || checkoutOpened,
@@ -166,7 +229,9 @@ export function createDesktopPaypalSession(
       run(async () => {
         const agentReady = await prepareModels(options);
         const order = await session.create();
-        agentPreparedForSession = agentReady;
+        agent.prepared = agentReady;
+        agent.unavailable = !agentReady;
+        agent.scope = agentReady ? randomUUID() : undefined;
         approvalUrl = order.approvalUrl;
         return status();
       }),
@@ -188,14 +253,10 @@ export function createDesktopPaypalSession(
         awaitingAcknowledgement = true;
         return { text: answer.text, messageId: answer.messageId };
       }),
-    sendAgent: (input: unknown, signal?: AbortSignal) =>
-      run(async () => {
-        await checkAgent();
-        const answer = await sendAgent(session, orderId(), input, signal);
-        awaitingAcknowledgement = true;
-        return answer;
-      }),
-    prepareAgent: () => run(checkAgent),
+    ...agentOperations(session, run, checkAgent, orderId, () => {
+      awaitingAcknowledgement = true;
+    }),
+    agentScope: () => agent.scope,
     acknowledge: (messageId: string) =>
       run(async () => {
         await session.acknowledge(orderId(), messageId);
@@ -205,11 +266,13 @@ export function createDesktopPaypalSession(
     finish: () =>
       run(async () => {
         await session.finish(orderId());
+        clearAgent(agent);
         return status();
       }),
     abandon: () =>
       run(async () => {
         await session.cancel(orderId());
+        clearAgent(agent);
         approvalUrl = undefined;
         return status();
       }),

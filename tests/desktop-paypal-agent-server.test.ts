@@ -82,27 +82,67 @@ void test('an agent key cannot spend a later sandbox authorization', async () =>
     model: 'synthetic-model',
     async generate() {
       return {
-        id: 'synthetic', object: 'chat.completion', created: 0, model: 'synthetic-model',
-        choices: [{ index: 0, message: { role: 'assistant', content: 'synthetic answer' }, finish_reason: 'stop' }],
+        id: 'synthetic',
+        object: 'chat.completion',
+        created: 0,
+        model: 'synthetic-model',
+        choices: [
+          {
+            index: 0,
+            message: { role: 'assistant', content: 'synthetic answer' },
+            finish_reason: 'stop',
+          },
+        ],
         usage: { prompt_tokens: 2, completion_tokens: 3, total_tokens: 5 },
       };
     },
   };
-  const desktop = createDesktopPaypalSession(await createPaypalSession({ ...f, agentEngine }), async () => {});
+  const desktop = createDesktopPaypalSession(
+    await createPaypalSession({ ...f, agentEngine }),
+    async () => {},
+  );
   await desktop.create();
   await desktop.approve();
   const first = await startDesktopPaypalAgent(desktop, agentEngine.model);
   const request = {
-    model: agentEngine.model, messages: [{ role: 'user', content: 'synthetic' }], max_tokens: 128,
+    model: agentEngine.model,
+    messages: [{ role: 'user', content: 'synthetic' }],
+    max_tokens: 128,
   };
-  const call = (endpoint: typeof first) => fetch(`${endpoint.url}/chat/completions`, {
-    method: 'POST', headers: { authorization: `Bearer ${endpoint.key}`, 'content-type': 'application/json' },
-    body: JSON.stringify(request),
-  });
+  const call = (endpoint: typeof first) =>
+    fetch(`${endpoint.url}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${endpoint.key}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify(request),
+    });
   try {
     assert.equal((await call(first)).status, 200);
     await first.acknowledgePending();
-    await desktop.finish();
+    const capture = f.payment.capture;
+    let enteredCapture = () => {};
+    let releaseCapture = () => {};
+    const entered = new Promise<void>((resolve) => {
+      enteredCapture = resolve;
+    });
+    const waiting = new Promise<void>((resolve) => {
+      releaseCapture = resolve;
+    });
+    f.payment.capture = async (...args) => {
+      enteredCapture();
+      await waiting;
+      return capture(...args);
+    };
+    const settling = desktop.finish();
+    await entered;
+    try {
+      assert.notEqual((await call(first)).status, 200);
+    } finally {
+      releaseCapture();
+    }
+    await settling;
     await desktop.create();
     await desktop.approve();
     assert.notEqual((await call(first)).status, 200);

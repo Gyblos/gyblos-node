@@ -55,10 +55,13 @@ function count(value: unknown, maximum = Number.MAX_SAFE_INTEGER) {
 function toolCalls(value: unknown) {
   if (!Array.isArray(value) || value.length === 0 || value.length > MAX_TOOLS)
     return invalid();
+  const ids = new Set<string>();
   for (const item of value) {
     const call = fields(item);
     allowed(call, ['id', 'type', 'function']);
-    name(call.id);
+    const id = name(call.id);
+    if (ids.has(id)) invalid();
+    ids.add(id);
     if (call.type !== AGENT_CHAT.FUNCTION) invalid();
     const fn = fields(call.function);
     allowed(fn, ['name', 'arguments']);
@@ -209,6 +212,12 @@ export function validatePaypalAgentResult(
   if (answer.role !== AGENT_CHAT.ROLES.ASSISTANT) invalid();
   message(answer);
   if (
+    typeof answer.content === 'string' &&
+    !answer.content.trim() &&
+    answer.tool_calls === undefined
+  )
+    invalid();
+  if (
     !Object.values(AGENT_CHAT.FINISH).some(
       (value) => value === choice.finish_reason,
     )
@@ -226,12 +235,22 @@ export function validatePaypalAgentResult(
     invalid();
   if (answer.tool_calls !== undefined) {
     const declared = new Set<string>();
+    const previousIds = new Set<string>();
+    if (Array.isArray(request.messages))
+      for (const entry of request.messages) {
+        const previous = fields(entry);
+        if (Array.isArray(previous.tool_calls))
+          for (const call of previous.tool_calls)
+            previousIds.add(name(fields(call).id));
+      }
     if (Array.isArray(request.tools))
       for (const item of request.tools)
         declared.add(name(fields(fields(item).function).name));
     if (!Array.isArray(answer.tool_calls)) invalid();
     for (const item of answer.tool_calls) {
-      const fn = fields(fields(item).function);
+      const call = fields(item);
+      if (previousIds.has(name(call.id))) invalid();
+      const fn = fields(call.function);
       if (!declared.has(name(fn.name))) invalid();
     }
   }

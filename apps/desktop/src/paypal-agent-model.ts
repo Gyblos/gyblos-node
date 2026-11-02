@@ -22,7 +22,25 @@ export const PAYPAL_AGENT_ERROR = {
   INVALID: 'invalid',
   UNAVAILABLE: 'unavailable',
   FAILED: 'failed',
+  MODEL_UNAVAILABLE: 'model_unavailable',
+  NEW_SESSION_REQUIRED: 'new_session_required',
 } as const;
+export class PaypalAgentConnectionError extends Error {
+  constructor(
+    readonly code:
+      | typeof PAYPAL_AGENT_ERROR.MODEL_UNAVAILABLE
+      | typeof PAYPAL_AGENT_ERROR.NEW_SESSION_REQUIRED,
+  ) {
+    super(code);
+  }
+}
+export function paypalAgentErrorMessage(error: PaypalAgentResult['error']) {
+  if (error === PAYPAL_AGENT_ERROR.MODEL_UNAVAILABLE)
+    return `Check that ${DESKTOP_PAYPAL_AGENT.MODEL} is installed in Ollama. Then settle this session in Chat and start a new one.`;
+  if (error === PAYPAL_AGENT_ERROR.NEW_SESSION_REQUIRED)
+    return 'Settle the current session in Chat and start a new one to connect the agent.';
+  return 'Check that a PayPal Sandbox session is active in Chat, then try again.';
+}
 export type PaypalAgentAction =
   (typeof PAYPAL_AGENT_ACTION)[keyof typeof PAYPAL_AGENT_ACTION];
 export type PaypalAgentResult = {
@@ -40,6 +58,7 @@ export function opencodeConfig(
   return JSON.stringify(
     {
       $schema: 'https://opencode.ai/config.json',
+      agent: { title: { disable: true } },
       provider: {
         gyblos: {
           npm: '@ai-sdk/openai-compatible',

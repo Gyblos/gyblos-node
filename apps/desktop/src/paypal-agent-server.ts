@@ -90,10 +90,25 @@ async function dispatch(
 }
 
 export async function startDesktopPaypalAgent(service: Service, model: string) {
+  const scope = service.agentScope();
+  if (!scope) throw new Error('A fresh agent session is required.');
+  const isCurrent = () => service.agentScope() === scope;
+  const scopedService = {
+    status: () => (isCurrent() ? service.status() : { phase: 'blocked' }),
+    sendAgent: (input: unknown, signal?: AbortSignal) => {
+      if (!isCurrent()) throw new Error('Agent access expired.');
+      return service.sendAgent(input, signal);
+    },
+    acknowledge: (messageId: string) => {
+      if (!isCurrent()) throw new Error('Agent access expired.');
+      return service.acknowledge(messageId);
+    },
+  };
   let origin = '';
   let gateway: Gateway | undefined;
+  let closing = false;
   const server = createServer((request, response) => {
-    if (!gateway)
+    if (!gateway || closing)
       return response.writeHead(HTTP_STATUS.serviceUnavailable).end();
     void dispatch(request, response, origin, gateway);
   });
@@ -110,16 +125,25 @@ export async function startDesktopPaypalAgent(service: Service, model: string) {
     throw new Error('Local agent endpoint is unavailable.');
   }
   origin = `http://${LOCALHOST}:${address.port}`;
-  const key = randomBytes(DESKTOP_PAYPAL_AGENT.TOKEN_BYTES).toString('base64url');
-  gateway = createPaypalAgentGateway({ origin, key, model, service });
+  const key = randomBytes(DESKTOP_PAYPAL_AGENT.TOKEN_BYTES).toString(
+    'base64url',
+  );
+  gateway = createPaypalAgentGateway({
+    origin,
+    key,
+    model,
+    service: scopedService,
+  });
   return {
     url: `${origin}${ROUTES.agentBase}`,
     key,
     model,
+    isCurrent,
+    isBusy: gateway.isBusy,
     hasPending: gateway.hasPending,
     acknowledgePending: gateway.acknowledgePending,
     async close() {
-      server.closeAllConnections();
+      closing = true;
       await new Promise<void>((resolve, reject) =>
         server.close((error) => (error ? reject(error) : resolve())),
       );

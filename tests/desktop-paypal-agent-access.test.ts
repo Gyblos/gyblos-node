@@ -11,6 +11,8 @@ void test('agent access starts once only after a sandbox session is active', asy
     url: 'http://127.0.0.1:12345/v1',
     key: 'synthetic-key',
     model: 'synthetic-model',
+    isCurrent: () => true,
+    isBusy: () => false,
     hasPending: () => false,
     async acknowledgePending() {},
     async close() {
@@ -46,6 +48,8 @@ void test('a pending agent response must be confirmed before disconnect', async 
     url: 'http://127.0.0.1:12345/v1',
     key: 'synthetic-key',
     model: 'synthetic-model',
+    isCurrent: () => true,
+    isBusy: () => false,
     hasPending: () => pending,
     async acknowledgePending() {
       pending = false;
@@ -80,6 +84,8 @@ void test('application shutdown waits for an in-flight disconnect', async () => 
     url: 'http://127.0.0.1:12345/v1',
     key: 'synthetic-key',
     model: 'synthetic-model',
+    isCurrent: () => true,
+    isBusy: () => false,
     hasPending: () => false,
     async acknowledgePending() {},
     async close() {
@@ -114,10 +120,16 @@ void test('a new session gets a new connection and the previous endpoint is clos
     async () => {
       const openedGeneration = generation;
       return {
-        url: 'http://127.0.0.1:12345/v1', key: `key-${generation}`, model: 'synthetic-model',
+        url: 'http://127.0.0.1:12345/v1',
+        key: `key-${generation}`,
+        model: 'synthetic-model',
         isCurrent: () => openedGeneration === generation,
-        isBusy: () => false, hasPending: () => false,
-        async acknowledgePending() {}, async close() { closed += 1; },
+        isBusy: () => false,
+        hasPending: () => false,
+        async acknowledgePending() {},
+        async close() {
+          closed += 1;
+        },
       };
     },
   );
@@ -132,11 +144,21 @@ void test('a new session gets a new connection and the previous endpoint is clos
 void test('a running agent inference cannot be disconnected', async () => {
   let closed = 0;
   const endpoint = {
-    url: 'http://127.0.0.1:12345/v1', key: 'synthetic', model: 'synthetic-model',
-    isCurrent: () => true, isBusy: () => true, hasPending: () => false,
-    async acknowledgePending() {}, async close() { closed += 1; },
+    url: 'http://127.0.0.1:12345/v1',
+    key: 'synthetic',
+    model: 'synthetic-model',
+    isCurrent: () => true,
+    isBusy: () => true,
+    hasPending: () => false,
+    async acknowledgePending() {},
+    async close() {
+      closed += 1;
+    },
   };
-  const access = createDesktopPaypalAgentAccess(() => ({ phase: 'active', expired: false }), async () => endpoint);
+  const access = createDesktopPaypalAgentAccess(
+    () => ({ phase: 'active', expired: false }),
+    async () => endpoint,
+  );
   await access.connect();
   await assert.rejects(access.disconnect());
   assert.equal(closed, 0);
