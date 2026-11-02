@@ -1,10 +1,15 @@
 // The token accounts a claim pays into, made to exist before the seller charges: a distribute that
 // finds a recipient's account missing pays that share to the program's treasury for good, so payTo,
 // the fee treasury, the channel payee and the channel's payer (its refund) are each read and, when
-// missing, created at the fee payer's cost in one transaction. No Gyblos imports.
+// missing, created at the fee payer's cost in one transaction. Creations run one at a time, so claims
+// arriving together do not each pay to create the same account. No Gyblos imports.
 import type { Address, TransactionSigner } from '@solana/kit';
 
-import { UPTO_ERROR_CODES, UPTO_PROGRAM } from './constants';
+import {
+  UPTO_ERROR_CODES,
+  UPTO_PROGRAM,
+  UPTO_TOKEN_ACCOUNT,
+} from './constants';
 import { UptoError } from './errors';
 import {
   uptoConfirmed,
@@ -37,14 +42,15 @@ export interface UptoTokenAccountsQuery {
   owners: readonly string[];
 }
 
-// The owners (each once, in order) with no token account for the mint. An empty system account at
-// the address (anyone can send it lamports) is missing too: the associated token program creates
-// over it. UNAVAILABLE when the RPC cannot say, or anything else the token program does not own sits
-// there, which could never receive a payout.
-export async function uptoMissingTokenAccounts(
+// The owners (each once, in order) with no token account for the mint, and those whose account
+// could never receive a payout: a token account that is frozen or not initialized, or anything else
+// the token program does not own. An empty system account at the address (anyone can send it
+// lamports) is missing: the associated token program creates over it. UNAVAILABLE when the RPC
+// cannot say.
+export async function uptoRecipientTokenAccounts(
   rpc: Pick<UptoRecipientAccountsRpc, 'getMultipleAccounts'>,
   query: UptoTokenAccountsQuery,
-): Promise<string[]> {
+): Promise<{ missing: string[]; unusable: string[] }> {
   const owners = [...new Set(query.owners)];
   const accounts = await Promise.all(
     owners.map((owner) =>
@@ -56,14 +62,24 @@ export async function uptoMissingTokenAccounts(
   );
   if (value.length !== owners.length)
     throw new UptoError(UPTO_ERROR_CODES.UNAVAILABLE);
-  return owners.filter((_, index) => {
+  const missing: string[] = [];
+  const unusable: string[] = [];
+  owners.forEach((owner, index) => {
     const found = value[index];
-    if (!found) return true;
-    if (String(found.owner) === query.tokenProgram) return false;
-    if (String(found.owner) === UPTO_PROGRAM.systemProgram && !found.data[0])
-      return true;
-    throw new UptoError(UPTO_ERROR_CODES.UNAVAILABLE);
+    if (!found) missing.push(owner);
+    else if (String(found.owner) === query.tokenProgram) {
+      const state = Buffer.from(found.data[0], 'base64')[
+        UPTO_TOKEN_ACCOUNT.stateOffset
+      ];
+      if (state !== UPTO_TOKEN_ACCOUNT.initialized) unusable.push(owner);
+    } else if (
+      String(found.owner) === UPTO_PROGRAM.systemProgram &&
+      !found.data[0]
+    )
+      missing.push(owner);
+    else unusable.push(owner);
   });
+  return { missing, unusable };
 }
 
 export interface UptoRecipientAccountsOptions {
@@ -87,25 +103,39 @@ export function createUptoRecipientAccounts(
   options: UptoRecipientAccountsOptions,
 ): UptoRecipientAccounts {
   const { feePayer, mint, tokenProgram } = options;
+  const read = async (also: readonly string[]) => {
+    const { missing, unusable } = await uptoRecipientTokenAccounts(rpc, {
+      mint,
+      tokenProgram,
+      owners: [...options.owners, ...also],
+    });
+    if (unusable.length > 0) throw new UptoError(UPTO_ERROR_CODES.UNAVAILABLE);
+    return missing;
+  };
+  // Creations run one at a time and read again first, so claims that found the same account
+  // missing together create it once; a check with nothing to create never waits.
+  let creating: Promise<unknown> = Promise.resolve();
+  async function create(also: readonly string[]) {
+    const missing = await read(also);
+    if (missing.length === 0) return;
+    const { confirmed } = await uptoSend(
+      rpc,
+      feePayer,
+      await Promise.all(
+        missing.map((owner) =>
+          tokenAccountInstruction(feePayer, owner, mint, tokenProgram),
+        ),
+      ),
+      options.sleep,
+    );
+    if (!confirmed) throw new UptoError(UPTO_ERROR_CODES.UNAVAILABLE);
+  }
   return {
     async ensure(also = []) {
-      const missing = await uptoMissingTokenAccounts(rpc, {
-        mint,
-        tokenProgram,
-        owners: [...options.owners, ...also],
-      });
-      if (missing.length === 0) return;
-      const { confirmed } = await uptoSend(
-        rpc,
-        feePayer,
-        await Promise.all(
-          missing.map((owner) =>
-            tokenAccountInstruction(feePayer, owner, mint, tokenProgram),
-          ),
-        ),
-        options.sleep,
-      );
-      if (!confirmed) throw new UptoError(UPTO_ERROR_CODES.UNAVAILABLE);
+      if ((await read(also)).length === 0) return;
+      const run = creating.then(() => create(also));
+      creating = run.catch(() => {});
+      await run;
     },
   };
 }

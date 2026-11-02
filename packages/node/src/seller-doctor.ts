@@ -48,8 +48,8 @@ import { inspectSellerSequence } from './public-sequence';
 import { loadRole, roleKeyFilesStatus, type RoleConfig } from './roles';
 import type { SellerCatalogOffer } from './seller-offer';
 import {
-  missingPaymentAccounts,
-  type PaymentAccountsQuery,
+  paymentAccountsVerdict,
+  type PaymentAccountsProbes,
 } from './seller-payment-accounts';
 import {
   sellerBaseSettings,
@@ -82,8 +82,9 @@ export interface DoctorProbes {
   tokenizer?: (environment: HomeEnvironment) => Promise<unknown>;
   // The engines' transport; tests serve a synthetic provider.
   fetch?: typeof fetch;
-  // How many of these owners' token accounts for the mint are missing, on that RPC (--online).
-  paymentAccounts?: (query: PaymentAccountsQuery) => Promise<number>;
+  // The chain the role's RPC serves and its payment token accounts (--online).
+  genesis?: PaymentAccountsProbes['genesis'];
+  paymentAccounts?: PaymentAccountsProbes['paymentAccounts'];
 }
 export interface DoctorOptions {
   environment: HomeEnvironment;
@@ -249,18 +250,23 @@ async function paymentsCheck(
     return fail(errorCode(error));
   }
   if (!options.online) return OK;
-  try {
-    const missing = await (
-      options.probes?.paymentAccounts ?? missingPaymentAccounts
-    )({
+  const verdict = await paymentAccountsVerdict(
+    {
       rpcUrl: config.rpcUrl,
       mint: config.mint,
       owners: [config.payTo, PROTOCOL_FEE.treasury, config.facilitator],
-    });
-    return missing === 0 ? OK : warn(DOCTOR_CODES.PAYMENT_ACCOUNTS_MISSING);
-  } catch {
-    return warn(DOCTOR_CODES.PAYMENT_ACCOUNTS_UNCHECKED);
-  }
+    },
+    options.probes ?? {},
+  );
+  return {
+    ready: OK,
+    // Startup creates them.
+    missing: warn(DOCTOR_CODES.PAYMENT_ACCOUNTS_MISSING),
+    unchecked: warn(DOCTOR_CODES.PAYMENT_ACCOUNTS_UNCHECKED),
+    // Startup refuses both.
+    unusable: fail(DOCTOR_CODES.PAYMENT_ACCOUNTS_UNUSABLE),
+    'other-network': fail(NODE_ERROR_CODES.SELLER_PAYMENT_NETWORK_MISMATCH),
+  }[verdict];
 }
 
 const engineDependencies = (options: DoctorOptions) => ({
