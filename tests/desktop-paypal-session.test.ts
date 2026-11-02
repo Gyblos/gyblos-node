@@ -68,6 +68,46 @@ void test('one approval covers two acknowledged answers and one partial capture'
   ]);
 });
 
+void test('desktop chat and a local agent share one sandbox session', async () => {
+  const f = fixture();
+  const agentEngine = {
+    model: 'synthetic-model',
+    async generate() {
+      f.calls.push('agent-generate');
+      return {
+        id: 'synthetic',
+        object: 'chat.completion',
+        created: 0,
+        model: 'synthetic-model',
+        choices: [
+          {
+            index: 0,
+            message: { role: 'assistant', content: 'synthetic answer' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: { prompt_tokens: 2, completion_tokens: 3, total_tokens: 5 },
+      };
+    },
+  };
+  const session = await createPaypalSession({ ...f, agentEngine });
+  const desktop = createDesktopPaypalSession(session, async () => {});
+  await desktop.create();
+  await desktop.approve();
+  const chat = await desktop.send('synthetic chat');
+  await desktop.acknowledge(chat.messageId);
+  const agent = await desktop.sendAgent({
+    model: 'synthetic-model',
+    messages: [{ role: 'user', content: 'synthetic agent request' }],
+    max_tokens: 128,
+  });
+  assert.equal(desktop.isCloseBlocked(), true);
+  await assert.rejects(desktop.finish());
+  await desktop.acknowledge(agent.messageId);
+  assert.equal((await desktop.finish()).spentCents, 20);
+  assert.deepEqual(f.calls, ['create', 'authorize', 'generate', 'agent-generate', 'capture:20']);
+});
+
 void test('an unacknowledged response blocks another message and settlement', async () => {
   const { f, desktop } = await setup();
   await desktop.create();
