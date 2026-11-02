@@ -3,8 +3,9 @@ import { test } from 'node:test';
 
 import { createPaypalAgentStatusPoll } from '@gyblos/desktop/paypal-agent-model';
 
-void test('a slow status check cannot overlap and becomes unknown until it completes', async () => {
+void test('a timed-out status is discarded while a new bounded check can recover', async () => {
   let calls = 0;
+  const updates: string[] = [];
   let release = (_value: string) => {};
   let timedOut = () => {};
   let received = (_value: string) => {};
@@ -20,9 +21,9 @@ void test('a slow status check cannot overlap and becomes unknown until it compl
   const poll = createPaypalAgentStatusPoll(
     async () => {
       calls += 1;
-      return pending;
+      return calls === 1 ? pending : 'fresh';
     },
-    received,
+    (value) => { updates.push(value); received(value); },
     timedOut,
     15,
   );
@@ -31,15 +32,41 @@ void test('a slow status check cannot overlap and becomes unknown until it compl
   await deadline;
   assert.equal(calls, 1);
   assert.equal(poll.isStalled(), true);
+  try {
+    poll.poll();
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.equal(calls, 2);
+    assert.equal(await finished, 'fresh');
+    release('outdated');
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.deepEqual(updates, ['fresh']);
+    assert.equal(poll.isStalled(), false);
+  } finally {
+    release('outdated');
+    poll.stop();
+  }
+});
+
+void test('a stuck status channel cannot create unbounded pending requests', async () => {
+  let calls = 0;
+  let timeouts = 0;
+  let first = () => {};
+  let second = () => {};
+  const firstTimeout = new Promise<void>((resolve) => { first = resolve; });
+  const secondTimeout = new Promise<void>((resolve) => { second = resolve; });
+  const poll = createPaypalAgentStatusPoll(() => { calls += 1; return new Promise<string>(() => {}); }, () => {}, () => {
+    timeouts += 1;
+    if (timeouts === 1) first();
+    if (timeouts === 2) second();
+  }, 15);
   poll.poll();
-  assert.equal(calls, 1);
-  release('fresh');
-  assert.equal(await finished, 'fresh');
-  await new Promise<void>((resolve) => setImmediate(resolve));
-  assert.equal(poll.isStalled(), false);
+  await firstTimeout;
+  poll.poll();
+  await secondTimeout;
   poll.poll();
   await new Promise<void>((resolve) => setImmediate(resolve));
   assert.equal(calls, 2);
+  assert.equal(poll.isStalled(), true);
   poll.stop();
 });
 
