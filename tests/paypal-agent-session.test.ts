@@ -26,6 +26,7 @@ void test('one sandbox authorization covers a tool-calling conversation without 
   const f = fixture();
   const seen: unknown[] = [];
   const agentEngine = {
+    model: 'synthetic-model',
     async generate(input: unknown) {
       seen.push(input);
       f.calls.push('agent-generate');
@@ -91,6 +92,7 @@ void test('one sandbox authorization covers a tool-calling conversation without 
 void test('an unacknowledged agent answer blocks another inference and settlement', async () => {
   const f = fixture();
   const agentEngine = {
+    model: 'synthetic-model',
     async generate() {
       f.calls.push('agent-generate');
       return completion(1);
@@ -122,6 +124,7 @@ void test('an unacknowledged agent answer blocks another inference and settlemen
 void test('malformed agent messages are refused before dispatch or journal changes', async () => {
   const f = fixture();
   const agentEngine = {
+    model: 'synthetic-model',
     async generate() {
       f.calls.push('agent-generate');
       return completion(1);
@@ -164,6 +167,7 @@ void test('malformed agent messages are refused before dispatch or journal chang
 void test('malformed engine output never becomes an acknowledged charge', async () => {
   const f = fixture();
   const agentEngine = {
+    model: 'synthetic-model',
     async generate() {
       f.calls.push('agent-generate');
       return { error: 'synthetic upstream error' };
@@ -186,4 +190,26 @@ void test('malformed engine output never becomes an acknowledged charge', async 
   assert.equal(session.status().spentCents, 0);
   await assert.rejects(session.finish(order.orderId));
   assert.deepEqual(f.calls, ['create', 'authorize', 'agent-generate']);
+});
+
+void test('a reentrant validator cannot start two paid inferences', async () => {
+  const f = fixture();
+  let entered = false;
+  let reentry: Promise<unknown> | undefined;
+  let session: Awaited<ReturnType<typeof createPaypalSession>>;
+  const validateRequest = () => {
+    if (entered) return;
+    entered = true;
+    reentry = session.message('ORDER1', 'synthetic reentrant', 16, 'REENTER');
+    void reentry.catch(() => {});
+  };
+  session = await createPaypalSession({ ...f, validateRequest });
+  const order = await session.create();
+  await session.approve(order.orderId);
+  const first = await session.message(order.orderId, 'synthetic outer', 16, 'OUTER');
+  assert.ok(reentry);
+  await assert.rejects(reentry);
+  await session.acknowledge(order.orderId, first.messageId);
+  await session.finish(order.orderId);
+  assert.deepEqual(f.calls, ['create', 'authorize', 'generate', 'capture:10']);
 });
