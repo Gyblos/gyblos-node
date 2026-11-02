@@ -39,6 +39,34 @@ export function networkRecoveryBlock(
   return recorded === network ? undefined : NETWORK_RECOVERY_BLOCKS.MISMATCH;
 }
 
+// Read every contract field before asynchronous work, including inherited getters.
+export function snapshotJournalEntry(
+  entry: UptoJournalEntry,
+): UptoJournalEntry {
+  const policy = entry.policy;
+  return {
+    requestDigest: entry.requestDigest,
+    channelId: entry.channelId,
+    payTo: entry.payTo,
+    feePayer: entry.feePayer,
+    maxAtomic: entry.maxAtomic,
+    policy: policy
+      ? {
+          network: policy.network,
+          mint: policy.mint,
+          treasury: policy.treasury,
+          protocolFeeBps: policy.protocolFeeBps,
+        }
+      : null,
+    openSlot: entry.openSlot,
+    lastValidBlockHeight: entry.lastValidBlockHeight,
+    expiresAt: entry.expiresAt,
+    state: entry.state,
+    chargedAtomic: entry.chargedAtomic,
+    updatedAt: entry.updatedAt,
+  };
+}
+
 // Keep caller-supplied method references stable throughout asynchronous recovery.
 export function snapshotJournal(journal: UptoBuyerJournal): UptoBuyerJournal {
   return {

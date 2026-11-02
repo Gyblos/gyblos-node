@@ -17,6 +17,7 @@ import {
   checkJournalNetwork,
   networkRecoveryBlock,
   snapshotJournal,
+  snapshotJournalEntry,
 } from './journal-network';
 import { assertPaymentNetworkEnabled } from './mainnet';
 import { verifyPaymentNetwork, type PaymentGenesisRpc } from './seller-network';
@@ -158,10 +159,7 @@ export async function reconcileUptoBuyer(
     rpc: snapshotRpc(options.rpc),
   };
   checkJournalNetwork(fixed.network);
-  const entries = (await fixed.journal.list()).map((entry) => ({
-    ...entry,
-    policy: entry.policy ? { ...entry.policy } : null,
-  }));
+  const entries = (await fixed.journal.list()).map(snapshotJournalEntry);
   const shown = readers(fixed);
   const results: UptoReconcileResult[] = [];
   let verified = false;

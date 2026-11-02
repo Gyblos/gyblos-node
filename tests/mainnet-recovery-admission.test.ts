@@ -331,3 +331,44 @@ void test('withdrawal fixes its channel and split inputs before waiting for gene
   assert.notEqual(readsBeforeGenesis, 0);
   assert.deepEqual(double.sent, []);
 });
+
+void test('withdrawal accepts query and split getters on a prototype', async () => {
+  const payer = await generateKeyPairSigner();
+  const double = withdrawChain({ accounts: new Map(), blockTime: 0n });
+  let splitReads = 0;
+  class Split {
+    get recipient() {
+      splitReads++;
+      return ADDRESS;
+    }
+    get bps() {
+      splitReads++;
+      return 1;
+    }
+  }
+  class Query {
+    get channelId() {
+      return ADDRESS;
+    }
+    get mint() {
+      return ADDRESS;
+    }
+    get rentPayer() {
+      return ADDRESS;
+    }
+    get maxAtomic() {
+      return '1000';
+    }
+    get splits() {
+      return [new Split()];
+    }
+  }
+  const withdrawal = createUptoWithdrawal(double.rpc, {
+    payer,
+    network: DEVNET,
+    tokenProgram: TOKEN_PROGRAM_ADDRESS,
+  });
+  assert.equal((await withdrawal.withdraw(new Query())).step, 'nothing');
+  assert.equal(double.sent.length, 0);
+  assert.equal(splitReads, 2);
+});

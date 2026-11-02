@@ -27,7 +27,11 @@ import {
 } from '@gyblos/protocol/payment';
 
 import type { UptoBuyerJournal } from './buyer-journal';
-import { networkRecoveryBlock, snapshotJournal } from './journal-network';
+import {
+  networkRecoveryBlock,
+  snapshotJournal,
+  snapshotJournalEntry,
+} from './journal-network';
 import { assertPaymentNetworkEnabled } from './mainnet';
 import { uptoTermsFor, type UptoChannelSettings } from './terms';
 
@@ -203,6 +207,29 @@ function checkedPolicy(policy: UptoBuyerPolicy): UptoBuyerPolicy {
   return policy;
 }
 
+// Payment port inputs may expose their fields through getters; capture them before waiting.
+function snapshotAuthorization(
+  input: PaymentAuthorization,
+): PaymentAuthorization {
+  return {
+    channelId: input.channelId,
+    payer: input.payer,
+    requestDigest: input.requestDigest,
+    maxAtomic: input.maxAtomic,
+    payload: input.payload,
+  };
+}
+function snapshotSettlement(input: PaymentSettlement): PaymentSettlement {
+  return {
+    channelId: input.channelId,
+    chargedAtomic: input.chargedAtomic,
+    refundedAtomic: input.refundedAtomic,
+    sellerAtomic: input.sellerAtomic,
+    feeAtomic: input.feeAtomic,
+    transaction: input.transaction,
+  };
+}
+
 // Drops a signed entry the caller knows never left the buyer; a settled one, or another channel's
 // identity, is refused.
 async function discardUnsent(
@@ -210,7 +237,7 @@ async function discardUnsent(
   inputAuthorization: PaymentAuthorization,
   network: string,
 ) {
-  const authorization = { ...inputAuthorization };
+  const authorization = snapshotAuthorization(inputAuthorization);
   const entry = await journal
     .get(authorization.requestDigest)
     .catch(() => fail(PAYMENT_ERROR_CODES.JOURNAL_UNAVAILABLE));
@@ -232,14 +259,12 @@ async function checkReceipt(
   inputSettlement: PaymentSettlement,
   expectedChargedAtomic: string,
 ): Promise<void> {
-  const authorization = { ...inputAuthorization };
-  const settlement = { ...inputSettlement };
+  const authorization = snapshotAuthorization(inputAuthorization);
+  const settlement = snapshotSettlement(inputSettlement);
   const observed = await fixed.journal
     .get(authorization.requestDigest)
     .catch(() => fail(PAYMENT_ERROR_CODES.JOURNAL_UNAVAILABLE));
-  const entry = observed
-    ? { ...observed, policy: observed.policy ? { ...observed.policy } : null }
-    : undefined;
+  const entry = observed ? snapshotJournalEntry(observed) : undefined;
   if (
     !entry ||
     entry.channelId !== authorization.channelId ||

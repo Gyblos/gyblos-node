@@ -34,8 +34,14 @@ export function createUptoWithdrawal(
   return {
     async withdraw(input: Parameters<typeof withdrawal.withdraw>[0]) {
       const query = {
-        ...input,
-        splits: input.splits.map((split) => ({ ...split })),
+        channelId: input.channelId,
+        mint: input.mint,
+        rentPayer: input.rentPayer,
+        maxAtomic: input.maxAtomic,
+        splits: input.splits.map((split) => ({
+          recipient: split.recipient,
+          bps: split.bps,
+        })),
       };
       await verifyPaymentNetwork(fixedRpc, network);
       return withdrawal.withdraw(query);

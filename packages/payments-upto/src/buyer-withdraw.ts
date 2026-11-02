@@ -26,6 +26,7 @@ import {
   checkJournalNetwork,
   networkRecoveryBlock,
   snapshotJournal,
+  snapshotJournalEntry,
 } from './journal-network';
 import { assertPaymentNetworkEnabled } from './mainnet';
 
@@ -141,10 +142,7 @@ export async function withdrawUptoBuyer(
     report: options.report.bind(options),
   };
   checkJournalNetwork(fixed.network);
-  const entries = (await fixed.journal.list()).map((entry) => ({
-    ...entry,
-    policy: entry.policy ? { ...entry.policy } : null,
-  }));
+  const entries = (await fixed.journal.list()).map(snapshotJournalEntry);
   const results: UptoBuyerWithdrawResult[] = [];
   for (const entry of entries) {
     const { channelId } = entry;

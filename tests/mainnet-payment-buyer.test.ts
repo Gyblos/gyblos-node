@@ -25,7 +25,12 @@ import {
   PAYMENT_CHANNEL_STATES,
   PAYMENT_ERROR_CODES,
 } from '@gyblos/protocol/constants';
-import { PaymentError, type PaymentTerms } from '@gyblos/protocol/payment';
+import {
+  PaymentError,
+  type PaymentAuthorization,
+  type PaymentSettlement,
+  type PaymentTerms,
+} from '@gyblos/protocol/payment';
 
 import { entry } from './support/mainnet-journal';
 import { hints } from './support/payment-upto';
@@ -242,3 +247,83 @@ void test('an unresolved legacy journal blocks new signatures without upgrading 
       await journal.close();
     }
   }));
+
+class AuthorizationView implements PaymentAuthorization {
+  constructor(private readonly source: PaymentAuthorization) {}
+  get channelId() {
+    return this.source.channelId;
+  }
+  get payer() {
+    return this.source.payer;
+  }
+  get requestDigest() {
+    return this.source.requestDigest;
+  }
+  get maxAtomic() {
+    return this.source.maxAtomic;
+  }
+  get payload() {
+    return this.source.payload;
+  }
+}
+class SettlementView implements PaymentSettlement {
+  constructor(private readonly source: PaymentSettlement) {}
+  get channelId() {
+    return this.source.channelId;
+  }
+  get chargedAtomic() {
+    return this.source.chargedAtomic;
+  }
+  get refundedAtomic() {
+    return this.source.refundedAtomic;
+  }
+  get sellerAtomic() {
+    return this.source.sellerAtomic;
+  }
+  get feeAtomic() {
+    return this.source.feeAtomic;
+  }
+  get transaction() {
+    return this.source.transaction;
+  }
+}
+
+void test('receipt and discard accept payment values with inherited getters', async () => {
+  for (const operation of ['receipt', 'discard'] as const) {
+    const journal = memory();
+    const { options, terms } = await buyer(journal);
+    const client = createUptoPaymentClient({
+      ...options,
+      confirm: async (settlement) => ({
+        channelId: settlement.channelId,
+        chargedAtomic: settlement.chargedAtomic,
+        refundedAtomic: settlement.refundedAtomic,
+        sellerAtomic: settlement.sellerAtomic,
+        feeAtomic: settlement.feeAtomic,
+      }),
+    });
+    const authorization = await client.authorize(terms);
+    if (operation === 'discard') {
+      await client.discard(new AuthorizationView(authorization));
+      assert.equal(journal.entries.size, 0);
+    } else {
+      const settlement = {
+        channelId: authorization.channelId,
+        chargedAtomic: '30',
+        refundedAtomic: '970',
+        sellerAtomic: '29',
+        feeAtomic: '0',
+        transaction: 'synthetic',
+      };
+      await client.checkReceipt(
+        new AuthorizationView(authorization),
+        new SettlementView(settlement),
+        '30',
+      );
+      assert.equal(
+        journal.entries.get(DIGEST)?.state,
+        PAYMENT_CHANNEL_STATES.SETTLED,
+      );
+    }
+  }
+});
