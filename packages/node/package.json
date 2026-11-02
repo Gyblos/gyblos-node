@@ -42,6 +42,7 @@
     "./paid-router": "./src/paid-router.ts",
     "./paypal-inference": "./src/paypal-inference.ts",
     "./paypal-session": "./src/paypal-session.ts",
+    "./paypal-agent-gateway": "./src/paypal-agent-gateway.ts",
     "./paypal-journal": "./src/paypal-journal.ts",
     "./paypal-startup": "./src/paypal-startup.ts",
     "./paid-retry": "./src/paid-retry.ts",

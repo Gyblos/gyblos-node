@@ -222,6 +222,8 @@ export const AGENT_CHAT = {
   FUNCTION: 'function',
   FINISH: { ...ENGINE_DONE_REASONS, TOOL_CALLS: 'tool_calls' },
   COMPLETION: 'chat.completion',
+  CHUNK: 'chat.completion.chunk',
+  STREAM_DONE: '[DONE]',
 } as const;
 export const FREE_EXECUTION_CODES = {
   INVALID: 'INVALID_FREE_EXECUTION',

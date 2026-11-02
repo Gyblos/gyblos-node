@@ -126,7 +126,10 @@ function optionalNumber(value: unknown, min: number, max: number) {
     invalid();
 }
 
-export function validatePaypalAgentRequest(input: unknown, model: string) {
+export function validatePaypalAgentRequest(
+  input: unknown,
+  model: string,
+): Record<string, unknown> {
   const row = fields(input);
   allowed(row, REQUEST_FIELDS);
   if (name(row.model) !== model) invalid();
