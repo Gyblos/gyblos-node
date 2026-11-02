@@ -15,7 +15,10 @@ marketplace. It does not collect a platform fee.
    [toolchain setup guide](../CONTRIBUTING.md#set-up-nodejs-and-pnpm). Install
    [Ollama](https://ollama.com/download) and start its local server.
 2. From the repository root, install dependencies and the models needed for the
-   flows you want to try:
+   flows you want to try. The
+   [agent model](https://ollama.com/library/gpt-oss:20b) is an approximately 14
+   GB download; Ollama notes it can run on systems with 16 GB of memory, subject
+   to the available hardware and workload:
 
    ```sh
    pnpm install --frozen-lockfile
@@ -41,6 +44,10 @@ marketplace. It does not collect a platform fee.
    transactions use simulated money.
 
 Never put credentials or sandbox account passwords in Git, screenshots, or chat.
+Before approving the sandbox authorization, note that each completed agent
+inference records USD 0.10 even if delivery fails. One instruction may require
+several inferences, and an already dispatched inference can finish and count
+after the agent disconnects.
 
 Choose an empty dedicated absolute directory for sandbox state. In a private
 terminal, set `PAYPAL_SANDBOX_CLIENT_ID`, `PAYPAL_SANDBOX_CLIENT_SECRET`, and
