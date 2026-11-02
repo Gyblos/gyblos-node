@@ -134,3 +134,27 @@ void test('a second click cannot create a parallel order', async () => {
   await first;
   assert.equal(f.calls.filter((call) => call === 'create').length, 1);
 });
+
+void test('a follow-up draft typed during inference is preserved', async () => {
+  const { f, chat } = await setup();
+  const generate = f.engine.generate;
+  let release: (() => void) | undefined;
+  const wait = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  f.engine.generate = async () => {
+    await wait;
+    return generate();
+  };
+  await chat.refresh();
+  await chat.create();
+  await chat.approve();
+  chat.setDraft('First prompt');
+  const pending = chat.send();
+  chat.setDraft('Follow-up draft');
+  assert.ok(release);
+  release();
+  await pending;
+  assert.equal(chat.getSnapshot().draft, 'Follow-up draft');
+  assert.equal(chat.getSnapshot().status?.spentCents, 10);
+});
