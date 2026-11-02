@@ -1,7 +1,7 @@
 // Owns one local agent endpoint for the lifetime of the desktop sandbox session.
 import { PAYPAL_SESSION_PHASE } from '@gyblos/node/constants';
 
-import { PAYPAL_AGENT_USAGE_STATE as USAGE } from './paypal-agent-model';
+import { PAYPAL_AGENT_USAGE_STATE as USAGE } from './constants';
 
 type Endpoint = {
   url: string;

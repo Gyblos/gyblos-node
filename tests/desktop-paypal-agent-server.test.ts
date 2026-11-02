@@ -295,7 +295,10 @@ void test('shutdown closes a socket that never completes its HTTP headers', asyn
 
 void test('closing an agent endpoint is safe to repeat concurrently or after completion', async () => {
   const f = fixture();
-  const desktop = createDesktopPaypalSession(await createPaypalSession(f), async () => {});
+  const desktop = createDesktopPaypalSession(
+    await createPaypalSession(f),
+    async () => {},
+  );
   await desktop.create();
   await desktop.approve();
   const endpoint = await startDesktopPaypalAgent(desktop, 'synthetic-model');
@@ -357,9 +360,11 @@ void test('shutdown waits for an already running inference before closing socket
   }).then((response) => response.text());
   await started;
   let closed = false;
-  const stopping = endpoint.close().then(() => {
-    closed = true;
-  });
+  const stopping = Promise.all([endpoint.close(), endpoint.close()]).then(
+    () => {
+      closed = true;
+    },
+  );
   await Promise.resolve();
   assert.equal(closed, false);
   release();

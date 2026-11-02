@@ -6,13 +6,25 @@ import { waitForPaypalAgentServerClose } from '@gyblos/desktop/paypal-agent-serv
 void test('an already closed server still waits for dispatched requests to drain', async () => {
   let release = () => {};
   let drained = false;
-  const waiting = new Promise<void>((resolve) => { release = resolve; });
+  const waiting = new Promise<void>((resolve) => {
+    release = resolve;
+  });
   const closed = waitForPaypalAgentServerClose(
-    (done) => done(Object.assign(new Error('already closed'), { code: 'ERR_SERVER_NOT_RUNNING' })),
-    async () => { await waiting; drained = true; },
+    (done) =>
+      done(
+        Object.assign(new Error('already closed'), {
+          code: 'ERR_SERVER_NOT_RUNNING',
+        }),
+      ),
+    async () => {
+      await waiting;
+      drained = true;
+    },
   );
   let returned = false;
-  const finished = closed.then(() => { returned = true; });
+  const finished = closed.then(() => {
+    returned = true;
+  });
   await Promise.resolve();
   assert.equal(returned, false);
   release();
@@ -21,8 +33,10 @@ void test('an already closed server still waits for dispatched requests to drain
 });
 
 void test('an unexpected server close failure is not presented as a successful disconnect', async () => {
-  await assert.rejects(waitForPaypalAgentServerClose(
-    (done) => done(new Error('unexpected failure')),
-    async () => {},
-  ));
+  await assert.rejects(
+    waitForPaypalAgentServerClose(
+      (done) => done(new Error('unexpected failure')),
+      async () => {},
+    ),
+  );
 });

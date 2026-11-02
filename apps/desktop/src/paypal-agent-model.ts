@@ -4,6 +4,16 @@ import { IPV6_LOOPBACK, LOCALHOST } from '@gyblos/config/hosts';
 import { SANDBOX_AGENT_LIMITS } from '@gyblos/config/limits';
 import { ROUTES } from '@gyblos/config/paths';
 
+import {
+  PAYPAL_AGENT_USAGE_STATE,
+  type PaypalAgentUsageState,
+} from './constants';
+
+export {
+  PAYPAL_AGENT_USAGE_STATE,
+  type PaypalAgentUsageState,
+} from './constants';
+export { createPaypalAgentStatusPoll } from './paypal-agent-poll';
 export const DESKTOP_PAYPAL_AGENT = {
   CHANNEL: 'desktop:paypal-agent',
   TOKEN_BYTES: 32,
@@ -26,19 +36,6 @@ export const PAYPAL_AGENT_ERROR = {
   MODEL_UNAVAILABLE: 'model_unavailable',
   NEW_SESSION_REQUIRED: 'new_session_required',
 } as const;
-export const PAYPAL_AGENT_USAGE_STATE = {
-  AVAILABLE: 'available',
-  BUSY: 'busy',
-  CHAT_PENDING: 'chat_pending',
-  NEEDS_REVIEW: 'needs_review',
-  EXPIRED: 'expired',
-  ATTEMPTS_EXHAUSTED: 'attempts_exhausted',
-  LIMIT_REACHED: 'limit_reached',
-  DISCONNECTING: 'disconnecting',
-  DISCONNECT_FAILED: 'disconnect_failed',
-} as const;
-export type PaypalAgentUsageState =
-  (typeof PAYPAL_AGENT_USAGE_STATE)[keyof typeof PAYPAL_AGENT_USAGE_STATE];
 export class PaypalAgentConnectionError extends Error {
   constructor(
     readonly code:

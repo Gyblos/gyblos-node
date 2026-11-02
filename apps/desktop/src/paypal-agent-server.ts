@@ -4,18 +4,37 @@ import { randomBytes } from 'node:crypto';
 import {
   createServer,
   type IncomingMessage,
+  type Server,
   type ServerResponse,
 } from 'node:http';
 
 import { HTTP_STATUS, LOCALHOST, ROUTES } from '@gyblos/config';
 import { createPaypalAgentGateway } from '@gyblos/node/paypal-agent-gateway';
 
+import { DESKTOP_AGENT_SERVER_NOT_RUNNING } from './constants';
 import { drainAgentResponse } from './paypal-agent-drain';
 import { DESKTOP_PAYPAL_AGENT } from './paypal-agent-model';
 import type { createDesktopPaypalSession } from './paypal-session';
 
 type Service = ReturnType<typeof createDesktopPaypalSession>;
 type Gateway = ReturnType<typeof createPaypalAgentGateway>;
+
+export async function waitForPaypalAgentServerClose(
+  close: (done: (error?: Error) => void) => void,
+  drain: () => Promise<void>,
+) {
+  await new Promise<void>((resolve, reject) =>
+    close((error) => {
+      if (
+        error &&
+        (!('code' in error) || error.code !== DESKTOP_AGENT_SERVER_NOT_RUNNING)
+      )
+        reject(error);
+      else resolve();
+    }),
+  );
+  await drain();
+}
 
 function requestHeaders(request: IncomingMessage) {
   const headers = new Headers();
@@ -109,12 +128,50 @@ async function dispatch(
   }
 }
 
+type Lifecycle = {
+  closing: boolean;
+  inFlight: number;
+  drained: (() => void) | undefined;
+  shutdown: Promise<void> | undefined;
+};
+function closeAgentServer(
+  server: Server,
+  state: Lifecycle,
+  revoked: AbortController,
+) {
+  if (!state.shutdown) {
+    state.closing = true;
+    revoked.abort();
+    const next = waitForPaypalAgentServerClose(
+      (done) => {
+        server.close(done);
+        if (state.inFlight === 0) server.closeAllConnections();
+      },
+      async () => {
+        if (state.inFlight > 0)
+          await new Promise<void>((resolve) => {
+            state.drained = resolve;
+          });
+      },
+    ).catch((error: unknown) => {
+      if (state.shutdown === next) state.shutdown = undefined;
+      throw error;
+    });
+    state.shutdown = next;
+  }
+  return state.shutdown;
+}
 export async function startDesktopPaypalAgent(service: Service, model: string) {
   const scope = service.agentScope();
   if (!scope) throw new Error('A fresh agent session is required.');
-  let closing = false;
+  const state: Lifecycle = {
+    closing: false,
+    inFlight: 0,
+    drained: undefined,
+    shutdown: undefined,
+  };
   const revoked = new AbortController();
-  const isCurrent = () => !closing && service.agentScope() === scope;
+  const isCurrent = () => !state.closing && service.agentScope() === scope;
   const scopedService = {
     sendAgent: (
       input: unknown,
@@ -130,21 +187,23 @@ export async function startDesktopPaypalAgent(service: Service, model: string) {
   };
   let origin = '';
   let gateway: Gateway | undefined;
-  let inFlight = 0;
   const server = createServer((request, response) => {
-    if (!gateway || closing || !isCurrent()) {
+    if (!gateway || state.closing || !isCurrent()) {
       response.shouldKeepAlive = false;
       const status =
-        !gateway || closing
+        !gateway || state.closing
           ? HTTP_STATUS.serviceUnavailable
           : HTTP_STATUS.unauthorized;
       return response.writeHead(status).end();
     }
-    inFlight += 1;
+    state.inFlight += 1;
     void dispatch(request, response, origin, gateway)
       .finally(() => {
-        inFlight -= 1;
-        if (closing && inFlight === 0) server.closeAllConnections();
+        state.inFlight -= 1;
+        if (state.closing && state.inFlight === 0) {
+          server.closeAllConnections();
+          state.drained?.();
+        }
       })
       .catch(() => {});
   });
@@ -176,14 +235,6 @@ export async function startDesktopPaypalAgent(service: Service, model: string) {
     model,
     isCurrent,
     isBusy: gateway.isBusy,
-    async close() {
-      closing = true;
-      revoked.abort();
-      const stopped = new Promise<void>((resolve, reject) =>
-        server.close((error) => (error ? reject(error) : resolve())),
-      );
-      if (inFlight === 0) server.closeAllConnections();
-      await stopped;
-    },
+    close: () => closeAgentServer(server, state, revoked),
   };
 }
