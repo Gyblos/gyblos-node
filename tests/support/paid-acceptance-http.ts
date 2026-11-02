@@ -1,8 +1,10 @@
 // Sends only synthetic input to the owned buyer's loopback endpoint; response bodies never enter reports.
 import assert from 'node:assert/strict';
 import { request, type IncomingMessage } from 'node:http';
+import { setTimeout as delay } from 'node:timers/promises';
 
 import { PAID_VERDICTS } from '@gyblos/buyer/constants';
+import { ACCEPTANCE } from '@gyblos/lab-harness/acceptance/constants';
 import { FREE_CHAT_ROLES, MODEL_IDS } from '@gyblos/protocol/constants';
 
 import {
@@ -12,11 +14,13 @@ import {
 import { PAID_ACCEPTANCE } from './paid-acceptance-constants';
 import type { PaidAcceptanceHost } from './paid-acceptance-host';
 
-export function paidHttp(
+export async function paidHttp(
   run: PaidAcceptanceHost,
   signal: AbortSignal,
   stream = false,
 ) {
+  // Keep sequential synthetic phases within the product's real-time peer quota.
+  await delay(ACCEPTANCE.controlRefillMs, undefined, { signal });
   const url = new URL(run.url());
   assert.equal(url.protocol, 'http:');
   assert.equal(url.hostname, '127.0.0.1');

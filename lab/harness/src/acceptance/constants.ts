@@ -1,4 +1,6 @@
 // Canonical acceptance modes, evidence cases and static failures; no operational state or secrets.
+import { CONTROL_CAPACITY } from '@gyblos/core/constants';
+
 export const ACCEPTANCE_MODES = {
   SYNTHETIC: 'synthetic',
   OLLAMA: 'ollama',
@@ -35,6 +37,9 @@ export type AcceptanceCode =
   (typeof ACCEPTANCE_CODES)[keyof typeof ACCEPTANCE_CODES];
 export const ACCEPTANCE = {
   schemaVersion: 1,
+  controlRefillMs:
+    (CONTROL_CAPACITY.peerBurst * CONTROL_CAPACITY.millisecondsPerSecond) /
+    CONTROL_CAPACITY.peerRate,
   origin: 'http://127.0.0.1',
   baseUrl: 'http://127.0.0.1/v1',
   unusedHttpOrigin: 'http://127.0.0.1:1',

@@ -2,6 +2,7 @@
 // Faults cut a native dial or lose an actual native response; no substitute transport executes requests.
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 
 import type { Connection, Endpoint } from '@number0/iroh';
 
@@ -16,6 +17,7 @@ import { FREE_EXECUTION, FREE_STREAM } from '@gyblos/protocol/constants';
 import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
 
 import { acceptanceSelection } from './buyer';
+import { ACCEPTANCE } from './constants';
 import { acceptanceAssert } from './errors';
 import {
   FREE_ACCEPTANCE,
@@ -152,6 +154,12 @@ export async function createFreeBuyer(
             return dependencies.execute(...args);
           },
           select: async (excluded, deadline) => {
+            // Evidence time is accelerated; the product's admission clock is real.
+            // Refill its peer burst before the next synthetic selection instead of
+            // depending on native transport latency or changing production quotas.
+            await delay(ACCEPTANCE.controlRefillMs, undefined, {
+              signal: deadline,
+            });
             const before = generations();
             const attempts = sellers.reduce(
               (sum, seller) => sum + seller.engine.attempts(),
