@@ -722,7 +722,10 @@ load-balanced RPC can only keep a channel `open` (it never makes one look
 unopened), because the command reads the finalized tip first and requires the
 RPC to still serve blocks and ledger back to the open's slot. A journal from
 before this version is read as is: its signed opens can still settle but are
-never reported `never-opened`.
+never reported `never-opened`. The first write saves the journal in the current
+format, which earlier releases refuse (`BUYER_PAYMENT_JOURNAL_UNAVAILABLE`,
+`PAID_RECONCILE_INCOMPLETE`, `PAID_WITHDRAW_INCOMPLETE`), so do not roll back
+the buyer.
 
 The command exits 0 when nothing blocks payments (disputes included, since they
 are recorded and no longer block), 2 while a channel stays open, and 1 when it
@@ -752,9 +755,11 @@ shortest `retryAfterSeconds`:
   because the program would otherwise send the refund to its own treasury.
 - `nothing`: already distributed, or no channel account at the address.
 - `refused`: the account is not this buyer's channel with the journaled rent
-  payer and deposit and the current role's mint and network fee distribution, so
-  nothing was signed for it. Restore the role's mint (or run the release the
-  channel was opened with) and run again.
+  payer, deposit, mint and network fee distribution, so nothing was signed for
+  it. The journal keeps the mint, fee treasury and fee rate each open accepted,
+  so a later change to the role's mint or the network fee does not affect
+  channels already open. Entries journaled before that use the current role's
+  mint and fee; for those, restore the role's mint and run again.
 - `failed`: this channel's step failed with the static code in `failure`
   (`UPTO_UNAVAILABLE` for the RPC, `UPTO_CHAIN_REJECTED` when the chain or its
   preflight refused the transaction, which also happens when an earlier

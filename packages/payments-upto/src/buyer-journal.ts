@@ -4,6 +4,7 @@
 import { isAddress } from '@solana/kit';
 
 import {
+  PAYMENT_BINDING,
   PAYMENT_CHANNEL_STATES,
   PAYMENT_ERROR_CODES,
   PUBLIC_RECORD_LIMITS,
@@ -21,6 +22,14 @@ import {
 import { BUYER_JOURNAL } from './constants';
 import type { UptoLedgerPaths } from './file-ledger';
 
+// The mint, fee treasury and fee rate an open accepted: its escrow is withdrawn and read with these,
+// whatever the buyer's policy says later.
+export interface UptoJournalPolicy {
+  mint: string;
+  treasury: string;
+  protocolFeeBps: number;
+}
+
 export interface UptoJournalEntry {
   requestDigest: string;
   // Null until the open is signed; an entry without one never left the buyer.
@@ -30,6 +39,8 @@ export interface UptoJournalEntry {
   payTo: string;
   feePayer: string;
   maxAtomic: string;
+  // Null for an entry journaled before version 3, which is read with the buyer's current policy.
+  policy: UptoJournalPolicy | null;
   // The open's slot (a seed of its channel address) and the last block height its blockhash allows:
   // past that height an open that never landed never will.
   openSlot: string;
@@ -67,6 +78,7 @@ const FIELDS = [
   'payTo',
   'feePayer',
   'maxAtomic',
+  'policy',
   'openSlot',
   'lastValidBlockHeight',
   'expiresAt',
@@ -96,24 +108,53 @@ function atomic(value: unknown): string {
   return BigInt(amount) <= U64_MAX ? amount : unavailable();
 }
 
-// Legacy (version 1) entries had no open slot or blockhash lifetime.
-const V1_FIELDS = FIELDS.filter(
+// A fee rate any terms may carry.
+function feeBps(value: unknown): number {
+  return Number.isInteger(value) &&
+    typeof value === 'number' &&
+    value >= 0 &&
+    value <= PAYMENT_BINDING.maxFeeBps
+    ? value
+    : unavailable();
+}
+const POLICY_FIELDS = 3;
+function policy(value: unknown): UptoJournalPolicy | null {
+  if (value === null) return null;
+  if (!isRecord(value) || Object.keys(value).length !== POLICY_FIELDS)
+    unavailable();
+  return {
+    mint: address(value.mint),
+    treasury: address(value.treasury),
+    protocolFeeBps: feeBps(value.protocolFeeBps),
+  };
+}
+
+// Version 2 entries had no policy; version 1 entries had no open slot or blockhash lifetime either.
+const V2_FIELDS = FIELDS.filter((field) => field !== 'policy');
+const V1_FIELDS = V2_FIELDS.filter(
   (field) => field !== 'openSlot' && field !== 'lastValidBlockHeight',
 );
 // A version 1 signed entry can still settle but is never proven unopened: its blockhash lifetime is
 // unknown, so it is read as never expiring.
 const V1_UNKNOWN = { openSlot: '0', lastValidBlockHeight: String(U64_MAX) };
+const READ = new Map<number, { fields: readonly string[]; missing: object }>([
+  [BUYER_JOURNAL.version, { fields: FIELDS, missing: {} }],
+  [BUYER_JOURNAL.slotVersion, { fields: V2_FIELDS, missing: { policy: null } }],
+  [
+    BUYER_JOURNAL.legacyVersion,
+    { fields: V1_FIELDS, missing: { ...V1_UNKNOWN, policy: null } },
+  ],
+]);
 
 function entry(value: unknown, version: number): UptoJournalEntry {
-  const legacy = version === BUYER_JOURNAL.legacyVersion;
-  const fields: readonly string[] = legacy ? V1_FIELDS : FIELDS;
+  const read = READ.get(version) ?? unavailable();
   if (
     !isRecord(value) ||
-    Object.keys(value).length !== fields.length ||
-    !fields.every((field) => Object.hasOwn(value, field))
+    Object.keys(value).length !== read.fields.length ||
+    !read.fields.every((field) => Object.hasOwn(value, field))
   )
     return unavailable();
-  return checked(legacy ? { ...value, ...V1_UNKNOWN } : value);
+  return checked({ ...value, ...read.missing });
 }
 
 function checked(value: Record<string, unknown>): UptoJournalEntry {
@@ -130,6 +171,7 @@ function checked(value: Record<string, unknown>): UptoJournalEntry {
     payTo: address(value.payTo),
     feePayer: address(value.feePayer),
     maxAtomic: atomic(value.maxAtomic),
+    policy: policy(value.policy),
     openSlot: atomic(value.openSlot),
     lastValidBlockHeight: atomic(value.lastValidBlockHeight),
     expiresAt: Number(expiresAt),
@@ -150,15 +192,15 @@ function parseJournal(source: string): Map<string, UptoJournalEntry> {
   const version = isRecord(parsed) ? parsed.version : undefined;
   if (
     !isRecord(parsed) ||
-    (version !== BUYER_JOURNAL.version &&
-      version !== BUYER_JOURNAL.legacyVersion) ||
+    typeof version !== 'number' ||
+    !READ.has(version) ||
     Object.keys(parsed).length !== 2 ||
     !Array.isArray(parsed.entries)
   )
     return unavailable();
   const entries = new Map<string, UptoJournalEntry>();
   for (const value of parsed.entries) {
-    const parsedEntry = entry(value, Number(version));
+    const parsedEntry = entry(value, version);
     if (entries.has(parsedEntry.requestDigest)) unavailable();
     // A version 1 open that was never signed never left the buyer: nothing to keep.
     if (
