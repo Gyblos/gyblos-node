@@ -10,6 +10,7 @@ import {
 import { HTTP_STATUS, LOCALHOST, ROUTES } from '@gyblos/config';
 import { createPaypalAgentGateway } from '@gyblos/node/paypal-agent-gateway';
 
+import { drainAgentResponse } from './paypal-agent-drain';
 import { DESKTOP_PAYPAL_AGENT } from './paypal-agent-model';
 import type { createDesktopPaypalSession } from './paypal-session';
 
@@ -80,7 +81,26 @@ async function dispatch(
       headers[key] = value;
     });
     response.writeHead(result.status, headers);
-    response.end(await result.text());
+    await drainAgentResponse(
+      {
+        end: (text, done) => {
+          response.end(text, done);
+        },
+        onClosed: (done) => {
+          response.once('close', done);
+          response.once('error', done);
+          return () => {
+            response.off('close', done);
+            response.off('error', done);
+          };
+        },
+        destroy: () => {
+          response.destroy();
+        },
+      },
+      await result.text(),
+      DESKTOP_PAYPAL_AGENT.RESPONSE_DRAIN_MS,
+    );
   } catch {
     if (!response.destroyed && !response.writableEnded) {
       response.shouldKeepAlive = false;

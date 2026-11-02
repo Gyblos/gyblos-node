@@ -346,7 +346,7 @@ void test('shutdown waits for an already running inference before closing socket
       messages: [{ role: 'user', content: 'synthetic' }],
       max_tokens: 128,
     }),
-  }).catch(() => undefined);
+  }).then((response) => response.text());
   await started;
   let closed = false;
   const stopping = endpoint.close().then(() => {
@@ -355,7 +355,8 @@ void test('shutdown waits for an already running inference before closing socket
   await Promise.resolve();
   assert.equal(closed, false);
   release();
-  await Promise.all([request, stopping]);
+  const [received] = await Promise.all([request, stopping]);
+  assert.match(received, /synthetic answer/);
   assert.equal(desktop.status().phase, 'message_pending');
   await endpoint.acknowledgePending();
   await desktop.finish();

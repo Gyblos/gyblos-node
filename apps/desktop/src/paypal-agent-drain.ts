@@ -5,9 +5,35 @@ type AgentResponseOutput = {
 };
 
 export function drainAgentResponse(
-  _output: AgentResponseOutput,
-  _text: string,
-  _timeoutMs: number,
+  output: AgentResponseOutput,
+  text: string,
+  timeoutMs: number,
 ): Promise<void> {
-  return Promise.resolve();
+  return new Promise((resolve) => {
+    let finished = false;
+    let detach = () => {};
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const done = () => {
+      if (finished) return;
+      finished = true;
+      if (timer) clearTimeout(timer);
+      detach();
+      resolve();
+    };
+    detach = output.onClosed(done);
+    if (finished) {
+      detach();
+      return;
+    }
+    timer = setTimeout(() => {
+      output.destroy();
+      done();
+    }, timeoutMs);
+    try {
+      output.end(text, done);
+    } catch {
+      output.destroy();
+      done();
+    }
+  });
 }

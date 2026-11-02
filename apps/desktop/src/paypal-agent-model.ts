@@ -10,6 +10,7 @@ export const DESKTOP_PAYPAL_AGENT = {
   MODEL_CHARACTERS: 128,
   MODEL: 'gpt-oss:20b',
   POLL_MS: 2000,
+  RESPONSE_DRAIN_MS: 10_000,
 } as const;
 export const PAYPAL_AGENT_ACTION = {
   STATUS: 'status',

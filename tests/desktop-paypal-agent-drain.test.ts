@@ -9,11 +9,23 @@ void test('a response is not considered drained until the write callback fires',
   let destroyed = false;
   let done = false;
   const output = {
-    end(_text: string, callback: () => void) { finish = callback; },
-    onClosed(callback: () => void) { closed = callback; return () => { closed = () => {}; }; },
-    destroy() { destroyed = true; closed(); },
+    end(_text: string, callback: () => void) {
+      finish = callback;
+    },
+    onClosed(callback: () => void) {
+      closed = callback;
+      return () => {
+        closed = () => {};
+      };
+    },
+    destroy() {
+      destroyed = true;
+      closed();
+    },
   };
-  const pending = drainAgentResponse(output, 'synthetic', 5000).then(() => { done = true; });
+  const pending = drainAgentResponse(output, 'synthetic', 5000).then(() => {
+    done = true;
+  });
   await Promise.resolve();
   assert.equal(done, false);
   assert.equal(destroyed, false);
@@ -28,9 +40,39 @@ void test('a stalled response is closed after the bounded drain period', async (
   let destroyed = false;
   const output = {
     end(_text: string, _callback: () => void) {},
-    onClosed(callback: () => void) { closed = callback; return () => { closed = () => {}; }; },
-    destroy() { destroyed = true; closed(); },
+    onClosed(callback: () => void) {
+      closed = callback;
+      return () => {
+        closed = () => {};
+      };
+    },
+    destroy() {
+      destroyed = true;
+      closed();
+    },
   };
   await drainAgentResponse(output, 'synthetic', 5);
   assert.equal(destroyed, true);
+});
+
+void test('a disconnected client releases the pending write without confirming receipt', async () => {
+  let closed = () => {};
+  let destroyed = false;
+  const output = {
+    end(_text: string, _callback: () => void) {},
+    onClosed(callback: () => void) {
+      closed = callback;
+      return () => {
+        closed = () => {};
+      };
+    },
+    destroy() {
+      destroyed = true;
+      closed();
+    },
+  };
+  const pending = drainAgentResponse(output, 'synthetic', 5000);
+  closed();
+  await pending;
+  assert.equal(destroyed, false);
 });
