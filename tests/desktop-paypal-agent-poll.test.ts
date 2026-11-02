@@ -23,7 +23,10 @@ void test('a timed-out status is discarded while a new bounded check can recover
       calls += 1;
       return calls === 1 ? pending : 'fresh';
     },
-    (value) => { updates.push(value); received(value); },
+    (value) => {
+      updates.push(value);
+      received(value);
+    },
     timedOut,
     15,
   );
@@ -52,13 +55,25 @@ void test('a stuck status channel cannot create unbounded pending requests', asy
   let timeouts = 0;
   let first = () => {};
   let second = () => {};
-  const firstTimeout = new Promise<void>((resolve) => { first = resolve; });
-  const secondTimeout = new Promise<void>((resolve) => { second = resolve; });
-  const poll = createPaypalAgentStatusPoll(() => { calls += 1; return new Promise<string>(() => {}); }, () => {}, () => {
-    timeouts += 1;
-    if (timeouts === 1) first();
-    if (timeouts === 2) second();
-  }, 15);
+  const firstTimeout = new Promise<void>((resolve) => {
+    first = resolve;
+  });
+  const secondTimeout = new Promise<void>((resolve) => {
+    second = resolve;
+  });
+  const poll = createPaypalAgentStatusPoll(
+    () => {
+      calls += 1;
+      return new Promise<string>(() => {});
+    },
+    () => {},
+    () => {
+      timeouts += 1;
+      if (timeouts === 1) first();
+      if (timeouts === 2) second();
+    },
+    15,
+  );
   poll.poll();
   await firstTimeout;
   poll.poll();
@@ -91,4 +106,18 @@ void test('stopping a status poll prevents late updates', async () => {
   release('late');
   await new Promise<void>((resolve) => setImmediate(resolve));
   assert.equal(updates, 0);
+});
+
+void test('starting a poll records its request before a later disconnect can invalidate it', () => {
+  const events: string[] = [];
+  const poll = createPaypalAgentStatusPoll(
+    async () => { events.push('status started'); return 'synthetic'; },
+    () => {},
+    () => {},
+    15,
+  );
+  poll.poll();
+  events.push('disconnect started');
+  assert.deepEqual(events, ['status started', 'disconnect started']);
+  poll.stop();
 });
