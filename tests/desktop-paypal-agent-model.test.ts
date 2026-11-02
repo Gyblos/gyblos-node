@@ -18,11 +18,25 @@ void test('OpenCode configuration uses an environment variable instead of embedd
   assert.doesNotMatch(config, /synthetic-secret-key/);
   const parsed: unknown = JSON.parse(config);
   assert.ok(parsed && typeof parsed === 'object' && 'provider' in parsed);
-  assert.ok(parsed.provider && typeof parsed.provider === 'object' && 'gyblos' in parsed.provider);
-  assert.ok(parsed.provider.gyblos && typeof parsed.provider.gyblos === 'object' && 'models' in parsed.provider.gyblos);
-  assert.ok(parsed.provider.gyblos.models && typeof parsed.provider.gyblos.models === 'object' && 'synthetic-model' in parsed.provider.gyblos.models);
+  assert.ok(
+    parsed.provider &&
+      typeof parsed.provider === 'object' &&
+      'gyblos' in parsed.provider,
+  );
+  assert.ok(
+    parsed.provider.gyblos &&
+      typeof parsed.provider.gyblos === 'object' &&
+      'models' in parsed.provider.gyblos,
+  );
+  assert.ok(
+    parsed.provider.gyblos.models &&
+      typeof parsed.provider.gyblos.models === 'object' &&
+      'synthetic-model' in parsed.provider.gyblos.models,
+  );
   assert.deepEqual(parsed.provider.gyblos.models['synthetic-model'], {
-    name: 'synthetic-model', limit: { context: 8192, output: 512 },
+    name: 'synthetic-model',
+    tool_call: true,
+    limit: { context: 8192, output: 512 },
   });
 });
 
