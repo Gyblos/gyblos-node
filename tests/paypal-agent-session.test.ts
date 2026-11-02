@@ -282,6 +282,32 @@ void test('the agent cannot select another model or conflicting output limits', 
   assert.deepEqual(f.calls, ['create', 'authorize']);
 });
 
+void test('engine-specific limits are checked before journaling an agent attempt', async () => {
+  const f = fixture();
+  const agentEngine = {
+    model: 'synthetic-model',
+    validate(input: unknown) {
+      assert.ok(input && typeof input === 'object' && 'max_tokens' in input);
+      if (input.max_tokens !== 128) throw new Error('unsupported output limit');
+    },
+    async generate() {
+      f.calls.push('agent-generate');
+      return completion(1);
+    },
+  };
+  const session = await createPaypalSession({ ...f, agentEngine });
+  const order = await session.create();
+  await session.approve(order.orderId);
+  const before = f.getState();
+  await assert.rejects(session.agentMessage(order.orderId, {
+    model: 'synthetic-model',
+    messages: [{ role: 'user', content: 'synthetic request' }],
+    max_tokens: 1024,
+  }, 'MESSAGE1'));
+  assert.deepEqual(f.getState(), before);
+  assert.deepEqual(f.calls, ['create', 'authorize']);
+});
+
 void test('chat and agent turns share the same authorization and pending-response lock', async () => {
   const f = fixture();
   const agentEngine = {
