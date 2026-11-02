@@ -12,15 +12,12 @@ import {
   createUptoSeller,
   createUptoVerifier,
   UPTO_COMMITMENT,
-  UPTO_SOLANA_NAMESPACE,
-  UPTO_SOLANA_REFERENCE_LENGTH,
   uptoChannelRpc,
   UptoError,
   type UptoKitRpc,
   type UptoRecipientAccountsRpc,
 } from 'x402-upto-metered';
 
-import { TIMEOUTS } from '@gyblos/config';
 import { PAYMENT_ERROR_CODES } from '@gyblos/protocol/constants';
 import {
   PaymentError,
@@ -31,6 +28,7 @@ import {
 import { LEDGER_FILE, UPTO_SELLER } from './constants';
 import { openUptoFileLedger, type UptoLedgerPaths } from './file-ledger';
 import { assertPaymentNetworkEnabled } from './mainnet';
+import { verifySellerNetwork, type SellerGenesisRpc } from './seller-network';
 import { createUptoPaymentServer } from './server';
 import { uptoSellerTerms, type UptoChannelSettings } from './terms';
 
@@ -47,10 +45,8 @@ export interface UptoSellerPaymentsOptions {
   now?: () => number;
   // Tests inject a double; production reads the chain at rpcUrl.
   rpc?: UptoKitRpc &
-    UptoRecipientAccountsRpc & {
-      getGenesisHash(): {
-        send(config?: { abortSignal: AbortSignal }): Promise<string>;
-      };
+    UptoRecipientAccountsRpc &
+    SellerGenesisRpc & {
       getSlot(config: { commitment: typeof UPTO_COMMITMENT }): {
         send(): Promise<bigint>;
       };
@@ -70,7 +66,7 @@ export async function openUptoSellerPayments(
 ): Promise<UptoSellerPayments> {
   const description = { ...options.description };
   const settings = { ...options.settings };
-  const { feePayer, authorizer } = options;
+  const { feePayer, authorizer, rpcUrl } = options;
   assertPaymentNetworkEnabled(description.network);
   const now = options.now ?? Date.now;
   const own = uptoSellerTerms(description, settings);
@@ -80,23 +76,8 @@ export async function openUptoSellerPayments(
   )
     // Keys that cannot sign for this description would only fail later, on a buyer's deposit.
     throw new PaymentError(PAYMENT_ERROR_CODES.UNTRUSTED_TERMS);
-  const rpc = options.rpc ?? createSolanaRpc(options.rpcUrl);
-  const [namespace, reference, ...rest] = own.network.split(':');
-  let genesis: string;
-  try {
-    genesis = await rpc.getGenesisHash().send({
-      abortSignal: AbortSignal.timeout(TIMEOUTS.rpc),
-    });
-  } catch {
-    throw new PaymentError(PAYMENT_ERROR_CODES.UNAVAILABLE);
-  }
-  if (
-    namespace !== UPTO_SOLANA_NAMESPACE ||
-    reference?.length !== UPTO_SOLANA_REFERENCE_LENGTH ||
-    rest.length !== 0 ||
-    String(genesis).slice(0, UPTO_SOLANA_REFERENCE_LENGTH) !== reference
-  )
-    throw new PaymentError(PAYMENT_ERROR_CODES.UNTRUSTED_TERMS);
+  const rpc = options.rpc ?? createSolanaRpc(rpcUrl);
+  await verifySellerNetwork(rpc, own.network);
   const ledger = await openUptoFileLedger({
     paths: options.paths,
     now,
@@ -119,7 +100,7 @@ export async function openUptoSellerPayments(
         : error;
     });
     const facilitator = createUptoFacilitator(
-      toFacilitatorSvmSigner(feePayer, { defaultRpcUrl: options.rpcUrl }),
+      toFacilitatorSvmSigner(feePayer, { defaultRpcUrl: rpcUrl }),
       ledger.chain,
     );
     const readers = createUptoChannelReaders(uptoChannelRpc(rpc), {

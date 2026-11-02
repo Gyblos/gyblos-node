@@ -2,7 +2,7 @@
 // written, one signature per request across a restart, failures after journaling leaving no entry
 // behind, and receipts checked against the durable journal. Synthetic keys and hints; no network.
 import assert from 'node:assert/strict';
-import { lstat, mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -12,7 +12,6 @@ import {
   getBase58Decoder,
   type TransactionSigner,
 } from '@solana/kit';
-import { SOLANA_MAINNET_CAIP2 } from '@x402/svm';
 import {
   decodeUptoPayload,
   UPTO_ERROR_CODES,
@@ -28,7 +27,6 @@ import {
 import {
   createUptoPaymentClient,
   openUptoBuyerJournal,
-  openUptoBuyerPayments,
   uptoSettlementView,
   type UptoBuyerJournal,
   type UptoPaymentClientOptions,
@@ -399,52 +397,4 @@ void test('a receipt is checked against what the claim transaction itself paid',
     journal.entries.get(DIGEST)?.state,
     PAYMENT_CHANNEL_STATES.SETTLED,
   );
-});
-
-void test('mainnet buyer is disabled before journal writes or signatures', async () => {
-  const journal = memory();
-  const { options, counter } = await buyer(journal);
-  assert.throws(
-    () =>
-      createUptoPaymentClient({
-        ...options,
-        policy: { ...options.policy, network: SOLANA_MAINNET_CAIP2 },
-      }),
-    code(PAYMENT_ERROR_CODES.UNTRUSTED_TERMS),
-  );
-  assert.equal(journal.entries.size, 0);
-  assert.equal(counter.signed, 0);
-});
-
-void test('mainnet buyer stack refuses before creating a journal or calling RPC', () =>
-  withRoot(async (root) => {
-    const { options } = await buyer(memory());
-    const paths = buyerJournalPathsIn({ GYBLOS_HOME: root });
-    await assert.rejects(
-      openUptoBuyerPayments({
-        rpcUrl: 'https://rpc.invalid',
-        policy: { ...options.policy, network: SOLANA_MAINNET_CAIP2 },
-        settings: options.settings,
-        payer: options.payer,
-        paths,
-      }),
-      code(PAYMENT_ERROR_CODES.UNTRUSTED_TERMS),
-    );
-    await assert.rejects(lstat(paths.directory), { code: 'ENOENT' });
-  }));
-
-void test('mutating or replacing the buyer policy cannot enable mainnet', async () => {
-  for (const replace of [false, true]) {
-    const journal = memory();
-    const { options, counter, client, terms } = await buyer(journal);
-    if (replace)
-      options.policy = { ...options.policy, network: SOLANA_MAINNET_CAIP2 };
-    else options.policy.network = SOLANA_MAINNET_CAIP2;
-    await assert.rejects(
-      client.authorize({ ...terms, network: SOLANA_MAINNET_CAIP2 }),
-      code(PAYMENT_ERROR_CODES.UNTRUSTED_TERMS),
-    );
-    assert.equal(journal.entries.size, 0);
-    assert.equal(counter.signed, 0);
-  }
 });

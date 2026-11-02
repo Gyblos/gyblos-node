@@ -262,7 +262,7 @@ export function createUptoPaymentClient(
         maxAtomic: entry.maxAtomic,
         payTo: entry.payTo,
       };
-      const onChain = await options
+      const onChain = await fixed
         .confirm(settlement, channel)
         .catch(() => fail(PAYMENT_ERROR_CODES.UNAVAILABLE));
       if (
