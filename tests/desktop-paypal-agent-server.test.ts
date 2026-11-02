@@ -1,0 +1,50 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+
+import { startDesktopPaypalAgent } from '@gyblos/desktop/paypal-agent-server';
+import { createDesktopPaypalSession } from '@gyblos/desktop/paypal-session';
+import { createPaypalSession } from '@gyblos/node/paypal-session';
+
+import { fixture } from './support/paypal-session-fixture';
+
+void test('a local agent connects through a key and shares the sandbox authorization', async () => {
+  const f = fixture();
+  const agentEngine = {
+    model: 'synthetic-model',
+    async generate() {
+      f.calls.push('agent-generate');
+      return {
+        id: 'synthetic',
+        object: 'chat.completion',
+        created: 0,
+        model: 'synthetic-model',
+        choices: [{ index: 0, message: { role: 'assistant', content: 'synthetic answer' }, finish_reason: 'stop' }],
+        usage: { prompt_tokens: 2, completion_tokens: 3, total_tokens: 5 },
+      };
+    },
+  };
+  const session = await createPaypalSession({ ...f, agentEngine });
+  const desktop = createDesktopPaypalSession(session, async () => {});
+  await desktop.create();
+  await desktop.approve();
+  const agent = await startDesktopPaypalAgent(desktop, agentEngine.model);
+  try {
+    const endpoint = `${agent.url}/chat/completions`;
+    const request = {
+      model: agentEngine.model,
+      messages: [{ role: 'user', content: 'synthetic request' }],
+      max_tokens: 128,
+    };
+    const headers = { authorization: `Bearer ${agent.key}`, 'content-type': 'application/json' };
+    assert.equal((await fetch(endpoint, { method: 'POST', headers: { ...headers, authorization: 'Bearer wrong' }, body: JSON.stringify(request) })).status, 401);
+    const response = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify(request) });
+    assert.equal(response.status, 200);
+    assert.equal(agent.hasPending(), true);
+    await assert.rejects(desktop.finish());
+    await agent.acknowledgePending();
+    assert.equal((await desktop.finish()).spentCents, 10);
+    assert.deepEqual(f.calls, ['create', 'authorize', 'agent-generate', 'capture:10']);
+  } finally {
+    await agent.close();
+  }
+});
