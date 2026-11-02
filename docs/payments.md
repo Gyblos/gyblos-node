@@ -1,6 +1,7 @@
 # Payments
 
-All payments use the official `@x402/*` SDK (pinned to 2.28.0) on Solana devnet.
+The x402 integration uses the official SDK on Solana devnet: core, Express and
+fetch are pinned to 2.29.0, while SVM remains at 2.28.0 with the local patch.
 Amounts are in atomic units of a six-decimal token.
 
 ## Two schemes

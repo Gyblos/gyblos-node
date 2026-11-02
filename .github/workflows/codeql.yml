@@ -19,6 +19,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
+      # CodeQL reads workflow-run metadata when uploading from private repos.
+      actions: read
       contents: read
       security-events: write
     steps:
