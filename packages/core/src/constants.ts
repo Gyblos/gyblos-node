@@ -199,3 +199,6 @@ export type ReceiptCollectorStatus =
 
 // Hex radix for the private pair fingerprint, not a wire/signing domain.
 export const RECEIPT_COLLECTOR_FINGERPRINT_RADIX = 16;
+
+// Pilot ceiling in atomic units of six-decimal USDC; applies to one channel deposit.
+export const MAINNET_PILOT_MAX_USDC_ATOMIC = '1000000';
