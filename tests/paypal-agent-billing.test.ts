@@ -152,19 +152,41 @@ void test('a repeated unkeyed agent request is rejected without generating or ch
 
 void test('reordered JSON tool arguments do not bypass duplicate request detection', async () => {
   const f = fixture();
-  const agentEngine = { model, async generate() { f.calls.push('agent-generate'); return completion(); } };
+  const agentEngine = {
+    model,
+    async generate() {
+      f.calls.push('agent-generate');
+      return completion();
+    },
+  };
   const session = await createPaypalSession({ ...f, agentEngine });
   const order = await session.create();
   await session.approve(order.orderId);
   function input(args: string) {
-    return { model, max_tokens: 64, messages: [
-      { role: 'user', content: 'synthetic' },
-      { role: 'assistant', content: null, tool_calls: [{ id: 'call1', type: 'function', function: { name: 'read', arguments: args } }] },
-      { role: 'tool', tool_call_id: 'call1', content: 'synthetic result' },
-    ] };
+    return {
+      model,
+      max_tokens: 64,
+      messages: [
+        { role: 'user', content: 'synthetic' },
+        {
+          role: 'assistant',
+          content: null,
+          tool_calls: [
+            {
+              id: 'call1',
+              type: 'function',
+              function: { name: 'read', arguments: args },
+            },
+          ],
+        },
+        { role: 'tool', tool_call_id: 'call1', content: 'synthetic result' },
+      ],
+    };
   }
   await session.agentMessage(order.orderId, input('{"x":1,"y":2}'), 'AGENT1');
-  await assert.rejects(session.agentMessage(order.orderId, input('{ "y":2, "x":1 }'), 'AGENT2'));
+  await assert.rejects(
+    session.agentMessage(order.orderId, input('{ "y":2, "x":1 }'), 'AGENT2'),
+  );
   assert.equal(session.status().spentCents, 10);
   assert.deepEqual(f.calls, ['create', 'authorize', 'agent-generate']);
 });

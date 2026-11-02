@@ -11,6 +11,7 @@ import {
 import { DESKTOP_PAYPAL_AGENT } from '../paypal-agent-model';
 import { PaypalChatController } from '../paypal-chat';
 import {
+  paypalDollars as dollars,
   PAYPAL_DESKTOP_ERROR,
   paypalFailure,
   type PaypalRequest,
@@ -28,8 +29,6 @@ declare global {
 
 type Snapshot = ReturnType<PaypalChatController['getSnapshot']>;
 type ChatProps = { chat: PaypalChatController; state: Snapshot };
-const dollars = (cents: number) =>
-  `USD ${(cents / PAYPAL_SANDBOX.centsPerDollar).toFixed(2)}`;
 
 function uncertain(state: Snapshot) {
   const phase = state.status?.phase;
@@ -166,11 +165,12 @@ function SessionPanel({ chat, state }: ChatProps) {
         </p>
       )}
       <p>
-        Sandbox sessions authorize up to USD 1 in test funds. Each completed
-        agent inference uses USD 0.10, even if the response cannot be delivered.
-        One instruction can require multiple inferences. An inference already
-        started can finish and count after the agent disconnects. Closing the
-        session captures the recorded usage.
+        Sandbox sessions authorize up to {dollars(PAYPAL_SANDBOX.limitCents)} in
+        test funds. Each completed agent inference uses{' '}
+        {dollars(PAYPAL_SANDBOX.messageCents)}, even if the response cannot be
+        delivered. One instruction can require multiple inferences. An inference
+        already started can finish and count after the agent disconnects.
+        Closing the session captures the recorded usage.
       </p>
       {phase === PAYPAL_SESSION_PHASE.COMPLETED && (
         <p>Sandbox payment captured for recorded usage.</p>

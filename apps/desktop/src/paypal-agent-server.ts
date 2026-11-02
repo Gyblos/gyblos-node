@@ -112,7 +112,8 @@ async function dispatch(
 export async function startDesktopPaypalAgent(service: Service, model: string) {
   const scope = service.agentScope();
   if (!scope) throw new Error('A fresh agent session is required.');
-  const isCurrent = () => service.agentScope() === scope;
+  let closing = false;
+  const isCurrent = () => !closing && service.agentScope() === scope;
   const scopedService = {
     sendAgent: (
       input: unknown,
@@ -125,7 +126,6 @@ export async function startDesktopPaypalAgent(service: Service, model: string) {
   };
   let origin = '';
   let gateway: Gateway | undefined;
-  let closing = false;
   let inFlight = 0;
   const server = createServer((request, response) => {
     if (!gateway || closing || !isCurrent()) {

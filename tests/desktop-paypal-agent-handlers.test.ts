@@ -11,6 +11,9 @@ void test('only the desktop main frame can request agent connection details', as
     url: 'http://127.0.0.1:12345/v1',
     key: 'synthetic-key',
     model: 'synthetic-model',
+    spentCents: 0,
+    limitCents: 100,
+    usageUncertain: false,
   };
   const access = {
     status: () => connection,

@@ -147,13 +147,7 @@ function agentError(reason: unknown) {
     reason instanceof PaypalError
       ? reason.code
       : PAYPAL_ERROR_CODES.UNAVAILABLE;
-  return error(
-    code === PAYPAL_ERROR_CODES.INVALID_REQUEST ||
-      code === PAYPAL_ERROR_CODES.DUPLICATE_REQUEST
-      ? HTTP_STATUS.badRequest
-      : HTTP_STATUS.conflict,
-    code,
-  );
+  return error(HTTP_STATUS.badRequest, code);
 }
 
 function modelList(model: string) {

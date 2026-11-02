@@ -263,6 +263,41 @@ export function validatePaypalAgentResult(
   return row;
 }
 
+function stableJson(value: unknown) {
+  const text = JSON.stringify(value, (_key: string, entry: unknown) => {
+    if (typeof entry === 'number' && !Number.isFinite(entry)) invalid();
+    if (entry && typeof entry === 'object' && !Array.isArray(entry))
+      return Object.fromEntries(
+        Object.entries(entry).sort(([left], [right]) =>
+          left < right ? -1 : left > right ? 1 : 0,
+        ),
+      );
+    return entry;
+  });
+  if (text === undefined) return invalid();
+  return text;
+}
+function digestMessages(value: unknown) {
+  if (!Array.isArray(value)) return invalid();
+  return value.map((item: unknown) => {
+    const row = fields(item);
+    if (
+      row.role !== AGENT_CHAT.ROLES.ASSISTANT ||
+      !Array.isArray(row.tool_calls)
+    )
+      return row;
+    return {
+      ...row,
+      tool_calls: row.tool_calls.map((entry: unknown) => {
+        const call = fields(entry);
+        const fn = fields(call.function);
+        if (typeof fn.arguments !== 'string') return invalid();
+        const args: unknown = JSON.parse(fn.arguments);
+        return { ...call, function: { ...fn, arguments: stableJson(args) } };
+      }),
+    };
+  });
+}
 export function preparePaypalAgentRequest(input: unknown, model: string) {
   let serialized: string | undefined;
   try {
@@ -285,18 +320,10 @@ export function preparePaypalAgentRequest(input: unknown, model: string) {
     stream_options: _streamOptions,
     ...inference
   } = normalized;
-  const normalizedBytes = JSON.stringify(
-    inference,
-    (_key: string, entry: unknown) => {
-      if (entry && typeof entry === 'object' && !Array.isArray(entry))
-        return Object.fromEntries(
-          Object.entries(entry).sort(([left], [right]) =>
-            left < right ? -1 : left > right ? 1 : 0,
-          ),
-        );
-      return entry;
-    },
-  );
+  const normalizedBytes = stableJson({
+    ...inference,
+    messages: digestMessages(inference.messages),
+  });
   return {
     input: normalized,
     digest: createHash('sha256')

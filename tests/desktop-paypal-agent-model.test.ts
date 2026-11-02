@@ -51,14 +51,24 @@ void test('OpenCode configuration uses an environment variable instead of embedd
 
 void test('a failed status check preserves an existing connection until status is known', () => {
   const connection = {
-    url: 'http://127.0.0.1:12345/v1', key: 'a'.repeat(43), model: 'synthetic-model',
-    spentCents: 20, limitCents: 100, usageUncertain: false,
+    url: 'http://127.0.0.1:12345/v1',
+    key: 'a'.repeat(43),
+    model: 'synthetic-model',
+    spentCents: 20,
+    limitCents: 100,
+    usageUncertain: false,
   };
   const previous = { connection, error: null };
   const unknown = retainPaypalAgentStatus(previous, undefined);
   assert.deepEqual(unknown, { result: previous, unavailable: true });
-  const recovered = retainPaypalAgentStatus(previous, { connection: null, error: null });
-  assert.deepEqual(recovered, { result: { connection: null, error: null }, unavailable: false });
+  const recovered = retainPaypalAgentStatus(previous, {
+    connection: null,
+    error: null,
+  });
+  assert.deepEqual(recovered, {
+    result: { connection: null, error: null },
+    unavailable: false,
+  });
 });
 
 void test('IPC result rejects external connection URLs and malformed keys', () => {
@@ -66,6 +76,9 @@ void test('IPC result rejects external connection URLs and malformed keys', () =
     url: 'http://127.0.0.1:12345/v1',
     key: 'a'.repeat(43),
     model: 'synthetic-model',
+    spentCents: 0,
+    limitCents: 100,
+    usageUncertain: false,
   };
   assert.deepEqual(
     parsePaypalAgentResult({ connection, error: null }).connection,

@@ -1,15 +1,19 @@
 // Guides one OpenCode connection to the existing local PayPal Sandbox session.
 import { useEffect, useRef, useState } from 'react';
 
+import { PAYPAL_SANDBOX } from '@gyblos/config/constants';
+
 import {
   agentFailure,
   DESKTOP_PAYPAL_AGENT,
   opencodeConfig,
   PAYPAL_AGENT_ACTION,
   paypalAgentErrorMessage,
+  retainPaypalAgentStatus,
   type PaypalAgentAction,
   type PaypalAgentResult,
 } from '../paypal-agent-model';
+import { paypalDollars } from '../paypal-model';
 import { writeClipboardText } from './clipboard';
 import { BUTTON_VARIANT, COPY_RESULT } from './constants';
 import { Badge, Button, Note } from './UI';
@@ -22,6 +26,14 @@ declare global {
   }
 }
 
+function actionFailure(
+  action: PaypalAgentAction,
+  error: PaypalAgentResult['error'],
+) {
+  return action === PAYPAL_AGENT_ACTION.DISCONNECT
+    ? 'Could not confirm disconnection. The agent may still be connected; try again.'
+    : paypalAgentErrorMessage(error);
+}
 function usePaypalAgentConnection() {
   const [result, setResult] = useState<PaypalAgentResult>({
     connection: null,
@@ -29,6 +41,7 @@ function usePaypalAgentConnection() {
   });
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
+  const [statusUnavailable, setStatusUnavailable] = useState(false);
   const busyRef = useRef(false);
   const sequence = useRef(0);
   const mounted = useRef(false);
@@ -41,8 +54,10 @@ function usePaypalAgentConnection() {
       const next = await window.desktopPaypalAgent
         ?.run({ action: PAYPAL_AGENT_ACTION.STATUS })
         .catch(() => agentFailure());
-      if (mounted.current && request === sequence.current && next)
-        setResult(next);
+      if (mounted.current && request === sequence.current) {
+        setResult((previous) => retainPaypalAgentStatus(previous, next).result);
+        setStatusUnavailable(!next || !!next.error);
+      }
     }
     void refresh();
     const interval = window.setInterval(() => {
@@ -59,17 +74,25 @@ function usePaypalAgentConnection() {
     busyRef.current = true;
     sequence.current += 1;
     setBusy(true);
-    setNotice('');
+    setNotice(
+      action === PAYPAL_AGENT_ACTION.DISCONNECT
+        ? 'Disconnecting. An inference already started can finish and count.'
+        : '',
+    );
     try {
       const next = await window.desktopPaypalAgent?.run({ action });
       if (!mounted.current) return;
-      setResult(next ?? agentFailure());
+      setResult((previous) => retainPaypalAgentStatus(previous, next).result);
+      setStatusUnavailable(!next || !!next.error);
       if (!next || next.error)
-        setNotice(paypalAgentErrorMessage(next?.error ?? null));
+        setNotice(actionFailure(action, next?.error ?? null));
+      else setNotice('');
     } catch {
       if (mounted.current) {
-        setResult(agentFailure());
-        setNotice('The local connection is unavailable.');
+        setStatusUnavailable(true);
+        setNotice(
+          'The local connection is unavailable; the agent may still be connected.',
+        );
       }
     } finally {
       busyRef.current = false;
@@ -86,7 +109,7 @@ function usePaypalAgentConnection() {
           : 'Clipboard unavailable. Copy the values below.',
       );
   }
-  return { connection, busy, notice, run, copy };
+  return { connection, busy, notice, statusUnavailable, run, copy };
 }
 
 type Connection = NonNullable<PaypalAgentResult['connection']>;
@@ -182,13 +205,44 @@ function AgentDetails(props: DetailProps) {
   );
 }
 
+function AgentUsage({
+  connection,
+  statusUnavailable,
+}: {
+  connection: PaypalAgentResult['connection'];
+  statusUnavailable: boolean;
+}) {
+  return (
+    <>
+      {statusUnavailable && (
+        <p role="status">
+          The connection status cannot be checked. A prior connection may still
+          be active.
+        </p>
+      )}
+      {connection &&
+        (connection.usageUncertain ? (
+          <p>
+            Usage may change or need review. Check the PayPal session in Chat.
+          </p>
+        ) : (
+          <p>
+            Session maximum: {paypalDollars(connection.limitCents)} · Recorded
+            usage: {paypalDollars(connection.spentCents)} · Remaining:{' '}
+            {paypalDollars(connection.limitCents - connection.spentCents)}
+          </p>
+        ))}
+    </>
+  );
+}
 export function PaypalAgentConnection({
   onlyConnected = false,
 }: {
   onlyConnected?: boolean;
 }) {
-  const { connection, busy, notice, run, copy } = usePaypalAgentConnection();
-  if (onlyConnected && !connection) return null;
+  const { connection, busy, notice, statusUnavailable, run, copy } =
+    usePaypalAgentConnection();
+  if (onlyConnected && !connection && !statusUnavailable) return null;
   return (
     <section
       className="paypal-session"
@@ -203,16 +257,21 @@ export function PaypalAgentConnection({
         chat. Keep Gyblos open while the tool runs.
       </p>
       <p>
-        Approve a session in Chat first. Each completed agent inference uses USD
-        0.10 of the session limit, even if delivery fails. One instruction can
-        require several inferences. A started inference can finish and count
-        after OpenCode disconnects. Settle the session in Chat when finished.
+        Approve a session in Chat first. Each completed agent inference uses{' '}
+        {paypalDollars(PAYPAL_SANDBOX.messageCents)} of the session limit, even
+        if delivery fails. One instruction can require several inferences. A
+        started inference can finish and count after OpenCode disconnects.
+        Settle the session in Chat when finished.
       </p>
       <p>
         An identical request without an operation key may be rejected to avoid a
         repeated charge. OpenCode does not currently send such a key.
       </p>
-      {!connection && (
+      <AgentUsage
+        connection={connection}
+        statusUnavailable={statusUnavailable}
+      />
+      {!connection && !onlyConnected && (
         <Button
           variant={BUTTON_VARIANT.PRIMARY}
           disabled={busy}

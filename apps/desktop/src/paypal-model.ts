@@ -12,6 +12,9 @@ const PAYPAL_RENDER_LIMITS = {
   modelCharacters: 128,
   responseCharacters: 1_000_000,
 } as const;
+export function paypalDollars(cents: number) {
+  return `USD ${(cents / PAYPAL_SANDBOX.centsPerDollar).toFixed(2)}`;
+}
 
 export const PAYMENT_METHOD = {
   USDC: 'usdc',

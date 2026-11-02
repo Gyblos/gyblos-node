@@ -1,5 +1,8 @@
 // Owns one local agent endpoint for the lifetime of the desktop sandbox session.
-import { PAYPAL_SESSION_PHASE } from '@gyblos/node/constants';
+import {
+  PAYPAL_SESSION_PHASE,
+  PAYPAL_SESSION_STATUS,
+} from '@gyblos/node/constants';
 
 type Endpoint = {
   url: string;
@@ -10,11 +13,22 @@ type Endpoint = {
   close(): Promise<void>;
 };
 
-function snapshot(endpoint: Endpoint) {
+type SessionStatus = {
+  phase: unknown;
+  expired: boolean;
+  spentCents: number;
+  limitCents: number;
+};
+function snapshot(endpoint: Endpoint, state: SessionStatus) {
   return {
     url: endpoint.url,
     key: endpoint.key,
     model: endpoint.model,
+    spentCents: state.spentCents,
+    limitCents: state.limitCents,
+    usageUncertain:
+      state.phase === PAYPAL_SESSION_STATUS.BLOCKED ||
+      state.phase === PAYPAL_SESSION_PHASE.EXECUTING,
   };
 }
 
@@ -55,7 +69,7 @@ function ensureEndpoint(access: EndpointState, start: () => Promise<Endpoint>) {
 }
 
 export function createDesktopPaypalAgentAccess(
-  status: () => { phase: unknown; expired: boolean },
+  status: () => SessionStatus,
   start: () => Promise<Endpoint>,
 ) {
   const access: EndpointState = { opening: undefined, current: undefined };
@@ -88,12 +102,11 @@ export function createDesktopPaypalAgentAccess(
       state.expired
     )
       throw new Error('An active sandbox session is required.');
-    return snapshot(await ensureEndpoint(access, start));
+    return snapshot(await ensureEndpoint(access, start), status());
   }
   function disconnect() {
     return run(async () => {
       const endpoint = access.opening ? await access.opening : undefined;
-      if (endpoint?.isBusy()) throw new Error('An agent response is pending.');
       await endpoint?.close();
       access.opening = undefined;
       access.current = undefined;
@@ -116,6 +129,6 @@ export function createDesktopPaypalAgentAccess(
     disconnect,
     close,
     status: () =>
-      access.current?.isCurrent() ? snapshot(access.current) : null,
+      access.current?.isCurrent() ? snapshot(access.current, status()) : null,
   };
 }

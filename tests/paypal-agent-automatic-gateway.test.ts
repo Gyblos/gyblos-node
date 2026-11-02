@@ -96,19 +96,48 @@ void test('the agent gateway performs several paid inferences without acknowledg
 void test('an uncertain inference requires review instead of triggering repeated client retries', async () => {
   const f = fixture();
   const model = 'synthetic-model';
-  const agentEngine = { model, async generate() { f.calls.push('agent-generate'); throw new Error('synthetic timeout'); } };
+  const agentEngine = {
+    model,
+    async generate() {
+      f.calls.push('agent-generate');
+      throw new Error('synthetic timeout');
+    },
+  };
   const session = await createPaypalSession({ ...f, agentEngine });
   const order = await session.create();
   await session.approve(order.orderId);
   let counter = 0;
-  const service = { sendAgent: async (input: unknown, signal?: AbortSignal, key?: string) =>
-    session.agentMessage(order.orderId, input, `AGENT${++counter}`, signal, key) };
+  const service = {
+    sendAgent: async (input: unknown, signal?: AbortSignal, key?: string) =>
+      session.agentMessage(
+        order.orderId,
+        input,
+        `AGENT${++counter}`,
+        signal,
+        key,
+      ),
+  };
   const origin = 'http://127.0.0.1:12345';
-  const gateway = createPaypalAgentGateway({ origin, key: 'test-key', model, service });
+  const gateway = createPaypalAgentGateway({
+    origin,
+    key: 'test-key',
+    model,
+    service,
+  });
   function request() {
-    return new Request(`${origin}/v1/chat/completions`, { method: 'POST',
-      headers: { host: '127.0.0.1:12345', authorization: 'Bearer test-key', 'content-type': 'application/json' },
-      body: JSON.stringify({ model, messages: [{ role: 'user', content: 'synthetic' }], max_tokens: 16 }) });
+    return new Request(`${origin}/v1/chat/completions`, {
+      method: 'POST',
+      headers: {
+        host: '127.0.0.1:12345',
+        authorization: 'Bearer test-key',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: 'user', content: 'synthetic' }],
+        max_tokens: 16,
+      }),
+    });
   }
   assert.equal((await gateway.handle(request())).status, 400);
   assert.equal((await gateway.handle(request())).status, 400);

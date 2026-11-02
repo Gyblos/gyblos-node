@@ -1,4 +1,5 @@
 // Validates the desktop's local sandbox agent connection details at the IPC boundary.
+import { PAYPAL_SANDBOX } from '@gyblos/config/constants';
 import { IPV6_LOOPBACK, LOCALHOST } from '@gyblos/config/hosts';
 import { SANDBOX_AGENT_LIMITS } from '@gyblos/config/limits';
 import { ROUTES } from '@gyblos/config/paths';
@@ -48,11 +49,17 @@ export type PaypalAgentResult = {
     url: string;
     key: string;
     model: string;
+    spentCents: number;
+    limitCents: number;
+    usageUncertain: boolean;
   } | null;
   error: (typeof PAYPAL_AGENT_ERROR)[keyof typeof PAYPAL_AGENT_ERROR] | null;
 };
 export function opencodeConfig(
-  connection: NonNullable<PaypalAgentResult['connection']>,
+  connection: Pick<
+    NonNullable<PaypalAgentResult['connection']>,
+    'url' | 'key' | 'model'
+  >,
 ) {
   return JSON.stringify(
     {
@@ -81,6 +88,13 @@ export function opencodeConfig(
     2,
   );
 }
+export function retainPaypalAgentStatus(
+  previous: PaypalAgentResult,
+  next: PaypalAgentResult | undefined,
+) {
+  if (!next || next.error) return { result: previous, unavailable: true };
+  return { result: next, unavailable: false };
+}
 export function agentFailure(
   error: PaypalAgentResult['error'] = PAYPAL_AGENT_ERROR.FAILED,
 ): PaypalAgentResult {
@@ -93,7 +107,11 @@ function fields(value: unknown) {
 }
 function connection(value: unknown): PaypalAgentResult['connection'] {
   const row = fields(value);
-  if (!row || Object.keys(row).sort().join(',') !== 'key,model,url')
+  if (
+    !row ||
+    Object.keys(row).sort().join(',') !==
+      'key,limitCents,model,spentCents,url,usageUncertain'
+  )
     return null;
   if (
     typeof row.url !== 'string' ||
@@ -103,7 +121,13 @@ function connection(value: unknown): PaypalAgentResult['connection'] {
     !/^[A-Za-z0-9_-]+$/.test(row.key) ||
     typeof row.model !== 'string' ||
     !row.model ||
-    row.model.length > DESKTOP_PAYPAL_AGENT.MODEL_CHARACTERS
+    row.model.length > DESKTOP_PAYPAL_AGENT.MODEL_CHARACTERS ||
+    typeof row.spentCents !== 'number' ||
+    !Number.isSafeInteger(row.spentCents) ||
+    row.spentCents < 0 ||
+    row.limitCents !== PAYPAL_SANDBOX.limitCents ||
+    row.spentCents > row.limitCents ||
+    typeof row.usageUncertain !== 'boolean'
   )
     return null;
   const url = new URL(row.url);
@@ -118,7 +142,14 @@ function connection(value: unknown): PaypalAgentResult['connection'] {
     url.hash
   )
     return null;
-  return { url: row.url, key: row.key, model: row.model };
+  return {
+    url: row.url,
+    key: row.key,
+    model: row.model,
+    spentCents: row.spentCents,
+    limitCents: row.limitCents,
+    usageUncertain: row.usageUncertain,
+  };
 }
 export function parsePaypalAgentResult(value: unknown): PaypalAgentResult {
   const row = fields(value);
