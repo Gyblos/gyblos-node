@@ -247,7 +247,7 @@ private offer prices and request price ceilings. Public pricing has
 `unit: "million-tokens"`; v1 retains its `"token"` unit and `inputAtomic` /
 `outputAtomic` keys. The previous per-token v2 shapes and mixed representations
 are rejected, never guessed from values or converted after signature verification.
-This is an intentional update of the not-yet-paid v2 family; v1 wire bytes,
+This is an intentional update of the v2 family; v1 wire bytes,
 APIs, signing domains and vectors remain unchanged. Existing v2 records must be
 reissued with the explicit fields and fresh signatures/digests. Rollout must not
 reuse old retained catalogs as if their prices had the new unit; normal sequence,
@@ -262,14 +262,15 @@ context-token limit; canonical decimal rates and the resulting charge are
 bounded by the existing unsigned 64-bit atomic limit. Arbitrary-precision integer
 intermediates may exceed u64 when the final result fits; overflow of the final
 charge is a static typed limit error, never truncation or floating-point rounding.
-This arithmetic is pure policy, not wired payment execution.
+This helper is pure policy. Paid execution separately applies combined rounding,
+caps the amount at the authorized ceiling, and charges zero if no output was
+delivered or the output count is zero.
 
 USDC-per-million configuration prices map exactly to atomic-per-million rates
 by multiplying by 1,000,000 (at most six decimal places); there is no division
-by token count during this conversion. Seller startup still advertises the
-unchanged PoC v1 rates multiplied by the million-token scale, and the buyer's
-legacy compatibility check compares those exact economic terms. It does not
-convert a signed v2 quote into a v1 offer or enable v2 payments. Selector weights
+by token count during this conversion. Seller startup advertises configured v2
+rates plus the protocol fee. The legacy buyer's v1 compatibility check does not
+convert a signed v2 quote into a v1 offer. Selector weights
 compare the same per-million rate sums (without charge rounding); its minimum
 paid budget covers the once-rounded cost of one input and one output token.
 A quote's total budget remains a ceiling, not a promise that an unknown prompt
@@ -281,8 +282,8 @@ supported paid ALPN. The current paid v1 validator rejects v2. The pure policy
 in `@gyblos/core/control-quotes` (`createControlQuote` for sellers,
 `acceptControlQuote` for buyers) verifies caller-trusted identities, catalog and
 request terms. It does not carry v1 payment checks (payTo distinct from
-owner/feePayer/authorizer, capability and metering requirements); payment
-admission must enforce them when paid v2 is wired. Its caller supplies
+owner/feePayer/authorizer, capability and metering requirements); paid execution
+admission enforces its own checks. Its caller supplies
 engine/readiness snapshots and increments readiness generation when those
 change; no engine or payment adapter runs here.
 Free quotes can be consumed by the separate free-execution service described
@@ -320,9 +321,8 @@ late response is published. The buyer retains at most one pending native dial
 until it settles, closing any late connection after cancellation. A buyer
 client serializes its queries without a queue and reuses one connection.
 
-The seller registers `gyblos/control/1` alongside `gyblos/http/1`. Control
-requests never forward to the paid HTTP bridge, whose strict routes are
-unchanged. Catalogs map the startup-cached, warmed engine identity explicitly
+The seller registers `gyblos/control/1` alongside the configured execution
+channels. Control requests never forward to an execution channel. Catalogs map the startup-cached, warmed engine identity explicitly
 to its public model; only implemented reasoning levels (currently `off`) are
 announced. Busy/readiness state is observed from normal inference lifecycle,
 without querying or loading an engine on the control channel. Catalog and
@@ -333,15 +333,16 @@ refresh them. Quotes neither consume nor reserve capacity.
 `getPresence` and `requestOffer` for one independently chosen/trusted seller.
 It binds the authenticated NodeId, configured relay policy, public signatures,
 catalog digest/sequence and exact quote terms using `acceptControlQuote`.
-This does not wire seller selection, the buyer proxy, paid v2 or free execution.
+This control client alone does not perform seller selection or execution.
 Closing the client closes its connection, not the caller-owned endpoint.
 
 `vectors/control-v2-mtok.json` fixes request framing/digest, all three public records
 and owner-signed offer bytes using an independent Node/OpenSSL oracle. Only
 synthetic public keys/signatures are retained. The historical `control-v2.json`
 is retained unchanged to verify rejection of the previous per-token v2 shape.
-The complete design and rollout
-constraints live in vault GYB-DOC-022, control-contract appendix.
+The control contract and its admission, framing, trust and rollout constraints
+are described in this section. Broader discovery choices remain proposed; see
+[discovery](../../docs/discovery.md) and [limitations](../../docs/limitations.md).
 
 ## Free inference execution v3
 
@@ -547,13 +548,13 @@ canonical bytes and frames come from an independent one-shot Python oracle that
 first reproduced every v2 vector; the oracle is not committed. The v1 vectors,
 control v2 vectors and their domains remain unchanged.
 Each protocol change ships the contract first, then the seller, then the buyer.
-The seller daemon serves only a free offer with its handler and caps present;
-paid selling is off until phase 2.
-Acceptance later covers publication → discovery → selection → free quote →
+Free offers use their own handler and caps; paid offers use a separate paid
+stream when a payment server is configured. Acceptance covers publication → discovery → selection → free quote →
 execution → answer using an in-process index and synthetic engine, including
 replay, expiry, wrong peer, exhausted caps, engine failure and no fallback once
 prompt transmission begins. Real engines, off-host or production runs require
-separate founder authorization. Streaming and paid v2 remain later work.
+separate founder authorization. Free streaming and conditional paid-v2 wiring
+are separate channels; see their runtime documentation for scope and limits.
 
 ### Seller runtime scope
 

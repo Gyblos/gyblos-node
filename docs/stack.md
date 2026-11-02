@@ -69,10 +69,11 @@ for a component when at least one of these holds:
    signature verification or token counting at scale) where Rust gives a clear
    multiple, not a guess.
 
-Rust components stay small and sit behind a stable interface (a CLI, a local
-socket or a binding), so the TypeScript code that handles payments does not
-change. Payment logic stays in TypeScript next to the x402 SDK unless a reviewed
-reason says otherwise.
+Future Gyblos Rust components run as separate sidecar processes using JSON-RPC
+over stdio or a Unix socket. TypeScript re-verifies signed envelopes they
+return; the sidecar receives neither keys nor payment headers, and payments
+remain in TypeScript. This decision does not replace existing third-party native
+bindings, such as the Iroh SDK.
 
 ## Identity and planned work
 

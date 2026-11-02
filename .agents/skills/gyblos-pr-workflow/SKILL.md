@@ -119,7 +119,9 @@ Merge commits only, never `--squash` or `--rebase`. Do not pass
 
 ## 7. Post-merge vault update
 
-Follow the vault's own `AGENTS.md`; this is the usual shape for
+Contributors without vault access hand off the merged change and validation to
+an authorized maintainer. Maintainers and agents with authorized vault access
+follow the vault's own `AGENTS.md`; this is the usual shape for
 `../gyblos-brain/30 Repos/gyblos-payments.md` (GYB-DOC-007):
 
 1. `git -C ../gyblos-brain status` first; leave unrelated edits alone.

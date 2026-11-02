@@ -1,6 +1,6 @@
-// Starts the paid buyer on devnet behind the same loopback endpoint as the free one: the role's wallet
-// and RPC (proven devnet), the pinned public tokenizer for its own recount, the payment journal (one
-// buyer process at a time) and selection quoted at the configured ceilings. Refusals carry static reasons.
+// Starts the paid buyer on devnet behind the free one's loopback endpoint, guarded by a bearer token: the
+// role's wallet and RPC (proven devnet), the pinned tokenizer for its recount, the payment journal (one
+// buyer at a time) and selection quoted at the configured ceilings. Refusals carry static reasons.
 import {
   BUYER_RELAY_ONLY_ENV,
   DEVNET,
@@ -38,6 +38,7 @@ import {
 import { classifyPaidError, paidChat } from './paid-http';
 import { paidRecords } from './paid-records';
 import { paidBuyerDependencies } from './paid-selection';
+import { paidToken } from './paid-token';
 import type { SellerFailureReporter } from './seller-failures';
 
 type Prepared = Awaited<ReturnType<typeof buyerSelection>>;
@@ -63,6 +64,14 @@ async function tokenizer(): Promise<RecountTokenizer> {
     return await modelTokenizer();
   } catch {
     return refuse(FREE_BUYER_STARTUP.TOKENIZER);
+  }
+}
+
+async function endpointToken() {
+  try {
+    return await paidToken(rolePath(P2P_ROLES.BUYER, PAID_BUYER.tokenFile));
+  } catch {
+    return refuse(FREE_BUYER_STARTUP.PAID_TOKEN);
   }
 }
 
@@ -135,6 +144,7 @@ export async function startPaidBuyer(
   const prepared = await buyerSelection();
   checkPaidRequest(prepared, role);
   const meter = await (options.meter ?? tokenizer)();
+  const token = await endpointToken();
   const secret = await buyerNodeSecret();
   const chain = await payments(
     options.chain ?? buyerChainPayments(),
@@ -179,6 +189,7 @@ export async function startPaidBuyer(
           stream: chat.stream,
           classify: classifyPaidError,
           requestMs: PAID_BUYER_HTTP_MS,
+          token,
         },
       ),
     );

@@ -30,7 +30,13 @@ import {
 import { acceptLoopbackHost } from '@gyblos/runtime/loopback-host';
 import { FreeClientError } from '@gyblos/transport-iroh/free-client';
 
-import { FREE_BUYER, FREE_BUYER_CODES, FREE_CHAT_DETAILS } from './constants';
+import {
+  FREE_BUYER,
+  FREE_BUYER_CODES,
+  FREE_CHAT_DETAILS,
+  PAID_BUYER,
+  PAID_BUYER_CODES,
+} from './constants';
 import { FreeBuyerError, invalidChat, parseFreeChat } from './free-chat';
 import { FreeSelectionFailure } from './free-execution';
 import {
@@ -42,6 +48,7 @@ import {
   type ChatResult,
   type FreeChatStreamExecutor,
 } from './free-sse';
+import { bearerAuthorizer } from './paid-token';
 
 type FreeChatExecutor = (
   input: FreeExecutionBuildInput,
@@ -183,6 +190,31 @@ function replyError(
     }),
   );
 }
+// A loopback Host, then in paid mode the bearer token: loopback is not authentication, and any local
+// process could otherwise spend. The refusal comes before the body is read, and the connection closes
+// rather than draining an unread body.
+function acceptCaller(
+  request: IncomingMessage,
+  response: ServerResponse,
+  authorize?: (request: IncomingMessage) => boolean,
+) {
+  if (!acceptLoopbackHost(request, response)) return false;
+  if (!authorize || authorize(request)) return true;
+  response.shouldKeepAlive = false;
+  const code = PAID_BUYER_CODES.UNAUTHORIZED;
+  response
+    .writeHead(HTTP_STATUS.unauthorized, {
+      'content-type': 'application/json',
+      'www-authenticate': PAID_BUYER.authScheme,
+      [FREE_BUYER.noRetryHeader]: 'false',
+    })
+    .end(
+      JSON.stringify({
+        error: { message: code, type: FREE_BUYER.errorType, param: null, code },
+      }),
+    );
+  return false;
+}
 // Browsers can send "simple" cross-site POSTs only as form or text bodies; requiring JSON forces a
 // preflight, which is refused, on top of the Origin rejection.
 function isJson(request: IncomingMessage) {
@@ -229,10 +261,11 @@ export function freeBuyerHandler(
   requestMs: number = FREE_BUYER.requestMs,
   stream?: FreeChatStreamExecutor,
   classify?: ChatErrorClassifier,
+  authorize?: (request: IncomingMessage) => boolean,
 ) {
   let active = 0;
   return async (request: IncomingMessage, response: ServerResponse) => {
-    if (!acceptLoopbackHost(request, response)) return;
+    if (!acceptCaller(request, response, authorize)) return;
     if (
       request.method !== 'POST' ||
       request.url !== ROUTES.inference ||
@@ -311,6 +344,8 @@ export async function startFreeBuyerHttp(
     requestMs?: number;
     stream?: FreeChatStreamExecutor;
     classify?: ChatErrorClassifier;
+    // Paid mode only: the bearer token every request must carry.
+    token?: string;
   } = {},
 ) {
   const server = createServer(
@@ -325,6 +360,7 @@ export async function startFreeBuyerHttp(
       options.requestMs,
       options.stream,
       options.classify,
+      options.token === undefined ? undefined : bearerAuthorizer(options.token),
     ),
   );
   await new Promise<void>((resolve, reject) => {

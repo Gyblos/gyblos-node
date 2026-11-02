@@ -51,6 +51,9 @@ from [faucet.solana.com](https://faucet.solana.com); inference needs
 
 ### 1. Offline checks
 
+First check the active Node.js and pnpm versions; see the
+[toolchain setup guide](CONTRIBUTING.md#set-up-nodejs-and-pnpm).
+
 ```sh
 pnpm install --frozen-lockfile
 pnpm check
@@ -98,7 +101,7 @@ export GYBLOS_RELAY_TOKEN=...   # 32-512 characters; never commit it
 pnpm node:setup --role seller --mint MINT   # free selling needs no payout or buyer address
 pnpm node:tokenizer             # pinned tokenizer, for offers whose usage the seller recounts
 # run your own engine (a dedicated Ollama, or an OpenAI- or Anthropic-compatible API; see the full steps)
-cp examples/seller-daemon.toml gyblos.toml   # one free offer; paid selling is off for now
+cp examples/seller-daemon.toml gyblos.toml   # example free offer
 pnpm gyblos doctor              # read-only preflight; prints the public NodeId and owner
 pnpm node:start
 ```
@@ -106,8 +109,8 @@ pnpm node:start
 Buyer: same token, `pnpm node:setup --role buyer --mint MINT`, then
 `pnpm buyer:free` for the free chat endpoint (it also needs a `selection.json`;
 see the full steps). The paid v1 buyer flow (`buyer:trust`, `buyer:start`) needs
-a paid seller, which only the lab gates run until paid selling returns. Full
-steps: [docs/running-a-node.md](docs/running-a-node.md).
+a paid v1 seller, which only the lab gates run. Paid v2 uses a separate path.
+Full steps: [docs/running-a-node.md](docs/running-a-node.md).
 
 ## Commands
 
@@ -186,7 +189,8 @@ checks, the standalone lab facilitator and their evidence, and `tests/` and
 [Discovery index](docs/discovery-index.md) · [Stack](docs/stack.md) ·
 [Limitations](docs/limitations.md) · [Protocol spec](packages/protocol/SPEC.md)
 · [Tests](tests/README.md) · [Code standards](docs/code-standards.md) ·
-[Contributing](AGENTS.md)
+[Contributing](CONTRIBUTING.md) · [Repository rules](AGENTS.md) ·
+[AI-assisted contribution workflow](docs/ai-assisted-contributing.md)
 
 ## Telemetry adapters
 
@@ -198,6 +202,9 @@ The free seller and buyer APIs support explicitly supplied local event sinks;
 see [local telemetry composition and event semantics](docs/local-telemetry.md).
 Seller and free-buyer startup can opt in with `[telemetry] file = true` in
 `gyblos.toml`.
+
+Simulated paid product-startup verification: `pnpm acceptance:paid`
+([scope and limits](docs/paid-acceptance.md)).
 
 ## PayPal Sandbox prototype
 

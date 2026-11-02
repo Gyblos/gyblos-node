@@ -1,9 +1,20 @@
 // `pnpm buyer` in paid mode: each startup refusal names its own static reason (model, network, tokenizer,
-// wallet key, journal held by another buyer), and a started buyer answers on the loopback endpoint in
-// paid mode. A disposable home, a fake endpoint, an injected tokenizer and an RPC double; no network.
+// wallet key, journal held by another buyer, unsafe API token), and a started buyer answers on the loopback
+// endpoint only with the bearer token it keeps in the buyer home. A disposable home, a fake endpoint, an
+// injected tokenizer and an RPC double; no network.
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { execFileSync, spawnSync } from 'node:child_process';
+import {
+  chmod,
+  link,
+  mkdtemp,
+  readdir,
+  readFile,
+  rm,
+  stat,
+  symlink,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -85,16 +96,32 @@ void test('paid startup names each refusal and answers in paid mode once started
     async () => DEVNET_GENESIS,
     rpc(DEVNET_GENESIS),
   );
+  const tokenFile = join(buyer, 'api-token');
+  const secrets = [home];
   const reason = async (options: Parameters<typeof startPaidBuyer>[0]) => {
     try {
       const host = await startPaidBuyer(options);
       await host.close();
       return 'STARTED';
     } catch (error) {
-      assert.equal(startupMessage(error).includes(home), false);
+      for (const secret of secrets)
+        assert.equal(startupMessage(error).includes(secret), false);
       return startupReason(error);
     }
   };
+  const ask = (url: string, authorization?: string) =>
+    fetch(url, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        ...(authorization === undefined ? {} : { authorization }),
+      },
+      body: JSON.stringify({
+        model: 'qwen3-0.6b',
+        messages: [{ role: 'user', content: REFUSED }],
+      }),
+      signal: AbortSignal.timeout(5000),
+    });
   try {
     const setup = spawnSync(
       process.execPath,
@@ -162,18 +189,23 @@ void test('paid startup names each refusal and answers in paid mode once started
       'BUYER_NODE_KEY_MISMATCH',
     );
     const host = await startPaidBuyer(base);
+    let token = '';
     try {
+      // The first paid start creates a private bearer token in the buyer home.
+      token = await readFile(tokenFile, 'utf8');
+      secrets.push(token);
+      assert.match(token, /^[A-Za-z0-9_-]{43}$/);
+      assert.equal((await stat(tokenFile)).mode & 0o777, 0o600);
       // A second buyer cannot hold the same payment journal.
       assert.equal(await reason(base), 'BUYER_PAYMENT_JOURNAL_UNAVAILABLE');
-      const response = await fetch(host.url, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          model: 'qwen3-0.6b',
-          messages: [{ role: 'user', content: REFUSED }],
-        }),
-        signal: AbortSignal.timeout(5000),
-      });
+      const refused = await ask(host.url);
+      assert.equal(refused.status, 401);
+      assert.equal(refused.headers.get('x-should-retry'), 'false');
+      assert.equal(
+        ((await refused.json()) as { error: { code: string } }).error.code,
+        'PAID_BUYER_UNAUTHORIZED',
+      );
+      const response = await ask(host.url, `Bearer ${token}`);
       assert.equal(response.status, 400);
       assert.equal(
         ((await response.json()) as { error: { code: string } }).error.code,
@@ -182,6 +214,44 @@ void test('paid startup names each refusal and answers in paid mode once started
     } finally {
       await host.close();
     }
+    // A restart keeps the same token.
+    const again = await startPaidBuyer(base);
+    try {
+      assert.equal(await readFile(tokenFile, 'utf8'), token);
+      assert.equal((await ask(again.url, `Bearer ${token}`)).status, 400);
+    } finally {
+      await again.close();
+    }
+
+    // A token others could read, a link, or content that is not a token is refused, never repaired.
+    await chmod(tokenFile, 0o644);
+    assert.equal(await reason(base), 'BUYER_API_TOKEN_INVALID');
+    await chmod(tokenFile, 0o600);
+    await writeFile(tokenFile, 'short');
+    assert.equal(await reason(base), 'BUYER_API_TOKEN_INVALID');
+    await rm(tokenFile);
+    const elsewhere = join(home, 'elsewhere');
+    await writeFile(elsewhere, token, { mode: 0o600 });
+    await symlink(elsewhere, tokenFile);
+    assert.equal(await reason(base), 'BUYER_API_TOKEN_INVALID');
+    await rm(tokenFile);
+    // A second name elsewhere, a FIFO (which must not block the start) and an oversized file.
+    await link(elsewhere, tokenFile);
+    assert.equal(await reason(base), 'BUYER_API_TOKEN_INVALID');
+    await rm(tokenFile);
+    execFileSync('mkfifo', ['-m', '600', tokenFile]);
+    assert.equal(await reason(base), 'BUYER_API_TOKEN_INVALID');
+    await rm(tokenFile);
+    await writeFile(tokenFile, `${token}\n`.repeat(8), { mode: 0o600 });
+    assert.equal(await reason(base), 'BUYER_API_TOKEN_INVALID');
+    // Removing it makes the next start generate a new one, and no staged file is left beside it.
+    await rm(tokenFile);
+    assert.equal(await reason(base), 'STARTED');
+    assert.notEqual(await readFile(tokenFile, 'utf8'), token);
+    assert.deepEqual(
+      (await readdir(buyer)).filter((name) => name.startsWith('api-token')),
+      ['api-token'],
+    );
 
     await writeFile(join(buyer, ROLE_KEY_FILES.buyer), '[1,2,3]', {
       mode: 0o600,

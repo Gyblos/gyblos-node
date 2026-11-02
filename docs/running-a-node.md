@@ -259,7 +259,7 @@ request correlation, signatures and exact quote terms. It does not choose a
 seller or change proxy behavior. Call `close()` when finished; the endpoint
 remains owned by the caller. There is no control CLI yet.
 
-Quotes are `offer/v2` and are rejected by the current paid flow. They indicate
+Quotes are `offer/v2` and are rejected by the legacy paid v1 flow. They indicate
 observed availability, not guaranteed admission. Both clocks must be
 synchronized: v2 retains zero clock-skew tolerance and no expiration grace.
 Queries have a 10-second absolute deadline and share endpoint admission before
@@ -567,7 +567,7 @@ stream sets `x-should-retry: false`. A disconnect or deadline cancels execution;
 after possible prompt transmission the buyer never retries or switches seller,
 even before the first fragment. Writes await backpressure. Complete and
 streaming execution share replay/caps; cancellation keeps a conservative full
-token reservation. No paid-v2 path is enabled.
+token reservation. This free buyer does not invoke the separate paid-v2 path.
 
 Status codes: 400 for an invalid request or a request beyond the quote's limits,
 413 for an oversized body, 429 when the endpoint is already running a request
@@ -630,7 +630,8 @@ Product contract tests use a synthetic engine and native encrypted loopback.
 They are not the complete publication-to-answer acceptance: the separate lab
 scenario with an in-process discovery index follows this buyer's integration.
 Real Ollama, off-host/relay/CGNAT and production acceptance remain separate
-operations. Streaming, 8004 identity reading and paid v2 are subsequent work.
+operations. See the following paid-v2 section and the identity documentation for
+their separate scope and limits.
 
 ## Paid v2 buyer endpoint
 
@@ -646,6 +647,8 @@ Paid mode is devnet only and needs:
 - `request.selection.modelId` `qwen3-0.6b`, reasoning `off`, `network` devnet
   and `asset` the role's mint, with `maxAtomic` the most one request may deposit
   and `priceCeilings` the highest prices it accepts (protocol fee included).
+- every request to carry `Authorization: Bearer <token>`, with the token the
+  first paid start writes to `api-token` in the buyer home (below).
 
 Each request takes one quote from a paid seller (a free winner, or a seller that
 fails discovery or identity checks, is skipped before anything is signed), signs
@@ -666,7 +669,8 @@ Any channel in the journal not settled on the buyer's own count (a refusal, a
 stop, a pending or lapsed claim, a dispute or a settlement the chain could not
 confirm) blocks new payments (`PAID_BUYER_UNRESOLVED_PAYMENT`) until it is
 reconciled; the buyer also appends it to `paid-records.jsonl` in the buyer home
-when it can (`recorded`).
+when it can (`recorded`). Never reset or delete a journal or lock to bypass the
+block.
 
 To reconcile, stop the paid buyer and run `pnpm buyer:reconcile:paid`. It checks
 that the role's RPC serves devnet, then reads each open channel's finalized
@@ -753,14 +757,39 @@ counted a delivered answer that the seller never claimed, that shows as
 open never landed shows `nothing` here, and reconciliation cannot prove it
 unopened, so it keeps blocking payments.
 
-The endpoint listens on loopback only and refuses browser requests, but any
-local process can call it and spend up to `maxAtomic` per request: run the paid
-buyer only on a machine you control, with a devnet wallet.
+The endpoint listens on loopback only and refuses browser requests, but loopback
+is not authentication, so paid mode also requires a bearer token. The first paid
+start creates `api-token` in the buyer home (`.local/gyblos/buyer/` by default),
+a private 0600 file, and later starts reuse it. Every request must send
+`Authorization: Bearer <token>`; OpenAI SDKs send their `apiKey` this way. A
+request without the token gets 401 `PAID_BUYER_UNAUTHORIZED` with
+`x-should-retry: false`, before its body is read or a seller is selected. The
+token is never printed; read it yourself. Every call to the paid endpoint, from
+curl or an SDK, must carry the header:
+
+```sh
+export OPENAI_API_KEY="$(cat .local/gyblos/buyer/api-token)"
+curl http://127.0.0.1:4031/v1/chat/completions \
+  -H "Authorization: Bearer $OPENAI_API_KEY" \
+  -H 'content-type: application/json' \
+  -d '{"model":"qwen3-0.6b","messages":[{"role":"user","content":"Hello"}]}'
+```
+
+With an OpenAI SDK, set `baseURL` (`base_url` in Python) to
+`http://127.0.0.1:4031/v1` and `apiKey` to the token; the SDK reads
+`OPENAI_API_KEY` by default and sends it as `Authorization: Bearer`.
+
+Anyone who can read that file, or run as your user, can still spend up to
+`maxAtomic` per request: run the paid buyer only on a machine you control, with
+a devnet wallet. To rotate the token, stop the buyer, delete `api-token` and
+start it again. The free buyer needs no token.
 
 Startup reasons beyond the free ones: `BUYER_PAYMENT_NETWORK_MISMATCH` (RPC,
 network or asset not devnet's test token), `BUYER_PAID_MODEL_UNSUPPORTED`,
-`BUYER_WALLET_KEY_INVALID`, `BUYER_TOKENIZER_UNAVAILABLE` and
-`BUYER_PAYMENT_JOURNAL_UNAVAILABLE`.
+`BUYER_WALLET_KEY_INVALID`, `BUYER_TOKENIZER_UNAVAILABLE`,
+`BUYER_PAYMENT_JOURNAL_UNAVAILABLE` and `BUYER_API_TOKEN_INVALID` (`api-token`
+is not a private 0600 regular file with one name, owned by you and holding a
+token; it is never repaired, since its token may already have been read).
 
 ## Private free-inference receipts
 
