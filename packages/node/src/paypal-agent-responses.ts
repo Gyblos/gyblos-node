@@ -2,6 +2,7 @@
 import { SANDBOX_AGENT_LIMITS } from '@gyblos/config/limits';
 import { AGENT_CHAT } from '@gyblos/protocol/constants';
 
+import { PAYPAL_AGENT_REQUEST_LIMITS } from './constants';
 import {
   invalidAgentProtocol,
   protocolFields,
@@ -14,7 +15,11 @@ function responsesMessages(value: unknown) {
   const messages: Record<string, unknown>[] = [];
   if (typeof value === 'string')
     return [{ role: AGENT_CHAT.ROLES.USER, content: value }];
-  if (!Array.isArray(value) || !value.length || value.length > 128)
+  if (
+    !Array.isArray(value) ||
+    !value.length ||
+    value.length > PAYPAL_AGENT_REQUEST_LIMITS.maxRows
+  )
     return invalidAgentProtocol();
   for (const item of value) {
     const row = protocolObject(item);
@@ -83,7 +88,11 @@ function responsesMessages(value: unknown) {
   return messages;
 }
 function responsesTools(value: unknown) {
-  if (!Array.isArray(value) || value.length > 64) return invalidAgentProtocol();
+  if (
+    !Array.isArray(value) ||
+    value.length > PAYPAL_AGENT_REQUEST_LIMITS.maxTools
+  )
+    return invalidAgentProtocol();
   return value.map((item) => {
     const tool = protocolObject(item);
     protocolFields(tool, [
@@ -177,9 +186,6 @@ export function responsesAgentRequest(value: unknown) {
     ...(row.tools !== undefined ? { tools: responsesTools(row.tools) } : {}),
     ...(row.tool_choice !== undefined ? { tool_choice: row.tool_choice } : {}),
     ...(row.stream !== undefined ? { stream: row.stream } : {}),
-    ...(row.parallel_tool_calls !== undefined
-      ? { parallel_tool_calls: row.parallel_tool_calls }
-      : {}),
     ...(row.temperature !== undefined ? { temperature: row.temperature } : {}),
     ...(row.top_p !== undefined ? { top_p: row.top_p } : {}),
   };
@@ -189,13 +195,13 @@ function responsesOutput(result: Record<string, unknown>) {
     return invalidAgentProtocol();
   const choice = protocolObject(result.choices[0]);
   const message = protocolObject(choice.message);
-  const usage = protocolObject(result.usage);
+  const incomplete = choice.finish_reason === AGENT_CHAT.FINISH.LENGTH;
   const output: Record<string, unknown>[] = [];
   if (typeof message.content === 'string' && message.content)
     output.push({
       id: `msg_${protocolText(result.id)}`,
       type: 'message',
-      status: 'completed',
+      status: incomplete ? 'incomplete' : 'completed',
       role: AGENT_CHAT.ROLES.ASSISTANT,
       content: [
         { type: 'output_text', text: message.content, annotations: [] },
@@ -218,17 +224,12 @@ function responsesOutput(result: Record<string, unknown>) {
     id: `resp_${protocolText(result.id)}`,
     object: 'response',
     created_at: result.created,
-    status:
-      choice.finish_reason === AGENT_CHAT.FINISH.LENGTH
-        ? 'incomplete'
-        : 'completed',
+    status: incomplete ? 'incomplete' : 'completed',
+    incomplete_details: incomplete ? { reason: 'max_output_tokens' } : null,
     model: result.model,
     output,
-    usage: {
-      input_tokens: usage.prompt_tokens,
-      output_tokens: usage.completion_tokens,
-      total_tokens: usage.total_tokens,
-    },
+    // Ollama does not provide the cache and reasoning breakdown required by Responses.
+    usage: null,
   };
 }
 function event(type: string, value: Record<string, unknown>) {
@@ -245,15 +246,28 @@ export function responsesAgentResponse(
   const emit = (type: string, value: Record<string, unknown>) =>
     event(type, { sequence_number: sequence++, ...value });
   let stream = emit('response.created', {
-    response: { ...output, status: 'in_progress', output: [] },
+    response: {
+      ...output,
+      status: 'in_progress',
+      incomplete_details: null,
+      output: [],
+    },
   });
   stream += emit('response.in_progress', {
-    response: { ...output, status: 'in_progress', output: [] },
+    response: {
+      ...output,
+      status: 'in_progress',
+      incomplete_details: null,
+      output: [],
+    },
   });
   for (const [index, item] of output.output.entries()) {
     stream += emit('response.output_item.added', {
       output_index: index,
-      item: { ...item, status: 'in_progress' },
+      item:
+        item.type === 'function_call'
+          ? { ...item, status: 'in_progress', arguments: '' }
+          : { ...item, status: 'in_progress', content: [] },
     });
     if (item.type === 'function_call') {
       stream += emit('response.function_call_arguments.delta', {

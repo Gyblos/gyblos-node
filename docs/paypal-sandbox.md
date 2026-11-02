@@ -107,8 +107,8 @@ seller and does not send paid requests to the network marketplace.
 
 ## Connect an agent
 
-After starting a PayPal session, open **Connect** and choose **Create local
-connection**. Gyblos displays a loopback API URL, a temporary API key and
+After starting a PayPal session, open **Connect** and choose **Create shared
+local connection**. Gyblos displays a loopback API URL, a temporary API key and
 `gpt-oss:20b`. Select OpenCode, Pi, Codex or Claude Code for the relevant
 configuration. All four share the authorization and disconnecting revokes the
 shared connection. Never publish the connection URL, key or local settings.
@@ -135,13 +135,22 @@ embedding the key.
 
 ### Pi
 
-Merge the copied Pi model configuration into `models.json` in Pi's agent
-directory and merge the separately copied Pi settings into that directory's
-`settings.json`. The supplied settings disable automatic retry, compaction and
-cache warming, which can otherwise generate additional charged requests. An
-isolated Pi agent directory can be selected with `PI_CODING_AGENT_DIR`; it does
-not inherit the user's existing Pi configuration or extensions. Set
-`GYBLOS_API_KEY` as above and select `gyblos/gpt-oss:20b` in Pi.
+Create a new, private Pi agent directory and select it with
+`PI_CODING_AGENT_DIR`. Save the copied Pi model configuration as `models.json`
+and the separately copied Pi settings as `settings.json` in that directory. This
+isolated directory does not inherit existing Pi configuration, credentials or
+extensions. The supplied settings disable automatic retry, compaction and cache
+warming, which can otherwise generate additional charged requests. Set
+`GYBLOS_API_KEY` as above and select `gyblos/gpt-oss:20b` in Pi. For example, in
+bash or zsh, choose a new path and export it before starting Pi:
+
+```sh
+export PI_CODING_AGENT_DIR="$HOME/.gyblos-pi-sandbox"
+mkdir -p "$PI_CODING_AGENT_DIR"
+```
+
+On Windows PowerShell use `$env:PI_CODING_AGENT_DIR = '<private directory>'` and
+create that directory before saving the two files. Keep its contents private.
 
 Pi's estimated token price cannot express this prototype's fixed USD 0.10 per
 completed inference. Use the session usage shown in Gyblos for the actual
@@ -157,12 +166,17 @@ text tools; web search, image viewing and multi-agent tools are disabled by the
 generated configuration. Do not overwrite existing settings. Codex's developer
 messages are sent to Ollama as system messages because the local engine does not
 expose a separate developer role. The local model may produce invalid tool
-arguments or request permissions; Codex's own approval rules still apply.
+arguments or request permissions; Codex's own approval rules still apply. The
+Responses adapter reports token usage as unavailable because the engine does not
+supply the required cache and reasoning breakdown. Codex cannot rely on this
+usage field to measure context, so keep tasks short; long conversations may hit
+the local context limit.
 
 ### Claude Code
 
 Set `GYBLOS_API_KEY`, then run the copied environment settings in that same
-terminal. A bounded starting point is:
+terminal. The connection provides separate bash/zsh and PowerShell copies; use
+the one for your shell. A bounded starting point is:
 
 ```sh
 claude --bare --tools default --append-system-prompt 'Use only required tool parameters unless explicitly needed.'
@@ -204,11 +218,15 @@ This can reject an intentional repeat and cannot detect every changed retry.
 These clients do not necessarily provide a stable per-inference key; this is not
 an exactly-once guarantee. Tool execution follows the client's own permissions
 and is outside Gyblos's payment deduplication. The prototype supports bounded
-subsets of Chat Completions, Responses and Anthropic Messages. Unsupported
-fields or capabilities are rejected rather than silently forwarded. The agent
-configuration declares an 8,192-token context and a 512-token output maximum.
-The engine has a 90-second generation timeout, and a session allows at most 30
-attempts, even when the spending limit has not been reached.
+subsets of Chat Completions, Responses and Anthropic Messages. Most unsupported
+fields or capabilities are rejected before inference. To support the clients,
+the adapter accepts but ignores Anthropic cache hints and metadata, as well as
+Responses cache keys, client metadata, `reasoning.summary: auto` and the request
+to include encrypted reasoning. It provides no cached tokens or reasoning
+content through these fields. The agent configuration declares an 8,192-token
+context and a 512-token output maximum. The engine has a 90-second generation
+timeout, and a session allows at most 30 attempts, even when the spending limit
+has not been reached.
 
 The separate browser demonstration is still available with
 `pnpm paypal:sandbox`. It prints a private local session link; do not share that

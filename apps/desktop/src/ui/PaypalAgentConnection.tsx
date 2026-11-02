@@ -5,6 +5,7 @@ import { PAYPAL_SANDBOX } from '@gyblos/config/constants';
 
 import {
   claudeCodeConfig,
+  claudeCodePowerShellConfig,
   codexConfig,
   DESKTOP_PAYPAL_AGENT,
   opencodeConfig,
@@ -87,8 +88,22 @@ function AgentActions({ connection, client, busy, run, copy }: DetailProps) {
             void copy(clientConfig(client, connection), 'Configuration');
           }}
         >
-          Copy {client} configuration
+          {client === PAYPAL_AGENT_CLIENT.CLAUDE_CODE
+            ? 'Copy Claude Code bash/zsh configuration'
+            : `Copy ${client} configuration`}
         </Button>
+        {client === PAYPAL_AGENT_CLIENT.CLAUDE_CODE && (
+          <Button
+            onClick={() => {
+              void copy(
+                claudeCodePowerShellConfig(connection),
+                'PowerShell configuration',
+              );
+            }}
+          >
+            Copy Claude Code PowerShell configuration
+          </Button>
+        )}
         {client === PAYPAL_AGENT_CLIENT.PI && (
           <Button
             onClick={() => {
@@ -131,18 +146,20 @@ function ClientInstructions({ client }: { client: PaypalAgentClient }) {
   if (client === PAYPAL_AGENT_CLIENT.PI)
     return (
       <p className="modal-note">
-        Merge the model configuration into Pi's models.json and the copied
-        settings into its settings.json, set GYBLOS_API_KEY in its environment,
-        and select the Gyblos model. These settings disable automatic retry,
-        compaction and cache warming. Pi's cost estimate does not represent
-        Gyblos's fixed per-inference charge; check usage here.
+        Create a new, private Pi agent directory and set PI_CODING_AGENT_DIR to
+        its path. Save the copied configuration as models.json and the copied
+        settings as settings.json there. Set GYBLOS_API_KEY in that environment
+        and select the Gyblos model. The new directory does not inherit your Pi
+        settings or extensions; project settings can still override it. Pi's
+        estimate does not show Gyblos's fixed per-inference charge; check usage
+        here.
       </p>
     );
   if (client === PAYPAL_AGENT_CLIENT.CLAUDE_CODE)
     return (
       <p className="modal-note">
         Set GYBLOS_API_KEY in your terminal and run the copied environment
-        settings there. The tested text-and-tools setup is: claude --bare
+        settings there. A starting point is: claude --bare --tools default
         --append-system-prompt 'Use only required tool parameters unless
         explicitly needed.' This uses a local non-Claude model and is an
         experimental gateway configuration.
@@ -162,7 +179,9 @@ function AgentDetails(props: DetailProps) {
       <AgentFields connection={props.connection} />
       <ClientInstructions client={props.client} />
       <p className="modal-note">
-        The URL and key change for each PayPal session or when you disconnect.
+        All tools share this connection and session limit. Disconnecting revokes
+        access for all tools. The URL and key change for each PayPal session or
+        when you disconnect.
       </p>
       <AgentActions {...props} />
     </div>
@@ -290,7 +309,7 @@ export function PaypalAgentConnection({
             void run(PAYPAL_AGENT_ACTION.CONNECT);
           }}
         >
-          Create local connection for {client}
+          Create shared local connection
         </Button>
       )}
       {connection?.usageState ===

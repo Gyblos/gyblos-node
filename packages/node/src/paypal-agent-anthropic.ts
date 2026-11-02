@@ -1,6 +1,7 @@
 // Adapts the supported text-and-tool subset of Anthropic Messages to the local paid agent.
 import { AGENT_CHAT } from '@gyblos/protocol/constants';
 
+import { PAYPAL_AGENT_REQUEST_LIMITS } from './constants';
 import {
   invalidAgentProtocol,
   protocolCache,
@@ -12,28 +13,57 @@ import {
 } from './paypal-agent-protocol-common';
 
 function anthropicMessages(value: unknown) {
-  if (!Array.isArray(value) || !value.length || value.length > 128)
+  if (
+    !Array.isArray(value) ||
+    !value.length ||
+    value.length > PAYPAL_AGENT_REQUEST_LIMITS.maxRows
+  )
     return invalidAgentProtocol();
   const messages: Record<string, unknown>[] = [];
-  for (const item of value) {
+  const pendingCalls = new Set<string>();
+  for (const [index, item] of value.entries()) {
     const message = protocolObject(item);
     protocolFields(message, ['role', 'content']);
+    if (message.role === AGENT_CHAT.ROLES.SYSTEM) {
+      const previous = index > 0 ? protocolObject(value[index - 1]) : null;
+      const next =
+        index + 1 < value.length ? protocolObject(value[index + 1]) : null;
+      if (
+        pendingCalls.size ||
+        !previous ||
+        (previous.role !== AGENT_CHAT.ROLES.USER &&
+          previous.role !== AGENT_CHAT.ROLES.SYSTEM) ||
+        (next &&
+          next.role !== AGENT_CHAT.ROLES.SYSTEM &&
+          next.role !== AGENT_CHAT.ROLES.ASSISTANT)
+      )
+        return invalidAgentProtocol();
+      messages.push({
+        role: AGENT_CHAT.ROLES.SYSTEM,
+        content: protocolTextBlocks(message.content, ['text']),
+      });
+      continue;
+    }
     if (
       message.role !== AGENT_CHAT.ROLES.USER &&
       message.role !== AGENT_CHAT.ROLES.ASSISTANT
     )
       return invalidAgentProtocol();
+    if (pendingCalls.size && message.role !== AGENT_CHAT.ROLES.USER)
+      return invalidAgentProtocol();
     if (typeof message.content === 'string') {
+      if (pendingCalls.size) return invalidAgentProtocol();
       messages.push({ role: message.role, content: message.content });
       continue;
     }
     if (
       !Array.isArray(message.content) ||
       !message.content.length ||
-      message.content.length > 128
+      message.content.length > PAYPAL_AGENT_REQUEST_LIMITS.maxRows
     )
       return invalidAgentProtocol();
     let text = '';
+    let sawUserText = false;
     const calls: Record<string, unknown>[] = [];
     const flushUser = () => {
       if (text) messages.push({ role: AGENT_CHAT.ROLES.USER, content: text });
@@ -43,6 +73,10 @@ function anthropicMessages(value: unknown) {
       const block = protocolObject(entry);
       if (block.type === 'text') {
         if (calls.length) return invalidAgentProtocol();
+        if (message.role === AGENT_CHAT.ROLES.USER) {
+          if (pendingCalls.size) return invalidAgentProtocol();
+          sawUserText = true;
+        }
         text += protocolTextBlocks([block], ['text']);
       } else if (
         block.type === 'tool_use' &&
@@ -63,6 +97,7 @@ function anthropicMessages(value: unknown) {
         block.type === 'tool_result' &&
         message.role === AGENT_CHAT.ROLES.USER
       ) {
+        if (sawUserText) return invalidAgentProtocol();
         protocolFields(block, [
           'type',
           'tool_use_id',
@@ -74,28 +109,46 @@ function anthropicMessages(value: unknown) {
           protocolCache(block.cache_control);
         if (block.is_error !== undefined && typeof block.is_error !== 'boolean')
           return invalidAgentProtocol();
+        const toolUseId = protocolText(block.tool_use_id);
+        if (!pendingCalls.delete(toolUseId)) return invalidAgentProtocol();
         flushUser();
-        const content = protocolTextBlocks(block.content, ['text']);
+        const content =
+          block.content === undefined
+            ? ''
+            : protocolTextBlocks(block.content, ['text']);
         messages.push({
           role: AGENT_CHAT.ROLES.TOOL,
-          tool_call_id: protocolText(block.tool_use_id),
+          tool_call_id: toolUseId,
           content: block.is_error ? `Tool error: ${content}` : content,
         });
       } else return invalidAgentProtocol();
     }
     if (message.role === AGENT_CHAT.ROLES.ASSISTANT) {
       if (!text && !calls.length) return invalidAgentProtocol();
+      for (const call of calls) {
+        const id = protocolText(call.id);
+        if (pendingCalls.has(id)) return invalidAgentProtocol();
+        pendingCalls.add(id);
+      }
       messages.push({
         role: AGENT_CHAT.ROLES.ASSISTANT,
         content: text || null,
         ...(calls.length ? { tool_calls: calls } : {}),
       });
-    } else flushUser();
+    } else {
+      if (pendingCalls.size) return invalidAgentProtocol();
+      flushUser();
+    }
   }
+  if (pendingCalls.size) return invalidAgentProtocol();
   return messages;
 }
 function anthropicTools(value: unknown) {
-  if (!Array.isArray(value) || value.length > 64) return invalidAgentProtocol();
+  if (
+    !Array.isArray(value) ||
+    value.length > PAYPAL_AGENT_REQUEST_LIMITS.maxTools
+  )
+    return invalidAgentProtocol();
   return value.map((item) => {
     const tool = protocolObject(item);
     protocolFields(tool, [

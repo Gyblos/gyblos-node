@@ -5,6 +5,7 @@ import { SANDBOX_AGENT_LIMITS } from '@gyblos/config/limits';
 import { ROUTES } from '@gyblos/config/paths';
 
 import {
+  AGENT_CLIENT,
   PAYPAL_AGENT_USAGE_STATE,
   type PaypalAgentUsageState,
 } from './constants';
@@ -29,10 +30,10 @@ export const PAYPAL_AGENT_ACTION = {
   DISCONNECT: 'disconnect',
 } as const;
 export const PAYPAL_AGENT_CLIENT = {
-  OPENCODE: 'OpenCode',
-  CODEX: 'Codex',
-  PI: 'Pi',
-  CLAUDE_CODE: 'Claude Code',
+  OPENCODE: AGENT_CLIENT.OPENCODE,
+  CODEX: AGENT_CLIENT.CODEX,
+  PI: AGENT_CLIENT.PI,
+  CLAUDE_CODE: AGENT_CLIENT.CLAUDE_CODE,
 } as const;
 export type PaypalAgentClient =
   (typeof PAYPAL_AGENT_CLIENT)[keyof typeof PAYPAL_AGENT_CLIENT];
@@ -202,6 +203,26 @@ export function claudeCodeConfig(
     'export CLAUDE_CODE_EFFORT_LEVEL=auto',
     'export CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1',
     'export CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false',
+  ].join('\n');
+}
+export function claudeCodePowerShellConfig(
+  connection: Pick<
+    NonNullable<PaypalAgentResult['connection']>,
+    'url' | 'key' | 'model'
+  >,
+) {
+  const literal = (value: string) => `'${value.replaceAll("'", "''")}'`;
+  return [
+    `$env:ANTHROPIC_BASE_URL = ${literal(new URL(connection.url).origin)}`,
+    '$env:ANTHROPIC_AUTH_TOKEN = $env:GYBLOS_API_KEY',
+    '$env:ANTHROPIC_API_KEY = $env:GYBLOS_API_KEY',
+    `$env:ANTHROPIC_MODEL = ${literal(connection.model)}`,
+    `$env:CLAUDE_CODE_MAX_CONTEXT_TOKENS = '${SANDBOX_AGENT_LIMITS.contextTokens}'`,
+    `$env:CLAUDE_CODE_MAX_OUTPUT_TOKENS = '${SANDBOX_AGENT_LIMITS.maxOutputTokens}'`,
+    "$env:CLAUDE_CODE_DISABLE_THINKING = '1'",
+    "$env:CLAUDE_CODE_EFFORT_LEVEL = 'auto'",
+    "$env:CLAUDE_CODE_DISABLE_TERMINAL_TITLE = '1'",
+    "$env:CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION = 'false'",
   ].join('\n');
 }
 export function retainPaypalAgentStatus(

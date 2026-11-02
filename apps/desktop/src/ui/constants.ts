@@ -1,4 +1,5 @@
 // Owns simulated UI catalogs and precomputed brand morph paths; never live network state.
+import { AGENT_CLIENT } from '../constants';
 import { LOCAL_NODE_STATE } from '../node-status';
 import type { CatalogModel } from './model-types';
 
@@ -46,10 +47,10 @@ export const SLIDE_SURFACE = {
 } as const;
 
 export const CONNECTION_TOOLS = [
-  'Claude Code',
-  'Codex',
-  'Pi',
-  'Other tool',
+  AGENT_CLIENT.CLAUDE_CODE,
+  AGENT_CLIENT.CODEX,
+  AGENT_CLIENT.PI,
+  AGENT_CLIENT.OTHER,
 ] as const;
 
 export const CHAT_ROLE = { USER: 'user', ASSISTANT: 'assistant' } as const;

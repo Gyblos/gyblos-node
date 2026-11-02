@@ -341,6 +341,8 @@ export const PAYPAL_REQUEST_LIMITS = {
 } as const;
 export const PAYPAL_AGENT_REQUEST_LIMITS = {
   maxTokens: 2048,
+  maxRows: 128,
+  maxTools: 64,
   bodyReadMs: 5_000,
   requestBytes: 262144,
   responseBytes: 262144,

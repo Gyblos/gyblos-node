@@ -203,9 +203,13 @@ void test('Responses maps a streamed function call and its result to one session
   assert.match(streamed, /"call_id":"call_1"/);
   assert.match(streamed, /event: response.completed/);
   const events = streamEvents(streamed);
-  const item = events.find((event) => event.type === 'response.output_item.added')?.item;
+  const item = events.find(
+    (event) => event.type === 'response.output_item.added',
+  )?.item;
   assert.ok(item && typeof item === 'object' && 'arguments' in item);
-  const delta = events.find((event) => event.type === 'response.function_call_arguments.delta')?.delta;
+  const delta = events.find(
+    (event) => event.type === 'response.function_call_arguments.delta',
+  )?.delta;
   assert.equal(typeof item.arguments, 'string');
   assert.equal(typeof delta, 'string');
   assert.deepEqual(JSON.parse(`${item.arguments}${delta}`), {});
@@ -247,21 +251,41 @@ void test('Responses maps a streamed function call and its result to one session
 void test('Responses streams message content once, starting with an empty item', async () => {
   const f = fixture('length');
   const input = { model, input: 'synthetic request', max_output_tokens: 128 };
-  const streamed = await f.gateway.handle(post('/v1/responses', { ...input, stream: true }));
+  const streamed = await f.gateway.handle(
+    post('/v1/responses', { ...input, stream: true }),
+  );
   const events = streamEvents(await streamed.text());
-  const item = events.find((event) => event.type === 'response.output_item.added')?.item;
+  const item = events.find(
+    (event) => event.type === 'response.output_item.added',
+  )?.item;
   assert.ok(item && typeof item === 'object' && 'content' in item);
   assert.deepEqual(item.content, []);
-  const delta = events.find((event) => event.type === 'response.output_text.delta')?.delta;
+  const delta = events.find(
+    (event) => event.type === 'response.output_text.delta',
+  )?.delta;
   assert.equal(delta, 'synthetic answer');
-  const incomplete = events.find((event) => event.type === 'response.incomplete')?.response;
-  assert.ok(incomplete && typeof incomplete === 'object' && 'output' in incomplete && 'incomplete_details' in incomplete);
-  assert.deepEqual(incomplete.incomplete_details, { reason: 'max_output_tokens' });
+  const incomplete = events.find(
+    (event) => event.type === 'response.incomplete',
+  )?.response;
+  assert.ok(
+    incomplete &&
+      typeof incomplete === 'object' &&
+      'output' in incomplete &&
+      'incomplete_details' in incomplete,
+  );
+  assert.deepEqual(incomplete.incomplete_details, {
+    reason: 'max_output_tokens',
+  });
   assert.ok(Array.isArray(incomplete.output));
   assert.equal(incomplete.output[0]?.status, 'incomplete');
   const json = await f.gateway.handle(post('/v1/responses', input));
   const result: unknown = await json.json();
-  assert.ok(result && typeof result === 'object' && 'output' in result && 'incomplete_details' in result);
+  assert.ok(
+    result &&
+      typeof result === 'object' &&
+      'output' in result &&
+      'incomplete_details' in result,
+  );
   assert.deepEqual(result.incomplete_details, { reason: 'max_output_tokens' });
   assert.ok(Array.isArray(result.output));
   assert.equal(result.output[0]?.status, 'incomplete');
@@ -269,32 +293,52 @@ void test('Responses streams message content once, starting with an empty item',
 
 void test('Claude accepts a tool result without optional content', async () => {
   const f = fixture('length');
-  const response = await f.gateway.handle(post('/v1/messages', {
-    model,
-    max_tokens: 128,
-    messages: [
-      { role: 'user', content: 'synthetic request' },
-      { role: 'assistant', content: [{ type: 'tool_use', id: 'call_1', name: 'read_file', input: {} }] },
-      { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'call_1' }] },
-    ],
-  }));
+  const response = await f.gateway.handle(
+    post('/v1/messages', {
+      model,
+      max_tokens: 128,
+      messages: [
+        { role: 'user', content: 'synthetic request' },
+        {
+          role: 'assistant',
+          content: [
+            { type: 'tool_use', id: 'call_1', name: 'read_file', input: {} },
+          ],
+        },
+        {
+          role: 'user',
+          content: [{ type: 'tool_result', tool_use_id: 'call_1' }],
+        },
+      ],
+    }),
+  );
   assert.equal(response.status, 200);
   const request = f.requests[0];
   assert.ok(request && typeof request === 'object' && 'messages' in request);
   assert.ok(Array.isArray(request.messages));
-  assert.deepEqual(request.messages.at(-1), { role: 'tool', tool_call_id: 'call_1', content: '' });
+  assert.deepEqual(request.messages.at(-1), {
+    role: 'tool',
+    tool_call_id: 'call_1',
+    content: '',
+  });
 });
 
 void test('Claude forwards bounded mid-conversation system text only at valid turn boundaries', async () => {
   const f = fixture('length');
   const first = { role: 'user', content: 'synthetic request' };
-  const reminder = { role: 'system', content: [{ type: 'text', text: 'synthetic reminder' }] };
-  const valid = await f.gateway.handle(post('/v1/messages', {
-    model,
-    max_tokens: 128,
-    system: 'synthetic instruction',
-    messages: [first, reminder],
-  }));
+  const reminder = {
+    role: 'system',
+    content: [{ type: 'text', text: 'synthetic reminder' }],
+  };
+  const reminderString = { role: 'system', content: 'second reminder' };
+  const valid = await f.gateway.handle(
+    post('/v1/messages', {
+      model,
+      max_tokens: 128,
+      system: 'synthetic instruction',
+      messages: [first, reminder, reminderString],
+    }),
+  );
   assert.equal(valid.status, 200);
   const request = f.requests[0];
   assert.ok(request && typeof request === 'object' && 'messages' in request);
@@ -302,23 +346,33 @@ void test('Claude forwards bounded mid-conversation system text only at valid tu
     { role: 'system', content: 'synthetic instruction' },
     first,
     { role: 'system', content: 'synthetic reminder' },
+    reminderString,
   ]);
-  const invalidPosition = await f.gateway.handle(post('/v1/messages', {
-    model,
-    max_tokens: 128,
-    messages: [first, reminder, first],
-  }));
+  const invalidPosition = await f.gateway.handle(
+    post('/v1/messages', {
+      model,
+      max_tokens: 128,
+      messages: [first, reminder, first],
+    }),
+  );
   assert.equal(invalidPosition.status, 400);
-  const pendingTool = await f.gateway.handle(post('/v1/messages', {
-    model,
-    max_tokens: 128,
-    messages: [
-      first,
-      { role: 'assistant', content: [{ type: 'tool_use', id: 'call_1', name: 'read_file', input: {} }] },
-      { role: 'user', content: 'not a tool result' },
-      reminder,
-    ],
-  }));
+  const pendingTool = await f.gateway.handle(
+    post('/v1/messages', {
+      model,
+      max_tokens: 128,
+      messages: [
+        first,
+        {
+          role: 'assistant',
+          content: [
+            { type: 'tool_use', id: 'call_1', name: 'read_file', input: {} },
+          ],
+        },
+        { role: 'user', content: 'not a tool result' },
+        reminder,
+      ],
+    }),
+  );
   assert.equal(pendingTool.status, 400);
   assert.equal(f.requests.length, 1);
 });
@@ -333,29 +387,52 @@ void test('Claude requires all tool results first in the next user turn', async 
       { type: 'tool_use', id: 'call_2', name: 'read_file', input: {} },
     ],
   };
-  const result1 = { type: 'tool_result', tool_use_id: 'call_1', content: 'first' };
-  const result2 = { type: 'tool_result', tool_use_id: 'call_2', content: 'second' };
+  const result1 = {
+    type: 'tool_result',
+    tool_use_id: 'call_1',
+    content: 'first',
+  };
+  const result2 = {
+    type: 'tool_result',
+    tool_use_id: 'call_2',
+    content: 'second',
+  };
   const text = { type: 'text', text: 'synthetic follow-up' };
-  const request = (content: unknown[]) => post('/v1/messages', {
-    model,
-    max_tokens: 128,
-    messages: [first, calls, { role: 'user', content }],
-  });
-  assert.equal((await f.gateway.handle(request([text, result1, result2]))).status, 400);
-  assert.equal((await f.gateway.handle(request([result1, text, result2]))).status, 400);
+  const request = (content: unknown[]) =>
+    post('/v1/messages', {
+      model,
+      max_tokens: 128,
+      messages: [first, calls, { role: 'user', content }],
+    });
+  assert.equal(
+    (await f.gateway.handle(request([text, result1, result2]))).status,
+    400,
+  );
+  assert.equal(
+    (await f.gateway.handle(request([result1, text, result2]))).status,
+    400,
+  );
   assert.equal((await f.gateway.handle(request([result1]))).status, 400);
-  assert.equal((await f.gateway.handle(request([result1, result1]))).status, 400);
-  assert.equal((await f.gateway.handle(request([result1, result2, text]))).status, 200);
+  assert.equal(
+    (await f.gateway.handle(request([result1, result1]))).status,
+    400,
+  );
+  assert.equal(
+    (await f.gateway.handle(request([result1, result2, text]))).status,
+    200,
+  );
   assert.equal(f.requests.length, 1);
 });
 
 void test('Responses does not invent unknown cached or reasoning token counts', async () => {
   const f = fixture('length');
-  const response = await f.gateway.handle(post('/v1/responses', {
-    model,
-    input: 'synthetic request',
-    max_output_tokens: 128,
-  }));
+  const response = await f.gateway.handle(
+    post('/v1/responses', {
+      model,
+      input: 'synthetic request',
+      max_output_tokens: 128,
+    }),
+  );
   const result: unknown = await response.json();
   assert.ok(result && typeof result === 'object' && 'usage' in result);
   assert.equal(result.usage, null);

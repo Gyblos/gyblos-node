@@ -24,8 +24,6 @@ const REQUEST_FIELDS = [
   'parallel_tool_calls',
   'n',
 ] as const;
-const MAX_ROWS = 128;
-const MAX_TOOLS = 64;
 const MAX_NAME = 128;
 
 function invalid(): never {
@@ -55,7 +53,11 @@ function count(value: unknown, maximum = Number.MAX_SAFE_INTEGER) {
   return value;
 }
 function toolCalls(value: unknown) {
-  if (!Array.isArray(value) || value.length === 0 || value.length > MAX_TOOLS)
+  if (
+    !Array.isArray(value) ||
+    value.length === 0 ||
+    value.length > PAYPAL_AGENT_REQUEST_LIMITS.maxTools
+  )
     return invalid();
   const ids = new Set<string>();
   for (const item of value) {
@@ -78,7 +80,11 @@ function toolCalls(value: unknown) {
 }
 function textContent(value: unknown) {
   if (typeof value === 'string') return value;
-  if (!Array.isArray(value) || value.length === 0 || value.length > MAX_ROWS)
+  if (
+    !Array.isArray(value) ||
+    value.length === 0 ||
+    value.length > PAYPAL_AGENT_REQUEST_LIMITS.maxRows
+  )
     return invalid();
   return value
     .map((item) => {
@@ -128,7 +134,11 @@ function message(value: unknown) {
   invalid();
 }
 function tools(value: unknown) {
-  if (!Array.isArray(value) || value.length > MAX_TOOLS) return invalid();
+  if (
+    !Array.isArray(value) ||
+    value.length > PAYPAL_AGENT_REQUEST_LIMITS.maxTools
+  )
+    return invalid();
   for (const item of value) {
     const tool = fields(item);
     allowed(tool, ['type', 'function']);
@@ -163,7 +173,7 @@ export function validatePaypalAgentRequest(
   if (
     !Array.isArray(row.messages) ||
     !row.messages.length ||
-    row.messages.length > MAX_ROWS
+    row.messages.length > PAYPAL_AGENT_REQUEST_LIMITS.maxRows
   )
     invalid();
   const messages = row.messages.map(message);

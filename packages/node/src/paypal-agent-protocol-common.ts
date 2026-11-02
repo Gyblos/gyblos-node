@@ -2,6 +2,8 @@
 import { PAYPAL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { PaypalError } from '@gyblos/protocol/paypal-payment';
 
+import { PAYPAL_AGENT_REQUEST_LIMITS } from './constants';
+
 export function invalidAgentProtocol(): never {
   throw new PaypalError(PAYPAL_ERROR_CODES.INVALID_REQUEST);
 }
@@ -26,7 +28,11 @@ export function protocolTextBlocks(
   types: readonly string[],
 ): string {
   if (typeof value === 'string') return value;
-  if (!Array.isArray(value) || value.length === 0 || value.length > 128)
+  if (
+    !Array.isArray(value) ||
+    value.length === 0 ||
+    value.length > PAYPAL_AGENT_REQUEST_LIMITS.maxRows
+  )
     return invalidAgentProtocol();
   return value
     .map((item) => {

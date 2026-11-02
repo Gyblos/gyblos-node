@@ -133,7 +133,10 @@ void test('Claude Code PowerShell configuration safely sets the local gateway wi
     model: "synthetic'model",
   });
   assert.doesNotMatch(config, /synthetic-secret-key/);
-  assert.match(config, /\$env:ANTHROPIC_BASE_URL = 'http:\/\/127\.0\.0\.1:12345'/);
+  assert.match(
+    config,
+    /\$env:ANTHROPIC_BASE_URL = 'http:\/\/127\.0\.0\.1:12345'/,
+  );
   assert.match(config, /\$env:ANTHROPIC_AUTH_TOKEN = \$env:GYBLOS_API_KEY/);
   assert.match(config, /\$env:ANTHROPIC_API_KEY = \$env:GYBLOS_API_KEY/);
   assert.match(config, /\$env:ANTHROPIC_MODEL = 'synthetic''model'/);
