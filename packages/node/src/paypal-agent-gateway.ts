@@ -104,6 +104,19 @@ function fingerprint(value: unknown) {
   return createHash('sha256').update(text).digest('hex');
 }
 
+function fingerprintCount(messages: unknown, target: string) {
+  if (!Array.isArray(messages)) return 0;
+  let count = 0;
+  for (const item of messages) {
+    try {
+      if (fingerprint(item) === target) count += 1;
+    } catch {
+      continue;
+    }
+  }
+  return count;
+}
+
 function eventStream(result: Record<string, unknown>, includeUsage: boolean) {
   const choice = record(
     Array.isArray(result.choices) ? result.choices[0] : undefined,
@@ -138,12 +151,26 @@ function eventStream(result: Record<string, unknown>, includeUsage: boolean) {
   });
 }
 
-function agentResponse(input: Record<string, unknown>, result: Record<string, unknown>) {
+function agentResponse(
+  input: Record<string, unknown>,
+  result: Record<string, unknown>,
+) {
   const streamOptions =
     input.stream_options === undefined ? {} : record(input.stream_options);
   return input.stream === true
     ? eventStream(result, streamOptions.include_usage === true)
     : Response.json(result, { headers: { 'cache-control': 'no-store' } });
+}
+
+function agentError(reason: unknown) {
+  const code =
+    reason instanceof PaypalError ? reason.code : PAYPAL_ERROR_CODES.UNAVAILABLE;
+  return error(
+    code === PAYPAL_ERROR_CODES.INVALID_REQUEST
+      ? HTTP_STATUS.badRequest
+      : HTTP_STATUS.conflict,
+    code,
+  );
 }
 
 interface GatewayOptions {
@@ -195,7 +222,9 @@ export function createPaypalAgentGateway(options: GatewayOptions) {
   const base = gatewayOrigin(options);
   const key = Buffer.from(options.key);
   let busy = false;
-  let pending: { messageId: string; fingerprint: string } | undefined;
+  let pending:
+    | { messageId: string; fingerprint: string; previousCount: number }
+    | undefined;
   async function acknowledgePending() {
     if (busy || !pending) throw new Error('No agent response is available.');
     busy = true;
@@ -227,14 +256,8 @@ export function createPaypalAgentGateway(options: GatewayOptions) {
         pending = undefined;
       if (pending) {
         if (
-          !Array.isArray(input.messages) ||
-          !input.messages.some((item) => {
-            try {
-              return fingerprint(item) === pending?.fingerprint;
-            } catch {
-              return false;
-            }
-          })
+          fingerprintCount(input.messages, pending.fingerprint) <=
+          pending.previousCount
         )
           return error(
             HTTP_STATUS.conflict,
@@ -252,22 +275,15 @@ export function createPaypalAgentGateway(options: GatewayOptions) {
         input.max_tokens,
         input,
       );
+      const responseFingerprint = fingerprint(answer(response));
       pending = {
         messageId: result.messageId,
-        fingerprint: fingerprint(answer(response)),
+        fingerprint: responseFingerprint,
+        previousCount: fingerprintCount(input.messages, responseFingerprint),
       };
       return agentResponse(input, response);
     } catch (reason) {
-      const code =
-        reason instanceof PaypalError
-          ? reason.code
-          : PAYPAL_ERROR_CODES.UNAVAILABLE;
-      return error(
-        code === PAYPAL_ERROR_CODES.INVALID_REQUEST
-          ? HTTP_STATUS.badRequest
-          : HTTP_STATUS.conflict,
-        code,
-      );
+      return agentError(reason);
     } finally {
       busy = false;
     }
