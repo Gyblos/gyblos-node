@@ -124,10 +124,15 @@ void test('Responses maps a streamed function call and its result to one session
     model,
     max_output_tokens: 128,
     instructions: 'synthetic instruction',
-    input: [{ role: 'user', content: [{ type: 'input_text', text: 'synthetic request' }] }],
+    input: [{ type: 'message', id: null, role: 'developer', content: [{ type: 'input_text', text: 'synthetic developer instruction' }] }, { role: 'user', content: [{ type: 'input_text', text: 'synthetic request' }] }],
     tools: [{ type: 'function', name: 'read_file', parameters: tool.function.parameters, strict: false }],
     stream: true,
     store: false,
+    parallel_tool_calls: true,
+    reasoning: { summary: 'auto' },
+    include: ['reasoning.encrypted_content'],
+    prompt_cache_key: 'synthetic-session',
+    client_metadata: { session_id: 'synthetic-session' },
   };
   const response = await f.gateway.handle(post('/v1/responses', input));
   assert.equal(response.status, 200);
