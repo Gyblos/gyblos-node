@@ -276,3 +276,42 @@ void test('a connection remains visibly disconnecting while an inference drains'
   await stopping;
   assert.equal(activeAccess.status(), null);
 });
+
+void test('connection status explains expiration and attempt exhaustion', async () => {
+  let expired = false;
+  let remainingAttempts = 30;
+  const endpoint = { url: 'http://127.0.0.1:12345/v1', key: 'synthetic', model: 'synthetic-model',
+    isCurrent: () => true, isBusy: () => false, async close() {} };
+  const access = createDesktopPaypalAgentAccess(
+    () => ({ phase: 'active', expired, remainingAttempts, spentCents: 10, limitCents: 100 }),
+    async () => endpoint,
+  );
+  await access.connect();
+  expired = true;
+  assert.equal(access.status()?.usageState, 'expired');
+  expired = false;
+  remainingAttempts = 0;
+  assert.equal(access.status()?.usageState, 'attempts_exhausted');
+  await access.close();
+});
+
+void test('a failed disconnect stays visible and can be retried', async () => {
+  let calls = 0;
+  const endpoint = { url: 'http://127.0.0.1:12345/v1', key: 'synthetic', model: 'synthetic-model',
+    isCurrent: () => false, isBusy: () => false,
+    async close() { calls += 1; if (calls === 1) throw new Error('synthetic close failure'); },
+  };
+  let current = true;
+  endpoint.isCurrent = () => current;
+  endpoint.close = async () => { calls += 1; current = false; if (calls === 1) throw new Error('synthetic close failure'); };
+  const access = createDesktopPaypalAgentAccess(
+    () => ({ phase: 'active', expired: false, remainingAttempts: 30, spentCents: 0, limitCents: 100 }),
+    async () => endpoint,
+  );
+  await access.connect();
+  await assert.rejects(access.disconnect());
+  assert.equal(access.status()?.usageState, 'disconnect_failed');
+  await access.disconnect();
+  assert.equal(access.status(), null);
+  assert.equal(calls, 2);
+});
