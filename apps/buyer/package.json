@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     "./chat-cli-turn": "./src/chat-cli-turn.ts",
+    "./chat-cli": "./src/chat-cli.ts",
     "./buyer": "./src/buyer.ts",
     "./buyer-main": "./src/buyer-main.ts",
     "./paid-execution": "./src/paid-execution.ts",
