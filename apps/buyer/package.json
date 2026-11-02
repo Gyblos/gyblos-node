@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./chat-cli-turn": "./src/chat-cli-turn.ts",
     "./buyer": "./src/buyer.ts",
     "./buyer-main": "./src/buyer-main.ts",
     "./paid-execution": "./src/paid-execution.ts",
