@@ -44,9 +44,9 @@ loopback check. See [running and packaging the preview](docs/desktop-probe.md).
 
 ## Quickstart
 
-Requirements: Node.js 24.22.1+, pnpm 10.12.1 and a native Iroh platform (macOS ARM64
-or Linux x64/ARM64; no Intel Mac, Windows untested). Paid runs need devnet SOL
-from [faucet.solana.com](https://faucet.solana.com); inference needs
+Requirements: Node.js 24.22.1+, pnpm 10.12.1 and a native Iroh platform (macOS
+ARM64 or Linux x64/ARM64; no Intel Mac, Windows untested). Paid runs need devnet
+SOL from [faucet.solana.com](https://faucet.solana.com); inference needs
 [Ollama](https://ollama.com).
 
 ### 1. Offline checks
