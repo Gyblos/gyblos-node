@@ -208,3 +208,25 @@ void test('an identical older assistant message cannot acknowledge a lost new re
   assert.equal((await f.gateway.handle(post(repeated))).status, 409);
   assert.deepEqual(f.calls, ['generate']);
 });
+
+void test('a slow incoming request cannot block confirmation of a completed response', async () => {
+  const f = fixture();
+  assert.equal((await f.gateway.handle(post(input))).status, 200);
+  let finishBody: () => void = () => {};
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      finishBody = () => { controller.enqueue(new TextEncoder().encode('{}')); controller.close(); };
+    },
+  });
+  const slow = new Request(`${origin}/v1/chat/completions`, {
+    method: 'POST', headers: {
+      host: '127.0.0.1:12345', authorization: `Bearer ${key}`, 'content-type': 'application/json',
+    }, body: stream, duplex: 'half',
+  });
+  const pendingRequest = f.gateway.handle(slow);
+  await Promise.resolve();
+  await f.gateway.acknowledgePending();
+  finishBody();
+  assert.equal((await pendingRequest).status, 400);
+  assert.deepEqual(f.calls, ['generate', 'ack:MSG1']);
+});
