@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 
 import { generateKeyPairSigner } from '@solana/kit';
 
-import { ROLE_FILES } from '@gyblos/config';
+import { HOME_ENVIRONMENT, ROLE_FILES } from '@gyblos/config';
 import { OFFER_LIFETIME_MS } from '@gyblos/core/constants';
 import type { OfferTrust } from '@gyblos/core/offers';
 import { signInferenceOffer } from '@gyblos/node/offers';
@@ -145,6 +145,8 @@ export function endpointProbe(
       env: {
         PATH: process.env.PATH,
         TMPDIR: process.env.TMPDIR,
+        [HOME_ENVIRONMENT.product]: process.env[HOME_ENVIRONMENT.product],
+        [HOME_ENVIRONMENT.lab]: process.env[HOME_ENVIRONMENT.lab],
         PROBE_ACTION: action,
         ...environment,
       },
