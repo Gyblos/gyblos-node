@@ -25,6 +25,7 @@ import {
   payerTokenAccountInstruction,
   requestCloseInstruction,
   sealInstruction,
+  tokenAccountInstruction,
   UPTO_PROGRAM,
   uptoDistributionHash,
   uptoProgramTreasury,
@@ -186,6 +187,29 @@ void test('the payer token account is created as @solana-program/token does it',
         payer,
         ata,
         owner: payer.address,
+        mint,
+        tokenProgram: address(TOKEN_PROGRAM),
+      }),
+    ),
+  );
+});
+
+void test('another owner’s token account, paid by the fee payer, is created as @solana-program/token does it', async () => {
+  const feePayer = await generateKeyPairSigner();
+  const owner = await newAddress();
+  const mint = await newAddress();
+  const [ata] = await findAssociatedTokenPda({
+    owner,
+    mint,
+    tokenProgram: address(TOKEN_PROGRAM),
+  });
+  assert.deepEqual(
+    view(await tokenAccountInstruction(feePayer, owner, mint, TOKEN_PROGRAM)),
+    view(
+      getCreateAssociatedTokenIdempotentInstruction({
+        payer: feePayer,
+        ata,
+        owner,
         mint,
         tokenProgram: address(TOKEN_PROGRAM),
       }),
