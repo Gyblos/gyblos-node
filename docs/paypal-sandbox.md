@@ -135,18 +135,20 @@ buffered until the complete result and its usage have been recorded.
 
 The endpoint accepts an optional `Idempotency-Key` per operation. Within the
 same session, reusing a key for a completed inference is rejected without a
-second inference, including after a restart. The protection does not extend to
-new authorizations. For clients without a key, an identical normalized request
-within the same session is conservatively rejected. This can reject an
-intentional repeat and cannot detect every changed retry. OpenCode 1.14.48, the
-version used for the isolated test, does not provide a stable per-inference key;
-this is not an exactly-once guarantee. Tool execution follows the client's own
-permissions and is outside Gyblos's payment deduplication. The prototype
-supports a bounded subset of the OpenAI-compatible chat and tool-call format;
-other clients and configurations require separate testing. The generated
-OpenCode configuration declares an 8,192-token context and a 512-token output
-maximum. The engine has a 90-second generation timeout, and a session allows at
-most 30 attempts, even when the spending limit has not been reached.
+second inference. The private record preserves completed operations across a
+restart, although Desktop does not reconnect an agent to a restored session. The
+protection does not extend to new authorizations. For clients without a key, an
+identical normalized request within the same session is conservatively rejected.
+This can reject an intentional repeat and cannot detect every changed retry.
+OpenCode 1.14.48, the version used for the isolated test, does not provide a
+stable per-inference key; this is not an exactly-once guarantee. Tool execution
+follows the client's own permissions and is outside Gyblos's payment
+deduplication. The prototype supports a bounded subset of the OpenAI-compatible
+chat and tool-call format; other clients and configurations require separate
+testing. The generated OpenCode configuration declares an 8,192-token context
+and a 512-token output maximum. The engine has a 90-second generation timeout,
+and a session allows at most 30 attempts, even when the spending limit has not
+been reached.
 
 The separate browser demonstration is still available with
 `pnpm paypal:sandbox`. It prints a private local session link; do not share that
