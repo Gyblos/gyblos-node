@@ -160,3 +160,23 @@ void test('a running agent inference cannot be disconnected', async () => {
   assert.equal(closed, 0);
   await access.close();
 });
+
+void test('the connection reports current shared usage and an uncertain session', async () => {
+  let spentCents = 0;
+  let phase = 'active';
+  const endpoint = {
+    url: 'http://127.0.0.1:12345/v1', key: 'synthetic-key', model: 'synthetic-model',
+    isCurrent: () => true, isBusy: () => false, async close() {},
+  };
+  const access = createDesktopPaypalAgentAccess(
+    () => ({ phase, expired: false, spentCents, limitCents: 100 }),
+    async () => endpoint,
+  );
+  assert.equal((await access.connect()).spentCents, 0);
+  spentCents = 20;
+  assert.equal(access.status()?.spentCents, 20);
+  assert.equal(access.status()?.limitCents, 100);
+  phase = 'blocked';
+  assert.equal(access.status()?.usageUncertain, true);
+  await access.close();
+});
