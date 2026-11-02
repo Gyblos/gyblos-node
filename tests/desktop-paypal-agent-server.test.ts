@@ -293,6 +293,18 @@ void test('shutdown closes a socket that never completes its HTTP headers', asyn
   }
 });
 
+void test('closing an agent endpoint is safe to repeat concurrently or after completion', async () => {
+  const f = fixture();
+  const desktop = createDesktopPaypalSession(await createPaypalSession(f), async () => {});
+  await desktop.create();
+  await desktop.approve();
+  const endpoint = await startDesktopPaypalAgent(desktop, 'synthetic-model');
+  await Promise.all([endpoint.close(), endpoint.close()]);
+  await endpoint.close();
+  await desktop.finish();
+  assert.deepEqual(f.calls, ['create', 'authorize', 'void']);
+});
+
 void test('shutdown waits for an already running inference before closing sockets', async () => {
   const f = fixture();
   let entered = () => {};
