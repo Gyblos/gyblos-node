@@ -1,0 +1,402 @@
+{
+  "rules": [
+    {
+      "id": "gyblos.dynamic-eval",
+      "languages": ["typescript", "javascript"],
+      "severity": "ERROR",
+      "message": "Review dynamic code execution; parse data without evaluating source.",
+      "metadata": {
+        "license": "Apache-2.0"
+      },
+      "pattern-either": [
+        {
+          "pattern": "eval(...)"
+        },
+        {
+          "pattern": "globalThis.eval(...)"
+        }
+      ]
+    },
+    {
+      "id": "gyblos.function-constructor",
+      "languages": ["typescript", "javascript"],
+      "severity": "ERROR",
+      "message": "Do not construct executable functions from source strings.",
+      "metadata": {
+        "license": "Apache-2.0"
+      },
+      "pattern-either": [
+        {
+          "pattern": "new Function(...)"
+        },
+        {
+          "pattern": "Function(...)"
+        }
+      ]
+    },
+    {
+      "id": "gyblos.shell-exec",
+      "languages": ["typescript", "javascript"],
+      "severity": "ERROR",
+      "message": "Use a fixed executable with an argument array instead of a shell command.",
+      "metadata": {
+        "license": "Apache-2.0"
+      },
+      "pattern-either": [
+        {
+          "patterns": [
+            {
+              "pattern-inside": "import { exec as $CALL } from \"child_process\"; ..."
+            },
+            {
+              "pattern": "$CALL(...)"
+            }
+          ]
+        },
+        {
+          "patterns": [
+            {
+              "pattern-inside": "import { execSync as $CALL } from \"child_process\"; ..."
+            },
+            {
+              "pattern": "$CALL(...)"
+            }
+          ]
+        },
+        {
+          "patterns": [
+            {
+              "pattern-inside": "import * as $CP from \"child_process\"; ..."
+            },
+            {
+              "pattern-either": [
+                {
+                  "pattern": "$CP.exec(...)"
+                },
+                {
+                  "pattern": "$CP.execSync(...)"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "patterns": [
+            {
+              "pattern-inside": "import $CP from \"child_process\"; ..."
+            },
+            {
+              "pattern-either": [
+                {
+                  "pattern": "$CP.exec(...)"
+                },
+                {
+                  "pattern": "$CP.execSync(...)"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "patterns": [
+            {
+              "pattern-inside": "const $CP = require(\"child_process\"); ..."
+            },
+            {
+              "pattern-either": [
+                {
+                  "pattern": "$CP.exec(...)"
+                },
+                {
+                  "pattern": "$CP.execSync(...)"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "patterns": [
+            {
+              "pattern-inside": "import { exec as $CALL } from \"node:child_process\"; ..."
+            },
+            {
+              "pattern": "$CALL(...)"
+            }
+          ]
+        },
+        {
+          "patterns": [
+            {
+              "pattern-inside": "import { execSync as $CALL } from \"node:child_process\"; ..."
+            },
+            {
+              "pattern": "$CALL(...)"
+            }
+          ]
+        },
+        {
+          "patterns": [
+            {
+              "pattern-inside": "import * as $CP from \"node:child_process\"; ..."
+            },
+            {
+              "pattern-either": [
+                {
+                  "pattern": "$CP.exec(...)"
+                },
+                {
+                  "pattern": "$CP.execSync(...)"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "patterns": [
+            {
+              "pattern-inside": "import $CP from \"node:child_process\"; ..."
+            },
+            {
+              "pattern-either": [
+                {
+                  "pattern": "$CP.exec(...)"
+                },
+                {
+                  "pattern": "$CP.execSync(...)"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "patterns": [
+            {
+              "pattern-inside": "const $CP = require(\"node:child_process\"); ..."
+            },
+            {
+              "pattern-either": [
+                {
+                  "pattern": "$CP.exec(...)"
+                },
+                {
+                  "pattern": "$CP.execSync(...)"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "patterns": [
+            {
+              "pattern-inside": "import { exec } from \"child_process\"; ..."
+            },
+            {
+              "pattern": "exec(...)"
+            }
+          ]
+        },
+        {
+          "patterns": [
+            {
+              "pattern-inside": "import { execSync } from \"child_process\"; ..."
+            },
+            {
+              "pattern": "execSync(...)"
+            }
+          ]
+        },
+        {
+          "patterns": [
+            {
+              "pattern-inside": "import { exec } from \"node:child_process\"; ..."
+            },
+            {
+              "pattern": "exec(...)"
+            }
+          ]
+        },
+        {
+          "patterns": [
+            {
+              "pattern-inside": "import { execSync } from \"node:child_process\"; ..."
+            },
+            {
+              "pattern": "execSync(...)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gyblos.shell-option",
+      "languages": ["typescript", "javascript"],
+      "severity": "ERROR",
+      "message": "Do not enable a shell in process options.",
+      "metadata": {
+        "license": "Apache-2.0"
+      },
+      "pattern-either": [
+        {
+          "pattern": "{..., shell: true, ...}"
+        }
+      ]
+    },
+    {
+      "id": "gyblos.tls-verification",
+      "languages": ["typescript", "javascript"],
+      "severity": "ERROR",
+      "message": "Do not disable TLS certificate verification.",
+      "metadata": {
+        "license": "Apache-2.0"
+      },
+      "pattern-either": [
+        {
+          "pattern": "{..., rejectUnauthorized: false, ...}"
+        },
+        {
+          "pattern": "process.env.NODE_TLS_REJECT_UNAUTHORIZED = \"0\""
+        },
+        {
+          "pattern": "process.env[\"NODE_TLS_REJECT_UNAUTHORIZED\"] = \"0\""
+        }
+      ]
+    },
+    {
+      "id": "gyblos.electron-preferences",
+      "languages": ["typescript", "javascript"],
+      "severity": "ERROR",
+      "message": "Preserve Electron isolation, sandboxing and web security.",
+      "metadata": {
+        "license": "Apache-2.0"
+      },
+      "pattern-either": [
+        {
+          "pattern": "{..., nodeIntegration: true, ...}"
+        },
+        {
+          "pattern": "{..., contextIsolation: false, ...}"
+        },
+        {
+          "pattern": "{..., sandbox: false, ...}"
+        },
+        {
+          "pattern": "{..., webSecurity: false, ...}"
+        },
+        {
+          "pattern": "{..., allowRunningInsecureContent: true, ...}"
+        }
+      ]
+    },
+    {
+      "id": "gyblos.raw-html",
+      "languages": ["typescript", "javascript"],
+      "severity": "ERROR",
+      "message": "Use text rendering instead of assigning raw HTML.",
+      "metadata": {
+        "license": "Apache-2.0"
+      },
+      "pattern-either": [
+        {
+          "pattern": "$ELEMENT.innerHTML = $HTML"
+        },
+        {
+          "pattern": "{..., dangerouslySetInnerHTML: $VALUE, ...}"
+        },
+        {
+          "pattern": "<$TAG ... dangerouslySetInnerHTML={$VALUE} ... />"
+        }
+      ]
+    },
+    {
+      "id": "gyblos.weak-hash",
+      "languages": ["typescript", "javascript"],
+      "severity": "ERROR",
+      "message": "Use a reviewed modern cryptographic hash instead of MD5 or SHA-1.",
+      "metadata": {
+        "license": "Apache-2.0"
+      },
+      "pattern-either": [
+        {
+          "patterns": [
+            {
+              "pattern-inside": "import { createHash as $HASH } from \"crypto\"; ..."
+            },
+            {
+              "pattern": "$HASH(\"md5\", ...)"
+            }
+          ]
+        },
+        {
+          "patterns": [
+            {
+              "pattern-inside": "import { createHash as $HASH } from \"crypto\"; ..."
+            },
+            {
+              "pattern": "$HASH(\"sha1\", ...)"
+            }
+          ]
+        },
+        {
+          "patterns": [
+            {
+              "pattern-inside": "import { createHash as $HASH } from \"node:crypto\"; ..."
+            },
+            {
+              "pattern": "$HASH(\"md5\", ...)"
+            }
+          ]
+        },
+        {
+          "patterns": [
+            {
+              "pattern-inside": "import { createHash as $HASH } from \"node:crypto\"; ..."
+            },
+            {
+              "pattern": "$HASH(\"sha1\", ...)"
+            }
+          ]
+        },
+        {
+          "patterns": [
+            {
+              "pattern-inside": "import { createHash } from \"crypto\"; ..."
+            },
+            {
+              "pattern": "createHash(\"md5\", ...)"
+            }
+          ]
+        },
+        {
+          "patterns": [
+            {
+              "pattern-inside": "import { createHash } from \"crypto\"; ..."
+            },
+            {
+              "pattern": "createHash(\"sha1\", ...)"
+            }
+          ]
+        },
+        {
+          "patterns": [
+            {
+              "pattern-inside": "import { createHash } from \"node:crypto\"; ..."
+            },
+            {
+              "pattern": "createHash(\"md5\", ...)"
+            }
+          ]
+        },
+        {
+          "patterns": [
+            {
+              "pattern-inside": "import { createHash } from \"node:crypto\"; ..."
+            },
+            {
+              "pattern": "createHash(\"sha1\", ...)"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

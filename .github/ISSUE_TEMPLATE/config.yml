@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security vulnerability privately
+    url: https://github.com/Gyblos/gyblos-node/security/policy
+    about: Follow SECURITY.md. Do not disclose vulnerabilities or credentials in a public issue.
+  - name: Support and usage questions
+    url: https://github.com/Gyblos/gyblos-node/blob/main/SUPPORT.md
+    about: Read the support policy and search existing issues before asking a question.

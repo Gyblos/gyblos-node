@@ -44,6 +44,11 @@ loopback check. See [running and packaging the preview](docs/desktop-probe.md).
 
 ## Quickstart
 
+For a first contribution, start with [CONTRIBUTING.md](CONTRIBUTING.md): it
+covers forks, toolchain setup, offline checks and pull requests. Use
+[SUPPORT.md](SUPPORT.md) for questions and [SECURITY.md](SECURITY.md) for
+private vulnerability reports.
+
 Requirements: Node.js 24.22.1+, pnpm 10.12.1 and a native Iroh platform (macOS
 ARM64 or Linux x64/ARM64; no Intel Mac, Windows untested). Paid runs need devnet
 SOL from [faucet.solana.com](https://faucet.solana.com); inference needs
@@ -59,7 +64,9 @@ pnpm install --frozen-lockfile
 pnpm check
 ```
 
-No wallet, model or network needed; unsupported native cases skip explicitly.
+Installing dependencies requires registry access unless all packages are cached.
+The checks themselves need no funded wallet, running model or external network;
+unsupported native cases skip explicitly and do not prove platform support.
 
 ### Local node and discovery acceptance (no payments)
 
@@ -205,3 +212,13 @@ Seller and free-buyer startup can opt in with `[telemetry] file = true` in
 
 Simulated paid product-startup verification: `pnpm acceptance:paid`
 ([scope and limits](docs/paid-acceptance.md)).
+
+## License and community
+
+Original code is licensed under [Apache 2.0](LICENSE). Third-party components
+and marks retain their own terms; see
+[third-party notices](docs/third-party-notices.md). Contributions follow
+[CONTRIBUTING.md](CONTRIBUTING.md) and the
+[code of conduct](CODE_OF_CONDUCT.md). Maintainer responsibilities and the
+[opening checklist](docs/repository-maintenance.md) describe how the repository
+is maintained.

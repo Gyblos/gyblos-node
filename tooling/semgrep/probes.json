@@ -1,0 +1,202 @@
+{
+  "cases": [
+    {
+      "file": "eval.ts",
+      "source": "eval(input);",
+      "expected": ["gyblos.dynamic-eval"],
+      "padding": 0
+    },
+    {
+      "file": "global-eval.ts",
+      "source": "globalThis.eval(input);",
+      "expected": ["gyblos.dynamic-eval"],
+      "padding": 0
+    },
+    {
+      "file": "suppression.ts",
+      "source": "eval(input); // nosemgrep: gyblos.dynamic-eval",
+      "expected": ["gyblos.dynamic-eval"],
+      "padding": 0
+    },
+    {
+      "file": "constructor.ts",
+      "source": "new Function(input);",
+      "expected": ["gyblos.function-constructor"],
+      "padding": 0
+    },
+    {
+      "file": "function-call.ts",
+      "source": "Function(input);",
+      "expected": ["gyblos.function-constructor"],
+      "padding": 0
+    },
+    {
+      "file": "exec-alias.ts",
+      "source": "import { exec as run } from \"node:child_process\"; run(input);",
+      "expected": ["gyblos.shell-exec"],
+      "padding": 0
+    },
+    {
+      "file": "exec-named.ts",
+      "source": "import { exec } from \"child_process\"; exec(input);",
+      "expected": ["gyblos.shell-exec"],
+      "padding": 0
+    },
+    {
+      "file": "exec-sync.ts",
+      "source": "import { execSync as run } from \"node:child_process\"; run(input);",
+      "expected": ["gyblos.shell-exec"],
+      "padding": 0
+    },
+    {
+      "file": "exec-namespace.ts",
+      "source": "import * as cp from \"node:child_process\"; cp.exec(input);",
+      "expected": ["gyblos.shell-exec"],
+      "padding": 0
+    },
+    {
+      "file": "exec-default.ts",
+      "source": "import cp from \"child_process\"; cp.execSync(input);",
+      "expected": ["gyblos.shell-exec"],
+      "padding": 0
+    },
+    {
+      "file": "exec-require.js",
+      "source": "const cp = require(\"child_process\"); cp.exec(input);",
+      "expected": ["gyblos.shell-exec"],
+      "padding": 0
+    },
+    {
+      "file": "shell.ts",
+      "source": "import { spawn } from \"node:child_process\"; spawn(command, [], {shell: true});",
+      "expected": ["gyblos.shell-option"],
+      "padding": 0
+    },
+    {
+      "file": "tls.ts",
+      "source": "const options = {rejectUnauthorized: false};",
+      "expected": ["gyblos.tls-verification"],
+      "padding": 0
+    },
+    {
+      "file": "tls-env.ts",
+      "source": "process.env.NODE_TLS_REJECT_UNAUTHORIZED = \"0\";",
+      "expected": ["gyblos.tls-verification"],
+      "padding": 0
+    },
+    {
+      "file": "electron-node.ts",
+      "source": "const options = {webPreferences: {nodeIntegration: true}};",
+      "expected": ["gyblos.electron-preferences"],
+      "padding": 0
+    },
+    {
+      "file": "electron-context.ts",
+      "source": "const options = {webPreferences: {contextIsolation: false}};",
+      "expected": ["gyblos.electron-preferences"],
+      "padding": 0
+    },
+    {
+      "file": "electron-sandbox.ts",
+      "source": "const options = {webPreferences: {sandbox: false}};",
+      "expected": ["gyblos.electron-preferences"],
+      "padding": 0
+    },
+    {
+      "file": "electron-web.ts",
+      "source": "const options = {webPreferences: {webSecurity: false}};",
+      "expected": ["gyblos.electron-preferences"],
+      "padding": 0
+    },
+    {
+      "file": "electron-content.ts",
+      "source": "const options = {webPreferences: {allowRunningInsecureContent: true}};",
+      "expected": ["gyblos.electron-preferences"],
+      "padding": 0
+    },
+    {
+      "file": "html.ts",
+      "source": "element.innerHTML = input;",
+      "expected": ["gyblos.raw-html"],
+      "padding": 0
+    },
+    {
+      "file": "tsx.tsx",
+      "source": "const element = <div dangerouslySetInnerHTML={{__html: input}} />;",
+      "expected": ["gyblos.raw-html"],
+      "padding": 0
+    },
+    {
+      "file": "weak-hash.ts",
+      "source": "import { createHash as hash } from \"node:crypto\"; hash(\"md5\").update(input);",
+      "expected": ["gyblos.weak-hash"],
+      "padding": 0
+    },
+    {
+      "file": "sha1.ts",
+      "source": "import { createHash } from \"crypto\"; createHash(\"sha1\").update(input);",
+      "expected": ["gyblos.weak-hash"],
+      "padding": 0
+    },
+    {
+      "file": "tests/included.test.ts",
+      "source": "eval(input);",
+      "expected": ["gyblos.dynamic-eval"],
+      "padding": 0
+    },
+    {
+      "file": "included.min.js",
+      "source": "eval(input);",
+      "expected": ["gyblos.dynamic-eval"],
+      "padding": 0
+    },
+    {
+      "file": "large.ts",
+      "source": "eval(input);",
+      "expected": ["gyblos.dynamic-eval"],
+      "padding": 1100000
+    },
+    {
+      "file": "data.ts",
+      "source": "const value = JSON.parse(input);",
+      "expected": [],
+      "padding": 0
+    },
+    {
+      "file": "process-safe.ts",
+      "source": "import { execFile, spawn } from \"node:child_process\"; execFile(\"node\", [input]); spawn(\"node\", [input], {shell: false});",
+      "expected": [],
+      "padding": 0
+    },
+    {
+      "file": "regex-db-safe.ts",
+      "source": "const match = /x/.exec(input); db.exec(\"SELECT 1\");",
+      "expected": [],
+      "padding": 0
+    },
+    {
+      "file": "tls-safe.ts",
+      "source": "const options = {rejectUnauthorized: true};",
+      "expected": [],
+      "padding": 0
+    },
+    {
+      "file": "electron-safe.ts",
+      "source": "const options = {webPreferences: {nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true}};",
+      "expected": [],
+      "padding": 0
+    },
+    {
+      "file": "safe.tsx",
+      "source": "const element = <div>{input}</div>; element.textContent = input;",
+      "expected": [],
+      "padding": 0
+    },
+    {
+      "file": "hash-safe.ts",
+      "source": "import { createHash } from \"node:crypto\"; createHash(\"sha256\").update(input);",
+      "expected": [],
+      "padding": 0
+    }
+  ]
+}
