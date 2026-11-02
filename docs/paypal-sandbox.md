@@ -79,8 +79,8 @@ needed to preserve unresolved payment attempts. Use sandbox credentials only. In
 Selecting a method does not create an order. Create a session, open PayPal,
 approve with the sandbox buyer, and return to the app to start the session. Use
 Chat or connect OpenCode as described below; close the session explicitly when
-finished to settle it. Each message is independent: previous messages are not
-passed to the engine as conversation context. The selection lasts until the
+finished to settle it. In the built-in Chat, each message is independent;
+OpenCode supplies its own conversation context. The selection lasts until the
 desktop app closes; its payment journal persists separately. No live PayPal
 endpoint is used. The optional `PAYPAL_SANDBOX_OLLAMA_ORIGIN` setting chooses a
 different literal loopback Ollama origin.
