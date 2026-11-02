@@ -130,6 +130,10 @@ git commit -m "Describe the concrete change"
 git push -u origin codex/describe-the-change
 ```
 
+CI also runs [Semgrep Community Edition](docs/static-analysis.md). Docker-based
+local reproduction is optional; the normal checks above do not need Docker, a
+Semgrep account, an AI tool or a vault.
+
 Use the product and lab counts separately, and explain every relevant skipped
 or unavailable check. Confirmed bugs require a failing regression before the
 fix and a passing run afterward. Never run `gate:*`, funding, devnet or deployment

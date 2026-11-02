@@ -61,22 +61,26 @@ fixed deadline.
 
 Protect `main` with mandatory pull requests and successful current checks:
 `CI / check`, `Security / Secrets`, `Security / Dependencies` and
-`CodeQL / TypeScript`. Confirm the actual check contexts from successful runs
-before selecting them; display names and API contexts can differ. Require the
-branch to be current before merge. Block direct and force pushes and branch
-deletion, apply restrictions to administrators and keep bypasses empty.
+`Static analysis / Semgrep CE`. Confirm the actual check contexts from
+successful runs before selecting them; display names and API contexts can
+differ. Require the branch to be current before merge. Block direct and force
+pushes and branch deletion, apply restrictions to administrators and keep
+bypasses empty.
 
 Default Actions tokens remain read-only and cannot approve PRs. Require approval
 for workflows from all outside collaborators. Use GitHub-hosted runners for
 untrusted PRs, pin third-party actions by SHA, and do not use
-`pull_request_target` to execute their code. The CodeQL job has only the
-additional permission needed to upload analysis; it does not build or execute
-project code. Do not add secrets or environment credentials to these checks.
+`pull_request_target` to execute their code. The Semgrep CE job also uses only
+read permissions. Its scanner runs without network access or credentials and
+does not build or execute product source. Do not add secrets or environment
+credentials to these checks.
 
-Enable dependency alerts, secret scanning, push protection, TypeScript code
-scanning and private vulnerability reporting where available. Keep auto-merge
-disabled and Discussions off. Verify account MFA separately without recording
-credentials or recovery material. Feature availability does not mean activation.
+Enable dependency alerts, secret scanning, push protection, static analysis and
+private vulnerability reporting where available. The local Semgrep CE workflow
+works with Free and private repositories; hosted code-scanning alerts are a
+separate feature and are not provided by this workflow. Keep auto-merge disabled
+and Discussions off. Verify account MFA separately without recording credentials
+or recovery material. Feature availability does not mean activation.
 
 The security workflow scans all commits introduced by a PR or push with Gitleaks
 default rules, full redaction and no repository allowlist or baseline. The
@@ -84,9 +88,10 @@ opening review separately scans all reachable history and GitHub surfaces.
 Dependency analysis includes development dependencies and blocks high/critical
 advisory results; an unavailable advisory service fails the check. Triage
 applicability before changing dependencies; never use a forced bulk upgrade to
-hide a result. CodeQL adds static analysis. None replaces review of trust
-boundaries or synthetic regression tests. Dependabot proposes weekly updates; a
-proposal never authorizes automatic merge.
+hide a result. [Static analysis](static-analysis.md) checks the complete tracked
+JS/TS/TSX snapshot against reviewed local Semgrep CE rules. Its explicit
+coverage limits do not replace trust-boundary review or synthetic regressions.
+Dependabot proposes weekly updates; a proposal never authorizes automatic merge.
 
 ## Opening and maintenance
 
