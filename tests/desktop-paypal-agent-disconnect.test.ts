@@ -3,6 +3,7 @@ import { request as httpRequest } from 'node:http';
 import { test } from 'node:test';
 
 import { startDesktopPaypalAgent } from '@gyblos/desktop/paypal-agent-server';
+import { createDesktopPaypalAgentAccess } from '@gyblos/desktop/paypal-agent-access';
 import { createDesktopPaypalSession } from '@gyblos/desktop/paypal-session';
 import { createPaypalSession } from '@gyblos/node/paypal-session';
 
@@ -82,5 +83,41 @@ void test('a disconnected client cannot cancel an already dispatched agent infer
     release();
     request.destroy();
     if (!closed) await endpoint.close();
+  }
+});
+
+void test('disconnect refuses an accepted slow request before it reaches inference', async () => {
+  const f = fixture();
+  const agentEngine = { model: 'synthetic-model', async generate() { f.calls.push('agent-generate'); throw new Error('must not run'); } };
+  const desktop = createDesktopPaypalSession(await createPaypalSession({ ...f, agentEngine }), async () => {});
+  await desktop.create();
+  await desktop.approve();
+  const endpoint = await startDesktopPaypalAgent(desktop, agentEngine.model);
+  const access = createDesktopPaypalAgentAccess(desktop.status, async () => endpoint);
+  await access.connect();
+  const body = JSON.stringify({ model: agentEngine.model, messages: [{ role: 'user', content: 'synthetic' }], max_tokens: 128 });
+  const request = httpRequest(`${endpoint.url}/chat/completions`, { method: 'POST', headers: {
+    authorization: `Bearer ${endpoint.key}`, 'content-type': 'application/json', 'content-length': Buffer.byteLength(body),
+  } });
+  const response = new Promise<number | undefined>((resolve) => {
+    request.on('error', () => resolve(undefined));
+    request.on('response', (incoming) => { incoming.resume(); incoming.on('end', () => resolve(incoming.statusCode)); });
+  });
+  request.write(body.slice(0, 10));
+  try {
+    for (let attempt = 0; attempt < 500 && !endpoint.isBusy(); attempt += 1)
+      await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.equal(endpoint.isBusy(), true);
+    const disconnect = access.disconnect().then(() => true, () => false);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    request.end(body.slice(10));
+    assert.notEqual(await response, 200);
+    assert.equal(await disconnect, true);
+    assert.equal(desktop.status().spentCents, 0);
+    assert.deepEqual(f.calls, ['create', 'authorize']);
+    await desktop.finish();
+  } finally {
+    request.destroy();
+    await access.close();
   }
 });
