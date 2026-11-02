@@ -33,7 +33,8 @@ export interface UptoBuyerWithdrawOptions {
   withdrawal: {
     withdraw(query: UptoWithdrawQuery): Promise<UptoWithdrawResult>;
   };
-  // The buyer's policy: its mint and the network's fee treasury and rate.
+  // The buyer's policy: its mint and the network's fee treasury and rate. Each channel is withdrawn
+  // with the policy its open accepted; this one only for an entry journaled without it.
   mint: string;
   treasury: string;
   protocolFeeBps: number;
@@ -69,17 +70,14 @@ async function stepFor(
       retryAfterSeconds: Math.ceil((left + 1) / msPerSecond),
       failure: null,
     };
+  const { mint, treasury, protocolFeeBps } = entry.policy ?? options;
   try {
     const done = await options.withdrawal.withdraw({
       channelId: entry.channelId,
-      mint: options.mint,
+      mint,
       rentPayer: entry.feePayer,
       maxAtomic: entry.maxAtomic,
-      splits: paymentSplits({
-        payTo: entry.payTo,
-        treasury: options.treasury,
-        protocolFeeBps: options.protocolFeeBps,
-      }),
+      splits: paymentSplits({ payTo: entry.payTo, treasury, protocolFeeBps }),
     });
     return { ...done, failure: null };
   } catch (error) {

@@ -136,6 +136,12 @@ void test('a request is signed once, even by the same buyer after a restart', ()
       journaled?.lastValidBlockHeight,
       (await hints()).lastValidBlockHeight,
     );
+    // So are the mint, treasury and rate it accepted, for withdrawing and reconciling it later.
+    assert.deepEqual(journaled?.policy, {
+      mint: first.options.policy.mint,
+      treasury: first.options.policy.treasury,
+      protocolFeeBps: first.options.policy.protocolFeeBps,
+    });
     await first.options.journal.close();
     const journal = await durable(root);
     const again = createUptoPaymentClient({ ...first.options, journal });
@@ -239,6 +245,7 @@ void test('an unsigned entry left by a crash blocks its request until the terms 
       payTo: crashed.terms.payTo,
       feePayer: crashed.terms.feePayer,
       maxAtomic: '1000',
+      policy: null,
       openSlot: '1',
       lastValidBlockHeight: '100',
       expiresAt: crashed.terms.expiresAt,
@@ -258,6 +265,7 @@ void test('an unsigned entry left by a crash blocks its request until the terms 
       payTo: crashed.terms.payTo,
       feePayer: crashed.terms.feePayer,
       maxAtomic: '1',
+      policy: null,
       openSlot: '1',
       lastValidBlockHeight: '100',
       expiresAt: now + 1,

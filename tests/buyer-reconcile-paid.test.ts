@@ -70,6 +70,7 @@ void test('paid reconciliation keeps each resolution, then reports what still bl
         payTo: PAY_TO,
         feePayer: PAY_TO,
         maxAtomic: '1000',
+        policy: null,
         openSlot: '5',
         lastValidBlockHeight: '150',
         expiresAt: Date.now() + 60_000,

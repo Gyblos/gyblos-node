@@ -74,6 +74,7 @@ async function journaled(home: string, payer: string) {
       payTo,
       feePayer,
       maxAtomic: '1000',
+      policy: null,
       openSlot: '5',
       lastValidBlockHeight: '150',
       expiresAt: signedAt,

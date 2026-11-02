@@ -34,7 +34,8 @@ export interface UptoReconcileResult {
 export interface UptoReconcileOptions {
   journal: UptoBuyerJournal;
   rpc: UptoSignaturesRpc & UptoTransactionRpc;
-  // The buyer's wallet address and the mint and fee treasury of its policy.
+  // The buyer's wallet address and the mint and fee treasury of its policy. Each channel is read with
+  // the mint and treasury its open accepted; these only for an entry journaled without them.
   payer: string;
   mint: string;
   treasury: string;
@@ -83,16 +84,17 @@ function readers(options: UptoReconcileOptions) {
       entry.channelId,
       slot,
     );
+    const { mint, treasury } = entry.policy ?? options;
     let deposited = false;
     for (const transaction of signatures) {
       const found = await receipts.transfer({
         transaction,
         channelId: entry.channelId,
-        mint: options.mint,
+        mint,
         maxAtomic: entry.maxAtomic,
         payer: options.payer,
         payTo: entry.payTo,
-        treasury: options.treasury,
+        treasury,
       });
       if (found.settled) return { ...found.settled, transaction };
       deposited ||= found.deposited;
