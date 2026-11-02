@@ -2,13 +2,18 @@
 // them: the distribution is rebuilt from the buyer's own policy. The journal is left as is;
 // reconciliation resolves each channel from finalized history after its escrow is distributed.
 import {
+  UPTO_ERROR_CODES,
   uptoError,
   type UptoErrorCode,
   type UptoWithdrawQuery,
   type UptoWithdrawResult,
 } from 'x402-upto-metered';
 
-import { PAYMENT_CHANNEL_STATES } from '@gyblos/protocol/constants';
+import {
+  PAYMENT_CHANNEL_STATES,
+  PAYMENT_ERROR_CODES,
+} from '@gyblos/protocol/constants';
+import { PaymentError } from '@gyblos/protocol/payment';
 import { paymentSplits } from '@gyblos/protocol/payment-binding';
 
 import type { UptoBuyerJournal, UptoJournalEntry } from './buyer-journal';
@@ -60,6 +65,17 @@ export interface UptoBuyerWithdrawOptions {
 
 const { msPerSecond } = BUYER_WITHDRAW;
 
+// The network preflight uses payment-port errors; preserve their meaning in withdrawal results.
+function withdrawalFailure(error: unknown): UptoErrorCode {
+  if (error instanceof PaymentError) {
+    if (error.code === PAYMENT_ERROR_CODES.UNAVAILABLE)
+      return UPTO_ERROR_CODES.UNAVAILABLE;
+    if (error.code === PAYMENT_ERROR_CODES.UNTRUSTED_TERMS)
+      return UPTO_ERROR_CODES.INVALID_TERMS;
+  }
+  return uptoError(error).code;
+}
+
 // Until when the seller may still claim: the quote's expiry or the signed payload's lifetime, plus the
 // margin. The entry is written when the open is signed and not again while it stays open.
 const claimableUntil = (
@@ -100,7 +116,7 @@ async function stepFor(
       transaction: null,
       confirmed: true,
       retryAfterSeconds: BUYER_WITHDRAW.failedRetrySeconds,
-      failure: uptoError(error).code,
+      failure: withdrawalFailure(error),
     };
   }
 }

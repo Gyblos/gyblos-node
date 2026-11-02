@@ -32,7 +32,11 @@ export function createUptoWithdrawal(
     ...(options.sleep ? { sleep: options.sleep.bind(options) } : {}),
   });
   return {
-    async withdraw(query: Parameters<typeof withdrawal.withdraw>[0]) {
+    async withdraw(input: Parameters<typeof withdrawal.withdraw>[0]) {
+      const query = {
+        ...input,
+        splits: input.splits.map((split) => ({ ...split })),
+      };
       await verifyPaymentNetwork(fixedRpc, network);
       return withdrawal.withdraw(query);
     },

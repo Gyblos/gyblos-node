@@ -252,3 +252,82 @@ void test('withdrawal fixes RPC methods before the genesis check', async () => {
   assert.equal(foreignReads, 0);
   assert.equal(double.sent.length, 0);
 });
+
+void test('withdrawal reports wrong-chain and unavailable RPC errors without hiding their cause', async () => {
+  for (const [paymentCode, expected] of [
+    [PAYMENT_ERROR_CODES.UNAVAILABLE, 'UPTO_UNAVAILABLE'],
+    [PAYMENT_ERROR_CODES.UNTRUSTED_TERMS, 'UPTO_INVALID_TERMS'],
+  ] as const) {
+    await withJournal(async (journal) => {
+      await journal.put(entry(DEVNET));
+      const results = await withdrawUptoBuyer({
+        journal,
+        network: DEVNET,
+        withdrawal: {
+          withdraw: async () => {
+            throw new PaymentError(paymentCode);
+          },
+        },
+        mint: ADDRESS,
+        treasury: ADDRESS,
+        protocolFeeBps: 300,
+        maxTimeoutSeconds: 120,
+        now: () => NOW + 500_000,
+        report: async () => {},
+      });
+      assert.equal(results[0]?.step, 'failed');
+      assert.equal(results[0]?.failure, expected);
+    });
+  }
+});
+
+void test('withdrawal fixes its channel and split inputs before waiting for genesis', async () => {
+  const payer = await generateKeyPairSigner();
+  const double = withdrawChain({ accounts: new Map(), blockTime: 0n });
+  let releaseGenesis: ((value: string) => void) | undefined;
+  let splitReads = 0;
+  const seen: string[] = [];
+  const rpc = {
+    ...double.rpc,
+    getGenesisHash: () => ({
+      send: () =>
+        new Promise<string>((resolve) => {
+          releaseGenesis = resolve;
+        }),
+    }),
+    getAccountInfo: (...args: Parameters<typeof double.rpc.getAccountInfo>) => {
+      seen.push(String(args[0]));
+      return double.rpc.getAccountInfo(...args);
+    },
+  };
+  const split = { recipient: ADDRESS, bps: 1 };
+  Object.defineProperty(split, 'bps', {
+    get: () => {
+      splitReads++;
+      return 1;
+    },
+  });
+  const query = {
+    channelId: ADDRESS,
+    mint: ADDRESS,
+    rentPayer: ADDRESS,
+    maxAtomic: '1000',
+    splits: [split],
+  };
+  const withdrawal = createUptoWithdrawal(rpc, {
+    payer,
+    network: DEVNET,
+    tokenProgram: TOKEN_PROGRAM_ADDRESS,
+  });
+  const pending = withdrawal.withdraw(query);
+  const readsBeforeGenesis = splitReads;
+  query.channelId = 'SysvarRent111111111111111111111111111111111';
+  split.recipient = query.channelId;
+  assert.ok(releaseGenesis);
+  releaseGenesis(DEVNET_GENESIS);
+  const result = await pending;
+  assert.equal(result.step, 'nothing');
+  assert.deepEqual(seen, [ADDRESS]);
+  assert.notEqual(readsBeforeGenesis, 0);
+  assert.deepEqual(double.sent, []);
+});
