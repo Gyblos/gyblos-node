@@ -105,3 +105,29 @@ void test('keeping the app open does not abort or close other services', async (
   assert.equal(quits, 1);
   assert.equal(prevented, 3);
 });
+
+void test('an opened checkout keeps the close guard active until it is authorized', async () => {
+  const f = fixture();
+  const service = createDesktopPaypalSession(
+    await createPaypalSession(f),
+    async () => {},
+  );
+  await service.create();
+  assert.equal(service.isCloseBlocked(), false);
+  await service.openApproval();
+  assert.equal(service.isCloseBlocked(), true);
+  await service.approve();
+  assert.equal(service.isCloseBlocked(), false);
+});
+
+void test('abandoning a checkout does not pretend its external browser tab was closed', async () => {
+  const f = fixture();
+  const service = createDesktopPaypalSession(
+    await createPaypalSession(f),
+    async () => {},
+  );
+  await service.create();
+  await service.openApproval();
+  await service.abandon();
+  assert.equal(service.isCloseBlocked(), true);
+});
