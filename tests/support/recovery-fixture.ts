@@ -36,6 +36,8 @@ export async function recoveryFixture(fullRefund = true) {
   if (fullRefund) await fullPrincipalRefund(financial);
   await tokenCredit(financial, 17n);
   const directory = await mkdtemp(join(tmpdir(), 'gyblos-public-recovery-'));
+  const productHome = join(directory, 'product');
+  const labHome = join(directory, 'lab');
   const {
     rpcUrl,
     channelId,
@@ -105,7 +107,7 @@ export async function recoveryFixture(fullRefund = true) {
     claimSignature,
   };
   const path = (filename: string) =>
-    join(directory, homeLayout(process.env).roles.buyer, filename);
+    join(homeLayout({ GYBLOS_HOME: productHome }).roles.buyer, filename);
   const write = (filename: string, value: unknown) =>
     saveJson(path(filename), value);
   try {
@@ -120,6 +122,8 @@ export async function recoveryFixture(fullRefund = true) {
   return {
     financial,
     directory,
+    productHome,
+    labHome,
     journal,
     path,
     write,
@@ -128,13 +132,21 @@ export async function recoveryFixture(fullRefund = true) {
       const { main } = await import('@gyblos/buyer/reconcile');
       const originalDirectory = process.cwd();
       const originalLog = console.log;
+      const originalHome = process.env.GYBLOS_HOME;
+      const originalLabHome = process.env.GYBLOS_LAB_HOME;
       try {
         process.chdir(directory);
+        process.env.GYBLOS_HOME = productHome;
+        process.env.GYBLOS_LAB_HOME = labHome;
         console.log = () => {};
         return await withOfflineProof(financial, () => main(args));
       } finally {
         process.chdir(originalDirectory);
         console.log = originalLog;
+        if (originalHome === undefined) delete process.env.GYBLOS_HOME;
+        else process.env.GYBLOS_HOME = originalHome;
+        if (originalLabHome === undefined) delete process.env.GYBLOS_LAB_HOME;
+        else process.env.GYBLOS_LAB_HOME = originalLabHome;
       }
     },
     close: () => rm(directory, { recursive: true, force: true }),

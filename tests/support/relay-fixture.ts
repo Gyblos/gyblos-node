@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { isAbsolute, join, relative } from 'node:path';
+import { isAbsolute, join, relative, resolve } from 'node:path';
 
 import { generateKeyPairSigner } from '@solana/kit';
 
@@ -135,12 +135,20 @@ export function endpointProbe(
   action: ProbeAction = PROBE_ACTIONS.ENDPOINT,
   cwd?: string,
 ) {
-  const directory = cwd ?? mkdtempSync(join(tmpdir(), 'gyblos-relay-probe-'));
-  const root = join(directory, homeLayout(process.env).root);
-  const inside = relative(directory, root);
-  if (inside.startsWith('..') || isAbsolute(inside))
-    throw new Error('Relay probe home must stay inside its fixture.');
+  const directory =
+    cwd === undefined
+      ? mkdtempSync(join(tmpdir(), 'gyblos-relay-probe-'))
+      : resolve(cwd);
   try {
+    const configured = homeLayout(process.env).root;
+    const candidate = isAbsolute(configured)
+      ? configured
+      : join(directory, configured);
+    const inside = relative(directory, candidate);
+    const root =
+      cwd !== undefined && !inside.startsWith('..') && !isAbsolute(inside)
+        ? candidate
+        : join(directory, 'product');
     const child = spawnSync(
       process.execPath,
       [
@@ -159,7 +167,7 @@ export function endpointProbe(
           [HOME_ENVIRONMENT.product]: root,
           [HOME_ENVIRONMENT.lab]: join(directory, 'gyblos-probe-lab'),
         },
-        cwd,
+        cwd: directory,
         encoding: 'utf8',
         timeout: PROBE_TIMEOUT_MS,
         maxBuffer: OUTPUT_LIMIT_BYTES,
@@ -201,7 +209,11 @@ export async function withRelayOffer(
   const fixture = await recoveryFixture();
   const owner = await generateKeyPairSigner();
   const previousDirectory = process.cwd();
+  const previousHome = process.env.GYBLOS_HOME;
+  const previousLabHome = process.env.GYBLOS_LAB_HOME;
   try {
+    process.env.GYBLOS_HOME = fixture.productHome;
+    process.env.GYBLOS_LAB_HOME = fixture.labHome;
     const signed = await fixture.read<SignedInferenceOffer>(ROLE_FILES.offer);
     const trust = await fixture.read<OfferTrust>(ROLE_FILES.trust);
     const nodeId = options.sellerNodeId ?? signed.offer.nodeId;
@@ -235,6 +247,10 @@ export async function withRelayOffer(
     await run(fixture.directory);
   } finally {
     process.chdir(previousDirectory);
+    if (previousHome === undefined) delete process.env.GYBLOS_HOME;
+    else process.env.GYBLOS_HOME = previousHome;
+    if (previousLabHome === undefined) delete process.env.GYBLOS_LAB_HOME;
+    else process.env.GYBLOS_LAB_HOME = previousLabHome;
     await fixture.close();
   }
 }
