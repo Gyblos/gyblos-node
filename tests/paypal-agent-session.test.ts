@@ -192,6 +192,25 @@ void test('malformed engine output never becomes an acknowledged charge', async 
   assert.deepEqual(f.calls, ['create', 'authorize', 'agent-generate']);
 });
 
+void test('an empty response cannot become an acknowledged charge', async () => {
+  const f = fixture();
+  const agentEngine = {
+    model: 'synthetic-model',
+    async generate() {
+      const response = completion(1);
+      response.choices[0].message.content = '';
+      return response;
+    },
+  };
+  const session = await createPaypalSession({ ...f, agentEngine });
+  const order = await session.create();
+  await session.approve(order.orderId);
+  await assert.rejects(session.agentMessage(order.orderId, {
+    model: 'synthetic-model', messages: [{ role: 'user', content: 'synthetic' }], max_tokens: 128,
+  }, 'MESSAGE1'));
+  assert.equal(session.status().spentCents, 0);
+});
+
 void test('a reentrant validator cannot start two paid inferences', async () => {
   const f = fixture();
   let entered = false;

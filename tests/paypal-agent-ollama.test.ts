@@ -107,6 +107,7 @@ void test('an explicitly selected local agent model is used and verified', async
   const fetcher: typeof fetch = async (url, init) => {
     if (String(url).endsWith('/api/version'))
       return Response.json({ version: '0.40.0' });
+    if (String(url).endsWith('/api/show')) return Response.json({ capabilities: ['tools'] });
     if (String(url).endsWith('/api/tags'))
       return Response.json({
         models: [{ name: chosen, digest, capabilities: ['tools'] }],
@@ -229,6 +230,7 @@ void test('model verification rejects an Ollama version that can ignore context 
   let version = '0.12.5';
   const fetcher: typeof fetch = async (url) => {
     if (String(url).endsWith('/api/version')) return Response.json({ version });
+    if (String(url).endsWith('/api/show')) return Response.json({ capabilities: ['tools'] });
     return Response.json({
       models: [
         {
@@ -383,4 +385,21 @@ void test('an empty assistant response cannot be presented as completed work', a
   });
   const engine = createOllamaAgent('http://127.0.0.1:11434/', fetcher);
   await assert.rejects(engine.generate(request));
+});
+
+void test('a new tool call cannot reuse an ID from previous history', async () => {
+  const call = { id: 'call_1', function: { name: 'read_file', arguments: {} } };
+  const fetcher: typeof fetch = async () => Response.json({
+    model: MODEL.name, created_at: '2026-01-01T00:00:00Z', done: true,
+    done_reason: 'stop', message: { role: 'assistant', content: '', tool_calls: [call] },
+    prompt_eval_count: 2, eval_count: 3,
+  });
+  const engine = createOllamaAgent('http://127.0.0.1:11434/', fetcher);
+  await assert.rejects(engine.generate({ ...request, messages: [
+    ...request.messages,
+    { role: 'assistant', content: null, tool_calls: [
+      { id: 'call_1', type: 'function', function: { name: 'read_file', arguments: '{}' } },
+    ] },
+    { role: 'tool', tool_call_id: 'call_1', content: 'synthetic' },
+  ] }));
 });
