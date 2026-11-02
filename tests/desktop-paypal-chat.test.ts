@@ -158,3 +158,20 @@ void test('a follow-up draft typed during inference is preserved', async () => {
   assert.equal(chat.getSnapshot().draft, 'Follow-up draft');
   assert.equal(chat.getSnapshot().status?.spentCents, 10);
 });
+
+void test('a valid long response is acknowledged rather than lost by the desktop boundary', async () => {
+  const { f, chat } = await setup();
+  const text = 'x'.repeat(70_000);
+  f.engine.generate = async () => ({
+    text,
+    usage: { inputTokens: 2, outputTokens: 3 },
+  });
+  await chat.refresh();
+  await chat.create();
+  await chat.approve();
+  chat.setDraft('Long response');
+  await chat.send();
+  assert.equal(chat.getSnapshot().messages.at(-1)?.text, text);
+  assert.equal(chat.getSnapshot().status?.spentCents, 10);
+  assert.equal(chat.getSnapshot().pendingMessageId, null);
+});
