@@ -77,6 +77,7 @@ void test('a temporarily busy shared session tells the agent to retry without di
     await started;
     const busy = await gateway.handle(post());
     assert.equal(busy.status, 409);
+    assert.equal(busy.headers.get('x-should-retry'), 'true');
     assert.equal((await busy.json()).error.code, 'PAYPAL_BUSY');
   } finally {
     release();
