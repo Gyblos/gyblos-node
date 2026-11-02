@@ -288,8 +288,8 @@ pinned public tokenizer (`SELLER_PAID_METERING_UNRECOUNTED` otherwise) and the
 seller role was set up with a payout and payment keys
 (`SELLER_PAYMENT_ROLE_MISSING` otherwise). Buyers see and pay the seller's price
 plus the protocol fee (`PROTOCOL_FEE`, 3% on devnet), rounded up. Paid v2 has
-not settled on devnet yet; see [limitations](limitations.md). The v1 paid path
-remains in the lab gates (`pnpm gate:*`) only.
+settled on devnet only in a controlled run; see [limitations](limitations.md).
+The v1 paid path remains in the lab gates (`pnpm gate:*`) only.
 [examples/seller-daemon.toml](../examples/seller-daemon.toml) is a file it
 accepts as written; the other examples are valid files for future nodes but stop
 this daemon. Today it honors:
@@ -322,16 +322,16 @@ channel's rent until the channel is reclaimed. `pnpm gyblos doctor` also names
 the `[[offers]]` entry a code is about.
 
 A claim pays the payout, the protocol fee treasury and the fee payer (the
-channel's payee) into their token accounts for the mint. The payment program
-does not fail when one of them is missing: it pays that share to its own
-treasury for good. So before starting, and again before every claim, the seller
-reads those three accounts and creates any that are missing in one transaction
-the fee payer signs and pays for (about 0.002 devnet SOL of rent each, once). A
-seller that cannot create them does not start; a claim that cannot is not sent
-and stays pending with its recorded charge, retried on recovery.
-`pnpm gyblos doctor --online` warns with `PAYMENT_ACCOUNTS_MISSING` (startup
-creates them) or `PAYMENT_ACCOUNTS_UNCHECKED` (the RPC did not answer), and
-never sends anything.
+channel's payee) into their token accounts for the mint, and refunds the rest to
+the buyer's. The payment program does not fail when one of them is missing: it
+pays that share to its own treasury for good. So before starting the seller
+reads the first three accounts, and before every claim all four, and creates any
+that are missing in one transaction the fee payer signs and pays for (about
+0.002 devnet SOL of rent each). A seller that cannot create them does not start;
+a claim that cannot is not sent and stays pending with its recorded charge,
+retried on recovery. `pnpm gyblos doctor --online` warns with
+`PAYMENT_ACCOUNTS_MISSING` (startup creates them) or
+`PAYMENT_ACCOUNTS_UNCHECKED` (the RPC did not answer), and never sends anything.
 
 `pnpm gyblos config validate --config "$GYBLOS_CONFIG"` explains file problems
 (it does not read `GYBLOS_CONFIG`, does not check the `SELLER_*` limits above,

@@ -25,7 +25,7 @@ export async function rig(
       attempts: readonly string[];
     }) => { transaction: string; chargedAtomic: string } | undefined;
     // What making the recipients' token accounts exist does; resolves by default.
-    recipients?: () => Promise<void>;
+    recipients?: (also: readonly string[] | undefined) => Promise<void>;
   } = {},
 ) {
   const party = await parties();
@@ -62,9 +62,9 @@ export async function rig(
     now: () => now,
     openWindowMs: 90_000,
     recipients: {
-      ensure: async () => {
+      ensure: async (also) => {
         steps.push('recipients');
-        await options.recipients?.();
+        await options.recipients?.(also);
       },
     },
   });

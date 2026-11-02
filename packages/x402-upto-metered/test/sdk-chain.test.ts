@@ -190,10 +190,12 @@ void test('the pending store keeps broadcast signatures across restarts and forg
 
 void test('every claim attempt first makes the recipients exist; a failure there sends nothing and keeps the charge', async () => {
   let missing = true;
+  const also: (readonly string[] | undefined)[] = [];
   const { chain, steps, record, store } = await rig(
     async () => ({ success: true, transaction: 'C'.repeat(64) }),
     {
-      recipients: async () => {
+      recipients: async (owners) => {
+        also.push(owners);
         if (missing) throw new UptoError(UPTO_ERROR_CODES.UNAVAILABLE);
       },
     },
@@ -211,6 +213,8 @@ void test('every claim attempt first makes the recipients exist; a failure there
     transaction: 'C'.repeat(64),
   });
   assert.deepEqual(steps, ['recipients', 'recipients', 'claim']);
+  // With the channel payer's own, which distribute refunds.
+  assert.deepEqual(also, [[record.payer], [record.payer]]);
   // A claim already known to have landed sends nothing, so it needs no accounts.
   missing = true;
   await chain.claim(record, '5');

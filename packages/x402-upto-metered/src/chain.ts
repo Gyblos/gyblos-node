@@ -64,7 +64,8 @@ export interface UptoSdkChainOptions {
   now: () => number;
   // How long after sending an open it can still land (its blockhash validity), in ms.
   openWindowMs: number;
-  // Made to exist before every new claim attempt, so the program never redirects a share.
+  // Made to exist, with the channel payer's own (its refund), before every new claim attempt, so
+  // the program never redirects a share or the refund.
   recipients: UptoRecipientAccounts;
 }
 
@@ -264,7 +265,7 @@ export function createUptoSdkChain(options: UptoSdkChainOptions): UptoChain {
       if (!previous)
         await store.putClaim({ channelId: record.channelId, chargedAtomic });
       // After the charge is recorded: a failure leaves this claim for recovery, never another one.
-      await options.recipients.ensure();
+      await options.recipients.ensure([record.payer]);
       const transaction = await claimed(options, server, record, chargedAtomic);
       await store.putClaim({
         ...(await store.getClaim(record.channelId)),

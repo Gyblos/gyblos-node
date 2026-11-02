@@ -1,6 +1,7 @@
 // Sending the package's own transactions: each RPC call under its own deadline, one transaction
 // signed and paid by its fee payer, and its confirmation polled for a bounded time. Shared by the
-// payer's withdrawal and the seller's recipient token accounts.
+// payer's withdrawal and the seller's recipient token accounts, so UPTO_WITHDRAW's rpcMs, pollMs and
+// confirmMs bound both.
 import {
   appendTransactionMessageInstructions,
   createTransactionMessage,
@@ -49,8 +50,7 @@ export interface UptoSendRpc {
 }
 
 export const uptoConfirmed: UptoConfirmed = { commitment: UPTO_COMMITMENT };
-export const uptoPause = (ms: number) =>
-  new Promise<void>((done) => setTimeout(done, ms));
+const pause = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));
 
 // One RPC call under its own deadline; any failure is UNAVAILABLE, never the RPC's own text.
 export async function uptoRead<T>(call: UptoCall<T>): Promise<T> {
@@ -92,7 +92,7 @@ export async function uptoSend(
   rpc: UptoSendRpc,
   feePayer: TransactionSigner,
   instructions: readonly Instruction[],
-  sleep: (ms: number) => Promise<void> = uptoPause,
+  sleep: (ms: number) => Promise<void> = pause,
 ): Promise<{ transaction: string; confirmed: boolean }> {
   const { value: lifetime } = await uptoRead(
     rpc.getLatestBlockhash(uptoConfirmed),

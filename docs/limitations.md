@@ -24,11 +24,13 @@ only; never import mainnet keys.
 
 - The devnet protocol fee treasury is a public Gyblos test wallet
   (`4Ui1dfvqbFx9CtjXNcKajHdr7aKT1nbYRiYjB1s7umNy`), distinct from the x402
-  program's own treasury. Mainnet has no treasury configured. Before the first
-  devnet claim, the treasury needs a token account for the test mint, since the
-  claim pays its share there.
-- Paid v2 selling (x402 upto channels) is wired to devnet but tested offline
-  only; nothing has settled on devnet yet.
+  program's own treasury. Mainnet has no treasury configured. A claim pays into
+  token accounts for the mint, and the program pays a share whose account is
+  missing to its own treasury for good; the paid seller creates the missing ones
+  (payout, fee treasury, fee payer and the channel's payer) before it starts and
+  before each claim ([Seller startup](configuration.md#seller-startup)).
+- Paid v2 selling (x402 upto channels) is wired to devnet and has settled there
+  only in a controlled run; it is not validated beyond that.
 - A claim is recognized as landed only through the transactions this seller sent
   for it. If a claim lands without its signature being recorded (the process
   stops after sending it, or the RPC fails the send after it propagated), the

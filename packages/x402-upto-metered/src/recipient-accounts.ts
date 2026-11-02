@@ -1,10 +1,10 @@
 // The token accounts a claim pays into, made to exist before the seller charges: a distribute that
 // finds a recipient's account missing pays that share to the program's treasury for good, so payTo,
-// the fee treasury and the channel payee are each read and, when missing, created at the fee
-// payer's cost in one transaction. No Gyblos imports.
+// the fee treasury, the channel payee and the channel's payer (its refund) are each read and, when
+// missing, created at the fee payer's cost in one transaction. No Gyblos imports.
 import type { Address, TransactionSigner } from '@solana/kit';
 
-import { UPTO_ERROR_CODES } from './constants';
+import { UPTO_ERROR_CODES, UPTO_PROGRAM } from './constants';
 import { UptoError } from './errors';
 import {
   uptoConfirmed,
@@ -23,7 +23,12 @@ export interface UptoRecipientAccountsRpc extends UptoSendRpc {
   getMultipleAccounts(
     accounts: Address[],
     config: UptoConfirmed & { encoding: 'base64' },
-  ): UptoCall<{ value: readonly ({ owner: Address } | null)[] }>;
+  ): UptoCall<{
+    value: readonly ({
+      owner: Address;
+      data: readonly [string, 'base64'];
+    } | null)[];
+  }>;
 }
 
 export interface UptoTokenAccountsQuery {
@@ -32,9 +37,10 @@ export interface UptoTokenAccountsQuery {
   owners: readonly string[];
 }
 
-// The owners (each once, in order) with no token account for the mint; UNAVAILABLE when the RPC
-// cannot say, or something the token program does not own sits at an account's address (only the
-// associated token program can create one there, so it could never receive a payout).
+// The owners (each once, in order) with no token account for the mint. An empty system account at
+// the address (anyone can send it lamports) is missing too: the associated token program creates
+// over it. UNAVAILABLE when the RPC cannot say, or anything else the token program does not own sits
+// there, which could never receive a payout.
 export async function uptoMissingTokenAccounts(
   rpc: Pick<UptoRecipientAccountsRpc, 'getMultipleAccounts'>,
   query: UptoTokenAccountsQuery,
@@ -48,12 +54,16 @@ export async function uptoMissingTokenAccounts(
   const { value } = await uptoRead(
     rpc.getMultipleAccounts(accounts, { ...uptoConfirmed, encoding: 'base64' }),
   );
-  if (
-    value.length !== owners.length ||
-    value.some((found) => found && String(found.owner) !== query.tokenProgram)
-  )
+  if (value.length !== owners.length)
     throw new UptoError(UPTO_ERROR_CODES.UNAVAILABLE);
-  return owners.filter((_, index) => !value[index]);
+  return owners.filter((_, index) => {
+    const found = value[index];
+    if (!found) return true;
+    if (String(found.owner) === query.tokenProgram) return false;
+    if (String(found.owner) === UPTO_PROGRAM.systemProgram && !found.data[0])
+      return true;
+    throw new UptoError(UPTO_ERROR_CODES.UNAVAILABLE);
+  });
 }
 
 export interface UptoRecipientAccountsOptions {
@@ -61,15 +71,15 @@ export interface UptoRecipientAccountsOptions {
   feePayer: TransactionSigner;
   mint: string;
   tokenProgram: string;
-  // Every owner a claim may pay: payTo, the fee treasury and the channel payee.
+  // Every owner a claim of this seller pays: payTo, the fee treasury and the channel payee.
   owners: readonly string[];
   sleep?: (ms: number) => Promise<void>;
 }
 
 export interface UptoRecipientAccounts {
-  // Resolves once every owner's account exists; UNAVAILABLE (or CHAIN_REJECTED, when the chain
-  // refused the creation) otherwise, and the caller must not charge.
-  ensure(): Promise<void>;
+  // Resolves once every owner's account exists, with these too (a channel's payer); UNAVAILABLE (or
+  // CHAIN_REJECTED, when the chain refused the creation) otherwise, and the caller must not charge.
+  ensure(also?: readonly string[]): Promise<void>;
 }
 
 export function createUptoRecipientAccounts(
@@ -78,8 +88,12 @@ export function createUptoRecipientAccounts(
 ): UptoRecipientAccounts {
   const { feePayer, mint, tokenProgram } = options;
   return {
-    async ensure() {
-      const missing = await uptoMissingTokenAccounts(rpc, options);
+    async ensure(also = []) {
+      const missing = await uptoMissingTokenAccounts(rpc, {
+        mint,
+        tokenProgram,
+        owners: [...options.owners, ...also],
+      });
       if (missing.length === 0) return;
       const { confirmed } = await uptoSend(
         rpc,

@@ -13,6 +13,7 @@ import {
   createUptoVerifier,
   UPTO_COMMITMENT,
   uptoChannelRpc,
+  UptoError,
   type UptoKitRpc,
   type UptoRecipientAccountsRpc,
 } from 'x402-upto-metered';
@@ -86,8 +87,10 @@ export async function openUptoSellerPayments(
       sleep: options.sleep,
     });
     // Before anything is admitted: a seller whose payouts would be redirected does not start.
-    await recipients.ensure().catch(() => {
-      throw new PaymentError(PAYMENT_ERROR_CODES.UNAVAILABLE);
+    await recipients.ensure().catch((error: unknown) => {
+      throw error instanceof UptoError
+        ? new PaymentError(PAYMENT_ERROR_CODES.UNAVAILABLE)
+        : error;
     });
     const facilitator = createUptoFacilitator(
       toFacilitatorSvmSigner(feePayer, { defaultRpcUrl: options.rpcUrl }),

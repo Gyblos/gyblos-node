@@ -155,10 +155,11 @@ pnpm node:start
   (`pnpm node:setup --role seller --mint <mint> --pay-to <payout> --buyer <address>`
   in a new `GYBLOS_HOME`; `--buyer` is still required by the v1 setup). The fee
   payer key needs devnet SOL for transaction fees, channel rent and, once, the
-  rent of any missing payout, fee or fee payer token account, which startup
-  creates so that no claim is redirected to the payment program
-  ([Seller startup](configuration.md#seller-startup)). Paid v2 has not settled
-  on devnet yet; the v1 paid path remains in the lab gates only.
+  rent of any missing payout, fee, fee payer or buyer token account, which the
+  seller creates so that no claim is redirected to the payment program
+  ([Seller startup](configuration.md#seller-startup)). Paid v2 has settled on
+  devnet only in a controlled run; the v1 paid path remains in the lab gates
+  only.
 - The seller runs its own Ollama; the daemon never starts it. Startup warms each
   offer in order at its own engine URL (a literal loopback address), checking
   memory headroom for engines on this machine, and signs its public records once

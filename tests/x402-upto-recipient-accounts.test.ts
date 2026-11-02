@@ -5,6 +5,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { TOKEN_PROGRAM_ADDRESS } from '@solana-program/token';
 import {
   generateKeyPairSigner,
   getBase58Decoder,
@@ -23,8 +24,6 @@ import {
   type UptoRecipientAccountsRpc,
 } from 'x402-upto-metered';
 
-import { TOKEN_PROGRAM_ADDRESS } from '@gyblos/config';
-
 import {
   decodeSent,
   newAddress,
@@ -35,7 +34,10 @@ const TOKEN_PROGRAM = String(TOKEN_PROGRAM_ADDRESS);
 
 interface Chain {
   // Token accounts that exist, by address, with their owning program.
-  existing: Map<string, string>;
+  // Accounts at those addresses: their owning program and base64 data ('' when empty).
+  existing: Map<string, { owner: string; data: string }>;
+  // The RPC answers with one entry too few.
+  short?: boolean;
   outcome?: 'confirmed' | 'never' | 'failed';
   preflightFails?: boolean;
   failing?: boolean;
@@ -59,9 +61,14 @@ function chainDouble(state: Chain) {
           commitment: config.commitment,
         });
         return {
-          value: accounts.map((account) => {
-            const owner = state.existing.get(String(account));
-            return owner ? { owner: owner as Address } : null;
+          value: accounts.slice(state.short ? 1 : 0).map((account) => {
+            const found = state.existing.get(String(account));
+            return found
+              ? {
+                  owner: found.owner as Address,
+                  data: [found.data, 'base64'] as const,
+                }
+              : null;
           }),
         };
       }),
@@ -125,7 +132,10 @@ async function setup(
     ),
   );
   const existing = new Map(
-    (state.present ?? []).map((index) => [accounts[index]!, TOKEN_PROGRAM]),
+    (state.present ?? []).map((index) => [
+      accounts[index]!,
+      { owner: TOKEN_PROGRAM, data: 'AAAA' },
+    ]),
   );
   const chain = chainDouble({ ...state, existing });
   const recipients = createUptoRecipientAccounts(chain.rpc, {
@@ -180,11 +190,49 @@ void test('the missing accounts are created idempotently in one transaction the 
   );
 });
 
+void test('an empty system account at an address (anyone can fund one) is missing and created over', async () => {
+  const { recipients, sent, existing, accounts, owners } = await setup({
+    present: [1, 2],
+  });
+  existing.set(accounts[0]!, { owner: UPTO_PROGRAM.systemProgram, data: '' });
+  await recipients.ensure();
+  assert.deepEqual(
+    sent[0]?.instructions.map((instruction) => instruction.accounts[2]),
+    [owners[0]],
+  );
+});
+
+void test('owners given for one claim are read and created with the seller’s own', async () => {
+  const { recipients, sent, reads, mint, accounts } = await setup({
+    present: [0, 1, 2],
+  });
+  const buyer = await newAddress();
+  await recipients.ensure([buyer]);
+  const refund = String(await uptoTokenAccount(buyer, mint, TOKEN_PROGRAM));
+  assert.deepEqual(reads[0]?.accounts, [...accounts, refund]);
+  assert.deepEqual(
+    sent[0]?.instructions.map((instruction) => instruction.accounts[2]),
+    [buyer],
+  );
+});
+
+void test('an RPC answer of the wrong length fails before anything is sent', async () => {
+  const { recipients, sent } = await setup({ present: [0, 1, 2], short: true });
+  await assert.rejects(
+    recipients.ensure(),
+    failsWith(UPTO_ERROR_CODES.UNAVAILABLE),
+  );
+  assert.deepEqual(sent, []);
+});
+
 void test('an account the token program does not own fails before anything is sent', async () => {
   const { recipients, sent, existing, accounts } = await setup({
     present: [1, 2],
   });
-  existing.set(accounts[0]!, UPTO_PROGRAM.systemProgram);
+  existing.set(accounts[0]!, {
+    owner: UPTO_PROGRAM.systemProgram,
+    data: 'AA==',
+  });
   await assert.rejects(
     recipients.ensure(),
     failsWith(UPTO_ERROR_CODES.UNAVAILABLE),
