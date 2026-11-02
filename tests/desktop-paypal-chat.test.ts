@@ -6,6 +6,7 @@ import { PaypalChatController } from '@gyblos/desktop/paypal-chat';
 import { createDesktopPaypalHandlers } from '@gyblos/desktop/paypal-handlers';
 import { createDesktopPaypalSession } from '@gyblos/desktop/paypal-session';
 import { createPaypalSession } from '@gyblos/node/paypal-session';
+import { validatePaypalPrompt } from '@gyblos/node/paypal-startup';
 
 import { fixture } from './support/paypal-session-fixture';
 
@@ -13,7 +14,7 @@ async function setup() {
   const f = fixture();
   const opened: string[] = [];
   const service = createDesktopPaypalSession(
-    await createPaypalSession(f),
+    await createPaypalSession({ ...f, validateRequest: validatePaypalPrompt }),
     async (url) => {
       opened.push(url);
     },
@@ -188,4 +189,18 @@ void test('a new sandbox session starts with an empty transcript after settlemen
   await chat.create();
   assert.equal(chat.getSnapshot().status?.phase, 'created');
   assert.deepEqual(chat.getSnapshot().messages, []);
+});
+
+void test('an invalid prompt keeps the session usable and explains how to fix it', async () => {
+  const { f, chat } = await setup();
+  await chat.refresh();
+  await chat.create();
+  await chat.approve();
+  const draft = 'x'.repeat(3000);
+  chat.setDraft(draft);
+  await chat.send();
+  assert.equal(chat.getSnapshot().draft, draft);
+  assert.equal(chat.getSnapshot().status?.phase, 'active');
+  assert.match(chat.getSnapshot().notice, /shorten|shorter/i);
+  assert.deepEqual(f.calls, ['create', 'authorize']);
 });
