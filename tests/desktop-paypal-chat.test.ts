@@ -4,6 +4,7 @@ import { test } from 'node:test';
 
 import { PaypalChatController } from '@gyblos/desktop/paypal-chat';
 import { createDesktopPaypalHandlers } from '@gyblos/desktop/paypal-handlers';
+import { PAYPAL_DESKTOP_ERROR } from '@gyblos/desktop/paypal-model';
 import { createDesktopPaypalSession } from '@gyblos/desktop/paypal-session';
 import { createPaypalSession } from '@gyblos/node/paypal-session';
 import { validatePaypalPrompt } from '@gyblos/node/paypal-startup';
@@ -203,4 +204,25 @@ void test('an invalid prompt keeps the session usable and explains how to fix it
   assert.equal(chat.getSnapshot().status?.phase, 'active');
   assert.match(chat.getSnapshot().notice, /shorten|shorter/i);
   assert.deepEqual(f.calls, ['create', 'authorize']);
+});
+
+void test('an expired session does not blame a valid prompt', async () => {
+  const { run } = await setup();
+  const chat = new PaypalChatController(async (request) => {
+    if (request.action !== 'send') return run(request);
+    const result = await run({ action: 'status' });
+    assert.ok(result.status);
+    return {
+      ...result,
+      status: { ...result.status, expired: true },
+      error: PAYPAL_DESKTOP_ERROR.INVALID_PROMPT,
+    };
+  });
+  await chat.refresh();
+  await chat.create();
+  await chat.approve();
+  chat.setDraft('A valid prompt');
+  await chat.send();
+  assert.match(chat.getSnapshot().notice, /expired/i);
+  assert.equal(chat.getSnapshot().draft, 'A valid prompt');
 });

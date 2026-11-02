@@ -10,6 +10,7 @@
     "./probe-model": "./src/probe-model.ts",
     "./probe-session": "./src/probe-session.ts",
     "./paypal-session": "./src/paypal-session.ts",
+    "./paypal-model": "./src/paypal-model.ts",
     "./paypal-close-guard": "./src/paypal-close-guard.ts",
     "./paypal-handlers": "./src/paypal-handlers.ts",
     "./paypal-runtime": "./src/paypal-runtime.ts",
