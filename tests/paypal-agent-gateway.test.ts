@@ -63,14 +63,20 @@ function fixture() {
       calls.push('generate');
       phase = 'message_pending';
       count += 1;
-      return { response: count === 1 ? firstAnswer : secondAnswer, messageId: `MSG${count}` };
+      return {
+        response: count === 1 ? firstAnswer : secondAnswer,
+        messageId: `MSG${count}`,
+      };
     },
     async acknowledge(messageId: string) {
       calls.push(`ack:${messageId}`);
       phase = 'active';
     },
   };
-  return { calls, gateway: createPaypalAgentGateway({ origin, key, model, service }) };
+  return {
+    calls,
+    gateway: createPaypalAgentGateway({ origin, key, model, service }),
+  };
 }
 
 function post(body: unknown, headers: Record<string, string> = {}) {
@@ -88,9 +94,23 @@ function post(body: unknown, headers: Record<string, string> = {}) {
 
 void test('the local gateway requires its key and rejects browser origins', async () => {
   const f = fixture();
-  assert.equal((await f.gateway.handle(post(input, { authorization: 'Bearer wrong' }))).status, 401);
-  assert.equal((await f.gateway.handle(post(input, { origin: 'https://attacker.invalid' }))).status, 403);
-  assert.equal((await f.gateway.handle(post(input, { host: 'attacker.invalid' }))).status, 403);
+  assert.equal(
+    (await f.gateway.handle(post(input, { authorization: 'Bearer wrong' })))
+      .status,
+    401,
+  );
+  assert.equal(
+    (
+      await f.gateway.handle(
+        post(input, { origin: 'https://attacker.invalid' }),
+      )
+    ).status,
+    403,
+  );
+  assert.equal(
+    (await f.gateway.handle(post(input, { host: 'attacker.invalid' }))).status,
+    403,
+  );
   assert.deepEqual(f.calls, []);
 });
 
@@ -101,11 +121,13 @@ void test('a following agent request acknowledges the prior response only when i
   assert.deepEqual(await first.json(), firstAnswer);
   assert.equal((await f.gateway.handle(post(input))).status, 409);
   assert.deepEqual(f.calls, ['generate']);
+  const firstChoice = firstAnswer.choices[0];
+  assert.ok(firstChoice);
   const second = {
     ...input,
     messages: [
       ...input.messages,
-      firstAnswer.choices[0].message,
+      firstChoice.message,
       { role: 'tool', tool_call_id: 'call_1', content: 'synthetic contents' },
     ],
   };
@@ -121,10 +143,30 @@ void test('streaming clients receive an SSE representation only after the comple
   const f = fixture();
   const response = await f.gateway.handle(post({ ...input, stream: true }));
   assert.equal(response.status, 200);
-  assert.match(response.headers.get('content-type') ?? '', /text\/event-stream/);
+  assert.match(
+    response.headers.get('content-type') ?? '',
+    /text\/event-stream/,
+  );
   const text = await response.text();
   assert.match(text, /tool_calls/);
   assert.match(text, /call_1/);
   assert.match(text, /data: \[DONE\]/);
+  assert.deepEqual(f.calls, ['generate']);
+});
+
+void test('an identical older assistant message cannot acknowledge a lost new response', async () => {
+  const f = fixture();
+  const firstChoice = firstAnswer.choices[0];
+  assert.ok(firstChoice);
+  const repeated = {
+    ...input,
+    messages: [
+      ...input.messages,
+      firstChoice.message,
+      { role: 'tool', tool_call_id: 'call_1', content: 'synthetic contents' },
+    ],
+  };
+  assert.equal((await f.gateway.handle(post(repeated))).status, 200);
+  assert.equal((await f.gateway.handle(post(repeated))).status, 409);
   assert.deepEqual(f.calls, ['generate']);
 });
