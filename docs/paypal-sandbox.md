@@ -46,16 +46,42 @@ Choose an empty dedicated absolute directory for sandbox state. In a private
 terminal, set `PAYPAL_SANDBOX_CLIENT_ID`, `PAYPAL_SANDBOX_CLIENT_SECRET`, and
 `PAYPAL_SANDBOX_STATE_DIRECTORY`, then start the desktop app with
 `pnpm desktop:start`. First close any earlier desktop instance so the new one
-inherits these settings; settle or preserve any open session before closing. In
+inherits these settings; settle or preserve any open session before closing.
+
+For example, in a private macOS or Linux terminal using zsh or bash, from this
+repository:
+
+```sh
+printf 'Sandbox client ID: '
+read -r PAYPAL_SANDBOX_CLIENT_ID
+printf 'Sandbox client secret: '
+read -rs PAYPAL_SANDBOX_CLIENT_SECRET
+printf '\n'
+export PAYPAL_SANDBOX_CLIENT_ID PAYPAL_SANDBOX_CLIENT_SECRET
+if [ -z "${PAYPAL_SANDBOX_STATE_DIRECTORY:-}" ]; then
+  printf 'Absolute sandbox state directory (reuse it on later runs): '
+  read -r PAYPAL_SANDBOX_STATE_DIRECTORY
+fi
+export PAYPAL_SANDBOX_STATE_DIRECTORY
+pnpm desktop:start
+```
+
+The secret is not echoed. Reuse the same state directory on later runs: it is
+needed to preserve unresolved payment attempts. Use sandbox credentials only. In
 **Settings → Payment method**, select **PayPal Sandbox** and return to **Chat**.
 Selecting a method does not create an order. Create a session, open PayPal,
-approve with the sandbox buyer, and return to the app to start the session and
-send messages. Close the session explicitly to settle it. Each message is
-independent: previous messages are not passed to the engine as conversation
-context. The selection lasts until the desktop app closes; its payment journal
-persists separately. No live PayPal endpoint is used. The optional
-`PAYPAL_SANDBOX_OLLAMA_ORIGIN` setting chooses a different literal loopback
-Ollama origin.
+approve with the sandbox buyer, and return to the app to start the session. Use
+Chat or connect OpenCode as described below; close the session explicitly when
+finished to settle it. Each message is independent: previous messages are not
+passed to the engine as conversation context. The selection lasts until the
+desktop app closes; its payment journal persists separately. No live PayPal
+endpoint is used. The optional `PAYPAL_SANDBOX_OLLAMA_ORIGIN` setting chooses a
+different literal loopback Ollama origin.
+
+For a chat-only walkthrough, approve the USD 1.00 limit, send two messages, and
+close the session. The expected capture is USD 0.20; the unspent authorization
+is released according to PayPal's timing. Create a new session before the
+OpenCode walkthrough.
 
 Keep Gyblos open while its PayPal checkout is open. If leaving the app, close
 the checkout tab first; a local return address can be reused by another process
@@ -77,8 +103,11 @@ local seller and does not send paid requests to the network marketplace.
 After starting a PayPal session, open **Connect** and choose **Create local
 connection**. Gyblos displays a loopback API URL, a temporary API key and
 `gpt-oss:20b`. Copy the OpenCode configuration into the project's
-`opencode.json`, and set the key privately in the environment before starting
-OpenCode. For example, in a private zsh or bash terminal:
+`opencode.json`, merging it with any existing configuration rather than
+overwriting it. The generated settings select Gyblos as the project's default
+model and disable automatic titles. Keep this local configuration and its
+loopback URL out of Git. Set the key privately in the environment before
+starting OpenCode. For example, in a private zsh or bash terminal:
 
 ```sh
 printf 'Gyblos API key: '
@@ -92,8 +121,10 @@ The copied configuration uses `{env:GYBLOS_API_KEY}` rather than embedding the
 key. Keep Gyblos open; the key is local and scoped to this authorization, and a
 new connection gets a different key. Disconnecting refuses new requests and
 waits for any inference already dispatched to finish. Settle the PayPal session
-in Chat. If the app restarts, settle the old session and create a new one to
-connect an agent; it cannot silently attach a new model to the old session.
+in Chat. If the app restarts, settle the old session if its state permits, then
+create a new one to connect an agent; it cannot silently attach a new model to
+the old session. If the prior state needs review, do not retry payment or remove
+its journal or lock to make a new session possible.
 
 Each valid completed **agent inference** records USD 0.10 before returning the
 result, even when delivery fails. One instruction can require multiple
@@ -102,42 +133,20 @@ response-acknowledgment policy. Both flows share the same approved maximum;
 closing the session captures their recorded usage. Streaming responses are
 buffered until the complete result and its usage have been recorded.
 
-The endpoint accepts an optional `Idempotency-Key` per operation. Reusing a key
-is rejected without a second inference, including after a restart. For clients
-without a key, an identical normalized request within the same session is
-conservatively rejected. This can reject an intentional repeat and cannot detect
-every changed retry. OpenCode 1.14.48, the version used for the isolated test,
-does not provide a stable per-inference key; this is not an exactly-once
-guarantee. Tool execution follows the client's own permissions and is outside
-Gyblos's payment deduplication. The prototype supports a bounded subset of the
-OpenAI-compatible chat and tool-call format; other clients and configurations
-require separate testing.
-
-For example, in a private macOS or Linux terminal using zsh or bash, from this
-repository:
-
-```sh
-printf 'Sandbox client ID: '
-read -r PAYPAL_SANDBOX_CLIENT_ID
-printf 'Sandbox client secret: '
-read -rs PAYPAL_SANDBOX_CLIENT_SECRET
-printf '\n'
-export PAYPAL_SANDBOX_CLIENT_ID PAYPAL_SANDBOX_CLIENT_SECRET
-if [ -z "${PAYPAL_SANDBOX_STATE_DIRECTORY:-}" ]; then
-  printf 'Absolute sandbox state directory (reuse it on later runs): '
-  read -r PAYPAL_SANDBOX_STATE_DIRECTORY
-fi
-export PAYPAL_SANDBOX_STATE_DIRECTORY
-pnpm desktop:start
-```
-
-The secret is not echoed. Reuse the same state directory on later runs: it is
-needed to preserve unresolved payment attempts. Use sandbox credentials only.
-For a quick walkthrough, create a session and approve the USD 1.00 limit in
-PayPal. Return to the demo, select **I approved · start session**, and send two
-messages, waiting for each response to be acknowledged. Select **Close session
-and settle**. The expected final capture is USD 0.20; the unspent authorization
-is released according to PayPal's timing.
+The endpoint accepts an optional `Idempotency-Key` per operation. Within the
+same session, reusing a key for a completed inference is rejected without a
+second inference, including after a restart. The protection does not extend to
+new authorizations. For clients without a key, an identical normalized request
+within the same session is conservatively rejected. This can reject an
+intentional repeat and cannot detect every changed retry. OpenCode 1.14.48, the
+version used for the isolated test, does not provide a stable per-inference key;
+this is not an exactly-once guarantee. Tool execution follows the client's own
+permissions and is outside Gyblos's payment deduplication. The prototype
+supports a bounded subset of the OpenAI-compatible chat and tool-call format;
+other clients and configurations require separate testing. The generated
+OpenCode configuration declares an 8,192-token context and a 512-token output
+maximum. The engine has a 90-second generation timeout, and a session allows at
+most 30 attempts, even when the spending limit has not been reached.
 
 The separate browser demonstration is still available with
 `pnpm paypal:sandbox`. It prints a private local session link; do not share that
