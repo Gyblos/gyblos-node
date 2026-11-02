@@ -107,6 +107,7 @@ export async function startDesktopPaypalAgent(service: Service, model: string) {
   let origin = '';
   let gateway: Gateway | undefined;
   let closing = false;
+  let inFlight = 0;
   const server = createServer((request, response) => {
     if (!gateway || closing || !isCurrent()) {
       response.shouldKeepAlive = false;
@@ -116,7 +117,13 @@ export async function startDesktopPaypalAgent(service: Service, model: string) {
           : HTTP_STATUS.unauthorized;
       return response.writeHead(status).end();
     }
-    void dispatch(request, response, origin, gateway);
+    inFlight += 1;
+    void dispatch(request, response, origin, gateway)
+      .finally(() => {
+        inFlight -= 1;
+        if (closing && inFlight === 0) server.closeAllConnections();
+      })
+      .catch(() => {});
   });
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject);
@@ -150,9 +157,11 @@ export async function startDesktopPaypalAgent(service: Service, model: string) {
     acknowledgePending: gateway.acknowledgePending,
     async close() {
       closing = true;
-      await new Promise<void>((resolve, reject) =>
+      const stopped = new Promise<void>((resolve, reject) =>
         server.close((error) => (error ? reject(error) : resolve())),
       );
+      if (inFlight === 0) server.closeAllConnections();
+      await stopped;
     },
   };
 }

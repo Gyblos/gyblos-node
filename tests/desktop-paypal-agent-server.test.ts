@@ -264,21 +264,99 @@ void test('retired access closes an incomplete request instead of delaying recon
 
 void test('shutdown closes a socket that never completes its HTTP headers', async () => {
   const f = fixture();
-  const desktop = createDesktopPaypalSession(await createPaypalSession(f), async () => {});
+  const desktop = createDesktopPaypalSession(
+    await createPaypalSession(f),
+    async () => {},
+  );
   await desktop.create();
   await desktop.approve();
   const endpoint = await startDesktopPaypalAgent(desktop, 'synthetic-model');
   const address = new URL(endpoint.url);
-  const socket = createConnection({ host: '127.0.0.1', port: Number(address.port) });
-  await new Promise<void>((resolve, reject) => { socket.once('connect', resolve); socket.once('error', reject); });
+  const socket = createConnection({
+    host: '127.0.0.1',
+    port: Number(address.port),
+  });
+  await new Promise<void>((resolve, reject) => {
+    socket.once('connect', resolve);
+    socket.once('error', reject);
+  });
   socket.write('POST /v1/chat/completions HTTP/1.1\r\nHost: 127.0.0.1\r\n');
   try {
     await Promise.race([
       endpoint.close(),
-      new Promise<never>((_resolve, reject) => setTimeout(() => reject(new Error('incomplete headers blocked shutdown')), 1000)),
+      new Promise<never>((_resolve, reject) =>
+        setTimeout(
+          () => reject(new Error('incomplete headers blocked shutdown')),
+          1000,
+        ),
+      ),
     ]);
     await desktop.finish();
   } finally {
     socket.destroy();
   }
+});
+
+void test('shutdown waits for an already running inference before closing sockets', async () => {
+  const f = fixture();
+  let entered = () => {};
+  let release = () => {};
+  const started = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const waiting = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const agentEngine = {
+    model: 'synthetic-model',
+    async generate() {
+      entered();
+      await waiting;
+      return {
+        id: 'synthetic',
+        object: 'chat.completion',
+        created: 0,
+        model: 'synthetic-model',
+        choices: [
+          {
+            index: 0,
+            message: { role: 'assistant', content: 'synthetic answer' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: { prompt_tokens: 2, completion_tokens: 3, total_tokens: 5 },
+      };
+    },
+  };
+  const desktop = createDesktopPaypalSession(
+    await createPaypalSession({ ...f, agentEngine }),
+    async () => {},
+  );
+  await desktop.create();
+  await desktop.approve();
+  const endpoint = await startDesktopPaypalAgent(desktop, agentEngine.model);
+  const request = fetch(`${endpoint.url}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${endpoint.key}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: agentEngine.model,
+      messages: [{ role: 'user', content: 'synthetic' }],
+      max_tokens: 128,
+    }),
+  }).catch(() => undefined);
+  await started;
+  let closed = false;
+  const stopping = endpoint.close().then(() => {
+    closed = true;
+  });
+  await Promise.resolve();
+  assert.equal(closed, false);
+  release();
+  await Promise.all([request, stopping]);
+  assert.equal(desktop.status().phase, 'message_pending');
+  await endpoint.acknowledgePending();
+  await desktop.finish();
 });
