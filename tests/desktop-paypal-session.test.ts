@@ -23,6 +23,7 @@ void test('creating a session keeps the approval link in the host', async () => 
   const created = await desktop.create();
   assert.equal(created.phase, 'created');
   assert.deepEqual(Object.keys(created).sort(), [
+    'approvalLinkAvailable',
     'expired',
     'limitCents',
     'messageCents',
@@ -126,6 +127,8 @@ void test('a restarted unapproved order cannot silently create a second order', 
     async () => {},
   );
   assert.equal(resumed.status().phase, 'created');
+  assert.equal(desktop.status().approvalLinkAvailable, true);
+  assert.equal(resumed.status().approvalLinkAvailable, false);
   await assert.rejects(resumed.openApproval());
   await assert.rejects(resumed.create());
   assert.deepEqual(f.calls, ['create']);
@@ -152,25 +155,4 @@ void test('model unavailability prevents new usage but allows existing settlemen
   assert.equal(desktop.status().phase, 'active');
   assert.equal((await desktop.finish()).phase, 'completed');
   assert.deepEqual(f.calls, ['create', 'authorize', 'generate', 'capture:10']);
-});
-
-void test('a created order can recover its private approval link after restart', async () => {
-  const { f, desktop } = await setup();
-  await desktop.create();
-  const opened: string[] = [];
-  const resumed = createDesktopPaypalSession(
-    await createPaypalSession(f),
-    async (url) => {
-      opened.push(url);
-    },
-    {
-      recoverApproval: async (orderId) => {
-        assert.equal(orderId, 'ORDER1');
-        return 'https://www.sandbox.paypal.com/checkoutnow?token=ORDER1';
-      },
-    },
-  );
-  await resumed.openApproval();
-  assert.equal(opened.length, 1);
-  assert.deepEqual(f.calls, ['create']);
 });

@@ -182,7 +182,7 @@ void test('a partial capture with an unexpected amount or currency remains unres
   }
 });
 
-void test('an existing order recovers only its own validated approval link', async () => {
+void test('sandbox checkout links cannot target a nonstandard port', async () => {
   const fetchMock: typeof fetch = async (input) =>
     String(input).endsWith('/v1/oauth2/token')
       ? Response.json({ access_token: 'synthetic-token' })
@@ -191,7 +191,7 @@ void test('an existing order recovers only its own validated approval link', asy
           links: [
             {
               rel: 'payer-action',
-              href: 'https://www.sandbox.paypal.com/checkoutnow?token=ORDER1',
+              href: 'https://www.sandbox.paypal.com:444/checkoutnow?token=ORDER1',
             },
           ],
         });
@@ -201,9 +201,5 @@ void test('an existing order recovers only its own validated approval link', asy
     returnOrigin: 'http://127.0.0.1:8765',
     fetch: fetchMock,
   });
-  assert.equal(
-    await payment.approvalUrl('ORDER1'),
-    'https://www.sandbox.paypal.com/checkoutnow?token=ORDER1',
-  );
-  await assert.rejects(payment.approvalUrl('ORDER2'));
+  await assert.rejects(payment.create('REQUEST1'));
 });
