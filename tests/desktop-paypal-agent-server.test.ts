@@ -75,3 +75,48 @@ void test('a local agent connects through a key and shares the sandbox authoriza
     await agent.close();
   }
 });
+
+void test('an agent key cannot spend a later sandbox authorization', async () => {
+  const f = fixture();
+  const agentEngine = {
+    model: 'synthetic-model',
+    async generate() {
+      return {
+        id: 'synthetic', object: 'chat.completion', created: 0, model: 'synthetic-model',
+        choices: [{ index: 0, message: { role: 'assistant', content: 'synthetic answer' }, finish_reason: 'stop' }],
+        usage: { prompt_tokens: 2, completion_tokens: 3, total_tokens: 5 },
+      };
+    },
+  };
+  const desktop = createDesktopPaypalSession(await createPaypalSession({ ...f, agentEngine }), async () => {});
+  await desktop.create();
+  await desktop.approve();
+  const first = await startDesktopPaypalAgent(desktop, agentEngine.model);
+  const request = {
+    model: agentEngine.model, messages: [{ role: 'user', content: 'synthetic' }], max_tokens: 128,
+  };
+  const call = (endpoint: typeof first) => fetch(`${endpoint.url}/chat/completions`, {
+    method: 'POST', headers: { authorization: `Bearer ${endpoint.key}`, 'content-type': 'application/json' },
+    body: JSON.stringify(request),
+  });
+  try {
+    assert.equal((await call(first)).status, 200);
+    await first.acknowledgePending();
+    await desktop.finish();
+    await desktop.create();
+    await desktop.approve();
+    assert.notEqual((await call(first)).status, 200);
+    assert.equal(desktop.status().spentCents, 0);
+    const second = await startDesktopPaypalAgent(desktop, agentEngine.model);
+    try {
+      assert.notEqual(second.key, first.key);
+      assert.equal((await call(second)).status, 200);
+      await second.acknowledgePending();
+      await desktop.finish();
+    } finally {
+      await second.close();
+    }
+  } finally {
+    await first.close();
+  }
+});
