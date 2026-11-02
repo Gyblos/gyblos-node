@@ -10,8 +10,10 @@ only; never import mainnet keys.
   buyer, required direct Iroh route, test token (not USDC). All six transactions
   finalized and every answer was recounted. Report:
   [gate-0008.json](../lab/evidence/gate-0008.json), bound to source `ba168c4`.
-- Later code is checked with offline tests only. No paid run has been repeated
-  on the current head.
+- That historical run covers its recorded source revision. A separate controlled
+  devnet run exercised paid v2 selling and recovery; see the limits below.
+  Neither run establishes paid behavior on every later revision or the current
+  head.
 - Docker NAT-direct did not pass. A relay session with inbound UDP blocked did
   complete paid calls (see [gate-0006.json](../lab/evidence/gate-0006.json)).
   Hotspot/CGNAT and wider NAT coverage are untested, as is a direct-to-relay

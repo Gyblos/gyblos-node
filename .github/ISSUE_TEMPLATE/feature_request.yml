@@ -1,0 +1,30 @@
+name: Feature proposal
+description: Describe a problem and a bounded proposal before implementation.
+title: '[Proposal]: '
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem and affected users
+      description: Describe the use case and current obstacle without private user data.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed outcome
+      description: State the intended behavior, scope, non-goals and alternatives considered.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: How could a contributor and maintainer verify that this solves the problem?
+    validations:
+      required: true
+  - type: textarea
+    id: decisions
+    attributes:
+      label: Related decisions or contracts
+      description: Link relevant public decisions or issues. Flag conflicts for a maintainer; do not assume a new policy.
