@@ -91,7 +91,6 @@ export function createDesktopPaypalSession(
   let approvalUrl: string | undefined;
   let awaitingAcknowledgement = false;
   let checkoutOpened = false;
-  let abandonedCheckout = false;
   const { run, close, isBusy } = serialOperations();
   function orderId() {
     const id = session.status().orderId;
@@ -101,11 +100,7 @@ export function createDesktopPaypalSession(
   const status = () => visibleStatus(session, approvalUrl);
   return {
     status,
-    isCloseBlocked: () =>
-      isBusy() ||
-      awaitingAcknowledgement ||
-      checkoutOpened ||
-      abandonedCheckout,
+    isCloseBlocked: () => isBusy() || awaitingAcknowledgement || checkoutOpened,
     create: () =>
       run(async () => {
         await options.checkEngine?.();
@@ -125,7 +120,6 @@ export function createDesktopPaypalSession(
     approve: () =>
       run(async () => {
         await session.approve(orderId());
-        checkoutOpened = false;
         approvalUrl = undefined;
         return status();
       }),
@@ -155,8 +149,6 @@ export function createDesktopPaypalSession(
     abandon: () =>
       run(async () => {
         await session.cancel(orderId());
-        abandonedCheckout ||= checkoutOpened;
-        checkoutOpened = false;
         approvalUrl = undefined;
         return status();
       }),

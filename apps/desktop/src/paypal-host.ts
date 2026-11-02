@@ -88,7 +88,7 @@ export function registerDesktopPaypal(window: BrowserWindow) {
           type: 'warning',
           message: 'A PayPal Sandbox checkout or response is still open.',
           detail:
-            'Finish or close the PayPal checkout before leaving. If a checkout stays open after Gyblos closes, another local process could receive its return details. An unfinished response may need manual review.',
+            'Close every PayPal checkout tab before exiting. If a tab stays open after Gyblos closes, another local process could receive its return details. An unfinished response may need manual review.',
           buttons: ['Keep open', 'Close anyway'],
           defaultId: 0,
           cancelId: 0,
