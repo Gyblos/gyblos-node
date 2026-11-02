@@ -32,6 +32,7 @@ export interface PaypalSessionDependencies {
   validateRequest?: PaypalInferenceDependencies['validateRequest'];
   agentEngine?: {
     model: string;
+    validate?(input: unknown): void;
     generate(input: unknown, signal?: AbortSignal): Promise<unknown>;
   };
   journal: {
@@ -311,7 +312,7 @@ class PaypalSession {
           maxTokens,
           request.input,
         ),
-      () => {},
+      () => engine.validate?.(request.input),
       signal,
     );
     return { response: result.output, messageId: result.messageId };
