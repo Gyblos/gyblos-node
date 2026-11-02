@@ -159,7 +159,7 @@ verified separately.
 
 ## Run locally
 
-Use Node 22+ and the repository's pinned pnpm. After a frozen install:
+Use Node 24.22.1+ and the repository's pinned pnpm. After a frozen install:
 
 ```sh
 pnpm desktop:start

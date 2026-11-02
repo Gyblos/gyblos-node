@@ -1,6 +1,6 @@
 # Simulated paid startup acceptance
 
-Run `pnpm acceptance:paid` with Node 22 and the pinned pnpm version. This is a
+Run `pnpm acceptance:paid` with Node 24.22.1+ and the pinned pnpm version. This is a
 verification command, not an operational buyer or a payment demonstration. It
 accepts no arguments, real home, RPC, index, wallet, engine or network
 overrides. A failed or unsupported native run is not successful acceptance.

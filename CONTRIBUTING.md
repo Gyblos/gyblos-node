@@ -10,11 +10,10 @@ unclear.
 
 ## Set up Node.js and pnpm
 
-The project currently declares Node.js 22 or newer and the pnpm version pinned
-in [package.json](package.json). Some desktop tooling dependencies require at
-least Node 22.12. For development, prefer the latest available security-patched
-Node.js 24 release. If you use Node 22, use a current patched release. Before
-installing dependencies, check the tools selected by the terminal you will use:
+The project requires Node.js 24.22.1 or newer and the pnpm version pinned in
+[package.json](package.json). For development, use the latest available
+security-patched Node.js 24 release. Before installing dependencies, check the
+tools selected by the terminal you will use:
 
 ```sh
 node --version
@@ -22,9 +21,8 @@ node -p "process.execPath"
 pnpm --version
 ```
 
-If Node is older than 22, or you want to use the recommended Node 24 line,
-select a supported version with your existing version manager, or install one
-if needed. For example, if you already use nvm:
+If Node is older than 24.22.1, select a supported version with your existing
+version manager, or install one if needed. For example, if you already use nvm:
 
 ```sh
 nvm install 24
@@ -39,8 +37,7 @@ use the [pnpm installation guide](https://pnpm.io/installation) to install or
 select the version pinned in `package.json`, then check `pnpm --version` again
 before running `pnpm install --frozen-lockfile`.
 
-The discovery index's `node:sqlite` tests skip when that module is unavailable
-(it is unflagged in Node 22.13 and later). See
+The discovery index's `node:sqlite` tests skip when that module is unavailable. See
 [native skips](tests/README.md#native-skips); a skipped case is not a pass.
 
 ## One workflow for every contributor
