@@ -3,10 +3,11 @@
 // before it starts (or does not start), refuses a junk deposit before touching the chain, recovers an
 // empty ledger and releases everything on close. RPC is a double; no network.
 import assert from 'node:assert/strict';
-import { rm } from 'node:fs/promises';
+import { lstat, rm } from 'node:fs/promises';
 import test from 'node:test';
 
 import { generateKeyPairSigner } from '@solana/kit';
+import { SOLANA_MAINNET_CAIP2 } from '@x402/svm';
 
 import { DEVNET, PROTOCOL_FEE, TOKEN_PROGRAM_ADDRESS } from '@gyblos/config';
 import { openUptoSellerPayments } from '@gyblos/payments-upto';
@@ -135,6 +136,29 @@ void test('a deposit that is not a valid channel open is refused before any tran
       PaymentError,
     );
     await payments.close();
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+void test('mainnet seller is disabled before opening a ledger or sending', async () => {
+  const { root, options, sent } = await setup();
+  try {
+    await assert.rejects(
+      openUptoSellerPayments({
+        ...options,
+        description: { ...options.description, network: SOLANA_MAINNET_CAIP2 },
+      }).then(async (payments) => {
+        await payments.close();
+        return payments;
+      }),
+      (error) =>
+        error instanceof PaymentError &&
+        error.code === PAYMENT_ERROR_CODES.UNTRUSTED_TERMS,
+    );
+    assert.deepEqual(sent, []);
+    await assert.rejects(lstat(options.paths.directory), { code: 'ENOENT' });
+    await (await openUptoSellerPayments(options)).close();
   } finally {
     await rm(root, { recursive: true, force: true });
   }

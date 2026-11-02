@@ -18,6 +18,7 @@ import {
   type UptoBuyerPolicy,
 } from './client';
 import type { UptoLedgerPaths } from './file-ledger';
+import { assertPaymentNetworkEnabled } from './mainnet';
 import type { UptoChannelSettings } from './terms';
 
 export interface UptoBuyerPaymentsOptions {
@@ -43,6 +44,7 @@ const caip = (network: string): network is `${string}:${string}` =>
 export async function openUptoBuyerPayments(
   options: UptoBuyerPaymentsOptions,
 ): Promise<UptoBuyerPayments> {
+  assertPaymentNetworkEnabled(options.policy.network);
   const now = options.now ?? Date.now;
   const network = options.policy.network;
   if (!caip(network))

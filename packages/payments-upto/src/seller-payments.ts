@@ -27,6 +27,7 @@ import {
 
 import { LEDGER_FILE, UPTO_SELLER } from './constants';
 import { openUptoFileLedger, type UptoLedgerPaths } from './file-ledger';
+import { assertPaymentNetworkEnabled } from './mainnet';
 import { createUptoPaymentServer } from './server';
 import { uptoSellerTerms, type UptoChannelSettings } from './terms';
 
@@ -61,6 +62,7 @@ export interface UptoSellerPayments {
 export async function openUptoSellerPayments(
   options: UptoSellerPaymentsOptions,
 ): Promise<UptoSellerPayments> {
+  assertPaymentNetworkEnabled(options.description.network);
   const now = options.now ?? Date.now;
   const { description, settings, feePayer } = options;
   const own = uptoSellerTerms(description, settings);

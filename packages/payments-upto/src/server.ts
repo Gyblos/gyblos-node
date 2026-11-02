@@ -16,6 +16,7 @@ import {
 
 import { DESCRIPTION_FIELDS, PAYMENT_PHASES } from './constants';
 import { paymentFailure } from './errors';
+import { assertPaymentNetworkEnabled } from './mainnet';
 import {
   uptoSellerTerms,
   uptoTermsFor,
@@ -51,6 +52,7 @@ export function createUptoPaymentServer(
   options: UptoPaymentServerOptions,
 ): PaymentServer {
   const { description, settings, seller } = options;
+  assertPaymentNetworkEnabled(description.network);
   // Fails at construction on a malformed description rather than on the first request.
   uptoSellerTerms(description, settings);
   return {

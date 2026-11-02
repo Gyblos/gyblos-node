@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { generateKeyPairSigner } from '@solana/kit';
+import { SOLANA_MAINNET_CAIP2 } from '@x402/svm';
 import {
   createUptoAuthorization,
   createUptoSeller,
@@ -170,4 +171,18 @@ void test('a malformed network is refused rather than normalised', async () => {
         }),
       failsWith(PAYMENT_ERROR_CODES.UNTRUSTED_TERMS),
     );
+});
+
+void test('mainnet seller port remains disabled', async () => {
+  const { ledger, recent, description } = await setup();
+  assert.throws(
+    () =>
+      seller(
+        ledger,
+        { ...description, network: SOLANA_MAINNET_CAIP2 },
+        recent.recentSlot,
+        { failUpstream: false },
+      ),
+    failsWith(PAYMENT_ERROR_CODES.UNTRUSTED_TERMS),
+  );
 });
