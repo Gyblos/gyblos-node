@@ -178,5 +178,9 @@ void test('the connection reports current shared usage and an uncertain session'
   assert.equal(access.status()?.limitCents, 100);
   phase = 'blocked';
   assert.equal(access.status()?.usageUncertain, true);
+  for (const uncertain of ['executing', 'message_pending', 'capturing', 'voiding']) {
+    phase = uncertain;
+    assert.equal(access.status()?.usageUncertain, true);
+  }
   await access.close();
 });

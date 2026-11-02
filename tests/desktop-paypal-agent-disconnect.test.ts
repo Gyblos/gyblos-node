@@ -234,3 +234,43 @@ void test('disconnect revokes new agent requests while a started inference finis
     await access.close();
   }
 });
+
+void test('disconnect during the model preflight prevents a later inference', async () => {
+  const f = fixture();
+  let release = () => {};
+  let entered = () => {};
+  let checks = 0;
+  const waiting = new Promise<void>((resolve) => { release = resolve; });
+  const started = new Promise<void>((resolve) => { entered = resolve; });
+  const agentEngine = { model: 'synthetic-model', async generate() {
+    f.calls.push('agent-generate');
+    return { id: 'synthetic', object: 'chat.completion', created: 0, model: 'synthetic-model',
+      choices: [{ index: 0, message: { role: 'assistant', content: 'answer' }, finish_reason: 'stop' }],
+      usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } };
+  } };
+  const desktop = createDesktopPaypalSession(await createPaypalSession({ ...f, agentEngine }), async () => {}, {
+    checkAgentEngine: async () => { checks += 1; if (checks > 1) { entered(); await waiting; } },
+  });
+  await desktop.create();
+  await desktop.approve();
+  const endpoint = await startDesktopPaypalAgent(desktop, agentEngine.model);
+  const access = createDesktopPaypalAgentAccess(desktop.status, async () => endpoint);
+  await access.connect();
+  const request = fetch(`${endpoint.url}/chat/completions`, { method: 'POST', headers: {
+    authorization: `Bearer ${endpoint.key}`, 'content-type': 'application/json',
+  }, body: JSON.stringify({ model: agentEngine.model, messages: [{ role: 'user', content: 'synthetic' }], max_tokens: 128 }) });
+  try {
+    await started;
+    const disconnect = access.disconnect();
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    release();
+    assert.notEqual((await request).status, 200);
+    await disconnect;
+    assert.equal(desktop.status().spentCents, 0);
+    assert.deepEqual(f.calls, ['create', 'authorize']);
+    await desktop.finish();
+  } finally {
+    release();
+    await access.close();
+  }
+});
