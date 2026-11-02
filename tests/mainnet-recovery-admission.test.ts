@@ -5,7 +5,7 @@ import test from 'node:test';
 import { generateKeyPairSigner } from '@solana/kit';
 import { SOLANA_MAINNET_CAIP2 } from '@x402/svm';
 
-import { DEVNET, TOKEN_PROGRAM_ADDRESS } from '@gyblos/config';
+import { DEVNET, DEVNET_GENESIS, TOKEN_PROGRAM_ADDRESS } from '@gyblos/config';
 import {
   createUptoWithdrawal,
   reconcileUptoBuyer,
@@ -148,4 +148,107 @@ void test('recovery options implemented by class methods keep their receiver', a
     await withdrawUptoBuyer(options);
     assert.equal(options.calls, 2);
   });
+});
+
+void test('wrong-chain RPC is refused before recovery reads', async () => {
+  await withJournal(async (journal) => {
+    await journal.put(entry(DEVNET));
+    const double = chain();
+    let genesisReads = 0;
+    const rpc = {
+      ...double.rpc,
+      getGenesisHash: () => ({
+        send: async () => {
+          genesisReads++;
+          return 'wrong-chain';
+        },
+      }),
+    };
+    let reports = 0;
+    await assert.rejects(
+      reconcileUptoBuyer({
+        journal,
+        network: DEVNET,
+        rpc,
+        payer: ADDRESS,
+        mint: ADDRESS,
+        treasury: ADDRESS,
+        expected: () => undefined,
+        report: async () => {
+          reports++;
+        },
+      }),
+      refused,
+    );
+    assert.equal(genesisReads, 1);
+    assert.deepEqual(double.reads, []);
+    assert.equal(reports, 0);
+    assert.equal((await journal.list())[0]?.state, 'open');
+  });
+});
+
+void test('wrong-chain RPC is refused before direct withdrawal', async () => {
+  const payer = await generateKeyPairSigner();
+  const double = withdrawChain({ accounts: new Map(), blockTime: 0n });
+  let genesisReads = 0;
+  const rpc = {
+    ...double.rpc,
+    getGenesisHash: () => ({
+      send: async () => {
+        genesisReads++;
+        return 'wrong-chain';
+      },
+    }),
+  };
+  const withdrawal = createUptoWithdrawal(rpc, {
+    payer,
+    network: DEVNET,
+    tokenProgram: TOKEN_PROGRAM_ADDRESS,
+  });
+  await assert.rejects(
+    withdrawal.withdraw({
+      channelId: ADDRESS,
+      mint: ADDRESS,
+      rentPayer: ADDRESS,
+      maxAtomic: '1000',
+      splits: [],
+    }),
+    refused,
+  );
+  assert.equal(genesisReads, 1);
+  assert.deepEqual(double.reads, []);
+  assert.deepEqual(double.sent, []);
+});
+
+void test('withdrawal fixes RPC methods before the genesis check', async () => {
+  const payer = await generateKeyPairSigner();
+  const double = withdrawChain({ accounts: new Map(), blockTime: 0n });
+  let foreignReads = 0;
+  const rpc = { ...double.rpc };
+  rpc.getGenesisHash = () => ({
+    send: async () => {
+      rpc.getAccountInfo = () => ({
+        send: async () => {
+          foreignReads++;
+          throw new Error('wrong RPC');
+        },
+      });
+      return DEVNET_GENESIS;
+    },
+  });
+  const withdrawal = createUptoWithdrawal(rpc, {
+    payer,
+    network: DEVNET,
+    tokenProgram: TOKEN_PROGRAM_ADDRESS,
+  });
+  const result = await withdrawal.withdraw({
+    channelId: ADDRESS,
+    mint: ADDRESS,
+    rentPayer: ADDRESS,
+    maxAtomic: '1000',
+    splits: [],
+  });
+  assert.equal(result.step, 'nothing');
+  assert.equal(foreignReads, 0);
+  assert.equal(double.sent.length, 0);
 });

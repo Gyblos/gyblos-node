@@ -8,6 +8,8 @@ import {
 } from '@solana/kit';
 import type { UptoSignaturesRpc, UptoTransactionRpc } from 'x402-upto-metered';
 
+import { DEVNET_GENESIS } from '@gyblos/config';
+
 export const signatureOf = (index: number) => {
   const bytes = new Uint8Array(64);
   new DataView(bytes.buffer).setUint32(0, index + 1);
@@ -59,7 +61,11 @@ export function chainDouble(state: ChainState) {
       owner: flow.owner,
       uiTokenAmount: { amount: String(flow[when]) },
     }));
-  const rpc: UptoSignaturesRpc & UptoTransactionRpc = {
+  const rpc: UptoSignaturesRpc &
+    UptoTransactionRpc & {
+      getGenesisHash(): { send(): Promise<string> };
+    } = {
+    getGenesisHash: () => ({ send: async () => DEVNET_GENESIS }),
     getSignaturesForAddress: (account, config) => ({
       send: async () => {
         commitments.push(config.commitment);

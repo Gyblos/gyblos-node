@@ -19,6 +19,7 @@ import {
   snapshotJournal,
 } from './journal-network';
 import { assertPaymentNetworkEnabled } from './mainnet';
+import { verifyPaymentNetwork, type PaymentGenesisRpc } from './seller-network';
 
 export type UptoReconcileOutcome =
   (typeof RECONCILE_OUTCOMES)[keyof typeof RECONCILE_OUTCOMES];
@@ -43,7 +44,7 @@ export interface UptoReconcileOptions {
   journal: UptoBuyerJournal;
   // The network already established by the caller's RPC check.
   network: string;
-  rpc: UptoSignaturesRpc & UptoTransactionRpc;
+  rpc: UptoSignaturesRpc & UptoTransactionRpc & PaymentGenesisRpc;
   // The buyer's wallet address and the mint and fee treasury of its policy. Each channel is read with
   // the mint and treasury its open accepted; these only for an entry journaled without them.
   payer: string;
@@ -124,6 +125,21 @@ function outcomeOf(
     : RECONCILE_OUTCOMES.DISPUTED;
 }
 
+// A caller cannot swap the RPC methods between verifying genesis and reading history.
+function snapshotRpc(
+  rpc: UptoReconcileOptions['rpc'],
+): UptoReconcileOptions['rpc'] {
+  return {
+    getGenesisHash: rpc.getGenesisHash.bind(rpc),
+    getSignaturesForAddress: rpc.getSignaturesForAddress.bind(rpc),
+    getEpochInfo: rpc.getEpochInfo.bind(rpc),
+    minimumLedgerSlot: rpc.minimumLedgerSlot.bind(rpc),
+    getFirstAvailableBlock: rpc.getFirstAvailableBlock.bind(rpc),
+    getAccountInfo: rpc.getAccountInfo.bind(rpc),
+    getTransaction: rpc.getTransaction.bind(rpc),
+  };
+}
+
 // Every open, signed entry is read; a resolved one is reported, then written settled with what the
 // chain charged, so it no longer blocks payments. Chain, report or journal failures reject.
 export async function reconcileUptoBuyer(
@@ -131,7 +147,6 @@ export async function reconcileUptoBuyer(
 ): Promise<UptoReconcileResult[]> {
   const network = options.network;
   assertPaymentNetworkEnabled(network);
-  const rpc = options.rpc;
   const fixed: UptoReconcileOptions = {
     network,
     journal: snapshotJournal(options.journal),
@@ -140,14 +155,7 @@ export async function reconcileUptoBuyer(
     treasury: options.treasury,
     expected: options.expected.bind(options),
     report: options.report.bind(options),
-    rpc: {
-      getSignaturesForAddress: rpc.getSignaturesForAddress.bind(rpc),
-      getEpochInfo: rpc.getEpochInfo.bind(rpc),
-      minimumLedgerSlot: rpc.minimumLedgerSlot.bind(rpc),
-      getFirstAvailableBlock: rpc.getFirstAvailableBlock.bind(rpc),
-      getAccountInfo: rpc.getAccountInfo.bind(rpc),
-      getTransaction: rpc.getTransaction.bind(rpc),
-    },
+    rpc: snapshotRpc(options.rpc),
   };
   checkJournalNetwork(fixed.network);
   const entries = (await fixed.journal.list()).map((entry) => ({
@@ -156,6 +164,7 @@ export async function reconcileUptoBuyer(
   }));
   const shown = readers(fixed);
   const results: UptoReconcileResult[] = [];
+  let verified = false;
   for (const entry of entries) {
     const { channelId, updatedAt: _updatedAt, ...rest } = entry;
     if (!channelId || entry.state !== PAYMENT_CHANNEL_STATES.OPEN) continue;
@@ -176,6 +185,10 @@ export async function reconcileUptoBuyer(
       await fixed.report(open);
       results.push(open);
       continue;
+    }
+    if (!verified) {
+      await verifyPaymentNetwork(fixed.rpc, fixed.network);
+      verified = true;
     }
     const chain = await shown({ ...entry, channelId });
     if (chain === 'open') {
