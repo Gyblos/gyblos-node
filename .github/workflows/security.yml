@@ -43,6 +43,11 @@ jobs:
         run: |
           [[ "$SCAN_BASE" =~ ^[0-9a-f]{40}$ ]]
           git rev-parse --verify "${SCAN_BASE}^{commit}"
+          # Gitleaks also reads a source-root ignore file despite an explicit path.
+          if [[ -e .gitleaksignore || -L .gitleaksignore ]]; then
+            echo 'Repository Gitleaks ignore files are not permitted.' >&2
+            exit 1
+          fi
           mkdir "$RUNNER_TEMP/gitleaks-ignore"
           printf '[extend]\nuseDefault = true\n' > "$RUNNER_TEMP/gitleaks-default.toml"
           "$RUNNER_TEMP/gitleaks" git . --log-opts="${SCAN_BASE}..HEAD" \
