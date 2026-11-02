@@ -215,7 +215,10 @@ void test(
       });
       assert.deepEqual(await readdir(directory), []);
       assert.equal(process.env.GYBLOS_HOME, join(directory, 'external-home'));
-      assert.equal(process.env.GYBLOS_LAB_HOME, join(directory, 'external-lab'));
+      assert.equal(
+        process.env.GYBLOS_LAB_HOME,
+        join(directory, 'external-lab'),
+      );
     } finally {
       if (previous === undefined) delete process.env.GYBLOS_HOME;
       else process.env.GYBLOS_HOME = previous;
