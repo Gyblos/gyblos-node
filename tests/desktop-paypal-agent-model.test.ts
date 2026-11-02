@@ -57,6 +57,7 @@ void test('a failed status check preserves an existing connection until status i
     spentCents: 20,
     limitCents: 100,
     usageUncertain: false,
+    disconnecting: false,
   };
   const previous = { connection, error: null };
   const unknown = retainPaypalAgentStatus(previous, undefined);
@@ -79,6 +80,7 @@ void test('IPC result rejects external connection URLs and malformed keys', () =
     spentCents: 0,
     limitCents: 100,
     usageUncertain: false,
+    disconnecting: false,
   };
   assert.deepEqual(
     parsePaypalAgentResult({ connection, error: null }).connection,

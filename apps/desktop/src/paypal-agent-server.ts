@@ -113,6 +113,7 @@ export async function startDesktopPaypalAgent(service: Service, model: string) {
   const scope = service.agentScope();
   if (!scope) throw new Error('A fresh agent session is required.');
   let closing = false;
+  const revoked = new AbortController();
   const isCurrent = () => !closing && service.agentScope() === scope;
   const scopedService = {
     sendAgent: (
@@ -121,7 +122,10 @@ export async function startDesktopPaypalAgent(service: Service, model: string) {
       idempotencyKey?: string,
     ) => {
       if (!isCurrent()) throw new Error('Agent access expired.');
-      return service.sendAgent(input, signal, idempotencyKey);
+      const cancellation = signal
+        ? AbortSignal.any([signal, revoked.signal])
+        : revoked.signal;
+      return service.sendAgent(input, cancellation, idempotencyKey);
     },
   };
   let origin = '';
@@ -174,6 +178,7 @@ export async function startDesktopPaypalAgent(service: Service, model: string) {
     isBusy: gateway.isBusy,
     async close() {
       closing = true;
+      revoked.abort();
       const stopped = new Promise<void>((resolve, reject) =>
         server.close((error) => (error ? reject(error) : resolve())),
       );

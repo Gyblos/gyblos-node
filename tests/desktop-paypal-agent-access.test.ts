@@ -20,7 +20,13 @@ void test('agent access starts once only after a sandbox session is active', asy
     },
   };
   const access = createDesktopPaypalAgentAccess(
-    () => ({ phase, expired: false, spentCents: 0, limitCents: 100 }),
+    () => ({
+      phase,
+      expired: false,
+      spentCents: 0,
+      limitCents: 100,
+      remainingAttempts: 30,
+    }),
     async () => {
       opened += 1;
       return endpoint;
@@ -54,7 +60,13 @@ void test('disconnect asks the endpoint to drain a running inference', async () 
     },
   };
   const access = createDesktopPaypalAgentAccess(
-    () => ({ phase: 'active', expired: false, spentCents: 0, limitCents: 100 }),
+    () => ({
+      phase: 'active',
+      expired: false,
+      spentCents: 0,
+      limitCents: 100,
+      remainingAttempts: 30,
+    }),
     async () => endpoint,
   );
   await access.connect();
@@ -87,7 +99,13 @@ void test('application shutdown waits for an in-flight disconnect', async () => 
     },
   };
   const access = createDesktopPaypalAgentAccess(
-    () => ({ phase: 'active', expired: false, spentCents: 0, limitCents: 100 }),
+    () => ({
+      phase: 'active',
+      expired: false,
+      spentCents: 0,
+      limitCents: 100,
+      remainingAttempts: 30,
+    }),
     async () => endpoint,
   );
   await access.connect();
@@ -108,7 +126,13 @@ void test('a new session gets a new connection and the previous endpoint is clos
   let generation = 1;
   let closed = 0;
   const access = createDesktopPaypalAgentAccess(
-    () => ({ phase: 'active', expired: false, spentCents: 0, limitCents: 100 }),
+    () => ({
+      phase: 'active',
+      expired: false,
+      spentCents: 0,
+      limitCents: 100,
+      remainingAttempts: 30,
+    }),
     async () => {
       const openedGeneration = generation;
       return {
@@ -148,7 +172,13 @@ void test('disconnect closes a busy endpoint', async () => {
     },
   };
   const access = createDesktopPaypalAgentAccess(
-    () => ({ phase: 'active', expired: false, spentCents: 0, limitCents: 100 }),
+    () => ({
+      phase: 'active',
+      expired: false,
+      spentCents: 0,
+      limitCents: 100,
+      remainingAttempts: 30,
+    }),
     async () => endpoint,
   );
   await access.connect();
@@ -206,15 +236,32 @@ void test('a connection remains visibly disconnecting while an inference drains'
   let closing = false;
   let entered = () => {};
   let release = () => {};
-  const waiting = new Promise<void>((resolve) => { release = resolve; });
-  const started = new Promise<void>((resolve) => { entered = resolve; });
+  const waiting = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const started = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
   const endpoint = {
-    url: 'http://127.0.0.1:12345/v1', key: 'synthetic-key', model: 'synthetic-model',
-    isCurrent: () => !closing, isBusy: () => true,
-    async close() { closing = true; entered(); await waiting; },
+    url: 'http://127.0.0.1:12345/v1',
+    key: 'synthetic-key',
+    model: 'synthetic-model',
+    isCurrent: () => !closing,
+    isBusy: () => true,
+    async close() {
+      closing = true;
+      entered();
+      await waiting;
+    },
   };
   const activeAccess = createDesktopPaypalAgentAccess(
-    () => ({ phase: 'active', expired: false, spentCents: 0, limitCents: 100 }),
+    () => ({
+      phase: 'active',
+      expired: false,
+      spentCents: 0,
+      limitCents: 100,
+      remainingAttempts: 30,
+    }),
     async () => endpoint,
   );
   await activeAccess.connect();
@@ -223,7 +270,9 @@ void test('a connection remains visibly disconnecting while an inference drains'
     await started;
     assert.equal(activeAccess.status()?.disconnecting, true);
     assert.equal(activeAccess.status()?.usageUncertain, true);
-  } finally { release(); }
+  } finally {
+    release();
+  }
   await stopping;
   assert.equal(activeAccess.status(), null);
 });

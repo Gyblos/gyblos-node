@@ -344,7 +344,7 @@ export const PAYPAL_AGENT_REQUEST_LIMITS = {
   bodyReadMs: 5_000,
   requestBytes: 262144,
   responseBytes: 262144,
-  digestDomain: 'paypal-agent-request-v1:',
+  digestDomain: 'paypal-agent-request-v2:',
   idempotencyDigestDomain: 'paypal-agent-idempotency-v1:',
   idempotencyKeyCharacters: 128,
 } as const;

@@ -147,7 +147,12 @@ function agentError(reason: unknown) {
     reason instanceof PaypalError
       ? reason.code
       : PAYPAL_ERROR_CODES.UNAVAILABLE;
-  return error(HTTP_STATUS.badRequest, code);
+  return error(
+    code === PAYPAL_ERROR_CODES.BUSY
+      ? HTTP_STATUS.conflict
+      : HTTP_STATUS.badRequest,
+    code,
+  );
 }
 
 function modelList(model: string) {

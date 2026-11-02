@@ -14,6 +14,7 @@ void test('only the desktop main frame can request agent connection details', as
     spentCents: 0,
     limitCents: 100,
     usageUncertain: false,
+    disconnecting: false,
   };
   const access = {
     status: () => connection,

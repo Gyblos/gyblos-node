@@ -52,6 +52,7 @@ export type PaypalAgentResult = {
     spentCents: number;
     limitCents: number;
     usageUncertain: boolean;
+    disconnecting: boolean;
   } | null;
   error: (typeof PAYPAL_AGENT_ERROR)[keyof typeof PAYPAL_AGENT_ERROR] | null;
 };
@@ -110,7 +111,7 @@ function connection(value: unknown): PaypalAgentResult['connection'] {
   if (
     !row ||
     Object.keys(row).sort().join(',') !==
-      'key,limitCents,model,spentCents,url,usageUncertain'
+      'disconnecting,key,limitCents,model,spentCents,url,usageUncertain'
   )
     return null;
   if (
@@ -127,7 +128,8 @@ function connection(value: unknown): PaypalAgentResult['connection'] {
     row.spentCents < 0 ||
     row.limitCents !== PAYPAL_SANDBOX.limitCents ||
     row.spentCents > row.limitCents ||
-    typeof row.usageUncertain !== 'boolean'
+    typeof row.usageUncertain !== 'boolean' ||
+    typeof row.disconnecting !== 'boolean'
   )
     return null;
   const url = new URL(row.url);
@@ -149,6 +151,7 @@ function connection(value: unknown): PaypalAgentResult['connection'] {
     spentCents: row.spentCents,
     limitCents: row.limitCents,
     usageUncertain: row.usageUncertain,
+    disconnecting: row.disconnecting,
   };
 }
 export function parsePaypalAgentResult(value: unknown): PaypalAgentResult {

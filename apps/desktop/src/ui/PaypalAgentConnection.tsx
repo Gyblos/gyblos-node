@@ -221,9 +221,12 @@ function AgentUsage({
         </p>
       )}
       {connection &&
-        (connection.usageUncertain ? (
+        (statusUnavailable ? (
+          <p>Session usage and the remaining amount cannot be verified.</p>
+        ) : connection.usageUncertain ? (
           <p>
-            Usage may change or need review. Check the PayPal session in Chat.
+            The session cannot currently accept new agent requests or needs
+            review. Check the PayPal session in Chat.
           </p>
         ) : (
           <p>
@@ -282,7 +285,12 @@ export function PaypalAgentConnection({
           Create local connection
         </Button>
       )}
-      {connection && (
+      {connection?.disconnecting && (
+        <p role="status">
+          Disconnecting. An inference already started can finish and count.
+        </p>
+      )}
+      {connection && !connection.disconnecting && (
         <AgentDetails
           connection={connection}
           busy={busy}

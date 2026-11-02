@@ -7,6 +7,8 @@ import {
   PAYPAL_SESSION_PHASE,
 } from '@gyblos/node/constants';
 import type { createPaypalSession } from '@gyblos/node/paypal-session';
+import { PAYPAL_ERROR_CODES } from '@gyblos/protocol/constants';
+import { PaypalError } from '@gyblos/protocol/paypal-payment';
 
 import {
   PAYPAL_AGENT_ERROR,
@@ -61,7 +63,11 @@ function serialOperations() {
   let closing = false;
   let pending: Promise<void> = Promise.resolve();
   function run<T>(action: () => Promise<T>): Promise<T> {
-    if (busy || closing) return Promise.reject(new Error('Session is busy.'));
+    if (closing)
+      return Promise.reject(
+        new PaypalError(PAYPAL_ERROR_CODES.NEEDS_RECONCILIATION),
+      );
+    if (busy) return Promise.reject(new PaypalError(PAYPAL_ERROR_CODES.BUSY));
     busy = true;
     const result = (async () => {
       try {

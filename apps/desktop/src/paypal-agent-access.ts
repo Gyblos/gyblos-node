@@ -1,8 +1,5 @@
 // Owns one local agent endpoint for the lifetime of the desktop sandbox session.
-import {
-  PAYPAL_SESSION_PHASE,
-  PAYPAL_SESSION_STATUS,
-} from '@gyblos/node/constants';
+import { PAYPAL_SESSION_PHASE } from '@gyblos/node/constants';
 
 type Endpoint = {
   url: string;
@@ -18,23 +15,34 @@ type SessionStatus = {
   expired: boolean;
   spentCents: number;
   limitCents: number;
+  remainingAttempts: number;
 };
-function snapshot(endpoint: Endpoint, state: SessionStatus) {
+function snapshot(
+  endpoint: Endpoint,
+  state: SessionStatus,
+  disconnecting: boolean,
+) {
   return {
     url: endpoint.url,
     key: endpoint.key,
     model: endpoint.model,
     spentCents: state.spentCents,
     limitCents: state.limitCents,
+    disconnecting,
     usageUncertain:
-      state.phase === PAYPAL_SESSION_STATUS.BLOCKED ||
-      state.phase === PAYPAL_SESSION_PHASE.EXECUTING,
+      disconnecting ||
+      endpoint.isBusy() ||
+      state.phase !== PAYPAL_SESSION_PHASE.ACTIVE ||
+      state.expired ||
+      state.remainingAttempts === 0 ||
+      state.spentCents >= state.limitCents,
   };
 }
 
 type EndpointState = {
   current: Endpoint | undefined;
   opening: Promise<Endpoint> | undefined;
+  disconnecting: boolean;
 };
 function ensureEndpoint(access: EndpointState, start: () => Promise<Endpoint>) {
   const stale =
@@ -72,7 +80,11 @@ export function createDesktopPaypalAgentAccess(
   status: () => SessionStatus,
   start: () => Promise<Endpoint>,
 ) {
-  const access: EndpointState = { opening: undefined, current: undefined };
+  const access: EndpointState = {
+    opening: undefined,
+    current: undefined,
+    disconnecting: false,
+  };
   let busy = false;
   let pending: Promise<void> = Promise.resolve();
   let closing: Promise<void> | undefined;
@@ -98,18 +110,23 @@ export function createDesktopPaypalAgentAccess(
     if (
       closing ||
       busy ||
+      access.disconnecting ||
       state.phase !== PAYPAL_SESSION_PHASE.ACTIVE ||
-      state.expired
+      state.expired ||
+      state.remainingAttempts === 0 ||
+      state.spentCents >= state.limitCents
     )
       throw new Error('An active sandbox session is required.');
-    return snapshot(await ensureEndpoint(access, start), status());
+    return snapshot(await ensureEndpoint(access, start), status(), false);
   }
   function disconnect() {
     return run(async () => {
       const endpoint = access.opening ? await access.opening : undefined;
+      access.disconnecting = !!endpoint;
       await endpoint?.close();
       access.opening = undefined;
       access.current = undefined;
+      access.disconnecting = false;
     });
   }
   function close() {
@@ -129,6 +146,8 @@ export function createDesktopPaypalAgentAccess(
     disconnect,
     close,
     status: () =>
-      access.current?.isCurrent() ? snapshot(access.current, status()) : null,
+      access.current && (access.current.isCurrent() || access.disconnecting)
+        ? snapshot(access.current, status(), access.disconnecting)
+        : null,
   };
 }
