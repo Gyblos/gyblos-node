@@ -720,12 +720,12 @@ until the seller claims it or the buyer withdraws it (below).
 Use the role's RPC as one endpoint with full transaction history. A pruned or
 load-balanced RPC can only keep a channel `open` (it never makes one look
 unopened), because the command reads the finalized tip first and requires the
-RPC to still serve blocks and ledger back to the open's slot. A journal from
-before this version is read as is: its signed opens can still settle but are
-never reported `never-opened`. The first write saves the journal in the current
-format, which earlier releases refuse (`BUYER_PAYMENT_JOURNAL_UNAVAILABLE`,
-`PAID_RECONCILE_INCOMPLETE`, `PAID_WITHDRAW_INCOMPLETE`), so do not roll back
-the buyer.
+RPC to still serve blocks and ledger back to the open's slot. A signed open
+from an older journal has no recorded network and remains blocked, as described
+below. A journal upgraded to the current format is refused by earlier releases
+(`BUYER_PAYMENT_JOURNAL_UNAVAILABLE`, `PAID_RECONCILE_INCOMPLETE`,
+`PAID_WITHDRAW_INCOMPLETE`), so do not roll back the buyer while channels need
+recovery.
 
 The command exits 0 when nothing blocks payments (disputes included, since they
 are recorded and no longer block), 2 while a channel stays open, and 1 when it
