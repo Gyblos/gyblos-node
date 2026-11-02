@@ -28,7 +28,10 @@ only; never import mainnet keys.
   token accounts for the mint, and the program pays a share whose account is
   missing to its own treasury for good; the paid seller creates the missing ones
   (payout, fee treasury, fee payer and the channel's payer) before it starts and
-  before each claim ([Seller startup](configuration.md#seller-startup)).
+  before each claim ([Seller startup](configuration.md#seller-startup)). A buyer
+  who closed its emptied token account makes the seller pay, unrecovered, the
+  rent to recreate it for its refund: about 0.002 SOL, at most about once per
+  channel.
 - Paid v2 selling (x402 upto channels) is wired to devnet and has settled there
   only in a controlled run; it is not validated beyond that.
 - A claim is recognized as landed only through the transactions this seller sent
