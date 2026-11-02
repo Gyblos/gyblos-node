@@ -11,7 +11,6 @@ void test('OpenCode configuration uses an environment variable instead of embedd
     url: 'http://127.0.0.1:12345/v1',
     key: 'synthetic-secret-key',
     model: 'synthetic-model',
-    pending: false,
   });
   assert.match(config, /\{env:GYBLOS_API_KEY\}/);
   assert.match(config, /synthetic-model/);
@@ -54,7 +53,6 @@ void test('IPC result rejects external connection URLs and malformed keys', () =
     url: 'http://127.0.0.1:12345/v1',
     key: 'a'.repeat(43),
     model: 'synthetic-model',
-    pending: false,
   };
   assert.deepEqual(
     parsePaypalAgentResult({ connection, error: null }).connection,

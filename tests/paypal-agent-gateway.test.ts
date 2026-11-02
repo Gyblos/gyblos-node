@@ -55,22 +55,15 @@ const input = {
 
 function fixture(initialAnswer: unknown = firstAnswer) {
   const calls: string[] = [];
-  let phase = 'active';
   let count = 0;
   const service = {
-    status: () => ({ phase }),
     async sendAgent() {
       calls.push('generate');
-      phase = 'message_pending';
       count += 1;
       return {
         response: count === 1 ? initialAnswer : secondAnswer,
         messageId: `MSG${count}`,
       };
-    },
-    async acknowledge(messageId: string) {
-      calls.push(`ack:${messageId}`);
-      phase = 'active';
     },
   };
   return {
@@ -128,13 +121,11 @@ void test('the authorized model catalog exposes only the configured model', asyn
   assert.deepEqual(f.calls, []);
 });
 
-void test('a following agent request waits for explicit confirmation of the prior response', async () => {
+void test('a following agent request continues without manual confirmation', async () => {
   const f = fixture();
   const first = await f.gateway.handle(post(input));
   assert.equal(first.status, 200);
   assert.deepEqual(await first.json(), firstAnswer);
-  assert.equal((await f.gateway.handle(post(input))).status, 409);
-  assert.deepEqual(f.calls, ['generate']);
   const firstChoice = firstAnswer.choices[0];
   assert.ok(firstChoice);
   const second = {
@@ -145,18 +136,13 @@ void test('a following agent request waits for explicit confirmation of the prio
       { role: 'tool', tool_call_id: 'call_1', content: 'synthetic contents' },
     ],
   };
-  assert.equal((await f.gateway.handle(post(second))).status, 409);
-  assert.deepEqual(f.calls, ['generate']);
-  await f.gateway.acknowledgePending();
   const next = await f.gateway.handle(post(second));
   assert.equal(next.status, 200);
   assert.deepEqual(await next.json(), secondAnswer);
-  assert.deepEqual(f.calls, ['generate', 'ack:MSG1', 'generate']);
-  await f.gateway.acknowledgePending();
-  assert.deepEqual(f.calls, ['generate', 'ack:MSG1', 'generate', 'ack:MSG2']);
+  assert.deepEqual(f.calls, ['generate', 'generate']);
 });
 
-void test('assistant tool calls with omitted content remain valid after explicit confirmation', async () => {
+void test('assistant tool calls with omitted content remain valid', async () => {
   const f = fixture();
   assert.equal((await f.gateway.handle(post(input))).status, 200);
   const message = firstAnswer.choices[0]?.message;
@@ -174,11 +160,9 @@ void test('assistant tool calls with omitted content remain valid after explicit
       },
     ],
   };
-  assert.equal((await f.gateway.handle(post(nextInput))).status, 409);
-  await f.gateway.acknowledgePending();
   const next = await f.gateway.handle(post(nextInput));
   assert.equal(next.status, 200);
-  assert.deepEqual(f.calls, ['generate', 'ack:MSG1', 'generate']);
+  assert.deepEqual(f.calls, ['generate', 'generate']);
 });
 
 void test('streaming clients receive an SSE representation only after the complete response', async () => {
@@ -196,7 +180,7 @@ void test('streaming clients receive an SSE representation only after the comple
   assert.deepEqual(f.calls, ['generate']);
 });
 
-void test('an identical older assistant message cannot acknowledge a lost new response', async () => {
+void test('an existing assistant message remains valid in a later request', async () => {
   const f = fixture(secondAnswer);
   const firstChoice = secondAnswer.choices[0];
   assert.ok(firstChoice);
@@ -209,11 +193,10 @@ void test('an identical older assistant message cannot acknowledge a lost new re
     ],
   };
   assert.equal((await f.gateway.handle(post(repeated))).status, 200);
-  assert.equal((await f.gateway.handle(post(repeated))).status, 409);
   assert.deepEqual(f.calls, ['generate']);
 });
 
-void test('a slow incoming request cannot block confirmation of a completed response', async () => {
+void test('a slow incoming request rejects another request until its body completes', async () => {
   const f = fixture();
   assert.equal((await f.gateway.handle(post(input))).status, 200);
   let finishBody: () => void = () => {};
@@ -238,13 +221,13 @@ void test('a slow incoming request cannot block confirmation of a completed resp
   const slow = new Request(`${origin}/v1/chat/completions`, init);
   const pendingRequest = f.gateway.handle(slow);
   await Promise.resolve();
-  await f.gateway.acknowledgePending();
+  assert.equal((await f.gateway.handle(post(input))).status, 409);
   finishBody();
   assert.equal((await pendingRequest).status, 400);
-  assert.deepEqual(f.calls, ['generate', 'ack:MSG1']);
+  assert.deepEqual(f.calls, ['generate']);
 });
 
-void test('an unrelated conversation cannot confirm an unseen agent response', async () => {
+void test('an unrelated conversation can start without confirming an earlier response', async () => {
   const f = fixture(secondAnswer);
   assert.equal((await f.gateway.handle(post(input))).status, 200);
   const unrelated = {
@@ -255,8 +238,8 @@ void test('an unrelated conversation cannot confirm an unseen agent response', a
       { role: 'user', content: 'unrelated follow-up' },
     ],
   };
-  assert.equal((await f.gateway.handle(post(unrelated))).status, 409);
-  assert.deepEqual(f.calls, ['generate']);
+  assert.equal((await f.gateway.handle(post(unrelated))).status, 200);
+  assert.deepEqual(f.calls, ['generate', 'generate']);
 });
 
 void test('an incomplete request body eventually releases the gateway', async () => {

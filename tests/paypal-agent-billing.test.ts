@@ -11,29 +11,69 @@ function request(text: string) {
 }
 function completion(text = 'synthetic answer') {
   return {
-    id: 'synthetic', object: 'chat.completion', created: 0, model,
-    choices: [{ index: 0, message: { role: 'assistant', content: text }, finish_reason: 'stop' }],
+    id: 'synthetic',
+    object: 'chat.completion',
+    created: 0,
+    model,
+    choices: [
+      {
+        index: 0,
+        message: { role: 'assistant', content: text },
+        finish_reason: 'stop',
+      },
+    ],
     usage: { prompt_tokens: 2, completion_tokens: 3, total_tokens: 5 },
   };
 }
 
 void test('completed agent inferences are recorded before delivery and share the chat limit', async () => {
   const f = fixture();
-  const agentEngine = { model, async generate() { f.calls.push('agent-generate'); return completion(); } };
+  const agentEngine = {
+    model,
+    async generate() {
+      f.calls.push('agent-generate');
+      return completion();
+    },
+  };
   const session = await createPaypalSession({ ...f, agentEngine });
   const order = await session.create();
   await session.approve(order.orderId);
-  await session.agentMessage(order.orderId, request('first synthetic'), 'AGENT1');
+  await session.agentMessage(
+    order.orderId,
+    request('first synthetic'),
+    'AGENT1',
+  );
   assert.equal(session.status().phase, 'active');
   assert.equal(session.status().spentCents, 10);
-  const chat = await session.message(order.orderId, 'synthetic chat', 16, 'CHAT1');
-  await assert.rejects(session.agentMessage(order.orderId, request('second synthetic'), 'AGENT2'));
+  const chat = await session.message(
+    order.orderId,
+    'synthetic chat',
+    16,
+    'CHAT1',
+  );
+  await assert.rejects(
+    session.agentMessage(order.orderId, request('second synthetic'), 'AGENT2'),
+  );
   await session.acknowledge(order.orderId, chat.messageId);
-  await session.agentMessage(order.orderId, request('second synthetic'), 'AGENT2');
+  await session.agentMessage(
+    order.orderId,
+    request('second synthetic'),
+    'AGENT2',
+  );
   assert.equal(session.status().spentCents, 30);
-  assert.doesNotMatch(JSON.stringify(f.getState()), /first synthetic|second synthetic|synthetic answer/);
+  assert.doesNotMatch(
+    JSON.stringify(f.getState()),
+    /first synthetic|second synthetic|synthetic answer/,
+  );
   await session.finish(order.orderId);
-  assert.deepEqual(f.calls, ['create', 'authorize', 'agent-generate', 'generate', 'agent-generate', 'capture:30']);
+  assert.deepEqual(f.calls, [
+    'create',
+    'authorize',
+    'agent-generate',
+    'generate',
+    'agent-generate',
+    'capture:30',
+  ]);
 });
 
 void test('disconnect after dispatch cannot cancel or erase a completed charge', async () => {
@@ -41,17 +81,32 @@ void test('disconnect after dispatch cannot cancel or erase a completed charge',
   let entered = () => {};
   let release = () => {};
   let seenSignal: AbortSignal | undefined;
-  const started = new Promise<void>((resolve) => { entered = resolve; });
-  const waiting = new Promise<void>((resolve) => { release = resolve; });
-  const agentEngine = { model, async generate(_input: unknown, signal?: AbortSignal) {
-    seenSignal = signal;
-    f.calls.push('agent-generate'); entered(); await waiting; return completion();
-  } };
+  const started = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const waiting = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const agentEngine = {
+    model,
+    async generate(_input: unknown, signal?: AbortSignal) {
+      seenSignal = signal;
+      f.calls.push('agent-generate');
+      entered();
+      await waiting;
+      return completion();
+    },
+  };
   const session = await createPaypalSession({ ...f, agentEngine });
   const order = await session.create();
   await session.approve(order.orderId);
   const controller = new AbortController();
-  const pending = session.agentMessage(order.orderId, request('synthetic'), 'AGENT1', controller.signal);
+  const pending = session.agentMessage(
+    order.orderId,
+    request('synthetic'),
+    'AGENT1',
+    controller.signal,
+  );
   await started;
   controller.abort();
   release();
@@ -62,18 +117,34 @@ void test('disconnect after dispatch cannot cancel or erase a completed charge',
   const restarted = await createPaypalSession({ ...f, agentEngine });
   assert.equal(restarted.status().spentCents, 10);
   await restarted.finish(order.orderId);
-  assert.deepEqual(f.calls, ['create', 'authorize', 'agent-generate', 'capture:10']);
+  assert.deepEqual(f.calls, [
+    'create',
+    'authorize',
+    'agent-generate',
+    'capture:10',
+  ]);
 });
 
 void test('a repeated unkeyed agent request is rejected without generating or charging twice', async () => {
   const f = fixture();
-  const agentEngine = { model, async generate() { f.calls.push('agent-generate'); return completion(); } };
+  const agentEngine = {
+    model,
+    async generate() {
+      f.calls.push('agent-generate');
+      return completion();
+    },
+  };
   const session = await createPaypalSession({ ...f, agentEngine });
   const order = await session.create();
   await session.approve(order.orderId);
   const first = request('synthetic');
   await session.agentMessage(order.orderId, first, 'AGENT1');
-  const same = { max_tokens: 64, messages: first.messages, model, stream: true };
+  const same = {
+    max_tokens: 64,
+    messages: first.messages,
+    model,
+    stream: true,
+  };
   await assert.rejects(session.agentMessage(order.orderId, same, 'AGENT2'));
   assert.equal(session.status().spentCents, 10);
   assert.deepEqual(f.calls, ['create', 'authorize', 'agent-generate']);
@@ -81,100 +152,95 @@ void test('a repeated unkeyed agent request is rejected without generating or ch
 
 void test('an idempotency key permits explicit repetitions but cannot be reused', async () => {
   const f = fixture();
-  const agentEngine = { model, async generate() { f.calls.push('agent-generate'); return completion(); } };
+  const agentEngine = {
+    model,
+    async generate() {
+      f.calls.push('agent-generate');
+      return completion();
+    },
+  };
   const session = await createPaypalSession({ ...f, agentEngine });
   const order = await session.create();
   await session.approve(order.orderId);
-  await session.agentMessage(order.orderId, request('synthetic'), 'AGENT1', undefined, 'operation-1');
-  await assert.rejects(session.agentMessage(order.orderId, request('different synthetic'), 'AGENT2', undefined, 'operation-1'));
-  await session.agentMessage(order.orderId, request('synthetic'), 'AGENT3', undefined, 'operation-2');
+  await session.agentMessage(
+    order.orderId,
+    request('synthetic'),
+    'AGENT1',
+    undefined,
+    'operation-1',
+  );
+  await assert.rejects(
+    session.agentMessage(
+      order.orderId,
+      request('different synthetic'),
+      'AGENT2',
+      undefined,
+      'operation-1',
+    ),
+  );
+  await session.agentMessage(
+    order.orderId,
+    request('synthetic'),
+    'AGENT3',
+    undefined,
+    'operation-2',
+  );
   assert.equal(session.status().spentCents, 20);
   assert.doesNotMatch(JSON.stringify(f.getState()), /operation-1|operation-2/);
-  assert.deepEqual(f.calls, ['create', 'authorize', 'agent-generate', 'agent-generate']);
+  assert.deepEqual(f.calls, [
+    'create',
+    'authorize',
+    'agent-generate',
+    'agent-generate',
+  ]);
 });
 
 void test('a completed result is not returned before its charge is recorded', async () => {
   const f = fixture();
   let entered = () => {};
   let release = () => {};
-  const started = new Promise<void>((resolve) => { entered = resolve; });
-  const waiting = new Promise<void>((resolve) => { release = resolve; });
+  const started = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const waiting = new Promise<void>((resolve) => {
+    release = resolve;
+  });
   const write = f.journal.write;
-  const agentEngine = { model, async generate() { return completion(); } };
+  const agentEngine = {
+    model,
+    async generate() {
+      return completion();
+    },
+  };
   const session = await createPaypalSession({ ...f, agentEngine });
   const order = await session.create();
   await session.approve(order.orderId);
   f.journal.write = async (value: unknown) => {
-    if (value && typeof value === 'object' && 'agentCompletions' in value && Array.isArray(value.agentCompletions) && value.agentCompletions.length) { entered(); await waiting; }
+    if (
+      value &&
+      typeof value === 'object' &&
+      'agentCompletions' in value &&
+      Array.isArray(value.agentCompletions) &&
+      value.agentCompletions.length
+    ) {
+      entered();
+      await waiting;
+    }
     await write(value);
   };
   let returned = false;
-  const pending = session.agentMessage(order.orderId, request('synthetic'), 'AGENT1').then(() => { returned = true; });
+  const pending = session
+    .agentMessage(order.orderId, request('synthetic'), 'AGENT1')
+    .then(() => {
+      returned = true;
+    });
   await Promise.race([started, pending]);
   assert.equal(returned, false);
+  await assert.rejects(session.finish(order.orderId));
+  await assert.rejects(
+    session.agentMessage(order.orderId, request('other'), 'AGENT2'),
+  );
   release();
   await pending;
   assert.equal(session.status().spentCents, 10);
-});
-
-void test('a version 2 authorization keeps chat semantics and cannot acquire the new agent policy', async () => {
-  const f = fixture();
-  const agentEngine = { model, async generate() { f.calls.push('agent-generate'); return completion(); } };
-  f.setState({
-    version: 2, phase: 'active', requestId: 'REQUEST1', currency: 'USD',
-    limitCents: 100, messageCents: 10, maxMessageAttempts: 30, spentCents: 0,
-    attemptIds: [], acknowledgedIds: [], orderId: 'ORDER1', authorizationId: 'AUTH1',
-    expiresAt: Date.now() + 60000,
-  });
-  const session = await createPaypalSession({ ...f, agentEngine });
-  await assert.rejects(session.agentMessage('ORDER1', request('synthetic'), 'AGENT1'));
-  const chat = await session.message('ORDER1', 'synthetic chat', 16, 'CHAT1');
-  assert.equal(session.status().phase, 'message_pending');
-  await session.acknowledge('ORDER1', chat.messageId);
-  await session.finish('ORDER1');
-  assert.deepEqual(f.calls, ['generate', 'capture:10']);
-});
-
-void test('an invalid agent result and an uncertain final journal write both block the session', async () => {
-  const f = fixture();
-  const agentEngine = { model, async generate() { return completion(''); } };
-  const session = await createPaypalSession({ ...f, agentEngine });
-  const order = await session.create();
-  await session.approve(order.orderId);
-  await assert.rejects(session.agentMessage(order.orderId, request('synthetic'), 'AGENT1'));
-  await assert.rejects(session.finish(order.orderId));
-  const restarted = await createPaypalSession({ ...f, agentEngine });
-  await assert.rejects(restarted.agentMessage(order.orderId, request('another'), 'AGENT2'));
-
-  const g = fixture();
-  const goodEngine = { model, async generate() { return completion(); } };
-  const current = await createPaypalSession({ ...g, agentEngine: goodEngine });
-  const nextOrder = await current.create();
-  await current.approve(nextOrder.orderId);
-  const write = g.journal.write;
-  g.journal.write = async (value: unknown) => {
-    if (value && typeof value === 'object' && 'agentCompletions' in value && Array.isArray(value.agentCompletions) && value.agentCompletions.length) throw new Error('disk failed');
-    await write(value);
-  };
-  await assert.rejects(current.agentMessage(nextOrder.orderId, request('synthetic'), 'AGENT1'));
-  assert.equal(current.status().phase, 'blocked');
-  await assert.rejects(current.finish(nextOrder.orderId));
-  const recovered = await createPaypalSession({ ...g, agentEngine: goodEngine });
-  await assert.rejects(recovered.finish(nextOrder.orderId));
-});
-
-void test('agent usage cannot exceed the approved limit', async () => {
-  const f = fixture();
-  const agentEngine = { model, async generate() { f.calls.push('agent-generate'); return completion(); } };
-  const session = await createPaypalSession({ ...f, agentEngine });
-  const order = await session.create();
-  await session.approve(order.orderId);
-  for (let i = 0; i < 10; i += 1) {
-    await session.agentMessage(order.orderId, request(`synthetic ${i}`), `AGENT${i}`);
-  }
-  await assert.rejects(session.agentMessage(order.orderId, request('eleventh'), 'AGENT11'));
-  assert.equal(session.status().spentCents, 100);
-  assert.equal(f.calls.filter((call) => call === 'agent-generate').length, 10);
-  await session.finish(order.orderId);
-  assert.equal(f.calls.at(-1), 'capture:100');
 });

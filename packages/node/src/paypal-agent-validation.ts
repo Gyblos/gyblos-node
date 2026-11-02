@@ -1,5 +1,7 @@
 // Validates the sandbox agent's bounded OpenAI-compatible request and completed result.
 // This is a local prototype contract, not the network execution wire.
+import { createHash } from 'node:crypto';
+
 import { AGENT_CHAT, PAYPAL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { PaypalError } from '@gyblos/protocol/paypal-payment';
 
@@ -259,4 +261,59 @@ export function validatePaypalAgentResult(
   const completion = count(usage.completion_tokens, maxTokens);
   if (count(usage.total_tokens) !== prompt + completion) invalid();
   return row;
+}
+
+export function preparePaypalAgentRequest(input: unknown, model: string) {
+  let serialized: string | undefined;
+  try {
+    serialized = JSON.stringify(input);
+  } catch {
+    return invalid();
+  }
+  if (
+    !serialized ||
+    Buffer.byteLength(serialized, 'utf8') >
+      PAYPAL_AGENT_REQUEST_LIMITS.requestBytes
+  )
+    return invalid();
+  const value: unknown = JSON.parse(serialized);
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    return invalid();
+  const normalized = validatePaypalAgentRequest(value, model);
+  const {
+    stream: _stream,
+    stream_options: _streamOptions,
+    ...inference
+  } = normalized;
+  const normalizedBytes = JSON.stringify(
+    inference,
+    (_key: string, entry: unknown) => {
+      if (entry && typeof entry === 'object' && !Array.isArray(entry))
+        return Object.fromEntries(
+          Object.entries(entry).sort(([left], [right]) =>
+            left < right ? -1 : left > right ? 1 : 0,
+          ),
+        );
+      return entry;
+    },
+  );
+  return {
+    input: normalized,
+    digest: createHash('sha256')
+      .update(PAYPAL_AGENT_REQUEST_LIMITS.digestDomain)
+      .update(normalizedBytes)
+      .digest('hex'),
+  };
+}
+export function paypalAgentIdempotencyDigest(key: string | undefined) {
+  if (key === undefined) return undefined;
+  if (
+    key.length > PAYPAL_AGENT_REQUEST_LIMITS.idempotencyKeyCharacters ||
+    !/^[A-Za-z0-9._~-]+$/.test(key)
+  )
+    return invalid();
+  return createHash('sha256')
+    .update(PAYPAL_AGENT_REQUEST_LIMITS.idempotencyDigestDomain)
+    .update(key)
+    .digest('hex');
 }

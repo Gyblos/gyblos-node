@@ -161,9 +161,17 @@ function SessionPanel({ chat, state }: ChatProps) {
         <p>
           Session maximum: {dollars(state.status.limitCents)} · Recorded usage:{' '}
           {dollars(state.status.spentCents)} ·{' '}
-          {dollars(state.status.messageCents)} per acknowledged response
+          {dollars(state.status.messageCents)} per acknowledged chat response or
+          completed agent inference
         </p>
       )}
+      <p>
+        Sandbox sessions authorize up to USD 1 in test funds. Each completed
+        agent inference uses USD 0.10, even if the response cannot be delivered.
+        One instruction can require multiple inferences. An inference already
+        started can finish and count after the agent disconnects. Closing the
+        session captures the recorded usage.
+      </p>
       {phase === PAYPAL_SESSION_PHASE.COMPLETED && (
         <p>Sandbox payment captured for recorded usage.</p>
       )}
@@ -183,7 +191,10 @@ function SessionPanel({ chat, state }: ChatProps) {
           </p>
         )}
       {uncertain(state) && (
-        <p>Session needs review. Do not retry payment or remove its record.</p>
+        <p>
+          Session needs review and the usage shown may be uncertain. Do not
+          retry payment or remove its record.
+        </p>
       )}
       {phase === PAYPAL_SESSION_PHASE.EXECUTING && (
         <p>
@@ -194,8 +205,7 @@ function SessionPanel({ chat, state }: ChatProps) {
       {phase === PAYPAL_SESSION_PHASE.MESSAGE_PENDING &&
         !state.pendingMessageId && (
           <p>
-            Check Connect for an agent response to confirm. If none is
-            available, the session needs review.
+            A prior response awaits confirmation and the session needs review.
           </p>
         )}
       <SessionActions chat={chat} state={state} />

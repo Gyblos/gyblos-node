@@ -128,11 +128,15 @@ export function registerDesktopPaypal(window: BrowserWindow) {
     mainFrame: () => window.webContents.mainFrame,
     destroyed: () => window.isDestroyed(),
   });
-  const agentHandlers = createDesktopPaypalAgentHandlers(runtime.load, {
-    contents: window.webContents,
-    mainFrame: () => window.webContents.mainFrame,
-    destroyed: () => window.isDestroyed(),
-  });
+  const agentHandlers = createDesktopPaypalAgentHandlers(
+    runtime.load,
+    {
+      contents: window.webContents,
+      mainFrame: () => window.webContents.mainFrame,
+      destroyed: () => window.isDestroyed(),
+    },
+    runtime.current,
+  );
   ipcMain.handle(DESKTOP_PAYPAL.CHANNEL, (event, ...args: unknown[]) =>
     handlers.run(event, args),
   );

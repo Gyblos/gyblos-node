@@ -519,12 +519,13 @@ export function DesktopApp() {
               </InfoBar>
             </PagePanel>
           )}
-          {view === UI_VIEW.CONNECT &&
-            paymentMethod === PAYMENT_METHOD.PAYPAL && (
-              <PagePanel>
-                <PaypalAgentConnection />
-              </PagePanel>
-            )}
+          {view === UI_VIEW.CONNECT && (
+            <PagePanel>
+              <PaypalAgentConnection
+                onlyConnected={paymentMethod !== PAYMENT_METHOD.PAYPAL}
+              />
+            </PagePanel>
+          )}
           {view === UI_VIEW.CONNECT &&
             paymentMethod !== PAYMENT_METHOD.PAYPAL && (
               <PagePanel>
@@ -601,7 +602,9 @@ export function DesktopApp() {
                     PayPal authorizes a separate sandbox session; it does not
                     add USDC to the wallet. The method resets to USDC when the
                     app closes, but an open PayPal session remains until
-                    settled.
+                    settled. Switching to USDC does not disconnect an active
+                    PayPal agent, which can keep using its session. Disconnect
+                    it in Connect and settle the session in PayPal Chat.
                   </p>
                 </SettingsGroup>
                 <SettingsGroup

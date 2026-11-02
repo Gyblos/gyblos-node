@@ -1,4 +1,4 @@
-// Restricts sandbox agent setup and response acknowledgment to the desktop main frame.
+// Restricts sandbox agent setup to the desktop main frame.
 import type { createDesktopPaypalAgentAccess } from './paypal-agent-access';
 import {
   agentFailure,
@@ -26,6 +26,7 @@ function action(value: unknown): PaypalAgentAction | undefined {
 export function createDesktopPaypalAgentHandlers(
   load: () => Promise<{ agentAccess: Access }>,
   window: Window,
+  current?: () => { agentAccess: Access } | null,
 ) {
   return {
     async run(
@@ -41,6 +42,11 @@ export function createDesktopPaypalAgentHandlers(
         return agentFailure(PAYPAL_AGENT_ERROR.DENIED);
       const request = action(args[0]);
       if (!request) return agentFailure(PAYPAL_AGENT_ERROR.INVALID);
+      if (request === PAYPAL_AGENT_ACTION.STATUS)
+        return {
+          connection: current?.()?.agentAccess.status() ?? null,
+          error: null,
+        };
       let access: Access;
       try {
         access = (await load()).agentAccess;
@@ -49,13 +55,8 @@ export function createDesktopPaypalAgentHandlers(
       }
       try {
         switch (request) {
-          case PAYPAL_AGENT_ACTION.STATUS:
-            break;
           case PAYPAL_AGENT_ACTION.CONNECT:
             await access.connect();
-            break;
-          case PAYPAL_AGENT_ACTION.CONFIRM:
-            await access.confirm();
             break;
           case PAYPAL_AGENT_ACTION.DISCONNECT:
             await access.disconnect();

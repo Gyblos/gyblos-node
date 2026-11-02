@@ -139,8 +139,9 @@ function sendAgent(
   id: string,
   input: unknown,
   signal?: AbortSignal,
+  idempotencyKey?: string,
 ) {
-  return session.agentMessage(id, input, randomUUID(), signal);
+  return session.agentMessage(id, input, randomUUID(), signal, idempotencyKey);
 }
 
 function agentCheck(
@@ -170,15 +171,16 @@ function agentOperations(
   run: ReturnType<typeof serialOperations>['run'],
   check: () => Promise<void>,
   orderId: () => string,
-  onPending: () => void,
 ) {
   return {
-    sendAgent: (input: unknown, signal?: AbortSignal) =>
+    sendAgent: (
+      input: unknown,
+      signal?: AbortSignal,
+      idempotencyKey?: string,
+    ) =>
       run(async () => {
         await check();
-        const answer = await sendAgent(session, orderId(), input, signal);
-        onPending();
-        return answer;
+        return sendAgent(session, orderId(), input, signal, idempotencyKey);
       }),
     prepareAgent: () => run(check),
   };
@@ -253,9 +255,7 @@ export function createDesktopPaypalSession(
         awaitingAcknowledgement = true;
         return { text: answer.text, messageId: answer.messageId };
       }),
-    ...agentOperations(session, run, checkAgent, orderId, () => {
-      awaitingAcknowledgement = true;
-    }),
+    ...agentOperations(session, run, checkAgent, orderId),
     agentScope: () => agent.scope,
     acknowledge: (messageId: string) =>
       run(async () => {

@@ -7,8 +7,6 @@ type Endpoint = {
   model: string;
   isCurrent(): boolean;
   isBusy(): boolean;
-  hasPending(): boolean;
-  acknowledgePending(): Promise<void>;
   close(): Promise<void>;
 };
 
@@ -17,7 +15,6 @@ function snapshot(endpoint: Endpoint) {
     url: endpoint.url,
     key: endpoint.key,
     model: endpoint.model,
-    pending: endpoint.hasPending(),
   };
 }
 
@@ -29,7 +26,7 @@ function ensureEndpoint(access: EndpointState, start: () => Promise<Endpoint>) {
   const stale =
     access.current && !access.current.isCurrent() ? access.current : undefined;
   if (stale) {
-    if (stale.isBusy() || stale.hasPending())
+    if (stale.isBusy())
       return Promise.reject(new Error('An agent response is pending.'));
     access.current = undefined;
     access.opening = undefined;
@@ -93,18 +90,10 @@ export function createDesktopPaypalAgentAccess(
       throw new Error('An active sandbox session is required.');
     return snapshot(await ensureEndpoint(access, start));
   }
-  function confirm() {
-    return run(async () => {
-      if (!access.current || !access.current.hasPending())
-        throw new Error('No agent response is available.');
-      await access.current.acknowledgePending();
-    });
-  }
   function disconnect() {
     return run(async () => {
       const endpoint = access.opening ? await access.opening : undefined;
-      if (endpoint?.isBusy() || endpoint?.hasPending())
-        throw new Error('An agent response is pending.');
+      if (endpoint?.isBusy()) throw new Error('An agent response is pending.');
       await endpoint?.close();
       access.opening = undefined;
       access.current = undefined;
@@ -124,7 +113,6 @@ export function createDesktopPaypalAgentAccess(
   }
   return {
     connect,
-    confirm,
     disconnect,
     close,
     status: () =>

@@ -15,7 +15,6 @@ export const DESKTOP_PAYPAL_AGENT = {
 export const PAYPAL_AGENT_ACTION = {
   STATUS: 'status',
   CONNECT: 'connect',
-  CONFIRM: 'confirm',
   DISCONNECT: 'disconnect',
 } as const;
 export const PAYPAL_AGENT_ERROR = {
@@ -49,7 +48,6 @@ export type PaypalAgentResult = {
     url: string;
     key: string;
     model: string;
-    pending: boolean;
   } | null;
   error: (typeof PAYPAL_AGENT_ERROR)[keyof typeof PAYPAL_AGENT_ERROR] | null;
 };
@@ -95,7 +93,7 @@ function fields(value: unknown) {
 }
 function connection(value: unknown): PaypalAgentResult['connection'] {
   const row = fields(value);
-  if (!row || Object.keys(row).sort().join(',') !== 'key,model,pending,url')
+  if (!row || Object.keys(row).sort().join(',') !== 'key,model,url')
     return null;
   if (
     typeof row.url !== 'string' ||
@@ -105,8 +103,7 @@ function connection(value: unknown): PaypalAgentResult['connection'] {
     !/^[A-Za-z0-9_-]+$/.test(row.key) ||
     typeof row.model !== 'string' ||
     !row.model ||
-    row.model.length > DESKTOP_PAYPAL_AGENT.MODEL_CHARACTERS ||
-    typeof row.pending !== 'boolean'
+    row.model.length > DESKTOP_PAYPAL_AGENT.MODEL_CHARACTERS
   )
     return null;
   const url = new URL(row.url);
@@ -121,7 +118,7 @@ function connection(value: unknown): PaypalAgentResult['connection'] {
     url.hash
   )
     return null;
-  return { url: row.url, key: row.key, model: row.model, pending: row.pending };
+  return { url: row.url, key: row.key, model: row.model };
 }
 export function parsePaypalAgentResult(value: unknown): PaypalAgentResult {
   const row = fields(value);

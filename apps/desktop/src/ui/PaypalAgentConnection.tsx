@@ -155,7 +155,7 @@ function AgentActions({ connection, busy, run, copy }: DetailProps) {
           Copy API key
         </Button>
         <Button
-          disabled={busy || connection.pending}
+          disabled={busy}
           onClick={() => {
             void run(PAYPAL_AGENT_ACTION.DISCONNECT);
           }}
@@ -163,23 +163,6 @@ function AgentActions({ connection, busy, run, copy }: DetailProps) {
           Disconnect
         </Button>
       </div>
-      {connection.pending && (
-        <div>
-          <p>
-            Confirm the last agent response after receiving it. The agent can
-            continue after this confirmation. Settle the session in Chat when
-            finished.
-          </p>
-          <Button
-            disabled={busy}
-            onClick={() => {
-              void run(PAYPAL_AGENT_ACTION.CONFIRM);
-            }}
-          >
-            I received the last response
-          </Button>
-        </div>
-      )}
     </>
   );
 }
@@ -199,8 +182,13 @@ function AgentDetails(props: DetailProps) {
   );
 }
 
-export function PaypalAgentConnection() {
+export function PaypalAgentConnection({
+  onlyConnected = false,
+}: {
+  onlyConnected?: boolean;
+}) {
   const { connection, busy, notice, run, copy } = usePaypalAgentConnection();
+  if (onlyConnected && !connection) return null;
   return (
     <section
       className="paypal-session"
@@ -215,8 +203,14 @@ export function PaypalAgentConnection() {
         chat. Keep Gyblos open while the tool runs.
       </p>
       <p>
-        Approve a session in Chat first. Each acknowledged test response uses
-        USD 0.10 of the session limit; settle it in Chat when finished.
+        Approve a session in Chat first. Each completed agent inference uses USD
+        0.10 of the session limit, even if delivery fails. One instruction can
+        require several inferences. A started inference can finish and count
+        after OpenCode disconnects. Settle the session in Chat when finished.
+      </p>
+      <p>
+        An identical request without an operation key may be rejected to avoid a
+        repeated charge. OpenCode does not currently send such a key.
       </p>
       {!connection && (
         <Button

@@ -96,14 +96,12 @@ void test('desktop chat and a local agent share one sandbox session', async () =
   await desktop.approve();
   const chat = await desktop.send('synthetic chat');
   await desktop.acknowledge(chat.messageId);
-  const agent = await desktop.sendAgent({
+  await desktop.sendAgent({
     model: 'synthetic-model',
     messages: [{ role: 'user', content: 'synthetic agent request' }],
     max_tokens: 128,
   });
-  assert.equal(desktop.isCloseBlocked(), true);
-  await assert.rejects(desktop.finish());
-  await desktop.acknowledge(agent.messageId);
+  assert.equal(desktop.isCloseBlocked(), false);
   assert.equal((await desktop.finish()).spentCents, 20);
   assert.deepEqual(f.calls, [
     'create',
@@ -148,12 +146,11 @@ void test('an agent-ready model can prepare a session while the chat model is un
   await desktop.create();
   await desktop.approve();
   await assert.rejects(desktop.send('synthetic chat'));
-  const answer = await desktop.sendAgent({
+  await desktop.sendAgent({
     model: 'synthetic-model',
     messages: [{ role: 'user', content: 'synthetic request' }],
     max_tokens: 128,
   });
-  await desktop.acknowledge(answer.messageId);
   assert.equal((await desktop.finish()).spentCents, 10);
 });
 

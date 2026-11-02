@@ -7,14 +7,19 @@ import { PAYPAL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { isPaypalId, PaypalError } from '@gyblos/protocol/paypal-payment';
 
 import {
-  PAYPAL_AGENT_REQUEST_LIMITS,
   PAYPAL_REQUEST_LIMITS,
   PAYPAL_SESSION_RECORD_VERSION,
   PAYPAL_SESSION_PHASE as PHASE,
   PAYPAL_SESSION_STATUS as STATUS,
 } from './constants';
 import {
-  validatePaypalAgentRequest,
+  checkAgentOperation,
+  completedAgentRecord,
+  type AgentOperation,
+} from './paypal-agent-billing';
+import {
+  paypalAgentIdempotencyDigest,
+  preparePaypalAgentRequest,
   validatePaypalAgentResult,
 } from './paypal-agent-validation';
 import type { PaypalInferenceDependencies } from './paypal-inference';
@@ -62,32 +67,6 @@ function promptDigest(prompt: string, maxTokens: number) {
   return createHash('sha256')
     .update(JSON.stringify({ prompt, maxTokens }))
     .digest('hex');
-}
-function agentRequest(input: unknown, model: string) {
-  let serialized: string | undefined;
-  try {
-    serialized = JSON.stringify(input);
-  } catch {
-    return fail(PAYPAL_ERROR_CODES.INVALID_REQUEST);
-  }
-  if (
-    !serialized ||
-    Buffer.byteLength(serialized, 'utf8') >
-      PAYPAL_AGENT_REQUEST_LIMITS.requestBytes
-  )
-    return fail(PAYPAL_ERROR_CODES.INVALID_REQUEST);
-  const value: unknown = JSON.parse(serialized);
-  if (!value || typeof value !== 'object' || Array.isArray(value))
-    return fail(PAYPAL_ERROR_CODES.INVALID_REQUEST);
-  const normalized = validatePaypalAgentRequest(value, model);
-  const normalizedBytes = JSON.stringify(normalized);
-  return {
-    input: normalized,
-    digest: createHash('sha256')
-      .update(PAYPAL_AGENT_REQUEST_LIMITS.digestDomain)
-      .update(normalizedBytes)
-      .digest('hex'),
-  };
 }
 function terminal(record: PaypalSessionRecord | null) {
   return (
@@ -164,6 +143,7 @@ class PaypalSession {
         spentCents: 0,
         attemptIds: [],
         acknowledgedIds: [],
+        agentCompletions: [],
       };
       await this.save(record);
       const order = await this.deps.payment.create(record.requestId);
@@ -218,6 +198,7 @@ class PaypalSession {
     generate: () => Promise<T>,
     validate: () => void,
     signal: AbortSignal | undefined,
+    agent?: AgentOperation,
   ) {
     const record = this.check(PHASE.ACTIVE);
     if (
@@ -233,6 +214,7 @@ class PaypalSession {
       return fail(PAYPAL_ERROR_CODES.INVALID_REQUEST);
     this.busy = true;
     try {
+      if (agent) checkAgentOperation(record, digest, agent);
       validate();
       signal?.throwIfAborted();
       const attemptIds = [...record.attemptIds, messageId];
@@ -250,9 +232,15 @@ class PaypalSession {
       let output: T;
       try {
         output = await generate();
-        signal?.throwIfAborted();
+        if (!agent) signal?.throwIfAborted();
       } catch {
         return fail(PAYPAL_ERROR_CODES.INFERENCE_FAILED);
+      }
+      if (agent && record.version === PAYPAL_SESSION_RECORD_VERSION) {
+        await this.save(
+          completedAgentRecord(record, attemptIds, messageId, digest, agent),
+        );
+        return { output, messageId };
       }
       await this.save({
         ...record,
@@ -294,10 +282,12 @@ class PaypalSession {
     input: unknown,
     messageId: string,
     signal?: AbortSignal,
+    idempotencyKey?: string,
   ) {
     const engine = this.deps.agentEngine;
     if (!engine) return fail(PAYPAL_ERROR_CODES.INVALID_CONFIG);
-    const request = agentRequest(input, engine.model);
+    const request = preparePaypalAgentRequest(input, engine.model);
+    const keyDigest = paypalAgentIdempotencyDigest(idempotencyKey);
     const maxTokens = request.input.max_tokens;
     if (typeof maxTokens !== 'number')
       return fail(PAYPAL_ERROR_CODES.INVALID_REQUEST);
@@ -307,13 +297,14 @@ class PaypalSession {
       request.digest,
       async () =>
         validatePaypalAgentResult(
-          await engine.generate(request.input, signal),
+          await engine.generate(request.input),
           engine.model,
           maxTokens,
           request.input,
         ),
       () => engine.validate?.(request.input),
       signal,
+      keyDigest ? { idempotencyDigest: keyDigest } : {},
     );
     return { response: result.output, messageId: result.messageId };
   }

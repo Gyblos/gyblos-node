@@ -63,9 +63,7 @@ void test('a local agent connects through a key and shares the sandbox authoriza
       body: JSON.stringify(request),
     });
     assert.equal(response.status, 200);
-    assert.equal(agent.hasPending(), true);
-    await assert.rejects(desktop.finish());
-    await agent.acknowledgePending();
+    assert.equal(desktop.status().phase, 'active');
     assert.equal((await desktop.finish()).spentCents, 10);
     assert.deepEqual(f.calls, [
       'create',
@@ -122,7 +120,6 @@ void test('an agent key cannot spend a later sandbox authorization', async () =>
     });
   try {
     assert.equal((await call(first)).status, 200);
-    await first.acknowledgePending();
     const capture = f.payment.capture;
     let enteredCapture = () => {};
     let releaseCapture = () => {};
@@ -157,7 +154,6 @@ void test('an agent key cannot spend a later sandbox authorization', async () =>
     try {
       assert.notEqual(second.key, first.key);
       assert.equal((await call(second)).status, 200);
-      await second.acknowledgePending();
       await desktop.finish();
     } finally {
       await second.close();
@@ -357,7 +353,6 @@ void test('shutdown waits for an already running inference before closing socket
   release();
   const [received] = await Promise.all([request, stopping]);
   assert.match(received, /synthetic answer/);
-  assert.equal(desktop.status().phase, 'message_pending');
-  await endpoint.acknowledgePending();
+  assert.equal(desktop.status().phase, 'active');
   await desktop.finish();
 });

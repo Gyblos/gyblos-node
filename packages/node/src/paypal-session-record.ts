@@ -8,14 +8,19 @@ import { PAYPAL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { isPaypalId, PaypalError } from '@gyblos/protocol/paypal-payment';
 
 import {
+  PAYPAL_SESSION_PREVIOUS_RECORD_VERSION,
   PAYPAL_SESSION_RECORD_VERSION,
   PAYPAL_SESSION_PHASE as PHASE,
 } from './constants';
 import { paypalPreviousAttemptFinished } from './paypal-inference';
 
 type Phase = (typeof PHASE)[keyof typeof PHASE];
-export interface PaypalSessionRecord {
-  version: typeof PAYPAL_SESSION_RECORD_VERSION;
+interface PaypalAgentCompletion {
+  messageId: string;
+  requestDigest: string;
+  idempotencyDigest?: string;
+}
+interface PaypalSessionRecordBase {
   phase: Phase;
   requestId: string;
   currency: (typeof PAYPAL_SANDBOX_CURRENCIES)[keyof typeof PAYPAL_SANDBOX_CURRENCIES];
@@ -32,6 +37,17 @@ export interface PaypalSessionRecord {
   promptDigest?: string;
   captureId?: string;
 }
+export type PaypalSessionRecord = PaypalSessionRecordBase &
+  (
+    | {
+        version: typeof PAYPAL_SESSION_PREVIOUS_RECORD_VERSION;
+        agentCompletions?: never;
+      }
+    | {
+        version: typeof PAYPAL_SESSION_RECORD_VERSION;
+        agentCompletions: PaypalAgentCompletion[];
+      }
+  );
 function fail(
   code: (typeof PAYPAL_ERROR_CODES)[keyof typeof PAYPAL_ERROR_CODES],
 ): never {
@@ -46,6 +62,34 @@ function idList(value: unknown): value is string[] {
     value.every(isPaypalId) &&
     new Set(value).size === value.length
   );
+}
+function digest(value: unknown): value is string {
+  return typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
+}
+function completions(value: unknown): PaypalAgentCompletion[] {
+  if (!Array.isArray(value)) return fail(PAYPAL_ERROR_CODES.INVALID_JOURNAL);
+  return value.map((entry: unknown) => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry))
+      return fail(PAYPAL_ERROR_CODES.INVALID_JOURNAL);
+    const row = Object.fromEntries(Object.entries(entry));
+    if (
+      Object.keys(row).some(
+        (key) =>
+          !['messageId', 'requestDigest', 'idempotencyDigest'].includes(key),
+      ) ||
+      !isPaypalId(row.messageId) ||
+      !digest(row.requestDigest) ||
+      (row.idempotencyDigest !== undefined && !digest(row.idempotencyDigest))
+    )
+      return fail(PAYPAL_ERROR_CODES.INVALID_JOURNAL);
+    return {
+      messageId: row.messageId,
+      requestDigest: row.requestDigest,
+      ...(typeof row.idempotencyDigest === 'string'
+        ? { idempotencyDigest: row.idempotencyDigest }
+        : {}),
+    };
+  });
 }
 function validateShape(
   item: Record<string, unknown>,
@@ -83,6 +127,9 @@ function validateShape(
     'messageId',
     'promptDigest',
     'captureId',
+    ...(item.version === PAYPAL_SESSION_RECORD_VERSION
+      ? ['agentCompletions']
+      : []),
   ];
   if (
     Object.keys(item).some((key) => !validKeys.includes(key)) ||
@@ -145,6 +192,54 @@ function useNewTerms(item: Record<string, unknown>, phase: Phase) {
     return fail(PAYPAL_ERROR_CODES.INVALID_JOURNAL);
   return changed;
 }
+function invalidLedger(
+  phase: Phase,
+  attempts: string[],
+  acknowledged: string[],
+  agentCompletions: PaypalAgentCompletion[],
+  messageId: unknown,
+  spentCents: number,
+  messageCents: number,
+) {
+  const agentIds = agentCompletions.map((entry) => entry.messageId);
+  const keys = agentCompletions.flatMap((entry) =>
+    entry.idempotencyDigest ? [entry.idempotencyDigest] : [],
+  );
+  return (
+    (hasPhase(phase, [
+      PHASE.CREATING,
+      PHASE.CREATED,
+      PHASE.AUTHORIZING,
+      PHASE.CANCELLED,
+    ]) &&
+      attempts.length !== 0) ||
+    acknowledged.some((id) => !attempts.includes(id)) ||
+    new Set(agentIds).size !== agentIds.length ||
+    new Set(keys).size !== keys.length ||
+    agentIds.some(
+      (id) => !attempts.includes(id) || acknowledged.includes(id),
+    ) ||
+    spentCents !==
+      (acknowledged.length +
+        agentCompletions.length +
+        (phase === PHASE.MESSAGE_PENDING ? 1 : 0)) *
+        messageCents ||
+    (hasPhase(phase, [PHASE.EXECUTING, PHASE.MESSAGE_PENDING]) &&
+      (typeof messageId !== 'string' ||
+        messageId !== attempts.at(-1) ||
+        acknowledged.includes(messageId) ||
+        agentIds.includes(messageId)))
+  );
+}
+function versionedRecord(
+  common: Omit<PaypalSessionRecord, 'version' | 'agentCompletions'>,
+  version: unknown,
+  agentCompletions: PaypalAgentCompletion[],
+): PaypalSessionRecord {
+  return version === PAYPAL_SESSION_PREVIOUS_RECORD_VERSION
+    ? { ...common, version: PAYPAL_SESSION_PREVIOUS_RECORD_VERSION }
+    : { ...common, version: PAYPAL_SESSION_RECORD_VERSION, agentCompletions };
+}
 export function parsePaypalSessionState(value: unknown): {
   record: PaypalSessionRecord | null;
   legacyBlocked: boolean;
@@ -159,8 +254,13 @@ export function parsePaypalSessionState(value: unknown): {
       legacyBlocked: !paypalPreviousAttemptFinished(value),
     };
   const phase = Object.values(PHASE).find((entry) => entry === item.phase);
+  const agentCompletions =
+    item.version === PAYPAL_SESSION_RECORD_VERSION
+      ? completions(item.agentCompletions)
+      : [];
   if (
-    item.version !== PAYPAL_SESSION_RECORD_VERSION ||
+    (item.version !== PAYPAL_SESSION_RECORD_VERSION &&
+      item.version !== PAYPAL_SESSION_PREVIOUS_RECORD_VERSION) ||
     !Object.values(PAYPAL_SANDBOX_CURRENCIES).some(
       (currency) => currency === item.currency,
     ) ||
@@ -181,21 +281,15 @@ export function parsePaypalSessionState(value: unknown): {
     !idList(item.attemptIds) ||
     !idList(item.acknowledgedIds) ||
     item.attemptIds.length > item.maxMessageAttempts ||
-    (hasPhase(phase, [
-      PHASE.CREATING,
-      PHASE.CREATED,
-      PHASE.AUTHORIZING,
-      PHASE.CANCELLED,
-    ]) &&
-      item.attemptIds.length !== 0) ||
-    item.acknowledgedIds.some((id) => !item.attemptIds.includes(id)) ||
-    item.spentCents !==
-      (item.acknowledgedIds.length +
-        (phase === PHASE.MESSAGE_PENDING ? 1 : 0)) *
-        item.messageCents ||
-    (hasPhase(phase, [PHASE.EXECUTING, PHASE.MESSAGE_PENDING]) &&
-      (item.messageId !== item.attemptIds.at(-1) ||
-        item.acknowledgedIds.includes(item.messageId)))
+    invalidLedger(
+      phase,
+      item.attemptIds,
+      item.acknowledgedIds,
+      agentCompletions,
+      item.messageId,
+      item.spentCents,
+      item.messageCents,
+    )
   )
     return fail(PAYPAL_ERROR_CODES.INVALID_JOURNAL);
   validateShape(
@@ -208,20 +302,20 @@ export function parsePaypalSessionState(value: unknown): {
   if (useNewTerms(item, phase)) {
     return { record: null, legacyBlocked: false };
   }
+  const common = {
+    phase,
+    requestId: item.requestId,
+    currency: PAYPAL_SANDBOX.currency,
+    limitCents: PAYPAL_SANDBOX.limitCents,
+    messageCents: PAYPAL_SANDBOX.messageCents,
+    maxMessageAttempts: PAYPAL_SANDBOX.maxMessageAttempts,
+    spentCents: item.spentCents,
+    attemptIds: item.attemptIds,
+    acknowledgedIds: item.acknowledgedIds,
+    ...optionalDetails(item),
+  };
   return {
-    record: {
-      version: PAYPAL_SESSION_RECORD_VERSION,
-      phase,
-      requestId: item.requestId,
-      currency: PAYPAL_SANDBOX.currency,
-      limitCents: PAYPAL_SANDBOX.limitCents,
-      messageCents: PAYPAL_SANDBOX.messageCents,
-      maxMessageAttempts: PAYPAL_SANDBOX.maxMessageAttempts,
-      spentCents: item.spentCents,
-      attemptIds: item.attemptIds,
-      acknowledgedIds: item.acknowledgedIds,
-      ...optionalDetails(item),
-    },
+    record: versionedRecord(common, item.version, agentCompletions),
     legacyBlocked: false,
   };
 }

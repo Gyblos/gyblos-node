@@ -74,10 +74,8 @@ void test('one sandbox authorization covers a tool-calling conversation without 
   const result1 = await session.agentMessage(order.orderId, first, 'MESSAGE1');
   assert.deepEqual(result1.response, completion(1));
   assert.doesNotMatch(JSON.stringify(f.getState()), /synthetic/);
-  await session.acknowledge(order.orderId, result1.messageId);
   const result2 = await session.agentMessage(order.orderId, second, 'MESSAGE2');
   assert.deepEqual(result2.response, completion(2));
-  await session.acknowledge(order.orderId, result2.messageId);
   await session.finish(order.orderId);
   assert.deepEqual(seen, [first, second]);
   assert.deepEqual(f.calls, [
@@ -89,7 +87,7 @@ void test('one sandbox authorization covers a tool-calling conversation without 
   ]);
 });
 
-void test('an unacknowledged agent answer blocks another inference and settlement', async () => {
+void test('a repeated agent request is refused while the completed charge can be settled', async () => {
   const f = fixture();
   const agentEngine = {
     model: 'synthetic-model',
@@ -106,12 +104,10 @@ void test('an unacknowledged agent answer blocks another inference and settlemen
     messages: [{ role: 'user', content: 'synthetic request' }],
     max_tokens: 128,
   };
-  const first = await session.agentMessage(order.orderId, request, 'MESSAGE1');
+  await session.agentMessage(order.orderId, request, 'MESSAGE1');
   await assert.rejects(
     session.agentMessage(order.orderId, request, 'MESSAGE2'),
   );
-  await assert.rejects(session.finish(order.orderId));
-  await session.acknowledge(order.orderId, first.messageId);
   await session.finish(order.orderId);
   assert.deepEqual(f.calls, [
     'create',
@@ -343,7 +339,7 @@ void test('engine-specific limits are checked before journaling an agent attempt
   assert.deepEqual(f.calls, ['create', 'authorize']);
 });
 
-void test('chat and agent turns share the same authorization and pending-response lock', async () => {
+void test('chat and agent turns share the same authorization while chat awaits acknowledgment', async () => {
   const f = fixture();
   const agentEngine = {
     model: 'synthetic-model',
@@ -370,13 +366,8 @@ void test('chat and agent turns share the same authorization and pending-respons
     session.agentMessage(order.orderId, agentRequest, 'AGENT'),
   );
   await session.acknowledge(order.orderId, chat.messageId);
-  const agent = await session.agentMessage(
-    order.orderId,
-    agentRequest,
-    'AGENT',
-  );
-  await assert.rejects(session.message(order.orderId, 'other', 16, 'OTHER'));
-  await session.acknowledge(order.orderId, agent.messageId);
+  await session.agentMessage(order.orderId, agentRequest, 'AGENT');
+  assert.equal(session.status().phase, 'active');
   await session.finish(order.orderId);
   assert.deepEqual(f.calls, [
     'create',

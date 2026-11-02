@@ -41,19 +41,15 @@ void test('agent access starts once only after a sandbox session is active', asy
   await assert.rejects(access.connect());
 });
 
-void test('a pending agent response must be confirmed before disconnect', async () => {
-  let pending = true;
+void test('a running agent inference must finish before disconnect', async () => {
+  let busy = true;
   let closed = 0;
   const endpoint = {
     url: 'http://127.0.0.1:12345/v1',
     key: 'synthetic-key',
     model: 'synthetic-model',
     isCurrent: () => true,
-    isBusy: () => false,
-    hasPending: () => pending,
-    async acknowledgePending() {
-      pending = false;
-    },
+    isBusy: () => busy,
     async close() {
       closed += 1;
     },
@@ -65,7 +61,7 @@ void test('a pending agent response must be confirmed before disconnect', async 
   await access.connect();
   await assert.rejects(access.disconnect());
   assert.equal(closed, 0);
-  await access.confirm();
+  busy = false;
   await access.disconnect();
   assert.equal(closed, 1);
 });

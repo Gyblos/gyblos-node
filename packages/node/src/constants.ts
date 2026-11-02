@@ -345,6 +345,8 @@ export const PAYPAL_AGENT_REQUEST_LIMITS = {
   requestBytes: 262144,
   responseBytes: 262144,
   digestDomain: 'paypal-agent-request-v1:',
+  idempotencyDigestDomain: 'paypal-agent-idempotency-v1:',
+  idempotencyKeyCharacters: 128,
 } as const;
 export const PAYPAL_SESSION_PHASE = {
   CREATING: 'creating',
@@ -363,4 +365,5 @@ export const PAYPAL_SESSION_STATUS = {
   READY: 'ready',
   BLOCKED: 'blocked',
 } as const;
-export const PAYPAL_SESSION_RECORD_VERSION = 2;
+export const PAYPAL_SESSION_PREVIOUS_RECORD_VERSION = 2;
+export const PAYPAL_SESSION_RECORD_VERSION = 3;

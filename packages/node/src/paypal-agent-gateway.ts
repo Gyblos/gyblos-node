@@ -1,5 +1,5 @@
 // Authenticated local agent requests sharing one sandbox session. Responses are buffered;
-// A user explicitly confirms each delivered response before another inference.
+// Completed inferences are charged before their buffered results are returned.
 import { timingSafeEqual } from 'node:crypto';
 
 import { HTTP_STATUS, IPV6_LOOPBACK, LOCALHOST, ROUTES } from '@gyblos/config';
@@ -9,19 +9,18 @@ import {
   type PaypalErrorCode,
 } from '@gyblos/protocol/paypal-payment';
 
-import { PAYPAL_AGENT_REQUEST_LIMITS, PAYPAL_SESSION_PHASE } from './constants';
+import { PAYPAL_AGENT_REQUEST_LIMITS } from './constants';
 import {
   validatePaypalAgentRequest,
   validatePaypalAgentResult,
 } from './paypal-agent-validation';
 
 interface AgentService {
-  status(): { phase: unknown };
   sendAgent(
     input: unknown,
     signal?: AbortSignal,
+    idempotencyKey?: string,
   ): Promise<{ response: unknown; messageId: string }>;
-  acknowledge(messageId: string): Promise<unknown>;
 }
 
 function record(value: unknown): Record<string, unknown> {
@@ -149,7 +148,8 @@ function agentError(reason: unknown) {
       ? reason.code
       : PAYPAL_ERROR_CODES.UNAVAILABLE;
   return error(
-    code === PAYPAL_ERROR_CODES.INVALID_REQUEST
+    code === PAYPAL_ERROR_CODES.INVALID_REQUEST ||
+      code === PAYPAL_ERROR_CODES.DUPLICATE_REQUEST
       ? HTTP_STATUS.badRequest
       : HTTP_STATUS.conflict,
     code,
@@ -220,17 +220,6 @@ export function createPaypalAgentGateway(options: GatewayOptions) {
   const key = Buffer.from(options.key);
   let busy = false;
   let reading = false;
-  let pending: { messageId: string } | undefined;
-  async function acknowledgePending() {
-    if (busy || !pending) throw new Error('No agent response is available.');
-    busy = true;
-    try {
-      await options.service.acknowledge(pending.messageId);
-      pending = undefined;
-    } finally {
-      busy = false;
-    }
-  }
   async function handle(request: Request) {
     const rejection = requestError(request, base, key);
     if (rejection) return rejection;
@@ -256,18 +245,20 @@ export function createPaypalAgentGateway(options: GatewayOptions) {
       );
     busy = true;
     try {
+      const idempotencyKey =
+        request.headers.get('idempotency-key') ?? undefined;
       if (
-        pending &&
-        options.service.status().phase !== PAYPAL_SESSION_PHASE.MESSAGE_PENDING
+        idempotencyKey !== undefined &&
+        (idempotencyKey.length >
+          PAYPAL_AGENT_REQUEST_LIMITS.idempotencyKeyCharacters ||
+          !/^[A-Za-z0-9._~-]+$/.test(idempotencyKey))
       )
-        pending = undefined;
-      if (pending) {
-        return error(
-          HTTP_STATUS.conflict,
-          PAYPAL_ERROR_CODES.NEEDS_RECONCILIATION,
-        );
-      }
-      const result = await options.service.sendAgent(input, request.signal);
+        throw new PaypalError(PAYPAL_ERROR_CODES.INVALID_REQUEST);
+      const result = await options.service.sendAgent(
+        input,
+        request.signal,
+        idempotencyKey,
+      );
       if (typeof input.max_tokens !== 'number')
         throw new Error('Invalid output limit.');
       const response = validatePaypalAgentResult(
@@ -276,7 +267,6 @@ export function createPaypalAgentGateway(options: GatewayOptions) {
         input.max_tokens,
         input,
       );
-      pending = { messageId: result.messageId };
       return agentResponse(input, response);
     } catch (reason) {
       return agentError(reason);
@@ -286,10 +276,6 @@ export function createPaypalAgentGateway(options: GatewayOptions) {
   }
   return {
     handle,
-    acknowledgePending,
     isBusy: () => busy || reading,
-    hasPending: () =>
-      !!pending &&
-      options.service.status().phase === PAYPAL_SESSION_PHASE.MESSAGE_PENDING,
   };
 }

@@ -101,7 +101,7 @@ export class PaypalChatController {
     const notice = result.error
       ? failure(result)
       : needsReview(result.status, this.snapshot.pendingMessageId)
-        ? 'A response awaits confirmation. Check Connect; if none is available, review the session.'
+        ? 'A prior response awaits confirmation. Review the session.'
         : '';
     this.update({
       status: result.status,

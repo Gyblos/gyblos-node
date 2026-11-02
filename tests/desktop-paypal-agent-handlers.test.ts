@@ -49,7 +49,10 @@ void test('checking agent status does not start the PayPal service', async () =>
   const frame = {};
   let loads = 0;
   const handlers = createDesktopPaypalAgentHandlers(
-    async () => { loads += 1; throw new Error('must not load'); },
+    async () => {
+      loads += 1;
+      throw new Error('must not load');
+    },
     { contents, mainFrame: () => frame, destroyed: () => false },
     () => null,
   );
