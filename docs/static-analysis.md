@@ -95,9 +95,10 @@ workflow configuration, requires normal review and appropriate other checks.
 
 Ordinary contribution checks remain `pnpm check` and `pnpm desktop:build`. Local
 scanner reproduction is optional and needs Docker with Linux containers, Git and
-GNU `timeout`. In a clean checkout, set `GITHUB_WORKSPACE` to the absolute
-checkout path, `RUNNER_TEMP` to a new temporary directory and `SEMGREP_IMAGE` to
-the exact pinned value in the workflow. Run its `Fetch pinned scanner` and
+GNU `timeout`. Use a fresh disposable clone/worktree without real ignored
+`.local` or `.env` state. Set `GITHUB_WORKSPACE` to the absolute checkout path,
+`RUNNER_TEMP` to a new temporary directory and `SEMGREP_IMAGE` to the exact
+pinned value in the workflow. Run its `Fetch pinned scanner` and
 `Verify rule probes and scan every tracked JS/TS/TSX file` command blocks. The
 image is fetched before the scanner's offline container starts. No project
 installation, wallet, environment secret, engine or operational service is used.
