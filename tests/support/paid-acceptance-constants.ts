@@ -22,6 +22,8 @@ export const PAID_ACCEPTANCE_CASES = {
   RECOVERY: 'seller-recovers-pending-claim-once',
   ENGINE: 'engine-failure-no-retry',
   CANCEL: 'cancellation-no-retry',
+  CLI_ANSWER: 'terminal-chat-answer',
+  CLI_INTERRUPTED: 'terminal-chat-interrupted-settlement',
   PRIVACY: 'private-content-free-records',
   ISOLATION: 'no-external-services',
 } as const;

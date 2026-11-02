@@ -32,7 +32,23 @@ type ChatStarter = (options: { port: number }) => Promise<{
   };
   close(): Promise<void>;
 }>;
-export async function runTerminal(_start: ChatStarter, _input: Readable, _output: Writable, _signal?: AbortSignal) {}
+export async function runTerminal(start: ChatStarter, inputStream: Readable, output: Writable, signal?: AbortSignal) {
+  if (signal?.aborted) return;
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  signal?.addEventListener('abort', abort, { once: true });
+  if (signal?.aborted) abort();
+  const input = createInterface({ input: inputStream, output });
+  input.on('SIGINT', abort);
+  try {
+    await runOwnedChat(start, async () => {
+      try { return await input.question('\nYou: ', { signal: controller.signal }); } catch { return undefined; }
+    }, (text) => { output.write(text); }, controller.signal);
+  } finally {
+    signal?.removeEventListener('abort', abort);
+    input.close();
+  }
+}
 export async function runOwnedChat(
   start: ChatStarter,
   read: () => Promise<string | undefined>,
@@ -90,28 +106,10 @@ export async function chatSession(options: ChatSessionOptions) {
 }
 export async function main() {
   const controller = new AbortController();
-  const input = createInterface({ input: stdin, output: stdout });
-  const cancel = () => {
-    controller.abort();
-    input.close();
-  };
-  input.on('SIGINT', cancel);
+  const cancel = () => controller.abort();
   process.once('SIGINT', cancel);
   try {
-    await runOwnedChat(
-      startBuyer,
-      async () => {
-        try {
-          return await input.question('\nYou: ', { signal: controller.signal });
-        } catch {
-          return undefined;
-        }
-      },
-      (text) => {
-        stdout.write(text);
-      },
-      controller.signal,
-    );
+    await runTerminal(startBuyer, stdin, stdout, controller.signal);
   } catch {
     console.error(
       'Could not start the buyer. Check its configuration and ensure another buyer is not running; see docs/running-a-node.md.',
@@ -119,7 +117,6 @@ export async function main() {
     process.exitCode = 1;
   } finally {
     process.off('SIGINT', cancel);
-    input.close();
   }
 }
 if (isMain(import.meta.url)) await main();
