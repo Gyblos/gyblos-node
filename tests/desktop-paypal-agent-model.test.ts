@@ -2,15 +2,15 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import {
-  opencodeConfig,
-  piConfig,
-  piSettings,
-  codexConfig,
   claudeCodeConfig,
+  codexConfig,
+  opencodeConfig,
   parsePaypalAgentResult,
   PAYPAL_AGENT_ACTION,
   PAYPAL_AGENT_USAGE_STATE,
   paypalAgentStatusUnavailable,
+  piConfig,
+  piSettings,
   retainPaypalAgentStatus,
 } from '@gyblos/desktop/paypal-agent-model';
 
@@ -94,7 +94,11 @@ void test('Pi configuration connects to Gyblos without embedding its temporary k
 });
 
 void test('Codex configuration uses Responses without embedding credentials or automatic retries', () => {
-  const config = codexConfig({ url: 'http://127.0.0.1:12345/v1', key: 'synthetic-secret-key', model: 'synthetic-model' });
+  const config = codexConfig({
+    url: 'http://127.0.0.1:12345/v1',
+    key: 'synthetic-secret-key',
+    model: 'synthetic-model',
+  });
   assert.doesNotMatch(config, /synthetic-secret-key/);
   assert.match(config, /wire_api = "responses"/);
   assert.match(config, /env_key = "GYBLOS_API_KEY"/);
@@ -107,7 +111,11 @@ void test('Codex configuration uses Responses without embedding credentials or a
 });
 
 void test('Claude Code configuration uses a local root URL without embedding credentials', () => {
-  const config = claudeCodeConfig({ url: 'http://127.0.0.1:12345/v1', key: 'synthetic-secret-key', model: 'synthetic-model' });
+  const config = claudeCodeConfig({
+    url: 'http://127.0.0.1:12345/v1',
+    key: 'synthetic-secret-key',
+    model: 'synthetic-model',
+  });
   assert.doesNotMatch(config, /synthetic-secret-key/);
   assert.match(config, /ANTHROPIC_BASE_URL='http:\/\/127\.0\.0\.1:12345'/);
   assert.match(config, /ANTHROPIC_AUTH_TOKEN="\$GYBLOS_API_KEY"/);

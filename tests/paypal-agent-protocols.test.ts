@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { createPaypalAgentGateway } from '@gyblos/node/paypal-agent-gateway';
+import { createPaypalSession } from '@gyblos/node/paypal-session';
+
+import { fixture as paymentFixture } from './support/paypal-session-fixture';
 
 const origin = 'http://127.0.0.1:12345';
 const model = 'synthetic-model';
@@ -59,7 +62,11 @@ function fixture() {
   return { gateway, requests };
 }
 
-function post(path: string, input: unknown, headers: Record<string, string> = {}) {
+function post(
+  path: string,
+  input: unknown,
+  headers: Record<string, string> = {},
+) {
   return new Request(`${origin}${path}`, {
     method: 'POST',
     headers: {
@@ -83,9 +90,14 @@ void test('Claude Messages maps a streamed tool call and its result to one sessi
     tools: [{ name: 'read_file', input_schema: tool.function.parameters }],
     stream: true,
   };
-  const response = await f.gateway.handle(post('/v1/messages?beta=true', input));
+  const response = await f.gateway.handle(
+    post('/v1/messages?beta=true', input),
+  );
   assert.equal(response.status, 200);
-  assert.match(response.headers.get('content-type') ?? '', /text\/event-stream/);
+  assert.match(
+    response.headers.get('content-type') ?? '',
+    /text\/event-stream/,
+  );
   const streamed = await response.text();
   assert.match(streamed, /event: message_start/);
   assert.match(streamed, /event: content_block_start/);
@@ -98,8 +110,22 @@ void test('Claude Messages maps a streamed tool call and its result to one sessi
       stream: false,
       messages: [
         ...input.messages,
-        { role: 'assistant', content: [{ type: 'tool_use', id: 'call_1', name: 'read_file', input: {} }] },
-        { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'call_1', content: 'synthetic contents' }] },
+        {
+          role: 'assistant',
+          content: [
+            { type: 'tool_use', id: 'call_1', name: 'read_file', input: {} },
+          ],
+        },
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'tool_result',
+              tool_use_id: 'call_1',
+              content: 'synthetic contents',
+            },
+          ],
+        },
       ],
     }),
   );
@@ -124,8 +150,28 @@ void test('Responses maps a streamed function call and its result to one session
     model,
     max_output_tokens: 128,
     instructions: 'synthetic instruction',
-    input: [{ type: 'message', id: null, role: 'developer', content: [{ type: 'input_text', text: 'synthetic developer instruction' }] }, { role: 'user', content: [{ type: 'input_text', text: 'synthetic request' }] }],
-    tools: [{ type: 'function', name: 'read_file', parameters: tool.function.parameters, strict: false }],
+    input: [
+      {
+        type: 'message',
+        id: null,
+        role: 'developer',
+        content: [
+          { type: 'input_text', text: 'synthetic developer instruction' },
+        ],
+      },
+      {
+        role: 'user',
+        content: [{ type: 'input_text', text: 'synthetic request' }],
+      },
+    ],
+    tools: [
+      {
+        type: 'function',
+        name: 'read_file',
+        parameters: tool.function.parameters,
+        strict: false,
+      },
+    ],
     stream: true,
     store: false,
     parallel_tool_calls: true,
@@ -136,7 +182,10 @@ void test('Responses maps a streamed function call and its result to one session
   };
   const response = await f.gateway.handle(post('/v1/responses', input));
   assert.equal(response.status, 200);
-  assert.match(response.headers.get('content-type') ?? '', /text\/event-stream/);
+  assert.match(
+    response.headers.get('content-type') ?? '',
+    /text\/event-stream/,
+  );
   const streamed = await response.text();
   assert.match(streamed, /event: response.output_item.done/);
   assert.match(streamed, /"type":"function_call"/);
@@ -148,8 +197,17 @@ void test('Responses maps a streamed function call and its result to one session
       stream: false,
       input: [
         ...input.input,
-        { type: 'function_call', call_id: 'call_1', name: 'read_file', arguments: '{}' },
-        { type: 'function_call_output', call_id: 'call_1', output: 'synthetic contents' },
+        {
+          type: 'function_call',
+          call_id: 'call_1',
+          name: 'read_file',
+          arguments: '{}',
+        },
+        {
+          type: 'function_call_output',
+          call_id: 'call_1',
+          output: 'synthetic contents',
+        },
       ],
     }),
   );
@@ -179,7 +237,11 @@ void test('unsupported or unauthenticated client requests never dispatch inferen
   );
   assert.equal(response.status, 400);
   const unauthorized = await f.gateway.handle(
-    post('/v1/responses', { model, input: 'synthetic' }, { authorization: 'Bearer wrong' }),
+    post(
+      '/v1/responses',
+      { model, input: 'synthetic' },
+      { authorization: 'Bearer wrong' },
+    ),
   );
   assert.equal(unauthorized.status, 401);
   assert.deepEqual(f.requests, []);
@@ -187,15 +249,129 @@ void test('unsupported or unauthenticated client requests never dispatch inferen
 
 void test('Codex requests without an explicit output limit use the agent limit', async () => {
   const f = fixture();
-  const response = await f.gateway.handle(post('/v1/responses', {
-    model,
-    input: 'synthetic request',
-    tools: [{ type: 'function', name: 'read_file', parameters: tool.function.parameters, strict: false }],
-    stream: true,
-    store: false,
-  }));
+  const response = await f.gateway.handle(
+    post('/v1/responses', {
+      model,
+      input: 'synthetic request',
+      tools: [
+        {
+          type: 'function',
+          name: 'read_file',
+          parameters: tool.function.parameters,
+          strict: false,
+        },
+      ],
+      stream: true,
+      store: false,
+    }),
+  );
   assert.equal(response.status, 200);
   const request = f.requests[0];
   assert.ok(request && typeof request === 'object' && 'max_tokens' in request);
   assert.equal(request.max_tokens, 512);
+});
+
+void test('Claude API keys obey the same origin and authentication checks', async () => {
+  const f = fixture();
+  const input = {
+    model,
+    max_tokens: 128,
+    messages: [{ role: 'user', content: 'synthetic' }],
+    tools: [{ name: 'read_file', input_schema: tool.function.parameters }],
+  };
+  const accepted = new Request(`${origin}/v1/messages`, {
+    method: 'POST',
+    headers: {
+      host: '127.0.0.1:12345',
+      'x-api-key': key,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(input),
+  });
+  assert.equal((await f.gateway.handle(accepted)).status, 200);
+  assert.equal(
+    (
+      await f.gateway.handle(
+        post('/v1/messages', input, { 'x-api-key': 'wrong' }),
+      )
+    ).status,
+    401,
+  );
+  assert.equal(
+    (
+      await f.gateway.handle(
+        post('/v1/messages', input, { origin: 'https://attacker.invalid' }),
+      )
+    ).status,
+    403,
+  );
+  assert.equal(f.requests.length, 1);
+});
+
+void test('equivalent Claude and OpenAI requests cannot be charged twice', async () => {
+  const f = paymentFixture();
+  const agentEngine = {
+    model,
+    async generate() {
+      f.calls.push('agent-generate');
+      return {
+        id: 'synthetic-answer',
+        object: 'chat.completion',
+        created: 0,
+        model,
+        choices: [
+          {
+            index: 0,
+            message: { role: 'assistant', content: 'synthetic answer' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: { prompt_tokens: 2, completion_tokens: 3, total_tokens: 5 },
+      };
+    },
+  };
+  const session = await createPaypalSession({ ...f, agentEngine });
+  const order = await session.create();
+  await session.approve(order.orderId);
+  let count = 0;
+  const gateway = createPaypalAgentGateway({
+    origin,
+    key,
+    model,
+    service: {
+      sendAgent(input, signal, idempotencyKey) {
+        count += 1;
+        return session.agentMessage(
+          order.orderId,
+          input,
+          `MESSAGE${count}`,
+          signal,
+          idempotencyKey,
+        );
+      },
+    },
+  });
+  const first = await gateway.handle(
+    post('/v1/messages', {
+      model,
+      max_tokens: 128,
+      messages: [{ role: 'user', content: 'synthetic request' }],
+    }),
+  );
+  assert.equal(first.status, 200);
+  const repeated = await gateway.handle(
+    post('/v1/chat/completions', {
+      model,
+      max_tokens: 128,
+      messages: [{ role: 'user', content: 'synthetic request' }],
+    }),
+  );
+  assert.equal(repeated.status, 400);
+  await session.finish(order.orderId);
+  assert.deepEqual(f.calls, [
+    'create',
+    'authorize',
+    'agent-generate',
+    'capture:10',
+  ]);
 });

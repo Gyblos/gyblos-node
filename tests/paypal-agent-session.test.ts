@@ -137,7 +137,10 @@ void test('equivalent Pi text blocks and string messages cannot be charged twice
     {
       ...common,
       messages: [
-        { role: 'user', content: [{ type: 'text', text: 'synthetic request' }] },
+        {
+          role: 'user',
+          content: [{ type: 'text', text: 'synthetic request' }],
+        },
       ],
     },
     'MESSAGE1',
@@ -153,7 +156,12 @@ void test('equivalent Pi text blocks and string messages cannot be charged twice
     { ...common, messages: [{ role: 'user', content: 'synthetic request' }] },
   ]);
   await session.finish(order.orderId);
-  assert.deepEqual(f.calls, ['create', 'authorize', 'agent-generate', 'capture:10']);
+  assert.deepEqual(f.calls, [
+    'create',
+    'authorize',
+    'agent-generate',
+    'capture:10',
+  ]);
 });
 
 void test('malformed agent messages are refused before dispatch or journal changes', async () => {
@@ -172,8 +180,23 @@ void test('malformed agent messages are refused before dispatch or journal chang
   for (const messages of [
     [null],
     [{ role: 'user', content: 42 }],
-    [{ role: 'user', content: [{ type: 'image_url', image_url: { url: 'https://example.invalid/image' } }] }],
-    [{ role: 'user', content: [{ type: 'text', text: 'synthetic', extra: true }] }],
+    [
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'image_url',
+            image_url: { url: 'https://example.invalid/image' },
+          },
+        ],
+      },
+    ],
+    [
+      {
+        role: 'user',
+        content: [{ type: 'text', text: 'synthetic', extra: true }],
+      },
+    ],
     [{ role: 'user', content: [] }],
     [{ role: 'tool', content: 'synthetic result' }],
     [{ role: 'system', content: 'synthetic instruction', extra: true }],

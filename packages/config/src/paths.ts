@@ -2,6 +2,8 @@
 export const ROUTES = {
   health: '/health',
   inference: '/v1/chat/completions',
+  agentResponses: '/v1/responses',
+  agentMessages: '/v1/messages',
   agentBase: '/v1',
   models: '/v1/models',
   events: '/facilitator/events',

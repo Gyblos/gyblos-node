@@ -11,6 +11,14 @@ import {
 
 import { PAYPAL_AGENT_REQUEST_LIMITS } from './constants';
 import {
+  anthropicAgentRequest,
+  anthropicAgentResponse,
+} from './paypal-agent-anthropic';
+import {
+  responsesAgentRequest,
+  responsesAgentResponse,
+} from './paypal-agent-responses';
+import {
   validatePaypalAgentRequest,
   validatePaypalAgentResult,
 } from './paypal-agent-validation';
@@ -200,14 +208,24 @@ function requestError(request: Request, base: URL, key: Buffer) {
     request.headers.has('origin')
   )
     return error(HTTP_STATUS.forbidden, PAYPAL_ERROR_CODES.INVALID_REQUEST);
-  if (!matchesKey(request.headers.get('authorization'), key))
+  const apiKey = request.headers.get('x-api-key');
+  const auth = request.headers.get('authorization');
+  if (
+    (auth !== null && !matchesKey(auth, key)) ||
+    (apiKey !== null && !matchesKey(`Bearer ${apiKey}`, key)) ||
+    (auth === null &&
+      (url.pathname !== ROUTES.agentMessages || apiKey === null))
+  )
     return error(HTTP_STATUS.unauthorized, PAYPAL_ERROR_CODES.INVALID_REQUEST);
   if (request.method === 'GET' && url.pathname === ROUTES.models && !url.search)
     return undefined;
   if (
     request.method !== 'POST' ||
-    url.pathname !== ROUTES.inference ||
-    url.search
+    ![ROUTES.inference, ROUTES.agentResponses, ROUTES.agentMessages].some(
+      (path) => path === url.pathname,
+    ) ||
+    (url.search &&
+      !(url.pathname === ROUTES.agentMessages && url.search === '?beta=true'))
   )
     return error(HTTP_STATUS.notFound, PAYPAL_ERROR_CODES.INVALID_REQUEST);
   if (
@@ -231,7 +249,15 @@ export function createPaypalAgentGateway(options: GatewayOptions) {
     let input: Record<string, unknown>;
     reading = true;
     try {
-      input = validatePaypalAgentRequest(await body(request), options.model);
+      const raw = await body(request);
+      const path = new URL(request.url).pathname;
+      const translated =
+        path === ROUTES.agentMessages
+          ? anthropicAgentRequest(raw)
+          : path === ROUTES.agentResponses
+            ? responsesAgentRequest(raw)
+            : raw;
+      input = validatePaypalAgentRequest(translated, options.model);
     } catch (reason) {
       return agentError(reason);
     } finally {
@@ -262,6 +288,11 @@ export function createPaypalAgentGateway(options: GatewayOptions) {
         input.max_tokens,
         input,
       );
+      const path = new URL(request.url).pathname;
+      if (path === ROUTES.agentMessages)
+        return anthropicAgentResponse(input, response);
+      if (path === ROUTES.agentResponses)
+        return responsesAgentResponse(input, response);
       return agentResponse(input, response);
     } catch (reason) {
       return agentError(reason);

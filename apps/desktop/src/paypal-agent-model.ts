@@ -28,6 +28,14 @@ export const PAYPAL_AGENT_ACTION = {
   CONNECT: 'connect',
   DISCONNECT: 'disconnect',
 } as const;
+export const PAYPAL_AGENT_CLIENT = {
+  OPENCODE: 'OpenCode',
+  CODEX: 'Codex',
+  PI: 'Pi',
+  CLAUDE_CODE: 'Claude Code',
+} as const;
+export type PaypalAgentClient =
+  (typeof PAYPAL_AGENT_CLIENT)[keyof typeof PAYPAL_AGENT_CLIENT];
 export const PAYPAL_AGENT_ERROR = {
   DENIED: 'denied',
   INVALID: 'invalid',
@@ -135,6 +143,66 @@ export function piConfig(
     null,
     2,
   );
+}
+export function piSettings() {
+  return JSON.stringify(
+    {
+      retry: { enabled: false, provider: { maxRetries: 0 } },
+      compaction: { enabled: false },
+      cacheWarming: 'off',
+    },
+    null,
+    2,
+  );
+}
+export function codexConfig(
+  connection: Pick<
+    NonNullable<PaypalAgentResult['connection']>,
+    'url' | 'key' | 'model'
+  >,
+) {
+  return [
+    'model_provider = "gyblos"',
+    `model = ${JSON.stringify(connection.model)}`,
+    `model_context_window = ${SANDBOX_AGENT_LIMITS.contextTokens}`,
+    'web_search = "disabled"',
+    '',
+    '[features]',
+    'multi_agent = false',
+    'view_image = false',
+    '',
+    '[model_providers.gyblos]',
+    'name = "Gyblos Sandbox"',
+    `base_url = ${JSON.stringify(connection.url)}`,
+    'env_key = "GYBLOS_API_KEY"',
+    'wire_api = "responses"',
+    'requires_openai_auth = false',
+    'supports_websockets = false',
+    'request_max_retries = 0',
+    'stream_max_retries = 0',
+  ].join('\n');
+}
+function shellLiteral(value: string) {
+  return `'${value.replaceAll("'", "'\\''")}'`;
+}
+export function claudeCodeConfig(
+  connection: Pick<
+    NonNullable<PaypalAgentResult['connection']>,
+    'url' | 'key' | 'model'
+  >,
+) {
+  return [
+    `export ANTHROPIC_BASE_URL=${shellLiteral(new URL(connection.url).origin)}`,
+    'export ANTHROPIC_AUTH_TOKEN="$GYBLOS_API_KEY"',
+    'export ANTHROPIC_API_KEY="$GYBLOS_API_KEY"',
+    `export ANTHROPIC_MODEL=${shellLiteral(connection.model)}`,
+    `export CLAUDE_CODE_MAX_CONTEXT_TOKENS=${SANDBOX_AGENT_LIMITS.contextTokens}`,
+    `export CLAUDE_CODE_MAX_OUTPUT_TOKENS=${SANDBOX_AGENT_LIMITS.maxOutputTokens}`,
+    'export CLAUDE_CODE_DISABLE_THINKING=1',
+    'export CLAUDE_CODE_EFFORT_LEVEL=auto',
+    'export CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1',
+    'export CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false',
+  ].join('\n');
 }
 export function retainPaypalAgentStatus(
   previous: PaypalAgentResult,

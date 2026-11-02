@@ -5,6 +5,7 @@ const SCHEMA_FIELDS = [
   '$schema',
   'type',
   'description',
+  'default',
   'properties',
   'required',
   'items',
@@ -13,6 +14,8 @@ const SCHEMA_FIELDS = [
   'additionalProperties',
   'minimum',
   'maximum',
+  'exclusiveMinimum',
+  'exclusiveMaximum',
 ];
 const SCHEMA_DIALECTS = [
   'https://json-schema.org/draft/2020-12/schema',
@@ -54,7 +57,12 @@ export function checkToolSchema(input: unknown, depth = 0): void {
       !SCHEMA_DIALECTS.includes(schema.$schema))
   )
     return invalid();
-  for (const bound of [schema.minimum, schema.maximum])
+  for (const bound of [
+    schema.minimum,
+    schema.maximum,
+    schema.exclusiveMinimum,
+    schema.exclusiveMaximum,
+  ])
     if (
       bound !== undefined &&
       (typeof bound !== 'number' || !Number.isFinite(bound))
@@ -135,6 +143,18 @@ export function matchesToolSchema(input: unknown, value: unknown): boolean {
   )
     return false;
   if (
+    typeof value === 'number' &&
+    typeof schema.exclusiveMinimum === 'number' &&
+    value <= schema.exclusiveMinimum
+  )
+    return false;
+  if (
+    typeof value === 'number' &&
+    typeof schema.exclusiveMaximum === 'number' &&
+    value >= schema.exclusiveMaximum
+  )
+    return false;
+  if (
     (schema.type === 'string' || schema.type === 'boolean') &&
     typeof value !== schema.type
   )
@@ -170,6 +190,8 @@ export function ollamaToolSchema(input: unknown): Record<string, unknown> {
     $schema: _dialect,
     minimum,
     maximum,
+    exclusiveMinimum,
+    exclusiveMaximum,
     additionalProperties,
     ...output
   } = schema;
@@ -177,6 +199,12 @@ export function ollamaToolSchema(input: unknown): Record<string, unknown> {
     typeof schema.description === 'string' ? schema.description : '',
     typeof minimum === 'number' ? `Minimum: ${minimum}.` : '',
     typeof maximum === 'number' ? `Maximum: ${maximum}.` : '',
+    typeof exclusiveMinimum === 'number'
+      ? `Must be greater than ${exclusiveMinimum}.`
+      : '',
+    typeof exclusiveMaximum === 'number'
+      ? `Must be less than ${exclusiveMaximum}.`
+      : '',
     additionalProperties === false
       ? 'Do not include unspecified properties.'
       : '',
