@@ -79,6 +79,7 @@ void test('Pi configuration connects to Gyblos without embedding its temporary k
   assert.ok(provider.models[0]?.compat);
   assert.equal(provider.models[0].compat.supportsStore, false);
   assert.equal(provider.models[0].compat.supportsDeveloperRole, false);
+  assert.equal(provider.models[0].compat.supportsStrictMode, false);
 });
 
 void test('a confirmed disconnect clears an older stalled status warning', () => {
