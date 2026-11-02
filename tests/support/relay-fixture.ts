@@ -3,10 +3,13 @@
 // native bind-failure probe, which opens no network path. Tokens never print.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { isAbsolute, join, relative } from 'node:path';
 
 import { generateKeyPairSigner } from '@solana/kit';
 
-import { HOME_ENVIRONMENT, ROLE_FILES } from '@gyblos/config';
+import { HOME_ENVIRONMENT, homeLayout, ROLE_FILES } from '@gyblos/config';
 import { OFFER_LIFETIME_MS } from '@gyblos/core/constants';
 import type { OfferTrust } from '@gyblos/core/offers';
 import { signInferenceOffer } from '@gyblos/node/offers';
@@ -132,44 +135,56 @@ export function endpointProbe(
   action: ProbeAction = PROBE_ACTIONS.ENDPOINT,
   cwd?: string,
 ) {
-  const child = spawnSync(
-    process.execPath,
-    [
-      '--import',
-      import.meta.resolve('tsx'),
-      '--input-type=module',
-      '-e',
-      probeScript(),
-    ],
-    {
-      env: {
-        PATH: process.env.PATH,
-        TMPDIR: process.env.TMPDIR,
-        [HOME_ENVIRONMENT.product]: process.env[HOME_ENVIRONMENT.product],
-        [HOME_ENVIRONMENT.lab]: process.env[HOME_ENVIRONMENT.lab],
-        PROBE_ACTION: action,
-        ...environment,
+  const directory = cwd ?? mkdtempSync(join(tmpdir(), 'gyblos-relay-probe-'));
+  const root = join(directory, homeLayout(process.env).root);
+  const inside = relative(directory, root);
+  if (inside.startsWith('..') || isAbsolute(inside))
+    throw new Error('Relay probe home must stay inside its fixture.');
+  try {
+    const child = spawnSync(
+      process.execPath,
+      [
+        '--import',
+        import.meta.resolve('tsx'),
+        '--input-type=module',
+        '-e',
+        probeScript(),
+      ],
+      {
+        env: {
+          PATH: process.env.PATH,
+          TMPDIR: process.env.TMPDIR,
+          PROBE_ACTION: action,
+          ...environment,
+          [HOME_ENVIRONMENT.product]: root,
+          [HOME_ENVIRONMENT.lab]: join(directory, 'gyblos-probe-lab'),
+        },
+        cwd,
+        encoding: 'utf8',
+        timeout: PROBE_TIMEOUT_MS,
+        maxBuffer: OUTPUT_LIMIT_BYTES,
       },
-      cwd,
-      encoding: 'utf8',
-      timeout: PROBE_TIMEOUT_MS,
-      maxBuffer: OUTPUT_LIMIT_BYTES,
-    },
-  );
-  assert.equal(child.error, undefined);
-  assert.ok(
-    !child.stdout.includes(RELAY_TOKEN_SENTINEL) &&
-      !child.stderr.includes(RELAY_TOKEN_SENTINEL),
-    'Relay token sentinel appeared in probe output.',
-  );
-  assert.equal(child.status, 0, child.stderr);
-  const lines = child.stdout.trimEnd().split('\n');
-  const result: Omit<EndpointProbe, 'nativeLogLines'> = JSON.parse(
-    lines.at(-1) ?? '',
-  );
-  const probe: EndpointProbe = { ...result, nativeLogLines: lines.length - 1 };
-  assert.ok(!probe.error?.message.includes(RELAY_TOKEN_SENTINEL));
-  return probe;
+    );
+    assert.equal(child.error, undefined);
+    assert.ok(
+      !child.stdout.includes(RELAY_TOKEN_SENTINEL) &&
+        !child.stderr.includes(RELAY_TOKEN_SENTINEL),
+      'Relay token sentinel appeared in probe output.',
+    );
+    assert.equal(child.status, 0, child.stderr);
+    const lines = child.stdout.trimEnd().split('\n');
+    const result: Omit<EndpointProbe, 'nativeLogLines'> = JSON.parse(
+      lines.at(-1) ?? '',
+    );
+    const probe: EndpointProbe = {
+      ...result,
+      nativeLogLines: lines.length - 1,
+    };
+    assert.ok(!probe.error?.message.includes(RELAY_TOKEN_SENTINEL));
+    return probe;
+  } finally {
+    if (cwd === undefined) rmSync(directory, { recursive: true, force: true });
+  }
 }
 
 export interface RelayOfferOptions {
