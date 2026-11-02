@@ -160,16 +160,19 @@ void test('disconnect closes a busy endpoint', async () => {
 void test('the connection reports current shared usage and an uncertain session', async () => {
   let spentCents = 0;
   let phase = 'active';
+  let expired = false;
+  let remainingAttempts = 30;
+  let busy = false;
   const endpoint = {
     url: 'http://127.0.0.1:12345/v1',
     key: 'synthetic-key',
     model: 'synthetic-model',
     isCurrent: () => true,
-    isBusy: () => false,
+    isBusy: () => busy,
     async close() {},
   };
   const access = createDesktopPaypalAgentAccess(
-    () => ({ phase, expired: false, spentCents, limitCents: 100 }),
+    () => ({ phase, expired, spentCents, limitCents: 100, remainingAttempts }),
     async () => endpoint,
   );
   assert.equal((await access.connect()).spentCents, 0);
@@ -178,9 +181,49 @@ void test('the connection reports current shared usage and an uncertain session'
   assert.equal(access.status()?.limitCents, 100);
   phase = 'blocked';
   assert.equal(access.status()?.usageUncertain, true);
-  for (const uncertain of ['executing', 'message_pending', 'capturing', 'voiding']) {
+  for (const uncertain of [
+    'executing',
+    'message_pending',
+    'capturing',
+    'voiding',
+  ]) {
     phase = uncertain;
     assert.equal(access.status()?.usageUncertain, true);
   }
+  phase = 'active';
+  expired = true;
+  assert.equal(access.status()?.usageUncertain, true);
+  expired = false;
+  remainingAttempts = 0;
+  assert.equal(access.status()?.usageUncertain, true);
+  remainingAttempts = 30;
+  busy = true;
+  assert.equal(access.status()?.usageUncertain, true);
   await access.close();
+});
+
+void test('a connection remains visibly disconnecting while an inference drains', async () => {
+  let closing = false;
+  let entered = () => {};
+  let release = () => {};
+  const waiting = new Promise<void>((resolve) => { release = resolve; });
+  const started = new Promise<void>((resolve) => { entered = resolve; });
+  const endpoint = {
+    url: 'http://127.0.0.1:12345/v1', key: 'synthetic-key', model: 'synthetic-model',
+    isCurrent: () => !closing, isBusy: () => true,
+    async close() { closing = true; entered(); await waiting; },
+  };
+  const activeAccess = createDesktopPaypalAgentAccess(
+    () => ({ phase: 'active', expired: false, spentCents: 0, limitCents: 100 }),
+    async () => endpoint,
+  );
+  await activeAccess.connect();
+  const stopping = activeAccess.disconnect();
+  try {
+    await started;
+    assert.equal(activeAccess.status()?.disconnecting, true);
+    assert.equal(activeAccess.status()?.usageUncertain, true);
+  } finally { release(); }
+  await stopping;
+  assert.equal(activeAccess.status(), null);
 });
