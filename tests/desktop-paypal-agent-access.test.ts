@@ -13,16 +13,24 @@ void test('agent access starts once only after a sandbox session is active', asy
     model: 'synthetic-model',
     hasPending: () => false,
     async acknowledgePending() {},
-    async close() { closed += 1; },
+    async close() {
+      closed += 1;
+    },
   };
   const access = createDesktopPaypalAgentAccess(
     () => ({ phase, expired: false }),
-    async () => { opened += 1; return endpoint; },
+    async () => {
+      opened += 1;
+      return endpoint;
+    },
   );
   await assert.rejects(access.connect());
   assert.equal(opened, 0);
   phase = 'active';
-  const [first, second] = await Promise.all([access.connect(), access.connect()]);
+  const [first, second] = await Promise.all([
+    access.connect(),
+    access.connect(),
+  ]);
   assert.equal(opened, 1);
   assert.equal(first.url, endpoint.url);
   assert.equal(second.key, endpoint.key);
@@ -39,8 +47,12 @@ void test('a pending agent response must be confirmed before disconnect', async 
     key: 'synthetic-key',
     model: 'synthetic-model',
     hasPending: () => pending,
-    async acknowledgePending() { pending = false; },
-    async close() { closed += 1; },
+    async acknowledgePending() {
+      pending = false;
+    },
+    async close() {
+      closed += 1;
+    },
   };
   const access = createDesktopPaypalAgentAccess(
     () => ({ phase: 'active', expired: false }),
