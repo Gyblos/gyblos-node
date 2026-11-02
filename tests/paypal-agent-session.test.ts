@@ -172,6 +172,9 @@ void test('malformed agent messages are refused before dispatch or journal chang
   for (const messages of [
     [null],
     [{ role: 'user', content: 42 }],
+    [{ role: 'user', content: [{ type: 'image_url', image_url: { url: 'https://example.invalid/image' } }] }],
+    [{ role: 'user', content: [{ type: 'text', text: 'synthetic', extra: true }] }],
+    [{ role: 'user', content: [] }],
     [{ role: 'tool', content: 'synthetic result' }],
     [{ role: 'system', content: 'synthetic instruction', extra: true }],
   ]) {
