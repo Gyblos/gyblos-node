@@ -153,6 +153,22 @@ void test('a following agent request acknowledges the prior response only when i
   assert.deepEqual(f.calls, ['generate', 'ack:MSG1', 'generate', 'ack:MSG2']);
 });
 
+void test('assistant tool calls with omitted content acknowledge the equivalent prior response', async () => {
+  const f = fixture();
+  assert.equal((await f.gateway.handle(post(input))).status, 200);
+  const message = firstAnswer.choices[0]?.message;
+  assert.ok(message);
+  const { content: _content, ...withoutContent } = message;
+  const next = await f.gateway.handle(post({
+    ...input,
+    messages: [...input.messages, withoutContent, {
+      role: 'tool', tool_call_id: 'call_1', content: 'synthetic result',
+    }],
+  }));
+  assert.equal(next.status, 200);
+  assert.deepEqual(f.calls, ['generate', 'ack:MSG1', 'generate']);
+});
+
 void test('streaming clients receive an SSE representation only after the complete response', async () => {
   const f = fixture();
   const response = await f.gateway.handle(post({ ...input, stream: true }));
