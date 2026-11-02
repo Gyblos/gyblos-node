@@ -42,7 +42,7 @@ export interface UptoJournalEntry {
   payTo: string;
   feePayer: string;
   maxAtomic: string;
-  // Null for an entry journaled before version 3, which is read with the buyer's current policy.
+  // Null for an entry journaled before version 3; its network is unknown and recovery is blocked.
   policy: UptoJournalPolicy | null;
   // The open's slot (a seed of its channel address) and the last block height its blockhash allows:
   // past that height an open that never landed never will.
@@ -147,8 +147,8 @@ const V2_FIELDS = FIELDS.filter((field) => field !== 'policy');
 const V1_FIELDS = V2_FIELDS.filter(
   (field) => field !== 'openSlot' && field !== 'lastValidBlockHeight',
 );
-// A version 1 signed entry can still settle but is never proven unopened: its blockhash lifetime is
-// unknown, so it is read as never expiring.
+// A version 1 entry has unknown blockhash lifetime, so it is read as never expiring. Signed entries
+// also lack a network and remain blocked from automatic recovery.
 const V1_UNKNOWN = { openSlot: '0', lastValidBlockHeight: String(U64_MAX) };
 const READ = new Map<number, { fields: readonly string[]; missing: object }>([
   [BUYER_JOURNAL.version, { fields: FIELDS, missing: {} }],
