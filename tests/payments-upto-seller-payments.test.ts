@@ -163,3 +163,50 @@ void test('mainnet seller is disabled before opening a ledger or sending', async
     await rm(root, { recursive: true, force: true });
   }
 });
+
+void test('seller refuses a mismatched RPC before writing or sending', async () => {
+  const { root, options } = await setup();
+  const wrong = offline({ missing: true, genesis: 'wrong-chain' });
+  try {
+    await assert.rejects(
+      openUptoSellerPayments({ ...options, rpc: wrong.rpc }).then(
+        async (payments) => {
+          await payments.close();
+          return payments;
+        },
+      ),
+      (error) =>
+        error instanceof PaymentError &&
+        error.code === PAYMENT_ERROR_CODES.UNTRUSTED_TERMS,
+    );
+    assert.deepEqual(wrong.sent, []);
+    await assert.rejects(lstat(options.paths.directory), { code: 'ENOENT' });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+void test('seller refuses an unavailable genesis before writing or sending', async () => {
+  const { root, options } = await setup();
+  const double = offline({ missing: true });
+  const rpc = {
+    ...double.rpc,
+    getGenesisHash: () => ({
+      send: async () => {
+        throw new Error('synthetic RPC error');
+      },
+    }),
+  };
+  try {
+    await assert.rejects(
+      openUptoSellerPayments({ ...options, rpc }),
+      (error) =>
+        error instanceof PaymentError &&
+        error.code === PAYMENT_ERROR_CODES.UNAVAILABLE,
+    );
+    assert.deepEqual(double.sent, []);
+    await assert.rejects(lstat(options.paths.directory), { code: 'ENOENT' });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

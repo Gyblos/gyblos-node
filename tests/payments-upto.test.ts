@@ -186,3 +186,17 @@ void test('mainnet seller port remains disabled', async () => {
     failsWith(PAYMENT_ERROR_CODES.UNTRUSTED_TERMS),
   );
 });
+
+void test('mutating the seller description cannot enable mainnet', async () => {
+  const { ledger, recent, description, terms, authorization } = await setup();
+  const port = seller(ledger, description, recent.recentSlot, {
+    failUpstream: false,
+  });
+  description.network = SOLANA_MAINNET_CAIP2;
+  assert.equal((await port.describe()).network, NETWORK);
+  await assert.rejects(
+    port.admit(authorization, { ...terms, network: SOLANA_MAINNET_CAIP2 }),
+    failsWith(PAYMENT_ERROR_CODES.AUTHORIZATION_MISMATCH),
+  );
+  assert.deepEqual(ledger.events, []);
+});

@@ -44,9 +44,11 @@ const caip = (network: string): network is `${string}:${string}` =>
 export async function openUptoBuyerPayments(
   options: UptoBuyerPaymentsOptions,
 ): Promise<UptoBuyerPayments> {
-  assertPaymentNetworkEnabled(options.policy.network);
+  const policy = { ...options.policy };
+  const settings = { ...options.settings };
+  assertPaymentNetworkEnabled(policy.network);
   const now = options.now ?? Date.now;
-  const network = options.policy.network;
+  const network = policy.network;
   if (!caip(network))
     throw new PaymentError(PAYMENT_ERROR_CODES.UNTRUSTED_TERMS);
   const journal = await openUptoBuyerJournal({ paths: options.paths, now });
@@ -55,11 +57,11 @@ export async function openUptoBuyerPayments(
   try {
     const client = createUptoPaymentClient({
       payer: options.payer,
-      policy: options.policy,
-      settings: options.settings,
+      policy,
+      settings,
       hints: () => hints.hints(),
       journal,
-      confirm: uptoSettlementView(rpc, options.policy, options.payer),
+      confirm: uptoSettlementView(rpc, policy, options.payer),
       now,
     });
     return { client, close: () => journal.close() };

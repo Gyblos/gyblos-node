@@ -223,28 +223,34 @@ async function discardUnsent(
 export function createUptoPaymentClient(
   options: UptoPaymentClientOptions,
 ): PaymentClient {
-  checkedPolicy(options.policy);
+  const fixed = {
+    ...options,
+    policy: { ...options.policy },
+    settings: { ...options.settings },
+  };
+  checkedPolicy(fixed.policy);
   // Requests being authorized now, so a concurrent call for the same one is refused before any await.
   const reserved = new Set<string>();
   return {
-    async authorize(terms) {
-      if (!trusted(terms, options.policy, options.payer.address, options.now()))
+    async authorize(input) {
+      const terms = { ...input };
+      if (!trusted(terms, fixed.policy, fixed.payer.address, fixed.now()))
         fail(PAYMENT_ERROR_CODES.UNTRUSTED_TERMS);
       if (reserved.has(terms.requestDigest))
         fail(PAYMENT_ERROR_CODES.ALREADY_AUTHORIZED);
       reserved.add(terms.requestDigest);
       try {
-        const known = await options.journal
+        const known = await fixed.journal
           .get(terms.requestDigest)
           .catch(() => fail(PAYMENT_ERROR_CODES.JOURNAL_UNAVAILABLE));
         if (known) fail(PAYMENT_ERROR_CODES.ALREADY_AUTHORIZED);
-        return await signOpen(options, terms);
+        return await signOpen(fixed, terms);
       } finally {
         reserved.delete(terms.requestDigest);
       }
     },
     async checkReceipt(authorization, settlement, expectedChargedAtomic) {
-      const entry = await options.journal
+      const entry = await fixed.journal
         .get(authorization.requestDigest)
         .catch(() => fail(PAYMENT_ERROR_CODES.JOURNAL_UNAVAILABLE));
       if (!entry || entry.channelId !== authorization.channelId)
@@ -273,7 +279,7 @@ export function createUptoPaymentClient(
       )
         fail(PAYMENT_ERROR_CODES.RECEIPT_MISMATCH);
       await journaled(() =>
-        options.journal.put({
+        fixed.journal.put({
           ...entry,
           state: PAYMENT_CHANNEL_STATES.SETTLED,
           chargedAtomic: settlement.chargedAtomic,
@@ -281,7 +287,7 @@ export function createUptoPaymentClient(
       );
     },
     async reconcile() {
-      const entries = await options.journal
+      const entries = await fixed.journal
         .list()
         .catch(() => fail(PAYMENT_ERROR_CODES.JOURNAL_UNAVAILABLE));
       // An entry without a channel never left the buyer: there is nothing to reconcile.
@@ -290,7 +296,7 @@ export function createUptoPaymentClient(
           channelId ? [{ channelId, requestDigest, state, chargedAtomic }] : [],
       );
     },
-    discard: (authorization) => discardUnsent(options.journal, authorization),
+    discard: (authorization) => discardUnsent(fixed.journal, authorization),
   };
 }
 

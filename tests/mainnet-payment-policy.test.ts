@@ -5,7 +5,6 @@ import test from 'node:test';
 import { generateKeyPairSigner } from '@solana/kit';
 import { SOLANA_MAINNET_CAIP2, USDC_MAINNET_ADDRESS } from '@x402/svm';
 
-import { PROTOCOL_FEE } from '@gyblos/config';
 import { mainnetPilotBuyerPolicy } from '@gyblos/payments-upto';
 import { PAYMENT_ERROR_CODES } from '@gyblos/protocol/constants';
 import { PaymentError } from '@gyblos/protocol/payment';
@@ -21,7 +20,7 @@ void test('mainnet candidate pins the network, USDC and fee within the pilot cap
       network: SOLANA_MAINNET_CAIP2,
       mint: USDC_MAINNET_ADDRESS,
       treasury,
-      protocolFeeBps: PROTOCOL_FEE.bps,
+      protocolFeeBps: 300,
       maxAtomic,
     });
 });

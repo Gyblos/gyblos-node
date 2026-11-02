@@ -432,3 +432,19 @@ void test('mainnet buyer stack refuses before creating a journal or calling RPC'
     );
     await assert.rejects(lstat(paths.directory), { code: 'ENOENT' });
   }));
+
+void test('mutating or replacing the buyer policy cannot enable mainnet', async () => {
+  for (const replace of [false, true]) {
+    const journal = memory();
+    const { options, counter, client, terms } = await buyer(journal);
+    if (replace)
+      options.policy = { ...options.policy, network: SOLANA_MAINNET_CAIP2 };
+    else options.policy.network = SOLANA_MAINNET_CAIP2;
+    await assert.rejects(
+      client.authorize({ ...terms, network: SOLANA_MAINNET_CAIP2 }),
+      code(PAYMENT_ERROR_CODES.UNTRUSTED_TERMS),
+    );
+    assert.equal(journal.entries.size, 0);
+    assert.equal(counter.signed, 0);
+  }
+});
