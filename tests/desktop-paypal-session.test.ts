@@ -114,6 +114,49 @@ void test('desktop chat and a local agent share one sandbox session', async () =
   ]);
 });
 
+void test('an agent-ready model can prepare a session while the chat model is unavailable', async () => {
+  const f = fixture();
+  const agentEngine = {
+    model: 'synthetic-model',
+    async generate() {
+      return {
+        id: 'synthetic', object: 'chat.completion', created: 0, model: 'synthetic-model',
+        choices: [{ index: 0, message: { role: 'assistant', content: 'synthetic answer' }, finish_reason: 'stop' }],
+        usage: { prompt_tokens: 2, completion_tokens: 3, total_tokens: 5 },
+      };
+    },
+  };
+  const desktop = createDesktopPaypalSession(await createPaypalSession({ ...f, agentEngine }), async () => {}, {
+    checkEngine: async () => { throw new Error('chat model unavailable'); },
+    checkAgentEngine: async () => ({ digest: 'synthetic' }),
+  });
+  await desktop.create();
+  await desktop.approve();
+  await assert.rejects(desktop.send('synthetic chat'));
+  const answer = await desktop.sendAgent({
+    model: 'synthetic-model', messages: [{ role: 'user', content: 'synthetic request' }], max_tokens: 128,
+  });
+  await desktop.acknowledge(answer.messageId);
+  assert.equal((await desktop.finish()).spentCents, 10);
+});
+
+void test('a restarted session cannot silently bind a different agent model', async () => {
+  const f = fixture();
+  const agentEngine = { model: 'synthetic-model', async generate() { throw new Error('must not run'); } };
+  const dependencies = { ...f, agentEngine };
+  const first = createDesktopPaypalSession(await createPaypalSession(dependencies), async () => {});
+  await first.create();
+  await first.approve();
+  const resumed = createDesktopPaypalSession(await createPaypalSession(dependencies), async () => {}, {
+    checkAgentEngine: async () => ({ digest: 'different' }),
+  });
+  await assert.rejects(resumed.sendAgent({
+    model: 'synthetic-model', messages: [{ role: 'user', content: 'synthetic request' }], max_tokens: 128,
+  }));
+  assert.equal((await resumed.finish()).phase, 'voided');
+  assert.deepEqual(f.calls, ['create', 'authorize', 'void']);
+});
+
 void test('an unacknowledged response blocks another message and settlement', async () => {
   const { f, desktop } = await setup();
   await desktop.create();
