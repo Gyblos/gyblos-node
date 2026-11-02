@@ -101,3 +101,27 @@ void test('agent adapter rejects malformed responses without exposing the upstre
     return true;
   });
 });
+
+void test('an explicitly selected local agent model is used and verified', async () => {
+  const chosen = 'synthetic-tool-model';
+  let digest = 'a'.repeat(64);
+  const fetcher: typeof fetch = async (url, init) => {
+    if (String(url).endsWith('/api/tags'))
+      return Response.json({ models: [{ name: chosen, digest, capabilities: ['tools'] }] });
+    assert.equal(typeof init?.body, 'string');
+    if (typeof init?.body !== 'string') throw new Error('missing body');
+    const sent: unknown = JSON.parse(init.body);
+    assert.ok(sent && typeof sent === 'object' && 'model' in sent);
+    assert.equal(sent.model, chosen);
+    return Response.json({
+      id: 'synthetic-id', object: 'chat.completion', created: 0, model: chosen,
+      choices: [{ index: 0, message: { role: 'assistant', content: 'synthetic answer' }, finish_reason: 'stop' }],
+      usage: { prompt_tokens: 2, completion_tokens: 3, total_tokens: 5 },
+    });
+  };
+  const engine = createOllamaAgent('http://127.0.0.1:11434/', fetcher, { model: chosen });
+  assert.equal((await engine.describe()).name, chosen);
+  await engine.generate({ ...request, model: chosen });
+  digest = 'b'.repeat(64);
+  await assert.rejects(engine.describe());
+});
