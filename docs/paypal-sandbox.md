@@ -131,7 +131,9 @@ waits for any inference already dispatched to finish. Settle the PayPal session
 in Chat. If the app restarts, settle the old session if its state permits, then
 create a new one to connect an agent; it cannot silently attach a new model to
 the old session. If the prior state needs review, do not retry payment or remove
-its journal or lock to make a new session possible.
+its journal or lock to make a new session possible. If you update the agent
+model, settle the current session and restart Gyblos before creating another;
+the running process pins the model digest.
 
 Each valid completed **agent inference** records USD 0.10 before returning the
 result, even when delivery fails. One instruction can require multiple
