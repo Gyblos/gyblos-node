@@ -122,8 +122,8 @@ importers:
         specifier: 4.17.21
         version: 4.17.21
       '@types/node':
-        specifier: 22.19.0
-        version: 22.19.0
+        specifier: 24.19.2
+        version: 24.19.2
       dependency-cruiser:
         specifier: 18.7.0
         version: 18.7.0
