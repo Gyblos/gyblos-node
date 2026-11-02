@@ -1,5 +1,6 @@
 // Runs a private buyer and presents its actual startup policy; never retries a sent prompt.
 import { stdin, stdout } from 'node:process';
+import type { Readable, Writable } from 'node:stream';
 import { createInterface } from 'node:readline/promises';
 
 import { isMain } from '@gyblos/runtime';
@@ -31,6 +32,7 @@ type ChatStarter = (options: { port: number }) => Promise<{
   };
   close(): Promise<void>;
 }>;
+export async function runTerminal(_start: ChatStarter, _input: Readable, _output: Writable, _signal?: AbortSignal) {}
 export async function runOwnedChat(
   start: ChatStarter,
   read: () => Promise<string | undefined>,
