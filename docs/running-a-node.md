@@ -775,12 +775,19 @@ after every channel was visited) or could not run
 (`PAID_WITHDRAW_NETWORK_MISMATCH`, `PAID_WITHDRAW_ROLE_INVALID`,
 `PAID_WITHDRAW_INCOMPLETE`).
 
-The buyer journal records the network of new signed opens. Older entries do not
-name a network; the existing recovery commands treat them as devnet-only, and
-refuse them for another network. A mixture of open entries from different
-networks is refused before any recovery action. On the first journal write, the
-file is upgraded to the current format. Earlier software rejects the new format,
-so do not roll back the buyer while any channel may need recovery.
+The buyer journal records the network of new signed opens. A signed open entry
+from an older version has no provable network: recovery keeps it open and
+refuses withdrawal on every network, reporting `networkBlock: "unknown"`.
+Confirm its provenance independently before attempting any separate recovery; do
+not delete or edit it to unblock payments. An open channel belonging to a
+different network is also left untouched and reports `networkBlock: "mismatch"`.
+Recovery can still process signed channels bound to the selected, verified
+network.
+
+An older journal containing an unresolved signed open is not upgraded or
+rewritten, so earlier software can still read it. Once no such entry remains,
+the first journal write upgrades the file to the current format. Earlier
+software rejects that format; do not roll back while channels need recovery.
 
 It never changes the journal. Once a channel is distributed and finalized,
 `pnpm buyer:reconcile:paid` reads it from history and unblocks payments: the

@@ -36,7 +36,8 @@ export function buyerChainWithdraw(
   role: RoleConfig,
   report: UptoBuyerWithdrawOptions['report'],
 ) => Promise<UptoBuyerWithdrawResult[]> {
-  return async (role, report) => {
+  return async (inputRole, report) => {
+    const role = { ...inputRole };
     if (role.role !== P2P_ROLES.BUYER)
       throw new NodeError(NODE_ERROR_CODES.BUYER_PAYMENT_KEY_INVALID);
     // Devnet only: this signs and spends fees from the buyer's wallet.

@@ -85,7 +85,12 @@ function state(history: HistoryEntry[], change: Partial<ChainState> = {}) {
 async function withJournal(
   run: (journal: UptoBuyerJournal) => Promise<void>,
   digests: [string, string][] = [[DIGEST, CHANNEL]],
-  policy: UptoJournalPolicy | null = null,
+  policy: UptoJournalPolicy | null = {
+    network: DEVNET,
+    mint: MINT,
+    treasury: TREASURY,
+    protocolFeeBps: 300,
+  },
 ) {
   const root = await mkdtemp(join(tmpdir(), 'gyblos-buyer-reconcile-'));
   const journal = await openUptoBuyerJournal({

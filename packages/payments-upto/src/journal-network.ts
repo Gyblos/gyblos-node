@@ -1,17 +1,17 @@
 // Refuses cross-network recovery before RPC, reporting, or withdrawal; legacy entries are devnet-only.
-import { SOLANA_DEVNET_CAIP2 } from '@x402/svm';
 import {
   UPTO_SOLANA_NAMESPACE,
   UPTO_SOLANA_REFERENCE_LENGTH,
 } from 'x402-upto-metered';
 
-import {
-  PAYMENT_CHANNEL_STATES,
-  PAYMENT_ERROR_CODES,
-} from '@gyblos/protocol/constants';
+import { PAYMENT_ERROR_CODES } from '@gyblos/protocol/constants';
 import { PaymentError } from '@gyblos/protocol/payment';
 
-import type { UptoJournalEntry } from './buyer-journal';
+import type { UptoBuyerJournal, UptoJournalEntry } from './buyer-journal';
+import {
+  NETWORK_RECOVERY_BLOCKS,
+  type NetworkRecoveryBlock,
+} from './constants';
 
 const BASE58 = /^[1-9A-HJ-NP-Za-km-z]+$/;
 export function isJournalNetwork(value: unknown): value is string {
@@ -25,19 +25,27 @@ export function isJournalNetwork(value: unknown): value is string {
   );
 }
 
-export function checkJournalNetwork(
-  entries: UptoJournalEntry[],
-  network: string,
-): void {
+export function checkJournalNetwork(network: string): void {
   if (!isJournalNetwork(network))
     throw new PaymentError(PAYMENT_ERROR_CODES.UNTRUSTED_TERMS);
-  for (const entry of entries) {
-    if (!entry.channelId || entry.state !== PAYMENT_CHANNEL_STATES.OPEN)
-      continue;
-    const recorded = entry.policy?.network ?? null;
-    if (
-      recorded === null ? network !== SOLANA_DEVNET_CAIP2 : recorded !== network
-    )
-      throw new PaymentError(PAYMENT_ERROR_CODES.UNTRUSTED_TERMS);
-  }
+}
+
+export function networkRecoveryBlock(
+  entry: UptoJournalEntry,
+  network: string,
+): NetworkRecoveryBlock | undefined {
+  const recorded = entry.policy?.network ?? null;
+  if (recorded === null) return NETWORK_RECOVERY_BLOCKS.UNKNOWN;
+  return recorded === network ? undefined : NETWORK_RECOVERY_BLOCKS.MISMATCH;
+}
+
+// Keep caller-supplied method references stable throughout asynchronous recovery.
+export function snapshotJournal(journal: UptoBuyerJournal): UptoBuyerJournal {
+  return {
+    get: journal.get.bind(journal),
+    put: journal.put.bind(journal),
+    remove: journal.remove.bind(journal),
+    list: journal.list.bind(journal),
+    close: journal.close.bind(journal),
+  };
 }

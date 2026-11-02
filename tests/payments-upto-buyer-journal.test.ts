@@ -121,12 +121,14 @@ void test('a valid document reads back; each malformed one is refused', () =>
     }
   }));
 
-void test('a version 2 journal reads without a policy and is saved as the current version', () =>
+void test('a resolved version 2 journal reads without policy and upgrades on write', () =>
   withRoot(async (root) => {
     const { state } = buyerJournalPathsIn({ GYBLOS_HOME: root });
     const { policy: _policy, ...v2 } = {
       ...ENTRY,
       channelId: 'Chan1',
+      state: PAYMENT_CHANNEL_STATES.SETTLED,
+      chargedAtomic: '0',
       updatedAt: NOW,
     };
     await (await open(root)).close();
@@ -179,17 +181,17 @@ void test('a version 1 journal keeps its signed opens, never proven unopened, an
         policy: null,
       },
     ]);
-    // The next write saves it as the current version, which the strict parser reads back.
-    await journal.put({ ...ENTRY, requestDigest: OTHER });
+    // A signed open without network provenance cannot be upgraded or rewritten.
+    await assert.rejects(
+      journal.put({ ...ENTRY, requestDigest: OTHER }),
+      unavailable,
+    );
     await journal.close();
     assert.equal(
       (JSON.parse(await readFile(state, 'utf8')) as { version: number })
         .version,
-      BUYER_JOURNAL.version,
+      BUYER_JOURNAL.legacyVersion,
     );
-    const reread = await open(root);
-    assert.equal((await reread.list()).length, 2);
-    await reread.close();
   }));
 
 void test('a full journal refuses new requests, keeps writing open ones and prunes finished ones', () =>

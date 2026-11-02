@@ -51,6 +51,14 @@ export const BUYER_JOURNAL = {
   settledRetentionMs: 30 * 86_400_000,
 } as const;
 
+// Why a signed open is not eligible for recovery on this network.
+export const NETWORK_RECOVERY_BLOCKS = {
+  UNKNOWN: 'unknown',
+  MISMATCH: 'mismatch',
+} as const;
+export type NetworkRecoveryBlock =
+  (typeof NETWORK_RECOVERY_BLOCKS)[keyof typeof NETWORK_RECOVERY_BLOCKS];
+
 export const RECONCILE_OUTCOMES = {
   // The chain charged exactly the buyer's own count.
   SETTLED: 'settled',

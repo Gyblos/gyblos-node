@@ -12,8 +12,16 @@ import { PAYMENT_CHANNEL_STATES } from '@gyblos/protocol/constants';
 import { paymentSplits } from '@gyblos/protocol/payment-binding';
 
 import type { UptoBuyerJournal, UptoJournalEntry } from './buyer-journal';
-import { BUYER_WITHDRAW, WITHDRAW_STEPS } from './constants';
-import { checkJournalNetwork } from './journal-network';
+import {
+  BUYER_WITHDRAW,
+  WITHDRAW_STEPS,
+  type NetworkRecoveryBlock,
+} from './constants';
+import {
+  checkJournalNetwork,
+  networkRecoveryBlock,
+  snapshotJournal,
+} from './journal-network';
 
 export type UptoBuyerWithdrawStep =
   (typeof WITHDRAW_STEPS)[keyof typeof WITHDRAW_STEPS];
@@ -27,6 +35,8 @@ export interface UptoBuyerWithdrawResult extends Omit<
   step: UptoBuyerWithdrawStep;
   // Why a failed step failed, as a static code; null otherwise.
   failure: UptoErrorCode | null;
+  // Present when this signed channel cannot be attributed to the selected network.
+  networkBlock?: NetworkRecoveryBlock;
 }
 
 export interface UptoBuyerWithdrawOptions {
@@ -99,18 +109,39 @@ async function stepFor(
 export async function withdrawUptoBuyer(
   options: UptoBuyerWithdrawOptions,
 ): Promise<UptoBuyerWithdrawResult[]> {
-  const entries = await options.journal.list();
-  checkJournalNetwork(entries, options.network);
+  const withdraw = options.withdrawal.withdraw.bind(options.withdrawal);
+  const fixed = {
+    ...options,
+    journal: snapshotJournal(options.journal),
+    withdrawal: { withdraw },
+  };
+  checkJournalNetwork(fixed.network);
+  const entries = (await fixed.journal.list()).map((entry) => ({
+    ...entry,
+    policy: entry.policy ? { ...entry.policy } : null,
+  }));
   const results: UptoBuyerWithdrawResult[] = [];
   for (const entry of entries) {
     const { channelId } = entry;
     if (!channelId || entry.state !== PAYMENT_CHANNEL_STATES.OPEN) continue;
-    const result: UptoBuyerWithdrawResult = {
-      requestDigest: entry.requestDigest,
-      channelId,
-      ...(await stepFor({ ...entry, channelId }, options)),
-    };
-    await options.report(result);
+    const networkBlock = networkRecoveryBlock(entry, fixed.network);
+    const result: UptoBuyerWithdrawResult = networkBlock
+      ? {
+          requestDigest: entry.requestDigest,
+          channelId,
+          step: WITHDRAW_STEPS.REFUSED,
+          transaction: null,
+          confirmed: true,
+          retryAfterSeconds: null,
+          failure: null,
+          networkBlock,
+        }
+      : {
+          requestDigest: entry.requestDigest,
+          channelId,
+          ...(await stepFor({ ...entry, channelId }, fixed)),
+        };
+    await fixed.report(result);
     results.push(result);
   }
   return results;

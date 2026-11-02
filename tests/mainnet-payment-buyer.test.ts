@@ -162,3 +162,50 @@ void test('replacing the receipt verifier cannot mark an unverified payment sett
   );
   assert.equal(journal.entries.get(DIGEST)?.state, PAYMENT_CHANNEL_STATES.OPEN);
 });
+
+void test('receipt and discard cannot close a foreign or unknown network entry', async () => {
+  for (const network of [SOLANA_MAINNET_CAIP2, null]) {
+    const journal = memory();
+    const { options, terms } = await buyer(journal);
+    let confirmations = 0;
+    const client = createUptoPaymentClient({
+      ...options,
+      confirm: async (settlement) => {
+        confirmations++;
+        return {
+          channelId: settlement.channelId,
+          chargedAtomic: settlement.chargedAtomic,
+          refundedAtomic: settlement.refundedAtomic,
+          sellerAtomic: settlement.sellerAtomic,
+          feeAtomic: settlement.feeAtomic,
+        };
+      },
+    });
+    const authorization = await client.authorize(terms);
+    const held = journal.entries.get(DIGEST);
+    assert.ok(held?.policy);
+    held.policy.network = network;
+    const settlement = {
+      channelId: authorization.channelId,
+      chargedAtomic: '30',
+      refundedAtomic: '970',
+      sellerAtomic: '29',
+      feeAtomic: '0',
+      transaction: 'synthetic',
+    };
+    await assert.rejects(
+      client.checkReceipt(authorization, settlement, '30'),
+      code(PAYMENT_ERROR_CODES.RECEIPT_MISMATCH),
+    );
+    assert.equal(confirmations, 0);
+    assert.equal(
+      journal.entries.get(DIGEST)?.state,
+      PAYMENT_CHANNEL_STATES.OPEN,
+    );
+    await assert.rejects(client.discard(authorization));
+    assert.equal(
+      journal.entries.get(DIGEST)?.state,
+      PAYMENT_CHANNEL_STATES.OPEN,
+    );
+  }
+});

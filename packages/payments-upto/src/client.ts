@@ -27,6 +27,7 @@ import {
 } from '@gyblos/protocol/payment';
 
 import type { UptoBuyerJournal } from './buyer-journal';
+import { networkRecoveryBlock, snapshotJournal } from './journal-network';
 import { assertPaymentNetworkEnabled } from './mainnet';
 import { uptoTermsFor, type UptoChannelSettings } from './terms';
 
@@ -206,12 +207,16 @@ function checkedPolicy(policy: UptoBuyerPolicy): UptoBuyerPolicy {
 // identity, is refused.
 async function discardUnsent(
   journal: UptoBuyerJournal,
-  authorization: PaymentAuthorization,
+  inputAuthorization: PaymentAuthorization,
+  network: string,
 ) {
+  const authorization = { ...inputAuthorization };
   const entry = await journal
     .get(authorization.requestDigest)
     .catch(() => fail(PAYMENT_ERROR_CODES.JOURNAL_UNAVAILABLE));
   if (!entry) return;
+  if (networkRecoveryBlock(entry, network))
+    fail(PAYMENT_ERROR_CODES.UNTRUSTED_TERMS);
   if (entry.channelId !== authorization.channelId)
     fail(PAYMENT_ERROR_CODES.RECEIPT_MISMATCH);
   if (entry.state === PAYMENT_CHANNEL_STATES.SETTLED)
@@ -221,11 +226,64 @@ async function discardUnsent(
     .catch(() => fail(PAYMENT_ERROR_CODES.JOURNAL_UNAVAILABLE));
 }
 
+async function checkReceipt(
+  fixed: UptoPaymentClientOptions,
+  inputAuthorization: PaymentAuthorization,
+  inputSettlement: PaymentSettlement,
+  expectedChargedAtomic: string,
+): Promise<void> {
+  const authorization = { ...inputAuthorization };
+  const settlement = { ...inputSettlement };
+  const observed = await fixed.journal
+    .get(authorization.requestDigest)
+    .catch(() => fail(PAYMENT_ERROR_CODES.JOURNAL_UNAVAILABLE));
+  const entry = observed
+    ? { ...observed, policy: observed.policy ? { ...observed.policy } : null }
+    : undefined;
+  if (
+    !entry ||
+    entry.channelId !== authorization.channelId ||
+    networkRecoveryBlock(entry, fixed.policy.network)
+  )
+    fail(PAYMENT_ERROR_CODES.RECEIPT_MISMATCH);
+  if (entry.state === PAYMENT_CHANNEL_STATES.SETTLED)
+    fail(PAYMENT_ERROR_CODES.ALREADY_SETTLED);
+  const channel = {
+    channelId: entry.channelId,
+    maxAtomic: entry.maxAtomic,
+    payTo: entry.payTo,
+  };
+  const onChain = await fixed
+    .confirm(settlement, channel)
+    .catch(() => fail(PAYMENT_ERROR_CODES.UNAVAILABLE));
+  if (
+    !onChain ||
+    onChain.channelId !== channel.channelId ||
+    settlement.channelId !== channel.channelId ||
+    onChain.chargedAtomic !== settlement.chargedAtomic ||
+    onChain.refundedAtomic !== settlement.refundedAtomic ||
+    onChain.sellerAtomic !== settlement.sellerAtomic ||
+    onChain.feeAtomic !== settlement.feeAtomic ||
+    settlement.chargedAtomic !== expectedChargedAtomic ||
+    BigInt(onChain.chargedAtomic) + BigInt(onChain.refundedAtomic) !==
+      BigInt(channel.maxAtomic)
+  )
+    fail(PAYMENT_ERROR_CODES.RECEIPT_MISMATCH);
+  await journaled(() =>
+    fixed.journal.put({
+      ...entry,
+      state: PAYMENT_CHANNEL_STATES.SETTLED,
+      chargedAtomic: settlement.chargedAtomic,
+    }),
+  );
+}
+
 export function createUptoPaymentClient(
   options: UptoPaymentClientOptions,
 ): PaymentClient {
   const fixed = {
     ...options,
+    journal: snapshotJournal(options.journal),
     policy: { ...options.policy },
     settings: { ...options.settings },
   };
@@ -250,43 +308,8 @@ export function createUptoPaymentClient(
         reserved.delete(terms.requestDigest);
       }
     },
-    async checkReceipt(authorization, settlement, expectedChargedAtomic) {
-      const entry = await fixed.journal
-        .get(authorization.requestDigest)
-        .catch(() => fail(PAYMENT_ERROR_CODES.JOURNAL_UNAVAILABLE));
-      if (!entry || entry.channelId !== authorization.channelId)
-        fail(PAYMENT_ERROR_CODES.RECEIPT_MISMATCH);
-      if (entry.state === PAYMENT_CHANNEL_STATES.SETTLED)
-        fail(PAYMENT_ERROR_CODES.ALREADY_SETTLED);
-      const channel = {
-        channelId: entry.channelId,
-        maxAtomic: entry.maxAtomic,
-        payTo: entry.payTo,
-      };
-      const onChain = await fixed
-        .confirm(settlement, channel)
-        .catch(() => fail(PAYMENT_ERROR_CODES.UNAVAILABLE));
-      if (
-        !onChain ||
-        onChain.channelId !== channel.channelId ||
-        settlement.channelId !== channel.channelId ||
-        onChain.chargedAtomic !== settlement.chargedAtomic ||
-        onChain.refundedAtomic !== settlement.refundedAtomic ||
-        onChain.sellerAtomic !== settlement.sellerAtomic ||
-        onChain.feeAtomic !== settlement.feeAtomic ||
-        settlement.chargedAtomic !== expectedChargedAtomic ||
-        BigInt(onChain.chargedAtomic) + BigInt(onChain.refundedAtomic) !==
-          BigInt(channel.maxAtomic)
-      )
-        fail(PAYMENT_ERROR_CODES.RECEIPT_MISMATCH);
-      await journaled(() =>
-        fixed.journal.put({
-          ...entry,
-          state: PAYMENT_CHANNEL_STATES.SETTLED,
-          chargedAtomic: settlement.chargedAtomic,
-        }),
-      );
-    },
+    checkReceipt: (authorization, settlement, expectedChargedAtomic) =>
+      checkReceipt(fixed, authorization, settlement, expectedChargedAtomic),
     async reconcile() {
       const entries = await fixed.journal
         .list()
@@ -297,7 +320,8 @@ export function createUptoPaymentClient(
           channelId ? [{ channelId, requestDigest, state, chargedAtomic }] : [],
       );
     },
-    discard: (authorization) => discardUnsent(fixed.journal, authorization),
+    discard: (authorization) =>
+      discardUnsent(fixed.journal, authorization, fixed.policy.network),
   };
 }
 

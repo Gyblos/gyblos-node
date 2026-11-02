@@ -12,8 +12,12 @@ import {
 import { PAYMENT_CHANNEL_STATES } from '@gyblos/protocol/constants';
 
 import type { UptoBuyerJournal, UptoJournalEntry } from './buyer-journal';
-import { RECONCILE_OUTCOMES } from './constants';
-import { checkJournalNetwork } from './journal-network';
+import { RECONCILE_OUTCOMES, type NetworkRecoveryBlock } from './constants';
+import {
+  checkJournalNetwork,
+  networkRecoveryBlock,
+  snapshotJournal,
+} from './journal-network';
 
 export type UptoReconcileOutcome =
   (typeof RECONCILE_OUTCOMES)[keyof typeof RECONCILE_OUTCOMES];
@@ -30,6 +34,8 @@ export interface UptoReconcileResult {
   feeAtomic: string | null;
   refundedAtomic: string | null;
   transaction: string | null;
+  // Present when this signed channel cannot be attributed to the selected network.
+  networkBlock?: NetworkRecoveryBlock;
 }
 
 export interface UptoReconcileOptions {
@@ -122,23 +128,51 @@ function outcomeOf(
 export async function reconcileUptoBuyer(
   options: UptoReconcileOptions,
 ): Promise<UptoReconcileResult[]> {
-  const entries = await options.journal.list();
-  checkJournalNetwork(entries, options.network);
-  const shown = readers(options);
+  const rpc = options.rpc;
+  const fixed = {
+    ...options,
+    journal: snapshotJournal(options.journal),
+    rpc: {
+      getSignaturesForAddress: rpc.getSignaturesForAddress.bind(rpc),
+      getEpochInfo: rpc.getEpochInfo.bind(rpc),
+      minimumLedgerSlot: rpc.minimumLedgerSlot.bind(rpc),
+      getFirstAvailableBlock: rpc.getFirstAvailableBlock.bind(rpc),
+      getAccountInfo: rpc.getAccountInfo.bind(rpc),
+      getTransaction: rpc.getTransaction.bind(rpc),
+    },
+  };
+  checkJournalNetwork(fixed.network);
+  const entries = (await fixed.journal.list()).map((entry) => ({
+    ...entry,
+    policy: entry.policy ? { ...entry.policy } : null,
+  }));
+  const shown = readers(fixed);
   const results: UptoReconcileResult[] = [];
   for (const entry of entries) {
     const { channelId, updatedAt: _updatedAt, ...rest } = entry;
     if (!channelId || entry.state !== PAYMENT_CHANNEL_STATES.OPEN) continue;
-    const expectedAtomic = options.expected(entry.requestDigest) ?? null;
+    const expectedAtomic = fixed.expected(entry.requestDigest) ?? null;
     const base = {
       requestDigest: entry.requestDigest,
       channelId,
       expectedAtomic,
     };
+    const networkBlock = networkRecoveryBlock(entry, fixed.network);
+    if (networkBlock) {
+      const open = {
+        ...base,
+        outcome: RECONCILE_OUTCOMES.OPEN,
+        ...NOTHING,
+        networkBlock,
+      };
+      await fixed.report(open);
+      results.push(open);
+      continue;
+    }
     const chain = await shown({ ...entry, channelId });
     if (chain === 'open') {
       const open = { ...base, outcome: RECONCILE_OUTCOMES.OPEN, ...NOTHING };
-      await options.report(open);
+      await fixed.report(open);
       results.push(open);
       continue;
     }
@@ -153,8 +187,8 @@ export async function reconcileUptoBuyer(
           ? RECONCILE_OUTCOMES.NEVER_OPENED
           : outcomeOf(expectedAtomic, charged),
     };
-    await options.report(result);
-    await options.journal.put({
+    await fixed.report(result);
+    await fixed.journal.put({
       ...rest,
       channelId,
       state: PAYMENT_CHANNEL_STATES.SETTLED,

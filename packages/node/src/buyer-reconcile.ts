@@ -33,7 +33,8 @@ export function buyerChainReconcile(
   expected: UptoReconcileOptions['expected'],
   report: UptoReconcileOptions['report'],
 ) => Promise<UptoReconcileResult[]> {
-  return async (role, expected, report) => {
+  return async (inputRole, expected, report) => {
+    const role = { ...inputRole };
     if (role.role !== P2P_ROLES.BUYER)
       throw new NodeError(NODE_ERROR_CODES.BUYER_PAYMENT_KEY_INVALID);
     const served = await genesis(role.rpcUrl).catch(() => undefined);

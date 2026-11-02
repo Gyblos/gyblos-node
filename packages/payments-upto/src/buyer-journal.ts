@@ -199,7 +199,10 @@ function checked(
 }
 
 // The whole document, or a refusal: another version, an unknown field or a malformed entry.
-function parseJournal(source: string): Map<string, UptoJournalEntry> {
+function parseJournal(source: string): {
+  entries: Map<string, UptoJournalEntry>;
+  version: number;
+} {
   let parsed: unknown;
   try {
     parsed = JSON.parse(source);
@@ -227,7 +230,7 @@ function parseJournal(source: string): Map<string, UptoJournalEntry> {
       continue;
     entries.set(parsedEntry.requestDigest, parsedEntry);
   }
-  return entries;
+  return { entries, version };
 }
 
 function serialize(entries: Map<string, UptoJournalEntry>): string {
@@ -258,6 +261,35 @@ async function guarded<T>(run: () => Promise<T>): Promise<T> {
   }
 }
 
+// Settled entries past retention and unsigned entries past their terms are dropped.
+function prune(entries: Map<string, UptoJournalEntry>, at: number) {
+  const cutoff = at - BUYER_JOURNAL.settledRetentionMs;
+  for (const [digest, held] of entries)
+    if (
+      (held.state === PAYMENT_CHANNEL_STATES.SETTLED &&
+        held.updatedAt <= cutoff) ||
+      (held.channelId === null && held.expiresAt <= at)
+    )
+      entries.delete(digest);
+}
+
+// Keep an older file readable while it contains an unresolved signed open with no network provenance.
+function checkLegacyWrite(loaded: {
+  entries: Map<string, UptoJournalEntry>;
+  version: number;
+}): void {
+  if (
+    loaded.version !== BUYER_JOURNAL.version &&
+    [...loaded.entries.values()].some(
+      (entry) =>
+        entry.channelId &&
+        entry.state === PAYMENT_CHANNEL_STATES.OPEN &&
+        !entry.policy?.network,
+    )
+  )
+    unavailable();
+}
+
 export async function openUptoBuyerJournal(options: {
   paths: UptoLedgerPaths;
   now: () => number;
@@ -276,25 +308,21 @@ export async function openUptoBuyerJournal(options: {
   const load = () =>
     guarded(async () => {
       const source = await readPrivateFile(paths.state, BUYER_JOURNAL.maxBytes);
-      return source === undefined ? new Map() : parseJournal(source);
+      return source === undefined
+        ? {
+            entries: new Map<string, UptoJournalEntry>(),
+            version: BUYER_JOURNAL.version,
+          }
+        : parseJournal(source);
     });
-  // Settled entries past retention and unsigned entries past their terms are dropped.
-  function prune(entries: Map<string, UptoJournalEntry>, at: number) {
-    const cutoff = at - BUYER_JOURNAL.settledRetentionMs;
-    for (const [digest, held] of entries)
-      if (
-        (held.state === PAYMENT_CHANNEL_STATES.SETTLED &&
-          held.updatedAt <= cutoff) ||
-        (held.channelId === null && held.expiresAt <= at)
-      )
-        entries.delete(digest);
-  }
   function mutate(change: (entries: Map<string, UptoJournalEntry>) => void) {
     if (closing) return guarded(async () => unavailable());
     const run = queue.then(() =>
       guarded(async () => {
         await lock.verify();
-        const entries = await load();
+        const loaded = await load();
+        const { entries } = loaded;
+        checkLegacyWrite(loaded);
         prune(entries, now());
         change(entries);
         const source = serialize(entries);
@@ -326,10 +354,10 @@ export async function openUptoBuyerJournal(options: {
       entries.delete(requestDigest);
     });
   return {
-    get: async (requestDigest) => (await load()).get(requestDigest),
+    get: async (requestDigest) => (await load()).entries.get(requestDigest),
     put,
     remove,
-    list: async () => [...(await load()).values()],
+    list: async () => [...(await load()).entries.values()],
     // Refuses new writes at once, lets queued ones finish, then releases the lock.
     close() {
       closing ??= guarded(() => queue.then(() => lock.release()));
