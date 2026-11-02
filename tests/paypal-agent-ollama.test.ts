@@ -101,6 +101,7 @@ void test('an explicitly selected local agent model is used and verified', async
   const chosen = 'synthetic-tool-model';
   let digest = 'a'.repeat(64);
   const fetcher: typeof fetch = async (url, init) => {
+    if (String(url).endsWith('/api/version')) return Response.json({ version: '0.40.0' });
     if (String(url).endsWith('/api/tags'))
       return Response.json({ models: [{ name: chosen, digest, capabilities: ['tools'] }] });
     assert.equal(typeof init?.body, 'string');
@@ -187,4 +188,28 @@ void test('model verification rejects an Ollama version that can ignore context 
   await assert.rejects(engine.describe());
   version = '0.12.10';
   assert.equal((await engine.describe()).name, MODEL.name);
+});
+
+void test('unsupported tool schemas are rejected before contacting Ollama', async () => {
+  let calls = 0;
+  const fetcher: typeof fetch = async () => { calls += 1; return Response.json({}); };
+  const engine = createOllamaAgent('http://127.0.0.1:11434/', fetcher);
+  assert.throws(() => engine.validate({
+    ...request,
+    tools: [{ type: 'function', function: { name: 'read_file', parameters: {
+      type: 'object', properties: { path: { type: 'string', pattern: 'secret' } },
+    } } }],
+  }));
+  assert.equal(calls, 0);
+});
+
+void test('a tool call truncated by the model is never returned for execution', async () => {
+  const fetcher: typeof fetch = async () => Response.json({
+    model: MODEL.name, created_at: '2026-01-01T00:00:00Z', done: true,
+    done_reason: 'length', message: { role: 'assistant', content: '', tool_calls: [
+      { function: { name: 'read_file', arguments: {} } },
+    ] }, prompt_eval_count: 2, eval_count: 3,
+  });
+  const engine = createOllamaAgent('http://127.0.0.1:11434/', fetcher);
+  await assert.rejects(engine.generate(request));
 });
