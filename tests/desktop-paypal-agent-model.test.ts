@@ -3,6 +3,8 @@ import { test } from 'node:test';
 
 import {
   opencodeConfig,
+  paypalAgentStatusUnavailable,
+  PAYPAL_AGENT_ACTION,
   parsePaypalAgentResult,
   PAYPAL_AGENT_USAGE_STATE,
   retainPaypalAgentStatus,
@@ -48,6 +50,13 @@ void test('OpenCode configuration uses an environment variable instead of embedd
     tool_call: true,
     limit: { context: 8192, output: 512 },
   });
+});
+
+void test('a confirmed disconnect clears an older stalled status warning', () => {
+  const disconnected = { connection: null, error: null };
+  assert.equal(paypalAgentStatusUnavailable(PAYPAL_AGENT_ACTION.DISCONNECT, disconnected, true), false);
+  assert.equal(paypalAgentStatusUnavailable(PAYPAL_AGENT_ACTION.CONNECT, disconnected, true), true);
+  assert.equal(paypalAgentStatusUnavailable(PAYPAL_AGENT_ACTION.DISCONNECT, undefined, true), true);
 });
 
 void test('a failed status check preserves an existing connection until status is known', () => {
