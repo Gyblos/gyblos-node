@@ -190,6 +190,28 @@ void test('a restarted session cannot silently bind a different agent model', as
   assert.deepEqual(f.calls, ['create', 'authorize', 'void']);
 });
 
+void test('the connection distinguishes a missing agent model from a restored session', async () => {
+  const f = fixture();
+  const desktop = createDesktopPaypalSession(await createPaypalSession(f), async () => {}, {
+    checkEngine: async () => {},
+    checkAgentEngine: async () => { throw new Error('synthetic unavailable'); },
+  });
+  await desktop.create();
+  await desktop.approve();
+  await assert.rejects(desktop.prepareAgent(), (error: unknown) => {
+    assert.ok(error && typeof error === 'object' && 'code' in error);
+    assert.equal(error.code, 'model_unavailable');
+    return true;
+  });
+  const restored = createDesktopPaypalSession(await createPaypalSession(f), async () => {});
+  await assert.rejects(restored.prepareAgent(), (error: unknown) => {
+    assert.ok(error && typeof error === 'object' && 'code' in error);
+    assert.equal(error.code, 'new_session_required');
+    return true;
+  });
+  await restored.finish();
+});
+
 void test('an unacknowledged response blocks another message and settlement', async () => {
   const { f, desktop } = await setup();
   await desktop.create();
