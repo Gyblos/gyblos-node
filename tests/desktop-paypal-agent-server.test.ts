@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { request as httpRequest } from 'node:http';
+import { createConnection } from 'node:net';
 import { test } from 'node:test';
 
 import { startDesktopPaypalAgent } from '@gyblos/desktop/paypal-agent-server';
@@ -258,5 +259,26 @@ void test('retired access closes an incomplete request instead of delaying recon
     await desktop.finish();
   } finally {
     request.destroy();
+  }
+});
+
+void test('shutdown closes a socket that never completes its HTTP headers', async () => {
+  const f = fixture();
+  const desktop = createDesktopPaypalSession(await createPaypalSession(f), async () => {});
+  await desktop.create();
+  await desktop.approve();
+  const endpoint = await startDesktopPaypalAgent(desktop, 'synthetic-model');
+  const address = new URL(endpoint.url);
+  const socket = createConnection({ host: '127.0.0.1', port: Number(address.port) });
+  await new Promise<void>((resolve, reject) => { socket.once('connect', resolve); socket.once('error', reject); });
+  socket.write('POST /v1/chat/completions HTTP/1.1\r\nHost: 127.0.0.1\r\n');
+  try {
+    await Promise.race([
+      endpoint.close(),
+      new Promise<never>((_resolve, reject) => setTimeout(() => reject(new Error('incomplete headers blocked shutdown')), 1000)),
+    ]);
+    await desktop.finish();
+  } finally {
+    socket.destroy();
   }
 });
