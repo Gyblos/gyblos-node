@@ -22,6 +22,7 @@ import type { RecountTokenizer } from '@gyblos/protocol/engine';
 import { PaymentError } from '@gyblos/protocol/payment';
 import { bindEndpoint } from '@gyblos/transport-iroh/endpoint';
 
+import { ownedChat } from './chat-owned';
 import {
   FREE_BUYER_STARTUP,
   PAID_BUYER,
@@ -195,6 +196,13 @@ export async function startPaidBuyer(
     );
     return {
       url: host.url,
+      chat: ownedChat(
+        prepared.config.request.selection.modelId,
+        prepared.config.request.maxTokens,
+        prepared.config.request.maxAtomic,
+        host.url,
+        token,
+      ),
       close: () => closePaidResources(chain, bound, host, dependencies.idle),
     };
   } catch (error) {

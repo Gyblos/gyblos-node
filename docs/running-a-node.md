@@ -508,20 +508,20 @@ operators should use current signed v2 quotes rather than that old file.
 
 ### Terminal chat
 
-After configuring the buyer and starting `pnpm buyer` in another terminal, run
-`pnpm buyer:chat`. It uses the same local endpoint and existing selection, shows
-the configured model and per-request maximum deposit, and streams a response.
-Each line is one independent user message; the terminal does not send history.
-Enter `/exit` or press Ctrl-C to stop. The CLI does not choose or display a
-seller independently of the buyer, and does not write conversations to files.
+After configuring the buyer, run `pnpm buyer:chat`. It starts and owns a local
+buyer endpoint on an ephemeral port, uses the startup selection, shows the
+configured model and per-request maximum deposit, and streams a response. Each
+line is one independent user message; the terminal does not send history. Enter
+`/exit` or press Ctrl-C to stop. The CLI does not choose or display a seller
+independently of the buyer, and does not write conversations to files.
 
-For paid mode the buyer must already be running: the CLI reads its existing
-private bearer token without creating or printing it. Amounts are atomic units
-of the configured devnet test token, not USDC. The CLI prints usage and the
-payment verdict when available. If a request fails after it may have been sent,
-or the payment is not confirmed, it stops without retrying; use the buyer's
-reconciliation procedure before another paid request. A completed streamed
-fragment is provisional until the final result arrives.
+In paid mode the owned buyer manages its private bearer token without printing
+it. Another buyer holding the same journal must be stopped before starting paid
+chat. Amounts are atomic units of the configured devnet test token, not USDC.
+The CLI prints usage and the payment verdict when available. If a request fails
+after it may have been sent, or the payment is not confirmed, it stops without
+retrying; use the buyer's reconciliation procedure before another paid request.
+A completed streamed fragment is provisional until the final result arrives.
 
 `pnpm buyer:free` starts a separate loopback endpoint on the buyer proxy port
 (default `127.0.0.1:4031`). Stop `buyer:start` first; both commands use that

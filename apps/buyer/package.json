@@ -6,6 +6,7 @@
   "exports": {
     "./chat-cli-turn": "./src/chat-cli-turn.ts",
     "./chat-cli": "./src/chat-cli.ts",
+    "./chat-owned": "./src/chat-owned.ts",
     "./buyer": "./src/buyer.ts",
     "./buyer-main": "./src/buyer-main.ts",
     "./paid-execution": "./src/paid-execution.ts",

@@ -2,8 +2,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { chatSession } from '@gyblos/buyer/chat-cli';
+import { chatSession, runOwnedChat } from '@gyblos/buyer/chat-cli';
 import { chatTurn, type ChatTurnOptions } from '@gyblos/buyer/chat-cli-turn';
+import { ownedChat } from '@gyblos/buyer/chat-owned';
 import { startFreeBuyerHttp } from '@gyblos/buyer/free-http';
 import { ENGINE_DONE_REASONS } from '@gyblos/protocol/constants';
 
@@ -30,7 +31,7 @@ const setup = () => {
     model: 'synthetic',
     maxTokens: 8,
     prompt: 'example',
-    token: 'synthetic',
+    paid: true,
     write: (text) => output.push(text),
   };
   return { options, output };
@@ -43,10 +44,7 @@ void test('streams one answer and reports usage and paid settlement', async () =
     calls++;
     assert.equal(String(url), 'http://127.0.0.1:4031/v1/chat/completions');
     assert.equal(init?.redirect, 'error');
-    assert.equal(
-      new Headers(init?.headers).get('authorization'),
-      'Bearer synthetic',
-    );
+    assert.equal(new Headers(init?.headers).get('authorization'), null);
     assert.deepEqual(JSON.parse(String(init?.body)).messages, [
       { role: 'user', content: 'example' },
     ]);
@@ -108,6 +106,95 @@ void test('a remote failure or cancelled request ends without retry or revealing
   assert.equal(output.join('').includes('secret'), false);
 });
 
+void test('preserves typed remote error and settlement without revealing arbitrary error text', async () => {
+  const { options, output } = setup();
+  const detail = {
+    error: {
+      code: 'FREE_EXECUTION_SELLER_CANNOT_CONTINUE',
+      message: 'secret',
+      gyblos_payment: {
+        verdict: 'settled',
+        chargedAtomic: '5',
+        refundedAtomic: '7',
+      },
+    },
+  };
+  const request: typeof fetch = async () =>
+    stream(`data: ${JSON.stringify(detail)}\n\n`);
+  const result = await chatTurn(options, request);
+  assert.equal(result.status, 'uncertain');
+  assert.equal(result.code, 'FREE_EXECUTION_SELLER_CANNOT_CONTINUE');
+  assert.deepEqual(result.payment, {
+    verdict: 'settled',
+    charged: '5',
+    refunded: '7',
+  });
+  assert.equal(output.join('').includes('secret'), false);
+});
+
+void test('preserves a bounded JSON error payment without echoing remote text', async () => {
+  const { options, output } = setup();
+  const body = {
+    error: {
+      code: 'PAID_BUYER_UNAUTHORIZED',
+      message: 'private',
+      gyblos_payment: {
+        verdict: 'unverified',
+        chargedAtomic: null,
+        refundedAtomic: null,
+      },
+    },
+  };
+  const request: typeof fetch = async () =>
+    new Response(JSON.stringify(body), {
+      status: 401,
+      headers: { 'content-type': 'application/json' },
+    });
+  const result = await chatTurn(options, request);
+  assert.equal(result.code, 'PAID_BUYER_UNAUTHORIZED');
+  assert.equal(result.payment?.verdict, 'unverified');
+  assert.equal(output.join('').includes('private'), false);
+});
+
+void test('decodes fragmented streaming events and does not retry after cancellation', async () => {
+  const { options, output } = setup();
+  const bytes = new TextEncoder().encode(
+    `data: ${delta}\n\ndata: ${terminal}\n\ndata: [DONE]\n\n`,
+  );
+  const request: typeof fetch = async () =>
+    new Response(
+      new ReadableStream({
+        start(controller) {
+          for (const byte of bytes) controller.enqueue(Uint8Array.of(byte));
+          controller.close();
+        },
+      }),
+      { headers: { 'content-type': 'text/event-stream' } },
+    );
+  assert.equal((await chatTurn(options, request)).status, 'complete');
+  assert.equal(output.join(''), 'Hello');
+  const abort = new AbortController();
+  options.signal = abort.signal;
+  let calls = 0;
+  const cancelled: typeof fetch = async (_url, init) => {
+    calls++;
+    return new Response(
+      new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode(`data: ${delta}\n\n`));
+          init?.signal?.addEventListener('abort', () =>
+            controller.error(new Error('aborted')),
+          );
+          abort.abort();
+        },
+      }),
+      { headers: { 'content-type': 'text/event-stream' } },
+    );
+  };
+  assert.equal((await chatTurn(options, cancelled)).status, 'uncertain');
+  assert.equal(calls, 1);
+});
+
 void test('session stops immediately after an uncertain result and asks for reconciliation', async () => {
   const output: string[] = [];
   let reads = 0;
@@ -116,7 +203,6 @@ void test('session stops immediately after an uncertain result and asks for reco
     model: 'synthetic',
     maxTokens: 8,
     maxAtomic: '100',
-    token: 'synthetic',
     read: async () => {
       reads++;
       return 'test question';
@@ -149,6 +235,35 @@ void test('a pre-aborted request never sends a prompt', async () => {
   assert.equal(calls, 0);
 });
 
+void test('owned buyer uses its actual startup budget and closes after the session', async () => {
+  const output: string[] = [];
+  let closed = false;
+  let requestedPort: number | undefined;
+  await runOwnedChat(
+    async (options) => {
+      requestedPort = options.port;
+      return {
+        chat: {
+          model: 'actual-model',
+          maxTokens: 8,
+          maxAtomic: '500',
+          request: async () =>
+            stream(`data: ${delta}\n\ndata: ${terminal}\n\ndata: [DONE]\n\n`),
+        },
+        close: async () => {
+          closed = true;
+        },
+      };
+    },
+    async () => '/exit',
+    (line) => output.push(line),
+  );
+  assert.equal(requestedPort, 0);
+  assert.match(output.join(''), /actual-model/);
+  assert.match(output.join(''), /500/);
+  assert.equal(closed, true);
+});
+
 void test('streams from the real local buyer HTTP handler with a fake engine', async () => {
   const host = await startFreeBuyerHttp(
     async () => ({
@@ -174,12 +289,61 @@ void test('streams from the real local buyer HTTP handler with a fake engine', a
   );
   try {
     const { options, output } = setup();
-    options.token = undefined;
+    options.paid = false;
     const request: typeof fetch = async (_url, init) => fetch(host.url, init);
     const result = await chatTurn(options, request);
     assert.equal(result.status, 'complete');
     assert.deepEqual(result.usage, { input: 1, output: 2 });
     assert.equal(output.join(''), 'local');
+  } finally {
+    await host.close();
+  }
+});
+
+void test('owned paid connection sends its token only to the endpoint it started', async () => {
+  const host = await startFreeBuyerHttp(
+    async () => ({
+      text: 'x',
+      finishReason: ENGINE_DONE_REASONS.STOP,
+      usage: { inputTokens: 1, outputTokens: 1 },
+    }),
+    {
+      selection: { modelId: 'synthetic', variant: null, quantization: null },
+      maxTokens: 8,
+    },
+    { port: 0, token: 'private-synthetic-bearer' },
+  );
+  try {
+    const connection = ownedChat(
+      'synthetic',
+      8,
+      '100',
+      host.url,
+      'private-synthetic-bearer',
+    );
+    const result = await connection.request('http://example.invalid/', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        model: 'synthetic',
+        messages: [{ role: 'user', content: 'test' }],
+      }),
+    });
+    assert.equal(result.status, 200);
+    assert.equal(
+      JSON.stringify(connection).includes('private-synthetic-bearer'),
+      false,
+    );
+    assert.equal(Object.hasOwn(connection, 'token'), false);
+    assert.throws(() =>
+      ownedChat(
+        'model',
+        8,
+        '100',
+        'https://example.invalid/v1/chat/completions',
+        'secret',
+      ),
+    );
   } finally {
     await host.close();
   }

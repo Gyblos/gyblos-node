@@ -191,6 +191,16 @@ void test('paid startup names each refusal and answers in paid mode once started
     const host = await startPaidBuyer(base);
     let token = '';
     try {
+      assert.equal(host.chat.maxAtomic, '1000');
+      await writeFile(
+        join(buyer, 'selection.json'),
+        JSON.stringify({
+          ...SELECTION,
+          request: { ...SELECTION.request, maxAtomic: '1' },
+        }),
+      );
+      assert.equal(host.chat.maxAtomic, '1000');
+      await writeFile(join(buyer, 'selection.json'), JSON.stringify(SELECTION));
       // The first paid start creates a private bearer token in the buyer home.
       token = await readFile(tokenFile, 'utf8');
       secrets.push(token);

@@ -1,10 +1,16 @@
 // Performs one bounded interactive request to the local buyer, never retries or follows redirects.
 import { LOCALHOST, PORTS, ROUTES, UNITS } from '@gyblos/config';
-import { FREE_CHAT_ROLES } from '@gyblos/protocol/constants';
+import {
+  FREE_CHAT_ROLES,
+  FREE_EXECUTION_CODES,
+} from '@gyblos/protocol/constants';
+import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 
 import {
   FREE_BUYER,
+  FREE_BUYER_CODES,
   PAID_BUYER,
+  PAID_BUYER_CODES,
   PAID_BUYER_HTTP_MS,
   PAID_VERDICTS,
 } from './constants';
@@ -13,12 +19,13 @@ export interface ChatTurnOptions {
   model: string;
   maxTokens: number;
   prompt: string;
-  token?: string;
+  paid?: boolean;
   write: (text: string) => void;
   signal?: AbortSignal;
 }
 export interface ChatTurnResult {
   status: 'complete' | 'uncertain' | 'rejected';
+  code?: string;
   usage?: { input: number; output: number };
   payment?: {
     verdict: string;
@@ -55,6 +62,77 @@ function paymentResult(payment: Record<string, unknown>) {
   };
 }
 
+function errorResult(value: unknown): ChatTurnResult {
+  const error = record(record(value)?.error);
+  const result: ChatTurnResult = { status: 'uncertain' };
+  if (!error) return result;
+  const codes = [
+    ...Object.values(FREE_BUYER_CODES),
+    ...Object.values(PAID_BUYER_CODES),
+    ...Object.values(FREE_EXECUTION_CODES),
+    ...Object.values(PAID_EXECUTION_CODES),
+  ];
+  if (
+    typeof error.code === 'string' &&
+    codes.some((code) => code === error.code)
+  )
+    result.code = error.code;
+  const payment = record(error[PAID_BUYER.paymentField]);
+  if (payment) result.payment = paymentResult(payment);
+  return result;
+}
+
+function completeResult(
+  choice: Record<string, unknown>,
+  body: Record<string, unknown>,
+  paid: boolean | undefined,
+): ChatTurnResult {
+  const usage = record(body.usage);
+  if (
+    typeof choice.finish_reason !== 'string' ||
+    !usage ||
+    !count(usage.prompt_tokens) ||
+    !count(usage.completion_tokens)
+  )
+    throw new Error('usage');
+  const terminal: ChatTurnResult = {
+    status: 'complete',
+    usage: { input: usage.prompt_tokens, output: usage.completion_tokens },
+  };
+  const payment = record(body[PAID_BUYER.paymentField]);
+  if (paid && !payment) throw new Error('payment');
+  if (payment) {
+    terminal.payment = paymentResult(payment);
+    if (payment.verdict !== PAID_VERDICTS.SETTLED)
+      terminal.status = 'uncertain';
+  }
+  return terminal;
+}
+
+async function readError(
+  body: ReadableStream<Uint8Array>,
+): Promise<ChatTurnResult> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder('utf-8', { fatal: true });
+  let text = '';
+  let size = 0;
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      size += chunk.value.byteLength;
+      if (size > BOUNDS.responseBytes) throw new Error('bound');
+      text += decoder.decode(chunk.value, { stream: true });
+    }
+    text += decoder.decode();
+    const parsed: unknown = JSON.parse(text);
+    return errorResult(parsed);
+  } finally {
+    await reader.cancel().catch(() => undefined);
+    reader.releaseLock();
+  }
+}
+
 export async function chatTurn(
   options: ChatTurnOptions,
   request: typeof fetch = fetch,
@@ -78,9 +156,6 @@ export async function chatTurn(
         signal,
         headers: {
           'content-type': 'application/json',
-          ...(options.token
-            ? { authorization: `${PAID_BUYER.authScheme} ${options.token}` }
-            : {}),
         },
         body: JSON.stringify({
           model: options.model,
@@ -90,9 +165,9 @@ export async function chatTurn(
         }),
       },
     );
+    if (!response.body) return { status: 'uncertain' };
+    if (!response.ok) return await readError(response.body);
     if (
-      !response.ok ||
-      !response.body ||
       !response.headers
         .get('content-type')
         ?.startsWith(FREE_BUYER.streamContentType)
@@ -135,12 +210,18 @@ async function readStream(
           const body = record(value);
           if (
             !body ||
-            body.error ||
             terminal ||
             !Array.isArray(body.choices) ||
             body.choices.length !== 1
-          )
+          ) {
+            if (body?.error && !terminal) {
+              terminal = errorResult(body);
+              done = true;
+              end = pending.indexOf('\n\n');
+              continue;
+            }
             throw new Error('event');
+          }
           const choice = record(body.choices[0]);
           const delta = record(choice?.delta);
           if (!choice || !delta) throw new Error('choice');
@@ -149,28 +230,7 @@ async function readStream(
               delta.content.replace(/[\x00-\x08\x0b-\x1f\x7f-\x9f]/g, ''),
             );
           if (choice.finish_reason !== null) {
-            const usage = record(body.usage);
-            if (
-              typeof choice.finish_reason !== 'string' ||
-              !usage ||
-              !count(usage.prompt_tokens) ||
-              !count(usage.completion_tokens)
-            )
-              throw new Error('usage');
-            terminal = {
-              status: 'complete',
-              usage: {
-                input: usage.prompt_tokens,
-                output: usage.completion_tokens,
-              },
-            };
-            const payment = record(body[PAID_BUYER.paymentField]);
-            if (options.token && !payment) throw new Error('payment');
-            if (payment) {
-              terminal.payment = paymentResult(payment);
-              if (payment.verdict !== PAID_VERDICTS.SETTLED)
-                terminal.status = 'uncertain';
-            }
+            terminal = completeResult(choice, body, options.paid);
           }
         }
         end = pending.indexOf('\n\n');
