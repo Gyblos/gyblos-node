@@ -580,6 +580,15 @@ void test('equivalent Claude and OpenAI requests cannot be charged twice', async
     }),
   );
   assert.equal(equivalent.status, 400);
+  const parallelRetry = await gateway.handle(
+    post('/v1/chat/completions', {
+      model,
+      max_tokens: 128,
+      messages: [{ role: 'user', content: 'synthetic request' }],
+      parallel_tool_calls: true,
+    }),
+  );
+  assert.equal(parallelRetry.status, 400);
   const repeated = await gateway.handle(
     post('/v1/chat/completions', {
       model,
@@ -595,4 +604,52 @@ void test('equivalent Claude and OpenAI requests cannot be charged twice', async
     'agent-generate',
     'capture:10',
   ]);
+});
+
+void test('a prior Chat Completions request with parallel tools blocks an equivalent Responses retry', async () => {
+  const f = paymentFixture();
+  const agentEngine = {
+    model,
+    async generate() {
+      f.calls.push('agent-generate');
+      return {
+        id: 'synthetic-answer',
+        object: 'chat.completion',
+        created: 0,
+        model,
+        choices: [{ index: 0, message: { role: 'assistant', content: 'synthetic answer' }, finish_reason: 'stop' }],
+        usage: { prompt_tokens: 2, completion_tokens: 3, total_tokens: 5 },
+      };
+    },
+  };
+  const session = await createPaypalSession({ ...f, agentEngine });
+  const order = await session.create();
+  await session.approve(order.orderId);
+  let count = 0;
+  const gateway = createPaypalAgentGateway({
+    origin,
+    key,
+    model,
+    service: {
+      sendAgent(input, signal, idempotencyKey) {
+        count += 1;
+        return session.agentMessage(order.orderId, input, `MESSAGE${count}`, signal, idempotencyKey);
+      },
+    },
+  });
+  const first = await gateway.handle(post('/v1/chat/completions', {
+    model,
+    max_tokens: 128,
+    messages: [{ role: 'user', content: 'synthetic request' }],
+    parallel_tool_calls: true,
+  }));
+  assert.equal(first.status, 200);
+  const retry = await gateway.handle(post('/v1/responses', {
+    model,
+    max_output_tokens: 128,
+    input: [{ role: 'user', content: 'synthetic request' }],
+  }));
+  assert.equal(retry.status, 400);
+  await session.finish(order.orderId);
+  assert.deepEqual(f.calls, ['create', 'authorize', 'agent-generate', 'capture:10']);
 });
