@@ -403,3 +403,32 @@ void test('a new tool call cannot reuse an ID from previous history', async () =
     { role: 'tool', tool_call_id: 'call_1', content: 'synthetic' },
   ] }));
 });
+
+void test('OpenCode read schemas retain numeric limits when validated locally', async () => {
+  let sent: unknown;
+  const fetcher: typeof fetch = async (_url, init) => {
+    if (typeof init?.body !== 'string') throw new Error('Missing body');
+    sent = JSON.parse(init.body);
+    return Response.json({
+      model: MODEL.name, created_at: '2026-01-01T00:00:00Z', done: true,
+      done_reason: 'stop', message: { role: 'assistant', content: '', tool_calls: [
+        { function: { name: 'read_file', arguments: { offset: -1 } } },
+      ] }, prompt_eval_count: 2, eval_count: 3,
+    });
+  };
+  const engine = createOllamaAgent('http://127.0.0.1:11434/', fetcher);
+  const input = { ...request, tools: [{ type: 'function', function: {
+    name: 'read_file', parameters: {
+      $schema: 'https://json-schema.org/draft/2020-12/schema', type: 'object',
+      properties: { offset: { type: 'integer', minimum: 0, maximum: 100 } },
+    },
+  } }] };
+  assert.doesNotThrow(() => engine.validate(input));
+  await assert.rejects(engine.generate(input));
+  assert.ok(sent && typeof sent === 'object' && 'tools' in sent && Array.isArray(sent.tools));
+  const schema = sent.tools[0].function.parameters;
+  assert.equal(schema.$schema, undefined);
+  assert.equal(schema.properties.offset.minimum, undefined);
+  assert.match(schema.properties.offset.description, /0/);
+  assert.match(schema.properties.offset.description, /100/);
+});
