@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./artifacts": "./src/artifacts.ts",
+    "./agent": "./src/agent.ts",
     "./constants": "./src/constants.ts",
     "./engine": "./src/engine.ts",
     "./model": "./src/model.ts"
