@@ -8,7 +8,7 @@ import {
 } from '@solana/kit';
 import { UPTO_TOKEN_ACCOUNT } from 'x402-upto-metered';
 
-import { TOKEN_PROGRAM_ADDRESS } from '@gyblos/config';
+import { DEVNET_GENESIS, TOKEN_PROGRAM_ADDRESS } from '@gyblos/config';
 import type { UptoSellerPaymentsOptions } from '@gyblos/payments-upto';
 
 // An initialized token account's data (165 bytes).
@@ -16,9 +16,14 @@ const bytes = new Uint8Array(165);
 bytes[UPTO_TOKEN_ACCOUNT.stateOffset] = UPTO_TOKEN_ACCOUNT.initialized;
 const INITIALIZED_TOKEN_ACCOUNT = Buffer.from(bytes).toString('base64');
 
-export function offline(chain: { missing?: boolean; refuse?: boolean } = {}) {
+export function offline(
+  chain: { missing?: boolean; refuse?: boolean; genesis?: string } = {},
+) {
   const sent: string[] = [];
   const rpc: NonNullable<UptoSellerPaymentsOptions['rpc']> = {
+    getGenesisHash: () => ({
+      send: async () => chain.genesis ?? DEVNET_GENESIS,
+    }),
     getAccountInfo: () => ({ send: async () => ({ value: null }) }),
     getMultipleAccounts: (accounts: readonly Address[]) => ({
       send: async () => ({

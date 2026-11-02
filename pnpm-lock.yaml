@@ -518,6 +518,9 @@ importers:
       '@gyblos/config':
         specifier: workspace:*
         version: link:../config
+      '@gyblos/core':
+        specifier: workspace:*
+        version: link:../core
       '@gyblos/protocol':
         specifier: workspace:*
         version: link:../protocol
