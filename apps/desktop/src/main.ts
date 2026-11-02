@@ -9,6 +9,7 @@ import { app, BrowserWindow, ipcMain } from 'electron';
 import { registerNetworkCatalog } from './catalog/host';
 import { DESKTOP, PROBE_STATUS, STARTUP_WINDOW } from './constants';
 import { registerDesktopNode } from './node-host';
+import { createDesktopQuitCoordinator } from './paypal-close-guard';
 import { registerDesktopPaypal } from './paypal-host';
 import { probeInUtility } from './probe-host';
 import { failedProbe, type ProbeResult } from './probe-model';
@@ -84,6 +85,34 @@ async function loadDesktopWindows(
   }
 }
 
+type DesktopServices = {
+  wallet: ReturnType<typeof registerDesktopWallet> | undefined;
+  node: ReturnType<typeof registerDesktopNode> | null;
+  paypal: ReturnType<typeof registerDesktopPaypal> | null;
+};
+
+function registerDesktopQuit(
+  controller: AbortController,
+  services: () => DesktopServices,
+) {
+  app.on(
+    'before-quit',
+    createDesktopQuitCoordinator(
+      (event) => services().paypal?.guard(event) ?? false,
+      async () => {
+        controller.abort();
+        const { wallet, node, paypal } = services();
+        await Promise.allSettled([
+          wallet?.settled() ?? Promise.resolve(),
+          node?.close() ?? Promise.resolve(),
+          paypal?.close() ?? Promise.resolve(),
+        ]);
+      },
+      () => app.quit(),
+    ),
+  );
+}
+
 async function main() {
   const smoke = process.argv.includes(DESKTOP.SMOKE_FLAG);
   app.setName(WALLET.APP_NAME);
@@ -98,13 +127,15 @@ async function main() {
     }
   }
   const controller = new AbortController();
+  let wallet: ReturnType<typeof registerDesktopWallet> | undefined;
+  let node: ReturnType<typeof registerDesktopNode> | null = null;
+  let paypal: ReturnType<typeof registerDesktopPaypal> | null = null;
   const fail = () => {
     process.stdout.write(`${JSON.stringify(failedProbe())}\n`);
     app.exit(1);
   };
   const cancelWatchdog = smoke ? armSmokeWatchdog(fail) : () => {};
-  // Stop window reveals immediately; wallet/backup settlement still owns quit.
-  app.once('before-quit', () => controller.abort());
+  registerDesktopQuit(controller, () => ({ wallet, node, paypal }));
   app.on('quit', () => {
     cancelWatchdog();
     controller.abort();
@@ -121,15 +152,10 @@ async function main() {
   app.dock?.setIcon(join(__dirname, 'renderer', DESKTOP.ICON_FILE));
   const window = createProbeWindow();
   const loading = smoke ? null : createProbeWindow(true);
-  const prepared = registerDesktopWallet(
-    window,
-    walletRoot,
-    smoke,
-    controller.signal,
-  );
+  wallet = registerDesktopWallet(window, walletRoot, smoke, controller.signal);
   if (!smoke) registerNetworkCatalog(window, controller.signal);
-  if (!smoke) registerDesktopPaypal(window);
-  const node = smoke
+  if (!smoke) paypal = registerDesktopPaypal(window);
+  node = smoke
     ? null
     : registerDesktopNode(window, __dirname, controller.signal);
   app.on('second-instance', () => {
@@ -161,7 +187,7 @@ async function main() {
     app.quit();
   });
   await settleDesktopStartup(
-    loadDesktopWindows(window, loading, prepared, controller.signal),
+    loadDesktopWindows(window, loading, wallet.ready, controller.signal),
     () => node?.close() ?? Promise.resolve(),
   );
 }

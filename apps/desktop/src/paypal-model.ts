@@ -74,7 +74,7 @@ function parseStatus(value: unknown): DesktopPaypalStatus | null {
   if (
     !item ||
     Object.keys(item).sort().join(',') !==
-      'expired,limitCents,messageCents,phase,remainingAttempts,spentCents'
+      'approvalLinkAvailable,expired,limitCents,messageCents,phase,remainingAttempts,spentCents'
   )
     return null;
   const phase = [
@@ -83,6 +83,8 @@ function parseStatus(value: unknown): DesktopPaypalStatus | null {
   ].find((entry) => entry === item.phase);
   if (
     !phase ||
+    typeof item.approvalLinkAvailable !== 'boolean' ||
+    (item.approvalLinkAvailable && phase !== PAYPAL_SESSION_PHASE.CREATED) ||
     typeof item.expired !== 'boolean' ||
     typeof item.spentCents !== 'number' ||
     !Number.isSafeInteger(item.spentCents) ||
@@ -96,6 +98,7 @@ function parseStatus(value: unknown): DesktopPaypalStatus | null {
   )
     return null;
   return {
+    approvalLinkAvailable: item.approvalLinkAvailable,
     phase,
     expired: item.expired,
     spentCents: item.spentCents,

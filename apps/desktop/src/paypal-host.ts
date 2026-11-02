@@ -13,7 +13,6 @@ import { createDesktopPaypalHandlers } from './paypal-handlers';
 import { DESKTOP_PAYPAL } from './paypal-model';
 import { createDesktopPaypalRuntime } from './paypal-runtime';
 import { createDesktopPaypalSession } from './paypal-session';
-import { waitForWalletBeforeQuit } from './wallet/lifecycle';
 
 async function startSandbox() {
   const clientId = process.env.PAYPAL_SANDBOX_CLIENT_ID;
@@ -45,7 +44,6 @@ async function startSandbox() {
       (url) => shell.openExternal(url),
       {
         checkEngine: () => opened.engine.describe(),
-        recoverApproval: (orderId) => opened.payment.approvalUrl(orderId),
       },
     );
     return {
@@ -116,8 +114,5 @@ export function registerDesktopPaypal(window: BrowserWindow) {
     handlers.run(event, args),
   );
   window.on('close', guard);
-  const quit = waitForWalletBeforeQuit(runtime.close, () => app.quit());
-  app.on('before-quit', (event) => {
-    if (!guard(event)) quit(event);
-  });
+  return { guard, close: runtime.close };
 }

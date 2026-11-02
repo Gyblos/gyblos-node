@@ -32,6 +32,19 @@ type Snapshot = {
 type Run = (request: PaypalRequest) => Promise<PaypalResult>;
 
 function failure(result: PaypalResult) {
+  if (
+    result.error === PAYPAL_DESKTOP_ERROR.INVALID_PROMPT &&
+    result.status?.expired
+  )
+    return 'The sandbox session has expired. Close it to settle recorded usage.';
+  if (
+    result.error === PAYPAL_DESKTOP_ERROR.INVALID_PROMPT &&
+    result.status &&
+    (result.status.remainingAttempts === 0 ||
+      result.status.spentCents + result.status.messageCents >
+        result.status.limitCents)
+  )
+    return 'The sandbox session limit has been reached. Close it to settle recorded usage.';
   if (result.error === PAYPAL_DESKTOP_ERROR.INVALID_PROMPT)
     return 'Shorten the message or remove reserved model control markers, then try again.';
   if (result.error === PAYPAL_DESKTOP_ERROR.NOT_APPROVED)

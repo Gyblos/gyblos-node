@@ -12,9 +12,12 @@ type PaypalSession = Awaited<ReturnType<typeof createPaypalSession>>;
 export type DesktopPaypalStatus = Omit<
   ReturnType<PaypalSession['status']>,
   'orderId'
->;
+> & { approvalLinkAvailable: boolean };
 
-function visibleStatus(session: PaypalSession): DesktopPaypalStatus {
+function visibleStatus(
+  session: PaypalSession,
+  approvalUrl?: string,
+): DesktopPaypalStatus {
   const {
     phase,
     spentCents,
@@ -24,6 +27,8 @@ function visibleStatus(session: PaypalSession): DesktopPaypalStatus {
     expired,
   } = session.status();
   return {
+    approvalLinkAvailable:
+      phase === PAYPAL_SESSION_PHASE.CREATED && !!approvalUrl,
     phase,
     spentCents,
     limitCents,
@@ -81,7 +86,6 @@ export function createDesktopPaypalSession(
   openExternal: (url: string) => Promise<void>,
   options: {
     checkEngine?: () => Promise<unknown>;
-    recoverApproval?: (orderId: string) => Promise<string>;
   } = {},
 ) {
   let approvalUrl: string | undefined;
@@ -92,21 +96,21 @@ export function createDesktopPaypalSession(
     if (!id) throw new Error('No sandbox order.');
     return id;
   }
+  const status = () => visibleStatus(session, approvalUrl);
   return {
-    status: () => visibleStatus(session),
+    status,
     isCloseBlocked: () => isBusy() || awaitingAcknowledgement,
     create: () =>
       run(async () => {
         await options.checkEngine?.();
         const order = await session.create();
         approvalUrl = order.approvalUrl;
-        return visibleStatus(session);
+        return status();
       }),
     openApproval: () =>
       run(async () => {
         if (session.status().phase !== PAYPAL_SESSION_PHASE.CREATED)
           throw new Error('Sandbox approval link is unavailable.');
-        approvalUrl ??= await options.recoverApproval?.(orderId());
         if (!approvalUrl)
           throw new Error('Sandbox approval link is unavailable.');
         await openExternal(sandboxApproval(approvalUrl));
@@ -115,7 +119,7 @@ export function createDesktopPaypalSession(
       run(async () => {
         await session.approve(orderId());
         approvalUrl = undefined;
-        return visibleStatus(session);
+        return status();
       }),
     send: (prompt: string) =>
       run(async () => {
@@ -133,18 +137,18 @@ export function createDesktopPaypalSession(
       run(async () => {
         await session.acknowledge(orderId(), messageId);
         awaitingAcknowledgement = false;
-        return visibleStatus(session);
+        return status();
       }),
     finish: () =>
       run(async () => {
         await session.finish(orderId());
-        return visibleStatus(session);
+        return status();
       }),
     abandon: () =>
       run(async () => {
         await session.cancel(orderId());
         approvalUrl = undefined;
-        return visibleStatus(session);
+        return status();
       }),
     close,
   };

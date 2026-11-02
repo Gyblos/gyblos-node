@@ -47,7 +47,7 @@ function CreatedActions({ chat, state }: ChatProps) {
   return (
     <>
       <Button
-        disabled={state.busy}
+        disabled={state.busy || !state.status?.approvalLinkAvailable}
         onClick={() => {
           void chat.openApproval();
         }}
@@ -171,6 +171,15 @@ function SessionPanel({ chat, state }: ChatProps) {
       {phase === PAYPAL_SESSION_PHASE.ACTIVE && state.status?.expired && (
         <p>Session expired for new messages. Close it to settle.</p>
       )}
+      {phase === PAYPAL_SESSION_PHASE.CREATED &&
+        !state.status?.approvalLinkAvailable && (
+          <p>
+            The old checkout cannot be reopened safely after restarting. If
+            already approved, start the session; otherwise abandon this order
+            and create a new one. Do not use a checkout tab opened before the
+            restart.
+          </p>
+        )}
       {uncertain(state) && (
         <p>Session needs review. Do not retry payment or remove its record.</p>
       )}
