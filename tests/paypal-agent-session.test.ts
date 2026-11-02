@@ -299,11 +299,17 @@ void test('engine-specific limits are checked before journaling an agent attempt
   const order = await session.create();
   await session.approve(order.orderId);
   const before = f.getState();
-  await assert.rejects(session.agentMessage(order.orderId, {
-    model: 'synthetic-model',
-    messages: [{ role: 'user', content: 'synthetic request' }],
-    max_tokens: 1024,
-  }, 'MESSAGE1'));
+  await assert.rejects(
+    session.agentMessage(
+      order.orderId,
+      {
+        model: 'synthetic-model',
+        messages: [{ role: 'user', content: 'synthetic request' }],
+        max_tokens: 1024,
+      },
+      'MESSAGE1',
+    ),
+  );
   assert.deepEqual(f.getState(), before);
   assert.deepEqual(f.calls, ['create', 'authorize']);
 });

@@ -67,6 +67,7 @@ import {
 } from './ui/Motion';
 import { NetworkCatalogPanel, useNetworkCatalog } from './ui/NetworkCatalog';
 import { NetworkStatus, useLocalNode } from './ui/NetworkStatus';
+import { PaypalAgentConnection } from './ui/PaypalAgentConnection';
 import { PaypalChat } from './ui/PaypalChat';
 import { ResizeHandle } from './ui/ResizeHandle';
 import { SidebarIcon, type SidebarSection } from './ui/SidebarIcon';
@@ -518,36 +519,47 @@ export function DesktopApp() {
               </InfoBar>
             </PagePanel>
           )}
-          {view === UI_VIEW.CONNECT && (
-            <PagePanel>
-              <SectionTitle trailing={<Badge>{apps.length} configured</Badge>}>
-                On this computer
-              </SectionTitle>
-              <p className="connections-description">
-                Choose a tool, model and daily budget. Gyblos handles the
-                connection.
-              </p>
+          {view === UI_VIEW.CONNECT &&
+            paymentMethod === PAYMENT_METHOD.PAYPAL && (
+              <PagePanel>
+                <PaypalAgentConnection />
+              </PagePanel>
+            )}
+          {view === UI_VIEW.CONNECT &&
+            paymentMethod !== PAYMENT_METHOD.PAYPAL && (
+              <PagePanel>
+                <SectionTitle
+                  trailing={<Badge>{apps.length} configured</Badge>}
+                >
+                  On this computer
+                </SectionTitle>
+                <p className="connections-description">
+                  Choose a tool, model and daily budget. Gyblos handles the
+                  connection.
+                </p>
 
-              <ConnectionList
-                connections={apps}
-                models={MODELS}
-                onEdit={(tool) => {
-                  setSelectedApp(tool);
-                  setConnectionOpen(true);
-                }}
-              />
-              <Note>Each application has its own model and daily budget.</Note>
-              <InfoBar leading={<PlugsConnected size={16} />}>
-                <div>
-                  <strong>Local gateway</strong>
-                  <p className="modal-note">
-                    Your tools use Gyblos while this app is open. Server and
-                    remote access are under Advanced in each connection.
-                  </p>
-                </div>
-              </InfoBar>
-            </PagePanel>
-          )}
+                <ConnectionList
+                  connections={apps}
+                  models={MODELS}
+                  onEdit={(tool) => {
+                    setSelectedApp(tool);
+                    setConnectionOpen(true);
+                  }}
+                />
+                <Note>
+                  Each application has its own model and daily budget.
+                </Note>
+                <InfoBar leading={<PlugsConnected size={16} />}>
+                  <div>
+                    <strong>Local gateway</strong>
+                    <p className="modal-note">
+                      Your tools use Gyblos while this app is open. Server and
+                      remote access are under Advanced in each connection.
+                    </p>
+                  </div>
+                </InfoBar>
+              </PagePanel>
+            )}
           {view === UI_VIEW.TOOLS && (
             <PagePanel>
               <ToolConnections

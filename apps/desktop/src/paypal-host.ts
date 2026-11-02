@@ -7,6 +7,10 @@ import { paypalSandboxSettings } from '@gyblos/config/paypal';
 import { createPaypalSession } from '@gyblos/node/paypal-session';
 import { openPaypalSandbox } from '@gyblos/node/paypal-startup';
 
+import { createDesktopPaypalAgentAccess } from './paypal-agent-access';
+import { createDesktopPaypalAgentHandlers } from './paypal-agent-handlers';
+import { DESKTOP_PAYPAL_AGENT } from './paypal-agent-model';
+import { startDesktopPaypalAgent } from './paypal-agent-server';
 import { openDesktopPaypalCallback } from './paypal-callback';
 import { createDesktopPaypalCloseGuard } from './paypal-close-guard';
 import { createDesktopPaypalHandlers } from './paypal-handlers';
@@ -35,6 +39,7 @@ async function startSandbox() {
       stateDirectory,
       returnOrigin: callback.origin,
       ollamaOrigin: settings.ollamaOrigin,
+      agentModel: DESKTOP_PAYPAL_AGENT.MODEL,
       deferEngineCheck: true,
     });
     const model = sandbox.model;
@@ -44,20 +49,33 @@ async function startSandbox() {
       (url) => shell.openExternal(url),
       {
         checkEngine: () => opened.engine.describe(),
+        checkAgentEngine: () => opened.agentEngine.describe(),
+      },
+    );
+    const agentAccess = createDesktopPaypalAgentAccess(
+      service.status,
+      async () => {
+        await service.prepareAgent();
+        return startDesktopPaypalAgent(service, opened.agentEngine.model);
       },
     );
     return {
       model,
+      agentAccess,
       service: {
         ...service,
         async close() {
           try {
-            await service.close();
+            await agentAccess.close();
           } finally {
             try {
-              await opened.close();
+              await service.close();
             } finally {
-              await callback.close();
+              try {
+                await opened.close();
+              } finally {
+                await callback.close();
+              }
             }
           }
         },
@@ -110,8 +128,16 @@ export function registerDesktopPaypal(window: BrowserWindow) {
     mainFrame: () => window.webContents.mainFrame,
     destroyed: () => window.isDestroyed(),
   });
+  const agentHandlers = createDesktopPaypalAgentHandlers(runtime.load, {
+    contents: window.webContents,
+    mainFrame: () => window.webContents.mainFrame,
+    destroyed: () => window.isDestroyed(),
+  });
   ipcMain.handle(DESKTOP_PAYPAL.CHANNEL, (event, ...args: unknown[]) =>
     handlers.run(event, args),
+  );
+  ipcMain.handle(DESKTOP_PAYPAL_AGENT.CHANNEL, (event, ...args: unknown[]) =>
+    agentHandlers.run(event, args),
   );
   window.on('close', guard);
   return { guard, close: runtime.close };

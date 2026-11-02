@@ -26,10 +26,13 @@ export async function openPaypalSandbox(options: {
   stateDirectory: string;
   returnOrigin: string;
   ollamaOrigin: string;
+  agentModel?: string;
   deferEngineCheck?: boolean;
 }) {
   const engine = createOllamaEngine(options.ollamaOrigin);
-  const agentEngine = createOllamaAgent(options.ollamaOrigin);
+  const agentEngine = createOllamaAgent(options.ollamaOrigin, fetch, {
+    model: options.agentModel,
+  });
   if (!options.deferEngineCheck) await engine.describe();
   const payment = createPaypalSandbox(options);
   const journal = await openPaypalJournal(options.stateDirectory);

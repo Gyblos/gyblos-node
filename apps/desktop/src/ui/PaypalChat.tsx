@@ -1,6 +1,6 @@
 // Renders the real local PayPal Sandbox session without preview responses or tools.
 import { ArrowUp } from '@phosphor-icons/react';
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 
 import { PAYPAL_SANDBOX } from '@gyblos/config/constants';
 import {
@@ -294,11 +294,8 @@ export function PaypalChat({ active }: { active: boolean }) {
       ),
   );
   const state = useSyncExternalStore(chat.subscribe, chat.getSnapshot);
-  const initialized = useRef(false);
   useEffect(() => {
-    if (!active || initialized.current) return;
-    initialized.current = true;
-    void chat.refresh();
+    if (active) void chat.refresh();
   }, [active, chat]);
   return (
     <main className="chat-page enhanced-chat paypal-chat">

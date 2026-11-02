@@ -7,6 +7,9 @@
     ".": "./src/index.ts",
     "./constants": "./src/constants.ts",
     "./home": "./src/home.ts",
+    "./hosts": "./src/hosts.ts",
+    "./limits": "./src/limits.ts",
+    "./paths": "./src/paths.ts",
     "./paypal": "./src/paypal.ts",
     "./lock": "./src/lock.ts"
   },

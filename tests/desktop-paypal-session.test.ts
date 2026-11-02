@@ -120,21 +120,38 @@ void test('an agent-ready model can prepare a session while the chat model is un
     model: 'synthetic-model',
     async generate() {
       return {
-        id: 'synthetic', object: 'chat.completion', created: 0, model: 'synthetic-model',
-        choices: [{ index: 0, message: { role: 'assistant', content: 'synthetic answer' }, finish_reason: 'stop' }],
+        id: 'synthetic',
+        object: 'chat.completion',
+        created: 0,
+        model: 'synthetic-model',
+        choices: [
+          {
+            index: 0,
+            message: { role: 'assistant', content: 'synthetic answer' },
+            finish_reason: 'stop',
+          },
+        ],
         usage: { prompt_tokens: 2, completion_tokens: 3, total_tokens: 5 },
       };
     },
   };
-  const desktop = createDesktopPaypalSession(await createPaypalSession({ ...f, agentEngine }), async () => {}, {
-    checkEngine: async () => { throw new Error('chat model unavailable'); },
-    checkAgentEngine: async () => ({ digest: 'synthetic' }),
-  });
+  const desktop = createDesktopPaypalSession(
+    await createPaypalSession({ ...f, agentEngine }),
+    async () => {},
+    {
+      checkEngine: async () => {
+        throw new Error('chat model unavailable');
+      },
+      checkAgentEngine: async () => ({ digest: 'synthetic' }),
+    },
+  );
   await desktop.create();
   await desktop.approve();
   await assert.rejects(desktop.send('synthetic chat'));
   const answer = await desktop.sendAgent({
-    model: 'synthetic-model', messages: [{ role: 'user', content: 'synthetic request' }], max_tokens: 128,
+    model: 'synthetic-model',
+    messages: [{ role: 'user', content: 'synthetic request' }],
+    max_tokens: 128,
   });
   await desktop.acknowledge(answer.messageId);
   assert.equal((await desktop.finish()).spentCents, 10);
@@ -142,17 +159,33 @@ void test('an agent-ready model can prepare a session while the chat model is un
 
 void test('a restarted session cannot silently bind a different agent model', async () => {
   const f = fixture();
-  const agentEngine = { model: 'synthetic-model', async generate() { throw new Error('must not run'); } };
+  const agentEngine = {
+    model: 'synthetic-model',
+    async generate() {
+      throw new Error('must not run');
+    },
+  };
   const dependencies = { ...f, agentEngine };
-  const first = createDesktopPaypalSession(await createPaypalSession(dependencies), async () => {});
+  const first = createDesktopPaypalSession(
+    await createPaypalSession(dependencies),
+    async () => {},
+  );
   await first.create();
   await first.approve();
-  const resumed = createDesktopPaypalSession(await createPaypalSession(dependencies), async () => {}, {
-    checkAgentEngine: async () => ({ digest: 'different' }),
-  });
-  await assert.rejects(resumed.sendAgent({
-    model: 'synthetic-model', messages: [{ role: 'user', content: 'synthetic request' }], max_tokens: 128,
-  }));
+  const resumed = createDesktopPaypalSession(
+    await createPaypalSession(dependencies),
+    async () => {},
+    {
+      checkAgentEngine: async () => ({ digest: 'different' }),
+    },
+  );
+  await assert.rejects(
+    resumed.sendAgent({
+      model: 'synthetic-model',
+      messages: [{ role: 'user', content: 'synthetic request' }],
+      max_tokens: 128,
+    }),
+  );
   assert.equal((await resumed.finish()).phase, 'voided');
   assert.deepEqual(f.calls, ['create', 'authorize', 'void']);
 });

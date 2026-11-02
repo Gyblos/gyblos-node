@@ -81,16 +81,72 @@ function serialOperations() {
   };
 }
 
+type DesktopPaypalSessionOptions = {
+  checkEngine?: () => Promise<unknown>;
+  checkAgentEngine?: () => Promise<unknown>;
+};
+
+async function prepareModels(options: DesktopPaypalSessionOptions) {
+  let chatReady = !options.checkEngine;
+  let agentReady = !options.checkEngine && !options.checkAgentEngine;
+  if (options.checkEngine) {
+    try {
+      await options.checkEngine();
+      chatReady = true;
+    } catch {
+      chatReady = false;
+    }
+  }
+  if (options.checkAgentEngine) {
+    try {
+      await options.checkAgentEngine();
+      agentReady = true;
+    } catch {
+      agentReady = false;
+    }
+  }
+  if (!chatReady && !agentReady)
+    throw new Error('No sandbox model is available.');
+  return agentReady;
+}
+
+async function openApproval(
+  session: PaypalSession,
+  approvalUrl: string | undefined,
+  openExternal: (url: string) => Promise<void>,
+) {
+  if (session.status().phase !== PAYPAL_SESSION_PHASE.CREATED || !approvalUrl)
+    throw new Error('Sandbox approval link is unavailable.');
+  await openExternal(sandboxApproval(approvalUrl));
+}
+
+function sendChat(session: PaypalSession, id: string, prompt: string) {
+  return session.message(
+    id,
+    prompt,
+    PAYPAL_REQUEST_LIMITS.maxTokens,
+    randomUUID(),
+  );
+}
+
+function sendAgent(
+  session: PaypalSession,
+  id: string,
+  input: unknown,
+  signal?: AbortSignal,
+) {
+  return session.agentMessage(id, input, randomUUID(), signal);
+}
+
 export function createDesktopPaypalSession(
   session: PaypalSession,
   openExternal: (url: string) => Promise<void>,
-  options: {
-    checkEngine?: () => Promise<unknown>;
-  } = {},
+  options: DesktopPaypalSessionOptions = {},
 ) {
   let approvalUrl: string | undefined;
   let awaitingAcknowledgement = false;
   let checkoutOpened = false;
+  let agentPreparedForSession = false;
   const { run, close, isBusy } = serialOperations();
   function orderId() {
     const id = session.status().orderId;
@@ -98,23 +154,25 @@ export function createDesktopPaypalSession(
     return id;
   }
   const status = () => visibleStatus(session, approvalUrl);
+  async function checkAgent() {
+    if (!agentPreparedForSession)
+      throw new Error('A fresh agent session is required.');
+    await options.checkAgentEngine?.();
+  }
   return {
     status,
     isCloseBlocked: () => isBusy() || awaitingAcknowledgement || checkoutOpened,
     create: () =>
       run(async () => {
-        await options.checkEngine?.();
+        const agentReady = await prepareModels(options);
         const order = await session.create();
+        agentPreparedForSession = agentReady;
         approvalUrl = order.approvalUrl;
         return status();
       }),
     openApproval: () =>
       run(async () => {
-        if (session.status().phase !== PAYPAL_SESSION_PHASE.CREATED)
-          throw new Error('Sandbox approval link is unavailable.');
-        if (!approvalUrl)
-          throw new Error('Sandbox approval link is unavailable.');
-        await openExternal(sandboxApproval(approvalUrl));
+        await openApproval(session, approvalUrl, openExternal);
         checkoutOpened = true;
       }),
     approve: () =>
@@ -126,27 +184,18 @@ export function createDesktopPaypalSession(
     send: (prompt: string) =>
       run(async () => {
         await options.checkEngine?.();
-        const answer = await session.message(
-          orderId(),
-          prompt,
-          PAYPAL_REQUEST_LIMITS.maxTokens,
-          randomUUID(),
-        );
+        const answer = await sendChat(session, orderId(), prompt);
         awaitingAcknowledgement = true;
         return { text: answer.text, messageId: answer.messageId };
       }),
     sendAgent: (input: unknown, signal?: AbortSignal) =>
       run(async () => {
-        await options.checkEngine?.();
-        const answer = await session.agentMessage(
-          orderId(),
-          input,
-          randomUUID(),
-          signal,
-        );
+        await checkAgent();
+        const answer = await sendAgent(session, orderId(), input, signal);
         awaitingAcknowledgement = true;
         return answer;
       }),
+    prepareAgent: () => run(checkAgent),
     acknowledge: (messageId: string) =>
       run(async () => {
         await session.acknowledge(orderId(), messageId);

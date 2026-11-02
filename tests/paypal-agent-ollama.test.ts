@@ -333,13 +333,22 @@ void test('tool arguments must satisfy the supported schema before returning the
 });
 
 void test('remote model aliases and remote inference results are not accepted', async () => {
-  assert.throws(() => createOllamaAgent('http://127.0.0.1:11434/', fetch, { model: 'other-cloud' }));
-  const fetcher: typeof fetch = async () => Response.json({
-    model: MODEL.name, remote_host: 'https://remote.invalid',
-    created_at: '2026-01-01T00:00:00Z', done: true,
-    done_reason: 'stop', message: { role: 'assistant', content: 'synthetic' },
-    prompt_eval_count: 2, eval_count: 3,
-  });
+  assert.throws(() =>
+    createOllamaAgent('http://127.0.0.1:11434/', fetch, {
+      model: 'other-cloud',
+    }),
+  );
+  const fetcher: typeof fetch = async () =>
+    Response.json({
+      model: MODEL.name,
+      remote_host: 'https://remote.invalid',
+      created_at: '2026-01-01T00:00:00Z',
+      done: true,
+      done_reason: 'stop',
+      message: { role: 'assistant', content: 'synthetic' },
+      prompt_eval_count: 2,
+      eval_count: 3,
+    });
   const engine = createOllamaAgent('http://127.0.0.1:11434/', fetcher);
   await assert.rejects(engine.generate(request));
 });

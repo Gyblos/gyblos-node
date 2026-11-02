@@ -12,6 +12,8 @@
     "./paypal-session": "./src/paypal-session.ts",
     "./paypal-agent-server": "./src/paypal-agent-server.ts",
     "./paypal-agent-access": "./src/paypal-agent-access.ts",
+    "./paypal-agent-handlers": "./src/paypal-agent-handlers.ts",
+    "./paypal-agent-model": "./src/paypal-agent-model.ts",
     "./paypal-model": "./src/paypal-model.ts",
     "./paypal-close-guard": "./src/paypal-close-guard.ts",
     "./paypal-handlers": "./src/paypal-handlers.ts",

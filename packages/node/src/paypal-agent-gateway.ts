@@ -87,7 +87,7 @@ function assistant(value: unknown) {
   if (row.role !== AGENT_CHAT.ROLES.ASSISTANT) return undefined;
   return JSON.stringify({
     role: row.role,
-    content: row.content,
+    content: row.content ?? null,
     tool_calls: row.tool_calls,
   });
 }

@@ -159,12 +159,20 @@ void test('assistant tool calls with omitted content acknowledge the equivalent 
   const message = firstAnswer.choices[0]?.message;
   assert.ok(message);
   const { content: _content, ...withoutContent } = message;
-  const next = await f.gateway.handle(post({
-    ...input,
-    messages: [...input.messages, withoutContent, {
-      role: 'tool', tool_call_id: 'call_1', content: 'synthetic result',
-    }],
-  }));
+  const next = await f.gateway.handle(
+    post({
+      ...input,
+      messages: [
+        ...input.messages,
+        withoutContent,
+        {
+          role: 'tool',
+          tool_call_id: 'call_1',
+          content: 'synthetic result',
+        },
+      ],
+    }),
+  );
   assert.equal(next.status, 200);
   assert.deepEqual(f.calls, ['generate', 'ack:MSG1', 'generate']);
 });

@@ -90,3 +90,8 @@ export const INFERENCE_REQUEST_LIMITS = {
   maxOutputTokens: 128,
   maxPromptCharacters: 4000,
 } as const;
+
+export const SANDBOX_AGENT_LIMITS = {
+  contextTokens: 8192,
+  maxOutputTokens: 512,
+} as const;

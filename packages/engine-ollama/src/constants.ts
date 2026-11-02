@@ -40,3 +40,7 @@ export const MODEL_LIMITS = {
   maxFrameCharacters: 1_000_000,
   maxOutputCharacters: 100_000,
 } as const;
+
+export const AGENT_MODEL_LIMITS = {
+  minimumOllamaVersion: [0, 20, 0],
+} as const;

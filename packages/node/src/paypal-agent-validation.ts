@@ -92,10 +92,19 @@ function message(value: unknown) {
   }
   if (row.role === ROLES.ASSISTANT) {
     allowed(row, ['role', 'content', 'tool_calls', 'name']);
-    if (row.content !== null && typeof row.content !== 'string') invalid();
+    if (
+      row.content !== null &&
+      row.content !== undefined &&
+      typeof row.content !== 'string'
+    )
+      invalid();
     if (row.name !== undefined) name(row.name);
     if (row.tool_calls !== undefined) toolCalls(row.tool_calls);
-    if (row.content === null && row.tool_calls === undefined) invalid();
+    if (
+      (row.content === null || row.content === undefined) &&
+      row.tool_calls === undefined
+    )
+      invalid();
     return;
   }
   invalid();

@@ -11,6 +11,7 @@ export const ROUTES = {
   supported: '/supported',
   ollamaVersion: '/api/version',
   ollamaTags: '/api/tags',
+  ollamaChat: '/api/chat',
   ollamaGenerate: '/api/generate',
   inferenceDefinition: 'POST /v1/chat/completions',
 } as const;

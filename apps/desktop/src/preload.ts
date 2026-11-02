@@ -4,6 +4,10 @@ import { contextBridge, ipcRenderer } from 'electron';
 import { NETWORK_CATALOG, parseNetworkCatalog } from './catalog/model';
 import { DESKTOP } from './constants';
 import { LOCAL_NODE, parseLocalNodeState } from './node-status';
+import {
+  DESKTOP_PAYPAL_AGENT,
+  parsePaypalAgentResult,
+} from './paypal-agent-model';
 import { DESKTOP_PAYPAL, parsePaypalResult } from './paypal-model';
 import { parseProbeResult } from './probe-model';
 import { BACKUP_FLOW, parseBackupResult } from './wallet/backup-flow-model';
@@ -36,6 +40,13 @@ contextBridge.exposeInMainWorld('desktopPaypal', {
   run: async (request: unknown) =>
     parsePaypalResult(
       await ipcRenderer.invoke(DESKTOP_PAYPAL.CHANNEL, request),
+    ),
+});
+
+contextBridge.exposeInMainWorld('desktopPaypalAgent', {
+  run: async (request: unknown) =>
+    parsePaypalAgentResult(
+      await ipcRenderer.invoke(DESKTOP_PAYPAL_AGENT.CHANNEL, request),
     ),
 });
 
