@@ -186,7 +186,9 @@ void test('model verification rejects an Ollama version that can ignore context 
   };
   const engine = createOllamaAgent('http://127.0.0.1:11434/', fetcher);
   await assert.rejects(engine.describe());
-  version = '0.12.10';
+  version = '0.19.9';
+  await assert.rejects(engine.describe());
+  version = '0.20.0';
   assert.equal((await engine.describe()).name, MODEL.name);
 });
 
