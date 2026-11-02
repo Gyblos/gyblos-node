@@ -11,12 +11,31 @@ live multi-seller marketplace. It does not collect a platform fee.
 
 ## Setup
 
-Use Node 22+, the pinned pnpm version, and a local Ollama server with Gyblos's
-pinned `qwen3:0.6b` model. The engine verifies the model digest before serving.
-Create a PayPal developer sandbox REST application and obtain its **sandbox**
-client ID and secret. Use the sandbox personal account as the buyer and the
-sandbox business account associated with the application as the seller. Never
-put credentials or sandbox account passwords in Git, screenshots, or chat.
+1. Install Node.js 22 or newer and the pnpm version pinned in `package.json`;
+   see the [toolchain setup guide](../CONTRIBUTING.md#set-up-nodejs-and-pnpm).
+   Install [Ollama](https://ollama.com/download) and start its local server.
+2. From the repository root, install dependencies and download the model:
+
+   ```sh
+   pnpm install --frozen-lockfile
+   ollama pull qwen3:0.6b
+   ollama list
+   ```
+
+   The model download is about 523 MB. `ollama list` should show `qwen3:0.6b`
+   with an ID beginning `7df6b6e09427`. The engine checks the full pinned digest
+   before serving; a different model or digest will be rejected.
+
+3. Create a
+   [PayPal developer account and sandbox REST app](https://developer.paypal.com/api/get-started/)
+   and obtain its **sandbox** client ID and secret. Use the associated sandbox
+   business account as the seller and a separate sandbox personal account as the
+   buyer. PayPal's
+   [sandbox accounts guide](https://developer.paypal.com/sandbox-testing/accounts)
+   explains how to find or create both accounts. Use test accounts only; sandbox
+   transactions use simulated money.
+
+Never put credentials or sandbox account passwords in Git, screenshots, or chat.
 
 Choose an empty dedicated absolute directory for sandbox state. In a private
 terminal, set `PAYPAL_SANDBOX_CLIENT_ID`, `PAYPAL_SANDBOX_CLIENT_SECRET`, and
@@ -29,19 +48,31 @@ context. No live endpoint is used. Optional `PAYPAL_SANDBOX_PORT` and
 `PAYPAL_SANDBOX_OLLAMA_ORIGIN` settings select a different local port and
 literal loopback Ollama origin.
 
-For example, in a private macOS zsh terminal, from this repository:
+For example, in a private macOS or Linux terminal using zsh or bash, from this
+repository:
 
 ```sh
-read -r 'PAYPAL_SANDBOX_CLIENT_ID?Sandbox client ID: '
-read -rs 'PAYPAL_SANDBOX_CLIENT_SECRET?Sandbox secret: '
-print
+printf 'Sandbox client ID: '
+read -r PAYPAL_SANDBOX_CLIENT_ID
+printf 'Sandbox client secret: '
+read -rs PAYPAL_SANDBOX_CLIENT_SECRET
+printf '\n'
 export PAYPAL_SANDBOX_CLIENT_ID PAYPAL_SANDBOX_CLIENT_SECRET
-export PAYPAL_SANDBOX_STATE_DIRECTORY="$HOME/Library/Application Support/Gyblos/paypal-sandbox"
+if [ -z "${PAYPAL_SANDBOX_STATE_DIRECTORY:-}" ]; then
+  printf 'Absolute sandbox state directory (reuse it on later runs): '
+  read -r PAYPAL_SANDBOX_STATE_DIRECTORY
+fi
+export PAYPAL_SANDBOX_STATE_DIRECTORY
 pnpm paypal:sandbox
 ```
 
 The secret is not echoed. Reuse the same state directory on later runs: it is
 needed to preserve unresolved payment attempts. Use sandbox credentials only.
+For a quick walkthrough, create a session and approve the USD 1.00 limit in
+PayPal. Return to the demo, select **I approved · start session**, and send two
+messages, waiting for each response to be acknowledged. Select **Close session
+and settle**. The expected final capture is USD 0.20; the unspent authorization
+is released according to PayPal's timing.
 
 The session accepts new messages for 30 minutes after authorization, but the
 buyer must explicitly close it; leaving the page does not capture or void it.
