@@ -213,3 +213,20 @@ void test('a tool call truncated by the model is never returned for execution', 
   const engine = createOllamaAgent('http://127.0.0.1:11434/', fetcher);
   await assert.rejects(engine.generate(request));
 });
+
+void test('tool arguments must satisfy the supported schema before returning them', async () => {
+  const fetcher: typeof fetch = async () => Response.json({
+    model: MODEL.name, created_at: '2026-01-01T00:00:00Z', done: true,
+    done_reason: 'stop', message: { role: 'assistant', content: '', tool_calls: [
+      { function: { name: 'read_file', arguments: { path: 1 } } },
+    ] }, prompt_eval_count: 2, eval_count: 3,
+  });
+  const engine = createOllamaAgent('http://127.0.0.1:11434/', fetcher);
+  await assert.rejects(engine.generate({
+    ...request,
+    tools: [{ type: 'function', function: { name: 'read_file', parameters: {
+      type: 'object', properties: { path: { type: 'string' } }, required: ['path'],
+      additionalProperties: false,
+    } } }],
+  }));
+});
