@@ -221,6 +221,20 @@ void test('malformed agent messages are refused before dispatch or journal chang
       'MESSAGE1',
     ),
   );
+  for (const toolChoice of [['none'], ['required'], ['auto']]) {
+    await assert.rejects(
+      session.agentMessage(
+        order.orderId,
+        {
+          model: 'synthetic-model',
+          messages: [{ role: 'user', content: 'synthetic request' }],
+          max_tokens: 128,
+          tool_choice: toolChoice,
+        },
+        'MESSAGE1',
+      ),
+    );
+  }
   assert.deepEqual(f.getState(), before);
   assert.deepEqual(f.calls, ['create', 'authorize']);
 });
