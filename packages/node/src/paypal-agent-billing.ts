@@ -15,7 +15,10 @@ function fail(
 ): never {
   throw new PaypalError(code);
 }
-export type AgentOperation = { idempotencyDigest?: string };
+export type AgentOperation = {
+  idempotencyDigest?: string;
+  equivalentDigests?: readonly string[];
+};
 type CurrentRecord = Extract<
   PaypalSessionRecord,
   { version: typeof PAYPAL_SESSION_RECORD_VERSION }
@@ -30,7 +33,8 @@ export function checkAgentOperation(
   if (
     record.agentCompletions.some((completed) =>
       agent.idempotencyDigest === undefined
-        ? completed.requestDigest === digest
+        ? completed.requestDigest === digest ||
+          agent.equivalentDigests?.includes(completed.requestDigest)
         : completed.idempotencyDigest === agent.idempotencyDigest,
     )
   )

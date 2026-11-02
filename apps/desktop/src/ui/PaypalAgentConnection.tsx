@@ -159,10 +159,11 @@ function ClientInstructions({ client }: { client: PaypalAgentClient }) {
     return (
       <p className="modal-note">
         Set GYBLOS_API_KEY in your terminal and run the copied environment
-        settings there. A starting point is: claude --bare --tools default
-        --append-system-prompt 'Use only required tool parameters unless
-        explicitly needed.' This uses a local non-Claude model and is an
-        experimental gateway configuration.
+        settings there. Use a new dedicated terminal: the copied settings remain
+        in that terminal until it closes. A starting point is: claude --bare
+        --tools default --append-system-prompt 'Use only required tool
+        parameters unless explicitly needed.' This uses a local non-Claude model
+        and is an experimental gateway configuration.
       </p>
     );
   return (
@@ -250,6 +251,31 @@ function RetryDisconnect({ busy, run }: Pick<DetailProps, 'busy' | 'run'>) {
     </Button>
   );
 }
+function ClientSelector({
+  client,
+  select,
+}: {
+  client: PaypalAgentClient;
+  select: (client: PaypalAgentClient) => void;
+}) {
+  return (
+    <div
+      className="connection-actions"
+      role="group"
+      aria-label="Choose an agent"
+    >
+      {Object.values(PAYPAL_AGENT_CLIENT).map((item) => (
+        <Button
+          key={item}
+          aria-pressed={client === item}
+          onClick={() => select(item)}
+        >
+          {item}
+        </Button>
+      ))}
+    </div>
+  );
+}
 export function PaypalAgentConnection({
   onlyConnected = false,
 }: {
@@ -282,21 +308,7 @@ export function PaypalAgentConnection({
         An identical request without an operation key may be rejected to avoid a
         repeated charge. Some tools do not send such a key.
       </p>
-      <div
-        className="connection-actions"
-        role="group"
-        aria-label="Choose an agent"
-      >
-        {Object.values(PAYPAL_AGENT_CLIENT).map((item) => (
-          <Button
-            key={item}
-            aria-pressed={client === item}
-            onClick={() => setClient(item)}
-          >
-            {item}
-          </Button>
-        ))}
-      </div>
+      <ClientSelector client={client} select={setClient} />
       <AgentUsage
         connection={connection}
         statusUnavailable={statusUnavailable || busy}

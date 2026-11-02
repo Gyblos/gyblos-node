@@ -304,7 +304,10 @@ class PaypalSession {
         ),
       () => engine.validate?.(request.input),
       signal,
-      keyDigest ? { idempotencyDigest: keyDigest } : {},
+      {
+        ...(keyDigest ? { idempotencyDigest: keyDigest } : {}),
+        equivalentDigests: request.equivalentDigests,
+      },
     );
     return { response: result.output, messageId: result.messageId };
   }

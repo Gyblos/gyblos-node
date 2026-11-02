@@ -343,16 +343,41 @@ export function preparePaypalAgentRequest(input: unknown, model: string) {
     stream_options: _streamOptions,
     ...inference
   } = normalized;
-  const normalizedBytes = stableJson({
+  const request = {
     ...inference,
     messages: digestMessages(inference.messages),
+  };
+  const requestDigest = (value: Record<string, unknown>) =>
+    createHash('sha256')
+      .update(PAYPAL_AGENT_REQUEST_LIMITS.digestDomain)
+      .update(stableJson(value))
+      .digest('hex');
+  const digest = requestDigest(request);
+  // Compare old v2 digests for defaults ignored by Ollama without rewriting journals.
+  const common: Record<string, unknown> = { ...request };
+  const ignoredDefaults = [
+    ['parallel_tool_calls', true],
+    ['n', 1],
+    ['tool_choice', 'auto'],
+  ] as const;
+  const optional = ignoredDefaults.filter(([field, value]) => {
+    if (common[field] !== undefined && common[field] !== value) return false;
+    delete common[field];
+    return true;
   });
+  let variants = [common];
+  for (const [field, value] of optional)
+    variants = [
+      ...variants,
+      ...variants.map((row) => ({ ...row, [field]: value })),
+    ];
+  const equivalentDigests = variants
+    .map(requestDigest)
+    .filter((value) => value !== digest);
   return {
     input: normalized,
-    digest: createHash('sha256')
-      .update(PAYPAL_AGENT_REQUEST_LIMITS.digestDomain)
-      .update(normalizedBytes)
-      .digest('hex'),
+    digest,
+    equivalentDigests,
   };
 }
 export function paypalAgentIdempotencyDigest(key: string | undefined) {

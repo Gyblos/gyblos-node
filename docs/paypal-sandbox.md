@@ -133,6 +133,22 @@ opencode
 The copied OpenCode configuration uses `{env:GYBLOS_API_KEY}` rather than
 embedding the key.
 
+For PowerShell, enter the key without placing it in the shell history:
+
+```powershell
+$gyblosKey = Read-Host 'Gyblos API key' -AsSecureString
+$gyblosBuffer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($gyblosKey)
+try {
+  $env:GYBLOS_API_KEY = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($gyblosBuffer)
+} finally {
+  [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($gyblosBuffer)
+  Remove-Variable gyblosKey, gyblosBuffer
+}
+```
+
+The environment variable remains in that terminal and is available to its child
+processes until the terminal closes.
+
 ### Pi
 
 Create a new, private Pi agent directory and select it with
@@ -142,15 +158,21 @@ isolated directory does not inherit existing Pi configuration, credentials or
 extensions. The supplied settings disable automatic retry, compaction and cache
 warming, which can otherwise generate additional charged requests. Set
 `GYBLOS_API_KEY` as above and select `gyblos/gpt-oss:20b` in Pi. For example, in
-bash or zsh, choose a new path and export it before starting Pi:
+bash or zsh, create a unique, private directory before starting Pi:
 
 ```sh
-export PI_CODING_AGENT_DIR="$HOME/.gyblos-pi-sandbox"
-mkdir -p "$PI_CODING_AGENT_DIR"
+export PI_CODING_AGENT_DIR="$(mktemp -d "${TMPDIR:-/tmp}/gyblos-pi.XXXXXXXX")"
 ```
 
-On Windows PowerShell use `$env:PI_CODING_AGENT_DIR = '<private directory>'` and
-create that directory before saving the two files. Keep its contents private.
+On Windows PowerShell, create a unique directory under your user profile:
+
+```powershell
+$env:PI_CODING_AGENT_DIR = Join-Path $env:LOCALAPPDATA ('gyblos-pi-' + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $env:PI_CODING_AGENT_DIR -ErrorAction Stop | Out-Null
+```
+
+Keep its contents private and check the directory's permissions on a shared
+computer.
 
 Pi's estimated token price cannot express this prototype's fixed USD 0.10 per
 completed inference. Use the session usage shown in Gyblos for the actual
@@ -174,8 +196,10 @@ the local context limit.
 
 ### Claude Code
 
-Set `GYBLOS_API_KEY`, then run the copied environment settings in that same
-terminal. The connection provides separate bash/zsh and PowerShell copies; use
+Open a new, dedicated terminal, set `GYBLOS_API_KEY`, then run the copied
+environment settings in that same terminal. Those settings persist in it until
+it closes; using a dedicated terminal preserves the settings in your other
+terminals. The connection provides separate bash/zsh and PowerShell copies; use
 the one for your shell. A bounded starting point is:
 
 ```sh
