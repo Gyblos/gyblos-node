@@ -135,7 +135,13 @@ void test('terminal cancellation after a fragment aborts the request and closes 
 
 void test(
   'SIGINT during terminal streaming aborts once and closes the buyer',
-  { timeout: 15000 },
+  {
+    timeout: 15000,
+    skip:
+      process.platform === 'win32'
+        ? 'Child SIGINT is not delivered on Windows'
+        : false,
+  },
   async () => {
     const source = `
     import { main } from '@gyblos/buyer/chat-cli';

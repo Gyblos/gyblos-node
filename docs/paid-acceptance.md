@@ -56,7 +56,10 @@ restricts the model, reasoning and network to its supported subset and devnet.
 The acceptance command prints evidence rather than chat content; it must not be
 presented as real paid inference. The acceptance invokes the terminal entrypoint
 with injected streams and adapters; it does not launch a separate interactive
-terminal process, run a real model or test an internet relay.
+terminal process, run a real model or test an internet relay. The separate
+subprocess SIGINT regression runs on Unix; Windows uses the portable injected
+cancellation test and its native Ctrl-C behavior remains unverified by that
+subprocess test.
 
 Buyer bearer authentication is maintained separately. On versions that provision
 an API token the harness reads only its freshly created private token and sends
