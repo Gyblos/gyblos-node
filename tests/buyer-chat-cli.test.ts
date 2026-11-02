@@ -6,7 +6,11 @@ import { chatSession, runOwnedChat } from '@gyblos/buyer/chat-cli';
 import { chatTurn, type ChatTurnOptions } from '@gyblos/buyer/chat-cli-turn';
 import { ownedChat } from '@gyblos/buyer/chat-owned';
 import { startFreeBuyerHttp } from '@gyblos/buyer/free-http';
-import { ENGINE_DONE_REASONS } from '@gyblos/protocol/constants';
+import { SELLER_SELECTION_CODES } from '@gyblos/core/constants';
+import {
+  ENGINE_DONE_REASONS,
+  PAYMENT_ERROR_CODES,
+} from '@gyblos/protocol/constants';
 
 const terminal = JSON.stringify({
   choices: [{ delta: {}, finish_reason: 'stop' }],
@@ -156,6 +160,21 @@ void test('preserves a bounded JSON error payment without echoing remote text', 
   assert.equal(output.join('').includes('private'), false);
 });
 
+void test('preserves known selection and payment error codes', async () => {
+  for (const code of [
+    SELLER_SELECTION_CODES.PINNED_IN_COOLDOWN,
+    PAYMENT_ERROR_CODES.ALREADY_SETTLED,
+  ]) {
+    const { options } = setup();
+    const request: typeof fetch = async () =>
+      new Response(
+        JSON.stringify({ error: { code, message: 'do not show' } }),
+        { status: 503 },
+      );
+    assert.equal((await chatTurn(options, request)).code, code);
+  }
+});
+
 void test('decodes fragmented streaming events and does not retry after cancellation', async () => {
   const { options, output } = setup();
   const bytes = new TextEncoder().encode(
@@ -195,6 +214,20 @@ void test('decodes fragmented streaming events and does not retry after cancella
   assert.equal(calls, 1);
 });
 
+void test('accepts protocol-sized output whose JSON escaping exceeds one mebibyte', async () => {
+  const { options } = setup();
+  const chunk = JSON.stringify({
+    choices: [
+      { delta: { content: '\u0001'.repeat(4096) }, finish_reason: null },
+    ],
+  });
+  const request: typeof fetch = async () =>
+    stream(
+      `${`data: ${chunk}\n\n`.repeat(48)}data: ${terminal}\n\ndata: [DONE]\n\n`,
+    );
+  assert.equal((await chatTurn(options, request)).status, 'complete');
+});
+
 void test('session stops immediately after an uncertain result and asks for reconciliation', async () => {
   const output: string[] = [];
   let reads = 0;
@@ -203,6 +236,7 @@ void test('session stops immediately after an uncertain result and asks for reco
     model: 'synthetic',
     maxTokens: 8,
     maxAtomic: '100',
+    request: async () => stream(''),
     read: async () => {
       reads++;
       return 'test question';

@@ -16,7 +16,7 @@ export interface ChatSessionOptions {
   model: string;
   maxTokens: number;
   maxAtomic: string;
-  request?: typeof fetch;
+  request: typeof fetch;
   read: () => Promise<string | undefined>;
   write: (text: string) => void;
   signal?: AbortSignal;

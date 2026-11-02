@@ -1,12 +1,16 @@
 // Performs one bounded interactive request to the local buyer, never retries or follows redirects.
 import { LOCALHOST, PORTS, ROUTES, UNITS } from '@gyblos/config';
+import { SELLER_SELECTION_CODES } from '@gyblos/core/constants';
 import {
   FREE_CHAT_ROLES,
   FREE_EXECUTION_CODES,
+  FREE_STREAM,
+  PAYMENT_ERROR_CODES,
 } from '@gyblos/protocol/constants';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 
 import {
+  BUYER_SELECTION_CODES,
   FREE_BUYER,
   FREE_BUYER_CODES,
   PAID_BUYER,
@@ -33,9 +37,13 @@ export interface ChatTurnResult {
     refunded: string | null;
   };
 }
+const SSE_FRAMING = { jsonExpansion: 6, envelopeBytes: 1024 } as const;
 const BOUNDS = {
   promptBytes: 64_000,
-  responseBytes: 1_048_576,
+  // A delta may expand to six bytes per character in JSON and each event adds an SSE envelope.
+  responseBytes:
+    FREE_STREAM.totalBytes * SSE_FRAMING.jsonExpansion +
+    FREE_STREAM.maxEvents * SSE_FRAMING.envelopeBytes,
   timeoutMs: PAID_BUYER_HTTP_MS + UNITS.millisecondsPerSecond,
 } as const;
 const record = (value: unknown): Record<string, unknown> | undefined =>
@@ -71,6 +79,9 @@ function errorResult(value: unknown): ChatTurnResult {
     ...Object.values(PAID_BUYER_CODES),
     ...Object.values(FREE_EXECUTION_CODES),
     ...Object.values(PAID_EXECUTION_CODES),
+    ...Object.values(SELLER_SELECTION_CODES),
+    ...Object.values(BUYER_SELECTION_CODES),
+    ...Object.values(PAYMENT_ERROR_CODES),
   ];
   if (
     typeof error.code === 'string' &&
@@ -135,7 +146,7 @@ async function readError(
 
 export async function chatTurn(
   options: ChatTurnOptions,
-  request: typeof fetch = fetch,
+  request: typeof fetch,
 ): Promise<ChatTurnResult> {
   if (
     !options.prompt.trim() ||
