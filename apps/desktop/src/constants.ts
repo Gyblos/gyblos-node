@@ -1,6 +1,7 @@
 // Owns fixed desktop host and compatibility-probe values.
 export const DESKTOP_AGENT_SERVER_NOT_RUNNING = 'ERR_SERVER_NOT_RUNNING';
 export const PAYPAL_AGENT_POLL_TIMEOUT_MS = 5000;
+export const PAYPAL_AGENT_POLL_MAX_OUTSTANDING = 2;
 export const PAYPAL_AGENT_USAGE_STATE = {
   AVAILABLE: 'available',
   BUSY: 'busy',

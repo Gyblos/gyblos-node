@@ -111,7 +111,10 @@ void test('stopping a status poll prevents late updates', async () => {
 void test('starting a poll records its request before a later disconnect can invalidate it', () => {
   const events: string[] = [];
   const poll = createPaypalAgentStatusPoll(
-    async () => { events.push('status started'); return 'synthetic'; },
+    async () => {
+      events.push('status started');
+      return 'synthetic';
+    },
     () => {},
     () => {},
     15,

@@ -107,6 +107,18 @@ export function retainPaypalAgentStatus(
   if (!next || next.error) return { result: previous, unavailable: true };
   return { result: next, unavailable: false };
 }
+export function paypalAgentStatusUnavailable(
+  action: PaypalAgentAction,
+  next: PaypalAgentResult | undefined,
+  stalled: boolean,
+) {
+  const disconnected =
+    action === PAYPAL_AGENT_ACTION.DISCONNECT &&
+    !!next &&
+    !next.error &&
+    !next.connection;
+  return !disconnected && (stalled || !next || !!next.error);
+}
 export function agentFailure(
   error: PaypalAgentResult['error'] = PAYPAL_AGENT_ERROR.FAILED,
 ): PaypalAgentResult {

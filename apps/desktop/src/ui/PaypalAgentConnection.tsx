@@ -1,170 +1,21 @@
 // Guides one OpenCode connection to the existing local PayPal Sandbox session.
-import {
-  useEffect,
-  useRef,
-  useState,
-  type Dispatch,
-  type SetStateAction,
-} from 'react';
+import { useState } from 'react';
 
 import { PAYPAL_SANDBOX } from '@gyblos/config/constants';
 
-import { PAYPAL_AGENT_POLL_TIMEOUT_MS } from '../constants';
 import {
-  agentFailure,
-  createPaypalAgentStatusPoll,
   DESKTOP_PAYPAL_AGENT,
   opencodeConfig,
   PAYPAL_AGENT_ACTION,
   PAYPAL_AGENT_USAGE_STATE,
-  paypalAgentErrorMessage,
-  retainPaypalAgentStatus,
   type PaypalAgentAction,
   type PaypalAgentResult,
   type PaypalAgentUsageState,
 } from '../paypal-agent-model';
 import { paypalDollars } from '../paypal-model';
-import { writeClipboardText } from './clipboard';
-import { BUTTON_VARIANT, COPY_RESULT } from './constants';
+import { BUTTON_VARIANT } from './constants';
+import { usePaypalAgentConnection } from './paypal-agent-connection-hook';
 import { Badge, Button, Note } from './UI';
-
-declare global {
-  interface Window {
-    desktopPaypalAgent?: {
-      run(request: { action: PaypalAgentAction }): Promise<PaypalAgentResult>;
-    };
-  }
-}
-
-function actionFailure(
-  action: PaypalAgentAction,
-  error: PaypalAgentResult['error'],
-) {
-  return action === PAYPAL_AGENT_ACTION.DISCONNECT
-    ? 'Could not confirm disconnection. The agent may still be connected; try again.'
-    : paypalAgentErrorMessage(error);
-}
-type AgentStatusPolling = {
-  busyRef: { current: boolean };
-  sequence: { current: number };
-  mounted: { current: boolean };
-  pollerRef: { current: { isStalled(): boolean } | null };
-  setResult: Dispatch<SetStateAction<PaypalAgentResult>>;
-  setStatusUnavailable: Dispatch<SetStateAction<boolean>>;
-};
-function useAgentStatusPolling({
-  busyRef,
-  sequence,
-  mounted,
-  pollerRef,
-  setResult,
-  setStatusUnavailable,
-}: AgentStatusPolling) {
-  useEffect(() => {
-    mounted.current = true;
-    const poller = createPaypalAgentStatusPoll(
-      async () => {
-        const request = ++sequence.current;
-        const next = await window.desktopPaypalAgent
-          ?.run({ action: PAYPAL_AGENT_ACTION.STATUS })
-          .catch(() => agentFailure());
-        return { request, next };
-      },
-      ({ request, next }) => {
-        if (mounted.current && request === sequence.current) {
-          setResult(
-            (previous) => retainPaypalAgentStatus(previous, next).result,
-          );
-          setStatusUnavailable(!next || !!next.error);
-        }
-      },
-      () => {
-        if (mounted.current) setStatusUnavailable(true);
-      },
-      PAYPAL_AGENT_POLL_TIMEOUT_MS,
-    );
-    pollerRef.current = poller;
-    function refresh() {
-      if (!busyRef.current) poller.poll();
-    }
-    void refresh();
-    const interval = window.setInterval(() => {
-      void refresh();
-    }, DESKTOP_PAYPAL_AGENT.POLL_MS);
-    return () => {
-      mounted.current = false;
-      sequence.current += 1;
-      poller.stop();
-      pollerRef.current = null;
-      window.clearInterval(interval);
-    };
-  }, [busyRef, sequence, mounted, pollerRef, setResult, setStatusUnavailable]);
-}
-function usePaypalAgentConnection() {
-  const [result, setResult] = useState<PaypalAgentResult>({
-    connection: null,
-    error: null,
-  });
-  const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState('');
-  const [statusUnavailable, setStatusUnavailable] = useState(false);
-  const busyRef = useRef(false);
-  const sequence = useRef(0);
-  const mounted = useRef(false);
-  const pollerRef = useRef<{ isStalled(): boolean } | null>(null);
-  const connection = result.connection;
-  useAgentStatusPolling({
-    busyRef,
-    sequence,
-    mounted,
-    pollerRef,
-    setResult,
-    setStatusUnavailable,
-  });
-  async function run(action: PaypalAgentAction) {
-    if (busyRef.current) return;
-    busyRef.current = true;
-    sequence.current += 1;
-    setBusy(true);
-    setNotice(
-      action === PAYPAL_AGENT_ACTION.DISCONNECT
-        ? 'Disconnecting. An inference already started can finish and count.'
-        : '',
-    );
-    try {
-      const next = await window.desktopPaypalAgent?.run({ action });
-      if (!mounted.current) return;
-      setResult((previous) => retainPaypalAgentStatus(previous, next).result);
-      setStatusUnavailable(
-        !!pollerRef.current?.isStalled() || !next || !!next.error,
-      );
-      if (!next || next.error)
-        setNotice(actionFailure(action, next?.error ?? null));
-      else setNotice('');
-    } catch {
-      if (mounted.current) {
-        setStatusUnavailable(true);
-        setNotice(
-          'The local connection is unavailable; the agent may still be connected.',
-        );
-      }
-    } finally {
-      busyRef.current = false;
-      if (mounted.current) setBusy(false);
-    }
-  }
-  async function copy(value: string, label: string) {
-    if (!connection) return;
-    const copied = await writeClipboardText(value, navigator.clipboard);
-    if (mounted.current)
-      setNotice(
-        copied === COPY_RESULT.COPIED
-          ? `${label} copied.`
-          : 'Clipboard unavailable. Copy the values below.',
-      );
-  }
-  return { connection, busy, notice, statusUnavailable, run, copy };
-}
 
 type Connection = NonNullable<PaypalAgentResult['connection']>;
 type DetailProps = {
