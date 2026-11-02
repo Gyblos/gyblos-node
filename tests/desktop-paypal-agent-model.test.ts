@@ -18,6 +18,8 @@ void test('OpenCode configuration uses an environment variable instead of embedd
   assert.doesNotMatch(config, /synthetic-secret-key/);
   const parsed: unknown = JSON.parse(config);
   assert.ok(parsed && typeof parsed === 'object' && 'provider' in parsed);
+  assert.ok('model' in parsed);
+  assert.equal(parsed.model, 'gyblos/synthetic-model');
   assert.ok(
     'agent' in parsed &&
       parsed.agent &&
