@@ -26,39 +26,34 @@ const request = {
 void test('agent adapter preserves history and tool calls through the local Ollama API', async () => {
   let sent: unknown;
   const fetcher: typeof fetch = async (url, init) => {
-    assert.equal(String(url), 'http://127.0.0.1:11434/v1/chat/completions');
+    assert.equal(String(url), 'http://127.0.0.1:11434/api/chat');
     assert.equal(init?.redirect, 'error');
     assert.equal(typeof init?.body, 'string');
     if (typeof init?.body !== 'string') throw new Error('missing body');
     sent = JSON.parse(init.body);
     return Response.json({
-      id: 'synthetic-id',
-      object: 'chat.completion',
-      created: 0,
       model: MODEL.name,
-      choices: [
-        {
-          index: 0,
-          message: {
-            role: 'assistant',
-            content: null,
-            tool_calls: [
-              {
-                id: 'call_1',
-                type: 'function',
-                function: { name: 'read_file', arguments: '{}' },
-              },
-            ],
-          },
-          finish_reason: 'tool_calls',
-        },
-      ],
-      usage: { prompt_tokens: 2, completion_tokens: 3, total_tokens: 5 },
+      created_at: '2026-01-01T00:00:00Z',
+      done: true,
+      done_reason: 'stop',
+      message: { role: 'assistant', content: '', tool_calls: [
+        { id: 'call_1', function: { name: 'read_file', arguments: {} } },
+      ] },
+      prompt_eval_count: 2,
+      eval_count: 3,
     });
   };
   const engine = createOllamaAgent('http://127.0.0.1:11434/', fetcher);
   const result: unknown = await engine.generate(request);
-  assert.deepEqual(sent, { ...request, stream: false });
+  assert.deepEqual(sent, {
+    model: request.model,
+    messages: request.messages,
+    tools: request.tools,
+    stream: false,
+    truncate: false,
+    shift: false,
+    options: { num_ctx: 8192, num_predict: 128 },
+  });
   assert.ok(result && typeof result === 'object' && 'choices' in result);
   assert.deepEqual(result.choices, [
     {
@@ -114,9 +109,9 @@ void test('an explicitly selected local agent model is used and verified', async
     assert.ok(sent && typeof sent === 'object' && 'model' in sent);
     assert.equal(sent.model, chosen);
     return Response.json({
-      id: 'synthetic-id', object: 'chat.completion', created: 0, model: chosen,
-      choices: [{ index: 0, message: { role: 'assistant', content: 'synthetic answer' }, finish_reason: 'stop' }],
-      usage: { prompt_tokens: 2, completion_tokens: 3, total_tokens: 5 },
+      model: chosen, created_at: '2026-01-01T00:00:00Z', done: true,
+      done_reason: 'stop', message: { role: 'assistant', content: 'synthetic answer' },
+      prompt_eval_count: 2, eval_count: 3,
     });
   };
   const engine = createOllamaAgent('http://127.0.0.1:11434/', fetcher, { model: chosen });
@@ -178,4 +173,18 @@ void test('native agent requests disable context truncation and preserve tool-ca
     name: 'read_file', arguments: '{"path":"synthetic.txt"}',
   });
   assert.ok(result.choices[0].message.tool_calls[0].id);
+});
+
+void test('model verification rejects an Ollama version that can ignore context controls', async () => {
+  let version = '0.12.5';
+  const fetcher: typeof fetch = async (url) => {
+    if (String(url).endsWith('/api/version')) return Response.json({ version });
+    return Response.json({ models: [{
+      name: MODEL.name, digest: 'a'.repeat(64), capabilities: ['tools'],
+    }] });
+  };
+  const engine = createOllamaAgent('http://127.0.0.1:11434/', fetcher);
+  await assert.rejects(engine.describe());
+  version = '0.12.10';
+  assert.equal((await engine.describe()).name, MODEL.name);
 });
