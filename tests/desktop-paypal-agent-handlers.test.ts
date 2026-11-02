@@ -11,14 +11,12 @@ void test('only the desktop main frame can request agent connection details', as
     url: 'http://127.0.0.1:12345/v1',
     key: 'synthetic-key',
     model: 'synthetic-model',
-    pending: false,
   };
   const access = {
     status: () => connection,
     async connect() {
       return connection;
     },
-    async confirm() {},
     async disconnect() {},
     async close() {},
   };
@@ -44,4 +42,20 @@ void test('only the desktop main frame can request agent connection details', as
   ]);
   assert.equal(invalid.connection, null);
   assert.equal(loads, 1);
+});
+
+void test('checking agent status does not start the PayPal service', async () => {
+  const contents = {};
+  const frame = {};
+  let loads = 0;
+  const handlers = createDesktopPaypalAgentHandlers(
+    async () => { loads += 1; throw new Error('must not load'); },
+    { contents, mainFrame: () => frame, destroyed: () => false },
+    () => null,
+  );
+  const result = await handlers.run({ sender: contents, senderFrame: frame }, [
+    { action: 'status' },
+  ]);
+  assert.deepEqual(result, { connection: null, error: null });
+  assert.equal(loads, 0);
 });
