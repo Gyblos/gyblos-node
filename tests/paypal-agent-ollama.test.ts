@@ -36,9 +36,13 @@ void test('agent adapter preserves history and tool calls through the local Olla
       created_at: '2026-01-01T00:00:00Z',
       done: true,
       done_reason: 'stop',
-      message: { role: 'assistant', content: '', tool_calls: [
-        { id: 'call_1', function: { name: 'read_file', arguments: {} } },
-      ] },
+      message: {
+        role: 'assistant',
+        content: '',
+        tool_calls: [
+          { id: 'call_1', function: { name: 'read_file', arguments: {} } },
+        ],
+      },
       prompt_eval_count: 2,
       eval_count: 3,
     });
@@ -101,21 +105,30 @@ void test('an explicitly selected local agent model is used and verified', async
   const chosen = 'synthetic-tool-model';
   let digest = 'a'.repeat(64);
   const fetcher: typeof fetch = async (url, init) => {
-    if (String(url).endsWith('/api/version')) return Response.json({ version: '0.40.0' });
+    if (String(url).endsWith('/api/version'))
+      return Response.json({ version: '0.40.0' });
     if (String(url).endsWith('/api/tags'))
-      return Response.json({ models: [{ name: chosen, digest, capabilities: ['tools'] }] });
+      return Response.json({
+        models: [{ name: chosen, digest, capabilities: ['tools'] }],
+      });
     assert.equal(typeof init?.body, 'string');
     if (typeof init?.body !== 'string') throw new Error('missing body');
     const sent: unknown = JSON.parse(init.body);
     assert.ok(sent && typeof sent === 'object' && 'model' in sent);
     assert.equal(sent.model, chosen);
     return Response.json({
-      model: chosen, created_at: '2026-01-01T00:00:00Z', done: true,
-      done_reason: 'stop', message: { role: 'assistant', content: 'synthetic answer' },
-      prompt_eval_count: 2, eval_count: 3,
+      model: chosen,
+      created_at: '2026-01-01T00:00:00Z',
+      done: true,
+      done_reason: 'stop',
+      message: { role: 'assistant', content: 'synthetic answer' },
+      prompt_eval_count: 2,
+      eval_count: 3,
     });
   };
-  const engine = createOllamaAgent('http://127.0.0.1:11434/', fetcher, { model: chosen });
+  const engine = createOllamaAgent('http://127.0.0.1:11434/', fetcher, {
+    model: chosen,
+  });
   assert.equal((await engine.describe()).name, chosen);
   await engine.generate({ ...request, model: chosen });
   digest = 'b'.repeat(64);
@@ -134,9 +147,18 @@ void test('native agent requests disable context truncation and preserve tool-ca
       created_at: '2026-01-01T00:00:00Z',
       done: true,
       done_reason: 'stop',
-      message: { role: 'assistant', content: '', tool_calls: [
-        { function: { name: 'read_file', arguments: { path: 'synthetic.txt' } } },
-      ] },
+      message: {
+        role: 'assistant',
+        content: '',
+        tool_calls: [
+          {
+            function: {
+              name: 'read_file',
+              arguments: { path: 'synthetic.txt' },
+            },
+          },
+        ],
+      },
       prompt_eval_count: 20,
       eval_count: 5,
     });
@@ -146,9 +168,20 @@ void test('native agent requests disable context truncation and preserve tool-ca
     ...request,
     messages: [
       ...request.messages,
-      { role: 'assistant', content: null, tool_calls: [
-        { id: 'call_1', type: 'function', function: { name: 'read_file', arguments: '{"path":"synthetic.txt"}' } },
-      ] },
+      {
+        role: 'assistant',
+        content: null,
+        tool_calls: [
+          {
+            id: 'call_1',
+            type: 'function',
+            function: {
+              name: 'read_file',
+              arguments: '{"path":"synthetic.txt"}',
+            },
+          },
+        ],
+      },
       { role: 'tool', tool_call_id: 'call_1', content: 'synthetic contents' },
     ],
   };
@@ -156,22 +189,38 @@ void test('native agent requests disable context truncation and preserve tool-ca
   assert.ok(sent && typeof sent === 'object');
   assert.ok('truncate' in sent && sent.truncate === false);
   assert.ok('shift' in sent && sent.shift === false);
-  assert.ok('options' in sent && sent.options && typeof sent.options === 'object');
+  assert.ok(
+    'options' in sent && sent.options && typeof sent.options === 'object',
+  );
   assert.ok('num_ctx' in sent.options && sent.options.num_ctx === 8192);
   assert.ok('num_predict' in sent.options && sent.options.num_predict === 128);
   assert.ok('messages' in sent && Array.isArray(sent.messages));
   assert.deepEqual(sent.messages[2], {
-    role: 'assistant', content: '', tool_calls: [
-      { id: 'call_1', function: { name: 'read_file', arguments: { path: 'synthetic.txt' } } },
+    role: 'assistant',
+    content: '',
+    tool_calls: [
+      {
+        id: 'call_1',
+        function: { name: 'read_file', arguments: { path: 'synthetic.txt' } },
+      },
     ],
   });
   assert.deepEqual(sent.messages[3], {
-    role: 'tool', tool_call_id: 'call_1', tool_name: 'read_file', content: 'synthetic contents',
+    role: 'tool',
+    tool_call_id: 'call_1',
+    tool_name: 'read_file',
+    content: 'synthetic contents',
   });
-  assert.ok(result && typeof result === 'object' && 'choices' in result && Array.isArray(result.choices));
+  assert.ok(
+    result &&
+      typeof result === 'object' &&
+      'choices' in result &&
+      Array.isArray(result.choices),
+  );
   assert.equal(result.choices[0].finish_reason, 'tool_calls');
   assert.deepEqual(result.choices[0].message.tool_calls[0].function, {
-    name: 'read_file', arguments: '{"path":"synthetic.txt"}',
+    name: 'read_file',
+    arguments: '{"path":"synthetic.txt"}',
   });
   assert.ok(result.choices[0].message.tool_calls[0].id);
 });
@@ -180,9 +229,15 @@ void test('model verification rejects an Ollama version that can ignore context 
   let version = '0.12.5';
   const fetcher: typeof fetch = async (url) => {
     if (String(url).endsWith('/api/version')) return Response.json({ version });
-    return Response.json({ models: [{
-      name: MODEL.name, digest: 'a'.repeat(64), capabilities: ['tools'],
-    }] });
+    return Response.json({
+      models: [
+        {
+          name: MODEL.name,
+          digest: 'a'.repeat(64),
+          capabilities: ['tools'],
+        },
+      ],
+    });
   };
   const engine = createOllamaAgent('http://127.0.0.1:11434/', fetcher);
   await assert.rejects(engine.describe());
@@ -194,41 +249,97 @@ void test('model verification rejects an Ollama version that can ignore context 
 
 void test('unsupported tool schemas are rejected before contacting Ollama', async () => {
   let calls = 0;
-  const fetcher: typeof fetch = async () => { calls += 1; return Response.json({}); };
+  const fetcher: typeof fetch = async () => {
+    calls += 1;
+    return Response.json({});
+  };
   const engine = createOllamaAgent('http://127.0.0.1:11434/', fetcher);
-  assert.throws(() => engine.validate({
-    ...request,
-    tools: [{ type: 'function', function: { name: 'read_file', parameters: {
-      type: 'object', properties: { path: { type: 'string', pattern: 'secret' } },
-    } } }],
-  }));
+  assert.throws(() =>
+    engine.validate({
+      ...request,
+      tools: [
+        {
+          type: 'function',
+          function: {
+            name: 'read_file',
+            parameters: {
+              type: 'object',
+              properties: { path: { type: 'string', pattern: 'secret' } },
+            },
+          },
+        },
+      ],
+    }),
+  );
   assert.equal(calls, 0);
 });
 
 void test('a tool call truncated by the model is never returned for execution', async () => {
-  const fetcher: typeof fetch = async () => Response.json({
-    model: MODEL.name, created_at: '2026-01-01T00:00:00Z', done: true,
-    done_reason: 'length', message: { role: 'assistant', content: '', tool_calls: [
-      { function: { name: 'read_file', arguments: {} } },
-    ] }, prompt_eval_count: 2, eval_count: 3,
-  });
+  const fetcher: typeof fetch = async () =>
+    Response.json({
+      model: MODEL.name,
+      created_at: '2026-01-01T00:00:00Z',
+      done: true,
+      done_reason: 'length',
+      message: {
+        role: 'assistant',
+        content: '',
+        tool_calls: [{ function: { name: 'read_file', arguments: {} } }],
+      },
+      prompt_eval_count: 2,
+      eval_count: 3,
+    });
   const engine = createOllamaAgent('http://127.0.0.1:11434/', fetcher);
   await assert.rejects(engine.generate(request));
 });
 
 void test('tool arguments must satisfy the supported schema before returning them', async () => {
+  const fetcher: typeof fetch = async () =>
+    Response.json({
+      model: MODEL.name,
+      created_at: '2026-01-01T00:00:00Z',
+      done: true,
+      done_reason: 'stop',
+      message: {
+        role: 'assistant',
+        content: '',
+        tool_calls: [
+          { function: { name: 'read_file', arguments: { path: 1 } } },
+        ],
+      },
+      prompt_eval_count: 2,
+      eval_count: 3,
+    });
+  const engine = createOllamaAgent('http://127.0.0.1:11434/', fetcher);
+  await assert.rejects(
+    engine.generate({
+      ...request,
+      tools: [
+        {
+          type: 'function',
+          function: {
+            name: 'read_file',
+            parameters: {
+              type: 'object',
+              properties: { path: { type: 'string' } },
+              required: ['path'],
+              additionalProperties: false,
+            },
+          },
+        },
+      ],
+    }),
+  );
+});
+
+void test('remote model aliases and remote inference results are not accepted', async () => {
+  assert.throws(() => createOllamaAgent('http://127.0.0.1:11434/', fetch, { model: 'other-cloud' }));
   const fetcher: typeof fetch = async () => Response.json({
-    model: MODEL.name, created_at: '2026-01-01T00:00:00Z', done: true,
-    done_reason: 'stop', message: { role: 'assistant', content: '', tool_calls: [
-      { function: { name: 'read_file', arguments: { path: 1 } } },
-    ] }, prompt_eval_count: 2, eval_count: 3,
+    model: MODEL.name, remote_host: 'https://remote.invalid',
+    created_at: '2026-01-01T00:00:00Z', done: true,
+    done_reason: 'stop', message: { role: 'assistant', content: 'synthetic' },
+    prompt_eval_count: 2, eval_count: 3,
   });
   const engine = createOllamaAgent('http://127.0.0.1:11434/', fetcher);
-  await assert.rejects(engine.generate({
-    ...request,
-    tools: [{ type: 'function', function: { name: 'read_file', parameters: {
-      type: 'object', properties: { path: { type: 'string' } }, required: ['path'],
-      additionalProperties: false,
-    } } }],
-  }));
+  await assert.rejects(engine.generate(request));
 });
