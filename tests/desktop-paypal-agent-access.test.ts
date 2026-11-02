@@ -70,8 +70,12 @@ void test('application shutdown waits for an in-flight disconnect', async () => 
   let closed = 0;
   let release = () => {};
   let entered = () => {};
-  const waiting = new Promise<void>((resolve) => { release = resolve; });
-  const started = new Promise<void>((resolve) => { entered = resolve; });
+  const waiting = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const started = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
   const endpoint = {
     url: 'http://127.0.0.1:12345/v1',
     key: 'synthetic-key',

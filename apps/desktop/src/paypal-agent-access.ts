@@ -26,7 +26,25 @@ export function createDesktopPaypalAgentAccess(
   let opening: Promise<Endpoint> | undefined;
   let current: Endpoint | undefined;
   let busy = false;
+  let pending: Promise<void> = Promise.resolve();
   let closing: Promise<void> | undefined;
+  function run(action: () => Promise<void>) {
+    if (closing || busy)
+      return Promise.reject(new Error('Agent access is busy.'));
+    busy = true;
+    const result = (async () => {
+      try {
+        await action();
+      } finally {
+        busy = false;
+      }
+    })();
+    pending = result.then(
+      () => {},
+      () => {},
+    );
+    return result;
+  }
   async function connect() {
     const state = status();
     if (
@@ -51,33 +69,27 @@ export function createDesktopPaypalAgentAccess(
     }
     return snapshot(await opening);
   }
-  async function confirm() {
-    if (closing || busy || !current || !current.hasPending())
-      throw new Error('No agent response is available.');
-    busy = true;
-    try {
+  function confirm() {
+    return run(async () => {
+      if (!current || !current.hasPending())
+        throw new Error('No agent response is available.');
       await current.acknowledgePending();
-    } finally {
-      busy = false;
-    }
+    });
   }
-  async function disconnect() {
-    if (closing || busy) throw new Error('Agent access is busy.');
-    busy = true;
-    try {
+  function disconnect() {
+    return run(async () => {
       const endpoint = opening ? await opening : undefined;
       if (endpoint?.hasPending())
         throw new Error('An agent response is pending.');
       await endpoint?.close();
       opening = undefined;
       current = undefined;
-    } finally {
-      busy = false;
-    }
+    });
   }
   function close() {
     if (!closing) {
       closing = (async () => {
+        await pending;
         const endpoint = opening
           ? await opening.catch(() => undefined)
           : undefined;
