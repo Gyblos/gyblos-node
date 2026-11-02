@@ -51,6 +51,9 @@ from [faucet.solana.com](https://faucet.solana.com); inference needs
 
 ### 1. Offline checks
 
+First check the active Node.js and pnpm versions; see the
+[toolchain setup guide](CONTRIBUTING.md#set-up-nodejs-and-pnpm).
+
 ```sh
 pnpm install --frozen-lockfile
 pnpm check

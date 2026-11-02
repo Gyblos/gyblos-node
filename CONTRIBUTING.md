@@ -8,6 +8,38 @@ provides product and technical context without access to the private vault.
 Ask a maintainer when a decision needed for your contribution is missing or
 unclear.
 
+## Set up Node.js and pnpm
+
+The project currently requires Node.js 22 or newer and the pnpm version pinned
+in [package.json](package.json). For development, prefer the latest available
+security-patched Node.js 24 release. Before installing dependencies, check the
+tools selected by the terminal you will use:
+
+```sh
+node --version
+node -p "process.execPath"
+pnpm --version
+```
+
+If Node is older than 22, or you want to use the recommended Node 24 line,
+select a supported version with your existing version manager, or install one
+if needed. For example, if you already use nvm:
+
+```sh
+nvm install 24
+nvm use 24
+```
+
+If the terminal still selects an older Node, check your shell's `PATH` and
+version-manager initialization, then open a new terminal (including an editor's
+integrated terminal) and repeat the checks. `process.execPath` shows the Node
+executable actually in use. Make sure pnpm reports the pinned version before
+running `pnpm install --frozen-lockfile`.
+
+The discovery index's `node:sqlite` tests skip when that module is unavailable
+(it is unflagged in Node 22.13 and later). See
+[native skips](tests/README.md#native-skips); a skipped case is not a pass.
+
 ## One workflow for every contributor
 
 The repository uses the same workflow for humans, Codex, Claude Code and other
