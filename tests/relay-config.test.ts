@@ -203,8 +203,10 @@ void test(
   async (context) => {
     const directory = await mkdtemp(join(tmpdir(), 'gyblos-relay-parent-'));
     const previous = process.env.GYBLOS_HOME;
+    const previousLab = process.env.GYBLOS_LAB_HOME;
     try {
       process.env.GYBLOS_HOME = join(directory, 'external-home');
+      process.env.GYBLOS_LAB_HOME = join(directory, 'external-lab');
       setRelayUrls(context, OWNED_RELAY);
       const { trustedOffer } = await import('@gyblos/buyer/buyer');
       await withRelayOffer(OWNED_RELAY.slice(0, -1), async () => {
@@ -212,9 +214,13 @@ void test(
         assert.equal(offer.endpoint.relayUrl, OWNED_RELAY.slice(0, -1));
       });
       assert.deepEqual(await readdir(directory), []);
+      assert.equal(process.env.GYBLOS_HOME, join(directory, 'external-home'));
+      assert.equal(process.env.GYBLOS_LAB_HOME, join(directory, 'external-lab'));
     } finally {
       if (previous === undefined) delete process.env.GYBLOS_HOME;
       else process.env.GYBLOS_HOME = previous;
+      if (previousLab === undefined) delete process.env.GYBLOS_LAB_HOME;
+      else process.env.GYBLOS_LAB_HOME = previousLab;
       await rm(directory, { recursive: true, force: true });
     }
   },
