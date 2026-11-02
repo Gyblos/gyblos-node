@@ -140,6 +140,12 @@ async function signOpen(
     payTo: terms.payTo,
     feePayer: terms.feePayer,
     maxAtomic: terms.maxAtomic,
+    // What the open signs for: trusted terms carry exactly the policy's mint, treasury and rate.
+    policy: {
+      mint: terms.mint,
+      treasury: terms.treasury,
+      protocolFeeBps: terms.protocolFeeBps,
+    },
     openSlot: hints.recentSlot,
     lastValidBlockHeight: hints.lastValidBlockHeight,
     expiresAt: terms.expiresAt,

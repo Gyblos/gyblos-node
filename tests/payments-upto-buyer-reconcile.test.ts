@@ -1,6 +1,7 @@
 // The buyer's reconciliation from finalized history: a claim that emptied the escrow settles, disputes
 // or is unchecked against the buyer's own count, reported before the journal changes; an open is never
-// opened only on the chain's word; anything else stays open. Temporary journal; chain double.
+// opened only on the chain's word; anything else stays open. Each channel is read with the mint and
+// treasury its open accepted. Temporary journal; chain double.
 import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -91,6 +92,7 @@ async function withJournal(
         payTo: PAY_TO,
         feePayer: PAY_TO,
         maxAtomic: '1000',
+        policy: null,
         openSlot: String(OPEN_SLOT),
         lastValidBlockHeight: String(LAST_VALID),
         expiresAt: Date.now() + 60_000,
@@ -166,6 +168,39 @@ void test('a claim that emptied the escrow settles, disputes or is unchecked, re
       assert.deepEqual(await reconcile(journal, state([])).run, []);
     });
 });
+
+void test('a channel is read with the mint and treasury its open accepted, not the buyer’s current ones', () =>
+  withJournal(async (journal) => {
+    const accepted = {
+      mint: 'Mint211111111111111111111111111111111111111',
+      treasury: 'Treas21111111111111111111111111111111111111',
+      protocolFeeBps: 300,
+    };
+    const held = await journal.get(DIGEST);
+    await journal.put({ ...held!, policy: accepted });
+    // The claim moved the old mint and paid the old treasury; the buyer's policy now names others.
+    const claim: HistoryEntry = {
+      signature: signatureOf(1),
+      flows: [
+        { owner: CHANNEL, before: 1000n, after: 0n },
+        { owner: PAY_TO, before: 0n, after: 8n },
+        { owner: accepted.treasury, before: 0n, after: 1n },
+        { owner: PAYER, before: 0n, after: 991n },
+      ],
+    };
+    const { run } = reconcile(
+      journal,
+      state([OPEN, claim], { mint: accepted.mint }),
+      { expected: '9' },
+    );
+    const [result] = await run;
+    assert.deepEqual(
+      [result?.outcome, result?.chargedAtomic, result?.feeAtomic],
+      [RECONCILE_OUTCOMES.SETTLED, '9', '1'],
+    );
+    // Settling keeps the accepted policy.
+    assert.deepEqual((await journal.get(DIGEST))?.policy, accepted);
+  }));
 
 void test('a report that fails leaves the channel open for the next run', () =>
   withJournal(async (journal) => {
@@ -292,6 +327,7 @@ void test('entries are read in turn; a failing read keeps what was already repor
         payTo: PAY_TO,
         feePayer: PAY_TO,
         maxAtomic: '1000',
+        policy: null,
         openSlot: '1',
         lastValidBlockHeight: '1',
         expiresAt: Date.now() + 60_000,

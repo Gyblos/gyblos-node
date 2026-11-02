@@ -27,6 +27,7 @@ export {
   openUptoBuyerJournal,
   type UptoBuyerJournal,
   type UptoJournalEntry,
+  type UptoJournalPolicy,
 } from './buyer-journal';
 export {
   createUptoPaymentClient,
