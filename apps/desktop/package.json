@@ -9,6 +9,7 @@
     "./backup-feedback": "./src/ui/backup-feedback.ts",
     "./probe-model": "./src/probe-model.ts",
     "./probe-session": "./src/probe-session.ts",
+    "./paypal-session": "./src/paypal-session.ts",
     "./chat-state": "./src/ui/chat-state.ts",
     "./chat-controller": "./src/ui/chat-controller.ts",
     "./connection-state": "./src/ui/connection-state.ts",

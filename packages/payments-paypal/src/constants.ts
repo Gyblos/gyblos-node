@@ -3,7 +3,7 @@ import { PAYPAL_SANDBOX } from '@gyblos/config/constants';
 
 export const PAYPAL_API = {
   origin: 'https://api-m.sandbox.paypal.com',
-  approvalHost: 'www.sandbox.paypal.com',
+  approvalHost: PAYPAL_SANDBOX.approvalHost,
   timeoutMs: 15_000,
   limitCents: PAYPAL_SANDBOX.limitCents,
   centsPerDollar: PAYPAL_SANDBOX.centsPerDollar,

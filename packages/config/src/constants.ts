@@ -29,6 +29,7 @@ export const PAYPAL_SANDBOX = {
   sessionMs: PAYPAL_SESSION_MINUTES * MILLISECONDS_PER_MINUTE,
   port: 8765,
   maxPort: 65535,
+  approvalHost: 'www.sandbox.paypal.com',
   ollamaOrigin: 'http://127.0.0.1:11434/',
 } as const;
 export const PAYPAL_CONFIG_ERROR = 'PAYPAL_CONFIG_INVALID';
