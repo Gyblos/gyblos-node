@@ -102,6 +102,7 @@ void test('Claude Code configuration uses a local root URL without embedding cre
   assert.doesNotMatch(config, /synthetic-secret-key/);
   assert.match(config, /ANTHROPIC_BASE_URL='http:\/\/127\.0\.0\.1:12345'/);
   assert.match(config, /ANTHROPIC_AUTH_TOKEN="\$GYBLOS_API_KEY"/);
+  assert.match(config, /ANTHROPIC_API_KEY="\$GYBLOS_API_KEY"/);
   assert.match(config, /CLAUDE_CODE_MAX_OUTPUT_TOKENS=512/);
   assert.match(config, /CLAUDE_CODE_MAX_CONTEXT_TOKENS=8192/);
   assert.match(config, /CLAUDE_CODE_EFFORT_LEVEL=auto/);
