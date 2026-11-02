@@ -181,3 +181,29 @@ void test('a partial capture with an unexpected amount or currency remains unres
     await assert.rejects(payment.capture('AUTH1', 20));
   }
 });
+
+void test('an existing order recovers only its own validated approval link', async () => {
+  const fetchMock: typeof fetch = async (input) =>
+    String(input).endsWith('/v1/oauth2/token')
+      ? Response.json({ access_token: 'synthetic-token' })
+      : Response.json({
+          id: 'ORDER1',
+          links: [
+            {
+              rel: 'payer-action',
+              href: 'https://www.sandbox.paypal.com/checkoutnow?token=ORDER1',
+            },
+          ],
+        });
+  const payment = createPaypalSandbox({
+    clientId: 'test-id',
+    clientSecret: 'test-secret',
+    returnOrigin: 'http://127.0.0.1:8765',
+    fetch: fetchMock,
+  });
+  assert.equal(
+    await payment.approvalUrl('ORDER1'),
+    'https://www.sandbox.paypal.com/checkoutnow?token=ORDER1',
+  );
+  await assert.rejects(payment.approvalUrl('ORDER2'));
+});

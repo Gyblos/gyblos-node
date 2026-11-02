@@ -130,3 +130,47 @@ void test('a restarted unapproved order cannot silently create a second order', 
   await assert.rejects(resumed.create());
   assert.deepEqual(f.calls, ['create']);
 });
+
+void test('model unavailability prevents new usage but allows existing settlement', async () => {
+  const f = fixture();
+  let available = false;
+  const session = await createPaypalSession(f);
+  const desktop = createDesktopPaypalSession(session, async () => {}, {
+    checkEngine: async () => {
+      if (!available) throw new Error('synthetic model unavailable');
+    },
+  });
+  await assert.rejects(desktop.create());
+  assert.deepEqual(f.calls, []);
+  available = true;
+  await desktop.create();
+  await desktop.approve();
+  const answer = await desktop.send('First question');
+  await desktop.acknowledge(answer.messageId);
+  available = false;
+  await assert.rejects(desktop.send('Second question'));
+  assert.equal(desktop.status().phase, 'active');
+  assert.equal((await desktop.finish()).phase, 'completed');
+  assert.deepEqual(f.calls, ['create', 'authorize', 'generate', 'capture:10']);
+});
+
+void test('a created order can recover its private approval link after restart', async () => {
+  const { f, desktop } = await setup();
+  await desktop.create();
+  const opened: string[] = [];
+  const resumed = createDesktopPaypalSession(
+    await createPaypalSession(f),
+    async (url) => {
+      opened.push(url);
+    },
+    {
+      recoverApproval: async (orderId) => {
+        assert.equal(orderId, 'ORDER1');
+        return 'https://www.sandbox.paypal.com/checkoutnow?token=ORDER1';
+      },
+    },
+  );
+  await resumed.openApproval();
+  assert.equal(opened.length, 1);
+  assert.deepEqual(f.calls, ['create']);
+});

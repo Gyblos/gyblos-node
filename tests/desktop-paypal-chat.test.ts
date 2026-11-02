@@ -175,3 +175,17 @@ void test('a valid long response is acknowledged rather than lost by the desktop
   assert.equal(chat.getSnapshot().status?.spentCents, 10);
   assert.equal(chat.getSnapshot().pendingMessageId, null);
 });
+
+void test('a new sandbox session starts with an empty transcript after settlement', async () => {
+  const { chat } = await setup();
+  await chat.refresh();
+  await chat.create();
+  await chat.approve();
+  chat.setDraft('First session');
+  await chat.send();
+  await chat.finish();
+  assert.equal(chat.getSnapshot().messages.length, 2);
+  await chat.create();
+  assert.equal(chat.getSnapshot().status?.phase, 'created');
+  assert.deepEqual(chat.getSnapshot().messages, []);
+});
