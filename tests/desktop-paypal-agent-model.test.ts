@@ -3,6 +3,7 @@ import { test } from 'node:test';
 
 import {
   claudeCodeConfig,
+  claudeCodePowerShellConfig,
   codexConfig,
   opencodeConfig,
   parsePaypalAgentResult,
@@ -123,6 +124,21 @@ void test('Claude Code configuration uses a local root URL without embedding cre
   assert.match(config, /CLAUDE_CODE_MAX_OUTPUT_TOKENS=512/);
   assert.match(config, /CLAUDE_CODE_MAX_CONTEXT_TOKENS=8192/);
   assert.match(config, /CLAUDE_CODE_EFFORT_LEVEL=auto/);
+});
+
+void test('Claude Code PowerShell configuration safely sets the local gateway without embedding the key', () => {
+  const config = claudeCodePowerShellConfig({
+    url: 'http://127.0.0.1:12345/v1',
+    key: 'synthetic-secret-key',
+    model: "synthetic'model",
+  });
+  assert.doesNotMatch(config, /synthetic-secret-key/);
+  assert.match(config, /\$env:ANTHROPIC_BASE_URL = 'http:\/\/127\.0\.0\.1:12345'/);
+  assert.match(config, /\$env:ANTHROPIC_AUTH_TOKEN = \$env:GYBLOS_API_KEY/);
+  assert.match(config, /\$env:ANTHROPIC_API_KEY = \$env:GYBLOS_API_KEY/);
+  assert.match(config, /\$env:ANTHROPIC_MODEL = 'synthetic''model'/);
+  assert.match(config, /\$env:CLAUDE_CODE_MAX_OUTPUT_TOKENS = '512'/);
+  assert.match(config, /\$env:CLAUDE_CODE_MAX_CONTEXT_TOKENS = '8192'/);
 });
 
 void test('a confirmed disconnect clears an older stalled status warning', () => {
