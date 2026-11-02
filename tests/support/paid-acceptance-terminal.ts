@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { PassThrough, Writable } from 'node:stream';
 
-import { runTerminal } from '@gyblos/buyer/chat-cli';
+import { main as terminalMain } from '@gyblos/buyer/chat-cli';
 import { PAYMENT_CHANNEL_STATES } from '@gyblos/protocol/constants';
 
 import { PAID_ACCEPTANCE } from './paid-acceptance-constants';
@@ -27,6 +27,7 @@ export async function paidTerminal(
   };
   if (interrupted) run.engine.interrupt();
   if (reconcile) run.payments.unavailable(true);
+  await run.stopBuyer();
   const output = new Writable({
     write(chunk, _encoding, done) {
       const value = String(chunk);
@@ -41,10 +42,11 @@ export async function paidTerminal(
     },
   });
   try {
-    await runTerminal(
-      async ({ port }) => {
-        assert.equal(port, 0);
-        const owned = run.ownedBuyer();
+    await terminalMain({
+      buyerOptions: run.terminalOptions(),
+      onStarted: (host) => {
+        assert.ok('url' in host && typeof host.url === 'string');
+        const owned = run.registerTerminal({ ...host, url: host.url });
         return {
           chat: owned.chat,
           close: async () => {
@@ -56,7 +58,7 @@ export async function paidTerminal(
       input,
       output,
       signal,
-    );
+    });
   } finally {
     input.destroy();
     output.destroy();
@@ -83,6 +85,10 @@ export async function paidTerminal(
     assert.equal(questions, 1);
     assert.ok(text.includes('No retry was made'));
     assert.ok(text.includes('charged: 45; refunded: 9955'));
+    assert.ok(
+      text.indexOf(PAID_ACCEPTANCE.interruptedText) < text.indexOf('Error:'),
+    );
+    assert.ok(text.indexOf('Error:') < text.indexOf('Payment:'));
     assert.equal(state?.chargedAtomic, reconcile ? null : '45');
     const settlement = [...run.payments.ledger.transactions.values()].at(-1);
     assert.equal(settlement?.chargedAtomic, '45');

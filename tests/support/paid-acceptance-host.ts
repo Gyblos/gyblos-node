@@ -5,6 +5,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 import { address } from '@solana/kit';
 
+import { startBuyer as startProductBuyer } from '@gyblos/buyer/buyer-main';
 import { startPaidBuyer } from '@gyblos/buyer/paid-startup';
 import { rolePathIn } from '@gyblos/config';
 import { fetchSellers } from '@gyblos/discovery-http';
@@ -92,7 +93,7 @@ export async function paidAcceptanceHost(signal: AbortSignal) {
     buyer = undefined;
   };
   const startBuyer = async () => {
-    buyer = await startPaidBuyer({
+    buyer = await startProductBuyer({
       bind,
       port: 0,
       chain: payments.buyer,
@@ -191,8 +192,18 @@ export async function paidAcceptanceHost(signal: AbortSignal) {
       reads: () => reads,
       external: () => external,
       token: () => token,
-      ownedBuyer() {
-        assert.ok(buyer);
+      stopBuyer: closeBuyer,
+      terminalOptions() {
+        assert.equal(buyer, undefined);
+        return {
+          bind,
+          chain: payments.buyer,
+          meter: async () => paidAcceptanceMeter,
+        };
+      },
+      registerTerminal(host: Awaited<ReturnType<typeof startProductBuyer>>) {
+        assert.equal(buyer, undefined);
+        buyer = host;
         return { chat: buyer.chat, close: closeBuyer };
       },
       url: () => {

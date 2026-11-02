@@ -40,10 +40,13 @@ export async function runTerminal(
 ) {
   if (signal?.aborted) return;
   const controller = new AbortController();
-  const abort = () => controller.abort();
+  const input = createInterface({ input: inputStream, output });
+  const abort = () => {
+    controller.abort();
+    input.close();
+  };
   signal?.addEventListener('abort', abort, { once: true });
   if (signal?.aborted) abort();
-  const input = createInterface({ input: inputStream, output });
   input.on('SIGINT', abort);
   try {
     await runOwnedChat(
@@ -120,12 +123,41 @@ export async function chatSession(options: ChatSessionOptions) {
     }
   }
 }
-export async function main() {
+export async function main(options?: {
+  start?: ChatStarter;
+  buyerOptions?: Parameters<typeof startBuyer>[0];
+  onStarted?: (
+    host: Awaited<ReturnType<ChatStarter>>,
+  ) => Awaited<ReturnType<ChatStarter>>;
+  input?: Readable;
+  output?: Writable;
+  signal?: AbortSignal;
+}) {
   const controller = new AbortController();
   const cancel = () => controller.abort();
   process.once('SIGINT', cancel);
   try {
-    await runTerminal(startBuyer, stdin, stdout, controller.signal);
+    const signal = options?.signal
+      ? AbortSignal.any([controller.signal, options.signal])
+      : controller.signal;
+    const start: ChatStarter = async ({ port }) => {
+      const host = await (options?.start ?? startBuyer)({
+        ...options?.buyerOptions,
+        port,
+      });
+      try {
+        return options?.onStarted?.(host) ?? host;
+      } catch (error) {
+        await host.close();
+        throw error;
+      }
+    };
+    await runTerminal(
+      start,
+      options?.input ?? stdin,
+      options?.output ?? stdout,
+      signal,
+    );
   } catch {
     console.error(
       'Could not start the buyer. Check its configuration and ensure another buyer is not running; see docs/running-a-node.md.',
