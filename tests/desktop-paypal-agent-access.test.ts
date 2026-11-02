@@ -65,3 +65,39 @@ void test('a pending agent response must be confirmed before disconnect', async 
   await access.disconnect();
   assert.equal(closed, 1);
 });
+
+void test('application shutdown waits for an in-flight disconnect', async () => {
+  let closed = 0;
+  let release = () => {};
+  let entered = () => {};
+  const waiting = new Promise<void>((resolve) => { release = resolve; });
+  const started = new Promise<void>((resolve) => { entered = resolve; });
+  const endpoint = {
+    url: 'http://127.0.0.1:12345/v1',
+    key: 'synthetic-key',
+    model: 'synthetic-model',
+    hasPending: () => false,
+    async acknowledgePending() {},
+    async close() {
+      closed += 1;
+      entered();
+      await waiting;
+    },
+  };
+  const access = createDesktopPaypalAgentAccess(
+    () => ({ phase: 'active', expired: false }),
+    async () => endpoint,
+  );
+  await access.connect();
+  const disconnect = access.disconnect();
+  await started;
+  const shutdown = access.close();
+  await Promise.resolve();
+  try {
+    assert.equal(closed, 1);
+  } finally {
+    release();
+  }
+  await Promise.all([disconnect, shutdown]);
+  assert.equal(closed, 1);
+});
