@@ -1,4 +1,4 @@
-// Refuses cross-network recovery before RPC, reporting, or withdrawal; legacy entries are devnet-only.
+// Classifies signed journal entries by network before recovery; legacy entries remain unbound.
 import {
   UPTO_SOLANA_NAMESPACE,
   UPTO_SOLANA_REFERENCE_LENGTH,

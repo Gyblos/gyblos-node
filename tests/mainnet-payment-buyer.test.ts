@@ -1,6 +1,6 @@
 // Mainnet remains locked and caller mutation cannot change the verified buyer policy or verifier.
 import assert from 'node:assert/strict';
-import { lstat, mkdtemp, rm } from 'node:fs/promises';
+import { lstat, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -16,6 +16,7 @@ import {
 } from '@gyblos/config';
 import {
   createUptoPaymentClient,
+  openUptoBuyerJournal,
   openUptoBuyerPayments,
   type UptoBuyerJournal,
   type UptoPaymentClientOptions,
@@ -26,6 +27,7 @@ import {
 } from '@gyblos/protocol/constants';
 import { PaymentError, type PaymentTerms } from '@gyblos/protocol/payment';
 
+import { entry } from './support/mainnet-journal';
 import { hints } from './support/payment-upto';
 import { JOURNAL_FAULTS, memoryJournal } from './support/payment-upto-client';
 import { newLedger } from './support/payment-upto-ledger';
@@ -209,3 +211,34 @@ void test('receipt and discard cannot close a foreign or unknown network entry',
     );
   }
 });
+
+void test('an unresolved legacy journal blocks new signatures without upgrading the file', () =>
+  withRoot(async (root) => {
+    const paths = buyerJournalPathsIn({ GYBLOS_HOME: root });
+    await (await openUptoBuyerJournal({ paths, now: () => NOW })).close();
+    const { network: _network, ...legacyPolicy } = entry(DEVNET).policy;
+    const legacy = JSON.stringify({
+      version: 3,
+      entries: [
+        {
+          ...entry(DEVNET),
+          requestDigest: 'cd'.repeat(32),
+          policy: legacyPolicy,
+          updatedAt: NOW,
+        },
+      ],
+    });
+    await writeFile(paths.state, legacy, { mode: 0o600 });
+    const journal = await openUptoBuyerJournal({ paths, now: () => NOW });
+    try {
+      const { client, counter, terms } = await buyer(journal);
+      await assert.rejects(
+        client.authorize(terms),
+        code(PAYMENT_ERROR_CODES.JOURNAL_UNAVAILABLE),
+      );
+      assert.equal(counter.signed, 0);
+      assert.equal(await readFile(paths.state, 'utf8'), legacy);
+    } finally {
+      await journal.close();
+    }
+  }));

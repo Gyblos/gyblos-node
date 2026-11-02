@@ -22,6 +22,7 @@ import {
   networkRecoveryBlock,
   snapshotJournal,
 } from './journal-network';
+import { assertPaymentNetworkEnabled } from './mainnet';
 
 export type UptoBuyerWithdrawStep =
   (typeof WITHDRAW_STEPS)[keyof typeof WITHDRAW_STEPS];
@@ -109,11 +110,19 @@ async function stepFor(
 export async function withdrawUptoBuyer(
   options: UptoBuyerWithdrawOptions,
 ): Promise<UptoBuyerWithdrawResult[]> {
+  const network = options.network;
+  assertPaymentNetworkEnabled(network);
   const withdraw = options.withdrawal.withdraw.bind(options.withdrawal);
-  const fixed = {
-    ...options,
+  const fixed: UptoBuyerWithdrawOptions = {
+    network,
     journal: snapshotJournal(options.journal),
     withdrawal: { withdraw },
+    mint: options.mint,
+    treasury: options.treasury,
+    protocolFeeBps: options.protocolFeeBps,
+    maxTimeoutSeconds: options.maxTimeoutSeconds,
+    now: options.now.bind(options),
+    report: options.report.bind(options),
   };
   checkJournalNetwork(fixed.network);
   const entries = (await fixed.journal.list()).map((entry) => ({

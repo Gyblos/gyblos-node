@@ -281,11 +281,14 @@ async function checkReceipt(
 export function createUptoPaymentClient(
   options: UptoPaymentClientOptions,
 ): PaymentClient {
-  const fixed = {
-    ...options,
+  const fixed: UptoPaymentClientOptions = {
+    payer: options.payer,
     journal: snapshotJournal(options.journal),
     policy: { ...options.policy },
     settings: { ...options.settings },
+    hints: options.hints.bind(options),
+    confirm: options.confirm.bind(options),
+    now: options.now.bind(options),
   };
   checkedPolicy(fixed.policy);
   // Requests being authorized now, so a concurrent call for the same one is refused before any await.

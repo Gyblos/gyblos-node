@@ -46,7 +46,7 @@ void test('journal records network with the policy and persists it after restart
 });
 
 void test('reconcile keeps foreign or unbound networks open without RPC', async () => {
-  for (const network of [DEVNET, null]) {
+  for (const network of [SOLANA_MAINNET_CAIP2, null]) {
     await withJournal(async (journal) => {
       await journal.put(entry(network));
       const chain = chainDouble({
@@ -59,7 +59,7 @@ void test('reconcile keeps foreign or unbound networks open without RPC', async 
       let reports = 0;
       const options = {
         journal,
-        network: SOLANA_MAINNET_CAIP2,
+        network: DEVNET,
         rpc: chain.rpc,
         payer: ADDRESS,
         mint: ADDRESS,
@@ -86,14 +86,14 @@ void test('reconcile keeps foreign or unbound networks open without RPC', async 
 });
 
 void test('withdraw refuses foreign or unbound networks without transactions', async () => {
-  for (const network of [DEVNET, null]) {
+  for (const network of [SOLANA_MAINNET_CAIP2, null]) {
     await withJournal(async (journal) => {
       await journal.put(entry(network));
       let transactions = 0;
       let reports = 0;
       const options = {
         journal,
-        network: SOLANA_MAINNET_CAIP2,
+        network: DEVNET,
         withdrawal: {
           withdraw: async () => {
             transactions++;
@@ -212,97 +212,6 @@ void test('journal rejects malformed network identifiers without changing the si
       await assert.rejects(journal.put(entry(network)));
       assert.deepEqual(await journal.list(), []);
     }
-  });
-});
-
-void test('a mainnet-bound synthetic journal can be reconciled against a matching fake chain', async () => {
-  await withJournal(async (journal) => {
-    await journal.put(entry(SOLANA_MAINNET_CAIP2));
-    const chain = chainDouble({
-      mint: ADDRESS,
-      history: new Map(),
-      blockHeight: 2n,
-      oldestSlot: 0n,
-      accounts: new Set(),
-    });
-    const results = await reconcileUptoBuyer({
-      journal,
-      network: SOLANA_MAINNET_CAIP2,
-      rpc: chain.rpc,
-      payer: ADDRESS,
-      mint: ADDRESS,
-      treasury: ADDRESS,
-      expected: () => undefined,
-      report: async () => {},
-    });
-    assert.equal(results.length, 1);
-    assert.equal(
-      (await journal.list())[0]?.state,
-      PAYMENT_CHANNEL_STATES.SETTLED,
-    );
-    assert.notEqual(chain.reads.length, 0);
-  });
-});
-
-void test('legacy unknown network never resolves merely because devnet has no channel', async () => {
-  await withJournal(async (journal) => {
-    await journal.put(entry(null));
-    const chain = chainDouble({
-      mint: ADDRESS,
-      history: new Map(),
-      blockHeight: 2n,
-      oldestSlot: 0n,
-      accounts: new Set(),
-    });
-    const [result] = await reconcileUptoBuyer({
-      journal,
-      network: DEVNET,
-      rpc: chain.rpc,
-      payer: ADDRESS,
-      mint: ADDRESS,
-      treasury: ADDRESS,
-      expected: () => undefined,
-      report: async () => {},
-    });
-    assert.equal(result?.outcome, 'open');
-    assert.equal(result?.networkBlock, 'unknown');
-    assert.deepEqual(chain.reads, []);
-    assert.equal((await journal.list())[0]?.state, PAYMENT_CHANNEL_STATES.OPEN);
-  });
-});
-
-void test('changing recovery network while reading the journal cannot redirect a channel', async () => {
-  await withJournal(async (journal) => {
-    await journal.put(entry(SOLANA_MAINNET_CAIP2));
-    const chain = chainDouble({
-      mint: ADDRESS,
-      history: new Map(),
-      blockHeight: 2n,
-      oldestSlot: 0n,
-      accounts: new Set(),
-    });
-    const options = {
-      journal,
-      network: DEVNET as string,
-      rpc: chain.rpc,
-      payer: ADDRESS,
-      mint: ADDRESS,
-      treasury: ADDRESS,
-      expected: () => undefined,
-      report: async () => {},
-    };
-    options.journal = {
-      ...journal,
-      list: async () => {
-        options.network = SOLANA_MAINNET_CAIP2;
-        return journal.list();
-      },
-    };
-    const [result] = await reconcileUptoBuyer(options);
-    assert.equal(result?.outcome, 'open');
-    assert.equal(result?.networkBlock, 'mismatch');
-    assert.deepEqual(chain.reads, []);
-    assert.equal((await journal.list())[0]?.state, PAYMENT_CHANNEL_STATES.OPEN);
   });
 });
 

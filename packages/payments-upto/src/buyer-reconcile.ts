@@ -18,6 +18,7 @@ import {
   networkRecoveryBlock,
   snapshotJournal,
 } from './journal-network';
+import { assertPaymentNetworkEnabled } from './mainnet';
 
 export type UptoReconcileOutcome =
   (typeof RECONCILE_OUTCOMES)[keyof typeof RECONCILE_OUTCOMES];
@@ -128,10 +129,17 @@ function outcomeOf(
 export async function reconcileUptoBuyer(
   options: UptoReconcileOptions,
 ): Promise<UptoReconcileResult[]> {
+  const network = options.network;
+  assertPaymentNetworkEnabled(network);
   const rpc = options.rpc;
-  const fixed = {
-    ...options,
+  const fixed: UptoReconcileOptions = {
+    network,
     journal: snapshotJournal(options.journal),
+    payer: options.payer,
+    mint: options.mint,
+    treasury: options.treasury,
+    expected: options.expected.bind(options),
+    report: options.report.bind(options),
     rpc: {
       getSignaturesForAddress: rpc.getSignaturesForAddress.bind(rpc),
       getEpochInfo: rpc.getEpochInfo.bind(rpc),

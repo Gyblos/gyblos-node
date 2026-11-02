@@ -34,10 +34,10 @@ export function buyerChainReconcile(
   report: UptoReconcileOptions['report'],
 ) => Promise<UptoReconcileResult[]> {
   return async (inputRole, expected, report) => {
-    const role = { ...inputRole };
-    if (role.role !== P2P_ROLES.BUYER)
+    if (inputRole.role !== P2P_ROLES.BUYER)
       throw new NodeError(NODE_ERROR_CODES.BUYER_PAYMENT_KEY_INVALID);
-    const served = await genesis(role.rpcUrl).catch(() => undefined);
+    const { rpcUrl, buyer, mint } = inputRole;
+    const served = await genesis(rpcUrl).catch(() => undefined);
     if (served !== DEVNET_GENESIS)
       throw new NodeError(NODE_ERROR_CODES.BUYER_PAYMENT_NETWORK_MISMATCH);
     const journal = await openUptoBuyerJournal({
@@ -48,9 +48,9 @@ export function buyerChainReconcile(
       return await reconcileUptoBuyer({
         journal,
         network: DEVNET,
-        rpc: rpc ?? createSolanaRpc(role.rpcUrl),
-        payer: role.buyer,
-        mint: role.mint,
+        rpc: rpc ?? createSolanaRpc(rpcUrl),
+        payer: buyer,
+        mint,
         treasury: PROTOCOL_FEE.treasury,
         expected,
         report,

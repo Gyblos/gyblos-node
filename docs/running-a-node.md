@@ -758,8 +758,8 @@ shortest `retryAfterSeconds`:
   payer, deposit, mint and network fee distribution, so nothing was signed for
   it. The journal keeps the mint, fee treasury and fee rate each open accepted,
   so a later change to the role's mint or the network fee does not affect
-  channels already open. Entries journaled before that use the current role's
-  mint and fee; for those, restore the role's mint and run again.
+  channels already open. Entries journaled before that have no recorded network
+  and remain blocked until their provenance is independently established.
 - `failed`: this channel's step failed with the static code in `failure`
   (`UPTO_UNAVAILABLE` for the RPC, `UPTO_CHAIN_REJECTED` when the chain or its
   preflight refused the transaction, which also happens when an earlier
@@ -793,9 +793,10 @@ It never changes the journal. Once a channel is distributed and finalized,
 `pnpm buyer:reconcile:paid` reads it from history and unblocks payments: the
 charge is what the seller had settled (usually nothing). If the buyer had
 counted a delivered answer that the seller never claimed, that shows as
-`disputed` with a smaller charge. A journal entry from before this version whose
-open never landed shows `nothing` here, and reconciliation cannot prove it
-unopened, so it keeps blocking payments.
+`disputed` with a smaller charge. A signed older entry without a recorded
+network remains open; an empty history on the selected chain does not prove the
+entry was created on that chain. There is no automatic legacy attribution or
+recovery command yet.
 
 The endpoint listens on loopback only and refuses browser requests, but loopback
 is not authentication, so paid mode also requires a bearer token. The first paid

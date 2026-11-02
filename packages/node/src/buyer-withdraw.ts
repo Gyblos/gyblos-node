@@ -37,11 +37,11 @@ export function buyerChainWithdraw(
   report: UptoBuyerWithdrawOptions['report'],
 ) => Promise<UptoBuyerWithdrawResult[]> {
   return async (inputRole, report) => {
-    const role = { ...inputRole };
-    if (role.role !== P2P_ROLES.BUYER)
+    if (inputRole.role !== P2P_ROLES.BUYER)
       throw new NodeError(NODE_ERROR_CODES.BUYER_PAYMENT_KEY_INVALID);
+    const { rpcUrl, mint } = inputRole;
     // Devnet only: this signs and spends fees from the buyer's wallet.
-    const served = await genesis(role.rpcUrl).catch(() => undefined);
+    const served = await genesis(rpcUrl).catch(() => undefined);
     if (served !== DEVNET_GENESIS)
       throw new NodeError(NODE_ERROR_CODES.BUYER_PAYMENT_NETWORK_MISMATCH);
     const payer = await roleSigner(P2P_ROLES.BUYER, P2P_ROLES.BUYER).catch(
@@ -57,12 +57,12 @@ export function buyerChainWithdraw(
       return await withdrawUptoBuyer({
         journal,
         network: DEVNET,
-        withdrawal: createUptoWithdrawal(rpc ?? createSolanaRpc(role.rpcUrl), {
+        withdrawal: createUptoWithdrawal(rpc ?? createSolanaRpc(rpcUrl), {
           payer,
           network: DEVNET,
           tokenProgram: UPTO_CHANNEL_SETTINGS.tokenProgram,
         }),
-        mint: role.mint,
+        mint,
         treasury: PROTOCOL_FEE.treasury,
         protocolFeeBps: PROTOCOL_FEE.bps,
         maxTimeoutSeconds: UPTO_CHANNEL_SETTINGS.maxTimeoutSeconds,
