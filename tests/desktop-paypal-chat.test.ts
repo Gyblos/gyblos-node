@@ -226,3 +226,23 @@ void test('an expired session does not blame a valid prompt', async () => {
   assert.match(chat.getSnapshot().notice, /expired/i);
   assert.equal(chat.getSnapshot().draft, 'A valid prompt');
 });
+
+void test('background status updates show external usage without blocking the composer', async () => {
+  const { run } = await setup();
+  let externalSpent = 0;
+  const chat = new PaypalChatController(async (request) => {
+    const result = await run(request);
+    if (request.action === 'status' && result.status)
+      return { ...result, status: { ...result.status, spentCents: externalSpent } };
+    return result;
+  });
+  await chat.refresh();
+  await chat.create();
+  await chat.approve();
+  chat.setDraft('Keep typing');
+  externalSpent = 20;
+  await chat.poll();
+  assert.equal(chat.getSnapshot().status?.spentCents, 20);
+  assert.equal(chat.getSnapshot().draft, 'Keep typing');
+  assert.equal(chat.getSnapshot().busy, false);
+});
