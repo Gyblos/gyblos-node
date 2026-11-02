@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { createDesktopPaypalAgentHandlers } from '@gyblos/desktop/paypal-agent-handlers';
+import { PAYPAL_AGENT_USAGE_STATE } from '@gyblos/desktop/paypal-agent-model';
 
 void test('only the desktop main frame can request agent connection details', async () => {
   const contents = {};
@@ -15,6 +16,7 @@ void test('only the desktop main frame can request agent connection details', as
     limitCents: 100,
     usageUncertain: false,
     disconnecting: false,
+    usageState: PAYPAL_AGENT_USAGE_STATE.AVAILABLE,
   };
   const access = {
     status: () => connection,

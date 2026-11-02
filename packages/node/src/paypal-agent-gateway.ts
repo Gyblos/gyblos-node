@@ -34,7 +34,10 @@ function error(status: number, code: PaypalErrorCode) {
     { error: { message: code, type: 'invalid_request_error', code } },
     {
       status,
-      headers: { 'x-should-retry': 'false', 'cache-control': 'no-store' },
+      headers: {
+        'x-should-retry': code === PAYPAL_ERROR_CODES.BUSY ? 'true' : 'false',
+        'cache-control': 'no-store',
+      },
     },
   );
 }
@@ -224,10 +227,7 @@ export function createPaypalAgentGateway(options: GatewayOptions) {
     if (rejection) return rejection;
     if (request.method === 'GET') return modelList(options.model);
     if (busy || reading)
-      return error(
-        HTTP_STATUS.conflict,
-        PAYPAL_ERROR_CODES.NEEDS_RECONCILIATION,
-      );
+      return error(HTTP_STATUS.conflict, PAYPAL_ERROR_CODES.BUSY);
     let input: Record<string, unknown>;
     reading = true;
     try {
@@ -237,11 +237,7 @@ export function createPaypalAgentGateway(options: GatewayOptions) {
     } finally {
       reading = false;
     }
-    if (busy)
-      return error(
-        HTTP_STATUS.conflict,
-        PAYPAL_ERROR_CODES.NEEDS_RECONCILIATION,
-      );
+    if (busy) return error(HTTP_STATUS.conflict, PAYPAL_ERROR_CODES.BUSY);
     busy = true;
     try {
       const idempotencyKey =

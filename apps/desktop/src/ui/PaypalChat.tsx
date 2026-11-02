@@ -181,6 +181,10 @@ function SessionPanel({ chat, state }: ChatProps) {
       {phase === PAYPAL_SESSION_PHASE.ACTIVE && state.status?.expired && (
         <p>Session expired for new messages. Close it to settle.</p>
       )}
+      {phase === PAYPAL_SESSION_PHASE.ACTIVE &&
+        state.status?.remainingAttempts === 0 && (
+          <p>The attempt limit was reached. Close and settle the session.</p>
+        )}
       {phase === PAYPAL_SESSION_PHASE.CREATED &&
         !state.status?.approvalLinkAvailable && (
           <p>

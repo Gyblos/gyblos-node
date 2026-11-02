@@ -58,6 +58,7 @@ async function startSandbox() {
         await service.prepareAgent();
         return startDesktopPaypalAgent(service, opened.agentEngine.model);
       },
+      service.isBusy,
     );
     return {
       model,

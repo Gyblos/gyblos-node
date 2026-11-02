@@ -26,6 +26,19 @@ export const PAYPAL_AGENT_ERROR = {
   MODEL_UNAVAILABLE: 'model_unavailable',
   NEW_SESSION_REQUIRED: 'new_session_required',
 } as const;
+export const PAYPAL_AGENT_USAGE_STATE = {
+  AVAILABLE: 'available',
+  BUSY: 'busy',
+  CHAT_PENDING: 'chat_pending',
+  NEEDS_REVIEW: 'needs_review',
+  EXPIRED: 'expired',
+  ATTEMPTS_EXHAUSTED: 'attempts_exhausted',
+  LIMIT_REACHED: 'limit_reached',
+  DISCONNECTING: 'disconnecting',
+  DISCONNECT_FAILED: 'disconnect_failed',
+} as const;
+export type PaypalAgentUsageState =
+  (typeof PAYPAL_AGENT_USAGE_STATE)[keyof typeof PAYPAL_AGENT_USAGE_STATE];
 export class PaypalAgentConnectionError extends Error {
   constructor(
     readonly code:
@@ -53,6 +66,7 @@ export type PaypalAgentResult = {
     limitCents: number;
     usageUncertain: boolean;
     disconnecting: boolean;
+    usageState: PaypalAgentUsageState;
   } | null;
   error: (typeof PAYPAL_AGENT_ERROR)[keyof typeof PAYPAL_AGENT_ERROR] | null;
 };
@@ -111,7 +125,18 @@ function connection(value: unknown): PaypalAgentResult['connection'] {
   if (
     !row ||
     Object.keys(row).sort().join(',') !==
-      'disconnecting,key,limitCents,model,spentCents,url,usageUncertain'
+      'disconnecting,key,limitCents,model,spentCents,url,usageState,usageUncertain'
+  )
+    return null;
+  const usageState = Object.values(PAYPAL_AGENT_USAGE_STATE).find(
+    (entry) => entry === row.usageState,
+  );
+  if (
+    !usageState ||
+    row.usageUncertain !==
+      (usageState !== PAYPAL_AGENT_USAGE_STATE.AVAILABLE) ||
+    row.disconnecting !==
+      (usageState === PAYPAL_AGENT_USAGE_STATE.DISCONNECTING)
   )
     return null;
   if (
@@ -152,6 +177,7 @@ function connection(value: unknown): PaypalAgentResult['connection'] {
     limitCents: row.limitCents,
     usageUncertain: row.usageUncertain,
     disconnecting: row.disconnecting,
+    usageState,
   };
 }
 export function parsePaypalAgentResult(value: unknown): PaypalAgentResult {

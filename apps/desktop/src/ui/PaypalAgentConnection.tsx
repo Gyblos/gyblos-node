@@ -8,10 +8,12 @@ import {
   DESKTOP_PAYPAL_AGENT,
   opencodeConfig,
   PAYPAL_AGENT_ACTION,
+  PAYPAL_AGENT_USAGE_STATE,
   paypalAgentErrorMessage,
   retainPaypalAgentStatus,
   type PaypalAgentAction,
   type PaypalAgentResult,
+  type PaypalAgentUsageState,
 } from '../paypal-agent-model';
 import { paypalDollars } from '../paypal-model';
 import { writeClipboardText } from './clipboard';
@@ -205,6 +207,26 @@ function AgentDetails(props: DetailProps) {
   );
 }
 
+function usageMessage(state: PaypalAgentUsageState) {
+  switch (state) {
+    case PAYPAL_AGENT_USAGE_STATE.BUSY:
+      return 'An inference or session operation is in progress; usage may change.';
+    case PAYPAL_AGENT_USAGE_STATE.CHAT_PENDING:
+      return 'A chat response awaits confirmation. Finish it in PayPal Chat.';
+    case PAYPAL_AGENT_USAGE_STATE.EXPIRED:
+      return 'The session expired. Close and settle it in PayPal Chat.';
+    case PAYPAL_AGENT_USAGE_STATE.ATTEMPTS_EXHAUSTED:
+      return 'The attempt limit was reached. Close and settle the session in PayPal Chat.';
+    case PAYPAL_AGENT_USAGE_STATE.LIMIT_REACHED:
+      return 'The approved spending limit was reached. Close and settle it in PayPal Chat.';
+    case PAYPAL_AGENT_USAGE_STATE.DISCONNECTING:
+      return 'Disconnecting. An inference already started can finish and count.';
+    case PAYPAL_AGENT_USAGE_STATE.DISCONNECT_FAILED:
+      return 'Disconnection could not be confirmed. Retry or review the session in PayPal Chat.';
+    default:
+      return 'The session needs review. Check PayPal Chat.';
+  }
+}
 function AgentUsage({
   connection,
   statusUnavailable,
@@ -224,10 +246,7 @@ function AgentUsage({
         (statusUnavailable ? (
           <p>Session usage and the remaining amount cannot be verified.</p>
         ) : connection.usageUncertain ? (
-          <p>
-            The session cannot currently accept new agent requests or needs
-            review. Check the PayPal session in Chat.
-          </p>
+          <p>{usageMessage(connection.usageState)}</p>
         ) : (
           <p>
             Session maximum: {paypalDollars(connection.limitCents)} · Recorded
@@ -236,6 +255,18 @@ function AgentUsage({
           </p>
         ))}
     </>
+  );
+}
+function RetryDisconnect({ busy, run }: Pick<DetailProps, 'busy' | 'run'>) {
+  return (
+    <Button
+      disabled={busy}
+      onClick={() => {
+        void run(PAYPAL_AGENT_ACTION.DISCONNECT);
+      }}
+    >
+      Retry disconnect
+    </Button>
   );
 }
 export function PaypalAgentConnection({
@@ -285,19 +316,21 @@ export function PaypalAgentConnection({
           Create local connection
         </Button>
       )}
-      {connection?.disconnecting && (
-        <p role="status">
-          Disconnecting. An inference already started can finish and count.
-        </p>
+      {connection?.usageState ===
+        PAYPAL_AGENT_USAGE_STATE.DISCONNECT_FAILED && (
+        <RetryDisconnect busy={busy} run={run} />
       )}
-      {connection && !connection.disconnecting && (
-        <AgentDetails
-          connection={connection}
-          busy={busy}
-          run={run}
-          copy={copy}
-        />
-      )}
+      {connection &&
+        !connection.disconnecting &&
+        connection.usageState !==
+          PAYPAL_AGENT_USAGE_STATE.DISCONNECT_FAILED && (
+          <AgentDetails
+            connection={connection}
+            busy={busy}
+            run={run}
+            copy={copy}
+          />
+        )}
       <Note>
         The agent uses the local {DESKTOP_PAYPAL_AGENT.MODEL} model. Chat keeps
         its existing model, which must be installed to send chat messages.

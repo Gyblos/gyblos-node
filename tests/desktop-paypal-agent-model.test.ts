@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import {
   opencodeConfig,
   parsePaypalAgentResult,
+  PAYPAL_AGENT_USAGE_STATE,
   retainPaypalAgentStatus,
 } from '@gyblos/desktop/paypal-agent-model';
 
@@ -58,6 +59,7 @@ void test('a failed status check preserves an existing connection until status i
     limitCents: 100,
     usageUncertain: false,
     disconnecting: false,
+    usageState: PAYPAL_AGENT_USAGE_STATE.AVAILABLE,
   };
   const previous = { connection, error: null };
   const unknown = retainPaypalAgentStatus(previous, undefined);
@@ -81,6 +83,7 @@ void test('IPC result rejects external connection URLs and malformed keys', () =
     limitCents: 100,
     usageUncertain: false,
     disconnecting: false,
+    usageState: PAYPAL_AGENT_USAGE_STATE.AVAILABLE,
   };
   assert.deepEqual(
     parsePaypalAgentResult({ connection, error: null }).connection,

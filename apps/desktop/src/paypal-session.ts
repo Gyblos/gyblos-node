@@ -232,6 +232,7 @@ export function createDesktopPaypalSession(
   );
   return {
     status,
+    isBusy,
     isCloseBlocked: () => isBusy() || awaitingAcknowledgement || checkoutOpened,
     create: () =>
       run(async () => {

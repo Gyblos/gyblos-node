@@ -193,6 +193,7 @@ void test('the connection reports current shared usage and an uncertain session'
   let expired = false;
   let remainingAttempts = 30;
   let busy = false;
+  let sharedBusy = false;
   const endpoint = {
     url: 'http://127.0.0.1:12345/v1',
     key: 'synthetic-key',
@@ -204,6 +205,7 @@ void test('the connection reports current shared usage and an uncertain session'
   const access = createDesktopPaypalAgentAccess(
     () => ({ phase, expired, spentCents, limitCents: 100, remainingAttempts }),
     async () => endpoint,
+    () => sharedBusy,
   );
   assert.equal((await access.connect()).spentCents, 0);
   spentCents = 20;
@@ -229,6 +231,9 @@ void test('the connection reports current shared usage and an uncertain session'
   remainingAttempts = 30;
   busy = true;
   assert.equal(access.status()?.usageUncertain, true);
+  busy = false;
+  sharedBusy = true;
+  assert.equal(access.status()?.usageState, 'busy');
   await access.close();
 });
 
@@ -280,10 +285,22 @@ void test('a connection remains visibly disconnecting while an inference drains'
 void test('connection status explains expiration and attempt exhaustion', async () => {
   let expired = false;
   let remainingAttempts = 30;
-  const endpoint = { url: 'http://127.0.0.1:12345/v1', key: 'synthetic', model: 'synthetic-model',
-    isCurrent: () => true, isBusy: () => false, async close() {} };
+  const endpoint = {
+    url: 'http://127.0.0.1:12345/v1',
+    key: 'synthetic',
+    model: 'synthetic-model',
+    isCurrent: () => true,
+    isBusy: () => false,
+    async close() {},
+  };
   const access = createDesktopPaypalAgentAccess(
-    () => ({ phase: 'active', expired, remainingAttempts, spentCents: 10, limitCents: 100 }),
+    () => ({
+      phase: 'active',
+      expired,
+      remainingAttempts,
+      spentCents: 10,
+      limitCents: 100,
+    }),
     async () => endpoint,
   );
   await access.connect();
@@ -297,15 +314,32 @@ void test('connection status explains expiration and attempt exhaustion', async 
 
 void test('a failed disconnect stays visible and can be retried', async () => {
   let calls = 0;
-  const endpoint = { url: 'http://127.0.0.1:12345/v1', key: 'synthetic', model: 'synthetic-model',
-    isCurrent: () => false, isBusy: () => false,
-    async close() { calls += 1; if (calls === 1) throw new Error('synthetic close failure'); },
+  const endpoint = {
+    url: 'http://127.0.0.1:12345/v1',
+    key: 'synthetic',
+    model: 'synthetic-model',
+    isCurrent: () => false,
+    isBusy: () => false,
+    async close() {
+      calls += 1;
+      if (calls === 1) throw new Error('synthetic close failure');
+    },
   };
   let current = true;
   endpoint.isCurrent = () => current;
-  endpoint.close = async () => { calls += 1; current = false; if (calls === 1) throw new Error('synthetic close failure'); };
+  endpoint.close = async () => {
+    calls += 1;
+    current = false;
+    if (calls === 1) throw new Error('synthetic close failure');
+  };
   const access = createDesktopPaypalAgentAccess(
-    () => ({ phase: 'active', expired: false, remainingAttempts: 30, spentCents: 0, limitCents: 100 }),
+    () => ({
+      phase: 'active',
+      expired: false,
+      remainingAttempts: 30,
+      spentCents: 0,
+      limitCents: 100,
+    }),
     async () => endpoint,
   );
   await access.connect();
