@@ -1,5 +1,5 @@
-// Mounts either the simulated buyer UI or the existing isolated compatibility smoke.
-// Chat/Connect remain simulated; the host owns a separate local-only Iroh endpoint.
+// Mounts the buyer UI or the existing isolated compatibility smoke.
+// USDC Chat/Connect remain simulated; PayPal Sandbox uses the local inference service.
 import { createRoot } from 'react-dom/client';
 
 import { CompatibilityView } from './compatibility-view';

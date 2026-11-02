@@ -1,5 +1,5 @@
-// Hosts simulated inference and a local protected wallet; never starts paid services.
-// The renderer receives public metadata only; smoke never creates a wallet.
+// Hosts the local protected wallet and an opt-in PayPal Sandbox inference service.
+// The renderer receives public metadata only; smoke never creates a wallet or PayPal service.
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -9,6 +9,7 @@ import { app, BrowserWindow, ipcMain } from 'electron';
 import { registerNetworkCatalog } from './catalog/host';
 import { DESKTOP, PROBE_STATUS, STARTUP_WINDOW } from './constants';
 import { registerDesktopNode } from './node-host';
+import { registerDesktopPaypal } from './paypal-host';
 import { probeInUtility } from './probe-host';
 import { failedProbe, type ProbeResult } from './probe-model';
 import { cleanupDesktopSession } from './session-cleanup';
@@ -127,6 +128,7 @@ async function main() {
     controller.signal,
   );
   if (!smoke) registerNetworkCatalog(window, controller.signal);
+  if (!smoke) registerDesktopPaypal(window);
   const node = smoke
     ? null
     : registerDesktopNode(window, __dirname, controller.signal);

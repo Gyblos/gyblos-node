@@ -46,15 +46,10 @@ function sandboxApproval(value: string) {
   return url.href;
 }
 
-export function createDesktopPaypalSession(
-  session: PaypalSession,
-  openExternal: (url: string) => Promise<void>,
-) {
-  let approvalUrl: string | undefined;
+function serialOperations() {
   let busy = false;
   let closing = false;
   let pending: Promise<void> = Promise.resolve();
-
   function run<T>(action: () => Promise<T>): Promise<T> {
     if (busy || closing) return Promise.reject(new Error('Session is busy.'));
     busy = true;
@@ -71,6 +66,21 @@ export function createDesktopPaypalSession(
     );
     return result;
   }
+  return {
+    run,
+    async close() {
+      closing = true;
+      await pending;
+    },
+  };
+}
+
+export function createDesktopPaypalSession(
+  session: PaypalSession,
+  openExternal: (url: string) => Promise<void>,
+) {
+  let approvalUrl: string | undefined;
+  const { run, close } = serialOperations();
   function orderId() {
     const id = session.status().orderId;
     if (!id) throw new Error('No sandbox order.');
@@ -125,9 +135,6 @@ export function createDesktopPaypalSession(
         approvalUrl = undefined;
         return visibleStatus(session);
       }),
-    async close() {
-      closing = true;
-      await pending;
-    },
+    close,
   };
 }

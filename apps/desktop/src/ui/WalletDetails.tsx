@@ -77,7 +77,7 @@ export function WalletDetails({
       </div>
       <div className="settings-restriction wallet-balance">
         <div>
-          <span>Available balance</span>
+          <span>Balance preview</span>
           <strong>
             0.0 <small>USDC</small>
           </strong>

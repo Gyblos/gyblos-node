@@ -1,5 +1,5 @@
-// Explores a buyer desktop app with Chat and local gateway connections.
-// Inference/Connect remain simulated; Wallet receives public local metadata only.
+// Hosts the buyer desktop, including the local PayPal Sandbox inference session.
+// USDC Chat and Connect remain simulated; Wallet receives public local metadata only.
 import {
   ArrowUp,
   CaretDown,
@@ -10,6 +10,7 @@ import {
   CheckCircle,
   Clock,
   Code,
+  CreditCard,
   GearSix,
   Globe,
   MagnifyingGlass,
@@ -27,6 +28,7 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 
 import manifest from '../package.json';
 import { CATALOG_STATE } from './catalog/model';
+import { PAYMENT_METHOD, type PaymentMethod } from './paypal-model';
 import { themeStyle } from './theme';
 import { AddFunds } from './ui/AddFunds';
 import { announcedModels } from './ui/announced-models';
@@ -65,6 +67,7 @@ import {
 } from './ui/Motion';
 import { NetworkCatalogPanel, useNetworkCatalog } from './ui/NetworkCatalog';
 import { NetworkStatus, useLocalNode } from './ui/NetworkStatus';
+import { PaypalChat } from './ui/PaypalChat';
 import { ResizeHandle } from './ui/ResizeHandle';
 import { SidebarIcon, type SidebarSection } from './ui/SidebarIcon';
 import type { ToolId } from './ui/tools';
@@ -137,6 +140,9 @@ export function DesktopApp() {
   }, [sidebarCollapsed, sidebarMoving]);
   const modifier = /Mac/.test(navigator.platform) ? '⌘' : 'Ctrl+';
   const [light, setLight] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(
+    PAYMENT_METHOD.USDC,
+  );
   const frameStyle: CSSProperties & { '--navigation-width': string } = {
     '--navigation-width': navigationWidth + 'px',
     ...themeStyle(light),
@@ -192,10 +198,14 @@ export function DesktopApp() {
       if (key === 'b') {
         event.preventDefault();
         toggleSidebar();
-      } else if (key === 'k') {
+      } else if (key === 'k' && paymentMethod !== PAYMENT_METHOD.PAYPAL) {
         event.preventDefault();
         navigate(UI_VIEW.MODELS);
-      } else if (key === 'n' && view === UI_VIEW.CHAT) {
+      } else if (
+        key === 'n' &&
+        view === UI_VIEW.CHAT &&
+        paymentMethod === PAYMENT_METHOD.USDC
+      ) {
         event.preventDefault();
         chatRef.current?.newChat();
       } else if (/^[1-9]$/.test(key) && Number(key) <= navigation.length) {
@@ -207,13 +217,14 @@ export function DesktopApp() {
     }
     window.addEventListener('keydown', command);
     return () => window.removeEventListener('keydown', command);
-  }, [view, mode]);
+  }, [view, mode, paymentMethod]);
   useEffect(() => {
     if (!toast) return;
     const timer = setTimeout(() => setToast(''), DEMO_ACCOUNT.TOAST_MS);
     return () => clearTimeout(timer);
   }, [toast]);
   function choose(next: Model) {
+    if (paymentMethod === PAYMENT_METHOD.PAYPAL) return;
     if (next.id === model.id) return;
     if (!next.free) {
       setPaidModel(next);
@@ -269,7 +280,12 @@ export function DesktopApp() {
           <Button
             variant={BUTTON_VARIANT.SECONDARY}
             className="command-trigger"
-            title={'Choose model (' + modifier + 'K)'}
+            title={
+              paymentMethod === PAYMENT_METHOD.PAYPAL
+                ? 'The Sandbox uses its local model'
+                : 'Choose model (' + modifier + 'K)'
+            }
+            disabled={paymentMethod === PAYMENT_METHOD.PAYPAL}
             onClick={() => {
               navigate(UI_VIEW.MODELS);
             }}
@@ -281,11 +297,13 @@ export function DesktopApp() {
           <Button
             variant={BUTTON_VARIANT.SECONDARY}
             className="balance-button"
-            title="Wallet · 0.0 USDC"
+            title="USDC wallet"
             onClick={() => navigate(UI_VIEW.SETTINGS)}
           >
             <Wallet size={17} />
-            <span aria-hidden="true">0.0</span>
+            <span aria-hidden="true">
+              {paymentMethod === PAYMENT_METHOD.PAYPAL ? 'USDC' : '0.0'}
+            </span>
           </Button>
         </div>
       </header>
@@ -367,10 +385,17 @@ export function DesktopApp() {
           ref={content}
           className={'content ' + (view === UI_VIEW.CHAT ? 'chat-content' : '')}
         >
-          <div className="chat-root" hidden={view !== UI_VIEW.CHAT}>
+          <div
+            className="chat-root"
+            hidden={
+              view !== UI_VIEW.CHAT || paymentMethod !== PAYMENT_METHOD.USDC
+            }
+          >
             <Chat
               ref={chatRef}
-              active={view === UI_VIEW.CHAT}
+              active={
+                view === UI_VIEW.CHAT && paymentMethod === PAYMENT_METHOD.USDC
+              }
               model={model}
               online={online}
               onAuthorize={authorizeChatRequest}
@@ -382,6 +407,18 @@ export function DesktopApp() {
                 if (next) choose(next);
               }}
               onBrowseModels={() => navigate(UI_VIEW.MODELS)}
+            />
+          </div>
+          <div
+            className="chat-root"
+            hidden={
+              view !== UI_VIEW.CHAT || paymentMethod !== PAYMENT_METHOD.PAYPAL
+            }
+          >
+            <PaypalChat
+              active={
+                view === UI_VIEW.CHAT && paymentMethod === PAYMENT_METHOD.PAYPAL
+              }
             />
           </div>
           {view === UI_VIEW.MODELS && (
@@ -473,7 +510,10 @@ export function DesktopApp() {
                   </Button>
                 }
               >
-                <span>Chat and Connect use simulated responses.</span>
+                <span>
+                  USDC Chat and Connect use simulated responses. PayPal Sandbox
+                  uses its local model.
+                </span>
               </InfoBar>
             </PagePanel>
           )}
@@ -519,6 +559,38 @@ export function DesktopApp() {
             <PagePanel>
               <div className="settings-content">
                 <SettingsGroup
+                  leading={<CreditCard size={18} aria-hidden="true" />}
+                  title="Payment method"
+                  description="Choose how to pay for new inference sessions."
+                >
+                  <fieldset className="paypal-methods">
+                    <legend className="field-label">Method</legend>
+                    <label>
+                      <input
+                        type="radio"
+                        name="payment-method"
+                        checked={paymentMethod === PAYMENT_METHOD.USDC}
+                        onChange={() => setPaymentMethod(PAYMENT_METHOD.USDC)}
+                      />{' '}
+                      USDC wallet · preview
+                    </label>
+                    <label>
+                      <input
+                        type="radio"
+                        name="payment-method"
+                        checked={paymentMethod === PAYMENT_METHOD.PAYPAL}
+                        onChange={() => setPaymentMethod(PAYMENT_METHOD.PAYPAL)}
+                      />{' '}
+                      PayPal Sandbox · test funds
+                    </label>
+                  </fieldset>
+                  <p className="modal-note">
+                    PayPal authorizes a separate sandbox session; it does not
+                    add USDC to the wallet. An open session remains until you
+                    close it.
+                  </p>
+                </SettingsGroup>
+                <SettingsGroup
                   leading={<Wallet size={18} aria-hidden="true" />}
                   title="Wallet & backup"
                   description="Your address, key protection and recovery backup."
@@ -531,7 +603,7 @@ export function DesktopApp() {
                 <SettingsGroup
                   leading={<ChartBar size={18} aria-hidden="true" />}
                   title="Chat spending"
-                  description="Choose how much you can spend on chat each day."
+                  description="USDC chat preview only; this does not change the PayPal Sandbox session maximum."
                 >
                   <List label="Chat spending limit">
                     <ListRow
@@ -568,76 +640,89 @@ export function DesktopApp() {
               </div>
             </PagePanel>
           )}
-          {view === UI_VIEW.ACTIVITY && (
-            <PagePanel>
-              <div className="ui-stats">
-                <StatCard
-                  label="Spent today"
-                  value={money(spent)}
-                  detail={`Daily limit: ${money(budget)} per day`}
-                />
-                <StatCard
-                  label="Requests"
-                  value={
-                    mode === UI_VIEW.CHAT
-                      ? String(chatRequestCount + DEMO_ACCOUNT.SAMPLE_REQUESTS)
-                      : '0'
-                  }
-                  detail={
-                    mode === UI_VIEW.CHAT
-                      ? 'Requests today'
-                      : 'No application requests yet'
-                  }
-                />
-                <StatCard
-                  label="Available balance"
-                  value={money(credits)}
-                  detail="USDC"
-                />
-              </div>
-              <SectionTitle
-                trailing={
-                  <Badge>{mode === UI_VIEW.CHAT ? 'Chat' : 'Connect'}</Badge>
-                }
-              >
-                Recent requests
-              </SectionTitle>
-              <List label="Recent requests">
-                {(mode === UI_VIEW.CHAT
-                  ? [MODELS[0], MODELS[1], MODELS[0], MODELS[1]]
-                  : []
-                ).map((item, index) => (
-                  <ListRow
-                    key={index}
-                    leading={<ModelIcon model={item} />}
-                    trailing={
-                      <>
-                        <span className="ui-row-time">
-                          {index * 6 + 2} min ago
-                        </span>
-                        <span className="ui-status">
-                          <CheckCircle size={14} />
-                          Completed
-                        </span>
-                        <strong className="ui-amount">$0.00</strong>
-                      </>
-                    }
-                  >
-                    <RowCopy title={item.name} detail="Chat · This Mac" />
-                  </ListRow>
-                ))}
-              </List>
-              {mode === UI_VIEW.CONNECT && (
+          {view === UI_VIEW.ACTIVITY &&
+            paymentMethod === PAYMENT_METHOD.PAYPAL && (
+              <PagePanel>
                 <Note>
-                  No application requests yet. Connection setup does not
-                  generate inference traffic.
+                  Sandbox usage and settlement are shown in the PayPal chat
+                  session.
                 </Note>
-              )}
-              <Note>
-                Pending payments stay visible until their outcome is confirmed.
-              </Note>
-            </PagePanel>
-          )}
+              </PagePanel>
+            )}
+          {view === UI_VIEW.ACTIVITY &&
+            paymentMethod === PAYMENT_METHOD.USDC && (
+              <PagePanel>
+                <div className="ui-stats">
+                  <StatCard
+                    label="Spent today"
+                    value={money(spent)}
+                    detail={`Daily limit: ${money(budget)} per day`}
+                  />
+                  <StatCard
+                    label="Requests"
+                    value={
+                      mode === UI_VIEW.CHAT
+                        ? String(
+                            chatRequestCount + DEMO_ACCOUNT.SAMPLE_REQUESTS,
+                          )
+                        : '0'
+                    }
+                    detail={
+                      mode === UI_VIEW.CHAT
+                        ? 'Requests today'
+                        : 'No application requests yet'
+                    }
+                  />
+                  <StatCard
+                    label="Available balance"
+                    value={money(credits)}
+                    detail="USDC"
+                  />
+                </div>
+                <SectionTitle
+                  trailing={
+                    <Badge>{mode === UI_VIEW.CHAT ? 'Chat' : 'Connect'}</Badge>
+                  }
+                >
+                  Recent requests
+                </SectionTitle>
+                <List label="Recent requests">
+                  {(mode === UI_VIEW.CHAT
+                    ? [MODELS[0], MODELS[1], MODELS[0], MODELS[1]]
+                    : []
+                  ).map((item, index) => (
+                    <ListRow
+                      key={index}
+                      leading={<ModelIcon model={item} />}
+                      trailing={
+                        <>
+                          <span className="ui-row-time">
+                            {index * 6 + 2} min ago
+                          </span>
+                          <span className="ui-status">
+                            <CheckCircle size={14} />
+                            Completed
+                          </span>
+                          <strong className="ui-amount">$0.00</strong>
+                        </>
+                      }
+                    >
+                      <RowCopy title={item.name} detail="Chat · This Mac" />
+                    </ListRow>
+                  ))}
+                </List>
+                {mode === UI_VIEW.CONNECT && (
+                  <Note>
+                    No application requests yet. Connection setup does not
+                    generate inference traffic.
+                  </Note>
+                )}
+                <Note>
+                  Pending payments stay visible until their outcome is
+                  confirmed.
+                </Note>
+              </PagePanel>
+            )}
         </div>
       </div>
       <footer className="app-footer" aria-label="Application status">
@@ -685,7 +770,7 @@ export function DesktopApp() {
         {modal === UI_DIALOG.BUDGET && (
           <Modal
             title="Daily spending limit"
-            description="Applies to paid messages in Chat."
+            description="Applies to the USDC chat preview only."
             close={() => setModal(null)}
           >
             <label className="field-label" htmlFor={UI_DIALOG.BUDGET}>

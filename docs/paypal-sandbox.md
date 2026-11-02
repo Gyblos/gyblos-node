@@ -11,9 +11,9 @@ live multi-seller marketplace. It does not collect a platform fee.
 
 ## Setup
 
-1. Install Node.js 22 or newer and the pnpm version pinned in `package.json`;
-   see the [toolchain setup guide](../CONTRIBUTING.md#set-up-nodejs-and-pnpm).
-   Install [Ollama](https://ollama.com/download) and start its local server.
+1. Install the Node.js and pnpm versions pinned in `package.json`; see the
+   [toolchain setup guide](../CONTRIBUTING.md#set-up-nodejs-and-pnpm). Install
+   [Ollama](https://ollama.com/download) and start its local server.
 2. From the repository root, install dependencies and download the model:
 
    ```sh
@@ -39,14 +39,20 @@ Never put credentials or sandbox account passwords in Git, screenshots, or chat.
 
 Choose an empty dedicated absolute directory for sandbox state. In a private
 terminal, set `PAYPAL_SANDBOX_CLIENT_ID`, `PAYPAL_SANDBOX_CLIENT_SECRET`, and
-`PAYPAL_SANDBOX_STATE_DIRECTORY`, then run `pnpm paypal:sandbox` and open the
-printed private session link. Do not share it: it grants access to the local
-demo. Create a session, approve it with the sandbox buyer, return to start the
-session, and send messages. Close the session to settle it. Each message is
-independent: previous messages are not passed to the engine as conversation
-context. No live endpoint is used. Optional `PAYPAL_SANDBOX_PORT` and
-`PAYPAL_SANDBOX_OLLAMA_ORIGIN` settings select a different local port and
+`PAYPAL_SANDBOX_STATE_DIRECTORY`, then start the desktop app with
+`pnpm desktop:start`. In **Settings → Payment method**, select **PayPal
+Sandbox** and return to **Chat**. Selecting a method does not create an order.
+Create a session, open PayPal, approve with the sandbox buyer, and return to the
+app to start the session and send messages. Close the session explicitly to
+settle it. Each message is independent: previous messages are not passed to the
+engine as conversation context. The selection lasts until the desktop app
+closes; its payment journal persists separately. No live PayPal endpoint is
+used. The optional `PAYPAL_SANDBOX_OLLAMA_ORIGIN` setting chooses a different
 literal loopback Ollama origin.
+
+The USDC chat and Connect views are previews. A PayPal authorization is not a
+wallet top-up or a conversion to USDC. This demonstration uses one local seller
+and does not send paid requests to the network marketplace.
 
 For example, in a private macOS or Linux terminal using zsh or bash, from this
 repository:
@@ -63,7 +69,7 @@ if [ -z "${PAYPAL_SANDBOX_STATE_DIRECTORY:-}" ]; then
   read -r PAYPAL_SANDBOX_STATE_DIRECTORY
 fi
 export PAYPAL_SANDBOX_STATE_DIRECTORY
-pnpm paypal:sandbox
+pnpm desktop:start
 ```
 
 The secret is not echoed. Reuse the same state directory on later runs: it is
@@ -73,6 +79,11 @@ PayPal. Return to the demo, select **I approved · start session**, and send two
 messages, waiting for each response to be acknowledged. Select **Close session
 and settle**. The expected final capture is USD 0.20; the unspent authorization
 is released according to PayPal's timing.
+
+The separate browser demonstration is still available with
+`pnpm paypal:sandbox`. It prints a private local session link; do not share that
+link. Its optional `PAYPAL_SANDBOX_PORT` setting chooses a local port. Do not
+run two processes using the same state directory at the same time.
 
 The session accepts new messages for 30 minutes after authorization, but the
 buyer must explicitly close it; leaving the page does not capture or void it.
