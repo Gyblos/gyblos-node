@@ -221,6 +221,16 @@ void test('every claim attempt first makes the recipients exist; a failure there
   assert.deepEqual(steps, ['recipients', 'recipients', 'claim']);
 });
 
+void test('a claim of the whole ceiling refunds nothing, so the payer’s account is not made to exist', async () => {
+  const also: (readonly string[] | undefined)[] = [];
+  const { chain, record } = await rig(
+    async () => ({ success: true, transaction: 'C'.repeat(64) }),
+    { recipients: async (owners) => void also.push(owners) },
+  );
+  await chain.claim(record, record.maxAtomic);
+  assert.deepEqual(also, [[]]);
+});
+
 void test('a claim that landed before it was recorded is found on chain, not claimed again', async () => {
   let sealed: { transaction: string; chargedAtomic: string } | undefined;
   const { chain, calls, record } = await rig(
