@@ -13,6 +13,37 @@ import {
 } from './support/paypal-agent-protocol-fixture';
 import { fixture as paymentFixture } from './support/paypal-session-fixture';
 
+void test('malformed tool choices do not dispatch inference or change the session journal', async () => {
+  const f = paymentFixture();
+  const agentEngine = {
+    model,
+    async generate() {
+      f.calls.push('agent-generate');
+      throw new Error('Unexpected inference');
+    },
+  };
+  const session = await createPaypalSession({ ...f, agentEngine });
+  const order = await session.create();
+  await session.approve(order.orderId);
+  const before = f.getState();
+  for (const toolChoice of [['none'], ['required'], ['auto']]) {
+    await assert.rejects(
+      session.agentMessage(
+        order.orderId,
+        {
+          model,
+          messages: [{ role: 'user', content: 'synthetic request' }],
+          max_tokens: 128,
+          tool_choice: toolChoice,
+        },
+        'MESSAGE1',
+      ),
+    );
+  }
+  assert.deepEqual(f.getState(), before);
+  assert.deepEqual(f.calls, ['create', 'authorize']);
+});
+
 void test('equivalent Claude and OpenAI requests cannot be charged twice', async () => {
   const f = paymentFixture();
   const agentEngine = {

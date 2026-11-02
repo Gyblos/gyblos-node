@@ -147,16 +147,20 @@ export function responsesAgentRequest(value: unknown) {
   if (
     row.prompt_cache_key !== undefined &&
     (typeof row.prompt_cache_key !== 'string' ||
-      row.prompt_cache_key.length > 256)
+      row.prompt_cache_key.length >
+        PAYPAL_AGENT_REQUEST_LIMITS.protocolIdentifierCharacters)
   )
     return invalidAgentProtocol();
   if (row.client_metadata !== undefined) {
     const metadata = protocolObject(row.client_metadata);
     if (
-      Object.keys(metadata).length > 32 ||
+      Object.keys(metadata).length >
+        PAYPAL_AGENT_REQUEST_LIMITS.metadataEntries ||
       Object.entries(metadata).some(
         ([key, value]) =>
-          key.length > 128 || typeof value !== 'string' || value.length > 1024,
+          key.length > PAYPAL_AGENT_REQUEST_LIMITS.metadataKeyCharacters ||
+          typeof value !== 'string' ||
+          value.length > PAYPAL_AGENT_REQUEST_LIMITS.metadataValueCharacters,
       )
     )
       return invalidAgentProtocol();
@@ -235,6 +239,62 @@ function responsesOutput(result: Record<string, unknown>) {
 function event(type: string, value: Record<string, unknown>) {
   return `event: ${type}\ndata: ${JSON.stringify({ type, ...value })}\n\n`;
 }
+function responsesStreamItem(
+  item: Record<string, unknown>,
+  index: number,
+  emit: (type: string, value: Record<string, unknown>) => string,
+) {
+  let stream = '';
+  stream += emit('response.output_item.added', {
+    output_index: index,
+    item:
+      item.type === 'function_call'
+        ? { ...item, status: 'in_progress', arguments: '' }
+        : { ...item, status: 'in_progress', content: [] },
+  });
+  if (item.type === 'function_call') {
+    stream += emit('response.function_call_arguments.delta', {
+      item_id: item.id,
+      output_index: index,
+      delta: item.arguments,
+    });
+    stream += emit('response.function_call_arguments.done', {
+      item_id: item.id,
+      output_index: index,
+      arguments: item.arguments,
+    });
+  } else {
+    const part = Array.isArray(item.content)
+      ? protocolObject(item.content[0])
+      : invalidAgentProtocol();
+    stream += emit('response.content_part.added', {
+      item_id: item.id,
+      output_index: index,
+      content_index: 0,
+      part: { type: 'output_text', text: '', annotations: [] },
+    });
+    stream += emit('response.output_text.delta', {
+      item_id: item.id,
+      output_index: index,
+      content_index: 0,
+      delta: part.text,
+    });
+    stream += emit('response.output_text.done', {
+      item_id: item.id,
+      output_index: index,
+      content_index: 0,
+      text: part.text,
+    });
+    stream += emit('response.content_part.done', {
+      item_id: item.id,
+      output_index: index,
+      content_index: 0,
+      part,
+    });
+  }
+  stream += emit('response.output_item.done', { output_index: index, item });
+  return stream;
+}
 export function responsesAgentResponse(
   input: Record<string, unknown>,
   result: Record<string, unknown>,
@@ -261,56 +321,8 @@ export function responsesAgentResponse(
       output: [],
     },
   });
-  for (const [index, item] of output.output.entries()) {
-    stream += emit('response.output_item.added', {
-      output_index: index,
-      item:
-        item.type === 'function_call'
-          ? { ...item, status: 'in_progress', arguments: '' }
-          : { ...item, status: 'in_progress', content: [] },
-    });
-    if (item.type === 'function_call') {
-      stream += emit('response.function_call_arguments.delta', {
-        item_id: item.id,
-        output_index: index,
-        delta: item.arguments,
-      });
-      stream += emit('response.function_call_arguments.done', {
-        item_id: item.id,
-        output_index: index,
-        arguments: item.arguments,
-      });
-    } else {
-      const part = Array.isArray(item.content)
-        ? protocolObject(item.content[0])
-        : invalidAgentProtocol();
-      stream += emit('response.content_part.added', {
-        item_id: item.id,
-        output_index: index,
-        content_index: 0,
-        part: { type: 'output_text', text: '', annotations: [] },
-      });
-      stream += emit('response.output_text.delta', {
-        item_id: item.id,
-        output_index: index,
-        content_index: 0,
-        delta: part.text,
-      });
-      stream += emit('response.output_text.done', {
-        item_id: item.id,
-        output_index: index,
-        content_index: 0,
-        text: part.text,
-      });
-      stream += emit('response.content_part.done', {
-        item_id: item.id,
-        output_index: index,
-        content_index: 0,
-        part,
-      });
-    }
-    stream += emit('response.output_item.done', { output_index: index, item });
-  }
+  for (const [index, item] of output.output.entries())
+    stream += responsesStreamItem(item, index, emit);
   stream += emit(
     output.status === 'completed'
       ? 'response.completed'

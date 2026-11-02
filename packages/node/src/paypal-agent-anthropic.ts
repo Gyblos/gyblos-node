@@ -12,6 +12,126 @@ import {
   protocolTextBlocks,
 } from './paypal-agent-protocol-common';
 
+function anthropicSystemMessage(
+  rows: unknown[],
+  index: number,
+  message: Record<string, unknown>,
+  pendingCalls: ReadonlySet<string>,
+) {
+  const previous = index > 0 ? protocolObject(rows[index - 1]) : null;
+  const next = index + 1 < rows.length ? protocolObject(rows[index + 1]) : null;
+  if (
+    pendingCalls.size ||
+    !previous ||
+    (previous.role !== AGENT_CHAT.ROLES.USER &&
+      previous.role !== AGENT_CHAT.ROLES.SYSTEM) ||
+    (next &&
+      next.role !== AGENT_CHAT.ROLES.SYSTEM &&
+      next.role !== AGENT_CHAT.ROLES.ASSISTANT)
+  )
+    return invalidAgentProtocol();
+  return {
+    role: AGENT_CHAT.ROLES.SYSTEM,
+    content: protocolTextBlocks(message.content, ['text']),
+  };
+}
+function anthropicToolCall(block: Record<string, unknown>) {
+  protocolFields(block, ['type', 'id', 'name', 'input', 'cache_control']);
+  if (block.cache_control !== undefined) protocolCache(block.cache_control);
+  return {
+    id: protocolText(block.id),
+    type: AGENT_CHAT.FUNCTION,
+    function: {
+      name: protocolText(block.name),
+      arguments: JSON.stringify(protocolObject(block.input)),
+    },
+  };
+}
+function anthropicToolResult(
+  block: Record<string, unknown>,
+  pendingCalls: Set<string>,
+) {
+  protocolFields(block, [
+    'type',
+    'tool_use_id',
+    'content',
+    'is_error',
+    'cache_control',
+  ]);
+  if (block.cache_control !== undefined) protocolCache(block.cache_control);
+  if (block.is_error !== undefined && typeof block.is_error !== 'boolean')
+    return invalidAgentProtocol();
+  const toolUseId = protocolText(block.tool_use_id);
+  if (!pendingCalls.delete(toolUseId)) return invalidAgentProtocol();
+  const content =
+    block.content === undefined
+      ? ''
+      : protocolTextBlocks(block.content, ['text']);
+  return {
+    role: AGENT_CHAT.ROLES.TOOL,
+    tool_call_id: toolUseId,
+    content: block.is_error ? `Tool error: ${content}` : content,
+  };
+}
+function anthropicBlocks(
+  message: Record<string, unknown>,
+  pendingCalls: Set<string>,
+) {
+  if (
+    !Array.isArray(message.content) ||
+    !message.content.length ||
+    message.content.length > PAYPAL_AGENT_REQUEST_LIMITS.maxRows
+  )
+    return invalidAgentProtocol();
+  const messages: Record<string, unknown>[] = [];
+  let text = '';
+  let sawUserText = false;
+  const calls: Record<string, unknown>[] = [];
+  const flushUser = () => {
+    if (text) messages.push({ role: AGENT_CHAT.ROLES.USER, content: text });
+    text = '';
+  };
+  for (const entry of message.content) {
+    const block = protocolObject(entry);
+    if (block.type === 'text') {
+      if (calls.length) return invalidAgentProtocol();
+      if (message.role === AGENT_CHAT.ROLES.USER) {
+        if (pendingCalls.size) return invalidAgentProtocol();
+        sawUserText = true;
+      }
+      text += protocolTextBlocks([block], ['text']);
+    } else if (
+      block.type === 'tool_use' &&
+      message.role === AGENT_CHAT.ROLES.ASSISTANT
+    ) {
+      calls.push(anthropicToolCall(block));
+    } else if (
+      block.type === 'tool_result' &&
+      message.role === AGENT_CHAT.ROLES.USER
+    ) {
+      if (sawUserText) return invalidAgentProtocol();
+      flushUser();
+      messages.push(anthropicToolResult(block, pendingCalls));
+    } else return invalidAgentProtocol();
+  }
+  if (message.role === AGENT_CHAT.ROLES.ASSISTANT) {
+    if (!text && !calls.length) return invalidAgentProtocol();
+    for (const call of calls) {
+      const id = protocolText(call.id);
+      if (pendingCalls.has(id)) return invalidAgentProtocol();
+      pendingCalls.add(id);
+    }
+    messages.push({
+      role: AGENT_CHAT.ROLES.ASSISTANT,
+      content: text || null,
+      ...(calls.length ? { tool_calls: calls } : {}),
+    });
+  } else {
+    if (pendingCalls.size) return invalidAgentProtocol();
+    flushUser();
+  }
+  return messages;
+}
 function anthropicMessages(value: unknown) {
   if (
     !Array.isArray(value) ||
@@ -25,23 +145,9 @@ function anthropicMessages(value: unknown) {
     const message = protocolObject(item);
     protocolFields(message, ['role', 'content']);
     if (message.role === AGENT_CHAT.ROLES.SYSTEM) {
-      const previous = index > 0 ? protocolObject(value[index - 1]) : null;
-      const next =
-        index + 1 < value.length ? protocolObject(value[index + 1]) : null;
-      if (
-        pendingCalls.size ||
-        !previous ||
-        (previous.role !== AGENT_CHAT.ROLES.USER &&
-          previous.role !== AGENT_CHAT.ROLES.SYSTEM) ||
-        (next &&
-          next.role !== AGENT_CHAT.ROLES.SYSTEM &&
-          next.role !== AGENT_CHAT.ROLES.ASSISTANT)
-      )
-        return invalidAgentProtocol();
-      messages.push({
-        role: AGENT_CHAT.ROLES.SYSTEM,
-        content: protocolTextBlocks(message.content, ['text']),
-      });
+      messages.push(
+        anthropicSystemMessage(value, index, message, pendingCalls),
+      );
       continue;
     }
     if (
@@ -56,89 +162,7 @@ function anthropicMessages(value: unknown) {
       messages.push({ role: message.role, content: message.content });
       continue;
     }
-    if (
-      !Array.isArray(message.content) ||
-      !message.content.length ||
-      message.content.length > PAYPAL_AGENT_REQUEST_LIMITS.maxRows
-    )
-      return invalidAgentProtocol();
-    let text = '';
-    let sawUserText = false;
-    const calls: Record<string, unknown>[] = [];
-    const flushUser = () => {
-      if (text) messages.push({ role: AGENT_CHAT.ROLES.USER, content: text });
-      text = '';
-    };
-    for (const entry of message.content) {
-      const block = protocolObject(entry);
-      if (block.type === 'text') {
-        if (calls.length) return invalidAgentProtocol();
-        if (message.role === AGENT_CHAT.ROLES.USER) {
-          if (pendingCalls.size) return invalidAgentProtocol();
-          sawUserText = true;
-        }
-        text += protocolTextBlocks([block], ['text']);
-      } else if (
-        block.type === 'tool_use' &&
-        message.role === AGENT_CHAT.ROLES.ASSISTANT
-      ) {
-        protocolFields(block, ['type', 'id', 'name', 'input', 'cache_control']);
-        if (block.cache_control !== undefined)
-          protocolCache(block.cache_control);
-        calls.push({
-          id: protocolText(block.id),
-          type: AGENT_CHAT.FUNCTION,
-          function: {
-            name: protocolText(block.name),
-            arguments: JSON.stringify(protocolObject(block.input)),
-          },
-        });
-      } else if (
-        block.type === 'tool_result' &&
-        message.role === AGENT_CHAT.ROLES.USER
-      ) {
-        if (sawUserText) return invalidAgentProtocol();
-        protocolFields(block, [
-          'type',
-          'tool_use_id',
-          'content',
-          'is_error',
-          'cache_control',
-        ]);
-        if (block.cache_control !== undefined)
-          protocolCache(block.cache_control);
-        if (block.is_error !== undefined && typeof block.is_error !== 'boolean')
-          return invalidAgentProtocol();
-        const toolUseId = protocolText(block.tool_use_id);
-        if (!pendingCalls.delete(toolUseId)) return invalidAgentProtocol();
-        flushUser();
-        const content =
-          block.content === undefined
-            ? ''
-            : protocolTextBlocks(block.content, ['text']);
-        messages.push({
-          role: AGENT_CHAT.ROLES.TOOL,
-          tool_call_id: toolUseId,
-          content: block.is_error ? `Tool error: ${content}` : content,
-        });
-      } else return invalidAgentProtocol();
-    }
-    if (message.role === AGENT_CHAT.ROLES.ASSISTANT) {
-      if (!text && !calls.length) return invalidAgentProtocol();
-      for (const call of calls) {
-        const id = protocolText(call.id);
-        if (pendingCalls.has(id)) return invalidAgentProtocol();
-        pendingCalls.add(id);
-      }
-      messages.push({
-        role: AGENT_CHAT.ROLES.ASSISTANT,
-        content: text || null,
-        ...(calls.length ? { tool_calls: calls } : {}),
-      });
-    } else {
-      if (pendingCalls.size) return invalidAgentProtocol();
-      flushUser();
-    }
+    messages.push(...anthropicBlocks(message, pendingCalls));
   }
   if (pendingCalls.size) return invalidAgentProtocol();
   return messages;
@@ -189,7 +213,9 @@ export function anthropicAgentRequest(value: unknown) {
     protocolFields(metadata, ['user_id']);
     if (
       metadata.user_id !== undefined &&
-      (typeof metadata.user_id !== 'string' || metadata.user_id.length > 256)
+      (typeof metadata.user_id !== 'string' ||
+        metadata.user_id.length >
+          PAYPAL_AGENT_REQUEST_LIMITS.protocolIdentifierCharacters)
     )
       return invalidAgentProtocol();
   }
