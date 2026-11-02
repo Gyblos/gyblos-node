@@ -775,6 +775,13 @@ after every channel was visited) or could not run
 (`PAID_WITHDRAW_NETWORK_MISMATCH`, `PAID_WITHDRAW_ROLE_INVALID`,
 `PAID_WITHDRAW_INCOMPLETE`).
 
+The buyer journal records the network of new signed opens. Older entries do not
+name a network; the existing recovery commands treat them as devnet-only, and
+refuse them for another network. A mixture of open entries from different
+networks is refused before any recovery action. On the first journal write, the
+file is upgraded to the current format. Earlier software rejects the new format,
+so do not roll back the buyer while any channel may need recovery.
+
 It never changes the journal. Once a channel is distributed and finalized,
 `pnpm buyer:reconcile:paid` reads it from history and unblocks payments: the
 charge is what the seller had settled (usually nothing). If the buyer had

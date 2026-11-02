@@ -21,10 +21,13 @@ import {
 
 import { BUYER_JOURNAL } from './constants';
 import type { UptoLedgerPaths } from './file-ledger';
+import { isJournalNetwork } from './journal-network';
 
 // The mint, fee treasury and fee rate an open accepted: its escrow is withdrawn and read with these,
 // whatever the buyer's policy says later.
 export interface UptoJournalPolicy {
+  // Null for an entry written before the journal began recording networks.
+  network: string | null;
   mint: string;
   treasury: string;
   protocolFeeBps: number;
@@ -117,12 +120,22 @@ function feeBps(value: unknown): number {
     ? value
     : unavailable();
 }
-const POLICY_FIELDS = 3;
-function policy(value: unknown): UptoJournalPolicy | null {
+const LEGACY_POLICY_FIELDS = ['mint', 'treasury', 'protocolFeeBps'] as const;
+const POLICY_FIELDS = [...LEGACY_POLICY_FIELDS, 'network'] as const;
+function policy(value: unknown, version: number): UptoJournalPolicy | null {
   if (value === null) return null;
-  if (!isRecord(value) || Object.keys(value).length !== POLICY_FIELDS)
+  const fields =
+    version === BUYER_JOURNAL.version ? POLICY_FIELDS : LEGACY_POLICY_FIELDS;
+  if (
+    !isRecord(value) ||
+    Object.keys(value).length !== fields.length ||
+    !fields.every((field) => Object.hasOwn(value, field))
+  )
     unavailable();
+  const network = version === BUYER_JOURNAL.version ? value.network : null;
+  if (network !== null && !isJournalNetwork(network)) unavailable();
   return {
+    network,
     mint: address(value.mint),
     treasury: address(value.treasury),
     protocolFeeBps: feeBps(value.protocolFeeBps),
@@ -139,6 +152,7 @@ const V1_FIELDS = V2_FIELDS.filter(
 const V1_UNKNOWN = { openSlot: '0', lastValidBlockHeight: String(U64_MAX) };
 const READ = new Map<number, { fields: readonly string[]; missing: object }>([
   [BUYER_JOURNAL.version, { fields: FIELDS, missing: {} }],
+  [BUYER_JOURNAL.policyVersion, { fields: FIELDS, missing: {} }],
   [BUYER_JOURNAL.slotVersion, { fields: V2_FIELDS, missing: { policy: null } }],
   [
     BUYER_JOURNAL.legacyVersion,
@@ -154,10 +168,13 @@ function entry(value: unknown, version: number): UptoJournalEntry {
     !read.fields.every((field) => Object.hasOwn(value, field))
   )
     return unavailable();
-  return checked({ ...value, ...read.missing });
+  return checked({ ...value, ...read.missing }, version);
 }
 
-function checked(value: Record<string, unknown>): UptoJournalEntry {
+function checked(
+  value: Record<string, unknown>,
+  version: number,
+): UptoJournalEntry {
   const { state, updatedAt, expiresAt, channelId, chargedAtomic } = value;
   if (
     !isState(state) ||
@@ -171,7 +188,7 @@ function checked(value: Record<string, unknown>): UptoJournalEntry {
     payTo: address(value.payTo),
     feePayer: address(value.feePayer),
     maxAtomic: atomic(value.maxAtomic),
-    policy: policy(value.policy),
+    policy: policy(value.policy, version),
     openSlot: atomic(value.openSlot),
     lastValidBlockHeight: atomic(value.lastValidBlockHeight),
     expiresAt: Number(expiresAt),
@@ -218,6 +235,18 @@ function serialize(entries: Map<string, UptoJournalEntry>): string {
     version: BUYER_JOURNAL.version,
     entries: [...entries.values()],
   });
+}
+
+function retainSignedNetwork(
+  held: UptoJournalEntry | undefined,
+  next: UptoJournalEntry,
+): void {
+  if (
+    held?.channelId &&
+    (next.channelId !== held.channelId ||
+      (held.policy?.network ?? null) !== (next.policy?.network ?? null))
+  )
+    unavailable();
 }
 
 async function guarded<T>(run: () => Promise<T>): Promise<T> {
@@ -280,10 +309,10 @@ export async function openUptoBuyerJournal(options: {
     mutate((entries) => {
       if (!entries.has(value.requestDigest) && entries.size >= maxEntries)
         unavailable();
-      entries.set(
-        value.requestDigest,
-        entry({ ...value, updatedAt: now() }, BUYER_JOURNAL.version),
-      );
+      const held = entries.get(value.requestDigest);
+      const next = entry({ ...value, updatedAt: now() }, BUYER_JOURNAL.version);
+      retainSignedNetwork(held, next);
+      entries.set(value.requestDigest, next);
     });
   const remove = (requestDigest: string, channelId?: string) =>
     mutate((entries) => {

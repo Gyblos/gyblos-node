@@ -13,6 +13,7 @@ import { PAYMENT_CHANNEL_STATES } from '@gyblos/protocol/constants';
 
 import type { UptoBuyerJournal, UptoJournalEntry } from './buyer-journal';
 import { RECONCILE_OUTCOMES } from './constants';
+import { checkJournalNetwork } from './journal-network';
 
 export type UptoReconcileOutcome =
   (typeof RECONCILE_OUTCOMES)[keyof typeof RECONCILE_OUTCOMES];
@@ -33,6 +34,8 @@ export interface UptoReconcileResult {
 
 export interface UptoReconcileOptions {
   journal: UptoBuyerJournal;
+  // The network already established by the caller's RPC check.
+  network: string;
   rpc: UptoSignaturesRpc & UptoTransactionRpc;
   // The buyer's wallet address and the mint and fee treasury of its policy. Each channel is read with
   // the mint and treasury its open accepted; these only for an entry journaled without them.
@@ -119,9 +122,11 @@ function outcomeOf(
 export async function reconcileUptoBuyer(
   options: UptoReconcileOptions,
 ): Promise<UptoReconcileResult[]> {
+  const entries = await options.journal.list();
+  checkJournalNetwork(entries, options.network);
   const shown = readers(options);
   const results: UptoReconcileResult[] = [];
-  for (const entry of await options.journal.list()) {
+  for (const entry of entries) {
     const { channelId, updatedAt: _updatedAt, ...rest } = entry;
     if (!channelId || entry.state !== PAYMENT_CHANNEL_STATES.OPEN) continue;
     const expectedAtomic = options.expected(entry.requestDigest) ?? null;

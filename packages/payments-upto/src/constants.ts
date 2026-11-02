@@ -40,9 +40,9 @@ export const UPTO_SELLER = {
 // The buyer's journal of authorized channels: one small private document. Settled entries are kept
 // long past any channel's lifetime, then pruned; open ones are never dropped.
 export const BUYER_JOURNAL = {
-  // 3 adds each open's mint, fee treasury and rate; 2 its slot and blockhash lifetime. 2 and 1 are
-  // still read.
-  version: 3,
+  // 4 records the network; 3 records mint, fee treasury and rate; 2 records slot and lifetime.
+  version: 4,
+  policyVersion: 3,
   slotVersion: 2,
   legacyVersion: 1,
   // maxEntries entries of the widest form fit, with room to spare.

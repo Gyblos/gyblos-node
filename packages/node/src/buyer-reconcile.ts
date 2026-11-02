@@ -5,6 +5,7 @@ import { createSolanaRpc } from '@solana/kit';
 
 import {
   buyerJournalPathsIn,
+  DEVNET,
   DEVNET_GENESIS,
   PROTOCOL_FEE,
 } from '@gyblos/config';
@@ -45,6 +46,7 @@ export function buyerChainReconcile(
     try {
       return await reconcileUptoBuyer({
         journal,
+        network: DEVNET,
         rpc: rpc ?? createSolanaRpc(role.rpcUrl),
         payer: role.buyer,
         mint: role.mint,

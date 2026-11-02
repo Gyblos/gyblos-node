@@ -13,6 +13,7 @@ import { paymentSplits } from '@gyblos/protocol/payment-binding';
 
 import type { UptoBuyerJournal, UptoJournalEntry } from './buyer-journal';
 import { BUYER_WITHDRAW, WITHDRAW_STEPS } from './constants';
+import { checkJournalNetwork } from './journal-network';
 
 export type UptoBuyerWithdrawStep =
   (typeof WITHDRAW_STEPS)[keyof typeof WITHDRAW_STEPS];
@@ -30,6 +31,8 @@ export interface UptoBuyerWithdrawResult extends Omit<
 
 export interface UptoBuyerWithdrawOptions {
   journal: UptoBuyerJournal;
+  // The network already established by the caller's RPC check.
+  network: string;
   withdrawal: {
     withdraw(query: UptoWithdrawQuery): Promise<UptoWithdrawResult>;
   };
@@ -96,8 +99,10 @@ async function stepFor(
 export async function withdrawUptoBuyer(
   options: UptoBuyerWithdrawOptions,
 ): Promise<UptoBuyerWithdrawResult[]> {
+  const entries = await options.journal.list();
+  checkJournalNetwork(entries, options.network);
   const results: UptoBuyerWithdrawResult[] = [];
-  for (const entry of await options.journal.list()) {
+  for (const entry of entries) {
     const { channelId } = entry;
     if (!channelId || entry.state !== PAYMENT_CHANNEL_STATES.OPEN) continue;
     const result: UptoBuyerWithdrawResult = {

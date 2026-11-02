@@ -15,7 +15,7 @@ import {
   type UptoWithdrawQuery,
 } from 'x402-upto-metered';
 
-import { buyerJournalPathsIn } from '@gyblos/config';
+import { buyerJournalPathsIn, DEVNET } from '@gyblos/config';
 import {
   BUYER_WITHDRAW,
   openUptoBuyerJournal,
@@ -34,6 +34,7 @@ const FIRST = 'Chan111111111111111111111111111111111111111';
 const SECOND = 'Chan311111111111111111111111111111111111111';
 // What FIRST's open accepted, before the buyer's policy changed to MINT, TREASURY and 300.
 const OPENED = {
+  network: DEVNET,
   mint: 'Mint211111111111111111111111111111111111111',
   treasury: 'Treas21111111111111111111111111111111111111',
   protocolFeeBps: 250,
@@ -97,6 +98,7 @@ async function run(
       const reported: UptoBuyerWithdrawResult[] = [];
       const results = await withdrawUptoBuyer({
         journal,
+        network: DEVNET,
         withdrawal: {
           withdraw: async (query) => {
             asked.push(query);

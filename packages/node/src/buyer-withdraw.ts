@@ -55,6 +55,7 @@ export function buyerChainWithdraw(
     try {
       return await withdrawUptoBuyer({
         journal,
+        network: DEVNET,
         withdrawal: createUptoWithdrawal(rpc ?? createSolanaRpc(role.rpcUrl), {
           payer,
           network: DEVNET,

@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { buyerJournalPathsIn } from '@gyblos/config';
+import { buyerJournalPathsIn, DEVNET } from '@gyblos/config';
 import { BUYER_JOURNAL, openUptoBuyerJournal } from '@gyblos/payments-upto';
 import {
   PAYMENT_CHANNEL_STATES,
@@ -31,6 +31,7 @@ const ENTRY = {
   feePayer: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
   maxAtomic: '1000',
   policy: {
+    network: DEVNET,
     mint: 'So11111111111111111111111111111111111111112',
     treasury: 'SysvarRent111111111111111111111111111111111',
     protocolFeeBps: 300,
@@ -233,7 +234,12 @@ void test('a full journal of the widest entries still fits its byte bound', () =
       payTo: address,
       feePayer: address,
       maxAtomic: atomic,
-      policy: { mint: address, treasury: address, protocolFeeBps: 1_000 },
+      policy: {
+        network: DEVNET,
+        mint: address,
+        treasury: address,
+        protocolFeeBps: 1_000,
+      },
       openSlot: atomic,
       lastValidBlockHeight: atomic,
       expiresAt: Number.MAX_SAFE_INTEGER,

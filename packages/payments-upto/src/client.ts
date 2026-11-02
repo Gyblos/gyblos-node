@@ -143,6 +143,7 @@ async function signOpen(
     maxAtomic: terms.maxAtomic,
     // What the open signs for: trusted terms carry exactly the policy's mint, treasury and rate.
     policy: {
+      network: terms.network,
       mint: terms.mint,
       treasury: terms.treasury,
       protocolFeeBps: terms.protocolFeeBps,
