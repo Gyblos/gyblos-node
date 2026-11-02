@@ -52,13 +52,15 @@ persists separately. No live PayPal endpoint is used. The optional
 `PAYPAL_SANDBOX_OLLAMA_ORIGIN` setting chooses a different literal loopback
 Ollama origin.
 
-The USDC preview offers **Review PayPal session** after a restart. Do not use a
-checkout tab opened before restarting: its local return address belonged to the
-previous process. If the order was already approved, select **I approved · start
-session**; the app checks PayPal directly. Otherwise abandon the un-authorized
-order and create a new one. Existing sessions can be reviewed and settled while
-Ollama is unavailable; creating a session or requesting inference requires the
-pinned local model.
+Keep Gyblos open while its PayPal checkout is open. If leaving the app, close
+the checkout tab first; a local return address can be reused by another process
+after Gyblos exits. The USDC preview offers **Review PayPal session** after a
+restart. Do not use a checkout tab opened before restarting: its local return
+address belonged to the previous process. If the order was already approved,
+select **I approved · start session**; the app checks PayPal directly. Otherwise
+abandon the un-authorized order and create a new one. Existing sessions can be
+reviewed and settled while Ollama is unavailable; creating a session or
+requesting inference requires the pinned local model.
 
 The USDC chat and Connect views are previews. A PayPal authorization is not a
 wallet top-up or a conversion to USDC. This demonstration uses one local seller

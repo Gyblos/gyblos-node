@@ -86,9 +86,9 @@ export function registerDesktopPaypal(window: BrowserWindow) {
       void dialog
         .showMessageBox(window, {
           type: 'warning',
-          message: 'A PayPal Sandbox response is still being confirmed.',
+          message: 'A PayPal Sandbox checkout or response is still open.',
           detail:
-            'Keep Gyblos open until confirmation finishes. Closing now may require manual review of the test session.',
+            'Finish or close the PayPal checkout before leaving. If a checkout stays open after Gyblos closes, another local process could receive its return details. An unfinished response may need manual review.',
           buttons: ['Keep open', 'Close anyway'],
           defaultId: 0,
           cancelId: 0,
