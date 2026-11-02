@@ -114,6 +114,20 @@ void test('the local gateway requires its key and rejects browser origins', asyn
   assert.deepEqual(f.calls, []);
 });
 
+void test('the authorized model catalog exposes only the configured model', async () => {
+  const f = fixture();
+  const request = new Request(`${origin}/v1/models`, {
+    headers: { host: '127.0.0.1:12345', authorization: `Bearer ${key}` },
+  });
+  const response = await f.gateway.handle(request);
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), {
+    object: 'list',
+    data: [{ id: model, object: 'model', created: 0, owned_by: 'gyblos' }],
+  });
+  assert.deepEqual(f.calls, []);
+});
+
 void test('a following agent request acknowledges the prior response only when its history includes it', async () => {
   const f = fixture();
   const first = await f.gateway.handle(post(input));
