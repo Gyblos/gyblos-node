@@ -107,7 +107,11 @@ export function createDesktopPaypalHandlers(
           failure instanceof PaypalError &&
           failure.code === PAYPAL_ERROR_CODES.NOT_APPROVED
             ? PAYPAL_DESKTOP_ERROR.NOT_APPROVED
-            : PAYPAL_DESKTOP_ERROR.FAILED;
+            : failure instanceof PaypalError &&
+                input.action === PAYPAL_ACTION.SEND &&
+                failure.code === PAYPAL_ERROR_CODES.INVALID_REQUEST
+              ? PAYPAL_DESKTOP_ERROR.INVALID_PROMPT
+              : PAYPAL_DESKTOP_ERROR.FAILED;
       }
       return { status: service.status(), model, answer, error };
     },

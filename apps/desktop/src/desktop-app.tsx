@@ -407,6 +407,7 @@ export function DesktopApp() {
                 if (next) choose(next);
               }}
               onBrowseModels={() => navigate(UI_VIEW.MODELS)}
+              onReviewPaypal={() => setPaymentMethod(PAYMENT_METHOD.PAYPAL)}
             />
           </div>
           <div
@@ -586,8 +587,9 @@ export function DesktopApp() {
                   </fieldset>
                   <p className="modal-note">
                     PayPal authorizes a separate sandbox session; it does not
-                    add USDC to the wallet. An open session remains until you
-                    close it.
+                    add USDC to the wallet. The method resets to USDC when the
+                    app closes, but an open PayPal session remains until
+                    settled.
                   </p>
                 </SettingsGroup>
                 <SettingsGroup
@@ -652,6 +654,10 @@ export function DesktopApp() {
           {view === UI_VIEW.ACTIVITY &&
             paymentMethod === PAYMENT_METHOD.USDC && (
               <PagePanel>
+                <Note>
+                  USDC activity below is sample data, not real payments or a
+                  queried wallet balance.
+                </Note>
                 <div className="ui-stats">
                   <StatCard
                     label="Spent today"

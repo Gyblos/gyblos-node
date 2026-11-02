@@ -119,6 +119,7 @@ function parseCreatedOrder(value: unknown) {
   if (
     approval.protocol !== 'https:' ||
     approval.hostname !== PAYPAL_API.approvalHost ||
+    approval.port ||
     approval.username ||
     approval.password
   )
@@ -214,6 +215,14 @@ export function createPaypalSandbox(options: SandboxOptions) {
   const { post, prepare, get } = transport(options);
   return {
     prepare,
+    async approvalUrl(orderId: string) {
+      const order = parseCreatedOrder(
+        await get(`/v2/checkout/orders/${id(orderId)}`),
+      );
+      if (order.orderId !== orderId)
+        throw new PaypalError(PAYPAL_ERROR_CODES.INVALID_RESPONSE);
+      return order.approvalUrl;
+    },
     async isApproved(orderId: string) {
       return isOrderApproved(get, orderId);
     },

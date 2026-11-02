@@ -40,15 +40,24 @@ Never put credentials or sandbox account passwords in Git, screenshots, or chat.
 Choose an empty dedicated absolute directory for sandbox state. In a private
 terminal, set `PAYPAL_SANDBOX_CLIENT_ID`, `PAYPAL_SANDBOX_CLIENT_SECRET`, and
 `PAYPAL_SANDBOX_STATE_DIRECTORY`, then start the desktop app with
-`pnpm desktop:start`. In **Settings → Payment method**, select **PayPal
-Sandbox** and return to **Chat**. Selecting a method does not create an order.
-Create a session, open PayPal, approve with the sandbox buyer, and return to the
-app to start the session and send messages. Close the session explicitly to
-settle it. Each message is independent: previous messages are not passed to the
-engine as conversation context. The selection lasts until the desktop app
-closes; its payment journal persists separately. No live PayPal endpoint is
-used. The optional `PAYPAL_SANDBOX_OLLAMA_ORIGIN` setting chooses a different
-literal loopback Ollama origin.
+`pnpm desktop:start`. First close any earlier desktop instance so the new one
+inherits these settings; settle or preserve any open session before closing. In
+**Settings → Payment method**, select **PayPal Sandbox** and return to **Chat**.
+Selecting a method does not create an order. Create a session, open PayPal,
+approve with the sandbox buyer, and return to the app to start the session and
+send messages. Close the session explicitly to settle it. Each message is
+independent: previous messages are not passed to the engine as conversation
+context. The selection lasts until the desktop app closes; its payment journal
+persists separately. No live PayPal endpoint is used. The optional
+`PAYPAL_SANDBOX_OLLAMA_ORIGIN` setting chooses a different literal loopback
+Ollama origin.
+
+The USDC preview offers **Review PayPal session** after a restart. A created
+order can recover its approval link from PayPal. If a browser return opened
+before a restart cannot reach its old local address, return to Gyblos manually
+and select **I approved · start session**; the app checks PayPal directly.
+Existing sessions can be reviewed and settled while Ollama is unavailable;
+creating a session or requesting inference requires the pinned local model.
 
 The USDC chat and Connect views are previews. A PayPal authorization is not a
 wallet top-up or a conversion to USDC. This demonstration uses one local seller

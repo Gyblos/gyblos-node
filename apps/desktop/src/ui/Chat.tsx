@@ -66,6 +66,7 @@ type Props = {
   models: readonly ModelOption[];
   onSelectModel: (id: string) => void;
   onBrowseModels: () => void;
+  onReviewPaypal: () => void;
   onAuthorize: () => DemoAuthorizationStatus;
 };
 type PendingSend = { text: string; tools: ToolId[] };
@@ -101,6 +102,7 @@ export function Chat({
   models,
   onSelectModel,
   onBrowseModels,
+  onReviewPaypal,
   onAuthorize,
 }: Props) {
   const [chat] = useState(() => new ChatController('first-chat'));
@@ -301,9 +303,13 @@ export function Chat({
     .reverse();
   return (
     <main className="chat-page enhanced-chat">
-      <p className="chat-preview-note">
-        USDC chat preview · responses and spending are simulated
-      </p>
+      <div className="chat-preview-note">
+        <span>
+          USDC chat preview · responses and spending are simulated. PayPal
+          Sandbox sessions remain open until settled.
+        </span>
+        <Button onClick={onReviewPaypal}>Review PayPal session</Button>
+      </div>
       <div className="chat-toolbar">
         <div className="chat-tools">
           <Button

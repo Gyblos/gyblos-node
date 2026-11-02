@@ -7,18 +7,19 @@ searchable model/tool dropdowns, history, motion, SVG signature, palette and
 local artwork. Connect reuses its tool list and model/budget editor; no external
 tool is launched. Models, Activity, full-page Settings, appearance, the
 adjustable sidebar and full-width status footer use the same mockup components
-and styles. The personal wallet is local and protected; inference and Connect
-remain simulated.
+and styles. The personal wallet is local and protected; USDC Chat and Connect
+remain simulated. An opt-in [PayPal Sandbox session](paypal-sandbox.md) runs a
+pinned local Ollama model with test payments for one local seller.
 
-Chat responses stream synthetic text independently per conversation. New chats,
-history selection and switching Chat/Connect leave other responses running and
-preserve separate drafts. Stop affects only the visible conversation and keeps
-its generated prefix. Local-node availability does not authorize inference or
-stop synthetic responses. Blocked sends explain missing credits or a daily limit
-inside the chat instead of opening wallet settings. Choosing a free model clears
-only the corresponding paid-model block. All conversations, drafts, theme
-choices and connection budgets are in memory and clear when the app closes. They
-are not saved to the product home.
+The USDC Chat preview streams synthetic text independently per conversation. New
+chats, history selection and switching Chat/Connect leave other responses
+running and preserve separate drafts. Stop affects only the visible conversation
+and keeps its generated prefix. Local-node availability does not authorize
+inference or stop synthetic responses. Blocked sends explain missing credits or
+a daily limit inside the chat instead of opening wallet settings. Choosing a
+free model clears only the corresponding paid-model block. All conversations,
+drafts, theme choices and connection budgets are in memory and clear when the
+app closes. They are not saved to the product home.
 
 The five sample models and their prices remain under the collapsed Preview
 catalog; connection budgets are illustrative, not enforced tool spending limits.
@@ -34,8 +35,10 @@ visible 0.0 balance is a placeholder, not a queried or funded balance. Preview
 credits are not the personal wallet balance. The renderer remains
 network-denied. Only an explicit model lookup allows the host to issue an
 anonymous GET to the fixed public index in an ephemeral, cookieless session,
-with redirects denied and a deadline. No inference, web tool, gateway, provider
-connection or existing node configuration is used by the UI.
+with redirects denied and a deadline. The PayPal Sandbox host separately
+connects to the local Ollama engine and PayPal Sandbox. The preview does not
+connect web tools, a gateway, a remote inference provider or existing node
+configuration.
 
 Network lookup is lazy: opening the app or Models makes no discovery request.
 The current index searches by exact model ID, not a global model enumeration.

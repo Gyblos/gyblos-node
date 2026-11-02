@@ -268,8 +268,8 @@ function Composer({ chat, state }: ChatProps) {
         </div>
       </form>
       <p className="composer-note">
-        Each message is independent. Acknowledge the response before sending
-        another.
+        Each message is independent and must fit the local model's context. A
+        response must be acknowledged before sending another.
       </p>
     </div>
   );

@@ -1,5 +1,6 @@
 // Coordinates one visible sandbox chat and acknowledges only responses received by the renderer.
 import {
+  PAYPAL_REQUEST_LIMITS,
   PAYPAL_SESSION_PHASE,
   PAYPAL_SESSION_STATUS,
 } from '@gyblos/node/constants';
@@ -31,6 +32,8 @@ type Snapshot = {
 type Run = (request: PaypalRequest) => Promise<PaypalResult>;
 
 function failure(result: PaypalResult) {
+  if (result.error === PAYPAL_DESKTOP_ERROR.INVALID_PROMPT)
+    return 'Shorten the message or remove reserved model control markers, then try again.';
   if (result.error === PAYPAL_DESKTOP_ERROR.NOT_APPROVED)
     return 'Approve the request in PayPal Sandbox before starting the session.';
   if (result.error === PAYPAL_DESKTOP_ERROR.UNAVAILABLE)
@@ -91,6 +94,11 @@ export class PaypalChatController {
       model: result.model,
       notice,
       busy: false,
+      ...(request.action === PAYPAL_ACTION.CREATE &&
+      !result.error &&
+      result.status?.phase === PAYPAL_SESSION_PHASE.CREATED
+        ? { messages: [], pendingMessageId: null }
+        : {}),
     });
   }
   refresh = () => this.command({ action: PAYPAL_ACTION.STATUS });
@@ -140,6 +148,14 @@ export class PaypalChatController {
       status.spentCents + status.messageCents > status.limitCents
     )
       return;
+    if (
+      new TextEncoder().encode(draft).length > PAYPAL_REQUEST_LIMITS.promptBytes
+    ) {
+      this.update({
+        notice: failure(paypalFailure(PAYPAL_DESKTOP_ERROR.INVALID_PROMPT)),
+      });
+      return;
+    }
     this.update({ busy: true, notice: '' });
     const result = await this.call({
       action: PAYPAL_ACTION.SEND,

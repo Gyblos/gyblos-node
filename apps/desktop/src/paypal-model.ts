@@ -33,6 +33,7 @@ export const PAYPAL_ACTION = {
 export const PAYPAL_DESKTOP_ERROR = {
   DENIED: 'denied',
   INVALID: 'invalid',
+  INVALID_PROMPT: 'invalid-prompt',
   UNAVAILABLE: 'unavailable',
   NOT_APPROVED: 'not-approved',
   FAILED: 'failed',

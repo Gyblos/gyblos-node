@@ -68,6 +68,7 @@ function serialOperations() {
   }
   return {
     run,
+    isBusy: () => busy,
     async close() {
       closing = true;
       await pending;
@@ -78,9 +79,14 @@ function serialOperations() {
 export function createDesktopPaypalSession(
   session: PaypalSession,
   openExternal: (url: string) => Promise<void>,
+  options: {
+    checkEngine?: () => Promise<unknown>;
+    recoverApproval?: (orderId: string) => Promise<string>;
+  } = {},
 ) {
   let approvalUrl: string | undefined;
-  const { run, close } = serialOperations();
+  let awaitingAcknowledgement = false;
+  const { run, close, isBusy } = serialOperations();
   function orderId() {
     const id = session.status().orderId;
     if (!id) throw new Error('No sandbox order.');
@@ -88,18 +94,20 @@ export function createDesktopPaypalSession(
   }
   return {
     status: () => visibleStatus(session),
+    isCloseBlocked: () => isBusy() || awaitingAcknowledgement,
     create: () =>
       run(async () => {
+        await options.checkEngine?.();
         const order = await session.create();
         approvalUrl = order.approvalUrl;
         return visibleStatus(session);
       }),
     openApproval: () =>
       run(async () => {
-        if (
-          session.status().phase !== PAYPAL_SESSION_PHASE.CREATED ||
-          !approvalUrl
-        )
+        if (session.status().phase !== PAYPAL_SESSION_PHASE.CREATED)
+          throw new Error('Sandbox approval link is unavailable.');
+        approvalUrl ??= await options.recoverApproval?.(orderId());
+        if (!approvalUrl)
           throw new Error('Sandbox approval link is unavailable.');
         await openExternal(sandboxApproval(approvalUrl));
       }),
@@ -111,17 +119,20 @@ export function createDesktopPaypalSession(
       }),
     send: (prompt: string) =>
       run(async () => {
+        await options.checkEngine?.();
         const answer = await session.message(
           orderId(),
           prompt,
           PAYPAL_REQUEST_LIMITS.maxTokens,
           randomUUID(),
         );
+        awaitingAcknowledgement = true;
         return { text: answer.text, messageId: answer.messageId };
       }),
     acknowledge: (messageId: string) =>
       run(async () => {
         await session.acknowledge(orderId(), messageId);
+        awaitingAcknowledgement = false;
         return visibleStatus(session);
       }),
     finish: () =>

@@ -3,12 +3,17 @@ export function createDesktopPaypalRuntime<
   T extends { service: { close(): Promise<void> } },
 >(start: () => Promise<T>) {
   let opening: Promise<T> | null = null;
+  let current: T | null = null;
   let closing: Promise<void> | null = null;
   function load(): Promise<T> {
     if (closing) return Promise.reject(new Error('Sandbox is closing.'));
     if (!opening) {
       const next = Promise.resolve()
         .then(start)
+        .then((value) => {
+          current = value;
+          return value;
+        })
         .catch((error: unknown) => {
           if (opening === next) opening = null;
           throw error;
@@ -28,5 +33,5 @@ export function createDesktopPaypalRuntime<
     }
     return closing;
   }
-  return { load, close };
+  return { load, close, current: () => current };
 }
