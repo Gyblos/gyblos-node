@@ -11,6 +11,7 @@
     "./probe-session": "./src/probe-session.ts",
     "./paypal-session": "./src/paypal-session.ts",
     "./paypal-agent-server": "./src/paypal-agent-server.ts",
+    "./paypal-agent-drain": "./src/paypal-agent-drain.ts",
     "./paypal-agent-access": "./src/paypal-agent-access.ts",
     "./paypal-agent-handlers": "./src/paypal-agent-handlers.ts",
     "./paypal-agent-model": "./src/paypal-agent-model.ts",
