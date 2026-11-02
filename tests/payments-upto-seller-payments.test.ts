@@ -1,6 +1,7 @@
 // The seller's real-chain payment stack, assembled offline: it holds the ledger lock for its lifetime,
-// refuses keys that do not sign for its description, refuses a junk deposit before touching the chain,
-// recovers an empty ledger and releases everything on close. RPC is a double; no network.
+// refuses keys that do not sign for its description, makes the token accounts a claim pays into exist
+// before it starts (or does not start), refuses a junk deposit before touching the chain, recovers an
+// empty ledger and releases everything on close. RPC is a double; no network.
 import assert from 'node:assert/strict';
 import { rm } from 'node:fs/promises';
 import test from 'node:test';
@@ -13,6 +14,7 @@ import { PAYMENT_ERROR_CODES } from '@gyblos/protocol/constants';
 import { PaymentError } from '@gyblos/protocol/payment';
 
 import { directory, paths } from './support/payment-upto-file';
+import { offline } from './support/upto-seller-rpc';
 
 const SETTINGS = {
   tokenProgram: String(TOKEN_PROGRAM_ADDRESS),
@@ -20,16 +22,11 @@ const SETTINGS = {
   maxTimeoutSeconds: 120,
 };
 
-const offline = {
-  getAccountInfo: () => ({ send: async () => ({ value: null }) }),
-  getSignatureStatuses: () => ({ send: async () => ({ value: [] }) }),
-  getSlot: () => ({ send: async () => 1n }),
-};
-
-async function setup() {
+async function setup(chain: Parameters<typeof offline>[0] = {}) {
   const root = await directory();
   const feePayer = await generateKeyPairSigner();
   const authorizer = await generateKeyPairSigner();
+  const double = offline(chain);
   const description = {
     network: DEVNET,
     mint: (await generateKeyPairSigner()).address,
@@ -47,9 +44,10 @@ async function setup() {
     authorizer,
     paths: paths(root),
     cleanup: { intervalSecs: 3600, abandonGraceSecs: 30 },
-    rpc: offline,
+    rpc: double.rpc,
+    sleep: async () => undefined,
   };
-  return { root, options, description };
+  return { root, options, description, sent: double.sent };
 }
 
 void test('the stack holds the ledger for its lifetime and releases it on close', async () => {
@@ -82,6 +80,32 @@ void test('keys that do not sign for the description are refused and leave no lo
     await (await openUptoSellerPayments(options)).close();
   } finally {
     await rm(root, { recursive: true, force: true });
+  }
+});
+
+void test('missing recipient token accounts are created before start; a seller that cannot create them does not start', async () => {
+  for (const refuse of [false, true]) {
+    const { root, options, sent } = await setup({ missing: true, refuse });
+    try {
+      if (refuse) {
+        await assert.rejects(
+          openUptoSellerPayments(options),
+          (error) =>
+            error instanceof PaymentError &&
+            error.code === PAYMENT_ERROR_CODES.UNAVAILABLE,
+        );
+        assert.deepEqual(sent, []);
+        // The ledger lock was released: a later start once the accounts exist is not refused.
+        await (
+          await openUptoSellerPayments({ ...options, rpc: offline().rpc })
+        ).close();
+      } else {
+        await (await openUptoSellerPayments(options)).close();
+        assert.equal(sent.length, 1);
+      }
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   }
 });
 

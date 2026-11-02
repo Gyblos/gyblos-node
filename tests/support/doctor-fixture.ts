@@ -47,6 +47,7 @@ export const REMOTE_FREE =
 
 const ALL_OK = {
   tokenizer: async () => undefined,
+  paymentAccounts: async () => 0,
 } satisfies NonNullable<CliContext['doctor']>;
 
 export interface Fixture {

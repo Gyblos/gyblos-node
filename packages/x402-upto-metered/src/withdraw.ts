@@ -3,35 +3,31 @@
 // step per call, chosen from the channel's confirmed state; only this payer's channel is ever signed.
 import {
   address,
-  appendTransactionMessageInstructions,
-  createTransactionMessage,
-  getBase64EncodedWireTransaction,
   isSolanaError,
-  pipe,
-  setTransactionMessageFeePayerSigner,
-  setTransactionMessageLifetimeUsingBlockhash,
-  signTransactionMessageWithSigners,
   SOLANA_ERROR__JSON_RPC__SERVER_ERROR_BLOCK_NOT_AVAILABLE,
   SOLANA_ERROR__JSON_RPC__SERVER_ERROR_BLOCK_STATUS_NOT_AVAILABLE_YET,
-  SOLANA_ERROR__JSON_RPC__SERVER_ERROR_SEND_TRANSACTION_PREFLIGHT_FAILURE,
   SOLANA_ERROR__JSON_RPC__SERVER_ERROR_SLOT_SKIPPED,
   type Address,
-  type Base64EncodedWireTransaction,
-  type Blockhash,
-  type Signature,
   type TransactionSigner,
 } from '@solana/kit';
 import { discoverChannelsByRentPayer } from '@x402/svm';
 
 import {
   UPTO_CHANNEL_ACCOUNT,
-  UPTO_COMMITMENT,
   UPTO_ERROR_CODES,
   UPTO_WITHDRAW,
   UPTO_WITHDRAW_STEPS,
   type UptoWithdrawStep,
 } from './constants';
-import { UptoError, uptoError } from './errors';
+import { UptoError } from './errors';
+import {
+  uptoConfirmed as confirmed,
+  uptoRead as read,
+  uptoSend,
+  type UptoCall as Call,
+  type UptoConfirmed as Confirmed,
+  type UptoSendRpc,
+} from './transactions';
 import type { UptoSplit } from './types';
 import {
   distributeInstruction,
@@ -42,13 +38,8 @@ import {
   type UptoProgramInstruction,
 } from './withdraw-instructions';
 
-type Confirmed = { commitment: typeof UPTO_COMMITMENT };
-type Deadline = { abortSignal: AbortSignal };
-type Call<T> = { send(options: Deadline): Promise<T> };
-type Landed = (typeof UPTO_CHANNEL_ACCOUNT.landedStatuses)[number];
-
 // The slice of a @solana/kit RPC the withdrawal uses.
-export interface UptoWithdrawRpc {
+export interface UptoWithdrawRpc extends UptoSendRpc {
   getAccountInfo(
     account: Address,
     config: Confirmed & { encoding: 'base64' },
@@ -58,19 +49,6 @@ export interface UptoWithdrawRpc {
   getSlot(config: Confirmed): Call<bigint>;
   // Unix seconds of the block at that slot; a node may not know it yet.
   getBlockTime(slot: bigint): Call<bigint | null>;
-  getLatestBlockhash(config: Confirmed): Call<{
-    value: { blockhash: Blockhash; lastValidBlockHeight: bigint };
-  }>;
-  sendTransaction(
-    transaction: Base64EncodedWireTransaction,
-    config: { encoding: 'base64'; preflightCommitment: typeof UPTO_COMMITMENT },
-  ): Call<Signature>;
-  getSignatureStatuses(signatures: Signature[]): Call<{
-    value: readonly ({
-      err: unknown;
-      confirmationStatus: Landed | 'processed' | null;
-    } | null)[];
-  }>;
 }
 
 export interface UptoWithdrawOptions {
@@ -99,29 +77,16 @@ export interface UptoWithdrawResult {
   retryAfterSeconds: number | null;
 }
 
-// One RPC call under its own deadline; any failure is UNAVAILABLE, never the RPC's own text.
-async function read<T>(call: Call<T>): Promise<T> {
-  try {
-    return await call.send({
-      abortSignal: AbortSignal.timeout(UPTO_WITHDRAW.rpcMs),
-    });
-  } catch {
-    throw new UptoError(UPTO_ERROR_CODES.UNAVAILABLE);
-  }
-}
-
 const sameBytes = (left: readonly number[], right: Uint8Array) =>
   left.length === right.length &&
   left.every((value, index) => value === right[index]);
 
-const confirmed = { commitment: UPTO_COMMITMENT };
 // What a node answers for a block whose time it does not know (yet): wait, do not fail.
 const BLOCK_TIME_UNKNOWN = [
   SOLANA_ERROR__JSON_RPC__SERVER_ERROR_BLOCK_NOT_AVAILABLE,
   SOLANA_ERROR__JSON_RPC__SERVER_ERROR_BLOCK_STATUS_NOT_AVAILABLE_YET,
   SOLANA_ERROR__JSON_RPC__SERVER_ERROR_SLOT_SKIPPED,
 ] as const;
-const pause = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));
 
 // The channel at its canonical address for this rent payer, decoded by the SDK: undefined when no
 // account exists, null when the account is not that channel.
@@ -166,73 +131,12 @@ const ours = (channel: Channel, payer: string, query: UptoWithdrawQuery) =>
     (known) => known === channel.status,
   );
 
-// Waits for the transaction to confirm; a chain error is a refusal, a timeout leaves it unknown.
-async function landed(
-  rpc: UptoWithdrawRpc,
-  sleep: (ms: number) => Promise<void>,
-  signature: Signature,
-): Promise<boolean> {
-  for (let waited = 0; ; waited += UPTO_WITHDRAW.pollMs) {
-    const { value } = await read(rpc.getSignatureStatuses([signature]));
-    const status = value[0];
-    if (status && status.err !== null)
-      throw new UptoError(UPTO_ERROR_CODES.CHAIN_REJECTED);
-    if (
-      status &&
-      UPTO_CHANNEL_ACCOUNT.landedStatuses.some(
-        (landedStatus) => landedStatus === status.confirmationStatus,
-      )
-    )
-      return true;
-    if (waited >= UPTO_WITHDRAW.confirmMs) return false;
-    await sleep(UPTO_WITHDRAW.pollMs);
-  }
-}
-
-// Signed by the payer, who also pays the fee; a preflight refusal costs no fee and is CHAIN_REJECTED.
-async function send(
+// Signed and paid by the payer.
+const send = (
   rpc: UptoWithdrawRpc,
   options: UptoWithdrawOptions,
   instructions: readonly UptoProgramInstruction[],
-): Promise<{ transaction: string; confirmed: boolean }> {
-  const { value: lifetime } = await read(rpc.getLatestBlockhash(confirmed));
-  const message = pipe(
-    createTransactionMessage({ version: 0 }),
-    (draft) => setTransactionMessageFeePayerSigner(options.payer, draft),
-    (draft) => setTransactionMessageLifetimeUsingBlockhash(lifetime, draft),
-    (draft) => appendTransactionMessageInstructions(instructions, draft),
-  );
-  const signed = await signTransactionMessageWithSigners(message);
-  let signature: Signature;
-  try {
-    signature = await rpc
-      .sendTransaction(getBase64EncodedWireTransaction(signed), {
-        encoding: 'base64',
-        preflightCommitment: UPTO_COMMITMENT,
-      })
-      .send({ abortSignal: AbortSignal.timeout(UPTO_WITHDRAW.rpcMs) });
-  } catch (error) {
-    throw new UptoError(
-      isSolanaError(
-        error,
-        SOLANA_ERROR__JSON_RPC__SERVER_ERROR_SEND_TRANSACTION_PREFLIGHT_FAILURE,
-      )
-        ? UPTO_ERROR_CODES.CHAIN_REJECTED
-        : UPTO_ERROR_CODES.UNAVAILABLE,
-    );
-  }
-  // Once sent, its signature is kept: a status the RPC could not give leaves it unconfirmed, not lost.
-  const unconfirmed = (error: unknown) => {
-    if (uptoError(error).code === UPTO_ERROR_CODES.CHAIN_REJECTED) throw error;
-    return false;
-  };
-  return {
-    transaction: String(signature),
-    confirmed: await landed(rpc, options.sleep ?? pause, signature).catch(
-      unconfirmed,
-    ),
-  };
-}
+) => uptoSend(rpc, options.payer, instructions, options.sleep);
 
 const result = (
   step: UptoWithdrawStep,

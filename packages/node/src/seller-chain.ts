@@ -11,8 +11,12 @@ import {
   PROTOCOL_FEE,
   UPTO_CHANNEL_SETTINGS,
 } from '@gyblos/config';
-import { openUptoSellerPayments } from '@gyblos/payments-upto';
-import { P2P_ROLES } from '@gyblos/protocol/constants';
+import {
+  openUptoSellerPayments,
+  type UptoSellerPaymentsOptions,
+} from '@gyblos/payments-upto';
+import { P2P_ROLES, PAYMENT_ERROR_CODES } from '@gyblos/protocol/constants';
+import { PaymentError } from '@gyblos/protocol/payment';
 
 import { GENESIS_READ_MS, NODE_ERROR_CODES } from './constants';
 import { NodeError } from './errors';
@@ -29,8 +33,10 @@ export const readGenesis: GenesisReader = async (rpcUrl) =>
   );
 
 // Role keys are read from the process home (as every role file is), so the ledger lives there too.
+// Tests inject the RPC; production reads the role's.
 export function sellerChainPayments(
   genesis: GenesisReader = readGenesis,
+  rpc?: UptoSellerPaymentsOptions['rpc'],
 ): (role: RoleConfig) => Promise<SellerPayments> {
   return async (role) => {
     if (
@@ -44,8 +50,9 @@ export function sellerChainPayments(
     const served = await genesis(role.rpcUrl).catch(() => undefined);
     if (served !== DEVNET_GENESIS)
       throw new NodeError(NODE_ERROR_CODES.SELLER_PAYMENT_NETWORK_MISMATCH);
-    const payments = await openUptoSellerPayments({
+    return openUptoSellerPayments({
       rpcUrl: role.rpcUrl,
+      ...(rpc ? { rpc } : {}),
       description: {
         network: DEVNET,
         mint: role.mint,
@@ -63,7 +70,12 @@ export function sellerChainPayments(
         intervalSecs: CLEANUP.intervalSeconds,
         abandonGraceSecs: CLEANUP.abandonGraceSeconds,
       },
+    }).catch((error: unknown) => {
+      // The only chain call while opening: making the token accounts a claim pays into exist.
+      throw error instanceof PaymentError &&
+        error.code === PAYMENT_ERROR_CODES.UNAVAILABLE
+        ? new NodeError(NODE_ERROR_CODES.SELLER_PAYMENT_ACCOUNTS_UNAVAILABLE)
+        : error;
     });
-    return payments;
   };
 }

@@ -1,17 +1,20 @@
 // Builds the seller's payment server on the real chain: the durable ledger, the SDK facilitator signing
-// with the fee payer, offline verification, vouchers by the authorizer, channel reads over RPC, recovery
-// of earlier claims and the SDK's rent cleanup. Keys are the caller's; nothing here reads key files.
+// with the fee payer, offline verification, vouchers by the authorizer, channel reads over RPC, the
+// token accounts every claim pays into, recovery of earlier claims and the SDK's rent cleanup. Keys
+// are the caller's; nothing here reads key files.
 import { createSolanaRpc, type KeyPairSigner } from '@solana/kit';
 import { toFacilitatorSvmSigner } from '@x402/svm';
 import {
   createUptoChannelReaders,
   createUptoFacilitator,
+  createUptoRecipientAccounts,
   createUptoSdkChain,
   createUptoSeller,
   createUptoVerifier,
   UPTO_COMMITMENT,
   uptoChannelRpc,
   type UptoKitRpc,
+  type UptoRecipientAccountsRpc,
 } from 'x402-upto-metered';
 
 import { PAYMENT_ERROR_CODES } from '@gyblos/protocol/constants';
@@ -38,11 +41,13 @@ export interface UptoSellerPaymentsOptions {
   cleanup: { intervalSecs: number; abandonGraceSecs: number };
   now?: () => number;
   // Tests inject a double; production reads the chain at rpcUrl.
-  rpc?: UptoKitRpc & {
-    getSlot(config: { commitment: typeof UPTO_COMMITMENT }): {
-      send(): Promise<bigint>;
+  rpc?: UptoKitRpc &
+    UptoRecipientAccountsRpc & {
+      getSlot(config: { commitment: typeof UPTO_COMMITMENT }): {
+        send(): Promise<bigint>;
+      };
     };
-  };
+  sleep?: (ms: number) => Promise<void>;
 }
 
 export interface UptoSellerPayments {
@@ -72,6 +77,18 @@ export async function openUptoSellerPayments(
   });
   try {
     const rpc = options.rpc ?? createSolanaRpc(options.rpcUrl);
+    // payTo, the fee treasury and the channel payee (the fee payer), which a claim may each pay.
+    const recipients = createUptoRecipientAccounts(rpc, {
+      feePayer,
+      mint: description.mint,
+      tokenProgram: settings.tokenProgram,
+      owners: [description.payTo, description.treasury, feePayer.address],
+      sleep: options.sleep,
+    });
+    // Before anything is admitted: a seller whose payouts would be redirected does not start.
+    await recipients.ensure().catch(() => {
+      throw new PaymentError(PAYMENT_ERROR_CODES.UNAVAILABLE);
+    });
     const facilitator = createUptoFacilitator(
       toFacilitatorSvmSigner(feePayer, { defaultRpcUrl: options.rpcUrl }),
       ledger.chain,
@@ -92,6 +109,7 @@ export async function openUptoSellerPayments(
         settledClaim: readers.settledClaim,
         now,
         openWindowMs: UPTO_SELLER.openWindowMs,
+        recipients,
       }),
       store: ledger.channels,
       now,

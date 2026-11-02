@@ -159,6 +159,7 @@ void test('the voucher is signed by the authorizer and accepted by the real faci
     settledClaim: async () => undefined,
     now: () => NOW,
     openWindowMs: 90_000,
+    recipients: { ensure: async () => undefined },
   });
   await assert.rejects(
     chain.claim(
@@ -185,6 +186,35 @@ void test('the pending store keeps broadcast signatures across restarts and forg
   assert.equal(await restarted.get('upto:claim:x'), 'sig');
   await restarted.delete('upto:claim:x');
   assert.equal(await restarted.get('upto:claim:x'), undefined);
+});
+
+void test('every claim attempt first makes the recipients exist; a failure there sends nothing and keeps the charge', async () => {
+  let missing = true;
+  const { chain, steps, record, store } = await rig(
+    async () => ({ success: true, transaction: 'C'.repeat(64) }),
+    {
+      recipients: async () => {
+        if (missing) throw new UptoError(UPTO_ERROR_CODES.UNAVAILABLE);
+      },
+    },
+  );
+  await assert.rejects(
+    chain.claim(record, '5'),
+    (error) =>
+      error instanceof UptoError && error.code === UPTO_ERROR_CODES.UNAVAILABLE,
+  );
+  // Nothing reached the program, and only this charge can be retried.
+  assert.deepEqual(steps, ['recipients']);
+  assert.equal((await store.getClaim(record.channelId))?.chargedAtomic, '5');
+  missing = false;
+  assert.deepEqual(await chain.claim(record, '5'), {
+    transaction: 'C'.repeat(64),
+  });
+  assert.deepEqual(steps, ['recipients', 'recipients', 'claim']);
+  // A claim already known to have landed sends nothing, so it needs no accounts.
+  missing = true;
+  await chain.claim(record, '5');
+  assert.deepEqual(steps, ['recipients', 'recipients', 'claim']);
 });
 
 void test('a claim that landed before it was recorded is found on chain, not claimed again', async () => {

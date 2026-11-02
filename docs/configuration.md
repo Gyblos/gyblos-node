@@ -314,11 +314,24 @@ Startup stops with a static code: `NODE_CONFIG_INVALID`,
 `SELLER_OFFER_REASONING_UNSUPPORTED`, `SELLER_OFFER_API_KEY_MISSING`,
 `SELLER_OFFER_API_KEY_UNSAFE`, `SELLER_PAID_METERING_UNRECOUNTED`,
 `SELLER_PAYMENT_ROLE_MISSING`, `SELLER_PAYMENT_NETWORK_MISMATCH` (the role's RPC
-is not devnet) or `SELLER_PAYMENT_DESCRIPTION_INVALID` (the payout is the owner,
-fee payer or authorizer key). A paid seller's fee payer key needs devnet SOL: it
-pays every channel transaction and fronts each buyer channel's rent until the
-channel is reclaimed. `pnpm gyblos doctor` also names the `[[offers]]` entry a
-code is about.
+is not devnet), `SELLER_PAYMENT_DESCRIPTION_INVALID` (the payout is the owner,
+fee payer or authorizer key) or `SELLER_PAYMENT_ACCOUNTS_UNAVAILABLE` (a token
+account below is missing and could not be created). A paid seller's fee payer
+key needs devnet SOL: it pays every channel transaction and fronts each buyer
+channel's rent until the channel is reclaimed. `pnpm gyblos doctor` also names
+the `[[offers]]` entry a code is about.
+
+A claim pays the payout, the protocol fee treasury and the fee payer (the
+channel's payee) into their token accounts for the mint. The payment program
+does not fail when one of them is missing: it pays that share to its own
+treasury for good. So before starting, and again before every claim, the seller
+reads those three accounts and creates any that are missing in one transaction
+the fee payer signs and pays for (about 0.002 devnet SOL of rent each, once). A
+seller that cannot create them does not start; a claim that cannot is not sent
+and stays pending with its recorded charge, retried on recovery.
+`pnpm gyblos doctor --online` warns with `PAYMENT_ACCOUNTS_MISSING` (startup
+creates them) or `PAYMENT_ACCOUNTS_UNCHECKED` (the RPC did not answer), and
+never sends anything.
 
 `pnpm gyblos config validate --config "$GYBLOS_CONFIG"` explains file problems
 (it does not read `GYBLOS_CONFIG`, does not check the `SELLER_*` limits above,

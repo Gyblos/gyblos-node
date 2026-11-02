@@ -45,8 +45,17 @@ export {
   type UptoWithdrawRpc,
 } from './withdraw';
 export {
+  createUptoRecipientAccounts,
+  uptoMissingTokenAccounts,
+  type UptoRecipientAccounts,
+  type UptoRecipientAccountsOptions,
+  type UptoRecipientAccountsRpc,
+  type UptoTokenAccountsQuery,
+} from './recipient-accounts';
+export {
   distributeInstruction,
   payerTokenAccountInstruction,
+  tokenAccountInstruction,
   requestCloseInstruction,
   sealInstruction,
   uptoDistributionHash,
