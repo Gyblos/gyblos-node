@@ -91,6 +91,9 @@ void test('Codex configuration uses Responses without embedding credentials or a
   assert.match(config, /env_key = "GYBLOS_API_KEY"/);
   assert.match(config, /request_max_retries = 0/);
   assert.match(config, /stream_max_retries = 0/);
+  assert.match(config, /web_search = "disabled"/);
+  assert.match(config, /multi_agent = false/);
+  assert.match(config, /view_image = false/);
   assert.match(config, /http:\/\/127\.0\.0\.1:12345\/v1/);
 });
 
