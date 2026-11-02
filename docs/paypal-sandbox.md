@@ -161,18 +161,31 @@ warming, which can otherwise generate additional charged requests. Set
 bash or zsh, create a unique, private directory before starting Pi:
 
 ```sh
-export PI_CODING_AGENT_DIR="$(mktemp -d "${TMPDIR:-/tmp}/gyblos-pi.XXXXXXXX")"
+if PI_CODING_AGENT_DIR="$(mktemp -d "${TMPDIR:-/tmp}/gyblos-pi.XXXXXXXX")"; then
+  export PI_CODING_AGENT_DIR
+  printf 'Pi directory: %s\n' "$PI_CODING_AGENT_DIR"
+else
+  unset PI_CODING_AGENT_DIR
+  printf 'Could not create the Pi directory. Stop here.\n' >&2
+fi
 ```
 
 On Windows PowerShell, create a unique directory under your user profile:
 
 ```powershell
-$env:PI_CODING_AGENT_DIR = Join-Path $env:LOCALAPPDATA ('gyblos-pi-' + [guid]::NewGuid().ToString('N'))
-New-Item -ItemType Directory -Path $env:PI_CODING_AGENT_DIR -ErrorAction Stop | Out-Null
+$gyblosPiDir = Join-Path $env:LOCALAPPDATA ('gyblos-pi-' + [guid]::NewGuid().ToString('N'))
+try {
+  New-Item -ItemType Directory -Path $gyblosPiDir -ErrorAction Stop | Out-Null
+  $env:PI_CODING_AGENT_DIR = $gyblosPiDir
+} catch {
+  Remove-Item Env:PI_CODING_AGENT_DIR -ErrorAction SilentlyContinue
+  Write-Error 'Could not create the Pi directory. Stop here.'
+}
+Remove-Variable gyblosPiDir
 ```
 
-Keep its contents private and check the directory's permissions on a shared
-computer.
+If creation fails, stop before saving files or starting Pi. Keep the directory's
+contents private and check its permissions on a shared computer.
 
 Pi's estimated token price cannot express this prototype's fixed USD 0.10 per
 completed inference. Use the session usage shown in Gyblos for the actual

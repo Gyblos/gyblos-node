@@ -191,7 +191,8 @@ export function validatePaypalAgentRequest(
   }
   if (
     row.tool_choice !== undefined &&
-    !['auto', 'none', 'required'].includes(String(row.tool_choice))
+    (typeof row.tool_choice !== 'string' ||
+      !['auto', 'none', 'required'].includes(row.tool_choice))
   )
     invalid();
   if (row.n !== undefined && row.n !== 1) invalid();
