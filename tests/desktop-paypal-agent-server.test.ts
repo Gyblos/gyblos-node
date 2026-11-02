@@ -218,3 +218,32 @@ void test('a body started in an old session cannot execute after that session is
     await endpoint.close();
   }
 });
+
+void test('retired access closes an incomplete request instead of delaying reconnection', async () => {
+  const f = fixture();
+  const desktop = createDesktopPaypalSession(await createPaypalSession(f), async () => {});
+  await desktop.create();
+  await desktop.approve();
+  const endpoint = await startDesktopPaypalAgent(desktop, 'synthetic-model');
+  await desktop.finish();
+  await desktop.create();
+  await desktop.approve();
+  const request = httpRequest(`${endpoint.url}/chat/completions`, {
+    method: 'POST', headers: { authorization: `Bearer ${endpoint.key}`, 'content-type': 'application/json', 'content-length': 1000 },
+  });
+  const result = new Promise<number | undefined>((resolve, reject) => {
+    request.on('error', reject);
+    request.on('response', (response) => { response.resume(); response.on('end', () => resolve(response.statusCode)); });
+  });
+  request.write('{');
+  try {
+    assert.equal(await result, 401);
+    await Promise.race([
+      endpoint.close(),
+      new Promise<never>((_resolve, reject) => setTimeout(() => reject(new Error('stale socket remained open')), 1000)),
+    ]);
+    await desktop.finish();
+  } finally {
+    request.destroy();
+  }
+});
