@@ -10,10 +10,11 @@ unclear.
 
 ## Set up Node.js and pnpm
 
-The project currently requires Node.js 22 or newer and the pnpm version pinned
-in [package.json](package.json). For development, prefer the latest available
-security-patched Node.js 24 release. Before installing dependencies, check the
-tools selected by the terminal you will use:
+The project currently declares Node.js 22 or newer and the pnpm version pinned
+in [package.json](package.json). Some desktop tooling dependencies require at
+least Node 22.12. For development, prefer the latest available security-patched
+Node.js 24 release. If you use Node 22, use a current patched release. Before
+installing dependencies, check the tools selected by the terminal you will use:
 
 ```sh
 node --version
@@ -33,8 +34,10 @@ nvm use 24
 If the terminal still selects an older Node, check your shell's `PATH` and
 version-manager initialization, then open a new terminal (including an editor's
 integrated terminal) and repeat the checks. `process.execPath` shows the Node
-executable actually in use. Make sure pnpm reports the pinned version before
-running `pnpm install --frozen-lockfile`.
+executable actually in use. If pnpm is missing or reports a different version,
+use the [pnpm installation guide](https://pnpm.io/installation) to install or
+select the version pinned in `package.json`, then check `pnpm --version` again
+before running `pnpm install --frozen-lockfile`.
 
 The discovery index's `node:sqlite` tests skip when that module is unavailable
 (it is unflagged in Node 22.13 and later). See
