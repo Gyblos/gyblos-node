@@ -61,6 +61,8 @@ void test(
     assert.equal(report.nativeIroh, true);
     assert.equal(report.simulatedChain, true);
     assert.equal(report.realPayments, false);
+    assert.ok(report.cases.includes(PAID_ACCEPTANCE_CASES.CLI_ANSWER));
+    assert.ok(report.cases.includes(PAID_ACCEPTANCE_CASES.CLI_INTERRUPTED));
     assert.deepEqual(report.cases, Object.values(PAID_ACCEPTANCE_CASES));
     assert.ok(report.answers >= 4);
     assert.ok(report.attempts >= report.answers);
