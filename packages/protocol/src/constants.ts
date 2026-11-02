@@ -217,6 +217,12 @@ export const FREE_CHAT_ROLES = {
 } as const;
 export type FreeChatRole =
   (typeof FREE_CHAT_ROLES)[keyof typeof FREE_CHAT_ROLES];
+export const AGENT_CHAT = {
+  ROLES: { ...FREE_CHAT_ROLES, DEVELOPER: 'developer', TOOL: 'tool' },
+  FUNCTION: 'function',
+  FINISH: { ...ENGINE_DONE_REASONS, TOOL_CALLS: 'tool_calls' },
+  COMPLETION: 'chat.completion',
+} as const;
 export const FREE_EXECUTION_CODES = {
   INVALID: 'INVALID_FREE_EXECUTION',
   VERSION: 'UNSUPPORTED_FREE_EXECUTION_VERSION',

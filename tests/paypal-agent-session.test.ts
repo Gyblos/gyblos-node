@@ -206,10 +206,122 @@ void test('a reentrant validator cannot start two paid inferences', async () => 
   session = await createPaypalSession({ ...f, validateRequest });
   const order = await session.create();
   await session.approve(order.orderId);
-  const first = await session.message(order.orderId, 'synthetic outer', 16, 'OUTER');
+  const first = await session.message(
+    order.orderId,
+    'synthetic outer',
+    16,
+    'OUTER',
+  );
   assert.ok(reentry);
   await assert.rejects(reentry);
   await session.acknowledge(order.orderId, first.messageId);
   await session.finish(order.orderId);
   assert.deepEqual(f.calls, ['create', 'authorize', 'generate', 'capture:10']);
+});
+
+void test('a stream-like engine result cannot be settled as a completed response', async () => {
+  const f = fixture();
+  const agentEngine = {
+    model: 'synthetic-model',
+    async generate() {
+      f.calls.push('agent-generate');
+      return new ReadableStream();
+    },
+  };
+  const session = await createPaypalSession({ ...f, agentEngine });
+  const order = await session.create();
+  await session.approve(order.orderId);
+  await assert.rejects(
+    session.agentMessage(
+      order.orderId,
+      {
+        model: 'synthetic-model',
+        messages: [{ role: 'user', content: 'synthetic request' }],
+        stream: true,
+        max_tokens: 128,
+      },
+      'MESSAGE1',
+    ),
+  );
+  assert.equal(session.status().spentCents, 0);
+  await assert.rejects(session.finish(order.orderId));
+  assert.deepEqual(f.calls, ['create', 'authorize', 'agent-generate']);
+});
+
+void test('the agent cannot select another model or conflicting output limits', async () => {
+  const f = fixture();
+  const agentEngine = {
+    model: 'synthetic-model',
+    async generate() {
+      f.calls.push('agent-generate');
+      return completion(1);
+    },
+  };
+  const session = await createPaypalSession({ ...f, agentEngine });
+  const order = await session.create();
+  await session.approve(order.orderId);
+  const body = {
+    model: 'synthetic-model',
+    messages: [{ role: 'user', content: 'synthetic request' }],
+    max_tokens: 128,
+  };
+  await assert.rejects(
+    session.agentMessage(
+      order.orderId,
+      { ...body, model: 'other' },
+      'MESSAGE1',
+    ),
+  );
+  await assert.rejects(
+    session.agentMessage(
+      order.orderId,
+      { ...body, max_completion_tokens: 2048 },
+      'MESSAGE1',
+    ),
+  );
+  assert.deepEqual(f.calls, ['create', 'authorize']);
+});
+
+void test('chat and agent turns share the same authorization and pending-response lock', async () => {
+  const f = fixture();
+  const agentEngine = {
+    model: 'synthetic-model',
+    async generate() {
+      f.calls.push('agent-generate');
+      return completion(1);
+    },
+  };
+  const session = await createPaypalSession({ ...f, agentEngine });
+  const order = await session.create();
+  await session.approve(order.orderId);
+  const chat = await session.message(
+    order.orderId,
+    'synthetic request',
+    16,
+    'CHAT',
+  );
+  const agentRequest = {
+    model: 'synthetic-model',
+    messages: [{ role: 'user', content: 'synthetic request' }],
+    max_tokens: 128,
+  };
+  await assert.rejects(
+    session.agentMessage(order.orderId, agentRequest, 'AGENT'),
+  );
+  await session.acknowledge(order.orderId, chat.messageId);
+  const agent = await session.agentMessage(
+    order.orderId,
+    agentRequest,
+    'AGENT',
+  );
+  await assert.rejects(session.message(order.orderId, 'other', 16, 'OTHER'));
+  await session.acknowledge(order.orderId, agent.messageId);
+  await session.finish(order.orderId);
+  assert.deepEqual(f.calls, [
+    'create',
+    'authorize',
+    'generate',
+    'agent-generate',
+    'capture:20',
+  ]);
 });

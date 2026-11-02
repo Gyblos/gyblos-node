@@ -13,6 +13,10 @@ import {
   PAYPAL_SESSION_PHASE as PHASE,
   PAYPAL_SESSION_STATUS as STATUS,
 } from './constants';
+import {
+  validatePaypalAgentRequest,
+  validatePaypalAgentResult,
+} from './paypal-agent-validation';
 import type { PaypalInferenceDependencies } from './paypal-inference';
 import {
   parsePaypalSessionState,
@@ -27,9 +31,9 @@ export interface PaypalSessionDependencies {
   engine: PaypalInferenceDependencies['engine'];
   validateRequest?: PaypalInferenceDependencies['validateRequest'];
   agentEngine?: {
+    model: string;
     generate(input: unknown, signal?: AbortSignal): Promise<unknown>;
   };
-  validateAgentRequest?: (input: unknown) => void;
   journal: {
     read(): Promise<unknown>;
     write(value: PaypalSessionRecord): Promise<void>;
@@ -58,7 +62,7 @@ function promptDigest(prompt: string, maxTokens: number) {
     .update(JSON.stringify({ prompt, maxTokens }))
     .digest('hex');
 }
-function agentRequest(input: unknown) {
+function agentRequest(input: unknown, model: string) {
   let serialized: string | undefined;
   try {
     serialized = JSON.stringify(input);
@@ -74,25 +78,13 @@ function agentRequest(input: unknown) {
   const value: unknown = JSON.parse(serialized);
   if (!value || typeof value !== 'object' || Array.isArray(value))
     return fail(PAYPAL_ERROR_CODES.INVALID_REQUEST);
-  const model: unknown = Reflect.get(value, 'model');
-  const messages: unknown = Reflect.get(value, 'messages');
-  const maxTokens: unknown = Reflect.get(value, 'max_tokens');
-  if (
-    typeof model !== 'string' ||
-    !model.trim() ||
-    !Array.isArray(messages) ||
-    messages.length === 0 ||
-    typeof maxTokens !== 'number' ||
-    !Number.isSafeInteger(maxTokens) ||
-    maxTokens < 1 ||
-    maxTokens > PAYPAL_AGENT_REQUEST_LIMITS.maxTokens
-  )
-    return fail(PAYPAL_ERROR_CODES.INVALID_REQUEST);
+  const normalized = validatePaypalAgentRequest(value, model);
+  const normalizedBytes = JSON.stringify(normalized);
   return {
-    input: value,
+    input: normalized,
     digest: createHash('sha256')
-      .update('paypal-agent-request-v1:')
-      .update(serialized)
+      .update(PAYPAL_AGENT_REQUEST_LIMITS.digestDomain)
+      .update(normalizedBytes)
       .digest('hex'),
   };
 }
@@ -238,9 +230,9 @@ class PaypalSession {
         PAYPAL_SANDBOX.limitCents
     )
       return fail(PAYPAL_ERROR_CODES.INVALID_REQUEST);
-    validate();
     this.busy = true;
     try {
+      validate();
       signal?.throwIfAborted();
       const attemptIds = [...record.attemptIds, messageId];
       await this.save({
@@ -302,15 +294,24 @@ class PaypalSession {
     messageId: string,
     signal?: AbortSignal,
   ) {
-    const request = agentRequest(input);
     const engine = this.deps.agentEngine;
     if (!engine) return fail(PAYPAL_ERROR_CODES.INVALID_CONFIG);
+    const request = agentRequest(input, engine.model);
+    const maxTokens = request.input.max_tokens;
+    if (typeof maxTokens !== 'number')
+      return fail(PAYPAL_ERROR_CODES.INVALID_REQUEST);
     const result = await this.runMessage(
       orderId,
       messageId,
       request.digest,
-      () => engine.generate(request.input, signal),
-      () => this.deps.validateAgentRequest?.(request.input),
+      async () =>
+        validatePaypalAgentResult(
+          await engine.generate(request.input, signal),
+          engine.model,
+          maxTokens,
+          request.input,
+        ),
+      () => {},
       signal,
     );
     return { response: result.output, messageId: result.messageId };
