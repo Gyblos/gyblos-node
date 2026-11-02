@@ -31,7 +31,11 @@ only; never import mainnet keys.
   before each claim ([Seller startup](configuration.md#seller-startup)). A buyer
   who closed its emptied token account makes the seller pay, unrecovered, the
   rent to recreate it for its refund: about 0.002 SOL, at most about once per
-  channel.
+  channel. Rent cleanup and a buyer's withdrawal distribute channels without
+  that check, so an owner who closes its own token account while the seller runs
+  loses those shares for good; the next claim or restart recreates the account.
+  A claim whose buyer's refund account is frozen is not sent and stays pending,
+  retried on recovery, with the same code as an unreachable RPC.
 - Paid v2 selling (x402 upto channels) is wired to devnet and has settled there
   only in a controlled run; it is not validated beyond that.
 - A claim is recognized as landed only through the transactions this seller sent

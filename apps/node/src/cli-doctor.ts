@@ -63,11 +63,13 @@ const HINTS: Readonly<Partial<Record<DoctorResultCode, string>>> = {
   [NODE_ERROR_CODES.SELLER_PAYMENT_NETWORK_MISMATCH]:
     'paid selling runs on devnet only; set the role up with a devnet RPC',
   [NODE_ERROR_CODES.SELLER_PAYMENT_ACCOUNTS_UNAVAILABLE]:
-    'fund the fee payer with devnet SOL and check the RPC; startup creates the payout, fee and fee payer token accounts',
+    'fund the fee payer with devnet SOL and check the RPC; startup creates the payout, fee and fee payer token accounts, and refuses a frozen one',
   [DOCTOR_CODES.PAYMENT_ACCOUNTS_MISSING]:
     'startup creates the missing payout, fee or fee payer token account, about 0.002 devnet SOL each from the fee payer',
   [DOCTOR_CODES.PAYMENT_ACCOUNTS_UNCHECKED]:
     'the RPC did not answer; startup checks the token accounts again',
+  [DOCTOR_CODES.PAYMENT_ACCOUNTS_UNUSABLE]:
+    'a payout, fee or fee payer token account is frozen or is not a token account; startup refuses it until it can receive payouts',
   [NODE_ERROR_CODES.SELLER_PAYMENT_DESCRIPTION_INVALID]:
     'the payout must differ from the owner, fee payer and authorizer keys',
   [NODE_ERROR_CODES.NODE_CONFIG_INVALID]:

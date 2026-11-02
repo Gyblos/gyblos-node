@@ -327,11 +327,17 @@ the buyer's. The payment program does not fail when one of them is missing: it
 pays that share to its own treasury for good. So before starting the seller
 reads the first three accounts, and before every claim all four, and creates any
 that are missing in one transaction the fee payer signs and pays for (about
-0.002 devnet SOL of rent each). A seller that cannot create them does not start;
-a claim that cannot is not sent and stays pending with its recorded charge,
-retried on recovery. `pnpm gyblos doctor --online` warns with
-`PAYMENT_ACCOUNTS_MISSING` (startup creates them) or
-`PAYMENT_ACCOUNTS_UNCHECKED` (the RPC did not answer), and never sends anything.
+0.002 devnet SOL of rent each). Creations run one at a time, so claims arriving
+together create a missing account once; a claim with nothing to create never
+waits for another's. A frozen token account cannot receive its share, so it
+counts as unavailable. A seller that cannot create them, or finds one frozen,
+does not start; a claim that cannot is not sent and stays pending with its
+recorded charge, retried on recovery. `pnpm gyblos doctor --online` first checks
+that the role's RPC serves devnet (`SELLER_PAYMENT_NETWORK_MISMATCH` otherwise,
+as at startup), then warns with `PAYMENT_ACCOUNTS_MISSING` (startup creates
+them) or `PAYMENT_ACCOUNTS_UNCHECKED` (the RPC did not answer), fails with
+`PAYMENT_ACCOUNTS_UNUSABLE` for an account that is frozen or not a token account
+(startup refuses it), and never sends anything.
 
 `pnpm gyblos config validate --config "$GYBLOS_CONFIG"` explains file problems
 (it does not read `GYBLOS_CONFIG`, does not check the `SELLER_*` limits above,

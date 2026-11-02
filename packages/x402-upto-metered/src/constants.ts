@@ -88,6 +88,13 @@ export const UPTO_PROGRAM = {
     mainnet: 'Cs2zdfUNonRdRGsiZUQQLdTxzxVvJZmgiX2mpLYKuEqP',
   },
 } as const;
+// An SPL token account's state byte (after mint, owner, amount and delegate) and the one state that
+// can receive a payout; a frozen account cannot.
+export const UPTO_TOKEN_ACCOUNT = {
+  stateOffset: 108,
+  initialized: 1,
+  frozen: 2,
+} as const;
 // The payer's withdrawal, one step per run: what it did to each channel.
 export const UPTO_WITHDRAW_STEPS = {
   // request_close was sent; the grace period runs from when it lands.

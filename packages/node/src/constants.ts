@@ -90,6 +90,8 @@ export const DOCTOR_CODES = {
   PAYMENT_ACCOUNTS_MISSING: 'PAYMENT_ACCOUNTS_MISSING',
   // The RPC could not say whether those token accounts exist.
   PAYMENT_ACCOUNTS_UNCHECKED: 'PAYMENT_ACCOUNTS_UNCHECKED',
+  // One of those token accounts can never receive a payout (frozen, say); startup refuses it.
+  PAYMENT_ACCOUNTS_UNUSABLE: 'PAYMENT_ACCOUNTS_UNUSABLE',
   // Every offer's usage is declared by its provider, so no tokenizer is loaded.
   NOT_NEEDED: 'NOT_NEEDED',
   // A remote engine is called only with --online.

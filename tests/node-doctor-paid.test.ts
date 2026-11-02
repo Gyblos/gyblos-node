@@ -6,7 +6,7 @@ import { chmod, readFile, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { PROTOCOL_FEE } from '@gyblos/config';
+import { DEVNET_GENESIS, PROTOCOL_FEE } from '@gyblos/config';
 
 import {
   doctor,
@@ -75,7 +75,7 @@ void test('doctor: a payout on a signing key or loose payment key files fail pay
     );
   }));
 
-void test('doctor --online: missing payment token accounts warn, an unreadable RPC warns, offline never asks', () =>
+void test('doctor --online: missing payment token accounts warn, an unreadable RPC warns, another chain fails, offline never asks', () =>
   scenario({}, async (run) => {
     await withOllama(run);
     await writeFile(join(run.root, 'gyblos.toml'), paidToml(run));
@@ -85,9 +85,10 @@ void test('doctor --online: missing payment token accounts warn, an unreadable R
       ['--online'],
       {},
       {
+        genesis: async () => DEVNET_GENESIS,
         paymentAccounts: async ({ mint, owners }) => {
           asked.push({ mint, owners });
-          return 2;
+          return { missing: 2, unusable: 0 };
         },
       },
     );
@@ -111,6 +112,7 @@ void test('doctor --online: missing payment token accounts warn, an unreadable R
       ['--online'],
       {},
       {
+        genesis: async () => DEVNET_GENESIS,
         paymentAccounts: async () => {
           throw new Error('rpc down at https://rpc.example/?key=s');
         },
@@ -133,4 +135,54 @@ void test('doctor --online: missing payment token accounts warn, an unreadable R
       },
     );
     assert.match(line(offline.output, 'payments'), /^\s*OK\s+payments/);
+    // Another chain fails as startup would, and an unreadable genesis warns; neither reads accounts.
+    let read = 0;
+    const never = async () => {
+      read += 1;
+      return { missing: 0, unusable: 0 };
+    };
+    const mainnet = await doctor(
+      run,
+      ['--online'],
+      {},
+      { genesis: async () => 'another chain', paymentAccounts: never },
+    );
+    assert.equal(mainnet.code, 1);
+    assert.match(
+      line(mainnet.output, 'payments'),
+      /FAIL\s+payments\s+SELLER_PAYMENT_NETWORK_MISMATCH/,
+    );
+    const silent = await doctor(
+      run,
+      ['--online'],
+      {},
+      {
+        genesis: async () => {
+          throw new Error('rpc down at https://rpc.example/?key=s');
+        },
+        paymentAccounts: never,
+      },
+    );
+    assert.equal(silent.code, 0);
+    assert.match(
+      line(silent.output, 'payments'),
+      /WARN\s+payments\s+PAYMENT_ACCOUNTS_UNCHECKED/,
+    );
+    assert.equal(silent.output.includes('rpc.example'), false);
+    assert.equal(read, 0);
+    // A frozen account fails: startup refuses it.
+    const frozen = await doctor(
+      run,
+      ['--online'],
+      {},
+      {
+        genesis: async () => DEVNET_GENESIS,
+        paymentAccounts: async () => ({ missing: 1, unusable: 1 }),
+      },
+    );
+    assert.equal(frozen.code, 1);
+    assert.match(
+      line(frozen.output, 'payments'),
+      /FAIL\s+payments\s+PAYMENT_ACCOUNTS_UNUSABLE\s+a payout/,
+    );
   }));
