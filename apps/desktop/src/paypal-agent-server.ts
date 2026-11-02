@@ -108,9 +108,14 @@ export async function startDesktopPaypalAgent(service: Service, model: string) {
   let gateway: Gateway | undefined;
   let closing = false;
   const server = createServer((request, response) => {
-    if (!gateway || closing)
-      return response.writeHead(HTTP_STATUS.serviceUnavailable).end();
-    if (!isCurrent()) return response.writeHead(HTTP_STATUS.unauthorized).end();
+    if (!gateway || closing || !isCurrent()) {
+      response.shouldKeepAlive = false;
+      const status =
+        !gateway || closing
+          ? HTTP_STATUS.serviceUnavailable
+          : HTTP_STATUS.unauthorized;
+      return response.writeHead(status).end();
+    }
     void dispatch(request, response, origin, gateway);
   });
   await new Promise<void>((resolve, reject) => {
