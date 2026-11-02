@@ -3,6 +3,7 @@ import { test } from 'node:test';
 
 import {
   opencodeConfig,
+  piConfig,
   parsePaypalAgentResult,
   PAYPAL_AGENT_ACTION,
   PAYPAL_AGENT_USAGE_STATE,
@@ -50,6 +51,34 @@ void test('OpenCode configuration uses an environment variable instead of embedd
     tool_call: true,
     limit: { context: 8192, output: 512 },
   });
+});
+
+void test('Pi configuration connects to Gyblos without embedding its temporary key', () => {
+  const config = piConfig({
+    url: 'http://127.0.0.1:12345/v1',
+    key: 'synthetic-secret-key',
+    model: 'synthetic-model',
+  });
+  assert.doesNotMatch(config, /synthetic-secret-key/);
+  const parsed: unknown = JSON.parse(config);
+  assert.ok(parsed && typeof parsed === 'object' && 'providers' in parsed);
+  assert.ok(parsed.providers && typeof parsed.providers === 'object');
+  assert.ok('gyblos' in parsed.providers);
+  const provider = parsed.providers.gyblos;
+  assert.ok(provider && typeof provider === 'object');
+  assert.ok('baseUrl' in provider && 'api' in provider && 'apiKey' in provider);
+  assert.equal(provider.baseUrl, 'http://127.0.0.1:12345/v1');
+  assert.equal(provider.api, 'openai-completions');
+  assert.equal(provider.apiKey, '$GYBLOS_API_KEY');
+  assert.ok('models' in provider && Array.isArray(provider.models));
+  assert.equal(provider.models[0]?.id, 'synthetic-model');
+  assert.equal(provider.models[0]?.maxTokens, 512);
+  assert.equal(provider.models[0]?.contextWindow, 8192);
+  assert.equal(provider.models[0]?.reasoning, false);
+  assert.deepEqual(provider.models[0]?.input, ['text']);
+  assert.ok(provider.models[0]?.compat);
+  assert.equal(provider.models[0].compat.supportsStore, false);
+  assert.equal(provider.models[0].compat.supportsDeveloperRole, false);
 });
 
 void test('a confirmed disconnect clears an older stalled status warning', () => {
