@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import {
   opencodeConfig,
   piConfig,
+  piSettings,
   codexConfig,
   claudeCodeConfig,
   parsePaypalAgentResult,
@@ -52,6 +53,14 @@ void test('OpenCode configuration uses an environment variable instead of embedd
     name: 'synthetic-model',
     tool_call: true,
     limit: { context: 8192, output: 512 },
+  });
+});
+
+void test('Pi settings disable automatic extra calls for the sandbox session', () => {
+  assert.deepEqual(JSON.parse(piSettings()), {
+    retry: { enabled: false, provider: { maxRetries: 0 } },
+    compaction: { enabled: false },
+    cacheWarming: 'off',
   });
 });
 
