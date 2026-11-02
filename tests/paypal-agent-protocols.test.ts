@@ -184,3 +184,18 @@ void test('unsupported or unauthenticated client requests never dispatch inferen
   assert.equal(unauthorized.status, 401);
   assert.deepEqual(f.requests, []);
 });
+
+void test('Codex requests without an explicit output limit use the agent limit', async () => {
+  const f = fixture();
+  const response = await f.gateway.handle(post('/v1/responses', {
+    model,
+    input: 'synthetic request',
+    tools: [{ type: 'function', name: 'read_file', parameters: tool.function.parameters, strict: false }],
+    stream: true,
+    store: false,
+  }));
+  assert.equal(response.status, 200);
+  const request = f.requests[0];
+  assert.ok(request && typeof request === 'object' && 'max_tokens' in request);
+  assert.equal(request.max_tokens, 512);
+});
