@@ -42,8 +42,8 @@ state, and simultaneous buyer and seller observations must be queried by role.
 ## Bounds and lifecycle
 
 The OpenTelemetry metrics SDK is pinned to 2.6.0 (API 1.9.0), compatible with
-the repository's Node 22 minimum; SDK 3 requires Node 22.15 or newer. There are
-eleven fixed instruments, cumulative temporality, a maximum of 128 attribute
+the repository's Node.js requirement; SDK 3 requires Node 22.15 or newer. There
+are eleven fixed instruments, cumulative temporality, a maximum of 128 attribute
 sets per instrument (including the SDK's overflow series), and fixed latency
 histogram boundaries. No per-request/model/peer table is retained. Finite
 nonnegative safe-integer measurements are required by the telemetry port. OTel
