@@ -224,6 +224,8 @@ export const AGENT_CHAT = {
   COMPLETION: 'chat.completion',
   CHUNK: 'chat.completion.chunk',
   STREAM_DONE: '[DONE]',
+  LIST: 'list',
+  MODEL: 'model',
 } as const;
 export const FREE_EXECUTION_CODES = {
   INVALID: 'INVALID_FREE_EXECUTION',

@@ -164,12 +164,26 @@ function agentResponse(
 
 function agentError(reason: unknown) {
   const code =
-    reason instanceof PaypalError ? reason.code : PAYPAL_ERROR_CODES.UNAVAILABLE;
+    reason instanceof PaypalError
+      ? reason.code
+      : PAYPAL_ERROR_CODES.UNAVAILABLE;
   return error(
     code === PAYPAL_ERROR_CODES.INVALID_REQUEST
       ? HTTP_STATUS.badRequest
       : HTTP_STATUS.conflict,
     code,
+  );
+}
+
+function modelList(model: string) {
+  return Response.json(
+    {
+      object: AGENT_CHAT.LIST,
+      data: [
+        { id: model, object: AGENT_CHAT.MODEL, created: 0, owned_by: 'gyblos' },
+      ],
+    },
+    { headers: { 'cache-control': 'no-store' } },
   );
 }
 
@@ -205,6 +219,8 @@ function requestError(request: Request, base: URL, key: Buffer) {
     return error(HTTP_STATUS.forbidden, PAYPAL_ERROR_CODES.INVALID_REQUEST);
   if (!matchesKey(request.headers.get('authorization'), key))
     return error(HTTP_STATUS.unauthorized, PAYPAL_ERROR_CODES.INVALID_REQUEST);
+  if (request.method === 'GET' && url.pathname === ROUTES.models && !url.search)
+    return undefined;
   if (
     request.method !== 'POST' ||
     url.pathname !== ROUTES.inference ||
@@ -238,6 +254,7 @@ export function createPaypalAgentGateway(options: GatewayOptions) {
   async function handle(request: Request) {
     const rejection = requestError(request, base, key);
     if (rejection) return rejection;
+    if (request.method === 'GET') return modelList(options.model);
     if (busy)
       return error(
         HTTP_STATUS.conflict,
