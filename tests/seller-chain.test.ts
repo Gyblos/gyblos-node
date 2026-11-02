@@ -1,6 +1,6 @@
 // The daemon's devnet payment server is built from the seller role: its payout, fee payer and authorizer
-// keys, the network fee and the role's private payments directory. Ephemeral role files in a temporary
-// home; the RPC is never called.
+// keys, the network fee and the role's private payments directory, and only once the token accounts
+// a claim pays into exist. Ephemeral role files in a temporary home; the RPC is a double.
 import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -15,6 +15,8 @@ import { NodeError } from '@gyblos/node/errors';
 import { loadRole, setupRole } from '@gyblos/node/roles';
 import { sellerChainPayments } from '@gyblos/node/seller-chain';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
+
+import { offline } from './support/upto-seller-rpc';
 
 async function withHome(run: (home: string) => Promise<void>) {
   const home = await mkdtemp(join(tmpdir(), 'gyblos-seller-chain-'));
@@ -42,9 +44,10 @@ void test('a seller set up with a payout gets a payment server for its own keys 
     });
     const role = await loadRole(P2P_ROLES.SELLER);
     assert.ok(role.role === P2P_ROLES.SELLER && role.facilitator);
-    const payments = await sellerChainPayments(async () => DEVNET_GENESIS)(
-      role,
-    );
+    const payments = await sellerChainPayments(
+      async () => DEVNET_GENESIS,
+      offline().rpc,
+    )(role);
     try {
       assert.deepEqual(await payments.server.describe(), {
         network: DEVNET,
@@ -65,7 +68,7 @@ void test('a seller set up without a payout cannot sell paid', () =>
     await setupRole({ role: P2P_ROLES.SELLER, mint: await address() });
     const role = await loadRole(P2P_ROLES.SELLER);
     await assert.rejects(
-      sellerChainPayments(async () => DEVNET_GENESIS)(role),
+      sellerChainPayments(async () => DEVNET_GENESIS, offline().rpc)(role),
       (error) =>
         error instanceof NodeError &&
         error.code === NODE_ERROR_CODES.SELLER_PAYMENT_ROLE_MISSING,
@@ -88,14 +91,39 @@ void test('a role whose RPC is not devnet, or cannot answer, never opens payment
       },
     ])
       await assert.rejects(
-        sellerChainPayments(genesis)(role),
+        sellerChainPayments(genesis, offline().rpc)(role),
         (error) =>
           error instanceof NodeError &&
           error.code === NODE_ERROR_CODES.SELLER_PAYMENT_NETWORK_MISMATCH,
       );
     // Nothing was opened: the payments directory holds no ledger lock.
-    const payments = await sellerChainPayments(async () => DEVNET_GENESIS)(
-      role,
-    );
+    const payments = await sellerChainPayments(
+      async () => DEVNET_GENESIS,
+      offline().rpc,
+    )(role);
     await payments.close();
+  }));
+
+void test('a seller whose payout, fee or fee payer token account cannot be created does not start', () =>
+  withHome(async () => {
+    await setupRole({
+      role: P2P_ROLES.SELLER,
+      mint: await address(),
+      payTo: await address(),
+      buyer: await address(),
+    });
+    const role = await loadRole(P2P_ROLES.SELLER);
+    await assert.rejects(
+      sellerChainPayments(
+        async () => DEVNET_GENESIS,
+        offline({ missing: true, refuse: true }).rpc,
+      )(role),
+      (error) =>
+        error instanceof NodeError &&
+        error.code === NODE_ERROR_CODES.SELLER_PAYMENT_ACCOUNTS_UNAVAILABLE,
+    );
+    // Nothing was left open: the payments directory holds no ledger lock.
+    await (
+      await sellerChainPayments(async () => DEVNET_GENESIS, offline().rpc)(role)
+    ).close();
   }));

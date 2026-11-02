@@ -1,9 +1,12 @@
 // The doctor for a seller with paid offers: the same verdict as startup for the payout and payment
-// keys, from file metadata only. Synthetic homes and keys; nothing is read from a real role.
+// keys, from file metadata only, and with --online a warning for token accounts startup will create.
+// Synthetic homes and keys; nothing is read from a real role, and the chain is a probe.
 import assert from 'node:assert/strict';
 import { chmod, readFile, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import test from 'node:test';
+
+import { PROTOCOL_FEE } from '@gyblos/config';
 
 import {
   doctor,
@@ -70,4 +73,64 @@ void test('doctor: a payout on a signing key or loose payment key files fail pay
       line((await doctor(run)).output, 'payments'),
       /FAIL\s+payments\s+SELLER_PAYMENT_DESCRIPTION_INVALID/,
     );
+  }));
+
+void test('doctor --online: missing payment token accounts warn, an unreadable RPC warns, offline never asks', () =>
+  scenario({}, async (run) => {
+    await withOllama(run);
+    await writeFile(join(run.root, 'gyblos.toml'), paidToml(run));
+    const asked: { mint: string; owners: readonly string[] }[] = [];
+    const missing = await doctor(
+      run,
+      ['--online'],
+      {},
+      {
+        paymentAccounts: async ({ mint, owners }) => {
+          asked.push({ mint, owners });
+          return 2;
+        },
+      },
+    );
+    // A warning, not a failure: startup creates them.
+    assert.equal(missing.code, 0);
+    assert.match(
+      line(missing.output, 'payments'),
+      /WARN\s+payments\s+PAYMENT_ACCOUNTS_MISSING\s+startup creates/,
+    );
+    const role = JSON.parse(
+      await readFile(join(run.seller, 'role.json'), 'utf8'),
+    ) as { mint: string; payTo: string; facilitator: string };
+    assert.deepEqual(asked, [
+      {
+        mint: role.mint,
+        owners: [role.payTo, PROTOCOL_FEE.treasury, role.facilitator],
+      },
+    ]);
+    const unreadable = await doctor(
+      run,
+      ['--online'],
+      {},
+      {
+        paymentAccounts: async () => {
+          throw new Error('rpc down at https://rpc.example/?key=s');
+        },
+      },
+    );
+    assert.equal(unreadable.code, 0);
+    assert.match(
+      line(unreadable.output, 'payments'),
+      /WARN\s+payments\s+PAYMENT_ACCOUNTS_UNCHECKED/,
+    );
+    assert.equal(unreadable.output.includes('rpc.example'), false);
+    const offline = await doctor(
+      run,
+      [],
+      {},
+      {
+        paymentAccounts: async () => {
+          throw new Error('never asked without --online');
+        },
+      },
+    );
+    assert.match(line(offline.output, 'payments'), /^\s*OK\s+payments/);
   }));

@@ -24,7 +24,7 @@ Dependency direction is protocol → core → adapters → node → apps; config
 
 ## Commands
 
-Node 22+ and the pnpm version pinned in `package.json`.
+Node 24.22.1+ and the pnpm version pinned in `package.json`.
 
 ```sh
 pnpm install --frozen-lockfile

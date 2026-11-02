@@ -49,6 +49,9 @@ export const NODE_ERROR_CODES = {
   SELLER_PAYMENT_ROLE_MISSING: 'SELLER_PAYMENT_ROLE_MISSING',
   // The role's RPC is not devnet (or cannot say which chain it is): paid selling stays off.
   SELLER_PAYMENT_NETWORK_MISMATCH: 'SELLER_PAYMENT_NETWORK_MISMATCH',
+  // The payout, fee treasury or fee payer token account is missing and could not be created, so a
+  // claim would pay that share to the payment program: paid selling stays off.
+  SELLER_PAYMENT_ACCOUNTS_UNAVAILABLE: 'SELLER_PAYMENT_ACCOUNTS_UNAVAILABLE',
   // The buyer role's RPC does not serve devnet, so paid buying refuses to start.
   BUYER_PAYMENT_NETWORK_MISMATCH: 'BUYER_PAYMENT_NETWORK_MISMATCH',
   // The buyer wallet key is missing, unreadable or not the one role.json names.
@@ -83,6 +86,10 @@ export const DOCTOR_CODES = {
   SEQUENCE_LOCK_PRESENT: 'SEQUENCE_LOCK_PRESENT',
   TOKENIZER_UNAVAILABLE: 'TOKENIZER_UNAVAILABLE',
   NOT_CHECKED: 'NOT_CHECKED',
+  // A token account a paid claim pays into is missing; startup creates it.
+  PAYMENT_ACCOUNTS_MISSING: 'PAYMENT_ACCOUNTS_MISSING',
+  // The RPC could not say whether those token accounts exist.
+  PAYMENT_ACCOUNTS_UNCHECKED: 'PAYMENT_ACCOUNTS_UNCHECKED',
   // Every offer's usage is declared by its provider, so no tokenizer is loaded.
   NOT_NEEDED: 'NOT_NEEDED',
   // A remote engine is called only with --online.

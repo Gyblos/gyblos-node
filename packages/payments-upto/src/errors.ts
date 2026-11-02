@@ -26,7 +26,7 @@ const SHARED = {
     PAYMENT_ERROR_CODES.AUTHORIZATION_MISMATCH,
   [UPTO_ERROR_CODES.TERMS_EXPIRED]: PAYMENT_ERROR_CODES.TERMS_EXPIRED,
   [UPTO_ERROR_CODES.UNAVAILABLE]: PAYMENT_ERROR_CODES.UNAVAILABLE,
-  // Only the payer's own withdrawal raises it; nothing on the payment ports does.
+  // The payer's own withdrawal, and a refused token account creation before a claim (retried).
   [UPTO_ERROR_CODES.CHAIN_REJECTED]: PAYMENT_ERROR_CODES.UNAVAILABLE,
   [UPTO_ERROR_CODES.INTERNAL]: PAYMENT_ERROR_CODES.UNAVAILABLE,
 } as const satisfies Record<UptoErrorCode, PaymentErrorCode>;

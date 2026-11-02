@@ -1,11 +1,13 @@
 // Read-only preflight for the seller daemon: the checks `pnpm node:start` would fail on, without starting,
 // spawning or writing anything. Results carry static codes only; the RPC URL, relay token, key contents and
 // home location never leave this module. Network use is limited to describing each offer's engine: one on
-// this machine always, a remote API only with --online, since that call carries the seller's API key.
+// this machine always, a remote API only with --online, since that call carries the seller's API key;
+// --online also reads which token accounts a paid claim would pay into are missing.
 import { resolve } from 'node:path';
 
 import {
   NODE_ENVIRONMENT,
+  PROTOCOL_FEE,
   ROLE_FILES,
   ROLE_KEY_FILES,
   type HomeEnvironment,
@@ -46,6 +48,10 @@ import { inspectSellerSequence } from './public-sequence';
 import { loadRole, roleKeyFilesStatus, type RoleConfig } from './roles';
 import type { SellerCatalogOffer } from './seller-offer';
 import {
+  missingPaymentAccounts,
+  type PaymentAccountsQuery,
+} from './seller-payment-accounts';
+import {
   sellerBaseSettings,
   sellerSettings,
   type SellerBaseSettings,
@@ -76,6 +82,8 @@ export interface DoctorProbes {
   tokenizer?: (environment: HomeEnvironment) => Promise<unknown>;
   // The engines' transport; tests serve a synthetic provider.
   fetch?: typeof fetch;
+  // How many of these owners' token accounts for the mint are missing, on that RPC (--online).
+  paymentAccounts?: (query: PaymentAccountsQuery) => Promise<number>;
 }
 export interface DoctorOptions {
   environment: HomeEnvironment;
@@ -208,10 +216,11 @@ async function roleChecks(environment: HomeEnvironment) {
   };
 }
 
-// The payout and payment keys paid selling uses, as the daemon checks them; metadata only.
+// The payout and payment keys paid selling uses, as the daemon checks them; metadata only. With
+// --online, also the token accounts a paid claim pays into, which startup creates when missing.
 async function paymentsCheck(
   config: RoleConfig,
-  environment: HomeEnvironment,
+  options: DoctorOptions,
 ): Promise<Result> {
   if (
     config.role !== P2P_ROLES.SELLER ||
@@ -228,16 +237,29 @@ async function paymentsCheck(
     const status = await roleKeyFilesStatus(
       P2P_ROLES.SELLER,
       [ROLE_KEY_FILES.facilitator, ROLE_KEY_FILES.authorizer],
-      environment,
+      options.environment,
     );
-    if (status === 'ok') return OK;
-    return fail(
-      status === 'missing'
-        ? DOCTOR_CODES.KEYS_MISSING
-        : DOCTOR_CODES.KEY_PERMISSIONS,
-    );
+    if (status !== 'ok')
+      return fail(
+        status === 'missing'
+          ? DOCTOR_CODES.KEYS_MISSING
+          : DOCTOR_CODES.KEY_PERMISSIONS,
+      );
   } catch (error) {
     return fail(errorCode(error));
+  }
+  if (!options.online) return OK;
+  try {
+    const missing = await (
+      options.probes?.paymentAccounts ?? missingPaymentAccounts
+    )({
+      rpcUrl: config.rpcUrl,
+      mint: config.mint,
+      owners: [config.payTo, PROTOCOL_FEE.treasury, config.facilitator],
+    });
+    return missing === 0 ? OK : warn(DOCTOR_CODES.PAYMENT_ACCOUNTS_MISSING);
+  } catch {
+    return warn(DOCTOR_CODES.PAYMENT_ACCOUNTS_UNCHECKED);
   }
 }
 
@@ -355,7 +377,7 @@ export async function sellerDoctor(
   )
     add(
       DOCTOR_CHECKS.PAYMENTS,
-      role.config ? await paymentsCheck(role.config, environment) : notChecked,
+      role.config ? await paymentsCheck(role.config, options) : notChecked,
     );
   return {
     checks,

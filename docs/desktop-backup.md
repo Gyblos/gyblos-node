@@ -36,7 +36,7 @@ operation. Buffers are cleared where possible; JavaScript strings cannot be
 reliably erased. Losing the file or password loses this recovery route.
 
 The profile follows the existing vault direction and uses
-[Node crypto](https://nodejs.org/docs/latest-v22.x/api/crypto.html) primitives;
+[Node crypto](https://nodejs.org/docs/latest-v24.x/api/crypto.html) primitives;
 the scrypt cost matches one of
 [OWASP's listed configurations](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html#scrypt).
 This does not establish an independent cryptographic audit or production safety.

@@ -19,6 +19,7 @@ import {
   UPTO_ERROR_CODES,
 } from './constants';
 import { UptoError } from './errors';
+import type { UptoRecipientAccounts } from './recipient-accounts';
 import { uptoRequirements } from './requirements';
 import { durablePendingStore } from './store';
 import type {
@@ -63,6 +64,9 @@ export interface UptoSdkChainOptions {
   now: () => number;
   // How long after sending an open it can still land (its blockhash validity), in ms.
   openWindowMs: number;
+  // Made to exist, with the channel payer's own when it gets a refund, before every new claim
+  // attempt, so the program never redirects a share or the refund.
+  recipients: UptoRecipientAccounts;
 }
 
 export function createUptoFacilitator(
@@ -260,6 +264,10 @@ export function createUptoSdkChain(options: UptoSdkChainOptions): UptoChain {
       // Written before the voucher exists, so a crash can only ever retry this charge.
       if (!previous)
         await store.putClaim({ channelId: record.channelId, chargedAtomic });
+      // After the charge is recorded: a failure leaves this claim for recovery, never another one.
+      await options.recipients.ensure(
+        BigInt(chargedAtomic) < BigInt(record.maxAtomic) ? [record.payer] : [],
+      );
       const transaction = await claimed(options, server, record, chargedAtomic);
       await store.putClaim({
         ...(await store.getClaim(record.channelId)),

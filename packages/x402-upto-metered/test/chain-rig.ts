@@ -24,6 +24,8 @@ export async function rig(
       chargedAtomic: string;
       attempts: readonly string[];
     }) => { transaction: string; chargedAtomic: string } | undefined;
+    // What making the recipients' token accounts exist does; resolves by default.
+    recipients?: (also: readonly string[] | undefined) => Promise<void>;
   } = {},
 ) {
   const party = await parties();
@@ -33,12 +35,15 @@ export async function rig(
     party.hints,
   );
   const calls: { type: unknown; amount: string }[] = [];
+  // Each step in order: 'recipients' before a claim is sent, then the settle's own type.
+  const steps: string[] = [];
   let now = NOW;
   const store = memoryUptoChainStore();
   const chain = createUptoSdkChain({
     facilitator: {
       settle: async (payload, requirements) => {
         calls.push({ type: payload.payload.type, amount: requirements.amount });
+        steps.push(String(payload.payload.type));
         return {
           network: requirements.network,
           payer: '',
@@ -56,6 +61,12 @@ export async function rig(
     settledClaim: async (_channelId, claim) => options.sealedBy?.(claim),
     now: () => now,
     openWindowMs: 90_000,
+    recipients: {
+      ensure: async (also) => {
+        steps.push('recipients');
+        await options.recipients?.(also);
+      },
+    },
   });
   const record: UptoChannelRecord = {
     channelId: authorization.channelId,
@@ -70,6 +81,7 @@ export async function rig(
     authorization,
     chain,
     calls,
+    steps,
     store,
     record,
     advance: (ms: number) => {

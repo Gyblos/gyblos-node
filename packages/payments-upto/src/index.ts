@@ -53,6 +53,8 @@ export {
 } from './buyer-reconcile';
 // The chain steps themselves, for the node to build over its RPC and the buyer's key.
 export { createUptoWithdrawal, type UptoWithdrawRpc } from 'x402-upto-metered';
+// Read only, for the seller's preflight: which token accounts a claim would pay into are missing.
+export { uptoMissingTokenAccounts } from 'x402-upto-metered';
 export {
   withdrawUptoBuyer,
   type UptoBuyerWithdrawOptions,
