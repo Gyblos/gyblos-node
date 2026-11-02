@@ -277,3 +277,27 @@ void test('exclusive numeric bounds in Claude Code tool schemas are enforced', a
   value = 1;
   await assert.doesNotReject(engine.generate(input));
 });
+
+void test('tool defaults are annotations and do not waive argument validation', async () => {
+  let replaceAll: unknown = 'false';
+  const fetcher: typeof fetch = async () => Response.json({
+    model: MODEL.name,
+    created_at: '2026-01-01T00:00:00Z',
+    done: true,
+    done_reason: 'stop',
+    message: { role: 'assistant', content: '', tool_calls: [{ function: { name: 'read_file', arguments: { replace_all: replaceAll } } }] },
+    prompt_eval_count: 2,
+    eval_count: 3,
+  });
+  const engine = createOllamaAgent('http://127.0.0.1:11434/', fetcher);
+  const input = {
+    ...request,
+    tools: [{ type: 'function', function: { name: 'read_file', parameters: {
+      type: 'object', properties: { replace_all: { type: 'boolean', default: false } },
+    } } }],
+  };
+  assert.doesNotThrow(() => engine.validate(input));
+  await assert.rejects(engine.generate(input));
+  replaceAll = false;
+  await assert.doesNotReject(engine.generate(input));
+});
