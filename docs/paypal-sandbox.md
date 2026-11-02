@@ -163,8 +163,8 @@ The journal stores payment IDs, the approved currency and prices, accumulated
 cents, phase, and digests of requests and optional idempotency keys, not prompts
 or responses. It takes an exclusive process lock. If the configured terms
 change, an unfinished session does not resume under different prices or limits.
-Each response must be acknowledged before another inference or settlement in
-Chat. A completed agent inference does not require that acknowledgment. An
+An unacknowledged chat response blocks further chat and agent inference as well
+as settlement. A completed agent inference does not require acknowledgment. An
 interrupted inference, lost acknowledgment, uncertain payment, or storage
 failure can block the session; do not remove the journal or lock to bypass this
 state. There is no automatic payment reconciliation UI. A previous unfinished
