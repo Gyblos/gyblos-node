@@ -18,6 +18,7 @@ import {
   createUptoPaymentClient,
   openUptoBuyerJournal,
   openUptoBuyerPayments,
+  reconcileUptoBuyer,
   type UptoBuyerJournal,
   type UptoPaymentClientOptions,
 } from '@gyblos/payments-upto';
@@ -36,6 +37,7 @@ import { entry } from './support/mainnet-journal';
 import { hints } from './support/payment-upto';
 import { JOURNAL_FAULTS, memoryJournal } from './support/payment-upto-client';
 import { newLedger } from './support/payment-upto-ledger';
+import { chainDouble } from './support/upto-chain-history';
 
 const NOW = 1_800_000_000_000;
 const DIGEST = 'ab'.repeat(32);
@@ -231,18 +233,130 @@ void test('an unresolved legacy journal blocks new signatures without upgrading 
           policy: legacyPolicy,
           updatedAt: NOW,
         },
+        {
+          ...entry(DEVNET),
+          requestDigest: 'ef'.repeat(32),
+          policy: legacyPolicy,
+          state: PAYMENT_CHANNEL_STATES.SETTLED,
+          chargedAtomic: '13',
+          updatedAt: NOW,
+        },
       ],
     });
     await writeFile(paths.state, legacy, { mode: 0o600 });
     const journal = await openUptoBuyerJournal({ paths, now: () => NOW });
     try {
       const { client, counter, terms } = await buyer(journal);
+      const channels = await client.reconcile();
+      assert.equal(channels.length, 2);
+      assert.equal(
+        channels.filter(
+          (channel) => channel.state === PAYMENT_CHANNEL_STATES.OPEN,
+        ).length,
+        1,
+      );
+      assert.equal(
+        channels.filter(
+          (channel) => channel.state === PAYMENT_CHANNEL_STATES.SETTLED,
+        ).length,
+        1,
+      );
       await assert.rejects(
         client.authorize(terms),
         code(PAYMENT_ERROR_CODES.JOURNAL_UNAVAILABLE),
       );
       assert.equal(counter.signed, 0);
       assert.equal(await readFile(paths.state, 'utf8'), legacy);
+    } finally {
+      await journal.close();
+    }
+  }));
+
+void test('settled version 3 entries allow reconciliation and a new simulated payment', () =>
+  withRoot(async (root) => {
+    const paths = buyerJournalPathsIn({ GYBLOS_HOME: root });
+    await (await openUptoBuyerJournal({ paths, now: () => NOW })).close();
+    const { network: _network, ...legacyPolicy } = entry(DEVNET).policy;
+    const entries = ['11', '22', '33', '44'].map((byte, index) => ({
+      ...entry(DEVNET),
+      requestDigest: byte.repeat(32),
+      policy: legacyPolicy,
+      state: PAYMENT_CHANNEL_STATES.SETTLED,
+      chargedAtomic: ['13', '29', '0', '8'][index],
+      updatedAt: NOW,
+    }));
+    const legacy = JSON.stringify({ version: 3, entries });
+    await writeFile(paths.state, legacy, { mode: 0o600 });
+    const journal = await openUptoBuyerJournal({ paths, now: () => NOW });
+    try {
+      const { options, terms, counter } = await buyer(journal);
+      const client = createUptoPaymentClient({
+        ...options,
+        confirm: async (settlement) => ({
+          channelId: settlement.channelId,
+          chargedAtomic: settlement.chargedAtomic,
+          refundedAtomic: settlement.refundedAtomic,
+          sellerAtomic: settlement.sellerAtomic,
+          feeAtomic: settlement.feeAtomic,
+        }),
+      });
+      const oldChannels = await client.reconcile();
+      assert.equal(oldChannels.length, 4);
+      assert.ok(
+        oldChannels.every(
+          (channel) => channel.state === PAYMENT_CHANNEL_STATES.SETTLED,
+        ),
+      );
+      const chain = chainDouble({
+        mint: terms.mint,
+        history: new Map(),
+        blockHeight: 2n,
+        oldestSlot: 0n,
+        accounts: new Set(),
+      });
+      assert.deepEqual(
+        await reconcileUptoBuyer({
+          journal,
+          network: DEVNET,
+          rpc: chain.rpc,
+          payer: terms.buyer,
+          mint: terms.mint,
+          treasury: terms.treasury,
+          expected: () => undefined,
+          report: async () => {
+            throw new Error('unexpected report');
+          },
+        }),
+        [],
+      );
+      assert.deepEqual(chain.reads, []);
+      assert.equal(await readFile(paths.state, 'utf8'), legacy);
+      const authorization = await client.authorize(terms);
+      assert.ok(counter.signed > 0);
+      await client.checkReceipt(
+        authorization,
+        {
+          channelId: authorization.channelId,
+          chargedAtomic: '30',
+          refundedAtomic: '970',
+          sellerAtomic: '29',
+          feeAtomic: '0',
+          transaction: 'synthetic',
+        },
+        '30',
+      );
+      const saved: unknown = JSON.parse(await readFile(paths.state, 'utf8'));
+      assert.ok(saved && typeof saved === 'object' && 'version' in saved);
+      assert.equal(saved.version, 4);
+      const channels = await journal.list();
+      assert.equal(channels.length, 5);
+      assert.ok(
+        channels.every((item) => item.state === PAYMENT_CHANNEL_STATES.SETTLED),
+      );
+      assert.deepEqual(
+        channels.slice(0, 4).map((item) => item.chargedAtomic),
+        ['13', '29', '0', '8'],
+      );
     } finally {
       await journal.close();
     }
