@@ -107,8 +107,8 @@ type CgroupFiles = {
 };
 
 // Reads every group on the path that exposes memory files (a host's root and an unlimited leaf may not).
-// Usage and limit come from the group with the least headroom, so a parent slice's limit counts; OOM
-// counts come from the widest group, which also covers an engine running beside this process.
+// Everything comes from the group with the least headroom, so a parent slice's or container's limit
+// counts and its OOM kills are the ones that limit causes; with no limit, the process's own group.
 export async function readCgroupMemory(
   read: (path: string) => Promise<string>,
 ): Promise<CgroupFiles> {
@@ -135,10 +135,9 @@ export async function readCgroupMemory(
     group.limit.trim() === 'max'
       ? Infinity
       : bytes(group.limit) - bytes(group.current);
-  const tightest = groups.reduce((best, group) =>
+  return groups.reduce((best, group) =>
     headroom(group) < headroom(best) ? group : best,
   );
-  return { ...tightest, events: groups.at(-1)!.events };
 }
 
 export async function memorySnapshot(): Promise<MemorySnapshot> {

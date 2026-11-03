@@ -1,7 +1,7 @@
 // Checks memory snapshot parsing: OOM counts, unlimited cgroups and absent peaks stay explicit, and
 // missing or malformed evidence yields no readiness observation. Also checks which cgroup directories are
 // read: the process's own group and its parents on a host, the mount root inside a container, with the
-// tightest limit and the widest OOM count.
+// tightest limit and that group's OOM count.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -123,7 +123,7 @@ void test('a limit on a parent slice counts when the service itself is unlimited
   });
   assert.equal(snapshot.cgroup!.limitBytes, 4 * GiB);
   assert.equal(snapshot.cgroup!.currentBytes, 3.5 * GiB);
-  // OOM kills anywhere in the slice, such as an engine service beside the seller, are seen.
+  // OOM kills under the limit that is checked are the ones counted.
   assert.equal(snapshot.cgroup!.events.oomKill, 1);
   assert.throws(() => assertMemoryHeadroom(snapshot), /cgroup memory headroom/);
 });
@@ -141,6 +141,22 @@ void test('the least headroom wins and an unlimited path stays unlimited', async
   );
   assert.equal(unlimited.limit.trim(), 'max');
   assert.equal(unlimited.current.trim(), String(GiB));
+});
+
+void test('an unreadable group is skipped and a malformed limit fails closed', async () => {
+  const skipped = await readCgroupMemory(
+    mount('0::/a/b\n', { '/a/b': group(GiB, 'max'), '': group(GiB, 3 * GiB) }),
+  );
+  assert.equal(skipped.limit.trim(), String(3 * GiB));
+  await assert.rejects(
+    readCgroupMemory(
+      mount('0::/a/b\n', {
+        '/a/b': group(GiB, 'max'),
+        '/a': { ...group(GiB, 'max'), 'memory.max': 'lots\n' },
+      }),
+    ),
+    /Invalid memory observation/,
+  );
 });
 
 void test('a container reads its root, and no readable group keeps the specific error', async () => {
