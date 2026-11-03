@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { lstat, readFile, writeFile } from 'node:fs/promises';
 import test from 'node:test';
 
+import { generateKeyPairSigner } from '@solana/kit';
 import { SOLANA_MAINNET_CAIP2 } from '@x402/svm';
 
 import { buyerJournalPathsIn, DEVNET } from '@gyblos/config';
@@ -211,9 +212,16 @@ void test('settled version 3 entries allow reconciliation and a new simulated pa
     const paths = buyerJournalPathsIn({ GYBLOS_HOME: root });
     await (await openUptoBuyerJournal({ paths, now: () => NOW })).close();
     const { network: _network, ...legacyPolicy } = entry(DEVNET).policy;
+    const channelIds = await Promise.all(
+      Array.from(
+        { length: 4 },
+        async () => (await generateKeyPairSigner()).address,
+      ),
+    );
     const entries = ['11', '22', '33', '44'].map((byte, index) => ({
       ...entry(DEVNET),
       requestDigest: byte.repeat(32),
+      channelId: channelIds[index],
       policy: legacyPolicy,
       state: PAYMENT_CHANNEL_STATES.SETTLED,
       chargedAtomic: ['13', '29', '0', '8'][index],
@@ -223,6 +231,7 @@ void test('settled version 3 entries allow reconciliation and a new simulated pa
     await writeFile(paths.state, legacy, { mode: 0o600 });
     const journal = await openUptoBuyerJournal({ paths, now: () => NOW });
     try {
+      const snapshot = await journal.list();
       const { options, terms, counter } = await buyer(journal);
       const client = createUptoPaymentClient({
         ...options,
@@ -271,19 +280,20 @@ void test('settled version 3 entries allow reconciliation and a new simulated pa
         authorization,
         {
           channelId: authorization.channelId,
-          chargedAtomic: '30',
-          refundedAtomic: '970',
-          sellerAtomic: '29',
-          feeAtomic: '0',
+          chargedAtomic: '100',
+          refundedAtomic: '900',
+          sellerAtomic: '97',
+          feeAtomic: '3',
           transaction: 'synthetic',
         },
-        '30',
+        '100',
       );
       const saved: unknown = JSON.parse(await readFile(paths.state, 'utf8'));
       assert.ok(saved && typeof saved === 'object' && 'version' in saved);
       assert.equal(saved.version, 4);
       const channels = await journal.list();
       assert.equal(channels.length, 5);
+      assert.deepEqual(channels.slice(0, 4), snapshot);
       assert.ok(
         channels.every((item) => item.state === PAYMENT_CHANNEL_STATES.SETTLED),
       );
