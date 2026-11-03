@@ -13,7 +13,7 @@ const code = (error: unknown) =>
   error instanceof PaymentError &&
   error.code === PAYMENT_ERROR_CODES.UNTRUSTED_TERMS;
 
-void test('mainnet accepts only positive canonical USDC deposits up to one USDC', () => {
+void test('pilot deposit policy accepts only positive canonical USDC up to one USDC', () => {
   for (const maxAtomic of ['1', '999999', '1000000'])
     assert.doesNotThrow(() =>
       assertMainnetPilotDeposit({
