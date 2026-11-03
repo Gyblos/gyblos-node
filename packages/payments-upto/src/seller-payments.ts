@@ -28,7 +28,7 @@ import {
 import { LEDGER_FILE, UPTO_SELLER } from './constants';
 import { openUptoFileLedger, type UptoLedgerPaths } from './file-ledger';
 import { assertPaymentNetworkEnabled } from './mainnet';
-import { verifySellerNetwork, type SellerGenesisRpc } from './seller-network';
+import { verifyPaymentNetwork, type PaymentGenesisRpc } from './seller-network';
 import { createUptoPaymentServer } from './server';
 import { uptoSellerTerms, type UptoChannelSettings } from './terms';
 
@@ -46,7 +46,7 @@ export interface UptoSellerPaymentsOptions {
   // Tests inject a double; production reads the chain at rpcUrl.
   rpc?: UptoKitRpc &
     UptoRecipientAccountsRpc &
-    SellerGenesisRpc & {
+    PaymentGenesisRpc & {
       getSlot(config: { commitment: typeof UPTO_COMMITMENT }): {
         send(): Promise<bigint>;
       };
@@ -77,7 +77,7 @@ export async function openUptoSellerPayments(
     // Keys that cannot sign for this description would only fail later, on a buyer's deposit.
     throw new PaymentError(PAYMENT_ERROR_CODES.UNTRUSTED_TERMS);
   const rpc = options.rpc ?? createSolanaRpc(rpcUrl);
-  await verifySellerNetwork(rpc, own.network);
+  await verifyPaymentNetwork(rpc, own.network);
   const ledger = await openUptoFileLedger({
     paths: options.paths,
     now,

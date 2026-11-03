@@ -15,7 +15,7 @@ import {
   type UptoWithdrawQuery,
 } from 'x402-upto-metered';
 
-import { buyerJournalPathsIn } from '@gyblos/config';
+import { buyerJournalPathsIn, DEVNET } from '@gyblos/config';
 import {
   BUYER_WITHDRAW,
   openUptoBuyerJournal,
@@ -34,9 +34,16 @@ const FIRST = 'Chan111111111111111111111111111111111111111';
 const SECOND = 'Chan311111111111111111111111111111111111111';
 // What FIRST's open accepted, before the buyer's policy changed to MINT, TREASURY and 300.
 const OPENED = {
+  network: DEVNET,
   mint: 'Mint211111111111111111111111111111111111111',
   treasury: 'Treas21111111111111111111111111111111111111',
   protocolFeeBps: 250,
+};
+const CURRENT = {
+  network: DEVNET,
+  mint: MINT,
+  treasury: TREASURY,
+  protocolFeeBps: 300,
 };
 const MAX_TIMEOUT_SECONDS = 120;
 // When the seller can no longer claim an open signed at SIGNED_AT whose quote expired before that.
@@ -49,7 +56,7 @@ const entry = (
   channelId: string | null,
   state: (typeof PAYMENT_CHANNEL_STATES)[keyof typeof PAYMENT_CHANNEL_STATES],
   expiresAt = SIGNED_AT + 60_000,
-  policy: typeof OPENED | null = null,
+  policy: typeof OPENED | null = CURRENT,
 ) => ({
   requestDigest,
   channelId,
@@ -97,6 +104,7 @@ async function run(
       const reported: UptoBuyerWithdrawResult[] = [];
       const results = await withdrawUptoBuyer({
         journal,
+        network: DEVNET,
         withdrawal: {
           withdraw: async (query) => {
             asked.push(query);
@@ -161,7 +169,7 @@ void test('past the claim window, each open signed channel takes a step with the
       maxAtomic: '1000',
       splits: paymentSplits({ payTo: PAY_TO, ...OPENED }),
     },
-    // Journaled without its policy: the buyer's current one.
+    // The channel recorded the buyer's current policy at authorization.
     {
       channelId: SECOND,
       mint: MINT,

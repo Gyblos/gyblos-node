@@ -136,8 +136,8 @@ void test('a request is signed once, even by the same buyer after a restart', ()
       journaled?.lastValidBlockHeight,
       (await hints()).lastValidBlockHeight,
     );
-    // So are the mint, treasury and rate it accepted, for withdrawing and reconciling it later.
     assert.deepEqual(journaled?.policy, {
+      network: DEVNET,
       mint: first.options.policy.mint,
       treasury: first.options.policy.treasury,
       protocolFeeBps: first.options.policy.protocolFeeBps,

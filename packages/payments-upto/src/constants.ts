@@ -40,9 +40,9 @@ export const UPTO_SELLER = {
 // The buyer's journal of authorized channels: one small private document. Settled entries are kept
 // long past any channel's lifetime, then pruned; open ones are never dropped.
 export const BUYER_JOURNAL = {
-  // 3 adds each open's mint, fee treasury and rate; 2 its slot and blockhash lifetime. 2 and 1 are
-  // still read.
-  version: 3,
+  // 4 records the network; 3 records mint, fee treasury and rate; 2 records slot and lifetime.
+  version: 4,
+  policyVersion: 3,
   slotVersion: 2,
   legacyVersion: 1,
   // maxEntries entries of the widest form fit, with room to spare.
@@ -50,6 +50,14 @@ export const BUYER_JOURNAL = {
   maxEntries: 2_000,
   settledRetentionMs: 30 * 86_400_000,
 } as const;
+
+// Why a signed open is not eligible for recovery on this network.
+export const NETWORK_RECOVERY_BLOCKS = {
+  UNKNOWN: 'unknown',
+  MISMATCH: 'mismatch',
+} as const;
+export type NetworkRecoveryBlock =
+  (typeof NETWORK_RECOVERY_BLOCKS)[keyof typeof NETWORK_RECOVERY_BLOCKS];
 
 export const RECONCILE_OUTCOMES = {
   // The chain charged exactly the buyer's own count.
