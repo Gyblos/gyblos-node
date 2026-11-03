@@ -84,7 +84,13 @@ export async function paidTerminal(
   if (interrupted) {
     assert.equal(questions, 1);
     assert.ok(text.includes('No retry was made'));
-    assert.ok(text.includes('charged: 45; refunded: 9955'));
+    assert.ok(
+      text.includes(
+        reconcile
+          ? 'reported charge: 45 atomic units (not confirmed)'
+          : 'charged: 45; refunded: 9955',
+      ),
+    );
     assert.ok(
       text.indexOf(PAID_ACCEPTANCE.interruptedText) < text.indexOf('Error:'),
     );

@@ -29,6 +29,7 @@ export interface ChatTurnOptions {
 }
 export interface ChatTurnResult {
   status: 'complete' | 'uncertain' | 'rejected';
+  requestDigest?: string;
   code?: string;
   usage?: { input: number; output: number };
   payment?: {
@@ -167,6 +168,9 @@ export async function chatTurn(
         signal,
         headers: {
           'content-type': 'application/json',
+          ...(options.paid
+            ? { [PAID_BUYER.observationHeader]: PAID_BUYER.observationValue }
+            : {}),
         },
         body: JSON.stringify({
           model: options.model,
@@ -190,6 +194,56 @@ export async function chatTurn(
   }
 }
 
+function streamDigest(
+  value: unknown,
+  previous: string | undefined,
+): string | undefined {
+  if (value === undefined) return previous;
+  if (
+    typeof value !== 'string' ||
+    !/^[0-9a-f]{64}$/.test(value) ||
+    (previous !== undefined && previous !== value)
+  )
+    throw new Error('digest');
+  return value;
+}
+function frameDigest(
+  body: Record<string, unknown> | undefined,
+  previous: string | undefined,
+  paid: boolean | undefined,
+  terminal: ChatTurnResult | undefined,
+) {
+  const candidate = paid ? body?.[PAID_BUYER.requestDigestField] : undefined;
+  if (candidate === undefined) return previous;
+  if (
+    terminal ||
+    !body ||
+    !Array.isArray(body.choices) ||
+    body.choices.length !== 1
+  )
+    throw new Error('digest');
+  const choice = record(body.choices[0]);
+  const delta = record(choice?.delta);
+  if (
+    !choice ||
+    !delta ||
+    choice.finish_reason !== null ||
+    typeof delta.content !== 'string' ||
+    delta.content.length === 0
+  )
+    throw new Error('digest');
+  return streamDigest(candidate, previous);
+}
+const uncertain = (requestDigest?: string): ChatTurnResult =>
+  requestDigest
+    ? { status: 'uncertain', requestDigest }
+    : { status: 'uncertain' };
+
+function writeDelta(options: ChatTurnOptions, value: unknown) {
+  if (typeof value === 'string')
+    options.write(value.replace(/[\x00-\x08\x0b-\x1f\x7f-\x9f]/g, ''));
+}
+
 async function readStream(
   body: ReadableStream<Uint8Array>,
   options: ChatTurnOptions,
@@ -200,6 +254,7 @@ async function readStream(
   let bytes = 0;
   let done = false;
   let terminal: ChatTurnResult | undefined;
+  let requestDigest: string | undefined;
   try {
     while (true) {
       const item = await reader.read();
@@ -219,6 +274,17 @@ async function readStream(
         } else {
           const value: unknown = JSON.parse(data);
           const body = record(value);
+          try {
+            requestDigest = frameDigest(
+              body,
+              requestDigest,
+              options.paid,
+              terminal,
+            );
+          } catch {
+            requestDigest = undefined;
+            throw new Error('digest');
+          }
           if (
             !body ||
             terminal ||
@@ -236,10 +302,7 @@ async function readStream(
           const choice = record(body.choices[0]);
           const delta = record(choice?.delta);
           if (!choice || !delta) throw new Error('choice');
-          if (typeof delta.content === 'string')
-            options.write(
-              delta.content.replace(/[\x00-\x08\x0b-\x1f\x7f-\x9f]/g, ''),
-            );
+          writeDelta(options, delta.content);
           if (choice.finish_reason !== null) {
             terminal = completeResult(choice, body, options.paid);
           }
@@ -248,8 +311,12 @@ async function readStream(
       }
     }
     pending += decoder.decode();
-    if (!done || pending || !terminal) return { status: 'uncertain' };
-    return terminal;
+    if (!done || pending || !terminal) return uncertain(requestDigest);
+    return terminal.status === 'uncertain' && requestDigest
+      ? { ...terminal, requestDigest }
+      : terminal;
+  } catch {
+    return uncertain(requestDigest);
   } finally {
     await reader.cancel().catch(() => undefined);
     reader.releaseLock();

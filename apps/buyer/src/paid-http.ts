@@ -53,7 +53,7 @@ export function paidChat(dependencies: PaidBuyerDependencies) {
   const run = async (
     input: FreeExecutionBuildInput,
     signal: AbortSignal,
-    onDelta?: (text: string) => Promise<void>,
+    onDelta?: (text: string, requestDigest?: string) => Promise<void>,
   ): Promise<ChatResult> => {
     const outcome = await executeBuyerPaid(
       input,

@@ -1,6 +1,7 @@
 // Orchestrates one paid request: terms from the seller's signed offer plus the network's own fee, one
 // authorization per attempt, failover only while the signed open never left the buyer, then the buyer's
 // own recount and a verdict on the seller's settlement. Selection, payment and I/O are injected.
+import { paidPrompt, paidRecount } from '@gyblos/core/buyer-paid-recount';
 import {
   PAYMENT_ERROR_CODES,
   type PaymentErrorCode,
@@ -33,7 +34,6 @@ import {
   type PaidVerdict,
 } from './constants';
 import { PaidBuyerError } from './paid-errors';
-import { paidPrompt, paidRecount } from './paid-recount';
 
 export interface PaidWinner {
   nodeId: string;
@@ -233,7 +233,7 @@ interface Attempt {
   input: FreeExecutionBuildInput;
   prompt: string;
   signal: AbortSignal;
-  onDelta: (text: string) => Promise<void>;
+  onDelta: (text: string, requestDigest?: string) => Promise<void>;
 }
 
 // One attempt with one seller: undefined when the signed open never left the buyer and another
@@ -264,7 +264,7 @@ async function attempt(run: Attempt): Promise<PaidBuyerOutcome | undefined> {
       // Text the seller already wrote counts as delivered, even if the caller just left.
       received += text;
       signal.throwIfAborted();
-      return run.onDelta(text);
+      return run.onDelta(text, base.requestDigest);
     });
   } catch (error) {
     if (error instanceof PaidClientError && !error.sent) {
@@ -309,7 +309,10 @@ export async function executeBuyerPaid(
   input: FreeExecutionBuildInput,
   dependencies: PaidBuyerDependencies,
   external?: AbortSignal,
-  onDelta: (text: string) => Promise<void> = async () => {},
+  onDelta: (
+    text: string,
+    requestDigest?: string,
+  ) => Promise<void> = async () => {},
 ): Promise<PaidBuyerOutcome> {
   const prompt = paidPrompt(input, dependencies.meter);
   if (prompt === undefined)
