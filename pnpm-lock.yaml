@@ -530,6 +530,9 @@ importers:
       '@solana/kit':
         specifier: 5.1.0
         version: 5.1.0(typescript@5.9.3)(ws@8.21.0)
+      '@solana/rpc-spec-types':
+        specifier: 5.1.0
+        version: 5.1.0(typescript@5.9.3)
       '@x402/svm':
         specifier: 2.28.0
         version: 2.28.0(patch_hash=710ddfaef39f0955de8678f39b90ee9f67c1b5d0624219816acfb8b41e0b6cd7)(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))(typescript@5.9.3)

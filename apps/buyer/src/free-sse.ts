@@ -56,7 +56,7 @@ export const paymentFields = (payment: ChatPayment | undefined) =>
 export type FreeChatStreamExecutor = (
   input: FreeExecutionBuildInput,
   signal: AbortSignal,
-  onDelta: (text: string) => Promise<void>,
+  onDelta: (text: string, requestDigest?: string) => Promise<void>,
 ) => Promise<ChatResult>;
 function active(response: ServerResponse, signal: AbortSignal) {
   if (signal.aborted || response.destroyed || response.writableEnded)
@@ -96,6 +96,7 @@ export async function executeFreeSse(
   signal: AbortSignal,
   response: ServerResponse,
   model: string,
+  includeDigest = false,
 ) {
   const header = {
     id: `chatcmpl-${randomUUID()}`,
@@ -114,31 +115,38 @@ export async function executeFreeSse(
         [FREE_BUYER.noRetryHeader]: 'false',
       });
   };
-  const result = await execute(input, signal, async (fragment) => {
-    active(response, signal);
-    if (Buffer.byteLength(text + fragment) > FREE_EXECUTION.outputBytes)
-      throw new FreeBuyerError(FREE_BUYER_CODES.TOO_LARGE);
-    text += fragment;
-    begin();
-    await write(
-      response,
-      {
-        ...header,
-        choices: [
-          {
-            index: 0,
-            delta: {
-              ...(initial ? { role: FREE_CHAT_ROLES.ASSISTANT } : {}),
-              content: fragment,
+  const result = await execute(
+    input,
+    signal,
+    async (fragment, requestDigest) => {
+      active(response, signal);
+      if (Buffer.byteLength(text + fragment) > FREE_EXECUTION.outputBytes)
+        throw new FreeBuyerError(FREE_BUYER_CODES.TOO_LARGE);
+      text += fragment;
+      begin();
+      await write(
+        response,
+        {
+          ...header,
+          ...(includeDigest && requestDigest
+            ? { [PAID_BUYER.requestDigestField]: requestDigest }
+            : {}),
+          choices: [
+            {
+              index: 0,
+              delta: {
+                ...(initial ? { role: FREE_CHAT_ROLES.ASSISTANT } : {}),
+                content: fragment,
+              },
+              finish_reason: null,
             },
-            finish_reason: null,
-          },
-        ],
-      },
-      signal,
-    );
-    initial = false;
-  });
+          ],
+        },
+        signal,
+      );
+      initial = false;
+    },
+  );
   active(response, signal);
   if (text !== result.text) throw new FreeBuyerError(FREE_BUYER_CODES.INTERNAL);
   begin();

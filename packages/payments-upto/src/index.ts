@@ -17,6 +17,7 @@ export {
 } from './file-ledger';
 export {
   BUYER_JOURNAL,
+  BUYER_OBSERVATION,
   BUYER_WITHDRAW,
   LEDGER_FILE,
   NETWORK_RECOVERY_BLOCKS,
@@ -50,6 +51,8 @@ export {
 } from './buyer-payments';
 export {
   reconcileUptoBuyer,
+  observeUptoBuyer,
+  type UptoChargeObservation,
   type UptoReconcileOptions,
   type UptoReconcileOutcome,
   type UptoReconcileResult,
@@ -66,3 +69,4 @@ export {
   type UptoBuyerWithdrawStep,
 } from './buyer-withdraw';
 export { mainnetPilotBuyerPolicy } from './mainnet';
+export { createBuyerObservationRpc } from './buyer-observation-transport';

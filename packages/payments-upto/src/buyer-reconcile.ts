@@ -9,10 +9,19 @@ import {
   type UptoTransactionRpc,
 } from 'x402-upto-metered';
 
-import { PAYMENT_CHANNEL_STATES } from '@gyblos/protocol/constants';
+import { TIMEOUTS } from '@gyblos/config';
+import {
+  PAYMENT_CHANNEL_STATES,
+  PUBLIC_RECORD_LIMITS,
+} from '@gyblos/protocol/constants';
 
 import type { UptoBuyerJournal, UptoJournalEntry } from './buyer-journal';
-import { RECONCILE_OUTCOMES, type NetworkRecoveryBlock } from './constants';
+import { beforeAbort, observationRpc } from './buyer-observation-rpc';
+import {
+  RECONCILE_OUTCOMES,
+  UPTO_BUYER_DISTINCT_PARTIES,
+  type NetworkRecoveryBlock,
+} from './constants';
 import {
   checkJournalNetwork,
   networkRecoveryBlock,
@@ -58,6 +67,80 @@ export interface UptoReconcileOptions {
   report(result: UptoReconcileResult): Promise<void>;
 }
 
+export interface UptoChargeObservation {
+  chargedAtomic: string;
+  refundedAtomic: string;
+}
+
+export async function observeUptoBuyer(
+  options: Omit<UptoReconcileOptions, 'report' | 'expected'> & {
+    requestDigest: string;
+    signal?: AbortSignal;
+  },
+): Promise<UptoChargeObservation | undefined> {
+  const signal = AbortSignal.any([
+    AbortSignal.timeout(TIMEOUTS.rpc),
+    ...(options.signal ? [options.signal] : []),
+  ]);
+  const fixed = {
+    network: options.network,
+    payer: options.payer,
+    mint: options.mint,
+    treasury: options.treasury,
+    requestDigest: options.requestDigest,
+    signal,
+    journal: snapshotJournal(options.journal),
+    rpc: observationRpc(snapshotRpc(options.rpc), signal),
+  };
+  assertPaymentNetworkEnabled(fixed.network);
+  checkJournalNetwork(fixed.network);
+  if (!/^[0-9a-f]{64}$/.test(fixed.requestDigest)) return undefined;
+  fixed.signal?.throwIfAborted();
+  const found = await beforeAbort(signal, () =>
+    fixed.journal.get(fixed.requestDigest),
+  );
+  fixed.signal?.throwIfAborted();
+  if (!found) return undefined;
+  const entry = snapshotJournalEntry(found);
+  if (
+    entry.requestDigest !== fixed.requestDigest ||
+    !entry.channelId ||
+    networkRecoveryBlock(entry, fixed.network) ||
+    !entry.policy ||
+    new Set([fixed.payer, entry.payTo, entry.feePayer, entry.policy.treasury])
+      .size !== UPTO_BUYER_DISTINCT_PARTIES
+  )
+    return undefined;
+  await verifyPaymentNetwork(fixed.rpc, fixed.network);
+  fixed.signal?.throwIfAborted();
+  const shown = await readers(
+    fixed,
+    true,
+  )({ ...entry, channelId: entry.channelId });
+  fixed.signal?.throwIfAborted();
+  if (
+    shown === 'open' ||
+    shown === 'never' ||
+    shown.chargedAtomic === null ||
+    shown.refundedAtomic === null ||
+    shown.transaction === null
+  )
+    return undefined;
+  if (
+    !/^(0|[1-9][0-9]{0,19})$/.test(shown.chargedAtomic) ||
+    !/^(0|[1-9][0-9]{0,19})$/.test(shown.refundedAtomic) ||
+    BigInt(shown.chargedAtomic) > BigInt(PUBLIC_RECORD_LIMITS.maxAtomic) ||
+    BigInt(shown.refundedAtomic) > BigInt(PUBLIC_RECORD_LIMITS.maxAtomic) ||
+    BigInt(shown.chargedAtomic) + BigInt(shown.refundedAtomic) !==
+      BigInt(entry.maxAtomic)
+  )
+    return undefined;
+  return {
+    chargedAtomic: shown.chargedAtomic,
+    refundedAtomic: shown.refundedAtomic,
+  };
+}
+
 type Signed = UptoJournalEntry & { channelId: string };
 type Shown = Pick<
   UptoReconcileResult,
@@ -75,7 +158,10 @@ const NOTHING: Shown = {
   transaction: null,
 };
 
-function readers(options: UptoReconcileOptions) {
+function readers(
+  options: Pick<UptoReconcileOptions, 'rpc' | 'payer' | 'mint' | 'treasury'>,
+  requireComplete = false,
+) {
   const history = createUptoChannelHistory(options.rpc);
   const receipts = createUptoReceiptReader(options.rpc, UPTO_FINAL_COMMITMENT);
 
@@ -108,10 +194,13 @@ function readers(options: UptoReconcileOptions) {
         payTo: entry.payTo,
         treasury,
       });
-      if (found.settled) return { ...found.settled, transaction };
+      if (found.settled)
+        return requireComplete && !complete
+          ? 'open'
+          : { ...found.settled, transaction };
       deposited ||= found.deposited;
     }
-    if (deposited || !complete) return 'open';
+    if (deposited || !complete || requireComplete) return 'open';
     return (await neverOpened(entry, slot, height)) ? 'never' : 'open';
   };
 }

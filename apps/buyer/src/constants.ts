@@ -226,6 +226,9 @@ export const PAID_BUYER = {
   freeSkips: 8,
   // The JSON field that carries the payment summary in completions and errors.
   paymentField: 'gyblos_payment',
+  observationHeader: 'x-gyblos-payment-observation',
+  observationValue: '1',
+  requestDigestField: 'gyblos_request_digest',
   // The endpoint's bearer token, private in the buyer home; OpenAI SDKs send it as their apiKey.
   tokenFile: 'api-token',
   tokenBytes: 32,
