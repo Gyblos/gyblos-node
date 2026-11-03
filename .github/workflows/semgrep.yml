@@ -1,0 +1,45 @@
+# Local CE rules, no account, uploads, subscription or product-code execution.
+name: Static analysis
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: static-analysis-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  semgrep:
+    name: Semgrep CE
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      SEMGREP_IMAGE: semgrep/semgrep:1.183.0@sha256:2e45517a85e13a9cca14a2a00df6bb48affd66b8ebfae1b0991cd57578362fb0
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Fetch pinned scanner
+        run: docker pull "$SEMGREP_IMAGE"
+      - name: Verify rule probes and scan every tracked JS/TS/TSX file
+        run: |
+          git ls-files -z > "$RUNNER_TEMP/semgrep-targets"
+          image_tag="${SEMGREP_IMAGE#*:}"
+          scanner_version="${image_tag%@*}"
+          timeout 480 docker run --rm --init --network none --read-only \
+            --user 65532:65532 --cap-drop ALL --security-opt no-new-privileges \
+            --cpus 2 --memory 4g --pids-limit 128 --ulimit fsize=8388608:8388608 \
+            --tmpfs /scratch:rw,size=256m,mode=1777 \
+            --mount "type=bind,src=$GITHUB_WORKSPACE,dst=/src,readonly" \
+            --mount "type=bind,src=$RUNNER_TEMP/semgrep-targets,dst=/targets,readonly" \
+            --entrypoint /usr/bin/env "$SEMGREP_IMAGE" -i \
+            PATH=/usr/local/bin:/usr/bin:/bin HOME=/scratch/home TMPDIR=/scratch/tmp \
+            XDG_CONFIG_HOME=/scratch/config XDG_CACHE_HOME=/scratch/cache \
+            PYTHONDONTWRITEBYTECODE=1 SEMGREP_SEND_METRICS=off \
+            SEMGREP_ENABLE_VERSION_CHECK=0 \
+            python3 /src/tooling/semgrep/check.py /src /targets "$scanner_version"

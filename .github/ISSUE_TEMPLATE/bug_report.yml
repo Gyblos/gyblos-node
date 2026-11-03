@@ -1,0 +1,43 @@
+name: Bug report
+description: Report a reproducible problem using synthetic, non-sensitive data.
+title: '[Bug]: '
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For vulnerabilities, use the private channel in SECURITY.md.
+        Never include keys, tokens, wallet backups, payment payloads, private endpoints, prompts, responses, journals or raw logs.
+  - type: input
+    id: revision
+    attributes:
+      label: Source revision
+      description: Exact commit SHA or release, if applicable.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Operating system and architecture, Node.js version and pnpm version.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Commands and steps using synthetic data only. Include the component and relevant non-secret configuration.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: observed
+    attributes:
+      label: Observed behavior
+      description: Include only a small, manually redacted error excerpt when necessary; do not attach raw logs or .local/ contents.
+    validations:
+      required: true

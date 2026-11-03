@@ -24,12 +24,17 @@
     {
       "file": "tinyfish.svg",
       "source": "https://tinyfish.ai/favicon-for-app/icon0.svg",
-      "sha256": "3141625032019b3d3e5242716d243abb70fb2afa27f4f744a4ccb620013214d1"
+      "sha256": "3141625032019b3d3e5242716d243abb70fb2afa27f4f744a4ccb620013214d1",
+      "license": "No open-source license asserted; TinyFish retains mark and content rights."
     },
     {
       "file": "pi.svg",
-      "source": "https://pi.dev/logo-auto.svg"
+      "source": "https://pi.dev/logo-auto.svg",
+      "sha256": "abd66e7868b2d24f0f0895f9237ee8a6dcb22337583b0dc54aeb595acecb4d6b",
+      "license": "MIT",
+      "licenseSource": "https://raw.githubusercontent.com/earendil-works/pi-website/2f5e410b97474d0a34ec2500aa1aa58d6c3f992c/LICENSE",
+      "attribution": "Copyright 2026 Earendil Inc. and contributors; see pi-LICENSE.txt and the official press kit at https://pi.dev/press-kit."
     }
   ],
-  "license": "Lobe Icons SVGs use MIT; see ../models/lobe-icons-LICENSE.txt. Brand rights remain with their owners. TinyFish mark from official site."
+  "license": "Lobe Icons SVGs use MIT; see ../models/lobe-icons-LICENSE.txt. Pi uses MIT; see pi-LICENSE.txt. TinyFish rights are reserved; no MIT or Apache grant is asserted. Brand rights remain with their owners."
 }
