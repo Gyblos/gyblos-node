@@ -106,7 +106,7 @@ export const DOCTOR_CODES = {
 } as const;
 // Buyers and the index accept a record issued at most CONTROL_LIMITS.clockSkewMs ahead of their clock;
 // doctor warns well before that. With the header's 1 s resolution and at most 1 s of round trip, a
-// clock reported within warnMs is less than 4 s off.
+// clock reported within warnMs is at most 4 s off.
 export const DOCTOR_CLOCK = {
   warnMs: 2000,
   dateResolutionMs: 1000,
