@@ -16,7 +16,10 @@ import {
 
 import { DESCRIPTION_FIELDS, PAYMENT_PHASES } from './constants';
 import { paymentFailure } from './errors';
-import { assertPaymentNetworkEnabled } from './mainnet';
+import {
+  assertMainnetPilotDeposit,
+  assertPaymentNetworkEnabled,
+} from './mainnet';
 import {
   uptoSellerTerms,
   uptoTermsFor,
@@ -69,6 +72,12 @@ export function createUptoPaymentServer(
         terms.requestDigest !== authorization.requestDigest
       )
         return mismatch();
+      assertMainnetPilotDeposit(terms);
+      assertMainnetPilotDeposit({
+        network: terms.network,
+        mint: terms.mint,
+        maxAtomic: authorization.maxAtomic,
+      });
       try {
         const admitted = await seller.admit(
           authorization,
