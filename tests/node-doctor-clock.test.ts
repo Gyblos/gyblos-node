@@ -1,6 +1,6 @@
 // `gyblos doctor --online` compares this clock with the discovery index's Date header: a clock over the
 // warning threshold is reported before buyers refuse its records, the index is asked at its origin only,
-// and offline nothing is requested. Synthetic homes, a fake index and fake clocks; no network.
+// and offline nothing is requested. Synthetic homes and a fake index with its own clock; no network.
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -34,7 +34,8 @@ void test('the offset is only what the one-second header and the round trip cann
   assert.equal(clockOffsetMs(SERVER, SERVER + 1, 'not a date'), undefined);
 });
 
-function index(date: string | null) {
+// The index answers with its own clock: `ahead` ms ahead of this machine's, or with no Date header.
+function index(ahead: number | null) {
   const requests: string[] = [];
   const fetch: typeof globalThis.fetch = async (input, init) => {
     const url = String(input);
@@ -42,7 +43,10 @@ function index(date: string | null) {
     requests.push(url);
     return new Response('{}', {
       status: 404,
-      headers: date ? { date } : {},
+      headers:
+        ahead === null
+          ? {}
+          : { date: new Date(Date.now() + ahead).toUTCString() },
     });
   };
   return { fetch, requests };
@@ -56,21 +60,12 @@ async function published(run: Fixture) {
   );
 }
 
-const at = (offset: number) => () => SERVER + offset;
-
 void test('doctor --online warns when this clock is seconds off the index', () =>
   scenario({}, async (run) => {
     await published(run);
-    const fake = index(DATE);
-    const result = await doctor(
-      run,
-      ['--online'],
-      {},
-      {
-        fetch: fake.fetch,
-        now: at(3500),
-      },
-    );
+    // This clock is 3.5 s ahead of the index's.
+    const fake = index(-3500);
+    const result = await doctor(run, ['--online'], {}, { fetch: fake.fetch });
     assert.equal(result.code, 0, result.output);
     assert.match(
       line(result.output, 'clock'),
@@ -87,10 +82,7 @@ void test('doctor --online accepts a clock within the warning threshold', () =>
       run,
       ['--online'],
       {},
-      {
-        fetch: index(DATE).fetch,
-        now: at(-230),
-      },
+      { fetch: index(230).fetch },
     );
     assert.equal(result.code, 0, result.output);
     assert.match(line(result.output, 'clock'), /^\s*OK\s+clock/);
@@ -103,10 +95,7 @@ void test('doctor --online reports an index without a Date header as unchecked',
       run,
       ['--online'],
       {},
-      {
-        fetch: index(null).fetch,
-        now: at(0),
-      },
+      { fetch: index(null).fetch },
     );
     assert.equal(result.code, 0, result.output);
     assert.match(
@@ -118,13 +107,8 @@ void test('doctor --online reports an index without a Date header as unchecked',
 void test('doctor offline never asks the index for its time', () =>
   scenario({}, async (run) => {
     await published(run);
-    const fake = index(DATE);
-    const result = await doctor(
-      run,
-      [],
-      {},
-      { fetch: fake.fetch, now: at(9000) },
-    );
+    const fake = index(-9000);
+    const result = await doctor(run, [], {}, { fetch: fake.fetch });
     assert.equal(result.code, 0, result.output);
     assert.deepEqual(fake.requests, []);
     assert.ok(!/\bclock\b/.test(result.output));

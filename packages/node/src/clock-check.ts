@@ -1,7 +1,12 @@
 // Compares this machine's clock with a server's HTTP Date header, so doctor can warn before buyers or
 // the index refuse this seller's records as issued in the future. The header has one-second resolution,
 // so only the part of the offset that the header and the round trip cannot explain is reported.
-import { DOCTOR_CLOCK } from './constants';
+import {
+  DOCTOR_CLOCK,
+  DOCTOR_CODES,
+  DOCTOR_STATUS,
+  type DoctorCode,
+} from './constants';
 
 // The smallest offset of this clock from the server's (positive: this clock is ahead) consistent with a
 // request sent at `sent` and answered at `received`; undefined without a valid Date header or after a
@@ -39,4 +44,23 @@ export async function measureClockOffset(
   const received = now();
   await response.body?.cancel();
   return clockOffsetMs(sent, received, response.headers.get('date'));
+}
+
+// Doctor's clock result against the discovery index at `url`: a warning only, since buyers and the
+// index refuse this seller's records but nothing on this machine fails.
+export async function clockCheck(
+  url: string,
+  fetch: typeof globalThis.fetch = globalThis.fetch,
+  now: () => number = Date.now,
+) {
+  const warn = (code: DoctorCode) => ({ status: DOCTOR_STATUS.WARN, code });
+  try {
+    const offset = await measureClockOffset(url, fetch, now);
+    if (offset === undefined) return warn(DOCTOR_CODES.CLOCK_UNCHECKED);
+    return Math.abs(offset) > DOCTOR_CLOCK.warnMs
+      ? warn(DOCTOR_CODES.CLOCK_SKEWED)
+      : { status: DOCTOR_STATUS.OK, code: DOCTOR_CODES.READY };
+  } catch {
+    return warn(DOCTOR_CODES.CLOCK_UNCHECKED);
+  }
 }
