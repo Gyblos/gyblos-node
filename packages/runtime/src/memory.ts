@@ -1,6 +1,7 @@
 // Memory snapshots from /proc and cgroup files (or macOS) and the headroom check before engine warmup.
 import { readFile } from 'node:fs/promises';
 import { freemem } from 'node:os';
+import { posix } from 'node:path';
 
 import { DIAGNOSTICS } from '@gyblos/config';
 
@@ -83,6 +84,36 @@ export function assertMemoryHeadroom(snapshot: MemorySnapshot) {
     );
 }
 
+// cgroup v2 directories to read, most specific first: the process's own group (its `0::` line), then
+// the mount root. A missing, relative or escaping path leaves only the root.
+export function cgroupMemoryDirectories(selfCgroup: string): string[] {
+  const root = DIAGNOSTICS.memory.cgroupRoot;
+  const own = /^0::(\/.*)$/m.exec(selfCgroup)?.[1];
+  if (own === undefined || own.split('/').includes('..')) return [root];
+  const directory = posix.join(root, own).replace(/\/+$/, '');
+  return directory === root ? [root] : [directory, root];
+}
+
+async function readCgroupMemory(read: (path: string) => Promise<string>) {
+  const selfCgroup = await read(DIAGNOSTICS.memory.selfCgroup).catch(() => '');
+  let failure: unknown;
+  for (const directory of cgroupMemoryDirectories(selfCgroup)) {
+    const file = (name: string) => read(posix.join(directory, name));
+    try {
+      const [current, limit, events] = await Promise.all([
+        file(DIAGNOSTICS.memory.current),
+        file(DIAGNOSTICS.memory.limit),
+        file(DIAGNOSTICS.memory.events),
+      ]);
+      const peak = await file(DIAGNOSTICS.memory.peak).catch(() => undefined);
+      return { current, limit, events, peak };
+    } catch (error) {
+      failure = error;
+    }
+  }
+  throw failure;
+}
+
 export async function memorySnapshot(): Promise<MemorySnapshot> {
   if (process.platform === 'darwin') return readDarwinMemorySnapshot();
   if (process.platform !== 'linux')
@@ -92,12 +123,9 @@ export async function memorySnapshot(): Promise<MemorySnapshot> {
       cgroup: null,
     };
   const read = (path: string) => readFile(path, 'utf8');
-  const [available, current, limit, events, peak] = await Promise.all([
+  const [available, cgroup] = await Promise.all([
     read(DIAGNOSTICS.memory.available),
-    read(DIAGNOSTICS.memory.current),
-    read(DIAGNOSTICS.memory.limit),
-    read(DIAGNOSTICS.memory.events),
-    read(DIAGNOSTICS.memory.peak).catch(() => undefined),
+    readCgroupMemory(read),
   ]);
-  return parseMemorySnapshot({ available, current, limit, events, peak });
+  return parseMemorySnapshot({ available, ...cgroup });
 }

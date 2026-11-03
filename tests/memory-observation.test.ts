@@ -1,9 +1,13 @@
 // Checks memory snapshot parsing: OOM counts, unlimited cgroups and absent peaks stay explicit, and
-// missing or malformed evidence yields no readiness observation.
+// missing or malformed evidence yields no readiness observation. Also checks which cgroup directory is
+// read: the process's own group on a host, the mount root inside a container.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { parseMemorySnapshot } from '@gyblos/runtime/memory';
+import {
+  cgroupMemoryDirectories,
+  parseMemorySnapshot,
+} from '@gyblos/runtime/memory';
 
 const input = {
   available: 'MemTotal: 8000000 kB\nMemAvailable: 2000000 kB\n',
@@ -40,4 +44,26 @@ void test('missing or malformed memory evidence prevents a readiness observation
     { events: 'max 0\noom 0' },
   ])
     assert.throws(() => parseMemorySnapshot({ ...input, ...changed }));
+});
+
+void test('a host process reads its own cgroup before the mount root', () => {
+  assert.deepEqual(
+    cgroupMemoryDirectories('0::/system.slice/gyblos-seller.service\n'),
+    ['/sys/fs/cgroup/system.slice/gyblos-seller.service', '/sys/fs/cgroup'],
+  );
+  assert.deepEqual(
+    cgroupMemoryDirectories(
+      '12:memory:/legacy\n0::/user.slice/user-1000.slice/session-3.scope\n',
+    ),
+    ['/sys/fs/cgroup/user.slice/user-1000.slice/session-3.scope', '/sys/fs/cgroup'],
+  );
+});
+
+void test('a container at its cgroup root reads the mount root once', () => {
+  assert.deepEqual(cgroupMemoryDirectories('0::/\n'), ['/sys/fs/cgroup']);
+});
+
+void test('an unknown or escaping cgroup path falls back to the mount root only', () => {
+  for (const selfCgroup of ['', '1:memory:/x\n', '0::/a/../../etc\n', '0::relative\n'])
+    assert.deepEqual(cgroupMemoryDirectories(selfCgroup), ['/sys/fs/cgroup']);
 });
