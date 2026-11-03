@@ -84,18 +84,36 @@ export function assertMemoryHeadroom(snapshot: MemorySnapshot) {
     );
 }
 
-// cgroup v2 directories to read, most specific first: the process's own group (its `0::` line), then
-// the mount root. A missing, relative or escaping path leaves only the root.
+// cgroup v2 directories from the process's own group (its `0::` line) up to the mount root, most
+// specific first. A missing, relative or escaping path leaves only the root.
 export function cgroupMemoryDirectories(selfCgroup: string): string[] {
   const root = DIAGNOSTICS.memory.cgroupRoot;
   const own = /^0::(\/.*)$/m.exec(selfCgroup)?.[1];
   if (own === undefined || own.split('/').includes('..')) return [root];
-  const directory = posix.join(root, own).replace(/\/+$/, '');
-  return directory === root ? [root] : [directory, root];
+  const parts = own.split('/').filter((part) => part !== '' && part !== '.');
+  return [
+    ...parts.map((_, end) =>
+      posix.join(root, ...parts.slice(0, parts.length - end)),
+    ),
+    root,
+  ];
 }
 
-async function readCgroupMemory(read: (path: string) => Promise<string>) {
+type CgroupFiles = {
+  current: string;
+  limit: string;
+  events: string;
+  peak?: string;
+};
+
+// Reads every group on the path that exposes memory files (a host's root and an unlimited leaf may not).
+// Usage and limit come from the group with the least headroom, so a parent slice's limit counts; OOM
+// counts come from the widest group, which also covers an engine running beside this process.
+export async function readCgroupMemory(
+  read: (path: string) => Promise<string>,
+): Promise<CgroupFiles> {
   const selfCgroup = await read(DIAGNOSTICS.memory.selfCgroup).catch(() => '');
+  const groups: CgroupFiles[] = [];
   let failure: unknown;
   for (const directory of cgroupMemoryDirectories(selfCgroup)) {
     const file = (name: string) => read(posix.join(directory, name));
@@ -106,12 +124,21 @@ async function readCgroupMemory(read: (path: string) => Promise<string>) {
         file(DIAGNOSTICS.memory.events),
       ]);
       const peak = await file(DIAGNOSTICS.memory.peak).catch(() => undefined);
-      return { current, limit, events, peak };
+      groups.push({ current, limit, events, peak });
     } catch (error) {
-      failure = error;
+      // The most specific failure explains a host where no group can be read.
+      failure ??= error;
     }
   }
-  throw failure;
+  if (groups.length === 0) throw failure;
+  const headroom = (group: CgroupFiles) =>
+    group.limit.trim() === 'max'
+      ? Infinity
+      : bytes(group.limit) - bytes(group.current);
+  const tightest = groups.reduce((best, group) =>
+    headroom(group) < headroom(best) ? group : best,
+  );
+  return { ...tightest, events: groups.at(-1)!.events };
 }
 
 export async function memorySnapshot(): Promise<MemorySnapshot> {
