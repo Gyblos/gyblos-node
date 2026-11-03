@@ -1,6 +1,7 @@
 // Orchestrates one paid request: terms from the seller's signed offer plus the network's own fee, one
 // authorization per attempt, failover only while the signed open never left the buyer, then the buyer's
 // own recount and a verdict on the seller's settlement. Selection, payment and I/O are injected.
+import { paidPrompt, paidRecount } from '@gyblos/core/buyer-paid-recount';
 import {
   PAYMENT_ERROR_CODES,
   type PaymentErrorCode,
@@ -33,7 +34,6 @@ import {
   type PaidVerdict,
 } from './constants';
 import { PaidBuyerError } from './paid-errors';
-import { paidPrompt, paidRecount } from './paid-recount';
 
 export interface PaidWinner {
   nodeId: string;
