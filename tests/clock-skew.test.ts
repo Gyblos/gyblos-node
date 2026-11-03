@@ -1,14 +1,23 @@
-// Checks the shared clock-skew tolerance on v2 public records and quotes: a record issued slightly
-// ahead of the verifier's clock is accepted, one beyond the tolerance is refused, and expiry stays
-// exact. Synthetic timestamps only; no signer, transport or payment.
+// Checks the shared clock-skew tolerance on v2 public records, quotes and seller selection: a record
+// issued slightly ahead of the verifier's clock is accepted, one beyond the tolerance is refused, and
+// expiry stays exact. Synthetic timestamps only; no signer, transport or payment.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { SELLER_SELECTION_CODES } from '@gyblos/core/constants';
+import { selectSellers } from '@gyblos/core/seller-selection';
 import { CONTROL_CODES, CONTROL_LIMITS } from '@gyblos/protocol/constants';
 import { validateOfferV2Time } from '@gyblos/protocol/offer-v2';
 import { validatePublicV2Time } from '@gyblos/protocol/public-v2';
 
-const now = 1_800_000_000_000;
+import {
+  NOW,
+  request,
+  seeded,
+  seller,
+} from './support/seller-selection-fixture';
+
+const now = NOW;
 const skew = CONTROL_LIMITS.clockSkewMs;
 
 type PublicRecord = Parameters<typeof validatePublicV2Time>[0];
@@ -48,4 +57,25 @@ void test('expiry gets no grace', () => {
     expired,
   );
   validatePublicV2Time(presence(now - 59_999, now + 1), now);
+});
+
+void test('selection keeps a seller whose fresh presence is slightly ahead of the buyer clock', () => {
+  const ahead = (offset: number) => {
+    const known = seller(1);
+    // Signed by the seller an instant ago, on a clock `offset` ms ahead of the buyer's.
+    known.presence = { ...known.presence!, issuedAt: NOW + offset };
+    return selectSellers({
+      request: request(),
+      sellers: [known],
+      stats: new Map(),
+      now: NOW,
+      random: seeded(1),
+    });
+  };
+  assert.equal(ahead(230).ok, true);
+  assert.equal(ahead(skew).ok, true);
+  assert.deepEqual(ahead(skew + 1), {
+    ok: false,
+    code: SELLER_SELECTION_CODES.NO_CANDIDATES,
+  });
 });
