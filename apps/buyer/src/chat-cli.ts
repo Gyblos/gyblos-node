@@ -11,7 +11,7 @@ import {
   type ChatTurnOptions,
   type ChatTurnResult,
 } from './chat-cli-turn';
-import { isFreeAtomic } from './constants';
+import { isFreeAtomic, PAID_VERDICTS } from './constants';
 
 export interface ChatSessionOptions {
   model: string;
@@ -111,10 +111,14 @@ export async function chatSession(options: ChatSessionOptions) {
       options.write(
         `Tokens: ${result.usage.input} input, ${result.usage.output} output\n`,
       );
-    if (result.payment)
+    if (result.payment) {
+      const { verdict, charged, refunded } = result.payment;
       options.write(
-        `Payment: ${result.payment.verdict}; charged: ${result.payment.charged ?? 'unknown'}; refunded: ${result.payment.refunded ?? 'unknown'} atomic units\n`,
+        verdict === PAID_VERDICTS.SETTLED
+          ? `Payment: ${verdict}; charged: ${charged ?? 'unknown'}; refunded: ${refunded ?? 'unknown'} atomic units\n`
+          : `Payment: ${verdict}; reported charge: ${charged ?? 'unknown'} atomic units (not confirmed)\n`,
       );
+    }
     if (result.status === 'uncertain') {
       options.write(
         'The request may have been sent. No retry was made. Check the buyer and reconcile any uncertain payment before continuing.\n',
