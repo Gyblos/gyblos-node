@@ -83,6 +83,10 @@ const HINTS: Readonly<Partial<Record<DoctorResultCode, string>>> = {
   [RELAY_CONFIGURATION_CODES.INVALID_TOKEN_LENGTH]:
     'the relay token must be 32-512 characters',
   [RELAY_CONFIGURATION_CODES.INVALID_URLS]: 'relay URLs must be HTTPS origins',
+  [DOCTOR_CODES.CLOCK_SKEWED]:
+    'this clock is over 2 s off the discovery index; turn on automatic time sync (NTP), since buyers refuse records issued over 5 s ahead',
+  [DOCTOR_CODES.CLOCK_UNCHECKED]:
+    'the discovery index did not report its time; check the connection',
 };
 
 const hint = (code: DoctorResultCode) =>

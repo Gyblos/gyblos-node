@@ -264,10 +264,11 @@ seller or change proxy behavior. Call `close()` when finished; the endpoint
 remains owned by the caller. There is no control CLI yet.
 
 Quotes are `offer/v2` and are rejected by the legacy paid v1 flow. They indicate
-observed availability, not guaranteed admission. Both clocks must be
-synchronized: v2 retains zero clock-skew tolerance and no expiration grace.
-Queries have a 10-second absolute deadline and share endpoint admission before
-their separate control quotas. See
+observed availability, not guaranteed admission. A record or quote issued up to
+5 s ahead of the buyer's clock is accepted; expiry has no grace. Keep automatic
+time sync (NTP) on: `pnpm gyblos doctor --online` warns when the seller's clock
+is over 2 s off the discovery index. Queries have a 10-second absolute deadline
+and share endpoint admission before their separate control quotas. See
 [the protocol specification](../packages/protocol/SPEC.md).
 
 ## Relays

@@ -2,7 +2,8 @@
 // spawning or writing anything. Results carry static codes only; the RPC URL, relay token, key contents and
 // home location never leave this module. Network use is limited to describing each offer's engine: one on
 // this machine always, a remote API only with --online, since that call carries the seller's API key;
-// --online also reads which token accounts a paid claim would pay into are missing.
+// --online also reads which token accounts a paid claim would pay into are missing, and compares this
+// clock with the discovery index's.
 import { resolve } from 'node:path';
 
 import {
@@ -26,8 +27,10 @@ import {
 } from '@gyblos/transport-iroh/relays';
 
 import { modelTokenizer } from './artifacts';
+import { measureClockOffset } from './clock-check';
 import {
   DOCTOR_CHECKS,
+  DOCTOR_CLOCK,
   DOCTOR_CODES,
   DOCTOR_STATUS,
   NODE_CONFIG_FILENAME,
@@ -85,6 +88,8 @@ export interface DoctorProbes {
   // The chain the role's RPC serves and its payment token accounts (--online).
   genesis?: PaymentAccountsProbes['genesis'];
   paymentAccounts?: PaymentAccountsProbes['paymentAccounts'];
+  // The clock compared with the discovery index's (--online).
+  now?: () => number;
 }
 export interface DoctorOptions {
   environment: HomeEnvironment;
@@ -274,6 +279,27 @@ const engineDependencies = (options: DoctorOptions) => ({
   environment: options.environment,
 });
 
+// --online with a discovery index: buyers and the index refuse records issued too far ahead of their
+// clocks, so a skewed clock makes this seller unreachable without any other error.
+async function clockCheck(
+  publication: string,
+  options: DoctorOptions,
+): Promise<Result> {
+  try {
+    const offset = await measureClockOffset(
+      publication,
+      options.probes?.fetch ?? globalThis.fetch,
+      options.probes?.now ?? Date.now,
+    );
+    if (offset === undefined) return warn(DOCTOR_CODES.CLOCK_UNCHECKED);
+    return Math.abs(offset) > DOCTOR_CLOCK.warnMs
+      ? warn(DOCTOR_CODES.CLOCK_SKEWED)
+      : OK;
+  } catch {
+    return warn(DOCTOR_CODES.CLOCK_UNCHECKED);
+  }
+}
+
 // Needed unless every offer is known to be declared by its provider.
 async function tokenizerCheck(
   options: DoctorOptions,
@@ -385,6 +411,9 @@ export async function sellerDoctor(
       DOCTOR_CHECKS.PAYMENTS,
       role.config ? await paymentsCheck(role.config, options) : notChecked,
     );
+  const publication = config.settings?.publication?.baseUrl;
+  if (options.online && publication)
+    add(DOCTOR_CHECKS.CLOCK, await clockCheck(publication, options));
   return {
     checks,
     configIssues: config.issues,

@@ -7,6 +7,7 @@ import test from 'node:test';
 import { createDiscoveryIndex } from '@gyblos/discovery-index/app';
 import { PUBLISH_MODES } from '@gyblos/discovery-index/constants';
 import { createMemoryStorage } from '@gyblos/discovery-index/storage';
+import { CONTROL_LIMITS } from '@gyblos/protocol/constants';
 
 import {
   allLimiters,
@@ -205,7 +206,12 @@ eachStorage(
       'INVALID_RECORD',
     );
     await expectError(
-      await publish(seller.catalog(1, { issuedAt: T0 + 5000 })),
+      await publish(
+        seller.catalog(1, {
+          // The fixture clock is T0 + 1000.
+          issuedAt: T0 + 1000 + CONTROL_LIMITS.clockSkewMs + 1,
+        }),
+      ),
       400,
       'EXPIRED_RECORD',
     );

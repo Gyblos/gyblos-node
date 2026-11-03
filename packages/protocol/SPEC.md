@@ -236,10 +236,15 @@ levels and separate v2 domains. `./offer-v2` adds owner-signed quotes binding th
 complete request digest and exact buyer/model/reasoning terms. Public signatures
 remain lowercase hex; private signatures remain Base64. V1 exports, domains and
 vectors are unchanged. V2 cache/sequence namespaces must be distinct from v1;
-presence and withdrawal references cannot cross versions. Time validation has
-zero clock-skew tolerance (`issuedAt > now` is rejected), as in v1. The runtime
-retains zero: operators must synchronize clocks. A tolerance would widen quote
-acceptance and needs separate policy review; no expiry grace is applied.
+presence and withdrawal references cannot cross versions. V2 time validation
+accepts a record or quote issued up to `CONTROL_LIMITS.clockSkewMs` (5 s) ahead
+of the verifier's clock (`issuedAt > now + 5000` is rejected), because real
+machines differ by hundreds of milliseconds and a remote record issued an
+instant earlier would otherwise look future-dated. Expiry gets no grace
+(`expiresAt <= now` is rejected), so a quote is never usable past its signed
+lifetime; the tolerance only lets it be accepted up to 5 s before the verifier's
+clock reaches its issue time. V1 retains zero tolerance. Seller admission
+compares the seller's own quote with the seller's own clock and keeps zero skew.
 
 V2 prices are **atomic asset units per million tokens**, with the explicit
 `inputAtomicPerMtok` and `outputAtomicPerMtok` fields in public listing pricing,
@@ -638,8 +643,8 @@ Cancellation closes the connection and reaches the engine's abort signal;
 late deltas are forbidden. A writer ignoring abort retains its admission permit
 until it actually settles. The buyer marks possible transmission before its
 first write, so partial/failed writes and any later failure prohibit failover.
-Zero clock skew remains: quote expiry is rechecked immediately before the first
-write, with no grace interval. Streaming does not authorize payments, call a
+Expiry has no grace: quote expiry is rechecked immediately before the first
+write. Streaming does not authorize payments, call a
 facilitator, modify the v1 flow or reserve capacity during quotation.
 
 ## Paid inference execution v1
