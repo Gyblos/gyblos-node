@@ -1,7 +1,6 @@
 // The buyer's own count of a paid request, made exactly as the seller counts: the single user message as
 // input, the streamed text as output, and a stop that reports delivery at least one token and at most
 // its bytes (other stops charge no output). Pure; the tokenizer is the model's public one.
-import { paidCharge } from '@gyblos/core/paid-charge';
 import { FREE_CHAT_ROLES } from '@gyblos/protocol/constants';
 import type { RecountTokenizer } from '@gyblos/protocol/engine';
 import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
@@ -13,6 +12,8 @@ import {
   PAID_DELIVERED_CODES,
   type PaidExecutionCode,
 } from '@gyblos/protocol/paid/constants';
+
+import { paidCharge } from './paid-charge';
 
 // The prompt a paid seller would count, or undefined for input no paid seller serves: more than one
 // message, another role, or a prompt the model's chat template refuses (checked before any payment).
