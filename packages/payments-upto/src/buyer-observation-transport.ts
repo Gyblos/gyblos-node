@@ -37,9 +37,19 @@ function requestId(payload: unknown): string {
     return invalid();
   return payload.id;
 }
+function active(
+  signal: AbortSignal,
+  deadline: number,
+  now: () => number,
+): void {
+  const time = now();
+  if (signal.aborted || !Number.isFinite(time) || time >= deadline) invalid();
+}
 async function bodyText(
   response: Response,
   signal: AbortSignal,
+  deadline: number,
+  now: () => number,
 ): Promise<string> {
   const limit = BUYER_OBSERVATION.maxResponseBytes;
   const length = response.headers.get('content-length');
@@ -50,7 +60,9 @@ async function bodyText(
   let used = 0;
   try {
     for (;;) {
+      active(signal, deadline, now);
       const chunk = await beforeAbort(signal, () => reader.read());
+      active(signal, deadline, now);
       if (chunk.done) break;
       if (chunk.value.byteLength > limit - used) return invalid();
       bytes.set(chunk.value, used);
@@ -127,6 +139,7 @@ function envelope(text: string, id: string, method: string): unknown {
 export function createBuyerObservationRpc(
   url: string,
   fetcher: BuyerObservationFetch = globalThis.fetch,
+  now: () => number = () => performance.now(),
 ) {
   function transport<TResponse>(
     request: Parameters<RpcTransport>[0],
@@ -139,9 +152,11 @@ export function createBuyerObservationRpc(
       AbortSignal.timeout(TIMEOUTS.rpc),
       ...(external ? [external] : []),
     ]);
-    const deadline = performance.now() + TIMEOUTS.rpc;
     let response: Response | undefined;
     try {
+      const deadline = now() + TIMEOUTS.rpc;
+      if (!Number.isFinite(deadline)) return invalid();
+      active(signal, deadline, now);
       const id = requestId(payload);
       if (
         !payload ||
@@ -172,10 +187,11 @@ export function createBuyerObservationRpc(
       });
       if (!(response instanceof Response) || !response.ok || signal.aborted)
         return invalid();
-      const text = await bodyText(response, signal);
-      if (signal.aborted || performance.now() >= deadline) return invalid();
+      active(signal, deadline, now);
+      const text = await bodyText(response, signal, deadline, now);
+      active(signal, deadline, now);
       const result = envelope(text, id, payload.method);
-      if (signal.aborted || performance.now() >= deadline) return invalid();
+      active(signal, deadline, now);
       return result;
     } catch {
       return invalid();

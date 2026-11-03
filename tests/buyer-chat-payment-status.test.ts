@@ -102,6 +102,29 @@ void test('changed or invalid digests are not used to inspect another payment', 
   }
 });
 
+void test('an invalid or error-only frame cannot supply a payment digest', async () => {
+  for (const frame of [
+    { gyblos_request_digest: DIGEST, choices: [] },
+    { gyblos_request_digest: DIGEST, error: { code: 'synthetic' } },
+  ]) {
+    const result = await chatTurn(
+      {
+        model: 'synthetic',
+        maxTokens: 8,
+        prompt: 'synthetic',
+        paid: true,
+        write: () => {},
+      },
+      async () =>
+        new Response(`data: ${JSON.stringify(frame)}\n\n`, {
+          headers: { 'content-type': 'text/event-stream' },
+        }),
+    );
+    assert.equal(result.status, 'uncertain');
+    assert.equal(result.requestDigest, undefined);
+  }
+});
+
 void test('a cut before the first complete digest cannot trigger an inspection', async () => {
   let inspections = 0;
   let calls = 0;

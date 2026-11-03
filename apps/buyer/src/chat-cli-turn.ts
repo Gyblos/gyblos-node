@@ -207,6 +207,33 @@ function streamDigest(
     throw new Error('digest');
   return value;
 }
+function frameDigest(
+  body: Record<string, unknown> | undefined,
+  previous: string | undefined,
+  paid: boolean | undefined,
+  terminal: ChatTurnResult | undefined,
+) {
+  const candidate = paid ? body?.[PAID_BUYER.requestDigestField] : undefined;
+  if (candidate === undefined) return previous;
+  if (
+    terminal ||
+    !body ||
+    !Array.isArray(body.choices) ||
+    body.choices.length !== 1
+  )
+    throw new Error('digest');
+  const choice = record(body.choices[0]);
+  const delta = record(choice?.delta);
+  if (
+    !choice ||
+    !delta ||
+    choice.finish_reason !== null ||
+    typeof delta.content !== 'string' ||
+    delta.content.length === 0
+  )
+    throw new Error('digest');
+  return streamDigest(candidate, previous);
+}
 const uncertain = (requestDigest?: string): ChatTurnResult =>
   requestDigest
     ? { status: 'uncertain', requestDigest }
@@ -247,16 +274,16 @@ async function readStream(
         } else {
           const value: unknown = JSON.parse(data);
           const body = record(value);
-          if (options.paid) {
-            try {
-              requestDigest = streamDigest(
-                body?.[PAID_BUYER.requestDigestField],
-                requestDigest,
-              );
-            } catch {
-              requestDigest = undefined;
-              throw new Error('digest');
-            }
+          try {
+            requestDigest = frameDigest(
+              body,
+              requestDigest,
+              options.paid,
+              terminal,
+            );
+          } catch {
+            requestDigest = undefined;
+            throw new Error('digest');
           }
           if (
             !body ||

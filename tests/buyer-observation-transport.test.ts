@@ -93,6 +93,42 @@ void test('an aborted observation does not wait for a stalled response body', as
   );
 });
 
+void test('a stream of immediately resolved empty chunks cannot evade the absolute deadline', async () => {
+  let clock = 0;
+  let chunks = 0;
+  const rpc = createBuyerObservationRpc(
+    'https://synthetic.invalid',
+    async (_url, init) => {
+      const request: unknown = JSON.parse(String(init.body));
+      assert.ok(request && typeof request === 'object' && 'id' in request);
+      const bytes = new TextEncoder().encode(
+        JSON.stringify({
+          jsonrpc: '2.0',
+          id: request.id,
+          result: 'synthetic-genesis',
+        }),
+      );
+      return new Response(
+        new ReadableStream({
+          pull(controller) {
+            if (chunks++ < 100) controller.enqueue(new Uint8Array());
+            else {
+              controller.enqueue(bytes);
+              controller.close();
+            }
+          },
+        }),
+      );
+    },
+    () => {
+      clock += 1000;
+      return clock;
+    },
+  );
+  await assert.rejects(rpc.getGenesisHash().send());
+  assert.ok(chunks < 100);
+});
+
 void test('invalid UTF-8 and HTTP errors fail without exposing the RPC URL', async () => {
   for (const response of [
     new Response(Uint8Array.of(0xff)),
