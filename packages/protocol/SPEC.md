@@ -585,7 +585,8 @@ entries by default (`[limits] max_free_buyers_per_day`).
 Capacity exhaustion refuses new work without evicting unexpired accounting.
 A startup-time barrier rejects quotes issued at or before startup, including
 the same millisecond; backward clock movement during a process fails closed.
-This assumes a trustworthy wall clock across restarts, as does zero-skew expiry.
+This assumes a trustworthy wall clock across restarts, as does the seller's
+zero-skew admission of its own quotes.
 
 Native ingress, generation and egress share endpoint request admission. A
 read, engine or writer ignoring cancellation retains its request permit until

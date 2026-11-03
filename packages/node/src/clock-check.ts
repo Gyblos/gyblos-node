@@ -4,14 +4,20 @@
 import { DOCTOR_CLOCK } from './constants';
 
 // The smallest offset of this clock from the server's (positive: this clock is ahead) consistent with a
-// request sent at `sent` and answered at `received`; undefined without a valid Date header.
+// request sent at `sent` and answered at `received`; undefined without a valid Date header or after a
+// round trip slow enough to hide an offset buyers would refuse.
 export function clockOffsetMs(
   sent: number,
   received: number,
   date: string | null,
 ): number | undefined {
   const server = Date.parse(date ?? '');
-  if (!Number.isFinite(server) || received < sent) return undefined;
+  if (
+    !Number.isFinite(server) ||
+    received < sent ||
+    received - sent > DOCTOR_CLOCK.maxRoundTripMs
+  )
+    return undefined;
   // The server's true time was within [server, server + 1 s) at some instant in [sent, received].
   if (sent > server + DOCTOR_CLOCK.dateResolutionMs)
     return sent - (server + DOCTOR_CLOCK.dateResolutionMs);

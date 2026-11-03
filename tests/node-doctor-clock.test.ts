@@ -27,6 +27,9 @@ void test('the offset is only what the one-second header and the round trip cann
   // 230 ms behind, as measured between two real machines.
   assert.equal(clockOffsetMs(SERVER - 230, SERVER - 200, DATE), -200);
   assert.equal(clockOffsetMs(SERVER + 3500, SERVER + 3600, DATE), 2500);
+  // A slow answer could hide seconds of offset, so it proves nothing.
+  assert.equal(clockOffsetMs(SERVER, SERVER + 1001, DATE), undefined);
+  assert.equal(clockOffsetMs(SERVER, SERVER + 1000, DATE), 0);
   assert.equal(clockOffsetMs(SERVER, SERVER + 1, null), undefined);
   assert.equal(clockOffsetMs(SERVER, SERVER + 1, 'not a date'), undefined);
 });

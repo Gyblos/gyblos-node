@@ -143,6 +143,20 @@ eachStorage(
 );
 
 eachStorage(
+  'records issued slightly ahead of the index clock are listed at once',
+  async ({ publish, sellers }) => {
+    // The fixture clock is T0 + 1000; the seller's clock runs ahead of it.
+    const ahead = T0 + 1000 + CONTROL_LIMITS.clockSkewMs;
+    const seller = indexNode();
+    const catalog = seller.catalog(1, { issuedAt: T0 + 1230 });
+    assert.equal((await publish(catalog)).status, 201);
+    const presence = await seller.presence(2, catalog, { issuedAt: ahead });
+    assert.equal((await publish(presence)).status, 201);
+    assert.deepEqual((await sellers()).body.sellers, [{ catalog, presence }]);
+  },
+);
+
+eachStorage(
   'presence referencing an unknown or another node catalog is rejected',
   async ({ publish, sellers }) => {
     const seller = indexNode();
