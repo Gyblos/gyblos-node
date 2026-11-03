@@ -27,6 +27,7 @@ import {
 } from '@gyblos/protocol/payment';
 
 import type { UptoBuyerJournal } from './buyer-journal';
+import { UPTO_BUYER_DISTINCT_PARTIES } from './constants';
 import {
   networkRecoveryBlock,
   snapshotJournal,
@@ -62,7 +63,6 @@ export interface UptoPaymentClientOptions {
 }
 
 const ATOMIC = /^(0|[1-9][0-9]{0,19})$/;
-const DISTINCT_PARTIES = 4;
 // The chain's u64 ceiling for any atomic amount.
 const U64_MAX = BigInt(PUBLIC_RECORD_LIMITS.maxAtomic);
 // A canonical atomic amount that fits the chain's u64.
@@ -87,7 +87,7 @@ function trusted(
     // Payout, fee payer, buyer and fee treasury are four different accounts: the fee payer signs and
     // pays the open, and the receipt check tells each party's payment apart by its owner.
     new Set([terms.payTo, terms.feePayer, payer, policy.treasury]).size ===
-      DISTINCT_PARTIES &&
+      UPTO_BUYER_DISTINCT_PARTIES &&
     terms.protocolFeeBps === policy.protocolFeeBps &&
     terms.treasury === policy.treasury &&
     terms.buyer === payer &&
