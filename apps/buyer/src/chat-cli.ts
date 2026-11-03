@@ -31,12 +31,24 @@ type ChatStarter = (options: { port: number }) => Promise<{
     request: typeof fetch;
   };
   close(): Promise<void>;
+  inspectAndClose?: PaymentInspector;
 }>;
+type PaymentInspector = (
+  requestDigest: string,
+  signal?: AbortSignal,
+) => Promise<
+  | {
+      chargedAtomic: string;
+      refundedAtomic: string;
+    }
+  | undefined
+>;
 export async function runTerminal(
   start: ChatStarter,
   inputStream: Readable,
   output: Writable,
   signal?: AbortSignal,
+  inspect?: PaymentInspector,
 ) {
   if (signal?.aborted) return;
   const controller = new AbortController();
@@ -62,6 +74,7 @@ export async function runTerminal(
         output.write(text);
       },
       controller.signal,
+      inspect,
     );
   } finally {
     signal?.removeEventListener('abort', abort);
@@ -73,12 +86,39 @@ export async function runOwnedChat(
   read: () => Promise<string | undefined>,
   write: (text: string) => void,
   signal?: AbortSignal,
+  inspect?: PaymentInspector,
 ) {
   const host = await start({ port: 0 });
+  let digest: string | undefined;
+  let observed: Awaited<ReturnType<PaymentInspector>>;
+  let attempted = false;
   try {
-    await chatSession({ ...host.chat, read, write, signal });
+    digest = await chatSession({ ...host.chat, read, write, signal });
   } finally {
-    await host.close();
+    if (digest && host.inspectAndClose) {
+      attempted = true;
+      try {
+        observed = await host.inspectAndClose(digest);
+      } catch {
+        observed = undefined;
+      }
+    } else await host.close();
+  }
+  if (digest && (attempted || inspect)) {
+    try {
+      const payment = attempted ? observed : await inspect?.(digest);
+      if (payment) {
+        write(
+          `Configured RPC reports finalized charge ${payment.chargedAtomic}; refunded ${payment.refundedAtomic} atomic units. Check the journal with buyer:reconcile:paid before continuing.\n`,
+        );
+        return;
+      }
+    } catch {
+      // The inspection is optional; a failure never changes the payment state.
+    }
+    write(
+      'Payment is still pending or could not be verified. Reconcile before continuing.\n',
+    );
   }
 }
 export async function chatSession(options: ChatSessionOptions) {
@@ -123,7 +163,9 @@ export async function chatSession(options: ChatSessionOptions) {
       options.write(
         'The request may have been sent. No retry was made. Check the buyer and reconcile any uncertain payment before continuing.\n',
       );
-      return;
+      return paid && result.payment?.verdict !== PAID_VERDICTS.SETTLED
+        ? result.requestDigest
+        : undefined;
     }
   }
 }

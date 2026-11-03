@@ -103,6 +103,16 @@ async function payments(
 
 type Chain = Awaited<ReturnType<ReturnType<typeof buyerChainPayments>>>;
 
+export interface PaidBuyerHost {
+  url: string;
+  chat: ReturnType<typeof ownedChat>;
+  close(): Promise<void>;
+  inspectAndClose?(
+    digest: string,
+    signal?: AbortSignal,
+  ): Promise<{ chargedAtomic: string; refundedAtomic: string } | undefined>;
+}
+
 // The HTTP server first; then a paid request still checking its receipt or writing its record gets
 // a bounded moment before the endpoint and the journal close under it.
 async function closePaidResources(
@@ -110,16 +120,21 @@ async function closePaidResources(
   endpoint?: Awaited<ReturnType<typeof bindEndpoint>>,
   host?: { close(): Promise<void> },
   idle?: () => Promise<void>,
-) {
+  inspect?: () => Promise<
+    { chargedAtomic: string; refundedAtomic: string } | undefined
+  >,
+): Promise<{ chargedAtomic: string; refundedAtomic: string } | undefined> {
   try {
     await host?.close();
     let timer: ReturnType<typeof setTimeout> | undefined;
-    await Promise.race([
-      idle?.(),
+    const drained = await Promise.race([
+      idle ? idle().then(() => true) : Promise.resolve(true),
       new Promise((resolve) => {
-        timer = setTimeout(resolve, PAID_BUYER.drainMs);
+        timer = setTimeout(() => resolve(false), PAID_BUYER.drainMs);
       }),
     ]).finally(() => clearTimeout(timer));
+    if (drained && inspect) return await inspect();
+    return undefined;
   } finally {
     try {
       await endpoint?.close();
@@ -127,6 +142,27 @@ async function closePaidResources(
       await chain.close();
     }
   }
+}
+
+function paidClosers(
+  chain: Chain,
+  endpoint: Awaited<ReturnType<typeof bindEndpoint>>,
+  host: { close(): Promise<void> },
+  idle: () => Promise<void>,
+) {
+  return {
+    close: async () => {
+      await closePaidResources(chain, endpoint, host, idle);
+    },
+    inspectAndClose: (digest: string, signal?: AbortSignal) =>
+      closePaidResources(
+        chain,
+        endpoint,
+        host,
+        idle,
+        () => chain.observe?.(digest, signal) ?? Promise.resolve(undefined),
+      ),
+  };
 }
 
 export async function startPaidBuyer(
@@ -138,7 +174,7 @@ export async function startPaidBuyer(
     // Tests inject a tokenizer; the default loads the pinned one from the home.
     meter?: () => Promise<RecountTokenizer>;
   } = {},
-) {
+): Promise<PaidBuyerHost> {
   const role = await buyerRole();
   if (role.role !== P2P_ROLES.BUYER)
     return refuse(FREE_BUYER_STARTUP.NOT_BUYER);
@@ -203,7 +239,7 @@ export async function startPaidBuyer(
         host.url,
         token,
       ),
-      close: () => closePaidResources(chain, bound, host, dependencies.idle),
+      ...paidClosers(chain, bound, host, dependencies.idle),
     };
   } catch (error) {
     await closePaidResources(chain, endpoint);

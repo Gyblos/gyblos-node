@@ -321,6 +321,8 @@ export function freeBuyerHandler(
           controller.signal,
           response,
           settings.selection.modelId,
+          request.headers[PAID_BUYER.observationHeader] ===
+            PAID_BUYER.observationValue,
         );
         return;
       }
