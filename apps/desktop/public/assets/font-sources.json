@@ -6,7 +6,8 @@
       "license": "SIL Open Font License 1.1",
       "licenseFile": "Geist-OFL.txt",
       "upstream": "https://github.com/vercel/geist-font",
-      "exactDownloadRevision": "not recorded; hash identifies the bundled bytes, not the original retrieval revision"
+      "exactDownloadRevision": "not recorded; hash identifies the bundled bytes, not the original retrieval revision",
+      "verifiedSource": "https://fonts.gstatic.com/s/geist/v5/gyBhhwUxId8gMGYQMKR3pzfaWI_RnOM4nQ.ttf"
     },
     {
       "file": "geist-500.ttf",
@@ -14,7 +15,8 @@
       "license": "SIL Open Font License 1.1",
       "licenseFile": "Geist-OFL.txt",
       "upstream": "https://github.com/vercel/geist-font",
-      "exactDownloadRevision": "not recorded; hash identifies the bundled bytes, not the original retrieval revision"
+      "exactDownloadRevision": "not recorded; hash identifies the bundled bytes, not the original retrieval revision",
+      "verifiedSource": "https://fonts.gstatic.com/s/geist/v5/gyBhhwUxId8gMGYQMKR3pzfaWI_RruM4nQ.ttf"
     },
     {
       "file": "geist-600.ttf",
@@ -22,7 +24,8 @@
       "license": "SIL Open Font License 1.1",
       "licenseFile": "Geist-OFL.txt",
       "upstream": "https://github.com/vercel/geist-font",
-      "exactDownloadRevision": "not recorded; hash identifies the bundled bytes, not the original retrieval revision"
+      "exactDownloadRevision": "not recorded; hash identifies the bundled bytes, not the original retrieval revision",
+      "verifiedSource": "https://fonts.gstatic.com/s/geist/v5/gyBhhwUxId8gMGYQMKR3pzfaWI_RQuQ4nQ.ttf"
     },
     {
       "file": "JetBrainsMono-Regular.woff2",
@@ -30,7 +33,10 @@
       "license": "SIL Open Font License 1.1",
       "licenseFile": "JetBrainsMono-OFL.txt",
       "upstream": "https://github.com/JetBrains/JetBrainsMono",
-      "exactDownloadRevision": "not recorded; hash identifies the bundled bytes, not the original retrieval revision"
+      "exactDownloadRevision": "not recorded; hash identifies the bundled bytes, not the original retrieval revision",
+      "verifiedSource": "https://raw.githubusercontent.com/JetBrains/JetBrainsMono/cd5227bd1f61dff3bbd6c814ceaf7ffd95e947d9/fonts/webfonts/JetBrainsMono-Regular.woff2",
+      "verifiedSourceCommit": "cd5227bd1f61dff3bbd6c814ceaf7ffd95e947d9"
     }
-  ]
+  ],
+  "sourceVerification": "The verified source URLs served bytes matching the recorded SHA256 values. This establishes a reproducible source match, not the original download date or revision. Google Fonts distribution URLs are versioned endpoints, not cryptographic Git revisions."
 }
