@@ -26,6 +26,8 @@ import {
 } from '@solana/kit';
 import { UPTO_PROGRAM, type UptoWithdrawRpc } from 'x402-upto-metered';
 
+import { DEVNET_GENESIS } from '@gyblos/config';
+
 const channelEncoder = getStructEncoder([
   ['discriminator', getU8Encoder()],
   ['version', getU8Encoder()],
@@ -181,7 +183,10 @@ export function withdrawChain(state: WithdrawChainState) {
     bytes[0] = index + 1;
     return getBase58Decoder().decode(bytes) as Signature;
   };
-  const rpc: UptoWithdrawRpc = {
+  const rpc: UptoWithdrawRpc & {
+    getGenesisHash(): { send(): Promise<string> };
+  } = {
+    getGenesisHash: () => ({ send: async () => DEVNET_GENESIS }),
     getAccountInfo: (account, config) =>
       call('account', config.commitment, () => ({
         value: state.accounts.get(String(account)) ?? null,
