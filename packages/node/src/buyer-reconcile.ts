@@ -5,6 +5,7 @@ import { createSolanaRpc } from '@solana/kit';
 
 import {
   buyerJournalPathsIn,
+  DEVNET,
   DEVNET_GENESIS,
   PROTOCOL_FEE,
 } from '@gyblos/config';
@@ -32,10 +33,11 @@ export function buyerChainReconcile(
   expected: UptoReconcileOptions['expected'],
   report: UptoReconcileOptions['report'],
 ) => Promise<UptoReconcileResult[]> {
-  return async (role, expected, report) => {
-    if (role.role !== P2P_ROLES.BUYER)
+  return async (inputRole, expected, report) => {
+    if (inputRole.role !== P2P_ROLES.BUYER)
       throw new NodeError(NODE_ERROR_CODES.BUYER_PAYMENT_KEY_INVALID);
-    const served = await genesis(role.rpcUrl).catch(() => undefined);
+    const { rpcUrl, buyer, mint } = inputRole;
+    const served = await genesis(rpcUrl).catch(() => undefined);
     if (served !== DEVNET_GENESIS)
       throw new NodeError(NODE_ERROR_CODES.BUYER_PAYMENT_NETWORK_MISMATCH);
     const journal = await openUptoBuyerJournal({
@@ -45,9 +47,10 @@ export function buyerChainReconcile(
     try {
       return await reconcileUptoBuyer({
         journal,
-        rpc: rpc ?? createSolanaRpc(role.rpcUrl),
-        payer: role.buyer,
-        mint: role.mint,
+        network: DEVNET,
+        rpc: rpc ?? createSolanaRpc(rpcUrl),
+        payer: buyer,
+        mint,
         treasury: PROTOCOL_FEE.treasury,
         expected,
         report,

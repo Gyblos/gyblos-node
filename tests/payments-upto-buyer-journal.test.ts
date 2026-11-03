@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { buyerJournalPathsIn } from '@gyblos/config';
+import { buyerJournalPathsIn, DEVNET } from '@gyblos/config';
 import { BUYER_JOURNAL, openUptoBuyerJournal } from '@gyblos/payments-upto';
 import {
   PAYMENT_CHANNEL_STATES,
@@ -31,6 +31,7 @@ const ENTRY = {
   feePayer: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
   maxAtomic: '1000',
   policy: {
+    network: DEVNET,
     mint: 'So11111111111111111111111111111111111111112',
     treasury: 'SysvarRent111111111111111111111111111111111',
     protocolFeeBps: 300,
@@ -120,12 +121,14 @@ void test('a valid document reads back; each malformed one is refused', () =>
     }
   }));
 
-void test('a version 2 journal reads without a policy and is saved as the current version', () =>
+void test('a resolved version 2 journal reads without policy and upgrades on write', () =>
   withRoot(async (root) => {
     const { state } = buyerJournalPathsIn({ GYBLOS_HOME: root });
     const { policy: _policy, ...v2 } = {
       ...ENTRY,
       channelId: 'Chan1',
+      state: PAYMENT_CHANNEL_STATES.SETTLED,
+      chargedAtomic: '0',
       updatedAt: NOW,
     };
     await (await open(root)).close();
@@ -178,17 +181,17 @@ void test('a version 1 journal keeps its signed opens, never proven unopened, an
         policy: null,
       },
     ]);
-    // The next write saves it as the current version, which the strict parser reads back.
-    await journal.put({ ...ENTRY, requestDigest: OTHER });
+    // A signed open without network provenance cannot be upgraded or rewritten.
+    await assert.rejects(
+      journal.put({ ...ENTRY, requestDigest: OTHER }),
+      unavailable,
+    );
     await journal.close();
     assert.equal(
       (JSON.parse(await readFile(state, 'utf8')) as { version: number })
         .version,
-      BUYER_JOURNAL.version,
+      BUYER_JOURNAL.legacyVersion,
     );
-    const reread = await open(root);
-    assert.equal((await reread.list()).length, 2);
-    await reread.close();
   }));
 
 void test('a full journal refuses new requests, keeps writing open ones and prunes finished ones', () =>
@@ -233,7 +236,12 @@ void test('a full journal of the widest entries still fits its byte bound', () =
       payTo: address,
       feePayer: address,
       maxAtomic: atomic,
-      policy: { mint: address, treasury: address, protocolFeeBps: 1_000 },
+      policy: {
+        network: DEVNET,
+        mint: address,
+        treasury: address,
+        protocolFeeBps: 1_000,
+      },
       openSlot: atomic,
       lastValidBlockHeight: atomic,
       expiresAt: Number.MAX_SAFE_INTEGER,

@@ -1,4 +1,4 @@
-// Verifies the seller's declared Solana network before ledger, account or signing operations.
+// Verifies an RPC's declared Solana network before payment reads, writes or signing.
 import {
   UPTO_SOLANA_NAMESPACE,
   UPTO_SOLANA_REFERENCE_LENGTH,
@@ -8,14 +8,14 @@ import { TIMEOUTS } from '@gyblos/config';
 import { PAYMENT_ERROR_CODES } from '@gyblos/protocol/constants';
 import { PaymentError } from '@gyblos/protocol/payment';
 
-export interface SellerGenesisRpc {
+export interface PaymentGenesisRpc {
   getGenesisHash(): {
     send(config?: { abortSignal: AbortSignal }): Promise<string>;
   };
 }
 
-export async function verifySellerNetwork(
-  rpc: SellerGenesisRpc,
+export async function verifyPaymentNetwork(
+  rpc: PaymentGenesisRpc,
   network: string,
 ) {
   const [namespace, reference, ...rest] = network.split(':');

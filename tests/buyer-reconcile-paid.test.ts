@@ -9,6 +9,7 @@ import test from 'node:test';
 
 import {
   buyerJournalPathsIn,
+  DEVNET,
   DEVNET_GENESIS,
   PROTOCOL_FEE,
 } from '@gyblos/config';
@@ -70,7 +71,12 @@ void test('paid reconciliation keeps each resolution, then reports what still bl
         payTo: PAY_TO,
         feePayer: PAY_TO,
         maxAtomic: '1000',
-        policy: null,
+        policy: {
+          network: DEVNET,
+          mint: MINT,
+          treasury: PROTOCOL_FEE.treasury,
+          protocolFeeBps: PROTOCOL_FEE.bps,
+        },
         openSlot: '5',
         lastValidBlockHeight: '150',
         expiresAt: Date.now() + 60_000,
