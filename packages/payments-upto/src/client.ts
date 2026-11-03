@@ -33,7 +33,10 @@ import {
   snapshotJournal,
   snapshotJournalEntry,
 } from './journal-network';
-import { assertPaymentNetworkEnabled } from './mainnet';
+import {
+  assertMainnetPilotDeposit,
+  assertPaymentNetworkEnabled,
+} from './mainnet';
 import { uptoTermsFor, type UptoChannelSettings } from './terms';
 
 // What this buyer accepts: its network and asset, the network's fee and treasury, and the most it
@@ -196,6 +199,7 @@ async function signOpen(
 
 // A policy the buyer could never honor is a configuration error, refused at construction.
 function checkedPolicy(policy: UptoBuyerPolicy): UptoBuyerPolicy {
+  assertMainnetPilotDeposit(policy);
   assertPaymentNetworkEnabled(policy.network);
   if (
     !atomic(policy.maxAtomic) ||
