@@ -1,26 +1,16 @@
 // Mainnet remains locked and caller mutation cannot change the verified buyer policy or verifier.
 import assert from 'node:assert/strict';
-import { lstat, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { lstat, readFile, writeFile } from 'node:fs/promises';
 import test from 'node:test';
 
-import { generateKeyPairSigner, type TransactionSigner } from '@solana/kit';
 import { SOLANA_MAINNET_CAIP2 } from '@x402/svm';
 
-import {
-  buyerJournalPathsIn,
-  DEVNET,
-  PROTOCOL_FEE,
-  UPTO_CHANNEL_SETTINGS,
-} from '@gyblos/config';
+import { buyerJournalPathsIn, DEVNET } from '@gyblos/config';
 import {
   createUptoPaymentClient,
   openUptoBuyerJournal,
   openUptoBuyerPayments,
   reconcileUptoBuyer,
-  type UptoBuyerJournal,
-  type UptoPaymentClientOptions,
 } from '@gyblos/payments-upto';
 import {
   PAYMENT_CHANNEL_STATES,
@@ -30,73 +20,17 @@ import {
   PaymentError,
   type PaymentAuthorization,
   type PaymentSettlement,
-  type PaymentTerms,
 } from '@gyblos/protocol/payment';
 
-import { entry } from './support/mainnet-journal';
-import { hints } from './support/payment-upto';
+import { buyer, DIGEST, entry, NOW, withRoot } from './support/mainnet-journal';
 import { JOURNAL_FAULTS, memoryJournal } from './support/payment-upto-client';
 import { newLedger } from './support/payment-upto-ledger';
 import { chainDouble } from './support/upto-chain-history';
 
-const NOW = 1_800_000_000_000;
-const DIGEST = 'ab'.repeat(32);
 const code = (expected: string) => (error: unknown) =>
   error instanceof PaymentError && error.code === expected;
-const address = async () => (await generateKeyPairSigner()).address;
 const memory = () =>
   memoryJournal(newLedger(NOW), JOURNAL_FAULTS.NONE, () => NOW);
-
-async function buyer(journal: UptoBuyerJournal) {
-  const signer = await generateKeyPairSigner();
-  const counter = { signed: 0 };
-  const payer: TransactionSigner = {
-    address: signer.address,
-    async signTransactions(transactions, config) {
-      counter.signed += transactions.length;
-      return signer.signTransactions(transactions, config);
-    },
-  };
-  const mint = await address();
-  const options: UptoPaymentClientOptions = {
-    payer,
-    policy: {
-      network: DEVNET,
-      mint,
-      protocolFeeBps: PROTOCOL_FEE.bps,
-      treasury: PROTOCOL_FEE.treasury,
-      maxAtomic: '1000',
-    },
-    settings: UPTO_CHANNEL_SETTINGS,
-    hints,
-    journal,
-    confirm: async () => undefined,
-    now: () => NOW,
-  };
-  const terms: PaymentTerms = {
-    network: DEVNET,
-    mint,
-    payTo: await address(),
-    feePayer: await address(),
-    authorizer: await address(),
-    protocolFeeBps: PROTOCOL_FEE.bps,
-    treasury: PROTOCOL_FEE.treasury,
-    buyer: payer.address,
-    requestDigest: DIGEST,
-    maxAtomic: '1000',
-    expiresAt: NOW + 60_000,
-  };
-  return { options, terms, counter, client: createUptoPaymentClient(options) };
-}
-
-async function withRoot(run: (root: string) => Promise<void>) {
-  const root = await mkdtemp(join(tmpdir(), 'gyblos-mainnet-buyer-'));
-  try {
-    await run(root);
-  } finally {
-    await rm(root, { recursive: true, force: true });
-  }
-}
 
 void test('mainnet buyer is disabled before journal writes or signatures', async () => {
   const journal = memory();
