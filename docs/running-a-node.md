@@ -192,8 +192,9 @@ pnpm node:start
 
 ### Docker
 
-`compose.yaml` runs a seller with its own Ollama. Only Docker is needed on the
-host; no port is published, because Iroh connects outbound.
+`compose.yaml` runs a seller with its own Ollama. Only Docker (with Compose
+v2.17 or later) is needed on the host; no port is published, because Iroh
+connects outbound.
 
 ```sh
 cp examples/seller-docker.toml gyblos.toml        # one free offer; edit the caps
