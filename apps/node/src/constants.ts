@@ -1,7 +1,8 @@
 // Canonical values of the node application: the seller background service's names, locations, limits and
 // error codes. Rendering lives in service.ts and the CLI in cli-service.ts. The unit and agent directories
 // are operating-system locations under the account's home, not product-home paths (config/src/home.ts).
-export const EXIT = { ok: 0, failure: 1 } as const;
+// 130 is the shell's code for a run stopped with Ctrl-C.
+export const EXIT = { ok: 0, failure: 1, interrupted: 130 } as const;
 
 export const SERVICE_KINDS = {
   SYSTEMD_USER: 'systemd-user',
@@ -94,3 +95,28 @@ export const SERVICE_ERRORS = {
 } as const;
 export type ServiceErrorCode =
   (typeof SERVICE_ERRORS)[keyof typeof SERVICE_ERRORS];
+
+// `gyblos seller init`: the starting values it offers and its error codes.
+export const INIT_DEFAULTS = {
+  // The dedicated selling Ollama of docs/running-a-node.md, apart from the Ollama app's 11434.
+  ollamaUrl: 'http://127.0.0.1:11435',
+  ollamaModel: 'qwen3:0.6b',
+  openaiUrl: 'https://api.openai.com/v1',
+  anthropicUrl: 'https://api.anthropic.com',
+  openaiKeyEnv: 'OPENAI_API_KEY',
+  anthropicKeyEnv: 'ANTHROPIC_API_KEY',
+  dailyTokenCap: '200000',
+  perBuyerCap: '5000',
+  fileMode: 0o644,
+} as const;
+
+export const INIT_ERRORS = {
+  MISSING_VALUE: 'INIT_MISSING_VALUE',
+  INVALID_ENGINE: 'INIT_INVALID_ENGINE',
+  INVALID_NUMBER: 'INIT_INVALID_NUMBER',
+  CONFIG_INVALID: 'INIT_CONFIG_INVALID',
+  FILE_EXISTS: 'INIT_FILE_EXISTS',
+  UNSAFE_PATH: 'INIT_UNSAFE_PATH',
+  WRITE_FAILED: 'INIT_WRITE_FAILED',
+} as const;
+export type InitErrorCode = (typeof INIT_ERRORS)[keyof typeof INIT_ERRORS];

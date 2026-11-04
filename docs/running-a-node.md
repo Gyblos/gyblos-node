@@ -144,11 +144,23 @@ pnpm node:tokenizer              # pinned tokenizer; doctor reports NOT_NEEDED w
 # A dedicated Ollama, used only for selling, on loopback; leave it running in its own terminal:
 OLLAMA_HOST=127.0.0.1:11435 OLLAMA_MODELS=$HOME/.gyblos-ollama OLLAMA_NO_CLOUD=1 OLLAMA_NUM_PARALLEL=1 OLLAMA_MAX_LOADED_MODELS=1 ollama serve
 OLLAMA_HOST=127.0.0.1:11435 ollama pull qwen3:0.6b   # the pinned model
-cp examples/seller-daemon.toml gyblos.toml   # one free offer at http://127.0.0.1:11435/; edit the caps
+pnpm gyblos seller init         # asks for the engine, model and free caps; writes gyblos.toml
 pnpm gyblos doctor               # read-only preflight; prints the public NodeId and owner
 pnpm node:start
 ```
 
+- `pnpm gyblos seller init` writes a `gyblos.toml` with one free devnet offer:
+  it asks for the engine (`ollama`, `openai` or `anthropic`), its URL (default
+  the dedicated Ollama above), the model and the daily caps, and whether to list
+  the seller in discovery (default no). Without a terminal it takes flags and
+  defaults (`--engine`, `--url`, `--model`, `--upstream-model`,
+  `--context-tokens`, `--api-key-env <NAME>|none`, `--daily-cap`,
+  `--per-buyer-cap`, `--publish`). It writes `GYBLOS_CONFIG` or `./gyblos.toml`,
+  replaces an existing file only with `--force`, never writes through a symlink,
+  and writes nothing when node:start would refuse the values. It handles no
+  secret: API keys and the relay token stay in the environment or `seller.env`,
+  and it prints only their variable names. `examples/seller-daemon.toml` is the
+  same starting point as a file to copy.
 - The seller serves every free offer in `gyblos.toml`; without one it does not
   start (`SELLER_OFFERS_MISSING`). A paid offer is sold on devnet over the paid
   stream when the seller role was set up with a payout
