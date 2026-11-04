@@ -3,7 +3,10 @@
 // setup commands, kept files on a rerun, and that the relay token is never printed. Also the guards of
 // scripts/publish-image.sh that run before any build. Offline; the image itself is a manual check.
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import {
+  spawnSync,
+  type SpawnSyncOptionsWithStringEncoding,
+} from 'node:child_process';
 import {
   chmodSync,
   mkdirSync,
@@ -46,20 +49,23 @@ async function harness() {
   const directory = join(root, 'seller');
   const log = join(root, 'docker.log');
   const run = (env: Record<string, string> = {}) => {
-    const result = spawnSync('sh', [SCRIPT], {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-      // Its own session, so there is no controlling terminal to prompt on.
-      detached: true,
-      env: {
-        PATH: `${bin}:/usr/bin:/bin`,
-        HOME: root,
-        GYBLOS_DIR: directory,
-        GYBLOS_IMAGE: IMAGE,
-        FAKE_DOCKER_LOG: log,
-        ...env,
-      },
-    });
+    const options: SpawnSyncOptionsWithStringEncoding & { detached: boolean } =
+      {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+        // Its own session, so there is no controlling terminal to prompt on. spawnSync honors it, but its
+        // options type omits it.
+        detached: true,
+        env: {
+          PATH: `${bin}:/usr/bin:/bin`,
+          HOME: root,
+          GYBLOS_DIR: directory,
+          GYBLOS_IMAGE: IMAGE,
+          FAKE_DOCKER_LOG: log,
+          ...env,
+        },
+      };
+    const result = spawnSync('sh', [SCRIPT], options);
     return { ...result, output: result.stdout + result.stderr };
   };
   const calls = () => {
