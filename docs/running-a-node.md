@@ -249,6 +249,32 @@ pnpm gyblos seller service uninstall           # stops and removes it
   this checkout with the Node that ran `install`, so reinstall after moving
   either.
 
+### Seller status
+
+```sh
+pnpm gyblos seller status            # read-only; same GYBLOS_HOME and gyblos.toml as node:start
+pnpm gyblos seller status --online   # also looks this NodeId up in the discovery index
+```
+
+It prints the NodeId and owner, then:
+
+- `service`: `active` or `inactive` for the unit or agent
+  `seller service install` wrote (launchd reports a loaded agent, not a running
+  process), `not installed`, or `unknown` on other platforms;
+- `daemon`: the last state the daemon wrote to `status.json` (`starting` with
+  its phase, or `ready`) and when; a stopped daemon does not rewrite it;
+- one `offer` line per offer, `serving` once it is in the signed catalog;
+- `discovery`: `off`, or `on` with the index origin, and with `--online` whether
+  the index lists this NodeId for a served model;
+- counts from the seller's signed receipts for the last 24 hours and 7 days
+  (completed, failed, cancelled, output tokens), the last request time and
+  failure codes. Receipts keep at most 256 records for 7 days, so busy sellers
+  see a lower bound.
+
+`Result: RUNNING` (exit 0) needs an active service and a ready daemon;
+`STARTING`, `STOPPED` and `NOT_CONFIRMED` (no service to confirm the process)
+exit 1. It writes nothing and prints no buyer, prompt, key or home location.
+
 ### Docker
 
 `compose.yaml` runs a seller with its own Ollama. Only Docker (with Compose

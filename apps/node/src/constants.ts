@@ -123,3 +123,27 @@ export const INIT_ERRORS = {
   CANCELLED: 'INIT_CANCELLED',
 } as const;
 export type InitErrorCode = (typeof INIT_ERRORS)[keyof typeof INIT_ERRORS];
+
+// `gyblos seller status`: the windows it counts receipts over and how far it pages the discovery index.
+export const STATUS = {
+  dayMs: 86_400_000,
+  weekMs: 604_800_000,
+  maxOffers: 64,
+  indexPageSize: 200,
+  maxIndexPages: 10,
+  indexTimeoutMs: 10_000,
+} as const;
+
+export const STATUS_RESULTS = {
+  RUNNING: 'RUNNING',
+  STARTING: 'STARTING',
+  STOPPED: 'STOPPED',
+  NOT_CONFIRMED: 'NOT_CONFIRMED',
+} as const;
+export type StatusResult = (typeof STATUS_RESULTS)[keyof typeof STATUS_RESULTS];
+
+export const STATUS_ERRORS = {
+  ROLE_MISSING: 'STATUS_ROLE_MISSING',
+  ROLE_UNREADABLE: 'STATUS_ROLE_UNREADABLE',
+  ROLE_NOT_SELLER: 'STATUS_ROLE_NOT_SELLER',
+} as const;

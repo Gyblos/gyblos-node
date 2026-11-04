@@ -1,6 +1,6 @@
 // The `gyblos` command: `config validate` checks gyblos.toml and the GYBLOS_* environment; `doctor` runs the
 // seller's read-only startup preflight, calling remote engines only with --online; `seller init` writes a
-// starting gyblos.toml and `seller service` installs the background service. Prints codes, key
+// starting gyblos.toml, `seller service` installs the background service and `seller status` reports it. Prints codes, key
 // paths and environment variable names; never a value read from the environment, and URLs only as
 // origins, because providers embed API keys in URL paths.
 import { resolve } from 'node:path';
@@ -26,6 +26,7 @@ import { doctor } from './cli-doctor';
 import { COLUMN, issueLine, URL_HIDDEN, urlOrigin } from './cli-format';
 import { initCommand, terminalPrompt, type Prompt } from './cli-init';
 import { serviceCommand, type ServiceSystem } from './cli-service';
+import { statusCommand, type StatusSystem } from './cli-status';
 import { EXIT } from './constants';
 
 export interface CliContext {
@@ -40,10 +41,12 @@ export interface CliContext {
   service?: ServiceSystem;
   // Terminal questions for `seller init`; without one it takes flags and defaults only.
   prompt?: Prompt;
+  // The service manager, index and clock for `seller status`; tests inject fakes.
+  status?: StatusSystem;
 }
 
 const USAGE =
-  'Usage: gyblos config validate [--config <path>]\n       gyblos doctor [--online]   (reads GYBLOS_CONFIG or ./gyblos.toml, like node:start; --online also calls remote engines)\n       gyblos seller service install [--memory 3G] [--cpu 100%] [--dry-run]   (as the seller account, never root)\n       gyblos seller service uninstall [--dry-run]\n       gyblos seller init [--engine ollama|openai|anthropic] [--url <url>] [--model <id>] [--upstream-model <name>] [--context-tokens <n>] [--api-key-env <NAME>|none] [--daily-cap <n>] [--per-buyer-cap <n>] [--publish|--no-publish] [--force]\n';
+  'Usage: gyblos config validate [--config <path>]\n       gyblos doctor [--online]   (reads GYBLOS_CONFIG or ./gyblos.toml, like node:start; --online also calls remote engines)\n       gyblos seller service install [--memory 3G] [--cpu 100%] [--dry-run]   (as the seller account, never root)\n       gyblos seller service uninstall [--dry-run]\n       gyblos seller init [--engine ollama|openai|anthropic] [--url <url>] [--model <id>] [--upstream-model <name>] [--context-tokens <n>] [--api-key-env <NAME>|none] [--daily-cap <n>] [--per-buyer-cap <n>] [--publish|--no-publish] [--force]\n       gyblos seller status [--online]   (--online also looks the seller up in the discovery index)\n';
 // `seller init`'s flags, declared once for parsing and for refusing them on other commands.
 const INIT_OPTIONS = {
   engine: { type: 'string' },
@@ -197,6 +200,42 @@ function runInit(values: CommandValues, context: CliContext) {
   );
 }
 
+function runService(
+  command: string | undefined,
+  values: CommandValues,
+  context: CliContext,
+) {
+  return serviceCommand(
+    command,
+    {
+      memory: values.memory,
+      cpu: values.cpu,
+      dryRun: values['dry-run'] === true,
+    },
+    {
+      env: context.env,
+      cwd: context.cwd ?? process.cwd(),
+      stdout: context.stdout,
+      stderr: context.stderr,
+      doctor: context.doctor,
+    },
+    context.service,
+  );
+}
+
+function runStatus(online: boolean, context: CliContext) {
+  return statusCommand(
+    { online },
+    {
+      env: context.env,
+      cwd: context.cwd ?? process.cwd(),
+      stdout: context.stdout,
+      stderr: context.stderr,
+    },
+    context.status,
+  );
+}
+
 export async function runCli(args: readonly string[], context: CliContext) {
   const parsed = parseCommand(args);
   const [group, command, ...rest] = parsed?.positionals ?? [];
@@ -212,6 +251,16 @@ export async function runCli(args: readonly string[], context: CliContext) {
   ) {
     return runInit(parsed.values, context);
   }
+  if (
+    parsed &&
+    group === 'seller' &&
+    command === 'status' &&
+    rest.length === 0 &&
+    parsed.values.config === undefined &&
+    !usesServiceFlags(parsed.values) &&
+    !usesInitFlags(parsed.values)
+  )
+    return runStatus(parsed.values.online === true, context);
   if (parsed && usesInitFlags(parsed.values)) {
     context.stderr(USAGE);
     return EXIT.failure;
@@ -224,22 +273,7 @@ export async function runCli(args: readonly string[], context: CliContext) {
     parsed.values.config === undefined &&
     parsed.values.online === undefined
   ) {
-    const code = await serviceCommand(
-      rest[0],
-      {
-        memory: parsed.values.memory,
-        cpu: parsed.values.cpu,
-        dryRun: parsed.values['dry-run'] === true,
-      },
-      {
-        env: context.env,
-        cwd: context.cwd ?? process.cwd(),
-        stdout: context.stdout,
-        stderr: context.stderr,
-        doctor: context.doctor,
-      },
-      context.service,
-    );
+    const code = await runService(rest[0], parsed.values, context);
     if (code !== undefined) return code;
   }
   // doctor reads exactly what node:start reads (GYBLOS_CONFIG or ./gyblos.toml), so it takes no --config.
