@@ -5,7 +5,6 @@
 // from the environment.
 import { resolve } from 'node:path';
 
-import { ENVIRONMENT_SWITCH, NODE_ENVIRONMENT } from '@gyblos/config';
 import { homeLayout } from '@gyblos/config/home';
 import { fetchSellers } from '@gyblos/discovery-http';
 import { RECEIPT_STORAGE, SELLER_DAEMON_STATES } from '@gyblos/node/constants';
@@ -33,6 +32,7 @@ import {
 } from './status';
 import {
   defaultStatusSystem,
+  inContainer,
   readDaemonStatus,
   serviceState,
   type DaemonFile,
@@ -256,10 +256,11 @@ export async function statusCommand(
   const status = daemon.kind === 'read' ? daemon.status : undefined;
   output.stdout(`Seller ${identity.nodeId}\n`);
   output.stdout(line('owner', identity.owner));
-  const inContainer =
-    output.env[NODE_ENVIRONMENT.container] === ENVIRONMENT_SWITCH.on;
   output.stdout(
-    line('service', inContainer ? `${service} (container)` : service),
+    line(
+      'service',
+      inContainer(output.env) ? `${service} (container)` : service,
+    ),
   );
   output.stdout(line('daemon', daemonLine(daemon)));
   for (const offer of status?.offers ?? [])

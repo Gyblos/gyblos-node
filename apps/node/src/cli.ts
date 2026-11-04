@@ -307,8 +307,12 @@ export async function runCli(args: readonly string[], context: CliContext) {
     context.stderr(USAGE);
     return EXIT.failure;
   }
+  // validate checks the file it is given (--config, else ./gyblos.toml), not GYBLOS_CONFIG: doctor does that.
   return validate(
-    resolve(parsed.values.config ?? NODE_CONFIG_FILENAME),
+    resolve(
+      context.cwd ?? process.cwd(),
+      parsed.values.config ?? NODE_CONFIG_FILENAME,
+    ),
     context,
   );
 }

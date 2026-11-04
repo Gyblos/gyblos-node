@@ -15,7 +15,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 
 import { runCli } from '@gyblos/node-app/cli';
-import { writeConfigFile } from '@gyblos/node-app/cli-init';
+import { writeConfigFile } from '@gyblos/node-app/init-file';
 
 import { inDirectory, INIT, run } from './support/init-fixture';
 

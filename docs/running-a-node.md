@@ -261,8 +261,11 @@ It prints the NodeId and owner, then:
 - `service`: inside the seller image
   (`docker compose exec seller gyblos seller status`; the image sets
   `GYBLOS_CONTAINER=1`), `active (container)` while the daemon runs in that
-  container, else `inactive (container)`. Otherwise `active` while the unit or
-  agent `seller service install` wrote has a running process (for launchd,
+  container, `inactive (container)` when it does not, or `unknown (container)`
+  when the process list cannot be read. Use `exec`, not `run`:
+  `docker compose run` starts a new container that cannot see the seller and
+  reports it inactive. Otherwise `active` while the unit or agent
+  `seller service install` wrote has a running process (for launchd,
   `launchctl print` must show `state = running`; a loaded agent that exited is
   `inactive`), `inactive`, `not installed`, or `unknown` as root or on other
   platforms;

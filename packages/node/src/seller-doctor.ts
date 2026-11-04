@@ -104,8 +104,8 @@ const errorCode = (error: unknown): DoctorResultCode =>
     ? error.code
     : DOCTOR_CODES.CHECK_FAILED;
 
-// Exactly seller startup's file choice: GYBLOS_CONFIG must exist; without ./gyblos.toml the settings fail
-// with SELLER_OFFERS_MISSING, as startup does.
+// Startup's own file choice (readStartupConfig); without a file the settings fail with SELLER_OFFERS_MISSING,
+// as startup does.
 async function configCheck(options: DoctorOptions) {
   const read = await readStartupConfig(options.environment, options.cwd);
   if (!read.ok)

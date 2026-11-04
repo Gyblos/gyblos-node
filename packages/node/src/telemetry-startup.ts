@@ -1,6 +1,5 @@
 // Composes opt-in local file telemetry; startup closes only its own sink after the role stops.
 // Failures are static health metadata and never affect inference, admission or retry policy.
-
 import type { HomeEnvironment, HomeRole } from '@gyblos/config';
 import { fanOut } from '@gyblos/core/telemetry';
 import type { TelemetrySink } from '@gyblos/protocol/telemetry';

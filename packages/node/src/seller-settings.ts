@@ -4,7 +4,6 @@
 // The daemon serves every listed offer it can warm; each offer's engine plugin refuses what it cannot
 // honor. Paid offers are refused unless the caller has paid selling wired, and then only when their
 // usage is recounted with the model's pinned public tokenizer.
-
 import { NODE_ENVIRONMENT, type HomeEnvironment } from '@gyblos/config';
 import { validateDiscoveryBaseUrl } from '@gyblos/discovery-http';
 import { OFFER_PRICING_KINDS } from '@gyblos/protocol/constants';
@@ -223,7 +222,7 @@ function resolveSeller(
   };
 }
 
-// An explicit GYBLOS_CONFIG must exist; the implicit ./gyblos.toml is optional.
+// The file readStartupConfig chooses (node-config-file.ts), or startup's defaults without one.
 export async function loadSellerSettings(
   environment: HomeEnvironment,
   cwd = process.cwd(),

@@ -106,13 +106,18 @@ async function installed(path: string) {
   }
 }
 
+// The seller image sets GYBLOS_CONTAINER=1; status then means the daemon in this container.
+export const inContainer = (
+  environment: Readonly<Record<string, string | undefined>>,
+) => environment[NODE_ENVIRONMENT.container] === ENVIRONMENT_SWITCH.on;
+
 // The seller image's container, else the unit or agent `gyblos seller service install` writes, and whether
 // its process runs now.
 export async function serviceState(
   system: StatusSystem,
   environment: Readonly<Record<string, string | undefined>>,
 ): Promise<ServiceState> {
-  if (environment[NODE_ENVIRONMENT.container] === ENVIRONMENT_SWITCH.on) {
+  if (inContainer(environment)) {
     try {
       return (await system.daemonInContainer())
         ? SERVICE_STATES.ACTIVE

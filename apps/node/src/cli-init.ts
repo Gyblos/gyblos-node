@@ -3,9 +3,6 @@
 // ./gyblos.toml), checks it with startup's own offer rules, never replaces one without --force, never
 // follows a symlink, and handles no secret: API keys and the relay token stay in seller.env, so only their
 // variable names appear.
-import { randomUUID } from 'node:crypto';
-import { constants, link, lstat, open, rename, rm } from 'node:fs/promises';
-import { dirname } from 'node:path';
 import { createInterface, type Interface } from 'node:readline/promises';
 
 import { NodeError } from '@gyblos/node/errors';
@@ -19,10 +16,10 @@ import {
   EXIT,
   INIT_DEFAULTS,
   INIT_ERRORS,
-  INIT_FILE_MODE,
   type InitErrorCode,
 } from './constants';
 import { initToml, ollamaTag, type InitAnswers } from './init';
+import { checkTarget, InitError, writeConfigFile } from './init-file';
 
 // Answers a question typed at the terminal; rejects when the operator cancels.
 export type Prompt = (question: string) => Promise<string>;
@@ -53,13 +50,6 @@ const YES = /^y(es)?$/i;
 const POSITIVE_INTEGER = /^[1-9][0-9]*$/;
 // Stands in for the API key while startup's rules check the file; init never reads the real one.
 const KEY_PRESENT = 'present';
-// A new file only, never through a symlink.
-const NEW_FILE =
-  constants.O_WRONLY |
-  constants.O_CREAT |
-  constants.O_EXCL |
-  constants.O_NOFOLLOW;
-
 const HINTS: Readonly<Record<InitErrorCode, string>> = {
   [INIT_ERRORS.MISSING_VALUE]:
     'pass it as a flag, or run on a terminal to be asked',
@@ -76,15 +66,6 @@ const HINTS: Readonly<Record<InitErrorCode, string>> = {
     'could not write the config file; check the directory exists and is writable',
   [INIT_ERRORS.CANCELLED]: 'nothing was written',
 };
-
-class InitError extends Error {
-  constructor(
-    readonly code: InitErrorCode,
-    readonly subject?: string,
-  ) {
-    super(code);
-  }
-}
 
 const isEngine = (value: string): value is EngineKind =>
   (Object.values(ENGINE_KINDS) as string[]).includes(value);
@@ -232,77 +213,6 @@ async function answersFrom(
     ...remote,
     ...(await freeAnswers(options, prompt)),
   };
-}
-
-// An existing file is replaced only with --force, and never through a symlink or over a non-file.
-async function checkTarget(path: string, force: boolean) {
-  let stats;
-  try {
-    stats = await lstat(path);
-  } catch (error) {
-    if (error instanceof Error && 'code' in error && error.code === 'ENOENT')
-      return;
-    throw new InitError(INIT_ERRORS.WRITE_FAILED);
-  }
-  if (!stats.isFile()) throw new InitError(INIT_ERRORS.UNSAFE_PATH);
-  if (!force) throw new InitError(INIT_ERRORS.FILE_EXISTS);
-}
-
-// Codes link() gives where the filesystem has no hard links (FAT, exFAT, some network mounts).
-const NO_HARD_LINKS = new Set([
-  'EPERM',
-  'ENOTSUP',
-  'EOPNOTSUPP',
-  'EXDEV',
-  'ENOSYS',
-]);
-const errorCode = (error: unknown) =>
-  error instanceof Error && 'code' in error ? error.code : undefined;
-
-// A new file only (never through a symlink or over an existing file), with its mode and contents synced.
-async function writeNew(path: string, text: string) {
-  const file = await open(path, NEW_FILE, INIT_FILE_MODE);
-  try {
-    await file.writeFile(text);
-    // The umask may have narrowed the mode; the handle cannot be swapped for a symlink.
-    await file.chmod(INIT_FILE_MODE);
-    await file.sync();
-  } finally {
-    await file.close();
-  }
-}
-
-// Written and synced beside the target, then moved into place and the directory synced, so a reader never
-// sees half a file. Without --force the move is a link, which fails if a file appeared meanwhile; where the
-// filesystem has no hard links the file is created in place instead, still never over an existing one.
-export async function writeConfigFile(
-  path: string,
-  text: string,
-  force: boolean,
-  linkFile: (from: string, to: string) => Promise<void> = link,
-) {
-  const temporary = `${path}.${randomUUID()}.tmp`;
-  try {
-    await writeNew(temporary, text);
-    if (force) await rename(temporary, path);
-    else
-      await linkFile(temporary, path).catch(async (error: unknown) => {
-        if (!NO_HARD_LINKS.has(String(errorCode(error)))) throw error;
-        await writeNew(path, text);
-      });
-    const parent = await open(dirname(path), constants.O_RDONLY);
-    try {
-      await parent.sync();
-    } finally {
-      await parent.close();
-    }
-  } catch (error) {
-    if (errorCode(error) === 'EEXIST')
-      throw new InitError(INIT_ERRORS.FILE_EXISTS);
-    throw new InitError(INIT_ERRORS.WRITE_FAILED);
-  } finally {
-    await rm(temporary, { force: true });
-  }
 }
 
 // Startup's own offer rules (engine, model, URL and key variable), with the key stood in for.

@@ -70,7 +70,16 @@ void test('seller status in the seller image: the container is the service, RUNN
     assert.match(stopped.stdout, /service\s+inactive \(container\)/);
     assert.match(stopped.stdout, /^Result: STOPPED$/m);
 
-    const unreadable = await status(home, system(home), [], CONTAINER);
+    const unreadable = await status(
+      home,
+      system(home, {
+        daemonInContainer: async () => {
+          throw new Error('no /proc');
+        },
+      }),
+      [],
+      CONTAINER,
+    );
     assert.equal(unreadable.code, 1);
     assert.match(unreadable.stdout, /service\s+unknown \(container\)/);
     assert.match(unreadable.stdout, /^Result: NOT_CONFIRMED$/m);
