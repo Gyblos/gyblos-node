@@ -23,7 +23,7 @@ import { assertMemoryHeadroom, memorySnapshot } from '@gyblos/runtime/memory';
 import { withDeadline } from '@gyblos/transport-iroh/deadline';
 import { bindEndpoint } from '@gyblos/transport-iroh/endpoint';
 
-import { SELLER_PUBLIC_RECORDS } from './constants';
+import { SELLER_DAEMON_STATES, SELLER_PUBLIC_RECORDS } from './constants';
 import { prepareSellerControl } from './control-startup';
 import {
   assertReadinessCurrent,
@@ -119,7 +119,7 @@ export async function startSeller(
   try {
     const stage = (phase: string) =>
       saveJson(rolePath(P2P_ROLES.SELLER, ROLE_FILES.status), {
-        status: 'starting',
+        status: SELLER_DAEMON_STATES.STARTING,
         phase,
         runId: process.env.GYBLOS_P2P_RUN_ID,
       });
@@ -317,7 +317,7 @@ export async function startSeller(
     const offerTicket = EndpointTicket.fromAddr(endpointAddress).toString();
     const writeReady = () =>
       saveJson(rolePath(P2P_ROLES.SELLER, ROLE_FILES.status), {
-        status: 'ready',
+        status: SELLER_DAEMON_STATES.READY,
         runId: process.env.GYBLOS_P2P_RUN_ID,
         role: P2P_ROLES.SELLER,
         nodeId: config.nodeId,

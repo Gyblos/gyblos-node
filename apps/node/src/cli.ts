@@ -1,7 +1,7 @@
 // The `gyblos` command: `config validate` checks gyblos.toml and the GYBLOS_* environment; `doctor` runs the
 // seller's read-only startup preflight, calling remote engines only with --online; `seller init` writes a
-// starting gyblos.toml, `seller service` installs the background service and `seller status` reports it. Prints codes, key
-// paths and environment variable names; never a value read from the environment, and URLs only as
+// starting gyblos.toml, `seller service` installs the background service and `seller status` reports on
+// the running seller. Prints codes, key paths and environment variable names; never a value read from the environment, and URLs only as
 // origins, because providers embed API keys in URL paths.
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -26,8 +26,9 @@ import { doctor } from './cli-doctor';
 import { COLUMN, issueLine, URL_HIDDEN, urlOrigin } from './cli-format';
 import { initCommand, terminalPrompt, type Prompt } from './cli-init';
 import { serviceCommand, type ServiceSystem } from './cli-service';
-import { statusCommand, type StatusSystem } from './cli-status';
+import { statusCommand } from './cli-status';
 import { EXIT } from './constants';
+import type { StatusSystem } from './status-system';
 
 export interface CliContext {
   env: Readonly<Record<string, string | undefined>>;

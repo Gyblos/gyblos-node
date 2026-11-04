@@ -1,7 +1,8 @@
 // Canonical values of the node application: the seller background service's names, locations, limits and
-// error codes, and `seller init`'s defaults and codes. Rendering lives in service.ts and the CLI in
-// cli-service.ts and cli-init.ts. The unit and agent directories
-// are operating-system locations under the account's home, not product-home paths (config/src/home.ts).
+// error codes, `seller init`'s defaults and codes, and `seller status`'s windows, limits and results.
+// Rendering lives in service.ts and the CLIs in cli-service.ts, cli-init.ts and cli-status.ts. The unit and
+// agent directories are operating-system locations under the account's home, not product-home paths
+// (config/src/home.ts).
 // 130 is the shell's code for a run stopped with Ctrl-C.
 export const EXIT = { ok: 0, failure: 1, interrupted: 130 } as const;
 
@@ -124,15 +125,26 @@ export const INIT_ERRORS = {
 } as const;
 export type InitErrorCode = (typeof INIT_ERRORS)[keyof typeof INIT_ERRORS];
 
-// `gyblos seller status`: the windows it counts receipts over and how far it pages the discovery index.
+// `gyblos seller status`: its day window (the week is the receipts' own retention), its file and probe
+// bounds and how far it pages the discovery index.
 export const STATUS = {
   dayMs: 86_400_000,
-  weekMs: 604_800_000,
   maxOffers: 64,
+  statusFileBytes: 64 * 1024,
+  probeTimeoutMs: 5_000,
+  probeOutputCharacters: 64 * 1024,
   indexPageSize: 200,
   maxIndexPages: 10,
   indexTimeoutMs: 10_000,
 } as const;
+
+export const SERVICE_STATES = {
+  ACTIVE: 'active',
+  INACTIVE: 'inactive',
+  NOT_INSTALLED: 'not installed',
+  UNKNOWN: 'unknown',
+} as const;
+export type ServiceState = (typeof SERVICE_STATES)[keyof typeof SERVICE_STATES];
 
 export const STATUS_RESULTS = {
   RUNNING: 'RUNNING',
@@ -147,3 +159,5 @@ export const STATUS_ERRORS = {
   ROLE_UNREADABLE: 'STATUS_ROLE_UNREADABLE',
   ROLE_NOT_SELLER: 'STATUS_ROLE_NOT_SELLER',
 } as const;
+export type StatusErrorCode =
+  (typeof STATUS_ERRORS)[keyof typeof STATUS_ERRORS];

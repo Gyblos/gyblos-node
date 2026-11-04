@@ -492,7 +492,8 @@ Qwen3 thinking is on or off, written `["off", "high"]`. The custom model in
   returning settings, origins, secret references and warnings, or issues.
 - `apps/node/src/cli.ts`: the `gyblos` command (`pnpm gyblos`);
   `apps/node/src/cli-init.ts` and `init.ts` hold `gyblos seller init`, and
-  `cli-status.ts` and `status.ts` hold `gyblos seller status`.
+  `cli-status.ts`, `status.ts` and `status-system.ts` hold
+  `gyblos seller status`.
 
 ## Local telemetry
 

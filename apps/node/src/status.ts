@@ -1,5 +1,6 @@
 // Pure parts of `gyblos seller status`: reading the daemon's status.json defensively and counting its signed
 // receipts by outcome over the last day and week. Nothing here touches files, the network or the clock.
+import { RECEIPT_STORAGE } from '@gyblos/node/constants';
 import type { StoredReceipt } from '@gyblos/node/receipts';
 import { RECEIPT_OUTCOMES } from '@gyblos/protocol/constants';
 
@@ -63,12 +64,13 @@ export function parseDaemonStatus(text: string): DaemonStatus | undefined {
   const offers = Array.isArray(record.offers)
     ? record.offers.slice(0, STATUS.maxOffers).map(statusOffer)
     : [];
-  if (offers.some((entry) => entry === undefined)) return undefined;
+  const valid = offers.filter((entry) => entry !== undefined);
+  if (valid.length !== offers.length) return undefined;
   return {
     state,
     phase: printable(record.phase),
     nodeId: printable(record.nodeId),
-    offers: offers as StatusOffer[],
+    offers: valid,
   };
 }
 
@@ -98,7 +100,7 @@ export function receiptActivity(
   for (const entry of entries) {
     const at = entry.receipt.seller.record.timing.receivedAt;
     const age = now - at;
-    if (age < 0 || age >= STATUS.weekMs) continue;
+    if (age < 0 || age >= RECEIPT_STORAGE.retentionMs) continue;
     add(week, entry);
     if (age < STATUS.dayMs) add(day, entry);
     lastAt = Math.max(lastAt ?? at, at);

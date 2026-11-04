@@ -258,14 +258,20 @@ pnpm gyblos seller status --online   # also looks this NodeId up in the discover
 
 It prints the NodeId and owner, then:
 
-- `service`: `active` or `inactive` for the unit or agent
-  `seller service install` wrote (launchd reports a loaded agent, not a running
-  process), `not installed`, or `unknown` on other platforms;
+- `service`: `active` while the unit or agent `seller service install` wrote has
+  a running process (for launchd, `launchctl print` must show `state = running`;
+  a loaded agent that exited is `inactive`), `inactive`, `not installed`, or
+  `unknown` as root or on other platforms;
 - `daemon`: the last state the daemon wrote to `status.json` (`starting` with
   its phase, or `ready`) and when; a stopped daemon does not rewrite it;
-- one `offer` line per offer, `serving` once it is in the signed catalog;
-- `discovery`: `off`, or `on` with the index origin, and with `--online` whether
-  the index lists this NodeId for a served model;
+- one `offer` line per offer: `serving` once it is in the signed catalog, else
+  `not serving yet`;
+- `discovery`: `off`, `on` with the index origin, or `configuration invalid`
+  when node:start would refuse the file (an explicit `GYBLOS_CONFIG` must
+  exist). With `--online` it pages the index for each served model, sending only
+  the model, and says `listed in the index`, `not found in the index`, that it
+  stopped after 2000 sellers, `index unreachable`, or that no offer was serving
+  to look up;
 - counts from the seller's signed receipts for the last 24 hours and 7 days
   (completed, failed, cancelled, output tokens), the last request time and
   failure codes. Receipts keep at most 256 records for 7 days, so busy sellers
