@@ -1,5 +1,6 @@
 // The `gyblos` command: `config validate` checks gyblos.toml and the GYBLOS_* environment; `doctor` runs the
-// seller's read-only startup preflight, calling remote engines only with --online. Prints codes, key
+// seller's read-only startup preflight, calling remote engines only with --online; `seller init` writes a
+// starting gyblos.toml and `seller service` installs the background service. Prints codes, key
 // paths and environment variable names; never a value read from the environment, and URLs only as
 // origins, because providers embed API keys in URL paths.
 import { resolve } from 'node:path';
@@ -23,6 +24,7 @@ import { isMain } from '@gyblos/runtime';
 
 import { doctor } from './cli-doctor';
 import { COLUMN, issueLine, URL_HIDDEN, urlOrigin } from './cli-format';
+import { initCommand, terminalPrompt, type Prompt } from './cli-init';
 import { serviceCommand, type ServiceSystem } from './cli-service';
 import { EXIT } from './constants';
 
@@ -36,10 +38,29 @@ export interface CliContext {
   doctor?: DoctorProbes;
   // The operating system for `seller service`; tests inject a fake.
   service?: ServiceSystem;
+  // Terminal questions for `seller init`; without one it takes flags and defaults only.
+  prompt?: Prompt;
 }
 
 const USAGE =
-  'Usage: gyblos config validate [--config <path>]\n       gyblos doctor [--online]   (reads GYBLOS_CONFIG or ./gyblos.toml, like node:start; --online also calls remote engines)\n       gyblos seller service install [--memory 3G] [--cpu 100%] [--dry-run]   (as the seller account, never root)\n       gyblos seller service uninstall [--dry-run]\n';
+  'Usage: gyblos config validate [--config <path>]\n       gyblos doctor [--online]   (reads GYBLOS_CONFIG or ./gyblos.toml, like node:start; --online also calls remote engines)\n       gyblos seller service install [--memory 3G] [--cpu 100%] [--dry-run]   (as the seller account, never root)\n       gyblos seller service uninstall [--dry-run]\n       gyblos seller init [--engine ollama|openai|anthropic] [--url <url>] [--model <id>] [--upstream-model <name>] [--context-tokens <n>] [--api-key-env <NAME>|none] [--daily-cap <n>] [--per-buyer-cap <n>] [--publish|--no-publish] [--force]\n';
+// `seller init`'s flags, declared once for parsing and for refusing them on other commands.
+const INIT_OPTIONS = {
+  engine: { type: 'string' },
+  url: { type: 'string' },
+  model: { type: 'string' },
+  'upstream-model': { type: 'string' },
+  'context-tokens': { type: 'string' },
+  'api-key-env': { type: 'string' },
+  'daily-cap': { type: 'string' },
+  'per-buyer-cap': { type: 'string' },
+  publish: { type: 'boolean' },
+  'no-publish': { type: 'boolean' },
+  force: { type: 'boolean' },
+} as const;
+const INIT_FLAG_NAMES = Object.keys(
+  INIT_OPTIONS,
+) as (keyof typeof INIT_OPTIONS)[];
 const URL_SETTINGS: ReadonlySet<NodeSettingKey> = new Set([
   NODE_SETTINGS.RPC_URL,
   NODE_SETTINGS.RELAY_URLS,
@@ -131,6 +152,7 @@ function parseCommand(args: readonly string[]) {
         memory: { type: 'string' },
         cpu: { type: 'string' },
         'dry-run': { type: 'boolean' },
+        ...INIT_OPTIONS,
       },
       allowPositionals: true,
     });
@@ -139,17 +161,61 @@ function parseCommand(args: readonly string[]) {
   }
 }
 
+type CommandValues = NonNullable<ReturnType<typeof parseCommand>>['values'];
+
 // The service flags belong to `seller service` only.
-const usesServiceFlags = (
-  values: NonNullable<ReturnType<typeof parseCommand>>['values'],
-) =>
+const usesServiceFlags = (values: CommandValues) =>
   values.memory !== undefined ||
   values.cpu !== undefined ||
   values['dry-run'] !== undefined;
 
+// The init flags belong to `seller init` only.
+const usesInitFlags = (values: CommandValues) =>
+  INIT_FLAG_NAMES.some((flag) => values[flag] !== undefined);
+
+function runInit(values: CommandValues, context: CliContext) {
+  return initCommand(
+    {
+      engine: values.engine,
+      url: values.url,
+      model: values.model,
+      upstreamModel: values['upstream-model'],
+      contextTokens: values['context-tokens'],
+      apiKeyEnv: values['api-key-env'],
+      dailyCap: values['daily-cap'],
+      perBuyerCap: values['per-buyer-cap'],
+      publish: values.publish ?? (values['no-publish'] ? false : undefined),
+      force: values.force === true,
+    },
+    {
+      env: context.env,
+      cwd: context.cwd ?? process.cwd(),
+      stdout: context.stdout,
+      stderr: context.stderr,
+    },
+    context.prompt,
+  );
+}
+
 export async function runCli(args: readonly string[], context: CliContext) {
   const parsed = parseCommand(args);
   const [group, command, ...rest] = parsed?.positionals ?? [];
+  if (
+    parsed &&
+    group === 'seller' &&
+    command === 'init' &&
+    rest.length === 0 &&
+    parsed.values.config === undefined &&
+    parsed.values.online === undefined &&
+    !usesServiceFlags(parsed.values) &&
+    !(parsed.values.publish && parsed.values['no-publish'])
+  ) {
+    return runInit(parsed.values, context);
+  }
+  if (parsed && usesInitFlags(parsed.values)) {
+    context.stderr(USAGE);
+    return EXIT.failure;
+  }
   if (
     parsed &&
     group === 'seller' &&
@@ -213,11 +279,18 @@ export async function runCli(args: readonly string[], context: CliContext) {
 }
 
 export async function main(args = process.argv.slice(2)) {
-  process.exitCode = await runCli(args, {
-    env: process.env,
-    stdout: (text) => process.stdout.write(text),
-    stderr: (text) => process.stderr.write(text),
-  });
+  // Questions only on a terminal; piped or scripted runs take flags and defaults.
+  const terminal = process.stdin.isTTY ? terminalPrompt() : undefined;
+  try {
+    process.exitCode = await runCli(args, {
+      env: process.env,
+      stdout: (text) => process.stdout.write(text),
+      stderr: (text) => process.stderr.write(text),
+      prompt: terminal?.prompt,
+    });
+  } finally {
+    terminal?.close();
+  }
 }
 
 if (isMain(import.meta.url)) await main();

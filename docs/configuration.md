@@ -4,8 +4,8 @@ A node can be described by one TOML file, `gyblos.toml`, as decided in vault
 GYB-DOC-026. This page is its reference. The seller daemon (`pnpm node:start`)
 reads it at startup; see [Seller startup](#seller-startup) for what it honors
 today. `gyblos doctor` checks a seller before startup
-([Seller preflight](#seller-preflight-gyblos-doctor)); `gyblos init` comes
-later.
+([Seller preflight](#seller-preflight-gyblos-doctor)), and `gyblos seller init`
+writes a starting file with one free offer ([Seller](running-a-node.md#seller)).
 
 ## Validate a file
 
@@ -490,7 +490,8 @@ Qwen3 thinking is on or off, written `["off", "high"]`. The custom model in
   a valid result also carries `warnings`.
 - `@gyblos/node/node-config-resolve`: `resolveNodeConfig({ file, env, flags })`,
   returning settings, origins, secret references and warnings, or issues.
-- `apps/node/src/cli.ts`: the `gyblos` command (`pnpm gyblos`).
+- `apps/node/src/cli.ts`: the `gyblos` command (`pnpm gyblos`);
+  `apps/node/src/cli-init.ts` and `init.ts` hold `gyblos seller init`.
 
 ## Local telemetry
 
