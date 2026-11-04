@@ -1,4 +1,6 @@
 // Private bounded per-role receipt persistence; atomic CAS never overwrites a conflicting attestation.
+import { lstat } from 'node:fs/promises';
+
 import {
   HOME_ENVIRONMENT,
   receiptPathsIn,
@@ -131,26 +133,52 @@ async function persistReceiptSnapshot(
   if (Buffer.byteLength(text) > context.maxBytes) receiptUnavailable();
   await writeReceiptFile(context.paths.state, text, signal);
 }
+// Every unexpired verified record, read without the lock.
+async function readEntries(
+  context: ReturnType<typeof receiptStoreContext>,
+  signal?: AbortSignal,
+) {
+  receiptSignal(signal);
+  await assertRoleHome(context.role, context.environment);
+  await receiptDirectory(context.paths.directory);
+  receiptSignal(signal);
+  const now = controlInteger(context.now());
+  return (
+    await parseReceiptSnapshot(
+      await readReceiptFile(context.paths.state),
+      context.role,
+      context.nodeId,
+      now,
+      signal,
+    )
+  ).filter((entry) => now - entry.storedAt < context.retentionMs);
+}
+
+// Read-only listing for local reports such as `gyblos seller status`; never writes or takes the lock, and
+// a seller that never stored a receipt has no directory, which is not created here.
+export async function listReceipts(
+  options: ReceiptStoreOptions,
+  signal?: AbortSignal,
+): Promise<StoredReceipt[]> {
+  try {
+    const context = receiptStoreContext(options);
+    try {
+      await lstat(context.paths.directory);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+      throw error;
+    }
+    return await readEntries(context, signal);
+  } catch {
+    return receiptUnavailable();
+  }
+}
+
 export function openReceiptStore(
   options: ReceiptStoreOptions,
 ): LocalReceiptStore {
   const context = receiptStoreContext(options);
-  async function read(signal?: AbortSignal) {
-    receiptSignal(signal);
-    await assertRoleHome(context.role, context.environment);
-    await receiptDirectory(context.paths.directory);
-    receiptSignal(signal);
-    const now = controlInteger(context.now());
-    return (
-      await parseReceiptSnapshot(
-        await readReceiptFile(context.paths.state),
-        context.role,
-        context.nodeId,
-        now,
-        signal,
-      )
-    ).filter((entry) => now - entry.storedAt < context.retentionMs);
-  }
+  const read = (signal?: AbortSignal) => readEntries(context, signal);
   async function update(
     value: unknown,
     confirm: boolean,

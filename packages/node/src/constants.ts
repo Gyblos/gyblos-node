@@ -169,6 +169,11 @@ export const READINESS_REASONS = {
 // file never holds secrets; it names environment variables instead.
 export const NODE_CONFIG_VERSION = 1;
 export const NODE_CONFIG_FILENAME = 'gyblos.toml';
+// The `status` values the seller daemon writes to its status.json; `gyblos seller status` reads them.
+export const SELLER_DAEMON_STATES = {
+  STARTING: 'starting',
+  READY: 'ready',
+} as const;
 
 // Mainnet is recognized only so the validator can refuse it with a specific code.
 export const NODE_NETWORKS = { DEVNET: 'devnet', MAINNET: 'mainnet' } as const;

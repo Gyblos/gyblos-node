@@ -6,6 +6,8 @@
   "exports": {
     "./cli": "./src/cli.ts",
     "./cli-service": "./src/cli-service.ts",
+    "./cli-status": "./src/cli-status.ts",
+    "./status-system": "./src/status-system.ts",
     "./constants": "./src/constants.ts",
     "./main": "./src/main.ts",
     "./service": "./src/service.ts",
