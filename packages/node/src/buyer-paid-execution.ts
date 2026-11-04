@@ -42,6 +42,7 @@ export interface PaidWinner {
 
 export interface PaidBuyerOutcome {
   winner: PaidWinner;
+  // Contains a signed payload: keep it in the trusted host, never send it directly to a UI or log.
   authorization: PaymentAuthorization;
   terminal: PaidExecutionResponse;
   // What the buyer itself counts as owed for what it received.
@@ -63,20 +64,26 @@ export interface PaidBuyerRecord {
 }
 
 export interface PaidBuyerDependencies {
+  // These are trusted ports, not untrusted adapters: the caller must enforce the checks below.
   enter(): () => void;
   // Whether a channel whose open reached a seller still needs reconciliation. Checked once per
   // request: failover only follows an open that never left the buyer.
   unresolved(): Promise<boolean>;
-  // Must accept only quotes that match the query and the buyer's price ceilings.
+  // Verify the seller owner–NodeId binding independently of discovery, the authenticated catalog and
+  // signed quote, their request binding and freshness, and exact selection and buyer price ceilings.
+  // This orchestration does not perform those checks before asking the payment port to authorize.
   select(
     excluded: ReadonlySet<string>,
     signal: AbortSignal,
   ): Promise<PaidWinner>;
+  // Enforce the buyer's independent terms, durable journal and unresolved-payment policy.
   payment: PaymentClient;
   // The network's fee and treasury, from this buyer's configuration.
   fee: { bps: number; treasury: string };
   // The model's public tokenizer, as the seller recounts with it.
   meter: RecountTokenizer;
+  // Authenticate the selected peer and verify the response. PaidClientError.sent may be false only
+  // when no signed open could have left the buyer; false permits discard and another seller attempt.
   execute(
     winner: PaidWinner,
     request: PaidExecutionRequest,

@@ -43,6 +43,16 @@ entry as a compatibility export and owns its HTTP and terminal interfaces. The
 current execution error contract still uses the Iroh adapter, so this entry
 alone does not establish support for another transport or mobile runtime.
 
+These are trusted host dependencies. Selection must independently verify the
+seller owner–NodeId binding, authenticated catalog, signed quote, request
+binding, freshness, exact selection and buyer price ceilings. The payment port
+must enforce its independent terms and durable journal. The transport must
+authenticate the selected peer, verify the response and report an open as unsent
+only when it could not have left the buyer: that result permits discard and
+failover. The orchestration does not perform those checks for the host. Its
+outcome includes a signed authorization payload; hosts must not expose it to UI,
+IPC or logs and must provide a safe projection instead.
+
 "Gate" is a lab word only. `lab/harness` holds the `gate:*` proof-of-concept
 checks (including the x402 `exact` scheme, the fixed-price test seller, the gate
 runner and the devnet wallet configuration), `lab/facilitator` the standalone
