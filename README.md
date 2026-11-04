@@ -126,6 +126,7 @@ Full steps: [docs/running-a-node.md](docs/running-a-node.md).
 | Node   | `pnpm node:start`, `buyer:start`                     | Start the seller node; start the buyer proxy (`:4031`).                                |
 | Node   | `pnpm gyblos config validate --config gyblos.toml`   | Check a node config file and the environment ([configuration](docs/configuration.md)). |
 | Node   | `pnpm node:setup --role buyer\|seller --mint MINT`   | Create isolated role keys without RPC or funding.                                      |
+| Node   | `pnpm gyblos seller service install\|uninstall`      | Run the seller in the background (systemd or launchd) after an offline doctor check.   |
 | Node   | `pnpm node:tokenizer`                                | Download and verify the pinned tokenizer for either role, without an engine.           |
 | Node   | `pnpm buyer:setup`                                   | The same tokenizer download, under the buyer's older name.                             |
 | Node   | `pnpm buyer:free`                                    | Start the separate free v2 chat endpoint (complete or SSE) (`:4031`).                  |

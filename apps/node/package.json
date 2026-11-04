@@ -5,7 +5,10 @@
   "type": "module",
   "exports": {
     "./cli": "./src/cli.ts",
+    "./cli-service": "./src/cli-service.ts",
+    "./constants": "./src/constants.ts",
     "./main": "./src/main.ts",
+    "./service": "./src/service.ts",
     "./setup": "./src/setup.ts",
     "./tokenizer": "./src/tokenizer.ts"
   },
