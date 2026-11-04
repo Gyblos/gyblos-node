@@ -1,0 +1,21 @@
+# Only the source the seller image needs; never local state, keys or evidence.
+**/node_modules
+.git
+.local
+.wrangler
+.env
+.env.*
+!.env.example
+**/*.key
+**/*.pem
+**/*.log
+captures
+measurements
+private
+internal
+coverage
+dist
+lab/evidence
+apps/desktop/out
+gyblos.toml
+seller.env

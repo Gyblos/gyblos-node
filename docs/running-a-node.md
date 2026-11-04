@@ -190,6 +190,45 @@ pnpm node:start
   [sequence recovery procedure](discovery.md#seller-duties); never reset the
   persisted sequence high-water mark.
 
+### Docker
+
+`compose.yaml` runs a seller with its own Ollama. Only Docker is needed on the
+host; no port is published, because Iroh connects outbound.
+
+```sh
+cp examples/seller-docker.toml gyblos.toml        # one free offer; edit the caps
+umask 077; printf 'GYBLOS_RELAY_TOKEN=%s\n' "$GYBLOS_RELAY_TOKEN" > seller.env
+docker compose up -d ollama
+docker compose exec ollama ollama pull qwen3:0.6b # `ollama list` must show 7df6b6e09427
+docker compose run --rm seller setup --role seller --mint MINT
+docker compose run --rm seller tokenizer
+docker compose run --rm seller gyblos doctor      # READY, and the public NodeId and owner
+docker compose up -d                              # starts the seller
+docker compose logs -f seller
+docker compose stop seller                        # SIGINT; withdraws within 120 s
+```
+
+- The image (`Dockerfile`) holds the node and the `gyblos` CLI, runs as the
+  unprivileged `node` user and has no engine. Its commands are `start` (the
+  default), `gyblos …`, `setup …` and `tokenizer`.
+- Keys, journals, the public sequence and the tokenizer live in the `gyblos`
+  volume (`/data`, mode 0700); `docker compose down -v` deletes them, keys
+  included. `gyblos.toml` is mounted read-only at `/config/gyblos.toml`, and
+  `seller.env` holds the relay token and any `api_key_env` variables (it is in
+  `.gitignore`; keep it mode 0600).
+- The Ollama engine accepts only a literal loopback URL, so the seller shares
+  the Ollama container's network namespace (`network_mode: service:ollama`):
+  Ollama listens on `127.0.0.1:11434` there and the example's offer points to
+  it. Do not publish its port or set `OLLAMA_HOST=0.0.0.0`.
+- The seller container has `mem_limit: 2g`, because startup needs 1.5 GiB of
+  headroom in its own cgroup above the seller itself, and one CPU. Ollama's
+  model memory is counted in its own container.
+- A remote engine (an OpenAI- or Anthropic-compatible URL) needs no Ollama
+  service: point the offer at it, put its `api_key_env` variable in `seller.env`
+  and remove `ollama` and `network_mode` from the compose file.
+- Build the image yourself with `docker compose build`; there is no published
+  image yet.
+
 ## Buyer
 
 Free inference uses `pnpm buyer:free`

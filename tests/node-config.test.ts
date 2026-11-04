@@ -47,6 +47,7 @@ void test('every example in examples/ is a valid gyblos.toml', () => {
       'openai-free.toml',
       'openai-reseller.toml',
       'seller-daemon.toml',
+      'seller-docker.toml',
     ],
   );
   for (const example of examples) {
@@ -344,11 +345,13 @@ void test('examples follow the reasoning levels each model supports and do not p
       // gpt-oss has low/medium/high effort and no off switch; Qwen3 is on/off (GYB-DOC-028).
       if (entry.model.id.startsWith('gpt-oss'))
         assert.equal(entry.reasoning.includes('off'), false, example.name);
-      // The seller daemon's pinned Qwen3 template implements only off.
+      // The seller daemon's pinned Qwen3 template (also in Docker) implements only off.
       if (entry.model.id.startsWith('qwen3'))
         assert.deepEqual(
           entry.reasoning,
-          example.name === 'seller-daemon.toml' ? ['off'] : ['off', 'high'],
+          ['seller-daemon.toml', 'seller-docker.toml'].includes(example.name)
+            ? ['off']
+            : ['off', 'high'],
           example.name,
         );
     }
