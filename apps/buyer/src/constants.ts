@@ -1,6 +1,7 @@
 // Buyer call outcomes, phases, journal states, proxy error codes, measurement schema version, call and
 // proof bounds, error diagnostic codes and synthetic inference case names.
 import { TRANSPORT_TIMEOUTS } from '@gyblos/config';
+import { BUYER_PAID_TIMEOUTS } from '@gyblos/node/constants';
 import { JOURNAL_STATES } from '@gyblos/payments-x402/constants';
 import {
   FREE_EXECUTION,
@@ -169,20 +170,8 @@ export const FREE_BUYER_CODES = {
 } as const;
 export type FreeBuyerCode =
   (typeof FREE_BUYER_CODES)[keyof typeof FREE_BUYER_CODES];
-// The paid buyer's own refusals, before any payment.
-export const PAID_BUYER_CODES = {
-  // An earlier channel is not resolved yet; `pnpm buyer:reconcile:paid` resolves it.
-  UNRESOLVED: 'PAID_BUYER_UNRESOLVED_PAYMENT',
-  UNAVAILABLE: 'PAID_BUYER_NO_OFFER',
-  // Paid sellers serve a single user message; anything else is refused before paying.
-  UNSUPPORTED: 'PAID_BUYER_UNSUPPORTED_INPUT',
-  // Another paid request is still running in this buyer.
-  BUSY: 'PAID_BUYER_BUSY',
-  // The request did not carry the endpoint's bearer token.
-  UNAUTHORIZED: 'PAID_BUYER_UNAUTHORIZED',
-} as const;
-export type PaidBuyerCode =
-  (typeof PAID_BUYER_CODES)[keyof typeof PAID_BUYER_CODES];
+// Shared paid-buyer refusals remain available through the buyer's existing entry.
+export { PAID_BUYER_CODES, type PaidBuyerCode } from '@gyblos/node/constants';
 // Paid reconciliation's exit codes: 0 when nothing blocks payments.
 export const PAID_RECONCILE_EXIT = { FAILED: 1, OPEN: 2 } as const;
 // Why paid reconciliation stopped, with what to fix; printed alone, never with paths or URLs.
@@ -211,9 +200,9 @@ export const PAID_WITHDRAW_CODES = {
 export const isFreeAtomic = (maxAtomic: string) => maxAtomic === '0';
 export const PAID_BUYER = {
   // The whole request, from selection to the seller's terminal.
-  requestMs: 180000,
+  requestMs: BUYER_PAID_TIMEOUTS.requestMs,
   // Checking the settlement on chain and recording the outcome, once the terminal arrived.
-  receiptMs: 30000,
+  receiptMs: BUYER_PAID_TIMEOUTS.receiptMs,
   // On shutdown, how long a running paid request may finish its receipt and record.
   drainMs: 90000,
   // Outcomes for reconciliation, one JSON line each, in the buyer home.
@@ -246,24 +235,8 @@ export const PAID_BUYER_HTTP_MS =
   PAID_BUYER.requestMs +
   TRANSPORT_TIMEOUTS.connectMs +
   2 * PAID_BUYER.receiptMs;
-// How the buyer judges a paid request once the signed open reached the seller.
-export const PAID_VERDICTS = {
-  // The chain shows the settlement the buyer's own count expects.
-  SETTLED: 'settled',
-  // The seller's claim is still being confirmed; reconciliation decides.
-  PENDING: 'pending',
-  // The seller says its claim lapsed; reconciliation confirms nothing was charged.
-  LAPSED: 'lapsed',
-  // The seller claims more or less than the buyer's own count.
-  DISPUTED: 'disputed',
-  // The settlement could not be confirmed on chain now; reconciliation checks it.
-  UNVERIFIED: 'unverified',
-  // The seller refused after receiving the signed open, which it could still land.
-  REFUSED: 'refused',
-  // The request stopped before any terminal arrived, after the signed open was sent.
-  INTERRUPTED: 'interrupted',
-} as const;
-export type PaidVerdict = (typeof PAID_VERDICTS)[keyof typeof PAID_VERDICTS];
+// Preserve the existing buyer entry for shared payment outcomes.
+export { PAID_VERDICTS, type PaidVerdict } from '@gyblos/node/constants';
 // The OpenAI-compatible subset the free buyer accepts, and the fixed reasons it gives for refusing one.
 export const FREE_CHAT_FIELDS = {
   MODEL: 'model',
