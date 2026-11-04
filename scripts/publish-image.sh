@@ -24,15 +24,18 @@ case "$tag" in
 esac
 cd "$(git rev-parse --show-toplevel)"
 git fetch -q origin main
-git merge-base --is-ancestor HEAD origin/main ||
-  die 'HEAD is not on origin/main; publish only a merged commit.'
+# Only the tip, so the moving tag never goes back to an older commit.
+[ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] ||
+  die 'HEAD is not origin/main; check out the latest main to publish.'
 revision=$(git rev-parse HEAD)
 short=$(git rev-parse --short=12 HEAD)
 
 # The build context is the commit itself, so no local, untracked or ignored file can reach the image.
 context=$(mktemp -d)
-trap 'rm -rf "$context"' EXIT
-git archive HEAD | tar -x -C "$context"
+trap 'rm -rf "$context" "$context.tar"' EXIT
+git archive --output "$context.tar" HEAD
+tar -x -f "$context.tar" -C "$context"
+rm -f "$context.tar"
 
 docker buildx build \
   --platform "$PLATFORMS" \

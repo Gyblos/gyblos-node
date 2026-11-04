@@ -77,6 +77,14 @@ install_file() {
   cat >"$tmp"
   chmod "$2" "$tmp"
   mv -f "$tmp" "$1"
+  tmp=
+}
+
+# Runs on every exit: removes a temporary file an interruption left (it may hold the token) and turns
+# echo back on if the token prompt was interrupted.
+cleanup() {
+  [ -z "${tmp:-}" ] || rm -f "$tmp"
+  [ -z "${prompting:-}" ] || stty echo </dev/tty 2>/dev/null || true
 }
 
 # The same compose.yaml as the repository's, with the published image instead of a local build.
@@ -87,7 +95,8 @@ write_compose() {
     [ -z "${GYBLOS_IMAGE:-}" ] || say "  GYBLOS_IMAGE is not applied to it; change its seller image there."
     return
   fi
-  sed "s|GYBLOS_IMAGE_PLACEHOLDER|$image|" <<'COMPOSE' | install_file compose.yaml 644
+  # A substitution, not a pipe, so `set -e` sees a failing sed; it drops the final newline printf restores.
+  contents=$(sed "s|GYBLOS_IMAGE_PLACEHOLDER|$image|" <<'COMPOSE'
 # A seller with its own Ollama. Setup and use: docs/running-a-node.md#docker.
 # The seller shares Ollama's network namespace because the Ollama engine accepts only a literal loopback
 # URL; Ollama listens on 127.0.0.1 there and no port is published. Iroh connects outbound only.
@@ -134,6 +143,8 @@ volumes:
   ollama:
   gyblos:
 COMPOSE
+  )
+  printf '%s\n' "$contents" | install_file compose.yaml 644
   say "Wrote $dir/compose.yaml"
 }
 
@@ -173,10 +184,6 @@ TOML
   say "Wrote $dir/gyblos.toml"
 }
 
-restore_echo() {
-  stty echo </dev/tty 2>/dev/null || true
-}
-
 # The relay token goes straight from the prompt or the environment into seller.env.
 write_environment() {
   refuse_symlink seller.env
@@ -189,13 +196,12 @@ write_environment() {
     # Opening it, not testing its mode: /dev/tty exists even without a controlling terminal.
     (exec </dev/tty) 2>/dev/null ||
       die 'No terminal to ask for the relay token: set GYBLOS_RELAY_TOKEN.'
-    trap restore_echo EXIT
-    trap 'restore_echo; exit 130' INT TERM HUP
     printf 'Relay token (from your Gyblos invitation; not shown): ' >/dev/tty
+    prompting=1
     stty -echo </dev/tty
     IFS= read -r token </dev/tty || token=
-    restore_echo
-    trap - EXIT INT TERM HUP
+    stty echo </dev/tty
+    prompting=
     printf '\n' >/dev/tty
   fi
   # seller.env's grammar (`gyblos seller service install` reads it too): printable, no shell characters.
@@ -222,6 +228,8 @@ wait_for_ollama() {
 }
 
 main() {
+  trap cleanup EXIT
+  trap 'exit 130' INT TERM HUP
   check_docker
   check_image
   if [ ! -d "$dir" ]; then

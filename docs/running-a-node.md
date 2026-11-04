@@ -259,14 +259,14 @@ sh install.sh
 - Existing files are kept, so rerunning it resumes a failed install and
   recreates the seller with the current `gyblos.toml` and `seller.env`. After
   editing `gyblos.toml` (for example `publish = true`), rerun it or run
-  `docker compose up -d --force-recreate seller`; a plain `up -d` or `restart`
-  does not apply the edit.
+  `docker compose up -d --force-recreate seller`; a plain `up -d` does not
+  apply the edit.
 - `GYBLOS_IMAGE` sets the image of a first install, such as a commit tag; after
   that, change the seller's `image:` in `compose.yaml`.
 - While the package is private, `docker login ghcr.io` first with a token that
   may read it.
 
-Maintainers publish a commit already on `origin/main`, built from that commit
+Maintainers publish the tip of `origin/main`, built from that commit
 alone (`git archive`), after `docker login ghcr.io` with a token allowed to
 write Gyblos packages and with a buildx builder for both platforms
 (`docker buildx create --use`):
