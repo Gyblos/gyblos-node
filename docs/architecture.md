@@ -51,7 +51,9 @@ authenticate the selected peer, verify the response and report an open as unsent
 only when it could not have left the buyer: that result permits discard and
 failover. The orchestration does not perform those checks for the host. Its
 outcome includes a signed authorization payload; hosts must not expose it to UI,
-IPC or logs and must provide a safe projection instead.
+IPC or logs and must provide a safe projection instead. The `unresolved` port
+must block earlier signed, unsettled opens, including those whose transmission
+is uncertain or whose discard failed, and fail closed when state is unavailable.
 
 "Gate" is a lab word only. `lab/harness` holds the `gate:*` proof-of-concept
 checks (including the x402 `exact` scheme, the fixed-price test seller, the gate
