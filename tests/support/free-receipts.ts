@@ -144,14 +144,23 @@ export async function nativeFreeReceiptFixture(receiptEnabled = true) {
     stats: { rows: new Map(), save: async () => {} },
     discovery: undefined,
   };
+  const base = freeBuyerDependencies(prepared, {
+    endpoint: buyer,
+    buyer: wallet,
+    relayOnly: false,
+    now: f.options.now,
+    receipts: buyerReceipts,
+  });
+  let beginReceipt = () => {};
+  const receiptStarted = new Promise<void>((resolve) => {
+    beginReceipt = resolve;
+  });
   const dependencies = {
-    ...freeBuyerDependencies(prepared, {
-      endpoint: buyer,
-      buyer: wallet,
-      relayOnly: false,
-      now: f.options.now,
-      receipts: buyerReceipts,
-    }),
+    ...base,
+    receipt: async (...args: Parameters<NonNullable<typeof base.receipt>>) => {
+      beginReceipt();
+      await base.receipt?.(...args);
+    },
     select: async () => {
       selections++;
       return { nodeId: seller.id().toString(), quote: request.quote };
@@ -168,6 +177,7 @@ export async function nativeFreeReceiptFixture(receiptEnabled = true) {
     sellerReceipts,
     buyerReceipts,
     request,
+    receiptStarted,
     calls: f.calls,
     selections: () => selections,
     execute: (streaming = false) =>

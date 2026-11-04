@@ -9,6 +9,7 @@ import { freeExecutionDigest } from '@gyblos/protocol/free-execution';
 import { verifyReceipt } from '@gyblos/protocol/receipt';
 
 import { nativeFreeReceiptFixture } from './support/free-receipts';
+import { within } from './support/native-fixture';
 import { NATIVE_CAPABILITY } from './support/native-runtime';
 
 for (const streaming of [false, true])
@@ -148,6 +149,57 @@ void test(
       assert.equal(f.calls(), 1);
     } finally {
       release();
+      await f.close();
+    }
+  },
+);
+
+void test(
+  'native receipt success fixture waits for seller publication before buyer exchange',
+  { skip: NATIVE_CAPABILITY.transportSkip },
+  async () => {
+    const f = await nativeFreeReceiptFixture();
+    let release = () => {};
+    const publication = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let published = false;
+    let readyAtExchange: boolean | undefined;
+    let exchanges = 0;
+    const put = f.sellerStore.put.bind(f.sellerStore);
+    f.sellerStore.put = async (...args) => {
+      await publication;
+      await put(...args);
+      published = true;
+    };
+    const exchange = f.buyerReceipts.exchange.bind(f.buyerReceipts);
+    f.buyerReceipts.exchange = (...args) => {
+      exchanges++;
+      readyAtExchange = published;
+      exchange(...args);
+    };
+    const answer = f.execute(true);
+    try {
+      await within(
+        Promise.race([
+          f.receiptStarted,
+          answer.then(() => assert.fail('Receipt callback did not start')),
+        ]),
+      );
+      assert.equal(published, false);
+      release();
+      assert.equal((await answer).text, 'é😀');
+      await f.buyerReceipts.settled();
+      await f.sellerReceipts.settled();
+      assert.equal(exchanges, 1);
+      assert.equal(readyAtExchange, true);
+      assert.equal(f.buyerReceipts.health().saved, 1);
+      assert.equal(f.sellerReceipts.health().saved, 1);
+      assert.equal(f.calls(), 1);
+      assert.equal(f.selections(), 1);
+    } finally {
+      release();
+      await answer.catch(() => {});
       await f.close();
     }
   },
