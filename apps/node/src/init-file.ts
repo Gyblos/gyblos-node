@@ -49,6 +49,7 @@ const errorCode = (error: unknown) =>
   error instanceof Error && 'code' in error ? error.code : undefined;
 
 // A new file only (never through a symlink or over an existing file), with its mode and contents synced.
+// A file this call created is removed again when its write fails; nothing is removed if it never opened.
 async function writeNew(path: string, text: string) {
   const file = await open(path, NEW_FILE, INIT_FILE_MODE);
   try {
@@ -56,9 +57,12 @@ async function writeNew(path: string, text: string) {
     // The umask may have narrowed the mode; the handle cannot be swapped for a symlink.
     await file.chmod(INIT_FILE_MODE);
     await file.sync();
-  } finally {
-    await file.close();
+  } catch (error) {
+    await file.close().catch(() => undefined);
+    await rm(path, { force: true });
+    throw error;
   }
+  await file.close();
 }
 
 // Written and synced beside the target, then moved into place and the directory synced, so a reader never
@@ -78,11 +82,7 @@ export async function writeConfigFile(
     else
       await linkFile(temporary, path).catch(async (error: unknown) => {
         if (!NO_HARD_LINKS.has(String(errorCode(error)))) throw error;
-        await writeNew(path, text).catch(async (failure: unknown) => {
-          // EEXIST: someone else's file, never removed.
-          if (errorCode(failure) !== 'EEXIST') await rm(path, { force: true });
-          throw failure;
-        });
+        await writeNew(path, text);
       });
     const parent = await open(dirname(path), constants.O_RDONLY);
     try {
