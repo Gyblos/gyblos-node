@@ -12,7 +12,7 @@
   "dependencies": {
     "@x402/core": "2.29.0",
     "@huggingface/tokenizers": "0.2.0",
-    "@solana-program/token": "0.9.0",
-    "@solana-program/system": "0.10.0"
+    "@solana-program/token": "0.18.0",
+    "@solana-program/system": "0.16.0"
   }
 }

@@ -21,6 +21,6 @@
     "@gyblos/identity": "workspace:*",
     "@gyblos/protocol": "workspace:*",
     "@gyblos/runtime": "workspace:*",
-    "hono": "4.13.13"
+    "hono": "4.13.16"
   }
 }
