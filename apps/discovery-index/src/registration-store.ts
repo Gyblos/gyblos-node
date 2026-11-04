@@ -75,9 +75,11 @@ export function inviteStateOf(
     return invite.expiresAt > now
       ? INVITE_STATES.USABLE
       : INVITE_STATES.INVALID;
-  return invite.nodeId === nodeId &&
-    admittedStatus === REGISTRATION_STATUS.ACTIVE
-    ? INVITE_STATES.ADMITTED
+  if (invite.nodeId !== nodeId) return INVITE_STATES.INVALID;
+  if (admittedStatus === REGISTRATION_STATUS.ACTIVE)
+    return INVITE_STATES.ADMITTED;
+  return admittedStatus === REGISTRATION_STATUS.REVOKED
+    ? INVITE_STATES.REVOKED
     : INVITE_STATES.INVALID;
 }
 

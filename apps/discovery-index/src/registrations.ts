@@ -77,7 +77,7 @@ async function chainBinding(registry: RegistryReader, nodeId: string) {
 }
 
 // Throws IndexError with a static code; storage failures propagate (503). The invite is checked first,
-// so without a valid code nothing reveals whether a NodeId is registered.
+// so without an invite for that NodeId or a usable one nothing reveals whether a NodeId is registered.
 export async function registerSeller(
   bytes: ArrayBuffer,
   context: RegistrationContext,
@@ -88,6 +88,7 @@ export async function registerSeller(
   const state = await store.inviteState(hash, nodeId, now);
   // A retry with the invite that already admitted this NodeId succeeds without the chain.
   if (state === INVITE_STATES.ADMITTED) return REDEEM_RESULTS.ALREADY_ACTIVE;
+  if (state === INVITE_STATES.REVOKED) indexFail(INDEX_ERRORS.NODE_REVOKED);
   if (state !== INVITE_STATES.USABLE) indexFail(INDEX_ERRORS.INVITE_INVALID);
   const binding = await chainBinding(context.registry, nodeId);
   const result = await store.redeem({

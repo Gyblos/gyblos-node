@@ -91,15 +91,18 @@ The beta replaces the allowlist with one-use invites (vault
 (JSON, at most 512 bytes).
 
 - **Order of checks:** per-IP and publish limits, content type, size and strict
-  shape (`400 INVALID_REGISTRATION`). The invite comes next, so without a valid
-  code nothing reveals whether a NodeId is registered: an unknown, expired or
-  already spent invite is `403 INVITE_INVALID`, before the chain is read. A
-  retry with the invite that already admitted this NodeId answers
-  `200 {"ok":true,"status":"active"}` without reading the chain. Then the
-  registry is read through the RPC secret: no binding for the NodeId is
+  shape (`400 INVALID_REGISTRATION`). The invite comes next, so without a usable
+  invite (or the one that admitted that NodeId) nothing reveals whether a NodeId
+  is registered: an unknown, expired or already spent invite is
+  `403 INVITE_INVALID`, before the chain is read. A retry with the invite that
+  already admitted this NodeId answers `200 {"ok":true,"status":"active"}`, or
+  `403 NODE_REVOKED` once revoked, without reading the chain. Then the registry
+  is read through the RPC secret: no binding for the NodeId is
   `403 IDENTITY_NOT_REGISTERED`; an RPC outage or a binding for another NodeId
   is `503 DISCOVERY_UNAVAILABLE`. A NodeId already active answers `200` and a
-  revoked one `403 NODE_REVOKED`. None of these spends the invite. Success is
+  revoked one `403 NODE_REVOKED`. None of these spends the invite, so a holder
+  of a usable invite can learn the status of NodeIds bound on chain until it is
+  spent or expires (one RPC read each, per-IP limited). Success is
   `201 {"ok":true,"status":"active"}`.
 - **What is stored** (migration `0003_registrations.sql`): the invite's SHA-256
   (never the code), the contact it was issued to, its creation, expiry and use

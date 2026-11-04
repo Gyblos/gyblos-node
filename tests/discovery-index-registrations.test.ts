@@ -181,10 +181,8 @@ for (const kind of STORE_KINDS) {
     const harness = await enrollmentHarness(kind);
     if (!harness) return context.skip('node:sqlite unavailable');
     const seller = indexNode();
-    await harness.register({
-      invite: await harness.invite(),
-      nodeId: seller.nodeId,
-    });
+    const original = await harness.invite();
+    await harness.register({ invite: original, nodeId: seller.nodeId });
     assert.equal(
       (await harness.app.fetch(publish(await seller.catalog(1)))).status,
       201,
@@ -201,6 +199,14 @@ for (const kind of STORE_KINDS) {
       403,
       'NODE_REVOKED',
     );
+    // Its original invite says the same, without the chain.
+    const lookups = harness.registry.lookups.length;
+    await expectError(
+      await harness.register({ invite: original, nodeId: seller.nodeId }),
+      403,
+      'NODE_REVOKED',
+    );
+    assert.equal(harness.registry.lookups.length, lookups);
     // The refused invite is not spent.
     assert.equal(
       (await harness.register({ invite: spare, nodeId: indexNode().nodeId }))

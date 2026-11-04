@@ -20,7 +20,7 @@ import {
 
 for (const kind of STORE_KINDS)
   void test(`registration store (${kind}): redeem itself spends an invite once and never after expiry`, async (context) => {
-    // Called directly, as a request racing past the route's inviteUsable check would.
+    // Called directly, as a request racing past the route's inviteState check would.
     const harness = await enrollmentHarness(kind);
     if (!harness) return context.skip('node:sqlite unavailable');
     const { inviteHash } =

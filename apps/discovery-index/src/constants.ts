@@ -161,11 +161,13 @@ export const REGISTRATION_STATUS = {
 } as const;
 export type RegistrationStatus =
   (typeof REGISTRATION_STATUS)[keyof typeof REGISTRATION_STATUS];
-// What an invite can do for one NodeId: be spent, nothing (already spent on this active NodeId, so a
-// retry succeeds), or be refused (unknown, expired, spent on another NodeId).
+// What an invite can do for one NodeId: be spent, nothing (already spent on this NodeId: a retry
+// succeeds while it is active and is refused as revoked after), or be refused (unknown, expired, spent
+// on another NodeId).
 export const INVITE_STATES = {
   USABLE: 'usable',
   ADMITTED: 'admitted',
+  REVOKED: 'revoked',
   INVALID: 'invalid',
 } as const;
 export type InviteState = (typeof INVITE_STATES)[keyof typeof INVITE_STATES];
