@@ -10,6 +10,9 @@
   "name": "gyblos-discovery",
   "main": "./src/worker.ts",
   "compatibility_date": "2026-10-01",
+  // The 8004 registry reader (@gyblos/identity, for /v1/registrations) pulls @gyblos/config, whose root
+  // also exports Node path helpers; nodejs_compat lets the bundle load them.
+  "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
   "preview_urls": false,
   // No request logs: the index must not store or log client IPs.
@@ -50,6 +53,9 @@
     },
   ],
   "routes": [{ "pattern": "discovery.gyblos.com", "custom_domain": true }],
+  // /v1/registrations needs the DISCOVERY_SOLANA_RPC_URL secret: a devnet RPC URL with any provider key
+  // in its path (no query string), set with `secret put`, never here; without it that route answers 503.
+  // Registered NodeIds publish without the allowlist once migration 0003 is applied.
   // Publishing also needs the DISCOVERY_PUBLISH_ALLOWLIST secret (approved NodeIds or `*`), set
   // with `secret put` after the first deploy, never here; without it publishes answer 503 and
   // reads keep working.

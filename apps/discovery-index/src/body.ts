@@ -1,6 +1,11 @@
-// Owns strict decoding of a publish body into its signed envelope and that envelope's verbatim text.
-// It must not verify records (protocol does) or echo input; every failure is INVALID_RECORD.
-import { DISCOVERY_INDEX_LIMITS } from './constants';
+// Owns strict decoding of a publish body into its signed envelope and that envelope's verbatim text, and
+// the strict UTF-8 and JSON steps other bodies share. It must not verify records (protocol does) or echo
+// input; every publish failure is INVALID_RECORD.
+import {
+  DISCOVERY_INDEX_LIMITS,
+  INDEX_ERRORS,
+  type IndexErrorCode,
+} from './constants';
 import { indexFail } from './errors';
 
 export interface PublishBody {
@@ -20,22 +25,28 @@ export function isJsonContentType(value: string | undefined) {
   return CONTENT_TYPE.test(value ?? '');
 }
 
-function decodeUtf8(bytes: ArrayBuffer): string {
+export function decodeUtf8(
+  bytes: ArrayBuffer,
+  code: IndexErrorCode = INDEX_ERRORS.INVALID_RECORD,
+): string {
   try {
     // ignoreBOM keeps a BOM in the text, so JSON parsing rejects it.
     return new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(
       bytes,
     );
   } catch {
-    return indexFail();
+    return indexFail(code);
   }
 }
 
-function parseJson(text: string): unknown {
+export function parseJson(
+  text: string,
+  code: IndexErrorCode = INDEX_ERRORS.INVALID_RECORD,
+): unknown {
   try {
     return JSON.parse(text);
   } catch {
-    return indexFail();
+    return indexFail(code);
   }
 }
 

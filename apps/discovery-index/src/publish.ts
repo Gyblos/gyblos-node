@@ -1,4 +1,5 @@
-// Owns acceptance of one published record: decode, allowlist, verify, replay and rate checks, then an atomic put.
+// Owns acceptance of one published record: decode, allowlist or registration, verify, replay and rate checks,
+// then an atomic put.
 // It stores only signed public data and never sees or keeps the client address.
 import { PUBLIC_RECORD_KINDS } from '@gyblos/protocol/constants';
 import type { PublicRecordV2 } from '@gyblos/protocol/control-types';
@@ -14,16 +15,20 @@ import { indexFail } from './errors';
 import { allowed, type ResolvedLimiters } from './limits';
 import {
   allowlistWithin,
+  claimedNodeId,
   publisherAllowed,
   type DiscoveryPublishers,
 } from './publishers';
+import type { RegistrationStore } from './registration-store';
 import type { DiscoveryStorage, StoredEntry } from './storage';
 import { verifyAgainstStored, verifySelfSigned } from './verify';
 
 export interface PublishContext {
   storage: DiscoveryStorage;
   limiters: ResolvedLimiters;
-  publishers: DiscoveryPublishers;
+  // At least one of the two is present: the allowlist secret, the registered NodeIds, or both.
+  publishers: DiscoveryPublishers | undefined;
+  registrations: RegistrationStore | undefined;
   now: number;
   maxNodes: number;
   // Throttled pruning, run only before admitting a new NodeId.
@@ -55,6 +60,18 @@ async function storedEntry(
   };
 }
 
+// The allowlist is checked first, so an allowlisted seller never depends on the registration tables.
+async function mayPublish(context: PublishContext, envelope: unknown) {
+  if (context.publishers && publisherAllowed(context.publishers, envelope))
+    return true;
+  const nodeId = claimedNodeId(envelope);
+  return (
+    !!context.registrations &&
+    typeof nodeId === 'string' &&
+    (await context.registrations.active(nodeId))
+  );
+}
+
 // Throws IndexError with a static code; storage failures propagate (503).
 export async function acceptRecord(
   bytes: ArrayBuffer,
@@ -62,9 +79,10 @@ export async function acceptRecord(
 ) {
   const { storage, now } = context;
   const { envelope, json } = readPublishBody(bytes);
-  // The claimed NodeId is refused before the signature, storage or the per-NodeId limit,
-  // so an unlisted publisher costs one parse and consumes no NodeId allowance.
-  if (!publisherAllowed(context.publishers, envelope))
+  // The claimed NodeId is refused before the signature, record storage or the per-NodeId limit, so
+  // an unlisted publisher costs one parse (plus one registration read when registrations are on)
+  // and consumes no NodeId allowance.
+  if (!(await mayPublish(context, envelope)))
     indexFail(INDEX_ERRORS.PUBLISH_NOT_ALLOWED);
   const { record, signature } = await verifySelfSigned(envelope, now);
   // Stale records are rejected before the per-NodeId limit, so replaying a seller's public
@@ -79,10 +97,12 @@ export async function acceptRecord(
   await verifyAgainstStored(envelope, record, state?.catalog ?? null, now);
   if (!state) {
     await context.prune(now);
-    if (
-      !allowlistWithin(context.publishers, context.maxNodes) &&
-      (await storage.nodeCount()) >= context.maxNodes
-    )
+    // Registered NodeIds are not bounded by the allowlist, so then the stored count decides.
+    const bounded =
+      !!context.publishers &&
+      !context.registrations &&
+      allowlistWithin(context.publishers, context.maxNodes);
+    if (!bounded && (await storage.nodeCount()) >= context.maxNodes)
       indexFail(INDEX_ERRORS.RATE_LIMITED);
   }
   if (!(await storage.put(await storedEntry(record, signature, json))))

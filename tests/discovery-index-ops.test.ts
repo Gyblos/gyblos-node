@@ -347,7 +347,7 @@ void test('ipKey keys IPv4 by full address and IPv6 by /64 prefix', () => {
   assert.equal(ipKey('not-an-ip'), 'not-an-ip');
 });
 
-void test('the Worker entry fails closed without bindings and serves health with them', async (context) => {
+void test('the Worker entry fails closed without bindings; with them it serves health and admits registered NodeIds', async (context) => {
   const worker = createWorker();
   const health = new Request(`${INDEX_ORIGIN}/v1/health`);
   for (const bindings of [
@@ -367,7 +367,8 @@ void test('the Worker entry fails closed without bindings and serves health with
   assert.deepEqual(await response.json(), {
     ok: true,
     records: 0,
-    publish: 'closed',
+    // No allowlist: only NodeIds admitted through /v1/registrations may publish.
+    publish: 'registered',
   });
   // Loopback hosts get no development relaxation from the Worker entry.
   const local = await worker.fetch(new Request('https://localhost/v1/health'), {

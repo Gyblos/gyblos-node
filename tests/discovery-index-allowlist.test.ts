@@ -226,25 +226,26 @@ void test('open publishers accept any self-signed NodeId and health reports the 
   assert.ok(!health.includes(allowed.nodeId));
 });
 
-void test('the Worker maps the allowlist secret: absent, empty, malformed, open and listed', async (context) => {
+void test('the Worker maps the allowlist secret: absent, empty, malformed (registered NodeIds only), open and listed', async (context) => {
   const db = await createSqliteD1();
   if (!db) return context.skip('node:sqlite unavailable');
   const limiters: Record<string, FakeLimiter> = allLimiters(allow);
   // The Worker uses the wall clock, so these records are issued now.
   const live = { issuedAt: Date.now() };
   const base = { [DISCOVERY_DB_BINDING]: db, ...limiters };
-  const closed = [
+  // Without a usable allowlist only registered NodeIds publish; this one is not registered.
+  const registeredOnly = [
     base,
     { ...base, [DISCOVERY_PUBLISH_ALLOWLIST_BINDING]: '' },
     { ...base, [DISCOVERY_PUBLISH_ALLOWLIST_BINDING]: `${allowed.nodeId},` },
     { ...base, [DISCOVERY_PUBLISH_ALLOWLIST_BINDING]: 7 },
   ];
-  for (const bindings of closed) {
+  for (const bindings of registeredOnly) {
     const worker = createWorker();
     await expectError(
       await worker.fetch(post(allowed.catalog(1, live)), bindings),
-      503,
-      'DISCOVERY_UNAVAILABLE',
+      403,
+      'PUBLISH_NOT_ALLOWED',
     );
     assert.equal((await worker.fetch(sellersRequest(), bindings)).status, 200);
     assert.deepEqual(
@@ -252,7 +253,7 @@ void test('the Worker maps the allowlist secret: absent, empty, malformed, open 
       {
         ok: true,
         records: 0,
-        publish: 'closed',
+        publish: 'registered',
       },
     );
   }

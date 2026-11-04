@@ -24,8 +24,12 @@ import {
   LOOPBACK_HOSTS,
   PUBLIC_READ_ROUTES,
   READ_LIMIT_KEY,
+  REDEEM_RESULTS,
+  REGISTRATION,
+  REGISTRATION_STATUS,
   type DiscoveryLimiterName,
   type IndexErrorCode,
+  type RedeemResult,
 } from './constants';
 import { IndexError, statusOf } from './errors';
 import { ipKey } from './ip-key';
@@ -37,6 +41,8 @@ import {
 } from './limits';
 import { acceptRecord, type PublishContext } from './publish';
 import { publishModeOf, type DiscoveryPublishers } from './publishers';
+import type { RegistrationStore } from './registration-store';
+import { registerSeller, type RegistryReader } from './registrations';
 import { parseSellersQuery, sellersPage, type SellersQuery } from './sellers';
 import type { DiscoveryStorage } from './storage';
 
@@ -49,6 +55,11 @@ export interface DiscoveryIndexOptions {
   // Who may publish. Missing means closed: every publish is 503 DISCOVERY_UNAVAILABLE,
   // reads are unaffected. Development never relaxes it.
   publishers?: DiscoveryPublishers;
+  // NodeIds admitted through /v1/registrations; they may publish too. With no allowlist either,
+  // publishing is closed.
+  registrations?: RegistrationStore;
+  // The 8004 registry reader /v1/registrations verifies against. Missing, that route answers 503.
+  registry?: RegistryReader;
   // Response cache for GET /v1/sellers (the Worker passes caches.default). Missing means none.
   cache?: ResponseCache;
   now?: () => number;
@@ -63,6 +74,8 @@ export interface DiscoveryIndexOptions {
 interface IndexVariables {
   storage: DiscoveryStorage;
   limiters: ResolvedLimiters;
+  // Read before bodyLimit, which replaces the raw request and with it Cloudflare's `cf` data.
+  country: unknown;
 }
 interface IndexEnv {
   Variables: IndexVariables;
@@ -123,6 +136,8 @@ interface IndexSettings {
   development: boolean;
   storage: DiscoveryStorage | undefined;
   publishers: DiscoveryPublishers | undefined;
+  registrations: RegistrationStore | undefined;
+  registry: RegistryReader | undefined;
   cache: ResponseCache | undefined;
   records: RecordCounter;
   resolve: (url: string) => ResolvedLimiters | null;
@@ -139,6 +154,8 @@ function settingsOf(options: DiscoveryIndexOptions): IndexSettings {
     development,
     storage: options.storage,
     publishers: options.publishers,
+    registrations: options.registrations,
+    registry: options.registry,
     cache: options.cache,
     records: recordCounter(),
     resolve: limiterResolver(options.limiters ?? {}, development, now),
@@ -184,10 +201,7 @@ function gate(settings: IndexSettings) {
   };
 }
 
-function publishHandler(
-  settings: IndexSettings,
-  publishers: DiscoveryPublishers,
-) {
+function publishHandler(settings: IndexSettings) {
   return async (context: IndexContext) => {
     if (!(await clientAllowed(context, DISCOVERY_LIMITERS.PUBLISH)))
       return rejection(context, INDEX_ERRORS.RATE_LIMITED);
@@ -199,7 +213,8 @@ function publishHandler(
     const publish: PublishContext = {
       storage: context.get('storage'),
       limiters: context.get('limiters'),
-      publishers,
+      publishers: settings.publishers,
+      registrations: settings.registrations,
       now: settings.now(),
       maxNodes: settings.maxNodes,
       prune: settings.prune,
@@ -213,6 +228,47 @@ function publishHandler(
     settings.records.reset();
     return context.json({ ok: true }, INDEX_STATUS.CREATED);
   };
+}
+
+// Rare and spends an invite or an RPC read: limited like a publish, per IP(/64).
+function registrationHandler(
+  settings: IndexSettings,
+  registrations: RegistrationStore,
+  registry: RegistryReader,
+) {
+  return async (context: IndexContext) => {
+    if (!(await clientAllowed(context, DISCOVERY_LIMITERS.PUBLISH)))
+      return rejection(context, INDEX_ERRORS.RATE_LIMITED);
+    if (!isJsonContentType(context.req.header(INDEX_HEADERS.CONTENT_TYPE)))
+      return rejection(context, INDEX_ERRORS.INVALID_REGISTRATION);
+    const bytes = await context.req.arrayBuffer();
+    if (bytes.byteLength > REGISTRATION.maxBodyBytes)
+      return rejection(context, INDEX_ERRORS.PAYLOAD_TOO_LARGE);
+    let result: RedeemResult;
+    try {
+      result = await registerSeller(bytes, {
+        store: registrations,
+        registry,
+        now: settings.now(),
+        country: context.get('country'),
+      });
+    } catch (error) {
+      if (error instanceof IndexError) return rejection(context, error.code);
+      throw error;
+    }
+    return context.json(
+      { ok: true, status: REGISTRATION_STATUS.ACTIVE },
+      result === REDEEM_RESULTS.REGISTERED
+        ? INDEX_STATUS.CREATED
+        : INDEX_STATUS.OK,
+    );
+  };
+}
+
+// Cloudflare's country for the request (request.cf.country), when the Worker runtime provides it.
+function requestCountry(context: IndexContext): unknown {
+  const cf: unknown = Reflect.get(context.req.raw, 'cf');
+  return cf && typeof cf === 'object' ? Reflect.get(cf, 'country') : undefined;
 }
 
 function sellersHandler(settings: IndexSettings) {
@@ -263,9 +319,9 @@ export function createDiscoveryIndex(options: DiscoveryIndexOptions = {}) {
     rejection(context, INDEX_ERRORS.UNAVAILABLE),
   );
   app.notFound((context) => rejection(context, INDEX_ERRORS.NOT_FOUND));
-  const publishers = settings.publishers;
+  const { publishers, registrations, registry } = settings;
   // Closed publishing answers 503 before the body is read or any publish limit is consumed.
-  if (!publishers)
+  if (!publishers && !registrations)
     app.post(INDEX_ROUTES.RECORDS, (context) =>
       rejection(context, INDEX_ERRORS.UNAVAILABLE),
     );
@@ -277,10 +333,28 @@ export function createDiscoveryIndex(options: DiscoveryIndexOptions = {}) {
         onError: (context) =>
           rejection(context, INDEX_ERRORS.PAYLOAD_TOO_LARGE),
       }),
-      publishHandler(settings, publishers),
+      publishHandler(settings),
+    );
+  if (!registrations || !registry)
+    app.post(INDEX_ROUTES.REGISTRATIONS, (context) =>
+      rejection(context, INDEX_ERRORS.UNAVAILABLE),
+    );
+  else
+    app.post(
+      INDEX_ROUTES.REGISTRATIONS,
+      async (context, next) => {
+        context.set('country', requestCountry(context));
+        await next();
+      },
+      bodyLimit({
+        maxSize: REGISTRATION.maxBodyBytes,
+        onError: (context) =>
+          rejection(context, INDEX_ERRORS.PAYLOAD_TOO_LARGE),
+      }),
+      registrationHandler(settings, registrations, registry),
     );
   app.get(INDEX_ROUTES.SELLERS, sellersHandler(settings));
-  // Reports the publish mode only, never the allowlisted NodeIds.
+  // Reports the publish mode only, never the allowlisted or registered NodeIds.
   app.get(INDEX_ROUTES.HEALTH, async (context) => {
     const records = await settings.records.read(
       context.get('storage'),
@@ -291,7 +365,7 @@ export function createDiscoveryIndex(options: DiscoveryIndexOptions = {}) {
     return context.json({
       ok: true,
       records,
-      publish: publishModeOf(publishers),
+      publish: publishModeOf(publishers, !!registrations),
     });
   });
   return app;
