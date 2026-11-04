@@ -177,6 +177,30 @@ const INIT_FLAGS = [
 const usesInitFlags = (values: CommandValues) =>
   INIT_FLAGS.some((flag) => values[flag] !== undefined);
 
+function runInit(values: CommandValues, context: CliContext) {
+  return initCommand(
+    {
+      engine: values.engine,
+      url: values.url,
+      model: values.model,
+      upstreamModel: values['upstream-model'],
+      contextTokens: values['context-tokens'],
+      apiKeyEnv: values['api-key-env'],
+      dailyCap: values['daily-cap'],
+      perBuyerCap: values['per-buyer-cap'],
+      publish: values.publish,
+      force: values.force === true,
+    },
+    {
+      env: context.env,
+      cwd: context.cwd ?? process.cwd(),
+      stdout: context.stdout,
+      stderr: context.stderr,
+    },
+    context.prompt,
+  );
+}
+
 export async function runCli(args: readonly string[], context: CliContext) {
   const parsed = parseCommand(args);
   const [group, command, ...rest] = parsed?.positionals ?? [];
@@ -189,28 +213,7 @@ export async function runCli(args: readonly string[], context: CliContext) {
     parsed.values.online === undefined &&
     !usesServiceFlags(parsed.values)
   ) {
-    const { values } = parsed;
-    return initCommand(
-      {
-        engine: values.engine,
-        url: values.url,
-        model: values.model,
-        upstreamModel: values['upstream-model'],
-        contextTokens: values['context-tokens'],
-        apiKeyEnv: values['api-key-env'],
-        dailyCap: values['daily-cap'],
-        perBuyerCap: values['per-buyer-cap'],
-        publish: values.publish,
-        force: values.force === true,
-      },
-      {
-        env: context.env,
-        cwd: context.cwd ?? process.cwd(),
-        stdout: context.stdout,
-        stderr: context.stderr,
-      },
-      context.prompt,
-    );
+    return runInit(parsed.values, context);
   }
   if (parsed && usesInitFlags(parsed.values)) {
     context.stderr(USAGE);

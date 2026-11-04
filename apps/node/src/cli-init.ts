@@ -48,6 +48,7 @@ interface InitOutput {
 const NO_KEY = 'none';
 const YES = /^y(es)?$/i;
 const POSITIVE_INTEGER = /^[1-9][0-9]*$/;
+const TEMPORARY_SUFFIX_BYTES = 6;
 
 const HINTS: Readonly<Record<InitErrorCode, string>> = {
   [INIT_ERRORS.MISSING_VALUE]:
@@ -99,69 +100,51 @@ async function ask(
   return value;
 }
 
-async function answersFrom(
+type RemoteAnswers = Pick<
+  InitAnswers,
+  'upstreamModel' | 'contextTokens' | 'apiKeyEnv'
+>;
+
+// Remote APIs only: the provider's model name, its context window and the key's variable.
+async function remoteAnswers(
+  engine: EngineKind,
+  model: string,
   options: InitOptions,
   prompt: Prompt | undefined,
-): Promise<InitAnswers> {
-  const engine = await ask(
+): Promise<RemoteAnswers> {
+  const upstreamModel = await ask(
     prompt,
-    '--engine',
-    'Engine (ollama, openai or anthropic)',
-    options.engine,
-    ENGINE_KINDS.OLLAMA,
+    '--upstream-model',
+    'Model name at the provider',
+    options.upstreamModel,
+    model,
   );
-  if (!isEngine(engine))
-    throw new InitError(INIT_ERRORS.INVALID_ENGINE, '--engine');
-  const local = engine === ENGINE_KINDS.OLLAMA;
-  const defaultUrl = local
-    ? INIT_DEFAULTS.ollamaUrl
-    : engine === ENGINE_KINDS.OPENAI
-      ? INIT_DEFAULTS.openaiUrl
-      : INIT_DEFAULTS.anthropicUrl;
-  const url = await ask(prompt, '--url', 'Engine URL', options.url, defaultUrl);
-  const model = await ask(
-    prompt,
-    '--model',
-    'Model to offer',
-    options.model,
-    local ? INIT_DEFAULTS.ollamaModel : undefined,
-  );
-  let remote: Pick<
-    InitAnswers,
-    'upstreamModel' | 'contextTokens' | 'apiKeyEnv'
-  > = {};
-  if (!local) {
-    const upstreamModel = await ask(
+  const contextTokens = count(
+    await ask(
       prompt,
-      '--upstream-model',
-      'Model name at the provider',
-      options.upstreamModel,
-      model,
-    );
-    const contextTokens = count(
-      await ask(
-        prompt,
-        '--context-tokens',
-        'Context window in tokens',
-        options.contextTokens,
-      ),
       '--context-tokens',
-    );
-    const apiKeyEnv = await ask(
-      prompt,
-      '--api-key-env',
-      `Variable holding the API key (${NO_KEY} for no key)`,
-      options.apiKeyEnv,
-      engine === ENGINE_KINDS.OPENAI
-        ? INIT_DEFAULTS.openaiKeyEnv
-        : INIT_DEFAULTS.anthropicKeyEnv,
-    );
-    remote = {
-      upstreamModel,
-      contextTokens,
-      ...(apiKeyEnv === NO_KEY ? {} : { apiKeyEnv }),
-    };
-  }
+      'Context window in tokens',
+      options.contextTokens,
+    ),
+    '--context-tokens',
+  );
+  const apiKeyEnv = await ask(
+    prompt,
+    '--api-key-env',
+    `Variable holding the API key (${NO_KEY} for no key)`,
+    options.apiKeyEnv,
+    engine === ENGINE_KINDS.OPENAI
+      ? INIT_DEFAULTS.openaiKeyEnv
+      : INIT_DEFAULTS.anthropicKeyEnv,
+  );
+  return {
+    upstreamModel,
+    contextTokens,
+    ...(apiKeyEnv === NO_KEY ? {} : { apiKeyEnv }),
+  };
+}
+
+async function freeAnswers(options: InitOptions, prompt: Prompt | undefined) {
   const dailyTokenCap = count(
     await ask(
       prompt,
@@ -193,14 +176,45 @@ async function answersFrom(
           ).trim(),
         )
       : false);
+  return { dailyTokenCap, perBuyerCap, publish };
+}
+
+async function answersFrom(
+  options: InitOptions,
+  prompt: Prompt | undefined,
+): Promise<InitAnswers> {
+  const engine = await ask(
+    prompt,
+    '--engine',
+    'Engine (ollama, openai or anthropic)',
+    options.engine,
+    ENGINE_KINDS.OLLAMA,
+  );
+  if (!isEngine(engine))
+    throw new InitError(INIT_ERRORS.INVALID_ENGINE, '--engine');
+  const local = engine === ENGINE_KINDS.OLLAMA;
+  const defaultUrl = local
+    ? INIT_DEFAULTS.ollamaUrl
+    : engine === ENGINE_KINDS.OPENAI
+      ? INIT_DEFAULTS.openaiUrl
+      : INIT_DEFAULTS.anthropicUrl;
+  const url = await ask(prompt, '--url', 'Engine URL', options.url, defaultUrl);
+  const model = await ask(
+    prompt,
+    '--model',
+    'Model to offer',
+    options.model,
+    local ? INIT_DEFAULTS.ollamaModel : undefined,
+  );
+  const remote = local
+    ? {}
+    : await remoteAnswers(engine, model, options, prompt);
   return {
     engine,
     url,
     model,
     ...remote,
-    dailyTokenCap,
-    perBuyerCap,
-    publish,
+    ...(await freeAnswers(options, prompt)),
   };
 }
 
@@ -220,7 +234,7 @@ async function checkTarget(path: string, force: boolean) {
 
 // Written beside the target and renamed over it, so a reader never sees half a file.
 async function writeAtomically(path: string, text: string) {
-  const temporary = `${path}.${randomBytes(6).toString('hex')}.tmp`;
+  const temporary = `${path}.${randomBytes(TEMPORARY_SUFFIX_BYTES).toString('hex')}.tmp`;
   try {
     await writeFile(temporary, text, {
       flag: 'wx',
