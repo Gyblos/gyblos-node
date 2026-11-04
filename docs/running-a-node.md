@@ -190,6 +190,51 @@ pnpm node:start
   [sequence recovery procedure](discovery.md#seller-duties); never reset the
   persisted sequence high-water mark.
 
+### Running the seller as a service
+
+Once `pnpm gyblos doctor` reports `READY`, the seller can run in the background
+and restart with the machine. Run these as the account that owns the seller home
+and keys, never as root:
+
+```sh
+(umask 077; printf 'GYBLOS_RELAY_TOKEN=%s\n' "$GYBLOS_RELAY_TOKEN" > "${GYBLOS_HOME:-.local/gyblos}/seller.env")
+pnpm gyblos seller service install --dry-run   # prints the unit; changes nothing
+pnpm gyblos seller service install             # writes and starts it
+pnpm gyblos seller service uninstall           # stops and removes it
+```
+
+- The service sees only `<home>/seller.env`, plus `GYBLOS_HOME` and
+  `GYBLOS_CONFIG` resolved to absolute paths from the directory where you run
+  `install`. Install first runs the offline doctor with exactly that environment
+  and writes nothing when it is not `READY`, so a token exported only in your
+  shell is reported as missing.
+- `seller.env` holds the relay token and any `api_key_env` variables: a regular
+  file you own, mode 0600, not a symlink. Each line is `NAME=value` with no
+  spaces, quotes, `$`, backticks, backslashes, `#`, `~` or shell operators in
+  the value, because systemd and the macOS agent read only that form alike. It
+  may not set `GYBLOS_HOME`, `GYBLOS_CONFIG`, `PATH`, `HOME`, shell variables
+  (`UID`, `IFS`, `BASH*` and the like) or `NODE_*`, `LD_*`, `DYLD_*`, `TSX_*`,
+  `OPENSSL_*` variables, and no line, comment included, may contain a backslash
+  or carriage return.
+- Linux: a systemd user unit (`~/.config/systemd/user/gyblos-seller.service`).
+  It stops when you log out and does not start at boot unless lingering is on
+  (`sudo loginctl enable-linger <account>`, once). On a server where the seller
+  has its own account, enable lingering, then run the commands in a login shell
+  of that account (`sudo -iu <account>`). The unit stops the seller with SIGINT
+  and waits 120 s for withdrawal, restarts it on failure but gives up after 5
+  failed starts in 10 minutes (`systemctl --user reset-failed gyblos-seller`
+  clears that once fixed), and sets `MemoryMax` (`--memory`, default and minimum
+  `2048M`, the 1.5 GiB startup headroom plus the seller itself) and `CPUQuota`
+  (`--cpu`, default `100%`). Logs: `journalctl --user -u gyblos-seller`.
+- macOS: a launch agent (`~/Library/LaunchAgents/com.gyblos.seller.plist`) that
+  runs while you are logged in and logs to `<home>/service.log`. launchd has no
+  memory or CPU limit; the startup headroom check still applies.
+- The engine is not part of the service: run Ollama as its own service (its
+  Linux installer creates one) on the offer URL.
+- Installing again refuses while a unit exists; uninstall first. The unit runs
+  this checkout with the Node that ran `install`, so reinstall after moving
+  either.
+
 ## Buyer
 
 Free inference uses `pnpm buyer:free`
