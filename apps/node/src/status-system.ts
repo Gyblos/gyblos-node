@@ -155,6 +155,7 @@ export async function readDaemonStatus(
   } catch {
     return { kind: 'unreadable' };
   } finally {
-    await file.close();
+    // A failed close of a read-only handle changes nothing that was read.
+    await file.close().catch(() => undefined);
   }
 }
