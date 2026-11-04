@@ -447,8 +447,8 @@ importers:
         specifier: 5.1.0
         version: 5.1.0(typescript@5.9.3)(ws@8.21.0)
       '@solana/rpc-spec-types':
-        specifier: 5.1.0
-        version: 5.1.0(typescript@5.9.3)
+        specifier: 8.6.0
+        version: 8.6.0(typescript@5.9.3)
 
   packages/node:
     dependencies:
@@ -531,8 +531,8 @@ importers:
         specifier: 5.1.0
         version: 5.1.0(typescript@5.9.3)(ws@8.21.0)
       '@solana/rpc-spec-types':
-        specifier: 5.1.0
-        version: 5.1.0(typescript@5.9.3)
+        specifier: 8.6.0
+        version: 8.6.0(typescript@5.9.3)
       '@x402/svm':
         specifier: 2.28.0
         version: 2.28.0(patch_hash=710ddfaef39f0955de8678f39b90ee9f67c1b5d0624219816acfb8b41e0b6cd7)(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))(typescript@5.9.3)
@@ -1728,6 +1728,16 @@ packages:
       typescript:
         optional: true
 
+  '@solana/errors@8.6.0':
+    resolution: {integrity: sha512-viHL51ymR1HZB7ZTp0ESkLOyHCa4bPfok9dvRYbMmYokY5ys1xinISKHUhcOHsg9zbuAWBRJUOnZRWAPbb4+yA==}
+    engines: {node: '>=20.18.0'}
+    hasBin: true
+    peerDependencies:
+      typescript: '>=5.4.0'
+    peerDependenciesMeta:
+      typescript:
+        optional: true
+
   '@solana/fast-stable-stringify@5.1.0':
     resolution: {integrity: sha512-ACZo7cH/5EXsBmruw/0gU2/PXL2l4aET0YpL93H6QEaZwEAICFD8cLkj20nBcfLTf4srEiuKtwuSDeONTWIulw==}
     engines: {node: '>=20.18.0'}
@@ -1922,6 +1932,15 @@ packages:
 
   '@solana/rpc-spec-types@6.10.0':
     resolution: {integrity: sha512-NDZrKyZrJk4HaMFhTE/lAiMB824cWAodKqDHyKi0UteHU9pyRmil3BN1jt7e+j08mwMWwfklSgyrTaq52g6DIQ==}
+    engines: {node: '>=20.18.0'}
+    peerDependencies:
+      typescript: '>=5.4.0'
+    peerDependenciesMeta:
+      typescript:
+        optional: true
+
+  '@solana/rpc-spec-types@8.6.0':
+    resolution: {integrity: sha512-6+2F2BN2CXp4g7cnvLp2mRo/XwdN5At7f3HbdEablxNe1UvI5S8WIEY3l/Y+nh2NQIaEVz9fLjmTYV+UfZNzEg==}
     engines: {node: '>=20.18.0'}
     peerDependencies:
       typescript: '>=5.4.0'
@@ -4069,6 +4088,13 @@ snapshots:
     optionalDependencies:
       typescript: 5.9.3
 
+  '@solana/errors@8.6.0(typescript@5.9.3)':
+    dependencies:
+      chalk: 5.6.2
+      commander: 15.0.0
+    optionalDependencies:
+      typescript: 5.9.3
+
   '@solana/fast-stable-stringify@5.1.0(typescript@5.9.3)':
     dependencies:
       typescript: 5.9.3
@@ -4319,6 +4345,12 @@ snapshots:
       typescript: 5.9.3
 
   '@solana/rpc-spec-types@6.10.0(typescript@5.9.3)':
+    optionalDependencies:
+      typescript: 5.9.3
+
+  '@solana/rpc-spec-types@8.6.0(typescript@5.9.3)':
+    dependencies:
+      '@solana/errors': 8.6.0(typescript@5.9.3)
     optionalDependencies:
       typescript: 5.9.3
 
