@@ -113,6 +113,9 @@ export function system(
         output: argv[0] === 'launchctl' ? '\tstate = running\n' : '',
       };
     },
+    daemonInContainer: async () => {
+      throw new Error('not in a container in this test');
+    },
     fetch: async () => {
       throw new Error('no network in this test');
     },

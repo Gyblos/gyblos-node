@@ -3,10 +3,7 @@
 // home location never leave this module. Network use is limited to describing each offer's engine: one on
 // this machine always, a remote API only with --online, since that call carries the seller's API key;
 // --online also reads missing payment token accounts and checks this clock against the discovery index.
-import { resolve } from 'node:path';
-
 import {
-  NODE_ENVIRONMENT,
   PROTOCOL_FEE,
   ROLE_FILES,
   ROLE_KEY_FILES,
@@ -31,8 +28,6 @@ import {
   DOCTOR_CHECKS,
   DOCTOR_CODES,
   DOCTOR_STATUS,
-  NODE_CONFIG_FILENAME,
-  NODE_CONFIG_ISSUE_CODES,
   NODE_ERROR_CODES,
   type DoctorCheckName,
   type DoctorCode,
@@ -42,8 +37,8 @@ import {
 import { createSellerEngine } from './engine-registry';
 import { NodeError } from './errors';
 import { assertRoleHome, assertTokenizerHome } from './home';
-import { readNodeConfigFile, type NodeConfig } from './node-config';
 import type { NodeConfigIssue } from './node-config-fields';
+import { readStartupConfig } from './node-config-file';
 import type { SellerLimits } from './node-config-limits';
 import { inspectSellerSequence } from './public-sequence';
 import { loadRole, roleKeyFilesStatus, type RoleConfig } from './roles';
@@ -109,25 +104,16 @@ const errorCode = (error: unknown): DoctorResultCode =>
     ? error.code
     : DOCTOR_CODES.CHECK_FAILED;
 
-// Exactly seller startup's file choice: GYBLOS_CONFIG must exist; without ./gyblos.toml the settings fail
-// with SELLER_OFFERS_MISSING, as startup does.
+// Startup's own file choice (readStartupConfig); without a file the settings fail with SELLER_OFFERS_MISSING,
+// as startup does.
 async function configCheck(options: DoctorOptions) {
-  const explicit = options.environment[NODE_ENVIRONMENT.config];
-  const read = await readNodeConfigFile(
-    resolve(options.cwd, explicit || NODE_CONFIG_FILENAME),
-  );
-  let file: NodeConfig | undefined;
-  if (read.ok) file = read.config;
-  else {
-    const missing =
-      read.issues.length === 1 &&
-      read.issues[0]!.code === NODE_CONFIG_ISSUE_CODES.FILE_NOT_FOUND;
-    if (!missing || explicit)
-      return {
-        issues: read.issues,
-        result: fail(NODE_ERROR_CODES.NODE_CONFIG_INVALID),
-      };
-  }
+  const read = await readStartupConfig(options.environment, options.cwd);
+  if (!read.ok)
+    return {
+      issues: read.issues,
+      result: fail(NODE_ERROR_CODES.NODE_CONFIG_INVALID),
+    };
+  const file = read.config;
   try {
     // As the daemon does: paid offers are served through the role's payment keys.
     const settings = sellerSettings(file, options.environment, {

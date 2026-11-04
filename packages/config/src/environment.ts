@@ -9,6 +9,9 @@ export const NODE_ENVIRONMENT = {
   irohExternalAddress: 'GYBLOS_IROH_EXTERNAL_ADDR',
   // Path to gyblos.toml for the seller daemon; without it ./gyblos.toml is read when present.
   config: 'GYBLOS_CONFIG',
+  // Set to ENVIRONMENT_SWITCH.on by the seller image: `gyblos seller status` then looks for the daemon in
+  // its own container instead of a systemd unit or launch agent.
+  container: 'GYBLOS_CONTAINER',
 } as const;
 
 // Value an operator sets to turn an environment switch on; today's readers compare against it exactly.

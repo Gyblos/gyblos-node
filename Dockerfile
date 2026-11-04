@@ -8,9 +8,10 @@ COPY . .
 RUN pnpm install --frozen-lockfile && pnpm store prune
 
 FROM node:24.22.1-bookworm-slim
-ENV GYBLOS_HOME=/data GYBLOS_CONFIG=/config/gyblos.toml
+ENV GYBLOS_HOME=/data GYBLOS_CONFIG=/config/gyblos.toml GYBLOS_CONTAINER=1
 COPY --from=build --chown=node:node /app /app
-RUN install -d -o node -g node -m 0700 /data
+# `docker compose exec seller gyblos …` runs the CLI inside the seller's own container.
+RUN install -d -o node -g node -m 0700 /data && ln -s /app/docker/gyblos /usr/local/bin/gyblos
 USER node
 WORKDIR /app
 VOLUME /data

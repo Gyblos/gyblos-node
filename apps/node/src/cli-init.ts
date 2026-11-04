@@ -3,15 +3,11 @@
 // ./gyblos.toml), checks it with startup's own offer rules, never replaces one without --force, never
 // follows a symlink, and handles no secret: API keys and the relay token stay in seller.env, so only their
 // variable names appear.
-import { randomUUID } from 'node:crypto';
-import { constants, link, lstat, open, rename, rm } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
 import { createInterface, type Interface } from 'node:readline/promises';
 
-import { NODE_ENVIRONMENT } from '@gyblos/config';
-import { NODE_CONFIG_FILENAME } from '@gyblos/node/constants';
 import { NodeError } from '@gyblos/node/errors';
 import { parseNodeConfig, type NodeConfig } from '@gyblos/node/node-config';
+import { nodeConfigPath } from '@gyblos/node/node-config-file';
 import { sellerSettings } from '@gyblos/node/seller-settings';
 import { ENGINE_KINDS, type EngineKind } from '@gyblos/protocol/constants';
 
@@ -20,10 +16,10 @@ import {
   EXIT,
   INIT_DEFAULTS,
   INIT_ERRORS,
-  INIT_FILE_MODE,
   type InitErrorCode,
 } from './constants';
 import { initToml, ollamaTag, type InitAnswers } from './init';
+import { checkTarget, InitError, writeConfigFile } from './init-file';
 
 // Answers a question typed at the terminal; rejects when the operator cancels.
 export type Prompt = (question: string) => Promise<string>;
@@ -54,13 +50,6 @@ const YES = /^y(es)?$/i;
 const POSITIVE_INTEGER = /^[1-9][0-9]*$/;
 // Stands in for the API key while startup's rules check the file; init never reads the real one.
 const KEY_PRESENT = 'present';
-// A new file only, never through a symlink.
-const NEW_FILE =
-  constants.O_WRONLY |
-  constants.O_CREAT |
-  constants.O_EXCL |
-  constants.O_NOFOLLOW;
-
 const HINTS: Readonly<Record<InitErrorCode, string>> = {
   [INIT_ERRORS.MISSING_VALUE]:
     'pass it as a flag, or run on a terminal to be asked',
@@ -77,15 +66,6 @@ const HINTS: Readonly<Record<InitErrorCode, string>> = {
     'could not write the config file; check the directory exists and is writable',
   [INIT_ERRORS.CANCELLED]: 'nothing was written',
 };
-
-class InitError extends Error {
-  constructor(
-    readonly code: InitErrorCode,
-    readonly subject?: string,
-  ) {
-    super(code);
-  }
-}
 
 const isEngine = (value: string): value is EngineKind =>
   (Object.values(ENGINE_KINDS) as string[]).includes(value);
@@ -235,51 +215,6 @@ async function answersFrom(
   };
 }
 
-// An existing file is replaced only with --force, and never through a symlink or over a non-file.
-async function checkTarget(path: string, force: boolean) {
-  let stats;
-  try {
-    stats = await lstat(path);
-  } catch (error) {
-    if (error instanceof Error && 'code' in error && error.code === 'ENOENT')
-      return;
-    throw new InitError(INIT_ERRORS.WRITE_FAILED);
-  }
-  if (!stats.isFile()) throw new InitError(INIT_ERRORS.UNSAFE_PATH);
-  if (!force) throw new InitError(INIT_ERRORS.FILE_EXISTS);
-}
-
-// Written and synced beside the target, then moved into place and the directory synced, so a reader never
-// sees half a file. Without --force the move is a link, which fails if a file appeared meanwhile.
-async function writeAtomically(path: string, text: string, force: boolean) {
-  const temporary = `${path}.${randomUUID()}.tmp`;
-  try {
-    const file = await open(temporary, NEW_FILE, INIT_FILE_MODE);
-    try {
-      await file.writeFile(text);
-      // The umask may have narrowed the mode; the handle cannot be swapped for a symlink.
-      await file.chmod(INIT_FILE_MODE);
-      await file.sync();
-    } finally {
-      await file.close();
-    }
-    if (force) await rename(temporary, path);
-    else await link(temporary, path);
-    const parent = await open(dirname(path), constants.O_RDONLY);
-    try {
-      await parent.sync();
-    } finally {
-      await parent.close();
-    }
-  } catch (error) {
-    if (error instanceof Error && 'code' in error && error.code === 'EEXIST')
-      throw new InitError(INIT_ERRORS.FILE_EXISTS);
-    throw new InitError(INIT_ERRORS.WRITE_FAILED);
-  } finally {
-    await rm(temporary, { force: true });
-  }
-}
-
 // Startup's own offer rules (engine, model, URL and key variable), with the key stood in for.
 function startupRefusal(config: NodeConfig, answers: InitAnswers) {
   try {
@@ -315,10 +250,7 @@ export async function initCommand(
   output: InitOutput,
   prompt?: Prompt,
 ) {
-  const path = resolve(
-    output.cwd,
-    output.env[NODE_ENVIRONMENT.config] || NODE_CONFIG_FILENAME,
-  );
+  const { path } = nodeConfigPath(output.env, output.cwd);
   try {
     await checkTarget(path, options.force);
     let answers: InitAnswers;
@@ -344,7 +276,7 @@ export async function initCommand(
     }
     // Checked again: the file may have appeared or changed while the operator was answering.
     await checkTarget(path, options.force);
-    await writeAtomically(path, text, options.force);
+    await writeConfigFile(path, text, options.force);
     output.stdout(
       `Wrote ${path}: free offer ${answers.model} via ${answers.engine} ${urlOrigin(answers.url)}; discovery ${answers.publish ? 'on' : 'off'}\nNext:\n${nextSteps(answers)}`,
     );

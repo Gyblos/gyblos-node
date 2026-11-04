@@ -488,12 +488,15 @@ Qwen3 thinking is on or off, written `["off", "high"]`. The custom model in
 - `@gyblos/node/node-config`: `parseNodeConfig`, `validateNodeConfig`,
   `readNodeConfigFile`, `pricePerMtokToAtomicPerMtok` and the `NodeConfig` type;
   a valid result also carries `warnings`.
+- `@gyblos/node/node-config-file`: `nodeConfigPath` and `readStartupConfig`, the
+  one rule for which file is read (`GYBLOS_CONFIG`, else an optional
+  `./gyblos.toml`).
 - `@gyblos/node/node-config-resolve`: `resolveNodeConfig({ file, env, flags })`,
   returning settings, origins, secret references and warnings, or issues.
 - `apps/node/src/cli.ts`: the `gyblos` command (`pnpm gyblos`);
-  `apps/node/src/cli-init.ts` and `init.ts` hold `gyblos seller init`, and
-  `cli-status.ts`, `status.ts` and `status-system.ts` hold
-  `gyblos seller status`.
+  `apps/node/src/cli-init.ts`, `init.ts` and `init-file.ts` hold
+  `gyblos seller init`, and `cli-status.ts`, `status.ts` and `status-system.ts`
+  hold `gyblos seller status`.
 
 ## Local telemetry
 

@@ -34,6 +34,7 @@
     "./seller-doctor": "./src/seller-doctor.ts",
     "./control-startup": "./src/control-startup.ts",
     "./node-config": "./src/node-config.ts",
+    "./node-config-file": "./src/node-config-file.ts",
     "./node-config-resolve": "./src/node-config-resolve.ts",
     "./node-config-limits": "./src/node-config-limits.ts",
     "./free-execution": "./src/free-execution.ts",

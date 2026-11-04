@@ -1,10 +1,12 @@
 // What `gyblos seller status` reads outside its receipts: the service manager (asked with a fixed argv, no
-// shell, a timeout and bounded output) and the daemon's status.json (opened without following a link,
-// bounded, never a FIFO or device). Tests replace the service manager, the index and the clock.
+// shell, a timeout and bounded output) or, inside the seller image, the container's process list; and the
+// daemon's status.json (opened without following a link, bounded, never a FIFO or device). Tests replace
+// the service manager, the process list, the index and the clock.
 import { spawn } from 'node:child_process';
-import { constants, lstat, open } from 'node:fs/promises';
+import { constants, lstat, open, readdir, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 
+import { ENVIRONMENT_SWITCH, NODE_ENVIRONMENT } from '@gyblos/config';
 import { ROLE_FILES, rolePathIn } from '@gyblos/config/home';
 import type { DiscoveryFetch } from '@gyblos/discovery-http';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
@@ -31,6 +33,8 @@ export interface StatusSystem {
   accountHome: string;
   // Runs a command without a shell and resolves its exit code and the start of its standard output.
   probe: (argv: readonly string[]) => Promise<ProbeResult>;
+  // Inside the seller image: whether the daemon runs in this container.
+  daemonInContainer: () => Promise<boolean>;
   fetch: DiscoveryFetch;
   now: () => number;
 }
@@ -58,12 +62,35 @@ function probeCommand(argv: readonly string[]) {
   });
 }
 
+const PROCESS_ID = /^[0-9]+$/;
+
+// Another process in this PID namespace whose arguments include the daemon's entry; `docker compose exec`
+// shares the seller container's namespace, and its own CLI process is skipped.
+export async function daemonProcess(
+  procRoot = '/proc',
+  ownPid = process.pid,
+): Promise<boolean> {
+  const entries = await readdir(procRoot);
+  for (const entry of entries) {
+    if (!PROCESS_ID.test(entry) || Number(entry) === ownPid) continue;
+    let cmdline: string;
+    try {
+      cmdline = await readFile(`${procRoot}/${entry}/cmdline`, 'utf8');
+    } catch {
+      continue;
+    }
+    if (cmdline.split('\0').includes(SERVICE.entry)) return true;
+  }
+  return false;
+}
+
 export function defaultStatusSystem(): StatusSystem {
   return {
     platform: process.platform,
     uid: process.getuid?.(),
     accountHome: homedir(),
     probe: probeCommand,
+    daemonInContainer: () => daemonProcess(),
     fetch: (input, init) => fetch(input, init),
     now: Date.now,
   };
@@ -79,10 +106,26 @@ async function installed(path: string) {
   }
 }
 
-// The unit or agent `gyblos seller service install` writes, and whether its process runs now.
+// The seller image sets GYBLOS_CONTAINER=1; status then means the daemon in this container.
+export const inContainer = (
+  environment: Readonly<Record<string, string | undefined>>,
+) => environment[NODE_ENVIRONMENT.container] === ENVIRONMENT_SWITCH.on;
+
+// The seller image's container, else the unit or agent `gyblos seller service install` writes, and whether
+// its process runs now.
 export async function serviceState(
   system: StatusSystem,
+  environment: Readonly<Record<string, string | undefined>>,
 ): Promise<ServiceState> {
+  if (inContainer(environment)) {
+    try {
+      return (await system.daemonInContainer())
+        ? SERVICE_STATES.ACTIVE
+        : SERVICE_STATES.INACTIVE;
+    } catch {
+      return SERVICE_STATES.UNKNOWN;
+    }
+  }
   const kind =
     system.platform === 'linux'
       ? SERVICE_KINDS.SYSTEMD_USER

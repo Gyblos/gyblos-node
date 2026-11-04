@@ -258,10 +258,17 @@ pnpm gyblos seller status --online   # also looks this NodeId up in the discover
 
 It prints the NodeId and owner, then:
 
-- `service`: `active` while the unit or agent `seller service install` wrote has
-  a running process (for launchd, `launchctl print` must show `state = running`;
-  a loaded agent that exited is `inactive`), `inactive`, `not installed`, or
-  `unknown` as root or on other platforms;
+- `service`: inside the seller image
+  (`docker compose exec seller gyblos seller status`; the image sets
+  `GYBLOS_CONTAINER=1`), `active (container)` while the daemon runs in that
+  container, `inactive (container)` when it does not, or `unknown (container)`
+  when the process list cannot be read. Use `exec`, not `run`:
+  `docker compose run` starts a new container that cannot see the seller and
+  reports it inactive. Otherwise `active` while the unit or agent
+  `seller service install` wrote has a running process (for launchd,
+  `launchctl print` must show `state = running`; a loaded agent that exited is
+  `inactive`), `inactive`, `not installed`, or `unknown` as root or on other
+  platforms;
 - `daemon`: the last state the daemon wrote to `status.json` (`starting` with
   its phase, or `ready`) and when; a stopped daemon does not rewrite it;
 - one `offer` line per offer: `serving` once it is in the signed catalog, else
@@ -296,6 +303,7 @@ docker compose run --rm seller setup --role seller --mint MINT
 docker compose run --rm seller tokenizer
 docker compose run --rm seller gyblos doctor      # READY, and the public NodeId and owner
 docker compose up -d                              # starts the seller
+docker compose exec seller gyblos seller status   # RUNNING once it serves
 docker compose logs -f seller
 docker compose stop seller                        # SIGINT; withdraws within 120 s
 ```

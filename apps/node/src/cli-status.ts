@@ -5,16 +5,10 @@
 // from the environment.
 import { resolve } from 'node:path';
 
-import { NODE_ENVIRONMENT } from '@gyblos/config';
 import { homeLayout } from '@gyblos/config/home';
 import { fetchSellers } from '@gyblos/discovery-http';
-import {
-  NODE_CONFIG_FILENAME,
-  NODE_CONFIG_ISSUE_CODES,
-  RECEIPT_STORAGE,
-  SELLER_DAEMON_STATES,
-} from '@gyblos/node/constants';
-import { readNodeConfigFile } from '@gyblos/node/node-config';
+import { RECEIPT_STORAGE, SELLER_DAEMON_STATES } from '@gyblos/node/constants';
+import { readStartupConfig } from '@gyblos/node/node-config-file';
 import { resolveNodeConfig } from '@gyblos/node/node-config-resolve';
 import { listReceipts } from '@gyblos/node/receipts';
 import { loadRole } from '@gyblos/node/roles';
@@ -38,6 +32,7 @@ import {
 } from './status';
 import {
   defaultStatusSystem,
+  inContainer,
   readDaemonStatus,
   serviceState,
   type DaemonFile,
@@ -67,19 +62,12 @@ const line = (label: string, value: string) =>
 const iso = (time: number) =>
   new Date(time).toISOString().replace(/\.\d+Z$/, 'Z');
 
-// node:start's choice: an explicit GYBLOS_CONFIG must be readable; only a missing ./gyblos.toml is optional.
+// The file node:start reads, refused exactly when node:start would refuse it.
 async function discoverySettings(output: StatusOutput) {
-  const explicit = output.env[NODE_ENVIRONMENT.config];
-  const parsed = await readNodeConfigFile(
-    resolve(output.cwd, explicit || NODE_CONFIG_FILENAME),
-  );
-  const missing =
-    !parsed.ok &&
-    parsed.issues.length === 1 &&
-    parsed.issues[0]!.code === NODE_CONFIG_ISSUE_CODES.FILE_NOT_FOUND;
-  if (!parsed.ok && (explicit || !missing)) return undefined;
+  const read = await readStartupConfig(output.env, output.cwd);
+  if (!read.ok) return undefined;
   const resolved = resolveNodeConfig({
-    file: parsed.ok ? parsed.config : undefined,
+    file: read.config,
     env: output.env,
   });
   return resolved.ok
@@ -261,14 +249,19 @@ export async function statusCommand(
   if (!identity) return EXIT.failure;
   const now = system.now();
   const [service, daemon, discovery] = await Promise.all([
-    serviceState(system),
+    serviceState(system, output.env),
     readDaemonStatus(homeEnvironment),
     discoverySettings(output),
   ]);
   const status = daemon.kind === 'read' ? daemon.status : undefined;
   output.stdout(`Seller ${identity.nodeId}\n`);
   output.stdout(line('owner', identity.owner));
-  output.stdout(line('service', service));
+  output.stdout(
+    line(
+      'service',
+      inContainer(output.env) ? `${service} (container)` : service,
+    ),
+  );
   output.stdout(line('daemon', daemonLine(daemon)));
   for (const offer of status?.offers ?? [])
     output.stdout(
