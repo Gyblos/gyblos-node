@@ -4,9 +4,15 @@ import { readFile, stat } from 'node:fs/promises';
 import test from 'node:test';
 
 import { FILE_MODES, receiptPathsIn } from '@gyblos/config';
-import { P2P_ROLES, RECEIPT_CHANNEL } from '@gyblos/protocol/constants';
+import { RECEIPT_WORK } from '@gyblos/node/constants';
+import {
+  P2P_ROLES,
+  RECEIPT_CHANNEL,
+  RECEIPT_CHANNEL_METHODS,
+} from '@gyblos/protocol/constants';
 import { freeExecutionDigest } from '@gyblos/protocol/free-execution';
 import { verifyReceipt } from '@gyblos/protocol/receipt';
+import { parseReceiptChannelRequest } from '@gyblos/protocol/receipt-channel';
 
 import { nativeFreeReceiptFixture } from './support/free-receipts';
 import { within } from './support/native-fixture';
@@ -165,6 +171,8 @@ void test(
     });
     let published = false;
     let readyAtExchange: boolean | undefined;
+    let sellerAtExchange:
+      ReturnType<typeof f.sellerReceipts.health> | undefined;
     let exchanges = 0;
     const put = f.sellerStore.put.bind(f.sellerStore);
     f.sellerStore.put = async (...args) => {
@@ -176,6 +184,7 @@ void test(
     f.buyerReceipts.exchange = (...args) => {
       exchanges++;
       readyAtExchange = published;
+      sellerAtExchange = f.sellerReceipts.health();
       exchange(...args);
     };
     const answer = f.execute(true);
@@ -193,8 +202,67 @@ void test(
       await f.sellerReceipts.settled();
       assert.equal(exchanges, 1);
       assert.equal(readyAtExchange, true);
+      assert.deepEqual(sellerAtExchange, {
+        active: false,
+        saved: 1,
+        failed: 0,
+        dropped: 0,
+      });
       assert.equal(f.buyerReceipts.health().saved, 1);
       assert.equal(f.sellerReceipts.health().saved, 1);
+      assert.equal(f.calls(), 1);
+      assert.equal(f.selections(), 1);
+    } finally {
+      release();
+      await answer.catch(() => {});
+      await f.close();
+    }
+  },
+);
+
+void test(
+  'native delayed receipt publication preserves the answer and bounds metadata work without repeating inference',
+  { skip: NATIVE_CAPABILITY.transportSkip },
+  async () => {
+    const f = await nativeFreeReceiptFixture(true, { awaitPublication: false });
+    let release = () => {};
+    const publication = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let publishing = () => {};
+    const started = new Promise<void>((resolve) => {
+      publishing = resolve;
+    });
+    let published = false;
+    let gets = 0;
+    const put = f.sellerStore.put.bind(f.sellerStore);
+    f.sellerStore.put = async (...args) => {
+      publishing();
+      await publication;
+      await put(...args);
+      published = true;
+    };
+    const respond = f.sellerReceipts.service.respond.bind(
+      f.sellerReceipts.service,
+    );
+    f.sellerReceipts.service.respond = async (value, ...args) => {
+      if (
+        parseReceiptChannelRequest(value).method === RECEIPT_CHANNEL_METHODS.GET
+      )
+        gets++;
+      return respond(value, ...args);
+    };
+    const answer = f.execute(true);
+    try {
+      await within(Promise.race([started, answer.then(() => started)]));
+      assert.equal((await within(answer)).text, 'é😀');
+      assert.equal(published, false);
+      assert.equal(f.sellerReceipts.health().active, true);
+      await within(f.buyerReceipts.settled());
+      assert.equal(f.buyerReceipts.health().saved, 0);
+      assert.equal(f.buyerReceipts.health().failed, 1);
+      assert.equal(f.buyerReceipts.health().dropped, 0);
+      assert.ok(gets <= RECEIPT_WORK.attempts);
       assert.equal(f.calls(), 1);
       assert.equal(f.selections(), 1);
     } finally {

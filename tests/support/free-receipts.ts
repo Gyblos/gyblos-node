@@ -1,4 +1,5 @@
-// Isolates native free inference and signed-receipt exchange in temporary role homes with synthetic engines.
+// Isolates native receipt checks with synthetic engines and temporary homes.
+// Success cases wait for seller publication; explicit concurrent cases retain best-effort ordering.
 import { mkdtemp, realpath, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -63,7 +64,10 @@ async function nativeReceiptSeller(seller: Endpoint, buyer: Endpoint) {
   };
   return { ...f, engine };
 }
-export async function nativeFreeReceiptFixture(receiptEnabled = true) {
+export async function nativeFreeReceiptFixture(
+  receiptEnabled = true,
+  { awaitPublication = true }: { awaitPublication?: boolean } = {},
+) {
   const directory = await realpath(
     await mkdtemp(join(tmpdir(), 'gyblos-free-receipts-native-')),
   );
@@ -159,6 +163,7 @@ export async function nativeFreeReceiptFixture(receiptEnabled = true) {
     ...base,
     receipt: async (...args: Parameters<NonNullable<typeof base.receipt>>) => {
       beginReceipt();
+      if (awaitPublication) await sellerReceipts.settled();
       await base.receipt?.(...args);
     },
     select: async () => {
