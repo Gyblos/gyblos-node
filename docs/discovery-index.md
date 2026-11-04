@@ -19,11 +19,12 @@ remote database and deploying are founder-approved manual steps (see
 Routes sit at the root of the index host; the client base URL is
 `https://discovery.gyblos.com/v1` (`DISCOVERY_INDEX_URL` in `@gyblos/config`).
 
-| Route              | Purpose                                                       |
-| ------------------ | ------------------------------------------------------------- |
-| `POST /v1/records` | Publish one signed public v2 catalog, presence or withdrawal. |
-| `GET /v1/sellers`  | List live sellers of one model, paged by an opaque cursor.    |
-| `GET /v1/health`   | `{ ok: true, records, publish }` (see below).                 |
+| Route                    | Purpose                                                                                    |
+| ------------------------ | ------------------------------------------------------------------------------------------ |
+| `POST /v1/records`       | Publish one signed public v2 catalog, presence or withdrawal.                              |
+| `GET /v1/sellers`        | List live sellers of one model, paged by an opaque cursor.                                 |
+| `GET /v1/health`         | `{ ok: true, records, publish }` (see below).                                              |
+| `POST /v1/registrations` | Trade a beta invite for publishing, once the NodeId is bound in the 8004 registry (below). |
 
 The index is HTTPS only: a request whose URL is not `https` gets
 `400 {"error":"HTTPS_REQUIRED"}` for every method and path, before storage or
@@ -38,9 +39,9 @@ Anything else is a real `404 {"error":"NOT_FOUND"}`. Every response carries
 `Access-Control-Allow-Origin: *` on every status, errors included.
 
 `records` in the health body is the count of unexpired records; `publish` is
-`"closed"`, `"allowlist"` or `"open"` (the publish mode, never the listed
-NodeIds). `publish` is a reference-index extension that clients must not rely
-on.
+`"closed"`, `"allowlist"`, `"registered"` or `"open"` (the publish mode, never
+the listed or registered NodeIds). `publish` is a reference-index extension that
+clients must not rely on.
 
 ## Publish allowlist (devnet)
 
@@ -50,11 +51,16 @@ secret `DISCOVERY_PUBLISH_ALLOWLIST` holds them as comma-separated lowercase
 most 1000 entries. The single value `*` opens publishing to any self-signed
 NodeId, the permissionless design for later.
 
-- **Fail closed:** if the secret is missing, empty, or has any malformed entry
-  (uppercase, wrong length, an empty item such as a trailing comma, `*` mixed
-  with NodeIds, more than 1000 entries), every `POST /v1/records` answers
-  `503 DISCOVERY_UNAVAILABLE` before the body is read or any publish limit is
-  consumed. `GET /v1/sellers` and `GET /v1/health` keep working.
+- **Without a usable secret:** if the secret is missing, empty, or has any
+  malformed entry (uppercase, wrong length, an empty item such as a trailing
+  comma, `*` mixed with NodeIds, more than 1000 entries), only NodeIds admitted
+  through `POST /v1/registrations` may publish (health reports `registered`);
+  every other NodeId gets `403 PUBLISH_NOT_ALLOWED`. Without storage either,
+  every `POST /v1/records` answers `503 DISCOVERY_UNAVAILABLE` before the body
+  is read. `GET /v1/sellers` and `GET /v1/health` keep working.
+- **Allowlist first:** an allowlisted NodeId is accepted without reading the
+  registration tables, so allowlisted sellers keep publishing before migration
+  0003 is applied.
 - **Cheap rejection:** after the per-IP and publish limits and the strict body
   checks, the record's claimed `nodeId` is looked up first. An unlisted NodeId
   gets `403 PUBLISH_NOT_ALLOWED` before signature verification, any storage read
@@ -70,6 +76,47 @@ NodeId, the permissionless design for later.
 - The Worker parses the secret once per isolate, with the app it caches.
   `createDiscoveryIndex` takes it as `publishers`: `{ mode: 'open' }`,
   `{ mode: 'allowlist', nodeIds }`, or undefined (closed).
+
+## Beta registration (invites)
+
+The beta replaces the allowlist with one-use invites (vault
+`20 Decisions/Alta de vendedores.md` §2). The seller registers its NodeId in the
+8004-solana registry, paying with its own wallet, then sends
+`POST /v1/registrations` with `{"invite":"gyb_<26 base32>","nodeId":"<64 hex>"}`
+(JSON, at most 512 bytes).
+
+- **Order of checks:** per-IP and publish limits, content type, size and strict
+  shape (`400 INVALID_REGISTRATION`). An already active NodeId answers
+  `200 {"ok":true,"status":"active"}` without reading the chain or spending an
+  invite. An unknown, used or expired invite is `403 INVITE_INVALID` before the
+  chain is read. Then the registry is read through the RPC secret: no binding
+  for the NodeId is `403 IDENTITY_NOT_REGISTERED`, and an RPC outage or a
+  binding for another NodeId is `503 DISCOVERY_UNAVAILABLE`. None of these
+  spends the invite. Success is `201 {"ok":true,"status":"active"}`.
+- **What is stored** (migration `0003_registrations.sql`): the invite's SHA-256
+  (never the code), the contact it was issued to, its creation, expiry and use
+  time and the NodeId it admitted; for the NodeId, the owner and asset the
+  registry bound (from the chain, not the request), `active` or `revoked`, and
+  Cloudflare's two-letter country when present. No IP or IP fingerprint.
+- **Invites and revocation** are founder commands that write to the remote D1
+  through a Wrangler login; the index has no admin route:
+
+  ```sh
+  pnpm index:invite --contact seller@example.com   # prints a gyb_… code, valid 14 days (--days 1-90)
+  pnpm index:revoke <NodeId>                       # its publishes are refused; a new invite readmits it
+  ```
+
+  Add `--dry-run` to print the SQL instead. The code is printed once and cannot
+  be shown again.
+
+- **RPC secret:** `DISCOVERY_SOLANA_RPC_URL`, a devnet RPC URL. The reader
+  refuses query strings, so the provider key must be in the path (Alchemy- or
+  QuickNode-style URLs; a `?api-key=` URL is refused). Without it the route
+  answers 503. The public `api.devnet.solana.com` answers 403 to Workers.
+- **Workers runtime:** the reader comes from `@gyblos/identity`, which pulls
+  `@gyblos/config`; the Worker sets `nodejs_compat` for its Node path helpers,
+  and maps the reader's `redirect: 'error'` (unsupported on Workers) to
+  `manual`, so a redirect is refused as a non-OK response.
 
 ## Security model and limits
 
@@ -230,6 +277,23 @@ curl -s http://discovery.gyblos.com/v1/health
 # expected: 400 {"error":"HTTPS_REQUIRED"} (unless the zone's Always Use HTTPS
 # redirects first; either way nothing is served over http)
 ```
+
+For beta registration (migration `0003`, `nodejs_compat`, the RPC secret), apply
+the migration first; it only adds tables, so the running version keeps working.
+Keep the allowlist secret during the switch, so the allowlisted seller keeps
+publishing, and remove it once that seller is registered:
+
+```sh
+npx wrangler@4.151.1 d1 migrations apply gyblos-discovery --remote   # 0003
+npx wrangler@4.151.1 deploy
+npx wrangler@4.151.1 secret put DISCOVERY_SOLANA_RPC_URL             # devnet URL, key in the path
+curl -s https://discovery.gyblos.com/v1/health                       # "publish":"allowlist" while the secret stays
+curl -s -X POST https://discovery.gyblos.com/v1/registrations \
+  -H 'content-type: application/json' -d '{"invite":"gyb_aaaaaaaaaaaaaaaaaaaaaaaaaa","nodeId":"'"$(printf 'ab%.0s' $(seq 32))"'"}'
+# expected: 403 {"error":"INVITE_INVALID"} (503 means the RPC secret is missing or refused)
+```
+
+Rolling that code back leaves the `0003` tables unused; nothing needs reverting.
 
 The global read limiter (`DISCOVERY_READ_LIMITER`, namespace `42621007`) ships
 in the same deploy as the code that requires it; deploying the code without the

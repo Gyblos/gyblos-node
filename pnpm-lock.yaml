@@ -233,9 +233,18 @@ importers:
 
   apps/discovery-index:
     dependencies:
+      '@gyblos/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@gyblos/identity':
+        specifier: workspace:*
+        version: link:../../packages/identity
       '@gyblos/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
+      '@gyblos/runtime':
+        specifier: workspace:*
+        version: link:../../packages/runtime
       hono:
         specifier: 4.13.13
         version: 4.13.13

@@ -367,7 +367,8 @@ void test('the Worker entry fails closed without bindings and serves health with
   assert.deepEqual(await response.json(), {
     ok: true,
     records: 0,
-    publish: 'closed',
+    // No allowlist: only NodeIds admitted through /v1/registrations may publish.
+    publish: 'registered',
   });
   // Loopback hosts get no development relaxation from the Worker entry.
   const local = await worker.fetch(new Request('https://localhost/v1/health'), {

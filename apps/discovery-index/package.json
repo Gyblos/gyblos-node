@@ -4,16 +4,23 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./admin": "./scripts/admin.ts",
     "./app": "./src/app.ts",
     "./constants": "./src/constants.ts",
     "./ip-key": "./src/ip-key.ts",
     "./publishers": "./src/publishers.ts",
+    "./registration-store": "./src/registration-store.ts",
+    "./registration-store-d1": "./src/registration-store-d1.ts",
+    "./registrations": "./src/registrations.ts",
     "./storage": "./src/storage.ts",
     "./storage-d1": "./src/storage-d1.ts",
     "./worker": "./src/worker.ts"
   },
   "dependencies": {
+    "@gyblos/core": "workspace:*",
+    "@gyblos/identity": "workspace:*",
     "@gyblos/protocol": "workspace:*",
+    "@gyblos/runtime": "workspace:*",
     "hono": "4.13.13"
   }
 }

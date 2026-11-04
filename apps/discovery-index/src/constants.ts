@@ -17,6 +17,11 @@ export const INDEX_ERRORS = {
   PUBLISH_NOT_ALLOWED: 'PUBLISH_NOT_ALLOWED',
   // The request did not use https (400 for every method, never a redirect).
   HTTPS_REQUIRED: 'HTTPS_REQUIRED',
+  // POST /v1/registrations: a malformed body; an unknown, used or expired invite; a NodeId with no
+  // verified 8004 registration on chain.
+  INVALID_REGISTRATION: 'INVALID_REGISTRATION',
+  INVITE_INVALID: 'INVITE_INVALID',
+  IDENTITY_NOT_REGISTERED: 'IDENTITY_NOT_REGISTERED',
   UNAVAILABLE: 'DISCOVERY_UNAVAILABLE',
 } as const;
 export type IndexErrorCode = (typeof INDEX_ERRORS)[keyof typeof INDEX_ERRORS];
@@ -39,6 +44,7 @@ export const INDEX_ROUTES = {
   RECORDS: '/v1/records',
   SELLERS: '/v1/sellers',
   HEALTH: '/v1/health',
+  REGISTRATIONS: '/v1/registrations',
 } as const;
 // Public reads are CORS-readable on every status, errors included.
 export const PUBLIC_READ_ROUTES: ReadonlySet<string> = new Set([
@@ -121,8 +127,42 @@ export const PUBLISH_ALLOWLIST = {
 export const PUBLISH_MODES = {
   CLOSED: 'closed',
   ALLOWLIST: 'allowlist',
+  // No allowlist secret, but NodeIds admitted through /v1/registrations may publish.
+  REGISTERED: 'registered',
   OPEN: 'open',
 } as const;
+
+// Worker secret: a devnet Solana RPC URL the index reads the 8004 registry through. A provider key
+// belongs in the URL path (query strings are refused). Missing, /v1/registrations answers 503.
+export const DISCOVERY_SOLANA_RPC_BINDING = 'DISCOVERY_SOLANA_RPC_URL';
+
+// Beta invites (vault: 20 Decisions/Alta de vendedores.md §2). The code is `gyb_` and 26 base32
+// characters (128 random bits); only its SHA-256 is stored.
+export const REGISTRATION = {
+  invite: /^gyb_[a-z2-7]{26}$/,
+  nodeId: /^[0-9a-f]{64}$/,
+  country: /^[A-Z]{2}$/,
+  maxBodyBytes: 512,
+  inviteLifetimeMs: 14 * 24 * 60 * 60 * 1000,
+  contact: /^[A-Za-z0-9@._+-]{1,128}$/,
+  invitePrefix: 'gyb_',
+  inviteBytes: 16,
+  dayMs: 24 * 60 * 60 * 1000,
+  maxInviteDays: 90,
+} as const;
+// Lowercase hex of a SHA-256 digest: two characters per byte.
+export const HEX = { radix: 16, byteWidth: 2 } as const;
+export const REGISTRATION_STATUS = {
+  ACTIVE: 'active',
+  REVOKED: 'revoked',
+} as const;
+// Results of redeeming an invite for a NodeId.
+export const REDEEM_RESULTS = {
+  REGISTERED: 'registered',
+  ALREADY_ACTIVE: 'already-active',
+  INVITE_INVALID: 'invite-invalid',
+} as const;
+export type RedeemResult = (typeof REDEEM_RESULTS)[keyof typeof REDEEM_RESULTS];
 export type PublishMode = (typeof PUBLISH_MODES)[keyof typeof PUBLISH_MODES];
 
 // Loopback-only development counters (never used by the Worker entry). The host list is local
