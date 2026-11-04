@@ -75,7 +75,7 @@ async function readerMain() {
         ok: true,
         nodeId: client?.id().toString(),
       } satisfies ReaderReply);
-      if (message.action === READER_ACTIONS.SHUTDOWN) process.disconnect();
+      if (message.action === READER_ACTIONS.SHUTDOWN) process.disconnect?.();
     } catch {
       process.send!({ id: message.id, ok: false } satisfies ReaderReply);
     }
