@@ -1,4 +1,5 @@
-// Isolates native free inference and signed-receipt exchange in temporary role homes with synthetic engines.
+// Isolates native receipt checks with synthetic engines and temporary homes.
+// Success cases wait for seller publication; explicit concurrent cases retain best-effort ordering.
 import { mkdtemp, realpath, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -63,7 +64,10 @@ async function nativeReceiptSeller(seller: Endpoint, buyer: Endpoint) {
   };
   return { ...f, engine };
 }
-export async function nativeFreeReceiptFixture(receiptEnabled = true) {
+export async function nativeFreeReceiptFixture(
+  receiptEnabled = true,
+  { awaitPublication = true }: { awaitPublication?: boolean } = {},
+) {
   const directory = await realpath(
     await mkdtemp(join(tmpdir(), 'gyblos-free-receipts-native-')),
   );
@@ -144,14 +148,24 @@ export async function nativeFreeReceiptFixture(receiptEnabled = true) {
     stats: { rows: new Map(), save: async () => {} },
     discovery: undefined,
   };
+  const base = freeBuyerDependencies(prepared, {
+    endpoint: buyer,
+    buyer: wallet,
+    relayOnly: false,
+    now: f.options.now,
+    receipts: buyerReceipts,
+  });
+  let beginReceipt = () => {};
+  const receiptStarted = new Promise<void>((resolve) => {
+    beginReceipt = resolve;
+  });
   const dependencies = {
-    ...freeBuyerDependencies(prepared, {
-      endpoint: buyer,
-      buyer: wallet,
-      relayOnly: false,
-      now: f.options.now,
-      receipts: buyerReceipts,
-    }),
+    ...base,
+    receipt: async (...args: Parameters<NonNullable<typeof base.receipt>>) => {
+      beginReceipt();
+      if (awaitPublication) await sellerReceipts.settled();
+      await base.receipt?.(...args);
+    },
     select: async () => {
       selections++;
       return { nodeId: seller.id().toString(), quote: request.quote };
@@ -168,6 +182,7 @@ export async function nativeFreeReceiptFixture(receiptEnabled = true) {
     sellerReceipts,
     buyerReceipts,
     request,
+    receiptStarted,
     calls: f.calls,
     selections: () => selections,
     execute: (streaming = false) =>
