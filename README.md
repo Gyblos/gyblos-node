@@ -122,7 +122,9 @@ a paid v1 seller, which only the lab gates run. Paid v2 uses a separate path.
 Full steps: [docs/running-a-node.md](docs/running-a-node.md).
 
 With Docker instead: `compose.yaml` runs a seller with its own Ollama
-([Docker](docs/running-a-node.md#docker)).
+([Docker](docs/running-a-node.md#docker)), and `sh install.sh` sets one up
+from the published image without a checkout
+([Install script](docs/running-a-node.md#install-script)).
 
 ## Commands
 

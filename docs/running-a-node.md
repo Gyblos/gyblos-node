@@ -235,8 +235,42 @@ docker compose stop seller                        # SIGINT; withdraws within 120
 - A remote engine (an OpenAI- or Anthropic-compatible URL) needs no Ollama
   service: point the offer at it, put its `api_key_env` variable in `seller.env`
   and remove `ollama` and `network_mode` from the compose file.
-- Build the image yourself with `docker compose build`; there is no published
-  image yet.
+- Build the image yourself with `docker compose build`, or use the published
+  one through the install script below.
+
+#### Install script
+
+`install.sh` sets up the same seller from the published image
+(`ghcr.io/gyblos/node:beta`) without a checkout. It needs only Docker with
+Compose v2.17 or later:
+
+```sh
+sh install.sh
+```
+
+- It writes `compose.yaml` (this repository's, with the published image),
+  `gyblos.toml` (`examples/seller-docker.toml`) and `seller.env` into
+  `~/gyblos-seller` (mode 0700; `GYBLOS_DIR` changes it), then pulls the images
+  and the model, creates the seller keys, downloads the tokenizer, runs
+  `gyblos doctor` and starts the seller only when doctor is READY.
+- The relay token is read without echo, or from `GYBLOS_RELAY_TOKEN`, and is
+  written only to `seller.env` (mode 0600), never printed.
+- Existing files are kept, so rerunning it resumes a failed install or
+  restarts the seller; edit `gyblos.toml` (for example `publish = true`) and
+  rerun or `docker compose up -d`.
+- `GYBLOS_IMAGE` pins another image, such as a commit tag.
+- While the package is private, `docker login ghcr.io` first with a token that
+  may read it.
+
+Maintainers publish the image from a clean checkout of `main` after
+`docker login ghcr.io` with a token allowed to write Gyblos packages:
+
+```sh
+sh scripts/publish-image.sh        # pushes :<commit> and :beta for amd64 and arm64
+```
+
+The first push creates the package private; its visibility is changed in the
+package's settings on GitHub. A public image contains the node's source.
 
 ## Buyer
 
