@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     "./cli": "./src/cli.ts",
+    "./cli-init": "./src/cli-init.ts",
     "./cli-service": "./src/cli-service.ts",
     "./cli-status": "./src/cli-status.ts",
     "./status-system": "./src/status-system.ts",

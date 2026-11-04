@@ -4,7 +4,6 @@
 // The daemon serves every listed offer it can warm; each offer's engine plugin refuses what it cannot
 // honor. Paid offers are refused unless the caller has paid selling wired, and then only when their
 // usage is recounted with the model's pinned public tokenizer.
-import { resolve } from 'node:path';
 
 import { NODE_ENVIRONMENT, type HomeEnvironment } from '@gyblos/config';
 import { validateDiscoveryBaseUrl } from '@gyblos/discovery-http';
@@ -12,8 +11,6 @@ import { OFFER_PRICING_KINDS } from '@gyblos/protocol/constants';
 import type { RelayEnvironment } from '@gyblos/transport-iroh/endpoint';
 
 import {
-  NODE_CONFIG_FILENAME,
-  NODE_CONFIG_ISSUE_CODES,
   NODE_CONFIG_SOURCES,
   NODE_ERROR_CODES,
   NODE_SETTINGS,
@@ -22,11 +19,8 @@ import {
 import type { SellerEngineOffer } from './engine-factory';
 import { engineOfferRefusal } from './engine-registry';
 import { NodeError, type NodeErrorContext } from './errors';
-import {
-  readNodeConfigFile,
-  type NodeConfig,
-  type NodeOffer,
-} from './node-config';
+import type { NodeConfig, NodeOffer } from './node-config';
+import { readStartupConfig } from './node-config-file';
 import { sellerLimits, type SellerLimits } from './node-config-limits';
 import { pricePerMtokToAtomicPerMtok } from './node-config-price';
 import { resolveNodeConfig } from './node-config-resolve';
@@ -235,15 +229,8 @@ export async function loadSellerSettings(
   cwd = process.cwd(),
   options: SellerSettingsOptions = {},
 ): Promise<SellerSettings> {
-  const explicit = environment[NODE_ENVIRONMENT.config];
-  const result = await readNodeConfigFile(
-    resolve(cwd, explicit || NODE_CONFIG_FILENAME),
-  );
-  if (result.ok) return sellerSettings(result.config, environment, options);
-  const missing =
-    result.issues.length === 1 &&
-    result.issues[0]!.code === NODE_CONFIG_ISSUE_CODES.FILE_NOT_FOUND;
-  if (missing && !explicit)
-    return sellerSettings(undefined, environment, options);
-  return fail(NODE_ERROR_CODES.NODE_CONFIG_INVALID);
+  const result = await readStartupConfig(environment, cwd);
+  return result.ok
+    ? sellerSettings(result.config, environment, options)
+    : fail(NODE_ERROR_CODES.NODE_CONFIG_INVALID);
 }

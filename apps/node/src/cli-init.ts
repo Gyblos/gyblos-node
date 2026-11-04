@@ -5,13 +5,12 @@
 // variable names appear.
 import { randomUUID } from 'node:crypto';
 import { constants, link, lstat, open, rename, rm } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { dirname } from 'node:path';
 import { createInterface, type Interface } from 'node:readline/promises';
 
-import { NODE_ENVIRONMENT } from '@gyblos/config';
-import { NODE_CONFIG_FILENAME } from '@gyblos/node/constants';
 import { NodeError } from '@gyblos/node/errors';
 import { parseNodeConfig, type NodeConfig } from '@gyblos/node/node-config';
+import { nodeConfigPath } from '@gyblos/node/node-config-file';
 import { sellerSettings } from '@gyblos/node/seller-settings';
 import { ENGINE_KINDS, type EngineKind } from '@gyblos/protocol/constants';
 
@@ -249,22 +248,48 @@ async function checkTarget(path: string, force: boolean) {
   if (!force) throw new InitError(INIT_ERRORS.FILE_EXISTS);
 }
 
+// Codes link() gives where the filesystem has no hard links (FAT, exFAT, some network mounts).
+const NO_HARD_LINKS = new Set([
+  'EPERM',
+  'ENOTSUP',
+  'EOPNOTSUPP',
+  'EXDEV',
+  'ENOSYS',
+]);
+const errorCode = (error: unknown) =>
+  error instanceof Error && 'code' in error ? error.code : undefined;
+
+// A new file only (never through a symlink or over an existing file), with its mode and contents synced.
+async function writeNew(path: string, text: string) {
+  const file = await open(path, NEW_FILE, INIT_FILE_MODE);
+  try {
+    await file.writeFile(text);
+    // The umask may have narrowed the mode; the handle cannot be swapped for a symlink.
+    await file.chmod(INIT_FILE_MODE);
+    await file.sync();
+  } finally {
+    await file.close();
+  }
+}
+
 // Written and synced beside the target, then moved into place and the directory synced, so a reader never
-// sees half a file. Without --force the move is a link, which fails if a file appeared meanwhile.
-async function writeAtomically(path: string, text: string, force: boolean) {
+// sees half a file. Without --force the move is a link, which fails if a file appeared meanwhile; where the
+// filesystem has no hard links the file is created in place instead, still never over an existing one.
+export async function writeConfigFile(
+  path: string,
+  text: string,
+  force: boolean,
+  linkFile: (from: string, to: string) => Promise<void> = link,
+) {
   const temporary = `${path}.${randomUUID()}.tmp`;
   try {
-    const file = await open(temporary, NEW_FILE, INIT_FILE_MODE);
-    try {
-      await file.writeFile(text);
-      // The umask may have narrowed the mode; the handle cannot be swapped for a symlink.
-      await file.chmod(INIT_FILE_MODE);
-      await file.sync();
-    } finally {
-      await file.close();
-    }
+    await writeNew(temporary, text);
     if (force) await rename(temporary, path);
-    else await link(temporary, path);
+    else
+      await linkFile(temporary, path).catch(async (error: unknown) => {
+        if (!NO_HARD_LINKS.has(String(errorCode(error)))) throw error;
+        await writeNew(path, text);
+      });
     const parent = await open(dirname(path), constants.O_RDONLY);
     try {
       await parent.sync();
@@ -272,7 +297,7 @@ async function writeAtomically(path: string, text: string, force: boolean) {
       await parent.close();
     }
   } catch (error) {
-    if (error instanceof Error && 'code' in error && error.code === 'EEXIST')
+    if (errorCode(error) === 'EEXIST')
       throw new InitError(INIT_ERRORS.FILE_EXISTS);
     throw new InitError(INIT_ERRORS.WRITE_FAILED);
   } finally {
@@ -315,10 +340,7 @@ export async function initCommand(
   output: InitOutput,
   prompt?: Prompt,
 ) {
-  const path = resolve(
-    output.cwd,
-    output.env[NODE_ENVIRONMENT.config] || NODE_CONFIG_FILENAME,
-  );
+  const { path } = nodeConfigPath(output.env, output.cwd);
   try {
     await checkTarget(path, options.force);
     let answers: InitAnswers;
@@ -344,7 +366,7 @@ export async function initCommand(
     }
     // Checked again: the file may have appeared or changed while the operator was answering.
     await checkTarget(path, options.force);
-    await writeAtomically(path, text, options.force);
+    await writeConfigFile(path, text, options.force);
     output.stdout(
       `Wrote ${path}: free offer ${answers.model} via ${answers.engine} ${urlOrigin(answers.url)}; discovery ${answers.publish ? 'on' : 'off'}\nNext:\n${nextSteps(answers)}`,
     );

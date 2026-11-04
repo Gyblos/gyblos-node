@@ -8,7 +8,7 @@ import { homedir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 
 import { homeLayout } from '@gyblos/config/home';
-import { NODE_CONFIG_FILENAME } from '@gyblos/node/constants';
+import { nodeConfigPath } from '@gyblos/node/node-config-file';
 import type { DoctorProbes } from '@gyblos/node/seller-doctor';
 import {
   PrivateFileError,
@@ -128,10 +128,7 @@ function serviceInput(
     nodePath: system.nodePath,
     repository: system.repository,
     home: layout.root,
-    config: resolve(
-      output.cwd,
-      output.env.GYBLOS_CONFIG || NODE_CONFIG_FILENAME,
-    ),
+    config: nodeConfigPath(output.env, output.cwd).path,
     environmentFile: layout.files.sellerEnvironment,
     logFile: layout.files.serviceLog,
     accountHome: system.accountHome,

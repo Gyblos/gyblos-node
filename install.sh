@@ -257,6 +257,7 @@ main() {
   docker compose up -d --force-recreate seller
   say ''
   say "The seller is running. In $dir:"
+  say '  docker compose exec seller gyblos seller status   is it serving?'
   say '  docker compose logs -f seller        follow it'
   say '  docker compose stop seller           stop it (withdraws within 120 s)'
   say '  docker compose up -d --force-recreate seller   apply an edited gyblos.toml'

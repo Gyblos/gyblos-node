@@ -7,6 +7,7 @@ import {
   mkdir,
   readdir,
   readFile,
+  rm,
   symlink,
   writeFile,
 } from 'node:fs/promises';
@@ -14,6 +15,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 
 import { runCli } from '@gyblos/node-app/cli';
+import { writeConfigFile } from '@gyblos/node-app/cli-init';
 
 import { inDirectory, INIT, run } from './support/init-fixture';
 
@@ -144,3 +146,28 @@ void test('seller init: its flags are refused on other commands, and other flags
     assert.match(stderr, /^Usage:/, args.join(' '));
   }
 });
+
+void test('seller init: where hard links are unsupported it creates the file in place, still never over one', () =>
+  inDirectory(async (directory) => {
+    const path = join(directory, 'gyblos.toml');
+    const unsupported = async () => {
+      throw Object.assign(new Error('link'), { code: 'ENOTSUP' });
+    };
+    await writeConfigFile(path, 'version = 1\n', false, unsupported);
+    assert.equal(await readFile(path, 'utf8'), 'version = 1\n');
+    assert.equal((await lstat(path)).mode & 0o777, 0o600);
+    assert.deepEqual(await readdir(directory), ['gyblos.toml']);
+    await assert.rejects(
+      writeConfigFile(path, 'replaced\n', false, unsupported),
+      { message: 'INIT_FILE_EXISTS' },
+    );
+    assert.equal(await readFile(path, 'utf8'), 'version = 1\n');
+    const broken = async () => {
+      throw Object.assign(new Error('link'), { code: 'EIO' });
+    };
+    await rm(path);
+    await assert.rejects(writeConfigFile(path, 'x\n', false, broken), {
+      message: 'INIT_WRITE_FAILED',
+    });
+    assert.deepEqual(await readdir(directory), []);
+  }));

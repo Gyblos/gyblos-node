@@ -1,0 +1,3 @@
+#!/bin/sh
+# `gyblos` on the image's PATH, so `docker compose exec seller gyblos seller status` reaches the CLI.
+exec /app/docker/entrypoint.sh gyblos "$@"
