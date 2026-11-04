@@ -17,14 +17,24 @@ services:
     build: .
     image: gyblos-node:local
     network_mode: service:ollama
+    # A restarted Ollama gets a new network namespace; compose then restarts the seller into it.
     depends_on:
-      - ollama
+      ollama:
+        condition: service_started
+        restart: true
+    # Forwards stop signals to the daemon even during startup, before it installs its own handler.
+    init: true
     # GYBLOS_RELAY_TOKEN and any api_key_env variables, NAME=value per line; keep it private.
     env_file:
       - ./seller.env
     volumes:
       - gyblos:/data
-      - ./gyblos.toml:/config/gyblos.toml:ro
+      - type: bind
+        source: ./gyblos.toml
+        target: /config/gyblos.toml
+        read_only: true
+        bind:
+          create_host_path: false
     # Startup needs 1.5 GiB of memory headroom above the seller itself.
     mem_limit: 2g
     cpus: 1.0

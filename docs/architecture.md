@@ -157,7 +157,7 @@ One module, `packages/config/src/home.ts`, owns every local path as a pure
 function of the environment; no other module builds `.local/...` paths.
 
 ```text
-$GYBLOS_HOME (default .local/gyblos; a container would use /data)
+$GYBLOS_HOME (default .local/gyblos; the Docker image uses /data)
   buyer/     role.json, node.key, buyer.json, trust.json, offer.json, journals,
              locks, calls, status, transport metrics, measurements + salt
   seller/    role.json, node.key, owner key (a paid seller also has authorizer
