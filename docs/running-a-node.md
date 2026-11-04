@@ -242,7 +242,7 @@ docker compose stop seller                        # SIGINT; withdraws within 120
 
 `install.sh` sets up the same seller from the published image
 (`ghcr.io/gyblos/node:beta`) without a checkout. It needs only Docker with
-Compose v2.17 or later:
+Compose v2.17 or later. Beta sellers receive the file with their invitation:
 
 ```sh
 sh install.sh
@@ -250,20 +250,26 @@ sh install.sh
 
 - It writes `compose.yaml` (this repository's, with the published image),
   `gyblos.toml` (`examples/seller-docker.toml`) and `seller.env` into
-  `~/gyblos-seller` (mode 0700; `GYBLOS_DIR` changes it), then pulls the images
-  and the model, creates the seller keys, downloads the tokenizer, runs
-  `gyblos doctor` and starts the seller only when doctor is READY.
+  `~/gyblos-seller` (created mode 0700; `GYBLOS_DIR` changes it), then pulls
+  the images and the model, creates the seller keys, downloads the tokenizer,
+  runs `gyblos doctor` and starts the seller only when doctor is READY.
 - The relay token is read without echo, or from `GYBLOS_RELAY_TOKEN`, and is
-  written only to `seller.env` (mode 0600), never printed.
-- Existing files are kept, so rerunning it resumes a failed install or
-  restarts the seller; edit `gyblos.toml` (for example `publish = true`) and
-  rerun or `docker compose up -d`.
-- `GYBLOS_IMAGE` pins another image, such as a commit tag.
+  written only to `seller.env` (mode 0600), never printed. Without a terminal
+  (for example `ssh host sh install.sh`), set `GYBLOS_RELAY_TOKEN`.
+- Existing files are kept, so rerunning it resumes a failed install and
+  recreates the seller with the current `gyblos.toml` and `seller.env`. After
+  editing `gyblos.toml` (for example `publish = true`), rerun it or run
+  `docker compose up -d --force-recreate seller`; a plain `up -d` or `restart`
+  does not apply the edit.
+- `GYBLOS_IMAGE` sets the image of a first install, such as a commit tag; after
+  that, change the seller's `image:` in `compose.yaml`.
 - While the package is private, `docker login ghcr.io` first with a token that
   may read it.
 
-Maintainers publish the image from a clean checkout of `main` after
-`docker login ghcr.io` with a token allowed to write Gyblos packages:
+Maintainers publish a commit already on `origin/main`, built from that commit
+alone (`git archive`), after `docker login ghcr.io` with a token allowed to
+write Gyblos packages and with a buildx builder for both platforms
+(`docker buildx create --use`):
 
 ```sh
 sh scripts/publish-image.sh        # pushes :<commit> and :beta for amd64 and arm64

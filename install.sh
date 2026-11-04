@@ -9,7 +9,8 @@
 #   GYBLOS_IMAGE        node image (default below)
 #   GYBLOS_RELAY_TOKEN  the relay token; asked for without echo when unset
 #
-# Existing gyblos.toml, seller.env and compose.yaml are kept; rerunning resumes and restarts the seller.
+# Existing gyblos.toml, seller.env and compose.yaml are kept; rerunning resumes a failed install and
+# restarts the seller with the current gyblos.toml.
 # The relay token is written only to seller.env (mode 0600) and never printed.
 set -eu
 # Byte-wise character classes: [:graph:] is then exactly the printable ASCII seller.env accepts.
@@ -24,6 +25,10 @@ MODEL=qwen3:0.6b
 COMPOSE_MAJOR=2
 COMPOSE_MINOR=17
 OLLAMA_WAIT_SECONDS=60
+OLLAMA_POLL_SECONDS=2
+# packages/transport-iroh/src/constants.ts RELAY_TOKEN_LENGTH.
+RELAY_TOKEN_MIN=32
+RELAY_TOKEN_MAX=512
 
 dir=${GYBLOS_DIR:-$HOME/gyblos-seller}
 image=${GYBLOS_IMAGE:-$DEFAULT_IMAGE}
@@ -56,17 +61,33 @@ check_docker() {
 
 check_image() {
   case "$image" in
-    '' | *[!a-z0-9./:_@-]*) die "GYBLOS_IMAGE is not an image reference: $image" ;;
+    '' | *[!A-Za-z0-9./:_@-]*) die "GYBLOS_IMAGE is not an image reference: $image" ;;
   esac
+}
+
+# Refuses a symbolic link where the script writes a file, so the token never lands elsewhere.
+refuse_symlink() {
+  [ ! -L "$1" ] || die "$dir/$1 is a symbolic link; remove it and run this script again."
+}
+
+# Writes standard input to a private temporary file beside $1, then renames it with mode $2: an
+# interrupted run never leaves a partial file that a rerun would keep.
+install_file() {
+  tmp=$(mktemp "./.$1.XXXXXX")
+  cat >"$tmp"
+  chmod "$2" "$tmp"
+  mv -f "$tmp" "$1"
 }
 
 # The same compose.yaml as the repository's, with the published image instead of a local build.
 write_compose() {
+  refuse_symlink compose.yaml
   if [ -e compose.yaml ]; then
     say "Kept existing $dir/compose.yaml"
+    [ -z "${GYBLOS_IMAGE:-}" ] || say "  GYBLOS_IMAGE is not applied to it; change its seller image there."
     return
   fi
-  cat >compose.yaml.tmp <<'COMPOSE'
+  sed "s|GYBLOS_IMAGE_PLACEHOLDER|$image|" <<'COMPOSE' | install_file compose.yaml 644
 # A seller with its own Ollama. Setup and use: docs/running-a-node.md#docker.
 # The seller shares Ollama's network namespace because the Ollama engine accepts only a literal loopback
 # URL; Ollama listens on 127.0.0.1 there and no port is published. Iroh connects outbound only.
@@ -113,18 +134,17 @@ volumes:
   ollama:
   gyblos:
 COMPOSE
-  sed "s|GYBLOS_IMAGE_PLACEHOLDER|$image|" compose.yaml.tmp >compose.yaml
-  rm -f compose.yaml.tmp
   say "Wrote $dir/compose.yaml"
 }
 
 # examples/seller-docker.toml without its repository-relative schema line.
 write_config() {
+  refuse_symlink gyblos.toml
   if [ -e gyblos.toml ]; then
     say "Kept existing $dir/gyblos.toml"
     return
   fi
-  cat >gyblos.toml <<'TOML'
+  install_file gyblos.toml 644 <<'TOML'
 # The seller daemon in Docker (compose.yaml): the pinned Qwen3 0.6B with reasoning off on the compose
 # Ollama, given away free within daily token caps. Copy it next to compose.yaml as gyblos.toml; the seller
 # shares Ollama's network namespace, so 127.0.0.1:11434 is that Ollama (docs/running-a-node.md#docker).
@@ -159,20 +179,23 @@ restore_echo() {
 
 # The relay token goes straight from the prompt or the environment into seller.env.
 write_environment() {
+  refuse_symlink seller.env
   if [ -e seller.env ]; then
     say "Kept existing $dir/seller.env"
     return
   fi
   token=${GYBLOS_RELAY_TOKEN:-}
   if [ -z "$token" ]; then
-    { [ -r /dev/tty ] && [ -w /dev/tty ]; } ||
+    # Opening it, not testing its mode: /dev/tty exists even without a controlling terminal.
+    (exec </dev/tty) 2>/dev/null ||
       die 'No terminal to ask for the relay token: set GYBLOS_RELAY_TOKEN.'
-    trap restore_echo EXIT INT TERM
+    trap restore_echo EXIT
+    trap 'restore_echo; exit 130' INT TERM HUP
     printf 'Relay token (from your Gyblos invitation; not shown): ' >/dev/tty
     stty -echo </dev/tty
     IFS= read -r token </dev/tty || token=
     restore_echo
-    trap - EXIT INT TERM
+    trap - EXIT INT TERM HUP
     printf '\n' >/dev/tty
   fi
   # seller.env's grammar (`gyblos seller service install` reads it too): printable, no shell characters.
@@ -181,10 +204,10 @@ write_environment() {
       die 'The relay token is empty or has characters a relay token never has.'
       ;;
   esac
-  (
-    umask 077
-    printf 'GYBLOS_RELAY_TOKEN=%s\n' "$token" >seller.env
-  )
+  [ "${#token}" -ge "$RELAY_TOKEN_MIN" ] && [ "${#token}" -le "$RELAY_TOKEN_MAX" ] ||
+    die "The relay token must have $RELAY_TOKEN_MIN to $RELAY_TOKEN_MAX characters."
+  # printf is a shell builtin: the token never appears in a process's arguments.
+  printf 'GYBLOS_RELAY_TOKEN=%s\n' "$token" | install_file seller.env 600
   token=
   say "Wrote $dir/seller.env (mode 0600)"
 }
@@ -193,16 +216,18 @@ wait_for_ollama() {
   waited=0
   until docker compose exec -T ollama ollama list >/dev/null 2>&1; do
     [ "$waited" -lt "$OLLAMA_WAIT_SECONDS" ] || die 'Ollama did not start; see `docker compose logs ollama`.'
-    sleep 2
-    waited=$((waited + 2))
+    sleep "$OLLAMA_POLL_SECONDS"
+    waited=$((waited + OLLAMA_POLL_SECONDS))
   done
 }
 
 main() {
   check_docker
   check_image
-  mkdir -p "$dir"
-  chmod 700 "$dir"
+  if [ ! -d "$dir" ]; then
+    mkdir -p "$dir"
+    chmod 700 "$dir"
+  fi
   cd "$dir"
   write_compose
   write_config
@@ -220,11 +245,13 @@ main() {
   if ! docker compose run --rm seller gyblos doctor; then
     die "The seller is not ready; fix the failures above, then run this script again (cd $dir)."
   fi
-  docker compose up -d seller
+  # Recreated so a rerun applies the current gyblos.toml and seller.env; stopping sends SIGINT.
+  docker compose up -d --force-recreate seller
   say ''
   say "The seller is running. In $dir:"
   say '  docker compose logs -f seller        follow it'
   say '  docker compose stop seller           stop it (withdraws within 120 s)'
+  say '  docker compose up -d --force-recreate seller   apply an edited gyblos.toml'
   say '  docker compose pull && docker compose up -d   update it'
   say 'Its keys are in the gyblos volume: `docker compose down -v` deletes them.'
 }

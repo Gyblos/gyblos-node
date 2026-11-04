@@ -1,10 +1,17 @@
 // install.sh against a fake `docker` that records its arguments: the files it writes (the repository's
 // compose file and Docker example, with the published image), the private seller.env, the order of the
-// setup commands, kept files on a rerun, and that the relay token is never printed. Offline; the image
-// itself is a manual check.
+// setup commands, kept files on a rerun, and that the relay token is never printed. Also the guards of
+// scripts/publish-image.sh that run before any build. Offline; the image itself is a manual check.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { chmodSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  mkdirSync,
+  readFileSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -15,7 +22,10 @@ import { DEVNET_USDC } from '@gyblos/config';
 import { FAKE_SECRET, REPOSITORY_ROOT } from './support/node-config-fixtures';
 
 const SCRIPT = join(REPOSITORY_ROOT, 'install.sh');
+const PUBLISH = join(REPOSITORY_ROOT, 'scripts/publish-image.sh');
 const IMAGE = 'ghcr.io/gyblos/node:test';
+const read = (path: string) =>
+  readFileSync(join(REPOSITORY_ROOT, path), 'utf8');
 
 // Logs each call as one line; the compose version and doctor's result come from the environment.
 const FAKE_DOCKER = `#!/bin/sh
@@ -30,7 +40,7 @@ exit 0
 async function harness() {
   const root = await mkdtemp(join(tmpdir(), 'gyblos-install-'));
   const bin = join(root, 'bin');
-  spawnSync('mkdir', [bin]);
+  mkdirSync(bin);
   writeFileSync(join(bin, 'docker'), FAKE_DOCKER);
   chmodSync(join(bin, 'docker'), 0o755);
   const directory = join(root, 'seller');
@@ -38,8 +48,9 @@ async function harness() {
   const run = (env: Record<string, string> = {}) => {
     const result = spawnSync('sh', [SCRIPT], {
       encoding: 'utf8',
-      // No terminal: the token comes only from the environment here.
       stdio: ['ignore', 'pipe', 'pipe'],
+      // Its own session, so there is no controlling terminal to prompt on.
+      detached: true,
       env: {
         PATH: `${bin}:/usr/bin:/bin`,
         HOME: root,
@@ -59,6 +70,7 @@ async function harness() {
     }
   };
   return {
+    root,
     directory,
     run,
     calls,
@@ -72,45 +84,64 @@ void test('installs from the repository compose file and example with the publis
   try {
     const result = install.run({ GYBLOS_RELAY_TOKEN: FAKE_SECRET });
     assert.equal(result.status, 0, result.output);
+    const compose = read('compose.yaml');
+    assert.ok(compose.includes('    build: .\n'));
+    assert.ok(compose.includes('    image: gyblos-node:local\n'));
     assert.equal(
       install.file('compose.yaml'),
-      readFileSync(join(REPOSITORY_ROOT, 'compose.yaml'), 'utf8')
+      compose
         .replace('    build: .\n', '')
         .replace('image: gyblos-node:local', `image: ${IMAGE}`),
     );
+    const example = read('examples/seller-docker.toml');
     assert.equal(
       install.file('gyblos.toml'),
-      readFileSync(
-        join(REPOSITORY_ROOT, 'examples/seller-docker.toml'),
-        'utf8',
-      )
+      example
         .split('\n')
-        .slice(2)
+        .filter((line) => !/^(#:schema|# \(The #:schema)/.test(line))
         .join('\n'),
     );
     assert.equal(
       install.file('seller.env'),
       `GYBLOS_RELAY_TOKEN=${FAKE_SECRET}\n`,
     );
-    assert.equal(statSync(join(install.directory, 'seller.env')).mode & 0o777, 0o600);
-    assert.equal(statSync(install.directory).mode & 0o777, 0o700);
+    const mode = (name: string) =>
+      statSync(join(install.directory, name)).mode & 0o777;
+    assert.equal(mode('seller.env'), 0o600);
+    assert.equal(mode('gyblos.toml'), 0o644);
+    assert.equal(mode('.'), 0o700);
     assert.ok(!result.output.includes(FAKE_SECRET), 'token printed');
-    assert.deepEqual(install.calls().slice(2), [
+    const model = /^model = "(.+)"$/m.exec(example)?.[1];
+    assert.ok(model);
+    assert.deepEqual(install.calls(), [
+      'info',
+      'compose version --short',
       'compose pull',
       'compose up -d ollama',
       'compose exec -T ollama ollama list',
-      'compose exec -T ollama ollama pull qwen3:0.6b',
+      `compose exec -T ollama ollama pull ${model}`,
       `compose run --rm seller setup --role seller --mint ${DEVNET_USDC}`,
       'compose run --rm seller tokenizer',
       'compose run --rm seller gyblos doctor',
-      'compose up -d seller',
+      'compose up -d --force-recreate seller',
     ]);
   } finally {
     await install.cleanup();
   }
 });
 
-void test('a rerun keeps every file and needs no token', async () => {
+void test('pulls by default the tag the publish script pushes', () => {
+  const repository = /^REPOSITORY=(.+)$/m.exec(
+    read('scripts/publish-image.sh'),
+  );
+  assert.ok(repository);
+  assert.match(
+    read('install.sh'),
+    new RegExp(`^DEFAULT_IMAGE=${repository[1]}:beta$`, 'm'),
+  );
+});
+
+void test('a rerun keeps every file, needs no token and recreates the seller', async () => {
   const install = await harness();
   try {
     assert.equal(install.run({ GYBLOS_RELAY_TOKEN: FAKE_SECRET }).status, 0);
@@ -121,24 +152,34 @@ void test('a rerun keeps every file and needs no token', async () => {
     for (const name of ['compose.yaml', 'gyblos.toml', 'seller.env'])
       assert.equal(install.file(name), `edited ${name}\n`);
     assert.match(rerun.stdout, /Kept existing .*seller\.env/);
+    assert.match(rerun.stdout, /GYBLOS_IMAGE is not applied/);
+    assert.equal(
+      install.calls().at(-1),
+      'compose up -d --force-recreate seller',
+    );
   } finally {
     await install.cleanup();
   }
 });
 
-void test('refuses a token seller.env could not hold, without writing it', async () => {
+void test('refuses a token seller.env or the relay could not hold, without writing it', async () => {
+  const padding = 'x'.repeat(40);
   for (const token of [
-    'has space',
-    'dollar$x',
-    'quote"x',
-    "single'x",
-    'back\\slash',
-    'hash#x',
-    'semi;x',
-    'pipe|x',
-    'amp&x',
-    'tilde~x',
-    'café',
+    ...[
+      'has space',
+      'dollar$x',
+      'quote"x',
+      "single'x",
+      'back\\slash',
+      'hash#x',
+      'semi;x',
+      'pipe|x',
+      'amp&x',
+      'tilde~x',
+      'café',
+    ].map((bad) => bad + padding),
+    'x'.repeat(31),
+    'x'.repeat(513),
   ]) {
     const install = await harness();
     try {
@@ -154,6 +195,34 @@ void test('refuses a token seller.env could not hold, without writing it', async
   }
 });
 
+void test('without a token or a terminal it stops before writing seller.env', async () => {
+  const install = await harness();
+  try {
+    const result = install.run();
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /No terminal .*GYBLOS_RELAY_TOKEN/);
+    assert.throws(() => install.file('seller.env'));
+  } finally {
+    await install.cleanup();
+  }
+});
+
+void test('refuses a symbolic link where it would write the token', async () => {
+  const install = await harness();
+  try {
+    mkdirSync(install.directory, { mode: 0o700 });
+    const elsewhere = join(install.root, 'elsewhere');
+    writeFileSync(elsewhere, '');
+    symlinkSync(elsewhere, join(install.directory, 'seller.env'));
+    const result = install.run({ GYBLOS_RELAY_TOKEN: FAKE_SECRET });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /symbolic link/);
+    assert.equal(readFileSync(elsewhere, 'utf8'), '');
+  } finally {
+    await install.cleanup();
+  }
+});
+
 void test('stops before starting the seller when doctor is not ready', async () => {
   const install = await harness();
   try {
@@ -163,7 +232,11 @@ void test('stops before starting the seller when doctor is not ready', async () 
     });
     assert.equal(result.status, 1);
     assert.match(result.stderr, /not ready/);
-    assert.ok(!install.calls().includes('compose up -d seller'));
+    assert.ok(
+      !install
+        .calls()
+        .some((call) => call.startsWith('compose up -d --force-recreate')),
+    );
   } finally {
     await install.cleanup();
   }
@@ -180,13 +253,15 @@ void test('refuses Docker Compose older than 2.17 and image references with shel
       assert.equal(result.status, 1, version);
       assert.match(result.stderr, /Compose/, version);
     }
-    assert.equal(
-      install.run({
-        GYBLOS_RELAY_TOKEN: FAKE_SECRET,
-        FAKE_COMPOSE_VERSION: 'v2.17.0',
-      }).status,
-      0,
-    );
+    for (const version of ['v2.17.0', '2.29.1-desktop.1'])
+      assert.equal(
+        install.run({
+          GYBLOS_RELAY_TOKEN: FAKE_SECRET,
+          FAKE_COMPOSE_VERSION: version,
+        }).status,
+        0,
+        version,
+      );
     const bad = install.run({
       GYBLOS_RELAY_TOKEN: FAKE_SECRET,
       GYBLOS_IMAGE: 'x|touch pwned',
@@ -198,10 +273,9 @@ void test('refuses Docker Compose older than 2.17 and image references with shel
   }
 });
 
-void test('the publish script refuses a dirty checkout and bad tags before building', () => {
-  const script = join(REPOSITORY_ROOT, 'scripts/publish-image.sh');
-  assert.equal(spawnSync('sh', ['-n', script]).status, 0);
-  const result = spawnSync('sh', [script, 'bad tag'], { encoding: 'utf8' });
+void test('the publish script parses and refuses a bad tag before touching git', () => {
+  assert.equal(spawnSync('sh', ['-n', PUBLISH]).status, 0);
+  const result = spawnSync('sh', [PUBLISH, 'bad tag'], { encoding: 'utf8' });
   assert.equal(result.status, 1);
   assert.match(result.stderr, /invalid tag/);
 });
