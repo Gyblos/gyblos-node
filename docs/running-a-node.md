@@ -193,34 +193,40 @@ pnpm node:start
 ### Running the seller as a service
 
 Once `pnpm gyblos doctor` reports `READY`, the seller can run in the background
-and restart with the machine:
+and restart with the machine. Run these as the account that owns the seller home
+and keys, never as root:
 
 ```sh
-umask 077; printf 'GYBLOS_RELAY_TOKEN=%s\n' "$GYBLOS_RELAY_TOKEN" > "${GYBLOS_HOME:-.local/gyblos}/seller.env"
+(umask 077; printf 'GYBLOS_RELAY_TOKEN=%s\n' "$GYBLOS_RELAY_TOKEN" > "${GYBLOS_HOME:-.local/gyblos}/seller.env")
 pnpm gyblos seller service install --dry-run   # prints the unit; changes nothing
 pnpm gyblos seller service install             # writes and starts it
 pnpm gyblos seller service uninstall           # stops and removes it
 ```
 
-- The service sees only `<home>/seller.env` (the relay token and any
-  `api_key_env` variables, `NAME=value` per line, mode 0600 and owned by you),
-  plus `GYBLOS_HOME` and `GYBLOS_CONFIG` resolved to absolute paths from the
-  directory where you run `install`. Install first runs the offline doctor with
-  exactly that environment and writes nothing when it is not `READY`, so a token
-  exported only in your shell is reported as missing.
-- Linux: as a normal user it installs a systemd user unit
-  (`~/.config/systemd/user/gyblos-seller.service`); without
-  `loginctl enable-linger` it stops when you log out. As root it installs a
-  system unit and needs `--user <account>`, the account that owns the home and
-  the checkout; it never runs the seller as root. The unit stops the seller with
-  SIGINT and waits 120 s for withdrawal, restarts it on failure, and sets
-  `MemoryMax` (`--memory`, default and minimum `2G`, because startup needs 1.5
-  GiB of headroom above the seller itself) and `CPUQuota` (`--cpu`, default
-  `100%`). Logs: `journalctl --user -u gyblos-seller` (or without `--user`).
-- macOS: it installs a launch agent
-  (`~/Library/LaunchAgents/com.gyblos.seller.plist`) that runs while you are
-  logged in and logs to `<home>/service.log`. launchd has no memory or CPU
-  limit; the startup headroom check still applies.
+- The service sees only `<home>/seller.env`, plus `GYBLOS_HOME` and
+  `GYBLOS_CONFIG` resolved to absolute paths from the directory where you run
+  `install`. Install first runs the offline doctor with exactly that environment
+  and writes nothing when it is not `READY`, so a token exported only in your
+  shell is reported as missing.
+- `seller.env` holds the relay token and any `api_key_env` variables: a regular
+  file you own, mode 0600, not a symlink. Each line is `NAME=value` with no
+  spaces, quotes, `$`, backticks, backslashes, `#`, `~` or shell operators in
+  the value, because systemd and the macOS agent read only that form alike. It
+  may not set `GYBLOS_HOME`, `GYBLOS_CONFIG`, `PATH`, `HOME` or `NODE_*`,
+  `LD_*`, `DYLD_*` variables.
+- Linux: a systemd user unit (`~/.config/systemd/user/gyblos-seller.service`).
+  It stops when you log out and does not start at boot unless lingering is on
+  (`sudo loginctl enable-linger <account>`, once). On a server where the seller
+  has its own account, enable lingering, then run the commands in a login shell
+  of that account (`sudo -iu <account>`). The unit stops the seller with SIGINT
+  and waits 120 s for withdrawal, restarts it on failure but gives up after 5
+  failed starts in 10 minutes, and sets `MemoryMax` (`--memory`, default and
+  minimum `2048M`, the 1.5 GiB startup headroom plus the seller itself) and
+  `CPUQuota` (`--cpu`, default `100%`). Logs:
+  `journalctl --user -u gyblos-seller`.
+- macOS: a launch agent (`~/Library/LaunchAgents/com.gyblos.seller.plist`) that
+  runs while you are logged in and logs to `<home>/service.log`. launchd has no
+  memory or CPU limit; the startup headroom check still applies.
 - The engine is not part of the service: run Ollama as its own service (its
   Linux installer creates one) on the offer URL.
 - Installing again refuses while a unit exists; uninstall first. The unit runs

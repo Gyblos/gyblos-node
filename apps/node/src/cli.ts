@@ -24,6 +24,7 @@ import { isMain } from '@gyblos/runtime';
 import { doctor } from './cli-doctor';
 import { COLUMN, issueLine, URL_HIDDEN, urlOrigin } from './cli-format';
 import { serviceCommand, type ServiceSystem } from './cli-service';
+import { EXIT } from './constants';
 
 export interface CliContext {
   env: Readonly<Record<string, string | undefined>>;
@@ -37,9 +38,8 @@ export interface CliContext {
   service?: ServiceSystem;
 }
 
-const EXIT = { ok: 0, failure: 1 } as const;
 const USAGE =
-  'Usage: gyblos config validate [--config <path>]\n       gyblos doctor [--online]   (reads GYBLOS_CONFIG or ./gyblos.toml, like node:start; --online also calls remote engines)\n       gyblos seller service install [--user <account>] [--memory 2G] [--cpu 100%] [--dry-run]\n       gyblos seller service uninstall [--dry-run]\n';
+  'Usage: gyblos config validate [--config <path>]\n       gyblos doctor [--online]   (reads GYBLOS_CONFIG or ./gyblos.toml, like node:start; --online also calls remote engines)\n       gyblos seller service install [--memory 3G] [--cpu 100%] [--dry-run]   (as the seller account, never root)\n       gyblos seller service uninstall [--dry-run]\n';
 const URL_SETTINGS: ReadonlySet<NodeSettingKey> = new Set([
   NODE_SETTINGS.RPC_URL,
   NODE_SETTINGS.RELAY_URLS,
@@ -128,7 +128,6 @@ function parseCommand(args: readonly string[]) {
       options: {
         config: { type: 'string' },
         online: { type: 'boolean' },
-        user: { type: 'string' },
         memory: { type: 'string' },
         cpu: { type: 'string' },
         'dry-run': { type: 'boolean' },
@@ -144,7 +143,6 @@ function parseCommand(args: readonly string[]) {
 const usesServiceFlags = (
   values: NonNullable<ReturnType<typeof parseCommand>>['values'],
 ) =>
-  values.user !== undefined ||
   values.memory !== undefined ||
   values.cpu !== undefined ||
   values['dry-run'] !== undefined;
@@ -163,7 +161,6 @@ export async function runCli(args: readonly string[], context: CliContext) {
     const code = await serviceCommand(
       rest[0],
       {
-        account: parsed.values.user,
         memory: parsed.values.memory,
         cpu: parsed.values.cpu,
         dryRun: parsed.values['dry-run'] === true,

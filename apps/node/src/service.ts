@@ -1,6 +1,6 @@
-// Renders the seller's background service: a systemd unit (system-wide for a named account, or the user's
-// own) or a macOS launch agent, plus the commands that enable and remove it. Pure text; never touches the
-// file system, runs a command or reads the environment file it names.
+// Renders the seller's background service for the account that installs it: a systemd user unit or a macOS
+// launch agent, plus the commands that enable and remove it. Pure text; never touches the file system,
+// runs a command or reads the environment file it names.
 import { join } from 'node:path';
 
 import { DIAGNOSTICS } from '@gyblos/config';
@@ -19,11 +19,13 @@ export class ServiceError extends Error {
   }
 }
 
+const MEBIBYTE = DIAGNOSTICS.kibibyte * DIAGNOSTICS.kibibyte;
 const MEMORY_UNITS = 'KMGT';
 // Startup refuses to warm an engine with less cgroup headroom than this above the seller itself, so a
-// smaller MemoryMax makes the unit fail at every start.
+// smaller MemoryMax makes the unit fail at every start. It is also the default.
 const MINIMUM_MEMORY_BYTES =
   DIAGNOSTICS.minimumCgroupHeadroomBytes + SERVICE.sellerBaselineBytes;
+export const DEFAULT_MEMORY_MAX = `${MINIMUM_MEMORY_BYTES / MEBIBYTE}M`;
 
 export interface ServiceInput {
   kind: ServiceKind;
@@ -34,22 +36,23 @@ export interface ServiceInput {
   config: string;
   environmentFile: string;
   logFile: string;
-  // The operating-system home of the account that runs the service (user units and launch agents).
+  // The installing account's operating-system home, where its units and agents live.
   accountHome: string;
-  // systemd-system only: the account that runs the seller; never root.
-  account?: string;
-  // launchd only: the GUI domain is per uid.
-  uid?: number;
+  // The account's uid: launchd's GUI domain is per uid.
+  uid: number;
   memoryMax: string;
   cpuQuota: string;
 }
 
-export interface ServicePlan {
+export interface ServiceLocation {
   path: string;
-  contents: string;
-  enable: string[][];
   disable: string[][];
   reload: string[][];
+}
+
+export interface ServicePlan extends ServiceLocation {
+  contents: string;
+  enable: string[][];
   notes: string[];
 }
 
@@ -68,13 +71,6 @@ export function memoryBytes(value: string) {
   return Number(match[1]) * DIAGNOSTICS.kibibyte ** exponent;
 }
 
-function checkLimits(input: ServiceInput) {
-  if (memoryBytes(input.memoryMax) < MINIMUM_MEMORY_BYTES)
-    throw new ServiceError(SERVICE_ERRORS.MEMORY_TOO_LOW);
-  if (!/^[1-9]\d{0,4}%$/.test(input.cpuQuota))
-    throw new ServiceError(SERVICE_ERRORS.CPU_INVALID);
-}
-
 function checkInput(input: ServiceInput) {
   for (const path of [
     input.nodePath,
@@ -86,40 +82,36 @@ function checkInput(input: ServiceInput) {
     input.accountHome,
   ])
     checkPath(path);
-  checkLimits(input);
-  if (
-    input.kind === SERVICE_KINDS.SYSTEMD_SYSTEM &&
-    (!input.account ||
-      input.account === 'root' ||
-      !/^[a-z_][a-z0-9_-]{0,31}$/.test(input.account))
-  )
-    throw new ServiceError(SERVICE_ERRORS.ACCOUNT_INVALID);
-  if (input.kind === SERVICE_KINDS.LAUNCHD && input.uid === undefined)
-    throw new ServiceError(SERVICE_ERRORS.ACCOUNT_INVALID);
+  if (memoryBytes(input.memoryMax) < MINIMUM_MEMORY_BYTES)
+    throw new ServiceError(SERVICE_ERRORS.MEMORY_TOO_LOW);
+  if (!/^[1-9]\d{0,4}%$/.test(input.cpuQuota))
+    throw new ServiceError(SERVICE_ERRORS.CPU_INVALID);
 }
 
 const quoted = (value: string) => `"${value}"`;
 const nodeBin = (nodePath: string) =>
   nodePath.slice(0, nodePath.lastIndexOf('/'));
+const octal = (mode: number) => mode.toString(8).padStart(4, '0');
 
 function systemdUnit(input: ServiceInput) {
-  const system = input.kind === SERVICE_KINDS.SYSTEMD_SYSTEM;
   return [
     '[Unit]',
     `Description=${SERVICE.description}`,
     'Wants=network-online.target',
     'After=network-online.target',
+    `StartLimitIntervalSec=${SERVICE.startLimitIntervalSeconds}`,
+    `StartLimitBurst=${SERVICE.startLimitBurst}`,
     '',
     '[Service]',
     'Type=simple',
-    ...(system ? [`User=${input.account}`] : []),
     // A path setting: systemd takes it verbatim and refuses quotes.
     `WorkingDirectory=${input.repository}`,
+    // Optional: the relay token and API keys live here, never in the unit. systemd lets it override the
+    // Environment= lines below, so install refuses those names in the file.
+    `EnvironmentFile=-${input.environmentFile}`,
     `Environment=${quoted(`GYBLOS_HOME=${input.home}`)}`,
     `Environment=${quoted(`GYBLOS_CONFIG=${input.config}`)}`,
     `Environment=${quoted(`PATH=${nodeBin(input.nodePath)}:${SERVICE.systemPath}`)}`,
-    // Optional: the relay token and API keys live here, never in the unit.
-    `EnvironmentFile=-${input.environmentFile}`,
     `ExecStart=${quoted(input.nodePath)} --import tsx ${SERVICE.entry}`,
     'KillSignal=SIGINT',
     `TimeoutStopSec=${SERVICE.stopTimeoutSeconds}`,
@@ -127,10 +119,11 @@ function systemdUnit(input: ServiceInput) {
     `RestartSec=${SERVICE.restartSeconds}`,
     `CPUQuota=${input.cpuQuota}`,
     `MemoryMax=${input.memoryMax}`,
+    `UMask=${octal(SERVICE.umask)}`,
     'NoNewPrivileges=true',
     '',
     '[Install]',
-    `WantedBy=${system ? 'multi-user.target' : 'default.target'}`,
+    'WantedBy=default.target',
     '',
   ].join('\n');
 }
@@ -143,7 +136,8 @@ const xml = (value: string) =>
 const plistString = (value: string) => `<string>${xml(value)}</string>`;
 
 // launchd has no environment-file setting: a fixed shell line loads it, with both paths passed as
-// arguments so they are never parsed as shell text.
+// arguments so they are never parsed as shell text. Install accepts only lines that sh and systemd read
+// the same way.
 const LAUNCH_SCRIPT =
   'set -a; if [ -f "$0" ]; then . "$0"; fi; set +a; exec "$1" --import tsx "$2"';
 
@@ -180,6 +174,8 @@ function launchAgent(input: ServiceInput) {
       `    ${plistString(value)}`,
     ]),
     '  </dict>',
+    '  <key>Umask</key>',
+    `  <integer>${SERVICE.umask}</integer>`,
     '  <key>RunAtLoad</key>',
     '  <true/>',
     '  <key>KeepAlive</key>',
@@ -201,43 +197,57 @@ function launchAgent(input: ServiceInput) {
   ].join('\n');
 }
 
-export function servicePlan(input: ServiceInput): ServicePlan {
-  checkInput(input);
-  if (input.kind === SERVICE_KINDS.LAUNCHD) {
+// Where the service lives and how it is removed; needs no limits or product paths, so uninstall works
+// whatever the current directory or options.
+export function serviceLocation(
+  kind: ServiceKind,
+  accountHome: string,
+  uid: number,
+): ServiceLocation {
+  if (kind === SERVICE_KINDS.LAUNCHD) {
     const path = join(
-      input.accountHome,
+      checkPath(accountHome),
       SERVICE.launchAgentsDirectory,
       `${SERVICE.label}.plist`,
     );
-    const domain = `gui/${input.uid}`;
     return {
       path,
-      contents: launchAgent(input),
-      enable: [['launchctl', 'bootstrap', domain, path]],
-      disable: [['launchctl', 'bootout', domain, path]],
+      disable: [['launchctl', 'bootout', `gui/${uid}`, path]],
       reload: [],
-      notes: [
-        'macOS has no per-service memory or CPU limit; the startup headroom check still applies.',
-      ],
     };
   }
-  const user = input.kind === SERVICE_KINDS.SYSTEMD_USER;
-  const systemctl = user ? ['systemctl', '--user'] : ['systemctl'];
   return {
-    path: user
-      ? join(input.accountHome, SERVICE.systemdUserDirectory, SERVICE.unit)
-      : join(SERVICE.systemdSystemDirectory, SERVICE.unit),
+    path: join(
+      checkPath(accountHome),
+      SERVICE.systemdUserDirectory,
+      SERVICE.unit,
+    ),
+    disable: [['systemctl', '--user', 'disable', '--now', SERVICE.unit]],
+    reload: [['systemctl', '--user', 'daemon-reload']],
+  };
+}
+
+export function servicePlan(input: ServiceInput): ServicePlan {
+  checkInput(input);
+  const location = serviceLocation(input.kind, input.accountHome, input.uid);
+  if (input.kind === SERVICE_KINDS.LAUNCHD)
+    return {
+      ...location,
+      contents: launchAgent(input),
+      enable: [['launchctl', 'bootstrap', `gui/${input.uid}`, location.path]],
+      notes: [
+        'It runs while you are logged in. macOS has no per-service memory or CPU limit; the startup headroom check still applies.',
+      ],
+    };
+  return {
+    ...location,
     contents: systemdUnit(input),
     enable: [
-      [...systemctl, 'daemon-reload'],
-      [...systemctl, 'enable', '--now', SERVICE.unit],
+      ['systemctl', '--user', 'daemon-reload'],
+      ['systemctl', '--user', 'enable', '--now', SERVICE.unit],
     ],
-    disable: [[...systemctl, 'disable', '--now', SERVICE.unit]],
-    reload: [[...systemctl, 'daemon-reload']],
-    notes: user
-      ? [
-          'A user service stops when you log out unless lingering is on: `loginctl enable-linger` (may need sudo).',
-        ]
-      : [],
+    notes: [
+      'A user service stops when you log out and does not start at boot unless lingering is on: `sudo loginctl enable-linger $USER`.',
+    ],
   };
 }
