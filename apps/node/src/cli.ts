@@ -23,6 +23,8 @@ import { isMain } from '@gyblos/runtime';
 
 import { doctor } from './cli-doctor';
 import { COLUMN, issueLine, URL_HIDDEN, urlOrigin } from './cli-format';
+import { serviceCommand, type ServiceSystem } from './cli-service';
+import { EXIT } from './constants';
 
 export interface CliContext {
   env: Readonly<Record<string, string | undefined>>;
@@ -32,11 +34,12 @@ export interface CliContext {
   cwd?: string;
   // Loopback and devnet probes for `doctor`; tests inject fakes.
   doctor?: DoctorProbes;
+  // The operating system for `seller service`; tests inject a fake.
+  service?: ServiceSystem;
 }
 
-const EXIT = { ok: 0, failure: 1 } as const;
 const USAGE =
-  'Usage: gyblos config validate [--config <path>]\n       gyblos doctor [--online]   (reads GYBLOS_CONFIG or ./gyblos.toml, like node:start; --online also calls remote engines)\n';
+  'Usage: gyblos config validate [--config <path>]\n       gyblos doctor [--online]   (reads GYBLOS_CONFIG or ./gyblos.toml, like node:start; --online also calls remote engines)\n       gyblos seller service install [--memory 3G] [--cpu 100%] [--dry-run]   (as the seller account, never root)\n       gyblos seller service uninstall [--dry-run]\n';
 const URL_SETTINGS: ReadonlySet<NodeSettingKey> = new Set([
   NODE_SETTINGS.RPC_URL,
   NODE_SETTINGS.RELAY_URLS,
@@ -125,6 +128,9 @@ function parseCommand(args: readonly string[]) {
       options: {
         config: { type: 'string' },
         online: { type: 'boolean' },
+        memory: { type: 'string' },
+        cpu: { type: 'string' },
+        'dry-run': { type: 'boolean' },
       },
       allowPositionals: true,
     });
@@ -133,15 +139,50 @@ function parseCommand(args: readonly string[]) {
   }
 }
 
+// The service flags belong to `seller service` only.
+const usesServiceFlags = (
+  values: NonNullable<ReturnType<typeof parseCommand>>['values'],
+) =>
+  values.memory !== undefined ||
+  values.cpu !== undefined ||
+  values['dry-run'] !== undefined;
+
 export async function runCli(args: readonly string[], context: CliContext) {
   const parsed = parseCommand(args);
   const [group, command, ...rest] = parsed?.positionals ?? [];
+  if (
+    parsed &&
+    group === 'seller' &&
+    command === 'service' &&
+    rest.length === 1 &&
+    parsed.values.config === undefined &&
+    parsed.values.online === undefined
+  ) {
+    const code = await serviceCommand(
+      rest[0],
+      {
+        memory: parsed.values.memory,
+        cpu: parsed.values.cpu,
+        dryRun: parsed.values['dry-run'] === true,
+      },
+      {
+        env: context.env,
+        cwd: context.cwd ?? process.cwd(),
+        stdout: context.stdout,
+        stderr: context.stderr,
+        doctor: context.doctor,
+      },
+      context.service,
+    );
+    if (code !== undefined) return code;
+  }
   // doctor reads exactly what node:start reads (GYBLOS_CONFIG or ./gyblos.toml), so it takes no --config.
   if (
     parsed &&
     group === 'doctor' &&
     command === undefined &&
-    parsed.values.config === undefined
+    parsed.values.config === undefined &&
+    !usesServiceFlags(parsed.values)
   ) {
     const ready = await doctor(
       {
@@ -159,7 +200,8 @@ export async function runCli(args: readonly string[], context: CliContext) {
     group !== 'config' ||
     command !== 'validate' ||
     rest.length ||
-    parsed.values.online !== undefined
+    parsed.values.online !== undefined ||
+    usesServiceFlags(parsed.values)
   ) {
     context.stderr(USAGE);
     return EXIT.failure;
