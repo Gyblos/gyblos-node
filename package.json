@@ -37,6 +37,7 @@
     "tooling:test": "node --import tsx --test \"tooling/**/*.test.ts\"",
     "index:invite": "node --import tsx apps/discovery-index/scripts/admin.ts invite",
     "index:revoke": "node --import tsx apps/discovery-index/scripts/admin.ts revoke",
+    "index:restore": "node --import tsx apps/discovery-index/scripts/admin.ts restore",
     "node:start": "node --import tsx apps/node/src/main.ts",
     "gyblos": "node --import tsx apps/node/src/cli.ts",
     "buyer:start": "node --import tsx apps/buyer/src/main.ts",

@@ -1,16 +1,22 @@
 // Founder-only enrollment commands for the discovery index, run from a checkout with a Wrangler login:
 //   pnpm index:invite --contact <email or telegram> [--days 14]   prints a one-use invite code
 //   pnpm index:revoke <NodeId>                                     stops that seller from publishing
+//   pnpm index:restore <NodeId>                                    readmits a revoked seller
 // They write to the remote D1 through Wrangler (no admin route on the index). Only the invite's SHA-256
 // reaches D1; the code is printed once here and never stored. --dry-run prints the SQL instead.
 import { execFileSync } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
 import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
 import { isMain } from '@gyblos/runtime';
 
-import { REGISTRATION, REGISTRATION_STATUS } from '../src/constants';
+import {
+  REGISTRATION,
+  REGISTRATION_STATUS,
+  type RegistrationStatus,
+} from '../src/constants';
 
 const WRANGLER = 'wrangler@4.151.1';
 const DATABASE = 'gyblos-discovery';
@@ -24,7 +30,7 @@ const BASE32 = {
 const DEFAULT_DAYS = REGISTRATION.inviteLifetimeMs / REGISTRATION.dayMs;
 const DAYS = /^[1-9][0-9]?$/;
 
-export interface AdminOutput {
+export interface AdminIo {
   stdout: (text: string) => void;
   stderr: (text: string) => void;
   // Runs the SQL against the remote D1; tests and --dry-run replace it.
@@ -34,7 +40,7 @@ export interface AdminOutput {
 }
 
 // RFC 4648 base32, lowercase and unpadded: 16 bytes become 26 characters.
-function base32(bytes: Uint8Array) {
+export function base32(bytes: Uint8Array) {
   let bits = 0;
   let value = 0;
   let text = '';
@@ -51,12 +57,12 @@ function base32(bytes: Uint8Array) {
   return text;
 }
 
-export function newInvite(random: AdminOutput['random']) {
+export function newInvite(random: AdminIo['random']) {
   const code = `${REGISTRATION.invitePrefix}${base32(random(REGISTRATION.inviteBytes))}`;
   return { code, hash: createHash('sha256').update(code).digest('hex') };
 }
 
-function invite(args: readonly string[], output: AdminOutput) {
+function invite(args: readonly string[], output: AdminIo) {
   const { values } = parseArgs({
     args: [...args],
     options: { contact: { type: 'string' }, days: { type: 'string' } },
@@ -86,27 +92,40 @@ function invite(args: readonly string[], output: AdminOutput) {
   return 0;
 }
 
-function revoke(args: readonly string[], output: AdminOutput) {
+// Revoked NodeIds cannot be readmitted by an invite (no publish, 403 NODE_REVOKED on registration);
+// only `restore` makes them active again.
+function setStatus(
+  args: readonly string[],
+  output: AdminIo,
+  status: RegistrationStatus,
+) {
   const [nodeId, ...rest] = args;
+  const command =
+    status === REGISTRATION_STATUS.REVOKED ? 'index:revoke' : 'index:restore';
   if (rest.length || !nodeId || !REGISTRATION.nodeId.test(nodeId)) {
-    output.stderr('usage: pnpm index:revoke <NodeId (64 lowercase hex)>\n');
+    output.stderr(`usage: pnpm ${command} <NodeId (64 lowercase hex)>\n`);
     return 1;
   }
   output.execute(
-    `UPDATE discovery_registrations SET status = '${REGISTRATION_STATUS.REVOKED}' WHERE node_id = '${nodeId}';`,
+    `UPDATE discovery_registrations SET status = '${status}' WHERE node_id = '${nodeId}';`,
   );
   output.stdout(
-    `Revoked ${nodeId}: its publishes are refused. A new invite can admit it again.\n`,
+    status === REGISTRATION_STATUS.REVOKED
+      ? `Revoked ${nodeId}: its publishes and registrations are refused until \`pnpm index:restore\`.\n`
+      : `Restored ${nodeId}: it may publish again (no effect if it was never registered).\n`,
   );
   return 0;
 }
 
-export function runAdmin(argv: readonly string[], output: AdminOutput) {
+export function runAdmin(argv: readonly string[], output: AdminIo) {
   const [command, ...args] = argv;
   if (command === 'invite') return invite(args, output);
-  if (command === 'revoke') return revoke(args, output);
+  if (command === 'revoke')
+    return setStatus(args, output, REGISTRATION_STATUS.REVOKED);
+  if (command === 'restore')
+    return setStatus(args, output, REGISTRATION_STATUS.ACTIVE);
   output.stderr(
-    'usage: pnpm index:invite --contact <contact> [--days 14] | pnpm index:revoke <NodeId>\n',
+    'usage: pnpm index:invite --contact <contact> [--days 14] | pnpm index:revoke <NodeId> | pnpm index:restore <NodeId>\n',
   );
   return 1;
 }
@@ -116,7 +135,7 @@ function wranglerExecute(sql: string) {
     'npx',
     [WRANGLER, 'd1', 'execute', DATABASE, '--remote', '--command', sql],
     {
-      cwd: resolve(dirname(new URL(import.meta.url).pathname), '..'),
+      cwd: resolve(dirname(fileURLToPath(import.meta.url)), '..'),
       stdio: ['ignore', 'ignore', 'inherit'],
     },
   );

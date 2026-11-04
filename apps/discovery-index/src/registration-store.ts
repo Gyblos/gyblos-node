@@ -2,9 +2,12 @@
 // adapter for tests and local runs; the D1 adapter is registration-store-d1.ts. Invites are kept only
 // as SHA-256 hashes, and nothing here sees an IP or request header.
 import {
+  INVITE_STATES,
   REDEEM_RESULTS,
   REGISTRATION_STATUS,
+  type InviteState,
   type RedeemResult,
+  type RegistrationStatus,
 } from './constants';
 
 export interface InviteInput {
@@ -25,11 +28,16 @@ export interface Redemption {
 }
 
 export interface RegistrationStore {
+  // The operator's insert (scripts/admin.ts writes the same row through Wrangler); tests seed with it.
   createInvite(invite: InviteInput): Promise<void>;
-  // An unused, unexpired invite: checked before the chain is read, so a bad code costs no RPC call.
-  inviteUsable(inviteHash: string, now: number): Promise<boolean>;
-  // Atomic: an unused, unexpired invite is spent on this NodeId and the NodeId becomes active. A NodeId
-  // that is already active keeps its registration and spends no invite.
+  // Checked before the chain is read, so a bad code costs no RPC call and reveals nothing about NodeIds.
+  inviteState(
+    inviteHash: string,
+    nodeId: string,
+    now: number,
+  ): Promise<InviteState>;
+  // Atomic: an unused, unexpired invite is spent and the NodeId admitted only when the NodeId has no
+  // registration yet. An active NodeId spends nothing; a revoked one stays revoked.
   redeem(redemption: Redemption): Promise<RedeemResult>;
   // Whether the NodeId may publish.
   active(nodeId: string): Promise<boolean>;
@@ -43,32 +51,61 @@ interface MemoryInvite extends InviteInput {
 interface MemoryRegistration {
   owner: string;
   asset: string;
-  status: string;
+  status: RegistrationStatus;
   inviteHash: string;
   country: string | null;
   registeredAt: number;
 }
 
-// Same semantics as the D1 adapter, in process memory. `revoke` mirrors the operator's SQL.
+export interface StoredInvite {
+  usedAt: number | null;
+  nodeId: string | null;
+  expiresAt: number;
+}
+
+// The invite's state for this NodeId from its stored row and the registration it admitted, if any.
+export function inviteStateOf(
+  invite: StoredInvite | null,
+  admittedStatus: string | null,
+  nodeId: string,
+  now: number,
+): InviteState {
+  if (!invite) return INVITE_STATES.INVALID;
+  if (invite.usedAt === null)
+    return invite.expiresAt > now
+      ? INVITE_STATES.USABLE
+      : INVITE_STATES.INVALID;
+  return invite.nodeId === nodeId &&
+    admittedStatus === REGISTRATION_STATUS.ACTIVE
+    ? INVITE_STATES.ADMITTED
+    : INVITE_STATES.INVALID;
+}
+
+// Same semantics as the D1 adapter, in process memory. `setStatus` mirrors the operator's SQL.
 export function createMemoryRegistrationStore(): RegistrationStore & {
-  revoke(nodeId: string): void;
+  setStatus(nodeId: string, status: RegistrationStatus): void;
 } {
   const invites = new Map<string, MemoryInvite>();
   const registrations = new Map<string, MemoryRegistration>();
-  const isActive = (nodeId: string) =>
-    registrations.get(nodeId)?.status === REGISTRATION_STATUS.ACTIVE;
   return {
     async createInvite(invite) {
       if (invites.has(invite.inviteHash))
         throw new Error('Invite already exists.');
       invites.set(invite.inviteHash, { ...invite, usedAt: null, nodeId: null });
     },
-    async inviteUsable(inviteHash, now) {
-      const invite = invites.get(inviteHash);
-      return !!invite && invite.usedAt === null && invite.expiresAt > now;
+    async inviteState(inviteHash, nodeId, now) {
+      const invite = invites.get(inviteHash) ?? null;
+      const admitted = invite?.nodeId
+        ? registrations.get(invite.nodeId)
+        : undefined;
+      return inviteStateOf(invite, admitted?.status ?? null, nodeId, now);
     },
     async redeem(redemption) {
-      if (isActive(redemption.nodeId)) return REDEEM_RESULTS.ALREADY_ACTIVE;
+      const existing = registrations.get(redemption.nodeId);
+      if (existing)
+        return existing.status === REGISTRATION_STATUS.ACTIVE
+          ? REDEEM_RESULTS.ALREADY_ACTIVE
+          : REDEEM_RESULTS.REVOKED;
       const invite = invites.get(redemption.inviteHash);
       if (
         !invite ||
@@ -89,11 +126,11 @@ export function createMemoryRegistrationStore(): RegistrationStore & {
       return REDEEM_RESULTS.REGISTERED;
     },
     async active(nodeId) {
-      return isActive(nodeId);
+      return registrations.get(nodeId)?.status === REGISTRATION_STATUS.ACTIVE;
     },
-    revoke(nodeId) {
+    setStatus(nodeId, status) {
       const registration = registrations.get(nodeId);
-      if (registration) registration.status = REGISTRATION_STATUS.REVOKED;
+      if (registration) registration.status = status;
     },
   };
 }

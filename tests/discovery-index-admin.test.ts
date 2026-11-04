@@ -4,7 +4,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { runAdmin, type AdminOutput } from '@gyblos/discovery-index/admin';
+import {
+  base32,
+  newInvite,
+  runAdmin,
+  type AdminIo,
+} from '@gyblos/discovery-index/admin';
 import { REGISTRATION } from '@gyblos/discovery-index/constants';
 import { inviteHash } from '@gyblos/discovery-index/registrations';
 
@@ -20,7 +25,7 @@ function admin(execute: (sql: string) => void, now: number) {
   let stdout = '';
   let stderr = '';
   const statements: string[] = [];
-  const output: AdminOutput = {
+  const output: AdminIo = {
     stdout: (text) => {
       stdout += text;
     },
@@ -95,11 +100,29 @@ void test('index:invite and index:revoke refuse bad input without touching D1', 
     ['revoke'],
     ['revoke', 'AB'.repeat(32)],
     ['revoke', 'ab'.repeat(32), 'extra'],
+    ['restore'],
+    ['restore', 'xyz'],
     ['other'],
   ]) {
     const cli = admin(() => assert.fail('no SQL expected'), 0);
     assert.equal(cli.run(argv), 1, argv.join(' '));
     assert.equal(cli.out().statements.length, 0);
     assert.notEqual(cli.out().stderr, '');
+  }
+});
+
+void test('invite codes are RFC 4648 base32 of 16 random bytes, hashed the same way the Worker hashes', async () => {
+  // RFC 4648 section 10 vectors, lowercase and unpadded.
+  const encode = (text: string) => base32(new TextEncoder().encode(text));
+  assert.deepEqual(
+    ['', 'f', 'fo', 'foo', 'foob', 'fooba', 'foobar'].map(encode),
+    ['', 'my', 'mzxq', 'mzxw6', 'mzxw6yq', 'mzxw6ytb', 'mzxw6ytboi'],
+  );
+  for (const fill of [0, 0xff, 0x5a]) {
+    const { code, hash } = newInvite((bytes) =>
+      new Uint8Array(bytes).fill(fill),
+    );
+    assert.match(code, REGISTRATION.invite);
+    assert.equal(hash, await inviteHash(code));
   }
 });

@@ -6,11 +6,16 @@ import {
   IDENTITY_LOOKUP_KINDS,
 } from '@gyblos/core/constants';
 import type { IdentityLookup } from '@gyblos/core/identity-policy';
+import { newInvite, runAdmin } from '@gyblos/discovery-index/admin';
 import {
   createDiscoveryIndex,
   type DiscoveryIndexOptions,
 } from '@gyblos/discovery-index/app';
-import { REGISTRATION } from '@gyblos/discovery-index/constants';
+import {
+  REGISTRATION,
+  REGISTRATION_STATUS,
+  type RegistrationStatus,
+} from '@gyblos/discovery-index/constants';
 import {
   createMemoryRegistrationStore,
   type RegistrationStore,
@@ -37,15 +42,13 @@ const SCOPE = {
 };
 
 let inviteCounter = 0;
-// A well-formed invite code (gyb_ + 26 base32 characters), distinct per call.
+// A fresh invite made exactly as `pnpm index:invite` makes one, from counter-seeded bytes.
 export function inviteCode() {
   inviteCounter += 1;
-  const digits = inviteCounter
-    .toString(8)
-    .split('')
-    .map((digit) => String.fromCharCode(97 + Number(digit)))
-    .join('');
-  return `gyb_${digits.padStart(26, 'a')}`;
+  const seed = inviteCounter;
+  return newInvite((bytes) =>
+    new Uint8Array(bytes).map((_byte, index) => (seed * 31 + index) % 256),
+  ).code;
 }
 
 export type ChainAnswer = 'bound' | 'missing' | 'unavailable' | 'other-node';
@@ -93,6 +96,7 @@ export async function enrollmentHarness(
     chain?: () => ChainAnswer;
   } = {},
 ) {
+  const { limiter, chain, ...indexOptions } = options;
   let db: SqliteD1 | null = null;
   if (kind === 'sqlite-d1') {
     db = await createSqliteD1();
@@ -102,15 +106,15 @@ export async function enrollmentHarness(
   const registrations: RegistrationStore = db
     ? createD1RegistrationStore(db)
     : memory!;
-  const registry = fakeRegistry(options.chain);
+  const registry = fakeRegistry(chain);
   const clock = { now: T0 + 1000 };
   const app = createDiscoveryIndex({
     storage: db ? createD1Storage(db) : createMemoryStorage(),
-    limiters: allLimiters(options.limiter),
+    limiters: allLimiters(limiter),
     registrations,
     registry: registry.reader,
     now: () => clock.now,
-    ...options,
+    ...indexOptions,
   });
   async function invite(
     contact = 'seller@example.com',
@@ -138,15 +142,28 @@ export async function enrollmentHarness(
     if (cf) Object.defineProperty(request, 'cf', { value: cf });
     return app.fetch(request);
   }
-  async function revoke(nodeId: string) {
-    if (memory) memory.revoke(nodeId);
-    else
-      await db!
-        .prepare(
-          `UPDATE discovery_registrations SET status = 'revoked' WHERE node_id = ?1`,
-        )
-        .bind(nodeId)
-        .run();
+  // The operator's revoke and restore, through the same SQL the admin script sends to D1.
+  function setStatus(nodeId: string, status: RegistrationStatus) {
+    if (memory) return memory.setStatus(nodeId, status);
+    const command =
+      status === REGISTRATION_STATUS.REVOKED ? 'revoke' : 'restore';
+    const code = runAdmin([command, nodeId], {
+      stdout: () => {},
+      stderr: () => {},
+      execute: (sql) => db!.raw.exec(sql),
+      now: () => clock.now,
+      random: (bytes) => new Uint8Array(bytes),
+    });
+    if (code !== 0) throw new Error(`admin ${command} failed`);
   }
-  return { app, db, clock, registry, registrations, invite, register, revoke };
+  return {
+    app,
+    db,
+    clock,
+    registry,
+    registrations,
+    invite,
+    register,
+    setStatus,
+  };
 }

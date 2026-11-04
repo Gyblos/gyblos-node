@@ -4,9 +4,11 @@
 import { IDENTITY_LOOKUP_KINDS } from '@gyblos/core/constants';
 import type { IdentityLookup } from '@gyblos/core/identity-policy';
 
+import { decodeUtf8, parseJson } from './body';
 import {
   HEX,
   INDEX_ERRORS,
+  INVITE_STATES,
   REDEEM_RESULTS,
   REGISTRATION,
   type RedeemResult,
@@ -30,27 +32,24 @@ export interface RegistrationContext {
 const BODY_KEYS = ['invite', 'nodeId'];
 
 function readRequest(bytes: ArrayBuffer) {
-  let value: unknown;
-  try {
-    value = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
-  } catch {
-    return indexFail(INDEX_ERRORS.INVALID_REGISTRATION);
-  }
+  const code = INDEX_ERRORS.INVALID_REGISTRATION;
+  const value = parseJson(decodeUtf8(bytes, code), code);
   if (
     !value ||
     typeof value !== 'object' ||
     Array.isArray(value) ||
     Object.keys(value).sort().join() !== BODY_KEYS.join()
   )
-    return indexFail(INDEX_ERRORS.INVALID_REGISTRATION);
-  const { invite, nodeId } = value as Record<string, unknown>;
+    return indexFail(code);
+  const invite: unknown = Reflect.get(value, 'invite');
+  const nodeId: unknown = Reflect.get(value, 'nodeId');
   if (
     typeof invite !== 'string' ||
     !REGISTRATION.invite.test(invite) ||
     typeof nodeId !== 'string' ||
     !REGISTRATION.nodeId.test(nodeId)
   )
-    return indexFail(INDEX_ERRORS.INVALID_REGISTRATION);
+    return indexFail(code);
   return { invite, nodeId };
 }
 
@@ -77,7 +76,8 @@ async function chainBinding(registry: RegistryReader, nodeId: string) {
   return lookup.binding;
 }
 
-// Throws IndexError with a static code; storage failures propagate (503).
+// Throws IndexError with a static code; storage failures propagate (503). The invite is checked first,
+// so without a valid code nothing reveals whether a NodeId is registered.
 export async function registerSeller(
   bytes: ArrayBuffer,
   context: RegistrationContext,
@@ -85,10 +85,10 @@ export async function registerSeller(
   const { invite, nodeId } = readRequest(bytes);
   const { store, now } = context;
   const hash = await inviteHash(invite);
-  // An active NodeId answers without reading the chain or spending the invite.
-  if (await store.active(nodeId)) return REDEEM_RESULTS.ALREADY_ACTIVE;
-  if (!(await store.inviteUsable(hash, now)))
-    indexFail(INDEX_ERRORS.INVITE_INVALID);
+  const state = await store.inviteState(hash, nodeId, now);
+  // A retry with the invite that already admitted this NodeId succeeds without the chain.
+  if (state === INVITE_STATES.ADMITTED) return REDEEM_RESULTS.ALREADY_ACTIVE;
+  if (state !== INVITE_STATES.USABLE) indexFail(INDEX_ERRORS.INVITE_INVALID);
   const binding = await chainBinding(context.registry, nodeId);
   const result = await store.redeem({
     inviteHash: hash,
@@ -102,6 +102,7 @@ export async function registerSeller(
         : null,
     now,
   });
+  if (result === REDEEM_RESULTS.REVOKED) indexFail(INDEX_ERRORS.NODE_REVOKED);
   if (result === REDEEM_RESULTS.INVITE_INVALID)
     indexFail(INDEX_ERRORS.INVITE_INVALID);
   return result;

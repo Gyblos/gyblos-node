@@ -79,8 +79,9 @@ export async function acceptRecord(
 ) {
   const { storage, now } = context;
   const { envelope, json } = readPublishBody(bytes);
-  // The claimed NodeId is refused before the signature, storage or the per-NodeId limit,
-  // so an unlisted publisher costs one parse and consumes no NodeId allowance.
+  // The claimed NodeId is refused before the signature, record storage or the per-NodeId limit, so
+  // an unlisted publisher costs one parse (plus one registration read when registrations are on)
+  // and consumes no NodeId allowance.
   if (!(await mayPublish(context, envelope)))
     indexFail(INDEX_ERRORS.PUBLISH_NOT_ALLOWED);
   const { record, signature } = await verifySelfSigned(envelope, now);

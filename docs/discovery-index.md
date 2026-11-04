@@ -60,7 +60,12 @@ NodeId, the permissionless design for later.
   is read. `GET /v1/sellers` and `GET /v1/health` keep working.
 - **Allowlist first:** an allowlisted NodeId is accepted without reading the
   registration tables, so allowlisted sellers keep publishing before migration
-  0003 is applied.
+  0003 is applied; until then any other NodeId gets `503` instead of `403`.
+- **In production** D1 is always bound, so the mode is never `closed`: health
+  reports `registered` even before the RPC secret is set (then
+  `/v1/registrations` answers 503) or the migration is applied. Registered
+  NodeIds count toward `maxNodes` like any other, so with registrations on the
+  stored node count is always checked, allowlisted NodeIds included.
 - **Cheap rejection:** after the per-IP and publish limits and the strict body
   checks, the record's claimed `nodeId` is looked up first. An unlisted NodeId
   gets `403 PUBLISH_NOT_ALLOWED` before signature verification, any storage read
@@ -86,24 +91,30 @@ The beta replaces the allowlist with one-use invites (vault
 (JSON, at most 512 bytes).
 
 - **Order of checks:** per-IP and publish limits, content type, size and strict
-  shape (`400 INVALID_REGISTRATION`). An already active NodeId answers
-  `200 {"ok":true,"status":"active"}` without reading the chain or spending an
-  invite. An unknown, used or expired invite is `403 INVITE_INVALID` before the
-  chain is read. Then the registry is read through the RPC secret: no binding
-  for the NodeId is `403 IDENTITY_NOT_REGISTERED`, and an RPC outage or a
-  binding for another NodeId is `503 DISCOVERY_UNAVAILABLE`. None of these
-  spends the invite. Success is `201 {"ok":true,"status":"active"}`.
+  shape (`400 INVALID_REGISTRATION`). The invite comes next, so without a valid
+  code nothing reveals whether a NodeId is registered: an unknown, expired or
+  already spent invite is `403 INVITE_INVALID`, before the chain is read. A
+  retry with the invite that already admitted this NodeId answers
+  `200 {"ok":true,"status":"active"}` without reading the chain. Then the
+  registry is read through the RPC secret: no binding for the NodeId is
+  `403 IDENTITY_NOT_REGISTERED`; an RPC outage or a binding for another NodeId
+  is `503 DISCOVERY_UNAVAILABLE`. A NodeId already active answers `200` and a
+  revoked one `403 NODE_REVOKED`. None of these spends the invite. Success is
+  `201 {"ok":true,"status":"active"}`.
 - **What is stored** (migration `0003_registrations.sql`): the invite's SHA-256
   (never the code), the contact it was issued to, its creation, expiry and use
   time and the NodeId it admitted; for the NodeId, the owner and asset the
   registry bound (from the chain, not the request), `active` or `revoked`, and
-  Cloudflare's two-letter country when present. No IP or IP fingerprint.
+  the two-letter country Cloudflare derives from the request IP, when present
+  (the vault decision; it is joinable to the invite's contact). No IP or IP
+  fingerprint.
 - **Invites and revocation** are founder commands that write to the remote D1
   through a Wrangler login; the index has no admin route:
 
   ```sh
   pnpm index:invite --contact seller@example.com   # prints a gyb_… code, valid 14 days (--days 1-90)
-  pnpm index:revoke <NodeId>                       # its publishes are refused; a new invite readmits it
+  pnpm index:revoke <NodeId>                       # its publishes and registrations are refused
+  pnpm index:restore <NodeId>                      # readmits a revoked NodeId; invites never do
   ```
 
   Add `--dry-run` to print the SQL instead. The code is printed once and cannot

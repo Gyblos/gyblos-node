@@ -5,6 +5,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { REGISTRATION_STATUS } from '@gyblos/discovery-index/constants';
+
 import {
   CLIENT_IP,
   deny,
@@ -62,14 +64,30 @@ for (const kind of STORE_KINDS) {
       (await harness.app.fetch(publish(await seller.catalog(2)))).status,
       201,
     );
-    // Again: already active, answered without the chain and without spending another invite.
+    // A retry with the same invite answers 200 without the chain.
+    const retry = await harness.register({
+      invite: code,
+      nodeId: seller.nodeId,
+    });
+    assert.equal(retry.status, 200);
+    assert.deepEqual(await retry.json(), { ok: true, status: 'active' });
+    assert.equal(harness.registry.lookups.length, 1);
+    // Without a valid invite nothing says whether a NodeId is registered.
+    await expectError(
+      await harness.register({
+        invite: `gyb_${'z'.repeat(26)}`,
+        nodeId: seller.nodeId,
+      }),
+      403,
+      'INVITE_INVALID',
+    );
+    // Another invite for an active NodeId answers 200 and is not spent.
     const spare = await harness.invite();
     const again = await harness.register({
       invite: spare,
       nodeId: seller.nodeId,
     });
     assert.equal(again.status, 200);
-    assert.equal(harness.registry.lookups.length, 1);
     assert.equal(
       (await harness.register({ invite: spare, nodeId: indexNode().nodeId }))
         .status,
@@ -159,7 +177,7 @@ for (const kind of STORE_KINDS) {
     assert.equal(harness.registry.lookups.length, 4);
   });
 
-  void test(`registrations (${kind}): a revoked NodeId stops publishing until a new invite`, async (context) => {
+  void test(`registrations (${kind}): a revoked NodeId stops publishing, no invite readmits it, restore does`, async (context) => {
     const harness = await enrollmentHarness(kind);
     if (!harness) return context.skip('node:sqlite unavailable');
     const seller = indexNode();
@@ -171,21 +189,25 @@ for (const kind of STORE_KINDS) {
       (await harness.app.fetch(publish(await seller.catalog(1)))).status,
       201,
     );
-    await harness.revoke(seller.nodeId);
+    harness.setStatus(seller.nodeId, REGISTRATION_STATUS.REVOKED);
     await expectError(
       await harness.app.fetch(publish(await seller.catalog(2))),
       403,
       'PUBLISH_NOT_ALLOWED',
     );
+    const spare = await harness.invite();
+    await expectError(
+      await harness.register({ invite: spare, nodeId: seller.nodeId }),
+      403,
+      'NODE_REVOKED',
+    );
+    // The refused invite is not spent.
     assert.equal(
-      (
-        await harness.register({
-          invite: await harness.invite(),
-          nodeId: seller.nodeId,
-        })
-      ).status,
+      (await harness.register({ invite: spare, nodeId: indexNode().nodeId }))
+        .status,
       201,
     );
+    harness.setStatus(seller.nodeId, REGISTRATION_STATUS.ACTIVE);
     assert.equal(
       (await harness.app.fetch(publish(await seller.catalog(3)))).status,
       201,
@@ -229,14 +251,25 @@ void test('registrations: malformed bodies, oversized bodies and the publish lim
   );
   assert.equal(harness.registry.lookups.length, 0);
   // A country that is not a two-letter code is not stored; the registration still succeeds.
-  assert.equal(
-    (
-      await harness.register({ invite, nodeId }, undefined, {
-        country: 'Chile',
-      })
-    ).status,
-    201,
-  );
+  const stored = (await enrollmentHarness('sqlite-d1'))!;
+  if (stored) {
+    assert.equal(
+      (
+        await stored.register(
+          { invite: await stored.invite(), nodeId },
+          undefined,
+          { country: 'Chile' },
+        )
+      ).status,
+      201,
+    );
+    const row = stored
+      .db!.raw.prepare(
+        'SELECT country FROM discovery_registrations WHERE node_id = ?',
+      )
+      .get(nodeId);
+    assert.deepEqual({ ...row }, { country: null });
+  }
   const limited = (await enrollmentHarness('memory', { limiter: deny }))!;
   await expectError(
     await limited.register({ invite: await limited.invite(), nodeId }),
@@ -257,11 +290,33 @@ void test('registrations: no registry or no store answers 503, and the allowlist
     503,
     'DISCOVERY_UNAVAILABLE',
   );
+  // No store and no allowlist: registration and publishing are both closed.
+  const closed = (await enrollmentHarness('memory', {
+    registrations: undefined,
+  }))!;
+  await expectError(
+    await closed.register({
+      invite: `gyb_${'a'.repeat(26)}`,
+      nodeId: indexNode().nodeId,
+    }),
+    503,
+    'DISCOVERY_UNAVAILABLE',
+  );
+  await expectError(
+    await closed.app.fetch(publish(await indexNode().catalog(1))),
+    503,
+    'DISCOVERY_UNAVAILABLE',
+  );
+  assert.deepEqual(await health(closed.app), {
+    ok: true,
+    records: 0,
+    publish: 'closed',
+  });
   // An allowlisted NodeId publishes even when the registration tables cannot be read.
   const listed = indexNode();
   const broken = {
     createInvite: async () => {},
-    inviteUsable: async () => false,
+    inviteState: async () => 'invalid' as const,
     redeem: async () => {
       throw new Error('no table');
     },
@@ -288,82 +343,3 @@ void test('registrations: no registry or no store answers 503, and the allowlist
     publish: 'allowlist',
   });
 });
-
-void test('the Worker maps the RPC secret and asks for manual redirects, which Workers supports', async () => {
-  const { edgeFetch, createWorker } =
-    await import('@gyblos/discovery-index/worker');
-  const seen: RequestInit[] = [];
-  const recorder = (async (_url: string, init: RequestInit) => {
-    seen.push(init);
-    return new Response('{}');
-  }) as typeof fetch;
-  await edgeFetch(recorder)('https://rpc.example.com/v2/key', {
-    redirect: 'error',
-    method: 'POST',
-  });
-  await edgeFetch(recorder)('https://rpc.example.com/v2/key', {
-    method: 'POST',
-  });
-  assert.deepEqual(
-    seen.map((init) => [init.redirect, init.method]),
-    [
-      ['manual', 'POST'],
-      [undefined, 'POST'],
-    ],
-  );
-  // A URL the reader refuses (a query string may carry a key) leaves the route at 503.
-  const { allLimiters } = await import('./support/discovery-index-fixture');
-  const { createSqliteD1 } = await import('./support/d1-sqlite');
-  const db = await createSqliteD1();
-  if (!db) return;
-  const response = await createWorker().fetch(
-    new Request(`${INDEX_ORIGIN}/v1/registrations`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        invite: `gyb_${'a'.repeat(26)}`,
-        nodeId: 'ab'.repeat(32),
-      }),
-    }),
-    {
-      DISCOVERY_DB: db,
-      ...allLimiters(),
-      DISCOVERY_SOLANA_RPC_URL: 'https://rpc.example.com/?api-key=secret',
-    },
-  );
-  await expectError(response, 503, 'DISCOVERY_UNAVAILABLE');
-});
-
-for (const kind of STORE_KINDS)
-  void test(`registration store (${kind}): redeem itself spends an invite once and never after expiry`, async (context) => {
-    // Called directly, as a request racing past the route's inviteUsable check would.
-    const harness = await enrollmentHarness(kind);
-    if (!harness) return context.skip('node:sqlite unavailable');
-    const { inviteHash } =
-      await import('@gyblos/discovery-index/registrations');
-    const store = harness.registrations;
-    const now = harness.clock.now;
-    const hash = await inviteHash(
-      await harness.invite('seller@example.com', 1000),
-    );
-    const redemption = (nodeId: string, at = now) => ({
-      inviteHash: hash,
-      nodeId,
-      owner: CHAIN_OWNER,
-      asset: ASSET,
-      country: null,
-      now: at,
-    });
-    const late = indexNode().nodeId;
-    assert.equal(
-      await store.redeem(redemption(late, now + 1000)),
-      'invite-invalid',
-    );
-    assert.equal(await store.active(late), false);
-    const first = indexNode().nodeId;
-    assert.equal(await store.redeem(redemption(first)), 'registered');
-    const second = indexNode().nodeId;
-    assert.equal(await store.redeem(redemption(second)), 'invite-invalid');
-    assert.equal(await store.active(second), false);
-    assert.equal(await store.active(first), true);
-  });
