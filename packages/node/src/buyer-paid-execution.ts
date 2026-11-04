@@ -66,8 +66,8 @@ export interface PaidBuyerRecord {
 export interface PaidBuyerDependencies {
   // These are trusted ports, not untrusted adapters: the caller must enforce the checks below.
   enter(): () => void;
-  // Whether a channel whose open reached a seller still needs reconciliation. Checked once per
-  // request: failover only follows an open that never left the buyer.
+  // Report whether any earlier sent open still needs reconciliation; fail closed if its state is
+  // unavailable. Checked once per request: failover follows only an open that never left the buyer.
   unresolved(): Promise<boolean>;
   // Verify the seller owner–NodeId binding independently of discovery, the authenticated catalog and
   // signed quote, their request binding and freshness, and exact selection and buyer price ceilings.
@@ -76,7 +76,7 @@ export interface PaidBuyerDependencies {
     excluded: ReadonlySet<string>,
     signal: AbortSignal,
   ): Promise<PaidWinner>;
-  // Enforce the buyer's independent terms, durable journal and unresolved-payment policy.
+  // Enforce the buyer's independent terms and durable journal.
   payment: PaymentClient;
   // The network's fee and treasury, from this buyer's configuration.
   fee: { bps: number; treasury: string };
