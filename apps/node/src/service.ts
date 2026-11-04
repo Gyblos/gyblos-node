@@ -113,7 +113,8 @@ function systemdUnit(input: ServiceInput) {
     '[Service]',
     'Type=simple',
     ...(system ? [`User=${input.account}`] : []),
-    `WorkingDirectory=${quoted(input.repository)}`,
+    // A path setting: systemd takes it verbatim and refuses quotes.
+    `WorkingDirectory=${input.repository}`,
     `Environment=${quoted(`GYBLOS_HOME=${input.home}`)}`,
     `Environment=${quoted(`GYBLOS_CONFIG=${input.config}`)}`,
     `Environment=${quoted(`PATH=${nodeBin(input.nodePath)}:${SERVICE.systemPath}`)}`,

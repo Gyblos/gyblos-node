@@ -47,7 +47,7 @@ void test('a system unit runs the seller as its account with limits, SIGINT and 
   assert.equal(plan.path, '/etc/systemd/system/gyblos-seller.service');
   for (const line of [
     'User=gyblos',
-    'WorkingDirectory="/srv/gyblos node"',
+    'WorkingDirectory=/srv/gyblos node',
     'Environment="GYBLOS_HOME=/srv/gyblos-home"',
     'Environment="GYBLOS_CONFIG=/srv/gyblos-home/gyblos.toml"',
     'EnvironmentFile=-/srv/gyblos-home/seller.env',
