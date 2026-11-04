@@ -121,6 +121,9 @@ see the full steps). The paid v1 buyer flow (`buyer:trust`, `buyer:start`) needs
 a paid v1 seller, which only the lab gates run. Paid v2 uses a separate path.
 Full steps: [docs/running-a-node.md](docs/running-a-node.md).
 
+With Docker instead: `compose.yaml` runs a seller with its own Ollama
+([Docker](docs/running-a-node.md#docker)).
+
 ## Commands
 
 | Group  | Command                                              | What it does                                                                           |

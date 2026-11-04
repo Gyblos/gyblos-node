@@ -290,9 +290,10 @@ seller role was set up with a payout and payment keys
 plus the protocol fee (`PROTOCOL_FEE`, 3% on devnet), rounded up. Paid v2 has
 settled on devnet only in a controlled run; see [limitations](limitations.md).
 The v1 paid path remains in the lab gates (`pnpm gate:*`) only.
-[examples/seller-daemon.toml](../examples/seller-daemon.toml) is a file it
-accepts as written; the other examples are valid files for future nodes but stop
-this daemon. Today it honors:
+[examples/seller-daemon.toml](../examples/seller-daemon.toml) and its Docker
+variant [examples/seller-docker.toml](../examples/seller-docker.toml) are files
+it accepts as written; the other examples are valid files for future nodes but
+stop this daemon. Today it honors:
 
 | Setting                                                                                                                                           | Used                                                                                                                      |
 | ------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
@@ -479,6 +480,7 @@ Qwen3 thinking is on or off, written `["off", "high"]`. The custom model in
 | [examples/anthropic-reseller.toml](../examples/anthropic-reseller.toml) | An Anthropic-compatible API and a custom model.              |
 | [examples/free-offer.toml](../examples/free-offer.toml)                 | A free offer with caps, Docker host engine, publication off. |
 | [examples/seller-daemon.toml](../examples/seller-daemon.toml)           | What the seller daemon serves today; it starts as written.   |
+| [examples/seller-docker.toml](../examples/seller-docker.toml)           | The same in Docker (`compose.yaml`); it starts as written.   |
 | [examples/multi-model.toml](../examples/multi-model.toml)               | Several models on one node.                                  |
 
 ## Code

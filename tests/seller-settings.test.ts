@@ -304,6 +304,17 @@ void test('the seller-daemon example starts the seller as written', () => {
   assert.equal(settings.publication, undefined);
 });
 
+void test('the seller-docker example starts the seller as written', () => {
+  const settings = sellerSettings(
+    fileConfig(
+      readFileSync(join(EXAMPLES_DIRECTORY, 'seller-docker.toml'), 'utf8'),
+    ),
+    {},
+  );
+  assert.deepEqual(settings.offers[0]!.offer, FREE_LISTING);
+  assert.equal(settings.publication, undefined);
+});
+
 void test('loadSellerSettings: optional ./gyblos.toml, required GYBLOS_CONFIG, invalid files fail closed', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'gyblos-seller-settings-'));
   try {
