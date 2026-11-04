@@ -28,7 +28,7 @@ void test('relay-only allows the relay and same-machine loopback paths only', ()
     assert.equal(
       relayOnlyAllows(connection(allowed)),
       true,
-      allowed.remoteAddr,
+      String(allowed.remoteAddr),
     );
   for (const refused of [
     path('192.168.1.20:51234'),
@@ -42,7 +42,7 @@ void test('relay-only allows the relay and same-machine loopback paths only', ()
     assert.equal(
       relayOnlyAllows(connection(refused)),
       false,
-      refused.remoteAddr,
+      String(refused.remoteAddr),
     );
   assert.equal(relayOnlyAllows(connection()), false);
   assert.equal(
