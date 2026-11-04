@@ -407,7 +407,7 @@ there are no `GYBLOS_*` variables for it, and the buyer ignores it.
 ```sh
 pnpm gyblos doctor                         # reads ./gyblos.toml, like node:start
 GYBLOS_CONFIG=my.toml pnpm gyblos doctor   # the file node:start will read
-pnpm gyblos doctor --online                # also calls remote engine APIs
+pnpm gyblos doctor --online                # also calls remote engine APIs and checks the clock
 ```
 
 `doctor` has no `--config` flag on purpose: it reads exactly the file
@@ -426,16 +426,17 @@ the checks startup would fail on, and prints one line per check (`OK`, `WARN` or
 | `tokenizer` | the pinned tokenizer files are present and match their hashes (`TOKENIZER_UNAVAILABLE` hints `node:tokenizer`); `NOT_NEEDED` when every offer's usage is declared by its provider                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `engine[N]` | one line per `[[offers]]` entry N (counted from 1): its engine answers at its URL with its model, by describing it (for Ollama, the model list and pinned digest; for an API, its model list, which some providers serve without checking the key); it never generates. A failure shows the engine code, such as `ENGINE_UNAVAILABLE` or `ENGINE_TIMEOUT`; it fails only when no offer's engine answers (startup needs one), and is otherwise a warning. Not checked when an offer is refused. A remote API is called only with `--online` (the call carries its API key, and a hosted provider may count it); without it the line warns `REMOTE_ENGINE_NOT_CHECKED` |
 | `relays`    | relay URLs and token as the endpoint would build them (the token is never printed)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `clock`     | `--online` with a discovery index only: this clock against the index's HTTP `Date` header. `CLOCK_SKEWED` warns when it is over 2 s off; buyers and the index refuse records issued over 5 s ahead of their clocks, so turn on automatic time sync (NTP). `CLOCK_UNCHECKED` when the index gives no time or answers in over 1 s                                                                                                                                                                                                                                                                                                                                      |
 
 It then prints the seller's public **NodeId and owner** address from
 `role.json`; share those to be enrolled in a discovery index. The exit code is 0
 when no check fails (warnings do not fail) and 1 otherwise. It starts, spawns
 and writes nothing. It never prints the home location, the RPC URL, the relay
 token, an API key or key material, and only reaches each offer's loopback engine
-URL, plus each remote engine's model list with `--online`. Memory headroom, key
-contents and the NodeId matching `node.key` are checked at startup only. With a
-valid configuration it also prints the effective
-[seller limits](#seller-limits).
+URL, plus, with `--online`, each remote engine's model list and the discovery
+index origin for its time. Memory headroom, key contents and the NodeId matching
+`node.key` are checked at startup only. With a valid configuration it also
+prints the effective [seller limits](#seller-limits).
 
 ## Issue codes
 

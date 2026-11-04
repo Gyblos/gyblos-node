@@ -30,6 +30,7 @@
     "./control-offers": "./src/control-offers.ts",
     "./free-offers": "./src/free-offers.ts",
     "./seller-settings": "./src/seller-settings.ts",
+    "./clock-check": "./src/clock-check.ts",
     "./seller-doctor": "./src/seller-doctor.ts",
     "./control-startup": "./src/control-startup.ts",
     "./node-config": "./src/node-config.ts",

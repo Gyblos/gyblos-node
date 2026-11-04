@@ -1,7 +1,10 @@
 // Chooses buyer-side seller candidates from caller-verified v2 catalogs, presence and local stats.
 // Pure policy: no clock, randomness, filesystem, network or signature checks; callers inject them.
 // The caller contract (verification, badge, offer race) is documented above `selectSellers`.
-import type { ReasoningLevel } from '@gyblos/protocol/constants';
+import {
+  CONTROL_LIMITS,
+  type ReasoningLevel,
+} from '@gyblos/protocol/constants';
 import type {
   ModelSelection,
   PublicCatalogV2,
@@ -57,10 +60,12 @@ export type SellerSelectionResult =
   | { ok: false; code: CooldownCode; cooldownUntil: number }
   | { ok: false; code: Exclude<SellerSelectionCode, CooldownCode> };
 
+// A record signed an instant ago on a clock slightly ahead is live, as in verification; expiry is exact.
 const withinLifetime = (
   record: { issuedAt: number; expiresAt: number },
   now: number,
-) => record.issuedAt <= now && now < record.expiresAt;
+) =>
+  record.issuedAt <= now + CONTROL_LIMITS.clockSkewMs && now < record.expiresAt;
 
 // Presence must be fresh and newer than its catalog; a later withdrawal tombstones that catalog.
 // Only owner, NodeId, sequence and lifetimes are compared here; the catalogDigest binding is the

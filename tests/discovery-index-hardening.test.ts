@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 
 import { DISCOVERY_LIMITERS } from '@gyblos/discovery-index/constants';
+import { CONTROL_LIMITS } from '@gyblos/protocol/constants';
 
 import {
   broken,
@@ -219,10 +220,10 @@ eachStorage(
 );
 
 eachStorage(
-  'time validation has zero skew and enforces kind lifetimes',
+  'time validation tolerates small skew only and enforces kind lifetimes',
   async ({ publish, clock }) => {
     const seller = indexNode();
-    clock.now = T0 - 1;
+    clock.now = T0 - CONTROL_LIMITS.clockSkewMs - 1;
     await expectError(await publish(seller.catalog(1)), 400, 'EXPIRED_RECORD');
     clock.now = T0 + 600_000;
     await expectError(await publish(seller.catalog(2)), 400, 'EXPIRED_RECORD');

@@ -4,6 +4,7 @@ import test from 'node:test';
 
 import { createControlQuote } from '@gyblos/core/control-quotes';
 import {
+  CONTROL_LIMITS,
   ENGINE_DONE_REASONS,
   FREE_CHAT_ROLES,
   FREE_EXECUTION,
@@ -104,7 +105,7 @@ void test('free execution binds requestId, exact selection, reasoning and output
   );
 });
 
-void test('free execution verifies signature, peer and zero-skew expiry boundaries', async () => {
+void test('free execution verifies signature, peer, skew and expiry boundaries', async () => {
   const api = await import('@gyblos/protocol/free-execution');
   const { request, trust } = await fixture();
   await assert.rejects(
@@ -124,7 +125,7 @@ void test('free execution verifies signature, peer and zero-skew expiry boundari
   await assert.rejects(
     api.verifyFreeExecutionRequest(request, {
       ...trust,
-      now: request.quote.offer.issuedAt - 1,
+      now: request.quote.offer.issuedAt - CONTROL_LIMITS.clockSkewMs - 1,
     }),
     { code: FREE_EXECUTION_CODES.EXPIRED },
   );

@@ -2,7 +2,7 @@
 // spawning or writing anything. Results carry static codes only; the RPC URL, relay token, key contents and
 // home location never leave this module. Network use is limited to describing each offer's engine: one on
 // this machine always, a remote API only with --online, since that call carries the seller's API key;
-// --online also reads which token accounts a paid claim would pay into are missing.
+// --online also reads missing payment token accounts and checks this clock against the discovery index.
 import { resolve } from 'node:path';
 
 import {
@@ -26,6 +26,7 @@ import {
 } from '@gyblos/transport-iroh/relays';
 
 import { modelTokenizer } from './artifacts';
+import { clockCheck } from './clock-check';
 import {
   DOCTOR_CHECKS,
   DOCTOR_CODES,
@@ -385,6 +386,9 @@ export async function sellerDoctor(
       DOCTOR_CHECKS.PAYMENTS,
       role.config ? await paymentsCheck(role.config, options) : notChecked,
     );
+  const index = config.settings?.publication?.baseUrl;
+  if (options.online && index)
+    add(DOCTOR_CHECKS.CLOCK, await clockCheck(index, options.probes?.fetch));
   return {
     checks,
     configIssues: config.issues,

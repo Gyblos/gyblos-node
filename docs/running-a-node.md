@@ -264,10 +264,11 @@ seller or change proxy behavior. Call `close()` when finished; the endpoint
 remains owned by the caller. There is no control CLI yet.
 
 Quotes are `offer/v2` and are rejected by the legacy paid v1 flow. They indicate
-observed availability, not guaranteed admission. Both clocks must be
-synchronized: v2 retains zero clock-skew tolerance and no expiration grace.
-Queries have a 10-second absolute deadline and share endpoint admission before
-their separate control quotas. See
+observed availability, not guaranteed admission. A record or quote issued up to
+5 s ahead of the buyer's clock is accepted; expiry has no grace. Keep automatic
+time sync (NTP) on: `pnpm gyblos doctor --online` warns when the seller's clock
+is over 2 s off the discovery index. Queries have a 10-second absolute deadline
+and share endpoint admission before their separate control quotas. See
 [the protocol specification](../packages/protocol/SPEC.md).
 
 ## Relays
@@ -632,7 +633,8 @@ still observe the submitted text; free does not imply private or verified.
 
 Control connections close before execution connects on `gyblos/free/3` or
 `gyblos/free-stream/3`. The client verifies the seller peer, signed quote, local
-buyer NodeId, exact terms and zero-skew expiry again before sending.
+buyer NodeId, exact terms and lifetime again before sending (an issue time up
+to 5 s ahead is accepted; expiry has no grace).
 Request/response bounds and correlation use the free protocol codec. A query has
 an absolute 180-second budget including discovery, quotes and execution; each
 transport also retains its stage bounds. A failed seller may be excluded and

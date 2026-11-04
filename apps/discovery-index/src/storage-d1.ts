@@ -1,6 +1,9 @@
 // Owns the Cloudflare D1 adapter of the discovery storage contract (schema in migrations/, applied in order).
 // Minimal local D1 interfaces stand in for @cloudflare/workers-types; rows are validated on read.
-import { PUBLIC_RECORD_KINDS } from '@gyblos/protocol/constants';
+import {
+  CONTROL_LIMITS,
+  PUBLIC_RECORD_KINDS,
+} from '@gyblos/protocol/constants';
 
 import type {
   DiscoveryStorage,
@@ -46,13 +49,14 @@ const STATE_SQL = `SELECT n.last_sequence AS lastSequence, c.sequence AS sequenc
 FROM discovery_nodes n LEFT JOIN discovery_catalogs c ON c.node_id = n.node_id WHERE n.node_id = ?1`;
 // Two phases: the page CTE filters, sorts and limits keys from covering indexes only (migration
 // 0002), then the signed JSON of just those rows is read by primary key. INDEXED BY pins the plan
-// because D1 may have no statistics; the indexes must exist before this code is deployed.
+// because D1 may have no statistics; the indexes must exist before this code is deployed. ?6 is the
+// latest accepted issue time: records issued slightly ahead of this clock are listed, as at publish.
 const LIST_SQL = `WITH page AS (
   SELECT p.node_id AS nodeId, p.issued_at AS issuedAt
   FROM discovery_catalog_models m
   JOIN discovery_catalogs c INDEXED BY discovery_catalogs_listing ON c.node_id = m.node_id
   JOIN discovery_presence p INDEXED BY discovery_presence_listing ON p.node_id = m.node_id AND p.catalog_digest = c.digest
-  WHERE m.model_id = ?1 AND c.issued_at <= ?2 AND c.expires_at > ?2 AND p.issued_at <= ?2 AND p.expires_at > ?2
+  WHERE m.model_id = ?1 AND c.issued_at <= ?6 AND c.expires_at > ?2 AND p.issued_at <= ?6 AND p.expires_at > ?2
     AND NOT EXISTS (SELECT 1 FROM discovery_withdrawals w INDEXED BY discovery_withdrawals_listing
       WHERE w.node_id = c.node_id AND w.catalog_digest = c.digest)
     AND (?3 IS NULL OR p.issued_at < ?3 OR (p.issued_at = ?3 AND p.node_id > ?4))
@@ -194,7 +198,14 @@ export function createD1Storage(db: D1Database): DiscoveryStorage {
     async list({ model, now, limit, after }) {
       const { results } = await db
         .prepare(LIST_SQL)
-        .bind(model, now, after?.issuedAt ?? null, after?.nodeId ?? null, limit)
+        .bind(
+          model,
+          now,
+          after?.issuedAt ?? null,
+          after?.nodeId ?? null,
+          limit,
+          now + CONTROL_LIMITS.clockSkewMs,
+        )
         .all();
       return results.map(sellerRow);
     },

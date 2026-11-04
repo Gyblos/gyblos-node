@@ -72,6 +72,8 @@ export const DOCTOR_CHECKS = {
   RELAYS: 'relays',
   // Only for a seller with paid offers.
   PAYMENTS: 'payments',
+  // Only with --online and a discovery index to compare against.
+  CLOCK: 'clock',
 } as const;
 export type DoctorCheckName =
   (typeof DOCTOR_CHECKS)[keyof typeof DOCTOR_CHECKS];
@@ -96,7 +98,20 @@ export const DOCTOR_CODES = {
   NOT_NEEDED: 'NOT_NEEDED',
   // A remote engine is called only with --online.
   REMOTE_ENGINE_NOT_CHECKED: 'REMOTE_ENGINE_NOT_CHECKED',
+  // This clock differs from the discovery index's by more than DOCTOR_CLOCK.warnMs.
+  CLOCK_SKEWED: 'CLOCK_SKEWED',
+  // The discovery index did not answer with its time, or answered too slowly to measure it.
+  CLOCK_UNCHECKED: 'CLOCK_UNCHECKED',
   CHECK_FAILED: 'DOCTOR_CHECK_FAILED',
+} as const;
+// Buyers and the index accept a record issued at most CONTROL_LIMITS.clockSkewMs ahead of their clock;
+// doctor warns well before that. With the header's 1 s resolution and at most 1 s of round trip, a
+// clock reported within warnMs is at most 4 s off.
+export const DOCTOR_CLOCK = {
+  warnMs: 2000,
+  dateResolutionMs: 1000,
+  maxRoundTripMs: 1000,
+  timeoutMs: 5000,
 } as const;
 export type DoctorCode = (typeof DOCTOR_CODES)[keyof typeof DOCTOR_CODES];
 
