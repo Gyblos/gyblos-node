@@ -155,12 +155,14 @@ pnpm node:start
   the seller in discovery (default no). Without a terminal it takes flags and
   defaults (`--engine`, `--url`, `--model`, `--upstream-model`,
   `--context-tokens`, `--api-key-env <NAME>|none`, `--daily-cap`,
-  `--per-buyer-cap`, `--publish`). It writes `GYBLOS_CONFIG` or `./gyblos.toml`,
-  replaces an existing file only with `--force`, never writes through a symlink,
-  and writes nothing when node:start would refuse the values. It handles no
-  secret: API keys and the relay token stay in the environment or `seller.env`,
-  and it prints only their variable names. `examples/seller-daemon.toml` is the
-  same starting point as a file to copy.
+  `--per-buyer-cap`, `--publish` or `--no-publish`). It writes `GYBLOS_CONFIG`
+  or `./gyblos.toml` (mode 0600, since an engine URL may carry a key in its
+  path), replaces an existing file only with `--force`, never writes through a
+  symlink, and writes nothing when the file format or startup's offer rules
+  would refuse the values (for Ollama, only the pinned `qwen3:0.6b` at a literal
+  loopback address). It handles no secret: API keys and the relay token stay in
+  the environment or `seller.env`, and it prints only their variable names.
+  `examples/seller-daemon.toml` is an equivalent file to copy instead.
 - The seller serves every free offer in `gyblos.toml`; without one it does not
   start (`SELLER_OFFERS_MISSING`). A paid offer is sold on devnet over the paid
   stream when the seller role was set up with a payout

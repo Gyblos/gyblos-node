@@ -1,90 +1,14 @@
-// Owns the `gyblos seller init` contract: a gyblos.toml that node:start accepts, one question per missing
-// value on a terminal and defaults otherwise, no overwrite without --force, no write through a symlink,
-// nothing written on invalid or cancelled input, and no secret or URL path in any output. Offline;
-// temporary directories only.
+// Owns the `gyblos seller init` contract for a successful run: a gyblos.toml that node:start accepts, one
+// question per missing value on a terminal and defaults otherwise, --force, GYBLOS_CONFIG, and no secret or
+// URL path in any output. Offline; temporary directories only. Refusals are in node-init-refusal.test.ts.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import {
-  lstat,
-  mkdir,
-  mkdtemp,
-  readdir,
-  readFile,
-  rm,
-  symlink,
-  writeFile,
-} from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { lstat, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { runCli } from '@gyblos/node-app/cli';
-import { parseNodeConfig } from '@gyblos/node/node-config';
-import { resolveNodeConfig } from '@gyblos/node/node-config-resolve';
-
+import { configOf, inDirectory, INIT, run } from './support/init-fixture';
 import { FAKE_SECRET, REPOSITORY_ROOT } from './support/node-config-fixtures';
-
-const INIT = ['seller', 'init'];
-
-interface Run {
-  code: number;
-  stdout: string;
-  stderr: string;
-  output: string;
-  questions: string[];
-}
-
-async function inDirectory<T>(use: (directory: string) => Promise<T>) {
-  const directory = await mkdtemp(join(tmpdir(), 'gyblos-init-'));
-  try {
-    return await use(directory);
-  } finally {
-    await rm(directory, { recursive: true, force: true });
-  }
-}
-
-// answers === undefined runs without a terminal; otherwise each question takes the next answer.
-async function run(
-  directory: string,
-  args: string[],
-  options: {
-    answers?: string[];
-    env?: Record<string, string>;
-    cancelAt?: number;
-  } = {},
-): Promise<Run> {
-  let stdout = '';
-  let stderr = '';
-  const questions: string[] = [];
-  const answers = options.answers ? [...options.answers] : undefined;
-  const code = await runCli([...INIT, ...args], {
-    env: options.env ?? {},
-    cwd: directory,
-    stdout: (text) => {
-      stdout += text;
-    },
-    stderr: (text) => {
-      stderr += text;
-    },
-    prompt: answers
-      ? (question) => {
-          questions.push(question);
-          if (questions.length === options.cancelAt)
-            return Promise.reject(new Error('aborted'));
-          return Promise.resolve(answers.shift() ?? '');
-        }
-      : undefined,
-  });
-  return { code, stdout, stderr, output: stdout + stderr, questions };
-}
-
-async function configOf(path: string) {
-  const parsed = parseNodeConfig(await readFile(path, 'utf8'));
-  assert.ok(parsed.ok, JSON.stringify(parsed));
-  const resolved = resolveNodeConfig({ file: parsed.config, env: {} });
-  assert.ok(resolved.ok, JSON.stringify(resolved));
-  return { file: parsed.config, settings: resolved.settings };
-}
 
 void test('seller init: without a terminal it writes the default free Ollama offer that node:start reads', () =>
   inDirectory(async (directory) => {
@@ -106,7 +30,7 @@ void test('seller init: without a terminal it writes the default free Ollama off
       dailyTokenCap: 200000,
       perBuyerCap: 5000,
     });
-    assert.equal((await lstat(path)).mode & 0o777, 0o644);
+    assert.equal((await lstat(path)).mode & 0o777, 0o600);
     assert.deepEqual(await readdir(directory), ['gyblos.toml']);
     assert.match(
       result.stdout,
@@ -135,20 +59,17 @@ void test('seller init: on a terminal it asks each missing value, in order, and 
       ],
     });
     assert.equal(result.code, 0, result.output);
-    assert.deepEqual(
-      result.questions.map((question) => question.replace(/ \[.*$/, '')),
-      [
-        'Engine (ollama, openai or anthropic)',
-        'Engine URL',
-        'Model to offer: ',
-        'Model name at the provider',
-        'Context window in tokens: ',
-        'Variable holding the API key (none for no key)',
-        'Free tokens per day, all buyers',
-        'Free tokens per buyer per day',
-        'List this seller in the public discovery index?',
-      ],
-    );
+    assert.deepEqual(result.questions, [
+      'Engine (ollama, openai or anthropic) [ollama]: ',
+      'Engine URL [https://api.anthropic.com]: ',
+      'Model to offer: ',
+      'Model name at the provider [acme/claude-chat]: ',
+      'Context window in tokens: ',
+      'Variable holding the API key (none for no key) [ANTHROPIC_API_KEY]: ',
+      'Free tokens per day, all buyers [200000]: ',
+      'Free tokens per buyer per day [5000]: ',
+      'List this seller in the public discovery index? [y/N]: ',
+    ]);
     const { file, settings } = await configOf(join(directory, 'gyblos.toml'));
     assert.equal(file.discovery?.publish, true);
     const [entry] = settings.offers;
@@ -182,7 +103,7 @@ void test('seller init: flags are never asked again, and "none" leaves the API k
         '--url',
         'http://127.0.0.1:1234/v1',
         '--model',
-        'gpt-oss-20b',
+        'acme/local-chat',
         '--context-tokens',
         '131072',
         '--api-key-env',
@@ -197,16 +118,42 @@ void test('seller init: flags are never asked again, and "none" leaves the API k
     );
     assert.equal(result.code, 0, result.output);
     assert.deepEqual(result.questions, [
-      'Model name at the provider [gpt-oss-20b]: ',
+      'Model name at the provider [acme/local-chat]: ',
     ]);
     const { settings } = await configOf(join(directory, 'gyblos.toml'));
     assert.deepEqual(settings.offers[0]!.engine, {
       kind: 'openai',
       url: 'http://127.0.0.1:1234/v1',
-      upstreamModel: 'gpt-oss-20b',
+      upstreamModel: 'acme/local-chat',
       contextTokens: 131072,
     });
     assert.doesNotMatch(result.stdout, /API key/);
+  }));
+
+void test('seller init: OpenAI defaults to OPENAI_API_KEY, and any answer but yes keeps discovery off', () =>
+  inDirectory(async (directory) => {
+    const result = await run(directory, [], {
+      answers: ['openai', '', 'x/y', '', '8192', '', '', '', 'n'],
+    });
+    assert.equal(result.code, 0, result.output);
+    const { file, settings } = await configOf(join(directory, 'gyblos.toml'));
+    assert.equal(file.discovery?.publish, false);
+    assert.equal(settings.offers[0]!.engine.apiKeyEnv, 'OPENAI_API_KEY');
+    assert.equal(settings.offers[0]!.engine.url, 'https://api.openai.com/v1');
+  }));
+
+void test('seller init: --no-publish answers the discovery question, and both flags together are refused', () =>
+  inDirectory(async (directory) => {
+    const result = await run(directory, ['--no-publish'], {
+      answers: ['', '', '', '', ''],
+    });
+    assert.equal(result.code, 0, result.output);
+    assert.equal(result.questions.length, 5);
+    const { file } = await configOf(join(directory, 'gyblos.toml'));
+    assert.equal(file.discovery?.publish, false);
+    const both = await run(directory, ['--publish', '--no-publish', '--force']);
+    assert.equal(both.code, 1);
+    assert.match(both.stderr, /^Usage:/);
   }));
 
 void test('seller init: a catalog id is pulled by its Ollama alias', () =>
@@ -233,25 +180,6 @@ void test('seller init: an existing file is kept without --force and replaced wi
     assert.deepEqual(await readdir(directory), ['gyblos.toml']);
   }));
 
-void test('seller init: never writes through a symlink or over a directory, even with --force', () =>
-  inDirectory(async (directory) => {
-    const target = join(directory, 'target.txt');
-    await writeFile(target, 'untouched\n');
-    await symlink(target, join(directory, 'gyblos.toml'));
-    const result = await run(directory, ['--force']);
-    assert.equal(result.code, 1);
-    assert.match(result.stderr, /INIT_UNSAFE_PATH/);
-    assert.equal(await readFile(target, 'utf8'), 'untouched\n');
-    assert.ok((await lstat(join(directory, 'gyblos.toml'))).isSymbolicLink());
-
-    await mkdir(join(directory, 'folder.toml'));
-    const nested = await run(directory, ['--force'], {
-      env: { GYBLOS_CONFIG: 'folder.toml' },
-    });
-    assert.equal(nested.code, 1);
-    assert.match(nested.stderr, /INIT_UNSAFE_PATH/);
-  }));
-
 void test('seller init: writes to GYBLOS_CONFIG, relative to the working directory', () =>
   inDirectory(async (directory) => {
     const result = await run(directory, [], {
@@ -262,45 +190,6 @@ void test('seller init: writes to GYBLOS_CONFIG, relative to the working directo
     await configOf(join(directory, 'seller.toml'));
   }));
 
-void test('seller init: values node:start would refuse write nothing and print the parser codes', () =>
-  inDirectory(async (directory) => {
-    for (const [args, code] of [
-      [['--url', 'http://engine.example.com:11434'], 'INSECURE_URL'],
-      [['--url', 'not a url'], 'offers[0].engine.url'],
-      [['--model', 'bad"model\u0000'], 'INIT_CONFIG_INVALID'],
-    ] as const) {
-      const result = await run(directory, [...args]);
-      assert.equal(result.code, 1, `${args.join(' ')}: ${result.output}`);
-      assert.match(result.stderr, new RegExp(code.replace(/[[\].]/g, '\\$&')));
-      assert.deepEqual(await readdir(directory), [], args.join(' '));
-    }
-  }));
-
-void test('seller init: missing, unknown or non-numeric values stop before writing', () =>
-  inDirectory(async (directory) => {
-    for (const [args, code, flag] of [
-      [
-        ['--engine', 'openai', '--model', 'x/y'],
-        'INIT_MISSING_VALUE',
-        '--context-tokens',
-      ],
-      [['--engine', 'anthropic'], 'INIT_MISSING_VALUE', '--model'],
-      [['--engine', 'vllm'], 'INIT_INVALID_ENGINE', '--engine'],
-      [['--daily-cap', '0'], 'INIT_INVALID_NUMBER', '--daily-cap'],
-      [['--per-buyer-cap', '5e3'], 'INIT_INVALID_NUMBER', '--per-buyer-cap'],
-      [
-        ['--engine', 'openai', '--model', 'x/y', '--context-tokens', '1.5'],
-        'INIT_INVALID_NUMBER',
-        '--context-tokens',
-      ],
-    ] as const) {
-      const result = await run(directory, [...args]);
-      assert.equal(result.code, 1, args.join(' '));
-      assert.match(result.stderr, new RegExp(`${code} ${flag}:`));
-      assert.deepEqual(await readdir(directory), []);
-    }
-  }));
-
 void test('seller init: a cancelled question exits 130 and writes nothing', () =>
   inDirectory(async (directory) => {
     const result = await run(directory, [], {
@@ -308,7 +197,7 @@ void test('seller init: a cancelled question exits 130 and writes nothing', () =
       cancelAt: 2,
     });
     assert.equal(result.code, 130);
-    assert.match(result.stderr, /cancelled; nothing was written/);
+    assert.match(result.stderr, /^INIT_CANCELLED: nothing was written/);
     assert.deepEqual(await readdir(directory), []);
   }));
 
@@ -336,30 +225,6 @@ void test('seller init: prints URLs as origins and never a secret from the envir
     assert.doesNotMatch(result.output, new RegExp(FAKE_SECRET));
     assert.match(result.stdout, /https:\/\/api\.example\.com <path hidden>/);
   }));
-
-void test('seller init: its flags are refused on other commands, and other flags on init', async () => {
-  for (const args of [
-    ['doctor', '--force'],
-    ['config', 'validate', '--engine', 'ollama'],
-    ['seller', 'service', 'install', '--publish'],
-    [...INIT, '--online'],
-    [...INIT, '--config', 'x.toml'],
-    [...INIT, '--dry-run'],
-    [...INIT, 'extra'],
-  ]) {
-    let stderr = '';
-    const code = await runCli(args, {
-      env: {},
-      cwd: '/nonexistent',
-      stdout: () => undefined,
-      stderr: (text) => {
-        stderr += text;
-      },
-    });
-    assert.equal(code, 1, args.join(' '));
-    assert.match(stderr, /^Usage:/, args.join(' '));
-  }
-});
 
 void test('seller init: the script entry takes defaults without a terminal and sets the exit code', () =>
   inDirectory(async (directory) => {

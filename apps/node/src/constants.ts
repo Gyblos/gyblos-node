@@ -1,5 +1,6 @@
 // Canonical values of the node application: the seller background service's names, locations, limits and
-// error codes. Rendering lives in service.ts and the CLI in cli-service.ts. The unit and agent directories
+// error codes, and `seller init`'s defaults and codes. Rendering lives in service.ts and the CLI in
+// cli-service.ts and cli-init.ts. The unit and agent directories
 // are operating-system locations under the account's home, not product-home paths (config/src/home.ts).
 // 130 is the shell's code for a run stopped with Ctrl-C.
 export const EXIT = { ok: 0, failure: 1, interrupted: 130 } as const;
@@ -107,8 +108,9 @@ export const INIT_DEFAULTS = {
   anthropicKeyEnv: 'ANTHROPIC_API_KEY',
   dailyTokenCap: '200000',
   perBuyerCap: '5000',
-  fileMode: 0o644,
 } as const;
+// Owner only: an engine URL may carry a provider key in its path.
+export const INIT_FILE_MODE = 0o600;
 
 export const INIT_ERRORS = {
   MISSING_VALUE: 'INIT_MISSING_VALUE',
@@ -118,5 +120,6 @@ export const INIT_ERRORS = {
   FILE_EXISTS: 'INIT_FILE_EXISTS',
   UNSAFE_PATH: 'INIT_UNSAFE_PATH',
   WRITE_FAILED: 'INIT_WRITE_FAILED',
+  CANCELLED: 'INIT_CANCELLED',
 } as const;
 export type InitErrorCode = (typeof INIT_ERRORS)[keyof typeof INIT_ERRORS];

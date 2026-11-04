@@ -490,7 +490,8 @@ Qwen3 thinking is on or off, written `["off", "high"]`. The custom model in
   a valid result also carries `warnings`.
 - `@gyblos/node/node-config-resolve`: `resolveNodeConfig({ file, env, flags })`,
   returning settings, origins, secret references and warnings, or issues.
-- `apps/node/src/cli.ts`: the `gyblos` command (`pnpm gyblos`).
+- `apps/node/src/cli.ts`: the `gyblos` command (`pnpm gyblos`);
+  `apps/node/src/cli-init.ts` and `init.ts` hold `gyblos seller init`.
 
 ## Local telemetry
 

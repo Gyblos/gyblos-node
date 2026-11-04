@@ -13,10 +13,10 @@ export interface InitAnswers {
   model: string;
   // Remote engines only; the parser requires context_tokens for them and refuses it for Ollama.
   upstreamModel?: string;
-  contextTokens?: string;
+  contextTokens?: number;
   apiKeyEnv?: string;
-  dailyTokenCap: string;
-  perBuyerCap: string;
+  dailyTokenCap: number;
+  perBuyerCap: number;
   publish: boolean;
 }
 

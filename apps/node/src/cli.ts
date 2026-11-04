@@ -43,7 +43,24 @@ export interface CliContext {
 }
 
 const USAGE =
-  'Usage: gyblos config validate [--config <path>]\n       gyblos doctor [--online]   (reads GYBLOS_CONFIG or ./gyblos.toml, like node:start; --online also calls remote engines)\n       gyblos seller service install [--memory 3G] [--cpu 100%] [--dry-run]   (as the seller account, never root)\n       gyblos seller service uninstall [--dry-run]\n       gyblos seller init [--engine ollama|openai|anthropic] [--url <url>] [--model <id>] [--upstream-model <name>] [--context-tokens <n>] [--api-key-env <NAME>|none] [--daily-cap <n>] [--per-buyer-cap <n>] [--publish] [--force]\n';
+  'Usage: gyblos config validate [--config <path>]\n       gyblos doctor [--online]   (reads GYBLOS_CONFIG or ./gyblos.toml, like node:start; --online also calls remote engines)\n       gyblos seller service install [--memory 3G] [--cpu 100%] [--dry-run]   (as the seller account, never root)\n       gyblos seller service uninstall [--dry-run]\n       gyblos seller init [--engine ollama|openai|anthropic] [--url <url>] [--model <id>] [--upstream-model <name>] [--context-tokens <n>] [--api-key-env <NAME>|none] [--daily-cap <n>] [--per-buyer-cap <n>] [--publish|--no-publish] [--force]\n';
+// `seller init`'s flags, declared once for parsing and for refusing them on other commands.
+const INIT_OPTIONS = {
+  engine: { type: 'string' },
+  url: { type: 'string' },
+  model: { type: 'string' },
+  'upstream-model': { type: 'string' },
+  'context-tokens': { type: 'string' },
+  'api-key-env': { type: 'string' },
+  'daily-cap': { type: 'string' },
+  'per-buyer-cap': { type: 'string' },
+  publish: { type: 'boolean' },
+  'no-publish': { type: 'boolean' },
+  force: { type: 'boolean' },
+} as const;
+const INIT_FLAG_NAMES = Object.keys(
+  INIT_OPTIONS,
+) as (keyof typeof INIT_OPTIONS)[];
 const URL_SETTINGS: ReadonlySet<NodeSettingKey> = new Set([
   NODE_SETTINGS.RPC_URL,
   NODE_SETTINGS.RELAY_URLS,
@@ -135,16 +152,7 @@ function parseCommand(args: readonly string[]) {
         memory: { type: 'string' },
         cpu: { type: 'string' },
         'dry-run': { type: 'boolean' },
-        engine: { type: 'string' },
-        url: { type: 'string' },
-        model: { type: 'string' },
-        'upstream-model': { type: 'string' },
-        'context-tokens': { type: 'string' },
-        'api-key-env': { type: 'string' },
-        'daily-cap': { type: 'string' },
-        'per-buyer-cap': { type: 'string' },
-        publish: { type: 'boolean' },
-        force: { type: 'boolean' },
+        ...INIT_OPTIONS,
       },
       allowPositionals: true,
     });
@@ -161,21 +169,9 @@ const usesServiceFlags = (values: CommandValues) =>
   values.cpu !== undefined ||
   values['dry-run'] !== undefined;
 
-const INIT_FLAGS = [
-  'engine',
-  'url',
-  'model',
-  'upstream-model',
-  'context-tokens',
-  'api-key-env',
-  'daily-cap',
-  'per-buyer-cap',
-  'publish',
-  'force',
-] as const;
 // The init flags belong to `seller init` only.
 const usesInitFlags = (values: CommandValues) =>
-  INIT_FLAGS.some((flag) => values[flag] !== undefined);
+  INIT_FLAG_NAMES.some((flag) => values[flag] !== undefined);
 
 function runInit(values: CommandValues, context: CliContext) {
   return initCommand(
@@ -188,7 +184,7 @@ function runInit(values: CommandValues, context: CliContext) {
       apiKeyEnv: values['api-key-env'],
       dailyCap: values['daily-cap'],
       perBuyerCap: values['per-buyer-cap'],
-      publish: values.publish,
+      publish: values.publish ?? (values['no-publish'] ? false : undefined),
       force: values.force === true,
     },
     {
@@ -211,7 +207,8 @@ export async function runCli(args: readonly string[], context: CliContext) {
     rest.length === 0 &&
     parsed.values.config === undefined &&
     parsed.values.online === undefined &&
-    !usesServiceFlags(parsed.values)
+    !usesServiceFlags(parsed.values) &&
+    !(parsed.values.publish && parsed.values['no-publish'])
   ) {
     return runInit(parsed.values, context);
   }

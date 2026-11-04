@@ -1,15 +1,18 @@
 // `gyblos seller init`: writes gyblos.toml with one free devnet offer, asking for each value on a terminal
 // and taking flags or defaults otherwise. It writes the file node:start and doctor read (GYBLOS_CONFIG, else
-// ./gyblos.toml), never replaces one without --force, never follows a symlink, and handles no secret: API
-// keys and the relay token stay in seller.env, so only their variable names appear.
-import { randomBytes } from 'node:crypto';
-import { chmod, lstat, rename, rm, writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+// ./gyblos.toml), checks it with startup's own offer rules, never replaces one without --force, never
+// follows a symlink, and handles no secret: API keys and the relay token stay in seller.env, so only their
+// variable names appear.
+import { randomUUID } from 'node:crypto';
+import { constants, link, lstat, open, rename, rm } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
 import { createInterface, type Interface } from 'node:readline/promises';
 
 import { NODE_ENVIRONMENT } from '@gyblos/config';
 import { NODE_CONFIG_FILENAME } from '@gyblos/node/constants';
-import { parseNodeConfig } from '@gyblos/node/node-config';
+import { NodeError } from '@gyblos/node/errors';
+import { parseNodeConfig, type NodeConfig } from '@gyblos/node/node-config';
+import { sellerSettings } from '@gyblos/node/seller-settings';
 import { ENGINE_KINDS, type EngineKind } from '@gyblos/protocol/constants';
 
 import { issueLine, urlOrigin } from './cli-format';
@@ -17,6 +20,7 @@ import {
   EXIT,
   INIT_DEFAULTS,
   INIT_ERRORS,
+  INIT_FILE_MODE,
   type InitErrorCode,
 } from './constants';
 import { initToml, ollamaTag, type InitAnswers } from './init';
@@ -48,7 +52,14 @@ interface InitOutput {
 const NO_KEY = 'none';
 const YES = /^y(es)?$/i;
 const POSITIVE_INTEGER = /^[1-9][0-9]*$/;
-const TEMPORARY_SUFFIX_BYTES = 6;
+// Stands in for the API key while startup's rules check the file; init never reads the real one.
+const KEY_PRESENT = 'present';
+// A new file only, never through a symlink.
+const NEW_FILE =
+  constants.O_WRONLY |
+  constants.O_CREAT |
+  constants.O_EXCL |
+  constants.O_NOFOLLOW;
 
 const HINTS: Readonly<Record<InitErrorCode, string>> = {
   [INIT_ERRORS.MISSING_VALUE]:
@@ -57,13 +68,14 @@ const HINTS: Readonly<Record<InitErrorCode, string>> = {
   [INIT_ERRORS.INVALID_NUMBER]:
     'caps and context sizes are whole numbers above zero',
   [INIT_ERRORS.CONFIG_INVALID]:
-    'the values above would not pass node:start; nothing was written',
+    'node:start would refuse these values (docs/configuration.md#seller-startup); nothing was written',
   [INIT_ERRORS.FILE_EXISTS]:
     'the config file already exists; pass --force to replace it',
   [INIT_ERRORS.UNSAFE_PATH]:
     'the config path is a symlink or not a regular file; nothing was written',
   [INIT_ERRORS.WRITE_FAILED]:
     'could not write the config file; check the directory exists and is writable',
+  [INIT_ERRORS.CANCELLED]: 'nothing was written',
 };
 
 class InitError extends Error {
@@ -79,9 +91,9 @@ const isEngine = (value: string): value is EngineKind =>
   (Object.values(ENGINE_KINDS) as string[]).includes(value);
 
 function count(value: string, flag: string) {
-  if (!POSITIVE_INTEGER.test(value))
+  if (!POSITIVE_INTEGER.test(value) || !Number.isSafeInteger(Number(value)))
     throw new InitError(INIT_ERRORS.INVALID_NUMBER, flag);
-  return value;
+  return Number(value);
 }
 
 // A flag wins; otherwise the terminal is asked with the default shown; otherwise the default is taken.
@@ -137,10 +149,13 @@ async function remoteAnswers(
       ? INIT_DEFAULTS.openaiKeyEnv
       : INIT_DEFAULTS.anthropicKeyEnv,
   );
+  // Only an OpenAI-compatible server may run without a key; for Anthropic, startup refuses the offer.
   return {
     upstreamModel,
     contextTokens,
-    ...(apiKeyEnv === NO_KEY ? {} : { apiKeyEnv }),
+    ...(apiKeyEnv === NO_KEY && engine === ENGINE_KINDS.OPENAI
+      ? {}
+      : { apiKeyEnv }),
   };
 }
 
@@ -232,19 +247,48 @@ async function checkTarget(path: string, force: boolean) {
   if (!force) throw new InitError(INIT_ERRORS.FILE_EXISTS);
 }
 
-// Written beside the target and renamed over it, so a reader never sees half a file.
-async function writeAtomically(path: string, text: string) {
-  const temporary = `${path}.${randomBytes(TEMPORARY_SUFFIX_BYTES).toString('hex')}.tmp`;
+// Written and synced beside the target, then moved into place and the directory synced, so a reader never
+// sees half a file. Without --force the move is a link, which fails if a file appeared meanwhile.
+async function writeAtomically(path: string, text: string, force: boolean) {
+  const temporary = `${path}.${randomUUID()}.tmp`;
   try {
-    await writeFile(temporary, text, {
-      flag: 'wx',
-      mode: INIT_DEFAULTS.fileMode,
-    });
-    await chmod(temporary, INIT_DEFAULTS.fileMode);
-    await rename(temporary, path);
-  } catch {
-    await rm(temporary, { force: true });
+    const file = await open(temporary, NEW_FILE, INIT_FILE_MODE);
+    try {
+      await file.writeFile(text);
+      // The umask may have narrowed the mode; the handle cannot be swapped for a symlink.
+      await file.chmod(INIT_FILE_MODE);
+      await file.sync();
+    } finally {
+      await file.close();
+    }
+    if (force) await rename(temporary, path);
+    else await link(temporary, path);
+    const parent = await open(dirname(path), constants.O_RDONLY);
+    try {
+      await parent.sync();
+    } finally {
+      await parent.close();
+    }
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'EEXIST')
+      throw new InitError(INIT_ERRORS.FILE_EXISTS);
     throw new InitError(INIT_ERRORS.WRITE_FAILED);
+  } finally {
+    await rm(temporary, { force: true });
+  }
+}
+
+// Startup's own offer rules (engine, model, URL and key variable), with the key stood in for.
+function startupRefusal(config: NodeConfig, answers: InitAnswers) {
+  try {
+    sellerSettings(
+      config,
+      answers.apiKeyEnv ? { [answers.apiKeyEnv]: KEY_PRESENT } : {},
+    );
+    return undefined;
+  } catch (error) {
+    if (error instanceof NodeError) return error.code;
+    throw error;
   }
 }
 
@@ -280,7 +324,9 @@ export async function initCommand(
       answers = await answersFrom(options, prompt);
     } catch (error) {
       if (error instanceof InitError) throw error;
-      output.stderr('init: cancelled; nothing was written\n');
+      output.stderr(
+        `${INIT_ERRORS.CANCELLED}: ${HINTS[INIT_ERRORS.CANCELLED]}\n`,
+      );
       return EXIT.interrupted;
     }
     const text = initToml(answers);
@@ -289,9 +335,14 @@ export async function initCommand(
       for (const issue of parsed.issues) output.stderr(issueLine(issue));
       throw new InitError(INIT_ERRORS.CONFIG_INVALID);
     }
-    // Checked again: the file may have appeared while the operator was answering.
+    const refusal = startupRefusal(parsed.config, answers);
+    if (refusal) {
+      output.stderr(`  ${refusal}\n`);
+      throw new InitError(INIT_ERRORS.CONFIG_INVALID);
+    }
+    // Checked again: the file may have appeared or changed while the operator was answering.
     await checkTarget(path, options.force);
-    await writeAtomically(path, text);
+    await writeAtomically(path, text, options.force);
     output.stdout(
       `Wrote ${path}: free offer ${answers.model} via ${answers.engine} ${urlOrigin(answers.url)}; discovery ${answers.publish ? 'on' : 'off'}\nNext:\n${nextSteps(answers)}`,
     );
@@ -299,7 +350,7 @@ export async function initCommand(
   } catch (error) {
     if (!(error instanceof InitError)) throw error;
     const subject = error.subject ? ` ${error.subject}` : '';
-    output.stderr(`init: ${error.code}${subject}: ${HINTS[error.code]}\n`);
+    output.stderr(`${error.code}${subject}: ${HINTS[error.code]}\n`);
     return EXIT.failure;
   }
 }
