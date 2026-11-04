@@ -340,7 +340,7 @@ docker compose stop seller                        # SIGINT; withdraws within 120
 #### Install script
 
 `install.sh` sets up the same seller from the published image
-(`ghcr.io/gyblos/node:beta`) without a checkout. It needs only Docker with
+(`ghcr.io/gyblos/seller:beta`) without a checkout. It needs only Docker with
 Compose v2.17 or later. Beta sellers receive the file with their invitation:
 
 ```sh

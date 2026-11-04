@@ -26,7 +26,7 @@ import { FAKE_SECRET, REPOSITORY_ROOT } from './support/node-config-fixtures';
 
 const SCRIPT = join(REPOSITORY_ROOT, 'install.sh');
 const PUBLISH = join(REPOSITORY_ROOT, 'scripts/publish-image.sh');
-const IMAGE = 'ghcr.io/gyblos/node:test';
+const IMAGE = 'ghcr.io/gyblos/seller:test';
 const read = (path: string) =>
   readFileSync(join(REPOSITORY_ROOT, path), 'utf8');
 
