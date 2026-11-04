@@ -1,6 +1,9 @@
 // Owns offline regressions for buyer relay-only binding and seller dialing.
 // startBuyer runs against fake native endpoints; nothing dials, binds or reaches an RPC.
 import assert from 'node:assert/strict';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
 
 import { BUYER_RELAY_ONLY_ENV, IPV6_LOOPBACK, LOCALHOST } from '@gyblos/config';
@@ -27,6 +30,24 @@ function isLoopbackBind(address: string) {
 
 const SELLER_DIRECT = `${LOCALHOST}:7`;
 const PROBE_STOP = 'Relay probe stops before dialing.';
+
+void test(
+  'buyer relay probe keeps an absolute parent home inside its fixture',
+  OPTIONS,
+  async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'gyblos-relay-parent-'));
+    const previous = process.env.GYBLOS_HOME;
+    try {
+      process.env.GYBLOS_HOME = join(directory, 'external-home');
+      const result = await startBuyerProbe({});
+      assert.equal(result.error?.message, PROBE_STOP);
+    } finally {
+      if (previous === undefined) delete process.env.GYBLOS_HOME;
+      else process.env.GYBLOS_HOME = previous;
+      await rm(directory, { recursive: true, force: true });
+    }
+  },
+);
 
 // Runs the real startBuyer against fake native endpoints; the dial is recorded, never sent.
 async function startBuyerProbe(

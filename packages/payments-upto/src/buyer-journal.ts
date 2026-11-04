@@ -21,10 +21,13 @@ import {
 
 import { BUYER_JOURNAL } from './constants';
 import type { UptoLedgerPaths } from './file-ledger';
+import { isJournalNetwork } from './journal-network';
 
 // The mint, fee treasury and fee rate an open accepted: its escrow is withdrawn and read with these,
 // whatever the buyer's policy says later.
 export interface UptoJournalPolicy {
+  // Null for an entry written before the journal began recording networks.
+  network: string | null;
   mint: string;
   treasury: string;
   protocolFeeBps: number;
@@ -39,7 +42,7 @@ export interface UptoJournalEntry {
   payTo: string;
   feePayer: string;
   maxAtomic: string;
-  // Null for an entry journaled before version 3, which is read with the buyer's current policy.
+  // Null for an entry journaled before version 3; its network is unknown and recovery is blocked.
   policy: UptoJournalPolicy | null;
   // The open's slot (a seed of its channel address) and the last block height its blockhash allows:
   // past that height an open that never landed never will.
@@ -117,12 +120,22 @@ function feeBps(value: unknown): number {
     ? value
     : unavailable();
 }
-const POLICY_FIELDS = 3;
-function policy(value: unknown): UptoJournalPolicy | null {
+const LEGACY_POLICY_FIELDS = ['mint', 'treasury', 'protocolFeeBps'] as const;
+const POLICY_FIELDS = [...LEGACY_POLICY_FIELDS, 'network'] as const;
+function policy(value: unknown, version: number): UptoJournalPolicy | null {
   if (value === null) return null;
-  if (!isRecord(value) || Object.keys(value).length !== POLICY_FIELDS)
+  const fields =
+    version === BUYER_JOURNAL.version ? POLICY_FIELDS : LEGACY_POLICY_FIELDS;
+  if (
+    !isRecord(value) ||
+    Object.keys(value).length !== fields.length ||
+    !fields.every((field) => Object.hasOwn(value, field))
+  )
     unavailable();
+  const network = version === BUYER_JOURNAL.version ? value.network : null;
+  if (network !== null && !isJournalNetwork(network)) unavailable();
   return {
+    network,
     mint: address(value.mint),
     treasury: address(value.treasury),
     protocolFeeBps: feeBps(value.protocolFeeBps),
@@ -134,11 +147,12 @@ const V2_FIELDS = FIELDS.filter((field) => field !== 'policy');
 const V1_FIELDS = V2_FIELDS.filter(
   (field) => field !== 'openSlot' && field !== 'lastValidBlockHeight',
 );
-// A version 1 signed entry can still settle but is never proven unopened: its blockhash lifetime is
-// unknown, so it is read as never expiring.
+// A version 1 entry has unknown blockhash lifetime, so it is read as never expiring. Signed entries
+// also lack a network and remain blocked from automatic recovery.
 const V1_UNKNOWN = { openSlot: '0', lastValidBlockHeight: String(U64_MAX) };
 const READ = new Map<number, { fields: readonly string[]; missing: object }>([
   [BUYER_JOURNAL.version, { fields: FIELDS, missing: {} }],
+  [BUYER_JOURNAL.policyVersion, { fields: FIELDS, missing: {} }],
   [BUYER_JOURNAL.slotVersion, { fields: V2_FIELDS, missing: { policy: null } }],
   [
     BUYER_JOURNAL.legacyVersion,
@@ -154,10 +168,13 @@ function entry(value: unknown, version: number): UptoJournalEntry {
     !read.fields.every((field) => Object.hasOwn(value, field))
   )
     return unavailable();
-  return checked({ ...value, ...read.missing });
+  return checked({ ...value, ...read.missing }, version);
 }
 
-function checked(value: Record<string, unknown>): UptoJournalEntry {
+function checked(
+  value: Record<string, unknown>,
+  version: number,
+): UptoJournalEntry {
   const { state, updatedAt, expiresAt, channelId, chargedAtomic } = value;
   if (
     !isState(state) ||
@@ -171,7 +188,7 @@ function checked(value: Record<string, unknown>): UptoJournalEntry {
     payTo: address(value.payTo),
     feePayer: address(value.feePayer),
     maxAtomic: atomic(value.maxAtomic),
-    policy: policy(value.policy),
+    policy: policy(value.policy, version),
     openSlot: atomic(value.openSlot),
     lastValidBlockHeight: atomic(value.lastValidBlockHeight),
     expiresAt: Number(expiresAt),
@@ -182,7 +199,10 @@ function checked(value: Record<string, unknown>): UptoJournalEntry {
 }
 
 // The whole document, or a refusal: another version, an unknown field or a malformed entry.
-function parseJournal(source: string): Map<string, UptoJournalEntry> {
+function parseJournal(source: string): {
+  entries: Map<string, UptoJournalEntry>;
+  version: number;
+} {
   let parsed: unknown;
   try {
     parsed = JSON.parse(source);
@@ -210,7 +230,7 @@ function parseJournal(source: string): Map<string, UptoJournalEntry> {
       continue;
     entries.set(parsedEntry.requestDigest, parsedEntry);
   }
-  return entries;
+  return { entries, version };
 }
 
 function serialize(entries: Map<string, UptoJournalEntry>): string {
@@ -220,6 +240,18 @@ function serialize(entries: Map<string, UptoJournalEntry>): string {
   });
 }
 
+function retainSignedNetwork(
+  held: UptoJournalEntry | undefined,
+  next: UptoJournalEntry,
+): void {
+  if (
+    held?.channelId &&
+    (next.channelId !== held.channelId ||
+      (held.policy?.network ?? null) !== (next.policy?.network ?? null))
+  )
+    unavailable();
+}
+
 async function guarded<T>(run: () => Promise<T>): Promise<T> {
   try {
     return await run();
@@ -227,6 +259,35 @@ async function guarded<T>(run: () => Promise<T>): Promise<T> {
     if (error instanceof PaymentError) throw error;
     return unavailable();
   }
+}
+
+// Settled entries past retention and unsigned entries past their terms are dropped.
+function prune(entries: Map<string, UptoJournalEntry>, at: number) {
+  const cutoff = at - BUYER_JOURNAL.settledRetentionMs;
+  for (const [digest, held] of entries)
+    if (
+      (held.state === PAYMENT_CHANNEL_STATES.SETTLED &&
+        held.updatedAt <= cutoff) ||
+      (held.channelId === null && held.expiresAt <= at)
+    )
+      entries.delete(digest);
+}
+
+// Keep an older file readable while it contains an unresolved signed open with no network provenance.
+function checkLegacyWrite(loaded: {
+  entries: Map<string, UptoJournalEntry>;
+  version: number;
+}): void {
+  if (
+    loaded.version !== BUYER_JOURNAL.version &&
+    [...loaded.entries.values()].some(
+      (entry) =>
+        entry.channelId &&
+        entry.state === PAYMENT_CHANNEL_STATES.OPEN &&
+        !entry.policy?.network,
+    )
+  )
+    unavailable();
 }
 
 export async function openUptoBuyerJournal(options: {
@@ -247,25 +308,21 @@ export async function openUptoBuyerJournal(options: {
   const load = () =>
     guarded(async () => {
       const source = await readPrivateFile(paths.state, BUYER_JOURNAL.maxBytes);
-      return source === undefined ? new Map() : parseJournal(source);
+      return source === undefined
+        ? {
+            entries: new Map<string, UptoJournalEntry>(),
+            version: BUYER_JOURNAL.version,
+          }
+        : parseJournal(source);
     });
-  // Settled entries past retention and unsigned entries past their terms are dropped.
-  function prune(entries: Map<string, UptoJournalEntry>, at: number) {
-    const cutoff = at - BUYER_JOURNAL.settledRetentionMs;
-    for (const [digest, held] of entries)
-      if (
-        (held.state === PAYMENT_CHANNEL_STATES.SETTLED &&
-          held.updatedAt <= cutoff) ||
-        (held.channelId === null && held.expiresAt <= at)
-      )
-        entries.delete(digest);
-  }
   function mutate(change: (entries: Map<string, UptoJournalEntry>) => void) {
     if (closing) return guarded(async () => unavailable());
     const run = queue.then(() =>
       guarded(async () => {
         await lock.verify();
-        const entries = await load();
+        const loaded = await load();
+        const { entries } = loaded;
+        checkLegacyWrite(loaded);
         prune(entries, now());
         change(entries);
         const source = serialize(entries);
@@ -280,10 +337,10 @@ export async function openUptoBuyerJournal(options: {
     mutate((entries) => {
       if (!entries.has(value.requestDigest) && entries.size >= maxEntries)
         unavailable();
-      entries.set(
-        value.requestDigest,
-        entry({ ...value, updatedAt: now() }, BUYER_JOURNAL.version),
-      );
+      const held = entries.get(value.requestDigest);
+      const next = entry({ ...value, updatedAt: now() }, BUYER_JOURNAL.version);
+      retainSignedNetwork(held, next);
+      entries.set(value.requestDigest, next);
     });
   const remove = (requestDigest: string, channelId?: string) =>
     mutate((entries) => {
@@ -297,10 +354,10 @@ export async function openUptoBuyerJournal(options: {
       entries.delete(requestDigest);
     });
   return {
-    get: async (requestDigest) => (await load()).get(requestDigest),
+    get: async (requestDigest) => (await load()).entries.get(requestDigest),
     put,
     remove,
-    list: async () => [...(await load()).values()],
+    list: async () => [...(await load()).entries.values()],
     // Refuses new writes at once, lets queued ones finish, then releases the lock.
     close() {
       closing ??= guarded(() => queue.then(() => lock.release()));

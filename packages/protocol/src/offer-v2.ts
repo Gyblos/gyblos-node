@@ -41,7 +41,7 @@ export function parseOfferSignatureV2(value: unknown): string {
 export function validateOfferV2Time(offer: InferenceOfferV2, now: number) {
   controlInteger(now);
   if (
-    offer.issuedAt > now ||
+    offer.issuedAt > now + CONTROL_LIMITS.clockSkewMs ||
     offer.expiresAt <= now ||
     offer.expiresAt <= offer.issuedAt ||
     offer.expiresAt - offer.issuedAt > CONTROL_LIMITS.quoteLifetimeMs ||

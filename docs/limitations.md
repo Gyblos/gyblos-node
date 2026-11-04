@@ -113,6 +113,10 @@ See [recovery.md](recovery.md) for how recovery works.
 - The seller's 1.5 GiB memory reserve is an admission policy, not a guarantee.
   Later memory pressure or model eviction can still break a request. The model
   stays loaded for five minutes; offers expire after four.
+- On Linux the reserve is checked against the machine's available memory and
+  the tightest cgroup limit from the seller's own group up to the root. An
+  engine in a separately limited service or container is outside that path, so
+  its own limit is not checked.
 
 Details: [inference.md](inference.md).
 

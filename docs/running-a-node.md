@@ -264,10 +264,11 @@ seller or change proxy behavior. Call `close()` when finished; the endpoint
 remains owned by the caller. There is no control CLI yet.
 
 Quotes are `offer/v2` and are rejected by the legacy paid v1 flow. They indicate
-observed availability, not guaranteed admission. Both clocks must be
-synchronized: v2 retains zero clock-skew tolerance and no expiration grace.
-Queries have a 10-second absolute deadline and share endpoint admission before
-their separate control quotas. See
+observed availability, not guaranteed admission. A record or quote issued up to
+5 s ahead of the buyer's clock is accepted; expiry has no grace. Keep automatic
+time sync (NTP) on: `pnpm gyblos doctor --online` warns when the seller's clock
+is over 2 s off the discovery index. Queries have a 10-second absolute deadline
+and share endpoint admission before their separate control quotas. See
 [the protocol specification](../packages/protocol/SPEC.md).
 
 ## Relays
@@ -632,7 +633,8 @@ still observe the submitted text; free does not imply private or verified.
 
 Control connections close before execution connects on `gyblos/free/3` or
 `gyblos/free-stream/3`. The client verifies the seller peer, signed quote, local
-buyer NodeId, exact terms and zero-skew expiry again before sending.
+buyer NodeId, exact terms and lifetime again before sending (an issue time up
+to 5 s ahead is accepted; expiry has no grace).
 Request/response bounds and correlation use the free protocol codec. A query has
 an absolute 180-second budget including discovery, quotes and execution; each
 transport also retains its stage bounds. A failed seller may be excluded and
@@ -717,15 +719,18 @@ in the buyer home before the journal unblocks it, so a failed run loses nothing
 and the next one picks up where it stopped. An `open` channel keeps blocking
 until the seller claims it or the buyer withdraws it (below).
 
-Use the role's RPC as one endpoint with full transaction history. A pruned or
-load-balanced RPC can only keep a channel `open` (it never makes one look
-unopened), because the command reads the finalized tip first and requires the
-RPC to still serve blocks and ledger back to the open's slot. A journal from
-before this version is read as is: its signed opens can still settle but are
-never reported `never-opened`. The first write saves the journal in the current
-format, which earlier releases refuse (`BUYER_PAYMENT_JOURNAL_UNAVAILABLE`,
-`PAID_RECONCILE_INCOMPLETE`, `PAID_WITHDRAW_INCOMPLETE`), so do not roll back
-the buyer.
+Use the role's RPC as one endpoint with complete, consistent finalized
+transaction history. The command reads the finalized tip and checks that the RPC
+still serves blocks and ledger back to the open's slot; those checks do not
+prove that its signature history is complete or consistent across backends. The
+operator must verify that history before running reconciliation: the command can
+automatically mark an open as never landed and unblock payments. Do not run it
+against an RPC whose history may be incomplete or inconsistent. A signed open
+from an older journal has no recorded network and remains blocked, as described
+below. A journal upgraded to the current format is refused by earlier releases
+(`BUYER_PAYMENT_JOURNAL_UNAVAILABLE`, `PAID_RECONCILE_INCOMPLETE`,
+`PAID_WITHDRAW_INCOMPLETE`), so do not roll back the buyer while channels need
+recovery.
 
 The command exits 0 when nothing blocks payments (disputes included, since they
 are recorded and no longer block), 2 while a channel stays open, and 1 when it
@@ -758,8 +763,8 @@ shortest `retryAfterSeconds`:
   payer, deposit, mint and network fee distribution, so nothing was signed for
   it. The journal keeps the mint, fee treasury and fee rate each open accepted,
   so a later change to the role's mint or the network fee does not affect
-  channels already open. Entries journaled before that use the current role's
-  mint and fee; for those, restore the role's mint and run again.
+  channels already open. Entries journaled before that have no recorded network
+  and remain blocked until their provenance is independently established.
 - `failed`: this channel's step failed with the static code in `failure`
   (`UPTO_UNAVAILABLE` for the RPC, `UPTO_CHAIN_REJECTED` when the chain or its
   preflight refused the transaction, which also happens when an earlier
@@ -775,13 +780,28 @@ after every channel was visited) or could not run
 (`PAID_WITHDRAW_NETWORK_MISMATCH`, `PAID_WITHDRAW_ROLE_INVALID`,
 `PAID_WITHDRAW_INCOMPLETE`).
 
+The buyer journal records the network of new signed opens. A signed open entry
+from an older version has no provable network: recovery keeps it open and
+refuses withdrawal on every network, reporting `networkBlock: "unknown"`.
+Confirm its provenance independently before attempting any separate recovery; do
+not delete or edit it to unblock payments. An open channel belonging to a
+different network is also left untouched and reports `networkBlock: "mismatch"`.
+Recovery can still process signed channels bound to the selected, verified
+network.
+
+An older journal containing an unresolved signed open is not upgraded or
+rewritten, so earlier software can still read it. Once no such entry remains,
+the first journal write upgrades the file to the current format. Earlier
+software rejects that format; do not roll back while channels need recovery.
+
 It never changes the journal. Once a channel is distributed and finalized,
 `pnpm buyer:reconcile:paid` reads it from history and unblocks payments: the
 charge is what the seller had settled (usually nothing). If the buyer had
 counted a delivered answer that the seller never claimed, that shows as
-`disputed` with a smaller charge. A journal entry from before this version whose
-open never landed shows `nothing` here, and reconciliation cannot prove it
-unopened, so it keeps blocking payments.
+`disputed` with a smaller charge. A signed older entry without a recorded
+network remains open; an empty history on the selected chain does not prove the
+entry was created on that chain. There is no automatic legacy attribution or
+recovery command yet.
 
 The endpoint listens on loopback only and refuses browser requests, but loopback
 is not authentication, so paid mode also requires a bearer token. The first paid

@@ -19,10 +19,14 @@ export const DIAGNOSTICS = {
   },
   memory: {
     available: '/proc/meminfo',
-    current: '/sys/fs/cgroup/memory.current',
-    limit: '/sys/fs/cgroup/memory.max',
-    peak: '/sys/fs/cgroup/memory.peak',
-    events: '/sys/fs/cgroup/memory.events',
+    // cgroup v2: the process's own group (a systemd unit or session on a host); the root of the
+    // mount is the fallback, as inside a container that does not show its own path.
+    selfCgroup: '/proc/self/cgroup',
+    cgroupRoot: '/sys/fs/cgroup',
+    current: 'memory.current',
+    limit: 'memory.max',
+    peak: 'memory.peak',
+    events: 'memory.events',
   },
   readinessFilename: 'engine-readiness.json',
   warmupMs: 90_000,

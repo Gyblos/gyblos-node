@@ -10,6 +10,19 @@ import { PaymentError } from '@gyblos/protocol/payment';
 
 import type { UptoBuyerPolicy } from './client';
 
+export function assertMainnetPilotDeposit(terms: {
+  network: string;
+  mint: string;
+  maxAtomic: string;
+}): void {
+  if (terms.network !== SOLANA_MAINNET_CAIP2) return;
+  if (
+    terms.mint !== USDC_MAINNET_ADDRESS ||
+    !isMainnetPilotDepositAllowed(terms.maxAtomic)
+  )
+    throw new PaymentError(PAYMENT_ERROR_CODES.UNTRUSTED_TERMS);
+}
+
 export function mainnetPilotBuyerPolicy(input: {
   treasury: string;
   maxAtomic: string;

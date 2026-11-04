@@ -2,6 +2,9 @@
 // Only the native bind-failure probe opens a real endpoint, on an unassigned address;
 // offers use temporary, unfunded synthetic identities.
 import assert from 'node:assert/strict';
+import { mkdtemp, readdir, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test, { type TestContext } from 'node:test';
 
 import { IPV6_LOOPBACK, LOCALHOST } from '@gyblos/config';
@@ -190,6 +193,38 @@ void test(
       );
       assert.ok(!result.error.message.includes('PRIVATE_SENTINEL'));
       assert.ok(!result.events.includes('bind'));
+    }
+  },
+);
+
+void test(
+  'relay fixture isolates direct buyer reads from an absolute parent home',
+  OPTIONS,
+  async (context) => {
+    const directory = await mkdtemp(join(tmpdir(), 'gyblos-relay-parent-'));
+    const previous = process.env.GYBLOS_HOME;
+    const previousLab = process.env.GYBLOS_LAB_HOME;
+    try {
+      process.env.GYBLOS_HOME = join(directory, 'external-home');
+      process.env.GYBLOS_LAB_HOME = join(directory, 'external-lab');
+      setRelayUrls(context, OWNED_RELAY);
+      const { trustedOffer } = await import('@gyblos/buyer/buyer');
+      await withRelayOffer(OWNED_RELAY.slice(0, -1), async () => {
+        const { offer } = await trustedOffer();
+        assert.equal(offer.endpoint.relayUrl, OWNED_RELAY.slice(0, -1));
+      });
+      assert.deepEqual(await readdir(directory), []);
+      assert.equal(process.env.GYBLOS_HOME, join(directory, 'external-home'));
+      assert.equal(
+        process.env.GYBLOS_LAB_HOME,
+        join(directory, 'external-lab'),
+      );
+    } finally {
+      if (previous === undefined) delete process.env.GYBLOS_HOME;
+      else process.env.GYBLOS_HOME = previous;
+      if (previousLab === undefined) delete process.env.GYBLOS_LAB_HOME;
+      else process.env.GYBLOS_LAB_HOME = previousLab;
+      await rm(directory, { recursive: true, force: true });
     }
   },
 );

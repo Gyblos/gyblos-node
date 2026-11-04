@@ -1,6 +1,7 @@
 // Owns the discovery index storage contract and its in-process adapter for tests and local runs.
 // Entries hold only signed public data; callers never pass IPs, headers or request metadata.
 import {
+  CONTROL_LIMITS,
   PUBLIC_RECORD_KINDS,
   type PublicRecordKind,
 } from '@gyblos/protocol/constants';
@@ -96,8 +97,9 @@ function afterCursor(row: SellerRow, after: SellerCursor | null) {
   );
 }
 
+// Listed as soon as accepted: a record issued slightly ahead of this clock is live, expiry is exact.
 const live = (row: MemoryRecord, now: number) =>
-  row.issuedAt <= now && row.expiresAt > now;
+  row.issuedAt <= now + CONTROL_LIMITS.clockSkewMs && row.expiresAt > now;
 
 function dropExpired(table: Map<string, MemoryRecord>, now: number) {
   for (const [id, row] of table) if (row.expiresAt <= now) table.delete(id);

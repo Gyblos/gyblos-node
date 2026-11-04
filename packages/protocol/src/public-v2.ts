@@ -34,7 +34,7 @@ export function validatePublicV2Time(record: PublicRecordV2, now: number) {
         ? PUBLIC_RECORD_LIMITS.withdrawalLifetimeMs
         : PUBLIC_RECORD_LIMITS.catalogLifetimeMs;
   if (
-    record.issuedAt > now ||
+    record.issuedAt > now + CONTROL_LIMITS.clockSkewMs ||
     record.expiresAt <= now ||
     record.expiresAt <= record.issuedAt ||
     record.expiresAt - record.issuedAt > lifetime
