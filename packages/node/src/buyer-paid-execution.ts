@@ -66,8 +66,8 @@ export interface PaidBuyerRecord {
 export interface PaidBuyerDependencies {
   // These are trusted ports, not untrusted adapters: the caller must enforce the checks below.
   enter(): () => void;
-  // Report every earlier signed open still unresolved, including uncertain transmission or a failed
-  // discard; fail closed if the state is unavailable. Checked once before selecting a new seller.
+  // Return whether any earlier signed open remains unresolved, including uncertain transmission or
+  // failed discard; fail closed if state is unavailable. Checked once before selecting a seller.
   unresolved(): Promise<boolean>;
   // Verify the seller owner–NodeId binding independently of discovery, the authenticated catalog and
   // signed quote, their request binding and freshness, and exact selection and buyer price ceilings.
