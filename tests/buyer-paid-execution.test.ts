@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { PROTOCOL_FEE } from '@gyblos/config';
+import { executeBuyerPaid } from '@gyblos/node/buyer-paid-execution';
 import {
   FREE_CHAT_ROLES,
   PAYMENT_ERROR_CODES,
@@ -14,7 +15,6 @@ import { PaymentError } from '@gyblos/protocol/payment';
 import { PaidClientError } from '@gyblos/transport-iroh/paid-client';
 
 import { PAID_BUYER_CODES, PAID_VERDICTS } from '../apps/buyer/src/constants';
-import { executeBuyerPaid } from '../apps/buyer/src/paid-execution';
 import { A, B, INPUT, refuses, settles, setup } from './support/buyer-paid';
 
 void test('terms come from the signed offer and the network fee; a matching settlement is checked', async () => {

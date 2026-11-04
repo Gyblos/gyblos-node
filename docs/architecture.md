@@ -36,6 +36,25 @@ are in [stack.md](stack.md).
 | `apps/discovery-index`   | none (Cloudflare Worker, manual deploy)         | Reference HTTP discovery index for `discovery.gyblos.com` (Hono, D1); verifies records only through protocol ([discovery-index.md](discovery-index.md)).            |
 | `apps/receipt-collector` | `pnpm --filter @gyblos/receipt-collector start` | Explicit private loopback receipt receiver with buyer-scoped capabilities and bounded retention; no uploader, payments or public aggregates.                        |
 
+The paid buyer's single-request orchestration is available in process through
+`@gyblos/node/buyer-paid-execution`. Hosts supply seller selection, payment,
+metering, transport and record dependencies; the buyer app keeps its existing
+entry as a compatibility export and owns its HTTP and terminal interfaces. The
+current execution error contract still uses the Iroh adapter, so this entry
+alone does not establish support for another transport or mobile runtime.
+
+These are trusted host dependencies. Selection must independently verify the
+seller owner–NodeId binding, authenticated catalog, signed quote, request
+binding, freshness, exact selection and buyer price ceilings. The payment port
+must enforce its independent terms and durable journal. The transport must
+authenticate the selected peer, verify the response and report an open as unsent
+only when it could not have left the buyer: that result permits discard and
+failover. The orchestration does not perform those checks for the host. Its
+outcome includes a signed authorization payload; hosts must not expose it to UI,
+IPC or logs and must provide a safe projection instead. The `unresolved` port
+must block earlier signed, unsettled opens, including those whose transmission
+is uncertain or whose discard failed, and fail closed when state is unavailable.
+
 "Gate" is a lab word only. `lab/harness` holds the `gate:*` proof-of-concept
 checks (including the x402 `exact` scheme, the fixed-price test seller, the gate
 runner and the devnet wallet configuration), `lab/facilitator` the standalone

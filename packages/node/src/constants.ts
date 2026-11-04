@@ -339,3 +339,41 @@ export const LOCAL_TELEMETRY = { closeMs: 5000 } as const;
 
 // How long a role's RPC may take to say which chain it serves before paid startup refuses it.
 export const GENESIS_READ_MS = 10000;
+
+// Buyer orchestration values shared by every host, with no process or network actions.
+export const BUYER_PAID_TIMEOUTS = {
+  requestMs: 180000,
+  receiptMs: 30000,
+} as const;
+// The paid buyer's own refusals, before any payment.
+export const PAID_BUYER_CODES = {
+  // An earlier channel is not resolved yet; `pnpm buyer:reconcile:paid` resolves it.
+  UNRESOLVED: 'PAID_BUYER_UNRESOLVED_PAYMENT',
+  UNAVAILABLE: 'PAID_BUYER_NO_OFFER',
+  // Paid sellers serve a single user message; anything else is refused before paying.
+  UNSUPPORTED: 'PAID_BUYER_UNSUPPORTED_INPUT',
+  // Another paid request is still running in this buyer.
+  BUSY: 'PAID_BUYER_BUSY',
+  // The request did not carry the endpoint's bearer token.
+  UNAUTHORIZED: 'PAID_BUYER_UNAUTHORIZED',
+} as const;
+export type PaidBuyerCode =
+  (typeof PAID_BUYER_CODES)[keyof typeof PAID_BUYER_CODES];
+// How the buyer judges a paid request once the signed open reached the seller.
+export const PAID_VERDICTS = {
+  // The chain shows the settlement the buyer's own count expects.
+  SETTLED: 'settled',
+  // The seller's claim is still being confirmed; reconciliation decides.
+  PENDING: 'pending',
+  // The seller says its claim lapsed; reconciliation confirms nothing was charged.
+  LAPSED: 'lapsed',
+  // The seller claims more or less than the buyer's own count.
+  DISPUTED: 'disputed',
+  // The settlement could not be confirmed on chain now; reconciliation checks it.
+  UNVERIFIED: 'unverified',
+  // The seller refused after receiving the signed open, which it could still land.
+  REFUSED: 'refused',
+  // The request stopped before any terminal arrived, after the signed open was sent.
+  INTERRUPTED: 'interrupted',
+} as const;
+export type PaidVerdict = (typeof PAID_VERDICTS)[keyof typeof PAID_VERDICTS];

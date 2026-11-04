@@ -4,6 +4,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { executeBuyerPaid } from '@gyblos/node/buyer-paid-execution';
 import { PAYMENT_ERROR_CODES } from '@gyblos/protocol/constants';
 import {
   PAID_DELIVERED_CODES,
@@ -14,7 +15,6 @@ import { PaymentError } from '@gyblos/protocol/payment';
 import { PaidClientError } from '@gyblos/transport-iroh/paid-client';
 
 import { PAID_BUYER_CODES, PAID_VERDICTS } from '../apps/buyer/src/constants';
-import { executeBuyerPaid } from '../apps/buyer/src/paid-execution';
 import {
   header,
   INPUT,
