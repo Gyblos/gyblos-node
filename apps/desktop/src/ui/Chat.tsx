@@ -25,7 +25,12 @@ import {
 } from 'react';
 
 import { ChatController } from './chat-controller';
-import { CHAT_PHASE, MESSAGE_STATE, toggleToolSelection } from './chat-state';
+import {
+  CHAT_PHASE,
+  MESSAGE_STATE,
+  toggleToolSelection,
+  type ChatMessage,
+} from './chat-state';
 import { ToolsDropdown } from './ChatTools';
 import {
   BUTTON_VARIANT,
@@ -91,6 +96,22 @@ const QUICK_PROMPTS = [
     prompt: 'Help me think through an idea step by step.',
   },
 ];
+type ChatTurn = { id: string; user?: ChatMessage; answer?: ChatMessage };
+// Groups each request with the answer it produced so the transcript has turns.
+function groupTurns(messages: readonly ChatMessage[]): ChatTurn[] {
+  const turns: ChatTurn[] = [];
+  for (const message of messages) {
+    const last = turns.at(-1);
+    if (!last || message.role === CHAT_ROLE.USER || last.answer) {
+      turns.push({ id: message.id });
+    }
+    const turn = turns.at(-1);
+    if (!turn) continue;
+    if (message.role === CHAT_ROLE.USER) turn.user = message;
+    else turn.answer = message;
+  }
+  return turns;
+}
 export function Chat({
   ref,
   model,
@@ -134,6 +155,7 @@ export function Chat({
   const lastUser = [...session.messages]
     .reverse()
     .find((message) => message.role === CHAT_ROLE.USER);
+  const turns = groupTurns(session.messages);
 
   function setDraft(text: string) {
     chat.setDraft(text);
@@ -353,137 +375,147 @@ export function Chat({
               aria-label="Conversation"
               aria-live="off"
             >
-              {session.messages.map((message) =>
-                message.role === CHAT_ROLE.USER ? (
-                  <article key={message.id} className="chat-user">
-                    <p>{message.text}</p>
-                    <IconButton
-                      label="Reuse message"
-                      onClick={() => {
-                        setDraft(message.text);
-                        input.current?.focus();
-                      }}
-                    >
-                      <PencilSimple size={14} />
-                    </IconButton>
-                  </article>
-                ) : (
-                  <article key={message.id} className="chat-answer">
-                    <header className="answer-heading">
-                      <SignalMark
-                        state={
-                          message.state === MESSAGE_STATE.PENDING
-                            ? !online
-                              ? SIGNAL_STATE.PAUSED
-                              : run?.phase === CHAT_PHASE.CONNECTING
-                                ? SIGNAL_STATE.CONNECTING
-                                : run?.phase === CHAT_PHASE.TOOLS
-                                  ? SIGNAL_STATE.WORKING
-                                  : SIGNAL_STATE.RESPONDING
-                            : message.state === MESSAGE_STATE.STOPPED
-                              ? SIGNAL_STATE.STOPPED
-                              : SIGNAL_STATE.COMPLETE
-                        }
-                      />
-                      <span>{message.model.name}</span>
-                      <Badge>{message.model.free ? 'Free' : 'Paid'}</Badge>
-                    </header>
-                    {message.state === MESSAGE_STATE.PENDING && (
-                      <div className="run-line" role="status">
-                        <span className="ascii-state" aria-hidden="true">
-                          {run?.phase === CHAT_PHASE.RESPONDING
-                            ? '::'
-                            : run?.phase === CHAT_PHASE.TOOLS
-                              ? '[+]'
-                              : '[..]'}
-                        </span>
-                        <span>
-                          {run ? PHASE_LABEL[run.phase] : 'Preparing response'}
-                        </span>
-                      </div>
-                    )}
-                    {message.text ? (
-                      <MessageText text={message.text} />
-                    ) : message.state === MESSAGE_STATE.STOPPED ? (
-                      <p className="stopped-note">
-                        Stopped before a response arrived.
-                      </p>
-                    ) : null}
-                    <div className="answer-actions">
-                      {message.state !== MESSAGE_STATE.PENDING && (
-                        <>
-                          <span className="answer-state" role="status">
-                            {message.state === MESSAGE_STATE.STOPPED
-                              ? message.text
-                                ? 'Stopped · partial response'
-                                : 'Stopped'
-                              : 'Completed'}
-                          </span>
-                          {message.text && (
-                            <IconButton
-                              label={
-                                copied === message.id
-                                  ? 'Response copied'
-                                  : 'Copy response'
-                              }
-                              onClick={() => copy(message.text, message.id)}
-                            >
-                              {copied === message.id ? (
-                                <Check size={14} />
-                              ) : (
-                                <Copy size={14} />
-                              )}
-                            </IconButton>
-                          )}
-                          {message === session.messages.at(-1) && lastUser && (
-                            <IconButton
-                              label="Reuse question"
-                              disabled={busy || !online}
-                              onClick={() => {
-                                setDraft(lastUser.text);
-                                input.current?.focus();
-                              }}
-                            >
-                              <ArrowClockwise size={14} />
-                            </IconButton>
-                          )}
-                        </>
-                      )}
-                      <Button
-                        className="run-details-trigger"
-                        aria-expanded={details.includes(message.id)}
-                        aria-controls={`details-${message.id}`}
-                        onClick={() =>
-                          setDetails((previous) =>
-                            previous.includes(message.id)
-                              ? previous.filter((id) => id !== message.id)
-                              : [...previous, message.id],
-                          )
-                        }
+              {turns.map(({ id, user, answer }) => (
+                <div className="chat-turn" key={id}>
+                  {user && (
+                    <article className="chat-user">
+                      <span className="chat-user-label">You</span>
+                      <p>{user.text}</p>
+                      <IconButton
+                        label="Reuse message"
+                        onClick={() => {
+                          setDraft(user.text);
+                          input.current?.focus();
+                        }}
                       >
-                        Run details
-                      </Button>
-                    </div>
-                    <MotionPresence variant={MOTION_VARIANT.EXPAND}>
-                      {details.includes(message.id) && (
-                        <section
-                          id={`details-${message.id}`}
-                          className="run-details"
-                        >
-                          <SignalTrace model={message.model.name} />
-                          <p>Model route</p>
-                          {message.tools.length > 0 && (
-                            <p>
-                              Tools: {message.tools.map(toolName).join(', ')}
-                            </p>
-                          )}
-                          <p>Review the response before using it.</p>
-                        </section>
+                        <PencilSimple size={14} />
+                      </IconButton>
+                    </article>
+                  )}
+                  {answer && (
+                    <article className="chat-answer">
+                      <header className="answer-heading">
+                        <SignalMark
+                          state={
+                            answer.state === MESSAGE_STATE.PENDING
+                              ? !online
+                                ? SIGNAL_STATE.PAUSED
+                                : run?.phase === CHAT_PHASE.CONNECTING
+                                  ? SIGNAL_STATE.CONNECTING
+                                  : run?.phase === CHAT_PHASE.TOOLS
+                                    ? SIGNAL_STATE.WORKING
+                                    : SIGNAL_STATE.RESPONDING
+                              : answer.state === MESSAGE_STATE.STOPPED
+                                ? SIGNAL_STATE.STOPPED
+                                : SIGNAL_STATE.COMPLETE
+                          }
+                        />
+                        <span className="answer-author">Gyblos</span>
+                        <span className="answer-sep" aria-hidden="true">
+                          ·
+                        </span>
+                        <span>{answer.model.name}</span>
+                        <Badge>{answer.model.free ? 'Free' : 'Paid'}</Badge>
+                      </header>
+                      {answer.state === MESSAGE_STATE.PENDING && (
+                        <div className="run-line" role="status">
+                          <span className="ascii-state" aria-hidden="true">
+                            {run?.phase === CHAT_PHASE.RESPONDING
+                              ? '::'
+                              : run?.phase === CHAT_PHASE.TOOLS
+                                ? '[+]'
+                                : '[..]'}
+                          </span>
+                          <span>
+                            {run
+                              ? PHASE_LABEL[run.phase]
+                              : 'Preparing response'}
+                          </span>
+                        </div>
                       )}
-                    </MotionPresence>
-                  </article>
-                ),
-              )}
+                      {answer.text ? (
+                        <MessageText text={answer.text} />
+                      ) : answer.state === MESSAGE_STATE.STOPPED ? (
+                        <p className="stopped-note">
+                          Stopped before a response arrived.
+                        </p>
+                      ) : null}
+                      <div className="answer-actions">
+                        {answer.state !== MESSAGE_STATE.PENDING && (
+                          <>
+                            <span className="answer-state" role="status">
+                              {answer.state === MESSAGE_STATE.STOPPED
+                                ? answer.text
+                                  ? 'Stopped · partial response'
+                                  : 'Stopped'
+                                : 'Completed'}
+                            </span>
+                            {answer.text && (
+                              <IconButton
+                                label={
+                                  copied === answer.id
+                                    ? 'Response copied'
+                                    : 'Copy response'
+                                }
+                                onClick={() => copy(answer.text, answer.id)}
+                              >
+                                {copied === answer.id ? (
+                                  <Check size={14} />
+                                ) : (
+                                  <Copy size={14} />
+                                )}
+                              </IconButton>
+                            )}
+                            {answer === session.messages.at(-1) && lastUser && (
+                              <IconButton
+                                label="Reuse question"
+                                disabled={busy || !online}
+                                onClick={() => {
+                                  setDraft(lastUser.text);
+                                  input.current?.focus();
+                                }}
+                              >
+                                <ArrowClockwise size={14} />
+                              </IconButton>
+                            )}
+                          </>
+                        )}
+                        <Button
+                          className="run-details-trigger"
+                          aria-expanded={details.includes(answer.id)}
+                          aria-controls={`details-${answer.id}`}
+                          onClick={() =>
+                            setDetails((previous) =>
+                              previous.includes(answer.id)
+                                ? previous.filter((item) => item !== answer.id)
+                                : [...previous, answer.id],
+                            )
+                          }
+                        >
+                          Run details
+                        </Button>
+                      </div>
+                      <MotionPresence variant={MOTION_VARIANT.EXPAND}>
+                        {details.includes(answer.id) && (
+                          <section
+                            id={`details-${answer.id}`}
+                            className="run-details"
+                          >
+                            <SignalTrace model={answer.model.name} />
+                            <p>Model route</p>
+                            {answer.tools.length > 0 && (
+                              <p>
+                                Tools: {answer.tools.map(toolName).join(', ')}
+                              </p>
+                            )}
+                            <p>Review the response before using it.</p>
+                          </section>
+                        )}
+                      </MotionPresence>
+                    </article>
+                  )}
+                </div>
+              ))}
             </div>
           )}
         </div>

@@ -30,25 +30,46 @@
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 28px;
-  padding: 20px 0 28px;
+  padding: 8px 0 24px;
+}
+/* One request and its answer share a turn, so spacing carries the rhythm. */
+.chat-turn {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 0;
+}
+.chat-turn + .chat-turn {
+  border-top: 1px solid var(--subtle-line);
 }
 .chat-user {
   align-self: flex-end;
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  max-width: 86%;
-  padding: 10px 12px;
-  background: var(--raised);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 2px 8px;
+  max-width: 72%;
+  padding: 10px 12px 12px;
+  background: var(--bubble-user);
+  border: 1px solid var(--line);
+}
+.chat-user-label {
+  grid-column: 1 / -1;
+  font-size: 10px;
+  font-weight: 550;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dim);
 }
 .chat-user p {
+  grid-column: 1;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   font-size: 13px;
-  line-height: 1.7;
+  line-height: 1.65;
 }
 .chat-user .ui-icon-button {
+  grid-column: 2;
   flex-shrink: 0;
 }
 .chat-answer {
@@ -58,26 +79,41 @@
 .answer-heading {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--subtle-line);
   font-size: 11px;
   color: var(--muted);
 }
+/* The mark supports the byline; it does not outrank the speaker's name. */
+.answer-heading .signal-mark {
+  width: 20px;
+  height: 15px;
+}
+.answer-author {
+  color: var(--ink);
+  font-weight: 550;
+}
+.answer-sep {
+  color: var(--dim);
+}
 
 .reply-text {
-  font-size: 13px;
-  line-height: 1.8;
+  font-size: 14px;
+  line-height: 1.75;
   overflow-wrap: anywhere;
 }
 .reply-text h3 {
-  font-size: 16px;
+  font-size: 17px;
   line-height: 1.5;
   font-weight: 500;
-  margin: 12px 0 8px;
+  margin: 16px 0 8px;
 }
 .reply-text p {
-  margin: 10px 0;
-  max-width: 76ch;
+  margin: 12px 0;
+  max-width: 72ch;
 }
 .reply-text strong {
   font-weight: 550;
@@ -223,9 +259,12 @@
   .desktop-frame .composer-actions > span {
     display: none;
   }
-  .chat-transcript {
-    padding: 12px 0 20px;
-    gap: 20px;
+  .chat-turn {
+    gap: 10px;
+    padding: 14px 0;
+  }
+  .chat-user {
+    max-width: 86%;
   }
 }
 @media (max-width: 480px) {
@@ -260,10 +299,10 @@
 .ui-composer-action[data-busy='true'] .composer-stop-glyph {
   opacity: 1;
 }
-.chat-transcript > article {
+.chat-turn > article {
   animation: message-arrive var(--motion-enter) var(--motion-ease) both;
 }
-.chat-transcript > .chat-answer {
+.chat-turn > .chat-answer {
   animation-delay: 60ms;
 }
 @keyframes message-arrive {
@@ -281,7 +320,7 @@
   .ui-composer-action > span {
     transition: none;
   }
-  .chat-transcript > article {
+  .chat-turn > article {
     animation: none;
   }
 }
