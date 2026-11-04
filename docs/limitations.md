@@ -185,8 +185,10 @@ bindings. Opt-in read-only 8004 admission verifies expected bindings
 independently and persists scoped high-water/tombstone state, with explicit
 manual overrides. It does not enroll unknown sellers, provide DHT discovery or
 establish live-index production availability. Replay state and withdrawal
-barriers persist; a retained lock or unsafe/corrupt state fails closed. Payment
-execution remains the compatible trusted v1 flow.
+barriers persist; a retained lock or unsafe/corrupt state fails closed. These
+discovery and admission checks do not establish paid execution. The seller
+separately composes paid v2 when supplied with a payment server; the legacy v1
+paid path remains in the lab gates only.
 
 Seller discovery publication is opt-in and locally tested. It uses one durable
 public-v2 sequence allocator shared with control Iroh; it does not establish a
@@ -201,5 +203,6 @@ availability closed until it settles; no queued retry can accumulate. Shutdown
 invalidates snapshots without waiting for an uncooperative engine. Timing is
 locally tested, not a production load/cancellation guarantee. The legacy paid
 offer retains its original expiry, and free execution has separate startup
-acceptance. Paid v2 uses a separate conditional execution path; its devnet
-settlement remains unverified as described above.
+acceptance. Paid v2 uses a separate conditional execution path. Only the
+historical controlled devnet settlement described above has been observed;
+current-head and production settlement remain unverified.
