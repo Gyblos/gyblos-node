@@ -9,7 +9,7 @@
 # A first push creates the package private; its visibility is set in the package's settings on GitHub.
 set -eu
 
-REPOSITORY=ghcr.io/gyblos/node
+REPOSITORY=ghcr.io/gyblos/seller
 SOURCE=https://github.com/Gyblos/gyblos-node
 PLATFORMS=linux/amd64,linux/arm64
 

@@ -17,7 +17,7 @@ set -eu
 LC_ALL=C
 export LC_ALL
 
-DEFAULT_IMAGE=ghcr.io/gyblos/node:beta
+DEFAULT_IMAGE=ghcr.io/gyblos/seller:beta
 # Devnet USDC (packages/config/src/network.ts DEVNET_USDC).
 MINT=4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU
 # The model the default offer serves (examples/seller-docker.toml).
