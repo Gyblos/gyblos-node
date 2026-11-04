@@ -51,7 +51,7 @@ const HINTS: Readonly<Record<ServiceErrorCode, string>> = {
   [SERVICE_ERRORS.ENVIRONMENT_INVALID]:
     'each line must be NAME=value: no spaces, quotes, `$`, backticks, backslashes, `#`, `~` or shell operators in the value',
   [SERVICE_ERRORS.ENVIRONMENT_RESERVED]:
-    'the environment file may not set GYBLOS_HOME, GYBLOS_CONFIG, PATH, HOME or NODE_*/LD_*/DYLD_* variables',
+    'the environment file may not set GYBLOS_HOME, GYBLOS_CONFIG, PATH, HOME, shell variables (UID, IFS, BASH*, …) or NODE_*/LD_*/DYLD_*/TSX_*/OPENSSL_* variables',
   [SERVICE_ERRORS.ALREADY_INSTALLED]:
     'run `gyblos seller service uninstall` first',
   [SERVICE_ERRORS.DOCTOR_NOT_READY]:
@@ -148,6 +148,9 @@ const reserved = (name: string) =>
 // NAME=value with a non-empty value of printable characters and none that either expands, quotes,
 // escapes or comments. Blank lines and whole-line comments are skipped.
 export function parseEnvironmentFile(text: string) {
+  // systemd continues a line, even a comment, after a trailing backslash and ends one at a carriage return.
+  if (/[\\\r]/.test(text))
+    throw new ServiceError(SERVICE_ERRORS.ENVIRONMENT_INVALID);
   const values: Record<string, string> = {};
   for (const line of text.split('\n')) {
     if (line === '' || line.startsWith('#')) continue;

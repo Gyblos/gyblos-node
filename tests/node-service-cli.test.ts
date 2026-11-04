@@ -158,6 +158,8 @@ void test('the environment file accepts only lines systemd and sh read alike, an
     'K=a;b',
     'export K=v',
     'K=',
+    '# comment \\\nK=v',
+    '# comment\rK=v',
   ])
     refused(text, SERVICE_ERRORS.ENVIRONMENT_INVALID);
   for (const name of [
@@ -168,6 +170,10 @@ void test('the environment file accepts only lines systemd and sh read alike, an
     'NODE_OPTIONS',
     'LD_PRELOAD',
     'DYLD_INSERT_LIBRARIES',
+    'UID',
+    'IFS',
+    'BASH_ENV',
+    'TSX_TSCONFIG_PATH',
   ])
     refused(`${name}=x`, SERVICE_ERRORS.ENVIRONMENT_RESERVED);
 });

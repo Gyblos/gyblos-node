@@ -42,14 +42,37 @@ export const SERVICE = {
 
 // Names seller.env may not set: the unit and launch agent set these themselves, and systemd's
 // EnvironmentFile and the agent's shell would let the file override them behind doctor's back.
+// Shell variables follow: macOS's sh exits when a file sets a read-only one, and the others change how
+// the agent's shell runs.
 export const SERVICE_RESERVED_VARIABLES = [
   'GYBLOS_HOME',
   'GYBLOS_CONFIG',
   'PATH',
   'HOME',
+  'UID',
+  'EUID',
+  'PPID',
+  'SHELLOPTS',
+  'BASHOPTS',
+  'IFS',
+  'ENV',
+  'CDPATH',
+  'SHELL',
+  'PWD',
+  'OLDPWD',
+  'OPTIND',
+  'OPTARG',
+  'POSIXLY_CORRECT',
 ] as const;
-// Prefixes that change how the runtime loads code.
-export const SERVICE_RESERVED_PREFIXES = ['NODE_', 'LD_', 'DYLD_'] as const;
+// Prefixes that change how the runtime or the agent's shell loads code.
+export const SERVICE_RESERVED_PREFIXES = [
+  'NODE_',
+  'LD_',
+  'DYLD_',
+  'TSX_',
+  'OPENSSL_',
+  'BASH',
+] as const;
 
 export const SERVICE_ERRORS = {
   UNSAFE_PATH: 'SERVICE_UNSAFE_PATH',
