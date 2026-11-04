@@ -19,10 +19,13 @@ provider's brand assets.
 | Gyblos marks                                | Gyblos brand material; font-derived outlines as attributed     | [Brand provenance](../apps/desktop/public/assets/brand/sources.json); code licensing does not grant trademark rights                                                                                                                 |
 | Qwen tokenizer fixtures                     | Pinned Qwen source, Apache 2.0                                 | [License](../tests/fixtures/Qwen-LICENSE); [fixture revision and hashes](../tests/fixtures/chat-template-vectors.json)                                                                                                               |
 
-The font inventory records the exact bundled bytes. Where the original download
-revision was not recorded, it says so; an upstream repository link does not
-establish an immutable retrieval revision. Preserve these licenses with copied
-assets. Do not replace them with the project's Apache notice.
+The font inventory records the exact bundled bytes and verified official source
+URLs whose bytes match those hashes. The JetBrains Mono source is pinned to a
+Git commit; the Geist sources are versioned Google Fonts distribution URLs,
+which are not cryptographic Git revisions. These matches do not recover the
+original download date or revision, which remain unknown where recorded as such.
+Preserve these licenses with copied assets. Do not replace them with the
+project's Apache notice.
 
 ## Dependencies and local modifications
 
