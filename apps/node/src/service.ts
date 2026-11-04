@@ -91,7 +91,6 @@ function checkInput(input: ServiceInput) {
 const quoted = (value: string) => `"${value}"`;
 const nodeBin = (nodePath: string) =>
   nodePath.slice(0, nodePath.lastIndexOf('/'));
-const octal = (mode: number) => mode.toString(8).padStart(4, '0');
 
 function systemdUnit(input: ServiceInput) {
   return [
@@ -119,7 +118,7 @@ function systemdUnit(input: ServiceInput) {
     `RestartSec=${SERVICE.restartSeconds}`,
     `CPUQuota=${input.cpuQuota}`,
     `MemoryMax=${input.memoryMax}`,
-    `UMask=${octal(SERVICE.umask)}`,
+    `UMask=${SERVICE.umaskOctal}`,
     'NoNewPrivileges=true',
     '',
     '[Install]',

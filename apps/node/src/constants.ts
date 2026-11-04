@@ -16,6 +16,9 @@ export const SERVICE_COMMANDS = {
 export type ServiceCommand =
   (typeof SERVICE_COMMANDS)[keyof typeof SERVICE_COMMANDS];
 
+// Owner read/write only for files the service creates (launchd's log, the daemon's state).
+const SERVICE_UMASK = 0o077;
+
 export const SERVICE = {
   unit: 'gyblos-seller.service',
   label: 'com.gyblos.seller',
@@ -35,8 +38,9 @@ export const SERVICE = {
   // What the seller itself uses besides an engine's headroom: a few hundred MiB, rounded up.
   sellerBaselineBytes: 512 * 1024 * 1024,
   unitMode: 0o644,
-  // Files the service runs with: owner read/write only (launchd's log, the daemon's state).
-  umask: 0o077,
+  umask: SERVICE_UMASK,
+  // systemd's UMask= spelling of the same value.
+  umaskOctal: SERVICE_UMASK.toString(8).padStart(4, '0'),
   environmentMaxBytes: 64 * 1024,
 } as const;
 
