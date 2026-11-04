@@ -41,7 +41,7 @@ recorded in `pnpm-workspace.yaml`. Preserve upstream attribution and identify
 the Gyblos modification when distributing patched code. No upstream acceptance
 is implied.
 
-The Contributor Covenant text retains its attribution and license link in
+The Contributor Covenant text retains its source/version attribution links in
 `CODE_OF_CONDUCT.md`.
 
 ## Public records and model names
