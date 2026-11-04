@@ -65,7 +65,7 @@ void test('seller init: on a terminal it asks each missing value, in order, and 
       'Model to offer: ',
       'Model name at the provider [acme/claude-chat]: ',
       'Context window in tokens: ',
-      'Variable holding the API key (none for no key) [ANTHROPIC_API_KEY]: ',
+      'Variable holding the API key [ANTHROPIC_API_KEY]: ',
       'Free tokens per day, all buyers [200000]: ',
       'Free tokens per buyer per day [5000]: ',
       'List this seller in the public discovery index? [y/N]: ',

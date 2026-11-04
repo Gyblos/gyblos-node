@@ -143,7 +143,9 @@ async function remoteAnswers(
   const apiKeyEnv = await ask(
     prompt,
     '--api-key-env',
-    `Variable holding the API key (${NO_KEY} for no key)`,
+    engine === ENGINE_KINDS.OPENAI
+      ? `Variable holding the API key (${NO_KEY} for no key)`
+      : 'Variable holding the API key',
     options.apiKeyEnv,
     engine === ENGINE_KINDS.OPENAI
       ? INIT_DEFAULTS.openaiKeyEnv
