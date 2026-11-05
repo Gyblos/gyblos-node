@@ -3,37 +3,147 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { PaypalChatController } from '@gyblos/desktop/paypal-chat';
-import { createDesktopPaypalHandlers } from '@gyblos/desktop/paypal-handlers';
 import { PAYPAL_DESKTOP_ERROR } from '@gyblos/desktop/paypal-model';
-import { createDesktopPaypalSession } from '@gyblos/desktop/paypal-session';
-import { createPaypalSession } from '@gyblos/node/paypal-session';
-import { validatePaypalPrompt } from '@gyblos/node/paypal-startup';
 
-import { fixture } from './support/paypal-session-fixture';
+import { setup } from './support/desktop-paypal-chat-fixture';
 
-async function setup() {
-  const f = fixture();
-  const opened: string[] = [];
-  const service = createDesktopPaypalSession(
-    await createPaypalSession({ ...f, validateRequest: validatePaypalPrompt }),
-    async (url) => {
-      opened.push(url);
-    },
+void test('cancelling the close confirmation clearly leaves the session open', async () => {
+  const { f, chat } = await setup(false);
+  await chat.refresh();
+  await chat.create();
+  await chat.approve();
+  await chat.finish();
+  assert.equal(chat.getSnapshot().status?.phase, 'active');
+  assert.match(chat.getSnapshot().notice, /session remains open/i);
+  assert.deepEqual(f.calls, ['create', 'authorize']);
+});
+
+void test('a failed status poll marks the last known session as stale until refreshed', async () => {
+  const { f, run } = await setup();
+  let unavailable = false;
+  const chat = new PaypalChatController(async (request) => {
+    if (unavailable && request.action === 'status') throw new Error('offline');
+    return run(request);
+  });
+  await chat.refresh();
+  await chat.create();
+  await chat.approve();
+  assert.equal(chat.getSnapshot().statusFresh, true);
+  unavailable = true;
+  await chat.poll();
+  assert.equal(chat.getSnapshot().status?.phase, 'active');
+  assert.equal(chat.getSnapshot().statusFresh, false);
+  chat.setDraft('Hello');
+  await chat.send();
+  await chat.finish();
+  assert.deepEqual(chat.getSnapshot().messages, []);
+  assert.equal(chat.getSnapshot().status?.phase, 'active');
+  assert.deepEqual(f.calls, ['create', 'authorize']);
+  unavailable = false;
+  await chat.poll();
+  assert.equal(chat.getSnapshot().statusFresh, true);
+});
+
+void test('the buyer starts checkout once and the verified return starts the session', async () => {
+  const { f, opened, service, states, chat } = await setup();
+  await chat.refresh();
+  await chat.startCheckout();
+  assert.equal(opened.length, 1);
+  const state = states[0];
+  assert.ok(state);
+  assert.equal(service.noteApprovedReturn({ state, token: 'ORDER1' }), true);
+  await chat.returnedFromPaypal();
+  assert.equal(chat.getSnapshot().status?.phase, 'active');
+  assert.deepEqual(f.calls, ['create', 'authorize']);
+});
+
+void test('a return arriving during browser opening is processed once afterward', async () => {
+  const { f, run, service, states } = await setup();
+  let release: (() => void) | undefined;
+  const wait = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const chat = new PaypalChatController(async (request) => {
+    const result = await run(request);
+    if (request.action === 'open') await wait;
+    return result;
+  });
+  await chat.refresh();
+  await chat.create();
+  const opening = chat.openApproval();
+  await new Promise((resolve) => setImmediate(resolve));
+  const state = states[0];
+  assert.ok(state);
+  assert.equal(service.noteApprovedReturn({ state, token: 'ORDER1' }), true);
+  await chat.returnedFromPaypal();
+  await chat.returnedFromPaypal();
+  assert.ok(release);
+  release();
+  await opening;
+  assert.equal(chat.getSnapshot().status?.phase, 'active');
+  assert.deepEqual(f.calls, ['create', 'authorize']);
+});
+
+void test('a valid approval arriving while an old cancellation notice is checked is not lost', async () => {
+  const { f, run, service, states } = await setup();
+  let release: (() => void) | undefined;
+  const wait = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const chat = new PaypalChatController(async (request) => {
+    if (request.action === 'complete-cancel') await wait;
+    return run(request);
+  });
+  await chat.refresh();
+  await chat.startCheckout();
+  const oldState = states[0];
+  assert.ok(oldState);
+  assert.equal(
+    service.noteCancelledReturn({ state: oldState, token: 'ORDER1' }),
+    true,
   );
-  const contents = {};
-  const frame = {};
-  const handlers = createDesktopPaypalHandlers(
-    async () => ({ service, model: 'qwen-test' }),
-    {
-      contents,
-      mainFrame: () => frame,
-      destroyed: () => false,
-    },
-  );
-  const event = { sender: contents, senderFrame: frame };
-  const run = (request: unknown) => handlers.run(event, [request]);
-  return { f, opened, run, chat: new PaypalChatController(run) };
-}
+  await chat.abandon();
+  await chat.startCheckout();
+  const cancelling = chat.cancelledFromPaypal();
+  const state = states[1];
+  assert.ok(state);
+  assert.equal(service.noteApprovedReturn({ state, token: 'ORDER1' }), true);
+  await chat.returnedFromPaypal();
+  assert.ok(release);
+  release();
+  await cancelling;
+  assert.equal(chat.getSnapshot().status?.phase, 'active');
+  assert.deepEqual(f.calls, ['create', 'create', 'authorize']);
+});
+
+void test('an ambiguous manual approval does not dispatch a queued automatic check', async () => {
+  const { f, run, service, states } = await setup();
+  let release: (() => void) | undefined;
+  let automaticChecks = 0;
+  const wait = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  f.payment.isApproved = async () => {
+    await wait;
+    throw new Error('synthetic timeout');
+  };
+  const chat = new PaypalChatController(async (request) => {
+    if (request.action === 'complete-return') automaticChecks += 1;
+    return run(request);
+  });
+  await chat.refresh();
+  await chat.startCheckout();
+  const checking = chat.approve();
+  const state = states[0];
+  assert.ok(state);
+  assert.equal(service.noteApprovedReturn({ state, token: 'ORDER1' }), true);
+  await chat.returnedFromPaypal();
+  assert.ok(release);
+  release();
+  await checking;
+  assert.equal(automaticChecks, 0);
+  assert.deepEqual(f.calls, ['create']);
+});
 
 void test('desktop chat completes two real service responses with a single approval', async () => {
   const { f, opened, chat } = await setup();

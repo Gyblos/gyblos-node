@@ -248,6 +248,30 @@ class PaypalInference {
       this.busy = false;
     }
   }
+  private async checkApproval(
+    orderId: string,
+    attempt: Attempt,
+    signal?: AbortSignal,
+  ) {
+    if (!this.deps.payment.isApproved) return;
+    await this.save({ ...attempt, phase: PHASE.AUTHORIZING });
+    if (signal?.aborted) await this.restoreAborted(attempt, signal);
+    const approved = await this.deps.payment.isApproved(
+      orderId,
+      attempt.requestId,
+    );
+    if (!approved || signal?.aborted) {
+      this.deps.payment.discardApproval?.();
+      await this.save(attempt);
+      if (!approved) throw new PaypalError(PAYPAL_ERROR_CODES.NOT_APPROVED);
+      signal?.throwIfAborted();
+    }
+  }
+  private async restoreAborted(attempt: Attempt, signal: AbortSignal) {
+    this.deps.payment.discardApproval?.();
+    await this.save(attempt);
+    signal.throwIfAborted();
+  }
   async execute(
     orderId: string,
     prompt: string,
@@ -265,17 +289,18 @@ class PaypalInference {
       this.active.maxTokens !== maxTokens
     )
       throw new PaypalError(PAYPAL_ERROR_CODES.INVALID_REQUEST);
+    signal?.throwIfAborted();
     this.busy = true;
     try {
       const attempt = this.active;
-      if (
-        this.deps.payment.isApproved &&
-        !(await this.deps.payment.isApproved(orderId))
-      )
-        throw new PaypalError(PAYPAL_ERROR_CODES.NOT_APPROVED);
-      signal?.throwIfAborted();
+      await this.checkApproval(orderId, attempt, signal);
+      if (signal?.aborted) await this.restoreAborted(attempt, signal);
       await this.save({ ...attempt, phase: PHASE.AUTHORIZING });
-      const authorization = await this.deps.payment.authorize(orderId);
+      if (signal?.aborted) await this.restoreAborted(attempt, signal);
+      const authorization = await this.deps.payment.authorize(
+        orderId,
+        attempt.requestId,
+      );
       const authorized = {
         ...attempt,
         ...authorization,
@@ -304,24 +329,23 @@ class PaypalInference {
       const capture = await this.deps.payment.capture(
         authorization.authorizationId,
       );
-      if (signal?.aborted)
-        return await refundCapture(
+      const refund = () =>
+        refundCapture(
           this.deps,
           (item) => this.save(item),
           authorized,
           capture,
         );
+      if (signal?.aborted) return await refund();
       await this.save({ ...authorized, ...capture, phase: PHASE.COMPLETED });
-      if (signal?.aborted)
-        return await refundCapture(
-          this.deps,
-          (item) => this.save(item),
-          authorized,
-          capture,
-        );
+      if (signal?.aborted) return await refund();
       return output;
     } finally {
-      this.busy = false;
+      try {
+        this.deps.payment.discardApproval?.();
+      } finally {
+        this.busy = false;
+      }
     }
   }
 }

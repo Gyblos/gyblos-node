@@ -546,18 +546,11 @@ nav {
   color: var(--dim);
   line-height: 1.7;
 }
-.field-label {
-  display: block;
-  font-size: 11px;
-  color: var(--muted);
-  margin: 22px 0 9px;
-}
 .engine-field {
   display: flex;
   gap: 8px;
 }
 .engine-field input,
-.full-input,
 .terms-row input,
 .terms-row select {
   padding: 11px 12px;
@@ -794,10 +787,6 @@ nav {
 .balance-display > span {
   font-size: 11px;
   color: var(--dim);
-}
-.full-input {
-  width: 100%;
-  font-size: 15px;
 }
 .paid-terms > div {
   display: flex;
@@ -2266,10 +2255,6 @@ kbd {
 .desktop-frame .endpoint {
   border-color: var(--subtle-line);
   background: var(--editor);
-}
-.desktop-frame .full-input {
-  background: var(--editor);
-  border-color: var(--line);
 }
 .desktop-frame .toast {
   background: var(--raised);

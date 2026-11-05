@@ -381,6 +381,8 @@ export type ReceiptChannelCode =
 // Payment port catalogs live in their own module; re-exported so every caller keeps one import.
 export * from './payments/constants';
 export const PAYPAL_ID_PATTERN = /^[A-Za-z0-9-]{1,64}$/;
+export const PAYPAL_RETURN_STATE_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+export const PAYPAL_RETURN_STATE_BYTES = 32;
 export const PAYPAL_ERROR_CODES = {
   INVALID_RESPONSE: 'PAYPAL_INVALID_RESPONSE',
   INVALID_CONFIG: 'PAYPAL_INVALID_CONFIG',
@@ -392,6 +394,7 @@ export const PAYPAL_ERROR_CODES = {
   DUPLICATE_REQUEST: 'PAYPAL_DUPLICATE_REQUEST',
   BUSY: 'PAYPAL_BUSY',
   NOT_APPROVED: 'PAYPAL_NOT_APPROVED',
+  INTERRUPTED: 'PAYPAL_INTERRUPTED',
   INFERENCE_FAILED: 'PAYPAL_INFERENCE_FAILED',
   REFUNDED: 'PAYPAL_REFUNDED',
 } as const;

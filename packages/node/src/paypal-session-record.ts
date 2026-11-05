@@ -36,6 +36,7 @@ interface PaypalSessionRecordBase {
   messageId?: string;
   promptDigest?: string;
   captureId?: string;
+  reviewDigest?: string;
 }
 export type PaypalSessionRecord = PaypalSessionRecordBase &
   (
@@ -55,6 +56,12 @@ function fail(
 }
 function hasPhase(phase: Phase, values: readonly Phase[]) {
   return values.includes(phase);
+}
+export function paypalSessionIsTerminal(record: PaypalSessionRecord | null) {
+  return (
+    !record ||
+    hasPhase(record.phase, [PHASE.COMPLETED, PHASE.VOIDED, PHASE.CANCELLED])
+  );
 }
 function idList(value: unknown): value is string[] {
   return (
@@ -127,6 +134,7 @@ function validateShape(
     'messageId',
     'promptDigest',
     'captureId',
+    'reviewDigest',
     ...(item.version === PAYPAL_SESSION_RECORD_VERSION
       ? ['agentCompletions']
       : []),
@@ -148,11 +156,15 @@ function validateShape(
     (item.promptDigest !== undefined && !message) ||
     isPaypalId(item.captureId) !== captured ||
     (item.captureId !== undefined && !captured) ||
+    (item.reviewDigest !== undefined &&
+      (!digest(item.reviewDigest) ||
+        !hasPhase(phase, [PHASE.CAPTURING, PHASE.COMPLETED]))) ||
     (phase === PHASE.MESSAGE_PENDING && spentCents < messageCents) ||
     (phase === PHASE.EXECUTING && spentCents + messageCents > limitCents) ||
     (hasPhase(phase, [
       PHASE.CREATING,
       PHASE.CREATED,
+      PHASE.REVIEW,
       PHASE.AUTHORIZING,
       PHASE.CANCELLED,
       PHASE.VOIDING,
@@ -177,9 +189,14 @@ function optionalDetails(item: Record<string, unknown>) {
       ? { promptDigest: item.promptDigest }
       : {}),
     ...(isPaypalId(item.captureId) ? { captureId: item.captureId } : {}),
+    ...(digest(item.reviewDigest) ? { reviewDigest: item.reviewDigest } : {}),
   };
 }
-function useNewTerms(item: Record<string, unknown>, phase: Phase) {
+function useNewTerms(
+  item: Record<string, unknown>,
+  phase: Phase,
+  historical: boolean,
+) {
   const changed =
     item.currency !== PAYPAL_SANDBOX.currency ||
     item.limitCents !== PAYPAL_SANDBOX.limitCents ||
@@ -187,6 +204,7 @@ function useNewTerms(item: Record<string, unknown>, phase: Phase) {
     item.maxMessageAttempts !== PAYPAL_SANDBOX.maxMessageAttempts;
   if (
     changed &&
+    !historical &&
     !hasPhase(phase, [PHASE.COMPLETED, PHASE.VOIDED, PHASE.CANCELLED])
   )
     return fail(PAYPAL_ERROR_CODES.INVALID_JOURNAL);
@@ -209,6 +227,7 @@ function invalidLedger(
     (hasPhase(phase, [
       PHASE.CREATING,
       PHASE.CREATED,
+      PHASE.REVIEW,
       PHASE.AUTHORIZING,
       PHASE.CANCELLED,
     ]) &&
@@ -240,7 +259,24 @@ function versionedRecord(
     ? { ...common, version: PAYPAL_SESSION_PREVIOUS_RECORD_VERSION }
     : { ...common, version: PAYPAL_SESSION_RECORD_VERSION, agentCompletions };
 }
-export function parsePaypalSessionState(value: unknown): {
+function legacySessionState(value: unknown) {
+  return { record: null, legacyBlocked: !paypalPreviousAttemptFinished(value) };
+}
+function sessionCurrency(value: unknown) {
+  return Object.values(PAYPAL_SANDBOX_CURRENCIES).find(
+    (currency) => currency === value,
+  );
+}
+function validVersion(value: unknown) {
+  return (
+    value === PAYPAL_SESSION_RECORD_VERSION ||
+    value === PAYPAL_SESSION_PREVIOUS_RECORD_VERSION
+  );
+}
+export function parsePaypalSessionState(
+  value: unknown,
+  historical = false,
+): {
   record: PaypalSessionRecord | null;
   legacyBlocked: boolean;
 } {
@@ -248,22 +284,16 @@ export function parsePaypalSessionState(value: unknown): {
   if (!value || typeof value !== 'object' || Array.isArray(value))
     return fail(PAYPAL_ERROR_CODES.INVALID_JOURNAL);
   const item = Object.fromEntries(Object.entries(value));
-  if (item.version === undefined)
-    return {
-      record: null,
-      legacyBlocked: !paypalPreviousAttemptFinished(value),
-    };
+  if (item.version === undefined) return legacySessionState(value);
   const phase = Object.values(PHASE).find((entry) => entry === item.phase);
+  const currency = sessionCurrency(item.currency);
   const agentCompletions =
     item.version === PAYPAL_SESSION_RECORD_VERSION
       ? completions(item.agentCompletions)
       : [];
   if (
-    (item.version !== PAYPAL_SESSION_RECORD_VERSION &&
-      item.version !== PAYPAL_SESSION_PREVIOUS_RECORD_VERSION) ||
-    !Object.values(PAYPAL_SANDBOX_CURRENCIES).some(
-      (currency) => currency === item.currency,
-    ) ||
+    !validVersion(item.version) ||
+    !currency ||
     !Number.isSafeInteger(item.limitCents) ||
     item.limitCents < 1 ||
     !Number.isSafeInteger(item.messageCents) ||
@@ -299,16 +329,20 @@ export function parsePaypalSessionState(value: unknown): {
     item.limitCents,
     item.messageCents,
   );
-  if (useNewTerms(item, phase)) {
+  if (
+    useNewTerms(item, phase, historical) &&
+    !historical &&
+    !digest(item.reviewDigest)
+  ) {
     return { record: null, legacyBlocked: false };
   }
   const common = {
     phase,
     requestId: item.requestId,
-    currency: PAYPAL_SANDBOX.currency,
-    limitCents: PAYPAL_SANDBOX.limitCents,
-    messageCents: PAYPAL_SANDBOX.messageCents,
-    maxMessageAttempts: PAYPAL_SANDBOX.maxMessageAttempts,
+    currency,
+    limitCents: item.limitCents,
+    messageCents: item.messageCents,
+    maxMessageAttempts: item.maxMessageAttempts,
     spentCents: item.spentCents,
     attemptIds: item.attemptIds,
     acknowledgedIds: item.acknowledgedIds,

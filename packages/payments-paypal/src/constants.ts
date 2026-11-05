@@ -1,6 +1,16 @@
 // Sandbox-only provider endpoints and request limits for the PayPal adapter.
 import { PAYPAL_SANDBOX } from '@gyblos/config/constants';
 
+export const PAYPAL_ORDER_STATUS = {
+  CREATED: 'CREATED',
+  PAYER_ACTION_REQUIRED: 'PAYER_ACTION_REQUIRED',
+  APPROVED: 'APPROVED',
+  COMPLETED: 'COMPLETED',
+} as const;
+
+export const PAYPAL_ORDER_INTENT = { AUTHORIZE: 'AUTHORIZE' } as const;
+export const PAYPAL_AUTHORIZATION_STATUS = { CREATED: 'CREATED' } as const;
+
 export const PAYPAL_API = {
   origin: 'https://api-m.sandbox.paypal.com',
   approvalHost: PAYPAL_SANDBOX.approvalHost,

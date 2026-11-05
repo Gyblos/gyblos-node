@@ -3,15 +3,165 @@
   --shell-header-height: 40px;
   --shell-control-size: 24px;
   --shell-divider: color-mix(in srgb, var(--line) 85%, var(--muted));
-  --control-size: 28px;
+  --control-size: 32px;
   --control-icon: 16px;
-  --row-size: 48px;
+  --row-size: 52px;
   --avatar-size: 28px;
-  --ui-font: 12px;
-  --ui-detail: 11px;
-  --page-gutter: 12px;
-  --page-top: 8px;
-  --section-gap: 12px;
+  --ui-font: 14px;
+  --ui-detail: 12px;
+  --page-gutter: 16px;
+  --page-top: 12px;
+  --section-gap: 16px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+}
+
+/* Shared selections, sections and supporting text for buyer surfaces. */
+.desktop-frame .ui-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: var(--space-3);
+}
+.desktop-frame .ui-choice {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  min-height: 72px;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.desktop-frame .ui-choice:hover {
+  background: var(--panel);
+  border-color: var(--blue);
+}
+.desktop-frame .ui-choice:has(.ui-choice-input:checked) {
+  background: var(--selected-surface);
+  border-color: var(--blue);
+}
+.desktop-frame .ui-choice:has(.ui-choice-input:focus-visible) {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+.desktop-frame .ui-choice-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.desktop-frame .ui-choice--stacked {
+  flex-direction: column;
+  justify-content: center;
+  min-height: 136px;
+  text-align: center;
+}
+.desktop-frame .ui-choice--stacked .ui-choice-copy {
+  flex: none;
+}
+.desktop-frame .ui-icon-tile {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  border-radius: var(--radius-control);
+  background: var(--raised);
+}
+.desktop-frame .ui-icon-tile .model-artwork,
+.desktop-frame .ui-icon-tile > svg {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+.desktop-frame .ui-choice-copy {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: var(--space-1);
+}
+.desktop-frame .ui-choice-copy strong {
+  font-size: 13px;
+}
+.desktop-frame .ui-choice-copy small,
+.desktop-frame .ui-help-text {
+  color: var(--muted);
+  font-size: var(--ui-font);
+  line-height: 1.5;
+}
+.desktop-frame .ui-selection {
+  color: var(--blue);
+  font-size: var(--ui-detail);
+}
+.desktop-frame .ui-section {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.desktop-frame .ui-section > p,
+.desktop-frame .ui-help-text > p {
+  margin: 0;
+}
+.desktop-frame .ui-subheading {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--ui-font);
+  font-weight: 600;
+}
+.desktop-frame .ui-steps {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding-left: var(--space-6);
+  color: var(--muted);
+  font-size: var(--ui-font);
+  line-height: 1.5;
+}
+.desktop-frame .ui-steps li::marker {
+  color: var(--blue);
+}
+.desktop-frame .ui-design-preview {
+  display: grid;
+  gap: var(--space-6);
+}
+.desktop-frame .ui-inline-actions,
+.desktop-frame .ui-swatch-list {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.desktop-frame .ui-swatch {
+  display: inline-flex;
+  align-items: end;
+  min-width: 90px;
+  min-height: 64px;
+  padding: var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  font-size: var(--ui-detail);
+}
+.desktop-frame .ui-swatch--background {
+  background: var(--bg);
+}
+.desktop-frame .ui-swatch--panel {
+  background: var(--panel);
+}
+.desktop-frame .ui-swatch--accent {
+  background: var(--accent);
+  color: var(--primary-ink);
 }
 .desktop-frame .ui-button {
   display: inline-flex;
@@ -668,9 +818,15 @@
   font-size: var(--ui-detail);
   line-height: 17px;
 }
-.desktop-frame .full-input {
+.desktop-frame .ui-input {
+  width: 100%;
+  min-width: 0;
   height: var(--control-size);
   padding: 0 8px;
+  border: 1px solid var(--line);
+  outline: 0;
+  background: var(--editor);
+  color: var(--ink);
   font-size: var(--ui-font);
 }
 .desktop-frame .command-trigger kbd {
@@ -765,34 +921,37 @@
   padding: 3px;
 }
 
-/* Connection editors reuse the shared form controls, menus and dialog geometry. */
-.desktop-frame .connection-form {
+/* Form layout and controls are shared by buyer screens and dialogs. */
+.desktop-frame .ui-form {
   display: grid;
   gap: 12px;
 }
-.desktop-frame .connection-field {
+.desktop-frame .ui-field {
   display: grid;
-  gap: 6px;
+  gap: var(--space-2);
   font-size: var(--ui-font);
   color: var(--muted);
 }
-.desktop-frame .connection-field .composer-model {
+.desktop-frame .ui-field .composer-model {
   justify-content: flex-start;
   max-width: 100%;
 }
-.desktop-frame .connection-actions {
+.desktop-frame .ui-form-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   justify-content: flex-end;
 }
-.desktop-frame .connection-form .modal-note {
+.desktop-frame .ui-form-actions--start {
+  justify-content: flex-start;
+}
+.desktop-frame .ui-form .modal-note {
   margin: 0;
 }
-.desktop-frame .connection-field select {
+.desktop-frame .ui-field select {
   color-scheme: dark;
 }
-.desktop-frame.light .connection-field select {
+.desktop-frame.light .ui-field select {
   color-scheme: light;
 }
 
@@ -985,19 +1144,19 @@
   font-size: var(--ui-detail);
   line-height: 16px;
 }
-.desktop-frame .connection-form .instructions-toggle {
+.desktop-frame .ui-form .instructions-toggle {
   padding-inline: 0;
 }
-.desktop-frame .connection-form .ui-row small {
+.desktop-frame .ui-form .ui-row small {
   white-space: normal;
 }
-.desktop-frame .wallet-details :is(.field-label, .modal-note, .ui-note) {
+.desktop-frame .wallet-details :is(.ui-field, .modal-note, .ui-note) {
   margin: 0;
 }
-.desktop-frame .field-label input[aria-invalid='true'] {
+.desktop-frame .ui-field input[aria-invalid='true'] {
   border-color: var(--warm);
 }
-.desktop-frame .field-label .modal-note[role='alert'] {
+.desktop-frame .ui-field .modal-note[role='alert'] {
   color: var(--warm);
 }
 

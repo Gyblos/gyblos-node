@@ -1,5 +1,6 @@
 // Owns the local data layout: the product home (one directory per role plus shared public artifacts),
 // the separate lab home and the legacy paths they replace. Pure path computation; never touches files.
+import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 
 import { CONFIG_PATH_ERROR } from './constants';
@@ -214,5 +215,14 @@ export function paypalSandboxPaths(root: string) {
     directory: root,
     state: join(root, 'paypal-sandbox-v1.json'),
     lock: join(root, 'paypal-sandbox-v1.lock'),
+    reviewDirectory: join(root, 'paypal-sandbox-reviews-v1'),
+  };
+}
+export function paypalSandboxReviewPaths(root: string, requestId: string) {
+  const digest = createHash('sha256').update(requestId).digest('hex');
+  const directory = paypalSandboxPaths(root).reviewDirectory;
+  return {
+    decision: join(directory, `${digest}-decision.json`),
+    outcome: join(directory, `${digest}-outcome.json`),
   };
 }

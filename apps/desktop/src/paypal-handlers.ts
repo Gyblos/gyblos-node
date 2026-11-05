@@ -21,6 +21,21 @@ type DesktopWindow = {
 type DesktopSender = { sender: unknown; senderFrame: unknown };
 type Loaded = { service: DesktopSession; model: string };
 
+function actionError(failure: unknown, input: PaypalRequest) {
+  if (failure instanceof PaypalError) {
+    if (failure.code === PAYPAL_ERROR_CODES.NOT_APPROVED)
+      return PAYPAL_DESKTOP_ERROR.NOT_APPROVED;
+    if (failure.code === PAYPAL_ERROR_CODES.INTERRUPTED)
+      return PAYPAL_DESKTOP_ERROR.INTERRUPTED;
+    if (
+      input.action === PAYPAL_ACTION.SEND &&
+      failure.code === PAYPAL_ERROR_CODES.INVALID_REQUEST
+    )
+      return PAYPAL_DESKTOP_ERROR.INVALID_PROMPT;
+  }
+  return PAYPAL_DESKTOP_ERROR.FAILED;
+}
+
 function request(value: unknown): PaypalRequest | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const item = Object.fromEntries(Object.entries(value));
@@ -30,7 +45,10 @@ function request(value: unknown): PaypalRequest | null {
     case PAYPAL_ACTION.CREATE:
     case PAYPAL_ACTION.OPEN:
     case PAYPAL_ACTION.APPROVE:
+    case PAYPAL_ACTION.COMPLETE_RETURN:
+    case PAYPAL_ACTION.COMPLETE_CANCEL:
     case PAYPAL_ACTION.FINISH:
+    case PAYPAL_ACTION.REVIEW_AND_SETTLE:
     case PAYPAL_ACTION.ABANDON:
       return keys === 'action' ? { action: item.action } : null;
     case PAYPAL_ACTION.SEND:
@@ -52,6 +70,14 @@ function request(value: unknown): PaypalRequest | null {
 export function createDesktopPaypalHandlers(
   load: () => Promise<Loaded>,
   window: DesktopWindow,
+  confirmReview: (ticket: {
+    fingerprint: string;
+    spentCents: number;
+  }) => Promise<boolean> = async () => false,
+  confirmFinish: (summary: {
+    spentCents: number;
+    limitCents: number;
+  }) => Promise<boolean> = async () => false,
 ) {
   return {
     async run(
@@ -89,6 +115,13 @@ export function createDesktopPaypalHandlers(
           case PAYPAL_ACTION.APPROVE:
             await service.approve();
             break;
+          case PAYPAL_ACTION.COMPLETE_RETURN:
+            await service.consumeApprovedReturn();
+            break;
+          case PAYPAL_ACTION.COMPLETE_CANCEL:
+            if (!(await service.consumeCancelledReturn()))
+              return { status: null, model, answer: null, error: null };
+            break;
           case PAYPAL_ACTION.SEND:
             answer = await service.send(input.prompt);
             break;
@@ -96,22 +129,17 @@ export function createDesktopPaypalHandlers(
             await service.acknowledge(input.messageId);
             break;
           case PAYPAL_ACTION.FINISH:
-            await service.finish();
+            await service.finishWithConfirmation(confirmFinish);
+            break;
+          case PAYPAL_ACTION.REVIEW_AND_SETTLE:
+            await service.reviewAndSettle(confirmReview);
             break;
           case PAYPAL_ACTION.ABANDON:
             await service.abandon();
             break;
         }
       } catch (failure) {
-        error =
-          failure instanceof PaypalError &&
-          failure.code === PAYPAL_ERROR_CODES.NOT_APPROVED
-            ? PAYPAL_DESKTOP_ERROR.NOT_APPROVED
-            : failure instanceof PaypalError &&
-                input.action === PAYPAL_ACTION.SEND &&
-                failure.code === PAYPAL_ERROR_CODES.INVALID_REQUEST
-              ? PAYPAL_DESKTOP_ERROR.INVALID_PROMPT
-              : PAYPAL_DESKTOP_ERROR.FAILED;
+        error = actionError(failure, input);
       }
       return { status: service.status(), model, answer, error };
     },

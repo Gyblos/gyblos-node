@@ -1,14 +1,12 @@
 // Stateful desktop conversation preview: sessions, interruption, streaming and tool consent.
 // Timers render synthetic text only; this component never contacts a model or web service.
 import {
-  ArrowClockwise,
   ArrowDown,
   ArrowUp,
   ChatCircle,
   Check,
   Clock,
   Code,
-  Copy,
   PencilSimple,
   Plus,
   Sparkle,
@@ -25,16 +23,13 @@ import {
 } from 'react';
 
 import { ChatController } from './chat-controller';
-import { CHAT_PHASE, MESSAGE_STATE, toggleToolSelection } from './chat-state';
+import { toggleToolSelection } from './chat-state';
+import { ChatAnswer } from './ChatAnswer';
+import { ChatComposer } from './ChatComposer';
 import { ToolsDropdown } from './ChatTools';
-import {
-  BUTTON_VARIANT,
-  CHAT_PREVIEW,
-  CHAT_ROLE,
-  MOTION_VARIANT,
-} from './constants';
+import { ChatUserMessage } from './ChatUserMessage';
+import { BUTTON_VARIANT, CHAT_PREVIEW, CHAT_ROLE } from './constants';
 import type { DemoAuthorizationStatus } from './demo-account';
-import { MessageText } from './MessageText';
 import { Modal } from './Modal';
 import { ModelDropdown, type ModelOption } from './ModelDropdown';
 import { MotionPresence } from './Motion';
@@ -42,7 +37,6 @@ import { SIGNAL_STATE, SignalMark, SignalTrace } from './Signal';
 import { toolName, TOOLS, type ToolId } from './tools';
 import {
   Avatar,
-  Badge,
   Button,
   IconButton,
   List,
@@ -70,11 +64,6 @@ type Props = {
   onAuthorize: () => DemoAuthorizationStatus;
 };
 type PendingSend = { text: string; tools: ToolId[] };
-const PHASE_LABEL = {
-  [CHAT_PHASE.CONNECTING]: 'Connecting to a provider',
-  [CHAT_PHASE.TOOLS]: 'Using web tools',
-  [CHAT_PHASE.RESPONDING]: 'Writing response',
-} as const;
 const QUICK_PROMPTS = [
   {
     icon: Sparkle,
@@ -116,7 +105,7 @@ export function Chat({
   const [selectedTools, setSelectedTools] = useState<ToolId[]>([]);
   const [allowedTools, setAllowedTools] = useState<ToolId[]>([]);
   const [pendingSend, setPendingSend] = useState<PendingSend | null>(null);
-  const [details, setDetails] = useState<string[]>([]);
+  const [details, setDetails] = useState<string | null>(null);
   const [copied, setCopied] = useState('');
   const notice = session.notice;
   const [nearBottom, setNearBottom] = useState(true);
@@ -157,7 +146,7 @@ export function Chat({
     setSelectedTools([]);
     setAllowedTools([]);
     setPendingSend(null);
-    setDetails([]);
+    setDetails(null);
     follow.current = true;
     setNearBottom(true);
   }
@@ -364,133 +353,39 @@ export function Chat({
             >
               {session.messages.map((message) =>
                 message.role === CHAT_ROLE.USER ? (
-                  <article key={message.id} className="chat-user">
-                    <p>{message.text}</p>
-                    <IconButton
-                      label="Reuse message"
-                      onClick={() => {
-                        setDraft(message.text);
-                        input.current?.focus();
-                      }}
-                    >
-                      <PencilSimple size={14} />
-                    </IconButton>
-                  </article>
-                ) : (
-                  <article key={message.id} className="chat-answer">
-                    <header className="answer-heading">
-                      <SignalMark
-                        state={
-                          message.state === MESSAGE_STATE.PENDING
-                            ? !online
-                              ? SIGNAL_STATE.PAUSED
-                              : run?.phase === CHAT_PHASE.CONNECTING
-                                ? SIGNAL_STATE.CONNECTING
-                                : run?.phase === CHAT_PHASE.TOOLS
-                                  ? SIGNAL_STATE.WORKING
-                                  : SIGNAL_STATE.RESPONDING
-                            : message.state === MESSAGE_STATE.STOPPED
-                              ? SIGNAL_STATE.STOPPED
-                              : SIGNAL_STATE.COMPLETE
-                        }
-                      />
-                      <span>{message.model.name}</span>
-                      <Badge>{message.model.free ? 'Free' : 'Paid'}</Badge>
-                    </header>
-                    {message.state === MESSAGE_STATE.PENDING && (
-                      <div className="run-line" role="status">
-                        <span className="ascii-state" aria-hidden="true">
-                          {run?.phase === CHAT_PHASE.RESPONDING
-                            ? '::'
-                            : run?.phase === CHAT_PHASE.TOOLS
-                              ? '[+]'
-                              : '[..]'}
-                        </span>
-                        <span>
-                          {run ? PHASE_LABEL[run.phase] : 'Preparing response'}
-                        </span>
-                      </div>
-                    )}
-                    {message.text ? (
-                      <MessageText text={message.text} />
-                    ) : message.state === MESSAGE_STATE.STOPPED ? (
-                      <p className="stopped-note">
-                        Stopped before a response arrived.
-                      </p>
-                    ) : null}
-                    <div className="answer-actions">
-                      {message.state !== MESSAGE_STATE.PENDING && (
-                        <>
-                          <span className="answer-state" role="status">
-                            {message.state === MESSAGE_STATE.STOPPED
-                              ? message.text
-                                ? 'Stopped · partial response'
-                                : 'Stopped'
-                              : 'Completed'}
-                          </span>
-                          {message.text && (
-                            <IconButton
-                              label={
-                                copied === message.id
-                                  ? 'Response copied'
-                                  : 'Copy response'
-                              }
-                              onClick={() => copy(message.text, message.id)}
-                            >
-                              {copied === message.id ? (
-                                <Check size={14} />
-                              ) : (
-                                <Copy size={14} />
-                              )}
-                            </IconButton>
-                          )}
-                          {message === session.messages.at(-1) && lastUser && (
-                            <IconButton
-                              label="Reuse question"
-                              disabled={busy || !online}
-                              onClick={() => {
-                                setDraft(lastUser.text);
-                                input.current?.focus();
-                              }}
-                            >
-                              <ArrowClockwise size={14} />
-                            </IconButton>
-                          )}
-                        </>
-                      )}
-                      <Button
-                        className="run-details-trigger"
-                        aria-expanded={details.includes(message.id)}
-                        aria-controls={`details-${message.id}`}
-                        onClick={() =>
-                          setDetails((previous) =>
-                            previous.includes(message.id)
-                              ? previous.filter((id) => id !== message.id)
-                              : [...previous, message.id],
-                          )
-                        }
+                  <ChatUserMessage
+                    key={message.id}
+                    text={message.text}
+                    action={
+                      <IconButton
+                        label="Reuse message"
+                        onClick={() => {
+                          setDraft(message.text);
+                          input.current?.focus();
+                        }}
                       >
-                        Run details
-                      </Button>
-                    </div>
-                    <MotionPresence variant={MOTION_VARIANT.EXPAND}>
-                      {details.includes(message.id) && (
-                        <section
-                          id={`details-${message.id}`}
-                          className="run-details"
-                        >
-                          <SignalTrace model={message.model.name} />
-                          <p>Model route</p>
-                          {message.tools.length > 0 && (
-                            <p>
-                              Tools: {message.tools.map(toolName).join(', ')}
-                            </p>
-                          )}
-                          <p>Review the response before using it.</p>
-                        </section>
-                      )}
-                    </MotionPresence>
-                  </article>
+                        <PencilSimple size={14} />
+                      </IconButton>
+                    }
+                  />
+                ) : (
+                  <ChatAnswer
+                    key={message.id}
+                    message={message}
+                    run={run}
+                    copied={copied === message.id}
+                    canReuse={message === session.messages.at(-1) && !!lastUser}
+                    reuseDisabled={busy || !online}
+                    onCopy={() => {
+                      void copy(message.text, message.id);
+                    }}
+                    onReuse={() => {
+                      if (!lastUser) return;
+                      setDraft(lastUser.text);
+                      input.current?.focus();
+                    }}
+                    onDetails={() => setDetails(message.id)}
+                  />
                 ),
               )}
             </div>
@@ -524,87 +419,71 @@ export function Chat({
               Connection paused. Your conversation and draft are kept.
             </p>
           )}
-          <form
+          <ChatComposer
             ref={composer}
-            className="composer"
-            onSubmit={(event) => {
-              event.preventDefault();
-              submit();
-            }}
+            inputRef={input}
+            placeholder={
+              !online
+                ? 'Your draft stays here while paused.'
+                : busy
+                  ? 'Write a follow-up…'
+                  : 'Message'
+            }
+            value={session.draft}
+            onChange={setDraft}
+            onSubmit={submit}
           >
-            <textarea
-              ref={input}
-              aria-label="Your message"
-              placeholder={
-                !online
-                  ? 'Your draft stays here while paused.'
-                  : busy
-                    ? 'Write a follow-up…'
-                    : 'Message'
-              }
-              value={session.draft}
-              onChange={(event) => setDraft(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.nativeEvent.isComposing) return;
-                if (event.key === 'Enter' && !event.shiftKey) {
-                  event.preventDefault();
-                  submit();
+            <div className="composer-leading">
+              <ModelDropdown
+                model={model}
+                models={models}
+                onSelect={onSelectModel}
+                onBrowse={onBrowseModels}
+              />
+              <ToolsDropdown
+                connected={connectedTools}
+                selected={chosenTools}
+                onConnect={onToggleTool}
+                onSelect={(id) =>
+                  setSelectedTools((previous) =>
+                    toggleToolSelection(previous, connectedTools, id),
+                  )
                 }
-              }}
-            />
-            <div className="composer-bottom">
-              <div className="composer-leading">
-                <ModelDropdown
-                  model={model}
-                  models={models}
-                  onSelect={onSelectModel}
-                  onBrowse={onBrowseModels}
-                />
-                <ToolsDropdown
-                  connected={connectedTools}
-                  selected={chosenTools}
-                  onConnect={onToggleTool}
-                  onSelect={(id) =>
-                    setSelectedTools((previous) =>
-                      toggleToolSelection(previous, connectedTools, id),
-                    )
-                  }
-                />
-              </div>
-              <div className="composer-actions">
-                <span>
-                  {busy
-                    ? 'Esc to stop'
-                    : model.free
-                      ? 'No credits needed'
-                      : 'Uses wallet balance'}
-                </span>
-                <IconButton
-                  variant={busy ? 'secondary' : 'primary'}
-                  className="ui-composer-action"
-                  type={busy ? 'button' : 'submit'}
-                  label={busy ? 'Stop response' : 'Send message'}
-                  data-busy={busy}
-                  onClick={
-                    busy
-                      ? (event) => {
-                          event.preventDefault();
-                          stop();
-                        }
-                      : undefined
-                  }
-                  disabled={!busy && (!session.draft.trim() || !online)}
-                >
-                  <span className="composer-send-glyph" aria-hidden="true">
-                    <ArrowUp size={16} weight="bold" />
-                  </span>
-                  <span className="composer-stop-glyph" aria-hidden="true">
-                    <Square size={14} weight="fill" />
-                  </span>
-                </IconButton>
-              </div>
+              />
             </div>
-          </form>
+            <div className="composer-actions">
+              <span>
+                {busy
+                  ? 'Esc to stop'
+                  : model.free
+                    ? 'No credits needed'
+                    : 'Uses wallet balance'}
+              </span>
+              <IconButton
+                variant={busy ? 'secondary' : 'primary'}
+                className="ui-composer-action"
+                type={busy ? 'button' : 'submit'}
+                label={busy ? 'Stop response' : 'Send message'}
+                data-busy={busy}
+                onClick={
+                  busy
+                    ? (event) => {
+                        event.preventDefault();
+                        stop();
+                      }
+                    : undefined
+                }
+                disabled={!busy && (!session.draft.trim() || !online)}
+              >
+                <span className="composer-send-glyph" aria-hidden="true">
+                  <ArrowUp size={16} weight="bold" />
+                </span>
+                <span className="composer-stop-glyph" aria-hidden="true">
+                  <Square size={14} weight="fill" />
+                </span>
+              </IconButton>
+            </div>
+          </ChatComposer>
           {!session.messages.length && (
             <div className="quick-actions" aria-label="Suggested prompts">
               {QUICK_PROMPTS.map((item) => (
@@ -687,6 +566,27 @@ export function Chat({
             </Button>
           </Modal>
         )}
+      </MotionPresence>
+      <MotionPresence>
+        {details &&
+          session.messages
+            .filter((message) => message.id === details)
+            .map((message) => (
+              <Modal
+                key={message.id}
+                title="Run details"
+                close={() => setDetails(null)}
+              >
+                <div className="ui-section ui-help-text">
+                  <SignalTrace model={message.model.name} />
+                  <p>Model route</p>
+                  {message.tools.length > 0 && (
+                    <p>Tools: {message.tools.map(toolName).join(', ')}</p>
+                  )}
+                  <p>Review the response before using it.</p>
+                </div>
+              </Modal>
+            ))}
       </MotionPresence>
       <MotionPresence>
         {pendingSend && (

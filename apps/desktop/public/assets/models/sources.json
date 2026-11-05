@@ -47,11 +47,38 @@
       "retrieved": "2026-10-22",
       "sha256": "8cdc48e35113d2f76f602fc93977ce8b8eebe41bc66a65f532ed9c89f6a68e2d",
       "bytes": 2368
+    },
+    {
+      "file": "claude-color.svg",
+      "family": "Claude",
+      "source": "https://raw.githubusercontent.com/lobehub/lobe-icons/8a1b2821bb768c484fe8da20c5e1838b6bf551a9/packages/static-svg/icons/claude-color.svg",
+      "license": "MIT",
+      "retrieved": "2026-11-04",
+      "sha256": "a3101f3047a119aa11825ad9369510f0c472428c8c52d420e31bc62db44a8364",
+      "bytes": 1696
+    },
+    {
+      "file": "gemini-color.svg",
+      "family": "Gemini",
+      "source": "https://raw.githubusercontent.com/lobehub/lobe-icons/8a1b2821bb768c484fe8da20c5e1838b6bf551a9/packages/static-svg/icons/gemini-color.svg",
+      "license": "MIT",
+      "retrieved": "2026-11-04",
+      "sha256": "8ab0a9bafec11f7e69bcb9fc4ffd8f1bc927d1ddcbbb6ff36dee5ae8b5a9d602",
+      "bytes": 2836
+    },
+    {
+      "file": "mistral-color.svg",
+      "family": "Mistral",
+      "source": "https://raw.githubusercontent.com/lobehub/lobe-icons/8a1b2821bb768c484fe8da20c5e1838b6bf551a9/packages/static-svg/icons/mistral-color.svg",
+      "license": "MIT",
+      "retrieved": "2026-11-04",
+      "sha256": "722f74b289d95486b43662fe24fa883b333701296f618406cd0ed502299170b6",
+      "bytes": 655
     }
   ],
   "lobe_icons_license": {
     "file": "lobe-icons-LICENSE.txt",
     "source": "https://raw.githubusercontent.com/lobehub/lobe-icons/8a1b2821bb768c484fe8da20c5e1838b6bf551a9/LICENSE"
   },
-  "updated": "2026-10-22"
+  "updated": "2026-11-04"
 }

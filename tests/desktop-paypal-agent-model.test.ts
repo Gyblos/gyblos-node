@@ -53,7 +53,7 @@ void test('OpenCode configuration uses an environment variable instead of embedd
   assert.deepEqual(parsed.provider.gyblos.models['synthetic-model'], {
     name: 'synthetic-model',
     tool_call: true,
-    limit: { context: 8192, output: 512 },
+    limit: { context: 16384, output: 512 },
   });
 });
 
@@ -85,7 +85,7 @@ void test('Pi configuration connects to Gyblos without embedding its temporary k
   assert.ok('models' in provider && Array.isArray(provider.models));
   assert.equal(provider.models[0]?.id, 'synthetic-model');
   assert.equal(provider.models[0]?.maxTokens, 512);
-  assert.equal(provider.models[0]?.contextWindow, 8192);
+  assert.equal(provider.models[0]?.contextWindow, 16384);
   assert.equal(provider.models[0]?.reasoning, false);
   assert.deepEqual(provider.models[0]?.input, ['text']);
   assert.ok(provider.models[0]?.compat);
@@ -101,6 +101,7 @@ void test('Codex configuration uses Responses without embedding credentials or a
     model: 'synthetic-model',
   });
   assert.doesNotMatch(config, /synthetic-secret-key/);
+  assert.match(config, /model_context_window = 16384/);
   assert.match(config, /wire_api = "responses"/);
   assert.match(config, /env_key = "GYBLOS_API_KEY"/);
   assert.match(config, /request_max_retries = 0/);
@@ -122,7 +123,7 @@ void test('Claude Code configuration uses a local root URL without embedding cre
   assert.match(config, /ANTHROPIC_AUTH_TOKEN="\$GYBLOS_API_KEY"/);
   assert.match(config, /ANTHROPIC_API_KEY="\$GYBLOS_API_KEY"/);
   assert.match(config, /CLAUDE_CODE_MAX_OUTPUT_TOKENS=512/);
-  assert.match(config, /CLAUDE_CODE_MAX_CONTEXT_TOKENS=8192/);
+  assert.match(config, /CLAUDE_CODE_MAX_CONTEXT_TOKENS=16384/);
   assert.match(config, /CLAUDE_CODE_EFFORT_LEVEL=auto/);
 });
 
@@ -141,7 +142,7 @@ void test('Claude Code PowerShell configuration safely sets the local gateway wi
   assert.match(config, /\$env:ANTHROPIC_API_KEY = \$env:GYBLOS_API_KEY/);
   assert.match(config, /\$env:ANTHROPIC_MODEL = 'synthetic''model'/);
   assert.match(config, /\$env:CLAUDE_CODE_MAX_OUTPUT_TOKENS = '512'/);
-  assert.match(config, /\$env:CLAUDE_CODE_MAX_CONTEXT_TOKENS = '8192'/);
+  assert.match(config, /\$env:CLAUDE_CODE_MAX_CONTEXT_TOKENS = '16384'/);
 });
 
 void test('a confirmed disconnect clears an older stalled status warning', () => {

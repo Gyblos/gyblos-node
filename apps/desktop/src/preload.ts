@@ -41,6 +41,20 @@ contextBridge.exposeInMainWorld('desktopPaypal', {
     parsePaypalResult(
       await ipcRenderer.invoke(DESKTOP_PAYPAL.CHANNEL, request),
     ),
+  onReturn: (listener: () => void) => {
+    const handler = () => listener();
+    ipcRenderer.on(DESKTOP_PAYPAL.RETURN_CHANNEL, handler);
+    return () => {
+      ipcRenderer.removeListener(DESKTOP_PAYPAL.RETURN_CHANNEL, handler);
+    };
+  },
+  onCancel: (listener: () => void) => {
+    const handler = () => listener();
+    ipcRenderer.on(DESKTOP_PAYPAL.CANCEL_CHANNEL, handler);
+    return () => {
+      ipcRenderer.removeListener(DESKTOP_PAYPAL.CANCEL_CHANNEL, handler);
+    };
+  },
 });
 
 contextBridge.exposeInMainWorld('desktopPaypalAgent', {
@@ -48,6 +62,9 @@ contextBridge.exposeInMainWorld('desktopPaypalAgent', {
     parsePaypalAgentResult(
       await ipcRenderer.invoke(DESKTOP_PAYPAL_AGENT.CHANNEL, request),
     ),
+  copy: async (request: unknown) =>
+    (await ipcRenderer.invoke(DESKTOP_PAYPAL_AGENT.COPY_CHANNEL, request)) ===
+    true,
 });
 
 contextBridge.exposeInMainWorld('desktopProbe', {

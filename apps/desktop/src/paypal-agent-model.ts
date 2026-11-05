@@ -6,17 +6,20 @@ import { ROUTES } from '@gyblos/config/paths';
 
 import {
   AGENT_CLIENT,
+  PAYPAL_AGENT_COPY,
   PAYPAL_AGENT_USAGE_STATE,
   type PaypalAgentUsageState,
 } from './constants';
 
 export {
+  PAYPAL_AGENT_COPY,
   PAYPAL_AGENT_USAGE_STATE,
   type PaypalAgentUsageState,
 } from './constants';
 export { createPaypalAgentStatusPoll } from './paypal-agent-poll';
 export const DESKTOP_PAYPAL_AGENT = {
   CHANNEL: 'desktop:paypal-agent',
+  COPY_CHANNEL: 'desktop:paypal-agent-copy',
   TOKEN_BYTES: 32,
   TOKEN_CHARACTERS: 43,
   MODEL_CHARACTERS: 128,
@@ -37,6 +40,9 @@ export const PAYPAL_AGENT_CLIENT = {
 } as const;
 export type PaypalAgentClient =
   (typeof PAYPAL_AGENT_CLIENT)[keyof typeof PAYPAL_AGENT_CLIENT];
+export type PaypalAgentCopyTarget =
+  | PaypalAgentClient
+  | (typeof PAYPAL_AGENT_COPY)[keyof typeof PAYPAL_AGENT_COPY];
 export const PAYPAL_AGENT_ERROR = {
   DENIED: 'denied',
   INVALID: 'invalid',
@@ -76,6 +82,25 @@ export type PaypalAgentResult = {
   } | null;
   error: (typeof PAYPAL_AGENT_ERROR)[keyof typeof PAYPAL_AGENT_ERROR] | null;
 };
+
+export function canCreatePaypalAgent(
+  connection: PaypalAgentResult['connection'],
+  statusUnavailable: boolean,
+  busy: boolean,
+  onlyConnected: boolean,
+) {
+  return !connection && !statusUnavailable && !busy && !onlyConnected;
+}
+export function paypalAgentConnectionLabel(
+  connection: PaypalAgentResult['connection'],
+  busy: boolean,
+  statusUnavailable: boolean,
+) {
+  if (busy) return 'Checking connection';
+  if (statusUnavailable) return 'Connection status unavailable';
+  if (connection?.usageUncertain) return 'Session needs attention';
+  return connection ? 'Local connection active' : 'No local connection';
+}
 export function opencodeConfig(
   connection: Pick<
     NonNullable<PaypalAgentResult['connection']>,
@@ -224,6 +249,27 @@ export function claudeCodePowerShellConfig(
     "$env:CLAUDE_CODE_DISABLE_TERMINAL_TITLE = '1'",
     "$env:CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION = 'false'",
   ].join('\n');
+}
+export function paypalAgentCopyText(
+  connection: NonNullable<PaypalAgentResult['connection']>,
+  target: PaypalAgentCopyTarget,
+) {
+  switch (target) {
+    case PAYPAL_AGENT_COPY.KEY:
+      return connection.key;
+    case PAYPAL_AGENT_COPY.PI_SETTINGS:
+      return piSettings();
+    case PAYPAL_AGENT_COPY.CLAUDE_POWERSHELL:
+      return claudeCodePowerShellConfig(connection);
+    case PAYPAL_AGENT_CLIENT.CODEX:
+      return codexConfig(connection);
+    case PAYPAL_AGENT_CLIENT.PI:
+      return piConfig(connection);
+    case PAYPAL_AGENT_CLIENT.CLAUDE_CODE:
+      return claudeCodeConfig(connection);
+    case PAYPAL_AGENT_CLIENT.OPENCODE:
+      return opencodeConfig(connection);
+  }
 }
 export function retainPaypalAgentStatus(
   previous: PaypalAgentResult,

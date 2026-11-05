@@ -357,6 +357,7 @@ export const PAYPAL_AGENT_REQUEST_LIMITS = {
 export const PAYPAL_SESSION_PHASE = {
   CREATING: 'creating',
   CREATED: 'created',
+  REVIEW: 'review',
   AUTHORIZING: 'authorizing',
   ACTIVE: 'active',
   EXECUTING: 'executing',
@@ -371,5 +372,12 @@ export const PAYPAL_SESSION_STATUS = {
   READY: 'ready',
   BLOCKED: 'blocked',
 } as const;
+export const PAYPAL_SESSION_REVIEW_DECISION = {
+  WAIVE_UNCERTAIN: 'waive-uncertain',
+} as const;
+export const PAYPAL_SESSION_REVIEW_ACTOR = {
+  LOCAL_OPERATOR: 'local-operator-attestation',
+} as const;
+export const PAYPAL_SESSION_REVIEW_ARCHIVE_VERSION = 1;
 export const PAYPAL_SESSION_PREVIOUS_RECORD_VERSION = 2;
 export const PAYPAL_SESSION_RECORD_VERSION = 3;

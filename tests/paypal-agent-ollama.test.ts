@@ -39,7 +39,7 @@ void test('agent adapter preserves history and tool calls through the local Olla
     stream: false,
     truncate: false,
     shift: false,
-    options: { num_ctx: 8192, num_predict: 128 },
+    options: { num_ctx: 16384, num_predict: 128 },
   });
   assert.ok(result && typeof result === 'object' && 'choices' in result);
   assert.deepEqual(result.choices, [
@@ -177,7 +177,7 @@ void test('native agent requests disable context truncation and preserve tool-ca
   assert.ok(
     'options' in sent && sent.options && typeof sent.options === 'object',
   );
-  assert.ok('num_ctx' in sent.options && sent.options.num_ctx === 8192);
+  assert.ok('num_ctx' in sent.options && sent.options.num_ctx === 16384);
   assert.ok('num_predict' in sent.options && sent.options.num_predict === 128);
   assert.ok('messages' in sent && Array.isArray(sent.messages));
   assert.deepEqual(sent.messages[2], {

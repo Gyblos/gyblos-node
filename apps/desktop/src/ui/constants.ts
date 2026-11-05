@@ -52,6 +52,12 @@ export const CONNECTION_TOOLS = [
   AGENT_CLIENT.PI,
   AGENT_CLIENT.OTHER,
 ] as const;
+export const PAYPAL_AGENT_CARDS = [
+  { client: AGENT_CLIENT.CLAUDE_CODE, detail: 'Anthropic’s coding agent' },
+  { client: AGENT_CLIENT.CODEX, detail: 'OpenAI’s coding agent' },
+  { client: AGENT_CLIENT.OPENCODE, detail: 'The open-source coding agent' },
+  { client: AGENT_CLIENT.PI, detail: 'A minimal coding agent' },
+] as const;
 
 export const CHAT_ROLE = { USER: 'user', ASSISTANT: 'assistant' } as const;
 export const BUTTON_VARIANT = {
@@ -150,6 +156,7 @@ export const UI_VIEW = {
 } as const;
 export const UI_DIALOG = {
   BACKUP: 'backup',
+  DESIGN_SYSTEM: 'design-system',
   BUDGET: 'budget',
   ADD_FUNDS: 'add-funds',
 } as const;
@@ -232,6 +239,12 @@ export const MODELS: [CatalogModel, CatalogModel, ...CatalogModel[]] = [
     output: 0.28,
   },
 ];
+
+export const ADDITIONAL_MODEL_ARTWORK = [
+  { prefix: 'claude', image: { src: './assets/models/claude-color.svg' } },
+  { prefix: 'gemini', image: { src: './assets/models/gemini-color.svg' } },
+  { prefix: 'mistral', image: { src: './assets/models/mistral-color.svg' } },
+] as const;
 
 export const MODES = [UI_VIEW.CHAT, UI_VIEW.CONNECT] as const;
 export const MODE_NAV = {

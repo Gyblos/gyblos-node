@@ -1,193 +1,20 @@
 // Guides local agent connections to the existing shared PayPal Sandbox session.
 import { useState } from 'react';
 
-import { PAYPAL_SANDBOX } from '@gyblos/config/constants';
-
 import {
-  claudeCodeConfig,
-  claudeCodePowerShellConfig,
-  codexConfig,
-  DESKTOP_PAYPAL_AGENT,
-  opencodeConfig,
-  PAYPAL_AGENT_ACTION,
   PAYPAL_AGENT_CLIENT,
   PAYPAL_AGENT_USAGE_STATE,
-  piConfig,
-  piSettings,
-  type PaypalAgentAction,
+  paypalAgentConnectionLabel,
   type PaypalAgentClient,
   type PaypalAgentResult,
   type PaypalAgentUsageState,
 } from '../paypal-agent-model';
 import { paypalDollars } from '../paypal-model';
-import { BUTTON_VARIANT } from './constants';
+import { PAYPAL_AGENT_CARDS } from './constants';
 import { usePaypalAgentConnection } from './paypal-agent-connection-hook';
-import { Badge, Button, Note } from './UI';
-
-type Connection = NonNullable<PaypalAgentResult['connection']>;
-type DetailProps = {
-  connection: Connection;
-  client: PaypalAgentClient;
-  busy: boolean;
-  run: (action: PaypalAgentAction) => Promise<void>;
-  copy: (value: string, label: string) => Promise<void>;
-};
-
-function AgentFields({ connection }: { connection: Connection }) {
-  const [showKey, setShowKey] = useState(false);
-  return (
-    <>
-      <label className="connection-field" htmlFor="agent-url">
-        API URL
-        <input
-          id="agent-url"
-          className="full-input"
-          readOnly
-          value={connection.url}
-        />
-      </label>
-      <label className="connection-field" htmlFor="agent-key">
-        API key
-        <input
-          id="agent-key"
-          className="full-input"
-          type={showKey ? 'text' : 'password'}
-          readOnly
-          value={connection.key}
-        />
-      </label>
-      <Button onClick={() => setShowKey((visible) => !visible)}>
-        {showKey ? 'Hide key' : 'Show key'}
-      </Button>
-      <label className="connection-field" htmlFor="agent-model">
-        Model
-        <input
-          id="agent-model"
-          className="full-input"
-          readOnly
-          value={connection.model}
-        />
-      </label>
-    </>
-  );
-}
-
-function clientConfig(client: PaypalAgentClient, connection: Connection) {
-  if (client === PAYPAL_AGENT_CLIENT.CODEX) return codexConfig(connection);
-  if (client === PAYPAL_AGENT_CLIENT.PI) return piConfig(connection);
-  if (client === PAYPAL_AGENT_CLIENT.CLAUDE_CODE)
-    return claudeCodeConfig(connection);
-  return opencodeConfig(connection);
-}
-function AgentActions({ connection, client, busy, run, copy }: DetailProps) {
-  return (
-    <>
-      <div className="connection-actions">
-        <Button
-          onClick={() => {
-            void copy(clientConfig(client, connection), 'Configuration');
-          }}
-        >
-          {client === PAYPAL_AGENT_CLIENT.CLAUDE_CODE
-            ? 'Copy Claude Code bash/zsh configuration'
-            : `Copy ${client} configuration`}
-        </Button>
-        {client === PAYPAL_AGENT_CLIENT.CLAUDE_CODE && (
-          <Button
-            onClick={() => {
-              void copy(
-                claudeCodePowerShellConfig(connection),
-                'PowerShell configuration',
-              );
-            }}
-          >
-            Copy Claude Code PowerShell configuration
-          </Button>
-        )}
-        {client === PAYPAL_AGENT_CLIENT.PI && (
-          <Button
-            onClick={() => {
-              void copy(piSettings(), 'Pi settings');
-            }}
-          >
-            Copy Pi settings
-          </Button>
-        )}
-        <Button
-          onClick={() => {
-            void copy(connection.key, 'API key');
-          }}
-        >
-          Copy API key
-        </Button>
-        <Button
-          disabled={busy}
-          onClick={() => {
-            void run(PAYPAL_AGENT_ACTION.DISCONNECT);
-          }}
-        >
-          Disconnect
-        </Button>
-      </div>
-    </>
-  );
-}
-
-function ClientInstructions({ client }: { client: PaypalAgentClient }) {
-  if (client === PAYPAL_AGENT_CLIENT.CODEX)
-    return (
-      <p className="modal-note">
-        Merge the configuration into your trusted project's .codex/config.toml,
-        set GYBLOS_API_KEY in its environment, then start Codex CLI. This
-        text-only configuration disables web search, multiple agents and image
-        tools, as well as automatic provider retries.
-      </p>
-    );
-  if (client === PAYPAL_AGENT_CLIENT.PI)
-    return (
-      <p className="modal-note">
-        Create a new, private Pi agent directory and set PI_CODING_AGENT_DIR to
-        its path. Save the copied configuration as models.json and the copied
-        settings as settings.json there. Set GYBLOS_API_KEY in that environment
-        and select the Gyblos model. The new directory does not inherit your Pi
-        settings or extensions; project settings can still override it. Pi's
-        estimate does not show Gyblos's fixed per-inference charge; check usage
-        here.
-      </p>
-    );
-  if (client === PAYPAL_AGENT_CLIENT.CLAUDE_CODE)
-    return (
-      <p className="modal-note">
-        Set GYBLOS_API_KEY in your terminal and run the copied environment
-        settings there. Use a new dedicated terminal: the copied settings remain
-        in that terminal until it closes. A starting point is: claude --bare
-        --tools default --append-system-prompt 'Use only required tool
-        parameters unless explicitly needed.' This uses a local non-Claude model
-        and is an experimental gateway configuration.
-      </p>
-    );
-  return (
-    <p className="modal-note">
-      Add the configuration to your project's opencode.json and set
-      GYBLOS_API_KEY in OpenCode's environment. It selects Gyblos and disables
-      automatic titles in that project.
-    </p>
-  );
-}
-function AgentDetails(props: DetailProps) {
-  return (
-    <div className="connection-form">
-      <AgentFields connection={props.connection} />
-      <ClientInstructions client={props.client} />
-      <p className="modal-note">
-        All tools share this connection and session limit. Disconnecting revokes
-        access for all tools. The URL and key change for each PayPal session or
-        when you disconnect.
-      </p>
-      <AgentActions {...props} />
-    </div>
-  );
-}
+import { PaypalAgentSetup } from './PaypalAgentSetup';
+import { ServiceLogo } from './ServiceLogo';
+import { Badge, ChoiceCard } from './UI';
 
 function usageMessage(state: PaypalAgentUsageState) {
   switch (state) {
@@ -231,24 +58,12 @@ function AgentUsage({
           <p>{usageMessage(connection.usageState)}</p>
         ) : (
           <p>
-            Session maximum: {paypalDollars(connection.limitCents)} · Recorded
-            usage: {paypalDollars(connection.spentCents)} · Remaining:{' '}
-            {paypalDollars(connection.limitCents - connection.spentCents)}
+            {paypalDollars(connection.limitCents - connection.spentCents)}{' '}
+            remaining · {paypalDollars(connection.spentCents)} used of{' '}
+            {paypalDollars(connection.limitCents)}
           </p>
         ))}
     </>
-  );
-}
-function RetryDisconnect({ busy, run }: Pick<DetailProps, 'busy' | 'run'>) {
-  return (
-    <Button
-      disabled={busy}
-      onClick={() => {
-        void run(PAYPAL_AGENT_ACTION.DISCONNECT);
-      }}
-    >
-      Retry disconnect
-    </Button>
   );
 }
 function ClientSelector({
@@ -260,20 +75,43 @@ function ClientSelector({
 }) {
   return (
     <div
-      className="connection-actions"
-      role="group"
+      className="ui-choice-grid"
+      role="radiogroup"
       aria-label="Choose an agent"
     >
-      {Object.values(PAYPAL_AGENT_CLIENT).map((item) => (
-        <Button
-          key={item}
-          aria-pressed={client === item}
-          onClick={() => select(item)}
-        >
-          {item}
-        </Button>
+      {PAYPAL_AGENT_CARDS.map((item) => (
+        <ChoiceCard
+          key={item.client}
+          name="paypal-agent-client"
+          title={item.client}
+          description={item.detail}
+          leading={<ServiceLogo service={item.client} />}
+          selected={client === item.client}
+          onSelect={() => select(item.client)}
+          stacked
+        />
       ))}
     </div>
+  );
+}
+function SandboxUsageDetails() {
+  return (
+    <section
+      className="ui-section ui-help-text"
+      aria-label="PayPal Sandbox usage"
+    >
+      <h3 className="ui-subheading">PayPal Sandbox usage</h3>
+      <p>
+        Each completed inference uses the session's rate, even if its response
+        is not delivered. Check the rate in PayPal Chat. One instruction may
+        need several inferences.
+      </p>
+      <p>
+        An inference already started can finish after disconnecting. Identical
+        requests without an operation key may be rejected to prevent a repeated
+        charge. Settle the session in Chat when finished.
+      </p>
+    </section>
   );
 }
 export function PaypalAgentConnection({
@@ -288,62 +126,59 @@ export function PaypalAgentConnection({
   );
   if (onlyConnected && !connection && !statusUnavailable) return null;
   return (
-    <section className="paypal-session" aria-label="Agent sandbox connection">
-      <div className="paypal-session-heading">
-        <strong>Connect an agent</strong>
+    <section
+      className="paypal-agent-page"
+      aria-label="Agent sandbox connection"
+    >
+      <header className="paypal-agent-header">
+        <div>
+          <h2>Connect your agent</h2>
+          <p>Use Gyblos inference in the tools you already work with.</p>
+        </div>
         <Badge>PayPal Sandbox</Badge>
-      </div>
-      <p>
-        Your agent uses the same approved session and local seller as your
-        PayPal chat. Keep Gyblos open while the tool runs.
-      </p>
-      <p>
-        Approve a session in Chat first. Each completed agent inference uses{' '}
-        {paypalDollars(PAYPAL_SANDBOX.messageCents)} of the session limit, even
-        if delivery fails. One instruction can require several inferences. A
-        started inference can finish and count after the agent disconnects.
-        Settle the session in Chat when finished.
-      </p>
-      <p>
-        An identical request without an operation key may be rejected to avoid a
-        repeated charge. Some tools do not send such a key.
-      </p>
-      <ClientSelector client={client} select={setClient} />
-      <AgentUsage
-        connection={connection}
-        statusUnavailable={statusUnavailable || busy}
-      />
-      {!connection && !onlyConnected && (
-        <Button
-          variant={BUTTON_VARIANT.PRIMARY}
-          disabled={busy}
-          onClick={() => {
-            void run(PAYPAL_AGENT_ACTION.CONNECT);
-          }}
-        >
-          Create shared local connection
-        </Button>
-      )}
-      {connection?.usageState ===
-        PAYPAL_AGENT_USAGE_STATE.DISCONNECT_FAILED && (
-        <RetryDisconnect busy={busy} run={run} />
-      )}
-      {connection &&
-        !connection.disconnecting &&
-        connection.usageState !==
-          PAYPAL_AGENT_USAGE_STATE.DISCONNECT_FAILED && (
-          <AgentDetails
-            connection={connection}
-            client={client}
-            busy={busy}
-            run={run}
-            copy={copy}
+      </header>
+      <div className="paypal-agent-session">
+        <div className="paypal-agent-session-copy">
+          <span
+            className="paypal-agent-status-dot"
+            data-connected={
+              !!connection &&
+              !connection.usageUncertain &&
+              !statusUnavailable &&
+              !busy
+            }
+            aria-hidden="true"
           />
-        )}
-      <Note>
-        The agent uses the local {DESKTOP_PAYPAL_AGENT.MODEL} model. Chat keeps
-        its existing model, which must be installed to send chat messages.
-      </Note>
+          <div>
+            <strong>
+              {paypalAgentConnectionLabel(connection, busy, statusUnavailable)}
+            </strong>
+            <AgentUsage
+              connection={connection}
+              statusUnavailable={statusUnavailable || busy}
+            />
+            {!connection && !statusUnavailable && !busy && (
+              <p>A PayPal session in Chat is needed to connect.</p>
+            )}
+          </div>
+        </div>
+        <span className="paypal-agent-rate">Test funds</span>
+      </div>
+      <div className="paypal-agent-section-heading">
+        <h3>Choose an app</h3>
+        <span>One connection, all your agents</span>
+      </div>
+      <ClientSelector client={client} select={setClient} />
+      <PaypalAgentSetup
+        connection={connection}
+        client={client}
+        busy={busy}
+        statusUnavailable={statusUnavailable}
+        run={run}
+        copy={copy}
+        onlyConnected={onlyConnected}
+      />
+      <SandboxUsageDetails />
       {notice && (
         <p className="chat-notice" role="status">
           {notice}

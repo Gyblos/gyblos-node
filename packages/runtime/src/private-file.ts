@@ -177,6 +177,39 @@ export function writePrivateFile(
   });
 }
 
+// Creates a durable audit record without replacing an existing name. A failed or
+// interrupted write is deliberately retained so a later operation cannot retry blindly.
+export function writePrivateFileOnce(
+  path: string,
+  text: string,
+  maxBytes: number,
+): Promise<void> {
+  return guarded(async () => {
+    if (Buffer.byteLength(text) > maxBytes) fail();
+    const parent = await open(
+      dirname(path),
+      constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW,
+    );
+    try {
+      owned(await parent.stat(), FILE_MODES.privateDirectory);
+      const file = await open(path, NEW_FILE, FILE_MODES.privateFile);
+      try {
+        await file.writeFile(text);
+        await file.sync();
+        await sameFile(file, path, maxBytes);
+        const before = await parent.stat();
+        const named = await lstat(dirname(path));
+        if (before.dev !== named.dev || before.ino !== named.ino) fail();
+        if (process.platform !== 'win32') await parent.sync();
+      } finally {
+        await file.close();
+      }
+    } finally {
+      await parent.close();
+    }
+  });
+}
+
 export interface ProcessLock {
   // Fails if the lock file at the path is no longer the one this process holds.
   verify(): Promise<void>;

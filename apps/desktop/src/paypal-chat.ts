@@ -14,7 +14,33 @@ import {
   type PaypalResult,
 } from './paypal-model';
 import type { DesktopPaypalStatus } from './paypal-session';
-import { CHAT_ROLE } from './ui/constants';
+import { CHAT_PREVIEW, CHAT_ROLE } from './ui/constants';
+
+type ScrollViewport = {
+  scrollTop: number;
+  readonly scrollHeight: number;
+  readonly clientHeight: number;
+};
+
+export class PaypalChatScroll {
+  private following = true;
+
+  observe(viewport: ScrollViewport) {
+    this.following =
+      viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight <
+      CHAT_PREVIEW.FOLLOW_THRESHOLD;
+    return this.following;
+  }
+
+  follow(viewport: ScrollViewport) {
+    if (this.following) viewport.scrollTop = viewport.scrollHeight;
+  }
+
+  latest(viewport: ScrollViewport) {
+    this.following = true;
+    this.follow(viewport);
+  }
+}
 
 type Message = {
   role: (typeof CHAT_ROLE)[keyof typeof CHAT_ROLE];
@@ -22,9 +48,11 @@ type Message = {
 };
 type Snapshot = {
   status: DesktopPaypalStatus | null;
+  statusFresh: boolean;
   model: string | null;
   messages: Message[];
   draft: string;
+  pendingPrompt: string | null;
   busy: boolean;
   notice: string;
   pendingMessageId: string | null;
@@ -48,7 +76,11 @@ function failure(result: PaypalResult) {
   if (result.error === PAYPAL_DESKTOP_ERROR.INVALID_PROMPT)
     return 'Shorten the message or remove reserved model control markers, then try again.';
   if (result.error === PAYPAL_DESKTOP_ERROR.NOT_APPROVED)
-    return 'Approve the request in PayPal Sandbox before starting the session.';
+    return result.status?.approvalLinkAvailable
+      ? 'Approve the request in PayPal Sandbox before starting the session.'
+      : 'PayPal has not confirmed approval. If already approved, check again; otherwise abandon this order and start a new session.';
+  if (result.error === PAYPAL_DESKTOP_ERROR.INTERRUPTED)
+    return 'The approval check was interrupted before authorization.';
   if (result.error === PAYPAL_DESKTOP_ERROR.UNAVAILABLE)
     return 'PayPal Sandbox is unavailable. Check its configuration and the local model.';
   return 'The operation could not be confirmed. Check the session before continuing.';
@@ -63,15 +95,21 @@ function needsReview(
 export class PaypalChatController {
   private snapshot: Snapshot = {
     status: null,
+    statusFresh: false,
     model: null,
     messages: [],
     draft: '',
+    pendingPrompt: null,
     busy: false,
     notice: '',
     pendingMessageId: null,
   };
   private readonly listeners = new Set<() => void>();
+  private draftRevision = 0;
   private polling = false;
+  private returnPending = false;
+  private returning = false;
+  private cancellationPending = false;
   constructor(private readonly run: Run) {}
   getSnapshot = () => this.snapshot;
   subscribe = (listener: () => void) => {
@@ -81,6 +119,7 @@ export class PaypalChatController {
     };
   };
   setDraft(draft: string) {
+    this.draftRevision++;
     this.update({ draft });
   }
   private update(values: Partial<Snapshot>) {
@@ -96,15 +135,32 @@ export class PaypalChatController {
   }
   private async command(request: PaypalRequest) {
     if (this.snapshot.busy) return;
-    this.update({ busy: true, notice: '' });
+    const previous = this.snapshot.status;
+    this.update({
+      busy: true,
+      ...(request.action === PAYPAL_ACTION.STATUS ? {} : { notice: '' }),
+    });
     const result = await this.call(request);
+    if (
+      request.action === PAYPAL_ACTION.APPROVE &&
+      result.error &&
+      result.error !== PAYPAL_DESKTOP_ERROR.NOT_APPROVED
+    )
+      this.returnPending = false;
     const notice = result.error
       ? failure(result)
-      : needsReview(result.status, this.snapshot.pendingMessageId)
-        ? 'A prior response awaits confirmation. Review the session.'
-        : '';
+      : request.action === PAYPAL_ACTION.FINISH &&
+          result.status?.phase === PAYPAL_SESSION_PHASE.ACTIVE
+        ? 'Session remains open. No payment was requested.'
+        : needsReview(result.status, this.snapshot.pendingMessageId)
+          ? 'A prior response awaits confirmation. Review the session.'
+          : request.action === PAYPAL_ACTION.STATUS &&
+              result.status?.phase === previous?.phase
+            ? this.snapshot.notice
+            : '';
     this.update({
       status: result.status,
+      statusFresh: result.status !== null,
       model: result.model,
       notice,
       busy: false,
@@ -114,7 +170,50 @@ export class PaypalChatController {
         ? { messages: [], pendingMessageId: null }
         : {}),
     });
+    if (request.action !== PAYPAL_ACTION.COMPLETE_RETURN)
+      await this.consumeReturn();
+    await this.consumeCancellation();
   }
+  private async consumeReturn() {
+    if (!this.returnPending || this.returning || this.snapshot.busy) return;
+    this.returnPending = false;
+    this.returning = true;
+    try {
+      await this.command({ action: PAYPAL_ACTION.COMPLETE_RETURN });
+    } finally {
+      this.returning = false;
+    }
+  }
+  returnedFromPaypal = async () => {
+    if (this.returning || this.returnPending) return;
+    this.returnPending = true;
+    await this.consumeReturn();
+  };
+  private async consumeCancellation() {
+    if (!this.cancellationPending || this.snapshot.busy) return;
+    this.cancellationPending = false;
+    this.update({ busy: true });
+    const result = await this.call({ action: PAYPAL_ACTION.COMPLETE_CANCEL });
+    if (!result.error && !result.status) {
+      this.update({ busy: false });
+      await this.consumeReturn();
+      return;
+    }
+    this.update({
+      status: result.status,
+      statusFresh: result.status !== null,
+      model: result.model,
+      busy: false,
+      notice: result.error
+        ? failure(result)
+        : 'PayPal checkout was cancelled. Abandon this order to start a new session.',
+    });
+    await this.consumeReturn();
+  }
+  cancelledFromPaypal = async () => {
+    this.cancellationPending = true;
+    await this.consumeCancellation();
+  };
   refresh = () => this.command({ action: PAYPAL_ACTION.STATUS });
   async poll() {
     if (this.snapshot.busy || this.polling) return;
@@ -122,17 +221,21 @@ export class PaypalChatController {
     const previous = this.snapshot.status;
     try {
       const result = await this.call({ action: PAYPAL_ACTION.STATUS });
-      if (
-        !result.error &&
-        !this.snapshot.busy &&
-        this.snapshot.status === previous
-      )
-        this.update({ status: result.status, model: result.model });
+      if (!this.snapshot.busy && this.snapshot.status === previous) {
+        if (result.error || !result.status) this.update({ statusFresh: false });
+        else
+          this.update({
+            status: result.status,
+            statusFresh: true,
+            model: result.model,
+          });
+      }
     } finally {
       this.polling = false;
     }
   }
   create = () => {
+    if (!this.snapshot.statusFresh) return Promise.resolve();
     const phase = this.snapshot.status?.phase;
     if (
       phase !== PAYPAL_SESSION_STATUS.READY &&
@@ -143,33 +246,72 @@ export class PaypalChatController {
       return Promise.resolve();
     return this.command({ action: PAYPAL_ACTION.CREATE });
   };
+  startCheckout = async () => {
+    if (!this.snapshot.statusFresh) return;
+    const phase = this.snapshot.status?.phase;
+    if (
+      phase !== PAYPAL_SESSION_STATUS.READY &&
+      phase !== PAYPAL_SESSION_PHASE.COMPLETED &&
+      phase !== PAYPAL_SESSION_PHASE.VOIDED &&
+      phase !== PAYPAL_SESSION_PHASE.CANCELLED
+    )
+      return;
+    await this.create();
+    if (
+      this.snapshot.status?.phase === PAYPAL_SESSION_PHASE.CREATED &&
+      this.snapshot.status.approvalLinkAvailable &&
+      !this.snapshot.notice
+    )
+      await this.openApproval();
+  };
   openApproval = () => {
-    if (this.snapshot.status?.phase !== PAYPAL_SESSION_PHASE.CREATED)
+    if (
+      !this.snapshot.statusFresh ||
+      this.snapshot.status?.phase !== PAYPAL_SESSION_PHASE.CREATED
+    )
       return Promise.resolve();
     return this.command({ action: PAYPAL_ACTION.OPEN });
   };
   approve = () => {
-    if (this.snapshot.status?.phase !== PAYPAL_SESSION_PHASE.CREATED)
+    if (
+      !this.snapshot.statusFresh ||
+      this.snapshot.status?.phase !== PAYPAL_SESSION_PHASE.CREATED
+    )
       return Promise.resolve();
     return this.command({ action: PAYPAL_ACTION.APPROVE });
   };
   abandon = () => {
-    if (this.snapshot.status?.phase !== PAYPAL_SESSION_PHASE.CREATED)
+    if (
+      !this.snapshot.statusFresh ||
+      this.snapshot.status?.phase !== PAYPAL_SESSION_PHASE.CREATED
+    )
       return Promise.resolve();
     return this.command({ action: PAYPAL_ACTION.ABANDON });
   };
   finish = () => {
     if (
+      !this.snapshot.statusFresh ||
       this.snapshot.status?.phase !== PAYPAL_SESSION_PHASE.ACTIVE ||
       this.snapshot.pendingMessageId
     )
       return Promise.resolve();
     return this.command({ action: PAYPAL_ACTION.FINISH });
   };
+  reviewAndSettle = () => {
+    if (
+      !this.snapshot.statusFresh ||
+      this.snapshot.status?.phase !== PAYPAL_SESSION_PHASE.EXECUTING ||
+      this.snapshot.status.spentCents <= 0 ||
+      this.snapshot.pendingMessageId
+    )
+      return Promise.resolve();
+    return this.command({ action: PAYPAL_ACTION.REVIEW_AND_SETTLE });
+  };
   async send() {
     const { status, draft, busy, pendingMessageId } = this.snapshot;
     if (
       busy ||
+      !this.snapshot.statusFresh ||
       pendingMessageId ||
       !draft.trim() ||
       status?.phase !== PAYPAL_SESSION_PHASE.ACTIVE ||
@@ -186,7 +328,8 @@ export class PaypalChatController {
       });
       return;
     }
-    this.update({ busy: true, notice: '' });
+    const draftRevision = this.draftRevision;
+    this.update({ busy: true, notice: '', pendingPrompt: draft, draft: '' });
     const result = await this.call({
       action: PAYPAL_ACTION.SEND,
       prompt: draft,
@@ -198,16 +341,21 @@ export class PaypalChatController {
     ) {
       this.update({
         status: result.status,
+        statusFresh: result.status !== null,
         model: result.model,
         notice: failure(result),
+        draft:
+          this.draftRevision === draftRevision ? draft : this.snapshot.draft,
+        pendingPrompt: null,
         busy: false,
       });
       return;
     }
     this.update({
       status: result.status,
+      statusFresh: true,
       model: result.model,
-      draft: this.snapshot.draft === draft ? '' : this.snapshot.draft,
+      pendingPrompt: null,
       messages: [
         ...this.snapshot.messages,
         { role: CHAT_ROLE.USER, text: draft },
@@ -226,6 +374,7 @@ export class PaypalChatController {
     if (result.error || result.status?.phase !== PAYPAL_SESSION_PHASE.ACTIVE) {
       this.update({
         status: result.status,
+        statusFresh: result.status !== null,
         model: result.model,
         notice:
           'The response arrived but its acknowledgment is pending. Retry acknowledgment only.',
@@ -234,6 +383,7 @@ export class PaypalChatController {
     }
     this.update({
       status: result.status,
+      statusFresh: true,
       model: result.model,
       pendingMessageId: null,
       notice: '',

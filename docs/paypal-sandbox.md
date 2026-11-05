@@ -76,14 +76,18 @@ pnpm desktop:start
 The secret is not echoed. Reuse the same state directory on later runs: it is
 needed to preserve unresolved payment attempts. Use sandbox credentials only. In
 **Settings → Payment method**, select **PayPal Sandbox** and return to **Chat**.
-Selecting a method does not create an order. Create a session, open PayPal,
-approve with the sandbox buyer, and return to the app to start the session. Use
-Chat or connect an agent as described below; close the session explicitly when
-finished to settle it. In the built-in Chat, each message is independent; the
-agent supplies its own conversation context. The selection lasts until the
-desktop app closes; its payment journal persists separately. No live PayPal
-endpoint is used. The optional `PAYPAL_SANDBOX_OLLAMA_ORIGIN` setting chooses a
-different literal loopback Ollama origin.
+Selecting a method does not create an order. Choose **Continue with PayPal**,
+approve with the sandbox buyer in the system browser, and return to Gyblos. A
+matching checkout return prompts the app to verify the order with PayPal and
+start the session automatically. If the return does not arrive, use **Check
+approval and start session**. If the checkout is cancelled, abandon that
+unapproved order before creating a new session. Use Chat or connect an agent as
+described below; close the session explicitly when finished to settle it. In the
+built-in Chat, each message is independent; the agent supplies its own
+conversation context. The selection lasts until the desktop app closes; its
+payment journal persists separately. No live PayPal endpoint is used. The
+optional `PAYPAL_SANDBOX_OLLAMA_ORIGIN` setting chooses a different literal
+loopback Ollama origin.
 
 For a chat-only walkthrough, approve the USD 1.00 limit, send two messages, and
 close the session. The expected capture is USD 0.20; the unspent authorization
@@ -95,10 +99,26 @@ the checkout tab first; a local return address can be reused by another process
 after Gyblos exits. The USDC preview offers **Review PayPal session** after a
 restart. Do not use a checkout tab opened before restarting: its local return
 address belonged to the previous process. If the order was already approved,
-select **I approved · start session**; the app checks PayPal directly. Otherwise
-abandon the un-authorized order and create a new one. Existing sessions can be
-reviewed and settled while Ollama is unavailable; creating a session requires at
-least one of the configured models to be ready.
+select **Check approval and start session**; the app checks PayPal directly.
+Otherwise abandon the un-authorized order and create a new one. Existing
+sessions can be reviewed and settled while Ollama is unavailable; creating a
+session requires at least one of the configured models to be ready. Restored
+sessions cannot connect agents, even if an already approved order is started
+after a restart. Settle the session and create a new one first.
+
+The return page is only a local signal, not proof of payment approval. Before
+authorization, Gyblos checks the matching order, request reference, intent,
+amount and currency with PayPal. A missing or contradictory response stops the
+flow for review, and the local journal blocks new orders until the situation is
+reconciled. Another authorized merchant client could still change the order
+between that check and the authorization request; the local journal does not
+lock PayPal against external changes. Do not modify the order from another
+merchant client while the session is starting.
+
+Direct adapter consumers must pass the same order ID and request ID to
+`isApproved` and `authorize`. A successful approval check reserves a private,
+single-use token for that pair; an authorization without that matching check
+fails before the payment request. This changes the earlier adapter contract.
 
 The USDC chat and its Connect entries are previews. The PayPal Connect entry
 provides the local agent integrations described below. A PayPal authorization is
@@ -131,7 +151,11 @@ opencode
 ```
 
 The copied OpenCode configuration uses `{env:GYBLOS_API_KEY}` rather than
-embedding the key.
+embedding the key. Enabled tool schemas support minimum string length, minimum
+array length and anchored literal prefixes such as `^ses`, with ASCII letters,
+digits, underscores or hyphens after `^`. Other patterns are rejected before
+inference. These constraints are checked locally on the model's tool calls; an
+invalid result after dispatch leaves the session blocked for review.
 
 For PowerShell, enter the key without placing it in the shell history:
 
@@ -260,10 +284,14 @@ fields or capabilities are rejected before inference. To support the clients,
 the adapter accepts but ignores Anthropic cache hints and metadata, as well as
 Responses cache keys, client metadata, `reasoning.summary: auto` and the request
 to include encrypted reasoning. It provides no cached tokens or reasoning
-content through these fields. The agent configuration declares an 8,192-token
-context and a 512-token output maximum. The engine has a 90-second generation
-timeout, and a session allows at most 30 attempts, even when the spending limit
-has not been reached.
+content through these fields. The agent configuration declares a 16,384-token
+context and a 512-token output maximum. Instructions, tools, conversation and
+output share that context. Larger contexts can use more memory and take longer;
+the model and hardware determine whether a request completes. Configurations
+copied before this change do not update automatically; copy and apply the
+updated configuration when it is safe to do so. The engine has a 90-second
+generation timeout, and a session allows at most 30 attempts, even when the
+spending limit has not been reached.
 
 The separate browser demonstration is still available with
 `pnpm paypal:sandbox`. It prints a private local session link; do not share that
@@ -271,10 +299,13 @@ link. Its optional `PAYPAL_SANDBOX_PORT` setting chooses a local port. Do not
 run two processes using the same state directory at the same time.
 
 The session accepts new messages for 30 minutes after authorization, but the
-buyer must explicitly close it; leaving the page does not capture or void it.
-Closing a partially used session captures the recorded usage. PayPal controls
-the timing of release of any remaining hold, and an authorization can expire or
-be revoked before capture.
+buyer must explicitly close it; leaving the page does not capture or void it. In
+the desktop app, **Review and close session** opens a native confirmation
+showing the recorded amount. Confirming attempts to capture that amount, or void
+an unused authorization. Cancelling leaves the session open. PayPal controls the
+timing of release of any remaining hold, and an authorization can expire or be
+revoked before capture. If the session status is unavailable, check it before
+continuing.
 
 The journal stores payment IDs, the approved currency and prices, accumulated
 cents, phase, and digests of requests and optional idempotency keys, not prompts
@@ -284,12 +315,28 @@ An unacknowledged chat response blocks further chat and agent inference as well
 as settlement. A completed agent inference does not require acknowledgment. An
 interrupted inference, lost acknowledgment, uncertain payment, or storage
 failure can block the session; do not remove the journal or lock to bypass this
-state. There is no automatic payment reconciliation UI. A previous unfinished
-single-request journal also blocks a new session. An order that has not been
-authorized may be abandoned from the page. A crash can still lose a response or
-its acknowledgment; when the page has received a response, it can retry
-acknowledgment without charging twice. A buyer who receives a response but
-withholds acknowledgment can block settlement, including earlier usage.
-Acknowledgment does not prove delivery exactly once. The prompt digest can be
-checked against guesses by anyone able to read the private journal. This
-prototype is not safe for live money or distribution.
+state. Desktop offers a manual review for an interrupted inference when earlier
+usage is recorded. An operator authorized for both parties may waive the
+uncertain attempt and confirm capture of the recorded usage in a native dialog.
+The app checks the exact order and authorization with PayPal, archives the local
+decision, then attempts one final capture. Its private audit files retain the
+session snapshot, request digests, decision and capture result; they contain no
+prompt or response. A failed or ambiguous step stays blocked and is not retried
+automatically. This flow cannot reconcile a capture that was already dispatched
+and lost its response. The confirmation and local lease apply to Desktop and
+this adapter instance only: an external merchant client can still race the
+provider checks. The operator must ensure no other operation is in progress. The
+file writes do not guarantee recovery from every power loss or incomplete
+restore, including simultaneous loss of the journal update and audit files; it
+also does not scan historical audit files for later loss or tampering. Do not
+treat this prototype as exactly-once settlement. Older readers do not recognize
+a reviewed record's marker and fail closed. The status check otherwise reads
+local state. A previous unfinished single-request journal also blocks a new
+session. A CREATED order that does not need review may be abandoned from the
+page. Older versions do not recognize the REVIEW journal phase and cannot resume
+it. A crash can still lose a response or its acknowledgment; when the page has
+received a response, it can retry acknowledgment without charging twice. A buyer
+who receives a response but withholds acknowledgment can block settlement,
+including earlier usage. Acknowledgment does not prove delivery exactly once.
+The prompt digest can be checked against guesses by anyone able to read the
+private journal. This prototype is not safe for live money or distribution.

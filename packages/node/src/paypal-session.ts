@@ -1,16 +1,18 @@
 // Coordinates one sandbox authorization and a bounded sequence of independent inferences.
 // The durable journal contains payment metadata only; ambiguous effects remain blocked.
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 
 import { PAYPAL_SANDBOX } from '@gyblos/config/constants';
 import { PAYPAL_ERROR_CODES } from '@gyblos/protocol/constants';
-import { isPaypalId, PaypalError } from '@gyblos/protocol/paypal-payment';
+import {
+  isPaypalId,
+  isPaypalReturnState,
+  PaypalError,
+} from '@gyblos/protocol/paypal-payment';
 
 import {
-  PAYPAL_REQUEST_LIMITS,
   PAYPAL_SESSION_RECORD_VERSION,
   PAYPAL_SESSION_PHASE as PHASE,
-  PAYPAL_SESSION_STATUS as STATUS,
 } from './constants';
 import {
   checkAgentOperation,
@@ -22,59 +24,31 @@ import {
   preparePaypalAgentRequest,
   validatePaypalAgentResult,
 } from './paypal-agent-validation';
-import type { PaypalInferenceDependencies } from './paypal-inference';
 import {
   parsePaypalSessionState,
+  paypalSessionIsTerminal,
   type PaypalSessionRecord,
 } from './paypal-session-record';
+import {
+  paypalReviewTicket,
+  settlePaypalReviewedInference,
+} from './paypal-session-review';
+import {
+  paypalPromptDigest,
+  paypalSessionStatus,
+  type PaypalSessionDependencies,
+} from './paypal-session-support';
 
 export type { PaypalSessionRecord } from './paypal-session-record';
 type Phase = (typeof PHASE)[keyof typeof PHASE];
-
-export interface PaypalSessionDependencies {
-  payment: PaypalInferenceDependencies['payment'];
-  engine: PaypalInferenceDependencies['engine'];
-  validateRequest?: PaypalInferenceDependencies['validateRequest'];
-  agentEngine?: {
-    model: string;
-    validate?(input: unknown): void;
-    generate(input: unknown, signal?: AbortSignal): Promise<unknown>;
-  };
-  journal: {
-    read(): Promise<unknown>;
-    write(value: PaypalSessionRecord): Promise<void>;
-  };
-}
-
+export type { PaypalReviewJournal } from './paypal-session-review';
+export type { PaypalWaiverArchive } from './paypal-session-review';
+export type { PaypalSessionDependencies } from './paypal-session-support';
 function fail(
   code: (typeof PAYPAL_ERROR_CODES)[keyof typeof PAYPAL_ERROR_CODES],
 ): never {
   throw new PaypalError(code);
 }
-function hasPhase(phase: Phase, values: readonly Phase[]) {
-  return values.includes(phase);
-}
-function promptDigest(prompt: string, maxTokens: number) {
-  if (
-    typeof prompt !== 'string' ||
-    !prompt.trim() ||
-    Buffer.byteLength(prompt, 'utf8') > PAYPAL_REQUEST_LIMITS.promptBytes ||
-    !Number.isSafeInteger(maxTokens) ||
-    maxTokens < 1 ||
-    maxTokens > PAYPAL_REQUEST_LIMITS.maxTokens
-  )
-    return fail(PAYPAL_ERROR_CODES.INVALID_REQUEST);
-  return createHash('sha256')
-    .update(JSON.stringify({ prompt, maxTokens }))
-    .digest('hex');
-}
-function terminal(record: PaypalSessionRecord | null) {
-  return (
-    !record ||
-    hasPhase(record.phase, [PHASE.COMPLETED, PHASE.VOIDED, PHASE.CANCELLED])
-  );
-}
-
 class PaypalSession {
   private busy = false;
   private journalFailed = false;
@@ -82,56 +56,55 @@ class PaypalSession {
     private readonly deps: PaypalSessionDependencies,
     private active: PaypalSessionRecord | null,
     private readonly legacyBlocked: boolean,
+    private readonly exclusiveJournal: boolean,
   ) {}
-  private async save(value: PaypalSessionRecord) {
+  private get unavailable() {
+    return (
+      this.busy ||
+      this.journalFailed ||
+      this.legacyBlocked ||
+      this.deps.journal.isReviewSealed?.() === true
+    );
+  }
+  private async save(
+    value: PaypalSessionRecord,
+    write?: (value: PaypalSessionRecord) => Promise<void>,
+  ) {
     this.active = value;
     try {
-      await this.deps.journal.write(value);
+      if (write) await write(value);
+      else await this.deps.journal.write(value);
     } catch (error) {
       this.journalFailed = true;
       throw error;
     }
   }
+  private async interruptApproval(record: PaypalSessionRecord): Promise<never> {
+    this.deps.payment.discardApproval?.();
+    await this.save(record);
+    return fail(PAYPAL_ERROR_CODES.INTERRUPTED);
+  }
   private check(phase: Phase) {
-    if (
-      this.busy ||
-      this.journalFailed ||
-      this.legacyBlocked ||
-      !this.active ||
-      this.active.phase !== phase
-    )
+    if (this.unavailable || !this.active || this.active.phase !== phase)
       return fail(PAYPAL_ERROR_CODES.NEEDS_RECONCILIATION);
     return this.active;
   }
   status() {
-    return {
-      phase:
-        this.journalFailed || this.legacyBlocked
-          ? STATUS.BLOCKED
-          : (this.active?.phase ?? STATUS.READY),
-      spentCents: this.active?.spentCents ?? 0,
-      limitCents: PAYPAL_SANDBOX.limitCents,
-      messageCents: PAYPAL_SANDBOX.messageCents,
-      orderId: this.active?.orderId,
-      remainingAttempts:
-        PAYPAL_SANDBOX.maxMessageAttempts -
-        (this.active?.attemptIds.length ?? 0),
-      expired:
-        this.active?.expiresAt !== undefined &&
-        Date.now() >= this.active.expiresAt,
-    };
+    return paypalSessionStatus(
+      this.active,
+      this.journalFailed,
+      this.legacyBlocked || this.deps.journal.isReviewSealed?.() === true,
+    );
   }
-  async create() {
-    if (
-      this.busy ||
-      this.journalFailed ||
-      this.legacyBlocked ||
-      !terminal(this.active)
-    )
+  async create(returnState?: string) {
+    if (returnState !== undefined && !isPaypalReturnState(returnState))
+      return fail(PAYPAL_ERROR_CODES.INVALID_REQUEST);
+    if (this.unavailable || !paypalSessionIsTerminal(this.active))
       return fail(PAYPAL_ERROR_CODES.NEEDS_RECONCILIATION);
     this.busy = true;
     try {
-      await this.deps.payment.prepare?.();
+      const { payment } = this.deps;
+      await payment.prepare?.();
       const record: PaypalSessionRecord = {
         version: PAYPAL_SESSION_RECORD_VERSION,
         phase: PHASE.CREATING,
@@ -146,7 +119,7 @@ class PaypalSession {
         agentCompletions: [],
       };
       await this.save(record);
-      const order = await this.deps.payment.create(record.requestId);
+      const order = await payment.create(record.requestId, returnState);
       await this.save({
         ...record,
         phase: PHASE.CREATED,
@@ -168,18 +141,33 @@ class PaypalSession {
       this.busy = false;
     }
   }
-  async approve(orderId: string) {
+  async approve(
+    orderId: string,
+    mayAuthorize?: () => boolean,
+    onDispatch?: () => void,
+  ) {
     const record = this.check(PHASE.CREATED);
     if (record.orderId !== orderId)
       return fail(PAYPAL_ERROR_CODES.INVALID_REQUEST);
     this.busy = true;
     try {
-      if (!this.deps.payment.isApproved)
-        return fail(PAYPAL_ERROR_CODES.INVALID_CONFIG);
-      if (!(await this.deps.payment.isApproved(orderId)))
+      const { payment } = this.deps;
+      if (!payment.isApproved) return fail(PAYPAL_ERROR_CODES.INVALID_CONFIG);
+      await this.save({ ...record, phase: PHASE.REVIEW });
+      if (mayAuthorize && !mayAuthorize())
+        return await this.interruptApproval(record);
+      const approved = await payment.isApproved(orderId, record.requestId);
+      if (mayAuthorize && !mayAuthorize())
+        return await this.interruptApproval(record);
+      if (!approved) {
+        await this.save(record);
         return fail(PAYPAL_ERROR_CODES.NOT_APPROVED);
+      }
       await this.save({ ...record, phase: PHASE.AUTHORIZING });
-      const authorization = await this.deps.payment.authorize(orderId);
+      if (mayAuthorize && !mayAuthorize())
+        return await this.interruptApproval(record);
+      onDispatch?.();
+      const authorization = await payment.authorize(orderId, record.requestId);
       await this.save({
         ...record,
         ...authorization,
@@ -188,7 +176,11 @@ class PaypalSession {
       });
       return this.status();
     } finally {
-      this.busy = false;
+      try {
+        this.deps.payment.discardApproval?.();
+      } finally {
+        this.busy = false;
+      }
     }
   }
   private async runMessage<T>(
@@ -213,7 +205,9 @@ class PaypalSession {
     )
       return fail(PAYPAL_ERROR_CODES.INVALID_REQUEST);
     this.busy = true;
+    let finishExecution = () => {};
     try {
+      finishExecution = this.deps.journal.startExecution?.() ?? finishExecution;
       if (agent) checkAgentOperation(record, digest, agent);
       validate();
       signal?.throwIfAborted();
@@ -256,6 +250,7 @@ class PaypalSession {
       }
       return { output, messageId };
     } finally {
+      finishExecution();
       this.busy = false;
     }
   }
@@ -266,7 +261,7 @@ class PaypalSession {
     messageId: string,
     signal?: AbortSignal,
   ) {
-    const digest = promptDigest(prompt, maxTokens);
+    const digest = paypalPromptDigest(prompt, maxTokens);
     const result = await this.runMessage(
       orderId,
       messageId,
@@ -313,9 +308,7 @@ class PaypalSession {
   }
   async acknowledge(orderId: string, messageId: string) {
     if (
-      !this.busy &&
-      !this.journalFailed &&
-      !this.legacyBlocked &&
+      !this.unavailable &&
       this.active?.phase === PHASE.ACTIVE &&
       this.active.orderId === orderId &&
       this.active.acknowledgedIds.includes(messageId)
@@ -366,8 +359,42 @@ class PaypalSession {
       this.busy = false;
     }
   }
+  reviewTicket = () => paypalReviewTicket(this.check(PHASE.EXECUTING));
+  async settleReviewedInference(
+    orderId: string,
+    confirmedCents: number,
+    fingerprint: string,
+    decidedAt: number,
+  ) {
+    const record = this.check(PHASE.EXECUTING);
+    this.busy = true;
+    try {
+      await settlePaypalReviewedInference({
+        record,
+        orderId,
+        confirmedCents,
+        fingerprint,
+        decidedAt,
+        exclusiveJournal: this.exclusiveJournal,
+        payment: this.deps.payment,
+        journal: this.deps.journal,
+        save: (value, write) => this.save(value, write),
+      });
+      return this.status();
+    } finally {
+      this.busy = false;
+    }
+  }
 }
 export async function createPaypalSession(deps: PaypalSessionDependencies) {
-  const state = parsePaypalSessionState(await deps.journal.read());
-  return new PaypalSession(deps, state.record, state.legacyBlocked);
+  const owned = deps.journal.claimSession?.();
+  const exclusiveJournal = owned !== undefined;
+  const journal = owned ?? deps.journal;
+  const state = parsePaypalSessionState(await journal.read());
+  return new PaypalSession(
+    { ...deps, journal },
+    state.record,
+    state.legacyBlocked,
+    exclusiveJournal,
+  );
 }

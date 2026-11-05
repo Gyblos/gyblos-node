@@ -21,6 +21,7 @@ export const RETRIES = {
 
 export const HTTP_STATUS = {
   ok: 200,
+  created: 201,
   unauthorized: 401,
   paymentRequired: 402,
   forbidden: 403,
@@ -92,6 +93,6 @@ export const INFERENCE_REQUEST_LIMITS = {
 } as const;
 
 export const SANDBOX_AGENT_LIMITS = {
-  contextTokens: 8192,
+  contextTokens: 16384,
   maxOutputTokens: 512,
 } as const;

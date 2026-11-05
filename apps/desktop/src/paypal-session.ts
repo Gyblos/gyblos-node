@@ -1,5 +1,5 @@
 // Keeps sandbox order details in the host and serializes desktop session operations.
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 
 import { PAYPAL_SANDBOX } from '@gyblos/config/constants';
 import {
@@ -7,13 +7,19 @@ import {
   PAYPAL_SESSION_PHASE,
 } from '@gyblos/node/constants';
 import type { createPaypalSession } from '@gyblos/node/paypal-session';
-import { PAYPAL_ERROR_CODES } from '@gyblos/protocol/constants';
+import {
+  PAYPAL_ERROR_CODES,
+  PAYPAL_RETURN_STATE_BYTES,
+} from '@gyblos/protocol/constants';
 import { PaypalError } from '@gyblos/protocol/paypal-payment';
 
 import {
   PAYPAL_AGENT_ERROR,
   PaypalAgentConnectionError,
 } from './paypal-agent-model';
+import { desktopPaypalFinishActions } from './paypal-finish';
+import { DesktopPaypalReturns, type PaypalReturn } from './paypal-return';
+import { desktopPaypalReviewActions } from './paypal-review';
 
 type PaypalSession = Awaited<ReturnType<typeof createPaypalSession>>;
 export type DesktopPaypalStatus = Omit<
@@ -85,6 +91,7 @@ function serialOperations() {
   return {
     run,
     isBusy: () => busy,
+    isClosing: () => closing,
     async close() {
       closing = true;
       await pending;
@@ -119,16 +126,6 @@ async function prepareModels(options: DesktopPaypalSessionOptions) {
   if (!chatReady && !agentReady)
     throw new Error('No sandbox model is available.');
   return agentReady;
-}
-
-async function openApproval(
-  session: PaypalSession,
-  approvalUrl: string | undefined,
-  openExternal: (url: string) => Promise<void>,
-) {
-  if (session.status().phase !== PAYPAL_SESSION_PHASE.CREATED || !approvalUrl)
-    throw new Error('Sandbox approval link is unavailable.');
-  await openExternal(sandboxApproval(approvalUrl));
 }
 
 function sendChat(session: PaypalSession, id: string, prompt: string) {
@@ -209,52 +206,164 @@ function currentOrderId(session: PaypalSession) {
   return id;
 }
 
+type CheckoutState = {
+  approvalUrl: string | undefined;
+  opened: boolean;
+  checking: boolean;
+};
+export type CheckoutContext = {
+  session: PaypalSession;
+  openExternal: (url: string) => Promise<void>;
+  options: DesktopPaypalSessionOptions;
+  agent: AgentReadiness;
+  state: CheckoutState;
+  returns: DesktopPaypalReturns;
+  run: ReturnType<typeof serialOperations>['run'];
+  isClosing: () => boolean;
+  orderId: () => string;
+  status: () => DesktopPaypalStatus;
+};
+
+async function checkApproval(context: CheckoutContext, orderId: string) {
+  context.state.checking = true;
+  try {
+    await context.session.approve(
+      orderId,
+      () => !context.isClosing() && !context.returns.hasCancellation(),
+      () => {
+        context.state.checking = false;
+      },
+    );
+  } finally {
+    context.state.checking = false;
+  }
+}
+
+function checkoutEntryActions(context: CheckoutContext) {
+  return {
+    create: () =>
+      context.run(async () => {
+        const agentReady = await prepareModels(context.options);
+        const state = randomBytes(PAYPAL_RETURN_STATE_BYTES).toString(
+          'base64url',
+        );
+        const order = await context.session.create(state);
+        context.returns.start(state, order.orderId);
+        context.agent.prepared = agentReady;
+        context.agent.unavailable = !agentReady;
+        context.agent.scope = agentReady ? randomUUID() : undefined;
+        context.state.approvalUrl = order.approvalUrl;
+        return context.status();
+      }),
+    openApproval: () =>
+      context.run(async () => {
+        if (
+          context.session.status().phase !== PAYPAL_SESSION_PHASE.CREATED ||
+          !context.state.approvalUrl
+        )
+          throw new Error('Sandbox approval link is unavailable.');
+        context.state.opened = true;
+        context.returns.open();
+        await context.openExternal(sandboxApproval(context.state.approvalUrl));
+      }),
+    approve: () =>
+      context.run(async () => {
+        try {
+          await checkApproval(context, context.orderId());
+        } catch (error) {
+          if (
+            !context.returns.hasCancellation() &&
+            !(
+              error instanceof PaypalError &&
+              error.code === PAYPAL_ERROR_CODES.NOT_APPROVED
+            )
+          ) {
+            context.returns.disarm();
+            context.state.approvalUrl = undefined;
+          }
+          throw error;
+        }
+        context.returns.disarm();
+        context.state.approvalUrl = undefined;
+        return context.status();
+      }),
+  };
+}
+
+function checkoutReturnActions(context: CheckoutContext) {
+  return {
+    noteApprovedReturn(value: PaypalReturn) {
+      return context.returns.approve(value);
+    },
+    noteCancelledReturn(value: PaypalReturn) {
+      if (!context.returns.cancel(value)) return false;
+      context.state.approvalUrl = undefined;
+      return true;
+    },
+    consumeApprovedReturn: () =>
+      context.run(async () => {
+        const pending = context.returns.take();
+        if (!pending) return context.status();
+        try {
+          await checkApproval(context, pending);
+        } finally {
+          if (!context.returns.hasCancellation()) context.returns.disarm();
+          context.state.approvalUrl = undefined;
+        }
+        return context.status();
+      }),
+    consumeCancelledReturn: () =>
+      context.run(async () => context.returns.takeCancellation()),
+  };
+}
+
 export function createDesktopPaypalSession(
   session: PaypalSession,
   openExternal: (url: string) => Promise<void>,
   options: DesktopPaypalSessionOptions = {},
 ) {
-  let approvalUrl: string | undefined;
   let awaitingAcknowledgement = false;
-  let checkoutOpened = false;
   const agent: AgentReadiness = {
     prepared: false,
     unavailable: false,
     scope: undefined,
   };
-  const { run, close, isBusy } = serialOperations();
+  const state: CheckoutState = {
+    approvalUrl: undefined,
+    opened: false,
+    checking: false,
+  };
+  const { run, close, isBusy, isClosing } = serialOperations();
+  const returns = new DesktopPaypalReturns(
+    session,
+    isClosing,
+    () => state.checking,
+  );
   const orderId = () => currentOrderId(session);
-  const status = () => visibleStatus(session, approvalUrl);
+  const status = () => visibleStatus(session, state.approvalUrl);
   const checkAgent = agentCheck(
     options,
     () => agent.prepared,
     () => agent.unavailable,
   );
+  const checkout: CheckoutContext = {
+    session,
+    openExternal,
+    options,
+    agent,
+    state,
+    returns,
+    run,
+    isClosing,
+    orderId,
+    status,
+  };
   return {
     status,
     isBusy,
-    isCloseBlocked: () => isBusy() || awaitingAcknowledgement || checkoutOpened,
-    create: () =>
-      run(async () => {
-        const agentReady = await prepareModels(options);
-        const order = await session.create();
-        agent.prepared = agentReady;
-        agent.unavailable = !agentReady;
-        agent.scope = agentReady ? randomUUID() : undefined;
-        approvalUrl = order.approvalUrl;
-        return status();
-      }),
-    openApproval: () =>
-      run(async () => {
-        await openApproval(session, approvalUrl, openExternal);
-        checkoutOpened = true;
-      }),
-    approve: () =>
-      run(async () => {
-        await session.approve(orderId());
-        approvalUrl = undefined;
-        return status();
-      }),
+    isCloseBlocked: () => isBusy() || awaitingAcknowledgement || state.opened,
+    ...checkoutEntryActions(checkout),
+    ...checkoutReturnActions(checkout),
     send: (prompt: string) =>
       run(async () => {
         await options.checkEngine?.();
@@ -270,17 +379,14 @@ export function createDesktopPaypalSession(
         awaitingAcknowledgement = false;
         return status();
       }),
-    finish: () =>
-      run(async () => {
-        await session.finish(orderId());
-        clearAgent(agent);
-        return status();
-      }),
+    ...desktopPaypalFinishActions(checkout, () => clearAgent(agent)),
+    ...desktopPaypalReviewActions(checkout, () => clearAgent(agent)),
     abandon: () =>
       run(async () => {
         await session.cancel(orderId());
         clearAgent(agent);
-        approvalUrl = undefined;
+        returns.disarm();
+        state.approvalUrl = undefined;
         return status();
       }),
     close,

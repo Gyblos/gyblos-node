@@ -17,15 +17,15 @@ import {
   paypalAgentStatusUnavailable,
   retainPaypalAgentStatus,
   type PaypalAgentAction,
+  type PaypalAgentCopyTarget,
   type PaypalAgentResult,
 } from '../paypal-agent-model';
-import { writeClipboardText } from './clipboard';
-import { COPY_RESULT } from './constants';
 
 declare global {
   interface Window {
     desktopPaypalAgent?: {
       run(request: { action: PaypalAgentAction }): Promise<PaypalAgentResult>;
+      copy?(request: { target: PaypalAgentCopyTarget }): Promise<boolean>;
     };
   }
 }
@@ -104,7 +104,7 @@ export function usePaypalAgentConnection() {
   });
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
-  const [statusUnavailable, setStatusUnavailable] = useState(false);
+  const [statusUnavailable, setStatusUnavailable] = useState(true);
   const busyRef = useRef(false);
   const sequence = useRef(0);
   const mounted = useRef(false);
@@ -154,14 +154,16 @@ export function usePaypalAgentConnection() {
       if (mounted.current) setBusy(false);
     }
   }
-  async function copy(value: string, label: string) {
+  async function copy(target: PaypalAgentCopyTarget, label: string) {
     if (!connection) return;
-    const copied = await writeClipboardText(value, navigator.clipboard);
+    const copied = await window.desktopPaypalAgent
+      ?.copy?.({ target })
+      .catch(() => false);
     if (mounted.current)
       setNotice(
-        copied === COPY_RESULT.COPIED
+        copied
           ? `${label} copied.`
-          : 'Clipboard unavailable. Copy the values below.',
+          : 'Could not copy. Check the connection and try again.',
       );
   }
   return { connection, busy, notice, statusUnavailable, run, copy };

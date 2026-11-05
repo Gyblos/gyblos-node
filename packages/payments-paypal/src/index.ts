@@ -1,10 +1,21 @@
 // PayPal Sandbox direct-merchant REST adapter; it cannot access live PayPal or an inference engine.
-import { randomUUID } from 'node:crypto';
-
+import { HTTP_STATUS } from '@gyblos/config/limits';
 import { PAYPAL_ERROR_CODES } from '@gyblos/protocol/constants';
-import { isPaypalId, PaypalError } from '@gyblos/protocol/paypal-payment';
+import {
+  isPaypalId,
+  isPaypalReturnState,
+  PaypalError,
+} from '@gyblos/protocol/paypal-payment';
 
-import { PAYPAL_API } from './constants';
+import {
+  PAYPAL_API,
+  PAYPAL_AUTHORIZATION_STATUS,
+  PAYPAL_ORDER_INTENT,
+  PAYPAL_ORDER_STATUS,
+} from './constants';
+import { managedPaypalOperations } from './managed-operations';
+import { createPaypalReviewAccess } from './review';
+import { transport, type SandboxOptions } from './transport';
 
 function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value))
@@ -29,85 +40,29 @@ function correctAmount(
   );
 }
 
-interface SandboxOptions {
-  clientId: string;
-  clientSecret: string;
-  returnOrigin: string;
-  fetch?: typeof fetch;
+function confirmedVoid(value: unknown, authorizationId: string): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const data = Object.fromEntries(Object.entries(value));
+  if (data.id !== authorizationId || data.status !== 'VOIDED') return false;
+  if (data.amount === undefined) return true;
+  if (
+    !data.amount ||
+    typeof data.amount !== 'object' ||
+    Array.isArray(data.amount)
+  )
+    return false;
+  return correctAmount(data.amount);
 }
 
-function transport(options: SandboxOptions) {
-  if (!options.clientId || !options.clientSecret)
-    throw new PaypalError(PAYPAL_ERROR_CODES.INVALID_CONFIG);
-  const fetchImpl = options.fetch ?? fetch;
-  let preparedToken: string | undefined;
-  async function token(): Promise<string> {
-    const credentials = Buffer.from(
-      `${options.clientId}:${options.clientSecret}`,
-    ).toString('base64');
-    const response = await fetchImpl(`${PAYPAL_API.origin}/v1/oauth2/token`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Basic ${credentials}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: 'grant_type=client_credentials',
-      redirect: 'error',
-      signal: AbortSignal.timeout(PAYPAL_API.timeoutMs),
-    });
-    if (!response.ok) throw new PaypalError(PAYPAL_ERROR_CODES.UNAVAILABLE);
-    const data = object(await response.json());
-    if (typeof data.access_token !== 'string' || !data.access_token)
-      throw new PaypalError(PAYPAL_ERROR_CODES.INVALID_RESPONSE);
-    return data.access_token;
-  }
-  async function post(
-    path: string,
-    body?: unknown,
-    requiredStatus?: number,
-    requestId?: string,
-  ): Promise<unknown> {
-    const accessToken = preparedToken ?? (await token());
-    preparedToken = undefined;
-    const response = await fetchImpl(`${PAYPAL_API.origin}${path}`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-        Prefer: 'return=representation',
-        'PayPal-Request-Id': requestId ?? randomUUID(),
-      },
-      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-      redirect: 'error',
-      signal: AbortSignal.timeout(PAYPAL_API.timeoutMs),
-    });
-    if (
-      !response.ok ||
-      (requiredStatus !== undefined && response.status !== requiredStatus)
-    )
-      throw new PaypalError(PAYPAL_ERROR_CODES.UNRESOLVED);
-    if (response.status === PAYPAL_API.noContent) return null;
-    return response.json();
-  }
-  async function prepare() {
-    preparedToken = await token();
-  }
-  async function get(path: string): Promise<unknown> {
-    const accessToken = await token();
-    const response = await fetchImpl(`${PAYPAL_API.origin}${path}`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-      redirect: 'error',
-      signal: AbortSignal.timeout(PAYPAL_API.timeoutMs),
-    });
-    if (!response.ok) throw new PaypalError(PAYPAL_ERROR_CODES.UNRESOLVED);
-    return response.json();
-  }
-  return { post, prepare, get };
-}
-
-function parseCreatedOrder(value: unknown) {
+function parseCreatedOrder(value: unknown, requestId: string) {
   const data = object(value);
   const orderId = id(data.id);
+  if (
+    data.status !== PAYPAL_ORDER_STATUS.CREATED &&
+    data.status !== PAYPAL_ORDER_STATUS.PAYER_ACTION_REQUIRED
+  )
+    throw new PaypalError(PAYPAL_ERROR_CODES.INVALID_RESPONSE);
+  validateOrderTerms(data, id(requestId), false);
   if (!Array.isArray(data.links))
     throw new PaypalError(PAYPAL_ERROR_CODES.INVALID_RESPONSE);
   const link = data.links
@@ -116,27 +71,43 @@ function parseCreatedOrder(value: unknown) {
   if (!link || typeof link.href !== 'string' || !URL.canParse(link.href))
     throw new PaypalError(PAYPAL_ERROR_CODES.INVALID_RESPONSE);
   const approval = new URL(link.href);
+  const tokens = approval.searchParams.getAll('token');
   if (
     approval.protocol !== 'https:' ||
     approval.hostname !== PAYPAL_API.approvalHost ||
     approval.port ||
     approval.username ||
-    approval.password
+    approval.password ||
+    tokens.length > 1 ||
+    (tokens.length === 1 && tokens[0] !== orderId)
   )
     throw new PaypalError(PAYPAL_ERROR_CODES.INVALID_RESPONSE);
   return { orderId, approvalUrl: approval.href };
 }
 
-function parseAuthorization(value: unknown, orderId: string) {
+function parseAuthorization(
+  value: unknown,
+  orderId: string,
+  requestId: string,
+) {
   const data = object(value);
   if (
     data.id !== orderId ||
-    data.status !== 'COMPLETED' ||
+    data.status !== PAYPAL_ORDER_STATUS.COMPLETED ||
     !Array.isArray(data.purchase_units) ||
     data.purchase_units.length !== 1
   )
     throw new PaypalError(PAYPAL_ERROR_CODES.INVALID_RESPONSE);
-  const payments = object(object(data.purchase_units[0]).payments);
+  const unit = object(data.purchase_units[0]);
+  if (
+    (data.intent !== undefined &&
+      data.intent !== PAYPAL_ORDER_INTENT.AUTHORIZE) ||
+    (unit.custom_id !== undefined && unit.custom_id !== requestId) ||
+    (unit.amount !== undefined && !correctAmount(unit.amount))
+  )
+    throw new PaypalError(PAYPAL_ERROR_CODES.INVALID_RESPONSE);
+  const payments = object(unit.payments);
+  rejectPriorPayments(payments, true);
   if (
     !Array.isArray(payments.authorizations) ||
     payments.authorizations.length !== 1
@@ -144,7 +115,7 @@ function parseAuthorization(value: unknown, orderId: string) {
     throw new PaypalError(PAYPAL_ERROR_CODES.INVALID_RESPONSE);
   const authorization = object(payments.authorizations[0]);
   if (
-    authorization.status !== 'CREATED' ||
+    authorization.status !== PAYPAL_AUTHORIZATION_STATUS.CREATED ||
     !correctAmount(authorization.amount)
   )
     throw new PaypalError(PAYPAL_ERROR_CODES.INVALID_RESPONSE);
@@ -168,25 +139,80 @@ function callbackOrigin(returnOrigin: string): string {
 }
 
 async function isOrderApproved(
-  get: (path: string) => Promise<unknown>,
+  get: (path: string) => Promise<{ value: unknown; accessToken: string }>,
   orderId: string,
+  requestId: string,
 ) {
-  const data = object(await get(`/v2/checkout/orders/${id(orderId)}`));
+  const expectedRequest = id(requestId);
+  const result = await get(`/v2/checkout/orders/${id(orderId)}`);
+  const data = object(result.value);
   if (data.id !== orderId)
     throw new PaypalError(PAYPAL_ERROR_CODES.INVALID_RESPONSE);
-  return data.status === 'APPROVED';
+  const approved = data.status === PAYPAL_ORDER_STATUS.APPROVED;
+  const pending =
+    data.status === PAYPAL_ORDER_STATUS.CREATED ||
+    data.status === PAYPAL_ORDER_STATUS.PAYER_ACTION_REQUIRED;
+  if (!approved && !pending)
+    throw new PaypalError(PAYPAL_ERROR_CODES.INVALID_RESPONSE);
+  validateOrderTerms(data, expectedRequest, approved);
+  return { approved, accessToken: result.accessToken };
 }
 
-async function captureAuthorized(
-  post: ReturnType<typeof transport>['post'],
-  authorizationId: string,
-  cents?: number,
+function rejectPriorPayments(
+  payments: Record<string, unknown>,
+  allowAuthorization: boolean,
 ) {
+  for (const key of ['authorizations', 'captures', 'refunds']) {
+    if (allowAuthorization && key === 'authorizations') continue;
+    const entries = payments[key];
+    if (
+      entries !== undefined &&
+      (!Array.isArray(entries) || entries.length > 0)
+    )
+      throw new PaypalError(PAYPAL_ERROR_CODES.INVALID_RESPONSE);
+  }
+}
+
+function validateOrderTerms(
+  data: Record<string, unknown>,
+  requestId: string,
+  required: boolean,
+) {
+  if (
+    (required || data.intent !== undefined) &&
+    data.intent !== PAYPAL_ORDER_INTENT.AUTHORIZE
+  )
+    throw new PaypalError(PAYPAL_ERROR_CODES.INVALID_RESPONSE);
+  if (!required && data.purchase_units === undefined) return;
+  if (!Array.isArray(data.purchase_units) || data.purchase_units.length !== 1)
+    throw new PaypalError(PAYPAL_ERROR_CODES.INVALID_RESPONSE);
+  const unit = object(data.purchase_units[0]);
+  if (
+    ((required || unit.custom_id !== undefined) &&
+      unit.custom_id !== requestId) ||
+    ((required || unit.amount !== undefined) && !correctAmount(unit.amount))
+  )
+    throw new PaypalError(PAYPAL_ERROR_CODES.INVALID_RESPONSE);
+  if (unit.payments !== undefined) {
+    const payments = object(unit.payments);
+    rejectPriorPayments(payments, false);
+  }
+}
+
+function validateCapture(authorizationId: string, cents?: number) {
+  id(authorizationId);
   if (
     cents !== undefined &&
     (!Number.isSafeInteger(cents) || cents < 1 || cents > PAYPAL_API.limitCents)
   )
     throw new PaypalError(PAYPAL_ERROR_CODES.INVALID_REQUEST);
+}
+async function captureAuthorized(
+  post: ReturnType<typeof transport>['post'],
+  authorizationId: string,
+  cents?: number,
+) {
+  validateCapture(authorizationId, cents);
   const expected =
     cents === undefined
       ? PAYPAL_API.price.value
@@ -210,69 +236,157 @@ async function captureAuthorized(
   return { captureId: id(data.id) };
 }
 
+async function createOrder(
+  post: ReturnType<typeof transport>['post'],
+  callback: string,
+  requestId: string,
+  returnState?: string,
+) {
+  if (returnState !== undefined && !isPaypalReturnState(returnState))
+    throw new PaypalError(PAYPAL_ERROR_CODES.INVALID_REQUEST);
+  const query = returnState === undefined ? '' : `?state=${returnState}`;
+  return parseCreatedOrder(
+    await post(
+      '/v2/checkout/orders',
+      {
+        intent: PAYPAL_ORDER_INTENT.AUTHORIZE,
+        purchase_units: [
+          { amount: PAYPAL_API.price, custom_id: id(requestId) },
+        ],
+        application_context: {
+          return_url: `${callback}/paypal/approved${query}`,
+          cancel_url: `${callback}/paypal/cancelled${query}`,
+        },
+      },
+      undefined,
+      id(requestId),
+    ),
+    requestId,
+  );
+}
+
+async function voidAuthorized(
+  post: ReturnType<typeof transport>['post'],
+  authorizationId: string,
+) {
+  const result = await post(
+    `/v2/payments/authorizations/${id(authorizationId)}/void`,
+    undefined,
+    [HTTP_STATUS.ok, PAYPAL_API.noContent],
+    `void-${id(authorizationId)}`,
+    true,
+  );
+  if (result !== undefined && !confirmedVoid(result, authorizationId))
+    throw new PaypalError(PAYPAL_ERROR_CODES.UNRESOLVED);
+}
+
+async function refundCaptured(
+  post: ReturnType<typeof transport>['post'],
+  captureId: string,
+) {
+  const data = object(
+    await post(
+      `/v2/payments/captures/${id(captureId)}/refund`,
+      { amount: PAYPAL_API.price },
+      undefined,
+      `refund-${id(captureId)}`,
+    ),
+  );
+  if (data.status !== 'COMPLETED' || !correctAmount(data.amount))
+    throw new PaypalError(PAYPAL_ERROR_CODES.UNRESOLVED);
+  id(data.id);
+}
+
+function sandboxActions(
+  post: ReturnType<typeof transport>['post'],
+  callback: string,
+) {
+  return {
+    validateCapture,
+    validateAuthorization: id,
+    create: (requestId: string, returnState?: string) =>
+      createOrder(post, callback, requestId, returnState),
+    capture: (authorizationId: string, cents?: number) =>
+      captureAuthorized(post, authorizationId, cents),
+    void: (authorizationId: string) => voidAuthorized(post, authorizationId),
+    refund: (captureId: string) => refundCaptured(post, captureId),
+  };
+}
 export function createPaypalSandbox(options: SandboxOptions) {
   const callback = callbackOrigin(options.returnOrigin);
-  const { post, prepare, get } = transport(options);
+  const { post, prepare, get } = transport(options, object);
+  let revision = 0;
+  let authorizing = false;
+  let approvedToken:
+    { orderId: string; requestId: string; accessToken: string } | undefined;
+  function invalidateApproval() {
+    revision += 1;
+    approvedToken = undefined;
+  }
+  const { operation, beginReview } = createPaypalReviewAccess({
+    get,
+    validateCapture,
+    capture: (authorizationId, cents) =>
+      captureAuthorized(post, authorizationId, cents),
+    invalidate: invalidateApproval,
+  });
   return {
-    prepare,
-    async isApproved(orderId: string) {
-      return isOrderApproved(get, orderId);
+    prepare: () => operation(prepare),
+    discardApproval: invalidateApproval,
+    beginReview,
+    async isApproved(orderId: string, requestId: string) {
+      return operation(async () => {
+        if (authorizing) throw new PaypalError(PAYPAL_ERROR_CODES.BUSY);
+        invalidateApproval();
+        const current = revision;
+        const result = await isOrderApproved(get, orderId, requestId);
+        if (revision !== current)
+          throw new PaypalError(PAYPAL_ERROR_CODES.UNRESOLVED);
+        if (result.approved)
+          approvedToken = {
+            orderId,
+            requestId,
+            accessToken: result.accessToken,
+          };
+        return result.approved;
+      });
     },
-    async create(requestId: string) {
-      return parseCreatedOrder(
-        await post(
-          '/v2/checkout/orders',
-          {
-            intent: 'AUTHORIZE',
-            purchase_units: [
-              { amount: PAYPAL_API.price, custom_id: id(requestId) },
-            ],
-            application_context: {
-              return_url: `${callback}/paypal/approved`,
-              cancel_url: `${callback}/paypal/cancelled`,
-            },
-          },
-          undefined,
-          id(requestId),
-        ),
-      );
-    },
-    async authorize(orderId: string) {
-      return parseAuthorization(
-        await post(
-          `/v2/checkout/orders/${id(orderId)}/authorize`,
-          undefined,
-          undefined,
-          `authorize-${id(orderId)}`,
-        ),
-        orderId,
-      );
-    },
-    async capture(authorizationId: string, cents?: number) {
-      return captureAuthorized(post, authorizationId, cents);
-    },
-    async void(authorizationId: string) {
-      await post(
-        `/v2/payments/authorizations/${id(authorizationId)}/void`,
-        undefined,
-        PAYPAL_API.noContent,
-        `void-${id(authorizationId)}`,
-      );
-    },
-    async refund(captureId: string) {
-      const data = object(
-        await post(
-          `/v2/payments/captures/${id(captureId)}/refund`,
-          {
-            amount: PAYPAL_API.price,
-          },
-          undefined,
-          `refund-${id(captureId)}`,
-        ),
-      );
-      if (data.status !== 'COMPLETED' || !correctAmount(data.amount))
-        throw new PaypalError(PAYPAL_ERROR_CODES.UNRESOLVED);
-      id(data.id);
+    ...managedPaypalOperations(
+      operation,
+      invalidateApproval,
+      sandboxActions(post, callback),
+    ),
+    async authorize(orderId: string, requestId: string) {
+      return operation(async () => {
+        if (authorizing) throw new PaypalError(PAYPAL_ERROR_CODES.BUSY);
+        const expectedRequest = id(requestId);
+        const expectedOrder = id(orderId);
+        const reserved = approvedToken;
+        invalidateApproval();
+        if (
+          !reserved ||
+          reserved.orderId !== expectedOrder ||
+          reserved.requestId !== expectedRequest
+        )
+          throw new PaypalError(PAYPAL_ERROR_CODES.INVALID_REQUEST);
+        authorizing = true;
+        try {
+          return parseAuthorization(
+            await post(
+              `/v2/checkout/orders/${expectedOrder}/authorize`,
+              undefined,
+              undefined,
+              `authorize-${expectedOrder}`,
+              false,
+              reserved.accessToken,
+            ),
+            orderId,
+            expectedRequest,
+          );
+        } finally {
+          authorizing = false;
+        }
+      });
     },
   };
 }

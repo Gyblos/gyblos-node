@@ -29,6 +29,12 @@
     {
       "file": "pi.svg",
       "source": "https://pi.dev/logo-auto.svg"
+    },
+    {
+      "file": "opencode.svg",
+      "source": "https://github.com/anomalyco/opencode/blob/dev/packages/ui/src/components/logo.tsx",
+      "sha256": "622de0ee5c1ab68c00a19bb7886dc8828e68704211dcd7f3aca33f5a278c0374",
+      "license": "MIT; see opencode-LICENSE.txt"
     }
   ],
   "license": "Lobe Icons SVGs use MIT; see ../models/lobe-icons-LICENSE.txt. Brand rights remain with their owners. TinyFish mark from official site."

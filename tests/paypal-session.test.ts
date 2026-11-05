@@ -2,8 +2,42 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { createPaypalSession } from '@gyblos/node/paypal-session';
+import { PAYPAL_ERROR_CODES } from '@gyblos/protocol/constants';
+import { PaypalError } from '@gyblos/protocol/paypal-payment';
 
 import { fixture, start } from './support/paypal-session-fixture';
+
+void test('a contradictory order response blocks abandonment and new orders across restart', async () => {
+  const f = fixture();
+  f.payment.isApproved = async () => {
+    throw new PaypalError(PAYPAL_ERROR_CODES.INVALID_RESPONSE);
+  };
+  const session = await createPaypalSession(f);
+  await session.create();
+  await assert.rejects(session.approve('ORDER1'));
+  assert.equal(session.status().phase, 'review');
+  await assert.rejects(session.cancel('ORDER1'));
+  await assert.rejects(session.create());
+  const restarted = await createPaypalSession(f);
+  assert.equal(restarted.status().phase, 'review');
+  await assert.rejects(restarted.cancel('ORDER1'));
+  await assert.rejects(restarted.create());
+  await assert.rejects(restarted.approve('ORDER1'));
+  assert.deepEqual(f.calls, ['create']);
+});
+
+void test('an invalid checkout return state cannot write a journal or contact PayPal', async () => {
+  const f = fixture();
+  let prepared = 0;
+  f.payment.prepare = async () => {
+    prepared += 1;
+  };
+  const session = await createPaypalSession(f);
+  await assert.rejects(session.create('invalid'));
+  assert.equal(f.getState(), null);
+  assert.equal(prepared, 0);
+  assert.deepEqual(f.calls, []);
+});
 
 void test('one approval pays for multiple acknowledged messages with one partial capture', async () => {
   const f = fixture();

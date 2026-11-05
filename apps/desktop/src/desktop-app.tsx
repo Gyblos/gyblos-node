@@ -28,7 +28,17 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 
 import manifest from '../package.json';
 import { CATALOG_STATE } from './catalog/model';
-import { PAYMENT_METHOD, type PaymentMethod } from './paypal-model';
+import {
+  canSelectPreviewModel,
+  PAYMENT_METHOD,
+  paymentMethodLabel,
+  paypalActivityLabel,
+  paypalAmountsAvailable,
+  paypalDollars,
+  paypalHasUnfinishedSession,
+  type PaymentMethod,
+} from './paypal-model';
+import type { DesktopPaypalStatus } from './paypal-session';
 import { themeStyle } from './theme';
 import { AddFunds } from './ui/AddFunds';
 import { announcedModels } from './ui/announced-models';
@@ -56,6 +66,8 @@ import {
   UI_VIEW,
 } from './ui/constants';
 import { authorizeDemo, DEMO_ACCOUNT, DEMO_AUTH } from './ui/demo-account';
+import { DesignSystem } from './ui/DesignSystem';
+import { FormField, FormInput } from './ui/Form';
 import { Modal } from './ui/Modal';
 import type { Mode, CatalogModel as Model, View } from './ui/model-types';
 import { ModelImage, type ModelArtwork } from './ui/ModelImage';
@@ -67,6 +79,7 @@ import {
 } from './ui/Motion';
 import { NetworkCatalogPanel, useNetworkCatalog } from './ui/NetworkCatalog';
 import { NetworkStatus, useLocalNode } from './ui/NetworkStatus';
+import { PaymentMethodSelector } from './ui/PaymentMethodSelector';
 import { PaypalAgentConnection } from './ui/PaypalAgentConnection';
 import { PaypalChat } from './ui/PaypalChat';
 import { ResizeHandle } from './ui/ResizeHandle';
@@ -144,6 +157,23 @@ export function DesktopApp() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(
     PAYMENT_METHOD.USDC,
   );
+  const [paypalStatus, setPaypalStatus] = useState<DesktopPaypalStatus | null>(
+    null,
+  );
+  const [paypalStatusFresh, setPaypalStatusFresh] = useState(false);
+  useEffect(() => {
+    const showPaypalChat = () => {
+      setPaymentMethod(PAYMENT_METHOD.PAYPAL);
+      setMode(UI_VIEW.CHAT);
+      setView(UI_VIEW.CHAT);
+    };
+    const removeReturn = window.desktopPaypal?.onReturn?.(showPaypalChat);
+    const removeCancel = window.desktopPaypal?.onCancel?.(showPaypalChat);
+    return () => {
+      removeReturn?.();
+      removeCancel?.();
+    };
+  }, []);
   const frameStyle: CSSProperties & { '--navigation-width': string } = {
     '--navigation-width': navigationWidth + 'px',
     ...themeStyle(light),
@@ -278,6 +308,20 @@ export function DesktopApp() {
           <h1 id="route-title">{view}</h1>
         </div>
         <div className="top-actions">
+          {paymentMethod === PAYMENT_METHOD.USDC &&
+            (!paypalStatusFresh ||
+              paypalHasUnfinishedSession(paypalStatus)) && (
+              <Button
+                variant={BUTTON_VARIANT.TONAL}
+                title="Check PayPal session"
+                onClick={() => {
+                  setPaymentMethod(PAYMENT_METHOD.PAYPAL);
+                  navigate(UI_VIEW.CHAT);
+                }}
+              >
+                Review PayPal session
+              </Button>
+            )}
           <Button
             variant={BUTTON_VARIANT.SECONDARY}
             className="command-trigger"
@@ -298,13 +342,11 @@ export function DesktopApp() {
           <Button
             variant={BUTTON_VARIANT.SECONDARY}
             className="balance-button"
-            title="USDC wallet"
+            title={paymentMethodLabel(paymentMethod)}
             onClick={() => navigate(UI_VIEW.SETTINGS)}
           >
             <Wallet size={17} />
-            <span aria-hidden="true">
-              {paymentMethod === PAYMENT_METHOD.PAYPAL ? 'USDC' : '0.0'}
-            </span>
+            <span aria-hidden="true">{paymentMethodLabel(paymentMethod)}</span>
           </Button>
         </div>
       </header>
@@ -421,6 +463,12 @@ export function DesktopApp() {
               active={
                 view === UI_VIEW.CHAT && paymentMethod === PAYMENT_METHOD.PAYPAL
               }
+              monitor={
+                view === UI_VIEW.ACTIVITY &&
+                paymentMethod === PAYMENT_METHOD.PAYPAL
+              }
+              onStatusChange={setPaypalStatus}
+              onFreshnessChange={setPaypalStatusFresh}
             />
           </div>
           {view === UI_VIEW.MODELS && (
@@ -428,11 +476,18 @@ export function DesktopApp() {
               <NetworkCatalogPanel
                 snapshot={announcements.snapshot}
                 onLookup={announcements.lookup}
-                onSelect={choose}
+                onSelect={
+                  canSelectPreviewModel(paymentMethod) ? choose : undefined
+                }
                 selected={model.id}
               />
-              <details>
-                <summary>Preview models</summary>
+              <section aria-label="Preview models" className="ui-section">
+                {!canSelectPreviewModel(paymentMethod) && (
+                  <Note>
+                    This catalog is a USDC preview. PayPal Sandbox uses its
+                    configured local model.
+                  </Note>
+                )}
                 <div className="ui-toolbar">
                   <SearchField
                     label="Search catalog"
@@ -464,8 +519,15 @@ export function DesktopApp() {
                     <ListRow
                       key={item.id}
                       leading={<ModelIcon model={item} />}
-                      onActivate={() => choose(item)}
-                      selected={model.id === item.id}
+                      onActivate={
+                        canSelectPreviewModel(paymentMethod)
+                          ? () => choose(item)
+                          : undefined
+                      }
+                      selected={
+                        canSelectPreviewModel(paymentMethod) &&
+                        model.id === item.id
+                      }
                       trailing={
                         <>
                           <div className="ui-price">
@@ -480,7 +542,8 @@ export function DesktopApp() {
                                 : 'In / out per 1M tokens'}
                             </small>
                           </div>
-                          {model.id === item.id && <Check size={16} />}
+                          {canSelectPreviewModel(paymentMethod) &&
+                            model.id === item.id && <Check size={16} />}
                         </>
                       }
                     >
@@ -498,7 +561,7 @@ export function DesktopApp() {
                     </p>
                   )}
                 </List>
-              </details>
+              </section>
               <InfoBar
                 leading={<Globe size={16} />}
                 trailing={
@@ -576,27 +639,11 @@ export function DesktopApp() {
                   title="Payment method"
                   description="Choose how to pay for new inference sessions."
                 >
-                  <fieldset className="paypal-methods">
-                    <legend className="field-label">Method</legend>
-                    <label>
-                      <input
-                        type="radio"
-                        name="payment-method"
-                        checked={paymentMethod === PAYMENT_METHOD.USDC}
-                        onChange={() => setPaymentMethod(PAYMENT_METHOD.USDC)}
-                      />{' '}
-                      USDC wallet · preview
-                    </label>
-                    <label>
-                      <input
-                        type="radio"
-                        name="payment-method"
-                        checked={paymentMethod === PAYMENT_METHOD.PAYPAL}
-                        onChange={() => setPaymentMethod(PAYMENT_METHOD.PAYPAL)}
-                      />{' '}
-                      PayPal Sandbox · test funds
-                    </label>
-                  </fieldset>
+                  <PaymentMethodSelector
+                    name="payment-method"
+                    value={paymentMethod}
+                    onChange={setPaymentMethod}
+                  />
                   <p className="modal-note">
                     PayPal authorizes a separate sandbox session; it does not
                     add USDC to the wallet. The method resets to USDC when the
@@ -652,6 +699,12 @@ export function DesktopApp() {
                     onLightChange={setLight}
                     label="Theme"
                   />
+                  <Button
+                    variant={BUTTON_VARIANT.SECONDARY}
+                    onClick={() => setModal(UI_DIALOG.DESIGN_SYSTEM)}
+                  >
+                    Preview design system
+                  </Button>
                 </SettingsGroup>
               </div>
             </PagePanel>
@@ -659,10 +712,45 @@ export function DesktopApp() {
           {view === UI_VIEW.ACTIVITY &&
             paymentMethod === PAYMENT_METHOD.PAYPAL && (
               <PagePanel>
+                <SectionTitle trailing={<Badge>Test funds</Badge>}>
+                  PayPal Sandbox session
+                </SectionTitle>
                 <Note>
-                  Sandbox usage and settlement are shown in the PayPal chat
-                  session.
+                  This shows the current session, not a complete payment
+                  history. Recorded usage is not a confirmed capture until the
+                  session says payment captured.
                 </Note>
+                <div className="ui-stats">
+                  <StatCard
+                    label="Status"
+                    value={paypalActivityLabel(
+                      paypalStatusFresh ? paypalStatus : null,
+                    )}
+                    detail="Last status received by Gyblos"
+                  />
+                  {paypalStatusFresh &&
+                    paypalStatus &&
+                    paypalAmountsAvailable(paypalStatus) && (
+                      <>
+                        <StatCard
+                          label="Recorded usage"
+                          value={paypalDollars(paypalStatus.spentCents)}
+                          detail="May need review if the session is uncertain"
+                        />
+                        <StatCard
+                          label="Session limit"
+                          value={paypalDollars(paypalStatus.limitCents)}
+                          detail="Sandbox test funds"
+                        />
+                      </>
+                    )}
+                </div>
+                <Button
+                  variant={BUTTON_VARIANT.SECONDARY}
+                  onClick={() => navigate(UI_VIEW.CHAT)}
+                >
+                  Review session in Chat
+                </Button>
               </PagePanel>
             )}
           {view === UI_VIEW.ACTIVITY &&
@@ -764,6 +852,17 @@ export function DesktopApp() {
         </span>
       </footer>
       <MotionPresence>
+        {modal === UI_DIALOG.DESIGN_SYSTEM && (
+          <Modal
+            title="Design system"
+            description="Shared visual components for the buyer app."
+            close={() => setModal(null)}
+          >
+            <DesignSystem />
+          </Modal>
+        )}
+      </MotionPresence>
+      <MotionPresence>
         {modal === UI_DIALOG.ADD_FUNDS && (
           <Modal
             title="Add funds"
@@ -793,17 +892,15 @@ export function DesktopApp() {
             description="Applies to the USDC chat preview only."
             close={() => setModal(null)}
           >
-            <label className="field-label" htmlFor={UI_DIALOG.BUDGET}>
-              Daily limit ($)
-            </label>
-            <input
-              className="full-input"
-              id={UI_DIALOG.BUDGET}
-              type="number"
-              min="0"
-              value={budgetDraft}
-              onChange={(event) => setBudgetDraft(event.target.value)}
-            />
+            <FormField htmlFor={UI_DIALOG.BUDGET} label="Daily limit ($)">
+              <FormInput
+                id={UI_DIALOG.BUDGET}
+                type="number"
+                min="0"
+                value={budgetDraft}
+                onChange={(event) => setBudgetDraft(event.target.value)}
+              />
+            </FormField>
             <p className="modal-note">Free models do not use this limit.</p>
             <Button
               variant={BUTTON_VARIANT.PRIMARY}

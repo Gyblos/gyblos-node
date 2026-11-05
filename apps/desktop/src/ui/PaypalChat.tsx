@@ -1,8 +1,7 @@
 // Renders the real local PayPal Sandbox session without preview responses or tools.
-import { ArrowUp } from '@phosphor-icons/react';
+import { ArrowDown, ArrowUp } from '@phosphor-icons/react';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 
-import { PAYPAL_SANDBOX } from '@gyblos/config/constants';
 import {
   PAYPAL_SESSION_PHASE,
   PAYPAL_SESSION_STATUS,
@@ -13,17 +12,29 @@ import { PaypalChatController } from '../paypal-chat';
 import {
   paypalDollars as dollars,
   PAYPAL_DESKTOP_ERROR,
+  paypalActivityLabel,
+  paypalAmountsAvailable,
   paypalFailure,
   type PaypalRequest,
   type PaypalResult,
 } from '../paypal-model';
+import type { DesktopPaypalStatus } from '../paypal-session';
+import { ChatComposer } from './ChatComposer';
+import { ChatUserMessage } from './ChatUserMessage';
 import { BUTTON_VARIANT, CHAT_ROLE } from './constants';
 import { MessageText } from './MessageText';
+import { CheckStatus, PaypalCheckoutActions } from './PaypalCheckoutActions';
+import { PaypalAssistantHeading, PaypalPendingMessage } from './PaypalMessage';
 import { Badge, Button, IconButton } from './UI';
+import { usePaypalChatScroll } from './usePaypalChatScroll';
 
 declare global {
   interface Window {
-    desktopPaypal?: { run(request: PaypalRequest): Promise<PaypalResult> };
+    desktopPaypal?: {
+      run(request: PaypalRequest): Promise<PaypalResult>;
+      onReturn?(listener: () => void): () => void;
+      onCancel?(listener: () => void): () => void;
+    };
   }
 }
 
@@ -35,46 +46,15 @@ function uncertain(state: Snapshot) {
   return (
     phase === PAYPAL_SESSION_STATUS.BLOCKED ||
     phase === PAYPAL_SESSION_PHASE.CREATING ||
+    phase === PAYPAL_SESSION_PHASE.REVIEW ||
     phase === PAYPAL_SESSION_PHASE.AUTHORIZING ||
     phase === PAYPAL_SESSION_PHASE.CAPTURING ||
     phase === PAYPAL_SESSION_PHASE.VOIDING
   );
 }
 
-function CreatedActions({ chat, state }: ChatProps) {
-  return (
-    <>
-      <Button
-        disabled={state.busy || !state.status?.approvalLinkAvailable}
-        onClick={() => {
-          void chat.openApproval();
-        }}
-      >
-        Open PayPal Sandbox
-      </Button>
-      <Button
-        variant={BUTTON_VARIANT.PRIMARY}
-        disabled={state.busy}
-        onClick={() => {
-          void chat.approve();
-        }}
-      >
-        I approved · start session
-      </Button>
-      <Button
-        disabled={state.busy}
-        onClick={() => {
-          void chat.abandon();
-        }}
-      >
-        Abandon unapproved order
-      </Button>
-    </>
-  );
-}
-
 function SessionActions({ chat, state }: ChatProps) {
-  const phase = state.status?.phase;
+  const phase = state.statusFresh ? state.status?.phase : undefined;
   const canCreate =
     phase === PAYPAL_SESSION_STATUS.READY ||
     phase === PAYPAL_SESSION_PHASE.COMPLETED ||
@@ -82,7 +62,7 @@ function SessionActions({ chat, state }: ChatProps) {
     phase === PAYPAL_SESSION_PHASE.CANCELLED;
   return (
     <div className="paypal-session-actions">
-      {!state.status && (
+      {!state.statusFresh && (
         <Button
           disabled={state.busy}
           onClick={() => {
@@ -97,14 +77,14 @@ function SessionActions({ chat, state }: ChatProps) {
           variant={BUTTON_VARIANT.PRIMARY}
           disabled={state.busy}
           onClick={() => {
-            void chat.create();
+            void chat.startCheckout();
           }}
         >
-          Create sandbox session
+          Continue with PayPal
         </Button>
       )}
       {phase === PAYPAL_SESSION_PHASE.CREATED && (
-        <CreatedActions chat={chat} state={state} />
+        <PaypalCheckoutActions chat={chat} state={state} />
       )}
       {phase === PAYPAL_SESSION_PHASE.ACTIVE && (
         <Button
@@ -113,9 +93,20 @@ function SessionActions({ chat, state }: ChatProps) {
             void chat.finish();
           }}
         >
-          Close session and settle
+          Review and close session
         </Button>
       )}
+      {phase === PAYPAL_SESSION_PHASE.EXECUTING &&
+        (state.status?.spentCents ?? 0) > 0 && (
+          <Button
+            disabled={state.busy}
+            onClick={() => {
+              void chat.reviewAndSettle();
+            }}
+          >
+            Review uncertain attempt
+          </Button>
+        )}
       {state.pendingMessageId && (
         <Button
           disabled={state.busy}
@@ -126,52 +117,37 @@ function SessionActions({ chat, state }: ChatProps) {
           Retry response acknowledgment
         </Button>
       )}
-      {(uncertain(state) ||
-        phase === PAYPAL_SESSION_PHASE.EXECUTING ||
-        (phase === PAYPAL_SESSION_PHASE.MESSAGE_PENDING &&
-          !state.pendingMessageId)) && (
-        <Button
-          disabled={state.busy}
-          onClick={() => {
-            void chat.refresh();
-          }}
-        >
-          Check status
-        </Button>
-      )}
+      {state.statusFresh &&
+        (uncertain(state) ||
+          phase === PAYPAL_SESSION_PHASE.EXECUTING ||
+          (phase === PAYPAL_SESSION_PHASE.MESSAGE_PENDING &&
+            !state.pendingMessageId)) && (
+          <CheckStatus chat={chat} state={state} />
+        )}
     </div>
   );
 }
 
-function SessionPanel({ chat, state }: ChatProps) {
-  const phase = state.status?.phase;
+function SessionMessages({ state }: { state: Snapshot }) {
+  const phase = state.statusFresh ? state.status?.phase : undefined;
   return (
-    <section className="paypal-session" aria-label="PayPal Sandbox session">
-      <div className="paypal-session-heading">
-        <strong>PayPal Sandbox</strong>
-        <Badge>Test funds</Badge>
-        <span>{state.model ?? 'Local inference'}</span>
-      </div>
-      <p>
-        One local seller · independent messages · no conversation context or web
-        tools.
-      </p>
-      {state.status && (
+    <>
+      {!state.statusFresh && (
         <p>
-          Session maximum: {dollars(state.status.limitCents)} · Recorded usage:{' '}
-          {dollars(state.status.spentCents)} ·{' '}
-          {dollars(state.status.messageCents)} per acknowledged chat response or
-          completed agent inference
+          The session status could not be checked. Check it before continuing.
         </p>
       )}
-      <p>
-        Sandbox sessions authorize up to {dollars(PAYPAL_SANDBOX.limitCents)} in
-        test funds. Each completed agent inference uses{' '}
-        {dollars(PAYPAL_SANDBOX.messageCents)}, even if the response cannot be
-        delivered. One instruction can require multiple inferences. An inference
-        already started can finish and count after the agent disconnects.
-        Closing the session captures the recorded usage.
-      </p>
+      <div className="ui-help-text">
+        <p>One local seller. Messages are independent and have no web tools.</p>
+        <p>
+          The session authorizes a limit in test funds. Each acknowledged chat
+          response or completed agent inference uses the session's rate shown
+          above. An agent can use multiple inferences, and a completed inference
+          counts even if its response cannot be delivered. An inference already
+          started can finish and count after the agent disconnects. Closing
+          attempts to capture recorded usage or void an unused authorization.
+        </p>
+      </div>
       {phase === PAYPAL_SESSION_PHASE.COMPLETED && (
         <p>Sandbox payment captured for recorded usage.</p>
       )}
@@ -188,16 +164,18 @@ function SessionPanel({ chat, state }: ChatProps) {
       {phase === PAYPAL_SESSION_PHASE.CREATED &&
         !state.status?.approvalLinkAvailable && (
           <p>
-            The old checkout cannot be reopened safely after restarting. If
-            already approved, start the session; otherwise abandon this order
-            and create a new one. Do not use a checkout tab opened before the
-            restart.
+            This checkout link is no longer available. If already approved,
+            check the approval; otherwise abandon this order and create a new
+            one. Do not use a checkout tab opened before restarting Gyblos. If
+            Gyblos was restarted, settle the restored session and create a new
+            one before connecting agents.
           </p>
         )}
-      {uncertain(state) && (
+      {state.statusFresh && uncertain(state) && (
         <p>
-          Session needs review and the usage shown may be uncertain. Do not
-          retry payment or remove its record.
+          Session needs external review and the usage shown may be uncertain.
+          Checking status only updates the local view. Do not retry payment or
+          remove its record.
         </p>
       )}
       {phase === PAYPAL_SESSION_PHASE.EXECUTING && (
@@ -212,6 +190,31 @@ function SessionPanel({ chat, state }: ChatProps) {
             A prior response awaits confirmation and the session needs review.
           </p>
         )}
+    </>
+  );
+}
+
+function SessionPanel({ chat, state }: ChatProps) {
+  return (
+    <section className="paypal-session" aria-label="PayPal Sandbox session">
+      <div className="paypal-session-heading">
+        <strong>PayPal Sandbox</strong>
+        <Badge>Test funds</Badge>
+        <Badge>
+          {paypalActivityLabel(state.statusFresh ? state.status : null)}
+        </Badge>
+        {state.statusFresh &&
+          state.status &&
+          paypalAmountsAvailable(state.status) && (
+            <span className="paypal-session-usage">
+              <strong>{dollars(state.status.spentCents)}</strong> recorded ·
+              session limit {dollars(state.status.limitCents)} ·{' '}
+              {dollars(state.status.messageCents)} per chat reply or agent
+              inference
+            </span>
+          )}
+      </div>
+      <SessionMessages state={state} />
       <SessionActions chat={chat} state={state} />
       {state.notice && (
         <p className="chat-notice" role="status">
@@ -222,38 +225,56 @@ function SessionPanel({ chat, state }: ChatProps) {
   );
 }
 
-function Transcript({ state }: { state: Snapshot }) {
+function Transcript({ state, active }: { state: Snapshot; active: boolean }) {
+  const scroll = usePaypalChatScroll(state, active);
   return (
-    <div
-      className="conversation"
-      role="log"
-      aria-label="Sandbox conversation"
-      aria-live="polite"
-    >
-      <div className="chat-transcript">
-        {state.messages.map((message, index) =>
-          message.role === CHAT_ROLE.USER ? (
-            <article className="chat-user" key={index}>
-              <p>{message.text}</p>
-            </article>
-          ) : (
-            <article className="chat-answer" key={index}>
-              <header className="answer-heading">
-                <span>{state.model ?? 'Local model'}</span>
-                <Badge>PayPal Sandbox</Badge>
-              </header>
-              <MessageText text={message.text || '(Empty response)'} />
-            </article>
-          ),
-        )}
+    <>
+      <div
+        ref={scroll.viewport}
+        className="conversation"
+        role="log"
+        aria-label="Sandbox conversation"
+        aria-live="polite"
+        onScroll={scroll.onScroll}
+      >
+        <div className="chat-transcript">
+          {state.messages.map((message, index) =>
+            message.role === CHAT_ROLE.USER ? (
+              <ChatUserMessage key={index} text={message.text} />
+            ) : (
+              <article
+                className="chat-answer paypal-answer"
+                aria-label="Assistant"
+                key={index}
+              >
+                <PaypalAssistantHeading model={state.model} />
+                <MessageText text={message.text || '(Empty response)'} />
+              </article>
+            ),
+          )}
+          {state.pendingPrompt && (
+            <PaypalPendingMessage
+              model={state.model}
+              prompt={state.pendingPrompt}
+            />
+          )}
+        </div>
       </div>
-    </div>
+      {!scroll.nearBottom && (
+        <div className="latest-wrap">
+          <Button onClick={scroll.latest}>
+            <ArrowDown size={14} /> Latest message
+          </Button>
+        </div>
+      )}
+    </>
   );
 }
 
 function Composer({ chat, state }: ChatProps) {
   const status = state.status;
   const canSend =
+    state.statusFresh &&
     status !== null &&
     status.phase === PAYPAL_SESSION_PHASE.ACTIVE &&
     !status.expired &&
@@ -264,47 +285,30 @@ function Composer({ chat, state }: ChatProps) {
     !!state.draft.trim();
   return (
     <div className="composer-wrap">
-      <form
-        className="composer"
-        onSubmit={(event) => {
-          event.preventDefault();
+      <ChatComposer
+        placeholder="Message the local model"
+        value={state.draft}
+        onChange={(value) => chat.setDraft(value)}
+        onSubmit={() => {
           void chat.send();
         }}
       >
-        <textarea
-          aria-label="Your message"
-          placeholder="Message the local model"
-          value={state.draft}
-          onChange={(event) => chat.setDraft(event.target.value)}
-          onKeyDown={(event) => {
-            if (
-              !event.nativeEvent.isComposing &&
-              event.key === 'Enter' &&
-              !event.shiftKey
-            ) {
-              event.preventDefault();
-              void chat.send();
-            }
-          }}
-        />
-        <div className="composer-bottom">
-          <div className="composer-leading">
-            <span>{state.model ?? 'Local model'}</span>
-          </div>
-          <div className="composer-actions">
-            <span>{state.busy ? 'Working…' : 'Sandbox session'}</span>
-            <IconButton
-              variant={BUTTON_VARIANT.PRIMARY}
-              className="ui-composer-action"
-              type="submit"
-              label="Send message"
-              disabled={!canSend}
-            >
-              <ArrowUp size={16} weight="bold" />
-            </IconButton>
-          </div>
+        <div className="composer-leading">
+          <span>{state.model ?? 'Local model'}</span>
         </div>
-      </form>
+        <div className="composer-actions">
+          <span>{state.busy ? 'Working…' : 'Sandbox session'}</span>
+          <IconButton
+            variant={BUTTON_VARIANT.PRIMARY}
+            className="ui-composer-action"
+            type="submit"
+            label="Send message"
+            disabled={!canSend}
+          >
+            <ArrowUp size={16} weight="bold" />
+          </IconButton>
+        </div>
+      </ChatComposer>
       <p className="composer-note">
         Each message is independent and must fit the local model's context. A
         response must be acknowledged before sending another.
@@ -313,7 +317,17 @@ function Composer({ chat, state }: ChatProps) {
   );
 }
 
-export function PaypalChat({ active }: { active: boolean }) {
+export function PaypalChat({
+  active,
+  monitor,
+  onStatusChange,
+  onFreshnessChange,
+}: {
+  active: boolean;
+  monitor: boolean;
+  onStatusChange: (status: DesktopPaypalStatus | null) => void;
+  onFreshnessChange: (fresh: boolean) => void;
+}) {
   const [chat] = useState(
     () =>
       new PaypalChatController(async (request) =>
@@ -324,18 +338,34 @@ export function PaypalChat({ active }: { active: boolean }) {
   );
   const state = useSyncExternalStore(chat.subscribe, chat.getSnapshot);
   useEffect(() => {
-    if (!active) return;
+    onStatusChange(state.status);
+    onFreshnessChange(state.statusFresh);
+  }, [onFreshnessChange, onStatusChange, state.status, state.statusFresh]);
+  useEffect(() => {
+    const removeReturn = window.desktopPaypal?.onReturn?.(() => {
+      void chat.returnedFromPaypal();
+    });
+    const removeCancel = window.desktopPaypal?.onCancel?.(() => {
+      void chat.cancelledFromPaypal();
+    });
+    return () => {
+      removeReturn?.();
+      removeCancel?.();
+    };
+  }, [chat]);
+  useEffect(() => {
+    if (!active && !monitor) return;
     void chat.refresh();
     const interval = window.setInterval(() => {
       void chat.poll();
     }, DESKTOP_PAYPAL_AGENT.POLL_MS);
     return () => window.clearInterval(interval);
-  }, [active, chat]);
+  }, [active, chat, monitor]);
   return (
     <main className="chat-page enhanced-chat paypal-chat">
       <SessionPanel chat={chat} state={state} />
       <div className="chat-stage">
-        <Transcript state={state} />
+        <Transcript state={state} active={active} />
         <Composer chat={chat} state={state} />
       </div>
     </main>

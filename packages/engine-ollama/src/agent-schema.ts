@@ -16,6 +16,9 @@ const SCHEMA_FIELDS = [
   'maximum',
   'exclusiveMinimum',
   'exclusiveMaximum',
+  'minLength',
+  'minItems',
+  'pattern',
 ];
 const SCHEMA_DIALECTS = [
   'https://json-schema.org/draft/2020-12/schema',
@@ -39,6 +42,69 @@ function fields(value: unknown): Record<string, unknown> {
   if (!isJsonFields(value)) return invalid();
   return value;
 }
+function checkLengthAndPrefix(schema: Record<string, unknown>): void {
+  for (const bound of [schema.minLength, schema.minItems]) {
+    if (
+      bound !== undefined &&
+      (typeof bound !== 'number' || !Number.isSafeInteger(bound) || bound < 0)
+    )
+      invalid();
+  }
+  if (
+    schema.pattern !== undefined &&
+    (typeof schema.pattern !== 'string' ||
+      !schema.pattern.startsWith('^') ||
+      schema.pattern.length < 2 ||
+      /[^A-Za-z0-9_-]/.test(schema.pattern.slice(1)))
+  )
+    invalid();
+}
+
+function matchesLengthAndPrefix(
+  schema: Record<string, unknown>,
+  value: unknown,
+  lengths: Map<string, number>,
+): boolean {
+  if (
+    typeof value === 'string' &&
+    typeof schema.minLength === 'number' &&
+    !hasMinimumCharacters(value, schema.minLength, lengths)
+  )
+    return false;
+  if (
+    Array.isArray(value) &&
+    typeof schema.minItems === 'number' &&
+    value.length < schema.minItems
+  )
+    return false;
+  return !(
+    typeof value === 'string' &&
+    typeof schema.pattern === 'string' &&
+    !value.startsWith(schema.pattern.slice(1))
+  );
+}
+
+function hasMinimumCharacters(
+  value: string,
+  minimum: number,
+  lengths: Map<string, number>,
+): boolean {
+  if (value.length < minimum) return false;
+  if (Math.ceil(value.length / 2) >= minimum) return true;
+  let count = lengths.get(value);
+  if (count === undefined) {
+    count = 0;
+    const iterator = value[Symbol.iterator]();
+    let character = iterator.next();
+    while (!character.done) {
+      count += 1;
+      character = iterator.next();
+    }
+    lengths.set(value, count);
+  }
+  return count >= minimum;
+}
+
 export function checkToolSchema(input: unknown, depth = 0): void {
   const schema = fields(input);
   if (
@@ -100,6 +166,7 @@ export function checkToolSchema(input: unknown, depth = 0): void {
       ))
   )
     return invalid();
+  checkLengthAndPrefix(schema);
   if (schema.properties !== undefined) {
     for (const property of Object.values(fields(schema.properties)))
       checkToolSchema(property, depth + 1);
@@ -111,12 +178,17 @@ export function checkToolSchema(input: unknown, depth = 0): void {
   }
 }
 
-export function matchesToolSchema(input: unknown, value: unknown): boolean {
+export function matchesToolSchema(
+  input: unknown,
+  value: unknown,
+  lengths = new Map<string, number>(),
+): boolean {
   const schema = fields(input);
+  if (!matchesLengthAndPrefix(schema, value, lengths)) return false;
   if (
     schema.anyOf !== undefined &&
     (!Array.isArray(schema.anyOf) ||
-      !schema.anyOf.some((item) => matchesToolSchema(item, value)))
+      !schema.anyOf.some((item) => matchesToolSchema(item, value, lengths)))
   )
     return false;
   if (Array.isArray(schema.enum) && !schema.enum.some((item) => item === value))
@@ -162,7 +234,7 @@ export function matchesToolSchema(input: unknown, value: unknown): boolean {
   if (
     Array.isArray(value) &&
     schema.items !== undefined &&
-    value.some((item) => !matchesToolSchema(schema.items, item))
+    value.some((item) => !matchesToolSchema(schema.items, item, lengths))
   )
     return false;
   if (isJsonFields(value)) {
@@ -177,7 +249,7 @@ export function matchesToolSchema(input: unknown, value: unknown): boolean {
       return false;
     for (const [name, item] of Object.entries(value)) {
       if (Object.hasOwn(properties, name)) {
-        if (!matchesToolSchema(properties[name], item)) return false;
+        if (!matchesToolSchema(properties[name], item, lengths)) return false;
       } else if (schema.additionalProperties === false) return false;
     }
   }
@@ -193,6 +265,9 @@ export function ollamaToolSchema(input: unknown): Record<string, unknown> {
     exclusiveMinimum,
     exclusiveMaximum,
     additionalProperties,
+    minLength,
+    minItems,
+    pattern,
     ...output
   } = schema;
   const details = [
@@ -208,6 +283,9 @@ export function ollamaToolSchema(input: unknown): Record<string, unknown> {
     additionalProperties === false
       ? 'Do not include unspecified properties.'
       : '',
+    typeof minLength === 'number' ? `Minimum length: ${minLength}.` : '',
+    typeof minItems === 'number' ? `Minimum items: ${minItems}.` : '',
+    typeof pattern === 'string' ? `Must start with ${pattern.slice(1)}.` : '',
   ]
     .filter(Boolean)
     .join(' ');

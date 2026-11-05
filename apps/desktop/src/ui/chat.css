@@ -1,16 +1,15 @@
 /* The Gyblos conversation: calm reading surface, compact controls, a small ASCII signal. */
 .paypal-session {
-  margin: 12px auto 0;
-  width: min(100% - 32px, 720px);
-  padding: 14px 16px;
+  margin: var(--space-3) auto 0;
+  width: min(100% - var(--space-8), 720px);
+  padding: var(--space-3) var(--space-4);
   border: 1px solid var(--line);
-  border-radius: 12px;
   background: var(--raised);
   color: var(--muted);
   font-size: 12px;
 }
 .paypal-session p {
-  margin: 6px 0;
+  margin: var(--space-2) 0;
   line-height: 1.5;
 }
 .paypal-session-heading,
@@ -18,13 +17,83 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-2);
 }
 .paypal-session-heading strong {
   color: var(--ink);
 }
 .paypal-session-actions {
-  margin-top: 10px;
+  margin-top: var(--space-2);
+}
+/* Keep payment context visible without covering the conversation. */
+.desktop-frame .paypal-chat .paypal-session {
+  flex: 0 0 auto;
+  max-height: 38%;
+  overflow-y: auto;
+  padding: var(--space-2) var(--space-3);
+}
+.paypal-chat .paypal-session-usage {
+  margin-left: auto;
+  font-size: 11px;
+}
+.paypal-chat .paypal-session-actions {
+  margin-top: var(--space-1);
+}
+.chat-message-role {
+  display: block;
+  margin-bottom: var(--space-1);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+.paypal-answer {
+  padding-left: var(--space-3);
+  border-left: 2px solid var(--line);
+}
+.paypal-answer .reply-text > :first-child {
+  margin-top: 0;
+}
+.chat-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 28px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.chat-progress-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.chat-progress-dots i {
+  width: 5px;
+  height: 5px;
+  border-radius: var(--radius-circle);
+  background: var(--blue);
+  animation: chat-thinking 1.2s ease-in-out infinite;
+}
+.chat-progress-dots i:nth-child(2) {
+  animation-delay: 150ms;
+}
+.chat-progress-dots i:nth-child(3) {
+  animation-delay: 300ms;
+}
+@keyframes chat-thinking {
+  0%,
+  60%,
+  100% {
+    opacity: 0.35;
+  }
+  30% {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-progress-dots i {
+    animation: none;
+    opacity: 0.7;
+  }
 }
 .chat-root:not([hidden]) {
   display: flex;
@@ -39,8 +108,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 12px 16px;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
   text-align: center;
 }
 .chat-start h2 {
@@ -57,16 +126,17 @@
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 28px;
-  padding: 20px 0 28px;
+  gap: var(--space-8);
+  padding: var(--space-6) 0 var(--space-8);
 }
 .chat-user {
   align-self: flex-end;
   display: flex;
   align-items: flex-start;
-  gap: 8px;
-  max-width: 86%;
-  padding: 10px 12px;
+  gap: var(--space-2);
+  max-width: min(86%, 480px);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
   background: var(--raised);
 }
 .chat-user p {
@@ -85,10 +155,15 @@
 .answer-heading {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 12px;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
   font-size: 11px;
   color: var(--muted);
+}
+.answer-heading strong {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 550;
 }
 
 .reply-text {
@@ -100,10 +175,10 @@
   font-size: 16px;
   line-height: 1.5;
   font-weight: 500;
-  margin: 12px 0 8px;
+  margin: var(--space-3) 0 var(--space-2);
 }
 .reply-text p {
-  margin: 10px 0;
+  margin: var(--space-2) 0;
   max-width: 76ch;
 }
 .reply-text strong {
@@ -112,36 +187,21 @@
 .reply-list-item {
   display: flex;
   align-items: baseline;
-  gap: 10px;
-  margin: 7px 0;
+  gap: var(--space-2);
+  margin: var(--space-2) 0;
 }
 .reply-list-item > span:first-child {
   color: var(--blue);
 }
 .reply-text pre {
-  padding: 14px;
-  margin: 12px 0;
+  padding: var(--space-3);
+  margin: var(--space-3) 0;
   overflow: auto;
   background: var(--bg);
   border: 1px solid var(--line);
   font:
     11px/1.8 GeistMono,
     monospace;
-}
-.run-line {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--muted);
-  font-size: 11px;
-  min-height: 28px;
-  margin: 8px 0;
-}
-.ascii-state {
-  font:
-    11px GeistMono,
-    monospace;
-  color: var(--blue);
 }
 .run-preview {
   color: var(--dim);
@@ -151,30 +211,17 @@
 .answer-actions {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
   min-height: 28px;
-  margin-top: 10px;
+  margin-top: var(--space-2);
 }
 .answer-state {
   font-size: 10px;
   color: var(--dim);
-  margin-right: 4px;
-}
-.desktop-frame .run-details-trigger {
-  margin-left: auto;
-  font-size: 10px;
-}
-.run-details {
-  background: var(--bg);
-  border: 1px solid var(--line);
-  padding: 10px 12px;
-  margin-top: 8px;
-  color: var(--muted);
-  font-size: 10px;
-  line-height: 1.8;
+  margin-right: var(--space-1);
 }
 .signal-trace {
-  margin: 0 0 6px;
+  margin: 0 0 var(--space-2);
   white-space: pre;
   overflow: auto;
   font:
@@ -195,7 +242,7 @@
   display: flex;
   align-items: center;
   min-width: 0;
-  gap: 4px;
+  gap: var(--space-1);
 }
 .desktop-frame .composer-leading .composer-model {
   max-width: none;
@@ -211,7 +258,7 @@
 .chat-notice {
   font-size: 11px;
   color: var(--muted);
-  padding: 8px 4px;
+  padding: var(--space-2) var(--space-1);
 }
 .latest-wrap {
   height: 0;
@@ -222,20 +269,20 @@
 }
 .latest-wrap > button {
   position: absolute;
-  bottom: 8px;
+  bottom: var(--space-2);
   box-shadow: 0 4px 18px #0003;
 }
 .tool-connections {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--space-2);
 }
 .tool-request-preview {
   max-height: 100px;
   overflow: auto;
   border: 1px solid var(--line);
   background: var(--editor);
-  padding: 10px;
+  padding: var(--space-2);
   font-size: 12px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -251,8 +298,8 @@
     display: none;
   }
   .chat-transcript {
-    padding: 12px 0 20px;
-    gap: 20px;
+    padding: var(--space-3) 0 var(--space-6);
+    gap: var(--space-6);
   }
 }
 @media (max-width: 480px) {
@@ -260,7 +307,7 @@
     display: none;
   }
   .desktop-frame .chat-tools-button {
-    padding-inline: 4px;
+    padding-inline: var(--space-1);
   }
 }
 
@@ -316,21 +363,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 8px 16px;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
   margin: 0;
   color: var(--muted);
   font-size: 11px;
-}
-.paypal-methods {
-  display: grid;
-  gap: 10px;
-  border: 0;
-  margin: 0;
-  padding: 0;
-}
-.paypal-methods label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }

@@ -71,9 +71,13 @@ function messages(value: unknown) {
 }
 function tools(value: unknown) {
   if (!Array.isArray(value)) return invalid();
+  const names = new Set<string>();
   return value.map((entry) => {
     const tool = row(entry);
     const fn = row(tool.function);
+    const name = text(fn.name);
+    if (names.has(name)) return invalid();
+    names.add(name);
     if (fn.strict === true) return invalid();
     if (fn.parameters !== undefined) checkToolSchema(fn.parameters);
     const { strict: _strict, ...remaining } = fn;

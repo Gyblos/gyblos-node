@@ -91,6 +91,44 @@ export function IconButton({
     />
   );
 }
+
+export function ChoiceCard({
+  title,
+  name,
+  description,
+  leading,
+  selected,
+  onSelect,
+  stacked = false,
+}: {
+  title: string;
+  name: string;
+  description: string;
+  leading: ReactNode;
+  selected: boolean;
+  onSelect: () => void;
+  stacked?: boolean;
+}) {
+  return (
+    <label className={stacked ? 'ui-choice ui-choice--stacked' : 'ui-choice'}>
+      <input
+        className="ui-choice-input"
+        type="radio"
+        name={name}
+        checked={selected}
+        onChange={onSelect}
+      />
+      <span className="ui-icon-tile" aria-hidden="true">
+        {leading}
+      </span>
+      <span className="ui-choice-copy">
+        <strong>{title}</strong>
+        <small>{description}</small>
+      </span>
+      {selected && <span className="ui-selection">Selected</span>}
+    </label>
+  );
+}
 // Choice semantics and compact row anatomy are shared by model and tool menus.
 export function MenuItem({
   label,

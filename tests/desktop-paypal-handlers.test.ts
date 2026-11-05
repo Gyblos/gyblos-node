@@ -8,7 +8,12 @@ import { createPaypalSession } from '@gyblos/node/paypal-session';
 
 import { fixture } from './support/paypal-session-fixture';
 
-async function setup() {
+async function setup(
+  confirmFinish: (summary: {
+    spentCents: number;
+    limitCents: number;
+  }) => Promise<boolean> = async () => false,
+) {
   const f = fixture();
   const opened: string[] = [];
   const service = createDesktopPaypalSession(
@@ -26,6 +31,8 @@ async function setup() {
       return { service, model: 'synthetic-model' };
     },
     { contents, mainFrame: () => frame, destroyed: () => false },
+    async () => false,
+    confirmFinish,
   );
   return {
     f,
@@ -55,6 +62,78 @@ void test('only the owning main frame can invoke sandbox operations', async () =
   );
   assert.equal(loads(), 0);
   assert.deepEqual(f.calls, []);
+});
+
+void test('settlement requires a host confirmation of the actual recorded amount', async () => {
+  const seen: { spentCents: number; limitCents: number }[] = [];
+  const { f, handlers, event } = await setup(async (summary) => {
+    seen.push(summary);
+    return true;
+  });
+  await handlers.run(event, [{ action: 'create' }]);
+  await handlers.run(event, [{ action: 'approve' }]);
+  const answer = await handlers.run(event, [
+    { action: 'send', prompt: 'Question' },
+  ]);
+  await handlers.run(event, [
+    { action: 'acknowledge', messageId: answer.answer?.messageId },
+  ]);
+  const result = await handlers.run(event, [{ action: 'finish' }]);
+  assert.deepEqual(seen, [{ spentCents: 10, limitCents: 100 }]);
+  assert.equal(result.status?.phase, 'completed');
+  assert.deepEqual(f.calls, ['create', 'authorize', 'generate', 'capture:10']);
+});
+
+void test('cancelling settlement leaves the session and provider untouched', async () => {
+  const { f, handlers, event } = await setup();
+  await handlers.run(event, [{ action: 'create' }]);
+  await handlers.run(event, [{ action: 'approve' }]);
+  const result = await handlers.run(event, [{ action: 'finish' }]);
+  assert.equal(result.status?.phase, 'active');
+  assert.deepEqual(f.calls, ['create', 'authorize']);
+});
+
+void test('an unused authorization is voided only after confirmation', async () => {
+  const seen: { spentCents: number; limitCents: number }[] = [];
+  const { f, handlers, event } = await setup(async (summary) => {
+    seen.push(summary);
+    return true;
+  });
+  await handlers.run(event, [{ action: 'create' }]);
+  await handlers.run(event, [{ action: 'approve' }]);
+  const result = await handlers.run(event, [{ action: 'finish' }]);
+  assert.deepEqual(seen, [{ spentCents: 0, limitCents: 100 }]);
+  assert.equal(result.status?.phase, 'voided');
+  assert.deepEqual(f.calls, ['create', 'authorize', 'void']);
+});
+
+void test('the reviewed amount cannot change while confirmation is open', async () => {
+  let release: (() => void) | undefined;
+  let entered: (() => void) | undefined;
+  const waiting = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const started = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const { f, service, handlers, event } = await setup(async () => {
+    entered?.();
+    await waiting;
+    return false;
+  });
+  await handlers.run(event, [{ action: 'create' }]);
+  await handlers.run(event, [{ action: 'approve' }]);
+  const finishing = handlers.run(event, [{ action: 'finish' }]);
+  await started;
+  try {
+    await assert.rejects(service.send('A concurrent request'));
+    await assert.rejects(service.prepareAgent());
+  } finally {
+    release?.();
+  }
+  const result = await finishing;
+  assert.equal(result.status?.phase, 'active');
+  assert.deepEqual(f.calls, ['create', 'authorize']);
 });
 
 void test('malformed requests are rejected before starting the service', async () => {
