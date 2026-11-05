@@ -85,7 +85,7 @@ type Blockhash = Awaited<
   ReturnType<ReturnType<IdentityRpc['getLatestBlockhash']>['send']>
 >['value'];
 
-function composeMessage(
+export function composeMessage(
   feePayer: TransactionSigner,
   blockhash: Blockhash,
   instructions: readonly Instruction[],
@@ -108,7 +108,7 @@ function wireBytes(base64: string): number {
   return (base64.length * BASE64_BITS_PER_CHAR) / BITS_PER_BYTE - padding;
 }
 
-async function chainDeadline(rpc: IdentityRpc): Promise<bigint> {
+export async function chainDeadline(rpc: IdentityRpc): Promise<bigint> {
   const slot = await rpc.getSlot({ commitment: COMMITMENT }).send();
   const blockTime = await rpc.getBlockTime(slot).send();
   if (blockTime === null) {
@@ -120,8 +120,11 @@ async function chainDeadline(rpc: IdentityRpc): Promise<bigint> {
   return BigInt(blockTime) + REGISTRATION_DEFAULTS.walletDeadlineSeconds;
 }
 
-async function registrationInstructions(
-  input: SponsoredRegistrationInput,
+export async function registrationInstructions(
+  input: Pick<
+    SponsoredRegistrationInput,
+    'owner' | 'asset' | 'node' | 'payoutWallet' | 'agentUri' | 'bindingSequence'
+  >,
   deadline: bigint,
 ) {
   const binding = await signNodeBinding(input.node, {
@@ -163,7 +166,7 @@ function simulationDetail(
 }
 
 // Simulates the message and returns the owner's post-run lamports; any program error throws SIMULATION_FAILED.
-async function simulateOwnerAfter(
+export async function simulateOwnerAfter(
   rpc: IdentityRpc,
   message: SponsoredMessage,
   owner: Address,
@@ -220,7 +223,7 @@ function isMessageBase64(text: string): text is TransactionMessageBytesBase64 {
 }
 
 // The network fee for this exact message (signatures plus Ed25519 precompile proofs).
-async function messageFee(
+export async function messageFee(
   rpc: IdentityRpc,
   message: SponsoredMessage,
 ): Promise<bigint> {
@@ -254,7 +257,7 @@ function assertWithinCeiling(sponsorCost: bigint, ceiling: bigint): void {
   }
 }
 
-function assertFits(message: SponsoredMessage): number {
+export function assertFits(message: SponsoredMessage): number {
   const transactionBytes = wireBytes(wireBase64(message));
   if (transactionBytes > LIMITS.transactionBytes) {
     throw new IdentityError(
