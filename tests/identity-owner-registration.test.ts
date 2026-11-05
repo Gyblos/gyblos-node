@@ -6,6 +6,7 @@ import test from 'node:test';
 import { SecretKey } from '@number0/iroh';
 import { generateKeyPairSigner, getAddressEncoder } from '@solana/kit';
 
+import { FINALIZED_COMMITMENT } from '@gyblos/config';
 import {
   buildOwnerRegistration,
   detachedSignerFromNodeSecret,
@@ -13,10 +14,7 @@ import {
   IdentityError,
 } from '@gyblos/identity';
 import { decodeBindingValue, verifyNodeBinding } from '@gyblos/identity/codec';
-import {
-  OWNER_REGISTRATION_COMMITMENT,
-  PROGRAMS,
-} from '@gyblos/identity/constants';
+import { PROGRAMS } from '@gyblos/identity/constants';
 
 import { fixedSigner } from './support/identity-fixture';
 import { startFakeRpc } from './support/identity-rpc-fake';
@@ -138,7 +136,7 @@ void test('the owner pays without prefunding and proves the owner wallet', async
       typeof simulationConfig === 'object' && simulationConfig !== null,
     );
     if ('commitment' in simulationConfig)
-      assert.equal(simulationConfig.commitment, OWNER_REGISTRATION_COMMITMENT);
+      assert.equal(simulationConfig.commitment, FINALIZED_COMMITMENT);
     if ('replaceRecentBlockhash' in simulationConfig)
       assert.equal(simulationConfig.replaceRecentBlockhash, false);
   } finally {

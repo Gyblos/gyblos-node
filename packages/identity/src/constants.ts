@@ -176,8 +176,6 @@ export const ONLINE_CHALLENGE = {
 } as const;
 
 // Registration defaults: simulation probe (sponsor must hold at least this) and wallet-proof lifetime.
-export const OWNER_REGISTRATION_COMMITMENT = 'finalized' as const;
-
 export const REGISTRATION_DEFAULTS = {
   probeLamports: 50_000_000n,
   walletDeadlineSeconds: 120n,

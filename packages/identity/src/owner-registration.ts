@@ -8,12 +8,9 @@ import {
   type SolanaRpcApi,
 } from '@solana/kit';
 
-import { DEVNET_GENESIS } from '@gyblos/config';
+import { DEVNET_GENESIS, FINALIZED_COMMITMENT } from '@gyblos/config';
 
-import {
-  IDENTITY_ERROR_CODES,
-  OWNER_REGISTRATION_COMMITMENT,
-} from './constants';
+import { IDENTITY_ERROR_CODES } from './constants';
 import { IdentityError } from './errors';
 import {
   assertFits,
@@ -46,19 +43,19 @@ async function estimateOwnerCost(
   owner: Address,
 ): Promise<{ feeLamports: bigint; estimatedTotalLamports: bigint }> {
   const before = await rpc
-    .getBalance(owner, { commitment: OWNER_REGISTRATION_COMMITMENT })
+    .getBalance(owner, { commitment: FINALIZED_COMMITMENT })
     .send();
   const { ownerAfter, contextSlot } = await simulateOwnerAfter(
     rpc,
     message,
     owner,
     {
-      commitment: OWNER_REGISTRATION_COMMITMENT,
+      commitment: FINALIZED_COMMITMENT,
       replaceRecentBlockhash: false,
     },
   );
   const after = await rpc
-    .getBalance(owner, { commitment: OWNER_REGISTRATION_COMMITMENT })
+    .getBalance(owner, { commitment: FINALIZED_COMMITMENT })
     .send();
   if (
     before.context.slot !== contextSlot ||
@@ -104,7 +101,7 @@ export async function buildOwnerRegistration(
       IDENTITY_ERROR_CODES.NETWORK_MISMATCH,
       'Registration requires devnet.',
     );
-  const deadline = await chainDeadline(rpc, OWNER_REGISTRATION_COMMITMENT);
+  const deadline = await chainDeadline(rpc, FINALIZED_COMMITMENT);
   const [owner, asset] = await Promise.all([
     createSignerFromKeyPair(ownerKeys),
     createSignerFromKeyPair(assetKeys),
@@ -124,7 +121,7 @@ export async function buildOwnerRegistration(
     deadline,
   );
   const { value: blockhash } = await rpc
-    .getLatestBlockhash({ commitment: OWNER_REGISTRATION_COMMITMENT })
+    .getLatestBlockhash({ commitment: FINALIZED_COMMITMENT })
     .send();
   const message = composeMessage(owner, blockhash, instructions);
   assertFits(message);
