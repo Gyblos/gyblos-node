@@ -188,6 +188,22 @@ export function failStatus(
   return discoveryFail(code, response.status);
 }
 
+// The deadline or the caller ended the read, as opposed to the body being unreadable.
+export const isDeadlineError = (error: unknown) =>
+  error instanceof DiscoveryError &&
+  (error.code === DISCOVERY_ERROR_CODES.TIMEOUT ||
+    error.code === DISCOVERY_ERROR_CODES.CANCELLED);
+
+// The index's static `{ "error": code }` mapped through `known`, else `fallback`.
+export function rejectionCode(
+  body: unknown,
+  known: ReadonlyMap<string, DiscoveryErrorCode>,
+  fallback: DiscoveryErrorCode,
+) {
+  const code = isPlainObject(body, ['error']) ? body.error : undefined;
+  return (typeof code === 'string' ? known.get(code) : undefined) ?? fallback;
+}
+
 export function isPlainObject(
   value: unknown,
   keys: readonly string[],

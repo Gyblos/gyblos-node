@@ -249,6 +249,39 @@ pnpm gyblos seller service uninstall           # stops and removes it
   this checkout with the Node that ran `install`, so reinstall after moving
   either.
 
+### Seller registration (beta invite)
+
+In the beta the discovery index lists only sellers admitted with a one-use
+invite ([discovery-index.md](discovery-index.md#beta-registration-invites)):
+
+```sh
+pnpm gyblos seller register   # asks for the invite on a terminal, or reads GYBLOS_INVITE
+```
+
+In the seller image, from the compose directory:
+`docker compose exec seller gyblos seller register`.
+
+- It sends the index only the invite and this home's NodeId, at the
+  `discovery.url` node:start would publish to. The index reads the NodeId's
+  8004-solana registration itself, so the seller must already be registered
+  there; this command does not register it on chain yet.
+- `Registered` or `Already registered` (a retry with the same invite) means the
+  seller may now publish; set `publish = true` under `[discovery]` to be listed.
+- Before asking for the invite it checks this home's seller role
+  (`SELLER_ROLE_MISSING`, `SELLER_ROLE_UNREADABLE`, `SELLER_ROLE_NOT_SELLER`)
+  and that node:start would accept the configuration and `discovery.url`
+  (`REGISTER_CONFIG_INVALID`). It takes no flags, so the invite never goes on
+  the command line: without `GYBLOS_INVITE` or a terminal it stops with
+  `REGISTER_NO_INVITE`, and a malformed code with `REGISTER_INVITE_FORMAT`.
+- It prints the index's origin before sending. The index's refusals are static
+  codes with a hint: `DISCOVERY_INVITE_INVALID` (wrong, spent or expired: ask
+  Gyblos for a new invite), `DISCOVERY_IDENTITY_NOT_REGISTERED` (not on chain
+  yet), `DISCOVERY_NODE_REVOKED`, `DISCOVERY_RATE_LIMITED`,
+  `DISCOVERY_UNAVAILABLE`, `DISCOVERY_REGISTRATION_REJECTED` or a 404
+  `DISCOVERY_HTTP_STATUS` when that index does not take registrations, and other
+  network or index failures (try again later). The invite is never printed
+  (though a terminal shows it as it is typed) and nothing is written.
+
 ### Seller status
 
 ```sh

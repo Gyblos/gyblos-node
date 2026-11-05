@@ -86,7 +86,9 @@ NodeId, the permissionless design for later.
 
 The beta replaces the allowlist with one-use invites (vault
 `20 Decisions/Alta de vendedores.md` §2). The seller registers its NodeId in the
-8004-solana registry, paying with its own wallet, then sends
+8004-solana registry, paying with its own wallet, then sends (with
+`gyblos seller register`;
+[running-a-node.md](running-a-node.md#seller-registration-beta-invite))
 `POST /v1/registrations` with `{"invite":"gyb_<26 base32>","nodeId":"<64 hex>"}`
 (JSON, at most 512 bytes).
 

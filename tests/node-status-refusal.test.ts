@@ -25,10 +25,10 @@ import {
 
 const PUBLISH = `version = 1\n[node]\nnetwork = "devnet"\n[discovery]\npublish = true\nurl = "${DISCOVERY_BASE}"\n`;
 
-void test('seller status: a missing, buyer or unreadable role exits 1 with a STATUS code', async () => {
+void test('seller status: a missing, buyer or unreadable role exits 1 with a SELLER_ROLE code', async () => {
   for (const [role, code] of [
-    [false, 'STATUS_ROLE_MISSING'],
-    ['buyer', 'STATUS_ROLE_NOT_SELLER'],
+    [false, 'SELLER_ROLE_MISSING'],
+    ['buyer', 'SELLER_ROLE_NOT_SELLER'],
   ] as const)
     await withHome(
       async (home) => {
@@ -43,7 +43,7 @@ void test('seller status: a missing, buyer or unreadable role exits 1 with a STA
     await writeFile(join(home.seller, 'role.json'), '{not json');
     const result = await status(home, system(home));
     assert.equal(result.code, 1);
-    assert.match(result.stderr, /^STATUS_ROLE_UNREADABLE: /);
+    assert.match(result.stderr, /^SELLER_ROLE_UNREADABLE: /);
   });
 });
 
