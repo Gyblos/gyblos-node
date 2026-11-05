@@ -5,6 +5,7 @@ import { REUSABLE_JOURNAL } from './constants';
 import type {
   NeverOpenedRecord,
   ReusableChannelTerms,
+  ReusableClosureRecord,
   ReusablePending,
   ReusableVoucher,
 } from './reusable-journal-model';
@@ -82,6 +83,45 @@ export async function verifyNeverOpened(
       key,
       signature,
       Uint8Array.from(neverOpenedMessage(terms, evidence)),
+    );
+  } catch {
+    return false;
+  }
+}
+export function closureMessage(
+  terms: ReusableChannelTerms,
+  evidence: Omit<ReusableClosureRecord, 'signature'>,
+): Uint8Array {
+  return new TextEncoder().encode(
+    'gyblos/reusable-closed/v1\n' + JSON.stringify({ terms, ...evidence }),
+  );
+}
+export async function verifyClosure(
+  terms: ReusableChannelTerms,
+  evidence: ReusableClosureRecord,
+): Promise<boolean> {
+  try {
+    const encoder = getBase58Encoder();
+    const signature = Uint8Array.from(encoder.encode(evidence.signature));
+    const keyBytes = Uint8Array.from(encoder.encode(terms.buyer));
+    if (
+      signature.length !== REUSABLE_JOURNAL.signatureBytes ||
+      keyBytes.length !== REUSABLE_JOURNAL.addressBytes
+    )
+      return false;
+    const key = await crypto.subtle.importKey(
+      'raw',
+      keyBytes,
+      'Ed25519',
+      false,
+      ['verify'],
+    );
+    const { signature: _signature, ...data } = evidence;
+    return await crypto.subtle.verify(
+      'Ed25519',
+      key,
+      signature,
+      Uint8Array.from(closureMessage(terms, data)),
     );
   } catch {
     return false;

@@ -1,16 +1,14 @@
 // Strict, bounded persisted state and voucher verification for the reusable buyer journal.
 // This module never signs, sends, reads a chain or touches the existing payment journal.
-import { isAddress } from '@solana/kit';
+import { PAYMENT_BINDING } from '@gyblos/protocol/constants';
 
 import {
-  PAYMENT_BINDING,
-  PAYMENT_ERROR_CODES,
-  PUBLIC_RECORD_LIMITS,
-} from '@gyblos/protocol/constants';
-import { PaymentError } from '@gyblos/protocol/payment';
-
-import { REUSABLE_JOURNAL, REUSABLE_JOURNAL_STATES } from './constants';
+  REUSABLE_JOURNAL,
+  REUSABLE_JOURNAL_STATES,
+  REUSABLE_OPEN_WIRE,
+} from './constants';
 import { isJournalNetwork } from './journal-network';
+import { parseClosure } from './reusable-journal-closure-model';
 import {
   verifyBinding,
   verifyNeverOpened,
@@ -24,6 +22,13 @@ import type {
   ReusablePending,
   ReusableVoucher,
 } from './reusable-journal-types';
+import {
+  address,
+  atomic,
+  digest,
+  fields,
+  unavailable,
+} from './reusable-journal-validation';
 
 export type {
   ReusableChannelTerms,
@@ -33,39 +38,14 @@ export type {
   NeverOpenedRecord,
   NeverOpenedObservation,
   FinalizedOpenObservation,
+  PreparationObservation,
+  PreparedOpeningObservation,
+  ClosedChannelObservation,
+  ReusableClosureRecord,
 } from './reusable-journal-types';
 
-export function unavailable(): never {
-  throw new PaymentError(PAYMENT_ERROR_CODES.JOURNAL_UNAVAILABLE);
-}
-function record(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-function fields(
-  value: unknown,
-  expected: readonly string[],
-): value is Record<string, unknown> {
-  return (
-    record(value) &&
-    Object.keys(value).length === expected.length &&
-    expected.every((key) => Object.hasOwn(value, key))
-  );
-}
-function address(value: unknown): string {
-  return typeof value === 'string' && isAddress(value) ? value : unavailable();
-}
-export function digest(value: unknown): string {
-  return typeof value === 'string' && /^[0-9a-f]{64}$/.test(value)
-    ? value
-    : unavailable();
-}
-export function atomic(value: unknown): string {
-  return typeof value === 'string' &&
-    /^(0|[1-9][0-9]{0,19})$/.test(value) &&
-    BigInt(value) <= BigInt(PUBLIC_RECORD_LIMITS.maxAtomic)
-    ? value
-    : unavailable();
-}
+export { atomic, digest, unavailable } from './reusable-journal-validation';
+
 const TERMS_FIELDS = [
   'channelId',
   'buyer',
@@ -165,6 +145,16 @@ interface Seen {
   requests: Set<string>;
   relationships: Set<string>;
 }
+function isPreparationTombstone(
+  status: unknown,
+  terms: ReusableChannelTerms,
+): boolean {
+  return (
+    status === REUSABLE_JOURNAL_STATES.NOT_OPENED &&
+    terms.channelId === terms.buyer &&
+    terms.salt === '0'
+  );
+}
 async function checkHistory(
   terms: ReusableChannelTerms,
   authorizedAtomic: string,
@@ -229,12 +219,42 @@ async function parseTerminal(
       authorizedAtomic !== '0' ||
       BigInt(terminal.finalizedBlockHeight) <=
         BigInt(terms.lastValidBlockHeight) ||
+      BigInt(terminal.contextSlot) <=
+        BigInt(terms.openSlot) + BigInt(REUSABLE_OPEN_WIRE.openSlotWindow) ||
       terminal.contextSlot !== atomic(raw.lastObservedSlot) ||
       !(await verifyNeverOpened(terms, terminal))
     )
       unavailable();
   } else if (terminal) unavailable();
   return terminal;
+}
+function checkIdentity(
+  status: unknown,
+  terms: ReusableChannelTerms,
+  authorizedAtomic: string,
+  seen: Seen,
+): void {
+  const preparationTombstone = isPreparationTombstone(status, terms);
+  if (
+    (!preparationTombstone && seen.channels.has(terms.channelId)) ||
+    BigInt(authorizedAtomic) > BigInt(terms.depositAtomic)
+  )
+    unavailable();
+  if (!preparationTombstone) seen.channels.add(terms.channelId);
+  const relation = JSON.stringify([
+    terms.network,
+    terms.mint,
+    terms.buyer,
+    terms.sellerNodeId,
+  ]);
+  if (
+    status !== REUSABLE_JOURNAL_STATES.NOT_OPENED &&
+    status !== REUSABLE_JOURNAL_STATES.CLOSED &&
+    status !== REUSABLE_JOURNAL_STATES.CLOSED_REDIRECTED
+  ) {
+    if (seen.relationships.has(relation)) unavailable();
+    seen.relationships.add(relation);
+  }
 }
 async function parseEntry(
   raw: unknown,
@@ -249,11 +269,14 @@ async function parseEntry(
       'authorizedAtomic',
       'pending',
       'terminal',
+      'closure',
       'vouchers',
     ]) ||
     (raw.status !== REUSABLE_JOURNAL_STATES.PREPARING &&
       raw.status !== REUSABLE_JOURNAL_STATES.OPENING &&
       raw.status !== REUSABLE_JOURNAL_STATES.READY &&
+      raw.status !== REUSABLE_JOURNAL_STATES.CLOSED &&
+      raw.status !== REUSABLE_JOURNAL_STATES.CLOSED_REDIRECTED &&
       raw.status !== REUSABLE_JOURNAL_STATES.NOT_OPENED) ||
     !Array.isArray(raw.vouchers) ||
     raw.vouchers.length > REUSABLE_JOURNAL.maxVouchersPerChannel
@@ -276,22 +299,14 @@ async function parseEntry(
     hold,
     vouchers,
   );
-  if (
-    seen.channels.has(terms.channelId) ||
-    BigInt(authorizedAtomic) > BigInt(terms.depositAtomic)
-  )
-    unavailable();
-  seen.channels.add(terms.channelId);
-  const relation = JSON.stringify([
-    terms.network,
-    terms.mint,
-    terms.buyer,
-    terms.sellerNodeId,
-  ]);
-  if (raw.status !== REUSABLE_JOURNAL_STATES.NOT_OPENED) {
-    if (seen.relationships.has(relation)) unavailable();
-    seen.relationships.add(relation);
-  }
+  const closure = await parseClosure(
+    raw,
+    terms,
+    authorizedAtomic,
+    hold,
+    vouchers,
+  );
+  checkIdentity(raw.status, terms, authorizedAtomic, seen);
   if (
     (raw.status === REUSABLE_JOURNAL_STATES.OPENING ||
       raw.status === REUSABLE_JOURNAL_STATES.PREPARING) &&
@@ -312,6 +327,7 @@ async function parseEntry(
     authorizedAtomic,
     pending: hold,
     terminal,
+    closure,
     vouchers,
   };
 }

@@ -119,6 +119,8 @@ export const REUSABLE_JOURNAL_STATES = {
   OPENING: 'opening',
   READY: 'ready',
   NOT_OPENED: 'not-opened',
+  CLOSED: 'closed',
+  CLOSED_REDIRECTED: 'closed-redirected',
 } as const;
 
 // Layout of the pinned payment-channel program's open instruction, used before signing.
@@ -139,6 +141,8 @@ export const REUSABLE_OPEN_WIRE = {
   computeBudgetProgram: 'ComputeBudget111111111111111111111111111111',
   computeLimit: 200_000,
   instructionCount: 4,
+  // Maximum open epoch window of the pinned program; the reader must verify the deployed binary.
+  openSlotWindow: 1_500,
   computeLimitTag: 2,
   computePriceTag: 3,
   computeLimitBytes: 5,

@@ -5,6 +5,7 @@ import { uptoDistributionHash } from 'x402-upto-metered';
 import { CHANNEL_PROGRAM } from '@gyblos/config';
 import { paymentSplits } from '@gyblos/protocol/payment-binding';
 
+import { REUSABLE_JOURNAL_STATES } from './constants';
 import {
   atomic,
   unavailable,
@@ -18,7 +19,13 @@ export function findChannel(
   channelId: string,
 ): ReusableChannelEntry {
   return (
-    entries.find((item) => item.terms.channelId === channelId) ?? unavailable()
+    entries.find(
+      (item) =>
+        item.terms.channelId === channelId &&
+        item.status !== REUSABLE_JOURNAL_STATES.NOT_OPENED,
+    ) ??
+    entries.find((item) => item.terms.channelId === channelId) ??
+    unavailable()
   );
 }
 export function verifyObservation(

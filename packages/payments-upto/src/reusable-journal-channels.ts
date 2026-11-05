@@ -99,7 +99,9 @@ function beginOpening(
       entries.length >= REUSABLE_JOURNAL.maxChannels ||
       entries.some(
         (item) =>
-          item.pending ||
+          (item.pending &&
+            item.status !== REUSABLE_JOURNAL_STATES.CLOSED &&
+            item.status !== REUSABLE_JOURNAL_STATES.CLOSED_REDIRECTED) ||
           item.status === REUSABLE_JOURNAL_STATES.OPENING ||
           item.status === REUSABLE_JOURNAL_STATES.PREPARING,
       ) ||
@@ -107,6 +109,8 @@ function beginOpening(
         (item) =>
           item.terms.channelId === terms.channelId ||
           (item.status !== REUSABLE_JOURNAL_STATES.NOT_OPENED &&
+            item.status !== REUSABLE_JOURNAL_STATES.CLOSED &&
+            item.status !== REUSABLE_JOURNAL_STATES.CLOSED_REDIRECTED &&
             sameRelationship(item.terms, terms)),
       ) ||
       signer.address !== terms.buyer ||
@@ -127,6 +131,7 @@ function beginOpening(
       lastObservedSlot: '0',
       pending: null,
       terminal: null,
+      closure: null,
       vouchers: [],
     });
     await save();

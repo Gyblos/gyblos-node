@@ -4,11 +4,15 @@ import type { HomeEnvironment } from '@gyblos/config/home';
 
 import { REUSABLE_JOURNAL } from './constants';
 import { createReusableChannelActions } from './reusable-journal-channels';
+import { createClosureActions } from './reusable-journal-close';
+import { createPreparationActions } from './reusable-journal-preparation';
 import { openReusableStore } from './reusable-journal-store';
 import { createReusableVoucherActions } from './reusable-journal-vouchers';
 
 export type ReusableJournal = ReturnType<typeof createReusableChannelActions> &
-  ReturnType<typeof createReusableVoucherActions> & { close(): Promise<void> };
+  ReturnType<typeof createReusableVoucherActions> &
+  ReturnType<typeof createClosureActions> &
+  ReturnType<typeof createPreparationActions> & { close(): Promise<void> };
 export async function openReusableJournal(options: {
   environment: HomeEnvironment;
   maxBytes?: number;
@@ -19,6 +23,8 @@ export async function openReusableJournal(options: {
   );
   return {
     ...createReusableChannelActions(store),
+    ...createClosureActions(store),
+    ...createPreparationActions(store),
     ...createReusableVoucherActions(store),
     close: store.close,
   };

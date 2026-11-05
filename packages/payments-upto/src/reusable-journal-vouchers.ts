@@ -105,12 +105,16 @@ export function createReusableVoucherActions(store: ReusableJournalStore) {
           entry.vouchers.length >= REUSABLE_JOURNAL.maxVouchersPerChannel ||
           entries.some(
             (row) =>
-              row.pending !== null ||
+              (row.pending !== null &&
+                row.status !== REUSABLE_JOURNAL_STATES.CLOSED &&
+                row.status !== REUSABLE_JOURNAL_STATES.CLOSED_REDIRECTED) ||
               row.status === REUSABLE_JOURNAL_STATES.OPENING ||
               row.status === REUSABLE_JOURNAL_STATES.PREPARING,
           ) ||
-          entries.some((row) =>
-            row.vouchers.some((item) => item.requestDigest === requestDigest),
+          entries.some(
+            (row) =>
+              row.pending?.requestDigest === requestDigest ||
+              row.vouchers.some((item) => item.requestDigest === requestDigest),
           ) ||
           BigInt(cumulative) <= BigInt(entry.authorizedAtomic) ||
           BigInt(cumulative) > BigInt(entry.terms.depositAtomic)

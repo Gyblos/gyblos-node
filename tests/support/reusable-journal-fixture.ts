@@ -57,9 +57,7 @@ export async function context(root: string) {
   return { payer, terms, paths, environment };
 }
 export function observation(
-  terms: Omit<Awaited<ReturnType<typeof context>>['terms'], 'network'> & {
-    network: string;
-  },
+  terms: Parameters<ReusableJournal['beginOpening']>[0],
 ) {
   return {
     channelId: terms.channelId,

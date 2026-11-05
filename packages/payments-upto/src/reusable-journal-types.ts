@@ -40,7 +40,52 @@ export interface ReusableChannelEntry {
   authorizedAtomic: string;
   pending: ReusablePending | null;
   terminal: NeverOpenedRecord | null;
+  closure: ReusableClosureRecord | null;
   vouchers: ReusableVoucher[];
+}
+export interface ReusableClosureRecord {
+  contextSlot: string;
+  escrowTokenAccount: string;
+  programTreasuryOwner: string;
+  settledAtomic: string;
+  sellerReceivedAtomic: string;
+  treasuryReceivedAtomic: string;
+  programResidualAtomic: string;
+  buyerRefundAtomic: string;
+  buyerRefundRedirectedAtomic: string;
+  sellerRedirectedAtomic: string;
+  treasuryRedirectedAtomic: string;
+  signature: string;
+}
+// A trusted archival reader must derive these totals from complete finalized token transfers.
+export interface ClosedChannelObservation {
+  finalized: boolean;
+  network: string;
+  program: string;
+  programTreasuryOwner: string;
+  escrowTokenAccount: string;
+  channelId: string;
+  mint: string;
+  buyer: string;
+  payTo: string;
+  treasury: string;
+  historyComplete: boolean;
+  historyFromSlot: string;
+  historyThroughSlot: string;
+  finalizedTipSlot: string;
+  channelClosed: boolean;
+  escrowBalanceAtomic: string;
+  depositedAtomic: string;
+  settledAtomic: string;
+  sellerReceivedAtomic: string;
+  treasuryReceivedAtomic: string;
+  programResidualAtomic: string;
+  buyerRefundAtomic: string;
+  buyerRefundOwner: string;
+  redirectedAtomic: string;
+  buyerRefundRedirectedAtomic: string;
+  sellerRedirectedAtomic: string;
+  treasuryRedirectedAtomic: string;
 }
 export interface NeverOpenedRecord {
   contextSlot: string;
@@ -51,6 +96,7 @@ export interface NeverOpenedObservation {
   network: string;
   channelId: string;
   finalized: boolean;
+  programWindowVerified: boolean;
   contextSlot: string;
   finalizedTipSlot: string;
   finalizedBlockHeight: string;
@@ -62,8 +108,37 @@ export interface NeverOpenedObservation {
   blockhashStatusFinalized: boolean;
   blockhashContextSlot: string;
   accountContextSlot: string;
+  historyFromSlot: string;
   historyThroughSlot: string;
   blockHeightContextSlot: string;
+}
+// The reader must provide complete finalized buyer history from openSlot through the tip.
+// It is a trusted archival reader, not evidence cryptographically proved by this API.
+export interface PreparationObservation {
+  network: string;
+  buyer: string;
+  memo: string;
+  finalized: boolean;
+  programWindowVerified: boolean;
+  historyComplete: boolean;
+  noMatchingOpen: boolean;
+  historyFromSlot: string;
+  historyThroughSlot: string;
+  finalizedTipSlot: string;
+  finalizedBlockHeight: string;
+  blockHeightContextSlot: string;
+  blockhash: string;
+  blockhashValid: boolean;
+  blockhashContextSlot: string;
+}
+export interface PreparedOpeningObservation {
+  network: string;
+  buyer: string;
+  finalized: boolean;
+  transactionSucceeded: boolean;
+  transactionSlot: string;
+  finalizedTipSlot: string;
+  messageBytes: Uint8Array;
 }
 export interface FinalizedOpenObservation {
   channelId: string;
