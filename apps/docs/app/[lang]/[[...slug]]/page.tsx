@@ -1,3 +1,4 @@
+// Renders one MDX page per language and path, with canonical and hreflang links.
 import {
   DocsBody,
   DocsDescription,
@@ -52,12 +53,15 @@ export async function generateMetadata(props: PageProps): Promise<Metadata> {
     description: page.data.description,
     alternates: {
       canonical: page.url,
-      languages: Object.fromEntries(
-        i18n.languages.map((language) => [
-          language,
-          `/${language}${path ? `/${path}` : ''}`,
-        ]),
-      ),
+      languages: {
+        ...Object.fromEntries(
+          i18n.languages.map((language) => [
+            language,
+            `/${language}${path ? `/${path}` : ''}`,
+          ]),
+        ),
+        'x-default': `/${i18n.defaultLanguage}${path ? `/${path}` : ''}`,
+      },
     },
   };
 }

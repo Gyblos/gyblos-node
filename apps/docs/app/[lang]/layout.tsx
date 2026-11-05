@@ -1,3 +1,4 @@
+// Root layout of every page: fonts, metadata, language provider and the docs sidebar.
 import { i18nProvider } from 'fumadocs-ui/i18n';
 import { DocsLayout } from 'fumadocs-ui/layouts/docs';
 import type { Metadata } from 'next';

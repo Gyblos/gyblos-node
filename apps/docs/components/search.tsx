@@ -1,5 +1,6 @@
 'use client';
 
+// The search dialog: queries the static index of the page's language in the browser.
 import { useStaticSearch } from 'fumadocs-core/search/client';
 import {
   SearchDialog,
@@ -15,7 +16,7 @@ import {
 import { useI18n } from 'fumadocs-ui/contexts/i18n';
 
 export default function DefaultSearchDialog(props: SharedProps) {
-  const { locale } = useI18n(); // (optional) for i18n
+  const { locale } = useI18n();
   const search = useStaticSearch({
     locale,
   });

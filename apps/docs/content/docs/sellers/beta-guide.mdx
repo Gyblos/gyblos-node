@@ -182,17 +182,17 @@ Stopping withdraws your offer from discovery within two minutes.
 
 ## Troubleshooting
 
-| You see                                                         | What to do                                                                                                                                                 |
-| --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Docker is not installed` or `Docker Compose v2 is missing`     | Install Docker with the compose plugin (v2.17 or later) and run the script again.                                                                          |
-| `Docker is not running`                                         | Start Docker Desktop, or the Docker service on Linux, and run the script again.                                                                            |
-| `Docker Compose … is too old`                                   | Update Docker or the compose plugin to v2.17 or later.                                                                                                     |
-| `The relay token is empty…` or `must have 32 to 512 characters` | Copy the relay token again from your invitation, with nothing before or after it.                                                                          |
-| `FAILING` with `SELLER_RELAY_OFFLINE`                           | No relay answered. Check the relay token in `seller.env` and that the machine can reach the internet, then `docker compose up -d --force-recreate seller`. |
-| `Ollama did not start`                                          | Run `cd ~/gyblos-seller && docker compose logs ollama`. It is often a lack of memory or disk.                                                              |
-| The seller fails after Ollama restarted by itself               | Run `docker compose restart seller`.                                                                                                                       |
-| `DISCOVERY_INVITE_INVALID`                                      | The code is wrong, already used or expired. Ask Gyblos for a new one.                                                                                      |
-| `DISCOVERY_RATE_LIMITED` or `DISCOVERY_UNAVAILABLE`             | Discovery is busy. Try again in a few minutes.                                                                                                             |
+| You see                                                         | What to do                                                                                                                                                                                               |
+| --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Docker is not installed` or `Docker Compose v2 is missing`     | Install Docker with the compose plugin (v2.17 or later) and run the script again.                                                                                                                        |
+| `Docker is not running`                                         | Start Docker Desktop, or the Docker service on Linux, and run the script again.                                                                                                                          |
+| `Docker Compose … is too old`                                   | Update Docker or the compose plugin to v2.17 or later.                                                                                                                                                   |
+| `The relay token is empty…` or `must have 32 to 512 characters` | Copy the relay token again from your invitation, with nothing before or after it.                                                                                                                        |
+| `FAILING` with `SELLER_RELAY_OFFLINE`                           | No relay answered. Check that the machine can reach the internet. If the token may be wrong, delete `seller.env` and run `sh install.sh` again to enter it; never print `seller.env` on a shared screen. |
+| `Ollama did not start`                                          | Run `cd ~/gyblos-seller && docker compose logs ollama`. It is often a lack of memory or disk.                                                                                                            |
+| The seller fails after Ollama restarted by itself               | Run `docker compose restart seller`.                                                                                                                                                                     |
+| `DISCOVERY_INVITE_INVALID`                                      | The code is wrong, already used or expired. Ask Gyblos for a new one.                                                                                                                                    |
+| `DISCOVERY_RATE_LIMITED` or `DISCOVERY_UNAVAILABLE`             | Discovery is busy. Try again in a few minutes.                                                                                                                                                           |
 
 If you are stuck, send the Gyblos team the output of `docker compose exec seller gyblos seller status`. It
 never contains your relay token or your keys.

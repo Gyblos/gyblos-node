@@ -1,3 +1,4 @@
+// Shared navigation and the Spanish interface strings (Fumadocs has no Spanish pack).
 import { uiTranslations } from 'fumadocs-ui/i18n';
 import type { BaseLayoutProps } from 'fumadocs-ui/layouts/shared';
 
@@ -79,8 +80,6 @@ export const translations = i18n
     },
   });
 
-const websiteLabel = { en: 'gyblos.com', es: 'gyblos.com' } as const;
-
 export function baseOptions(locale: string): BaseLayoutProps {
   return {
     nav: {
@@ -109,7 +108,7 @@ export function baseOptions(locale: string): BaseLayoutProps {
     },
     links: [
       {
-        text: websiteLabel[locale as keyof typeof websiteLabel] ?? 'gyblos.com',
+        text: 'gyblos.com',
         url: locale === 'es' ? `${websiteUrl}/es` : websiteUrl,
         external: true,
       },

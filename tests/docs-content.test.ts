@@ -1,21 +1,25 @@
 // Owns the docs site content contract (apps/docs): every page and sidebar file exists in English and
-// Spanish, no page carries something shaped like a real invite code, and the output strings the seller
-// guide tells sellers to look for still exist in the code that prints them. Offline; reads files only.
+// Spanish, each language links only to its own pages, no page carries an invite or a relay token, and the
+// output the seller guide tells sellers to look for is still printed by the code. Offline; reads files.
 import assert from 'node:assert/strict';
 import { readdir, readFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import test from 'node:test';
 
+import { REGISTRATION } from '@gyblos/discovery-index/constants';
 import { STATUS_RESULTS } from '@gyblos/node-app/constants';
 
 const ROOT = join(import.meta.dirname, '..');
 const CONTENT = join(ROOT, 'apps/docs/content/docs');
 const GUIDE = 'sellers/beta-guide';
 const SPANISH = /\.es\.(mdx|json)$/;
-// An invite (apps/discovery-index/src/constants.ts) anywhere in a page, examples included.
-const INVITE = /gyb_[a-z2-7]{26}/;
+// The invite format without its anchors, so it matches anywhere in a page.
+const INVITE = new RegExp(REGISTRATION.invite.source.slice(1, -1));
+const RELAY_TOKEN = /GYBLOS_RELAY_TOKEN=\S/;
+// Site links in MDX: href="/…" in components and ](/…) in Markdown.
+const SITE_LINK = /(?:href="|\]\()\/([^"/)]*)/g;
 
-// Output the guide quotes verbatim, and the file that prints it.
+// Output the guide quotes verbatim, and the file that prints it inside a string literal.
 const QUOTED_OUTPUT = [
   ['The seller is running', 'install.sh'],
   ['Docker is not running', 'install.sh'],
@@ -23,7 +27,6 @@ const QUOTED_OUTPUT = [
   ['Docker Compose v2 is missing', 'install.sh'],
   ['is too old', 'install.sh'],
   ['The relay token is empty', 'install.sh'],
-  ['must have $RELAY_TOKEN_MIN to $RELAY_TOKEN_MAX characters', 'install.sh'],
   ['Ollama did not start', 'install.sh'],
   ['gyblos install:', 'install.sh'],
   ['Seller identity (public;', 'apps/node/src/cli-doctor.ts'],
@@ -51,8 +54,11 @@ async function files(directory: string): Promise<string[]> {
   return nested.flat();
 }
 
-const guide = (suffix: string) =>
-  readFile(join(CONTENT, `${GUIDE}${suffix}.mdx`), 'utf8');
+const read = (path: string) => readFile(join(ROOT, path), 'utf8');
+const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+// The text appears inside one '…', "…" or `…` literal, not only in a comment.
+const inLiteral = (code: string, text: string) =>
+  new RegExp(`(['"\`])[^'"\`\\n]*${escape(text)}`).test(code);
 
 void test('docs: every page and sidebar file has an English and a Spanish version', async () => {
   const all = (await files(CONTENT)).map((path) => relative(CONTENT, path));
@@ -65,24 +71,44 @@ void test('docs: every page and sidebar file has an English and a Spanish versio
   assert.deepEqual(spanish, english);
 });
 
-void test('docs: no page carries an invite-shaped code', async () => {
-  for (const path of await files(CONTENT))
-    assert.doesNotMatch(await readFile(path, 'utf8'), INVITE, path);
+void test('docs: each language links only to pages in the same language', async () => {
+  for (const path of await files(CONTENT)) {
+    if (!path.endsWith('.mdx')) continue;
+    const locale = SPANISH.test(path) ? 'es' : 'en';
+    for (const [, first] of (await readFile(path, 'utf8')).matchAll(SITE_LINK))
+      assert.equal(first, locale, `${relative(ROOT, path)} links to /${first}`);
+  }
+});
+
+void test('docs: no page carries an invite or a relay token', async () => {
+  for (const path of await files(CONTENT)) {
+    const text = await readFile(path, 'utf8');
+    assert.doesNotMatch(text, INVITE, path);
+    assert.doesNotMatch(text, RELAY_TOKEN, path);
+  }
 });
 
 void test('docs: the seller guide quotes output that the node still prints', async () => {
-  const pages = [await guide(''), await guide('.es')];
+  const pages = [
+    await read(`apps/docs/content/docs/${GUIDE}.mdx`),
+    await read(`apps/docs/content/docs/${GUIDE}.es.mdx`),
+  ];
   for (const [text, source] of QUOTED_OUTPUT) {
-    const code = await readFile(join(ROOT, source), 'utf8');
-    assert.ok(code.includes(text), `${source} no longer prints: ${text}`);
-    // Shell variables in the source appear as their values in the guide.
-    const shown = text.replace(
-      '$RELAY_TOKEN_MIN to $RELAY_TOKEN_MAX',
-      '32 to 512',
-    );
+    assert.ok(inLiteral(await read(source), text), `${source}: ${text}`);
     for (const page of pages)
-      assert.ok(page.includes(shown), `the guide does not quote: ${shown}`);
+      assert.ok(page.includes(text), `the guide does not quote: ${text}`);
   }
+  // install.sh prints the relay token bounds from two variables.
+  const installer = await read('install.sh');
+  const bound = (name: string) =>
+    installer.match(new RegExp(`^${name}=(\\d+)$`, 'm'))?.[1];
+  const bounds = `must have ${bound('RELAY_TOKEN_MIN')} to ${bound('RELAY_TOKEN_MAX')} characters`;
+  assert.ok(
+    installer.includes(
+      'must have $RELAY_TOKEN_MIN to $RELAY_TOKEN_MAX characters',
+    ),
+  );
+  for (const page of pages) assert.ok(page.includes(bounds), bounds);
   for (const result of Object.values(STATUS_RESULTS))
     for (const page of pages)
       assert.ok(page.includes(`\`${result}\``), `missing result ${result}`);

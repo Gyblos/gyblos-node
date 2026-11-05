@@ -14,8 +14,19 @@ pnpm docs:dev     # http://localhost:3000/en
 pnpm docs:build   # static site in apps/docs/out
 ```
 
-`pnpm typecheck`, `pnpm lint` and `pnpm test` cover this app with the rest of
-the repository.
+`pnpm typecheck`, `pnpm lint`, `pnpm test` and CI's `pnpm docs:build` cover this
+app with the rest of the repository. In `docs:dev`, open `/en` or `/es`: the
+root redirect only exists on Cloudflare (`public/_redirects`).
+
+## Publishing
+
+Cloudflare serves `out/` as static files (`wrangler.jsonc`, with
+`public/_headers` and `public/_redirects`). Publishing is a founder-approved
+manual step:
+
+```sh
+cd apps/docs && pnpm build && npx wrangler@4.151.1 deploy
+```
 
 ## Writing pages
 
@@ -36,4 +47,4 @@ the repository.
   browser.
 - `lib/layout.shared.tsx` — navigation and the Spanish interface strings.
 - `app/global.css` — the Gyblos palette.
-- `public/_redirects` and `public/index.html` send `/` to `/en`.
+- `app/global-not-found.tsx` — the 404 page, in both languages.

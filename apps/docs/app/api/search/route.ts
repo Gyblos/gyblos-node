@@ -1,3 +1,4 @@
+// The search index, exported as the static file out/api/search.
 import { createFromSource } from 'fumadocs-core/search/server';
 
 import { source } from '../../../lib/source';
