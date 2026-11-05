@@ -154,10 +154,23 @@ export const STATUS_RESULTS = {
 } as const;
 export type StatusResult = (typeof STATUS_RESULTS)[keyof typeof STATUS_RESULTS];
 
-export const STATUS_ERRORS = {
-  ROLE_MISSING: 'STATUS_ROLE_MISSING',
-  ROLE_UNREADABLE: 'STATUS_ROLE_UNREADABLE',
-  ROLE_NOT_SELLER: 'STATUS_ROLE_NOT_SELLER',
+// Why `seller status` or `seller register` found no usable seller role in this home.
+export const SELLER_ROLE_ERRORS = {
+  MISSING: 'SELLER_ROLE_MISSING',
+  UNREADABLE: 'SELLER_ROLE_UNREADABLE',
+  NOT_SELLER: 'SELLER_ROLE_NOT_SELLER',
 } as const;
-export type StatusErrorCode =
-  (typeof STATUS_ERRORS)[keyof typeof STATUS_ERRORS];
+export type SellerRoleErrorCode =
+  (typeof SELLER_ROLE_ERRORS)[keyof typeof SELLER_ROLE_ERRORS];
+
+// `gyblos seller register`: the index call's deadline, where the invite comes from and its own codes.
+export const REGISTER = {
+  timeoutMs: 15_000,
+  inviteEnv: 'GYBLOS_INVITE',
+} as const;
+
+export const REGISTER_ERRORS = {
+  NO_INVITE: 'REGISTER_NO_INVITE',
+  INVITE_FORMAT: 'REGISTER_INVITE_FORMAT',
+  CONFIG_INVALID: 'REGISTER_CONFIG_INVALID',
+} as const;

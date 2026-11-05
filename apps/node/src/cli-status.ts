@@ -3,15 +3,9 @@
 // --online it also looks the NodeId up in the discovery index, sending only the model. Prints counts,
 // codes, public identifiers and URL origins; never a prompt, a buyer, a key, the home location or a value
 // from the environment.
-import { resolve } from 'node:path';
-
-import { homeLayout } from '@gyblos/config/home';
 import { fetchSellers } from '@gyblos/discovery-http';
 import { RECEIPT_STORAGE, SELLER_DAEMON_STATES } from '@gyblos/node/constants';
-import { readStartupConfig } from '@gyblos/node/node-config-file';
-import { resolveNodeConfig } from '@gyblos/node/node-config-resolve';
 import { listReceipts } from '@gyblos/node/receipts';
-import { loadRole } from '@gyblos/node/roles';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 
 import { urlOrigin } from './cli-format';
@@ -19,12 +13,16 @@ import {
   EXIT,
   SERVICE_STATES,
   STATUS,
-  STATUS_ERRORS,
   STATUS_RESULTS,
   type ServiceState,
-  type StatusErrorCode,
   type StatusResult,
 } from './constants';
+import {
+  discoverySettings,
+  homeEnvironmentOf,
+  sellerIdentity,
+  type SellerOutput,
+} from './seller-home';
 import {
   receiptActivity,
   type ActivityWindow,
@@ -40,43 +38,19 @@ import {
 } from './status-system';
 
 const COLUMN = 13;
-const ROLE_HINT =
-  'no usable seller role in this home; `pnpm gyblos doctor` explains why';
 const INDEX_LOOKUP = {
   FOUND: 'found',
   ABSENT: 'absent',
   TRUNCATED: 'truncated',
 } as const;
 
-interface StatusOutput {
-  env: Readonly<Record<string, string | undefined>>;
-  cwd: string;
-  stdout: (text: string) => void;
-  stderr: (text: string) => void;
-}
-
+type StatusOutput = SellerOutput;
 type HomeEnvironment = StatusOutput['env'];
 
 const line = (label: string, value: string) =>
   `  ${label.padEnd(COLUMN)} ${value}\n`;
 const iso = (time: number) =>
   new Date(time).toISOString().replace(/\.\d+Z$/, 'Z');
-
-// The file node:start reads, refused exactly when node:start would refuse it.
-async function discoverySettings(output: StatusOutput) {
-  const read = await readStartupConfig(output.env, output.cwd);
-  if (!read.ok) return undefined;
-  const resolved = resolveNodeConfig({
-    file: read.config,
-    env: output.env,
-  });
-  return resolved.ok
-    ? {
-        publish: resolved.settings.discoveryPublish,
-        url: resolved.settings.discoveryUrl,
-      }
-    : undefined;
-}
 
 // Pages the index for one model until the NodeId shows up, the pages run out or the page budget is spent.
 async function lookUp(
@@ -211,40 +185,12 @@ function result(
   return STATUS_RESULTS.NOT_CONFIRMED;
 }
 
-// The seller role of this home, or undefined after printing why there is none.
-async function sellerIdentity(
-  homeEnvironment: HomeEnvironment,
-  output: StatusOutput,
-) {
-  const refuse = (code: StatusErrorCode) => {
-    output.stderr(`${code}: ${ROLE_HINT}\n`);
-    return undefined;
-  };
-  let identity: Awaited<ReturnType<typeof loadRole>>;
-  try {
-    identity = await loadRole(P2P_ROLES.SELLER, homeEnvironment);
-  } catch (error) {
-    return refuse(
-      (error as NodeJS.ErrnoException).code === 'ENOENT'
-        ? STATUS_ERRORS.ROLE_MISSING
-        : STATUS_ERRORS.ROLE_UNREADABLE,
-    );
-  }
-  return identity.role === P2P_ROLES.SELLER
-    ? identity
-    : refuse(STATUS_ERRORS.ROLE_NOT_SELLER);
-}
-
 export async function statusCommand(
   options: { online: boolean },
   output: StatusOutput,
   system: StatusSystem = defaultStatusSystem(),
 ) {
-  // A relative GYBLOS_HOME is the working directory's, as for node:start.
-  const homeEnvironment = {
-    ...output.env,
-    GYBLOS_HOME: resolve(output.cwd, homeLayout(output.env).root),
-  };
+  const homeEnvironment = homeEnvironmentOf(output);
   const identity = await sellerIdentity(homeEnvironment, output);
   if (!identity) return EXIT.failure;
   const now = system.now();

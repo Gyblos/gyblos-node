@@ -10,12 +10,14 @@ import {
   INDEX_ERROR_MAP,
   PUBLISH_STATUS_ERROR_MAP,
 } from './constants';
-import { DiscoveryError, discoveryFail } from './errors';
+import { discoveryFail } from './errors';
 import {
   failStatus,
   indexUrl,
+  isDeadlineError,
   isPlainObject,
   readJson,
+  rejectionCode,
   timeoutOf,
   withDeadline,
   type DiscoveryFetch,
@@ -45,14 +47,6 @@ function publishBody(record: unknown): string {
   return body;
 }
 
-function rejectionCode(body: unknown) {
-  const code = isPlainObject(body, ['error']) ? body.error : undefined;
-  return (
-    (typeof code === 'string' ? INDEX_ERROR_MAP.get(code) : undefined) ??
-    DISCOVERY_ERROR_CODES.RECORD_REJECTED
-  );
-}
-
 async function readPublish(response: Response, aborted: Promise<never>) {
   const mapped = PUBLISH_STATUS_ERROR_MAP.get(response.status);
   if (mapped) failStatus(response, mapped);
@@ -70,19 +64,19 @@ async function readPublish(response: Response, aborted: Promise<never>) {
     );
   } catch (error) {
     // A 400 whose body cannot be read is still a rejection, unless the deadline ended the read.
-    if (
-      response.status === HTTP_STATUS.BAD_REQUEST &&
-      !(
-        error instanceof DiscoveryError &&
-        (error.code === DISCOVERY_ERROR_CODES.TIMEOUT ||
-          error.code === DISCOVERY_ERROR_CODES.CANCELLED)
-      )
-    )
+    if (response.status === HTTP_STATUS.BAD_REQUEST && !isDeadlineError(error))
       discoveryFail(DISCOVERY_ERROR_CODES.RECORD_REJECTED, response.status);
     throw error;
   }
   if (response.status === HTTP_STATUS.BAD_REQUEST)
-    discoveryFail(rejectionCode(body), response.status);
+    discoveryFail(
+      rejectionCode(
+        body,
+        INDEX_ERROR_MAP,
+        DISCOVERY_ERROR_CODES.RECORD_REJECTED,
+      ),
+      response.status,
+    );
   if (!isPlainObject(body, ['ok']) || body.ok !== true)
     discoveryFail(DISCOVERY_ERROR_CODES.MALFORMED_RESPONSE, response.status);
 }

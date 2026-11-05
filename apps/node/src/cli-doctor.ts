@@ -130,7 +130,9 @@ export async function doctor(
   for (const issue of report.configIssues)
     stdout(`        ${issueLine(issue)}`);
   if (report.seller) {
-    stdout('Seller identity (public; share it to be enrolled in discovery):\n');
+    stdout(
+      'Seller identity (public; `gyblos seller register` enrolls it in discovery):\n',
+    );
     stdout(`  nodeId  ${report.seller.nodeId}\n`);
     stdout(`  owner   ${report.seller.owner}\n`);
   }
