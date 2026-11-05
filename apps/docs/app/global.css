@@ -1,0 +1,73 @@
+@import 'tailwindcss';
+@import 'fumadocs-ui/css/neutral.css';
+@import 'fumadocs-ui/css/preset.css';
+
+/* Gyblos palette (gyblos-brain DESIGN.md §3): charcoal grays, one calm sky-blue accent. */
+@theme {
+  --font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  --color-fd-background: #fcfcfc;
+  --color-fd-foreground: #1c1c1c;
+  --color-fd-muted: #f4f5f6;
+  --color-fd-muted-foreground: #5f6368;
+  --color-fd-popover: #fcfcfc;
+  --color-fd-popover-foreground: #1c1c1c;
+  --color-fd-card: #f4f5f6;
+  --color-fd-card-foreground: #1c1c1c;
+  --color-fd-border: #e4e6e8;
+  /* Primary is also used as text (active links), so light mode takes the readable sky text. */
+  --color-fd-primary: #0369a1;
+  --color-fd-primary-foreground: #fcfcfc;
+  --color-fd-secondary: #f4f5f6;
+  --color-fd-secondary-foreground: #1c1c1c;
+  --color-fd-accent: #e4e6e8;
+  --color-fd-accent-foreground: #1c1c1c;
+  --color-fd-ring: #0369a1;
+}
+
+.dark {
+  --color-fd-background: #171717;
+  --color-fd-foreground: #ededed;
+  --color-fd-muted: #1f1f1f;
+  --color-fd-muted-foreground: #a1a1a1;
+  --color-fd-popover: #1f1f1f;
+  --color-fd-popover-foreground: #ededed;
+  --color-fd-card: #1f1f1f;
+  --color-fd-card-foreground: #ededed;
+  --color-fd-border: #2e2e2e;
+  --color-fd-primary: #7dcef0;
+  --color-fd-primary-foreground: #0b1a22;
+  --color-fd-secondary: #1f1f1f;
+  --color-fd-secondary-foreground: #ededed;
+  --color-fd-accent: #2e2e2e;
+  --color-fd-accent-foreground: #ededed;
+  --color-fd-ring: #6cc6ec;
+}
+
+.dark #nd-sidebar {
+  --color-fd-muted: #1f1f1f;
+  --color-fd-secondary: #242424;
+  --color-fd-muted-foreground: #a1a1a1;
+}
+
+@theme static {
+  --color-fd-info: #0369a1;
+  --color-fd-warning: #b45309;
+  --color-fd-error: #d61f4f;
+}
+
+.dark {
+  --color-fd-info: #7dcef0;
+  --color-fd-warning: #f2c26b;
+  --color-fd-error: #f27b93;
+}
+
+html {
+  scrollbar-gutter: stable;
+}
+
+html > body[data-scroll-locked] {
+  margin-right: 0px !important;
+  --removed-body-scroll-bar-size: 0px !important;
+}
