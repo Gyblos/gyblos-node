@@ -12,11 +12,19 @@ export interface StatusOffer {
   listed: boolean;
 }
 
+export interface DaemonFailure {
+  code?: string;
+  phase?: string;
+}
+
 export interface DaemonStatus {
   state: string;
   phase?: string;
   nodeId?: string;
   offers: StatusOffer[];
+  // A failed start's static code, or while starting again, the previous start's failure.
+  code?: string;
+  lastFailure?: DaemonFailure;
 }
 
 export interface ActivityWindow {
@@ -38,6 +46,12 @@ export interface Activity {
 const PRINTABLE = /^[A-Za-z0-9._:/@-]{1,128}$/;
 const printable = (value: unknown) =>
   typeof value === 'string' && PRINTABLE.test(value) ? value : undefined;
+
+function daemonFailure(value: unknown): DaemonFailure | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const entry = value as Record<string, unknown>;
+  return { code: printable(entry.code), phase: printable(entry.phase) };
+}
 
 function statusOffer(value: unknown): StatusOffer | undefined {
   if (typeof value !== 'object' || value === null) return undefined;
@@ -71,6 +85,8 @@ export function parseDaemonStatus(text: string): DaemonStatus | undefined {
     phase: printable(record.phase),
     nodeId: printable(record.nodeId),
     offers: valid,
+    code: printable(record.code),
+    lastFailure: daemonFailure(record.lastFailure),
   };
 }
 

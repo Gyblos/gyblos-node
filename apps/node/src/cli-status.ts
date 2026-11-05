@@ -9,6 +9,7 @@ import { listReceipts } from '@gyblos/node/receipts';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 
 import { urlOrigin } from './cli-format';
+import { codeHint } from './cli-hints';
 import {
   EXIT,
   SERVICE_STATES,
@@ -170,7 +171,17 @@ function daemonLine(daemon: DaemonFile) {
   if (daemon.kind === 'unreadable') return 'status file unreadable';
   const { status } = daemon;
   const phase = status.phase ? ` (${status.phase})` : '';
-  return `${status.state}${phase}, written ${iso(daemon.updatedAt)}`;
+  const code = status.code ? `: ${status.code}` : '';
+  return `${status.state}${phase}${code}, written ${iso(daemon.updatedAt)}`;
+}
+
+// The failure to explain: this status's own, or the previous start's while it restarts.
+function failureOf(status: DaemonStatus | undefined) {
+  if (status?.state === SELLER_DAEMON_STATES.FAILED)
+    return { code: status.code, phase: status.phase };
+  if (status?.state === SELLER_DAEMON_STATES.STARTING)
+    return status.lastFailure;
+  return undefined;
 }
 
 function result(
@@ -178,6 +189,7 @@ function result(
   status: DaemonStatus | undefined,
 ): StatusResult {
   if (service === SERVICE_STATES.INACTIVE) return STATUS_RESULTS.STOPPED;
+  if (failureOf(status)) return STATUS_RESULTS.FAILING;
   if (service === SERVICE_STATES.ACTIVE)
     return status?.state === SELLER_DAEMON_STATES.READY
       ? STATUS_RESULTS.RUNNING
@@ -234,6 +246,15 @@ export async function statusCommand(
   output.stdout(await activityLines(homeEnvironment, identity.nodeId, now));
   const verdict = result(service, status);
   output.stdout(`Result: ${verdict}\n`);
+  const failure = failureOf(status);
+  if (verdict === STATUS_RESULTS.FAILING && failure) {
+    const where = failure.phase ? ` at ${failure.phase}` : '';
+    const code = failure.code ?? 'no static code; see the daemon log';
+    const help = failure.code ? codeHint(failure.code) : '';
+    output.stdout(
+      `  The last start failed${where}: ${code}${help ? ` (${help})` : ''}\n`,
+    );
+  }
   if (verdict === STATUS_RESULTS.NOT_CONFIRMED)
     output.stdout(
       '  Without a service, status.json shows the last state written; a stopped seller may still read "ready".\n',

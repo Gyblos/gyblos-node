@@ -318,8 +318,12 @@ It prints the NodeId and owner, then:
   see a lower bound.
 
 `Result: RUNNING` (exit 0) needs an active service and a ready daemon;
-`STARTING`, `STOPPED` and `NOT_CONFIRMED` (no service to confirm the process)
-exit 1. It writes nothing and prints no buyer, prompt, key or home location.
+`STARTING`, `FAILING`, `STOPPED` and `NOT_CONFIRMED` (no service to confirm the
+process) exit 1. `FAILING` means the last start failed, including while the
+service restarts after it; status then names the phase, the static code and a
+hint, such as `SELLER_RELAY_OFFLINE` when no relay answered (a refused relay
+token or no network). It writes nothing and prints no buyer, prompt, key or home
+location.
 
 ### Docker
 

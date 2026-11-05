@@ -317,10 +317,13 @@ Startup stops with a static code: `NODE_CONFIG_INVALID`,
 `SELLER_PAYMENT_ROLE_MISSING`, `SELLER_PAYMENT_NETWORK_MISMATCH` (the role's RPC
 is not devnet), `SELLER_PAYMENT_DESCRIPTION_INVALID` (the payout is the owner,
 fee payer or authorizer key) or `SELLER_PAYMENT_ACCOUNTS_UNAVAILABLE` (a token
-account below is missing and could not be created). A paid seller's fee payer
-key needs devnet SOL: it pays every channel transaction and fronts each buyer
-channel's rent until the channel is reclaimed. `pnpm gyblos doctor` also names
-the `[[offers]]` entry a code is about.
+account below is missing and could not be created). After the file is accepted,
+`SELLER_RELAY_OFFLINE` means no relay answered within 30 s: a relay token the
+relays refuse, or no outbound connection. The daemon prints the code with a hint
+in one line, and `gyblos seller status` shows it until a start succeeds. A paid
+seller's fee payer key needs devnet SOL: it pays every channel transaction and
+fronts each buyer channel's rent until the channel is reclaimed.
+`pnpm gyblos doctor` also names the `[[offers]]` entry a code is about.
 
 A claim pays the payout, the protocol fee treasury and the fee payer (the
 channel's payee) into their token accounts for the mint, and refunds the rest to
