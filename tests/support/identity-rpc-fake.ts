@@ -31,6 +31,9 @@ export interface SimulatedSpend {
   ownerAfterProbe: number;
   fee: number | null;
   laterSimulationErr?: string;
+  initialSimulationErr?: string;
+  simulationSlot?: number;
+  balanceAfterSimulation?: number;
 }
 
 export interface FakeRpcState {
@@ -159,9 +162,12 @@ function simulation(state: FakeRpcState) {
     (method) => method === 'simulateTransaction',
   ).length;
   return {
-    context: { slot: SLOT },
+    context: { slot: state.spend.simulationSlot ?? SLOT },
     value: {
-      err: simulations > 1 ? (state.spend.laterSimulationErr ?? null) : null,
+      err:
+        simulations > 1
+          ? (state.spend.laterSimulationErr ?? null)
+          : (state.spend.initialSimulationErr ?? null),
       logs: [],
       accounts: [
         {
@@ -208,7 +214,14 @@ function respond(state: FakeRpcState, call: JsonRpcCall): object {
         },
       };
     case 'getBalance':
-      return { result: { context, value: state.spend.ownerBalance } };
+      return {
+        result: {
+          context,
+          value: state.calls.includes('simulateTransaction')
+            ? (state.spend.balanceAfterSimulation ?? state.spend.ownerBalance)
+            : state.spend.ownerBalance,
+        },
+      };
     case 'simulateTransaction':
       return { result: simulation(state) };
     case 'getFeeForMessage':

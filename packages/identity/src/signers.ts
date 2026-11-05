@@ -35,6 +35,6 @@ export async function detachedSignerFromNodeSecret(
       'Invalid node secret.',
     );
   return detachedSignerFromKeyPair(
-    await createKeyPairFromPrivateKeyBytes(secret.slice()),
+    await createKeyPairFromPrivateKeyBytes(Uint8Array.from(secret)),
   );
 }

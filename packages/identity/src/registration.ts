@@ -11,6 +11,7 @@ import {
   setTransactionMessageFeePayerSigner,
   setTransactionMessageLifetimeUsingBlockhash,
   type Address,
+  type Commitment,
   type Instruction,
   type Rpc,
   type SolanaRpcApi,
@@ -20,7 +21,11 @@ import {
 
 import { COMMITMENT, SVM_TRANSACTION_VERSION } from '@gyblos/config';
 
-import { encodeBindingValue, signNodeBinding } from './binding';
+import {
+  encodeBindingValue,
+  signNodeBinding,
+  verifyNodeBinding,
+} from './binding';
 import {
   BASE64_ENCODING,
   IDENTITY_ERROR_CODES,
@@ -108,8 +113,11 @@ function wireBytes(base64: string): number {
   return (base64.length * BASE64_BITS_PER_CHAR) / BITS_PER_BYTE - padding;
 }
 
-export async function chainDeadline(rpc: IdentityRpc): Promise<bigint> {
-  const slot = await rpc.getSlot({ commitment: COMMITMENT }).send();
+export async function chainDeadline(
+  rpc: IdentityRpc,
+  commitment: Commitment = COMMITMENT,
+): Promise<bigint> {
+  const slot = await rpc.getSlot({ commitment }).send();
   const blockTime = await rpc.getBlockTime(slot).send();
   if (blockTime === null) {
     throw new IdentityError(
@@ -132,6 +140,17 @@ export async function registrationInstructions(
     owner: input.owner.address,
     sequence: input.bindingSequence,
   });
+  if (
+    !(await verifyNodeBinding(
+      binding,
+      input.asset.address,
+      input.owner.address,
+    ))
+  )
+    throw new IdentityError(
+      IDENTITY_ERROR_CODES.BINDING_INVALID,
+      'Node binding signature is invalid.',
+    );
   const register = await registerInstruction(
     input.owner,
     input.asset,
@@ -170,13 +189,14 @@ export async function simulateOwnerAfter(
   rpc: IdentityRpc,
   message: SponsoredMessage,
   owner: Address,
-): Promise<{ ownerAfter: bigint; unitsConsumed: bigint }> {
+  options: { commitment?: Commitment; replaceRecentBlockhash?: boolean } = {},
+): Promise<{ ownerAfter: bigint; unitsConsumed: bigint; contextSlot: bigint }> {
   const result = await rpc
     .simulateTransaction(wireBase64(message), {
       encoding: BASE64_ENCODING,
       sigVerify: false,
-      replaceRecentBlockhash: true,
-      commitment: COMMITMENT,
+      replaceRecentBlockhash: options.replaceRecentBlockhash ?? true,
+      commitment: options.commitment ?? COMMITMENT,
       accounts: { addresses: [owner], encoding: BASE64_ENCODING },
     })
     .send();
@@ -187,7 +207,11 @@ export async function simulateOwnerAfter(
       simulationDetail(result.value.err, result.value.logs),
     );
   }
-  return { ownerAfter, unitsConsumed: result.value.unitsConsumed ?? 0n };
+  return {
+    ownerAfter,
+    unitsConsumed: result.value.unitsConsumed ?? 0n,
+    contextSlot: result.context.slot,
+  };
 }
 
 // Simulates with a generous prefund and returns how many lamports the owner actually spent.
