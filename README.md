@@ -197,6 +197,9 @@ checks, the standalone lab facilitator and their evidence, and `tests/` and
 
 ## Documentation
 
+Public guides for sellers and buyers, in English and Spanish, live in
+[apps/docs](apps/docs/README.md) (docs.gyblos.com). Repository documentation:
+
 [Architecture](docs/architecture.md) · [Running a node](docs/running-a-node.md)
 · [Configuration](docs/configuration.md) · [Payments](docs/payments.md) ·
 [Inference](docs/inference.md) · [Recovery](docs/recovery.md) ·

@@ -21,6 +21,10 @@ export default [
       'lab/evidence/**',
       '**/dist/**',
       'coverage/**',
+      'apps/docs/.next/**',
+      'apps/docs/out/**',
+      'apps/docs/.source/**',
+      'apps/docs/next-env.d.ts',
     ],
   },
   {
@@ -39,6 +43,7 @@ export default [
           './tsconfig.json',
           './tsconfig.tests.json',
           './apps/desktop/tsconfig.renderer.json',
+          './apps/docs/tsconfig.json',
         ],
         tsconfigRootDir: ROOT,
       },
