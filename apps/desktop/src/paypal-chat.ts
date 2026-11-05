@@ -9,6 +9,7 @@ import {
   PAYPAL_STATUS_POLL_MAX_OUTSTANDING,
   PAYPAL_STATUS_POLL_TIMEOUT_MS,
 } from './constants';
+import { paypalChatFailure } from './paypal-chat-notice';
 import {
   parsePaypalResult,
   PAYPAL_ACTION,
@@ -18,33 +19,9 @@ import {
   type PaypalResult,
 } from './paypal-model';
 import type { DesktopPaypalStatus } from './paypal-session';
-import { CHAT_PREVIEW, CHAT_ROLE } from './ui/constants';
+import { CHAT_ROLE } from './ui/constants';
 
-type ScrollViewport = {
-  scrollTop: number;
-  readonly scrollHeight: number;
-  readonly clientHeight: number;
-};
-
-export class PaypalChatScroll {
-  private following = true;
-
-  observe(viewport: ScrollViewport) {
-    this.following =
-      viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight <
-      CHAT_PREVIEW.FOLLOW_THRESHOLD;
-    return this.following;
-  }
-
-  follow(viewport: ScrollViewport) {
-    if (this.following) viewport.scrollTop = viewport.scrollHeight;
-  }
-
-  latest(viewport: ScrollViewport) {
-    this.following = true;
-    this.follow(viewport);
-  }
-}
+export { PaypalChatScroll } from './paypal-chat-scroll';
 
 type Message = {
   role: (typeof CHAT_ROLE)[keyof typeof CHAT_ROLE];
@@ -63,32 +40,6 @@ type Snapshot = {
 };
 type Run = (request: PaypalRequest) => Promise<PaypalResult>;
 
-function failure(result: PaypalResult) {
-  if (
-    result.error === PAYPAL_DESKTOP_ERROR.INVALID_PROMPT &&
-    result.status?.expired
-  )
-    return 'The sandbox session has expired. Close it to settle recorded usage.';
-  if (
-    result.error === PAYPAL_DESKTOP_ERROR.INVALID_PROMPT &&
-    result.status &&
-    (result.status.remainingAttempts === 0 ||
-      result.status.spentCents + result.status.messageCents >
-        result.status.limitCents)
-  )
-    return 'The sandbox session limit has been reached. Close it to settle recorded usage.';
-  if (result.error === PAYPAL_DESKTOP_ERROR.INVALID_PROMPT)
-    return 'Shorten the message or remove reserved model control markers, then try again.';
-  if (result.error === PAYPAL_DESKTOP_ERROR.NOT_APPROVED)
-    return result.status?.approvalLinkAvailable
-      ? 'Approve the request in PayPal Sandbox before starting the session.'
-      : 'PayPal has not confirmed approval. If already approved, check again; otherwise abandon this order and start a new session.';
-  if (result.error === PAYPAL_DESKTOP_ERROR.INTERRUPTED)
-    return 'The approval check was interrupted before authorization.';
-  if (result.error === PAYPAL_DESKTOP_ERROR.UNAVAILABLE)
-    return 'PayPal Sandbox is unavailable. Check its configuration and the local model.';
-  return 'The operation could not be confirmed. Check the session before continuing.';
-}
 function needsReview(
   status: DesktopPaypalStatus | null,
   pending: string | null,
@@ -177,7 +128,7 @@ export class PaypalChatController {
     )
       this.returnPending = false;
     const notice = result.error
-      ? failure(result)
+      ? paypalChatFailure(result)
       : request.action === PAYPAL_ACTION.FINISH &&
           result.status?.phase === PAYPAL_SESSION_PHASE.ACTIVE
         ? 'Session remains open. No payment was requested.'
@@ -234,7 +185,7 @@ export class PaypalChatController {
       model: result.model,
       busy: false,
       notice: result.error
-        ? failure(result)
+        ? paypalChatFailure(result)
         : 'PayPal checkout was cancelled. Abandon this order to start a new session.',
     });
     await this.consumeReturn();
@@ -353,7 +304,9 @@ export class PaypalChatController {
       new TextEncoder().encode(draft).length > PAYPAL_REQUEST_LIMITS.promptBytes
     ) {
       this.update({
-        notice: failure(paypalFailure(PAYPAL_DESKTOP_ERROR.INVALID_PROMPT)),
+        notice: paypalChatFailure(
+          paypalFailure(PAYPAL_DESKTOP_ERROR.INVALID_PROMPT),
+        ),
       });
       return;
     }
@@ -372,7 +325,7 @@ export class PaypalChatController {
         status: result.status,
         statusFresh: result.status !== null,
         model: result.model,
-        notice: failure(result),
+        notice: paypalChatFailure(result),
         draft:
           this.draftRevision === draftRevision ? draft : this.snapshot.draft,
         pendingPrompt: null,
