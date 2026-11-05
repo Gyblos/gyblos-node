@@ -21,7 +21,7 @@ free model clears only the corresponding paid-model block. All conversations,
 drafts, theme choices and connection budgets are in memory and clear when the
 app closes. They are not saved to the product home.
 
-The five sample models and their prices remain under the collapsed Preview
+The five sample models and their prices remain visible in the Preview
 catalog; connection budgets are illustrative, not enforced tool spending limits.
 Models also supports an explicit exact-ID lookup of signed free announcements
 from the public discovery index. This reads one bounded page and only retains

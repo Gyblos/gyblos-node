@@ -12,6 +12,7 @@ import {
   PAYPAL_AUTHORIZATION_STATUS,
   PAYPAL_ORDER_INTENT,
   PAYPAL_ORDER_STATUS,
+  PAYPAL_RESOURCE_STATUS,
 } from './constants';
 import { managedPaypalOperations } from './managed-operations';
 import { createPaypalReviewAccess } from './review';
@@ -43,7 +44,11 @@ function correctAmount(
 function confirmedVoid(value: unknown, authorizationId: string): boolean {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const data = Object.fromEntries(Object.entries(value));
-  if (data.id !== authorizationId || data.status !== 'VOIDED') return false;
+  if (
+    data.id !== authorizationId ||
+    data.status !== PAYPAL_AUTHORIZATION_STATUS.VOIDED
+  )
+    return false;
   if (data.amount === undefined) return true;
   if (
     !data.amount ||
@@ -231,7 +236,10 @@ async function captureAuthorized(
       `capture-${id(authorizationId)}`,
     ),
   );
-  if (data.status !== 'COMPLETED' || !correctAmount(data.amount, expected))
+  if (
+    data.status !== PAYPAL_RESOURCE_STATUS.COMPLETED ||
+    !correctAmount(data.amount, expected)
+  )
     throw new PaypalError(PAYPAL_ERROR_CODES.UNRESOLVED);
   return { captureId: id(data.id) };
 }
@@ -292,7 +300,10 @@ async function refundCaptured(
       `refund-${id(captureId)}`,
     ),
   );
-  if (data.status !== 'COMPLETED' || !correctAmount(data.amount))
+  if (
+    data.status !== PAYPAL_RESOURCE_STATUS.COMPLETED ||
+    !correctAmount(data.amount)
+  )
     throw new PaypalError(PAYPAL_ERROR_CODES.UNRESOLVED);
   id(data.id);
 }

@@ -7,6 +7,7 @@ import {
 } from 'node:http';
 
 import { PAYPAL_SANDBOX } from '@gyblos/config/constants';
+import { HTTP_STATUS as HTTP } from '@gyblos/config/limits';
 import {
   PAYPAL_SESSION_PHASE,
   PAYPAL_SESSION_STATUS,
@@ -18,13 +19,6 @@ import {
 import { PAYPAL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { PaypalError } from '@gyblos/protocol/paypal-payment';
 
-const HTTP = {
-  ok: 200,
-  badRequest: 400,
-  forbidden: 403,
-  notFound: 404,
-  conflict: 409,
-} as const;
 const BODY_BYTES = 16384;
 const SESSION_BYTES = 32;
 

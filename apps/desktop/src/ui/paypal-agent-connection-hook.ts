@@ -7,7 +7,7 @@ import {
   type SetStateAction,
 } from 'react';
 
-import { PAYPAL_AGENT_POLL_TIMEOUT_MS } from '../constants';
+import { PAYPAL_STATUS_POLL_TIMEOUT_MS } from '../constants';
 import {
   agentFailure,
   createPaypalAgentStatusPoll,
@@ -78,7 +78,7 @@ function useAgentStatusPolling({
         if (mounted.current && statusSequence === sequence.current)
           setStatusUnavailable(true);
       },
-      PAYPAL_AGENT_POLL_TIMEOUT_MS,
+      PAYPAL_STATUS_POLL_TIMEOUT_MS,
     );
     pollerRef.current = poller;
     function refresh() {

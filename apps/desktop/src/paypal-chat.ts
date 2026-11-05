@@ -6,6 +6,10 @@ import {
 } from '@gyblos/node/constants';
 
 import {
+  PAYPAL_STATUS_POLL_MAX_OUTSTANDING,
+  PAYPAL_STATUS_POLL_TIMEOUT_MS,
+} from './constants';
+import {
   parsePaypalResult,
   PAYPAL_ACTION,
   PAYPAL_DESKTOP_ERROR,
@@ -107,10 +111,14 @@ export class PaypalChatController {
   private readonly listeners = new Set<() => void>();
   private draftRevision = 0;
   private polling = false;
+  private outstandingStatus = 0;
   private returnPending = false;
   private returning = false;
   private cancellationPending = false;
-  constructor(private readonly run: Run) {}
+  constructor(
+    private readonly run: Run,
+    private readonly statusTimeoutMs = PAYPAL_STATUS_POLL_TIMEOUT_MS,
+  ) {}
   getSnapshot = () => this.snapshot;
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
@@ -133,6 +141,24 @@ export class PaypalChatController {
       return paypalFailure();
     }
   }
+  private async statusCall() {
+    if (this.outstandingStatus >= PAYPAL_STATUS_POLL_MAX_OUTSTANDING)
+      return paypalFailure();
+    this.outstandingStatus += 1;
+    const pending = this.call({ action: PAYPAL_ACTION.STATUS });
+    void pending.then(() => {
+      this.outstandingStatus -= 1;
+    });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<PaypalResult>((resolve) => {
+      timer = setTimeout(() => resolve(paypalFailure()), this.statusTimeoutMs);
+    });
+    try {
+      return await Promise.race([pending, timeout]);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
   private async command(request: PaypalRequest) {
     if (this.snapshot.busy) return;
     const previous = this.snapshot.status;
@@ -140,7 +166,10 @@ export class PaypalChatController {
       busy: true,
       ...(request.action === PAYPAL_ACTION.STATUS ? {} : { notice: '' }),
     });
-    const result = await this.call(request);
+    const result =
+      request.action === PAYPAL_ACTION.STATUS
+        ? await this.statusCall()
+        : await this.call(request);
     if (
       request.action === PAYPAL_ACTION.APPROVE &&
       result.error &&
@@ -220,7 +249,7 @@ export class PaypalChatController {
     this.polling = true;
     const previous = this.snapshot.status;
     try {
-      const result = await this.call({ action: PAYPAL_ACTION.STATUS });
+      const result = await this.statusCall();
       if (!this.snapshot.busy && this.snapshot.status === previous) {
         if (result.error || !result.status) this.update({ statusFresh: false });
         else

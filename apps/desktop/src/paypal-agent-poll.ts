@@ -1,6 +1,6 @@
 // Bounds status polling and discards responses from requests that timed out.
 // It does not start a sandbox service or retain connection details.
-import { PAYPAL_AGENT_POLL_MAX_OUTSTANDING } from './constants';
+import { PAYPAL_STATUS_POLL_MAX_OUTSTANDING } from './constants';
 
 export function createPaypalAgentStatusPoll<T>(
   request: () => Promise<T>,
@@ -18,7 +18,7 @@ export function createPaypalAgentStatusPoll<T>(
     if (
       active !== undefined ||
       stopped ||
-      outstanding >= PAYPAL_AGENT_POLL_MAX_OUTSTANDING
+      outstanding >= PAYPAL_STATUS_POLL_MAX_OUTSTANDING
     )
       return;
     const id = ++counter;

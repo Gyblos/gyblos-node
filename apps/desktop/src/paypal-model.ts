@@ -8,7 +8,18 @@ import {
 } from '@gyblos/node/constants';
 import { isPaypalId } from '@gyblos/protocol/paypal-payment';
 
+import {
+  PAYMENT_METHOD,
+  PAYPAL_ACTION,
+  PAYPAL_DESKTOP_ERROR,
+} from './constants';
 import type { DesktopPaypalStatus } from './paypal-session';
+
+export {
+  PAYMENT_METHOD,
+  PAYPAL_ACTION,
+  PAYPAL_DESKTOP_ERROR,
+} from './constants';
 
 const PAYPAL_RENDER_LIMITS = {
   modelCharacters: 128,
@@ -18,10 +29,6 @@ export function paypalDollars(cents: number) {
   return `USD ${(cents / PAYPAL_SANDBOX.centsPerDollar).toFixed(2)}`;
 }
 
-export const PAYMENT_METHOD = {
-  USDC: 'usdc',
-  PAYPAL: 'paypal-sandbox',
-} as const;
 export type PaymentMethod =
   (typeof PAYMENT_METHOD)[keyof typeof PAYMENT_METHOD];
 
@@ -130,28 +137,6 @@ export function paypalFinishDialog(summary: {
     noLink: true,
   };
 }
-export const PAYPAL_ACTION = {
-  STATUS: 'status',
-  CREATE: 'create',
-  OPEN: 'open',
-  APPROVE: 'approve',
-  COMPLETE_RETURN: 'complete-return',
-  COMPLETE_CANCEL: 'complete-cancel',
-  SEND: 'send',
-  ACKNOWLEDGE: 'acknowledge',
-  FINISH: 'finish',
-  REVIEW_AND_SETTLE: 'review-and-settle',
-  ABANDON: 'abandon',
-} as const;
-export const PAYPAL_DESKTOP_ERROR = {
-  DENIED: 'denied',
-  INVALID: 'invalid',
-  INVALID_PROMPT: 'invalid-prompt',
-  UNAVAILABLE: 'unavailable',
-  NOT_APPROVED: 'not-approved',
-  INTERRUPTED: 'interrupted',
-  FAILED: 'failed',
-} as const;
 
 export type PaypalRequest =
   | {

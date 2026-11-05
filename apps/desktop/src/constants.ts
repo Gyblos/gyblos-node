@@ -12,8 +12,8 @@ export const PAYPAL_AGENT_COPY = {
   CLAUDE_POWERSHELL: 'claude-powershell',
 } as const;
 export const DESKTOP_AGENT_SERVER_NOT_RUNNING = 'ERR_SERVER_NOT_RUNNING';
-export const PAYPAL_AGENT_POLL_TIMEOUT_MS = 5000;
-export const PAYPAL_AGENT_POLL_MAX_OUTSTANDING = 2;
+export const PAYPAL_STATUS_POLL_TIMEOUT_MS = 5000;
+export const PAYPAL_STATUS_POLL_MAX_OUTSTANDING = 2;
 export const PAYPAL_AGENT_USAGE_STATE = {
   AVAILABLE: 'available',
   BUSY: 'busy',
@@ -27,6 +27,50 @@ export const PAYPAL_AGENT_USAGE_STATE = {
 } as const;
 export type PaypalAgentUsageState =
   (typeof PAYPAL_AGENT_USAGE_STATE)[keyof typeof PAYPAL_AGENT_USAGE_STATE];
+export const PAYMENT_METHOD = {
+  USDC: 'usdc',
+  PAYPAL: 'paypal-sandbox',
+} as const;
+
+export const PAYPAL_ACTION = {
+  STATUS: 'status',
+  CREATE: 'create',
+  OPEN: 'open',
+  APPROVE: 'approve',
+  COMPLETE_RETURN: 'complete-return',
+  COMPLETE_CANCEL: 'complete-cancel',
+  SEND: 'send',
+  ACKNOWLEDGE: 'acknowledge',
+  FINISH: 'finish',
+  REVIEW_AND_SETTLE: 'review-and-settle',
+  ABANDON: 'abandon',
+} as const;
+
+export const PAYPAL_DESKTOP_ERROR = {
+  DENIED: 'denied',
+  INVALID: 'invalid',
+  INVALID_PROMPT: 'invalid-prompt',
+  UNAVAILABLE: 'unavailable',
+  NOT_APPROVED: 'not-approved',
+  INTERRUPTED: 'interrupted',
+  FAILED: 'failed',
+} as const;
+
+export const PAYPAL_AGENT_ACTION = {
+  STATUS: 'status',
+  CONNECT: 'connect',
+  DISCONNECT: 'disconnect',
+} as const;
+
+export const PAYPAL_AGENT_ERROR = {
+  DENIED: 'denied',
+  INVALID: 'invalid',
+  UNAVAILABLE: 'unavailable',
+  FAILED: 'failed',
+  MODEL_UNAVAILABLE: 'model_unavailable',
+  NEW_SESSION_REQUIRED: 'new_session_required',
+} as const;
+
 export const PROBE_STATUS = {
   WAITING: 'waiting',
   PASSED: 'passed',

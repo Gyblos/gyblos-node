@@ -6,12 +6,16 @@ import { ROUTES } from '@gyblos/config/paths';
 
 import {
   AGENT_CLIENT,
+  PAYPAL_AGENT_ACTION,
   PAYPAL_AGENT_COPY,
+  PAYPAL_AGENT_ERROR,
   PAYPAL_AGENT_USAGE_STATE,
   type PaypalAgentUsageState,
 } from './constants';
 
 export {
+  PAYPAL_AGENT_ACTION,
+  PAYPAL_AGENT_ERROR,
   PAYPAL_AGENT_COPY,
   PAYPAL_AGENT_USAGE_STATE,
   type PaypalAgentUsageState,
@@ -27,11 +31,6 @@ export const DESKTOP_PAYPAL_AGENT = {
   POLL_MS: 2000,
   RESPONSE_DRAIN_MS: 10_000,
 } as const;
-export const PAYPAL_AGENT_ACTION = {
-  STATUS: 'status',
-  CONNECT: 'connect',
-  DISCONNECT: 'disconnect',
-} as const;
 export const PAYPAL_AGENT_CLIENT = {
   OPENCODE: AGENT_CLIENT.OPENCODE,
   CODEX: AGENT_CLIENT.CODEX,
@@ -43,14 +42,6 @@ export type PaypalAgentClient =
 export type PaypalAgentCopyTarget =
   | PaypalAgentClient
   | (typeof PAYPAL_AGENT_COPY)[keyof typeof PAYPAL_AGENT_COPY];
-export const PAYPAL_AGENT_ERROR = {
-  DENIED: 'denied',
-  INVALID: 'invalid',
-  UNAVAILABLE: 'unavailable',
-  FAILED: 'failed',
-  MODEL_UNAVAILABLE: 'model_unavailable',
-  NEW_SESSION_REQUIRED: 'new_session_required',
-} as const;
 export class PaypalAgentConnectionError extends Error {
   constructor(
     readonly code:
