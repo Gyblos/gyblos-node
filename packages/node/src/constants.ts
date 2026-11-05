@@ -52,6 +52,8 @@ export const NODE_ERROR_CODES = {
   // The payout, fee treasury or fee payer token account is missing and could not be created, so a
   // claim would pay that share to the payment program: paid selling stays off.
   SELLER_PAYMENT_ACCOUNTS_UNAVAILABLE: 'SELLER_PAYMENT_ACCOUNTS_UNAVAILABLE',
+  // The Iroh endpoint did not come online (no relay within 30 s): a refused relay token or no network.
+  SELLER_RELAY_OFFLINE: 'SELLER_RELAY_OFFLINE',
   // The buyer role's RPC does not serve devnet, so paid buying refuses to start.
   BUYER_PAYMENT_NETWORK_MISMATCH: 'BUYER_PAYMENT_NETWORK_MISMATCH',
   // The buyer wallet key is missing, unreadable or not the one role.json names.
@@ -173,6 +175,8 @@ export const NODE_CONFIG_FILENAME = 'gyblos.toml';
 export const SELLER_DAEMON_STATES = {
   STARTING: 'starting',
   READY: 'ready',
+  // Startup threw; status.json keeps the phase and, for a NodeError, its static code.
+  FAILED: 'failed',
 } as const;
 
 // Mainnet is recognized only so the validator can refuse it with a specific code.

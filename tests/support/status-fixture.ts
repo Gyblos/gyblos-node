@@ -74,6 +74,10 @@ export async function withHome(
   }
 }
 
+export async function daemonStatus(home: Home, value: Record<string, unknown>) {
+  await writeFile(join(home.seller, 'status.json'), JSON.stringify(value));
+}
+
 export async function daemonReady(home: Home, offers = [{ listed: true }]) {
   await writeFile(
     join(home.seller, 'status.json'),

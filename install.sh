@@ -248,7 +248,8 @@ main() {
   say "Pulling $MODEL into Ollama…"
   docker compose exec -T ollama ollama pull "$MODEL"
   say 'Creating the seller keys (kept if they exist)…'
-  docker compose run --rm seller setup --role seller --mint "$MINT"
+  # Quiet: doctor below prints the NodeId and owner to share.
+  docker compose run --rm seller setup --role seller --mint "$MINT" >/dev/null
   docker compose run --rm seller tokenizer
   if ! docker compose run --rm seller gyblos doctor; then
     die "The seller is not ready; fix the failures above, then run this script again (cd $dir)."

@@ -149,6 +149,8 @@ export type ServiceState = (typeof SERVICE_STATES)[keyof typeof SERVICE_STATES];
 export const STATUS_RESULTS = {
   RUNNING: 'RUNNING',
   STARTING: 'STARTING',
+  // The last start failed: status.json says failed, or a restart is under way after a failure.
+  FAILING: 'FAILING',
   STOPPED: 'STOPPED',
   NOT_CONFIRMED: 'NOT_CONFIRMED',
 } as const;
