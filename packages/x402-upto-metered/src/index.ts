@@ -10,6 +10,9 @@ export {
   UPTO_HISTORY_LIMIT,
   UPTO_HISTORY_PAGES,
   UPTO_PROGRAM,
+  UPTO_SOLANA_NAMESPACE,
+  UPTO_SOLANA_REFERENCE_LENGTH,
+  UPTO_TOKEN_ACCOUNT,
   UPTO_WITHDRAW,
   UPTO_WITHDRAW_STEPS,
   type UptoWithdrawStep,
@@ -46,7 +49,7 @@ export {
 } from './withdraw';
 export {
   createUptoRecipientAccounts,
-  uptoMissingTokenAccounts,
+  uptoRecipientTokenAccounts,
   type UptoRecipientAccounts,
   type UptoRecipientAccountsOptions,
   type UptoRecipientAccountsRpc,

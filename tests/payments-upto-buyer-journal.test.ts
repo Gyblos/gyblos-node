@@ -1,5 +1,5 @@
 // The buyer's durable journal on its own: one process at a time, strict reads (a valid document reads
-// back, each malformed one is refused), the entry cap with pruning of old settled and expired unsigned
+// back, each malformed one is refused), older versions read with what they lacked, the entry cap with pruning of old settled and expired unsigned
 // entries, and no writes once closing. Temporary homes; no network.
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { buyerJournalPathsIn } from '@gyblos/config';
+import { buyerJournalPathsIn, DEVNET } from '@gyblos/config';
 import { BUYER_JOURNAL, openUptoBuyerJournal } from '@gyblos/payments-upto';
 import {
   PAYMENT_CHANNEL_STATES,
@@ -30,6 +30,12 @@ const ENTRY = {
   payTo: '11111111111111111111111111111111',
   feePayer: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
   maxAtomic: '1000',
+  policy: {
+    network: DEVNET,
+    mint: 'So11111111111111111111111111111111111111112',
+    treasury: 'SysvarRent111111111111111111111111111111111',
+    protocolFeeBps: 300,
+  },
   openSlot: '1',
   lastValidBlockHeight: '100',
   expiresAt: NOW + 60_000,
@@ -79,9 +85,11 @@ void test('a valid document reads back; each malformed one is refused', () =>
     assert.deepEqual(await reader.list(), [valid]);
     await reader.close();
     for (const tampered of [
-      // Another version, including the one before the open's slot and blockhash lifetime.
+      // Another version, including the ones before the open's policy, slot and blockhash lifetime.
       JSON.stringify({ version: BUYER_JOURNAL.version + 1, entries: [valid] }),
+      JSON.stringify({ version: 2, entries: [valid] }),
       JSON.stringify({ version: 1, entries: [valid] }),
+      JSON.stringify({ version: '3', entries: [valid] }),
       document([{ ...valid, lastValidBlockHeight: '-1' }]),
       document([valid], { extra: 1 }),
       document([valid, valid]),
@@ -92,6 +100,18 @@ void test('a valid document reads back; each malformed one is refused', () =>
       document([{ ...valid, state: 'lost' }]),
       document([{ ...valid, channelId: 'not a channel' }]),
       document([{ ...valid, payTo: 'not an address' }]),
+      document([{ ...valid, policy: { ...valid.policy, mint: 'not a mint' } }]),
+      document([{ ...valid, policy: { ...valid.policy, treasury: 1 } }]),
+      document([{ ...valid, policy: { ...valid.policy, protocolFeeBps: -1 } }]),
+      document([
+        { ...valid, policy: { ...valid.policy, protocolFeeBps: 1_001 } },
+      ]),
+      document([
+        { ...valid, policy: { ...valid.policy, protocolFeeBps: 1.5 } },
+      ]),
+      document([{ ...valid, policy: { ...valid.policy, extra: 1 } }]),
+      document([{ ...valid, policy: { mint: valid.policy.mint } }]),
+      document([{ ...valid, policy: 'none' }]),
       document([{ ...valid, expiresAt: '1' }]),
     ]) {
       await writeFile(state, tampered, { mode: 0o600 });
@@ -101,12 +121,42 @@ void test('a valid document reads back; each malformed one is refused', () =>
     }
   }));
 
+void test('a resolved version 2 journal reads without policy and upgrades on write', () =>
+  withRoot(async (root) => {
+    const { state } = buyerJournalPathsIn({ GYBLOS_HOME: root });
+    const { policy: _policy, ...v2 } = {
+      ...ENTRY,
+      channelId: 'Chan1',
+      state: PAYMENT_CHANNEL_STATES.SETTLED,
+      chargedAtomic: '0',
+      updatedAt: NOW,
+    };
+    await (await open(root)).close();
+    await writeFile(state, JSON.stringify({ version: 2, entries: [v2] }), {
+      mode: 0o600,
+    });
+    const journal = await open(root);
+    assert.deepEqual(await journal.list(), [{ ...v2, policy: null }]);
+    await journal.put({ ...ENTRY, requestDigest: OTHER });
+    await journal.close();
+    const saved = JSON.parse(await readFile(state, 'utf8')) as {
+      version: number;
+      entries: { policy: unknown }[];
+    };
+    assert.equal(saved.version, BUYER_JOURNAL.version);
+    assert.deepEqual(
+      saved.entries.map((held) => held.policy),
+      [null, ENTRY.policy],
+    );
+  }));
+
 void test('a version 1 journal keeps its signed opens, never proven unopened, and drops unsigned ones', () =>
   withRoot(async (root) => {
     const { state } = buyerJournalPathsIn({ GYBLOS_HOME: root });
     const {
       openSlot: _openSlot,
       lastValidBlockHeight: _height,
+      policy: _policy,
       ...v1
     } = { ...ENTRY, updatedAt: NOW };
     await (await open(root)).close();
@@ -128,19 +178,20 @@ void test('a version 1 journal keeps its signed opens, never proven unopened, an
         channelId: 'Chan1',
         openSlot: '0',
         lastValidBlockHeight: String(BigInt(PUBLIC_RECORD_LIMITS.maxAtomic)),
+        policy: null,
       },
     ]);
-    // The next write saves it as the current version, which the strict parser reads back.
-    await journal.put({ ...ENTRY, requestDigest: OTHER });
+    // A signed open without network provenance cannot be upgraded or rewritten.
+    await assert.rejects(
+      journal.put({ ...ENTRY, requestDigest: OTHER }),
+      unavailable,
+    );
     await journal.close();
     assert.equal(
       (JSON.parse(await readFile(state, 'utf8')) as { version: number })
         .version,
-      BUYER_JOURNAL.version,
+      BUYER_JOURNAL.legacyVersion,
     );
-    const reread = await open(root);
-    assert.equal((await reread.list()).length, 2);
-    await reread.close();
   }));
 
 void test('a full journal refuses new requests, keeps writing open ones and prunes finished ones', () =>
@@ -170,5 +221,47 @@ void test('a full journal refuses new requests, keeps writing open ones and prun
     // An unsigned entry can be removed at once.
     await journal.remove(OTHER);
     assert.deepEqual(await journal.list(), []);
+    await journal.close();
+  }));
+
+void test('a full journal of the widest entries still fits its byte bound', () =>
+  withRoot(async (root) => {
+    const { state } = buyerJournalPathsIn({ GYBLOS_HOME: root });
+    // A 44-character address, the longest form.
+    const address = 'ATokenGPvbdGVxr1b2hvZbsiqW5xUH25efTNsLJA8knL';
+    const atomic = '1'.repeat(20);
+    const widest = (index: number) => ({
+      requestDigest: index.toString(16).padStart(64, '0'),
+      channelId: 'C'.repeat(128),
+      payTo: address,
+      feePayer: address,
+      maxAtomic: atomic,
+      policy: {
+        network: DEVNET,
+        mint: address,
+        treasury: address,
+        protocolFeeBps: 1_000,
+      },
+      openSlot: atomic,
+      lastValidBlockHeight: atomic,
+      expiresAt: Number.MAX_SAFE_INTEGER,
+      state: PAYMENT_CHANNEL_STATES.SETTLED,
+      chargedAtomic: atomic,
+      updatedAt: Number.MAX_SAFE_INTEGER,
+    });
+    const entries = Array.from({ length: BUYER_JOURNAL.maxEntries }, (_, i) =>
+      widest(i),
+    );
+    await (await open(root)).close();
+    await writeFile(
+      state,
+      JSON.stringify({ version: BUYER_JOURNAL.version, entries }),
+      { mode: 0o600 },
+    );
+    const journal = await open(root);
+    assert.equal((await journal.list()).length, BUYER_JOURNAL.maxEntries);
+    // Rewriting one entry, stamped with a wider time than any it held, still fits.
+    const { updatedAt: _updatedAt, ...first } = widest(0);
+    await journal.put(first);
     await journal.close();
   }));

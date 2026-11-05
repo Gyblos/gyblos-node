@@ -129,6 +129,11 @@
   gap: var(--space-8);
   padding: var(--space-6) 0 var(--space-8);
 }
+.chat-turn {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
 .chat-user {
   align-self: flex-end;
   display: flex;
@@ -140,12 +145,14 @@
   background: var(--raised);
 }
 .chat-user p {
+  grid-column: 1;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   font-size: 13px;
-  line-height: 1.7;
+  line-height: 1.65;
 }
 .chat-user .ui-icon-button {
+  grid-column: 2;
   flex-shrink: 0;
 }
 .chat-answer {
@@ -155,6 +162,7 @@
 .answer-heading {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--space-2);
   margin-bottom: var(--space-3);
   font-size: 11px;
@@ -167,12 +175,12 @@
 }
 
 .reply-text {
-  font-size: 13px;
-  line-height: 1.8;
+  font-size: 14px;
+  line-height: 1.75;
   overflow-wrap: anywhere;
 }
 .reply-text h3 {
-  font-size: 16px;
+  font-size: 17px;
   line-height: 1.5;
   font-weight: 500;
   margin: var(--space-3) 0 var(--space-2);
@@ -301,6 +309,9 @@
     padding: var(--space-3) 0 var(--space-6);
     gap: var(--space-6);
   }
+  .chat-turn {
+    gap: var(--space-2);
+  }
 }
 @media (max-width: 480px) {
   .composer-leading .composer-model .model-artwork {
@@ -334,10 +345,10 @@
 .ui-composer-action[data-busy='true'] .composer-stop-glyph {
   opacity: 1;
 }
-.chat-transcript > article {
+.chat-turn > article {
   animation: message-arrive var(--motion-enter) var(--motion-ease) both;
 }
-.chat-transcript > .chat-answer {
+.chat-turn > .chat-answer {
   animation-delay: 60ms;
 }
 @keyframes message-arrive {
@@ -355,7 +366,7 @@
   .ui-composer-action > span {
     transition: none;
   }
-  .chat-transcript > article {
+  .chat-turn > article {
     animation: none;
   }
 }

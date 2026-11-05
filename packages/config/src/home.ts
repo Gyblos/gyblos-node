@@ -26,6 +26,13 @@ export const ARTIFACT_DIRECTORIES = {
   ollamaModels: 'ollama-models',
 } as const;
 
+// File names directly in the product home: the seller service's private environment file (secrets such as
+// the relay token, mode 0600) and the log a background service writes.
+export const HOME_FILES = {
+  sellerEnvironment: 'seller.env',
+  serviceLog: 'service.log',
+} as const;
+
 // File names inside one role directory.
 export const ROLE_FILES = {
   roleConfig: 'role.json',
@@ -97,6 +104,10 @@ export function homeLayout(environment: HomeEnvironment) {
   const tokenizer = join(artifacts, ARTIFACT_DIRECTORIES.tokenizer);
   return {
     root,
+    files: {
+      sellerEnvironment: join(root, HOME_FILES.sellerEnvironment),
+      serviceLog: join(root, HOME_FILES.serviceLog),
+    },
     roles: {
       buyer: join(root, ROLE_DIRECTORIES.buyer),
       seller: join(root, ROLE_DIRECTORIES.seller),

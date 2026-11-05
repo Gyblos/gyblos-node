@@ -17,6 +17,10 @@ import {
 import { DESCRIPTION_FIELDS, PAYMENT_PHASES } from './constants';
 import { paymentFailure } from './errors';
 import {
+  assertMainnetPilotDeposit,
+  assertPaymentNetworkEnabled,
+} from './mainnet';
+import {
   uptoSellerTerms,
   uptoTermsFor,
   type UptoChannelSettings,
@@ -50,12 +54,17 @@ function mismatch(): never {
 export function createUptoPaymentServer(
   options: UptoPaymentServerOptions,
 ): PaymentServer {
-  const { description, settings, seller } = options;
+  const description = { ...options.description };
+  const settings = { ...options.settings };
+  const { seller } = options;
+  assertPaymentNetworkEnabled(description.network);
   // Fails at construction on a malformed description rather than on the first request.
   uptoSellerTerms(description, settings);
   return {
     describe: async () => ({ ...description }),
-    async admit(authorization, terms, admitOptions = {}) {
+    async admit(inputAuthorization, inputTerms, admitOptions = {}) {
+      const authorization = { ...inputAuthorization };
+      const terms = { ...inputTerms };
       // Fails fast on foreign terms; the payer-signed memo would also refuse them at verify.
       if (
         !DESCRIPTION_FIELDS.every((key) => terms[key] === description[key]) ||
@@ -63,6 +72,12 @@ export function createUptoPaymentServer(
         terms.requestDigest !== authorization.requestDigest
       )
         return mismatch();
+      assertMainnetPilotDeposit(terms);
+      assertMainnetPilotDeposit({
+        network: terms.network,
+        mint: terms.mint,
+        maxAtomic: authorization.maxAtomic,
+      });
       try {
         const admitted = await seller.admit(
           authorization,

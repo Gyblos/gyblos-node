@@ -1,6 +1,7 @@
 // The buyer's withdrawal over its journal: a channel the seller can still claim (with a margin) is left
 // alone until it cannot; every other open, signed channel takes one step with the distribution rebuilt
-// from the buyer's policy; one channel's failure is reported and the run goes on; the journal stays.
+// from the policy its open accepted (the buyer's current one for an entry journaled without it); one
+// channel's failure is reported and the run goes on; the journal stays.
 import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -14,7 +15,7 @@ import {
   type UptoWithdrawQuery,
 } from 'x402-upto-metered';
 
-import { buyerJournalPathsIn } from '@gyblos/config';
+import { buyerJournalPathsIn, DEVNET } from '@gyblos/config';
 import {
   BUYER_WITHDRAW,
   openUptoBuyerJournal,
@@ -31,6 +32,19 @@ const FEE_PAYER = 'FeePa11111111111111111111111111111111111111';
 const TREASURY = 'Treas11111111111111111111111111111111111111';
 const FIRST = 'Chan111111111111111111111111111111111111111';
 const SECOND = 'Chan311111111111111111111111111111111111111';
+// What FIRST's open accepted, before the buyer's policy changed to MINT, TREASURY and 300.
+const OPENED = {
+  network: DEVNET,
+  mint: 'Mint211111111111111111111111111111111111111',
+  treasury: 'Treas21111111111111111111111111111111111111',
+  protocolFeeBps: 250,
+};
+const CURRENT = {
+  network: DEVNET,
+  mint: MINT,
+  treasury: TREASURY,
+  protocolFeeBps: 300,
+};
 const MAX_TIMEOUT_SECONDS = 120;
 // When the seller can no longer claim an open signed at SIGNED_AT whose quote expired before that.
 const SIGNED_AT = 1_000_000;
@@ -42,12 +56,14 @@ const entry = (
   channelId: string | null,
   state: (typeof PAYMENT_CHANNEL_STATES)[keyof typeof PAYMENT_CHANNEL_STATES],
   expiresAt = SIGNED_AT + 60_000,
+  policy: typeof OPENED | null = CURRENT,
 ) => ({
   requestDigest,
   channelId,
   payTo: PAY_TO,
   feePayer: FEE_PAYER,
   maxAtomic: '1000',
+  policy,
   openSlot: '5',
   lastValidBlockHeight: '150',
   expiresAt,
@@ -69,6 +85,7 @@ async function run(
         FIRST,
         PAYMENT_CHANNEL_STATES.OPEN,
         options.expiresAt,
+        OPENED,
       ),
       entry(
         'bb'.repeat(32),
@@ -87,6 +104,7 @@ async function run(
       const reported: UptoBuyerWithdrawResult[] = [];
       const results = await withdrawUptoBuyer({
         journal,
+        network: DEVNET,
         withdrawal: {
           withdraw: async (query) => {
             asked.push(query);
@@ -141,23 +159,29 @@ void test('a channel the seller can still claim, margin included, is left alone 
   assert.deepEqual(reported, results);
 });
 
-void test('past the claim window, each open signed channel takes a step with the buyer’s own split', async () => {
+void test('past the claim window, each open signed channel takes a step with the split its open accepted', async () => {
   const { results, asked } = await run(CLAIMABLE_UNTIL + 1);
-  const splits = paymentSplits({
-    payTo: PAY_TO,
-    treasury: TREASURY,
-    protocolFeeBps: 300,
-  });
-  assert.deepEqual(
-    asked,
-    [FIRST, SECOND].map((channelId) => ({
-      channelId,
+  assert.deepEqual(asked, [
+    {
+      channelId: FIRST,
+      mint: OPENED.mint,
+      rentPayer: FEE_PAYER,
+      maxAtomic: '1000',
+      splits: paymentSplits({ payTo: PAY_TO, ...OPENED }),
+    },
+    // The channel recorded the buyer's current policy at authorization.
+    {
+      channelId: SECOND,
       mint: MINT,
       rentPayer: FEE_PAYER,
       maxAtomic: '1000',
-      splits,
-    })),
-  );
+      splits: paymentSplits({
+        payTo: PAY_TO,
+        treasury: TREASURY,
+        protocolFeeBps: 300,
+      }),
+    },
+  ]);
   assert.deepEqual(
     results.map(({ step, transaction }) => [step, transaction]),
     [

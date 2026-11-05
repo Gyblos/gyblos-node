@@ -8,6 +8,7 @@ import { createBuyerControlClient } from '@gyblos/buyer/control';
 import { createSellerControlService } from '@gyblos/node/control';
 import {
   CONTROL_CODES,
+  CONTROL_LIMITS,
   CONTROL_METHODS,
   CONTROL_VERSION,
   REASONING_LEVELS,
@@ -173,14 +174,30 @@ void test('loopback fragmented prefix works but trailing bytes close the stream'
     await run.wire.close();
   }
 });
-void test('zero skew refuses a future catalog instead of silently accepting it', async () => {
+void test('a catalog issued slightly ahead of the buyer clock is accepted', async () => {
   const run = await fixture();
   try {
     const client = createBuyerControlClient(
       { ...run.wire.transport, remoteNodeId: run.catalog.nodeId },
       {
         ...run.trust(),
-        now: () => run.context.now() - 1,
+        // A buyer clock 230 ms behind the seller, as measured between two real machines.
+        now: () => run.context.now() - 230,
+      },
+    );
+    await client.getCatalog();
+  } finally {
+    await run.wire.close();
+  }
+});
+void test('a catalog issued beyond the skew tolerance is refused', async () => {
+  const run = await fixture();
+  try {
+    const client = createBuyerControlClient(
+      { ...run.wire.transport, remoteNodeId: run.catalog.nodeId },
+      {
+        ...run.trust(),
+        now: () => run.context.now() - CONTROL_LIMITS.clockSkewMs - 1,
       },
     );
     await assert.rejects(client.getCatalog(), { code: CONTROL_CODES.EXPIRED });

@@ -71,7 +71,7 @@
     "electron": "45.0.0",
     "@electron/packager": "20.3.0",
     "esbuild": "0.28.2",
-    "vite": "6.4.2",
+    "vite": "6.4.5",
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2"
   }

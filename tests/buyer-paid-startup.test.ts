@@ -191,6 +191,16 @@ void test('paid startup names each refusal and answers in paid mode once started
     const host = await startPaidBuyer(base);
     let token = '';
     try {
+      assert.equal(host.chat.maxAtomic, '1000');
+      await writeFile(
+        join(buyer, 'selection.json'),
+        JSON.stringify({
+          ...SELECTION,
+          request: { ...SELECTION.request, maxAtomic: '1' },
+        }),
+      );
+      assert.equal(host.chat.maxAtomic, '1000');
+      await writeFile(join(buyer, 'selection.json'), JSON.stringify(SELECTION));
       // The first paid start creates a private bearer token in the buyer home.
       token = await readFile(tokenFile, 'utf8');
       secrets.push(token);
@@ -222,6 +232,37 @@ void test('paid startup names each refusal and answers in paid mode once started
     } finally {
       await again.close();
     }
+
+    // The chat closes its HTTP listener before the read-only inspection and releases the journal after it.
+    let inspectionUrl = '';
+    let observed = false;
+    let chainClosed = false;
+    const inspectChain: typeof devnet = async (role, maxAtomic) => {
+      const held = await devnet(role, maxAtomic);
+      return {
+        ...held,
+        observe: async (digest) => {
+          assert.equal(digest, 'ab'.repeat(32));
+          await assert.rejects(fetch(inspectionUrl));
+          assert.equal(chainClosed, false);
+          observed = true;
+          return { chargedAtomic: '7', refundedAtomic: '993' };
+        },
+        close: async () => {
+          chainClosed = true;
+          await held.close();
+        },
+      };
+    };
+    const inspectHost = await startPaidBuyer({ ...base, chain: inspectChain });
+    inspectionUrl = inspectHost.url;
+    assert.ok(inspectHost.inspectAndClose);
+    assert.deepEqual(await inspectHost.inspectAndClose('ab'.repeat(32)), {
+      chargedAtomic: '7',
+      refundedAtomic: '993',
+    });
+    assert.equal(observed, true);
+    assert.equal(chainClosed, true);
 
     // A token others could read, a link, or content that is not a token is refused, never repaired.
     await chmod(tokenFile, 0o644);

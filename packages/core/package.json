@@ -17,12 +17,14 @@
     "./seller-selection": "./src/seller-selection.ts",
     "./pricing-v2": "./src/pricing-v2.ts",
     "./paid-charge": "./src/paid-charge.ts",
+    "./buyer-paid-recount": "./src/buyer-paid-recount.ts",
     "./paid-admission": "./src/paid-admission.ts",
     "./free-admission": "./src/free-admission.ts",
     "./identity-policy": "./src/identity-policy.ts",
     "./telemetry": "./src/telemetry.ts",
     "./receipts": "./src/receipts.ts",
-    "./receipt-collector": "./src/receipt-collector.ts"
+    "./receipt-collector": "./src/receipt-collector.ts",
+    "./mainnet-pilot": "./src/mainnet-pilot.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",

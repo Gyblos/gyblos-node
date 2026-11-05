@@ -5,9 +5,9 @@ import { constants } from 'node:fs';
 import { open } from 'node:fs/promises';
 
 import { FILE_MODES } from '@gyblos/config';
+import type { PaidBuyerRecord } from '@gyblos/node/buyer-paid-execution';
 
 import { PAID_BUYER } from './constants';
-import type { PaidBuyerRecord } from './paid-execution';
 
 const DIGEST = /^[0-9a-f]{64}$/;
 const ATOMIC = /^(0|[1-9][0-9]{0,19})$/;

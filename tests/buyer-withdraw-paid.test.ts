@@ -16,6 +16,7 @@ import {
 
 import {
   buyerJournalPathsIn,
+  DEVNET,
   DEVNET_GENESIS,
   PROTOCOL_FEE,
 } from '@gyblos/config';
@@ -74,6 +75,12 @@ async function journaled(home: string, payer: string) {
       payTo,
       feePayer,
       maxAtomic: '1000',
+      policy: {
+        network: DEVNET,
+        mint: MINT,
+        treasury: PROTOCOL_FEE.treasury,
+        protocolFeeBps: PROTOCOL_FEE.bps,
+      },
       openSlot: '5',
       lastValidBlockHeight: '150',
       expiresAt: signedAt,

@@ -16,6 +16,12 @@ export const DISCOVERY_ERROR_CODES = {
   UNKNOWN_CATALOG: 'DISCOVERY_UNKNOWN_CATALOG',
   STALE_RECORD: 'DISCOVERY_STALE_RECORD',
   PUBLISH_NOT_ALLOWED: 'DISCOVERY_PUBLISH_NOT_ALLOWED',
+  // Registration (POST /registrations): the invite is wrong, spent or expired; the NodeId has no 8004
+  // registration; an operator revoked it; or the index refused the request's shape.
+  INVITE_INVALID: 'DISCOVERY_INVITE_INVALID',
+  IDENTITY_NOT_REGISTERED: 'DISCOVERY_IDENTITY_NOT_REGISTERED',
+  NODE_REVOKED: 'DISCOVERY_NODE_REVOKED',
+  REGISTRATION_REJECTED: 'DISCOVERY_REGISTRATION_REJECTED',
   RECORD_REJECTED: 'DISCOVERY_RECORD_REJECTED',
   PAYLOAD_TOO_LARGE: 'DISCOVERY_PAYLOAD_TOO_LARGE',
   RATE_LIMITED: 'DISCOVERY_RATE_LIMITED',
@@ -35,6 +41,10 @@ export const INDEX_WIRE_ERRORS = {
   STALE_RECORD: 'STALE_RECORD',
   // The index refuses plain http; reachable only through a loopback http base URL.
   HTTPS_REQUIRED: 'HTTPS_REQUIRED',
+  INVALID_REGISTRATION: 'INVALID_REGISTRATION',
+  INVITE_INVALID: 'INVITE_INVALID',
+  IDENTITY_NOT_REGISTERED: 'IDENTITY_NOT_REGISTERED',
+  NODE_REVOKED: 'NODE_REVOKED',
 } as const;
 
 export const INDEX_ERROR_MAP: ReadonlyMap<string, DiscoveryErrorCode> = new Map(
@@ -51,10 +61,45 @@ export const INDEX_ERROR_MAP: ReadonlyMap<string, DiscoveryErrorCode> = new Map(
   ],
 );
 
+// The index's answers to a registration's 400 and 403; any other body is REGISTRATION_REJECTED.
+export const REGISTRATION_ERROR_MAP: ReadonlyMap<string, DiscoveryErrorCode> =
+  new Map([
+    [
+      INDEX_WIRE_ERRORS.INVALID_REGISTRATION,
+      DISCOVERY_ERROR_CODES.REGISTRATION_REJECTED,
+    ],
+    [INDEX_WIRE_ERRORS.INVITE_INVALID, DISCOVERY_ERROR_CODES.INVITE_INVALID],
+    [
+      INDEX_WIRE_ERRORS.IDENTITY_NOT_REGISTERED,
+      DISCOVERY_ERROR_CODES.IDENTITY_NOT_REGISTERED,
+    ],
+    [INDEX_WIRE_ERRORS.NODE_REVOKED, DISCOVERY_ERROR_CODES.NODE_REVOKED],
+    [INDEX_WIRE_ERRORS.HTTPS_REQUIRED, DISCOVERY_ERROR_CODES.INSECURE_URL],
+  ]);
+
 export const DISCOVERY_PATHS = {
   records: '/records',
   sellers: '/sellers',
+  registrations: '/registrations',
 } as const;
+
+// A beta invite as `gyblos index:invite` prints it, and a NodeId (lowercase hex of its Ed25519 key);
+// the same shapes the index accepts (apps/discovery-index REGISTRATION).
+export const REGISTRATION_FORMAT = {
+  invite: /^gyb_[a-z2-7]{26}$/,
+  nodeId: /^[0-9a-f]{64}$/,
+} as const;
+
+// The `status` of an accepted registration's body (apps/discovery-index REGISTRATION_STATUS.ACTIVE).
+export const REGISTRATION_WIRE_STATUS = { ACTIVE: 'active' } as const;
+
+// How the index answered an accepted registration: newly admitted (201), or admitted before (200).
+export const REGISTRATION_RESULTS = {
+  REGISTERED: 'registered',
+  ALREADY_ACTIVE: 'already-active',
+} as const;
+export type RegistrationResult =
+  (typeof REGISTRATION_RESULTS)[keyof typeof REGISTRATION_RESULTS];
 
 export const HTTP_STATUS = {
   OK: 200,
@@ -84,10 +129,19 @@ export const PUBLISH_STATUS_ERROR_MAP: ReadonlyMap<number, DiscoveryErrorCode> =
     [HTTP_STATUS.FORBIDDEN, DISCOVERY_ERROR_CODES.PUBLISH_NOT_ALLOWED],
   ]);
 
+// A registration's 409 means nothing, so it keeps HTTP_STATUS rather than the reads' STALE_RECORD.
+export const REGISTRATION_STATUS_ERROR_MAP: ReadonlyMap<
+  number,
+  DiscoveryErrorCode
+> = new Map(
+  [...STATUS_ERROR_MAP].filter(([status]) => status !== HTTP_STATUS.CONFLICT),
+);
+
 export const DISCOVERY_LIMITS = {
   // Sellers response cap (index caps at about 1 MiB) plus headroom for JSON framing.
   maxSellersResponseBytes: 1_100_000,
   maxPublishResponseBytes: 4_096,
+  maxRegistrationResponseBytes: 4_096,
   // A canonical public v2 record may reach 32 KiB; 2 KiB more covers the envelope (same cap as the index).
   maxPublishBodyBytes: 34_816,
   defaultSellers: 50,

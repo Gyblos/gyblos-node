@@ -30,14 +30,19 @@ export function parsePublishAllowlist(
   return { mode: PUBLISH_MODES.ALLOWLIST, nodeIds };
 }
 
+// Without an allowlist, publishing is open only to NodeIds admitted through /v1/registrations.
 export function publishModeOf(
   publishers: DiscoveryPublishers | undefined,
+  registrations: boolean,
 ): PublishMode {
-  return publishers?.mode ?? PUBLISH_MODES.CLOSED;
+  return (
+    publishers?.mode ??
+    (registrations ? PUBLISH_MODES.REGISTERED : PUBLISH_MODES.CLOSED)
+  );
 }
 
 // The NodeId the unverified envelope claims, or undefined when it has none.
-function claimedNodeId(envelope: unknown): unknown {
+export function claimedNodeId(envelope: unknown): unknown {
   const record: unknown =
     envelope && typeof envelope === 'object'
       ? Reflect.get(envelope, 'record')

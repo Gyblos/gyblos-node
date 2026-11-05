@@ -27,6 +27,8 @@ import {
 
 import { LEDGER_FILE, UPTO_SELLER } from './constants';
 import { openUptoFileLedger, type UptoLedgerPaths } from './file-ledger';
+import { assertPaymentNetworkEnabled } from './mainnet';
+import { verifyPaymentNetwork, type PaymentGenesisRpc } from './seller-network';
 import { createUptoPaymentServer } from './server';
 import { uptoSellerTerms, type UptoChannelSettings } from './terms';
 
@@ -43,7 +45,8 @@ export interface UptoSellerPaymentsOptions {
   now?: () => number;
   // Tests inject a double; production reads the chain at rpcUrl.
   rpc?: UptoKitRpc &
-    UptoRecipientAccountsRpc & {
+    UptoRecipientAccountsRpc &
+    PaymentGenesisRpc & {
       getSlot(config: { commitment: typeof UPTO_COMMITMENT }): {
         send(): Promise<bigint>;
       };
@@ -61,15 +64,20 @@ export interface UptoSellerPayments {
 export async function openUptoSellerPayments(
   options: UptoSellerPaymentsOptions,
 ): Promise<UptoSellerPayments> {
+  const description = { ...options.description };
+  const settings = { ...options.settings };
+  const { feePayer, authorizer, rpcUrl } = options;
+  assertPaymentNetworkEnabled(description.network);
   const now = options.now ?? Date.now;
-  const { description, settings, feePayer } = options;
   const own = uptoSellerTerms(description, settings);
   if (
     feePayer.address !== description.feePayer ||
-    options.authorizer.address !== description.authorizer
+    authorizer.address !== description.authorizer
   )
     // Keys that cannot sign for this description would only fail later, on a buyer's deposit.
     throw new PaymentError(PAYMENT_ERROR_CODES.UNTRUSTED_TERMS);
+  const rpc = options.rpc ?? createSolanaRpc(rpcUrl);
+  await verifyPaymentNetwork(rpc, own.network);
   const ledger = await openUptoFileLedger({
     paths: options.paths,
     now,
@@ -77,7 +85,6 @@ export async function openUptoSellerPayments(
     maxChannels: UPTO_SELLER.maxChannels,
   });
   try {
-    const rpc = options.rpc ?? createSolanaRpc(options.rpcUrl);
     // payTo, the fee treasury and the channel payee (the fee payer), which a claim may each pay.
     const recipients = createUptoRecipientAccounts(rpc, {
       feePayer,
@@ -93,7 +100,7 @@ export async function openUptoSellerPayments(
         : error;
     });
     const facilitator = createUptoFacilitator(
-      toFacilitatorSvmSigner(feePayer, { defaultRpcUrl: options.rpcUrl }),
+      toFacilitatorSvmSigner(feePayer, { defaultRpcUrl: rpcUrl }),
       ledger.chain,
     );
     const readers = createUptoChannelReaders(uptoChannelRpc(rpc), {
@@ -106,7 +113,7 @@ export async function openUptoSellerPayments(
         verify: createUptoVerifier(feePayer.address, () =>
           rpc.getSlot({ commitment: UPTO_COMMITMENT }).send(),
         ),
-        authorizer: options.authorizer,
+        authorizer,
         store: ledger.chain,
         channelExists: readers.channelExists,
         settledClaim: readers.settledClaim,

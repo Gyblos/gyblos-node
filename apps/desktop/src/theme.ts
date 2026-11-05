@@ -42,6 +42,10 @@ export function themeStyle(light: boolean): ThemeStyle {
     '--editor': light ? colors.paper : colors.charcoal,
     '--canvas': light ? colors.panelLight : colors.panel,
     '--composer-surface': light ? colors.paper : colors.raised,
+    // The user's turn is a distinct material, not the canvas with a text offset.
+    '--bubble-user': light
+      ? `color-mix(in srgb, ${colors.skyTextLight} 12%, ${colors.raisedLight})`
+      : `color-mix(in srgb, ${colors.sky} 12%, ${colors.raised})`,
     '--panel': light ? colors.panelLight : colors.panel,
     '--raised': light ? colors.raisedLight : colors.raised,
     '--line': light ? colors.lineLight : colors.line,

@@ -63,11 +63,13 @@ const HINTS: Readonly<Partial<Record<DoctorResultCode, string>>> = {
   [NODE_ERROR_CODES.SELLER_PAYMENT_NETWORK_MISMATCH]:
     'paid selling runs on devnet only; set the role up with a devnet RPC',
   [NODE_ERROR_CODES.SELLER_PAYMENT_ACCOUNTS_UNAVAILABLE]:
-    'fund the fee payer with devnet SOL and check the RPC; startup creates the payout, fee and fee payer token accounts',
+    'fund the fee payer with devnet SOL and check the RPC; startup creates the payout, fee and fee payer token accounts, and refuses a frozen one',
   [DOCTOR_CODES.PAYMENT_ACCOUNTS_MISSING]:
     'startup creates the missing payout, fee or fee payer token account, about 0.002 devnet SOL each from the fee payer',
   [DOCTOR_CODES.PAYMENT_ACCOUNTS_UNCHECKED]:
     'the RPC did not answer; startup checks the token accounts again',
+  [DOCTOR_CODES.PAYMENT_ACCOUNTS_UNUSABLE]:
+    'a payout, fee or fee payer token account is frozen or is not a token account; startup refuses it until it can receive payouts',
   [NODE_ERROR_CODES.SELLER_PAYMENT_DESCRIPTION_INVALID]:
     'the payout must differ from the owner, fee payer and authorizer keys',
   [NODE_ERROR_CODES.NODE_CONFIG_INVALID]:
@@ -81,6 +83,10 @@ const HINTS: Readonly<Partial<Record<DoctorResultCode, string>>> = {
   [RELAY_CONFIGURATION_CODES.INVALID_TOKEN_LENGTH]:
     'the relay token must be 32-512 characters',
   [RELAY_CONFIGURATION_CODES.INVALID_URLS]: 'relay URLs must be HTTPS origins',
+  [DOCTOR_CODES.CLOCK_SKEWED]:
+    'this clock is over 2 s off the discovery index; turn on automatic time sync (NTP): buyers refuse records issued over 5 s ahead, and a clock behind shortens every quote',
+  [DOCTOR_CODES.CLOCK_UNCHECKED]:
+    'the discovery index did not report its time quickly; check the connection and run doctor again',
 };
 
 const hint = (code: DoctorResultCode) =>
@@ -124,7 +130,9 @@ export async function doctor(
   for (const issue of report.configIssues)
     stdout(`        ${issueLine(issue)}`);
   if (report.seller) {
-    stdout('Seller identity (public; share it to be enrolled in discovery):\n');
+    stdout(
+      'Seller identity (public; `gyblos seller register` enrolls it in discovery):\n',
+    );
     stdout(`  nodeId  ${report.seller.nodeId}\n`);
     stdout(`  owner   ${report.seller.owner}\n`);
   }

@@ -183,6 +183,9 @@ export const CONTROL_LIMITS = {
   prefixBytes: 4,
   requestIdBytes: 16,
   quoteLifetimeMs: 30000,
+  // How far ahead of the verifier's clock a v2 record or quote may be issued. Real machines differ
+  // by hundreds of milliseconds; expiry gets no grace.
+  clockSkewMs: 5000,
   signatureBytes: 64,
   digestBytes: 32,
 } as const;

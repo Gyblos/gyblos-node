@@ -4,8 +4,8 @@ A node can be described by one TOML file, `gyblos.toml`, as decided in vault
 GYB-DOC-026. This page is its reference. The seller daemon (`pnpm node:start`)
 reads it at startup; see [Seller startup](#seller-startup) for what it honors
 today. `gyblos doctor` checks a seller before startup
-([Seller preflight](#seller-preflight-gyblos-doctor)); `gyblos init` comes
-later.
+([Seller preflight](#seller-preflight-gyblos-doctor)), and `gyblos seller init`
+writes a starting file with one free offer ([Seller](running-a-node.md#seller)).
 
 ## Validate a file
 
@@ -290,9 +290,10 @@ seller role was set up with a payout and payment keys
 plus the protocol fee (`PROTOCOL_FEE`, 3% on devnet), rounded up. Paid v2 has
 settled on devnet only in a controlled run; see [limitations](limitations.md).
 The v1 paid path remains in the lab gates (`pnpm gate:*`) only.
-[examples/seller-daemon.toml](../examples/seller-daemon.toml) is a file it
-accepts as written; the other examples are valid files for future nodes but stop
-this daemon. Today it honors:
+[examples/seller-daemon.toml](../examples/seller-daemon.toml) and its Docker
+variant [examples/seller-docker.toml](../examples/seller-docker.toml) are files
+it accepts as written; the other examples are valid files for future nodes but
+stop this daemon. Today it honors:
 
 | Setting                                                                                                                                           | Used                                                                                                                      |
 | ------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
@@ -327,11 +328,17 @@ the buyer's. The payment program does not fail when one of them is missing: it
 pays that share to its own treasury for good. So before starting the seller
 reads the first three accounts, and before every claim all four, and creates any
 that are missing in one transaction the fee payer signs and pays for (about
-0.002 devnet SOL of rent each). A seller that cannot create them does not start;
-a claim that cannot is not sent and stays pending with its recorded charge,
-retried on recovery. `pnpm gyblos doctor --online` warns with
-`PAYMENT_ACCOUNTS_MISSING` (startup creates them) or
-`PAYMENT_ACCOUNTS_UNCHECKED` (the RPC did not answer), and never sends anything.
+0.002 devnet SOL of rent each). Creations run one at a time, so claims arriving
+together create a missing account once; a claim with nothing to create never
+waits for another's. A frozen token account cannot receive its share, so it
+counts as unavailable. A seller that cannot create them, or finds one frozen,
+does not start; a claim that cannot is not sent and stays pending with its
+recorded charge, retried on recovery. `pnpm gyblos doctor --online` first checks
+that the role's RPC serves devnet (`SELLER_PAYMENT_NETWORK_MISMATCH` otherwise,
+as at startup), then warns with `PAYMENT_ACCOUNTS_MISSING` (startup creates
+them) or `PAYMENT_ACCOUNTS_UNCHECKED` (the RPC did not answer), fails with
+`PAYMENT_ACCOUNTS_UNUSABLE` for an account that is frozen or not a token account
+(startup refuses it), and never sends anything.
 
 `pnpm gyblos config validate --config "$GYBLOS_CONFIG"` explains file problems
 (it does not read `GYBLOS_CONFIG`, does not check the `SELLER_*` limits above,
@@ -401,7 +408,7 @@ there are no `GYBLOS_*` variables for it, and the buyer ignores it.
 ```sh
 pnpm gyblos doctor                         # reads ./gyblos.toml, like node:start
 GYBLOS_CONFIG=my.toml pnpm gyblos doctor   # the file node:start will read
-pnpm gyblos doctor --online                # also calls remote engine APIs
+pnpm gyblos doctor --online                # also calls remote engine APIs and checks the clock
 ```
 
 `doctor` has no `--config` flag on purpose: it reads exactly the file
@@ -420,16 +427,17 @@ the checks startup would fail on, and prints one line per check (`OK`, `WARN` or
 | `tokenizer` | the pinned tokenizer files are present and match their hashes (`TOKENIZER_UNAVAILABLE` hints `node:tokenizer`); `NOT_NEEDED` when every offer's usage is declared by its provider                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `engine[N]` | one line per `[[offers]]` entry N (counted from 1): its engine answers at its URL with its model, by describing it (for Ollama, the model list and pinned digest; for an API, its model list, which some providers serve without checking the key); it never generates. A failure shows the engine code, such as `ENGINE_UNAVAILABLE` or `ENGINE_TIMEOUT`; it fails only when no offer's engine answers (startup needs one), and is otherwise a warning. Not checked when an offer is refused. A remote API is called only with `--online` (the call carries its API key, and a hosted provider may count it); without it the line warns `REMOTE_ENGINE_NOT_CHECKED` |
 | `relays`    | relay URLs and token as the endpoint would build them (the token is never printed)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `clock`     | `--online` with a discovery index only: this clock against the index's HTTP `Date` header. `CLOCK_SKEWED` warns when it is over 2 s off; buyers and the index refuse records issued over 5 s ahead of their clocks, so turn on automatic time sync (NTP). `CLOCK_UNCHECKED` when the index gives no time or answers in over 1 s                                                                                                                                                                                                                                                                                                                                      |
 
 It then prints the seller's public **NodeId and owner** address from
 `role.json`; share those to be enrolled in a discovery index. The exit code is 0
 when no check fails (warnings do not fail) and 1 otherwise. It starts, spawns
 and writes nothing. It never prints the home location, the RPC URL, the relay
 token, an API key or key material, and only reaches each offer's loopback engine
-URL, plus each remote engine's model list with `--online`. Memory headroom, key
-contents and the NodeId matching `node.key` are checked at startup only. With a
-valid configuration it also prints the effective
-[seller limits](#seller-limits).
+URL, plus, with `--online`, each remote engine's model list and the discovery
+index origin for its time. Memory headroom, key contents and the NodeId matching
+`node.key` are checked at startup only. With a valid configuration it also
+prints the effective [seller limits](#seller-limits).
 
 ## Issue codes
 
@@ -472,6 +480,7 @@ Qwen3 thinking is on or off, written `["off", "high"]`. The custom model in
 | [examples/anthropic-reseller.toml](../examples/anthropic-reseller.toml) | An Anthropic-compatible API and a custom model.              |
 | [examples/free-offer.toml](../examples/free-offer.toml)                 | A free offer with caps, Docker host engine, publication off. |
 | [examples/seller-daemon.toml](../examples/seller-daemon.toml)           | What the seller daemon serves today; it starts as written.   |
+| [examples/seller-docker.toml](../examples/seller-docker.toml)           | The same in Docker (`compose.yaml`); it starts as written.   |
 | [examples/multi-model.toml](../examples/multi-model.toml)               | Several models on one node.                                  |
 
 ## Code
@@ -479,9 +488,15 @@ Qwen3 thinking is on or off, written `["off", "high"]`. The custom model in
 - `@gyblos/node/node-config`: `parseNodeConfig`, `validateNodeConfig`,
   `readNodeConfigFile`, `pricePerMtokToAtomicPerMtok` and the `NodeConfig` type;
   a valid result also carries `warnings`.
+- `@gyblos/node/node-config-file`: `nodeConfigPath` and `readStartupConfig`, the
+  one rule for which file is read (`GYBLOS_CONFIG`, else an optional
+  `./gyblos.toml`).
 - `@gyblos/node/node-config-resolve`: `resolveNodeConfig({ file, env, flags })`,
   returning settings, origins, secret references and warnings, or issues.
-- `apps/node/src/cli.ts`: the `gyblos` command (`pnpm gyblos`).
+- `apps/node/src/cli.ts`: the `gyblos` command (`pnpm gyblos`);
+  `apps/node/src/cli-init.ts`, `init.ts` and `init-file.ts` hold
+  `gyblos seller init`, and `cli-status.ts`, `status.ts` and `status-system.ts`
+  hold `gyblos seller status`.
 
 ## Local telemetry
 

@@ -2,11 +2,8 @@
 // spawning or writing anything. Results carry static codes only; the RPC URL, relay token, key contents and
 // home location never leave this module. Network use is limited to describing each offer's engine: one on
 // this machine always, a remote API only with --online, since that call carries the seller's API key;
-// --online also reads which token accounts a paid claim would pay into are missing.
-import { resolve } from 'node:path';
-
+// --online also reads missing payment token accounts and checks this clock against the discovery index.
 import {
-  NODE_ENVIRONMENT,
   PROTOCOL_FEE,
   ROLE_FILES,
   ROLE_KEY_FILES,
@@ -26,12 +23,11 @@ import {
 } from '@gyblos/transport-iroh/relays';
 
 import { modelTokenizer } from './artifacts';
+import { clockCheck } from './clock-check';
 import {
   DOCTOR_CHECKS,
   DOCTOR_CODES,
   DOCTOR_STATUS,
-  NODE_CONFIG_FILENAME,
-  NODE_CONFIG_ISSUE_CODES,
   NODE_ERROR_CODES,
   type DoctorCheckName,
   type DoctorCode,
@@ -41,15 +37,15 @@ import {
 import { createSellerEngine } from './engine-registry';
 import { NodeError } from './errors';
 import { assertRoleHome, assertTokenizerHome } from './home';
-import { readNodeConfigFile, type NodeConfig } from './node-config';
 import type { NodeConfigIssue } from './node-config-fields';
+import { readStartupConfig } from './node-config-file';
 import type { SellerLimits } from './node-config-limits';
 import { inspectSellerSequence } from './public-sequence';
 import { loadRole, roleKeyFilesStatus, type RoleConfig } from './roles';
 import type { SellerCatalogOffer } from './seller-offer';
 import {
-  missingPaymentAccounts,
-  type PaymentAccountsQuery,
+  paymentAccountsVerdict,
+  type PaymentAccountsProbes,
 } from './seller-payment-accounts';
 import {
   sellerBaseSettings,
@@ -82,8 +78,9 @@ export interface DoctorProbes {
   tokenizer?: (environment: HomeEnvironment) => Promise<unknown>;
   // The engines' transport; tests serve a synthetic provider.
   fetch?: typeof fetch;
-  // How many of these owners' token accounts for the mint are missing, on that RPC (--online).
-  paymentAccounts?: (query: PaymentAccountsQuery) => Promise<number>;
+  // The chain the role's RPC serves and its payment token accounts (--online).
+  genesis?: PaymentAccountsProbes['genesis'];
+  paymentAccounts?: PaymentAccountsProbes['paymentAccounts'];
 }
 export interface DoctorOptions {
   environment: HomeEnvironment;
@@ -107,25 +104,16 @@ const errorCode = (error: unknown): DoctorResultCode =>
     ? error.code
     : DOCTOR_CODES.CHECK_FAILED;
 
-// Exactly seller startup's file choice: GYBLOS_CONFIG must exist; without ./gyblos.toml the settings fail
-// with SELLER_OFFERS_MISSING, as startup does.
+// Startup's own file choice (readStartupConfig); without a file the settings fail with SELLER_OFFERS_MISSING,
+// as startup does.
 async function configCheck(options: DoctorOptions) {
-  const explicit = options.environment[NODE_ENVIRONMENT.config];
-  const read = await readNodeConfigFile(
-    resolve(options.cwd, explicit || NODE_CONFIG_FILENAME),
-  );
-  let file: NodeConfig | undefined;
-  if (read.ok) file = read.config;
-  else {
-    const missing =
-      read.issues.length === 1 &&
-      read.issues[0]!.code === NODE_CONFIG_ISSUE_CODES.FILE_NOT_FOUND;
-    if (!missing || explicit)
-      return {
-        issues: read.issues,
-        result: fail(NODE_ERROR_CODES.NODE_CONFIG_INVALID),
-      };
-  }
+  const read = await readStartupConfig(options.environment, options.cwd);
+  if (!read.ok)
+    return {
+      issues: read.issues,
+      result: fail(NODE_ERROR_CODES.NODE_CONFIG_INVALID),
+    };
+  const file = read.config;
   try {
     // As the daemon does: paid offers are served through the role's payment keys.
     const settings = sellerSettings(file, options.environment, {
@@ -249,18 +237,23 @@ async function paymentsCheck(
     return fail(errorCode(error));
   }
   if (!options.online) return OK;
-  try {
-    const missing = await (
-      options.probes?.paymentAccounts ?? missingPaymentAccounts
-    )({
+  const verdict = await paymentAccountsVerdict(
+    {
       rpcUrl: config.rpcUrl,
       mint: config.mint,
       owners: [config.payTo, PROTOCOL_FEE.treasury, config.facilitator],
-    });
-    return missing === 0 ? OK : warn(DOCTOR_CODES.PAYMENT_ACCOUNTS_MISSING);
-  } catch {
-    return warn(DOCTOR_CODES.PAYMENT_ACCOUNTS_UNCHECKED);
-  }
+    },
+    options.probes ?? {},
+  );
+  return {
+    ready: OK,
+    // Startup creates them.
+    missing: warn(DOCTOR_CODES.PAYMENT_ACCOUNTS_MISSING),
+    unchecked: warn(DOCTOR_CODES.PAYMENT_ACCOUNTS_UNCHECKED),
+    // Startup refuses both.
+    unusable: fail(DOCTOR_CODES.PAYMENT_ACCOUNTS_UNUSABLE),
+    'other-network': fail(NODE_ERROR_CODES.SELLER_PAYMENT_NETWORK_MISMATCH),
+  }[verdict];
 }
 
 const engineDependencies = (options: DoctorOptions) => ({
@@ -379,6 +372,9 @@ export async function sellerDoctor(
       DOCTOR_CHECKS.PAYMENTS,
       role.config ? await paymentsCheck(role.config, options) : notChecked,
     );
+  const index = config.settings?.publication?.baseUrl;
+  if (options.online && index)
+    add(DOCTOR_CHECKS.CLOCK, await clockCheck(index, options.probes?.fetch));
   return {
     checks,
     configIssues: config.issues,

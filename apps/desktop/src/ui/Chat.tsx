@@ -23,7 +23,7 @@ import {
 } from 'react';
 
 import { ChatController } from './chat-controller';
-import { toggleToolSelection } from './chat-state';
+import { toggleToolSelection, type ChatMessage } from './chat-state';
 import { ChatAnswer } from './ChatAnswer';
 import { ChatComposer } from './ChatComposer';
 import { ToolsDropdown } from './ChatTools';
@@ -81,6 +81,22 @@ const QUICK_PROMPTS = [
     prompt: 'Help me think through an idea step by step.',
   },
 ];
+type ChatTurn = { id: string; user?: ChatMessage; answer?: ChatMessage };
+// Groups each request with the answer it produced so the transcript has turns.
+function groupTurns(messages: readonly ChatMessage[]): ChatTurn[] {
+  const turns: ChatTurn[] = [];
+  for (const message of messages) {
+    const last = turns.at(-1);
+    if (!last || message.role === CHAT_ROLE.USER || last.answer) {
+      turns.push({ id: message.id });
+    }
+    const turn = turns.at(-1);
+    if (!turn) continue;
+    if (message.role === CHAT_ROLE.USER) turn.user = message;
+    else turn.answer = message;
+  }
+  return turns;
+}
 export function Chat({
   ref,
   model,
@@ -125,6 +141,7 @@ export function Chat({
   const lastUser = [...session.messages]
     .reverse()
     .find((message) => message.role === CHAT_ROLE.USER);
+  const turns = groupTurns(session.messages);
 
   function setDraft(text: string) {
     chat.setDraft(text);
@@ -351,43 +368,46 @@ export function Chat({
               aria-label="Conversation"
               aria-live="off"
             >
-              {session.messages.map((message) =>
-                message.role === CHAT_ROLE.USER ? (
-                  <ChatUserMessage
-                    key={message.id}
-                    text={message.text}
-                    action={
-                      <IconButton
-                        label="Reuse message"
-                        onClick={() => {
-                          setDraft(message.text);
-                          input.current?.focus();
-                        }}
-                      >
-                        <PencilSimple size={14} />
-                      </IconButton>
-                    }
-                  />
-                ) : (
-                  <ChatAnswer
-                    key={message.id}
-                    message={message}
-                    run={run}
-                    copied={copied === message.id}
-                    canReuse={message === session.messages.at(-1) && !!lastUser}
-                    reuseDisabled={busy || !online}
-                    onCopy={() => {
-                      void copy(message.text, message.id);
-                    }}
-                    onReuse={() => {
-                      if (!lastUser) return;
-                      setDraft(lastUser.text);
-                      input.current?.focus();
-                    }}
-                    onDetails={() => setDetails(message.id)}
-                  />
-                ),
-              )}
+              {turns.map(({ id, user, answer }) => (
+                <div className="chat-turn" key={id}>
+                  {user && (
+                    <ChatUserMessage
+                      text={user.text}
+                      action={
+                        <IconButton
+                          label="Reuse message"
+                          onClick={() => {
+                            setDraft(user.text);
+                            input.current?.focus();
+                          }}
+                        >
+                          <PencilSimple size={14} />
+                        </IconButton>
+                      }
+                    />
+                  )}
+                  {answer && (
+                    <ChatAnswer
+                      message={answer}
+                      run={run}
+                      copied={copied === answer.id}
+                      canReuse={
+                        answer === session.messages.at(-1) && !!lastUser
+                      }
+                      reuseDisabled={busy || !online}
+                      onCopy={() => {
+                        void copy(answer.text, answer.id);
+                      }}
+                      onReuse={() => {
+                        if (!lastUser) return;
+                        setDraft(lastUser.text);
+                        input.current?.focus();
+                      }}
+                      onDetails={() => setDetails(answer.id)}
+                    />
+                  )}
+                </div>
+              ))}
             </div>
           )}
         </div>

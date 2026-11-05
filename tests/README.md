@@ -156,4 +156,6 @@ loopback only and no uploader or real credentials are activated.
 
 `tests/lab/paid-startup-acceptance.test.ts` runs actual paid seller/buyer
 startup over native loopback, synthetic chain services and private temporary
-journals. See [the acceptance boundary](../docs/paid-acceptance.md).
+journals. It also drives the product terminal loop with synthetic streams,
+checks a mid-answer engine interruption and reconciles a simulated settlement.
+See [the acceptance boundary](../docs/paid-acceptance.md).

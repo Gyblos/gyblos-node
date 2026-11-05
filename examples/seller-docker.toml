@@ -1,0 +1,26 @@
+#:schema ../packages/node/schemas/gyblos.schema.json
+# (The #:schema path above is relative to this repository; in a copy elsewhere, update or delete it.)
+# The seller daemon in Docker (compose.yaml): the pinned Qwen3 0.6B with reasoning off on the compose
+# Ollama, given away free within daily token caps. Copy it next to compose.yaml as gyblos.toml; the seller
+# shares Ollama's network namespace, so 127.0.0.1:11434 is that Ollama (docs/running-a-node.md#docker).
+# Paid offers are refused at startup until paid selling returns (docs/configuration.md).
+
+version = 1
+
+[node]
+network = "devnet"
+
+[discovery]
+# Off so a test node is not listed by accident; set publish = true to appear in discovery.
+publish = false
+
+# Optional capacity limits; omitted keys keep these defaults (docs/configuration.md#seller-limits).
+# [limits]
+# max_connections = 8
+# requests_per_minute = 30
+
+[[offers]]
+model = "qwen3:0.6b"
+reasoning = ["off"]
+engine = { kind = "ollama", url = "http://127.0.0.1:11434/" }
+free = { daily_token_cap = 200000, per_buyer_cap = 5000 }

@@ -144,11 +144,25 @@ pnpm node:tokenizer              # pinned tokenizer; doctor reports NOT_NEEDED w
 # A dedicated Ollama, used only for selling, on loopback; leave it running in its own terminal:
 OLLAMA_HOST=127.0.0.1:11435 OLLAMA_MODELS=$HOME/.gyblos-ollama OLLAMA_NO_CLOUD=1 OLLAMA_NUM_PARALLEL=1 OLLAMA_MAX_LOADED_MODELS=1 ollama serve
 OLLAMA_HOST=127.0.0.1:11435 ollama pull qwen3:0.6b   # the pinned model
-cp examples/seller-daemon.toml gyblos.toml   # one free offer at http://127.0.0.1:11435/; edit the caps
+pnpm gyblos seller init         # asks for the engine, model and free caps; writes gyblos.toml
 pnpm gyblos doctor               # read-only preflight; prints the public NodeId and owner
 pnpm node:start
 ```
 
+- `pnpm gyblos seller init` writes a `gyblos.toml` with one free devnet offer:
+  it asks for the engine (`ollama`, `openai` or `anthropic`), its URL (default
+  the dedicated Ollama above), the model and the daily caps, and whether to list
+  the seller in discovery (default no). Without a terminal it takes flags and
+  defaults (`--engine`, `--url`, `--model`, `--upstream-model`,
+  `--context-tokens`, `--api-key-env <NAME>|none`, `--daily-cap`,
+  `--per-buyer-cap`, `--publish` or `--no-publish`). It writes `GYBLOS_CONFIG`
+  or `./gyblos.toml` (mode 0600, since an engine URL may carry a key in its
+  path), replaces an existing file only with `--force`, never writes through a
+  symlink, and writes nothing when the file format or startup's offer rules
+  would refuse the values (for Ollama, only the pinned `qwen3:0.6b` at a literal
+  loopback address). It handles no secret: API keys and the relay token stay in
+  the environment or `seller.env`, and it prints only their variable names.
+  `examples/seller-daemon.toml` is an equivalent file to copy instead.
 - The seller serves every free offer in `gyblos.toml`; without one it does not
   start (`SELLER_OFFERS_MISSING`). A paid offer is sold on devnet over the paid
   stream when the seller role was set up with a payout
@@ -189,6 +203,212 @@ pnpm node:start
   `pnpm gyblos doctor` and the guarded
   [sequence recovery procedure](discovery.md#seller-duties); never reset the
   persisted sequence high-water mark.
+
+### Running the seller as a service
+
+Once `pnpm gyblos doctor` reports `READY`, the seller can run in the background
+and restart with the machine. Run these as the account that owns the seller home
+and keys, never as root:
+
+```sh
+(umask 077; printf 'GYBLOS_RELAY_TOKEN=%s\n' "$GYBLOS_RELAY_TOKEN" > "${GYBLOS_HOME:-.local/gyblos}/seller.env")
+pnpm gyblos seller service install --dry-run   # prints the unit; changes nothing
+pnpm gyblos seller service install             # writes and starts it
+pnpm gyblos seller service uninstall           # stops and removes it
+```
+
+- The service sees only `<home>/seller.env`, plus `GYBLOS_HOME` and
+  `GYBLOS_CONFIG` resolved to absolute paths from the directory where you run
+  `install`. Install first runs the offline doctor with exactly that environment
+  and writes nothing when it is not `READY`, so a token exported only in your
+  shell is reported as missing.
+- `seller.env` holds the relay token and any `api_key_env` variables: a regular
+  file you own, mode 0600, not a symlink. Each line is `NAME=value` with no
+  spaces, quotes, `$`, backticks, backslashes, `#`, `~` or shell operators in
+  the value, because systemd and the macOS agent read only that form alike. It
+  may not set `GYBLOS_HOME`, `GYBLOS_CONFIG`, `PATH`, `HOME`, shell variables
+  (`UID`, `IFS`, `BASH*` and the like) or `NODE_*`, `LD_*`, `DYLD_*`, `TSX_*`,
+  `OPENSSL_*` variables, and no line, comment included, may contain a backslash
+  or carriage return.
+- Linux: a systemd user unit (`~/.config/systemd/user/gyblos-seller.service`).
+  It stops when you log out and does not start at boot unless lingering is on
+  (`sudo loginctl enable-linger <account>`, once). On a server where the seller
+  has its own account, enable lingering, then run the commands in a login shell
+  of that account (`sudo -iu <account>`). The unit stops the seller with SIGINT
+  and waits 120 s for withdrawal, restarts it on failure but gives up after 5
+  failed starts in 10 minutes (`systemctl --user reset-failed gyblos-seller`
+  clears that once fixed), and sets `MemoryMax` (`--memory`, default and minimum
+  `2048M`, the 1.5 GiB startup headroom plus the seller itself) and `CPUQuota`
+  (`--cpu`, default `100%`). Logs: `journalctl --user -u gyblos-seller`.
+- macOS: a launch agent (`~/Library/LaunchAgents/com.gyblos.seller.plist`) that
+  runs while you are logged in and logs to `<home>/service.log`. launchd has no
+  memory or CPU limit; the startup headroom check still applies.
+- The engine is not part of the service: run Ollama as its own service (its
+  Linux installer creates one) on the offer URL.
+- Installing again refuses while a unit exists; uninstall first. The unit runs
+  this checkout with the Node that ran `install`, so reinstall after moving
+  either.
+
+### Seller registration (beta invite)
+
+In the beta the discovery index lists only sellers admitted with a one-use
+invite ([discovery-index.md](discovery-index.md#beta-registration-invites)):
+
+```sh
+pnpm gyblos seller register   # asks for the invite on a terminal, or reads GYBLOS_INVITE
+```
+
+In the seller image, from the compose directory:
+`docker compose exec seller gyblos seller register`.
+
+- It sends the index only the invite and this home's NodeId, at the
+  `discovery.url` node:start would publish to. The index reads the NodeId's
+  8004-solana registration itself, so the seller must already be registered
+  there; this command does not register it on chain yet.
+- `Registered` or `Already registered` (a retry with the same invite) means the
+  seller may now publish; set `publish = true` under `[discovery]` to be listed.
+- Before asking for the invite it checks this home's seller role
+  (`SELLER_ROLE_MISSING`, `SELLER_ROLE_UNREADABLE`, `SELLER_ROLE_NOT_SELLER`)
+  and that node:start would accept the configuration and `discovery.url`
+  (`REGISTER_CONFIG_INVALID`). It takes no flags, so the invite never goes on
+  the command line: without `GYBLOS_INVITE` or a terminal it stops with
+  `REGISTER_NO_INVITE`, and a malformed code with `REGISTER_INVITE_FORMAT`.
+- It prints the index's origin before sending. The index's refusals are static
+  codes with a hint: `DISCOVERY_INVITE_INVALID` (wrong, spent or expired: ask
+  Gyblos for a new invite), `DISCOVERY_IDENTITY_NOT_REGISTERED` (not on chain
+  yet), `DISCOVERY_NODE_REVOKED`, `DISCOVERY_RATE_LIMITED`,
+  `DISCOVERY_UNAVAILABLE`, `DISCOVERY_REGISTRATION_REJECTED` or a 404
+  `DISCOVERY_HTTP_STATUS` when that index does not take registrations, and other
+  network or index failures (try again later). The invite is never printed
+  (though a terminal shows it as it is typed) and nothing is written.
+
+### Seller status
+
+```sh
+pnpm gyblos seller status            # read-only; same GYBLOS_HOME and gyblos.toml as node:start
+pnpm gyblos seller status --online   # also looks this NodeId up in the discovery index
+```
+
+It prints the NodeId and owner, then:
+
+- `service`: inside the seller image
+  (`docker compose exec seller gyblos seller status`; the image sets
+  `GYBLOS_CONTAINER=1`), `active (container)` while the daemon runs in that
+  container, `inactive (container)` when it does not, or `unknown (container)`
+  when the process list cannot be read. Use `exec`, not `run`:
+  `docker compose run` starts a new container that cannot see the seller and
+  reports it inactive. Otherwise `active` while the unit or agent
+  `seller service install` wrote has a running process (for launchd,
+  `launchctl print` must show `state = running`; a loaded agent that exited is
+  `inactive`), `inactive`, `not installed`, or `unknown` as root or on other
+  platforms;
+- `daemon`: the last state the daemon wrote to `status.json` (`starting` with
+  its phase, or `ready`) and when; a stopped daemon does not rewrite it;
+- one `offer` line per offer: `serving` once it is in the signed catalog, else
+  `not serving yet`;
+- `discovery`: `off`, `on` with the index origin, or `configuration invalid`
+  when node:start would refuse the file (an explicit `GYBLOS_CONFIG` must
+  exist). With `--online` it pages the index for each served model, sending only
+  the model, and says `listed in the index`, `not found in the index`, that it
+  stopped after 2000 sellers, `index unreachable`, or that no offer was serving
+  to look up;
+- counts from the seller's signed receipts for the last 24 hours and 7 days
+  (completed, failed, cancelled, output tokens), the last request time and
+  failure codes. Receipts keep at most 256 records for 7 days, so busy sellers
+  see a lower bound.
+
+`Result: RUNNING` (exit 0) needs an active service and a ready daemon;
+`STARTING`, `STOPPED` and `NOT_CONFIRMED` (no service to confirm the process)
+exit 1. It writes nothing and prints no buyer, prompt, key or home location.
+
+### Docker
+
+`compose.yaml` runs a seller with its own Ollama. Only Docker (with Compose
+v2.17 or later) is needed on the host; no port is published, because Iroh
+connects outbound.
+
+```sh
+cp examples/seller-docker.toml gyblos.toml        # one free offer; edit the caps
+(umask 077; printf 'GYBLOS_RELAY_TOKEN=%s\n' "$GYBLOS_RELAY_TOKEN" > seller.env)
+docker compose up -d ollama
+docker compose exec ollama ollama pull qwen3:0.6b # `ollama list` must show 7df6b6e09427
+docker compose run --rm seller setup --role seller --mint MINT
+docker compose run --rm seller tokenizer
+docker compose run --rm seller gyblos doctor      # READY, and the public NodeId and owner
+docker compose up -d                              # starts the seller
+docker compose exec seller gyblos seller status   # RUNNING once it serves
+docker compose logs -f seller
+docker compose stop seller                        # SIGINT; withdraws within 120 s
+```
+
+- The image (`Dockerfile`) holds the node and the `gyblos` CLI, runs as the
+  unprivileged `node` user and has no engine. Its commands are `start` (the
+  default), `gyblos …`, `setup …` and `tokenizer`.
+- **`docker compose down -v` deletes the `gyblos` volume, and with it the
+  seller's keys and journals.** Back the volume up before removing it.
+- Keys, journals, the public sequence and the tokenizer live in the `gyblos`
+  volume (`/data`, mode 0700). `gyblos.toml` is mounted read-only at
+  `/config/gyblos.toml` and must exist before the first `up` (compose refuses to
+  create it). `seller.env` holds the relay token and any `api_key_env` variables
+  (it is in `.gitignore`; keep it mode 0600).
+- The Ollama engine accepts only a literal loopback URL, so the seller shares
+  the Ollama container's network namespace (`network_mode: service:ollama`):
+  Ollama listens on `127.0.0.1:11434` there and the example's offer points to
+  it. Do not publish its port or set `OLLAMA_HOST=0.0.0.0`. A restarted Ollama
+  container gets a new namespace: compose restarts the seller with it, but after
+  Ollama restarts on its own (a crash), run `docker compose restart seller`.
+- The seller runs with `init: true`, so a stop signal reaches it even during
+  startup.
+- The seller container has `mem_limit: 2g`, because startup needs 1.5 GiB of
+  headroom in its own cgroup above the seller itself, and one CPU. Ollama's
+  model memory is counted in its own container. The host needs cgroup v2 (any
+  current Docker Desktop or Linux distribution), and startup also checks 1.5 GiB
+  of available memory on the host or Docker Desktop VM.
+- A remote engine (an OpenAI- or Anthropic-compatible URL) needs no Ollama
+  service: point the offer at it, put its `api_key_env` variable in `seller.env`
+  and remove `ollama` and `network_mode` from the compose file.
+- Build the image yourself with `docker compose build`, or use the published one
+  through the install script below.
+
+#### Install script
+
+`install.sh` sets up the same seller from the published image
+(`ghcr.io/gyblos/seller:beta`) without a checkout. It needs only Docker with
+Compose v2.17 or later. Beta sellers receive the file with their invitation:
+
+```sh
+sh install.sh
+```
+
+- It writes `compose.yaml` (this repository's, with the published image),
+  `gyblos.toml` (`examples/seller-docker.toml`) and `seller.env` into
+  `~/gyblos-seller` (created mode 0700; `GYBLOS_DIR` changes it), then pulls the
+  images and the model, creates the seller keys, downloads the tokenizer, runs
+  `gyblos doctor` and starts the seller only when doctor is READY.
+- The relay token is read without echo, or from `GYBLOS_RELAY_TOKEN`, and is
+  written only to `seller.env` (mode 0600), never printed. Without a terminal
+  (for example `ssh host sh install.sh`), set `GYBLOS_RELAY_TOKEN`.
+- Existing files are kept, so rerunning it resumes a failed install and
+  recreates the seller with the current `gyblos.toml` and `seller.env`. After
+  editing `gyblos.toml` (for example `publish = true`), rerun it or run
+  `docker compose up -d --force-recreate seller`; a plain `up -d` does not apply
+  the edit.
+- `GYBLOS_IMAGE` sets the image of a first install, such as a commit tag; after
+  that, change the seller's `image:` in `compose.yaml`.
+- While the package is private, `docker login ghcr.io` first with a token that
+  may read it.
+
+Maintainers publish the tip of `origin/main`, built from that commit alone
+(`git archive`), after `docker login ghcr.io` with a token allowed to write
+Gyblos packages and with a buildx builder for both platforms
+(`docker buildx create --use`):
+
+```sh
+sh scripts/publish-image.sh        # pushes :<commit> and :beta for amd64 and arm64
+```
+
+The first push creates the package private; its visibility is changed in the
+package's settings on GitHub. A public image contains the node's source.
 
 ## Buyer
 
@@ -264,10 +484,11 @@ seller or change proxy behavior. Call `close()` when finished; the endpoint
 remains owned by the caller. There is no control CLI yet.
 
 Quotes are `offer/v2` and are rejected by the legacy paid v1 flow. They indicate
-observed availability, not guaranteed admission. Both clocks must be
-synchronized: v2 retains zero clock-skew tolerance and no expiration grace.
-Queries have a 10-second absolute deadline and share endpoint admission before
-their separate control quotas. See
+observed availability, not guaranteed admission. A record or quote issued up to
+5 s ahead of the buyer's clock is accepted; expiry has no grace. Keep automatic
+time sync (NTP) on: `pnpm gyblos doctor --online` warns when the seller's clock
+is over 2 s off the discovery index. Queries have a 10-second absolute deadline
+and share endpoint admission before their separate control quotas. See
 [the protocol specification](../packages/protocol/SPEC.md).
 
 ## Relays
@@ -506,6 +727,23 @@ operators should use current signed v2 quotes rather than that old file.
 
 ## Free v2 buyer endpoint
 
+### Terminal chat
+
+After configuring the buyer, run `pnpm buyer:chat`. It starts and owns a local
+buyer endpoint on an ephemeral port, uses the startup selection, shows the
+configured model and per-request maximum deposit, and streams a response. Each
+line is one independent user message; the terminal does not send history. Enter
+`/exit` or press Ctrl-C to stop. The CLI does not choose or display a seller
+independently of the buyer, and does not write conversations to files.
+
+In paid mode the owned buyer manages its private bearer token without printing
+it. Another buyer holding the same journal must be stopped before starting paid
+chat. Amounts are atomic units of the configured devnet test token, not USDC.
+The CLI prints usage and the payment verdict when available. If a request fails
+after it may have been sent, or the payment is not confirmed, it stops without
+retrying; use the buyer's reconciliation procedure before another paid request.
+A completed streamed fragment is provisional until the final result arrives.
+
 `pnpm buyer:free` starts a separate loopback endpoint on the buyer proxy port
 (default `127.0.0.1:4031`). Stop `buyer:start` first; both commands use that
 port. It needs the buyer role's public configuration, node key and the
@@ -615,20 +853,21 @@ still observe the submitted text; free does not imply private or verified.
 
 Control connections close before execution connects on `gyblos/free/3` or
 `gyblos/free-stream/3`. The client verifies the seller peer, signed quote, local
-buyer NodeId, exact terms and zero-skew expiry again before sending.
-Request/response bounds and correlation use the free protocol codec. A query has
-an absolute 180-second budget including discovery, quotes and execution; each
-transport also retains its stage bounds. A failed seller may be excluded and
-selection repeated only before sending begins, and no seller is executed twice
-in one local request. The free runtime admits one orchestration at a time with
-no queue; overlapping requests return `FREE_BUYER_BUSY` rather than racing the
-per-peer connection limit or poisoning another request's cooldown. Cancelled
-selection attempts do not commit quote statistics. Control and execution
-admission remain occupied until pending native work settles. The client marks
-sending before the first frame write: partial writes, remote errors, timeouts
-and lost responses never cause automatic failover afterward. Native work that
-ignores cancellation retains its execution resource until it actually settles.
-The v1 paid proxy remains a separate command.
+buyer NodeId, exact terms and lifetime again before sending (an issue time up to
+5 s ahead is accepted; expiry has no grace). Request/response bounds and
+correlation use the free protocol codec. A query has an absolute 180-second
+budget including discovery, quotes and execution; each transport also retains
+its stage bounds. A failed seller may be excluded and selection repeated only
+before sending begins, and no seller is executed twice in one local request. The
+free runtime admits one orchestration at a time with no queue; overlapping
+requests return `FREE_BUYER_BUSY` rather than racing the per-peer connection
+limit or poisoning another request's cooldown. Cancelled selection attempts do
+not commit quote statistics. Control and execution admission remain occupied
+until pending native work settles. The client marks sending before the first
+frame write: partial writes, remote errors, timeouts and lost responses never
+cause automatic failover afterward. Native work that ignores cancellation
+retains its execution resource until it actually settles. The v1 paid proxy
+remains a separate command.
 
 Product contract tests use a synthetic engine and native encrypted loopback.
 They are not the complete publication-to-answer acceptance: the separate lab
@@ -700,12 +939,18 @@ in the buyer home before the journal unblocks it, so a failed run loses nothing
 and the next one picks up where it stopped. An `open` channel keeps blocking
 until the seller claims it or the buyer withdraws it (below).
 
-Use the role's RPC as one endpoint with full transaction history. A pruned or
-load-balanced RPC can only keep a channel `open` (it never makes one look
-unopened), because the command reads the finalized tip first and requires the
-RPC to still serve blocks and ledger back to the open's slot. A journal from
-before this version is read as is: its signed opens can still settle but are
-never reported `never-opened`.
+Use the role's RPC as one endpoint with complete, consistent finalized
+transaction history. The command reads the finalized tip and checks that the RPC
+still serves blocks and ledger back to the open's slot; those checks do not
+prove that its signature history is complete or consistent across backends. The
+operator must verify that history before running reconciliation: the command can
+automatically mark an open as never landed and unblock payments. Do not run it
+against an RPC whose history may be incomplete or inconsistent. A signed open
+from an older journal has no recorded network and remains blocked, as described
+below. A journal upgraded to the current format is refused by earlier releases
+(`BUYER_PAYMENT_JOURNAL_UNAVAILABLE`, `PAID_RECONCILE_INCOMPLETE`,
+`PAID_WITHDRAW_INCOMPLETE`), so do not roll back the buyer while channels need
+recovery.
 
 The command exits 0 when nothing blocks payments (disputes included, since they
 are recorded and no longer block), 2 while a channel stays open, and 1 when it
@@ -735,9 +980,11 @@ shortest `retryAfterSeconds`:
   because the program would otherwise send the refund to its own treasury.
 - `nothing`: already distributed, or no channel account at the address.
 - `refused`: the account is not this buyer's channel with the journaled rent
-  payer and deposit and the current role's mint and network fee distribution, so
-  nothing was signed for it. Restore the role's mint (or run the release the
-  channel was opened with) and run again.
+  payer, deposit, mint and network fee distribution, so nothing was signed for
+  it. The journal keeps the mint, fee treasury and fee rate each open accepted,
+  so a later change to the role's mint or the network fee does not affect
+  channels already open. Entries journaled before that have no recorded network
+  and remain blocked until their provenance is independently established.
 - `failed`: this channel's step failed with the static code in `failure`
   (`UPTO_UNAVAILABLE` for the RPC, `UPTO_CHAIN_REJECTED` when the chain or its
   preflight refused the transaction, which also happens when an earlier
@@ -753,13 +1000,28 @@ after every channel was visited) or could not run
 (`PAID_WITHDRAW_NETWORK_MISMATCH`, `PAID_WITHDRAW_ROLE_INVALID`,
 `PAID_WITHDRAW_INCOMPLETE`).
 
+The buyer journal records the network of new signed opens. A signed open entry
+from an older version has no provable network: recovery keeps it open and
+refuses withdrawal on every network, reporting `networkBlock: "unknown"`.
+Confirm its provenance independently before attempting any separate recovery; do
+not delete or edit it to unblock payments. An open channel belonging to a
+different network is also left untouched and reports `networkBlock: "mismatch"`.
+Recovery can still process signed channels bound to the selected, verified
+network.
+
+An older journal containing an unresolved signed open is not upgraded or
+rewritten, so earlier software can still read it. Once no such entry remains,
+the first journal write upgrades the file to the current format. Earlier
+software rejects that format; do not roll back while channels need recovery.
+
 It never changes the journal. Once a channel is distributed and finalized,
 `pnpm buyer:reconcile:paid` reads it from history and unblocks payments: the
 charge is what the seller had settled (usually nothing). If the buyer had
 counted a delivered answer that the seller never claimed, that shows as
-`disputed` with a smaller charge. A journal entry from before this version whose
-open never landed shows `nothing` here, and reconciliation cannot prove it
-unopened, so it keeps blocking payments.
+`disputed` with a smaller charge. A signed older entry without a recorded
+network remains open; an empty history on the selected chain does not prove the
+entry was created on that chain. There is no automatic legacy attribution or
+recovery command yet.
 
 The endpoint listens on loopback only and refuses browser requests, but loopback
 is not authentication, so paid mode also requires a bearer token. The first paid

@@ -17,3 +17,9 @@ packageExtensions:
 # @x402/svm release supports it.
 patchedDependencies:
   '@x402/svm@2.28.0': patches/@x402__svm@2.28.0.patch
+
+# Core 2.29 updates its schemas to the fixed Zod 4 API. Retain SVM 2.28 and its
+# Solana 5 peer contract/local split patch; SVM 2.29 requires a separate Solana 8
+# migration. Verify the mixed minor versions with the offline payment contracts.
+overrides:
+  '@x402/svm@2.28.0>@x402/core': 2.29.0

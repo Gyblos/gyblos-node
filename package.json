@@ -1,6 +1,7 @@
 {
   "name": "gyblos-node",
   "version": "0.1.0",
+  "license": "Apache-2.0",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.12.1",
@@ -34,6 +35,9 @@
     "skills:materialize": "node --import tsx tooling/skills-cli.ts materialize",
     "skills:materialize:replace": "node --import tsx tooling/skills-cli.ts materialize --replace",
     "tooling:test": "node --import tsx --test \"tooling/**/*.test.ts\"",
+    "index:invite": "node --import tsx apps/discovery-index/scripts/admin.ts invite",
+    "index:revoke": "node --import tsx apps/discovery-index/scripts/admin.ts revoke",
+    "index:restore": "node --import tsx apps/discovery-index/scripts/admin.ts restore",
     "node:start": "node --import tsx apps/node/src/main.ts",
     "paypal:sandbox": "node --import tsx apps/node/src/paypal-main.ts",
     "gyblos": "node --import tsx apps/node/src/cli.ts",
@@ -52,6 +56,7 @@
     "desktop:smoke": "pnpm desktop:build && pnpm --filter @gyblos/desktop smoke",
     "desktop:package": "pnpm desktop:build && pnpm --filter @gyblos/desktop package",
     "buyer": "node --import tsx apps/buyer/src/buyer-main.ts",
+    "buyer:chat": "node --import tsx apps/buyer/src/chat-cli.ts",
     "buyer:free": "node --import tsx apps/buyer/src/free-main.ts",
     "acceptance:receipts": "pnpm --filter @gyblos/lab-harness acceptance:receipts",
     "acceptance:paid": "node --import tsx tests/support/paid-acceptance-cli.ts"
@@ -67,9 +72,9 @@
     "@number0/iroh": "1.1.0",
     "@solana-program/token": "0.9.0",
     "@solana/kit": "5.1.0",
-    "@x402/core": "2.28.0",
+    "@x402/core": "2.29.0",
     "@x402/svm": "2.28.0",
-    "express": "4.21.2",
+    "express": "4.22.3",
     "@gyblos/transport-iroh": "workspace:*",
     "@gyblos/protocol": "workspace:*",
     "@gyblos/node": "workspace:*",
@@ -92,7 +97,7 @@
   "devDependencies": {
     "@ianvs/prettier-plugin-sort-imports": "4.7.0",
     "@types/express": "4.17.21",
-    "@types/node": "24.19.2",
+    "@types/node": "26.6.6",
     "dependency-cruiser": "18.7.0",
     "eslint": "9.39.1",
     "prettier": "3.9.10",
@@ -101,6 +106,6 @@
     "typescript-eslint": "8.48.1",
     "@opentelemetry/api": "1.9.0",
     "@opentelemetry/core": "2.6.0",
-    "@opentelemetry/sdk-metrics": "2.6.0"
+    "@opentelemetry/sdk-metrics": "2.12.0"
   }
 }

@@ -1,6 +1,12 @@
 // The paid buyer's real dependencies: verified selection quoted at the configured ceilings (paid sellers
 // only), execution over the paid stream to a configured seller, one paid request at a time, and the
 // payment journal deciding whether an earlier channel still needs reconciliation.
+import { PaidBuyerError } from '@gyblos/node/buyer-paid-error';
+import type {
+  PaidBuyerDependencies,
+  PaidBuyerRecord,
+  PaidWinner,
+} from '@gyblos/node/buyer-paid-execution';
 import { PAYMENT_CHANNEL_STATES } from '@gyblos/protocol/constants';
 import type { RecountTokenizer } from '@gyblos/protocol/engine';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
@@ -20,12 +26,6 @@ import {
   type PreparedSelection,
 } from './free-selection';
 import { requireBuyerIdentity, verifyBuyerIdentity } from './identity';
-import { PaidBuyerError } from './paid-errors';
-import type {
-  PaidBuyerDependencies,
-  PaidBuyerRecord,
-  PaidWinner,
-} from './paid-execution';
 
 export interface PaidSelectionOptions extends FreeSelectionOptions {
   payment: PaymentClient;

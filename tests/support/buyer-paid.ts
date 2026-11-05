@@ -1,6 +1,11 @@
 // Fakes for the paid buyer tests: two sellers with their own quotes, a payment client that signs each
 // request once, scripted seller terminals, a counting meter and a record log. No network or chain.
 import { PROTOCOL_FEE } from '@gyblos/config';
+import type {
+  PaidBuyerDependencies,
+  PaidBuyerRecord,
+  PaidWinner,
+} from '@gyblos/node/buyer-paid-execution';
 import {
   ENGINE_DONE_REASONS,
   FREE_CHAT_ROLES,
@@ -22,11 +27,6 @@ import {
   type PaymentTerms,
 } from '@gyblos/protocol/payment';
 
-import type {
-  PaidBuyerDependencies,
-  PaidBuyerRecord,
-  PaidWinner,
-} from '../../apps/buyer/src/paid-execution';
 import { paidSource } from './paid-fixture';
 
 export const INPUT = {

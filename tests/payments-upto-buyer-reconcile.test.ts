@@ -1,6 +1,7 @@
 // The buyer's reconciliation from finalized history: a claim that emptied the escrow settles, disputes
 // or is unchecked against the buyer's own count, reported before the journal changes; an open is never
-// opened only on the chain's word; anything else stays open. Temporary journal; chain double.
+// opened only on the chain's word; anything else stays open. Each channel is read with the mint and
+// treasury its open accepted. Temporary journal; chain double.
 import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -14,12 +15,13 @@ import {
   UptoError,
 } from 'x402-upto-metered';
 
-import { buyerJournalPathsIn } from '@gyblos/config';
+import { buyerJournalPathsIn, DEVNET } from '@gyblos/config';
 import {
   openUptoBuyerJournal,
   RECONCILE_OUTCOMES,
   reconcileUptoBuyer,
   type UptoBuyerJournal,
+  type UptoJournalPolicy,
   type UptoReconcileResult,
 } from '@gyblos/payments-upto';
 import {
@@ -46,6 +48,12 @@ const OTHER_DIGEST = 'cd'.repeat(32);
 // The open's slot and the last block height its blockhash allows, as journaled at signing.
 const OPEN_SLOT = 50n;
 const LAST_VALID = 100n;
+const ACCEPTED = {
+  network: DEVNET,
+  mint: 'Mint211111111111111111111111111111111111111',
+  treasury: 'Treas21111111111111111111111111111111111111',
+  protocolFeeBps: 300,
+};
 
 const OPEN: HistoryEntry = {
   signature: signatureOf(0),
@@ -77,6 +85,12 @@ function state(history: HistoryEntry[], change: Partial<ChainState> = {}) {
 async function withJournal(
   run: (journal: UptoBuyerJournal) => Promise<void>,
   digests: [string, string][] = [[DIGEST, CHANNEL]],
+  policy: UptoJournalPolicy | null = {
+    network: DEVNET,
+    mint: MINT,
+    treasury: TREASURY,
+    protocolFeeBps: 300,
+  },
 ) {
   const root = await mkdtemp(join(tmpdir(), 'gyblos-buyer-reconcile-'));
   const journal = await openUptoBuyerJournal({
@@ -91,6 +105,7 @@ async function withJournal(
         payTo: PAY_TO,
         feePayer: PAY_TO,
         maxAtomic: '1000',
+        policy,
         openSlot: String(OPEN_SLOT),
         lastValidBlockHeight: String(LAST_VALID),
         expiresAt: Date.now() + 60_000,
@@ -116,6 +131,7 @@ function reconcile(
   const double = chainDouble(chain);
   const run = reconcileUptoBuyer({
     journal,
+    network: DEVNET,
     rpc: double.rpc,
     payer: PAYER,
     mint: MINT,
@@ -166,6 +182,37 @@ void test('a claim that emptied the escrow settles, disputes or is unchecked, re
       assert.deepEqual(await reconcile(journal, state([])).run, []);
     });
 });
+
+void test('a channel is read with the mint and treasury its open accepted, not the buyer’s current ones', () =>
+  withJournal(
+    async (journal) => {
+      const accepted = ACCEPTED;
+      // The claim moved the old mint and paid the old treasury; the buyer's policy now names others.
+      const claim: HistoryEntry = {
+        signature: signatureOf(1),
+        flows: [
+          { owner: CHANNEL, before: 1000n, after: 0n },
+          { owner: PAY_TO, before: 0n, after: 8n },
+          { owner: accepted.treasury, before: 0n, after: 1n },
+          { owner: PAYER, before: 0n, after: 991n },
+        ],
+      };
+      const { run } = reconcile(
+        journal,
+        state([OPEN, claim], { mint: accepted.mint }),
+        { expected: '9' },
+      );
+      const [result] = await run;
+      assert.deepEqual(
+        [result?.outcome, result?.chargedAtomic, result?.feeAtomic],
+        [RECONCILE_OUTCOMES.SETTLED, '9', '1'],
+      );
+      // Settling keeps the accepted policy.
+      assert.deepEqual((await journal.get(DIGEST))?.policy, accepted);
+    },
+    undefined,
+    ACCEPTED,
+  ));
 
 void test('a report that fails leaves the channel open for the next run', () =>
   withJournal(async (journal) => {
@@ -246,6 +293,7 @@ void test('an open is never opened only when the whole chain agrees', () =>
     const double = chainDouble(state(spam));
     const [never] = await reconcileUptoBuyer({
       journal,
+      network: DEVNET,
       rpc: double.rpc,
       payer: PAYER,
       mint: MINT,
@@ -292,6 +340,7 @@ void test('entries are read in turn; a failing read keeps what was already repor
         payTo: PAY_TO,
         feePayer: PAY_TO,
         maxAtomic: '1000',
+        policy: null,
         openSlot: '1',
         lastValidBlockHeight: '1',
         expiresAt: Date.now() + 60_000,
@@ -314,6 +363,7 @@ void test('entries are read in turn; a failing read keeps what was already repor
       await assert.rejects(
         reconcileUptoBuyer({
           journal,
+          network: DEVNET,
           rpc: double.rpc,
           payer: PAYER,
           mint: MINT,

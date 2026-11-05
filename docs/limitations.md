@@ -10,8 +10,10 @@ only; never import mainnet keys.
   buyer, required direct Iroh route, test token (not USDC). All six transactions
   finalized and every answer was recounted. Report:
   [gate-0008.json](../lab/evidence/gate-0008.json), bound to source `ba168c4`.
-- Later code is checked with offline tests only. No paid run has been repeated
-  on the current head.
+- That historical run covers its recorded source revision. A separate controlled
+  devnet run exercised paid v2 selling and recovery; see the limits below.
+  Neither run establishes paid behavior on every later revision or the current
+  head.
 - Docker NAT-direct did not pass. A relay session with inbound UDP blocked did
   complete paid calls (see [gate-0006.json](../lab/evidence/gate-0006.json)).
   Hotspot/CGNAT and wider NAT coverage are untested, as is a direct-to-relay
@@ -31,7 +33,11 @@ only; never import mainnet keys.
   before each claim ([Seller startup](configuration.md#seller-startup)). A buyer
   who closed its emptied token account makes the seller pay, unrecovered, the
   rent to recreate it for its refund: about 0.002 SOL, at most about once per
-  channel.
+  channel. Rent cleanup and a buyer's withdrawal distribute channels without
+  that check, so an owner who closes its own token account while the seller runs
+  loses those shares for good; the next claim or restart recreates the account.
+  A claim whose buyer's refund account is frozen is not sent and stays pending,
+  retried on recovery, with the same code as an unreachable RPC.
 - Paid v2 selling (x402 upto channels) is wired to devnet and has settled there
   only in a controlled run; it is not validated beyond that.
 - A claim is recognized as landed only through the transactions this seller sent
@@ -107,6 +113,10 @@ See [recovery.md](recovery.md) for how recovery works.
 - The seller's 1.5 GiB memory reserve is an admission policy, not a guarantee.
   Later memory pressure or model eviction can still break a request. The model
   stays loaded for five minutes; offers expire after four.
+- On Linux the reserve is checked against the machine's available memory and the
+  tightest cgroup limit from the seller's own group up to the root. An engine in
+  a separately limited service or container is outside that path, so its own
+  limit is not checked.
 
 Details: [inference.md](inference.md).
 
@@ -175,8 +185,10 @@ bindings. Opt-in read-only 8004 admission verifies expected bindings
 independently and persists scoped high-water/tombstone state, with explicit
 manual overrides. It does not enroll unknown sellers, provide DHT discovery or
 establish live-index production availability. Replay state and withdrawal
-barriers persist; a retained lock or unsafe/corrupt state fails closed. Payment
-execution remains the compatible trusted v1 flow.
+barriers persist; a retained lock or unsafe/corrupt state fails closed. These
+discovery and admission checks do not establish paid execution. The seller
+separately composes paid v2 when supplied with a payment server; the legacy v1
+paid path remains in the lab gates only.
 
 Seller discovery publication is opt-in and locally tested. It uses one durable
 public-v2 sequence allocator shared with control Iroh; it does not establish a
@@ -191,5 +203,6 @@ availability closed until it settles; no queued retry can accumulate. Shutdown
 invalidates snapshots without waiting for an uncooperative engine. Timing is
 locally tested, not a production load/cancellation guarantee. The legacy paid
 offer retains its original expiry, and free execution has separate startup
-acceptance. Paid v2 uses a separate conditional execution path; its devnet
-settlement remains unverified as described above.
+acceptance. Paid v2 uses a separate conditional execution path. Only the
+historical controlled devnet settlement described above has been observed;
+current-head and production settlement remain unverified.

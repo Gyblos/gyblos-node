@@ -247,11 +247,24 @@ void test('one lock reached through another spelling of its path is still one lo
       acquireProcessLock(join(root, 'alias', 'ledger.lock')),
       refused,
     );
-    // A different case names the same file on case-insensitive volumes; refused there too.
-    await assert.rejects(
-      acquireProcessLock(join(root, 'real', 'LEDGER.lock')),
-      refused,
-    );
+    const alternate = join(root, 'real', 'LEDGER.lock');
+    const alternateInfo = await stat(alternate).catch((error: unknown) => {
+      assert.ok(error instanceof Error && 'code' in error);
+      assert.equal(error.code, 'ENOENT');
+      return undefined;
+    });
+    if (alternateInfo) {
+      // Case-insensitive volumes resolve both names to the held file.
+      const originalInfo = await stat(join(root, 'real', 'ledger.lock'));
+      assert.equal(alternateInfo.dev, originalInfo.dev);
+      assert.equal(alternateInfo.ino, originalInfo.ino);
+      await assert.rejects(acquireProcessLock(alternate), refused);
+    } else {
+      // On case-sensitive volumes the uppercase name is an independent file.
+      const independent = await acquireProcessLock(alternate);
+      await independent.verify();
+      await independent.release();
+    }
     await lock.verify();
     await lock.release();
   }));

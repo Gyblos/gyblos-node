@@ -1,7 +1,8 @@
 // The token accounts a seller's claim pays into: read in one call at confirmed commitment; every
-// missing one is created in one transaction the fee payer signs and pays for; an account the token
-// program does not own, a refused or unconfirmed creation, or an unreachable RPC is a failure and
-// nothing more is sent. RPC is a double; no network.
+// missing one is created in one transaction the fee payer signs and pays for; creations run one at a
+// time, each reading again first; a frozen account, an account the token program does not own, a
+// refused or unconfirmed creation, or an unreachable RPC is a failure and nothing more is sent. RPC is
+// a double; no network.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -19,7 +20,9 @@ import {
   createUptoRecipientAccounts,
   UPTO_ERROR_CODES,
   UPTO_PROGRAM,
+  UPTO_TOKEN_ACCOUNT,
   UptoError,
+  uptoRecipientTokenAccounts,
   uptoTokenAccount,
   type UptoRecipientAccountsRpc,
 } from 'x402-upto-metered';
@@ -31,6 +34,14 @@ import {
 } from './support/upto-withdraw-chain';
 
 const TOKEN_PROGRAM = String(TOKEN_PROGRAM_ADDRESS);
+// A token account's data (165 bytes) in the given state.
+const tokenAccount = (state: number) => {
+  const bytes = new Uint8Array(165);
+  bytes[UPTO_TOKEN_ACCOUNT.stateOffset] = state;
+  return Buffer.from(bytes).toString('base64');
+};
+const INITIALIZED = tokenAccount(UPTO_TOKEN_ACCOUNT.initialized);
+const FROZEN = tokenAccount(UPTO_TOKEN_ACCOUNT.frozen);
 
 interface Chain {
   // Token accounts that exist, by address, with their owning program.
@@ -95,7 +106,15 @@ function chainDouble(state: Chain) {
               unitsConsumed: null,
             },
           );
-        sent.push(decodeSent(wire));
+        const transaction = decodeSent(wire);
+        sent.push(transaction);
+        // A confirmed creation exists for the next read.
+        if (state.outcome === undefined || state.outcome === 'confirmed')
+          for (const instruction of transaction.instructions)
+            state.existing.set(String(instruction.accounts[1]), {
+              owner: TOKEN_PROGRAM,
+              data: INITIALIZED,
+            });
         const bytes = new Uint8Array(64);
         bytes[0] = sent.length;
         return getBase58Decoder().decode(bytes) as Signature;
@@ -134,10 +153,11 @@ async function setup(
   const existing = new Map(
     (state.present ?? []).map((index) => [
       accounts[index]!,
-      { owner: TOKEN_PROGRAM, data: 'AAAA' },
+      { owner: TOKEN_PROGRAM, data: INITIALIZED },
     ]),
   );
-  const chain = chainDouble({ ...state, existing });
+  const chainState: Chain = { ...state, existing };
+  const chain = chainDouble(chainState);
   const recipients = createUptoRecipientAccounts(chain.rpc, {
     feePayer,
     mint,
@@ -146,7 +166,16 @@ async function setup(
     owners: [...owners, feePayer.address],
     sleep: async () => undefined,
   });
-  return { ...chain, recipients, feePayer, mint, owners, accounts, existing };
+  return {
+    ...chain,
+    chainState,
+    recipients,
+    feePayer,
+    mint,
+    owners,
+    accounts,
+    existing,
+  };
 }
 
 const failsWith = (code: string) => (error: unknown) =>
@@ -213,6 +242,54 @@ void test('owners given for one claim are read and created with the seller’s o
   assert.deepEqual(
     sent[0]?.instructions.map((instruction) => instruction.accounts[2]),
     [buyer],
+  );
+});
+
+void test('creations run one at a time and read again first, so a missing account is created once', async () => {
+  const { recipients, sent, reads } = await setup({ present: [1, 2] });
+  await Promise.all([recipients.ensure(), recipients.ensure()]);
+  assert.equal(sent.length, 1);
+  // Each found it missing, then read again in turn before creating.
+  assert.equal(reads.length, 4);
+  // With nothing missing, a check only reads.
+  await recipients.ensure();
+  assert.equal(reads.length, 5);
+  // A failed check does not stop the next one.
+  const failing = await setup({ failing: true });
+  await assert.rejects(
+    failing.recipients.ensure(),
+    failsWith(UPTO_ERROR_CODES.UNAVAILABLE),
+  );
+  failing.chainState.failing = false;
+  await failing.recipients.ensure();
+  assert.equal(failing.sent.length, 1);
+});
+
+void test('a frozen or uninitialized token account fails before anything is sent', async () => {
+  for (const data of [FROZEN, tokenAccount(0), '']) {
+    const { recipients, sent, existing, accounts } = await setup({
+      present: [1, 2],
+    });
+    existing.set(accounts[0]!, { owner: TOKEN_PROGRAM, data });
+    await assert.rejects(
+      recipients.ensure(),
+      failsWith(UPTO_ERROR_CODES.UNAVAILABLE),
+      data,
+    );
+    assert.deepEqual(sent, []);
+  }
+  // Read on its own, a frozen account is unusable rather than missing.
+  const { chainState, rpc, mint, owners, accounts } = await setup({
+    present: [1, 2],
+  });
+  chainState.existing.set(accounts[1]!, { owner: TOKEN_PROGRAM, data: FROZEN });
+  assert.deepEqual(
+    await uptoRecipientTokenAccounts(rpc, {
+      mint,
+      tokenProgram: TOKEN_PROGRAM,
+      owners,
+    }),
+    { missing: [owners[0]], unusable: [owners[1]] },
   );
 });
 

@@ -5,6 +5,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 import { address } from '@solana/kit';
 
+import { startBuyer as startProductBuyer } from '@gyblos/buyer/buyer-main';
 import { startPaidBuyer } from '@gyblos/buyer/paid-startup';
 import { rolePathIn } from '@gyblos/config';
 import { fetchSellers } from '@gyblos/discovery-http';
@@ -65,10 +66,13 @@ export async function paidAcceptanceHost(signal: AbortSignal) {
   const localFetch = globalThis.fetch;
   let external = 0;
   let reads = 0;
+  let buyer: Awaited<ReturnType<typeof startPaidBuyer>> | undefined;
   globalThis.fetch = async (input, init) => {
     const request = new Request(input, init);
     const url = new URL(request.url);
     if (url.href === registry.url + '/' && request.method === 'POST')
+      return localFetch(request);
+    if (buyer && request.url === buyer.url && request.method === 'POST')
       return localFetch(request);
     if (url.origin !== ACCEPTANCE.origin || !url.pathname.startsWith('/v1/')) {
       external++;
@@ -83,14 +87,13 @@ export async function paidAcceptanceHost(signal: AbortSignal) {
     });
   };
   let seller: ReturnType<typeof createNode> | undefined;
-  let buyer: Awaited<ReturnType<typeof startPaidBuyer>> | undefined;
   let token: string | undefined;
   const closeBuyer = async () => {
     await buyer?.close();
     buyer = undefined;
   };
   const startBuyer = async () => {
-    buyer = await startPaidBuyer({
+    buyer = await startProductBuyer({
       bind,
       port: 0,
       chain: payments.buyer,
@@ -179,6 +182,7 @@ export async function paidAcceptanceHost(signal: AbortSignal) {
     assert.ok(binding.protocols()[0]?.includes(PAID_STREAM.alpn));
     return {
       engine,
+      roles,
       payments,
       binding,
       registry,
@@ -188,6 +192,20 @@ export async function paidAcceptanceHost(signal: AbortSignal) {
       reads: () => reads,
       external: () => external,
       token: () => token,
+      stopBuyer: closeBuyer,
+      terminalOptions() {
+        assert.equal(buyer, undefined);
+        return {
+          bind,
+          chain: payments.buyer,
+          meter: async () => paidAcceptanceMeter,
+        };
+      },
+      registerTerminal(host: Awaited<ReturnType<typeof startProductBuyer>>) {
+        assert.equal(buyer, undefined);
+        buyer = host;
+        return { chat: buyer.chat, close: closeBuyer };
+      },
       url: () => {
         assert.ok(buyer);
         return buyer.url;

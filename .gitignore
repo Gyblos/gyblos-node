@@ -33,3 +33,6 @@ AGENTS.local.md
 !/lab/evidence/gate-0006.json
 !/lab/evidence/gate-0007.json
 !/lab/evidence/gate-0008.json
+
+# The Docker seller's private environment file (compose.yaml)
+/seller.env

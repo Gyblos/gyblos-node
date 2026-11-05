@@ -32,7 +32,9 @@ reuses the compact Chat and Connect mockup, with in-memory conversations and
 simulated USDC Chat responses/connections. The separate
 [PayPal Sandbox prototype](docs/paypal-sandbox.md) runs real local inference
 with simulated payments for one local seller. Normal startup prepares a
-protected local wallet; portable backup is pending and funding remains disabled.
+protected local wallet; saving, same-address backup verification and
+Settings-only restoration are implemented, while funding remains disabled.
+Native OS custody and cross-platform recovery still need separate acceptance.
 Local packaging is macOS arm64 only. A separate wallet-free smoke retains the
 isolated Iroh loopback check. See
 [running and packaging the preview](docs/desktop-probe.md).
@@ -46,6 +48,11 @@ isolated Iroh loopback check. See
   mainnet ([all limits](docs/limitations.md)).
 
 ## Quickstart
+
+For a first contribution, start with [CONTRIBUTING.md](CONTRIBUTING.md): it
+covers forks, toolchain setup, offline checks and pull requests. Use
+[SUPPORT.md](SUPPORT.md) for questions and [SECURITY.md](SECURITY.md) for
+private vulnerability reports.
 
 Requirements: Node.js 24.22.1+, pnpm 10.12.1 and a native Iroh platform (macOS
 ARM64 or Linux x64/ARM64; no Intel Mac, Windows untested). Paid runs need devnet
@@ -62,7 +69,9 @@ pnpm install --frozen-lockfile
 pnpm check
 ```
 
-No wallet, model or network needed; unsupported native cases skip explicitly.
+Installing dependencies requires registry access unless all packages are cached.
+The checks themselves need no funded wallet, running model or external network;
+unsupported native cases skip explicitly and do not prove platform support.
 
 ### Local node and discovery acceptance (no payments)
 
@@ -115,6 +124,11 @@ see the full steps). The paid v1 buyer flow (`buyer:trust`, `buyer:start`) needs
 a paid v1 seller, which only the lab gates run. Paid v2 uses a separate path.
 Full steps: [docs/running-a-node.md](docs/running-a-node.md).
 
+With Docker instead: `compose.yaml` runs a seller with its own Ollama
+([Docker](docs/running-a-node.md#docker)), and `sh install.sh` sets one up from
+the published image without a checkout
+([Install script](docs/running-a-node.md#install-script)).
+
 ## Commands
 
 | Group  | Command                                              | What it does                                                                           |
@@ -122,6 +136,7 @@ Full steps: [docs/running-a-node.md](docs/running-a-node.md).
 | Node   | `pnpm node:start`, `buyer:start`                     | Start the seller node; start the buyer proxy (`:4031`).                                |
 | Node   | `pnpm gyblos config validate --config gyblos.toml`   | Check a node config file and the environment ([configuration](docs/configuration.md)). |
 | Node   | `pnpm node:setup --role buyer\|seller --mint MINT`   | Create isolated role keys without RPC or funding.                                      |
+| Node   | `pnpm gyblos seller service install\|uninstall`      | Run the seller in the background (systemd or launchd) after an offline doctor check.   |
 | Node   | `pnpm node:tokenizer`                                | Download and verify the pinned tokenizer for either role, without an engine.           |
 | Node   | `pnpm buyer:setup`                                   | The same tokenizer download, under the buyer's older name.                             |
 | Node   | `pnpm buyer:free`                                    | Start the separate free v2 chat endpoint (complete or SSE) (`:4031`).                  |
@@ -213,3 +228,13 @@ Simulated paid product-startup verification: `pnpm acceptance:paid`
 
 The local single-seller prototype and its limitations are documented in
 [docs/paypal-sandbox.md](docs/paypal-sandbox.md).
+
+## License and community
+
+Original code is licensed under [Apache 2.0](LICENSE). Third-party components
+and marks retain their own terms; see
+[third-party notices](docs/third-party-notices.md). Contributions follow
+[CONTRIBUTING.md](CONTRIBUTING.md) and the
+[code of conduct](CODE_OF_CONDUCT.md). Maintainer responsibilities and the
+[opening checklist](docs/repository-maintenance.md) describe how the repository
+is maintained.

@@ -17,6 +17,13 @@ export const INDEX_ERRORS = {
   PUBLISH_NOT_ALLOWED: 'PUBLISH_NOT_ALLOWED',
   // The request did not use https (400 for every method, never a redirect).
   HTTPS_REQUIRED: 'HTTPS_REQUIRED',
+  // POST /v1/registrations: a malformed body; an unknown, used or expired invite; a NodeId with no
+  // verified 8004 registration on chain.
+  INVALID_REGISTRATION: 'INVALID_REGISTRATION',
+  INVITE_INVALID: 'INVITE_INVALID',
+  IDENTITY_NOT_REGISTERED: 'IDENTITY_NOT_REGISTERED',
+  // An operator revoked this NodeId; only the operator can readmit it (`pnpm index:restore`).
+  NODE_REVOKED: 'NODE_REVOKED',
   UNAVAILABLE: 'DISCOVERY_UNAVAILABLE',
 } as const;
 export type IndexErrorCode = (typeof INDEX_ERRORS)[keyof typeof INDEX_ERRORS];
@@ -39,6 +46,7 @@ export const INDEX_ROUTES = {
   RECORDS: '/v1/records',
   SELLERS: '/v1/sellers',
   HEALTH: '/v1/health',
+  REGISTRATIONS: '/v1/registrations',
 } as const;
 // Public reads are CORS-readable on every status, errors included.
 export const PUBLIC_READ_ROUTES: ReadonlySet<string> = new Set([
@@ -121,8 +129,56 @@ export const PUBLISH_ALLOWLIST = {
 export const PUBLISH_MODES = {
   CLOSED: 'closed',
   ALLOWLIST: 'allowlist',
+  // No allowlist secret, but NodeIds admitted through /v1/registrations may publish.
+  REGISTERED: 'registered',
   OPEN: 'open',
 } as const;
+
+// Worker secret: a devnet Solana RPC URL the index reads the 8004 registry through. A provider key
+// belongs in the URL path (query strings are refused). Missing, /v1/registrations answers 503.
+export const DISCOVERY_SOLANA_RPC_BINDING = 'DISCOVERY_SOLANA_RPC_URL';
+
+// Beta invites (vault: 20 Decisions/Alta de vendedores.md §2). The code is the prefix and 26 base32
+// characters (128 random bits); only its SHA-256 is stored.
+const INVITE_PREFIX = 'gyb_';
+export const REGISTRATION = {
+  invitePrefix: INVITE_PREFIX,
+  invite: new RegExp(`^${INVITE_PREFIX}[a-z2-7]{26}$`),
+  inviteBytes: 16,
+  nodeId: PUBLISH_ALLOWLIST.nodeId,
+  country: /^[A-Z]{2}$/,
+  maxBodyBytes: 512,
+  dayMs: 24 * 60 * 60 * 1000,
+  inviteLifetimeMs: 14 * 24 * 60 * 60 * 1000,
+  maxInviteDays: 90,
+  contact: /^[A-Za-z0-9@._+-]{1,128}$/,
+} as const;
+// Lowercase hex of a SHA-256 digest: two characters per byte.
+export const HEX = { radix: 16, byteWidth: 2 } as const;
+export const REGISTRATION_STATUS = {
+  ACTIVE: 'active',
+  REVOKED: 'revoked',
+} as const;
+export type RegistrationStatus =
+  (typeof REGISTRATION_STATUS)[keyof typeof REGISTRATION_STATUS];
+// What an invite can do for one NodeId: be spent, nothing (already spent on this NodeId: a retry
+// succeeds while it is active and is refused as revoked after), or be refused (unknown, expired, spent
+// on another NodeId).
+export const INVITE_STATES = {
+  USABLE: 'usable',
+  ADMITTED: 'admitted',
+  REVOKED: 'revoked',
+  INVALID: 'invalid',
+} as const;
+export type InviteState = (typeof INVITE_STATES)[keyof typeof INVITE_STATES];
+// Results of redeeming an invite for a NodeId.
+export const REDEEM_RESULTS = {
+  REGISTERED: 'registered',
+  ALREADY_ACTIVE: 'already-active',
+  REVOKED: 'revoked',
+  INVITE_INVALID: 'invite-invalid',
+} as const;
+export type RedeemResult = (typeof REDEEM_RESULTS)[keyof typeof REDEEM_RESULTS];
 export type PublishMode = (typeof PUBLISH_MODES)[keyof typeof PUBLISH_MODES];
 
 // Loopback-only development counters (never used by the Worker entry). The host list is local

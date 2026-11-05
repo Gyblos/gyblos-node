@@ -2,6 +2,12 @@
 // seller's stop or refusal carries its code and the payment summary, and every paid error answers
 // whether the prompt certainly never left this process. No keys, RPC URLs or prompts reach a reply.
 import { HTTP_STATUS } from '@gyblos/config';
+import { PaidBuyerError } from '@gyblos/node/buyer-paid-error';
+import {
+  executeBuyerPaid,
+  type PaidBuyerDependencies,
+  type PaidBuyerOutcome,
+} from '@gyblos/node/buyer-paid-execution';
 import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
 import {
   PAID_EXECUTION_CODES,
@@ -13,12 +19,6 @@ import { PaidClientError } from '@gyblos/transport-iroh/paid-client';
 import { FREE_BUYER_CODES, PAID_BUYER_CODES } from './constants';
 import type { ChatErrorView } from './free-http';
 import type { ChatPayment, ChatResult } from './free-sse';
-import { PaidBuyerError } from './paid-errors';
-import {
-  executeBuyerPaid,
-  type PaidBuyerDependencies,
-  type PaidBuyerOutcome,
-} from './paid-execution';
 
 // A paid request that ended in the seller's stop or refusal rather than a result.
 export class PaidOutcomeError extends Error {
@@ -53,7 +53,7 @@ export function paidChat(dependencies: PaidBuyerDependencies) {
   const run = async (
     input: FreeExecutionBuildInput,
     signal: AbortSignal,
-    onDelta?: (text: string) => Promise<void>,
+    onDelta?: (text: string, requestDigest?: string) => Promise<void>,
   ): Promise<ChatResult> => {
     const outcome = await executeBuyerPaid(
       input,

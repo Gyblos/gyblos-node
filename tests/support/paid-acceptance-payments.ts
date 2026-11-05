@@ -95,6 +95,7 @@ export async function paidAcceptancePayments(role: RoleConfig) {
     deposits: () => deposits,
     settlements: () => settlements,
     authorizations: () => authorizations.length,
+    latestAuthorization: () => authorizations.at(-1),
     unavailable(value: boolean) {
       unavailable = value;
     },
@@ -202,6 +203,10 @@ export async function paidAcceptancePayments(role: RoleConfig) {
         last.settlement,
         last.charged,
       );
+    },
+    async states() {
+      assert.ok(current);
+      return current.reconcile();
     },
     uniqueChannels: () => new Set(authorizations.map((a) => a.channelId)).size,
   };

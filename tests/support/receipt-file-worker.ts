@@ -19,7 +19,7 @@ async function main() {
   } catch {
     process.send?.({ failed: true });
     process.exitCode = 1;
-    if (process.connected) process.disconnect();
+    if (process.connected) process.disconnect?.();
   }
 }
 if (isMain(import.meta.url)) void main();

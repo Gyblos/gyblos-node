@@ -17,6 +17,7 @@ import { join } from 'node:path';
 
 import { generateKeyPairSigner } from '@solana/kit';
 
+import { DEVNET_GENESIS } from '@gyblos/config';
 import { CONFIG_ASSET_LABELS } from '@gyblos/config/constants';
 import { runCli, type CliContext } from '@gyblos/node-app/cli';
 
@@ -47,7 +48,9 @@ export const REMOTE_FREE =
 
 const ALL_OK = {
   tokenizer: async () => undefined,
-  paymentAccounts: async () => 0,
+  paymentAccounts: async () => ({ missing: 0, unusable: 0 }),
+  // Never the network: the role's RPC serves devnet.
+  genesis: async () => DEVNET_GENESIS,
 } satisfies NonNullable<CliContext['doctor']>;
 
 export interface Fixture {

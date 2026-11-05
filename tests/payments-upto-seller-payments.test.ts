@@ -3,10 +3,11 @@
 // before it starts (or does not start), refuses a junk deposit before touching the chain, recovers an
 // empty ledger and releases everything on close. RPC is a double; no network.
 import assert from 'node:assert/strict';
-import { rm } from 'node:fs/promises';
-import test from 'node:test';
+import { lstat, rm } from 'node:fs/promises';
+import test, { mock } from 'node:test';
 
 import { generateKeyPairSigner } from '@solana/kit';
+import { SOLANA_MAINNET_CAIP2 } from '@x402/svm';
 
 import { DEVNET, PROTOCOL_FEE, TOKEN_PROGRAM_ADDRESS } from '@gyblos/config';
 import { openUptoSellerPayments } from '@gyblos/payments-upto';
@@ -136,6 +137,134 @@ void test('a deposit that is not a valid channel open is refused before any tran
     );
     await payments.close();
   } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+void test('mainnet seller is disabled before opening a ledger or sending', async () => {
+  const { root, options, sent } = await setup();
+  try {
+    await assert.rejects(
+      openUptoSellerPayments({
+        ...options,
+        description: { ...options.description, network: SOLANA_MAINNET_CAIP2 },
+      }).then(async (payments) => {
+        await payments.close();
+        return payments;
+      }),
+      (error) =>
+        error instanceof PaymentError &&
+        error.code === PAYMENT_ERROR_CODES.UNTRUSTED_TERMS,
+    );
+    assert.deepEqual(sent, []);
+    await assert.rejects(lstat(options.paths.directory), { code: 'ENOENT' });
+    await (await openUptoSellerPayments(options)).close();
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+void test('seller refuses a mismatched RPC before writing or sending', async () => {
+  const { root, options } = await setup();
+  const wrong = offline({ missing: true, genesis: 'wrong-chain' });
+  try {
+    await assert.rejects(
+      openUptoSellerPayments({ ...options, rpc: wrong.rpc }).then(
+        async (payments) => {
+          await payments.close();
+          return payments;
+        },
+      ),
+      (error) =>
+        error instanceof PaymentError &&
+        error.code === PAYMENT_ERROR_CODES.UNTRUSTED_TERMS,
+    );
+    assert.deepEqual(wrong.sent, []);
+    await assert.rejects(lstat(options.paths.directory), { code: 'ENOENT' });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+void test('seller refuses an unavailable genesis before writing or sending', async () => {
+  const { root, options } = await setup();
+  const double = offline({ missing: true });
+  const rpc = {
+    ...double.rpc,
+    getGenesisHash: () => ({
+      send: async () => {
+        throw new Error('synthetic RPC error');
+      },
+    }),
+  };
+  try {
+    await assert.rejects(
+      openUptoSellerPayments({ ...options, rpc }),
+      (error) =>
+        error instanceof PaymentError &&
+        error.code === PAYMENT_ERROR_CODES.UNAVAILABLE,
+    );
+    assert.deepEqual(double.sent, []);
+    await assert.rejects(lstat(options.paths.directory), { code: 'ENOENT' });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+void test('seller fixes the RPC URL before the genesis check', async () => {
+  const { root, options } = await setup();
+  let reads = 0;
+  Object.defineProperty(options, 'rpcUrl', {
+    get: () => {
+      reads++;
+      return reads === 1 ? 'https://first.invalid' : 'https://changed.invalid';
+    },
+  });
+  const double = offline();
+  const rpc = {
+    ...double.rpc,
+    getGenesisHash: () => ({
+      send: async () => {
+        assert.equal(reads, 1);
+        return double.rpc.getGenesisHash().send();
+      },
+    }),
+  };
+  options.rpc = rpc;
+  try {
+    const payments = await openUptoSellerPayments(options);
+    await payments.close();
+    assert.equal(reads, 1);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+void test('seller times out when genesis RPC ignores cancellation', async () => {
+  const { root, options } = await setup();
+  const controller = new AbortController();
+  const timeout = mock.method(AbortSignal, 'timeout', () => controller.signal);
+  const double = offline();
+  const rpc = {
+    ...double.rpc,
+    getGenesisHash: () => ({ send: () => new Promise<string>(() => {}) }),
+  };
+  try {
+    const pending = openUptoSellerPayments({ ...options, rpc }).then(
+      () => 'opened',
+      (error: unknown) =>
+        error instanceof PaymentError ? error.code : 'other',
+    );
+    controller.abort();
+    const outcome = await Promise.race([
+      pending,
+      new Promise<string>((resolve) => setTimeout(() => resolve('hung'), 100)),
+    ]);
+    assert.equal(outcome, PAYMENT_ERROR_CODES.UNAVAILABLE);
+    assert.deepEqual(double.sent, []);
+    await assert.rejects(lstat(options.paths.directory), { code: 'ENOENT' });
+  } finally {
+    timeout.mock.restore();
     await rm(root, { recursive: true, force: true });
   }
 });

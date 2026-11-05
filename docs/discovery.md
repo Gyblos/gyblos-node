@@ -266,9 +266,9 @@ before sending anything.
   bytes (a canonical record may be 32 KiB, plus the envelope).
 - Checks: strict shape (unknown fields rejected), canonical encoding and size,
   the Ed25519 signature by `record.nodeId` under the v2 domain for its kind, and
-  lifetimes against the index clock with zero skew
-  (`issuedAt <= now < expiresAt`, within 600 s for catalog and withdrawal, 90 s
-  for presence).
+  lifetimes against the index clock, accepting a record issued up to 5 s ahead
+  of it and no expiry grace (`issuedAt <= now + 5 s`, `now < expiresAt`, within
+  600 s for catalog and withdrawal, 90 s for presence).
 - Sequence: one high-water mark per NodeId, shared across all three kinds. A
   record whose `sequence` is at or below it is stale. The mark is retained past
   record expiry (at least `expiresAt` plus the 600 s catalog lifetime) so stale

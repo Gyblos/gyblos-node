@@ -1,24 +1,13 @@
 // Composes opt-in local file telemetry; startup closes only its own sink after the role stops.
 // Failures are static health metadata and never affect inference, admission or retry policy.
-import { resolve } from 'node:path';
-
-import {
-  NODE_ENVIRONMENT,
-  type HomeEnvironment,
-  type HomeRole,
-} from '@gyblos/config';
+import type { HomeEnvironment, HomeRole } from '@gyblos/config';
 import { fanOut } from '@gyblos/core/telemetry';
 import type { TelemetrySink } from '@gyblos/protocol/telemetry';
 import { createFileTelemetrySink } from '@gyblos/telemetry-file';
 
-import {
-  LOCAL_TELEMETRY,
-  NODE_CONFIG_FILENAME,
-  NODE_CONFIG_ISSUE_CODES,
-  NODE_ERROR_CODES,
-} from './constants';
+import { LOCAL_TELEMETRY, NODE_ERROR_CODES } from './constants';
 import { NodeError } from './errors';
-import { readNodeConfigFile } from './node-config';
+import { readStartupConfig } from './node-config-file';
 
 export interface LocalTelemetryOptions {
   enabled: boolean;
@@ -89,16 +78,7 @@ export async function loadLocalTelemetry(
   environment: HomeEnvironment,
   cwd = process.cwd(),
 ) {
-  const explicit = environment[NODE_ENVIRONMENT.config];
-  const parsed = await readNodeConfigFile(
-    resolve(cwd, explicit || NODE_CONFIG_FILENAME),
-  );
-  if (parsed.ok) return parsed.config.telemetry?.file ?? false;
-  if (
-    !explicit &&
-    parsed.issues.length === 1 &&
-    parsed.issues[0]!.code === NODE_CONFIG_ISSUE_CODES.FILE_NOT_FOUND
-  )
-    return false;
+  const result = await readStartupConfig(environment, cwd);
+  if (result.ok) return result.config?.telemetry?.file ?? false;
   throw new NodeError(NODE_ERROR_CODES.NODE_CONFIG_INVALID);
 }

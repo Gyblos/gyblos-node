@@ -15,6 +15,6 @@
     "@solana-program/system": "0.10.0",
     "@solana/kit": "5.1.0",
     "@gyblos/core": "workspace:*",
-    "@solana/rpc-spec-types": "5.1.0"
+    "@solana/rpc-spec-types": "8.6.0"
   }
 }

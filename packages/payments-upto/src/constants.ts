@@ -3,6 +3,17 @@
 import { UPTO_WITHDRAW_STEPS } from 'x402-upto-metered';
 
 export const PAYMENT_PHASES = { ADMIT: 'admit', SETTLE: 'settle' } as const;
+export const BUYER_OBSERVATION = { maxResponseBytes: 1024 * 1024 } as const;
+export const UPTO_BUYER_DISTINCT_PARTIES = 4;
+export const BUYER_OBSERVATION_RPC_METHODS = [
+  'getGenesisHash',
+  'getEpochInfo',
+  'getSignaturesForAddress',
+  'getTransaction',
+  'getAccountInfo',
+  'minimumLedgerSlot',
+  'getFirstAvailableBlock',
+] as const;
 export type PaymentPhase = (typeof PAYMENT_PHASES)[keyof typeof PAYMENT_PHASES];
 
 // Every PaymentDescription field; terms naming another value for any of them are not this seller's.
@@ -40,13 +51,24 @@ export const UPTO_SELLER = {
 // The buyer's journal of authorized channels: one small private document. Settled entries are kept
 // long past any channel's lifetime, then pruned; open ones are never dropped.
 export const BUYER_JOURNAL = {
-  // 2 adds each open's slot and blockhash lifetime; 1 is still read.
-  version: 2,
+  // 4 records the network; 3 records mint, fee treasury and rate; 2 records slot and lifetime.
+  version: 4,
+  policyVersion: 3,
+  slotVersion: 2,
   legacyVersion: 1,
-  maxBytes: 1024 * 1024,
+  // maxEntries entries of the widest form fit, with room to spare.
+  maxBytes: 2 * 1024 * 1024,
   maxEntries: 2_000,
   settledRetentionMs: 30 * 86_400_000,
 } as const;
+
+// Why a signed open is not eligible for recovery on this network.
+export const NETWORK_RECOVERY_BLOCKS = {
+  UNKNOWN: 'unknown',
+  MISMATCH: 'mismatch',
+} as const;
+export type NetworkRecoveryBlock =
+  (typeof NETWORK_RECOVERY_BLOCKS)[keyof typeof NETWORK_RECOVERY_BLOCKS];
 
 export const RECONCILE_OUTCOMES = {
   // The chain charged exactly the buyer's own count.

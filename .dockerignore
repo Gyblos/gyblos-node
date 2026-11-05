@@ -1,0 +1,36 @@
+# Allowlist: only what the seller image needs; local state, secrets and evidence can never enter.
+*
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!tsconfig.json
+!patches
+!apps
+!packages
+!lab/harness
+!lab/facilitator
+!docker
+!LICENSE
+!NOTICE
+
+# Never, at any depth inside the allowed directories.
+**/node_modules
+**/.local
+**/.wrangler
+**/.env
+**/.env.*
+**/*.key
+**/*.pem
+**/*.log
+**/.DS_Store
+**/AGENTS.local.md
+**/*.private.*
+**/*-private.*
+**/captures
+**/measurements
+**/private
+**/internal
+**/evidence
+**/dist
+**/coverage
+**/out

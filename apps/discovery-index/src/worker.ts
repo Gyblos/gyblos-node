@@ -1,7 +1,10 @@
-// Owns the Cloudflare Worker entry for discovery.gyblos.com: maps bindings, the publish allowlist
-// secret and the Cache API (caches.default, when present) to the app, fails closed.
+// Owns the Cloudflare Worker entry for discovery.gyblos.com: maps bindings, the publish allowlist and
+// Solana RPC secrets and the Cache API (caches.default, when present) to the app, fails closed.
 // Development relaxations are never enabled here; nothing runs on import.
 import type { ExecutionContext } from 'hono';
+
+import { readRegistryIdentity } from '@gyblos/identity/resolution';
+import { createIdentityResolutionRpc } from '@gyblos/identity/resolution-rpc';
 
 import {
   createDiscoveryIndex,
@@ -12,9 +15,12 @@ import {
   DISCOVERY_DB_BINDING,
   DISCOVERY_LIMITERS,
   DISCOVERY_PUBLISH_ALLOWLIST_BINDING,
+  DISCOVERY_SOLANA_RPC_BINDING,
 } from './constants';
 import type { DiscoveryLimiters, RateLimiter } from './limits';
 import { parsePublishAllowlist } from './publishers';
+import { createD1RegistrationStore } from './registration-store-d1';
+import type { RegistryReader } from './registrations';
 import { createD1Storage, type D1Database } from './storage-d1';
 
 function binding(bindings: unknown, name: string): unknown {
@@ -64,8 +70,32 @@ function limitersOf(bindings: unknown): DiscoveryLimiters {
   return limiters;
 }
 
+// Workers throws on `redirect: 'error'` (it supports only follow and manual). The registry reader asks for
+// it, so it becomes manual here: a redirect then arrives as a 3xx, which the reader refuses as not ok.
+export function edgeFetch(
+  fetcher: typeof fetch = fetch,
+): (url: string, init: RequestInit) => Promise<Response> {
+  return (url, init) =>
+    fetcher(url, {
+      ...init,
+      redirect: init.redirect === 'error' ? 'manual' : init.redirect,
+    });
+}
+
+// The 8004 registry through the RPC secret; a missing or refused URL leaves registrations at 503.
+function registryOf(bindings: unknown): RegistryReader | undefined {
+  const url = binding(bindings, DISCOVERY_SOLANA_RPC_BINDING);
+  if (typeof url !== 'string') return undefined;
+  try {
+    const rpc = createIdentityResolutionRpc(url, { fetch: edgeFetch() });
+    return { lookup: (nodeId) => readRegistryIdentity(rpc, nodeId) };
+  } catch {
+    return undefined;
+  }
+}
+
 // Bindings are fixed for an isolate, so one app (its prune throttle and the parsed allowlist)
-// is kept per bindings object. A missing or malformed allowlist closes publishing.
+// is kept per bindings object. A missing or malformed allowlist leaves only registered NodeIds.
 function appFor(bindings: unknown, cache: WeakMap<object, DiscoveryIndex>) {
   const key = bindings && typeof bindings === 'object' ? bindings : cache;
   let app = cache.get(key);
@@ -73,6 +103,10 @@ function appFor(bindings: unknown, cache: WeakMap<object, DiscoveryIndex>) {
     const database = binding(bindings, DISCOVERY_DB_BINDING);
     app = createDiscoveryIndex({
       storage: isDatabase(database) ? createD1Storage(database) : undefined,
+      registrations: isDatabase(database)
+        ? createD1RegistrationStore(database)
+        : undefined,
+      registry: registryOf(bindings),
       limiters: limitersOf(bindings),
       publishers: parsePublishAllowlist(
         binding(bindings, DISCOVERY_PUBLISH_ALLOWLIST_BINDING),

@@ -17,6 +17,7 @@ import {
   bindEndpoint,
 } from '@gyblos/transport-iroh/endpoint';
 
+import { ownedChat } from './chat-owned';
 import {
   BUYER_SELECTION_CODES,
   FREE_BUYER_STARTUP,
@@ -82,6 +83,12 @@ export async function buyerSelection() {
   } catch (error) {
     return refuse(stateReason(error));
   }
+}
+function freeChat(
+  request: Awaited<ReturnType<typeof buyerSelection>>['config']['request'],
+  url: string,
+) {
+  return ownedChat(request.selection.modelId, request.maxTokens, '0', url);
 }
 export async function listenOrRefuse<T>(listen: () => Promise<T>) {
   try {
@@ -221,6 +228,7 @@ export async function startFreeBuyer(
     );
     return {
       url: host.url,
+      chat: freeChat(request, host.url),
       receipts: receipts.health,
       telemetry: telemetry.health,
       close: () => closeBuyerResources(receipts, endpoint, telemetry, host),

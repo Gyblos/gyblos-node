@@ -72,6 +72,8 @@ export const DOCTOR_CHECKS = {
   RELAYS: 'relays',
   // Only for a seller with paid offers.
   PAYMENTS: 'payments',
+  // Only with --online and a discovery index to compare against.
+  CLOCK: 'clock',
 } as const;
 export type DoctorCheckName =
   (typeof DOCTOR_CHECKS)[keyof typeof DOCTOR_CHECKS];
@@ -90,11 +92,26 @@ export const DOCTOR_CODES = {
   PAYMENT_ACCOUNTS_MISSING: 'PAYMENT_ACCOUNTS_MISSING',
   // The RPC could not say whether those token accounts exist.
   PAYMENT_ACCOUNTS_UNCHECKED: 'PAYMENT_ACCOUNTS_UNCHECKED',
+  // One of those token accounts can never receive a payout (frozen, say); startup refuses it.
+  PAYMENT_ACCOUNTS_UNUSABLE: 'PAYMENT_ACCOUNTS_UNUSABLE',
   // Every offer's usage is declared by its provider, so no tokenizer is loaded.
   NOT_NEEDED: 'NOT_NEEDED',
   // A remote engine is called only with --online.
   REMOTE_ENGINE_NOT_CHECKED: 'REMOTE_ENGINE_NOT_CHECKED',
+  // This clock differs from the discovery index's by more than DOCTOR_CLOCK.warnMs.
+  CLOCK_SKEWED: 'CLOCK_SKEWED',
+  // The discovery index did not answer with its time, or answered too slowly to measure it.
+  CLOCK_UNCHECKED: 'CLOCK_UNCHECKED',
   CHECK_FAILED: 'DOCTOR_CHECK_FAILED',
+} as const;
+// Buyers and the index accept a record issued at most CONTROL_LIMITS.clockSkewMs ahead of their clock;
+// doctor warns well before that. With the header's 1 s resolution and at most 1 s of round trip, a
+// clock reported within warnMs is at most 4 s off.
+export const DOCTOR_CLOCK = {
+  warnMs: 2000,
+  dateResolutionMs: 1000,
+  maxRoundTripMs: 1000,
+  timeoutMs: 5000,
 } as const;
 export type DoctorCode = (typeof DOCTOR_CODES)[keyof typeof DOCTOR_CODES];
 
@@ -152,6 +169,11 @@ export const READINESS_REASONS = {
 // file never holds secrets; it names environment variables instead.
 export const NODE_CONFIG_VERSION = 1;
 export const NODE_CONFIG_FILENAME = 'gyblos.toml';
+// The `status` values the seller daemon writes to its status.json; `gyblos seller status` reads them.
+export const SELLER_DAEMON_STATES = {
+  STARTING: 'starting',
+  READY: 'ready',
+} as const;
 
 // Mainnet is recognized only so the validator can refuse it with a specific code.
 export const NODE_NETWORKS = { DEVNET: 'devnet', MAINNET: 'mainnet' } as const;
@@ -381,3 +403,41 @@ export const PAYPAL_SESSION_REVIEW_ACTOR = {
 export const PAYPAL_SESSION_REVIEW_ARCHIVE_VERSION = 1;
 export const PAYPAL_SESSION_PREVIOUS_RECORD_VERSION = 2;
 export const PAYPAL_SESSION_RECORD_VERSION = 3;
+
+// Buyer orchestration values shared by every host, with no process or network actions.
+export const BUYER_PAID_TIMEOUTS = {
+  requestMs: 180000,
+  receiptMs: 30000,
+} as const;
+// The paid buyer's own refusals, before any payment.
+export const PAID_BUYER_CODES = {
+  // An earlier channel is not resolved yet; `pnpm buyer:reconcile:paid` resolves it.
+  UNRESOLVED: 'PAID_BUYER_UNRESOLVED_PAYMENT',
+  UNAVAILABLE: 'PAID_BUYER_NO_OFFER',
+  // Paid sellers serve a single user message; anything else is refused before paying.
+  UNSUPPORTED: 'PAID_BUYER_UNSUPPORTED_INPUT',
+  // Another paid request is still running in this buyer.
+  BUSY: 'PAID_BUYER_BUSY',
+  // The request did not carry the endpoint's bearer token.
+  UNAUTHORIZED: 'PAID_BUYER_UNAUTHORIZED',
+} as const;
+export type PaidBuyerCode =
+  (typeof PAID_BUYER_CODES)[keyof typeof PAID_BUYER_CODES];
+// How the buyer judges a paid request once the signed open reached the seller.
+export const PAID_VERDICTS = {
+  // The chain shows the settlement the buyer's own count expects.
+  SETTLED: 'settled',
+  // The seller's claim is still being confirmed; reconciliation decides.
+  PENDING: 'pending',
+  // The seller says its claim lapsed; reconciliation confirms nothing was charged.
+  LAPSED: 'lapsed',
+  // The seller claims more or less than the buyer's own count.
+  DISPUTED: 'disputed',
+  // The settlement could not be confirmed on chain now; reconciliation checks it.
+  UNVERIFIED: 'unverified',
+  // The seller refused after receiving the signed open, which it could still land.
+  REFUSED: 'refused',
+  // The request stopped before any terminal arrived, after the signed open was sent.
+  INTERRUPTED: 'interrupted',
+} as const;
+export type PaidVerdict = (typeof PAID_VERDICTS)[keyof typeof PAID_VERDICTS];
