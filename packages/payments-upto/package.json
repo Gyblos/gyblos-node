@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./reusable-journal": "./src/reusable-journal.ts",
+    "./reusable-opening": "./src/reusable-opening.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",

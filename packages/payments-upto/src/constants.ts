@@ -98,3 +98,49 @@ export const BUYER_WITHDRAW = {
   // When a failed channel is worth trying again.
   failedRetrySeconds: 30,
 } as const;
+
+// Bounded private reusable-channel journal; never aliases the legacy per-request journal.
+export const REUSABLE_JOURNAL = {
+  version: 1,
+  maxChannels: 256,
+  maxVouchersPerChannel: 256,
+  maxBytes: 2 * 1024 * 1024,
+  signatureChars: 90,
+  signatureBytes: 64,
+  addressBytes: 32,
+  voucherBytes: 50,
+  voucherAmountOffset: 34,
+  voucherPrefix: 86,
+  voucherVersion: 1,
+  maxGracePeriod: 0xffff_ffff,
+} as const;
+export const REUSABLE_JOURNAL_STATES = {
+  PREPARING: 'preparing',
+  OPENING: 'opening',
+  READY: 'ready',
+  NOT_OPENED: 'not-opened',
+} as const;
+
+// Layout of the pinned payment-channel program's open instruction, used before signing.
+export const REUSABLE_OPEN_WIRE = {
+  discriminator: 1,
+  maxMessageBytes: 1232,
+  saltOffset: 1,
+  depositOffset: 9,
+  graceOffset: 17,
+  slotOffset: 21,
+  countOffset: 29,
+  recipientsOffset: 33,
+  recipientBytes: 34,
+  channelAccountIndex: 5,
+  tokenProgramAccountIndex: 8,
+  seed: 'channel',
+  memoProgram: 'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr',
+  computeBudgetProgram: 'ComputeBudget111111111111111111111111111111',
+  computeLimit: 200_000,
+  instructionCount: 4,
+  computeLimitTag: 2,
+  computePriceTag: 3,
+  computeLimitBytes: 5,
+  computePriceBytes: 9,
+} as const;
