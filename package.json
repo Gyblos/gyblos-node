@@ -52,6 +52,7 @@
     "buyer:trust": "node --import tsx apps/buyer/src/trust.ts",
     "docs:dev": "pnpm --filter @gyblos/docs dev",
     "docs:build": "pnpm --filter @gyblos/docs build",
+    "docs:test": "pnpm --filter @gyblos/docs test:export",
     "desktop:build": "pnpm --filter @gyblos/desktop build",
     "desktop:start": "pnpm desktop:build && pnpm --filter @gyblos/desktop start",
     "desktop:smoke": "pnpm desktop:build && pnpm --filter @gyblos/desktop smoke",

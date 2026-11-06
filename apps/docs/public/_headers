@@ -5,7 +5,20 @@
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
+  Link: </llms.txt>; rel="describedby"
 
 # The search index is exported as a file without an extension.
 /api/search
   Content-Type: application/json; charset=utf-8
+
+/markdown/*
+  Content-Type: text/markdown; charset=utf-8
+
+/llms*.txt
+  Content-Type: text/plain; charset=utf-8
+
+/en/llms-full.txt
+  Content-Type: text/plain; charset=utf-8
+
+/es/llms-full.txt
+  Content-Type: text/plain; charset=utf-8
