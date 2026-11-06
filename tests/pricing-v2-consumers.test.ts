@@ -31,7 +31,7 @@ void test('seller minimum budget rounds the combined per-million cost of one inp
     }),
     {
       ok: false,
-      code: SELLER_SELECTION_CODES.NO_CANDIDATES,
+      code: SELLER_SELECTION_CODES.PRICE_ABOVE_BUDGET,
     },
   );
   assert.equal(

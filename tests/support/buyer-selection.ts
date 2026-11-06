@@ -8,8 +8,8 @@ import { createSellerControlService } from '@gyblos/node/control';
 import { controlFixture } from './control-fixture';
 import { controlLoopback } from './control-loopback';
 
-export async function selectionFixture() {
-  const source = await controlFixture();
+export async function selectionFixture(free = false) {
+  const source = await controlFixture(free);
   const service = createSellerControlService({
     context: source.context,
     ownerSigner: source.ownerSigner,

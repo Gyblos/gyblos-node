@@ -97,20 +97,22 @@ function passesSellerFilters(
     request.retention.includes(seller.catalog.dataPolicy.retention)
   );
 }
-// A paid budget must cover at least one input plus one output token at the listed prices.
 function passesListingFilters(listing: PublicModelV2, request: SellerRequest) {
   const { pricing } = listing;
-  if (
-    !isAtomic(pricing.inputAtomicPerMtok) ||
-    !isAtomic(pricing.outputAtomicPerMtok)
-  )
-    return false;
+  return (
+    isAtomic(pricing.inputAtomicPerMtok) &&
+    isAtomic(pricing.outputAtomicPerMtok) &&
+    pricing.network === request.network &&
+    pricing.asset === request.asset &&
+    listing.contextTokens >= request.maxTokens
+  );
+}
+// A paid budget must cover at least one input plus one output token at the listed prices.
+function withinBudget(listing: PublicModelV2, request: SellerRequest) {
+  const { pricing } = listing;
   const input = BigInt(pricing.inputAtomicPerMtok);
   const output = BigInt(pricing.outputAtomicPerMtok);
   return (
-    pricing.network === request.network &&
-    pricing.asset === request.asset &&
-    listing.contextTokens >= request.maxTokens &&
     input <= BigInt(request.priceCeilings.inputAtomicPerMtok) &&
     output <= BigInt(request.priceCeilings.outputAtomicPerMtok) &&
     (isFree(listing) ||
@@ -133,17 +135,20 @@ function findListing(catalog: PublicCatalogV2, selection: ModelSelection) {
   );
 }
 // Every hard filter except the reasoning level, which decides tiers and the unsupported-level code.
-// The pinned path checks cooldown itself so it can report when the seller returns.
+// The pinned path checks cooldown itself so it can report when the seller returns; `budget` false
+// skips only the price checks, to tell an unaffordable market from an empty one.
 function eligible(
   input: SellerSelectionInput,
   seller: KnownSeller,
   honorCooldown = true,
+  budget = true,
 ) {
   const stats = input.stats.get(seller.catalog.nodeId);
   if (honorCooldown && isCooling(stats, input.now)) return;
   if (!passesSellerFilters(seller, input.request, input.now)) return;
   const listing = findListing(seller.catalog, input.request.selection);
   if (!listing || !passesListingFilters(listing, input.request)) return;
+  if (budget && !withinBudget(listing, input.request)) return;
   const entry: Eligible = { seller, listing, stats };
   return entry;
 }
@@ -219,10 +224,15 @@ function selectAutomatic(
     candidates.push(...picked);
   }
   if (candidates.length) return { ok: true, candidates };
+  if (pool.length)
+    return { ok: false, code: SELLER_SELECTION_CODES.LEVEL_UNSUPPORTED };
+  const priced = input.sellers.some((seller) =>
+    eligible(input, seller, true, false),
+  );
   return {
     ok: false,
-    code: pool.length
-      ? SELLER_SELECTION_CODES.LEVEL_UNSUPPORTED
+    code: priced
+      ? SELLER_SELECTION_CODES.PRICE_ABOVE_BUDGET
       : SELLER_SELECTION_CODES.NO_CANDIDATES,
   };
 }

@@ -17,6 +17,13 @@ signed quote reach the chosen executor; neither executor selects again. The
 existing selection policy still chooses sellers; routing adds no free-first
 preference or reasoning downgrade.
 
+A ceiling of `"0"` (with zero price ceilings) only admits free listings. When a
+seller offers the requested model but every such listing is priced above the
+ceilings, selection fails with `SELLER_PRICE_ABOVE_BUDGET` before any quote is
+requested; raise `request.maxAtomic` and `priceCeilings` to buy from it.
+`NO_SELLER_CANDIDATES` remains the answer when no live seller offers the model
+on the requested network and asset at all.
+
 Free execution does not load the payment signer, paid tokenizer or payment RPC,
 and does not create a payment journal, authorization, deposit or settlement. The
 buyer checks existing payment state read-only: an unresolved signed payment,
