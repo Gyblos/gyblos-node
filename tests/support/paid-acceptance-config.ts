@@ -2,8 +2,6 @@
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { generateKeyPairSigner } from '@solana/kit';
-
 import { BUYER_SELECTION } from '@gyblos/buyer/constants';
 import { DEVNET, DEVNET_USDC, FILE_MODES, rolePathIn } from '@gyblos/config';
 import { SELLER_BADGES } from '@gyblos/core/constants';
@@ -30,7 +28,6 @@ export async function paidAcceptanceRoles() {
     role: P2P_ROLES.SELLER,
     mint: DEVNET_USDC,
     buyer: buyer.buyer,
-    payTo: (await generateKeyPairSigner()).address,
   });
   if (seller.role !== P2P_ROLES.SELLER || buyer.role !== P2P_ROLES.BUYER)
     throw new Error('Synthetic role mismatch');

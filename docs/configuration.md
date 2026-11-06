@@ -118,7 +118,8 @@ however many digits it has.
   - `network`: `"devnet"`. `"mainnet"` is refused with `MAINNET_UNSUPPORTED`.
   - `data_dir`: local home, same meaning as `GYBLOS_HOME` (relative paths
     resolve against the working directory).
-  - `payout_wallet`: a Solana address; a cold address, never a node hot key.
+  - `payout_wallet`: a Solana address, never the node key. Seller startup does
+    not yet read this setting.
   - `rpc_url`: https, or http on loopback; no credentials or query.
 - `[relays]`: `urls` (1 to 8 HTTPS origins without path, query or credentials;
   duplicates refused after normalization) and `relay_token_env`.
@@ -315,8 +316,8 @@ Startup stops with a static code: `NODE_CONFIG_INVALID`,
 `SELLER_OFFER_REASONING_UNSUPPORTED`, `SELLER_OFFER_API_KEY_MISSING`,
 `SELLER_OFFER_API_KEY_UNSAFE`, `SELLER_PAID_METERING_UNRECOUNTED`,
 `SELLER_PAYMENT_ROLE_MISSING`, `SELLER_PAYMENT_NETWORK_MISMATCH` (the role's RPC
-is not devnet), `SELLER_PAYMENT_DESCRIPTION_INVALID` (the payout is the owner,
-fee payer or authorizer key) or `SELLER_PAYMENT_ACCOUNTS_UNAVAILABLE` (a token
+is not devnet), `SELLER_PAYMENT_DESCRIPTION_INVALID` (the payout is the fee
+payer or authorizer key) or `SELLER_PAYMENT_ACCOUNTS_UNAVAILABLE` (a token
 account below is missing and could not be created). After the file is accepted,
 `SELLER_RELAY_OFFLINE` means no relay answered within 30 s: a relay token the
 relays refuse, or no outbound connection. The daemon prints the code with a hint

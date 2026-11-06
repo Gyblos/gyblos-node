@@ -1,6 +1,5 @@
-// A free seller sets up with only --mint: node:setup creates the owner and node keys and no paid
-// roles, while the paid pair (--buyer with --pay-to) stays all-or-nothing and existing paid role files
-// keep loading. Disposable homes; no RPC, funding or network.
+// Free sellers need only --mint; paid sellers add --buyer and use owner as the default payout.
+// Existing paid role files keep loading. Disposable homes; no RPC, funding or network.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
@@ -144,7 +143,7 @@ void test(
 );
 
 void test(
-  'node:setup needs only --mint for a seller and keeps --buyer/--pay-to as a pair',
+  'node:setup needs only --mint for a free seller and rejects a payout without a buyer',
   ROLE_OPTIONS,
   async () => {
     const home = await mkdtemp(join(tmpdir(), 'gyblos-free-setup-cli-'));
@@ -155,11 +154,11 @@ void test(
         'seller',
         '--mint',
         MINT,
-        '--buyer',
+        '--pay-to',
         buyer!,
       ]);
       assert.equal(half.status, 1);
-      assert.match(half.stderr, /--buyer and --pay-to together/);
+      assert.match(half.stderr, /payout requires --buyer/i);
       await assert.rejects(readdir(join(home, 'seller')), { code: 'ENOENT' });
       const result = setup(home, ['--role', 'seller', '--mint', MINT]);
       assert.equal(result.status, 0, result.stderr);
@@ -230,6 +229,32 @@ void test(
         assert.doesNotMatch(result.stderr, /SolanaError/, flag);
       }
       assert.deepEqual(await readdir(home), []);
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  },
+);
+
+void test(
+  'node:setup defaults a new paid seller payout to its owner',
+  ROLE_OPTIONS,
+  async () => {
+    const home = await mkdtemp(join(tmpdir(), 'gyblos-paid-setup-cli-'));
+    try {
+      const [buyer] = await addresses(1);
+      const args = ['--role', 'seller', '--mint', MINT, '--buyer', buyer!];
+      const result = setup(home, args);
+      assert.equal(result.status, 0, result.stderr);
+      const role: unknown = JSON.parse(
+        await readFile(join(home, 'seller', ROLE_FILES.roleConfig), 'utf8'),
+      );
+      assert.ok(
+        role && typeof role === 'object' && 'payTo' in role && 'owner' in role,
+      );
+      assert.equal(role.payTo, role.owner);
+      const repeat = setup(home, args);
+      assert.equal(repeat.status, 0, repeat.stderr);
+      assert.deepEqual(JSON.parse(repeat.stdout), JSON.parse(result.stdout));
     } finally {
       await rm(home, { recursive: true, force: true });
     }

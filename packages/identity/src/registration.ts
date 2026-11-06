@@ -11,6 +11,7 @@ import {
   setTransactionMessageFeePayerSigner,
   setTransactionMessageLifetimeUsingBlockhash,
   type Address,
+  type Commitment,
   type Instruction,
   type Rpc,
   type SolanaRpcApi,
@@ -20,7 +21,11 @@ import {
 
 import { COMMITMENT, SVM_TRANSACTION_VERSION } from '@gyblos/config';
 
-import { encodeBindingValue, signNodeBinding } from './binding';
+import {
+  encodeBindingValue,
+  signNodeBinding,
+  verifyNodeBinding,
+} from './binding';
 import {
   BASE64_ENCODING,
   IDENTITY_ERROR_CODES,
@@ -85,7 +90,7 @@ type Blockhash = Awaited<
   ReturnType<ReturnType<IdentityRpc['getLatestBlockhash']>['send']>
 >['value'];
 
-function composeMessage(
+export function composeMessage(
   feePayer: TransactionSigner,
   blockhash: Blockhash,
   instructions: readonly Instruction[],
@@ -108,9 +113,14 @@ function wireBytes(base64: string): number {
   return (base64.length * BASE64_BITS_PER_CHAR) / BITS_PER_BYTE - padding;
 }
 
-async function chainDeadline(rpc: IdentityRpc): Promise<bigint> {
-  const slot = await rpc.getSlot({ commitment: COMMITMENT }).send();
-  const blockTime = await rpc.getBlockTime(slot).send();
+export async function chainDeadline(
+  rpc: IdentityRpc,
+  commitment: Commitment = COMMITMENT,
+  signal?: AbortSignal,
+): Promise<bigint> {
+  const slot = await rpc.getSlot({ commitment }).send({ abortSignal: signal });
+  signal?.throwIfAborted();
+  const blockTime = await rpc.getBlockTime(slot).send({ abortSignal: signal });
   if (blockTime === null) {
     throw new IdentityError(
       IDENTITY_ERROR_CODES.SIMULATION_FAILED,
@@ -120,8 +130,11 @@ async function chainDeadline(rpc: IdentityRpc): Promise<bigint> {
   return BigInt(blockTime) + REGISTRATION_DEFAULTS.walletDeadlineSeconds;
 }
 
-async function registrationInstructions(
-  input: SponsoredRegistrationInput,
+export async function registrationInstructions(
+  input: Pick<
+    SponsoredRegistrationInput,
+    'owner' | 'asset' | 'node' | 'payoutWallet' | 'agentUri' | 'bindingSequence'
+  >,
   deadline: bigint,
 ) {
   const binding = await signNodeBinding(input.node, {
@@ -129,6 +142,17 @@ async function registrationInstructions(
     owner: input.owner.address,
     sequence: input.bindingSequence,
   });
+  if (
+    !(await verifyNodeBinding(
+      binding,
+      input.asset.address,
+      input.owner.address,
+    ))
+  )
+    throw new IdentityError(
+      IDENTITY_ERROR_CODES.BINDING_INVALID,
+      'Node binding signature is invalid.',
+    );
   const register = await registerInstruction(
     input.owner,
     input.asset,
@@ -163,20 +187,25 @@ function simulationDetail(
 }
 
 // Simulates the message and returns the owner's post-run lamports; any program error throws SIMULATION_FAILED.
-async function simulateOwnerAfter(
+export async function simulateOwnerAfter(
   rpc: IdentityRpc,
   message: SponsoredMessage,
   owner: Address,
-): Promise<{ ownerAfter: bigint; unitsConsumed: bigint }> {
+  options: {
+    commitment?: Commitment;
+    replaceRecentBlockhash?: boolean;
+    signal?: AbortSignal;
+  } = {},
+): Promise<{ ownerAfter: bigint; unitsConsumed: bigint; contextSlot: bigint }> {
   const result = await rpc
     .simulateTransaction(wireBase64(message), {
       encoding: BASE64_ENCODING,
       sigVerify: false,
-      replaceRecentBlockhash: true,
-      commitment: COMMITMENT,
+      replaceRecentBlockhash: options.replaceRecentBlockhash ?? true,
+      commitment: options.commitment ?? COMMITMENT,
       accounts: { addresses: [owner], encoding: BASE64_ENCODING },
     })
-    .send();
+    .send({ abortSignal: options.signal });
   const ownerAfter = result.value.accounts?.[0]?.lamports;
   if (result.value.err !== null || ownerAfter === undefined) {
     throw new IdentityError(
@@ -184,7 +213,11 @@ async function simulateOwnerAfter(
       simulationDetail(result.value.err, result.value.logs),
     );
   }
-  return { ownerAfter, unitsConsumed: result.value.unitsConsumed ?? 0n };
+  return {
+    ownerAfter,
+    unitsConsumed: result.value.unitsConsumed ?? 0n,
+    contextSlot: result.context.slot,
+  };
 }
 
 // Simulates with a generous prefund and returns how many lamports the owner actually spent.
@@ -220,9 +253,10 @@ function isMessageBase64(text: string): text is TransactionMessageBytesBase64 {
 }
 
 // The network fee for this exact message (signatures plus Ed25519 precompile proofs).
-async function messageFee(
+export async function messageFee(
   rpc: IdentityRpc,
   message: SponsoredMessage,
+  signal?: AbortSignal,
 ): Promise<bigint> {
   const encoded = BYTES_TO_BASE64_TEXT.decode(
     compileTransaction(message).messageBytes,
@@ -235,7 +269,7 @@ async function messageFee(
   }
   const { value } = await rpc
     .getFeeForMessage(encoded, { commitment: COMMITMENT })
-    .send();
+    .send({ abortSignal: signal });
   if (value === null) {
     throw new IdentityError(
       IDENTITY_ERROR_CODES.FEE_UNAVAILABLE,
@@ -254,7 +288,7 @@ function assertWithinCeiling(sponsorCost: bigint, ceiling: bigint): void {
   }
 }
 
-function assertFits(message: SponsoredMessage): number {
+export function assertFits(message: SponsoredMessage): number {
   const transactionBytes = wireBytes(wireBase64(message));
   if (transactionBytes > LIMITS.transactionBytes) {
     throw new IdentityError(
