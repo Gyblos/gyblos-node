@@ -186,3 +186,11 @@ html > body[data-scroll-locked] {
     transition: none;
   }
 }
+
+/* Decorative group glyphs share the existing labels and leave navigation sizing unchanged. */
+.docs-sidebar-icon {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  color: var(--color-fd-muted-foreground);
+}

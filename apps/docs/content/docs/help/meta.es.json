@@ -1,5 +1,6 @@
 {
   "title": "Ayuda",
   "pages": ["troubleshooting"],
-  "defaultOpen": true
+  "defaultOpen": true,
+  "icon": "life-buoy"
 }

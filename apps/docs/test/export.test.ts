@@ -164,7 +164,9 @@ void test('docs export: all four sidebar groups have decorative icons and locali
       )?.[0];
       assert.ok(button, `${html}: missing ${group.icon} group icon`);
       assert.ok(button.includes(label), `${html}: missing ${label} label`);
-      const icon = button.match(/<svg\b[^>]*data-sidebar-icon="[^"]+"[^>]*>/)?.[0];
+      const icon = button.match(
+        /<svg\b[^>]*data-sidebar-icon="[^"]+"[^>]*>/,
+      )?.[0];
       assert.ok(icon, `${html}: group icon is not an inline SVG`);
       assert.ok(icon.includes('aria-hidden="true"'));
       assert.ok(icon.includes('focusable="false"'));

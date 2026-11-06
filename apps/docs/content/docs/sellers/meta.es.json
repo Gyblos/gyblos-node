@@ -7,5 +7,6 @@
     "operate",
     "identity"
   ],
-  "defaultOpen": true
+  "defaultOpen": true,
+  "icon": "server"
 }

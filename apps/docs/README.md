@@ -40,6 +40,10 @@ cd apps/docs && pnpm build && npx wrangler@4.151.1 deploy
 - `meta.json` / `meta.es.json` set the sidebar order and folder titles. The
   seller handbook follows scope → install → register/publish → offers →
   operation → identity, with CLI/configuration reference and symptom-based help.
+  The four folder icons are resolved by `components/sidebar-icons.tsx` through
+  the source loader. Use matching icon IDs in both locales; keep the SVGs
+  decorative, 16px, nonfocusable and secondary in color. Page labels and URLs
+  remain the navigation's accessible names.
 - Public Docker seller procedures are canonical here. Engineering docs in
   `docs/` retain checkout, library and experimental detail and link to this
   handbook. Do not copy operational or lab history into public onboarding.

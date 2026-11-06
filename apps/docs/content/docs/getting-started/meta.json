@@ -1,5 +1,6 @@
 {
   "title": "Start here",
   "pages": ["beta"],
-  "defaultOpen": true
+  "defaultOpen": true,
+  "icon": "compass"
 }
