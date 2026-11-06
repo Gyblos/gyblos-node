@@ -49,6 +49,7 @@ export type BuyerExecutionFactory = (context: {
   requestMs?: number;
   classify?: ChatErrorClassifier;
   chat(url: string): ReturnType<typeof ownedChat> & { automatic?: boolean };
+  drain?(): Promise<unknown>;
   close(): Promise<void>;
   inspect?(
     digest: string,
@@ -165,7 +166,7 @@ function buyerReceipts(
     },
   });
 }
-// Stop HTTP/protocol resources before draining the startup-owned log, even when a close rejects.
+// Stop admission and bound draining before the endpoint closes; only then release payment journals.
 async function closeBuyerResources(
   receipts: ReturnType<typeof createBuyerReceiptRuntime> | undefined,
   endpoint: Awaited<ReturnType<typeof bindEndpoint>>,
@@ -174,19 +175,23 @@ async function closeBuyerResources(
   execution?: Awaited<ReturnType<BuyerExecutionFactory>>,
 ) {
   try {
-    await host?.close();
+    try {
+      await host?.close();
+    } finally {
+      await execution?.drain?.();
+    }
   } finally {
     try {
-      try {
-        await execution?.close();
-      } finally {
-        await receipts?.close();
-      }
+      await receipts?.close();
     } finally {
       try {
         await endpoint.close();
       } finally {
-        await telemetry.close();
+        try {
+          await execution?.close();
+        } finally {
+          await telemetry.close();
+        }
       }
     }
   }

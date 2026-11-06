@@ -4,6 +4,7 @@ import {
   buyerChainPayments,
   buyerPaymentsUnresolved,
 } from '@gyblos/node/buyer-chain';
+import { bounded } from '@gyblos/node/buyer-operation';
 import { PaidBuyerError } from '@gyblos/node/buyer-paid-error';
 import { executeSelectedBuyerPaid } from '@gyblos/node/buyer-paid-execution';
 import { executeBuyerQuote } from '@gyblos/node/buyer-quote-execution';
@@ -59,61 +60,91 @@ function admission(enter: Context['dependencies']['enter']) {
     },
   };
 }
+function drain(state: ReturnType<typeof admission>) {
+  return bounded(state.stop(), AbortSignal.timeout(PAID_BUYER.drainMs)).then(
+    () => true,
+    () => false,
+  );
+}
+async function preparePaid(
+  context: Context,
+  options: Options,
+  state: ReturnType<typeof admission>,
+  buyer: string,
+  signal: AbortSignal,
+) {
+  const { prepared, role, endpoint, relayOnly } = context;
+  checkPaidRequest(prepared, role);
+  const meter = await (options.meter ?? tokenizer)();
+  signal.throwIfAborted();
+  if (state.closed()) throw new PaidBuyerError(PAID_BUYER_CODES.UNAVAILABLE);
+  const chain = await payments(
+    options.chain ?? buyerChainPayments(),
+    role,
+    prepared.config.request.maxAtomic,
+  );
+  try {
+    signal.throwIfAborted();
+    if (state.closed()) throw new PaidBuyerError(PAID_BUYER_CODES.UNAVAILABLE);
+    const paid = paidBuyerDependencies(prepared, {
+      endpoint,
+      buyer,
+      relayOnly,
+      onSellerFailure: options.onSellerFailure,
+      payment: chain.client,
+      fee: PROTOCOL_FEE,
+      meter,
+      record: paidRecords(rolePath(P2P_ROLES.BUYER, PAID_BUYER.recordsFile))
+        .record,
+    });
+    return { chain, paid };
+  } catch (error) {
+    await chain.close();
+    throw error;
+  }
+}
 function lazyPaid(
   context: Context,
   options: Options,
   state: ReturnType<typeof admission>,
   buyer: string,
 ) {
-  const { prepared, role, endpoint, relayOnly } = context;
-  let pending: ReturnType<typeof prepare> | undefined;
-  async function prepare(signal: AbortSignal) {
-    checkPaidRequest(prepared, role);
-    const meter = await (options.meter ?? tokenizer)();
-    signal.throwIfAborted();
-    if (state.closed()) throw new PaidBuyerError(PAID_BUYER_CODES.UNAVAILABLE);
-    const chain = await payments(
-      options.chain ?? buyerChainPayments(),
-      role,
-      prepared.config.request.maxAtomic,
-    );
-    try {
+  let pending: ReturnType<typeof preparePaid> | undefined;
+  let opened: Awaited<ReturnType<typeof preparePaid>> | undefined;
+
+  return {
+    get(signal: AbortSignal) {
       signal.throwIfAborted();
       if (state.closed())
         throw new PaidBuyerError(PAID_BUYER_CODES.UNAVAILABLE);
-      const paid = paidBuyerDependencies(prepared, {
-        endpoint,
-        buyer,
-        relayOnly,
-        onSellerFailure: options.onSellerFailure,
-        payment: chain.client,
-        fee: PROTOCOL_FEE,
-        meter,
-        record: paidRecords(rolePath(P2P_ROLES.BUYER, PAID_BUYER.recordsFile))
-          .record,
-      });
-      return { chain, paid };
-    } catch (error) {
-      await chain.close();
-      throw error;
-    }
-  }
-  return {
-    get: (signal: AbortSignal) => (pending ??= prepare(signal)),
+      pending ??= preparePaid(context, options, state, buyer, signal)
+        .then(async (runtime) => {
+          if (state.closed() || signal.aborted) {
+            await runtime.chain.close();
+            signal.throwIfAborted();
+            throw new PaidBuyerError(PAID_BUYER_CODES.UNAVAILABLE);
+          }
+          opened = runtime;
+          return runtime;
+        })
+        .catch((error: unknown) => {
+          pending = undefined;
+          throw error;
+        });
+      return bounded(pending, signal);
+    },
     unresolved: () =>
       pending
         ? pending.then((runtime) => runtime.paid.unresolved())
         : buyerPaymentsUnresolved(),
     async inspect(digest: string, signal?: AbortSignal) {
-      await state.stop();
-      return pending
-        ? (await pending).chain.observe?.(digest, signal)
-        : undefined;
+      const drained = await drain(state);
+      return drained ? opened?.chain.observe?.(digest, signal) : undefined;
     },
-    async close() {
-      await state.stop();
-      const runtime = await pending?.catch(() => undefined);
-      await runtime?.chain.close();
+    drain: () => drain(state),
+    // Endpoint closure precedes journal closure; an unfinished prepare owns its late cleanup.
+    close: async () => {
+      await opened?.chain.close();
     },
   };
 }
@@ -201,6 +232,7 @@ async function startQuoteRuntime(
       automatic: true,
     }),
     inspect: paid.inspect,
+    drain: paid.drain,
     close: paid.close,
   };
 }

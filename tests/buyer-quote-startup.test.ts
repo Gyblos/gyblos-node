@@ -37,7 +37,7 @@ import { endpoint, within } from './support/native-fixture';
 import { NATIVE_CAPABILITY } from './support/native-runtime';
 
 void test(
-  'automatic startup executes a zero-price quote with a positive ceiling and no payer, tokenizer or RPC',
+  'automatic startup keeps free execution independent and cancels late paid preparation without authorization',
   { skip: NATIVE_CAPABILITY.transportSkip },
   async () => {
     const fixture = await freeSellerFixture();
@@ -83,10 +83,15 @@ void test(
       },
     });
     source.context.catalog = records.current();
+    let controlTick = 0;
     const server = serveSellerTransport(
       seller,
       {
         control: createSellerControlService({
+          monotonic: () => {
+            controlTick += 1000;
+            return controlTick;
+          },
           context: source.context,
           ownerSigner: source.ownerSigner,
           nodeSigner: signer,
@@ -140,6 +145,36 @@ void test(
     let host: Awaited<ReturnType<typeof startBuyer>> | undefined;
     let paymentPreparations = 0;
     let tokenizerLoads = 0;
+    let chainClosed = 0;
+    let releaseChain = () => {};
+    let beganChain = () => {};
+    let finishedChain = () => {};
+    const chainBegan = new Promise<void>((resolve) => {
+      beganChain = resolve;
+    });
+    const chainReleased = new Promise<void>((resolve) => {
+      releaseChain = resolve;
+    });
+    const chainFinished = new Promise<void>((resolve) => {
+      finishedChain = resolve;
+    });
+    const unexpected = async (): Promise<never> => {
+      assert.fail('unexpected payment operation');
+    };
+    const prices = async (free: boolean) => {
+      const at = Date.now();
+      source.setNow(at);
+      source.setReadiness({ observedAt: at, validUntil: at + 20000 });
+      source.catalog.models = source.catalog.models.map((model) => ({
+        ...model,
+        pricing: {
+          ...model.pricing,
+          inputAtomicPerMtok: free ? '0' : '1',
+          outputAtomicPerMtok: free ? '0' : '2',
+        },
+      }));
+      source.context.catalog = await records.refresh(true);
+    };
     try {
       process.env.GYBLOS_HOME = join(directory, 'home');
       process.env.GYBLOS_LAB_HOME = join(directory, 'lab');
@@ -174,11 +209,27 @@ void test(
         bind: (bytes) => endpoint(bytes),
         meter: async () => {
           tokenizerLoads++;
-          throw new Error('free must not load paid tokenizer');
+          if (tokenizerLoads === 1)
+            throw new Error('synthetic tokenizer unavailable');
+          return { input: () => 4, count: () => 2 };
         },
-        chain: async () => {
+        chain: async (_role, maxAtomic) => {
+          assert.equal(maxAtomic, '1000');
           paymentPreparations++;
-          throw new Error('free must not open payment runtime');
+          beganChain();
+          await chainReleased;
+          return {
+            client: {
+              authorize: unexpected,
+              discard: unexpected,
+              checkReceipt: unexpected,
+              reconcile: async () => [],
+            },
+            close: async () => {
+              chainClosed++;
+              finishedChain();
+            },
+          };
         },
       });
       assert.equal(host.chat.automatic, true);
@@ -213,10 +264,51 @@ void test(
         readFile(join(buyer, 'payments', 'upto-journal-v1.json')),
         { code: 'ENOENT' },
       );
-      await host.close();
-      host = undefined;
+      const ask = (signal?: AbortSignal) =>
+        host!.chat.request(host!.url, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body,
+          signal,
+        });
+      await prices(false);
+      const refused = await within(ask());
+      assert.notEqual(refused.status, 200);
+      await refused.arrayBuffer();
+      assert.equal(tokenizerLoads, 1);
       assert.equal(paymentPreparations, 0);
+      await prices(true);
+      const recovered = await within(ask());
+      assert.equal(recovered.status, 200, await recovered.text());
+      assert.equal(tokenizerLoads, 1);
+      assert.equal(paymentPreparations, 0);
+      assert.equal(fixture.calls(), 2);
+      await prices(false);
+      const cancel = new AbortController();
+      const pending = ask(cancel.signal).catch(() => undefined);
+      const began = await within(
+        Promise.race([
+          chainBegan.then(() => undefined),
+          pending.then(async (response) =>
+            response ? response.json() : 'request ended',
+          ),
+        ]),
+      );
+      assert.equal(began, undefined, JSON.stringify(began));
+      cancel.abort();
+      await within(pending);
+      // Shutdown must finish before a stalled payment opener returns.
+      await within(host.close());
+      host = undefined;
+      assert.equal(chainClosed, 0);
+      releaseChain();
+      await within(chainFinished);
+      assert.equal(chainClosed, 1);
+      assert.equal(paymentPreparations, 1);
+      assert.equal(tokenizerLoads, 2);
+      assert.equal(fixture.calls(), 2);
     } finally {
+      releaseChain();
       await host?.close();
       await server.close();
       for (const key of Object.keys(process.env))

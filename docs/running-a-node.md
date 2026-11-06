@@ -448,10 +448,12 @@ package's settings on GitHub. A public image contains the node's source.
 
 Free inference uses `pnpm buyer:free`
 ([Free v2 buyer endpoint](#free-v2-buyer-endpoint)); `pnpm buyer` serves the
-same endpoint and pays on devnet when `selection.json` sets a deposit ceiling
-([Paid v2 buyer endpoint](#paid-v2-buyer-endpoint)). The paid v1 flow below
-needs a paid seller's `offer.json`; the seller daemon never writes one, so the
-v1 flow runs only against the lab gates (`gate:*`).
+same endpoint and chooses free or paid execution from the verified signed quote,
+within the `selection.json` ceilings
+([Paid v2 buyer endpoint](#paid-v2-buyer-endpoint),
+[routing](buyer-routing.md)). The paid v1 flow below needs a paid seller's
+`offer.json`; the seller daemon never writes one, so the v1 flow runs only
+against the lab gates (`gate:*`).
 
 ```sh
 export GYBLOS_RELAY_TOKEN=...
@@ -770,13 +772,15 @@ line is one independent user message; the terminal does not send history. Enter
 `/exit` or press Ctrl-C to stop. The CLI does not choose or display a seller
 independently of the buyer, and does not write conversations to files.
 
-In paid mode the owned buyer manages its private bearer token without printing
-it. Another buyer holding the same journal must be stopped before starting paid
-chat. Amounts are atomic units of the configured devnet test token, not USDC.
-The CLI prints usage and the payment verdict when available. If a request fails
-after it may have been sent, or the payment is not confirmed, it stops without
-retrying; use the buyer's reconciliation procedure before another paid request.
-A completed streamed fragment is provisional until the final result arrives.
+The automatic owned buyer manages its private bearer token without printing it,
+including for free answers. An unresolved signed payment or another buyer
+holding the journal blocks requests; starting chat does not itself open
+payments. Amounts are atomic units of the configured devnet test token, not
+USDC. The CLI prints usage and the payment verdict when available. If a request
+fails after it may have been sent, or the payment is not confirmed, it stops
+without retrying; use the buyer's reconciliation procedure before another paid
+request. A completed streamed fragment is provisional until the final result
+arrives.
 
 `pnpm buyer:free` starts a separate loopback endpoint on the buyer proxy port
 (default `127.0.0.1:4031`). Stop `buyer:start` first; both commands use that
@@ -912,9 +916,13 @@ their separate scope and limits.
 
 ## Paid v2 buyer endpoint
 
-`pnpm buyer` reads `selection.json`: with `request.maxAtomic` above `"0"` it
-starts the paid buyer on the same loopback endpoint, otherwise the free one.
-Paid mode is devnet only and needs:
+`pnpm buyer` reads `selection.json`, selects a seller and verifies its signed
+quote. Both prices zero and `maxAtomic: "0"` use free execution without payment
+transactions. Either positive price uses the existing paid channel. A positive
+configured `request.maxAtomic` is a ceiling and can also accept a free quote.
+Payment preparation is deferred until a positive quote wins; the following paid
+requirements are not needed to execute a free quote. See
+[buyer routing](buyer-routing.md). Paid execution is devnet only and needs:
 
 - the buyer role (`pnpm node:setup --role buyer --mint MINT`) whose `rpcUrl`
   serves devnet (checked by its genesis hash) and whose wallet holds devnet SOL
@@ -925,18 +933,17 @@ Paid mode is devnet only and needs:
   and `asset` the role's mint, with `maxAtomic` the most one request may deposit
   and `priceCeilings` the highest prices it accepts (protocol fee included).
 - every request to carry `Authorization: Bearer <token>`, with the token the
-  first paid start writes to `api-token` in the buyer home (below).
+  first automatic start writes to `api-token` in the buyer home (below).
 
-Each request takes one quote from a paid seller (a free winner, or a seller that
-fails discovery or identity checks, is skipped before anything is signed), signs
-one channel open for at most `maxAtomic`, streams the answer and checks the
-seller's settlement against the buyer's own count. A completed answer, and an
-error the seller answered after receiving the open, carries `gyblos_payment`:
-the verdict, the ceiling, the buyer's expected charge, the seller's charge,
-payout, fee and refund in atomic units, and whether a record was kept. A stream
-cut before the seller answered, or the endpoint's own deadline, carries only the
-error code. Only a single user message the model's chat template accepts is
-sent; anything else is refused before paying.
+For a positive-price winning quote, the buyer signs one channel open for at most
+`maxAtomic`, streams the answer and checks the seller's settlement against the
+buyer's own count. A completed answer, and an error the seller answered after
+receiving the open, carries `gyblos_payment`: the verdict, the ceiling, the
+buyer's expected charge, the seller's charge, payout, fee and refund in atomic
+units, and whether a record was kept. A stream cut before the seller answered,
+or the endpoint's own deadline, carries only the error code. Only a single user
+message the model's chat template accepts is sent; anything else is refused
+before paying.
 
 One paid request runs at a time (`PAID_BUYER_BUSY`) and one buyer process holds
 the payment journal (`BUYER_PAYMENT_JOURNAL_UNAVAILABLE`). The buyer never fails
@@ -944,10 +951,10 @@ over once a seller received the signed open, since that seller could still land
 it; an open that never left the buyer is discarded and the next seller is tried.
 Any channel in the journal not settled on the buyer's own count (a refusal, a
 stop, a pending or lapsed claim, a dispute or a settlement the chain could not
-confirm) blocks new payments (`PAID_BUYER_UNRESOLVED_PAYMENT`) until it is
-reconciled; the buyer also appends it to `paid-records.jsonl` in the buyer home
-when it can (`recorded`). Never reset or delete a journal or lock to bypass the
-block.
+confirm) blocks new automatic requests, including free execution
+(`PAID_BUYER_UNRESOLVED_PAYMENT`), until it is reconciled; the buyer also
+appends it to `paid-records.jsonl` in the buyer home when it can (`recorded`).
+Never reset or delete a journal or lock to bypass the block.
 
 To reconcile, stop the paid buyer and run `pnpm buyer:reconcile:paid`. It checks
 that the role's RPC serves devnet, then reads each open channel's finalized
@@ -1058,14 +1065,14 @@ entry was created on that chain. There is no automatic legacy attribution or
 recovery command yet.
 
 The endpoint listens on loopback only and refuses browser requests, but loopback
-is not authentication, so paid mode also requires a bearer token. The first paid
-start creates `api-token` in the buyer home (`.local/gyblos/buyer/` by default),
-a private 0600 file, and later starts reuse it. Every request must send
-`Authorization: Bearer <token>`; OpenAI SDKs send their `apiKey` this way. A
-request without the token gets 401 `PAID_BUYER_UNAUTHORIZED` with
-`x-should-retry: false`, before its body is read or a seller is selected. The
-token is never printed; read it yourself. Every call to the paid endpoint, from
-curl or an SDK, must carry the header:
+is not authentication, so the automatic entry requires a bearer token for every
+request, including free ones. Its first start creates `api-token` in the buyer
+home (`.local/gyblos/buyer/` by default), a private 0600 file, and later starts
+reuse it. Every request must send `Authorization: Bearer <token>`; OpenAI SDKs
+send their `apiKey` this way. A request without the token gets 401
+`PAID_BUYER_UNAUTHORIZED` with `x-should-retry: false`, before its body is read
+or a seller is selected. The token is never printed; read it yourself. Every
+call to the paid endpoint, from curl or an SDK, must carry the header:
 
 ```sh
 export OPENAI_API_KEY="$(cat .local/gyblos/buyer/api-token)"
