@@ -23,6 +23,10 @@ export async function registerOnChain(
     environment,
     identity: { owner: identity.owner, nodeId: identity.nodeId },
     operations: sellerRegistrationOperations({ environment, role: identity }),
+    onCostChanged: () =>
+      output.stderr(
+        'Registration cost increased; run the command again to review the updated estimate.\n',
+      ),
     confirm: async (lamports) => {
       const whole = lamports / REGISTER.lamportsPerSol;
       const fraction = String(lamports % REGISTER.lamportsPerSol).padStart(

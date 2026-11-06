@@ -1,6 +1,6 @@
 // Owns the `gyblos seller register` contract: it sends the index only the invite and this home's NodeId,
 // takes the invite from GYBLOS_INVITE or a terminal question (never a flag), names the index before sending, explains each refusal with a static
-// code and a hint, writes nothing and never prints the invite or the home location. Offline: fetch is faked.
+// code and a hint; the index-only path writes nothing and never prints the invite or home. Fetch is faked.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 

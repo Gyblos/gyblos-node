@@ -1,4 +1,4 @@
-// Creates the buyer's read-only Solana RPC port with bounded decoded HTTP responses.
+// Creates separate read-only and registration Solana RPC ports with bounded decoded responses.
 // SDK method/BigInt transforms remain intact; strict registry account validation still owns trust.
 import {
   createSolanaRpcFromTransport,

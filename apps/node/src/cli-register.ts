@@ -37,7 +37,7 @@ const HINTS: ReadonlyMap<DiscoveryErrorCode, string> = new Map([
   ],
   [
     DISCOVERY_ERROR_CODES.IDENTITY_NOT_REGISTERED,
-    'this seller is not registered on chain (8004-solana) yet; register it there first, then run this again with the same invite',
+    'this seller is not registered on chain yet; run this command in a terminal to register it',
   ],
   [
     DISCOVERY_ERROR_CODES.NODE_REVOKED,

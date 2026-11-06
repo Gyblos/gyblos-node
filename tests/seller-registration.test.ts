@@ -189,6 +189,7 @@ void test('a price increase while the user decides requires fresh consent and se
   let builds = 0;
   let signs = 0;
   let sends = 0;
+  let notified = 0;
   try {
     const result = await registerSellerIdentity({
       environment: { GYBLOS_HOME: root },
@@ -215,11 +216,15 @@ void test('a price increase while the user decides requires fresh consent and se
         },
       },
       confirm: async (cost) => cost === 1n,
+      onCostChanged: () => {
+        notified++;
+      },
     });
     assert.equal(result, false);
     assert.equal(builds, 2);
     assert.equal(signs, 0);
     assert.equal(sends, 0);
+    assert.equal(notified, 1);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

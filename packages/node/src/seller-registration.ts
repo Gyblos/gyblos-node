@@ -49,6 +49,7 @@ export async function registerSellerIdentity(input: {
   identity: { owner: string; nodeId: string };
   operations: SellerRegistrationOperations;
   confirm(estimatedTotalLamports: bigint): Promise<boolean>;
+  onCostChanged?(): void;
 }): Promise<boolean> {
   const state = await openSellerRegistrationState(
     input.environment,
@@ -97,8 +98,10 @@ export async function registerSellerIdentity(input: {
     const draft = await input.operations.build(signer);
     if (!(await input.confirm(draft.estimatedTotalLamports))) return false;
     const refreshed = await input.operations.build(signer);
-    if (refreshed.estimatedTotalLamports > draft.estimatedTotalLamports)
+    if (refreshed.estimatedTotalLamports > draft.estimatedTotalLamports) {
+      input.onCostChanged?.();
       return false;
+    }
     const prepared = await refreshed.sign();
     await state.savePrepared(prepared, failedSignature);
     const result = await input.operations.send(prepared);
