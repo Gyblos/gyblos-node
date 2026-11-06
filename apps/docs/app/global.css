@@ -89,6 +89,27 @@ html > body[data-scroll-locked] {
   margin-bottom: 0.5rem;
 }
 
+/* Give the first installation step clear priority over the secondary guide links. */
+.docs-quickstart {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  background: var(--color-fd-primary);
+  color: var(--color-fd-primary-foreground);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.docs-quickstart:hover {
+  opacity: 0.9;
+}
+
+.docs-quickstart > p {
+  margin: 0;
+}
+
 .docs-action-button {
   display: inline-flex;
   align-items: center;

@@ -1,5 +1,5 @@
 ---
-title: Models and free offers
+title: Models
 description: Change free token limits and understand which model and engine settings the seller can serve.
 ---
 
@@ -7,7 +7,7 @@ The default installation serves pinned **Qwen3 0.6B through local Ollama**, with
 This is the model validated end to end for this onboarding. A catalog entry or valid TOML file does not
 mean that every model has been tested.
 
-## Lower the free limits
+## Free limits [#lower-the-free-limits]
 
 Edit the existing `[[offers]]` entry in `~/gyblos-seller/gyblos.toml`. The following complete example
 halves the total daily limit and lowers the per-buyer limit. It deliberately leaves publication off;
@@ -37,7 +37,7 @@ the unused reservation.
 The counters are in memory and reset on restart. Per-buyer limits are best effort; they are not
 persistent billing or a guarantee against someone creating another buyer identity.
 
-## Validate and apply
+### Apply changes [#validate-and-apply]
 
 ```sh
 cd ~/gyblos-seller
@@ -55,7 +55,7 @@ Check `RUNNING` and the offered model. Use `seller status --online` if publicati
 If it fails, use the reported code in [troubleshooting](/en/help/troubleshooting). Configuration is read
 at startup; editing the file alone does not change the running seller.
 
-## Changing the model or engine
+## Models and engines [#changing-the-model-or-engine]
 
 Changing `model` does not download a model or start an engine. The installer downloads only
 `qwen3:0.6b`. Ollama startup currently accepts the pinned Qwen3 0.6B, a literal loopback root URL,

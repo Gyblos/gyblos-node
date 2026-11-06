@@ -1,5 +1,5 @@
 ---
-title: Beta scope and requirements
+title: Requirements
 description: Check the supported seller path, invitation and machine requirements before installing.
 ---
 
@@ -7,7 +7,7 @@ This handbook follows the invitation's `install.sh` and `ghcr.io/gyblos/seller:b
 The beta tag can change. Include `docker compose images seller` when asking for help so the team can
 identify your installed image.
 
-## What you can do today
+## Scope [#what-you-can-do-today]
 
 | Task                          | Scope of this handbook                                                                                       |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------ |
@@ -23,7 +23,7 @@ estimates its cost and asks for approval; see [Register and publish](/en/sellers
 The beta uses Solana **devnet**. The default free offer moves no real money. Your electricity,
 hosting and internet still have a cost; a remote engine may also charge you even for a free offer.
 
-## Before you install
+## Before you start [#before-you-install]
 
 - An invitation containing `install.sh`, a private **relay token** and a one-use **invite code** starting with `gyb_`.
 - Linux x86-64 or ARM64, or macOS, on a machine that stays on. This installer is not a Windows-native procedure.
@@ -34,7 +34,7 @@ hosting and internet still have a cost; a remote engine may also charge you even
 Treat Docker access as privileged. On Linux use an account already authorized to run Docker;
 do not change host permissions merely to bypass an installation error.
 
-## What a successful check means
+## What checks prove [#what-a-successful-check-means]
 
 `doctor` checks startup prerequisites and probes supported dependencies. It does not generate an answer.
 `RUNNING` confirms the service state; registration grants permission to publish; `listed in the index`

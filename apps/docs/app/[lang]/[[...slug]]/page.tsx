@@ -30,7 +30,9 @@ export default async function Page(props: PageProps) {
   return (
     <DocsPage toc={page.data.toc} full={page.data.full}>
       <DocsTitle>{page.data.title}</DocsTitle>
-      <DocsDescription>{page.data.description}</DocsDescription>
+      <DocsDescription className="mb-0">
+        {page.data.description}
+      </DocsDescription>
       <PageActions
         key={page.url}
         markdownUrl={markdownUrl(page.url)}

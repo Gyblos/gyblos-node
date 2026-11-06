@@ -1,12 +1,12 @@
 ---
-title: Operate and update
+title: Operation
 description: Check health, apply edits, stop and update the Docker seller while preserving its identity.
 ---
 
 Use these commands for the invitation's free Docker seller. If you chose another installation folder,
 replace `~/gyblos-seller` consistently. Keep the Compose project and its existing volumes together.
 
-## Check health and activity
+## Health and activity [#check-health-and-activity]
 
 ```sh
 cd ~/gyblos-seller
@@ -22,7 +22,7 @@ Use `docker compose exec seller gyblos seller status --online` to check discover
 For a container that will not stay up, run `docker compose run --rm seller gyblos doctor` and
 follow the code in [troubleshooting](/en/help/troubleshooting).
 
-## Stop and start
+## Stop and start [#stop-and-start]
 
 ```sh
 cd ~/gyblos-seller
@@ -38,7 +38,7 @@ docker compose up -d
 `docker compose down` removes containers while preserving named volumes. **Never add `-v` to an
 ordinary stop or repair**: it deletes the persistent volumes, including keys and the downloaded model.
 
-## Apply configuration or environment changes
+## Apply changes [#apply-configuration-or-environment-changes]
 
 Edit `gyblos.toml` on the host. Validate it as shown in the
 [configuration reference](/en/reference/configuration), then recreate the seller:
@@ -52,7 +52,7 @@ docker compose exec seller gyblos seller status
 Recreation is also needed after changing `seller.env`; a simple container restart does not load a
 changed Compose environment file. Never display that file in logs, screenshots or a shared terminal.
 
-## Update the beta image
+## Update [#update-the-beta-image]
 
 Before updating, record the installed image and review any update instructions from your invitation channel.
 
@@ -69,7 +69,7 @@ Compose template or environment file. Rerunning `install.sh` preserves those fil
 After the update, run status and, if publishing, status with `--online`. If it fails, preserve the
 volumes and report the image and error code. Do not keep restarting to clear a lock or bypass a refusal.
 
-## Inspect logs privately
+## Private logs [#inspect-logs-privately]
 
 ```sh
 cd ~/gyblos-seller

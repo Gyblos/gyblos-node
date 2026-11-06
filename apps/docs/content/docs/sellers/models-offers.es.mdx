@@ -1,5 +1,5 @@
 ---
-title: Modelos y ofertas gratuitas
+title: Modelos
 description: Cambia las cuotas gratuitas y conoce los modelos y motores que puede servir el vendedor.
 ---
 
@@ -7,7 +7,7 @@ La instalación predeterminada sirve **Qwen3 0.6B fijado mediante Ollama local**
 Es el modelo validado de extremo a extremo para este inicio. Estar en el catálogo o tener TOML válido
 no significa que todos los modelos hayan sido probados.
 
-## Reduce las cuotas gratuitas
+## Cuotas gratuitas [#reduce-las-cuotas-gratuitas]
 
 Edita la entrada `[[offers]]` existente en `~/gyblos-seller/gyblos.toml`. Este ejemplo completo reduce
 a la mitad la cuota total y baja la cuota por comprador. Deja la publicación desactivada intencionadamente;
@@ -37,7 +37,7 @@ la reserva no utilizada.
 Los contadores están en memoria y se restablecen al reiniciar. El límite por comprador es una protección
 parcial; no es facturación persistente ni garantiza impedir que alguien cree otra identidad de comprador.
 
-## Valida y aplica
+### Aplica cambios [#valida-y-aplica]
 
 ```sh
 cd ~/gyblos-seller
@@ -55,7 +55,7 @@ Comprueba `RUNNING` y el modelo ofrecido. Usa `seller status --online` si public
 Si falla, busca el código en [solución de problemas](/es/help/troubleshooting). La configuración se lee
 al arrancar; editar el archivo por sí solo no cambia el vendedor en ejecución.
 
-## Cambiar de modelo o motor
+## Modelos y motores [#cambiar-de-modelo-o-motor]
 
 Cambiar `model` no descarga un modelo ni inicia un motor. El instalador solo descarga `qwen3:0.6b`.
 Actualmente el inicio con Ollama acepta Qwen3 0.6B fijado, una URL raíz de loopback literal,

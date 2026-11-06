@@ -1,5 +1,5 @@
 ---
-title: Alcance y requisitos de la beta
+title: Requisitos
 description: Comprueba la instalación admitida, la invitación y los requisitos del equipo antes de empezar.
 ---
 
@@ -7,7 +7,7 @@ Este manual sigue el `install.sh` de tu invitación y la imagen `ghcr.io/gyblos/
 La etiqueta beta puede cambiar. Incluye `docker compose images seller` al pedir ayuda para que el equipo
 pueda identificar la imagen instalada.
 
-## Qué puedes hacer hoy
+## Alcance [#qué-puedes-hacer-hoy]
 
 | Tarea                                | Alcance de este manual                                                                                    |
 | ------------------------------------ | --------------------------------------------------------------------------------------------------------- |
@@ -23,7 +23,7 @@ el coste y pide aprobación; consulta [Registra y publica](/es/sellers/register-
 La beta usa Solana **devnet**. La oferta gratuita predeterminada no mueve dinero real. La electricidad,
 el alojamiento e internet tienen un coste; un motor remoto también puede cobrarte aunque la oferta sea gratuita.
 
-## Antes de instalar
+## Antes de empezar [#antes-de-instalar]
 
 - Una invitación con `install.sh`, un **token de relay** privado y un **código de invitación** de un solo uso que empieza con `gyb_`.
 - Linux x86-64 o ARM64, o macOS, en un equipo que permanezca encendido. Este instalador no es un procedimiento nativo para Windows.
@@ -34,7 +34,7 @@ el alojamiento e internet tienen un coste; un motor remoto también puede cobrar
 El acceso a Docker es privilegiado. En Linux utiliza una cuenta ya autorizada para ejecutarlo;
 no cambies los permisos del equipo solo para saltarte un error de instalación.
 
-## Qué demuestra una comprobación correcta
+## Qué demuestran las pruebas [#qué-demuestra-una-comprobación-correcta]
 
 `doctor` revisa requisitos de inicio y consulta las dependencias admitidas. No genera una respuesta.
 `RUNNING` confirma el estado del servicio; el registro da permiso para publicar; `listed in the index`
