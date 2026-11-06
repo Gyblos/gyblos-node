@@ -1,6 +1,8 @@
 // The buyer's durable journal of authorized channels by request digest: one private document, read
 // strictly and rewritten atomically under the process lock. A signed open is never dropped while open;
 // an entry whose open was never signed is dropped once its terms expire, or at once when signing fails.
+import { lstat } from 'node:fs/promises';
+
 import { isAddress } from '@solana/kit';
 
 import {
@@ -13,6 +15,7 @@ import {
 import { PaymentError } from '@gyblos/protocol/payment';
 import {
   acquireProcessLock,
+  checkPrivateDirectory,
   ensurePrivateDirectory,
   readPrivateFile,
   writePrivateFile,
@@ -365,4 +368,32 @@ export async function openUptoBuyerJournal(options: {
       return closing;
     },
   };
+}
+
+// Snapshot only: never opens a wallet, takes a lock, creates files or recovers another process's lock.
+export async function hasUnresolvedBuyerPayments(
+  paths: UptoLedgerPaths,
+): Promise<boolean> {
+  return guarded(async () => {
+    if (!(await checkPrivateDirectory(paths.directory))) return false;
+    const unlocked = async () => {
+      const lock = await lstat(paths.lock).catch(
+        (error: NodeJS.ErrnoException) => {
+          if (error.code === 'ENOENT') return undefined;
+          throw error;
+        },
+      );
+      if (lock) unavailable();
+    };
+    await unlocked();
+    const source = await readPrivateFile(paths.state, BUYER_JOURNAL.maxBytes);
+    const entries =
+      source === undefined ? [] : [...parseJournal(source).entries.values()];
+    await unlocked();
+    return entries.some(
+      (entry) =>
+        entry.channelId !== null &&
+        entry.state !== PAYMENT_CHANNEL_STATES.SETTLED,
+    );
+  });
 }

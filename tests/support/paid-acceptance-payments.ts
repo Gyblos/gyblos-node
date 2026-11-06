@@ -24,6 +24,7 @@ import {
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 import type {
   PaymentAuthorization,
+  PaymentClient,
   PaymentDescription,
   PaymentSettlement,
 } from '@gyblos/protocol/payment';
@@ -68,6 +69,7 @@ export async function paidAcceptancePayments(role: RoleConfig) {
       }
     | undefined;
   let current: ReturnType<typeof createUptoPaymentClient> | undefined;
+  let currentOpen = false;
   let deposits = 0;
   let settlements = 0;
   const deposit = chain.deposit;
@@ -84,7 +86,16 @@ export async function paidAcceptancePayments(role: RoleConfig) {
     settlements += ledger.transactions.size - before;
     return result;
   };
-  return {
+  async function recover(check: (client: PaymentClient) => Promise<void>) {
+    if (currentOpen && current) return check(current);
+    const runtime = await services.buyer();
+    try {
+      await check(runtime.client);
+    } finally {
+      await runtime.close();
+    }
+  }
+  const services = {
     ledger,
     wrongShares(value: boolean) {
       wrongShares = value;
@@ -157,6 +168,7 @@ export async function paidAcceptancePayments(role: RoleConfig) {
           now: Date.now,
         });
         current = client;
+        currentOpen = true;
         return {
           client: {
             ...client,
@@ -174,7 +186,10 @@ export async function paidAcceptancePayments(role: RoleConfig) {
               await client.checkReceipt(authorization, settlement, charged);
             },
           },
-          close: () => journal.close(),
+          close: async () => {
+            currentOpen = false;
+            await journal.close();
+          },
         };
       } catch (error) {
         await journal.close();
@@ -190,18 +205,19 @@ export async function paidAcceptancePayments(role: RoleConfig) {
         ([, item]) => item.channelId === channelId,
       );
       assert.ok(authorization && found);
-      await current.checkReceipt(
-        authorization,
-        { ...found[1], transaction: found[0] },
-        expected,
+      await recover((client) =>
+        client.checkReceipt(
+          authorization,
+          { ...found[1], transaction: found[0] },
+          expected,
+        ),
       );
     },
     async confirmLast() {
       assert.ok(current && last);
-      await current.checkReceipt(
-        last.authorization,
-        last.settlement,
-        last.charged,
+      const held = last;
+      await recover((client) =>
+        client.checkReceipt(held.authorization, held.settlement, held.charged),
       );
     },
     async states() {
@@ -210,6 +226,7 @@ export async function paidAcceptancePayments(role: RoleConfig) {
     },
     uniqueChannels: () => new Set(authorizations.map((a) => a.channelId)).size,
   };
+  return services;
 }
 export type PaidAcceptancePayments = Awaited<
   ReturnType<typeof paidAcceptancePayments>

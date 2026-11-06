@@ -45,7 +45,7 @@ import type { SellerFailureReporter } from './seller-failures';
 type Prepared = Awaited<ReturnType<typeof buyerSelection>>;
 
 // The request the paid buyer can honor: the pinned model, reasoning off, devnet and the role's mint.
-function checkPaidRequest(prepared: Prepared, role: RoleConfig) {
+export function checkPaidRequest(prepared: Prepared, role: RoleConfig) {
   const { request } = prepared.config;
   if (request.maxTokens > INFERENCE_REQUEST_LIMITS.maxOutputTokens)
     refuse(FREE_BUYER_STARTUP.MAX_TOKENS);
@@ -60,7 +60,7 @@ function checkPaidRequest(prepared: Prepared, role: RoleConfig) {
     refuse(FREE_BUYER_STARTUP.PAID_NETWORK);
 }
 
-async function tokenizer(): Promise<RecountTokenizer> {
+export async function tokenizer(): Promise<RecountTokenizer> {
   try {
     return await modelTokenizer();
   } catch {
@@ -68,7 +68,7 @@ async function tokenizer(): Promise<RecountTokenizer> {
   }
 }
 
-async function endpointToken() {
+export async function endpointToken() {
   try {
     return await paidToken(rolePath(P2P_ROLES.BUYER, PAID_BUYER.tokenFile));
   } catch {
@@ -76,7 +76,7 @@ async function endpointToken() {
   }
 }
 
-async function payments(
+export async function payments(
   open: ReturnType<typeof buyerChainPayments>,
   role: RoleConfig,
   maxAtomic: string,
@@ -105,7 +105,7 @@ type Chain = Awaited<ReturnType<ReturnType<typeof buyerChainPayments>>>;
 
 export interface PaidBuyerHost {
   url: string;
-  chat: ReturnType<typeof ownedChat>;
+  chat: ReturnType<typeof ownedChat> & { automatic?: boolean };
   close(): Promise<void>;
   inspectAndClose?(
     digest: string,

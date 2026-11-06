@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 
 import {
+  BUYER_EXECUTION_FIELD,
   FREE_BUYER,
   PAID_BUYER,
   PAID_VERDICTS,
@@ -11,6 +12,7 @@ import {
   ENGINE_DONE_REASONS,
   FREE_CHAT_ROLES,
   MODEL_IDS,
+  OFFER_PRICING_KINDS,
 } from '@gyblos/protocol/constants';
 import {
   controlArray,
@@ -58,7 +60,10 @@ export function assertPaidJsonAnswer(body: string, verdict: PaidVerdict) {
     'choices',
     'usage',
     PAID_BUYER.paymentField,
+    BUYER_EXECUTION_FIELD,
   ]);
+  if (row[BUYER_EXECUTION_FIELD] !== undefined)
+    assert.equal(row[BUYER_EXECUTION_FIELD], OFFER_PRICING_KINDS.PAID);
   assert.equal(row.object, FREE_BUYER.completionObject);
   assert.equal(row.model, MODEL_IDS.QWEN3_0_6B);
   const choices = controlArray(row.choices, 1);
@@ -99,6 +104,7 @@ export function assertPaidStreamAnswer(
       'model',
       'choices',
       ...(has('usage') ? ['usage'] : []),
+      ...(has(BUYER_EXECUTION_FIELD) ? [BUYER_EXECUTION_FIELD] : []),
       ...(has(PAID_BUYER.paymentField) ? [PAID_BUYER.paymentField] : []),
     ]);
     assert.equal(row.object, FREE_BUYER.chunkObject);
@@ -118,10 +124,17 @@ export function assertPaidStreamAnswer(
       controlObject(choice.delta, []);
       usage(row.usage);
       payment(row[PAID_BUYER.paymentField], PAID_VERDICTS.SETTLED);
+      if (has(BUYER_EXECUTION_FIELD))
+        assert.equal(row[BUYER_EXECUTION_FIELD], OFFER_PRICING_KINDS.PAID);
       ended = true;
     } else {
       assert.equal(choice.finish_reason, null);
-      assert.equal(has('usage') || has(PAID_BUYER.paymentField), false);
+      assert.equal(
+        has('usage') ||
+          has(PAID_BUYER.paymentField) ||
+          has(BUYER_EXECUTION_FIELD),
+        false,
+      );
       const withRole =
         typeof choice.delta === 'object' &&
         choice.delta !== null &&
