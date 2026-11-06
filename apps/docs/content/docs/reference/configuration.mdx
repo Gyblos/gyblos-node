@@ -1,0 +1,158 @@
+---
+title: Configuration reference
+description: Seller TOML keys, defaults, environment overrides and startup restrictions.
+---
+
+Edit `~/gyblos-seller/gyblos.toml` on the host. The supplied image mounts it read-only at
+`/config/gyblos.toml` and selects it through `GYBLOS_CONFIG`. It is read at startup; edits require recreation.
+
+## Complete free Docker configuration
+
+```toml
+version = 1
+
+[node]
+network = "devnet"
+
+[discovery]
+publish = false
+
+[[offers]]
+model = "qwen3:0.6b"
+reasoning = ["off"]
+engine = { kind = "ollama", url = "http://127.0.0.1:11434/" }
+free = { daily_token_cap = 200000, per_buyer_cap = 5000 }
+```
+
+This is a local free offer with publication off. Keep your existing publication choice when editing
+another setting. To change caps, use [Models and offers](/en/sellers/models-offers).
+
+## Validate before applying
+
+```sh
+cd ~/gyblos-seller
+docker compose run --rm seller gyblos config validate --config /config/gyblos.toml
+```
+
+Expect `OK`; correct each reported issue code and key path before applying. Then:
+
+```sh
+docker compose up -d --force-recreate seller
+docker compose exec seller gyblos seller status
+```
+
+`config validate` checks the schema and environment; `doctor` checks seller startup compatibility and
+probes dependencies. A valid file alone does not prove a model can serve. If needed, run
+`docker compose run --rm seller gyblos doctor` before recreation.
+
+## File format and defaults
+
+Schema version **1** requires `version = 1` and `[node] network = "devnet"`. Unknown keys fail.
+The file limit is 64 KiB. Counts must be TOML integers, not floats or quoted numbers. Mainnet is refused
+with `MAINNET_UNSUPPORTED`. The schema accepts more settings than this seller runtime consumes.
+
+| Key                       | Type, default and supported seller behavior                                                                                  |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `node.network`            | Required string `"devnet"`                                                                                                   |
+| `node.data_dir`           | Optional path in the general schema; file-derived value refused by this seller; use `GYBLOS_HOME` for native paths           |
+| `node.rpc_url`            | Optional HTTPS or loopback HTTP URL in schema; file-derived value refused; seller RPC belongs to provisioned role state      |
+| `node.payout_wallet`      | Optional Solana address in schema; file-derived value refused; outside free onboarding                                       |
+| `discovery.publish`       | Boolean; default `false`                                                                                                     |
+| `discovery.url`           | HTTPS or loopback HTTP base URL; default `https://discovery.gyblos.com/v1`                                                   |
+| `relays.urls`             | 1–8 HTTPS origins; default `["https://na1.relay.gyblos.com/"]`; no nonroot path, query, credentials or normalized duplicates |
+| `relays.relay_token_env`  | Environment-variable name; default `"GYBLOS_RELAY_TOKEN"`, never the token value                                             |
+| `transport.relay_only`    | Boolean; default `false`; do not combine with an external address                                                            |
+| `transport.bind`          | Optional literal `ip:port`; IPv6 in brackets; bind port may be zero                                                          |
+| `transport.external_addr` | Optional advertised `ip:port`; port 1–65535; not with relay-only                                                             |
+| `buyer.relay_only`        | Boolean, default `false`; ignored by seller                                                                                  |
+| `telemetry.file`          | Boolean, default `false`; opt-in private local file telemetry, no external collection                                        |
+
+Keep the Docker image's `/data` home and volume wiring. The native default home is `.local/gyblos`
+relative to the working directory; changing it selects different identity state. Do not use a path change
+to repair a missing identity.
+
+## Seller capacity
+
+All `[limits]` keys are optional integers, minimum 1, file-only:
+
+| Key                          | Default | Maximum | Meaning                                    |
+| ---------------------------- | ------- | ------- | ------------------------------------------ |
+| `max_connections`            | 8       | 64      | Open buyer connections                     |
+| `requests_per_minute`        | 30      | 120     | Requests per buyer NodeId per minute       |
+| `global_requests_per_minute` | 256     | 1024    | Requests across buyers per minute          |
+| `max_free_buyers_per_day`    | 1024    | 65536   | Distinct buyers per free offer per UTC day |
+
+Effective `max_connections × requests_per_minute` must not exceed `global_requests_per_minute`, including
+omitted defaults. Doctor prints effective capacity limits. These are separate from offer token quotas.
+
+## Offer fields
+
+The seller needs at least one `[[offers]]` entry; at most 32 are allowed. A normalized model can occur
+only once, including aliases. Every entry must pass plugin compatibility checks; at least one engine
+must become ready to start, and only ready offers are published.
+
+| Field                   | Rule                                                                                                                                                                |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `model`                 | Catalog ID or alias such as `qwen3:0.6b`; unknown ID requires `custom = true`                                                                                       |
+| `custom`                | Boolean; must not be true for a catalog model                                                                                                                       |
+| `reasoning`             | Nonempty distinct levels from `off`, `low`, `medium`, `high`; omitted value follows catalog, or `off` for custom/unverified models; runtime here requires `["off"]` |
+| `engine.kind`           | Required `ollama`, `openai` or `anthropic`                                                                                                                          |
+| `engine.url`            | Required base URL; HTTPS, or HTTP only for loopback / `host.docker.internal` in schema; runtime restrictions below                                                  |
+| `engine.upstream_model` | Optional provider model name, up to 256 characters; defaults to offered model                                                                                       |
+| `engine.api_key_env`    | Optional variable name; required by Anthropic; must not begin `GYBLOS_` or reuse the relay-token variable                                                           |
+| `engine.context_tokens` | Integer 1024–2,000,000; required for OpenAI/Anthropic, forbidden for Ollama                                                                                         |
+| `free.daily_token_cap`  | Required for a free offer; integer 1–1,000,000,000,000; total input plus output per UTC day                                                                         |
+| `free.per_buyer_cap`    | Same integer range; must not exceed daily total                                                                                                                     |
+
+Exactly one of `free` or `price` is required. Free counters reset on restart; they are not persisted.
+The broader schema accepts `price.input_per_mtok` and `price.output_per_mtok` as decimal strings in
+USDC per million tokens, with `price.currency = "USDC"`. At least one rate must be positive; no signs,
+exponents or leading zeros, up to four integer and six fractional digits after removing trailing zeros.
+**The default Docker daemon does not wire paid selling.** Schema acceptance of `price` is not paid onboarding.
+
+## Engine compatibility at startup
+
+- **Ollama:** pinned Qwen3 0.6B, reasoning `off`, literal loopback root URL, no API-key variable. The supplied Docker URL is `http://127.0.0.1:11434/`. `localhost` or `host.docker.internal` can pass schema validation but fail this plugin.
+- **OpenAI-compatible:** reasoning `off`, explicit context size, HTTPS or literal loopback URL, normally ending in `/v1`. Disable reasoning upstream. A named key must be set and nonempty.
+- **Anthropic-compatible:** reasoning `off`, context size and a nonempty named API key. Use the API root without `/v1`; the provider must support model lookup and Messages.
+
+Provider usage for other models is declared, not independently recounted by the pinned Qwen tokenizer.
+Remote providers can incur costs and receive buyer data even when your offer is free.
+
+## Environment overrides
+
+For seller settings, environment overrides the file, then built-in defaults apply. The general resolver
+also has programmatic flags, but these are not general CLI options. Compose passes the container's
+environment; setting a variable only in your host shell does not automatically forward it.
+
+| Variable                    | Meaning                                                                                      |
+| --------------------------- | -------------------------------------------------------------------------------------------- |
+| `GYBLOS_CONFIG`             | Select startup/doctor/init file; validator instead needs `--config`                          |
+| `GYBLOS_HOME`               | Select identity/data home; fixed to `/data` by the supplied image                            |
+| `GYBLOS_RELAYS`             | Comma-separated relay origins                                                                |
+| `GYBLOS_RELAY_TOKEN`        | Default secret relay-token variable; keep in private `seller.env`                            |
+| `GYBLOS_RELAY_ONLY`         | `1` enables, `0` disables; other values disable with a warning                               |
+| `GYBLOS_IROH_BIND`          | Override bind address; empty ignored                                                         |
+| `GYBLOS_IROH_EXTERNAL_ADDR` | Override advertised address; empty ignored                                                   |
+| `GYBLOS_DISCOVERY_PUBLISH`  | Strict `1` / `0` override; any other value is an error                                       |
+| `GYBLOS_DISCOVERY_URL`      | Override discovery base URL; environment URL checked when publication enabled                |
+| `GYBLOS_BUYER_RELAY_ONLY`   | Buyer setting; not a seller behavior switch                                                  |
+| `GYBLOS_RPC_URL`            | Resolved by general validation, deliberately ignored for seller startup; role state owns RPC |
+| `GYBLOS_INVITE`             | Invite input to `seller register`; do not put in TOML or shell history                       |
+
+Empty home, bind and external-address variables are ignored. `[limits]`, offers and telemetry have no
+environment override. After editing `seller.env`, recreate the container to load the changes.
+
+## Secrets and errors
+
+Use `*_env` names in TOML, never credential values. Variable names use uppercase letters, digits and
+underscores and cannot start with a digit. Keep credentials only in the private environment file;
+never reuse a relay token as a provider key. Inline credential fields and credential-bearing URL queries
+are rejected, but a credential hidden in a URL path may evade detection. Review before sharing.
+
+Common file codes include `TOML_SYNTAX`, `UNKNOWN_KEY`, `WRONG_TYPE`, `INLINE_SECRET`, `INVALID_CAP`,
+`INVALID_LIMIT`, `RELAY_ONLY_CONFLICT` and `REASONING_UNSUPPORTED`. Warnings such as
+`ENV_SWITCH_NOT_STRICT` and `REASONING_UNVERIFIED` do not fail validation. Startup can additionally reject
+unsupported settings, engines, reasoning or missing API keys. See [troubleshooting](/en/help/troubleshooting).
+
+**Related:** [CLI reference](/en/reference/cli) · [Models and offers](/en/sellers/models-offers).

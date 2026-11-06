@@ -1,0 +1,81 @@
+---
+title: Register and publish
+description: Distinguish running, registered and listed, then enable your seller in discovery.
+---
+
+You need a running seller, the invitation's unused code and the same persistent identity created during
+installation. [Install first](/en/sellers/beta-guide) if the node is not ready.
+
+## Register the identity with discovery
+
+```sh
+cd ~/gyblos-seller
+docker compose exec seller gyblos seller register
+```
+
+Check the index origin printed by the command. Enter your code only for the intended Gyblos index.
+The prompt **echoes what you type**: do not screen-share, record it or paste the code into a command.
+The command sends the invite and your public NodeId to that index.
+
+`Registered: this seller may now publish.` means discovery accepted the registration.
+`Already registered` is also a success for the same invite and identity. Registration neither changes
+`gyblos.toml` nor publishes the offer.
+
+<Callout type="warn" title="On-chain enrollment is a separate prerequisite">
+  `seller register` does not create the 8004-solana enrollment. If it returns
+  `DISCOVERY_IDENTITY_NOT_REGISTERED`, send your public `nodeId` and `owner` to
+  the Gyblos team through your invitation channel. Keep your code: this
+  rejection does not consume it, but it can still expire. Retry registration
+  after the team confirms enrollment; request a new code if it has expired.
+</Callout>
+
+`DISCOVERY_INVITE_INVALID` means the code is wrong, used or expired. `DISCOVERY_RATE_LIMITED` means wait
+before retrying; `DISCOVERY_UNAVAILABLE` means the index could not complete the request. See
+[troubleshooting](/en/help/troubleshooting) for those errors and revoked identities.
+
+## Enable publication
+
+Edit the existing `[discovery]` table in `~/gyblos-seller/gyblos.toml`; do not add a duplicate table:
+
+```toml
+[discovery]
+publish = true
+```
+
+Validate the mounted file, then recreate the seller to apply it:
+
+```sh
+cd ~/gyblos-seller
+docker compose run --rm seller gyblos config validate --config /config/gyblos.toml && docker compose up -d --force-recreate seller
+```
+
+The first command must report `OK`. Validation checks file syntax and environment resolution; startup
+also checks whether the seller can serve the offer. If validation fails, correct the reported key before restarting.
+
+## Confirm the listing
+
+After the seller starts, query discovery:
+
+```sh
+cd ~/gyblos-seller
+docker compose exec seller gyblos seller status --online
+```
+
+| Observation                     | What it establishes                                 |
+| ------------------------------- | --------------------------------------------------- |
+| `RUNNING`                       | The seller service is running                       |
+| Registration succeeded          | This identity may publish to that index             |
+| `listed in the index`           | The lookup found this NodeId for the queried model  |
+| `not found in the index`        | The completed lookup did not find this NodeId       |
+| `not in the first 2000 sellers` | The lookup budget ended; absence is not established |
+| `index unreachable`             | The lookup failed; listing state is unknown         |
+
+An index listing is not an external inference test. Only ready offers are published. The index receives
+public identity, model and offer metadata; prompts are not part of this listing.
+
+## Unlist without losing your identity
+
+Set `publish = false` in the same table and recreate the seller. Stopping the seller also withdraws its
+presence within two minutes. Do not delete keys to leave discovery. A listing can take time to expire.
+
+**Next:** [Adjust models and offers](/en/sellers/models-offers) or [operate your seller](/en/sellers/operate).

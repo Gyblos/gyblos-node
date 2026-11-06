@@ -1,0 +1,81 @@
+---
+title: Registra y publica
+description: Distingue servicio, registro y publicación, y habilita tu vendedor en descubrimiento.
+---
+
+Necesitas un vendedor en ejecución, el código sin usar de tu invitación y la misma identidad persistente
+creada al instalar. [Instala primero](/es/sellers/beta-guide) si el nodo aún no está listo.
+
+## Registra la identidad en descubrimiento
+
+```sh
+cd ~/gyblos-seller
+docker compose exec seller gyblos seller register
+```
+
+Comprueba el origen del índice que muestra el comando. Introduce el código solo para el índice de Gyblos previsto.
+La pregunta **muestra lo que escribes**: no compartas ni grabes la pantalla y no pegues el código en un comando.
+El comando envía al índice la invitación y tu NodeId público.
+
+`Registered: this seller may now publish.` significa que descubrimiento aceptó el registro.
+`Already registered` también es correcto para la misma invitación e identidad. El registro no modifica
+`gyblos.toml` ni publica la oferta.
+
+<Callout type="warn" title="La inscripción en cadena es un requisito separado">
+  `seller register` no crea la inscripción 8004-solana. Si devuelve
+  `DISCOVERY_IDENTITY_NOT_REGISTERED`, envía tu `nodeId` y `owner` públicos al
+  equipo de Gyblos por el canal de tu invitación. Conserva el código: este
+  rechazo no lo consume, pero puede vencer. Repite el registro cuando el equipo
+  confirme la inscripción; pide otro código si ha vencido.
+</Callout>
+
+`DISCOVERY_INVITE_INVALID` indica código incorrecto, usado o vencido. `DISCOVERY_RATE_LIMITED` requiere
+esperar antes de repetir; `DISCOVERY_UNAVAILABLE` indica que el índice no pudo completar la solicitud. Consulta
+[solución de problemas](/es/help/troubleshooting) para esos errores e identidades retiradas.
+
+## Activa la publicación
+
+Edita la tabla `[discovery]` existente en `~/gyblos-seller/gyblos.toml`; no agregues una tabla duplicada:
+
+```toml
+[discovery]
+publish = true
+```
+
+Valida el archivo montado y recrea el vendedor para aplicarlo:
+
+```sh
+cd ~/gyblos-seller
+docker compose run --rm seller gyblos config validate --config /config/gyblos.toml && docker compose up -d --force-recreate seller
+```
+
+El primer comando debe mostrar `OK`. La validación revisa sintaxis y resolución del entorno; el inicio
+comprueba además si el vendedor puede servir la oferta. Si falla la validación, corrige la clave antes de reiniciar.
+
+## Confirma la publicación
+
+Cuando el vendedor arranque, consulta descubrimiento:
+
+```sh
+cd ~/gyblos-seller
+docker compose exec seller gyblos seller status --online
+```
+
+| Observación                     | Qué demuestra                                              |
+| ------------------------------- | ---------------------------------------------------------- |
+| `RUNNING`                       | El servicio vendedor está en ejecución                     |
+| Registro correcto               | Esta identidad puede publicar en ese índice                |
+| `listed in the index`           | La consulta encontró este NodeId para el modelo solicitado |
+| `not found in the index`        | La consulta completa no encontró este NodeId               |
+| `not in the first 2000 sellers` | Se agotó el límite de búsqueda; no demuestra ausencia      |
+| `index unreachable`             | Falló la consulta; el estado de publicación es desconocido |
+
+Estar publicado no equivale a probar inferencia externa. Solo se publican ofertas listas. El índice recibe
+identidad pública, modelo y metadatos de la oferta; los mensajes no forman parte de esa publicación.
+
+## Retira la oferta sin perder tu identidad
+
+Pon `publish = false` en la misma tabla y recrea el vendedor. Detenerlo también retira su presencia en
+un plazo de dos minutos. No borres las llaves para salir de descubrimiento. La publicación puede tardar en vencer.
+
+**Siguiente:** [Ajusta modelos y ofertas](/es/sellers/models-offers) u [opera tu vendedor](/es/sellers/operate).

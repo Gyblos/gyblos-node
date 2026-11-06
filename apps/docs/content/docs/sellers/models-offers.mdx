@@ -1,0 +1,79 @@
+---
+title: Models and free offers
+description: Change free token limits and understand which model and engine settings the seller can serve.
+---
+
+The default installation serves pinned **Qwen3 0.6B through local Ollama**, with reasoning `off`.
+This is the model validated end to end for this onboarding. A catalog entry or valid TOML file does not
+mean that every model has been tested.
+
+## Lower the free limits
+
+Edit the existing `[[offers]]` entry in `~/gyblos-seller/gyblos.toml`. The following complete example
+halves the total daily limit and lowers the per-buyer limit. It deliberately leaves publication off;
+if already listed, preserve your existing `[discovery]` setting when editing just the caps.
+
+```toml
+version = 1
+
+[node]
+network = "devnet"
+
+[discovery]
+publish = false
+
+[[offers]]
+model = "qwen3:0.6b"
+reasoning = ["off"]
+engine = { kind = "ollama", url = "http://127.0.0.1:11434/" }
+free = { daily_token_cap = 100000, per_buyer_cap = 2000 }
+```
+
+Both caps are positive integers, with the per-buyer cap no higher than the daily total. They count
+**input plus output** per UTC day. Admission reserves input plus the requested maximum output, so a
+request can be refused before the nominal remaining balance reaches zero. Valid final usage releases
+the unused reservation.
+
+The counters are in memory and reset on restart. Per-buyer limits are best effort; they are not
+persistent billing or a guarantee against someone creating another buyer identity.
+
+## Validate and apply
+
+```sh
+cd ~/gyblos-seller
+docker compose run --rm seller gyblos config validate --config /config/gyblos.toml
+```
+
+After `OK`, apply the edit:
+
+```sh
+docker compose up -d --force-recreate seller
+docker compose exec seller gyblos seller status
+```
+
+Check `RUNNING` and the offered model. Use `seller status --online` if publication is enabled.
+If it fails, use the reported code in [troubleshooting](/en/help/troubleshooting). Configuration is read
+at startup; editing the file alone does not change the running seller.
+
+## Changing the model or engine
+
+Changing `model` does not download a model or start an engine. The installer downloads only
+`qwen3:0.6b`. Ollama startup currently accepts the pinned Qwen3 0.6B, a literal loopback root URL,
+no API-key variable and reasoning `off`. Keep its Docker URL at `http://127.0.0.1:11434/`.
+The two containers share a network namespace; a host service or another container has different addressing.
+
+OpenAI-compatible and Anthropic-compatible plugins also exist. They require explicit context size,
+reasoning `off` and a compatible model-list endpoint as well as generation. Anthropic also requires an
+API-key environment variable and an API root without `/v1`. These are advanced paths, outside the
+local installation tutorial. See the [configuration reference](/en/reference/configuration).
+
+<Callout type="warn" title="A free offer can still cost you money">
+  A hosted model provider can charge the seller for requests. Keep provider
+  credentials in environment variables, never in TOML. Do not enable a remote
+  provider until you understand its costs and data policy.
+</Callout>
+
+The default Docker daemon does not wire paid selling. Adding a `price` table is not a supported way to
+turn this onboarding into paid service. Paid devnet validation elsewhere in the project is separate.
+
+**Next:** [Operate and update](/en/sellers/operate).

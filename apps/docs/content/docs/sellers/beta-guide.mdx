@@ -1,70 +1,27 @@
 ---
 title: Seller beta guide
-description: Install the Gyblos seller node, check that it serves and register it with your invitation.
+description: Install your first free Docker seller, check it and continue to registration.
 ---
 
-You were invited to the Gyblos seller beta. This guide takes you from the files in your invitation to a
-running seller ready for registration. Installation takes about 15 minutes, most of it downloading.
-Getting listed may need help from the Gyblos team with the on-chain registration step below.
+Use this guide after checking the [beta requirements](/en/getting-started/beta).
+Keep your invitation's relay token and invite code private. Downloading the images and model takes most
+of the installation time; the duration depends on your connection and machine.
 
-<Callout title="Guide scope · November 5, 2026">
-  This guide covers the free Docker seller installed by the `install.sh` in your
-  invitation, using `ghcr.io/gyblos/seller:beta`. The beta tag can change; when
-  asking for help, include `docker compose images seller` so the team can
-  identify your installed image. Paid-offer setup is outside this guide's
-  current scope.
-</Callout>
+## Install the seller
 
-<Callout title="Beta on devnet">
-  The beta runs on Solana **devnet**. Your node gives a small model away for
-  free, within daily limits. No real money moves.
-</Callout>
-
-## What you need
-
-- **Your invitation**, with three things:
-  - `install.sh`, the install script;
-  - a **relay token**, which lets your node reach Gyblos relays;
-  - an **invite code** that starts with `gyb_`, used once to register.
-- **A machine that stays on.** Linux (x86-64 or ARM64) or macOS. A small VPS works.
-- **Docker** with **Compose v2.17 or later**. On macOS, Docker Desktop. On Linux, Docker Engine with the
-  compose plugin, and an account in the `docker` group.
-- **At least 4 GB of memory.** The seller needs 1.5 GB free to start, and the model runs next to it.
-- **A few GB of disk** for the images and the model.
-- **An outbound internet connection.** No port is opened: your node connects out to the relays.
-
-Keep the relay token and the invite code private. Do not paste them in chats, issues or screenshots.
-
-## Install
-
-<Steps>
-<Step>
-
-### Run the script
-
-In the folder where you saved `install.sh`:
+In the folder where you saved the invitation's `install.sh`, run:
 
 ```sh
 sh install.sh
 ```
 
-It asks for the **relay token**. The token is not shown as you type or paste it.
+The relay token is hidden while you enter it. The script works in `~/gyblos-seller` unless you explicitly
+set another installation directory. It creates `compose.yaml`, `gyblos.toml` and private `seller.env`,
+downloads Ollama and `qwen3:0.6b`, creates seller keys in a Docker volume, installs the tokenizer,
+runs `gyblos doctor` and starts the seller.
 
-</Step>
-<Step>
-
-### Wait for it to finish
-
-The script works in `~/gyblos-seller`:
-
-1. writes `compose.yaml`, `gyblos.toml` (your offer) and `seller.env` (your relay token, readable only by
-   you);
-2. downloads the seller image, Ollama and the `qwen3:0.6b` model;
-3. creates your seller keys;
-4. runs `gyblos doctor`, which checks everything before starting;
-5. starts the seller.
-
-When it ends with `The seller is running`, you are done. Doctor also prints your **seller identity**:
+When it prints `The seller is running`, continue with the status check. Save the public identity
+printed by doctor:
 
 ```text
 Seller identity (public; `gyblos seller register` enrolls it in discovery):
@@ -72,137 +29,50 @@ Seller identity (public; `gyblos seller register` enrolls it in discovery):
   owner   7is91kWV…
 ```
 
-Both values are public. Save them: Gyblos may ask for them.
+These are abbreviated examples, not keys or values to copy into configuration. Discovery registration
+is separate from the on-chain enrollment that the index checks.
 
-</Step>
-<Step>
+If installation stops, read the `FAIL` or `gyblos install:` line and use
+[troubleshooting](/en/help/troubleshooting). Correct the cause before rerunning the script.
+Rerunning preserves existing configuration, token file and identity; it does not reset those files.
 
-### If it stops with an error
+## Confirm the service state
 
-Read the line marked `FAIL`, or the one that starts with `gyblos install:`: it says what is wrong and what to do. Fix it and
-run `sh install.sh` again. Rerunning is safe: it keeps your files and keys and continues where it stopped.
-
-</Step>
-</Steps>
-
-## Check that it serves
-
-Every command below runs from the install folder:
+Run commands from the installation folder:
 
 ```sh
 cd ~/gyblos-seller
 docker compose exec seller gyblos seller status
 ```
 
-Look at the `Result:` line:
+| Result          | Meaning and next action                                                   |
+| --------------- | ------------------------------------------------------------------------- |
+| `RUNNING`       | The service is running. Continue to registration.                         |
+| `STARTING`      | Wait briefly, then check again.                                           |
+| `FAILING`       | Read the phase and error code; follow the matching troubleshooting entry. |
+| `STOPPED`       | Run `docker compose up -d --force-recreate seller`.                       |
+| `NOT_CONFIRMED` | Check `docker compose ps`; service health could not be confirmed.         |
 
-| Result          | Meaning                                                                                                |
-| --------------- | ------------------------------------------------------------------------------------------------------ |
-| `RUNNING`       | The seller is up and serving.                                                                          |
-| `STARTING`      | Still starting. Wait a minute and check again.                                                         |
-| `FAILING`       | The last start failed. The next line names the step, the error code and what to do.                    |
-| `STOPPED`       | The container is up but the seller is not running. Run `docker compose up -d --force-recreate seller`. |
-| `NOT_CONFIRMED` | Status could not confirm the service. Check `docker compose ps`.                                       |
-
-If the command itself says the service is not running or is restarting, the seller stopped after a failure:
-read `docker compose logs seller`, fix the cause and start it with `docker compose up -d`.
-
-## Register with your invite
-
-Registration lets your seller appear in Gyblos discovery, where buyers find it. Use your invite code once:
+If the container is stopped or restarting, `exec` cannot work. Run the one-off diagnostic instead:
 
 ```sh
 cd ~/gyblos-seller
-docker compose exec seller gyblos seller register
+docker compose run --rm seller gyblos doctor
 ```
 
-Paste the code when asked. It is shown on screen as you paste it, so do this where no one can see your
-screen. `Registered: this seller may now publish.` means it worked. If you run it again
-with the same code, it answers `Already registered`.
+Doctor success does not prove that a buyer request completed. After registration and publication,
+ask the team through your invitation channel if you need help arranging a free external check.
 
-The code is tied to your seller's keys. If you delete them (`docker compose down -v`), the same code no longer
-works.
+## Finish onboarding
 
-<Callout type="warn" title="On-chain step">
-  Discovery also checks that your node is recorded on Solana devnet. We are
-  finishing that step. If register answers `DISCOVERY_IDENTITY_NOT_REGISTERED`,
-  your node is not recorded yet: send the `nodeId` and `owner` from the install
-  to the Gyblos team and keep your code. It is not used up, but it can still
-  expire; if it does, ask for a new one.
+Your node starts **unlisted**. Follow [Register and publish](/en/sellers/register-publish) to use your
+invite and enable publication. The default offer allows 200,000 input plus output tokens per UTC day,
+with 5,000 per buyer; see [Models and offers](/en/sellers/models-offers) before changing limits.
+
+<Callout type="error" title="Preserve your identity">
+  `docker compose down -v` deletes the persistent volumes and your seller keys.
+  Stop with `docker compose stop seller`. Read the identity guide before moving
+  or removing data.
 </Callout>
 
-## Publish your offer
-
-New installs start unlisted. Once registered, open `~/gyblos-seller/gyblos.toml` and change:
-
-```toml
-[discovery]
-publish = true
-```
-
-Apply the change:
-
-```sh
-cd ~/gyblos-seller
-docker compose up -d --force-recreate seller
-```
-
-After a minute, check that discovery lists you:
-
-```sh
-docker compose exec seller gyblos seller status --online
-```
-
-It should say `listed in the index`.
-
-## What your node offers
-
-The default offer in `gyblos.toml` gives `qwen3:0.6b` away for free:
-
-- up to **200,000 input and output tokens per UTC day** in total;
-- up to **5,000 input and output tokens per UTC day** for each buyer.
-
-The counts reset when the seller restarts. You can lower these limits in the `[[offers]]` section. Apply edits with
-`docker compose up -d --force-recreate seller`.
-
-Prompts are processed on your machine, so your node can read them. Do not store or share what buyers send.
-Discovery publishes your `nodeId`, your `owner`, your model and a zero price.
-
-## Everyday commands
-
-From `~/gyblos-seller`:
-
-| What                          | Command                                           |
-| ----------------------------- | ------------------------------------------------- |
-| Status                        | `docker compose exec seller gyblos seller status` |
-| Follow the log                | `docker compose logs -f seller`                   |
-| Stop                          | `docker compose stop seller`                      |
-| Start                         | `docker compose up -d`                            |
-| Apply an edited `gyblos.toml` | `docker compose up -d --force-recreate seller`    |
-| Update to the latest beta     | `docker compose pull && docker compose up -d`     |
-
-Stopping withdraws your offer from discovery within two minutes.
-
-<Callout type="error" title="Your keys live in a Docker volume">
-  `docker compose down -v` **deletes your seller keys**, and with them your
-  identity. Use `docker compose down` (without `-v`) to remove the containers
-  and keep the keys.
-</Callout>
-
-## Troubleshooting
-
-| You see                                                         | What to do                                                                                                                                                                                                                                                        |
-| --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Docker is not installed` or `Docker Compose v2 is missing`     | Install Docker with the compose plugin (v2.17 or later) and run the script again.                                                                                                                                                                                 |
-| `Docker is not running`                                         | Start Docker Desktop, or the Docker service on Linux, and run the script again.                                                                                                                                                                                   |
-| `Docker Compose … is too old`                                   | Update Docker or the compose plugin to v2.17 or later.                                                                                                                                                                                                            |
-| `The relay token is empty…` or `must have 32 to 512 characters` | Copy the relay token again from your invitation, with nothing before or after it.                                                                                                                                                                                 |
-| `FAILING` with `SELLER_RELAY_OFFLINE`                           | No relay answered. Check that the machine can reach the internet. If the token may be wrong, run `rm ~/gyblos-seller/seller.env`, then `sh install.sh` again from the folder where you saved it, to enter the token; never print `seller.env` on a shared screen. |
-| `Ollama did not start`                                          | Run `cd ~/gyblos-seller && docker compose logs ollama`. It is often a lack of memory or disk.                                                                                                                                                                     |
-| The seller fails after Ollama restarted by itself               | Run `docker compose restart seller`.                                                                                                                                                                                                                              |
-| `DISCOVERY_INVITE_INVALID`                                      | The code is wrong, already used or expired. Ask Gyblos for a new one.                                                                                                                                                                                             |
-| `DISCOVERY_RATE_LIMITED` or `DISCOVERY_UNAVAILABLE`             | Discovery is busy. Try again in a few minutes.                                                                                                                                                                                                                    |
-
-For help, reply through the same channel where you received your invitation. Send the Gyblos team the
-output of `docker compose exec seller gyblos seller status` and `docker compose images seller`. Status
-never contains your relay token or your keys.
+**Next:** [Register and publish](/en/sellers/register-publish).

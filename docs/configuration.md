@@ -1,5 +1,14 @@
 # Node configuration file (`gyblos.toml`)
 
+For the invited free Docker seller, use the bilingual
+[public seller handbook](https://docs.gyblos.com/en/sellers/beta-guide),
+[CLI reference](https://docs.gyblos.com/en/reference/cli),
+[configuration reference](https://docs.gyblos.com/en/reference/configuration)
+and [troubleshooting](https://docs.gyblos.com/en/help/troubleshooting). Their
+canonical source is `apps/docs/content/docs/`. This engineering document also
+covers checkout, library and experimental paths; those paths are not
+interchangeable with the invitation's Docker onboarding.
+
 A node can be described by one TOML file, `gyblos.toml`, as decided in vault
 GYB-DOC-026. This page is its reference. The seller daemon (`pnpm node:start`)
 reads it at startup; see [Seller startup](#seller-startup) for what it honors

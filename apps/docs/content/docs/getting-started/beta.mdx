@@ -1,0 +1,44 @@
+---
+title: Beta scope and requirements
+description: Check the supported seller path, invitation and machine requirements before installing.
+---
+
+This handbook follows the invitation's `install.sh` and `ghcr.io/gyblos/seller:beta` image.
+The beta tag can change. Include `docker compose images seller` when asking for help so the team can
+identify your installed image.
+
+## What you can do today
+
+| Task                          | Scope of this handbook                                                                    |
+| ----------------------------- | ----------------------------------------------------------------------------------------- |
+| Install and operate a seller  | Docker with local Ollama and pinned Qwen3 0.6B, reasoning off                             |
+| Offer free inference          | Daily total and per-buyer token caps; counters are in memory                              |
+| Register and publish          | Invitation plus existing Solana devnet identity enrollment; team assistance may be needed |
+| Use other engine plugins      | Advanced configuration; schema acceptance does not establish model validation             |
+| Set up paid offers or mainnet | Outside this onboarding; mainnet configuration is refused                                 |
+
+The beta uses Solana **devnet**. The default free offer moves no real money. Your electricity,
+hosting and internet still have a cost; a remote engine may also charge you even for a free offer.
+
+## Before you install
+
+- An invitation containing `install.sh`, a private **relay token** and a one-use **invite code** starting with `gyb_`.
+- Linux x86-64 or ARM64, or macOS, on a machine that stays on. This installer is not a Windows-native procedure.
+- Docker Engine with Compose on Linux, or Docker Desktop on macOS. Compose must be **v2.17 or later**.
+- At least **4 GB of memory** and a few GB of free disk. Seller startup requires **1.5 GiB of headroom** above the seller process; Ollama needs memory too.
+- Outbound internet access. The supplied Compose setup publishes no listening ports and uses outbound relay connections.
+
+Treat Docker access as privileged. On Linux use an account already authorized to run Docker;
+do not change host permissions merely to bypass an installation error.
+
+## What a successful check means
+
+`doctor` checks startup prerequisites and probes supported dependencies. It does not generate an answer.
+`RUNNING` confirms the service state; registration grants permission to publish; `listed in the index`
+confirms an index lookup. None of these alone proves that an external buyer completed inference.
+
+Prompts are processed by the engine you configure. A local seller can read them; a remote provider also
+receives them. Relay use does not guarantee IP anonymity. Signed records do not independently prove
+which model answered or whether its answer is correct.
+
+**Next:** [Install your first seller](/en/sellers/beta-guide).

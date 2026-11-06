@@ -1,4 +1,10 @@
 {
   "title": "Sellers",
-  "pages": ["beta-guide"]
+  "pages": [
+    "beta-guide",
+    "register-publish",
+    "models-offers",
+    "operate",
+    "identity"
+  ]
 }

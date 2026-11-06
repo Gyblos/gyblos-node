@@ -11,7 +11,6 @@ import { STATUS_RESULTS } from '@gyblos/node-app/constants';
 
 const ROOT = join(import.meta.dirname, '..');
 const CONTENT = join(ROOT, 'apps/docs/content/docs');
-const GUIDE = 'sellers/beta-guide';
 const SPANISH = /\.es\.(mdx|json)$/;
 // The invite format without its anchors, so it matches anywhere in a page.
 const INVITE = new RegExp(REGISTRATION.invite.source.slice(1, -1));
@@ -88,11 +87,19 @@ void test('docs: no page carries an invite or a relay token', async () => {
   }
 });
 
-void test('docs: the seller guide quotes output that the node still prints', async () => {
-  const pages = [
-    await read(`apps/docs/content/docs/${GUIDE}.mdx`),
-    await read(`apps/docs/content/docs/${GUIDE}.es.mdx`),
-  ];
+void test('docs: the seller handbook quotes output that the node still prints', async () => {
+  const paths = (await files(CONTENT)).filter((path) => path.endsWith('.mdx'));
+  const pages = await Promise.all(
+    ['en', 'es'].map(async (locale) =>
+      (
+        await Promise.all(
+          paths
+            .filter((path) => SPANISH.test(path) === (locale === 'es'))
+            .map((path) => readFile(path, 'utf8')),
+        )
+      ).join('\n'),
+    ),
+  );
   for (const [text, source] of QUOTED_OUTPUT) {
     assert.ok(inLiteral(await read(source), text), `${source}: ${text}`);
     for (const page of pages)

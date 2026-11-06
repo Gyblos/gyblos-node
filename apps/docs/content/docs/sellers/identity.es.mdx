@@ -1,0 +1,58 @@
+---
+title: Identidad y datos privados
+description: Conserva el volumen del vendedor y distingue identificadores públicos de archivos privados.
+---
+
+El vendedor gratuito de Docker tiene un **NodeId** y una dirección **owner** públicos, respaldados por
+llaves privadas distintas. Conserva la identidad persistente creada al instalar. `seller init` escribe
+configuración; no crea ni recupera esas llaves.
+
+## Dónde se guarda cada cosa
+
+| Ubicación en la instalación suministrada        | Uso                                                              | Regla para compartir                                                              |
+| ----------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `~/gyblos-seller/gyblos.toml`                   | Modelos, cuotas y publicación                                    | Revísalo antes de compartir; las URLs personalizadas pueden contener credenciales |
+| `~/gyblos-seller/compose.yaml`                  | Contenedores y referencias a volúmenes                           | Consérvalo con la instalación; revisa valores personalizados antes de compartir   |
+| `~/gyblos-seller/seller.env`                    | Token de relay y credenciales de proveedores                     | Privado; nunca lo subas ni lo muestres                                            |
+| Volumen con nombre de Docker montado en `/data` | Llaves, estado del rol, secuencia pública, recibos y tokenizador | Privado; nunca subas el volumen ni sus archivos                                   |
+| Volumen separado de Ollama                      | Datos del modelo descargado                                      | Consérvalo para evitar descargas innecesarias                                     |
+
+El proyecto de Compose determina los nombres de los volúmenes. Mover o renombrar la instalación puede
+seleccionar otro proyecto y hacer que el vendedor parezca nuevo. No lo muevas, cambies el nombre del
+proyecto ni purgues sus volúmenes para resolver un problema.
+
+## Conserva la identidad al detener
+
+Usa `docker compose stop seller` para dejar de servir. `docker compose down` conserva los volúmenes con nombre.
+`docker compose down -v` los elimina y pierde las llaves del vendedor. Una invitación consumida está vinculada
+al NodeId original y no registra una identidad recién generada.
+
+Este manual no ofrece un procedimiento completo de copia y restauración del vendedor. La copia de cartera
+de escritorio pertenece a otra aplicación y no recupera la identidad Iroh, secuencia pública ni journals de este nodo.
+Si faltan o están dañados las llaves, el estado del rol o los bloqueos de secuencia, deja de modificar los datos y
+contacta con Gyblos. Nunca borres un bloqueo, archivo de secuencia o journal solo para conseguir que arranque.
+
+## Qué puedes enviar para pedir ayuda
+
+```sh
+cd ~/gyblos-seller
+docker compose exec seller gyblos seller status
+docker compose images seller
+```
+
+El comando de estado está diseñado para mostrar identificadores públicos, códigos y actividad agregada sin
+llaves, tokens ni mensajes de compradores. Si el contenedor no está disponible, usa
+`docker compose run --rm seller gyblos doctor` y envía el código relevante. Lee la salida antes de compartirla,
+especialmente si personalizaste la instalación.
+
+No envíes `seller.env`, códigos de invitación, volcados del entorno, `docker inspect`, archivos de rol, recibos,
+logs completos ni capturas de la pregunta de registro. Pide ayuda por el canal original de tu invitación.
+
+## Datos del comprador y privacidad de red
+
+El motor local procesa los mensajes en tu equipo. No guardes ni compartas su contenido.
+Un motor remoto también los recibe. El transporte cifrado y los relays no hacen anónimo al vendedor;
+los operadores de relay y los participantes de red tienen su propia visibilidad. Firmar identidades y recibos
+no verifica de forma independiente el modelo remoto ni la corrección de las respuestas.
+
+**Siguiente:** [Resuelve problemas de forma segura](/es/help/troubleshooting).
