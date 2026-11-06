@@ -32,6 +32,7 @@ export default async function Page(props: PageProps) {
       <DocsTitle>{page.data.title}</DocsTitle>
       <DocsDescription>{page.data.description}</DocsDescription>
       <PageActions
+        key={page.url}
         markdownUrl={markdownUrl(page.url)}
         spanish={lang === 'es'}
       />
