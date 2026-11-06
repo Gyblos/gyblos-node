@@ -2,7 +2,7 @@
 // Offline: only source files and pure public configuration entries; never reads operator state.
 import assert from 'node:assert/strict';
 import { readdir, readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import test from 'node:test';
 
 import { parseNodeConfig } from '@gyblos/node/node-config';
@@ -55,7 +55,12 @@ void test('docs handbook: both sidebars expose the complete seller journey witho
       assert.ok(Array.isArray(value.pages));
       for (const entry of value.pages) {
         assert.equal(typeof entry, 'string');
-        const slug = directory ? `${directory}/${entry}` : entry;
+        // Fumadocs supports named internal links and reparenting with ../ paths.
+        const link = /^\[[^\]]+\]\((\/[^)]+)\)$/.exec(entry);
+        if (link) assert.ok(link[1]?.startsWith(`/${locale}`), entry);
+        const slug = link
+          ? link[1]!.replace(new RegExp(`^/${locale}/?`), '') || 'index'
+          : relative(CONTENT, join(CONTENT, directory, entry));
         if (JOURNEY.includes(slug)) {
           const text = await page(slug, locale);
           assert.match(text, /^---\ntitle: .+\ndescription: .+\n---/);
