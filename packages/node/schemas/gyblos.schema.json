@@ -158,7 +158,7 @@
           "maximum": 1024
         },
         "max_free_buyers_per_day": {
-          "description": "Distinct buyers a free offer serves per UTC day (default 1024).",
+          "description": "Distinct buyers across all free offers on this seller per UTC day (default 1024).",
           "type": "integer",
           "minimum": 1,
           "maximum": 65536

@@ -1,4 +1,5 @@
 {
   "title": "Start here",
-  "pages": ["beta"]
+  "pages": ["beta"],
+  "defaultOpen": true
 }

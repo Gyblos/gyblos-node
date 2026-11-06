@@ -75,12 +75,12 @@ No cambies de ruta para reparar una identidad ausente.
 
 Todas las claves de `[limits]` son enteros opcionales, mínimo 1, solo en archivo:
 
-| Clave                        | Predeterminado | Máximo | Significado                                           |
-| ---------------------------- | -------------- | ------ | ----------------------------------------------------- |
-| `max_connections`            | 8              | 64     | Conexiones abiertas de compradores                    |
-| `requests_per_minute`        | 30             | 120    | Solicitudes por NodeId comprador por minuto           |
-| `global_requests_per_minute` | 256            | 1024   | Solicitudes de todos los compradores por minuto       |
-| `max_free_buyers_per_day`    | 1024           | 65536  | Compradores distintos por oferta gratuita por día UTC |
+| Clave                        | Predeterminado | Máximo | Significado                                                                      |
+| ---------------------------- | -------------- | ------ | -------------------------------------------------------------------------------- |
+| `max_connections`            | 8              | 64     | Conexiones abiertas de compradores                                               |
+| `requests_per_minute`        | 30             | 120    | Solicitudes por NodeId comprador por minuto                                      |
+| `global_requests_per_minute` | 256            | 1024   | Solicitudes de todos los compradores por minuto                                  |
+| `max_free_buyers_per_day`    | 1024           | 65536  | Compradores distintos entre todas las ofertas gratuitas del vendedor por día UTC |
 
 El producto efectivo `max_connections × requests_per_minute` no puede superar `global_requests_per_minute`,
 incluidos los valores predeterminados omitidos. Doctor muestra los límites efectivos de capacidad.
@@ -109,7 +109,8 @@ Se exige exactamente uno entre `free` y `price`. Los contadores gratuitos se res
 El esquema general admite `price.input_per_mtok` y `price.output_per_mtok` como cadenas decimales en
 USDC por millón de tokens, con `price.currency = "USDC"`. Al menos una tarifa debe ser positiva; sin signos,
 exponentes ni ceros iniciales; hasta cuatro dígitos enteros y seis decimales tras quitar ceros finales.
-**El daemon predeterminado de Docker no conecta la venta pagada.** Aceptar `price` en el esquema no es un alta pagada.
+**Este tutorial aprovisiona un rol vendedor solo gratuito.** Las ofertas pagadas requieren preparar por separado
+el rol de pagos en devnet; aceptar `price` no aprovisiona esos roles ni demuestra preparación para pagos.
 
 ## Compatibilidad de motores al iniciar
 

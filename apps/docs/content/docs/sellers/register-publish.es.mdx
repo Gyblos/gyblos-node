@@ -8,14 +8,19 @@ creada al instalar. [Instala primero](/es/sellers/beta-guide) si el nodo aún no
 
 ## Registra la identidad en descubrimiento
 
+Antes de ejecutar el comando, verifica el `discovery.url` previsto en `gyblos.toml` y cualquier
+`GYBLOS_DISCOVERY_URL` que prevalezca en el entorno del contenedor. El valor predeterminado es
+`https://discovery.gyblos.com/v1`. Revisa un `seller.env` personalizado solo en un editor privado; no lo muestres.
+Introduce la invitación solo si confías en el destino configurado.
+
 ```sh
 cd ~/gyblos-seller
 docker compose exec seller gyblos seller register
 ```
 
-Comprueba el origen del índice que muestra el comando. Introduce el código solo para el índice de Gyblos previsto.
 La pregunta **muestra lo que escribes**: no compartas ni grabes la pantalla y no pegues el código en un comando.
-El comando envía al índice la invitación y tu NodeId público.
+Tras aceptar la invitación, el comando muestra el origen del índice y envía inmediatamente la invitación
+y el NodeId público. Esa línea es informativa; no hay una pausa de confirmación.
 
 `Registered: this seller may now publish.` significa que descubrimiento aceptó el registro.
 `Already registered` también es correcto para la misma invitación e identidad. El registro no modifica

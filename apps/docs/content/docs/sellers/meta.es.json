@@ -6,5 +6,6 @@
     "models-offers",
     "operate",
     "identity"
-  ]
+  ],
+  "defaultOpen": true
 }

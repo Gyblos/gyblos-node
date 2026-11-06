@@ -7,6 +7,7 @@ import test from 'node:test';
 
 import { parseNodeConfig } from '@gyblos/node/node-config';
 import { sellerSettings } from '@gyblos/node/seller-settings';
+import { OFFER_PRICING_KINDS } from '@gyblos/protocol/constants';
 
 const CONTENT = join(import.meta.dirname, '../apps/docs/content/docs');
 const JOURNEY = [
@@ -91,7 +92,9 @@ void test('docs handbook: complete configuration examples validate and resolve f
         const settings = sellerSettings(result.config, {});
         assert.ok(settings.offers.length > 0, slug);
         assert.ok(
-          settings.offers.every((offer) => offer.offer.kind === 'free'),
+          settings.offers.every(
+            (offer) => offer.offer.kind === OFFER_PRICING_KINDS.FREE,
+          ),
           slug,
         );
         checked++;

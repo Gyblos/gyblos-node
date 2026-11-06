@@ -75,12 +75,12 @@ to repair a missing identity.
 
 All `[limits]` keys are optional integers, minimum 1, file-only:
 
-| Key                          | Default | Maximum | Meaning                                    |
-| ---------------------------- | ------- | ------- | ------------------------------------------ |
-| `max_connections`            | 8       | 64      | Open buyer connections                     |
-| `requests_per_minute`        | 30      | 120     | Requests per buyer NodeId per minute       |
-| `global_requests_per_minute` | 256     | 1024    | Requests across buyers per minute          |
-| `max_free_buyers_per_day`    | 1024    | 65536   | Distinct buyers per free offer per UTC day |
+| Key                          | Default | Maximum | Meaning                                                   |
+| ---------------------------- | ------- | ------- | --------------------------------------------------------- |
+| `max_connections`            | 8       | 64      | Open buyer connections                                    |
+| `requests_per_minute`        | 30      | 120     | Requests per buyer NodeId per minute                      |
+| `global_requests_per_minute` | 256     | 1024    | Requests across buyers per minute                         |
+| `max_free_buyers_per_day`    | 1024    | 65536   | Distinct buyers across all seller free offers per UTC day |
 
 Effective `max_connections × requests_per_minute` must not exceed `global_requests_per_minute`, including
 omitted defaults. Doctor prints effective capacity limits. These are separate from offer token quotas.
@@ -108,7 +108,8 @@ Exactly one of `free` or `price` is required. Free counters reset on restart; th
 The broader schema accepts `price.input_per_mtok` and `price.output_per_mtok` as decimal strings in
 USDC per million tokens, with `price.currency = "USDC"`. At least one rate must be positive; no signs,
 exponents or leading zeros, up to four integer and six fractional digits after removing trailing zeros.
-**The default Docker daemon does not wire paid selling.** Schema acceptance of `price` is not paid onboarding.
+**This tutorial provisions a free-only seller role.** Paid offers need separate payment-role setup on devnet;
+schema acceptance of `price` does not provision those roles or establish paid readiness.
 
 ## Engine compatibility at startup
 

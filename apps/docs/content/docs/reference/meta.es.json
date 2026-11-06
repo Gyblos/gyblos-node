@@ -1,4 +1,5 @@
 {
   "title": "Referencia",
-  "pages": ["cli", "configuration"]
+  "pages": ["cli", "configuration"],
+  "defaultOpen": true
 }

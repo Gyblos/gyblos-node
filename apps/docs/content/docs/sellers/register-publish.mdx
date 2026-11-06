@@ -8,14 +8,19 @@ installation. [Install first](/en/sellers/beta-guide) if the node is not ready.
 
 ## Register the identity with discovery
 
+Before running the command, verify the intended `discovery.url` in `gyblos.toml` and any
+`GYBLOS_DISCOVERY_URL` override in the container environment. The default is
+`https://discovery.gyblos.com/v1`. Review a customized `seller.env` only in a private editor; do not print it.
+Enter an invite only when you trust the configured destination.
+
 ```sh
 cd ~/gyblos-seller
 docker compose exec seller gyblos seller register
 ```
 
-Check the index origin printed by the command. Enter your code only for the intended Gyblos index.
 The prompt **echoes what you type**: do not screen-share, record it or paste the code into a command.
-The command sends the invite and your public NodeId to that index.
+After accepting the invite, the command prints the index origin and immediately sends the invite and
+public NodeId. That printed line is informational; there is no confirmation pause.
 
 `Registered: this seller may now publish.` means discovery accepted the registration.
 `Already registered` is also a success for the same invite and identity. Registration neither changes
