@@ -422,8 +422,8 @@ sh install.sh
   images and the model, creates the seller keys, downloads the tokenizer, runs
   `gyblos doctor` and starts the seller only when doctor is READY.
 - `DEFAULT_IMAGE` pins one release by version and digest
-  (`ghcr.io/gyblos/seller:<version>@sha256:<digest>`); the publish script below
-  sets it. `GYBLOS_IMAGE` overrides it.
+  (`ghcr.io/gyblos/seller:<version>@sha256:<digest>`); the release workflow
+  below sets it. `GYBLOS_IMAGE` overrides it.
 - The relay token is read without echo, or from `GYBLOS_RELAY_TOKEN`, and is
   written only to `seller.env` (mode 0600), never printed. Without a terminal
   (for example `ssh host sh install.sh`), set `GYBLOS_RELAY_TOKEN`.
@@ -440,37 +440,58 @@ sh install.sh
 Every release is built and signed keyless by the release workflow
 (`.github/workflows/release-seller-image.yml`) with its GitHub OIDC identity;
 there is no long-lived signing key, and each signature is recorded in the public
-Sigstore log. With cosign installed, the installer verifies a
-`ghcr.io/gyblos/seller` image before pulling (identity `RELEASE_IDENTITY`,
-issuer `RELEASE_ISSUER` in `install.sh`) and stops on a bad signature; without
-cosign it says the check was skipped. By hand:
+Sigstore log (with this repository and workflow name). With cosign 3 or later
+installed, the installer verifies a `ghcr.io/gyblos/seller` image before pulling
+(identity `RELEASE_IDENTITY`, issuer `RELEASE_ISSUER` in `install.sh`) and stops
+on a bad signature; without cosign, or with an older one, it says the check was
+skipped, and integrity rests on HTTPS and the digest the installer pins. The
+check reads the seller image from `compose.yaml`; the installer names any
+override file or `COMPOSE_FILE` it does not cover. By hand:
 
 ```sh
 cosign verify ghcr.io/gyblos/seller:<version>@sha256:<digest> \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  --certificate-identity-regexp '^https://github\.com/Gyblos/gyblos-node/\.github/workflows/release-seller-image\.yml@refs/tags/v'
+  --certificate-identity-regexp '^https://github\.com/Gyblos/gyblos-node/\.github/workflows/release-seller-image\.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'
 ```
 
 ##### Releasing the seller image
 
-A release is a version tag pushed from a commit on `main`:
+A release is a version tag pushed from a commit on `main`, one tag at a time:
 
 ```sh
 git tag v0.1.0-beta.2 origin/main
 git push origin v0.1.0-beta.2
 ```
 
-The workflow runs `scripts/release-image.sh`, which refuses a commit outside
-`main`, an existing version or any run outside that workflow. It builds the
-tagged commit alone (`git archive`) for amd64 and arm64, pushes `:<version>`,
-`:<commit>` and the moving `:beta`, signs the digest, verifies the signature
-names this workflow at this tag and pins `DEFAULT_IMAGE` in `install.sh`. The
-workflow then opens a pull request with that pin; merge it and deploy the docs
-site so `https://gyblos.com/install.sh` serves the release. Its only credential
-is the run's `GITHUB_TOKEN`, which needs write access to the
-`ghcr.io/gyblos/seller` package (package settings, Manage Actions access) and
-permission to open pull requests (repository settings, Actions). The package is
-public, so the image exposes the node's source.
+1. The `release` job waits in the `release` environment for a maintainer's
+   approval, then runs `scripts/release-image.sh`. It refuses a commit outside
+   `main`, an existing version (or a registry it cannot query) and any run
+   outside the workflow; builds the tagged commit alone (`git archive`) for
+   amd64 and arm64; pushes `:<version>` and `:<commit>`; signs the digest and
+   verifies the signature names this workflow at this tag; and only then moves
+   `:beta`, when the commit is main's tip.
+2. The `pin` job runs `scripts/pin-installer.sh` and opens a pull request that
+   pins `DEFAULT_IMAGE` in `install.sh`. Pull requests opened with the
+   workflow's token run no checks: compare the digest with the release run's log
+   before merging.
+3. After that pull request is merged, deploy the docs site. Never deploy the
+   docs from a `main` whose `install.sh` is not pinned: the unpinned installer
+   names `:beta`, and sellers with cosign refuse an unsigned image.
+
+One-time GitHub setup, by an organization owner:
+
+- Package `seller` → Package settings → Manage Actions access: add `gyblos-node`
+  with the Write role, so the workflow token can push.
+- Repository Settings → Actions → General → Workflow permissions: enable "Allow
+  GitHub Actions to create and approve pull requests" (the organization setting
+  may need it too).
+- Repository Settings → Environments → `release`: required reviewer (the
+  maintainers who may publish) and deployment tags `v*`.
+- Repository Settings → Rules → Rulesets: a tag ruleset for `v*` that only
+  maintainers may create, update or delete. The signature names the workflow at
+  a tag, so whoever can push such a tag can sign a release.
+
+The package is public, so the image exposes the node's source.
 
 ## Buyer
 

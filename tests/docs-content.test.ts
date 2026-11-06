@@ -167,5 +167,7 @@ void test('the manual install page matches what install.sh writes and runs', asy
       `${page}: model`,
     );
     assert.ok(text.includes(`--mint ${value('MINT')}\n`), `${page}: mint`);
+    const identity = /^RELEASE_IDENTITY='([^']+)'$/m.exec(installer)?.[1];
+    assert.ok(identity && text.includes(`'${identity}'`), `${page}: identity`);
   }
 });

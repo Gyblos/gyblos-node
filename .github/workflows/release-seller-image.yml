@@ -1,8 +1,10 @@
-# Releases the seller image when a version tag (v0.1.0-beta.1) on main is pushed: scripts/release-image.sh
+# Releases the seller image when a version tag (v0.1.0-beta.2) on main is pushed. The `release` job, in
+# the `release` environment so it waits for a maintainer's approval, runs scripts/release-image.sh: it
 # builds amd64 and arm64, pushes ghcr.io/gyblos/seller, signs the digest keyless with this workflow's
-# GitHub identity (the identity install.sh verifies) and pins install.sh; this workflow then opens the
-# pull request with that pin. The installer reaches sellers when that pull request is merged and the
-# docs site is deployed. The only credential is this run's GITHUB_TOKEN.
+# GitHub identity (the identity install.sh verifies) and moves `beta`. The `pin` job then opens the pull
+# request that pins install.sh to that release; the installer reaches sellers when it is merged and the
+# docs site is deployed. The only credential is each run's GITHUB_TOKEN. Push one release tag at a time:
+# a newer pending run replaces an older pending one.
 name: Release seller image
 
 on:
@@ -20,11 +22,13 @@ jobs:
   release:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    environment: release
     permissions:
-      contents: write
-      pull-requests: write
+      contents: read
       packages: write
       id-token: write
+    outputs:
+      pinned: ${{ steps.release.outputs.pinned }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -40,20 +44,36 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
       - name: Build, push and sign
+        id: release
         run: sh scripts/release-image.sh "${GITHUB_REF_NAME#v}"
+
+  pin:
+    needs: release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
       - name: Open the pull request that pins install.sh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PINNED: ${{ needs.release.outputs.pinned }}
         run: |
           version="${GITHUB_REF_NAME#v}"
           branch="release/seller-$version"
+          sh scripts/pin-installer.sh "$PINNED"
           gh auth setup-git
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git switch -c "$branch"
           git add install.sh
-          git commit -m "install.sh: pin the seller image $version [skip ci]"
+          git commit -m "install.sh: pin the seller image $version"
           git push origin "$branch"
           gh pr create --base main --head "$branch" \
             --title "install.sh: pin the seller image $version" \
-            --body "Pins install.sh to the signed seller image $version released by run $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID. Merge it, then deploy the docs site so https://gyblos.com/install.sh serves this release."
+            --body "Pins install.sh to the signed seller image \`$PINNED\`, released by $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID. Check that the digest matches that run's log, merge, then deploy the docs site so https://gyblos.com/install.sh serves this release."

@@ -1,15 +1,19 @@
 // The release path of the seller image: scripts/release-image.sh refuses a malformed version and any
-// run outside the release workflow before touching git, install.sh pins what that script publishes,
-// and the identity install.sh trusts is exactly that workflow at a version tag. Offline.
+// run outside the release workflow before touching git, scripts/pin-installer.sh writes only a release
+// reference into install.sh, and the identity install.sh trusts is exactly that workflow at a version
+// tag. Offline.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, statSync, writeFileSync } from 'node:fs';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
 import { REPOSITORY_ROOT } from './support/node-config-fixtures';
 
 const RELEASE = join(REPOSITORY_ROOT, 'scripts/release-image.sh');
+const PIN = join(REPOSITORY_ROOT, 'scripts/pin-installer.sh');
 const WORKFLOW = '.github/workflows/release-seller-image.yml';
 const read = (path: string) =>
   readFileSync(join(REPOSITORY_ROOT, path), 'utf8');
@@ -58,6 +62,8 @@ void test('the installer trusts exactly the release workflow at a version tag', 
   const workflow = read(WORKFLOW);
   assert.ok(workflow.includes("tags: ['v[0-9]+.[0-9]+.[0-9]+*']"));
   assert.match(workflow, /id-token: write/);
+  assert.match(workflow, /environment: release/);
+  assert.ok(workflow.includes('sh scripts/pin-installer.sh "$PINNED"'));
   assert.ok(
     workflow.includes('sh scripts/release-image.sh "${GITHUB_REF_NAME#v}"'),
   );
@@ -87,4 +93,37 @@ void test('the release script refuses a malformed version, then any run outside 
   });
   assert.equal(local.status, 1);
   assert.match(local.stderr, /only in the release workflow/);
+});
+
+void test('the pin script writes only a seller release reference into the installer', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'gyblos-pin-'));
+  try {
+    const file = join(directory, 'install.sh');
+    writeFileSync(
+      file,
+      'set -eu\nDEFAULT_IMAGE=ghcr.io/gyblos/seller:beta\nrest\n',
+    );
+    const reference = `ghcr.io/gyblos/seller:0.1.0-beta.2@sha256:${'a'.repeat(64)}`;
+    for (const bad of [
+      'ghcr.io/gyblos/seller:beta',
+      `ghcr.io/other/seller:0.1.0@sha256:${'a'.repeat(64)}`,
+      `ghcr.io/gyblos/seller:0.1.0@sha256:${'a'.repeat(63)}`,
+      `${reference}|x`,
+    ]) {
+      const result = spawnSync('sh', [PIN, bad, file], { encoding: 'utf8' });
+      assert.equal(result.status, 1, bad);
+      assert.match(result.stderr, /not a seller release reference/, bad);
+    }
+    const pinned = spawnSync('sh', [PIN, reference, file], {
+      encoding: 'utf8',
+    });
+    assert.equal(pinned.status, 0, pinned.stderr);
+    assert.equal(
+      readFileSync(file, 'utf8'),
+      `set -eu\nDEFAULT_IMAGE=${reference}\nrest\n`,
+    );
+    assert.equal(statSync(file).mode & 0o777, 0o755);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });

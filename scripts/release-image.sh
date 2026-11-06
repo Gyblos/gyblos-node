@@ -1,10 +1,10 @@
 #!/bin/sh
 # Releases the seller node image; runs only in the release workflow
-# (.github/workflows/release-seller-image.yml), started by pushing a version tag such as v0.1.0-beta.1
-# from main. Builds the tagged commit alone for amd64 and arm64, pushes it as the version, the commit
-# and the moving `beta` tag, signs the pushed digest keyless with the workflow's GitHub identity (the
-# identity install.sh verifies) and pins install.sh in this checkout to that version and digest
-# (docs/running-a-node.md#releasing-the-seller-image).
+# (.github/workflows/release-seller-image.yml), started by pushing a version tag such as v0.1.0-beta.2
+# from main. Builds the tagged commit alone for amd64 and arm64, pushes it as the version and the
+# commit, signs the pushed digest keyless with the workflow's GitHub identity (the identity install.sh
+# verifies), and only then moves `beta` to it when the commit is main's tip. Prints the pinned reference
+# and hands it to the next job (docs/running-a-node.md#releasing-the-seller-image).
 #
 #   sh scripts/release-image.sh <version>
 set -eu
@@ -31,12 +31,17 @@ printf '%s\n' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-
 cd "$(git rev-parse --show-toplevel)"
 revision=$(git rev-parse HEAD)
 short=$(git rev-parse --short=12 HEAD)
-git fetch -q origin main
+# origin/main comes from the workflow's full-history checkout; no credentials are needed here.
 git merge-base --is-ancestor "$revision" origin/main ||
   die "the tagged commit $short is not on main."
-if docker buildx imagetools inspect "$REPOSITORY:$version" >/dev/null 2>&1; then
+# Only a clear "not found" lets the release go ahead; any other failure might hide an existing version.
+if found=$(docker buildx imagetools inspect "$REPOSITORY:$version" 2>&1); then
   die "$REPOSITORY:$version already exists; choose a new version."
 fi
+case "$found" in
+  *'not found'* | *MANIFEST_UNKNOWN* | *'manifest unknown'*) ;;
+  *) die "could not check whether $REPOSITORY:$version exists: $found" ;;
+esac
 
 # The build context is the commit itself, so no local, untracked or ignored file can reach the image.
 context=$(mktemp -d)
@@ -52,7 +57,6 @@ docker buildx build \
   --label "org.opencontainers.image.version=$version" \
   --tag "$REPOSITORY:$version" \
   --tag "$REPOSITORY:$short" \
-  --tag "$REPOSITORY:$CHANNEL" \
   --metadata-file "$context.json" \
   --push \
   "$context"
@@ -67,9 +71,14 @@ cosign verify \
   "$REPOSITORY@$digest" >/dev/null ||
   die "the signature of $REPOSITORY@$digest does not verify."
 
+# The channel moves only to a signed release of main's tip, never back to an older commit.
+if [ "$revision" = "$(git rev-parse origin/main)" ]; then
+  docker buildx imagetools create --tag "$REPOSITORY:$CHANNEL" "$REPOSITORY@$digest"
+  moved=" and :$CHANNEL"
+else
+  moved=''
+fi
+
 pinned="$REPOSITORY:$version@$digest"
-tmp=$(mktemp ./.install.sh.XXXXXX)
-sed "s|^DEFAULT_IMAGE=.*|DEFAULT_IMAGE=$pinned|" install.sh >"$tmp"
-chmod 755 "$tmp"
-mv -f "$tmp" install.sh
-printf 'Released %s (commit %s), signed, also tagged :%s and :%s.\n' "$pinned" "$short" "$short" "$CHANNEL"
+[ -z "${GITHUB_OUTPUT:-}" ] || printf 'pinned=%s\n' "$pinned" >>"$GITHUB_OUTPUT"
+printf 'Released %s (commit %s), signed, also tagged :%s%s.\n' "$pinned" "$short" "$short" "$moved"

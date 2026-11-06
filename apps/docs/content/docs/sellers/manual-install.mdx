@@ -21,12 +21,12 @@ replace `VERSION@sha256:DIGEST` with the part after `ghcr.io/gyblos/seller:`.
 
 Every release is built and signed by the Gyblos release workflow on GitHub, with no long-lived key: the
 signature names that workflow at a version tag and is recorded in the public Sigstore log. Install
-[cosign](https://docs.sigstore.dev/cosign/system_config/installation/) and verify the image:
+[cosign](https://docs.sigstore.dev/cosign/system_config/installation/) version 3 or later and verify the image:
 
 ```sh
 cosign verify ghcr.io/gyblos/seller:VERSION@sha256:DIGEST \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  --certificate-identity-regexp '^https://github\.com/Gyblos/gyblos-node/\.github/workflows/release-seller-image\.yml@refs/tags/v'
+  --certificate-identity-regexp '^https://github\.com/Gyblos/gyblos-node/\.github/workflows/release-seller-image\.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'
 ```
 
 A verified image prints the signature details and exits without error. If verification fails, do not
@@ -122,7 +122,7 @@ free = { daily_token_cap = 200000, per_buyer_cap = 5000 }
 
 Create `~/gyblos-seller/seller.env` readable only by you (`chmod 600`), and in a private editor write one
 line: the variable name `GYBLOS_RELAY_TOKEN`, an equals sign and your relay token, with no spaces or
-quotes. Never print that file or paste it into a terminal command.
+quotes. The token is 32 to 512 printable characters. Never print that file or paste it into a terminal command.
 
 Then pull the images and the model, create the keys, install the tokenizer, check and start:
 

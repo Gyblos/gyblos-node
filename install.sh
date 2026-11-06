@@ -22,6 +22,8 @@ export LC_ALL
 # Set by scripts/release-image.sh when a release is published.
 DEFAULT_IMAGE=ghcr.io/gyblos/seller:beta
 RELEASE_REPOSITORY=ghcr.io/gyblos/seller
+# The same, as a sed pattern.
+RELEASE_PATTERN='ghcr\.io/gyblos/seller'
 # Releases are signed keyless by the release workflow at a version tag; cosign checks that identity.
 RELEASE_IDENTITY='^https://github\.com/Gyblos/gyblos-node/\.github/workflows/release-seller-image\.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'
 RELEASE_ISSUER=https://token.actions.githubusercontent.com
@@ -31,6 +33,7 @@ MINT=4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU
 MODEL=qwen3:0.6b
 COMPOSE_MAJOR=2
 COMPOSE_MINOR=17
+COSIGN_MAJOR=3
 OLLAMA_WAIT_SECONDS=60
 OLLAMA_POLL_SECONDS=2
 # packages/transport-iroh/src/constants.ts RELAY_TOKEN_LENGTH.
@@ -157,7 +160,7 @@ COMPOSE
 # An existing compose.yaml keeps every line except a seller image from the Gyblos repository, which
 # moves to $image; any other image is the operator's own and stays.
 update_compose_image() {
-  current=$(sed -n "s|^    image: \($RELEASE_REPOSITORY[:@][^ ]*\)\$|\1|p" compose.yaml)
+  current=$(sed -n "s|^    image: \($RELEASE_PATTERN[:@][^ ]*\)\$|\1|p" compose.yaml)
   if [ -z "$current" ] || [ "$(printf '%s\n' "$current" | wc -l)" -ne 1 ]; then
     say "Kept existing $dir/compose.yaml"
     [ -z "${GYBLOS_IMAGE:-}" ] || say "  GYBLOS_IMAGE is not applied to it; change its seller image there."
@@ -167,7 +170,7 @@ update_compose_image() {
     say "Kept existing $dir/compose.yaml"
     return
   fi
-  contents=$(sed "s|^    image: $RELEASE_REPOSITORY[:@][^ ]*\$|    image: $image|" compose.yaml)
+  contents=$(sed "s|^    image: $RELEASE_PATTERN[:@][^ ]*\$|    image: $image|" compose.yaml)
   printf '%s\n' "$contents" | install_file compose.yaml 644
   say "Updated the seller image in $dir/compose.yaml: $current -> $image"
 }
@@ -193,6 +196,17 @@ verify_image() {
     say 'cosign is not installed, so the image signature was not checked (docs: image signature).'
     return
   fi
+  # Releases carry cosign 3 signature bundles, which older cosign does not find.
+  major=$(cosign version 2>/dev/null | sed -n 's/^GitVersion: *v\{0,1\}\([0-9][0-9]*\)\..*/\1/p')
+  if [ -z "$major" ] || [ "$major" -lt "$COSIGN_MAJOR" ]; then
+    say "cosign $COSIGN_MAJOR or later is needed to check the image signature; it was not checked."
+    return
+  fi
+  # Compose also reads override files and COMPOSE_FILE; the check covers only compose.yaml's seller.
+  for other in compose.override.yaml compose.override.yml docker-compose.override.yaml docker-compose.override.yml .env; do
+    [ ! -e "$other" ] || say "  $other is present: the signature check covers only the seller image in compose.yaml."
+  done
+  [ -z "${COMPOSE_FILE:-}" ] || say '  COMPOSE_FILE is set: the signature check covers only the seller image in compose.yaml.'
   cosign verify --certificate-identity-regexp "$RELEASE_IDENTITY" \
     --certificate-oidc-issuer "$RELEASE_ISSUER" "$run" >/dev/null 2>&1 ||
     die "The image signature did not verify as a Gyblos release: $run"

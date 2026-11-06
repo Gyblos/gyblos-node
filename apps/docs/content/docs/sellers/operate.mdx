@@ -55,7 +55,7 @@ changed Compose environment file. Never display that file in logs, screenshots o
 ## Update the seller
 
 Each update is a new signed release in the installer. Record the installed image, then download the
-current installer and run it again in the same folder:
+current installer and run it again (with the same `GYBLOS_DIR`, if you set one):
 
 ```sh
 cd ~/gyblos-seller
@@ -66,7 +66,7 @@ sh install.sh
 
 It keeps `gyblos.toml`, `seller.env`, the keys and your other Compose edits. It changes only the Gyblos
 seller `image:` line in `compose.yaml` to the new release, checks its signature when cosign is installed
-and restarts the seller. A seller image from another registry is treated as your own build and is left
+and restarts the seller. A seller image from another image repository is treated as your own build and is left
 unchanged. It does not migrate the TOML or the environment file.
 
 After the update, run status and, if publishing, status with `--online`. If it fails, preserve the

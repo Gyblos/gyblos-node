@@ -41,8 +41,12 @@ esac
 exit 0
 `;
 
-// Logs each call; FAKE_COSIGN_EXIT makes verification fail.
+// Logs each verification; FAKE_COSIGN_EXIT makes it fail and FAKE_COSIGN_VERSION sets its version.
 const FAKE_COSIGN = `#!/bin/sh
+if [ "$1" = version ]; then
+  printf 'GitVersion:    v%s\\n' "\${FAKE_COSIGN_VERSION:-3.1.4}"
+  exit 0
+fi
 printf '%s\\n' "$*" >>"$FAKE_COSIGN_LOG"
 exit "\${FAKE_COSIGN_EXIT:-0}"
 `;
@@ -350,5 +354,31 @@ void test('with cosign the Gyblos image must carry the release signature before 
     assert.match(result.stdout, /cosign is not installed/);
   } finally {
     await unchecked.cleanup();
+  }
+  const old = await harness({ cosign: true });
+  try {
+    const result = old.run({
+      GYBLOS_RELAY_TOKEN: FAKE_SECRET,
+      FAKE_COSIGN_VERSION: '2.6.1',
+    });
+    assert.equal(result.status, 0, result.output);
+    assert.match(result.stdout, /cosign 3 or later is needed/);
+    assert.deepEqual(old.signatureChecks(), []);
+  } finally {
+    await old.cleanup();
+  }
+});
+
+void test('names Compose files the signature check does not cover', async () => {
+  const install = await harness({ cosign: true });
+  try {
+    assert.equal(install.run({ GYBLOS_RELAY_TOKEN: FAKE_SECRET }).status, 0);
+    writeFileSync(join(install.directory, 'compose.override.yaml'), '');
+    const result = install.run({ COMPOSE_FILE: 'other.yaml' });
+    assert.equal(result.status, 0, result.output);
+    assert.match(result.stdout, /compose\.override\.yaml is present/);
+    assert.match(result.stdout, /COMPOSE_FILE is set/);
+  } finally {
+    await install.cleanup();
   }
 });
