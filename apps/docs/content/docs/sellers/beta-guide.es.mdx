@@ -4,7 +4,17 @@ description: Instala el nodo vendedor de Gyblos, revisa que esté sirviendo y re
 ---
 
 Te invitaron a la beta de vendedores de Gyblos. Esta guía te lleva desde los archivos de tu invitación
-hasta tener tu nodo listado en el descubrimiento. Toma unos 15 minutos, casi todo en descargas.
+hasta tener un vendedor funcionando y listo para registrarse. La instalación toma unos 15 minutos,
+casi todo en descargas. Para quedar listado puedes necesitar ayuda del equipo de Gyblos con el paso
+de inscripción en la blockchain que se explica más adelante.
+
+<Callout title="Alcance de la guía · 5 de noviembre de 2026">
+  Esta guía cubre el vendedor gratuito en Docker que instala el `install.sh` de
+  tu invitación, con `ghcr.io/gyblos/seller:beta`. La etiqueta beta puede
+  cambiar; cuando pidas ayuda, incluye `docker compose images seller` para que
+  el equipo identifique la imagen instalada. La configuración de ofertas pagadas
+  queda fuera del alcance actual de esta guía.
+</Callout>
 
 <Callout title="Beta en devnet">
   La beta funciona en la **devnet** de Solana. Tu nodo regala un modelo pequeño,
@@ -162,8 +172,8 @@ Debería decir `listed in the index`.
 
 La oferta por defecto en `gyblos.toml` regala `qwen3:0.6b`:
 
-- hasta **200.000 tokens al día** en total;
-- hasta **5.000 tokens al día** por cada comprador.
+- hasta **200.000 tokens de entrada y salida por día UTC** en total;
+- hasta **5.000 tokens de entrada y salida por día UTC** por cada comprador.
 
 Los contadores se reinician cuando el vendedor se reinicia. Puedes bajar estos límites en la sección
 `[[offers]]`. Aplica los cambios con
@@ -207,5 +217,6 @@ Al detenerlo, tu oferta sale del descubrimiento en menos de dos minutos.
 | `DISCOVERY_INVITE_INVALID`                                     | El código está mal, ya se usó o venció. Pide uno nuevo a Gyblos.                                                                                                                                                                                                                       |
 | `DISCOVERY_RATE_LIMITED` o `DISCOVERY_UNAVAILABLE`             | El descubrimiento está ocupado. Intenta de nuevo en unos minutos.                                                                                                                                                                                                                      |
 
-Si te quedas atascado, envía al equipo de Gyblos lo que muestra
-`docker compose exec seller gyblos seller status`. Nunca incluye tu token de relay ni tus llaves.
+Para pedir ayuda, responde por el mismo canal donde recibiste tu invitación. Envía al equipo de Gyblos
+lo que muestran `docker compose exec seller gyblos seller status` y `docker compose images seller`.
+El estado nunca incluye tu token de relay ni tus llaves.

@@ -4,7 +4,16 @@ description: Install the Gyblos seller node, check that it serves and register i
 ---
 
 You were invited to the Gyblos seller beta. This guide takes you from the files in your invitation to a
-seller listed in discovery. It takes about 15 minutes, most of it downloading.
+running seller ready for registration. Installation takes about 15 minutes, most of it downloading.
+Getting listed may need help from the Gyblos team with the on-chain registration step below.
+
+<Callout title="Guide scope · November 5, 2026">
+  This guide covers the free Docker seller installed by the `install.sh` in your
+  invitation, using `ghcr.io/gyblos/seller:beta`. The beta tag can change; when
+  asking for help, include `docker compose images seller` so the team can
+  identify your installed image. Paid-offer setup is outside this guide's
+  current scope.
+</Callout>
 
 <Callout title="Beta on devnet">
   The beta runs on Solana **devnet**. Your node gives a small model away for
@@ -156,8 +165,8 @@ It should say `listed in the index`.
 
 The default offer in `gyblos.toml` gives `qwen3:0.6b` away for free:
 
-- up to **200,000 tokens per day** in total;
-- up to **5,000 tokens per day** for each buyer.
+- up to **200,000 input and output tokens per UTC day** in total;
+- up to **5,000 input and output tokens per UTC day** for each buyer.
 
 The counts reset when the seller restarts. You can lower these limits in the `[[offers]]` section. Apply edits with
 `docker compose up -d --force-recreate seller`.
@@ -200,5 +209,6 @@ Stopping withdraws your offer from discovery within two minutes.
 | `DISCOVERY_INVITE_INVALID`                                      | The code is wrong, already used or expired. Ask Gyblos for a new one.                                                                                                                                                                                             |
 | `DISCOVERY_RATE_LIMITED` or `DISCOVERY_UNAVAILABLE`             | Discovery is busy. Try again in a few minutes.                                                                                                                                                                                                                    |
 
-If you are stuck, send the Gyblos team the output of `docker compose exec seller gyblos seller status`. It
+For help, reply through the same channel where you received your invitation. Send the Gyblos team the
+output of `docker compose exec seller gyblos seller status` and `docker compose images seller`. Status
 never contains your relay token or your keys.

@@ -71,3 +71,64 @@ html > body[data-scroll-locked] {
   margin-right: 0px !important;
   --removed-body-scroll-bar-size: 0px !important;
 }
+
+/* Keep navigation at a fixed width even when the viewport exceeds the article layout width.
+   Fumadocs otherwise includes the outer centering gutter inside the sidebar's grid area. */
+@media (min-width: 48rem) {
+  #nd-docs-layout {
+    --fd-sidebar-width: 17rem;
+  }
+}
+
+#nd-page {
+  max-width: 54rem;
+  padding-bottom: 3rem;
+}
+
+.docs-page-actions {
+  margin-bottom: 0.5rem;
+}
+
+.docs-page-actions button,
+.docs-page-actions a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.875rem;
+  border: 1px solid var(--color-fd-border);
+  border-radius: 0.5rem;
+  background: var(--color-fd-card);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.docs-page-actions :is(button, a):hover {
+  background: var(--color-fd-accent);
+}
+
+.docs-page-actions button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.docs-page-actions [role='status']:not(:empty) {
+  margin-top: 0.5rem;
+}
+
+:where(a, button, input):focus-visible {
+  outline: 2px solid var(--color-fd-ring);
+  outline-offset: 3px;
+}
+
+/* Wide tables and code scroll inside the article rather than widening the whole page. */
+#nd-page :is(pre, .prose table) {
+  max-width: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #nd-docs-layout,
+  #nd-sidebar {
+    transition: none;
+  }
+}
