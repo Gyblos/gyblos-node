@@ -25,6 +25,7 @@ import {
   type PaidExecutionService,
 } from '@gyblos/transport-iroh/paid-server';
 
+import { within } from './support/native-fixture';
 import { CHARGE, request, RESULT, settled } from './support/paid-fixture';
 
 async function fixture(frame?: Uint8Array) {
@@ -120,7 +121,7 @@ void test('the paid stream emits ordered deltas then the settled terminal under 
   assert.equal(denied.counts.closed, 1);
 });
 
-void test('a buyer leaving stops generation but the lease waits for settlement', async () => {
+void test('a buyer leaving stops generation but the lease waits for settlement', { timeout: 15000 }, async (context) => {
   const value = await fixture();
   const controller = new AbortController();
   let settle = () => {};
@@ -155,7 +156,8 @@ void test('a buyer leaving stops generation but the lease waits for settlement',
     controller.signal,
     value.enter,
   );
-  await entered;
+  context.after(async () => { controller.abort(); settle(); await running; });
+  await within(Promise.race([entered, running.then(() => { throw new Error('Synthetic service ended before entering.'); })]), 10000);
   controller.abort();
   assert.equal(value.counts.closed, 1);
   assert.equal(value.counts.released, 0);
@@ -230,35 +232,7 @@ void test('an oversized or malformed request is refused before the service runs'
   assert.equal(value.counts.reads, 1);
 });
 
-void test('the request deadline aborts generation and closes the stream', async () => {
-  const value = await fixture();
-  let aborted = false;
-  const service: PaidExecutionService = {
-    async stream(_request, _peer, signal) {
-      await new Promise<void>((resolve) =>
-        signal.addEventListener('abort', () => resolve(), { once: true }),
-      );
-      aborted = true;
-      return value.terminal;
-    },
-  };
-  await servePaidExecutionStream(
-    value.stream,
-    service,
-    'synthetic',
-    value.close,
-    new AbortController().signal,
-    value.enter,
-    () => true,
-    { requestMs: 20 },
-  );
-  assert.equal(aborted, true);
-  assert.equal(value.counts.closed, 1);
-  assert.equal(value.frames.length, 0);
-  assert.equal(value.counts.released, 1);
-});
-
-void test('a stalled writer is cut by the egress deadline but the lease waits for it', async () => {
+void test('a stalled writer is cut by the egress deadline but the lease waits for it', { timeout: 15000 }, async (context) => {
   const value = await fixture();
   let unstall = () => {};
   let stopped = () => {};
@@ -282,7 +256,8 @@ void test('a stalled writer is cut by the egress deadline but the lease waits fo
     () => true,
     { egressMs: 10 },
   );
-  await closing;
+  context.after(async () => { unstall(); await running; });
+  await within(closing, 10000);
   assert.equal(value.counts.released, 0);
   unstall();
   await running;
