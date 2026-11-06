@@ -88,6 +88,11 @@ export const LEGACY_LOCAL_PATHS = {
 export const LAB_DIRECTORIES = {
   identityKeys: 'identity/keys',
   identityValidator: 'identity-validator',
+  batchChannelCheck: 'batch-channel-check',
+} as const;
+
+export const LAB_FILES = {
+  batchChannelKeys: 'keys.json',
 } as const;
 
 export type HomeEnvironment = Readonly<Record<string, string | undefined>>;
@@ -148,6 +153,11 @@ export function labLayout(environment: HomeEnvironment) {
     facilitatorDiagnostics: join(root, ROLE_FILES.facilitatorDiagnostics),
     identityKeys: join(root, LAB_DIRECTORIES.identityKeys),
     identityValidator: join(root, LAB_DIRECTORIES.identityValidator),
+    batchChannelKeys: join(
+      root,
+      LAB_DIRECTORIES.batchChannelCheck,
+      LAB_FILES.batchChannelKeys,
+    ),
   } as const;
 }
 

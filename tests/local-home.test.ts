@@ -74,6 +74,7 @@ void test('home layout defaults to one cwd-relative product home and a separate 
     facilitatorDiagnostics: '.local/lab/facilitator-diagnostics',
     identityKeys: '.local/lab/identity/keys',
     identityValidator: '.local/lab/identity-validator',
+    batchChannelKeys: '.local/lab/batch-channel-check/keys.json',
   });
   assert.equal(DEFAULT_HOMES.product, layout.root);
 });

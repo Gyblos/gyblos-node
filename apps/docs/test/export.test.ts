@@ -66,6 +66,18 @@ void test('docs export: every authored page has complete clean Markdown and copy
       `${html}: no Markdown alternate`,
     );
     assert.ok(page.includes(locale === 'es' ? 'Copiar página' : 'Copy page'));
+    const buttons = [...page.matchAll(/<button\b[^>]*>[\s\S]*?<\/button>/g)];
+    assert.ok(
+      buttons.some(([button]) =>
+        button.includes(locale === 'es' ? '>Abrir en<' : '>Open in<'),
+      ),
+      `${html}: no assistant menu`,
+    );
+    const copy = [...page.matchAll(/<button\b[^>]*>[\s\S]*?<\/button>/g)].find(
+      ([button]) =>
+        button.includes(locale === 'es' ? 'Copiar página' : 'Copy page'),
+    );
+    assert.ok(copy?.[0].includes('<svg'), `${html}: no copy icon`);
     assert.ok(
       page.includes(locale === 'es' ? 'Ver Markdown' : 'View Markdown'),
     );

@@ -28,6 +28,7 @@
     "gate:challenge": "node --import tsx lab/harness/scripts/challenge.ts",
     "gate:failures": "node --import tsx lab/harness/scripts/failures.ts",
     "gate:exact": "node --import tsx lab/harness/src/cli/exact.ts",
+    "gate:channel": "node --import tsx lab/harness/scripts/batch-channel-check.ts",
     "identity:devnet-run": "node --import tsx lab/tools/identity-devnet-run.ts",
     "identity:fixtures": "node --import tsx lab/tools/identity-fixtures.ts",
     "boundaries": "node --import tsx tooling/check-boundaries.ts",

@@ -56,7 +56,19 @@ cd apps/docs && pnpm build && npx wrangler@4.151.1 deploy
   gets a stable `/markdown/<locale>/<path>.md` URL, with `index` for home pages.
 - Every page exposes **Copy page** and **View Markdown**, plus a Markdown
   alternate link and an `llms.txt` discovery link. Copy failures point readers
-  to the direct Markdown link. No article is sent to an external assistant.
+  to the direct Markdown link. Compact controls show a copy/check icon, Markdown
+  icon and an **Open in** menu with the ChatGPT, Claude, Claude Code and Cursor
+  icons. Success is shown inside the copy button and announced to screen
+  readers. Controls are 32px tall with 12px labels on desktop, with larger touch
+  targets on coarse-pointer devices. Provider icon attribution ships in
+  `public/third-party-icons.txt`.
+- Assistant links prefill a composer with the canonical public Markdown URL, in
+  the page's language; they never include the current browser URL, local preview
+  address, query parameters, private content or a local folder. They only open
+  after an explicit click and do not submit a prompt. Claude Code uses the
+  [official Desktop deep link](https://support.claude.com/en/articles/14729294-open-claude-desktop-with-a-link)
+  and needs the app installed. The local preview's assistant links still point
+  to the public site, whose content changes only after an approved deployment.
 - `sitemap.xml`, `robots.txt` and page metadata use the canonical public URL.
 
 The sidebar uses three grid columns with a fixed desktop navigation width. Keep

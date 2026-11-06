@@ -3,10 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "exports": {
+    "./assistant-links": "./lib/assistant-links.ts"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "test:export": "node --test test/*.test.ts"
+    "test:export": "node --import tsx --test test/*.test.ts"
   },
   "dependencies": {
     "fumadocs-core": "16.17.9",
