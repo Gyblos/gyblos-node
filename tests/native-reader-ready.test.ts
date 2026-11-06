@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import type { ChildProcess } from 'node:child_process';
 import { EventEmitter } from 'node:events';
+import { setImmediate as yieldTurn } from 'node:timers/promises';
 import test from 'node:test';
 
 import type { EndpointAddr } from '@number0/iroh';
@@ -122,19 +123,27 @@ void test('CONNECT retains its own original deadline after a successful READY', 
   context.mock.timers.enable({ apis: ['setTimeout'] });
   const child = new ReaderDouble();
   child.replyToConnect = false;
-  const opening = unreadPeer(target, {
-    spawn: () => child as unknown as ChildProcess,
-  });
-  const refused = assert.rejects(opening, NativeTestDeadlineError);
-  context.mock.timers.tick(4000);
-  child.ready();
-  await Promise.resolve();
-  assert.deepEqual(child.commands, [READER_ACTIONS.CONNECT]);
-  context.mock.timers.tick(3500);
-  await refused;
-  assert.deepEqual(child.commands, [
-    READER_ACTIONS.CONNECT,
-    READER_ACTIONS.SHUTDOWN,
-  ]);
-  assert.equal(child.exitCode, 0);
+  const opening = unreadPeer(target, { spawn: () => child as unknown as ChildProcess });
+  let ended = false;
+  let failure: unknown;
+  const settled = opening.then(() => { ended = true; }, (error: unknown) => { failure = error; ended = true; });
+  try {
+    context.mock.timers.tick(4000);
+    child.ready();
+    await Promise.resolve();
+    assert.deepEqual(child.commands, [READER_ACTIONS.CONNECT]);
+    context.mock.timers.tick(3499);
+    await yieldTurn();
+    assert.equal(ended, false);
+    context.mock.timers.tick(1);
+    await yieldTurn();
+    assert.equal(ended, true);
+    await settled;
+    assert.ok(failure instanceof NativeTestDeadlineError);
+    assert.deepEqual(child.commands, [READER_ACTIONS.CONNECT, READER_ACTIONS.SHUTDOWN]);
+    assert.equal(child.exitCode, 0);
+  } finally {
+    if (child.exitCode === null && child.signalCode === null) { child.exitCode = 1; child.emit('exit', 1, null); }
+    await settled;
+  }
 });
