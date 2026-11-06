@@ -148,7 +148,7 @@ void test('docs export: article links resolve to exported pages and existing anc
 
 void test('docs export: all four sidebar groups have decorative icons and localized labels', async () => {
   const groups = [
-    { en: 'Start here', es: 'Empieza aquí', icon: 'compass' },
+    { en: 'Get started', es: 'Inicio', icon: 'compass' },
     { en: 'Sellers', es: 'Vendedores', icon: 'server' },
     { en: 'Reference', es: 'Referencia', icon: 'book-open' },
     { en: 'Help', es: 'Ayuda', icon: 'life-buoy' },
@@ -173,5 +173,49 @@ void test('docs export: all four sidebar groups have decorative icons and locali
       assert.ok(icon.includes('width="16"'));
       assert.ok(icon.includes('height="16"'));
     }
+  }
+});
+
+void test('docs export: introduction and quickstart lead the sidebar once in both languages', async () => {
+  for (const locale of ['en', 'es']) {
+    const output = await read(`${locale}.html`);
+    assert.match(output, /<h1\b[^>]*>Docs<\/h1>/);
+    const sidebar = output.match(/<aside\b[^>]*id="nd-sidebar"[\s\S]*?<\/aside>/)?.[0];
+    assert.ok(sidebar, `${locale}: missing sidebar`);
+    const links = [...sidebar.matchAll(/<a\b[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g)]
+      .filter(([, href]) => href?.startsWith(`/${locale}`));
+    const destinations = links.map(([, href]) => href);
+    assert.deepEqual(destinations, [
+      `/${locale}`, // Brand home link.
+      `/${locale}`,
+      `/${locale}/sellers/beta-guide`,
+      `/${locale}/getting-started/beta`,
+      `/${locale}/sellers/register-publish`,
+      `/${locale}/sellers/models-offers`,
+      `/${locale}/sellers/operate`,
+      `/${locale}/sellers/identity`,
+      `/${locale}/reference/cli`,
+      `/${locale}/reference/configuration`,
+      `/${locale}/help/troubleshooting`,
+    ]);
+    assert.ok(links[1]?.[2]?.includes('Intro'));
+    assert.ok(links[2]?.[2]?.includes(locale === 'es' ? 'Inicio rápido' : 'Quickstart'));
+  }
+});
+
+void test('docs export: troubleshooting has nested sections and retains previous deep links', async () => {
+  for (const locale of ['en', 'es']) {
+    const output = await read(`${locale}/help/troubleshooting.html`);
+    const sections = locale === 'es'
+      ? ['docker', 'ollama', 'motor', 'relay', 'registro', 'visibilidad']
+      : ['docker', 'ollama', 'engine', 'relay', 'registration', 'visibility'];
+    for (const id of sections) {
+      assert.match(output, new RegExp(`<h3\\b[^>]*id="${id}"`));
+      assert.ok(output.includes(`href="#${id}"`));
+    }
+    const previous = locale === 'es'
+      ? ['empieza-por-el-estado-del-servicio', 'errores-de-instalación', 'configuración-rechazada', 'motor-o-relay-no-disponible', 'funciona-pero-no-aparece-publicado', 'solicitudes-gratuitas-rechazadas-o-sin-actividad', 'llaves-ausentes-estado-corrupto-o-bloqueos', 'pide-ayuda-de-forma-segura']
+      : ['start-with-the-service-state', 'installation-errors', 'configuration-rejected', 'engine-or-relay-unavailable', 'running-but-not-listed', 'free-requests-refused-or-no-activity', 'missing-keys-corrupt-state-or-locks', 'ask-for-help-safely'];
+    for (const id of previous) assert.ok(output.includes(`id="${id}"`), `${locale}: removed #${id}`);
   }
 });
