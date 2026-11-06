@@ -98,11 +98,13 @@ together with its version-specific patch and Solana compatibility review. An
 automated upgrade can fail with `ERR_PNPM_UNUSED_PATCH` when it leaves the patch
 for the previous version unused. This is an update-generation failure, not
 evidence of a vulnerability or a failing installation of the currently pinned
-version. Do not delete the split-distribution patch, allow unused patches or add
-a dependency ignore rule to make that update succeed. Keep dependency alerts and
-the audit active; triage any advisory separately. A manual update must port or
-demonstrate that upstream replaces the patch, preserve recipient-distribution
-and recovery behavior, and pass the normal reviews and validation before merge.
+version. Do not delete the split-distribution patch (`upto` splits, and
+`batch-settlement` splits with the client's `approveSplits` check), allow unused
+patches or add a dependency ignore rule to make that update succeed. Keep
+dependency alerts and the audit active; triage any advisory separately. A manual
+update must port or demonstrate that upstream replaces the patch, preserve
+recipient-distribution and recovery behavior, and pass the normal reviews and
+validation before merge.
 
 ## Opening and maintenance
 

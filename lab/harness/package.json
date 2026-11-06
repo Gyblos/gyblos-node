@@ -11,6 +11,7 @@
     "./cli/inference/billing": "./src/cli/inference/billing.ts",
     "./cli/preflight": "./src/cli/preflight.ts",
     "./cli/run": "./src/cli/run.ts",
+    "./commands/batch-channel-check": "./scripts/batch-channel-check.ts",
     "./commands/challenge": "./scripts/challenge.ts",
     "./commands/failures": "./scripts/failures.ts",
     "./commands/fund": "./scripts/fund.ts",

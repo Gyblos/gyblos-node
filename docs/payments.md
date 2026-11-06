@@ -39,6 +39,7 @@ after `pnpm gate:setup` and funding; network confirmation can take minutes.
 | `pnpm gate:failures`  | An empty buyer and an expired authorization are both refused without a charge (about 62 s).                  |
 | `pnpm gate:exact`     | Fixed-price payment through x402.org: network, mint, amount, recipient and fee payer checked before signing. |
 | `pnpm gate:inference` | Six metered-inference cases with a real model; see [inference.md](inference.md).                             |
+| `pnpm gate:channel`   | One long-lived channel for several requests, with the protocol fee split on chain; see below.                |
 
 `gate:setup` creates isolated buyer, seller, authorizer, facilitator and
 test-mint keys in the lab home (`.local/lab/`, or `GYBLOS_LAB_HOME`) and never
@@ -51,6 +52,55 @@ To run the fixed-resource roles in separate terminals: `pnpm gate:facilitator`
 Gate reports for `exact` and inference are written locally to
 `lab/evidence/gate-0004.json` and `gate-0005.json`. These paths are ignored by
 Git; those reports are not published.
+
+## Batch-settlement channel check
+
+Today the node opens one `upto` channel per request, so every request pays its
+own transactions and rent. `pnpm gate:channel` checks the alternative with the
+SDK's `batch-settlement` scheme and the official payment-channels program
+(`CHNLxYvVA28MJP9PrFuDXccuoGXAx7jBacfLEkahyGsX`): the buyer deposits 5,000 once,
+pays three requests (145, 210 and 95) with metered vouchers signed by the
+seller's operator key, the seller redeems them in one claim and distribution,
+and the buyer gets the rest back with a cooperative refund. The check fails
+unless the seller receives 97% of the 450 charged (rounded down), the treasury
+3% (rounded down), the program treasury the rounding remainder, the refund is
+4,550 and the buyer spends no SOL. It is not wired into the buyer or seller.
+
+The protocol fee is committed when the channel opens, through `extra.splits`
+(seller first, then the treasury; 1–4 distinct recipients, basis points summing
+to 10,000). The buyer's client opens such a channel only if its `approveSplits`
+callback accepts the exact list. Without `extra.splits` the SDK keeps paying
+100% to `payTo`. This part comes from the local `@x402/svm` patch, proposed
+upstream in
+[x402-foundation/x402#4166](https://github.com/x402-foundation/x402/issues/4166).
+Here the fee comes out of the seller's charge, unlike `upto`, where it is added
+on top of the seller's price.
+
+Before this replaces `upto` in the node:
+
+- The splits are fixed for the channel's life, and the facilitator checks every
+  voucher, top-up, claim and refund against the splits of the current terms.
+  Changing the fee or treasury while a channel is open makes it unusable until
+  the buyer withdraws; close channels before changing them.
+- The facilitator's channel storage must be durable and keep each channel's
+  splits; otherwise, after a restart, rent cleanup builds a 100% `payTo`
+  distribution that the program rejects.
+- Every recipient needs a token account for the mint before redemption.
+
+By default the check needs a loopback validator (Agave 4.x; Solana 1.18 cannot
+run the program) that loads the program dumped from devnet:
+
+```sh
+solana program dump -u devnet CHNLxYvVA28MJP9PrFuDXccuoGXAx7jBacfLEkahyGsX channels.so
+solana-test-validator --reset --bpf-program CHNLxYvVA28MJP9PrFuDXccuoGXAx7jBacfLEkahyGsX channels.so
+pnpm gate:channel
+```
+
+It uses throwaway keys and a fresh test mint. `pnpm gate:channel --devnet` runs
+on the public devnet RPC; it sends real devnet transactions, so run it only when
+approved. It keeps its keys in `.local/lab/batch-channel-check/keys.json` (mode
+`0600`; a more open file is refused), and only the funder key needs devnet SOL;
+when it has none, the check prints the funder address and exits with code 2.
 
 ## Published evidence
 
