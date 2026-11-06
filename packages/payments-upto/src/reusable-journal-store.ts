@@ -24,11 +24,14 @@ import {
 export interface ReusableJournalSession {
   entries: ReusableChannelEntry[];
   save(): Promise<void>;
+  saveControl(source: string): Promise<void>;
+  readControl(): Promise<string | undefined>;
   maxBytes: number;
 }
 export interface ReusableJournalStore {
   run<T>(
     operation: (session: ReusableJournalSession) => Promise<T>,
+    inspection?: boolean,
   ): Promise<T>;
   close(): Promise<void>;
 }
@@ -51,25 +54,49 @@ export async function openReusableStore(
   } catch {
     return unavailable();
   }
-  return createStore(paths.state, lock, maxBytes);
+  return createStore(paths.state, paths.control, lock, maxBytes);
+}
+function controlWriter(
+  path: string,
+  lock: ProcessLock,
+  maxBytes: number,
+  poison: () => void,
+) {
+  return async (source: string) => {
+    try {
+      await lock.verify();
+      await writePrivateFile(path, source, maxBytes);
+    } catch {
+      poison();
+      unavailable();
+    }
+  };
+}
+async function loadJournal(
+  path: string,
+  lock: ProcessLock,
+  maxBytes: number,
+): Promise<ReusableChannelEntry[]> {
+  try {
+    await lock.verify();
+    const source = await readPrivateFile(path, maxBytes);
+    return source === undefined ? [] : await parseDocument(source);
+  } catch {
+    return unavailable();
+  }
 }
 function createStore(
   path: string,
+  controlPath: string,
   lock: ProcessLock,
   maxBytes: number,
 ): ReusableJournalStore {
   let queue: Promise<unknown> = Promise.resolve();
   let closing: Promise<void> | undefined;
   let poisoned = false;
-  async function load(): Promise<ReusableChannelEntry[]> {
-    try {
-      await lock.verify();
-      const source = await readPrivateFile(path, maxBytes);
-      return source === undefined ? [] : await parseDocument(source);
-    } catch {
-      return unavailable();
-    }
-  }
+  const saveControl = controlWriter(controlPath, lock, maxBytes, () => {
+    poisoned = true;
+  });
   async function save(entries: ReusableChannelEntry[]): Promise<void> {
     const source = JSON.stringify({
       version: REUSABLE_JOURNAL.version,
@@ -86,6 +113,7 @@ function createStore(
   }
   function run<T>(
     operation: (session: ReusableJournalSession) => Promise<T>,
+    inspection = false,
   ): Promise<T> {
     if (closing || poisoned)
       return Promise.reject(
@@ -94,10 +122,21 @@ function createStore(
     const next = queue.then(async () => {
       if (poisoned) return unavailable();
       try {
-        const entries = await load();
+        const entries = await loadJournal(path, lock, maxBytes);
+        // A marker is never interpreted as proof of failure or safe to retry.
+        if (
+          !inspection &&
+          (await readPrivateFile(controlPath, maxBytes)) !== undefined
+        )
+          unavailable();
         return await operation({
           entries,
           save: () => save(entries),
+          saveControl,
+          readControl: async () => {
+            await lock.verify();
+            return readPrivateFile(controlPath, maxBytes);
+          },
           maxBytes,
         });
       } catch {

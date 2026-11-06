@@ -168,14 +168,16 @@ export function createReusableChannelActions(store: ReusableJournalStore) {
       return recoverNeverOpened();
     },
     get(channelId: string) {
-      return store.run(async ({ entries }) =>
-        structuredClone(
-          entries.find((item) => item.terms.channelId === channelId),
-        ),
+      return store.run(
+        async ({ entries }) =>
+          structuredClone(
+            entries.find((item) => item.terms.channelId === channelId),
+          ),
+        true,
       );
     },
     list() {
-      return store.run(async ({ entries }) => structuredClone(entries));
+      return store.run(async ({ entries }) => structuredClone(entries), true);
     },
   };
 }

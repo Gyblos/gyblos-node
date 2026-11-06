@@ -19,7 +19,11 @@ import {
   type ReusableChannelEntry,
   type ReusableChannelTerms,
 } from './reusable-journal-model';
-import { findChannel, verifyObservation } from './reusable-journal-observation';
+import {
+  findChannel,
+  knownSettlement,
+  verifyObservation,
+} from './reusable-journal-observation';
 import type {
   ReusableJournalSession,
   ReusableJournalStore,
@@ -72,12 +76,6 @@ async function signPending(
   entry.pending = null;
   await session.save();
   return signed;
-}
-function knownSettlement(entry: ReusableChannelEntry, amount: string): boolean {
-  return (
-    amount === '0' ||
-    entry.vouchers.some((voucher) => voucher.maxClaimableAmount === amount)
-  );
 }
 // A signature may have escaped before interruption; do not sign it again.
 function recoverPending(): Promise<SignedReusableVoucher> {

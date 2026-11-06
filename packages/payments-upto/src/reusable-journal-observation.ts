@@ -28,6 +28,15 @@ export function findChannel(
     unavailable()
   );
 }
+export function knownSettlement(
+  entry: ReusableChannelEntry,
+  amount: string,
+): boolean {
+  return (
+    amount === '0' ||
+    entry.vouchers.some((voucher) => voucher.maxClaimableAmount === amount)
+  );
+}
 export function verifyObservation(
   expected: ReusableChannelTerms,
   observed: FinalizedOpenObservation,

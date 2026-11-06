@@ -100,6 +100,17 @@ export const BUYER_WITHDRAW = {
 } as const;
 
 // Bounded private reusable-channel journal; never aliases the legacy per-request journal.
+export const REUSABLE_CONTROL = {
+  // Base64 expansion of the maximum Solana wire transaction size.
+  maxEncodedWireBytes: 1644,
+  version: 1,
+  preparing: 'preparing',
+  pending: 'pending',
+  confirmed: 'confirmed',
+  failed: 'failed',
+  unknown: 'unknown',
+} as const;
+
 export const REUSABLE_JOURNAL = {
   version: 1,
   maxChannels: 256,
