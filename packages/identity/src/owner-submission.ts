@@ -8,7 +8,9 @@ import {
   getSignatureFromTransaction,
   getTransactionDecoder,
   signTransactionMessageWithSigners,
+  type Address,
   type Base64EncodedWireTransaction,
+  type Blockhash,
   type Rpc,
   type Signature,
   type SolanaRpcApi,
@@ -24,6 +26,7 @@ import {
   REGISTRATION_FINAL_FAILURES,
   REGISTRATION_INSTRUCTION_FAILURES,
 } from './constants';
+import { expiredOwnerRegistration } from './owner-recovery';
 import type { OwnerRegistration } from './owner-registration';
 
 export interface PreparedOwnerRegistration {
@@ -137,11 +140,13 @@ export async function checkOwnerRegistration(input: {
   rpc: Rpc<SolanaRpcApi>;
   signature: Signature;
   lastValidBlockHeight: bigint;
+  attempt?: { asset: Address; blockhash: Blockhash };
 }): Promise<OwnerRegistrationSubmission> {
   const unknown = { status: OWNER_REGISTRATION_STATUS.UNKNOWN };
   const rpc = input.rpc;
   const transactionSignature = input.signature;
   const lastValidBlockHeight = input.lastValidBlockHeight;
+  const attempt = input.attempt ? { ...input.attempt } : undefined;
   if (lastValidBlockHeight < 0n) return unknown;
   const signal = AbortSignal.timeout(IDENTITY_RESOLUTION_LIMITS.timeoutMs);
   try {
@@ -152,7 +157,20 @@ export async function checkOwnerRegistration(input: {
       )) !== DEVNET_GENESIS
     )
       return unknown;
-    return await readStatus(rpc, transactionSignature, signal);
+    const result = await readStatus(rpc, transactionSignature, signal);
+    if (result.status !== OWNER_REGISTRATION_STATUS.UNKNOWN || !attempt)
+      return result;
+    return await bounded(
+      () =>
+        expiredOwnerRegistration({
+          rpc,
+          signature: transactionSignature,
+          lastValidBlockHeight,
+          attempt,
+          signal,
+        }),
+      signal,
+    );
   } catch {
     return unknown;
   }

@@ -139,3 +139,77 @@ void test('seller CLI registers one synthetic 8004 asset before retrying the loc
       await fake.close();
     }
   }));
+
+void test('unfunded registration shows a funding estimate and missing SOL before simulation or approval', () =>
+  withHome(async (home) => {
+    const fake = await startFakeRpc(new Map(), {
+      ownerBalance: 0,
+      ownerAfterProbe: 0,
+      fee: 20_000,
+      initialSimulationErr: 'InsufficientFundsForRent',
+    });
+    try {
+      const key = generateKeyPairSync('ed25519').privateKey.export({
+        format: 'jwk',
+      });
+      assert.ok(key.d && key.x);
+      const secret = [
+        ...Buffer.from(key.d, 'base64url'),
+        ...Buffer.from(key.x, 'base64url'),
+      ];
+      const owner = await createKeyPairSignerFromBytes(Uint8Array.from(secret));
+      const node = await fixedSigner(7);
+      const nodeId = Buffer.from(
+        getAddressEncoder().encode(node.address),
+      ).toString('hex');
+      const role: Extract<RoleConfig, { role: typeof P2P_ROLES.SELLER }> = {
+        schemaVersion: ROLE_CONFIG_SCHEMA_VERSION,
+        role: P2P_ROLES.SELLER,
+        rpcUrl: fake.url,
+        mint: owner.address,
+        assetLabel: CONFIG_ASSET_LABELS.TEST_TOKEN,
+        nodeId,
+        owner: owner.address,
+      };
+      await writeFile(joinPath(home.seller, 'role.json'), JSON.stringify(role));
+      await writeFile(
+        joinPath(home.seller, 'owner.json'),
+        JSON.stringify(secret),
+        { mode: 0o600 },
+      );
+      await writeFile(
+        joinPath(home.seller, 'node.key'),
+        JSON.stringify(Array(32).fill(7)),
+        { mode: 0o600 },
+      );
+      let stdout = '';
+      let stderr = '';
+      let approvals = 0;
+      const result = await runCli(['seller', 'register'], {
+        env: { GYBLOS_HOME: home.home, GYBLOS_INVITE: INVITE },
+        cwd: home.root,
+        stdout: (text) => {
+          stdout += text;
+        },
+        stderr: (text) => {
+          stderr += text;
+        },
+        prompt: async () => {
+          approvals++;
+          return 'yes';
+        },
+        fetch: async () =>
+          new Response(JSON.stringify({ error: 'IDENTITY_NOT_REGISTERED' }), {
+            status: 403,
+          }),
+      });
+      assert.equal(result, 1);
+      assert.match(stdout, /Pre-simulation funding estimate: 0\.012544640 SOL/);
+      assert.match(stderr, /you need 0\.012544640 more SOL/);
+      assert.equal(approvals, 0);
+      assert.equal(fake.state.calls.includes('simulateTransaction'), false);
+      assert.equal(fake.state.calls.includes('sendTransaction'), false);
+    } finally {
+      await fake.close();
+    }
+  }));

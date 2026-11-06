@@ -116,13 +116,16 @@ works.
 
 <Callout type="warn" title="Solana registration">
   If your node is not registered on Solana devnet yet, the command shows an
-  estimated SOL cost and asks before signing and submitting the transaction.
-  Fund the owner wallet first. If confirmation is uncertain, keep the seller's
-  files and run the command again; it checks the same attempt. If the attempt
-  has expired and remains uncertain, contact Gyblos instead of deleting its
-  state. The owner wallet is registered in 8004; existing paid payout settings
-  may differ. Without a terminal, `DISCOVERY_IDENTITY_NOT_REGISTERED` asks you
-  to rerun interactively.
+  estimated SOL cost and asks before signing and submitting the transaction. It
+  estimates funding and missing SOL before simulation; upgradeable programs may
+  change the actual cost. Fund the owner wallet first. If confirmation is
+  uncertain, keep the seller's files and rerun: it verifies the saved attempt. A
+  proven expired blockhash with finalized absent asset accounts permits a new
+  attempt with the same asset and fresh consent. Expiry does not prove the old
+  attempt never landed or paid a fee. Partial or inconclusive state still needs
+  Gyblos assistance; never delete it. The owner wallet is registered in 8004;
+  existing paid payout settings may differ. Without a terminal,
+  `DISCOVERY_IDENTITY_NOT_REGISTERED` asks you to rerun interactively.
 </Callout>
 
 ## Publish your offer

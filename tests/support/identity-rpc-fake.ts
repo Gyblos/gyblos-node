@@ -45,8 +45,13 @@ export interface FakeRpcState {
   calls: string[];
   configs: { method: string; params: unknown[] }[];
   genesisHash: string;
+  blockHeight: number;
+  blockhashValid: boolean;
+  transactionResult: unknown;
+  rentQueries: number[];
   failingMethods: Set<string>;
   batchValue?: unknown;
+  accountsContextSlot?: number;
   programValue?: unknown;
   responsePadding: Map<string, number>;
   signatureStatus: {
@@ -156,7 +161,7 @@ function multipleAccounts(state: FakeRpcState, params: unknown[]) {
     return { error: { code: RPC_ERROR_CODE, message: 'synthetic outage' } };
   return {
     result: {
-      context: { slot: SLOT },
+      context: { slot: state.accountsContextSlot ?? SLOT },
       value: Object.hasOwn(state, 'batchValue')
         ? state.batchValue
         : keys.map((key) => accountJson(state.chain, key)),
@@ -211,6 +216,26 @@ function respond(state: FakeRpcState, call: JsonRpcCall): object {
       };
     case 'sendTransaction':
       return { result: state.sendSignature };
+    case 'getEpochInfo':
+      return {
+        result: {
+          absoluteSlot: SLOT,
+          blockHeight: state.blockHeight,
+          epoch: 1,
+          slotIndex: 1,
+          slotsInEpoch: 432000,
+          transactionCount: 1,
+        },
+      };
+    case 'isBlockhashValid':
+      return { result: { context, value: state.blockhashValid } };
+    case 'getTransaction':
+      return { result: state.transactionResult };
+    case 'getMinimumBalanceForRentExemption': {
+      const bytes = Number(call.params[0]);
+      state.rentQueries.push(bytes);
+      return { result: 890880 + bytes * 6960 };
+    }
     case 'getSignatureStatuses':
       return { result: { context, value: [state.signatureStatus] } };
     case 'getSlot':
@@ -284,6 +309,10 @@ export async function startFakeRpc(
     calls: [],
     configs: [],
     genesisHash: DEVNET_GENESIS,
+    blockHeight: SLOT,
+    blockhashValid: true,
+    transactionResult: null,
+    rentQueries: [],
     failingMethods: new Set(),
     responsePadding: new Map(),
     signatureStatus: null,

@@ -23,17 +23,20 @@ export async function registerOnChain(
     environment,
     identity: { owner: identity.owner, nodeId: identity.nodeId },
     operations: sellerRegistrationOperations({ environment, role: identity }),
+    onEstimate: (lamports) =>
+      output.stdout(
+        `Pre-simulation funding estimate: ${registrationSol(lamports)} SOL; the cost may change.\n`,
+      ),
+    onResend: () =>
+      output.stdout('Resending the previously approved registration.\n'),
     onCostChanged: () =>
       output.stderr(
         'Registration cost increased; run the command again to review the updated estimate.\n',
       ),
     confirm: async (lamports) => {
-      const whole = lamports / REGISTER.lamportsPerSol;
-      const fraction = String(lamports % REGISTER.lamportsPerSol).padStart(
-        REGISTER.solDecimals,
-        '0',
+      output.stdout(
+        `Estimated registration cost: ${registrationSol(lamports)} SOL.\n`,
       );
-      output.stdout(`Estimated registration cost: ${whole}.${fraction} SOL.\n`);
       return (
         (await prompt('Sign and submit this registration? (yes/no): '))
           .trim()
@@ -41,4 +44,9 @@ export async function registerOnChain(
       );
     },
   });
+}
+
+// Amounts come from bounded registration arithmetic, never user-formatted decimal text.
+export function registrationSol(lamports: bigint): string {
+  return `${lamports / REGISTER.lamportsPerSol}.${String(lamports % REGISTER.lamportsPerSol).padStart(REGISTER.solDecimals, '0')}`;
 }

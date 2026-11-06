@@ -23,7 +23,10 @@ import { openSellerRegistrationState } from './seller-registration-state';
 export interface SellerRegistrationOperations {
   // true means a matching binding exists; false means absent; undefined means unavailable.
   lookup(asset?: string): Promise<boolean | undefined>;
-  build(asset: KeyPairSigner): Promise<{
+  build(
+    asset: KeyPairSigner,
+    onEstimate?: (lamports: bigint) => void,
+  ): Promise<{
     estimatedTotalLamports: bigint;
     sign(): Promise<PreparedOwnerRegistration>;
   }>;
@@ -50,6 +53,8 @@ export async function registerSellerIdentity(input: {
   operations: SellerRegistrationOperations;
   confirm(estimatedTotalLamports: bigint): Promise<boolean>;
   onCostChanged?(): void;
+  onEstimate?(lamports: bigint): void;
+  onResend?(): void;
 }): Promise<boolean> {
   const state = await openSellerRegistrationState(
     input.environment,
@@ -78,13 +83,21 @@ export async function registerSellerIdentity(input: {
       if (result.status === OWNER_REGISTRATION_STATUS.CONFIRMED)
         return (await input.operations.lookup(asset?.address)) === true;
       if (result.status === OWNER_REGISTRATION_STATUS.UNKNOWN) {
+        input.onResend?.();
         const retried = await input.operations.send(pending);
         return (
           retried.status === OWNER_REGISTRATION_STATUS.CONFIRMED &&
           (await input.operations.lookup(asset?.address)) === true
         );
       }
-      if (result.status !== OWNER_REGISTRATION_STATUS.FAILED) return false;
+      if (
+        result.status !== OWNER_REGISTRATION_STATUS.FAILED &&
+        result.status !== OWNER_REGISTRATION_STATUS.EXPIRED
+      )
+        return false;
+      // Expiry permits replacing dead bytes, not assuming that the original transaction never landed.
+      const registered = await input.operations.lookup();
+      if (registered !== false) return registered === true;
       failedSignature = current.prepared.signature;
     }
     if (!current) {
@@ -95,9 +108,9 @@ export async function registerSellerIdentity(input: {
     const signer = await createKeyPairSignerFromBytes(
       Uint8Array.from(current.assetSecret),
     );
-    const draft = await input.operations.build(signer);
+    const draft = await input.operations.build(signer, input.onEstimate);
     if (!(await input.confirm(draft.estimatedTotalLamports))) return false;
-    const refreshed = await input.operations.build(signer);
+    const refreshed = await input.operations.build(signer, input.onEstimate);
     if (refreshed.estimatedTotalLamports > draft.estimatedTotalLamports) {
       input.onCostChanged?.();
       return false;

@@ -266,16 +266,24 @@ In the seller image, from the compose directory:
   but the NodeId lacks an 8004 registration, an interactive terminal offers to
   register it on Solana devnet. The owner wallet pays; the command shows the
   estimated SOL cost and asks for consent before signing and submitting. Fund
-  the owner wallet first; no automatic faucet is used. If simulation fails, the
-  exact cost may not be available.
+  the owner wallet first; no automatic faucet is used. A funding estimate and
+  missing SOL are available before simulation. The estimate uses pinned account
+  layouts and the published Core create fee; upgradeable programs may change the
+  actual cost. Simulation remains mandatory before signing, and the final
+  estimate is never lower than the preliminary one.
 - The asset key and signed attempt are stored privately in the seller home. Keep
   this state if a result is uncertain. Running the command again checks the
   saved attempt and may resend the identical signed transaction; it does not
-  make another asset while that attempt is unresolved. If an expired attempt
-  remains unconfirmed and the RPC has no conclusive history, contact the
-  operator rather than deleting the state. This devnet flow does not enable
-  mainnet. The 8004 wallet is the owner; existing paid seller roles may still
-  use a different payout address until wallet unification is completed.
+  make another asset while that attempt is unresolved. Before resending it
+  verifies both signatures, the owner, asset, NodeId and canonical instructions.
+  When the saved blockhash is invalid in a finalized view and all three asset
+  accounts are absent in a sufficiently recent view, it can rebuild with the
+  same asset after fresh consent. Expiry does not prove the previous transaction
+  never landed or incurred a fee. Inconclusive or partial state still requires
+  operator assistance; never delete it. A verified registration under another
+  asset of the same owner and NodeId is accepted. This devnet flow does not
+  enable mainnet. The 8004 wallet is the owner; existing paid seller roles may
+  still use a different payout address until wallet unification is completed.
 - `Registered` or `Already registered` (a retry with the same invite) means the
   seller may now publish; set `publish = true` under `[discovery]` to be listed.
 - Before asking for the invite it checks this home's seller role

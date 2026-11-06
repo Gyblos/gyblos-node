@@ -16,6 +16,7 @@ import {
   REGISTRATION_ERROR_LIMITS,
 } from './constants';
 import { IdentityError } from './errors';
+import { estimateOwnerFunding } from './owner-cost';
 import {
   assertFits,
   chainDeadline,
@@ -35,6 +36,7 @@ export interface OwnerRegistrationInput {
   agentUri: string;
   bindingSequence: bigint;
   timeoutMs?: number;
+  onEstimate?: (lamports: bigint) => void;
 }
 export interface OwnerRegistration {
   message: SponsoredMessage;
@@ -48,6 +50,7 @@ async function estimateOwnerCost(
   message: SponsoredMessage,
   owner: Address,
   signal: AbortSignal,
+  minimum: bigint,
 ): Promise<{ feeLamports: bigint; estimatedTotalLamports: bigint }> {
   const before = await rpc
     .getBalance(owner, { commitment: FINALIZED_COMMITMENT })
@@ -81,24 +84,30 @@ async function estimateOwnerCost(
       IDENTITY_ERROR_CODES.SIMULATION_FAILED,
       'Invalid registration cost.',
     );
-  return { feeLamports, estimatedTotalLamports };
+  return {
+    feeLamports,
+    estimatedTotalLamports:
+      estimatedTotalLamports > minimum ? estimatedTotalLamports : minimum,
+  };
 }
 
+function assertInstructionCount(count: number): void {
+  if (BigInt(count) !== REGISTRATION_ERROR_LIMITS.maxInstructionIndex + 1n)
+    throw new IdentityError(
+      IDENTITY_ERROR_CODES.ENCODING_INVARIANT,
+      'Unexpected registration instruction count.',
+    );
+}
 async function buildWithinDeadline(
   input: OwnerRegistrationInput,
   signal: AbortSignal,
 ): Promise<OwnerRegistration> {
   const rpc = input.rpc;
+  const onEstimate = input.onEstimate;
   const ownerAddress = input.owner.address;
-  const ownerKeys = {
-    publicKey: input.owner.keyPair.publicKey,
-    privateKey: input.owner.keyPair.privateKey,
-  };
+  const ownerKeys = { ...input.owner.keyPair };
   const assetAddress = input.asset.address;
-  const assetKeys = {
-    publicKey: input.asset.keyPair.publicKey,
-    privateKey: input.asset.keyPair.privateKey,
-  };
+  const assetKeys = { ...input.asset.keyPair };
   const node = {
     address: input.node.address,
     signDetached: input.node.signDetached.bind(input.node),
@@ -135,21 +144,28 @@ async function buildWithinDeadline(
     { owner, asset, node, agentUri, bindingSequence, payoutWallet },
     deadline,
   );
-  if (
-    BigInt(instructions.length) !==
-    REGISTRATION_ERROR_LIMITS.maxInstructionIndex + 1n
-  )
-    throw new IdentityError(
-      IDENTITY_ERROR_CODES.ENCODING_INVARIANT,
-      'Unexpected registration instruction count.',
-    );
+  assertInstructionCount(instructions.length);
   const { value: blockhash } = await rpc
     .getLatestBlockhash({ commitment: FINALIZED_COMMITMENT })
     .send({ abortSignal: signal });
   signal.throwIfAborted();
   const message = composeMessage(owner, blockhash, instructions);
   assertFits(message);
-  const cost = await estimateOwnerCost(rpc, message, owner.address, signal);
+  const preliminary = await estimateOwnerFunding(
+    rpc,
+    message,
+    owner.address,
+    agentUri,
+    signal,
+    onEstimate,
+  );
+  const cost = await estimateOwnerCost(
+    rpc,
+    message,
+    owner.address,
+    signal,
+    preliminary.estimatedTotalLamports,
+  );
   signal.throwIfAborted();
   return {
     message,

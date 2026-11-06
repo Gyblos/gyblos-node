@@ -1,6 +1,14 @@
 // Connects seller registration to the pinned devnet 8004 reader and owner-funded builder.
 // It never sends anything unless the caller asks to submit a previously persisted attempt.
-import { address, type Rpc, type SolanaRpcApi } from '@solana/kit';
+import {
+  address,
+  blockhash,
+  getBase64Encoder,
+  getCompiledTransactionMessageDecoder,
+  getTransactionDecoder,
+  type Rpc,
+  type SolanaRpcApi,
+} from '@solana/kit';
 
 import {
   FINALIZED_COMMITMENT,
@@ -13,6 +21,7 @@ import {
   checkOwnerRegistration,
   detachedSignerFromNodeSecret,
   IdentityError,
+  OwnerRegistrationFundsError,
   prepareOwnerRegistration,
   readNodeIdentity,
   submitOwnerRegistration,
@@ -32,6 +41,51 @@ import { nodeSecret, roleSigner, type RoleConfig } from './roles';
 import type { SellerRegistrationOperations } from './seller-registration';
 
 type SellerRole = Extract<RoleConfig, { role: typeof P2P_ROLES.SELLER }>;
+async function buildRegistration(
+  rpc: Rpc<SolanaRpcApi>,
+  environment: HomeEnvironment,
+  role: SellerRole,
+  asset: Parameters<SellerRegistrationOperations['build']>[0],
+  onEstimate?: (lamports: bigint) => void,
+) {
+  const owner = await roleSigner(P2P_ROLES.SELLER, 'owner', environment);
+  const node = await detachedSignerFromNodeSecret(
+    Uint8Array.from(await nodeSecret(P2P_ROLES.SELLER, environment)),
+  );
+  const registration = await buildOwnerRegistration({
+    rpc,
+    owner,
+    asset,
+    node,
+    agentUri: REGISTRATION_DEFAULTS.agentUri,
+    bindingSequence: BigInt(Date.now()),
+    onEstimate,
+  }).catch((error: unknown) => {
+    if (error instanceof OwnerRegistrationFundsError)
+      throw new NodeError(
+        NODE_ERROR_CODES.SELLER_REGISTRATION_INSUFFICIENT_FUNDS,
+        {
+          requiredLamports: error.estimatedTotalLamports,
+          missingLamports: error.missingLamports,
+        },
+      );
+    if (
+      error instanceof IdentityError &&
+      error.code === IDENTITY_ERROR_CODES.SIMULATION_FAILED
+    )
+      throw new NodeError(
+        NODE_ERROR_CODES.SELLER_REGISTRATION_SIMULATION_FAILED,
+      );
+    throw error;
+  });
+  if (registration.nodeId !== role.nodeId || owner.address !== role.owner)
+    throw new Error('REGISTRATION_IDENTITY_MISMATCH');
+  return {
+    estimatedTotalLamports: registration.estimatedTotalLamports,
+    sign: () => prepareOwnerRegistration(registration),
+  };
+}
+
 export function sellerRegistrationOperations(input: {
   rpc?: Rpc<SolanaRpcApi>;
   environment: HomeEnvironment;
@@ -41,13 +95,12 @@ export function sellerRegistrationOperations(input: {
   const environment = { ...input.environment };
   const role = { ...input.role };
   return {
-    async lookup(expectedAsset) {
+    async lookup(_expectedAsset) {
       const found = await readRegistryIdentity(rpc, role.nodeId);
       if (found.kind === IDENTITY_LOOKUP_KINDS.MISSING) return false;
       if (
         found.kind !== IDENTITY_LOOKUP_KINDS.BOUND ||
-        found.binding.owner !== role.owner ||
-        (expectedAsset !== undefined && found.binding.asset !== expectedAsset)
+        found.binding.owner !== role.owner
       )
         return undefined;
       const actual = await readNodeIdentity(
@@ -65,41 +118,23 @@ export function sellerRegistrationOperations(input: {
         ? true
         : undefined;
     },
-    async build(asset) {
-      const owner = await roleSigner(P2P_ROLES.SELLER, 'owner', environment);
-      const node = await detachedSignerFromNodeSecret(
-        Uint8Array.from(await nodeSecret(P2P_ROLES.SELLER, environment)),
-      );
-      const registration = await buildOwnerRegistration({
-        rpc,
-        owner,
-        asset,
-        node,
-        agentUri: REGISTRATION_DEFAULTS.agentUri,
-        bindingSequence: BigInt(Date.now()),
-      }).catch((error: unknown) => {
-        if (
-          error instanceof IdentityError &&
-          error.code === IDENTITY_ERROR_CODES.SIMULATION_FAILED
-        )
-          throw new NodeError(
-            NODE_ERROR_CODES.SELLER_REGISTRATION_SIMULATION_FAILED,
-          );
-        throw error;
-      });
-      if (registration.nodeId !== role.nodeId || owner.address !== role.owner)
-        throw new Error('REGISTRATION_IDENTITY_MISMATCH');
-      return {
-        estimatedTotalLamports: registration.estimatedTotalLamports,
-        sign: () => prepareOwnerRegistration(registration),
-      };
-    },
+    build: (asset, onEstimate) =>
+      buildRegistration(rpc, environment, role, asset, onEstimate),
     send: (prepared) => submitOwnerRegistration({ rpc, prepared }),
-    check: (prepared) =>
-      checkOwnerRegistration({
+    check: (prepared) => {
+      const message = getCompiledTransactionMessageDecoder().decode(
+        getTransactionDecoder().decode(getBase64Encoder().encode(prepared.wire))
+          .messageBytes,
+      );
+      return checkOwnerRegistration({
         rpc,
         signature: prepared.signature,
         lastValidBlockHeight: prepared.lastValidBlockHeight,
-      }),
+        attempt: {
+          asset: address(message.staticAccounts[1]!),
+          blockhash: blockhash(message.lifetimeToken),
+        },
+      });
+    },
   };
 }

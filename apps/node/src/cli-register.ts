@@ -16,7 +16,7 @@ import { NodeError } from '@gyblos/node/errors';
 
 import { urlOrigin } from './cli-format';
 import type { Prompt } from './cli-init';
-import { registerOnChain } from './cli-register-identity';
+import { registerOnChain, registrationSol } from './cli-register-identity';
 import { EXIT, REGISTER, REGISTER_ERRORS } from './constants';
 import {
   discoverySettings,
@@ -62,9 +62,21 @@ async function inviteOf(output: SellerOutput, prompt: Prompt | undefined) {
 }
 
 class RegistrationUnavailable extends Error {
-  constructor(readonly simulationFailed = false) {
+  constructor(
+    readonly simulationFailed = false,
+    readonly missingLamports?: bigint,
+    readonly requiredLamports?: bigint,
+  ) {
     super();
   }
+}
+function registrationUnavailableHint(error: RegistrationUnavailable): string {
+  return error.missingLamports !== undefined &&
+    error.requiredLamports !== undefined
+    ? `you need ${registrationSol(error.missingLamports)} more SOL for the estimated ${registrationSol(error.requiredLamports)} SOL registration; fund the owner and retry`
+    : error.simulationFailed
+      ? 'registration simulation failed; ensure the owner has SOL, then retry to estimate the cost'
+      : 'registration is not confirmed; check the wallet and retry later without deleting its local state';
 }
 async function registerWithIdentity(
   attempt: () => Promise<
@@ -88,6 +100,8 @@ async function registerWithIdentity(
       throw new RegistrationUnavailable(
         cause instanceof NodeError &&
           cause.code === NODE_ERROR_CODES.SELLER_REGISTRATION_SIMULATION_FAILED,
+        cause instanceof NodeError ? cause.missingLamports : undefined,
+        cause instanceof NodeError ? cause.requiredLamports : undefined,
       );
     }
     if (!ready) throw new RegistrationUnavailable();
@@ -152,9 +166,7 @@ export async function registerCommand(
     if (error instanceof RegistrationUnavailable)
       return fail(
         REGISTER_ERRORS.IDENTITY_UNAVAILABLE,
-        error.simulationFailed
-          ? 'registration simulation failed; ensure the owner has SOL, then retry to estimate the cost'
-          : 'registration is not confirmed; check the wallet and retry later without deleting its local state',
+        registrationUnavailableHint(error),
       );
     if (!(error instanceof DiscoveryError)) throw error;
     const hint =

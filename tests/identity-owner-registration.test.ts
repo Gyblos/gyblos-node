@@ -298,7 +298,7 @@ void test('refuses a cost estimated from different chain snapshots or changed ba
   }
 });
 
-void test('an unfunded owner fails simulation without sending or fabricating a total', async () => {
+void test('an unfunded owner receives a funding estimate without simulating or sending', async () => {
   const fake = await startFakeRpc(new Map(), {
     ownerBalance: 0,
     ownerAfterProbe: 0,
@@ -317,7 +317,7 @@ void test('an unfunded owner fails simulation without sending or fabricating a t
       }),
       (error: unknown) =>
         error instanceof IdentityError &&
-        error.code === IDENTITY_ERROR_CODES.SIMULATION_FAILED,
+        error.code === IDENTITY_ERROR_CODES.INSUFFICIENT_FUNDS,
     );
     assert.equal(fake.state.calls.includes('sendTransaction'), false);
   } finally {
@@ -327,7 +327,7 @@ void test('an unfunded owner fails simulation without sending or fabricating a t
 
 void test('owner registration never reflects raw RPC simulation details', async () => {
   const fake = await startFakeRpc(new Map(), {
-    ownerBalance: 0,
+    ownerBalance: BALANCE,
     ownerAfterProbe: 0,
     fee: FEE,
     initialSimulationErr: 'synthetic-sensitive-marker',

@@ -120,13 +120,17 @@ no funciona.
 <Callout type="warn" title="Registro en Solana">
   Si tu nodo aún no está inscrito en la devnet de Solana, el comando muestra el
   costo estimado en SOL y pide tu confirmación antes de firmar y enviar la
-  transacción. Primero fondea la wallet del owner. Si el resultado es incierto,
-  conserva los archivos del vendedor y vuelve a ejecutar el comando: consultará
-  el mismo intento. Si el intento venció y sigue incierto, contacta a Gyblos sin
-  borrar su estado. La wallet inscrita en 8004 es la del owner; la dirección de
-  cobro de configuraciones pagadas anteriores puede ser diferente. Sin terminal,
-  `DISCOVERY_IDENTITY_NOT_REGISTERED` pide repetir el comando de forma
-  interactiva.
+  transacción. Antes de simular muestra una estimación y el SOL faltante; el
+  costo real puede cambiar si se actualizan los programas. Primero fondea la
+  wallet del owner. Si el resultado es incierto, conserva los archivos y repite
+  el comando: verificará el intento guardado. Un blockhash vencido y cuentas del
+  asset ausentes en una vista finalizada permiten reconstruir con el mismo asset
+  y una nueva confirmación. El vencimiento no demuestra que el intento anterior
+  nunca entró ni pagó una comisión. Si el estado es parcial o incierto, contacta
+  a Gyblos sin borrarlo. La wallet inscrita en 8004 es la del owner; la
+  dirección de cobro de configuraciones pagadas anteriores puede ser diferente.
+  Sin terminal, `DISCOVERY_IDENTITY_NOT_REGISTERED` pide repetir el comando de
+  forma interactiva.
 </Callout>
 
 ## Publica tu oferta

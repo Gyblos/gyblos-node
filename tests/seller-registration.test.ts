@@ -6,21 +6,17 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import {
-  blockhash,
-  createTransactionMessage,
-  generateKeyPairSigner,
-  getAddressEncoder,
-  getBase64EncodedWireTransaction,
-  getSignatureFromTransaction,
-  pipe,
-  setTransactionMessageFeePayerSigner,
-  setTransactionMessageLifetimeUsingBlockhash,
-  signTransactionMessageWithSigners,
-} from '@solana/kit';
+import { generateKeyPairSigner, getAddressEncoder } from '@solana/kit';
 
 import { CONFIG_ASSET_LABELS } from '@gyblos/config/constants';
-import { OWNER_REGISTRATION_STATUS } from '@gyblos/identity/constants';
+import {
+  buildOwnerRegistration,
+  prepareOwnerRegistration,
+} from '@gyblos/identity';
+import {
+  OWNER_REGISTRATION_STATUS,
+  REGISTRATION_DEFAULTS,
+} from '@gyblos/identity/constants';
 import { ROLE_CONFIG_SCHEMA_VERSION } from '@gyblos/node/constants';
 import type { RoleConfig } from '@gyblos/node/roles';
 import {
@@ -36,43 +32,48 @@ import { startFakeRpc } from './support/identity-rpc-fake';
 void test('lost registration reply can resend only the identical signed attempt', async () => {
   const root = await mkdtemp(join(tmpdir(), 'gyb-seller-registration-'));
   const environment = { GYBLOS_HOME: root };
+  const owner = await generateKeyPairSigner();
+  const node = await fixedSigner(1);
   const identity = {
-    owner: '11111111111111111111111111111112',
-    nodeId: '01'.repeat(32),
+    owner: owner.address,
+    nodeId: Buffer.from(getAddressEncoder().encode(node.address)).toString(
+      'hex',
+    ),
   };
-  const signer = await generateKeyPairSigner();
-  const message = pipe(
-    createTransactionMessage({ version: 0 }),
-    (item) => setTransactionMessageFeePayerSigner(signer, item),
-    (item) =>
-      setTransactionMessageLifetimeUsingBlockhash(
-        {
-          blockhash: blockhash('11111111111111111111111111111111'),
-          lastValidBlockHeight: 100n,
-        },
-        item,
-      ),
-  );
-  const transaction = await signTransactionMessageWithSigners(message);
-  const prepared = {
-    wire: getBase64EncodedWireTransaction(transaction),
-    signature: getSignatureFromTransaction(transaction),
-    lastValidBlockHeight: 100n,
-  };
+  const fake = await startFakeRpc(new Map(), {
+    ownerBalance: 100_000_000,
+    ownerAfterProbe: 87_475_360,
+    fee: 20_000,
+  });
   let sends = 0;
+  let resends = 0;
   let builds = 0;
   let checks = 0;
   const sentWires: string[] = [];
-  let checkStatus: 'unknown' | 'failed' = OWNER_REGISTRATION_STATUS.UNKNOWN;
+  let checkStatus: 'unknown' | 'failed' | 'expired' =
+    OWNER_REGISTRATION_STATUS.UNKNOWN;
   const assets: string[] = [];
   const operations = {
     lookup: async () => false,
     build: async (asset: Awaited<ReturnType<typeof generateKeyPairSigner>>) => {
       assets.push(asset.address);
       builds++;
-      return { estimatedTotalLamports: 123n, sign: async () => prepared };
+      const draft = await buildOwnerRegistration({
+        rpc: fake.rpc,
+        owner,
+        asset,
+        node,
+        agentUri: REGISTRATION_DEFAULTS.agentUri,
+        bindingSequence: BigInt(builds),
+      });
+      return {
+        estimatedTotalLamports: draft.estimatedTotalLamports,
+        sign: () => prepareOwnerRegistration(draft),
+      };
     },
-    send: async (attempt: typeof prepared) => {
+    send: async (
+      attempt: Awaited<ReturnType<typeof prepareOwnerRegistration>>,
+    ) => {
       sentWires.push(attempt.wire);
       sends++;
       const state = JSON.parse(
@@ -81,7 +82,7 @@ void test('lost registration reply can resend only the identical signed attempt'
           'utf8',
         ),
       );
-      assert.equal(state.prepared.signature, prepared.signature);
+      assert.equal(state.prepared.signature, attempt.signature);
       return { status: OWNER_REGISTRATION_STATUS.UNKNOWN };
     },
     check: async () => {
@@ -95,6 +96,9 @@ void test('lost registration reply can resend only the identical signed attempt'
       identity,
       operations,
       confirm: async () => true,
+      onResend: () => {
+        resends++;
+      },
     };
     assert.equal(await registerSellerIdentity(args), false);
     const saved = await readFile(
@@ -110,12 +114,19 @@ void test('lost registration reply can resend only the identical signed attempt'
     assert.equal(sentWires[0], sentWires[1]);
     assert.equal(builds, 2);
     assert.equal(checks, 1);
+    assert.equal(resends, 1);
     checkStatus = OWNER_REGISTRATION_STATUS.FAILED;
     assert.equal(await registerSellerIdentity(args), false);
     assert.equal(sends, 3);
     assert.equal(builds, 4);
     assert.equal(assets[0], assets[3]);
+    checkStatus = OWNER_REGISTRATION_STATUS.EXPIRED;
+    assert.equal(await registerSellerIdentity(args), false);
+    assert.equal(sends, 4);
+    assert.equal(builds, 6);
+    assert.equal(assets[0], assets[5]);
   } finally {
+    await fake.close();
     await rm(root, { recursive: true, force: true });
   }
 });
@@ -171,7 +182,7 @@ void test('registration checks the on-chain owner, node binding and payout walle
     assert.equal(await paid.lookup(asset.address), true);
     assert.equal(
       await operations.lookup((await generateKeyPairSigner()).address),
-      undefined,
+      true,
     );
     const foreign = sellerRegistrationOperations({
       rpc: fake.rpc,
@@ -225,6 +236,58 @@ void test('a price increase while the user decides requires fresh consent and se
     assert.equal(signs, 0);
     assert.equal(sends, 0);
     assert.equal(notified, 1);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+void test('a crash after saving the asset and before preparing wire preserves the same asset on restart', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'gyb-registration-crash-'));
+  const assets: string[] = [];
+  let crashed = false;
+  let sends = 0;
+  try {
+    const args = {
+      environment: { GYBLOS_HOME: root },
+      identity: {
+        owner: '11111111111111111111111111111112',
+        nodeId: '01'.repeat(32),
+      },
+      operations: {
+        lookup: async () => false,
+        async build(asset: Awaited<ReturnType<typeof generateKeyPairSigner>>) {
+          assets.push(asset.address);
+          if (!crashed) {
+            crashed = true;
+            throw new Error('synthetic crash after asset write');
+          }
+          return {
+            estimatedTotalLamports: 1n,
+            sign: async () => {
+              throw new Error('must not sign');
+            },
+          };
+        },
+        check: async () => ({ status: OWNER_REGISTRATION_STATUS.UNKNOWN }),
+        send: async () => {
+          sends++;
+          return { status: OWNER_REGISTRATION_STATUS.UNKNOWN };
+        },
+      },
+      confirm: async () => false,
+    };
+    await assert.rejects(registerSellerIdentity(args), /synthetic crash/);
+    const saved = await readFile(
+      join(root, 'seller', 'registration-8004-v1.json'),
+      'utf8',
+    );
+    assert.equal(await registerSellerIdentity(args), false);
+    assert.deepEqual(assets, [assets[0], assets[0]]);
+    assert.equal(
+      await readFile(join(root, 'seller', 'registration-8004-v1.json'), 'utf8'),
+      saved,
+    );
+    assert.equal(sends, 0);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

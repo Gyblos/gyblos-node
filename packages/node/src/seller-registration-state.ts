@@ -2,9 +2,10 @@
 // Never sends transactions or prints the retained asset key or signed bytes.
 import {
   createKeyPairSignerFromBytes,
+  getBase64EncodedWireTransaction,
   getBase64Encoder,
-  getSignatureFromTransaction,
   getTransactionDecoder,
+  signature,
 } from '@solana/kit';
 
 import { KEY_LIMITS } from '@gyblos/config';
@@ -13,7 +14,10 @@ import {
   rolePathIn,
   type HomeEnvironment,
 } from '@gyblos/config/home';
-import type { PreparedOwnerRegistration } from '@gyblos/identity';
+import {
+  verifyPreparedOwnerRegistration,
+  type PreparedOwnerRegistration,
+} from '@gyblos/identity';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 import {
   acquireProcessLock,
@@ -65,7 +69,9 @@ async function parse(
     )
   )
     fail();
-  await createKeyPairSignerFromBytes(Uint8Array.from(value.assetSecret));
+  const asset = await createKeyPairSignerFromBytes(
+    Uint8Array.from(value.assetSecret),
+  );
   const state: RegistrationState = {
     version: SELLER_REGISTRATION_STATE.version,
     owner: identity.owner,
@@ -84,14 +90,18 @@ async function parse(
       !/^(0|[1-9][0-9]*)$/.test(pending.lastValidBlockHeight)
     )
       fail();
-    const wire = Uint8Array.from(getBase64Encoder().encode(pending.wire));
-    if (
-      Buffer.from(wire).toString('base64') !== pending.wire ||
-      String(
-        getSignatureFromTransaction(getTransactionDecoder().decode(wire)),
-      ) !== pending.signature
-    )
-      fail();
+    await verifyPreparedOwnerRegistration(
+      {
+        wire: getBase64EncodedWireTransaction(
+          getTransactionDecoder().decode(
+            getBase64Encoder().encode(pending.wire),
+          ),
+        ),
+        signature: signature(pending.signature),
+        lastValidBlockHeight: BigInt(pending.lastValidBlockHeight),
+      },
+      { ...identity, asset: asset.address },
+    );
     state.prepared = {
       wire: pending.wire,
       signature: pending.signature,
