@@ -1,0 +1,385 @@
+diff --git a/Cargo.lock b/Cargo.lock
+index 644bf2d..04895ff 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -3482,0 +3483 @@ dependencies = [
++ "bincode",
+diff --git a/program/payment_channels/Cargo.toml b/program/payment_channels/Cargo.toml
+index a5301d9..4f52886 100644
+--- a/program/payment_channels/Cargo.toml
++++ b/program/payment_channels/Cargo.toml
+@@ -41,0 +42 @@ thiserror                          = { version = "2", default-features = false }
++bincode                  = "1.3.3"
+diff --git a/program/payment_channels/tests/distribute/e2e.rs b/program/payment_channels/tests/distribute/e2e.rs
+index be13215..dc63af4 100644
+--- a/program/payment_channels/tests/distribute/e2e.rs
++++ b/program/payment_channels/tests/distribute/e2e.rs
+@@ -117,0 +118,368 @@ fn set_payer_withdrawn_at(svm: &mut LiteSVM, channel: &Pubkey, ts: i64) {
++// Exercise the exact product opening wire, with only an offline SDK helper and synthetic keys.
++#[test]
++fn gyblos_product_opening_no_voucher_spl() {
++    gyblos_product_opening_no_voucher(SPL_TOKEN, false, false);
++}
++#[test]
++fn gyblos_product_opening_no_voucher_2022() {
++    gyblos_product_opening_no_voucher(TOKEN_2022, false, false);
++}
++#[test]
++fn gyblos_product_opening_redirected_spl() {
++    gyblos_product_opening_no_voucher(SPL_TOKEN, true, false);
++}
++#[test]
++fn gyblos_product_opening_redirected_2022() {
++    gyblos_product_opening_no_voucher(TOKEN_2022, true, false);
++}
++#[test]
++fn gyblos_product_opening_charged_spl() {
++    gyblos_product_opening_no_voucher(SPL_TOKEN, false, true);
++}
++#[test]
++fn gyblos_product_opening_charged_2022() {
++    gyblos_product_opening_no_voucher(TOKEN_2022, false, true);
++}
++#[test]
++fn gyblos_product_opening_charged_redirected_spl() {
++    gyblos_product_opening_no_voucher(SPL_TOKEN, true, true);
++}
++#[test]
++fn gyblos_product_opening_charged_redirected_2022() {
++    gyblos_product_opening_no_voucher(TOKEN_2022, true, true);
++}
++fn gyblos_product_opening_no_voucher(token_program: Pubkey, frozen: bool, charged: bool) {
++    use payment_channels_client::instructions::{RequestClose, Seal};
++    use solana_transaction::versioned::VersionedTransaction;
++    use std::io::Write;
++    use std::process::{Command, Stdio};
++
++    let mut svm = LiteSVM::load_program();
++    let fee_payer = Keypair::new();
++    svm.airdrop(&fee_payer.pubkey(), 10_000_000_000).unwrap();
++    svm.airdrop(&treasury_owner(), 1_000_000_000).unwrap();
++    let (payer, mint, payer_ata) =
++        setup_funded_svm_with_token_program(&mut svm, 1_000, &token_program);
++    let seller = Pubkey::new_unique();
++    let gyblos = Pubkey::new_unique();
++    let splits = vec![
++        Split {
++            owner: seller,
++            bps: 9709,
++        },
++        Split {
++            owner: gyblos,
++            bps: 291,
++        },
++    ];
++    let payee_ata = CreateAssociatedTokenAccount::new(&mut svm, &fee_payer, &mint)
++        .owner(&fee_payer.pubkey())
++        .token_program_id(&token_program)
++        .send()
++        .unwrap();
++    let treasury_ata = CreateAssociatedTokenAccount::new(&mut svm, &fee_payer, &mint)
++        .owner(&treasury_owner())
++        .token_program_id(&token_program)
++        .send()
++        .unwrap();
++    let recipient_atas: Vec<Pubkey> = splits
++        .iter()
++        .map(|split| {
++            CreateAssociatedTokenAccount::new(&mut svm, &fee_payer, &mint)
++                .owner(&split.owner)
++                .token_program_id(&token_program)
++                .send()
++                .unwrap()
++        })
++        .collect();
++    let home = std::env::temp_dir().join(format!("gyblos-litesvm-journal-{}", payer.pubkey()));
++    let blockhash = svm.latest_blockhash();
++    let slot = current_slot(&svm);
++    let mut child = Command::new(std::env::var("GYBLOS_PROBE_NODE").expect("node required"))
++        .arg("--import")
++        .arg("tsx")
++        .arg("tests/lab/reusable-opening-recovery-litesvm.ts")
++        .current_dir(std::env::var("GYBLOS_SDK_PROBE_REPO").expect("repo required"))
++        .stdin(Stdio::piped())
++        .stdout(Stdio::piped())
++        .stderr(Stdio::piped())
++        .spawn()
++        .unwrap();
++    let input = serde_json::json!({ "phase": "open", "home": home.to_str().unwrap(), "secret": payer.to_bytes().to_vec(),
++        "seller": seller.to_string(), "feePayer": fee_payer.pubkey().to_string(),
++        "treasury": gyblos.to_string(), "mint": mint.to_string(),
++        "tokenProgram": token_program.to_string(), "blockhash": blockhash.to_string(),
++        "slot": slot.to_string() });
++    child
++        .stdin
++        .take()
++        .unwrap()
++        .write_all(input.to_string().as_bytes())
++        .unwrap();
++    let result = child.wait_with_output().unwrap();
++    assert!(result.status.success(), "product SDK helper failed");
++    let parsed: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
++    assert_eq!(parsed["authorizedAtomic"], "0");
++    assert_eq!(parsed["voucherCount"], 0);
++    let bytes: Vec<u8> = parsed["transaction"]
++        .as_array()
++        .unwrap()
++        .iter()
++        .map(|x| u8::try_from(x.as_u64().unwrap()).unwrap())
++        .collect();
++    let mut tx: VersionedTransaction = bincode::deserialize(&bytes).expect("SDK wire");
++    let channel: Pubkey = parsed["channelId"].as_str().unwrap().parse().unwrap();
++    let keys = tx.message.static_account_keys();
++    assert_eq!(tx.message.header().num_required_signatures, 2);
++    assert_eq!(keys[0], fee_payer.pubkey());
++    assert_eq!(keys[1], payer.pubkey());
++    let message_bytes = tx.message.serialize();
++    assert!(tx.signatures[1] == payer.sign_message(&message_bytes), "product buyer signature");
++    assert!(tx.signatures[0] == Default::default(), "fee payer has not signed yet");
++    tx.signatures[0] = fee_payer.sign_message(&message_bytes);
++    let mut invalid = tx.clone();
++    invalid.signatures[1] = fee_payer.sign_message(&message_bytes);
++    assert!(
++        svm.send_transaction(invalid).is_err(),
++        "invalid buyer signature rejected"
++    );
++    assert!(svm.get_account(&channel).is_none());
++    assert!(
++        svm.send_transaction(tx).is_ok(),
++        "SDK opening accepted by SBF"
++    );
++    read_channel(&svm, &channel, |ch| assert_eq!(ch.settled(), 0));
++    let (derived_channel, channel_ata) = derive_pdas_with_token_program(
++        &payer.pubkey(),
++        &fee_payer.pubkey(),
++        &mint,
++        &payer.pubkey(),
++        read_channel(&svm, &channel, |ch| ch.salt()),
++        slot,
++        &token_program,
++    );
++    assert_eq!(channel, derived_channel);
++    assert_eq!(token_balance(&svm, &payer_ata), 0);
++    let observed_deposit = token_balance(&svm, &channel_ata);
++    assert_eq!(observed_deposit, 1_000);
++
++    // Restart after open and recover the channel from its actual SBF account.
++    assert_eq!(svm.get_account(&channel).unwrap().owner, PROGRAM_ID);
++    assert_eq!(svm.get_account(&mint).unwrap().owner, token_program);
++    let observed = read_channel(&svm, &channel, |ch| {
++        assert_eq!(ch.status, STATUS_OPEN);
++        assert_eq!(ch.payer.as_ref(), payer.pubkey().as_ref());
++        assert_eq!(ch.authorized_signer.as_ref(), payer.pubkey().as_ref());
++        assert_eq!(ch.rent_payer.as_ref(), fee_payer.pubkey().as_ref());
++        assert_eq!(ch.payee.as_ref(), fee_payer.pubkey().as_ref());
++        assert_eq!(ch.mint.as_ref(), mint.as_ref());
++        serde_json::json!({ "salt": ch.salt().to_string(), "deposit": ch.deposit().to_string(),
++          "slot": ch.open_slot().to_string(), "grace": ch.grace_period(),
++          "distribution": ch.distribution_hash, "settled": ch.settled().to_string(),
++          "paid": ch.payout_watermark().to_string() })
++    });
++    let confirm_input = serde_json::json!({ "phase": "confirm", "home": home.to_str().unwrap(),
++        "secret": payer.to_bytes().to_vec(), "seller": seller.to_string(),
++        "feePayer": fee_payer.pubkey().to_string(), "treasury": gyblos.to_string(),
++        "mint": mint.to_string(), "tokenProgram": token_program.to_string(),
++        "blockhash": blockhash.to_string(), "slot": slot.to_string(),
++        "channel": channel.to_string(), "tip": current_slot(&svm).to_string(),
++        "observedSalt": observed["salt"], "observedDeposit": observed["deposit"],
++        "observedSlot": observed["slot"], "observedGrace": observed["grace"],
++        "distribution": observed["distribution"], "observedSettled": observed["settled"],
++        "observedPaid": observed["paid"], "charged": charged });
++    let mut confirm = Command::new(std::env::var("GYBLOS_PROBE_NODE").expect("node required"))
++        .arg("--import")
++        .arg("tsx")
++        .arg("tests/lab/reusable-opening-recovery-litesvm.ts")
++        .current_dir(std::env::var("GYBLOS_SDK_PROBE_REPO").expect("repo required"))
++        .stdin(Stdio::piped())
++        .stdout(Stdio::piped())
++        .stderr(Stdio::piped())
++        .spawn()
++        .unwrap();
++    confirm
++        .stdin
++        .take()
++        .unwrap()
++        .write_all(confirm_input.to_string().as_bytes())
++        .unwrap();
++    let confirmed = confirm.wait_with_output().unwrap();
++    assert!(
++        confirmed.status.success(),
++        "journal open confirmation failed"
++    );
++    let confirmed: serde_json::Value = serde_json::from_slice(&confirmed.stdout).unwrap();
++    assert_eq!(confirmed["status"], "ready");
++    let settled = if charged { 200u64 } else { 0u64 };
++    if charged {
++        let signatures = confirmed["signatures"].as_array().expect("SDK signatures");
++        assert_eq!(signatures.len(), 2);
++        let sig = |index: usize| -> [u8; 64] {
++            signatures[index]
++                .as_array()
++                .unwrap()
++                .iter()
++                .map(|v| u8::try_from(v.as_u64().unwrap()).unwrap())
++                .collect::<Vec<_>>()
++                .try_into()
++                .unwrap()
++        };
++        let first = build_ed25519_ix(
++            &payer.pubkey().to_bytes(),
++            &sig(0),
++            &voucher_payload(&voucher(channel, 56, 0)),
++        );
++        let last = build_ed25519_ix(
++            &payer.pubkey().to_bytes(),
++            &sig(1),
++            &voucher_payload(&voucher(channel, 200, 0)),
++        );
++        svm.expire_blockhash();
++        let batch = Transaction::new_signed_with_payer(
++            &[first, last, build_settle_ix(&channel)],
++            Some(&fee_payer.pubkey()),
++            &[&fee_payer],
++            svm.latest_blockhash(),
++        );
++        assert!(
++            svm.send_transaction(batch).is_ok(),
++            "journal SDK vouchers verified and latest settled"
++        );
++        read_channel(&svm, &channel, |ch| assert_eq!(ch.settled(), 200));
++    } else {
++        assert_eq!(confirmed["signatures"].as_array().unwrap().len(), 0);
++    }
++
++    let close = RequestClose {
++        payer: payer.pubkey(),
++        channel,
++    }
++    .instruction();
++    svm.expire_blockhash();
++    let close_tx = Transaction::new_signed_with_payer(
++        &[close],
++        Some(&payer.pubkey()),
++        &[&payer],
++        svm.latest_blockhash(),
++    );
++    assert!(svm.send_transaction(close_tx).is_ok(), "close request");
++    let now = svm.get_sysvar::<solana_clock::Clock>().unix_timestamp;
++    set_clock(&mut svm, now + i64::from(GRACE_PERIOD));
++    warp_past_close_gate(&mut svm, &channel);
++    if frozen {
++        set_token_account_state(&mut svm, &payer_ata, AccountState::Frozen);
++    }
++    let mut distribute = build_distribute_ix(
++        &channel,
++        &payer.pubkey(),
++        &channel_ata,
++        &payer_ata,
++        &payee_ata,
++        &treasury_ata,
++        &mint,
++        &token_program,
++        &recipient_atas,
++        build_recipients(&splits),
++    );
++    // The product SDK makes the distinct fee payer the channel rent payer.
++    distribute.accounts[2] = AccountMeta::new(fee_payer.pubkey(), false);
++    svm.expire_blockhash();
++    let final_tx = Transaction::new_signed_with_payer(
++        &[Seal { channel }.instruction(), distribute],
++        Some(&fee_payer.pubkey()),
++        &[&fee_payer],
++        svm.latest_blockhash(),
++    );
++    let result = svm.send_transaction(final_tx);
++    assert!(result.is_ok(), "seal and refund");
++    let metadata = result.unwrap();
++    let expected_redirect = if frozen { 1_000 - settled } else { 0 };
++    let redirects = events::<PayoutRedirected>(&metadata);
++    if frozen {
++        assert_eq!(
++            redirects,
++            vec![PayoutRedirected {
++                channel,
++                owner: payer.pubkey(),
++                amount: expected_redirect,
++                beneficiary: PayoutBeneficiary::Payer,
++                reason: RedirectReason::NotInitialized
++            }]
++        );
++    } else {
++        assert!(redirects.is_empty());
++    }
++    assert_eq!(
++        token_balance(&svm, &payer_ata),
++        1_000 - settled - expected_redirect
++    );
++    assert_eq!(
++        token_balance(&svm, &recipient_atas[0]),
++        settled * 9709 / 10_000
++    );
++    assert_eq!(
++        token_balance(&svm, &recipient_atas[1]),
++        settled * 291 / 10_000
++    );
++    let residual = settled - settled * 9709 / 10_000 - settled * 291 / 10_000;
++    assert_eq!(
++        token_balance(&svm, &treasury_ata),
++        expected_redirect + residual
++    );
++    assert_fully_closed(&svm, &channel);
++    // Reopen the private journal in a second Node process using observations read
++    // from the isolated simulator. Finality and history completeness are simulated.
++    let closed = svm
++        .get_account(&channel)
++        .is_none_or(|account| account.lamports == 0 && account.data.is_empty());
++    let escrow = svm
++        .get_account(&channel_ata)
++        .map_or(0, |_| token_balance(&svm, &channel_ata));
++    let input = serde_json::json!({ "phase": "recover", "home": home.to_str().unwrap(),
++        "secret": payer.to_bytes().to_vec(), "seller": seller.to_string(),
++        "feePayer": fee_payer.pubkey().to_string(), "treasury": gyblos.to_string(),
++        "mint": mint.to_string(), "tokenProgram": token_program.to_string(),
++        "blockhash": blockhash.to_string(), "slot": slot.to_string(),
++        "channel": channel.to_string(), "tip": current_slot(&svm).to_string(),
++        "deposited": observed_deposit.to_string(), "closed": closed,
++        "escrow": escrow.to_string(), "escrowAccount": channel_ata.to_string(),
++        "programTreasuryOwner": treasury_owner().to_string(), "refund": token_balance(&svm, &payer_ata).to_string(),
++        "sellerReceived": token_balance(&svm, &recipient_atas[0]).to_string(),
++        "treasuryReceived": token_balance(&svm, &recipient_atas[1]).to_string(),
++        "programResidual": (token_balance(&svm, &treasury_ata) - expected_redirect).to_string(),
++        "redirected": expected_redirect.to_string(), "settled": settled.to_string() });
++    let mut child = Command::new(std::env::var("GYBLOS_PROBE_NODE").expect("node required"))
++        .arg("--import")
++        .arg("tsx")
++        .arg("tests/lab/reusable-opening-recovery-litesvm.ts")
++        .current_dir(std::env::var("GYBLOS_SDK_PROBE_REPO").expect("repo required"))
++        .stdin(Stdio::piped())
++        .stdout(Stdio::piped())
++        .stderr(Stdio::piped())
++        .spawn()
++        .unwrap();
++    child
++        .stdin
++        .take()
++        .unwrap()
++        .write_all(input.to_string().as_bytes())
++        .unwrap();
++    let output = child.wait_with_output().unwrap();
++    assert!(output.status.success(), "journal recovery failed");
++    let recovered: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
++    assert_eq!(
++        recovered["status"],
++        if frozen {
++            "closed-redirected"
++        } else {
++            "closed"
++        }
++    );
++    assert_eq!(
++        recovered["refund"],
++        (1_000 - settled - expected_redirect).to_string()
++    );
++    assert_eq!(recovered["redirected"], expected_redirect.to_string());
++}
++

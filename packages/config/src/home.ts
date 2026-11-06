@@ -212,6 +212,21 @@ export const BUYER_JOURNAL_FILES = {
   state: 'upto-journal-v1.json',
   lock: 'upto-journal-v1.lock',
 } as const;
+// Reusable channels have a separate format and lock; never overwrite the single-request journal.
+export const BUYER_REUSABLE_JOURNAL_FILES = {
+  state: 'reusable-channels-v1.json',
+  lock: 'reusable-channels-v1.lock',
+  control: 'reusable-control-pending-v1.json',
+} as const;
+export function buyerReusableJournalPathsIn(environment: HomeEnvironment) {
+  const directory = rolePathIn(environment, 'buyer', ROLE_FILES.payments);
+  return {
+    directory,
+    state: join(directory, BUYER_REUSABLE_JOURNAL_FILES.state),
+    lock: join(directory, BUYER_REUSABLE_JOURNAL_FILES.lock),
+    control: join(directory, BUYER_REUSABLE_JOURNAL_FILES.control),
+  };
+}
 export function buyerJournalPathsIn(environment: HomeEnvironment) {
   const directory = rolePathIn(environment, 'buyer', ROLE_FILES.payments);
   return {

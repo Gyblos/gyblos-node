@@ -159,3 +159,24 @@ startup over native loopback, synthetic chain services and private temporary
 journals. It also drives the product terminal loop with synthetic streams,
 checks a mid-answer engine interruption and reconciles a simulated settlement.
 See [the acceptance boundary](../docs/paid-acceptance.md).
+
+Reusable-channel SDK and LiteSVM coverage uses the
+`tests/lab/reusable-opening-litesvm.patch` test fixture against an isolated copy
+of `solana-foundation/payment-channels` at commit
+`3ffa4d6728ad88e4a9667a76ad9ccd68a302c696`. Apply the patch with
+`git apply --unidiff-zero`, then run offline with a prebuilt SBF artifact and
+populated Cargo cache:
+
+```sh
+CARGO_HOME="$OFFLINE_CARGO_HOME" CARGO_TARGET_DIR="$ISOLATED_CARGO_TARGET" \
+  PAYMENT_CHANNELS_SO="$LOCAL_SBF" GYBLOS_SDK_PROBE_REPO="$GYBLOS_CHECKOUT" \
+  GYBLOS_PROBE_NODE="$NODE_24" \
+  cargo test --locked --offline -p payment_channels --test instructions \
+    gyblos_product_opening_ -- --test-threads=1
+```
+
+The test covers the SDK opening, two cumulative vouchers, one settlement and
+refund accounting with synthetic identities and token balances. Closure is
+constructed by the Rust fixture, not the Gyblos buyer or seller. Chain
+observations and finality are simulated, and this local SBF does not prove what
+is deployed on devnet. No payment or network access is required.
