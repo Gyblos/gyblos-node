@@ -14,6 +14,7 @@ const JOURNEY = [
   'index',
   'getting-started/beta',
   'sellers/beta-guide',
+  'sellers/manual-install',
   'sellers/register-publish',
   'sellers/models-offers',
   'sellers/operate',

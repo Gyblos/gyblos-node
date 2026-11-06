@@ -28,6 +28,8 @@ const QUOTED_OUTPUT = [
   ['The relay token is empty', 'install.sh'],
   ['Ollama did not start', 'install.sh'],
   ['gyblos install:', 'install.sh'],
+  ['The image signature did not verify', 'install.sh'],
+  ['Verified the Gyblos release signature', 'install.sh'],
   ['Seller identity (public;', 'apps/node/src/cli-doctor.ts'],
   ['Registered: this seller may now publish.', 'apps/node/src/cli-register.ts'],
   ['Already registered', 'apps/node/src/cli-register.ts'],
@@ -132,4 +134,40 @@ void test('docs: the seller handbook quotes output that the node still prints', 
   for (const result of Object.values(STATUS_RESULTS))
     for (const page of pages)
       assert.ok(page.includes(`\`${result}\``), `missing result ${result}`);
+});
+
+// The by-hand page shows the installer's own compose file (with a release placeholder), example, model and
+// mint, so following it sets up the same seller.
+void test('the manual install page matches what install.sh writes and runs', async () => {
+  const installer = await read('install.sh');
+  const between = (start: string, end: string) =>
+    installer.slice(
+      installer.indexOf(start) + start.length,
+      installer.indexOf(end),
+    );
+  const compose = between("<<'COMPOSE'\n", '\nCOMPOSE\n').replace(
+    'GYBLOS_IMAGE_PLACEHOLDER',
+    'ghcr.io/gyblos/seller:VERSION@sha256:DIGEST',
+  );
+  const toml = between("<<'TOML'\n", '\nTOML\n');
+  const value = (name: string) =>
+    installer.match(new RegExp(`^${name}=(.+)$`, 'm'))?.[1];
+  for (const page of ['manual-install.mdx', 'manual-install.es.mdx']) {
+    const text = await readFile(join(CONTENT, 'sellers', page), 'utf8');
+    assert.ok(
+      text.includes(`\`\`\`yaml\n${compose}\n\`\`\``),
+      `${page}: compose`,
+    );
+    assert.ok(
+      text.includes(`\`\`\`toml\n${toml}\n\`\`\``),
+      `${page}: gyblos.toml`,
+    );
+    assert.ok(
+      text.includes(`ollama pull ${value('MODEL')}\n`),
+      `${page}: model`,
+    );
+    assert.ok(text.includes(`--mint ${value('MINT')}\n`), `${page}: mint`);
+    const identity = /^RELEASE_IDENTITY='([^']+)'$/m.exec(installer)?.[1];
+    assert.ok(identity && text.includes(`'${identity}'`), `${page}: identity`);
+  }
 });

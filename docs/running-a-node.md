@@ -406,11 +406,13 @@ docker compose stop seller                        # SIGINT; withdraws within 120
 
 #### Install script
 
-`install.sh` sets up the same seller from the published image
-(`ghcr.io/gyblos/seller:beta`) without a checkout. It needs only Docker with
-Compose v2.17 or later. Beta sellers receive the file with their invitation:
+`install.sh` sets up the same seller from a signed release of the published
+image without a checkout. It needs only Docker with Compose v2.17 or later.
+Sellers download it from the official address, which redirects to the copy the
+docs site builds from this repository (`https://docs.gyblos.com/install.sh`):
 
 ```sh
+curl -fsSL https://gyblos.com/install.sh -o install.sh
 sh install.sh
 ```
 
@@ -419,30 +421,77 @@ sh install.sh
   `~/gyblos-seller` (created mode 0700; `GYBLOS_DIR` changes it), then pulls the
   images and the model, creates the seller keys, downloads the tokenizer, runs
   `gyblos doctor` and starts the seller only when doctor is READY.
+- `DEFAULT_IMAGE` pins one release by version and digest
+  (`ghcr.io/gyblos/seller:<version>@sha256:<digest>`); the release workflow
+  below sets it. `GYBLOS_IMAGE` overrides it.
 - The relay token is read without echo, or from `GYBLOS_RELAY_TOKEN`, and is
   written only to `seller.env` (mode 0600), never printed. Without a terminal
   (for example `ssh host sh install.sh`), set `GYBLOS_RELAY_TOKEN`.
-- Existing files are kept, so rerunning it resumes a failed install and
-  recreates the seller with the current `gyblos.toml` and `seller.env`. After
-  editing `gyblos.toml` (for example `publish = true`), rerun it or run
-  `docker compose up -d --force-recreate seller`; a plain `up -d` does not apply
-  the edit.
-- `GYBLOS_IMAGE` sets the image of a first install, such as a commit tag; after
-  that, change the seller's `image:` in `compose.yaml`.
-- While the package is private, `docker login ghcr.io` first with a token that
-  may read it.
+- Rerunning it resumes a failed install and updates the seller: `gyblos.toml`,
+  `seller.env` and `compose.yaml` are kept, except that a seller `image:` from
+  `ghcr.io/gyblos/seller` moves to the installer's release. Any other image is
+  the operator's own build and stays. It then recreates the seller with the
+  current files; after editing `gyblos.toml`, rerun it or run
+  `docker compose up -d --force-recreate seller` (a plain `up -d` does not apply
+  the edit).
 
-Maintainers publish the tip of `origin/main`, built from that commit alone
-(`git archive`), after `docker login ghcr.io` with a token allowed to write
-Gyblos packages and with a buildx builder for both platforms
-(`docker buildx create --use`):
+##### Image signature
+
+Every release is built and signed keyless by the release workflow
+(`.github/workflows/release-seller-image.yml`) with its GitHub OIDC identity;
+there is no long-lived signing key, and each signature is recorded in the public
+Sigstore log (with this repository and workflow name). With cosign 3 or later
+installed, the installer verifies a `ghcr.io/gyblos/seller` image before pulling
+(identity `RELEASE_IDENTITY`, issuer `RELEASE_ISSUER` in `install.sh`) and stops
+on a bad signature; without cosign, or with an older one, it says the check was
+skipped, and integrity rests on HTTPS and the digest the installer pins. The
+check reads the seller image from `compose.yaml`; the installer names any
+override file or `COMPOSE_FILE` it does not cover. By hand:
 
 ```sh
-sh scripts/publish-image.sh        # pushes :<commit> and :beta for amd64 and arm64
+cosign verify ghcr.io/gyblos/seller:<version>@sha256:<digest> \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-identity-regexp '^https://github\.com/Gyblos/gyblos-node/\.github/workflows/release-seller-image\.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'
 ```
 
-The first push creates the package private; its visibility is changed in the
-package's settings on GitHub. A public image contains the node's source.
+##### Releasing the seller image
+
+A release is a version tag pushed from a commit on `main`, one tag at a time:
+
+```sh
+git tag v0.1.0-beta.2 origin/main
+git push origin v0.1.0-beta.2
+```
+
+1. The `release` job waits in the `release` environment for a maintainer's
+   approval, then runs `scripts/release-image.sh`. It refuses a commit outside
+   `main`, an existing version (or a registry it cannot query) and any run
+   outside the workflow; builds the tagged commit alone (`git archive`) for
+   amd64 and arm64; pushes `:<version>` and `:<commit>`; signs the digest and
+   verifies the signature names this workflow at this tag; and only then moves
+   `:beta`, when the commit is main's tip.
+2. The `pin` job runs `scripts/pin-installer.sh` and opens a pull request that
+   pins `DEFAULT_IMAGE` in `install.sh`. Pull requests opened with the
+   workflow's token run no checks: compare the digest with the release run's log
+   before merging.
+3. After that pull request is merged, deploy the docs site. Never deploy the
+   docs from a `main` whose `install.sh` is not pinned: the unpinned installer
+   names `:beta`, and sellers with cosign refuse an unsigned image.
+
+One-time GitHub setup, by an organization owner:
+
+- Package `seller` → Package settings → Manage Actions access: add `gyblos-node`
+  with the Write role, so the workflow token can push.
+- Repository Settings → Actions → General → Workflow permissions: enable "Allow
+  GitHub Actions to create and approve pull requests" (the organization setting
+  may need it too).
+- Repository Settings → Environments → `release`: required reviewer (the
+  maintainers who may publish) and deployment tags `v*`.
+- Repository Settings → Rules → Rulesets: a tag ruleset for `v*` that only
+  maintainers may create, update or delete. The signature names the workflow at
+  a tag, so whoever can push such a tag can sign a release.
+
+The package is public, so the image exposes the node's source.
 
 ## Buyer
 
