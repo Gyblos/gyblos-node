@@ -84,15 +84,21 @@ Work through [Register and publish](/en/sellers/register-publish): confirm regis
 recreation after the edit, then `seller status --online`. Confirm that you are querying the same index
 where you registered and that at least one offer is ready.
 
-| Discovery code / observation        | Remedy or interpretation                                                                                                                                         |
-| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DISCOVERY_IDENTITY_NOT_REGISTERED` | Ask Gyblos to help with devnet enrollment using public NodeId and owner. Preserve your identity and invite; retry after enrollment. The invite can still expire. |
-| `DISCOVERY_INVITE_INVALID`          | Code is wrong, used or expired; request a replacement through the invitation channel.                                                                            |
-| `DISCOVERY_NODE_REVOKED`            | Contact Gyblos; do not generate another identity to bypass removal.                                                                                              |
-| `DISCOVERY_RATE_LIMITED`            | Wait a minute before retrying registration.                                                                                                                      |
-| `DISCOVERY_UNAVAILABLE`             | Try later or contact Gyblos. Check the configured index origin before submitting an invite.                                                                      |
-| `not in the first 2000 sellers`     | Search budget exhausted; not proof that you are absent.                                                                                                          |
-| `index unreachable`                 | Listing state is unknown; resolve connectivity before drawing conclusions.                                                                                       |
+| Discovery code / observation        | Remedy or interpretation                                                                                                                                                                             |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DISCOVERY_IDENTITY_NOT_REGISTERED` | Rerun in an interactive terminal for devnet enrollment. Review estimated cost and approval in the registration guide first; the owner needs devnet SOL. Preserve the invite, which can still expire. |
+| `REGISTER_IDENTITY_UNAVAILABLE`     | Enrollment did not complete: read the missing-SOL, simulation or uncertain-result hint. Declining consent also returns this code. Follow the registration guide before retrying.                     |
+| `DISCOVERY_INVITE_INVALID`          | Code is wrong, used or expired; request a replacement through the invitation channel.                                                                                                                |
+| `DISCOVERY_NODE_REVOKED`            | Contact Gyblos; do not generate another identity to bypass removal.                                                                                                                                  |
+| `DISCOVERY_RATE_LIMITED`            | Wait a minute before retrying registration.                                                                                                                                                          |
+| `DISCOVERY_UNAVAILABLE`             | Try later or contact Gyblos. Check the configured index origin before submitting an invite.                                                                                                          |
+| `not in the first 2000 sellers`     | Search budget exhausted; not proof that you are absent.                                                                                                                                              |
+| `index unreachable`                 | Listing state is unknown; resolve connectivity before drawing conclusions.                                                                                                                           |
+
+A registration rerun checks saved state and may resend the same previously approved transaction
+without a new prompt. Preserve all files and locks. Expiry alone does not prove no transaction or fee;
+partial/inconclusive state needs help. Read [registration recovery limits](/en/sellers/register-publish)
+before repeating the command. Never clear state to force another attempt.
 
 ## Free requests refused or no activity
 

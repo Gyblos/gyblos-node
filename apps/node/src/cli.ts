@@ -48,6 +48,8 @@ export interface CliContext {
   status?: StatusSystem;
   // The index for `seller register`; tests inject a fake.
   fetch?: DiscoveryFetch;
+  // A synthetic identity registration can be injected by offline tests.
+  registerIdentity?: () => Promise<boolean>;
 }
 
 const USAGE =
@@ -260,6 +262,7 @@ function runRegister(context: CliContext) {
     {
       fetch: context.fetch ?? ((input, init) => fetch(input, init)),
       prompt: context.prompt,
+      registerIdentity: context.registerIdentity,
     },
   );
 }

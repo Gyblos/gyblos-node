@@ -26,13 +26,37 @@ public NodeId. That printed line is informational; there is no confirmation paus
 `Already registered` is also a success for the same invite and identity. Registration neither changes
 `gyblos.toml` nor publishes the offer.
 
-<Callout type="warn" title="On-chain enrollment is a separate prerequisite">
-  `seller register` does not create the 8004-solana enrollment. If it returns
-  `DISCOVERY_IDENTITY_NOT_REGISTERED`, send your public `nodeId` and `owner` to
-  the Gyblos team through your invitation channel. Keep your code: this
-  rejection does not consume it, but it can still expire. Retry registration
-  after the team confirms enrollment; request a new code if it has expired.
+## Complete Solana enrollment if requested
+
+If discovery reports missing enrollment, the interactive command can register your existing owner wallet
+and NodeId on **Solana devnet**, then retry discovery automatically. The owner address printed by doctor
+needs sufficient **devnet SOL** first. There is no automatic faucet in this command. The registration
+cost is separate from free inference; use no mainnet funds or mainnet keys.
+
+The command shows `Pre-simulation funding estimate:` before checking funding and simulation. It then
+shows `Estimated registration cost:` and asks `Sign and submit this registration? (yes/no):`.
+Only **`yes`** approves a new signed attempt. The estimate is not a fixed price: upgradeable programs
+can change actual costs. If the refreshed cost increases, the command stops so you can review again.
+Declining is a failed registration result, not a completed enrollment.
+
+Without an interactive terminal, `DISCOVERY_IDENTITY_NOT_REGISTERED` means rerun interactively.
+`GYBLOS_INVITE` supplies the invite, not consent to a new on-chain submission. If your installed beta
+image does not offer this flow, send its image identifier and your public NodeId/owner to the team.
+
+<Callout type="warn" title="Preserve an uncertain registration attempt">
+  The seller saves private registration state. Rerunning checks that attempt and
+  may print `Resending the previously approved registration.` before resending
+  the same signed bytes without another approval prompt. An uncertain result is
+  not proof of failure or zero fees. Keep the volume, registration file and
+  lock. A proven expired blockhash plus finalized absent asset accounts can
+  permit a replacement with the same asset and fresh consent; expiry alone does
+  not prove the old attempt never landed or paid a fee. Partial or inconclusive
+  state needs Gyblos assistance. Never delete state or change home to force
+  another attempt.
 </Callout>
+
+The wallet registered in 8004 is the owner. An existing paid role may have a different payout and show
+a warning; that does not change the owner. New paid roles use owner as payout, outside this free tutorial.
 
 `DISCOVERY_INVITE_INVALID` means the code is wrong, used or expired. `DISCOVERY_RATE_LIMITED` means wait
 before retrying; `DISCOVERY_UNAVAILABLE` means the index could not complete the request. See

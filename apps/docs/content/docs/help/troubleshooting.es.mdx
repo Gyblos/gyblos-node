@@ -84,15 +84,21 @@ Sigue [Registra y publica](/es/sellers/register-publish): confirma registro, `pu
 tras el cambio y después `seller status --online`. Comprueba que consultas el índice donde te registraste
 y que al menos una oferta esté lista.
 
-| Código de descubrimiento / observación | Solución o interpretación                                                                                                                                          |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `DISCOVERY_IDENTITY_NOT_REGISTERED`    | Pide ayuda a Gyblos con la inscripción devnet usando NodeId y owner públicos. Conserva identidad e invitación; repite tras la inscripción. El código puede vencer. |
-| `DISCOVERY_INVITE_INVALID`             | Código incorrecto, usado o vencido; pide otro por el canal de tu invitación.                                                                                       |
-| `DISCOVERY_NODE_REVOKED`               | Contacta con Gyblos; no generes otra identidad para saltarte la retirada.                                                                                          |
-| `DISCOVERY_RATE_LIMITED`               | Espera un minuto antes de repetir el registro.                                                                                                                     |
-| `DISCOVERY_UNAVAILABLE`                | Prueba más tarde o contacta con Gyblos. Comprueba el origen del índice antes de enviar una invitación.                                                             |
-| `not in the first 2000 sellers`        | Se agotó el límite de búsqueda; no demuestra ausencia.                                                                                                             |
-| `index unreachable`                    | Estado de publicación desconocido; resuelve conectividad antes de sacar conclusiones.                                                                              |
+| Código de descubrimiento / observación | Solución o interpretación                                                                                                                                                                          |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DISCOVERY_IDENTITY_NOT_REGISTERED`    | Repite en terminal interactiva para la inscripción devnet. Revisa primero el coste y la aprobación en la guía de registro; owner necesita SOL de devnet. Conserva la invitación, que puede vencer. |
+| `REGISTER_IDENTITY_UNAVAILABLE`        | La inscripción no se completó: lee el consejo sobre SOL faltante, simulación o resultado incierto. Rechazar el consentimiento también devuelve este código. Sigue la guía antes de repetir.        |
+| `DISCOVERY_INVITE_INVALID`             | Código incorrecto, usado o vencido; pide otro por el canal de tu invitación.                                                                                                                       |
+| `DISCOVERY_NODE_REVOKED`               | Contacta con Gyblos; no generes otra identidad para saltarte la retirada.                                                                                                                          |
+| `DISCOVERY_RATE_LIMITED`               | Espera un minuto antes de repetir el registro.                                                                                                                                                     |
+| `DISCOVERY_UNAVAILABLE`                | Prueba más tarde o contacta con Gyblos. Comprueba el origen del índice antes de enviar una invitación.                                                                                             |
+| `not in the first 2000 sellers`        | Se agotó el límite de búsqueda; no demuestra ausencia.                                                                                                                                             |
+| `index unreachable`                    | Estado de publicación desconocido; resuelve conectividad antes de sacar conclusiones.                                                                                                              |
+
+Repetir el registro comprueba el estado guardado y puede reenviar la misma transacción ya aprobada
+sin otra pregunta. Conserva archivos y bloqueos. El vencimiento por sí solo no demuestra ausencia de
+transacción o comisión; un estado parcial/inconcluso necesita ayuda. Lee los [límites de recuperación
+del registro](/es/sellers/register-publish) antes de repetir. Nunca borres estado para forzar otro intento.
 
 ## Solicitudes gratuitas rechazadas o sin actividad
 

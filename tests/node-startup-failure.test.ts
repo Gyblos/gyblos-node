@@ -202,7 +202,6 @@ void test(
         role: P2P_ROLES.SELLER,
         mint,
         buyer: (await generateKeyPairSigner()).address,
-        payTo: (await generateKeyPairSigner()).address,
       });
       const error: unknown = await createNode()
         .start()

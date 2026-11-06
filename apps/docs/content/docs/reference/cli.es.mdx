@@ -72,8 +72,12 @@ Su resumen de actividad es un historial limitado de recibos conservados, no un s
 
 Register recibe la invitación por terminal interactiva o `GYBLOS_INVITE`, nunca como argumento de línea
 de comandos. La entrada interactiva es visible. Concede permiso para publicar cuando el índice verifica
-la inscripción; no crea identidad en cadena ni modifica el archivo. Consulta
-[Registra y publica](/es/sellers/register-publish).
+la inscripción. Con terminal interactiva puede crear la inscripción devnet usando la cartera owner:
+estima el coste, simula y pide `yes` antes de un nuevo envío firmado. Escribe estado privado y al repetir
+puede reenviar una transacción guardada ya aprobada sin otra pregunta. No cambia TOML ni publica.
+`REGISTER_IDENTITY_UNAVAILABLE` indica una inscripción no completada; lee el consejo sobre fondos,
+simulación o estado incierto. Consulta [Registra y publica](/es/sellers/register-publish) para conocer
+requisitos y límites de recuperación antes de ejecutarlo.
 
 ## Opciones de init para un checkout nativo
 

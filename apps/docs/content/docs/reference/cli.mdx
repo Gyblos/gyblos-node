@@ -72,8 +72,12 @@ Its activity summary is bounded retained-receipt history, not a quota balance.
 
 Register accepts the invite through an interactive terminal or `GYBLOS_INVITE`, never a command-line
 argument. The interactive input is visible. It grants discovery publication permission after the index
-checks enrollment; it does not create on-chain identity or change the file. See
-[Register and publish](/en/sellers/register-publish).
+checks enrollment. With an interactive terminal it can create missing devnet enrollment using the
+owner wallet: it estimates cost, simulates and asks for `yes` before a new signed submission. It writes
+private registration state and may resend a saved approved transaction without a fresh prompt on rerun.
+It does not change TOML or publish. `REGISTER_IDENTITY_UNAVAILABLE` reports an enrollment that did not
+complete; read its funding, simulation or uncertain-state hint. See [Register and publish](/en/sellers/register-publish)
+for prerequisites and recovery limits before running it.
 
 ## Init flags for a native checkout
 

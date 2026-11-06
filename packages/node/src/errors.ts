@@ -4,18 +4,26 @@ import type { NodeErrorCode } from './constants';
 export interface NodeErrorContext {
   // Zero-based position of the gyblos.toml [[offers]] entry the error is about.
   offer?: number;
+  requiredLamports?: bigint;
+  missingLamports?: bigint;
   // The underlying error, kept for debugging and never part of the message.
   cause?: unknown;
 }
 export class NodeError extends Error {
   // Declared only, so the field is absent when there is no offer.
   declare readonly offer?: number;
+  declare readonly requiredLamports?: bigint;
+  declare readonly missingLamports?: bigint;
   constructor(
     readonly code: NodeErrorCode,
     context: NodeErrorContext = {},
   ) {
     super(code, context.cause === undefined ? {} : { cause: context.cause });
     this.name = 'NodeError';
+    if (context.requiredLamports !== undefined)
+      this.requiredLamports = context.requiredLamports;
+    if (context.missingLamports !== undefined)
+      this.missingLamports = context.missingLamports;
     if (context.offer !== undefined) this.offer = context.offer;
   }
 }

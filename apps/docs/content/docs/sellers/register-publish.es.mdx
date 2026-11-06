@@ -26,13 +26,38 @@ y el NodeId público. Esa línea es informativa; no hay una pausa de confirmaci�
 `Already registered` también es correcto para la misma invitación e identidad. El registro no modifica
 `gyblos.toml` ni publica la oferta.
 
-<Callout type="warn" title="La inscripción en cadena es un requisito separado">
-  `seller register` no crea la inscripción 8004-solana. Si devuelve
-  `DISCOVERY_IDENTITY_NOT_REGISTERED`, envía tu `nodeId` y `owner` públicos al
-  equipo de Gyblos por el canal de tu invitación. Conserva el código: este
-  rechazo no lo consume, pero puede vencer. Repite el registro cuando el equipo
-  confirme la inscripción; pide otro código si ha vencido.
+## Completa la inscripción en Solana si se solicita
+
+Si descubrimiento indica que falta la inscripción, el comando interactivo puede registrar tu cartera
+owner existente y NodeId en **Solana devnet**, y repetir descubrimiento automáticamente. La dirección owner
+que muestra doctor necesita suficiente **SOL de devnet** antes de continuar. El comando no tiene faucet
+automático. El coste de registro es independiente de la inferencia gratuita; no uses fondos ni llaves de mainnet.
+
+El comando muestra `Pre-simulation funding estimate:` antes de comprobar fondos y simular. Después
+muestra `Estimated registration cost:` y pregunta `Sign and submit this registration? (yes/no):`.
+Solo **`yes`** aprueba un nuevo intento firmado. La estimación no es un precio fijo: los programas actualizables
+pueden cambiar el coste real. Si el coste actualizado aumenta, el comando se detiene para que lo revises de nuevo.
+Rechazar la pregunta produce un resultado de registro fallido, no una inscripción completada.
+
+Sin terminal interactiva, `DISCOVERY_IDENTITY_NOT_REGISTERED` indica repetir de forma interactiva.
+`GYBLOS_INVITE` proporciona la invitación, no consentimiento para un nuevo envío en cadena. Si tu imagen beta
+instalada no ofrece este flujo, envía al equipo el identificador de imagen y tu NodeId/owner públicos.
+
+<Callout type="warn" title="Conserva un intento de registro incierto">
+  El vendedor guarda estado privado de registro. Repetir el comando comprueba
+  ese intento y puede mostrar `Resending the previously approved registration.`
+  antes de reenviar los mismos bytes firmados sin otra pregunta de aprobación.
+  Un resultado incierto no demuestra fallo ni comisión cero. Conserva el
+  volumen, archivo de registro y bloqueo. Un blockhash demostradamente vencido y
+  cuentas del asset ausentes a nivel finalized pueden permitir un reemplazo con
+  el mismo asset y consentimiento nuevo; el vencimiento por sí solo no demuestra
+  que el intento anterior nunca llegó ni pagó comisión. El estado parcial o
+  inconcluso necesita ayuda de Gyblos. Nunca borres estado ni cambies de
+  directorio de datos para forzar otro intento.
 </Callout>
+
+La cartera inscrita en 8004 es owner. Un rol pagado existente puede tener otro payout y mostrar un aviso;
+eso no cambia owner. Los roles pagados nuevos usan owner como payout, fuera de este tutorial gratuito.
 
 `DISCOVERY_INVITE_INVALID` indica código incorrecto, usado o vencido. `DISCOVERY_RATE_LIMITED` requiere
 esperar antes de repetir; `DISCOVERY_UNAVAILABLE` indica que el índice no pudo completar la solicitud. Consulta

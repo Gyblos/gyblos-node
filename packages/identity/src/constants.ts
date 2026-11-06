@@ -112,8 +112,10 @@ export const IDENTITY_ERROR_CODES = {
   RPC_CANCELLED: 'IDENTITY_RPC_CANCELLED',
   RPC_REQUEST_INVALID: 'IDENTITY_RPC_REQUEST_INVALID',
   NODE_ID_AMBIGUOUS: 'IDENTITY_NODE_ID_AMBIGUOUS',
+  NETWORK_MISMATCH: 'IDENTITY_NETWORK_MISMATCH',
   POLICY_CONFIG_INVALID: 'IDENTITY_POLICY_CONFIG_INVALID',
   SIMULATION_FAILED: 'IDENTITY_SIMULATION_FAILED',
+  INSUFFICIENT_FUNDS: 'IDENTITY_INSUFFICIENT_REGISTRATION_FUNDS',
   SPONSOR_COST_ABOVE_CEILING: 'IDENTITY_SPONSOR_COST_ABOVE_CEILING',
   TOO_MANY_CLAIMANTS: 'IDENTITY_TOO_MANY_CLAIMANTS',
   TRANSACTION_TOO_LARGE: 'IDENTITY_TRANSACTION_TOO_LARGE',
@@ -178,11 +180,13 @@ export const ONLINE_CHALLENGE = {
 export const REGISTRATION_DEFAULTS = {
   probeLamports: 50_000_000n,
   walletDeadlineSeconds: 120n,
+  agentUri: 'https://gyblos.com/.well-known/node.json',
 } as const;
 
 export const IDENTITY_RESOLUTION_LIMITS = {
   timeoutMs: 5000,
   maxTimeoutMs: 30000,
+  pollIntervalMs: 250,
 } as const;
 
 // Per HTTP response, measured on decompressed fetch bytes before SDK JSON parsing.
@@ -192,3 +196,72 @@ export const IDENTITY_RPC_METHODS = [
   'getProgramAccounts',
   'getMultipleAccounts',
 ] as const;
+export const IDENTITY_REGISTRATION_RPC_METHODS = [
+  ...IDENTITY_RPC_METHODS,
+  'getSlot',
+  'getBlockTime',
+  'getLatestBlockhash',
+  'getBalance',
+  'simulateTransaction',
+  'getFeeForMessage',
+  'sendTransaction',
+  'getSignatureStatuses',
+  'getTransaction',
+  'getEpochInfo',
+  'isBlockhashValid',
+  'getMinimumBalanceForRentExemption',
+] as const;
+
+// Expired means the saved bytes cannot land; it does not assert that they never landed.
+export const OWNER_REGISTRATION_STATUS = {
+  CONFIRMED: 'confirmed',
+  FAILED: 'failed',
+  UNKNOWN: 'unknown',
+  EXPIRED: 'expired',
+} as const;
+
+// Conservative subset of finalized Solana failures recognized for safe registration retry.
+// Unknown future variants remain unknown until their wire format is supported.
+export const REGISTRATION_FINAL_FAILURES = [
+  'AccountNotFound',
+  'InsufficientFundsForFee',
+  'InvalidAccountForFee',
+  'SignatureFailure',
+  'BlockhashNotFound',
+] as const;
+export const REGISTRATION_INSTRUCTION_FAILURES = [
+  'InsufficientFunds',
+  'InvalidAccountData',
+  'InvalidArgument',
+  'InvalidInstructionData',
+  'MissingRequiredSignature',
+  'IncorrectAuthority',
+  'GenericError',
+] as const;
+export const REGISTRATION_ERROR_LIMITS = {
+  maxInstructionIndex: 3n,
+  maxCustomError: 4_294_967_295n,
+} as const;
+
+// Canonical inline Ed25519 proof layout used by registration construction and saved-wire validation.
+export const ED25519_LAYOUT = {
+  headerBytes: 16,
+  pubkeyOffset: 16,
+  signatureOffset: 48,
+  messageOffset: 112,
+  inlineIndex: 0xffff,
+  deadlineBytes: 8,
+} as const;
+
+// Layouts: QuantuLabs/8004-solana 6b344c9, identity/state.rs (8-byte discriminator included).
+// Core source c8732ac, state/asset.rs and state/collect.rs; 80 includes the name 'Agent'.
+export const OWNER_REGISTRATION_COST = {
+  agentBytes: 748,
+  metadataBytes: 332,
+  coreBaseBytes: 80,
+  coreCreateLamports: 1_500_000n,
+} as const;
+
+// Recovering a saved registration requires several serialized finalized RPC reads.
+// Keep its end-to-end deadline separate from ordinary identity resolution.
+export const OWNER_REGISTRATION_LIMITS = { checkTimeoutMs: 30_000 } as const;

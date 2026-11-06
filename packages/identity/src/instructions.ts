@@ -22,6 +22,7 @@ import {
 } from './bytes';
 import {
   DEVNET_REGISTRY,
+  ED25519_LAYOUT,
   IDENTITY_ERROR_CODES,
   INSTRUCTION_DISCRIMINATORS,
   LIMITS,
@@ -40,11 +41,6 @@ export type RegistryInstruction = Instruction<
 >;
 
 const ADDRESS_ENCODER = getAddressEncoder();
-const ED25519_HEADER_BYTES = 16;
-const ED25519_PUBKEY_OFFSET = 16;
-const ED25519_SIGNATURE_OFFSET = 48;
-const ED25519_MESSAGE_OFFSET = 112;
-const ED25519_INLINE_INDEX = 0xffff;
 
 function readonlyMeta(address: Address): AccountMetaWithSigner {
   return { address, role: AccountRole.READONLY };
@@ -162,15 +158,15 @@ function ed25519VerifyInstruction(
   const padding = 0;
   const header = concatBytes([
     Uint8Array.of(signatureCount, padding),
-    u16(ED25519_SIGNATURE_OFFSET),
-    u16(ED25519_INLINE_INDEX),
-    u16(ED25519_PUBKEY_OFFSET),
-    u16(ED25519_INLINE_INDEX),
-    u16(ED25519_MESSAGE_OFFSET),
+    u16(ED25519_LAYOUT.signatureOffset),
+    u16(ED25519_LAYOUT.inlineIndex),
+    u16(ED25519_LAYOUT.pubkeyOffset),
+    u16(ED25519_LAYOUT.inlineIndex),
+    u16(ED25519_LAYOUT.messageOffset),
     u16(message.length),
-    u16(ED25519_INLINE_INDEX),
+    u16(ED25519_LAYOUT.inlineIndex),
   ]);
-  if (header.length !== ED25519_HEADER_BYTES) {
+  if (header.length !== ED25519_LAYOUT.headerBytes) {
     throw new IdentityError(
       IDENTITY_ERROR_CODES.ENCODING_INVARIANT,
       'ed25519 header size drift',

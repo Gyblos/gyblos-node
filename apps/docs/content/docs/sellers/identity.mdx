@@ -9,13 +9,13 @@ not create or recover these keys.
 
 ## What lives where
 
-| Location in the supplied installation  | Purpose                                                          | Sharing rule                                                    |
-| -------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- |
-| `~/gyblos-seller/gyblos.toml`          | Models, limits and publication                                   | Review before sharing; custom URLs can contain credentials      |
-| `~/gyblos-seller/compose.yaml`         | Container setup and volume references                            | Keep with the installation; review custom values before sharing |
-| `~/gyblos-seller/seller.env`           | Relay token and any provider credentials                         | Private; never upload or display it                             |
-| Named Docker volume mounted at `/data` | Seller keys, role state, public sequence, receipts and tokenizer | Private; never upload the volume or its files                   |
-| Separate Ollama volume                 | Downloaded model data                                            | Keep to avoid unnecessary downloads                             |
+| Location in the supplied installation  | Purpose                                                                                         | Sharing rule                                                    |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `~/gyblos-seller/gyblos.toml`          | Models, limits and publication                                                                  | Review before sharing; custom URLs can contain credentials      |
+| `~/gyblos-seller/compose.yaml`         | Container setup and volume references                                                           | Keep with the installation; review custom values before sharing |
+| `~/gyblos-seller/seller.env`           | Relay token and any provider credentials                                                        | Private; never upload or display it                             |
+| Named Docker volume mounted at `/data` | Seller keys, role state, private registration attempts, public sequence, receipts and tokenizer | Private; never upload the volume or its files                   |
+| Separate Ollama volume                 | Downloaded model data                                                                           | Keep to avoid unnecessary downloads                             |
 
 The Compose project determines the volume names. Moving or renaming the installation can select a new
 project and make the seller look newly installed. Do not move it, change the project name or prune its
@@ -31,6 +31,10 @@ There is no complete seller backup-and-restore procedure in this handbook. A des
 for a different application and does not restore this seller's Iroh identity, public sequence or journals.
 If keys, role state or sequence locks are missing or damaged, stop changing the data and contact Gyblos.
 Never delete a lock, sequence file or journal merely to make startup pass.
+
+The volume also holds private registration state, including an asset key and potentially signed
+transaction bytes. Never share that file or clear its lock to force a retry. A registration rerun may
+resend an existing approved attempt; follow [the registration guide](/en/sellers/register-publish).
 
 ## Information you can send for support
 

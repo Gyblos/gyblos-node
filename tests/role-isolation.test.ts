@@ -68,14 +68,12 @@ void test(
     const original = process.cwd();
     const directory = await mkdtemp(join(tmpdir(), 'gyblos-seller-role-test-'));
     const buyer = await generateKeyPairSigner();
-    const payout = await generateKeyPairSigner();
     try {
       process.chdir(directory);
       const first = await setupRole({
         role: P2P_ROLES.SELLER,
         mint: MINT,
         buyer: buyer.address,
-        payTo: payout.address,
       });
       assert.equal(first.role, 'seller');
       assert.deepEqual(
@@ -106,6 +104,110 @@ void test(
       );
     } finally {
       process.chdir(original);
+      await rm(directory, { recursive: true, force: true });
+    }
+  },
+);
+
+void test(
+  'a new paid seller defaults payout to its owner and preserves it on repeat',
+  ROLE_OPTIONS,
+  async () => {
+    const { setupRole } = await import('@gyblos/node/roles');
+    const originalDirectory = process.cwd();
+    const previousHome = process.env.GYBLOS_HOME;
+    const directory = await mkdtemp(join(tmpdir(), 'gyblos-paid-owner-test-'));
+    const buyer = await generateKeyPairSigner();
+    try {
+      process.chdir(directory);
+      process.env.GYBLOS_HOME = join(directory, 'home');
+      const first = await setupRole({
+        role: P2P_ROLES.SELLER,
+        mint: MINT,
+        buyer: buyer.address,
+      });
+      assert.equal(first.role, P2P_ROLES.SELLER);
+      if (first.role !== P2P_ROLES.SELLER) throw new Error('unexpected role');
+      assert.equal(first.payTo, first.owner);
+      assert.notEqual(first.facilitator, first.owner);
+      assert.notEqual(first.authorizer, first.owner);
+      assert.deepEqual(
+        await setupRole({
+          role: P2P_ROLES.SELLER,
+          mint: MINT,
+          buyer: buyer.address,
+        }),
+        first,
+      );
+    } finally {
+      process.chdir(originalDirectory);
+      if (previousHome === undefined) delete process.env.GYBLOS_HOME;
+      else process.env.GYBLOS_HOME = previousHome;
+      await rm(directory, { recursive: true, force: true });
+    }
+  },
+);
+
+void test(
+  'new paid sellers reject a different payout; existing legacy roles stay unchanged',
+  ROLE_OPTIONS,
+  async () => {
+    const { setupRole } = await import('@gyblos/node/roles');
+    const { readFile, writeFile } = await import('node:fs/promises');
+    const originalDirectory = process.cwd();
+    const previousHome = process.env.GYBLOS_HOME;
+    const directory = await mkdtemp(join(tmpdir(), 'gyblos-legacy-payout-'));
+    const buyer = await generateKeyPairSigner();
+    const legacyPayout = await generateKeyPairSigner();
+    try {
+      process.chdir(directory);
+      process.env.GYBLOS_HOME = join(directory, 'home');
+      await assert.rejects(
+        setupRole({
+          role: P2P_ROLES.SELLER,
+          mint: MINT,
+          buyer: buyer.address,
+          payTo: legacyPayout.address,
+        }),
+        /new seller.*owner/i,
+      );
+      await assert.rejects(readdir(homeLayout(process.env).roles.seller), {
+        code: 'ENOENT',
+      });
+      const created = await setupRole({
+        role: P2P_ROLES.SELLER,
+        mint: MINT,
+        buyer: buyer.address,
+      });
+      const path = join(
+        homeLayout(process.env).roles.seller,
+        ROLE_FILES.roleConfig,
+      );
+      const legacy = { ...created, payTo: legacyPayout.address };
+      await writeFile(path, JSON.stringify(legacy));
+      const before = await readFile(path, 'utf8');
+      assert.deepEqual(
+        await setupRole({
+          role: P2P_ROLES.SELLER,
+          mint: MINT,
+          buyer: buyer.address,
+        }),
+        legacy,
+      );
+      assert.deepEqual(
+        await setupRole({
+          role: P2P_ROLES.SELLER,
+          mint: MINT,
+          buyer: buyer.address,
+          payTo: legacyPayout.address,
+        }),
+        legacy,
+      );
+      assert.equal(await readFile(path, 'utf8'), before);
+    } finally {
+      process.chdir(originalDirectory);
+      if (previousHome === undefined) delete process.env.GYBLOS_HOME;
+      else process.env.GYBLOS_HOME = previousHome;
       await rm(directory, { recursive: true, force: true });
     }
   },

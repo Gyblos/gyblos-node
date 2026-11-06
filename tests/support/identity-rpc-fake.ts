@@ -31,6 +31,9 @@ export interface SimulatedSpend {
   ownerAfterProbe: number;
   fee: number | null;
   laterSimulationErr?: string;
+  initialSimulationErr?: string;
+  simulationSlot?: number;
+  balanceAfterSimulation?: number;
 }
 
 export interface FakeRpcState {
@@ -42,10 +45,22 @@ export interface FakeRpcState {
   calls: string[];
   configs: { method: string; params: unknown[] }[];
   genesisHash: string;
+  blockHeight: number;
+  blockhashValid: boolean;
+  transactionResult: unknown;
+  rentQueries: number[];
   failingMethods: Set<string>;
   batchValue?: unknown;
+  accountsContextSlot?: number;
   programValue?: unknown;
   responsePadding: Map<string, number>;
+  signatureStatus: {
+    confirmationStatus: 'processed' | 'confirmed' | 'finalized';
+    err?: unknown;
+  } | null;
+  sendSignature: string;
+  delayMethods: Map<string, number>;
+  onSend?: (wire: string) => Promise<void>;
 }
 
 export interface FakeRpc {
@@ -146,7 +161,7 @@ function multipleAccounts(state: FakeRpcState, params: unknown[]) {
     return { error: { code: RPC_ERROR_CODE, message: 'synthetic outage' } };
   return {
     result: {
-      context: { slot: SLOT },
+      context: { slot: state.accountsContextSlot ?? SLOT },
       value: Object.hasOwn(state, 'batchValue')
         ? state.batchValue
         : keys.map((key) => accountJson(state.chain, key)),
@@ -159,9 +174,12 @@ function simulation(state: FakeRpcState) {
     (method) => method === 'simulateTransaction',
   ).length;
   return {
-    context: { slot: SLOT },
+    context: { slot: state.spend.simulationSlot ?? SLOT },
     value: {
-      err: simulations > 1 ? (state.spend.laterSimulationErr ?? null) : null,
+      err:
+        simulations > 1
+          ? (state.spend.laterSimulationErr ?? null)
+          : (state.spend.initialSimulationErr ?? null),
       logs: [],
       accounts: [
         {
@@ -196,6 +214,30 @@ function respond(state: FakeRpcState, call: JsonRpcCall): object {
           ? state.programValue
           : programAccounts(state, call.params),
       };
+    case 'sendTransaction':
+      return { result: state.sendSignature };
+    case 'getEpochInfo':
+      return {
+        result: {
+          absoluteSlot: SLOT,
+          blockHeight: state.blockHeight,
+          epoch: 1,
+          slotIndex: 1,
+          slotsInEpoch: 432000,
+          transactionCount: 1,
+        },
+      };
+    case 'isBlockhashValid':
+      return { result: { context, value: state.blockhashValid } };
+    case 'getTransaction':
+      return { result: state.transactionResult };
+    case 'getMinimumBalanceForRentExemption': {
+      const bytes = Number(call.params[0]);
+      state.rentQueries.push(bytes);
+      return { result: 890880 + bytes * 6960 };
+    }
+    case 'getSignatureStatuses':
+      return { result: { context, value: [state.signatureStatus] } };
     case 'getSlot':
       return { result: SLOT };
     case 'getBlockTime':
@@ -208,7 +250,14 @@ function respond(state: FakeRpcState, call: JsonRpcCall): object {
         },
       };
     case 'getBalance':
-      return { result: { context, value: state.spend.ownerBalance } };
+      return {
+        result: {
+          context,
+          value: state.calls.includes('simulateTransaction')
+            ? (state.spend.balanceAfterSimulation ?? state.spend.ownerBalance)
+            : state.spend.ownerBalance,
+        },
+      };
     case 'simulateTransaction':
       return { result: simulation(state) };
     case 'getFeeForMessage':
@@ -227,16 +276,20 @@ async function readBody(request: IncomingMessage): Promise<unknown> {
 function serve(state: FakeRpcState): Server {
   return createServer((request, response) => {
     readBody(request)
-      .then((body) => {
+      .then(async (body) => {
         const call = asCall(body);
+        if (call.method === 'sendTransaction' && state.onSend)
+          await state.onSend(String(call.params[0]));
         response.setHeader('content-type', 'application/json');
-        response.end(
+        const responseBody =
           JSON.stringify({
             jsonrpc: '2.0',
             id: call.id,
             ...respond(state, call),
-          }) + ' '.repeat(state.responsePadding.get(call.method) ?? 0),
-        );
+          }) + ' '.repeat(state.responsePadding.get(call.method) ?? 0);
+        const wait = state.delayMethods.get(call.method) ?? 0;
+        if (wait > 0) setTimeout(() => response.end(responseBody), wait);
+        else response.end(responseBody);
       })
       .catch((error: unknown) => {
         response.statusCode = 500;
@@ -256,8 +309,15 @@ export async function startFakeRpc(
     calls: [],
     configs: [],
     genesisHash: DEVNET_GENESIS,
+    blockHeight: SLOT,
+    blockhashValid: true,
+    transactionResult: null,
+    rentQueries: [],
     failingMethods: new Set(),
     responsePadding: new Map(),
+    signatureStatus: null,
+    sendSignature: '',
+    delayMethods: new Map(),
   };
   const server = serve(state);
   server.listen(0, LOCALHOST);

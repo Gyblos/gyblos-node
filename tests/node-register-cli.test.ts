@@ -1,7 +1,9 @@
 // Owns the `gyblos seller register` contract: it sends the index only the invite and this home's NodeId,
 // takes the invite from GYBLOS_INVITE or a terminal question (never a flag), names the index before sending, explains each refusal with a static
-// code and a hint, writes nothing and never prints the invite or the home location. Offline: fetch is faked.
+// code and a hint; the index-only path writes nothing and never prints the invite or home. Fetch is faked.
 import assert from 'node:assert/strict';
+import { readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import test from 'node:test';
 
 import { runCli } from '../apps/node/src/cli';
@@ -29,6 +31,7 @@ async function register(
     answer?: (input: string, init: RequestInit) => Promise<Response>;
     env?: Record<string, string>;
     prompt?: (question: string) => Promise<string>;
+    registerIdentity?: () => Promise<boolean>;
   } = {},
 ) {
   const sent: Sent[] = [];
@@ -44,6 +47,7 @@ async function register(
       stderr += text;
     },
     prompt: options.prompt,
+    registerIdentity: options.registerIdentity,
     fetch: async (input, init) => {
       sent.push({ url: input, init });
       if (!options.answer) throw new Error('no network in this test');
@@ -239,3 +243,125 @@ void test('seller register: an invite flag, any other flag or extra arguments pr
     assert.equal(stderr.includes(INVITE), false);
   }
 });
+
+void test('seller register retries the index only after the seller identity is ready', () =>
+  withHome(async (home) => {
+    let attempts = 0;
+    let registrations = 0;
+    const result = await register(home, [], {
+      env: { GYBLOS_INVITE: INVITE },
+      registerIdentity: async () => {
+        registrations++;
+        return true;
+      },
+      answer: async () => {
+        attempts++;
+        return attempts === 1
+          ? new Response(JSON.stringify({ error: 'IDENTITY_NOT_REGISTERED' }), {
+              status: 403,
+              headers: { 'content-type': 'application/json' },
+            })
+          : new Response(JSON.stringify({ ok: true, status: 'active' }), {
+              status: 201,
+              headers: { 'content-type': 'application/json' },
+            });
+      },
+    });
+    assert.equal(result.code, 0, result.stderr);
+    assert.equal(registrations, 1);
+    assert.equal(attempts, 2);
+  }));
+
+void test('seller register gives a static useful hint when the registration simulation fails', () =>
+  withHome(async (home) => {
+    const { NodeError } = await import('@gyblos/node/errors');
+    const { NODE_ERROR_CODES } = await import('@gyblos/node/constants');
+    const result = await register(home, [], {
+      env: { GYBLOS_INVITE: INVITE },
+      registerIdentity: async () => {
+        throw new NodeError(
+          NODE_ERROR_CODES.SELLER_REGISTRATION_SIMULATION_FAILED,
+        );
+      },
+      answer: json(403, { error: 'IDENTITY_NOT_REGISTERED' }),
+    });
+    assert.equal(result.code, 1);
+    assert.match(result.stderr, /simulation.*SOL.*cost/i);
+  }));
+
+void test('seller register warns without blocking an older distinct payout', () =>
+  withHome(async (home) => {
+    const path = join(home.seller, 'role.json');
+    const role = JSON.parse(await readFile(path, 'utf8'));
+    const payout = '11111111111111111111111111111113';
+    await writeFile(
+      path,
+      JSON.stringify({
+        ...role,
+        payTo: payout,
+        authorizer: '11111111111111111111111111111114',
+        facilitator: '11111111111111111111111111111115',
+        buyer: '11111111111111111111111111111116',
+      }),
+    );
+    const before = await snapshot(home.root);
+    const result = await register(home, [], {
+      env: { GYBLOS_INVITE: INVITE },
+      answer: json(201, { ok: true, status: 'active' }),
+    });
+    assert.equal(result.code, 0, result.stderr);
+    assert.match(result.stderr, /payout.*different.*owner/i);
+    assert.equal(result.stderr.includes(payout), false);
+    assert.deepEqual(await snapshot(home.root), before);
+    await writeFile(
+      path,
+      JSON.stringify({
+        ...role,
+        payTo: role.owner,
+        authorizer: '11111111111111111111111111111114',
+        facilitator: '11111111111111111111111111111115',
+        buyer: '11111111111111111111111111111116',
+      }),
+    );
+    const unified = await register(home, [], {
+      env: { GYBLOS_INVITE: INVITE },
+      answer: json(201, { ok: true, status: 'active' }),
+    });
+    assert.equal(unified.code, 0, unified.stderr);
+    assert.doesNotMatch(unified.stderr, /payout.*different.*owner/i);
+  }));
+
+void test('seller register shows missing SOL only for the explicit funds-required error code', () =>
+  withHome(async (home) => {
+    const { NodeError } = await import('@gyblos/node/errors');
+    const { NODE_ERROR_CODES } = await import('@gyblos/node/constants');
+    for (const code of [
+      NODE_ERROR_CODES.SELLER_REGISTRATION_STATE_UNAVAILABLE,
+      NODE_ERROR_CODES.SELLER_REGISTRATION_SIMULATION_FAILED,
+    ]) {
+      const result = await register(home, [], {
+        env: { GYBLOS_INVITE: INVITE },
+        answer: json(403, { error: 'IDENTITY_NOT_REGISTERED' }),
+        registerIdentity: async () => {
+          throw new NodeError(code, {
+            missingLamports: 1000000n,
+            requiredLamports: 2000000n,
+          });
+        },
+      });
+      assert.equal(result.code, 1);
+      assert.doesNotMatch(result.stderr, /you need .*more SOL/);
+    }
+    const missing = await register(home, [], {
+      env: { GYBLOS_INVITE: INVITE },
+      answer: json(403, { error: 'IDENTITY_NOT_REGISTERED' }),
+      registerIdentity: async () => {
+        throw new NodeError(
+          NODE_ERROR_CODES.SELLER_REGISTRATION_FUNDS_REQUIRED,
+          { missingLamports: 1000000n, requiredLamports: 2000000n },
+        );
+      },
+    });
+    assert.equal(missing.code, 1);
+    assert.match(missing.stderr, /you need 0\.001000000 more SOL/);
+  }));

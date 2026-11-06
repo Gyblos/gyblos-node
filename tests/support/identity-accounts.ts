@@ -107,6 +107,7 @@ export interface ClaimantSpec {
   owner: Address;
   asset: Address;
   node: DetachedSigner;
+  agentWallet?: Address;
   collection?: Address;
   // Binding sequence the node signs (default 1); bindingValue replaces the signed value outright.
   sequence?: bigint;
@@ -145,6 +146,7 @@ export async function addClaimant(
       creator: spec.owner,
       owner: spec.owner,
       asset: spec.asset,
+      agentWallet: spec.agentWallet,
       uri: 'https://gyblos.com/n.json',
     }),
   });

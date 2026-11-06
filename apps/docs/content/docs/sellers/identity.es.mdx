@@ -9,13 +9,13 @@ configuración; no crea ni recupera esas llaves.
 
 ## Dónde se guarda cada cosa
 
-| Ubicación en la instalación suministrada        | Uso                                                              | Regla para compartir                                                              |
-| ----------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| `~/gyblos-seller/gyblos.toml`                   | Modelos, cuotas y publicación                                    | Revísalo antes de compartir; las URLs personalizadas pueden contener credenciales |
-| `~/gyblos-seller/compose.yaml`                  | Contenedores y referencias a volúmenes                           | Consérvalo con la instalación; revisa valores personalizados antes de compartir   |
-| `~/gyblos-seller/seller.env`                    | Token de relay y credenciales de proveedores                     | Privado; nunca lo subas ni lo muestres                                            |
-| Volumen con nombre de Docker montado en `/data` | Llaves, estado del rol, secuencia pública, recibos y tokenizador | Privado; nunca subas el volumen ni sus archivos                                   |
-| Volumen separado de Ollama                      | Datos del modelo descargado                                      | Consérvalo para evitar descargas innecesarias                                     |
+| Ubicación en la instalación suministrada        | Uso                                                                                             | Regla para compartir                                                              |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `~/gyblos-seller/gyblos.toml`                   | Modelos, cuotas y publicación                                                                   | Revísalo antes de compartir; las URLs personalizadas pueden contener credenciales |
+| `~/gyblos-seller/compose.yaml`                  | Contenedores y referencias a volúmenes                                                          | Consérvalo con la instalación; revisa valores personalizados antes de compartir   |
+| `~/gyblos-seller/seller.env`                    | Token de relay y credenciales de proveedores                                                    | Privado; nunca lo subas ni lo muestres                                            |
+| Volumen con nombre de Docker montado en `/data` | Llaves, estado del rol, intentos privados de registro, secuencia pública, recibos y tokenizador | Privado; nunca subas el volumen ni sus archivos                                   |
+| Volumen separado de Ollama                      | Datos del modelo descargado                                                                     | Consérvalo para evitar descargas innecesarias                                     |
 
 El proyecto de Compose determina los nombres de los volúmenes. Mover o renombrar la instalación puede
 seleccionar otro proyecto y hacer que el vendedor parezca nuevo. No lo muevas, cambies el nombre del
@@ -31,6 +31,10 @@ Este manual no ofrece un procedimiento completo de copia y restauración del ven
 de escritorio pertenece a otra aplicación y no recupera la identidad Iroh, secuencia pública ni journals de este nodo.
 Si faltan o están dañados las llaves, el estado del rol o los bloqueos de secuencia, deja de modificar los datos y
 contacta con Gyblos. Nunca borres un bloqueo, archivo de secuencia o journal solo para conseguir que arranque.
+
+El volumen también guarda estado privado de registro, incluida una llave de asset y posiblemente
+bytes de transacciones firmadas. Nunca compartas ese archivo ni borres su bloqueo para forzar un reintento.
+Repetir el registro puede reenviar un intento ya aprobado; sigue [la guía de registro](/es/sellers/register-publish).
 
 ## Qué puedes enviar para pedir ayuda
 

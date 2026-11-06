@@ -31,6 +31,19 @@ const QUOTED_OUTPUT = [
   ['Seller identity (public;', 'apps/node/src/cli-doctor.ts'],
   ['Registered: this seller may now publish.', 'apps/node/src/cli-register.ts'],
   ['Already registered', 'apps/node/src/cli-register.ts'],
+  [
+    'Resending the previously approved registration.',
+    'apps/node/src/cli-register-identity.ts',
+  ],
+  [
+    'Pre-simulation funding estimate:',
+    'apps/node/src/cli-register-identity.ts',
+  ],
+  ['Estimated registration cost:', 'apps/node/src/cli-register-identity.ts'],
+  [
+    'Sign and submit this registration? (yes/no):',
+    'apps/node/src/cli-register-identity.ts',
+  ],
   ['listed in the index', 'apps/node/src/cli-status.ts'],
   ['SELLER_RELAY_OFFLINE', 'packages/node/src/constants.ts'],
   ['DISCOVERY_INVITE_INVALID', 'packages/discovery-http/src/constants.ts'],

@@ -44,7 +44,7 @@ const HINTS: Readonly<Partial<Record<DoctorResultCode, string>>> = {
   [NODE_ERROR_CODES.SELLER_PAID_METERING_UNRECOUNTED]:
     'a paid offer needs a model recounted with its pinned public tokenizer (qwen3-0.6b)',
   [NODE_ERROR_CODES.SELLER_PAYMENT_ROLE_MISSING]:
-    'paid offers need a seller role with a payout: in a new GYBLOS_HOME, `pnpm node:setup --role seller --mint <mint> --pay-to <payout> --buyer <any address you control>`; fund the fee payer with devnet SOL',
+    'paid offers need a seller role with a payout: in a new GYBLOS_HOME, `pnpm node:setup --role seller --mint <mint> --buyer <any address you control>`; fund the fee payer with devnet SOL',
   [NODE_ERROR_CODES.SELLER_PAYMENT_NETWORK_MISMATCH]:
     'paid selling runs on devnet only; set the role up with a devnet RPC',
   [NODE_ERROR_CODES.SELLER_PAYMENT_ACCOUNTS_UNAVAILABLE]:
@@ -56,7 +56,7 @@ const HINTS: Readonly<Partial<Record<DoctorResultCode, string>>> = {
   [DOCTOR_CODES.PAYMENT_ACCOUNTS_UNUSABLE]:
     'a payout, fee or fee payer token account is frozen or is not a token account; startup refuses it until it can receive payouts',
   [NODE_ERROR_CODES.SELLER_PAYMENT_DESCRIPTION_INVALID]:
-    'the payout must differ from the owner, fee payer and authorizer keys',
+    'the payout must differ from the fee payer and authorizer keys',
   [NODE_ERROR_CODES.NODE_CONFIG_INVALID]:
     'run `pnpm gyblos config validate --config <file>` on the GYBLOS_CONFIG file',
   [NODE_ERROR_CODES.LEGACY_LOCAL_LAYOUT]:

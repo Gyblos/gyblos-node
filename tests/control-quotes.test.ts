@@ -2,6 +2,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { generateKeyPairSigner } from '@solana/kit';
+
 import {
   acceptControlQuote,
   createControlQuote,
@@ -110,7 +112,7 @@ void test('control supports free and mixed-zero model pricing without authorizin
   );
 });
 
-void test('a quote that can charge never names a hot key as payout; a free quote may', async () => {
+void test('a paid quote keeps payment signing keys separate; a free quote may use its owner', async () => {
   const free = await controlFixture(true);
   free.context.payTo = free.context.owner;
   const signed = await createControlQuote(
@@ -119,7 +121,7 @@ void test('a quote that can charge never names a hot key as payout; a free quote
     free.ownerSigner,
   );
   assert.equal(signed.offer.payTo, signed.offer.owner);
-  for (const hot of ['owner', 'feePayer', 'authorizer'] as const) {
+  for (const hot of ['feePayer', 'authorizer'] as const) {
     const paid = await controlFixture();
     paid.context.payTo = paid.context[hot];
     await assert.rejects(
@@ -370,4 +372,20 @@ void test('control serves two independent buyers and custom model tuples without
     acceptControlQuote(second, fixture.request, fixture.trust()),
     { code: CONTROL_CODES.POLICY },
   );
+});
+
+void test('paid v2 quotes permit the owner as payout when payment signers are separate', async () => {
+  const paid = await controlFixture();
+  const feePayer = await generateKeyPairSigner();
+  const authorizer = await generateKeyPairSigner();
+  paid.context.payTo = paid.context.owner;
+  paid.context.feePayer = feePayer.address;
+  paid.context.authorizer = authorizer.address;
+  const signed = await createControlQuote(
+    paid.request,
+    paid.context,
+    paid.ownerSigner,
+  );
+  assert.equal(signed.offer.payTo, paid.context.owner);
+  await acceptControlQuote(signed, paid.request, paid.trust());
 });

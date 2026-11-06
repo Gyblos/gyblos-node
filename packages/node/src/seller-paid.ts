@@ -39,20 +39,18 @@ export interface SellerPaid {
 }
 
 // Buyers pay the listed price, which already includes PROTOCOL_FEE, so the channel must split by it
-// too; the asset is the role's, and the payout is neither the owner nor a key that signs channel steps
-// (control quotes refuse those).
+// too; the asset is the role's, and the payout differs from keys that sign channel steps.
+// The payout may be the offer owner.
 function checkedDescription(
   description: PaymentDescription,
-  role: { owner: string; mint: string },
+  role: { mint: string },
 ) {
   if (
     description.network !== DEVNET ||
     description.mint !== role.mint ||
     description.protocolFeeBps !== PROTOCOL_FEE.bps ||
     description.treasury !== PROTOCOL_FEE.treasury ||
-    [role.owner, description.feePayer, description.authorizer].includes(
-      description.payTo,
-    )
+    [description.feePayer, description.authorizer].includes(description.payTo)
   )
     throw new NodeError(NODE_ERROR_CODES.SELLER_PAYMENT_DESCRIPTION_INVALID);
   return description;
@@ -73,7 +71,6 @@ export async function startSellerPaid(
 ): Promise<SellerPaid> {
   const timing = options.settlement ?? PAID_SETTLEMENT;
   const description = checkedDescription(await payments.server.describe(), {
-    owner: options.owner,
     mint: options.mint,
   });
   const daemon = new AbortController();
