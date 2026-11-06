@@ -7,7 +7,12 @@ import { i18n } from './i18n';
 
 const docs = defineDocs({
   dir: 'content/docs',
-  docs: { schema: pageSchema },
+  docs: {
+    schema: pageSchema,
+    postprocess: {
+      includeProcessedMarkdown: { output: 'function', headingIds: false },
+    },
+  },
   meta: { schema: metaSchema },
 });
 

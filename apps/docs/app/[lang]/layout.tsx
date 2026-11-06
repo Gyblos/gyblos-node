@@ -41,9 +41,21 @@ export default async function Layout({
       className={`${sans.variable} ${mono.variable}`}
       suppressHydrationWarning
     >
+      <head>
+        <link rel="describedby" href="/llms.txt" />
+      </head>
       <body className="flex flex-col min-h-screen">
         <Provider i18n={i18nProvider(translations, lang)}>
-          <DocsLayout tree={source.getPageTree(lang)} {...baseOptions(lang)}>
+          <DocsLayout
+            tree={source.getPageTree(lang)}
+            {...baseOptions(lang)}
+            containerProps={{
+              style: {
+                gridTemplate:
+                  '"sidebar header toc" "sidebar toc-popover toc" "sidebar tabs toc" "sidebar main toc" 1fr / var(--fd-sidebar-col) minmax(0, 1fr) var(--fd-toc-width)',
+              },
+            }}
+          >
             {children}
           </DocsLayout>
         </Provider>

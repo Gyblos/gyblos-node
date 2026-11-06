@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "next dev",
-    "build": "next build"
+    "build": "next build",
+    "test:export": "node --test test/*.test.ts"
   },
   "dependencies": {
     "fumadocs-core": "16.17.9",

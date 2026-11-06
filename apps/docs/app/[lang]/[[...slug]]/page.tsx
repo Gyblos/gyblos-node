@@ -10,7 +10,10 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import { getMDXComponents } from '../../../components/mdx';
+import { PageActions } from '../../../components/page-actions';
 import { i18n } from '../../../lib/i18n';
+import { markdownUrl } from '../../../lib/markdown';
+import { siteUrl } from '../../../lib/shared';
 import { source } from '../../../lib/source';
 
 interface PageProps {
@@ -28,6 +31,10 @@ export default async function Page(props: PageProps) {
     <DocsPage toc={page.data.toc} full={page.data.full}>
       <DocsTitle>{page.data.title}</DocsTitle>
       <DocsDescription>{page.data.description}</DocsDescription>
+      <PageActions
+        markdownUrl={markdownUrl(page.url)}
+        spanish={lang === 'es'}
+      />
       <DocsBody>
         <MDX
           components={getMDXComponents({ a: createRelativeLink(source, page) })}
@@ -51,8 +58,23 @@ export async function generateMetadata(props: PageProps): Promise<Metadata> {
     // The home page title already names the site; the template would repeat it.
     title: path ? page.data.title : { absolute: page.data.title },
     description: page.data.description,
+    openGraph: {
+      title: page.data.title,
+      description: page.data.description,
+      url: `${siteUrl}${page.url}`,
+      type: 'article',
+      locale: lang === 'es' ? 'es_ES' : 'en_US',
+      alternateLocale: lang === 'es' ? 'en_US' : 'es_ES',
+      siteName: 'Gyblos Docs',
+    },
+    twitter: {
+      card: 'summary',
+      title: page.data.title,
+      description: page.data.description,
+    },
     alternates: {
       canonical: page.url,
+      types: { 'text/markdown': markdownUrl(page.url) },
       languages: {
         ...Object.fromEntries(
           i18n.languages.map((language) => [
