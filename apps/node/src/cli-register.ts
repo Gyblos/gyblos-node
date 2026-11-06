@@ -14,6 +14,7 @@ import {
 
 import { urlOrigin } from './cli-format';
 import type { Prompt } from './cli-init';
+import { registerOnChain } from './cli-register-identity';
 import { EXIT, REGISTER, REGISTER_ERRORS } from './constants';
 import {
   discoverySettings,
@@ -58,9 +59,40 @@ async function inviteOf(output: SellerOutput, prompt: Prompt | undefined) {
   return (await prompt('Invite code (from your Gyblos invitation): ')).trim();
 }
 
+class RegistrationUnavailable extends Error {}
+async function registerWithIdentity(
+  attempt: () => Promise<
+    (typeof REGISTRATION_RESULTS)[keyof typeof REGISTRATION_RESULTS]
+  >,
+  registerIdentity?: () => Promise<boolean>,
+) {
+  try {
+    return await attempt();
+  } catch (error) {
+    if (
+      !(error instanceof DiscoveryError) ||
+      error.code !== DISCOVERY_ERROR_CODES.IDENTITY_NOT_REGISTERED ||
+      !registerIdentity
+    )
+      throw error;
+    let ready = false;
+    try {
+      ready = await registerIdentity();
+    } catch {
+      throw new RegistrationUnavailable();
+    }
+    if (!ready) throw new RegistrationUnavailable();
+    return attempt();
+  }
+}
+
 export async function registerCommand(
   output: SellerOutput,
-  system: { fetch: DiscoveryFetch; prompt?: Prompt },
+  system: {
+    fetch: DiscoveryFetch;
+    prompt?: Prompt;
+    registerIdentity?: () => Promise<boolean>;
+  },
 ) {
   const fail = (code: string, hint: string) => {
     output.stderr(`${code}: ${hint}\n`);
@@ -88,18 +120,28 @@ export async function registerCommand(
   output.stdout(
     `Registering seller ${identity.nodeId} with ${urlOrigin(discovery.url)}\n`,
   );
-  let result;
-  try {
-    result = await registerSeller({
+  const prompt = system.prompt;
+  const registerIdentity =
+    system.registerIdentity ??
+    (prompt ? () => registerOnChain(output, identity, prompt) : undefined);
+  const attempt = () =>
+    registerSeller({
       baseUrl: discovery.url,
       invite,
       nodeId: identity.nodeId,
       fetch: system.fetch,
       timeoutMs: REGISTER.timeoutMs,
     });
+  let result;
+  try {
+    result = await registerWithIdentity(attempt, registerIdentity);
   } catch (error) {
+    if (error instanceof RegistrationUnavailable)
+      return fail(
+        REGISTER_ERRORS.IDENTITY_UNAVAILABLE,
+        'registration is not confirmed; check the wallet and retry later without deleting its local state',
+      );
     if (!(error instanceof DiscoveryError)) throw error;
-    // A 404 is an index without the route; any other unexpected status may pass.
     const hint =
       error.code === DISCOVERY_ERROR_CODES.HTTP_STATUS &&
       error.status === HTTP_NOT_FOUND

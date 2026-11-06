@@ -169,10 +169,13 @@ export type SellerRoleErrorCode =
 export const REGISTER = {
   timeoutMs: 15_000,
   inviteEnv: 'GYBLOS_INVITE',
+  lamportsPerSol: 1_000_000_000n,
+  solDecimals: 9,
 } as const;
 
 export const REGISTER_ERRORS = {
   NO_INVITE: 'REGISTER_NO_INVITE',
   INVITE_FORMAT: 'REGISTER_INVITE_FORMAT',
   CONFIG_INVALID: 'REGISTER_CONFIG_INVALID',
+  IDENTITY_UNAVAILABLE: 'REGISTER_IDENTITY_UNAVAILABLE',
 } as const;

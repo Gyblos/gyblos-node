@@ -202,8 +202,12 @@ export async function loadRole(
   return parseRoleConfig(value);
 }
 
-export async function roleSigner(role: P2PRole, key: RoleKey) {
-  const config = await loadRole(role);
+export async function roleSigner(
+  role: P2PRole,
+  key: RoleKey,
+  home?: HomeEnvironment,
+) {
+  const config = await loadRole(role, home);
   if (
     (config.role === P2P_ROLES.BUYER && key !== P2P_ROLES.BUYER) ||
     (config.role === P2P_ROLES.SELLER && key === P2P_ROLES.BUYER)
@@ -211,7 +215,7 @@ export async function roleSigner(role: P2PRole, key: RoleKey) {
     throw new Error('Cross-role key access rejected.');
   const signer = await createKeyPairSignerFromBytes(
     await privateBytes(
-      file(role, ROLE_KEY_FILES[key]),
+      file(role, ROLE_KEY_FILES[key], home),
       KEY_LIMITS.keyPairBytes,
     ),
   );
@@ -220,9 +224,12 @@ export async function roleSigner(role: P2PRole, key: RoleKey) {
   return signer;
 }
 
-export async function nodeSecret(role: P2PRole) {
+export async function nodeSecret(role: P2PRole, home?: HomeEnvironment) {
   return [
-    ...(await privateBytes(file(role, ROLE_FILES.nodeKey), NODE_KEY_BYTES)),
+    ...(await privateBytes(
+      file(role, ROLE_FILES.nodeKey, home),
+      NODE_KEY_BYTES,
+    )),
   ];
 }
 

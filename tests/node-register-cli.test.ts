@@ -29,6 +29,7 @@ async function register(
     answer?: (input: string, init: RequestInit) => Promise<Response>;
     env?: Record<string, string>;
     prompt?: (question: string) => Promise<string>;
+    registerIdentity?: () => Promise<boolean>;
   } = {},
 ) {
   const sent: Sent[] = [];
@@ -44,6 +45,7 @@ async function register(
       stderr += text;
     },
     prompt: options.prompt,
+    registerIdentity: options.registerIdentity,
     fetch: async (input, init) => {
       sent.push({ url: input, init });
       if (!options.answer) throw new Error('no network in this test');
@@ -239,3 +241,31 @@ void test('seller register: an invite flag, any other flag or extra arguments pr
     assert.equal(stderr.includes(INVITE), false);
   }
 });
+
+void test('seller register retries the index only after the seller identity is ready', () =>
+  withHome(async (home) => {
+    let attempts = 0;
+    let registrations = 0;
+    const result = await register(home, [], {
+      env: { GYBLOS_INVITE: INVITE },
+      registerIdentity: async () => {
+        registrations++;
+        return true;
+      },
+      answer: async () => {
+        attempts++;
+        return attempts === 1
+          ? new Response(JSON.stringify({ error: 'IDENTITY_NOT_REGISTERED' }), {
+              status: 403,
+              headers: { 'content-type': 'application/json' },
+            })
+          : new Response(JSON.stringify({ ok: true, status: 'active' }), {
+              status: 201,
+              headers: { 'content-type': 'application/json' },
+            });
+      },
+    });
+    assert.equal(result.code, 0, result.stderr);
+    assert.equal(registrations, 1);
+    assert.equal(attempts, 2);
+  }));
