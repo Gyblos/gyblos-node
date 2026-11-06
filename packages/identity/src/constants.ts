@@ -179,11 +179,13 @@ export const ONLINE_CHALLENGE = {
 export const REGISTRATION_DEFAULTS = {
   probeLamports: 50_000_000n,
   walletDeadlineSeconds: 120n,
+  agentUri: 'https://gyblos.com/.well-known/node.json',
 } as const;
 
 export const IDENTITY_RESOLUTION_LIMITS = {
   timeoutMs: 5000,
   maxTimeoutMs: 30000,
+  pollIntervalMs: 250,
 } as const;
 
 // Per HTTP response, measured on decompressed fetch bytes before SDK JSON parsing.
@@ -193,3 +195,10 @@ export const IDENTITY_RPC_METHODS = [
   'getProgramAccounts',
   'getMultipleAccounts',
 ] as const;
+
+// A missing historical status remains unknown even after the blockhash expires.
+export const OWNER_REGISTRATION_STATUS = {
+  CONFIRMED: 'confirmed',
+  FAILED: 'failed',
+  UNKNOWN: 'unknown',
+} as const;

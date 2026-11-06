@@ -49,6 +49,11 @@ export interface FakeRpcState {
   batchValue?: unknown;
   programValue?: unknown;
   responsePadding: Map<string, number>;
+  signatureStatus: {
+    confirmationStatus: 'processed' | 'confirmed' | 'finalized';
+    err?: unknown;
+  } | null;
+  sendSignature: string;
 }
 
 export interface FakeRpc {
@@ -202,6 +207,10 @@ function respond(state: FakeRpcState, call: JsonRpcCall): object {
           ? state.programValue
           : programAccounts(state, call.params),
       };
+    case 'sendTransaction':
+      return { result: state.sendSignature };
+    case 'getSignatureStatuses':
+      return { result: { context, value: [state.signatureStatus] } };
     case 'getSlot':
       return { result: SLOT };
     case 'getBlockTime':
@@ -271,6 +280,8 @@ export async function startFakeRpc(
     genesisHash: DEVNET_GENESIS,
     failingMethods: new Set(),
     responsePadding: new Map(),
+    signatureStatus: null,
+    sendSignature: '',
   };
   const server = serve(state);
   server.listen(0, LOCALHOST);

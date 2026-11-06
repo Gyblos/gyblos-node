@@ -36,6 +36,7 @@ export interface OwnerRegistration {
   feeLamports: bigint;
   estimatedTotalLamports: bigint;
   nodeId: string;
+  lastValidBlockHeight: bigint;
 }
 async function estimateOwnerCost(
   rpc: Rpc<SolanaRpcApi>,
@@ -126,5 +127,10 @@ export async function buildOwnerRegistration(
   const message = composeMessage(owner, blockhash, instructions);
   assertFits(message);
   const cost = await estimateOwnerCost(rpc, message, owner.address);
-  return { message, ...cost, nodeId };
+  return {
+    message,
+    ...cost,
+    nodeId,
+    lastValidBlockHeight: blockhash.lastValidBlockHeight,
+  };
 }

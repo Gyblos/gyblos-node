@@ -61,3 +61,11 @@ export {
   type SponsorPolicyConfig,
   type SponsorRequest,
 } from './policy';
+
+export {
+  checkOwnerRegistration,
+  prepareOwnerRegistration,
+  submitOwnerRegistration,
+  type OwnerRegistrationSubmission,
+  type PreparedOwnerRegistration,
+} from './owner-submission';
