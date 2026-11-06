@@ -1,6 +1,5 @@
-// A free seller sets up with only --mint: node:setup creates the owner and node keys and no paid
-// roles, while the paid pair (--buyer with --pay-to) stays all-or-nothing and existing paid role files
-// keep loading. Disposable homes; no RPC, funding or network.
+// Free sellers need only --mint; paid sellers add --buyer and use owner as the default payout.
+// Existing paid role files keep loading. Disposable homes; no RPC, funding or network.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
