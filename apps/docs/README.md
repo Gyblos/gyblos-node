@@ -9,7 +9,7 @@ on Next.js as a static export.
 From the repository root:
 
 ```sh
-pnpm install
+pnpm install --frozen-lockfile
 pnpm docs:dev     # http://localhost:3000/en
 pnpm docs:build   # static site in apps/docs/out
 pnpm docs:test    # acceptance checks against that static export
@@ -37,9 +37,24 @@ cd apps/docs && pnpm build && npx wrangler@4.151.1 deploy
 - Pages live in `content/docs` as MDX. Each page has an English file
   (`page.mdx`) and a Spanish one (`page.es.mdx`) with the same content; update
   both together.
-- `meta.json` / `meta.es.json` set the sidebar order and folder titles.
+- `meta.json` / `meta.es.json` set the sidebar order and folder titles. The
+  seller handbook follows scope → install → register/publish → offers →
+  operation → identity, with CLI/configuration reference and symptom-based help.
+  The four folder icons are resolved by `components/sidebar-icons.tsx` through
+  the source loader. Use matching icon IDs in both locales; keep the SVGs
+  decorative, 16px, nonfocusable and secondary in color. Page labels and URLs
+  remain the navigation's accessible names.
+- Public Docker seller procedures are canonical here. Engineering docs in
+  `docs/` retain checkout, library and experimental detail and link to this
+  handbook. Do not copy operational or lab history into public onboarding.
+- Each task needs prerequisites, steps, expected output, safe failure guidance
+  and a next step. Match EN/ES meaning as well as file coverage; automated
+  parity checks do not establish translation quality.
+- `tests/docs-seller-handbook.test.ts` checks sidebar reachability and executes
+  complete TOML examples through the public parser and seller settings resolver.
+  Keep partial edit snippets distinct from complete `version = 1` examples.
 - Commands and messages in a guide must match the node release it describes;
-  `tests/docs-content.test.ts` checks the output the seller guide quotes.
+  `tests/docs-content.test.ts` checks the output the handbook quotes.
 - Never put relay tokens, invite codes, keys or private URLs in a page, even as
   examples.
 - Public copy and Markdown are generated from compiled MDX, with no separately

@@ -1,4 +1,4 @@
-// Canonical assistant identities and handoff endpoints. Links prefill a composer; they do not submit.
+// Canonical docs icon identities and assistant handoff endpoints. Links prefill; they do not submit.
 export const ASSISTANT_IDS = {
   CHATGPT: 'chatgpt',
   CLAUDE: 'claude',
@@ -34,3 +34,12 @@ export const ASSISTANTS = [
     parameter: 'text',
   },
 ] as const;
+
+export const SIDEBAR_ICON_IDS = {
+  COMPASS: 'compass',
+  SERVER: 'server',
+  BOOK_OPEN: 'book-open',
+  LIFE_BUOY: 'life-buoy',
+} as const;
+export type SidebarIconId =
+  (typeof SIDEBAR_ICON_IDS)[keyof typeof SIDEBAR_ICON_IDS];

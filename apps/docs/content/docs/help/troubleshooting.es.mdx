@@ -1,0 +1,127 @@
+---
+title: Solución de problemas
+description: Encuentra soluciones seguras para fallos de instalación, configuración, motor y descubrimiento.
+---
+
+Esta página corresponde al vendedor gratuito de Docker de tu invitación. Ejecuta los comandos desde
+`~/gyblos-seller` o tu carpeta elegida. Lee el código exacto antes de cambiar nada. Conserva la identidad
+y los volúmenes existentes durante el diagnóstico.
+
+## Empieza por el estado del servicio
+
+```sh
+cd ~/gyblos-seller
+docker compose ps
+docker compose exec seller gyblos seller status
+```
+
+Con `STARTING`, espera un momento y repite. Con `FAILING`, lee fase, código y consejo.
+Con `NOT_CONFIRMED`, comprueba si el contenedor está activo. Con `STOPPED`, inicia con
+`docker compose up -d --force-recreate seller`. `RUNNING` no demuestra publicación ni una solicitud externa.
+
+Si `exec` informa que el servicio está detenido o reiniciándose:
+
+```sh
+cd ~/gyblos-seller
+docker compose run --rm seller gyblos doctor
+```
+
+Doctor consulta dependencias y muestra identidad pública, códigos y consejos. Para el caso local predeterminado,
+comprueba primero Ollama. Usa `--online` solo cuando quieras añadir consultas remotas.
+
+## Errores de instalación
+
+| Síntoma o salida exacta                                       | Solución                                                                                                             |
+| ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `Docker is not installed` o `Docker Compose v2 is missing`    | Instala Docker con el plugin de Compose v2.17 o posterior siguiendo el proceso habitual de la plataforma.            |
+| `Docker is not running`                                       | Inicia Docker Desktop o el servicio autorizado de Docker y repite el instalador.                                     |
+| `Docker Compose … is too old`                                 | Actualiza Docker o Compose a v2.17 o posterior.                                                                      |
+| `The relay token is empty` o `must have 32 to 512 characters` | Copia el token de la invitación sin texto adicional. No lo muestres ni lo pegues en el chat de soporte.              |
+| `Ollama did not start`                                        | Revisa `docker compose logs ollama` en privado; comprueba memoria, disco y estado de Docker.                         |
+| El instalador se detiene con `gyblos install:` o `FAIL`       | Corrige la causa indicada y repite `sh install.sh` donde lo guardaste. Se conservan archivos e identidad existentes. |
+
+## Configuración rechazada
+
+```sh
+cd ~/gyblos-seller
+docker compose run --rm seller gyblos config validate --config /config/gyblos.toml
+```
+
+Usa la ruta de clave indicada, como `offers[0].free.per_buyer_cap`. Tras `OK`, ejecuta doctor si el inicio
+sigue rechazando el archivo. Consulta intervalos y valores en la [referencia de configuración](/es/reference/configuration).
+
+| Código / síntoma                                                                                          | Solución                                                                                                                                                                  |
+| --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `FILE_NOT_FOUND` al validar                                                                               | Usa la ruta explícita del contenedor indicada arriba. El validador ignora `GYBLOS_CONFIG` al seleccionar el archivo.                                                      |
+| `TOML_SYNTAX`, `UNKNOWN_KEY`, `WRONG_TYPE`                                                                | Corrige sintaxis, quita claves desconocidas o usa el tipo requerido. No dupliques `[discovery]` ni la oferta del mismo modelo.                                            |
+| `INVALID_CAP`                                                                                             | Usa enteros positivos; la cuota por comprador no puede superar la total diaria.                                                                                           |
+| `INVALID_LIMIT`                                                                                           | Respeta cada intervalo de capacidad y la restricción conexiones × tasa por comprador.                                                                                     |
+| `INLINE_SECRET`                                                                                           | Quita la credencial de TOML; usa nombre de variable y archivo privado de entorno. Rota una credencial expuesta mediante su emisor.                                        |
+| `RELAY_ONLY_CONFLICT`                                                                                     | Quita la dirección externa o desactiva relay-only; considera también las variables que prevalecen sobre el archivo.                                                       |
+| `SELLER_SETTING_UNSUPPORTED`                                                                              | Quita `node.data_dir`, `node.rpc_url` o `node.payout_wallet` procedentes del archivo; este vendedor usa el aprovisionamiento de datos/rol existente.                      |
+| `SELLER_OFFERS_MISSING`                                                                                   | Recupera al menos una oferta admitida. Una lista vacía válida para el esquema no puede servir.                                                                            |
+| `SELLER_OFFER_MODEL_UNSUPPORTED`, `SELLER_OFFER_ENGINE_UNSUPPORTED`, `SELLER_OFFER_REASONING_UNSUPPORTED` | Vuelve a la oferta local admitida de Qwen3 con razonamiento `off` o revisa las restricciones antes de usar un motor avanzado.                                             |
+| `SELLER_OFFER_API_KEY_MISSING`, `SELLER_OFFER_API_KEY_UNSAFE`                                             | Los proveedores avanzados necesitan la variable correcta no vacía dentro del contenedor; usa un nombre distinto que no empiece por `GYBLOS_` ni nombre el token de relay. |
+| `MAINNET_UNSUPPORTED`, `SELLER_PAYMENT_ROLE_MISSING`                                                      | Mantén devnet y una oferta gratuita en esta instalación; pagos/mainnet no forman parte de este inicio.                                                                    |
+
+## Motor o relay no disponible
+
+| Código / síntoma                                | Solución                                                                                                                   |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `ENGINE_UNAVAILABLE`, `ENGINE_TIMEOUT`          | Comprueba Ollama y que `qwen3:0.6b` esté descargado. Revisa sus logs en privado. Conserva la URL de loopback suministrada. |
+| El vendedor falla después de reiniciarse Ollama | Ejecuta `docker compose restart seller` y comprueba el estado; comparten espacio de red.                                   |
+| `SELLER_RELAY_OFFLINE`                          | Comprueba internet saliente y el token de la invitación. Significa que ningún relay respondió en el plazo de inicio.       |
+| `CLOCK_SKEWED`                                  | Activa sincronización horaria automática en el anfitrión; los registros fechados en el futuro pueden rechazarse.           |
+
+Si solo necesitas reemplazar el token de relay, detén el vendedor, abre `seller.env` en un editor local
+privado y cambia solo el valor del token por el correcto de tu invitación. Conserva las credenciales de proveedores.
+Recrea con `docker compose up -d --force-recreate seller` para cargar el entorno cambiado. Nunca muestres
+el archivo, pongas su contenido en una línea de comando ni borres el volumen de datos.
+
+## Funciona pero no aparece publicado
+
+Sigue [Registra y publica](/es/sellers/register-publish): confirma registro, `publish = true`, recreación
+tras el cambio y después `seller status --online`. Comprueba que consultas el índice donde te registraste
+y que al menos una oferta esté lista.
+
+| Código de descubrimiento / observación | Solución o interpretación                                                                                                                                                                          |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DISCOVERY_IDENTITY_NOT_REGISTERED`    | Repite en terminal interactiva para la inscripción devnet. Revisa primero el coste y la aprobación en la guía de registro; owner necesita SOL de devnet. Conserva la invitación, que puede vencer. |
+| `REGISTER_IDENTITY_UNAVAILABLE`        | La inscripción no se completó: lee el consejo sobre SOL faltante, simulación o resultado incierto. Rechazar el consentimiento también devuelve este código. Sigue la guía antes de repetir.        |
+| `DISCOVERY_INVITE_INVALID`             | Código incorrecto, usado o vencido; pide otro por el canal de tu invitación.                                                                                                                       |
+| `DISCOVERY_NODE_REVOKED`               | Contacta con Gyblos; no generes otra identidad para saltarte la retirada.                                                                                                                          |
+| `DISCOVERY_RATE_LIMITED`               | Espera un minuto antes de repetir el registro.                                                                                                                                                     |
+| `DISCOVERY_UNAVAILABLE`                | Prueba más tarde o contacta con Gyblos. Comprueba el origen del índice antes de enviar una invitación.                                                                                             |
+| `not in the first 2000 sellers`        | Se agotó el límite de búsqueda; no demuestra ausencia.                                                                                                                                             |
+| `index unreachable`                    | Estado de publicación desconocido; resuelve conectividad antes de sacar conclusiones.                                                                                                              |
+
+Repetir el registro comprueba el estado guardado y puede reenviar la misma transacción ya aprobada
+sin otra pregunta. Conserva archivos y bloqueos. El vencimiento por sí solo no demuestra ausencia de
+transacción o comisión; un estado parcial/inconcluso necesita ayuda. Lee los [límites de recuperación
+del registro](/es/sellers/register-publish) antes de repetir. Nunca borres estado para forzar otro intento.
+
+## Solicitudes gratuitas rechazadas o sin actividad
+
+La oferta reserva entrada más salida máxima en la admisión. Una solicitud puede superar el saldo diario
+o por comprador aunque queden tokens. La capacidad y el límite de compradores distintos también pueden
+rechazar solicitudes. Revisa [Modelos y ofertas](/es/sellers/models-offers); no reinicies para saltarte cuotas.
+Una publicación no genera demanda por sí sola y el resumen de recibos de 24 horas no es un saldo de cuotas.
+
+## Llaves ausentes, estado corrupto o bloqueos
+
+Conserva el volumen y pide ayuda. No borres bloqueos de secuencia, journals, archivos de rol ni llaves para
+superar comprobaciones. No repitas setup en otro directorio de datos ni uses `docker compose down -v`.
+Aquí no se documenta una restauración completa; consulta [Identidad y datos privados](/es/sellers/identity).
+
+## Pide ayuda de forma segura
+
+Responde por el canal de tu invitación con el código relevante y estas salidas:
+
+```sh
+cd ~/gyblos-seller
+docker compose exec seller gyblos seller status
+docker compose images seller
+```
+
+Si `exec` no está disponible, comparte el código relevante de doctor. Revisa la salida antes de enviarla.
+No envíes `seller.env`, códigos de invitación, logs completos, volcados del entorno, `docker inspect`, recibos ni volúmenes.

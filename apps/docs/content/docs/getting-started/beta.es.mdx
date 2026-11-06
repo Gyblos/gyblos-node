@@ -1,0 +1,47 @@
+---
+title: Alcance y requisitos de la beta
+description: Comprueba la instalación admitida, la invitación y los requisitos del equipo antes de empezar.
+---
+
+Este manual sigue el `install.sh` de tu invitación y la imagen `ghcr.io/gyblos/seller:beta`.
+La etiqueta beta puede cambiar. Incluye `docker compose images seller` al pedir ayuda para que el equipo
+pueda identificar la imagen instalada.
+
+## Qué puedes hacer hoy
+
+| Tarea                                | Alcance de este manual                                                                                    |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| Instalar y operar un vendedor        | Docker con Ollama local y Qwen3 0.6B fijado, sin razonamiento                                             |
+| Ofrecer inferencia gratuita          | Límites diarios totales y por comprador; los contadores están en memoria                                  |
+| Registrarse y publicar               | Invitación e inscripción devnet; el registro interactivo puede crear la inscripción tras aprobar el coste |
+| Usar otros motores                   | Configuración avanzada; aceptar el archivo no demuestra la validación del modelo                          |
+| Configurar ofertas pagadas o mainnet | Fuera de este inicio; la configuración mainnet se rechaza                                                 |
+
+Si falta la inscripción, la cartera owner necesita SOL de devnet para el registro. El comando estima
+el coste y pide aprobación; consulta [Registra y publica](/es/sellers/register-publish).
+
+La beta usa Solana **devnet**. La oferta gratuita predeterminada no mueve dinero real. La electricidad,
+el alojamiento e internet tienen un coste; un motor remoto también puede cobrarte aunque la oferta sea gratuita.
+
+## Antes de instalar
+
+- Una invitación con `install.sh`, un **token de relay** privado y un **código de invitación** de un solo uso que empieza con `gyb_`.
+- Linux x86-64 o ARM64, o macOS, en un equipo que permanezca encendido. Este instalador no es un procedimiento nativo para Windows.
+- Docker Engine con Compose en Linux, o Docker Desktop en macOS. Compose debe ser **v2.17 o posterior**.
+- Al menos **4 GB de memoria** y varios GB de disco disponibles. El inicio exige **1,5 GiB de margen** por encima del proceso vendedor; Ollama también necesita memoria.
+- Acceso saliente a internet. El Compose suministrado no publica puertos de escucha y usa conexiones salientes a relays.
+
+El acceso a Docker es privilegiado. En Linux utiliza una cuenta ya autorizada para ejecutarlo;
+no cambies los permisos del equipo solo para saltarte un error de instalación.
+
+## Qué demuestra una comprobación correcta
+
+`doctor` revisa requisitos de inicio y consulta las dependencias admitidas. No genera una respuesta.
+`RUNNING` confirma el estado del servicio; el registro da permiso para publicar; `listed in the index`
+confirma una consulta al índice. Ninguno demuestra por sí solo que un comprador externo completó inferencia.
+
+El motor configurado procesa los mensajes. El vendedor local puede leerlos; un proveedor remoto también
+los recibe. Usar un relay no garantiza anonimato de IP. Los registros firmados no prueban de forma
+independiente qué modelo respondió ni si la respuesta es correcta.
+
+**Siguiente:** [Instala tu primer vendedor](/es/sellers/beta-guide).

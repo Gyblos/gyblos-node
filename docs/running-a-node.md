@@ -1,5 +1,14 @@
 # Running a seller and a buyer
 
+For the invited free Docker seller, use the bilingual
+[public seller handbook](https://docs.gyblos.com/en/sellers/beta-guide),
+[CLI reference](https://docs.gyblos.com/en/reference/cli),
+[configuration reference](https://docs.gyblos.com/en/reference/configuration)
+and [troubleshooting](https://docs.gyblos.com/en/help/troubleshooting). Their
+canonical source is `apps/docs/content/docs/`. This engineering document also
+covers checkout, library and experimental paths; those paths are not
+interchangeable with the invitation's Docker onboarding.
+
 A seller node serves paid inference over Iroh. A buyer proxy on another machine
 forwards local requests to it. Both are devnet-only and experimental.
 

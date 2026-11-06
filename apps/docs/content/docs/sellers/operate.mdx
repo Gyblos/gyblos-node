@@ -1,0 +1,83 @@
+---
+title: Operate and update
+description: Check health, apply edits, stop and update the Docker seller while preserving its identity.
+---
+
+Use these commands for the invitation's free Docker seller. If you chose another installation folder,
+replace `~/gyblos-seller` consistently. Keep the Compose project and its existing volumes together.
+
+## Check health and activity
+
+```sh
+cd ~/gyblos-seller
+docker compose ps
+docker compose exec seller gyblos seller status
+```
+
+Expect `RUNNING`. The receipt summary shows completed, failed and cancelled requests and **output
+tokens** over a rolling 24-hour window of retained receipts. It is not the remaining free quota, total
+input-plus-output usage, earnings or proof of all past activity. Free quotas use a UTC-day boundary.
+
+Use `docker compose exec seller gyblos seller status --online` to check discovery separately.
+For a container that will not stay up, run `docker compose run --rm seller gyblos doctor` and
+follow the code in [troubleshooting](/en/help/troubleshooting).
+
+## Stop and start
+
+```sh
+cd ~/gyblos-seller
+docker compose stop seller
+```
+
+Presence withdraws within two minutes. Ollama remains running. To start the services again:
+
+```sh
+docker compose up -d
+```
+
+`docker compose down` removes containers while preserving named volumes. **Never add `-v` to an
+ordinary stop or repair**: it deletes the persistent volumes, including keys and the downloaded model.
+
+## Apply configuration or environment changes
+
+Edit `gyblos.toml` on the host. Validate it as shown in the
+[configuration reference](/en/reference/configuration), then recreate the seller:
+
+```sh
+cd ~/gyblos-seller
+docker compose up -d --force-recreate seller
+docker compose exec seller gyblos seller status
+```
+
+Recreation is also needed after changing `seller.env`; a simple container restart does not load a
+changed Compose environment file. Never display that file in logs, screenshots or a shared terminal.
+
+## Update the beta image
+
+Before updating, record the installed image and review any update instructions from your invitation channel.
+
+```sh
+cd ~/gyblos-seller
+docker compose images seller
+docker compose pull && docker compose up -d
+```
+
+This pulls the image references already present in `compose.yaml`; it does not migrate the TOML,
+Compose template or environment file. Rerunning `install.sh` preserves those files, and setting
+`GYBLOS_IMAGE` on a rerun does not replace an existing Compose image reference.
+
+After the update, run status and, if publishing, status with `--online`. If it fails, preserve the
+volumes and report the image and error code. Do not keep restarting to clear a lock or bypass a refusal.
+
+## Inspect logs privately
+
+```sh
+cd ~/gyblos-seller
+docker compose logs -f seller
+```
+
+Stop following logs with Ctrl+C; that does not stop the service. Review logs privately before extracting
+an error code. Do not publish raw logs, buyer messages or provider URLs. If Ollama restarted and the
+seller lost its engine connection, run `docker compose restart seller`, then check status.
+
+**Next:** [Protect identity and data](/en/sellers/identity), or [resolve a problem](/en/help/troubleshooting).

@@ -1,73 +1,26 @@
 ---
 title: Guía de la beta para vendedores
-description: Instala el nodo vendedor de Gyblos, revisa que esté sirviendo y regístralo con tu invitación.
+description: Instala tu primer vendedor gratuito de Docker, compruébalo y continúa con el registro.
 ---
 
-Te invitaron a la beta de vendedores de Gyblos. Esta guía te lleva desde los archivos de tu invitación
-hasta tener un vendedor funcionando y listo para registrarse. La instalación toma unos 15 minutos,
-casi todo en descargas. Para quedar listado puedes necesitar ayuda del equipo de Gyblos con el paso
-de inscripción en la blockchain que se explica más adelante.
+Usa esta guía después de revisar los [requisitos de la beta](/es/getting-started/beta).
+Mantén privados el token de relay y el código de invitación. Descargar las imágenes y el modelo ocupa
+la mayor parte de la instalación; el tiempo depende de tu conexión y equipo.
 
-<Callout title="Alcance de la guía · 5 de noviembre de 2026">
-  Esta guía cubre el vendedor gratuito en Docker que instala el `install.sh` de
-  tu invitación, con `ghcr.io/gyblos/seller:beta`. La etiqueta beta puede
-  cambiar; cuando pidas ayuda, incluye `docker compose images seller` para que
-  el equipo identifique la imagen instalada. La configuración de ofertas pagadas
-  queda fuera del alcance actual de esta guía.
-</Callout>
+## Instala el vendedor
 
-<Callout title="Beta en devnet">
-  La beta funciona en la **devnet** de Solana. Tu nodo regala un modelo pequeño,
-  con límites diarios. No se mueve dinero real.
-</Callout>
-
-## Qué necesitas
-
-- **Tu invitación**, con tres cosas:
-  - `install.sh`, el script de instalación;
-  - un **token de relay**, que permite que tu nodo llegue a los relays de Gyblos;
-  - un **código de invitación** que empieza con `gyb_` y se usa una sola vez para registrarte.
-- **Una máquina que quede encendida.** Linux (x86-64 o ARM64) o macOS. Sirve un VPS pequeño.
-- **Docker** con **Compose v2.17 o más nuevo**. En macOS, Docker Desktop. En Linux, Docker Engine con el
-  plugin de compose y tu usuario en el grupo `docker`.
-- **Al menos 4 GB de memoria.** El vendedor necesita 1,5 GB libres para arrancar, y el modelo corre al lado.
-- **Algunos GB de disco** para las imágenes y el modelo.
-- **Salida a internet.** No se abre ningún puerto: tu nodo se conecta hacia afuera, a los relays.
-
-Mantén en privado el token de relay y el código de invitación. No los pegues en chats, issues ni capturas
-de pantalla.
-
-## Instalar
-
-<Steps>
-<Step>
-
-### Corre el script
-
-En la carpeta donde guardaste `install.sh`:
+En la carpeta donde guardaste el `install.sh` de tu invitación, ejecuta:
 
 ```sh
 sh install.sh
 ```
 
-Te pide el **token de relay**. El token no se muestra mientras lo escribes o lo pegas.
+El token de relay permanece oculto mientras lo introduces. El script trabaja en `~/gyblos-seller`, salvo
+que hayas elegido otro directorio. Crea `compose.yaml`, `gyblos.toml` y el archivo privado `seller.env`,
+descarga Ollama y `qwen3:0.6b`, crea las llaves en un volumen de Docker, instala el tokenizador,
+ejecuta `gyblos doctor` e inicia el vendedor.
 
-</Step>
-<Step>
-
-### Espera a que termine
-
-El script trabaja en `~/gyblos-seller`:
-
-1. escribe `compose.yaml`, `gyblos.toml` (tu oferta) y `seller.env` (tu token de relay, que solo tú
-   puedes leer);
-2. descarga la imagen del vendedor, Ollama y el modelo `qwen3:0.6b`;
-3. crea las llaves de tu vendedor;
-4. corre `gyblos doctor`, que revisa todo antes de arrancar;
-5. arranca el vendedor.
-
-Cuando termina con `The seller is running`, está listo. Doctor también muestra la **identidad de tu
-vendedor**:
+Cuando muestre `The seller is running`, comprueba el estado. Guarda la identidad pública que muestra doctor:
 
 ```text
 Seller identity (public; `gyblos seller register` enrolls it in discovery):
@@ -75,148 +28,51 @@ Seller identity (public; `gyblos seller register` enrolls it in discovery):
   owner   7is91kWV…
 ```
 
-Los dos valores son públicos. Guárdalos: Gyblos te los puede pedir.
+Son ejemplos abreviados, no llaves ni valores para copiar en la configuración. El registro en descubrimiento
+es distinto de la inscripción en cadena que comprueba el índice.
 
-</Step>
-<Step>
+Si la instalación se detiene, lee la línea `FAIL` o `gyblos install:` y consulta
+[solución de problemas](/es/help/troubleshooting). Corrige la causa antes de repetir el script.
+Volver a ejecutarlo conserva la configuración, el archivo del token y la identidad; no restablece esos archivos.
 
-### Si se detiene con un error
+## Confirma el estado del servicio
 
-Lee la línea marcada con `FAIL`, o la que empieza con `gyblos install:`: dice qué está mal y qué hacer. Corrígelo y vuelve
-a correr `sh install.sh`. Repetirlo es seguro: conserva tus archivos y llaves y sigue donde se quedó.
-
-</Step>
-</Steps>
-
-## Revisa que esté sirviendo
-
-Todos los comandos de aquí en adelante se corren desde la carpeta de instalación:
+Ejecuta los comandos desde la carpeta de instalación:
 
 ```sh
 cd ~/gyblos-seller
 docker compose exec seller gyblos seller status
 ```
 
-Mira la línea `Result:`:
+| Resultado       | Significado y siguiente paso                                                        |
+| --------------- | ----------------------------------------------------------------------------------- |
+| `RUNNING`       | El servicio está en ejecución. Continúa con el registro.                            |
+| `STARTING`      | Espera un momento y vuelve a consultar.                                             |
+| `FAILING`       | Lee la fase y el código; sigue la entrada correspondiente en solución de problemas. |
+| `STOPPED`       | Ejecuta `docker compose up -d --force-recreate seller`.                             |
+| `NOT_CONFIRMED` | Comprueba `docker compose ps`; no se pudo confirmar el servicio.                    |
 
-| Resultado       | Qué significa                                                                                                        |
-| --------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `RUNNING`       | El vendedor está funcionando y sirviendo.                                                                            |
-| `STARTING`      | Todavía está arrancando. Espera un minuto y vuelve a revisar.                                                        |
-| `FAILING`       | El último arranque falló. La línea siguiente dice el paso, el código de error y qué hacer.                           |
-| `STOPPED`       | El contenedor está arriba, pero el vendedor no está corriendo. Corre `docker compose up -d --force-recreate seller`. |
-| `NOT_CONFIRMED` | No se pudo confirmar el servicio. Revisa `docker compose ps`.                                                        |
-
-Si el comando mismo dice que el servicio no está corriendo o se está reiniciando, el vendedor se detuvo por un
-error: lee `docker compose logs seller`, corrige la causa y arráncalo con `docker compose up -d`.
-
-## Regístrate con tu invitación
-
-El registro permite que tu vendedor aparezca en el descubrimiento de Gyblos, donde lo encuentran los
-compradores. Usa tu código una vez:
+Si el contenedor está detenido o reiniciándose, `exec` no puede funcionar. Ejecuta el diagnóstico independiente:
 
 ```sh
 cd ~/gyblos-seller
-docker compose exec seller gyblos seller register
+docker compose run --rm seller gyblos doctor
 ```
 
-Pega el código cuando te lo pida. Se ve en pantalla mientras lo pegas, así que hazlo donde nadie vea tu
-pantalla. `Registered: this seller may now publish.` significa que funcionó. Si lo
-vuelves a correr con el mismo código, responde `Already registered`.
+Que doctor termine correctamente no demuestra una solicitud completa de un comprador. Después del registro
+y la publicación, pide ayuda por el canal de tu invitación si necesitas coordinar una comprobación externa gratuita.
 
-El código queda ligado a las llaves de tu vendedor. Si las borras (`docker compose down -v`), el mismo código ya
-no funciona.
+## Completa el alta
 
-<Callout type="warn" title="Registro en Solana">
-  Si tu nodo aún no está inscrito en la devnet de Solana, el comando muestra el
-  costo estimado en SOL y pide tu confirmación antes de firmar y enviar la
-  transacción. Antes de simular muestra una estimación y el SOL faltante; el
-  costo real puede cambiar si se actualizan los programas. Primero fondea la
-  wallet del owner. Si el resultado es incierto, conserva los archivos y repite
-  el comando: verificará el intento guardado. Un blockhash vencido y cuentas del
-  asset ausentes en una vista finalizada permiten reconstruir con el mismo asset
-  y una nueva confirmación. El vencimiento no demuestra que el intento anterior
-  nunca entró ni pagó una comisión. Si el estado es parcial o incierto, contacta
-  a Gyblos sin borrarlo. La wallet inscrita en 8004 es la del owner; la
-  dirección de cobro de configuraciones pagadas anteriores puede ser diferente.
-  Sin terminal, `DISCOVERY_IDENTITY_NOT_REGISTERED` pide repetir el comando de
-  forma interactiva.
+Tu nodo empieza **sin publicar**. Sigue [Registra y publica](/es/sellers/register-publish) para usar tu
+invitación y activar la publicación. Si falta la inscripción en Solana, el registro interactivo estima el
+coste en SOL de devnet y pregunta antes de un nuevo envío firmado; revisa esa guía antes de continuar. La oferta predeterminada permite 200.000 tokens de entrada más salida
+por día UTC, con 5.000 por comprador; revisa [Modelos y ofertas](/es/sellers/models-offers) antes de cambiarlos.
+
+<Callout type="error" title="Conserva tu identidad">
+  `docker compose down -v` elimina los volúmenes persistentes y las llaves de tu
+  vendedor. Detén el servicio con `docker compose stop seller`. Lee la guía de
+  identidad antes de mover o borrar datos.
 </Callout>
 
-## Publica tu oferta
-
-Las instalaciones nuevas empiezan sin listarse. Cuando estés registrado, abre `~/gyblos-seller/gyblos.toml`
-y cambia:
-
-```toml
-[discovery]
-publish = true
-```
-
-Aplica el cambio:
-
-```sh
-cd ~/gyblos-seller
-docker compose up -d --force-recreate seller
-```
-
-Después de un minuto, revisa que el descubrimiento te liste:
-
-```sh
-docker compose exec seller gyblos seller status --online
-```
-
-Debería decir `listed in the index`.
-
-## Qué ofrece tu nodo
-
-La oferta por defecto en `gyblos.toml` regala `qwen3:0.6b`:
-
-- hasta **200.000 tokens de entrada y salida por día UTC** en total;
-- hasta **5.000 tokens de entrada y salida por día UTC** por cada comprador.
-
-Los contadores se reinician cuando el vendedor se reinicia. Puedes bajar estos límites en la sección
-`[[offers]]`. Aplica los cambios con
-`docker compose up -d --force-recreate seller`.
-
-Los prompts se procesan en tu máquina, así que tu nodo puede leerlos. No guardes ni compartas lo que envían
-los compradores. El descubrimiento publica tu `nodeId`, tu `owner`, tu modelo y un precio cero.
-
-## Comandos del día a día
-
-Desde `~/gyblos-seller`:
-
-| Qué                              | Comando                                           |
-| -------------------------------- | ------------------------------------------------- |
-| Estado                           | `docker compose exec seller gyblos seller status` |
-| Ver los logs en vivo             | `docker compose logs -f seller`                   |
-| Detener                          | `docker compose stop seller`                      |
-| Arrancar                         | `docker compose up -d`                            |
-| Aplicar un `gyblos.toml` editado | `docker compose up -d --force-recreate seller`    |
-| Actualizar a la última beta      | `docker compose pull && docker compose up -d`     |
-
-Al detenerlo, tu oferta sale del descubrimiento en menos de dos minutos.
-
-<Callout type="error" title="Tus llaves viven en un volumen de Docker">
-  `docker compose down -v` **borra las llaves de tu vendedor**, y con ellas tu
-  identidad. Usa `docker compose down` (sin `-v`) para quitar los contenedores y
-  conservar las llaves.
-</Callout>
-
-## Solución de problemas
-
-| Ves                                                            | Qué hacer                                                                                                                                                                                                                                                                              |
-| -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Docker is not installed` o `Docker Compose v2 is missing`     | Instala Docker con el plugin de compose (v2.17 o más nuevo) y vuelve a correr el script.                                                                                                                                                                                               |
-| `Docker is not running`                                        | Abre Docker Desktop, o arranca el servicio de Docker en Linux, y vuelve a correr el script.                                                                                                                                                                                            |
-| `Docker Compose … is too old`                                  | Actualiza Docker o el plugin de compose a v2.17 o más nuevo.                                                                                                                                                                                                                           |
-| `The relay token is empty…` o `must have 32 to 512 characters` | Copia otra vez el token de relay de tu invitación, sin nada antes ni después.                                                                                                                                                                                                          |
-| `FAILING` con `SELLER_RELAY_OFFLINE`                           | Ningún relay respondió. Revisa que la máquina tenga internet. Si el token puede estar mal, corre `rm ~/gyblos-seller/seller.env` y luego otra vez `sh install.sh` desde la carpeta donde lo guardaste, para ingresar el token; nunca muestres `seller.env` en una pantalla compartida. |
-| `Ollama did not start`                                         | Corre `cd ~/gyblos-seller && docker compose logs ollama`. Suele ser falta de memoria o de disco.                                                                                                                                                                                       |
-| El vendedor falla después de que Ollama se reinició solo       | Corre `docker compose restart seller`.                                                                                                                                                                                                                                                 |
-| `DISCOVERY_INVITE_INVALID`                                     | El código está mal, ya se usó o venció. Pide uno nuevo a Gyblos.                                                                                                                                                                                                                       |
-| `DISCOVERY_RATE_LIMITED` o `DISCOVERY_UNAVAILABLE`             | El descubrimiento está ocupado. Intenta de nuevo en unos minutos.                                                                                                                                                                                                                      |
-
-Para pedir ayuda, responde por el mismo canal donde recibiste tu invitación. Envía al equipo de Gyblos
-lo que muestran `docker compose exec seller gyblos seller status` y `docker compose images seller`.
-El estado nunca incluye tu token de relay ni tus llaves.
+**Siguiente:** [Registra y publica](/es/sellers/register-publish).

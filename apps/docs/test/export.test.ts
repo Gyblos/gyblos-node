@@ -145,3 +145,33 @@ void test('docs export: article links resolve to exported pages and existing anc
     }
   }
 });
+
+void test('docs export: all four sidebar groups have decorative icons and localized labels', async () => {
+  const groups = [
+    { en: 'Start here', es: 'Empieza aquí', icon: 'compass' },
+    { en: 'Sellers', es: 'Vendedores', icon: 'server' },
+    { en: 'Reference', es: 'Referencia', icon: 'book-open' },
+    { en: 'Help', es: 'Ayuda', icon: 'life-buoy' },
+  ];
+  for (const path of await pages()) {
+    const { locale, html } = route(path);
+    const output = await read(`${html}.html`);
+    const buttons = [...output.matchAll(/<button\b[^>]*>[\s\S]*?<\/button>/g)];
+    for (const group of groups) {
+      const label = locale === 'es' ? group.es : group.en;
+      const button = buttons.find(([button]) =>
+        button.includes(`data-sidebar-icon="${group.icon}"`),
+      )?.[0];
+      assert.ok(button, `${html}: missing ${group.icon} group icon`);
+      assert.ok(button.includes(label), `${html}: missing ${label} label`);
+      const icon = button.match(
+        /<svg\b[^>]*data-sidebar-icon="[^"]+"[^>]*>/,
+      )?.[0];
+      assert.ok(icon, `${html}: group icon is not an inline SVG`);
+      assert.ok(icon.includes('aria-hidden="true"'));
+      assert.ok(icon.includes('focusable="false"'));
+      assert.ok(icon.includes('width="16"'));
+      assert.ok(icon.includes('height="16"'));
+    }
+  }
+});

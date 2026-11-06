@@ -1,34 +1,39 @@
 ---
 title: Gyblos Docs
-description: Guides for running a Gyblos node.
+description: Install, publish and operate a free seller in the invited beta.
 ---
 
-Gyblos is a peer-to-peer market for AI inference: sellers serve a model from their own machine and buyers
-reach them directly. Start here if you received an invitation to run a seller in the beta.
+Gyblos is an open market for AI inference where agents pay per token in USDC to independent GPU sellers.
+This handbook covers the **free Docker seller in the invited beta**. Start with the requirements,
+then install your node, register it and publish your offer.
 
-## Start with your seller
-
-You need the `install.sh`, relay token and invite code from your invitation, a machine that stays on,
-and Docker with Compose v2.17 or later. The guide covers installation, checks, registration and
-publishing your offer.
+## Choose your next task
 
 <Cards>
-  <Card title="Seller beta guide" href="/en/sellers/beta-guide">
-    You received an invitation: install the seller node, check it and register
-    it. On-chain enrollment may need help from the Gyblos team before you can
-    get listed.
+  <Card title="Check the beta requirements" href="/en/getting-started/beta">
+    Understand what is available, what you need and what the installation checks
+    prove.
+  </Card>
+  <Card title="Install your first seller" href="/en/sellers/beta-guide">
+    Use your invitation to install the default model and check the running node.
+  </Card>
+  <Card title="Register and publish" href="/en/sellers/register-publish">
+    Complete discovery registration and confirm that the index lists your offer.
+  </Card>
+  <Card title="Resolve a problem" href="/en/help/troubleshooting">
+    Find safe next steps by symptom or exact error code.
   </Card>
 </Cards>
 
-## Current scope
+## After installation
 
-This documentation covers the **free Docker seller** shipped with the invitation. Gyblos runs on Solana
-**devnet** during this beta; no real money moves. These instructions do not establish mainnet readiness.
-
-The guide includes everyday commands, token limits and troubleshooting. For help, reply through the
-same channel where you received your invitation. Keep your relay token, invite code and keys private.
+- [Adjust models and free limits](/en/sellers/models-offers).
+- [Check, stop and update your seller](/en/sellers/operate).
+- [Protect your identity and private files](/en/sellers/identity).
+- Look up [CLI commands](/en/reference/cli) and [configuration keys](/en/reference/configuration).
 
 ## Read with your assistant
 
-Use **Copy page** to copy a complete article, including commands and warnings, or **View Markdown**
-to open a plain-text version. Both actions are available on every documentation page.
+Every page offers **Copy page**, **View Markdown** and **Open in** for supported assistants.
+The copied text includes commands and warnings. Keep relay tokens, invitation codes and keys out of
+assistant prompts and screenshots. For help, reply through the channel where you received your invitation.
