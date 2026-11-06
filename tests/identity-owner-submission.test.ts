@@ -48,6 +48,8 @@ void test('registration result requires finalized status and searches transactio
       0,
       {},
       { InstructionError: [0, false] },
+      { InstructionError: [4, 'GenericError'] },
+      { InstructionError: [255, 'GenericError'] },
       'invented',
     ]) {
       fake.state.signatureStatus = {

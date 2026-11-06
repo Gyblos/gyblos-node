@@ -233,6 +233,6 @@ export const REGISTRATION_INSTRUCTION_FAILURES = [
   'GenericError',
 ] as const;
 export const REGISTRATION_ERROR_LIMITS = {
-  maxInstructionIndex: 255n,
+  maxInstructionIndex: 3n,
   maxCustomError: 4_294_967_295n,
 } as const;

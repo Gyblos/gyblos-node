@@ -10,7 +10,11 @@ import {
 
 import { DEVNET_GENESIS, FINALIZED_COMMITMENT } from '@gyblos/config';
 
-import { IDENTITY_ERROR_CODES, IDENTITY_RESOLUTION_LIMITS } from './constants';
+import {
+  IDENTITY_ERROR_CODES,
+  IDENTITY_RESOLUTION_LIMITS,
+  REGISTRATION_ERROR_LIMITS,
+} from './constants';
 import { IdentityError } from './errors';
 import {
   assertFits,
@@ -131,6 +135,14 @@ async function buildWithinDeadline(
     { owner, asset, node, agentUri, bindingSequence, payoutWallet },
     deadline,
   );
+  if (
+    BigInt(instructions.length) !==
+    REGISTRATION_ERROR_LIMITS.maxInstructionIndex + 1n
+  )
+    throw new IdentityError(
+      IDENTITY_ERROR_CODES.ENCODING_INVARIANT,
+      'Unexpected registration instruction count.',
+    );
   const { value: blockhash } = await rpc
     .getLatestBlockhash({ commitment: FINALIZED_COMMITMENT })
     .send({ abortSignal: signal });
@@ -182,6 +194,14 @@ export async function buildOwnerRegistration(
       throw new IdentityError(
         IDENTITY_ERROR_CODES.READ_TIMEOUT,
         'Registration RPC deadline elapsed.',
+      );
+    if (
+      error instanceof IdentityError &&
+      error.code === IDENTITY_ERROR_CODES.SIMULATION_FAILED
+    )
+      throw new IdentityError(
+        IDENTITY_ERROR_CODES.SIMULATION_FAILED,
+        'Registration simulation failed.',
       );
     throw error;
   } finally {

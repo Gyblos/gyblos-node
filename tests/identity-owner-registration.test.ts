@@ -324,3 +324,30 @@ void test('an unfunded owner fails simulation without sending or fabricating a t
     await fake.close();
   }
 });
+
+void test('owner registration never reflects raw RPC simulation details', async () => {
+  const fake = await startFakeRpc(new Map(), {
+    ownerBalance: 0,
+    ownerAfterProbe: 0,
+    fee: FEE,
+    initialSimulationErr: 'synthetic-sensitive-marker',
+  });
+  try {
+    await assert.rejects(
+      buildOwnerRegistration({
+        rpc: fake.rpc,
+        owner: await generateKeyPairSigner(),
+        asset: await generateKeyPairSigner(),
+        node: await fixedSigner(1),
+        agentUri: 'https://gyblos.com/n.json',
+        bindingSequence: 1n,
+      }),
+      (error: unknown) =>
+        error instanceof IdentityError &&
+        error.code === IDENTITY_ERROR_CODES.SIMULATION_FAILED &&
+        !error.message.includes('synthetic-sensitive-marker'),
+    );
+  } finally {
+    await fake.close();
+  }
+});
