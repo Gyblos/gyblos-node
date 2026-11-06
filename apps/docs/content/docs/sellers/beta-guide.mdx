@@ -114,12 +114,15 @@ with the same code, it answers `Already registered`.
 The code is tied to your seller's keys. If you delete them (`docker compose down -v`), the same code no longer
 works.
 
-<Callout type="warn" title="On-chain step">
-  Discovery also checks that your node is recorded on Solana devnet. We are
-  finishing that step. If register answers `DISCOVERY_IDENTITY_NOT_REGISTERED`,
-  your node is not recorded yet: send the `nodeId` and `owner` from the install
-  to the Gyblos team and keep your code. It is not used up, but it can still
-  expire; if it does, ask for a new one.
+<Callout type="warn" title="Solana registration">
+  If your node is not registered on Solana devnet yet, the command shows an
+  estimated SOL cost and asks before signing and submitting the transaction.
+  Fund the owner wallet first. If confirmation is uncertain, keep the seller's
+  files and run the command again; it checks the same attempt. If the attempt
+  has expired and remains uncertain, contact Gyblos instead of deleting its
+  state. The owner wallet is registered in 8004; existing paid payout settings
+  may differ. Without a terminal, `DISCOVERY_IDENTITY_NOT_REGISTERED` asks you
+  to rerun interactively.
 </Callout>
 
 ## Publish your offer

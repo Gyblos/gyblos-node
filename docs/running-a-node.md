@@ -261,10 +261,21 @@ pnpm gyblos seller register   # asks for the invite on a terminal, or reads GYBL
 In the seller image, from the compose directory:
 `docker compose exec seller gyblos seller register`.
 
-- It sends the index only the invite and this home's NodeId, at the
-  `discovery.url` node:start would publish to. The index reads the NodeId's
-  8004-solana registration itself, so the seller must already be registered
-  there; this command does not register it on chain yet.
+- It first sends the index only the invite and this home's NodeId, at the
+  `discovery.url` node:start would publish to. If the index accepts the invite
+  but the NodeId lacks an 8004 registration, an interactive terminal offers to
+  register it on Solana devnet. The owner wallet pays; the command shows the
+  estimated SOL cost and asks for consent before signing and submitting. Fund
+  the owner wallet first; no automatic faucet is used. If simulation fails, the
+  exact cost may not be available.
+- The asset key and signed attempt are stored privately in the seller home. Keep
+  this state if a result is uncertain. Running the command again checks the
+  saved attempt and may resend the identical signed transaction; it does not
+  make another asset while that attempt is unresolved. If an expired attempt
+  remains unconfirmed and the RPC has no conclusive history, contact the
+  operator rather than deleting the state. This devnet flow does not enable
+  mainnet. The 8004 wallet is the owner; existing paid seller roles may still
+  use a different payout address until wallet unification is completed.
 - `Registered` or `Already registered` (a retry with the same invite) means the
   seller may now publish; set `publish = true` under `[discovery]` to be listed.
 - Before asking for the invite it checks this home's seller role
@@ -280,7 +291,7 @@ In the seller image, from the compose directory:
   `DISCOVERY_UNAVAILABLE`, `DISCOVERY_REGISTRATION_REJECTED` or a 404
   `DISCOVERY_HTTP_STATUS` when that index does not take registrations, and other
   network or index failures (try again later). The invite is never printed
-  (though a terminal shows it as it is typed) and nothing is written.
+  (though a terminal shows it as it is typed); registration state is private.
 
 ### Seller status
 

@@ -117,12 +117,16 @@ vuelves a correr con el mismo código, responde `Already registered`.
 El código queda ligado a las llaves de tu vendedor. Si las borras (`docker compose down -v`), el mismo código ya
 no funciona.
 
-<Callout type="warn" title="Paso en la blockchain">
-  El descubrimiento también revisa que tu nodo esté inscrito en la devnet de
-  Solana. Estamos terminando ese paso. Si register responde
-  `DISCOVERY_IDENTITY_NOT_REGISTERED`, tu nodo todavía no está inscrito: envía
-  al equipo de Gyblos el `nodeId` y el `owner` de la instalación y guarda tu
-  código. No se gastó, pero igual puede vencer; si vence, pide uno nuevo.
+<Callout type="warn" title="Registro en Solana">
+  Si tu nodo aún no está inscrito en la devnet de Solana, el comando muestra el
+  costo estimado en SOL y pide tu confirmación antes de firmar y enviar la
+  transacción. Primero fondea la wallet del owner. Si el resultado es incierto,
+  conserva los archivos del vendedor y vuelve a ejecutar el comando: consultará
+  el mismo intento. Si el intento venció y sigue incierto, contacta a Gyblos sin
+  borrar su estado. La wallet inscrita en 8004 es la del owner; la dirección de
+  cobro de configuraciones pagadas anteriores puede ser diferente. Sin terminal,
+  `DISCOVERY_IDENTITY_NOT_REGISTERED` pide repetir el comando de forma
+  interactiva.
 </Callout>
 
 ## Publica tu oferta
