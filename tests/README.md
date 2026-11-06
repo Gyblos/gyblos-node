@@ -159,3 +159,22 @@ startup over native loopback, synthetic chain services and private temporary
 journals. It also drives the product terminal loop with synthetic streams,
 checks a mid-answer engine interruption and reconciles a simulated settlement.
 See [the acceptance boundary](../docs/paid-acceptance.md).
+
+## Timing-sensitive fixtures
+
+Capacity assertions do not measure disk speed: the telemetry pending-buffer test
+controls only its drain timer while exercising real private writes. Separate
+cases advance that timer to verify timeout health; real private-log timeout
+coverage remains enabled.
+
+The owned unread Iroh child announces READY after installing IPC. Its startup
+has a separate bounded wait; CONNECT keeps its original budget, and native
+egress timing begins only after preparation. Missing readiness, early exit and
+late messages are covered without sockets; the native egress test still checks
+the product deadline, connection closure and admission-slot release.
+
+Synthetic paid-service deadline tests coordinate entry and digest completion
+before advancing their clock. Their abort wait accepts cancellation that already
+happened. Test watchdogs and cleanup release blocked fake operations so a failed
+assertion cannot strand the test worker or erase the lease-retention assertion.
+These fixtures do not change product transport, payment or logging limits.

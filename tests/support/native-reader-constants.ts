@@ -6,4 +6,7 @@ export const READER_ACTIONS = {
   SHUTDOWN: 'shutdown',
 } as const;
 export type ReaderAction = (typeof READER_ACTIONS)[keyof typeof READER_ACTIONS];
-export const READER_STARTUP = { ready: 'reader-ready', milliseconds: 10000 } as const;
+export const READER_STARTUP = {
+  ready: 'reader-ready',
+  milliseconds: 10000,
+} as const;

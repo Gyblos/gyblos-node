@@ -15,9 +15,13 @@ import { GYBLOS_ALPN } from '@gyblos/protocol/constants';
 import { isMain } from '@gyblos/runtime';
 
 import { bytes, endpoint, within } from './native-fixture';
-import { NATIVE_CAPABILITY } from './native-runtime';
-import { READER_ACTIONS, type ReaderAction } from './native-reader-constants';
+import {
+  READER_ACTIONS,
+  READER_STARTUP,
+  type ReaderAction,
+} from './native-reader-constants';
 import { waitForReaderReady } from './native-reader-ready';
+import { NATIVE_CAPABILITY } from './native-runtime';
 
 interface ReaderRequest {
   id: number;
@@ -29,6 +33,20 @@ interface ReaderReply {
   id: number;
   ok: boolean;
   nodeId?: string;
+}
+
+function isReply(value: unknown): value is ReaderReply {
+  return (
+    !!value &&
+    typeof value === 'object' &&
+    'id' in value &&
+    Number.isSafeInteger(value.id) &&
+    typeof value.id === 'number' &&
+    value.id > 0 &&
+    'ok' in value &&
+    typeof value.ok === 'boolean' &&
+    (!('nodeId' in value) || typeof value.nodeId === 'string')
+  );
 }
 
 async function readerMain() {
@@ -74,6 +92,7 @@ async function readerMain() {
       process.send!({ id: message.id, ok: false } satisfies ReaderReply);
     }
   });
+  process.send!({ kind: READER_STARTUP.ready });
   // The receiver handles remain referenced for the lifetime of the owned child.
   process.once('disconnect', () => {
     void retained.length;
@@ -81,18 +100,25 @@ async function readerMain() {
   });
 }
 
-export async function unreadPeer(target: EndpointAddr, options: { spawn?: () => ChildProcess } = {}) {
-  const child = options.spawn?.() ?? fork(new URL(import.meta.url), [], {
-    execArgv: ['--import', import.meta.resolve('tsx')],
-    stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
-  });
+export async function unreadPeer(
+  target: EndpointAddr,
+  options: { spawn?: () => ChildProcess } = {},
+) {
+  const child =
+    options.spawn?.() ??
+    fork(new URL(import.meta.url), [], {
+      execArgv: ['--import', import.meta.resolve('tsx')],
+      stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
+    });
   let sequence = 0;
   let stopped = false;
+  let ready = false;
   const pending = new Map<
     number,
     { resolve: (reply: ReaderReply) => void; reject: (error: Error) => void }
   >();
-  child.on('message', (value: ReaderReply) => {
+  child.on('message', (value: unknown) => {
+    if (!isReply(value)) return;
     const waiter = pending.get(value.id);
     if (!waiter) return;
     pending.delete(value.id);
@@ -136,6 +162,8 @@ export async function unreadPeer(target: EndpointAddr, options: { spawn?: () => 
     if (child.exitCode !== null || child.signalCode !== null) return;
     const exited = once(child, 'exit');
     try {
+      if (!ready)
+        throw new Error('Owned reader is not ready for shutdown commands.');
       await command(READER_ACTIONS.SHUTDOWN);
       await within(exited);
     } catch {
@@ -150,15 +178,16 @@ export async function unreadPeer(target: EndpointAddr, options: { spawn?: () => 
   };
   try {
     await waitForReaderReady(child);
-    const ready = await command(READER_ACTIONS.CONNECT, {
+    ready = true;
+    const connected = await command(READER_ACTIONS.CONNECT, {
       target: {
         nodeId: target.id().toString(),
         addresses: target.directAddresses(),
       },
     });
-    assert.ok(ready.nodeId);
+    assert.ok(connected.nodeId);
     return {
-      nodeId: ready.nodeId,
+      nodeId: connected.nodeId,
       request: (index: number) => command(READER_ACTIONS.REQUEST, { index }),
       pause() {
         assert.ok(child.kill('SIGSTOP'));

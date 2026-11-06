@@ -121,54 +121,72 @@ void test('the paid stream emits ordered deltas then the settled terminal under 
   assert.equal(denied.counts.closed, 1);
 });
 
-void test('a buyer leaving stops generation but the lease waits for settlement', { timeout: 15000 }, async (context) => {
-  const value = await fixture();
-  const controller = new AbortController();
-  let settle = () => {};
-  let started = () => {};
-  const entered = new Promise<void>((resolve) => {
-    started = resolve;
-  });
-  const settling = new Promise<void>((resolve) => {
-    settle = resolve;
-  });
-  let settledAfterAbort = false;
-  let late: ((text: string) => Promise<void>) | undefined;
-  const service: PaidExecutionService = {
-    async stream(_request, _peer, signal, onDelta) {
-      late = onDelta;
-      await onDelta('Hi');
-      started();
-      await settling;
-      assert.equal(signal.aborted, true);
-      await assert.rejects(onDelta('.'), {
-        code: PAID_EXECUTION_CODES.CANCELLED,
-      });
-      settledAfterAbort = true;
-      return value.terminal;
-    },
-  };
-  const running = servePaidExecutionStream(
-    value.stream,
-    service,
-    'synthetic',
-    value.close,
-    controller.signal,
-    value.enter,
-  );
-  context.after(async () => { controller.abort(); settle(); await running; });
-  await within(Promise.race([entered, running.then(() => { throw new Error('Synthetic service ended before entering.'); })]), 10000);
-  controller.abort();
-  assert.equal(value.counts.closed, 1);
-  assert.equal(value.counts.released, 0);
-  settle();
-  await running;
-  assert.equal(settledAfterAbort, true);
-  assert.equal(value.counts.released, 1);
-  // Only the delta before the buyer left was sent; the terminal had no stream left.
-  assert.equal(value.frames.length, 1);
-  await assert.rejects(late!('late'), { code: PAID_EXECUTION_CODES.CANCELLED });
-});
+void test(
+  'a buyer leaving stops generation but the lease waits for settlement',
+  { timeout: 15000 },
+  async (context) => {
+    const value = await fixture();
+    const controller = new AbortController();
+    let settle = () => {};
+    let started = () => {};
+    const entered = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const settling = new Promise<void>((resolve) => {
+      settle = resolve;
+    });
+    let settledAfterAbort = false;
+    let late: ((text: string) => Promise<void>) | undefined;
+    const service: PaidExecutionService = {
+      async stream(_request, _peer, signal, onDelta) {
+        late = onDelta;
+        await onDelta('Hi');
+        started();
+        await settling;
+        assert.equal(signal.aborted, true);
+        await assert.rejects(onDelta('.'), {
+          code: PAID_EXECUTION_CODES.CANCELLED,
+        });
+        settledAfterAbort = true;
+        return value.terminal;
+      },
+    };
+    const running = servePaidExecutionStream(
+      value.stream,
+      service,
+      'synthetic',
+      value.close,
+      controller.signal,
+      value.enter,
+    );
+    context.after(async () => {
+      controller.abort();
+      settle();
+      await running;
+    });
+    await within(
+      Promise.race([
+        entered,
+        running.then(() => {
+          throw new Error('Synthetic service ended before entering.');
+        }),
+      ]),
+      10000,
+    );
+    controller.abort();
+    assert.equal(value.counts.closed, 1);
+    assert.equal(value.counts.released, 0);
+    settle();
+    await running;
+    assert.equal(settledAfterAbort, true);
+    assert.equal(value.counts.released, 1);
+    // Only the delta before the buyer left was sent; the terminal had no stream left.
+    assert.equal(value.frames.length, 1);
+    await assert.rejects(late!('late'), {
+      code: PAID_EXECUTION_CODES.CANCELLED,
+    });
+  },
+);
 
 void test('a terminal the paid wire refuses is never sent', async () => {
   const value = await fixture();
@@ -232,37 +250,44 @@ void test('an oversized or malformed request is refused before the service runs'
   assert.equal(value.counts.reads, 1);
 });
 
-void test('a stalled writer is cut by the egress deadline but the lease waits for it', { timeout: 15000 }, async (context) => {
-  const value = await fixture();
-  let unstall = () => {};
-  let stopped = () => {};
-  const closing = new Promise<void>((resolve) => {
-    stopped = resolve;
-  });
-  value.stream.send.writeAll = () =>
-    new Promise<void>((resolve) => {
-      unstall = resolve;
+void test(
+  'a stalled writer is cut by the egress deadline but the lease waits for it',
+  { timeout: 15000 },
+  async (context) => {
+    const value = await fixture();
+    let unstall = () => {};
+    let stopped = () => {};
+    const closing = new Promise<void>((resolve) => {
+      stopped = resolve;
     });
-  const running = servePaidExecutionStream(
-    value.stream,
-    value.service,
-    'synthetic',
-    () => {
-      value.close();
-      stopped();
-    },
-    new AbortController().signal,
-    value.enter,
-    () => true,
-    { egressMs: 10 },
-  );
-  context.after(async () => { unstall(); await running; });
-  await within(closing, 10000);
-  assert.equal(value.counts.released, 0);
-  unstall();
-  await running;
-  assert.equal(value.counts.released, 1);
-});
+    value.stream.send.writeAll = () =>
+      new Promise<void>((resolve) => {
+        unstall = resolve;
+      });
+    const running = servePaidExecutionStream(
+      value.stream,
+      value.service,
+      'synthetic',
+      () => {
+        value.close();
+        stopped();
+      },
+      new AbortController().signal,
+      value.enter,
+      () => true,
+      { egressMs: 10 },
+    );
+    context.after(async () => {
+      unstall();
+      await running;
+    });
+    await within(closing, 10000);
+    assert.equal(value.counts.released, 0);
+    unstall();
+    await running;
+    assert.equal(value.counts.released, 1);
+  },
+);
 
 void test('a route revoked mid-stream stops delivery and closes the stream', async () => {
   const value = await fixture();

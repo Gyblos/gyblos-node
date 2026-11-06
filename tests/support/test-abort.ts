@@ -1,4 +1,7 @@
-// Synthetic service cancellation: test helpers must also observe cancellation before listener registration.
+// Synthetic service cancellation observes both prior and future aborts; no product policy is implemented here.
 export function waitForTestAbort(signal: AbortSignal): Promise<void> {
-  return new Promise((resolve) => signal.addEventListener('abort', () => resolve(), { once: true }));
+  if (signal.aborted) return Promise.resolve();
+  return new Promise((resolve) =>
+    signal.addEventListener('abort', () => resolve(), { once: true }),
+  );
 }
