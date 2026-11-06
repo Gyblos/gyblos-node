@@ -139,17 +139,20 @@ export async function checkOwnerRegistration(input: {
   lastValidBlockHeight: bigint;
 }): Promise<OwnerRegistrationSubmission> {
   const unknown = { status: OWNER_REGISTRATION_STATUS.UNKNOWN };
-  if (input.lastValidBlockHeight < 0n) return unknown;
+  const rpc = input.rpc;
+  const transactionSignature = input.signature;
+  const lastValidBlockHeight = input.lastValidBlockHeight;
+  if (lastValidBlockHeight < 0n) return unknown;
   const signal = AbortSignal.timeout(IDENTITY_RESOLUTION_LIMITS.timeoutMs);
   try {
     if (
       (await bounded(
-        () => input.rpc.getGenesisHash().send({ abortSignal: signal }),
+        () => rpc.getGenesisHash().send({ abortSignal: signal }),
         signal,
       )) !== DEVNET_GENESIS
     )
       return unknown;
-    return await readStatus(input.rpc, input.signature, signal);
+    return await readStatus(rpc, transactionSignature, signal);
   } catch {
     return unknown;
   }

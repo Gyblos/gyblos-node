@@ -104,3 +104,45 @@ void test('registration result requires finalized status and searches transactio
     await fake.close();
   }
 });
+
+void test('checking a saved signature snapshots the request before asynchronous work', async () => {
+  const check = Reflect.get(identity, 'checkOwnerRegistration');
+  const fake = await startFakeRpc(new Map());
+  let release = () => {};
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  try {
+    const rpc = new Proxy(fake.rpc, {
+      get(target, property) {
+        if (property === 'getGenesisHash')
+          return () => ({
+            send: async () => {
+              await gate;
+              return fake.state.genesisHash;
+            },
+          });
+        return Reflect.get(target, property);
+      },
+    });
+    const changed = signature(
+      getBase58Decoder().decode(new Uint8Array(64).fill(1)),
+    );
+    const input = {
+      rpc,
+      signature: syntheticSignature,
+      lastValidBlockHeight: 100n,
+    };
+    const pending = check(input);
+    input.signature = changed;
+    release();
+    await pending;
+    const call = fake.state.configs.find(
+      (item) => item.method === 'getSignatureStatuses',
+    );
+    assert.deepEqual(call?.params[0], [syntheticSignature]);
+  } finally {
+    release();
+    await fake.close();
+  }
+});
