@@ -85,49 +85,62 @@ export async function executeBuyerFree(
       if (excluded.has(winner.nodeId))
         throw new FreeBuyerError(FREE_BUYER_CODES.UNAVAILABLE);
       excluded.add(winner.nodeId);
-      const request = buildFreeExecutionRequest(winner.quote, input);
-      const observer = buyerExecutionTelemetry(
-        request,
+      const result = await executeSelectedBuyerFree(
+        input,
         dependencies,
-        Boolean(onDelta),
+        winner,
+        signal,
+        onDelta,
       );
-      observer?.received();
-      const receipt = buyerReceiptObservation(dependencies, Boolean(onDelta));
-      let delivered = false;
-      const emit = onDelta
-        ? async (text: string) => {
-            signal.throwIfAborted();
-            delivered = true;
-            receipt?.text(text);
-            await onDelta(text);
-            signal.throwIfAborted();
-            if (text) observer?.firstToken();
-          }
-        : undefined;
-      try {
-        const result = await dependencies.execute(
-          winner,
-          request,
-          signal,
-          emit,
-        );
-        signal.throwIfAborted();
-        completeBuyerTelemetry(observer, request, result);
-        await receipt?.finish(winner, request, result, signal);
-        return result;
-      } catch (error) {
-        failBuyerTelemetry(observer, error, signal, delivered);
-        if (
-          !(error instanceof FreeClientError) ||
-          error.sent ||
-          delivered ||
-          signal.aborted
-        )
-          throw error;
-      }
+      if (result) return result;
     }
     throw new FreeBuyerError(FREE_BUYER_CODES.UNAVAILABLE);
   } finally {
     release?.();
+  }
+}
+
+// Caller owns the request admission, deadline and exclusion set; this never selects another seller.
+export async function executeSelectedBuyerFree(
+  input: FreeExecutionBuildInput,
+  dependencies: FreeBuyerDependencies,
+  winner: FreeWinner,
+  signal: AbortSignal,
+  onDelta?: (text: string) => Promise<void>,
+): Promise<FreeExecutionResult | undefined> {
+  const request = buildFreeExecutionRequest(winner.quote, input);
+  const observer = buyerExecutionTelemetry(
+    request,
+    dependencies,
+    Boolean(onDelta),
+  );
+  observer?.received();
+  const receipt = buyerReceiptObservation(dependencies, Boolean(onDelta));
+  let delivered = false;
+  const emit = onDelta
+    ? async (text: string) => {
+        signal.throwIfAborted();
+        delivered = true;
+        receipt?.text(text);
+        await onDelta(text);
+        signal.throwIfAborted();
+        if (text) observer?.firstToken();
+      }
+    : undefined;
+  try {
+    const result = await dependencies.execute(winner, request, signal, emit);
+    signal.throwIfAborted();
+    completeBuyerTelemetry(observer, request, result);
+    await receipt?.finish(winner, request, result, signal);
+    return result;
+  } catch (error) {
+    failBuyerTelemetry(observer, error, signal, delivered);
+    if (
+      !(error instanceof FreeClientError) ||
+      error.sent ||
+      delivered ||
+      signal.aborted
+    )
+      throw error;
   }
 }

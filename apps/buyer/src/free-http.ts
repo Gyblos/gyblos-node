@@ -41,6 +41,7 @@ import { FreeBuyerError, invalidChat, parseFreeChat } from './free-chat';
 import { FreeSelectionFailure } from './free-execution';
 import {
   executeFreeSse,
+  executionFields,
   paymentFields,
   replyFreeSseError,
   type ChatErrorCode,
@@ -252,6 +253,7 @@ function replyCompletion(
           total_tokens: result.usage.inputTokens + result.usage.outputTokens,
         },
         ...paymentFields(result.payment),
+        ...executionFields(result),
       }),
     );
 }

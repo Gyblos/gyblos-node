@@ -27,6 +27,7 @@ import {
 } from '@gyblos/protocol/payment';
 import { PaidClientError } from '@gyblos/transport-iroh/paid-client';
 
+import { bounded } from './buyer-operation';
 import { PaidBuyerError } from './buyer-paid-error';
 import {
   BUYER_PAID_TIMEOUTS,
@@ -91,22 +92,6 @@ export interface PaidBuyerDependencies {
     onDelta: (text: string) => Promise<void>,
   ): Promise<PaidExecutionResponse>;
   record(record: PaidBuyerRecord): Promise<void>;
-}
-
-// Rejects with the signal's reason once it aborts; the operation may still finish in the background.
-function bounded<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {
-  if (signal.aborted) {
-    // Its own outcome no longer matters, but must not surface as an unhandled rejection.
-    operation.catch(() => {});
-    return Promise.reject(signal.reason);
-  }
-  return new Promise<T>((resolve, reject) => {
-    const abort = () => reject(signal.reason);
-    signal.addEventListener('abort', abort, { once: true });
-    operation
-      .then(resolve, reject)
-      .finally(() => signal.removeEventListener('abort', abort));
-  });
 }
 
 function termsFor(
@@ -353,4 +338,26 @@ export async function executeBuyerPaid(
   } finally {
     release();
   }
+}
+
+// Runs one already verified winner under the caller's admission and absolute deadline.
+// Undefined permits failover only when the signed open could not have left this buyer.
+export async function executeSelectedBuyerPaid(
+  input: FreeExecutionBuildInput,
+  dependencies: PaidBuyerDependencies,
+  winner: PaidWinner,
+  signal: AbortSignal,
+  onDelta: (
+    text: string,
+    requestDigest?: string,
+  ) => Promise<void> = async () => {},
+): Promise<PaidBuyerOutcome | undefined> {
+  signal.throwIfAborted();
+  const prompt = paidPrompt(input, dependencies.meter);
+  if (prompt === undefined)
+    throw new PaidBuyerError(PAID_BUYER_CODES.UNSUPPORTED);
+  if (await bounded(dependencies.unresolved(), signal))
+    throw new PaidBuyerError(PAID_BUYER_CODES.UNRESOLVED);
+  signal.throwIfAborted();
+  return attempt({ dependencies, winner, input, prompt, signal, onDelta });
 }

@@ -8,6 +8,7 @@ import {
   FREE_CHAT_ROLES,
   FREE_EXECUTION,
   type FreeExecutionCode,
+  type OfferPricingKind,
   type PaymentErrorCode,
 } from '@gyblos/protocol/constants';
 import type {
@@ -18,6 +19,7 @@ import type {
 import type { PaidExecutionCode } from '@gyblos/protocol/paid/constants';
 
 import {
+  BUYER_EXECUTION_FIELD,
   FREE_BUYER,
   FREE_BUYER_CODES,
   PAID_BUYER,
@@ -40,7 +42,12 @@ export interface ChatPayment {
   // Whether the buyer kept a record for reconciliation; false for a settled request.
   recorded: boolean;
 }
-export type ChatResult = FreeExecutionResult & { payment?: ChatPayment };
+export type ChatResult = FreeExecutionResult & {
+  payment?: ChatPayment;
+  execution?: OfferPricingKind;
+};
+export const executionFields = (result: ChatResult) =>
+  result.execution ? { [BUYER_EXECUTION_FIELD]: result.execution } : {};
 
 export type ChatErrorCode =
   | FreeBuyerCode
@@ -161,6 +168,7 @@ export async function executeFreeSse(
         total_tokens: result.usage.inputTokens + result.usage.outputTokens,
       },
       ...paymentFields(result.payment),
+      ...executionFields(result),
     },
     signal,
   );

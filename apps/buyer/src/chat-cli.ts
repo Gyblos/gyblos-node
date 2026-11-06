@@ -17,6 +17,7 @@ export interface ChatSessionOptions {
   model: string;
   maxTokens: number;
   maxAtomic: string;
+  automatic?: boolean;
   request: typeof fetch;
   read: () => Promise<string | undefined>;
   write: (text: string) => void;
@@ -28,6 +29,7 @@ type ChatStarter = (options: { port: number }) => Promise<{
     model: string;
     maxTokens: number;
     maxAtomic: string;
+    automatic?: boolean;
     request: typeof fetch;
   };
   close(): Promise<void>;
@@ -123,7 +125,11 @@ export async function runOwnedChat(
 }
 export async function chatSession(options: ChatSessionOptions) {
   const paid = !isFreeAtomic(options.maxAtomic);
-  const mode = paid ? 'paid (devnet)' : 'free';
+  const mode = options.automatic
+    ? 'automatic (free or paid by signed quote)'
+    : paid
+      ? 'paid (devnet)'
+      : 'free';
   options.write(
     `Model: ${options.model}\nMode: ${mode}\nMaximum deposit: ${options.maxAtomic} atomic units per request\nType /exit to quit. Each question is independent.\n`,
   );
@@ -135,6 +141,7 @@ export async function chatSession(options: ChatSessionOptions) {
       maxTokens: options.maxTokens,
       prompt,
       paid,
+      automatic: options.automatic,
       write: options.write,
       signal: options.signal,
     };

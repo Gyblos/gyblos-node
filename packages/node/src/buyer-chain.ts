@@ -9,6 +9,7 @@ import {
   UPTO_CHANNEL_SETTINGS,
 } from '@gyblos/config';
 import {
+  hasUnresolvedBuyerPayments,
   openUptoBuyerPayments,
   type UptoBuyerPayments,
   type UptoBuyerPaymentsOptions,
@@ -52,3 +53,7 @@ export function buyerChainPayments(
     });
   };
 }
+
+// Free quotes still respect unresolved signed payments, without starting the paid client or RPC.
+export const buyerPaymentsUnresolved = () =>
+  hasUnresolvedBuyerPayments(buyerJournalPathsIn(process.env));

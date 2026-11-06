@@ -28,6 +28,7 @@ export {
 } from './constants';
 export {
   openUptoBuyerJournal,
+  hasUnresolvedBuyerPayments,
   type UptoBuyerJournal,
   type UptoJournalEntry,
   type UptoJournalPolicy,

@@ -15,46 +15,82 @@ async function fixture() {
     ...buyer.winners[1]!,
     quote: {
       ...buyer.winners[1]!.quote,
-      offer: { ...buyer.winners[1]!.quote.offer, inputAtomicPerMtok: '0', outputAtomicPerMtok: '0', maxAtomic: '0' },
+      offer: {
+        ...buyer.winners[1]!.quote.offer,
+        prices: { inputAtomicPerMtok: '0', outputAtomicPerMtok: '0' },
+        maxAtomic: '0',
+      },
     },
   };
   const selected: string[] = [];
   let released = 0;
   let unresolved = false;
   const dependencies = {
-    enter: () => () => { released++; },
+    enter: () => () => {
+      released++;
+    },
     unresolved: async () => unresolved,
     select: async (excluded: ReadonlySet<string>) => {
       const winner = [paid, free].find((each) => !excluded.has(each.nodeId));
-      assert.ok(winner); selected.push(winner.nodeId); return winner;
+      assert.ok(winner);
+      selected.push(winner.nodeId);
+      return winner;
     },
-    free: async (winner: typeof free) => { assert.equal(winner, free); return 'free answer'; },
-    paid: async (winner: typeof paid) => { assert.equal(winner, paid); return 'paid answer'; },
+    free: async (winner: typeof free): Promise<string | undefined> => {
+      assert.equal(winner, free);
+      return 'free answer';
+    },
+    paid: async (winner: typeof paid): Promise<string | undefined> => {
+      assert.equal(winner, paid);
+      return 'paid answer';
+    },
   };
-  return { paid, free, dependencies, selected, released: () => released, block: () => { unresolved = true; } };
+  return {
+    paid,
+    free,
+    dependencies,
+    selected,
+    released: () => released,
+    block: () => {
+      unresolved = true;
+    },
+  };
 }
 void test('a free signed quote uses no payment port even with a positive buyer ceiling', async () => {
   const f = await fixture();
   f.dependencies.select = async () => f.free;
-  f.dependencies.paid = async () => { assert.fail('payment prepared for free quote'); };
-  assert.deepEqual(await executeBuyerQuote(f.dependencies), { kind: OFFER_PRICING_KINDS.FREE, result: 'free answer' });
+  f.dependencies.paid = async () => {
+    assert.fail('payment prepared for free quote');
+  };
+  assert.deepEqual(await executeBuyerQuote(f.dependencies), {
+    kind: OFFER_PRICING_KINDS.FREE,
+    result: 'free answer',
+  });
   assert.equal(f.released(), 1);
 });
 void test('a positive signed quote uses the paid port without selecting another winner', async () => {
   const f = await fixture();
-  assert.deepEqual(await executeBuyerQuote(f.dependencies), { kind: OFFER_PRICING_KINDS.PAID, result: 'paid answer' });
+  assert.deepEqual(await executeBuyerQuote(f.dependencies), {
+    kind: OFFER_PRICING_KINDS.PAID,
+    result: 'paid answer',
+  });
   assert.deepEqual(f.selected, [f.paid.nodeId]);
 });
 void test('a proven-unsent paid attempt may fail over to a free quote', async () => {
   const f = await fixture();
   f.dependencies.paid = async () => undefined;
-  assert.equal((await executeBuyerQuote(f.dependencies)).kind, OFFER_PRICING_KINDS.FREE);
+  assert.equal(
+    (await executeBuyerQuote(f.dependencies)).kind,
+    OFFER_PRICING_KINDS.FREE,
+  );
   assert.deepEqual(f.selected, [f.paid.nodeId, f.free.nodeId]);
 });
 void test('a potentially sent failure never selects another seller', async () => {
   const f = await fixture();
   const failure = new Error('synthetic interrupted transport');
-  f.dependencies.paid = async () => { throw failure; };
+  f.dependencies.paid = async () => {
+    throw failure;
+  };
   await assert.rejects(executeBuyerQuote(f.dependencies), failure);
   assert.deepEqual(f.selected, [f.paid.nodeId]);
   assert.equal(f.released(), 1);
@@ -63,9 +99,17 @@ void test('unresolved signed state blocks even free execution and a failed disca
   for (const before of [true, false]) {
     const f = await fixture();
     if (before) f.block();
-    else f.dependencies.paid = async () => { f.block(); return undefined; };
-    f.dependencies.free = async () => { assert.fail('free bypassed unresolved payment'); };
-    await assert.rejects(executeBuyerQuote(f.dependencies), { code: PAID_BUYER_CODES.UNRESOLVED });
+    else
+      f.dependencies.paid = async () => {
+        f.block();
+        return undefined;
+      };
+    f.dependencies.free = async () => {
+      assert.fail('free bypassed unresolved payment');
+    };
+    await assert.rejects(executeBuyerQuote(f.dependencies), {
+      code: PAID_BUYER_CODES.UNRESOLVED,
+    });
     assert.equal(f.selected.length, before ? 0 : 1);
   }
 });
@@ -73,6 +117,81 @@ void test('an inconsistent free price and positive budget is refused without eit
   const f = await fixture();
   f.free.quote.offer.maxAtomic = '1';
   f.dependencies.select = async () => f.free;
-  f.dependencies.free = async () => { assert.fail('invalid quote executed'); };
-  await assert.rejects(executeBuyerQuote(f.dependencies));
+  f.dependencies.free = async () => {
+    assert.fail('invalid quote executed');
+  };
+  await assert.rejects(executeBuyerQuote(f.dependencies), {
+    code: PAID_BUYER_CODES.UNAVAILABLE,
+  });
+});
+
+void test('an aborted selection ends promptly and does not release a late result to execution', async () => {
+  const f = await fixture();
+  const controller = new AbortController();
+  let release = () => {};
+  let began = () => {};
+  const started = new Promise<void>((resolve) => {
+    began = resolve;
+  });
+  const selected = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  f.dependencies.select = async () => {
+    began();
+    await selected;
+    return f.free;
+  };
+  f.dependencies.free = async () => {
+    assert.fail('late result executed');
+  };
+  const result = executeBuyerQuote(f.dependencies, controller.signal);
+  await started;
+  controller.abort();
+  try {
+    await assert.rejects(result, { name: 'AbortError' });
+  } finally {
+    release();
+  }
+  assert.equal(f.released(), 1);
+});
+void test('a repeated winner cannot execute twice or loop forever', async () => {
+  const f = await fixture();
+  let calls = 0;
+  f.dependencies.select = async () => f.free;
+  f.dependencies.free = async () => {
+    calls++;
+    return undefined;
+  };
+  await assert.rejects(executeBuyerQuote(f.dependencies), {
+    code: PAID_BUYER_CODES.UNAVAILABLE,
+  });
+  assert.equal(calls, 1);
+});
+
+void test('either positive price needs the paid port, and zero budget never authorizes it', async () => {
+  for (const zeroInput of [true, false]) {
+    const f = await fixture();
+    if (zeroInput) f.paid.quote.offer.prices.inputAtomicPerMtok = '0';
+    else f.paid.quote.offer.prices.outputAtomicPerMtok = '0';
+    assert.equal(
+      (await executeBuyerQuote(f.dependencies)).kind,
+      OFFER_PRICING_KINDS.PAID,
+    );
+    f.paid.quote.offer.maxAtomic = '0';
+    f.dependencies.paid = async () => {
+      assert.fail('zero deposit reached payment');
+    };
+    await assert.rejects(executeBuyerQuote(f.dependencies), {
+      code: PAID_BUYER_CODES.UNAVAILABLE,
+    });
+  }
+});
+void test('a proven-unsent free attempt can use a positive quote on another seller', async () => {
+  const f = await fixture();
+  f.dependencies.select = async (excluded) => (excluded.size ? f.paid : f.free);
+  f.dependencies.free = async () => undefined;
+  assert.equal(
+    (await executeBuyerQuote(f.dependencies)).kind,
+    OFFER_PRICING_KINDS.PAID,
+  );
 });

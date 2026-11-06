@@ -60,7 +60,10 @@ const NEW_FILE =
   constants.O_NONBLOCK;
 
 // Every component is a real directory (never a user-made symlink); the last one is owner-only.
-export function ensurePrivateDirectory(path: string): Promise<void> {
+async function privateDirectory(
+  path: string,
+  create: boolean,
+): Promise<boolean> {
   return guarded(async () => {
     const absolute = resolve(path);
     let current = parse(absolute).root;
@@ -70,11 +73,17 @@ export function ensurePrivateDirectory(path: string): Promise<void> {
       .filter(Boolean)) {
       current = join(current, part);
       try {
-        await mkdir(current, { mode: FILE_MODES.privateDirectory });
+        if (create) await mkdir(current, { mode: FILE_MODES.privateDirectory });
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
       }
-      const info = await lstat(current);
+      const info = await lstat(current).catch(
+        (error: NodeJS.ErrnoException) => {
+          if (!create && error.code === 'ENOENT') return undefined;
+          throw error;
+        },
+      );
+      if (!info) return false;
       // Only the system's own links (macOS /var, /tmp) are followed; any other link is refused.
       if (info.isSymbolicLink()) {
         if (info.uid !== 0 || current === absolute) fail();
@@ -84,7 +93,15 @@ export function ensurePrivateDirectory(path: string): Promise<void> {
       if (!info.isDirectory()) fail();
       if (current === absolute) owned(info, FILE_MODES.privateDirectory);
     }
+    return true;
   });
+}
+export async function ensurePrivateDirectory(path: string): Promise<void> {
+  await privateDirectory(path, true);
+}
+// Read-only validation; a missing directory is clear, unsafe existing components are refused.
+export function checkPrivateDirectory(path: string): Promise<boolean> {
+  return privateDirectory(path, false);
 }
 
 // The handle still names `path` (same device and inode), is a single-link regular file and is owned.

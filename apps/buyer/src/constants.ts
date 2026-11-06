@@ -291,3 +291,6 @@ export const FREE_BUYER_STARTUP = {
 } as const;
 export type FreeBuyerStartupReason =
   (typeof FREE_BUYER_STARTUP)[keyof typeof FREE_BUYER_STARTUP];
+
+// Local HTTP terminal metadata; never changes a signed protocol record.
+export const BUYER_EXECUTION_FIELD = 'gyblos_execution';
