@@ -18,7 +18,7 @@ const WORKFLOW = '.github/workflows/release-seller-image.yml';
 const read = (path: string) =>
   readFileSync(join(REPOSITORY_ROOT, path), 'utf8');
 
-void test('pulls by default the release the release script pinned by version and digest', () => {
+void test('pulls by default a release pinned by version and digest', () => {
   const repository = /^REPOSITORY=(.+)$/m.exec(
     read('scripts/release-image.sh'),
   );
