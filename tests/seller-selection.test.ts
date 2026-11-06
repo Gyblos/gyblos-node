@@ -320,7 +320,10 @@ void test('hard filters exclude cooldown, stale, withdrawn, policy, badge and pr
     ok: false,
     code: SELLER_SELECTION_CODES.PRICE_ABOVE_BUDGET,
   });
-  const unpriced = excluded.filter((_, index) => index !== 6 && index !== 7);
+  const overBudget = new Set([nodeId(7), nodeId(8)]);
+  const unpriced = excluded.filter(
+    (item) => !overBudget.has(item.catalog.nodeId),
+  );
   assert.deepEqual(select(unpriced, { request: strict, stats }), {
     ok: false,
     code: SELLER_SELECTION_CODES.NO_CANDIDATES,

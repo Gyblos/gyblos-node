@@ -134,23 +134,30 @@ function findListing(catalog: PublicCatalogV2, selection: ModelSelection) {
       item.quantization === selection.quantization,
   );
 }
-// Every hard filter except the reasoning level, which decides tiers and the unsupported-level code.
-// The pinned path checks cooldown itself so it can report when the seller returns; `budget` false
-// skips only the price checks, to tell an unaffordable market from an empty one.
-function eligible(
+// Every hard filter except price and the reasoning level, which decides tiers and the
+// unsupported-level code. The pinned path checks cooldown itself so it can report when the seller returns.
+function offersModel(
   input: SellerSelectionInput,
   seller: KnownSeller,
   honorCooldown = true,
-  budget = true,
 ) {
   const stats = input.stats.get(seller.catalog.nodeId);
   if (honorCooldown && isCooling(stats, input.now)) return;
   if (!passesSellerFilters(seller, input.request, input.now)) return;
   const listing = findListing(seller.catalog, input.request.selection);
   if (!listing || !passesListingFilters(listing, input.request)) return;
-  if (budget && !withinBudget(listing, input.request)) return;
   const entry: Eligible = { seller, listing, stats };
   return entry;
+}
+function eligible(
+  input: SellerSelectionInput,
+  seller: KnownSeller,
+  honorCooldown = true,
+) {
+  const entry = offersModel(input, seller, honorCooldown);
+  return entry && withinBudget(entry.listing, input.request)
+    ? entry
+    : undefined;
 }
 // Levels to try in order: the exact one, then each permitted lower level, closest first.
 function acceptableLevels(request: SellerRequest) {
@@ -226,8 +233,12 @@ function selectAutomatic(
   if (candidates.length) return { ok: true, candidates };
   if (pool.length)
     return { ok: false, code: SELLER_SELECTION_CODES.LEVEL_UNSUPPORTED };
+  // Only a listing at an acceptable reasoning level counts, so raising the budget would admit it.
+  const levels = acceptableLevels(input.request);
   const priced = input.sellers.some((seller) =>
-    eligible(input, seller, true, false),
+    offersModel(input, seller)?.listing.reasoning.some((level) =>
+      levels.includes(level),
+    ),
   );
   return {
     ok: false,

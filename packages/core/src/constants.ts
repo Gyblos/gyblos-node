@@ -49,8 +49,9 @@ export const CONTROL_CAPACITY = {
 export const SELLER_SELECTION_CODES = {
   INVALID: 'INVALID_SELECTION_INPUT',
   NO_CANDIDATES: 'NO_SELLER_CANDIDATES',
-  // Some seller offers the model, but every such listing costs more than the buyer's maxAtomic or
-  // price ceilings allow (a zero budget accepts only free listings).
+  // Automatic selection only: some seller offers the model at an acceptable reasoning level, but
+  // above the buyer's maxAtomic or price ceilings (a zero maxAtomic admits only free listings). A
+  // pinned seller that fails on price reports PINNED_REJECTED.
   PRICE_ABOVE_BUDGET: 'SELLER_PRICE_ABOVE_BUDGET',
   LEVEL_UNSUPPORTED: 'SELECTION_LEVEL_UNSUPPORTED',
   PINNED_REJECTED: 'PINNED_SELLER_REJECTED',
