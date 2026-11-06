@@ -164,13 +164,8 @@ async function buildQuote(
     BigInt(listed.pricing.outputAtomicPerMtok) === 0n;
   const maxAtomic = free ? '0' : query.params.maxAtomic;
   checkPricing(query, listed, maxAtomic);
-  // A free seller fills payTo with its owner; a quote that can charge must pay a cold wallet.
-  if (
-    !free &&
-    [context.owner, context.feePayer, context.authorizer].includes(
-      context.payTo,
-    )
-  )
+  // Paid payout may be the owner but must differ from transaction signing keys.
+  if (!free && [context.feePayer, context.authorizer].includes(context.payTo))
     return controlFail(CONTROL_CODES.POLICY);
   return parseOfferV2({
     schemaVersion: CONTROL_RECORD_VERSION,

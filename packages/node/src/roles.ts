@@ -1,5 +1,5 @@
 // P2P role setup and loading: per-role key files and role config in <home>/<role>/ with private file modes.
-// Never overwrites existing keys; seller setup keeps the payout wallet cold and stores no buyer key.
+// Never overwrites existing keys; seller payout defaults to its owner and no buyer key is stored.
 // A free seller has only owner and node keys; the paid fields and keys exist all together or not at all.
 import { generateKeyPairSync } from 'node:crypto';
 import { lstat, mkdir, readFile, writeFile } from 'node:fs/promises';
@@ -236,8 +236,8 @@ export async function nodeSecret(role: P2PRole, home?: HomeEnvironment) {
 export async function setupRole(options: SetupOptions) {
   address(options.mint);
   if (options.role === P2P_ROLES.SELLER) {
-    if ((options.buyer === undefined) !== (options.payTo === undefined))
-      throw new Error('Paid seller keys need --buyer and --pay-to together.');
+    if (options.buyer === undefined && options.payTo !== undefined)
+      throw new Error('A payout requires --buyer for paid seller keys.');
     // Checked before anything is written, so a bad paid address leaves no keys behind.
     if (options.payTo !== undefined) address(options.payTo);
     if (options.buyer !== undefined) address(options.buyer);
@@ -250,7 +250,8 @@ export async function setupRole(options: SetupOptions) {
       existing.role !== options.role ||
       existing.mint !== options.mint ||
       (existing.role === P2P_ROLES.SELLER &&
-        (existing.payTo !== options.payTo || existing.buyer !== options.buyer))
+        ((options.payTo !== undefined && existing.payTo !== options.payTo) ||
+          existing.buyer !== options.buyer))
     )
       throw new Error(
         'Existing role configuration does not match; keys preserved. A different mint, payout or buyer needs a new GYBLOS_HOME.',
@@ -259,6 +260,8 @@ export async function setupRole(options: SetupOptions) {
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
   }
+  if (options.role === P2P_ROLES.SELLER && options.payTo !== undefined)
+    throw new Error('New seller payout must use its owner wallet.');
   const rpcUrl = configurationRpcUrl(
     process.env.GYBLOS_RPC_URL ?? DEVNET_RPC_URL,
     NODE_ERROR_CODES.INVALID_ROLE_CONFIGURATION,
@@ -293,15 +296,17 @@ export async function setupRole(options: SetupOptions) {
       role: P2P_ROLES.BUYER,
       buyer: (await wallet(role, 'buyer')).address,
     };
-  // Both or neither are set (checked above); both are tested so the paid branch narrows.
-  else if (options.payTo === undefined || options.buyer === undefined)
+  // A buyer enables the paid role; new sellers use their owner wallet for payout.
+  else if (options.buyer === undefined)
     config = {
       ...common,
       role: P2P_ROLES.SELLER,
       owner: (await wallet(role, 'owner')).address,
     };
   else {
-    const payoutBytes = getAddressEncoder().encode(address(options.payTo));
+    const owner = await wallet(role, 'owner');
+    const payTo = owner.address;
+    const payoutBytes = getAddressEncoder().encode(address(payTo));
     if (
       Buffer.from(payoutBytes).equals(
         Buffer.from(
@@ -312,22 +317,17 @@ export async function setupRole(options: SetupOptions) {
       )
     )
       throw new Error('Payout cannot be the hot node key.');
-    const owner = await wallet(role, 'owner');
     const authorizer = await wallet(role, 'authorizer');
     const facilitator = await wallet(role, 'facilitator');
-    if (
-      [owner.address, authorizer.address, facilitator.address].includes(
-        address(options.payTo),
-      )
-    )
-      throw new Error('Payout key must be cold.');
+    if ([authorizer.address, facilitator.address].includes(address(payTo)))
+      throw new Error('Payout must differ from payment signing keys.');
     config = {
       ...common,
       role: P2P_ROLES.SELLER,
       owner: owner.address,
       authorizer: authorizer.address,
       facilitator: facilitator.address,
-      payTo: options.payTo,
+      payTo,
       buyer: options.buyer,
     };
   }

@@ -2,6 +2,8 @@
 // takes the invite from GYBLOS_INVITE or a terminal question (never a flag), names the index before sending, explains each refusal with a static
 // code and a hint; the index-only path writes nothing and never prints the invite or home. Fetch is faked.
 import assert from 'node:assert/strict';
+import { readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import test from 'node:test';
 
 import { runCli } from '../apps/node/src/cli';
@@ -285,4 +287,46 @@ void test('seller register gives a static useful hint when the registration simu
     });
     assert.equal(result.code, 1);
     assert.match(result.stderr, /simulation.*SOL.*cost/i);
+  }));
+
+void test('seller register warns without blocking an older distinct payout', () =>
+  withHome(async (home) => {
+    const path = join(home.seller, 'role.json');
+    const role = JSON.parse(await readFile(path, 'utf8'));
+    const payout = '11111111111111111111111111111113';
+    await writeFile(
+      path,
+      JSON.stringify({
+        ...role,
+        payTo: payout,
+        authorizer: '11111111111111111111111111111114',
+        facilitator: '11111111111111111111111111111115',
+        buyer: '11111111111111111111111111111116',
+      }),
+    );
+    const before = await snapshot(home.root);
+    const result = await register(home, [], {
+      env: { GYBLOS_INVITE: INVITE },
+      answer: json(201, { ok: true, status: 'active' }),
+    });
+    assert.equal(result.code, 0, result.stderr);
+    assert.match(result.stderr, /payout.*different.*owner/i);
+    assert.equal(result.stderr.includes(payout), false);
+    assert.deepEqual(await snapshot(home.root), before);
+    await writeFile(
+      path,
+      JSON.stringify({
+        ...role,
+        payTo: role.owner,
+        authorizer: '11111111111111111111111111111114',
+        facilitator: '11111111111111111111111111111115',
+        buyer: '11111111111111111111111111111116',
+      }),
+    );
+    const unified = await register(home, [], {
+      env: { GYBLOS_INVITE: INVITE },
+      answer: json(201, { ok: true, status: 'active' }),
+    });
+    assert.equal(unified.code, 0, unified.stderr);
+    assert.doesNotMatch(unified.stderr, /payout.*different.*owner/i);
   }));

@@ -119,16 +119,16 @@ node key (`node.key`) and the role's Solana keys with private permissions. It
 never overwrites existing keys; a mismatched existing role stops with an error.
 A seller needs only `--mint`: it gets an owner key and a node key. The paid
 seller keys (authorizer and facilitator) and fields (`payTo`, allowed `buyer`)
-are created only when `--buyer` and `--pay-to` are given together. A seller with
-a paid `[[offers]]` entry needs them: paid v2 selling uses the payout and both
-keys, and `--buyer` can be any address you control (v2 does not use it). Free
-sellers leave both out.
+are created when `--buyer` is given. For a new paid seller, `payTo` is the owner
+wallet; `--buyer` can be any address you control (v2 does not use it). Existing
+roles with a different payout are preserved and receive a warning at
+registration. New roles reject an explicit `--pay-to`; free sellers omit both.
 
 | File                                             | Role   | Contents                                                                                                               |
 | ------------------------------------------------ | ------ | ---------------------------------------------------------------------------------------------------------------------- |
 | `role.json`                                      | both   | Role, mint, NodeId and public addresses.                                                                               |
 | `node.key`                                       | both   | Iroh secret key (private).                                                                                             |
-| `*.json` keys                                    | both   | Buyer key, or seller owner key (paid keys only with `--buyer`/`--pay-to`).                                             |
+| `*.json` keys                                    | both   | Buyer key, or seller owner key (paid keys are added with `--buyer`).                                                   |
 | `offer.json`                                     | buyer  | A paid v1 seller's signed offer (lab gates only).                                                                      |
 | `trust.json`                                     | buyer  | Which seller and limits the buyer accepts.                                                                             |
 | `status.json`                                    | both   | `starting` with a phase, then `ready`; a seller lists each offer's index, model, engine kind and whether it is listed. |
@@ -163,14 +163,14 @@ pnpm node:start
   loopback address). It handles no secret: API keys and the relay token stay in
   the environment or `seller.env`, and it prints only their variable names.
   `examples/seller-daemon.toml` is an equivalent file to copy instead.
-- The seller serves every free offer in `gyblos.toml`; without one it does not
-  start (`SELLER_OFFERS_MISSING`). A paid offer is sold on devnet over the paid
-  stream when the seller role was set up with a payout
-  (`pnpm node:setup --role seller --mint <mint> --pay-to <payout> --buyer <address>`
-  in a new `GYBLOS_HOME`; `--buyer` is still required by the v1 setup). The fee
-  payer key needs devnet SOL for transaction fees, channel rent and, once, the
-  rent of any missing payout, fee, fee payer or buyer token account, which the
-  seller creates so that no claim is redirected to the payment program
+- The seller serves configured free and paid offers in `gyblos.toml`; it needs
+  at least one offer to start (`SELLER_OFFERS_MISSING`). A paid offer is sold on
+  devnet over the paid stream when the seller role was set up with a payout
+  (`pnpm node:setup --role seller --mint <mint> --buyer <address>` in a new
+  `GYBLOS_HOME`; `--buyer` is still required by the v1 setup). The fee payer key
+  needs devnet SOL for transaction fees, channel rent and, once, the rent of any
+  missing payout, fee, fee payer or buyer token account, which the seller
+  creates so that no claim is redirected to the payment program
   ([Seller startup](configuration.md#seller-startup)). Paid v2 has settled on
   devnet only in a controlled run; the v1 paid path remains in the lab gates
   only.

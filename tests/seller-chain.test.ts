@@ -35,11 +35,9 @@ const address = async () => (await generateKeyPairSigner()).address;
 
 void test('a seller set up with a payout gets a payment server for its own keys and fee', () =>
   withHome(async () => {
-    const payTo = await address();
     await setupRole({
       role: P2P_ROLES.SELLER,
       mint: await address(),
-      payTo,
       buyer: await address(),
     });
     const role = await loadRole(P2P_ROLES.SELLER);
@@ -52,7 +50,7 @@ void test('a seller set up with a payout gets a payment server for its own keys 
       assert.deepEqual(await payments.server.describe(), {
         network: DEVNET,
         mint: role.mint,
-        payTo,
+        payTo: role.owner,
         feePayer: role.facilitator,
         authorizer: role.authorizer,
         protocolFeeBps: PROTOCOL_FEE.bps,
@@ -80,7 +78,6 @@ void test('a role whose RPC is not devnet, or cannot answer, never opens payment
     await setupRole({
       role: P2P_ROLES.SELLER,
       mint: await address(),
-      payTo: await address(),
       buyer: await address(),
     });
     const role = await loadRole(P2P_ROLES.SELLER);
@@ -109,7 +106,6 @@ void test('a seller whose payout, fee or fee payer token account cannot be creat
     await setupRole({
       role: P2P_ROLES.SELLER,
       mint: await address(),
-      payTo: await address(),
       buyer: await address(),
     });
     const role = await loadRole(P2P_ROLES.SELLER);

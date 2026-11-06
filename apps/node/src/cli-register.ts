@@ -126,6 +126,10 @@ export async function registerCommand(
       REGISTER_ERRORS.INVITE_FORMAT,
       `that is not an invite code; it is ${INVITE_SHAPE}`,
     );
+  if (identity.payTo !== undefined && identity.payTo !== identity.owner)
+    output.stderr(
+      'Warning: payout is different from owner; accepted temporarily for the beta. The 8004 owner remains unchanged.\n',
+    );
   output.stdout(
     `Registering seller ${identity.nodeId} with ${urlOrigin(discovery.url)}\n`,
   );

@@ -68,11 +68,13 @@ void test('doctor: a payout on a signing key or loose payment key files fail pay
     await chmod(join(run.seller, 'authorizer.json'), 0o600);
     const rolePath = join(run.seller, 'role.json');
     const role = JSON.parse(await readFile(rolePath, 'utf8'));
-    await writeFile(rolePath, JSON.stringify({ ...role, payTo: role.owner }));
-    assert.match(
-      line((await doctor(run)).output, 'payments'),
-      /FAIL\s+payments\s+SELLER_PAYMENT_DESCRIPTION_INVALID/,
-    );
+    for (const payTo of [role.authorizer, role.facilitator]) {
+      await writeFile(rolePath, JSON.stringify({ ...role, payTo }));
+      assert.match(
+        line((await doctor(run)).output, 'payments'),
+        /FAIL\s+payments\s+SELLER_PAYMENT_DESCRIPTION_INVALID/,
+      );
+    }
   }));
 
 void test('doctor --online: missing payment token accounts warn, an unreadable RPC warns, another chain fails, offline never asks', () =>
@@ -184,5 +186,18 @@ void test('doctor --online: missing payment token accounts warn, an unreadable R
     assert.match(
       line(frozen.output, 'payments'),
       /FAIL\s+payments\s+PAYMENT_ACCOUNTS_UNUSABLE\s+a payout/,
+    );
+  }));
+
+void test('doctor accepts a paid seller whose payout is its owner', () =>
+  scenario({}, async (run) => {
+    await withOllama(run);
+    await writeFile(join(run.root, 'gyblos.toml'), paidToml(run));
+    const rolePath = join(run.seller, 'role.json');
+    const role = JSON.parse(await readFile(rolePath, 'utf8'));
+    await writeFile(rolePath, JSON.stringify({ ...role, payTo: role.owner }));
+    assert.match(
+      line((await doctor(run)).output, 'payments'),
+      /^\s*OK\s+payments/,
     );
   }));

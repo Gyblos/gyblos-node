@@ -1,5 +1,5 @@
 // CLI for isolated P2P role provisioning; it does not contact RPC, fund wallets or start the node.
-// A seller needs only --mint to sell for free.
+// A seller needs only --mint to sell for free; paid setup defaults payout to the owner.
 import { parseArgs } from 'node:util';
 
 import { isSolanaAddress } from '@gyblos/node/configuration';
