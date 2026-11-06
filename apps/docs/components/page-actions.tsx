@@ -1,8 +1,11 @@
 'use client';
 
 // Copies the complete exported article, with accessible success/failure feedback and a direct fallback.
-// Only a same-site static Markdown file is fetched; no content is sent to another service.
+// Copy fetches only same-site Markdown; the separate assistant menu hands off its canonical public URL.
 import { useState } from 'react';
+
+import { CheckIcon, CopyIcon, MarkdownIcon } from './action-icons';
+import { AssistantMenu } from './assistant-menu';
 
 export function PageActions({
   markdownUrl,
@@ -13,10 +16,12 @@ export function PageActions({
 }) {
   const [message, setMessage] = useState('');
   const [copying, setCopying] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   async function copyPage() {
     setCopying(true);
     setMessage('');
+    setCopied(false);
     try {
       if (!navigator.clipboard) throw new Error('Clipboard unavailable');
       // Start clipboard access during the click so Safari retains the user gesture.
@@ -38,7 +43,7 @@ export function PageActions({
       } else {
         await navigator.clipboard.writeText(await content);
       }
-      setMessage(spanish ? 'Página copiada' : 'Page copied');
+      setCopied(true);
     } catch {
       setMessage(
         spanish
@@ -53,19 +58,34 @@ export function PageActions({
   return (
     <div className="docs-page-actions">
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" onClick={copyPage} disabled={copying}>
+        <button
+          className="docs-action-button"
+          type="button"
+          onClick={copyPage}
+          disabled={copying}
+        >
+          {copied ? <CheckIcon /> : <CopyIcon />}
           {copying
             ? spanish
               ? 'Copiando…'
               : 'Copying…'
-            : spanish
-              ? 'Copiar página'
-              : 'Copy page'}
+            : copied
+              ? spanish
+                ? 'Copiado'
+                : 'Copied'
+              : spanish
+                ? 'Copiar página'
+                : 'Copy page'}
         </button>
-        <a href={markdownUrl}>{spanish ? 'Ver Markdown' : 'View Markdown'}</a>
+        <a className="docs-action-button" href={markdownUrl}>
+          <MarkdownIcon />
+          {spanish ? 'Ver Markdown' : 'View Markdown'}
+        </a>
+        <AssistantMenu markdownUrl={markdownUrl} spanish={spanish} />
       </div>
-      <p role="status" className="text-sm text-fd-muted-foreground">
-        {message}
+      <p role="status" className={message ? 'docs-copy-error' : 'sr-only'}>
+        {message ||
+          (copied ? (spanish ? 'Página copiada' : 'Page copied') : '')}
       </p>
     </div>
   );

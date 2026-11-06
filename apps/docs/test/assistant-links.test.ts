@@ -8,7 +8,10 @@ import { getAssistantLinks } from '@gyblos/docs/assistant-links';
 void test('assistant links open the requested products with the canonical article in the prompt', () => {
   const path = '/markdown/es/sellers/beta-guide.md';
   const links = getAssistantLinks(path, true);
-  assert.deepEqual(links.map((link) => link.name), ['ChatGPT', 'Claude', 'Claude Code', 'Cursor']);
+  assert.deepEqual(
+    links.map((link) => link.name),
+    ['ChatGPT', 'Claude', 'Claude Code', 'Cursor'],
+  );
   const expected = [
     ['https://chatgpt.com/', 'prompt'],
     ['https://claude.ai/new', 'q'],
@@ -18,11 +21,17 @@ void test('assistant links open the requested products with the canonical articl
   for (const [index, link] of links.entries()) {
     const target = new URL(link.url);
     const [endpoint, parameter] = expected[index]!;
-    assert.equal(`${target.protocol}//${target.host}${target.pathname}`, endpoint);
+    assert.equal(
+      `${target.protocol}//${target.host}${target.pathname}`,
+      endpoint,
+    );
     const prompt = target.searchParams.get(parameter!);
     assert.ok(prompt?.includes(`https://docs.gyblos.com${path}`));
     assert.ok(prompt?.startsWith('Lee '));
-    assert.doesNotMatch(link.url, /localhost|127\.0\.0\.1|folder=|repositories=|autoSubmit/);
+    assert.doesNotMatch(
+      link.url,
+      /localhost|127\.0\.0\.1|folder=|repositories=|autoSubmit/,
+    );
   }
 });
 
