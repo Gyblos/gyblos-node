@@ -1,5 +1,5 @@
 ---
-title: Identidad y datos privados
+title: Identidad
 description: Conserva el volumen del vendedor y distingue identificadores públicos de archivos privados.
 ---
 
@@ -7,7 +7,7 @@ El vendedor gratuito de Docker tiene un **NodeId** y una dirección **owner** p�
 llaves privadas distintas. Conserva la identidad persistente creada al instalar. `seller init` escribe
 configuración; no crea ni recupera esas llaves.
 
-## Dónde se guarda cada cosa
+## Almacenamiento [#dónde-se-guarda-cada-cosa]
 
 | Ubicación en la instalación suministrada        | Uso                                                                                             | Regla para compartir                                                              |
 | ----------------------------------------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
@@ -21,7 +21,7 @@ El proyecto de Compose determina los nombres de los volúmenes. Mover o renombra
 seleccionar otro proyecto y hacer que el vendedor parezca nuevo. No lo muevas, cambies el nombre del
 proyecto ni purgues sus volúmenes para resolver un problema.
 
-## Conserva la identidad al detener
+## Conserva la identidad [#conserva-la-identidad-al-detener]
 
 Usa `docker compose stop seller` para dejar de servir. `docker compose down` conserva los volúmenes con nombre.
 `docker compose down -v` los elimina y pierde las llaves del vendedor. Una invitación consumida está vinculada
@@ -36,7 +36,7 @@ El volumen también guarda estado privado de registro, incluida una llave de ass
 bytes de transacciones firmadas. Nunca compartas ese archivo ni borres su bloqueo para forzar un reintento.
 Repetir el registro puede reenviar un intento ya aprobado; sigue [la guía de registro](/es/sellers/register-publish).
 
-## Qué puedes enviar para pedir ayuda
+### Datos para soporte [#qué-puedes-enviar-para-pedir-ayuda]
 
 ```sh
 cd ~/gyblos-seller
@@ -52,7 +52,7 @@ especialmente si personalizaste la instalación.
 No envíes `seller.env`, códigos de invitación, volcados del entorno, `docker inspect`, archivos de rol, recibos,
 logs completos ni capturas de la pregunta de registro. Pide ayuda por el canal original de tu invitación.
 
-## Datos del comprador y privacidad de red
+## Privacidad [#datos-del-comprador-y-privacidad-de-red]
 
 El motor local procesa los mensajes en tu equipo. No guardes ni compartas su contenido.
 Un motor remoto también los recibe. El transporte cifrado y los relays no hacen anónimo al vendedor;

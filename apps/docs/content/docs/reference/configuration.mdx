@@ -1,12 +1,12 @@
 ---
-title: Configuration reference
+title: Configuration
 description: Seller TOML keys, defaults, environment overrides and startup restrictions.
 ---
 
 Edit `~/gyblos-seller/gyblos.toml` on the host. The supplied image mounts it read-only at
 `/config/gyblos.toml` and selects it through `GYBLOS_CONFIG`. It is read at startup; edits require recreation.
 
-## Complete free Docker configuration
+## Example [#complete-free-docker-configuration]
 
 ```toml
 version = 1
@@ -27,7 +27,7 @@ free = { daily_token_cap = 200000, per_buyer_cap = 5000 }
 This is a local free offer with publication off. Keep your existing publication choice when editing
 another setting. To change caps, use [Models and offers](/en/sellers/models-offers).
 
-## Validate before applying
+## Validate and apply [#validate-before-applying]
 
 ```sh
 cd ~/gyblos-seller
@@ -45,7 +45,7 @@ docker compose exec seller gyblos seller status
 probes dependencies. A valid file alone does not prove a model can serve. If needed, run
 `docker compose run --rm seller gyblos doctor` before recreation.
 
-## File format and defaults
+## Settings [#file-format-and-defaults]
 
 Schema version **1** requires `version = 1` and `[node] network = "devnet"`. Unknown keys fail.
 The file limit is 64 KiB. Counts must be TOML integers, not floats or quoted numbers. Mainnet is refused
@@ -71,7 +71,7 @@ Keep the Docker image's `/data` home and volume wiring. The native default home 
 relative to the working directory; changing it selects different identity state. Do not use a path change
 to repair a missing identity.
 
-## Seller capacity
+### Capacity [#seller-capacity]
 
 All `[limits]` keys are optional integers, minimum 1, file-only:
 
@@ -85,7 +85,7 @@ All `[limits]` keys are optional integers, minimum 1, file-only:
 Effective `max_connections × requests_per_minute` must not exceed `global_requests_per_minute`, including
 omitted defaults. Doctor prints effective capacity limits. These are separate from offer token quotas.
 
-## Offer fields
+### Offers [#offer-fields]
 
 The seller needs at least one `[[offers]]` entry; at most 32 are allowed. A normalized model can occur
 only once, including aliases. Every entry must pass plugin compatibility checks; at least one engine
@@ -111,7 +111,7 @@ exponents or leading zeros, up to four integer and six fractional digits after r
 **This tutorial provisions a free-only seller role.** Paid offers need separate payment-role setup on devnet;
 schema acceptance of `price` does not provision those roles or establish paid readiness.
 
-## Engine compatibility at startup
+### Engines [#engine-compatibility-at-startup]
 
 - **Ollama:** pinned Qwen3 0.6B, reasoning `off`, literal loopback root URL, no API-key variable. The supplied Docker URL is `http://127.0.0.1:11434/`. `localhost` or `host.docker.internal` can pass schema validation but fail this plugin.
 - **OpenAI-compatible:** reasoning `off`, explicit context size, HTTPS or literal loopback URL, normally ending in `/v1`. Disable reasoning upstream. A named key must be set and nonempty.
@@ -120,7 +120,7 @@ schema acceptance of `price` does not provision those roles or establish paid re
 Provider usage for other models is declared, not independently recounted by the pinned Qwen tokenizer.
 Remote providers can incur costs and receive buyer data even when your offer is free.
 
-## Environment overrides
+## Environment [#environment-overrides]
 
 For seller settings, environment overrides the file, then built-in defaults apply. The general resolver
 also has programmatic flags, but these are not general CLI options. Compose passes the container's
@@ -144,7 +144,7 @@ environment; setting a variable only in your host shell does not automatically f
 Empty home, bind and external-address variables are ignored. `[limits]`, offers and telemetry have no
 environment override. After editing `seller.env`, recreate the container to load the changes.
 
-## Secrets and errors
+## Secrets and errors [#secrets-and-errors]
 
 Use `*_env` names in TOML, never credential values. Variable names use uppercase letters, digits and
 underscores and cannot start with a digit. Keep credentials only in the private environment file;

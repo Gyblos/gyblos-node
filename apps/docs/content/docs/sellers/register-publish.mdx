@@ -1,12 +1,12 @@
 ---
-title: Register and publish
+title: Registration
 description: Distinguish running, registered and listed, then enable your seller in discovery.
 ---
 
 You need a running seller, the invitation's unused code and the same persistent identity created during
 installation. [Install first](/en/sellers/beta-guide) if the node is not ready.
 
-## Register the identity with discovery
+## Register [#register-the-identity-with-discovery]
 
 Before running the command, verify the intended `discovery.url` in `gyblos.toml` and any
 `GYBLOS_DISCOVERY_URL` override in the container environment. The default is
@@ -26,7 +26,7 @@ public NodeId. That printed line is informational; there is no confirmation paus
 `Already registered` is also a success for the same invite and identity. Registration neither changes
 `gyblos.toml` nor publishes the offer.
 
-## Complete Solana enrollment if requested
+### Solana enrollment [#complete-solana-enrollment-if-requested]
 
 If discovery reports missing enrollment, the interactive command can register your existing owner wallet
 and NodeId on **Solana devnet**, then retry discovery automatically. The owner address printed by doctor
@@ -62,7 +62,7 @@ a warning; that does not change the owner. New paid roles use owner as payout, o
 before retrying; `DISCOVERY_UNAVAILABLE` means the index could not complete the request. See
 [troubleshooting](/en/help/troubleshooting) for those errors and revoked identities.
 
-## Enable publication
+## Publication [#enable-publication]
 
 Edit the existing `[discovery]` table in `~/gyblos-seller/gyblos.toml`; do not add a duplicate table:
 
@@ -81,7 +81,7 @@ docker compose run --rm seller gyblos config validate --config /config/gyblos.to
 The first command must report `OK`. Validation checks file syntax and environment resolution; startup
 also checks whether the seller can serve the offer. If validation fails, correct the reported key before restarting.
 
-## Confirm the listing
+### Check the listing [#confirm-the-listing]
 
 After the seller starts, query discovery:
 
@@ -102,7 +102,7 @@ docker compose exec seller gyblos seller status --online
 An index listing is not an external inference test. Only ready offers are published. The index receives
 public identity, model and offer metadata; prompts are not part of this listing.
 
-## Unlist without losing your identity
+### Unlist [#unlist-without-losing-your-identity]
 
 Set `publish = false` in the same table and recreate the seller. Stopping the seller also withdraws its
 presence within two minutes. Do not delete keys to leave discovery. A listing can take time to expire.

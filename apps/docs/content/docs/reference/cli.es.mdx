@@ -1,5 +1,5 @@
 ---
-title: Referencia de CLI
+title: CLI
 description: Comandos del vendedor, opciones aceptadas, selección del archivo y códigos de salida.
 ---
 
@@ -8,7 +8,7 @@ ejecútalos desde `~/gyblos-seller` con el prefijo `docker compose exec seller`.
 Si el contenedor no está disponible, usa `docker compose run --rm seller` antes de `gyblos`.
 En un checkout nativo se usa `pnpm gyblos`; no sustituye la instalación de Docker.
 
-## Índice de comandos
+## Comandos [#índice-de-comandos]
 
 | Comando                           | Opciones aceptadas                                   | Códigos de salida                                          |
 | --------------------------------- | ---------------------------------------------------- | ---------------------------------------------------------- |
@@ -24,7 +24,9 @@ No hay comandos generales `gyblos start` ni `gyblos stop`, ni opciones generales
 `--rpc-url` o `--discovery-url` en la CLI. Usa Compose para el ciclo de vida de Docker y las
 [variables documentadas](/es/reference/configuration) para las modificaciones admitidas.
 
-## Valida la configuración montada
+## Comandos de Docker
+
+### Validación [#valida-la-configuración-montada]
 
 ```sh
 cd ~/gyblos-seller
@@ -45,7 +47,7 @@ restricciones de inicio del vendedor.
   status, register y service no aceptan `--config`.
 </Callout>
 
-## Diagnostica el inicio
+### Diagnóstico [#diagnostica-el-inicio]
 
 ```sh
 cd ~/gyblos-seller
@@ -58,7 +60,7 @@ No inicia el vendedor, genera inferencia ni escribe estado. Consulta los motores
 al proveedor configurado. Una consulta correcta no demuestra generación, margen de memoria ni integridad
 del contenido de las llaves privadas. Consulta [solución de problemas](/es/help/troubleshooting) si falla.
 
-## Estado y registro
+### Estado y registro [#estado-y-registro]
 
 ```sh
 cd ~/gyblos-seller
@@ -79,7 +81,9 @@ puede reenviar una transacción guardada ya aprobada sin otra pregunta. No cambi
 simulación o estado incierto. Consulta [Registra y publica](/es/sellers/register-publish) para conocer
 requisitos y límites de recuperación antes de ejecutarlo.
 
-## Opciones de init para un checkout nativo
+## Checkout nativo
+
+### Init [#opciones-de-init-para-un-checkout-nativo]
 
 `gyblos seller init` escribe una oferta gratuita en devnet. No instala Docker, crea llaves, descarga
 modelos ni inicia motores. En Docker edita el archivo del anfitrión: el montaje del contenedor es de solo lectura.
@@ -102,7 +106,7 @@ En terminal pregunta las opciones que faltan; los scripts usan opciones y valore
 Sin `--force` rechaza un archivo existente. Init comprueba los ajustes con una credencial de ejemplo;
 no valida la credencial real. Su puerto nativo de Ollama `11435` difiere del `11434` del instalador de Docker.
 
-## Servicios nativos en segundo plano
+### Servicios en segundo plano [#servicios-nativos-en-segundo-plano]
 
 Estos comandos usan systemd de usuario en Linux o launchd en macOS, **no Docker**. Ejecútalos con la cuenta
 vendedora, nunca como root. Install usa `2048M` de memoria por defecto, también el mínimo, y `100%` de CPU.

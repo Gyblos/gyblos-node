@@ -1,5 +1,5 @@
 ---
-title: CLI reference
+title: CLI
 description: Supported seller commands, accepted flags, configuration selection and exit codes.
 ---
 
@@ -8,7 +8,7 @@ run from `~/gyblos-seller` and prefix a command with `docker compose exec seller
 If the seller container is unavailable, use `docker compose run --rm seller` before `gyblos` instead.
 Native checkout commands use `pnpm gyblos`; they are not a replacement for the Docker installation.
 
-## Command index
+## Commands [#command-index]
 
 | Command                           | Accepted options                                     | Exit codes                                         |
 | --------------------------------- | ---------------------------------------------------- | -------------------------------------------------- |
@@ -24,7 +24,9 @@ There is no general `gyblos start` or `gyblos stop` command, or general `--home`
 `--rpc-url` or `--discovery-url` CLI flag. Use Compose for the Docker lifecycle and the
 [documented environment variables](/en/reference/configuration) for supported overrides.
 
-## Validate the mounted configuration
+## Docker commands
+
+### Validation [#validate-the-mounted-configuration]
 
 ```sh
 cd ~/gyblos-seller
@@ -45,7 +47,7 @@ all seller startup restrictions.
   init, status, register and service do not accept `--config`.
 </Callout>
 
-## Diagnose startup
+### Diagnostics [#diagnose-startup]
 
 ```sh
 cd ~/gyblos-seller
@@ -58,7 +60,7 @@ It does not start a seller, generate inference or write state. It probes loopbac
 be sent to the configured provider. A successful probe is not proof of generation, memory headroom or
 valid private-key contents. Use [troubleshooting](/en/help/troubleshooting) for failures.
 
-## Status and registration
+### Status and registration [#status-and-registration]
 
 ```sh
 cd ~/gyblos-seller
@@ -79,7 +81,9 @@ It does not change TOML or publish. `REGISTER_IDENTITY_UNAVAILABLE` reports an e
 complete; read its funding, simulation or uncertain-state hint. See [Register and publish](/en/sellers/register-publish)
 for prerequisites and recovery limits before running it.
 
-## Init flags for a native checkout
+## Native checkout
+
+### Init [#init-flags-for-a-native-checkout]
 
 `gyblos seller init` writes one free devnet offer. It does not install Docker, create keys, download
 models or start an engine. In Docker edit the host file: the container configuration mount is read-only.
@@ -102,7 +106,7 @@ On a terminal it asks for missing choices; scripted runs use flags and defaults.
 an existing file is refused. Init checks settings with a placeholder for provider credentials; it does
 not validate the actual credential. Its native Ollama port `11435` differs from the Docker installer's `11434`.
 
-## Native background services
+### Background services [#native-background-services]
 
 These commands target Linux user systemd or macOS launchd, **not Docker**. Run as the seller account,
 never root. Install defaults to `2048M` memory (also the minimum) and `100%` CPU. `--dry-run` previews
