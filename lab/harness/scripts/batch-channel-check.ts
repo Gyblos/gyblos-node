@@ -1,6 +1,7 @@
 // Lab check of one long-lived x402 batch-settlement channel on Solana: the buyer deposits once, pays
-// several requests with server-signed metered vouchers, the seller redeems them in one batch and the
-// buyer gets the unused escrow back. Official SDK pieces only (client, server, facilitator) against the
+// several requests with server-signed metered vouchers, the seller redeems them in one batch, the
+// protocol fee goes to the Gyblos treasury through the channel's committed distribution (extra.splits,
+// the monorepo's @x402/svm patch) and the buyer gets the unused escrow back. Official SDK pieces only (client, server, facilitator) against the
 // payment-channels program at CHNL…. By default it runs on a loopback validator that loads the program
 // dumped from devnet, with throwaway keys. With --devnet (founder-approved runs only) it uses the public
 // devnet RPC, checks the genesis hash, and keeps its keys in the lab home so leftover SOL is not lost;
@@ -63,6 +64,7 @@ import {
   DEVNET_TREASURY_OWNER,
   FILE_MODES,
   labLayout,
+  PROTOCOL_FEE,
   TOKEN_PROGRAM_ADDRESS,
 } from '@gyblos/config';
 
@@ -94,6 +96,7 @@ const METERED = [145n, 210n, 95n];
 // The SDK accepts 900 s to 30 days; a cooperative refund does not wait for it.
 const WITHDRAW_DELAY_SECONDS = 900;
 const MINT_SPACE = 82n;
+const BASIS_POINTS = 10_000;
 const AIRDROP_LAMPORTS = 2_000_000_000;
 const DEVNET_AIRDROP_LAMPORTS = 1_000_000_000;
 const CONFIRM_ATTEMPTS = 120;
@@ -338,9 +341,10 @@ async function main() {
   if (ON_DEVNET) await fundDevnet(funder, facilitatorKey);
   else for (const key of [funder, facilitatorKey]) await airdrop(key.address);
   const treasury = address(DEVNET_TREASURY_OWNER);
+  const gyblos = address(PROTOCOL_FEE.treasury);
   const mint = await createTestMint(
     funder,
-    [buyer.address, payTo.address, facilitatorKey.address, treasury],
+    [buyer.address, payTo.address, facilitatorKey.address, treasury, gyblos],
     buyer.address,
   );
 
@@ -375,12 +379,17 @@ async function main() {
     DEVNET,
     serverScheme,
   );
+  // payTo first with the remainder, then the protocol fee, as the patched SDK expects.
+  const splits = [
+    { recipient: payTo.address, bps: BASIS_POINTS - PROTOCOL_FEE.bps },
+    { recipient: gyblos, bps: PROTOCOL_FEE.bps },
+  ];
   const route = {
     scheme: 'batch-settlement',
     network: DEVNET,
     payTo: payTo.address,
     price: { asset: mint, amount: String(REQUEST_CEILING) },
-    extra: { tokenProgram: TOKEN_PROGRAM_ADDRESS },
+    extra: { tokenProgram: TOKEN_PROGRAM_ADDRESS, splits },
   };
   const httpServer = new x402HTTPResourceServer(resource, {
     'GET /infer': {
@@ -412,6 +421,10 @@ async function main() {
   const clientScheme = new BatchClient(buyer, {
     rpcUrl: RPC_URL,
     depositAmount: DEPOSIT,
+    // The buyer accepts only the published distribution: the seller and the Gyblos fee.
+    approveSplits: (offered) =>
+      JSON.stringify(offered) ===
+      JSON.stringify(splits.map(({ bps, recipient }) => ({ bps, recipient }))),
     serverSignedChannelsPolicy: {
       allowedOperators: [operator.address],
       allowedAssets: [
@@ -470,7 +483,7 @@ async function main() {
       asset: mint,
       payTo: payTo.address,
       maxTimeoutSeconds: 300,
-      extra: { tokenProgram: TOKEN_PROGRAM_ADDRESS },
+      extra: { tokenProgram: TOKEN_PROGRAM_ADDRESS, splits },
     },
     kind,
     [],
@@ -486,6 +499,7 @@ async function main() {
   report.afterRedemption = {
     buyer: String(await tokenBalance(buyer.address, mint)),
     payTo: String(await tokenBalance(payTo.address, mint)),
+    gyblos: String(await tokenBalance(gyblos, mint)),
     treasury: String(await tokenBalance(treasury, mint)),
   };
 
@@ -494,6 +508,7 @@ async function main() {
   const after = {
     buyer: await tokenBalance(buyer.address, mint),
     payTo: await tokenBalance(payTo.address, mint),
+    gyblos: await tokenBalance(gyblos, mint),
     treasury: await tokenBalance(treasury, mint),
     buyerSol: await solBalance(buyer.address),
     facilitatorSol: await solBalance(facilitatorKey.address),
@@ -502,6 +517,7 @@ async function main() {
     meteredTotal: String(metered),
     buyerSpent: String(before.buyer - after.buyer),
     payTo: String(after.payTo),
+    gyblosFee: String(after.gyblos),
     programTreasury: String(after.treasury),
     buyerSolSpentLamports: String(before.buyerSol - after.buyerSol),
     facilitatorSolSpentLamports: String(
