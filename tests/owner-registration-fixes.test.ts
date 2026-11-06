@@ -29,6 +29,7 @@ import {
   checkOwnerRegistration,
   IdentityError,
 } from '@gyblos/identity';
+import { OWNER_REGISTRATION_STATUS } from '@gyblos/identity/constants';
 import { ROLE_CONFIG_SCHEMA_VERSION } from '@gyblos/node/constants';
 import { sellerRegistrationOperations } from '@gyblos/node/seller-registration';
 import { openSellerRegistrationState } from '@gyblos/node/seller-registration-state';
@@ -52,14 +53,23 @@ void test('registration fix: expiry is a distinct result only after blockhash in
         blockhash: blockhash('11111111111111111111111111111111'),
       },
     };
-    assert.equal((await checkOwnerRegistration(input)).status, 'expired');
+    assert.equal(
+      (await checkOwnerRegistration(input)).status,
+      OWNER_REGISTRATION_STATUS.EXPIRED,
+    );
     assert.ok(fake.state.calls.includes('getTransaction'));
     assert.ok(fake.state.calls.includes('isBlockhashValid'));
     fake.state.blockhashValid = true;
-    assert.equal((await checkOwnerRegistration(input)).status, 'unknown');
+    assert.equal(
+      (await checkOwnerRegistration(input)).status,
+      OWNER_REGISTRATION_STATUS.UNKNOWN,
+    );
     fake.state.blockhashValid = false;
     fake.state.blockHeight = 100;
-    assert.equal((await checkOwnerRegistration(input)).status, 'unknown');
+    assert.equal(
+      (await checkOwnerRegistration(input)).status,
+      OWNER_REGISTRATION_STATUS.UNKNOWN,
+    );
   } finally {
     await fake.close();
   }
@@ -192,22 +202,40 @@ void test('registration recovery refuses partial, stale or unavailable finalized
     };
     for (const evidence of [[null, {}, null], [null], []]) {
       fake.state.batchValue = evidence;
-      assert.equal((await checkOwnerRegistration(input)).status, 'unknown');
+      assert.equal(
+        (await checkOwnerRegistration(input)).status,
+        OWNER_REGISTRATION_STATUS.UNKNOWN,
+      );
     }
     fake.state.batchValue = [null, null, null];
     fake.state.accountsContextSlot = 99;
-    assert.equal((await checkOwnerRegistration(input)).status, 'unknown');
+    assert.equal(
+      (await checkOwnerRegistration(input)).status,
+      OWNER_REGISTRATION_STATUS.UNKNOWN,
+    );
     fake.state.accountsContextSlot = 100;
     fake.state.failingMethods.add('isBlockhashValid');
-    assert.equal((await checkOwnerRegistration(input)).status, 'unknown');
+    assert.equal(
+      (await checkOwnerRegistration(input)).status,
+      OWNER_REGISTRATION_STATUS.UNKNOWN,
+    );
     fake.state.failingMethods.clear();
     fake.state.signatureStatus = { confirmationStatus: 'confirmed', err: null };
-    assert.equal((await checkOwnerRegistration(input)).status, 'unknown');
+    assert.equal(
+      (await checkOwnerRegistration(input)).status,
+      OWNER_REGISTRATION_STATUS.UNKNOWN,
+    );
     fake.state.signatureStatus = null;
     fake.state.transactionResult = { meta: { err: null } };
-    assert.equal((await checkOwnerRegistration(input)).status, 'unknown');
+    assert.equal(
+      (await checkOwnerRegistration(input)).status,
+      OWNER_REGISTRATION_STATUS.UNKNOWN,
+    );
     fake.state.transactionResult = null;
-    assert.equal((await checkOwnerRegistration(input)).status, 'expired');
+    assert.equal(
+      (await checkOwnerRegistration(input)).status,
+      OWNER_REGISTRATION_STATUS.EXPIRED,
+    );
     const accountCall = fake.state.configs.find(
       (entry) => entry.method === 'getMultipleAccounts',
     );
@@ -245,6 +273,69 @@ void test('pre-simulation estimate is reported first and cannot be lowered by a 
     assert.ok(estimate > 1_000_000n);
     assert.deepEqual(fake.state.rentQueries, [748, 332, 105]);
     assert.equal(fake.state.calls.includes('sendTransaction'), false);
+  } finally {
+    await fake.close();
+  }
+});
+
+void test(
+  'registration recovery completes on a slow RPC whose cumulative reads exceed five seconds',
+  { timeout: 15000 },
+  async () => {
+    const fake = await startFakeRpc(new Map());
+    try {
+      fake.state.blockHeight = 101;
+      fake.state.blockhashValid = false;
+      for (const method of [
+        'getGenesisHash',
+        'getSignatureStatuses',
+        'getTransaction',
+        'getEpochInfo',
+        'isBlockhashValid',
+        'getMultipleAccounts',
+      ])
+        fake.state.delayMethods.set(method, 800);
+      const started = performance.now();
+      const input = {
+        rpc: fake.rpc,
+        signature: signature(getBase58Decoder().decode(new Uint8Array(64))),
+        lastValidBlockHeight: 100n,
+        attempt: {
+          asset: (await generateKeyPairSigner()).address,
+          blockhash: blockhash('11111111111111111111111111111111'),
+        },
+      };
+      const result = await checkOwnerRegistration(input);
+      assert.equal(result.status, OWNER_REGISTRATION_STATUS.EXPIRED);
+      assert.ok(performance.now() - started > 5000);
+      assert.ok(fake.state.calls.includes('getMultipleAccounts'));
+      assert.equal(fake.state.calls.includes('sendTransaction'), false);
+    } finally {
+      await fake.close();
+    }
+  },
+);
+
+void test('registration recovery still obeys an explicit absolute deadline and rejects invalid deadlines before RPC', async () => {
+  const fake = await startFakeRpc(new Map());
+  try {
+    const input = {
+      rpc: fake.rpc,
+      signature: signature(getBase58Decoder().decode(new Uint8Array(64))),
+      lastValidBlockHeight: 100n,
+    };
+    for (const timeoutMs of [0, -1, 1.5, Infinity, 30001])
+      assert.equal(
+        (await checkOwnerRegistration({ ...input, timeoutMs })).status,
+        'unknown',
+      );
+    assert.deepEqual(fake.state.calls, []);
+    fake.state.delayMethods.set('getGenesisHash', 250);
+    assert.equal(
+      (await checkOwnerRegistration({ ...input, timeoutMs: 25 })).status,
+      'unknown',
+    );
+    assert.deepEqual(fake.state.calls, ['getGenesisHash']);
   } finally {
     await fake.close();
   }

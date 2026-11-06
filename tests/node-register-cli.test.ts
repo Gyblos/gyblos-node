@@ -330,3 +330,38 @@ void test('seller register warns without blocking an older distinct payout', () 
     assert.equal(unified.code, 0, unified.stderr);
     assert.doesNotMatch(unified.stderr, /payout.*different.*owner/i);
   }));
+
+void test('seller register shows missing SOL only for the explicit funds-required error code', () =>
+  withHome(async (home) => {
+    const { NodeError } = await import('@gyblos/node/errors');
+    const { NODE_ERROR_CODES } = await import('@gyblos/node/constants');
+    for (const code of [
+      NODE_ERROR_CODES.SELLER_REGISTRATION_STATE_UNAVAILABLE,
+      NODE_ERROR_CODES.SELLER_REGISTRATION_SIMULATION_FAILED,
+    ]) {
+      const result = await register(home, [], {
+        env: { GYBLOS_INVITE: INVITE },
+        answer: json(403, { error: 'IDENTITY_NOT_REGISTERED' }),
+        registerIdentity: async () => {
+          throw new NodeError(code, {
+            missingLamports: 1000000n,
+            requiredLamports: 2000000n,
+          });
+        },
+      });
+      assert.equal(result.code, 1);
+      assert.doesNotMatch(result.stderr, /you need .*more SOL/);
+    }
+    const missing = await register(home, [], {
+      env: { GYBLOS_INVITE: INVITE },
+      answer: json(403, { error: 'IDENTITY_NOT_REGISTERED' }),
+      registerIdentity: async () => {
+        throw new NodeError(
+          NODE_ERROR_CODES.SELLER_REGISTRATION_FUNDS_REQUIRED,
+          { missingLamports: 1000000n, requiredLamports: 2000000n },
+        );
+      },
+    });
+    assert.equal(missing.code, 1);
+    assert.match(missing.stderr, /you need 0\.001000000 more SOL/);
+  }));

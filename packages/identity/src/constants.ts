@@ -261,3 +261,7 @@ export const OWNER_REGISTRATION_COST = {
   coreBaseBytes: 80,
   coreCreateLamports: 1_500_000n,
 } as const;
+
+// Recovering a saved registration requires several serialized finalized RPC reads.
+// Keep its end-to-end deadline separate from ordinary identity resolution.
+export const OWNER_REGISTRATION_LIMITS = { checkTimeoutMs: 30_000 } as const;

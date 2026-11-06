@@ -11,7 +11,7 @@ import {
   type DiscoveryErrorCode,
   type DiscoveryFetch,
 } from '@gyblos/discovery-http';
-import { NODE_ERROR_CODES } from '@gyblos/node/constants';
+import { NODE_ERROR_CODES, type NodeErrorCode } from '@gyblos/node/constants';
 import { NodeError } from '@gyblos/node/errors';
 
 import { urlOrigin } from './cli-format';
@@ -63,7 +63,7 @@ async function inviteOf(output: SellerOutput, prompt: Prompt | undefined) {
 
 class RegistrationUnavailable extends Error {
   constructor(
-    readonly simulationFailed = false,
+    readonly code?: NodeErrorCode,
     readonly missingLamports?: bigint,
     readonly requiredLamports?: bigint,
   ) {
@@ -71,10 +71,11 @@ class RegistrationUnavailable extends Error {
   }
 }
 function registrationUnavailableHint(error: RegistrationUnavailable): string {
-  return error.missingLamports !== undefined &&
+  return error.code === NODE_ERROR_CODES.SELLER_REGISTRATION_FUNDS_REQUIRED &&
+    error.missingLamports !== undefined &&
     error.requiredLamports !== undefined
     ? `you need ${registrationSol(error.missingLamports)} more SOL for the estimated ${registrationSol(error.requiredLamports)} SOL registration; fund the owner and retry`
-    : error.simulationFailed
+    : error.code === NODE_ERROR_CODES.SELLER_REGISTRATION_SIMULATION_FAILED
       ? 'registration simulation failed; ensure the owner has SOL, then retry to estimate the cost'
       : 'registration is not confirmed; check the wallet and retry later without deleting its local state';
 }
@@ -98,8 +99,7 @@ async function registerWithIdentity(
       ready = await registerIdentity();
     } catch (cause) {
       throw new RegistrationUnavailable(
-        cause instanceof NodeError &&
-          cause.code === NODE_ERROR_CODES.SELLER_REGISTRATION_SIMULATION_FAILED,
+        cause instanceof NodeError ? cause.code : undefined,
         cause instanceof NodeError ? cause.missingLamports : undefined,
         cause instanceof NodeError ? cause.requiredLamports : undefined,
       );

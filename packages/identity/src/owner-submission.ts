@@ -21,6 +21,7 @@ import { DEVNET_GENESIS, FINALIZED_COMMITMENT } from '@gyblos/config';
 import {
   IDENTITY_RESOLUTION_LIMITS,
   LIMITS,
+  OWNER_REGISTRATION_LIMITS,
   OWNER_REGISTRATION_STATUS,
   REGISTRATION_ERROR_LIMITS,
   REGISTRATION_FINAL_FAILURES,
@@ -141,14 +142,22 @@ export async function checkOwnerRegistration(input: {
   signature: Signature;
   lastValidBlockHeight: bigint;
   attempt?: { asset: Address; blockhash: Blockhash };
+  timeoutMs?: number;
 }): Promise<OwnerRegistrationSubmission> {
   const unknown = { status: OWNER_REGISTRATION_STATUS.UNKNOWN };
   const rpc = input.rpc;
   const transactionSignature = input.signature;
   const lastValidBlockHeight = input.lastValidBlockHeight;
   const attempt = input.attempt ? { ...input.attempt } : undefined;
-  if (lastValidBlockHeight < 0n) return unknown;
-  const signal = AbortSignal.timeout(IDENTITY_RESOLUTION_LIMITS.timeoutMs);
+  const timeoutMs = input.timeoutMs ?? OWNER_REGISTRATION_LIMITS.checkTimeoutMs;
+  if (
+    lastValidBlockHeight < 0n ||
+    !Number.isSafeInteger(timeoutMs) ||
+    timeoutMs < 1 ||
+    timeoutMs > IDENTITY_RESOLUTION_LIMITS.maxTimeoutMs
+  )
+    return unknown;
+  const signal = AbortSignal.timeout(timeoutMs);
   try {
     if (
       (await bounded(
