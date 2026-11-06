@@ -72,7 +72,7 @@
     "@gyblos/runtime": "workspace:*",
     "@gyblos/telemetry-file": "workspace:*",
     "@gyblos/transport-iroh": "workspace:*",
-    "@number0/iroh": "1.1.0",
+    "@number0/iroh": "1.2.0",
     "@solana/kit": "5.1.0",
     "@x402/core": "2.29.0",
     "@x402/express": "2.29.0",
