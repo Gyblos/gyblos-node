@@ -1,5 +1,5 @@
 ---
-title: Solución de problemas
+title: Problemas
 description: Encuentra soluciones seguras para fallos de instalación, configuración, motor y descubrimiento.
 ---
 
@@ -7,7 +7,7 @@ Esta página corresponde al vendedor gratuito de Docker de tu invitación. Ejecu
 `~/gyblos-seller` o tu carpeta elegida. Lee el código exacto antes de cambiar nada. Conserva la identidad
 y los volúmenes existentes durante el diagnóstico.
 
-## Empieza por el estado del servicio
+## Diagnóstico [#empieza-por-el-estado-del-servicio]
 
 ```sh
 cd ~/gyblos-seller
@@ -29,18 +29,30 @@ docker compose run --rm seller gyblos doctor
 Doctor consulta dependencias y muestra identidad pública, códigos y consejos. Para el caso local predeterminado,
 comprueba primero Ollama. Usa `--online` solo cuando quieras añadir consultas remotas.
 
-## Errores de instalación
+## Instalación [#errores-de-instalación]
+
+### Docker
+
+| Síntoma o salida exacta                                    | Solución                                                                                                  |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `Docker is not installed` o `Docker Compose v2 is missing` | Instala Docker con el plugin de Compose v2.17 o posterior siguiendo el proceso habitual de la plataforma. |
+| `Docker is not running`                                    | Inicia Docker Desktop o el servicio autorizado de Docker y repite el instalador.                          |
+| `Docker Compose … is too old`                              | Actualiza Docker o Compose a v2.17 o posterior.                                                           |
+
+### Ollama
+
+| Síntoma o salida exacta | Solución                                                                                     |
+| ----------------------- | -------------------------------------------------------------------------------------------- |
+| `Ollama did not start`  | Revisa `docker compose logs ollama` en privado; comprueba memoria, disco y estado de Docker. |
+
+### Instalador
 
 | Síntoma o salida exacta                                       | Solución                                                                                                             |
 | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `Docker is not installed` o `Docker Compose v2 is missing`    | Instala Docker con el plugin de Compose v2.17 o posterior siguiendo el proceso habitual de la plataforma.            |
-| `Docker is not running`                                       | Inicia Docker Desktop o el servicio autorizado de Docker y repite el instalador.                                     |
-| `Docker Compose … is too old`                                 | Actualiza Docker o Compose a v2.17 o posterior.                                                                      |
 | `The relay token is empty` o `must have 32 to 512 characters` | Copia el token de la invitación sin texto adicional. No lo muestres ni lo pegues en el chat de soporte.              |
-| `Ollama did not start`                                        | Revisa `docker compose logs ollama` en privado; comprueba memoria, disco y estado de Docker.                         |
 | El instalador se detiene con `gyblos install:` o `FAIL`       | Corrige la causa indicada y repite `sh install.sh` donde lo guardaste. Se conservan archivos e identidad existentes. |
 
-## Configuración rechazada
+## Configuración [#configuración-rechazada]
 
 ```sh
 cd ~/gyblos-seller
@@ -64,25 +76,30 @@ sigue rechazando el archivo. Consulta intervalos y valores en la [referencia de 
 | `SELLER_OFFER_API_KEY_MISSING`, `SELLER_OFFER_API_KEY_UNSAFE`                                             | Los proveedores avanzados necesitan la variable correcta no vacía dentro del contenedor; usa un nombre distinto que no empiece por `GYBLOS_` ni nombre el token de relay. |
 | `MAINNET_UNSUPPORTED`, `SELLER_PAYMENT_ROLE_MISSING`                                                      | Mantén devnet y una oferta gratuita en esta instalación; pagos/mainnet no forman parte de este inicio.                                                                    |
 
-## Motor o relay no disponible
+## Conexión [#motor-o-relay-no-disponible]
+
+### Motor
 
 | Código / síntoma                                | Solución                                                                                                                   |
 | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
 | `ENGINE_UNAVAILABLE`, `ENGINE_TIMEOUT`          | Comprueba Ollama y que `qwen3:0.6b` esté descargado. Revisa sus logs en privado. Conserva la URL de loopback suministrada. |
 | El vendedor falla después de reiniciarse Ollama | Ejecuta `docker compose restart seller` y comprueba el estado; comparten espacio de red.                                   |
-| `SELLER_RELAY_OFFLINE`                          | Comprueba internet saliente y el token de la invitación. Significa que ningún relay respondió en el plazo de inicio.       |
-| `CLOCK_SKEWED`                                  | Activa sincronización horaria automática en el anfitrión; los registros fechados en el futuro pueden rechazarse.           |
+
+### Relay
+
+| Código / síntoma       | Solución                                                                                                             |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `SELLER_RELAY_OFFLINE` | Comprueba internet saliente y el token de la invitación. Significa que ningún relay respondió en el plazo de inicio. |
+| `CLOCK_SKEWED`         | Activa sincronización horaria automática en el anfitrión; los registros fechados en el futuro pueden rechazarse.     |
 
 Si solo necesitas reemplazar el token de relay, detén el vendedor, abre `seller.env` en un editor local
 privado y cambia solo el valor del token por el correcto de tu invitación. Conserva las credenciales de proveedores.
 Recrea con `docker compose up -d --force-recreate seller` para cargar el entorno cambiado. Nunca muestres
 el archivo, pongas su contenido en una línea de comando ni borres el volumen de datos.
 
-## Funciona pero no aparece publicado
+## Publicación [#funciona-pero-no-aparece-publicado]
 
-Sigue [Registra y publica](/es/sellers/register-publish): confirma registro, `publish = true`, recreación
-tras el cambio y después `seller status --online`. Comprueba que consultas el índice donde te registraste
-y que al menos una oferta esté lista.
+### Registro
 
 | Código de descubrimiento / observación | Solución o interpretación                                                                                                                                                                          |
 | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -92,28 +109,37 @@ y que al menos una oferta esté lista.
 | `DISCOVERY_NODE_REVOKED`               | Contacta con Gyblos; no generes otra identidad para saltarte la retirada.                                                                                                                          |
 | `DISCOVERY_RATE_LIMITED`               | Espera un minuto antes de repetir el registro.                                                                                                                                                     |
 | `DISCOVERY_UNAVAILABLE`                | Prueba más tarde o contacta con Gyblos. Comprueba el origen del índice antes de enviar una invitación.                                                                                             |
-| `not in the first 2000 sellers`        | Se agotó el límite de búsqueda; no demuestra ausencia.                                                                                                                                             |
-| `index unreachable`                    | Estado de publicación desconocido; resuelve conectividad antes de sacar conclusiones.                                                                                                              |
 
 Repetir el registro comprueba el estado guardado y puede reenviar la misma transacción ya aprobada
 sin otra pregunta. Conserva archivos y bloqueos. El vencimiento por sí solo no demuestra ausencia de
 transacción o comisión; un estado parcial/inconcluso necesita ayuda. Lee los [límites de recuperación
 del registro](/es/sellers/register-publish) antes de repetir. Nunca borres estado para forzar otro intento.
 
-## Solicitudes gratuitas rechazadas o sin actividad
+### Visibilidad
+
+Sigue [Registra y publica](/es/sellers/register-publish): confirma registro, `publish = true`, recreación
+tras el cambio y después `seller status --online`. Comprueba que consultas el índice donde te registraste
+y que al menos una oferta esté lista.
+
+| Código de descubrimiento / observación | Solución o interpretación                                                             |
+| -------------------------------------- | ------------------------------------------------------------------------------------- |
+| `not in the first 2000 sellers`        | Se agotó el límite de búsqueda; no demuestra ausencia.                                |
+| `index unreachable`                    | Estado de publicación desconocido; resuelve conectividad antes de sacar conclusiones. |
+
+## Solicitudes [#solicitudes-gratuitas-rechazadas-o-sin-actividad]
 
 La oferta reserva entrada más salida máxima en la admisión. Una solicitud puede superar el saldo diario
 o por comprador aunque queden tokens. La capacidad y el límite de compradores distintos también pueden
 rechazar solicitudes. Revisa [Modelos y ofertas](/es/sellers/models-offers); no reinicies para saltarte cuotas.
 Una publicación no genera demanda por sí sola y el resumen de recibos de 24 horas no es un saldo de cuotas.
 
-## Llaves ausentes, estado corrupto o bloqueos
+## Identidad y recuperación [#llaves-ausentes-estado-corrupto-o-bloqueos]
 
 Conserva el volumen y pide ayuda. No borres bloqueos de secuencia, journals, archivos de rol ni llaves para
 superar comprobaciones. No repitas setup en otro directorio de datos ni uses `docker compose down -v`.
 Aquí no se documenta una restauración completa; consulta [Identidad y datos privados](/es/sellers/identity).
 
-## Pide ayuda de forma segura
+## Pide ayuda [#pide-ayuda-de-forma-segura]
 
 Responde por el canal de tu invitación con el código relevante y estas salidas:
 

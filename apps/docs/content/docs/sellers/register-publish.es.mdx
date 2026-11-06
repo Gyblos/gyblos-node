@@ -1,12 +1,12 @@
 ---
-title: Registra y publica
+title: Registro
 description: Distingue servicio, registro y publicación, y habilita tu vendedor en descubrimiento.
 ---
 
 Necesitas un vendedor en ejecución, el código sin usar de tu invitación y la misma identidad persistente
 creada al instalar. [Instala primero](/es/sellers/beta-guide) si el nodo aún no está listo.
 
-## Registra la identidad en descubrimiento
+## Registra [#registra-la-identidad-en-descubrimiento]
 
 Antes de ejecutar el comando, verifica el `discovery.url` previsto en `gyblos.toml` y cualquier
 `GYBLOS_DISCOVERY_URL` que prevalezca en el entorno del contenedor. El valor predeterminado es
@@ -26,7 +26,7 @@ y el NodeId público. Esa línea es informativa; no hay una pausa de confirmaci�
 `Already registered` también es correcto para la misma invitación e identidad. El registro no modifica
 `gyblos.toml` ni publica la oferta.
 
-## Completa la inscripción en Solana si se solicita
+### Inscripción en Solana [#completa-la-inscripción-en-solana-si-se-solicita]
 
 Si descubrimiento indica que falta la inscripción, el comando interactivo puede registrar tu cartera
 owner existente y NodeId en **Solana devnet**, y repetir descubrimiento automáticamente. La dirección owner
@@ -63,7 +63,7 @@ eso no cambia owner. Los roles pagados nuevos usan owner como payout, fuera de e
 esperar antes de repetir; `DISCOVERY_UNAVAILABLE` indica que el índice no pudo completar la solicitud. Consulta
 [solución de problemas](/es/help/troubleshooting) para esos errores e identidades retiradas.
 
-## Activa la publicación
+## Publicación [#activa-la-publicación]
 
 Edita la tabla `[discovery]` existente en `~/gyblos-seller/gyblos.toml`; no agregues una tabla duplicada:
 
@@ -82,7 +82,7 @@ docker compose run --rm seller gyblos config validate --config /config/gyblos.to
 El primer comando debe mostrar `OK`. La validación revisa sintaxis y resolución del entorno; el inicio
 comprueba además si el vendedor puede servir la oferta. Si falla la validación, corrige la clave antes de reiniciar.
 
-## Confirma la publicación
+### Comprueba la publicación [#confirma-la-publicación]
 
 Cuando el vendedor arranque, consulta descubrimiento:
 
@@ -103,7 +103,7 @@ docker compose exec seller gyblos seller status --online
 Estar publicado no equivale a probar inferencia externa. Solo se publican ofertas listas. El índice recibe
 identidad pública, modelo y metadatos de la oferta; los mensajes no forman parte de esa publicación.
 
-## Retira la oferta sin perder tu identidad
+### Retira la oferta [#retira-la-oferta-sin-perder-tu-identidad]
 
 Pon `publish = false` en la misma tabla y recrea el vendedor. Detenerlo también retira su presencia en
 un plazo de dos minutos. No borres las llaves para salir de descubrimiento. La publicación puede tardar en vencer.

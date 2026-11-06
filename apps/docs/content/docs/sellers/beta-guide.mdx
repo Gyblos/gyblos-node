@@ -1,5 +1,5 @@
 ---
-title: Seller beta guide
+title: Quickstart
 description: Install your first free Docker seller, check it and continue to registration.
 ---
 
@@ -7,7 +7,13 @@ Use this guide after checking the [beta requirements](/en/getting-started/beta).
 Keep your invitation's relay token and invite code private. Downloading the images and model takes most
 of the installation time; the duration depends on your connection and machine.
 
-## Install the seller
+## Before you start
+
+You need an invitation with `install.sh` and a private relay token, Linux or macOS,
+Docker with Compose v2.17 or later, at least 4 GB of memory and outbound internet access.
+Check the [full requirements](/en/getting-started/beta), including memory headroom, before installing.
+
+## Install [#install-the-seller]
 
 In the folder where you saved the invitation's `install.sh`, run:
 
@@ -19,6 +25,8 @@ The relay token is hidden while you enter it. The script works in `~/gyblos-sell
 set another installation directory. It creates `compose.yaml`, `gyblos.toml` and private `seller.env`,
 downloads Ollama and `qwen3:0.6b`, creates seller keys in a Docker volume, installs the tokenizer,
 runs `gyblos doctor` and starts the seller.
+
+### Public identity
 
 When it prints `The seller is running`, continue with the status check. Save the public identity
 printed by doctor:
@@ -32,11 +40,13 @@ Seller identity (public; `gyblos seller register` enrolls it in discovery):
 These are abbreviated examples, not keys or values to copy into configuration. Discovery registration
 is separate from the on-chain enrollment that the index checks.
 
+### Installation issues
+
 If installation stops, read the `FAIL` or `gyblos install:` line and use
 [troubleshooting](/en/help/troubleshooting). Correct the cause before rerunning the script.
 Rerunning preserves existing configuration, token file and identity; it does not reset those files.
 
-## Confirm the service state
+## Check status [#confirm-the-service-state]
 
 Run commands from the installation folder:
 
@@ -53,6 +63,8 @@ docker compose exec seller gyblos seller status
 | `STOPPED`       | Run `docker compose up -d --force-recreate seller`.                       |
 | `NOT_CONFIRMED` | Check `docker compose ps`; service health could not be confirmed.         |
 
+### Diagnostics
+
 If the container is stopped or restarting, `exec` cannot work. Run the one-off diagnostic instead:
 
 ```sh
@@ -63,7 +75,7 @@ docker compose run --rm seller gyblos doctor
 Doctor success does not prove that a buyer request completed. After registration and publication,
 ask the team through your invitation channel if you need help arranging a free external check.
 
-## Finish onboarding
+## Next steps [#finish-onboarding]
 
 Your node starts **unlisted**. Follow [Register and publish](/en/sellers/register-publish) to use your
 invite and enable publication. If Solana enrollment is missing, interactive registration estimates its

@@ -1,12 +1,6 @@
 {
   "title": "Vendedores",
-  "pages": [
-    "beta-guide",
-    "register-publish",
-    "models-offers",
-    "operate",
-    "identity"
-  ],
+  "pages": ["register-publish", "models-offers", "operate", "identity"],
   "defaultOpen": true,
   "icon": "server"
 }

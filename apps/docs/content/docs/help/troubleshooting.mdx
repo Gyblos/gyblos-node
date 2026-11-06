@@ -7,7 +7,7 @@ Use this page for the free Docker seller from your invitation. Run commands from
 (or your chosen installation folder). Read the exact code before changing anything. Keep the existing
 identity and volumes throughout diagnosis.
 
-## Start with the service state
+## Diagnosis [#start-with-the-service-state]
 
 ```sh
 cd ~/gyblos-seller
@@ -29,18 +29,30 @@ docker compose run --rm seller gyblos doctor
 Doctor performs dependency probes and prints public identity, codes and hints. For the local default,
 check Ollama first. Only use `--online` when you intend additional remote probes.
 
-## Installation errors
+## Installation [#installation-errors]
+
+### Docker
+
+| Symptom or exact output                                     | Remedy                                                                                                    |
+| ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `Docker is not installed` or `Docker Compose v2 is missing` | Install Docker with the Compose plugin, v2.17 or later, using the platform's normal installation process. |
+| `Docker is not running`                                     | Start Docker Desktop or the authorized Docker service, then retry the installer.                          |
+| `Docker Compose … is too old`                               | Update Docker or Compose to v2.17 or later.                                                               |
+
+### Ollama
+
+| Symptom or exact output | Remedy                                                                                |
+| ----------------------- | ------------------------------------------------------------------------------------- |
+| `Ollama did not start`  | Inspect `docker compose logs ollama` privately; check memory, disk and Docker health. |
+
+### Installer
 
 | Symptom or exact output                                        | Remedy                                                                                                             |
 | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `Docker is not installed` or `Docker Compose v2 is missing`    | Install Docker with the Compose plugin, v2.17 or later, using the platform's normal installation process.          |
-| `Docker is not running`                                        | Start Docker Desktop or the authorized Docker service, then retry the installer.                                   |
-| `Docker Compose … is too old`                                  | Update Docker or Compose to v2.17 or later.                                                                        |
 | `The relay token is empty` or `must have 32 to 512 characters` | Copy the invitation's relay token without surrounding text. Do not show or paste it into support chat.             |
-| `Ollama did not start`                                         | Inspect `docker compose logs ollama` privately; check memory, disk and Docker health.                              |
 | Installer stops with `gyblos install:` or `FAIL`               | Correct the named cause, then rerun `sh install.sh` where you saved it. Existing files and identity are preserved. |
 
-## Configuration rejected
+## Configuration [#configuration-rejected]
 
 ```sh
 cd ~/gyblos-seller
@@ -64,25 +76,30 @@ refuses the file. See the [configuration reference](/en/reference/configuration)
 | `SELLER_OFFER_API_KEY_MISSING`, `SELLER_OFFER_API_KEY_UNSAFE`                                             | Advanced providers need the correct nonempty variable inside the container; use a separate name that does not begin `GYBLOS_` or name the relay token. |
 | `MAINNET_UNSUPPORTED`, `SELLER_PAYMENT_ROLE_MISSING`                                                      | Keep this installation on devnet with a free offer; paid/mainnet setup is not part of this onboarding.                                                 |
 
-## Engine or relay unavailable
+## Connection [#engine-or-relay-unavailable]
+
+### Engine
 
 | Code / symptom                         | Remedy                                                                                                                                 |
 | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | `ENGINE_UNAVAILABLE`, `ENGINE_TIMEOUT` | Check Ollama service health and that `qwen3:0.6b` is downloaded. Inspect Ollama logs privately. Keep the supplied loopback engine URL. |
 | Seller fails after Ollama restarted    | Run `docker compose restart seller`, then check status; both share a network namespace.                                                |
-| `SELLER_RELAY_OFFLINE`                 | Check outbound internet access and whether the invitation token is correct. This means no relay answered in the startup window.        |
-| `CLOCK_SKEWED`                         | Enable automatic time synchronization on the host; future-dated records can be rejected.                                               |
+
+### Relay
+
+| Code / symptom         | Remedy                                                                                                                          |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `SELLER_RELAY_OFFLINE` | Check outbound internet access and whether the invitation token is correct. This means no relay answered in the startup window. |
+| `CLOCK_SKEWED`         | Enable automatic time synchronization on the host; future-dated records can be rejected.                                        |
 
 If only the relay token needs replacement, stop the seller, open `seller.env` in a private local editor
 and replace only the token value with the invitation's correct value. Preserve any provider credentials.
 Recreate with `docker compose up -d --force-recreate seller` to load the changed environment. Never print
 the file, put its contents on a command line or delete the data volume.
 
-## Running but not listed
+## Publication [#running-but-not-listed]
 
-Work through [Register and publish](/en/sellers/register-publish): confirm registration, `publish = true`,
-recreation after the edit, then `seller status --online`. Confirm that you are querying the same index
-where you registered and that at least one offer is ready.
+### Registration
 
 | Discovery code / observation        | Remedy or interpretation                                                                                                                                                                             |
 | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -92,28 +109,37 @@ where you registered and that at least one offer is ready.
 | `DISCOVERY_NODE_REVOKED`            | Contact Gyblos; do not generate another identity to bypass removal.                                                                                                                                  |
 | `DISCOVERY_RATE_LIMITED`            | Wait a minute before retrying registration.                                                                                                                                                          |
 | `DISCOVERY_UNAVAILABLE`             | Try later or contact Gyblos. Check the configured index origin before submitting an invite.                                                                                                          |
-| `not in the first 2000 sellers`     | Search budget exhausted; not proof that you are absent.                                                                                                                                              |
-| `index unreachable`                 | Listing state is unknown; resolve connectivity before drawing conclusions.                                                                                                                           |
 
 A registration rerun checks saved state and may resend the same previously approved transaction
 without a new prompt. Preserve all files and locks. Expiry alone does not prove no transaction or fee;
 partial/inconclusive state needs help. Read [registration recovery limits](/en/sellers/register-publish)
 before repeating the command. Never clear state to force another attempt.
 
-## Free requests refused or no activity
+### Visibility
+
+Work through [Register and publish](/en/sellers/register-publish): confirm registration, `publish = true`,
+recreation after the edit, then `seller status --online`. Confirm that you are querying the same index
+where you registered and that at least one offer is ready.
+
+| Discovery code / observation    | Remedy or interpretation                                                   |
+| ------------------------------- | -------------------------------------------------------------------------- |
+| `not in the first 2000 sellers` | Search budget exhausted; not proof that you are absent.                    |
+| `index unreachable`             | Listing state is unknown; resolve connectivity before drawing conclusions. |
+
+## Requests [#free-requests-refused-or-no-activity]
 
 The offer reserves input plus maximum output at admission. A request may exceed the remaining daily
 or per-buyer allowance even if some tokens remain. Capacity and distinct-buyer limits can also refuse
 requests. Review [Models and offers](/en/sellers/models-offers); do not restart to bypass limits.
 A listing alone does not create demand, and a 24-hour receipt summary is not a quota balance.
 
-## Missing keys, corrupt state or locks
+## Identity and recovery [#missing-keys-corrupt-state-or-locks]
 
 Preserve the volume and ask for help. Do not delete a sequence lock, journal, role file or keys to make
 checks pass. Do not rerun setup into another home or use `docker compose down -v`. No complete seller
 restore is documented here; see [Identity and private data](/en/sellers/identity).
 
-## Ask for help safely
+## Ask for help [#ask-for-help-safely]
 
 Reply through the invitation channel with the relevant error code and these outputs:
 

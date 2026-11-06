@@ -1,5 +1,5 @@
 ---
-title: Identity and private data
+title: Identity
 description: Preserve the seller volume and know which identifiers and diagnostics are safe to share.
 ---
 
@@ -7,7 +7,7 @@ The free Docker seller has a public **NodeId** and **owner** address, backed by 
 Keep the persistent identity created during installation. `seller init` writes configuration; it does
 not create or recover these keys.
 
-## What lives where
+## Storage [#what-lives-where]
 
 | Location in the supplied installation  | Purpose                                                                                         | Sharing rule                                                    |
 | -------------------------------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
@@ -21,7 +21,7 @@ The Compose project determines the volume names. Moving or renaming the installa
 project and make the seller look newly installed. Do not move it, change the project name or prune its
 volumes as a troubleshooting step.
 
-## Preserve identity when stopping
+## Preserve identity [#preserve-identity-when-stopping]
 
 Use `docker compose stop seller` to stop serving. `docker compose down` preserves named volumes.
 `docker compose down -v` deletes them and loses the seller keys. A consumed invite is tied to the
@@ -36,7 +36,7 @@ The volume also holds private registration state, including an asset key and pot
 transaction bytes. Never share that file or clear its lock to force a retry. A registration rerun may
 resend an existing approved attempt; follow [the registration guide](/en/sellers/register-publish).
 
-## Information you can send for support
+### Support data [#information-you-can-send-for-support]
 
 ```sh
 cd ~/gyblos-seller
@@ -51,7 +51,7 @@ and send the relevant code. Read the output before sharing, especially if your s
 Do not send `seller.env`, invitation codes, environment dumps, `docker inspect`, role files, receipts,
 raw logs or screenshots of the registration prompt. Use the original invitation channel to ask for help.
 
-## Buyer data and network privacy
+## Privacy [#buyer-data-and-network-privacy]
 
 A local engine processes buyer messages on your machine. Do not store or share their contents.
 A remote engine also receives them. Encrypted transport and relays do not make the seller anonymous;
