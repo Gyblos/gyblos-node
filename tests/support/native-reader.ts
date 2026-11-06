@@ -14,14 +14,13 @@ import type {
 import { GYBLOS_ALPN } from '@gyblos/protocol/constants';
 import { isMain } from '@gyblos/runtime';
 
-import { bytes, endpoint, within } from './native-fixture';
 import {
   READER_ACTIONS,
   READER_STARTUP,
   type ReaderAction,
 } from './native-reader-constants';
 import { waitForReaderReady } from './native-reader-ready';
-import { NATIVE_CAPABILITY } from './native-runtime';
+import { within } from './test-deadline';
 
 interface ReaderRequest {
   id: number;
@@ -50,6 +49,8 @@ function isReply(value: unknown): value is ReaderReply {
 }
 
 async function readerMain() {
+  const { bytes, endpoint } = await import('./native-fixture');
+  const { NATIVE_CAPABILITY } = await import('./native-runtime');
   assert.ok(process.send && NATIVE_CAPABILITY.sdk);
   const { EndpointAddr, EndpointId } = NATIVE_CAPABILITY.sdk;
   let client: Endpoint | undefined;

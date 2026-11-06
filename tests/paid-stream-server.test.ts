@@ -25,9 +25,9 @@ import {
   type PaidExecutionService,
 } from '@gyblos/transport-iroh/paid-server';
 
-import { within } from './support/native-fixture';
-import { stalledTestWriter } from './support/test-stalled-writer';
 import { CHARGE, request, RESULT, settled } from './support/paid-fixture';
+import { within } from './support/test-deadline';
+import { stalledTestWriter } from './support/test-stalled-writer';
 
 async function fixture(frame?: Uint8Array) {
   const paid = await request();
@@ -258,7 +258,9 @@ void test(
     const value = await fixture();
     const writer = stalledTestWriter();
     let stopped = () => {};
-    const closing = new Promise<void>((resolve) => { stopped = resolve; });
+    const closing = new Promise<void>((resolve) => {
+      stopped = resolve;
+    });
     value.stream.send.writeAll = writer.writeAll;
     const running = servePaidExecutionStream(
       value.stream,

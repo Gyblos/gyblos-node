@@ -1,8 +1,8 @@
-// An owned synthetic writer must remember cleanup even if its first write starts later.
+// Creates the blocked write before execution so cleanup also releases any write that starts later.
 export function stalledTestWriter() {
   let release = () => {};
-  return {
-    writeAll: () => new Promise<void>((resolve) => { release = resolve; }),
-    release: () => release(),
-  };
+  const pending = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  return { writeAll: () => pending, release };
 }

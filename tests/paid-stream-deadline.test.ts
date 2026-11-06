@@ -12,8 +12,8 @@ import {
 } from '@gyblos/transport-iroh/paid-server';
 
 import { CHARGE, request, RESULT, settled } from './support/paid-fixture';
-import { stalledTestWriter } from './support/test-stalled-writer';
 import { waitForTestAbort } from './support/test-abort';
+import { stalledTestWriter } from './support/test-stalled-writer';
 
 async function fixture() {
   const paid = await request();
@@ -177,28 +177,70 @@ void test(
   },
 );
 
-void test('cleanup before a delayed digest remembers release for the late synthetic writer', { timeout: 15000 }, async (context) => {
-  const value = await fixture();
-  const digest = crypto.subtle.digest.bind(crypto.subtle);
-  let reached = () => {};
-  let releaseDigest = () => {};
-  let wrote = () => {};
-  const hashing = new Promise<void>((resolve) => { reached = resolve; });
-  const released = new Promise<void>((resolve) => { releaseDigest = resolve; });
-  const writing = new Promise<void>((resolve) => { wrote = resolve; });
-  context.mock.method(crypto.subtle, 'digest', async (...args: Parameters<SubtleCrypto['digest']>) => { reached(); await released; return digest(...args); });
-  context.mock.timers.enable({ apis: ['setTimeout'] });
-  const writer = stalledTestWriter();
-  value.stream.send.writeAll = async () => { value.counts.writes++; wrote(); await writer.writeAll(); };
-  const controller = new AbortController();
-  const service: PaidExecutionService = { stream: async () => value.terminal };
-  const running = servePaidExecutionStream(value.stream, service, 'synthetic', value.close, controller.signal, value.enter);
-  try {
-    await hashing;
-    writer.release();
-    releaseDigest();
-    await writing;
-    assert.equal(await Promise.race([running.then(() => true), yieldTurn().then(() => false)]), true);
-    assert.deepEqual(value.counts, { closed: 0, released: 1, writes: 1 });
-  } finally { writer.release(); releaseDigest(); controller.abort(); await running; }
-});
+void test(
+  'cleanup before a delayed digest remembers release for the late synthetic writer',
+  { timeout: 15000 },
+  async (context) => {
+    const value = await fixture();
+    const digest = crypto.subtle.digest.bind(crypto.subtle);
+    let reached = () => {};
+    let releaseDigest = () => {};
+    let wrote = () => {};
+    const hashing = new Promise<void>((resolve) => {
+      reached = resolve;
+    });
+    const released = new Promise<void>((resolve) => {
+      releaseDigest = resolve;
+    });
+    const writing = new Promise<void>((resolve) => {
+      wrote = resolve;
+    });
+    context.mock.method(
+      crypto.subtle,
+      'digest',
+      async (...args: Parameters<SubtleCrypto['digest']>) => {
+        reached();
+        await released;
+        return digest(...args);
+      },
+    );
+    context.mock.timers.enable({ apis: ['setTimeout'] });
+    const writer = stalledTestWriter();
+    value.stream.send.writeAll = async () => {
+      value.counts.writes++;
+      wrote();
+      await writer.writeAll();
+    };
+    const controller = new AbortController();
+    const service: PaidExecutionService = {
+      stream: async () => value.terminal,
+    };
+    const running = servePaidExecutionStream(
+      value.stream,
+      service,
+      'synthetic',
+      value.close,
+      controller.signal,
+      value.enter,
+    );
+    try {
+      await hashing;
+      writer.release();
+      releaseDigest();
+      await writing;
+      assert.equal(
+        await Promise.race([
+          running.then(() => true),
+          yieldTurn().then(() => false),
+        ]),
+        true,
+      );
+      assert.deepEqual(value.counts, { closed: 0, released: 1, writes: 1 });
+    } finally {
+      writer.release();
+      releaseDigest();
+      controller.abort();
+      await running;
+    }
+  },
+);

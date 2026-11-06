@@ -9,7 +9,13 @@ import { promisify } from 'node:util';
 
 void test('synthetic reader and deadline fixtures import without native socket setup', async () => {
   const root = await mkdtemp(join(tmpdir(), 'gyblos-pure-fixtures-'));
-  const modules = ['native-reader', 'native-reader-ready', 'test-deadline', 'test-abort', 'test-stalled-writer'].map((name) => new URL(`./support/${name}.ts`, import.meta.url).href);
+  const modules = [
+    'native-reader',
+    'native-reader-ready',
+    'test-deadline',
+    'test-abort',
+    'test-stalled-writer',
+  ].map((name) => new URL(`./support/${name}.ts`, import.meta.url).href);
   const script = `
     import dgram from 'node:dgram';
     import { syncBuiltinESMExports } from 'node:module';
@@ -19,10 +25,27 @@ void test('synthetic reader and deadline fixtures import without native socket s
     console.log('pure');
   `;
   try {
-    const output = await promisify(execFile)(process.execPath, ['--import', import.meta.resolve('tsx'), '--input-type=module', '--eval', script], {
-      cwd: root, timeout: 10000,
-      env: { PATH: process.env.PATH, GYBLOS_HOME: join(root, 'product'), GYBLOS_LAB_HOME: join(root, 'lab') },
-    });
+    const output = await promisify(execFile)(
+      process.execPath,
+      [
+        '--import',
+        import.meta.resolve('tsx'),
+        '--input-type=module',
+        '--eval',
+        script,
+      ],
+      {
+        cwd: root,
+        timeout: 10000,
+        env: {
+          PATH: process.env.PATH,
+          GYBLOS_HOME: join(root, 'product'),
+          GYBLOS_LAB_HOME: join(root, 'lab'),
+        },
+      },
+    );
     assert.equal(output.stdout.trim(), 'pure');
-  } finally { await rm(root, { recursive: true, force: true }); }
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });

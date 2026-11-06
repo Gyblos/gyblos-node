@@ -167,14 +167,18 @@ controls only its drain timer while exercising real private writes. Separate
 cases advance that timer to verify timeout health; real private-log timeout
 coverage remains enabled.
 
-The owned unread Iroh child announces READY after installing IPC. Its startup
-has a separate bounded wait; CONNECT keeps its original budget, and native
-egress timing begins only after preparation. Missing readiness, early exit and
-late messages are covered without sockets; the native egress test still checks
-the product deadline, connection closure and admission-slot release.
+Synthetic watchdog and reader-controller imports do not load Iroh or probe
+sockets. The owned unread Iroh child loads native setup only in its entry
+function and announces READY after installing IPC. Its startup has a separate
+bounded wait; CONNECT keeps its original budget, and native egress timing begins
+only after preparation. Missing readiness, early exit and late messages are
+covered without sockets; the native egress test still checks the product
+deadline, connection closure and admission-slot release.
 
 Synthetic paid-service deadline tests coordinate entry and digest completion
 before advancing their clock. Their abort wait accepts cancellation that already
-happened. Test watchdogs and cleanup release blocked fake operations so a failed
+happened. Test watchdogs use a pure, mockable timer; boundary cases assert
+before and at the original deadline. Cleanup releases a stable blocked-write
+promise even if preparation has not reached the writer yet, so a failed
 assertion cannot strand the test worker or erase the lease-retention assertion.
 These fixtures do not change product transport, payment or logging limits.

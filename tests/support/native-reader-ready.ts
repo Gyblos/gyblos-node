@@ -1,8 +1,8 @@
 // Waits for an owned test child's readiness; startup time never consumes a transport command's budget.
 import type { ChildProcess } from 'node:child_process';
 
-import { NativeTestDeadlineError } from './native-fixture';
 import { READER_STARTUP } from './native-reader-constants';
+import { NativeTestDeadlineError } from './test-deadline';
 
 export function waitForReaderReady(child: ChildProcess): Promise<void> {
   return new Promise((resolve, reject) => {
