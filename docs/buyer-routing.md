@@ -17,6 +17,16 @@ signed quote reach the chosen executor; neither executor selects again. The
 existing selection policy still chooses sellers; routing adds no free-first
 preference or reasoning downgrade.
 
+A `request.maxAtomic` of `"0"` only admits free listings. When automatic
+selection finds a seller offering the requested model at an acceptable reasoning
+level but every such listing is priced above `request.maxAtomic` or
+`priceCeilings`, it fails with `SELLER_PRICE_ABOVE_BUDGET` before any quote is
+requested; raise those limits in `selection.json` to buy from it with
+`pnpm buyer` (the free-only `pnpm buyer:free` always uses a zero budget). A
+pinned seller that fails on price still reports `PINNED_SELLER_REJECTED`.
+`NO_SELLER_CANDIDATES` means no eligible seller offers the model, whatever the
+budget.
+
 Free execution does not load the payment signer, paid tokenizer or payment RPC,
 and does not create a payment journal, authorization, deposit or settlement. The
 buyer checks existing payment state read-only: an unresolved signed payment,

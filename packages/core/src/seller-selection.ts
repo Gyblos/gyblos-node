@@ -97,20 +97,22 @@ function passesSellerFilters(
     request.retention.includes(seller.catalog.dataPolicy.retention)
   );
 }
-// A paid budget must cover at least one input plus one output token at the listed prices.
 function passesListingFilters(listing: PublicModelV2, request: SellerRequest) {
   const { pricing } = listing;
-  if (
-    !isAtomic(pricing.inputAtomicPerMtok) ||
-    !isAtomic(pricing.outputAtomicPerMtok)
-  )
-    return false;
+  return (
+    isAtomic(pricing.inputAtomicPerMtok) &&
+    isAtomic(pricing.outputAtomicPerMtok) &&
+    pricing.network === request.network &&
+    pricing.asset === request.asset &&
+    listing.contextTokens >= request.maxTokens
+  );
+}
+// A paid budget must cover at least one input plus one output token at the listed prices.
+function withinBudget(listing: PublicModelV2, request: SellerRequest) {
+  const { pricing } = listing;
   const input = BigInt(pricing.inputAtomicPerMtok);
   const output = BigInt(pricing.outputAtomicPerMtok);
   return (
-    pricing.network === request.network &&
-    pricing.asset === request.asset &&
-    listing.contextTokens >= request.maxTokens &&
     input <= BigInt(request.priceCeilings.inputAtomicPerMtok) &&
     output <= BigInt(request.priceCeilings.outputAtomicPerMtok) &&
     (isFree(listing) ||
@@ -132,9 +134,9 @@ function findListing(catalog: PublicCatalogV2, selection: ModelSelection) {
       item.quantization === selection.quantization,
   );
 }
-// Every hard filter except the reasoning level, which decides tiers and the unsupported-level code.
-// The pinned path checks cooldown itself so it can report when the seller returns.
-function eligible(
+// Every hard filter except price and the reasoning level, which decides tiers and the
+// unsupported-level code. The pinned path checks cooldown itself so it can report when the seller returns.
+function offersModel(
   input: SellerSelectionInput,
   seller: KnownSeller,
   honorCooldown = true,
@@ -146,6 +148,16 @@ function eligible(
   if (!listing || !passesListingFilters(listing, input.request)) return;
   const entry: Eligible = { seller, listing, stats };
   return entry;
+}
+function eligible(
+  input: SellerSelectionInput,
+  seller: KnownSeller,
+  honorCooldown = true,
+) {
+  const entry = offersModel(input, seller, honorCooldown);
+  return entry && withinBudget(entry.listing, input.request)
+    ? entry
+    : undefined;
 }
 // Levels to try in order: the exact one, then each permitted lower level, closest first.
 function acceptableLevels(request: SellerRequest) {
@@ -219,10 +231,19 @@ function selectAutomatic(
     candidates.push(...picked);
   }
   if (candidates.length) return { ok: true, candidates };
+  if (pool.length)
+    return { ok: false, code: SELLER_SELECTION_CODES.LEVEL_UNSUPPORTED };
+  // Only a listing at an acceptable reasoning level counts, so raising the budget would admit it.
+  const levels = acceptableLevels(input.request);
+  const priced = input.sellers.some((seller) =>
+    offersModel(input, seller)?.listing.reasoning.some((level) =>
+      levels.includes(level),
+    ),
+  );
   return {
     ok: false,
-    code: pool.length
-      ? SELLER_SELECTION_CODES.LEVEL_UNSUPPORTED
+    code: priced
+      ? SELLER_SELECTION_CODES.PRICE_ABOVE_BUDGET
       : SELLER_SELECTION_CODES.NO_CANDIDATES,
   };
 }
