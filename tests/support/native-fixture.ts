@@ -3,7 +3,6 @@
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { createServer } from 'node:http';
-import { setTimeout as delay } from 'node:timers/promises';
 
 import type { Connection, Endpoint, EndpointAddr } from '@number0/iroh';
 
@@ -18,19 +17,15 @@ import { serveIroh } from '@gyblos/transport-iroh/iroh-server';
 import { decodeResponse, encodeRequest } from '@gyblos/transport-iroh/wire';
 
 import { NATIVE_CAPABILITY } from './native-runtime';
+import { within } from './test-deadline';
+
+export { NativeTestDeadlineError, within } from './test-deadline';
 
 interface FixtureOptions {
   freeBody?: Buffer;
   holdFirstFreeResponse?: boolean;
   freeStatus?: number;
   dropPaidResponse?: boolean;
-}
-
-export class NativeTestDeadlineError extends Error {
-  constructor() {
-    super('Synthetic native test deadline exceeded');
-    this.name = 'NativeTestDeadlineError';
-  }
 }
 
 export async function endpoint(secret?: number[]) {
@@ -57,20 +52,6 @@ export const fixtureRequest = (
   headers: { 'content-type': 'application/json' },
   body: Buffer.from(JSON.stringify({ requestId })),
 });
-
-export async function within<T>(operation: Promise<T>, milliseconds = 3500) {
-  const controller = new AbortController();
-  try {
-    return await Promise.race([
-      operation,
-      delay(milliseconds, undefined, { signal: controller.signal }).then(() => {
-        throw new NativeTestDeadlineError();
-      }),
-    ]);
-  } finally {
-    controller.abort();
-  }
-}
 
 export async function fixture({
   freeStatus = HTTP_STATUS.paymentRequired,
