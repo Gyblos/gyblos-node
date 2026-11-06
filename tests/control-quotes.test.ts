@@ -389,3 +389,13 @@ void test('paid v2 quotes permit the owner as payout when payment signers are se
   assert.equal(signed.offer.payTo, paid.context.owner);
   await acceptControlQuote(signed, paid.request, paid.trust());
 });
+
+void test('paid quote refuses payout as authorizer independently of the fee payer', async () => {
+  const paid = await controlFixture();
+  paid.context.authorizer = paid.context.payTo;
+  paid.context.feePayer = (await generateKeyPairSigner()).address;
+  await assert.rejects(
+    createControlQuote(paid.request, paid.context, paid.ownerSigner),
+    { code: CONTROL_CODES.POLICY },
+  );
+});

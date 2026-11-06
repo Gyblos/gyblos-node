@@ -62,13 +62,10 @@ async function buildRegistration(
     onEstimate,
   }).catch((error: unknown) => {
     if (error instanceof OwnerRegistrationFundsError)
-      throw new NodeError(
-        NODE_ERROR_CODES.SELLER_REGISTRATION_INSUFFICIENT_FUNDS,
-        {
-          requiredLamports: error.estimatedTotalLamports,
-          missingLamports: error.missingLamports,
-        },
-      );
+      throw new NodeError(NODE_ERROR_CODES.SELLER_REGISTRATION_FUNDS_REQUIRED, {
+        requiredLamports: error.estimatedTotalLamports,
+        missingLamports: error.missingLamports,
+      });
     if (
       error instanceof IdentityError &&
       error.code === IDENTITY_ERROR_CODES.SIMULATION_FAILED

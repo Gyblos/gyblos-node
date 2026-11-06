@@ -12,6 +12,7 @@ import { CONFIG_ASSET_LABELS } from '@gyblos/config/constants';
 import {
   buildOwnerRegistration,
   prepareOwnerRegistration,
+  type OwnerRegistrationSubmission,
 } from '@gyblos/identity';
 import {
   OWNER_REGISTRATION_STATUS,
@@ -50,7 +51,7 @@ void test('lost registration reply can resend only the identical signed attempt'
   let builds = 0;
   let checks = 0;
   const sentWires: string[] = [];
-  let checkStatus: 'unknown' | 'failed' | 'expired' =
+  let checkStatus: OwnerRegistrationSubmission['status'] =
     OWNER_REGISTRATION_STATUS.UNKNOWN;
   const assets: string[] = [];
   const operations = {

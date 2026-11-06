@@ -1,12 +1,6 @@
 // Stores one seller-funded 8004 registration under a private, role-scoped process lock.
 // Never sends transactions or prints the retained asset key or signed bytes.
-import {
-  createKeyPairSignerFromBytes,
-  getBase64EncodedWireTransaction,
-  getBase64Encoder,
-  getTransactionDecoder,
-  signature,
-} from '@solana/kit';
+import { createKeyPairSignerFromBytes, signature } from '@solana/kit';
 
 import { KEY_LIMITS } from '@gyblos/config';
 import {
@@ -92,11 +86,7 @@ async function parse(
       fail();
     await verifyPreparedOwnerRegistration(
       {
-        wire: getBase64EncodedWireTransaction(
-          getTransactionDecoder().decode(
-            getBase64Encoder().encode(pending.wire),
-          ),
-        ),
+        wire: pending.wire,
         signature: signature(pending.signature),
         lastValidBlockHeight: BigInt(pending.lastValidBlockHeight),
       },

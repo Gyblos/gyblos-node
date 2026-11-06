@@ -34,7 +34,7 @@ type RegistrationMessage = ReturnType<
 >;
 async function restoreMessage(
   message: RegistrationMessage,
-  prepared: PreparedOwnerRegistration,
+  prepared: Pick<PreparedOwnerRegistration, 'lastValidBlockHeight'>,
   expected: { owner: string; asset: string; nodeId: string },
 ) {
   const metadata = new ByteReader(
@@ -90,7 +90,7 @@ async function restoreMessage(
 }
 
 export async function verifyPreparedOwnerRegistration(
-  prepared: PreparedOwnerRegistration,
+  prepared: Omit<PreparedOwnerRegistration, 'wire'> & { wire: string },
   expected: { owner: string; asset: string; nodeId: string },
 ): Promise<void> {
   try {

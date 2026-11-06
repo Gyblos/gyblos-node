@@ -1,9 +1,14 @@
 // Authenticates saved registration bytes with synthetic keys, including malicious but validly signed messages.
 // No private state, RPC outside loopback, chain transactions or replacement signatures are used in verification.
 import assert from 'node:assert/strict';
+import { generateKeyPairSync } from 'node:crypto';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
 
 import {
+  createKeyPairSignerFromBytes,
   generateKeyPairSigner,
   getBase64EncodedWireTransaction,
   getSignatureFromTransaction,
@@ -19,6 +24,7 @@ import {
   verifyPreparedOwnerRegistration,
 } from '@gyblos/identity';
 import { PROGRAMS, REGISTRATION_DEFAULTS } from '@gyblos/identity/constants';
+import { openSellerRegistrationState } from '@gyblos/node/seller-registration-state';
 
 import { fixedSigner } from './support/identity-fixture';
 import { startFakeRpc } from './support/identity-rpc-fake';
@@ -136,5 +142,59 @@ void test('saved registration verifies both signatures and the canonical instruc
     assert.equal(fake.state.calls.includes('sendTransaction'), false);
   } finally {
     await fake.close();
+  }
+});
+
+void test('registration state rejects noncanonical saved wire before it can be normalized for resend', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'gyb-register-raw-wire-'));
+  const fake = await startFakeRpc(new Map(), {
+    ownerBalance: 100_000_000,
+    ownerAfterProbe: 87_475_360,
+    fee: 20_000,
+  });
+  const owner = await generateKeyPairSigner();
+  const key = generateKeyPairSync('ed25519').privateKey.export({
+    format: 'jwk',
+  });
+  assert.ok(key.d && key.x);
+  const secret = [
+    ...Buffer.from(key.d, 'base64url'),
+    ...Buffer.from(key.x, 'base64url'),
+  ];
+  const asset = await createKeyPairSignerFromBytes(Uint8Array.from(secret));
+  const built = await buildOwnerRegistration({
+    rpc: fake.rpc,
+    owner,
+    asset,
+    node: await fixedSigner(1),
+    agentUri: REGISTRATION_DEFAULTS.agentUri,
+    bindingSequence: 1n,
+  });
+  const prepared = await prepareOwnerRegistration(built);
+  const state = await openSellerRegistrationState(
+    { GYBLOS_HOME: root },
+    { owner: owner.address, nodeId: built.nodeId },
+  );
+  try {
+    await state.create(secret);
+    await state.savePrepared(prepared);
+    const path = join(root, 'seller', 'registration-8004-v1.json');
+    const original = await readFile(path, 'utf8');
+    for (const wire of [
+      prepared.wire + '=',
+      Buffer.concat([
+        Buffer.from(prepared.wire, 'base64'),
+        Buffer.of(0),
+      ]).toString('base64'),
+    ]) {
+      await writeFile(path, original.replace(prepared.wire, wire), {
+        mode: 0o600,
+      });
+      await assert.rejects(state.read());
+    }
+  } finally {
+    await state.close();
+    await fake.close();
+    await rm(root, { recursive: true, force: true });
   }
 });
