@@ -31,7 +31,7 @@ void test('registration result requires finalized status and searches transactio
     assert.deepEqual(call?.params[1], { searchTransactionHistory: true });
     fake.state.signatureStatus = {
       confirmationStatus: 'finalized',
-      err: { InstructionError: [0, 'Custom'] },
+      err: { InstructionError: [0, { Custom: 1 }] },
     };
     assert.equal(
       (
@@ -43,6 +43,28 @@ void test('registration result requires finalized status and searches transactio
       ).status,
       'failed',
     );
+    for (const malformed of [
+      false,
+      0,
+      {},
+      { InstructionError: [0, false] },
+      'invented',
+    ]) {
+      fake.state.signatureStatus = {
+        confirmationStatus: 'finalized',
+        err: malformed,
+      };
+      assert.equal(
+        (
+          await check({
+            rpc: fake.rpc,
+            signature: syntheticSignature,
+            lastValidBlockHeight: 100n,
+          })
+        ).status,
+        'unknown',
+      );
+    }
     fake.state.signatureStatus = { confirmationStatus: 'confirmed', err: null };
     assert.equal(
       (

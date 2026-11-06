@@ -11,6 +11,8 @@ import {
   type DiscoveryErrorCode,
   type DiscoveryFetch,
 } from '@gyblos/discovery-http';
+import { NODE_ERROR_CODES } from '@gyblos/node/constants';
+import { NodeError } from '@gyblos/node/errors';
 
 import { urlOrigin } from './cli-format';
 import type { Prompt } from './cli-init';
@@ -59,7 +61,11 @@ async function inviteOf(output: SellerOutput, prompt: Prompt | undefined) {
   return (await prompt('Invite code (from your Gyblos invitation): ')).trim();
 }
 
-class RegistrationUnavailable extends Error {}
+class RegistrationUnavailable extends Error {
+  constructor(readonly simulationFailed = false) {
+    super();
+  }
+}
 async function registerWithIdentity(
   attempt: () => Promise<
     (typeof REGISTRATION_RESULTS)[keyof typeof REGISTRATION_RESULTS]
@@ -78,8 +84,11 @@ async function registerWithIdentity(
     let ready = false;
     try {
       ready = await registerIdentity();
-    } catch {
-      throw new RegistrationUnavailable();
+    } catch (cause) {
+      throw new RegistrationUnavailable(
+        cause instanceof NodeError &&
+          cause.code === NODE_ERROR_CODES.SELLER_REGISTRATION_SIMULATION_FAILED,
+      );
     }
     if (!ready) throw new RegistrationUnavailable();
     return attempt();
@@ -139,7 +148,9 @@ export async function registerCommand(
     if (error instanceof RegistrationUnavailable)
       return fail(
         REGISTER_ERRORS.IDENTITY_UNAVAILABLE,
-        'registration is not confirmed; check the wallet and retry later without deleting its local state',
+        error.simulationFailed
+          ? 'registration simulation failed; ensure the owner has SOL, then retry to estimate the cost'
+          : 'registration is not confirmed; check the wallet and retry later without deleting its local state',
       );
     if (!(error instanceof DiscoveryError)) throw error;
     const hint =

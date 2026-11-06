@@ -20,6 +20,9 @@ import {
   IDENTITY_RESOLUTION_LIMITS,
   LIMITS,
   OWNER_REGISTRATION_STATUS,
+  REGISTRATION_ERROR_LIMITS,
+  REGISTRATION_FINAL_FAILURES,
+  REGISTRATION_INSTRUCTION_FAILURES,
 } from './constants';
 import type { OwnerRegistration } from './owner-registration';
 
@@ -41,14 +44,80 @@ export async function prepareOwnerRegistration(
     lastValidBlockHeight: registration.lastValidBlockHeight,
   };
 }
+function boundedInteger(value: unknown, max: bigint): boolean {
+  if (typeof value === 'bigint') return value >= 0n && value <= max;
+  return (
+    typeof value === 'number' &&
+    Number.isSafeInteger(value) &&
+    value >= 0 &&
+    BigInt(value) <= max
+  );
+}
+function finalizedFailure(value: unknown): boolean {
+  if (typeof value === 'string')
+    return REGISTRATION_FINAL_FAILURES.some((item) => item === value);
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    Array.isArray(value) ||
+    Object.keys(value).join(',') !== 'InstructionError'
+  )
+    return false;
+  const instruction: unknown = Reflect.get(value, 'InstructionError');
+  if (
+    !Array.isArray(instruction) ||
+    instruction.length !== 2 ||
+    !boundedInteger(
+      instruction[0],
+      REGISTRATION_ERROR_LIMITS.maxInstructionIndex,
+    )
+  )
+    return false;
+  const error: unknown = instruction[1];
+  if (typeof error === 'string')
+    return REGISTRATION_INSTRUCTION_FAILURES.some((item) => item === error);
+  return Boolean(
+    error &&
+    typeof error === 'object' &&
+    !Array.isArray(error) &&
+    Object.keys(error).join(',') === 'Custom' &&
+    boundedInteger(
+      Reflect.get(error, 'Custom'),
+      REGISTRATION_ERROR_LIMITS.maxCustomError,
+    ),
+  );
+}
+async function bounded<T>(
+  operation: () => Promise<T>,
+  signal: AbortSignal,
+): Promise<T> {
+  signal.throwIfAborted();
+  let onAbort = () => {};
+  try {
+    return await Promise.race([
+      operation(),
+      new Promise<never>((_resolve, reject) => {
+        onAbort = () => reject(signal.reason);
+        signal.addEventListener('abort', onAbort, { once: true });
+        if (signal.aborted) onAbort();
+      }),
+    ]);
+  } finally {
+    signal.removeEventListener('abort', onAbort);
+  }
+}
 async function readStatus(
   rpc: Rpc<SolanaRpcApi>,
   signature: Signature,
   signal: AbortSignal,
 ): Promise<OwnerRegistrationSubmission> {
-  const response = await rpc
-    .getSignatureStatuses([signature], { searchTransactionHistory: true })
-    .send({ abortSignal: signal });
+  const response = await bounded(
+    () =>
+      rpc
+        .getSignatureStatuses([signature], { searchTransactionHistory: true })
+        .send({ abortSignal: signal }),
+    signal,
+  );
   const status = response.value[0];
   if (
     !status ||
@@ -56,11 +125,12 @@ async function readStatus(
     !Object.hasOwn(status, 'err')
   )
     return { status: OWNER_REGISTRATION_STATUS.UNKNOWN };
+  if (status.err === null)
+    return { status: OWNER_REGISTRATION_STATUS.CONFIRMED };
   return {
-    status:
-      status.err === null
-        ? OWNER_REGISTRATION_STATUS.CONFIRMED
-        : OWNER_REGISTRATION_STATUS.FAILED,
+    status: finalizedFailure(status.err)
+      ? OWNER_REGISTRATION_STATUS.FAILED
+      : OWNER_REGISTRATION_STATUS.UNKNOWN,
   };
 }
 export async function checkOwnerRegistration(input: {
@@ -73,8 +143,10 @@ export async function checkOwnerRegistration(input: {
   const signal = AbortSignal.timeout(IDENTITY_RESOLUTION_LIMITS.timeoutMs);
   try {
     if (
-      (await input.rpc.getGenesisHash().send({ abortSignal: signal })) !==
-      DEVNET_GENESIS
+      (await bounded(
+        () => input.rpc.getGenesisHash().send({ abortSignal: signal }),
+        signal,
+      )) !== DEVNET_GENESIS
     )
       return unknown;
     return await readStatus(input.rpc, input.signature, signal);
@@ -112,16 +184,22 @@ export async function submitOwnerRegistration(input: {
     if (getSignatureFromTransaction(transaction) !== prepared.signature)
       return unknown;
     if (
-      (await rpc.getGenesisHash().send({ abortSignal: signal })) !==
-      DEVNET_GENESIS
+      (await bounded(
+        () => rpc.getGenesisHash().send({ abortSignal: signal }),
+        signal,
+      )) !== DEVNET_GENESIS
     )
       return unknown;
-    const returned = await rpc
-      .sendTransaction(prepared.wire, {
-        encoding: 'base64',
-        preflightCommitment: FINALIZED_COMMITMENT,
-      })
-      .send({ abortSignal: signal });
+    const returned = await bounded(
+      () =>
+        rpc
+          .sendTransaction(prepared.wire, {
+            encoding: 'base64',
+            preflightCommitment: FINALIZED_COMMITMENT,
+          })
+          .send({ abortSignal: signal }),
+      signal,
+    );
     if (returned !== prepared.signature) return unknown;
     while (!signal.aborted) {
       const result = await readStatus(rpc, prepared.signature, signal);

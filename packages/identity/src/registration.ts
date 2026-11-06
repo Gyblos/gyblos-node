@@ -116,9 +116,11 @@ function wireBytes(base64: string): number {
 export async function chainDeadline(
   rpc: IdentityRpc,
   commitment: Commitment = COMMITMENT,
+  signal?: AbortSignal,
 ): Promise<bigint> {
-  const slot = await rpc.getSlot({ commitment }).send();
-  const blockTime = await rpc.getBlockTime(slot).send();
+  const slot = await rpc.getSlot({ commitment }).send({ abortSignal: signal });
+  signal?.throwIfAborted();
+  const blockTime = await rpc.getBlockTime(slot).send({ abortSignal: signal });
   if (blockTime === null) {
     throw new IdentityError(
       IDENTITY_ERROR_CODES.SIMULATION_FAILED,
@@ -189,7 +191,11 @@ export async function simulateOwnerAfter(
   rpc: IdentityRpc,
   message: SponsoredMessage,
   owner: Address,
-  options: { commitment?: Commitment; replaceRecentBlockhash?: boolean } = {},
+  options: {
+    commitment?: Commitment;
+    replaceRecentBlockhash?: boolean;
+    signal?: AbortSignal;
+  } = {},
 ): Promise<{ ownerAfter: bigint; unitsConsumed: bigint; contextSlot: bigint }> {
   const result = await rpc
     .simulateTransaction(wireBase64(message), {
@@ -199,7 +205,7 @@ export async function simulateOwnerAfter(
       commitment: options.commitment ?? COMMITMENT,
       accounts: { addresses: [owner], encoding: BASE64_ENCODING },
     })
-    .send();
+    .send({ abortSignal: options.signal });
   const ownerAfter = result.value.accounts?.[0]?.lamports;
   if (result.value.err !== null || ownerAfter === undefined) {
     throw new IdentityError(
@@ -250,6 +256,7 @@ function isMessageBase64(text: string): text is TransactionMessageBytesBase64 {
 export async function messageFee(
   rpc: IdentityRpc,
   message: SponsoredMessage,
+  signal?: AbortSignal,
 ): Promise<bigint> {
   const encoded = BYTES_TO_BASE64_TEXT.decode(
     compileTransaction(message).messageBytes,
@@ -262,7 +269,7 @@ export async function messageFee(
   }
   const { value } = await rpc
     .getFeeForMessage(encoded, { commitment: COMMITMENT })
-    .send();
+    .send({ abortSignal: signal });
   if (value === null) {
     throw new IdentityError(
       IDENTITY_ERROR_CODES.FEE_UNAVAILABLE,

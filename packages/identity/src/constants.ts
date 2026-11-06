@@ -195,10 +195,44 @@ export const IDENTITY_RPC_METHODS = [
   'getProgramAccounts',
   'getMultipleAccounts',
 ] as const;
+export const IDENTITY_REGISTRATION_RPC_METHODS = [
+  ...IDENTITY_RPC_METHODS,
+  'getSlot',
+  'getBlockTime',
+  'getLatestBlockhash',
+  'getBalance',
+  'simulateTransaction',
+  'getFeeForMessage',
+  'sendTransaction',
+  'getSignatureStatuses',
+] as const;
 
 // A missing historical status remains unknown even after the blockhash expires.
 export const OWNER_REGISTRATION_STATUS = {
   CONFIRMED: 'confirmed',
   FAILED: 'failed',
   UNKNOWN: 'unknown',
+} as const;
+
+// Conservative subset of finalized Solana failures recognized for safe registration retry.
+// Unknown future variants remain unknown until their wire format is supported.
+export const REGISTRATION_FINAL_FAILURES = [
+  'AccountNotFound',
+  'InsufficientFundsForFee',
+  'InvalidAccountForFee',
+  'SignatureFailure',
+  'BlockhashNotFound',
+] as const;
+export const REGISTRATION_INSTRUCTION_FAILURES = [
+  'InsufficientFunds',
+  'InvalidAccountData',
+  'InvalidArgument',
+  'InvalidInstructionData',
+  'MissingRequiredSignature',
+  'IncorrectAuthority',
+  'GenericError',
+] as const;
+export const REGISTRATION_ERROR_LIMITS = {
+  maxInstructionIndex: 255n,
+  maxCustomError: 4_294_967_295n,
 } as const;

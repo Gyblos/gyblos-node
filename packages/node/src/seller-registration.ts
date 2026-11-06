@@ -76,6 +76,13 @@ export async function registerSellerIdentity(input: {
       const result = await input.operations.check(pending);
       if (result.status === OWNER_REGISTRATION_STATUS.CONFIRMED)
         return (await input.operations.lookup(asset?.address)) === true;
+      if (result.status === OWNER_REGISTRATION_STATUS.UNKNOWN) {
+        const retried = await input.operations.send(pending);
+        return (
+          retried.status === OWNER_REGISTRATION_STATUS.CONFIRMED &&
+          (await input.operations.lookup(asset?.address)) === true
+        );
+      }
       if (result.status !== OWNER_REGISTRATION_STATUS.FAILED) return false;
       failedSignature = current.prepared.signature;
     }
@@ -89,7 +96,10 @@ export async function registerSellerIdentity(input: {
     );
     const draft = await input.operations.build(signer);
     if (!(await input.confirm(draft.estimatedTotalLamports))) return false;
-    const prepared = await draft.sign();
+    const refreshed = await input.operations.build(signer);
+    if (refreshed.estimatedTotalLamports > draft.estimatedTotalLamports)
+      return false;
+    const prepared = await refreshed.sign();
     await state.savePrepared(prepared, failedSignature);
     const result = await input.operations.send(prepared);
     return (

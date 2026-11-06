@@ -54,6 +54,8 @@ export interface FakeRpcState {
     err?: unknown;
   } | null;
   sendSignature: string;
+  delayMethods: Map<string, number>;
+  onSend?: (wire: string) => Promise<void>;
 }
 
 export interface FakeRpc {
@@ -249,16 +251,20 @@ async function readBody(request: IncomingMessage): Promise<unknown> {
 function serve(state: FakeRpcState): Server {
   return createServer((request, response) => {
     readBody(request)
-      .then((body) => {
+      .then(async (body) => {
         const call = asCall(body);
+        if (call.method === 'sendTransaction' && state.onSend)
+          await state.onSend(String(call.params[0]));
         response.setHeader('content-type', 'application/json');
-        response.end(
+        const responseBody =
           JSON.stringify({
             jsonrpc: '2.0',
             id: call.id,
             ...respond(state, call),
-          }) + ' '.repeat(state.responsePadding.get(call.method) ?? 0),
-        );
+          }) + ' '.repeat(state.responsePadding.get(call.method) ?? 0);
+        const wait = state.delayMethods.get(call.method) ?? 0;
+        if (wait > 0) setTimeout(() => response.end(responseBody), wait);
+        else response.end(responseBody);
       })
       .catch((error: unknown) => {
         response.statusCode = 500;
@@ -282,6 +288,7 @@ export async function startFakeRpc(
     responsePadding: new Map(),
     signatureStatus: null,
     sendSignature: '',
+    delayMethods: new Map(),
   };
   const server = serve(state);
   server.listen(0, LOCALHOST);

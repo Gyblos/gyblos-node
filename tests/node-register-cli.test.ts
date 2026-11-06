@@ -269,3 +269,20 @@ void test('seller register retries the index only after the seller identity is r
     assert.equal(registrations, 1);
     assert.equal(attempts, 2);
   }));
+
+void test('seller register gives a static useful hint when the registration simulation fails', () =>
+  withHome(async (home) => {
+    const { NodeError } = await import('@gyblos/node/errors');
+    const { NODE_ERROR_CODES } = await import('@gyblos/node/constants');
+    const result = await register(home, [], {
+      env: { GYBLOS_INVITE: INVITE },
+      registerIdentity: async () => {
+        throw new NodeError(
+          NODE_ERROR_CODES.SELLER_REGISTRATION_SIMULATION_FAILED,
+        );
+      },
+      answer: json(403, { error: 'IDENTITY_NOT_REGISTERED' }),
+    });
+    assert.equal(result.code, 1);
+    assert.match(result.stderr, /simulation.*SOL.*cost/i);
+  }));

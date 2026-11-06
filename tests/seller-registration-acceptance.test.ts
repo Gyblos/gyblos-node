@@ -6,16 +6,18 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { join as joinPath } from 'node:path';
 import test from 'node:test';
 
-import { createKeyPairSignerFromBytes, getAddressEncoder } from '@solana/kit';
+import {
+  createKeyPairSignerFromBytes,
+  getAddressEncoder,
+  getBase64Encoder,
+  getSignatureFromTransaction,
+  getTransactionDecoder,
+} from '@solana/kit';
 
 import { CONFIG_ASSET_LABELS } from '@gyblos/config/constants';
 import { runCli } from '@gyblos/node-app/cli';
 import { ROLE_CONFIG_SCHEMA_VERSION } from '@gyblos/node/constants';
 import type { RoleConfig } from '@gyblos/node/roles';
-import {
-  registerSellerIdentity,
-  sellerRegistrationOperations,
-} from '@gyblos/node/seller-registration';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 
 import { addClaimant } from './support/identity-accounts';
@@ -71,46 +73,39 @@ void test('seller CLI registers one synthetic 8004 asset before retrying the loc
         { mode: 0o600 },
       );
       const environment = { GYBLOS_HOME: home.home };
-      const operations = sellerRegistrationOperations({
-        rpc: fake.rpc,
-        environment,
-        role,
-      });
       let sent = 0;
       let indexRequests = 0;
       let approved = 0;
-      const wrapped = {
-        ...operations,
-        send: async (prepared: Parameters<typeof operations.send>[0]) => {
-          sent++;
-          const raw: unknown = JSON.parse(
-            await readFile(
-              joinPath(home.seller, 'registration-8004-v1.json'),
-              'utf8',
-            ),
-          );
-          assert.ok(
-            raw &&
-              typeof raw === 'object' &&
-              'assetSecret' in raw &&
-              Array.isArray(raw.assetSecret),
-          );
-          const asset = await createKeyPairSignerFromBytes(
-            Uint8Array.from(raw.assetSecret),
-          );
-          await addClaimant(fake.state.chain, {
-            owner: owner.address,
-            asset: asset.address,
-            node,
-            agentWallet: owner.address,
-          });
-          fake.state.sendSignature = prepared.signature;
-          fake.state.signatureStatus = {
-            confirmationStatus: 'finalized',
-            err: null,
-          };
-          return operations.send(prepared);
-        },
+      fake.state.onSend = async (wire: string) => {
+        sent++;
+        const raw: unknown = JSON.parse(
+          await readFile(
+            joinPath(home.seller, 'registration-8004-v1.json'),
+            'utf8',
+          ),
+        );
+        assert.ok(
+          raw &&
+            typeof raw === 'object' &&
+            'assetSecret' in raw &&
+            Array.isArray(raw.assetSecret),
+        );
+        const asset = await createKeyPairSignerFromBytes(
+          Uint8Array.from(raw.assetSecret),
+        );
+        await addClaimant(fake.state.chain, {
+          owner: owner.address,
+          asset: asset.address,
+          node,
+          agentWallet: owner.address,
+        });
+        fake.state.sendSignature = getSignatureFromTransaction(
+          getTransactionDecoder().decode(getBase64Encoder().encode(wire)),
+        );
+        fake.state.signatureStatus = {
+          confirmationStatus: 'finalized',
+          err: null,
+        };
       };
       let stderr = '';
       const result = await runCli(['seller', 'register'], {
@@ -120,17 +115,10 @@ void test('seller CLI registers one synthetic 8004 asset before retrying the loc
         stderr: (text) => {
           stderr += text;
         },
-        registerIdentity: () =>
-          registerSellerIdentity({
-            environment,
-            identity: { owner: owner.address, nodeId },
-            operations: wrapped,
-            confirm: async (cost) => {
-              approved++;
-              assert.equal(cost, BigInt(COST));
-              return true;
-            },
-          }),
+        prompt: async () => {
+          approved++;
+          return 'yes';
+        },
         fetch: async () => {
           indexRequests++;
           return indexRequests === 1

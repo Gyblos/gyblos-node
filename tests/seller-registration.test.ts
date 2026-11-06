@@ -33,7 +33,7 @@ import { addClaimant } from './support/identity-accounts';
 import { fixedSigner } from './support/identity-fixture';
 import { startFakeRpc } from './support/identity-rpc-fake';
 
-void test('lost registration reply is retained and never creates or submits a second attempt', async () => {
+void test('lost registration reply can resend only the identical signed attempt', async () => {
   const root = await mkdtemp(join(tmpdir(), 'gyb-seller-registration-'));
   const environment = { GYBLOS_HOME: root };
   const identity = {
@@ -62,6 +62,7 @@ void test('lost registration reply is retained and never creates or submits a se
   let sends = 0;
   let builds = 0;
   let checks = 0;
+  const sentWires: string[] = [];
   let checkStatus: 'unknown' | 'failed' = OWNER_REGISTRATION_STATUS.UNKNOWN;
   const assets: string[] = [];
   const operations = {
@@ -71,7 +72,8 @@ void test('lost registration reply is retained and never creates or submits a se
       builds++;
       return { estimatedTotalLamports: 123n, sign: async () => prepared };
     },
-    send: async () => {
+    send: async (attempt: typeof prepared) => {
+      sentWires.push(attempt.wire);
       sends++;
       const state = JSON.parse(
         await readFile(
@@ -104,14 +106,15 @@ void test('lost registration reply is retained and never creates or submits a se
       await readFile(join(root, 'seller', 'registration-8004-v1.json'), 'utf8'),
       saved,
     );
-    assert.equal(sends, 1);
-    assert.equal(builds, 1);
+    assert.equal(sends, 2);
+    assert.equal(sentWires[0], sentWires[1]);
+    assert.equal(builds, 2);
     assert.equal(checks, 1);
     checkStatus = OWNER_REGISTRATION_STATUS.FAILED;
     assert.equal(await registerSellerIdentity(args), false);
-    assert.equal(sends, 2);
-    assert.equal(builds, 2);
-    assert.equal(assets[0], assets[1]);
+    assert.equal(sends, 3);
+    assert.equal(builds, 4);
+    assert.equal(assets[0], assets[3]);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -154,6 +157,18 @@ void test('registration checks the on-chain owner, node binding and payout walle
       agentWallet: owner.address,
     });
     assert.equal(await operations.lookup(asset.address), true);
+    const paid = sellerRegistrationOperations({
+      rpc: fake.rpc,
+      environment: {},
+      role: {
+        ...role,
+        payTo: (await generateKeyPairSigner()).address,
+        authorizer: (await generateKeyPairSigner()).address,
+        facilitator: (await generateKeyPairSigner()).address,
+        buyer: (await generateKeyPairSigner()).address,
+      },
+    });
+    assert.equal(await paid.lookup(asset.address), true);
     assert.equal(
       await operations.lookup((await generateKeyPairSigner()).address),
       undefined,
@@ -166,5 +181,46 @@ void test('registration checks the on-chain owner, node binding and payout walle
     assert.equal(await foreign.lookup(), undefined);
   } finally {
     await fake.close();
+  }
+});
+
+void test('a price increase while the user decides requires fresh consent and sends nothing', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'gyb-registration-cost-'));
+  let builds = 0;
+  let signs = 0;
+  let sends = 0;
+  try {
+    const result = await registerSellerIdentity({
+      environment: { GYBLOS_HOME: root },
+      identity: {
+        owner: '11111111111111111111111111111112',
+        nodeId: '01'.repeat(32),
+      },
+      operations: {
+        lookup: async () => false,
+        build: async () => {
+          builds++;
+          return {
+            estimatedTotalLamports: BigInt(builds),
+            sign: async () => {
+              signs++;
+              throw new Error('must not sign');
+            },
+          };
+        },
+        check: async () => ({ status: OWNER_REGISTRATION_STATUS.UNKNOWN }),
+        send: async () => {
+          sends++;
+          return { status: OWNER_REGISTRATION_STATUS.UNKNOWN };
+        },
+      },
+      confirm: async (cost) => cost === 1n,
+    });
+    assert.equal(result, false);
+    assert.equal(builds, 2);
+    assert.equal(signs, 0);
+    assert.equal(sends, 0);
+  } finally {
+    await rm(root, { recursive: true, force: true });
   }
 });

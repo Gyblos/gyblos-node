@@ -10,7 +10,7 @@ import {
 
 import { DEVNET_GENESIS, FINALIZED_COMMITMENT } from '@gyblos/config';
 
-import { IDENTITY_ERROR_CODES } from './constants';
+import { IDENTITY_ERROR_CODES, IDENTITY_RESOLUTION_LIMITS } from './constants';
 import { IdentityError } from './errors';
 import {
   assertFits,
@@ -30,6 +30,7 @@ export interface OwnerRegistrationInput {
   node: DetachedSigner;
   agentUri: string;
   bindingSequence: bigint;
+  timeoutMs?: number;
 }
 export interface OwnerRegistration {
   message: SponsoredMessage;
@@ -42,10 +43,11 @@ async function estimateOwnerCost(
   rpc: Rpc<SolanaRpcApi>,
   message: SponsoredMessage,
   owner: Address,
+  signal: AbortSignal,
 ): Promise<{ feeLamports: bigint; estimatedTotalLamports: bigint }> {
   const before = await rpc
     .getBalance(owner, { commitment: FINALIZED_COMMITMENT })
-    .send();
+    .send({ abortSignal: signal });
   const { ownerAfter, contextSlot } = await simulateOwnerAfter(
     rpc,
     message,
@@ -53,11 +55,12 @@ async function estimateOwnerCost(
     {
       commitment: FINALIZED_COMMITMENT,
       replaceRecentBlockhash: false,
+      signal,
     },
   );
   const after = await rpc
     .getBalance(owner, { commitment: FINALIZED_COMMITMENT })
-    .send();
+    .send({ abortSignal: signal });
   if (
     before.context.slot !== contextSlot ||
     after.context.slot !== contextSlot ||
@@ -67,7 +70,7 @@ async function estimateOwnerCost(
       IDENTITY_ERROR_CODES.SIMULATION_FAILED,
       'Registration state changed during simulation.',
     );
-  const feeLamports = await messageFee(rpc, message);
+  const feeLamports = await messageFee(rpc, message, signal);
   const estimatedTotalLamports = before.value - ownerAfter;
   if (estimatedTotalLamports < feeLamports)
     throw new IdentityError(
@@ -77,8 +80,9 @@ async function estimateOwnerCost(
   return { feeLamports, estimatedTotalLamports };
 }
 
-export async function buildOwnerRegistration(
+async function buildWithinDeadline(
   input: OwnerRegistrationInput,
+  signal: AbortSignal,
 ): Promise<OwnerRegistration> {
   const rpc = input.rpc;
   const ownerAddress = input.owner.address;
@@ -97,12 +101,17 @@ export async function buildOwnerRegistration(
   };
   const agentUri = input.agentUri;
   const bindingSequence = input.bindingSequence;
-  if ((await rpc.getGenesisHash().send()) !== DEVNET_GENESIS)
+  if (
+    (await rpc.getGenesisHash().send({ abortSignal: signal })) !==
+    DEVNET_GENESIS
+  )
     throw new IdentityError(
       IDENTITY_ERROR_CODES.NETWORK_MISMATCH,
       'Registration requires devnet.',
     );
-  const deadline = await chainDeadline(rpc, FINALIZED_COMMITMENT);
+  signal.throwIfAborted();
+  const deadline = await chainDeadline(rpc, FINALIZED_COMMITMENT, signal);
+  signal.throwIfAborted();
   const [owner, asset] = await Promise.all([
     createSignerFromKeyPair(ownerKeys),
     createSignerFromKeyPair(assetKeys),
@@ -117,20 +126,65 @@ export async function buildOwnerRegistration(
       IDENTITY_ERROR_CODES.INPUT_INVALID,
       'Owner signer mismatch.',
     );
+  signal.throwIfAborted();
   const { nodeId, instructions } = await registrationInstructions(
     { owner, asset, node, agentUri, bindingSequence, payoutWallet },
     deadline,
   );
   const { value: blockhash } = await rpc
     .getLatestBlockhash({ commitment: FINALIZED_COMMITMENT })
-    .send();
+    .send({ abortSignal: signal });
+  signal.throwIfAborted();
   const message = composeMessage(owner, blockhash, instructions);
   assertFits(message);
-  const cost = await estimateOwnerCost(rpc, message, owner.address);
+  const cost = await estimateOwnerCost(rpc, message, owner.address, signal);
+  signal.throwIfAborted();
   return {
     message,
     ...cost,
     nodeId,
     lastValidBlockHeight: blockhash.lastValidBlockHeight,
   };
+}
+
+export async function buildOwnerRegistration(
+  input: OwnerRegistrationInput,
+): Promise<OwnerRegistration> {
+  const timeoutMs = input.timeoutMs ?? IDENTITY_RESOLUTION_LIMITS.timeoutMs;
+  if (
+    !Number.isSafeInteger(timeoutMs) ||
+    timeoutMs < 1 ||
+    timeoutMs > IDENTITY_RESOLUTION_LIMITS.maxTimeoutMs
+  )
+    throw new IdentityError(
+      IDENTITY_ERROR_CODES.INPUT_INVALID,
+      'Invalid registration timeout.',
+    );
+  const signal = AbortSignal.timeout(timeoutMs);
+  let onAbort = () => {};
+  try {
+    return await Promise.race([
+      buildWithinDeadline(input, signal),
+      new Promise<never>((_resolve, reject) => {
+        onAbort = () =>
+          reject(
+            new IdentityError(
+              IDENTITY_ERROR_CODES.READ_TIMEOUT,
+              'Registration RPC deadline elapsed.',
+            ),
+          );
+        signal.addEventListener('abort', onAbort, { once: true });
+        if (signal.aborted) onAbort();
+      }),
+    ]);
+  } catch (error) {
+    if (signal.aborted)
+      throw new IdentityError(
+        IDENTITY_ERROR_CODES.READ_TIMEOUT,
+        'Registration RPC deadline elapsed.',
+      );
+    throw error;
+  } finally {
+    signal.removeEventListener('abort', onAbort);
+  }
 }
