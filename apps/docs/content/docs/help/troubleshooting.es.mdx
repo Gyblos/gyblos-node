@@ -31,14 +31,15 @@ comprueba primero Ollama. Usa `--online` solo cuando quieras añadir consultas r
 
 ## Errores de instalación
 
-| Síntoma o salida exacta                                       | Solución                                                                                                             |
-| ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `Docker is not installed` o `Docker Compose v2 is missing`    | Instala Docker con el plugin de Compose v2.17 o posterior siguiendo el proceso habitual de la plataforma.            |
-| `Docker is not running`                                       | Inicia Docker Desktop o el servicio autorizado de Docker y repite el instalador.                                     |
-| `Docker Compose … is too old`                                 | Actualiza Docker o Compose a v2.17 o posterior.                                                                      |
-| `The relay token is empty` o `must have 32 to 512 characters` | Copia el token de la invitación sin texto adicional. No lo muestres ni lo pegues en el chat de soporte.              |
-| `Ollama did not start`                                        | Revisa `docker compose logs ollama` en privado; comprueba memoria, disco y estado de Docker.                         |
-| El instalador se detiene con `gyblos install:` o `FAIL`       | Corrige la causa indicada y repite `sh install.sh` donde lo guardaste. Se conservan archivos e identidad existentes. |
+| Síntoma o salida exacta                                       | Solución                                                                                                                                                                                  |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Docker is not installed` o `Docker Compose v2 is missing`    | Instala Docker con el plugin de Compose v2.17 o posterior siguiendo el proceso habitual de la plataforma.                                                                                 |
+| `Docker is not running`                                       | Inicia Docker Desktop o el servicio autorizado de Docker y repite el instalador.                                                                                                          |
+| `Docker Compose … is too old`                                 | Actualiza Docker o Compose a v2.17 o posterior.                                                                                                                                           |
+| `The relay token is empty` o `must have 32 to 512 characters` | Copia el token de la invitación sin texto adicional. No lo muestres ni lo pegues en el chat de soporte.                                                                                   |
+| `Ollama did not start`                                        | Revisa `docker compose logs ollama` en privado; comprueba memoria, disco y estado de Docker.                                                                                              |
+| El instalador se detiene con `gyblos install:` o `FAIL`       | Corrige la causa indicada y repite `sh install.sh` donde lo guardaste. Se conservan archivos e identidad existentes.                                                                      |
+| `The image signature did not verify`                          | No ejecutes esa imagen ni te saltes la comprobación. Descarga de nuevo el instalador desde `https://gyblos.com/install.sh` e informa la línea de la imagen por el canal de tu invitación. |
 
 ## Configuración rechazada
 

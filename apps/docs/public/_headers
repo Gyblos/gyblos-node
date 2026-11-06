@@ -22,3 +22,8 @@
 
 /es/llms-full.txt
   Content-Type: text/plain; charset=utf-8
+
+# The installer is plain text, never cached for long, so a release reaches sellers.
+/install.sh
+  Content-Type: text/plain; charset=utf-8
+  Cache-Control: public, max-age=300

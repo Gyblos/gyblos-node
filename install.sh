@@ -6,18 +6,25 @@
 #
 # Environment (all optional):
 #   GYBLOS_DIR          where compose.yaml, gyblos.toml and seller.env go (default: ~/gyblos-seller)
-#   GYBLOS_IMAGE        node image (default below)
+#   GYBLOS_IMAGE        node image (default: the release pinned below, by version and digest)
 #   GYBLOS_RELAY_TOKEN  the relay token; asked for without echo when unset
 #
-# Existing gyblos.toml, seller.env and compose.yaml are kept; rerunning resumes a failed install and
-# restarts the seller with the current gyblos.toml.
+# Existing gyblos.toml and seller.env are kept, and so is compose.yaml except for a Gyblos seller image,
+# which moves to this script's release: rerunning resumes a failed install, updates the seller and
+# restarts it with the current gyblos.toml. With cosign installed, a Gyblos image must carry the release
+# signature of the release workflow (docs/running-a-node.md#image-signature).
 # The relay token is written only to seller.env (mode 0600) and never printed.
 set -eu
 # Byte-wise character classes: [:graph:] is then exactly the printable ASCII seller.env accepts.
 LC_ALL=C
 export LC_ALL
 
+# Set by scripts/release-image.sh when a release is published.
 DEFAULT_IMAGE=ghcr.io/gyblos/seller:beta
+RELEASE_REPOSITORY=ghcr.io/gyblos/seller
+# Releases are signed keyless by the release workflow at a version tag; cosign checks that identity.
+RELEASE_IDENTITY='^https://github\.com/Gyblos/gyblos-node/\.github/workflows/release-seller-image\.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'
+RELEASE_ISSUER=https://token.actions.githubusercontent.com
 # Devnet USDC (packages/config/src/network.ts DEVNET_USDC).
 MINT=4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU
 # The model the default offer serves (examples/seller-docker.toml).
@@ -91,8 +98,7 @@ cleanup() {
 write_compose() {
   refuse_symlink compose.yaml
   if [ -e compose.yaml ]; then
-    say "Kept existing $dir/compose.yaml"
-    [ -z "${GYBLOS_IMAGE:-}" ] || say "  GYBLOS_IMAGE is not applied to it; change its seller image there."
+    update_compose_image
     return
   fi
   # A substitution, not a pipe, so `set -e` sees a failing sed; it drops the final newline printf restores.
@@ -146,6 +152,51 @@ COMPOSE
   )
   printf '%s\n' "$contents" | install_file compose.yaml 644
   say "Wrote $dir/compose.yaml"
+}
+
+# An existing compose.yaml keeps every line except a seller image from the Gyblos repository, which
+# moves to $image; any other image is the operator's own and stays.
+update_compose_image() {
+  current=$(sed -n "s|^    image: \($RELEASE_REPOSITORY[:@][^ ]*\)\$|\1|p" compose.yaml)
+  if [ -z "$current" ] || [ "$(printf '%s\n' "$current" | wc -l)" -ne 1 ]; then
+    say "Kept existing $dir/compose.yaml"
+    [ -z "${GYBLOS_IMAGE:-}" ] || say "  GYBLOS_IMAGE is not applied to it; change its seller image there."
+    return
+  fi
+  if [ "$current" = "$image" ]; then
+    say "Kept existing $dir/compose.yaml"
+    return
+  fi
+  contents=$(sed "s|^    image: $RELEASE_REPOSITORY[:@][^ ]*\$|    image: $image|" compose.yaml)
+  printf '%s\n' "$contents" | install_file compose.yaml 644
+  say "Updated the seller image in $dir/compose.yaml: $current -> $image"
+}
+
+# The seller image compose.yaml runs.
+compose_image() {
+  sed -n '/^  seller:$/,/^  [a-z]/s|^    image: \([^ ]*\)$|\1|p' compose.yaml
+}
+
+# A Gyblos image must carry the release workflow's signature when cosign is available; without cosign
+# the check is skipped and said so. Another repository's image is the operator's own build and is not
+# checked.
+verify_image() {
+  run=$(compose_image)
+  case "$run" in
+    "$RELEASE_REPOSITORY":* | "$RELEASE_REPOSITORY"@*) ;;
+    *)
+      say "Not a Gyblos release image, so its signature is not checked: $run"
+      return
+      ;;
+  esac
+  if ! command -v cosign >/dev/null 2>&1; then
+    say 'cosign is not installed, so the image signature was not checked (docs: image signature).'
+    return
+  fi
+  cosign verify --certificate-identity-regexp "$RELEASE_IDENTITY" \
+    --certificate-oidc-issuer "$RELEASE_ISSUER" "$run" >/dev/null 2>&1 ||
+    die "The image signature did not verify as a Gyblos release: $run"
+  say "Verified the Gyblos release signature of $run"
 }
 
 # examples/seller-docker.toml without its repository-relative schema line.
@@ -241,6 +292,7 @@ main() {
   write_config
   write_environment
 
+  verify_image
   say 'Pulling images…'
   docker compose pull
   docker compose up -d ollama
@@ -262,7 +314,7 @@ main() {
   say '  docker compose logs -f seller        follow it'
   say '  docker compose stop seller           stop it (withdraws within 120 s)'
   say '  docker compose up -d --force-recreate seller   apply an edited gyblos.toml'
-  say '  docker compose pull && docker compose up -d   update it'
+  say '  download the latest install.sh and run it again here   update it'
   say 'Its keys are in the gyblos volume: `docker compose down -v` deletes them.'
 }
 

@@ -52,19 +52,22 @@ docker compose exec seller gyblos seller status
 Recreation is also needed after changing `seller.env`; a simple container restart does not load a
 changed Compose environment file. Never display that file in logs, screenshots or a shared terminal.
 
-## Update the beta image
+## Update the seller
 
-Before updating, record the installed image and review any update instructions from your invitation channel.
+Each update is a new signed release in the installer. Record the installed image, then download the
+current installer and run it again in the same folder:
 
 ```sh
 cd ~/gyblos-seller
 docker compose images seller
-docker compose pull && docker compose up -d
+curl -fsSL https://gyblos.com/install.sh -o install.sh
+sh install.sh
 ```
 
-This pulls the image references already present in `compose.yaml`; it does not migrate the TOML,
-Compose template or environment file. Rerunning `install.sh` preserves those files, and setting
-`GYBLOS_IMAGE` on a rerun does not replace an existing Compose image reference.
+It keeps `gyblos.toml`, `seller.env`, the keys and your other Compose edits. It changes only the Gyblos
+seller `image:` line in `compose.yaml` to the new release, checks its signature when cosign is installed
+and restarts the seller. A seller image from another registry is treated as your own build and is left
+unchanged. It does not migrate the TOML or the environment file.
 
 After the update, run status and, if publishing, status with `--online`. If it fails, preserve the
 volumes and report the image and error code. Do not keep restarting to clear a lock or bypass a refusal.

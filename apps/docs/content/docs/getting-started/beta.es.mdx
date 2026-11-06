@@ -3,9 +3,9 @@ title: Alcance y requisitos de la beta
 description: Comprueba la instalación admitida, la invitación y los requisitos del equipo antes de empezar.
 ---
 
-Este manual sigue el `install.sh` de tu invitación y la imagen `ghcr.io/gyblos/seller:beta`.
-La etiqueta beta puede cambiar. Incluye `docker compose images seller` al pedir ayuda para que el equipo
-pueda identificar la imagen instalada.
+Este manual sigue el instalador oficial, `https://gyblos.com/install.sh`, que fija una versión firmada
+de la imagen `ghcr.io/gyblos/seller` por versión y digest. Incluye `docker compose images seller` al pedir
+ayuda para que el equipo pueda identificar la imagen instalada.
 
 ## Qué puedes hacer hoy
 
@@ -25,7 +25,7 @@ el alojamiento e internet tienen un coste; un motor remoto también puede cobrar
 
 ## Antes de instalar
 
-- Una invitación con `install.sh`, un **token de relay** privado y un **código de invitación** de un solo uso que empieza con `gyb_`.
+- Una invitación con un **token de relay** privado y un **código de invitación** de un solo uso que empieza con `gyb_`.
 - Linux x86-64 o ARM64, o macOS, en un equipo que permanezca encendido. Este instalador no es un procedimiento nativo para Windows.
 - Docker Engine con Compose en Linux, o Docker Desktop en macOS. Compose debe ser **v2.17 o posterior**.
 - Al menos **4 GB de memoria** y varios GB de disco disponibles. El inicio exige **1,5 GiB de margen** por encima del proceso vendedor; Ollama también necesita memoria.

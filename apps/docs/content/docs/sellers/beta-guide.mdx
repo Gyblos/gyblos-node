@@ -9,11 +9,17 @@ of the installation time; the duration depends on your connection and machine.
 
 ## Install the seller
 
-In the folder where you saved the invitation's `install.sh`, run:
+Download the official installer, read it if you like, and run it:
 
 ```sh
+curl -fsSL https://gyblos.com/install.sh -o install.sh
 sh install.sh
 ```
+
+The installer pins one signed release of the seller image by version and digest. With
+[cosign](https://docs.sigstore.dev/cosign/system_config/installation/) installed it prints
+`Verified the Gyblos release signature` before pulling; without cosign it says the check was skipped.
+To verify the image yourself or set up each file by hand, see [Install without the script](/en/sellers/manual-install).
 
 The relay token is hidden while you enter it. The script works in `~/gyblos-seller` unless you explicitly
 set another installation directory. It creates `compose.yaml`, `gyblos.toml` and private `seller.env`,

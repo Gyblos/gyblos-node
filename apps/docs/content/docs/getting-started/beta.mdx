@@ -3,9 +3,9 @@ title: Beta scope and requirements
 description: Check the supported seller path, invitation and machine requirements before installing.
 ---
 
-This handbook follows the invitation's `install.sh` and `ghcr.io/gyblos/seller:beta` image.
-The beta tag can change. Include `docker compose images seller` when asking for help so the team can
-identify your installed image.
+This handbook follows the official installer, `https://gyblos.com/install.sh`, which pins one signed
+release of the `ghcr.io/gyblos/seller` image by version and digest. Include `docker compose images seller`
+when asking for help so the team can identify your installed image.
 
 ## What you can do today
 
@@ -25,7 +25,7 @@ hosting and internet still have a cost; a remote engine may also charge you even
 
 ## Before you install
 
-- An invitation containing `install.sh`, a private **relay token** and a one-use **invite code** starting with `gyb_`.
+- An invitation containing a private **relay token** and a one-use **invite code** starting with `gyb_`.
 - Linux x86-64 or ARM64, or macOS, on a machine that stays on. This installer is not a Windows-native procedure.
 - Docker Engine with Compose on Linux, or Docker Desktop on macOS. Compose must be **v2.17 or later**.
 - At least **4 GB of memory** and a few GB of free disk. Seller startup requires **1.5 GiB of headroom** above the seller process; Ollama needs memory too.

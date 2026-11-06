@@ -175,3 +175,12 @@ void test('docs export: all four sidebar groups have decorative icons and locali
     }
   }
 });
+
+void test('docs export: the installer is the repository file, byte for byte, served as text', async () => {
+  assert.equal(
+    await read('install.sh'),
+    await readFile(join(ROOT, '../../install.sh'), 'utf8'),
+  );
+  const headers = await readFile(join(ROOT, 'public/_headers'), 'utf8');
+  assert.match(headers, /^\/install\.sh\n  Content-Type: text\/plain/m);
+});
