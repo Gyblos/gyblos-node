@@ -1,6 +1,6 @@
 // Forks a child-process Iroh peer that opens requests but never reads responses, driven over IPC.
 import assert from 'node:assert/strict';
-import { fork } from 'node:child_process';
+import { fork, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
 
 import type {
@@ -16,15 +16,9 @@ import { isMain } from '@gyblos/runtime';
 
 import { bytes, endpoint, within } from './native-fixture';
 import { NATIVE_CAPABILITY } from './native-runtime';
+import { READER_ACTIONS, type ReaderAction } from './native-reader-constants';
+import { waitForReaderReady } from './native-reader-ready';
 
-const READER_ACTIONS = {
-  CONNECT: 'connect',
-  REQUEST: 'request',
-  CLOSED: 'closed',
-  SHUTDOWN: 'shutdown',
-} as const;
-
-type ReaderAction = (typeof READER_ACTIONS)[keyof typeof READER_ACTIONS];
 interface ReaderRequest {
   id: number;
   action: ReaderAction;
@@ -87,8 +81,8 @@ async function readerMain() {
   });
 }
 
-export async function unreadPeer(target: EndpointAddr) {
-  const child = fork(new URL(import.meta.url), [], {
+export async function unreadPeer(target: EndpointAddr, options: { spawn?: () => ChildProcess } = {}) {
+  const child = options.spawn?.() ?? fork(new URL(import.meta.url), [], {
     execArgv: ['--import', import.meta.resolve('tsx')],
     stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
   });
@@ -155,6 +149,7 @@ export async function unreadPeer(target: EndpointAddr) {
     }
   };
   try {
+    await waitForReaderReady(child);
     const ready = await command(READER_ACTIONS.CONNECT, {
       target: {
         nodeId: target.id().toString(),
