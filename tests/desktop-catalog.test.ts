@@ -52,9 +52,9 @@ void test('desktop buyer navigation has one stable destination per task', () => 
     MAIN_NAV.map((item) => [item.name, item.label]),
     [
       [UI_VIEW.CHAT, 'Chat'],
+      [UI_VIEW.CONNECT, 'Connections'],
       [UI_VIEW.MODELS, 'Models'],
       [UI_VIEW.TOOLS, 'Applications'],
-      [UI_VIEW.CONNECT, 'Agents'],
       [UI_VIEW.ACTIVITY, 'Activity'],
       [UI_VIEW.PAYMENTS, 'Payments'],
     ],

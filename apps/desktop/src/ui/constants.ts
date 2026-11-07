@@ -55,12 +55,15 @@ export const CONNECTION_TOOLS = [
   AGENT_CLIENT.PI,
   AGENT_CLIENT.OTHER,
 ] as const;
+export const CONNECTION_PRESET = { GENERIC: 'Other app / API' } as const;
 export const PAYPAL_AGENT_CARDS = [
-  { client: AGENT_CLIENT.CLAUDE_CODE, detail: 'Anthropic’s coding agent' },
-  { client: AGENT_CLIENT.CODEX, detail: 'OpenAI’s coding agent' },
-  { client: AGENT_CLIENT.OPENCODE, detail: 'The open-source coding agent' },
-  { client: AGENT_CLIENT.PI, detail: 'A minimal coding agent' },
+  { client: CONNECTION_PRESET.GENERIC },
+  { client: AGENT_CLIENT.OPENCODE },
+  { client: AGENT_CLIENT.CODEX },
+  { client: AGENT_CLIENT.PI },
+  { client: AGENT_CLIENT.CLAUDE_CODE },
 ] as const;
+export type ConnectionPreset = (typeof PAYPAL_AGENT_CARDS)[number]['client'];
 
 export const CHAT_ROLE = { USER: 'user', ASSISTANT: 'assistant' } as const;
 export const BUTTON_VARIANT = {
@@ -257,9 +260,9 @@ export const ADDITIONAL_MODEL_ARTWORK = [
 
 export const MAIN_NAV = [
   { name: UI_VIEW.CHAT, label: 'Chat' },
+  { name: UI_VIEW.CONNECT, label: 'Connections' },
   { name: UI_VIEW.MODELS, label: 'Models' },
   { name: UI_VIEW.TOOLS, label: 'Applications' },
-  { name: UI_VIEW.CONNECT, label: 'Agents' },
   { name: UI_VIEW.ACTIVITY, label: 'Activity' },
   { name: UI_VIEW.PAYMENTS, label: 'Payments' },
 ] as const;
@@ -302,4 +305,5 @@ export const DEMO_ACCOUNT = {
   TOAST_MS: 3000,
   SAMPLE_REQUESTS: 4,
 } as const;
-export const NAVIGATION_WIDTH = { MIN: 84, MAX: 112 } as const;
+export const NAVIGATION_WIDTH = { MIN: 240, DEFAULT: 307, MAX: 360 } as const;
+export const WORKSPACE_BREAKPOINT = { SIDEBAR: 900, CONTEXT: 1200 } as const;

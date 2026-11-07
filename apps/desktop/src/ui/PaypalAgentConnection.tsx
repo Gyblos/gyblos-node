@@ -1,92 +1,56 @@
-// Guides local agent connections to the existing shared PayPal Sandbox session.
+// Guides API clients to one existing local connection, without changing payment authorization.
+import { Code } from '@phosphor-icons/react';
 import { useState } from 'react';
 
 import {
+  PAYPAL_AGENT_ACTION,
   PAYPAL_AGENT_CLIENT,
   PAYPAL_AGENT_USAGE_STATE,
-  paypalAgentConnectionLabel,
-  type PaypalAgentClient,
-  type PaypalAgentResult,
-  type PaypalAgentUsageState,
 } from '../paypal-agent-model';
-import { paypalDollars } from '../paypal-model';
-import { PAYPAL_AGENT_CARDS } from './constants';
+import type { PaypalResult } from '../paypal-model';
+import { ConnectionContext } from './ConnectionContext';
+import {
+  CONNECTION_PRESET,
+  PAYPAL_AGENT_CARDS,
+  type ConnectionPreset,
+} from './constants';
 import { usePaypalAgentConnection } from './paypal-agent-connection-hook';
-import { PaypalAgentSetup } from './PaypalAgentSetup';
+import { ConnectionGuide, PaypalAgentSetup } from './PaypalAgentSetup';
 import { ServiceLogo } from './ServiceLogo';
-import { Badge, ChoiceCard } from './UI';
+import { Badge, Button, ChoiceCard } from './UI';
+import { WorkspaceLayout } from './WorkspaceLayout';
 
-function usageMessage(state: PaypalAgentUsageState) {
-  switch (state) {
-    case PAYPAL_AGENT_USAGE_STATE.BUSY:
-      return 'An inference or session operation is in progress; usage may change.';
-    case PAYPAL_AGENT_USAGE_STATE.CHAT_PENDING:
-      return 'A chat response awaits confirmation. Finish it in Payments.';
-    case PAYPAL_AGENT_USAGE_STATE.EXPIRED:
-      return 'The session expired. Close and settle it in Payments.';
-    case PAYPAL_AGENT_USAGE_STATE.ATTEMPTS_EXHAUSTED:
-      return 'The attempt limit was reached. Close and settle the session in Payments.';
-    case PAYPAL_AGENT_USAGE_STATE.LIMIT_REACHED:
-      return 'The approved spending limit was reached. Close and settle it in Payments.';
-    case PAYPAL_AGENT_USAGE_STATE.DISCONNECTING:
-      return 'Disconnecting. An inference already started can finish and count.';
-    case PAYPAL_AGENT_USAGE_STATE.DISCONNECT_FAILED:
-      return 'Disconnection could not be confirmed. Retry or review the session in Payments.';
-    default:
-      return 'The session needs review. Check Payments.';
-  }
-}
-function AgentUsage({
-  connection,
-  statusUnavailable,
-}: {
-  connection: PaypalAgentResult['connection'];
-  statusUnavailable: boolean;
-}) {
-  return (
-    <>
-      {statusUnavailable && (
-        <p role="status">
-          The connection status cannot be checked. A prior connection may still
-          be active.
-        </p>
-      )}
-      {connection &&
-        (statusUnavailable ? (
-          <p>Session usage and the remaining amount cannot be verified.</p>
-        ) : connection.usageUncertain ? (
-          <p>{usageMessage(connection.usageState)}</p>
-        ) : (
-          <p>
-            {paypalDollars(connection.limitCents - connection.spentCents)}{' '}
-            remaining · {paypalDollars(connection.spentCents)} used of{' '}
-            {paypalDollars(connection.limitCents)}
-          </p>
-        ))}
-    </>
-  );
-}
 function ClientSelector({
-  client,
+  preset,
   select,
 }: {
-  client: PaypalAgentClient;
-  select: (client: PaypalAgentClient) => void;
+  preset: ConnectionPreset;
+  select: (preset: ConnectionPreset) => void;
 }) {
   return (
     <div
-      className="ui-choice-grid"
+      className="ui-choice-grid ui-choice-grid--compact"
       role="radiogroup"
-      aria-label="Choose an agent"
+      aria-label="Choose a setup guide"
     >
       {PAYPAL_AGENT_CARDS.map((item) => (
         <ChoiceCard
           key={item.client}
-          name="paypal-agent-client"
+          name="connection-preset"
           title={item.client}
-          description={item.detail}
-          leading={<ServiceLogo service={item.client} />}
-          selected={client === item.client}
+          description={
+            item.client === PAYPAL_AGENT_CLIENT.CLAUDE_CODE ? (
+              <Badge>Experimental</Badge>
+            ) : undefined
+          }
+          leading={
+            item.client === CONNECTION_PRESET.GENERIC ? (
+              <Code size={24} />
+            ) : (
+              <ServiceLogo service={item.client} />
+            )
+          }
+          selected={preset === item.client}
           onSelect={() => select(item.client)}
           stacked
         />
@@ -94,101 +58,153 @@ function ClientSelector({
     </div>
   );
 }
-function SandboxUsageDetails() {
+
+type Props = {
+  onlyConnected?: boolean;
+  sessionReady: boolean;
+  sessionStatus: PaypalResult['status'];
+  sessionFresh: boolean;
+  contextOpen: boolean;
+  onCloseContext: () => void;
+  onPayments: () => void;
+};
+
+function SetupGuides({
+  preset,
+  setPreset,
+  connected,
+  onGuide,
+}: {
+  preset: ConnectionPreset;
+  setPreset: (preset: ConnectionPreset) => void;
+  connected: boolean;
+  onGuide: () => void;
+}) {
   return (
-    <section
-      className="ui-section ui-help-text"
-      aria-label="PayPal Sandbox usage"
-    >
-      <h3 className="ui-subheading">PayPal Sandbox usage</h3>
-      <p>
-        Each completed inference uses the session's rate, even if its response
-        is not delivered. Check the rate in Payments. One instruction may need
-        several inferences.
-      </p>
-      <p>
-        An inference already started can finish after disconnecting. Identical
-        requests without an operation key may be rejected to prevent a repeated
-        charge. Settle the session in Payments when finished.
-      </p>
+    <section className="ui-separated-section" aria-label="Setup guides">
+      <h3>{connected ? 'Set up your tool' : 'Setup guides'}</h3>
+      <ClientSelector preset={preset} select={setPreset} />
+      <div className="ui-guide-actions">
+        <p className="ui-help-text">
+          {preset === CONNECTION_PRESET.GENERIC
+            ? 'OpenAI-compatible · Chat Completions'
+            : 'A setup guide for this shared connection.'}
+        </p>
+        <Button onClick={onGuide}>
+          {preset === CONNECTION_PRESET.GENERIC
+            ? 'View example request'
+            : `Set up ${preset}`}
+        </Button>
+      </div>
     </section>
   );
 }
+
+function ConnectionFooter({
+  connection,
+  busy,
+  statusUnavailable,
+  run,
+  onPayments,
+}: Pick<
+  ReturnType<typeof usePaypalAgentConnection>,
+  'connection' | 'busy' | 'run' | 'statusUnavailable'
+> &
+  Pick<Props, 'onPayments'>) {
+  if (!connection) return null;
+  const failed =
+    connection.usageState === PAYPAL_AGENT_USAGE_STATE.DISCONNECT_FAILED;
+  return (
+    <div className="ui-connection-footer">
+      <Button
+        disabled={busy || connection.disconnecting}
+        onClick={() => {
+          void run(PAYPAL_AGENT_ACTION.DISCONNECT);
+        }}
+      >
+        {failed
+          ? 'Retry disconnect'
+          : connection.disconnecting
+            ? 'Disconnecting…'
+            : 'Disconnect'}
+      </Button>
+      <p className="ui-help-text">
+        Shared by all tools. An inference already running can finish and count.
+      </p>
+      {(connection.usageUncertain || statusUnavailable) && (
+        <Button onClick={onPayments}>Review payments</Button>
+      )}
+    </div>
+  );
+}
+
 export function PaypalAgentConnection({
   onlyConnected = false,
   sessionReady,
+  sessionStatus,
+  sessionFresh,
+  contextOpen,
+  onCloseContext,
   onPayments,
-}: {
-  onlyConnected?: boolean;
-  sessionReady: boolean;
-  onPayments: () => void;
-}) {
-  const { connection, busy, notice, statusUnavailable, run, copy } =
-    usePaypalAgentConnection();
-  const [client, setClient] = useState<PaypalAgentClient>(
-    PAYPAL_AGENT_CLIENT.OPENCODE,
+}: Props) {
+  const endpoint = usePaypalAgentConnection();
+  const { connection, busy, notice, statusUnavailable, run } = endpoint;
+  const [preset, setPreset] = useState<ConnectionPreset>(
+    CONNECTION_PRESET.GENERIC,
+  );
+  const [guideOpen, setGuideOpen] = useState(false);
+  const setup = { ...endpoint, onlyConnected, sessionReady, onPayments };
+  const context = (
+    <ConnectionContext
+      {...endpoint}
+      sessionReady={sessionReady}
+      sessionStatus={sessionStatus}
+      sessionFresh={sessionFresh}
+      onPayments={onPayments}
+    />
   );
   return (
-    <section
-      className="paypal-agent-page"
-      aria-label="Agent sandbox connection"
+    <WorkspaceLayout
+      context={context}
+      contextOpen={contextOpen}
+      onCloseContext={onCloseContext}
     >
-      <header className="paypal-agent-header">
-        <div>
-          <h2>Connect your agent</h2>
-          <p>Use Gyblos inference in the tools you already work with.</p>
-        </div>
-        <Badge>PayPal Sandbox</Badge>
-      </header>
-      <div className="paypal-agent-session">
-        <div className="paypal-agent-session-copy">
-          <span
-            className="paypal-agent-status-dot"
-            data-connected={
-              !!connection &&
-              !connection.usageUncertain &&
-              !statusUnavailable &&
-              !busy
-            }
-            aria-hidden="true"
+      <div className="ui-connection-page">
+        <header className="ui-page-heading">
+          <h2>Use Gyblos in your tools</h2>
+          <p>
+            {connection
+              ? 'Your API details, ready for a compatible app.'
+              : 'Create an API key and local URL for compatible apps.'}
+          </p>
+        </header>
+        <PaypalAgentSetup {...setup} />
+        <SetupGuides
+          preset={preset}
+          setPreset={setPreset}
+          connected={!!connection}
+          onGuide={() => setGuideOpen(true)}
+        />
+        <ConnectionFooter
+          connection={connection}
+          busy={busy}
+          statusUnavailable={statusUnavailable}
+          run={run}
+          onPayments={onPayments}
+        />
+        {notice && (
+          <p className="chat-notice" role="status">
+            {notice}
+          </p>
+        )}
+        {guideOpen && (
+          <ConnectionGuide
+            {...endpoint}
+            preset={preset}
+            close={() => setGuideOpen(false)}
           />
-          <div>
-            <strong>
-              {paypalAgentConnectionLabel(connection, busy, statusUnavailable)}
-            </strong>
-            <AgentUsage
-              connection={connection}
-              statusUnavailable={statusUnavailable || busy}
-            />
-            {!connection && !statusUnavailable && !busy && !sessionReady && (
-              <p>Open Payments to start or review a session.</p>
-            )}
-          </div>
-        </div>
-        <span className="paypal-agent-rate">Test funds</span>
+        )}
       </div>
-      <div className="paypal-agent-section-heading">
-        <h3>Choose an app</h3>
-        <span>One connection, all your agents</span>
-      </div>
-      <ClientSelector client={client} select={setClient} />
-      <PaypalAgentSetup
-        connection={connection}
-        client={client}
-        busy={busy}
-        statusUnavailable={statusUnavailable}
-        run={run}
-        copy={copy}
-        onlyConnected={onlyConnected}
-        sessionReady={sessionReady}
-        onPayments={onPayments}
-      />
-      <SandboxUsageDetails />
-      {notice && (
-        <p className="chat-notice" role="status">
-          {notice}
-        </p>
-      )}
-    </section>
+    </WorkspaceLayout>
   );
 }

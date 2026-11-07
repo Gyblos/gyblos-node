@@ -12,6 +12,9 @@ import {
   PAYPAL_AGENT_USAGE_STATE,
   type PaypalAgentUsageState,
 } from './constants';
+import { paypalAgentExample } from './paypal-agent-example';
+
+export { paypalAgentExample } from './paypal-agent-example';
 
 export {
   PAYPAL_AGENT_ACTION,
@@ -53,10 +56,10 @@ export class PaypalAgentConnectionError extends Error {
 }
 export function paypalAgentErrorMessage(error: PaypalAgentResult['error']) {
   if (error === PAYPAL_AGENT_ERROR.MODEL_UNAVAILABLE)
-    return `Check that ${DESKTOP_PAYPAL_AGENT.MODEL} is installed in Ollama. Settle this session in Chat, restart Gyblos, and start a new session.`;
+    return `Check that ${DESKTOP_PAYPAL_AGENT.MODEL} is installed in Ollama. Settle this session in Payments, restart Gyblos, and start a new session.`;
   if (error === PAYPAL_AGENT_ERROR.NEW_SESSION_REQUIRED)
-    return 'Settle the current session in Chat and start a new one to connect the agent.';
-  return 'Check that a PayPal Sandbox session is active in Chat, then try again.';
+    return 'Settle the current session in Payments and start a new one to connect the agent.';
+  return 'Check that a PayPal Sandbox session is active in Payments, then try again.';
 }
 export type PaypalAgentAction =
   (typeof PAYPAL_AGENT_ACTION)[keyof typeof PAYPAL_AGENT_ACTION];
@@ -259,6 +262,12 @@ export function paypalAgentCopyText(
   switch (target) {
     case PAYPAL_AGENT_COPY.KEY:
       return connection.key;
+    case PAYPAL_AGENT_COPY.URL:
+      return connection.url;
+    case PAYPAL_AGENT_COPY.MODEL:
+      return connection.model;
+    case PAYPAL_AGENT_COPY.EXAMPLE:
+      return paypalAgentExample(connection);
     case PAYPAL_AGENT_COPY.PI_SETTINGS:
       return piSettings();
     case PAYPAL_AGENT_COPY.CLAUDE_POWERSHELL:

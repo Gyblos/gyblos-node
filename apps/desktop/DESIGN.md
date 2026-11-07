@@ -29,7 +29,7 @@ Use the desktop shell, `PageBody`, `PagePanel`, `SectionTitle`, `List`, `ListRow
 `ui-help-text` for supporting copy. Use the `--space-*` variables for new
 spacing. Align related controls and keep primary actions easy to identify.
 
-`PageBody` owns scrolling and the responsive page inset (12–32 px). `PagePanel`
+`PageBody` owns scrolling and the responsive page inset (16–40 px). `PagePanel`
 and the chat root share the 1440 px maximum width and centered alignment.
 Sections use a 24 px gap. `DataTable` and `DataCell` keep tables readable as
 labeled session cards below 700 px of body width, including the payment column. Do not add an independent page width or padding to a
@@ -42,7 +42,7 @@ local gateway does not by itself verify an individual application. Keep keys
 masked and preserve the existing clipboard and session boundaries.
 
 Keep the buyer navigation stable: Applications describes optional web services,
-Agents configures supported clients, and Payments holds wallet and payment
+Connections configures supported clients and standard API access, and Payments holds wallet and payment
 settings. Without a usable approved session, agent setup offers Go to Payments
 in the primary action position. The link selects the PayPal view and navigates;
 it never creates an order, approves payment or connects an agent. Existing
@@ -128,3 +128,37 @@ stack on narrow windows. Show the authorized ceiling separately from recorded
 usage. A captured amount appears only for a fresh completed session; available
 authorization appears only for an active, unexpired session with attempts left.
 Hide current amounts while checking, processing or when status is unavailable.
+
+## Connections and buyer navigation
+
+Connections sits beside New chat above the searchable local conversation history.
+Models and Applications stay in the primary group; Activity, Payments and Settings
+stay below the history. The shared navigation row owns selection, hover, focus
+and geometry. Its default width is 307 px, resizable from 240 to 360 px. Narrow
+windows use a collapsible overlay sidebar. New chat and history selection never
+send a message, change a payment method or discard a stored conversation.
+
+The shared control size is 40 px, with 18 px icons and 52 px navigation rows.
+Use the shared compact ChoiceCard grid for client setup guides. Do not introduce
+button-specific hover, padding or radius rules.
+
+Connections uses WorkspaceLayout: a main surface and an optional 363 px context
+panel. Each scrolls within the shared body. On narrow bodies the context becomes
+an overlay, with its header toggle and close button retained. The panel contains
+local access and freshly checked payment-session context. It is not an accordion.
+
+The entry action is Create API connection only when the existing guards confirm
+a usable authorization and known connection status. Otherwise Go to Payments
+retains the payment-readiness journey. API key, Base URL and Model use shared
+CopyField controls. The host copies from its current connection; the key stays
+masked and does not have to be revealed. The model is informational, not a picker.
+
+Other app / API precedes the named setup guides. Guides open a dialog, never an
+accordion. Their configurations use the same connection; selecting a guide is
+not evidence that a client has connected. Local API ready describes the local
+listener only. Request examples keep the key in GYBLOS_API_KEY and are never run
+automatically. They can consume the approved shared limit if the user runs them.
+
+The browser review uses the exact desktop renderer and stylesheet, with an
+external synthetic bridge for example data. That bridge is not product code,
+does not run a model, and cannot approve, capture or void a PayPal payment.

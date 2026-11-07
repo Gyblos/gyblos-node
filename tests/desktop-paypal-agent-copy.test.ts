@@ -1,5 +1,6 @@
 // Tests desktop agent copying with synthetic values and an injected clipboard.
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { test } from 'node:test';
 
 import { createDesktopPaypalAgentHandlers } from '@gyblos/desktop/paypal-agent-handlers';
@@ -11,6 +12,7 @@ import {
   PAYPAL_AGENT_CLIENT,
   PAYPAL_AGENT_COPY,
   PAYPAL_AGENT_USAGE_STATE,
+  paypalAgentExample,
   piConfig,
   piSettings,
   type PaypalAgentUsageState,
@@ -167,7 +169,10 @@ void test('standard API details copy independently without loading a session or 
   for (const target of [PAYPAL_AGENT_COPY.URL, PAYPAL_AGENT_COPY.MODEL])
     assert.equal(await f.handlers.copy(sender, [{ target }]), true);
   assert.deepEqual(f.writes, [f.connection.url, f.connection.model]);
-  assert.equal(f.writes.some((text) => text.includes(f.connection.key)), false);
+  assert.equal(
+    f.writes.some((text) => text.includes(f.connection.key)),
+    false,
+  );
   assert.equal(f.loads(), 0);
   f.disconnect();
   assert.equal(
@@ -189,4 +194,27 @@ void test('the generic API example keeps credentials in an environment variable'
   assert.ok(text.includes(f.connection.model));
   assert.equal(text.includes(f.connection.key), false);
   assert.equal(f.loads(), 0);
+});
+
+void test('the API example is one shell-safe request with literal model data', () => {
+  const model = "synthetic'$(printf unsafe)";
+  const example = paypalAgentExample({
+    url: 'http://127.0.0.1:12345/v1',
+    model,
+  });
+  const script =
+    'curl() { printf "%s\\n" "$@"; }; GYBLOS_API_KEY=synthetic-token;\n' +
+    example;
+  const args = execFileSync('bash', ['-c', script], { encoding: 'utf8' })
+    .trim()
+    .split('\n');
+  assert.deepEqual(args, [
+    'http://127.0.0.1:12345/v1/chat/completions',
+    '--header',
+    'Authorization: Bearer synthetic-token',
+    '--header',
+    'Content-Type: application/json',
+    '--data',
+    JSON.stringify({ model, messages: [{ role: 'user', content: 'Hello' }] }),
+  ]);
 });

@@ -8,6 +8,9 @@ export const AGENT_CLIENT = {
 } as const;
 export const PAYPAL_AGENT_COPY = {
   KEY: 'api-key',
+  URL: 'api-url',
+  MODEL: 'model',
+  EXAMPLE: 'api-example',
   PI_SETTINGS: 'pi-settings',
   CLAUDE_POWERSHELL: 'claude-powershell',
 } as const;

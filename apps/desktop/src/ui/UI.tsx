@@ -103,7 +103,7 @@ export function ChoiceCard({
 }: {
   title: string;
   name: string;
-  description: string;
+  description?: ReactNode;
   leading: ReactNode;
   selected: boolean;
   onSelect: () => void;
@@ -123,7 +123,7 @@ export function ChoiceCard({
       </span>
       <span className="ui-choice-copy">
         <strong>{title}</strong>
-        <small>{description}</small>
+        {description && <small>{description}</small>}
       </span>
       {selected && <span className="ui-selection">Selected</span>}
     </label>

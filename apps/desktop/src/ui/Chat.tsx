@@ -70,6 +70,7 @@ import type { PaypalSessionView } from './usePaypalSession';
 export type ChatHandle = {
   newChat: () => void;
   prefill: (text: string) => void;
+  openChat: (id: string) => void;
 };
 type Props = {
   ref?: Ref<ChatHandle>;
@@ -80,6 +81,7 @@ type Props = {
   model: ModelOption;
   online: boolean;
   active?: boolean;
+  showToolbar?: boolean;
   connectedTools: ToolId[];
   onBrowseApplications: () => void;
   models: readonly ModelOption[];
@@ -146,6 +148,7 @@ export function Chat({
   paymentControl,
   paypal,
   onBusyChange,
+  showToolbar = true,
 }: Props) {
   const { sessions, activeId } = useSyncExternalStore(
     chat.subscribe,
@@ -228,6 +231,9 @@ export function Chat({
   useImperativeHandle(ref, () => ({
     newChat: () => reset(),
     prefill: (text) => reset(text),
+    openChat: (id) => {
+      if (!loadingHistory) openSession(id);
+    },
   }));
 
   useEffect(
@@ -387,7 +393,7 @@ export function Chat({
           <Button onClick={onReviewPaypal}>Review in Payments</Button>
         </div>
       )}
-      <div className="chat-toolbar">
+      <div className="chat-toolbar" hidden={!showToolbar}>
         <div className="chat-tools">
           <Button
             aria-label="Recent conversations"

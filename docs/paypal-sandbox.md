@@ -163,20 +163,32 @@ seller and does not send paid requests to the network marketplace.
 
 ## Connect an agent
 
-After starting a PayPal session, open **Connect** and choose **Create shared
-local connection**. Gyblos displays a loopback API URL, a temporary API key and
+After starting a PayPal session, open **Connections** and choose **Create API
+connection**. Gyblos displays a loopback API URL, a temporary API key and
 `gpt-oss:20b`. Select OpenCode, Pi, Codex or Claude Code for the relevant
 configuration. All four share the authorization and disconnecting revokes the
 shared connection. Never publish the connection URL, key or local settings.
 
+### Standard API access
+
+Connections shows masked API key, Base URL and Model fields, each with its own
+copy action. Copying uses the existing host connection and does not require
+revealing the key. **Other app / API** opens a Chat Completions example with
+`GYBLOS_API_KEY` as an environment variable. Copying or viewing an example never
+runs it; executing it can consume the session's shared limit. The listener is
+local to this computer and Gyblos must stay open. A ready listener does not
+verify any particular client. Images and unsupported API capabilities remain
+outside this prototype's subset.
+
 ### OpenCode
 
-Copy the OpenCode configuration into the project's `opencode.json`, merging it
-with any existing configuration rather than overwriting it. The generated
-settings select Gyblos as the project's default model and disable automatic
-titles. Keep this local configuration and its loopback URL out of Git. Set the
-key privately in the environment before starting OpenCode. For example, in a
-private zsh or bash terminal:
+This recipe uses OpenCode's V1 provider format; newer versions may require the
+standard API details. Copy the configuration into the project's `opencode.json`,
+merging it with any existing configuration rather than overwriting it. The
+generated settings select Gyblos as the project's default model and disable
+automatic titles. Keep this local configuration and its loopback URL out of Git.
+Set the key privately in the environment before starting OpenCode. For example,
+in a private zsh or bash terminal:
 
 ```sh
 printf 'Gyblos API key: '
@@ -254,18 +266,19 @@ settings; check them before starting a paid session.
 
 ### Codex CLI
 
-Merge the copied Codex configuration into the trusted project's
-`.codex/config.toml` and set `GYBLOS_API_KEY` before starting Codex. It uses the
-Responses API, disables provider retries and restricts the local prototype to
-text tools; web search, image viewing and multi-agent tools are disabled by the
-generated configuration. Do not overwrite existing settings. Codex's developer
-messages are sent to Ollama as system messages because the local engine does not
-expose a separate developer role. The local model may produce invalid tool
-arguments or request permissions; Codex's own approval rules still apply. The
-Responses adapter reports token usage as unavailable because the engine does not
-supply the required cache and reasoning breakdown. Codex cannot rely on this
-usage field to measure context, so keep tasks short; long conversations may hit
-the local context limit.
+Merge the copied Codex provider configuration into your user-level
+`~/.codex/config.toml` or a dedicated profile and set `GYBLOS_API_KEY` before
+starting Codex. Current Codex versions ignore provider definitions in
+project-level configuration. It uses the Responses API, disables provider
+retries and restricts the local prototype to text tools; web search, image
+viewing and multi-agent tools are disabled by the generated configuration. Do
+not overwrite existing settings. Codex's developer messages are sent to Ollama
+as system messages because the local engine does not expose a separate developer
+role. The local model may produce invalid tool arguments or request permissions;
+Codex's own approval rules still apply. The Responses adapter reports token
+usage as unavailable because the engine does not supply the required cache and
+reasoning breakdown. Codex cannot rely on this usage field to measure context,
+so keep tasks short; long conversations may hit the local context limit.
 
 ### Claude Code
 

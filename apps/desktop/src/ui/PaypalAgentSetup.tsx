@@ -1,7 +1,5 @@
-// Presents the selected agent's local connection and copy actions.
-// The session and credentials remain owned by the desktop host.
-import { Copy } from '@phosphor-icons/react';
-import { useState } from 'react';
+// Local API fields and setup guides; credentials and clipboard remain owned by the host.
+import { Key, Link } from '@phosphor-icons/react';
 
 import {
   canCreatePaypalAgent,
@@ -9,110 +7,143 @@ import {
   PAYPAL_AGENT_CLIENT,
   PAYPAL_AGENT_COPY,
   PAYPAL_AGENT_USAGE_STATE,
+  paypalAgentExample,
   paypalAgentNeedsPayments,
   type PaypalAgentAction,
   type PaypalAgentClient,
   type PaypalAgentCopyTarget,
   type PaypalAgentResult,
 } from '../paypal-agent-model';
-import { BUTTON_VARIANT } from './constants';
-import { FormActions, FormField, FormInput } from './Form';
-import { ServiceLogo } from './ServiceLogo';
+import {
+  BUTTON_VARIANT,
+  CONNECTION_PRESET,
+  type ConnectionPreset,
+} from './constants';
+import { CopyField, FormActions } from './Form';
+import { Modal } from './Modal';
 import { Button } from './UI';
 
-type Connection = NonNullable<PaypalAgentResult['connection']>;
-type DetailProps = {
-  connection: Connection;
-  client: PaypalAgentClient;
+type SetupProps = {
+  connection: PaypalAgentResult['connection'];
   busy: boolean;
+  statusUnavailable: boolean;
   run: (action: PaypalAgentAction) => Promise<void>;
   copy: (target: PaypalAgentCopyTarget, label: string) => Promise<void>;
+  onlyConnected: boolean;
+  sessionReady: boolean;
+  onPayments: () => void;
 };
 
-function AgentFields({
+function ConnectionFields({
   connection,
   copy,
-}: Pick<DetailProps, 'connection' | 'copy'>) {
-  const [showKey, setShowKey] = useState(false);
+  busy,
+  statusUnavailable,
+}: Pick<SetupProps, 'connection' | 'copy' | 'busy' | 'statusUnavailable'>) {
+  if (!connection) return null;
+  const disabled =
+    busy ||
+    statusUnavailable ||
+    connection.disconnecting ||
+    connection.usageState === PAYPAL_AGENT_USAGE_STATE.DISCONNECT_FAILED;
   return (
-    <>
-      <FormField htmlFor="agent-url" label="API URL">
-        <FormInput id="agent-url" readOnly value={connection.url} />
-      </FormField>
-      <div className="paypal-agent-key-row">
-        <FormField htmlFor="agent-key" label="API key">
-          <FormInput
-            id="agent-key"
-            type={showKey ? 'text' : 'password'}
-            readOnly
-            value={connection.key}
-          />
-        </FormField>
-        <Button
-          variant={BUTTON_VARIANT.SECONDARY}
-          onClick={() => {
-            void copy(PAYPAL_AGENT_COPY.KEY, 'API key');
-          }}
-        >
-          <Copy size={14} />
-          Copy API key
-        </Button>
-        <Button onClick={() => setShowKey((visible) => !visible)}>
-          {showKey ? 'Hide key' : 'Show key'}
-        </Button>
-      </div>
-    </>
+    <section className="ui-form" aria-label="API connection details">
+      <CopyField
+        id="agent-key"
+        label="API key"
+        secret
+        value={connection.key}
+        actionLabel="Copy API key"
+        disabled={disabled}
+        onCopy={() => {
+          void copy(PAYPAL_AGENT_COPY.KEY, 'API key');
+        }}
+      />
+      <CopyField
+        id="agent-url"
+        label="Base URL"
+        value={connection.url}
+        actionLabel="Copy URL"
+        disabled={disabled}
+        onCopy={() => {
+          void copy(PAYPAL_AGENT_COPY.URL, 'URL');
+        }}
+      />
+      <CopyField
+        id="agent-model"
+        label="Model"
+        value={connection.model}
+        actionLabel="Copy model"
+        disabled={disabled}
+        onCopy={() => {
+          void copy(PAYPAL_AGENT_COPY.MODEL, 'Model');
+        }}
+      />
+      <p className="ui-help-text">
+        Use these details in your app's provider settings.
+      </p>
+    </section>
   );
 }
 
-function AgentActions({ client, busy, run, copy }: DetailProps) {
+export function PaypalAgentSetup(props: SetupProps) {
+  const {
+    connection,
+    busy,
+    statusUnavailable,
+    onlyConnected,
+    sessionReady,
+    run,
+    onPayments,
+  } = props;
+  if (connection) return <ConnectionFields {...props} />;
+  const paymentsNeeded = paypalAgentNeedsPayments(
+    connection,
+    onlyConnected,
+    sessionReady,
+  );
   return (
-    <>
-      <FormActions align="start">
-        <Button
-          variant={BUTTON_VARIANT.PRIMARY}
-          onClick={() => {
-            void copy(client, 'Configuration');
-          }}
-        >
-          <Copy size={14} />
-          {client === PAYPAL_AGENT_CLIENT.CLAUDE_CODE
-            ? 'Copy Claude Code bash/zsh configuration'
-            : `Copy ${client} configuration`}
-        </Button>
-        {client === PAYPAL_AGENT_CLIENT.CLAUDE_CODE && (
+    <section className="ui-connection-entry" aria-label="Create API connection">
+      <div className="ui-entry-art" aria-hidden="true">
+        <Key size={40} />
+        <Link size={40} />
+      </div>
+      <div className="ui-section">
+        <h3>Your local API connection</h3>
+        <p className="ui-help-text">One connection for your tools.</p>
+        {paymentsNeeded ? (
+          <Button variant={BUTTON_VARIANT.PRIMARY} onClick={onPayments}>
+            Go to Payments
+          </Button>
+        ) : (
           <Button
-            variant={BUTTON_VARIANT.SECONDARY}
+            variant={BUTTON_VARIANT.PRIMARY}
+            disabled={
+              !canCreatePaypalAgent(
+                connection,
+                statusUnavailable,
+                busy,
+                onlyConnected,
+                sessionReady,
+              )
+            }
             onClick={() => {
-              void copy(
-                PAYPAL_AGENT_COPY.CLAUDE_POWERSHELL,
-                'PowerShell configuration',
-              );
+              void run(PAYPAL_AGENT_ACTION.CONNECT);
             }}
           >
-            Copy Claude Code PowerShell configuration
+            Create API connection
           </Button>
         )}
-        {client === PAYPAL_AGENT_CLIENT.PI && (
-          <Button
-            variant={BUTTON_VARIANT.SECONDARY}
-            onClick={() => {
-              void copy(PAYPAL_AGENT_COPY.PI_SETTINGS, 'Pi settings');
-            }}
-          >
-            Copy Pi settings
-          </Button>
-        )}
-        <Button
-          disabled={busy}
-          onClick={() => {
-            void run(PAYPAL_AGENT_ACTION.DISCONNECT);
-          }}
-        >
-          Disconnect
-        </Button>
-      </FormActions>
-    </>
+        <div className="ui-inline-actions">
+          <span className="ui-help-text">
+            {sessionReady
+              ? 'Payment session ready'
+              : 'Prepare a payment session to connect.'}
+          </span>
+          <Button onClick={onPayments}>View payments</Button>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -121,11 +152,12 @@ function ClientInstructions({ client }: { client: PaypalAgentClient }) {
     return (
       <ol className="ui-steps">
         <li>
-          Merge the copied configuration into your trusted project's
-          .codex/config.toml.
+          Merge the provider configuration into your user-level
+          ~/.codex/config.toml or a dedicated Codex profile.
         </li>
         <li>
-          Set GYBLOS_API_KEY in that project's environment and start Codex CLI.
+          Set GYBLOS_API_KEY in your terminal and start Codex CLI with that
+          configuration.
         </li>
         <li>
           Web search, multiple agents, image tools and automatic provider
@@ -171,7 +203,11 @@ function ClientInstructions({ client }: { client: PaypalAgentClient }) {
     );
   return (
     <ol className="ui-steps">
-      <li>Merge the copied configuration into your project's opencode.json.</li>
+      <li>
+        Merge the copied configuration into your project's opencode.json. This
+        recipe uses the V1 provider format; newer versions may require the
+        standard API details.
+      </li>
       <li>Set GYBLOS_API_KEY in OpenCode's environment.</li>
       <li>
         The configuration selects Gyblos and disables automatic titles in that
@@ -180,114 +216,124 @@ function ClientInstructions({ client }: { client: PaypalAgentClient }) {
     </ol>
   );
 }
-function AgentDetails(props: DetailProps) {
+
+function GuideActions({
+  client,
+  copy,
+  disabled,
+}: {
+  client: PaypalAgentClient;
+  copy: SetupProps['copy'];
+  disabled: boolean;
+}) {
   return (
-    <div className="paypal-agent-setup-body">
-      <AgentActions {...props} />
-      <section className="ui-section" aria-label="Setup instructions">
-        <h4 className="ui-subheading">Setup instructions</h4>
-        <ClientInstructions client={props.client} />
-      </section>
-      <section className="ui-section" aria-label="Connection details">
-        <h4 className="ui-subheading">Connection details</h4>
-        <div className="ui-form">
-          <AgentFields connection={props.connection} copy={props.copy} />
-          <p className="modal-note">
-            All apps share this connection. Disconnecting revokes access for
-            every app; the URL and key change with a new connection.
-          </p>
-        </div>
-      </section>
-    </div>
+    <FormActions align="start">
+      <Button
+        variant={BUTTON_VARIANT.PRIMARY}
+        disabled={disabled}
+        onClick={() => {
+          void copy(client, 'Configuration');
+        }}
+      >
+        {client === PAYPAL_AGENT_CLIENT.CLAUDE_CODE
+          ? 'Copy bash/zsh configuration'
+          : `Copy ${client} configuration`}
+      </Button>
+      {client === PAYPAL_AGENT_CLIENT.CLAUDE_CODE && (
+        <Button
+          disabled={disabled}
+          onClick={() => {
+            void copy(
+              PAYPAL_AGENT_COPY.CLAUDE_POWERSHELL,
+              'PowerShell configuration',
+            );
+          }}
+        >
+          Copy PowerShell configuration
+        </Button>
+      )}
+      {client === PAYPAL_AGENT_CLIENT.PI && (
+        <Button
+          disabled={disabled}
+          onClick={() => {
+            void copy(PAYPAL_AGENT_COPY.PI_SETTINGS, 'Pi settings');
+          }}
+        >
+          Copy Pi settings
+        </Button>
+      )}
+    </FormActions>
   );
 }
 
-function RetryDisconnect({ busy, run }: Pick<DetailProps, 'busy' | 'run'>) {
-  return (
-    <Button
-      disabled={busy}
-      onClick={() => {
-        void run(PAYPAL_AGENT_ACTION.DISCONNECT);
-      }}
-    >
-      Retry disconnect
-    </Button>
-  );
-}
-type SetupProps = Omit<DetailProps, 'connection'> & {
-  connection: PaypalAgentResult['connection'];
-  onlyConnected: boolean;
-  statusUnavailable: boolean;
-  sessionReady: boolean;
-  onPayments: () => void;
-};
-export function PaypalAgentSetup({
+export function ConnectionGuide({
+  preset,
   connection,
-  client,
   busy,
-  run,
-  copy,
-  onlyConnected,
   statusUnavailable,
-  sessionReady,
-  onPayments,
-}: SetupProps) {
+  copy,
+  close,
+}: Pick<SetupProps, 'connection' | 'busy' | 'statusUnavailable' | 'copy'> & {
+  preset: ConnectionPreset;
+  close: () => void;
+}) {
+  const disabled =
+    !connection ||
+    busy ||
+    statusUnavailable ||
+    connection.disconnecting ||
+    connection.usageState === PAYPAL_AGENT_USAGE_STATE.DISCONNECT_FAILED;
   return (
-    <div className="paypal-agent-setup">
-      <div className="paypal-agent-setup-heading">
-        <span className="ui-icon-tile" aria-hidden="true">
-          <ServiceLogo service={client} />
-        </span>
-        <div>
-          <h3>Set up {client}</h3>
-          <p>Connect {client} to Gyblos.</p>
-        </div>
-      </div>
-      {paypalAgentNeedsPayments(connection, onlyConnected, sessionReady) && (
-        <Button variant={BUTTON_VARIANT.PRIMARY} onClick={onPayments}>
-          Go to Payments
-        </Button>
-      )}
-      {connection && !sessionReady && (
-        <Button variant={BUTTON_VARIANT.SECONDARY} onClick={onPayments}>
-          Review payments
-        </Button>
-      )}
-      {!connection && !onlyConnected && sessionReady && (
-        <Button
-          variant={BUTTON_VARIANT.PRIMARY}
-          disabled={
-            !canCreatePaypalAgent(
-              connection,
-              statusUnavailable,
-              busy,
-              onlyConnected,
-              sessionReady,
-            )
-          }
-          onClick={() => {
-            void run(PAYPAL_AGENT_ACTION.CONNECT);
-          }}
-        >
-          Create shared local connection
-        </Button>
-      )}
-      {connection?.usageState ===
-        PAYPAL_AGENT_USAGE_STATE.DISCONNECT_FAILED && (
-        <RetryDisconnect busy={busy} run={run} />
-      )}
-      {connection &&
-        !connection.disconnecting &&
-        connection.usageState !==
-          PAYPAL_AGENT_USAGE_STATE.DISCONNECT_FAILED && (
-          <AgentDetails
-            connection={connection}
-            client={client}
-            busy={busy}
-            run={run}
-            copy={copy}
-          />
+    <Modal
+      title={
+        preset === CONNECTION_PRESET.GENERIC
+          ? 'OpenAI-compatible API'
+          : `Set up ${preset}`
+      }
+      close={close}
+    >
+      <div className="ui-section">
+        {preset === CONNECTION_PRESET.GENERIC ? (
+          <>
+            <p className="ui-help-text">
+              Set your app's base URL, API key and model using your connection
+              details. Text and supported tool calls use Chat Completions.
+            </p>
+            {connection && (
+              <pre className="ui-code-block">
+                {paypalAgentExample(connection)}
+              </pre>
+            )}
+            <p className="ui-help-text">
+              Set GYBLOS_API_KEY privately in your terminal before running the
+              example. Running a request can consume the shared session limit.
+            </p>
+            <Button
+              variant={BUTTON_VARIANT.PRIMARY}
+              disabled={disabled}
+              onClick={() => {
+                void copy(PAYPAL_AGENT_COPY.EXAMPLE, 'Example request');
+              }}
+            >
+              Copy example request
+            </Button>
+          </>
+        ) : (
+          <>
+            <GuideActions client={preset} copy={copy} disabled={disabled} />
+            <ClientInstructions client={preset} />
+          </>
         )}
-    </div>
+        <p className="ui-help-text">
+          Each completed inference counts toward the shared limit, even if
+          delivery fails. One instruction can need several inferences.
+        </p>
+        {!connection && (
+          <p className="ui-help-text">
+            Create a connection to copy its configuration.
+          </p>
+        )}
+      </div>
+    </Modal>
   );
 }

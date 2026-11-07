@@ -37,6 +37,7 @@ import { Activity } from './ui/Activity';
 import { AddFunds } from './ui/AddFunds';
 import { announcedModels } from './ui/announced-models';
 import { Appearance } from './ui/Appearance';
+import { BuyerSidebar } from './ui/BuyerSidebar';
 import { matchesCatalog, type ModelFilter } from './ui/catalog-state';
 import { Chat, type ChatHandle } from './ui/Chat';
 import { ChatController } from './ui/chat-controller';
@@ -53,6 +54,7 @@ import {
   SIDEBAR_MOTION_MS,
   UI_DIALOG,
   UI_VIEW,
+  WORKSPACE_BREAKPOINT,
 } from './ui/constants';
 import { authorizeDemo, DEMO_ACCOUNT, DEMO_AUTH } from './ui/demo-account';
 import { DesignSystem } from './ui/DesignSystem';
@@ -78,7 +80,6 @@ import { PaymentMethodSelector } from './ui/PaymentMethodSelector';
 import { PaypalAgentConnection } from './ui/PaypalAgentConnection';
 import { PaypalSessionPanel } from './ui/PaypalSessionPanel';
 import { ResizeHandle } from './ui/ResizeHandle';
-import { SidebarIcon, type SidebarSection } from './ui/SidebarIcon';
 import type { ToolId } from './ui/tools';
 import {
   Avatar,
@@ -139,9 +140,14 @@ export function DesktopApp() {
     );
   }
   const [navigationWidth, setNavigationWidth] = useState<number>(
-    NAVIGATION_WIDTH.MIN,
+    NAVIGATION_WIDTH.DEFAULT,
   );
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => window.innerWidth < WORKSPACE_BREAKPOINT.SIDEBAR,
+  );
+  const [contextOpen, setContextOpen] = useState(
+    () => window.innerWidth >= WORKSPACE_BREAKPOINT.CONTEXT,
+  );
   const [sidebarMoving, setSidebarMoving] = useState(false);
   function toggleSidebar() {
     setSidebarMoving(true);
@@ -155,7 +161,16 @@ export function DesktopApp() {
     );
     return () => window.clearTimeout(timer);
   }, [sidebarCollapsed, sidebarMoving]);
-  const modifier = /Mac/.test(navigator.platform) ? '⌘' : 'Ctrl+';
+  useEffect(() => {
+    function resize() {
+      if (window.innerWidth < WORKSPACE_BREAKPOINT.SIDEBAR)
+        setSidebarCollapsed(true);
+      if (window.innerWidth < WORKSPACE_BREAKPOINT.CONTEXT)
+        setContextOpen(false);
+    }
+    window.addEventListener('resize', resize);
+    return () => window.removeEventListener('resize', resize);
+  }, []);
   const [light, setLight] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(
     PAYMENT_METHOD.USDC,
@@ -324,16 +339,17 @@ export function DesktopApp() {
     >
       <header className="topbar">
         <div className="breadcrumb">
-          <IconButton
-            className="sidebar-toggle"
-            label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            aria-controls="app-sidebar"
-            aria-expanded={!sidebarCollapsed}
-            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            onClick={toggleSidebar}
-          >
-            <SidebarSimple size={16} aria-hidden="true" />
-          </IconButton>
+          {sidebarCollapsed && (
+            <IconButton
+              className="sidebar-toggle"
+              label="Expand sidebar"
+              aria-controls="app-sidebar"
+              aria-expanded={false}
+              onClick={toggleSidebar}
+            >
+              <SidebarSimple size={18} />
+            </IconButton>
+          )}
           {route.history.length > 0 && (
             <IconButton
               label={`Back to ${navigation.find((item) => item.name === route.history.at(-1))?.label ?? route.history.at(-1)}`}
@@ -347,6 +363,20 @@ export function DesktopApp() {
           </h1>
         </div>
         <div className="top-actions">
+          {view === UI_VIEW.CONNECT && (
+            <IconButton
+              label={
+                contextOpen
+                  ? 'Hide connection context'
+                  : 'Show connection context'
+              }
+              aria-pressed={contextOpen}
+              onClick={() => setContextOpen((open) => !open)}
+            >
+              <SidebarSimple size={18} mirrored />
+            </IconButton>
+          )}
+
           {paypalBusy &&
             paymentMethod === PAYMENT_METHOD.PAYPAL &&
             view !== UI_VIEW.CHAT && (
@@ -366,40 +396,30 @@ export function DesktopApp() {
             )}
         </div>
       </header>
-      <aside
-        id="app-sidebar"
-        className="sidebar"
-        inert={sidebarCollapsed}
-        aria-hidden={sidebarCollapsed || undefined}
-      >
-        <nav aria-label="Main navigation">
-          {navigation.map((item, index) => (
-            <Button
-              className={'nav-item ' + (view === item.name ? 'active' : '')}
-              key={item.name}
-              title={item.label + ' (' + modifier + (index + 1) + ')'}
-              aria-label={item.label}
-              aria-current={view === item.name ? 'page' : undefined}
-              onClick={() => {
-                navigate(item.name, false);
-              }}
-            >
-              <SidebarIcon name={item.name} />
-              <span>{item.label}</span>
-            </Button>
-          ))}
-        </nav>
-        <div className="sidebar-bottom">
-          <IconButton
-            label="Settings"
-            aria-current={view === UI_VIEW.SETTINGS ? 'page' : undefined}
-            onClick={() => navigate(UI_VIEW.SETTINGS, false)}
-          >
-            <GearSix size={17} />
-          </IconButton>
-          <Appearance light={light} onLightChange={setLight} compact />
-        </div>
-      </aside>
+      <BuyerSidebar
+        view={view}
+        collapsed={sidebarCollapsed}
+        chat={chatController}
+        storageState={conversationStorage}
+        onCollapse={toggleSidebar}
+        navigate={(next) => {
+          navigate(next, false);
+          if (window.innerWidth < WORKSPACE_BREAKPOINT.SIDEBAR)
+            setSidebarCollapsed(true);
+        }}
+        onNewChat={() => {
+          chatRef.current?.newChat();
+          navigate(UI_VIEW.CHAT, false);
+          if (window.innerWidth < WORKSPACE_BREAKPOINT.SIDEBAR)
+            setSidebarCollapsed(true);
+        }}
+        onOpenChat={(id) => {
+          chatRef.current?.openChat(id);
+          navigate(UI_VIEW.CHAT, false);
+          if (window.innerWidth < WORKSPACE_BREAKPOINT.SIDEBAR)
+            setSidebarCollapsed(true);
+        }}
+      />
       <div
         className="navigation-resizer"
         inert={sidebarCollapsed}
@@ -411,13 +431,17 @@ export function DesktopApp() {
           value={navigationWidth}
           min={NAVIGATION_WIDTH.MIN}
           max={NAVIGATION_WIDTH.MAX}
-          initial={NAVIGATION_WIDTH.MIN}
+          initial={NAVIGATION_WIDTH.DEFAULT}
           controls="app-sidebar app-workspace"
           onChange={setNavigationWidth}
         />
       </div>
       <div id="app-workspace" className="app-body">
-        <PageBody ref={content} chat={view === UI_VIEW.CHAT}>
+        <PageBody
+          ref={content}
+          chat={view === UI_VIEW.CHAT}
+          split={view === UI_VIEW.CONNECT}
+        >
           <div className="chat-root" hidden={view !== UI_VIEW.CHAT}>
             <Chat
               ref={chatRef}
@@ -429,6 +453,7 @@ export function DesktopApp() {
                 navigate(UI_VIEW.ACTIVITY);
               }}
               active={view === UI_VIEW.CHAT}
+              showToolbar={sidebarCollapsed}
               paymentMethod={paymentMethod}
               paymentControl={paymentSelector()}
               paypal={paypal}
@@ -560,21 +585,19 @@ export function DesktopApp() {
             </PagePanel>
           )}
           {view === UI_VIEW.CONNECT && (
-            <PagePanel>
-              <PaypalAgentConnection
-                onlyConnected={paymentMethod !== PAYMENT_METHOD.PAYPAL}
-                sessionReady={paypalSessionCanConnectAgent(
-                  paypalStatus,
-                  paypalStatusFresh,
-                  paypalBusy,
-                )}
-                onPayments={reviewPaypalPayments}
-              />
-              <Note>
-                Agent connections use the shared PayPal Sandbox session. USDC
-                agent connections are not available yet.
-              </Note>
-            </PagePanel>
+            <PaypalAgentConnection
+              onlyConnected={paymentMethod !== PAYMENT_METHOD.PAYPAL}
+              sessionReady={paypalSessionCanConnectAgent(
+                paypalStatus,
+                paypalStatusFresh,
+                paypalBusy,
+              )}
+              sessionStatus={paypalStatus}
+              sessionFresh={paypalStatusFresh}
+              contextOpen={contextOpen}
+              onCloseContext={() => setContextOpen(false)}
+              onPayments={reviewPaypalPayments}
+            />
           )}
           {view === UI_VIEW.TOOLS && (
             <PagePanel>

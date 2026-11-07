@@ -1,5 +1,9 @@
 // Shared form primitives for buyer surfaces; the caller owns values and actions.
+import { Copy } from '@phosphor-icons/react';
 import type { ComponentPropsWithoutRef, ReactNode } from 'react';
+
+import { BUTTON_VARIANT } from './constants';
+import { Button } from './UI';
 
 export function FormField({
   htmlFor,
@@ -35,6 +39,46 @@ export function FormActions({
   return (
     <div className={`ui-form-actions ui-form-actions--${align}`}>
       {children}
+    </div>
+  );
+}
+
+export function CopyField({
+  id,
+  label,
+  value,
+  secret = false,
+  actionLabel,
+  disabled,
+  onCopy,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  secret?: boolean;
+  actionLabel: string;
+  disabled?: boolean;
+  onCopy: () => void;
+}) {
+  return (
+    <div className="ui-field">
+      <label htmlFor={id}>{label}</label>
+      <div className="ui-copy-field">
+        <FormInput
+          id={id}
+          readOnly
+          type={secret ? 'password' : 'text'}
+          value={value}
+        />
+        <Button
+          variant={BUTTON_VARIANT.PRIMARY}
+          disabled={disabled}
+          onClick={onCopy}
+        >
+          <Copy size={16} />
+          {actionLabel}
+        </Button>
+      </div>
     </div>
   );
 }
