@@ -13,6 +13,7 @@ import {
 import { listReceipts } from '@gyblos/node/receipts';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 import { controlObject } from '@gyblos/protocol/control-validation';
+import type { ReceiptV1, SellerReceiptV1 } from '@gyblos/protocol/receipt';
 import { TELEMETRY_EVENTS } from '@gyblos/protocol/telemetry';
 
 import { PAID_ACCEPTANCE } from './paid-acceptance-constants';
@@ -49,7 +50,7 @@ function contentFree(text: string) {
   ])
     assert.equal(text.includes(content), false);
 }
-export async function unifiedPrivateEvidence(requestIds: string[]) {
+export async function unifiedPrivateEvidence(receipts: ReceiptV1[]) {
   let completed = 0;
   for (const role of [P2P_ROLES.BUYER, P2P_ROLES.SELLER]) {
     const receipts = receiptPathsIn(process.env, role);
@@ -101,8 +102,13 @@ export async function unifiedPrivateEvidence(requestIds: string[]) {
         events.push(event);
       }
     }
-    for (const requestId of requestIds) {
-      const selected = events.filter((event) => event.requestId === requestId);
+    for (const receipt of receipts) {
+      const expected = receipt.seller.record;
+      const selected = events.filter(
+        (event) => event.requestId === expected.requestId,
+      );
+      for (const event of selected)
+        assertReceiptTelemetry(event, expected, role);
       assert.equal(
         selected.filter(
           (event) => event.type === TELEMETRY_EVENTS.REQUEST_RECEIVED,
@@ -126,4 +132,20 @@ export async function unifiedPrivateEvidence(requestIds: string[]) {
     }
   }
   return completed;
+}
+
+type ReceiptBinding = Pick<
+  SellerReceiptV1,
+  'requestId' | 'buyerNodeId' | 'sellerNodeId' | 'selection' | 'streaming'
+>;
+export function assertReceiptTelemetry(
+  value: unknown,
+  expected: ReceiptBinding,
+  role: string,
+) {
+  assert.ok(value && typeof value === 'object' && !Array.isArray(value));
+  const event = controlObject(value, Object.keys(value));
+  assert.equal(event.role, role);
+  assert.equal(event.requestId, expected.requestId);
+  return event;
 }

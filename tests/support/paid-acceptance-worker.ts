@@ -181,7 +181,7 @@ export async function paidScenario(
     await paidPrivateRecords();
     cases.push(PAID_ACCEPTANCE_CASES.PRIVACY);
     return await finishPaidAcceptance(run.close, async () => {
-      const telemetryEvents = await unifiedPrivateEvidence(free.requestIds);
+      const telemetryEvents = await unifiedPrivateEvidence(free.receipts);
       cases.push(PAID_ACCEPTANCE_CASES.TELEMETRY);
       assert.equal(globalThis.fetch, originalFetch);
       assert.equal(run.external(), 0);
