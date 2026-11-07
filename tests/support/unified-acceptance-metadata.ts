@@ -53,9 +53,9 @@ function contentFree(text: string) {
 export async function unifiedPrivateEvidence(receipts: ReceiptV1[]) {
   let completed = 0;
   for (const role of [P2P_ROLES.BUYER, P2P_ROLES.SELLER]) {
-    const receipts = receiptPathsIn(process.env, role);
+    const paths = receiptPathsIn(process.env, role);
     for (const directory of [
-      receipts.directory,
+      paths.directory,
       rolePathIn(process.env, role, ROLE_FILES.telemetry),
     ]) {
       const info = await lstat(directory);
@@ -65,13 +65,13 @@ export async function unifiedPrivateEvidence(receipts: ReceiptV1[]) {
         FILE_MODES.privateDirectory,
       );
     }
-    const snapshot = await lstat(receipts.state);
+    const snapshot = await lstat(paths.state);
     assert.ok(snapshot.isFile());
     assert.equal(
       snapshot.mode & FILE_MODES.permissionMask,
       FILE_MODES.privateFile,
     );
-    contentFree(await readFile(receipts.state, 'utf8'));
+    contentFree(await readFile(paths.state, 'utf8'));
     const directory = rolePathIn(process.env, role, ROLE_FILES.telemetry);
     const names = await readdir(directory);
     assert.ok(names.length > 0 && names.length <= PRIVATE_LOG_LIMITS.maxFiles);
