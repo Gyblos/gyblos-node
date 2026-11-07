@@ -160,3 +160,33 @@ void test('agent copying rejects foreign, malformed, or disconnected requests', 
   assert.deepEqual(f.writes, []);
   assert.equal(f.loads(), 0);
 });
+
+void test('standard API details copy independently without loading a session or exposing the key', async () => {
+  const f = fixture();
+  const sender = { sender: f.contents, senderFrame: f.frame };
+  for (const target of [PAYPAL_AGENT_COPY.URL, PAYPAL_AGENT_COPY.MODEL])
+    assert.equal(await f.handlers.copy(sender, [{ target }]), true);
+  assert.deepEqual(f.writes, [f.connection.url, f.connection.model]);
+  assert.equal(f.writes.some((text) => text.includes(f.connection.key)), false);
+  assert.equal(f.loads(), 0);
+  f.disconnect();
+  assert.equal(
+    await f.handlers.copy(sender, [{ target: PAYPAL_AGENT_COPY.URL }]),
+    false,
+  );
+});
+
+void test('the generic API example keeps credentials in an environment variable', async () => {
+  const f = fixture();
+  const sender = { sender: f.contents, senderFrame: f.frame };
+  assert.equal(
+    await f.handlers.copy(sender, [{ target: PAYPAL_AGENT_COPY.EXAMPLE }]),
+    true,
+  );
+  const text = f.writes[0]!;
+  assert.ok(text.includes(`${f.connection.url}/chat/completions`));
+  assert.ok(text.includes('Authorization: Bearer $GYBLOS_API_KEY'));
+  assert.ok(text.includes(f.connection.model));
+  assert.equal(text.includes(f.connection.key), false);
+  assert.equal(f.loads(), 0);
+});
