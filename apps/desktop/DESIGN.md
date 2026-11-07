@@ -29,7 +29,7 @@ Use the desktop shell, `PageBody`, `PagePanel`, `SectionTitle`, `List`, `ListRow
 `ui-help-text` for supporting copy. Use the `--space-*` variables for new
 spacing. Align related controls and keep primary actions easy to identify.
 
-`PageBody` owns scrolling and the responsive page inset (16–40 px). `PagePanel`
+`PageBody` owns scrolling and the responsive page inset (12–40 px). `PagePanel`
 and the chat root share the 1440 px maximum width and centered alignment.
 Sections use a 24 px gap. `DataTable` and `DataCell` keep tables readable as
 labeled session cards below 700 px of body width, including the payment column. Do not add an independent page width or padding to a
@@ -162,3 +162,7 @@ automatically. They can consume the approved shared limit if the user runs them.
 The browser review uses the exact desktop renderer and stylesheet, with an
 external synthetic bridge for example data. That bridge is not product code,
 does not run a model, and cannot approve, capture or void a PayPal payment.
+
+Connection failures and unusable session reasons stay visible in the main
+pane when the context panel is closed. Short windows use the shared compact
+sidebar scale and a scroll fallback so Settings and history remain reachable.

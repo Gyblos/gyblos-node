@@ -6,9 +6,10 @@ import {
   PAYPAL_AGENT_ACTION,
   PAYPAL_AGENT_CLIENT,
   PAYPAL_AGENT_USAGE_STATE,
+  paypalAgentIsReady,
 } from '../paypal-agent-model';
 import type { PaypalResult } from '../paypal-model';
-import { ConnectionContext } from './ConnectionContext';
+import { ConnectionContext, connectionUsageMessage } from './ConnectionContext';
 import {
   CONNECTION_PRESET,
   PAYPAL_AGENT_CARDS,
@@ -138,6 +139,40 @@ function ConnectionFooter({
   );
 }
 
+function ConnectionHeading({
+  connection,
+  busy,
+  statusUnavailable,
+}: Pick<
+  ReturnType<typeof usePaypalAgentConnection>,
+  'connection' | 'busy' | 'statusUnavailable'
+>) {
+  const ready = paypalAgentIsReady(connection, busy, statusUnavailable);
+  return (
+    <>
+      <header className="ui-page-heading">
+        <h2>Use Gyblos in your tools</h2>
+        <p>
+          {ready
+            ? 'Your API details, ready for a compatible app.'
+            : connection
+              ? 'Review this connection before starting another request.'
+              : 'Create an API key and local URL for compatible apps.'}
+        </p>
+      </header>
+      {connection && !ready && (
+        <p className="ui-inline-notice" role="status">
+          {statusUnavailable
+            ? 'The local API status cannot be checked. Review Payments before starting requests.'
+            : busy
+              ? 'Checking the local API.'
+              : connectionUsageMessage(connection.usageState)}
+        </p>
+      )}
+    </>
+  );
+}
+
 export function PaypalAgentConnection({
   onlyConnected = false,
   sessionReady,
@@ -170,14 +205,7 @@ export function PaypalAgentConnection({
       onCloseContext={onCloseContext}
     >
       <div className="ui-connection-page">
-        <header className="ui-page-heading">
-          <h2>Use Gyblos in your tools</h2>
-          <p>
-            {connection
-              ? 'Your API details, ready for a compatible app.'
-              : 'Create an API key and local URL for compatible apps.'}
-          </p>
-        </header>
+        <ConnectionHeading {...endpoint} />
         <PaypalAgentSetup {...setup} />
         <SetupGuides
           preset={preset}

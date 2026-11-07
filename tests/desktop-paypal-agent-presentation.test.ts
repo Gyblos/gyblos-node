@@ -114,8 +114,13 @@ void test('retained API details are ready only with confirmed usable connection 
   const model = await import('@gyblos/desktop/paypal-agent-model');
   assert.equal(typeof model.paypalAgentIsReady, 'function');
   const connection: NonNullable<PaypalAgentResult['connection']> = {
-    url: 'http://127.0.0.1:1234/v1', key: 'synthetic-key', model: 'synthetic-model',
-    spentCents: 20, limitCents: 100, usageUncertain: false, disconnecting: false,
+    url: 'http://127.0.0.1:1234/v1',
+    key: 'synthetic-key',
+    model: 'synthetic-model',
+    spentCents: 20,
+    limitCents: 100,
+    usageUncertain: false,
+    disconnecting: false,
     usageState: PAYPAL_AGENT_USAGE_STATE.AVAILABLE,
   };
   assert.equal(model.paypalAgentIsReady(connection, false, false), true);
@@ -124,6 +129,18 @@ void test('retained API details are ready only with confirmed usable connection 
   assert.equal(model.paypalAgentIsReady(connection, true, false), false);
   for (const state of Object.values(PAYPAL_AGENT_USAGE_STATE)) {
     if (state === PAYPAL_AGENT_USAGE_STATE.AVAILABLE) continue;
-    assert.equal(model.paypalAgentIsReady({ ...connection, usageUncertain: true, usageState: state, disconnecting: state === PAYPAL_AGENT_USAGE_STATE.DISCONNECTING }, false, false), false);
+    assert.equal(
+      model.paypalAgentIsReady(
+        {
+          ...connection,
+          usageUncertain: true,
+          usageState: state,
+          disconnecting: state === PAYPAL_AGENT_USAGE_STATE.DISCONNECTING,
+        },
+        false,
+        false,
+      ),
+      false,
+    );
   }
 });

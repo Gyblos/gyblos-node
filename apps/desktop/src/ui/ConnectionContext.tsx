@@ -3,6 +3,7 @@ import {
   DESKTOP_PAYPAL_AGENT,
   PAYPAL_AGENT_USAGE_STATE,
   paypalAgentConnectionLabel,
+  paypalAgentIsReady,
   type PaypalAgentResult,
 } from '../paypal-agent-model';
 import { paypalDollars, type PaypalResult } from '../paypal-model';
@@ -87,8 +88,7 @@ function SessionAmounts({
 
 export function ConnectionContext(props: Props) {
   const { connection, busy, statusUnavailable, onPayments } = props;
-  const ready =
-    !!connection && !busy && !statusUnavailable && !connection.usageUncertain;
+  const ready = paypalAgentIsReady(connection, busy, statusUnavailable);
   return (
     <>
       <section className="ui-context-section">

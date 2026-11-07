@@ -77,6 +77,8 @@ export type PaypalAgentResult = {
   error: (typeof PAYPAL_AGENT_ERROR)[keyof typeof PAYPAL_AGENT_ERROR] | null;
 };
 
+type AgentConnection = NonNullable<PaypalAgentResult['connection']>;
+
 export function canCreatePaypalAgent(
   connection: PaypalAgentResult['connection'],
   statusUnavailable: boolean,
@@ -106,11 +108,22 @@ export function paypalAgentConnectionLabel(
   if (connection?.usageUncertain) return 'Session needs attention';
   return connection ? 'Local connection active' : 'No local connection';
 }
+export function paypalAgentIsReady(
+  connection: PaypalAgentResult['connection'],
+  busy: boolean,
+  statusUnavailable: boolean,
+) {
+  return (
+    !!connection &&
+    !busy &&
+    !statusUnavailable &&
+    !connection.usageUncertain &&
+    !connection.disconnecting &&
+    connection.usageState === PAYPAL_AGENT_USAGE_STATE.AVAILABLE
+  );
+}
 export function opencodeConfig(
-  connection: Pick<
-    NonNullable<PaypalAgentResult['connection']>,
-    'url' | 'key' | 'model'
-  >,
+  connection: Pick<AgentConnection, 'url' | 'key' | 'model'>,
 ) {
   return JSON.stringify(
     {
@@ -140,10 +153,7 @@ export function opencodeConfig(
   );
 }
 export function piConfig(
-  connection: Pick<
-    NonNullable<PaypalAgentResult['connection']>,
-    'url' | 'key' | 'model'
-  >,
+  connection: Pick<AgentConnection, 'url' | 'key' | 'model'>,
 ) {
   return JSON.stringify(
     {
@@ -187,10 +197,7 @@ export function piSettings() {
   );
 }
 export function codexConfig(
-  connection: Pick<
-    NonNullable<PaypalAgentResult['connection']>,
-    'url' | 'key' | 'model'
-  >,
+  connection: Pick<AgentConnection, 'url' | 'key' | 'model'>,
 ) {
   return [
     'model_provider = "gyblos"',
@@ -217,10 +224,7 @@ function shellLiteral(value: string) {
   return `'${value.replaceAll("'", "'\\''")}'`;
 }
 export function claudeCodeConfig(
-  connection: Pick<
-    NonNullable<PaypalAgentResult['connection']>,
-    'url' | 'key' | 'model'
-  >,
+  connection: Pick<AgentConnection, 'url' | 'key' | 'model'>,
 ) {
   return [
     `export ANTHROPIC_BASE_URL=${shellLiteral(new URL(connection.url).origin)}`,
@@ -236,10 +240,7 @@ export function claudeCodeConfig(
   ].join('\n');
 }
 export function claudeCodePowerShellConfig(
-  connection: Pick<
-    NonNullable<PaypalAgentResult['connection']>,
-    'url' | 'key' | 'model'
-  >,
+  connection: Pick<AgentConnection, 'url' | 'key' | 'model'>,
 ) {
   const literal = (value: string) => `'${value.replaceAll("'", "''")}'`;
   return [
@@ -256,7 +257,7 @@ export function claudeCodePowerShellConfig(
   ].join('\n');
 }
 export function paypalAgentCopyText(
-  connection: NonNullable<PaypalAgentResult['connection']>,
+  connection: AgentConnection,
   target: PaypalAgentCopyTarget,
 ) {
   switch (target) {

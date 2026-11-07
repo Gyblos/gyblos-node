@@ -2264,3 +2264,45 @@
   width: 32px;
   height: 32px;
 }
+
+/* A closed inspector never hides a connection condition that needs attention. */
+.desktop-frame .ui-inline-notice {
+  border-inline-start: 2px solid var(--warm);
+  padding: var(--space-2) var(--space-3);
+  color: var(--ink);
+  font-size: var(--ui-font);
+  line-height: 1.5;
+}
+/* Keep the whole menu reachable at the supported minimum window height. */
+@media (max-height: 700px) {
+  .desktop-frame > .buyer-sidebar {
+    gap: var(--space-2);
+    padding-bottom: var(--space-2);
+    overflow-y: auto;
+    --control-size: 32px;
+  }
+  .desktop-frame .ui-sidebar-brand {
+    height: 48px;
+  }
+  .desktop-frame .ui-nav-row {
+    height: 36px;
+  }
+  .desktop-frame .ui-sidebar-history {
+    gap: var(--space-2);
+    padding-top: var(--space-2);
+    min-height: 120px;
+  }
+  .desktop-frame .ui-sidebar-footer {
+    padding-top: var(--space-2);
+  }
+}
+@container (max-width: 700px) {
+  .desktop-frame .ui-choice-grid--compact {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@container (max-width: 420px) {
+  .desktop-frame .ui-choice-grid--compact {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
