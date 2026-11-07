@@ -71,6 +71,12 @@ void test(
     assert.ok(report.restarts >= 2);
     assert.ok(report.blocked >= 2);
     assert.equal(report.externalCalls, 0);
+    assert.equal(Reflect.get(report, 'freeAnswers'), 3);
+    assert.equal(Reflect.get(report, 'freeAttempts'), 4);
+    assert.equal(Reflect.get(report, 'freePaymentPreparations'), 0);
+    assert.equal(Reflect.get(report, 'freeTokenizerLoads'), 0);
+    assert.equal(Reflect.get(report, 'confirmedReceipts'), 3);
+    assert.ok(Reflect.get(report, 'telemetryEvents') >= 6);
   },
 );
 
@@ -187,5 +193,30 @@ void test('paid acceptance teardown cannot hide swallowed forbidden I/O', async 
       },
     ),
     { code: 'ERR_ASSERTION' },
+  );
+});
+
+void test('paid acceptance rejects paid-only evidence without the unified free journey', () => {
+  assert.throws(
+    () =>
+      parsePaidReport(
+        JSON.stringify({
+          ok: true,
+          nativeIroh: true,
+          simulatedChain: true,
+          realPayments: false,
+          cases: Object.values(PAID_ACCEPTANCE_CASES),
+          answers: 4,
+          attempts: 4,
+          deposits: 4,
+          settlements: 4,
+          restarts: 2,
+          blocked: 2,
+          externalCalls: 0,
+          registryReads: 1,
+          forbiddenRpcMethods: 0,
+        }),
+      ),
+    { code: 'ACCEPTANCE_FAILED' },
   );
 });
