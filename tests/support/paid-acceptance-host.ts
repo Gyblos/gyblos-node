@@ -15,13 +15,21 @@ import { createAcceptanceRegistry } from '@gyblos/lab-harness/acceptance/identit
 import { createAcceptanceIndex } from '@gyblos/lab-harness/acceptance/index';
 import { receiptNativeBinding } from '@gyblos/lab-harness/acceptance/receipt-native';
 import { createNode } from '@gyblos/node';
-import { MODEL_IDS, P2P_ROLES } from '@gyblos/protocol/constants';
+import {
+  FREE_STREAM,
+  MODEL_IDS,
+  OFFER_PRICING_KINDS,
+  P2P_ROLES,
+  type OfferPricingKind,
+} from '@gyblos/protocol/constants';
 import { PAID_STREAM } from '@gyblos/protocol/paid/constants';
 
 import {
   paidAcceptanceRoles,
   paidBuyerConfiguration,
+  paidSellerConfiguration,
 } from './paid-acceptance-config';
+import { PAID_ACCEPTANCE } from './paid-acceptance-constants';
 import {
   paidAcceptanceEngine,
   paidAcceptanceMeter,
@@ -40,7 +48,15 @@ export async function paidWait(
   }
   assert.fail('Synthetic acceptance deadline');
 }
-export async function paidAcceptanceHost(signal: AbortSignal) {
+export async function paidAcceptanceHost(
+  signal: AbortSignal,
+  initialPricing: OfferPricingKind = OFFER_PRICING_KINDS.PAID,
+) {
+  let pricing = initialPricing;
+  let budget: string =
+    pricing === OFFER_PRICING_KINDS.FREE ? '0' : PAID_ACCEPTANCE.maxAtomic;
+  let paymentPreparations = 0;
+  let tokenizerLoads = 0;
   const roles = await paidAcceptanceRoles();
   const engine = paidAcceptanceEngine();
   const binding = receiptNativeBinding({ calls: engine.attempts });
@@ -92,13 +108,22 @@ export async function paidAcceptanceHost(signal: AbortSignal) {
     await buyer?.close();
     buyer = undefined;
   };
+  const buyerOptions = () => ({
+    bind,
+    port: 0,
+    chain: async () => {
+      paymentPreparations++;
+      assert.equal(pricing, OFFER_PRICING_KINDS.PAID);
+      return payments.buyer();
+    },
+    meter: async () => {
+      tokenizerLoads++;
+      assert.equal(pricing, OFFER_PRICING_KINDS.PAID);
+      return paidAcceptanceMeter;
+    },
+  });
   const startBuyer = async () => {
-    buyer = await startProductBuyer({
-      bind,
-      port: 0,
-      chain: payments.buyer,
-      meter: async () => paidAcceptanceMeter,
-    });
+    buyer = await startProductBuyer(buyerOptions());
     try {
       token = (
         await readFile(
@@ -116,6 +141,7 @@ export async function paidAcceptanceHost(signal: AbortSignal) {
     }
   };
   const startSeller = async () => {
+    await paidSellerConfiguration(pricing);
     seller = createNode({
       bind,
       payments: payments.seller,
@@ -168,6 +194,7 @@ export async function paidAcceptanceHost(signal: AbortSignal) {
       roles.seller.nodeId,
       binding.directAddresses(),
       registry.url,
+      budget,
     );
     await registry.bind(
       {
@@ -179,11 +206,21 @@ export async function paidAcceptanceHost(signal: AbortSignal) {
     );
     await startBuyer();
     assert.equal(engine.attempts(), 0);
-    assert.ok(binding.protocols()[0]?.includes(PAID_STREAM.alpn));
+    assert.ok(
+      binding
+        .protocols()[0]
+        ?.includes(
+          pricing === OFFER_PRICING_KINDS.PAID
+            ? PAID_STREAM.alpn
+            : FREE_STREAM.alpn,
+        ),
+    );
     return {
       engine,
       roles,
       payments,
+      paymentPreparations: () => paymentPreparations,
+      tokenizerLoads: () => tokenizerLoads,
       binding,
       registry,
       dropNextPaid() {
@@ -195,11 +232,7 @@ export async function paidAcceptanceHost(signal: AbortSignal) {
       stopBuyer: closeBuyer,
       terminalOptions() {
         assert.equal(buyer, undefined);
-        return {
-          bind,
-          chain: payments.buyer,
-          meter: async () => paidAcceptanceMeter,
-        };
+        return buyerOptions();
       },
       registerTerminal(host: Awaited<ReturnType<typeof startProductBuyer>>) {
         assert.equal(buyer, undefined);
@@ -211,6 +244,23 @@ export async function paidAcceptanceHost(signal: AbortSignal) {
         return buyer.url;
       },
       close,
+      async reprice(next: OfferPricingKind) {
+        pricing = next;
+        budget = PAID_ACCEPTANCE.maxAtomic;
+        await this.restart(true);
+      },
+      async setBudget(maxAtomic: string) {
+        budget = maxAtomic;
+        await closeBuyer();
+        await paidBuyerConfiguration(
+          roles.seller.owner,
+          roles.seller.nodeId,
+          binding.directAddresses(),
+          registry.url,
+          budget,
+        );
+        await startBuyer();
+      },
       async restart(both: boolean, afterStop?: () => void) {
         await closeBuyer();
         if (both) {
@@ -223,6 +273,7 @@ export async function paidAcceptanceHost(signal: AbortSignal) {
             roles.seller.nodeId,
             binding.directAddresses(),
             registry.url,
+            budget,
           );
         }
         await startBuyer();

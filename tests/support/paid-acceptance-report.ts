@@ -29,6 +29,12 @@ export function parsePaidReport(text: string): PaidAcceptanceReport {
       'externalCalls',
       'registryReads',
       'forbiddenRpcMethods',
+      'freeAnswers',
+      'freeAttempts',
+      'freePaymentPreparations',
+      'freeTokenizerLoads',
+      'confirmedReceipts',
+      'telemetryEvents',
     ]);
     const known = Object.values(PAID_ACCEPTANCE_CASES);
     const cases = controlArray(row.cases, known.length).map((value) => {
@@ -45,8 +51,19 @@ export function parsePaidReport(text: string): PaidAcceptanceReport {
     )
       throw new Error();
     const answers = controlInteger(row.answers, 4);
-    const attempts = controlInteger(row.attempts, answers);
-    const deposits = controlInteger(row.deposits, attempts, attempts);
+    const freeAnswers = controlInteger(row.freeAnswers, 3, 3);
+    const freeAttempts = controlInteger(row.freeAttempts, 4, 4);
+    const confirmedReceipts = controlInteger(
+      row.confirmedReceipts,
+      freeAnswers,
+      freeAnswers,
+    );
+    const attempts = controlInteger(row.attempts, answers + freeAttempts);
+    const deposits = controlInteger(
+      row.deposits,
+      attempts - freeAttempts,
+      attempts - freeAttempts,
+    );
     const settlements = controlInteger(row.settlements, deposits, deposits);
     return {
       ok: true,
@@ -55,6 +72,20 @@ export function parsePaidReport(text: string): PaidAcceptanceReport {
       realPayments: false,
       cases,
       answers,
+      freeAnswers,
+      freeAttempts,
+      confirmedReceipts,
+      freePaymentPreparations: controlInteger(
+        row.freePaymentPreparations,
+        0,
+        0,
+      ),
+      freeTokenizerLoads: controlInteger(row.freeTokenizerLoads, 0, 0),
+      telemetryEvents: controlInteger(
+        row.telemetryEvents,
+        freeAnswers * 2,
+        freeAnswers * 2,
+      ),
       attempts,
       deposits,
       settlements,
