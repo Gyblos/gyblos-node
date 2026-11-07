@@ -11,6 +11,7 @@ export async function finishReceiptWait(
     input.write('/exit\n');
     return { ok: true };
   } catch (error) {
+    controller.abort(error);
     input.end();
     return { ok: false, error };
   }

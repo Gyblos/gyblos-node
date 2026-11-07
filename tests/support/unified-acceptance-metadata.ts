@@ -11,7 +11,7 @@ import {
   rolePathIn,
 } from '@gyblos/config';
 import { listReceipts } from '@gyblos/node/receipts';
-import { P2P_ROLES } from '@gyblos/protocol/constants';
+import { P2P_ROLES, type P2PRole } from '@gyblos/protocol/constants';
 import { controlObject } from '@gyblos/protocol/control-validation';
 import type { ReceiptV1, SellerReceiptV1 } from '@gyblos/protocol/receipt';
 import { TELEMETRY_EVENTS } from '@gyblos/protocol/telemetry';
@@ -97,7 +97,7 @@ export async function unifiedPrivateEvidence(receipts: ReceiptV1[]) {
         );
         const value: unknown = JSON.parse(line);
         assert.ok(value && typeof value === 'object' && !Array.isArray(value));
-        const event = controlObject(value, Object.keys(value));
+        const event = telemetryMetadata(value);
         assert.equal(event.role, role);
         events.push(event);
       }
@@ -141,11 +141,47 @@ type ReceiptBinding = Pick<
 export function assertReceiptTelemetry(
   value: unknown,
   expected: ReceiptBinding,
-  role: string,
+  role: P2PRole,
 ) {
-  assert.ok(value && typeof value === 'object' && !Array.isArray(value));
-  const event = controlObject(value, Object.keys(value));
+  const event = telemetryMetadata(value);
   assert.equal(event.role, role);
   assert.equal(event.requestId, expected.requestId);
+  assert.equal(event.buyerNodeId, expected.buyerNodeId);
+  assert.equal(event.sellerNodeId, expected.sellerNodeId);
+  assert.deepEqual(event.selection, expected.selection);
+  assert.equal(event.streaming, expected.streaming);
   return event;
+}
+
+function telemetryMetadata(value: unknown) {
+  assert.ok(value && typeof value === 'object' && !Array.isArray(value));
+  const allowed = [
+    'type',
+    'at',
+    'role',
+    'buyerNodeId',
+    'sellerNodeId',
+    'selection',
+    'engineKind',
+    'streaming',
+    'meteringMode',
+    'requestId',
+    'usage',
+    'sizes',
+    'totalMs',
+    'finishReason',
+    'code',
+    'reason',
+    'delivered',
+    'refusal',
+    'firstTokenMs',
+    'amountAtomic',
+    'feeAtomic',
+    'network',
+    'asset',
+    'receipt',
+  ];
+  const keys = Object.keys(value);
+  assert.ok(keys.every((key) => allowed.includes(key)));
+  return controlObject(value, keys);
 }

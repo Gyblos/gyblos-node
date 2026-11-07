@@ -155,8 +155,12 @@ export function assertPaidStreamAnswer(
 export function assertFreeAnswer(
   body: string,
   stream: boolean,
-  _contentType?: string,
+  contentType?: string,
 ) {
+  assert.equal(
+    contentType,
+    stream ? FREE_BUYER.streamContentType : 'application/json',
+  );
   const frames = stream ? body.trimEnd().split('\n\n') : [];
   if (stream) assert.equal(frames.pop(), `data: ${FREE_BUYER.streamDone}`);
   const rows: unknown[] = stream
@@ -166,6 +170,7 @@ export function assertFreeAnswer(
       })
     : [JSON.parse(body)];
   let text = '';
+  let id: string | undefined;
   let terminal = false;
   for (const value of rows) {
     assert.equal(terminal, false);
@@ -180,6 +185,9 @@ export function assertFreeAnswer(
       ...(has('usage') ? ['usage'] : []),
       ...(has(BUYER_EXECUTION_FIELD) ? [BUYER_EXECUTION_FIELD] : []),
     ]);
+    assert.ok(typeof row.id === 'string');
+    id ??= row.id;
+    assert.equal(row.id, id);
     assert.equal(Object.hasOwn(row, PAID_BUYER.paymentField), false);
     const [choice] = controlArray(row.choices, 1);
     const item = controlObject(choice, [
