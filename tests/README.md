@@ -160,6 +160,24 @@ journals. It also drives the product terminal loop with synthetic streams,
 checks a mid-answer engine interruption and reconciles a simulated settlement.
 See [the acceptance boundary](../docs/paid-acceptance.md).
 
+The existing `acceptance:paid` startup harness also exercises `pnpm buyer`'s
+automatic free-or-paid entry. A free listing is served with both zero and
+positive buyer budgets over native Iroh: JSON, SSE and the actual terminal
+workflow must complete without constructing the paid buyer runtime, loading its
+tokenizer or making a payment authorization/deposit. The scripted terminal user
+waits for receipt confirmation before exiting; a failed wait aborts its pending
+terminal question and preserves the failure instead of hanging until the outer
+watchdog. Abrupt exit may cancel the best-effort receipt exchange. It verifies
+signed receipt pairs on both roles and after restart, private bounded metadata
+files and correlated completion events. A later priced listing uses the existing
+simulated payment adapters; uncertain paid state blocks a free listing across
+restart. Free and paid cancellation retain one engine attempt and no prompt
+retry. Only the local synthetic identity RPC is permitted; all other fetches
+outside the owned buyer and in-process index fail the scenario, including calls
+during teardown. Report parsing requires these phases, zero free
+payment-preparation counts and consistent separate paid/free totals. No real
+payments, providers, Docker or production index are used.
+
 ## Timing-sensitive fixtures
 
 Capacity assertions do not measure disk speed: the telemetry pending-buffer test

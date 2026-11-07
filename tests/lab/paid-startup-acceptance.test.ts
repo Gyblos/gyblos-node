@@ -71,6 +71,12 @@ void test(
     assert.ok(report.restarts >= 2);
     assert.ok(report.blocked >= 2);
     assert.equal(report.externalCalls, 0);
+    assert.equal(report.freeAnswers, 3);
+    assert.equal(report.freeAttempts, 4);
+    assert.equal(report.freePaymentPreparations, 0);
+    assert.equal(report.freeTokenizerLoads, 0);
+    assert.equal(report.confirmedReceipts, 3);
+    assert.ok(report.telemetryEvents >= 6);
   },
 );
 
@@ -187,5 +193,98 @@ void test('paid acceptance teardown cannot hide swallowed forbidden I/O', async 
       },
     ),
     { code: 'ERR_ASSERTION' },
+  );
+});
+
+void test('paid acceptance rejects paid-only evidence without the unified free journey', () => {
+  assert.throws(
+    () =>
+      parsePaidReport(
+        JSON.stringify({
+          ok: true,
+          nativeIroh: true,
+          simulatedChain: true,
+          realPayments: false,
+          cases: Object.values(PAID_ACCEPTANCE_CASES),
+          answers: 4,
+          attempts: 4,
+          deposits: 4,
+          settlements: 4,
+          restarts: 2,
+          blocked: 2,
+          externalCalls: 0,
+          registryReads: 1,
+          forbiddenRpcMethods: 0,
+        }),
+      ),
+    { code: 'ACCEPTANCE_FAILED' },
+  );
+});
+
+function unifiedReport() {
+  return {
+    ok: true,
+    nativeIroh: true,
+    simulatedChain: true,
+    realPayments: false,
+    cases: Object.values(PAID_ACCEPTANCE_CASES),
+    answers: 4,
+    attempts: 8,
+    deposits: 4,
+    settlements: 4,
+    restarts: 2,
+    blocked: 2,
+    externalCalls: 0,
+    registryReads: 1,
+    forbiddenRpcMethods: 0,
+    freeAnswers: 3,
+    freeAttempts: 4,
+    freePaymentPreparations: 0,
+    freeTokenizerLoads: 0,
+    confirmedReceipts: 3,
+    telemetryEvents: 6,
+  };
+}
+void test('unified acceptance report requires free execution without paid preparation and matching evidence', () => {
+  const report = unifiedReport();
+  assert.deepEqual(parsePaidReport(JSON.stringify(report)), report);
+  for (const change of [
+    { freePaymentPreparations: 1 },
+    { freeTokenizerLoads: 1 },
+    { freeAnswers: 2 },
+    { freeAttempts: 3 },
+    { confirmedReceipts: 2 },
+    { telemetryEvents: 5 },
+    { attempts: 7 },
+    { deposits: 5 },
+    { settlements: 3 },
+    { externalCalls: 1 },
+    { forbiddenRpcMethods: 1 },
+  ])
+    assert.throws(
+      () => parsePaidReport(JSON.stringify({ ...report, ...change })),
+      { code: 'ACCEPTANCE_FAILED' },
+    );
+});
+void test('unified acceptance report refuses missing phases and private extra fields', () => {
+  const report = unifiedReport();
+  assert.throws(
+    () =>
+      parsePaidReport(
+        JSON.stringify({
+          ...report,
+          cases: report.cases.filter(
+            (value) => value !== PAID_ACCEPTANCE_CASES.FREE_PENDING,
+          ),
+        }),
+      ),
+    { code: 'ACCEPTANCE_FAILED' },
+  );
+  assert.throws(
+    () =>
+      parsePaidReport(
+        JSON.stringify({ ...report, response: 'synthetic private content' }),
+      ),
+    { code: 'ACCEPTANCE_FAILED' },
   );
 });

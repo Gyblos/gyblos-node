@@ -16,13 +16,18 @@ export async function paidPreSend(
   run: PaidAcceptanceHost,
   signal: AbortSignal,
 ) {
+  const before = {
+    attempts: run.engine.attempts(),
+    deposits: run.payments.deposits(),
+    authorizations: run.payments.authorizations(),
+  };
   run.dropNextPaid();
   const response = await paidHttp(run, signal);
   await paidBody(response);
   assert.notEqual(response.statusCode, 200);
-  assert.equal(run.engine.attempts(), 0);
-  assert.equal(run.payments.deposits(), 0);
-  assert.equal(run.payments.authorizations(), 1);
+  assert.equal(run.engine.attempts(), before.attempts);
+  assert.equal(run.payments.deposits(), before.deposits);
+  assert.equal(run.payments.authorizations(), before.authorizations + 1);
 }
 export async function paidWrongShares(
   run: PaidAcceptanceHost,
