@@ -22,6 +22,45 @@ function completion(number: number) {
   };
 }
 
+void test('agent inference preserves a configurable session limit', async () => {
+  const f = fixture();
+  const agentEngine = {
+    model: 'synthetic-model',
+    async generate() {
+      return completion(1);
+    },
+  };
+  const payment = {
+    ...f.payment,
+    async beginReview(
+      _order: string,
+      _request: string,
+      authorizationId: string,
+    ) {
+      return {
+        capture: (cents: number) => f.payment.capture(authorizationId, cents),
+        release() {},
+      };
+    },
+  };
+  const session = await createPaypalSession({ ...f, payment, agentEngine });
+  const order = await session.create(undefined, 500);
+  await session.approve(order.orderId);
+  await session.agentMessage(
+    order.orderId,
+    {
+      model: 'synthetic-model',
+      messages: [{ role: 'user', content: 'synthetic request' }],
+      max_tokens: 128,
+    },
+    'MESSAGE1',
+  );
+  assert.equal(session.status().spentCents, 10);
+  assert.equal(session.status().limitCents, 500);
+  await session.finish(order.orderId);
+  assert.equal(f.calls.at(-1), 'capture:10');
+});
+
 void test('one sandbox authorization covers a tool-calling conversation without recording its contents', async () => {
   const f = fixture();
   const seen: unknown[] = [];

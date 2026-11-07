@@ -1,4 +1,6 @@
 // Owns simulated UI catalogs and precomputed brand morph paths; never live network state.
+import { MODEL_IDS } from '@gyblos/protocol/constants';
+
 import { AGENT_CLIENT } from '../constants';
 import { LOCAL_NODE_STATE } from '../node-status';
 import type { CatalogModel } from './model-types';
@@ -25,6 +27,7 @@ export const MESSAGE_STATE = {
   PENDING: 'pending',
   COMPLETE: 'complete',
   STOPPED: 'stopped',
+  FAILED: 'failed',
 } as const;
 
 export const SIGNAL_STATE = {
@@ -152,6 +155,7 @@ export const UI_VIEW = {
   TOOLS: 'Tools',
   MODELS: 'Models',
   ACTIVITY: 'Activity',
+  PAYMENTS: 'Payments',
   SETTINGS: 'Settings',
 } as const;
 export const UI_DIALOG = {
@@ -180,6 +184,7 @@ export const MODEL_FILTER = {
 export const MODELS: [CatalogModel, CatalogModel, ...CatalogModel[]] = [
   {
     id: 'qwen',
+    catalogId: MODEL_IDS.QWEN3_30B_A3B,
     name: 'Qwen3 30B-A3B',
     family: 'Qwen',
     image: { src: './assets/models/qwen-color.svg' },
@@ -192,6 +197,7 @@ export const MODELS: [CatalogModel, CatalogModel, ...CatalogModel[]] = [
   },
   {
     id: 'oss',
+    catalogId: MODEL_IDS.GPT_OSS_20B,
     name: 'gpt-oss 20B',
     family: 'OpenAI',
     image: { src: './assets/models/openai.svg', monochrome: true },
@@ -204,6 +210,7 @@ export const MODELS: [CatalogModel, CatalogModel, ...CatalogModel[]] = [
   },
   {
     id: 'llama',
+    catalogId: MODEL_IDS.LLAMA_3_3_70B,
     name: 'Llama 3.3 70B',
     family: 'Meta',
     image: { src: './assets/models/meta-color.svg' },
@@ -216,6 +223,7 @@ export const MODELS: [CatalogModel, CatalogModel, ...CatalogModel[]] = [
   },
   {
     id: 'gemma',
+    catalogId: MODEL_IDS.GEMMA_4_26B,
     name: 'Gemma 4 26B',
     family: 'Google',
     image: { src: './assets/models/gemma-color.svg' },
@@ -228,6 +236,7 @@ export const MODELS: [CatalogModel, CatalogModel, ...CatalogModel[]] = [
   },
   {
     id: 'deepseek',
+    catalogId: MODEL_IDS.DEEPSEEK_V4_1_FLASH,
     name: 'DeepSeek V4.1 Flash',
     family: 'DeepSeek',
     image: { src: './assets/models/deepseek-color.svg' },
@@ -246,26 +255,21 @@ export const ADDITIONAL_MODEL_ARTWORK = [
   { prefix: 'mistral', image: { src: './assets/models/mistral-color.svg' } },
 ] as const;
 
-export const MODES = [UI_VIEW.CHAT, UI_VIEW.CONNECT] as const;
-export const MODE_NAV = {
-  [UI_VIEW.CHAT]: [
-    { name: UI_VIEW.CHAT, label: 'Chat' },
-    { name: UI_VIEW.MODELS, label: 'Models' },
-    { name: UI_VIEW.ACTIVITY, label: 'Activity' },
-    { name: UI_VIEW.TOOLS, label: 'Tools' },
-  ],
-  [UI_VIEW.CONNECT]: [
-    { name: UI_VIEW.CONNECT, label: 'Applications' },
-    { name: UI_VIEW.MODELS, label: 'Models' },
-    { name: UI_VIEW.ACTIVITY, label: 'Activity' },
-  ],
-} as const;
+export const MAIN_NAV = [
+  { name: UI_VIEW.CHAT, label: 'Chat' },
+  { name: UI_VIEW.MODELS, label: 'Models' },
+  { name: UI_VIEW.TOOLS, label: 'Applications' },
+  { name: UI_VIEW.CONNECT, label: 'Agents' },
+  { name: UI_VIEW.ACTIVITY, label: 'Activity' },
+  { name: UI_VIEW.PAYMENTS, label: 'Payments' },
+] as const;
 export const ROUTE_ORDER = [
   UI_VIEW.CHAT,
-  UI_VIEW.CONNECT,
   UI_VIEW.MODELS,
-  UI_VIEW.ACTIVITY,
   UI_VIEW.TOOLS,
+  UI_VIEW.CONNECT,
+  UI_VIEW.ACTIVITY,
+  UI_VIEW.PAYMENTS,
   UI_VIEW.SETTINGS,
 ] as const;
 export const SIDEBAR_MOTION_MS = 620;

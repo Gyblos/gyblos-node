@@ -3,6 +3,7 @@
 import {
   PAYPAL_SANDBOX,
   PAYPAL_SANDBOX_CURRENCIES,
+  PAYPAL_SANDBOX_LIMIT_OPTIONS,
 } from '@gyblos/config/constants';
 import { PAYPAL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { isPaypalId, PaypalError } from '@gyblos/protocol/paypal-payment';
@@ -10,6 +11,7 @@ import { isPaypalId, PaypalError } from '@gyblos/protocol/paypal-payment';
 import {
   PAYPAL_SESSION_PREVIOUS_RECORD_VERSION,
   PAYPAL_SESSION_RECORD_VERSION,
+  PAYPAL_SESSION_VARIABLE_RECORD_VERSION,
   PAYPAL_SESSION_PHASE as PHASE,
 } from './constants';
 import { paypalPreviousAttemptFinished } from './paypal-inference';
@@ -37,6 +39,7 @@ interface PaypalSessionRecordBase {
   promptDigest?: string;
   captureId?: string;
   reviewDigest?: string;
+  voidReviewDigest?: string;
 }
 export type PaypalSessionRecord = PaypalSessionRecordBase &
   (
@@ -46,6 +49,10 @@ export type PaypalSessionRecord = PaypalSessionRecordBase &
       }
     | {
         version: typeof PAYPAL_SESSION_RECORD_VERSION;
+        agentCompletions: PaypalAgentCompletion[];
+      }
+    | {
+        version: typeof PAYPAL_SESSION_VARIABLE_RECORD_VERSION;
         agentCompletions: PaypalAgentCompletion[];
       }
   );
@@ -135,9 +142,10 @@ function validateShape(
     'promptDigest',
     'captureId',
     'reviewDigest',
-    ...(item.version === PAYPAL_SESSION_RECORD_VERSION
-      ? ['agentCompletions']
-      : []),
+    'voidReviewDigest',
+    ...(item.version === PAYPAL_SESSION_PREVIOUS_RECORD_VERSION
+      ? []
+      : ['agentCompletions']),
   ];
   if (
     Object.keys(item).some((key) => !validKeys.includes(key)) ||
@@ -159,6 +167,8 @@ function validateShape(
     (item.reviewDigest !== undefined &&
       (!digest(item.reviewDigest) ||
         !hasPhase(phase, [PHASE.CAPTURING, PHASE.COMPLETED]))) ||
+    (item.voidReviewDigest !== undefined &&
+      (!digest(item.voidReviewDigest) || phase !== PHASE.VOIDED)) ||
     (phase === PHASE.MESSAGE_PENDING && spentCents < messageCents) ||
     (phase === PHASE.EXECUTING && spentCents + messageCents > limitCents) ||
     (hasPhase(phase, [
@@ -190,6 +200,9 @@ function optionalDetails(item: Record<string, unknown>) {
       : {}),
     ...(isPaypalId(item.captureId) ? { captureId: item.captureId } : {}),
     ...(digest(item.reviewDigest) ? { reviewDigest: item.reviewDigest } : {}),
+    ...(digest(item.voidReviewDigest)
+      ? { voidReviewDigest: item.voidReviewDigest }
+      : {}),
   };
 }
 function useNewTerms(
@@ -197,6 +210,22 @@ function useNewTerms(
   phase: Phase,
   historical: boolean,
 ) {
+  if (item.version === PAYPAL_SESSION_VARIABLE_RECORD_VERSION) {
+    if (
+      item.currency !== PAYPAL_SANDBOX.currency ||
+      !PAYPAL_SANDBOX_LIMIT_OPTIONS.some(
+        (limit) => limit === item.limitCents,
+      ) ||
+      item.messageCents !== PAYPAL_SANDBOX.messageCents ||
+      typeof item.limitCents !== 'number' ||
+      item.maxMessageAttempts !==
+        item.limitCents / PAYPAL_SANDBOX.messageCents +
+          (PAYPAL_SANDBOX.maxMessageAttempts -
+            PAYPAL_SANDBOX.limitCents / PAYPAL_SANDBOX.messageCents)
+    )
+      return fail(PAYPAL_ERROR_CODES.INVALID_JOURNAL);
+    return false;
+  }
   const changed =
     item.currency !== PAYPAL_SANDBOX.currency ||
     item.limitCents !== PAYPAL_SANDBOX.limitCents ||
@@ -257,7 +286,13 @@ function versionedRecord(
 ): PaypalSessionRecord {
   return version === PAYPAL_SESSION_PREVIOUS_RECORD_VERSION
     ? { ...common, version: PAYPAL_SESSION_PREVIOUS_RECORD_VERSION }
-    : { ...common, version: PAYPAL_SESSION_RECORD_VERSION, agentCompletions };
+    : version === PAYPAL_SESSION_VARIABLE_RECORD_VERSION
+      ? {
+          ...common,
+          version: PAYPAL_SESSION_VARIABLE_RECORD_VERSION,
+          agentCompletions,
+        }
+      : { ...common, version: PAYPAL_SESSION_RECORD_VERSION, agentCompletions };
 }
 function legacySessionState(value: unknown) {
   return { record: null, legacyBlocked: !paypalPreviousAttemptFinished(value) };
@@ -270,6 +305,7 @@ function sessionCurrency(value: unknown) {
 function validVersion(value: unknown) {
   return (
     value === PAYPAL_SESSION_RECORD_VERSION ||
+    value === PAYPAL_SESSION_VARIABLE_RECORD_VERSION ||
     value === PAYPAL_SESSION_PREVIOUS_RECORD_VERSION
   );
 }
@@ -288,7 +324,8 @@ export function parsePaypalSessionState(
   const phase = Object.values(PHASE).find((entry) => entry === item.phase);
   const currency = sessionCurrency(item.currency);
   const agentCompletions =
-    item.version === PAYPAL_SESSION_RECORD_VERSION
+    item.version === PAYPAL_SESSION_RECORD_VERSION ||
+    item.version === PAYPAL_SESSION_VARIABLE_RECORD_VERSION
       ? completions(item.agentCompletions)
       : [];
   if (
@@ -329,11 +366,9 @@ export function parsePaypalSessionState(
     item.limitCents,
     item.messageCents,
   );
-  if (
-    useNewTerms(item, phase, historical) &&
-    !historical &&
-    !digest(item.reviewDigest)
-  ) {
+  const retainedReview =
+    digest(item.reviewDigest) || digest(item.voidReviewDigest);
+  if (useNewTerms(item, phase, historical) && !historical && !retainedReview) {
     return { record: null, legacyBlocked: false };
   }
   const common = {

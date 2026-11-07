@@ -5,11 +5,11 @@ import { useState } from 'react';
 
 import {
   canCreatePaypalAgent,
-  DESKTOP_PAYPAL_AGENT,
   PAYPAL_AGENT_ACTION,
   PAYPAL_AGENT_CLIENT,
   PAYPAL_AGENT_COPY,
   PAYPAL_AGENT_USAGE_STATE,
+  paypalAgentNeedsPayments,
   type PaypalAgentAction,
   type PaypalAgentClient,
   type PaypalAgentCopyTarget,
@@ -29,27 +29,38 @@ type DetailProps = {
   copy: (target: PaypalAgentCopyTarget, label: string) => Promise<void>;
 };
 
-function AgentFields({ connection }: { connection: Connection }) {
+function AgentFields({
+  connection,
+  copy,
+}: Pick<DetailProps, 'connection' | 'copy'>) {
   const [showKey, setShowKey] = useState(false);
   return (
     <>
       <FormField htmlFor="agent-url" label="API URL">
         <FormInput id="agent-url" readOnly value={connection.url} />
       </FormField>
-      <FormField htmlFor="agent-key" label="API key">
-        <FormInput
-          id="agent-key"
-          type={showKey ? 'text' : 'password'}
-          readOnly
-          value={connection.key}
-        />
-      </FormField>
-      <Button onClick={() => setShowKey((visible) => !visible)}>
-        {showKey ? 'Hide key' : 'Show key'}
-      </Button>
-      <FormField htmlFor="agent-model" label="Model">
-        <FormInput id="agent-model" readOnly value={connection.model} />
-      </FormField>
+      <div className="paypal-agent-key-row">
+        <FormField htmlFor="agent-key" label="API key">
+          <FormInput
+            id="agent-key"
+            type={showKey ? 'text' : 'password'}
+            readOnly
+            value={connection.key}
+          />
+        </FormField>
+        <Button
+          variant={BUTTON_VARIANT.SECONDARY}
+          onClick={() => {
+            void copy(PAYPAL_AGENT_COPY.KEY, 'API key');
+          }}
+        >
+          <Copy size={14} />
+          Copy API key
+        </Button>
+        <Button onClick={() => setShowKey((visible) => !visible)}>
+          {showKey ? 'Hide key' : 'Show key'}
+        </Button>
+      </div>
     </>
   );
 }
@@ -92,14 +103,6 @@ function AgentActions({ client, busy, run, copy }: DetailProps) {
             Copy Pi settings
           </Button>
         )}
-        <Button
-          variant={BUTTON_VARIANT.SECONDARY}
-          onClick={() => {
-            void copy(PAYPAL_AGENT_COPY.KEY, 'API key');
-          }}
-        >
-          Copy API key
-        </Button>
         <Button
           disabled={busy}
           onClick={() => {
@@ -188,7 +191,7 @@ function AgentDetails(props: DetailProps) {
       <section className="ui-section" aria-label="Connection details">
         <h4 className="ui-subheading">Connection details</h4>
         <div className="ui-form">
-          <AgentFields connection={props.connection} />
+          <AgentFields connection={props.connection} copy={props.copy} />
           <p className="modal-note">
             All apps share this connection. Disconnecting revokes access for
             every app; the URL and key change with a new connection.
@@ -215,6 +218,8 @@ type SetupProps = Omit<DetailProps, 'connection'> & {
   connection: PaypalAgentResult['connection'];
   onlyConnected: boolean;
   statusUnavailable: boolean;
+  sessionReady: boolean;
+  onPayments: () => void;
 };
 export function PaypalAgentSetup({
   connection,
@@ -224,6 +229,8 @@ export function PaypalAgentSetup({
   copy,
   onlyConnected,
   statusUnavailable,
+  sessionReady,
+  onPayments,
 }: SetupProps) {
   return (
     <div className="paypal-agent-setup">
@@ -233,10 +240,20 @@ export function PaypalAgentSetup({
         </span>
         <div>
           <h3>Set up {client}</h3>
-          <p>Connect to the local {DESKTOP_PAYPAL_AGENT.MODEL} model.</p>
+          <p>Connect {client} to Gyblos.</p>
         </div>
       </div>
-      {!connection && !onlyConnected && (
+      {paypalAgentNeedsPayments(connection, onlyConnected, sessionReady) && (
+        <Button variant={BUTTON_VARIANT.PRIMARY} onClick={onPayments}>
+          Go to Payments
+        </Button>
+      )}
+      {connection && !sessionReady && (
+        <Button variant={BUTTON_VARIANT.SECONDARY} onClick={onPayments}>
+          Review payments
+        </Button>
+      )}
+      {!connection && !onlyConnected && sessionReady && (
         <Button
           variant={BUTTON_VARIANT.PRIMARY}
           disabled={
@@ -245,6 +262,7 @@ export function PaypalAgentSetup({
               statusUnavailable,
               busy,
               onlyConnected,
+              sessionReady,
             )
           }
           onClick={() => {

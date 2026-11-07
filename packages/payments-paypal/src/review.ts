@@ -1,5 +1,6 @@
 // Coordinates a single reviewed sandbox capture and excludes other calls through this adapter.
 // The provider remains authoritative; this local lease cannot lock other merchant clients.
+import { PAYPAL_SANDBOX_LIMIT_OPTIONS } from '@gyblos/config/constants';
 import { PAYPAL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { isPaypalId, PaypalError } from '@gyblos/protocol/paypal-payment';
 
@@ -10,6 +11,7 @@ import {
   PAYPAL_ORDER_STATUS,
 } from './constants';
 import type { transport } from './transport';
+import { createVoidChecker } from './void-check';
 
 function fail(): never {
   throw new PaypalError(PAYPAL_ERROR_CODES.UNRESOLVED);
@@ -19,11 +21,11 @@ function object(value: unknown): Record<string, unknown> {
     return fail();
   return Object.fromEntries(Object.entries(value));
 }
-function matchesAmount(value: unknown) {
+function matchesAmount(value: unknown, limitCents: number) {
   const amount = object(value);
   return (
     amount.currency_code === PAYPAL_API.price.currency_code &&
-    amount.value === PAYPAL_API.price.value
+    amount.value === (limitCents / PAYPAL_API.centsPerDollar).toFixed(2)
   );
 }
 async function verifyUncaptured(
@@ -31,8 +33,13 @@ async function verifyUncaptured(
   orderId: string,
   requestId: string,
   authorizationId: string,
+  limitCents: number,
 ) {
-  if (![orderId, requestId, authorizationId].every(isPaypalId)) return fail();
+  if (
+    ![orderId, requestId, authorizationId].every(isPaypalId) ||
+    !PAYPAL_SANDBOX_LIMIT_OPTIONS.some((limit) => limit === limitCents)
+  )
+    return fail();
   const order = object((await get(`/v2/checkout/orders/${orderId}`)).value);
   if (
     order.id !== orderId ||
@@ -43,7 +50,7 @@ async function verifyUncaptured(
   )
     return fail();
   const unit = object(order.purchase_units[0]);
-  if (unit.custom_id !== requestId || !matchesAmount(unit.amount))
+  if (unit.custom_id !== requestId || !matchesAmount(unit.amount, limitCents))
     return fail();
   const payments = object(unit.payments);
   for (const name of ['captures', 'refunds']) {
@@ -60,7 +67,7 @@ async function verifyUncaptured(
   if (
     authorization.id !== authorizationId ||
     authorization.status !== PAYPAL_AUTHORIZATION_STATUS.CREATED ||
-    !matchesAmount(authorization.amount)
+    !matchesAmount(authorization.amount, limitCents)
   )
     return fail();
   const current = object(
@@ -69,10 +76,11 @@ async function verifyUncaptured(
   if (
     current.id !== authorizationId ||
     current.status !== PAYPAL_AUTHORIZATION_STATUS.CREATED ||
-    !matchesAmount(current.amount)
+    !matchesAmount(current.amount, limitCents)
   )
     return fail();
 }
+
 function assertReviewable(
   uncertain: boolean,
   reviewed: Set<string>,
@@ -81,17 +89,22 @@ function assertReviewable(
   if (uncertain || (id && reviewed.has(id)))
     throw new PaypalError(PAYPAL_ERROR_CODES.NEEDS_RECONCILIATION);
 }
-export function createPaypalReviewAccess(options: {
+type ReviewAccessOptions = {
   get: ReturnType<typeof transport>['get'];
-  validateCapture(authorizationId: string, cents?: number): void;
+  validateCapture(
+    authorizationId: string,
+    cents?: number,
+    limitCents?: number,
+  ): void;
   capture(
     authorizationId: string,
     cents: number,
+    limitCents?: number,
   ): Promise<{ captureId: string }>;
   invalidate(): void;
-}) {
-  let reviewing = false;
-  let inFlight = 0;
+};
+export function createPaypalReviewAccess(options: ReviewAccessOptions) {
+  const state = { reviewing: false, inFlight: 0 };
   let uncertain = false;
   const reviewedAuthorizations = new Set<string>();
   async function operation<T>(
@@ -100,8 +113,8 @@ export function createPaypalReviewAccess(options: {
     isCapture = false,
   ): Promise<T> {
     assertReviewable(uncertain, reviewedAuthorizations, authorizationId);
-    if (reviewing) throw new PaypalError(PAYPAL_ERROR_CODES.BUSY);
-    inFlight += 1;
+    if (state.reviewing) throw new PaypalError(PAYPAL_ERROR_CODES.BUSY);
+    state.inFlight += 1;
     if (isCapture && authorizationId)
       reviewedAuthorizations.add(authorizationId);
     try {
@@ -110,23 +123,30 @@ export function createPaypalReviewAccess(options: {
       if (isCapture) uncertain = true;
       throw error;
     } finally {
-      inFlight -= 1;
+      state.inFlight -= 1;
     }
   }
   async function beginReview(
     orderId: string,
     requestId: string,
     authorizationId: string,
+    limitCents: number = PAYPAL_API.limitCents,
   ) {
     assertReviewable(uncertain, reviewedAuthorizations, authorizationId);
-    if (reviewing || inFlight > 0)
+    if (state.reviewing || state.inFlight > 0)
       throw new PaypalError(PAYPAL_ERROR_CODES.BUSY);
-    reviewing = true;
+    state.reviewing = true;
     options.invalidate();
     try {
-      await verifyUncaptured(options.get, orderId, requestId, authorizationId);
+      await verifyUncaptured(
+        options.get,
+        orderId,
+        requestId,
+        authorizationId,
+        limitCents,
+      );
     } catch (error) {
-      reviewing = false;
+      state.reviewing = false;
       throw error;
     }
     let closed = false;
@@ -135,26 +155,29 @@ export function createPaypalReviewAccess(options: {
     return {
       async capture(cents: number) {
         if (closed || used) throw new PaypalError(PAYPAL_ERROR_CODES.BUSY);
-        options.validateCapture(authorizationId, cents);
+        options.validateCapture(authorizationId, cents, limitCents);
+        if (cents > limitCents)
+          throw new PaypalError(PAYPAL_ERROR_CODES.INVALID_REQUEST);
         used = true;
         reviewedAuthorizations.add(authorizationId);
         capturing = true;
         try {
-          return await options.capture(authorizationId, cents);
+          return await options.capture(authorizationId, cents, limitCents);
         } catch (error) {
           uncertain = true;
           throw error;
         } finally {
           capturing = false;
-          if (closed) reviewing = false;
+          if (closed) state.reviewing = false;
         }
       },
       release() {
         if (closed) return;
         closed = true;
-        if (!capturing) reviewing = false;
+        if (!capturing) state.reviewing = false;
       },
     };
   }
-  return { operation, beginReview };
+  const checkVoidedAuthorization = createVoidChecker(options, state);
+  return { operation, beginReview, checkVoidedAuthorization };
 }

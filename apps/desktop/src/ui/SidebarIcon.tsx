@@ -5,6 +5,7 @@ import {
   ChatCircle,
   Globe,
   PlugsConnected,
+  Wallet,
   Wrench,
 } from '@phosphor-icons/react';
 import { useId } from 'react';
@@ -17,6 +18,7 @@ const GLYPHS = {
   [UI_VIEW.MODELS]: Globe,
   [UI_VIEW.CONNECT]: PlugsConnected,
   [UI_VIEW.ACTIVITY]: ChartLineUp,
+  [UI_VIEW.PAYMENTS]: Wallet,
 };
 export type SidebarSection = keyof typeof GLYPHS;
 

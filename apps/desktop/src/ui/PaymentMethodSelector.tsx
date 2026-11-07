@@ -9,14 +9,21 @@ export function PaymentMethodSelector({
   onChange,
   name,
   label = 'Payment method',
+  lockChange = false,
 }: {
   value: PaymentMethod;
   onChange: (value: PaymentMethod) => void;
   name: string;
   label?: string;
+  lockChange?: boolean;
 }) {
   return (
-    <div className="ui-choice-grid" role="radiogroup" aria-label={label}>
+    <fieldset
+      className="ui-choice-grid"
+      role="radiogroup"
+      aria-label={label}
+      disabled={lockChange}
+    >
       <ChoiceCard
         name={name}
         title="USDC wallet"
@@ -33,6 +40,6 @@ export function PaymentMethodSelector({
         selected={value === PAYMENT_METHOD.PAYPAL}
         onSelect={() => onChange(PAYMENT_METHOD.PAYPAL)}
       />
-    </div>
+    </fieldset>
   );
 }

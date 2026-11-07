@@ -14,6 +14,9 @@ import { paypalSandboxSettings } from '@gyblos/config/paypal';
 import { createPaypalSession } from '@gyblos/node/paypal-session';
 import { openPaypalSandbox } from '@gyblos/node/paypal-startup';
 
+import { createActivityHandlers } from './activity-handlers';
+import { createDesktopActivityStorage } from './activity-storage';
+import { DESKTOP_ACTIVITY } from './constants';
 import { createDesktopPaypalAgentAccess } from './paypal-agent-access';
 import { createDesktopPaypalAgentHandlers } from './paypal-agent-handlers';
 import { DESKTOP_PAYPAL_AGENT } from './paypal-agent-model';
@@ -131,6 +134,20 @@ async function startSandbox(window: BrowserWindow) {
 
 export function registerDesktopPaypal(window: BrowserWindow) {
   const runtime = createDesktopPaypalRuntime(() => startSandbox(window));
+  const activity = createDesktopActivityStorage(
+    process.env.PAYPAL_SANDBOX_STATE_DIRECTORY,
+    () => runtime.current()?.service.activity() ?? null,
+  );
+  const activityHandlers = createActivityHandlers(() => activity.summary(), {
+    contents: window.webContents,
+    mainFrame: () => window.webContents.mainFrame,
+    destroyed: () => window.isDestroyed(),
+  });
+  // Observation never starts the sandbox or makes provider calls.
+  const activityTimer = setInterval(() => {
+    activity.capture();
+  }, DESKTOP_ACTIVITY.POLL_MS);
+  activityTimer.unref();
   let allowUnconfirmedExit = false;
   let promptOpen = false;
   const guard = createDesktopPaypalCloseGuard(
@@ -193,8 +210,13 @@ export function registerDesktopPaypal(window: BrowserWindow) {
     runtime.current,
     (text) => clipboard.writeText(text),
   );
+  ipcMain.handle(DESKTOP_ACTIVITY.CHANNEL, (event, ...args: unknown[]) =>
+    activityHandlers.summary(event, args),
+  );
   ipcMain.handle(DESKTOP_PAYPAL.CHANNEL, (event, ...args: unknown[]) =>
-    handlers.run(event, args),
+    activityHandlers.accepts(event, [])
+      ? activity.run(() => handlers.run(event, args))
+      : handlers.run(event, args),
   );
   ipcMain.handle(DESKTOP_PAYPAL_AGENT.CHANNEL, (event, ...args: unknown[]) =>
     agentHandlers.run(event, args),
@@ -204,5 +226,11 @@ export function registerDesktopPaypal(window: BrowserWindow) {
     (event, ...args: unknown[]) => agentHandlers.copy(event, args),
   );
   window.on('close', guard);
-  return { guard, close: runtime.close };
+  return {
+    guard,
+    async close() {
+      clearInterval(activityTimer);
+      await activity.close(runtime.close);
+    },
+  };
 }

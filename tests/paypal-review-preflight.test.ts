@@ -64,6 +64,45 @@ void test('manual review verifies the exact sandbox order and uncaptured authori
   assert.deepEqual(f.calls, ['order', 'authorization']);
 });
 
+void test('manual review verifies the configured sandbox limit on every provider resource', async () => {
+  for (const limit of [500, 1000]) {
+    const price = (limit / 100).toFixed(2);
+    const original = order();
+    original.purchase_units[0]!.amount.value = price;
+    original.purchase_units[0]!.payments.authorizations[0]!.amount.value =
+      price;
+    const active = authorization();
+    active.amount.value = price;
+    const lease = await fixture(original, active).payment.beginReview(
+      'ORDER1',
+      'REQUEST1',
+      'AUTH1',
+      limit,
+    );
+    lease.release();
+    await assert.rejects(
+      fixture(original, {
+        ...active,
+        amount: { currency_code: 'USD', value: '1.00' },
+      }).payment.beginReview('ORDER1', 'REQUEST1', 'AUTH1', limit),
+    );
+    await assert.rejects(
+      fixture(original, {
+        ...active,
+        amount: { currency_code: 'EUR', value: price },
+      }).payment.beginReview('ORDER1', 'REQUEST1', 'AUTH1', limit),
+    );
+    await assert.rejects(
+      fixture(order(), active).payment.beginReview(
+        'ORDER1',
+        'REQUEST1',
+        'AUTH1',
+        limit,
+      ),
+    );
+  }
+});
+
 void test('manual review rejects inconsistent or previously captured sandbox terms', async () => {
   const badOrders = [
     { ...order(), id: 'OTHER' },

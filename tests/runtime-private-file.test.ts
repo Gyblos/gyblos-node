@@ -122,6 +122,18 @@ void test('a held process lock refuses a second holder and is released only by i
     await again.release();
   }));
 
+void test('a no-takeover lock refuses even an apparently stale owner', () =>
+  withRoot(async (root) => {
+    const path = join(root, 'ledger.lock');
+    const owner = JSON.stringify({ pid: process.pid, host: hostname() });
+    await writeFile(path, owner, { mode: 0o600 });
+    await assert.rejects(
+      acquireProcessLock(path, { allowTakeover: false }),
+      refused,
+    );
+    assert.equal(await readPrivateFile(path, MAX), owner);
+  }));
+
 void test('only a lock whose owner process is gone is taken over', () =>
   withRoot(async (root) => {
     await ensurePrivateDirectory(root);

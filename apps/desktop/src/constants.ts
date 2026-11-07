@@ -42,6 +42,7 @@ export const PAYPAL_ACTION = {
   SEND: 'send',
   ACKNOWLEDGE: 'acknowledge',
   FINISH: 'finish',
+  CHECK_VOID: 'check-void',
   REVIEW_AND_SETTLE: 'review-and-settle',
   ABANDON: 'abandon',
 } as const;
@@ -121,3 +122,39 @@ export const LOCAL_NODE = {
   STOP_TIMEOUT_MS: 5000,
   POLL_MS: 600,
 } as const;
+
+// Local activity is descriptive metadata, never payment authority.
+export const DESKTOP_ACTIVITY = {
+  CHANNEL: 'desktop:activity:summary',
+  IO_TIMEOUT_MS: 1000,
+  VERSION: 1,
+  MAX_SESSIONS: 1000,
+  MAX_BYTES: 1_048_576,
+  DISPLAY_ID_CHARACTERS: 6,
+  POLL_MS: 2000,
+} as const;
+
+export const CHAT_STORAGE = {
+  VERSION: 1,
+  LOAD_CHANNEL: 'desktop:conversations:load',
+  SAVE_CHANNEL: 'desktop:conversations:save',
+  STATUS_CHANNEL: 'desktop:conversations:status',
+  MAX_CONVERSATIONS: 200,
+  MAX_MESSAGES: 5000,
+  MAX_TEXT_CHARACTERS: 1_000_000,
+  MAX_TITLE_CHARACTERS: 512,
+  MAX_MODEL_CHARACTERS: 512,
+  MAX_BYTES: 16_777_216,
+  POLL_MS: 500,
+  LOAD_TIMEOUT_MS: 2000,
+  ID_PATTERN: /^[A-Za-z0-9._:-]{1,128}$/,
+} as const;
+export const CHAT_STORAGE_STATE = {
+  LOADING: 'loading',
+  SAVING: 'saving',
+  SAVED: 'saved',
+  UNAVAILABLE: 'unavailable',
+} as const;
+
+export type ChatArchiveState =
+  (typeof CHAT_STORAGE_STATE)[keyof typeof CHAT_STORAGE_STATE];

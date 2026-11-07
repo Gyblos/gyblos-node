@@ -199,6 +199,9 @@ importers:
       '@gyblos/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
+      '@gyblos/runtime':
+        specifier: workspace:*
+        version: link:../../packages/runtime
       '@number0/iroh':
         specifier: 1.1.0
         version: 1.1.0

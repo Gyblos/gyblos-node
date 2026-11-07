@@ -21,8 +21,11 @@
     "./paypal-runtime": "./src/paypal-runtime.ts",
     "./paypal-callback": "./src/paypal-callback.ts",
     "./paypal-chat": "./src/paypal-chat.ts",
+    "./chat-reasoning": "./src/ui/chat-reasoning.ts",
     "./chat-state": "./src/ui/chat-state.ts",
     "./chat-controller": "./src/ui/chat-controller.ts",
+    "./chat-paypal": "./src/ui/chat-paypal.ts",
+    "./navigation-state": "./src/ui/navigation-state.ts",
     "./connection-state": "./src/ui/connection-state.ts",
     "./catalog-state": "./src/ui/catalog-state.ts",
     "./clipboard": "./src/ui/clipboard.ts",
@@ -48,7 +51,18 @@
     "./network-catalog-reader": "./src/catalog/reader.ts",
     "./network-catalog-session": "./src/catalog/session.ts",
     "./network-catalog-handlers": "./src/catalog/handlers.ts",
-    "./announced-models": "./src/ui/announced-models.ts"
+    "./announced-models": "./src/ui/announced-models.ts",
+    "./activity-model": "./src/activity-model.ts",
+    "./activity-history": "./src/activity-history.ts",
+    "./chat-history": "./src/ui/chat-history.ts",
+    "./activity-handlers": "./src/activity-handlers.ts",
+    "./activity-observer": "./src/activity-observer.ts",
+    "./activity-storage": "./src/activity-storage.ts",
+    "./chat-archive-model": "./src/chat-archive-model.ts",
+    "./chat-archive-store": "./src/chat-archive-store.ts",
+    "./chat-archive-handlers": "./src/chat-archive-handlers.ts",
+    "./chat-archive-storage": "./src/chat-archive-storage.ts",
+    "./chat-archive-client": "./src/ui/chat-archive-client.ts"
   },
   "scripts": {
     "build": "tsx scripts/build.ts",
@@ -65,7 +79,8 @@
     "react-dom": "19.2.0",
     "@phosphor-icons/react": "2.1.10",
     "@solana/kit": "5.1.0",
-    "@gyblos/discovery-http": "workspace:*"
+    "@gyblos/discovery-http": "workspace:*",
+    "@gyblos/runtime": "workspace:*"
   },
   "devDependencies": {
     "electron": "45.0.0",

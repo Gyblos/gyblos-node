@@ -1,4 +1,5 @@
 // Validates the desktop main-frame IPC boundary before touching a sandbox session.
+import { PAYPAL_SANDBOX_LIMIT_OPTIONS } from '@gyblos/config/constants';
 import { PAYPAL_REQUEST_LIMITS } from '@gyblos/node/constants';
 import { PAYPAL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { isPaypalId, PaypalError } from '@gyblos/protocol/paypal-payment';
@@ -20,6 +21,14 @@ type DesktopWindow = {
 };
 type DesktopSender = { sender: unknown; senderFrame: unknown };
 type Loaded = { service: DesktopSession; model: string };
+type ConfirmReview = (ticket: {
+  fingerprint: string;
+  spentCents: number;
+}) => Promise<boolean>;
+type ConfirmFinish = (summary: {
+  spentCents: number;
+  limitCents: number;
+}) => Promise<boolean>;
 
 function actionError(failure: unknown, input: PaypalRequest) {
   if (failure instanceof PaypalError) {
@@ -42,15 +51,22 @@ function request(value: unknown): PaypalRequest | null {
   const keys = Object.keys(item).sort().join(',');
   switch (item.action) {
     case PAYPAL_ACTION.STATUS:
-    case PAYPAL_ACTION.CREATE:
     case PAYPAL_ACTION.OPEN:
     case PAYPAL_ACTION.APPROVE:
     case PAYPAL_ACTION.COMPLETE_RETURN:
     case PAYPAL_ACTION.COMPLETE_CANCEL:
     case PAYPAL_ACTION.FINISH:
+    case PAYPAL_ACTION.CHECK_VOID:
     case PAYPAL_ACTION.REVIEW_AND_SETTLE:
     case PAYPAL_ACTION.ABANDON:
       return keys === 'action' ? { action: item.action } : null;
+    case PAYPAL_ACTION.CREATE:
+      if (keys === 'action') return { action: PAYPAL_ACTION.CREATE };
+      return keys === 'action,limitCents' &&
+        typeof item.limitCents === 'number' &&
+        PAYPAL_SANDBOX_LIMIT_OPTIONS.some((limit) => limit === item.limitCents)
+        ? { action: PAYPAL_ACTION.CREATE, limitCents: item.limitCents }
+        : null;
     case PAYPAL_ACTION.SEND:
       return keys === 'action,prompt' &&
         typeof item.prompt === 'string' &&
@@ -70,14 +86,8 @@ function request(value: unknown): PaypalRequest | null {
 export function createDesktopPaypalHandlers(
   load: () => Promise<Loaded>,
   window: DesktopWindow,
-  confirmReview: (ticket: {
-    fingerprint: string;
-    spentCents: number;
-  }) => Promise<boolean> = async () => false,
-  confirmFinish: (summary: {
-    spentCents: number;
-    limitCents: number;
-  }) => Promise<boolean> = async () => false,
+  confirmReview: ConfirmReview = async () => false,
+  confirmFinish: ConfirmFinish = async () => false,
 ) {
   return {
     async run(
@@ -105,9 +115,12 @@ export function createDesktopPaypalHandlers(
       try {
         switch (input.action) {
           case PAYPAL_ACTION.STATUS:
+          case PAYPAL_ACTION.CHECK_VOID:
+            if (input.action === PAYPAL_ACTION.CHECK_VOID)
+              await service.checkVoidedAuthorization();
             break;
           case PAYPAL_ACTION.CREATE:
-            await service.create();
+            await service.create(input.limitCents);
             break;
           case PAYPAL_ACTION.OPEN:
             await service.openApproval();
@@ -141,7 +154,23 @@ export function createDesktopPaypalHandlers(
       } catch (failure) {
         error = actionError(failure, input);
       }
-      return { status: service.status(), model, answer, error };
+      return visibleResult(service, model, answer, error);
     },
+  };
+}
+
+function visibleResult(
+  service: DesktopSession,
+  model: string,
+  answer: PaypalResult['answer'],
+  error: PaypalResult['error'],
+): PaypalResult {
+  const sessionId = service.activity()?.id;
+  return {
+    status: service.status(),
+    model,
+    answer,
+    error,
+    ...(sessionId ? { sessionId } : {}),
   };
 }

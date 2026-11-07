@@ -4,6 +4,7 @@ import type { ReactNode, Ref } from 'react';
 export function ChatComposer({
   ref,
   inputRef,
+  disabled = false,
   value,
   placeholder,
   onChange,
@@ -12,6 +13,7 @@ export function ChatComposer({
 }: {
   ref?: Ref<HTMLFormElement>;
   inputRef?: Ref<HTMLTextAreaElement>;
+  disabled?: boolean;
   value: string;
   placeholder: string;
   onChange: (value: string) => void;
@@ -29,6 +31,7 @@ export function ChatComposer({
     >
       <textarea
         ref={inputRef}
+        disabled={disabled}
         aria-label="Your message"
         placeholder={placeholder}
         value={value}

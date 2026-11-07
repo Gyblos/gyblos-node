@@ -28,16 +28,15 @@ app ─▶ buyer proxy ══ Iroh (direct or na1 relay) ══▶ seller node �
 ## Desktop preview
 
 The Electron preview in `apps/desktop` targets macOS, Windows and Linux and
-reuses the compact Chat and Connect mockup, with in-memory conversations and
-simulated USDC Chat responses/connections. The separate
-[PayPal Sandbox prototype](docs/paypal-sandbox.md) runs real local inference
-with simulated payments for one local seller. Normal startup prepares a
-protected local wallet; saving, same-address backup verification and
-Settings-only restoration are implemented, while funding remains disabled.
-Native OS custody and cross-platform recovery still need separate acceptance.
-Local packaging is macOS arm64 only. A separate wallet-free smoke retains the
-isolated Iroh loopback check. See
-[running and packaging the preview](docs/desktop-probe.md).
+reuses the compact Chat and Connect mockup, with local conversation history and
+simulated USDC responses/connections. The same Chat screen can use the
+[PayPal Sandbox prototype](docs/paypal-sandbox.md) for real local inference with
+simulated payments for one local seller. Normal startup prepares a protected
+local wallet; saving, same-address backup verification and Settings-only
+restoration are implemented, while funding remains disabled. Native OS custody
+and cross-platform recovery still need separate acceptance. Local packaging is
+macOS arm64 only. A separate wallet-free smoke retains the isolated Iroh
+loopback check. See [running and packaging the preview](docs/desktop-probe.md).
 
 ## Status
 

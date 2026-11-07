@@ -321,7 +321,10 @@ async function create(path: string): Promise<Created | undefined> {
   }
 }
 
-export function acquireProcessLock(path: string): Promise<ProcessLock> {
+export function acquireProcessLock(
+  path: string,
+  options: { allowTakeover?: boolean } = {},
+): Promise<ProcessLock> {
   let key: string;
   try {
     // The canonical directory, so one directory reached by two spellings is one key.
@@ -333,7 +336,9 @@ export function acquireProcessLock(path: string): Promise<ProcessLock> {
   // Reserved before any await, so two acquisitions in this process never both proceed.
   HELD.add(key);
   return guarded(async () => {
-    const created = (await create(path)) ?? (await takeOver(path));
+    const created =
+      (await create(path)) ??
+      (options.allowTakeover === false ? undefined : await takeOver(path));
     if (!created) return fail();
     const { file, id } = created;
     const verify = () =>

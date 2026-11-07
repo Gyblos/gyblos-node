@@ -6,17 +6,23 @@ type Operation = <T>(
   isCapture?: boolean,
 ) => Promise<T>;
 type Actions = {
-  validateCapture(authorizationId: string, cents?: number): void;
+  validateCapture(
+    authorizationId: string,
+    cents?: number,
+    limitCents?: number,
+  ): void;
   validateAuthorization(authorizationId: string): void;
   create(
     requestId: string,
     returnState?: string,
+    limitCents?: number,
   ): Promise<{ orderId: string; approvalUrl: string }>;
   capture(
     authorizationId: string,
     cents?: number,
+    limitCents?: number,
   ): Promise<{ captureId: string }>;
-  void(authorizationId: string): Promise<void>;
+  void(authorizationId: string, limitCents?: number): Promise<void>;
   refund(captureId: string): Promise<void>;
 };
 export function managedPaypalOperations(
@@ -25,10 +31,10 @@ export function managedPaypalOperations(
   actions: Actions,
 ) {
   return {
-    create: (requestId: string, returnState?: string) =>
+    create: (requestId: string, returnState?: string, limitCents?: number) =>
       operation(async () => {
         invalidate();
-        return actions.create(requestId, returnState);
+        return actions.create(requestId, returnState, limitCents);
       }),
     async capture(authorizationId: string, cents?: number) {
       actions.validateCapture(authorizationId, cents);
@@ -41,12 +47,12 @@ export function managedPaypalOperations(
         true,
       );
     },
-    async void(authorizationId: string) {
+    async void(authorizationId: string, limitCents?: number) {
       actions.validateAuthorization(authorizationId);
       await operation(
         async () => {
           invalidate();
-          await actions.void(authorizationId);
+          await actions.void(authorizationId, limitCents);
         },
         authorizationId,
         true,

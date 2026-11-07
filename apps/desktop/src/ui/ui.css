@@ -9,9 +9,9 @@
   --avatar-size: 28px;
   --ui-font: 14px;
   --ui-detail: 12px;
-  --page-gutter: 16px;
-  --page-top: 12px;
-  --section-gap: 16px;
+  --page-gutter: clamp(16px, 2vw, 32px);
+  --page-max-width: 1440px;
+  --section-gap: 24px;
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -25,6 +25,9 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
   gap: var(--space-3);
+  padding: 0;
+  margin: 0;
+  border: 0;
 }
 .desktop-frame .ui-choice {
   display: flex;
@@ -189,6 +192,12 @@
   background: var(--raised);
   color: var(--ink);
 }
+.desktop-frame
+  .ui-button--ghost:is(:hover, [aria-expanded='true']):not(:disabled) {
+  border-color: var(--line);
+  background: var(--raised);
+  color: var(--ink);
+}
 .desktop-frame .ui-button--secondary {
   background: var(--raised);
   color: var(--ink);
@@ -300,9 +309,10 @@
   flex-direction: column;
   gap: var(--section-gap);
   width: 100%;
+  max-width: var(--page-max-width);
   min-width: 0;
   padding: 0;
-  margin: 0;
+  margin: 0 auto;
 }
 .desktop-frame .breadcrumb h1 {
   margin: 0;
@@ -569,10 +579,9 @@
   max-width: 70%;
   min-width: 0;
 }
-.desktop-frame .model-picker .model-artwork,
-.desktop-frame .composer-model .model-artwork {
-  width: 16px;
-  height: 16px;
+.desktop-frame .ui-button .model-artwork {
+  width: var(--control-icon);
+  height: var(--control-icon);
 }
 /* Empty chats center one compact group; active conversations keep a bottom composer. */
 .desktop-frame .chat-stage {
@@ -598,7 +607,7 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 12px 16px;
+  padding: var(--space-3) 0;
 }
 .desktop-frame .conversation.empty {
   display: grid;
@@ -608,7 +617,7 @@
 .desktop-frame .composer-wrap {
   width: 100%;
   max-width: none;
-  padding: 8px var(--page-gutter) 12px;
+  padding: var(--space-2) 0 var(--space-3);
   margin: 0 auto;
   flex-shrink: 0;
 }
@@ -643,11 +652,6 @@
   justify-content: space-between;
   gap: 8px;
   margin-top: 4px;
-}
-.desktop-frame .composer-model {
-  min-width: 0;
-  max-width: 60%;
-  padding-inline: 4px;
 }
 .desktop-frame .composer-actions {
   display: flex;
@@ -854,7 +858,11 @@
   color: var(--ink);
   text-align: left;
 }
-.dropdown-row:hover,
+.dropdown-row:disabled {
+  opacity: 1;
+  color: var(--muted);
+}
+.dropdown-row:hover:not(:disabled),
 .dropdown-row:focus-visible {
   background: var(--soft);
 }
@@ -932,7 +940,7 @@
   font-size: var(--ui-font);
   color: var(--muted);
 }
-.desktop-frame .ui-field .composer-model {
+.desktop-frame .ui-field .ui-menu-trigger {
   justify-content: flex-start;
   max-width: 100%;
 }
@@ -1459,9 +1467,14 @@
     visibility 0s var(--motion-push);
 }
 
-/* One content inset for Chat, Connect, Models and Activity. */
+/* PageBody owns scrolling and responsive insets for every buyer route. */
 .desktop-frame .content {
-  padding: var(--page-top) var(--page-gutter) var(--page-gutter);
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--page-gutter);
+  container-type: inline-size;
 }
 .desktop-frame > .topbar {
   margin: 0 var(--page-gutter);
@@ -1523,4 +1536,354 @@
 }
 .top-up-amounts .ui-button {
   flex: 1;
+}
+
+/* Buyer payment choice and planned application catalog use shared tokens. */
+.desktop-frame .content[data-layout='chat'] {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.desktop-frame .chat-payment-options {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+.desktop-frame .chat-payment-options legend {
+  float: left;
+  padding: 0;
+  margin: 0 var(--space-2) 0 0;
+  color: var(--ink);
+  font-weight: 600;
+  line-height: var(--control-size);
+}
+.desktop-frame .chat-payment-option {
+  position: relative;
+  cursor: pointer;
+}
+.desktop-frame .chat-payment-option input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+.desktop-frame .chat-payment-option span {
+  display: flex;
+  align-items: center;
+  min-height: var(--control-size);
+  padding: 0 var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  color: var(--muted);
+}
+.desktop-frame .chat-payment-option input:checked + span {
+  border-color: var(--blue);
+  background: var(--selected-surface);
+  color: var(--selected-ink);
+}
+.desktop-frame .chat-payment-option input:disabled + span {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.desktop-frame .chat-payment-option input:focus-visible + span {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.desktop-frame .ui-choice:has(.ui-choice-input:disabled) {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.desktop-frame .ui-choice:has(.ui-choice-input:disabled):hover {
+  border-color: var(--line);
+  background: transparent;
+}
+.desktop-frame .payment-operation-notice {
+  color: var(--muted);
+  font-size: var(--ui-detail);
+}
+.desktop-frame .applications-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: var(--space-3);
+  margin: var(--space-4) 0;
+}
+.desktop-frame .application-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  background: var(--panel);
+}
+.desktop-frame .application-card-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+}
+.desktop-frame .application-card-heading > div {
+  flex: 1;
+  min-width: 0;
+}
+.desktop-frame .application-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--ui-font);
+  line-height: 1.5;
+}
+.desktop-frame .application-card > p {
+  flex: 1;
+}
+.desktop-frame .payment-session-status {
+  margin: var(--space-3) 0;
+  color: var(--muted);
+  font-size: var(--ui-font);
+  line-height: 1.5;
+}
+
+/* Payment management uses the workspace; Chat keeps one compact payment row. */
+.desktop-frame .payments-method {
+  display: grid;
+  gap: var(--space-4);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--line);
+}
+.payments-method h2,
+.payment-session-heading h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 24px;
+}
+.payments-method p,
+.payment-session-heading p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: var(--ui-detail);
+  line-height: 1.6;
+}
+.desktop-frame .payments-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(320px, 1fr);
+  align-items: start;
+  gap: var(--section-gap);
+}
+.payments-primary,
+.payments-wallet {
+  min-width: 0;
+}
+.payments-wallet {
+  display: grid;
+  gap: var(--section-gap);
+}
+.payment-session-heading,
+.payment-session-state,
+.payment-session-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.payment-session-heading {
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--line);
+  align-items: flex-start;
+}
+.payment-session-heading > div {
+  flex: 1;
+  min-width: 200px;
+}
+.payment-session-state {
+  justify-content: flex-start;
+  padding: var(--space-4);
+  font-size: var(--ui-font);
+}
+.payment-state-dot {
+  width: 7px;
+  height: 7px;
+  background: var(--muted);
+}
+.payment-session-rate {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: var(--ui-detail);
+}
+.payment-session-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-3);
+  margin: 0 var(--space-4) var(--space-4);
+}
+.desktop-frame .payment-session-stats .ui-stat {
+  min-width: 0;
+  background: var(--raised);
+  padding: var(--space-3);
+}
+.payment-session-stats .ui-stat strong {
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+}
+.payment-session > p,
+.payment-session > .chat-notice {
+  margin: 0 var(--space-4) var(--space-3);
+  color: var(--muted);
+  font-size: var(--ui-detail);
+  line-height: 1.6;
+}
+.payment-session .paypal-session-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-4) var(--space-4);
+}
+.payment-new-session {
+  width: 100%;
+  display: grid;
+  gap: var(--space-3);
+}
+.payment-new-session h3 {
+  margin: 0;
+  font-size: var(--ui-font);
+  font-weight: 600;
+}
+.payment-start-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+.payment-session-footer {
+  border-top: 1px solid var(--line);
+  padding: var(--space-3) var(--space-4);
+  color: var(--muted);
+  font-size: var(--ui-detail);
+}
+.payments-footnote {
+  margin: 0;
+  max-width: 90ch;
+  color: var(--muted);
+  font-size: var(--ui-detail);
+  line-height: 1.6;
+}
+.paypal-chat-alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--line);
+}
+.paypal-chat-alert p {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--ui-detail);
+}
+
+@container (max-width: 960px) {
+  .desktop-frame .payments-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Shared responsive tabular data, including session consumption and payments. */
+.desktop-frame .ui-data-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+}
+.desktop-frame .ui-data-table {
+  width: 100%;
+  min-width: 680px;
+  table-layout: fixed;
+  border-collapse: collapse;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+.desktop-frame .ui-data-table th,
+.desktop-frame .ui-data-table td {
+  padding: var(--space-4);
+  vertical-align: top;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+  font-weight: 400;
+}
+.desktop-frame .ui-data-table th:first-child {
+  width: 28%;
+}
+.desktop-frame .ui-data-table th:last-child {
+  width: 24%;
+}
+.desktop-frame .ui-data-table thead th {
+  color: var(--muted);
+  font-size: var(--ui-detail);
+}
+.desktop-frame .ui-data-table tr:last-child td,
+.desktop-frame .ui-data-table tr:last-child th {
+  border-bottom: 0;
+}
+.desktop-frame .ui-data-table th .ui-button {
+  padding: 0;
+  min-height: var(--control-size);
+}
+
+.ui-table-cell-label {
+  display: none;
+}
+@container (max-width: 700px) {
+  .desktop-frame .ui-data-table {
+    min-width: 0;
+  }
+  .desktop-frame .ui-data-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .desktop-frame .ui-data-table tbody {
+    display: block;
+  }
+  .desktop-frame .ui-data-table tbody tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-4);
+    padding: var(--space-4);
+    border-bottom: 1px solid var(--line);
+  }
+  .desktop-frame .ui-data-table tbody tr:last-child {
+    border-bottom: 0;
+  }
+  .desktop-frame .ui-data-table th,
+  .desktop-frame .ui-data-table td {
+    display: block;
+    min-width: 0;
+    width: auto;
+    padding: 0;
+    border: 0;
+    white-space: normal;
+  }
+  .desktop-frame .ui-data-table th[scope='row'] {
+    grid-column: 1 / -1;
+    width: auto;
+  }
+  .ui-table-cell-label {
+    display: block;
+    margin-bottom: var(--space-2);
+    color: var(--muted);
+    font-size: var(--ui-detail);
+  }
 }

@@ -23,7 +23,7 @@
   color: var(--ink);
 }
 .paypal-session-actions {
-  margin-top: var(--space-2);
+  margin-left: auto;
 }
 /* Keep payment context visible without covering the conversation. */
 .desktop-frame .paypal-chat .paypal-session {
@@ -33,11 +33,10 @@
   padding: var(--space-2) var(--space-3);
 }
 .paypal-chat .paypal-session-usage {
-  margin-left: auto;
   font-size: 11px;
 }
 .paypal-chat .paypal-session-actions {
-  margin-top: var(--space-1);
+  margin-top: 0;
 }
 .chat-message-role {
   display: block;
@@ -95,11 +94,18 @@
     opacity: 0.7;
   }
 }
+/* The transcript sits directly on the workspace, without an enclosing card. */
+.desktop-frame .chat-page {
+  background: transparent;
+}
 .chat-root:not([hidden]) {
   display: flex;
   flex: 1;
   min-width: 0;
   min-height: 0;
+  width: 100%;
+  max-width: var(--page-max-width);
+  margin-inline: auto;
 }
 .chat-root[hidden] {
   display: none;
@@ -134,26 +140,38 @@
   flex-direction: column;
   gap: var(--space-3);
 }
-.chat-user {
+.chat-user-message {
   align-self: flex-end;
   display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-1);
   max-width: min(86%, 480px);
+  min-width: 0;
+}
+.chat-user {
+  min-width: 0;
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--line);
   background: var(--raised);
 }
 .chat-user p {
-  grid-column: 1;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   font-size: 13px;
   line-height: 1.65;
 }
-.chat-user .ui-icon-button {
-  grid-column: 2;
-  flex-shrink: 0;
+.chat-user-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-1);
+  color: var(--muted);
+  font-size: var(--ui-detail);
+}
+.chat-user-actions time {
+  margin-right: var(--space-1);
+  font-variant-numeric: tabular-nums;
 }
 .chat-answer {
   color: var(--ink);
@@ -248,13 +266,10 @@
 }
 .composer-leading {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   min-width: 0;
   gap: var(--space-1);
-}
-.desktop-frame .composer-leading .composer-model {
-  max-width: none;
-  min-width: 0;
 }
 .desktop-frame .chat-tools-button {
   font-size: 11px;
@@ -299,9 +314,6 @@
   .composer-leading {
     gap: 2px;
   }
-  .desktop-frame .composer-model {
-    font-size: 10px;
-  }
   .desktop-frame .composer-actions > span {
     display: none;
   }
@@ -314,9 +326,6 @@
   }
 }
 @media (max-width: 480px) {
-  .composer-leading .composer-model .model-artwork {
-    display: none;
-  }
   .desktop-frame .chat-tools-button {
     padding-inline: var(--space-1);
   }
@@ -369,14 +378,4 @@
   .chat-turn > article {
     animation: none;
   }
-}
-.chat-preview-note {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-4);
-  margin: 0;
-  color: var(--muted);
-  font-size: 11px;
 }

@@ -5,7 +5,7 @@ import { PAYPAL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { PaypalError } from '@gyblos/protocol/paypal-payment';
 
 import {
-  PAYPAL_SESSION_RECORD_VERSION,
+  PAYPAL_SESSION_PREVIOUS_RECORD_VERSION,
   PAYPAL_SESSION_PHASE as PHASE,
 } from './constants';
 import type { PaypalSessionRecord } from './paypal-session-record';
@@ -21,14 +21,14 @@ export type AgentOperation = {
 };
 type CurrentRecord = Extract<
   PaypalSessionRecord,
-  { version: typeof PAYPAL_SESSION_RECORD_VERSION }
+  { agentCompletions: unknown }
 >;
 export function checkAgentOperation(
   record: PaypalSessionRecord,
   digest: string,
   agent: AgentOperation,
 ) {
-  if (record.version !== PAYPAL_SESSION_RECORD_VERSION)
+  if (record.version === PAYPAL_SESSION_PREVIOUS_RECORD_VERSION)
     return fail(PAYPAL_ERROR_CODES.INVALID_CONFIG);
   if (
     record.agentCompletions.some((completed) =>

@@ -11,15 +11,49 @@ and styles. The personal wallet is local and protected; USDC Chat and Connect
 remain simulated. An opt-in [PayPal Sandbox session](paypal-sandbox.md) runs a
 pinned local Ollama model with test payments for one local seller.
 
-The USDC Chat preview streams synthetic text independently per conversation. New
+Chat keeps one in-memory conversation and draft when switching USDC preview and
+PayPal Sandbox. The method applies to the next message only. Previous responses
+retain their payment-method label. PayPal still uses the configured local model
+and does not send previous messages as context. Switching method never opens a
+checkout or settles a session. Payment selection stays locked during responses
+and pending PayPal acknowledgments. Models and Tools use the same searchable
+menu with artwork; unimplemented web tools remain disabled previews. Contextual
+links show a back arrow, while sidebar destinations reset that journey.
+
+The USDC preview streams synthetic text independently per conversation. New
 chats, history selection and switching Chat/Connect leave other responses
 running and preserve separate drafts. Stop affects only the visible conversation
 and keeps its generated prefix. Local-node availability does not authorize
 inference or stop synthetic responses. Blocked sends explain missing credits or
 a daily limit inside the chat instead of opening wallet settings. Choosing a
-free model clears only the corresponding paid-model block. All conversations,
-drafts, theme choices and connection budgets are in memory and clear when the
-app closes. They are not saved to the product home.
+free model clears only the corresponding paid-model block. Conversations and
+drafts are saved locally in a private conversation file in the persistent
+desktop profile, including model and payment-method labels and opaque links to
+shared PayPal sessions. This is display history, not payment authority. Loading
+never resumes inference, acknowledges a response, or creates an authorization;
+incomplete responses reopen as interrupted. API keys, live execution state and
+payment identifiers are excluded. Files have owner-only permissions; this is
+local storage, not cloud synchronization or a claim of content encryption.
+Corrupt, oversized or inaccessible history is preserved and reported as
+unavailable instead of being replaced with an empty chat. Accepted snapshots are
+coalesced in the host; graceful exit drains them with a bounded wait, so abrupt
+exit or storage failure may lose unsaved changes. Theme choices and connection
+budgets remain in memory and clear when the app closes.
+
+Activity separately saves descriptive PayPal Sandbox session metadata in a
+private file beside the sandbox state. It contains no chat text, credentials or
+payment identifiers, and is never used to authorize or retry payments. Each
+observed session separates acknowledged Chat replies, completed agent
+inferences, unconfirmed consumption and successful captures. Dates are local
+observation times, not transaction dates. Earlier sessions that predate
+collection may be unavailable. Storage failures remain visible and do not block,
+change or retry financial work. Observation queues metadata independently of
+payment IPC. Shutdown closes financial resources before a bounded history flush;
+a separate metadata lock protects late writes without holding the payment
+journal open. Abrupt exit can lose unsaved descriptive history. USDC preview
+activity lists only completed simulated replies in saved conversations; it never
+appears as a real payment. Conversation history links new PayPal turns to their
+shared payment session; shared totals can include other chats and agents.
 
 The five sample models and their prices remain visible in the Preview catalog;
 connection budgets are illustrative, not enforced tool spending limits. Models
@@ -213,8 +247,7 @@ installed Node runtime nor workspace links at runtime.
 
 This is not a signed/notarized installer, release or updater. Windows/Linux
 installers, Intel Mac packaging, real P2P connectivity, application recovery and
-real inference, authenticated Connect and persistent conversation storage remain
-outside this preview. Generated apps, captures and run evidence stay outside
-Git. The normal root checks cover its TypeScript/TSX, lint rules and synthetic
-summary/lifecycle regressions; Electron packaging is a separate
-platform-specific check.
+real inference, authenticated Connect remain outside this preview. Generated
+apps, captures and run evidence stay outside Git. The normal root checks cover
+its TypeScript/TSX, lint rules and synthetic summary/lifecycle regressions;
+Electron packaging is a separate platform-specific check.

@@ -15,12 +15,14 @@ export function Dropdown({
   label,
   trigger,
   className = '',
+  iconOnly = false,
   searchLabel,
   children,
 }: {
   label: string;
   trigger: ReactNode;
   className?: string;
+  iconOnly?: boolean;
   searchLabel: string;
   children: (close: () => void, query: string) => ReactNode;
 }) {
@@ -83,7 +85,7 @@ export function Dropdown({
     <>
       <Button
         ref={button}
-        className={className}
+        className={`ui-menu-trigger${iconOnly ? ' ui-icon-button' : ''} ${className}`}
         aria-label={label}
         aria-haspopup="menu"
         aria-expanded={open}

@@ -1,5 +1,5 @@
-// Stateful desktop conversation preview: sessions, interruption, streaming and tool consent.
-// Timers render synthetic text only; this component never contacts a model or web service.
+// One buyer conversation surface with a shared draft, history and payment provenance.
+// USDC remains simulated; real Sandbox requests use the guarded PayPal coordinator.
 import {
   ArrowDown,
   ArrowUp,
@@ -7,6 +7,7 @@ import {
   Check,
   Clock,
   Code,
+  Copy,
   PencilSimple,
   Plus,
   Sparkle,
@@ -19,10 +20,26 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
+  type ReactNode,
   type Ref,
 } from 'react';
 
-import { ChatController } from './chat-controller';
+import { CHAT_STORAGE_STATE, DESKTOP_ACTIVITY } from '../constants';
+import {
+  PAYMENT_METHOD,
+  paypalDollars,
+  type PaymentMethod,
+} from '../paypal-model';
+import { activityDate, sessionOutcome } from './activity-presentation';
+import { modelArtwork } from './announced-models';
+import type { ChatController } from './chat-controller';
+import { conversationSummary } from './chat-history';
+import { canSendPaypal, sendPaypalMessage } from './chat-paypal';
+import {
+  chatReasoningChoice,
+  reasoningLabel,
+  type ReasoningSelection,
+} from './chat-reasoning';
 import { toggleToolSelection, type ChatMessage } from './chat-state';
 import { ChatAnswer } from './ChatAnswer';
 import { ChatComposer } from './ChatComposer';
@@ -33,6 +50,7 @@ import type { DemoAuthorizationStatus } from './demo-account';
 import { Modal } from './Modal';
 import { ModelDropdown, type ModelOption } from './ModelDropdown';
 import { MotionPresence } from './Motion';
+import { ReasoningDropdown } from './ReasoningDropdown';
 import { SIGNAL_STATE, SignalMark, SignalTrace } from './Signal';
 import { toolName, TOOLS, type ToolId } from './tools';
 import {
@@ -45,6 +63,9 @@ import {
   RowCopy,
   SearchField,
 } from './UI';
+import type { ActivityView } from './useActivity';
+import { chatArchiveLabel } from './useChatArchive';
+import type { PaypalSessionView } from './usePaypalSession';
 
 export type ChatHandle = {
   newChat: () => void;
@@ -52,16 +73,24 @@ export type ChatHandle = {
 };
 type Props = {
   ref?: Ref<ChatHandle>;
+  chat: ChatController;
+  storageState: (typeof CHAT_STORAGE_STATE)[keyof typeof CHAT_STORAGE_STATE];
+  activity: ActivityView;
+  onActivity(id: string): void;
   model: ModelOption;
   online: boolean;
   active?: boolean;
   connectedTools: ToolId[];
-  onToggleTool: (id: ToolId) => void;
+  onBrowseApplications: () => void;
   models: readonly ModelOption[];
   onSelectModel: (id: string) => void;
   onBrowseModels: () => void;
   onReviewPaypal: () => void;
   onAuthorize: () => DemoAuthorizationStatus;
+  paymentMethod: PaymentMethod;
+  paymentControl: ReactNode;
+  paypal: PaypalSessionView;
+  onBusyChange: (busy: boolean) => void;
 };
 type PendingSend = { text: string; tools: ToolId[] };
 const QUICK_PROMPTS = [
@@ -99,18 +128,25 @@ function groupTurns(messages: readonly ChatMessage[]): ChatTurn[] {
 }
 export function Chat({
   ref,
+  chat,
+  storageState,
+  activity,
+  onActivity,
   model,
   online,
   active = true,
   connectedTools,
-  onToggleTool,
+  onBrowseApplications,
   models,
   onSelectModel,
   onBrowseModels,
   onReviewPaypal,
   onAuthorize,
+  paymentMethod,
+  paymentControl,
+  paypal,
+  onBusyChange,
 }: Props) {
-  const [chat] = useState(() => new ChatController('first-chat'));
   const { sessions, activeId } = useSyncExternalStore(
     chat.subscribe,
     chat.getSnapshot,
@@ -123,7 +159,11 @@ export function Chat({
   const [pendingSend, setPendingSend] = useState<PendingSend | null>(null);
   const [details, setDetails] = useState<string | null>(null);
   const [copied, setCopied] = useState('');
-  const notice = session.notice;
+  const [reasoning, setReasoning] = useState<ReasoningSelection | null>(null);
+  const usingPaypal = paymentMethod === PAYMENT_METHOD.PAYPAL;
+  const notice = usingPaypal
+    ? paypal.state.notice || session.notice
+    : session.notice;
   const [nearBottom, setNearBottom] = useState(true);
   const [modelPulse, setModelPulse] = useState(false);
   const input = useRef<HTMLTextAreaElement>(null);
@@ -136,7 +176,23 @@ export function Chat({
   const scroller = useRef<HTMLDivElement>(null);
   const follow = useRef(true);
   const run = session.run;
-  const busy = Boolean(run);
+  const loadingHistory = storageState === CHAT_STORAGE_STATE.LOADING;
+  const busy = Boolean(run || session.paypalRun);
+  const canSend =
+    !loadingHistory &&
+    online &&
+    !busy &&
+    (!usingPaypal || canSendPaypal(paypal.state));
+  const sandboxModel: ModelOption = {
+    id: paypal.state.model ?? 'Local model',
+    name: paypal.state.model ?? 'Local model',
+    image: modelArtwork(paypal.state.model ?? ''),
+    free: false,
+    input: 0,
+    output: 0,
+  };
+  const composerModel = usingPaypal ? sandboxModel : model;
+  const thinking = chatReasoningChoice(composerModel, paymentMethod, reasoning);
   const chosenTools = selectedTools.filter((id) => connectedTools.includes(id));
   const lastUser = [...session.messages]
     .reverse()
@@ -144,6 +200,7 @@ export function Chat({
   const turns = groupTurns(session.messages);
 
   function setDraft(text: string) {
+    if (loadingHistory) return;
     chat.setDraft(text);
   }
   function stop() {
@@ -157,6 +214,7 @@ export function Chat({
     composerOrigin.current = composer.current?.getBoundingClientRect() ?? null;
   }
   function reset(text = '') {
+    if (loadingHistory) return;
     captureComposer();
     const id = crypto.randomUUID();
     chat.newChat(id, text);
@@ -183,6 +241,11 @@ export function Chat({
     [chat],
   );
   useEffect(() => chat.setOnline(online), [chat, online]);
+  useEffect(() => {
+    onBusyChange(
+      loadingHistory || sessions.some((item) => !!item.run || !!item.paypalRun),
+    );
+  }, [sessions, onBusyChange, loadingHistory]);
   useEffect(() => chat.modelChanged(model.free), [chat, model.id, model.free]);
   useEffect(() => {
     if (!active) return;
@@ -261,7 +324,7 @@ export function Chat({
     if (!text.trim() || busy) return;
     if (!session.messages.length) captureComposer();
     const runId = crypto.randomUUID();
-    if (!chat.start(text, model, tools, runId, onAuthorize)) {
+    if (!chat.start(text, model, tools, runId, onAuthorize, thinking?.value)) {
       composerOrigin.current = null;
       return;
     }
@@ -270,8 +333,14 @@ export function Chat({
     input.current?.focus();
   }
   function submit() {
-    if (busy) return;
-    if (!session.draft.trim() || !online) return;
+    if (!canSend || !session.draft.trim()) return;
+    if (usingPaypal) {
+      if (!session.messages.length) captureComposer();
+      follow.current = true;
+      setNearBottom(true);
+      void sendPaypalMessage(chat, paypal.chat, crypto.randomUUID());
+      return;
+    }
     if (chosenTools.some((id) => !allowedTools.includes(id)))
       setPendingSend({ text: session.draft, tools: [...chosenTools] });
     else start(session.draft, chosenTools);
@@ -309,17 +378,20 @@ export function Chat({
     .reverse();
   return (
     <main className="chat-page enhanced-chat">
-      <div className="chat-preview-note">
-        <span>
-          USDC chat preview · responses and spending are simulated. PayPal
-          Sandbox sessions remain open until settled.
-        </span>
-        <Button onClick={onReviewPaypal}>Review PayPal session</Button>
-      </div>
+      {storageState === CHAT_STORAGE_STATE.UNAVAILABLE && (
+        <Note>{chatArchiveLabel(storageState)}</Note>
+      )}
+      {usingPaypal && notice && (
+        <div className="paypal-chat-alert" role="status">
+          <p>{notice}</p>
+          <Button onClick={onReviewPaypal}>Review in Payments</Button>
+        </div>
+      )}
       <div className="chat-toolbar">
         <div className="chat-tools">
           <Button
             aria-label="Recent conversations"
+            disabled={loadingHistory}
             onClick={() => setHistoryOpen(true)}
           >
             <Clock size={16} />
@@ -359,7 +431,7 @@ export function Chat({
                 }
               />
               <h2>Start a conversation</h2>
-              <p>One question. A new direction.</p>
+              <p>Choose how to pay. Keep the conversation.</p>
             </div>
           ) : (
             <div
@@ -373,16 +445,37 @@ export function Chat({
                   {user && (
                     <ChatUserMessage
                       text={user.text}
+                      sentAt={user.sentAt}
                       action={
-                        <IconButton
-                          label="Reuse message"
-                          onClick={() => {
-                            setDraft(user.text);
-                            input.current?.focus();
-                          }}
-                        >
-                          <PencilSimple size={14} />
-                        </IconButton>
+                        <>
+                          <IconButton
+                            label={
+                              copied === user.id
+                                ? 'Message copied'
+                                : 'Copy message'
+                            }
+                            title="Copy message"
+                            onClick={() => {
+                              void copy(user.text, user.id);
+                            }}
+                          >
+                            {copied === user.id ? (
+                              <Check size={14} />
+                            ) : (
+                              <Copy size={14} />
+                            )}
+                          </IconButton>
+                          <IconButton
+                            label="Edit message"
+                            title="Edit in composer"
+                            onClick={() => {
+                              setDraft(user.text);
+                              input.current?.focus();
+                            }}
+                          >
+                            <PencilSimple size={14} />
+                          </IconButton>
+                        </>
                       }
                     />
                   )}
@@ -440,6 +533,7 @@ export function Chat({
             </p>
           )}
           <ChatComposer
+            disabled={loadingHistory}
             ref={composer}
             inputRef={input}
             placeholder={
@@ -455,45 +549,66 @@ export function Chat({
           >
             <div className="composer-leading">
               <ModelDropdown
-                model={model}
-                models={models}
+                model={composerModel}
+                models={usingPaypal ? [sandboxModel] : models}
                 onSelect={onSelectModel}
                 onBrowse={onBrowseModels}
+                showBrowse={!usingPaypal}
+                contextLabel={
+                  usingPaypal ? 'Local model · PayPal Sandbox' : undefined
+                }
               />
+              {thinking && (
+                <ReasoningDropdown
+                  support={thinking.support}
+                  value={thinking.value}
+                  onChange={(level) =>
+                    setReasoning({ modelId: composerModel.id, level })
+                  }
+                />
+              )}
               <ToolsDropdown
+                selected={selectedTools}
                 connected={connectedTools}
-                selected={chosenTools}
-                onConnect={onToggleTool}
-                onSelect={(id) =>
+                unavailable={usingPaypal}
+                onToggle={(id) =>
                   setSelectedTools((previous) =>
                     toggleToolSelection(previous, connectedTools, id),
                   )
                 }
+                onBrowse={onBrowseApplications}
               />
+              {paymentControl}
             </div>
             <div className="composer-actions">
               <span>
-                {busy
-                  ? 'Esc to stop'
-                  : model.free
-                    ? 'No credits needed'
-                    : 'Uses wallet balance'}
+                {session.paypalRun
+                  ? 'Generating…'
+                  : usingPaypal
+                    ? canSendPaypal(paypal.state)
+                      ? 'PayPal Sandbox'
+                      : 'Set up in Payments'
+                    : busy
+                      ? 'Esc to stop'
+                      : model.free
+                        ? 'No credits needed'
+                        : 'Uses wallet balance'}
               </span>
               <IconButton
-                variant={busy ? 'secondary' : 'primary'}
+                variant={run ? 'secondary' : 'primary'}
                 className="ui-composer-action"
-                type={busy ? 'button' : 'submit'}
-                label={busy ? 'Stop response' : 'Send message'}
-                data-busy={busy}
+                type={run ? 'button' : 'submit'}
+                label={run ? 'Stop response' : 'Send message'}
+                data-busy={!!run}
                 onClick={
-                  busy
+                  run
                     ? (event) => {
                         event.preventDefault();
                         stop();
                       }
                     : undefined
                 }
-                disabled={!busy && (!session.draft.trim() || !online)}
+                disabled={!run && (!session.draft.trim() || !canSend)}
               >
                 <span className="composer-send-glyph" aria-hidden="true">
                   <ArrowUp size={16} weight="bold" />
@@ -510,6 +625,7 @@ export function Chat({
                 <Button
                   variant={BUTTON_VARIANT.SECONDARY}
                   key={item.text}
+                  disabled={loadingHistory}
                   onClick={() => {
                     setDraft(item.prompt);
                     input.current?.focus();
@@ -522,10 +638,14 @@ export function Chat({
             </div>
           )}
           <p className="composer-note" role="status">
-            {notice ||
+            {(!usingPaypal && notice) ||
               (busy && session.draft.trim()
-                ? 'Draft kept · stop or wait to send'
-                : 'Enter to send · Shift+Enter for a new line')}
+                ? run
+                  ? 'Draft kept · stop or wait to send'
+                  : 'Draft kept · wait for the response'
+                : usingPaypal
+                  ? 'Messages are independent; previous messages are not sent to the model.'
+                  : 'Enter to send · Shift+Enter for a new line')}
           </p>
         </div>
       </div>
@@ -536,6 +656,7 @@ export function Chat({
             compact
             close={() => setHistoryOpen(false)}
           >
+            <Note>{chatArchiveLabel(storageState)}</Note>
             <SearchField
               label="Search conversations"
               placeholder="Search conversations…"
@@ -543,28 +664,67 @@ export function Chat({
               onValueChange={setHistorySearch}
             />
             <List label="Conversation history">
-              {history.map((item) => (
-                <ListRow
-                  key={item.id}
-                  selected={item.id === activeId}
-                  leading={
-                    <Avatar>
-                      <ChatCircle size={16} />
-                    </Avatar>
-                  }
-                  onActivate={() => openSession(item.id)}
-                  trailing={item.id === activeId ? <Check size={14} /> : null}
-                >
-                  <RowCopy
-                    title={item.title}
-                    detail={
-                      item.messages.length
-                        ? `${item.messages.filter((message) => message.role === CHAT_ROLE.USER).length} prompts`
-                        : 'Draft'
-                    }
-                  />
-                </ListRow>
-              ))}
+              {history.map((item) => {
+                const summary = conversationSummary(item);
+                return (
+                  <div key={item.id} className="chat-history-entry">
+                    <ListRow
+                      selected={item.id === activeId}
+                      leading={
+                        <Avatar>
+                          <ChatCircle size={16} />
+                        </Avatar>
+                      }
+                      onActivate={() => openSession(item.id)}
+                      trailing={
+                        item.id === activeId ? <Check size={14} /> : null
+                      }
+                    >
+                      <RowCopy
+                        title={item.title}
+                        detail={`${summary.prompts} prompts · ${summary.paypalReplies} PayPal replies · ${summary.previewReplies} simulated replies`}
+                      />
+                      {summary.lastSentAt !== null && (
+                        <small className="chat-history-date">
+                          {activityDate(summary.lastSentAt)}
+                        </small>
+                      )}
+                    </ListRow>
+                    {summary.paymentSessionIds.length > 0 && (
+                      <div className="chat-history-sessions">
+                        {summary.paymentSessionIds.map((id) => {
+                          const entry = activity.state?.sessions.find(
+                            (row) => row.id === id,
+                          );
+                          return (
+                            <Button
+                              key={id}
+                              onClick={() => {
+                                setHistoryOpen(false);
+                                onActivity(id);
+                              }}
+                              title="View shared session consumption and payment"
+                            >
+                              <span>
+                                Session{' '}
+                                {id.slice(
+                                  0,
+                                  DESKTOP_ACTIVITY.DISPLAY_ID_CHARACTERS,
+                                )}
+                              </span>
+                              <small>
+                                {entry
+                                  ? `${sessionOutcome(entry)} · ${paypalDollars(entry.recordedCents)} shared usage`
+                                  : 'View in Activity'}
+                              </small>
+                            </Button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
               {!history.length && (
                 <p className="ui-list-empty">
                   {historySearch
@@ -600,6 +760,17 @@ export function Chat({
                 <div className="ui-section ui-help-text">
                   <SignalTrace model={message.model.name} />
                   <p>Model route</p>
+                  <p>
+                    {message.paymentMethod === PAYMENT_METHOD.PAYPAL
+                      ? 'PayPal Sandbox · local inference'
+                      : 'USDC preview · simulated response'}
+                  </p>
+                  {message.reasoning && (
+                    <p>
+                      Thinking: {reasoningLabel(null, message.reasoning)} ·
+                      preview setting
+                    </p>
+                  )}
                   {message.tools.length > 0 && (
                     <p>Tools: {message.tools.map(toolName).join(', ')}</p>
                   )}

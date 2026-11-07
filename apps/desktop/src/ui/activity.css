@@ -1,0 +1,78 @@
+/* Consumption and payment history use the shared desktop spacing and control scale. */
+.desktop-frame .activity-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+.desktop-frame .activity-heading h2 {
+  margin: 0;
+  font-size: 20px;
+}
+.desktop-frame .activity-heading p {
+  color: var(--muted);
+  margin: var(--space-2) 0 0;
+}
+.desktop-frame .activity-stats {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.desktop-frame .activity-breakdown {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.desktop-frame .activity-row-meta {
+  display: block;
+  margin-top: var(--space-1);
+  color: var(--muted);
+  font-size: var(--ui-detail);
+}
+.desktop-frame .activity-footnote {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--ui-detail);
+  line-height: 1.6;
+}
+.desktop-frame .chat-history-date {
+  display: block;
+  margin-top: var(--space-1);
+  color: var(--muted);
+  font-size: var(--ui-detail);
+}
+.desktop-frame .chat-history-entry + .chat-history-entry {
+  border-top: 1px solid var(--line);
+}
+.desktop-frame .chat-history-sessions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: 0 var(--space-3) var(--space-3);
+}
+.desktop-frame .chat-history-sessions .ui-button {
+  height: auto;
+  white-space: normal;
+  text-align: left;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+}
+.desktop-frame .chat-history-sessions small {
+  color: var(--muted);
+  font-size: var(--ui-detail);
+}
+.desktop-frame .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+@media (max-width: 850px) {
+  .desktop-frame .activity-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

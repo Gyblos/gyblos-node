@@ -107,6 +107,25 @@ void test('the local gateway requires its key and rejects browser origins', asyn
   assert.deepEqual(f.calls, []);
 });
 
+void test('an invalid agent key explains how to reconnect without starting inference', async () => {
+  const f = fixture();
+  const response = await f.gateway.handle(
+    post(input, { authorization: 'Bearer wrong' }),
+  );
+  assert.equal(response.status, 401);
+  const body: unknown = await response.json();
+  assert.deepEqual(body, {
+    error: {
+      message:
+        'Invalid Gyblos API key. Copy the current key from Agents and try again.',
+      type: 'invalid_request_error',
+      code: 'PAYPAL_INVALID_REQUEST',
+    },
+  });
+  assert.equal(response.headers.get('x-should-retry'), 'false');
+  assert.deepEqual(f.calls, []);
+});
+
 void test('the authorized model catalog exposes only the configured model', async () => {
   const f = fixture();
   const request = new Request(`${origin}/v1/models`, {

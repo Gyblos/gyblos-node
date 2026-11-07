@@ -9,7 +9,8 @@ import {
   PAYPAL_STATUS_POLL_MAX_OUTSTANDING,
   PAYPAL_STATUS_POLL_TIMEOUT_MS,
 } from './constants';
-import { paypalChatFailure } from './paypal-chat-notice';
+import { createPaypalChatMonitor } from './paypal-chat-monitor';
+import { paypalChatFailure, paypalCommandNotice } from './paypal-chat-notice';
 import {
   parsePaypalResult,
   PAYPAL_ACTION,
@@ -28,6 +29,7 @@ type Message = {
   text: string;
 };
 type Snapshot = {
+  sessionId?: string | null;
   status: DesktopPaypalStatus | null;
   statusFresh: boolean;
   model: string | null;
@@ -39,13 +41,6 @@ type Snapshot = {
   pendingMessageId: string | null;
 };
 type Run = (request: PaypalRequest) => Promise<PaypalResult>;
-
-function needsReview(
-  status: DesktopPaypalStatus | null,
-  pending: string | null,
-) {
-  return status?.phase === PAYPAL_SESSION_PHASE.MESSAGE_PENDING && !pending;
-}
 
 export class PaypalChatController {
   private snapshot: Snapshot = {
@@ -66,6 +61,10 @@ export class PaypalChatController {
   private returnPending = false;
   private returning = false;
   private cancellationPending = false;
+  private readonly monitor = createPaypalChatMonitor(() => {
+    if (this.snapshot.statusFresh) this.update({ statusFresh: false });
+  });
+  hasKnownUnfinishedSession = this.monitor.hasKnownUnfinishedSession;
   constructor(
     private readonly run: Run,
     private readonly statusTimeoutMs = PAYPAL_STATUS_POLL_TIMEOUT_MS,
@@ -81,8 +80,16 @@ export class PaypalChatController {
     this.draftRevision++;
     this.update({ draft });
   }
+  private receive(result: PaypalResult) {
+    return {
+      status: result.status,
+      sessionId: result.sessionId ?? null,
+      model: result.model,
+    };
+  }
   private update(values: Partial<Snapshot>) {
     this.snapshot = { ...this.snapshot, ...values };
+    this.monitor.observe(this.snapshot);
     for (const listener of this.listeners) listener();
   }
   private async call(request: PaypalRequest) {
@@ -113,35 +120,41 @@ export class PaypalChatController {
   private async command(request: PaypalRequest) {
     if (this.snapshot.busy) return;
     const previous = this.snapshot.status;
+    const generation = this.monitor.generation();
     this.update({
       busy: true,
-      ...(request.action === PAYPAL_ACTION.STATUS ? {} : { notice: '' }),
+      ...(request.action === PAYPAL_ACTION.STATUS
+        ? { statusFresh: false }
+        : { notice: '' }),
     });
     const result =
       request.action === PAYPAL_ACTION.STATUS
         ? await this.statusCall()
         : await this.call(request);
     if (
+      this.monitor.stale(request.action === PAYPAL_ACTION.STATUS, generation)
+    ) {
+      this.update({ busy: false, statusFresh: false });
+      await this.consumeReturn();
+      await this.consumeCancellation();
+      return;
+    }
+    if (
       request.action === PAYPAL_ACTION.APPROVE &&
       result.error &&
       result.error !== PAYPAL_DESKTOP_ERROR.NOT_APPROVED
     )
       this.returnPending = false;
-    const notice = result.error
-      ? paypalChatFailure(result)
-      : request.action === PAYPAL_ACTION.FINISH &&
-          result.status?.phase === PAYPAL_SESSION_PHASE.ACTIVE
-        ? 'Session remains open. No payment was requested.'
-        : needsReview(result.status, this.snapshot.pendingMessageId)
-          ? 'A prior response awaits confirmation. Review the session.'
-          : request.action === PAYPAL_ACTION.STATUS &&
-              result.status?.phase === previous?.phase
-            ? this.snapshot.notice
-            : '';
+    const notice = paypalCommandNotice(
+      request,
+      result,
+      previous,
+      this.snapshot.pendingMessageId,
+      this.snapshot.notice,
+    );
     this.update({
-      status: result.status,
-      statusFresh: result.status !== null,
-      model: result.model,
+      ...this.receive(result),
+      statusFresh: this.monitor.isActive() && result.status !== null,
       notice,
       busy: false,
       ...(request.action === PAYPAL_ACTION.CREATE &&
@@ -180,9 +193,8 @@ export class PaypalChatController {
       return;
     }
     this.update({
-      status: result.status,
-      statusFresh: result.status !== null,
-      model: result.model,
+      ...this.receive(result),
+      statusFresh: this.monitor.isActive() && result.status !== null,
       busy: false,
       notice: result.error
         ? paypalChatFailure(result)
@@ -195,26 +207,34 @@ export class PaypalChatController {
     await this.consumeCancellation();
   };
   refresh = () => this.command({ action: PAYPAL_ACTION.STATUS });
+  checkVoidedAuthorization = () =>
+    this.command({ action: PAYPAL_ACTION.CHECK_VOID });
+  startMonitoring = this.monitor.start;
+  stopMonitoring = this.monitor.stop;
   async poll() {
     if (this.snapshot.busy || this.polling) return;
     this.polling = true;
     const previous = this.snapshot.status;
+    const generation = this.monitor.generation();
     try {
       const result = await this.statusCall();
-      if (!this.snapshot.busy && this.snapshot.status === previous) {
+      if (
+        this.monitor.isCurrent(generation) &&
+        !this.snapshot.busy &&
+        this.snapshot.status === previous
+      ) {
         if (result.error || !result.status) this.update({ statusFresh: false });
         else
           this.update({
-            status: result.status,
+            ...this.receive(result),
             statusFresh: true,
-            model: result.model,
           });
       }
     } finally {
       this.polling = false;
     }
   }
-  create = () => {
+  create = (limitCents?: number) => {
     if (!this.snapshot.statusFresh) return Promise.resolve();
     const phase = this.snapshot.status?.phase;
     if (
@@ -224,9 +244,12 @@ export class PaypalChatController {
       phase !== PAYPAL_SESSION_PHASE.CANCELLED
     )
       return Promise.resolve();
-    return this.command({ action: PAYPAL_ACTION.CREATE });
+    return this.command({
+      action: PAYPAL_ACTION.CREATE,
+      ...(limitCents === undefined ? {} : { limitCents }),
+    });
   };
-  startCheckout = async () => {
+  startCheckout = async (limitCents?: number) => {
     if (!this.snapshot.statusFresh) return;
     const phase = this.snapshot.status?.phase;
     if (
@@ -236,7 +259,7 @@ export class PaypalChatController {
       phase !== PAYPAL_SESSION_PHASE.CANCELLED
     )
       return;
-    await this.create();
+    await this.create(limitCents);
     if (
       this.snapshot.status?.phase === PAYPAL_SESSION_PHASE.CREATED &&
       this.snapshot.status.approvalLinkAvailable &&
@@ -322,9 +345,8 @@ export class PaypalChatController {
       result.status?.phase !== PAYPAL_SESSION_PHASE.MESSAGE_PENDING
     ) {
       this.update({
-        status: result.status,
-        statusFresh: result.status !== null,
-        model: result.model,
+        ...this.receive(result),
+        statusFresh: this.monitor.isActive() && result.status !== null,
         notice: paypalChatFailure(result),
         draft:
           this.draftRevision === draftRevision ? draft : this.snapshot.draft,
@@ -334,9 +356,8 @@ export class PaypalChatController {
       return;
     }
     this.update({
-      status: result.status,
-      statusFresh: true,
-      model: result.model,
+      ...this.receive(result),
+      statusFresh: this.monitor.isActive(),
       pendingPrompt: null,
       messages: [
         ...this.snapshot.messages,
@@ -355,18 +376,16 @@ export class PaypalChatController {
     });
     if (result.error || result.status?.phase !== PAYPAL_SESSION_PHASE.ACTIVE) {
       this.update({
-        status: result.status,
-        statusFresh: result.status !== null,
-        model: result.model,
+        ...this.receive(result),
+        statusFresh: this.monitor.isActive() && result.status !== null,
         notice:
           'The response arrived but its acknowledgment is pending. Retry acknowledgment only.',
       });
       return;
     }
     this.update({
-      status: result.status,
-      statusFresh: true,
-      model: result.model,
+      ...this.receive(result),
+      statusFresh: this.monitor.isActive(),
       pendingMessageId: null,
       notice: '',
     });

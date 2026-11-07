@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { app, BrowserWindow, ipcMain } from 'electron';
 
 import { registerNetworkCatalog } from './catalog/host';
+import { registerChatArchive } from './chat-archive-host';
 import { DESKTOP, PROBE_STATUS, STARTUP_WINDOW } from './constants';
 import { registerDesktopNode } from './node-host';
 import { createDesktopQuitCoordinator } from './paypal-close-guard';
@@ -89,6 +90,7 @@ type DesktopServices = {
   wallet: ReturnType<typeof registerDesktopWallet> | undefined;
   node: ReturnType<typeof registerDesktopNode> | null;
   paypal: ReturnType<typeof registerDesktopPaypal> | null;
+  chats: ReturnType<typeof registerChatArchive> | null;
 };
 
 function registerDesktopQuit(
@@ -101,11 +103,12 @@ function registerDesktopQuit(
       (event) => services().paypal?.guard(event) ?? false,
       async () => {
         controller.abort();
-        const { wallet, node, paypal } = services();
+        const { wallet, node, paypal, chats } = services();
         await Promise.allSettled([
           wallet?.settled() ?? Promise.resolve(),
           node?.close() ?? Promise.resolve(),
           paypal?.close() ?? Promise.resolve(),
+          chats?.close() ?? Promise.resolve(),
         ]);
       },
       () => app.quit(),
@@ -130,12 +133,13 @@ async function main() {
   let wallet: ReturnType<typeof registerDesktopWallet> | undefined;
   let node: ReturnType<typeof registerDesktopNode> | null = null;
   let paypal: ReturnType<typeof registerDesktopPaypal> | null = null;
+  let chats: ReturnType<typeof registerChatArchive> | null = null;
   const fail = () => {
     process.stdout.write(`${JSON.stringify(failedProbe())}\n`);
     app.exit(1);
   };
   const cancelWatchdog = smoke ? armSmokeWatchdog(fail) : () => {};
-  registerDesktopQuit(controller, () => ({ wallet, node, paypal }));
+  registerDesktopQuit(controller, () => ({ wallet, node, paypal, chats }));
   app.on('quit', () => {
     cancelWatchdog();
     controller.abort();
@@ -155,6 +159,7 @@ async function main() {
   wallet = registerDesktopWallet(window, walletRoot, smoke, controller.signal);
   if (!smoke) registerNetworkCatalog(window, controller.signal);
   if (!smoke) paypal = registerDesktopPaypal(window);
+  if (!smoke) chats = registerChatArchive(window, app.getPath('userData'));
   node = smoke
     ? null
     : registerDesktopNode(window, __dirname, controller.signal);

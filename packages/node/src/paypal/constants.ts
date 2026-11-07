@@ -56,5 +56,19 @@ export const PAYPAL_SESSION_REVIEW_ACTOR = {
   LOCAL_OPERATOR: 'local-operator-attestation',
 } as const;
 export const PAYPAL_SESSION_REVIEW_ARCHIVE_VERSION = 1;
+export const PAYPAL_VOID_EXCEPTION = {
+  VERSION: 1,
+  DECISION: 'sandbox-exception-accept-unknown-history',
+  UNKNOWN: 'unknown',
+  AUTHORIZATION_VOIDED: 'VOIDED',
+  HISTORY_SOURCE: 'paypal-transaction-search',
+  DECISION_SOURCE: 'founder-chat',
+  DECISION_SCOPE: 'single-sandbox-authorization',
+  MAX_HISTORY_EVENTS: 30,
+} as const;
 export const PAYPAL_SESSION_PREVIOUS_RECORD_VERSION = 2;
 export const PAYPAL_SESSION_RECORD_VERSION = 3;
+export const PAYPAL_SESSION_VARIABLE_RECORD_VERSION = 4;
+export const PAYPAL_SESSION_JOURNAL_MAX_BYTES = 65536;
+export const PAYPAL_REVIEW_ENVELOPE_MAX_BYTES = 1024;
+export const PAYPAL_VOID_EXCEPTION_ENVELOPE_MAX_BYTES = 16384;

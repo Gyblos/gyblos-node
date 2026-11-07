@@ -32,6 +32,91 @@ async function setup() {
   };
 }
 
+void test('a chosen session limit reaches the sandbox order from chat', async () => {
+  const f = fixture();
+  let sentLimit = 0;
+  const payment = {
+    ...f.payment,
+    async create(
+      _requestId: string,
+      _returnState?: string,
+      limitCents?: number,
+    ) {
+      sentLimit = limitCents ?? 0;
+      return f.payment.create();
+    },
+  };
+  const service = createDesktopPaypalSession(
+    await createPaypalSession({ ...f, payment }),
+    async () => {},
+  );
+  const contents = {};
+  const frame = {};
+  const handlers = createDesktopPaypalHandlers(
+    async () => ({ service, model: 'qwen-test' }),
+    { contents, mainFrame: () => frame, destroyed: () => false },
+  );
+  const chat = new PaypalChatController((request) =>
+    handlers.run({ sender: contents, senderFrame: frame }, [request]),
+  );
+  await chat.refresh();
+  await chat.startCheckout(500);
+  await chat.approve();
+  assert.equal(sentLimit, 500);
+  assert.equal(chat.getSnapshot().status?.limitCents, 500);
+  assert.equal(chat.getSnapshot().status?.phase, 'active');
+});
+
+void test('a void check explains what PayPal confirmed without closing or charging', async () => {
+  const f = fixture();
+  const payment = {
+    ...f.payment,
+    async void() {
+      f.calls.push('void');
+      throw new Error('lost response');
+    },
+    async checkVoidedAuthorization() {
+      f.calls.push('check void');
+    },
+  };
+  const node = await createPaypalSession({
+    ...f,
+    payment,
+    journal: { ...f.journal, claimSession: () => f.journal },
+  });
+  const order = await node.create();
+  await node.approve(order.orderId);
+  await assert.rejects(node.finish(order.orderId));
+  const service = createDesktopPaypalSession(node, async () => {});
+  const contents = {};
+  const frame = {};
+  const handlers = createDesktopPaypalHandlers(
+    async () => ({ service, model: 'qwen-test' }),
+    { contents, mainFrame: () => frame, destroyed: () => false },
+  );
+  const chat = new PaypalChatController((request) =>
+    handlers.run({ sender: contents, senderFrame: frame }, [request]),
+  );
+  await chat.refresh();
+  await chat.checkVoidedAuthorization();
+  assert.equal(chat.getSnapshot().status?.phase, 'voiding');
+  assert.match(chat.getSnapshot().notice, /authorization.*voided/i);
+  assert.match(chat.getSnapshot().notice, /payment history.*not verified/i);
+  assert.deepEqual(f.calls, ['create', 'authorize', 'void', 'check void']);
+});
+
+void test('a void check never claims confirmation when its result has no session status', async () => {
+  const chat = new PaypalChatController(async () => ({
+    status: null,
+    model: null,
+    answer: null,
+    error: null,
+  }));
+  await chat.checkVoidedAuthorization();
+  assert.doesNotMatch(chat.getSnapshot().notice, /PayPal confirms/);
+  assert.match(chat.getSnapshot().notice, /could not confirm/i);
+});
+
 void test('a submitted prompt remains visible while the response is generating', async () => {
   const { f, chat } = await setup();
   const generate = f.engine.generate;

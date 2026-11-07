@@ -1,17 +1,12 @@
-// Coordinates one sandbox authorization and a bounded sequence of independent inferences.
-// The durable journal contains payment metadata only; ambiguous effects remain blocked.
+// Coordinates sandbox inference and accounting; ambiguous payments stay blocked.
 import { randomUUID } from 'node:crypto';
 
 import { PAYPAL_SANDBOX } from '@gyblos/config/constants';
 import { PAYPAL_ERROR_CODES } from '@gyblos/protocol/constants';
-import {
-  isPaypalId,
-  isPaypalReturnState,
-  PaypalError,
-} from '@gyblos/protocol/paypal-payment';
+import { isPaypalId } from '@gyblos/protocol/paypal-payment';
 
 import {
-  PAYPAL_SESSION_RECORD_VERSION,
+  PAYPAL_SESSION_PREVIOUS_RECORD_VERSION,
   PAYPAL_SESSION_PHASE as PHASE,
 } from './constants';
 import {
@@ -24,6 +19,7 @@ import {
   preparePaypalAgentRequest,
   validatePaypalAgentResult,
 } from './paypal-agent-validation';
+import { paypalSessionActivity } from './paypal-session-activity';
 import {
   parsePaypalSessionState,
   paypalSessionIsTerminal,
@@ -34,30 +30,32 @@ import {
   settlePaypalReviewedInference,
 } from './paypal-session-review';
 import {
+  capturePaypalSession,
+  newPaypalSessionRecord,
   paypalPromptDigest,
+  paypalRestorationVerifier,
   paypalSessionStatus,
+  validatePaypalSessionTerms,
   type PaypalSessionDependencies,
 } from './paypal-session-support';
+import { checkVoid, fail } from './paypal-session-void-check';
 
 export type { PaypalSessionRecord } from './paypal-session-record';
-type Phase = (typeof PHASE)[keyof typeof PHASE];
 export type { PaypalReviewJournal } from './paypal-session-review';
 export type { PaypalWaiverArchive } from './paypal-session-review';
 export type { PaypalSessionDependencies } from './paypal-session-support';
-function fail(
-  code: (typeof PAYPAL_ERROR_CODES)[keyof typeof PAYPAL_ERROR_CODES],
-): never {
-  throw new PaypalError(code);
-}
 class PaypalSession {
   private busy = false;
   private journalFailed = false;
+  private readonly verifyRestored: ReturnType<typeof paypalRestorationVerifier>;
   constructor(
     private readonly deps: PaypalSessionDependencies,
     private active: PaypalSessionRecord | null,
     private readonly legacyBlocked: boolean,
-    private readonly exclusiveJournal: boolean,
-  ) {}
+    private readonly exclusive: boolean,
+  ) {
+    this.verifyRestored = paypalRestorationVerifier(active, deps.payment);
+  }
   private get unavailable() {
     return (
       this.busy ||
@@ -84,7 +82,7 @@ class PaypalSession {
     await this.save(record);
     return fail(PAYPAL_ERROR_CODES.INTERRUPTED);
   }
-  private check(phase: Phase) {
+  private check(phase: PaypalSessionRecord['phase']) {
     if (this.unavailable || !this.active || this.active.phase !== phase)
       return fail(PAYPAL_ERROR_CODES.NEEDS_RECONCILIATION);
     return this.active;
@@ -96,35 +94,26 @@ class PaypalSession {
       this.legacyBlocked || this.deps.journal.isReviewSealed?.() === true,
     );
   }
-  async create(returnState?: string) {
-    if (returnState !== undefined && !isPaypalReturnState(returnState))
-      return fail(PAYPAL_ERROR_CODES.INVALID_REQUEST);
+  activity = () => paypalSessionActivity(this.active, this.status());
+  checkVoidedAuthorization = () =>
+    checkVoid(this.check(PHASE.VOIDING), this.deps, this.exclusive, (busy) => {
+      this.busy = busy;
+    });
+  async create(returnState?: string, limitCents?: number) {
+    limitCents ??= PAYPAL_SANDBOX.limitCents;
+    validatePaypalSessionTerms(returnState, limitCents);
     if (this.unavailable || !paypalSessionIsTerminal(this.active))
       return fail(PAYPAL_ERROR_CODES.NEEDS_RECONCILIATION);
     this.busy = true;
     try {
       const { payment } = this.deps;
       await payment.prepare?.();
-      const record: PaypalSessionRecord = {
-        version: PAYPAL_SESSION_RECORD_VERSION,
-        phase: PHASE.CREATING,
-        requestId: randomUUID(),
-        currency: PAYPAL_SANDBOX.currency,
-        limitCents: PAYPAL_SANDBOX.limitCents,
-        messageCents: PAYPAL_SANDBOX.messageCents,
-        maxMessageAttempts: PAYPAL_SANDBOX.maxMessageAttempts,
-        spentCents: 0,
-        attemptIds: [],
-        acknowledgedIds: [],
-        agentCompletions: [],
-      };
+      const record = newPaypalSessionRecord(randomUUID(), limitCents);
       await this.save(record);
-      const order = await payment.create(record.requestId, returnState);
-      await this.save({
-        ...record,
-        phase: PHASE.CREATED,
-        orderId: order.orderId,
-      });
+      const { requestId } = record;
+      const order = await payment.create(requestId, returnState, limitCents);
+      const { orderId } = order;
+      await this.save({ ...record, phase: PHASE.CREATED, orderId });
       return order;
     } finally {
       this.busy = false;
@@ -156,7 +145,11 @@ class PaypalSession {
       await this.save({ ...record, phase: PHASE.REVIEW });
       if (mayAuthorize && !mayAuthorize())
         return await this.interruptApproval(record);
-      const approved = await payment.isApproved(orderId, record.requestId);
+      const approved = await payment.isApproved(
+        orderId,
+        record.requestId,
+        record.limitCents,
+      );
       if (mayAuthorize && !mayAuthorize())
         return await this.interruptApproval(record);
       if (!approved) {
@@ -167,7 +160,11 @@ class PaypalSession {
       if (mayAuthorize && !mayAuthorize())
         return await this.interruptApproval(record);
       onDispatch?.();
-      const authorization = await payment.authorize(orderId, record.requestId);
+      const authorization = await payment.authorize(
+        orderId,
+        record.requestId,
+        record.limitCents,
+      );
       await this.save({
         ...record,
         ...authorization,
@@ -199,14 +196,16 @@ class PaypalSession {
       Date.now() >= record.expiresAt ||
       !isPaypalId(messageId) ||
       record.attemptIds.includes(messageId) ||
-      record.attemptIds.length >= PAYPAL_SANDBOX.maxMessageAttempts ||
-      record.spentCents + PAYPAL_SANDBOX.messageCents >
-        PAYPAL_SANDBOX.limitCents
+      record.attemptIds.length >= record.maxMessageAttempts ||
+      record.spentCents + PAYPAL_SANDBOX.messageCents > record.limitCents
     )
       return fail(PAYPAL_ERROR_CODES.INVALID_REQUEST);
     this.busy = true;
     let finishExecution = () => {};
     try {
+      await this.verifyRestored(record);
+      if (!record.expiresAt || Date.now() >= record.expiresAt)
+        return fail(PAYPAL_ERROR_CODES.INVALID_REQUEST);
       finishExecution = this.deps.journal.startExecution?.() ?? finishExecution;
       if (agent) checkAgentOperation(record, digest, agent);
       validate();
@@ -230,7 +229,7 @@ class PaypalSession {
       } catch {
         return fail(PAYPAL_ERROR_CODES.INFERENCE_FAILED);
       }
-      if (agent && record.version === PAYPAL_SESSION_RECORD_VERSION) {
+      if (agent && record.version !== PAYPAL_SESSION_PREVIOUS_RECORD_VERSION) {
         await this.save(
           completedAgentRecord(record, attemptIds, messageId, digest, agent),
         );
@@ -319,6 +318,7 @@ class PaypalSession {
       return fail(PAYPAL_ERROR_CODES.INVALID_REQUEST);
     this.busy = true;
     try {
+      await this.verifyRestored(record);
       const {
         messageId: _messageId,
         promptDigest: _promptDigest,
@@ -342,15 +342,16 @@ class PaypalSession {
       return fail(PAYPAL_ERROR_CODES.INVALID_JOURNAL);
     this.busy = true;
     try {
+      await this.verifyRestored(record);
       if (record.spentCents === 0) {
         await this.save({ ...record, phase: PHASE.VOIDING });
-        await this.deps.payment.void(record.authorizationId);
+        await this.deps.payment.void(record.authorizationId, record.limitCents);
         await this.save({ ...record, phase: PHASE.VOIDED });
       } else {
-        await this.save({ ...record, phase: PHASE.CAPTURING });
-        const capture = await this.deps.payment.capture(
-          record.authorizationId,
-          record.spentCents,
+        const capture = await capturePaypalSession(
+          record,
+          this.deps.payment,
+          () => this.save({ ...record, phase: PHASE.CAPTURING }),
         );
         await this.save({ ...record, ...capture, phase: PHASE.COMPLETED });
       }
@@ -375,7 +376,7 @@ class PaypalSession {
         confirmedCents,
         fingerprint,
         decidedAt,
-        exclusiveJournal: this.exclusiveJournal,
+        exclusiveJournal: this.exclusive,
         payment: this.deps.payment,
         journal: this.deps.journal,
         save: (value, write) => this.save(value, write),
@@ -388,13 +389,12 @@ class PaypalSession {
 }
 export async function createPaypalSession(deps: PaypalSessionDependencies) {
   const owned = deps.journal.claimSession?.();
-  const exclusiveJournal = owned !== undefined;
   const journal = owned ?? deps.journal;
   const state = parsePaypalSessionState(await journal.read());
   return new PaypalSession(
     { ...deps, journal },
     state.record,
     state.legacyBlocked,
-    exclusiveJournal,
+    owned !== undefined,
   );
 }

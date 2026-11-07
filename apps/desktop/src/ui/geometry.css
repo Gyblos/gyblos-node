@@ -14,7 +14,6 @@
 .chat-user,
 .compact-dropdown,
 .compact-picker,
-.desktop-frame .chat-page,
 .desktop-frame .composer,
 .desktop-frame .desktop-editor,
 .desktop-frame .desktop-instructions,
@@ -104,6 +103,7 @@ kbd {
 .dot,
 .network-status-dot,
 .paypal-agent-status-dot,
+.payment-state-dot,
 .step-number {
   border-radius: var(--radius-circle);
 }

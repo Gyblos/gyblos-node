@@ -13,6 +13,7 @@ import './ui/motion.css';
 import './ui/ui.css';
 import './ui/geometry.css';
 import './ui/chat.css';
+import './ui/activity.css';
 import './ui/paypal-agent.css';
 import './ui/signal.css';
 import './ui/dropdown.css';

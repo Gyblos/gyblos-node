@@ -100,7 +100,12 @@ export async function settlePaypalReviewedInference(input: ReviewInput) {
   )
     throw new PaypalError(PAYPAL_ERROR_CODES.NEEDS_RECONCILIATION);
   await review(async (journal) => {
-    const lease = await beginReview(orderId, record.requestId, authorizationId);
+    const lease = await beginReview(
+      orderId,
+      record.requestId,
+      authorizationId,
+      record.limitCents,
+    );
     try {
       const decisionDigest = await journal.archiveWaiver({
         version: PAYPAL_SESSION_REVIEW_ARCHIVE_VERSION,

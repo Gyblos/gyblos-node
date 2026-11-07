@@ -20,6 +20,56 @@ import {
 
 import { fixture } from './support/paypal-session-fixture';
 
+void test('a large configurable session can be archived for uncertain-payment review', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'paypal-review-large-'));
+  try {
+    const journal = await openPaypalJournal(root);
+    const agentCompletions = Array.from({ length: 90 }, (_, index) => ({
+      messageId: `MESSAGE${index}${'A'.repeat(40)}`,
+      requestDigest: index.toString(16).padStart(64, '0'),
+      idempotencyDigest: (index + 100).toString(16).padStart(64, '0'),
+    }));
+    const messageId = 'PENDING1';
+    const session: PaypalSessionRecord = {
+      version: 4,
+      phase: PAYPAL_SESSION_PHASE.EXECUTING,
+      requestId: 'REQUEST1',
+      currency: 'USD',
+      limitCents: 1000,
+      messageCents: 10,
+      maxMessageAttempts: 120,
+      spentCents: 900,
+      attemptIds: [
+        ...agentCompletions.map((entry) => entry.messageId),
+        messageId,
+      ],
+      acknowledgedIds: [],
+      agentCompletions,
+      orderId: 'ORDER1',
+      authorizationId: 'AUTH1',
+      expiresAt: Date.now() + 60000,
+      messageId,
+      promptDigest: 'a'.repeat(64),
+    };
+    const archive: PaypalWaiverArchive = {
+      version: PAYPAL_SESSION_REVIEW_ARCHIVE_VERSION,
+      decision: PAYPAL_SESSION_REVIEW_DECISION.WAIVE_UNCERTAIN,
+      actor: PAYPAL_SESSION_REVIEW_ACTOR.LOCAL_OPERATOR,
+      decidedAt: 123456,
+      verifiedAt: 123457,
+      session,
+    };
+    assert.ok(Buffer.byteLength(JSON.stringify(archive)) > 9216);
+    await journal.write(session);
+    await journal.review(async (review) => {
+      await review.archiveWaiver(archive);
+    });
+    await journal.close();
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 void test('manual review privately preserves the uncertain session without overwriting an earlier archive', async () => {
   const root = await mkdtemp(join(tmpdir(), 'paypal-review-archive-'));
   try {

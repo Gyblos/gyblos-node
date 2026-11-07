@@ -39,7 +39,16 @@ function record(value: unknown): Record<string, unknown> {
 
 function error(status: number, code: PaypalErrorCode) {
   return Response.json(
-    { error: { message: code, type: 'invalid_request_error', code } },
+    {
+      error: {
+        message:
+          status === HTTP_STATUS.unauthorized
+            ? 'Invalid Gyblos API key. Copy the current key from Agents and try again.'
+            : code,
+        type: 'invalid_request_error',
+        code,
+      },
+    },
     {
       status,
       headers: {

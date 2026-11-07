@@ -21,19 +21,19 @@ function usageMessage(state: PaypalAgentUsageState) {
     case PAYPAL_AGENT_USAGE_STATE.BUSY:
       return 'An inference or session operation is in progress; usage may change.';
     case PAYPAL_AGENT_USAGE_STATE.CHAT_PENDING:
-      return 'A chat response awaits confirmation. Finish it in PayPal Chat.';
+      return 'A chat response awaits confirmation. Finish it in Payments.';
     case PAYPAL_AGENT_USAGE_STATE.EXPIRED:
-      return 'The session expired. Close and settle it in PayPal Chat.';
+      return 'The session expired. Close and settle it in Payments.';
     case PAYPAL_AGENT_USAGE_STATE.ATTEMPTS_EXHAUSTED:
-      return 'The attempt limit was reached. Close and settle the session in PayPal Chat.';
+      return 'The attempt limit was reached. Close and settle the session in Payments.';
     case PAYPAL_AGENT_USAGE_STATE.LIMIT_REACHED:
-      return 'The approved spending limit was reached. Close and settle it in PayPal Chat.';
+      return 'The approved spending limit was reached. Close and settle it in Payments.';
     case PAYPAL_AGENT_USAGE_STATE.DISCONNECTING:
       return 'Disconnecting. An inference already started can finish and count.';
     case PAYPAL_AGENT_USAGE_STATE.DISCONNECT_FAILED:
-      return 'Disconnection could not be confirmed. Retry or review the session in PayPal Chat.';
+      return 'Disconnection could not be confirmed. Retry or review the session in Payments.';
     default:
-      return 'The session needs review. Check PayPal Chat.';
+      return 'The session needs review. Check Payments.';
   }
 }
 function AgentUsage({
@@ -103,28 +103,31 @@ function SandboxUsageDetails() {
       <h3 className="ui-subheading">PayPal Sandbox usage</h3>
       <p>
         Each completed inference uses the session's rate, even if its response
-        is not delivered. Check the rate in PayPal Chat. One instruction may
-        need several inferences.
+        is not delivered. Check the rate in Payments. One instruction may need
+        several inferences.
       </p>
       <p>
         An inference already started can finish after disconnecting. Identical
         requests without an operation key may be rejected to prevent a repeated
-        charge. Settle the session in Chat when finished.
+        charge. Settle the session in Payments when finished.
       </p>
     </section>
   );
 }
 export function PaypalAgentConnection({
   onlyConnected = false,
+  sessionReady,
+  onPayments,
 }: {
   onlyConnected?: boolean;
+  sessionReady: boolean;
+  onPayments: () => void;
 }) {
   const { connection, busy, notice, statusUnavailable, run, copy } =
     usePaypalAgentConnection();
   const [client, setClient] = useState<PaypalAgentClient>(
     PAYPAL_AGENT_CLIENT.OPENCODE,
   );
-  if (onlyConnected && !connection && !statusUnavailable) return null;
   return (
     <section
       className="paypal-agent-page"
@@ -157,8 +160,8 @@ export function PaypalAgentConnection({
               connection={connection}
               statusUnavailable={statusUnavailable || busy}
             />
-            {!connection && !statusUnavailable && !busy && (
-              <p>A PayPal session in Chat is needed to connect.</p>
+            {!connection && !statusUnavailable && !busy && !sessionReady && (
+              <p>Open Payments to start or review a session.</p>
             )}
           </div>
         </div>
@@ -177,6 +180,8 @@ export function PaypalAgentConnection({
         run={run}
         copy={copy}
         onlyConnected={onlyConnected}
+        sessionReady={sessionReady}
+        onPayments={onPayments}
       />
       <SandboxUsageDetails />
       {notice && (

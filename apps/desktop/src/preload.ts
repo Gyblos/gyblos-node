@@ -1,8 +1,13 @@
 // Exposes fixed probe, public wallet status/copy and bounded setup/backup interactions; no signing or raw IPC.
 import { contextBridge, ipcRenderer } from 'electron';
 
+import { parseActivityResult } from './activity-model';
 import { NETWORK_CATALOG, parseNetworkCatalog } from './catalog/model';
-import { DESKTOP } from './constants';
+import {
+  parseChatArchiveLoad,
+  parseChatArchiveStatus,
+} from './chat-archive-model';
+import { CHAT_STORAGE, DESKTOP, DESKTOP_ACTIVITY } from './constants';
 import { LOCAL_NODE, parseLocalNodeState } from './node-status';
 import {
   DESKTOP_PAYPAL_AGENT,
@@ -17,6 +22,24 @@ import {
   parseWalletSettingsResult,
   WALLET_SETTINGS,
 } from './wallet/settings-model';
+
+contextBridge.exposeInMainWorld('desktopConversations', {
+  load: async () =>
+    parseChatArchiveLoad(await ipcRenderer.invoke(CHAT_STORAGE.LOAD_CHANNEL)),
+  save: async (request: unknown) =>
+    parseChatArchiveStatus(
+      await ipcRenderer.invoke(CHAT_STORAGE.SAVE_CHANNEL, request),
+    ),
+  status: async () =>
+    parseChatArchiveStatus(
+      await ipcRenderer.invoke(CHAT_STORAGE.STATUS_CHANNEL),
+    ),
+});
+
+contextBridge.exposeInMainWorld('desktopActivity', {
+  summary: async () =>
+    parseActivityResult(await ipcRenderer.invoke(DESKTOP_ACTIVITY.CHANNEL)),
+});
 
 contextBridge.exposeInMainWorld('desktopCatalog', {
   summary: async () =>

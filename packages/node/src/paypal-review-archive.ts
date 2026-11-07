@@ -9,6 +9,8 @@ import { isPaypalId, PaypalError } from '@gyblos/protocol/paypal-payment';
 import { readPrivateFile } from '@gyblos/runtime/private-file';
 
 import {
+  PAYPAL_REVIEW_ENVELOPE_MAX_BYTES,
+  PAYPAL_SESSION_JOURNAL_MAX_BYTES,
   PAYPAL_SESSION_REVIEW_ACTOR,
   PAYPAL_SESSION_REVIEW_ARCHIVE_VERSION,
   PAYPAL_SESSION_REVIEW_DECISION,
@@ -23,7 +25,8 @@ import type {
   PaypalWaiverOutcome,
 } from './paypal-session-review';
 
-export const PAYPAL_REVIEW_MAX_BYTES = 9216;
+export const PAYPAL_REVIEW_MAX_BYTES =
+  PAYPAL_SESSION_JOURNAL_MAX_BYTES + PAYPAL_REVIEW_ENVELOPE_MAX_BYTES;
 export function paypalReviewFailure(): never {
   throw new PaypalError(PAYPAL_ERROR_CODES.NEEDS_RECONCILIATION);
 }

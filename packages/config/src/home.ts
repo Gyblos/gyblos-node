@@ -237,3 +237,41 @@ export function paypalSandboxReviewPaths(root: string, requestId: string) {
     outcome: join(directory, `${digest}-outcome.json`),
   };
 }
+
+export function paypalSandboxVoidExceptionPath(
+  root: string,
+  requestId: string,
+) {
+  const digest = createHash('sha256').update(requestId).digest('hex');
+  return join(
+    paypalSandboxPaths(root).reviewDirectory,
+    `${digest}-void-sandbox-exception.json`,
+  );
+}
+
+// Separate from payment journals: private, descriptive desktop history only.
+export const DESKTOP_ACTIVITY_FILES = {
+  state: 'desktop-activity-v1.json',
+  lock: 'desktop-activity-v1.lock',
+} as const;
+export function desktopActivityPaths(sandboxDirectory: string) {
+  return {
+    state: join(sandboxDirectory, DESKTOP_ACTIVITY_FILES.state),
+    lock: join(sandboxDirectory, DESKTOP_ACTIVITY_FILES.lock),
+  };
+}
+
+// Conversation files live in the persistent desktop profile, outside disposable Chromium sessions.
+export const DESKTOP_CHAT_FILES = {
+  directory: 'conversations',
+  state: 'conversations-v1.json',
+  lock: 'conversations-v1.lock',
+} as const;
+export function desktopChatPaths(profile: string) {
+  const directory = join(profile, DESKTOP_CHAT_FILES.directory);
+  return {
+    directory,
+    state: join(directory, DESKTOP_CHAT_FILES.state),
+    lock: join(directory, DESKTOP_CHAT_FILES.lock),
+  };
+}

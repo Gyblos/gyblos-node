@@ -9,6 +9,7 @@ import {
   type ProcessLock,
 } from '@gyblos/runtime/private-file';
 
+import { PAYPAL_SESSION_JOURNAL_MAX_BYTES } from './constants';
 import type { PaypalAttempt } from './paypal-inference';
 import {
   paypalReviewFailure,
@@ -20,8 +21,11 @@ import {
   type PaypalSessionRecord,
 } from './paypal-session-record';
 import type { PaypalReviewJournal } from './paypal-session-review';
+import { paypalVoidExceptionIsSealed } from './paypal-void-exception-archive';
 
-const MAX_BYTES = 8192;
+export { paypalVoidExceptionIsSealed } from './paypal-void-exception-archive';
+
+const MAX_BYTES = PAYPAL_SESSION_JOURNAL_MAX_BYTES;
 type Value = PaypalAttempt | PaypalSessionRecord;
 function executionGuard() {
   let executing = false;
@@ -117,17 +121,25 @@ function journalAccess(
     },
   };
 }
-export async function openPaypalJournal(root: string) {
+export async function openPaypalJournal(
+  root: string,
+  options: { allowLockTakeover?: boolean } = {},
+) {
   const paths = paypalSandboxPaths(root);
   await ensurePrivateDirectory(paths.directory);
-  const lock = await acquireProcessLock(paths.lock);
+  const lock = await acquireProcessLock(paths.lock, {
+    allowTakeover: options.allowLockTakeover,
+  });
   try {
     const content = await readPrivateFile(paths.state, MAX_BYTES);
     const state =
       content === undefined
         ? null
         : parsePaypalSessionState(JSON.parse(content)).record;
-    const sealed = state ? await paypalReviewIsSealed(root, state) : false;
+    const sealed = state
+      ? (await paypalReviewIsSealed(root, state)) ||
+        (await paypalVoidExceptionIsSealed(root, state))
+      : false;
     return journalAccess(root, lock, sealed);
   } catch (error) {
     await lock.release();

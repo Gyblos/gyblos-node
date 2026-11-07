@@ -45,20 +45,12 @@
 .theme-switch[aria-checked='true'] > svg:last-of-type {
   color: var(--accent);
 }
-.settings-content {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  max-width: 760px;
-  width: 100%;
-}
 @media (prefers-reduced-motion: reduce) {
   .theme-switch-thumb {
     transition: none;
   }
 }
 /* The landing's neutral layers separate the work surface from the shell. */
-.desktop-frame .chat-page,
 .desktop-frame .desktop-editor {
   background: var(--canvas);
 }

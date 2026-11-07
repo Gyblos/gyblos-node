@@ -241,13 +241,13 @@ async function checkApproval(context: CheckoutContext, orderId: string) {
 
 function checkoutEntryActions(context: CheckoutContext) {
   return {
-    create: () =>
+    create: (limitCents?: number) =>
       context.run(async () => {
         const agentReady = await prepareModels(context.options);
         const state = randomBytes(PAYPAL_RETURN_STATE_BYTES).toString(
           'base64url',
         );
-        const order = await context.session.create(state);
+        const order = await context.session.create(state, limitCents);
         context.returns.start(state, order.orderId);
         context.agent.prepared = agentReady;
         context.agent.unavailable = !agentReady;
@@ -323,11 +323,7 @@ export function createDesktopPaypalSession(
   options: DesktopPaypalSessionOptions = {},
 ) {
   let awaitingAcknowledgement = false;
-  const agent: AgentReadiness = {
-    prepared: false,
-    unavailable: false,
-    scope: undefined,
-  };
+  const agent = initialAgentReadiness();
   const state: CheckoutState = {
     approvalUrl: undefined,
     opened: false,
@@ -360,6 +356,7 @@ export function createDesktopPaypalSession(
   };
   return {
     status,
+    activity: () => session.activity(),
     isBusy,
     isCloseBlocked: () => isBusy() || awaitingAcknowledgement || state.opened,
     ...checkoutEntryActions(checkout),
@@ -381,6 +378,11 @@ export function createDesktopPaypalSession(
       }),
     ...desktopPaypalFinishActions(checkout, () => clearAgent(agent)),
     ...desktopPaypalReviewActions(checkout, () => clearAgent(agent)),
+    checkVoidedAuthorization: () =>
+      run(async () => {
+        await session.checkVoidedAuthorization();
+        return status();
+      }),
     abandon: () =>
       run(async () => {
         await session.cancel(orderId());
@@ -391,4 +393,8 @@ export function createDesktopPaypalSession(
       }),
     close,
   };
+}
+
+function initialAgentReadiness(): AgentReadiness {
+  return { prepared: false, unavailable: false, scope: undefined };
 }

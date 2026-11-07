@@ -29,24 +29,37 @@ export interface PaypalSandboxReviewLease {
 export interface PaypalSandboxPayment {
   prepare?(): Promise<void>;
   discardApproval?(): void;
-  isApproved?(orderId: string, requestId: string): Promise<boolean>;
+  isApproved?(
+    orderId: string,
+    requestId: string,
+    limitCents?: number,
+  ): Promise<boolean>;
+  checkVoidedAuthorization?(
+    orderId: string,
+    requestId: string,
+    authorizationId: string,
+    limitCents?: number,
+  ): Promise<void>;
   beginReview?(
     orderId: string,
     requestId: string,
     authorizationId: string,
+    limitCents?: number,
   ): Promise<PaypalSandboxReviewLease>;
   create(
     requestId: string,
     returnState?: string,
+    limitCents?: number,
   ): Promise<{ orderId: string; approvalUrl: string }>;
   authorize(
     orderId: string,
     requestId: string,
+    limitCents?: number,
   ): Promise<{ authorizationId: string }>;
   capture(
     authorizationId: string,
     cents?: number,
   ): Promise<{ captureId: string }>;
-  void(authorizationId: string): Promise<void>;
+  void(authorizationId: string, limitCents?: number): Promise<void>;
   refund?(captureId: string): Promise<void>;
 }

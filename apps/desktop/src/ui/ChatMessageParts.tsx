@@ -25,14 +25,22 @@ export function AssistantHeading({
   );
 }
 
-export function AssistantProgress({ children }: { children: ReactNode }) {
+export function AssistantProgress({
+  children,
+  mark,
+}: {
+  children: ReactNode;
+  mark?: ReactNode;
+}) {
   return (
     <div className="chat-progress" role="status">
-      <span className="chat-progress-dots" aria-hidden="true">
-        <i />
-        <i />
-        <i />
-      </span>
+      {mark ?? (
+        <span className="chat-progress-dots" aria-hidden="true">
+          <i />
+          <i />
+          <i />
+        </span>
+      )}
       {children}
     </div>
   );

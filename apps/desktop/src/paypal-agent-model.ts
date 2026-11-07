@@ -1,5 +1,5 @@
 // Validates the desktop's local sandbox agent connection details at the IPC boundary.
-import { PAYPAL_SANDBOX } from '@gyblos/config/constants';
+import { PAYPAL_SANDBOX_LIMIT_OPTIONS } from '@gyblos/config/constants';
 import { IPV6_LOOPBACK, LOCALHOST } from '@gyblos/config/hosts';
 import { SANDBOX_AGENT_LIMITS } from '@gyblos/config/limits';
 import { ROUTES } from '@gyblos/config/paths';
@@ -79,8 +79,19 @@ export function canCreatePaypalAgent(
   statusUnavailable: boolean,
   busy: boolean,
   onlyConnected: boolean,
+  sessionReady: boolean,
 ) {
-  return !connection && !statusUnavailable && !busy && !onlyConnected;
+  return (
+    !connection && !statusUnavailable && !busy && !onlyConnected && sessionReady
+  );
+}
+// Navigation remains available without authorizing or creating a connection.
+export function paypalAgentNeedsPayments(
+  connection: PaypalAgentResult['connection'],
+  onlyConnected: boolean,
+  sessionReady: boolean,
+) {
+  return !connection && (onlyConnected || !sessionReady);
 }
 export function paypalAgentConnectionLabel(
   connection: PaypalAgentResult['connection'],
@@ -322,7 +333,8 @@ function connection(value: unknown): PaypalAgentResult['connection'] {
     typeof row.spentCents !== 'number' ||
     !Number.isSafeInteger(row.spentCents) ||
     row.spentCents < 0 ||
-    row.limitCents !== PAYPAL_SANDBOX.limitCents ||
+    typeof row.limitCents !== 'number' ||
+    !PAYPAL_SANDBOX_LIMIT_OPTIONS.some((limit) => limit === row.limitCents) ||
     row.spentCents > row.limitCents ||
     typeof row.usageUncertain !== 'boolean' ||
     typeof row.disconnecting !== 'boolean'
