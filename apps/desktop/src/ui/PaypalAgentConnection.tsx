@@ -143,9 +143,10 @@ function ConnectionHeading({
   connection,
   busy,
   statusUnavailable,
+  run,
 }: Pick<
   ReturnType<typeof usePaypalAgentConnection>,
-  'connection' | 'busy' | 'statusUnavailable'
+  'connection' | 'busy' | 'statusUnavailable' | 'run'
 >) {
   const ready = paypalAgentIsReady(connection, busy, statusUnavailable);
   return (
@@ -160,14 +161,23 @@ function ConnectionHeading({
               : 'Create an API key and local URL for compatible apps.'}
         </p>
       </header>
-      {connection && !ready && (
+      {!ready && (connection || statusUnavailable || busy) && (
         <p className="ui-inline-notice" role="status">
           {statusUnavailable
-            ? 'The local API status cannot be checked. Review Payments before starting requests.'
+            ? 'The local API status is not confirmed. Check again before starting requests.'
             : busy
               ? 'Checking the local API.'
-              : connectionUsageMessage(connection.usageState)}
+              : connection && connectionUsageMessage(connection.usageState)}
         </p>
+      )}
+      {statusUnavailable && !busy && (
+        <Button
+          onClick={() => {
+            void run(PAYPAL_AGENT_ACTION.STATUS);
+          }}
+        >
+          Check connection
+        </Button>
       )}
     </>
   );
