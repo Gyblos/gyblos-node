@@ -6,7 +6,6 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { address } from '@solana/kit';
 
 import { startBuyer as startProductBuyer } from '@gyblos/buyer/buyer-main';
-import { startPaidBuyer } from '@gyblos/buyer/paid-startup';
 import { rolePathIn } from '@gyblos/config';
 import { fetchSellers } from '@gyblos/discovery-http';
 import { ACCEPTANCE } from '@gyblos/lab-harness/acceptance/constants';
@@ -82,7 +81,7 @@ export async function paidAcceptanceHost(
   const localFetch = globalThis.fetch;
   let external = 0;
   let reads = 0;
-  let buyer: Awaited<ReturnType<typeof startPaidBuyer>> | undefined;
+  let buyer: Awaited<ReturnType<typeof startProductBuyer>> | undefined;
   globalThis.fetch = async (input, init) => {
     const request = new Request(input, init);
     const url = new URL(request.url);
@@ -123,7 +122,8 @@ export async function paidAcceptanceHost(
     },
   });
   const startBuyer = async () => {
-    buyer = await startProductBuyer(buyerOptions());
+    const host = await startProductBuyer(buyerOptions());
+    buyer = host;
     try {
       token = (
         await readFile(
@@ -139,6 +139,7 @@ export async function paidAcceptanceHost(
       ))
         throw error;
     }
+    return host;
   };
   const startSeller = async () => {
     await paidSellerConfiguration(pricing);
@@ -230,14 +231,14 @@ export async function paidAcceptanceHost(
       external: () => external,
       token: () => token,
       stopBuyer: closeBuyer,
-      terminalOptions() {
-        assert.equal(buyer, undefined);
-        return buyerOptions();
+      receipts: () => {
+        assert.ok(buyer);
+        return buyer.receipts();
       },
-      registerTerminal(host: Awaited<ReturnType<typeof startProductBuyer>>) {
+      async startTerminal() {
         assert.equal(buyer, undefined);
-        buyer = host;
-        return { chat: buyer.chat, close: closeBuyer };
+        const host = await startBuyer();
+        return { ...host, close: closeBuyer };
       },
       url: () => {
         assert.ok(buyer);

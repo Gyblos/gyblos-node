@@ -34,7 +34,13 @@ void test('receipt observation waits for work completion before reading a concur
   try {
     const store = openReceiptStore(options);
     await store.put(fixture.envelope);
-    assert.equal(await store.confirm(fixture.confirm.params.receipt), true);
+    assert.equal(
+      await store.confirm(
+        fixture.confirm.params.receipt,
+        new AbortController().signal,
+      ),
+      true,
+    );
     const path = receiptPathsIn(options.environment, options.role).state;
     const replacement = path + '.pending-snapshot';
     const bytes = await filesystem.readFile(path);
@@ -45,18 +51,7 @@ void test('receipt observation waits for work completion before reading a concur
       const file = await originalOpen(...args);
       if (String(args[0]) === path) {
         reads++;
-        if (active) {
-          const stat = file.stat.bind(file);
-          let replaced = false;
-          file.stat = async () => {
-            const info = await stat();
-            if (!replaced) {
-              replaced = true;
-              await filesystem.rename(replacement, path);
-            }
-            return info;
-          };
-        }
+        if (active) await filesystem.rename(replacement, path);
       }
       return file;
     };
@@ -86,7 +81,9 @@ void test('receipt observation waits for work completion before reading a concur
     assert.equal(waitChecks, 1);
     assert.equal(reads, 1);
     assert.equal(found.length, 1);
-    assert.deepEqual(found[0].receipt, fixture.confirm.params.receipt);
+    const [entry] = found;
+    assert.ok(entry);
+    assert.deepEqual(entry.receipt, fixture.confirm.params.receipt);
     assert.deepEqual(await filesystem.readFile(path), bytes);
   } finally {
     filesystem.open = originalOpen;
@@ -164,6 +161,26 @@ void test('receipt observation cancellation prevents both waiting and late snaps
   );
   assert.equal(reads, 0);
   assert.equal(waits, 0);
+  const during = new AbortController();
+  await assert.rejects(
+    observeReceipt(
+      {
+        health: () => ({ ...before, active: true }),
+        read: async () => {
+          reads++;
+          return [];
+        },
+        wait: async (ready) => {
+          assert.equal(ready(), false);
+          during.abort();
+        },
+      },
+      before,
+      during.signal,
+    ),
+    { name: 'AbortError' },
+  );
+  assert.equal(reads, 0);
   const late = new AbortController();
   await assert.rejects(
     observeReceipt(
@@ -182,4 +199,28 @@ void test('receipt observation cancellation prevents both waiting and late snaps
     ),
     { name: 'AbortError' },
   );
+});
+
+void test('receipt observation preserves the existing wait deadline without opening snapshots', async () => {
+  const deadline = new Error('Synthetic existing receipt deadline');
+  let reads = 0;
+  await assert.rejects(
+    observeReceipt(
+      {
+        health: () => ({ active: true, saved: 0, failed: 0, dropped: 0 }),
+        read: async () => {
+          reads++;
+          return [];
+        },
+        wait: async (ready) => {
+          assert.equal(ready(), false);
+          throw deadline;
+        },
+      },
+      { active: false, saved: 0, failed: 0, dropped: 0 },
+      new AbortController().signal,
+    ),
+    (error: unknown) => error === deadline,
+  );
+  assert.equal(reads, 0);
 });
