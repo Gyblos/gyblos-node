@@ -8,6 +8,7 @@ import { assertFreeAnswer } from './paid-acceptance-answers';
 import { PAID_ACCEPTANCE } from './paid-acceptance-constants';
 import { paidWait, type PaidAcceptanceHost } from './paid-acceptance-host';
 import { paidBody, paidHttp } from './paid-acceptance-http';
+import { observeReceipt } from './receipt-observation';
 import { confirmedFreeReceipts } from './unified-acceptance-metadata';
 import { finishReceiptWait } from './unified-acceptance-terminal';
 
@@ -25,7 +26,9 @@ async function freeAnswer(
   stream: boolean,
 ) {
   const attempts = run.engine.attempts();
-  const saved = (await confirmedFreeReceipts(run)).length;
+  const before = run.receipts();
+  assert.equal(before.active, false);
+  const saved = (await confirmedFreeReceipts(run, signal)).length;
   const response = await paidHttp(run, signal, stream);
   assert.equal(response.statusCode, 200);
   assertFreeAnswer(
@@ -33,10 +36,16 @@ async function freeAnswer(
     stream,
     response.headers['content-type'],
   );
-  await paidWait(
-    async () => (await confirmedFreeReceipts(run)).length === saved + 1,
+  const receipts = await observeReceipt(
+    {
+      health: run.receipts,
+      read: (readSignal) => confirmedFreeReceipts(run, readSignal),
+      wait: paidWait,
+    },
+    before,
     signal,
   );
+  assert.equal(receipts.length, saved + 1);
   assert.equal(run.engine.attempts(), attempts + 1);
   noPayments(run);
 }
@@ -47,6 +56,7 @@ async function freeTerminal(run: PaidAcceptanceHost, signal: AbortSignal) {
   const terminalController = new AbortController();
   const terminalSignal = AbortSignal.any([signal, terminalController.signal]);
   let waiting: ReturnType<typeof finishReceiptWait> | undefined;
+  let before: ReturnType<PaidAcceptanceHost['receipts']> | undefined;
   const saved = (await confirmedFreeReceipts(run)).length;
   const output = new Writable({
     write(chunk, _encoding, done) {
@@ -56,16 +66,24 @@ async function freeTerminal(run: PaidAcceptanceHost, signal: AbortSignal) {
         questions++;
         if (questions === 1)
           setImmediate(() => input.write('synthetic paid input\n'));
-        else
+        else {
+          assert.ok(before);
           waiting = finishReceiptWait(
             input,
             terminalController,
-            paidWait(
-              async () =>
-                (await confirmedFreeReceipts(run)).length === saved + 1,
+            observeReceipt(
+              {
+                health: run.receipts,
+                read: (readSignal) => confirmedFreeReceipts(run, readSignal),
+                wait: paidWait,
+              },
+              before,
               terminalSignal,
-            ),
+            ).then((receipts) => {
+              assert.equal(receipts.length, saved + 1);
+            }),
           );
+        }
       }
       done();
     },
@@ -73,10 +91,10 @@ async function freeTerminal(run: PaidAcceptanceHost, signal: AbortSignal) {
   await run.stopBuyer();
   try {
     await terminalMain({
-      buyerOptions: run.terminalOptions(),
-      onStarted: (host) => {
-        assert.ok('url' in host && typeof host.url === 'string');
-        return run.registerTerminal({ ...host, url: host.url });
+      start: async () => {
+        const host = await run.startTerminal();
+        before = host.receipts();
+        return host;
       },
       input,
       output,

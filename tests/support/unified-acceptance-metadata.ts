@@ -19,18 +19,27 @@ import { TELEMETRY_EVENTS } from '@gyblos/protocol/telemetry';
 import { PAID_ACCEPTANCE } from './paid-acceptance-constants';
 import type { PaidAcceptanceHost } from './paid-acceptance-host';
 
-export async function confirmedFreeReceipts(run: PaidAcceptanceHost) {
+export async function confirmedFreeReceipts(
+  run: PaidAcceptanceHost,
+  signal?: AbortSignal,
+) {
   const options = { environment: process.env };
-  const buyer = await listReceipts({
-    ...options,
-    role: P2P_ROLES.BUYER,
-    nodeId: run.roles.buyer.nodeId,
-  });
-  const seller = await listReceipts({
-    ...options,
-    role: P2P_ROLES.SELLER,
-    nodeId: run.roles.seller.nodeId,
-  });
+  const buyer = await listReceipts(
+    {
+      ...options,
+      role: P2P_ROLES.BUYER,
+      nodeId: run.roles.buyer.nodeId,
+    },
+    signal,
+  );
+  const seller = await listReceipts(
+    {
+      ...options,
+      role: P2P_ROLES.SELLER,
+      nodeId: run.roles.seller.nodeId,
+    },
+    signal,
+  );
   return buyer
     .filter(
       ({ receipt }) =>
