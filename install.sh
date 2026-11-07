@@ -20,7 +20,7 @@ LC_ALL=C
 export LC_ALL
 
 # Set by scripts/release-image.sh when a release is published.
-DEFAULT_IMAGE=ghcr.io/gyblos/seller:beta
+DEFAULT_IMAGE=ghcr.io/gyblos/seller:0.1.0-beta.2@sha256:ec35358fb0ec3426b5c3d42551937ee5a4466dc8292bf9652c842a0e4814a418
 RELEASE_REPOSITORY=ghcr.io/gyblos/seller
 # The same, as a sed pattern.
 RELEASE_PATTERN='ghcr\.io/gyblos/seller'
