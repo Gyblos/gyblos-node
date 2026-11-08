@@ -1,7 +1,7 @@
 // Product paid service and payment adapter meet the real SDK on a simulated channel/RPC.
 // Deposit inclusion and native execution are simulated; no network, accounts or funds are touched.
 import assert from 'node:assert/strict';
-import test from 'node:test';
+import test, { type TestContext } from 'node:test';
 
 import { generateKeyPairSigner } from '@solana/kit';
 import {
@@ -30,13 +30,18 @@ import { paidSellerFixture } from './support/paid-seller';
 import { CLAIM_NOW, sdkClaimFixture } from './support/upto-claim';
 
 async function flow(
+  context: TestContext,
   hooks: {
     now?: () => number;
-    verified?: () => void;
+    verified?: () => void | Promise<void>;
+    confirm?: () => Promise<void>;
     persisted?: () => void;
   } = {},
 ) {
-  const sdk = await sdkClaimFixture({ allowClosingClaims: true });
+  const sdk = await sdkClaimFixture({
+    allowClosingClaims: true,
+    confirm: hooks.confirm,
+  });
   let deposits = 0;
   const description: PaymentDescription = {
     network: sdk.record.terms.network,
@@ -53,7 +58,7 @@ async function flow(
       ...sdk.chain,
       verify: async (...args) => {
         const valid = await sdk.chain.verify(...args);
-        hooks.verified?.();
+        await hooks.verified?.();
         return valid;
       },
       deposit: async (open, terms) => {
@@ -119,7 +124,7 @@ for (const delayVerification of [true, false]) {
     const delay = () => {
       now += 2000;
     };
-    const value = await flow({
+    const value = await flow(context, {
       now: () => now,
       verified: delayVerification ? delay : undefined,
       persisted: delayVerification ? undefined : delay,
@@ -148,7 +153,7 @@ void test('quote expiry during write-ahead persistence refuses the deposit and r
   context.mock.method(Date, 'now', () => CLAIM_NOW);
   let now = CLAIM_NOW;
   let expiresAt = now;
-  const value = await flow({
+  const value = await flow(context, {
     now: () => now,
     persisted: () => {
       now = expiresAt;
@@ -169,7 +174,7 @@ void test('quote expiry during write-ahead persistence refuses the deposit and r
 
 void test('payer closure during product inference still claims exactly delivered usage once through the SDK', async (context) => {
   context.mock.method(Date, 'now', () => CLAIM_NOW);
-  const value = await flow();
+  const value = await flow(context);
   value.seller.setScript({
     deltas: ['Hi'],
     before: () => {
@@ -196,9 +201,40 @@ void test('payer closure during product inference still claims exactly delivered
   assert.equal(value.sdk.sent.length, 1);
 });
 
+for (const phase of ['verification', 'confirmation']) {
+  void test(`closure settles once when SDK ${phase} takes longer than the fixture wait in host time`, async (context) => {
+    context.mock.method(Date, 'now', () => CLAIM_NOW);
+    // Capture the host clock before the fixture virtualizes service timeouts.
+    const hostTimeout = setTimeout;
+    const pause = () =>
+      new Promise<void>((resolve) => hostTimeout(resolve, 51));
+    const value = await flow(context, {
+      verified: phase === 'verification' ? pause : undefined,
+      confirm: phase === 'confirmation' ? pause : undefined,
+    });
+    value.seller.setScript({
+      deltas: ['Hi'],
+      before: () => {
+        value.sdk.fields.status = UPTO_CHANNEL_ACCOUNT.statuses.CLOSING;
+        value.sdk.fields.closureStartedAt = BigInt(CLAIM_NOW / 1000);
+      },
+    });
+    const { terminal, deltas } = await value.seller.execute(
+      await value.seller.request(),
+    );
+    assert.deepEqual(deltas, ['Hi']);
+    assert.equal(terminal.payment?.settlement?.chargedAtomic, '8');
+    assert.equal(terminal.payment?.settlement?.refundedAtomic, '12');
+    assert.equal(value.deposits(), 1);
+    assert.equal(value.sdk.sent.length, 1);
+    assert.deepEqual(value.seller.pending, []);
+    assert.equal(value.seller.engineCalls.length, 1);
+  });
+}
+
 void test('an authorization too short for the claim reserve is refused before a deposit', async (context) => {
   context.mock.method(Date, 'now', () => CLAIM_NOW);
-  const value = await flow();
+  const value = await flow(context);
   const request = await value.seller.request();
   const payload: unknown = JSON.parse(
     Buffer.from(request.payment.payload, 'base64').toString(),
@@ -223,7 +259,7 @@ void test('an authorization too short for the claim reserve is refused before a 
 
 void test('paid v2 refuses grace settings that cannot cover the accepted payload window', async (context) => {
   context.mock.method(Date, 'now', () => CLAIM_NOW);
-  const value = await flow();
+  const value = await flow(context);
   const description = await value.server.describe();
   for (const withdrawDelaySeconds of [60, 180, Number.NaN]) {
     assert.throws(
