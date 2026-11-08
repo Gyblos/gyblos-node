@@ -10,6 +10,7 @@ import { P2P_ROLES } from '@gyblos/protocol/constants';
 
 import { urlOrigin } from './cli-format';
 import { codeHint } from './cli-hints';
+import { LISTING, nextStep } from './cli-next';
 import {
   EXIT,
   SERVICE_STATES,
@@ -37,6 +38,9 @@ import {
   type DaemonFile,
   type StatusSystem,
 } from './status-system';
+
+const LISTED = 'listed in the index';
+const NOT_FOUND = 'not found in the index';
 
 const COLUMN = 13;
 const INDEX_LOOKUP = {
@@ -92,7 +96,7 @@ async function indexListing(
   for (const model of models) {
     try {
       const found = await lookUp(system, baseUrl, model, nodeId);
-      if (found === INDEX_LOOKUP.FOUND) return 'listed in the index';
+      if (found === INDEX_LOOKUP.FOUND) return LISTED;
       if (found === INDEX_LOOKUP.TRUNCATED) truncated = true;
     } catch {
       unreachable = true;
@@ -101,7 +105,7 @@ async function indexListing(
   if (unreachable) return 'index unreachable';
   return truncated
     ? `not in the first ${STATUS.maxIndexPages * STATUS.indexPageSize} sellers of the index`
-    : 'not found in the index';
+    : NOT_FOUND;
 }
 
 async function discoveryLine(
@@ -111,16 +115,29 @@ async function discoveryLine(
   status: DaemonStatus | undefined,
   nodeId: string,
 ) {
-  if (!discovery) return 'configuration invalid; run `pnpm gyblos doctor`';
-  if (!discovery.publish) return 'off';
-  const listing = `on (${urlOrigin(discovery.url)})`;
-  if (!online) return listing;
+  if (!discovery)
+    return {
+      text: 'configuration invalid; run `pnpm gyblos doctor`',
+      listing: LISTING.UNKNOWN,
+    };
+  if (!discovery.publish) return { text: 'off', listing: LISTING.OFF };
+  const on = `on (${urlOrigin(discovery.url)})`;
+  if (!online) return { text: on, listing: LISTING.UNCHECKED };
   const models = new Set(
     (status?.offers ?? [])
       .filter((offer) => offer.listed)
       .map((offer) => offer.modelId),
   );
-  return `${listing}; ${await indexListing(system, discovery.url, models, nodeId)}`;
+  const found = await indexListing(system, discovery.url, models, nodeId);
+  return {
+    text: `${on}; ${found}`,
+    listing:
+      found === LISTED
+        ? LISTING.LISTED
+        : found === NOT_FOUND
+          ? LISTING.ABSENT
+          : LISTING.UNKNOWN,
+  };
 }
 
 function windowLine({
@@ -228,18 +245,14 @@ export async function statusCommand(
         `${offer.modelId} via ${offer.engine}: ${offer.listed ? 'serving' : 'not serving yet'}`,
       ),
     );
-  output.stdout(
-    line(
-      'discovery',
-      await discoveryLine(
-        options.online,
-        system,
-        discovery,
-        status,
-        identity.nodeId,
-      ),
-    ),
+  const listing = await discoveryLine(
+    options.online,
+    system,
+    discovery,
+    status,
+    identity.nodeId,
   );
+  output.stdout(line('discovery', listing.text));
   output.stdout(
     `Activity, from signed receipts (at most ${RECEIPT_STORAGE.maxEntries} kept):\n`,
   );
@@ -254,6 +267,16 @@ export async function statusCommand(
     output.stdout(
       `  The last start failed${where}: ${code}${help ? ` (${help})` : ''}\n`,
     );
+  }
+  if (verdict === STATUS_RESULTS.RUNNING) {
+    const next = nextStep(
+      listing.listing,
+      identity.owner,
+      inContainer(output.env),
+    );
+    if (listing.listing === LISTING.LISTED)
+      output.stdout('Selling: buyers can find this seller in the index.\n');
+    else if (next) output.stdout(`Next: ${next}\n`);
   }
   if (verdict === STATUS_RESULTS.NOT_CONFIRMED)
     output.stdout(

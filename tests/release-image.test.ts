@@ -66,9 +66,7 @@ void test('the installer trusts exactly the release workflow at a version tag', 
   assert.ok(workflow.includes("tags: ['v[0-9]+.[0-9]+.[0-9]+*']"));
   assert.match(workflow, /id-token: write/);
   assert.match(workflow, /environment: release/);
-  assert.ok(
-    workflow.includes('sh scripts/publish-installer.sh "$PINNED"'),
-  );
+  assert.ok(workflow.includes('sh scripts/publish-installer.sh "$PINNED"'));
   // No job commits to the repository or opens a pull request.
   assert.doesNotMatch(workflow, /pull-requests:|gh pr |git push/);
   assert.ok(
@@ -163,11 +161,18 @@ void test('the publish script refuses a malformed reference, a run outside the w
   const local = run([reference]);
   assert.equal(local.status, 1);
   assert.match(local.stderr, /only in the release workflow/);
-  const workflow = { GITHUB_ACTIONS: 'true', ACTIONS_ID_TOKEN_REQUEST_URL: 'x' };
+  const workflow = {
+    GITHUB_ACTIONS: 'true',
+    ACTIONS_ID_TOKEN_REQUEST_URL: 'x',
+  };
   for (const tag of ['', 'v0.1.0-beta.2', '0.1.0-beta.3']) {
     const other = run([reference], { ...workflow, GITHUB_REF_NAME: tag });
     assert.equal(other.status, 1, tag);
-    assert.match(other.stderr, /does not name the release 0\.1\.0-beta\.3/, tag);
+    assert.match(
+      other.stderr,
+      /does not name the release 0\.1\.0-beta\.3/,
+      tag,
+    );
   }
 });
 

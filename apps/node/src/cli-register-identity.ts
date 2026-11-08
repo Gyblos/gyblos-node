@@ -13,13 +13,22 @@ import {
   type SellerOutput,
 } from './seller-home';
 
+// The operator answered no: nothing was signed or sent.
+export class RegistrationDeclined extends Error {}
+
+const ACCEPT = new Set(['y', 'yes']);
+// y or yes, any case or surrounding space; anything else, including an empty answer, declines.
+export const approves = (answer: string) =>
+  ACCEPT.has(answer.trim().toLowerCase());
+
 export async function registerOnChain(
   output: SellerOutput,
   identity: NonNullable<Awaited<ReturnType<typeof sellerIdentity>>>,
   prompt: Prompt,
 ) {
   const environment = homeEnvironmentOf(output);
-  return registerSellerIdentity({
+  let declined = false;
+  const ready = await registerSellerIdentity({
     environment,
     identity: { owner: identity.owner, nodeId: identity.nodeId },
     operations: sellerRegistrationOperations({ environment, role: identity }),
@@ -37,13 +46,14 @@ export async function registerOnChain(
       output.stdout(
         `Estimated registration cost: ${registrationSol(lamports)} SOL.\n`,
       );
-      return (
-        (await prompt('Sign and submit this registration? (yes/no): '))
-          .trim()
-          .toLowerCase() === 'yes'
+      declined = !approves(
+        await prompt('Sign and submit this registration? (yes/no): '),
       );
+      return !declined;
     },
   });
+  if (declined) throw new RegistrationDeclined();
+  return ready;
 }
 
 // Amounts come from bounded registration arithmetic, never user-formatted decimal text.

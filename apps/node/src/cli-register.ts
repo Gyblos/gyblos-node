@@ -16,7 +16,12 @@ import { NodeError } from '@gyblos/node/errors';
 
 import { urlOrigin } from './cli-format';
 import type { Prompt } from './cli-init';
-import { registerOnChain, registrationSol } from './cli-register-identity';
+import { FAUCET, PUBLISH_STEP } from './cli-next';
+import {
+  registerOnChain,
+  RegistrationDeclined,
+  registrationSol,
+} from './cli-register-identity';
 import { EXIT, REGISTER, REGISTER_ERRORS } from './constants';
 import {
   discoverySettings,
@@ -61,6 +66,30 @@ async function inviteOf(output: SellerOutput, prompt: Prompt | undefined) {
   return (await prompt('Invite code (from your Gyblos invitation): ')).trim();
 }
 
+// The invite, or why there is none: an empty answer, an empty variable or no way to ask are told apart.
+async function checkedInvite(
+  output: SellerOutput,
+  prompt: Prompt | undefined,
+): Promise<{ value: string } | { code: string; hint: string }> {
+  const value = await inviteOf(output, prompt);
+  if (!value)
+    return {
+      code: REGISTER_ERRORS.NO_INVITE,
+      hint:
+        output.env[REGISTER.inviteEnv] !== undefined
+          ? `${REGISTER.inviteEnv} is empty; set it to the gyb_ code from your invitation`
+          : prompt
+            ? 'no invite code was entered; paste the gyb_ code from your invitation, then press Enter'
+            : `set ${REGISTER.inviteEnv}, or run this on a terminal to be asked`,
+    };
+  if (!REGISTRATION_FORMAT.invite.test(value))
+    return {
+      code: REGISTER_ERRORS.INVITE_FORMAT,
+      hint: `that is not an invite code; it is ${INVITE_SHAPE}`,
+    };
+  return { value };
+}
+
 class RegistrationUnavailable extends Error {
   constructor(
     readonly code?: NodeErrorCode,
@@ -70,13 +99,16 @@ class RegistrationUnavailable extends Error {
     super();
   }
 }
-function registrationUnavailableHint(error: RegistrationUnavailable): string {
+function registrationUnavailableHint(
+  error: RegistrationUnavailable,
+  owner: string,
+): string {
   return error.code === NODE_ERROR_CODES.SELLER_REGISTRATION_FUNDS_REQUIRED &&
     error.missingLamports !== undefined &&
     error.requiredLamports !== undefined
-    ? `you need ${registrationSol(error.missingLamports)} more SOL for the estimated ${registrationSol(error.requiredLamports)} SOL registration; fund the owner and retry`
+    ? `you need ${registrationSol(error.missingLamports)} more SOL for the estimated ${registrationSol(error.requiredLamports)} SOL registration; send devnet SOL to the owner ${owner} (${FAUCET}), then run this again`
     : error.code === NODE_ERROR_CODES.SELLER_REGISTRATION_SIMULATION_FAILED
-      ? 'registration simulation failed; ensure the owner has SOL, then retry to estimate the cost'
+      ? `registration simulation failed; send devnet SOL to the owner ${owner} (${FAUCET}), then run this again to estimate the cost`
       : 'registration is not confirmed; check the wallet and retry later without deleting its local state';
 }
 async function registerWithIdentity(
@@ -98,6 +130,7 @@ async function registerWithIdentity(
     try {
       ready = await registerIdentity();
     } catch (cause) {
+      if (cause instanceof RegistrationDeclined) throw cause;
       throw new RegistrationUnavailable(
         cause instanceof NodeError ? cause.code : undefined,
         cause instanceof NodeError ? cause.missingLamports : undefined,
@@ -129,17 +162,8 @@ export async function registerCommand(
       REGISTER_ERRORS.CONFIG_INVALID,
       'configuration invalid; run `pnpm gyblos doctor`',
     );
-  const invite = await inviteOf(output, system.prompt);
-  if (!invite)
-    return fail(
-      REGISTER_ERRORS.NO_INVITE,
-      `set ${REGISTER.inviteEnv}, or run this on a terminal to be asked`,
-    );
-  if (!REGISTRATION_FORMAT.invite.test(invite))
-    return fail(
-      REGISTER_ERRORS.INVITE_FORMAT,
-      `that is not an invite code; it is ${INVITE_SHAPE}`,
-    );
+  const invite = await checkedInvite(output, system.prompt);
+  if ('code' in invite) return fail(invite.code, invite.hint);
   if (identity.payTo !== undefined && identity.payTo !== identity.owner)
     output.stderr(
       'Warning: payout is different from owner; accepted temporarily for the beta. The 8004 owner remains unchanged.\n',
@@ -154,7 +178,7 @@ export async function registerCommand(
   const attempt = () =>
     registerSeller({
       baseUrl: discovery.url,
-      invite,
+      invite: invite.value,
       nodeId: identity.nodeId,
       fetch: system.fetch,
       timeoutMs: REGISTER.timeoutMs,
@@ -163,10 +187,15 @@ export async function registerCommand(
   try {
     result = await registerWithIdentity(attempt, registerIdentity);
   } catch (error) {
+    if (error instanceof RegistrationDeclined)
+      return fail(
+        REGISTER_ERRORS.CANCELLED,
+        'nothing was signed or sent; run this again and answer yes to register',
+      );
     if (error instanceof RegistrationUnavailable)
       return fail(
         REGISTER_ERRORS.IDENTITY_UNAVAILABLE,
-        registrationUnavailableHint(error),
+        registrationUnavailableHint(error, identity.owner),
       );
     if (!(error instanceof DiscoveryError)) throw error;
     const hint =
@@ -183,7 +212,7 @@ export async function registerCommand(
   );
   if (!discovery.publish)
     output.stdout(
-      '  Publishing is off in gyblos.toml; set publish = true under [discovery] to be listed.\n',
+      `  Publishing is off in gyblos.toml. Next: ${PUBLISH_STEP}\n`,
     );
   return EXIT.ok;
 }

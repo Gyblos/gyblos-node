@@ -2,7 +2,9 @@
 # Installs a Gyblos seller with Docker: the published node image and its own loopback Ollama
 # (docs/running-a-node.md#install-script). Needs only Docker with Compose v2.17 or later; no port is opened.
 #
-#   sh install.sh
+#   sh install.sh             install or update the seller, then print the next steps to start selling
+#   sh install.sh publish     list the installed seller in the discovery index (after registering it)
+#   sh install.sh unpublish   withdraw it from the index; it keeps running
 #
 # Environment (all optional):
 #   GYBLOS_DIR          where compose.yaml, gyblos.toml and seller.env go (default: ~/gyblos-seller)
@@ -41,6 +43,12 @@ RELAY_TOKEN_MIN=32
 RELAY_TOKEN_MAX=512
 
 dir=${GYBLOS_DIR:-$HOME/gyblos-seller}
+# This script's own path, for the next steps it prints (a piped script has none).
+if [ -f "$0" ]; then
+  self="$(cd "$(dirname -- "$0")" && pwd -P)/$(basename -- "$0")"
+else
+  self=install.sh
+fi
 image=${GYBLOS_IMAGE:-$DEFAULT_IMAGE}
 
 say() { printf '%s\n' "$*"; }
@@ -93,6 +101,8 @@ install_file() {
 # Runs on every exit: removes a temporary file an interruption left (it may hold the token) and turns
 # echo back on if the token prompt was interrupted.
 cleanup() {
+  # An interrupted or failed publish change goes back to the saved original before it is removed.
+  [ -z "${restore:-}" ] || cat "$original" >gyblos.toml
   [ -z "${tmp:-}" ] || rm -f "$tmp"
   [ -z "${prompting:-}" ] || stty echo </dev/tty 2>/dev/null || true
 }
@@ -298,6 +308,70 @@ wait_for_ollama() {
   done
 }
 
+# The steps between a running seller and a listed one; a seller already publishing only needs a check.
+# Single-quoted for pasting (paths with spaces); with GYBLOS_DIR when it is not the default.
+quoted() { printf "'%s'" "$1"; }
+publish_command() {
+  if [ "$dir" = "$HOME/gyblos-seller" ]; then
+    printf 'sh %s %s' "$(quoted "$self")" "$1"
+  else
+    printf 'GYBLOS_DIR=%s sh %s %s' "$(quoted "$dir")" "$(quoted "$self")" "$1"
+  fi
+}
+
+next_steps() {
+  # Tolerates spacing, a comment and CRLF line endings, like the TOML reader.
+  if tr -d '\r' <gyblos.toml | grep -Eq '^[[:space:]]*publish[[:space:]]*=[[:space:]]*true[[:space:]]*(#.*)?$'; then
+    say 'Publishing is on. Check that the index lists it:'
+    say '  docker compose exec seller gyblos seller status --online'
+    return
+  fi
+  say ''
+  say 'Next steps, to start selling:'
+  say "  1. Send about 0.02 devnet SOL to the seller's owner${owner:+ $owner}"
+  say '     (https://faucet.solana.com, choose devnet). It pays the one-time registration, about 0.01 SOL.'
+  say '  2. Register with the gyb_ invite code from your invitation (asked for, not the relay token):'
+  say "       cd $(quoted "$dir") && docker compose exec seller gyblos seller register"
+  say '  3. Publish to the discovery index:'
+  say "       $(publish_command publish)"
+}
+
+# Turns publishing on or off in the installed gyblos.toml, then restarts the seller with it. The file is
+# read-only inside the container, so this runs on the host; an invalid result restores the original.
+set_publish() {
+  check_docker
+  [ -f "$dir/gyblos.toml" ] && [ -f "$dir/compose.yaml" ] ||
+    die "No installed seller in $dir: run sh install.sh first (GYBLOS_DIR names another directory)."
+  cd "$dir"
+  refuse_symlink gyblos.toml
+  [ "$(grep -Ec '^publish = (true|false)$' gyblos.toml)" -eq 1 ] ||
+    die 'gyblos.toml has no single "publish = true" or "publish = false" line under [discovery]; set it by hand.'
+  original=$(mktemp ./.gyblos.toml.XXXXXX)
+  tmp=$original
+  cp gyblos.toml "$original"
+  # Rewritten in place, keeping the file the running container has bind-mounted; until the seller is
+  # recreated with it, any exit restores the original (cleanup).
+  restore=1
+  sed -E "s/^publish = (true|false)\$/publish = $1/" "$original" >gyblos.toml
+  grep -Eq "^publish = $1\$" gyblos.toml || {
+    cat "$original" >gyblos.toml
+    die 'could not change publish in gyblos.toml; set it by hand.'
+  }
+  if ! report=$(docker compose run --rm seller gyblos config validate --config /config/gyblos.toml 2>&1); then
+    cat "$original" >gyblos.toml
+    printf '%s\n' "$report" >&2
+    die 'gyblos.toml is not valid with that change; it was left as it was.'
+  fi
+  restore=
+  docker compose up -d --force-recreate seller
+  if [ "$1" = true ]; then
+    say 'Publishing is on: the index lists this seller within about two minutes, once it is registered.'
+    say "  Check: cd $(quoted "$dir") && docker compose exec seller gyblos seller status --online"
+  else
+    say 'Publishing is off: the index withdraws this seller within about two minutes. It keeps running.'
+  fi
+}
+
 main() {
   trap cleanup EXIT
   trap 'exit 130' INT TERM HUP
@@ -323,9 +397,13 @@ main() {
   # Quiet: doctor below prints the NodeId and owner to share.
   docker compose run --rm seller setup --role seller --mint "$MINT" >/dev/null
   docker compose run --rm seller tokenizer
-  if ! docker compose run --rm seller gyblos doctor; then
+  # Kept to read the public owner for the next steps; doctor never prints a secret.
+  ready=1
+  doctor=$(docker compose run --rm seller gyblos doctor 2>&1) || ready=
+  printf '%s\n' "$doctor"
+  [ -n "$ready" ] ||
     die "The seller is not ready; fix the failures above, then run this script again (cd $dir)."
-  fi
+  owner=$(printf '%s\n' "$doctor" | sed -n 's/^  owner  *\([1-9A-HJ-NP-Za-km-z]\{32,44\}\)[[:space:]]*$/\1/p' | sed -n 1p)
   # Recreated so a rerun applies the current gyblos.toml and seller.env; stopping sends SIGINT.
   docker compose up -d --force-recreate seller
   say ''
@@ -336,6 +414,16 @@ main() {
   say '  docker compose up -d --force-recreate seller   apply an edited gyblos.toml'
   say '  download the latest install.sh and run it again here   update it'
   say 'Its keys are in the gyblos volume: `docker compose down -v` deletes them.'
+  next_steps
 }
 
-main "$@"
+case "${1:-}" in
+  '') main ;;
+  publish | unpublish)
+    [ "$#" -eq 1 ] || die "Usage: sh install.sh [publish|unpublish]"
+    trap cleanup EXIT
+    trap 'exit 130' INT TERM HUP
+    if [ "$1" = publish ]; then set_publish true; else set_publish false; fi
+    ;;
+  *) die "Unknown command '$1'. Usage: sh install.sh [publish|unpublish]" ;;
+esac
