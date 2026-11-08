@@ -30,7 +30,7 @@ import {
 import { assertConfiguredRelay } from '@gyblos/transport-iroh/endpoint';
 
 import { BUYER_INIT_CODES, BUYER_INIT_LIMITS } from './buyer-init-constants';
-import { pricePerMtokToAtomicPerMtok } from './node-config-price';
+import { usdcToAtomic } from './node-config-price';
 
 export interface BuyerInitAnswers {
   modelId: string;
@@ -102,7 +102,7 @@ function safeUrl(value: unknown) {
 // Prices and the total ceiling use the same exact USDC scale; floating-point money is never used.
 function atomic(value: unknown) {
   const text = controlText(value, BUYER_INIT_LIMITS.inputCharacters);
-  return controlAtomic(pricePerMtokToAtomicPerMtok(text).toString());
+  return controlAtomic(usdcToAtomic(text).toString());
 }
 function request(row: Record<string, unknown>): SellerRequest {
   const maxTokens = controlText(row.maxTokens);
