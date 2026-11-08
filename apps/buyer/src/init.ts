@@ -15,7 +15,9 @@ import {
 import {
   BUYER_INIT_CODES,
   BUYER_INIT_FIELDS,
+  BUYER_INIT_MODES,
   type BuyerInitField,
+  type BuyerInitMode,
 } from '@gyblos/node/buyer-init-constants';
 import { setupRole } from '@gyblos/node/roles';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
@@ -118,7 +120,10 @@ async function readField(
     }
   }
 }
-export async function runBuyerInit(terminal: BuyerInitTerminal): Promise<void> {
+export async function runBuyerInit(
+  terminal: BuyerInitTerminal,
+  _mode: BuyerInitMode = BUYER_INIT_MODES.SHORT,
+): Promise<void> {
   const preflight = await terminal.preflight();
   if (preflight.exists) {
     terminal.write(
