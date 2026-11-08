@@ -41,6 +41,7 @@ import {
 } from './constants';
 import { NodeError } from './errors';
 import { assertRoleHome } from './home';
+import { privateBytes, privateKeyMetadata } from './role-key-file';
 
 interface CommonRole {
   schemaVersion: typeof ROLE_CONFIG_SCHEMA_VERSION;
@@ -84,33 +85,6 @@ function file(
 
 export function roleDirectory(role: P2PRole) {
   return resolve(homeLayout(process.env).roles[role]);
-}
-
-// A regular, non-symlinked file owned by this user with mode 0600; checked from metadata only.
-function privateKeyMetadata(metadata: Awaited<ReturnType<typeof lstat>>) {
-  return (
-    metadata.isFile() &&
-    !metadata.isSymbolicLink() &&
-    (Number(metadata.mode) & FILE_MODES.permissionMask) ===
-      FILE_MODES.privateFile &&
-    (!process.getuid || Number(metadata.uid) === process.getuid())
-  );
-}
-
-async function privateBytes(path: string, length: number) {
-  if (!privateKeyMetadata(await lstat(path)))
-    throw new Error('Role key permissions or owner are invalid.');
-  const value: unknown = JSON.parse(await readFile(path, 'utf8'));
-  if (
-    !Array.isArray(value) ||
-    value.length !== length ||
-    value.some(
-      (byte) =>
-        !Number.isInteger(byte) || byte < 0 || byte > KEY_LIMITS.byteMax,
-    )
-  )
-    throw new Error('Invalid role key.');
-  return Uint8Array.from(value);
 }
 
 async function wallet(role: P2PRole, key: RoleKey) {
