@@ -26,6 +26,7 @@ const QUOTED_OUTPUT = [
   ['Docker Compose v2 is missing', 'install.sh'],
   ['is too old', 'install.sh'],
   ['The relay token is empty', 'install.sh'],
+  ['not the relay token', 'install.sh'],
   ['Ollama did not start', 'install.sh'],
   ['gyblos install:', 'install.sh'],
   ['The image signature did not verify', 'install.sh'],

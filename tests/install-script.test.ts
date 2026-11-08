@@ -200,12 +200,17 @@ void test('refuses a token seller.env or the relay could not hold, without writi
     ].map((bad) => bad + padding),
     'x'.repeat(31),
     'x'.repeat(513),
+    // Synthetic invite codes: the gyb_ shape, and one long enough for a token.
+    `gyb_${'a2'.repeat(13)}`,
+    `gyb_${'x'.repeat(40)}`,
   ]) {
     const install = await harness();
     try {
       const result = install.run({ GYBLOS_RELAY_TOKEN: token });
       assert.equal(result.status, 1, token);
       assert.match(result.stderr, /relay token/);
+      if (token.startsWith('gyb_'))
+        assert.match(result.stderr, /invite code, not the relay token/);
       assert.ok(!result.output.includes(token), token);
       assert.throws(() => install.file('seller.env'), token);
       assert.ok(!install.calls().includes('compose pull'), token);
