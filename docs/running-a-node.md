@@ -485,7 +485,9 @@ cosign verify-blob install.sh --bundle install.sh.sigstore.json \
 
 A release is a version tag pushed from a commit on `main`, one tag at a time.
 Nothing else is committed or deployed: the release itself publishes the
-installer.
+installer. Tag a commit whose message does not contain `[skip ci]` (or another
+skip marker): GitHub then skips every workflow for the push, including this
+release, and the tag must be deleted and pushed again on another commit.
 
 ```sh
 git tag v0.1.0-beta.3 origin/main

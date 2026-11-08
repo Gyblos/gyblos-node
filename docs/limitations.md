@@ -79,6 +79,11 @@ only; never import mainnet keys.
   [payee-signed settle-and-seal path](https://github.com/solana-foundation/payment-channels/blob/0c07d5751c8972abf6a219570a3f39a72f46f879/program/payment_channels/src/instructions/settle_and_seal.rs#L83).
   The deadline comes from the SDK-validated payload expiry, not the quote's
   expiry; the payload expiry is not itself part of the payer-signed open.
+- The withdrawal grace is part of the channel authorization, and `v0.1.0-beta.4`
+  and earlier use 60 seconds. For paid requests, run buyer and seller on the
+  same release, `v0.1.0-beta.5` or later; mixed versions are not validated. Do
+  not downgrade to `v0.1.0-beta.4` while paid channels are still pending: it
+  cannot claim a `Closing` channel. Free requests are unaffected.
 - Closing and expiry regressions use the real installed SDK with synthetic
   accounts, RPC replies and transaction confirmation. They do not execute the
   native program or establish deployed-binary equivalence. Collection still
