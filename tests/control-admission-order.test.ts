@@ -5,7 +5,10 @@ import test from 'node:test';
 
 import { CONTROL_ALPN, GYBLOS_ALPN } from '@gyblos/protocol/constants';
 
-import { admissionOrder } from './support/native-admission-order';
+import {
+  admissionOrder,
+  invertedDataAdmission,
+} from './support/native-admission-order';
 import {
   holdNativeConnection,
   nativeControlFixture,
@@ -66,27 +69,61 @@ void test(
   async () => {
     const order = admissionOrder(GYBLOS_ALPN);
     const run = await nativeControlFixture(1000, order.observeSeller);
-    const first = await within(
-      run.buyer.connect(run.seller.addr(), [...Buffer.from(GYBLOS_ALPN)]),
-    );
-    const stream = await first.openBi();
-    try {
-      await stream.send.writeAll([0]);
-      await within(order.blocked);
-      await within(run.client.getCatalog());
-      const second = await within(
-        run.buyer.connect(run.seller.addr(), [...Buffer.from(GYBLOS_ALPN)]),
-      );
-      await within(order.secondAdmitted);
-      order.release();
-      await within(first.closed());
-      assert.equal(second.closeReason(), null);
-      assert.deepEqual(order.counts(), { arrivals: 2, admitted: 1 });
-      assert.equal(run.httpRequests, 0);
-    } finally {
-      order.release();
-      await stream.send.reset(1n).catch(() => undefined);
-      await run.close();
-    }
+    await invertedDataAdmission(run, order);
   },
 );
+for (const stage of ['connect', 'openBi'] as const) {
+  void test(
+    `inverted native ${stage} setup failure releases the gate and closes the fixture`,
+    { skip: NATIVE_CAPABILITY.transportSkip },
+    async () => {
+      const order = admissionOrder(GYBLOS_ALPN);
+      const run = await nativeControlFixture(1000, order.observeSeller);
+      const close = run.close.bind(run);
+      const failure = new Error('Synthetic admission setup failure');
+      let closed = false;
+      let released = false;
+      let releaseBeforeClose = false;
+      const release = order.release;
+      order.release = () => {
+        released = true;
+        release();
+      };
+      run.close = async () => {
+        releaseBeforeClose = released;
+        await close();
+        closed = true;
+      };
+      try {
+        const connect = run.buyer.connect.bind(run.buyer);
+        run.buyer.connect = async (...args) => {
+          if (stage === 'connect') throw failure;
+          const connection = await connect(...args);
+          connection.openBi = async () => {
+            throw failure;
+          };
+          return connection;
+        };
+        await assert.rejects(
+          invertedDataAdmission(run, order),
+          (error: unknown) => error === failure,
+        );
+        assert.equal(
+          closed,
+          true,
+          'Setup failure must close the already-created fixture',
+        );
+        assert.equal(
+          releaseBeforeClose,
+          true,
+          'Release held native work before closing the fixture',
+        );
+        await within(run.server.running);
+      } finally {
+        // Test-owned cleanup also runs when probing a mutation that removes scenario cleanup.
+        order.release();
+        if (!closed) await close();
+      }
+    },
+  );
+}

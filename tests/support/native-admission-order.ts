@@ -1,8 +1,13 @@
 // Controls native completion order in test-owned endpoints; all real admission still runs in serveIroh.
 // Records only phase/counter state, never identities, addresses, prompts or payment material.
+import assert from 'node:assert/strict';
+
 import type { Endpoint } from '@number0/iroh';
 
 import { CONTROL_ALPN, GYBLOS_ALPN } from '@gyblos/protocol/constants';
+
+import type { nativeControlFixture } from './native-control';
+import { within } from './test-deadline';
 
 function signal() {
   let resolve = () => {};
@@ -63,4 +68,33 @@ export function admissionOrder(alpn: typeof GYBLOS_ALPN | typeof CONTROL_ALPN) {
     release: release.resolve,
     counts: () => ({ arrivals, admitted }),
   };
+}
+
+// Runs the inverted-order scenario so setup failures exercise its real resource cleanup too.
+export async function invertedDataAdmission(
+  run: Awaited<ReturnType<typeof nativeControlFixture>>,
+  order: ReturnType<typeof admissionOrder>,
+) {
+  const first = await within(
+    run.buyer.connect(run.seller.addr(), [...Buffer.from(GYBLOS_ALPN)]),
+  );
+  const stream = await first.openBi();
+  try {
+    await stream.send.writeAll([0]);
+    await within(order.blocked);
+    await within(run.client.getCatalog());
+    const second = await within(
+      run.buyer.connect(run.seller.addr(), [...Buffer.from(GYBLOS_ALPN)]),
+    );
+    await within(order.secondAdmitted);
+    order.release();
+    await within(first.closed());
+    assert.equal(second.closeReason(), null);
+    assert.deepEqual(order.counts(), { arrivals: 2, admitted: 1 });
+    assert.equal(run.httpRequests, 0);
+  } finally {
+    order.release();
+    await stream.send.reset(1n).catch(() => undefined);
+    await run.close();
+  }
 }
