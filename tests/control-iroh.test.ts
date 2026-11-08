@@ -79,8 +79,11 @@ void test(
       phase = 'complete';
     } finally {
       context.diagnostic(`Native admission phase: ${phase}`);
-      await held?.close();
-      await run.close();
+      try {
+        await held?.close();
+      } finally {
+        await run.close();
+      }
     }
   },
 );
@@ -98,8 +101,11 @@ void test(
       await within(second.closed());
       assert.equal(held.connection.closeReason(), null);
     } finally {
-      await held?.close();
-      await run.close();
+      try {
+        await held?.close();
+      } finally {
+        await run.close();
+      }
     }
   },
 );

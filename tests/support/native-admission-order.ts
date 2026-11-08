@@ -2,7 +2,7 @@
 // Records only phase/counter state, never identities, addresses, prompts or payment material.
 import assert from 'node:assert/strict';
 
-import type { Endpoint } from '@number0/iroh';
+import type { BiStream, Endpoint } from '@number0/iroh';
 
 import { CONTROL_ALPN, GYBLOS_ALPN } from '@gyblos/protocol/constants';
 
@@ -75,12 +75,13 @@ export async function invertedDataAdmission(
   run: Awaited<ReturnType<typeof nativeControlFixture>>,
   order: ReturnType<typeof admissionOrder>,
 ) {
-  const first = await within(
-    run.buyer.connect(run.seller.addr(), [...Buffer.from(GYBLOS_ALPN)]),
-  );
-  const stream = await first.openBi();
+  let stream: BiStream | undefined;
   try {
-    await stream.send.writeAll([0]);
+    const first = await within(
+      run.buyer.connect(run.seller.addr(), [...Buffer.from(GYBLOS_ALPN)]),
+    );
+    stream = await within(first.openBi());
+    await within(stream.send.writeAll([0]));
     await within(order.blocked);
     await within(run.client.getCatalog());
     const second = await within(
@@ -94,7 +95,10 @@ export async function invertedDataAdmission(
     assert.equal(run.httpRequests, 0);
   } finally {
     order.release();
-    await stream.send.reset(1n).catch(() => undefined);
-    await run.close();
+    try {
+      await stream?.send.reset(1n).catch(() => undefined);
+    } finally {
+      await run.close();
+    }
   }
 }

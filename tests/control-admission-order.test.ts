@@ -57,8 +57,11 @@ for (const alpn of [GYBLOS_ALPN, CONTROL_ALPN] as const) {
       } finally {
         order.release();
         await opening.catch(() => undefined);
-        await held?.close();
-        await run.close();
+        try {
+          await held?.close();
+        } finally {
+          await run.close();
+        }
       }
     },
   );
