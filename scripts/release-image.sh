@@ -2,9 +2,9 @@
 # Releases the seller node image; runs only in the release workflow
 # (.github/workflows/release-seller-image.yml), started by pushing a version tag such as v0.1.0-beta.2
 # from main. Builds the tagged commit alone for amd64 and arm64, pushes it as the version and the
-# commit, signs the pushed digest keyless with the workflow's GitHub identity (the identity install.sh
-# verifies), and only then moves `beta` to it when the commit is main's tip. Prints the pinned reference
-# and hands it to the next job (docs/running-a-node.md#releasing-the-seller-image).
+# commit and signs the pushed digest keyless with the workflow's GitHub identity (the identity install.sh
+# verifies). Prints the pinned reference and hands it to the next job, scripts/publish-installer.sh,
+# which publishes the installer and moves `beta` (docs/running-a-node.md#releasing-the-seller-image).
 #
 #   sh scripts/release-image.sh <version>
 set -eu
@@ -12,7 +12,6 @@ set -eu
 REPOSITORY=ghcr.io/gyblos/seller
 SOURCE=https://github.com/Gyblos/gyblos-node
 PLATFORMS=linux/amd64,linux/arm64
-CHANNEL=beta
 ISSUER=https://token.actions.githubusercontent.com
 
 die() {
@@ -24,6 +23,10 @@ version=${1:-}
 # Semantic version, optionally with a pre-release such as -beta.1.
 printf '%s\n' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$' ||
   die "invalid version: '$version' (expected for example 0.1.0-beta.1)"
+# The same rule the publish job uses to order releases (no leading zeros), checked before anything is pushed.
+valid=0
+node "$(dirname "$0")/semver-newer.mjs" "$version" "$version" 2>/dev/null || valid=$?
+[ "$valid" -ne 2 ] || die "invalid version: '$version' (expected for example 0.1.0-beta.1)"
 # Keyless signing binds the release to the workflow's identity; anywhere else it would sign as a person.
 [ "${GITHUB_ACTIONS:-}" = true ] && [ -n "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ] ||
   die 'releases run only in the release workflow: push the tag v<version> from main.'
@@ -71,14 +74,6 @@ cosign verify \
   "$REPOSITORY@$digest" >/dev/null ||
   die "the signature of $REPOSITORY@$digest does not verify."
 
-# The channel moves only to a signed release of main's tip, never back to an older commit.
-if [ "$revision" = "$(git rev-parse origin/main)" ]; then
-  docker buildx imagetools create --tag "$REPOSITORY:$CHANNEL" "$REPOSITORY@$digest"
-  moved=" and :$CHANNEL"
-else
-  moved=''
-fi
-
 pinned="$REPOSITORY:$version@$digest"
 [ -z "${GITHUB_OUTPUT:-}" ] || printf 'pinned=%s\n' "$pinned" >>"$GITHUB_OUTPUT"
-printf 'Released %s (commit %s), signed, also tagged :%s%s.\n' "$pinned" "$short" "$short" "$moved"
+printf 'Released %s (commit %s), signed, also tagged :%s.\n' "$pinned" "$short" "$short"

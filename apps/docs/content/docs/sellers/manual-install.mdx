@@ -8,13 +8,15 @@ signature yourself, or to set up the same seller step by step and keep full cont
 
 ## Find the current release
 
-Each installer pins one release of the seller image by version and digest. Read it from the installer:
+Each installer pins one release of the seller image by version and digest. `gyblos.com/install.sh` serves
+the installer attached to the latest [GitHub release](https://github.com/Gyblos/gyblos-node/releases/latest),
+which also lists the image. Read it from the installer:
 
 ```sh
 curl -fsSL https://gyblos.com/install.sh | grep '^DEFAULT_IMAGE='
 ```
 
-It prints a line such as `DEFAULT_IMAGE=ghcr.io/gyblos/seller:0.1.0-beta.1@sha256:…`. Below,
+It prints a line such as `DEFAULT_IMAGE=ghcr.io/gyblos/seller:0.1.0-beta.3@sha256:…`. Below,
 replace `VERSION@sha256:DIGEST` with the part after `ghcr.io/gyblos/seller:`.
 
 ## Verify the image signature
