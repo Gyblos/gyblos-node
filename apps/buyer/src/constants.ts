@@ -1,7 +1,8 @@
 // Buyer call outcomes, phases, journal states, proxy error codes, measurement schema version, call and
 // proof bounds, error diagnostic codes and synthetic inference case names.
 import { ROLE_FILES, TRANSPORT_TIMEOUTS } from '@gyblos/config';
-import { BUYER_PAID_TIMEOUTS, BUYER_SELECTION_FILE } from '@gyblos/node/constants';
+import { BUYER_SELECTION_FILE } from '@gyblos/node/buyer-init-constants';
+import { BUYER_PAID_TIMEOUTS } from '@gyblos/node/constants';
 import { JOURNAL_STATES } from '@gyblos/payments-x402/constants';
 import {
   FREE_EXECUTION,
@@ -294,3 +295,6 @@ export type FreeBuyerStartupReason =
 
 // Local HTTP terminal metadata; never changes a signed protocol record.
 export const BUYER_EXECUTION_FIELD = 'gyblos_execution';
+
+// The guided form uses this explicit marker to clear a nullable field without changing blank defaults.
+export const BUYER_INIT_INPUT = { CLEAR: '-' } as const;

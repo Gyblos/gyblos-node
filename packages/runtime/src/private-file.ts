@@ -161,6 +161,7 @@ export function readPrivateFile(
   });
 }
 
+// Exclusive publication links the fully synced stage without replacing an existing destination.
 export function writePrivateFile(
   path: string,
   text: string,

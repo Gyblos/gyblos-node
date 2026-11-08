@@ -61,7 +61,8 @@
     "./seller-registration": "./src/seller-registration.ts",
     "./buyer-quote-execution": "./src/buyer-quote-execution.ts",
     "./buyer-operation": "./src/buyer-operation.ts",
-    "./buyer-init": "./src/buyer-init.ts"
+    "./buyer-init": "./src/buyer-init.ts",
+    "./buyer-init-constants": "./src/buyer-init-constants.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",
