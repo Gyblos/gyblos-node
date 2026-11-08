@@ -4,3 +4,8 @@ Copyright 2026 Gyblos contributors
 Original Gyblos code is licensed under the Apache License, Version 2.0.
 Third-party components retain their own licenses and notices; see
 docs/third-party-notices.md. This notice grants no rights to third-party marks.
+
+The native payment-channel test fixture includes an upstream MIT program and
+MIT/Apache-2.0 runtime components. See the compiled dependency inventory and
+preserved program/five8 notices in tests/fixtures/payment-channels-native*
+and docs/third-party-notices.md. Third-party code retains its own licenses.

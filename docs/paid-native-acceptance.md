@@ -75,10 +75,17 @@ congestion or clock drift. This lab does not claim 100% safety.
 
 The [manifest](../tests/fixtures/payment-channels-native.json) records the exact
 source commit, clean-source condition, lockfile digest, features, architecture,
-builder/tool archive digests and final ELF digest/size. The upstream
+builder/tool archive digests and final ELF digest/size. The upstream program's
 [MIT notice](../tests/fixtures/payment-channels-native-LICENSE.txt) is
-preserved. The program is not a modified processor or a mock; SPL distribution
-batching and all native guards remain enabled.
+preserved. The separate
+[target dependency inventory](../tests/fixtures/payment-channels-native-dependencies.json)
+records crate versions, declared/selected licenses and lockfile checksums. The
+program source's MIT label does not cover all linked dependencies: Apache-2.0
+covers the listed Apache/dual-licensed components and Rust core, while the
+MIT-only five8 family has its preserved copyright/permission notice. Host
+proc-macros/dev crates are excluded; compilation is not a claim that all
+component code survives linkage. The program is not a modified processor or a
+mock; SPL distribution batching and all native guards remain enabled.
 
 To rebuild, use a fresh source checkout at the manifest's commit and verify that
 its working tree and Cargo.lock are unchanged. Provision these official tools in

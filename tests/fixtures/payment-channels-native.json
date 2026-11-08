@@ -14,5 +14,12 @@
   "bytes": 66240,
   "license": "MIT",
   "deployedBinaryEquivalence": false,
-  "remapPathPrefixes": ["/Users=/build/users", "<source>=/source"]
+  "remapPathPrefixes": ["/Users=/build/users", "<source>=/source"],
+  "licenseScope": "MIT covers the upstream program source; compiled runtime dependencies retain their own licenses.",
+  "dependencyInventory": "payment-channels-native-dependencies.json",
+  "licenseNotices": [
+    "payment-channels-native-LICENSE.txt",
+    "payment-channels-native-five8-LICENSE.txt",
+    "../../LICENSE"
+  ]
 }
