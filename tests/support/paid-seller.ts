@@ -67,6 +67,7 @@ export function recordingPayment(own: PaymentDescription) {
     describeError: undefined as unknown,
     settle: { kind: 'settle' } as SettleBehaviour,
     description: own,
+    claimUntil: undefined as number | undefined,
   };
   const settled = new Map<string, PaymentSettlement>();
   const server: PaymentServer = {
@@ -85,7 +86,7 @@ export function recordingPayment(own: PaymentDescription) {
       )
         throw new PaymentError(PAYMENT_ERROR_CODES.AUTHORIZATION_MISMATCH);
       const { payload: _payload, ...admission } = authorization;
-      return admission;
+      return { ...admission, claimUntil: control.claimUntil ?? terms.expiresAt + 120_000 };
     },
     settle(admission, chargedAtomic) {
       calls.settle.push({ admission, chargedAtomic });

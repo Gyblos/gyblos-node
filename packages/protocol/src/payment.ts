@@ -61,7 +61,10 @@ export interface PaymentAuthorization {
 }
 
 // A verified, deposited channel the seller may now serve and later settle.
-export type PaymentAdmission = Omit<PaymentAuthorization, 'payload'>;
+export type PaymentAdmission = Omit<PaymentAuthorization, 'payload'> & {
+  // Adapter-verified voucher cutoff in epoch milliseconds, distinct from quote admission expiry.
+  claimUntil: number;
+};
 
 // One recipient of a channel's on-chain distribution, in basis points of each charge.
 export interface PaymentSplit {
@@ -108,7 +111,7 @@ export interface PaymentServer {
   admit(
     authorization: PaymentAuthorization,
     terms: PaymentTerms,
-    options?: { signal?: AbortSignal },
+    options?: { signal?: AbortSignal; minClaimWindowMs?: number },
   ): Promise<PaymentAdmission>;
   settle(
     admission: PaymentAdmission,

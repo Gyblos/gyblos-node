@@ -67,7 +67,7 @@ export {
   type UptoDistributeQuery,
   type UptoProgramInstruction,
 } from './withdraw-instructions';
-export { createUptoAuthorization, decodeUptoPayload } from './authorization';
+export { createUptoAuthorization, decodeUptoPayload, uptoClaimUntil } from './authorization';
 export { uptoRequirements } from './requirements';
 export {
   createUptoSeller,

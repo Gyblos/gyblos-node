@@ -13,6 +13,10 @@ import type {
   UptoTerms,
 } from './types';
 
+export function uptoClaimUntil(_authorization: Pick<UptoAuthorization, 'payload'>): number {
+  return 0;
+}
+
 function isPayload(
   value: unknown,
 ): value is Record<string, unknown> & UptoPayloadFields {

@@ -69,12 +69,14 @@ export interface ChannelFields {
   closureStartedAt: bigint;
   gracePeriod: number;
   distributionHash: Uint8Array;
+  salt?: bigint;
+  openSlot?: bigint;
 }
 
 // The account bytes at the channel's canonical address.
 export async function channelAccount(fields: ChannelFields) {
-  const salt = 7n;
-  const openSlot = 99n;
+  const salt = fields.salt ?? 7n;
+  const openSlot = fields.openSlot ?? 99n;
   const [channelId] = await getProgramDerivedAddress({
     programAddress: address(UPTO_PROGRAM.id),
     seeds: [
