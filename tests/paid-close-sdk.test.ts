@@ -9,6 +9,7 @@ import {
   createUptoSeller,
   memoryUptoStore,
   UPTO_CHANNEL_ACCOUNT,
+  UPTO_CHANNEL_STATES,
 } from 'x402-upto-metered';
 
 import { UPTO_CHANNEL_SETTINGS } from '@gyblos/config';
@@ -28,7 +29,13 @@ import type {
 import { paidSellerFixture } from './support/paid-seller';
 import { CLAIM_NOW, sdkClaimFixture } from './support/upto-claim';
 
-async function flow() {
+async function flow(
+  hooks: {
+    now?: () => number;
+    verified?: () => void;
+    persisted?: () => void;
+  } = {},
+) {
   const sdk = await sdkClaimFixture({ allowClosingClaims: true });
   let deposits = 0;
   const description: PaymentDescription = {
@@ -40,24 +47,37 @@ async function flow() {
     protocolFeeBps: 300,
     treasury: (await generateKeyPairSigner()).address,
   };
+  const store = memoryUptoStore();
   const native = createUptoSeller({
     chain: {
       ...sdk.chain,
+      verify: async (...args) => {
+        const valid = await sdk.chain.verify(...args);
+        hooks.verified?.();
+        return valid;
+      },
       deposit: async (open, terms) => {
         await sdk.prepareChannel(open, terms);
         deposits++;
         return { transaction: 'simulated-deposit' };
       },
     },
-    store: memoryUptoStore(),
-    now: () => CLAIM_NOW,
+    store: {
+      ...store,
+      async put(record) {
+        await store.put(record);
+        if (record.state === UPTO_CHANNEL_STATES.DEPOSITING)
+          hooks.persisted?.();
+      },
+    },
+    now: hooks.now ?? (() => CLAIM_NOW),
     own: uptoSellerTerms(description, UPTO_CHANNEL_SETTINGS),
   });
   const server = createUptoPaymentServer({
     description,
     settings: UPTO_CHANNEL_SETTINGS,
     seller: native,
-    now: () => CLAIM_NOW,
+    now: hooks.now ?? (() => CLAIM_NOW),
   });
   const termsFor = (quote: SignedOfferV2): PaymentTerms => ({
     ...description,
@@ -79,8 +99,73 @@ async function flow() {
     buyer: sdk.payer.address,
     authorize: (quote) => authorize(termsFor(quote)),
   });
-  return { sdk, seller, server, termsFor, deposits: () => deposits };
+  return { sdk, seller, server, store, termsFor, deposits: () => deposits };
 }
+
+function shortPayload(payload: string) {
+  const decoded: unknown = JSON.parse(
+    Buffer.from(payload, 'base64').toString(),
+  );
+  assert.ok(decoded && typeof decoded === 'object');
+  return Buffer.from(
+    JSON.stringify({ ...decoded, expiresAt: CLAIM_NOW / 1000 + 21 }),
+  ).toString('base64');
+}
+
+for (const delayVerification of [true, false]) {
+  void test(`claim reserve is rechecked after delayed ${delayVerification ? 'verification' : 'write-ahead persistence'}`, async (context) => {
+    context.mock.method(Date, 'now', () => CLAIM_NOW);
+    let now = CLAIM_NOW;
+    const delay = () => {
+      now += 2000;
+    };
+    const value = await flow({
+      now: () => now,
+      verified: delayVerification ? delay : undefined,
+      persisted: delayVerification ? undefined : delay,
+    });
+    const request = await value.seller.request();
+    const authorization = {
+      ...request.payment,
+      payload: shortPayload(request.payment.payload),
+    };
+    await assert.rejects(
+      value.server.admit(authorization, value.termsFor(request.quote), {
+        minClaimWindowMs: 20_000,
+      }),
+      { code: PAYMENT_ERROR_CODES.TERMS_EXPIRED },
+    );
+    assert.equal(value.deposits(), 0);
+    assert.equal(value.sdk.sent.length, 0);
+    assert.equal(
+      (await value.store.get(authorization.channelId))?.state,
+      delayVerification ? undefined : UPTO_CHANNEL_STATES.FAILED,
+    );
+  });
+}
+
+void test('quote expiry during write-ahead persistence refuses the deposit and records failure', async (context) => {
+  context.mock.method(Date, 'now', () => CLAIM_NOW);
+  let now = CLAIM_NOW;
+  let expiresAt = now;
+  const value = await flow({
+    now: () => now,
+    persisted: () => {
+      now = expiresAt;
+    },
+  });
+  const request = await value.seller.request();
+  expiresAt = request.quote.offer.expiresAt;
+  await assert.rejects(
+    value.server.admit(request.payment, value.termsFor(request.quote)),
+    { code: PAYMENT_ERROR_CODES.TERMS_EXPIRED },
+  );
+  assert.equal(value.deposits(), 0);
+  assert.equal(
+    (await value.store.get(request.payment.channelId))?.state,
+    UPTO_CHANNEL_STATES.FAILED,
+  );
+});
 
 void test('payer closure during product inference still claims exactly delivered usage once through the SDK', async (context) => {
   context.mock.method(Date, 'now', () => CLAIM_NOW);
