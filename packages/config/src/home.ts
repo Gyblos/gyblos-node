@@ -35,6 +35,8 @@ export const HOME_FILES = {
 // File names inside one role directory.
 export const ROLE_FILES = {
   roleConfig: 'role.json',
+  buyerSelection: 'selection.json',
+  buyerInitLock: 'init.lock',
   nodeKey: 'node.key',
   trust: 'trust.json',
   status: 'status.json',

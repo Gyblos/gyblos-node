@@ -62,7 +62,8 @@
     "buyer:chat": "node --import tsx apps/buyer/src/chat-cli.ts",
     "buyer:free": "node --import tsx apps/buyer/src/free-main.ts",
     "acceptance:receipts": "pnpm --filter @gyblos/lab-harness acceptance:receipts",
-    "acceptance:paid": "node --import tsx tests/support/paid-acceptance-cli.ts"
+    "acceptance:paid": "node --import tsx tests/support/paid-acceptance-cli.ts",
+    "buyer:init": "node --import tsx apps/buyer/src/init.ts"
   },
   "dependencies": {
     "@gyblos/core": "workspace:*",

@@ -1,6 +1,7 @@
 // Buyer call outcomes, phases, journal states, proxy error codes, measurement schema version, call and
 // proof bounds, error diagnostic codes and synthetic inference case names.
-import { TRANSPORT_TIMEOUTS } from '@gyblos/config';
+import { ROLE_FILES, TRANSPORT_TIMEOUTS } from '@gyblos/config';
+import { BUYER_SELECTION_FILE } from '@gyblos/node/buyer-init-constants';
 import { BUYER_PAID_TIMEOUTS } from '@gyblos/node/constants';
 import { JOURNAL_STATES } from '@gyblos/payments-x402/constants';
 import {
@@ -78,9 +79,9 @@ export const SELLER_FAILURES = {
   nodeIdChars: 8,
 } as const;
 export const BUYER_SELECTION = {
-  configFile: 'selection.json',
+  configFile: ROLE_FILES.buyerSelection,
   statsFile: 'selection-stats.json',
-  maxConfigBytes: 65536,
+  maxConfigBytes: BUYER_SELECTION_FILE.maxBytes,
   maxSellers: 16,
   maxDecisions: 1024,
   snapshotMs: 10000,
@@ -294,3 +295,6 @@ export type FreeBuyerStartupReason =
 
 // Local HTTP terminal metadata; never changes a signed protocol record.
 export const BUYER_EXECUTION_FIELD = 'gyblos_execution';
+
+// The guided form uses this explicit marker to clear a nullable field without changing blank defaults.
+export const BUYER_INIT_INPUT = { CLEAR: '-' } as const;
