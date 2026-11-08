@@ -281,10 +281,18 @@ for (const phase of ['verification', 'confirmation']) {
       });
       const request = await value.seller.request();
       let complete = false;
-      const running = value.seller.execute(request).then((result) => {
-        complete = true;
-        return result;
-      });
+      const stream = value.seller.service.stream;
+      // Observe the service itself, before the fixture's asynchronous buyer verification.
+      context.mock.method(
+        value.seller.service,
+        'stream',
+        async (...args: Parameters<typeof stream>) => {
+          const terminal = await stream(...args);
+          complete = true;
+          return terminal;
+        },
+      );
+      const running = value.seller.execute(request);
       try {
         await started;
         assert.equal(value.seller.options.settlement.waitMs, 50);
