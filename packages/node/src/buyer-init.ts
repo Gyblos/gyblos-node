@@ -24,9 +24,17 @@ export {
   buildBuyerInit,
   buyerInitDefaults,
   BuyerInitError,
+  validateBuyerInitField,
   type BuyerInitAnswers,
   type BuyerInitPlan,
 } from './buyer-init-plan';
+
+export async function checkBuyerInit(environment: HomeEnvironment) {
+  return {
+    path: rolePathIn(environment, P2P_ROLES.BUYER, ROLE_FILES.buyerSelection),
+    exists: false,
+  };
+}
 
 export interface BuyerInitOptions {
   environment: HomeEnvironment;

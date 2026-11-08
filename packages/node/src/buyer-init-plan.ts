@@ -29,7 +29,11 @@ import {
 } from '@gyblos/protocol/control-validation';
 import { assertConfiguredRelay } from '@gyblos/transport-iroh/endpoint';
 
-import { BUYER_INIT_CODES, BUYER_INIT_LIMITS } from './buyer-init-constants';
+import {
+  BUYER_INIT_CODES,
+  BUYER_INIT_LIMITS,
+  type BuyerInitField,
+} from './buyer-init-constants';
 import { usdcToAtomic } from './node-config-price';
 
 export interface BuyerInitAnswers {
@@ -61,10 +65,17 @@ export interface BuyerInitPlan {
 export class BuyerInitError extends Error {
   constructor(
     readonly code: (typeof BUYER_INIT_CODES)[keyof typeof BUYER_INIT_CODES],
+    readonly field: BuyerInitField | null = null,
   ) {
     super(code);
     this.name = 'BuyerInitError';
   }
+}
+export function validateBuyerInitField(
+  _field: BuyerInitField,
+  value: unknown,
+): string {
+  return typeof value === 'string' ? value : '';
 }
 export function buyerInitDefaults(): BuyerInitAnswers {
   return {
