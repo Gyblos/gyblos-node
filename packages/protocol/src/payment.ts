@@ -109,8 +109,8 @@ export interface PaymentClient {
 export interface PaymentServer {
   describe(): Promise<PaymentDescription>;
   // The signal is honoured only until the deposit is sent; after that, admission runs to the end.
-  // Refuse a payload with no minClaimWindowMs remaining before deposit. The caller rechecks the
-  // returned claimUntil after confirmation; this reserve does not bound chain inclusion.
+  // Refuse a payload with no minClaimWindowMs remaining before requesting a deposit from the
+  // chain adapter. The caller rechecks claimUntil after confirmation; inclusion is not bounded.
   admit(
     authorization: PaymentAuthorization,
     terms: PaymentTerms,

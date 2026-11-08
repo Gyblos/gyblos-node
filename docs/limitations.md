@@ -64,7 +64,10 @@ only; never import mainnet keys.
   generation; it attempts zero-charge settlement. Only completed deliveries
   before the cutoff enter the frozen charge. An already-issued transport write
   cannot be retracted, and an uncooperative engine cannot be forcibly stopped by
-  an AbortSignal; late completion cannot revise the terminal or its charge.
+  an AbortSignal; late completion cannot revise the terminal or its charge. If a
+  write is still pending when the charge freezes, transport closes and drains it
+  instead of sending an inconsistent terminal. The buyer must reconcile that
+  interrupted result; the prompt is never retried.
 - New v2 channels use a 300-second withdrawal grace, covering the default
   120-second SDK payload lifetime plus its 60-second accepted expiry slack and
   margin. Shorter unsafe custom channel settings are refused. Existing channel

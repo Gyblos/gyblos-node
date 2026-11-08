@@ -94,7 +94,7 @@ export function createUptoPaymentServer(
         const admitted = await seller.admit(
           authorization,
           await uptoTermsFor(terms, settings),
-          admitOptions,
+          { ...admitOptions, minClaimWindowMs: reserve },
         );
         return { ...admitted, requestDigest: terms.requestDigest, claimUntil };
       } catch (error) {

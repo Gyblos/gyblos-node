@@ -1,6 +1,7 @@
 // The seller's metered upto state machine: verify, write ahead, deposit once; later settle exactly
 // one charge, write ahead, claim once, and repeat that same settlement on retries. Every failure is
 // an UptoError with a static code; chain and store text never leaves.
+import { uptoClaimUntil } from './authorization';
 import { UPTO_CHANNEL_STATES, UPTO_ERROR_CODES } from './constants';
 import { keyedLock } from './lock';
 import {
@@ -67,11 +68,24 @@ export function createUptoSeller(options: UptoSellerOptions) {
   async function admit(
     authorization: UptoAuthorization,
     terms: UptoTerms,
-    { signal }: { signal?: AbortSignal } = {},
+    {
+      signal,
+      minClaimWindowMs,
+    }: { signal?: AbortSignal; minClaimWindowMs?: number } = {},
   ): Promise<UptoAdmission> {
     signal?.throwIfAborted();
     if (!(await matches(options, authorization, terms)))
       return fail(UPTO_ERROR_CODES.AUTHORIZATION_MISMATCH);
+    const reserve = minClaimWindowMs ?? 0;
+    if (!Number.isSafeInteger(reserve) || reserve < 0)
+      return fail(UPTO_ERROR_CODES.INVALID_TERMS);
+    const cutoff =
+      minClaimWindowMs === undefined
+        ? undefined
+        : uptoClaimUntil(authorization);
+    const expired = () =>
+      now() >= terms.expiresAt ||
+      (cutoff !== undefined && cutoff - now() <= reserve);
     return locked(authorization.channelId, async () => {
       if (
         await attempt(UPTO_ERROR_CODES.JOURNAL_UNAVAILABLE, () =>
@@ -79,7 +93,7 @@ export function createUptoSeller(options: UptoSellerOptions) {
         )
       )
         return fail(UPTO_ERROR_CODES.CHANNEL_REUSED);
-      if (now() >= terms.expiresAt) return fail(UPTO_ERROR_CODES.TERMS_EXPIRED);
+      if (expired()) return fail(UPTO_ERROR_CODES.TERMS_EXPIRED);
       // Last point the caller can cancel: after this the deposit is broadcast and recorded.
       signal?.throwIfAborted();
       const admission = {
@@ -89,6 +103,11 @@ export function createUptoSeller(options: UptoSellerOptions) {
       };
       const opened = { ...admission, payload: authorization.payload, terms };
       await write({ ...opened, state: UPTO_CHANNEL_STATES.DEPOSITING });
+      // Persistence may consume the reserve. This refusal is definitive: no deposit was requested.
+      if (expired()) {
+        await write({ ...opened, state: UPTO_CHANNEL_STATES.FAILED });
+        return fail(UPTO_ERROR_CODES.TERMS_EXPIRED);
+      }
       await depositOnce(context, opened, () =>
         chain.deposit(authorization, terms),
       );

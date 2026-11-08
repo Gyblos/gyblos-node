@@ -38,6 +38,7 @@ export async function streamPaidResponse(
   signal: AbortSignal,
   check: () => void,
   write: (frame: Uint8Array) => Promise<void>,
+  cancel: () => void,
 ) {
   const header = {
     version: PAID_EXECUTION.version,
@@ -48,7 +49,7 @@ export async function streamPaidResponse(
   let bytes = 0;
   let sealed = false;
   let outputBytes = 0;
-  let emitting = false;
+  let emitting: Promise<void> | undefined;
   async function send(event: unknown, maximum: number) {
     check();
     const frame = encodePaidStreamEvent(event);
@@ -61,9 +62,13 @@ export async function streamPaidResponse(
   const emit = async (text: string) => {
     if (sealed) return fail(PAID_EXECUTION_CODES.CANCELLED);
     if (emitting) return fail(PAID_EXECUTION_CODES.LIMIT);
-    emitting = true;
+    let drained = () => {};
+    emitting = new Promise<void>((resolve) => {
+      drained = resolve;
+    });
     try {
       for (const chunk of paidStreamDeltas(text)) {
+        if (sealed) return fail(PAID_EXECUTION_CODES.CANCELLED);
         outputBytes += new TextEncoder().encode(chunk).length;
         if (
           outputBytes > FREE_EXECUTION.outputBytes ||
@@ -81,7 +86,8 @@ export async function streamPaidResponse(
         );
       }
     } finally {
-      emitting = false;
+      drained();
+      emitting = undefined;
     }
   };
   let response: PaidExecutionResponse;
@@ -89,6 +95,13 @@ export async function streamPaidResponse(
     response = await service.stream(request, peer, signal, emit);
   } finally {
     sealed = true;
+    if (emitting) {
+      // The service froze its charge while a write was unacknowledged: never invent a terminal
+      // for that late prefix. Close, drain under the existing deadline, then release the lease.
+      const pending = emitting;
+      cancel();
+      await pending;
+    }
   }
   await send(
     { ...header, sequence, type: PAID_STREAM.events.TERMINAL, response },
