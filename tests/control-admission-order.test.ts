@@ -13,7 +13,7 @@ import {
 import { NATIVE_CAPABILITY } from './support/native-runtime';
 import { within } from './support/test-deadline';
 
-for (const alpn of [GYBLOS_ALPN, CONTROL_ALPN]) {
+for (const alpn of [GYBLOS_ALPN, CONTROL_ALPN] as const) {
   void test(
     `held ${alpn} connection waits for the server stream acknowledgement`,
     { skip: NATIVE_CAPABILITY.transportSkip },
@@ -29,6 +29,8 @@ for (const alpn of [GYBLOS_ALPN, CONTROL_ALPN]) {
           return value;
         },
       );
+      // Cleanup awaits this promise; observe an early rejection while waiting on native milestones.
+      void opening.catch(() => undefined);
       try {
         await within(order.blocked);
         await within(order.written);

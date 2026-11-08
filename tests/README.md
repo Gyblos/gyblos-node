@@ -47,6 +47,18 @@ outside macOS/Linux. The discovery index `sqlite-d1` cases use `node:sqlite`
 failed, cancelled and skipped counts separately; a skipped case proves nothing
 on that host.
 
+Native admission tests hold the incomplete client stream until explicit cleanup
+and wait for the server's real `acceptBi` result before opening the competing
+connection. Client handshake/write completion alone does not prove server
+admission. `control-admission-order.test.ts` controls native completion order to
+verify this barrier for data and control ALPNs, and proves that inverted server
+completion order can legitimately admit the second connection and refuse the
+first. The ordinary cap assertions and existing deadlines remain unchanged. No
+product hook, fixed sleep, enlarged timeout or retry is used. The original
+unforced timeout had no internal phase trace; controlled reproduction
+establishes a test-ordering defect, not exclusive attribution of that historical
+event.
+
 ## Opt-in identity integration
 
 `GYBLOS_IDENTITY_INTEGRATION=1 pnpm test:lab` starts a throwaway
