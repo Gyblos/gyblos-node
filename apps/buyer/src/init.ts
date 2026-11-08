@@ -7,9 +7,16 @@ import {
   buildBuyerInit,
   buyerInitDefaults,
   BuyerInitError,
+  checkBuyerInit,
   initializeBuyer,
+  validateBuyerInitField,
   type BuyerInitAnswers,
 } from '@gyblos/node/buyer-init';
+import {
+  BUYER_INIT_CODES,
+  BUYER_INIT_FIELDS,
+  type BuyerInitField,
+} from '@gyblos/node/buyer-init-constants';
 import { setupRole } from '@gyblos/node/roles';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 import { isMain } from '@gyblos/runtime';
@@ -17,68 +24,119 @@ import { isMain } from '@gyblos/runtime';
 import { BUYER_INIT_INPUT } from './constants';
 
 export interface BuyerInitTerminal {
+  preflight(): Promise<{ path: string; exists: boolean }>;
   read(question: string): Promise<string | undefined>;
   write(text: string): void;
   initialize(input: BuyerInitAnswers): Promise<unknown>;
 }
 const FIELDS: readonly {
-  key: keyof BuyerInitAnswers;
+  key: BuyerInitField;
   label: string;
+  hint: string;
   clearable?: boolean;
 }[] = [
   {
-    key: 'sellerNodeId',
+    key: BUYER_INIT_FIELDS.SELLER_NODE_ID,
     label: 'Seller NodeId (from an independent trusted source)',
+    hint: 'Use exactly 64 lowercase hexadecimal characters from an independent source.',
   },
   {
-    key: 'sellerOwner',
+    key: BUYER_INIT_FIELDS.SELLER_OWNER,
     label: 'Seller owner wallet (verified against 8004 at runtime)',
+    hint: 'Use the seller owner’s valid Solana address from an independent source.',
   },
-  { key: 'modelId', label: 'Model ID (exact catalog value)' },
   {
-    key: 'variant',
+    key: BUYER_INIT_FIELDS.MODEL_ID,
+    label: 'Model ID (exact catalog value)',
+    hint: 'Use a nonempty bounded model name without control characters.',
+  },
+  {
+    key: BUYER_INIT_FIELDS.VARIANT,
     label: `Variant (${BUYER_INIT_INPUT.CLEAR} for none)`,
     clearable: true,
+    hint: 'Use the exact bounded catalog variant, or - for none.',
   },
   {
-    key: 'quantization',
+    key: BUYER_INIT_FIELDS.QUANTIZATION,
     label: `Quantization (exact catalog value; ${BUYER_INIT_INPUT.CLEAR} for none)`,
     clearable: true,
+    hint: 'Use the exact bounded catalog quantization, or - for none.',
   },
-  { key: 'maxTokens', label: 'Maximum output tokens' },
   {
-    key: 'maxUsdc',
+    key: BUYER_INIT_FIELDS.MAX_TOKENS,
+    label: 'Maximum output tokens',
+    hint: 'Use a whole number within the supported output-token limit, without leading zeros.',
+  },
+  {
+    key: BUYER_INIT_FIELDS.MAX_USDC,
     label: 'Maximum spend per request in USDC (ceiling, not a payment mode)',
+    hint: 'Use a bounded nonnegative USDC amount with at most six significant decimal places; no leading zeros or exponents.',
   },
   {
-    key: 'inputUsdcPerMtok',
+    key: BUYER_INIT_FIELDS.INPUT_PRICE,
     label: 'Maximum input price in USDC per million tokens',
+    hint: 'Use a bounded nonnegative USDC price with at most six significant decimal places; no leading zeros or exponents.',
   },
   {
-    key: 'outputUsdcPerMtok',
+    key: BUYER_INIT_FIELDS.OUTPUT_PRICE,
     label: 'Maximum output price in USDC per million tokens',
+    hint: 'Use a bounded nonnegative USDC price with at most six significant decimal places; no leading zeros or exponents.',
   },
-  { key: 'discoveryUrl', label: 'Discovery index URL (availability only)' },
-  { key: 'relayUrl', label: 'Configured seller relay URL' },
-  { key: 'rpcUrl', label: '8004 devnet RPC URL' },
+  {
+    key: BUYER_INIT_FIELDS.DISCOVERY_URL,
+    label: 'Discovery index URL (availability only)',
+    hint: 'Use HTTPS, or loopback HTTP, without credentials, query or fragment.',
+  },
+  {
+    key: BUYER_INIT_FIELDS.RELAY_URL,
+    label: 'Configured seller relay URL',
+    hint: 'Use a relay already allowed by GYBLOS_RELAYS; the relay allowlist remains enforced.',
+  },
+  {
+    key: BUYER_INIT_FIELDS.RPC_URL,
+    label: '8004 devnet RPC URL',
+    hint: 'Use HTTPS, or loopback HTTP, without credentials, query or fragment.',
+  },
 ];
+async function readField(
+  terminal: BuyerInitTerminal,
+  field: (typeof FIELDS)[number],
+  previous: string,
+) {
+  for (;;) {
+    const value = await terminal.read(`${field.label} [${previous}]: `);
+    if (value === undefined) return undefined;
+    const candidate =
+      field.clearable && value.trim() === BUYER_INIT_INPUT.CLEAR
+        ? ''
+        : value.trim() || previous;
+    try {
+      return validateBuyerInitField(field.key, candidate);
+    } catch (error) {
+      if (!(error instanceof BuyerInitError)) throw error;
+      terminal.write(`Invalid ${field.label}. ${field.hint}\n`);
+    }
+  }
+}
 export async function runBuyerInit(terminal: BuyerInitTerminal): Promise<void> {
+  const preflight = await terminal.preflight();
+  if (preflight.exists) {
+    terminal.write(
+      `Buyer settings already exist at ${JSON.stringify(preflight.path)}. Edit that selection file to reconfigure; keep the buyer home, keys and journals. A separate GYBLOS_HOME creates a separate identity.\n`,
+    );
+    throw new BuyerInitError(BUYER_INIT_CODES.EXISTS);
+  }
   terminal.write(
     'Configure a devnet buyer. Nothing is sent to a seller or chain.\nUse seller identities from an independent source, never a discovery listing.\nDefaults accept free quotes only.\n',
   );
   const answers = buyerInitDefaults();
   for (const field of FIELDS) {
-    const value = await terminal.read(
-      `${field.label} [${answers[field.key]}]: `,
-    );
+    const value = await readField(terminal, field, answers[field.key]);
     if (value === undefined) {
       terminal.write('Cancelled. No initialization requested.\n');
       return;
     }
-    answers[field.key] =
-      field.clearable && value.trim() === BUYER_INIT_INPUT.CLEAR
-        ? ''
-        : value.trim() || answers[field.key];
+    answers[field.key] = value;
   }
   const plan = buildBuyerInit(answers);
   terminal.write(
@@ -96,8 +154,13 @@ export async function runBuyerInit(terminal: BuyerInitTerminal): Promise<void> {
   }
   await terminal.initialize(answers);
   terminal.write(
-    'Buyer settings saved privately. Start with: pnpm buyer:chat\nPositive-price execution also needs its existing funded devnet wallet and verified tokenizer; this command prepares neither funds nor downloads.\n',
+    'Buyer settings saved privately. Set GYBLOS_RELAY_TOKEN privately in the chat environment, then start with: pnpm buyer:chat\nUse GYBLOS_RELAYS if your seller uses another approved relay. Never share the token or put it in selection.json.\nPositive-price execution also needs its existing funded devnet wallet and verified tokenizer; this command prepares neither funds nor downloads.\n',
   );
+}
+export function buyerInitMessage(error: unknown) {
+  return error instanceof BuyerInitError
+    ? `${error.code}: See docs/buyer-init.md for setup and reconfiguration guidance. Existing state was preserved.`
+    : 'Buyer initialization failed. Existing state was preserved.';
 }
 export async function main() {
   if (process.argv.includes('--help')) {
@@ -118,6 +181,7 @@ export async function main() {
   input.on('SIGINT', () => controller.abort());
   try {
     await runBuyerInit({
+      preflight: () => checkBuyerInit(process.env),
       read: async (question) => {
         try {
           return await input.question(question, { signal: controller.signal });
@@ -137,11 +201,7 @@ export async function main() {
         }),
     });
   } catch (error) {
-    console.error(
-      error instanceof BuyerInitError
-        ? error.code
-        : 'Buyer initialization failed. Existing state was preserved.',
-    );
+    console.error(buyerInitMessage(error));
     process.exitCode = 1;
   } finally {
     input.close();
