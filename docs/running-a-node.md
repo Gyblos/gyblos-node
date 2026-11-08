@@ -456,7 +456,12 @@ installed, the installer verifies a `ghcr.io/gyblos/seller` image before pulling
 on a bad signature; without cosign, or with an older one, it says the check was
 skipped, and integrity rests on HTTPS and the digest the installer pins. The
 check reads the seller image from `compose.yaml`; the installer names any
-override file or `COMPOSE_FILE` it does not cover. By hand, the image:
+override file or `COMPOSE_FILE` it does not cover. With
+`GYBLOS_REQUIRE_SIGNATURE=1` every one of those cases (no cosign, an older one,
+a non-Gyblos image, an override file or `COMPOSE_FILE`) stops the installer
+before anything is pulled instead. The default stays permissive because the
+pinned digest already fixes the image bytes; strict mode matters most with
+`GYBLOS_IMAGE` or a moving tag. By hand, the image:
 
 ```sh
 cosign verify ghcr.io/gyblos/seller:<version>@sha256:<digest> \
@@ -512,10 +517,14 @@ One-time GitHub setup, by an organization owner:
 - Package `seller` → Package settings → Manage Actions access: add `gyblos-node`
   with the Write role, so the workflow token can push.
 - Repository Settings → Environments → `release`: required reviewer (the
-  maintainers who may publish) and deployment tags `v*`.
-- Repository Settings → Rules → Rulesets: a tag ruleset for `v*` that only
-  maintainers may create, update or delete. The signature names the workflow at
-  a tag, so whoever can push such a tag can sign a release.
+  maintainers who may publish) and a deployment rule for tags `v*` only.
+- Repository Settings → Rules → Rulesets: `Release tags v*`, where only
+  repository admins may create, update or delete `v*` tags (the signature names
+  the workflow at a tag, so whoever can push such a tag can sign a release), and
+  `Protect main`: changes reach `main` only through a pull request, with no
+  force push or deletion.
+- Organization Settings → Authentication security: require two-factor
+  authentication for every member.
 
 The package is public, so the image exposes the node's source.
 

@@ -300,3 +300,58 @@ void test('names Compose files the signature check does not cover', async () => 
     await install.cleanup();
   }
 });
+
+void test('GYBLOS_REQUIRE_SIGNATURE=1 stops before pulling unless the release signature verifies', async () => {
+  const strict = {
+    GYBLOS_RELAY_TOKEN: FAKE_SECRET,
+    GYBLOS_REQUIRE_SIGNATURE: '1',
+  };
+  const refused = async (
+    options: { cosign?: boolean },
+    env: Record<string, string>,
+    reason: RegExp,
+    before?: (directory: string) => void,
+  ) => {
+    const install = await harness(options);
+    try {
+      before?.(install.directory);
+      const result = install.run({ ...strict, ...env });
+      assert.equal(result.status, 1, result.output);
+      assert.match(result.stderr, reason);
+      assert.match(
+        result.stderr,
+        /GYBLOS_REQUIRE_SIGNATURE=1 requires a verified/,
+      );
+      assert.ok(!install.calls().includes('compose pull'));
+    } finally {
+      await install.cleanup();
+    }
+  };
+  await refused({}, {}, /cosign is not installed/);
+  await refused({ cosign: true }, { FAKE_COSIGN_VERSION: '2.4.1' }, /cosign 3/);
+  await refused(
+    { cosign: true },
+    { GYBLOS_IMAGE: 'registry.example/own:1' },
+    /Not a Gyblos release image/,
+  );
+  await refused(
+    { cosign: true },
+    {},
+    /^gyblos install: \.env is present/m,
+    (directory) => {
+      mkdirSync(directory, { mode: 0o700 });
+      writeFileSync(join(directory, '.env'), '');
+    },
+  );
+  const signed = await harness({ cosign: true });
+  try {
+    const result = signed.run(strict);
+    assert.equal(result.status, 0, result.output);
+    assert.match(result.stdout, /Verified the Gyblos release signature/);
+    const bad = signed.run({ GYBLOS_REQUIRE_SIGNATURE: 'yes' });
+    assert.equal(bad.status, 1);
+    assert.match(bad.stderr, /GYBLOS_REQUIRE_SIGNATURE must be 1 or unset/);
+  } finally {
+    await signed.cleanup();
+  }
+});
