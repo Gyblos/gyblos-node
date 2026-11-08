@@ -135,7 +135,7 @@ export async function nativeControlFixture(
   };
 }
 
-// Retains the incomplete stream until explicit cleanup. The initial red version lacks the server ack.
+// Owns an incomplete stream until cleanup and waits for its server-side receipt, after admission.
 export async function holdNativeConnection(
   run: Awaited<ReturnType<typeof nativeControlFixture>>,
   alpn: typeof GYBLOS_ALPN | typeof CONTROL_ALPN,
@@ -148,6 +148,12 @@ export async function holdNativeConnection(
     const stream = await within(connection.openBi());
     await within(stream.send.writeAll([0]));
     onWritten?.();
+    await within(run.streamReceived(alpn));
+    assert.equal(
+      connection.closeReason(),
+      null,
+      'The held connection closed before its server acknowledgement',
+    );
     return {
       connection,
       async close() {

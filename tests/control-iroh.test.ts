@@ -14,7 +14,10 @@ import {
 } from '@gyblos/protocol/constants';
 import { createControlTransport } from '@gyblos/transport-iroh/control-client';
 
-import { nativeControlFixture as fixture } from './support/native-control';
+import {
+  nativeControlFixture as fixture,
+  holdNativeConnection,
+} from './support/native-control';
 import { within } from './support/native-fixture';
 import { NATIVE_CAPABILITY } from './support/native-runtime';
 
@@ -57,24 +60,26 @@ void test(
 void test(
   'native NodeId admission allows one control and one data connection; a second data connection is refused',
   { skip: NATIVE_CAPABILITY.transportSkip },
-  async () => {
+  async (context) => {
     const run = await fixture();
+    let held: Awaited<ReturnType<typeof holdNativeConnection>> | undefined;
+    let phase = 'first data stream acknowledgement';
     try {
-      const http = await within(
-        run.buyer.connect(run.seller.addr(), [...Buffer.from(GYBLOS_ALPN)]),
-      );
-      // Wait for the server to receive its first stream; no HTTP bytes or payment are sent.
-      await http.openBi().then(async (stream) => {
-        await stream.send.writeAll([0]);
-      });
-      // A held data connection no longer blocks the same peer's control connection.
+      held = await holdNativeConnection(run, GYBLOS_ALPN);
+      // A server-acknowledged data lease coexists with this peer's separate control lease.
+      phase = 'control catalog with held data lease';
       await within(run.client.getCatalog());
+      phase = 'second data connection';
       const second = await within(
         run.buyer.connect(run.seller.addr(), [...Buffer.from(GYBLOS_ALPN)]),
       );
+      phase = 'second data refusal';
       await within(second.closed());
-      http.close(1n, []);
+      assert.equal(held.connection.closeReason(), null);
+      phase = 'complete';
     } finally {
+      context.diagnostic(`Native admission phase: ${phase}`);
+      await held?.close();
       await run.close();
     }
   },
@@ -84,21 +89,16 @@ void test(
   { skip: NATIVE_CAPABILITY.transportSkip },
   async () => {
     const run = await fixture();
+    let held: Awaited<ReturnType<typeof holdNativeConnection>> | undefined;
     try {
-      const held = await within(
-        run.buyer.connect(run.seller.addr(), [...Buffer.from(CONTROL_ALPN)]),
-      );
-      // A partial frame keeps the first control connection admitted without completing a query.
-      await held.openBi().then(async (stream) => {
-        await stream.send.writeAll([0]);
-      });
+      held = await holdNativeConnection(run, CONTROL_ALPN);
       const second = await within(
         run.buyer.connect(run.seller.addr(), [...Buffer.from(CONTROL_ALPN)]),
       );
       await within(second.closed());
-      assert.equal(held.closeReason(), null);
-      held.close(1n, []);
+      assert.equal(held.connection.closeReason(), null);
     } finally {
+      await held?.close();
       await run.close();
     }
   },
