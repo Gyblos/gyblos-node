@@ -2,7 +2,7 @@
 import { stdin, stdout } from 'node:process';
 import { createInterface } from 'node:readline/promises';
 
-import { DEVNET_USDC } from '@gyblos/config';
+import { DEVNET_USDC, INFERENCE_REQUEST_LIMITS } from '@gyblos/config';
 import {
   buildBuyerInit,
   buyerInitDefaults,
@@ -65,22 +65,22 @@ const FIELDS: readonly {
   {
     key: BUYER_INIT_FIELDS.MAX_TOKENS,
     label: 'Maximum output tokens',
-    hint: 'Use a whole number within the supported output-token limit, without leading zeros.',
+    hint: `Use a whole number from 1 to ${INFERENCE_REQUEST_LIMITS.maxOutputTokens}, without leading zeros.`,
   },
   {
     key: BUYER_INIT_FIELDS.MAX_USDC,
     label: 'Maximum spend per request in USDC (ceiling, not a payment mode)',
-    hint: 'Use a bounded nonnegative USDC amount with at most six significant decimal places; no leading zeros or exponents.',
+    hint: 'Use a bounded nonnegative USDC amount with micro-USDC precision; no leading zeros or exponents. Trailing fractional zeros are allowed.',
   },
   {
     key: BUYER_INIT_FIELDS.INPUT_PRICE,
     label: 'Maximum input price in USDC per million tokens',
-    hint: 'Use a bounded nonnegative USDC price with at most six significant decimal places; no leading zeros or exponents.',
+    hint: 'Use a bounded nonnegative USDC price with micro-USDC precision; no leading zeros or exponents. Trailing fractional zeros are allowed.',
   },
   {
     key: BUYER_INIT_FIELDS.OUTPUT_PRICE,
     label: 'Maximum output price in USDC per million tokens',
-    hint: 'Use a bounded nonnegative USDC price with at most six significant decimal places; no leading zeros or exponents.',
+    hint: 'Use a bounded nonnegative USDC price with micro-USDC precision; no leading zeros or exponents. Trailing fractional zeros are allowed.',
   },
   {
     key: BUYER_INIT_FIELDS.DISCOVERY_URL,
@@ -157,10 +157,22 @@ export async function runBuyerInit(terminal: BuyerInitTerminal): Promise<void> {
     'Buyer settings saved privately. Set GYBLOS_RELAY_TOKEN privately in the chat environment, then start with: pnpm buyer:chat\nUse GYBLOS_RELAYS if your seller uses another approved relay. Never share the token or put it in selection.json.\nPositive-price execution also needs its existing funded devnet wallet and verified tokenizer; this command prepares neither funds nor downloads.\n',
   );
 }
+const INITIALIZATION_HINTS: Readonly<Record<BuyerInitError['code'], string>> = {
+  [BUYER_INIT_CODES.INVALID]:
+    'Review the form values; see docs/buyer-init.md. Existing state was preserved.',
+  [BUYER_INIT_CODES.EXISTS]:
+    'Existing settings were preserved. Edit selection.json to reconfigure; keep the buyer home, keys and journals.',
+  [BUYER_INIT_CODES.UNAVAILABLE]:
+    'Check private paths and whether another initialization is running. If the existing role uses another mint, use a separate GYBLOS_HOME; keep the old home for recovery. See docs/buyer-init.md.',
+};
 export function buyerInitMessage(error: unknown) {
-  return error instanceof BuyerInitError
-    ? `${error.code}: See docs/buyer-init.md for setup and reconfiguration guidance. Existing state was preserved.`
-    : 'Buyer initialization failed. Existing state was preserved.';
+  if (!(error instanceof BuyerInitError))
+    return 'Buyer initialization failed. Existing state was preserved.';
+  const field = FIELDS.find((item) => item.key === error.field);
+  const hint = field
+    ? `${field.label}: ${field.hint}`
+    : INITIALIZATION_HINTS[error.code];
+  return `${error.code}: ${hint}`;
 }
 export async function main() {
   if (process.argv.includes('--help')) {

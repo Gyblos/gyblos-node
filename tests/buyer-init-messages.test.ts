@@ -7,10 +7,14 @@ import { BuyerInitError } from '@gyblos/node/buyer-init';
 import { BUYER_INIT_CODES } from '@gyblos/node/buyer-init-constants';
 
 void test('initialization failure hints explain existing settings and incompatible-role recovery', () => {
-  const existing = buyerInitMessage(new BuyerInitError(BUYER_INIT_CODES.EXISTS));
+  const existing = buyerInitMessage(
+    new BuyerInitError(BUYER_INIT_CODES.EXISTS),
+  );
   assert.match(existing, /edit.*selection\.json/i);
   assert.match(existing, /preserv/i);
-  const unavailable = buyerInitMessage(new BuyerInitError(BUYER_INIT_CODES.UNAVAILABLE));
+  const unavailable = buyerInitMessage(
+    new BuyerInitError(BUYER_INIT_CODES.UNAVAILABLE),
+  );
   assert.match(unavailable, /another mint/);
   assert.match(unavailable, /GYBLOS_HOME/);
   assert.match(unavailable, /keep.*old home/i);

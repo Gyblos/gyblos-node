@@ -31,25 +31,13 @@ import { assertConfiguredRelay } from '@gyblos/transport-iroh/endpoint';
 
 import {
   BUYER_INIT_CODES,
+  BUYER_INIT_FIELDS,
   BUYER_INIT_LIMITS,
   type BuyerInitField,
 } from './buyer-init-constants';
 import { usdcToAtomic } from './node-config-price';
 
-export interface BuyerInitAnswers {
-  modelId: string;
-  variant: string;
-  quantization: string;
-  maxTokens: string;
-  maxUsdc: string;
-  inputUsdcPerMtok: string;
-  outputUsdcPerMtok: string;
-  sellerOwner: string;
-  sellerNodeId: string;
-  relayUrl: string;
-  discoveryUrl: string;
-  rpcUrl: string;
-}
+export type BuyerInitAnswers = Record<BuyerInitField, string>;
 export interface BuyerInitPlan {
   request: SellerRequest;
   sellers: {
@@ -72,10 +60,50 @@ export class BuyerInitError extends Error {
   }
 }
 export function validateBuyerInitField(
-  _field: BuyerInitField,
+  field: BuyerInitField,
   value: unknown,
 ): string {
-  return typeof value === 'string' ? value : '';
+  try {
+    switch (field) {
+      case BUYER_INIT_FIELDS.SELLER_NODE_ID:
+        return controlHex(value);
+      case BUYER_INIT_FIELDS.SELLER_OWNER:
+        return controlAddress(value);
+      case BUYER_INIT_FIELDS.MAX_TOKENS: {
+        const text = controlText(value);
+        if (!/^[1-9][0-9]*$/.test(text))
+          throw new BuyerInitError(BUYER_INIT_CODES.INVALID);
+        controlInteger(
+          Number(text),
+          1,
+          INFERENCE_REQUEST_LIMITS.maxOutputTokens,
+        );
+        return text;
+      }
+      case BUYER_INIT_FIELDS.MAX_USDC:
+      case BUYER_INIT_FIELDS.INPUT_PRICE:
+      case BUYER_INIT_FIELDS.OUTPUT_PRICE: {
+        const text = controlText(value, BUYER_INIT_LIMITS.inputCharacters);
+        atomic(text);
+        return text;
+      }
+      case BUYER_INIT_FIELDS.RELAY_URL: {
+        const url = safeUrl(value);
+        assertConfiguredRelay(url);
+        return url;
+      }
+      case BUYER_INIT_FIELDS.DISCOVERY_URL:
+      case BUYER_INIT_FIELDS.RPC_URL:
+        return safeUrl(value);
+      case BUYER_INIT_FIELDS.VARIANT:
+      case BUYER_INIT_FIELDS.QUANTIZATION:
+        return value === '' ? '' : controlText(value);
+      case BUYER_INIT_FIELDS.MODEL_ID:
+        return controlText(value);
+    }
+  } catch {
+    throw new BuyerInitError(BUYER_INIT_CODES.INVALID, field);
+  }
 }
 export function buyerInitDefaults(): BuyerInitAnswers {
   return {
@@ -116,29 +144,25 @@ function atomic(value: unknown) {
   return controlAtomic(usdcToAtomic(text).toString());
 }
 function request(row: Record<string, unknown>): SellerRequest {
-  const maxTokens = controlText(row.maxTokens);
-  if (!/^[1-9][0-9]*$/.test(maxTokens))
-    throw new BuyerInitError(BUYER_INIT_CODES.INVALID);
+  const read = (field: BuyerInitField) =>
+    validateBuyerInitField(field, row[field]);
+  const variant = read(BUYER_INIT_FIELDS.VARIANT);
+  const quantization = read(BUYER_INIT_FIELDS.QUANTIZATION);
   return {
     selection: {
-      modelId: controlText(row.modelId),
-      variant: row.variant === '' ? null : controlText(row.variant),
-      quantization:
-        row.quantization === '' ? null : controlText(row.quantization),
+      modelId: read(BUYER_INIT_FIELDS.MODEL_ID),
+      variant: variant || null,
+      quantization: quantization || null,
     },
     reasoning: REASONING_LEVELS.OFF,
     lowestReasoning: null,
     network: DEVNET,
     asset: DEVNET_USDC,
-    maxTokens: controlInteger(
-      Number(maxTokens),
-      1,
-      INFERENCE_REQUEST_LIMITS.maxOutputTokens,
-    ),
-    maxAtomic: atomic(row.maxUsdc),
+    maxTokens: Number(read(BUYER_INIT_FIELDS.MAX_TOKENS)),
+    maxAtomic: atomic(read(BUYER_INIT_FIELDS.MAX_USDC)),
     priceCeilings: {
-      inputAtomicPerMtok: atomic(row.inputUsdcPerMtok),
-      outputAtomicPerMtok: atomic(row.outputUsdcPerMtok),
+      inputAtomicPerMtok: atomic(read(BUYER_INIT_FIELDS.INPUT_PRICE)),
+      outputAtomicPerMtok: atomic(read(BUYER_INIT_FIELDS.OUTPUT_PRICE)),
     },
     minimumBadge: SELLER_BADGES.DECLARED_USAGE,
     retention: [DATA_RETENTION.NONE],
@@ -146,7 +170,7 @@ function request(row: Record<string, unknown>): SellerRequest {
 }
 export function buildBuyerInit(input: unknown): BuyerInitPlan {
   try {
-    const row = controlObject(input, Object.keys(buyerInitDefaults()));
+    const row = controlObject(input, Object.values(BUYER_INIT_FIELDS));
     const policy = request(row);
     const checked = selectSellers({
       request: policy,
@@ -157,23 +181,24 @@ export function buildBuyerInit(input: unknown): BuyerInitPlan {
     });
     if (!checked.ok && checked.code === SELLER_SELECTION_CODES.INVALID)
       throw new BuyerInitError(BUYER_INIT_CODES.INVALID);
-    const relayUrl = safeUrl(row.relayUrl);
-    assertConfiguredRelay(relayUrl);
+    const read = (field: BuyerInitField) =>
+      validateBuyerInitField(field, row[field]);
     return {
       request: policy,
       sellers: [
         {
-          owner: controlAddress(row.sellerOwner),
-          nodeId: controlHex(row.sellerNodeId),
-          relayUrl,
+          owner: read(BUYER_INIT_FIELDS.SELLER_OWNER),
+          nodeId: read(BUYER_INIT_FIELDS.SELLER_NODE_ID),
+          relayUrl: read(BUYER_INIT_FIELDS.RELAY_URL),
           directAddresses: [],
           manualTrust: false,
         },
       ],
-      discovery: { baseUrl: safeUrl(row.discoveryUrl) },
-      identity: { rpcUrl: safeUrl(row.rpcUrl) },
+      discovery: { baseUrl: read(BUYER_INIT_FIELDS.DISCOVERY_URL) },
+      identity: { rpcUrl: read(BUYER_INIT_FIELDS.RPC_URL) },
     };
-  } catch {
+  } catch (error) {
+    if (error instanceof BuyerInitError) throw error;
     throw new BuyerInitError(BUYER_INIT_CODES.INVALID);
   }
 }

@@ -14,6 +14,10 @@ void test('wizard cancellation before answers or at confirmation performs no ini
   for (const confirm of [undefined, 'no']) {
     let writes = 0;
     await runBuyerInit({
+      preflight: async () => ({
+        path: '/synthetic/buyer/selection.json',
+        exists: false,
+      }),
       read: async (question) => {
         if (confirm === undefined) return undefined;
         if (question.startsWith('Seller NodeId')) return sellerNodeId;
@@ -33,6 +37,10 @@ void test('wizard confirms an explicit USDC ceiling and passes validated answers
   let received: BuyerInitAnswers | undefined;
   let output = '';
   await runBuyerInit({
+    preflight: async () => ({
+      path: '/synthetic/buyer/selection.json',
+      exists: false,
+    }),
     read: async (question) => {
       if (question.startsWith('Seller NodeId')) return sellerNodeId;
       if (question.startsWith('Seller owner')) return owner;
@@ -89,6 +97,10 @@ void test('the actual executable offers offline help and refuses unattended init
 void test('wizard can explicitly clear nullable model fields while keeping blank answers as defaults', async () => {
   let received: BuyerInitAnswers | undefined;
   await runBuyerInit({
+    preflight: async () => ({
+      path: '/synthetic/buyer/selection.json',
+      exists: false,
+    }),
     read: async (question) => {
       if (question.startsWith('Seller NodeId')) return sellerNodeId;
       if (question.startsWith('Seller owner')) return owner;

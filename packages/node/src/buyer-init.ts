@@ -11,6 +11,7 @@ import {
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 import {
   acquireProcessLock,
+  checkPrivateDirectory,
   ensurePrivateDirectory,
   writePrivateFile,
 } from '@gyblos/runtime/private-file';
@@ -30,10 +31,18 @@ export {
 } from './buyer-init-plan';
 
 export async function checkBuyerInit(environment: HomeEnvironment) {
-  return {
-    path: rolePathIn(environment, P2P_ROLES.BUYER, ROLE_FILES.buyerSelection),
-    exists: false,
-  };
+  try {
+    await assertRoleHome(P2P_ROLES.BUYER, environment);
+    await checkPrivateDirectory(rolePathIn(environment, P2P_ROLES.BUYER, ''));
+    const path = rolePathIn(
+      environment,
+      P2P_ROLES.BUYER,
+      ROLE_FILES.buyerSelection,
+    );
+    return { path, exists: await selectionExists(path) };
+  } catch {
+    throw new BuyerInitError(BUYER_INIT_CODES.UNAVAILABLE);
+  }
 }
 
 export interface BuyerInitOptions {
@@ -41,14 +50,18 @@ export interface BuyerInitOptions {
   signal?: AbortSignal;
   prepareRole(): Promise<RoleConfig>;
 }
-async function requireNewFile(path: string) {
+async function selectionExists(path: string) {
   try {
     await lstat(path);
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
     throw error;
   }
-  throw new BuyerInitError(BUYER_INIT_CODES.EXISTS);
+  return true;
+}
+async function requireNewFile(path: string) {
+  if (await selectionExists(path))
+    throw new BuyerInitError(BUYER_INIT_CODES.EXISTS);
 }
 export async function initializeBuyer(
   input: unknown,

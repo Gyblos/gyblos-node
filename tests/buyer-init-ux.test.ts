@@ -37,8 +37,14 @@ void test('shared field validation names every invalid field without reflecting 
       error.code === BUYER_INIT_CODES.INVALID &&
       error.field === field &&
       error.message === BUYER_INIT_CODES.INVALID;
-    assert.throws(() => validateBuyerInitField(field, invalid[field]), refusesField);
-    assert.throws(() => buildBuyerInit({ ...answers(), [field]: invalid[field] }), refusesField);
+    assert.throws(
+      () => validateBuyerInitField(field, invalid[field]),
+      refusesField,
+    );
+    assert.throws(
+      () => buildBuyerInit({ ...answers(), [field]: invalid[field] }),
+      refusesField,
+    );
   }
 });
 
@@ -63,29 +69,49 @@ void test('wizard retries only invalid fields and retains accepted answers', asy
   let output = '';
   let received: BuyerInitAnswers | undefined;
   const entries = [
-    'private-invalid-node', sellerNodeId,
-    owner, 'custom/model', '', '',
-    '129', '8',
-    '0.0000001', '0',
-    '', '', '',
-    'https://unconfigured.example/', '',
-    '', 'yes',
+    'private-invalid-node',
+    sellerNodeId,
+    owner,
+    'custom/model',
+    '',
+    '',
+    '129',
+    '8',
+    '0.0000001',
+    '0',
+    '',
+    '',
+    '',
+    'https://unconfigured.example/',
+    '',
+    '',
+    'yes',
   ];
   const terminal = {
-    preflight: async () => ({ path: '/synthetic/buyer/selection.json', exists: false }),
+    preflight: async () => ({
+      path: '/synthetic/buyer/selection.json',
+      exists: false,
+    }),
     read: async (question: string) => {
       questions.push(question);
       return entries.shift();
     },
-    write: (text: string) => { output += text; },
-    initialize: async (input: BuyerInitAnswers) => { received = input; },
+    write: (text: string) => {
+      output += text;
+    },
+    initialize: async (input: BuyerInitAnswers) => {
+      received = input;
+    },
   };
   await runBuyerInit(terminal);
   assert.ok(received);
   assert.equal(received.sellerNodeId, sellerNodeId);
   assert.equal(received.modelId, 'custom/model');
   assert.equal(received.maxTokens, '8');
-  assert.equal(questions.filter((q) => q.startsWith('Seller NodeId')).length, 2);
+  assert.equal(
+    questions.filter((q) => q.startsWith('Seller NodeId')).length,
+    2,
+  );
   assert.equal(questions.filter((q) => q.startsWith('Seller owner')).length, 1);
   assert.match(output, /Invalid Seller NodeId/);
   assert.match(output, /Invalid Maximum output tokens/);
@@ -100,10 +126,17 @@ void test('wizard can cancel while correcting a field without initialization', a
   let initializes = 0;
   let output = '';
   const terminal = {
-    preflight: async () => ({ path: '/synthetic/buyer/selection.json', exists: false }),
-    read: async () => ++reads === 1 ? 'private-invalid-node' : undefined,
-    write: (text: string) => { output += text; },
-    initialize: async () => { initializes++; },
+    preflight: async () => ({
+      path: '/synthetic/buyer/selection.json',
+      exists: false,
+    }),
+    read: async () => (++reads === 1 ? 'private-invalid-node' : undefined),
+    write: (text: string) => {
+      output += text;
+    },
+    initialize: async () => {
+      initializes++;
+    },
   };
   await runBuyerInit(terminal);
   assert.equal(reads, 2);
@@ -119,11 +152,20 @@ void test('existing selection is reported with its path before the wizard asks a
   const path = '/synthetic/buyer/selection.json';
   const terminal = {
     preflight: async () => ({ path, exists: true }),
-    read: async () => { reads++; return undefined; },
-    write: (text: string) => { output += text; },
-    initialize: async () => { initializes++; },
+    read: async () => {
+      reads++;
+      return undefined;
+    },
+    write: (text: string) => {
+      output += text;
+    },
+    initialize: async () => {
+      initializes++;
+    },
   };
-  await assert.rejects(runBuyerInit(terminal), { code: BUYER_INIT_CODES.EXISTS });
+  await assert.rejects(runBuyerInit(terminal), {
+    code: BUYER_INIT_CODES.EXISTS,
+  });
   assert.equal(reads, 0);
   assert.equal(initializes, 0);
   assert.ok(output.includes(path));
@@ -133,14 +175,19 @@ void test('existing selection is reported with its path before the wizard asks a
 void test('successful setup explains the relay token prerequisite before suggesting chat', async () => {
   let output = '';
   const terminal = {
-    preflight: async () => ({ path: '/synthetic/buyer/selection.json', exists: false }),
+    preflight: async () => ({
+      path: '/synthetic/buyer/selection.json',
+      exists: false,
+    }),
     read: async (question: string) => {
       if (question.startsWith('Seller NodeId')) return sellerNodeId;
       if (question.startsWith('Seller owner')) return owner;
       if (question.startsWith('Save')) return 'yes';
       return '';
     },
-    write: (text: string) => { output += text; },
+    write: (text: string) => {
+      output += text;
+    },
     initialize: async () => {},
   };
   await runBuyerInit(terminal);
