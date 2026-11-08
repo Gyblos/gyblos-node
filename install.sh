@@ -261,7 +261,9 @@ write_environment() {
     # Opening it, not testing its mode: /dev/tty exists even without a controlling terminal.
     (exec </dev/tty) 2>/dev/null ||
       die 'No terminal to ask for the relay token: set GYBLOS_RELAY_TOKEN.'
-    printf 'Relay token (from your Gyblos invitation; not shown): ' >/dev/tty
+    printf '%s\n' 'The relay token is the private key to the Gyblos relay. It is not the gyb_ invite code,' \
+      'which you enter later with `gyblos seller register`.' >/dev/tty
+    printf 'Relay token (not shown): ' >/dev/tty
     prompting=1
     stty -echo </dev/tty
     IFS= read -r token </dev/tty || token=
@@ -269,6 +271,10 @@ write_environment() {
     prompting=
     printf '\n' >/dev/tty
   fi
+  # An invite code here would install a seller that cannot reach the relay.
+  case "$token" in
+    gyb_*) die 'That is the gyb_ invite code, not the relay token. Enter the invite code later with `gyblos seller register`; rerun this with the relay token.' ;;
+  esac
   # seller.env's grammar (`gyblos seller service install` reads it too): printable, no shell characters.
   case "$token" in
     '' | *[![:graph:]]* | *[\"\'\`\$\\\#\;\|\<\>\&\(\)\{\}~]*)
