@@ -25,6 +25,7 @@ sh install.sh
 El instalador fija una versión firmada de la imagen del vendedor por versión y digest. Con
 [cosign](https://docs.sigstore.dev/cosign/system_config/installation/) 3 o posterior instalado muestra
 `Verified the Gyblos release signature` antes de descargarla; sin cosign indica que omitió la comprobación.
+Para que la comprobación sea obligatoria, ejecuta `GYBLOS_REQUIRE_SIGNATURE=1 sh install.sh`: se detiene si la firma no se verifica.
 Para verificar la imagen tú mismo o preparar cada archivo a mano, consulta [Instala sin el script](/es/sellers/manual-install).
 
 El token de relay permanece oculto mientras lo introduces. El script trabaja en `~/gyblos-seller`, salvo

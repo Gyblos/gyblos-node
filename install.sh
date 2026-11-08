@@ -10,6 +10,7 @@
 #   GYBLOS_DIR          where compose.yaml, gyblos.toml and seller.env go (default: ~/gyblos-seller)
 #   GYBLOS_IMAGE        node image (default: the release pinned below, by version and digest)
 #   GYBLOS_RELAY_TOKEN  the relay token; asked for without echo when unset
+#   GYBLOS_REQUIRE_SIGNATURE=1  stop unless cosign verifies the seller image as a Gyblos release
 #
 # Existing gyblos.toml and seller.env are kept, and so is compose.yaml except for a Gyblos seller image,
 # which moves to this script's release: rerunning resumes a failed install, updates the seller and
@@ -43,6 +44,14 @@ RELAY_TOKEN_MIN=32
 RELAY_TOKEN_MAX=512
 
 dir=${GYBLOS_DIR:-$HOME/gyblos-seller}
+strict=${GYBLOS_REQUIRE_SIGNATURE:-0}
+case "$strict" in
+  0 | 1) ;;
+  *)
+    printf 'gyblos install: GYBLOS_REQUIRE_SIGNATURE must be 1 or unset.\n' >&2
+    exit 1
+    ;;
+esac
 # This script's own path, for the next steps it prints (a piped script has none).
 if [ -f "$0" ]; then
   self="$(cd "$(dirname -- "$0")" && pwd -P)/$(basename -- "$0")"
@@ -193,30 +202,39 @@ compose_image() {
 # A Gyblos image must carry the release workflow's signature when cosign is available; without cosign
 # the check is skipped and said so. Another repository's image is the operator's own build and is not
 # checked.
+# A check that could not run: a note by default, a stop with GYBLOS_REQUIRE_SIGNATURE=1.
+unchecked() {
+  [ "$strict" = 1 ] || {
+    say "$1"
+    return
+  }
+  die "${1#"  "} GYBLOS_REQUIRE_SIGNATURE=1 requires a verified Gyblos release signature."
+}
+
 verify_image() {
   run=$(compose_image)
   case "$run" in
     "$RELEASE_REPOSITORY":* | "$RELEASE_REPOSITORY"@*) ;;
     *)
-      say "Not a Gyblos release image, so its signature is not checked: $run"
+      unchecked "Not a Gyblos release image, so its signature is not checked: $run"
       return
       ;;
   esac
   if ! command -v cosign >/dev/null 2>&1; then
-    say 'cosign is not installed, so the image signature was not checked (docs: image signature).'
+    unchecked 'cosign is not installed, so the image signature was not checked (docs: image signature).'
     return
   fi
   # Releases carry cosign 3 signature bundles, which older cosign does not find.
   major=$(cosign version 2>/dev/null | sed -n 's/^GitVersion: *v\{0,1\}\([0-9][0-9]*\)\..*/\1/p')
   if [ -z "$major" ] || [ "$major" -lt "$COSIGN_MAJOR" ]; then
-    say "cosign $COSIGN_MAJOR or later is needed to check the image signature; it was not checked."
+    unchecked "cosign $COSIGN_MAJOR or later is needed to check the image signature; it was not checked."
     return
   fi
   # Compose also reads override files and COMPOSE_FILE; the check covers only compose.yaml's seller.
   for other in compose.override.yaml compose.override.yml docker-compose.override.yaml docker-compose.override.yml .env; do
-    [ ! -e "$other" ] || say "  $other is present: the signature check covers only the seller image in compose.yaml."
+    [ ! -e "$other" ] || unchecked "  $other is present: the signature check covers only the seller image in compose.yaml."
   done
-  [ -z "${COMPOSE_FILE:-}" ] || say '  COMPOSE_FILE is set: the signature check covers only the seller image in compose.yaml.'
+  [ -z "${COMPOSE_FILE:-}" ] || unchecked '  COMPOSE_FILE is set: the signature check covers only the seller image in compose.yaml.'
   cosign verify --certificate-identity-regexp "$RELEASE_IDENTITY" \
     --certificate-oidc-issuer "$RELEASE_ISSUER" "$run" >/dev/null 2>&1 ||
     die "The image signature did not verify as a Gyblos release: $run"
