@@ -12,6 +12,7 @@ import {
   type ChatTurnResult,
 } from './chat-cli-turn';
 import { isFreeAtomic, PAID_VERDICTS } from './constants';
+import { startupMessage } from './free-main';
 
 export interface ChatSessionOptions {
   model: string;
@@ -211,10 +212,8 @@ export async function main(options?: {
       options?.output ?? stdout,
       signal,
     );
-  } catch {
-    console.error(
-      'Could not start the buyer. Check its configuration and ensure another buyer is not running; see docs/running-a-node.md.',
-    );
+  } catch (error) {
+    console.error(startupMessage(error));
     process.exitCode = 1;
   } finally {
     process.off('SIGINT', cancel);
