@@ -1,0 +1,180 @@
+{
+  "scope": "Conservative target compilation inventory; host procedural macros and dev-only crates excluded. Compilation does not prove every component survives linkage.",
+  "sourceCommit": "0c07d5751c8972abf6a219570a3f39a72f46f879",
+  "rustCore": {
+    "version": "1.89.0 SBF platform-tools v1.52",
+    "license": "MIT OR Apache-2.0",
+    "selectedLicense": "Apache-2.0",
+    "repository": "https://github.com/anza-xyz/rust/tree/790f1537507dbdb0da320fbb3b1c1eca3b33c474"
+  },
+  "components": [
+    {
+      "name": "borsh",
+      "version": "1.6.1",
+      "license": "MIT OR Apache-2.0",
+      "selectedLicense": "Apache-2.0",
+      "checksum": "cfd1e3f8955a5d7de9fab72fc8373fade9fb8a703968cb200ae3dc6cf08e185a",
+      "repository": "https://github.com/near/borsh-rs"
+    },
+    {
+      "name": "const-crypto",
+      "version": "0.3.0",
+      "license": "MIT OR Apache-2.0",
+      "selectedLicense": "Apache-2.0",
+      "checksum": "1c06f1eb05f06cf2e380fdded278fbf056a38974299d77960555a311dcf91a52",
+      "repository": "https://github.com/cavemanloverboy/const-crypto"
+    },
+    {
+      "name": "five8",
+      "version": "1.0.0",
+      "license": "MIT",
+      "selectedLicense": "MIT",
+      "checksum": "23f76610e969fa1784327ded240f1e28a3fd9520c9cec93b636fcf62dd37f772",
+      "repository": "https://github.com/kevinheavey/five8"
+    },
+    {
+      "name": "five8_const",
+      "version": "1.0.0",
+      "license": "MIT",
+      "selectedLicense": "MIT",
+      "checksum": "1a0f1728185f277989ca573a402716ae0beaaea3f76a8ff87ef9dd8fb19436c5",
+      "repository": "https://github.com/kevinheavey/five8"
+    },
+    {
+      "name": "five8_core",
+      "version": "1.0.0",
+      "license": "MIT",
+      "selectedLicense": "MIT",
+      "checksum": "059c31d7d36c43fe39d89e55711858b4da8be7eb6dabac23c7289b1a19489406",
+      "repository": "https://github.com/kevinheavey/five8"
+    },
+    {
+      "name": "keccak-const",
+      "version": "0.2.0",
+      "license": "MIT OR Apache-2.0",
+      "selectedLicense": "Apache-2.0",
+      "checksum": "57d8d8ce877200136358e0bbff3a77965875db3af755a11e1fa6b1b3e2df13ea",
+      "repository": "https://github.com/OffchainLabs/keccak-const"
+    },
+    {
+      "name": "pinocchio",
+      "version": "0.11.1",
+      "license": "Apache-2.0",
+      "selectedLicense": "Apache-2.0",
+      "checksum": "d707cea2843c1a2fd8ec49e4116ce3fdaedcd552a3ee168b03ce60e627fc0f62",
+      "repository": "https://github.com/anza-xyz/pinocchio"
+    },
+    {
+      "name": "pinocchio-associated-token-account",
+      "version": "0.4.0",
+      "license": "Apache-2.0",
+      "selectedLicense": "Apache-2.0",
+      "checksum": "c552da2a965b33511ac54494e434e69be0ae12da1619a72594b76703c3dca211",
+      "repository": "https://github.com/anza-xyz/pinocchio"
+    },
+    {
+      "name": "pinocchio-system",
+      "version": "0.6.0",
+      "license": "Apache-2.0",
+      "selectedLicense": "Apache-2.0",
+      "checksum": "b47216785b5877051afa074920e88b5990c4ce74f0da94c7cb5a139684c48ffe",
+      "repository": "https://github.com/anza-xyz/pinocchio"
+    },
+    {
+      "name": "pinocchio-token",
+      "version": "0.6.0",
+      "license": "Apache-2.0",
+      "selectedLicense": "Apache-2.0",
+      "checksum": "825f59c8348e5c2d3fd56432ef927f5819542b3b05fae4f5b6869801113e775e",
+      "repository": "https://github.com/anza-xyz/pinocchio"
+    },
+    {
+      "name": "pinocchio-token-2022",
+      "version": "0.3.1",
+      "license": "Apache-2.0",
+      "selectedLicense": "Apache-2.0",
+      "checksum": "57dbab5718ab6ae446b2217c47598fabd29173a09bd32b05344f031739db92b8",
+      "repository": "https://github.com/anza-xyz/pinocchio"
+    },
+    {
+      "name": "sha2-const-stable",
+      "version": "0.1.0",
+      "license": "MIT OR Apache-2.0",
+      "selectedLicense": "Apache-2.0",
+      "checksum": "5f179d4e11094a893b82fff208f74d448a7512f99f5a0acbd5c679b705f83ed9",
+      "repository": "https://github.com/saleemrashid/sha2-const"
+    },
+    {
+      "name": "solana-account-view",
+      "version": "2.0.0",
+      "license": "Apache-2.0",
+      "selectedLicense": "Apache-2.0",
+      "checksum": "fc141b940560430425ebaadb7645496c45f6a10fad9911d719bd03eab7f4d422",
+      "repository": "https://github.com/anza-xyz/solana-sdk"
+    },
+    {
+      "name": "solana-address",
+      "version": "2.6.0",
+      "license": "Apache-2.0",
+      "selectedLicense": "Apache-2.0",
+      "checksum": "f1384b52c435a750cc9c538760fc7bb472fd78e65a9900a2d07312c5bb335b72",
+      "repository": "https://github.com/anza-xyz/solana-sdk"
+    },
+    {
+      "name": "solana-define-syscall",
+      "version": "4.0.1",
+      "license": "Apache-2.0",
+      "selectedLicense": "Apache-2.0",
+      "checksum": "57e5b1c0bc1d4a4d10c88a4100499d954c09d3fecfae4912c1a074dff68b1738",
+      "repository": "https://github.com/anza-xyz/solana-sdk"
+    },
+    {
+      "name": "solana-define-syscall",
+      "version": "5.1.0",
+      "license": "Apache-2.0",
+      "selectedLicense": "Apache-2.0",
+      "checksum": "21e14a4f604117f379840956a8fc8695e4c84f5b0ebed192f31f60d9b85d581d",
+      "repository": "https://github.com/anza-xyz/solana-sdk"
+    },
+    {
+      "name": "solana-hash",
+      "version": "4.3.0",
+      "license": "Apache-2.0",
+      "selectedLicense": "Apache-2.0",
+      "checksum": "f1b113239362cee7093bfb250467138f079a2a03673181dc15bff6ccd677912d",
+      "repository": "https://github.com/anza-xyz/solana-sdk"
+    },
+    {
+      "name": "solana-instruction-view",
+      "version": "2.1.0",
+      "license": "Apache-2.0",
+      "selectedLicense": "Apache-2.0",
+      "checksum": "6ab7a27d0c4214b9f7389c3dd00b68c93093a67f1dcc5b7893aebe299bbcbb47",
+      "repository": "https://github.com/anza-xyz/solana-sdk"
+    },
+    {
+      "name": "solana-program-error",
+      "version": "3.0.1",
+      "license": "Apache-2.0",
+      "selectedLicense": "Apache-2.0",
+      "checksum": "4f04fa578707b3612b095f0c8e19b66a1233f7c42ca8082fcb3b745afcc0add6",
+      "repository": "https://github.com/anza-xyz/solana-sdk"
+    },
+    {
+      "name": "solana-sha256-hasher",
+      "version": "3.1.0",
+      "license": "Apache-2.0",
+      "selectedLicense": "Apache-2.0",
+      "checksum": "db7dc3011ea4c0334aaaa7e7128cb390ecf546b28d412e9bf2064680f57f588f",
+      "repository": "https://github.com/anza-xyz/solana-sdk"
+    },
+    {
+      "name": "thiserror",
+      "version": "2.0.18",
+      "license": "MIT OR Apache-2.0",
+      "selectedLicense": "Apache-2.0",
+      "checksum": "4288b5bcbc7920c07a1149a35cf9590a2aa808e0bc1eafaade0b80947865fbc4",
+      "repository": "https://github.com/dtolnay/thiserror"
+    }
+  ]
+}

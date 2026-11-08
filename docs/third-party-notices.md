@@ -55,3 +55,16 @@ authorizations, keys or raw captures as fixtures.
 The model catalog lists names and capabilities. It does not distribute model
 weights or grant their licenses. Operators and redistributors must check the
 terms of the specific models, services and assets they choose.
+
+## Native payment-channel test fixture
+
+The test-only SBF fixture in `tests/fixtures/payment-channels-native.so` is
+compiled from unmodified
+[Solana Foundation payment-channels source](https://github.com/solana-foundation/payment-channels/tree/0c07d5751c8972abf6a219570a3f39a72f46f879),
+whose own source is MIT. Its
+[program license](../tests/fixtures/payment-channels-native-LICENSE.txt),
+[build provenance and digest](../tests/fixtures/payment-channels-native.json),
+and [rebuild procedure](paid-native-acceptance.md) are included. It is used only
+in LiteSVM tests; it is not a deployment artifact or evidence of equivalence to
+any public-network binary. LiteSVM and its native packages retain their upstream
+licenses and are development dependencies only.
