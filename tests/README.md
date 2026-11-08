@@ -221,3 +221,17 @@ before and at the original deadline. Cleanup releases a stable blocked-write
 promise even if preparation has not reached the writer yet, so a failed
 assertion cannot strand the test worker or erase the lease-retention assertion.
 These fixtures do not change product transport, payment or logging limits.
+
+## Native payment-channel acceptance
+
+`tests/lab/paid-native.test.ts` executes the installed metered SDK's signed open
+and claim transactions in LiteSVM, using the bundled, hash-checked official
+program fixture and a synthetic mint. Payer closure, voucher/grace boundaries,
+actual token movement, fresh-blockhash replay and confirmation-loss recovery are
+covered without RPC, files holding keys, devnet or real funds.
+
+The feature/network label selects compatible treasury constants inside the VM;
+product mainnet remains disabled. These are SDK/native-program semantic tests,
+not current-devnet product startup, Iroh, an engine or deployed-binary
+acceptance. See
+[scope, prerequisites and rebuild instructions](../docs/paid-native-acceptance.md).

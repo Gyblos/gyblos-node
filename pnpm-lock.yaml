@@ -109,6 +109,9 @@ importers:
         specifier: workspace:*
         version: link:packages/x402-upto-metered
     devDependencies:
+      '@solana-program/system':
+        specifier: 0.10.0
+        version: 0.10.0(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))
       litesvm:
         specifier: 1.6.2
         version: 1.6.2(typescript@5.9.3)

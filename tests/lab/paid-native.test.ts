@@ -48,6 +48,11 @@ void test('native SDK open, early payer close, claim and refund conserve actual 
   assert.deepEqual(await value.claim(CHARGE), result);
   assert.equal(value.sends(), 2);
   assert.equal(await value.replay(), false);
+  assert.equal(
+    value.failureCode(),
+    2,
+    'native status rejection, not transaction-history duplication',
+  );
   assert.deepEqual(await value.balances(), after);
 });
 

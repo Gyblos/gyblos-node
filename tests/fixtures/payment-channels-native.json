@@ -1,0 +1,18 @@
+{
+  "source": "https://github.com/solana-foundation/payment-channels",
+  "commit": "0c07d5751c8972abf6a219570a3f39a72f46f879",
+  "sourceModified": false,
+  "cargoLockSha256": "e1ce31d4ddd7d101a1e9f0fb3553be3b78d9b621be82c410bbc6d491b23c38df",
+  "features": ["mainnet-beta"],
+  "defaultFeatures": false,
+  "architecture": "v0",
+  "builder": "agave cargo-build-sbf 3.1.13",
+  "builderArchiveSha256": "89daf96202c56edb6b333800ecea239bfa4473c6c18a5c06d1c6b510e21aeecd",
+  "platformTools": "v1.52",
+  "platformArchiveSha256": "1727dfb31e833ce777d01e70cb4b3cebd26b376bf09d80527f02457d4cf6fd00",
+  "sha256": "071e748877a4bace501f9ad1b5de3be3f3fbcfe3a00c357198801981bfa23637",
+  "bytes": 66240,
+  "license": "MIT",
+  "deployedBinaryEquivalence": false,
+  "remapPathPrefixes": ["/Users=/build/users", "<source>=/source"]
+}
