@@ -7,6 +7,7 @@ import { promisify } from 'node:util';
 
 import { runBuyerInit } from '@gyblos/buyer/init';
 import { buildBuyerInit, type BuyerInitAnswers } from '@gyblos/node/buyer-init';
+import { BUYER_INIT_MODES } from '@gyblos/node/buyer-init-constants';
 
 import { home, owner, sellerNodeId } from './support/buyer-init';
 
@@ -36,25 +37,28 @@ void test('wizard cancellation before answers or at confirmation performs no ini
 void test('wizard confirms an explicit USDC ceiling and passes validated answers to shared initialization', async () => {
   let received: BuyerInitAnswers | undefined;
   let output = '';
-  await runBuyerInit({
-    preflight: async () => ({
-      path: '/synthetic/buyer/selection.json',
-      exists: false,
-    }),
-    read: async (question) => {
-      if (question.startsWith('Seller NodeId')) return sellerNodeId;
-      if (question.startsWith('Seller owner')) return owner;
-      if (question.startsWith('Maximum spend')) return '0.01';
-      if (question.startsWith('Save')) return 'yes';
-      return '';
+  await runBuyerInit(
+    {
+      preflight: async () => ({
+        path: '/synthetic/buyer/selection.json',
+        exists: false,
+      }),
+      read: async (question) => {
+        if (question.startsWith('Seller NodeId')) return sellerNodeId;
+        if (question.startsWith('Seller owner')) return owner;
+        if (question.startsWith('Maximum spend')) return '0.01';
+        if (question.startsWith('Save')) return 'yes';
+        return '';
+      },
+      write: (text) => {
+        output += text;
+      },
+      initialize: async (input) => {
+        received = input;
+      },
     },
-    write: (text) => {
-      output += text;
-    },
-    initialize: async (input) => {
-      received = input;
-    },
-  });
+    BUYER_INIT_MODES.ADVANCED,
+  );
   assert.ok(received);
   assert.equal(buildBuyerInit(received).request.maxAtomic, '10000');
   assert.match(output, /ceiling/i);
@@ -96,24 +100,30 @@ void test('the actual executable offers offline help and refuses unattended init
 
 void test('wizard can explicitly clear nullable model fields while keeping blank answers as defaults', async () => {
   let received: BuyerInitAnswers | undefined;
-  await runBuyerInit({
-    preflight: async () => ({
-      path: '/synthetic/buyer/selection.json',
-      exists: false,
-    }),
-    read: async (question) => {
-      if (question.startsWith('Seller NodeId')) return sellerNodeId;
-      if (question.startsWith('Seller owner')) return owner;
-      if (question.startsWith('Variant') || question.startsWith('Quantization'))
-        return '-';
-      if (question.startsWith('Save')) return 'y';
-      return '';
+  await runBuyerInit(
+    {
+      preflight: async () => ({
+        path: '/synthetic/buyer/selection.json',
+        exists: false,
+      }),
+      read: async (question) => {
+        if (question.startsWith('Seller NodeId')) return sellerNodeId;
+        if (question.startsWith('Seller owner')) return owner;
+        if (
+          question.startsWith('Variant') ||
+          question.startsWith('Quantization')
+        )
+          return '-';
+        if (question.startsWith('Save')) return 'y';
+        return '';
+      },
+      write: () => {},
+      initialize: async (input) => {
+        received = input;
+      },
     },
-    write: () => {},
-    initialize: async (input) => {
-      received = input;
-    },
-  });
+    BUYER_INIT_MODES.ADVANCED,
+  );
   assert.ok(received);
   assert.deepEqual(buildBuyerInit(received).request.selection, {
     modelId: 'qwen3-0.6b',

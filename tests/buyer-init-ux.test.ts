@@ -12,6 +12,7 @@ import {
 import {
   BUYER_INIT_CODES,
   BUYER_INIT_FIELDS,
+  BUYER_INIT_MODES,
 } from '@gyblos/node/buyer-init-constants';
 
 import { answers, owner, sellerNodeId } from './support/buyer-init';
@@ -103,7 +104,7 @@ void test('wizard retries only invalid fields and retains accepted answers', asy
       received = input;
     },
   };
-  await runBuyerInit(terminal);
+  await runBuyerInit(terminal, BUYER_INIT_MODES.ADVANCED);
   assert.ok(received);
   assert.equal(received.sellerNodeId, sellerNodeId);
   assert.equal(received.modelId, 'custom/model');

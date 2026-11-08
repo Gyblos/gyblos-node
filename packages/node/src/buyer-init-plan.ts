@@ -208,11 +208,17 @@ export function buildBuyerInit(input: unknown): BuyerInitPlan {
 export function buyerInitFields(
   mode: BuyerInitMode = BUYER_INIT_MODES.SHORT,
 ): readonly BuyerInitField[] {
-  if (mode === BUYER_INIT_MODES.ADVANCED)
-    return Object.values(BUYER_INIT_FIELDS);
-  return Object.values(BUYER_INIT_FIELDS);
+  switch (mode) {
+    case BUYER_INIT_MODES.SHORT:
+      return [BUYER_INIT_FIELDS.SELLER_NODE_ID, BUYER_INIT_FIELDS.SELLER_OWNER];
+    case BUYER_INIT_MODES.ADVANCED:
+      return Object.values(BUYER_INIT_FIELDS);
+    default:
+      throw new BuyerInitError(BUYER_INIT_CODES.INVALID);
+  }
 }
 export function buyerInitModelNeedsConfirmation(value: unknown): boolean {
-  validateBuyerInitField(BUYER_INIT_FIELDS.MODEL_ID, value);
-  return false;
+  const model = validateBuyerInitField(BUYER_INIT_FIELDS.MODEL_ID, value);
+  // Advisory only: custom identifiers remain valid and are never rewritten.
+  return /^[^\p{L}\p{N}]/u.test(model) || /\s/u.test(model);
 }

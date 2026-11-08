@@ -127,7 +127,9 @@ export async function runOwnedChat(
 export async function chatSession(options: ChatSessionOptions) {
   const paid = !isFreeAtomic(options.maxAtomic);
   const mode = options.automatic
-    ? 'automatic (free or paid by signed quote)'
+    ? paid
+      ? 'automatic (free or paid by signed quote)'
+      : 'automatic (free quotes only)'
     : paid
       ? 'paid (devnet)'
       : 'free';
