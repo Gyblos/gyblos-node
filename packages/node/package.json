@@ -62,7 +62,8 @@
     "./buyer-quote-execution": "./src/buyer-quote-execution.ts",
     "./buyer-operation": "./src/buyer-operation.ts",
     "./buyer-init": "./src/buyer-init.ts",
-    "./buyer-init-constants": "./src/buyer-init-constants.ts"
+    "./buyer-init-constants": "./src/buyer-init-constants.ts",
+    "./paid-stream-output": "./src/paid-stream-output.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",

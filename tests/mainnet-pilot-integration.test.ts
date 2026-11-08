@@ -122,12 +122,21 @@ void test('seller checks both quoted and authorized ceilings before admission', 
     requestDigest: terms.requestDigest,
     channelId: await address(),
     maxAtomic: '1000000',
-    payload: '',
+    payload: Buffer.from(
+      JSON.stringify({
+        channelId: 'synthetic',
+        from: terms.buyer,
+        maxAmount: terms.maxAtomic,
+        openSlot: '1',
+        expiresAt: 1_800_000_001,
+      }),
+    ).toString('base64'),
   };
   const server = createUptoPaymentServer({
     description,
     settings: UPTO_CHANNEL_SETTINGS,
     seller,
+    now: () => 0,
   });
   await assert.rejects(
     server.admit(auth, { ...terms, maxAtomic: '1000001' }),
@@ -146,6 +155,7 @@ void test('seller checks both quoted and authorized ceilings before admission', 
     description: devnetDescription,
     settings: UPTO_CHANNEL_SETTINGS,
     seller,
+    now: () => 0,
   });
   await assert.rejects(
     devnet.admit(

@@ -11,7 +11,7 @@ packageExtensionsChecksum: sha256-kBsaE0bhIzDIv7kpUrZzYSdGDXBQFYhTtLsGQJ2TKJo=
 
 patchedDependencies:
   '@x402/svm@2.28.0':
-    hash: 058173e6c15b212b808edc4355a08e9a099a457e7ad3d1abc533150d8c70f419
+    hash: fcc1a78d73b6918ed8f8c91bd30b745b1783d27c8f243136410052f8bffa7a7d
     path: patches/@x402__svm@2.28.0.patch
 
 importers:
@@ -101,7 +101,7 @@ importers:
         version: 2.29.0
       '@x402/svm':
         specifier: 2.28.0
-        version: 2.28.0(patch_hash=058173e6c15b212b808edc4355a08e9a099a457e7ad3d1abc533150d8c70f419)(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))(typescript@5.9.3)
+        version: 2.28.0(patch_hash=fcc1a78d73b6918ed8f8c91bd30b745b1783d27c8f243136410052f8bffa7a7d)(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))(typescript@5.9.3)
       express:
         specifier: 4.22.3
         version: 4.22.3
@@ -410,7 +410,7 @@ importers:
         version: 2.29.0
       '@x402/svm':
         specifier: 2.28.0
-        version: 2.28.0(patch_hash=058173e6c15b212b808edc4355a08e9a099a457e7ad3d1abc533150d8c70f419)(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))(typescript@5.9.3)
+        version: 2.28.0(patch_hash=fcc1a78d73b6918ed8f8c91bd30b745b1783d27c8f243136410052f8bffa7a7d)(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))(typescript@5.9.3)
       express:
         specifier: 4.22.3
         version: 4.22.3
@@ -563,7 +563,7 @@ importers:
         version: 2.29.0(express@4.22.3)(typescript@5.9.3)
       '@x402/svm':
         specifier: 2.28.0
-        version: 2.28.0(patch_hash=058173e6c15b212b808edc4355a08e9a099a457e7ad3d1abc533150d8c70f419)(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))(typescript@5.9.3)
+        version: 2.28.0(patch_hash=fcc1a78d73b6918ed8f8c91bd30b745b1783d27c8f243136410052f8bffa7a7d)(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))(typescript@5.9.3)
       express:
         specifier: 4.22.3
         version: 4.22.3
@@ -593,7 +593,7 @@ importers:
         version: 8.6.0(typescript@5.9.3)
       '@x402/svm':
         specifier: 2.28.0
-        version: 2.28.0(patch_hash=058173e6c15b212b808edc4355a08e9a099a457e7ad3d1abc533150d8c70f419)(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))(typescript@5.9.3)
+        version: 2.28.0(patch_hash=fcc1a78d73b6918ed8f8c91bd30b745b1783d27c8f243136410052f8bffa7a7d)(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))(typescript@5.9.3)
       x402-upto-metered:
         specifier: workspace:*
         version: link:../x402-upto-metered
@@ -623,7 +623,7 @@ importers:
         version: 2.29.0
       '@x402/svm':
         specifier: 2.28.0
-        version: 2.28.0(patch_hash=058173e6c15b212b808edc4355a08e9a099a457e7ad3d1abc533150d8c70f419)(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))(typescript@5.9.3)
+        version: 2.28.0(patch_hash=fcc1a78d73b6918ed8f8c91bd30b745b1783d27c8f243136410052f8bffa7a7d)(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))(typescript@5.9.3)
       express:
         specifier: 4.22.3
         version: 4.22.3
@@ -706,7 +706,7 @@ importers:
         version: 2.29.0
       '@x402/svm':
         specifier: 2.28.0
-        version: 2.28.0(patch_hash=058173e6c15b212b808edc4355a08e9a099a457e7ad3d1abc533150d8c70f419)(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))(typescript@5.9.3)
+        version: 2.28.0(patch_hash=fcc1a78d73b6918ed8f8c91bd30b745b1783d27c8f243136410052f8bffa7a7d)(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))(typescript@5.9.3)
     devDependencies:
       '@solana-program/token':
         specifier: 0.9.0
@@ -6763,7 +6763,7 @@ snapshots:
     dependencies:
       '@x402/core': 2.29.0
 
-  '@x402/svm@2.28.0(patch_hash=058173e6c15b212b808edc4355a08e9a099a457e7ad3d1abc533150d8c70f419)(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))(typescript@5.9.3)':
+  '@x402/svm@2.28.0(patch_hash=fcc1a78d73b6918ed8f8c91bd30b745b1783d27c8f243136410052f8bffa7a7d)(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))(typescript@5.9.3)':
     dependencies:
       '@noble/hashes': 1.8.0
       '@solana-program/compute-budget': 0.11.0(@solana/kit@5.1.0(typescript@5.9.3)(ws@8.21.0))

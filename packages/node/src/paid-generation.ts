@@ -75,7 +75,14 @@ function stopCode(
   error: unknown,
   signal: AbortSignal,
 ): { code: PaidExecutionCode; reason?: FreeExecutionStopReason } {
-  if (signal.aborted) return { code: PAID_EXECUTION_CODES.CANCELLED };
+  if (signal.aborted)
+    return {
+      code:
+        signal.reason instanceof PaidExecutionError &&
+        signal.reason.code === PAID_EXECUTION_CODES.TIMEOUT
+          ? PAID_EXECUTION_CODES.TIMEOUT
+          : PAID_EXECUTION_CODES.CANCELLED,
+    };
   if (error instanceof EngineError) {
     const reason: FreeExecutionStopReason | undefined =
       ENGINE_ERROR_STOP_REASON[error.code];

@@ -383,11 +383,57 @@ index 24f9d8eaee214bad9a93005708709d074daf19aa..c5e78c3ffb7e285e4ddb0bd27caeb2f7
    return { feePayer, receiverAuthorizer, splits, withdrawDelay };
  }
  
+diff --git a/dist/cjs/upto/facilitator/index.d.ts b/dist/cjs/upto/facilitator/index.d.ts
+index 16b03d12677def81c05f273c88e25fb706bdbb0e..76937838afac24d4c5b4d3cdfc5916687fac5062 100644
+--- a/dist/cjs/upto/facilitator/index.d.ts
++++ b/dist/cjs/upto/facilitator/index.d.ts
+@@ -84,6 +84,8 @@ type UptoDelegatedSettleContext = {
+ };
+ /** Optional configuration for the upto SVM facilitator. */
+ interface UptoSvmFacilitatorConfig {
++    /** Opt-in: payee-signed claims may settle Closing channels before grace expires. Deposits stay Open-only. */
++    allowClosingClaims?: boolean;
+     /**
+      * Channel storage for rent cleanup and the delegated caller identity.
+      * Defaults to in-memory storage. Use a durable implementation when more
 diff --git a/dist/cjs/upto/facilitator/index.js b/dist/cjs/upto/facilitator/index.js
-index a01901d7a3e72f7db28a9402618e1205888ab7a0..cfe979f4f79ba81b39d6355ae26028de19cdd0f3 100644
+index a01901d7a3e72f7db28a9402618e1205888ab7a0..8c78727e26e43c1f4e6184ef4976797f0e831dfb 100644
 --- a/dist/cjs/upto/facilitator/index.js
 +++ b/dist/cjs/upto/facilitator/index.js
-@@ -1922,6 +1922,27 @@ async function revertOpenBestEffort(args, write) {
+@@ -1408,14 +1408,14 @@ function resolveChannelReadPolicy(policy = {}) {
+ function delayAfterAttempt(policy, attempt) {
+   return policy.backoffStepMs * attempt;
+ }
+-async function fetchAndVerifyOpenChannel(rpc, channelId, expected, policy = {}) {
++async function fetchAndVerifyOpenChannel(rpc, channelId, expected, policy = {}, allowClosing = false) {
+   const resolved = resolveChannelReadPolicy(policy);
+   for (let attempt = 1; attempt <= resolved.maxAttempts; attempt++) {
+     const account = await fetchMaybeChannel(rpc, (0, import_kit28.address)(channelId), {
+       commitment: STATE_COMMITMENT
+     });
+     if (account.exists) {
+-      return verifyOpenChannelAccount(channelId, account.data, expected);
++      return verifyOpenChannelAccount(channelId, account.data, expected, allowClosing);
+     }
+     if (attempt === resolved.maxAttempts) {
+       break;
+@@ -1425,11 +1425,13 @@ async function fetchAndVerifyOpenChannel(rpc, channelId, expected, policy = {})
+   }
+   throw new Error(`channel ${channelId} does not exist`);
+ }
+-function verifyOpenChannelAccount(channelId, channel, expected) {
++function verifyOpenChannelAccount(channelId, channel, expected, allowClosing = false) {
+   if (channel.discriminator !== 1 /* Channel */) {
+     throw new Error(`channel ${channelId} has an invalid account discriminator`);
+   }
+-  if (channel.status !== 0 /* Open */) {
++  const closingWithinGrace = allowClosing === true && channel.status === 2 /* Closing */ &&
++    BigInt(Math.floor(Date.now() / 1e3)) < channel.closureStartedAt + BigInt(channel.gracePeriod);
++  if (channel.status !== 0 /* Open */ && !closingWithinGrace) {
+     throw new Error(`channel ${channelId} is not open`);
+   }
+   assertChannelAddress("mint", channel.mint, expected.mint);
+@@ -1922,6 +1924,27 @@ async function revertOpenBestEffort(args, write) {
  }
  
  // src/upto/shared.ts
@@ -415,7 +461,7 @@ index a01901d7a3e72f7db28a9402618e1205888ab7a0..cfe979f4f79ba81b39d6355ae26028de
  function resolveUptoSvmPaymentChannelConfig(requirements) {
    const feePayer = requirements.extra?.feePayer;
    if (typeof feePayer !== "string" || feePayer.length === 0) {
-@@ -1935,7 +1956,7 @@ function resolveUptoSvmPaymentChannelConfig(requirements) {
+@@ -1935,7 +1958,7 @@ function resolveUptoSvmPaymentChannelConfig(requirements) {
    if (typeof withdrawDelay !== "number" || !Number.isInteger(withdrawDelay) || withdrawDelay <= 0) {
      throw new Error("withdrawDelay must be an integer greater than zero");
    }
@@ -424,7 +470,7 @@ index a01901d7a3e72f7db28a9402618e1205888ab7a0..cfe979f4f79ba81b39d6355ae26028de
    return { feePayer, receiverAuthorizer, splits, withdrawDelay };
  }
  
-@@ -2408,7 +2429,7 @@ var PaymentChannelRentCleanupManager = class {
+@@ -2408,7 +2431,7 @@ var PaymentChannelRentCleanupManager = class {
     * @returns Broadcast signature
     */
    async submitCloseOrDistribute(feePayerSigner, record, live, status) {
@@ -433,7 +479,7 @@ index a01901d7a3e72f7db28a9402618e1205888ab7a0..cfe979f4f79ba81b39d6355ae26028de
      const distribute = await buildDistributeInstruction({
        channelId: record.channelId,
        mint: live.mint,
-@@ -2999,6 +3020,7 @@ var UptoSvmScheme = class {
+@@ -2999,6 +3022,7 @@ var UptoSvmScheme = class {
        network: requirements.network,
        payTo: requirements.payTo,
        receiverAuthorizer: "",
@@ -441,6 +487,16 @@ index a01901d7a3e72f7db28a9402618e1205888ab7a0..cfe979f4f79ba81b39d6355ae26028de
        tokenProgram
      };
      try {
+@@ -3220,7 +3244,8 @@ var UptoSvmScheme = class {
+         rentPayer: channelConfig.feePayer,
+         splits: channelConfig.splits
+       },
+-      this.resolveChannelReadPolicy()
++      this.resolveChannelReadPolicy(),
++      this.config.allowClosingClaims === true
+     );
+     const blockhashPromise = this.signer.getLatestBlockhash(network);
+     let channel;
 diff --git a/dist/esm/batch-settlement/client/index.d.mts b/dist/esm/batch-settlement/client/index.d.mts
 index 421e5ac1b699810c8ce4064f9a5db51076e4eaa8..85f1b22fc8cffbee85b1916439e7668f72739e58 100644
 --- a/dist/esm/batch-settlement/client/index.d.mts
@@ -705,10 +761,43 @@ index a26ec87f5643d4b0bd8564a8068109bae15c8948..a5522e17f2abbce516f3d85b62db7c66
        withdrawDelay: terms.withdrawDelay,
        voucherSigner: terms.voucherSigner,
 diff --git a/dist/esm/chunk-UMK65UDR.mjs b/dist/esm/chunk-UMK65UDR.mjs
-index 52ac9f0a3502edf04953fcf270b8841eedf44bfc..1d744b0899433ba4bd7f953a06d560ae20933027 100644
+index 52ac9f0a3502edf04953fcf270b8841eedf44bfc..c2516c6ba05f038f3ab9c02c27a2a930bba10188 100644
 --- a/dist/esm/chunk-UMK65UDR.mjs
 +++ b/dist/esm/chunk-UMK65UDR.mjs
-@@ -1002,7 +1002,7 @@ var PaymentChannelRentCleanupManager = class {
+@@ -77,14 +77,14 @@ function resolveChannelReadPolicy(policy = {}) {
+ function delayAfterAttempt(policy, attempt) {
+   return policy.backoffStepMs * attempt;
+ }
+-async function fetchAndVerifyOpenChannel(rpc, channelId, expected, policy = {}) {
++async function fetchAndVerifyOpenChannel(rpc, channelId, expected, policy = {}, allowClosing = false) {
+   const resolved = resolveChannelReadPolicy(policy);
+   for (let attempt = 1; attempt <= resolved.maxAttempts; attempt++) {
+     const account = await fetchMaybeChannel(rpc, address(channelId), {
+       commitment: STATE_COMMITMENT
+     });
+     if (account.exists) {
+-      return verifyOpenChannelAccount(channelId, account.data, expected);
++      return verifyOpenChannelAccount(channelId, account.data, expected, allowClosing);
+     }
+     if (attempt === resolved.maxAttempts) {
+       break;
+@@ -94,11 +94,13 @@ async function fetchAndVerifyOpenChannel(rpc, channelId, expected, policy = {})
+   }
+   throw new Error(`channel ${channelId} does not exist`);
+ }
+-function verifyOpenChannelAccount(channelId, channel, expected) {
++function verifyOpenChannelAccount(channelId, channel, expected, allowClosing = false) {
+   if (channel.discriminator !== 1 /* Channel */) {
+     throw new Error(`channel ${channelId} has an invalid account discriminator`);
+   }
+-  if (channel.status !== 0 /* Open */) {
++  const closingWithinGrace = allowClosing === true && channel.status === 2 /* Closing */ &&
++    BigInt(Math.floor(Date.now() / 1e3)) < channel.closureStartedAt + BigInt(channel.gracePeriod);
++  if (channel.status !== 0 /* Open */ && !closingWithinGrace) {
+     throw new Error(`channel ${channelId} is not open`);
+   }
+   assertChannelAddress("mint", channel.mint, expected.mint);
+@@ -1002,7 +1004,7 @@ var PaymentChannelRentCleanupManager = class {
     * @returns Broadcast signature
     */
    async submitCloseOrDistribute(feePayerSigner, record, live, status) {
@@ -733,8 +822,21 @@ index 79dad6680953d2559d2da03184c949908d68975e..4880af59cf9b56969183d936923a310d
  }
  /**
   * Result of {@link PaymentChannelStorage.recordOpen}. `revertToken` is empty
+diff --git a/dist/esm/upto/facilitator/index.d.mts b/dist/esm/upto/facilitator/index.d.mts
+index f425a3767f9f9ac3102c35804fafa936e776d29c..b1c591af4f526ab7f61a6094197e315d4281cfed 100644
+--- a/dist/esm/upto/facilitator/index.d.mts
++++ b/dist/esm/upto/facilitator/index.d.mts
+@@ -84,6 +84,8 @@ type UptoDelegatedSettleContext = {
+ };
+ /** Optional configuration for the upto SVM facilitator. */
+ interface UptoSvmFacilitatorConfig {
++    /** Opt-in: payee-signed claims may settle Closing channels before grace expires. Deposits stay Open-only. */
++    allowClosingClaims?: boolean;
+     /**
+      * Channel storage for rent cleanup and the delegated caller identity.
+      * Defaults to in-memory storage. Use a durable implementation when more
 diff --git a/dist/esm/upto/facilitator/index.mjs b/dist/esm/upto/facilitator/index.mjs
-index 948ca0e8bc994ac47580ede3d80cc15dd94bcf71..935b74b90534bbb7ae783ddc3961a367c32a9ea2 100644
+index 948ca0e8bc994ac47580ede3d80cc15dd94bcf71..46861b6410e9c1ca57b6767cf648e19daceba0e8 100644
 --- a/dist/esm/upto/facilitator/index.mjs
 +++ b/dist/esm/upto/facilitator/index.mjs
 @@ -465,6 +465,7 @@ var UptoSvmScheme = class {
@@ -745,3 +847,13 @@ index 948ca0e8bc994ac47580ede3d80cc15dd94bcf71..935b74b90534bbb7ae783ddc3961a367
        tokenProgram
      };
      try {
+@@ -686,7 +687,8 @@ var UptoSvmScheme = class {
+         rentPayer: channelConfig.feePayer,
+         splits: channelConfig.splits
+       },
+-      this.resolveChannelReadPolicy()
++      this.resolveChannelReadPolicy(),
++      this.config.allowClosingClaims === true
+     );
+     const blockhashPromise = this.signer.getLatestBlockhash(network);
+     let channel;

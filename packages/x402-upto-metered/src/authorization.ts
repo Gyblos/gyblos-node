@@ -3,7 +3,7 @@
 import type { TransactionSigner } from '@solana/kit';
 import { UptoSvmScheme as UptoClientScheme } from '@x402/svm/upto/client';
 
-import { UPTO, UPTO_ERROR_CODES } from './constants';
+import { UPTO, UPTO_CLAIM_LIMITS, UPTO_ERROR_CODES } from './constants';
 import { UptoError } from './errors';
 import { uptoRequirements } from './requirements';
 import type {
@@ -12,6 +12,24 @@ import type {
   UptoPayloadFields,
   UptoTerms,
 } from './types';
+
+// The SDK validates this payload expiry; it is not part of the payer-signed open transaction.
+export function uptoClaimUntil(
+  authorization: Pick<UptoAuthorization, 'payload'>,
+): number {
+  const expiresAt = decodeUptoPayload(authorization).expiresAt;
+  const cutoff =
+    typeof expiresAt === 'number'
+      ? expiresAt * UPTO_CLAIM_LIMITS.millisecondsPerSecond
+      : Number.NaN;
+  if (
+    !Number.isSafeInteger(expiresAt) ||
+    !Number.isSafeInteger(cutoff) ||
+    cutoff <= 0
+  )
+    throw new UptoError(UPTO_ERROR_CODES.AUTHORIZATION_MISMATCH);
+  return cutoff;
+}
 
 function isPayload(
   value: unknown,

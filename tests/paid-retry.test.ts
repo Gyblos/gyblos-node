@@ -16,6 +16,7 @@ const ADMISSION: PaymentAdmission = {
   payer: 'payer',
   requestDigest: 'ab'.repeat(32),
   maxAtomic: '20',
+  claimUntil: 1_800_000_120_000,
 };
 const DELAYS = [5, 5, 5] as const;
 

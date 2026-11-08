@@ -75,6 +75,8 @@ export function createUptoFacilitator(
 ): UptoFacilitatorScheme {
   return new UptoFacilitatorScheme(signer, {
     pendingSettlementStore: durablePendingStore(store),
+    // This metered adapter opts in; the unconfigured upstream SDK remains Open-only.
+    allowClosingClaims: true,
   });
 }
 

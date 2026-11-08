@@ -1,7 +1,11 @@
 // Maps Gyblos payment terms onto x402-upto-metered terms: the memo is the payer-signed terms digest,
 // the distribution splits each charge between payTo and the protocol fee treasury, and the request
 // digest is kept as the channel's reference.
-import type { UptoSellerOptions, UptoTerms } from 'x402-upto-metered';
+import {
+  UPTO_CLAIM_LIMITS,
+  type UptoSellerOptions,
+  type UptoTerms,
+} from 'x402-upto-metered';
 
 import { PAYMENT_ERROR_CODES } from '@gyblos/protocol/constants';
 import {
@@ -32,6 +36,14 @@ export function uptoSellerTerms(
   description: PaymentDescription,
   settings: UptoChannelSettings,
 ): UptoSellerOptions['own'] {
+  if (
+    !Number.isSafeInteger(settings.maxTimeoutSeconds) ||
+    settings.maxTimeoutSeconds <= 0 ||
+    !Number.isSafeInteger(settings.withdrawDelaySeconds) ||
+    settings.withdrawDelaySeconds <=
+      settings.maxTimeoutSeconds + UPTO_CLAIM_LIMITS.sdkExpirySkewSeconds
+  )
+    throw new PaymentError(PAYMENT_ERROR_CODES.UNTRUSTED_TERMS);
   return {
     network: networkOf(description.network),
     asset: description.mint,

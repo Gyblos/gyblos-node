@@ -191,6 +191,7 @@ function createServer(
         payer: authorization.payer,
         requestDigest: authorization.requestDigest,
         maxAtomic: authorization.maxAtomic,
+        claimUntil: terms.expiresAt + 120000,
       };
       channels.set(authorization.channelId, {
         ...admission,
