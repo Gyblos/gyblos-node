@@ -130,13 +130,15 @@ Después descarga las imágenes y el modelo, crea las llaves, instala el tokeniz
 cd ~/gyblos-seller
 docker compose pull
 docker compose up -d ollama
+until docker compose exec -T ollama ollama list >/dev/null 2>&1; do sleep 2; done
 docker compose exec -T ollama ollama pull qwen3:0.6b
 docker compose run --rm seller setup --role seller --mint 4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU
 docker compose run --rm seller tokenizer
-docker compose run --rm seller gyblos doctor
-docker compose up -d --force-recreate seller
+docker compose run --rm seller gyblos doctor && docker compose up -d --force-recreate seller
 ```
 
-Inicia el vendedor solo cuando `gyblos doctor` no informe fallos. Continúa con la
+La línea de espera termina cuando Ollama responde; si sigue esperando, detenla con Ctrl+C y revisa
+`docker compose logs ollama` en privado. La última línea inicia el vendedor solo cuando `gyblos doctor` no
+informa fallos; si no, corrige la causa indicada y repite esa línea. Continúa con la
 [comprobación de estado](/es/sellers/beta-guide#confirma-el-estado-del-servicio) y el
 [registro](/es/sellers/register-publish).
