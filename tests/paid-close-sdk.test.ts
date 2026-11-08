@@ -2,6 +2,7 @@
 // Deposit inclusion and native execution are simulated; no network, accounts or funds are touched.
 import assert from 'node:assert/strict';
 import test, { type TestContext } from 'node:test';
+import { setImmediate as yieldTurn } from 'node:timers/promises';
 
 import { generateKeyPairSigner } from '@solana/kit';
 import {
@@ -38,6 +39,8 @@ async function flow(
     persisted?: () => void;
   } = {},
 ) {
+  // SDK crypto may outlive a 50 ms host tick; advance service deadlines explicitly.
+  context.mock.timers.enable({ apis: ['setTimeout'] });
   const sdk = await sdkClaimFixture({
     allowClosingClaims: true,
     confirm: hooks.confirm,
@@ -230,6 +233,101 @@ for (const phase of ['verification', 'confirmation']) {
     assert.deepEqual(value.seller.pending, []);
     assert.equal(value.seller.engineCalls.length, 1);
   });
+}
+
+for (const phase of ['verification', 'confirmation']) {
+  void test(
+    `the unchanged payment wait expires at its exact boundary during SDK ${phase}`,
+    { timeout: 15000 },
+    async (context) => {
+      context.mock.method(Date, 'now', () => CLAIM_NOW);
+      let entered = () => {};
+      const started = new Promise<void>((resolve) => {
+        entered = resolve;
+      });
+      let release = () => {};
+      const held = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const pause = async () => {
+        entered();
+        await held;
+      };
+      const value = await flow(context, {
+        verified: phase === 'verification' ? pause : undefined,
+        confirm: phase === 'confirmation' ? pause : undefined,
+      });
+      value.seller.setScript({
+        deltas: ['Hi'],
+        before: () => {
+          value.sdk.fields.status = UPTO_CHANNEL_ACCOUNT.statuses.CLOSING;
+          value.sdk.fields.closureStartedAt = BigInt(CLAIM_NOW / 1000);
+        },
+      });
+      let claim: ReturnType<typeof value.server.settle> | undefined;
+      const settle = value.server.settle;
+      context.mock.method(
+        value.server,
+        'settle',
+        (...args: Parameters<typeof settle>) => {
+          claim = settle(...args);
+          return claim;
+        },
+      );
+      const pending = new Promise<{ chargedAtomic: string }>((resolve) => {
+        value.seller.setPendingHook((_admission, chargedAtomic) =>
+          resolve({ chargedAtomic }),
+        );
+      });
+      const request = await value.seller.request();
+      let complete = false;
+      const running = value.seller.execute(request).then((result) => {
+        complete = true;
+        return result;
+      });
+      try {
+        await started;
+        assert.equal(value.seller.options.settlement.waitMs, 50);
+        context.mock.timers.tick(value.seller.options.settlement.waitMs - 1);
+        await yieldTurn();
+        assert.equal(complete, false);
+        context.mock.timers.tick(1);
+        const { terminal, deltas } = await running;
+        if (phase === 'verification') {
+          assert.equal(
+            terminal.error?.code,
+            PAID_EXECUTION_CODES.PAYMENT_UNAVAILABLE,
+          );
+          assert.deepEqual(deltas, []);
+          assert.equal(value.seller.engineCalls.length, 0);
+          assert.equal(value.deposits(), 0);
+          assert.equal(value.sdk.sent.length, 0);
+          release();
+          assert.deepEqual(await pending, { chargedAtomic: '0' });
+          assert.equal(value.deposits(), 1);
+        } else {
+          assert.deepEqual(deltas, ['Hi']);
+          assert.equal(terminal.payment?.settlement, undefined);
+          assert.equal(terminal.payment?.pending?.chargedAtomic, '8');
+          assert.deepEqual(await pending, { chargedAtomic: '8' });
+          release();
+          assert.ok(claim);
+          assert.equal((await claim).chargedAtomic, '8');
+          assert.equal((await claim).refundedAtomic, '12');
+          assert.equal(value.seller.engineCalls.length, 1);
+          assert.equal(value.deposits(), 1);
+          assert.equal(value.sdk.sent.length, 1);
+        }
+        const replay = await value.seller.execute(request);
+        assert.equal(replay.terminal.error?.code, PAID_EXECUTION_CODES.REPLAY);
+        assert.equal(value.sdk.sent.length, phase === 'verification' ? 0 : 1);
+      } finally {
+        release();
+        await running;
+        await claim;
+      }
+    },
+  );
 }
 
 void test('an authorization too short for the claim reserve is refused before a deposit', async (context) => {
