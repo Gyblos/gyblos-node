@@ -1,6 +1,7 @@
 // Public surface of x402-upto-metered; it must not import any Gyblos package.
 export {
   UPTO,
+  UPTO_CLAIM_LIMITS,
   UPTO_CHANNEL_STATES,
   UPTO_DEPOSIT_STATES,
   UPTO_CHANNEL_ACCOUNT,
@@ -67,7 +68,11 @@ export {
   type UptoDistributeQuery,
   type UptoProgramInstruction,
 } from './withdraw-instructions';
-export { createUptoAuthorization, decodeUptoPayload, uptoClaimUntil } from './authorization';
+export {
+  createUptoAuthorization,
+  decodeUptoPayload,
+  uptoClaimUntil,
+} from './authorization';
 export { uptoRequirements } from './requirements';
 export {
   createUptoSeller,

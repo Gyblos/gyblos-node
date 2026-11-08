@@ -24,6 +24,12 @@ export const UPTO = {
   payloadBytes: 4096,
 } as const;
 
+// Pinned SDK 2.28 accepts up to this expiry slack in addition to maxTimeoutSeconds.
+export const UPTO_CLAIM_LIMITS = {
+  millisecondsPerSecond: 1000,
+  sdkExpirySkewSeconds: 60,
+} as const;
+
 // A channel's write-ahead state on the seller: each is recorded before the step it names.
 export const UPTO_CHANNEL_STATES = {
   DEPOSITING: 'depositing',

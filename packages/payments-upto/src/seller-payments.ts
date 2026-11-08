@@ -125,7 +125,12 @@ export async function openUptoSellerPayments(
       now,
       own,
     });
-    const server = createUptoPaymentServer({ description, settings, seller });
+    const server = createUptoPaymentServer({
+      description,
+      settings,
+      seller,
+      now,
+    });
     // Last, so no failure above leaves its timer signing with the fee payer.
     const cleanup = facilitator.createRentCleanupManager(own.network);
     cleanup.start(options.cleanup);

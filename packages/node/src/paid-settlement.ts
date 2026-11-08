@@ -125,7 +125,10 @@ export async function admitDeposit(
   if (options.signal.aborted)
     return fail(PAID_EXECUTION_CODES.PAYMENT_UNAVAILABLE);
   const admitting = Promise.resolve().then(() =>
-    payment.admit(request.payment, terms, { signal }),
+    payment.admit(request.payment, terms, {
+      signal,
+      minClaimWindowMs: options.waitMs,
+    }),
   );
   let outcome: PaymentAdmission | Wait;
   try {

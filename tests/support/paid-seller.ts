@@ -86,7 +86,10 @@ export function recordingPayment(own: PaymentDescription) {
       )
         throw new PaymentError(PAYMENT_ERROR_CODES.AUTHORIZATION_MISMATCH);
       const { payload: _payload, ...admission } = authorization;
-      return { ...admission, claimUntil: control.claimUntil ?? terms.expiresAt + 120_000 };
+      return {
+        ...admission,
+        claimUntil: control.claimUntil ?? terms.expiresAt + 120_000,
+      };
     },
     settle(admission, chargedAtomic) {
       calls.settle.push({ admission, chargedAtomic });
@@ -139,9 +142,27 @@ export async function paidSellerFixture(
     meter?: FreeMeter;
     inputTokens?: number;
     maxTokens?: number;
+    payment?: PaymentServer;
+    buyer?: string;
+    authorize?: (
+      quote: Parameters<typeof buildPaidExecutionRequest>[0],
+    ) => Promise<PaymentAuthorization>;
   } = {},
 ) {
   const source = await controlFixture(false);
+  const own = await overrides.payment?.describe();
+  if (own) {
+    source.context.payTo = own.payTo;
+    source.context.feePayer = own.feePayer;
+    source.context.authorizer = own.authorizer;
+    source.request.params.network = own.network;
+    source.request.params.asset = own.mint;
+    for (const model of source.catalog.models) {
+      model.pricing.network = own.network;
+      model.pricing.asset = own.mint;
+    }
+  }
+  if (overrides.buyer) source.request.params.buyer = overrides.buyer;
   for (const model of source.catalog.models)
     model.pricing = { ...model.pricing, ...PAID_PRICES };
   source.context.catalog = await signPublicV2(
@@ -162,6 +183,7 @@ export async function paidSellerFixture(
     authorizer: source.context.authorizer,
     ...FEE,
   });
+  if (overrides.payment) payment.server = overrides.payment;
   let script: EngineScript = { deltas: ['Hi', '.'] };
   const engineCalls: EngineInput[] = [];
   let busy = false;
@@ -240,20 +262,22 @@ export async function paidSellerFixture(
       source.context,
       source.ownerSigner,
     );
+    const authorization = overrides.authorize
+      ? await overrides.authorize(quote)
+      : {
+          channelId: `${'c'.repeat(60)}${String(sequence).padStart(4, '0')}`,
+          payer: quote.offer.buyer,
+          requestDigest: quote.offer.requestDigest,
+          maxAtomic: quote.offer.maxAtomic,
+          payload: Buffer.from('open').toString('base64'),
+        };
     return buildPaidExecutionRequest(
       quote,
       {
         messages: [{ role: FREE_CHAT_ROLES.USER, content: 'Hello' }],
         maxTokens: quote.offer.maxTokens,
       },
-      {
-        // One channel per request, as each request opens its own.
-        channelId: `${'c'.repeat(60)}${String(sequence).padStart(4, '0')}`,
-        payer: quote.offer.buyer,
-        requestDigest: quote.offer.requestDigest,
-        maxAtomic: quote.offer.maxAtomic,
-        payload: Buffer.from('open').toString('base64'),
-      },
+      authorization,
     );
   }
 

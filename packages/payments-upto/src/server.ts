@@ -1,7 +1,11 @@
 // The PaymentServer port over x402-upto-metered: admits a buyer's channel open only for terms that are
 // this seller's own (description, fee and treasury) and name the authorization's payer and request,
 // and settles exactly the recorded channel, reporting the seller and fee shares of the charge.
-import type { UptoChannelRecord, UptoSeller } from 'x402-upto-metered';
+import {
+  uptoClaimUntil,
+  type UptoChannelRecord,
+  type UptoSeller,
+} from 'x402-upto-metered';
 
 import {
   PAYMENT_BINDING,
@@ -30,6 +34,7 @@ export interface UptoPaymentServerOptions {
   description: PaymentDescription;
   settings: UptoChannelSettings;
   seller: UptoSeller;
+  now?: () => number;
 }
 
 // What the channel's signed distribution pays for this charge (each share floored, as the program
@@ -57,6 +62,7 @@ export function createUptoPaymentServer(
   const description = { ...options.description };
   const settings = { ...options.settings };
   const { seller } = options;
+  const now = options.now ?? Date.now;
   assertPaymentNetworkEnabled(description.network);
   // Fails at construction on a malformed description rather than on the first request.
   uptoSellerTerms(description, settings);
@@ -79,12 +85,18 @@ export function createUptoPaymentServer(
         maxAtomic: authorization.maxAtomic,
       });
       try {
+        const claimUntil = uptoClaimUntil(authorization);
+        const reserve = admitOptions.minClaimWindowMs ?? 0;
+        if (!Number.isSafeInteger(reserve) || reserve < 0)
+          throw new PaymentError(PAYMENT_ERROR_CODES.UNTRUSTED_TERMS);
+        if (claimUntil - now() <= reserve)
+          throw new PaymentError(PAYMENT_ERROR_CODES.TERMS_EXPIRED);
         const admitted = await seller.admit(
           authorization,
           await uptoTermsFor(terms, settings),
           admitOptions,
         );
-        return { ...admitted, requestDigest: terms.requestDigest };
+        return { ...admitted, requestDigest: terms.requestDigest, claimUntil };
       } catch (error) {
         return paymentFailure(error, PAYMENT_PHASES.ADMIT);
       }

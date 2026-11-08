@@ -63,6 +63,7 @@ export interface PaymentAuthorization {
 // A verified, deposited channel the seller may now serve and later settle.
 export type PaymentAdmission = Omit<PaymentAuthorization, 'payload'> & {
   // Adapter-verified voucher cutoff in epoch milliseconds, distinct from quote admission expiry.
+  // Execution metadata, not a capacity/settlement guarantee or a new field on the paid wire.
   claimUntil: number;
 };
 
@@ -108,6 +109,8 @@ export interface PaymentClient {
 export interface PaymentServer {
   describe(): Promise<PaymentDescription>;
   // The signal is honoured only until the deposit is sent; after that, admission runs to the end.
+  // Refuse a payload with no minClaimWindowMs remaining before deposit. The caller rechecks the
+  // returned claimUntil after confirmation; this reserve does not bound chain inclusion.
   admit(
     authorization: PaymentAuthorization,
     terms: PaymentTerms,

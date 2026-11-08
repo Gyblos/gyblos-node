@@ -53,6 +53,8 @@ export { TOKEN_PROGRAM_ADDRESS };
 // the buyer's signed open never verifies on the seller.
 export const UPTO_CHANNEL_SETTINGS = {
   tokenProgram: TOKEN_PROGRAM_ADDRESS,
-  withdrawDelaySeconds: PAYMENT_LIMITS.withdrawDelay,
+  // V2 covers the 120 s payload, the SDK's 60 s accepted expiry slack and settlement margin.
+  // Legacy v1 retains PAYMENT_LIMITS.withdrawDelay.
+  withdrawDelaySeconds: 300,
   maxTimeoutSeconds: PAYMENT_LIMITS.maxTimeoutSeconds,
 } as const;

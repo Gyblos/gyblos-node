@@ -137,11 +137,11 @@ export const SELLER_PUBLIC_RECORDS = {
 } as const;
 
 // Paid settlement: how long a terminal waits for the claim (well under the 180 s request deadline,
-// which also covers generation), and the backoff for claims reported pending. The schedule ends well
-// within a channel's lifetime, so a claim never outlives the payer's authorization unnoticed.
+// which also covers generation), and the backoff for claims reported pending. A retry may outlive
+// the payload; it still reconciles a previously broadcast transaction and never changes the charge.
 export const PAID_SETTLEMENT = {
   waitMs: 20_000,
-  // Front-loaded into the channel's claim window (about two minutes), after which a claim lapses.
+  // Front-loaded attempts; a fresh claim is still subject to the actual payload expiry.
   retryDelaysMs: [2_000, 5_000, 10_000, 20_000, 40_000],
 } as const;
 // Claim failures a later attempt with the same charge may overcome.

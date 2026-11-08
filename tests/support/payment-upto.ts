@@ -47,7 +47,7 @@ const TERM_MS = 60_000;
 export const FEE_BPS = 300;
 export const SETTINGS: UptoChannelSettings = {
   tokenProgram: TOKEN_PROGRAM_ADDRESS,
-  withdrawDelaySeconds: 60,
+  withdrawDelaySeconds: 300,
   maxTimeoutSeconds: 120,
 };
 

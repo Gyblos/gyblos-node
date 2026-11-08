@@ -16,7 +16,9 @@ packageExtensions:
 # split on chain (x402-upto-metered); that part is not yet proposed upstream. It also lets a
 # batch-settlement channel commit extra.splits at open, with the client's explicit
 # approveSplits (proposed upstream: x402-foundation/x402#4166). Remove when an
-# @x402/svm release supports both.
+# @x402/svm release supports both. Also adds allowClosingClaims (not yet proposed
+# upstream), opt-in only on the upto claim path: native settle_and_seal accepts
+# Closing before grace expires. Default/deposit validation stays Open-only.
 patchedDependencies:
   '@x402/svm@2.28.0': patches/@x402__svm@2.28.0.patch
 

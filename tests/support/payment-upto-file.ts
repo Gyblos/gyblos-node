@@ -45,7 +45,7 @@ export function record(
       maxAtomic: '1030000',
       expiresAt: NOW + 60_000,
       memo: `gyblos:${'ab'.repeat(32)}`,
-      withdrawDelaySeconds: 60,
+      withdrawDelaySeconds: 300,
       maxTimeoutSeconds: 120,
       splits: [
         { recipient: 'PayTo11111111111111111111111111111111111111', bps: 9709 },
