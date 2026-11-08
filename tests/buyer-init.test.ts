@@ -186,3 +186,21 @@ void test('wizard confirms an explicit USDC ceiling and passes validated answers
   assert.match(output, /ceiling/i);
   assert.match(output, /buyer:chat/);
 });
+
+void test('cancelled initialization refuses before creating a home or preparing a role', async () => {
+  const fixture = await home();
+  let prepares = 0;
+  try {
+    await assert.rejects(initializeBuyer(answers(), { environment: fixture.environment, signal: AbortSignal.abort(), prepareRole: async () => { prepares++; return role(); } }), { code: BUYER_INIT_CODES.UNAVAILABLE });
+    assert.equal(prepares, 0);
+    await assert.rejects(stat(fixture.environment.GYBLOS_HOME), { code: 'ENOENT' });
+  } finally { await rm(fixture.directory, { recursive: true, force: true }); }
+});
+void test('cancellation during identity preparation cannot publish settings or leave the init lock', async () => {
+  const fixture = await home();
+  const controller = new AbortController();
+  try {
+    await assert.rejects(initializeBuyer(answers(), { environment: fixture.environment, signal: controller.signal, prepareRole: async () => { controller.abort(); return role(); } }), { code: BUYER_INIT_CODES.UNAVAILABLE });
+    assert.deepEqual(await readdir(join(fixture.path, '..')), []);
+  } finally { await rm(fixture.directory, { recursive: true, force: true }); }
+});

@@ -1,45 +1,49 @@
-// Builds and saves guided buyer settings; no discovery queries, payment preparation or engine calls.
-import type { HomeEnvironment } from '@gyblos/config/home';
-import type { SellerRequest } from '@gyblos/core/seller-selection';
+// Creates initial buyer settings privately and exclusively; role preparation is a host-supplied port.
+// Existing settings and role state are never replaced; no network, inference or payment is started.
+import { lstat } from 'node:fs/promises';
 
-import { BUYER_INIT_CODES } from './constants';
-import type { RoleConfig } from './roles';
+import { DEVNET_USDC, ROLE_FILES, rolePathIn, type HomeEnvironment } from '@gyblos/config';
+import { P2P_ROLES } from '@gyblos/protocol/constants';
+import { acquireProcessLock, ensurePrivateDirectory, writePrivateFile } from '@gyblos/runtime/private-file';
 
-export interface BuyerInitAnswers {
-  modelId: string;
-  variant: string;
-  quantization: string;
-  maxTokens: string;
-  maxUsdc: string;
-  inputUsdcPerMtok: string;
-  outputUsdcPerMtok: string;
-  sellerOwner: string;
-  sellerNodeId: string;
-  relayUrl: string;
-  discoveryUrl: string;
-  rpcUrl: string;
-}
-export interface BuyerInitPlan {
-  request: SellerRequest;
-  sellers: { owner: string; nodeId: string; relayUrl: string; directAddresses: string[]; manualTrust: false }[];
-  discovery: { baseUrl: string };
-  identity: { rpcUrl: string };
-}
+import { buildBuyerInit, BuyerInitError } from './buyer-init-plan';
+import { BUYER_INIT_CODES, BUYER_SELECTION_FILE } from './constants';
+import { assertRoleHome } from './home';
+import { parseRoleConfig, type RoleConfig } from './roles';
+
+export { buildBuyerInit, buyerInitDefaults, BuyerInitError, type BuyerInitAnswers, type BuyerInitPlan } from './buyer-init-plan';
+
 export interface BuyerInitOptions {
   environment: HomeEnvironment;
+  signal?: AbortSignal;
   prepareRole(): Promise<RoleConfig>;
 }
-export class BuyerInitError extends Error {
-  constructor(readonly code: (typeof BUYER_INIT_CODES)[keyof typeof BUYER_INIT_CODES]) {
-    super(code); this.name = 'BuyerInitError';
+async function requireNewFile(path: string) {
+  try { await lstat(path); }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
+    throw error;
   }
+  throw new BuyerInitError(BUYER_INIT_CODES.EXISTS);
 }
-export function buyerInitDefaults(): BuyerInitAnswers {
-  throw new BuyerInitError(BUYER_INIT_CODES.UNAVAILABLE);
-}
-export function buildBuyerInit(_input: unknown): BuyerInitPlan {
-  throw new BuyerInitError(BUYER_INIT_CODES.UNAVAILABLE);
-}
-export async function initializeBuyer(_input: unknown, _options: BuyerInitOptions): Promise<{ path: string; buyer: string; nodeId: string }> {
-  throw new BuyerInitError(BUYER_INIT_CODES.UNAVAILABLE);
+export async function initializeBuyer(input: unknown, options: BuyerInitOptions): Promise<{ path: string; buyer: string; nodeId: string }> {
+  const plan = buildBuyerInit(input);
+  const { environment } = options;
+  try {
+    await assertRoleHome(P2P_ROLES.BUYER, environment);
+    await ensurePrivateDirectory(rolePathIn(environment, P2P_ROLES.BUYER, ''));
+    const lock = await acquireProcessLock(rolePathIn(environment, P2P_ROLES.BUYER, ROLE_FILES.buyerInitLock));
+    try {
+      const path = rolePathIn(environment, P2P_ROLES.BUYER, ROLE_FILES.buyerSelection);
+      await requireNewFile(path);
+      const role = parseRoleConfig(await options.prepareRole());
+      if (role.role !== P2P_ROLES.BUYER || role.mint !== DEVNET_USDC) throw new BuyerInitError(BUYER_INIT_CODES.UNAVAILABLE);
+      await lock.verify();
+      await writePrivateFile(path, JSON.stringify(plan, null, 2) + '\n', BUYER_SELECTION_FILE.maxBytes, { exclusive: true });
+      return { path, buyer: role.buyer, nodeId: role.nodeId };
+    } finally { await lock.release(); }
+  } catch (error) {
+    if (error instanceof BuyerInitError) throw error;
+    throw new BuyerInitError(BUYER_INIT_CODES.UNAVAILABLE);
+  }
 }

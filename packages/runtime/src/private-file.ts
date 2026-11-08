@@ -165,6 +165,7 @@ export function writePrivateFile(
   path: string,
   text: string,
   maxBytes: number,
+  options: { exclusive?: boolean } = {},
 ): Promise<void> {
   return guarded(async () => {
     if (Buffer.byteLength(text) > maxBytes) fail();
@@ -185,7 +186,10 @@ export function writePrivateFile(
       const before = await parent.stat();
       const named = await lstat(dirname(path));
       if (before.dev !== named.dev || before.ino !== named.ino) fail();
-      await rename(temporary, path);
+      if (options.exclusive) {
+        await link(temporary, path);
+        await unlink(temporary);
+      } else await rename(temporary, path);
       if (process.platform !== 'win32') await parent.sync();
     } finally {
       await unlink(temporary).catch(() => {});
