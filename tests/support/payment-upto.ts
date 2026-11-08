@@ -84,6 +84,7 @@ export function seller(
   return createUptoPaymentServer({
     description,
     settings: SETTINGS,
+    now: () => ledger.now,
     seller: createUptoSeller({
       chain,
       store,
@@ -133,7 +134,8 @@ async function startRig(
 ): Promise<PaymentRig> {
   const disposers: (() => Promise<void>)[] = [];
   const store = () => newStore((cleanup) => disposers.push(cleanup));
-  const ledger = newLedger(START_MS);
+  // The SDK timestamps authorizations with Date.now(); begin this controllable clock there too.
+  const ledger = newLedger(Date.now());
   const recent = await hints();
   const payer = await generateKeyPairSigner();
   const description: PaymentDescription = {
