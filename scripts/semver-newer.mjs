@@ -36,7 +36,11 @@ function compare(a, b) {
   }
   // A pre-release precedes its release.
   if (!a.pre.length || !b.pre.length) return b.pre.length - a.pre.length;
-  for (let index = 0; index < Math.min(a.pre.length, b.pre.length); index += 1) {
+  for (
+    let index = 0;
+    index < Math.min(a.pre.length, b.pre.length);
+    index += 1
+  ) {
     const order = compareIdentifiers(a.pre[index], b.pre[index]);
     if (order) return order;
   }

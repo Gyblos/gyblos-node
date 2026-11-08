@@ -421,7 +421,15 @@ sh install.sh
   `gyblos.toml` (`examples/seller-docker.toml`) and `seller.env` into
   `~/gyblos-seller` (created mode 0700; `GYBLOS_DIR` changes it), then pulls the
   images and the model, creates the seller keys, downloads the tokenizer, runs
-  `gyblos doctor` and starts the seller only when doctor is READY.
+  `gyblos doctor` and starts the seller only when doctor is READY. It then
+  prints the steps to start selling: fund the owner doctor printed with devnet
+  SOL, `gyblos seller register` with the invite code, and
+  `sh install.sh publish` (`gyblos seller status` names the next step while the
+  seller runs).
+- `sh install.sh publish` (or `unpublish`) sets `publish` in the installed
+  `gyblos.toml` (`GYBLOS_DIR` names a non-default install), validates it and
+  recreates the seller; an invalid result or an interruption restores the file.
+  It rewrites the file in place, so the container's bind mount keeps working.
 - `DEFAULT_IMAGE` pins one release by version and digest
   (`ghcr.io/gyblos/seller:<version>@sha256:<digest>`). The release workflow
   below sets it in the copy it attaches to each release; the copy in this
@@ -456,9 +464,9 @@ cosign verify ghcr.io/gyblos/seller:<version>@sha256:<digest> \
   --certificate-identity-regexp '^https://github\.com/Gyblos/gyblos-node/\.github/workflows/release-seller-image\.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'
 ```
 
-The installer attached to a release is signed by the same workflow; its
-Sigstore bundle and SHA-256 are attached next to it. Name the release, so both
-files come from the same one:
+The installer attached to a release is signed by the same workflow; its Sigstore
+bundle and SHA-256 are attached next to it. Name the release, so both files come
+from the same one:
 
 ```sh
 base=https://github.com/Gyblos/gyblos-node/releases/download/v<version>
@@ -492,8 +500,8 @@ git push origin v0.1.0-beta.3
    version is newer than the latest release by semantic-version precedence
    (`scripts/semver-newer.mjs`), the release becomes latest, which is what
    `https://gyblos.com/install.sh` serves, and `:beta` moves to it; an older
-   line's patch is published without replacing either. Releases are never
-   marked pre-release, because GitHub's latest download skips those.
+   line's patch is published without replacing either. Releases are never marked
+   pre-release, because GitHub's latest download skips those.
 3. If only `publish` fails, re-run that failed job; never push the tag again,
    because the release job refuses a version already pushed. A re-run signs a
    new copy of the installer, replaces the files of a release a previous run

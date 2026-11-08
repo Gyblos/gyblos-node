@@ -5,11 +5,6 @@
 // Offline; the image itself is a manual check (release-image.test.ts covers the release script).
 import assert from 'node:assert/strict';
 import {
-  spawnSync,
-  type SpawnSyncOptionsWithStringEncoding,
-} from 'node:child_process';
-import {
-  chmodSync,
   mkdirSync,
   readdirSync,
   readFileSync,
@@ -17,98 +12,16 @@ import {
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
 import { DEVNET_USDC } from '@gyblos/config';
 
+import { harness, IMAGE } from './support/install-harness';
 import { FAKE_SECRET, REPOSITORY_ROOT } from './support/node-config-fixtures';
 
-const SCRIPT = join(REPOSITORY_ROOT, 'install.sh');
-const IMAGE = 'ghcr.io/gyblos/seller:test';
 const read = (path: string) =>
   readFileSync(join(REPOSITORY_ROOT, path), 'utf8');
-
-// Logs each call as one line; the compose version and doctor's result come from the environment.
-const FAKE_DOCKER = `#!/bin/sh
-printf '%s\\n' "$*" >>"$FAKE_DOCKER_LOG"
-case "$*" in
-  'compose version --short') printf '%s\\n' "\${FAKE_COMPOSE_VERSION:-2.29.1}" ;;
-  'compose run --rm seller gyblos doctor') exit "\${FAKE_DOCTOR_EXIT:-0}" ;;
-esac
-exit 0
-`;
-
-// Logs each verification; FAKE_COSIGN_EXIT makes it fail and FAKE_COSIGN_VERSION sets its version.
-const FAKE_COSIGN = `#!/bin/sh
-if [ "$1" = version ]; then
-  printf 'GitVersion:    v%s\\n' "\${FAKE_COSIGN_VERSION:-3.1.4}"
-  exit 0
-fi
-printf '%s\\n' "$*" >>"$FAKE_COSIGN_LOG"
-exit "\${FAKE_COSIGN_EXIT:-0}"
-`;
-
-async function harness(options: { cosign?: boolean } = {}) {
-  const root = await mkdtemp(join(tmpdir(), 'gyblos-install-'));
-  const bin = join(root, 'bin');
-  mkdirSync(bin);
-  writeFileSync(join(bin, 'docker'), FAKE_DOCKER);
-  chmodSync(join(bin, 'docker'), 0o755);
-  if (options.cosign) {
-    writeFileSync(join(bin, 'cosign'), FAKE_COSIGN);
-    chmodSync(join(bin, 'cosign'), 0o755);
-  }
-  const cosignLog = join(root, 'cosign.log');
-  const directory = join(root, 'seller');
-  const log = join(root, 'docker.log');
-  const run = (env: Record<string, string> = {}) => {
-    const options: SpawnSyncOptionsWithStringEncoding & { detached: boolean } =
-      {
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'pipe'],
-        // Its own session, so there is no controlling terminal to prompt on. spawnSync honors it, but its
-        // options type omits it.
-        detached: true,
-        env: {
-          PATH: `${bin}:/usr/bin:/bin`,
-          HOME: root,
-          GYBLOS_DIR: directory,
-          GYBLOS_IMAGE: IMAGE,
-          FAKE_DOCKER_LOG: log,
-          FAKE_COSIGN_LOG: cosignLog,
-          ...env,
-        },
-      };
-    const result = spawnSync('sh', [SCRIPT], options);
-    return { ...result, output: result.stdout + result.stderr };
-  };
-  const calls = () => {
-    try {
-      return readFileSync(log, 'utf8').trim().split('\n');
-    } catch {
-      return [];
-    }
-  };
-  const signatureChecks = () => {
-    try {
-      return readFileSync(cosignLog, 'utf8').trim().split('\n');
-    } catch {
-      return [];
-    }
-  };
-  return {
-    root,
-    directory,
-    run,
-    calls,
-    signatureChecks,
-    file: (name: string) => readFileSync(join(directory, name), 'utf8'),
-    cleanup: () => rm(root, { recursive: true, force: true }),
-  };
-}
 
 void test('installs from the repository compose file and example with the published image', async () => {
   const install = await harness();

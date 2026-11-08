@@ -30,14 +30,16 @@ public NodeId. That printed line is informational; there is no confirmation paus
 
 If discovery reports missing enrollment, the interactive command can register your existing owner wallet
 and NodeId on **Solana devnet**, then retry discovery automatically. The owner address printed by doctor
-needs sufficient **devnet SOL** first. There is no automatic faucet in this command. The registration
-cost is separate from free inference; use no mainnet funds or mainnet keys.
+needs sufficient **devnet SOL** first: about 0.01 SOL, so send it about 0.02 from
+[the devnet faucet](https://faucet.solana.com). If it has too little, the command names the owner and how
+much more SOL it needs. The registration cost is separate from free inference; use no mainnet funds or
+mainnet keys.
 
 The command shows `Pre-simulation funding estimate:` before checking funding and simulation. It then
 shows `Estimated registration cost:` and asks `Sign and submit this registration? (yes/no):`.
-Only **`yes`** approves a new signed attempt. The estimate is not a fixed price: upgradeable programs
+Only **`yes`** (or **`y`**) approves a new signed attempt. The estimate is not a fixed price: upgradeable programs
 can change actual costs. If the refreshed cost increases, the command stops so you can review again.
-Declining is a failed registration result, not a completed enrollment.
+Any other answer declines: `REGISTER_CANCELLED` means nothing was signed or sent, so run the command again.
 
 Without an interactive terminal, `DISCOVERY_IDENTITY_NOT_REGISTERED` means rerun interactively.
 `GYBLOS_INVITE` supplies the invite, not consent to a new on-chain submission. If your installed beta
@@ -64,7 +66,19 @@ before retrying; `DISCOVERY_UNAVAILABLE` means the index could not complete the 
 
 ## Publication [#enable-publication]
 
-Edit the existing `[discovery]` table in `~/gyblos-seller/gyblos.toml`; do not add a duplicate table:
+With the installer, turn publishing on from the folder where you saved `install.sh`:
+
+```sh
+sh install.sh publish
+```
+
+It sets `publish = true` in `~/gyblos-seller/gyblos.toml`, validates the file and recreates the seller; if
+validation fails or you interrupt it, it leaves the file as it was. If you installed elsewhere, prefix the same
+`GYBLOS_DIR=…` you installed with. An older `install.sh` does not know `publish`: download it again first. `gyblos seller status` also names this step while publishing
+is off.
+
+To do it by hand, edit the existing `[discovery]` table in `~/gyblos-seller/gyblos.toml`; do not add a
+duplicate table:
 
 ```toml
 [discovery]
@@ -104,7 +118,7 @@ public identity, model and offer metadata; prompts are not part of this listing.
 
 ### Unlist [#unlist-without-losing-your-identity]
 
-Set `publish = false` in the same table and recreate the seller. Stopping the seller also withdraws its
+Run `sh install.sh unpublish`, or set `publish = false` in the same table and recreate the seller. Stopping the seller also withdraws its
 presence within two minutes. Do not delete keys to leave discovery. A listing can take time to expire.
 
 **Next:** [Adjust models and offers](/en/sellers/models-offers) or [operate your seller](/en/sellers/operate).
