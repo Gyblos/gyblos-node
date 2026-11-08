@@ -4,6 +4,8 @@ import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { createServer } from 'node:http';
 
+import type { Endpoint } from '@number0/iroh';
+
 import { createBuyerControlClient } from '@gyblos/buyer/control';
 import { createSellerControlService } from '@gyblos/node/control';
 import { CONTROL_ALPN, GYBLOS_ALPN } from '@gyblos/protocol/constants';
@@ -12,9 +14,12 @@ import { createControlTransport } from '@gyblos/transport-iroh/control-client';
 import { serveIroh } from '@gyblos/transport-iroh/iroh-server';
 
 import { controlFixture } from './control-fixture';
-import { endpoint } from './native-fixture';
+import { endpoint, within } from './native-fixture';
 
-export async function nativeControlFixture(queryMs = 1000) {
+export async function nativeControlFixture(
+  queryMs = 1000,
+  observeSeller?: (endpoint: Endpoint) => void,
+) {
   const source = await controlFixture();
   source.catalog.models[0]!.pricing.inputAtomicPerMtok = '1000000';
   source.catalog.models[0]!.pricing.outputAtomicPerMtok = '2000000';
@@ -23,6 +28,41 @@ export async function nativeControlFixture(queryMs = 1000) {
     outputAtomicPerMtok: '3000000',
   };
   const seller = await endpoint();
+  const acknowledged = new Map<
+    string,
+    { ready: Promise<void>; signal(): void }
+  >();
+  for (const alpn of [GYBLOS_ALPN, CONTROL_ALPN]) {
+    let signal = () => {};
+    const ready = new Promise<void>((resolve) => {
+      signal = resolve;
+    });
+    acknowledged.set(alpn, { ready, signal });
+  }
+  const acceptNext = seller.acceptNext.bind(seller);
+  seller.acceptNext = async () => {
+    const incoming = await acceptNext();
+    if (!incoming) return incoming;
+    const accept = incoming.accept.bind(incoming);
+    incoming.accept = async () => {
+      const accepting = await accept();
+      const connect = accepting.connect.bind(accepting);
+      accepting.connect = async () => {
+        const connection = await connect();
+        const alpn = Buffer.from(connection.alpn()).toString();
+        const acceptBi = connection.acceptBi.bind(connection);
+        connection.acceptBi = async () => {
+          const stream = await acceptBi();
+          acknowledged.get(alpn)?.signal();
+          return stream;
+        };
+        return connection;
+      };
+      return accepting;
+    };
+    return incoming;
+  };
+  observeSeller?.(seller);
   seller.setAlpns(
     [GYBLOS_ALPN, CONTROL_ALPN].map((alpn) => [...Buffer.from(alpn)]),
   );
@@ -77,6 +117,11 @@ export async function nativeControlFixture(queryMs = 1000) {
     buyer,
     server,
     client,
+    streamReceived(alpn: typeof GYBLOS_ALPN | typeof CONTROL_ALPN) {
+      const item = acknowledged.get(alpn);
+      assert.ok(item);
+      return item.ready;
+    },
     get httpRequests() {
       return httpRequests;
     },
@@ -88,4 +133,31 @@ export async function nativeControlFixture(queryMs = 1000) {
       await new Promise<void>((resolve) => http.close(() => resolve()));
     },
   };
+}
+
+// Retains the incomplete stream until explicit cleanup. The initial red version lacks the server ack.
+export async function holdNativeConnection(
+  run: Awaited<ReturnType<typeof nativeControlFixture>>,
+  alpn: typeof GYBLOS_ALPN | typeof CONTROL_ALPN,
+  onWritten?: () => void,
+) {
+  const connection = await within(
+    run.buyer.connect(run.seller.addr(), [...Buffer.from(alpn)]),
+  );
+  try {
+    const stream = await within(connection.openBi());
+    await within(stream.send.writeAll([0]));
+    onWritten?.();
+    return {
+      connection,
+      async close() {
+        connection.close(1n, []);
+        await stream.send.reset(1n).catch(() => undefined);
+        await stream.recv.stop(1n).catch(() => undefined);
+      },
+    };
+  } catch (error) {
+    connection.close(1n, []);
+    throw error;
+  }
 }
