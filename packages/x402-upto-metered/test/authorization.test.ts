@@ -6,6 +6,7 @@ import test from 'node:test';
 import {
   createUptoAuthorization,
   createUptoVerifier,
+  UPTO_ERROR_CODES,
   uptoRequirements,
 } from '../src/index';
 import { parties } from './support';
@@ -111,4 +112,63 @@ void test('oversized or non-canonical payloads never reach the SDK', async () =>
     Buffer.from('[1]').toString('base64'),
   ])
     assert.equal(await verify({ ...authorization, payload }, terms), false);
+});
+
+void test('checkpoint mode refuses modifying or sending signers before preparation', async () => {
+  const { payer, terms, hints } = await parties();
+  let calls = 0;
+  const unsupported = async () => {
+    calls++;
+    throw new Error('must not ask a modifying or sending wallet');
+  };
+  for (const signer of [
+    { address: payer.address, modifyAndSignTransactions: unsupported },
+    { address: payer.address, signAndSendTransactions: unsupported },
+  ]) {
+    await assert.rejects(
+      createUptoAuthorization(signer, terms, hints, async () => {
+        calls++;
+      }),
+      { code: UPTO_ERROR_CODES.INVALID_TERMS },
+    );
+  }
+  assert.equal(calls, 0);
+});
+
+void test('a wallet cannot change the prepared message or return an invalid signature', async () => {
+  const { payer, terms, hints } = await parties();
+  for (const changeMessage of [true, false]) {
+    let checkpointed = false;
+    await assert.rejects(
+      createUptoAuthorization(
+        {
+          address: payer.address,
+          async signTransactions(transactions, ...rest) {
+            assert.equal(checkpointed, true);
+            const signatures = await payer.signTransactions(
+              transactions,
+              ...rest,
+            );
+            const target = changeMessage
+              ? transactions[0]?.messageBytes
+              : signatures[0]?.[payer.address];
+            assert.ok(target);
+            const bytes = new Uint8Array(
+              target.buffer,
+              target.byteOffset,
+              target.byteLength,
+            );
+            bytes[0] = bytes[0]! ^ 1;
+            return signatures;
+          },
+        },
+        terms,
+        hints,
+        async () => {
+          checkpointed = true;
+        },
+      ),
+      { code: UPTO_ERROR_CODES.INTERNAL },
+    );
+  }
 });

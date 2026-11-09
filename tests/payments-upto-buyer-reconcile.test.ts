@@ -1,7 +1,5 @@
-// The buyer's reconciliation from finalized history: a claim that emptied the escrow settles, disputes
-// or is unchecked against the buyer's own count, reported before the journal changes; an open is never
-// opened only on the chain's word; anything else stays open. Each channel is read with the mint and
-// treasury its open accepted. Temporary journal; chain double.
+// Finalized reconciliation reports first, then resolves only proven outcomes under accepted policy.
+// Temporary journals and synthetic chain replies; incomplete evidence keeps an opening blocked.
 import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -312,20 +310,27 @@ void test('an open is never opened only when the whole chain agrees', () =>
       [{ call: 'account', minContextSlot: double.tip }],
     );
     assert.equal(never?.outcome, RECONCILE_OUTCOMES.NEVER_OPENED);
-    // A version 1 open, whose blockhash lifetime is unknown, is never proven unopened.
+    // A separate legacy-shaped open with unknown lifetime is never proven unopened.
     const legacy = await journal.get(DIGEST);
-    await journal.put({
+    const oldOpening = {
       ...legacy!,
+      requestDigest: OTHER_DIGEST,
+      channelId: OTHER,
       state: PAYMENT_CHANNEL_STATES.OPEN,
       chargedAtomic: null,
       openSlot: '0',
       lastValidBlockHeight: String(BigInt(PUBLIC_RECORD_LIMITS.maxAtomic)),
-    });
+    };
+    await journal.put(oldOpening);
     assert.equal(
       await outcomeOf(journal, state(spam, { oldestSlot: 0n })),
       RECONCILE_OUTCOMES.OPEN,
     );
-    await journal.put({ ...legacy!, chargedAtomic: '0' });
+    await journal.put({
+      ...oldOpening,
+      state: PAYMENT_CHANNEL_STATES.SETTLED,
+      chargedAtomic: '0',
+    });
     assert.equal(never?.chargedAtomic, '0');
     assert.equal((await journal.get(DIGEST))?.chargedAtomic, '0');
   }));

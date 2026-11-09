@@ -94,6 +94,20 @@ only; never import mainnet keys.
   legacy v1 PoC retains its historical 60-second grace and is not covered by
   this service-lifetime protection.
 
+- Paid v2 checkpoints the original SDK opening identity and blockhash lifetime
+  before the payer signs. A wallet refusal or storage failure after that
+  checkpoint conservatively blocks new payments until read-only reconciliation
+  resolves the same channel. It neither saves a signed payload for
+  retransmission nor recovers stale process locks. Journal v4 and private paths
+  are unchanged; this is not reusable-channel closure or refund recovery.
+- Opening checkpoint regressions use the product payment client with synthetic
+  signers and finalized-history replies. A separate standalone-SDK test executes
+  the pinned native program in LiteSVM, loses confirmation and recovers the same
+  deposited channel without a second send or a service charge. That fixture's
+  compiled mainnet-beta treasury matches its offline SDK network label; product
+  mainnet remains disabled. It proves neither deployed-binary equivalence nor a
+  current-code devnet run.
+
 - A timeout, a 503 or a missing history entry does not prove that no payment
   happened. Uncertain payments block new ones until reconciled; there is no
   automatic retry or provider switch after settlement was attempted.

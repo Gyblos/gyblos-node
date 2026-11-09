@@ -1,6 +1,5 @@
-// The production buyer client: its own ceiling, addresses and network refused before anything is
-// written, one signature per request across a restart, failures after journaling leaving no entry
-// behind, and receipts checked against the durable journal. Synthetic keys and hints; no network.
+// Buyer policy, durable openings and settlement proof under injected signer/store faults.
+// Synthetic keys, hints and private temporary journals; no network.
 import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -51,8 +50,6 @@ const DIGEST = 'ab'.repeat(32);
 const code = (expected: string) => (error: unknown) =>
   error instanceof PaymentError && error.code === expected;
 const address = async () => (await generateKeyPairSigner()).address;
-
-// A signer that counts the transactions it was asked to sign.
 async function countingSigner() {
   const signer = await generateKeyPairSigner();
   const counter = { signed: 0 };
@@ -106,7 +103,6 @@ async function buyer(
 
 const memory = (fault: JournalFault = JOURNAL_FAULTS.NONE) =>
   memoryJournal(newLedger(NOW), fault, () => NOW);
-
 async function withRoot(run: (root: string) => Promise<void>) {
   const root = await mkdtemp(join(tmpdir(), 'gyblos-buyer-client-'));
   try {
@@ -126,7 +122,6 @@ void test('a request is signed once, even by the same buyer after a restart', ()
     const first = await buyer(await durable(root));
     const authorization = await first.client.authorize(first.terms);
     assert.equal(first.counter.signed, 1);
-    // The open's own slot and its blockhash lifetime are kept for reconciliation.
     const journaled = await first.options.journal.get(DIGEST);
     assert.equal(
       journaled?.openSlot,
@@ -204,7 +199,7 @@ void test('untrusted terms, another network or no RPC are refused before anythin
   assert.equal(journal.entries.size, 0);
 });
 
-void test('a failure after journaling drops the unsigned entry, leaving nothing to reconcile', async () => {
+void test('a failure after journaling drops only unprepared intents and retains uncertain channels', async () => {
   const unsaved = memory(JOURNAL_FAULTS.SIGNED_WRITE);
   const saving = await buyer(unsaved);
   await assert.rejects(
@@ -225,13 +220,17 @@ void test('a failure after journaling drops the unsigned entry, leaving nothing 
     signing.client.authorize(signing.terms),
     code(PAYMENT_ERROR_CODES.UNAVAILABLE),
   );
-  assert.equal(journal.entries.size, 0);
-  assert.deepEqual(await signing.client.reconcile(), []);
-  // A write that landed despite reporting failure keeps its journaled open.
+  assert.equal(journal.entries.size, 1);
+  assert.ok(journal.entries.get(DIGEST)?.channelId);
+  assert.equal((await signing.client.reconcile()).length, 1);
   const landed = memory(JOURNAL_FAULTS.SIGNED_WRITE_LANDS);
   const kept = await buyer(landed);
-  const authorization = await kept.client.authorize(kept.terms);
-  assert.equal(landed.entries.get(DIGEST)?.channelId, authorization.channelId);
+  await assert.rejects(
+    kept.client.authorize(kept.terms),
+    code(PAYMENT_ERROR_CODES.JOURNAL_UNAVAILABLE),
+  );
+  assert.ok(landed.entries.get(DIGEST)?.channelId);
+  assert.equal(kept.counter.signed, 0);
 });
 
 void test('an unsigned entry left by a crash blocks its request until the terms expire', () =>
