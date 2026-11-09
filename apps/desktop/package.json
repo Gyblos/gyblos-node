@@ -5,6 +5,7 @@
   "type": "module",
   "main": "dist/main.cjs",
   "exports": {
+    "./package-assets": "./scripts/package-assets.ts",
     "./modal-model": "./src/ui/modal-model.ts",
     "./x402-budget": "./src/x402-budget.ts",
     "./x402-client": "./src/x402-client.ts",
