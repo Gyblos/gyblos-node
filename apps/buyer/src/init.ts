@@ -7,6 +7,8 @@ import {
   buildBuyerInit,
   buyerInitDefaults,
   BuyerInitError,
+  buyerInitFields,
+  buyerInitModelNeedsConfirmation,
   checkBuyerInit,
   initializeBuyer,
   validateBuyerInitField,
@@ -15,13 +17,15 @@ import {
 import {
   BUYER_INIT_CODES,
   BUYER_INIT_FIELDS,
+  BUYER_INIT_MODES,
   type BuyerInitField,
+  type BuyerInitMode,
 } from '@gyblos/node/buyer-init-constants';
 import { setupRole } from '@gyblos/node/roles';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 import { isMain } from '@gyblos/runtime';
 
-import { BUYER_INIT_INPUT } from './constants';
+import { BUYER_INIT_FLAGS, BUYER_INIT_INPUT } from './constants';
 
 export interface BuyerInitTerminal {
   preflight(): Promise<{ path: string; exists: boolean }>;
@@ -52,15 +56,15 @@ const FIELDS: readonly {
   },
   {
     key: BUYER_INIT_FIELDS.VARIANT,
-    label: `Variant (${BUYER_INIT_INPUT.CLEAR} for none)`,
+    label: 'Variant',
     clearable: true,
-    hint: 'Use the exact bounded catalog variant, or - for none.',
+    hint: 'Use the exact bounded catalog variant. Enter keeps the displayed value.',
   },
   {
     key: BUYER_INIT_FIELDS.QUANTIZATION,
-    label: `Quantization (exact catalog value; ${BUYER_INIT_INPUT.CLEAR} for none)`,
+    label: 'Quantization',
     clearable: true,
-    hint: 'Use the exact bounded catalog quantization, or - for none.',
+    hint: 'Use the exact bounded catalog quantization. Enter keeps the displayed value.',
   },
   {
     key: BUYER_INIT_FIELDS.MAX_TOKENS,
@@ -104,21 +108,54 @@ async function readField(
   previous: string,
 ) {
   for (;;) {
-    const value = await terminal.read(`${field.label} [${previous}]: `);
+    const shown =
+      previous || (field.clearable ? BUYER_INIT_INPUT.EMPTY_LABEL : '');
+    const clear =
+      field.clearable && previous
+        ? ` (${BUYER_INIT_INPUT.CLEAR} to clear)`
+        : '';
+    const value = await terminal.read(
+      `${field.label}${shown ? ` [${shown}]` : ''}${clear}: `,
+    );
     if (value === undefined) return undefined;
     const candidate =
       field.clearable && value.trim() === BUYER_INIT_INPUT.CLEAR
         ? ''
-        : value.trim() || previous;
+        : field.key === BUYER_INIT_FIELDS.MODEL_ID && value.trim()
+          ? value
+          : value.trim() || previous;
     try {
-      return validateBuyerInitField(field.key, candidate);
+      const checked = validateBuyerInitField(field.key, candidate);
+      if (
+        field.key === BUYER_INIT_FIELDS.MODEL_ID &&
+        buyerInitModelNeedsConfirmation(checked)
+      ) {
+        terminal.write(
+          'This model ID looks unusual. Custom names are allowed and kept exactly; availability is checked when requesting a quote.\n',
+        );
+        const confirmation = await terminal.read(
+          'Keep this model ID exactly as entered? [y/N]: ',
+        );
+        if (confirmation === undefined) return undefined;
+        if (!isConfirmation(confirmation)) continue;
+      }
+      return checked;
     } catch (error) {
       if (!(error instanceof BuyerInitError)) throw error;
       terminal.write(`Invalid ${field.label}. ${field.hint}\n`);
     }
   }
 }
-export async function runBuyerInit(terminal: BuyerInitTerminal): Promise<void> {
+function isConfirmation(value: string | undefined) {
+  return (
+    value !== undefined && ['y', 'yes'].includes(value.trim().toLowerCase())
+  );
+}
+export async function runBuyerInit(
+  terminal: BuyerInitTerminal,
+  mode: BuyerInitMode = BUYER_INIT_MODES.SHORT,
+): Promise<void> {
+  const fields = buyerInitFields(mode);
   const preflight = await terminal.preflight();
   if (preflight.exists) {
     terminal.write(
@@ -127,10 +164,10 @@ export async function runBuyerInit(terminal: BuyerInitTerminal): Promise<void> {
     throw new BuyerInitError(BUYER_INIT_CODES.EXISTS);
   }
   terminal.write(
-    'Configure a devnet buyer. Nothing is sent to a seller or chain.\nUse seller identities from an independent source, never a discovery listing.\nDefaults accept free quotes only.\n',
+    'Configure a devnet buyer. Nothing is sent to a seller or chain.\nUse seller identities from an independent source, never a discovery listing.\nDefaults accept free quotes only.\nPress Enter to accept the value in brackets. Use --advanced to configure the model, limits, or endpoints.\n',
   );
   const answers = buyerInitDefaults();
-  for (const field of FIELDS) {
+  for (const field of FIELDS.filter((field) => fields.includes(field.key))) {
     const value = await readField(terminal, field, answers[field.key]);
     if (value === undefined) {
       terminal.write('Cancelled. No initialization requested.\n');
@@ -140,15 +177,12 @@ export async function runBuyerInit(terminal: BuyerInitTerminal): Promise<void> {
   }
   const plan = buildBuyerInit(answers);
   terminal.write(
-    `\nModel: ${plan.request.selection.modelId}; reasoning: ${plan.request.reasoning}.\nBudget ceiling: ${answers.maxUsdc} USDC per request. Prices: ${answers.inputUsdcPerMtok} input / ${answers.outputUsdcPerMtok} output USDC per million tokens.\nFree signed quotes cause no payment transactions, including with a positive ceiling.\n8004 identity verification remains enabled. Existing settings will be refused.\n`,
+    `\nModel: ${plan.request.selection.modelId}; reasoning: ${plan.request.reasoning}.\nVariant: ${answers.variant || `[${BUYER_INIT_INPUT.EMPTY_LABEL}]`}; Quantization: ${answers.quantization || `[${BUYER_INIT_INPUT.EMPTY_LABEL}]`}.\nMaximum output tokens: ${answers.maxTokens}.\nBudget ceiling: ${answers.maxUsdc} USDC per request. Prices: ${answers.inputUsdcPerMtok} input / ${answers.outputUsdcPerMtok} output USDC per million tokens.\nFree signed quotes cause no payment transactions, including with a positive ceiling.\n8004 identity verification remains enabled. Existing settings will be refused.\n`,
   );
   const confirmation = await terminal.read(
     'Save these settings and prepare the local buyer identity? [y/N]: ',
   );
-  if (
-    !confirmation ||
-    !['y', 'yes'].includes(confirmation.trim().toLowerCase())
-  ) {
+  if (!isConfirmation(confirmation)) {
     terminal.write('Cancelled. No initialization requested.\n');
     return;
   }
@@ -175,9 +209,20 @@ export function buyerInitMessage(error: unknown) {
   return `${error.code}: ${hint}`;
 }
 export async function main() {
-  if (process.argv.includes('--help')) {
+  const args = process.argv.slice(2);
+  if (
+    args.some(
+      (argument) =>
+        !Object.values(BUYER_INIT_FLAGS).some((flag) => flag === argument),
+    )
+  ) {
+    console.error('Usage: pnpm buyer:init [--advanced] [--help]');
+    process.exitCode = 1;
+    return;
+  }
+  if (args.includes(BUYER_INIT_FLAGS.HELP)) {
     stdout.write(
-      'Usage: pnpm buyer:init\nInteractive devnet setup. Existing buyer settings are never overwritten.\n',
+      'Usage: pnpm buyer:init [--advanced]\nDefault: Seller NodeId, owner wallet, then confirm free defaults.\n--advanced: configure the exact model, limits and endpoints.\nInteractive devnet setup. Existing buyer settings are never overwritten.\n',
     );
     return;
   }
@@ -192,26 +237,33 @@ export async function main() {
   const input = createInterface({ input: stdin, output: stdout });
   input.on('SIGINT', () => controller.abort());
   try {
-    await runBuyerInit({
-      preflight: () => checkBuyerInit(process.env),
-      read: async (question) => {
-        try {
-          return await input.question(question, { signal: controller.signal });
-        } catch {
-          return undefined;
-        }
+    await runBuyerInit(
+      {
+        preflight: () => checkBuyerInit(process.env),
+        read: async (question) => {
+          try {
+            return await input.question(question, {
+              signal: controller.signal,
+            });
+          } catch {
+            return undefined;
+          }
+        },
+        write: (text) => {
+          stdout.write(text);
+        },
+        initialize: (answers) =>
+          initializeBuyer(answers, {
+            environment: process.env,
+            signal: controller.signal,
+            prepareRole: () =>
+              setupRole({ role: P2P_ROLES.BUYER, mint: DEVNET_USDC }),
+          }),
       },
-      write: (text) => {
-        stdout.write(text);
-      },
-      initialize: (answers) =>
-        initializeBuyer(answers, {
-          environment: process.env,
-          signal: controller.signal,
-          prepareRole: () =>
-            setupRole({ role: P2P_ROLES.BUYER, mint: DEVNET_USDC }),
-        }),
-    });
+      args.includes(BUYER_INIT_FLAGS.ADVANCED)
+        ? BUYER_INIT_MODES.ADVANCED
+        : BUYER_INIT_MODES.SHORT,
+    );
   } catch (error) {
     console.error(buyerInitMessage(error));
     process.exitCode = 1;

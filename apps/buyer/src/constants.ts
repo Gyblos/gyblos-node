@@ -297,4 +297,8 @@ export type FreeBuyerStartupReason =
 export const BUYER_EXECUTION_FIELD = 'gyblos_execution';
 
 // The guided form uses this explicit marker to clear a nullable field without changing blank defaults.
-export const BUYER_INIT_INPUT = { CLEAR: '-' } as const;
+export const BUYER_INIT_INPUT = { CLEAR: '-', EMPTY_LABEL: 'none' } as const;
+export const BUYER_INIT_FLAGS = {
+  ADVANCED: '--advanced',
+  HELP: '--help',
+} as const;

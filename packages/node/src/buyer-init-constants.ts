@@ -22,3 +22,10 @@ export const BUYER_INIT_FIELDS = {
 } as const;
 export type BuyerInitField =
   (typeof BUYER_INIT_FIELDS)[keyof typeof BUYER_INIT_FIELDS];
+
+export const BUYER_INIT_MODES = {
+  SHORT: 'short',
+  ADVANCED: 'advanced',
+} as const;
+export type BuyerInitMode =
+  (typeof BUYER_INIT_MODES)[keyof typeof BUYER_INIT_MODES];

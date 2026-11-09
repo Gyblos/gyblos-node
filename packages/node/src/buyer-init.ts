@@ -24,6 +24,8 @@ import { parseRoleConfig, type RoleConfig } from './roles';
 export {
   buildBuyerInit,
   buyerInitDefaults,
+  buyerInitFields,
+  buyerInitModelNeedsConfirmation,
   BuyerInitError,
   validateBuyerInitField,
   type BuyerInitAnswers,

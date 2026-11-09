@@ -33,7 +33,9 @@ import {
   BUYER_INIT_CODES,
   BUYER_INIT_FIELDS,
   BUYER_INIT_LIMITS,
+  BUYER_INIT_MODES,
   type BuyerInitField,
+  type BuyerInitMode,
 } from './buyer-init-constants';
 import { usdcToAtomic } from './node-config-price';
 
@@ -201,4 +203,22 @@ export function buildBuyerInit(input: unknown): BuyerInitPlan {
     if (error instanceof BuyerInitError) throw error;
     throw new BuyerInitError(BUYER_INIT_CODES.INVALID);
   }
+}
+
+export function buyerInitFields(
+  mode: BuyerInitMode = BUYER_INIT_MODES.SHORT,
+): readonly BuyerInitField[] {
+  switch (mode) {
+    case BUYER_INIT_MODES.SHORT:
+      return [BUYER_INIT_FIELDS.SELLER_NODE_ID, BUYER_INIT_FIELDS.SELLER_OWNER];
+    case BUYER_INIT_MODES.ADVANCED:
+      return Object.values(BUYER_INIT_FIELDS);
+    default:
+      throw new BuyerInitError(BUYER_INIT_CODES.INVALID);
+  }
+}
+export function buyerInitModelNeedsConfirmation(value: unknown): boolean {
+  const model = validateBuyerInitField(BUYER_INIT_FIELDS.MODEL_ID, value);
+  // Advisory only: custom identifiers remain valid and are never rewritten.
+  return /^[^\p{L}\p{N}]/u.test(model) || /\s/u.test(model);
 }

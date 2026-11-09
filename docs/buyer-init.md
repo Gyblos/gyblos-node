@@ -17,30 +17,52 @@ startup diagnostic naming the relay settings to check.
 without one. It prepares local configuration only: it makes no discovery or RPC
 request, starts no engine, downloads nothing and sends no payment transaction.
 
-## Questions
+## Short setup and advanced setup
+
+The default `pnpm buyer:init` asks only for the seller's NodeId, owner wallet,
+and confirmation. It shows the exact model, variant, quantization, token limit
+and zero spending/price ceilings before saving. These are the existing bounded
+Qwen3-0.6B defaults, with reasoning off; short setup does not discover a model
+or check a seller's availability. For another model, limits, relay, discovery
+index or RPC, use the complete form:
+
+```sh
+pnpm buyer:init --advanced
+```
+
+Both modes use the same shared validation, private initializer and identity
+policy. Existing settings are refused before either mode asks a question.
 
 Have the seller's public NodeId and owner wallet address from an independent,
-trusted source. A discovery listing is not identity proof. The assistant asks
-for those values, the exact model/variant/quantization and the output-token
-limit. Defaults match the bounded Qwen3-0.6B offer, with reasoning off and no
-reasoning downgrade. Custom model names are preserved exactly; availability is
-checked by the existing buyer when it requests a quote. A blank answer keeps the
-displayed default; enter `-` to clear variant or quantization to null. Each
-answer is checked immediately using the same shared validation as the complete
-plan. An invalid answer names the field and gives a static hint; only that
-question repeats, with earlier valid answers retained. Cancelling during a
-correction performs no initialization.
+trusted source. A discovery listing is not identity proof. The advanced form
+also asks for the exact model/variant/quantization and the output-token limit.
+Defaults match the bounded Qwen3-0.6B offer, with reasoning off and no reasoning
+downgrade. Custom model names are preserved exactly; availability is checked by
+the existing buyer when it requests a quote. In advanced mode a name starting
+with punctuation or containing whitespace prompts for explicit confirmation.
+Declining repeats only the model question; cancelling performs no
+initialization. This warning does not validate a name against a central catalog
+or rewrite it, and the shared plan builder still accepts valid custom names.
+
+Press Enter to accept the value in brackets. An empty optional field is shown as
+`[none]`; Enter keeps it empty. A nullable field with a nonempty default also
+shows `- to clear`, which clears that field to null. Each answer is checked
+immediately using the same shared validation as the complete plan. An invalid
+answer names the field and gives a static hint; only that question repeats, with
+earlier valid answers retained. Cancelling during a correction performs no
+initialization.
 
 Amounts are entered as **USDC**, with exact micro-USDC precision. Input and
 output price ceilings are **USDC per million tokens**. The saved file contains
 canonical atomic amounts; no floating-point conversion is used.
 
 The default total ceiling and both price ceilings are zero. This admits free
-quotes only. A positive total ceiling still allows free quotes: the buyer
-chooses the execution path from the verified signed quote, not from a mode
-selected by this command. Positive-price execution additionally requires the
-existing devnet funding and pinned-tokenizer preparation; setup performs
-neither. The total ceiling bounds the payment, including the protocol fee.
+quotes only, and `buyer:chat` labels that automatic setup as `free quotes only`.
+A positive total ceiling still allows free quotes: the buyer chooses the
+execution path from the verified signed quote, not from a mode selected by this
+command. Positive-price execution additionally requires the existing devnet
+funding and pinned-tokenizer preparation; setup performs neither. The total
+ceiling bounds the payment, including the protocol fee.
 
 Discovery and the 8004 identity RPC have separate prompts. The generated
 configuration always enables independent 8004 verification and never sets a
@@ -113,8 +135,10 @@ succeed. Changes to an existing selection file must retain private file modes
 and the runtime's full validation and trust requirements.
 
 The shared `@gyblos/node/buyer-init` entry exports the form defaults, pure plan
-builder, field validator, read-only preflight and private initializer. Hosts
-supply role preparation and local-home context; the CLI supplies terminal
+builder, field validator, `buyerInitFields` mode policy,
+`buyerInitModelNeedsConfirmation` advisory, read-only preflight and private
+initializer. `BUYER_INIT_MODES` lives in `@gyblos/node/buyer-init-constants`.
+Hosts supply role preparation and local-home context; the CLI supplies terminal
 input/output. Other hosts can reuse these functions without importing the CLI.
 Runtime selection validation, quote verification and execution remain in their
 existing paths.
