@@ -17,6 +17,7 @@ import {
   UPTO_ERROR_CODES,
   UPTO_WITHDRAW,
   UPTO_WITHDRAW_STEPS,
+  type UptoCommitment,
   type UptoWithdrawStep,
 } from './constants';
 import { UptoError } from './errors';
@@ -42,10 +43,18 @@ import {
 export interface UptoWithdrawRpc extends UptoSendRpc {
   getAccountInfo(
     account: Address,
-    config: Confirmed & { encoding: 'base64' },
+    config: {
+      commitment: UptoCommitment;
+      encoding: 'base64';
+      minContextSlot?: bigint;
+    },
   ): Call<{
     value: { owner: Address; data: readonly [string, 'base64'] } | null;
+    context?: { slot: bigint };
   }>;
+  getEpochInfo?(config: {
+    commitment: typeof import('./constants').UPTO_FINAL_COMMITMENT;
+  }): Call<{ absoluteSlot: bigint; blockHeight: bigint }>;
   getSlot(config: Confirmed): Call<bigint>;
   // Unix seconds of the block at that slot; a node may not know it yet.
   getBlockTime(slot: bigint): Call<bigint | null>;
@@ -75,6 +84,22 @@ export interface UptoWithdrawResult {
   confirmed: boolean;
   // When another call can make progress, in seconds; null when nothing is left to do.
   retryAfterSeconds: number | null;
+}
+
+export interface UptoWithdrawalAttempt {
+  step:
+    | typeof UPTO_WITHDRAW_STEPS.CLOSE_REQUESTED
+    | typeof UPTO_WITHDRAW_STEPS.DISTRIBUTED;
+  transaction: string;
+  lastValidBlockHeight: string;
+  checkedSlot: string;
+  pending: boolean;
+}
+
+export interface UptoWithdrawalRecovery {
+  previous?: UptoWithdrawalAttempt;
+  save(attempt: UptoWithdrawalAttempt): Promise<void>;
+  readOnly?: boolean;
 }
 
 const sameBytes = (left: readonly number[], right: Uint8Array) =>
@@ -185,7 +210,10 @@ export function createUptoWithdrawal(
 ) {
   const statuses = UPTO_CHANNEL_ACCOUNT.statuses;
   return {
-    async withdraw(query: UptoWithdrawQuery): Promise<UptoWithdrawResult> {
+    async withdraw(
+      query: UptoWithdrawQuery,
+      _recovery?: UptoWithdrawalRecovery,
+    ): Promise<UptoWithdrawResult> {
       const channel = await channelAt(rpc, options.network, query);
       if (channel === undefined) return result(UPTO_WITHDRAW_STEPS.NOTHING);
       if (!channel || !ours(channel, options.payer.address, query))

@@ -3,6 +3,7 @@
 import { lstat } from 'node:fs/promises';
 
 import { isAddress } from '@solana/kit';
+import type { UptoWithdrawalAttempt } from 'x402-upto-metered';
 
 import {
   PAYMENT_BINDING,
@@ -35,6 +36,7 @@ export interface UptoJournalPolicy {
 }
 
 export interface UptoJournalEntry {
+  withdrawal?: UptoWithdrawalAttempt;
   requestDigest: string;
   // Null until the SDK open is prepared; non-null means signing may have happened.
   channelId: string | null;
@@ -56,6 +58,12 @@ export interface UptoJournalEntry {
 }
 
 export interface UptoBuyerJournal {
+  recordWithdrawal?(
+    requestDigest: string,
+    channelId: string,
+    expected: UptoWithdrawalAttempt | undefined,
+    next: UptoWithdrawalAttempt,
+  ): Promise<void>;
   get(requestDigest: string): Promise<UptoJournalEntry | undefined>;
   put(entry: Omit<UptoJournalEntry, 'updatedAt'>): Promise<void>;
   // Removing a prepared open known to be unsent also requires its exact channelId.
@@ -358,6 +366,7 @@ export async function openUptoBuyerJournal(options: {
       entries.delete(requestDigest);
     });
   return {
+    recordWithdrawal: async () => {},
     get: async (requestDigest) => (await load()).entries.get(requestDigest),
     put,
     remove,

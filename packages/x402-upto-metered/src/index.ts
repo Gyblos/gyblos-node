@@ -43,6 +43,8 @@ export {
 } from './channel-readers';
 export {
   createUptoWithdrawal,
+  type UptoWithdrawalAttempt,
+  type UptoWithdrawalRecovery,
   type UptoWithdrawOptions,
   type UptoWithdrawQuery,
   type UptoWithdrawResult,

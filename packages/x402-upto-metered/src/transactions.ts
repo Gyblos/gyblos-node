@@ -42,10 +42,15 @@ export interface UptoSendRpc {
     transaction: Base64EncodedWireTransaction,
     config: { encoding: 'base64'; preflightCommitment: typeof UPTO_COMMITMENT },
   ): UptoCall<Signature>;
-  getSignatureStatuses(signatures: Signature[]): UptoCall<{
+  getSignatureStatuses(
+    signatures: Signature[],
+    config?: { searchTransactionHistory: true },
+  ): UptoCall<{
+    context?: { slot: bigint };
     value: readonly ({
       err: unknown;
       confirmationStatus: Landed | 'processed' | null;
+      slot?: bigint;
     } | null)[];
   }>;
 }
