@@ -155,7 +155,7 @@ void test('publish restores gyblos.toml when the change does not validate, and r
       assert.equal(usage.status, 1, args.join(' '));
       assert.match(
         usage.stderr,
-        /Usage: sh install\.sh \[publish\|unpublish\]/,
+        /Usage: sh install\.sh \[publish\|unpublish\|update\]/,
         args.join(' '),
       );
     }

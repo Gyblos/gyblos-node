@@ -11,6 +11,7 @@ import { P2P_ROLES } from '@gyblos/protocol/constants';
 import { urlOrigin } from './cli-format';
 import { codeHint } from './cli-hints';
 import { LISTING, nextStep } from './cli-next';
+import { updateNotice } from './cli-update';
 import {
   EXIT,
   SERVICE_STATES,
@@ -223,6 +224,12 @@ export async function statusCommand(
   const identity = await sellerIdentity(homeEnvironment, output);
   if (!identity) return EXIT.failure;
   const now = system.now();
+  // Started first so the request overlaps the local reads.
+  const update = updateNotice(
+    output.env,
+    system.fetch,
+    inContainer(output.env),
+  );
   const [service, daemon, discovery] = await Promise.all([
     serviceState(system, output.env),
     readDaemonStatus(homeEnvironment),
@@ -282,5 +289,7 @@ export async function statusCommand(
     output.stdout(
       '  Without a service, status.json shows the last state written; a stopped seller may still read "ready".\n',
     );
+  const available = await update;
+  if (available) output.stdout(`Update: ${available}\n`);
   return verdict === STATUS_RESULTS.RUNNING ? EXIT.ok : EXIT.failure;
 }

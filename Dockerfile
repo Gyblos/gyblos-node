@@ -8,7 +8,10 @@ COPY . .
 RUN pnpm install --frozen-lockfile && pnpm store prune
 
 FROM node:24.22.1-bookworm-slim
-ENV GYBLOS_HOME=/data GYBLOS_CONFIG=/config/gyblos.toml GYBLOS_CONTAINER=1
+# The release version, set by scripts/release-image.sh; `gyblos seller status` compares it with the latest
+# release. A local build leaves it empty and checks nothing.
+ARG GYBLOS_VERSION=
+ENV GYBLOS_HOME=/data GYBLOS_CONFIG=/config/gyblos.toml GYBLOS_CONTAINER=1 GYBLOS_VERSION=$GYBLOS_VERSION
 COPY --from=build --chown=node:node /app /app
 # `docker compose exec seller gyblos …` runs the CLI inside the seller's own container.
 RUN install -d -o node -g node -m 0700 /data && ln -s /app/docker/gyblos /usr/local/bin/gyblos

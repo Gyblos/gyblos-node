@@ -6,6 +6,7 @@
 #                             and publishes it, asking before each step (otherwise it prints those steps)
 #   sh install.sh publish     list the installed seller in the discovery index (after registering it)
 #   sh install.sh unpublish   withdraw it from the index; it keeps running
+#   sh install.sh update      download the latest release's installer, check it and run it here
 #
 # Environment (all optional):
 #   GYBLOS_DIR          where compose.yaml, gyblos.toml and seller.env go (default: ~/gyblos-seller)
@@ -32,6 +33,8 @@ RELEASE_PATTERN='ghcr\.io/gyblos/seller'
 # Releases are signed keyless by the release workflow at a version tag; cosign checks that identity.
 RELEASE_IDENTITY='^https://github\.com/Gyblos/gyblos-node/\.github/workflows/release-seller-image\.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'
 RELEASE_ISSUER=https://token.actions.githubusercontent.com
+# Each release attaches its installer, checksum and signature bundle; the latest release is the update.
+RELEASE_DOWNLOAD=https://github.com/Gyblos/gyblos-node/releases/latest/download
 # Devnet USDC (packages/config/src/network.ts DEVNET_USDC).
 MINT=4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU
 # The model the default offer serves (examples/seller-docker.toml).
@@ -125,6 +128,7 @@ cleanup() {
   # An interrupted or failed publish change goes back to the saved original before it is removed.
   [ -z "${restore:-}" ] || cat "$original" >gyblos.toml
   [ -z "${tmp:-}" ] || rm -f "$tmp"
+  [ -z "${work:-}" ] || rm -rf "$work"
   [ -z "${prompting:-}" ] || stty echo </dev/tty 2>/dev/null || true
 }
 
@@ -441,6 +445,59 @@ set_publish() {
   fi
 }
 
+sha256_of() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | cut -d ' ' -f 1
+  elif command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$1" | cut -d ' ' -f 1
+  else
+    die 'sha256sum or shasum is needed to check the downloaded installer.'
+  fi
+}
+
+# Checks the downloaded installer's checksum and, with cosign, its release signature (strict mode needs it).
+verify_installer() {
+  expected=$(cut -d ' ' -f 1 "$work/install.sh.sha256")
+  [ "$(sha256_of "$work/install.sh")" = "$expected" ] ||
+    die 'The downloaded installer does not match its checksum; nothing was changed.'
+  if ! command -v cosign >/dev/null 2>&1; then
+    unchecked 'cosign is not installed, so the installer signature was not checked (docs: image signature).'
+    return
+  fi
+  cosign verify-blob "$work/install.sh" --bundle "$work/install.sh.sigstore.json" \
+    --certificate-identity-regexp "$RELEASE_IDENTITY" --certificate-oidc-issuer "$RELEASE_ISSUER" \
+    >/dev/null 2>&1 ||
+    die 'The downloaded installer signature did not verify as a Gyblos release; nothing was changed.'
+  say 'Verified the Gyblos release signature of the installer.'
+}
+
+# Downloads the latest release's installer, checks it, keeps it in place of this one (when this one is a
+# file) and runs it for the same install; an installer pinning this one's image means nothing to do.
+update_installer() {
+  command -v curl >/dev/null 2>&1 || die 'curl is needed to download the update.'
+  [ -f "$dir/compose.yaml" ] ||
+    die "No installed seller in $dir: run sh install.sh first (GYBLOS_DIR names another directory)."
+  work=$(mktemp -d)
+  for file in install.sh install.sh.sha256 install.sh.sigstore.json; do
+    curl -fsSL --proto '=https' --tlsv1.2 -o "$work/$file" "$RELEASE_DOWNLOAD/$file" ||
+      die "Could not download $file from the latest release; try again later."
+  done
+  verify_installer
+  latest=$(sed -n 's/^DEFAULT_IMAGE=//p' "$work/install.sh")
+  [ -n "$latest" ] || die 'The downloaded installer names no release image; nothing was changed.'
+  if [ "$latest" = "$DEFAULT_IMAGE" ]; then
+    say "Already the latest release: $DEFAULT_IMAGE"
+    return
+  fi
+  say "Updating to $latest"
+  target=$work/install.sh
+  # Renamed into place, never rewritten: this shell is still reading the old file.
+  if [ -f "$0" ] && [ -w "$0" ] && [ ! -L "$0" ]; then
+    cp "$work/install.sh" "$0.update.$$" && mv -f "$0.update.$$" "$0" && target=$0
+  fi
+  GYBLOS_DIR=$dir sh "$target"
+}
+
 main() {
   trap cleanup EXIT
   trap 'exit 130' INT TERM HUP
@@ -481,7 +538,7 @@ main() {
   say '  docker compose logs -f seller        follow it'
   say '  docker compose stop seller           stop it (withdraws within 120 s)'
   say '  docker compose up -d --force-recreate seller   apply an edited gyblos.toml'
-  say '  download the latest install.sh and run it again here   update it'
+  say "  $(publish_command update)   update it to the latest release"
   say 'Its keys are in the gyblos volume: `docker compose down -v` deletes them.'
   if publishing; then
     say 'Publishing is on. Check that the index lists it:'
@@ -494,10 +551,16 @@ main() {
 case "${1:-}" in
   '') main ;;
   publish | unpublish)
-    [ "$#" -eq 1 ] || die "Usage: sh install.sh [publish|unpublish]"
+    [ "$#" -eq 1 ] || die "Usage: sh install.sh [publish|unpublish|update]"
     trap cleanup EXIT
     trap 'exit 130' INT TERM HUP
     if [ "$1" = publish ]; then set_publish true; else set_publish false; fi
     ;;
-  *) die "Unknown command '$1'. Usage: sh install.sh [publish|unpublish]" ;;
+  update)
+    [ "$#" -eq 1 ] || die "Usage: sh install.sh [publish|unpublish|update]"
+    trap cleanup EXIT
+    trap 'exit 130' INT TERM HUP
+    update_installer
+    ;;
+  *) die "Unknown command '$1'. Usage: sh install.sh [publish|unpublish|update]" ;;
 esac

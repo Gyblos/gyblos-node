@@ -4,7 +4,13 @@ import {
   spawnSync,
   type SpawnSyncOptionsWithStringEncoding,
 } from 'node:child_process';
-import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  copyFileSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -41,17 +47,44 @@ printf '%s\\n' "$*" >>"$FAKE_COSIGN_LOG"
 exit "\${FAKE_COSIGN_EXIT:-0}"
 `;
 
-export async function harness(options: { cosign?: boolean } = {}) {
+// Serves a release download from FAKE_RELEASE_DIR by its file name and logs each URL; FAKE_CURL_EXIT fails it.
+const FAKE_CURL = `#!/bin/sh
+out= url=
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    -o) out=$2; shift 2 ;;
+    -*) shift ;;
+    *) url=$1; shift ;;
+  esac
+done
+printf '%s\\n' "$url" >>"$FAKE_CURL_LOG"
+[ "\${FAKE_CURL_EXIT:-0}" = 0 ] || exit "$FAKE_CURL_EXIT"
+cp "$FAKE_RELEASE_DIR/\${url##*/}" "$out"
+`;
+
+// `copy` runs a copy of install.sh in the temporary directory, for commands that replace the script.
+export async function harness(
+  options: { cosign?: boolean; curl?: boolean; copy?: boolean } = {},
+) {
   const root = await mkdtemp(join(tmpdir(), 'gyblos-install-'));
   const bin = join(root, 'bin');
   mkdirSync(bin);
   writeFileSync(join(bin, 'docker'), FAKE_DOCKER);
   chmodSync(join(bin, 'docker'), 0o755);
+  if (options.curl) {
+    writeFileSync(join(bin, 'curl'), FAKE_CURL);
+    chmodSync(join(bin, 'curl'), 0o755);
+  }
+  const script = options.copy ? join(root, 'install.sh') : SCRIPT;
+  if (options.copy) copyFileSync(SCRIPT, script);
   if (options.cosign) {
     writeFileSync(join(bin, 'cosign'), FAKE_COSIGN);
     chmodSync(join(bin, 'cosign'), 0o755);
   }
   const cosignLog = join(root, 'cosign.log');
+  const curlLog = join(root, 'curl.log');
+  const release = join(root, 'release');
+  mkdirSync(release);
   const directory = join(root, 'seller');
   const log = join(root, 'docker.log');
   const run = (env: Record<string, string> = {}, args: string[] = []) => {
@@ -69,10 +102,12 @@ export async function harness(options: { cosign?: boolean } = {}) {
           GYBLOS_IMAGE: IMAGE,
           FAKE_DOCKER_LOG: log,
           FAKE_COSIGN_LOG: cosignLog,
+          FAKE_CURL_LOG: curlLog,
+          FAKE_RELEASE_DIR: release,
           ...env,
         },
       };
-    const result = spawnSync('sh', [SCRIPT, ...args], options);
+    const result = spawnSync('sh', [script, ...args], options);
     return { ...result, output: result.stdout + result.stderr };
   };
   const calls = () => {
@@ -89,8 +124,18 @@ export async function harness(options: { cosign?: boolean } = {}) {
       return [];
     }
   };
+  const downloads = () => {
+    try {
+      return readFileSync(curlLog, 'utf8').trim().split('\n');
+    } catch {
+      return [];
+    }
+  };
   return {
     root,
+    script,
+    release,
+    downloads,
     directory,
     run,
     calls,
