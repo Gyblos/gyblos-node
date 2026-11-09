@@ -5,11 +5,13 @@ import {
   FREE_CHAT_ROLES,
   FREE_EXECUTION_CODES,
   FREE_STREAM,
+  OFFER_PRICING_KINDS,
   PAYMENT_ERROR_CODES,
 } from '@gyblos/protocol/constants';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 
 import {
+  BUYER_EXECUTION_FIELD,
   BUYER_SELECTION_CODES,
   FREE_BUYER,
   FREE_BUYER_CODES,
@@ -24,6 +26,7 @@ export interface ChatTurnOptions {
   maxTokens: number;
   prompt: string;
   paid?: boolean;
+  automatic?: boolean;
   write: (text: string) => void;
   signal?: AbortSignal;
 }
@@ -97,7 +100,7 @@ function errorResult(value: unknown): ChatTurnResult {
 function completeResult(
   choice: Record<string, unknown>,
   body: Record<string, unknown>,
-  paid: boolean | undefined,
+  options: Pick<ChatTurnOptions, 'paid' | 'automatic'>,
 ): ChatTurnResult {
   const usage = record(body.usage);
   if (
@@ -112,7 +115,16 @@ function completeResult(
     usage: { input: usage.prompt_tokens, output: usage.completion_tokens },
   };
   const payment = record(body[PAID_BUYER.paymentField]);
-  if (paid && !payment) throw new Error('payment');
+  if (options.automatic) {
+    const route = body[BUYER_EXECUTION_FIELD];
+    if (
+      route !== OFFER_PRICING_KINDS.FREE &&
+      route !== OFFER_PRICING_KINDS.PAID
+    )
+      throw new Error('route');
+    if ((route === OFFER_PRICING_KINDS.PAID) !== Boolean(payment))
+      throw new Error('payment');
+  } else if (options.paid && !payment) throw new Error('payment');
   if (payment) {
     terminal.payment = paymentResult(payment);
     if (payment.verdict !== PAID_VERDICTS.SETTLED)
@@ -168,7 +180,7 @@ export async function chatTurn(
         signal,
         headers: {
           'content-type': 'application/json',
-          ...(options.paid
+          ...(options.paid || options.automatic
             ? { [PAID_BUYER.observationHeader]: PAID_BUYER.observationValue }
             : {}),
         },
@@ -278,7 +290,7 @@ async function readStream(
             requestDigest = frameDigest(
               body,
               requestDigest,
-              options.paid,
+              options.paid || options.automatic,
               terminal,
             );
           } catch {
@@ -304,7 +316,7 @@ async function readStream(
           if (!choice || !delta) throw new Error('choice');
           writeDelta(options, delta.content);
           if (choice.finish_reason !== null) {
-            terminal = completeResult(choice, body, options.paid);
+            terminal = completeResult(choice, body, options);
           }
         }
         end = pending.indexOf('\n\n');

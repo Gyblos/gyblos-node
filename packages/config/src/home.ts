@@ -36,6 +36,8 @@ export const HOME_FILES = {
 // File names inside one role directory.
 export const ROLE_FILES = {
   roleConfig: 'role.json',
+  buyerSelection: 'selection.json',
+  buyerInitLock: 'init.lock',
   nodeKey: 'node.key',
   trust: 'trust.json',
   status: 'status.json',
@@ -54,6 +56,8 @@ export const ROLE_FILES = {
   offer: 'offer.json',
   identityState: 'identity-state-8004.json',
   identityStateLock: 'identity-state-8004.lock',
+  sellerRegistration: 'registration-8004-v1.json',
+  sellerRegistrationLock: 'registration-8004-v1.lock',
   publicSequence: 'public-sequence-v2.json',
   publicSequenceLock: 'public-sequence-v2.lock',
   facilitatorDiagnostics: 'facilitator-diagnostics',
@@ -87,6 +91,11 @@ export const LEGACY_LOCAL_PATHS = {
 export const LAB_DIRECTORIES = {
   identityKeys: 'identity/keys',
   identityValidator: 'identity-validator',
+  batchChannelCheck: 'batch-channel-check',
+} as const;
+
+export const LAB_FILES = {
+  batchChannelKeys: 'keys.json',
 } as const;
 
 export type HomeEnvironment = Readonly<Record<string, string | undefined>>;
@@ -147,6 +156,11 @@ export function labLayout(environment: HomeEnvironment) {
     facilitatorDiagnostics: join(root, ROLE_FILES.facilitatorDiagnostics),
     identityKeys: join(root, LAB_DIRECTORIES.identityKeys),
     identityValidator: join(root, LAB_DIRECTORIES.identityValidator),
+    batchChannelKeys: join(
+      root,
+      LAB_DIRECTORIES.batchChannelCheck,
+      LAB_FILES.batchChannelKeys,
+    ),
   } as const;
 }
 

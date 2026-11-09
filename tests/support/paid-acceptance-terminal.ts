@@ -43,15 +43,13 @@ export async function paidTerminal(
   });
   try {
     await terminalMain({
-      buyerOptions: run.terminalOptions(),
+      start: run.startTerminal,
       onStarted: (host) => {
-        assert.ok('url' in host && typeof host.url === 'string');
-        const owned = run.registerTerminal({ ...host, url: host.url });
         return {
-          chat: owned.chat,
+          chat: host.chat,
           close: async () => {
             states = await run.payments.states();
-            await owned.close();
+            await host.close();
           },
         };
       },

@@ -306,5 +306,7 @@ export function terminalPrompt() {
       return terminal.question(question, { signal: cancel.signal });
     },
     close: () => terminal?.close(),
+    // Aborted by Ctrl+C or end of input once a question has been asked.
+    signal: cancel.signal,
   };
 }

@@ -5,12 +5,13 @@ import {
   createBuyerReceiptRuntime,
   openReceiptStore,
 } from '@gyblos/node/receipts';
-import { loadRole, nodeSecret } from '@gyblos/node/roles';
+import { loadRole, nodeSecret, type RoleConfig } from '@gyblos/node/roles';
 import {
   createLocalTelemetry,
   loadLocalTelemetry,
 } from '@gyblos/node/telemetry-startup';
 import { P2P_ROLES, REASONING_LEVELS } from '@gyblos/protocol/constants';
+import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
 import type { TelemetrySink } from '@gyblos/protocol/telemetry';
 import {
   assertConfiguredRelay,
@@ -23,12 +24,38 @@ import {
   FREE_BUYER_STARTUP,
   type FreeBuyerStartupReason,
 } from './constants';
-import { executeBuyerFree } from './free-execution';
-import { startFreeBuyerHttp } from './free-http';
+import { executeBuyerFree, type FreeBuyerDependencies } from './free-execution';
+import { startFreeBuyerHttp, type ChatErrorClassifier } from './free-http';
 import { freeBuyerDependencies } from './free-selection';
+import type { ChatResult } from './free-sse';
 import { loadBuyerSelectionConfig } from './selection-config';
 import { prepareConfiguredBuyerSelection } from './selection-runtime';
 import type { SellerFailureReporter } from './seller-failures';
+
+// A host composition seam: transports, admission and quote verification remain in existing modules.
+export type BuyerExecutionFactory = (context: {
+  prepared: Awaited<ReturnType<typeof buyerSelection>>;
+  role: RoleConfig;
+  endpoint: Awaited<ReturnType<typeof bindEndpoint>>;
+  relayOnly: boolean;
+  dependencies: FreeBuyerDependencies;
+}) => Promise<{
+  execute(
+    input: FreeExecutionBuildInput,
+    signal: AbortSignal,
+    onDelta?: (text: string, requestDigest?: string) => Promise<void>,
+  ): Promise<ChatResult>;
+  token?: string;
+  requestMs?: number;
+  classify?: ChatErrorClassifier;
+  chat(url: string): ReturnType<typeof ownedChat> & { automatic?: boolean };
+  drain?(): Promise<unknown>;
+  close(): Promise<void>;
+  inspect?(
+    digest: string,
+    signal?: AbortSignal,
+  ): Promise<{ chargedAtomic: string; refundedAtomic: string } | undefined>;
+}>;
 
 // A startup refusal with a static reason; it never carries paths or file contents.
 export class FreeBuyerStartupError extends Error {
@@ -139,15 +166,20 @@ function buyerReceipts(
     },
   });
 }
-// Stop HTTP/protocol resources before draining the startup-owned log, even when a close rejects.
+// Stop admission and bound draining before the endpoint closes; only then release payment journals.
 async function closeBuyerResources(
   receipts: ReturnType<typeof createBuyerReceiptRuntime> | undefined,
   endpoint: Awaited<ReturnType<typeof bindEndpoint>>,
   telemetry: ReturnType<typeof createLocalTelemetry>,
   host?: Pick<Awaited<ReturnType<typeof startFreeBuyerHttp>>, 'close'>,
+  execution?: Awaited<ReturnType<BuyerExecutionFactory>>,
 ) {
   try {
-    await host?.close();
+    try {
+      await host?.close();
+    } finally {
+      await execution?.drain?.();
+    }
   } finally {
     try {
       await receipts?.close();
@@ -155,10 +187,69 @@ async function closeBuyerResources(
       try {
         await endpoint.close();
       } finally {
-        await telemetry.close();
+        try {
+          await execution?.close();
+        } finally {
+          await telemetry.close();
+        }
       }
     }
   }
+}
+
+function buyerHttp(
+  run: Awaited<ReturnType<BuyerExecutionFactory>>['execute'],
+  request: Awaited<ReturnType<typeof buyerSelection>>['config']['request'],
+  port?: number,
+  execution?: Awaited<ReturnType<BuyerExecutionFactory>>,
+) {
+  return listenOrRefuse(() =>
+    startFreeBuyerHttp(
+      (input, signal) => run(input, signal),
+      { selection: request.selection, maxTokens: request.maxTokens },
+      {
+        port,
+        stream: run,
+        token: execution?.token,
+        requestMs: execution?.requestMs,
+        classify: execution?.classify,
+      },
+    ),
+  );
+}
+
+function buyerHost(
+  host: Awaited<ReturnType<typeof startFreeBuyerHttp>>,
+  request: Awaited<ReturnType<typeof buyerSelection>>['config']['request'],
+  receipts: ReturnType<typeof createBuyerReceiptRuntime>,
+  endpoint: Awaited<ReturnType<typeof bindEndpoint>>,
+  telemetry: ReturnType<typeof createLocalTelemetry>,
+  execution?: Awaited<ReturnType<BuyerExecutionFactory>>,
+) {
+  return {
+    url: host.url,
+    chat: execution?.chat(host.url) ?? freeChat(request, host.url),
+    receipts: receipts.health,
+    telemetry: telemetry.health,
+    close: () =>
+      closeBuyerResources(receipts, endpoint, telemetry, host, execution),
+    inspectAndClose: execution?.inspect
+      ? async (digest: string, signal?: AbortSignal) => {
+          try {
+            await host.close();
+            return await execution?.inspect?.(digest, signal);
+          } finally {
+            await closeBuyerResources(
+              receipts,
+              endpoint,
+              telemetry,
+              undefined,
+              execution,
+            );
+          }
+        }
+      : undefined,
+  };
 }
 
 export async function startFreeBuyer(
@@ -167,6 +258,7 @@ export async function startFreeBuyer(
     port?: number;
     telemetry?: TelemetrySink;
     onSellerFailure?: SellerFailureReporter;
+    execution?: BuyerExecutionFactory;
   } = {},
 ) {
   const telemetryEnabled = await loadLocalTelemetry(process.env);
@@ -200,6 +292,7 @@ export async function startFreeBuyer(
     sink: options.telemetry,
   });
   let receipts: ReturnType<typeof createBuyerReceiptRuntime> | undefined;
+  let execution: Awaited<ReturnType<BuyerExecutionFactory>> | undefined;
   try {
     if (endpoint.id().toString() !== role.nodeId)
       refuse(FREE_BUYER_STARTUP.NODE_KEY);
@@ -212,29 +305,27 @@ export async function startFreeBuyer(
       buyer: role.buyer,
       relayOnly,
     });
-    const host = await listenOrRefuse(() =>
-      startFreeBuyerHttp(
-        (input, signal) => executeBuyerFree(input, dependencies, signal),
-        {
-          selection: prepared.config.request.selection,
-          maxTokens: prepared.config.request.maxTokens,
-        },
-        {
-          port: options.port,
-          stream: (input, signal, onDelta) =>
-            executeBuyerFree(input, dependencies, signal, onDelta),
-        },
-      ),
-    );
-    return {
-      url: host.url,
-      chat: freeChat(request, host.url),
-      receipts: receipts.health,
-      telemetry: telemetry.health,
-      close: () => closeBuyerResources(receipts, endpoint, telemetry, host),
-    };
+    execution = await options.execution?.({
+      prepared,
+      role,
+      endpoint,
+      relayOnly,
+      dependencies,
+    });
+    const run: Awaited<ReturnType<BuyerExecutionFactory>>['execute'] =
+      execution?.execute ??
+      ((input, signal, onDelta) =>
+        executeBuyerFree(input, dependencies, signal, onDelta));
+    const host = await buyerHttp(run, request, options.port, execution);
+    return buyerHost(host, request, receipts, endpoint, telemetry, execution);
   } catch (error) {
-    await closeBuyerResources(receipts, endpoint, telemetry);
+    await closeBuyerResources(
+      receipts,
+      endpoint,
+      telemetry,
+      undefined,
+      execution,
+    );
     throw error;
   }
 }

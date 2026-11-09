@@ -1,27 +1,20 @@
-// `pnpm buyer`: one loopback chat endpoint, paid on devnet when selection.json sets a deposit ceiling
-// (request.maxAtomic above zero) and free otherwise. A selection.json that cannot be read starts the
-// free buyer, which explains the problem.
+// One buyer entry: verify a signed quote first, then execute free or prepare its paid channel.
 import { isMain } from '@gyblos/runtime';
 
-import { isFreeAtomic } from './constants';
 import { main } from './free-main';
 import { startFreeBuyer } from './free-startup';
-import { startPaidBuyer } from './paid-startup';
-import { loadBuyerSelectionConfig } from './selection-config';
+import type { PaidBuyerHost, startPaidBuyer } from './paid-startup';
+import { quoteBuyerExecution } from './quote-startup';
 
-export async function paidSelected(): Promise<boolean> {
-  const config = await loadBuyerSelectionConfig(process.env).catch(
-    () => undefined,
-  );
-  return config !== undefined && !isFreeAtomic(config.request.maxAtomic);
-}
+type BuyerHost = PaidBuyerHost & Awaited<ReturnType<typeof startFreeBuyer>>;
 
 export async function startBuyer(
   options: Parameters<typeof startPaidBuyer>[0] = {},
-) {
-  return (await paidSelected())
-    ? startPaidBuyer(options)
-    : startFreeBuyer(options);
+): Promise<BuyerHost> {
+  return startFreeBuyer({
+    ...options,
+    execution: quoteBuyerExecution(options),
+  });
 }
 
 if (isMain(import.meta.url)) await main(startBuyer);

@@ -18,5 +18,5 @@
     "tooling/**/*.ts",
     "lab/**/*.ts"
   ],
-  "exclude": ["tooling/code-standards.test.ts"]
+  "exclude": ["tooling/code-standards.test.ts", "apps/docs"]
 }

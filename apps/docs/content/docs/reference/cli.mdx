@@ -1,0 +1,120 @@
+---
+title: CLI
+description: Supported seller commands, accepted flags, configuration selection and exit codes.
+---
+
+This reference lists the implemented `gyblos` commands. For the invitation's Docker installation,
+run from `~/gyblos-seller` and prefix a command with `docker compose exec seller`.
+If the seller container is unavailable, use `docker compose run --rm seller` before `gyblos` instead.
+Native checkout commands use `pnpm gyblos`; they are not a replacement for the Docker installation.
+
+## Commands [#command-index]
+
+| Command                           | Accepted options                                     | Exit codes                                         |
+| --------------------------------- | ---------------------------------------------------- | -------------------------------------------------- |
+| `gyblos config validate`          | `--config <path>`                                    | 0 valid; 1 invalid or usage error                  |
+| `gyblos doctor`                   | `--online`                                           | 0 no failed checks, even with warnings; 1 failure  |
+| `gyblos seller status`            | `--online`                                           | 0 only for `RUNNING`; 1 for other states or errors |
+| `gyblos seller register`          | None                                                 | 0 registered/already registered; 1 failure         |
+| `gyblos seller init`              | See init flags below                                 | 0 written; 1 failure; 130 cancelled prompt         |
+| `gyblos seller service install`   | `--memory <size>`, `--cpu <percentage>`, `--dry-run` | 0 success; 1 failure                               |
+| `gyblos seller service uninstall` | `--dry-run`                                          | 0 success; 1 failure                               |
+
+There is no general `gyblos start` or `gyblos stop` command, or general `--home`, `--relay`,
+`--rpc-url` or `--discovery-url` CLI flag. Use Compose for the Docker lifecycle and the
+[documented environment variables](/en/reference/configuration) for supported overrides.
+
+## Docker commands
+
+### Validation [#validate-the-mounted-configuration]
+
+```sh
+cd ~/gyblos-seller
+docker compose run --rm seller gyblos config validate --config /config/gyblos.toml
+```
+
+Success prints `OK`, effective settings and their source, offers, and secret variable names with
+`set` or `not set`. Failure prints issue codes and key paths. Values from the environment are hidden;
+file/default URLs are reduced to origins with paths hidden. Still review customized output before sharing.
+The command parses the file and resolves the environment; it does not check engine readiness or
+all seller startup restrictions.
+
+<Callout title="Configuration selection differs by command">
+  `config validate` uses `--config`, otherwise `./gyblos.toml`; it does not read
+  `GYBLOS_CONFIG` to select the file. In the supplied container use
+  `/config/gyblos.toml` explicitly. Doctor, init and startup use
+  `GYBLOS_CONFIG`, otherwise the working directory's `gyblos.toml`. Doctor,
+  init, status, register and service do not accept `--config`.
+</Callout>
+
+### Diagnostics [#diagnose-startup]
+
+```sh
+cd ~/gyblos-seller
+docker compose run --rm seller gyblos doctor
+```
+
+Doctor prints `OK`, `WARN` or `FAIL` with codes and hints, effective seller limits and public identity.
+It does not start a seller, generate inference or write state. It probes loopback engines.
+`--online` additionally checks remote engine model lists and discovery clock; provider credentials may
+be sent to the configured provider. A successful probe is not proof of generation, memory headroom or
+valid private-key contents. Use [troubleshooting](/en/help/troubleshooting) for failures.
+
+### Status and registration [#status-and-registration]
+
+```sh
+cd ~/gyblos-seller
+docker compose exec seller gyblos seller status
+docker compose exec seller gyblos seller status --online
+docker compose exec seller gyblos seller register
+```
+
+Status is read-only. `--online` queries discovery by model to look for the public NodeId.
+Its activity summary is bounded retained-receipt history, not a quota balance.
+
+Register accepts the invite through an interactive terminal or `GYBLOS_INVITE`, never a command-line
+argument. The interactive input is visible. It grants discovery publication permission after the index
+checks enrollment. With an interactive terminal it can create missing devnet enrollment using the
+owner wallet: it estimates cost, simulates and asks for `yes` before a new signed submission. It writes
+private registration state and may resend a saved approved transaction without a fresh prompt on rerun.
+It does not change TOML or publish. `REGISTER_IDENTITY_UNAVAILABLE` reports an enrollment that did not
+complete; read its funding, simulation or uncertain-state hint. See [Register and publish](/en/sellers/register-publish)
+for prerequisites and recovery limits before running it.
+
+## Native checkout
+
+### Init [#init-flags-for-a-native-checkout]
+
+`gyblos seller init` writes one free devnet offer. It does not install Docker, create keys, download
+models or start an engine. In Docker edit the host file: the container configuration mount is read-only.
+
+| Flag                                 | Meaning and default                                                                                                |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| `--engine ollama\|openai\|anthropic` | Engine kind; default `ollama`                                                                                      |
+| `--url <url>`                        | Default Ollama `http://127.0.0.1:11435`; OpenAI `https://api.openai.com/v1`; Anthropic `https://api.anthropic.com` |
+| `--model <id>`                       | Default `qwen3:0.6b` for Ollama; required/prompted for remote engines                                              |
+| `--upstream-model <name>`            | Engine's model name; defaults to offered model                                                                     |
+| `--context-tokens <n>`               | Required/prompted for OpenAI/Anthropic; omit for Ollama                                                            |
+| `--api-key-env <NAME>`               | Name of a secret variable; remote defaults `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`                                 |
+| `--api-key-env none`                 | Omit an API key for OpenAI; not accepted for Anthropic                                                             |
+| `--daily-cap <n>`                    | Default `200000` tokens                                                                                            |
+| `--per-buyer-cap <n>`                | Default `5000` tokens                                                                                              |
+| `--publish` / `--no-publish`         | Publication; default off; mutually exclusive                                                                       |
+| `--force`                            | Replace an existing regular configuration file; does not authorize following a symlink                             |
+
+On a terminal it asks for missing choices; scripted runs use flags and defaults. Without `--force`,
+an existing file is refused. Init checks settings with a placeholder for provider credentials; it does
+not validate the actual credential. Its native Ollama port `11435` differs from the Docker installer's `11434`.
+
+### Background services [#native-background-services]
+
+These commands target Linux user systemd or macOS launchd, **not Docker**. Run as the seller account,
+never root. Install defaults to `2048M` memory (also the minimum) and `100%` CPU. `--dry-run` previews
+without installing. macOS does not enforce these resource limits.
+
+The native service uses its product-home `seller.env`, with strict `NAME=value` lines and owner-only
+permissions, rather than inheriting all variables from your shell. It captures the home and configuration
+paths during installation. Uninstall removes service registration, not keys or configuration.
+Native provisioning is outside this Docker tutorial; do not run service install inside the container.
+
+**Related:** [Configuration reference](/en/reference/configuration) · [Operation](/en/sellers/operate).

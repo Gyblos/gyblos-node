@@ -1,0 +1,6 @@
+{
+  "title": "Referencia",
+  "pages": ["cli", "configuration"],
+  "defaultOpen": true,
+  "icon": "book-open"
+}

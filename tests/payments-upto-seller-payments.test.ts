@@ -19,7 +19,7 @@ import { offline } from './support/upto-seller-rpc';
 
 const SETTINGS = {
   tokenProgram: String(TOKEN_PROGRAM_ADDRESS),
-  withdrawDelaySeconds: 60,
+  withdrawDelaySeconds: 300,
   maxTimeoutSeconds: 120,
 };
 

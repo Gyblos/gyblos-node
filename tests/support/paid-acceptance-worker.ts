@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readdir, realpath } from 'node:fs/promises';
 import { basename } from 'node:path';
 
-import { PAID_VERDICTS } from '@gyblos/buyer/constants';
+import { PAID_BUYER_CODES, PAID_VERDICTS } from '@gyblos/buyer/constants';
 import { homeLayout } from '@gyblos/config';
 import {
   ACCEPTANCE,
@@ -11,7 +11,8 @@ import {
 } from '@gyblos/lab-harness/acceptance/constants';
 import { AcceptanceError } from '@gyblos/lab-harness/acceptance/errors';
 import { assertAcceptanceTempBase } from '@gyblos/lab-harness/acceptance/workspace';
-import { P2P_ROLES } from '@gyblos/protocol/constants';
+import { OFFER_PRICING_KINDS, P2P_ROLES } from '@gyblos/protocol/constants';
+import { controlObject } from '@gyblos/protocol/control-validation';
 import { isMain } from '@gyblos/runtime';
 
 import { assertPaidJsonAnswer } from './paid-acceptance-answers';
@@ -30,6 +31,8 @@ import {
   paidWrongShares,
 } from './paid-acceptance-phases';
 import { paidTerminal } from './paid-acceptance-terminal';
+import { unifiedFreeJourney } from './unified-acceptance-free';
+import { unifiedPrivateEvidence } from './unified-acceptance-metadata';
 
 async function uncertain(
   run: Awaited<ReturnType<typeof paidAcceptanceHost>>,
@@ -41,7 +44,10 @@ async function uncertain(
     run.payments.deposits(),
   ];
   const response = await paidHttp(run, signal);
-  await paidBody(response);
+  const value: unknown = JSON.parse(await paidBody(response));
+  const body = controlObject(value, ['error']);
+  const error = controlObject(body.error, ['message', 'type', 'param', 'code']);
+  assert.equal(error.code, PAID_BUYER_CODES.UNRESOLVED);
   assert.notEqual(response.statusCode, 200);
   assert.deepEqual(
     [
@@ -65,12 +71,21 @@ export async function paidScenario(
       0,
     );
   const originalFetch = globalThis.fetch;
-  const run = await paidAcceptanceHost(signal);
+  const run = await paidAcceptanceHost(signal, OFFER_PRICING_KINDS.FREE);
   const cases: PaidAcceptanceReport['cases'] = [PAID_ACCEPTANCE_CASES.STARTUP];
   let restarts = 0;
   let answers = 0;
   let blocked = 0;
   try {
+    const free = await unifiedFreeJourney(run, signal);
+    cases.push(
+      PAID_ACCEPTANCE_CASES.FREE,
+      PAID_ACCEPTANCE_CASES.FREE_CLI,
+      PAID_ACCEPTANCE_CASES.FREE_CANCEL,
+      PAID_ACCEPTANCE_CASES.FREE_RECEIPTS,
+    );
+    await run.reprice(OFFER_PRICING_KINDS.PAID);
+    restarts++;
     await paidPreSend(run, signal);
     cases.push(PAID_ACCEPTANCE_CASES.PRESEND);
     await paidTerminal(run, signal, false);
@@ -110,6 +125,15 @@ export async function paidScenario(
     assertPaidJsonAnswer(unverifiedBody, PAID_VERDICTS.UNVERIFIED);
     await uncertain(run, signal);
     blocked++;
+    // A free listing must not bypass a previous uncertain authorization, even after buyer restart.
+    const preparations = run.paymentPreparations();
+    await run.reprice(OFFER_PRICING_KINDS.FREE);
+    await uncertain(run, signal);
+    assert.equal(run.paymentPreparations(), preparations);
+    cases.push(PAID_ACCEPTANCE_CASES.FREE_PENDING);
+    blocked++;
+    await run.reprice(OFFER_PRICING_KINDS.PAID);
+    restarts += 2;
     cases.push(PAID_ACCEPTANCE_CASES.PENDING);
     await run.restart(false);
     restarts++;
@@ -145,7 +169,7 @@ export async function paidScenario(
     });
     response.destroy();
     await paidWait(() => run.engine.attempts() === beforeCancel + 1, signal);
-    await paidWait(() => run.engine.cancellations() === 1, signal);
+    await paidWait(() => run.engine.cancellations() === 2, signal);
     await paidWait(
       () => run.payments.settlements() === run.payments.deposits(),
       signal,
@@ -156,7 +180,9 @@ export async function paidScenario(
     cases.push(PAID_ACCEPTANCE_CASES.CANCEL);
     await paidPrivateRecords();
     cases.push(PAID_ACCEPTANCE_CASES.PRIVACY);
-    return await finishPaidAcceptance(run.close, () => {
+    return await finishPaidAcceptance(run.close, async () => {
+      const telemetryEvents = await unifiedPrivateEvidence(free.receipts);
+      cases.push(PAID_ACCEPTANCE_CASES.TELEMETRY);
       assert.equal(globalThis.fetch, originalFetch);
       assert.equal(run.external(), 0);
       assert.ok(run.registry.counts().reads > 0);
@@ -172,7 +198,15 @@ export async function paidScenario(
         nativeIroh: true,
         simulatedChain: true,
         realPayments: false,
-        cases,
+        cases: Object.values(PAID_ACCEPTANCE_CASES).filter((name) =>
+          cases.includes(name),
+        ),
+        freeAnswers: free.freeAnswers,
+        freeAttempts: free.freeAttempts,
+        freePaymentPreparations: free.freePaymentPreparations,
+        freeTokenizerLoads: free.freeTokenizerLoads,
+        confirmedReceipts: free.confirmedReceipts,
+        telemetryEvents,
         answers,
         attempts: run.engine.attempts(),
         deposits: run.payments.deposits(),

@@ -315,7 +315,16 @@ void test('hard filters exclude cooldown, stale, withdrawn, policy, badge and pr
     chosen(result).map((item) => item.nodeId),
     [nodeId(10)],
   );
+  // Sellers 7 and 8 offer the model above the budget, so the failure names the price.
   assert.deepEqual(select(excluded, { request: strict, stats }), {
+    ok: false,
+    code: SELLER_SELECTION_CODES.PRICE_ABOVE_BUDGET,
+  });
+  const overBudget = new Set([nodeId(7), nodeId(8)]);
+  const unpriced = excluded.filter(
+    (item) => !overBudget.has(item.catalog.nodeId),
+  );
+  assert.deepEqual(select(unpriced, { request: strict, stats }), {
     ok: false,
     code: SELLER_SELECTION_CODES.NO_CANDIDATES,
   });

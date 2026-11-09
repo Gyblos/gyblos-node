@@ -74,12 +74,6 @@ void test('a description off the network fee, network, asset or payout refuses p
     // Distinct signing accounts, so each case is refused for its own reason.
     { ...valid, feePayer: 'fee-payer', authorizer: 'auth', payTo: 'fee-payer' },
     { ...valid, feePayer: 'fee-payer', authorizer: 'auth', payTo: 'auth' },
-    {
-      ...valid,
-      feePayer: 'fee-payer',
-      authorizer: 'auth',
-      payTo: seller.options.owner,
-    },
     { ...valid, mint: 'another-mint' },
   ]) {
     seller.payment.control.description = description;
@@ -266,4 +260,30 @@ void test('a recovery that never ends delays shutdown by at most one claim wait'
   await paid.close();
   assert.ok(Date.now() - started < 2_000);
   assert.equal(closed, true);
+});
+
+void test('a paid seller may use its owner as payout while payment signers remain distinct', async () => {
+  const { seller, paid } = await wired();
+  await paid.close();
+  const current = await seller.payment.server.describe();
+  seller.payment.control.description = {
+    ...current,
+    payTo: seller.options.owner,
+    feePayer: 'fee-payer',
+    authorizer: 'authorizer',
+  };
+  const started = await startSellerPaid(
+    { server: seller.payment.server, close: async () => {} },
+    {
+      owner: seller.options.owner,
+      mint: current.mint,
+      nodeId: seller.options.nodeId,
+      startedAt: 0,
+      offers: () => [],
+    },
+  );
+  assert.equal(started.description.payTo, seller.options.owner);
+  assert.equal(seller.payment.calls.admit.length, 0);
+  assert.equal(seller.payment.calls.settle.length, 0);
+  await started.close();
 });

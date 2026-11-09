@@ -12,6 +12,7 @@ import {
   getCompiledTransactionMessageDecoder,
   getI64Encoder,
   getProgramDerivedAddress,
+  getSignatureFromTransaction,
   getStructEncoder,
   getTransactionDecoder,
   getU8Encoder,
@@ -22,7 +23,6 @@ import {
   SolanaError,
   type Address,
   type Blockhash,
-  type Signature,
 } from '@solana/kit';
 import { UPTO_PROGRAM, type UptoWithdrawRpc } from 'x402-upto-metered';
 
@@ -69,12 +69,14 @@ export interface ChannelFields {
   closureStartedAt: bigint;
   gracePeriod: number;
   distributionHash: Uint8Array;
+  salt?: bigint;
+  openSlot?: bigint;
 }
 
 // The account bytes at the channel's canonical address.
 export async function channelAccount(fields: ChannelFields) {
-  const salt = 7n;
-  const openSlot = 99n;
+  const salt = fields.salt ?? 7n;
+  const openSlot = fields.openSlot ?? 99n;
   const [channelId] = await getProgramDerivedAddress({
     programAddress: address(UPTO_PROGRAM.id),
     seeds: [
@@ -115,6 +117,8 @@ export interface SentInstruction {
   data: number[];
 }
 export interface SentTransaction {
+  // A partially signed SDK wire can still be inspected before its fee payer signs.
+  signature: string | null;
   feePayer: string;
   signers: string[];
   writableSigners: number;
@@ -130,7 +134,11 @@ export function decodeSent(wire: string): SentTransaction {
     decoded.messageBytes,
   );
   const keys = message.staticAccounts.map(String);
+  const payerSignature = decoded.signatures[message.staticAccounts[0]!];
   return {
+    signature: payerSignature
+      ? getBase58Decoder().decode(payerSignature)
+      : null,
     feePayer: keys[0]!,
     signers: keys.slice(0, message.header.numSignerAccounts),
     writableSigners:
@@ -178,11 +186,6 @@ export function withdrawChain(state: WithdrawChainState) {
         return answer();
       },
     });
-  const signature = (index: number) => {
-    const bytes = new Uint8Array(64);
-    bytes[0] = index + 1;
-    return getBase58Decoder().decode(bytes) as Signature;
-  };
   const rpc: UptoWithdrawRpc & {
     getGenesisHash(): { send(): Promise<string> };
   } = {
@@ -223,7 +226,9 @@ export function withdrawChain(state: WithdrawChainState) {
             },
           );
         sent.push(decodeSent(wire));
-        return signature(sent.length - 1);
+        return getSignatureFromTransaction(
+          getTransactionDecoder().decode(getBase64Encoder().encode(wire)),
+        );
       })(),
     getSignatureStatuses: () =>
       call('status', undefined, () => {

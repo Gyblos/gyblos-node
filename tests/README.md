@@ -47,6 +47,19 @@ outside macOS/Linux. The discovery index `sqlite-d1` cases use `node:sqlite`
 failed, cancelled and skipped counts separately; a skipped case proves nothing
 on that host.
 
+Native admission tests hold the incomplete client stream until explicit cleanup
+and wait for the server's real `acceptBi` result before opening the competing
+connection. Client handshake/write completion alone does not prove server
+admission. `control-admission-order.test.ts` controls native completion order to
+verify this barrier for data and control ALPNs, and proves that inverted server
+completion order can legitimately admit the second connection and refuse the
+first. Injected connection and stream-open failures verify gate release and
+fixture closure. The ordinary cap assertions and existing deadlines remain
+unchanged. No product hook, fixed sleep, enlarged timeout or retry is used. The
+original unforced timeout had no internal phase trace; controlled reproduction
+establishes a test-ordering defect, not exclusive attribution of that historical
+event.
+
 ## Opt-in identity integration
 
 `GYBLOS_IDENTITY_INTEGRATION=1 pnpm test:lab` starts a throwaway
@@ -159,3 +172,66 @@ startup over native loopback, synthetic chain services and private temporary
 journals. It also drives the product terminal loop with synthetic streams,
 checks a mid-answer engine interruption and reconciles a simulated settlement.
 See [the acceptance boundary](../docs/paid-acceptance.md).
+
+The existing `acceptance:paid` startup harness also exercises `pnpm buyer`'s
+automatic free-or-paid entry. A free listing is served with both zero and
+positive buyer budgets over native Iroh: JSON, SSE and the actual terminal
+workflow must complete without constructing the paid buyer runtime, loading its
+tokenizer or making a payment authorization/deposit. The scripted terminal user
+waits for receipt confirmation before exiting; a failed wait aborts its pending
+terminal question and preserves the failure instead of hanging until the outer
+watchdog. Snapshot observation waits for receipt work to become inactive with
+one additional saved exchange before opening files: paired records on disk can
+precede CONFIRM acknowledgment and connection settlement. The observer retains
+the existing wait deadline, propagates failed/dropped work and storage errors,
+and refuses snapshots after cancellation. `receipt-observation.test.ts` forces a
+valid atomic replacement between open and inode validation; the private reader
+continues to reject that race, while the observer waits for quiescence instead
+of weakening the reader or retrying inference. Abrupt exit may cancel the
+best-effort receipt exchange. It verifies signed receipt pairs on both roles and
+after restart, private bounded metadata files and correlated completion events.
+A later priced listing uses the existing simulated payment adapters; uncertain
+paid state blocks a free listing across restart. Free and paid cancellation
+retain one engine attempt and no prompt retry. Only the local synthetic identity
+RPC is permitted; all other fetches outside the owned buyer and in-process index
+fail the scenario, including calls during teardown. Report parsing requires
+these phases, zero free payment-preparation counts and consistent separate
+paid/free totals. No real payments, providers, Docker or production index are
+used.
+
+## Timing-sensitive fixtures
+
+Capacity assertions do not measure disk speed: the telemetry pending-buffer test
+controls only its drain timer while exercising real private writes. Separate
+cases advance that timer to verify timeout health; real private-log timeout
+coverage remains enabled.
+
+Synthetic watchdog and reader-controller imports do not load Iroh or probe
+sockets. The owned unread Iroh child loads native setup only in its entry
+function and announces READY after installing IPC. Its startup has a separate
+bounded wait; CONNECT keeps its original budget, and native egress timing begins
+only after preparation. Missing readiness, early exit and late messages are
+covered without sockets; the native egress test still checks the product
+deadline, connection closure and admission-slot release.
+
+Synthetic paid-service deadline tests coordinate entry and digest completion
+before advancing their clock. Their abort wait accepts cancellation that already
+happened. Test watchdogs use a pure, mockable timer; boundary cases assert
+before and at the original deadline. Cleanup releases a stable blocked-write
+promise even if preparation has not reached the writer yet, so a failed
+assertion cannot strand the test worker or erase the lease-retention assertion.
+These fixtures do not change product transport, payment or logging limits.
+
+## Native payment-channel acceptance
+
+`tests/lab/paid-native.test.ts` executes the installed metered SDK's signed open
+and claim transactions in LiteSVM, using the bundled, hash-checked official
+program fixture and a synthetic mint. Payer closure, voucher/grace boundaries,
+actual token movement, fresh-blockhash replay and confirmation-loss recovery are
+covered without RPC, files holding keys, devnet or real funds.
+
+The feature/network label selects compatible treasury constants inside the VM;
+product mainnet remains disabled. These are SDK/native-program semantic tests,
+not current-devnet product startup, Iroh, an engine or deployed-binary
+acceptance. See
+[scope, prerequisites and rebuild instructions](../docs/paid-native-acceptance.md).

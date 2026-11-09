@@ -6,6 +6,7 @@ import {
   appendTransactionMessageInstructions,
   createTransactionMessage,
   getBase64EncodedWireTransaction,
+  getSignatureFromTransaction,
   isSolanaError,
   pipe,
   setTransactionMessageFeePayerSigner,
@@ -104,23 +105,26 @@ export async function uptoSend(
     (draft) => appendTransactionMessageInstructions(instructions, draft),
   );
   const signed = await signTransactionMessageWithSigners(message);
-  let signature: Signature;
+  const signature = getSignatureFromTransaction(signed);
+  // The signed bytes already determine the identity, even when the RPC loses its send reply.
+  const uncertain = { transaction: String(signature), confirmed: false };
   try {
-    signature = await rpc
+    const returned = await rpc
       .sendTransaction(getBase64EncodedWireTransaction(signed), {
         encoding: 'base64',
         preflightCommitment: UPTO_COMMITMENT,
       })
       .send({ abortSignal: AbortSignal.timeout(UPTO_WITHDRAW.rpcMs) });
+    if (returned !== signature) return uncertain;
   } catch (error) {
-    throw new UptoError(
+    if (
       isSolanaError(
         error,
         SOLANA_ERROR__JSON_RPC__SERVER_ERROR_SEND_TRANSACTION_PREFLIGHT_FAILURE,
       )
-        ? UPTO_ERROR_CODES.CHAIN_REJECTED
-        : UPTO_ERROR_CODES.UNAVAILABLE,
-    );
+    )
+      throw new UptoError(UPTO_ERROR_CODES.CHAIN_REJECTED);
+    return uncertain;
   }
   // Once sent, its signature is kept: a status the RPC could not give leaves it unconfirmed, not lost.
   const unconfirmed = (error: unknown) => {

@@ -38,6 +38,7 @@ import type { PaidExecutionService } from '@gyblos/transport-iroh/paid-server';
 
 import type { FreeMeter } from './free-meter';
 import { generatePaid, stoppedAfterDeposit } from './paid-generation';
+import { paidGenerationWindow } from './paid-lifetime';
 import {
   admitDeposit,
   describeOwn,
@@ -216,30 +217,43 @@ async function outcomeAndCharge(
 ) {
   const { request, inputTokens, allowance } = admitted;
   try {
+    const window = paidGenerationWindow(
+      admitted.admission.claimUntil,
+      options.settlement.waitMs,
+      options.now,
+      signal,
+    );
     const output = createPaidStreamOutput(
       options.meter,
       { inputTokens, allowance },
-      signal,
+      window.signal,
       onDelta,
+      window.check,
     );
-    const outcome = await generatePaid(
-      { ...admitted, contextTokens: options.model.contextTokens },
-      output,
-      signal,
-      options.engine,
-      options.meter,
-    ).then(
-      (result) => ({ result }),
-      (error: unknown) => ({
-        error: stoppedAfterDeposit(
-          error,
-          signal,
-          output,
-          options.meter,
-          allowance,
-        ),
-      }),
-    );
+    const outcome = await window
+      .run(
+        () =>
+          generatePaid(
+            { ...admitted, contextTokens: options.model.contextTokens },
+            output,
+            window.signal,
+            options.engine,
+            options.meter,
+          ),
+        () => output.stop(),
+      )
+      .then(
+        (result) => ({ result }),
+        (error: unknown) => ({
+          error: stoppedAfterDeposit(
+            error,
+            window.signal,
+            output,
+            options.meter,
+            allowance,
+          ),
+        }),
+      );
     const outputTokens =
       'result' in outcome
         ? outcome.result.usage.outputTokens

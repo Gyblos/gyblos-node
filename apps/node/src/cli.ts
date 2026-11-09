@@ -26,7 +26,7 @@ import { isMain } from '@gyblos/runtime';
 import { doctor } from './cli-doctor';
 import { COLUMN, issueLine, URL_HIDDEN, urlOrigin } from './cli-format';
 import { initCommand, terminalPrompt, type Prompt } from './cli-init';
-import { registerCommand } from './cli-register';
+import { registerCommand, type FundsWait } from './cli-register';
 import { serviceCommand, type ServiceSystem } from './cli-service';
 import { statusCommand } from './cli-status';
 import { EXIT } from './constants';
@@ -48,6 +48,12 @@ export interface CliContext {
   status?: StatusSystem;
   // The index for `seller register`; tests inject a fake.
   fetch?: DiscoveryFetch;
+  // A synthetic identity registration can be injected by offline tests.
+  registerIdentity?: () => Promise<boolean>;
+  // How `seller register` waits for the owner's SOL on a terminal; tests inject a fake.
+  waitForFunds?: FundsWait;
+  // Ctrl+C on the terminal the prompt reads; stops a wait for SOL.
+  interrupt?: AbortSignal;
 }
 
 const USAGE =
@@ -260,6 +266,9 @@ function runRegister(context: CliContext) {
     {
       fetch: context.fetch ?? ((input, init) => fetch(input, init)),
       prompt: context.prompt,
+      registerIdentity: context.registerIdentity,
+      waitForFunds: context.waitForFunds,
+      interrupt: context.interrupt,
     },
   );
 }
@@ -354,6 +363,7 @@ export async function main(args = process.argv.slice(2)) {
       stdout: (text) => process.stdout.write(text),
       stderr: (text) => process.stderr.write(text),
       prompt: terminal?.prompt,
+      interrupt: terminal?.signal,
     });
   } finally {
     terminal?.close();

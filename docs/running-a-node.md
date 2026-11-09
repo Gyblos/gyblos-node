@@ -1,5 +1,14 @@
 # Running a seller and a buyer
 
+For the invited free Docker seller, use the bilingual
+[public seller handbook](https://docs.gyblos.com/en/sellers/beta-guide),
+[CLI reference](https://docs.gyblos.com/en/reference/cli),
+[configuration reference](https://docs.gyblos.com/en/reference/configuration)
+and [troubleshooting](https://docs.gyblos.com/en/help/troubleshooting). Their
+canonical source is `apps/docs/content/docs/`. This engineering document also
+covers checkout, library and experimental paths; those paths are not
+interchangeable with the invitation's Docker onboarding.
+
 A seller node serves paid inference over Iroh. A buyer proxy on another machine
 forwards local requests to it. Both are devnet-only and experimental.
 
@@ -119,16 +128,16 @@ node key (`node.key`) and the role's Solana keys with private permissions. It
 never overwrites existing keys; a mismatched existing role stops with an error.
 A seller needs only `--mint`: it gets an owner key and a node key. The paid
 seller keys (authorizer and facilitator) and fields (`payTo`, allowed `buyer`)
-are created only when `--buyer` and `--pay-to` are given together. A seller with
-a paid `[[offers]]` entry needs them: paid v2 selling uses the payout and both
-keys, and `--buyer` can be any address you control (v2 does not use it). Free
-sellers leave both out.
+are created when `--buyer` is given. For a new paid seller, `payTo` is the owner
+wallet; `--buyer` can be any address you control (v2 does not use it). Existing
+roles with a different payout are preserved and receive a warning at
+registration. New roles reject an explicit `--pay-to`; free sellers omit both.
 
 | File                                             | Role   | Contents                                                                                                               |
 | ------------------------------------------------ | ------ | ---------------------------------------------------------------------------------------------------------------------- |
 | `role.json`                                      | both   | Role, mint, NodeId and public addresses.                                                                               |
 | `node.key`                                       | both   | Iroh secret key (private).                                                                                             |
-| `*.json` keys                                    | both   | Buyer key, or seller owner key (paid keys only with `--buyer`/`--pay-to`).                                             |
+| `*.json` keys                                    | both   | Buyer key, or seller owner key (paid keys are added with `--buyer`).                                                   |
 | `offer.json`                                     | buyer  | A paid v1 seller's signed offer (lab gates only).                                                                      |
 | `trust.json`                                     | buyer  | Which seller and limits the buyer accepts.                                                                             |
 | `status.json`                                    | both   | `starting` with a phase, then `ready`; a seller lists each offer's index, model, engine kind and whether it is listed. |
@@ -163,14 +172,14 @@ pnpm node:start
   loopback address). It handles no secret: API keys and the relay token stay in
   the environment or `seller.env`, and it prints only their variable names.
   `examples/seller-daemon.toml` is an equivalent file to copy instead.
-- The seller serves every free offer in `gyblos.toml`; without one it does not
-  start (`SELLER_OFFERS_MISSING`). A paid offer is sold on devnet over the paid
-  stream when the seller role was set up with a payout
-  (`pnpm node:setup --role seller --mint <mint> --pay-to <payout> --buyer <address>`
-  in a new `GYBLOS_HOME`; `--buyer` is still required by the v1 setup). The fee
-  payer key needs devnet SOL for transaction fees, channel rent and, once, the
-  rent of any missing payout, fee, fee payer or buyer token account, which the
-  seller creates so that no claim is redirected to the payment program
+- The seller serves configured free and paid offers in `gyblos.toml`; it needs
+  at least one offer to start (`SELLER_OFFERS_MISSING`). A paid offer is sold on
+  devnet over the paid stream when the seller role was set up with a payout
+  (`pnpm node:setup --role seller --mint <mint> --buyer <address>` in a new
+  `GYBLOS_HOME`; `--buyer` is still required by the v1 setup). The fee payer key
+  needs devnet SOL for transaction fees, channel rent and, once, the rent of any
+  missing payout, fee, fee payer or buyer token account, which the seller
+  creates so that no claim is redirected to the payment program
   ([Seller startup](configuration.md#seller-startup)). Paid v2 has settled on
   devnet only in a controlled run; the v1 paid path remains in the lab gates
   only.
@@ -261,10 +270,31 @@ pnpm gyblos seller register   # asks for the invite on a terminal, or reads GYBL
 In the seller image, from the compose directory:
 `docker compose exec seller gyblos seller register`.
 
-- It sends the index only the invite and this home's NodeId, at the
-  `discovery.url` node:start would publish to. The index reads the NodeId's
-  8004-solana registration itself, so the seller must already be registered
-  there; this command does not register it on chain yet.
+- It first sends the index only the invite and this home's NodeId, at the
+  `discovery.url` node:start would publish to. If the index accepts the invite
+  but the NodeId lacks an 8004 registration, an interactive terminal offers to
+  register it on Solana devnet. The owner wallet pays; the command shows the
+  estimated SOL cost and asks for consent before signing and submitting. Fund
+  the owner wallet first; no automatic faucet is used. A funding estimate and
+  missing SOL are available before simulation. The estimate uses pinned account
+  layouts and the published Core create fee; upgradeable programs may change the
+  actual cost. Simulation remains mandatory before signing, and the final
+  estimate is never lower than the preliminary one.
+- The asset key and signed attempt are stored privately in the seller home. Keep
+  this state if a result is uncertain. Running the command again checks the
+  saved attempt and may resend the identical signed transaction; it does not
+  make another asset while that attempt is unresolved. Checking a saved attempt
+  has its own bounded 30-second budget to accommodate slower RPC responses.
+  Before resending it verifies both signatures, the owner, asset, NodeId and
+  canonical instructions. When the saved blockhash is invalid in a finalized
+  view and all three asset accounts are absent in a sufficiently recent view, it
+  can rebuild with the same asset after fresh consent. Expiry does not prove the
+  previous transaction never landed or incurred a fee. Inconclusive or partial
+  state still requires operator assistance; never delete it. A verified
+  registration under another asset of the same owner and NodeId is accepted.
+  This devnet flow does not enable mainnet. The 8004 wallet is the owner;
+  existing paid seller roles may still use a different payout address until
+  wallet unification is completed.
 - `Registered` or `Already registered` (a retry with the same invite) means the
   seller may now publish; set `publish = true` under `[discovery]` to be listed.
 - Before asking for the invite it checks this home's seller role
@@ -280,7 +310,7 @@ In the seller image, from the compose directory:
   `DISCOVERY_UNAVAILABLE`, `DISCOVERY_REGISTRATION_REJECTED` or a 404
   `DISCOVERY_HTTP_STATUS` when that index does not take registrations, and other
   network or index failures (try again later). The invite is never printed
-  (though a terminal shows it as it is typed) and nothing is written.
+  (though a terminal shows it as it is typed); registration state is private.
 
 ### Seller status
 
@@ -318,8 +348,12 @@ It prints the NodeId and owner, then:
   see a lower bound.
 
 `Result: RUNNING` (exit 0) needs an active service and a ready daemon;
-`STARTING`, `STOPPED` and `NOT_CONFIRMED` (no service to confirm the process)
-exit 1. It writes nothing and prints no buyer, prompt, key or home location.
+`STARTING`, `FAILING`, `STOPPED` and `NOT_CONFIRMED` (no service to confirm the
+process) exit 1. `FAILING` means the last start failed, including while the
+service restarts after it; status then names the phase, the static code and a
+hint, such as `SELLER_RELAY_OFFLINE` when no relay answered (a refused relay
+token or no network). It writes nothing and prints no buyer, prompt, key or home
+location.
 
 ### Docker
 
@@ -372,11 +406,14 @@ docker compose stop seller                        # SIGINT; withdraws within 120
 
 #### Install script
 
-`install.sh` sets up the same seller from the published image
-(`ghcr.io/gyblos/seller:beta`) without a checkout. It needs only Docker with
-Compose v2.17 or later. Beta sellers receive the file with their invitation:
+`install.sh` sets up the same seller from a signed release of the published
+image without a checkout. It needs only Docker with Compose v2.17 or later.
+Sellers download it from the official address, which redirects to the copy
+attached to the latest GitHub release
+(`https://github.com/Gyblos/gyblos-node/releases/latest/download/install.sh`):
 
 ```sh
+curl -fsSL https://gyblos.com/install.sh -o install.sh
 sh install.sh
 ```
 
@@ -385,39 +422,148 @@ sh install.sh
   `~/gyblos-seller` (created mode 0700; `GYBLOS_DIR` changes it), then pulls the
   images and the model, creates the seller keys, downloads the tokenizer, runs
   `gyblos doctor` and starts the seller only when doctor is READY.
+- On a terminal, an unpublished seller then finishes onboarding, asking before
+  each step: it runs `gyblos seller register` in the container (the command asks
+  for the invite code, waits for the owner's devnet SOL when it is short and
+  confirms before signing), then asks to publish and runs the `publish` step
+  below. A failed or declined step prints how to continue; a rerun picks up
+  where it stopped. Without a terminal (`GYBLOS_TERMINAL` names another answer
+  source, for tests) or with `GYBLOS_GUIDED=0`, it prints the steps instead:
+  fund the owner doctor printed with devnet SOL, `gyblos seller register` with
+  the invite code, and `sh install.sh publish` (`gyblos seller status` names the
+  next step while the seller runs).
+- `gyblos seller register` on a terminal waits for SOL when the registration
+  stops for want of it: it reads the owner's balance every 15 seconds, for up to
+  30 minutes, then tries again (at most three waits). It never signs while
+  waiting. Without a terminal it stops with the funding hint.
+- `sh install.sh update` downloads the latest release's `install.sh`,
+  `install.sh.sha256` and `install.sh.sigstore.json` with curl, checks the
+  checksum and, with cosign, the release signature (required with
+  `GYBLOS_REQUIRE_SIGNATURE=1`), renames the new installer over this one (when
+  it is a writable file; otherwise to `install.sh` in the install directory) and
+  runs it with the same `GYBLOS_DIR`. Cosign older than 3 cannot read the
+  bundle, so the check is skipped (refused in strict mode). An installer pinning
+  the same image runs this one again, which completes an update that stopped
+  halfway.
+- The release build sets `GYBLOS_VERSION` in the image. `gyblos seller status`
+  then asks GitHub for the latest release (one bounded HTTPS request, nothing
+  about the seller) and, when it is newer, ends with an `Update:` line;
+  `GYBLOS_UPDATE_CHECK=0` turns it off, and a build without `GYBLOS_VERSION`
+  checks nothing.
+- `sh install.sh publish` (or `unpublish`) sets `publish` in the installed
+  `gyblos.toml` (`GYBLOS_DIR` names a non-default install), validates it and
+  recreates the seller; an invalid result or an interruption restores the file.
+  It rewrites the file in place, so the container's bind mount keeps working.
+- `DEFAULT_IMAGE` pins one release by version and digest
+  (`ghcr.io/gyblos/seller:<version>@sha256:<digest>`). The release workflow
+  below sets it in the copy it attaches to each release; the copy in this
+  repository keeps an earlier pin. `GYBLOS_IMAGE` overrides it.
 - The relay token is read without echo, or from `GYBLOS_RELAY_TOKEN`, and is
   written only to `seller.env` (mode 0600), never printed. Without a terminal
   (for example `ssh host sh install.sh`), set `GYBLOS_RELAY_TOKEN`.
-- Existing files are kept, so rerunning it resumes a failed install and
-  recreates the seller with the current `gyblos.toml` and `seller.env`. After
-  editing `gyblos.toml` (for example `publish = true`), rerun it or run
-  `docker compose up -d --force-recreate seller`; a plain `up -d` does not apply
-  the edit.
-- `GYBLOS_IMAGE` sets the image of a first install, such as a commit tag; after
-  that, change the seller's `image:` in `compose.yaml`.
-- While the package is private, `docker login ghcr.io` first with a token that
-  may read it.
+- Rerunning it resumes a failed install and updates the seller: `gyblos.toml`,
+  `seller.env` and `compose.yaml` are kept, except that a seller `image:` from
+  `ghcr.io/gyblos/seller` moves to the installer's release. Any other image is
+  the operator's own build and stays. It then recreates the seller with the
+  current files; after editing `gyblos.toml`, rerun it or run
+  `docker compose up -d --force-recreate seller` (a plain `up -d` does not apply
+  the edit).
 
-Maintainers publish the tip of `origin/main`, built from that commit alone
-(`git archive`), after `docker login ghcr.io` with a token allowed to write
-Gyblos packages and with a buildx builder for both platforms
-(`docker buildx create --use`):
+##### Image signature
+
+Every release is built and signed keyless by the release workflow
+(`.github/workflows/release-seller-image.yml`) with its GitHub OIDC identity;
+there is no long-lived signing key, and each signature is recorded in the public
+Sigstore log (with this repository and workflow name). With cosign 3 or later
+installed, the installer verifies a `ghcr.io/gyblos/seller` image before pulling
+(identity `RELEASE_IDENTITY`, issuer `RELEASE_ISSUER` in `install.sh`) and stops
+on a bad signature; without cosign, or with an older one, it says the check was
+skipped, and integrity rests on HTTPS and the digest the installer pins. The
+check reads the seller image from `compose.yaml`; the installer names any
+override file or `COMPOSE_FILE` it does not cover. With
+`GYBLOS_REQUIRE_SIGNATURE=1` every one of those cases (no cosign, an older one,
+a non-Gyblos image, an override file or `COMPOSE_FILE`) stops the installer
+before anything is pulled instead. The default stays permissive because the
+pinned digest already fixes the image bytes; strict mode matters most with
+`GYBLOS_IMAGE` or a moving tag. By hand, the image:
 
 ```sh
-sh scripts/publish-image.sh        # pushes :<commit> and :beta for amd64 and arm64
+cosign verify ghcr.io/gyblos/seller:<version>@sha256:<digest> \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-identity-regexp '^https://github\.com/Gyblos/gyblos-node/\.github/workflows/release-seller-image\.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'
 ```
 
-The first push creates the package private; its visibility is changed in the
-package's settings on GitHub. A public image contains the node's source.
+The installer attached to a release is signed by the same workflow; its Sigstore
+bundle and SHA-256 are attached next to it. Name the release, so both files come
+from the same one:
+
+```sh
+base=https://github.com/Gyblos/gyblos-node/releases/download/v<version>
+curl -fsSL -O "$base/install.sh" -O "$base/install.sh.sigstore.json"
+cosign verify-blob install.sh --bundle install.sh.sigstore.json \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-identity-regexp '^https://github\.com/Gyblos/gyblos-node/\.github/workflows/release-seller-image\.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'
+```
+
+##### Releasing the seller image
+
+A release is a version tag pushed from a commit on `main`, one tag at a time.
+Nothing else is committed or deployed: the release itself publishes the
+installer. Tag a commit whose message does not contain `[skip ci]` (or another
+skip marker): GitHub then skips every workflow for the push, including this
+release, and the tag must be deleted and pushed again on another commit.
+
+```sh
+git tag v0.1.0-beta.3 origin/main
+git push origin v0.1.0-beta.3
+```
+
+1. The `release` job waits in the `release` environment for a maintainer's
+   approval, then runs `scripts/release-image.sh`. It refuses a commit outside
+   `main`, an existing version (or a registry it cannot query) and any run
+   outside the workflow; builds the tagged commit alone (`git archive`) for
+   amd64 and arm64; pushes `:<version>` and `:<commit>`; and signs the digest
+   and verifies that the signature names this workflow at this tag.
+2. The `publish` job runs `scripts/publish-installer.sh`. It pins a copy of
+   `install.sh` to that digest (`scripts/pin-installer.sh`), signs it keyless
+   with the same identity, and creates the GitHub release of the tag with
+   `install.sh`, `install.sh.sha256` and `install.sh.sigstore.json`. When the
+   version is newer than the latest release by semantic-version precedence
+   (`scripts/semver-newer.mjs`), the release becomes latest, which is what
+   `https://gyblos.com/install.sh` serves, and `:beta` moves to it; an older
+   line's patch is published without replacing either. Releases are never marked
+   pre-release, because GitHub's latest download skips those.
+3. If only `publish` fails, re-run that failed job; never push the tag again,
+   because the release job refuses a version already pushed. A re-run signs a
+   new copy of the installer, replaces the files of a release a previous run
+   created, and moves `:beta` when that release is the latest.
+
+One-time GitHub setup, by an organization owner:
+
+- Package `seller` → Package settings → Manage Actions access: add `gyblos-node`
+  with the Write role, so the workflow token can push.
+- Repository Settings → Environments → `release`: required reviewer (the
+  maintainers who may publish) and a deployment rule for tags `v*` only.
+- Repository Settings → Rules → Rulesets: `Release tags v*`, where only
+  repository admins may create, update or delete `v*` tags (the signature names
+  the workflow at a tag, so whoever can push such a tag can sign a release), and
+  `Protect main`: changes reach `main` only through a pull request, with no
+  force push or deletion.
+- Organization Settings → Authentication security: require two-factor
+  authentication for every member.
+
+The package is public, so the image exposes the node's source.
 
 ## Buyer
 
 Free inference uses `pnpm buyer:free`
 ([Free v2 buyer endpoint](#free-v2-buyer-endpoint)); `pnpm buyer` serves the
-same endpoint and pays on devnet when `selection.json` sets a deposit ceiling
-([Paid v2 buyer endpoint](#paid-v2-buyer-endpoint)). The paid v1 flow below
-needs a paid seller's `offer.json`; the seller daemon never writes one, so the
-v1 flow runs only against the lab gates (`gate:*`).
+same endpoint and chooses free or paid execution from the verified signed quote,
+within the `selection.json` ceilings
+([Paid v2 buyer endpoint](#paid-v2-buyer-endpoint),
+[routing](buyer-routing.md)). The paid v1 flow below needs a paid seller's
+`offer.json`; the seller daemon never writes one, so the v1 flow runs only
+against the lab gates (`gate:*`).
 
 ```sh
 export GYBLOS_RELAY_TOKEN=...
@@ -736,13 +882,15 @@ line is one independent user message; the terminal does not send history. Enter
 `/exit` or press Ctrl-C to stop. The CLI does not choose or display a seller
 independently of the buyer, and does not write conversations to files.
 
-In paid mode the owned buyer manages its private bearer token without printing
-it. Another buyer holding the same journal must be stopped before starting paid
-chat. Amounts are atomic units of the configured devnet test token, not USDC.
-The CLI prints usage and the payment verdict when available. If a request fails
-after it may have been sent, or the payment is not confirmed, it stops without
-retrying; use the buyer's reconciliation procedure before another paid request.
-A completed streamed fragment is provisional until the final result arrives.
+The automatic owned buyer manages its private bearer token without printing it,
+including for free answers. An unresolved signed payment or another buyer
+holding the journal blocks requests; starting chat does not itself open
+payments. Amounts are atomic units of the configured devnet test token, not
+USDC. The CLI prints usage and the payment verdict when available. If a request
+fails after it may have been sent, or the payment is not confirmed, it stops
+without retrying; use the buyer's reconciliation procedure before another paid
+request. A completed streamed fragment is provisional until the final result
+arrives.
 
 `pnpm buyer:free` starts a separate loopback endpoint on the buyer proxy port
 (default `127.0.0.1:4031`). Stop `buyer:start` first; both commands use that
@@ -878,9 +1026,13 @@ their separate scope and limits.
 
 ## Paid v2 buyer endpoint
 
-`pnpm buyer` reads `selection.json`: with `request.maxAtomic` above `"0"` it
-starts the paid buyer on the same loopback endpoint, otherwise the free one.
-Paid mode is devnet only and needs:
+`pnpm buyer` reads `selection.json`, selects a seller and verifies its signed
+quote. Both prices zero and `maxAtomic: "0"` use free execution without payment
+transactions. Either positive price uses the existing paid channel. A positive
+configured `request.maxAtomic` is a ceiling and can also accept a free quote.
+Payment preparation is deferred until a positive quote wins; the following paid
+requirements are not needed to execute a free quote. See
+[buyer routing](buyer-routing.md). Paid execution is devnet only and needs:
 
 - the buyer role (`pnpm node:setup --role buyer --mint MINT`) whose `rpcUrl`
   serves devnet (checked by its genesis hash) and whose wallet holds devnet SOL
@@ -891,18 +1043,17 @@ Paid mode is devnet only and needs:
   and `asset` the role's mint, with `maxAtomic` the most one request may deposit
   and `priceCeilings` the highest prices it accepts (protocol fee included).
 - every request to carry `Authorization: Bearer <token>`, with the token the
-  first paid start writes to `api-token` in the buyer home (below).
+  first automatic start writes to `api-token` in the buyer home (below).
 
-Each request takes one quote from a paid seller (a free winner, or a seller that
-fails discovery or identity checks, is skipped before anything is signed), signs
-one channel open for at most `maxAtomic`, streams the answer and checks the
-seller's settlement against the buyer's own count. A completed answer, and an
-error the seller answered after receiving the open, carries `gyblos_payment`:
-the verdict, the ceiling, the buyer's expected charge, the seller's charge,
-payout, fee and refund in atomic units, and whether a record was kept. A stream
-cut before the seller answered, or the endpoint's own deadline, carries only the
-error code. Only a single user message the model's chat template accepts is
-sent; anything else is refused before paying.
+For a positive-price winning quote, the buyer signs one channel open for at most
+`maxAtomic`, streams the answer and checks the seller's settlement against the
+buyer's own count. A completed answer, and an error the seller answered after
+receiving the open, carries `gyblos_payment`: the verdict, the ceiling, the
+buyer's expected charge, the seller's charge, payout, fee and refund in atomic
+units, and whether a record was kept. A stream cut before the seller answered,
+or the endpoint's own deadline, carries only the error code. Only a single user
+message the model's chat template accepts is sent; anything else is refused
+before paying.
 
 One paid request runs at a time (`PAID_BUYER_BUSY`) and one buyer process holds
 the payment journal (`BUYER_PAYMENT_JOURNAL_UNAVAILABLE`). The buyer never fails
@@ -910,10 +1061,10 @@ over once a seller received the signed open, since that seller could still land
 it; an open that never left the buyer is discarded and the next seller is tried.
 Any channel in the journal not settled on the buyer's own count (a refusal, a
 stop, a pending or lapsed claim, a dispute or a settlement the chain could not
-confirm) blocks new payments (`PAID_BUYER_UNRESOLVED_PAYMENT`) until it is
-reconciled; the buyer also appends it to `paid-records.jsonl` in the buyer home
-when it can (`recorded`). Never reset or delete a journal or lock to bypass the
-block.
+confirm) blocks new automatic requests, including free execution
+(`PAID_BUYER_UNRESOLVED_PAYMENT`), until it is reconciled; the buyer also
+appends it to `paid-records.jsonl` in the buyer home when it can (`recorded`).
+Never reset or delete a journal or lock to bypass the block.
 
 To reconcile, stop the paid buyer and run `pnpm buyer:reconcile:paid`. It checks
 that the role's RPC serves devnet, then reads each open channel's finalized
@@ -1024,14 +1175,14 @@ entry was created on that chain. There is no automatic legacy attribution or
 recovery command yet.
 
 The endpoint listens on loopback only and refuses browser requests, but loopback
-is not authentication, so paid mode also requires a bearer token. The first paid
-start creates `api-token` in the buyer home (`.local/gyblos/buyer/` by default),
-a private 0600 file, and later starts reuse it. Every request must send
-`Authorization: Bearer <token>`; OpenAI SDKs send their `apiKey` this way. A
-request without the token gets 401 `PAID_BUYER_UNAUTHORIZED` with
-`x-should-retry: false`, before its body is read or a seller is selected. The
-token is never printed; read it yourself. Every call to the paid endpoint, from
-curl or an SDK, must carry the header:
+is not authentication, so the automatic entry requires a bearer token for every
+request, including free ones. Its first start creates `api-token` in the buyer
+home (`.local/gyblos/buyer/` by default), a private 0600 file, and later starts
+reuse it. Every request must send `Authorization: Bearer <token>`; OpenAI SDKs
+send their `apiKey` this way. A request without the token gets 401
+`PAID_BUYER_UNAUTHORIZED` with `x-should-retry: false`, before its body is read
+or a seller is selected. The token is never printed; read it yourself. Every
+call to the paid endpoint, from curl or an SDK, must carry the header:
 
 ```sh
 export OPENAI_API_KEY="$(cat .local/gyblos/buyer/api-token)"

@@ -11,13 +11,16 @@ import {
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import test from 'node:test';
+import test, { type TestContext } from 'node:test';
+import { setTimeout as delay } from 'node:timers/promises';
 
 import { PRIVATE_LOG_LIMITS } from '@gyblos/config';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
+import type { TelemetrySink } from '@gyblos/protocol/telemetry';
 import { createConsoleTelemetrySink } from '@gyblos/telemetry-console';
 import { createFileTelemetrySink } from '@gyblos/telemetry-file';
 
+import { withLogIo } from './support/private-log-fixture';
 import { telemetryEvents } from './support/receipt-fixture';
 import { telemetrySinkContract } from './support/telemetry-sink-contract';
 
@@ -86,7 +89,10 @@ telemetrySinkContract('file telemetry', {
     };
   },
 });
-void test('file telemetry bounds the pending open buffer and records overflow', async () => {
+async function withBufferSink(
+  context: TestContext,
+  run: (sink: TelemetrySink) => Promise<void>,
+) {
   const root = await realpath(
     await mkdtemp(join(tmpdir(), 'gyblos-telemetry-buffer-')),
   );
@@ -94,15 +100,109 @@ void test('file telemetry bounds the pending open buffer and records overflow', 
     environment: { GYBLOS_HOME: root },
     role: P2P_ROLES.BUYER,
   });
+  // The capacity test must not make real disk throughput a drain-deadline assertion.
+  context.mock.timers.enable({ apis: ['setTimeout'] });
   try {
-    for (let index = 0; index < PRIVATE_LOG_LIMITS.pendingRecords + 5; index++)
-      sink.emit(telemetryEvents()[0]!);
-    const health = await sink.close();
-    assert.equal(health.emitted, PRIVATE_LOG_LIMITS.pendingRecords);
-    assert.equal(health.dropped, 5);
-    assert.equal(health.failed, false);
+    await run(sink);
   } finally {
-    await sink.close();
-    await rm(root, { recursive: true, force: true });
+    try {
+      await sink.flush();
+      await sink.close();
+    } finally {
+      context.mock.timers.reset();
+      await rm(root, { recursive: true, force: true });
+    }
   }
+}
+function fillBuffer(sink: TelemetrySink) {
+  for (let index = 0; index < PRIVATE_LOG_LIMITS.pendingRecords + 5; index++)
+    sink.emit(telemetryEvents()[0]!);
+}
+function assertBuffer(health: Awaited<ReturnType<TelemetrySink['close']>>) {
+  assert.equal(health.emitted, PRIVATE_LOG_LIMITS.pendingRecords);
+  assert.equal(health.dropped, 5);
+  assert.equal(health.failed, false);
+}
+void test('file telemetry bounds the pending open buffer and records overflow', async (context) => {
+  await withBufferSink(context, async (sink) => {
+    fillBuffer(sink);
+    assertBuffer(await sink.close());
+  });
 });
+void test(
+  'buffer capacity remains independent of a disk drain slower than the production deadline',
+  { timeout: 15000 },
+  async (context) => {
+    // Capture the real delay before the buffer fixture controls its drain clock.
+    const realDelay = delay;
+    await withLogIo(async (io) => {
+      let reached = () => {};
+      let release = () => {};
+      const stalled = new Promise<void>((resolve) => {
+        reached = resolve;
+      });
+      const released = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      io.sync = async () => {
+        if (io.fileSyncs === 2) {
+          reached();
+          await released;
+        }
+      };
+      await withBufferSink(context, async (sink) => {
+        fillBuffer(sink);
+        const closing = sink.close();
+        try {
+          await stalled;
+          await realDelay(PRIVATE_LOG_LIMITS.drainMs + 25);
+        } finally {
+          release();
+        }
+        assertBuffer(await closing);
+        await sink.flush();
+        assert.equal(io.fileSyncs, PRIVATE_LOG_LIMITS.pendingRecords + 1);
+      });
+    });
+  },
+);
+
+void test(
+  'file telemetry still reports the configured drain timeout while an append is stalled',
+  { timeout: 15000 },
+  async (context) => {
+    await withLogIo(async (io) => {
+      let reached = () => {};
+      let release = () => {};
+      const stalled = new Promise<void>((resolve) => {
+        reached = resolve;
+      });
+      const released = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      io.sync = async () => {
+        if (io.fileSyncs === 2) {
+          reached();
+          await released;
+        }
+      };
+      await withBufferSink(context, async (sink) => {
+        fillBuffer(sink);
+        const closing = sink.close();
+        try {
+          await stalled;
+          context.mock.timers.tick(PRIVATE_LOG_LIMITS.drainMs);
+          assert.deepEqual(await closing, {
+            emitted: PRIVATE_LOG_LIMITS.pendingRecords,
+            dropped: 5,
+            failed: true,
+          });
+        } finally {
+          release();
+        }
+        await sink.flush();
+        assert.equal(io.fileSyncs, PRIVATE_LOG_LIMITS.pendingRecords + 1);
+      });
+    });
+  },
+);

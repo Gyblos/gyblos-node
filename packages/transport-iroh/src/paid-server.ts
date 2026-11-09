@@ -95,8 +95,14 @@ async function respond(
     limits.ingressMs ?? IROH_DEADLINES.ingressMs,
     cancel,
   );
-  await streamPaidResponse(request, service, peer, signal, check, (frame) =>
-    deadline(stream.send.writeAll([...frame]), egressMs, cancel),
+  await streamPaidResponse(
+    request,
+    service,
+    peer,
+    signal,
+    check,
+    (frame) => deadline(stream.send.writeAll([...frame]), egressMs, cancel),
+    cancel,
   );
   check();
   await deadline(stream.send.finish(), egressMs, cancel);

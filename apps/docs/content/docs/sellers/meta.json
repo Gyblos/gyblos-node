@@ -1,0 +1,12 @@
+{
+  "title": "Sellers",
+  "pages": [
+    "manual-install",
+    "register-publish",
+    "models-offers",
+    "operate",
+    "identity"
+  ],
+  "defaultOpen": true,
+  "icon": "server"
+}

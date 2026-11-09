@@ -11,6 +11,7 @@
     "./cli/inference/billing": "./src/cli/inference/billing.ts",
     "./cli/preflight": "./src/cli/preflight.ts",
     "./cli/run": "./src/cli/run.ts",
+    "./commands/batch-channel-check": "./scripts/batch-channel-check.ts",
     "./commands/challenge": "./scripts/challenge.ts",
     "./commands/failures": "./scripts/failures.ts",
     "./commands/fund": "./scripts/fund.ts",
@@ -75,7 +76,8 @@
     "@number0/iroh": "1.1.0",
     "@gyblos/identity": "workspace:*",
     "@gyblos/telemetry-file": "workspace:*",
-    "@gyblos/receipt-collector": "workspace:*"
+    "@gyblos/receipt-collector": "workspace:*",
+    "@x402/fetch": "2.29.0"
   },
   "scripts": {
     "acceptance:node-discovery": "node --import tsx src/cli/node-discovery-acceptance.ts",

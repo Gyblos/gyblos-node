@@ -1,0 +1,94 @@
+---
+title: Operación
+description: Comprueba, modifica, detén y actualiza el vendedor de Docker conservando su identidad.
+---
+
+Usa estos comandos para el vendedor gratuito de Docker de tu invitación. Si elegiste otra carpeta,
+sustituye `~/gyblos-seller` de forma coherente. Conserva juntos el proyecto de Compose y sus volúmenes existentes.
+
+## Salud y actividad [#comprueba-salud-y-actividad]
+
+```sh
+cd ~/gyblos-seller
+docker compose ps
+docker compose exec seller gyblos seller status
+```
+
+Espera `RUNNING`. El resumen de recibos muestra solicitudes completadas, fallidas y canceladas, y **tokens
+de salida** durante una ventana móvil de 24 horas de recibos conservados. No es la cuota gratuita restante,
+el total de entrada más salida, ganancias ni prueba de toda la actividad pasada. Las cuotas gratuitas usan el día UTC.
+
+Usa `docker compose exec seller gyblos seller status --online` para comprobar descubrimiento por separado.
+Si el contenedor no permanece activo, ejecuta `docker compose run --rm seller gyblos doctor` y
+busca el código en [solución de problemas](/es/help/troubleshooting).
+
+## Detén e inicia [#detén-e-inicia]
+
+```sh
+cd ~/gyblos-seller
+docker compose stop seller
+```
+
+La presencia se retira en un plazo de dos minutos. Ollama sigue activo. Para iniciar de nuevo los servicios:
+
+```sh
+docker compose up -d
+```
+
+`docker compose down` elimina contenedores y conserva los volúmenes con nombre. **Nunca añadas `-v` a
+una parada o reparación habitual**: elimina los volúmenes persistentes, incluidas llaves y modelo descargado.
+
+## Aplica cambios [#aplica-cambios-de-configuración-o-entorno]
+
+Edita `gyblos.toml` en el equipo anfitrión. Valídalo como indica la
+[referencia de configuración](/es/reference/configuration) y recrea el vendedor:
+
+```sh
+cd ~/gyblos-seller
+docker compose up -d --force-recreate seller
+docker compose exec seller gyblos seller status
+```
+
+También debes recrearlo después de cambiar `seller.env`; reiniciar el contenedor no carga los cambios
+del archivo de entorno de Compose. Nunca muestres ese archivo en logs, capturas o una terminal compartida.
+
+## Actualiza el vendedor [#actualiza-la-imagen-beta]
+
+Cada actualización es una nueva versión firmada en el instalador. Cuando hay una, `gyblos seller status`
+termina con una línea `Update:` que la nombra. Registra la imagen instalada y después ejecuta la
+actualización donde guardaste `install.sh` (con el mismo `GYBLOS_DIR`, si definiste uno):
+
+```sh
+cd ~/gyblos-seller
+docker compose images seller
+sh install.sh update
+```
+
+`update` descarga el instalador de la última versión con su checksum y su firma, comprueba el checksum y,
+si cosign está instalado, la firma de la versión (`GYBLOS_REQUIRE_SIGNATURE=1` la hace obligatoria),
+reemplaza tu `install.sh` por él y lo ejecuta. Si tu instalador ya fija la última versión, lo vuelve a ejecutar, lo que también completa una actualización que se detuvo a mitad. Un
+`install.sh` anterior a este comando no conoce `update`: descarga el actual con
+`curl -fsSL https://gyblos.com/install.sh -o install.sh` y ejecuta `sh install.sh`.
+`GYBLOS_UPDATE_CHECK=0` en `seller.env` desactiva la comprobación de status, que solo pregunta a GitHub por
+la última versión.
+
+Conserva `gyblos.toml`, `seller.env`, las llaves y tus demás cambios de Compose. Solo cambia la línea
+`image:` del vendedor de Gyblos en `compose.yaml` a la nueva versión, comprueba su firma si cosign está
+instalado y reinicia el vendedor. Una imagen de vendedor de otro repositorio de imágenes se considera tu propia
+compilación y no se cambia. No migra el TOML ni el archivo de entorno.
+
+Después consulta el estado y, si publicas, el estado con `--online`. Si falla, conserva los volúmenes e
+informa de la imagen y el código. No reinicies repetidamente para eliminar un bloqueo o saltarte un rechazo.
+
+## Logs privados [#inspecciona-los-logs-en-privado]
+
+```sh
+cd ~/gyblos-seller
+docker compose logs -f seller
+```
+
+Ctrl+C deja de seguir los logs; no detiene el servicio. Revísalos en privado antes de extraer un código.
+No publiques logs completos, mensajes de compradores ni URLs de proveedores. Si Ollama se reinició y
+el vendedor perdió su conexión al motor, ejecuta `docker compose restart seller` y comprueba el estado.
+
+**Siguiente:** [Protege identidad y datos](/es/sellers/identity), o [resuelve un problema](/es/help/troubleshooting).

@@ -117,11 +117,11 @@ pnpm gyblos doctor              # read-only preflight; prints the public NodeId 
 pnpm node:start
 ```
 
-Buyer: same token, `pnpm node:setup --role buyer --mint MINT`, then
-`pnpm buyer:free` for the free chat endpoint (it also needs a `selection.json`;
-see the full steps). The paid v1 buyer flow (`buyer:trust`, `buyer:start`) needs
-a paid v1 seller, which only the lab gates run. Paid v2 uses a separate path.
-Full steps: [docs/running-a-node.md](docs/running-a-node.md).
+Buyer: with the same relay token, run `pnpm buyer:init` for guided local
+identity and selection settings, then `pnpm buyer:chat`. Defaults accept free
+quotes without payment transactions; spending and price ceilings are explicit.
+See [guided buyer setup](docs/buyer-init.md). The legacy paid v1 entry remains
+separate. Full steps: [docs/running-a-node.md](docs/running-a-node.md).
 
 With Docker instead: `compose.yaml` runs a seller with its own Ollama
 ([Docker](docs/running-a-node.md#docker)), and `sh install.sh` sets one up from
@@ -137,6 +137,7 @@ the published image without a checkout
 | Node   | `pnpm node:setup --role buyer\|seller --mint MINT`   | Create isolated role keys without RPC or funding.                                      |
 | Node   | `pnpm gyblos seller service install\|uninstall`      | Run the seller in the background (systemd or launchd) after an offline doctor check.   |
 | Node   | `pnpm node:tokenizer`                                | Download and verify the pinned tokenizer for either role, without an engine.           |
+| Node   | `pnpm buyer:init`                                    | Guide initial buyer settings and identity, without network requests or overwrites.     |
 | Node   | `pnpm buyer:setup`                                   | The same tokenizer download, under the buyer's older name.                             |
 | Node   | `pnpm buyer:free`                                    | Start the separate free v2 chat endpoint (complete or SSE) (`:4031`).                  |
 | Node   | `pnpm buyer:trust`                                   | Verify the offer against explicit seller identities and create trust.                  |
@@ -198,6 +199,9 @@ checks, the standalone lab facilitator and their evidence, and `tests/` and
 - Use only generated devnet keys. Never commit keys, tokens, journals or logs.
 
 ## Documentation
+
+Public guides for sellers and buyers, in English and Spanish, live in
+[apps/docs](apps/docs/README.md) (docs.gyblos.com). Repository documentation:
 
 [Architecture](docs/architecture.md) · [Running a node](docs/running-a-node.md)
 · [Configuration](docs/configuration.md) · [Payments](docs/payments.md) ·

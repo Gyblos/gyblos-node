@@ -23,13 +23,18 @@ import { assertMemoryHeadroom, memorySnapshot } from '@gyblos/runtime/memory';
 import { withDeadline } from '@gyblos/transport-iroh/deadline';
 import { bindEndpoint } from '@gyblos/transport-iroh/endpoint';
 
-import { SELLER_DAEMON_STATES, SELLER_PUBLIC_RECORDS } from './constants';
+import {
+  NODE_ERROR_CODES,
+  SELLER_DAEMON_STATES,
+  SELLER_PUBLIC_RECORDS,
+} from './constants';
 import { prepareSellerControl } from './control-startup';
 import {
   assertReadinessCurrent,
   type ReadinessRecord,
 } from './engine-readiness';
 import type { createSellerEngine } from './engine-registry';
+import { NodeError } from './errors';
 import { createSellerFreeOffers } from './free-offers';
 import { assertRoleHome } from './home';
 import { openSellerSequence } from './public-sequence';
@@ -54,6 +59,7 @@ import {
   type SellerPayments,
 } from './seller-paid';
 import { loadSellerSettings, type SellerSettings } from './seller-settings';
+import { previousFailure } from './seller-status';
 import { serveSellerTransport } from './seller-transport';
 import { createLocalTelemetry } from './telemetry-startup';
 
@@ -116,15 +122,22 @@ export async function startSeller(
     for (const dispose of disposers.splice(0).reverse())
       await dispose().catch(() => {});
   };
+  const statusPath = rolePath(P2P_ROLES.SELLER, ROLE_FILES.status);
+  // The phase startup reached, written as failed if it throws once the role home is known good.
+  let phase: string | undefined;
   try {
-    const stage = (phase: string) =>
-      saveJson(rolePath(P2P_ROLES.SELLER, ROLE_FILES.status), {
-        status: SELLER_DAEMON_STATES.STARTING,
-        phase,
-        runId: process.env.GYBLOS_P2P_RUN_ID,
-      });
     // Before the first status write, which would create the new role directory.
     await assertRoleHome(P2P_ROLES.SELLER);
+    const lastFailure = await previousFailure(statusPath);
+    const stage = (next: string) => {
+      phase = next;
+      return saveJson(statusPath, {
+        status: SELLER_DAEMON_STATES.STARTING,
+        phase,
+        lastFailure,
+        runId: process.env.GYBLOS_P2P_RUN_ID,
+      });
+    };
     await stage('configuration');
     const config = await loadRole(P2P_ROLES.SELLER);
     if (config.role !== P2P_ROLES.SELLER)
@@ -201,9 +214,18 @@ export async function startSeller(
     disposers.push(() => endpoint.close());
     if (endpoint.id().toString() !== config.nodeId)
       throw new Error('Node key changed unexpectedly.');
-    await withDeadline(endpoint.online(), TRANSPORT_TIMEOUTS.connectMs, () => {
-      void endpoint.close();
-    });
+    try {
+      await withDeadline(
+        endpoint.online(),
+        TRANSPORT_TIMEOUTS.connectMs,
+        () => {
+          void endpoint.close();
+        },
+      );
+    } catch (cause) {
+      // Any failure to come online, the 30 s deadline above all; the cause stays off the one-line output.
+      throw new NodeError(NODE_ERROR_CODES.SELLER_RELAY_OFFLINE, { cause });
+    }
     const endpointAddress = endpoint.addr();
     if (ready.some((warmed) => warmed.prepared.readiness.localResources))
       assertMemoryHeadroom(await memorySnapshot());
@@ -316,7 +338,7 @@ export async function startSeller(
     disposers.push(() => offers.stop());
     const offerTicket = EndpointTicket.fromAddr(endpointAddress).toString();
     const writeReady = () =>
-      saveJson(rolePath(P2P_ROLES.SELLER, ROLE_FILES.status), {
+      saveJson(statusPath, {
         status: SELLER_DAEMON_STATES.READY,
         runId: process.env.GYBLOS_P2P_RUN_ID,
         role: P2P_ROLES.SELLER,
@@ -345,6 +367,13 @@ export async function startSeller(
     };
   } catch (error) {
     await close();
+    if (phase !== undefined)
+      await saveJson(statusPath, {
+        status: SELLER_DAEMON_STATES.FAILED,
+        phase,
+        code: error instanceof NodeError ? error.code : undefined,
+        runId: process.env.GYBLOS_P2P_RUN_ID,
+      }).catch(() => {});
     throw error;
   }
 }

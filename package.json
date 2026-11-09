@@ -12,7 +12,7 @@
     "lint": "eslint . && prettier . --check && pnpm tooling:test && pnpm skills:check && pnpm boundaries",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
-    "typecheck": "tsc --noEmit && tsc -p tsconfig.tests.json && tsc -p apps/desktop/tsconfig.renderer.json",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.tests.json && tsc -p apps/desktop/tsconfig.renderer.json && tsc -p apps/docs/tsconfig.json",
     "test": "node --import tsx --test \"tests/*.test.ts\" \"packages/*/test/**/*.test.ts\"",
     "test:lab": "node --import tsx --test \"tests/lab/**/*.test.ts\"",
     "test:all": "node --import tsx --test \"tests/**/*.test.ts\" \"packages/*/test/**/*.test.ts\"",
@@ -28,6 +28,7 @@
     "gate:challenge": "node --import tsx lab/harness/scripts/challenge.ts",
     "gate:failures": "node --import tsx lab/harness/scripts/failures.ts",
     "gate:exact": "node --import tsx lab/harness/src/cli/exact.ts",
+    "gate:channel": "node --import tsx lab/harness/scripts/batch-channel-check.ts",
     "identity:devnet-run": "node --import tsx lab/tools/identity-devnet-run.ts",
     "identity:fixtures": "node --import tsx lab/tools/identity-fixtures.ts",
     "boundaries": "node --import tsx tooling/check-boundaries.ts",
@@ -51,6 +52,9 @@
     "node:tokenizer": "node --import tsx apps/node/src/tokenizer.ts",
     "check": "pnpm typecheck && pnpm lint && pnpm test:all",
     "buyer:trust": "node --import tsx apps/buyer/src/trust.ts",
+    "docs:dev": "pnpm --filter @gyblos/docs dev",
+    "docs:build": "pnpm --filter @gyblos/docs build",
+    "docs:test": "pnpm --filter @gyblos/docs test:export",
     "desktop:build": "pnpm --filter @gyblos/desktop build",
     "desktop:start": "pnpm desktop:build && pnpm --filter @gyblos/desktop start",
     "desktop:smoke": "pnpm desktop:build && pnpm --filter @gyblos/desktop smoke",
@@ -59,7 +63,8 @@
     "buyer:chat": "node --import tsx apps/buyer/src/chat-cli.ts",
     "buyer:free": "node --import tsx apps/buyer/src/free-main.ts",
     "acceptance:receipts": "pnpm --filter @gyblos/lab-harness acceptance:receipts",
-    "acceptance:paid": "node --import tsx tests/support/paid-acceptance-cli.ts"
+    "acceptance:paid": "node --import tsx tests/support/paid-acceptance-cli.ts",
+    "buyer:init": "node --import tsx apps/buyer/src/init.ts"
   },
   "dependencies": {
     "@gyblos/core": "workspace:*",
@@ -106,6 +111,8 @@
     "typescript-eslint": "8.48.1",
     "@opentelemetry/api": "1.9.0",
     "@opentelemetry/core": "2.6.0",
-    "@opentelemetry/sdk-metrics": "2.12.0"
+    "@opentelemetry/sdk-metrics": "2.12.0",
+    "litesvm": "1.6.2",
+    "@solana-program/system": "0.10.0"
   }
 }

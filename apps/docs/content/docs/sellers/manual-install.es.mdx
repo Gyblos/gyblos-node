@@ -1,0 +1,146 @@
+---
+title: Instala sin el script
+description: Verifica tú mismo la imagen firmada del vendedor y prepara el mismo vendedor Docker a mano.
+---
+
+El [instalador](/es/sellers/beta-guide) hace todo esto por ti. Usa esta página para comprobar tú mismo la
+firma de la imagen, o para preparar el mismo vendedor paso a paso con control total de cada archivo.
+
+## Encuentra la versión actual
+
+Cada instalador fija una versión de la imagen del vendedor por versión y digest. `gyblos.com/install.sh`
+entrega el instalador adjunto a la última [versión en GitHub](https://github.com/Gyblos/gyblos-node/releases/latest),
+que también muestra la imagen. Léela del instalador:
+
+```sh
+curl -fsSL https://gyblos.com/install.sh | grep '^DEFAULT_IMAGE='
+```
+
+Muestra una línea como `DEFAULT_IMAGE=ghcr.io/gyblos/seller:0.1.0-beta.3@sha256:…`. Abajo,
+reemplaza `VERSION@sha256:DIGEST` por lo que sigue a `ghcr.io/gyblos/seller:`.
+
+## Verifica la firma de la imagen
+
+Cada versión la construye y firma el workflow de publicación de Gyblos en GitHub, sin una llave de larga
+duración: la firma nombra ese workflow en una etiqueta de versión y queda registrada en el registro
+público de Sigstore. Instala [cosign](https://docs.sigstore.dev/cosign/system_config/installation/) versión 3 o posterior y verifica la imagen:
+
+```sh
+cosign verify ghcr.io/gyblos/seller:VERSION@sha256:DIGEST \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-identity-regexp '^https://github\.com/Gyblos/gyblos-node/\.github/workflows/release-seller-image\.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'
+```
+
+Una imagen verificada muestra los detalles de la firma y termina sin error. Si la verificación falla, no
+ejecutes esa imagen; informa la línea de la imagen por el canal de tu invitación. El instalador hace la
+misma comprobación cuando cosign está instalado y muestra `Verified the Gyblos release signature`.
+
+## Prepara el vendedor a mano
+
+Crea una carpeta privada:
+
+```sh
+mkdir -p ~/gyblos-seller && chmod 700 ~/gyblos-seller
+```
+
+Guarda esto como `~/gyblos-seller/compose.yaml`, con tu versión en la línea `image:` del vendedor:
+
+```yaml
+# A seller with its own Ollama. Setup and use: docs/running-a-node.md#docker.
+# The seller shares Ollama's network namespace because the Ollama engine accepts only a literal loopback
+# URL; Ollama listens on 127.0.0.1 there and no port is published. Iroh connects outbound only.
+services:
+  ollama:
+    image: ollama/ollama:0.40.0
+    environment:
+      OLLAMA_HOST: 127.0.0.1:11434
+      OLLAMA_NO_CLOUD: '1'
+      OLLAMA_NUM_PARALLEL: '1'
+      OLLAMA_MAX_LOADED_MODELS: '1'
+    volumes:
+      - ollama:/root/.ollama
+    restart: unless-stopped
+
+  seller:
+    image: ghcr.io/gyblos/seller:VERSION@sha256:DIGEST
+    network_mode: service:ollama
+    # A restarted Ollama gets a new network namespace; compose then restarts the seller into it.
+    depends_on:
+      ollama:
+        condition: service_started
+        restart: true
+    # Forwards stop signals to the daemon even during startup, before it installs its own handler.
+    init: true
+    # GYBLOS_RELAY_TOKEN and any api_key_env variables, NAME=value per line; keep it private.
+    env_file:
+      - ./seller.env
+    volumes:
+      - gyblos:/data
+      - type: bind
+        source: ./gyblos.toml
+        target: /config/gyblos.toml
+        read_only: true
+        bind:
+          create_host_path: false
+    # Startup needs 1.5 GiB of memory headroom above the seller itself.
+    mem_limit: 2g
+    cpus: 1.0
+    stop_grace_period: 120s
+    restart: unless-stopped
+
+volumes:
+  ollama:
+  gyblos:
+```
+
+Guarda esto como `~/gyblos-seller/gyblos.toml`:
+
+```toml
+# The seller daemon in Docker (compose.yaml): the pinned Qwen3 0.6B with reasoning off on the compose
+# Ollama, given away free within daily token caps. Copy it next to compose.yaml as gyblos.toml; the seller
+# shares Ollama's network namespace, so 127.0.0.1:11434 is that Ollama (docs/running-a-node.md#docker).
+# Paid offers are refused at startup until paid selling returns (docs/configuration.md).
+
+version = 1
+
+[node]
+network = "devnet"
+
+[discovery]
+# Off so a test node is not listed by accident; set publish = true to appear in discovery.
+publish = false
+
+# Optional capacity limits; omitted keys keep these defaults (docs/configuration.md#seller-limits).
+# [limits]
+# max_connections = 8
+# requests_per_minute = 30
+
+[[offers]]
+model = "qwen3:0.6b"
+reasoning = ["off"]
+engine = { kind = "ollama", url = "http://127.0.0.1:11434/" }
+free = { daily_token_cap = 200000, per_buyer_cap = 5000 }
+```
+
+Crea `~/gyblos-seller/seller.env` legible solo por ti (`chmod 600`) y, en un editor privado, escribe una
+línea: el nombre de variable `GYBLOS_RELAY_TOKEN`, un signo igual y tu token de relay, sin espacios ni
+comillas. El token tiene de 32 a 512 caracteres imprimibles, sin caracteres de shell como `$`, comillas o `#`. Nunca muestres ese archivo ni lo pegues en un comando de terminal.
+
+Después descarga las imágenes y el modelo, crea las llaves, instala el tokenizador, comprueba e inicia:
+
+```sh
+cd ~/gyblos-seller
+docker compose pull
+docker compose up -d ollama
+until docker compose exec -T ollama ollama list >/dev/null 2>&1; do sleep 2; done
+docker compose exec -T ollama ollama pull qwen3:0.6b
+docker compose run --rm seller setup --role seller --mint 4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU
+docker compose run --rm seller tokenizer
+docker compose run --rm seller gyblos doctor && docker compose up -d --force-recreate seller
+```
+
+La línea de espera termina cuando Ollama responde; si sigue esperando, detenla con Ctrl+C y revisa
+`docker compose logs ollama` en privado. La última línea inicia el vendedor solo cuando `gyblos doctor` no
+informa fallos; si no, corrige la causa indicada y repite esa línea. Continúa con la
+[comprobación de estado](/es/sellers/beta-guide#confirma-el-estado-del-servicio) y el
+[registro](/es/sellers/register-publish).

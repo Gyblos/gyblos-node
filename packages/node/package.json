@@ -32,6 +32,7 @@
     "./seller-settings": "./src/seller-settings.ts",
     "./clock-check": "./src/clock-check.ts",
     "./seller-doctor": "./src/seller-doctor.ts",
+    "./seller-status": "./src/seller-status.ts",
     "./control-startup": "./src/control-startup.ts",
     "./node-config": "./src/node-config.ts",
     "./node-config-file": "./src/node-config-file.ts",
@@ -61,7 +62,15 @@
     "./buyer-reconcile": "./src/buyer-reconcile.ts",
     "./buyer-withdraw": "./src/buyer-withdraw.ts",
     "./seller-chain": "./src/seller-chain.ts",
-    "./paypal-payment-reference": "./src/paypal-payment-reference.ts"
+    "./paypal-payment-reference": "./src/paypal-payment-reference.ts",
+    "./seller-registration-state": "./src/seller-registration-state.ts",
+    "./seller-registration": "./src/seller-registration.ts",
+    "./seller-funds": "./src/seller-funds.ts",
+    "./buyer-quote-execution": "./src/buyer-quote-execution.ts",
+    "./buyer-operation": "./src/buyer-operation.ts",
+    "./buyer-init": "./src/buyer-init.ts",
+    "./buyer-init-constants": "./src/buyer-init-constants.ts",
+    "./paid-stream-output": "./src/paid-stream-output.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",

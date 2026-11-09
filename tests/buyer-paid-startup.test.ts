@@ -88,7 +88,6 @@ void test('paid startup names each refusal and answers in paid mode once started
   process.env.GYBLOS_HOME = home;
   const buyer = join(home, 'buyer');
   const { startPaidBuyer } = await import('@gyblos/buyer/paid-startup');
-  const { paidSelected } = await import('@gyblos/buyer/buyer-main');
   const { startupMessage, startupReason } =
     await import('@gyblos/buyer/free-main');
   const { buyerChainPayments } = await import('@gyblos/node/buyer-chain');
@@ -157,9 +156,7 @@ void test('paid startup names each refusal and answers in paid mode once started
       ...SELECTION,
       request: { ...SELECTION.request, maxAtomic: '0' },
     });
-    assert.equal(await paidSelected(), false);
     await write(SELECTION);
-    assert.equal(await paidSelected(), true);
 
     const changed = (request: Record<string, unknown>) =>
       write({ ...SELECTION, request: { ...SELECTION.request, ...request } });

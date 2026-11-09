@@ -54,8 +54,71 @@ only; never import mainnet keys.
   minute and a half (at most about three minutes when every attempt times out).
   The retry queue lives in memory: claims still pending at shutdown are
   re-driven only by the payment server's own recovery at the next start, and a
-  claim not settled within the channel's window (about two minutes) lapses, so
-  the seller is not paid for it.
+  fresh claim past the SDK payload's expiry lapses. A broadcast transaction can
+  still confirm later; recovery keeps the same charge and checks its signature
+  instead of inferring that expiry means no payment happened.
+
+- Paid v2 reserves the settlement wait before the adapter-validated claim
+  deadline and stops further publication at that cutoff, even if the engine does
+  not finish. A confirmation that consumed the service window starts no
+  generation; it attempts zero-charge settlement. Only completed deliveries
+  before the cutoff enter the frozen charge. An already-issued transport write
+  cannot be retracted, and an uncooperative engine cannot be forcibly stopped by
+  an AbortSignal; late completion cannot revise the terminal or its charge. If a
+  write is still pending when the charge freezes, transport closes and drains it
+  instead of sending an inconsistent terminal. The buyer must reconcile that
+  interrupted result; the prompt is never retried.
+- New v2 channels use a 300-second withdrawal grace, covering the default
+  120-second SDK payload lifetime plus its 60-second accepted expiry slack and
+  margin. Shorter unsafe custom channel settings are refused. Existing channel
+  records keep their original terms; no journal migration occurs. The metered
+  facilitator explicitly enables a claim-only SDK patch for `Closing` channels
+  before grace ends, retaining the existing identity, amount, mint and
+  distribution checks. Unconfigured SDK/deposit behavior remains Open-only. This
+  uses the native program's
+  [payee-signed settle-and-seal path](https://github.com/solana-foundation/payment-channels/blob/0c07d5751c8972abf6a219570a3f39a72f46f879/program/payment_channels/src/instructions/settle_and_seal.rs#L83).
+  The deadline comes from the SDK-validated payload expiry, not the quote's
+  expiry; the payload expiry is not itself part of the payer-signed open.
+- The withdrawal grace is part of the channel authorization, and `v0.1.0-beta.4`
+  and earlier use 60 seconds. For paid requests, run buyer and seller on the
+  same release, `v0.1.0-beta.5` or later; mixed versions are not validated. Do
+  not downgrade to `v0.1.0-beta.4` while paid channels are still pending: it
+  cannot claim a `Closing` channel. Free requests are unaffected.
+- Closing and expiry regressions use the real installed SDK with synthetic
+  accounts, RPC replies and transaction confirmation. They do not execute the
+  native program or establish deployed-binary equivalence. Collection still
+  requires inclusion before voucher/grace expiry, bounded clock drift and
+  available RPC/chain services; a reserved wait is not a confirmation guarantee.
+  Native-program simulation and an explicitly approved current-code devnet
+  adversarial run remain separate validation. These guards cover paid v2; the
+  legacy v1 PoC retains its historical 60-second grace and is not covered by
+  this service-lifetime protection.
+
+- Paid v2 checkpoints the original SDK opening identity and blockhash lifetime
+  before the payer signs. A wallet refusal or storage failure after that
+  checkpoint conservatively blocks new payments until read-only reconciliation
+  resolves the same channel. It neither saves a signed payload for
+  retransmission nor recovers stale process locks. Journal v4 and private paths
+  are unchanged; this is not reusable-channel closure or refund recovery.
+- Closure/refund sends keep the locally signed transaction signature after a
+  lost or mismatched RPC reply and report it unconfirmed. They do not resend
+  inside the call or report refund amounts as verified. The existing read-only
+  finalized reconciliation remains required; absence of an account is not proof
+  of refund. Pending control signatures are not durably checkpointed yet, and a
+  stale RPC state on a later invocation may incur another rejected-transaction
+  fee. Full buyer/journal crash recovery remains separate.
+- Local native withdrawal acceptance drives the actual adapter through closing,
+  grace, seal and distribution. It checks token balances, recreation of the
+  payer's refund account, response loss, signed replay refusal, a rejected early
+  seal and an already-paid channel. The source-built SBF fixture and synthetic
+  mint do not establish deployed-program equivalence or a live product run.
+- Opening checkpoint regressions use the product payment client with synthetic
+  signers and finalized-history replies. A separate standalone-SDK test executes
+  the pinned native program in LiteSVM, loses confirmation and recovers the same
+  deposited channel without a second send or a service charge. That fixture's
+  compiled mainnet-beta treasury matches its offline SDK network label; product
+  mainnet remains disabled. It proves neither deployed-binary equivalence nor a
+  current-code devnet run.
 
 - A timeout, a 503 or a missing history entry does not prove that no payment
   happened. Uncertain payments block new ones until reconciled; there is no

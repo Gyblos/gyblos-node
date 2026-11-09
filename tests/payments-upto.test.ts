@@ -35,7 +35,7 @@ const CEILING = '1000000';
 const DIGEST = 'ab'.repeat(32);
 
 async function setup() {
-  const ledger = newLedger(START_MS);
+  const ledger = newLedger(Date.now());
   const recent = await hints();
   const payer = await generateKeyPairSigner();
   const description: PaymentDescription = {
@@ -52,7 +52,7 @@ async function setup() {
     buyer: payer.address,
     requestDigest: DIGEST,
     maxAtomic: CEILING,
-    expiresAt: START_MS + 60_000,
+    expiresAt: ledger.now + 60_000,
   };
   const authorization = {
     ...(await createUptoAuthorization(

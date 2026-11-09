@@ -74,6 +74,7 @@ void test('home layout defaults to one cwd-relative product home and a separate 
     facilitatorDiagnostics: '.local/lab/facilitator-diagnostics',
     identityKeys: '.local/lab/identity/keys',
     identityValidator: '.local/lab/identity-validator',
+    batchChannelKeys: '.local/lab/batch-channel-check/keys.json',
   });
   assert.equal(DEFAULT_HOMES.product, layout.root);
 });
@@ -297,7 +298,6 @@ void test(
   'buyer and seller set up in one home keep separate role directories',
   { skip: NATIVE_CAPABILITY.bindingSkip },
   async () => {
-    const { generateKeyPairSigner } = await import('@solana/kit');
     const { setupRole } = await import('@gyblos/node/roles');
     const { readdir } = await import('node:fs/promises');
     const previous = process.env.GYBLOS_HOME;
@@ -309,7 +309,6 @@ void test(
         role: P2P_ROLES.SELLER,
         mint,
         buyer: buyer.buyer,
-        payTo: (await generateKeyPairSigner()).address,
       });
       assert.notEqual(buyer.nodeId, seller.nodeId);
       const layout = homeLayout(process.env);

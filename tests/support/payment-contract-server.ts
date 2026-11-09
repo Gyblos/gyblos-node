@@ -265,6 +265,8 @@ function admissionContract(name: string, harness: PaymentHarness): void {
       const admission = results.find((result) => result.status === 'fulfilled');
       assert.equal(admission?.value.channelId, authorization.channelId);
       assert.equal(admission.value.maxAtomic, terms.maxAtomic);
+      assert.ok(Number.isSafeInteger(admission.value.claimUntil));
+      assert.ok(admission.value.claimUntil > 0);
       assertPublic(admission.value);
       const rejected = results.find((result) => result.status === 'rejected');
       await rejectsWith(

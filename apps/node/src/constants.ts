@@ -149,6 +149,8 @@ export type ServiceState = (typeof SERVICE_STATES)[keyof typeof SERVICE_STATES];
 export const STATUS_RESULTS = {
   RUNNING: 'RUNNING',
   STARTING: 'STARTING',
+  // The last start failed: status.json says failed, or a restart is under way after a failure.
+  FAILING: 'FAILING',
   STOPPED: 'STOPPED',
   NOT_CONFIRMED: 'NOT_CONFIRMED',
 } as const;
@@ -167,10 +169,19 @@ export type SellerRoleErrorCode =
 export const REGISTER = {
   timeoutMs: 15_000,
   inviteEnv: 'GYBLOS_INVITE',
+  lamportsPerSol: 1_000_000_000n,
+  solDecimals: 9,
+  // What to wait for when the registration cannot be estimated without SOL: 0.02, which covers the
+  // one-time 8004 registration (about 0.01 SOL) with margin.
+  simulationFundingLamports: 20_000_000n,
+  // How many times, on a terminal, registration waits for SOL and tries again before giving up.
+  fundWaits: 3,
 } as const;
 
 export const REGISTER_ERRORS = {
   NO_INVITE: 'REGISTER_NO_INVITE',
   INVITE_FORMAT: 'REGISTER_INVITE_FORMAT',
   CONFIG_INVALID: 'REGISTER_CONFIG_INVALID',
+  IDENTITY_UNAVAILABLE: 'REGISTER_IDENTITY_UNAVAILABLE',
+  CANCELLED: 'REGISTER_CANCELLED',
 } as const;

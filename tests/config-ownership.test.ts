@@ -78,6 +78,8 @@ void test('offer, payment-evidence, lock and key values keep their owners and va
 void test('role file and key names inside a role directory are unchanged', () => {
   assert.deepEqual(ROLE_FILES, {
     roleConfig: 'role.json',
+    buyerSelection: 'selection.json',
+    buyerInitLock: 'init.lock',
     nodeKey: 'node.key',
     trust: 'trust.json',
     status: 'status.json',
@@ -96,6 +98,8 @@ void test('role file and key names inside a role directory are unchanged', () =>
     offer: 'offer.json',
     identityState: 'identity-state-8004.json',
     identityStateLock: 'identity-state-8004.lock',
+    sellerRegistration: 'registration-8004-v1.json',
+    sellerRegistrationLock: 'registration-8004-v1.lock',
     publicSequence: 'public-sequence-v2.json',
     publicSequenceLock: 'public-sequence-v2.lock',
     facilitatorDiagnostics: 'facilitator-diagnostics',

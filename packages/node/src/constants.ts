@@ -26,6 +26,11 @@ export const NODE_ERROR_CODES = {
   LEGACY_LOCAL_LAYOUT: 'LEGACY_LOCAL_LAYOUT',
   PUBLIC_SEQUENCE_UNAVAILABLE: 'PUBLIC_SEQUENCE_UNAVAILABLE',
   IDENTITY_STATE_UNAVAILABLE: 'IDENTITY_STATE_UNAVAILABLE',
+  SELLER_REGISTRATION_STATE_UNAVAILABLE:
+    'SELLER_REGISTRATION_STATE_UNAVAILABLE',
+  SELLER_REGISTRATION_FUNDS_REQUIRED: 'SELLER_REGISTRATION_FUNDS_REQUIRED',
+  SELLER_REGISTRATION_SIMULATION_FAILED:
+    'SELLER_REGISTRATION_SIMULATION_FAILED',
   DISCOVERY_PUBLISH_FAILED: 'DISCOVERY_PUBLISH_FAILED',
   INVALID_PRICE: 'INVALID_PRICE',
   RECEIPT_STORAGE_UNAVAILABLE: 'RECEIPT_STORAGE_UNAVAILABLE',
@@ -52,6 +57,8 @@ export const NODE_ERROR_CODES = {
   // The payout, fee treasury or fee payer token account is missing and could not be created, so a
   // claim would pay that share to the payment program: paid selling stays off.
   SELLER_PAYMENT_ACCOUNTS_UNAVAILABLE: 'SELLER_PAYMENT_ACCOUNTS_UNAVAILABLE',
+  // The Iroh endpoint did not come online (no relay within 30 s): a refused relay token or no network.
+  SELLER_RELAY_OFFLINE: 'SELLER_RELAY_OFFLINE',
   // The buyer role's RPC does not serve devnet, so paid buying refuses to start.
   BUYER_PAYMENT_NETWORK_MISMATCH: 'BUYER_PAYMENT_NETWORK_MISMATCH',
   // The buyer wallet key is missing, unreadable or not the one role.json names.
@@ -130,11 +137,11 @@ export const SELLER_PUBLIC_RECORDS = {
 } as const;
 
 // Paid settlement: how long a terminal waits for the claim (well under the 180 s request deadline,
-// which also covers generation), and the backoff for claims reported pending. The schedule ends well
-// within a channel's lifetime, so a claim never outlives the payer's authorization unnoticed.
+// which also covers generation), and the backoff for claims reported pending. A retry may outlive
+// the payload; it still reconciles a previously broadcast transaction and never changes the charge.
 export const PAID_SETTLEMENT = {
   waitMs: 20_000,
-  // Front-loaded into the channel's claim window (about two minutes), after which a claim lapses.
+  // Front-loaded attempts; a fresh claim is still subject to the actual payload expiry.
   retryDelaysMs: [2_000, 5_000, 10_000, 20_000, 40_000],
 } as const;
 // Claim failures a later attempt with the same charge may overcome.
@@ -173,6 +180,8 @@ export const NODE_CONFIG_FILENAME = 'gyblos.toml';
 export const SELLER_DAEMON_STATES = {
   STARTING: 'starting',
   READY: 'ready',
+  // Startup threw; status.json keeps the phase and, for a NodeError, its static code.
+  FAILED: 'failed',
 } as const;
 
 // Mainnet is recognized only so the validator can refuse it with a specific code.
@@ -386,4 +395,11 @@ export type PaidVerdict = (typeof PAID_VERDICTS)[keyof typeof PAID_VERDICTS];
 export const PAYPAL_PAYMENT_REFERENCE_KIND = {
   AUTHORIZATION: 'authorization',
   CAPTURE: 'capture',
+} as const;
+
+// Durable seller registration state is private and limited to one active identity.
+export const SELLER_REGISTRATION_STATE = {
+  version: 1,
+  maxBytes: 8192,
+  secretBytes: 64,
 } as const;

@@ -1,6 +1,7 @@
-// The buyer's durable journal of authorized channels by request digest: one private document, read
-// strictly and rewritten atomically under the process lock. A signed open is never dropped while open;
-// an entry whose open was never signed is dropped once its terms expire, or at once when signing fails.
+// Tracks opening intents and conservatively retained prepared channels in private, versioned JSON.
+// Strict atomic writes under a process lock; recovery never broadcasts or restores locks.
+import { lstat } from 'node:fs/promises';
+
 import { isAddress } from '@solana/kit';
 
 import {
@@ -13,6 +14,7 @@ import {
 import { PaymentError } from '@gyblos/protocol/payment';
 import {
   acquireProcessLock,
+  checkPrivateDirectory,
   ensurePrivateDirectory,
   readPrivateFile,
   writePrivateFile,
@@ -23,8 +25,7 @@ import { BUYER_JOURNAL } from './constants';
 import type { UptoLedgerPaths } from './file-ledger';
 import { isJournalNetwork } from './journal-network';
 
-// The mint, fee treasury and fee rate an open accepted: its escrow is withdrawn and read with these,
-// whatever the buyer's policy says later.
+// The original accepted network, mint and fee policy, independent of later configuration.
 export interface UptoJournalPolicy {
   // Null for an entry written before the journal began recording networks.
   network: string | null;
@@ -35,20 +36,18 @@ export interface UptoJournalPolicy {
 
 export interface UptoJournalEntry {
   requestDigest: string;
-  // Null until the open is signed; an entry without one never left the buyer.
+  // Null until the SDK open is prepared; non-null means signing may have happened.
   channelId: string | null;
-  // The seller's payout and fee payer (which fronts the channel's rent), to check the claim and
-  // read the channel later.
+  // Accepted payout and fee payer, immutable once this opening is prepared.
   payTo: string;
   feePayer: string;
   maxAtomic: string;
-  // Null for an entry journaled before version 3; its network is unknown and recovery is blocked.
+  // Null in legacy rows without accepted policy; automatic recovery remains blocked.
   policy: UptoJournalPolicy | null;
-  // The open's slot (a seed of its channel address) and the last block height its blockhash allows:
-  // past that height an open that never landed never will.
+  // Original PDA slot and blockhash lifetime, immutable after preparation.
   openSlot: string;
   lastValidBlockHeight: string;
-  // When the terms expire; an unsigned entry is pruned after it.
+  // Admission expiry; only unprepared entries can be pruned at it.
   expiresAt: number;
   state: PaymentChannelState;
   chargedAtomic: string | null;
@@ -59,8 +58,7 @@ export interface UptoJournalEntry {
 export interface UptoBuyerJournal {
   get(requestDigest: string): Promise<UptoJournalEntry | undefined>;
   put(entry: Omit<UptoJournalEntry, 'updatedAt'>): Promise<void>;
-  // Drops an entry whose open was never signed; a signed one is refused.
-  // With `channelId`, also drops that signed entry, which the caller knows never left the buyer.
+  // Removing a prepared open known to be unsent also requires its exact channelId.
   remove(requestDigest: string, channelId?: string): Promise<void>;
   list(): Promise<UptoJournalEntry[]>;
   close(): Promise<void>;
@@ -240,14 +238,20 @@ function serialize(entries: Map<string, UptoJournalEntry>): string {
   });
 }
 
-function retainSignedNetwork(
+function retainOpeningIdentity(
   held: UptoJournalEntry | undefined,
   next: UptoJournalEntry,
 ): void {
   if (
     held?.channelId &&
     (next.channelId !== held.channelId ||
-      (held.policy?.network ?? null) !== (next.policy?.network ?? null))
+      next.openSlot !== held.openSlot ||
+      next.lastValidBlockHeight !== held.lastValidBlockHeight ||
+      next.expiresAt !== held.expiresAt ||
+      next.payTo !== held.payTo ||
+      next.feePayer !== held.feePayer ||
+      next.maxAtomic !== held.maxAtomic ||
+      JSON.stringify(next.policy) !== JSON.stringify(held.policy))
   )
     unavailable();
 }
@@ -261,7 +265,7 @@ async function guarded<T>(run: () => Promise<T>): Promise<T> {
   }
 }
 
-// Settled entries past retention and unsigned entries past their terms are dropped.
+// Only settled entries past retention and unprepared intents past expiry are dropped.
 function prune(entries: Map<string, UptoJournalEntry>, at: number) {
   const cutoff = at - BUYER_JOURNAL.settledRetentionMs;
   for (const [digest, held] of entries)
@@ -339,7 +343,7 @@ export async function openUptoBuyerJournal(options: {
         unavailable();
       const held = entries.get(value.requestDigest);
       const next = entry({ ...value, updatedAt: now() }, BUYER_JOURNAL.version);
-      retainSignedNetwork(held, next);
+      retainOpeningIdentity(held, next);
       entries.set(value.requestDigest, next);
     });
   const remove = (requestDigest: string, channelId?: string) =>
@@ -365,4 +369,32 @@ export async function openUptoBuyerJournal(options: {
       return closing;
     },
   };
+}
+
+// Snapshot only: never opens a wallet, takes a lock, creates files or recovers another process's lock.
+export async function hasUnresolvedBuyerPayments(
+  paths: UptoLedgerPaths,
+): Promise<boolean> {
+  return guarded(async () => {
+    if (!(await checkPrivateDirectory(paths.directory))) return false;
+    const unlocked = async () => {
+      const lock = await lstat(paths.lock).catch(
+        (error: NodeJS.ErrnoException) => {
+          if (error.code === 'ENOENT') return undefined;
+          throw error;
+        },
+      );
+      if (lock) unavailable();
+    };
+    await unlocked();
+    const source = await readPrivateFile(paths.state, BUYER_JOURNAL.maxBytes);
+    const entries =
+      source === undefined ? [] : [...parseJournal(source).entries.values()];
+    await unlocked();
+    return entries.some(
+      (entry) =>
+        entry.channelId !== null &&
+        entry.state !== PAYMENT_CHANNEL_STATES.SETTLED,
+    );
+  });
 }

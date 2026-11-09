@@ -12,6 +12,12 @@ export const PAID_ACCEPTANCE = {
 } as const;
 export const PAID_ACCEPTANCE_CASES = {
   STARTUP: 'product-startup',
+  FREE: 'automatic-free-without-payment-preparation',
+  FREE_CLI: 'automatic-free-terminal-with-paid-budget',
+  FREE_CANCEL: 'automatic-free-cancellation-no-retry',
+  FREE_RECEIPTS: 'automatic-free-confirmed-receipts',
+  FREE_PENDING: 'uncertain-payment-blocks-free-after-restart',
+  TELEMETRY: 'automatic-free-private-telemetry',
   PRESEND: 'pre-send-discard-without-generation',
   CLI_ANSWER: 'terminal-chat-answer',
   CLI_INTERRUPTED: 'terminal-chat-interrupted-settlement',
@@ -44,4 +50,10 @@ export interface PaidAcceptanceReport {
   externalCalls: number;
   registryReads: number;
   forbiddenRpcMethods: number;
+  freeAnswers: number;
+  freeAttempts: number;
+  freePaymentPreparations: number;
+  freeTokenizerLoads: number;
+  confirmedReceipts: number;
+  telemetryEvents: number;
 }

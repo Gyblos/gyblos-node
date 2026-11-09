@@ -23,7 +23,16 @@ export {
   type SponsorReason,
 } from './constants';
 export { IdentityError } from './errors';
-export { detachedSignerFromKeyPair, type DetachedSigner } from './signers';
+export {
+  detachedSignerFromKeyPair,
+  detachedSignerFromNodeSecret,
+  type DetachedSigner,
+} from './signers';
+export {
+  buildOwnerRegistration,
+  type OwnerRegistration,
+  type OwnerRegistrationInput,
+} from './owner-registration';
 export {
   buildSponsoredRegistration,
   prefundFromSpend,
@@ -52,3 +61,15 @@ export {
   type SponsorPolicyConfig,
   type SponsorRequest,
 } from './policy';
+
+export {
+  checkOwnerRegistration,
+  prepareOwnerRegistration,
+  submitOwnerRegistration,
+  type OwnerRegistrationSubmission,
+  type PreparedOwnerRegistration,
+} from './owner-submission';
+
+export { verifyPreparedOwnerRegistration } from './owner-wire';
+
+export { OwnerRegistrationFundsError } from './owner-cost';

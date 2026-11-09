@@ -38,3 +38,5 @@ jobs:
       - run: pnpm test
       - run: pnpm test:lab
       - run: pnpm desktop:build
+      - run: pnpm docs:build
+      - run: pnpm docs:test

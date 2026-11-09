@@ -22,6 +22,7 @@ export function createPaidStreamOutput(
   usage: { inputTokens: number; allowance: number },
   signal: AbortSignal,
   deliver: (text: string) => Promise<void>,
+  checkDeadline: () => void = () => {},
 ) {
   let text = '';
   // Only text whose delivery resolved; text above may hold a fragment still in flight.
@@ -31,6 +32,7 @@ export function createPaidStreamOutput(
   let failed = false;
   let failure: unknown;
   function check() {
+    checkDeadline();
     if (signal.aborted || !active) return fail(PAID_EXECUTION_CODES.CANCELLED);
     if (failed) throw failure;
   }
@@ -57,7 +59,8 @@ export function createPaidStreamOutput(
         }
         text = combined;
         await deliver(delta);
-        deliveredText = combined;
+        checkDeadline();
+        if (active) deliveredText = combined;
         check();
       } catch (error) {
         failed = true;

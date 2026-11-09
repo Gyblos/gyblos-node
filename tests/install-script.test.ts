@@ -1,89 +1,27 @@
-// install.sh against a fake `docker` that records its arguments: the files it writes (the repository's
-// compose file and Docker example, with the published image), the private seller.env, the order of the
-// setup commands, kept files on a rerun, and that the relay token is never printed. Also the guards of
-// scripts/publish-image.sh that run before any build. Offline; the image itself is a manual check.
+// install.sh against a fake `docker` (and, when given, a fake `cosign`) that records its arguments: the
+// files it writes (the repository's compose file and Docker example, with the published image), the
+// private seller.env, the order of the setup commands, kept files and a moved Gyblos image on a rerun,
+// the release signature check, and that the relay token is never printed. Also the guards of
+// Offline; the image itself is a manual check (release-image.test.ts covers the release script).
 import assert from 'node:assert/strict';
 import {
-  spawnSync,
-  type SpawnSyncOptionsWithStringEncoding,
-} from 'node:child_process';
-import {
-  chmodSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   statSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
 import { DEVNET_USDC } from '@gyblos/config';
 
+import { harness, IMAGE } from './support/install-harness';
 import { FAKE_SECRET, REPOSITORY_ROOT } from './support/node-config-fixtures';
 
-const SCRIPT = join(REPOSITORY_ROOT, 'install.sh');
-const PUBLISH = join(REPOSITORY_ROOT, 'scripts/publish-image.sh');
-const IMAGE = 'ghcr.io/gyblos/seller:test';
 const read = (path: string) =>
   readFileSync(join(REPOSITORY_ROOT, path), 'utf8');
-
-// Logs each call as one line; the compose version and doctor's result come from the environment.
-const FAKE_DOCKER = `#!/bin/sh
-printf '%s\\n' "$*" >>"$FAKE_DOCKER_LOG"
-case "$*" in
-  'compose version --short') printf '%s\\n' "\${FAKE_COMPOSE_VERSION:-2.29.1}" ;;
-  'compose run --rm seller gyblos doctor') exit "\${FAKE_DOCTOR_EXIT:-0}" ;;
-esac
-exit 0
-`;
-
-async function harness() {
-  const root = await mkdtemp(join(tmpdir(), 'gyblos-install-'));
-  const bin = join(root, 'bin');
-  mkdirSync(bin);
-  writeFileSync(join(bin, 'docker'), FAKE_DOCKER);
-  chmodSync(join(bin, 'docker'), 0o755);
-  const directory = join(root, 'seller');
-  const log = join(root, 'docker.log');
-  const run = (env: Record<string, string> = {}) => {
-    const options: SpawnSyncOptionsWithStringEncoding & { detached: boolean } =
-      {
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'pipe'],
-        // Its own session, so there is no controlling terminal to prompt on. spawnSync honors it, but its
-        // options type omits it.
-        detached: true,
-        env: {
-          PATH: `${bin}:/usr/bin:/bin`,
-          HOME: root,
-          GYBLOS_DIR: directory,
-          GYBLOS_IMAGE: IMAGE,
-          FAKE_DOCKER_LOG: log,
-          ...env,
-        },
-      };
-    const result = spawnSync('sh', [SCRIPT], options);
-    return { ...result, output: result.stdout + result.stderr };
-  };
-  const calls = () => {
-    try {
-      return readFileSync(log, 'utf8').trim().split('\n');
-    } catch {
-      return [];
-    }
-  };
-  return {
-    root,
-    directory,
-    run,
-    calls,
-    file: (name: string) => readFileSync(join(directory, name), 'utf8'),
-    cleanup: () => rm(root, { recursive: true, force: true }),
-  };
-}
 
 void test('installs from the repository compose file and example with the published image', async () => {
   const install = await harness();
@@ -136,17 +74,6 @@ void test('installs from the repository compose file and example with the publis
   }
 });
 
-void test('pulls by default the tag the publish script pushes', () => {
-  const repository = /^REPOSITORY=(.+)$/m.exec(
-    read('scripts/publish-image.sh'),
-  );
-  assert.ok(repository);
-  assert.match(
-    read('install.sh'),
-    new RegExp(`^DEFAULT_IMAGE=${repository[1]}:beta$`, 'm'),
-  );
-});
-
 void test('a rerun keeps every file, needs no token and recreates the seller', async () => {
   const install = await harness();
   try {
@@ -186,12 +113,17 @@ void test('refuses a token seller.env or the relay could not hold, without writi
     ].map((bad) => bad + padding),
     'x'.repeat(31),
     'x'.repeat(513),
+    // Synthetic invite codes: the gyb_ shape, and one long enough for a token.
+    `gyb_${'a2'.repeat(13)}`,
+    `gyb_${'x'.repeat(40)}`,
   ]) {
     const install = await harness();
     try {
       const result = install.run({ GYBLOS_RELAY_TOKEN: token });
       assert.equal(result.status, 1, token);
       assert.match(result.stderr, /relay token/);
+      if (token.startsWith('gyb_'))
+        assert.match(result.stderr, /invite code, not the relay token/);
       assert.ok(!result.output.includes(token), token);
       assert.throws(() => install.file('seller.env'), token);
       assert.ok(!install.calls().includes('compose pull'), token);
@@ -279,9 +211,147 @@ void test('refuses Docker Compose older than 2.17 and image references with shel
   }
 });
 
-void test('the publish script parses and refuses a bad tag before touching git', () => {
-  assert.equal(spawnSync('sh', ['-n', PUBLISH]).status, 0);
-  const result = spawnSync('sh', [PUBLISH, 'bad tag'], { encoding: 'utf8' });
-  assert.equal(result.status, 1);
-  assert.match(result.stderr, /invalid tag/);
+void test('a rerun moves a Gyblos seller image to this release and keeps any other image', async () => {
+  const install = await harness();
+  try {
+    assert.equal(install.run({ GYBLOS_RELAY_TOKEN: FAKE_SECRET }).status, 0);
+    const written = install.file('compose.yaml');
+    const next = 'ghcr.io/gyblos/seller:9.9.9@sha256:' + 'a'.repeat(64);
+    const moved = install.run({ GYBLOS_IMAGE: next });
+    assert.equal(moved.status, 0, moved.output);
+    assert.equal(install.file('compose.yaml'), written.replace(IMAGE, next));
+    assert.match(moved.stdout, /Updated the seller image/);
+    const own = written.replace(IMAGE, 'registry.example/own-build:1');
+    writeFileSync(join(install.directory, 'compose.yaml'), own);
+    const kept = install.run({ GYBLOS_IMAGE: next });
+    assert.equal(kept.status, 0, kept.output);
+    assert.equal(install.file('compose.yaml'), own);
+    assert.match(kept.stdout, /GYBLOS_IMAGE is not applied/);
+    assert.match(kept.stdout, /Not a Gyblos release image/);
+  } finally {
+    await install.cleanup();
+  }
+});
+
+void test('with cosign the Gyblos image must carry the release signature before anything is pulled', async () => {
+  const signed = await harness({ cosign: true });
+  try {
+    const result = signed.run({ GYBLOS_RELAY_TOKEN: FAKE_SECRET });
+    assert.equal(result.status, 0, result.output);
+    const [check] = signed.signatureChecks();
+    assert.match(
+      check ?? '',
+      new RegExp(
+        `^verify --certificate-identity-regexp \\S+ --certificate-oidc-issuer https://token.actions.githubusercontent.com ${IMAGE}$`,
+      ),
+    );
+    assert.match(result.stdout, /Verified the Gyblos release signature/);
+  } finally {
+    await signed.cleanup();
+  }
+  const forged = await harness({ cosign: true });
+  try {
+    const result = forged.run({
+      GYBLOS_RELAY_TOKEN: FAKE_SECRET,
+      FAKE_COSIGN_EXIT: '1',
+    });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /signature did not verify/);
+    assert.ok(!forged.calls().includes('compose pull'));
+    assert.deepEqual(
+      readdirSync(forged.directory).filter((name) => name.startsWith('.')),
+      [],
+    );
+  } finally {
+    await forged.cleanup();
+  }
+  const unchecked = await harness();
+  try {
+    const result = unchecked.run({ GYBLOS_RELAY_TOKEN: FAKE_SECRET });
+    assert.equal(result.status, 0, result.output);
+    assert.match(result.stdout, /cosign is not installed/);
+  } finally {
+    await unchecked.cleanup();
+  }
+  const old = await harness({ cosign: true });
+  try {
+    const result = old.run({
+      GYBLOS_RELAY_TOKEN: FAKE_SECRET,
+      FAKE_COSIGN_VERSION: '2.6.1',
+    });
+    assert.equal(result.status, 0, result.output);
+    assert.match(result.stdout, /cosign 3 or later is needed/);
+    assert.deepEqual(old.signatureChecks(), []);
+  } finally {
+    await old.cleanup();
+  }
+});
+
+void test('names Compose files the signature check does not cover', async () => {
+  const install = await harness({ cosign: true });
+  try {
+    assert.equal(install.run({ GYBLOS_RELAY_TOKEN: FAKE_SECRET }).status, 0);
+    writeFileSync(join(install.directory, 'compose.override.yaml'), '');
+    const result = install.run({ COMPOSE_FILE: 'other.yaml' });
+    assert.equal(result.status, 0, result.output);
+    assert.match(result.stdout, /compose\.override\.yaml is present/);
+    assert.match(result.stdout, /COMPOSE_FILE is set/);
+  } finally {
+    await install.cleanup();
+  }
+});
+
+void test('GYBLOS_REQUIRE_SIGNATURE=1 stops before pulling unless the release signature verifies', async () => {
+  const strict = {
+    GYBLOS_RELAY_TOKEN: FAKE_SECRET,
+    GYBLOS_REQUIRE_SIGNATURE: '1',
+  };
+  const refused = async (
+    options: { cosign?: boolean },
+    env: Record<string, string>,
+    reason: RegExp,
+    before?: (directory: string) => void,
+  ) => {
+    const install = await harness(options);
+    try {
+      before?.(install.directory);
+      const result = install.run({ ...strict, ...env });
+      assert.equal(result.status, 1, result.output);
+      assert.match(result.stderr, reason);
+      assert.match(
+        result.stderr,
+        /GYBLOS_REQUIRE_SIGNATURE=1 requires a verified/,
+      );
+      assert.ok(!install.calls().includes('compose pull'));
+    } finally {
+      await install.cleanup();
+    }
+  };
+  await refused({}, {}, /cosign is not installed/);
+  await refused({ cosign: true }, { FAKE_COSIGN_VERSION: '2.4.1' }, /cosign 3/);
+  await refused(
+    { cosign: true },
+    { GYBLOS_IMAGE: 'registry.example/own:1' },
+    /Not a Gyblos release image/,
+  );
+  await refused(
+    { cosign: true },
+    {},
+    /^gyblos install: \.env is present/m,
+    (directory) => {
+      mkdirSync(directory, { mode: 0o700 });
+      writeFileSync(join(directory, '.env'), '');
+    },
+  );
+  const signed = await harness({ cosign: true });
+  try {
+    const result = signed.run(strict);
+    assert.equal(result.status, 0, result.output);
+    assert.match(result.stdout, /Verified the Gyblos release signature/);
+    const bad = signed.run({ GYBLOS_REQUIRE_SIGNATURE: 'yes' });
+    assert.equal(bad.status, 1);
+    assert.match(bad.stderr, /GYBLOS_REQUIRE_SIGNATURE must be 1 or unset/);
+  } finally {
+    await signed.cleanup();
+  }
 });

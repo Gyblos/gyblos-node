@@ -1,5 +1,236 @@
+diff --git a/dist/cjs/batch-settlement/client/index.d.ts b/dist/cjs/batch-settlement/client/index.d.ts
+index 82df8720d3312a6524a081321a29683adeaaf0a5..cd68390a5a6f5a266120f7b68b9d52cb5bb53bdb 100644
+--- a/dist/cjs/batch-settlement/client/index.d.ts
++++ b/dist/cjs/batch-settlement/client/index.d.ts
+@@ -268,6 +268,14 @@ interface BatchClientChannelStorage {
+     delete(key: string): Promise<void>;
+ }
+ interface BatchSvmClientConfig extends ClientSvmConfig {
++    /**
++     * gyblos patch: approves a channel whose `extra.splits` sends part of each charge beyond `payTo`.
++     * Without it such a channel is refused. Return true only for distributions you accept.
++     */
++    approveSplits?: ((splits: ReadonlyArray<{
++        bps: number;
++        recipient: string;
++    }>, requirements: PaymentRequirements) => boolean) | undefined;
+     /** Fixed deposit target. Overrides server hints and `depositPolicy`. */
+     depositAmount?: bigint | string | undefined;
+     /** Policy used to size deposits when `depositAmount` is not set. */
+diff --git a/dist/cjs/batch-settlement/client/index.js b/dist/cjs/batch-settlement/client/index.js
+index 5440c1945c3c1d0d97553a9613dabb57dc6078c3..77e2e0d2b993fa01046ed5a6c60e4f8baaafcac8 100644
+--- a/dist/cjs/batch-settlement/client/index.js
++++ b/dist/cjs/batch-settlement/client/index.js
+@@ -1275,6 +1275,29 @@ async function credentialFor(mode, tracker, charge, authorization, refund = fals
+     }
+   }
+ }
++// gyblos patch (batch-settlement splits): a channel may commit, at open, a multi-recipient distribution
++// from extra.splits (payTo first, bps summing to 10000), so a protocol fee is split on chain. Without
++// extra.splits behavior is unchanged. Proposed upstream: x402-foundation/x402#4166.
++function gyblosBatchSplits(requirements) {
++  const splits = requirements.extra?.splits;
++  if (splits === void 0) return [{ bps: 1e4, recipient: requirements.payTo }];
++  if (!Array.isArray(splits) || splits.length < 1 || splits.length > 4) {
++    throw new Error("extra.splits must list 1 to 4 recipients");
++  }
++  let total = 0;
++  const seen = /* @__PURE__ */ new Set();
++  for (const split of splits) {
++    if (!split || typeof split.recipient !== "string" || !Number.isInteger(split.bps) || split.bps < 1 || split.bps > 1e4) {
++      throw new Error("extra.splits entries need a recipient and 1 to 10000 bps");
++    }
++    if (seen.has(split.recipient)) throw new Error("extra.splits recipients must be distinct");
++    seen.add(split.recipient);
++    total += split.bps;
++  }
++  if (total !== 1e4) throw new Error("extra.splits must sum to 10000 bps");
++  if (splits[0].recipient !== requirements.payTo) throw new Error("extra.splits must start with payTo");
++  return splits.map((split) => ({ bps: split.bps, recipient: split.recipient }));
++}
+ async function buildDepositPayload(args) {
+   if (args.firstCharge <= 0n || args.firstCharge > args.depositAmount) {
+     throw new Error("first charge must be positive and no greater than the deposit");
+@@ -1305,7 +1328,7 @@ async function buildDepositPayload(args) {
+     openSlot: args.openSlot,
+     payee: args.feePayer,
+     payer: args.payer,
+-    recipients: [{ bps: FULL_SPLIT_BPS, recipient: args.receiver }],
++    recipients: args.splits ?? [{ bps: FULL_SPLIT_BPS, recipient: args.receiver }],
+     ...args.salt !== void 0 ? { salt: args.salt } : {},
+     tokenProgram: args.tokenProgram
+   });
+@@ -1625,6 +1648,14 @@ function untrustedOperatorMessage(...operators) {
+ 
+ // src/batch-settlement/client/scheme.ts
+ var BatchSvmScheme = class {
++  // gyblos patch: a split channel needs the integrator's explicit approval (config.approveSplits).
++  gyblosApprovedSplits(requirements) {
++    const splits = gyblosBatchSplits(requirements);
++    if (splits.length > 1 && this.config.approveSplits?.(splits, requirements) !== true) {
++      throw new Error("extra.splits sends funds beyond payTo and was not approved");
++    }
++    return splits;
++  }
+   constructor(signer, config = {}) {
+     this.signer = signer;
+     this.config = config;
+@@ -1804,6 +1835,7 @@ var BatchSvmScheme = class {
+       receiver: requirements.payTo,
+       receiverAuthorizer: terms.receiverAuthorizer,
+       salt: this.salt(),
++      splits: this.gyblosApprovedSplits(requirements),
+       tokenProgram: terms.tokenProgram,
+       withdrawDelay: terms.withdrawDelay,
+       voucherSigner: terms.voucherSigner,
+diff --git a/dist/cjs/batch-settlement/facilitator/index.js b/dist/cjs/batch-settlement/facilitator/index.js
+index 5d8fd8433c8ccc76ccfae1c34cadb3dddb864b83..7cb2ad7caf14338aff4a129cd39a71379902e53c 100644
+--- a/dist/cjs/batch-settlement/facilitator/index.js
++++ b/dist/cjs/batch-settlement/facilitator/index.js
+@@ -17,6 +17,30 @@ var __copyProps = (to, from, except, desc) => {
+ };
+ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+ 
++// gyblos patch (batch-settlement splits): a channel may commit, at open, a multi-recipient distribution
++// from extra.splits (payTo first, bps summing to 10000), so a protocol fee is split on chain. Without
++// extra.splits behavior is unchanged. Proposed upstream: x402-foundation/x402#4166.
++function gyblosBatchSplits(requirements) {
++  const splits = requirements.extra?.splits;
++  if (splits === void 0) return [{ bps: 1e4, recipient: requirements.payTo }];
++  if (!Array.isArray(splits) || splits.length < 1 || splits.length > 4) {
++    throw new Error("extra.splits must list 1 to 4 recipients");
++  }
++  let total = 0;
++  const seen = /* @__PURE__ */ new Set();
++  for (const split of splits) {
++    if (!split || typeof split.recipient !== "string" || !Number.isInteger(split.bps) || split.bps < 1 || split.bps > 1e4) {
++      throw new Error("extra.splits entries need a recipient and 1 to 10000 bps");
++    }
++    if (seen.has(split.recipient)) throw new Error("extra.splits recipients must be distinct");
++    seen.add(split.recipient);
++    total += split.bps;
++  }
++  if (total !== 1e4) throw new Error("extra.splits must sum to 10000 bps");
++  if (splits[0].recipient !== requirements.payTo) throw new Error("extra.splits must start with payTo");
++  return splits.map((split) => ({ bps: split.bps, recipient: split.recipient }));
++}
++
+ // src/batch-settlement/facilitator/index.ts
+ var facilitator_exports = {};
+ __export(facilitator_exports, {
+@@ -2449,7 +2473,7 @@ var PaymentChannelRentCleanupManager = class {
+    * @returns Broadcast signature
+    */
+   async submitCloseOrDistribute(feePayerSigner, record, live, status) {
+-    const splits = [{ bps: BASIS_POINTS_DENOMINATOR, recipient: record.payTo }];
++    const splits = record.splits ?? [{ bps: BASIS_POINTS_DENOMINATOR, recipient: record.payTo }];
+     const distribute = await buildDistributeInstruction({
+       channelId: record.channelId,
+       mint: live.mint,
+@@ -4377,7 +4401,7 @@ var BatchSvmScheme = class {
+       openSlot: BigInt(payload.channelConfig.openSlot),
+       payee: terms.feePayer,
+       recentSlot: parseOptionalSlot(requirements.extra?.recentSlot),
+-      recipients: [{ bps: FULL_SPLIT_BPS, recipient: requirements.payTo }],
++      recipients: gyblosBatchSplits(requirements),
+       tokenProgram: terms.tokenProgram,
+       withdrawDelay: terms.withdrawDelay
+     });
+@@ -4432,7 +4456,7 @@ var BatchSvmScheme = class {
+               payee: terms.feePayer,
+               payer: payload.channelConfig.payer,
+               rentPayer: terms.feePayer,
+-              splits: [{ bps: FULL_SPLIT_BPS, recipient: requirements.payTo }],
++              splits: gyblosBatchSplits(requirements),
+               tokenProgram: terms.tokenProgram
+             },
+             openTransactionBase64: payload.deposit.transaction
+@@ -4462,7 +4486,8 @@ var BatchSvmScheme = class {
+       tokenProgram: terms.tokenProgram,
+       ...validated.isTopUp ? {} : {
+         callerIdentity: callerIdentity ?? "",
+-        receiverAuthorizer: terms.receiverAuthorizer
++        receiverAuthorizer: terms.receiverAuthorizer,
++        ...requirements.extra?.splits !== void 0 ? { splits: gyblosBatchSplits(requirements) } : {}
+       }
+     });
+     let broadcasting = false;
+@@ -5146,9 +5171,7 @@ var BatchSvmScheme = class {
+     return assertServerModeProof(payload, channelId, requirements, proofBound);
+   }
+   assertClaimChannel(channel, config, terms, requirements, allowedStatuses) {
+-    const expectedDistributionHash = getChannelDistributionHash([
+-      { bps: FULL_SPLIT_BPS, recipient: requirements.payTo }
+-    ]);
++    const expectedDistributionHash = getChannelDistributionHash(gyblosBatchSplits(requirements));
+     if (channel.discriminator !== 1 /* Channel */ || !allowedStatuses.includes(channel.status) || channel.payer !== config.payer || channel.payee !== terms.feePayer || channel.rentPayer !== terms.feePayer || channel.authorizedSigner !== config.payerAuthorizer || channel.mint !== requirements.asset || channel.gracePeriod !== terms.withdrawDelay || channel.salt !== BigInt(config.salt) || channel.openSlot !== BigInt(config.openSlot) || channel.distributionHash.length !== expectedDistributionHash.length || channel.distributionHash.some((value, index) => value !== expectedDistributionHash[index])) {
+       throw new Error(BatchError.CHANNEL_STATE);
+     }
+@@ -5161,7 +5184,7 @@ var BatchSvmScheme = class {
+       payee: channel.payee,
+       payer: channel.payer,
+       rentPayer: channel.rentPayer,
+-      splits: [{ bps: FULL_SPLIT_BPS, recipient: requirements.payTo }],
++      splits: gyblosBatchSplits(requirements),
+       tokenProgram: terms.tokenProgram
+     });
+   }
+@@ -5198,7 +5221,8 @@ function activityRecord(fields) {
+     network: fields.network,
+     payTo: fields.payTo,
+     receiverAuthorizer: fields.receiverAuthorizer ?? "",
+-    tokenProgram: fields.tokenProgram
++    tokenProgram: fields.tokenProgram,
++    ...fields.splits ? { splits: fields.splits } : {}
+   };
+ }
+ function openDisposition(result) {
+diff --git a/dist/cjs/batch-settlement/server/index.js b/dist/cjs/batch-settlement/server/index.js
+index d92523458e9417acb4d8eb89540a4edc5e427d7c..40f954544bd02eb5b371c6b0e90d22ed30136a9c 100644
+--- a/dist/cjs/batch-settlement/server/index.js
++++ b/dist/cjs/batch-settlement/server/index.js
+@@ -17,6 +17,30 @@ var __copyProps = (to, from, except, desc) => {
+ };
+ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+ 
++// gyblos patch (batch-settlement splits): a channel may commit, at open, a multi-recipient distribution
++// from extra.splits (payTo first, bps summing to 10000), so a protocol fee is split on chain. Without
++// extra.splits behavior is unchanged. Proposed upstream: x402-foundation/x402#4166.
++function gyblosBatchSplits(requirements) {
++  const splits = requirements.extra?.splits;
++  if (splits === void 0) return [{ bps: 1e4, recipient: requirements.payTo }];
++  if (!Array.isArray(splits) || splits.length < 1 || splits.length > 4) {
++    throw new Error("extra.splits must list 1 to 4 recipients");
++  }
++  let total = 0;
++  const seen = /* @__PURE__ */ new Set();
++  for (const split of splits) {
++    if (!split || typeof split.recipient !== "string" || !Number.isInteger(split.bps) || split.bps < 1 || split.bps > 1e4) {
++      throw new Error("extra.splits entries need a recipient and 1 to 10000 bps");
++    }
++    if (seen.has(split.recipient)) throw new Error("extra.splits recipients must be distinct");
++    seen.add(split.recipient);
++    total += split.bps;
++  }
++  if (total !== 1e4) throw new Error("extra.splits must sum to 10000 bps");
++  if (splits[0].recipient !== requirements.payTo) throw new Error("extra.splits must start with payTo");
++  return splits.map((split) => ({ bps: split.bps, recipient: split.recipient }));
++}
++
+ // src/batch-settlement/server/index.ts
+ var server_exports = {};
+ __export(server_exports, {
+@@ -2078,7 +2102,7 @@ var BatchSvmScheme = class {
+             mint: ctx.requirements.asset,
+             openSlot: BigInt(raw.channelConfig.openSlot),
+             payee: String(extra.feePayer),
+-            recipients: [{ bps: FULL_SPLIT_BPS, recipient: ctx.requirements.payTo }],
++            recipients: gyblosBatchSplits(ctx.requirements),
+             tokenProgram: String(extra.tokenProgram),
+             withdrawDelay: raw.channelConfig.withdrawDelay
+           });
 diff --git a/dist/cjs/index.js b/dist/cjs/index.js
-index 1b1e89f325f11e719bc0e19ccabcb84776e42e12..55150cd40ef18ca7e1cb2f3fbc8dca1dfd69030c 100644
+index 1b1e89f325f11e719bc0e19ccabcb84776e42e12..b71d4611a2370ff2a36b6722f3efb2ecde193923 100644
 --- a/dist/cjs/index.js
 +++ b/dist/cjs/index.js
 @@ -1192,6 +1192,27 @@ function requireTokenProgramHint(extra, invalid) {
@@ -7,7 +238,7 @@ index 1b1e89f325f11e719bc0e19ccabcb84776e42e12..55150cd40ef18ca7e1cb2f3fbc8dca1d
  
  // src/upto/shared.ts
 +// gyblos patch (x402-upto-metered): multi-recipient distribution from extra.splits, so a protocol
-+// fee is split on chain. Without extra.splits behavior is unchanged. Proposed upstream.
++// fee is split on chain. Without extra.splits behavior is unchanged. Not yet proposed upstream.
 +function validateUptoSvmSplits(splits, payTo) {
 +  if (!Array.isArray(splits) || splits.length < 1 || splits.length > 4) {
 +    throw new Error("extra.splits must list 1 to 4 recipients");
@@ -39,6 +270,62 @@ index 1b1e89f325f11e719bc0e19ccabcb84776e42e12..55150cd40ef18ca7e1cb2f3fbc8dca1d
    return { feePayer, receiverAuthorizer, splits, withdrawDelay };
  }
  
+@@ -1807,7 +1828,7 @@ async function buildDepositPayload(args) {
+     openSlot: args.openSlot,
+     payee: args.feePayer,
+     payer: args.payer,
+-    recipients: [{ bps: FULL_SPLIT_BPS, recipient: args.receiver }],
++    recipients: args.splits ?? [{ bps: FULL_SPLIT_BPS, recipient: args.receiver }],
+     ...args.salt !== void 0 ? { salt: args.salt } : {},
+     tokenProgram: args.tokenProgram
+   });
+@@ -2126,7 +2147,38 @@ function untrustedOperatorMessage(...operators) {
+ }
+ 
+ // src/batch-settlement/client/scheme.ts
++// gyblos patch (batch-settlement splits): a channel may commit, at open, a multi-recipient distribution
++// from extra.splits (payTo first, bps summing to 10000), so a protocol fee is split on chain. Without
++// extra.splits behavior is unchanged. Proposed upstream: x402-foundation/x402#4166.
++function gyblosBatchSplits(requirements) {
++  const splits = requirements.extra?.splits;
++  if (splits === void 0) return [{ bps: 1e4, recipient: requirements.payTo }];
++  if (!Array.isArray(splits) || splits.length < 1 || splits.length > 4) {
++    throw new Error("extra.splits must list 1 to 4 recipients");
++  }
++  let total = 0;
++  const seen = /* @__PURE__ */ new Set();
++  for (const split of splits) {
++    if (!split || typeof split.recipient !== "string" || !Number.isInteger(split.bps) || split.bps < 1 || split.bps > 1e4) {
++      throw new Error("extra.splits entries need a recipient and 1 to 10000 bps");
++    }
++    if (seen.has(split.recipient)) throw new Error("extra.splits recipients must be distinct");
++    seen.add(split.recipient);
++    total += split.bps;
++  }
++  if (total !== 1e4) throw new Error("extra.splits must sum to 10000 bps");
++  if (splits[0].recipient !== requirements.payTo) throw new Error("extra.splits must start with payTo");
++  return splits.map((split) => ({ bps: split.bps, recipient: split.recipient }));
++}
+ var BatchSvmScheme = class {
++  // gyblos patch: a split channel needs the integrator's explicit approval (config.approveSplits).
++  gyblosApprovedSplits(requirements) {
++    const splits = gyblosBatchSplits(requirements);
++    if (splits.length > 1 && this.config.approveSplits?.(splits, requirements) !== true) {
++      throw new Error("extra.splits sends funds beyond payTo and was not approved");
++    }
++    return splits;
++  }
+   constructor(signer, config = {}) {
+     this.signer = signer;
+     this.config = config;
+@@ -2306,6 +2358,7 @@ var BatchSvmScheme = class {
+       receiver: requirements.payTo,
+       receiverAuthorizer: terms.receiverAuthorizer,
+       salt: this.salt(),
++      splits: this.gyblosApprovedSplits(requirements),
+       tokenProgram: terms.tokenProgram,
+       withdrawDelay: terms.withdrawDelay,
+       voucherSigner: terms.voucherSigner,
 diff --git a/dist/cjs/rentCleanup-D91n7iIF.d.ts b/dist/cjs/rentCleanup-D91n7iIF.d.ts
 index 5d50bd15e183bb74ef583d7f8fec8f858c2ac7e3..ee9c5f7c6412d529d18877e23672a07a2e8289c8 100644
 --- a/dist/cjs/rentCleanup-D91n7iIF.d.ts
@@ -56,7 +343,7 @@ index 5d50bd15e183bb74ef583d7f8fec8f858c2ac7e3..ee9c5f7c6412d529d18877e23672a07a
  /**
   * Result of {@link PaymentChannelStorage.recordOpen}. `revertToken` is empty
 diff --git a/dist/cjs/upto/client/index.js b/dist/cjs/upto/client/index.js
-index 24f9d8eaee214bad9a93005708709d074daf19aa..3f3718e7f8cb83b64c55bc0250029d3f73a7cf93 100644
+index 24f9d8eaee214bad9a93005708709d074daf19aa..c5e78c3ffb7e285e4ddb0bd27caeb2f7f04e7ba6 100644
 --- a/dist/cjs/upto/client/index.js
 +++ b/dist/cjs/upto/client/index.js
 @@ -633,6 +633,27 @@ function resolveUptoSvmMemo(extra) {
@@ -64,7 +351,7 @@ index 24f9d8eaee214bad9a93005708709d074daf19aa..3f3718e7f8cb83b64c55bc0250029d3f
  
  // src/upto/shared.ts
 +// gyblos patch (x402-upto-metered): multi-recipient distribution from extra.splits, so a protocol
-+// fee is split on chain. Without extra.splits behavior is unchanged. Proposed upstream.
++// fee is split on chain. Without extra.splits behavior is unchanged. Not yet proposed upstream.
 +function validateUptoSvmSplits(splits, payTo) {
 +  if (!Array.isArray(splits) || splits.length < 1 || splits.length > 4) {
 +    throw new Error("extra.splits must list 1 to 4 recipients");
@@ -96,16 +383,62 @@ index 24f9d8eaee214bad9a93005708709d074daf19aa..3f3718e7f8cb83b64c55bc0250029d3f
    return { feePayer, receiverAuthorizer, splits, withdrawDelay };
  }
  
+diff --git a/dist/cjs/upto/facilitator/index.d.ts b/dist/cjs/upto/facilitator/index.d.ts
+index 16b03d12677def81c05f273c88e25fb706bdbb0e..76937838afac24d4c5b4d3cdfc5916687fac5062 100644
+--- a/dist/cjs/upto/facilitator/index.d.ts
++++ b/dist/cjs/upto/facilitator/index.d.ts
+@@ -84,6 +84,8 @@ type UptoDelegatedSettleContext = {
+ };
+ /** Optional configuration for the upto SVM facilitator. */
+ interface UptoSvmFacilitatorConfig {
++    /** Opt-in: payee-signed claims may settle Closing channels before grace expires. Deposits stay Open-only. */
++    allowClosingClaims?: boolean;
+     /**
+      * Channel storage for rent cleanup and the delegated caller identity.
+      * Defaults to in-memory storage. Use a durable implementation when more
 diff --git a/dist/cjs/upto/facilitator/index.js b/dist/cjs/upto/facilitator/index.js
-index a01901d7a3e72f7db28a9402618e1205888ab7a0..796d11ca168d427412291ee46192af9c701693d4 100644
+index a01901d7a3e72f7db28a9402618e1205888ab7a0..8c78727e26e43c1f4e6184ef4976797f0e831dfb 100644
 --- a/dist/cjs/upto/facilitator/index.js
 +++ b/dist/cjs/upto/facilitator/index.js
-@@ -1922,6 +1922,27 @@ async function revertOpenBestEffort(args, write) {
+@@ -1408,14 +1408,14 @@ function resolveChannelReadPolicy(policy = {}) {
+ function delayAfterAttempt(policy, attempt) {
+   return policy.backoffStepMs * attempt;
+ }
+-async function fetchAndVerifyOpenChannel(rpc, channelId, expected, policy = {}) {
++async function fetchAndVerifyOpenChannel(rpc, channelId, expected, policy = {}, allowClosing = false) {
+   const resolved = resolveChannelReadPolicy(policy);
+   for (let attempt = 1; attempt <= resolved.maxAttempts; attempt++) {
+     const account = await fetchMaybeChannel(rpc, (0, import_kit28.address)(channelId), {
+       commitment: STATE_COMMITMENT
+     });
+     if (account.exists) {
+-      return verifyOpenChannelAccount(channelId, account.data, expected);
++      return verifyOpenChannelAccount(channelId, account.data, expected, allowClosing);
+     }
+     if (attempt === resolved.maxAttempts) {
+       break;
+@@ -1425,11 +1425,13 @@ async function fetchAndVerifyOpenChannel(rpc, channelId, expected, policy = {})
+   }
+   throw new Error(`channel ${channelId} does not exist`);
+ }
+-function verifyOpenChannelAccount(channelId, channel, expected) {
++function verifyOpenChannelAccount(channelId, channel, expected, allowClosing = false) {
+   if (channel.discriminator !== 1 /* Channel */) {
+     throw new Error(`channel ${channelId} has an invalid account discriminator`);
+   }
+-  if (channel.status !== 0 /* Open */) {
++  const closingWithinGrace = allowClosing === true && channel.status === 2 /* Closing */ &&
++    BigInt(Math.floor(Date.now() / 1e3)) < channel.closureStartedAt + BigInt(channel.gracePeriod);
++  if (channel.status !== 0 /* Open */ && !closingWithinGrace) {
+     throw new Error(`channel ${channelId} is not open`);
+   }
+   assertChannelAddress("mint", channel.mint, expected.mint);
+@@ -1922,6 +1924,27 @@ async function revertOpenBestEffort(args, write) {
  }
  
  // src/upto/shared.ts
 +// gyblos patch (x402-upto-metered): multi-recipient distribution from extra.splits, so a protocol
-+// fee is split on chain. Without extra.splits behavior is unchanged. Proposed upstream.
++// fee is split on chain. Without extra.splits behavior is unchanged. Not yet proposed upstream.
 +function validateUptoSvmSplits(splits, payTo) {
 +  if (!Array.isArray(splits) || splits.length < 1 || splits.length > 4) {
 +    throw new Error("extra.splits must list 1 to 4 recipients");
@@ -128,7 +461,7 @@ index a01901d7a3e72f7db28a9402618e1205888ab7a0..796d11ca168d427412291ee46192af9c
  function resolveUptoSvmPaymentChannelConfig(requirements) {
    const feePayer = requirements.extra?.feePayer;
    if (typeof feePayer !== "string" || feePayer.length === 0) {
-@@ -1935,7 +1956,7 @@ function resolveUptoSvmPaymentChannelConfig(requirements) {
+@@ -1935,7 +1958,7 @@ function resolveUptoSvmPaymentChannelConfig(requirements) {
    if (typeof withdrawDelay !== "number" || !Number.isInteger(withdrawDelay) || withdrawDelay <= 0) {
      throw new Error("withdrawDelay must be an integer greater than zero");
    }
@@ -137,7 +470,7 @@ index a01901d7a3e72f7db28a9402618e1205888ab7a0..796d11ca168d427412291ee46192af9c
    return { feePayer, receiverAuthorizer, splits, withdrawDelay };
  }
  
-@@ -2408,7 +2429,7 @@ var PaymentChannelRentCleanupManager = class {
+@@ -2408,7 +2431,7 @@ var PaymentChannelRentCleanupManager = class {
     * @returns Broadcast signature
     */
    async submitCloseOrDistribute(feePayerSigner, record, live, status) {
@@ -146,7 +479,7 @@ index a01901d7a3e72f7db28a9402618e1205888ab7a0..796d11ca168d427412291ee46192af9c
      const distribute = await buildDistributeInstruction({
        channelId: record.channelId,
        mint: live.mint,
-@@ -2999,6 +3020,7 @@ var UptoSvmScheme = class {
+@@ -2999,6 +3022,7 @@ var UptoSvmScheme = class {
        network: requirements.network,
        payTo: requirements.payTo,
        receiverAuthorizer: "",
@@ -154,8 +487,174 @@ index a01901d7a3e72f7db28a9402618e1205888ab7a0..796d11ca168d427412291ee46192af9c
        tokenProgram
      };
      try {
+@@ -3220,7 +3244,8 @@ var UptoSvmScheme = class {
+         rentPayer: channelConfig.feePayer,
+         splits: channelConfig.splits
+       },
+-      this.resolveChannelReadPolicy()
++      this.resolveChannelReadPolicy(),
++      this.config.allowClosingClaims === true
+     );
+     const blockhashPromise = this.signer.getLatestBlockhash(network);
+     let channel;
+diff --git a/dist/esm/batch-settlement/client/index.d.mts b/dist/esm/batch-settlement/client/index.d.mts
+index 421e5ac1b699810c8ce4064f9a5db51076e4eaa8..85f1b22fc8cffbee85b1916439e7668f72739e58 100644
+--- a/dist/esm/batch-settlement/client/index.d.mts
++++ b/dist/esm/batch-settlement/client/index.d.mts
+@@ -268,6 +268,14 @@ interface BatchClientChannelStorage {
+     delete(key: string): Promise<void>;
+ }
+ interface BatchSvmClientConfig extends ClientSvmConfig {
++    /**
++     * gyblos patch: approves a channel whose `extra.splits` sends part of each charge beyond `payTo`.
++     * Without it such a channel is refused. Return true only for distributions you accept.
++     */
++    approveSplits?: ((splits: ReadonlyArray<{
++        bps: number;
++        recipient: string;
++    }>, requirements: PaymentRequirements) => boolean) | undefined;
+     /** Fixed deposit target. Overrides server hints and `depositPolicy`. */
+     depositAmount?: bigint | string | undefined;
+     /** Policy used to size deposits when `depositAmount` is not set. */
+diff --git a/dist/esm/batch-settlement/facilitator/index.mjs b/dist/esm/batch-settlement/facilitator/index.mjs
+index f3970046c565cac69738e3d4fe825d63fb915ec5..1cb4e691db0c83be192ab85b9d3511bd4eaa13e3 100644
+--- a/dist/esm/batch-settlement/facilitator/index.mjs
++++ b/dist/esm/batch-settlement/facilitator/index.mjs
+@@ -78,6 +78,30 @@ import {
+   recordPendingOrTerminal
+ } from "../../chunk-RXPBSPMZ.mjs";
+ 
++// gyblos patch (batch-settlement splits): a channel may commit, at open, a multi-recipient distribution
++// from extra.splits (payTo first, bps summing to 10000), so a protocol fee is split on chain. Without
++// extra.splits behavior is unchanged. Proposed upstream: x402-foundation/x402#4166.
++function gyblosBatchSplits(requirements) {
++  const splits = requirements.extra?.splits;
++  if (splits === void 0) return [{ bps: 1e4, recipient: requirements.payTo }];
++  if (!Array.isArray(splits) || splits.length < 1 || splits.length > 4) {
++    throw new Error("extra.splits must list 1 to 4 recipients");
++  }
++  let total = 0;
++  const seen = /* @__PURE__ */ new Set();
++  for (const split of splits) {
++    if (!split || typeof split.recipient !== "string" || !Number.isInteger(split.bps) || split.bps < 1 || split.bps > 1e4) {
++      throw new Error("extra.splits entries need a recipient and 1 to 10000 bps");
++    }
++    if (seen.has(split.recipient)) throw new Error("extra.splits recipients must be distinct");
++    seen.add(split.recipient);
++    total += split.bps;
++  }
++  if (total !== 1e4) throw new Error("extra.splits must sum to 10000 bps");
++  if (splits[0].recipient !== requirements.payTo) throw new Error("extra.splits must start with payTo");
++  return splits.map((split) => ({ bps: split.bps, recipient: split.recipient }));
++}
++
+ // src/batch-settlement/facilitator/scheme.ts
+ import { address } from "@solana/kit";
+ import { findAssociatedTokenPda } from "@solana-program/token-2022";
+@@ -1374,7 +1398,7 @@ var BatchSvmScheme = class {
+       openSlot: BigInt(payload.channelConfig.openSlot),
+       payee: terms.feePayer,
+       recentSlot: parseOptionalSlot(requirements.extra?.recentSlot),
+-      recipients: [{ bps: FULL_SPLIT_BPS, recipient: requirements.payTo }],
++      recipients: gyblosBatchSplits(requirements),
+       tokenProgram: terms.tokenProgram,
+       withdrawDelay: terms.withdrawDelay
+     });
+@@ -1429,7 +1453,7 @@ var BatchSvmScheme = class {
+               payee: terms.feePayer,
+               payer: payload.channelConfig.payer,
+               rentPayer: terms.feePayer,
+-              splits: [{ bps: FULL_SPLIT_BPS, recipient: requirements.payTo }],
++              splits: gyblosBatchSplits(requirements),
+               tokenProgram: terms.tokenProgram
+             },
+             openTransactionBase64: payload.deposit.transaction
+@@ -1459,7 +1483,8 @@ var BatchSvmScheme = class {
+       tokenProgram: terms.tokenProgram,
+       ...validated.isTopUp ? {} : {
+         callerIdentity: callerIdentity ?? "",
+-        receiverAuthorizer: terms.receiverAuthorizer
++        receiverAuthorizer: terms.receiverAuthorizer,
++        ...requirements.extra?.splits !== void 0 ? { splits: gyblosBatchSplits(requirements) } : {}
+       }
+     });
+     let broadcasting = false;
+@@ -2143,9 +2168,7 @@ var BatchSvmScheme = class {
+     return assertServerModeProof(payload, channelId, requirements, proofBound);
+   }
+   assertClaimChannel(channel, config, terms, requirements, allowedStatuses) {
+-    const expectedDistributionHash = getChannelDistributionHash([
+-      { bps: FULL_SPLIT_BPS, recipient: requirements.payTo }
+-    ]);
++    const expectedDistributionHash = getChannelDistributionHash(gyblosBatchSplits(requirements));
+     if (channel.discriminator !== 1 /* Channel */ || !allowedStatuses.includes(channel.status) || channel.payer !== config.payer || channel.payee !== terms.feePayer || channel.rentPayer !== terms.feePayer || channel.authorizedSigner !== config.payerAuthorizer || channel.mint !== requirements.asset || channel.gracePeriod !== terms.withdrawDelay || channel.salt !== BigInt(config.salt) || channel.openSlot !== BigInt(config.openSlot) || channel.distributionHash.length !== expectedDistributionHash.length || channel.distributionHash.some((value, index) => value !== expectedDistributionHash[index])) {
+       throw new Error(BatchError.CHANNEL_STATE);
+     }
+@@ -2158,7 +2181,7 @@ var BatchSvmScheme = class {
+       payee: channel.payee,
+       payer: channel.payer,
+       rentPayer: channel.rentPayer,
+-      splits: [{ bps: FULL_SPLIT_BPS, recipient: requirements.payTo }],
++      splits: gyblosBatchSplits(requirements),
+       tokenProgram: terms.tokenProgram
+     });
+   }
+@@ -2195,7 +2218,8 @@ function activityRecord(fields) {
+     network: fields.network,
+     payTo: fields.payTo,
+     receiverAuthorizer: fields.receiverAuthorizer ?? "",
+-    tokenProgram: fields.tokenProgram
++    tokenProgram: fields.tokenProgram,
++    ...fields.splits ? { splits: fields.splits } : {}
+   };
+ }
+ function openDisposition(result) {
+diff --git a/dist/esm/batch-settlement/server/index.mjs b/dist/esm/batch-settlement/server/index.mjs
+index 8bdfef41a2ab18377e44c69bc70851239774eb2a..c2b424619c0edecb02f07e960ac55d4180a54d4a 100644
+--- a/dist/esm/batch-settlement/server/index.mjs
++++ b/dist/esm/batch-settlement/server/index.mjs
+@@ -35,6 +35,30 @@ import {
+   validateSvmAddress
+ } from "../../chunk-RXPBSPMZ.mjs";
+ 
++// gyblos patch (batch-settlement splits): a channel may commit, at open, a multi-recipient distribution
++// from extra.splits (payTo first, bps summing to 10000), so a protocol fee is split on chain. Without
++// extra.splits behavior is unchanged. Proposed upstream: x402-foundation/x402#4166.
++function gyblosBatchSplits(requirements) {
++  const splits = requirements.extra?.splits;
++  if (splits === void 0) return [{ bps: 1e4, recipient: requirements.payTo }];
++  if (!Array.isArray(splits) || splits.length < 1 || splits.length > 4) {
++    throw new Error("extra.splits must list 1 to 4 recipients");
++  }
++  let total = 0;
++  const seen = /* @__PURE__ */ new Set();
++  for (const split of splits) {
++    if (!split || typeof split.recipient !== "string" || !Number.isInteger(split.bps) || split.bps < 1 || split.bps > 1e4) {
++      throw new Error("extra.splits entries need a recipient and 1 to 10000 bps");
++    }
++    if (seen.has(split.recipient)) throw new Error("extra.splits recipients must be distinct");
++    seen.add(split.recipient);
++    total += split.bps;
++  }
++  if (total !== 1e4) throw new Error("extra.splits must sum to 10000 bps");
++  if (splits[0].recipient !== requirements.payTo) throw new Error("extra.splits must start with payTo");
++  return splits.map((split) => ({ bps: split.bps, recipient: split.recipient }));
++}
++
+ // src/batch-settlement/server/scheme.ts
+ import { convertToTokenAmount, parseMoney } from "@x402/core/utils";
+ 
+@@ -944,7 +968,7 @@ var BatchSvmScheme = class {
+             mint: ctx.requirements.asset,
+             openSlot: BigInt(raw.channelConfig.openSlot),
+             payee: String(extra.feePayer),
+-            recipients: [{ bps: FULL_SPLIT_BPS, recipient: ctx.requirements.payTo }],
++            recipients: gyblosBatchSplits(ctx.requirements),
+             tokenProgram: String(extra.tokenProgram),
+             withdrawDelay: raw.channelConfig.withdrawDelay
+           });
 diff --git a/dist/esm/chunk-ASYOFNDS.mjs b/dist/esm/chunk-ASYOFNDS.mjs
-index 3aa59423ae02244da7b6db5ab944755a4e3d4677..99b2443b1190af17afd1a5e4510a77e73e66a5e3 100644
+index 3aa59423ae02244da7b6db5ab944755a4e3d4677..12270c1cdf2508aa245a7393e3086520574f754d 100644
 --- a/dist/esm/chunk-ASYOFNDS.mjs
 +++ b/dist/esm/chunk-ASYOFNDS.mjs
 @@ -3,6 +3,27 @@ import {
@@ -163,7 +662,7 @@ index 3aa59423ae02244da7b6db5ab944755a4e3d4677..99b2443b1190af17afd1a5e4510a77e7
  
  // src/upto/shared.ts
 +// gyblos patch (x402-upto-metered): multi-recipient distribution from extra.splits, so a protocol
-+// fee is split on chain. Without extra.splits behavior is unchanged. Proposed upstream.
++// fee is split on chain. Without extra.splits behavior is unchanged. Not yet proposed upstream.
 +function validateUptoSvmSplits(splits, payTo) {
 +  if (!Array.isArray(splits) || splits.length < 1 || splits.length > 4) {
 +    throw new Error("extra.splits must list 1 to 4 recipients");
@@ -195,11 +694,110 @@ index 3aa59423ae02244da7b6db5ab944755a4e3d4677..99b2443b1190af17afd1a5e4510a77e7
    return { feePayer, receiverAuthorizer, splits, withdrawDelay };
  }
  
+diff --git a/dist/esm/chunk-FVK5QHJM.mjs b/dist/esm/chunk-FVK5QHJM.mjs
+index a26ec87f5643d4b0bd8564a8068109bae15c8948..a5522e17f2abbce516f3d85b62db7c66ae56ccad 100644
+--- a/dist/esm/chunk-FVK5QHJM.mjs
++++ b/dist/esm/chunk-FVK5QHJM.mjs
+@@ -158,6 +158,29 @@ async function credentialFor(mode, tracker, charge, authorization, refund = fals
+     }
+   }
+ }
++// gyblos patch (batch-settlement splits): a channel may commit, at open, a multi-recipient distribution
++// from extra.splits (payTo first, bps summing to 10000), so a protocol fee is split on chain. Without
++// extra.splits behavior is unchanged. Proposed upstream: x402-foundation/x402#4166.
++function gyblosBatchSplits(requirements) {
++  const splits = requirements.extra?.splits;
++  if (splits === void 0) return [{ bps: 1e4, recipient: requirements.payTo }];
++  if (!Array.isArray(splits) || splits.length < 1 || splits.length > 4) {
++    throw new Error("extra.splits must list 1 to 4 recipients");
++  }
++  let total = 0;
++  const seen = /* @__PURE__ */ new Set();
++  for (const split of splits) {
++    if (!split || typeof split.recipient !== "string" || !Number.isInteger(split.bps) || split.bps < 1 || split.bps > 1e4) {
++      throw new Error("extra.splits entries need a recipient and 1 to 10000 bps");
++    }
++    if (seen.has(split.recipient)) throw new Error("extra.splits recipients must be distinct");
++    seen.add(split.recipient);
++    total += split.bps;
++  }
++  if (total !== 1e4) throw new Error("extra.splits must sum to 10000 bps");
++  if (splits[0].recipient !== requirements.payTo) throw new Error("extra.splits must start with payTo");
++  return splits.map((split) => ({ bps: split.bps, recipient: split.recipient }));
++}
+ async function buildDepositPayload(args) {
+   if (args.firstCharge <= 0n || args.firstCharge > args.depositAmount) {
+     throw new Error("first charge must be positive and no greater than the deposit");
+@@ -188,7 +211,7 @@ async function buildDepositPayload(args) {
+     openSlot: args.openSlot,
+     payee: args.feePayer,
+     payer: args.payer,
+-    recipients: [{ bps: FULL_SPLIT_BPS, recipient: args.receiver }],
++    recipients: args.splits ?? [{ bps: FULL_SPLIT_BPS, recipient: args.receiver }],
+     ...args.salt !== void 0 ? { salt: args.salt } : {},
+     tokenProgram: args.tokenProgram
+   });
+@@ -515,6 +538,14 @@ var OPERATION_KEY_SEPARATOR = "\0";
+ 
+ // src/batch-settlement/client/scheme.ts
+ var BatchSvmScheme = class {
++  // gyblos patch: a split channel needs the integrator's explicit approval (config.approveSplits).
++  gyblosApprovedSplits(requirements) {
++    const splits = gyblosBatchSplits(requirements);
++    if (splits.length > 1 && this.config.approveSplits?.(splits, requirements) !== true) {
++      throw new Error("extra.splits sends funds beyond payTo and was not approved");
++    }
++    return splits;
++  }
+   constructor(signer, config = {}) {
+     this.signer = signer;
+     this.config = config;
+@@ -694,6 +725,7 @@ var BatchSvmScheme = class {
+       receiver: requirements.payTo,
+       receiverAuthorizer: terms.receiverAuthorizer,
+       salt: this.salt(),
++      splits: this.gyblosApprovedSplits(requirements),
+       tokenProgram: terms.tokenProgram,
+       withdrawDelay: terms.withdrawDelay,
+       voucherSigner: terms.voucherSigner,
 diff --git a/dist/esm/chunk-UMK65UDR.mjs b/dist/esm/chunk-UMK65UDR.mjs
-index 52ac9f0a3502edf04953fcf270b8841eedf44bfc..1d744b0899433ba4bd7f953a06d560ae20933027 100644
+index 52ac9f0a3502edf04953fcf270b8841eedf44bfc..c2516c6ba05f038f3ab9c02c27a2a930bba10188 100644
 --- a/dist/esm/chunk-UMK65UDR.mjs
 +++ b/dist/esm/chunk-UMK65UDR.mjs
-@@ -1002,7 +1002,7 @@ var PaymentChannelRentCleanupManager = class {
+@@ -77,14 +77,14 @@ function resolveChannelReadPolicy(policy = {}) {
+ function delayAfterAttempt(policy, attempt) {
+   return policy.backoffStepMs * attempt;
+ }
+-async function fetchAndVerifyOpenChannel(rpc, channelId, expected, policy = {}) {
++async function fetchAndVerifyOpenChannel(rpc, channelId, expected, policy = {}, allowClosing = false) {
+   const resolved = resolveChannelReadPolicy(policy);
+   for (let attempt = 1; attempt <= resolved.maxAttempts; attempt++) {
+     const account = await fetchMaybeChannel(rpc, address(channelId), {
+       commitment: STATE_COMMITMENT
+     });
+     if (account.exists) {
+-      return verifyOpenChannelAccount(channelId, account.data, expected);
++      return verifyOpenChannelAccount(channelId, account.data, expected, allowClosing);
+     }
+     if (attempt === resolved.maxAttempts) {
+       break;
+@@ -94,11 +94,13 @@ async function fetchAndVerifyOpenChannel(rpc, channelId, expected, policy = {})
+   }
+   throw new Error(`channel ${channelId} does not exist`);
+ }
+-function verifyOpenChannelAccount(channelId, channel, expected) {
++function verifyOpenChannelAccount(channelId, channel, expected, allowClosing = false) {
+   if (channel.discriminator !== 1 /* Channel */) {
+     throw new Error(`channel ${channelId} has an invalid account discriminator`);
+   }
+-  if (channel.status !== 0 /* Open */) {
++  const closingWithinGrace = allowClosing === true && channel.status === 2 /* Closing */ &&
++    BigInt(Math.floor(Date.now() / 1e3)) < channel.closureStartedAt + BigInt(channel.gracePeriod);
++  if (channel.status !== 0 /* Open */ && !closingWithinGrace) {
+     throw new Error(`channel ${channelId} is not open`);
+   }
+   assertChannelAddress("mint", channel.mint, expected.mint);
+@@ -1002,7 +1004,7 @@ var PaymentChannelRentCleanupManager = class {
     * @returns Broadcast signature
     */
    async submitCloseOrDistribute(feePayerSigner, record, live, status) {
@@ -224,8 +822,21 @@ index 79dad6680953d2559d2da03184c949908d68975e..4880af59cf9b56969183d936923a310d
  }
  /**
   * Result of {@link PaymentChannelStorage.recordOpen}. `revertToken` is empty
+diff --git a/dist/esm/upto/facilitator/index.d.mts b/dist/esm/upto/facilitator/index.d.mts
+index f425a3767f9f9ac3102c35804fafa936e776d29c..b1c591af4f526ab7f61a6094197e315d4281cfed 100644
+--- a/dist/esm/upto/facilitator/index.d.mts
++++ b/dist/esm/upto/facilitator/index.d.mts
+@@ -84,6 +84,8 @@ type UptoDelegatedSettleContext = {
+ };
+ /** Optional configuration for the upto SVM facilitator. */
+ interface UptoSvmFacilitatorConfig {
++    /** Opt-in: payee-signed claims may settle Closing channels before grace expires. Deposits stay Open-only. */
++    allowClosingClaims?: boolean;
+     /**
+      * Channel storage for rent cleanup and the delegated caller identity.
+      * Defaults to in-memory storage. Use a durable implementation when more
 diff --git a/dist/esm/upto/facilitator/index.mjs b/dist/esm/upto/facilitator/index.mjs
-index 948ca0e8bc994ac47580ede3d80cc15dd94bcf71..935b74b90534bbb7ae783ddc3961a367c32a9ea2 100644
+index 948ca0e8bc994ac47580ede3d80cc15dd94bcf71..46861b6410e9c1ca57b6767cf648e19daceba0e8 100644
 --- a/dist/esm/upto/facilitator/index.mjs
 +++ b/dist/esm/upto/facilitator/index.mjs
 @@ -465,6 +465,7 @@ var UptoSvmScheme = class {
@@ -236,3 +847,13 @@ index 948ca0e8bc994ac47580ede3d80cc15dd94bcf71..935b74b90534bbb7ae783ddc3961a367
        tokenProgram
      };
      try {
+@@ -686,7 +687,8 @@ var UptoSvmScheme = class {
+         rentPayer: channelConfig.feePayer,
+         splits: channelConfig.splits
+       },
+-      this.resolveChannelReadPolicy()
++      this.resolveChannelReadPolicy(),
++      this.config.allowClosingClaims === true
+     );
+     const blockhashPromise = this.signer.getLatestBlockhash(network);
+     let channel;

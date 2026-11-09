@@ -1,0 +1,61 @@
+---
+title: Identity
+description: Preserve the seller volume and know which identifiers and diagnostics are safe to share.
+---
+
+The free Docker seller has a public **NodeId** and **owner** address, backed by different private keys.
+Keep the persistent identity created during installation. `seller init` writes configuration; it does
+not create or recover these keys.
+
+## Storage [#what-lives-where]
+
+| Location in the supplied installation  | Purpose                                                                                         | Sharing rule                                                    |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `~/gyblos-seller/gyblos.toml`          | Models, limits and publication                                                                  | Review before sharing; custom URLs can contain credentials      |
+| `~/gyblos-seller/compose.yaml`         | Container setup and volume references                                                           | Keep with the installation; review custom values before sharing |
+| `~/gyblos-seller/seller.env`           | Relay token and any provider credentials                                                        | Private; never upload or display it                             |
+| Named Docker volume mounted at `/data` | Seller keys, role state, private registration attempts, public sequence, receipts and tokenizer | Private; never upload the volume or its files                   |
+| Separate Ollama volume                 | Downloaded model data                                                                           | Keep to avoid unnecessary downloads                             |
+
+The Compose project determines the volume names. Moving or renaming the installation can select a new
+project and make the seller look newly installed. Do not move it, change the project name or prune its
+volumes as a troubleshooting step.
+
+## Preserve identity [#preserve-identity-when-stopping]
+
+Use `docker compose stop seller` to stop serving. `docker compose down` preserves named volumes.
+`docker compose down -v` deletes them and loses the seller keys. A consumed invite is tied to the
+original NodeId and cannot enroll a newly generated identity.
+
+There is no complete seller backup-and-restore procedure in this handbook. A desktop-wallet backup is
+for a different application and does not restore this seller's Iroh identity, public sequence or journals.
+If keys, role state or sequence locks are missing or damaged, stop changing the data and contact Gyblos.
+Never delete a lock, sequence file or journal merely to make startup pass.
+
+The volume also holds private registration state, including an asset key and potentially signed
+transaction bytes. Never share that file or clear its lock to force a retry. A registration rerun may
+resend an existing approved attempt; follow [the registration guide](/en/sellers/register-publish).
+
+### Support data [#information-you-can-send-for-support]
+
+```sh
+cd ~/gyblos-seller
+docker compose exec seller gyblos seller status
+docker compose images seller
+```
+
+The status command is designed to show public identifiers, codes and aggregate activity without keys,
+tokens or buyer messages. If the container is unavailable, use `docker compose run --rm seller gyblos doctor`
+and send the relevant code. Read the output before sharing, especially if your setup is customized.
+
+Do not send `seller.env`, invitation codes, environment dumps, `docker inspect`, role files, receipts,
+raw logs or screenshots of the registration prompt. Use the original invitation channel to ask for help.
+
+## Privacy [#buyer-data-and-network-privacy]
+
+A local engine processes buyer messages on your machine. Do not store or share their contents.
+A remote engine also receives them. Encrypted transport and relays do not make the seller anonymous;
+relay operators and network peers have their own visibility. Signing identity and receipts does not
+independently verify the remote model or answer correctness.
+
+**Next:** [Troubleshoot safely](/en/help/troubleshooting).

@@ -16,7 +16,14 @@ example a QUIC peer-to-peer stream).
 ## What exists today
 
 - `createUptoAuthorization(payer, terms, hints)`: the payer signs the channel
-  open with the x402 upto client, offline given recent-block hints.
+  open with the x402 upto client, offline given recent-block hints. An optional
+  fourth argument, `beforeSign({ channelId, openSlot, lastValidBlockHeight })`,
+  checkpoints that exact prepared open before invoking the payer. Await durable
+  storage in this callback and retain the checkpoint if signing later fails.
+  Checkpoint mode accepts partial signers only, signs the original message once
+  and verifies the returned payer signature; modifying or sending signers are
+  refused. Without the callback, the existing SDK signer behavior is preserved.
+  The callback neither broadcasts nor stores a reusable authorization payload.
 - `createUptoVerifier(feePayerAddress, currentSlot)`: the x402 upto facilitator
   verifies an open against the terms with no network call other than the
   current-slot source; it needs only the fee payer's address.
@@ -41,6 +48,17 @@ example a QUIC peer-to-peer stream).
   (for example a protocol fee). This needs the monorepo's patch of
   `@x402/svm@2.28.0` (`patches/@x402__svm@2.28.0.patch`); not yet proposed
   upstream.
+
+The payer's `createUptoWithdrawal` selects request-close, wait, seal/distribute
+from confirmed native channel state. Its shared transaction sender derives the
+signature from the signed bytes before broadcast. A lost or mismatched RPC send
+reply returns that signature unconfirmed, without resending. A definitive
+preflight/chain rejection still throws `UPTO_CHAIN_REJECTED`. Confirmation
+describes transaction status, not a verified refund amount; use finalized
+receipt/history verification for that. Control attempts are not durably
+checkpointed by this package, so process-loss recovery and stale-view duplicate
+fee protection remain host responsibilities. The same sender serves
+recipient-account creation, where an unconfirmed send still refuses admission.
 
 Planned: a durable file store and the host wiring.
 

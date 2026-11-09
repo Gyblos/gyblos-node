@@ -8,7 +8,11 @@ import { join } from 'node:path';
 import test from 'node:test';
 
 import { buyerJournalPathsIn, DEVNET } from '@gyblos/config';
-import { BUYER_JOURNAL, openUptoBuyerJournal } from '@gyblos/payments-upto';
+import {
+  BUYER_JOURNAL,
+  hasUnresolvedBuyerPayments,
+  openUptoBuyerJournal,
+} from '@gyblos/payments-upto';
 import {
   PAYMENT_CHANNEL_STATES,
   PAYMENT_ERROR_CODES,
@@ -264,4 +268,32 @@ void test('a full journal of the widest entries still fits its byte bound', () =
     const { updatedAt: _updatedAt, ...first } = widest(0);
     await journal.put(first);
     await journal.close();
+  }));
+
+void test('read-only payment guard neither creates state nor permits signed uncertainty or an occupied lock', () =>
+  withRoot(async (root) => {
+    const paths = buyerJournalPathsIn({ GYBLOS_HOME: root });
+    assert.equal(await hasUnresolvedBuyerPayments(paths), false);
+    await assert.rejects(readFile(paths.state), { code: 'ENOENT' });
+    const journal = await open(root);
+    try {
+      await assert.rejects(hasUnresolvedBuyerPayments(paths), unavailable);
+      await journal.put({ ...ENTRY, channelId: 'Chan1' });
+    } finally {
+      await journal.close();
+    }
+    const before = await readFile(paths.state, 'utf8');
+    assert.equal(await hasUnresolvedBuyerPayments(paths), true);
+    assert.equal(await readFile(paths.state, 'utf8'), before);
+    const settled = await open(root);
+    await settled.put({
+      ...ENTRY,
+      channelId: 'Chan1',
+      state: PAYMENT_CHANNEL_STATES.SETTLED,
+      chargedAtomic: '0',
+    });
+    await settled.close();
+    assert.equal(await hasUnresolvedBuyerPayments(paths), false);
+    await writeFile(paths.state, '{}');
+    await assert.rejects(hasUnresolvedBuyerPayments(paths), unavailable);
   }));

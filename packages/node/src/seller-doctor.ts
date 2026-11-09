@@ -217,9 +217,7 @@ async function paymentsCheck(
     config.authorizer === undefined
   )
     return fail(NODE_ERROR_CODES.SELLER_PAYMENT_ROLE_MISSING);
-  if (
-    [config.owner, config.facilitator, config.authorizer].includes(config.payTo)
-  )
+  if ([config.facilitator, config.authorizer].includes(config.payTo))
     return fail(NODE_ERROR_CODES.SELLER_PAYMENT_DESCRIPTION_INVALID);
   try {
     const status = await roleKeyFilesStatus(

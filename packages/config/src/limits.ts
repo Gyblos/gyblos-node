@@ -57,6 +57,8 @@ export const FILE_MODES = {
 export const KEY_LIMITS = {
   keyPairBytes: 64,
   byteMax: 255,
+  // A key file is a JSON array of at most 64 bytes (under 300 characters); larger files are refused unread.
+  fileBytes: 4096,
   measurementSaltBytes: 32,
 } as const;
 
