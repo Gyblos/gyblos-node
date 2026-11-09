@@ -13,6 +13,7 @@ import {
 } from '@gyblos/discovery-http';
 import { NODE_ERROR_CODES, type NodeErrorCode } from '@gyblos/node/constants';
 import { NodeError } from '@gyblos/node/errors';
+import { SELLER_FUNDS, waitForOwnerFunds } from '@gyblos/node/seller-funds';
 
 import { urlOrigin } from './cli-format';
 import type { Prompt } from './cli-init';
@@ -111,6 +112,32 @@ function registrationUnavailableHint(
       ? `registration simulation failed; send devnet SOL to the owner ${owner} (${FAUCET}), then run this again to estimate the cost`
       : 'registration is not confirmed; check the wallet and retry later without deleting its local state';
 }
+// Resolves true once the owner holds the lamports; false when no SOL arrived in time.
+export type FundsWait = (owner: string, lamports: bigint) => Promise<boolean>;
+
+// The balance to wait for when registration stopped for want of SOL; undefined for any other stop.
+function fundingTarget(error: RegistrationUnavailable) {
+  if (
+    error.code === NODE_ERROR_CODES.SELLER_REGISTRATION_FUNDS_REQUIRED &&
+    error.requiredLamports !== undefined
+  )
+    return error.requiredLamports;
+  return error.code === NODE_ERROR_CODES.SELLER_REGISTRATION_SIMULATION_FAILED
+    ? REGISTER.simulationFundingLamports
+    : undefined;
+}
+function waitingMessage(
+  error: RegistrationUnavailable,
+  owner: string,
+  target: bigint,
+) {
+  const need =
+    error.missingLamports !== undefined
+      ? `needs ${registrationSol(error.missingLamports)} more SOL for the estimated ${registrationSol(target)} SOL registration`
+      : `needs devnet SOL (about ${registrationSol(target)} SOL) before the registration can be estimated`;
+  return `The owner ${owner} ${need}.\n  Send devnet SOL to it (${FAUCET}).\n  Waiting for it to arrive, checking every ${SELLER_FUNDS.pollText}. Press Ctrl+C to stop; run this again later and nothing is lost.\n`;
+}
+
 async function registerWithIdentity(
   attempt: () => Promise<
     (typeof REGISTRATION_RESULTS)[keyof typeof REGISTRATION_RESULTS]
@@ -142,12 +169,56 @@ async function registerWithIdentity(
   }
 }
 
+// Registers; on a terminal, a registration stopped for want of SOL waits for the owner's SOL and tries
+// again (it asks for confirmation again with the new estimate).
+async function registerWaitingForFunds(
+  register: () => ReturnType<typeof registerWithIdentity>,
+  owner: string,
+  output: SellerOutput,
+  waitForFunds: FundsWait | undefined,
+) {
+  for (let waits = 0; ; waits += 1) {
+    try {
+      return await register();
+    } catch (error) {
+      const target =
+        error instanceof RegistrationUnavailable
+          ? fundingTarget(error)
+          : undefined;
+      if (
+        !waitForFunds ||
+        target === undefined ||
+        waits >= REGISTER.fundWaits ||
+        !(error instanceof RegistrationUnavailable)
+      )
+        throw error;
+      output.stdout(waitingMessage(error, owner, target));
+      if (!(await waitForFunds(owner, target))) throw error;
+      output.stdout('SOL received; continuing the registration.\n');
+    }
+  }
+}
+
+// Waiting needs someone watching: only on a terminal.
+function fundsWait(
+  prompt: Prompt | undefined,
+  injected: FundsWait | undefined,
+  rpcUrl: string,
+): FundsWait | undefined {
+  if (!prompt) return undefined;
+  return (
+    injected ??
+    ((owner, lamports) => waitForOwnerFunds({ rpcUrl, owner, lamports }))
+  );
+}
+
 export async function registerCommand(
   output: SellerOutput,
   system: {
     fetch: DiscoveryFetch;
     prompt?: Prompt;
     registerIdentity?: () => Promise<boolean>;
+    waitForFunds?: FundsWait;
   },
 ) {
   const fail = (code: string, hint: string) => {
@@ -185,7 +256,12 @@ export async function registerCommand(
     });
   let result;
   try {
-    result = await registerWithIdentity(attempt, registerIdentity);
+    result = await registerWaitingForFunds(
+      () => registerWithIdentity(attempt, registerIdentity),
+      identity.owner,
+      output,
+      fundsWait(prompt, system.waitForFunds, identity.rpcUrl),
+    );
   } catch (error) {
     if (error instanceof RegistrationDeclined)
       return fail(

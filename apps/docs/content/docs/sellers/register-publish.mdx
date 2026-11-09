@@ -32,7 +32,8 @@ If discovery reports missing enrollment, the interactive command can register yo
 and NodeId on **Solana devnet**, then retry discovery automatically. The owner address printed by doctor
 needs sufficient **devnet SOL** first: about 0.01 SOL, so send it about 0.02 from
 [the devnet faucet](https://faucet.solana.com). If it has too little, the command names the owner and how
-much more SOL it needs. The registration cost is separate from free inference; use no mainnet funds or
+much more SOL it needs; in a terminal it then waits, checking the balance every 15 seconds, and continues
+once the SOL arrives (Ctrl+C stops it; run it again later). The registration cost is separate from free inference; use no mainnet funds or
 mainnet keys.
 
 The command shows `Pre-simulation funding estimate:` before checking funding and simulation. It then

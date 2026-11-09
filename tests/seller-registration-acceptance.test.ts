@@ -185,6 +185,7 @@ void test('unfunded registration shows a funding estimate and missing SOL before
       let stdout = '';
       let stderr = '';
       let approvals = 0;
+      const waited: bigint[] = [];
       const result = await runCli(['seller', 'register'], {
         env: { GYBLOS_HOME: home.home, GYBLOS_INVITE: INVITE },
         cwd: home.root,
@@ -198,6 +199,11 @@ void test('unfunded registration shows a funding estimate and missing SOL before
           approvals++;
           return 'yes';
         },
+        // On a terminal it waits for the SOL; here none arrives.
+        waitForFunds: async (_owner, lamports) => {
+          waited.push(lamports);
+          return false;
+        },
         fetch: async () =>
           new Response(JSON.stringify({ error: 'IDENTITY_NOT_REGISTERED' }), {
             status: 403,
@@ -205,6 +211,11 @@ void test('unfunded registration shows a funding estimate and missing SOL before
       });
       assert.equal(result, 1);
       assert.match(stdout, /Pre-simulation funding estimate: 0\.012544640 SOL/);
+      assert.match(
+        stdout,
+        /needs 0\.012544640 more SOL.*\n.*\n.*Waiting for it/,
+      );
+      assert.deepEqual(waited, [12544640n]);
       assert.match(stderr, /you need 0\.012544640 more SOL/);
       assert.equal(approvals, 0);
       assert.equal(fake.state.calls.includes('simulateTransaction'), false);

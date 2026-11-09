@@ -2,7 +2,8 @@
 # Installs a Gyblos seller with Docker: the published node image and its own loopback Ollama
 # (docs/running-a-node.md#install-script). Needs only Docker with Compose v2.17 or later; no port is opened.
 #
-#   sh install.sh             install or update the seller, then print the next steps to start selling
+#   sh install.sh             install or update the seller; on a terminal it then registers the seller
+#                             and publishes it, asking before each step (otherwise it prints those steps)
 #   sh install.sh publish     list the installed seller in the discovery index (after registering it)
 #   sh install.sh unpublish   withdraw it from the index; it keeps running
 #
@@ -11,6 +12,7 @@
 #   GYBLOS_IMAGE        node image (default: the release pinned below, by version and digest)
 #   GYBLOS_RELAY_TOKEN  the relay token; asked for without echo when unset
 #   GYBLOS_REQUIRE_SIGNATURE=1  stop unless cosign verifies the seller image as a Gyblos release
+#   GYBLOS_GUIDED=0     only print the steps to start selling; never ask to register or publish
 #
 # Existing gyblos.toml and seller.env are kept, and so is compose.yaml except for a Gyblos seller image,
 # which moves to this script's release: rerunning resumes a failed install, updates the seller and
@@ -59,6 +61,16 @@ else
   self=install.sh
 fi
 image=${GYBLOS_IMAGE:-$DEFAULT_IMAGE}
+guided=${GYBLOS_GUIDED:-1}
+case "$guided" in
+  0 | 1) ;;
+  *)
+    printf 'gyblos install: GYBLOS_GUIDED must be 0 or unset.\n' >&2
+    exit 1
+    ;;
+esac
+# Where the guided steps read their answers; tests point it at a file.
+terminal=${GYBLOS_TERMINAL:-/dev/tty}
 
 say() { printf '%s\n' "$*"; }
 die() {
@@ -331,19 +343,18 @@ wait_for_ollama() {
 quoted() { printf "'%s'" "$1"; }
 publish_command() {
   if [ "$dir" = "$HOME/gyblos-seller" ]; then
-    printf 'sh %s %s' "$(quoted "$self")" "$1"
+    printf 'sh %s%s' "$(quoted "$self")" "${1:+ $1}"
   else
-    printf 'GYBLOS_DIR=%s sh %s %s' "$(quoted "$dir")" "$(quoted "$self")" "$1"
+    printf 'GYBLOS_DIR=%s sh %s%s' "$(quoted "$dir")" "$(quoted "$self")" "${1:+ $1}"
   fi
 }
 
+# Tolerates spacing, a comment and CRLF line endings, like the TOML reader.
+publishing() {
+  tr -d '\r' <gyblos.toml | grep -Eq '^[[:space:]]*publish[[:space:]]*=[[:space:]]*true[[:space:]]*(#.*)?$'
+}
+
 next_steps() {
-  # Tolerates spacing, a comment and CRLF line endings, like the TOML reader.
-  if tr -d '\r' <gyblos.toml | grep -Eq '^[[:space:]]*publish[[:space:]]*=[[:space:]]*true[[:space:]]*(#.*)?$'; then
-    say 'Publishing is on. Check that the index lists it:'
-    say '  docker compose exec seller gyblos seller status --online'
-    return
-  fi
   say ''
   say 'Next steps, to start selling:'
   say "  1. Send about 0.02 devnet SOL to the seller's owner${owner:+ $owner}"
@@ -352,6 +363,46 @@ next_steps() {
   say "       cd $(quoted "$dir") && docker compose exec seller gyblos seller register"
   say '  3. Publish to the discovery index:'
   say "       $(publish_command publish)"
+}
+
+# y, yes or an empty answer (the default) from the terminal; anything else, or no answer, declines.
+confirm() {
+  printf '%s [Y/n] ' "$1"
+  IFS= read -r answer <"$terminal" || answer=n
+  case "$answer" in
+    '' | [yY] | [yY][eE][sS]) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# On a terminal, finishes onboarding: registers the seller (the command asks for the invite, waits for
+# the owner's SOL and confirms before signing), then publishes it once the operator agrees. Returns 1
+# without asking anything when there is no terminal or GYBLOS_GUIDED=0, so the caller prints the steps.
+guided_setup() {
+  [ "$guided" = 1 ] || return 1
+  # Opening it, not testing its mode: /dev/tty exists even without a controlling terminal.
+  (exec <"$terminal") 2>/dev/null || return 1
+  say ''
+  say 'Next: register this seller and publish it, so buyers can find it.'
+  say 'Each step asks before it does anything. Press Ctrl+C at any time; run this script again to continue.'
+  say ''
+  say 'Step 1 of 2: register, with the gyb_ invite code from your invitation (not the relay token).'
+  say "  The owner${owner:+ $owner} pays about 0.01 devnet SOL once; registration waits for it if needed."
+  if ! docker compose exec seller gyblos seller register <"$terminal"; then
+    say ''
+    say 'Registration did not finish. Fix what it says, then run this script again to continue:'
+    say "  $(publish_command '')"
+    return 0
+  fi
+  say ''
+  if ! confirm 'Step 2 of 2: publish this seller to the discovery index now?'; then
+    say 'Not published. When you are ready:'
+    say "  $(publish_command publish)"
+    return 0
+  fi
+  set_publish true
+  say ''
+  say 'Done: this seller is registered and published. Buyers can find it within about two minutes.'
 }
 
 # Turns publishing on or off in the installed gyblos.toml, then restarts the seller with it. The file is
@@ -432,7 +483,12 @@ main() {
   say '  docker compose up -d --force-recreate seller   apply an edited gyblos.toml'
   say '  download the latest install.sh and run it again here   update it'
   say 'Its keys are in the gyblos volume: `docker compose down -v` deletes them.'
-  next_steps
+  if publishing; then
+    say 'Publishing is on. Check that the index lists it:'
+    say '  docker compose exec seller gyblos seller status --online'
+  elif ! guided_setup; then
+    next_steps
+  fi
 }
 
 case "${1:-}" in

@@ -26,7 +26,7 @@ import { isMain } from '@gyblos/runtime';
 import { doctor } from './cli-doctor';
 import { COLUMN, issueLine, URL_HIDDEN, urlOrigin } from './cli-format';
 import { initCommand, terminalPrompt, type Prompt } from './cli-init';
-import { registerCommand } from './cli-register';
+import { registerCommand, type FundsWait } from './cli-register';
 import { serviceCommand, type ServiceSystem } from './cli-service';
 import { statusCommand } from './cli-status';
 import { EXIT } from './constants';
@@ -50,6 +50,8 @@ export interface CliContext {
   fetch?: DiscoveryFetch;
   // A synthetic identity registration can be injected by offline tests.
   registerIdentity?: () => Promise<boolean>;
+  // How `seller register` waits for the owner's SOL on a terminal; tests inject a fake.
+  waitForFunds?: FundsWait;
 }
 
 const USAGE =
@@ -263,6 +265,7 @@ function runRegister(context: CliContext) {
       fetch: context.fetch ?? ((input, init) => fetch(input, init)),
       prompt: context.prompt,
       registerIdentity: context.registerIdentity,
+      waitForFunds: context.waitForFunds,
     },
   );
 }

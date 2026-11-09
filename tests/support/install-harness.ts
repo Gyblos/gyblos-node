@@ -13,8 +13,8 @@ import { REPOSITORY_ROOT } from './node-config-fixtures';
 
 export const SCRIPT = join(REPOSITORY_ROOT, 'install.sh');
 export const IMAGE = 'ghcr.io/gyblos/seller:test';
-// Logs each call as one line; the compose version, doctor's output and result, and config validation's
-// result or an interrupt during it come from the environment.
+// Logs each call as one line; the compose version, doctor's output and result, config validation's
+// result or an interrupt during it, and the result of `seller register` come from the environment.
 const FAKE_DOCKER = `#!/bin/sh
 printf '%s\\n' "$*" >>"$FAKE_DOCKER_LOG"
 case "$*" in
@@ -26,6 +26,7 @@ case "$*" in
     # An operator's Ctrl-C while validation runs.
     [ -z "\${FAKE_VALIDATE_INTERRUPT:-}" ] || { kill -INT 0; sleep 1; }
     exit "\${FAKE_VALIDATE_EXIT:-0}" ;;
+  'compose exec seller gyblos seller register') exit "\${FAKE_REGISTER_EXIT:-0}" ;;
 esac
 exit 0
 `;

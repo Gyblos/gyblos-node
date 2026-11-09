@@ -171,6 +171,11 @@ export const REGISTER = {
   inviteEnv: 'GYBLOS_INVITE',
   lamportsPerSol: 1_000_000_000n,
   solDecimals: 9,
+  // What to wait for when the registration cannot be estimated without SOL: 0.02, which covers the
+  // one-time 8004 registration (about 0.01 SOL) with margin.
+  simulationFundingLamports: 20_000_000n,
+  // How many times, on a terminal, registration waits for SOL and tries again before giving up.
+  fundWaits: 3,
 } as const;
 
 export const REGISTER_ERRORS = {

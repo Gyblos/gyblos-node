@@ -421,11 +421,21 @@ sh install.sh
   `gyblos.toml` (`examples/seller-docker.toml`) and `seller.env` into
   `~/gyblos-seller` (created mode 0700; `GYBLOS_DIR` changes it), then pulls the
   images and the model, creates the seller keys, downloads the tokenizer, runs
-  `gyblos doctor` and starts the seller only when doctor is READY. It then
-  prints the steps to start selling: fund the owner doctor printed with devnet
-  SOL, `gyblos seller register` with the invite code, and
-  `sh install.sh publish` (`gyblos seller status` names the next step while the
-  seller runs).
+  `gyblos doctor` and starts the seller only when doctor is READY.
+- On a terminal, an unpublished seller then finishes onboarding, asking before
+  each step: it runs `gyblos seller register` in the container (the command asks
+  for the invite code, waits for the owner's devnet SOL when it is short and
+  confirms before signing), then asks to publish and runs the `publish` step
+  below. A failed or declined step prints how to continue; a rerun picks up
+  where it stopped. Without a terminal (`GYBLOS_TERMINAL` names another answer
+  source, for tests) or with `GYBLOS_GUIDED=0`, it prints the steps instead:
+  fund the owner doctor printed with devnet SOL, `gyblos seller register` with
+  the invite code, and `sh install.sh publish` (`gyblos seller status` names the
+  next step while the seller runs).
+- `gyblos seller register` on a terminal waits for SOL when the registration
+  stops for want of it: it reads the owner's balance every 15 seconds, for up to
+  30 minutes, then tries again (at most three waits). It never signs while
+  waiting. Without a terminal it stops with the funding hint.
 - `sh install.sh publish` (or `unpublish`) sets `publish` in the installed
   `gyblos.toml` (`GYBLOS_DIR` names a non-default install), validates it and
   recreates the seller; an invalid result or an interruption restores the file.

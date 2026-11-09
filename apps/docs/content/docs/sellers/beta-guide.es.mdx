@@ -83,10 +83,18 @@ y la publicación, pide ayuda por el canal de tu invitación si necesitas coordi
 
 ## Siguientes pasos [#completa-el-alta]
 
-Tu nodo empieza **sin publicar**. El instalador termina con los tres pasos para empezar a vender: envía un
-poco de SOL de devnet al owner que indica, ejecuta `docker compose exec seller gyblos seller register` con tu
-código de invitación y luego `sh install.sh publish`. Mientras el vendedor está en marcha, `gyblos seller status`
-muestra el siguiente paso. Sigue
+Tu nodo empieza **sin publicar**. Si lo ejecutas en una terminal, el instalador termina el alta contigo y
+pregunta antes de cada paso:
+
+1. **Registro.** Pega el código `gyb_` de tu invitación. Si al owner que indica le falta SOL de devnet, el
+   comando dice cuánto enviar y espera a que llegue; después pide confirmar con `y` el registro único.
+2. **Publicación.** Pulsa Enter (o `y`) para listar tu oferta en el índice de descubrimiento.
+
+Pulsa Ctrl+C en cualquier paso y vuelve a ejecutar `sh install.sh` más tarde: conserva lo hecho y continúa. Sin
+terminal, o con `GYBLOS_GUIDED=0`, solo muestra los tres pasos: envía un poco de SOL de devnet al owner que
+indica, ejecuta `docker compose exec seller gyblos seller register` con tu código de invitación y luego
+`sh install.sh publish`. Mientras el vendedor está en marcha, `gyblos seller status` muestra el siguiente paso.
+Sigue
 [Registra y publica](/es/sellers/register-publish) para los detalles. Si falta la inscripción en Solana, el registro interactivo estima el
 coste en SOL de devnet y pregunta antes de un nuevo envío firmado; revisa esa guía antes de continuar. La oferta predeterminada permite 200.000 tokens de entrada más salida
 por día UTC, con 5.000 por comprador; revisa [Modelos y ofertas](/es/sellers/models-offers) antes de cambiarlos.
