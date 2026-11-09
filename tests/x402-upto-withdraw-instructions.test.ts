@@ -135,7 +135,13 @@ void test('request_close is the SDK instruction, signed by the payer', async () 
     memo: 'close',
   });
   assert.equal(UPTO_PROGRAM.id, builders.PAYMENT_CHANNELS_PROGRAM_ADDRESS);
-  const [theirs] = decodeSent(wire).instructions.filter(
+  const inspected = decodeSent(wire);
+  assert.equal(
+    inspected.signature,
+    null,
+    'SDK partial wire remains inspectable',
+  );
+  const [theirs] = inspected.instructions.filter(
     (ix) => ix.program === UPTO_PROGRAM.id,
   );
   const ours = requestCloseInstruction(payer, channelId);

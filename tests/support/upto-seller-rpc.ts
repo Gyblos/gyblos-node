@@ -2,9 +2,10 @@
 // unless `missing` says so, and a creation that is recorded and lands, or is refused with `refuse`.
 import {
   getBase58Decoder,
+  getSignatureFromTransaction,
+  getTransactionDecoder,
   type Address,
   type Blockhash,
-  type Signature,
 } from '@solana/kit';
 import { UPTO_TOKEN_ACCOUNT } from 'x402-upto-metered';
 
@@ -52,9 +53,9 @@ export function offline(
         if (chain.refuse) throw new Error('send refused');
         sent.push(wire);
         chain.missing = false;
-        return getBase58Decoder().decode(
-          new Uint8Array(64).fill(1),
-        ) as Signature;
+        return getSignatureFromTransaction(
+          getTransactionDecoder().decode(Buffer.from(wire, 'base64')),
+        );
       },
     }),
     getSignatureStatuses: () => ({
