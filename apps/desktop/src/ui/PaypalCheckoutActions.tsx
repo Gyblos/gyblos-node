@@ -29,21 +29,22 @@ export function SessionLimitSelector({
   onChange: (value: number) => void;
 }) {
   return (
-    <fieldset className="chat-payment-options" aria-label="Session limit">
-      <legend className="sr-only">Limit</legend>
+    <div
+      className="ui-inline-actions"
+      role="group"
+      aria-label="Session limit presets"
+    >
       {PAYPAL_SANDBOX_LIMIT_OPTIONS.map((limit) => (
-        <label className="chat-payment-option" key={limit}>
-          <input
-            type="radio"
-            name="paypal-session-limit"
-            checked={value === limit}
-            disabled={disabled}
-            onChange={() => onChange(limit)}
-          />
-          <span>{displayDollars(limit)}</span>
-        </label>
+        <Button
+          key={limit}
+          aria-pressed={value === limit}
+          disabled={disabled}
+          onClick={() => onChange(limit)}
+        >
+          {displayDollars(limit)}
+        </Button>
       ))}
-    </fieldset>
+    </div>
   );
 }
 
