@@ -346,8 +346,10 @@ It prints the NodeId and owner, then:
   stopped after 2000 sellers, `index unreachable`, or that no offer was serving
   to look up;
 - counts from the seller's signed receipts for the last 24 hours and 7 days
-  (completed, failed, cancelled, output tokens), the last request time and
-  failure codes. Receipts keep at most 256 records for 7 days, so busy sellers
+  (completed, failed, cancelled, output tokens, and the approximate output
+  tokens per second of completed sales: time after the first token when
+  streamed, the whole request otherwise), the last request time and failure
+  codes. Receipts keep at most 256 records for 7 days, so busy sellers
   see a lower bound.
 
 `Result: RUNNING` (exit 0) needs an active service and a ready daemon;

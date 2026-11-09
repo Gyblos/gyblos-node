@@ -32,6 +32,10 @@ export interface ActivityWindow {
   failed: number;
   cancelled: number;
   outputTokens: number;
+  // Completed sales with output: tokens and the seller's measured time after the first token (or the
+  // whole request when it did not stream). An approximation until receipts carry the engine's own time.
+  rateTokens: number;
+  rateMs: number;
 }
 
 export interface Activity {
@@ -95,6 +99,8 @@ const emptyWindow = (): ActivityWindow => ({
   failed: 0,
   cancelled: 0,
   outputTokens: 0,
+  rateTokens: 0,
+  rateMs: 0,
 });
 
 function add(window: ActivityWindow, receipt: StoredReceipt) {
@@ -103,6 +109,22 @@ function add(window: ActivityWindow, receipt: StoredReceipt) {
   else if (record.outcome === RECEIPT_OUTCOMES.FAILED) window.failed++;
   else window.cancelled++;
   window.outputTokens += record.usage.outputTokens;
+  const { firstTokenMs, totalMs } = record.timing;
+  const ms = totalMs - (firstTokenMs ?? 0);
+  if (
+    record.outcome === RECEIPT_OUTCOMES.COMPLETED &&
+    record.usage.outputTokens > 0 &&
+    ms > 0
+  ) {
+    window.rateTokens += record.usage.outputTokens;
+    window.rateMs += ms;
+  }
+}
+
+// Output tokens per second over the window's completed sales, or undefined without any.
+export function outputRate(window: ActivityWindow) {
+  if (window.rateMs <= 0) return undefined;
+  return (window.rateTokens * STATUS.secondMs) / window.rateMs;
 }
 
 export function receiptActivity(
