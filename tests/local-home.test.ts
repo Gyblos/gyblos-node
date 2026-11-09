@@ -308,7 +308,6 @@ void test(
       const seller = await setupRole({
         role: P2P_ROLES.SELLER,
         mint,
-        buyer: buyer.buyer,
       });
       assert.notEqual(buyer.nodeId, seller.nodeId);
       const layout = homeLayout(process.env);

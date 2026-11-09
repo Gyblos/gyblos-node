@@ -60,21 +60,16 @@ void test(
 );
 
 void test(
-  'seller setup stores no buyer or payout key and rejects reconfiguration',
+  'seller setup creates owner, node and payment keys, no buyer key, and refuses another mint',
   ROLE_OPTIONS,
   async () => {
     const { setupRole, publicRole, roleSigner } =
       await import('@gyblos/node/roles');
     const original = process.cwd();
     const directory = await mkdtemp(join(tmpdir(), 'gyblos-seller-role-test-'));
-    const buyer = await generateKeyPairSigner();
     try {
       process.chdir(directory);
-      const first = await setupRole({
-        role: P2P_ROLES.SELLER,
-        mint: MINT,
-        buyer: buyer.address,
-      });
+      const first = await setupRole({ role: P2P_ROLES.SELLER, mint: MINT });
       assert.equal(first.role, 'seller');
       assert.deepEqual(
         (await readdir(homeLayout(process.env).roles.seller)).sort(),
@@ -96,9 +91,7 @@ void test(
       await assert.rejects(
         setupRole({
           role: P2P_ROLES.SELLER,
-          mint: MINT,
-          buyer: buyer.address,
-          payTo: buyer.address,
+          mint: (await generateKeyPairSigner()).address,
         }),
         /preserved/,
       );
@@ -110,33 +103,25 @@ void test(
 );
 
 void test(
-  'a new paid seller defaults payout to its owner and preserves it on repeat',
+  'a new seller pays its owner and keeps its role on repeat',
   ROLE_OPTIONS,
   async () => {
     const { setupRole } = await import('@gyblos/node/roles');
     const originalDirectory = process.cwd();
     const previousHome = process.env.GYBLOS_HOME;
     const directory = await mkdtemp(join(tmpdir(), 'gyblos-paid-owner-test-'));
-    const buyer = await generateKeyPairSigner();
     try {
       process.chdir(directory);
       process.env.GYBLOS_HOME = join(directory, 'home');
-      const first = await setupRole({
-        role: P2P_ROLES.SELLER,
-        mint: MINT,
-        buyer: buyer.address,
-      });
+      const first = await setupRole({ role: P2P_ROLES.SELLER, mint: MINT });
       assert.equal(first.role, P2P_ROLES.SELLER);
       if (first.role !== P2P_ROLES.SELLER) throw new Error('unexpected role');
       assert.equal(first.payTo, first.owner);
       assert.notEqual(first.facilitator, first.owner);
       assert.notEqual(first.authorizer, first.owner);
+      assert.equal('buyer' in first, false);
       assert.deepEqual(
-        await setupRole({
-          role: P2P_ROLES.SELLER,
-          mint: MINT,
-          buyer: buyer.address,
-        }),
+        await setupRole({ role: P2P_ROLES.SELLER, mint: MINT }),
         first,
       );
     } finally {
@@ -149,7 +134,7 @@ void test(
 );
 
 void test(
-  'new paid sellers reject a different payout; existing legacy roles stay unchanged',
+  'an existing paid role with another payout or a legacy buyer field stays unchanged',
   ROLE_OPTIONS,
   async () => {
     const { setupRole } = await import('@gyblos/node/roles');
@@ -162,45 +147,19 @@ void test(
     try {
       process.chdir(directory);
       process.env.GYBLOS_HOME = join(directory, 'home');
-      await assert.rejects(
-        setupRole({
-          role: P2P_ROLES.SELLER,
-          mint: MINT,
-          buyer: buyer.address,
-          payTo: legacyPayout.address,
-        }),
-        /new seller.*owner/i,
-      );
-      await assert.rejects(readdir(homeLayout(process.env).roles.seller), {
-        code: 'ENOENT',
-      });
-      const created = await setupRole({
-        role: P2P_ROLES.SELLER,
-        mint: MINT,
-        buyer: buyer.address,
-      });
+      const created = await setupRole({ role: P2P_ROLES.SELLER, mint: MINT });
       const path = join(
         homeLayout(process.env).roles.seller,
         ROLE_FILES.roleConfig,
       );
       const legacy = { ...created, payTo: legacyPayout.address };
-      await writeFile(path, JSON.stringify(legacy));
+      await writeFile(
+        path,
+        JSON.stringify({ ...legacy, buyer: buyer.address }),
+      );
       const before = await readFile(path, 'utf8');
       assert.deepEqual(
-        await setupRole({
-          role: P2P_ROLES.SELLER,
-          mint: MINT,
-          buyer: buyer.address,
-        }),
-        legacy,
-      );
-      assert.deepEqual(
-        await setupRole({
-          role: P2P_ROLES.SELLER,
-          mint: MINT,
-          buyer: buyer.address,
-          payTo: legacyPayout.address,
-        }),
+        await setupRole({ role: P2P_ROLES.SELLER, mint: MINT }),
         legacy,
       );
       assert.equal(await readFile(path, 'utf8'), before);

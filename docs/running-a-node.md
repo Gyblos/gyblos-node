@@ -126,18 +126,22 @@ rewrite leaves the moved config and original backup for manual recovery.
 `pnpm node:setup --role` creates the role directory, the role file, the Iroh
 node key (`node.key`) and the role's Solana keys with private permissions. It
 never overwrites existing keys; a mismatched existing role stops with an error.
-A seller needs only `--mint`: it gets an owner key and a node key. The paid
-seller keys (authorizer and facilitator) and fields (`payTo`, allowed `buyer`)
-are created when `--buyer` is given. For a new paid seller, `payTo` is the owner
-wallet; `--buyer` can be any address you control (v2 does not use it). Existing
-roles with a different payout are preserved and receive a warning at
-registration. New roles reject an explicit `--pay-to`; free sellers omit both.
+A seller needs only `--mint`: it gets an owner key, a node key and the payment
+keys (authorizer and facilitator, the fee payer), with `payTo` set to the owner,
+so any offer can be free or priced. Running setup again on a seller created
+without payment keys (earlier releases) adds them, keeping its NodeId, owner and
+registration; the installer does this on every run. Existing roles with a
+different payout are preserved and receive a warning at registration. `--buyer`
+and `--pay-to` are no longer used and are refused. A seller `role.json` with
+payment fields also keeps `buyer` (the owner, unused) so that an earlier image
+still loads it; the `buyer` field is ignored. Running an earlier `install.sh`
+after the upgrade is not supported.
 
 | File                                             | Role   | Contents                                                                                                               |
 | ------------------------------------------------ | ------ | ---------------------------------------------------------------------------------------------------------------------- |
 | `role.json`                                      | both   | Role, mint, NodeId and public addresses.                                                                               |
 | `node.key`                                       | both   | Iroh secret key (private).                                                                                             |
-| `*.json` keys                                    | both   | Buyer key, or seller owner key (paid keys are added with `--buyer`).                                                   |
+| `*.json` keys                                    | both   | Buyer key, or seller owner, authorizer and fee payer (facilitator) keys.                                               |
 | `offer.json`                                     | buyer  | A paid v1 seller's signed offer (lab gates only).                                                                      |
 | `trust.json`                                     | buyer  | Which seller and limits the buyer accepts.                                                                             |
 | `status.json`                                    | both   | `starting` with a phase, then `ready`; a seller lists each offer's index, model, engine kind and whether it is listed. |
@@ -173,13 +177,12 @@ pnpm node:start
   the environment or `seller.env`, and it prints only their variable names.
   `examples/seller-daemon.toml` is an equivalent file to copy instead.
 - The seller serves configured free and paid offers in `gyblos.toml`; it needs
-  at least one offer to start (`SELLER_OFFERS_MISSING`). A paid offer is sold on
-  devnet over the paid stream when the seller role was set up with a payout
-  (`pnpm node:setup --role seller --mint <mint> --buyer <address>` in a new
-  `GYBLOS_HOME`; `--buyer` is still required by the v1 setup). The fee payer key
-  needs devnet SOL for transaction fees, channel rent and, once, the rent of any
-  missing payout, fee, fee payer or buyer token account, which the seller
-  creates so that no claim is redirected to the payment program
+  at least one offer to start (`SELLER_OFFERS_MISSING`). A paid offer
+  (`price = {...}` instead of `free`) is sold on devnet over the paid stream.
+  The fee payer key (`fee payer` in `gyblos doctor`'s identity) needs devnet SOL
+  for transaction fees, channel rent and, once, the rent of any missing payout,
+  fee, fee payer or buyer token account, which the seller creates so that no
+  claim is redirected to the payment program
   ([Seller startup](configuration.md#seller-startup)). Paid v2 has settled on
   devnet only in a controlled run; the v1 paid path remains in the lab gates
   only.

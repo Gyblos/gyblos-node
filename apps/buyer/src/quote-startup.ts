@@ -209,7 +209,7 @@ async function startQuoteRuntime(
   context: Context,
   options: Options,
 ): Promise<Runtime> {
-  if (!context.role.buyer)
+  if (context.role.role !== P2P_ROLES.BUYER || !context.role.buyer)
     throw new PaidBuyerError(PAID_BUYER_CODES.UNAVAILABLE);
   const buyer = context.role.buyer;
   const token = await endpointToken();

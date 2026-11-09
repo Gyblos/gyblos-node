@@ -58,6 +58,10 @@ export async function doctor(
     );
     stdout(`  nodeId  ${report.seller.nodeId}\n`);
     stdout(`  owner   ${report.seller.owner}\n`);
+    if (report.seller.feePayer)
+      stdout(
+        `  fee payer  ${report.seller.feePayer}  (pays priced offers' transactions; needs devnet SOL only to charge)\n`,
+      );
   }
   if (report.offers) {
     stdout('Listing:\n');
