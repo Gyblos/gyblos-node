@@ -22,9 +22,9 @@ function unbounded(
   return {
     signal: request,
     check: () => {},
-    async run(operation) {
-      await Promise.resolve();
-      if (request.aborted) throw errors.cancelled();
+    run(operation) {
+      // No extra tick: cancellation is checked right before the engine starts, as before.
+      if (request.aborted) return Promise.reject(errors.cancelled());
       return operation();
     },
   };
@@ -37,6 +37,9 @@ export function generationWindow(
   errors: GenerationWindowErrors,
 ): GenerationWindow {
   if (deadline === undefined) return unbounded(request, errors);
+  // A policy bug, not a timeout: the caller reports it as an internal failure that charges nothing.
+  if (!Number.isSafeInteger(deadline) || deadline <= 0)
+    throw new RangeError('invalid generation deadline');
   const controller = new AbortController();
   const signal = AbortSignal.any([request, controller.signal]);
   let expire = () => controller.abort(errors.timeout);
@@ -53,7 +56,13 @@ export function generationWindow(
       let timer: ReturnType<typeof setTimeout> | undefined;
       const expired = new Promise<never>((_resolve, reject) => {
         expire = () => {
-          stop();
+          // A throwing stop must neither crash the timer nor leave the engine running past the
+          // deadline; the request still ends with the timeout.
+          try {
+            stop();
+          } catch {
+            // The abort below stops the engine and the stream regardless.
+          }
           controller.abort(errors.timeout);
           reject(errors.timeout);
         };

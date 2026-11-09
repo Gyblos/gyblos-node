@@ -214,10 +214,10 @@ async function respond(
       inputTokens,
       options.now,
       signal,
-      (window) => {
+      async (window) => {
         started = true;
         receipt?.started(inputTokens);
-        return generateResponse(
+        const response = await generateResponse(
           request,
           prompt,
           inputTokens,
@@ -227,9 +227,12 @@ async function respond(
           observedOutput(onDelta, receipt, observer, window),
           observer,
         );
+        if (!response.result) return fail(FREE_EXECUTION_CODES.INTERNAL);
+        // Before the policy finishes, so a sale is reported before its tokens return to the caps.
+        finishSellerTelemetry(observer, request, response, started);
+        return response;
       },
     );
-    finishSellerTelemetry(observer, request, response, started);
     receipt?.finish(response);
     return response;
   } catch (error) {

@@ -3,14 +3,13 @@
 // Free generation has no deadline; the window only observes the request's cancellation.
 import { FREE_EXECUTION_CODES } from '@gyblos/protocol/constants';
 import {
-  freeExecutionFail as fail,
   FreeExecutionError,
   type FreeExecutionRequest,
   type FreeExecutionResponse,
 } from '@gyblos/protocol/free-execution';
 
 import { runAdmittedExecution } from './execution';
-import type { FreePolicy } from './policy-free';
+import type { FreeLease, FreePolicy } from './policy-free';
 
 const FREE_WINDOW_ERRORS = {
   timeout: new FreeExecutionError(FREE_EXECUTION_CODES.TIMEOUT),
@@ -23,25 +22,28 @@ export async function runFreeAdmitted(
   inputTokens: number,
   now: () => number,
   signal: AbortSignal,
+  // Resolves only with a result: it reports its own success telemetry before the policy finishes.
   generate: (signal: AbortSignal) => Promise<FreeExecutionResponse>,
 ): Promise<FreeExecutionResponse> {
   const permit = await policy.admit(request, { inputTokens, now: now() });
   const nothing = { inputTokens, outputTokens: 0, completed: false };
-  const run = await runAdmittedExecution({
+  const run = await runAdmittedExecution<
+    FreeLease,
+    undefined,
+    FreeExecutionResponse
+  >({
     policy,
     permit,
     now,
     signal,
     errors: FREE_WINDOW_ERRORS,
-    generate: async (window) => {
-      const response = await generate(window);
-      if (!response.result) return fail(FREE_EXECUTION_CODES.INTERNAL);
-      return response;
-    },
-    measure: (generated) =>
-      'value' in generated && generated.value.result
-        ? { ...generated.value.result.usage, completed: true }
-        : nothing,
+    open: (window) => ({
+      generate: () => generate(window.signal),
+      measure: (generated) =>
+        'value' in generated && generated.value.result
+          ? { ...generated.value.result.usage, completed: true }
+          : nothing,
+    }),
     nothing,
   });
   if ('error' in run.generated) throw run.generated.error;

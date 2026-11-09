@@ -1,25 +1,20 @@
 // Owns the contract every seller execution follows through runAdmittedExecution, free or paid: the policy
 // finishes exactly once with what was delivered (even after a failure, a cancellation or a deadline), the
-// slot is always released, finishing never sees the request's signal, and the free policy keeps its caps
-// and refunds only a completed recounted sale. A synthetic deposit-style policy stands in for payments.
+// slot is always released and finishing never sees the request's signal. A synthetic deposit-style
+// policy stands in for payments; tests/policy-free.test.ts owns the free policy.
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
-import { FREE_EXECUTION_ADMISSION } from '@gyblos/core/constants';
-import { FreeExecutionAdmission } from '@gyblos/core/free-admission';
-import { FREE_EXECUTION_CODES } from '@gyblos/protocol/constants';
 import type {
   ExecutionOutcome,
   ExecutionPermit,
 } from '@gyblos/protocol/execution-policy';
-import { parseFreeExecutionRequest } from '@gyblos/protocol/free-execution';
 
 import {
   runAdmittedExecution,
   type AdmittedExecution,
+  type ExecutionSession,
 } from '../packages/node/src/execution';
-import { createFreePolicy } from '../packages/node/src/policy-free';
 
 class Timeout extends Error {}
 class Cancelled extends Error {}
@@ -56,23 +51,40 @@ function depositPolicy(fail?: Error) {
   };
 }
 
+interface Overrides extends Partial<
+  Omit<AdmittedExecution<string, string, string>, 'open'>
+> {
+  generate?: (signal: AbortSignal, check: () => void) => Promise<string>;
+  stop?: () => void;
+  measure?: ExecutionSession<string>['measure'];
+}
+
 function execution(
-  overrides: Partial<AdmittedExecution<string, string, string>>,
+  overrides: Overrides,
   fake = depositPolicy(),
 ): AdmittedExecution<string, string, string> {
+  const {
+    generate = () => Promise.resolve('hello'),
+    stop,
+    measure = (generated) =>
+      'value' in generated
+        ? { inputTokens: 4, outputTokens: 2, completed: true }
+        : { inputTokens: 4, outputTokens: 1, completed: false },
+    ...rest
+  } = overrides;
   return {
     policy: fake.policy,
     permit: { outputTokens: 8, state: 'deposit' },
     now: Date.now,
     signal: new AbortController().signal,
     errors: ERRORS,
-    generate: () => Promise.resolve('hello'),
-    measure: (generated) =>
-      'value' in generated
-        ? { inputTokens: 4, outputTokens: 2, completed: true }
-        : { inputTokens: 4, outputTokens: 1, completed: false },
+    open: (window) => ({
+      generate: () => generate(window.signal, window.check),
+      ...(stop ? { stop } : {}),
+      measure,
+    }),
     nothing: NOTHING,
-    ...overrides,
+    ...rest,
   };
 }
 
@@ -238,87 +250,77 @@ void test('execution contract: a deadline already passed refuses to start the en
   assert.equal(fake.finished.length, 1);
 });
 
-async function freeFixture() {
-  const vector: { request: unknown } = JSON.parse(
-    await readFile(
-      new URL(
-        import.meta.resolve('@gyblos/protocol/vectors/free-execution-v3.json'),
-      ),
-      'utf8',
+void test('execution contract: an invalid deadline is a policy bug that charges nothing and never starts the engine', async () => {
+  const fake = depositPolicy();
+  let generated = false;
+  const run = await runAdmittedExecution(
+    execution(
+      {
+        permit: { outputTokens: 8, deadline: Number.NaN, state: 'deposit' },
+        generate: () => {
+          generated = true;
+          return Promise.resolve('late');
+        },
+      },
+      fake,
     ),
   );
-  const source = parseFreeExecutionRequest(vector.request);
-  const now = FREE_EXECUTION_ADMISSION.utcDayMs - 10;
-  const request = (id: number) => ({
-    ...source,
-    requestId: id.toString(16).padStart(32, '0'),
-    input: { ...source.input, maxTokens: 10 },
-    quote: {
-      ...source.quote,
-      offer: {
-        ...source.quote.offer,
-        requestId: id.toString(16).padStart(32, '0'),
-        issuedAt: now,
-        expiresAt: now + 1000,
-      },
-    },
-  });
-  return { now, request };
-}
-
-void test('free policy: the permit is the request ceiling, and only a completed refunding sale returns tokens', async () => {
-  const { now, request } = await freeFixture();
-  const admission = FreeExecutionAdmission.standalone(
-    { dailyTokenCap: 28, perBuyerCap: 28 },
-    now - 1,
+  assert.equal(generated, false);
+  assert.ok(
+    'error' in run.generated && run.generated.error instanceof RangeError,
   );
-  const policy = createFreePolicy(admission, { refunds: true });
-  const context = { inputTokens: 4, now };
-  const first = await policy.admit(request(1), context);
-  assert.equal(first.outputTokens, 10);
-  assert.equal(first.deadline, undefined);
-  await assert.rejects(policy.admit(request(2), context), {
-    code: FREE_EXECUTION_CODES.BUSY,
-  });
-  // Completed with 4 + 2 of the 14 reserved: 8 tokens return, so a second 14 still fits in 28.
-  await policy.finish(first, {
-    inputTokens: 4,
-    outputTokens: 2,
-    completed: true,
-  });
-  policy.release(first);
-  policy.release(first);
-  const second = await policy.admit(request(3), context);
-  // A failed sale keeps its whole reservation: 6 + 14 + 14 > 28.
-  await policy.finish(second, {
-    inputTokens: 4,
-    outputTokens: 2,
-    completed: false,
-  });
-  policy.release(second);
-  await assert.rejects(policy.admit(request(4), context), {
-    code: FREE_EXECUTION_CODES.DAILY_CAP,
-  });
+  assert.deepEqual(
+    fake.finished.map((entry) => entry.outcome),
+    [NOTHING],
+  );
+  assert.equal(fake.releases(), 1);
 });
 
-void test('free policy: a declared meter never refunds, and release alone frees the slot without refund', async () => {
-  const { now, request } = await freeFixture();
-  const admission = FreeExecutionAdmission.standalone(
-    { dailyTokenCap: 28, perBuyerCap: 28 },
-    now - 1,
+void test('execution contract: a throwing stop still ends the generation at the deadline', async () => {
+  const fake = depositPolicy();
+  let clock = 1_000;
+  let windowSignal: AbortSignal | undefined;
+  const run = await runAdmittedExecution(
+    execution(
+      {
+        permit: { outputTokens: 8, deadline: 1_020, state: 'deposit' },
+        now: () => clock,
+        stop: () => {
+          throw new Error('stop bug');
+        },
+        generate: (signal) => {
+          windowSignal = signal;
+          clock = 1_010;
+          return new Promise(() => {});
+        },
+      },
+      fake,
+    ),
+  ).catch((error: unknown) => ({ thrown: error }));
+  assert.ok('generated' in run && 'error' in run.generated);
+  assert.equal(windowSignal?.aborted, true);
+  assert.equal(fake.finished.length, 1);
+  assert.equal(fake.releases(), 1);
+});
+
+void test('execution contract: a fast generation clears its deadline timer', async () => {
+  const timers = () =>
+    process.getActiveResourcesInfo().filter((name) => name === 'Timeout')
+      .length;
+  const before = timers();
+  const fake = depositPolicy();
+  const run = await runAdmittedExecution(
+    execution(
+      {
+        permit: {
+          outputTokens: 8,
+          deadline: Date.now() + 60_000,
+          state: 'deposit',
+        },
+      },
+      fake,
+    ),
   );
-  const policy = createFreePolicy(admission, { refunds: false });
-  const context = { inputTokens: 4, now };
-  const first = await policy.admit(request(1), context);
-  await policy.finish(first, {
-    inputTokens: 4,
-    outputTokens: 2,
-    completed: true,
-  });
-  const second = await policy.admit(request(2), context);
-  policy.release(second);
-  // 14 + 14 kept: nothing fits.
-  await assert.rejects(policy.admit(request(3), context), {
-    code: FREE_EXECUTION_CODES.DAILY_CAP,
-  });
+  assert.deepEqual(run.generated, { value: 'hello' });
+  assert.equal(timers(), before);
 });

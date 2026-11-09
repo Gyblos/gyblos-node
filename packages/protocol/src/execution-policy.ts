@@ -6,6 +6,7 @@
 // What a policy authorizes for one admitted request.
 export interface ExecutionPermit<State> {
   // Output token ceiling: the request's own maxTokens when free, what the deposit pays for when paid.
+  // The adapter bounds the engine and its stream by it; the lifecycle does not enforce it.
   readonly outputTokens: number;
   // Epoch milliseconds after which generation must stop, reserving the policy's settlement time.
   readonly deadline?: number;
@@ -17,7 +18,8 @@ export interface ExecutionPermit<State> {
 export interface ExecutionOutcome {
   readonly inputTokens: number;
   readonly outputTokens: number;
-  // Whether the engine finished normally.
+  // Whether the engine finished normally. A policy may charge partial output regardless (paid charges
+  // delivered tokens); free refunds unused reservations only for a completed sale.
   readonly completed: boolean;
 }
 

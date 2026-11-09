@@ -10,10 +10,21 @@ import type {
 
 import {
   generationWindow,
+  type GenerationWindow,
   type GenerationWindowErrors,
 } from './generation-window';
 
 export type Generated<T> = { value: T } | { error: unknown };
+
+// One generation, opened inside the window so its output can watch the window's signal and deadline.
+export interface ExecutionSession<T> {
+  generate: () => Promise<T>;
+  // Stops publication when the deadline expires while the engine still runs.
+  stop?: () => void;
+  // What was delivered, for the result or the failure. If it throws, nothing counts as delivered and
+  // the run reports the measuring error instead of the result: a seller bug never charges the buyer.
+  measure: (generated: Generated<T>) => ExecutionOutcome;
+}
 
 export interface AdmittedExecution<State, Settlement, T> {
   policy: Pick<
@@ -24,13 +35,10 @@ export interface AdmittedExecution<State, Settlement, T> {
   now: () => number;
   signal: AbortSignal;
   errors: GenerationWindowErrors;
-  // Runs the engine within the window's signal; check() throws once the deadline passed.
-  generate: (signal: AbortSignal, check: () => void) => Promise<T>;
-  // Stops publication when the deadline expires while the engine still runs.
-  stop?: () => void;
-  // What was delivered, for the result or the failure; a measuring bug counts as nothing delivered.
-  measure: (generated: Generated<T>, signal: AbortSignal) => ExecutionOutcome;
-  // The outcome that charges nothing, when generation or measuring failed unexpectedly.
+  open: (
+    window: Pick<GenerationWindow, 'signal' | 'check'>,
+  ) => ExecutionSession<T>;
+  // The outcome that charges nothing, when opening, generating or measuring failed unexpectedly.
   nothing: ExecutionOutcome;
 }
 
@@ -40,7 +48,7 @@ export interface ExecutionResult<Settlement, T> {
   settlement: Settlement;
 }
 
-async function generateWithin<State, Settlement, T>(
+async function generateAndMeasure<State, Settlement, T>(
   execution: AdmittedExecution<State, Settlement, T>,
 ) {
   const window = generationWindow(
@@ -49,16 +57,14 @@ async function generateWithin<State, Settlement, T>(
     execution.signal,
     execution.errors,
   );
+  const session = execution.open(window);
   const generated: Generated<T> = await window
-    .run(
-      () => execution.generate(window.signal, window.check),
-      () => execution.stop?.(),
-    )
+    .run(session.generate, () => session.stop?.())
     .then(
       (value) => ({ value }),
       (error: unknown) => ({ error }),
     );
-  return { generated, signal: window.signal };
+  return { generated, outcome: session.measure(generated) };
 }
 
 export async function runAdmittedExecution<State, Settlement, T>(
@@ -67,9 +73,7 @@ export async function runAdmittedExecution<State, Settlement, T>(
   let generated: Generated<T>;
   let outcome: ExecutionOutcome;
   try {
-    const run = await generateWithin(execution);
-    generated = run.generated;
-    outcome = execution.measure(generated, run.signal);
+    ({ generated, outcome } = await generateAndMeasure(execution));
   } catch (error) {
     generated = { error };
     outcome = execution.nothing;
